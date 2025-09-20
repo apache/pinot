@@ -258,19 +258,19 @@ public class MultiNodesOfflineClusterIntegrationTest extends OfflineClusterInteg
     assertTrue(row.get(1).intValue() < 253);
 
     // Should fail when merging final results that cannot be merged.
-    try {
-      postQuery("SET serverReturnFinalResult = true; SELECT AVG(DaysSinceEpoch) FROM mytable");
-      fail();
-    } catch (Exception e) {
-      assertTrue(e.getMessage().contains("Cannot merge final results for function: AVG"));
-    }
-    try {
-      postQuery("SET serverReturnFinalResultKeyUnpartitioned = true; "
-          + "SELECT CRSArrTime, AVG(DaysSinceEpoch) FROM mytable GROUP BY 1 ORDER BY 2 DESC LIMIT 1");
-      fail();
-    } catch (Exception e) {
-      assertTrue(e.getMessage().contains("Cannot merge final results for function: AVG"));
-    }
+    result = postQuery("SET serverReturnFinalResult = true; SELECT AVG(DaysSinceEpoch) FROM mytable");
+    JsonNode exceptionNode = result.get("exceptions").get(0);
+    int errorCode = exceptionNode.get("errorCode").asInt();
+    assertEquals(errorCode, QueryErrorCode.MERGE_RESPONSE.getId());
+    String errorMessage = exceptionNode.get("message").asText();
+    assertTrue(errorMessage.contains("Cannot merge final results for function: AVG"));
+    result = postQuery("SET serverReturnFinalResultKeyUnpartitioned = true; "
+        + "SELECT CRSArrTime, AVG(DaysSinceEpoch) FROM mytable GROUP BY 1 ORDER BY 2 DESC LIMIT 1");
+    exceptionNode = result.get("exceptions").get(0);
+    errorCode = exceptionNode.get("errorCode").asInt();
+    assertEquals(errorCode, QueryErrorCode.MERGE_RESPONSE.getId());
+    errorMessage = exceptionNode.get("message").asText();
+    assertTrue(errorMessage.contains("Cannot merge final results for function: AVG"));
 
     // Should not fail when group keys are partitioned because there is no need to merge final results.
     result = postQuery("SELECT DaysSinceEpoch, AVG(CRSArrTime) FROM mytable GROUP BY 1 ORDER BY 2 DESC LIMIT 1");

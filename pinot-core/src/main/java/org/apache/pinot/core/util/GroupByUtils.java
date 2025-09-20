@@ -37,7 +37,7 @@ import org.apache.pinot.core.data.table.UnboundedConcurrentIndexedTable;
 import org.apache.pinot.core.operator.blocks.results.GroupByResultsBlock;
 import org.apache.pinot.core.query.reduce.DataTableReducerContext;
 import org.apache.pinot.core.query.request.context.QueryContext;
-import org.apache.pinot.spi.trace.Tracing;
+import org.apache.pinot.spi.query.QueryThreadContext;
 
 
 public final class GroupByUtils {
@@ -225,8 +225,8 @@ public final class GroupByUtils {
     Record[] sortedRecords = new Record[intermediateRecords.size()];
     int idx = 0;
     for (IntermediateRecord intermediateRecord : intermediateRecords) {
+      QueryThreadContext.checkTerminationAndSampleUsagePeriodically(idx, "GroupByUtils#getAndPopulateSortedRecords");
       sortedRecords[idx++] = intermediateRecord._record;
-      Tracing.ThreadAccountantOps.sampleAndCheckInterruptionPeriodically(idx);
     }
     return new SortedRecords(sortedRecords, idx);
   }

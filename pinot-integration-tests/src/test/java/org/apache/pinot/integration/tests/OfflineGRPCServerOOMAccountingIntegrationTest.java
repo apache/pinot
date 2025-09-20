@@ -18,29 +18,39 @@
  */
 package org.apache.pinot.integration.tests;
 
+import org.apache.pinot.core.accounting.PerQueryCPUMemAccountantFactory;
 import org.apache.pinot.spi.env.PinotConfiguration;
 import org.apache.pinot.spi.utils.CommonConstants;
+import org.apache.pinot.spi.utils.CommonConstants.Accounting;
+import org.apache.pinot.spi.utils.CommonConstants.Broker;
+import org.apache.pinot.spi.utils.CommonConstants.Server;
 
 
 public class OfflineGRPCServerOOMAccountingIntegrationTest extends OfflineGRPCServerIntegrationTest {
-  protected void overrideServerConf(PinotConfiguration serverConf) {
-    serverConf.setProperty(
-        CommonConstants.PINOT_QUERY_SCHEDULER_PREFIX + "." + CommonConstants.Accounting.CONFIG_OF_FACTORY_NAME,
-        "org.apache.pinot.core.accounting.PerQueryCPUMemAccountantFactory");
-    serverConf.setProperty(CommonConstants.PINOT_QUERY_SCHEDULER_PREFIX + "."
-        + CommonConstants.Accounting.CONFIG_OF_ENABLE_THREAD_MEMORY_SAMPLING, true);
-    serverConf.setProperty(
-        CommonConstants.PINOT_QUERY_SCHEDULER_PREFIX + "."
-            + CommonConstants.Accounting.CONFIG_OF_ENABLE_THREAD_CPU_SAMPLING, true);
-    serverConf.setProperty(CommonConstants.PINOT_QUERY_SCHEDULER_PREFIX + "."
-        + CommonConstants.Accounting.CONFIG_OF_OOM_PROTECTION_KILLING_QUERY, true);
-    serverConf.setProperty(CommonConstants.Server.CONFIG_OF_ENABLE_THREAD_ALLOCATED_BYTES_MEASUREMENT, true);
-    serverConf.setProperty(CommonConstants.Server.CONFIG_OF_ENABLE_THREAD_CPU_TIME_MEASUREMENT, true);
-    serverConf.setProperty(CommonConstants.PINOT_QUERY_SCHEDULER_PREFIX + "."
-        + CommonConstants.Accounting.CONFIG_OF_CPU_TIME_BASED_KILLING_ENABLED, true);
+
+  @Override
+  protected void overrideBrokerConf(PinotConfiguration brokerConf) {
+    brokerConf.setProperty(Broker.CONFIG_OF_ENABLE_THREAD_CPU_TIME_MEASUREMENT, true);
+    brokerConf.setProperty(Broker.CONFIG_OF_ENABLE_THREAD_ALLOCATED_BYTES_MEASUREMENT, true);
+
+    String prefix = CommonConstants.PINOT_QUERY_SCHEDULER_PREFIX + ".";
+    brokerConf.setProperty(prefix + Accounting.CONFIG_OF_FACTORY_NAME, PerQueryCPUMemAccountantFactory.class.getName());
+    brokerConf.setProperty(prefix + Accounting.CONFIG_OF_ENABLE_THREAD_CPU_SAMPLING, true);
+    brokerConf.setProperty(prefix + Accounting.CONFIG_OF_CPU_TIME_BASED_KILLING_ENABLED, true);
+    brokerConf.setProperty(prefix + Accounting.CONFIG_OF_ENABLE_THREAD_MEMORY_SAMPLING, true);
+    brokerConf.setProperty(prefix + Accounting.CONFIG_OF_OOM_PROTECTION_KILLING_QUERY, true);
   }
 
-  protected void overrideBrokerConf(PinotConfiguration serverConf) {
-    overrideServerConf(serverConf);
+  @Override
+  protected void overrideServerConf(PinotConfiguration serverConf) {
+    serverConf.setProperty(Server.CONFIG_OF_ENABLE_THREAD_CPU_TIME_MEASUREMENT, true);
+    serverConf.setProperty(Server.CONFIG_OF_ENABLE_THREAD_ALLOCATED_BYTES_MEASUREMENT, true);
+
+    String prefix = CommonConstants.PINOT_QUERY_SCHEDULER_PREFIX + ".";
+    serverConf.setProperty(prefix + Accounting.CONFIG_OF_FACTORY_NAME, PerQueryCPUMemAccountantFactory.class.getName());
+    serverConf.setProperty(prefix + Accounting.CONFIG_OF_ENABLE_THREAD_CPU_SAMPLING, true);
+    serverConf.setProperty(prefix + Accounting.CONFIG_OF_CPU_TIME_BASED_KILLING_ENABLED, true);
+    serverConf.setProperty(prefix + Accounting.CONFIG_OF_ENABLE_THREAD_MEMORY_SAMPLING, true);
+    serverConf.setProperty(prefix + Accounting.CONFIG_OF_OOM_PROTECTION_KILLING_QUERY, true);
   }
 }

@@ -33,13 +33,13 @@ import org.apache.pinot.core.query.scheduler.resources.ResourceManager;
 import org.apache.pinot.core.query.scheduler.resources.UnboundedResourceManager;
 import org.apache.pinot.spi.env.PinotConfiguration;
 import org.apache.pinot.spi.metrics.PinotMetricUtils;
-import org.apache.pinot.spi.trace.Tracing;
 import org.testng.annotations.BeforeMethod;
 import org.testng.annotations.Test;
 
 import static org.apache.pinot.core.query.scheduler.TestHelper.createQueryRequest;
 import static org.testng.Assert.assertEquals;
 import static org.testng.Assert.assertTrue;
+import static org.testng.Assert.fail;
 
 
 public class MultiLevelPriorityQueueTest {
@@ -82,8 +82,7 @@ public class MultiLevelPriorityQueueTest {
 
     PinotConfiguration configuration = new PinotConfiguration(properties);
 
-    ResourceManager rm =
-        new UnboundedResourceManager(configuration, new Tracing.DefaultThreadResourceUsageAccountant());
+    ResourceManager rm = new UnboundedResourceManager(configuration);
     MultiLevelPriorityQueue queue = createQueue(configuration, rm);
     queue.put(createQueryRequest(GROUP_ONE, METRICS));
     GROUP_FACTORY._groupMap.get(GROUP_ONE).addReservedThreads(rm.getTableThreadsHardLimit());
@@ -95,11 +94,10 @@ public class MultiLevelPriorityQueueTest {
     // it should throw now
     try {
       queue.put(createQueryRequest(GROUP_ONE, METRICS));
+      fail();
     } catch (OutOfCapacityException e) {
-      assertTrue(true);
-      return;
+      // expected
     }
-    assertTrue(false);
   }
 
   @Test
@@ -131,8 +129,7 @@ public class MultiLevelPriorityQueueTest {
 
     PinotConfiguration configuration = new PinotConfiguration(properties);
 
-    PolicyBasedResourceManager rm =
-        new PolicyBasedResourceManager(configuration, new Tracing.DefaultThreadResourceUsageAccountant());
+    PolicyBasedResourceManager rm = new PolicyBasedResourceManager(configuration);
     MultiLevelPriorityQueue queue = createQueue(configuration, rm);
 
     queue.put(createQueryRequest(GROUP_ONE, METRICS));
@@ -217,7 +214,7 @@ public class MultiLevelPriorityQueueTest {
 
   private MultiLevelPriorityQueue createQueue() {
     PinotConfiguration conf = new PinotConfiguration();
-    return createQueue(conf, new UnboundedResourceManager(conf, new Tracing.DefaultThreadResourceUsageAccountant()));
+    return createQueue(conf, new UnboundedResourceManager(conf));
   }
 
   private MultiLevelPriorityQueue createQueue(PinotConfiguration config, ResourceManager rm) {

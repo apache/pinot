@@ -28,41 +28,43 @@ import java.util.Random;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
-import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.stream.IntStream;
 import org.apache.avro.file.DataFileWriter;
 import org.apache.avro.generic.GenericData;
 import org.apache.avro.generic.GenericDatumWriter;
 import org.apache.commons.lang3.StringUtils;
-import org.apache.log4j.Level;
-import org.apache.log4j.LogManager;
-import org.apache.pinot.core.accounting.QueryAggregator;
-import org.apache.pinot.core.accounting.ResourceUsageAccountantFactory;
-import org.apache.pinot.spi.accounting.ThreadResourceUsageProvider;
+import org.apache.pinot.core.accounting.PerQueryCPUMemAccountantFactory;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.TableType;
 import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.env.PinotConfiguration;
-import org.apache.pinot.spi.trace.Tracing;
 import org.apache.pinot.spi.utils.CommonConstants;
+import org.apache.pinot.spi.utils.CommonConstants.Accounting;
+import org.apache.pinot.spi.utils.CommonConstants.Broker;
+import org.apache.pinot.spi.utils.CommonConstants.Server;
 import org.apache.pinot.spi.utils.builder.TableConfigBuilder;
 import org.apache.pinot.util.TestUtils;
-import org.testng.Assert;
 import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
 
+import static org.testng.Assert.assertFalse;
+import static org.testng.Assert.assertTrue;
 
-public class OfflineClusterCPUTimeResourceUsageAccountantTest extends BaseClusterIntegrationTestSet {
+
+/**
+ * Integration test for heap size based server query killing, this works only for xmx4G
+ * <p>
+ * Query killing isn't currently supported in the v2 multi-stage query engine so these tests only run on the v1 engine.
+ */
+public class OfflineClusterCpuBasedServerQueryKillingTest extends BaseClusterIntegrationTestSet {
   public static final String STRING_DIM_SV1 = "stringDimSV1";
   public static final String STRING_DIM_SV2 = "stringDimSV2";
   public static final String INT_DIM_SV1 = "intDimSV1";
   public static final String LONG_DIM_SV1 = "longDimSV1";
   public static final String DOUBLE_DIM_SV1 = "doubleDimSV1";
   public static final String BOOLEAN_DIM_SV1 = "booleanDimSV1";
-  private static final int NUM_BROKERS = 1;
-  private static final int NUM_SERVERS = 1;
   private static final String OOM_QUERY =
       "SELECT PERCENTILETDigest(doubleDimSV1, 50) AS digest, intDimSV1 FROM mytable GROUP BY intDimSV1"
           + " ORDER BY digest LIMIT 15000";
@@ -78,33 +80,16 @@ public class OfflineClusterCPUTimeResourceUsageAccountantTest extends BaseCluste
     return thread;
   });
 
-  protected int getNumBrokers() {
-    return NUM_BROKERS;
-  }
-
-  protected int getNumServers() {
-    return NUM_SERVERS;
-  }
-
   @BeforeClass
   public void setUp()
       throws Exception {
-    LogManager.getLogger(ResourceUsageAccountantFactory.ResourceUsageAccountant.class)
-        .setLevel(Level.ERROR);
-    ThreadResourceUsageProvider.setThreadCpuTimeMeasurementEnabled(true);
-    ThreadResourceUsageProvider.setThreadMemoryMeasurementEnabled(true);
-
     TestUtils.ensureDirectoriesExistAndEmpty(_tempDir, _segmentDir, _tarDir);
 
     // Start the Pinot cluster
     startZk();
     startController();
-    startServers();
-    TestUtils.waitForCondition(aVoid -> Tracing.isAccountantRegistered(), 100L, 60000L,
-        "ThreadResourceUsageAccountant did not register");
-
-    startBrokers();
-
+    startBroker();
+    startServer();
 
     // Create and upload the schema and table config
     Schema schema = new Schema.SchemaBuilder().setSchemaName(DEFAULT_SCHEMA_NAME)
@@ -125,83 +110,23 @@ public class OfflineClusterCPUTimeResourceUsageAccountantTest extends BaseCluste
 
     //Wait for all documents loaded
     waitForAllDocsLoaded(10_000L);
-
-    // Setup logging and resource accounting
-    LogManager.getLogger(OfflineClusterServerCPUTimeQueryKillingTest.class).setLevel(Level.INFO);
-    LogManager.getLogger(ResourceUsageAccountantFactory.ResourceUsageAccountant.class)
-        .setLevel(Level.INFO);
-    LogManager.getLogger(ThreadResourceUsageProvider.class).setLevel(Level.INFO);
-    LogManager.getLogger(Tracing.class).setLevel(Level.INFO);
-    LogManager.getLogger(QueryAggregator.class).setLevel(Level.INFO);
-  }
-
-  protected void startBrokers()
-      throws Exception {
-    startBrokers(getNumBrokers());
-  }
-
-  protected void startServers()
-      throws Exception {
-    startServers(getNumServers());
-  }
-
-  protected void overrideServerConf(PinotConfiguration serverConf) {
-    serverConf.setProperty(CommonConstants.PINOT_QUERY_SCHEDULER_PREFIX + "."
-        + CommonConstants.Accounting.CONFIG_OF_ALARMING_LEVEL_HEAP_USAGE_RATIO, 0.2f);
-    serverConf.setProperty(CommonConstants.PINOT_QUERY_SCHEDULER_PREFIX + "."
-        + CommonConstants.Accounting.CONFIG_OF_CRITICAL_LEVEL_HEAP_USAGE_RATIO, 1.1f);
-    serverConf.setProperty(
-        CommonConstants.PINOT_QUERY_SCHEDULER_PREFIX + "." + CommonConstants.Accounting.CONFIG_OF_FACTORY_NAME,
-        "org.apache.pinot.core.accounting.ResourceUsageAccountantFactory");
-    serverConf.setProperty(CommonConstants.PINOT_QUERY_SCHEDULER_PREFIX + "."
-        + CommonConstants.Accounting.CONFIG_OF_PANIC_LEVEL_HEAP_USAGE_RATIO, 1.1f);
-    serverConf.setProperty(CommonConstants.PINOT_QUERY_SCHEDULER_PREFIX + "."
-        + CommonConstants.Accounting.CONFIG_OF_ENABLE_THREAD_MEMORY_SAMPLING, true);
-    serverConf.setProperty(
-        CommonConstants.PINOT_QUERY_SCHEDULER_PREFIX + "."
-            + CommonConstants.Accounting.CONFIG_OF_ENABLE_THREAD_CPU_SAMPLING, true);
-    serverConf.setProperty(CommonConstants.PINOT_QUERY_SCHEDULER_PREFIX + "."
-        + CommonConstants.Accounting.CONFIG_OF_OOM_PROTECTION_KILLING_QUERY, true);
-    serverConf.setProperty(CommonConstants.Server.CONFIG_OF_ENABLE_THREAD_ALLOCATED_BYTES_MEASUREMENT, true);
-    serverConf.setProperty(CommonConstants.Server.CONFIG_OF_ENABLE_THREAD_CPU_TIME_MEASUREMENT, true);
-    serverConf.setProperty(CommonConstants.PINOT_QUERY_SCHEDULER_PREFIX + "."
-        + CommonConstants.Accounting.CONFIG_OF_CPU_TIME_BASED_KILLING_ENABLED, true);
-    serverConf.setProperty(CommonConstants.PINOT_QUERY_SCHEDULER_PREFIX + "."
-        + CommonConstants.Accounting.CONFIG_OF_CPU_TIME_BASED_KILLING_THRESHOLD_MS, 1_000);
-
-    serverConf.setProperty(CommonConstants.PINOT_QUERY_SCHEDULER_PREFIX + "."
-        + CommonConstants.Accounting.CONFIG_OF_WORKLOAD_ENABLE_COST_COLLECTION, true);
-    serverConf.setProperty(CommonConstants.PINOT_QUERY_SCHEDULER_PREFIX + "."
-        + CommonConstants.Accounting.CONFIG_OF_WORKLOAD_ENABLE_COST_ENFORCEMENT, true);
   }
 
   protected void overrideBrokerConf(PinotConfiguration brokerConf) {
-    brokerConf.setProperty(CommonConstants.PINOT_QUERY_SCHEDULER_PREFIX + "."
-        + CommonConstants.Accounting.CONFIG_OF_ALARMING_LEVEL_HEAP_USAGE_RATIO, 0.2f);
-    brokerConf.setProperty(CommonConstants.PINOT_QUERY_SCHEDULER_PREFIX + "."
-        + CommonConstants.Accounting.CONFIG_OF_CRITICAL_LEVEL_HEAP_USAGE_RATIO, 1.1f);
-    brokerConf.setProperty(CommonConstants.PINOT_QUERY_SCHEDULER_PREFIX + "."
-        + CommonConstants.Accounting.CONFIG_OF_PANIC_LEVEL_HEAP_USAGE_RATIO, 1.1f);
-    brokerConf.setProperty(CommonConstants.PINOT_QUERY_SCHEDULER_PREFIX + "."
-            + CommonConstants.Accounting.CONFIG_OF_FACTORY_NAME,
-        "org.apache.pinot.core.accounting.ResourceUsageAccountantFactory");
-    brokerConf.setProperty(CommonConstants.PINOT_QUERY_SCHEDULER_PREFIX + "."
-        + CommonConstants.Accounting.CONFIG_OF_ENABLE_THREAD_MEMORY_SAMPLING, true);
-    brokerConf.setProperty(CommonConstants.PINOT_QUERY_SCHEDULER_PREFIX + "."
-        + CommonConstants.Accounting.CONFIG_OF_ENABLE_THREAD_CPU_SAMPLING, true);
-    brokerConf.setProperty(CommonConstants.PINOT_QUERY_SCHEDULER_PREFIX + "."
-        + CommonConstants.Accounting.CONFIG_OF_OOM_PROTECTION_KILLING_QUERY, true);
-    brokerConf.setProperty(CommonConstants.Broker.CONFIG_OF_ENABLE_THREAD_ALLOCATED_BYTES_MEASUREMENT, true);
-    brokerConf.setProperty(CommonConstants.Broker.CONFIG_OF_ENABLE_THREAD_CPU_TIME_MEASUREMENT, true);
-    brokerConf.setProperty(CommonConstants.PINOT_QUERY_SCHEDULER_PREFIX + "."
-        + CommonConstants.Accounting.CONFIG_OF_CPU_TIME_BASED_KILLING_ENABLED, true);
-
-    brokerConf.setProperty(CommonConstants.PINOT_QUERY_SCHEDULER_PREFIX + "."
-        + CommonConstants.Accounting.CONFIG_OF_WORKLOAD_ENABLE_COST_COLLECTION, true);
-    brokerConf.setProperty(CommonConstants.PINOT_QUERY_SCHEDULER_PREFIX + "."
-        + CommonConstants.Accounting.CONFIG_OF_WORKLOAD_ENABLE_COST_ENFORCEMENT, true);
+    brokerConf.setProperty(Broker.CONFIG_OF_ENABLE_THREAD_CPU_TIME_MEASUREMENT, true);
   }
 
+  protected void overrideServerConf(PinotConfiguration serverConf) {
+    serverConf.setProperty(Server.CONFIG_OF_ENABLE_THREAD_CPU_TIME_MEASUREMENT, true);
+
+    String prefix = CommonConstants.PINOT_QUERY_SCHEDULER_PREFIX + ".";
+    serverConf.setProperty(prefix + Accounting.CONFIG_OF_FACTORY_NAME, PerQueryCPUMemAccountantFactory.class.getName());
+    serverConf.setProperty(prefix + Accounting.CONFIG_OF_ENABLE_THREAD_CPU_SAMPLING, true);
+    serverConf.setProperty(prefix + Accounting.CONFIG_OF_CPU_TIME_BASED_KILLING_ENABLED, true);
+    serverConf.setProperty(prefix + Accounting.CONFIG_OF_CPU_TIME_BASED_KILLING_THRESHOLD_MS, 1_000);
+    serverConf.setProperty(prefix + Accounting.CONFIG_OF_CRITICAL_LEVEL_HEAP_USAGE_RATIO, 1.1f);
+    serverConf.setProperty(prefix + Accounting.CONFIG_OF_PANIC_LEVEL_HEAP_USAGE_RATIO, 1.1f);
+  }
 
   protected long getCountStarResult() {
     return 3_000_000;
@@ -259,14 +184,12 @@ public class OfflineClusterCPUTimeResourceUsageAccountantTest extends BaseCluste
           }
         }
     );
-    Assert.assertTrue(countDownLatch.await(1, TimeUnit.MINUTES));
-    Assert.assertTrue(queryResponse1.get().get("exceptions").toString().contains("got killed on SERVER"));
-    Assert.assertTrue(queryResponse1.get().get("exceptions").toString().contains("CPU time exceeding limit of"));
-    Assert.assertFalse(StringUtils.isEmpty(queryResponse2.get().get("exceptions").toString()));
-    Assert.assertFalse(StringUtils.isEmpty(queryResponse3.get().get("exceptions").toString()));
+    countDownLatch.await();
+    String exceptions = queryResponse1.get().get("exceptions").toString();
+    assertTrue(exceptions.contains("CPU time based killed on SERVER"));
+    assertFalse(StringUtils.isEmpty(queryResponse2.get().get("exceptions").toString()));
+    assertFalse(StringUtils.isEmpty(queryResponse3.get().get("exceptions").toString()));
   }
-
-  // TODO: Add integation test after workload configs PR is merged.
 
   private List<File> createAvroFile()
       throws IOException {

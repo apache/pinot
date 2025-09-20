@@ -33,7 +33,6 @@ import java.sql.Statement;
 import java.sql.Timestamp;
 import java.util.ArrayList;
 import java.util.Arrays;
-import java.util.Collections;
 import java.util.Comparator;
 import java.util.HashMap;
 import java.util.List;
@@ -62,14 +61,17 @@ import org.apache.pinot.query.routing.StageMetadata;
 import org.apache.pinot.query.routing.StagePlan;
 import org.apache.pinot.query.routing.WorkerMetadata;
 import org.apache.pinot.query.service.dispatch.QueryDispatcher;
-import org.apache.pinot.spi.accounting.ThreadExecutionContext;
+import org.apache.pinot.spi.accounting.ThreadAccountantUtils;
 import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.data.readers.GenericRow;
 import org.apache.pinot.spi.exception.QueryErrorCode;
-import org.apache.pinot.spi.trace.Tracing;
+import org.apache.pinot.spi.query.QueryExecutionContext;
+import org.apache.pinot.spi.query.QueryThreadContext;
 import org.apache.pinot.spi.utils.BytesUtils;
-import org.apache.pinot.spi.utils.CommonConstants;
+import org.apache.pinot.spi.utils.CommonConstants.Broker;
+import org.apache.pinot.spi.utils.CommonConstants.Broker.Request.QueryOptionKey;
+import org.apache.pinot.spi.utils.CommonConstants.Query.Request.MetadataKeys;
 import org.apache.pinot.spi.utils.StringUtil;
 import org.apache.pinot.sql.parsers.CalciteSqlParser;
 import org.apache.pinot.sql.parsers.SqlNodeAndOptions;
@@ -114,25 +116,37 @@ public abstract class QueryRunnerTestBase extends QueryTestSet {
    * ser/de dispatches.
    */
   protected QueryDispatcher.QueryResult queryRunner(String sql, boolean trace) {
+    long startTimeMs = System.currentTimeMillis();
     long requestId = REQUEST_ID_GEN.getAndIncrement();
     SqlNodeAndOptions sqlNodeAndOptions = CalciteSqlParser.compileToSqlNodeAndOptions(sql);
+    Map<String, String> queryOptions = sqlNodeAndOptions.getOptions();
+    String cid = queryOptions.get(QueryOptionKey.CLIENT_QUERY_ID);
+    if (cid == null) {
+      cid = String.valueOf(requestId);
+    }
+    String workloadName = QueryOptionsUtils.getWorkloadName(queryOptions);
+    Long timeoutMsFromQueryOption = QueryOptionsUtils.getTimeoutMs(queryOptions);
+    long timeoutMs = timeoutMsFromQueryOption != null ? timeoutMsFromQueryOption : Broker.DEFAULT_BROKER_TIMEOUT_MS;
+    Long extraPassiveTimeoutMsFromQueryOption = QueryOptionsUtils.getExtraPassiveTimeoutMs(queryOptions);
+    long extraPassiveTimeoutMs = extraPassiveTimeoutMsFromQueryOption != null ? extraPassiveTimeoutMsFromQueryOption
+        : Broker.DEFAULT_EXTRA_PASSIVE_TIMEOUT_MS;
+    long activeDeadlineMs = startTimeMs + timeoutMs;
+    long passiveDeadlineMs = activeDeadlineMs + extraPassiveTimeoutMs;
     QueryEnvironment.QueryPlannerResult queryPlannerResult;
     try (QueryEnvironment.CompiledQuery compiledQuery = _queryEnvironment.compile(sql, sqlNodeAndOptions)) {
       queryPlannerResult = compiledQuery.planQuery(requestId);
     }
     DispatchableSubPlan dispatchableSubPlan = queryPlannerResult.getQueryPlan();
-    Map<String, String> requestMetadataMap = new HashMap<>();
-    requestMetadataMap.put(CommonConstants.Query.Request.MetadataKeys.REQUEST_ID, String.valueOf(requestId));
-    Long timeoutMsInQueryOption = QueryOptionsUtils.getTimeoutMs(sqlNodeAndOptions.getOptions());
-    long timeoutMs =
-        timeoutMsInQueryOption != null ? timeoutMsInQueryOption : CommonConstants.Broker.DEFAULT_BROKER_TIMEOUT_MS;
-    requestMetadataMap.put(CommonConstants.Broker.Request.QueryOptionKey.TIMEOUT_MS, String.valueOf(timeoutMs));
-    requestMetadataMap.put(CommonConstants.Broker.Request.QueryOptionKey.ENABLE_NULL_HANDLING, "true");
-    requestMetadataMap.putAll(sqlNodeAndOptions.getOptions());
+    Map<String, String> requestMetadataMap = new HashMap<>(queryOptions);
+    requestMetadataMap.put(MetadataKeys.REQUEST_ID, Long.toString(requestId));
+    requestMetadataMap.put(MetadataKeys.CORRELATION_ID, cid);
+    requestMetadataMap.put(QueryOptionKey.TIMEOUT_MS, Long.toString(timeoutMs));
+    requestMetadataMap.put(QueryOptionKey.EXTRA_PASSIVE_TIMEOUT_MS, Long.toString(extraPassiveTimeoutMs));
+    requestMetadataMap.putIfAbsent(QueryOptionKey.ENABLE_NULL_HANDLING, "true");
 
     // Putting trace testing here as extra options as it doesn't go along with the rest of the items.
     if (trace) {
-      requestMetadataMap.put(CommonConstants.Broker.Request.TRACE, "true");
+      requestMetadataMap.put(Broker.Request.TRACE, "true");
     }
 
     // Submission Stub logic are mimic {@link QueryServer}
@@ -140,8 +154,7 @@ public abstract class QueryRunnerTestBase extends QueryTestSet {
     List<CompletableFuture<?>> submissionStubs = new ArrayList<>();
     for (DispatchablePlanFragment stagePlan : stagePlans) {
       int stageId = stagePlan.getPlanFragment().getFragmentId();
-      submissionStubs.addAll(processDistributedStagePlans(dispatchableSubPlan, requestId, stageId,
-          requestMetadataMap));
+      submissionStubs.addAll(processDistributedStagePlans(dispatchableSubPlan, requestId, stageId, requestMetadataMap));
     }
     try {
       CompletableFuture.allOf(submissionStubs.toArray(new CompletableFuture[0])).get(timeoutMs, TimeUnit.MILLISECONDS);
@@ -158,14 +171,15 @@ public abstract class QueryRunnerTestBase extends QueryTestSet {
         }
       }
     }
-    // exception will be propagated through for assert purpose on runtime error
-    long now = System.currentTimeMillis();
-    long extraPassiveTimeout = 1000;
-    return QueryDispatcher.runReducer(requestId, dispatchableSubPlan,
-        timeoutMs + now,
-        timeoutMs + now + extraPassiveTimeout,
-        Collections.emptyMap(),
-        _mailboxService);
+    QueryExecutionContext executionContext =
+        new QueryExecutionContext(QueryExecutionContext.QueryType.MSE, requestId, cid, workloadName, startTimeMs,
+            activeDeadlineMs, passiveDeadlineMs, "brokerId", "brokerId");
+    QueryThreadContext.MseWorkerInfo mseWorkerInfo = new QueryThreadContext.MseWorkerInfo(0, 0);
+    try (QueryThreadContext ignore = QueryThreadContext.open(executionContext, mseWorkerInfo,
+        ThreadAccountantUtils.getNoOpAccountant())) {
+      // exception will be propagated through for assert purpose on runtime error
+      return QueryDispatcher.runReducer(dispatchableSubPlan, Map.of(), _mailboxService);
+    }
   }
 
   protected List<CompletableFuture<?>> processDistributedStagePlans(DispatchableSubPlan dispatchableSubPlan,
@@ -176,15 +190,13 @@ public abstract class QueryRunnerTestBase extends QueryTestSet {
     for (Map.Entry<QueryServerInstance, List<Integer>> entry : dispatchableStagePlan.getServerInstanceToWorkerIdMap()
         .entrySet()) {
       QueryServerEnclosure serverEnclosure = _servers.get(entry.getKey());
-      Tracing.ThreadAccountantOps.setupRunner(Long.toString(requestId), ThreadExecutionContext.TaskType.MSE, null);
-      ThreadExecutionContext parentContext = Tracing.getThreadAccountant().getThreadExecutionContext();
       List<WorkerMetadata> workerMetadataList =
           entry.getValue().stream().map(stageWorkerMetadataList::get).collect(Collectors.toList());
       StageMetadata stageMetadata =
           new StageMetadata(stageId, workerMetadataList, dispatchableStagePlan.getCustomProperties());
       StagePlan stagePlan = new StagePlan(dispatchableStagePlan.getPlanFragment().getFragmentRoot(), stageMetadata);
       for (WorkerMetadata workerMetadata : workerMetadataList) {
-        submissionStubs.add(serverEnclosure.processQuery(workerMetadata, stagePlan, requestMetadataMap, parentContext));
+        submissionStubs.add(serverEnclosure.processQuery(workerMetadata, stagePlan, requestMetadataMap));
       }
     }
     return submissionStubs;

@@ -35,26 +35,21 @@ import org.apache.pinot.core.query.scheduler.QueryScheduler;
 import org.apache.pinot.core.routing.SegmentsToQuery;
 import org.apache.pinot.core.transport.server.routing.stats.ServerRoutingStatsManager;
 import org.apache.pinot.server.access.AccessControl;
+import org.apache.pinot.spi.accounting.ThreadAccountantUtils;
 import org.apache.pinot.spi.config.table.TableType;
 import org.apache.pinot.spi.env.PinotConfiguration;
 import org.apache.pinot.spi.exception.QueryErrorCode;
-import org.apache.pinot.spi.query.QueryThreadContext;
 import org.apache.pinot.spi.utils.CommonConstants;
 import org.apache.pinot.sql.parsers.CalciteSqlCompiler;
 import org.apache.pinot.util.TestUtils;
 import org.testng.annotations.AfterMethod;
 import org.testng.annotations.BeforeClass;
-import org.testng.annotations.BeforeMethod;
 import org.testng.annotations.Test;
 
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
-import static org.testng.Assert.assertEquals;
-import static org.testng.Assert.assertFalse;
-import static org.testng.Assert.assertNotNull;
-import static org.testng.Assert.assertNull;
-import static org.testng.Assert.assertTrue;
+import static org.testng.Assert.*;
 
 
 public class QueryRoutingTest {
@@ -74,7 +69,6 @@ public class QueryRoutingTest {
   private ServerRoutingStatsManager _serverRoutingStatsManager;
   int _requestCount;
   private QueryServer _queryServer;
-  private QueryThreadContext.CloseableContext _closeableContext;
 
   @BeforeClass
   public void setUp() {
@@ -83,21 +77,9 @@ public class QueryRoutingTest {
     PinotConfiguration cfg = new PinotConfiguration(properties);
     _serverRoutingStatsManager = new ServerRoutingStatsManager(cfg, mock(BrokerMetrics.class));
     _serverRoutingStatsManager.init();
-    _queryRouter = new QueryRouter("testBroker", mock(BrokerMetrics.class), _serverRoutingStatsManager);
+    _queryRouter = new QueryRouter("testBroker", null, null, _serverRoutingStatsManager,
+        ThreadAccountantUtils.getNoOpAccountant());
     _requestCount = 0;
-  }
-
-  @BeforeMethod
-  public void setupQueryThreadContext() {
-    _closeableContext = QueryThreadContext.open();
-  }
-
-  @AfterMethod
-  void closeQueryThreadContext() {
-    if (_closeableContext != null) {
-      _closeableContext.close();
-      _closeableContext = null;
-    }
   }
 
   @AfterMethod
@@ -118,10 +100,9 @@ public class QueryRoutingTest {
   }
 
   private QueryServer getQueryServer(int responseDelayMs, byte[] responseBytes, int port) {
-    ServerMetrics serverMetrics = mock(ServerMetrics.class);
     InstanceRequestHandler handler = new InstanceRequestHandler("server01", new PinotConfiguration(),
-        mockQueryScheduler(responseDelayMs, responseBytes), serverMetrics, mock(AccessControl.class));
-    ServerMetrics.register(serverMetrics);
+        mockQueryScheduler(responseDelayMs, responseBytes), mock(AccessControl.class),
+        ThreadAccountantUtils.getNoOpAccountant());
     return new QueryServer(port, null, handler);
   }
 

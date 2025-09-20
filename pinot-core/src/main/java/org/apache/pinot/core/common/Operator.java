@@ -26,6 +26,7 @@ import org.apache.pinot.core.query.request.context.ExplainMode;
 import org.apache.pinot.segment.spi.IndexSegment;
 import org.apache.pinot.spi.annotations.InterfaceAudience;
 import org.apache.pinot.spi.exception.EarlyTerminationException;
+import org.apache.pinot.spi.exception.QueryException;
 
 
 @InterfaceAudience.Private
@@ -40,6 +41,7 @@ public interface Operator<T extends Block> {
    *
    * @throws EarlyTerminationException if the operator is early-terminated (interrupted) before processing the next
    *         block of data. Operator can be early terminated when the query times out, or is already satisfied.
+   * @throws QueryException if the query is cancelled, killed or timed out before processing the next block of data.
    */
   T nextBlock();
 

@@ -41,9 +41,7 @@ import org.apache.pinot.common.metrics.ServerMetrics;
 import org.apache.pinot.common.proto.PinotQueryWorkerGrpc;
 import org.apache.pinot.common.proto.Worker;
 import org.apache.pinot.common.utils.NamedThreadFactory;
-import org.apache.pinot.common.utils.config.QueryOptionsUtils;
 import org.apache.pinot.core.transport.grpc.GrpcQueryServer;
-import org.apache.pinot.query.MseWorkerThreadContext;
 import org.apache.pinot.query.access.AuthorizationInterceptor;
 import org.apache.pinot.query.access.QueryAccessControlFactory;
 import org.apache.pinot.query.planner.serde.PlanNodeSerializer;
@@ -53,13 +51,16 @@ import org.apache.pinot.query.routing.StagePlan;
 import org.apache.pinot.query.routing.WorkerMetadata;
 import org.apache.pinot.query.runtime.QueryRunner;
 import org.apache.pinot.query.runtime.plan.MultiStageQueryStats;
-import org.apache.pinot.spi.accounting.ThreadExecutionContext;
+import org.apache.pinot.spi.accounting.ThreadAccountant;
+import org.apache.pinot.spi.accounting.ThreadAccountantUtils;
 import org.apache.pinot.spi.env.PinotConfiguration;
 import org.apache.pinot.spi.executor.ExecutorServiceUtils;
 import org.apache.pinot.spi.executor.MetricsExecutor;
+import org.apache.pinot.spi.query.QueryExecutionContext;
 import org.apache.pinot.spi.query.QueryThreadContext;
-import org.apache.pinot.spi.trace.Tracing;
 import org.apache.pinot.spi.utils.CommonConstants;
+import org.apache.pinot.spi.utils.CommonConstants.Broker.Request.QueryOptionKey;
+import org.apache.pinot.spi.utils.CommonConstants.Query.Request.MetadataKeys;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -72,6 +73,7 @@ import org.slf4j.LoggerFactory;
 /// different thread pool. See each method for details.
 public class QueryServer extends PinotQueryWorkerGrpc.PinotQueryWorkerImplBase {
   private static final Logger LOGGER = LoggerFactory.getLogger(QueryServer.class);
+
   // TODO: Inbound messages can get quite large because we send the entire stage metadata map in each call.
   // See https://github.com/apache/pinot/issues/10331
   private static final int MAX_INBOUND_MESSAGE_SIZE = 64 * 1024 * 1024;
@@ -83,6 +85,8 @@ public class QueryServer extends PinotQueryWorkerGrpc.PinotQueryWorkerImplBase {
   private final TlsConfig _tlsConfig;
   @Nullable
   private final QueryAccessControlFactory _accessControlFactory;
+  private final ThreadAccountant _threadAccountant;
+
   // query submission service is only used for plan submission for now.
   // TODO: with complex query submission logic we should allow asynchronous query submission return instead of
   //   directly return from submission response observer.
@@ -104,58 +108,57 @@ public class QueryServer extends PinotQueryWorkerGrpc.PinotQueryWorkerImplBase {
   private Server _server = null;
 
   @VisibleForTesting
+  public QueryServer(int port, QueryRunner queryRunner) {
+    this(port, queryRunner, null);
+  }
+
+  @VisibleForTesting
   public QueryServer(int port, QueryRunner queryRunner, @Nullable TlsConfig tlsConfig) {
-    this("unknownServer", port, queryRunner, tlsConfig, new PinotConfiguration(), null);
+    this(port, queryRunner, tlsConfig, null);
   }
 
   @VisibleForTesting
   public QueryServer(int port, QueryRunner queryRunner, @Nullable TlsConfig tlsConfig,
-      QueryAccessControlFactory accessControlFactory) {
-    this("unknownServer", port, queryRunner, tlsConfig, new PinotConfiguration(), accessControlFactory);
+      @Nullable QueryAccessControlFactory accessControlFactory) {
+    this(new PinotConfiguration(), "serverId", port, queryRunner, tlsConfig, accessControlFactory,
+        ThreadAccountantUtils.getNoOpAccountant());
   }
 
-  public QueryServer(String instanceId, int port, QueryRunner queryRunner, @Nullable TlsConfig tlsConfig) {
-    this(instanceId, port, queryRunner, tlsConfig, new PinotConfiguration(), null);
+  public QueryServer(PinotConfiguration serverConf, String instanceId, int port, QueryRunner queryRunner,
+      @Nullable TlsConfig tlsConfig, ThreadAccountant threadAccountant) {
+    this(serverConf, instanceId, port, queryRunner, tlsConfig, null, threadAccountant);
   }
 
-  public QueryServer(String instanceId, int port, QueryRunner queryRunner, @Nullable TlsConfig tlsConfig,
-      PinotConfiguration config) {
-    this(instanceId, port, queryRunner, tlsConfig, config, null);
-  }
-
-  public QueryServer(String instanceId, int port, QueryRunner queryRunner, @Nullable TlsConfig tlsConfig,
-      PinotConfiguration config, @Nullable QueryAccessControlFactory accessControlFactory) {
+  public QueryServer(PinotConfiguration serverConf, String instanceId, int port, QueryRunner queryRunner,
+      @Nullable TlsConfig tlsConfig, @Nullable QueryAccessControlFactory accessControlFactory,
+      ThreadAccountant threadAccountant) {
     _instanceId = instanceId;
     _port = port;
     _queryRunner = queryRunner;
     _tlsConfig = tlsConfig;
     if (accessControlFactory == null) {
-      _accessControlFactory = QueryAccessControlFactory.fromConfig(config);
+      _accessControlFactory = QueryAccessControlFactory.fromConfig(serverConf);
     } else {
       _accessControlFactory = accessControlFactory;
     }
+    _threadAccountant = threadAccountant;
 
-    ExecutorService baseExecutorService = ExecutorServiceUtils.create(config,
-        CommonConstants.Server.MULTISTAGE_SUBMISSION_EXEC_CONFIG_PREFIX,
-        "query_submission_executor_on_" + _port + "_port",
-        CommonConstants.Server.DEFAULT_MULTISTAGE_SUBMISSION_EXEC_TYPE);
+    ExecutorService baseExecutorService =
+        ExecutorServiceUtils.create(serverConf, CommonConstants.Server.MULTISTAGE_SUBMISSION_EXEC_CONFIG_PREFIX,
+            "query_submission_executor_on_" + _port + "_port",
+            CommonConstants.Server.DEFAULT_MULTISTAGE_SUBMISSION_EXEC_TYPE);
 
     ServerMetrics serverMetrics = ServerMetrics.get();
-    _submissionExecutorService = new MetricsExecutor(
-        baseExecutorService,
+    _submissionExecutorService = new MetricsExecutor(baseExecutorService,
         serverMetrics.getMeteredValue(ServerMeter.MULTI_STAGE_SUBMISSION_STARTED_TASKS),
         serverMetrics.getMeteredValue(ServerMeter.MULTI_STAGE_SUBMISSION_COMPLETED_TASKS));
 
-    NamedThreadFactory explainThreadFactory =
-        new NamedThreadFactory("query_explain_on_" + _port + "_port");
+    NamedThreadFactory explainThreadFactory = new NamedThreadFactory("query_explain_on_" + _port + "_port");
     _explainExecutorService = Executors.newSingleThreadExecutor(explainThreadFactory);
 
-    ExecutorService baseTimeSeriesExecutorService = ExecutorServiceUtils.create(config,
-        CommonConstants.Server.MULTISTAGE_TIMESERIES_EXEC_CONFIG_PREFIX,
-        "query_ts_on_" + _port + "_port",
-        CommonConstants.Server.DEFAULT_TIMESERIES_EXEC_CONFIG_PREFIX);
-    _timeSeriesExecutorService = MseWorkerThreadContext.contextAwareExecutorService(
-        QueryThreadContext.contextAwareExecutorService(baseTimeSeriesExecutorService));
+    _timeSeriesExecutorService =
+        ExecutorServiceUtils.create(serverConf, CommonConstants.Server.MULTISTAGE_TIMESERIES_EXEC_CONFIG_PREFIX,
+            "query_ts_on_" + _port + "_port", CommonConstants.Server.DEFAULT_TIMESERIES_EXEC_CONFIG_PREFIX);
   }
 
   public void start() {
@@ -166,8 +169,7 @@ public class QueryServer extends PinotQueryWorkerGrpc.PinotQueryWorkerImplBase {
         if (_tlsConfig == null) {
           serverBuilder = ServerBuilder.forPort(_port);
         } else {
-          serverBuilder = NettyServerBuilder.forPort(_port)
-              .sslContext(GrpcQueryServer.buildGrpcSslContext(_tlsConfig));
+          serverBuilder = NettyServerBuilder.forPort(_port).sslContext(GrpcQueryServer.buildGrpcSslContext(_tlsConfig));
         }
         _server = buildGrpcServer(serverBuilder);
         LOGGER.info("Initialized QueryServer on port: {}", _port);
@@ -180,16 +182,12 @@ public class QueryServer extends PinotQueryWorkerGrpc.PinotQueryWorkerImplBase {
   }
 
   private <T extends ServerBuilder<T>> Server buildGrpcServer(ServerBuilder<T> builder) {
-    builder
-         // By using directExecutor, GRPC doesn't need to manage its own thread pool
-        .directExecutor();
+    // By using directExecutor, GRPC doesn't need to manage its own thread pool
+    builder.directExecutor();
     if (_accessControlFactory != null) {
       builder.intercept(new AuthorizationInterceptor(_accessControlFactory));
     }
-    return builder
-        .addService(this)
-        .maxInboundMessageSize(MAX_INBOUND_MESSAGE_SIZE)
-        .build();
+    return builder.addService(this).maxInboundMessageSize(MAX_INBOUND_MESSAGE_SIZE).build();
   }
 
   public void shutdown() {
@@ -232,7 +230,7 @@ public class QueryServer extends PinotQueryWorkerGrpc.PinotQueryWorkerImplBase {
       return;
     }
 
-    long timeoutMs = Long.parseLong(reqMetadata.get(CommonConstants.Broker.Request.QueryOptionKey.TIMEOUT_MS));
+    long timeoutMs = Long.parseLong(reqMetadata.get(QueryOptionKey.TIMEOUT_MS));
     CompletableFuture.runAsync(() -> submitInternal(request, reqMetadata), _submissionExecutorService)
         .orTimeout(timeoutMs, TimeUnit.MILLISECONDS)
         .whenComplete((result, error) -> {
@@ -240,22 +238,17 @@ public class QueryServer extends PinotQueryWorkerGrpc.PinotQueryWorkerImplBase {
           // (GRPC) thread in the improbable case all submission tasks finished before the caller thread reaches
           // this line
           if (error != null) { // if there was an error submitting the request, return an error response
-            try (QueryThreadContext.CloseableContext qCtx =
-                QueryThreadContext.openFromRequestMetadata(_instanceId, reqMetadata);
-                QueryThreadContext.CloseableContext mseCtx = MseWorkerThreadContext.open()) {
-              long requestId = QueryThreadContext.getRequestId();
-              LOGGER.error("Caught exception while submitting request: {}", requestId, error);
-              String errorMsg = "Caught exception while submitting request: " + error.getMessage();
-              responseObserver.onNext(Worker.QueryResponse.newBuilder()
-                  .putMetadata(CommonConstants.Query.Response.ServerResponseStatus.STATUS_ERROR, errorMsg)
-                  .build());
-              responseObserver.onCompleted();
-            }
+            long requestId = Long.parseLong(reqMetadata.get(MetadataKeys.REQUEST_ID));
+            LOGGER.error("Caught exception while submitting request: {}", requestId, error);
+            String errorMsg = "Caught exception while submitting request: " + error.getMessage();
+            responseObserver.onNext(Worker.QueryResponse.newBuilder()
+                .putMetadata(CommonConstants.Query.Response.ServerResponseStatus.STATUS_ERROR, errorMsg)
+                .build());
+            responseObserver.onCompleted();
           } else { // if the request was submitted successfully, return a success response
-            responseObserver.onNext(
-                Worker.QueryResponse.newBuilder()
-                    .putMetadata(CommonConstants.Query.Response.ServerResponseStatus.STATUS_OK, "")
-                    .build());
+            responseObserver.onNext(Worker.QueryResponse.newBuilder()
+                .putMetadata(CommonConstants.Query.Response.ServerResponseStatus.STATUS_OK, "")
+                .build());
             responseObserver.onCompleted();
           }
         });
@@ -271,27 +264,19 @@ public class QueryServer extends PinotQueryWorkerGrpc.PinotQueryWorkerImplBase {
   /// running, the exception will be managed by the worker, which usually send the error downstream to the receiver
   /// mailboxes. Therefore these error won't be reported here.
   private void submitInternal(Worker.QueryRequest request, Map<String, String> reqMetadata) {
-    try (QueryThreadContext.CloseableContext qTlClosable =
-        QueryThreadContext.openFromRequestMetadata(_instanceId, reqMetadata);
-        QueryThreadContext.CloseableContext mseTlCloseable = MseWorkerThreadContext.open()) {
-      QueryThreadContext.setQueryEngine("mse");
-      List<Worker.StagePlan> protoStagePlans = request.getStagePlanList();
-
-      List<CompletableFuture<Void>> startedWorkers = new ArrayList<>();
-
-      for (Worker.StagePlan protoStagePlan : protoStagePlans) {
-        StagePlan stagePlan = deserializePlan(protoStagePlan);
-        StageMetadata stageMetadata = stagePlan.getStageMetadata();
-        List<WorkerMetadata> workerMetadataList = stageMetadata.getWorkerMetadataList();
-
-        for (WorkerMetadata workerMetadata : workerMetadataList) {
-          try {
-            CompletableFuture<Void> job = submitWorker(workerMetadata, stagePlan, reqMetadata);
-            startedWorkers.add(job);
-          } catch (RuntimeException e) {
-            startedWorkers.forEach(worker -> worker.cancel(true));
-            throw e;
-          }
+    QueryExecutionContext executionContext = QueryExecutionContext.forMseServerRequest(reqMetadata, _instanceId);
+    long requestId = executionContext.getRequestId();
+    List<CompletableFuture<Void>> startedWorkers = new ArrayList<>();
+    List<Worker.StagePlan> protoStagePlans = request.getStagePlanList();
+    for (Worker.StagePlan protoStagePlan : protoStagePlans) {
+      StagePlan stagePlan = deserializePlan(requestId, protoStagePlan);
+      StageMetadata stageMetadata = stagePlan.getStageMetadata();
+      for (WorkerMetadata workerMetadata : stageMetadata.getWorkerMetadataList()) {
+        try {
+          startedWorkers.add(submitWorker(workerMetadata, stagePlan, reqMetadata, executionContext));
+        } catch (Exception e) {
+          startedWorkers.forEach(worker -> worker.cancel(true));
+          throw e;
         }
       }
     }
@@ -307,18 +292,11 @@ public class QueryServer extends PinotQueryWorkerGrpc.PinotQueryWorkerImplBase {
   /// CompletableFuture will be completed exceptionally. In that case it is up to the caller to deal with the error
   /// (normally cancelling other already started workers and sending the error through GRPC)
   private CompletableFuture<Void> submitWorker(WorkerMetadata workerMetadata, StagePlan stagePlan,
-      Map<String, String> reqMetadata) {
-    String workloadName = QueryOptionsUtils.getWorkloadName(reqMetadata);
-    //TODO: Verify if this matches with what OOM protection expects. This method will not block for the query to
-    // finish, so it may be breaking some of the OOM protection assumptions.
-    Tracing.ThreadAccountantOps.setupRunner(QueryThreadContext.getCid(), ThreadExecutionContext.TaskType.MSE,
-        workloadName);
-    ThreadExecutionContext parentContext = Tracing.getThreadAccountant().getThreadExecutionContext();
-
-    try {
-      return _queryRunner.processQuery(workerMetadata, stagePlan, reqMetadata, parentContext);
-    } finally {
-      Tracing.ThreadAccountantOps.clear();
+      Map<String, String> reqMetadata, QueryExecutionContext executionContext) {
+    QueryThreadContext.MseWorkerInfo mseWorkerInfo =
+        new QueryThreadContext.MseWorkerInfo(stagePlan.getStageMetadata().getStageId(), workerMetadata.getWorkerId());
+    try (QueryThreadContext ignore = QueryThreadContext.open(executionContext, mseWorkerInfo, _threadAccountant)) {
+      return _queryRunner.processQuery(workerMetadata, stagePlan, reqMetadata);
     }
   }
 
@@ -337,36 +315,30 @@ public class QueryServer extends PinotQueryWorkerGrpc.PinotQueryWorkerImplBase {
       return;
     }
 
-    long timeoutMs = Long.parseLong(reqMetadata.get(CommonConstants.Broker.Request.QueryOptionKey.TIMEOUT_MS));
-
+    long timeoutMs = Long.parseLong(reqMetadata.get(QueryOptionKey.TIMEOUT_MS));
     CompletableFuture.runAsync(() -> explainInternal(request, responseObserver, reqMetadata), _explainExecutorService)
         .orTimeout(timeoutMs, TimeUnit.MILLISECONDS)
         .handle((result, error) -> {
-      if (error != null) {
-        try (QueryThreadContext.CloseableContext qCtx =
-            QueryThreadContext.openFromRequestMetadata(_instanceId, reqMetadata);
-            QueryThreadContext.CloseableContext mseCtx = MseWorkerThreadContext.open()) {
-          long requestId = QueryThreadContext.getRequestId();
-          LOGGER.error("Caught exception while submitting request: {}", requestId, error);
-          String errorMsg = "Caught exception while submitting request: " + error.getMessage();
-          synchronized (responseObserver) {
-            responseObserver.onNext(Worker.ExplainResponse.newBuilder()
-                .putMetadata(CommonConstants.Explain.Response.ServerResponseStatus.STATUS_ERROR, errorMsg)
-                .build());
-            responseObserver.onCompleted();
-          }
-        }
-      } else {
-        synchronized (responseObserver) {
-          responseObserver.onNext(
-              Worker.ExplainResponse.newBuilder()
+          if (error != null) {
+            long requestId = Long.parseLong(reqMetadata.get(MetadataKeys.REQUEST_ID));
+            LOGGER.error("Caught exception while submitting request: {}", requestId, error);
+            String errorMsg = "Caught exception while submitting request: " + error.getMessage();
+            synchronized (responseObserver) {
+              responseObserver.onNext(Worker.ExplainResponse.newBuilder()
+                  .putMetadata(CommonConstants.Explain.Response.ServerResponseStatus.STATUS_ERROR, errorMsg)
+                  .build());
+              responseObserver.onCompleted();
+            }
+          } else {
+            synchronized (responseObserver) {
+              responseObserver.onNext(Worker.ExplainResponse.newBuilder()
                   .putMetadata(CommonConstants.Explain.Response.ServerResponseStatus.STATUS_OK, "")
                   .build());
-          responseObserver.onCompleted();
-        }
-      }
-      return null;
-    });
+              responseObserver.onCompleted();
+            }
+          }
+          return null;
+        });
   }
 
   /// Iterates over all the stage plans in the request and explains the query for each worker.
@@ -378,67 +350,53 @@ public class QueryServer extends PinotQueryWorkerGrpc.PinotQueryWorkerImplBase {
   /// Remember that in case of error some stages may have been explained and some not.
   private void explainInternal(Worker.QueryRequest request, StreamObserver<Worker.ExplainResponse> responseObserver,
       Map<String, String> reqMetadata) {
-    try (QueryThreadContext.CloseableContext qTlClosable
-        = QueryThreadContext.openFromRequestMetadata(_instanceId, reqMetadata);
-        QueryThreadContext.CloseableContext mseTlCloseable = MseWorkerThreadContext.open()) {
-      List<Worker.StagePlan> protoStagePlans = request.getStagePlanList();
+    QueryExecutionContext executionContext = QueryExecutionContext.forMseServerRequest(reqMetadata, _instanceId);
+    long requestId = executionContext.getRequestId();
+    for (Worker.StagePlan protoStagePlan : request.getStagePlanList()) {
+      StagePlan stagePlan = deserializePlan(requestId, protoStagePlan);
+      StageMetadata stageMetadata = stagePlan.getStageMetadata();
 
-      for (Worker.StagePlan protoStagePlan : protoStagePlans) {
-        StagePlan stagePlan = deserializePlan(protoStagePlan);
-        StageMetadata stageMetadata = stagePlan.getStageMetadata();
-        List<WorkerMetadata> workerMetadataList = stageMetadata.getWorkerMetadataList();
-
-        Worker.ExplainResponse stageResponse = calculateExplainPlanForStage(
-            protoStagePlan, workerMetadataList.toArray(new WorkerMetadata[0]), reqMetadata);
-        synchronized (responseObserver) {
-          responseObserver.onNext(stageResponse);
+      Worker.ExplainResponse.Builder builder = Worker.ExplainResponse.newBuilder();
+      List<WorkerMetadata> workerMetadataList = stageMetadata.getWorkerMetadataList();
+      for (WorkerMetadata workerMetadata : workerMetadataList) {
+        QueryThreadContext.MseWorkerInfo mseWorkerInfo =
+            new QueryThreadContext.MseWorkerInfo(stagePlan.getStageMetadata().getStageId(),
+                workerMetadata.getWorkerId());
+        StagePlan explainPlan;
+        try (QueryThreadContext ignore = QueryThreadContext.open(executionContext, mseWorkerInfo, _threadAccountant)) {
+          explainPlan = _queryRunner.explainQuery(workerMetadata, stagePlan, reqMetadata);
         }
+        ByteString rootAsBytes = PlanNodeSerializer.process(explainPlan.getRootNode()).toByteString();
+        StageMetadata metadata = explainPlan.getStageMetadata();
+        List<Worker.WorkerMetadata> protoWorkerMetadataList =
+            QueryPlanSerDeUtils.toProtoWorkerMetadataList(metadata.getWorkerMetadataList());
+        builder.addStagePlan(Worker.StagePlan.newBuilder()
+            .setRootNode(rootAsBytes)
+            .setStageMetadata(Worker.StageMetadata.newBuilder()
+                .setStageId(metadata.getStageId())
+                .addAllWorkerMetadata(protoWorkerMetadataList)
+                .setCustomProperty(QueryPlanSerDeUtils.toProtoProperties(metadata.getCustomProperties()))));
+      }
+      builder.putMetadata(CommonConstants.Explain.Response.ServerResponseStatus.STATUS_OK, "");
+      synchronized (responseObserver) {
+        responseObserver.onNext(builder.build());
       }
     }
-  }
-
-  /// Calculates the explain plan for a stage, iterating over each worker and merging the results.
-  ///
-  /// The result is then returned as result.
-  private Worker.ExplainResponse calculateExplainPlanForStage(Worker.StagePlan protoStagePlan,
-      WorkerMetadata[] workerMetadataList, Map<String, String> reqMetadata) {
-    Worker.ExplainResponse.Builder builder = Worker.ExplainResponse.newBuilder();
-    StagePlan stagePlan = deserializePlan(protoStagePlan);
-    for (WorkerMetadata workerMetadata : workerMetadataList) {
-      StagePlan explainPlan = _queryRunner.explainQuery(workerMetadata, stagePlan, reqMetadata);
-
-      ByteString rootAsBytes = PlanNodeSerializer.process(explainPlan.getRootNode()).toByteString();
-
-      StageMetadata metadata = explainPlan.getStageMetadata();
-      List<Worker.WorkerMetadata> protoWorkerMetadataList =
-          QueryPlanSerDeUtils.toProtoWorkerMetadataList(metadata.getWorkerMetadataList());
-
-      builder.addStagePlan(Worker.StagePlan.newBuilder()
-          .setRootNode(rootAsBytes)
-          .setStageMetadata(Worker.StageMetadata.newBuilder()
-              .setStageId(metadata.getStageId())
-              .addAllWorkerMetadata(protoWorkerMetadataList)
-              .setCustomProperty(QueryPlanSerDeUtils.toProtoProperties(metadata.getCustomProperties()))));
-    }
-    builder.putMetadata(CommonConstants.Explain.Response.ServerResponseStatus.STATUS_OK, "");
-    return builder.build();
   }
 
   @Override
   public void submitTimeSeries(Worker.TimeSeriesQueryRequest request,
       StreamObserver<Worker.TimeSeriesResponse> responseObserver) {
-    try (QueryThreadContext.CloseableContext qCtx = QueryThreadContext.open(_instanceId);
-        QueryThreadContext.CloseableContext mseCtx = MseWorkerThreadContext.open()) {
-      // TODO: populate the thread context with TSE information
-      QueryThreadContext.setQueryEngine("tse");
-
-      CompletableFuture.runAsync(() -> submitTimeSeriesInternal(request, responseObserver), _timeSeriesExecutorService);
-    }
+    CompletableFuture.runAsync(() -> submitTimeSeriesInternal(request, responseObserver), _timeSeriesExecutorService);
   }
 
   private void submitTimeSeriesInternal(Worker.TimeSeriesQueryRequest request,
       StreamObserver<Worker.TimeSeriesResponse> responseObserver) {
-    _queryRunner.processTimeSeriesQuery(request.getDispatchPlanList(), request.getMetadataMap(), responseObserver);
+    Map<String, String> metadataMap = request.getMetadataMap();
+    QueryExecutionContext executionContext = QueryExecutionContext.forTseServerRequest(metadataMap, _instanceId);
+    try (QueryThreadContext ignore = QueryThreadContext.open(executionContext, _threadAccountant)) {
+      _queryRunner.processTimeSeriesQuery(request.getDispatchPlanList(), metadataMap, responseObserver);
+    }
   }
 
   /// Executes a cancel request.
@@ -449,8 +407,7 @@ public class QueryServer extends PinotQueryWorkerGrpc.PinotQueryWorkerImplBase {
   @Override
   public void cancel(Worker.CancelRequest request, StreamObserver<Worker.CancelResponse> responseObserver) {
     long requestId = request.getRequestId();
-    try (QueryThreadContext.CloseableContext closeable = QueryThreadContext.open(_instanceId)) {
-      QueryThreadContext.setIds(requestId, request.getCid().isBlank() ? request.getCid() : Long.toString(requestId));
+    try {
       Map<Integer, MultiStageQueryStats.StageStats.Closed> stats = _queryRunner.cancel(requestId);
 
       Worker.CancelResponse.Builder cancelBuilder = Worker.CancelResponse.newBuilder();
@@ -474,11 +431,10 @@ public class QueryServer extends PinotQueryWorkerGrpc.PinotQueryWorkerImplBase {
     responseObserver.onCompleted();
   }
 
-  private StagePlan deserializePlan(Worker.StagePlan protoStagePlan) {
+  private StagePlan deserializePlan(long requestId, Worker.StagePlan protoStagePlan) {
     try {
       return QueryPlanSerDeUtils.fromProtoStagePlan(protoStagePlan);
     } catch (Exception e) {
-      long requestId = QueryThreadContext.getRequestId();
       throw new RuntimeException(
           String.format("Caught exception while deserializing stage plan for request: %d, stage: %d", requestId,
               protoStagePlan.getStageMetadata().getStageId()), e);

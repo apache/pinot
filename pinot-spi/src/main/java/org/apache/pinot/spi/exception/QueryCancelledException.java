@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.spi.exception;
 
+// TODO: Revisit if some usages can be replaced with TerminateException or EarlyTerminationException
 public class QueryCancelledException extends QueryException {
   public QueryCancelledException(String message) {
     super(QueryErrorCode.QUERY_CANCELLATION, message);

@@ -137,7 +137,7 @@ public class LookupJoinOperator extends MultiStageOperator {
         return leftBlock;
       }
       List<Object[]> rows = buildJoinedRows((MseBlock.Data) leftBlock);
-      sampleAndCheckInterruption();
+      checkTerminationAndSampleUsage();
       if (!rows.isEmpty()) {
         return new RowHeapDataBlock(rows, _resultSchema);
       }

@@ -57,7 +57,7 @@ public abstract class RightRowSetBasedSetOperator extends SetOperator {
       for (Object[] row : dataBlock.asRowHeap().getRows()) {
         _rightRowSet.add(new Record(row));
       }
-      sampleAndCheckInterruption();
+      checkTerminationAndSampleUsage();
       block = _rightChildOperator.nextBlock();
     }
     assert block.isEos();
@@ -85,7 +85,7 @@ public abstract class RightRowSetBasedSetOperator extends SetOperator {
           rows.add(row);
         }
       }
-      sampleAndCheckInterruption();
+      checkTerminationAndSampleUsage();
       if (!rows.isEmpty()) {
         return new RowHeapDataBlock(rows, _dataSchema);
       }

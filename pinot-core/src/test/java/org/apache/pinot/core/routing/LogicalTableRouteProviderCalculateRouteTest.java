@@ -23,33 +23,12 @@ import java.util.Set;
 import org.apache.pinot.common.request.InstanceRequest;
 import org.apache.pinot.core.transport.ServerInstance;
 import org.apache.pinot.core.transport.ServerRoutingInstance;
-import org.apache.pinot.spi.query.QueryThreadContext;
-import org.testng.annotations.AfterMethod;
-import org.testng.annotations.BeforeMethod;
 import org.testng.annotations.Test;
 
-import static org.testng.Assert.assertEquals;
-import static org.testng.Assert.assertFalse;
-import static org.testng.Assert.assertNotNull;
-import static org.testng.Assert.assertNull;
-import static org.testng.Assert.assertTrue;
+import static org.testng.Assert.*;
 
 
 public class LogicalTableRouteProviderCalculateRouteTest extends BaseTableRouteTest {
-  private QueryThreadContext.CloseableContext _closeableContext;
-
-  @BeforeMethod
-  public void setupQueryThreadContext() {
-    _closeableContext = QueryThreadContext.open();
-  }
-
-  @AfterMethod
-  void closeQueryThreadContext() {
-    if (_closeableContext != null) {
-      _closeableContext.close();
-      _closeableContext = null;
-    }
-  }
 
   private void assertTableRoute(String tableName, String logicalTableName,
       Map<String, Set<String>> expectedOfflineRoutingTable, Map<String, Set<String>> expectedRealtimeRoutingTable,
