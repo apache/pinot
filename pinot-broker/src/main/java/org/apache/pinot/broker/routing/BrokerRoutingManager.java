@@ -803,47 +803,47 @@ public class BrokerRoutingManager implements RoutingManager, ClusterChangeHandle
               timeBoundaryManager, partitionMetadataManager, queryTimeoutMs, !idealState.isEnabled());
       if (_routingEntryMap.put(tableNameWithType, routingEntry) == null) {
         LOGGER.info("Built routing for table: {}", tableNameWithType);
-
-        // Check for updates to the IS / EV after adding the routing entry, as it is possible that the
-        // processSegmentAssignmentChange() may have run and missed updating this newly added entry. Only update
-        // the entry if:
-        // - The calculated build time for this table is older than the processSegmentAssignmentChange() timestamp, and
-        // - The IS or EV version has changed since the entry was added
-        if (_routingTableBuildStartTimeMs.get(tableNameWithType) < _processAssignmentChangeSnapshotTimestampMs) {
-          LOGGER.info("processSegmentAssignmentChange started after build routing for table was started, check if "
-              + "routing entry needs to be updated for table: {} to prevent missed updates", tableNameWithType);
-          idealStatePath = getIdealStatePath(tableNameWithType);
-          idealState = getIdealState(idealStatePath);
-          Preconditions.checkState(idealState != null, "Failed to find ideal state for table: %s", tableNameWithType);
-          idealStateVersion = idealState.getRecord().getVersion();
-
-          externalViewPath = getExternalViewPath(tableNameWithType);
-          externalView = getExternalView(externalViewPath);
-          // NOTE: External view might be null for new created tables. In such case, create an empty one and set the
-          // version to -1 to ensure the version does not match the next external view
-          if (externalView == null) {
-            externalViewVersion = -1;
-          } else {
-            externalViewVersion = externalView.getRecord().getVersion();
-          }
-
-          RoutingEntry existingRoutingEntry = _routingEntryMap.get(tableNameWithType);
-          // Existing routing entry should ideally never be null on the second iteration the table level lock is still
-          // held, so removals cannot go through until it is released
-          if (existingRoutingEntry != null) {
-            boolean hasISOrEvVersionChanged = processAssignmentChangeForTable(idealStateVersion, externalViewVersion,
-                existingRoutingEntry);
-            if (!hasISOrEvVersionChanged) {
-              LOGGER.info("No need to update the routing entry for table {} as IS / EV version has not changed",
-                  tableNameWithType);
-            } else {
-              LOGGER.info("The IS / EV version has changed since the routing entry was added for table: {}, updated "
-                  + "it if both IS and EV exist", tableNameWithType);
-            }
-          }
-        }
       } else {
         LOGGER.info("Rebuilt routing for table: {}", tableNameWithType);
+      }
+
+      // Check for updates to the IS / EV after adding the routing entry, as it is possible that the
+      // processSegmentAssignmentChange() may have run and missed updating this newly added entry. Only update
+      // the entry if:
+      // - The calculated build time for this table is older than the processSegmentAssignmentChange() timestamp, and
+      // - The IS or EV version has changed since the entry was added
+      if (_routingTableBuildStartTimeMs.get(tableNameWithType) < _processAssignmentChangeSnapshotTimestampMs) {
+        LOGGER.info("processSegmentAssignmentChange started after build routing for table was started, check if "
+            + "routing entry needs to be updated for table: {} to prevent missed updates", tableNameWithType);
+        idealStatePath = getIdealStatePath(tableNameWithType);
+        idealState = getIdealState(idealStatePath);
+        Preconditions.checkState(idealState != null, "Failed to find ideal state for table: %s", tableNameWithType);
+        idealStateVersion = idealState.getRecord().getVersion();
+
+        externalViewPath = getExternalViewPath(tableNameWithType);
+        externalView = getExternalView(externalViewPath);
+        // NOTE: External view might be null for new created tables. In such case, create an empty one and set the
+        // version to -1 to ensure the version does not match the next external view
+        if (externalView == null) {
+          externalViewVersion = -1;
+        } else {
+          externalViewVersion = externalView.getRecord().getVersion();
+        }
+
+        RoutingEntry existingRoutingEntry = _routingEntryMap.get(tableNameWithType);
+        // Existing routing entry should ideally never be null on the second iteration the table level lock is still
+        // held, so removals cannot go through until it is released
+        if (existingRoutingEntry != null) {
+          boolean hasISOrEvVersionChanged = processAssignmentChangeForTable(idealStateVersion, externalViewVersion,
+              existingRoutingEntry);
+          if (!hasISOrEvVersionChanged) {
+            LOGGER.info("No need to update the routing entry for table {} as IS / EV version has not changed",
+                tableNameWithType);
+          } else {
+            LOGGER.info("The IS / EV version has changed since the routing entry was added for table: {}, updated "
+                + "it if both IS and EV exist", tableNameWithType);
+          }
+        }
       }
     }
   }
