@@ -94,18 +94,16 @@ public class DataTypeTransformer implements RecordTransformer {
    * This method can be reused by other components that need single value conversion.
    *
    * @param value The value to convert
-   * @param dest The target PinotDataType
+   * @param targetType The target PinotDataType
    * @param columnName The column name (for error reporting)
    * @return The converted value
    */
-  public static Object convertValue(@Nullable Object value, PinotDataType dest, String columnName) {
-    if (value == null) {
-      return null;
-    }
+  @Nullable
+  public static Object convertValue(Object value, PinotDataType targetType, String columnName) {
 
     // Standardize the value if it's not JSON or MAP type
-    if (dest != PinotDataType.JSON && dest != PinotDataType.MAP) {
-      value = standardize(columnName, value, dest.isSingleValue());
+    if (targetType != PinotDataType.JSON && targetType != PinotDataType.MAP) {
+      value = standardize(columnName, value, targetType.isSingleValue());
     }
 
     // NOTE: The standardized value could be null for empty Collection/Map/Object[].
@@ -119,7 +117,7 @@ public class DataTypeTransformer implements RecordTransformer {
       // Multi-value column
       Object[] values = (Object[]) value;
       // JSON is not standardised for empty json array
-      if (dest == PinotDataType.JSON && values.length == 0) {
+      if (targetType == PinotDataType.JSON && values.length == 0) {
         source = PinotDataType.JSON;
       } else {
         source = PinotDataType.getMultiValueType(values[0].getClass());
@@ -139,8 +137,8 @@ public class DataTypeTransformer implements RecordTransformer {
     // if the source type is not Object[] (but sth like Integer[], Double[]). For Object[],
     // the conversion loops through values in the array like before, but can catch the
     // ClassCastException if it happens and continue the conversion now.
-    value = dest.convert(value, source);
-    value = dest.toInternal(value);
+    value = targetType.convert(value, source);
+    value = targetType.toInternal(value);
 
     return value;
   }

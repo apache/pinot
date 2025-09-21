@@ -74,10 +74,6 @@ public class DefaultValueColumnReader implements ColumnReader {
     return _defaultValue;
   }
 
-  @Override
-  public boolean isNull() {
-    return _defaultValue == null;
-  }
 
   @Override
   public void rewind() throws IOException {

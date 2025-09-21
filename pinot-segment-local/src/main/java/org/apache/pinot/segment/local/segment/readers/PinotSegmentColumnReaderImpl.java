@@ -37,7 +37,6 @@ import org.slf4j.LoggerFactory;
  * <ul>
  *   <li>Reading column values from Pinot segments</li>
  *   <li>Data type conversions when target schema differs from source</li>
- *   <li>Null value detection</li>
  *   <li>Resource cleanup</li>
  * </ul>
  */
@@ -51,8 +50,9 @@ public class PinotSegmentColumnReaderImpl implements ColumnReader {
   private final FieldSpec _targetFieldSpec;
 
   private int _currentIndex;
-  private Object _currentValue;
-  private boolean _currentIsNull;
+
+  // Reusable variables to avoid garbage collection on every next() call
+  private Object _reuseValue;
 
   /**
    * Create a PinotSegmentColumnReaderImpl for an existing column in the segment.
@@ -91,35 +91,27 @@ public class PinotSegmentColumnReaderImpl implements ColumnReader {
       throw new IllegalStateException("No more values available");
     }
 
-    Object value = _segmentColumnReader.getValue(_currentIndex);
-    _currentIsNull = _segmentColumnReader.isNull(_currentIndex);
+    _reuseValue = _segmentColumnReader.getValue(_currentIndex);
     _currentIndex++;
 
-    if (value == null) {
-      _currentValue = null;
+    // Return null if the value is null
+    if (_segmentColumnReader.isNull(_currentIndex) || _reuseValue == null) {
       return null;
     }
 
     // Apply data type conversion if needed
     if (_needsConversion) {
-      _currentValue = convertValueToTargetDataType(value);
+      return convertValueToTargetDataType(_reuseValue);
     } else {
-      _currentValue = value;
+      return _reuseValue;
     }
-
-    return _currentValue;
   }
 
-  @Override
-  public boolean isNull() {
-    return _currentIsNull;
-  }
 
   @Override
   public void rewind() throws IOException {
     _currentIndex = 0;
-    _currentValue = null;
-    _currentIsNull = false;
+    _reuseValue = null;
   }
 
   @Override

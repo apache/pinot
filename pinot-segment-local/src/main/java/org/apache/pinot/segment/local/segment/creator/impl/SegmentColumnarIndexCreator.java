@@ -398,27 +398,26 @@ public class SegmentColumnarIndexCreator implements SegmentCreator {
     NullValueVectorCreator nullVec = _nullValueVectorCreatorMap.get(columnName);
     FieldSpec fieldSpec = _schema.getFieldSpecFor(columnName);
     SegmentDictionaryCreator dictionaryCreator = _dictionaryCreatorMap.get(columnName);
+    Object defaultNullValue = fieldSpec.getDefaultNullValue();
+    Object reuseColumnValueToIndex;
 
     // Reset column reader to start from beginning
     columnReader.rewind();
 
     int docId = 0;
     while (columnReader.hasNext()) {
-      Object columnValueToIndex = columnReader.next();
-      if (columnValueToIndex == null) {
-        throw new RuntimeException("Null value for column:" + columnName);
+      reuseColumnValueToIndex = columnReader.next();
+
+      // Handle null values
+      if (nullVec != null && reuseColumnValueToIndex == null) {
+        nullVec.setNull(docId);
+        reuseColumnValueToIndex = defaultNullValue;
       }
 
       if (fieldSpec.isSingleValueField()) {
-        indexSingleValueRow(dictionaryCreator, columnValueToIndex, creatorsByIndex);
+        indexSingleValueRow(dictionaryCreator, reuseColumnValueToIndex, creatorsByIndex);
       } else {
-        indexMultiValueRow(dictionaryCreator, (Object[]) columnValueToIndex, creatorsByIndex);
-      }
-
-      if (nullVec != null) {
-        if (columnReader.isNull()) {
-          nullVec.setNull(docId);
-        }
+        indexMultiValueRow(dictionaryCreator, (Object[]) reuseColumnValueToIndex, creatorsByIndex);
       }
 
       docId++;

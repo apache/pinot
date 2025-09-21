@@ -32,7 +32,6 @@ import javax.annotation.Nullable;
  * <p>This interface follows an iterator pattern similar to RecordReader:
  * <ul>
  *   <li>Sequential iteration over all values in a column using hasNext() and next()</li>
- *   <li>Null value detection for the current value</li>
  *   <li>Rewind capability to restart iteration</li>
  *   <li>Resource cleanup</li>
  * </ul>
@@ -57,22 +56,17 @@ public interface ColumnReader extends Closeable, Serializable {
    * @throws IOException If an I/O error occurs while reading
    */
   @Nullable
-  Object next() throws IOException;
+  Object next()
+      throws IOException;
 
-  /**
-   * Check if the current value (last returned by next()) is null.
-   * <p>This method should be called after {@link #next()} to check if the returned value represents a null.
-   *
-   * @return true if the current value is null, false otherwise
-   */
-  boolean isNull();
 
   /**
    * Rewind the reader to start reading from the first value again.
    *
    * @throws IOException If an I/O error occurs while rewinding
    */
-  void rewind() throws IOException;
+  void rewind()
+      throws IOException;
 
   /**
    * Get the name of the column.
