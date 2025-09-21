@@ -21,6 +21,7 @@ package org.apache.pinot.integration.tests;
 import java.util.HashMap;
 import java.util.Map;
 import org.apache.helix.model.InstanceConfig;
+import org.apache.pinot.common.utils.config.TagNameUtils;
 import org.apache.pinot.controller.helix.ControllerTest;
 import org.apache.pinot.server.starter.helix.HelixServerStarter;
 import org.apache.pinot.spi.env.PinotConfiguration;
@@ -32,6 +33,7 @@ import org.testng.annotations.Test;
 import static org.apache.pinot.spi.utils.CommonConstants.Helix.*;
 import static org.apache.pinot.spi.utils.CommonConstants.Server.CONFIG_OF_INSTANCE_ID;
 import static org.testng.Assert.assertEquals;
+import static org.testng.Assert.assertTrue;
 
 
 public class ServerStarterIntegrationTest extends ControllerTest {
@@ -137,5 +139,30 @@ public class ServerStarterIntegrationTest extends ControllerTest {
     properties.put(KEY_OF_SERVER_NETTY_HOST, customHost);
     properties.put(KEY_OF_SERVER_NETTY_PORT, customPort);
     verifyInstanceConfig(new PinotConfiguration(properties), customInstanceId, customHost, customPort);
+  }
+
+  @Test
+  public void testInitialServerTagsFromConfig()
+      throws Exception {
+    String expectedHost = NetUtils.getHostAddress();
+    int port = DEFAULT_SERVER_NETTY_PORT;
+    String expectedInstanceId = PREFIX_OF_SERVER_INSTANCE + expectedHost + "_" + port;
+
+    Map<String, Object> properties = new HashMap<>();
+    properties.put(CONFIG_OF_CLUSTER_NAME, getHelixClusterName());
+    properties.put(CONFIG_OF_ZOOKEEPER_SERVER, getZkUrl());
+    properties.put(KEY_OF_SERVER_NETTY_PORT, port);
+    properties.put("pinot.server.instance.initial.tags",
+        TagNameUtils.getOfflineTagForTenant(null) + "," + TagNameUtils.getRealtimeTagForTenant(null));
+
+    HelixServerStarter helixServerStarter = new HelixServerStarter();
+    helixServerStarter.init(new PinotConfiguration(properties));
+    helixServerStarter.start();
+    helixServerStarter.stop();
+
+    InstanceConfig instanceConfig =
+        _helixDataAccessor.getProperty(_helixDataAccessor.keyBuilder().instanceConfig(expectedInstanceId));
+    assertTrue(instanceConfig.getTags().contains(TagNameUtils.getOfflineTagForTenant(null)));
+    assertTrue(instanceConfig.getTags().contains(TagNameUtils.getRealtimeTagForTenant(null)));
   }
 }

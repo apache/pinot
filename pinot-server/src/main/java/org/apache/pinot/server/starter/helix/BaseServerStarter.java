@@ -179,6 +179,7 @@ public abstract class BaseServerStarter implements ServiceStartable {
   protected DefaultClusterConfigChangeHandler _clusterConfigChangeHandler;
   protected volatile boolean _isServerReadyToServeQueries = false;
   protected ScheduledExecutorService _helixMessageCountScheduler;
+  protected boolean _instanceAlreadyExistsInHelix;
 
   @Override
   public void init(PinotConfiguration serverConf)
@@ -232,6 +233,15 @@ public abstract class BaseServerStarter implements ServiceStartable {
     if (_serverConf.getProperty(CommonConstants.MultiStageQueryRunner.KEY_OF_QUERY_RUNNER_PORT,
         CommonConstants.MultiStageQueryRunner.DEFAULT_QUERY_RUNNER_PORT) == 0) {
       _serverConf.setProperty(CommonConstants.MultiStageQueryRunner.KEY_OF_QUERY_RUNNER_PORT, NetUtils.findOpenPort());
+    }
+
+    // Check if instance already exists in Helix prior to joining
+    try {
+      ZKHelixAdmin adminCheck = new ZKHelixAdmin(_zkAddress);
+      _instanceAlreadyExistsInHelix = HelixHelper.instanceExists(adminCheck, _helixClusterName, _instanceId);
+    } catch (Exception e) {
+      LOGGER.warn("Failed to check instance existence in Helix for {} before connect", _instanceId, e);
+      _instanceAlreadyExistsInHelix = false;
     }
 
     _instanceConfigScope =
@@ -437,8 +447,28 @@ public abstract class BaseServerStarter implements ServiceStartable {
     // Update hostname and port
     boolean updated = HelixHelper.updateHostnamePort(instanceConfig, _hostname, _port);
 
-    // Update tags
+    // Update tags for new servers (first time joining the cluster). If configured, allow initializing tags from
+    // pinot.server.instance.tags; otherwise, fall back to tenant isolation or untagged behavior.
     updated |= HelixHelper.addDefaultTags(instanceConfig, () -> {
+      // Only apply initial tags for first-time joiners; skip if instance already exists in Helix
+      if (_instanceAlreadyExistsInHelix) {
+        return Collections.emptyList();
+      }
+      String instanceTagsConfig =
+          _serverConf.getProperty(CommonConstants.Server.CONFIG_OF_SERVER_INSTANCE_INITIAL_TAGS);
+      if (StringUtils.isNotEmpty(instanceTagsConfig)) {
+        List<String> tags = new ArrayList<>();
+        for (String instanceTag : StringUtils.split(instanceTagsConfig, ',')) {
+          String trimmed = instanceTag.trim();
+          if (trimmed.isEmpty()) {
+            continue;
+          }
+          Preconditions.checkArgument(TagNameUtils.isServerTag(trimmed), "Illegal server instance tag: %s",
+              trimmed);
+          tags.add(trimmed);
+        }
+        return tags;
+      }
       if (ZKMetadataProvider.getClusterTenantIsolationEnabled(_helixManager.getHelixPropertyStore())) {
         return Arrays.asList(TagNameUtils.getOfflineTagForTenant(null), TagNameUtils.getRealtimeTagForTenant(null));
       } else {
