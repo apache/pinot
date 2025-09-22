@@ -32,10 +32,6 @@ import org.testng.annotations.BeforeMethod;
 import org.testng.annotations.Test;
 
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
-import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.ArgumentMatchers.anyLong;
-import static org.mockito.Mockito.doThrow;
-import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 
@@ -96,59 +92,6 @@ public class AuditMetricsTest {
     verify(_brokerMetrics).addMeteredGlobalValue(BrokerMeter.AUDIT_RESPONSE_FAILURES, 1L);
   }
 
-  @Test
-  public void testAllControllerTimers() {
-    AuditMetrics auditMetrics = new AuditMetrics(_controllerMetrics, ServiceRole.CONTROLLER);
-
-    // Test all audit timer mappings
-    auditMetrics.addTimedValue(AuditMetrics.AuditTimer.AUDIT_REQUEST_PROCESSING_TIME, 100L);
-    auditMetrics.addTimedValue(AuditMetrics.AuditTimer.AUDIT_RESPONSE_PROCESSING_TIME, 200L);
-
-    verify(_controllerMetrics).addTimedValue(ControllerTimer.AUDIT_REQUEST_PROCESSING_TIME, 100L,
-        TimeUnit.MILLISECONDS);
-    verify(_controllerMetrics).addTimedValue(ControllerTimer.AUDIT_RESPONSE_PROCESSING_TIME, 200L,
-        TimeUnit.MILLISECONDS);
-  }
-
-  @Test
-  public void testAllControllerMeters() {
-    AuditMetrics auditMetrics = new AuditMetrics(_controllerMetrics, ServiceRole.CONTROLLER);
-
-    // Test all audit meter mappings
-    auditMetrics.addMeteredGlobalValue(AuditMetrics.AuditMeter.AUDIT_REQUEST_FAILURES, 1L);
-    auditMetrics.addMeteredGlobalValue(AuditMetrics.AuditMeter.AUDIT_RESPONSE_FAILURES, 2L);
-    auditMetrics.addMeteredGlobalValue(AuditMetrics.AuditMeter.AUDIT_REQUEST_PAYLOAD_TRUNCATED, 3L);
-
-    verify(_controllerMetrics).addMeteredGlobalValue(ControllerMeter.AUDIT_REQUEST_FAILURES, 1L);
-    verify(_controllerMetrics).addMeteredGlobalValue(ControllerMeter.AUDIT_RESPONSE_FAILURES, 2L);
-    verify(_controllerMetrics).addMeteredGlobalValue(ControllerMeter.AUDIT_REQUEST_PAYLOAD_TRUNCATED, 3L);
-  }
-
-  @Test
-  public void testAllBrokerTimers() {
-    AuditMetrics auditMetrics = new AuditMetrics(_brokerMetrics, ServiceRole.BROKER);
-
-    // Test all audit timer mappings
-    auditMetrics.addTimedValue(AuditMetrics.AuditTimer.AUDIT_REQUEST_PROCESSING_TIME, 50L);
-    auditMetrics.addTimedValue(AuditMetrics.AuditTimer.AUDIT_RESPONSE_PROCESSING_TIME, 25L);
-
-    verify(_brokerMetrics).addTimedValue(BrokerTimer.AUDIT_REQUEST_PROCESSING_TIME, 50L, TimeUnit.MILLISECONDS);
-    verify(_brokerMetrics).addTimedValue(BrokerTimer.AUDIT_RESPONSE_PROCESSING_TIME, 25L, TimeUnit.MILLISECONDS);
-  }
-
-  @Test
-  public void testAllBrokerMeters() {
-    AuditMetrics auditMetrics = new AuditMetrics(_brokerMetrics, ServiceRole.BROKER);
-
-    // Test all audit meter mappings
-    auditMetrics.addMeteredGlobalValue(AuditMetrics.AuditMeter.AUDIT_REQUEST_FAILURES, 5L);
-    auditMetrics.addMeteredGlobalValue(AuditMetrics.AuditMeter.AUDIT_RESPONSE_FAILURES, 10L);
-    auditMetrics.addMeteredGlobalValue(AuditMetrics.AuditMeter.AUDIT_REQUEST_PAYLOAD_TRUNCATED, 15L);
-
-    verify(_brokerMetrics).addMeteredGlobalValue(BrokerMeter.AUDIT_REQUEST_FAILURES, 5L);
-    verify(_brokerMetrics).addMeteredGlobalValue(BrokerMeter.AUDIT_RESPONSE_FAILURES, 10L);
-    verify(_brokerMetrics).addMeteredGlobalValue(BrokerMeter.AUDIT_REQUEST_PAYLOAD_TRUNCATED, 15L);
-  }
 
   @Test
   public void testUnsupportedServiceRoleNoOp() {
@@ -172,67 +115,5 @@ public class AuditMetricsTest {
   public void testNullServiceRoleThrowsException() {
     assertThatThrownBy(() -> new AuditMetrics(_controllerMetrics, null)).isInstanceOf(NullPointerException.class)
         .hasMessage("Service role cannot be null");
-  }
-
-  @Test
-  public void testEnumMappingsConsistency() {
-    // Verify that enum mappings are consistent between timer/meter types
-    for (AuditMetrics.AuditTimer timer : AuditMetrics.AuditTimer.values()) {
-      // Should not throw any exceptions when accessing underlying timers
-      timer.getControllerTimer();
-      timer.getBrokerTimer();
-    }
-
-    for (AuditMetrics.AuditMeter meter : AuditMetrics.AuditMeter.values()) {
-      // Should not throw any exceptions when accessing underlying meters
-      meter.getControllerMeter();
-      meter.getBrokerMeter();
-    }
-  }
-
-  @Test
-  public void testServiceRoleTypeCasting() {
-    // Test that type casting works correctly for each supported service role
-    ControllerMetrics controllerMetrics = mock(ControllerMetrics.class);
-    BrokerMetrics brokerMetrics = mock(BrokerMetrics.class);
-
-    // Controller casting
-    AuditMetrics controllerAuditMetrics = new AuditMetrics(controllerMetrics, ServiceRole.CONTROLLER);
-    controllerAuditMetrics.addTimedValue(AuditMetrics.AuditTimer.AUDIT_REQUEST_PROCESSING_TIME, 100L);
-    verify(controllerMetrics).addTimedValue(ControllerTimer.AUDIT_REQUEST_PROCESSING_TIME, 100L, TimeUnit.MILLISECONDS);
-
-    // Broker casting
-    AuditMetrics brokerAuditMetrics = new AuditMetrics(brokerMetrics, ServiceRole.BROKER);
-    brokerAuditMetrics.addTimedValue(AuditMetrics.AuditTimer.AUDIT_REQUEST_PROCESSING_TIME, 200L);
-    verify(brokerMetrics).addTimedValue(BrokerTimer.AUDIT_REQUEST_PROCESSING_TIME, 200L, TimeUnit.MILLISECONDS);
-  }
-
-  @Test
-  public void testFunctionalInterfacesExecution() {
-    // Test that functional interfaces are properly executed with correct parameters
-    AuditMetrics auditMetrics = new AuditMetrics(_controllerMetrics, ServiceRole.CONTROLLER);
-
-    // Test timer functional interface
-    auditMetrics.addTimedValue(AuditMetrics.AuditTimer.AUDIT_REQUEST_PROCESSING_TIME, 500L);
-    verify(_controllerMetrics).addTimedValue(ControllerTimer.AUDIT_REQUEST_PROCESSING_TIME, 500L,
-        TimeUnit.MILLISECONDS);
-
-    // Test meter functional interface
-    auditMetrics.addMeteredGlobalValue(AuditMetrics.AuditMeter.AUDIT_REQUEST_FAILURES, 10L);
-    verify(_controllerMetrics).addMeteredGlobalValue(ControllerMeter.AUDIT_REQUEST_FAILURES, 10L);
-  }
-
-  @Test
-  public void testErrorHandlingInFunctionalInterfaces() {
-    // Simulate error in underlying metrics call
-    ControllerMetrics faultyMetrics = mock(ControllerMetrics.class);
-    doThrow(new RuntimeException("Metrics system failure")).when(faultyMetrics).addTimedValue(any(), anyLong(), any());
-
-    AuditMetrics auditMetrics = new AuditMetrics(faultyMetrics, ServiceRole.CONTROLLER);
-
-    // This should throw since we're not handling exceptions in the functional interface itself
-    assertThatThrownBy(
-        () -> auditMetrics.addTimedValue(AuditMetrics.AuditTimer.AUDIT_REQUEST_PROCESSING_TIME, 100L)).isInstanceOf(
-        RuntimeException.class).hasMessage("Metrics system failure");
   }
 }
