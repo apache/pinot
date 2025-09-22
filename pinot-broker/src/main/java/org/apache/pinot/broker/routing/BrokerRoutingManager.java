@@ -33,6 +33,7 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
 import java.util.concurrent.ThreadFactory;
+import java.util.concurrent.TimeUnit;
 import java.util.concurrent.locks.ReadWriteLock;
 import java.util.concurrent.locks.ReentrantReadWriteLock;
 import javax.annotation.Nullable;
@@ -127,7 +128,7 @@ public class BrokerRoutingManager implements RoutingManager, ClusterChangeHandle
   private final ServerRoutingStatsManager _serverRoutingStatsManager;
   private final PinotConfiguration _pinotConfig;
   private final boolean _enablePartitionMetadataManager;
-  private final int _processSegmentAssignmentChangeNumThreads;
+  private final ExecutorService _executorService;
 
   // Global read-write lock for protecting the global data structures such as _enabledServerInstanceMap,
   // _excludedServers, and _routableServers. Write lock must be held if any of these are modified, read lock must be
@@ -162,9 +163,11 @@ public class BrokerRoutingManager implements RoutingManager, ClusterChangeHandle
     _enablePartitionMetadataManager =
         pinotConfig.getProperty(CommonConstants.Broker.CONFIG_OF_ENABLE_PARTITION_METADATA_MANAGER,
             CommonConstants.Broker.DEFAULT_ENABLE_PARTITION_METADATA_MANAGER);
-    _processSegmentAssignmentChangeNumThreads =
+    int processSegmentAssignmentChangeNumThreads =
         pinotConfig.getProperty(CommonConstants.Broker.CONFIG_OF_ROUTING_ASSIGNMENT_CHANGE_PROCESS_PARALLELISM,
-            CommonConstants.Broker.DEFAULT_ROUTING_PROCESS_SEGMENT_ASSIGNMENT_CHANGE_NUM_THREADS);
+            CommonConstants.Broker.DEFAULT_ROUTING_ASSIGNMENT_CHANGE_PROCESS_PARALLELISM);
+    ThreadFactory threadFactory = new ThreadFactoryBuilder().setNameFormat("async-broker-assignment-change-%d").build();
+    _executorService = Executors.newFixedThreadPool(processSegmentAssignmentChangeNumThreads, threadFactory);
   }
 
   @Override
@@ -204,18 +207,14 @@ public class BrokerRoutingManager implements RoutingManager, ClusterChangeHandle
 
   private void processSegmentAssignmentChange() {
     _globalLock.readLock().lock();
-    ThreadFactory threadFactory = new ThreadFactoryBuilder().setNameFormat("async-broker-assignment-change-%d").build();
-    ExecutorService executorService = Executors.newFixedThreadPool(_processSegmentAssignmentChangeNumThreads,
-        threadFactory);
     try {
-      processSegmentAssignmentChangeInternal(executorService);
+      processSegmentAssignmentChangeInternal();
     } finally {
-      executorService.shutdown();
       _globalLock.readLock().unlock();
     }
   }
 
-  private void processSegmentAssignmentChangeInternal(ExecutorService executorService) {
+  private void processSegmentAssignmentChangeInternal() {
     LOGGER.info("Processing segment assignment change");
     long startTimeMs = System.currentTimeMillis();
 
@@ -231,11 +230,11 @@ public class BrokerRoutingManager implements RoutingManager, ClusterChangeHandle
       return;
     }
 
-    List<RoutingEntry> routingEntries = new ArrayList<>(numTables);
+    List<String> cachedTableNames = new ArrayList<>(numTables);
     List<String> idealStatePaths = new ArrayList<>(numTables);
     List<String> externalViewPaths = new ArrayList<>(numTables);
     for (Map.Entry<String, RoutingEntry> entry : routingEntrySnapshot.entrySet()) {
-      routingEntries.add(entry.getValue());
+      cachedTableNames.add(entry.getValue().getTableNameWithType());
       idealStatePaths.add(entry.getValue()._idealStatePath);
       externalViewPaths.add(entry.getValue()._externalViewPath);
     }
@@ -243,33 +242,31 @@ public class BrokerRoutingManager implements RoutingManager, ClusterChangeHandle
     Stat[] externalViewStats = _zkDataAccessor.getStats(externalViewPaths, AccessOption.PERSISTENT);
     long fetchStatsEndTimeMs = System.currentTimeMillis();
 
-    ConcurrentLinkedQueue<String> tablesToUpdate = new ConcurrentLinkedQueue<>();
+    ConcurrentLinkedQueue<String> tablesUpdated = new ConcurrentLinkedQueue<>();
     List<Future<?>> futures = new ArrayList<>();
     for (int i = 0; i < numTables; i++) {
-      final Stat idealStateStat = idealStateStats[i];
-      final Stat externalViewStat = externalViewStats[i];
+      Stat idealStateStat = idealStateStats[i];
+      Stat externalViewStat = externalViewStats[i];
       if (idealStateStat != null && externalViewStat != null) {
-        final int index = i;
-        futures.add(executorService.submit(() -> {
-          RoutingEntry cachedRoutingEntry = routingEntries.get(index);
-          Object tableLock = getRoutingTableBuildLock(cachedRoutingEntry.getTableNameWithType());
+        String tableNameWithType = cachedTableNames.get(i);
+        futures.add(_executorService.submit(() -> {
+          Object tableLock = getRoutingTableBuildLock(tableNameWithType);
           synchronized (tableLock) {
             // The routingEntry may have been removed from the _routingEntryMap by the time we get here in case
             // one of the other functions such as 'removeRouting' was called since taking the snapshot. Check for
             // existence before proceeding. Also note that if new entries were added since the snapshot was taken, we
             // will miss processing them in this call. The buildRouting() method tries to handle that by checking for
             // changes in the IS / EV version after adding a new entry
-            RoutingEntry routingEntry = _routingEntryMap.get(cachedRoutingEntry.getTableNameWithType());
+            RoutingEntry routingEntry = _routingEntryMap.get(tableNameWithType);
             if (routingEntry == null) {
               LOGGER.info("Table {} was removed while processing segment assignment change, skipping",
-                  cachedRoutingEntry.getTableNameWithType());
+                  tableNameWithType);
               return;
             }
             boolean hasISOrEVVersionChanged = processAssignmentChangeForTable(idealStateStat.getVersion(),
                 externalViewStat.getVersion(), routingEntry);
-            String tableNameWithType = routingEntry.getTableNameWithType();
             if (hasISOrEVVersionChanged) {
-              tablesToUpdate.add(tableNameWithType);
+              tablesUpdated.add(tableNameWithType);
             }
           }
         }));
@@ -293,7 +290,7 @@ public class BrokerRoutingManager implements RoutingManager, ClusterChangeHandle
     LOGGER.info(
         "Processed segment assignment change in {}ms (fetch ideal state and external view stats for {} tables: {}ms, "
             + "update routing entry for {} tables ({}): {}ms)", updateRoutingEntriesEndTimeMs - startTimeMs, numTables,
-        fetchStatsEndTimeMs - startTimeMs, tablesToUpdate.size(), tablesToUpdate,
+        fetchStatsEndTimeMs - startTimeMs, tablesUpdated.size(), tablesUpdated,
         updateRoutingEntriesEndTimeMs - fetchStatsEndTimeMs);
   }
 
@@ -830,19 +827,15 @@ public class BrokerRoutingManager implements RoutingManager, ClusterChangeHandle
           externalViewVersion = externalView.getRecord().getVersion();
         }
 
-        RoutingEntry existingRoutingEntry = _routingEntryMap.get(tableNameWithType);
-        // Existing routing entry should ideally never be null on the second iteration the table level lock is still
-        // held, so removals cannot go through until it is released
-        if (existingRoutingEntry != null) {
-          boolean hasISOrEvVersionChanged = processAssignmentChangeForTable(idealStateVersion, externalViewVersion,
-              existingRoutingEntry);
-          if (!hasISOrEvVersionChanged) {
-            LOGGER.info("No need to update the routing entry for table {} as IS / EV version has not changed",
-                tableNameWithType);
-          } else {
-            LOGGER.info("The IS / EV version has changed since the routing entry was added for table: {}, updated "
-                + "it if both IS and EV exist", tableNameWithType);
-          }
+        // Okay to directly reuse the routingEntry here since the table-level lock is still held
+        boolean hasISOrEvVersionChanged = processAssignmentChangeForTable(idealStateVersion, externalViewVersion,
+            routingEntry);
+        if (!hasISOrEvVersionChanged) {
+          LOGGER.info("No need to update the routing entry for table {} as IS / EV version has not changed",
+              tableNameWithType);
+        } else {
+          LOGGER.info("The IS / EV version has changed since the routing entry was added for table: {}, updated "
+              + "it if both IS and EV exist", tableNameWithType);
         }
       }
     }
@@ -1151,6 +1144,16 @@ public class BrokerRoutingManager implements RoutingManager, ClusterChangeHandle
   public Long getQueryTimeoutMs(String tableNameWithType) {
     RoutingEntry routingEntry = _routingEntryMap.get(tableNameWithType);
     return routingEntry != null ? routingEntry.getQueryTimeoutMs() : null;
+  }
+
+  public void stop() {
+    LOGGER.info("Stopping executor service for BrokerRoutingManager");
+    _executorService.shutdownNow();
+    try {
+      _executorService.awaitTermination(10L, TimeUnit.SECONDS);
+    } catch (InterruptedException e) {
+      LOGGER.warn("Interrupted while waiting termination for the BrokerRoutingManager executor service", e);
+    }
   }
 
   private static class RoutingEntry {

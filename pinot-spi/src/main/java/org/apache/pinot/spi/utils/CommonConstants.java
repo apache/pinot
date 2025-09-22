@@ -463,7 +463,7 @@ public class CommonConstants {
 
     public static final String CONFIG_OF_ROUTING_ASSIGNMENT_CHANGE_PROCESS_PARALLELISM =
         "pinot.broker.routing.assignment.change.process.parallelism";
-    public static final int DEFAULT_ROUTING_PROCESS_SEGMENT_ASSIGNMENT_CHANGE_NUM_THREADS =
+    public static final int DEFAULT_ROUTING_ASSIGNMENT_CHANGE_PROCESS_PARALLELISM =
         Runtime.getRuntime().availableProcessors();
 
       // When enabled, the broker will set a query option to ignore SERVER_SEGMENT_MISSING errors from servers.
