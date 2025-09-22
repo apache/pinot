@@ -679,9 +679,9 @@ public abstract class BaseDefaultColumnHandler implements DefaultColumnHandler {
             outputValues[i] = getIntOutputValue(outputValues[i], isSingleValue, outputValueType,
                 (Integer) fieldSpec.getDefaultNullValue(), createDictionary);
           }
-          AbstractColumnStatisticsCollector statsCollector = createDictionary ?
-              new IntColumnPreIndexStatsCollector(column, statsCollectorConfig) :
-              new NoDictColumnStatisticsCollector(column, statsCollectorConfig);
+          AbstractColumnStatisticsCollector statsCollector = createDictionary
+              ? new IntColumnPreIndexStatsCollector(column, statsCollectorConfig)
+              : new NoDictColumnStatisticsCollector(column, statsCollectorConfig);
           for (Object value : outputValues) {
             statsCollector.collect(value);
           }
@@ -696,9 +696,9 @@ public abstract class BaseDefaultColumnHandler implements DefaultColumnHandler {
             outputValues[i] = getLongOutputValue(outputValues[i], isSingleValue, outputValueType,
                 (Long) fieldSpec.getDefaultNullValue(), createDictionary);
           }
-          AbstractColumnStatisticsCollector statsCollector = createDictionary ?
-              new LongColumnPreIndexStatsCollector(column, statsCollectorConfig) :
-              new NoDictColumnStatisticsCollector(column, statsCollectorConfig);
+          AbstractColumnStatisticsCollector statsCollector = createDictionary
+              ? new LongColumnPreIndexStatsCollector(column, statsCollectorConfig)
+              : new NoDictColumnStatisticsCollector(column, statsCollectorConfig);
           for (Object value : outputValues) {
             statsCollector.collect(value);
           }
@@ -713,9 +713,9 @@ public abstract class BaseDefaultColumnHandler implements DefaultColumnHandler {
             outputValues[i] = getFloatOutputValue(outputValues[i], isSingleValue, outputValueType,
                 (Float) fieldSpec.getDefaultNullValue(), createDictionary);
           }
-          AbstractColumnStatisticsCollector statsCollector = createDictionary ?
-              new FloatColumnPreIndexStatsCollector(column, statsCollectorConfig) :
-              new NoDictColumnStatisticsCollector(column, statsCollectorConfig);
+          AbstractColumnStatisticsCollector statsCollector = createDictionary
+              ? new FloatColumnPreIndexStatsCollector(column, statsCollectorConfig)
+              : new NoDictColumnStatisticsCollector(column, statsCollectorConfig);
           for (Object value : outputValues) {
             statsCollector.collect(value);
           }
@@ -730,9 +730,9 @@ public abstract class BaseDefaultColumnHandler implements DefaultColumnHandler {
             outputValues[i] = getDoubleOutputValue(outputValues[i], isSingleValue, outputValueType,
                 (Double) fieldSpec.getDefaultNullValue(), createDictionary);
           }
-          AbstractColumnStatisticsCollector statsCollector = createDictionary ?
-              new DoubleColumnPreIndexStatsCollector(column, statsCollectorConfig) :
-              new NoDictColumnStatisticsCollector(column, statsCollectorConfig);
+          AbstractColumnStatisticsCollector statsCollector = createDictionary
+              ? new DoubleColumnPreIndexStatsCollector(column, statsCollectorConfig)
+              : new NoDictColumnStatisticsCollector(column, statsCollectorConfig);
           for (Object value : outputValues) {
             statsCollector.collect(value);
           }
@@ -753,9 +753,9 @@ public abstract class BaseDefaultColumnHandler implements DefaultColumnHandler {
               outputValues[i] = outputValueType.toBigDecimal(outputValues[i]);
             }
           }
-          AbstractColumnStatisticsCollector statsCollector = createDictionary ?
-              new DoubleColumnPreIndexStatsCollector(column, statsCollectorConfig) :
-              new NoDictColumnStatisticsCollector(column, statsCollectorConfig);
+          AbstractColumnStatisticsCollector statsCollector = createDictionary
+              ? new DoubleColumnPreIndexStatsCollector(column, statsCollectorConfig)
+              : new NoDictColumnStatisticsCollector(column, statsCollectorConfig);
           for (Object value : outputValues) {
             statsCollector.collect(value);
           }
@@ -770,9 +770,9 @@ public abstract class BaseDefaultColumnHandler implements DefaultColumnHandler {
             outputValues[i] = getStringOutputValue(outputValues[i], isSingleValue, outputValueType,
                 (String) fieldSpec.getDefaultNullValue());
           }
-          AbstractColumnStatisticsCollector statsCollector = createDictionary ?
-              new StringColumnPreIndexStatsCollector(column, statsCollectorConfig) :
-              new NoDictColumnStatisticsCollector(column, statsCollectorConfig);
+          AbstractColumnStatisticsCollector statsCollector = createDictionary
+              ? new StringColumnPreIndexStatsCollector(column, statsCollectorConfig)
+              : new NoDictColumnStatisticsCollector(column, statsCollectorConfig);
           for (Object value : outputValues) {
             statsCollector.collect(value);
           }
@@ -786,9 +786,9 @@ public abstract class BaseDefaultColumnHandler implements DefaultColumnHandler {
             outputValues[i] = getBytesOutputValue(outputValues[i], isSingleValue, outputValueType,
                 (byte[]) fieldSpec.getDefaultNullValue());
           }
-          AbstractColumnStatisticsCollector statsCollector = createDictionary ?
-              new BytesColumnPredIndexStatsCollector(column, statsCollectorConfig) :
-              new NoDictColumnStatisticsCollector(column, statsCollectorConfig);
+          AbstractColumnStatisticsCollector statsCollector = createDictionary
+              ? new BytesColumnPredIndexStatsCollector(column, statsCollectorConfig)
+              : new NoDictColumnStatisticsCollector(column, statsCollectorConfig);
           for (Object value : outputValues) {
             statsCollector.collect(value);
           }

@@ -20,8 +20,6 @@ package org.apache.pinot.segment.local.segment.creator.impl.stats;
 
 import java.math.BigDecimal;
 import java.nio.charset.StandardCharsets;
-import java.util.Objects;
-import javax.ws.rs.NotSupportedException;
 import org.apache.commons.lang3.NotImplementedException;
 import org.apache.pinot.segment.spi.creator.StatsCollectorConfig;
 import org.apache.pinot.spi.utils.BigDecimalUtils;
@@ -164,5 +162,3 @@ public class NoDictColumnStatisticsCollector extends AbstractColumnStatisticsCol
     _sealed = true;
   }
 }
-
-
