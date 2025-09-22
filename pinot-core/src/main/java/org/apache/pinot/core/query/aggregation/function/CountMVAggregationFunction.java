@@ -90,7 +90,6 @@ public class CountMVAggregationFunction extends CountAggregationFunction {
       return;
     }
 
-    // Raw multi-value data
     int[] valueArray = blockValSet.getNumMVEntries();
     forEachNotNull(length, blockValSet, (from, to) -> {
       for (int i = from; i < to; i++) {
@@ -105,19 +104,6 @@ public class CountMVAggregationFunction extends CountAggregationFunction {
       Map<ExpressionContext, BlockValSet> blockValSetMap) {
     BlockValSet blockValSet = blockValSetMap.get(_expression);
 
-    if (blockValSet.isSingleValue()) {
-      long[] valueArray = blockValSet.getLongValuesSV();
-      for (int i = 0; i < length; i++) {
-        long value = valueArray[i];
-        int[] groupKeys = groupKeysArray[i];
-        for (int groupKey : groupKeys) {
-          groupByResultHolder.setValueForKey(groupKey, groupByResultHolder.getDoubleResult(groupKey) + value);
-        }
-      }
-      return;
-    }
-
-    // Raw multi-value data
     int[] valueArray = blockValSet.getNumMVEntries();
     forEachNotNull(length, blockValSet, (from, to) -> {
       for (int i = from; i < to; i++) {

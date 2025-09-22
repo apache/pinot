@@ -119,18 +119,6 @@ public class SumMVAggregationFunction extends SumAggregationFunction {
       Map<ExpressionContext, BlockValSet> blockValSetMap) {
     BlockValSet blockValSet = blockValSetMap.get(_expression);
 
-    if (blockValSet.isSingleValue()) {
-      // StarTree pre-aggregated values
-      double[] valueArray = blockValSet.getDoubleValuesSV();
-      for (int i = 0; i < length; i++) {
-        double value = valueArray[i];
-        for (int groupKey : groupKeysArray[i]) {
-          groupByResultHolder.setValueForKey(groupKey, groupByResultHolder.getDoubleResult(groupKey) + value);
-        }
-      }
-      return;
-    }
-
     double[][] valuesArray = blockValSet.getDoubleValuesMV();
 
     if (_nullHandlingEnabled) {

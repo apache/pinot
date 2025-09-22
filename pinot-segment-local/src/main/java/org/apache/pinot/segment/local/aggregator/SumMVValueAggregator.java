@@ -101,7 +101,6 @@ public class SumMVValueAggregator implements ValueAggregator<Object, Double> {
       }
       return sum;
     } else {
-      // Single value case
       return ValueAggregatorUtils.toDouble(rawValue);
     }
   }

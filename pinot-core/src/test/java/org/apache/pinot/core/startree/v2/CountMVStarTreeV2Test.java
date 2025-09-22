@@ -18,11 +18,10 @@
  */
 package org.apache.pinot.core.startree.v2;
 
+import java.util.Random;
 import org.apache.pinot.segment.local.aggregator.CountMVValueAggregator;
 import org.apache.pinot.segment.local.aggregator.ValueAggregator;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
-
-import java.util.Random;
 
 import static org.testng.Assert.assertEquals;
 

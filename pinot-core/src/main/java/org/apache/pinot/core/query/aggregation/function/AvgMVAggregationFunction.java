@@ -71,7 +71,6 @@ public class AvgMVAggregationFunction extends AvgAggregationFunction {
         }
       }
     });
-    // Only set the aggregation result when there is at least one non-null input value
     if (avgPair.getCount() != 0) {
       updateAggregationResult(aggregationResultHolder, avgPair.getSum(), avgPair.getCount());
     }
@@ -115,8 +114,6 @@ public class AvgMVAggregationFunction extends AvgAggregationFunction {
         }
       }
     });
-
-    // Startree index does not support grouping by multi-value field, so no need to handle serialized AvgPair here.
   }
 
   private void aggregateOnGroupKey(int groupKey, GroupByResultHolder groupByResultHolder, double[] values) {
