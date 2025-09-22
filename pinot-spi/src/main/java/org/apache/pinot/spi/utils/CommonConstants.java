@@ -674,7 +674,7 @@ public class CommonConstants {
         public static final String USE_PLANNER_RULES = "usePlannerRules";
 
         public static final String REVERSE_ORDER = "allowReverseOrder";
-        public static final boolean DEFAULT_REVERSE_ORDER = true;
+        public static final boolean DEFAULT_REVERSE_ORDER = false;
 
         public static final String MULTI_STAGE_LEAF_LIMIT = "multiStageLeafLimit";
 
