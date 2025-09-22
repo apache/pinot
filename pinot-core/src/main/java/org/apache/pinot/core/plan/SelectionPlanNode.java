@@ -22,6 +22,7 @@ import java.util.ArrayList;
 import java.util.List;
 import org.apache.pinot.common.request.context.ExpressionContext;
 import org.apache.pinot.common.request.context.OrderByExpressionContext;
+import org.apache.pinot.common.utils.config.QueryOptionsUtils;
 import org.apache.pinot.core.common.Operator;
 import org.apache.pinot.core.operator.BaseProjectOperator;
 import org.apache.pinot.core.operator.DidOrderedOperator;
@@ -129,7 +130,7 @@ public class SelectionPlanNode implements PlanNode {
 
     boolean asc = orderByExpressions.get(0).isAsc();
     if (!asc
-        && reverseOptimizationEnabled(_queryContext)
+        && QueryOptionsUtils.reverseOptimizationEnabled(_queryContext.getQueryOptions())
         && !projectOperator.isCompatibleWith(DidOrderedOperator.DidOrder.DESC)) {
       try {
         return projectOperator.withOrder(DidOrderedOperator.DidOrder.DESC);
@@ -140,14 +141,6 @@ public class SelectionPlanNode implements PlanNode {
       }
     }
     return projectOperator;
-  }
-
-  private boolean reverseOptimizationEnabled(QueryContext queryContext) {
-    String value = queryContext.getQueryOptions().get(CommonConstants.Broker.Request.QueryOptionKey.REVERSE_ORDER);
-    if (value == null) {
-      return CommonConstants.Broker.Request.QueryOptionKey.DEFAULT_ALLOW_REVERSE_ORDER;
-    }
-    return Boolean.parseBoolean(value);
   }
 
   /**
