@@ -85,6 +85,7 @@ public class ZKMetadataProvider {
   private static final String PROPERTYSTORE_SEGMENT_LINEAGE = "/SEGMENT_LINEAGE";
   private static final String PROPERTYSTORE_MINION_TASK_METADATA_PREFIX = "/MINION_TASK_METADATA";
   private static final String PROPERTYSTORE_QUERY_WORKLOAD_CONFIGS_PREFIX = "/CONFIGS/QUERYWORKLOAD";
+  private static final String PROPERTYSTORE_TASK_LOCK_SUFFIX = "-Lock";
 
   public static void setUserConfig(ZkHelixPropertyStore<ZNRecord> propertyStore, String username, ZNRecord znRecord) {
     propertyStore.set(constructPropertyStorePathForUserConfig(username), znRecord, AccessOption.PERSISTENT);
@@ -309,7 +310,8 @@ public class ZKMetadataProvider {
   }
 
   public static String constructPropertyStorePathForMinionTaskGenerationLock(String tableNameWithType) {
-    return StringUtil.join("/", PROPERTYSTORE_MINION_TASK_METADATA_PREFIX, tableNameWithType + "-Lock");
+    return StringUtil.join("/", PROPERTYSTORE_MINION_TASK_METADATA_PREFIX, tableNameWithType
+        + PROPERTYSTORE_TASK_LOCK_SUFFIX);
   }
 
   public static String getPropertyStoreWorkloadConfigsPrefix() {

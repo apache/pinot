@@ -40,32 +40,49 @@ import org.slf4j.LoggerFactory;
  * This approach provides automatic cleanup and is suitable for long-running task generation.
  * Locks are held until explicitly released or the controller session terminates.
  * Locks are at the table level, to ensure that only one type of task can be generated per table at any given time.
+ * <p>
+ * ZK EPHEMERAL_SEQUENTIAL Locks (see <a href="https://zookeeper.apache.org/doc/current/recipes.html#sc_recipes_Locks">
+ *   ZooKeeper Lock Recipe.</a> for more details):
+ *   <ul>
+ *     <li>Every lock is created with a lock prefix. Lock prefix used: [controllerName]-lock-[UUID]. The UUID helps
+ *     differentiate between requests originating from the same controller at the same time
+ *     <li>When ZK creates the ZNode, it appends a sequence number at the end. E.g.
+ *     [controllerName]-lock-[UUID]-00000001
+ *     <li>The sequence number is used to identify the lock winner in case more than one lock node is created at the
+ *     same time. The smallest sequence number always wins
+ *     <li>The locks are EPHEMERAL in nature, meaning that once the session with ZK is lost, the lock is automatically
+ *     cleaned up. Scenarios when the ZK session can be lost: a) controller shutdown, b) controller crash, c) ZK session
+ *     expiry (e.g. long GC pauses can cause this)
+ *     <li>This implementation does not set up watches as described in the recipe as the task lock is released whenever
+ *     we identify that the lock is already acquired. Do not expect lock ownership to automatically change for the
+ *     time being. If such support is needed in the future, this can be enhanced to add a watch on the neighboring
+ *     lock node
+ *   </ul>
+ * <p>
+ * Example of how the locks will work:
+ * <p>
+ * Say we have two controllers, and one controller happens to run 2 threads at the same time, all of which need to take
+ * the distributed lock. Each thread will create a distributed lock node, and the "-Lock" ZNode getChildren will return:
+ * <ul>
+ *   <li>controller2-lock-xyzwx-00000002
+ *   <li>controller1-lock-abcde-00000001
+ *   <li>controller1-lock-ab345-00000003
+ * </ul>
+ * <p>
+ * In the above, the controller1 with UUID abcde will win the lock as it has the smallest sequence number. The other
+ * two threads will clean up their locks and return error that the distributed lock could not be acquired. Controller1
+ * will proceed with performing its tasks, and when done will release the lock.
  */
 public class DistributedTaskLockManager {
   private static final Logger LOGGER = LoggerFactory.getLogger(DistributedTaskLockManager.class);
 
-  // Lock and state paths are constructed using ZKMetadataProvider
-  private static final String LOCK_SUFFIX = "-Lock";
-  private static final String STATE_SUFFIX = "-State";
+  // Lock paths are constructed using ZKMetadataProvider
   private static final String LOCK_OWNER_KEY = "lockOwner";
-  private static final String LOCK_PATH_KEY = "lockPath";
   private static final String LOCK_UUID_KEY = "lockUuid";
   private static final String LOCK_TIMESTAMP_MILLIS_KEY = "lockTimestampMillis";
-  private static final String TASK_GENERATION_STATUS_KEY = "status";
-  private static final String TASK_GENERATION_START_TIME_MILLIS_KEY = "startTimeMillis";
-  private static final String TASK_GENERATION_COMPLETION_TIME_MILLIS_KEY = "completionTimeMillis";
-  private static final long STALE_THRESHOLD_MILLIS = 24 * 60 * 60 * 1000L; // 24 hours;
 
-  // Task generation states
-  private enum Status {
-    // IN_PROGRESS if the task generation is currently in progress;
-    // COMPLETED if the task generation completed successfully;
-    // FAILED if the task generation failed.
-    IN_PROGRESS, COMPLETED, FAILED
-  }
-
-  // Define a custom comparator to compare strings of format '<controllerName>-lock-<sequenceNumber>' and sort them by
-  // the sequence number at the end
+  // Define a custom comparator to compare strings of format '<controllerName>-lock-<uuid>-<sequenceNumber>' and sort
+  // them by the sequence number at the end
   private static final Comparator<String> TASK_LOCK_SEQUENCE_ID_COMPARATOR = (s1, s2) -> {
     // Regex to find the trailing sequence of digits
     Pattern p = Pattern.compile("\\d+$");
@@ -93,41 +110,38 @@ public class DistributedTaskLockManager {
   }
 
   /**
-   * Attempts to acquire a distributed lock for task generation using session-based locking.
+   * Attempts to acquire a distributed lock at the table level for task generation using session-based locking.
    * The lock is held until explicitly released or the controller session ends.
-   * The lock is created at the table level
    *
-   * @param tableName the table name (can be null for all-table operations)
+   * @param tableNameWithType the table name with type
    * @return TaskLock object if successful, null if lock could not be acquired
    */
   @Nullable
-  public TaskLock acquireLock(@Nullable String tableName) {
-    String tableNameForPath = (tableName != null) ? tableName : "ALL_TABLES";
-    String lockBasePath = getLockBasePath(tableNameForPath);
-    String statePath = lockBasePath.replace(LOCK_SUFFIX, STATE_SUFFIX);
+  public TaskLock acquireLock(String tableNameWithType) {
+    String lockBasePath = getLockBasePath(tableNameWithType);
 
-    LOGGER.info("Attempting to acquire task generation lock: {} by controller: {}", tableNameForPath,
+    LOGGER.info("Attempting to acquire task generation lock: {} by controller: {}", tableNameWithType,
         _controllerInstanceId);
 
     try {
       // Check if task generation is already in progress
-      if (isTaskGenerationInProgress(tableNameForPath, lockBasePath, statePath)) {
-        LOGGER.info("Task generation already in progress for: {} by this or another controller", tableNameForPath);
+      if (isTaskGenerationInProgress(tableNameWithType, lockBasePath)) {
+        LOGGER.info("Task generation already in progress for: {} by this or another controller", tableNameWithType);
         return null;
       }
 
       // Try to acquire the lock using ephemeral sequential node
-      TaskLock lock = tryAcquireSessionBasedLock(lockBasePath, statePath, tableNameForPath);
+      TaskLock lock = tryAcquireSessionBasedLock(lockBasePath, tableNameWithType);
       if (lock != null) {
-        LOGGER.info("Successfully acquired task generation lock: {} by controller: {}", tableNameForPath,
+        LOGGER.info("Successfully acquired task generation lock: {} by controller: {}", tableNameWithType,
             _controllerInstanceId);
         return lock;
       } else {
-        LOGGER.warn("Could not acquire lock: {} - another controller holds it", tableNameForPath);
+        LOGGER.warn("Could not acquire lock: {} - another controller holds it", tableNameWithType);
         return null;
       }
     } catch (Exception e) {
-      LOGGER.error("Error while trying to acquire lock: {}", tableNameForPath, e);
+      LOGGER.error("Error while trying to acquire lock: {}", tableNameWithType, e);
       return null;
     }
   }
@@ -162,9 +176,6 @@ public class DistributedTaskLockManager {
     String lockKey = lock.getLockKey();
 
     try {
-      // Mark task generation as completed/failed
-      markTaskGenerationCompleted(lock.getStatePath(), lockKey, success);
-
       // Remove the ephemeral lock node
       if (lock.getLockNodePath() != null) {
         try {
@@ -220,120 +231,42 @@ public class DistributedTaskLockManager {
   }
 
   /**
-   * Checks if task generation is currently in progress for the given task type and table.
+   * Checks if any task generation is currently in progress for the given table.
    *
-   * @param tableName the table name
+   * @param tableNameWithType the table name with type
    * @return true if task generation is in progress, false otherwise
    */
   @VisibleForTesting
-  boolean isTaskGenerationInProgress(@Nullable String tableName) {
-    String tableNameForPath = (tableName != null) ? tableName : "ALL_TABLES";
-    String lockBasePath = getLockBasePath(tableNameForPath);
-    String statePath = lockBasePath.replace(LOCK_SUFFIX, STATE_SUFFIX);
-    return isTaskGenerationInProgress(tableNameForPath, lockBasePath, statePath);
+  boolean isTaskGenerationInProgress(String tableNameWithType) {
+    String lockBasePath = getLockBasePath(tableNameWithType);
+    return isTaskGenerationInProgress(tableNameWithType, lockBasePath);
   }
 
   /**
    * Internal method to check if task generation is in progress for a lock key.
    */
-  private boolean isTaskGenerationInProgress(String lockKey, String lockBasePath, String statePath) {
+  private boolean isTaskGenerationInProgress(String tableNameWithType, String lockBasePath) {
     try {
+      if (!_propertyStore.exists(lockBasePath, AccessOption.PERSISTENT)) {
+        return false;
+      }
+
       // Check if there are any active ephemeral lock nodes
-      if (_propertyStore.exists(lockBasePath, AccessOption.PERSISTENT)) {
-        List<String> lockNodes = _propertyStore.getChildNames(lockBasePath, AccessOption.PERSISTENT);
-        if (lockNodes != null && !lockNodes.isEmpty()) {
-          // There are active ephemeral lock nodes, check if any are still valid
-          boolean anyEphemeralLockExists = false;
-          for (String nodeName : lockNodes) {
-            String nodePath = lockBasePath + "/" + nodeName;
-            if (_propertyStore.exists(nodePath, AccessOption.EPHEMERAL)) {
-              anyEphemeralLockExists = true;
-              // Ephemeral node exists, meaning session is still alive and task could be in progress (we update the
-              // state to COMPLETED / FAILED before removing the lock, so better to double-check the task generation
-              // state if the lock exists)
-              ZNRecord stateRecord = _propertyStore.get(statePath, null, AccessOption.PERSISTENT);
-              if (stateRecord != null) {
-                String status = stateRecord.getSimpleField(TASK_GENERATION_STATUS_KEY);
-                String lockPath = stateRecord.getSimpleField(LOCK_PATH_KEY);
-                if (lockPath != null && lockPath.equals(nodePath)) {
-                  return Status.IN_PROGRESS.name().equals(status);
-                }
-              }
-            }
+      List<String> lockNodes = _propertyStore.getChildNames(lockBasePath, AccessOption.PERSISTENT);
+      if (lockNodes != null && !lockNodes.isEmpty()) {
+        // There are active ephemeral lock nodes, check if any are still valid
+        for (String nodeName : lockNodes) {
+          String nodePath = lockBasePath + "/" + nodeName;
+          if (_propertyStore.exists(nodePath, AccessOption.EPHEMERAL)) {
+            // Ephemeral node exists, meaning session is still alive and task should be in progress
+            return true;
           }
-
-          // If we cannot find a matching statePath, but found valid locks, return true just in case the state path
-          // wasn't created yet
-          return anyEphemeralLockExists;
         }
       }
-
       return false;
     } catch (Exception e) {
-      LOGGER.error("Error checking task generation status for: {}", lockKey, e);
+      LOGGER.error("Error checking task generation status for: {}", tableNameWithType, e);
       return false;
-    }
-  }
-
-  /**
-   * Cleans up stale task generation state records.
-   * Since we use session-based locking, expired locks clean themselves up automatically.
-   * This method only cleans up stale state records.
-   */
-  public void cleanupStaleStates() {
-    try {
-      LOGGER.info("Start cleaning up stale states");
-      // Get the base path for minion task metadata
-      String basePath = getBasePath();
-      if (!_propertyStore.exists(basePath, AccessOption.PERSISTENT)) {
-        return;
-      }
-
-      // Traverse table directories under the base path
-      List<String> tableNameEntries = _propertyStore.getChildNames(basePath, AccessOption.PERSISTENT);
-      if (tableNameEntries == null) {
-        return;
-      }
-
-      long currentTimeMs = System.currentTimeMillis();
-
-      for (String tableNameEntry : tableNameEntries) {
-        try {
-          if (tableNameEntry.endsWith(STATE_SUFFIX)) {
-            String statePath = basePath + "/" + tableNameEntry;
-            ZNRecord stateRecord = _propertyStore.get(statePath, null, AccessOption.PERSISTENT);
-
-            if (stateRecord != null) {
-              String status = stateRecord.getSimpleField(TASK_GENERATION_STATUS_KEY);
-              String startTimeMsStr = stateRecord.getSimpleField(TASK_GENERATION_START_TIME_MILLIS_KEY);
-
-              if (startTimeMsStr != null) {
-                long startTimeMs = Long.parseLong(startTimeMsStr);
-                boolean isStale = (currentTimeMs - startTimeMs) > STALE_THRESHOLD_MILLIS;
-
-                int lastIndexOfTableName = tableNameEntry.lastIndexOf(STATE_SUFFIX);
-
-                // Clean up completed/failed states older than threshold, or in-progress states without active locks
-                if ((Status.COMPLETED.name().equals(status) || Status.FAILED.name().equals(status)) && isStale) {
-                  _propertyStore.remove(statePath, AccessOption.PERSISTENT);
-                  LOGGER.info("Cleaned up stale table state: {} (status: {}, age: {}ms)",
-                      tableNameEntry, status, currentTimeMs - startTimeMs);
-                } else if (Status.IN_PROGRESS.name().equals(status)
-                    && !hasActiveLocks(tableNameEntry.substring(0, lastIndexOfTableName))) {
-                  // In-progress state without active locks - likely a dead session
-                  _propertyStore.remove(statePath, AccessOption.PERSISTENT);
-                  LOGGER.info("Cleaned up orphaned in-progress task state: {}, for table: {}", tableNameEntry,
-                      tableNameEntry.substring(0, lastIndexOfTableName));
-                }
-              }
-            }
-          }
-        } catch (Exception e) {
-          LOGGER.warn("Error cleaning up state for table: {}", tableNameEntry, e);
-        }
-      }
-    } catch (Exception e) {
-      LOGGER.error("Error during state cleanup", e);
     }
   }
 
@@ -342,7 +275,7 @@ public class DistributedTaskLockManager {
    * Uses the ZooKeeper recipe for distributed locking with automatic cleanup.
    */
   @VisibleForTesting
-  TaskLock tryAcquireSessionBasedLock(String lockBasePath, String statePath, String lockKey) {
+  TaskLock tryAcquireSessionBasedLock(String lockBasePath, String lockKey) {
     try {
       long currentTimeMs = System.currentTimeMillis();
 
@@ -393,10 +326,9 @@ public class DistributedTaskLockManager {
             allChildren.sort(TASK_LOCK_SEQUENCE_ID_COMPARATOR); // Sort by sequence number
             String ourNode = lockNodePath.substring(lockNodePath.lastIndexOf('/') + 1);
             if (ourNode.equals(allChildren.get(0))) {
-              // We have the lock! Mark task generation as in progress
-              markTaskGenerationInProgress(statePath, lockNodePath, lockKey);
+              // We have the lock!
               LOGGER.info("Acquired lock with ephemeral node: {}", lockNodePath);
-              return new TaskLock(lockKey, _controllerInstanceId, currentTimeMs, lockNodePath, statePath);
+              return new TaskLock(lockKey, _controllerInstanceId, currentTimeMs, lockNodePath);
             } else {
               // Someone else has the lock, clean up our node
               boolean status = _propertyStore.remove(lockNodePath, AccessOption.EPHEMERAL);
@@ -430,72 +362,6 @@ public class DistributedTaskLockManager {
     }
   }
 
-  /**
-   * Marks task generation as in progress.
-   */
-  private void markTaskGenerationInProgress(String statePath, String lockNodePath, String lockKey) {
-    try {
-      ZNRecord stateRecord = new ZNRecord(lockKey);
-      stateRecord.setSimpleField(TASK_GENERATION_STATUS_KEY, Status.IN_PROGRESS.name());
-      stateRecord.setSimpleField(TASK_GENERATION_START_TIME_MILLIS_KEY, String.valueOf(System.currentTimeMillis()));
-      stateRecord.setSimpleField(LOCK_OWNER_KEY, _controllerInstanceId);
-      stateRecord.setSimpleField(LOCK_PATH_KEY, lockNodePath);
-
-      _propertyStore.set(statePath, stateRecord, AccessOption.PERSISTENT);
-    } catch (Exception e) {
-      LOGGER.warn("Error marking task generation in progress for path: {}, lockKey: {}", statePath, lockKey, e);
-    }
-  }
-
-  /**
-   * Marks task generation as completed or failed.
-   */
-  private void markTaskGenerationCompleted(String statePath, String lockKey, boolean success) {
-    try {
-      ZNRecord stateRecord = _propertyStore.get(statePath, null, AccessOption.PERSISTENT);
-
-      if (stateRecord == null) {
-        LOGGER.info("Could not find ZNode record for state path: {}, creating a new one", statePath);
-        stateRecord = new ZNRecord(lockKey);
-      }
-
-      stateRecord.setSimpleField(TASK_GENERATION_STATUS_KEY, success ? Status.COMPLETED.name() : Status.FAILED.name());
-      stateRecord.setSimpleField(TASK_GENERATION_COMPLETION_TIME_MILLIS_KEY,
-          String.valueOf(System.currentTimeMillis()));
-
-      _propertyStore.set(statePath, stateRecord, AccessOption.PERSISTENT);
-    } catch (Exception e) {
-      LOGGER.warn("Error marking task generation completed for path: {}, lockKey: {}", statePath, lockKey, e);
-    }
-  }
-
-  /**
-   * Checks if there are active ephemeral locks for the given key.
-   */
-  private boolean hasActiveLocks(String tableName) {
-    try {
-      String lockBasePath = getLockBasePath(tableName);
-      if (!_propertyStore.exists(lockBasePath, AccessOption.PERSISTENT)) {
-        return false;
-      }
-
-      List<String> children = _propertyStore.getChildNames(lockBasePath, AccessOption.PERSISTENT);
-      if (children != null && !children.isEmpty()) {
-        // Check if any ephemeral nodes still exist (session still alive)
-        for (String childName : children) {
-          String childPath = lockBasePath + "/" + childName;
-          if (_propertyStore.exists(childPath, AccessOption.EPHEMERAL)) {
-            return true;
-          }
-        }
-      }
-      return false;
-    } catch (Exception e) {
-      LOGGER.warn("Error checking active locks for table: {}", tableName, e);
-      return false;
-    }
-  }
-
   private void ensureBasePaths() {
     try {
       // Ensure minion task metadata base path exists
@@ -518,16 +384,14 @@ public class DistributedTaskLockManager {
   public static class TaskLock {
     private final String _lockKey;
     private final String _owner;
-    private final long _timestamp;
+    private final long _creationTimeMs;
     private final String _lockNodePath; // Path to the ephemeral lock node
-    private final String _statePath; // Path to the state record
 
-    public TaskLock(String lockKey, String owner, long timestamp, String lockNodePath, String statePath) {
+    public TaskLock(String lockKey, String owner, long creationTimeMs, String lockNodePath) {
       _lockKey = lockKey;
       _owner = owner;
-      _timestamp = timestamp;
+      _creationTimeMs = creationTimeMs;
       _lockNodePath = lockNodePath;
-      _statePath = statePath;
     }
 
     public String getLockKey() {
@@ -538,26 +402,22 @@ public class DistributedTaskLockManager {
       return _owner;
     }
 
-    public long getTimestamp() {
-      return _timestamp;
+    public long getCreationTimeMs() {
+      return _creationTimeMs;
     }
 
     public String getLockNodePath() {
       return _lockNodePath;
     }
 
-    public String getStatePath() {
-      return _statePath;
-    }
-
     public long getAge() {
-      return System.currentTimeMillis() - _timestamp;
+      return System.currentTimeMillis() - _creationTimeMs;
     }
 
     @Override
     public String toString() {
-      return String.format("TaskLock{key='%s', owner='%s', timestamp=%d, age=%dms, nodePath='%s'}",
-          _lockKey, _owner, _timestamp, getAge(), _lockNodePath);
+      return String.format("TaskLock{key='%s', owner='%s', creationTimeMs=%d, age=%dms, nodePath='%s'}",
+          _lockKey, _owner, _creationTimeMs, getAge(), _lockNodePath);
     }
   }
 }

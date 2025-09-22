@@ -34,9 +34,6 @@ import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.Executor;
-import java.util.concurrent.Executors;
-import java.util.concurrent.ScheduledExecutorService;
-import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
 import javax.annotation.Nullable;
 import org.apache.commons.collections4.CollectionUtils;
@@ -125,8 +122,7 @@ public class PinotTaskManager extends ControllerPeriodicTask<Void> {
 
   private final TaskManagerStatusCache<TaskGeneratorMostRecentRunInfo> _taskManagerStatusCache;
 
-  protected final DistributedTaskLockManager _distributedTaskLockManager;
-  private ScheduledExecutorService _distributedTaskExecutorService = null;
+  protected final @Nullable DistributedTaskLockManager _distributedTaskLockManager;
 
   public PinotTaskManager(PinotHelixTaskResourceManager helixTaskResourceManager,
       PinotHelixResourceManager helixResourceManager, LeadControllerManager leadControllerManager,
@@ -187,11 +183,6 @@ public class PinotTaskManager extends ControllerPeriodicTask<Void> {
       } catch (SchedulerException e) {
         throw new RuntimeException("Caught exception while setting up the scheduler", e);
       }
-    }
-
-    if (_distributedTaskLockManager != null) {
-      // Start the distributed lock cleanup task if enabled
-      startLockCleanupTask();
     }
   }
 
@@ -1000,12 +991,6 @@ public class PinotTaskManager extends ControllerPeriodicTask<Void> {
     for (String taskType : _taskGeneratorRegistry.getAllTaskTypes()) {
       _taskGeneratorRegistry.getTaskGenerator(taskType).nonLeaderCleanUp();
     }
-
-    if (_distributedTaskExecutorService != null) {
-      LOGGER.info("Shutting down lock cleanup executor service");
-      _distributedTaskExecutorService.shutdown();
-      _distributedTaskExecutorService = null;
-    }
   }
 
   @Override
@@ -1069,31 +1054,5 @@ public class PinotTaskManager extends ControllerPeriodicTask<Void> {
       // Add default configs if not present
       configs.putIfAbsent(MinionConstants.MergeTask.MAX_DISK_USAGE_PERCENTAGE, maxDiskUsagePercentageStr);
     };
-  }
-
-  /**
-   * Starts a background thread to periodically clean up stale task generation states.
-   * Note: Session-based locks clean themselves up automatically, but we still need to clean up state records.
-   */
-  public void startLockCleanupTask() {
-    if (_distributedTaskExecutorService != null) {
-      LOGGER.warn("Lock cleanup task already started");
-    }
-
-    LOGGER.info("Starting lock clean up task");
-    _distributedTaskExecutorService = Executors.newSingleThreadScheduledExecutor();
-    _distributedTaskExecutorService.scheduleWithFixedDelay(() -> {
-      try {
-        LOGGER.info("Starting the lock clean up task");
-        _distributedTaskLockManager.cleanupStaleStates();
-      } catch (Throwable e) {
-        // catch all errors to prevent subsequent executions from being silently suppressed
-        // <pre>
-        // See <a href="https://docs.oracle.com/javase/8/docs/api/java/util/concurrent/ScheduledExecutorService
-        // .html#scheduleWithFixedDelay-java.lang.Runnable-long-long-java.util.concurrent.TimeUnit-">Ref</a>
-        // </pre>
-        LOGGER.warn("Caught exception while running lock clean up task", e);
-      }
-    }, getInitialDelayInSeconds(), 300, TimeUnit.SECONDS);
   }
 }
