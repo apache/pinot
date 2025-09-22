@@ -173,6 +173,7 @@ public class MapColumnPreIndexStatsCollector extends AbstractColumnStatisticsCol
    *
    * NOTE: this could raise an issue if there are millions of keys with very few values (Sparse keys, in other words).
    * So a less memory intensive option may be better for this.
+   * TODO - Handle this case better.
    */
   private AbstractColumnStatisticsCollector createKeyStatsCollector(String key, Object value) {
     // Get the type of the value

@@ -21,7 +21,6 @@ package org.apache.pinot.segment.local.segment.creator.impl.stats;
 import it.unimi.dsi.fastutil.objects.ObjectOpenHashSet;
 import java.math.BigDecimal;
 import java.util.Arrays;
-import javax.annotation.Nullable;
 import org.apache.pinot.segment.spi.creator.StatsCollectorConfig;
 import org.apache.pinot.spi.utils.BigDecimalUtils;
 
@@ -30,22 +29,15 @@ import org.apache.pinot.spi.utils.BigDecimalUtils;
  * Extension of {@link AbstractColumnStatisticsCollector} for BigDecimal column type.
  */
 public class BigDecimalColumnPreIndexStatsCollector extends AbstractColumnStatisticsCollector {
-  @Nullable
-  private ObjectOpenHashSet<BigDecimal> _values;
+  private ObjectOpenHashSet<BigDecimal> _values = new ObjectOpenHashSet<>(INITIAL_HASH_SET_SIZE);
   private int _minLength = Integer.MAX_VALUE;
   private int _maxLength = 0;
   private int _maxRowLength = 0;
-  @Nullable
   private BigDecimal[] _sortedValues;
   private boolean _sealed = false;
-  private BigDecimal _minValue;
-  private BigDecimal _maxValue;
 
   public BigDecimalColumnPreIndexStatsCollector(String column, StatsCollectorConfig statsCollectorConfig) {
     super(column, statsCollectorConfig);
-    if (_dictionaryEnabled) {
-      _values = new ObjectOpenHashSet<>(INITIAL_HASH_SET_SIZE);
-    }
   }
 
   @Override
@@ -58,20 +50,13 @@ public class BigDecimalColumnPreIndexStatsCollector extends AbstractColumnStatis
       BigDecimal value = (BigDecimal) entry;
       int length = BigDecimalUtils.byteSize(value);
       addressSorted(value);
-      boolean isNewValue = _dictionaryEnabled ? _values.add(value) : true;
-      if (isNewValue) {
+      if (_values.add(value)) {
         if (isPartitionEnabled()) {
           updatePartition(value.toPlainString());
         }
         _minLength = Math.min(_minLength, length);
         _maxLength = Math.max(_maxLength, length);
         _maxRowLength = _maxLength;
-        if (_minValue == null || value.compareTo(_minValue) < 0) {
-          _minValue = value;
-        }
-        if (_maxValue == null || value.compareTo(_maxValue) > 0) {
-          _maxValue = value;
-        }
       }
       _totalNumberOfEntries++;
     }
@@ -80,7 +65,7 @@ public class BigDecimalColumnPreIndexStatsCollector extends AbstractColumnStatis
   @Override
   public BigDecimal getMinValue() {
     if (_sealed) {
-      return _minValue;
+      return _sortedValues[0];
     }
     throw new IllegalStateException("you must seal the collector first before asking for min value");
   }
@@ -88,7 +73,7 @@ public class BigDecimalColumnPreIndexStatsCollector extends AbstractColumnStatis
   @Override
   public BigDecimal getMaxValue() {
     if (_sealed) {
-      return _maxValue;
+      return _sortedValues[_sortedValues.length - 1];
     }
     throw new IllegalStateException("you must seal the collector first before asking for max value");
   }
@@ -96,7 +81,7 @@ public class BigDecimalColumnPreIndexStatsCollector extends AbstractColumnStatis
   @Override
   public BigDecimal[] getUniqueValuesSet() {
     if (_sealed) {
-      return _dictionaryEnabled ? _sortedValues : null;
+      return _sortedValues;
     }
     throw new IllegalStateException("you must seal the collector first before asking for unique values set");
   }
@@ -118,20 +103,15 @@ public class BigDecimalColumnPreIndexStatsCollector extends AbstractColumnStatis
 
   @Override
   public int getCardinality() {
-    if (_dictionaryEnabled) {
-      return _sealed ? _sortedValues.length : _values.size();
-    }
-    return _totalNumberOfEntries;
+    return _sealed ? _sortedValues.length : _values.size();
   }
 
   @Override
   public void seal() {
     if (!_sealed) {
-      if (_dictionaryEnabled) {
-        _sortedValues = _values.toArray(new BigDecimal[0]);
-        _values = null;
-        Arrays.sort(_sortedValues);
-      }
+      _sortedValues = _values.toArray(new BigDecimal[0]);
+      _values = null;
+      Arrays.sort(_sortedValues);
       _sealed = true;
     }
   }
