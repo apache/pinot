@@ -18,9 +18,9 @@
  */
 package org.apache.pinot.common.exception;
 
-public class SegmentIngestionFailureException extends Exception {
+public class SegmentIngestionFailureException extends RuntimeException {
 
-    public SegmentIngestionFailureException(String message) {
-        super(message);
-    }
+  public SegmentIngestionFailureException(String message) {
+    super(message);
+  }
 }

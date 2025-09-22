@@ -88,6 +88,7 @@ import org.apache.helix.model.StateModelDefinition;
 import org.apache.helix.model.builder.HelixConfigScopeBuilder;
 import org.apache.helix.store.zk.ZkHelixPropertyStore;
 import org.apache.helix.zookeeper.datamodel.ZNRecord;
+import org.apache.helix.zookeeper.zkclient.exception.ZkInterruptedException;
 import org.apache.pinot.common.assignment.InstanceAssignmentConfigUtils;
 import org.apache.pinot.common.assignment.InstancePartitions;
 import org.apache.pinot.common.assignment.InstancePartitionsUtils;
@@ -97,6 +98,7 @@ import org.apache.pinot.common.exception.InvalidConfigException;
 import org.apache.pinot.common.exception.SchemaAlreadyExistsException;
 import org.apache.pinot.common.exception.SchemaBackwardIncompatibleException;
 import org.apache.pinot.common.exception.SchemaNotFoundException;
+import org.apache.pinot.common.exception.SegmentIngestionFailureException;
 import org.apache.pinot.common.exception.TableNotFoundException;
 import org.apache.pinot.common.lineage.LineageEntry;
 import org.apache.pinot.common.lineage.LineageEntryState;
@@ -2595,8 +2597,49 @@ public class PinotHelixResourceManager {
         LOGGER.error("Failed to deleted segment ZK metadata for segment: {} of table: {}", segmentName,
             tableNameWithType);
       }
+
+      if (containsException(e, ZkInterruptedException.class)) {
+        LOGGER.warn("Encountered ZkInterruptedException while assigning segment: {} to table: {}. "
+                + "Deleting segment to prevent inconsistent state.",
+            segmentName, tableNameWithType);
+
+        PinotResourceManagerResponse response = deleteSegment(tableNameWithType, segmentName);
+        String errorMessage;
+        if (!response.isSuccessful()) {
+          errorMessage =
+              String.format("Failed to delete segment: %s of table: %s after ZkInterruptedException. Response: %s",
+                  segmentName, tableNameWithType, response.getMessage());
+        } else {
+          errorMessage = String.format(
+              "Failed to assign segment: %s to table: %s due to ZkInterruptedException. "
+                  + "Segment deleted successfully.",
+              segmentName, tableNameWithType);
+        }
+        LOGGER.error(errorMessage);
+        throw new SegmentIngestionFailureException(errorMessage);
+      }
+
       throw e;
     }
+  }
+
+  /**
+   * Checks if the given exception or any exception in its causal chain
+   * is an instance of the specified exception type.
+   *
+   * @param exception the exception to check
+   * @param exceptionType the exception type to look for
+   * @return true if the exception type is found in the chain, false otherwise
+   */
+  public static boolean containsException(Throwable exception, Class<? extends Throwable> exceptionType) {
+    Throwable current = exception;
+    while (current != null) {
+      if (exceptionType.isInstance(current)) {
+        return true;
+      }
+      current = current.getCause();
+    }
+    return false;
   }
 
   private Map<InstancePartitionsType, InstancePartitions> getInstacePartitionsMap(TableConfig tableConfig,

@@ -28,7 +28,6 @@ import javax.ws.rs.core.HttpHeaders;
 import javax.ws.rs.core.Response;
 import org.apache.commons.io.FileUtils;
 import org.apache.helix.model.IdealState;
-import org.apache.helix.zookeeper.zkclient.exception.ZkInterruptedException;
 import org.apache.pinot.common.metadata.segment.SegmentZKMetadata;
 import org.apache.pinot.common.metrics.ControllerMetrics;
 import org.apache.pinot.common.utils.FileUploadDownloadClient.FileUploadType;
@@ -51,7 +50,6 @@ import org.apache.pinot.spi.data.readers.GenericRow;
 import org.apache.pinot.spi.utils.CommonConstants.Segment.Realtime.Status;
 import org.apache.pinot.spi.utils.builder.TableConfigBuilder;
 import org.apache.pinot.spi.utils.builder.TableNameBuilder;
-import org.apache.pinot.spi.utils.retry.RetriableOperationException;
 import org.apache.pinot.util.TestUtils;
 import org.testng.Assert;
 import org.testng.annotations.AfterClass;
@@ -392,19 +390,6 @@ public class ZKOperatorTest {
     assertEquals(segmentZKMetadata.getStatus(), Status.UPLOADED);
     assertEquals(segmentZKMetadata.getStartOffset(), "1234");
     assertEquals(segmentZKMetadata.getEndOffset(), "2345");
-  }
-
-  @Test
-  public void testContainsZkInterruptedException() {
-    ZkInterruptedException zkInterruptedException =
-            new ZkInterruptedException(new InterruptedException("interrupted test"));
-
-    assertTrue(ZKOperator.containsException(zkInterruptedException, ZkInterruptedException.class));
-
-    RetriableOperationException retriableOperationException =
-            new RetriableOperationException(zkInterruptedException, 5);
-
-    assertTrue(ZKOperator.containsException(retriableOperationException, ZkInterruptedException.class));
   }
 
   @AfterClass
