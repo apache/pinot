@@ -86,6 +86,7 @@ public abstract class AbstractColumnStatisticsCollector implements ColumnStatist
 
     // Determine whether dictionary is enabled for this column based on table/index configs.
     // If there is no explicit config, dictionary is enabled by default.
+    // TODO - Check if it covers all cases where sorted values or exact cardinality is required
     // TODO - Check if we can obtain dictionary info from _fieldConfig
     Map<String, FieldIndexConfigs> indexConfigsByCol =
         FieldIndexConfigsUtil.createIndexConfigsByColName(statsCollectorConfig.getTableConfig(),

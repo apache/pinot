@@ -27,6 +27,7 @@ import java.io.IOException;
 import java.util.Arrays;
 import java.util.Set;
 import javax.annotation.Nullable;
+import org.apache.commons.lang3.NotImplementedException;
 import org.apache.pinot.segment.spi.creator.StatsCollectorConfig;
 import org.apache.pinot.spi.config.table.FieldConfig;
 import org.apache.pinot.spi.data.FieldSpec;
@@ -141,7 +142,10 @@ public class StringColumnPreIndexStatsCollector extends AbstractColumnStatistics
   @Override
   public Object[] getUniqueValuesSet() {
     if (_sealed) {
-      return _dictionaryEnabled ? _sortedValues : null;
+      if (_dictionaryEnabled) {
+        return _sortedValues;
+      }
+      throw new NotImplementedException("Unique values set is not supported when dictionary is disabled");
     }
     throw new IllegalStateException("you must seal the collector first before asking for unique values set");
   }

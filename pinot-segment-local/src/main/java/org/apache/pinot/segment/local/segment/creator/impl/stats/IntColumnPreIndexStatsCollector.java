@@ -22,6 +22,7 @@ import it.unimi.dsi.fastutil.ints.IntOpenHashSet;
 import it.unimi.dsi.fastutil.ints.IntSet;
 import java.util.Arrays;
 import javax.annotation.Nullable;
+import org.apache.commons.lang3.NotImplementedException;
 import org.apache.pinot.segment.spi.creator.StatsCollectorConfig;
 
 
@@ -125,7 +126,10 @@ public class IntColumnPreIndexStatsCollector extends AbstractColumnStatisticsCol
   @Override
   public Object getUniqueValuesSet() {
     if (_sealed) {
-      return _dictionaryEnabled ? _sortedValues : null;
+      if (_dictionaryEnabled) {
+        return _sortedValues;
+      }
+      throw new NotImplementedException("Unique values set is not supported when dictionary is disabled");
     }
     throw new IllegalStateException("you must seal the collector first before asking for unique values set");
   }
