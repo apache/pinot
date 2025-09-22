@@ -361,7 +361,7 @@ public class InnerSegmentSelectionSingleValueQueriesTest extends BaseSingleValue
 
   @Test
   public void testSelectionOrderByAllSortedColumnsDescDidOrder() {
-    String query =  "SET allowReverseOrder = false;"
+    String query = "SET allowReverseOrder = false;"
         + "SELECT column5 "
         + "FROM testTable "
         + "ORDER BY column5 DESC, daysSinceEpoch DESC";
