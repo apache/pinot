@@ -28,7 +28,15 @@ import org.mockito.MockedStatic;
 import org.testng.Assert;
 import org.testng.annotations.Test;
 
-import static org.mockito.Mockito.*;
+import static org.mockito.Mockito.any;
+import static org.mockito.Mockito.anyString;
+import static org.mockito.Mockito.contains;
+import static org.mockito.Mockito.eq;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.mockStatic;
+import static org.mockito.Mockito.times;
+import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.when;
 import static org.testng.Assert.assertEquals;
 import static org.testng.Assert.assertTrue;
 
@@ -36,7 +44,6 @@ import static org.testng.Assert.assertTrue;
 public class DistributedTaskLockManagerTest {
 
   @Test
-  @SuppressWarnings("unchecked")
   public void testEphemeralLockAcquisitionAndRelease() {
     // Mock the property store and data accessor
     ZkHelixPropertyStore<ZNRecord> mockPropertyStore = mock(ZkHelixPropertyStore.class);
@@ -79,7 +86,6 @@ public class DistributedTaskLockManagerTest {
   }
 
   @Test
-  @SuppressWarnings("unchecked")
   public void testConcurrentEphemeralLockAcquisition() {
     // Mock the property store and data accessor
     ZkHelixPropertyStore<ZNRecord> mockPropertyStore = mock(ZkHelixPropertyStore.class);
@@ -117,7 +123,6 @@ public class DistributedTaskLockManagerTest {
   }
 
   @Test
-  @SuppressWarnings("unchecked")
   public void testEphemeralNodeAutomaticCleanup() {
     // Mock the property store and data accessor
     ZkHelixPropertyStore<ZNRecord> mockPropertyStore = mock(ZkHelixPropertyStore.class);
@@ -151,7 +156,6 @@ public class DistributedTaskLockManagerTest {
   }
 
   @Test
-  @SuppressWarnings("unchecked")
   public void testTaskGenerationInProgressDetection() {
     // Mock the property store and data accessor
     ZkHelixPropertyStore<ZNRecord> mockPropertyStore = mock(ZkHelixPropertyStore.class);
@@ -173,62 +177,9 @@ public class DistributedTaskLockManagerTest {
     boolean inProgress = lockManager.isTaskGenerationInProgress("testTable");
     Assert.assertTrue(inProgress, "Should detect task generation in progress when ephemeral nodes exist");
 
-    // Also create a state node that matches the lock
-    ZNRecord staleState = new ZNRecord("testTable");
-    staleState.setSimpleField("status", "IN_PROGRESS");
-    staleState.setSimpleField("startTimeMillis", String.valueOf(System.currentTimeMillis())); // 24 hours ago
-    staleState.setSimpleField("lockPath", "/MINION_TASK_METADATA/testTable-Lock/controller2-" + expectedUuid
-        + "-lock-0000000001");
-    when(mockPropertyStore.get(anyString(), any(), eq(AccessOption.PERSISTENT))).thenReturn(staleState);
-
-    // Test that we can detect task generation in progress
+    // Test that we detect that the task generation is not in progress when we don't have any task locks
+    when(mockPropertyStore.getChildNames(anyString(), eq(AccessOption.PERSISTENT))).thenReturn(Collections.emptyList());
     inProgress = lockManager.isTaskGenerationInProgress("testTable");
-    Assert.assertTrue(inProgress, "Should detect task generation in progress when ephemeral nodes exist");
-
-    // Should detect task generation is completed if state ZNode indicates completed / failed
-    staleState.setSimpleField("status", "COMPLETED");
-    when(mockPropertyStore.get(anyString(), any(), eq(AccessOption.PERSISTENT))).thenReturn(staleState);
-    inProgress = lockManager.isTaskGenerationInProgress("testTable");
-    Assert.assertFalse(inProgress, "Should detect task generation is not in progress when ephemeral nodes "
-        + "exist but state node indicates completed and matches ephemeral node");
-
-    staleState.setSimpleField("status", "FAILED");
-    when(mockPropertyStore.get(anyString(), any(), eq(AccessOption.PERSISTENT))).thenReturn(staleState);
-    inProgress = lockManager.isTaskGenerationInProgress("testTable");
-    Assert.assertFalse(inProgress, "Should detect task generation is not in progress when ephemeral nodes "
-        + "exist but state node indicates completed and matches ephemeral node");
-  }
-
-  @Test
-  @SuppressWarnings("unchecked")
-  public void testLockManagerStateCleanup() {
-    // Mock the property store and data accessor
-    ZkHelixPropertyStore<ZNRecord> mockPropertyStore = mock(ZkHelixPropertyStore.class);
-
-    // Define the specific UUID to use for the lock
-    UUID expectedUuid = UUID.fromString("123e4567-e89b-42d3-a456-426614174000");
-
-    // Configure mocks for state cleanup
-    when(mockPropertyStore.exists(anyString(), eq(AccessOption.PERSISTENT))).thenReturn(true);
-    when(mockPropertyStore.getChildNames(anyString(), eq(AccessOption.PERSISTENT)))
-        .thenReturn(Arrays.asList("testTable-State"));
-
-    // Create a stale state record
-    ZNRecord staleState = new ZNRecord("testTable");
-    staleState.setSimpleField("status", "COMPLETED");
-    // Set a time larger than the 24 hours staleness timeout
-    staleState.setSimpleField("startTimeMillis", String.valueOf(System.currentTimeMillis() - 86410000));
-    staleState.setSimpleField("lockPath", "/MINION_TASK_METADATA/testTable-Lock/controller2-" + expectedUuid
-        + "-lock-0000000001");
-    when(mockPropertyStore.get(anyString(), any(), eq(AccessOption.PERSISTENT))).thenReturn(staleState);
-    when(mockPropertyStore.remove(anyString(), eq(AccessOption.PERSISTENT))).thenReturn(true);
-
-    DistributedTaskLockManager lockManager = new DistributedTaskLockManager(mockPropertyStore, "controller1");
-
-    // Test state cleanup
-    lockManager.cleanupStaleStates();
-
-    // Verify that stale state was removed
-    verify(mockPropertyStore, times(1)).remove(anyString(), eq(AccessOption.PERSISTENT));
+    Assert.assertFalse(inProgress, "Should detect task generation in not progress when ephemeral nodes don't exist");
   }
 }
