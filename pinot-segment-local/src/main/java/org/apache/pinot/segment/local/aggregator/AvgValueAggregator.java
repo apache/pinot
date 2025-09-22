@@ -51,6 +51,30 @@ public class AvgValueAggregator implements ValueAggregator<Object, AvgPair> {
   }
 
   @Override
+  public AvgPair getInitialAggregatedValue(@Nullable Object rawValue, @Nullable DataType sourceDataType) {
+    if (rawValue == null) {
+      return new AvgPair();
+    }
+    if (sourceDataType == null) {
+      return getInitialAggregatedValue(rawValue);
+    }
+    switch (sourceDataType) {
+      case BYTES:
+        return deserializeAggregatedValue((byte[]) rawValue);
+      case INT:
+      case LONG:
+      case DOUBLE:
+      case FLOAT:
+        return new AvgPair(((Number) rawValue).doubleValue(), 1L);
+      case STRING:
+        return new AvgPair(Double.parseDouble((String) rawValue), 1L);
+      default:
+        throw new UnsupportedOperationException(
+            "Cannot convert rawValue: " + rawValue + " of type: " + sourceDataType + " to double.");
+    }
+  }
+
+  @Override
   public AvgPair applyRawValue(AvgPair value, Object rawValue) {
     if (rawValue instanceof byte[]) {
       value.apply(deserializeAggregatedValue((byte[]) rawValue));
@@ -59,6 +83,33 @@ public class AvgValueAggregator implements ValueAggregator<Object, AvgPair> {
     }
     return value;
   }
+
+  @Override
+  public AvgPair applyRawValue(AvgPair value, Object rawValue, @Nullable DataType sourceDataType) {
+    if (sourceDataType == null) {
+      return applyRawValue(value, rawValue);
+    }
+
+    switch (sourceDataType) {
+      case BYTES:
+        value.apply(deserializeAggregatedValue((byte[]) rawValue));
+        return value;
+      case INT:
+      case LONG:
+      case DOUBLE:
+      case FLOAT:
+        value.apply(((Number) rawValue).doubleValue(), 1L);
+        return value;
+      case STRING:
+        value.apply(Double.parseDouble((String) rawValue), 1L);
+        return value;
+      default:
+        throw new UnsupportedOperationException(
+            "Cannot convert rawValue: " + rawValue + " of type: " + sourceDataType + " to double.");
+    }
+  }
+
+  // Two-arg overload implemented above
 
   @Override
   public AvgPair applyAggregatedValue(AvgPair value, AvgPair aggregatedValue) {

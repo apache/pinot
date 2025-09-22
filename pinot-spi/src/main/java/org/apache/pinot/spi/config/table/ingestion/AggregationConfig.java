@@ -21,7 +21,9 @@ package org.apache.pinot.spi.config.table.ingestion;
 import com.fasterxml.jackson.annotation.JsonCreator;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import com.fasterxml.jackson.annotation.JsonPropertyDescription;
+import javax.annotation.Nullable;
 import org.apache.pinot.spi.config.BaseJsonConfig;
+import org.apache.pinot.spi.data.FieldSpec.DataType;
 
 
 public class AggregationConfig extends BaseJsonConfig {
@@ -32,11 +34,24 @@ public class AggregationConfig extends BaseJsonConfig {
   @JsonPropertyDescription("Aggregation function")
   private final String _aggregationFunction;
 
+  @JsonPropertyDescription("Data type of the source")
+  private final DataType _sourceDataType;
+
+  @JsonCreator
+  public AggregationConfig(@JsonProperty("columnName") String columnName,
+      @JsonProperty("aggregationFunction") String aggregationFunction,
+      @JsonProperty("sourceDataType") DataType sourceDataType) {
+    _columnName = columnName;
+    _aggregationFunction = aggregationFunction;
+    _sourceDataType = sourceDataType;
+  }
+
   @JsonCreator
   public AggregationConfig(@JsonProperty("columnName") String columnName,
       @JsonProperty("aggregationFunction") String aggregationFunction) {
     _columnName = columnName;
     _aggregationFunction = aggregationFunction;
+    _sourceDataType = null;
   }
 
   public String getColumnName() {
@@ -45,5 +60,10 @@ public class AggregationConfig extends BaseJsonConfig {
 
   public String getAggregationFunction() {
     return _aggregationFunction;
+  }
+
+  @Nullable
+  public DataType getSourceDataType() {
+    return _sourceDataType;
   }
 }

@@ -52,6 +52,34 @@ public class MinMaxRangeValueAggregator implements ValueAggregator<Object, MinMa
   }
 
   @Override
+  public MinMaxRangePair getInitialAggregatedValue(@Nullable Object rawValue, @Nullable DataType sourceDataType) {
+    if (rawValue == null) {
+      return new MinMaxRangePair();
+    }
+    if (sourceDataType == null) {
+      return getInitialAggregatedValue(rawValue);
+    }
+    switch (sourceDataType) {
+      case BYTES:
+        return deserializeAggregatedValue((byte[]) rawValue);
+      case INT:
+      case LONG:
+      case DOUBLE:
+      case FLOAT: {
+        double v = ((Number) rawValue).doubleValue();
+        return new MinMaxRangePair(v, v);
+      }
+      case STRING: {
+        double v = Double.parseDouble((String) rawValue);
+        return new MinMaxRangePair(v, v);
+      }
+      default:
+        throw new UnsupportedOperationException(
+            "Cannot convert rawValue: " + rawValue + " of type: " + sourceDataType + " to double.");
+    }
+  }
+
+  @Override
   public MinMaxRangePair applyRawValue(MinMaxRangePair value, Object rawValue) {
     if (rawValue instanceof byte[]) {
       value.apply(deserializeAggregatedValue((byte[]) rawValue));
@@ -60,6 +88,32 @@ public class MinMaxRangeValueAggregator implements ValueAggregator<Object, MinMa
     }
     return value;
   }
+
+  @Override
+  public MinMaxRangePair applyRawValue(MinMaxRangePair value, Object rawValue, @Nullable DataType sourceDataType) {
+    if (sourceDataType == null) {
+      return applyRawValue(value, rawValue);
+    }
+    switch (sourceDataType) {
+      case BYTES:
+        value.apply(deserializeAggregatedValue((byte[]) rawValue));
+        return value;
+      case INT:
+      case LONG:
+      case DOUBLE:
+      case FLOAT:
+        value.apply(((Number) rawValue).doubleValue(), 1L);
+        return value;
+      case STRING:
+        value.apply(Double.parseDouble((String) rawValue), 1L);
+        return value;
+      default:
+        throw new UnsupportedOperationException(
+            "Cannot convert rawValue: " + rawValue + " of type: " + sourceDataType + " to double.");
+    }
+  }
+
+  // Two-arg overload implemented above
 
   @Override
   public MinMaxRangePair applyAggregatedValue(MinMaxRangePair value, MinMaxRangePair aggregatedValue) {
