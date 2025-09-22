@@ -562,9 +562,11 @@ public abstract class BaseBrokerStarter implements ServiceStartable {
 
   private QueryDispatcher createQueryDispatcher(PinotConfiguration brokerConf) {
     String hostname = _brokerConf.getProperty(CommonConstants.MultiStageQueryRunner.KEY_OF_QUERY_RUNNER_HOSTNAME);
-    int port = Integer.parseInt(_brokerConf.getProperty(
-        CommonConstants.MultiStageQueryRunner.KEY_OF_QUERY_RUNNER_PORT));
-    return new QueryDispatcher(new MailboxService(hostname, port, _brokerConf), _failureDetector);
+    int port =
+        Integer.parseInt(_brokerConf.getProperty(CommonConstants.MultiStageQueryRunner.KEY_OF_QUERY_RUNNER_PORT));
+    return new QueryDispatcher(
+        new MailboxService(hostname, port, org.apache.pinot.spi.config.instance.InstanceType.BROKER, _brokerConf),
+        _failureDetector);
   }
 
   private void updateInstanceConfigAndBrokerResourceIfNeeded() {
