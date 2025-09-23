@@ -74,13 +74,7 @@ public class AuditMetrics {
         _meterRecorder = (meter, count) -> brokerMetrics.addMeteredGlobalValue(meter.getBrokerMeter(), count);
         break;
       default:
-        LOG.warn("Audit not supported for service role: {}", serviceRole);
-        // No-op recorders for unsupported service roles
-        _timerRecorder = (timer, durationMs) -> {
-        };
-        _meterRecorder = (meter, count) -> {
-        };
-        break;
+        throw new IllegalArgumentException("Audit not supported for service role: " + serviceRole);
     }
   }
 

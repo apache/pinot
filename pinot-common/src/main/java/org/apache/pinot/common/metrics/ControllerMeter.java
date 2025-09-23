@@ -81,7 +81,7 @@ public enum ControllerMeter implements AbstractMetrics.Meter {
   // Audit logging metrics
   AUDIT_REQUEST_FAILURES("failures", true),
   AUDIT_RESPONSE_FAILURES("failures", true),
-  AUDIT_REQUEST_PAYLOAD_TRUNCATED("truncated", true);
+  AUDIT_REQUEST_PAYLOAD_TRUNCATED("count", true);
 
   private final String _brokerMeterName;
   private final String _unit;

@@ -33,7 +33,6 @@ import org.testng.annotations.Test;
 
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.Mockito.verify;
-import static org.mockito.Mockito.verifyNoInteractions;
 
 
 /**
@@ -94,15 +93,10 @@ public class AuditMetricsTest {
 
 
   @Test
-  public void testUnsupportedServiceRoleNoOp() {
-    AuditMetrics auditMetrics = new AuditMetrics(_controllerMetrics, ServiceRole.MINION);
-
-    // These calls should be no-ops and not throw exceptions
-    auditMetrics.addTimedValue(AuditMetrics.AuditTimer.AUDIT_REQUEST_PROCESSING_TIME, 100L);
-    auditMetrics.addMeteredGlobalValue(AuditMetrics.AuditMeter.AUDIT_REQUEST_FAILURES, 1L);
-
-    // Verify no interactions with the mock since unsupported roles use no-op recorders
-    verifyNoInteractions(_controllerMetrics);
+  public void testUnsupportedServiceRoleThrowsException() {
+    assertThatThrownBy(() -> new AuditMetrics(_controllerMetrics, ServiceRole.MINION))
+        .isInstanceOf(IllegalArgumentException.class)
+        .hasMessage("Audit not supported for service role: MINION");
   }
 
   @Test

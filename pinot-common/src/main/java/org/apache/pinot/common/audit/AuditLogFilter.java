@@ -122,7 +122,7 @@ public class AuditLogFilter implements ContainerRequestFilter, ContainerResponse
     if (requestId == null) {
       return;
     }
-    long durationMs = (System.nanoTime() - auditContext.getStartTimeNanos()) / 1_000_000;
+    long durationMs = TimeUnit.NANOSECONDS.toMillis(System.nanoTime() - auditContext.getStartTimeNanos());
     final AuditEvent auditEvent = new AuditEvent().setRequestId(requestId)
         .setTimestamp(Instant.now().toString())
         .setResponseCode(responseContext.getStatus())
@@ -142,7 +142,6 @@ public class AuditLogFilter implements ContainerRequestFilter, ContainerResponse
       // logging the failure meter provides additional context if request/response
       LOG.warn("Failed to process audit logging. Incrementing {}", failureMeter, e);
       _auditMetrics.addMeteredGlobalValue(failureMeter, 1L);
-      // DO NOT escalate the exception.
     } finally {
       long durationMs = TimeUnit.NANOSECONDS.toMillis(System.nanoTime() - startTime);
       _auditMetrics.addTimedValue(timer, durationMs);

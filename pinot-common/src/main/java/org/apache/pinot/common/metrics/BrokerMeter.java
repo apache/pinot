@@ -273,7 +273,7 @@ public class BrokerMeter implements AbstractMetrics.Meter {
   public static final BrokerMeter AUDIT_REQUEST_FAILURES = create("AUDIT_REQUEST_FAILURES", "failures", true);
   public static final BrokerMeter AUDIT_RESPONSE_FAILURES = create("AUDIT_RESPONSE_FAILURES", "failures", true);
   public static final BrokerMeter AUDIT_REQUEST_PAYLOAD_TRUNCATED = create("AUDIT_REQUEST_PAYLOAD_TRUNCATED",
-      "truncated", true);
+      "count", true);
 
   private static final Map<QueryErrorCode, BrokerMeter> QUERY_ERROR_CODE_METER_MAP;
 
