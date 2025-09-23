@@ -38,6 +38,7 @@ import org.apache.pinot.query.runtime.plan.OpChainExecutionContext;
 import org.apache.pinot.query.runtime.plan.server.ServerPlanRequestContext;
 import org.apache.pinot.query.testutils.MockDataBlockOperatorFactory;
 import org.apache.pinot.segment.spi.memory.DataBuffer;
+import org.apache.pinot.spi.query.QueryExecutionContext;
 import org.apache.pinot.spi.utils.CommonConstants;
 import org.testng.Assert;
 
@@ -109,8 +110,8 @@ public class OperatorTestUtil {
 
   public static OpChainExecutionContext getOpChainContext(MailboxService mailboxService, long deadlineMs,
       StageMetadata stageMetadata) {
-    return new OpChainExecutionContext(mailboxService, 0, deadlineMs, deadlineMs, Map.of(), stageMetadata,
-        stageMetadata.getWorkerMetadataList().get(0), null, null, true);
+    return new OpChainExecutionContext(mailboxService, 0, "cid", deadlineMs, deadlineMs, "brokerId", Map.of(),
+        stageMetadata, stageMetadata.getWorkerMetadataList().get(0), null, true);
   }
 
   public static OpChainExecutionContext getTracingContext() {
@@ -133,8 +134,8 @@ public class OperatorTestUtil {
     StageMetadata stageMetadata =
         new StageMetadata(0, List.of(workerMetadata), Map.of(DispatchablePlanFragment.TABLE_NAME_KEY, "testTable"));
     OpChainExecutionContext opChainExecutionContext =
-        new OpChainExecutionContext(mailboxService, 123L, Long.MAX_VALUE, Long.MAX_VALUE, opChainMetadata,
-            stageMetadata, workerMetadata, null, null, true);
+        OpChainExecutionContext.fromQueryContext(mailboxService, opChainMetadata, stageMetadata, workerMetadata, null,
+            true, QueryExecutionContext.forMseTest());
     opChainExecutionContext.setLeafStageContext(
         new ServerPlanRequestContext(new StagePlan(null, stageMetadata), null, null, null));
     return opChainExecutionContext;

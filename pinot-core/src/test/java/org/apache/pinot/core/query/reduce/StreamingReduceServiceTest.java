@@ -37,6 +37,7 @@ import org.apache.pinot.core.transport.ServerRoutingInstance;
 import org.apache.pinot.spi.config.table.TableType;
 import org.apache.pinot.spi.env.PinotConfiguration;
 import org.apache.pinot.spi.exception.QueryErrorCode;
+import org.apache.pinot.spi.query.QueryThreadContext;
 import org.apache.pinot.spi.utils.CommonConstants;
 import org.apache.pinot.sql.parsers.CalciteSqlCompiler;
 import org.mockito.invocation.InvocationOnMock;
@@ -136,7 +137,10 @@ public class StreamingReduceServiceTest {
 
     BrokerMetrics metrics = mock(BrokerMetrics.class);
     // Execute
-    BrokerResponseNative response = service.reduceOnStreamResponse(brokerRequest, serverResponseMap, 1000, metrics);
+    BrokerResponseNative response;
+    try (QueryThreadContext ignore = QueryThreadContext.openForSseTest()) {
+      response = service.reduceOnStreamResponse(brokerRequest, serverResponseMap, 1000, metrics);
+    }
 
     // Validate the SERVER_SEGMENT_MISSING was filtered out
     boolean hasMissing = response.getExceptions()

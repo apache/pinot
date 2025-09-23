@@ -54,25 +54,21 @@ public interface QueryExecutor {
    */
   void shutDown();
 
-  /**
-   * Executes the non-streaming query with the given executor service.
-   */
+  /// Executes the non-streaming query with the given [ExecutorService].
+  /// This [ExecutorService] must be wrapped with
+  /// [org.apache.pinot.spi.query.QueryThreadContext#contextAwareExecutorService].
+  /// [org.apache.pinot.spi.query.QueryThreadContext] must already be set up before calling this method.
   default InstanceResponseBlock execute(ServerQueryRequest queryRequest, ExecutorService executorService) {
     return execute(queryRequest, executorService, null);
   }
 
-  /**
-   * Executes the query (streaming or non-streaming) with the given executor service.
-   * <ul>
-   *   <li>
-   *     For streaming request, the returned {@link InstanceResponseBlock} contains only the metadata. The response is
-   *     streamed back via the observer.
-   *   </li>
-   *   <li>
-   *     For non-streaming request, the returned {@link InstanceResponseBlock} contains both data and metadata.
-   *   </li>
-   * </ul>
-   */
+  /// Executes the query (streaming or non-streaming) with the given [ExecutorService].
+  /// This [ExecutorService] must be wrapped with
+  /// [org.apache.pinot.spi.query.QueryThreadContext#contextAwareExecutorService].
+  /// [org.apache.pinot.spi.query.QueryThreadContext] must already be set up before calling this method.
+  /// - For streaming request, the returned {@link InstanceResponseBlock} contains only the metadata. The response is
+  ///   streamed back via the observer.
+  /// - For non-streaming request, the returned {@link InstanceResponseBlock} contains both data and metadata.
   InstanceResponseBlock execute(ServerQueryRequest queryRequest, ExecutorService executorService,
       @Nullable ResultsBlockStreamer streamer);
 }

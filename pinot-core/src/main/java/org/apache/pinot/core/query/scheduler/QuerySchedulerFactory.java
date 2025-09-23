@@ -18,16 +18,14 @@
  */
 package org.apache.pinot.core.query.scheduler;
 
-import com.google.common.base.Preconditions;
 import java.lang.reflect.Constructor;
 import java.util.concurrent.atomic.LongAccumulator;
 import javax.annotation.Nullable;
-import org.apache.pinot.common.metrics.ServerMetrics;
 import org.apache.pinot.core.query.executor.QueryExecutor;
 import org.apache.pinot.core.query.scheduler.fcfs.BoundedFCFSScheduler;
 import org.apache.pinot.core.query.scheduler.fcfs.FCFSQueryScheduler;
 import org.apache.pinot.core.query.scheduler.tokenbucket.TokenPriorityScheduler;
-import org.apache.pinot.spi.accounting.ThreadResourceUsageAccountant;
+import org.apache.pinot.spi.accounting.ThreadAccountant;
 import org.apache.pinot.spi.env.PinotConfiguration;
 import org.apache.pinot.spi.plugin.PluginManager;
 import org.slf4j.Logger;
@@ -59,39 +57,35 @@ public class QuerySchedulerFactory {
    * @param queryExecutor QueryExecutor to use
    * @return returns an instance of query scheduler
    */
-  public static QueryScheduler create(PinotConfiguration schedulerConfig, QueryExecutor queryExecutor,
-      ServerMetrics serverMetrics, LongAccumulator latestQueryTime,
-      ThreadResourceUsageAccountant resourceUsageAccountant) {
-    Preconditions.checkNotNull(schedulerConfig);
-    Preconditions.checkNotNull(queryExecutor);
-
+  public static QueryScheduler create(PinotConfiguration schedulerConfig, String instanceId,
+      QueryExecutor queryExecutor, ThreadAccountant threadAccountant, LongAccumulator latestQueryTime) {
     String schedulerName = schedulerConfig.getProperty(ALGORITHM_NAME_CONFIG_KEY, DEFAULT_QUERY_SCHEDULER_ALGORITHM);
     QueryScheduler scheduler;
     switch (schedulerName.toLowerCase()) {
       case FCFS_ALGORITHM:
-        scheduler = new FCFSQueryScheduler(schedulerConfig, queryExecutor, serverMetrics, latestQueryTime,
-            resourceUsageAccountant);
+        scheduler =
+            new FCFSQueryScheduler(schedulerConfig, instanceId, queryExecutor, threadAccountant, latestQueryTime);
         break;
       case TOKEN_BUCKET_ALGORITHM:
-        scheduler = TokenPriorityScheduler.create(schedulerConfig, queryExecutor, serverMetrics, latestQueryTime,
-            resourceUsageAccountant);
+        scheduler = TokenPriorityScheduler.create(schedulerConfig, instanceId, queryExecutor, threadAccountant,
+            latestQueryTime);
         break;
       case BOUNDED_FCFS_ALGORITHM:
-        scheduler = BoundedFCFSScheduler.create(schedulerConfig, queryExecutor, serverMetrics, latestQueryTime,
-            resourceUsageAccountant);
+        scheduler =
+            BoundedFCFSScheduler.create(schedulerConfig, instanceId, queryExecutor, threadAccountant, latestQueryTime);
         break;
       case BINARY_WORKLOAD_ALGORITHM:
-        scheduler = new BinaryWorkloadScheduler(schedulerConfig, queryExecutor, serverMetrics, latestQueryTime,
-            resourceUsageAccountant);
+        scheduler =
+            new BinaryWorkloadScheduler(schedulerConfig, instanceId, queryExecutor, threadAccountant, latestQueryTime);
         break;
       case WORKLOAD_SCHEDULER_ALGORITHM:
-        scheduler = new WorkloadScheduler(schedulerConfig, queryExecutor, serverMetrics, latestQueryTime,
-            resourceUsageAccountant);
+        scheduler =
+            new WorkloadScheduler(schedulerConfig, instanceId, queryExecutor, threadAccountant, latestQueryTime);
         break;
       default:
         scheduler =
-            getQuerySchedulerByClassName(schedulerName, schedulerConfig, queryExecutor, serverMetrics, latestQueryTime,
-                resourceUsageAccountant);
+            getQuerySchedulerByClassName(schedulerName, schedulerConfig, instanceId, queryExecutor, threadAccountant,
+                latestQueryTime);
         break;
     }
 
@@ -105,21 +99,21 @@ public class QuerySchedulerFactory {
     // Failure on bad configuration will cause outage vs an inferior algorithm that
     // will provide degraded service
     LOGGER.warn("Scheduler {} not found. Using default FCFS query scheduler", schedulerName);
-    return new FCFSQueryScheduler(schedulerConfig, queryExecutor, serverMetrics, latestQueryTime,
-        resourceUsageAccountant);
+    return new FCFSQueryScheduler(schedulerConfig, instanceId, queryExecutor, threadAccountant, latestQueryTime);
   }
 
   @Nullable
   private static QueryScheduler getQuerySchedulerByClassName(String className, PinotConfiguration schedulerConfig,
-      QueryExecutor queryExecutor, ServerMetrics serverMetrics, LongAccumulator latestQueryTime,
-      ThreadResourceUsageAccountant resourceUsageAccountant) {
+      String instanceId, QueryExecutor queryExecutor, ThreadAccountant threadAccountant,
+      LongAccumulator latestQueryTime) {
     try {
-      Constructor<?> constructor = PluginManager.get().loadClass(className)
-          .getDeclaredConstructor(PinotConfiguration.class, QueryExecutor.class, ServerMetrics.class,
-              LongAccumulator.class, ThreadResourceUsageAccountant.class);
+      Constructor<?> constructor = PluginManager.get()
+          .loadClass(className)
+          .getDeclaredConstructor(PinotConfiguration.class, String.class, QueryExecutor.class, ThreadAccountant.class,
+              LongAccumulator.class);
       constructor.setAccessible(true);
-      return (QueryScheduler) constructor.newInstance(schedulerConfig, queryExecutor, serverMetrics, latestQueryTime,
-          resourceUsageAccountant);
+      return (QueryScheduler) constructor.newInstance(schedulerConfig, instanceId, queryExecutor, threadAccountant,
+          latestQueryTime);
     } catch (Exception e) {
       LOGGER.error("Failed to instantiate scheduler class by name: {}", className, e);
       return null;

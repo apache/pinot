@@ -55,14 +55,16 @@ public class QueryMonitorConfig {
   private final boolean _publishHeapUsageMetric;
 
   // if we want kill query based on CPU time
-  private final boolean _isCPUTimeBasedKillingEnabled;
+  private final boolean _cpuTimeBasedKillingEnabled;
 
   // CPU time based killing threshold
-  private final long _cpuTimeBasedKillingThresholdNS;
+  private final long _cpuTimeBasedKillingThresholdNs;
 
-  private final boolean _isQueryKilledMetricEnabled;
+  private final boolean _queryKilledMetricEnabled;
 
-  private final boolean _isThreadSelfTerminate;
+  private final int _workloadSleepTimeMs;
+
+  private final boolean _workloadCostEnforcementEnabled;
 
   public QueryMonitorConfig(PinotConfiguration config, long maxHeapSize) {
     _maxHeapSize = maxHeapSize;
@@ -73,7 +75,7 @@ public class QueryMonitorConfig {
 
     _panicLevel =
         (long) (maxHeapSize * config.getProperty(CommonConstants.Accounting.CONFIG_OF_PANIC_LEVEL_HEAP_USAGE_RATIO,
-            CommonConstants.Accounting.DFAULT_PANIC_LEVEL_HEAP_USAGE_RATIO));
+            CommonConstants.Accounting.DEFAULT_PANIC_LEVEL_HEAP_USAGE_RATIO));
 
     // kill the most expensive query if heap usage exceeds this
     _criticalLevel =
@@ -98,19 +100,23 @@ public class QueryMonitorConfig {
     _publishHeapUsageMetric = config.getProperty(CommonConstants.Accounting.CONFIG_OF_PUBLISHING_JVM_USAGE,
         CommonConstants.Accounting.DEFAULT_PUBLISHING_JVM_USAGE);
 
-    _isCPUTimeBasedKillingEnabled =
+    _cpuTimeBasedKillingEnabled =
         config.getProperty(CommonConstants.Accounting.CONFIG_OF_CPU_TIME_BASED_KILLING_ENABLED,
             CommonConstants.Accounting.DEFAULT_CPU_TIME_BASED_KILLING_ENABLED);
 
-    _cpuTimeBasedKillingThresholdNS =
+    _cpuTimeBasedKillingThresholdNs =
         config.getProperty(CommonConstants.Accounting.CONFIG_OF_CPU_TIME_BASED_KILLING_THRESHOLD_MS,
             CommonConstants.Accounting.DEFAULT_CPU_TIME_BASED_KILLING_THRESHOLD_MS) * 1000_000L;
 
-    _isQueryKilledMetricEnabled = config.getProperty(CommonConstants.Accounting.CONFIG_OF_QUERY_KILLED_METRIC_ENABLED,
+    _queryKilledMetricEnabled = config.getProperty(CommonConstants.Accounting.CONFIG_OF_QUERY_KILLED_METRIC_ENABLED,
         CommonConstants.Accounting.DEFAULT_QUERY_KILLED_METRIC_ENABLED);
 
-    _isThreadSelfTerminate = config.getProperty(CommonConstants.Accounting.CONFIG_OF_THREAD_SELF_TERMINATE,
-        CommonConstants.Accounting.DEFAULT_THREAD_SELF_TERMINATE);
+    _workloadSleepTimeMs = config.getProperty(CommonConstants.Accounting.CONFIG_OF_WORKLOAD_SLEEP_TIME_MS,
+        CommonConstants.Accounting.DEFAULT_WORKLOAD_SLEEP_TIME_MS);
+
+    _workloadCostEnforcementEnabled =
+        config.getProperty(CommonConstants.Accounting.CONFIG_OF_WORKLOAD_ENABLE_COST_ENFORCEMENT,
+            CommonConstants.Accounting.DEFAULT_WORKLOAD_ENABLE_COST_ENFORCEMENT);
   }
 
   QueryMonitorConfig(QueryMonitorConfig oldConfig, Set<String> changedConfigs, Map<String, String> clusterConfigs) {
@@ -132,7 +138,7 @@ public class QueryMonitorConfig {
     if (changedConfigs.contains(CommonConstants.Accounting.CONFIG_OF_PANIC_LEVEL_HEAP_USAGE_RATIO)) {
       if (clusterConfigs == null || !clusterConfigs.containsKey(
           CommonConstants.Accounting.CONFIG_OF_PANIC_LEVEL_HEAP_USAGE_RATIO)) {
-        _panicLevel = (long) (_maxHeapSize * CommonConstants.Accounting.DFAULT_PANIC_LEVEL_HEAP_USAGE_RATIO);
+        _panicLevel = (long) (_maxHeapSize * CommonConstants.Accounting.DEFAULT_PANIC_LEVEL_HEAP_USAGE_RATIO);
       } else {
         _panicLevel = (long) (_maxHeapSize * Double.parseDouble(
             clusterConfigs.get(CommonConstants.Accounting.CONFIG_OF_PANIC_LEVEL_HEAP_USAGE_RATIO)));
@@ -216,51 +222,63 @@ public class QueryMonitorConfig {
     if (changedConfigs.contains(CommonConstants.Accounting.CONFIG_OF_CPU_TIME_BASED_KILLING_ENABLED)) {
       if (clusterConfigs == null || !clusterConfigs.containsKey(
           CommonConstants.Accounting.CONFIG_OF_CPU_TIME_BASED_KILLING_ENABLED)) {
-        _isCPUTimeBasedKillingEnabled = CommonConstants.Accounting.DEFAULT_CPU_TIME_BASED_KILLING_ENABLED;
+        _cpuTimeBasedKillingEnabled = CommonConstants.Accounting.DEFAULT_CPU_TIME_BASED_KILLING_ENABLED;
       } else {
-        _isCPUTimeBasedKillingEnabled = Boolean.parseBoolean(
+        _cpuTimeBasedKillingEnabled = Boolean.parseBoolean(
             clusterConfigs.get(CommonConstants.Accounting.CONFIG_OF_CPU_TIME_BASED_KILLING_ENABLED));
       }
     } else {
-      _isCPUTimeBasedKillingEnabled = oldConfig._isCPUTimeBasedKillingEnabled;
+      _cpuTimeBasedKillingEnabled = oldConfig._cpuTimeBasedKillingEnabled;
     }
 
     if (changedConfigs.contains(CommonConstants.Accounting.CONFIG_OF_CPU_TIME_BASED_KILLING_THRESHOLD_MS)) {
       if (clusterConfigs == null || !clusterConfigs.containsKey(
           CommonConstants.Accounting.CONFIG_OF_CPU_TIME_BASED_KILLING_THRESHOLD_MS)) {
-        _cpuTimeBasedKillingThresholdNS =
+        _cpuTimeBasedKillingThresholdNs =
             CommonConstants.Accounting.DEFAULT_CPU_TIME_BASED_KILLING_THRESHOLD_MS * 1000_000L;
       } else {
-        _cpuTimeBasedKillingThresholdNS =
+        _cpuTimeBasedKillingThresholdNs =
             Long.parseLong(clusterConfigs.get(CommonConstants.Accounting.CONFIG_OF_CPU_TIME_BASED_KILLING_THRESHOLD_MS))
                 * 1000_000L;
       }
     } else {
-      _cpuTimeBasedKillingThresholdNS = oldConfig._cpuTimeBasedKillingThresholdNS;
+      _cpuTimeBasedKillingThresholdNs = oldConfig._cpuTimeBasedKillingThresholdNs;
     }
 
     if (changedConfigs.contains(CommonConstants.Accounting.CONFIG_OF_QUERY_KILLED_METRIC_ENABLED)) {
       if (clusterConfigs == null || !clusterConfigs.containsKey(
           CommonConstants.Accounting.CONFIG_OF_QUERY_KILLED_METRIC_ENABLED)) {
-        _isQueryKilledMetricEnabled = CommonConstants.Accounting.DEFAULT_QUERY_KILLED_METRIC_ENABLED;
+        _queryKilledMetricEnabled = CommonConstants.Accounting.DEFAULT_QUERY_KILLED_METRIC_ENABLED;
       } else {
-        _isQueryKilledMetricEnabled =
+        _queryKilledMetricEnabled =
             Boolean.parseBoolean(clusterConfigs.get(CommonConstants.Accounting.CONFIG_OF_QUERY_KILLED_METRIC_ENABLED));
       }
     } else {
-      _isQueryKilledMetricEnabled = oldConfig._isQueryKilledMetricEnabled;
+      _queryKilledMetricEnabled = oldConfig._queryKilledMetricEnabled;
     }
 
-    if (changedConfigs.contains(CommonConstants.Accounting.CONFIG_OF_THREAD_SELF_TERMINATE)) {
+    if (changedConfigs.contains(CommonConstants.Accounting.CONFIG_OF_WORKLOAD_SLEEP_TIME_MS)) {
       if (clusterConfigs == null || !clusterConfigs.containsKey(
-          CommonConstants.Accounting.CONFIG_OF_THREAD_SELF_TERMINATE)) {
-        _isThreadSelfTerminate = CommonConstants.Accounting.DEFAULT_THREAD_SELF_TERMINATE;
+          CommonConstants.Accounting.CONFIG_OF_WORKLOAD_SLEEP_TIME_MS)) {
+        _workloadSleepTimeMs = CommonConstants.Accounting.DEFAULT_WORKLOAD_SLEEP_TIME_MS;
       } else {
-        _isThreadSelfTerminate =
-            Boolean.parseBoolean(clusterConfigs.get(CommonConstants.Accounting.CONFIG_OF_THREAD_SELF_TERMINATE));
+        _workloadSleepTimeMs =
+            Integer.parseInt(clusterConfigs.get(CommonConstants.Accounting.CONFIG_OF_WORKLOAD_SLEEP_TIME_MS));
       }
     } else {
-      _isThreadSelfTerminate = oldConfig._isThreadSelfTerminate;
+      _workloadSleepTimeMs = oldConfig._workloadSleepTimeMs;
+    }
+
+    if (changedConfigs.contains(CommonConstants.Accounting.CONFIG_OF_WORKLOAD_ENABLE_COST_ENFORCEMENT)) {
+      if (clusterConfigs == null || !clusterConfigs.containsKey(
+          CommonConstants.Accounting.CONFIG_OF_WORKLOAD_ENABLE_COST_ENFORCEMENT)) {
+        _workloadCostEnforcementEnabled = CommonConstants.Accounting.DEFAULT_WORKLOAD_ENABLE_COST_ENFORCEMENT;
+      } else {
+        _workloadCostEnforcementEnabled = Boolean.parseBoolean(
+            clusterConfigs.get(CommonConstants.Accounting.CONFIG_OF_WORKLOAD_ENABLE_COST_ENFORCEMENT));
+      }
+    } else {
+      _workloadCostEnforcementEnabled = oldConfig._workloadCostEnforcementEnabled;
     }
   }
 
@@ -301,18 +319,22 @@ public class QueryMonitorConfig {
   }
 
   public boolean isCpuTimeBasedKillingEnabled() {
-    return _isCPUTimeBasedKillingEnabled;
+    return _cpuTimeBasedKillingEnabled;
   }
 
-  public long getCpuTimeBasedKillingThresholdNS() {
-    return _cpuTimeBasedKillingThresholdNS;
+  public long getCpuTimeBasedKillingThresholdNs() {
+    return _cpuTimeBasedKillingThresholdNs;
   }
 
   public boolean isQueryKilledMetricEnabled() {
-    return _isQueryKilledMetricEnabled;
+    return _queryKilledMetricEnabled;
   }
 
-  public boolean isThreadSelfTerminate() {
-    return _isThreadSelfTerminate;
+  public int getWorkloadSleepTimeMs() {
+    return _workloadSleepTimeMs;
+  }
+
+  public boolean isWorkloadCostEnforcementEnabled() {
+    return _workloadCostEnforcementEnabled;
   }
 }

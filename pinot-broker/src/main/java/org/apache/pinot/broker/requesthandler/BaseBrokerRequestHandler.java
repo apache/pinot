@@ -53,7 +53,7 @@ import org.apache.pinot.common.utils.request.RequestUtils;
 import org.apache.pinot.core.auth.Actions;
 import org.apache.pinot.core.auth.TargetType;
 import org.apache.pinot.core.routing.RoutingManager;
-import org.apache.pinot.spi.accounting.ThreadResourceUsageAccountant;
+import org.apache.pinot.spi.accounting.ThreadAccountant;
 import org.apache.pinot.spi.auth.AuthorizationResult;
 import org.apache.pinot.spi.auth.TableAuthorizationResult;
 import org.apache.pinot.spi.auth.broker.RequesterIdentity;
@@ -62,10 +62,9 @@ import org.apache.pinot.spi.eventlistener.query.BrokerQueryEventListener;
 import org.apache.pinot.spi.eventlistener.query.BrokerQueryEventListenerFactory;
 import org.apache.pinot.spi.exception.BadQueryRequestException;
 import org.apache.pinot.spi.exception.QueryErrorCode;
-import org.apache.pinot.spi.query.QueryThreadContext;
 import org.apache.pinot.spi.trace.RequestContext;
-import org.apache.pinot.spi.utils.CommonConstants;
 import org.apache.pinot.spi.utils.CommonConstants.Broker;
+import org.apache.pinot.spi.utils.CommonConstants.Broker.Request.QueryOptionKey;
 import org.apache.pinot.spi.utils.builder.TableNameBuilder;
 import org.apache.pinot.sql.parsers.SqlNodeAndOptions;
 import org.slf4j.Logger;
@@ -81,6 +80,7 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
   protected final AccessControlFactory _accessControlFactory;
   protected final QueryQuotaManager _queryQuotaManager;
   protected final TableCache _tableCache;
+  protected final ThreadAccountant _threadAccountant;
   protected final BrokerMetrics _brokerMetrics;
   protected final BrokerQueryEventListener _brokerQueryEventListener;
   protected final Set<String> _trackedHeaders;
@@ -90,7 +90,7 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
   protected final QueryLogger _queryLogger;
   @Nullable
   protected final String _enableNullHandling;
-  protected final ThreadResourceUsageAccountant _resourceUsageAccountant;
+  protected final boolean _enableQueryCancellation;
 
   /**
    * Maps broker-generated query id to the query string.
@@ -104,7 +104,7 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
   public BaseBrokerRequestHandler(PinotConfiguration config, String brokerId,
       BrokerRequestIdGenerator requestIdGenerator, RoutingManager routingManager,
       AccessControlFactory accessControlFactory, QueryQuotaManager queryQuotaManager, TableCache tableCache,
-      ThreadResourceUsageAccountant resourceUsageAccountant) {
+      ThreadAccountant threadAccountant) {
     _config = config;
     _brokerId = brokerId;
     _requestIdGenerator = requestIdGenerator;
@@ -112,6 +112,7 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
     _accessControlFactory = accessControlFactory;
     _queryQuotaManager = queryQuotaManager;
     _tableCache = tableCache;
+    _threadAccountant = threadAccountant;
     _brokerMetrics = BrokerMetrics.get();
     _brokerQueryEventListener = BrokerQueryEventListenerFactory.getBrokerQueryEventListener();
     _trackedHeaders = BrokerQueryEventListenerFactory.getTrackedHeaders();
@@ -120,106 +121,96 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
         Broker.DEFAULT_BROKER_ENABLE_ROW_COLUMN_LEVEL_AUTH);
     _queryLogger = new QueryLogger(config);
     _enableNullHandling = config.getProperty(Broker.CONFIG_OF_BROKER_QUERY_ENABLE_NULL_HANDLING);
-
-    boolean enableQueryCancellation =
-        Boolean.parseBoolean(config.getProperty(CommonConstants.Broker.CONFIG_OF_BROKER_ENABLE_QUERY_CANCELLATION));
-    if (enableQueryCancellation) {
+    _enableQueryCancellation = config.getProperty(Broker.CONFIG_OF_BROKER_ENABLE_QUERY_CANCELLATION,
+        Broker.DEFAULT_BROKER_ENABLE_QUERY_CANCELLATION);
+    if (_enableQueryCancellation) {
       _queriesById = new ConcurrentHashMap<>();
       _clientQueryIds = new ConcurrentHashMap<>();
     } else {
       _queriesById = null;
       _clientQueryIds = null;
     }
-    _resourceUsageAccountant = resourceUsageAccountant;
   }
 
   @Override
   public BrokerResponse handleRequest(JsonNode request, @Nullable SqlNodeAndOptions sqlNodeAndOptions,
       @Nullable RequesterIdentity requesterIdentity, RequestContext requestContext, @Nullable HttpHeaders httpHeaders)
       throws Exception {
-    try (QueryThreadContext.CloseableContext closeMe = QueryThreadContext.open(_brokerId)) {
-      QueryThreadContext.setStartTimeMs(requestContext.getRequestArrivalTimeMillis());
-      requestContext.setBrokerId(_brokerId);
-      QueryThreadContext.setBrokerId(_brokerId);
-      long requestId = _requestIdGenerator.get();
-      requestContext.setRequestId(requestId);
+    requestContext.setBrokerId(_brokerId);
+    long requestId = _requestIdGenerator.get();
+    requestContext.setRequestId(requestId);
 
-      if (httpHeaders != null && !_trackedHeaders.isEmpty()) {
-        MultivaluedMap<String, String> requestHeaders = httpHeaders.getRequestHeaders();
-        Map<String, List<String>> trackedHeadersMap = Maps.newHashMapWithExpectedSize(_trackedHeaders.size());
-        for (Map.Entry<String, List<String>> entry : requestHeaders.entrySet()) {
-          String key = entry.getKey().toLowerCase();
-          if (_trackedHeaders.contains(key)) {
-            trackedHeadersMap.put(key, entry.getValue());
-          }
-        }
-        requestContext.setRequestHttpHeaders(trackedHeadersMap);
-      }
-
-      // First-stage access control to prevent unauthenticated requests from using up resources. Secondary table-level
-      // check comes later.
-      AccessControl accessControl = _accessControlFactory.create();
-      AuthorizationResult authorizationResult = accessControl.authorize(requesterIdentity);
-      if (!authorizationResult.hasAccess()) {
-        _brokerMetrics.addMeteredGlobalValue(BrokerMeter.REQUEST_DROPPED_DUE_TO_ACCESS_ERROR, 1);
-        requestContext.setErrorCode(QueryErrorCode.ACCESS_DENIED);
-        _brokerQueryEventListener.onQueryCompletion(requestContext);
-        String failureMessage = authorizationResult.getFailureMessage();
-        if (StringUtils.isNotBlank(failureMessage)) {
-          failureMessage = "Reason: " + failureMessage;
-        }
-        throw new WebApplicationException("Permission denied." + failureMessage, Response.Status.FORBIDDEN);
-      }
-
-      JsonNode sql = request.get(Broker.Request.SQL);
-      if (sql == null || !sql.isTextual()) {
-        requestContext.setErrorCode(QueryErrorCode.SQL_PARSING);
-        _brokerQueryEventListener.onQueryCompletion(requestContext);
-        throw new BadQueryRequestException("Failed to find 'sql' in the request: " + request);
-      }
-
-      String query = sql.textValue();
-      requestContext.setQuery(query);
-      QueryThreadContext.setSql(query);
-
-      // Parse the query if needed
-      if (sqlNodeAndOptions == null) {
-        try {
-          sqlNodeAndOptions = RequestUtils.parseQuery(query, request);
-        } catch (Exception e) {
-          // Do not log or emit metric here because it is pure user error
-          requestContext.setErrorCode(QueryErrorCode.SQL_PARSING);
-          return new BrokerResponseNative(QueryErrorCode.SQL_PARSING, e.getMessage());
+    if (httpHeaders != null && !_trackedHeaders.isEmpty()) {
+      MultivaluedMap<String, String> requestHeaders = httpHeaders.getRequestHeaders();
+      Map<String, List<String>> trackedHeadersMap = Maps.newHashMapWithExpectedSize(_trackedHeaders.size());
+      for (Map.Entry<String, List<String>> entry : requestHeaders.entrySet()) {
+        String key = entry.getKey().toLowerCase();
+        if (_trackedHeaders.contains(key)) {
+          trackedHeadersMap.put(key, entry.getValue());
         }
       }
-      String cid = extractClientRequestId(sqlNodeAndOptions);
-      QueryThreadContext.setIds(requestId, cid != null ? cid : Long.toString(requestId));
-
-      // check app qps before doing anything
-      String application = sqlNodeAndOptions.getOptions().get(Broker.Request.QueryOptionKey.APPLICATION_NAME);
-      if (application != null && !_queryQuotaManager.acquireApplication(application)) {
-        String errorMessage =
-            "Request " + requestId + ": " + query + " exceeds query quota for application: " + application;
-        LOGGER.info(errorMessage);
-        requestContext.setErrorCode(QueryErrorCode.TOO_MANY_REQUESTS);
-        return new BrokerResponseNative(QueryErrorCode.TOO_MANY_REQUESTS, errorMessage);
-      }
-
-      // Add null handling option from broker config only if there is no override in the query
-      if (_enableNullHandling != null) {
-        sqlNodeAndOptions.getOptions()
-            .putIfAbsent(Broker.Request.QueryOptionKey.ENABLE_NULL_HANDLING, _enableNullHandling);
-      }
-
-      BrokerResponse brokerResponse =
-          handleRequest(requestId, query, sqlNodeAndOptions, request, requesterIdentity, requestContext, httpHeaders,
-              accessControl);
-      brokerResponse.setBrokerId(_brokerId);
-      brokerResponse.setRequestId(Long.toString(requestId));
-      _brokerQueryEventListener.onQueryCompletion(requestContext);
-
-      return brokerResponse;
+      requestContext.setRequestHttpHeaders(trackedHeadersMap);
     }
+
+    // First-stage access control to prevent unauthenticated requests from using up resources. Secondary table-level
+    // check comes later.
+    AccessControl accessControl = _accessControlFactory.create();
+    AuthorizationResult authorizationResult = accessControl.authorize(requesterIdentity);
+    if (!authorizationResult.hasAccess()) {
+      _brokerMetrics.addMeteredGlobalValue(BrokerMeter.REQUEST_DROPPED_DUE_TO_ACCESS_ERROR, 1);
+      requestContext.setErrorCode(QueryErrorCode.ACCESS_DENIED);
+      _brokerQueryEventListener.onQueryCompletion(requestContext);
+      String failureMessage = authorizationResult.getFailureMessage();
+      if (StringUtils.isNotBlank(failureMessage)) {
+        failureMessage = "Reason: " + failureMessage;
+      }
+      throw new WebApplicationException("Permission denied." + failureMessage, Response.Status.FORBIDDEN);
+    }
+
+    JsonNode sql = request.get(Broker.Request.SQL);
+    if (sql == null || !sql.isTextual()) {
+      requestContext.setErrorCode(QueryErrorCode.SQL_PARSING);
+      _brokerQueryEventListener.onQueryCompletion(requestContext);
+      throw new BadQueryRequestException("Failed to find 'sql' in the request: " + request);
+    }
+
+    String query = sql.textValue();
+    requestContext.setQuery(query);
+
+    // Parse the query if needed
+    if (sqlNodeAndOptions == null) {
+      try {
+        sqlNodeAndOptions = RequestUtils.parseQuery(query, request);
+      } catch (Exception e) {
+        // Do not log or emit metric here because it is pure user error
+        requestContext.setErrorCode(QueryErrorCode.SQL_PARSING);
+        return new BrokerResponseNative(QueryErrorCode.SQL_PARSING, e.getMessage());
+      }
+    }
+
+    // check app qps before doing anything
+    String application = sqlNodeAndOptions.getOptions().get(QueryOptionKey.APPLICATION_NAME);
+    if (application != null && !_queryQuotaManager.acquireApplication(application)) {
+      String errorMessage =
+          "Request " + requestId + ": " + query + " exceeds query quota for application: " + application;
+      LOGGER.info(errorMessage);
+      requestContext.setErrorCode(QueryErrorCode.TOO_MANY_REQUESTS);
+      return new BrokerResponseNative(QueryErrorCode.TOO_MANY_REQUESTS, errorMessage);
+    }
+
+    // Add null handling option from broker config only if there is no override in the query
+    if (_enableNullHandling != null) {
+      sqlNodeAndOptions.getOptions().putIfAbsent(QueryOptionKey.ENABLE_NULL_HANDLING, _enableNullHandling);
+    }
+
+    BrokerResponse brokerResponse =
+        handleRequest(requestId, query, sqlNodeAndOptions, request, requesterIdentity, requestContext, httpHeaders,
+            accessControl);
+    brokerResponse.setBrokerId(_brokerId);
+    brokerResponse.setRequestId(Long.toString(requestId));
+    _brokerQueryEventListener.onQueryCompletion(requestContext);
+
+    return brokerResponse;
   }
 
   protected abstract BrokerResponse handleRequest(long requestId, String query, SqlNodeAndOptions sqlNodeAndOptions,
@@ -391,8 +382,7 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
 
   @Nullable
   protected String extractClientRequestId(SqlNodeAndOptions sqlNodeAndOptions) {
-    return sqlNodeAndOptions.getOptions() != null
-        ? sqlNodeAndOptions.getOptions().get(Broker.Request.QueryOptionKey.CLIENT_QUERY_ID) : null;
+    return sqlNodeAndOptions.getOptions().get(QueryOptionKey.CLIENT_QUERY_ID);
   }
 
   /**
@@ -401,7 +391,7 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
    *   But right now the semantics are not clear. For example, while MSE calls this method once, SSE calls it once per
    *   query AND subquery, which means this method is called multiple times for the same query.
    */
-  protected void onQueryStart(long requestId, String clientRequestId, String query, Object... extras) {
+  protected void onQueryStart(long requestId, @Nullable String clientRequestId, String query, Object... extras) {
     if (isQueryCancellationEnabled()) {
       _queriesById.put(requestId, query);
       if (StringUtils.isNotBlank(clientRequestId)) {
@@ -422,6 +412,6 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
   }
 
   protected boolean isQueryCancellationEnabled() {
-    return _queriesById != null;
+    return _enableQueryCancellation;
   }
 }
