@@ -723,6 +723,9 @@ public abstract class BaseBrokerStarter implements ServiceStartable {
     _brokerRequestHandler.shutDown();
     _brokerAdminApplication.stop();
 
+    LOGGER.info("Stopping the broker routing manager");
+    _routingManager.stop();
+
     LOGGER.info("Close PinotFs");
     try {
       PinotFSFactory.shutdown();
