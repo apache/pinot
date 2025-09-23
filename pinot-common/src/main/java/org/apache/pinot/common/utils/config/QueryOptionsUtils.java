@@ -573,9 +573,9 @@ public class QueryOptionsUtils {
   }
 
   public static boolean reverseOptimizationEnabled(Map<String, String> queryOptions) {
-    String value = queryOptions.get(CommonConstants.Broker.Request.QueryOptionKey.REVERSE_ORDER);
+    String value = queryOptions.get(QueryOptionKey.REVERSE_ORDER);
     if (value == null) {
-      return CommonConstants.Broker.Request.QueryOptionKey.DEFAULT_ALLOW_REVERSE_ORDER;
+      return QueryOptionKey.DEFAULT_ALLOW_REVERSE_ORDER;
     }
     return Boolean.parseBoolean(value);
   }
