@@ -54,7 +54,7 @@ import org.slf4j.LoggerFactory;
  * There is a single ReceivingMailbox for each {@link org.apache.pinot.query.runtime.operator.MailboxReceiveOperator}.
  * The offer methods will be called when new blocks are received from different sources. For example local workers will
  * directly call {@link #offer(MseBlock, List, long)} while each remote worker opens a GPRC channel where messages
- * are sent in raw format and {@link #offerRaw(ByteBuffer, long)} is called from them.
+ * are sent in raw format and {@link #offerRaw(List, long)} is called from them.
  */
 @ThreadSafe
 public class ReceivingMailbox {
@@ -103,19 +103,9 @@ public class ReceivingMailbox {
    */
   public ReceivingMailboxStatus offerRaw(List<ByteBuffer> byteBuffers, long timeoutMs)
       throws IOException {
-    MseBlock block;
     updateWaitCpuTime();
-    int totalBytes = 0;
-    for (ByteBuffer bb: byteBuffers) {
-      totalBytes += bb.remaining();
-    }
-    _stats.merge(StatKey.DESERIALIZED_BYTES, totalBytes);
-    _stats.merge(StatKey.DESERIALIZED_MESSAGES, 1);
-
-    long now = System.currentTimeMillis();
-    DataBlock dataBlock = DataBlockUtils.deserialize(byteBuffers);
-    _stats.merge(StatKey.DESERIALIZATION_TIME_MS, System.currentTimeMillis() - now);
-
+    DataBlock dataBlock = deserialize(byteBuffers);
+    MseBlock block;
     if (dataBlock instanceof MetadataBlock) {
       Map<Integer, String> exceptions = dataBlock.getExceptions();
       if (exceptions.isEmpty()) {
@@ -123,8 +113,9 @@ public class ReceivingMailbox {
       } else {
         MetadataBlock metadataBlock = (MetadataBlock) dataBlock;
         Map<QueryErrorCode, String> exceptionsByQueryError = QueryErrorCode.fromKeyMap(exceptions);
-        ErrorMseBlock errorBlock = new ErrorMseBlock(metadataBlock.getStageId(), metadataBlock.getWorkerId(),
-            metadataBlock.getServerId(), exceptionsByQueryError);
+        ErrorMseBlock errorBlock =
+            new ErrorMseBlock(metadataBlock.getStageId(), metadataBlock.getWorkerId(), metadataBlock.getServerId(),
+                exceptionsByQueryError);
         setErrorBlock(errorBlock, dataBlock.getStatsByStage());
         return ReceivingMailboxStatus.FIRST_ERROR;
       }
@@ -132,6 +123,28 @@ public class ReceivingMailbox {
       block = new SerializedDataBlock(dataBlock);
     }
     return offerPrivate(block, dataBlock.getStatsByStage(), timeoutMs);
+  }
+
+  private DataBlock deserialize(List<ByteBuffer> byteBuffers)
+      throws IOException {
+    long startTimeMs = System.currentTimeMillis();
+    int totalBytes;
+    DataBlock dataBlock;
+    if (byteBuffers.size() == 1) {
+      ByteBuffer byteBuffer = byteBuffers.get(0);
+      totalBytes = byteBuffer.remaining();
+      dataBlock = DataBlockUtils.readFrom(byteBuffer);
+    } else {
+      totalBytes = 0;
+      for (ByteBuffer bb : byteBuffers) {
+        totalBytes += bb.remaining();
+      }
+      dataBlock = DataBlockUtils.deserialize(byteBuffers);
+    }
+    _stats.merge(StatKey.DESERIALIZED_BYTES, totalBytes);
+    _stats.merge(StatKey.DESERIALIZED_MESSAGES, 1);
+    _stats.merge(StatKey.DESERIALIZATION_TIME_MS, System.currentTimeMillis() - startTimeMs);
+    return dataBlock;
   }
 
   public ReceivingMailboxStatus offer(MseBlock block, List<DataBuffer> serializedStats, long timeoutMs) {
