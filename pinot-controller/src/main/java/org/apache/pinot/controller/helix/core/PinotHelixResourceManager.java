@@ -4735,10 +4735,6 @@ public class PinotHelixResourceManager {
     return ZKMetadataProvider.getAllQueryWorkloadConfigs(_propertyStore);
   }
 
-  public List<InstancePartitions> getAllInstancePartitions() {
-    return ZKMetadataProvider.getAllInstancePartitions(_propertyStore);
-  }
-
   @Nullable
   public QueryWorkloadConfig getQueryWorkloadConfig(String queryWorkloadName) {
     return ZKMetadataProvider.getQueryWorkloadConfig(_propertyStore, queryWorkloadName);

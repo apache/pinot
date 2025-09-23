@@ -18,21 +18,22 @@
  */
 package org.apache.pinot.controller.workload.scheme;
 
-import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Map;
 import java.util.Set;
+import javax.annotation.Nullable;
 import org.apache.pinot.common.utils.config.TagNameUtils;
 import org.apache.pinot.controller.helix.core.PinotHelixResourceManager;
-import org.apache.pinot.controller.workload.splitter.CostSplitter;
-import org.apache.pinot.spi.config.workload.InstanceCost;
 import org.apache.pinot.spi.config.workload.NodeConfig;
 import org.apache.pinot.spi.config.workload.PropagationEntity;
+import org.apache.pinot.spi.config.workload.PropagationEntityOverrides;
 
 
 /**
  * TenantPropagationScheme is used to resolve instances based on the {@link NodeConfig} and {@link NodeConfig.Type}
  * It resolves the instances based on the tenants specified in the node configuration
+ *
+ * Please note that overrides are not supported in this scheme
  */
 public class TenantPropagationScheme implements PropagationScheme {
 
@@ -43,44 +44,9 @@ public class TenantPropagationScheme implements PropagationScheme {
   }
 
   @Override
-  public Set<String> resolveInstances(NodeConfig nodeConfig) {
-    Set<String> instances = new HashSet<>();
-    Map<String, Set<String>> helixTagToInstances = PropagationUtils.getHelixTagToInstances(_pinotHelixResourceManager);
-    NodeConfig.Type nodeType = nodeConfig.getNodeType();
-    for (PropagationEntity entity : nodeConfig.getPropagationScheme().getPropagationEntities()) {
-      Set<String> resolvedInstances = resolveInstances(entity, nodeType, helixTagToInstances);
-      if (!resolvedInstances.isEmpty()) {
-        instances.addAll(resolvedInstances);
-      } else {
-        throw new IllegalArgumentException("No instances found for PropagationEntity: "
-            + entity.getEntity());
-      }
-    }
-    return instances;
-  }
-
-  @Override
-  public Map<String, InstanceCost> resolveInstanceCostMap(NodeConfig nodeConfig, CostSplitter costSplitter) {
-    Map<String, InstanceCost> instanceCostMap = new HashMap<>();
-    Map<String, Set<String>> helixTagToInstances = PropagationUtils.getHelixTagToInstances(_pinotHelixResourceManager);
-    for (PropagationEntity entity : nodeConfig.getPropagationScheme().getPropagationEntities()) {
-      if (entity.getOverrides() != null) {
-        throw new IllegalArgumentException("Sub-allocations are not supported in TenantPropagationScheme");
-      }
-      Set<String> instances = resolveInstances(entity, nodeConfig.getNodeType(), helixTagToInstances);
-      if (instances.isEmpty()) {
-        // This is to ensure cost splits are added for active tenants
-        throw new IllegalArgumentException("No instances found for PropagationEntity: " + entity);
-      }
-      Map<String, InstanceCost> delta = costSplitter.computeInstanceCostMap(entity.getCpuCostNs(),
-          entity.getMemoryCostBytes(), instances);
-      PropagationUtils.mergeCosts(instanceCostMap, delta);
-    }
-    return instanceCostMap;
-  }
-
   public Set<String> resolveInstances(PropagationEntity entity, NodeConfig.Type nodeType,
-                                       Map<String, Set<String>> helixTagToInstances) {
+                                      @Nullable PropagationEntityOverrides override) {
+    Map<String, Set<String>> helixTagToInstances = PropagationUtils.getHelixTagToInstances(_pinotHelixResourceManager);
     String tenantName = entity.getEntity();
     Set<String> allInstances = new HashSet<>();
     // Get the unique set of helix tags for the tenants

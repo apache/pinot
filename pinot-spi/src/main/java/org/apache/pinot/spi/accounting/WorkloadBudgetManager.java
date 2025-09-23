@@ -150,7 +150,7 @@ public class WorkloadBudgetManager {
   }
 
   /**
-   * Retrieves the remaining budget for a specific workload.
+   * Retrieves the initial and remaining budget for a workload.
    */
   public BudgetStats getBudgetStats(String workload) {
     if (!_isEnabled) {
@@ -295,7 +295,7 @@ public class WorkloadBudgetManager {
     }
 
     /**
-     * Gets the current remaining budget.
+     * Gets the budget stats that provides initial and remaining CPU and memory budgets.
      */
     public BudgetStats getStats() {
       return new BudgetStats(_initialCpuBudget, _initialMemoryBudget, _cpuRemaining.get(), _memoryRemaining.get());

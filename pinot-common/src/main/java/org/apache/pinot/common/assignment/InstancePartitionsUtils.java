@@ -212,11 +212,4 @@ public class InstancePartitionsUtils {
     return hasPreConfiguredInstancePartitions(tableConfig, instancePartitionsType)
         && !InstanceAssignmentConfigUtils.isMirrorServerSetAssignment(tableConfig, instancePartitionsType);
   }
-
-  public static List<String> getAllPossibleInstancePartitionsName(String tableName) {
-    String rawTableName = TableNameBuilder.extractRawTableName(tableName);
-    return List.of(rawTableName + TYPE_SUFFIX_SEPARATOR + InstancePartitionsType.OFFLINE,
-        rawTableName + TYPE_SUFFIX_SEPARATOR + InstancePartitionsType.CONSUMING,
-        rawTableName + TYPE_SUFFIX_SEPARATOR + InstancePartitionsType.COMPLETED);
-  }
 }

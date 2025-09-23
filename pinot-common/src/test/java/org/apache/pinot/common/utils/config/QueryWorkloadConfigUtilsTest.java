@@ -429,6 +429,29 @@ public class QueryWorkloadConfigUtilsTest {
   }
 
   @Test
+  public void testValidateQueryWorkloadConfigEmptyCosts() {
+    PropagationEntity emptyCostEntity1 = new PropagationEntity("entity1", null, null, null);
+    PropagationEntity emptyCostEntity2 = new PropagationEntity("entity2", null, null, null);
+    PropagationScheme scheme = new PropagationScheme(PropagationScheme.Type.TABLE,
+        Arrays.asList(emptyCostEntity1, emptyCostEntity2));
+    EnforcementProfile profile = createValidEnforcementProfile();
+    NodeConfig nodeConfig = new NodeConfig(NodeConfig.Type.SERVER_NODE, profile, scheme);
+    QueryWorkloadConfig config = new QueryWorkloadConfig("testWorkload", Arrays.asList(nodeConfig));
+    List<String> errors = QueryWorkloadConfigUtils.validateQueryWorkloadConfig(config);
+    Assert.assertTrue(errors.isEmpty(), "Config with all empty costs should have no errors, but got: " + errors);
+
+    int numEntities = scheme.getPropagationEntities().size();
+    long expectedCpuCostPerEntity = profile.getCpuCostNs() / numEntities;
+    long expectedMemoryCostPerEntity = profile.getMemoryCostBytes() / numEntities;
+    for (PropagationEntity entity : scheme.getPropagationEntities()) {
+      Assert.assertEquals(entity.getCpuCostNs(), expectedCpuCostPerEntity,
+          "Expected cpuCostNs to be evenly distributed");
+      Assert.assertEquals(entity.getMemoryCostBytes(), expectedMemoryCostPerEntity,
+          "Expected memoryCostBytes to be evenly distributed");
+    }
+  }
+
+  @Test
   public void testValidateQueryWorkloadConfigComplexValidConfig() {
     // Test a complex but valid configuration with multiple nodes and sub-allocations
     PropagationEntityOverrides overrides1 = new PropagationEntityOverrides("CONSUMING", 30L, 30L);

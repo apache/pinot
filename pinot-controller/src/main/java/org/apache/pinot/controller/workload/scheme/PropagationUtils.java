@@ -28,7 +28,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import org.apache.helix.model.InstanceConfig;
-import org.apache.pinot.common.assignment.InstancePartitions;
 import org.apache.pinot.common.utils.config.TagNameUtils;
 import org.apache.pinot.controller.helix.core.PinotHelixResourceManager;
 import org.apache.pinot.spi.config.table.TableConfig;
@@ -116,53 +115,6 @@ public class PropagationUtils {
       tableToTags.put(tableConfig.getTableName(), nodeTypeToTags);
     }
     return tableToTags;
-  }
-
-  /**
-   * Builds a mapping from instance partition names to the set of instances assigned to those partitions.
-   * <p>
-   * This method retrieves all instance partitions from the cluster and creates a mapping where each
-   * partition configuration key (instance partition name) maps to the set of instances that have been
-   * assigned to that partition.
-   *
-   *
-   * <p>Example return value:
-   * <pre>
-   * {
-   *   "airline_OFFLINE": {"Server_1", "Server_2", "Server_3"},
-   *   "events_CONSUMING": {"Server_6", "Server_7"},
-   *   "events_COMPLETED": {"Server_8", "Server_9", "Server_10"}
-   * }
-   * </pre>
-   *
-   * <p>This mapping is useful for workload propagation schemes that need to understand which instances
-   * are responsible for serving specific table, enabling fine-grained resource allocation
-   * and cost distribution across the cluster.
-   *
-   */
-  public static Map<String, Set<String>> getPartitionConfigKeyToInstances(
-      PinotHelixResourceManager pinotResourceManager) {
-    Map<String, Set<String>> partitionTypeToInstances = new HashMap<>();
-    List<InstancePartitions> instancePartitionsList = pinotResourceManager.getAllInstancePartitions();
-    if (instancePartitionsList == null) {
-      LOGGER.warn("No instance partitions found, returning empty mapping");
-      return partitionTypeToInstances;
-    }
-    for (InstancePartitions instancePartitions : instancePartitionsList) {
-      if (instancePartitions == null) {
-        LOGGER.warn("Skipping null instance partitions");
-        continue;
-      }
-      String partitionType = instancePartitions.getInstancePartitionsName();
-      Map<String, Integer> instanceToPartitionIdMap = instancePartitions.getInstanceToPartitionIdMap();
-      if (instanceToPartitionIdMap == null) {
-        LOGGER.warn("Skipping instance partitions with null instance to partition ID map: {}", partitionType);
-        continue;
-      }
-      Set<String> instances = new HashSet<>(instanceToPartitionIdMap.keySet());
-      partitionTypeToInstances.put(partitionType, instances);
-    }
-    return partitionTypeToInstances;
   }
 
   /**

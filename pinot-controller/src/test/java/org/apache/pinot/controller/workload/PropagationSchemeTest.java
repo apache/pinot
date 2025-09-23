@@ -26,19 +26,20 @@ import java.util.Map;
 import java.util.Set;
 import java.util.stream.Collectors;
 import javax.annotation.Nullable;
+import org.apache.helix.AccessOption;
 import org.apache.helix.HelixAdmin;
 import org.apache.helix.HelixManager;
 import org.apache.helix.model.ExternalView;
 import org.apache.helix.model.InstanceConfig;
+import org.apache.helix.store.zk.ZkHelixPropertyStore;
+import org.apache.helix.zookeeper.datamodel.ZNRecord;
 import org.apache.pinot.common.assignment.InstancePartitions;
+import org.apache.pinot.common.metadata.ZKMetadataProvider;
 import org.apache.pinot.controller.helix.core.PinotHelixResourceManager;
 import org.apache.pinot.controller.workload.scheme.TablePropagationScheme;
 import org.apache.pinot.controller.workload.scheme.TenantPropagationScheme;
-import org.apache.pinot.controller.workload.splitter.CostSplitter;
-import org.apache.pinot.controller.workload.splitter.DefaultCostSplitter;
 import org.apache.pinot.spi.config.table.assignment.InstancePartitionsType;
 import org.apache.pinot.spi.config.workload.EnforcementProfile;
-import org.apache.pinot.spi.config.workload.InstanceCost;
 import org.apache.pinot.spi.config.workload.NodeConfig;
 import org.apache.pinot.spi.config.workload.PropagationEntity;
 import org.apache.pinot.spi.config.workload.PropagationEntityOverrides;
@@ -52,14 +53,12 @@ public class PropagationSchemeTest {
   private PinotHelixResourceManager _pinotHelixResourceManager;
   private TablePropagationScheme _tablePropagationScheme;
   private TenantPropagationScheme _tenantPropagationScheme;
-  private CostSplitter _costSplitter;
 
   @BeforeClass
   public void setUp() {
     _pinotHelixResourceManager = Mockito.mock(PinotHelixResourceManager.class);
     _tablePropagationScheme = new TablePropagationScheme(_pinotHelixResourceManager);
     _tenantPropagationScheme = new TenantPropagationScheme(_pinotHelixResourceManager);
-    _costSplitter = new DefaultCostSplitter();
   }
 
   @Test
@@ -78,7 +77,14 @@ public class PropagationSchemeTest {
     instancePartitions.add(createInstancePartitions(realtimeTable, InstancePartitionsType.CONSUMING, 2));
     instancePartitions.add(createInstancePartitions(realtimeTable, InstancePartitionsType.COMPLETED, 2));
     // Mock the behavior of getAllInstancePartitions to return the list of instance partitions
-    Mockito.when(_pinotHelixResourceManager.getAllInstancePartitions()).thenReturn(instancePartitions);
+    ZkHelixPropertyStore<ZNRecord> propertyStore = Mockito.mock(ZkHelixPropertyStore.class);
+    for (InstancePartitions partitions : instancePartitions) {
+      String partitionsPath = ZKMetadataProvider.constructPropertyStorePathForInstancePartitions(
+          partitions.getInstancePartitionsName());
+      ZNRecord partitionsZNRecord = partitions.toZNRecord();
+      Mockito.when(propertyStore.get(partitionsPath, null, AccessOption.PERSISTENT)).thenReturn(partitionsZNRecord);
+    }
+    Mockito.when(_pinotHelixResourceManager.getPropertyStore()).thenReturn(propertyStore);
 
     // Create Broker Resource ExternalView
     ExternalView externalView = new ExternalView("brokerResource");
@@ -89,31 +95,43 @@ public class PropagationSchemeTest {
     // Mock the behavior of getResourceExternalView to return the broker resource
     mockBrokerResource(externalView);
 
-    // Case 1 : Test for Server cost split for table1 (offline) and table2 (realtime)
+    // Case 1 : Test for Server instance resolution for table1 (offline) and table2 (realtime)
     NodeConfig nodeConfigServer = new NodeConfig(NodeConfig.Type.SERVER_NODE, profile, propagationScheme);
-    Map<String, InstanceCost> instanceCostMap = _tablePropagationScheme.resolveInstanceCostMap(nodeConfigServer,
-        _costSplitter);
-    assertTableSchemeResponse(nodeConfigServer, instanceCostMap, instancePartitions, null);
+    List<PropagationEntity> entities = propagationScheme.getPropagationEntities();
+    for (PropagationEntity entity : entities) {
+      Set<String> expectedInstances = _tablePropagationScheme.resolveInstances(entity, nodeConfigServer.getNodeType(),
+          null);
+      assertTableSchemeResponse(entity, expectedInstances, NodeConfig.Type.SERVER_NODE, null, instancePartitions,
+          null);
+    }
 
-    // Case 2 : Test for Broker cost split for table1 (offline) and table2 (realtime) for brokers
+    // Case 2 : Test for Broker instance resolution for table1 (offline) and table2 (realtime)
     NodeConfig nodeConfigBroker = new NodeConfig(NodeConfig.Type.BROKER_NODE, profile, propagationScheme);
-    instanceCostMap = _tablePropagationScheme.resolveInstanceCostMap(nodeConfigBroker, _costSplitter);
-    assertTableSchemeResponse(nodeConfigBroker, instanceCostMap, null, externalView);
+    entities = propagationScheme.getPropagationEntities();
+    for (PropagationEntity entity : entities) {
+      Set<String> expectedInstances = _tablePropagationScheme.resolveInstances(entity, nodeConfigBroker.getNodeType(),
+          null);
+      assertTableSchemeResponse(entity, expectedInstances, NodeConfig.Type.BROKER_NODE, null, null,
+          externalView);
+    }
 
-    // Case 3 : Test for Server cost split for table1 (offline) and table2 (realtime) with overrides for consuming
-    // and completed
+    // Case 3 : Test for instance resolution with overrides for consuming and completed
     PropagationEntityOverrides overrides1 = new PropagationEntityOverrides("CONSUMING", 25L, 25L);
     PropagationEntityOverrides overrides2 = new PropagationEntityOverrides("COMPLETED", 25L, 25L);
     entity2.setOverrides(List.of(overrides1, overrides2));
-    instanceCostMap = _tablePropagationScheme.resolveInstanceCostMap(nodeConfigServer, _costSplitter);
-    assertTableSchemeResponse(nodeConfigServer, instanceCostMap, instancePartitions, null);
+    for (PropagationEntityOverrides override : entity2.getOverrides()) {
+      Set<String> expectedInstances = _tablePropagationScheme.resolveInstances(entity2, nodeConfigServer.getNodeType(),
+          override);
+      assertTableSchemeResponse(entity2, expectedInstances, NodeConfig.Type.SERVER_NODE, override, instancePartitions,
+          null);
+    }
 
     // Case 4 : Test for exception when table does not exist
     PropagationEntity entity3 = new PropagationEntity("table3", 50L, 50L, null);
     propagationScheme = new PropagationScheme(PropagationScheme.Type.TABLE, List.of(entity1, entity3));
     nodeConfigServer = new NodeConfig(NodeConfig.Type.SERVER_NODE, profile, propagationScheme);
     try {
-      _tablePropagationScheme.resolveInstanceCostMap(nodeConfigServer, _costSplitter);
+      _tablePropagationScheme.resolveInstances(entity3, nodeConfigServer.getNodeType(), null);
       assert false;
     } catch (Exception e) {
       // Expected exception
@@ -124,7 +142,7 @@ public class PropagationSchemeTest {
     PropagationEntityOverrides overrides3 = new PropagationEntityOverrides("CONSUMING", 50L, 50L);
     entity1.setOverrides(List.of(overrides3));
     try {
-      _tablePropagationScheme.resolveInstanceCostMap(nodeConfigServer, _costSplitter);
+      _tablePropagationScheme.resolveInstances(entity1, nodeConfigServer.getNodeType(), overrides3);
       assert false;
     } catch (Exception e) {
       // Expected exception
@@ -132,50 +150,44 @@ public class PropagationSchemeTest {
     }
   }
 
-  private void assertTableSchemeResponse(NodeConfig nodeConfig, Map<String, InstanceCost> instanceCostMap,
+  private void assertTableSchemeResponse(PropagationEntity entity, Set<String> expectedInstances,
+                                         NodeConfig.Type nodeType,
+                                         @Nullable PropagationEntityOverrides override,
                                          @Nullable List<InstancePartitions> instancePartitions,
                                          @Nullable ExternalView externalView) {
     int totalNumInstancesExpected = 0;
-    for (PropagationEntity entity : nodeConfig.getPropagationScheme().getPropagationEntities()) {
-      int numInstancesForEntity = 0;
-      Set<String> expectedInstances = new HashSet<>();
-      // For servers, get expected instances from instance partitions
-      if (nodeConfig.getNodeType() == NodeConfig.Type.SERVER_NODE) {
-        List<InstancePartitions> tableInstancePartitions = instancePartitions.stream()
+    Set<String> actualInstances = new HashSet<>();
+    // For servers, get expected instances from instance partitions
+    List<InstancePartitions> tableInstancePartitions = null;
+    if (nodeType == NodeConfig.Type.SERVER_NODE) {
+      if (override != null) {
+        String partitionKey = entity.getEntity() + "_" + override.getEntity();
+         tableInstancePartitions = instancePartitions.stream()
+             .filter(partitions -> partitions.getInstancePartitionsName().equals(partitionKey))
+             .collect(Collectors.toList());
+      } else {
+        tableInstancePartitions = instancePartitions.stream()
             .filter(partitions -> partitions.getInstancePartitionsName().startsWith(entity.getEntity() + "_"))
             .collect(Collectors.toList());
-        for (InstancePartitions partitions : tableInstancePartitions) {
-          List<String> instances = partitions.getInstances(0, 0);
-          expectedInstances.addAll(instances);
-          numInstancesForEntity += instances.size();
-        }
-      } else { // For brokers, get expected instances from broker resource external view
-        Set<String> instances = externalView.getPartitionSet().stream()
-            .filter(partition -> partition.startsWith(entity.getEntity() + "_"))
-            .map(partition -> externalView.getStateMap(partition).keySet())
-            .flatMap(Set::stream)
-            .collect(Collectors.toSet());
-        expectedInstances.addAll(instances);
-        numInstancesForEntity += instances.size();
       }
-      totalNumInstancesExpected += numInstancesForEntity;
-      assert numInstancesForEntity > 0 : "No instances found for PropagationEntity: " + entity;
-      long totalCpuCost = entity.getCpuCostNs();
-      long totalMemoryCost = entity.getMemoryCostBytes();
-      long expectedCpuCostPerInstance = totalCpuCost / numInstancesForEntity;
-      long expectedMemoryCostPerInstance = totalMemoryCost / numInstancesForEntity;
-      for (String instance : expectedInstances) {
-        InstanceCost cost = instanceCostMap.get(instance);
-        assert cost != null : "Instance " + instance + " not found in instance cost map";
-        assert cost.getCpuCostNs() == expectedCpuCostPerInstance : "For instance " + instance
-            + ", expected CPU cost: " + expectedCpuCostPerInstance + ", but found: " + cost.getCpuCostNs();
-        assert cost.getMemoryCostBytes() == expectedMemoryCostPerInstance : "For instance " + instance
-            + ", expected Memory cost: " + expectedMemoryCostPerInstance + ", but found: "
-            + cost.getMemoryCostBytes();
+      for (InstancePartitions partitions : tableInstancePartitions) {
+        List<String> instances = partitions.getInstances(0, 0);
+        actualInstances.addAll(instances);
+        totalNumInstancesExpected += instances.size();
       }
+    } else { // For brokers, get expected instances from broker resource external view
+      Set<String> instances = externalView.getPartitionSet().stream()
+          .filter(partition -> partition.startsWith(entity.getEntity() + "_"))
+          .map(partition -> externalView.getStateMap(partition).keySet())
+          .flatMap(Set::stream)
+          .collect(Collectors.toSet());
+      actualInstances.addAll(instances);
+      totalNumInstancesExpected += instances.size();
     }
-    assert instanceCostMap.size() == totalNumInstancesExpected : "For server node, expected "
-        + totalNumInstancesExpected + " instances, but found " + instanceCostMap.size();
+    assert actualInstances.equals(expectedInstances) : "Expected instances: " + expectedInstances + ", but found: "
+        + actualInstances;
+    assert actualInstances.size() == totalNumInstancesExpected : "Expected number of instances: "
+        + totalNumInstancesExpected + ", but found: " + actualInstances.size();
   }
 
   private void mockBrokerResource(ExternalView externalView) {
@@ -220,53 +232,41 @@ public class PropagationSchemeTest {
     instanceConfigs.add(createInstanceConfig("instance4", List.of("tenant2_BROKER")));
     Mockito.when(_pinotHelixResourceManager.getAllHelixInstanceConfigs()).thenReturn(instanceConfigs);
 
-    Map<String, Map<NodeConfig.Type, Set<String>>> expectedTenantsToInstances = new HashMap<>();
-    expectedTenantsToInstances.put("tenant1", Map.of(NodeConfig.Type.SERVER_NODE, Set.of("instance1"),
+    Map<String, Map<NodeConfig.Type, Set<String>>> actualTenantsToInstances = new HashMap<>();
+    actualTenantsToInstances.put("tenant1", Map.of(NodeConfig.Type.SERVER_NODE, Set.of("instance1"),
         NodeConfig.Type.BROKER_NODE, Set.of("instance3")));
-    expectedTenantsToInstances.put("tenant2", Map.of(NodeConfig.Type.SERVER_NODE, Set.of("instance2"),
+    actualTenantsToInstances.put("tenant2", Map.of(NodeConfig.Type.SERVER_NODE, Set.of("instance2"),
         NodeConfig.Type.BROKER_NODE, Set.of("instance4")));
 
-    // Case 1 : Test for cost split for tenant1 and tenant2 for servers
+    // Case 1 : Test for Server instance resolution for tenant1 and tenant2
     NodeConfig nodeConfigServer = new NodeConfig(NodeConfig.Type.SERVER_NODE, profile, propagationScheme);
-    Map<String, InstanceCost> instanceCostMap = _tenantPropagationScheme.resolveInstanceCostMap(nodeConfigServer,
-        _costSplitter);
-    assertTenantSchemeResponse(nodeConfigServer, instanceCostMap, expectedTenantsToInstances);
+    List<PropagationEntity> entities = nodeConfigServer.getPropagationScheme().getPropagationEntities();
+    for (PropagationEntity entity : entities) {
+      NodeConfig.Type nodeType = nodeConfigServer.getNodeType();
+      Set<String> expectedServerInstances = _tenantPropagationScheme.resolveInstances(entity, nodeType, null);
+      assertTenantSchemeResponse(entity, nodeType, expectedServerInstances, actualTenantsToInstances);
+    }
 
-    // Case 2 : Test for cost split for tenant1 and tenant2 for brokers
+    // Case 2 : Test for Broker instance resolution for tenant1 and tenant2
     NodeConfig nodeConfigBroker = new NodeConfig(NodeConfig.Type.BROKER_NODE, profile, propagationScheme);
-    instanceCostMap = _tenantPropagationScheme.resolveInstanceCostMap(nodeConfigBroker, _costSplitter);
-    assertTenantSchemeResponse(nodeConfigBroker, instanceCostMap, expectedTenantsToInstances);
-
-    // Case 3 : Test for exception when overrides are present in tenant propagation scheme,
-    // since it's not supported
-    PropagationEntityOverrides overrides = new PropagationEntityOverrides("tenant1", 50L, 50L);
-    entity1.setOverrides(List.of(overrides));
-    try {
-      _tenantPropagationScheme.resolveInstanceCostMap(nodeConfigServer, _costSplitter);
-      assert false : "Expected IllegalArgumentException for sub-allocations in TenantPropagationScheme";
-    } catch (IllegalArgumentException e) {
-      // Expected exception
-      assert true;
+    entities = nodeConfigBroker.getPropagationScheme().getPropagationEntities();
+    for (PropagationEntity entity : entities) {
+      NodeConfig.Type nodeType = nodeConfigBroker.getNodeType();
+      Set<String> expectedBrokerInstances = _tenantPropagationScheme.resolveInstances(entity, nodeType, null);
+      assertTenantSchemeResponse(entity, nodeType, expectedBrokerInstances, actualTenantsToInstances);
     }
   }
 
-  private void assertTenantSchemeResponse(NodeConfig nodeConfig, Map<String, InstanceCost> instanceCostMap,
-                                          Map<String, Map<NodeConfig.Type, Set<String>>> expectedTenantsToInstances) {
-    // Verify the instance cost map for broker node
-    for (PropagationEntity entity : nodeConfig.getPropagationScheme().getPropagationEntities()) {
-      long totalCpuCost = entity.getCpuCostNs();
-      long totalMemoryCost = entity.getMemoryCostBytes();
-      Set<String> expectedInstances = expectedTenantsToInstances.get(entity.getEntity()).get(nodeConfig.getNodeType());
-      for (String instance : expectedInstances) {
-        InstanceCost cost = instanceCostMap.get(instance);
-        assert cost != null : "Instance " + instance + " not found in instance cost map";
-        long expectedCpuCostPerInstance = totalCpuCost / expectedInstances.size();
-        long expectedMemoryCostPerInstance = totalMemoryCost / expectedInstances.size();
-        assert cost.getCpuCostNs() == expectedCpuCostPerInstance : "For instance " + instance
-            + ", expected CPU cost: " + expectedCpuCostPerInstance + ", but found: " + cost.getCpuCostNs();
-        assert cost.getMemoryCostBytes() == expectedMemoryCostPerInstance : "For instance " + instance
-            + ", expected Memory cost: " + expectedMemoryCostPerInstance + ", but found: "
-            + cost.getMemoryCostBytes();
+  private void assertTenantSchemeResponse(PropagationEntity entity, NodeConfig.Type nodeType,
+                                          Set<String> expectedInstances,
+                                          Map<String, Map<NodeConfig.Type, Set<String>>> actualTenantsToInstances) {
+    for (String tenant : actualTenantsToInstances.keySet()) {
+      if (tenant.equals(entity.getEntity())) {
+        Set<String> actualInstances = actualTenantsToInstances.get(tenant).get(nodeType);
+        assert actualInstances.equals(expectedInstances) : "Expected instances: " + expectedInstances + ", but found: "
+            + actualInstances;
+        assert actualInstances.size() == expectedInstances.size() : "Expected number of instances: "
+            + expectedInstances.size() + ", but found: " + actualInstances.size();
       }
     }
   }

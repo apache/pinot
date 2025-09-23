@@ -254,6 +254,7 @@ public class QueryWorkloadConfigUtils {
    *   <li>Ensures consistency in cost definitions across all entities (either all or none define costs)</li>
    *   <li>Validates that total costs do not exceed provided limits (if any)</li>
    *   <li>Validates any overrides within each entity for the same cost rules</li>
+   *   <li>Rewrites empty costs to evenly distribute parent limits if all entities have empty costs</li>
    * </ul>
    *
    */
@@ -303,6 +304,10 @@ public class QueryWorkloadConfigUtils {
       }
     }
     validateLimits(totalCpu, totalMem, limitCpu, limitMem, prefix, errors);
+    // If no errors and all entities have empty costs, rewrite to evenly distribute enforcementProfile costs
+    if (errors.isEmpty() && definedCount == 0 && emptyCount == entities.size()) {
+      rewriteEmptyCosts(entities, limitCpu, limitMem);
+    }
   }
 
   private static void validateOverrides(List<PropagationEntityOverrides> overrides, String prefix,
@@ -345,6 +350,18 @@ public class QueryWorkloadConfigUtils {
         errors.add(prefix + ".propagationEntity '" + entityId + "' is duplicated");
       } else {
         entityIds.add(entityId);
+      }
+    }
+  }
+
+  private static void rewriteEmptyCosts(List<PropagationEntity> entities, long totalCpu, long totalMem) {
+    int numEntities = entities.size();
+    long shareCpuCostNs = totalCpu / numEntities;
+    long shareMemoryCostBytes = totalMem / numEntities;
+    for (PropagationEntity entity : entities) {
+      if (entity.getCpuCostNs() == null && entity.getMemoryCostBytes() == null) {
+        entity.setCpuCostNs(shareCpuCostNs);
+        entity.setMemoryCostBytes(shareMemoryCostBytes);
       }
     }
   }
