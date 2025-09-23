@@ -61,9 +61,7 @@ public interface ValueAggregator<R, A> {
    * Default implementation delegates to the 3-arg overload with null sourceDataType.
    * <p>NOTE: if value is mutable, will directly modify the value.
    */
-  default A applyRawValue(A value, R rawValue) {
-    return applyRawValue(value, rawValue, null);
-  }
+  A applyRawValue(A value, R rawValue);
 
   /**
    * Applies a raw value to the current aggregated value with optional source data type.
