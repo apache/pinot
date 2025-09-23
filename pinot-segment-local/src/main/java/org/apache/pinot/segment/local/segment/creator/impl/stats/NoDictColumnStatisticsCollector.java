@@ -37,8 +37,8 @@ public class NoDictColumnStatisticsCollector extends AbstractColumnStatisticsCol
   private Comparable _minValue;
   private Comparable _maxValue;
   private int _minLength = Integer.MAX_VALUE;
-  private int _maxLength = 0;
-  private int _maxRowLength = 0;
+  private int _maxLength = -1; // default return value is -1
+  private int _maxRowLength = -1; // default return value is -1
   private boolean _sealed = false;
 
   public NoDictColumnStatisticsCollector(String column, StatsCollectorConfig statsCollectorConfig) {
@@ -49,16 +49,15 @@ public class NoDictColumnStatisticsCollector extends AbstractColumnStatisticsCol
   public void collect(Object entry) {
     assert !_sealed;
     if (entry instanceof Object[]) {
-      // todo - handle native double[], int[], long[] etc too.
       Object[] values = (Object[]) entry;
       int rowLength = 0;
-      for (Object obj : values) {
-        if (obj instanceof BigDecimal) {
+      for (Object value : values) {
+        if (value instanceof BigDecimal) {
           // BigDecimalColumnPreIndexStatsCollector doesn't support multi-value
           throw new UnsupportedOperationException();
         }
-        updateMinMax(obj);
-        int len = valueLength(obj);
+        updateMinMax(value);
+        int len = getValueLength(value);
         _minLength = Math.min(_minLength, len);
         _maxLength = Math.max(_maxLength, len);
         rowLength += len;
@@ -66,15 +65,46 @@ public class NoDictColumnStatisticsCollector extends AbstractColumnStatisticsCol
       _maxNumberOfMultiValues = Math.max(_maxNumberOfMultiValues, values.length);
       _maxRowLength = Math.max(_maxRowLength, rowLength);
       updateTotalNumberOfEntries(values);
+    } else if (entry instanceof int[] || entry instanceof long[]
+        || entry instanceof float[] || entry instanceof double[]) {
+      // Native multi-value types don't require length calculation
+      int length;
+      if (entry instanceof int[]) {
+        int[] values = (int[]) entry;
+        for (int value : values) {
+          updateMinMax(value);
+        }
+        length = values.length;
+      } else if (entry instanceof long[]) {
+        long[] values = (long[]) entry;
+        for (long value : values) {
+          updateMinMax(value);
+        }
+        length = values.length;
+      } else if (entry instanceof float[]) {
+        float[] values = (float[]) entry;
+        for (float value : values) {
+          updateMinMax(value);
+        }
+        length = values.length;
+      } else {
+        double[] values = (double[]) entry;
+        for (double value : values) {
+          updateMinMax(value);
+        }
+        length = values.length;
+      }
+      _maxNumberOfMultiValues = Math.max(_maxNumberOfMultiValues, length);
+      updateTotalNumberOfEntries(length);
     } else {
       addressSorted(toComparable(entry));
       updateMinMax(entry);
+      int len = getValueLength(entry);
+      _minLength = Math.min(_minLength, len);
+      _maxLength = Math.max(_maxLength, len);
       if (isPartitionEnabled()) {
         updatePartition(entry.toString());
       }
-      int len = valueLength(entry);
-      _minLength = Math.min(_minLength, len);
-      _maxLength = Math.max(_maxLength, len);
       _maxRowLength = Math.max(_maxRowLength, len);
       _totalNumberOfEntries++;
     }
@@ -100,7 +130,7 @@ public class NoDictColumnStatisticsCollector extends AbstractColumnStatisticsCol
     throw new IllegalStateException("Unsupported value type " + value.getClass());
   }
 
-  private int valueLength(Object value) {
+  private int getValueLength(Object value) {
     if (value instanceof byte[]) {
       return ((byte[]) value).length;
     }
