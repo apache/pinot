@@ -572,7 +572,7 @@ public class QueryOptionsUtils {
     return queryOptions.getOrDefault(QueryOptionKey.WORKLOAD_NAME, CommonConstants.Accounting.DEFAULT_WORKLOAD_NAME);
   }
 
-  public static boolean reverseOptimizationEnabled(Map<String, String> queryOptions) {
+  public static boolean isReverseOrderAllowed(Map<String, String> queryOptions) {
     String value = queryOptions.get(QueryOptionKey.ALLOW_REVERSE_ORDER);
     if (value == null) {
       return QueryOptionKey.DEFAULT_ALLOW_REVERSE_ORDER;

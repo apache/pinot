@@ -129,7 +129,7 @@ public class SelectionPlanNode implements PlanNode {
 
     boolean asc = orderByExpressions.get(0).isAsc();
     if (!asc
-        && QueryOptionsUtils.reverseOptimizationEnabled(_queryContext.getQueryOptions())
+        && QueryOptionsUtils.isReverseOrderAllowed(_queryContext.getQueryOptions())
         && !projectOperator.isCompatibleWith(DidOrderedOperator.DidOrder.DESC)) {
       try {
         return projectOperator.withOrder(DidOrderedOperator.DidOrder.DESC);
