@@ -104,7 +104,17 @@ public class ReceivingMailbox {
   public ReceivingMailboxStatus offerRaw(List<ByteBuffer> byteBuffers, long timeoutMs)
       throws IOException {
     updateWaitCpuTime();
-    DataBlock dataBlock = deserialize(byteBuffers);
+
+    long startTimeMs = System.currentTimeMillis();
+    int totalBytes = 0;
+    for (ByteBuffer bb : byteBuffers) {
+      totalBytes += bb.remaining();
+    }
+    DataBlock dataBlock = DataBlockUtils.deserialize(byteBuffers);
+    _stats.merge(StatKey.DESERIALIZED_MESSAGES, 1);
+    _stats.merge(StatKey.DESERIALIZED_BYTES, totalBytes);
+    _stats.merge(StatKey.DESERIALIZATION_TIME_MS, System.currentTimeMillis() - startTimeMs);
+
     MseBlock block;
     if (dataBlock instanceof MetadataBlock) {
       Map<Integer, String> exceptions = dataBlock.getExceptions();
@@ -123,28 +133,6 @@ public class ReceivingMailbox {
       block = new SerializedDataBlock(dataBlock);
     }
     return offerPrivate(block, dataBlock.getStatsByStage(), timeoutMs);
-  }
-
-  private DataBlock deserialize(List<ByteBuffer> byteBuffers)
-      throws IOException {
-    long startTimeMs = System.currentTimeMillis();
-    int totalBytes;
-    DataBlock dataBlock;
-    if (byteBuffers.size() == 1) {
-      ByteBuffer byteBuffer = byteBuffers.get(0);
-      totalBytes = byteBuffer.remaining();
-      dataBlock = DataBlockUtils.readFrom(byteBuffer);
-    } else {
-      totalBytes = 0;
-      for (ByteBuffer bb : byteBuffers) {
-        totalBytes += bb.remaining();
-      }
-      dataBlock = DataBlockUtils.deserialize(byteBuffers);
-    }
-    _stats.merge(StatKey.DESERIALIZED_BYTES, totalBytes);
-    _stats.merge(StatKey.DESERIALIZED_MESSAGES, 1);
-    _stats.merge(StatKey.DESERIALIZATION_TIME_MS, System.currentTimeMillis() - startTimeMs);
-    return dataBlock;
   }
 
   public ReceivingMailboxStatus offer(MseBlock block, List<DataBuffer> serializedStats, long timeoutMs) {
