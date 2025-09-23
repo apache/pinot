@@ -461,6 +461,11 @@ public class CommonConstants {
         "pinot.broker.enable.partition.metadata.manager";
     public static final boolean DEFAULT_ENABLE_PARTITION_METADATA_MANAGER = true;
 
+    public static final String CONFIG_OF_ROUTING_ASSIGNMENT_CHANGE_PROCESS_PARALLELISM =
+        "pinot.broker.routing.assignment.change.process.parallelism";
+    public static final int DEFAULT_ROUTING_ASSIGNMENT_CHANGE_PROCESS_PARALLELISM =
+        Runtime.getRuntime().availableProcessors();
+
       // When enabled, the broker will set a query option to ignore SERVER_SEGMENT_MISSING errors from servers.
       // This is useful to tolerate short windows where routing has not yet reflected recently deleted segments.
       public static final String CONFIG_OF_IGNORE_MISSING_SEGMENTS =

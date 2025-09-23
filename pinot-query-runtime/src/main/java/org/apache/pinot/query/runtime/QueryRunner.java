@@ -76,6 +76,7 @@ import org.apache.pinot.query.runtime.timeseries.serde.TimeSeriesBlockSerde;
 import org.apache.pinot.spi.accounting.MseCancelCallback;
 import org.apache.pinot.spi.accounting.ThreadExecutionContext;
 import org.apache.pinot.spi.accounting.ThreadResourceUsageAccountant;
+import org.apache.pinot.spi.config.instance.InstanceType;
 import org.apache.pinot.spi.env.PinotConfiguration;
 import org.apache.pinot.spi.executor.ExecutorServiceUtils;
 import org.apache.pinot.spi.executor.HardLimitExecutor;
@@ -231,7 +232,7 @@ public class QueryRunner {
     }
 
     _opChainScheduler = new OpChainSchedulerService(_executorService, serverConf);
-    _mailboxService = new MailboxService(hostname, port, serverConf, tlsConfig);
+    _mailboxService = new MailboxService(hostname, port, InstanceType.SERVER, serverConf, tlsConfig);
     try {
       _leafQueryExecutor = new ServerQueryExecutorV1Impl();
       _leafQueryExecutor.init(serverConf.subset(Server.QUERY_EXECUTOR_CONFIG_PREFIX), instanceDataManager,
