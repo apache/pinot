@@ -25,7 +25,7 @@ import org.apache.pinot.common.request.context.OrderByExpressionContext;
 import org.apache.pinot.common.utils.config.QueryOptionsUtils;
 import org.apache.pinot.core.common.Operator;
 import org.apache.pinot.core.operator.BaseProjectOperator;
-import org.apache.pinot.core.operator.DidOrderedOperator;
+import org.apache.pinot.core.operator.DocIdOrderedOperator;
 import org.apache.pinot.core.operator.blocks.results.SelectionResultsBlock;
 import org.apache.pinot.core.operator.query.EmptySelectionOperator;
 import org.apache.pinot.core.operator.query.SelectionOnlyOperator;
@@ -94,7 +94,7 @@ public class SelectionPlanNode implements PlanNode {
       boolean asc = orderByExpressions.get(0).isAsc();
       // Remember that we cannot use asc == projectOperator.isAscending() because empty operators are considered
       // both ascending and descending
-      DidOrderedOperator.DidOrder queryOrder = DidOrderedOperator.DidOrder.fromAsc(asc);
+      DocIdOrderedOperator.DocIdOrder queryOrder = DocIdOrderedOperator.DocIdOrder.fromAsc(asc);
       if (projectOperator.isCompatibleWith(queryOrder)) {
         return new SelectionPartiallyOrderedByLinearOperator(_indexSegment, _queryContext, expressions, projectOperator,
             sortedColumnsPrefixSize);
@@ -130,9 +130,9 @@ public class SelectionPlanNode implements PlanNode {
     boolean asc = orderByExpressions.get(0).isAsc();
     if (!asc
         && QueryOptionsUtils.isReverseOrderAllowed(_queryContext.getQueryOptions())
-        && !projectOperator.isCompatibleWith(DidOrderedOperator.DidOrder.DESC)) {
+        && !projectOperator.isCompatibleWith(DocIdOrderedOperator.DocIdOrder.DESC)) {
       try {
-        return projectOperator.withOrder(DidOrderedOperator.DidOrder.DESC);
+        return projectOperator.withOrder(DocIdOrderedOperator.DocIdOrder.DESC);
       } catch (IllegalArgumentException | UnsupportedOperationException e) {
         // This happens when the operator cannot provide the required order between blocks
         // Fallback to SelectionOrderByOperator

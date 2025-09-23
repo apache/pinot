@@ -24,7 +24,7 @@ import org.apache.pinot.core.operator.blocks.ValueBlock;
 
 
 public abstract class BaseProjectOperator<T extends ValueBlock> extends BaseOperator<T>
-    implements DidOrderedOperator<T> {
+    implements DocIdOrderedOperator<T> {
 
   /**
    * Returns a map from source column name to context.
@@ -50,5 +50,5 @@ public abstract class BaseProjectOperator<T extends ValueBlock> extends BaseOper
    *
    * @throws UnsupportedOperationException if the order cannot be changed
    */
-  public abstract BaseProjectOperator<T> withOrder(DidOrder newOrder);
+  public abstract BaseProjectOperator<T> withOrder(DocIdOrder newOrder);
 }

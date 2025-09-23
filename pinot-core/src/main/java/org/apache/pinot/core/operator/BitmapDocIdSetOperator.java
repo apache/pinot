@@ -40,12 +40,12 @@ public class BitmapDocIdSetOperator extends BaseDocIdSetOperator {
   private IntIteratorDocIdSetOperator _docIdIteratorOperator = null;
   private final int[] _docIdBuffer;
   private final ImmutableBitmapDataProvider _docIds;
-  private final DidOrder _didOrder;
+  private final DocIdOrder _docIdOrder;
 
-  public BitmapDocIdSetOperator(ImmutableBitmapDataProvider docIds, int[] docIdBuffer, DidOrder didOrder) {
+  public BitmapDocIdSetOperator(ImmutableBitmapDataProvider docIds, int[] docIdBuffer, DocIdOrder docIdOrder) {
     _docIds = docIds;
     _docIdBuffer = docIdBuffer;
-    _didOrder = didOrder;
+    _docIdOrder = docIdOrder;
   }
 
   public static BitmapDocIdSetOperator ascending(ImmutableBitmapDataProvider docIds) {
@@ -57,7 +57,7 @@ public class BitmapDocIdSetOperator extends BaseDocIdSetOperator {
   }
 
   public static BitmapDocIdSetOperator ascending(ImmutableBitmapDataProvider docIds, int[] docIdBuffer) {
-    return new BitmapDocIdSetOperator(docIds, docIdBuffer, DidOrder.ASC);
+    return new BitmapDocIdSetOperator(docIds, docIdBuffer, DocIdOrder.ASC);
   }
 
   public static BitmapDocIdSetOperator descending(ImmutableBitmapDataProvider docIds, int numDocs) {
@@ -65,14 +65,14 @@ public class BitmapDocIdSetOperator extends BaseDocIdSetOperator {
   }
 
   public static BitmapDocIdSetOperator descending(ImmutableBitmapDataProvider bitmap, int[] docIdBuffer) {
-    return new BitmapDocIdSetOperator(bitmap, docIdBuffer, DidOrder.DESC);
+    return new BitmapDocIdSetOperator(bitmap, docIdBuffer, DocIdOrder.DESC);
   }
 
   @Override
   protected DocIdSetBlock getNextBlock() {
     if (_docIdIteratorOperator == null) {
-      IntIterator iterator = _didOrder == DidOrder.ASC ? _docIds.getIntIterator() : _docIds.getReverseIntIterator();
-      _docIdIteratorOperator = new IntIteratorDocIdSetOperator(iterator, _docIdBuffer, _didOrder);
+      IntIterator iterator = _docIdOrder == DocIdOrder.ASC ? _docIds.getIntIterator() : _docIds.getReverseIntIterator();
+      _docIdIteratorOperator = new IntIteratorDocIdSetOperator(iterator, _docIdBuffer, _docIdOrder);
     }
     return _docIdIteratorOperator.getNextBlock();
   }
@@ -88,12 +88,12 @@ public class BitmapDocIdSetOperator extends BaseDocIdSetOperator {
   }
 
   @Override
-  public boolean isCompatibleWith(DidOrder order) {
-    return _didOrder == order;
+  public boolean isCompatibleWith(DocIdOrder order) {
+    return _docIdOrder == order;
   }
 
   @Override
-  public BaseDocIdSetOperator withOrder(DidOrder order)
+  public BaseDocIdSetOperator withOrder(DocIdOrder order)
       throws UnsupportedOperationException {
     if (isCompatibleWith(order)) {
       return this;

@@ -109,12 +109,12 @@ public class DocIdSetOperator extends BaseDocIdSetOperator {
   }
 
   @Override
-  public boolean isCompatibleWith(DidOrder order) {
-    return order == DidOrder.ASC;
+  public boolean isCompatibleWith(DocIdOrder order) {
+    return order == DocIdOrder.ASC;
   }
 
   @Override
-  public BaseDocIdSetOperator withOrder(DidOrder order) {
+  public BaseDocIdSetOperator withOrder(DocIdOrder order) {
     if (isCompatibleWith(order)) {
       return this;
     }

@@ -135,12 +135,12 @@ public class ProjectionOperator extends BaseProjectOperator<ProjectionBlock> imp
   }
 
   @Override
-  public boolean isCompatibleWith(DidOrder order) {
+  public boolean isCompatibleWith(DocIdOrder order) {
     return _docIdSetOperator == null || _docIdSetOperator.isCompatibleWith(order);
   }
 
   @Override
-  public BaseProjectOperator<ProjectionBlock> withOrder(DidOrder newOrder) {
+  public BaseProjectOperator<ProjectionBlock> withOrder(DocIdOrder newOrder) {
     BaseDocIdSetOperator orderedOperator = _docIdSetOperator.withOrder(newOrder);
     if (orderedOperator == _docIdSetOperator) {
       return this;

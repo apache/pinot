@@ -117,12 +117,12 @@ public class ReverseDocIdSetOperator extends BaseDocIdSetOperator {
   }
 
   @Override
-  public boolean isCompatibleWith(DidOrder order) {
-    return order == DidOrder.DESC;
+  public boolean isCompatibleWith(DocIdOrder order) {
+    return order == DocIdOrder.DESC;
   }
 
   @Override
-  public BaseDocIdSetOperator withOrder(DidOrder order)
+  public BaseDocIdSetOperator withOrder(DocIdOrder order)
       throws UnsupportedOperationException {
     if (isCompatibleWith(order)) {
       return this;

@@ -23,19 +23,19 @@ import org.apache.pinot.core.common.Operator;
 
 
 /// An operator that is bound to a specific segment.
-public interface DidOrderedOperator<T extends Block> extends Operator<T> {
+public interface DocIdOrderedOperator<T extends Block> extends Operator<T> {
   /// Returns true if the operator is ordered by docId in the specified order.
   ///
   /// Remember that empty operators or operators that return a single row are considered ordered.
-  boolean isCompatibleWith(DidOrder order);
+  boolean isCompatibleWith(DocIdOrder order);
 
-  enum DidOrder {
+  enum DocIdOrder {
     /// The rows are sorted in strictly ascending docId order.
     ASC,
     /// The rows are sorted in strictly descending docId order.
     DESC;
 
-    public static DidOrder fromAsc(boolean asc) {
+    public static DocIdOrder fromAsc(boolean asc) {
       return asc ? ASC : DESC;
     }
   }

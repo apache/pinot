@@ -119,12 +119,12 @@ public class TransformOperator extends BaseProjectOperator<TransformBlock> {
   }
 
   @Override
-  public boolean isCompatibleWith(DidOrder order) {
+  public boolean isCompatibleWith(DocIdOrder order) {
     return _projectOperator.isCompatibleWith(order);
   }
 
   @Override
-  public BaseProjectOperator<TransformBlock> withOrder(DidOrder newOrder) {
+  public BaseProjectOperator<TransformBlock> withOrder(DocIdOrder newOrder) {
     return new TransformOperator(_projectOperator.withOrder(newOrder), _transformFunctionMap);
   }
 }
