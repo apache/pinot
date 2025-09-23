@@ -118,6 +118,6 @@ public class JoinNode extends BasePlanNode {
   }
 
   public enum JoinStrategy {
-    HASH, LOOKUP, ASOF
+    HASH, LOOKUP, ASOF, SORTED
   }
 }
