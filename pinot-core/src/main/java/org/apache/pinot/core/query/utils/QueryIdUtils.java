@@ -34,11 +34,15 @@ public class QueryIdUtils {
   public static final String REALTIME_SUFFIX = "_R";
 
   public static String getQueryId(String brokerId, long requestId, TableType tableType) {
-    return brokerId + "_" + requestId + (tableType == TableType.OFFLINE ? OFFLINE_SUFFIX : REALTIME_SUFFIX);
+    return withTypeSuffix(brokerId + "_" + requestId, tableType);
   }
 
   public static boolean hasTypeSuffix(String queryId) {
     return queryId.endsWith(OFFLINE_SUFFIX) || queryId.endsWith(REALTIME_SUFFIX);
+  }
+
+  public static String withTypeSuffix(String queryId, TableType tableType) {
+    return tableType == TableType.OFFLINE ? withOfflineSuffix(queryId) : withRealtimeSuffix(queryId);
   }
 
   public static String withOfflineSuffix(String queryId) {

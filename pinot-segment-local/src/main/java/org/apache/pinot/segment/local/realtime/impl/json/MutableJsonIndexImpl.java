@@ -55,7 +55,7 @@ import org.apache.pinot.segment.spi.index.mutable.MutableJsonIndex;
 import org.apache.pinot.spi.config.table.JsonIndexConfig;
 import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.exception.BadQueryRequestException;
-import org.apache.pinot.spi.trace.Tracing;
+import org.apache.pinot.spi.query.QueryThreadContext;
 import org.apache.pinot.spi.utils.JsonUtils;
 import org.apache.pinot.sql.parsers.CalciteSqlParser;
 import org.roaringbitmap.IntConsumer;
@@ -612,9 +612,10 @@ public class MutableJsonIndexImpl implements MutableJsonIndex {
         }
 
         if (!docIds.isEmpty()) {
+          QueryThreadContext.checkTerminationAndSampleUsagePeriodically(resultMap.size(),
+              "MutableJsonIndexImpl#getMatchingFlattenedDocsMap");
           String value = entry.getKey().substring(jsonPathKey.length() + 1);
           resultMap.put(value, docIds);
-          Tracing.ThreadAccountantOps.sampleAndCheckInterruptionPeriodically(resultMap.size());
         }
       }
 

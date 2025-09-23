@@ -33,9 +33,7 @@ import java.util.Map;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
-import java.util.concurrent.TimeoutException;
 import java.util.concurrent.atomic.AtomicReference;
-import org.apache.commons.lang3.StringUtils;
 import org.apache.pinot.common.CustomObject;
 import org.apache.pinot.common.Utils;
 import org.apache.pinot.common.datatable.DataTable;
@@ -45,7 +43,6 @@ import org.apache.pinot.common.metrics.BrokerMetrics;
 import org.apache.pinot.common.request.context.ExpressionContext;
 import org.apache.pinot.common.request.context.FilterContext;
 import org.apache.pinot.common.response.broker.BrokerResponseNative;
-import org.apache.pinot.common.response.broker.QueryProcessingException;
 import org.apache.pinot.common.response.broker.ResultTable;
 import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.common.utils.DataSchema.ColumnDataType;
@@ -59,11 +56,9 @@ import org.apache.pinot.core.query.utils.rewriter.RewriterResult;
 import org.apache.pinot.core.transport.ServerRoutingInstance;
 import org.apache.pinot.core.util.GroupByUtils;
 import org.apache.pinot.core.util.trace.TraceRunnable;
-import org.apache.pinot.spi.accounting.ThreadExecutionContext;
-import org.apache.pinot.spi.accounting.ThreadResourceUsageAccountant;
 import org.apache.pinot.spi.exception.EarlyTerminationException;
 import org.apache.pinot.spi.exception.QueryErrorCode;
-import org.apache.pinot.spi.trace.Tracing;
+import org.apache.pinot.spi.query.QueryThreadContext;
 import org.roaringbitmap.RoaringBitmap;
 
 
@@ -80,9 +75,8 @@ public class GroupByDataTableReducer implements DataTableReducer {
   private final int _numAggregationFunctions;
   private final int _numGroupByExpressions;
   private final int _numColumns;
-  private final ThreadResourceUsageAccountant _resourceUsageAccountant;
 
-  public GroupByDataTableReducer(QueryContext queryContext, ThreadResourceUsageAccountant accountant) {
+  public GroupByDataTableReducer(QueryContext queryContext) {
     _queryContext = queryContext;
     _aggregationFunctions = queryContext.getAggregationFunctions();
     assert _aggregationFunctions != null;
@@ -91,7 +85,6 @@ public class GroupByDataTableReducer implements DataTableReducer {
     assert groupByExpressions != null;
     _numGroupByExpressions = groupByExpressions.size();
     _numColumns = _numAggregationFunctions + _numGroupByExpressions;
-    _resourceUsageAccountant = accountant;
   }
 
   /**
@@ -118,12 +111,7 @@ public class GroupByDataTableReducer implements DataTableReducer {
     if (_queryContext.isServerReturnFinalResult() && dataTables.size() == 1) {
       processSingleFinalResult(dataSchema, dataTables.iterator().next(), brokerResponse);
     } else {
-      try {
-        reduceResult(brokerResponse, dataSchema, dataTables, reducerContext, tableName, brokerMetrics);
-      } catch (TimeoutException e) {
-        brokerResponse.getExceptions()
-            .add(new QueryProcessingException(QueryErrorCode.BROKER_TIMEOUT, e.getMessage()));
-      }
+      reduceResult(brokerResponse, dataSchema, dataTables, reducerContext, tableName, brokerMetrics);
     }
 
     if (brokerMetrics != null && brokerResponse.getResultTable() != null) {
@@ -132,20 +120,10 @@ public class GroupByDataTableReducer implements DataTableReducer {
     }
   }
 
-  /**
-   * Extract group by order by results and set into {@link ResultTable}
-   * @param brokerResponseNative broker response
-   * @param dataSchema data schema
-   * @param dataTables Collection of data tables
-   * @param reducerContext DataTableReducer context
-   * @param rawTableName table name
-   * @param brokerMetrics broker metrics (meters)
-   * @throws TimeoutException If unable complete within timeout.
-   */
+  /// Reduces group-by results into a [ResultTable] and set it into the [BrokerResponseNative].
   private void reduceResult(BrokerResponseNative brokerResponseNative, DataSchema dataSchema,
       Collection<DataTable> dataTables, DataTableReducerContext reducerContext, String rawTableName,
-      BrokerMetrics brokerMetrics)
-      throws TimeoutException {
+      BrokerMetrics brokerMetrics) {
     // NOTE: This step will modify the data schema and also return final aggregate results.
     IndexedTable indexedTable = getIndexedTable(dataSchema, dataTables, reducerContext);
     if (indexedTable.isTrimmed() && _queryContext.isUnsafeTrim()) {
@@ -180,6 +158,7 @@ public class GroupByDataTableReducer implements DataTableReducer {
           new HavingFilterHandler(havingFilter, postAggregationHandler, _queryContext.isNullHandlingEnabled());
       int processedRows = 0;
       while (rows.size() < limit && sortedIterator.hasNext()) {
+        QueryThreadContext.checkTerminationAndSampleUsagePeriodically(processedRows++, "GroupByDataTableReducer");
         Object[] row = sortedIterator.next().getValues();
         for (int i = 0; i < numColumns; i++) {
           Object value = row[i];
@@ -190,13 +169,12 @@ public class GroupByDataTableReducer implements DataTableReducer {
         if (havingFilterHandler.isMatch(row)) {
           rows.add(row);
         }
-        Tracing.ThreadAccountantOps.sampleAndCheckInterruptionPeriodically(processedRows);
-        processedRows++;
       }
     } else {
       int numRows = Math.min(numRecords, limit);
       rows = new ArrayList<>(numRows);
       for (int i = 0; i < numRows; i++) {
+        QueryThreadContext.checkTerminationAndSampleUsagePeriodically(i, "GroupByDataTableReducer");
         Object[] row = sortedIterator.next().getValues();
         for (int j = 0; j < numColumns; j++) {
           Object value = row[j];
@@ -205,7 +183,6 @@ public class GroupByDataTableReducer implements DataTableReducer {
           }
         }
         rows.add(row);
-        Tracing.ThreadAccountantOps.sampleAndCheckInterruptionPeriodically(i);
       }
     }
 
@@ -231,8 +208,7 @@ public class GroupByDataTableReducer implements DataTableReducer {
   }
 
   private IndexedTable getIndexedTable(DataSchema dataSchema, Collection<DataTable> dataTablesToReduce,
-      DataTableReducerContext reducerContext)
-      throws TimeoutException {
+      DataTableReducerContext reducerContext) {
     long start = System.currentTimeMillis();
 
     assert !dataTablesToReduce.isEmpty();
@@ -263,12 +239,9 @@ public class GroupByDataTableReducer implements DataTableReducer {
     ColumnDataType[] storedColumnDataTypes = dataSchema.getStoredColumnDataTypes();
     for (int i = 0; i < numReduceThreadsToUse; i++) {
       List<DataTable> reduceGroup = reduceGroups.get(i);
-      int taskId = i;
-      ThreadExecutionContext parentContext = Tracing.getThreadAccountant().getThreadExecutionContext();
       futures[i] = reducerContext.getExecutorService().submit(new TraceRunnable() {
         @Override
         public void runJob() {
-          _resourceUsageAccountant.setupWorker(taskId, ThreadExecutionContext.TaskType.SSE, parentContext);
           try {
             for (DataTable dataTable : reduceGroup) {
               boolean nullHandlingEnabled = _queryContext.isNullHandlingEnabled();
@@ -285,7 +258,7 @@ public class GroupByDataTableReducer implements DataTableReducer {
                 // Terminate when thread is interrupted.
                 // This is expected when the query already fails in the main thread.
                 // The first check will always be performed when rowId = 0
-                Tracing.ThreadAccountantOps.sampleAndCheckInterruptionPeriodically(rowId);
+                QueryThreadContext.checkTerminationAndSampleUsagePeriodically(rowId, "GroupByDataTableReducer");
                 Object[] values = new Object[_numColumns];
                 for (int colId = 0; colId < _numColumns; colId++) {
                   // NOTE: We need to handle data types for group key, intermediate and final aggregate result.
@@ -354,7 +327,6 @@ public class GroupByDataTableReducer implements DataTableReducer {
             exception.compareAndSet(null, t);
           } finally {
             countDownLatch.countDown();
-            Tracing.ThreadAccountantOps.clear();
           }
         }
       });
@@ -363,17 +335,14 @@ public class GroupByDataTableReducer implements DataTableReducer {
     try {
       long timeOutMs = reducerContext.getReduceTimeOutMs() - (System.currentTimeMillis() - start);
       if (!countDownLatch.await(timeOutMs, TimeUnit.MILLISECONDS)) {
-        throw new TimeoutException("Timed out on broker reduce phase");
+        throw QueryErrorCode.BROKER_TIMEOUT.asException("Timed out reducing group-by results");
       }
       Throwable t = exception.get();
       if (t != null) {
         Utils.rethrowException(t);
       }
     } catch (InterruptedException e) {
-      Exception killedErrorMsg = Tracing.getThreadAccountant().getErrorStatus();
-      throw new EarlyTerminationException(
-          "Interrupted in broker reduce phase" + (killedErrorMsg == null ? StringUtils.EMPTY : " " + killedErrorMsg),
-          e);
+      throw new EarlyTerminationException("Interrupted while reducing group-by results");
     } finally {
       for (Future future : futures) {
         if (!future.isDone()) {

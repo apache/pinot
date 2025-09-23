@@ -36,7 +36,7 @@ import org.apache.avro.generic.GenericDatumWriter;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.log4j.Level;
 import org.apache.log4j.LogManager;
-import org.apache.pinot.core.accounting.QueryAggregator;
+import org.apache.pinot.core.accounting.QueryResourceAggregator;
 import org.apache.pinot.core.accounting.ResourceUsageAccountantFactory;
 import org.apache.pinot.spi.accounting.ThreadResourceUsageProvider;
 import org.apache.pinot.spi.config.table.TableConfig;
@@ -47,11 +47,16 @@ import org.apache.pinot.spi.env.PinotConfiguration;
 import org.apache.pinot.spi.exception.QueryErrorCode;
 import org.apache.pinot.spi.trace.Tracing;
 import org.apache.pinot.spi.utils.CommonConstants;
+import org.apache.pinot.spi.utils.CommonConstants.Accounting;
+import org.apache.pinot.spi.utils.CommonConstants.Broker;
+import org.apache.pinot.spi.utils.CommonConstants.Server;
 import org.apache.pinot.spi.utils.builder.TableConfigBuilder;
 import org.apache.pinot.util.TestUtils;
-import org.testng.Assert;
 import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
+
+import static org.testng.Assert.assertFalse;
+import static org.testng.Assert.assertTrue;
 
 
 /**
@@ -66,8 +71,6 @@ public class OfflineClusterMemBasedServerResourceUsageAccountantTest extends Bas
   public static final String LONG_DIM_SV1 = "longDimSV1";
   public static final String DOUBLE_DIM_SV1 = "doubleDimSV1";
   public static final String BOOLEAN_DIM_SV1 = "booleanDimSV1";
-  private static final int NUM_BROKERS = 1;
-  private static final int NUM_SERVERS = 1;
   private static final int NUM_DOCS = 3_000_000;
 
   private static final String OOM_QUERY =
@@ -90,33 +93,16 @@ public class OfflineClusterMemBasedServerResourceUsageAccountantTest extends Bas
     return thread;
   });
 
-  protected int getNumBrokers() {
-    return NUM_BROKERS;
-  }
-
-  protected int getNumServers() {
-    return NUM_SERVERS;
-  }
-
   @BeforeClass
   public void setUp()
       throws Exception {
-    LogManager.getLogger(ResourceUsageAccountantFactory.ResourceUsageAccountant.class)
-        .setLevel(Level.ERROR);
-    ThreadResourceUsageProvider.setThreadCpuTimeMeasurementEnabled(true);
-    ThreadResourceUsageProvider.setThreadMemoryMeasurementEnabled(true);
-
     TestUtils.ensureDirectoriesExistAndEmpty(_tempDir, _segmentDir, _tarDir);
 
     // Start the Pinot cluster
     startZk();
     startController();
-    startServers();
-    while (!Tracing.isAccountantRegistered()) {
-      Thread.sleep(100L);
-    }
-    startBrokers();
-
+    startBroker();
+    startServer();
 
     // Create and upload the schema and table config
     Schema schema = new Schema.SchemaBuilder().setSchemaName(DEFAULT_SCHEMA_NAME)
@@ -144,66 +130,25 @@ public class OfflineClusterMemBasedServerResourceUsageAccountantTest extends Bas
         .setLevel(Level.INFO);
     LogManager.getLogger(ThreadResourceUsageProvider.class).setLevel(Level.INFO);
     LogManager.getLogger(Tracing.class).setLevel(Level.INFO);
-    LogManager.getLogger(QueryAggregator.class).setLevel(Level.INFO);
-  }
-
-  protected void startBrokers()
-      throws Exception {
-    startBrokers(getNumBrokers());
-  }
-
-  protected void startServers()
-      throws Exception {
-    startServers(getNumServers());
-  }
-
-  protected void overrideServerConf(PinotConfiguration serverConf) {
-    serverConf.setProperty(CommonConstants.PINOT_QUERY_SCHEDULER_PREFIX + "."
-        + CommonConstants.Accounting.CONFIG_OF_ALARMING_LEVEL_HEAP_USAGE_RATIO, 0.0f);
-    serverConf.setProperty(CommonConstants.PINOT_QUERY_SCHEDULER_PREFIX + "."
-        + CommonConstants.Accounting.CONFIG_OF_CRITICAL_LEVEL_HEAP_USAGE_RATIO, 0.15f);
-    serverConf.setProperty(
-        CommonConstants.PINOT_QUERY_SCHEDULER_PREFIX + "." + CommonConstants.Accounting.CONFIG_OF_FACTORY_NAME,
-        "org.apache.pinot.core.accounting.ResourceUsageAccountantFactory");
-    serverConf.setProperty(CommonConstants.PINOT_QUERY_SCHEDULER_PREFIX + "."
-        + CommonConstants.Accounting.CONFIG_OF_ENABLE_THREAD_MEMORY_SAMPLING, true);
-    serverConf.setProperty(
-        CommonConstants.PINOT_QUERY_SCHEDULER_PREFIX + "."
-            + CommonConstants.Accounting.CONFIG_OF_ENABLE_THREAD_CPU_SAMPLING, false);
-    serverConf.setProperty(CommonConstants.PINOT_QUERY_SCHEDULER_PREFIX + "."
-        + CommonConstants.Accounting.CONFIG_OF_OOM_PROTECTION_KILLING_QUERY, true);
-    serverConf.setProperty(CommonConstants.Server.CONFIG_OF_ENABLE_THREAD_ALLOCATED_BYTES_MEASUREMENT, true);
-
-    serverConf.setProperty(CommonConstants.PINOT_QUERY_SCHEDULER_PREFIX + "."
-        + CommonConstants.Accounting.CONFIG_OF_WORKLOAD_ENABLE_COST_COLLECTION, true);
-    serverConf.setProperty(CommonConstants.PINOT_QUERY_SCHEDULER_PREFIX + "."
-        + CommonConstants.Accounting.CONFIG_OF_WORKLOAD_ENABLE_COST_ENFORCEMENT, true);
+    LogManager.getLogger(QueryResourceAggregator.class).setLevel(Level.INFO);
   }
 
   protected void overrideBrokerConf(PinotConfiguration brokerConf) {
-    brokerConf.setProperty(CommonConstants.PINOT_QUERY_SCHEDULER_PREFIX + "."
-        + CommonConstants.Accounting.CONFIG_OF_ALARMING_LEVEL_HEAP_USAGE_RATIO, 0.0f);
-    brokerConf.setProperty(CommonConstants.PINOT_QUERY_SCHEDULER_PREFIX + "."
-        + CommonConstants.Accounting.CONFIG_OF_CRITICAL_LEVEL_HEAP_USAGE_RATIO, 0.60f);
-    brokerConf.setProperty(CommonConstants.PINOT_QUERY_SCHEDULER_PREFIX + "."
-        + CommonConstants.Accounting.CONFIG_OF_PANIC_LEVEL_HEAP_USAGE_RATIO, 1.1f);
-    brokerConf.setProperty(CommonConstants.PINOT_QUERY_SCHEDULER_PREFIX + "."
-            + CommonConstants.Accounting.CONFIG_OF_FACTORY_NAME,
-        "org.apache.pinot.core.accounting.ResourceUsageAccountantFactory");
-    brokerConf.setProperty(CommonConstants.PINOT_QUERY_SCHEDULER_PREFIX + "."
-        + CommonConstants.Accounting.CONFIG_OF_ENABLE_THREAD_MEMORY_SAMPLING, true);
-    brokerConf.setProperty(CommonConstants.PINOT_QUERY_SCHEDULER_PREFIX + "."
-        + CommonConstants.Accounting.CONFIG_OF_ENABLE_THREAD_CPU_SAMPLING, false);
-    brokerConf.setProperty(CommonConstants.PINOT_QUERY_SCHEDULER_PREFIX + "."
-        + CommonConstants.Accounting.CONFIG_OF_OOM_PROTECTION_KILLING_QUERY, true);
-    brokerConf.setProperty(CommonConstants.Broker.CONFIG_OF_ENABLE_THREAD_ALLOCATED_BYTES_MEASUREMENT, true);
-
-    brokerConf.setProperty(CommonConstants.PINOT_QUERY_SCHEDULER_PREFIX + "."
-        + CommonConstants.Accounting.CONFIG_OF_WORKLOAD_ENABLE_COST_COLLECTION, true);
-    brokerConf.setProperty(CommonConstants.PINOT_QUERY_SCHEDULER_PREFIX + "."
-        + CommonConstants.Accounting.CONFIG_OF_WORKLOAD_ENABLE_COST_ENFORCEMENT, true);
+    brokerConf.setProperty(Broker.CONFIG_OF_ENABLE_THREAD_ALLOCATED_BYTES_MEASUREMENT, true);
   }
 
+  protected void overrideServerConf(PinotConfiguration serverConf) {
+    serverConf.setProperty(Server.CONFIG_OF_ENABLE_THREAD_ALLOCATED_BYTES_MEASUREMENT, true);
+
+    String prefix = CommonConstants.PINOT_QUERY_SCHEDULER_PREFIX + ".";
+    serverConf.setProperty(prefix + Accounting.CONFIG_OF_FACTORY_NAME, ResourceUsageAccountantFactory.class.getName());
+    serverConf.setProperty(prefix + Accounting.CONFIG_OF_ENABLE_THREAD_MEMORY_SAMPLING, true);
+    serverConf.setProperty(prefix + Accounting.CONFIG_OF_OOM_PROTECTION_KILLING_QUERY, true);
+    serverConf.setProperty(prefix + Accounting.CONFIG_OF_ALARMING_LEVEL_HEAP_USAGE_RATIO, 0f);
+    serverConf.setProperty(prefix + Accounting.CONFIG_OF_CRITICAL_LEVEL_HEAP_USAGE_RATIO, 0.15f);
+    serverConf.setProperty(prefix + Accounting.CONFIG_OF_WORKLOAD_ENABLE_COST_COLLECTION, true);
+    serverConf.setProperty(prefix + Accounting.CONFIG_OF_WORKLOAD_ENABLE_COST_ENFORCEMENT, true);
+  }
 
   protected long getCountStarResult() {
     return NUM_DOCS * 3;
@@ -229,9 +174,10 @@ public class OfflineClusterMemBasedServerResourceUsageAccountantTest extends Bas
     setUseMultiStageQueryEngine(useMultiStageQueryEngine);
     notSupportedInV2();
     JsonNode queryResponse = postQuery(OOM_QUERY);
-    String exceptionsNode = queryResponse.get("exceptions").toString();
-    Assert.assertTrue(exceptionsNode.contains("\"errorCode\":" + QueryErrorCode.QUERY_CANCELLATION.getId()));
-    Assert.assertTrue(exceptionsNode.contains("got killed because"));
+    String exceptions = queryResponse.get("exceptions").toString();
+    assertTrue(exceptions.contains("\"errorCode\":" + QueryErrorCode.SERVER_RESOURCE_LIMIT_EXCEEDED.getId()),
+        exceptions);
+    assertTrue(exceptions.contains("OOM killed on SERVER"), exceptions);
   }
 
   @Test(dataProvider = "useBothQueryEngines")
@@ -241,9 +187,10 @@ public class OfflineClusterMemBasedServerResourceUsageAccountantTest extends Bas
     notSupportedInV2();
     JsonNode queryResponse = postQuery(OOM_QUERY_SELECTION_ONLY);
 
-    String exceptionsNode = queryResponse.get("exceptions").toString();
-    Assert.assertTrue(exceptionsNode.contains("\"errorCode\":" + QueryErrorCode.QUERY_CANCELLATION.getId()));
-    Assert.assertTrue(exceptionsNode.contains("got killed because"));
+    String exceptions = queryResponse.get("exceptions").toString();
+    assertTrue(exceptions.contains("\"errorCode\":" + QueryErrorCode.SERVER_RESOURCE_LIMIT_EXCEEDED.getId()),
+        exceptions);
+    assertTrue(exceptions.contains("OOM killed on SERVER"), exceptions);
   }
 
   @Test(dataProvider = "useBothQueryEngines")
@@ -252,8 +199,10 @@ public class OfflineClusterMemBasedServerResourceUsageAccountantTest extends Bas
     setUseMultiStageQueryEngine(useMultiStageQueryEngine);
     notSupportedInV2();
     JsonNode queryResponse = postQuery(OOM_QUERY_2);
-    String exceptionsNode = queryResponse.get("exceptions").toString();
-    Assert.assertTrue(exceptionsNode.contains("got killed because"));
+    String exceptions = queryResponse.get("exceptions").toString();
+    assertTrue(exceptions.contains("\"errorCode\":" + QueryErrorCode.SERVER_RESOURCE_LIMIT_EXCEEDED.getId()),
+        exceptions);
+    assertTrue(exceptions.contains("OOM killed on SERVER"), exceptions);
   }
 
   @Test(dataProvider = "useBothQueryEngines")
@@ -295,11 +244,12 @@ public class OfflineClusterMemBasedServerResourceUsageAccountantTest extends Bas
         }
     );
     countDownLatch.await();
-    String exceptionsNode = queryResponse1.get().get("exceptions").toString();
-    Assert.assertTrue(exceptionsNode.contains("\"errorCode\":503"));
-    Assert.assertTrue(exceptionsNode.contains("got killed because"));
-    Assert.assertFalse(StringUtils.isEmpty(queryResponse2.get().get("exceptions").toString()));
-    Assert.assertFalse(StringUtils.isEmpty(queryResponse3.get().get("exceptions").toString()));
+    String exceptions = queryResponse1.get().get("exceptions").toString();
+    assertTrue(exceptions.contains("\"errorCode\":" + QueryErrorCode.SERVER_RESOURCE_LIMIT_EXCEEDED.getId()),
+        exceptions);
+    assertTrue(exceptions.contains("OOM killed on SERVER"), exceptions);
+    assertFalse(StringUtils.isEmpty(queryResponse2.get().get("exceptions").toString()));
+    assertFalse(StringUtils.isEmpty(queryResponse3.get().get("exceptions").toString()));
   }
 
   // TODO: Add integation test after workload configs PR is merged.

@@ -45,7 +45,7 @@ import org.apache.pinot.core.query.request.context.utils.QueryContextConverterUt
 import org.apache.pinot.core.transport.ServerRoutingInstance;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.data.Schema;
-import org.apache.pinot.spi.trace.Tracing;
+import org.apache.pinot.spi.query.QueryThreadContext;
 import org.apache.pinot.spi.utils.CommonConstants;
 import org.apache.pinot.sql.parsers.CalciteSqlCompiler;
 import org.apache.pinot.util.TestUtils;
@@ -59,7 +59,8 @@ import static org.testng.Assert.*;
 
 
 public class OfflineGRPCServerIntegrationTest extends BaseClusterIntegrationTest {
-  private static final ExecutorService EXECUTOR_SERVICE = Executors.newFixedThreadPool(2);
+  private static final ExecutorService EXECUTOR_SERVICE =
+      QueryThreadContext.contextAwareExecutorService(Executors.newFixedThreadPool(2));
   private static final DataTableReducerContext DATATABLE_REDUCER_CONTEXT =
       new DataTableReducerContext(EXECUTOR_SERVICE, 2, 10000, 10000, 5000, 128);
 
@@ -202,15 +203,20 @@ public class OfflineGRPCServerIntegrationTest extends BaseClusterIntegrationTest
         // compare result dataTable against nonStreamingResultDataTable
         // Process server response.
         QueryContext queryContext = QueryContextConverterUtils.getQueryContext(sql);
-        DataTableReducer reducer =
-            ResultReducerFactory.getResultReducer(queryContext, new Tracing.DefaultThreadResourceUsageAccountant());
+        DataTableReducer reducer = ResultReducerFactory.getResultReducer(queryContext);
         BrokerResponseNative streamingBrokerResponse = new BrokerResponseNative();
-        reducer.reduceAndSetResults("mytable_OFFLINE", cachedDataSchema, dataTableMap, streamingBrokerResponse,
-            DATATABLE_REDUCER_CONTEXT, mock(BrokerMetrics.class));
+        try (QueryThreadContext ignore = useMultiStageQueryEngine() ? QueryThreadContext.openForMseTest()
+            : QueryThreadContext.openForSseTest()) {
+          reducer.reduceAndSetResults("mytable_OFFLINE", cachedDataSchema, dataTableMap, streamingBrokerResponse,
+              DATATABLE_REDUCER_CONTEXT, mock(BrokerMetrics.class));
+        }
         BrokerResponseNative nonStreamBrokerResponse = new BrokerResponseNative();
-        reducer.reduceAndSetResults("mytable_OFFLINE", nonStreamResultDataTable.getDataSchema(),
-            Map.of(mock(ServerRoutingInstance.class), nonStreamResultDataTable), nonStreamBrokerResponse,
-            DATATABLE_REDUCER_CONTEXT, mock(BrokerMetrics.class));
+        try (QueryThreadContext ignore = useMultiStageQueryEngine() ? QueryThreadContext.openForMseTest()
+            : QueryThreadContext.openForSseTest()) {
+          reducer.reduceAndSetResults("mytable_OFFLINE", nonStreamResultDataTable.getDataSchema(),
+              Map.of(mock(ServerRoutingInstance.class), nonStreamResultDataTable), nonStreamBrokerResponse,
+              DATATABLE_REDUCER_CONTEXT, mock(BrokerMetrics.class));
+        }
         assertEquals(streamingBrokerResponse.getResultTable().getRows().size(),
             nonStreamBrokerResponse.getResultTable().getRows().size());
 

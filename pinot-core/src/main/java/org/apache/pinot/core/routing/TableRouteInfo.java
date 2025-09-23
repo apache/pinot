@@ -246,7 +246,11 @@ public interface TableRouteInfo {
     InstanceRequest instanceRequest = new InstanceRequest();
     instanceRequest.setBrokerId(brokerId);
     instanceRequest.setRequestId(requestId);
-    instanceRequest.setCid(QueryThreadContext.getCid());
+    // NOTE: In production code, threadContext should never be null. It might be null in tests when QueryThreadContext
+    //       is not set up.
+    QueryThreadContext threadContext = QueryThreadContext.getIfAvailable();
+    String cid = threadContext != null ? threadContext.getExecutionContext().getCid() : null;
+    instanceRequest.setCid(cid);
     instanceRequest.setQuery(brokerRequest);
     Map<String, String> queryOptions = brokerRequest.getPinotQuery().getQueryOptions();
     if (queryOptions != null) {
