@@ -48,9 +48,9 @@ public class MailboxContentObserver implements StreamObserver<MailboxContent> {
 
   private final MailboxService _mailboxService;
   private final StreamObserver<MailboxStatus> _responseObserver;
-
   private final List<ByteBuffer> _mailboxBuffers;
-  private transient ReceivingMailbox _mailbox;
+
+  private volatile ReceivingMailbox _mailbox;
 
   public MailboxContentObserver(
     MailboxService mailboxService, String mailboxId, StreamObserver<MailboxStatus> responseObserver) {
