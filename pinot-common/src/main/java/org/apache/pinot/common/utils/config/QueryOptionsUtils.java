@@ -573,7 +573,7 @@ public class QueryOptionsUtils {
   }
 
   public static boolean reverseOptimizationEnabled(Map<String, String> queryOptions) {
-    String value = queryOptions.get(QueryOptionKey.REVERSE_ORDER);
+    String value = queryOptions.get(QueryOptionKey.ALLOW_REVERSE_ORDER);
     if (value == null) {
       return QueryOptionKey.DEFAULT_ALLOW_REVERSE_ORDER;
     }
