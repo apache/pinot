@@ -28,7 +28,6 @@ import org.apache.pinot.core.common.Operator;
 import org.apache.pinot.core.operator.BaseDocIdSetOperator;
 import org.apache.pinot.core.operator.BitmapDocIdSetOperator;
 import org.apache.pinot.core.operator.DocIdOrderedOperator;
-import org.apache.pinot.core.operator.IntIteratorDocIdSetOperator;
 import org.apache.pinot.core.operator.ProjectionOperator;
 import org.apache.pinot.core.operator.ProjectionOperatorUtils;
 import org.apache.pinot.core.operator.blocks.DocIdSetBlock;
@@ -129,10 +128,10 @@ public final class ExpressionScanDocIdIterator implements ScanBasedDocIdIterator
   @Override
   public MutableRoaringBitmap applyAnd(BatchIterator batchIterator, OptionalInt firstDoc, OptionalInt lastDoc) {
     IntIterator intIterator = batchIterator.asIntIterator(new int[OPTIMAL_ITERATOR_BATCH_SIZE]);
-    IntIteratorDocIdSetOperator docIdOperator =
-        new IntIteratorDocIdSetOperator(intIterator, _docIdBuffer, DocIdOrderedOperator.DocIdOrder.ASC);
-    try (ProjectionOperator projectionOperator = ProjectionOperatorUtils.getProjectionOperator(
-        _dataSourceMap, docIdOperator, _queryContext)) {
+    BaseDocIdSetOperator docIdSetOperator =
+        new BitmapDocIdSetOperator(intIterator, _docIdBuffer, DocIdOrderedOperator.DocIdOrder.ASC);
+    try (ProjectionOperator projectionOperator = ProjectionOperatorUtils.getProjectionOperator(_dataSourceMap,
+        docIdSetOperator, _queryContext)) {
       MutableRoaringBitmap matchingDocIds = new MutableRoaringBitmap();
       ProjectionBlock projectionBlock;
       while ((projectionBlock = projectionOperator.nextBlock()) != null) {

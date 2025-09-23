@@ -20,7 +20,6 @@ package org.apache.pinot.core.operator;
 
 import java.util.Collections;
 import java.util.List;
-import javax.annotation.Nullable;
 import org.apache.pinot.core.common.Operator;
 import org.apache.pinot.core.operator.blocks.DocIdSetBlock;
 import org.apache.pinot.core.plan.DocIdSetPlanNode;
@@ -34,16 +33,26 @@ import org.roaringbitmap.IntIterator;
  * documents) or already gathered enough documents (for selection queries).
  */
 public class BitmapDocIdSetOperator extends BaseDocIdSetOperator {
-
   private static final String EXPLAIN_NAME = "DOC_ID_SET_BITMAP";
-  @Nullable
-  private IntIteratorDocIdSetOperator _docIdIteratorOperator = null;
-  private final int[] _docIdBuffer;
+
   private final ImmutableBitmapDataProvider _docIds;
+  private final int[] _docIdBuffer;
   private final DocIdOrder _docIdOrder;
+
+  // TODO: Consider using BatchIterator to fill the document ids. Currently BatchIterator only reads bits for one
+  //       container instead of trying to fill up the buffer with bits from multiple containers. If in the future
+  //       BatchIterator provides an API to fill up the buffer, switch to BatchIterator.
+  private IntIterator _docIdIterator;
 
   public BitmapDocIdSetOperator(ImmutableBitmapDataProvider docIds, int[] docIdBuffer, DocIdOrder docIdOrder) {
     _docIds = docIds;
+    _docIdBuffer = docIdBuffer;
+    _docIdOrder = docIdOrder;
+  }
+
+  public BitmapDocIdSetOperator(IntIterator docIdIterator, int[] docIdBuffer, DocIdOrder docIdOrder) {
+    _docIds = null;
+    _docIdIterator = docIdIterator;
     _docIdBuffer = docIdBuffer;
     _docIdOrder = docIdOrder;
   }
@@ -70,11 +79,20 @@ public class BitmapDocIdSetOperator extends BaseDocIdSetOperator {
 
   @Override
   protected DocIdSetBlock getNextBlock() {
-    if (_docIdIteratorOperator == null) {
-      IntIterator iterator = _docIdOrder == DocIdOrder.ASC ? _docIds.getIntIterator() : _docIds.getReverseIntIterator();
-      _docIdIteratorOperator = new IntIteratorDocIdSetOperator(iterator, _docIdBuffer, _docIdOrder);
+    if (_docIdIterator == null) {
+      assert _docIds != null;
+      _docIdIterator = _docIdOrder == DocIdOrder.ASC ? _docIds.getIntIterator() : _docIds.getReverseIntIterator();
     }
-    return _docIdIteratorOperator.getNextBlock();
+    int bufferSize = _docIdBuffer.length;
+    int index = 0;
+    while (index < bufferSize && _docIdIterator.hasNext()) {
+      _docIdBuffer[index++] = _docIdIterator.next();
+    }
+    if (index > 0) {
+      return new DocIdSetBlock(_docIdBuffer, index);
+    } else {
+      return null;
+    }
   }
 
   @Override
@@ -97,6 +115,9 @@ public class BitmapDocIdSetOperator extends BaseDocIdSetOperator {
       throws UnsupportedOperationException {
     if (isCompatibleWith(order)) {
       return this;
+    }
+    if (_docIds == null) {
+      throw new UnsupportedOperationException(EXPLAIN_NAME + " doesn't support changing its order");
     }
     return new BitmapDocIdSetOperator(_docIds, _docIdBuffer, order);
   }
