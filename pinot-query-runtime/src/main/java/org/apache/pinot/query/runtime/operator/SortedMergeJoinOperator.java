@@ -143,7 +143,7 @@ public class SortedMergeJoinOperator extends MultiStageOperator {
           result.add(newRow);
           leftIndex++;
           rightIndex++;
-          // Breeze past duplicates.
+          // Breeze past duplicates on left.
           Comparable newLeftKey = null;
           while (leftIndex < leftRows.size() && (newLeftKey = (Comparable) _leftKeySelector.getKey(leftRows.get(leftIndex))) != null) {
             if (!newLeftKey.equals(leftKey)) {
@@ -152,10 +152,19 @@ public class SortedMergeJoinOperator extends MultiStageOperator {
             leftIndex++;
           }
           leftKey = newLeftKey;
+          // Breeze past duplicates on right.
+          Comparable newRightKey = null;
+          while (rightIndex < rightRows.size() && (newRightKey = (Comparable) _rightKeySelector.getKey(rightRows.get(rightIndex))) != null) {
+            if (!newRightKey.equals(rightKey)) {
+              break;
+            }
+            rightIndex++;
+          }
+          rightKey = newRightKey;
         } else if (c > 0) {
           rightIndex++;
           rightKey = null;
-        } else if (c < 0) {
+        } else {
           leftIndex++;
           leftKey = null;
         }
