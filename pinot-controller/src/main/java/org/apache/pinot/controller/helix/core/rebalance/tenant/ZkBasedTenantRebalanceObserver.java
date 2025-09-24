@@ -40,6 +40,8 @@ import org.slf4j.LoggerFactory;
 
 public class ZkBasedTenantRebalanceObserver implements TenantRebalanceObserver {
   private static final Logger LOGGER = LoggerFactory.getLogger(ZkBasedTenantRebalanceObserver.class);
+  private static final int ZK_UPDATE_MAX_RETRIES = 3;
+  private static final int ZK_UPDATE_RETRY_WAIT_MS = 1000;
 
   private final PinotHelixResourceManager _pinotHelixResourceManager;
   private final String _jobId;
@@ -192,7 +194,7 @@ public class ZkBasedTenantRebalanceObserver implements TenantRebalanceObserver {
   private void updateTenantRebalanceContextInZk(
       BiConsumer<TenantRebalanceContext, TenantRebalanceProgressStats> updater)
       throws AttemptFailureException {
-    RetryPolicy retry = RetryPolicies.fixedDelayRetryPolicy(3, 100);
+    RetryPolicy retry = RetryPolicies.fixedDelayRetryPolicy(ZK_UPDATE_MAX_RETRIES, ZK_UPDATE_RETRY_WAIT_MS);
     retry.attempt(() -> {
       Map<String, String> jobMetadata =
           _pinotHelixResourceManager.getControllerJobZKMetadata(_jobId, ControllerJobTypes.TENANT_REBALANCE);
