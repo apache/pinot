@@ -657,9 +657,10 @@ public class SegmentDeletionManagerTest {
       if (_tableDirs.containsKey(tableName)) {
         // remove all the segments from the table directory
         segmentUris.forEach(segmentUri -> _tableDirs.get(tableName).remove(segmentUri.getPath()));
+        return true;
       }
-      // the table does not exist and we return a true;
-      return true;
+      // the table does not exist and we return a false;
+      return false;
     }
 
     @Override
