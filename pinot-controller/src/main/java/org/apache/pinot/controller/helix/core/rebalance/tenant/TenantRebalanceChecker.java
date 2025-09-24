@@ -19,6 +19,7 @@
 package org.apache.pinot.controller.helix.core.rebalance.tenant;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
+import com.google.common.annotations.VisibleForTesting;
 import java.util.ArrayList;
 import java.util.Map;
 import java.util.Objects;
@@ -130,14 +131,15 @@ public class TenantRebalanceChecker extends BasePeriodicTask {
     }
   }
 
-  private void retryTenantRebalanceJob(TenantRebalanceContext tenantRebalanceContextForRetry,
+  @VisibleForTesting
+  void retryTenantRebalanceJob(TenantRebalanceContext tenantRebalanceContextForRetry,
       TenantRebalanceProgressStats progressStats) {
     ZkBasedTenantRebalanceObserver observer =
         new ZkBasedTenantRebalanceObserver(tenantRebalanceContextForRetry.getJobId(),
             tenantRebalanceContextForRetry.getConfig().getTenantName(),
             progressStats, tenantRebalanceContextForRetry, _pinotHelixResourceManager);
     _ongoingJobObserver = observer;
-    _tenantRebalancer.rebalanceWithObserver(observer);
+    _tenantRebalancer.rebalanceWithObserver(observer, tenantRebalanceContextForRetry.getConfig());
   }
 
   /**

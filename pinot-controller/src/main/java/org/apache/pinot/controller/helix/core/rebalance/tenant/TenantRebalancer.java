@@ -25,6 +25,7 @@ import java.util.HashMap;
 import java.util.HashSet;
 import java.util.LinkedList;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Queue;
 import java.util.Set;
 import java.util.UUID;
@@ -93,6 +94,21 @@ public class TenantRebalancer {
     public boolean shouldRebalanceWithDowntime() {
       return _withDowntime;
     }
+
+    @Override
+    public boolean equals(Object o) {
+      if (!(o instanceof TenantTableRebalanceJobContext)) {
+        return false;
+      }
+      TenantTableRebalanceJobContext that = (TenantTableRebalanceJobContext) o;
+      return _withDowntime == that._withDowntime && Objects.equals(_tableName, that._tableName)
+          && Objects.equals(_jobId, that._jobId);
+    }
+
+    @Override
+    public int hashCode() {
+      return Objects.hash(_tableName, _jobId, _withDowntime);
+    }
   }
 
   public TenantRebalanceResult rebalance(TenantRebalanceConfig config) {
@@ -145,7 +161,7 @@ public class TenantRebalancer {
         new ZkBasedTenantRebalanceObserver(tenantRebalanceContext.getJobId(), config.getTenantName(),
             tables, tenantRebalanceContext, _pinotHelixResourceManager);
     // Step 4: Spin up threads to consume the parallel queue and sequential queue.
-    rebalanceWithObserver(observer);
+    rebalanceWithObserver(observer, config);
 
     // Step 5: Prepare the rebalance results to be returned to the user. The rebalance jobs are running in the
     // background asynchronously.
@@ -172,38 +188,31 @@ public class TenantRebalancer {
    *
    * @param observer The observer to notify about the rebalance progress and results.
    */
-  public void rebalanceWithObserver(ZkBasedTenantRebalanceObserver observer) {
-    TenantRebalanceContext tenantRebalanceContext = observer.getTenantRebalanceContext();
-    LOGGER.info("Starting tenant rebalance with context: {}", tenantRebalanceContext);
-    TenantRebalanceConfig config = tenantRebalanceContext.getConfig();
-    ConcurrentLinkedDeque<TenantTableRebalanceJobContext> parallelQueue = tenantRebalanceContext.getParallelQueue();
-    Queue<TenantTableRebalanceJobContext> sequentialQueue = tenantRebalanceContext.getSequentialQueue();
-    ConcurrentLinkedQueue<TenantTableRebalanceJobContext> ongoingJobs = tenantRebalanceContext.getOngoingJobsQueue();
-
-    observer.onTrigger(TenantRebalanceObserver.Trigger.START_TRIGGER, null, null);
+  public void rebalanceWithObserver(ZkBasedTenantRebalanceObserver observer, TenantRebalanceConfig config) {
+    observer.onStart();
 
     // ensure atleast 1 thread is created to run the sequential table rebalance operations
     int parallelism = Math.max(config.getDegreeOfParallelism(), 1);
-    LOGGER.info("Spinning up {} threads for tenant rebalance job: {}", parallelism, tenantRebalanceContext.getJobId());
+    LOGGER.info("Spinning up {} threads for tenant rebalance job: {}", parallelism, observer.getJobId());
     AtomicInteger activeThreads = new AtomicInteger(parallelism);
     try {
       for (int i = 0; i < parallelism; i++) {
         _executorService.submit(() -> {
-          doConsumeTablesFromQueueAndRebalance(parallelQueue, ongoingJobs, config, observer);
+          doConsumeTablesFromQueueAndRebalance(config, observer, true);
           // If this is the last thread to finish, start consuming the sequential queue
           if (activeThreads.decrementAndGet() == 0) {
             LOGGER.info("All parallel threads completed, starting sequential rebalance for job: {}",
-                tenantRebalanceContext.getJobId());
-            doConsumeTablesFromQueueAndRebalance(sequentialQueue, ongoingJobs, config, observer);
+                observer.getJobId());
+            doConsumeTablesFromQueueAndRebalance(config, observer, false);
             observer.onSuccess(String.format("Successfully rebalanced tenant %s.", config.getTenantName()));
-            LOGGER.info("Completed tenant rebalance job: {}", tenantRebalanceContext.getJobId());
+            LOGGER.info("Completed tenant rebalance job: {}", observer.getJobId());
           }
         });
       }
     } catch (Exception exception) {
       observer.onError(String.format("Failed to rebalance the tenant %s. Cause: %s", config.getTenantName(),
           exception.getMessage()));
-      LOGGER.error("Caught exception in tenant rebalance job: {}, Cause: {}", tenantRebalanceContext.getJobId(),
+      LOGGER.error("Caught exception in tenant rebalance job: {}, Cause: {}", observer.getJobId(),
           exception.getMessage(), exception);
     }
   }
@@ -214,21 +223,24 @@ public class TenantRebalancer {
    * The ongoing jobs are tracked in the ongoingJobs queue, which is also from the monitored
    * DefaultTenantRebalanceContext.
    *
-   * @param queue The queue of TenantTableRebalanceJobContext to consume tables from.
-   * @param ongoingJobs The queue to track ongoing rebalance jobs.
    * @param config The rebalance configuration to use for the rebalancing.
    * @param observer The observer to notify about the rebalance progress and results, should be initiated with the
    *                 DefaultTenantRebalanceContext that contains `queue` and `ongoingJobs`.
    */
-  private void doConsumeTablesFromQueueAndRebalance(Queue<TenantTableRebalanceJobContext> queue,
-      Queue<TenantTableRebalanceJobContext> ongoingJobs, RebalanceConfig config,
-      ZkBasedTenantRebalanceObserver observer) {
+  private void doConsumeTablesFromQueueAndRebalance(RebalanceConfig config,
+      ZkBasedTenantRebalanceObserver observer, boolean isParallel) {
     while (true) {
-      TenantTableRebalanceJobContext jobContext = queue.poll();
+      TenantTableRebalanceJobContext jobContext;
+      try {
+        jobContext = isParallel ? observer.pollParallel() : observer.pollSequential();
+      } catch (Exception e) {
+        LOGGER.error("Caught exception while polling from the queue in tenant rebalance job: {}",
+            observer.getJobId(), e);
+        break;
+      }
       if (jobContext == null) {
         break;
       }
-      ongoingJobs.add(jobContext);
       String tableName = jobContext.getTableName();
       String rebalanceJobId = jobContext.getJobId();
       RebalanceConfig rebalanceConfig = RebalanceConfig.copy(config);
@@ -239,7 +251,6 @@ public class TenantRebalancer {
       try {
         LOGGER.info("Starting rebalance for table: {} with table rebalance job ID: {} in tenant rebalance job: {}",
             tableName, rebalanceJobId, observer.getJobId());
-        observer.onTrigger(TenantRebalanceObserver.Trigger.REBALANCE_STARTED_TRIGGER, tableName, rebalanceJobId);
         // Disallow TABLE rebalance checker to retry the rebalance job here, since we want TENANT rebalance checker
         // to do so
         RebalanceResult result =
@@ -249,20 +260,18 @@ public class TenantRebalancer {
         if (result.getStatus().equals(RebalanceResult.Status.DONE)) {
           LOGGER.info("Completed rebalance for table: {} with table rebalance job ID: {} in tenant rebalance job: {}",
               tableName, rebalanceJobId, observer.getJobId());
-          ongoingJobs.remove(jobContext);
-          observer.onTrigger(TenantRebalanceObserver.Trigger.REBALANCE_COMPLETED_TRIGGER, tableName, null);
+          observer.onJobDone(jobContext);
         } else {
-          LOGGER.warn("Rebalance for table: {} with table rebalance job ID: {} in tenant rebalance job: {} is not done."
+          LOGGER.warn(
+              "Rebalance for table: {} with table rebalance job ID: {} in tenant rebalance job: {} is not done."
                   + "Status: {}, Description: {}", tableName, rebalanceJobId, observer.getJobId(), result.getStatus(),
               result.getDescription());
-          ongoingJobs.remove(jobContext);
-          observer.onTrigger(TenantRebalanceObserver.Trigger.REBALANCE_ERRORED_TRIGGER, tableName,
-              result.getDescription());
+          observer.onJobError(jobContext, result.getDescription());
         }
       } catch (Throwable t) {
-        ongoingJobs.remove(jobContext);
-        observer.onTrigger(TenantRebalanceObserver.Trigger.REBALANCE_ERRORED_TRIGGER, tableName,
-            String.format("Caught exception/error while rebalancing table: %s", tableName));
+        LOGGER.error("Caught exception while rebalancing table: {} with table rebalance job ID: {} in tenant "
+            + "rebalance job: {}", tableName, rebalanceJobId, observer.getJobId(), t);
+        observer.onJobError(jobContext, t.getMessage());
       }
     }
   }
