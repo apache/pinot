@@ -604,7 +604,8 @@ public class QueryOptionsUtils {
         if (threshold >= 0.0 && threshold <= 1.0) {
           return threshold;
         } else {
-          throw new IllegalArgumentException("REGEXP_LIKE adaptive threshold must be between 0.0 and 1.0, got: " + threshold);
+          throw new IllegalArgumentException(
+              "REGEXP_LIKE adaptive threshold must be between 0.0 and 1.0, got: " + threshold);
         }
       } catch (NumberFormatException e) {
         throw new IllegalArgumentException("Invalid REGEXP_LIKE adaptive threshold value: " + thresholdStr, e);

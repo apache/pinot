@@ -39,7 +39,8 @@ public class RegexpLikePredicateEvaluatorFactory {
   private RegexpLikePredicateEvaluatorFactory() {
   }
 
-  /// Default threshold when the cardinality of the dictionary is less than this threshold, scan the dictionary to get the matching ids.
+  /// Default threshold when the cardinality of the dictionary is less than this threshold,
+  // scan the dictionary to get the matching ids.
   public static final int DEFAULT_DICTIONARY_CARDINALITY_THRESHOLD_FOR_SCAN = 10000;
 
   /**
