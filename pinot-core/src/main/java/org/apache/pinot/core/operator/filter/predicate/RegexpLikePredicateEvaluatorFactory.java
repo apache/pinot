@@ -39,6 +39,9 @@ public class RegexpLikePredicateEvaluatorFactory {
   private RegexpLikePredicateEvaluatorFactory() {
   }
 
+  /// Default threshold when the cardinality of the dictionary is less than this threshold, scan the dictionary to get the matching ids.
+  public static final int DEFAULT_DICTIONARY_CARDINALITY_THRESHOLD_FOR_SCAN = 10000;
+
   /**
    * Create a new instance of dictionary based REGEXP_LIKE predicate evaluator with configurable threshold.
    *
@@ -60,7 +63,8 @@ public class RegexpLikePredicateEvaluatorFactory {
       threshold = QueryOptionsUtils.getRegexpLikeAdaptiveThreshold(queryContext.getQueryOptions(),
           Broker.DEFAULT_REGEXP_LIKE_ADAPTIVE_THRESHOLD);
     }
-    if ((double) dictionary.length() / numDocs < threshold) {
+    if (dictionary.length() < DEFAULT_DICTIONARY_CARDINALITY_THRESHOLD_FOR_SCAN
+        || (double) dictionary.length() / numDocs < threshold) {
       return new DictIdBasedRegexpLikePredicateEvaluator(regexpLikePredicate, dictionary);
     } else {
       return new ScanBasedRegexpLikePredicateEvaluator(regexpLikePredicate, dictionary);
