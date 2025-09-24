@@ -58,7 +58,7 @@ public class SegmentPreIndexStatsCollectorImpl implements SegmentPreIndexStatsCo
       if (indexConfigsByCol.get(column) != null) {
         dictionaryEnabled = indexConfigsByCol.get(column).getConfig(StandardIndexes.dictionary()).isEnabled();
       }
-      if (dictionaryEnabled || fieldSpec.getDataType().getStoredType().equals(FieldSpec.DataType.MAP)) {
+      if (dictionaryEnabled) {
         switch (fieldSpec.getDataType().getStoredType()) {
           case INT:
             _columnStatsCollectorMap.put(column, new IntColumnPreIndexStatsCollector(column, _statsCollectorConfig));

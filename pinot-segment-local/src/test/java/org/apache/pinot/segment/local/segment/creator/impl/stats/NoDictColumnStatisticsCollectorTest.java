@@ -20,10 +20,13 @@ package org.apache.pinot.segment.local.segment.creator.impl.stats;
 
 import java.math.BigDecimal;
 import java.util.Collections;
+import java.util.HashMap;
+import java.util.Map;
 import org.apache.pinot.segment.spi.creator.StatsCollectorConfig;
 import org.apache.pinot.spi.config.table.ColumnPartitionConfig;
 import org.apache.pinot.spi.config.table.SegmentPartitionConfig;
 import org.apache.pinot.spi.config.table.TableConfig;
+import org.apache.pinot.spi.data.ComplexFieldSpec;
 import org.apache.pinot.spi.data.DimensionFieldSpec;
 import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.Schema;
@@ -362,6 +365,52 @@ public class NoDictColumnStatisticsCollectorTest {
     assertEquals(c.getLengthOfLargestElement(), bytesStats.getLengthOfLargestElement());
     assertEquals(c.getMaxRowLengthInBytes(), bytesStats.getMaxRowLengthInBytes());
     assertEquals(c.getPartitions(), bytesStats.getPartitions());
+  }
+
+  @Test
+  public void testSVMap() {
+    // Build a MAP field spec: key: STRING, value: INT
+    Map<String, FieldSpec> children = new HashMap<>();
+    children.put("key", new DimensionFieldSpec("key", FieldSpec.DataType.STRING, true));
+    children.put("value", new DimensionFieldSpec("value", FieldSpec.DataType.INT, true));
+    ComplexFieldSpec mapSpec = new ComplexFieldSpec("col", FieldSpec.DataType.MAP, true, children);
+
+    TableConfig tableConfig = new TableConfigBuilder(org.apache.pinot.spi.config.table.TableType.OFFLINE)
+        .setSegmentPartitionConfig(new SegmentPartitionConfig(
+            Collections.singletonMap("col", new ColumnPartitionConfig("murmur", 4))))
+        .setTableName("testTable").build();
+    Schema schema = new Schema();
+    schema.addField(mapSpec);
+    StatsCollectorConfig cfg = new StatsCollectorConfig(tableConfig, schema, tableConfig.getIndexingConfig().getSegmentPartitionConfig());
+
+    Map<String, Object> m1 = new HashMap<>();
+    m1.put("key1", 1);
+    m1.put("largeKey1", 3);
+    Map<String, Object> m2 = new HashMap<>();
+    // repeat key1
+    m2.put("key1", 2);
+    m2.put("anotherkey", 4);
+
+    NoDictColumnStatisticsCollector c = new NoDictColumnStatisticsCollector("col", cfg);
+    c.collect(m1);
+    c.collect(m2);
+    c.seal();
+
+    MapColumnPreIndexStatsCollector mapStats = new MapColumnPreIndexStatsCollector("col", cfg);
+    mapStats.collect(m1);
+    mapStats.collect(m2);
+    mapStats.seal();
+
+    assertEquals(c.getCardinality(), mapStats.getCardinality());
+    assertEquals(c.getMinValue(), mapStats.getMinValue());
+    assertEquals(c.getMaxValue(), mapStats.getMaxValue());
+    assertEquals(c.getTotalNumberOfEntries(), mapStats.getTotalNumberOfEntries());
+    assertEquals(c.getMaxNumberOfMultiValues(), mapStats.getMaxNumberOfMultiValues());
+    assertEquals(c.isSorted(), mapStats.isSorted());
+    assertEquals(c.getLengthOfShortestElement(), mapStats.getLengthOfShortestElement());
+    assertEquals(c.getLengthOfLargestElement(), mapStats.getLengthOfLargestElement());
+    assertEquals(c.getMaxRowLengthInBytes(), mapStats.getMaxRowLengthInBytes());
+    assertEquals(c.getPartitions(), mapStats.getPartitions());
   }
 
   @Test

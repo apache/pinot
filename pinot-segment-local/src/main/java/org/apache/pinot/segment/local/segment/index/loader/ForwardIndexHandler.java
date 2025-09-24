@@ -1038,7 +1038,7 @@ public class ForwardIndexHandler extends BaseIndexHandler {
   private AbstractColumnStatisticsCollector getStatsCollector(String column, DataType storedType) {
     StatsCollectorConfig statsCollectorConfig = new StatsCollectorConfig(_tableConfig, _schema, null);
     boolean dictionaryEnabled = hasIndex(column, StandardIndexes.dictionary());
-    if (!dictionaryEnabled && storedType != DataType.MAP) {
+    if (!dictionaryEnabled) {
       return new NoDictColumnStatisticsCollector(column, statsCollectorConfig);
     }
     switch (storedType) {
