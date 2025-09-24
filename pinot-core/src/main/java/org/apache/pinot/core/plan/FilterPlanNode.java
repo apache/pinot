@@ -363,7 +363,7 @@ public class FilterPlanNode implements PlanNode {
             }
             default:
               predicateEvaluator =
-                  PredicateEvaluatorProvider.getPredicateEvaluator(predicate, dataSource, _queryContext, 0);
+                  PredicateEvaluatorProvider.getPredicateEvaluator(predicate, dataSource, _queryContext);
               _predicateEvaluators.add(Pair.of(predicate, predicateEvaluator));
               return FilterOperatorUtils.getLeafFilterOperator(_queryContext, predicateEvaluator, dataSource, numDocs);
           }
