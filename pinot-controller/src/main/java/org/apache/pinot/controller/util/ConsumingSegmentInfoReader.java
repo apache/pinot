@@ -28,6 +28,7 @@ import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Set;
 import java.util.TreeMap;
 import java.util.concurrent.Executor;
@@ -35,6 +36,7 @@ import java.util.stream.Collectors;
 import org.apache.hc.client5.http.io.HttpClientConnectionManager;
 import org.apache.pinot.common.exception.InvalidConfigException;
 import org.apache.pinot.common.restlet.resources.SegmentConsumerInfo;
+import org.apache.pinot.common.utils.SegmentUtils;
 import org.apache.pinot.controller.helix.core.PinotHelixResourceManager;
 import org.apache.pinot.spi.config.table.TableStatus;
 import org.apache.pinot.spi.utils.CommonConstants.ConsumerState;
@@ -94,7 +96,10 @@ public class ConsumingSegmentInfoReader {
     // Segments which are in CONSUMING state but found no consumer on the server
     Set<String> consumingSegments = _pinotHelixResourceManager.getConsumingSegments(tableNameWithType);
     consumingSegments.forEach(c -> consumingSegmentInfoMap.putIfAbsent(c, Collections.emptyList()));
-    return new ConsumingSegmentsInfoMap(consumingSegmentInfoMap, response._failedResponseCount, response._failedParses);
+    // Calculate partition count from consuming segments
+    int partitionCount = getPartitionCount(consumingSegments, tableNameWithType);
+    return new ConsumingSegmentsInfoMap(
+        consumingSegmentInfoMap, response._failedResponseCount, response._failedParses, partitionCount);
   }
 
   /**
@@ -139,6 +144,18 @@ public class ConsumingSegmentInfoReader {
 
   private String generateServerURL(String tableNameWithType, String endpoint) {
     return String.format("%s/tables/%s/consumingSegmentsInfo", endpoint, tableNameWithType);
+  }
+
+  /**
+   * Calculate partition count from consuming segments using SegmentUtils.
+   */
+  private int getPartitionCount(Set<String> consumingSegments, String tableNameWithType) {
+    Set<Integer> uniquePartitionIds = consumingSegments.stream()
+        .map(segmentName -> SegmentUtils.getSegmentPartitionId(segmentName, tableNameWithType,
+            _pinotHelixResourceManager.getHelixZkManager(), null))
+        .filter(Objects::nonNull)
+        .collect(Collectors.toSet());
+    return uniquePartitionIds.size();
   }
 
   /**
@@ -195,14 +212,18 @@ public class ConsumingSegmentInfoReader {
     public int _serversFailingToRespond;
     @JsonProperty("serversUnparsableRespond")
     public int _serversUnparsableRespond;
+    @JsonProperty("partitionCount")
+    public int _partitionCount;
 
     public ConsumingSegmentsInfoMap(@JsonProperty("segmentToConsumingInfoMap")
         TreeMap<String, List<ConsumingSegmentInfo>> segmentToConsumingInfoMap,
         @JsonProperty("serversFailingToRespond") int serversFailingToRespond,
-        @JsonProperty("serversUnparsableRespond") int serversUnparsableRespond) {
+        @JsonProperty("serversUnparsableRespond") int serversUnparsableRespond,
+        @JsonProperty("partitionCount") int partitionCount) {
       _segmentToConsumingInfoMap = segmentToConsumingInfoMap;
       _serversFailingToRespond = serversFailingToRespond;
       _serversUnparsableRespond = serversUnparsableRespond;
+      _partitionCount = partitionCount;
     }
   }
 
