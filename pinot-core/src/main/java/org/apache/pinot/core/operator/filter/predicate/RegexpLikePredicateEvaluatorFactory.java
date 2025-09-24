@@ -24,9 +24,12 @@ import it.unimi.dsi.fastutil.ints.IntList;
 import it.unimi.dsi.fastutil.ints.IntOpenHashSet;
 import it.unimi.dsi.fastutil.ints.IntSet;
 import org.apache.pinot.common.request.context.predicate.RegexpLikePredicate;
+import org.apache.pinot.common.utils.config.QueryOptionsUtils;
 import org.apache.pinot.common.utils.regex.Matcher;
+import org.apache.pinot.core.query.request.context.QueryContext;
 import org.apache.pinot.segment.spi.index.reader.Dictionary;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
+import org.apache.pinot.spi.utils.CommonConstants.Broker;
 
 
 /**
@@ -36,21 +39,28 @@ public class RegexpLikePredicateEvaluatorFactory {
   private RegexpLikePredicateEvaluatorFactory() {
   }
 
-  /// When the cardinality of the dictionary is less than this threshold, scan the dictionary to get the matching ids.
-  public static final int DICTIONARY_CARDINALITY_THRESHOLD_FOR_SCAN = 10000;
-
   /**
-   * Create a new instance of dictionary based REGEXP_LIKE predicate evaluator.
+   * Create a new instance of dictionary based REGEXP_LIKE predicate evaluator with configurable threshold.
    *
    * @param regexpLikePredicate REGEXP_LIKE predicate to evaluate
-   * @param dictionary Dictionary for the column
-   * @param dataType Data type for the column
+   * @param dictionary          Dictionary for the column
+   * @param dataType            Data type for the column
+   * @param numDocs             Number of documents in the segment
+   * @param queryContext        Query context containing query options (can be null)
    * @return Dictionary based REGEXP_LIKE predicate evaluator
    */
   public static BaseDictionaryBasedPredicateEvaluator newDictionaryBasedEvaluator(
-      RegexpLikePredicate regexpLikePredicate, Dictionary dictionary, DataType dataType) {
+      RegexpLikePredicate regexpLikePredicate, Dictionary dictionary, DataType dataType, int numDocs,
+      QueryContext queryContext) {
     Preconditions.checkArgument(dataType.getStoredType() == DataType.STRING, "Unsupported data type: " + dataType);
-    if (dictionary.length() < DICTIONARY_CARDINALITY_THRESHOLD_FOR_SCAN) {
+
+    // Get threshold from query options or use default
+    double threshold = Broker.DEFAULT_REGEXP_LIKE_ADAPTIVE_THRESHOLD;
+    if (queryContext != null && queryContext.getQueryOptions() != null) {
+      threshold = QueryOptionsUtils.getRegexpLikeAdaptiveThreshold(queryContext.getQueryOptions(),
+          Broker.DEFAULT_REGEXP_LIKE_ADAPTIVE_THRESHOLD);
+    }
+    if ((double) dictionary.length() / numDocs < threshold) {
       return new DictIdBasedRegexpLikePredicateEvaluator(regexpLikePredicate, dictionary);
     } else {
       return new ScanBasedRegexpLikePredicateEvaluator(regexpLikePredicate, dictionary);

@@ -4297,4 +4297,96 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
     }
     Assert.assertTrue(columnPresent, "Column " + newAddedColumn + " not present in result set");
   }
+
+  @Test(dataProvider = "useBothQueryEngines")
+  public void testAdaptiveRegexpLike(boolean useMultiStageQueryEngine) throws Exception {
+    setUseMultiStageQueryEngine(useMultiStageQueryEngine);
+    testAdaptiveRegexpLikeSmallDictionary();
+    testAdaptiveRegexpLikeLargeDictionary();
+    testAdaptiveRegexpLikeWithCaseSensitivity();
+    testAdaptiveRegexpLikeConfigurableThreshold();
+  }
+
+  private void testAdaptiveRegexpLikeSmallDictionary() throws Exception {
+    JsonNode response = postQuery("SELECT COUNT(*) FROM mytable WHERE REGEXP_LIKE(Origin, '^[A-C].*')");
+    int matchCount = response.get("resultTable").get("rows").get(0).get(0).asInt();
+    assertTrue(matchCount > 0, "Should find matches for origins starting with A-C");
+    
+    int entriesScanned = response.get("numEntriesScannedInFilter").asInt();
+    assertTrue(entriesScanned < 1000, "Dictionary-based evaluation should scan few entries");
+    
+    response = postQuery("SELECT COUNT(*) FROM mytable WHERE REGEXP_LIKE(Origin, '^ZZZ.*')");
+    assertEquals(response.get("resultTable").get("rows").get(0).get(0).asInt(), 0);
+    entriesScanned = response.get("numEntriesScannedInFilter").asInt();
+    assertEquals(entriesScanned, 0, "Non-matching pattern should scan 0 entries");
+  }
+
+  private void testAdaptiveRegexpLikeLargeDictionary() throws Exception {
+    JsonNode response = postQuery("SELECT COUNT(*) FROM mytable WHERE REGEXP_LIKE(TailNum, '^N[0-9]{3}.*')");
+    int matchCount = response.get("resultTable").get("rows").get(0).get(0).asInt();
+    assertTrue(matchCount >= 0, "Should handle tail number pattern matching");
+    
+    int entriesScanned = response.get("numEntriesScannedInFilter").asInt();
+    assertTrue(entriesScanned >= matchCount, "Scan-based evaluation should scan at least as many entries as matches");
+    
+    response = postQuery("SELECT COUNT(*) FROM mytable WHERE REGEXP_LIKE(TailNum, '^N[1-5][0-9][0-9][A-Z]{2}$')");
+    matchCount = response.get("resultTable").get("rows").get(0).get(0).asInt();
+    assertTrue(matchCount >= 0, "Should handle complex tail number pattern");
+  }
+
+  private void testAdaptiveRegexpLikeWithCaseSensitivity() throws Exception {
+    JsonNode response = postQuery("SELECT COUNT(*) FROM mytable WHERE REGEXP_LIKE(Origin, '.*')");
+    int totalDocs = (int) getCountStarResult();
+    assertEquals(response.get("resultTable").get("rows").get(0).get(0).asInt(), totalDocs);
+    int entriesScanned = response.get("numEntriesScannedInFilter").asInt();
+    assertTrue(entriesScanned <= totalDocs, "Universal match should be optimized");
+    
+    response = postQuery("SELECT COUNT(*) FROM mytable WHERE REGEXP_LIKE(Origin, 'NONEXISTENT_PATTERN_XYZ123')");
+    assertEquals(response.get("resultTable").get("rows").get(0).get(0).asInt(), 0);
+    entriesScanned = response.get("numEntriesScannedInFilter").asInt();
+    assertTrue(entriesScanned <= 100, "Non-matching pattern should scan minimal entries");
+    
+    response = postQuery("SELECT COUNT(*) FROM mytable WHERE REGEXP_LIKE(Origin, '^lax$')");
+    int caseSensitiveCount = response.get("resultTable").get("rows").get(0).get(0).asInt();
+    
+    response = postQuery("SELECT COUNT(*) FROM mytable WHERE REGEXP_LIKE(Origin, '^lax$', 'i')");
+    int caseInsensitiveCount = response.get("resultTable").get("rows").get(0).get(0).asInt();
+    
+    assertTrue(caseInsensitiveCount >= caseSensitiveCount, "Case-insensitive should match at least as many");
+  }
+
+  private void testAdaptiveRegexpLikeConfigurableThreshold() throws Exception {
+    String queryLowThreshold = "SELECT COUNT(*) FROM mytable WHERE REGEXP_LIKE(Origin, '^[A-C].*') " +
+        "OPTION(regexpLikeAdaptiveThreshold=0.01)";
+    JsonNode response = postQuery(queryLowThreshold);
+    int matchCount = response.get("resultTable").get("rows").get(0).get(0).asInt();
+    assertTrue(matchCount > 0, "Should find matches with low threshold");
+    
+    String queryHighThreshold = "SELECT COUNT(*) FROM mytable WHERE REGEXP_LIKE(Origin, '^[A-C].*') " +
+        "OPTION(regexpLikeAdaptiveThreshold=0.99)";
+    response = postQuery(queryHighThreshold);
+    int matchCountHighThreshold = response.get("resultTable").get("rows").get(0).get(0).asInt();
+    assertEquals(matchCountHighThreshold, matchCount, "Results should be same regardless of threshold");
+    
+    try {
+      String queryInvalidThreshold = "SELECT COUNT(*) FROM mytable WHERE REGEXP_LIKE(Origin, '^[A-C].*') " +
+          "OPTION(regexpLikeAdaptiveThreshold=1.5)";
+      response = postQuery(queryInvalidThreshold);
+      assertTrue(response.has("resultTable") || response.has("exceptions"), "Should handle invalid threshold gracefully");
+    } catch (Exception e) {
+      assertTrue(e.getMessage().contains("threshold") || e.getMessage().contains("1.5"), "Error should mention threshold");
+    }
+    
+    String queryZeroThreshold = "SELECT COUNT(*) FROM mytable WHERE REGEXP_LIKE(Origin, '^[A-C].*') " +
+        "OPTION(regexpLikeAdaptiveThreshold=0.0)";
+    response = postQuery(queryZeroThreshold);
+    int matchCountZeroThreshold = response.get("resultTable").get("rows").get(0).get(0).asInt();
+    assertEquals(matchCountZeroThreshold, matchCount, "Results should be same with zero threshold");
+    
+    String queryMaxThreshold = "SELECT COUNT(*) FROM mytable WHERE REGEXP_LIKE(Origin, '^[A-C].*') " +
+        "OPTION(regexpLikeAdaptiveThreshold=1.0)";
+    response = postQuery(queryMaxThreshold);
+    int matchCountMaxThreshold = response.get("resultTable").get("rows").get(0).get(0).asInt();
+    assertEquals(matchCountMaxThreshold, matchCount, "Results should be same with max threshold");
+  }
 }

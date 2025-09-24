@@ -311,7 +311,8 @@ public class FilterPlanNode implements PlanNode {
                 } else {
                   predicateEvaluator =
                       PredicateEvaluatorProvider.getPredicateEvaluator(predicate, dataSource.getDictionary(),
-                          dataSource.getDataSourceMetadata().getDataType());
+                          dataSource.getDataSourceMetadata().getDataType(),
+                          dataSource.getDataSourceMetadata().getNumDocs());
                 }
               } else {
                 if (dataSource.getFSTIndex() != null) {
@@ -320,7 +321,8 @@ public class FilterPlanNode implements PlanNode {
                 } else {
                   predicateEvaluator =
                       PredicateEvaluatorProvider.getPredicateEvaluator(predicate, dataSource.getDictionary(),
-                          dataSource.getDataSourceMetadata().getDataType());
+                          dataSource.getDataSourceMetadata().getDataType(),
+                          dataSource.getDataSourceMetadata().getNumDocs());
                 }
               }
               _predicateEvaluators.add(Pair.of(predicate, predicateEvaluator));
@@ -361,7 +363,7 @@ public class FilterPlanNode implements PlanNode {
             }
             default:
               predicateEvaluator =
-                  PredicateEvaluatorProvider.getPredicateEvaluator(predicate, dataSource, _queryContext);
+                  PredicateEvaluatorProvider.getPredicateEvaluator(predicate, dataSource, _queryContext, 0);
               _predicateEvaluators.add(Pair.of(predicate, predicateEvaluator));
               return FilterOperatorUtils.getLeafFilterOperator(_queryContext, predicateEvaluator, dataSource, numDocs);
           }
