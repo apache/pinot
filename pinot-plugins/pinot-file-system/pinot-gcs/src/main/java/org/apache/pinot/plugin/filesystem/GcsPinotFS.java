@@ -76,7 +76,7 @@ public class GcsPinotFS extends BasePinotFS {
     if (version == null) {
       version = "unknown";
     }
-    String userAgent = "apache-pinot/:" + version + "(GPN:apache-pinot)";
+    String userAgent = "apache-pinot/" + version + " (GPN:apache-pinot)";
     Credentials credentials = null;
     try {
       StorageOptions.Builder storageBuilder = StorageOptions.newBuilder()
