@@ -67,7 +67,11 @@ import org.apache.pinot.controller.helix.core.PinotHelixResourceManager;
 import org.apache.pinot.controller.helix.core.PinotResourceManagerResponse;
 import org.apache.pinot.controller.helix.core.controllerjob.ControllerJobTypes;
 import org.apache.pinot.controller.helix.core.rebalance.RebalanceJobConstants;
+import org.apache.pinot.controller.helix.core.rebalance.RebalanceResult;
+import org.apache.pinot.controller.helix.core.rebalance.TableRebalanceManager;
+import org.apache.pinot.controller.helix.core.rebalance.tenant.TenantRebalanceChecker;
 import org.apache.pinot.controller.helix.core.rebalance.tenant.TenantRebalanceConfig;
+import org.apache.pinot.controller.helix.core.rebalance.tenant.TenantRebalanceContext;
 import org.apache.pinot.controller.helix.core.rebalance.tenant.TenantRebalanceProgressStats;
 import org.apache.pinot.controller.helix.core.rebalance.tenant.TenantRebalanceResult;
 import org.apache.pinot.controller.helix.core.rebalance.tenant.TenantRebalancer;
@@ -699,6 +703,46 @@ public class PinotTenantRestletResource {
     _controllerMetrics.addMeteredGlobalValue(ControllerMeter.CONTROLLER_TABLE_TENANT_DELETE_ERROR, 1L);
     throw new ControllerApplicationException(LOGGER, "Error deleting tenant. Reason: " + res.getMessage(),
         Response.Status.INTERNAL_SERVER_ERROR);
+  }
+
+  @DELETE
+  @Produces(MediaType.APPLICATION_JSON)
+  @Authenticate(AccessType.DELETE)
+  @Authorize(targetType = TargetType.CLUSTER, action = Actions.Cluster.REBALANCE_TENANT_TABLES)
+  @Path("/tenants/rebalance/{jobId}")
+  @ApiOperation(value = "Cancels a running tenant rebalance job")
+  @ApiResponses(value = {
+      @ApiResponse(code = 200, message = "Success", response = SuccessResponse.class),
+      @ApiResponse(code = 404, message = "Tenant rebalance job not found"),
+      @ApiResponse(code = 500, message = "Internal server error during cancelling the rebalance job")
+  })
+  public SuccessResponse cancelRebalance(
+      @ApiParam(value = "Tenant rebalance job id", required = true) @PathParam("jobId") String jobId) {
+    Map<String, String> jobMetadata =
+        _pinotHelixResourceManager.getControllerJobZKMetadata(jobId, ControllerJobTypes.TENANT_REBALANCE);
+    if (jobMetadata == null) {
+      throw new ControllerApplicationException(LOGGER, "Failed to cancel tenant rebalance job: " + jobId,
+          Response.Status.NOT_FOUND);
+    }
+    try {
+      TenantRebalanceContext originalContext = TenantRebalanceContext.fromTenantRebalanceJobMetadata(jobMetadata);
+      TenantRebalanceProgressStats progressStats =
+          JsonUtils.stringToObject(jobMetadata.get(RebalanceJobConstants.JOB_METADATA_KEY_REBALANCE_PROGRESS_STATS),
+              TenantRebalanceProgressStats.class);
+      originalContext.getParallelQueue().clear();
+      originalContext.getSequentialQueue().clear();
+      TenantRebalancer.TenantTableRebalanceJobContext ctx;
+      while ((ctx = originalContext.getOngoingJobsQueue().poll()) != null) {
+        TableRebalanceManager.cancelRebalance(ctx.getTableName(), _pinotHelixResourceManager,
+            RebalanceResult.Status.CANCELLED);
+      }
+      TenantRebalanceChecker.markTenantRebalanceJobAsCancelled(jobId, jobMetadata, originalContext, progressStats,
+          _pinotHelixResourceManager, true);
+      return new SuccessResponse("Successfully cancelled tenant rebalance job: " + jobId);
+    } catch (Exception e) {
+      throw new ControllerApplicationException(LOGGER, "Failed to cancel tenant rebalance job: " + jobId,
+          Response.Status.INTERNAL_SERVER_ERROR, e);
+    }
   }
 
   @POST

@@ -32,7 +32,7 @@ import org.apache.pinot.controller.helix.core.PinotHelixResourceManager;
 import org.apache.pinot.controller.helix.core.controllerjob.ControllerJobTypes;
 import org.apache.pinot.controller.helix.core.rebalance.RebalanceJobConstants;
 import org.apache.pinot.controller.helix.core.rebalance.RebalanceResult;
-import org.apache.pinot.controller.helix.core.rebalance.TableRebalanceProgressStats;
+import org.apache.pinot.controller.helix.core.rebalance.TableRebalanceManager;
 import org.apache.pinot.core.periodictask.BasePeriodicTask;
 import org.apache.pinot.spi.utils.CommonConstants;
 import org.apache.pinot.spi.utils.JsonUtils;
@@ -108,7 +108,8 @@ public class TenantRebalanceChecker extends BasePeriodicTask {
         if (retryTenantRebalanceContext != null) {
           TenantRebalancer.TenantTableRebalanceJobContext ctx;
           while ((ctx = retryTenantRebalanceContext.getOngoingJobsQueue().poll()) != null) {
-            abortTableRebalanceJob(ctx.getTableName());
+            TableRebalanceManager.cancelRebalance(ctx.getTableName(), _pinotHelixResourceManager,
+                RebalanceResult.Status.ABORTED);
             // the existing table rebalance job is aborted, we need to run the rebalance job with a new job ID.
             TenantRebalancer.TenantTableRebalanceJobContext newCtx =
                 new TenantRebalancer.TenantTableRebalanceJobContext(
@@ -117,7 +118,8 @@ public class TenantRebalanceChecker extends BasePeriodicTask {
           }
           // the retry tenant rebalance job id has been created in ZK, we can safely mark the original job as
           // aborted, so that this original job will not be picked up again in the future.
-          markTenantRebalanceJobAsAborted(jobId, jobZKMetadata, tenantRebalanceContext, progressStats);
+          markTenantRebalanceJobAsCancelled(jobId, jobZKMetadata, tenantRebalanceContext, progressStats,
+              _pinotHelixResourceManager, false);
           retryTenantRebalanceJob(retryTenantRebalanceContext, progressStats);
           // We only retry one stuck tenant rebalance job at a time to avoid multiple retries of the same job
           return;
@@ -263,30 +265,6 @@ public class TenantRebalanceChecker extends BasePeriodicTask {
     return false;
   }
 
-  private void abortTableRebalanceJob(String tableNameWithType) {
-    // TODO: This is a duplicate of a private method in RebalanceChecker, we should refactor it to a common place.
-    boolean updated =
-        _pinotHelixResourceManager.updateJobsForTable(tableNameWithType, ControllerJobTypes.TABLE_REBALANCE,
-            jobMetadata -> {
-              String jobId = jobMetadata.get(CommonConstants.ControllerJob.JOB_ID);
-              try {
-                String jobStatsInStr = jobMetadata.get(RebalanceJobConstants.JOB_METADATA_KEY_REBALANCE_PROGRESS_STATS);
-                TableRebalanceProgressStats jobStats =
-                    JsonUtils.stringToObject(jobStatsInStr, TableRebalanceProgressStats.class);
-                if (jobStats.getStatus() != RebalanceResult.Status.IN_PROGRESS) {
-                  return;
-                }
-                LOGGER.info("Abort rebalance job: {} for table: {}", jobId, tableNameWithType);
-                jobStats.setStatus(RebalanceResult.Status.ABORTED);
-                jobMetadata.put(RebalanceJobConstants.JOB_METADATA_KEY_REBALANCE_PROGRESS_STATS,
-                    JsonUtils.objectToString(jobStats));
-              } catch (Exception e) {
-                LOGGER.error("Failed to abort rebalance job: {} for table: {}", jobId, tableNameWithType, e);
-              }
-            });
-    LOGGER.info("Tried to abort existing jobs at best effort and done: {}", updated);
-  }
-
   /**
    * Mark the tenant rebalance job as aborted by updating the progress stats and clearing the queues in the context,
    * then update the updated job metadata to ZK. The tables that are unprocessed will be marked as CANCELLED, and the
@@ -297,19 +275,24 @@ public class TenantRebalanceChecker extends BasePeriodicTask {
    * @param tenantRebalanceContext The context of the tenant rebalance job.
    * @param progressStats The progress stats of the tenant rebalance job.
    */
-  private void markTenantRebalanceJobAsAborted(String jobId, Map<String, String> jobMetadata,
+  public static void markTenantRebalanceJobAsCancelled(String jobId, Map<String, String> jobMetadata,
       TenantRebalanceContext tenantRebalanceContext,
-      TenantRebalanceProgressStats progressStats) {
+      TenantRebalanceProgressStats progressStats, PinotHelixResourceManager resourceManager,
+      boolean isCancelledByUser) {
     LOGGER.info("Marking tenant rebalance job: {} as aborted", jobId);
     TenantRebalanceProgressStats abortedProgressStats = new TenantRebalanceProgressStats(progressStats);
     for (Map.Entry<String, String> entry : abortedProgressStats.getTableStatusMap().entrySet()) {
-      if (Objects.equals(entry.getValue(), TenantRebalanceProgressStats.TableStatus.UNPROCESSED.name())) {
-        entry.setValue(TenantRebalanceProgressStats.TableStatus.CANCELLED.name());
+      if (Objects.equals(entry.getValue(), TenantRebalanceProgressStats.TableStatus.IN_QUEUE.name())) {
+        entry.setValue(TenantRebalanceProgressStats.TableStatus.NOT_SCHEDULED.name());
       } else if (Objects.equals(entry.getValue(),
-          TenantRebalanceProgressStats.TableStatus.PROCESSING.name())) {
-        entry.setValue(TenantRebalanceProgressStats.TableStatus.ABORTED.name());
+          TenantRebalanceProgressStats.TableStatus.REBALANCING.name())) {
+        entry.setValue(isCancelledByUser ? TenantRebalanceProgressStats.TableStatus.CANCELLED.name()
+            : TenantRebalanceProgressStats.TableStatus.ABORTED.name());
       }
     }
+    abortedProgressStats.setRemainingTables(0);
+    abortedProgressStats.setCompletionStatusMsg("Tenant rebalance job has been cancelled.");
+    abortedProgressStats.setTimeToFinishInSeconds((System.currentTimeMillis() - progressStats.getStartTimeMs()) / 1000);
     tenantRebalanceContext.getSequentialQueue().clear();
     tenantRebalanceContext.getParallelQueue().clear();
     tenantRebalanceContext.getOngoingJobsQueue().clear();
@@ -327,6 +310,6 @@ public class TenantRebalanceChecker extends BasePeriodicTask {
       LOGGER.error("Error serialising rebalance context to JSON for marking tenant rebalance job as aborted {}", jobId,
           e);
     }
-    _pinotHelixResourceManager.addControllerJobToZK(jobId, jobMetadata, ControllerJobTypes.TENANT_REBALANCE);
+    resourceManager.addControllerJobToZK(jobId, jobMetadata, ControllerJobTypes.TENANT_REBALANCE);
   }
 }

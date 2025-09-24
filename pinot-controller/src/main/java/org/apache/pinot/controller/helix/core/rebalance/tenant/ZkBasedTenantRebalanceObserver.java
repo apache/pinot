@@ -20,12 +20,12 @@ package org.apache.pinot.controller.helix.core.rebalance.tenant;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.google.common.annotations.VisibleForTesting;
+import io.netty.util.internal.StringUtil;
 import java.util.HashMap;
-import java.util.List;
 import java.util.Map;
 import java.util.Set;
-import java.util.function.Function;
-import java.util.stream.Collectors;
+import java.util.concurrent.atomic.AtomicInteger;
+import java.util.function.BiConsumer;
 import org.apache.pinot.controller.helix.core.PinotHelixResourceManager;
 import org.apache.pinot.controller.helix.core.controllerjob.ControllerJobTypes;
 import org.apache.pinot.controller.helix.core.rebalance.RebalanceJobConstants;
@@ -44,10 +44,8 @@ public class ZkBasedTenantRebalanceObserver implements TenantRebalanceObserver {
   private final PinotHelixResourceManager _pinotHelixResourceManager;
   private final String _jobId;
   private final String _tenantName;
-  private final List<String> _unprocessedTables;
-  private final TenantRebalanceProgressStats _progressStats;
   // Keep track of number of updates. Useful during debugging.
-  private int _numUpdatesToZk;
+  private final AtomicInteger _numUpdatesToZk;
   private boolean _isDone;
 
   public ZkBasedTenantRebalanceObserver(String jobId, String tenantName, TenantRebalanceProgressStats progressStats,
@@ -56,17 +54,10 @@ public class ZkBasedTenantRebalanceObserver implements TenantRebalanceObserver {
     _isDone = false;
     _jobId = jobId;
     _tenantName = tenantName;
-    _unprocessedTables = progressStats.getTableStatusMap()
-        .entrySet()
-        .stream()
-        .filter(entry -> entry.getValue().equals(TenantRebalanceProgressStats.TableStatus.UNPROCESSED.name()))
-        .map(Map.Entry::getKey)
-        .collect(Collectors.toList());
     _pinotHelixResourceManager = pinotHelixResourceManager;
-    _progressStats = progressStats;
-    _pinotHelixResourceManager.addControllerJobToZK(_jobId, makeJobMetadata(tenantRebalanceContext),
+    _pinotHelixResourceManager.addControllerJobToZK(_jobId, makeJobMetadata(tenantRebalanceContext, progressStats),
         ControllerJobTypes.TENANT_REBALANCE);
-    _numUpdatesToZk = 1;
+    _numUpdatesToZk = new AtomicInteger(1);
   }
 
   public ZkBasedTenantRebalanceObserver(String jobId, String tenantName, Set<String> tables,
@@ -81,9 +72,9 @@ public class ZkBasedTenantRebalanceObserver implements TenantRebalanceObserver {
   }
 
   public void onStart() {
-    _progressStats.setStartTimeMs(System.currentTimeMillis());
     try {
-      updateTenantRebalanceContextInZk(ctx -> ctx);
+      updateTenantRebalanceContextInZk(
+          (ctx, progressStats) -> progressStats.setStartTimeMs(System.currentTimeMillis()));
     } catch (AttemptFailureException e) {
       LOGGER.error("Error updating ZK for jobId: {} on starting tenant rebalance", _jobId, e);
       throw new RuntimeException("Error updating ZK for jobId: " + _jobId + " on starting tenant rebalance", e);
@@ -92,10 +83,22 @@ public class ZkBasedTenantRebalanceObserver implements TenantRebalanceObserver {
 
   @Override
   public void onSuccess(String msg) {
-    _progressStats.setCompletionStatusMsg(msg);
-    _progressStats.setTimeToFinishInSeconds((System.currentTimeMillis() - _progressStats.getStartTimeMs()) / 1000);
+    onFinish(msg);
+  }
+
+  @Override
+  public void onError(String errorMsg) {
+    onFinish(errorMsg);
+  }
+
+  private void onFinish(String msg) {
     try {
-      updateTenantRebalanceContextInZk(ctx -> ctx);
+      updateTenantRebalanceContextInZk((ctx, progressStats) -> {
+        if (StringUtil.isNullOrEmpty(progressStats.getCompletionStatusMsg())) {
+          progressStats.setCompletionStatusMsg(msg);
+          progressStats.setTimeToFinishInSeconds((System.currentTimeMillis() - progressStats.getStartTimeMs()) / 1000);
+        }
+      });
     } catch (AttemptFailureException e) {
       LOGGER.error("Error updating ZK for jobId: {} on successful completion of tenant rebalance", _jobId, e);
       throw new RuntimeException(
@@ -104,21 +107,8 @@ public class ZkBasedTenantRebalanceObserver implements TenantRebalanceObserver {
     _isDone = true;
   }
 
-  @Override
-  public void onError(String errorMsg) {
-    _progressStats.setCompletionStatusMsg(errorMsg);
-    _progressStats.setTimeToFinishInSeconds(System.currentTimeMillis() - _progressStats.getStartTimeMs());
-    try {
-      updateTenantRebalanceContextInZk(ctx -> ctx);
-    } catch (AttemptFailureException e) {
-      LOGGER.error("Error updating ZK for jobId: {} on error completion of tenant rebalance", _jobId, e);
-      throw new RuntimeException(
-          "Error updating ZK for jobId: " + _jobId + " on error completion of tenant rebalance", e);
-    }
-    _isDone = true;
-  }
-
-  private Map<String, String> makeJobMetadata(TenantRebalanceContext tenantRebalanceContext) {
+  private Map<String, String> makeJobMetadata(TenantRebalanceContext tenantRebalanceContext,
+      TenantRebalanceProgressStats progressStats) {
     Map<String, String> jobMetadata = new HashMap<>();
     jobMetadata.put(CommonConstants.ControllerJob.TENANT_NAME, _tenantName);
     jobMetadata.put(CommonConstants.ControllerJob.JOB_ID, _jobId);
@@ -126,7 +116,7 @@ public class ZkBasedTenantRebalanceObserver implements TenantRebalanceObserver {
     jobMetadata.put(CommonConstants.ControllerJob.JOB_TYPE, ControllerJobTypes.TENANT_REBALANCE.name());
     try {
       jobMetadata.put(RebalanceJobConstants.JOB_METADATA_KEY_REBALANCE_PROGRESS_STATS,
-          JsonUtils.objectToString(_progressStats));
+          JsonUtils.objectToString(progressStats));
     } catch (JsonProcessingException e) {
       LOGGER.error("Error serialising rebalance stats to JSON for persisting to ZK {}", _jobId, e);
     }
@@ -139,23 +129,21 @@ public class ZkBasedTenantRebalanceObserver implements TenantRebalanceObserver {
     return jobMetadata;
   }
 
-  public synchronized TenantRebalancer.TenantTableRebalanceJobContext pollQueue(boolean isParallel) {
+  public TenantRebalancer.TenantTableRebalanceJobContext pollQueue(boolean isParallel) {
     final TenantRebalancer.TenantTableRebalanceJobContext[] ret =
         new TenantRebalancer.TenantTableRebalanceJobContext[1];
     try {
-      updateTenantRebalanceContextInZk(ctx -> {
-        TenantRebalanceContext updatedContext = new TenantRebalanceContext(ctx);
+      updateTenantRebalanceContextInZk((ctx, progressStats) -> {
         TenantRebalancer.TenantTableRebalanceJobContext polled =
-            isParallel ? updatedContext.getParallelQueue().poll() : updatedContext.getSequentialQueue().poll();
+            isParallel ? ctx.getParallelQueue().poll() : ctx.getSequentialQueue().poll();
         if (polled != null) {
-          updatedContext.getOngoingJobsQueue().add(polled);
+          ctx.getOngoingJobsQueue().add(polled);
           String tableName = polled.getTableName();
           String rebalanceJobId = polled.getJobId();
-          _progressStats.updateTableStatus(tableName, TenantRebalanceProgressStats.TableStatus.PROCESSING.name());
-          _progressStats.putTableRebalanceJobId(tableName, rebalanceJobId);
+          progressStats.updateTableStatus(tableName, TenantRebalanceProgressStats.TableStatus.REBALANCING.name());
+          progressStats.putTableRebalanceJobId(tableName, rebalanceJobId);
         }
         ret[0] = polled;
-        return updatedContext;
       });
     } catch (AttemptFailureException e) {
       LOGGER.error("Error updating ZK for jobId: {} while polling from {} queue", _jobId,
@@ -175,23 +163,24 @@ public class ZkBasedTenantRebalanceObserver implements TenantRebalanceObserver {
     return pollQueue(false);
   }
 
-  public synchronized void onJobError(TenantRebalancer.TenantTableRebalanceJobContext jobContext, String errorMessage) {
+  public void onJobError(TenantRebalancer.TenantTableRebalanceJobContext jobContext, String errorMessage) {
     onJobComplete(jobContext, errorMessage);
   }
 
-  public synchronized void onJobDone(TenantRebalancer.TenantTableRebalanceJobContext jobContext) {
-    onJobComplete(jobContext, TenantRebalanceProgressStats.TableStatus.PROCESSED.name());
+  public void onJobDone(TenantRebalancer.TenantTableRebalanceJobContext jobContext) {
+    onJobComplete(jobContext, TenantRebalanceProgressStats.TableStatus.DONE.name());
   }
 
-  private synchronized void onJobComplete(TenantRebalancer.TenantTableRebalanceJobContext jobContext, String message) {
+  private void onJobComplete(TenantRebalancer.TenantTableRebalanceJobContext jobContext, String message) {
     try {
-      updateTenantRebalanceContextInZk(ctx -> {
-        TenantRebalanceContext updatedContext = new TenantRebalanceContext(ctx);
-        updatedContext.getOngoingJobsQueue().remove(jobContext);
-        _progressStats.updateTableStatus(jobContext.getTableName(), message);
-        _unprocessedTables.remove(jobContext.getTableName());
-        _progressStats.setRemainingTables(_unprocessedTables.size());
-        return updatedContext;
+      updateTenantRebalanceContextInZk((ctx, progressStats) -> {
+        ctx.getOngoingJobsQueue().remove(jobContext);
+        if (progressStats.getTableStatusMap()
+            .get(jobContext.getTableName())
+            .equals(TenantRebalanceProgressStats.TableStatus.REBALANCING.name())) {
+          progressStats.updateTableStatus(jobContext.getTableName(), message);
+          progressStats.setRemainingTables(progressStats.getRemainingTables() - 1);
+        }
       });
     } catch (AttemptFailureException e) {
       LOGGER.error("Error updating ZK for jobId: {} on completion of table rebalance job: {}", _jobId, jobContext, e);
@@ -200,7 +189,8 @@ public class ZkBasedTenantRebalanceObserver implements TenantRebalanceObserver {
     }
   }
 
-  private synchronized void updateTenantRebalanceContextInZk(Function<TenantRebalanceContext, TenantRebalanceContext> contextUpdater)
+  private void updateTenantRebalanceContextInZk(
+      BiConsumer<TenantRebalanceContext, TenantRebalanceProgressStats> updater)
       throws AttemptFailureException {
     RetryPolicy retry = RetryPolicies.fixedDelayRetryPolicy(3, 100);
     retry.attempt(() -> {
@@ -210,14 +200,20 @@ public class ZkBasedTenantRebalanceObserver implements TenantRebalanceObserver {
         return false;
       }
       TenantRebalanceContext originalContext = TenantRebalanceContext.fromTenantRebalanceJobMetadata(jobMetadata);
-      TenantRebalanceContext updatedContext = contextUpdater.apply(originalContext);
+      TenantRebalanceProgressStats originalStats =
+          TenantRebalanceProgressStats.fromTenantRebalanceJobMetadata(jobMetadata);
+      TenantRebalanceContext updatedContext = new TenantRebalanceContext(originalContext);
+      TenantRebalanceProgressStats updatedStats = new TenantRebalanceProgressStats(originalStats);
+      updater.accept(updatedContext, updatedStats);
       boolean updateSuccessful =
-          _pinotHelixResourceManager.addControllerJobToZK(_jobId, makeJobMetadata(updatedContext),
+          _pinotHelixResourceManager.addControllerJobToZK(_jobId, makeJobMetadata(updatedContext, updatedStats),
               ControllerJobTypes.TENANT_REBALANCE, prevJobMetadata -> {
                 try {
                   TenantRebalanceContext prevContext =
                       TenantRebalanceContext.fromTenantRebalanceJobMetadata(prevJobMetadata);
-                  return prevContext.equals(originalContext);
+                  TenantRebalanceProgressStats prevStats =
+                      TenantRebalanceProgressStats.fromTenantRebalanceJobMetadata(prevJobMetadata);
+                  return prevContext.equals(originalContext) && prevStats.equals(originalStats);
                 } catch (JsonProcessingException e) {
                   LOGGER.error("Error deserializing rebalance context from ZK for jobId: {}", _jobId, e);
                   return false;
@@ -227,13 +223,12 @@ public class ZkBasedTenantRebalanceObserver implements TenantRebalanceObserver {
         return true;
       } else {
         LOGGER.info(
-            "Tenant rebalance context is out of sync with ZK while polling, fetching the latest context from ZK and "
-                + "retry. jobId: {}", _jobId);
+            "Tenant rebalance context or progress stats is out of sync with ZK while polling, fetching the latest "
+                + "context and progress stats from ZK and retry. jobId: {}", _jobId);
         return false;
       }
     });
-    _numUpdatesToZk++;
-    LOGGER.debug("Number of updates to Zk: {} for rebalanceJob: {}  ", _numUpdatesToZk, _jobId);
+    LOGGER.debug("Number of updates to Zk: {} for rebalanceJob: {}  ", _numUpdatesToZk.incrementAndGet(), _jobId);
   }
 
   public boolean isDone() {

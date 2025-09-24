@@ -919,7 +919,8 @@ public class PinotTableRestletResource {
       @Context HttpHeaders headers) {
     tableName = DatabaseUtils.translateTableName(tableName, headers);
     String tableNameWithType = constructTableNameWithType(tableName, tableTypeStr);
-    return _tableRebalanceManager.cancelRebalance(tableNameWithType);
+    return TableRebalanceManager.cancelRebalance(tableNameWithType, _pinotHelixResourceManager,
+        RebalanceResult.Status.CANCELLED);
   }
 
   @GET

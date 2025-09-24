@@ -139,7 +139,7 @@ public class TenantRebalancerTest extends ControllerTest {
     TenantRebalanceProgressStats progressStats = getProgress(result.getJobId());
     assertTrue(progressStats.getTableRebalanceJobIdMap().containsKey(OFFLINE_TABLE_NAME_A));
     assertEquals(progressStats.getTableStatusMap().get(OFFLINE_TABLE_NAME_A),
-        TenantRebalanceProgressStats.TableStatus.PROCESSED.name());
+        TenantRebalanceProgressStats.TableStatus.DONE.name());
     Map<String, Map<String, String>> idealState =
         _helixResourceManager.getTableIdealState(OFFLINE_TABLE_NAME_A).getRecord().getMapFields();
     Map<String, Map<String, String>> externalView =

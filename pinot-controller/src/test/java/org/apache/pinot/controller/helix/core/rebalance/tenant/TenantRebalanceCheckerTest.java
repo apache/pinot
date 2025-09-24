@@ -470,8 +470,8 @@ public class TenantRebalanceCheckerTest extends ControllerTest {
 
     TenantRebalanceProgressStats stats = new TenantRebalanceProgressStats(tables);
     stats.setStartTimeMs(System.currentTimeMillis() - 60000); // 1 minute ago
-    stats.updateTableStatus(TABLE_NAME_1, TenantRebalanceProgressStats.TableStatus.PROCESSING.name());
-    stats.updateTableStatus(TABLE_NAME_2, TenantRebalanceProgressStats.TableStatus.UNPROCESSED.name());
+    stats.updateTableStatus(TABLE_NAME_1, TenantRebalanceProgressStats.TableStatus.REBALANCING.name());
+    stats.updateTableStatus(TABLE_NAME_2, TenantRebalanceProgressStats.TableStatus.IN_QUEUE.name());
 
     return stats;
   }
@@ -483,8 +483,8 @@ public class TenantRebalanceCheckerTest extends ControllerTest {
 
     TenantRebalanceProgressStats stats = new TenantRebalanceProgressStats(tables);
     stats.setStartTimeMs(System.currentTimeMillis() - 60000);
-    stats.updateTableStatus(TABLE_NAME_1, TenantRebalanceProgressStats.TableStatus.PROCESSING.name());
-    stats.updateTableStatus(TABLE_NAME_2, TenantRebalanceProgressStats.TableStatus.PROCESSING.name());
+    stats.updateTableStatus(TABLE_NAME_1, TenantRebalanceProgressStats.TableStatus.REBALANCING.name());
+    stats.updateTableStatus(TABLE_NAME_2, TenantRebalanceProgressStats.TableStatus.REBALANCING.name());
 
     return stats;
   }
