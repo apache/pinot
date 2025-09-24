@@ -191,7 +191,7 @@ public class CastTransformFunction extends BaseTransformFunction {
       int length = valueBlock.getNumDocs();
       initLongValuesSV(length);
       String[] stringValues = _transformFunction.transformToStringValuesSV(valueBlock);
-      ArrayCopyUtils.copyToTimestamp(stringValues, _longValuesSV, length);
+      ArrayCopyUtils.copyToTimestamp(stringValues, _longValuesSV, length, _transformFunction.getNullBitmap(valueBlock));
       return _longValuesSV;
     } else {
       return _transformFunction.transformToLongValuesSV(valueBlock);
@@ -230,18 +230,20 @@ public class CastTransformFunction extends BaseTransformFunction {
     DataType resultDataType = _resultMetadata.getDataType();
     if (resultDataType.getStoredType() == DataType.STRING) {
       switch (_sourceDataType) {
-        case BOOLEAN:
+        case BOOLEAN: {
           int length = valueBlock.getNumDocs();
           initStringValuesSV(length);
           int[] intValues = _transformFunction.transformToIntValuesSV(valueBlock);
           ArrayCopyUtils.copyFromBoolean(intValues, _stringValuesSV, length);
           return _stringValuesSV;
-        case TIMESTAMP:
-          length = valueBlock.getNumDocs();
+        }
+        case TIMESTAMP: {
+          int length = valueBlock.getNumDocs();
           initStringValuesSV(length);
           long[] longValues = _transformFunction.transformToLongValuesSV(valueBlock);
           ArrayCopyUtils.copyFromTimestamp(longValues, _stringValuesSV, length);
           return _stringValuesSV;
+        }
         default:
           return _transformFunction.transformToStringValuesSV(valueBlock);
       }

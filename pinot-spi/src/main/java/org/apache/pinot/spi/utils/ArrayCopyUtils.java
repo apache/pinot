@@ -20,6 +20,8 @@ package org.apache.pinot.spi.utils;
 
 import java.math.BigDecimal;
 import java.sql.Timestamp;
+import org.roaringbitmap.IntConsumer;
+import org.roaringbitmap.RoaringBitmap;
 
 import static java.nio.charset.StandardCharsets.UTF_8;
 
@@ -267,8 +269,22 @@ public class ArrayCopyUtils {
   }
 
   public static void copyToTimestamp(String[] src, long[] dest, int length) {
+    copyToTimestamp(src, dest, length, null);
+  }
+
+  public static void copyToTimestamp(String[] src, long[] dest, int length, RoaringBitmap nullBitmap) {
+    // Skip actual null values because the default null string value won't be parseable as a valid timestamp.
+    if (nullBitmap != null) {
+      // Prefer this approach to calling RoaringBitmap::contains in a loop for better performance.
+      nullBitmap.forEach((IntConsumer) nullIdx -> dest[nullIdx] = -1);
+    }
     for (int i = 0; i < length; i++) {
-      dest[i] = TimestampUtils.toMillisSinceEpoch(src[i]);
+      if (dest[i] != -1) {
+        dest[i] = TimestampUtils.toMillisSinceEpoch(src[i]);
+      }
+    }
+    if (nullBitmap != null) {
+      nullBitmap.forEach((IntConsumer) nullIdx -> dest[nullIdx] = 0);
     }
   }
 
