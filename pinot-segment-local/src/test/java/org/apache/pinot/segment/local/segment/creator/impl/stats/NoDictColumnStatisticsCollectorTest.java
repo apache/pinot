@@ -381,7 +381,8 @@ public class NoDictColumnStatisticsCollectorTest {
         .setTableName("testTable").build();
     Schema schema = new Schema();
     schema.addField(mapSpec);
-    StatsCollectorConfig cfg = new StatsCollectorConfig(tableConfig, schema, tableConfig.getIndexingConfig().getSegmentPartitionConfig());
+    StatsCollectorConfig cfg = new StatsCollectorConfig(tableConfig, schema,
+        tableConfig.getIndexingConfig().getSegmentPartitionConfig());
 
     Map<String, Object> m1 = new HashMap<>();
     m1.put("key1", 1);
