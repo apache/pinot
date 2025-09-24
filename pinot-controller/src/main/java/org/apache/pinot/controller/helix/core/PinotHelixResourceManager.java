@@ -2542,7 +2542,7 @@ public class PinotHelixResourceManager {
         "Failed to create ZK metadata for table: " + tableNameWithType + ", segment: " + segmentName);
     LOGGER.info("Added segment: {} of table: {} to property store", segmentName, tableNameWithType);
 
-    assignSegment(tableConfig, segmentZKMetadata);
+    assignSegmentWithRetry(tableConfig, segmentZKMetadata);
   }
 
   public boolean needTieredSegmentAssignment(TableConfig tableConfig) {
@@ -2554,73 +2554,98 @@ public class PinotHelixResourceManager {
         TierFactory.PINOT_SERVER_STORAGE_TYPE);
   }
 
-  public void assignSegment(TableConfig tableConfig, SegmentZKMetadata segmentZKMetadata) {
+  public void assignSegmentWithRetry(TableConfig tableConfig, SegmentZKMetadata segmentZKMetadata) {
+    String tableNameWithType = tableConfig.getTableName();
+    String segmentName = segmentZKMetadata.getSegmentName();
+
+    try {
+      assignSegmentInternal(tableConfig, segmentZKMetadata);
+    } catch (Exception e) {
+      if (containsException(e, ZkInterruptedException.class)) {
+        LOGGER.warn("Encountered ZkInterruptedException while assigning segment: {} to table: {}. Retrying once...",
+            segmentName, tableNameWithType);
+
+        try {
+          assignSegmentInternal(tableConfig, segmentZKMetadata);
+          LOGGER.info("Successfully assigned segment: {} to table: {} on retry", segmentName, tableNameWithType);
+          return;
+        } catch (Exception retryException) {
+          LOGGER.error("Retry failed for assigning segment: {} to table {}. Proceeding with cleanup.",
+              segmentName, tableNameWithType, retryException);
+        }
+      }
+
+      handleAssignmentFailure(tableNameWithType, segmentName, e);
+    }
+  }
+
+  private void handleAssignmentFailure(String tableNameWithType, String segmentName, Exception originalException) {
+    LOGGER.error(
+        "Caught exception while adding segment: {} to IdealState for table: {}, deleting segment ZK metadata",
+        segmentName, tableNameWithType, originalException);
+    if (removeSegmentZKMetadata(tableNameWithType, segmentName)) {
+      LOGGER.info("Deleted segment ZK metadata for segment: {} of table: {}", segmentName, tableNameWithType);
+    } else {
+      LOGGER.error("Failed to delete segment ZK metadata for segment: {} of table: {}", segmentName,
+          tableNameWithType);
+    }
+
+    if (containsException(originalException, ZkInterruptedException.class)) {
+      LOGGER.warn("Encountered ZkInterruptedException while assigning segment: {} to table: {}. "
+              + "Deleting segment to prevent inconsistent state.",
+          segmentName, tableNameWithType);
+
+      PinotResourceManagerResponse response = deleteSegment(tableNameWithType, segmentName);
+      String errorMessage;
+      if (!response.isSuccessful()) {
+        errorMessage =
+            String.format("Failed to delete segment: %s of table: %s after ZkInterruptedException. Response: %s",
+                segmentName, tableNameWithType, response.getMessage());
+      } else {
+        errorMessage = String.format(
+            "Failed to assign segment: %s to table: %s due to ZkInterruptedException. "
+                + "Segment deleted successfully.",
+            segmentName, tableNameWithType);
+      }
+      LOGGER.error(errorMessage);
+      throw new SegmentIngestionFailureException(errorMessage);
+    }
+
+    throw new RuntimeException(originalException);
+  }
+
+  private void assignSegmentInternal(TableConfig tableConfig, SegmentZKMetadata segmentZKMetadata) {
     String tableNameWithType = tableConfig.getTableName();
     String segmentName = segmentZKMetadata.getSegmentName();
 
     // Assign instances for the segment and add it into IdealState
-    try {
-      Map<InstancePartitionsType, InstancePartitions> instancePartitionsMap;
-      // TODO: Support direct tier assignment for UPLOADED real-time segments
-      if (TableNameBuilder.isOfflineTableResource(tableNameWithType)) {
-        instancePartitionsMap = getInstacePartitionsMap(tableConfig, segmentZKMetadata.getTier());
-      } else {
-        instancePartitionsMap = fetchOrComputeInstancePartitions(tableNameWithType, tableConfig);
-      }
-
-      SegmentAssignment segmentAssignment =
-          SegmentAssignmentFactory.getSegmentAssignment(_helixZkManager, tableConfig, _controllerMetrics);
-      HelixHelper.updateIdealState(_helixZkManager, tableNameWithType, idealState -> {
-        assert idealState != null;
-        Map<String, Map<String, String>> currentAssignment = idealState.getRecord().getMapFields();
-        if (currentAssignment.containsKey(segmentName)) {
-          LOGGER.warn("Segment: {} already exists in the IdealState for table: {}, do not update", segmentName,
-              tableNameWithType);
-        } else {
-          List<String> assignedInstances =
-              segmentAssignment.assignSegment(segmentName, currentAssignment, instancePartitionsMap);
-          LOGGER.info("Assigning segment: {} to instances: {} for table: {}", segmentName, assignedInstances,
-              tableNameWithType);
-          currentAssignment.put(segmentName,
-              SegmentAssignmentUtils.getInstanceStateMap(assignedInstances, SegmentStateModel.ONLINE));
-        }
-        return idealState;
-      });
-      LOGGER.info("Added segment: {} to IdealState for table: {}", segmentName, tableNameWithType);
-    } catch (Exception e) {
-      LOGGER.error(
-          "Caught exception while adding segment: {} to IdealState for table: {}, deleting segment ZK metadata",
-          segmentName, tableNameWithType, e);
-      if (removeSegmentZKMetadata(tableNameWithType, segmentName)) {
-        LOGGER.info("Deleted segment ZK metadata for segment: {} of table: {}", segmentName, tableNameWithType);
-      } else {
-        LOGGER.error("Failed to deleted segment ZK metadata for segment: {} of table: {}", segmentName,
-            tableNameWithType);
-      }
-
-      if (containsException(e, ZkInterruptedException.class)) {
-        LOGGER.warn("Encountered ZkInterruptedException while assigning segment: {} to table: {}. "
-                + "Deleting segment to prevent inconsistent state.",
-            segmentName, tableNameWithType);
-
-        PinotResourceManagerResponse response = deleteSegment(tableNameWithType, segmentName);
-        String errorMessage;
-        if (!response.isSuccessful()) {
-          errorMessage =
-              String.format("Failed to delete segment: %s of table: %s after ZkInterruptedException. Response: %s",
-                  segmentName, tableNameWithType, response.getMessage());
-        } else {
-          errorMessage = String.format(
-              "Failed to assign segment: %s to table: %s due to ZkInterruptedException. "
-                  + "Segment deleted successfully.",
-              segmentName, tableNameWithType);
-        }
-        LOGGER.error(errorMessage);
-        throw new SegmentIngestionFailureException(errorMessage);
-      }
-
-      throw e;
+    Map<InstancePartitionsType, InstancePartitions> instancePartitionsMap;
+    // TODO: Support direct tier assignment for UPLOADED real-time segments
+    if (TableNameBuilder.isOfflineTableResource(tableNameWithType)) {
+      instancePartitionsMap = getInstacePartitionsMap(tableConfig, segmentZKMetadata.getTier());
+    } else {
+      instancePartitionsMap = fetchOrComputeInstancePartitions(tableNameWithType, tableConfig);
     }
+
+    SegmentAssignment segmentAssignment =
+        SegmentAssignmentFactory.getSegmentAssignment(_helixZkManager, tableConfig, _controllerMetrics);
+    HelixHelper.updateIdealState(_helixZkManager, tableNameWithType, idealState -> {
+      assert idealState != null;
+      Map<String, Map<String, String>> currentAssignment = idealState.getRecord().getMapFields();
+      if (currentAssignment.containsKey(segmentName)) {
+        LOGGER.warn("Segment: {} already exists in the IdealState for table: {}, do not update", segmentName,
+            tableNameWithType);
+      } else {
+        List<String> assignedInstances =
+            segmentAssignment.assignSegment(segmentName, currentAssignment, instancePartitionsMap);
+        LOGGER.info("Assigning segment: {} to instances: {} for table: {}", segmentName, assignedInstances,
+            tableNameWithType);
+        currentAssignment.put(segmentName,
+            SegmentAssignmentUtils.getInstanceStateMap(assignedInstances, SegmentStateModel.ONLINE));
+      }
+      return idealState;
+    });
+    LOGGER.info("Added segment: {} to IdealState for table: {}", segmentName, tableNameWithType);
   }
 
   /**

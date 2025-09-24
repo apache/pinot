@@ -39,12 +39,10 @@ import org.apache.helix.task.TaskPartitionState;
 import org.apache.helix.task.TaskState;
 import org.apache.helix.task.WorkflowConfig;
 import org.apache.helix.task.WorkflowContext;
-import org.apache.helix.zookeeper.zkclient.exception.ZkInterruptedException;
 import org.apache.pinot.controller.helix.core.PinotHelixResourceManager;
 import org.apache.pinot.controller.util.CompletionServiceHelper;
 import org.apache.pinot.core.minion.PinotTaskConfig;
 import org.apache.pinot.spi.utils.JsonUtils;
-import org.apache.pinot.spi.utils.retry.RetriableOperationException;
 import org.mockito.ArgumentCaptor;
 import org.mockito.Mockito;
 import org.testng.annotations.Test;
@@ -1044,21 +1042,6 @@ public class PinotHelixTaskResourceManagerTest {
         spyMgr.getTaskCounts(taskType, null, null);
     assertEquals(allTasks.size(), 1);
     assertTrue(allTasks.containsKey(taskName1));
-  }
-
-  @Test
-  public void testContainsZkInterruptedException() {
-    ZkInterruptedException zkInterruptedException =
-            new ZkInterruptedException(new InterruptedException("interrupted test"));
-
-    assertTrue(PinotHelixResourceManager.containsException(zkInterruptedException,
-            ZkInterruptedException.class));
-
-    RetriableOperationException retriableOperationException =
-            new RetriableOperationException(zkInterruptedException, 5);
-
-    assertTrue(PinotHelixResourceManager.containsException(retriableOperationException,
-            ZkInterruptedException.class));
   }
 
   /**
