@@ -4299,15 +4299,16 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
   }
 
   @Test(dataProvider = "useBothQueryEngines")
-  public void testAdaptiveRegexpLike(boolean useMultiStageQueryEngine) throws Exception {
+  public void testAdaptiveRegexpLike(boolean useMultiStageQueryEngine)
+      throws Exception {
     setUseMultiStageQueryEngine(useMultiStageQueryEngine);
-    testAdaptiveRegexpLikeSmallDictionary();
-    testAdaptiveRegexpLikeLargeDictionary();
-    testAdaptiveRegexpLikeWithCaseSensitivity();
-    testAdaptiveRegexpLikeConfigurableThreshold();
+    testRegexpLikeSmallDictionary();
+    testRegexpLikeLargeDictionary();
+    testRegexpLikeWithCaseSensitivity();
+    testRegexpLikeConfigurableThreshold();
   }
 
-  private void testAdaptiveRegexpLikeSmallDictionary() throws Exception {
+  private void testRegexpLikeSmallDictionary() throws Exception {
     JsonNode response = postQuery("SELECT COUNT(*) FROM mytable WHERE REGEXP_LIKE(Origin, '^[A-C].*')");
     int matchCount = response.get("resultTable").get("rows").get(0).get(0).asInt();
     assertTrue(matchCount > 0, "Should find matches for origins starting with A-C");
@@ -4321,7 +4322,7 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
     assertEquals(entriesScanned, 0, "Non-matching pattern should scan 0 entries");
   }
 
-  private void testAdaptiveRegexpLikeLargeDictionary() throws Exception {
+  private void testRegexpLikeLargeDictionary() throws Exception {
     JsonNode response = postQuery("SELECT COUNT(*) FROM mytable WHERE REGEXP_LIKE(TailNum, '^N[0-9]{3}.*')");
     int matchCount = response.get("resultTable").get("rows").get(0).get(0).asInt();
     assertTrue(matchCount >= 0, "Should handle tail number pattern matching");
@@ -4334,7 +4335,7 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
     assertTrue(matchCount >= 0, "Should handle complex tail number pattern");
   }
 
-  private void testAdaptiveRegexpLikeWithCaseSensitivity() throws Exception {
+  private void testRegexpLikeWithCaseSensitivity() throws Exception {
     JsonNode response = postQuery("SELECT COUNT(*) FROM mytable WHERE REGEXP_LIKE(Origin, '.*')");
     int totalDocs = (int) getCountStarResult();
     assertEquals(response.get("resultTable").get("rows").get(0).get(0).asInt(), totalDocs);
@@ -4355,7 +4356,7 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
     assertTrue(caseInsensitiveCount >= caseSensitiveCount, "Case-insensitive should match at least as many");
   }
 
-  private void testAdaptiveRegexpLikeConfigurableThreshold() throws Exception {
+  private void testRegexpLikeConfigurableThreshold() throws Exception {
     String queryLowThreshold = "SELECT COUNT(*) FROM mytable WHERE REGEXP_LIKE(Origin, '^[A-C].*') " +
         "OPTION(regexpLikeAdaptiveThreshold=0.01)";
     JsonNode response = postQuery(queryLowThreshold);
