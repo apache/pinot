@@ -338,18 +338,18 @@ public class RetentionManager extends ControllerPeriodicTask<Void> {
       return segmentsToDelete;
     }
 
-    List<String> segmentsPresentInZK;
+    Set<String> segmentsPresentInZK;
     if (isHybridTable) {
-      segmentsPresentInZK = new ArrayList<>();
+      segmentsPresentInZK = new HashSet<>();
       // This must be the OFFLINE table
       segmentsPresentInZK.addAll(
-          segmentZKMetadataList.stream().map(SegmentZKMetadata::getSegmentName).collect(Collectors.toList()));
+          segmentZKMetadataList.stream().map(SegmentZKMetadata::getSegmentName).collect(Collectors.toSet()));
       // Add segments from the REALTIME table as well
       segmentsPresentInZK.addAll(
           _pinotHelixResourceManager.getSegmentsFor(TableNameBuilder.REALTIME.tableNameWithType(rawTableName), false));
     } else {
       segmentsPresentInZK =
-          segmentZKMetadataList.stream().map(SegmentZKMetadata::getSegmentName).collect(Collectors.toList());
+          segmentZKMetadataList.stream().map(SegmentZKMetadata::getSegmentName).collect(Collectors.toSet());
     }
 
     try {
@@ -384,13 +384,13 @@ public class RetentionManager extends ControllerPeriodicTask<Void> {
    *
    * @param tableNameWithType   Name of the offline table
    * @param retentionStrategy  Strategy to determine if a segment should be purged
-   * @param segmentsToExclude  List of segment names that should be excluded from deletion
+   * @param segmentsToExclude  Set of segment names that should be excluded from deletion
    * @return List of segment names that should be deleted from deepstore
    * @throws IOException If there's an error accessing the filesystem
    */
-  private List<String> findUntrackedSegmentsToDeleteFromDeepstore(String tableNameWithType,
-      RetentionStrategy retentionStrategy, List<String> segmentsToExclude,
-      RetentionStrategy untrackedSegmentsRetentionStrategy)
+  @VisibleForTesting
+  List<String> findUntrackedSegmentsToDeleteFromDeepstore(String tableNameWithType, RetentionStrategy retentionStrategy,
+      Set<String> segmentsToExclude, RetentionStrategy untrackedSegmentsRetentionStrategy)
       throws IOException {
 
     List<String> segmentsToDelete = new ArrayList<>();

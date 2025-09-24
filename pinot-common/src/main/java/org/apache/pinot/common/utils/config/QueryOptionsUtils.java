@@ -347,11 +347,6 @@ public class QueryOptionsUtils {
   }
 
   @Nullable
-  public static String getOrderByAlgorithm(Map<String, String> queryOptions) {
-    return queryOptions.get(QueryOptionKey.ORDER_BY_ALGORITHM);
-  }
-
-  @Nullable
   public static Integer getMultiStageLeafLimit(Map<String, String> queryOptions) {
     String maxLeafLimitStr = queryOptions.get(QueryOptionKey.MULTI_STAGE_LEAF_LIMIT);
     return checkedParseIntNonNegative(QueryOptionKey.MULTI_STAGE_LEAF_LIMIT, maxLeafLimitStr);
@@ -496,9 +491,15 @@ public class QueryOptionsUtils {
     return option != null ? Boolean.parseBoolean(option) : defaultValue;
   }
 
-  public static int getLiteModeServerStageLimit(Map<String, String> queryOptions, int defaultValue) {
-    String option = queryOptions.get(QueryOptionKey.LITE_MODE_SERVER_STAGE_LIMIT);
-    return option != null ? checkedParseIntPositive(QueryOptionKey.LITE_MODE_SERVER_STAGE_LIMIT, option) : defaultValue;
+  public static Integer getLiteModeLeafStageLimit(Map<String, String> queryOptions, int defaultValue) {
+    String option = queryOptions.get(QueryOptionKey.LITE_MODE_LEAF_STAGE_LIMIT);
+    return option != null ? checkedParseIntPositive(QueryOptionKey.LITE_MODE_LEAF_STAGE_LIMIT, option) : defaultValue;
+  }
+
+  public static Integer getLiteModeLeafStageFanOutAdjustedLimit(Map<String, String> queryOptions, int defaultValue) {
+    String option = queryOptions.get(QueryOptionKey.LITE_MODE_LEAF_STAGE_FANOUT_ADJUSTED_LIMIT);
+    return option != null ? checkedParseIntPositive(QueryOptionKey.LITE_MODE_LEAF_STAGE_FANOUT_ADJUSTED_LIMIT, option)
+        : defaultValue;
   }
 
   @Nullable
@@ -575,5 +576,13 @@ public class QueryOptionsUtils {
 
   public static String getWorkloadName(Map<String, String> queryOptions) {
     return queryOptions.getOrDefault(QueryOptionKey.WORKLOAD_NAME, CommonConstants.Accounting.DEFAULT_WORKLOAD_NAME);
+  }
+
+  public static boolean isReverseOrderAllowed(Map<String, String> queryOptions) {
+    String value = queryOptions.get(QueryOptionKey.ALLOW_REVERSE_ORDER);
+    if (value == null) {
+      return QueryOptionKey.DEFAULT_ALLOW_REVERSE_ORDER;
+    }
+    return Boolean.parseBoolean(value);
   }
 }
