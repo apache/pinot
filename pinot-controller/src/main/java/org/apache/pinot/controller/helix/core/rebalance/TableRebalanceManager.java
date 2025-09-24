@@ -227,9 +227,10 @@ public class TableRebalanceManager {
    * @param tableNameWithType name of the table for which to cancel any ongoing rebalance job
    * @return the list of job IDs that were cancelled
    */
-  public List<String> cancelRebalance(String tableNameWithType) {
+  public static List<String> cancelRebalance(String tableNameWithType, PinotHelixResourceManager resourceManager,
+      RebalanceResult.Status setToStatus) {
     List<String> cancelledJobIds = new ArrayList<>();
-    boolean updated = _resourceManager.updateJobsForTable(tableNameWithType, ControllerJobTypes.TABLE_REBALANCE,
+    boolean updated = resourceManager.updateJobsForTable(tableNameWithType, ControllerJobTypes.TABLE_REBALANCE,
         jobMetadata -> {
           String jobId = jobMetadata.get(CommonConstants.ControllerJob.JOB_ID);
           try {
@@ -240,8 +241,9 @@ public class TableRebalanceManager {
               return;
             }
 
-            LOGGER.info("Cancelling rebalance job: {} for table: {}", jobId, tableNameWithType);
-            jobStats.setStatus(RebalanceResult.Status.CANCELLED);
+            LOGGER.info("Cancelling rebalance job: {} for table: {}, setting status to: {}", jobId, tableNameWithType,
+                setToStatus);
+            jobStats.setStatus(setToStatus);
             jobMetadata.put(RebalanceJobConstants.JOB_METADATA_KEY_REBALANCE_PROGRESS_STATS,
                 JsonUtils.objectToString(jobStats));
             cancelledJobIds.add(jobId);
@@ -249,8 +251,9 @@ public class TableRebalanceManager {
             LOGGER.error("Failed to cancel rebalance job: {} for table: {}", jobId, tableNameWithType, e);
           }
         });
-    LOGGER.info("Tried to cancel existing rebalance jobs for table: {} at best effort and done: {}", tableNameWithType,
-        updated);
+    LOGGER.info("Tried to cancel existing rebalance jobs for table: {} at best effort and done: {}. Status set to: {}",
+        tableNameWithType,
+        updated, setToStatus);
     return cancelledJobIds;
   }
 

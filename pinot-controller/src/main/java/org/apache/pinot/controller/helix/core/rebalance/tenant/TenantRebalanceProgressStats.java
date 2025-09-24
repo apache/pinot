@@ -18,12 +18,16 @@
  */
 package org.apache.pinot.controller.helix.core.rebalance.tenant;
 
+import com.fasterxml.jackson.core.JsonProcessingException;
 import com.google.common.base.Preconditions;
 import java.util.HashMap;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Set;
 import java.util.function.Function;
 import java.util.stream.Collectors;
+import org.apache.pinot.controller.helix.core.rebalance.RebalanceJobConstants;
+import org.apache.pinot.spi.utils.JsonUtils;
 
 
 public class TenantRebalanceProgressStats {
@@ -45,7 +49,7 @@ public class TenantRebalanceProgressStats {
   public TenantRebalanceProgressStats(Set<String> tables) {
     Preconditions.checkState(tables != null && !tables.isEmpty(), "List of tables to observe is empty.");
     _tableStatusMap = tables.stream()
-        .collect(Collectors.toMap(Function.identity(), k -> TableStatus.UNPROCESSED.name()));
+        .collect(Collectors.toMap(Function.identity(), k -> TableStatus.IN_QUEUE.name()));
     _totalTables = tables.size();
     _remainingTables = _totalTables;
   }
@@ -58,6 +62,12 @@ public class TenantRebalanceProgressStats {
     _startTimeMs = other._startTimeMs;
     _timeToFinishInSeconds = other._timeToFinishInSeconds;
     _completionStatusMsg = other._completionStatusMsg;
+  }
+
+  public static TenantRebalanceProgressStats fromTenantRebalanceJobMetadata(Map<String, String> jobMetadata)
+      throws JsonProcessingException {
+    String tenantRebalanceContextStr = jobMetadata.get(RebalanceJobConstants.JOB_METADATA_KEY_REBALANCE_PROGRESS_STATS);
+    return JsonUtils.stringToObject(tenantRebalanceContextStr, TenantRebalanceProgressStats.class);
   }
 
   public Map<String, String> getTableStatusMap() {
@@ -121,6 +131,30 @@ public class TenantRebalanceProgressStats {
   }
 
   public enum TableStatus {
-    UNPROCESSED, PROCESSING, PROCESSED, ABORTED, CANCELLED
+    IN_QUEUE,
+    REBALANCING,
+    DONE,
+    CANCELLED, // cancelled by user
+    ABORTED, // cancelled by TenantRebalanceChecker
+    NOT_SCHEDULED // tables IN_QUEUE will be marked as NOT_SCHEDULED once the rebalance job is cancelled/aborted
+  }
+
+  @Override
+  public boolean equals(Object o) {
+    if (!(o instanceof TenantRebalanceProgressStats)) {
+      return false;
+    }
+    TenantRebalanceProgressStats that = (TenantRebalanceProgressStats) o;
+    return _totalTables == that._totalTables && _remainingTables == that._remainingTables
+        && _startTimeMs == that._startTimeMs && _timeToFinishInSeconds == that._timeToFinishInSeconds
+        && Objects.equals(_tableStatusMap, that._tableStatusMap) && Objects.equals(
+        _tableRebalanceJobIdMap, that._tableRebalanceJobIdMap) && Objects.equals(_completionStatusMsg,
+        that._completionStatusMsg);
+  }
+
+  @Override
+  public int hashCode() {
+    return Objects.hash(_tableStatusMap, _tableRebalanceJobIdMap, _totalTables, _remainingTables, _startTimeMs,
+        _timeToFinishInSeconds, _completionStatusMsg);
   }
 }
