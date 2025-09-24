@@ -94,9 +94,11 @@ public class NoDictColumnStatisticsCollectorTest {
     return new Object[][] {
         // Ensure data has exactly 1 duplicate entry and total 4 entries
         // Sorted data
-        {new BigDecimal[]{new BigDecimal("1.23"), new BigDecimal("1.23"), new BigDecimal("2.34"), new BigDecimal("9.99")}, true},
+        {new BigDecimal[]{
+            new BigDecimal("1.23"), new BigDecimal("1.23"), new BigDecimal("2.34"), new BigDecimal("9.99")}, true},
         // Unsorted data
-        {new BigDecimal[]{new BigDecimal("2.34"), new BigDecimal("1.23"), new BigDecimal("9.99"), new BigDecimal("1.23")}, false}
+        {new BigDecimal[]{
+            new BigDecimal("2.34"), new BigDecimal("1.23"), new BigDecimal("9.99"), new BigDecimal("1.23")}, false}
     };
   }
 
@@ -112,16 +114,16 @@ public class NoDictColumnStatisticsCollectorTest {
     AbstractColumnStatisticsCollector expectedStatsCollector = null;
     switch (dataType) {
       case INT:
-        expectedStatsCollector = new IntColumnPreIndexStatsCollector("col", newConfig(FieldSpec.DataType.INT, true));
+        expectedStatsCollector = new IntColumnPreIndexStatsCollector("col", newConfig(dataType, true));
         break;
       case LONG:
-        expectedStatsCollector = new LongColumnPreIndexStatsCollector("col", newConfig(FieldSpec.DataType.LONG, true));
+        expectedStatsCollector = new LongColumnPreIndexStatsCollector("col", newConfig(dataType, true));
         break;
       case FLOAT:
-        expectedStatsCollector = new FloatColumnPreIndexStatsCollector("col", newConfig(FieldSpec.DataType.FLOAT, true));
+        expectedStatsCollector = new FloatColumnPreIndexStatsCollector("col", newConfig(dataType, true));
         break;
       case DOUBLE:
-        expectedStatsCollector = new DoubleColumnPreIndexStatsCollector("col", newConfig(FieldSpec.DataType.DOUBLE, true));
+        expectedStatsCollector = new DoubleColumnPreIndexStatsCollector("col", newConfig(dataType, true));
         break;
       default:
         throw new IllegalArgumentException("Unsupported data type: " + dataType);
@@ -231,15 +233,15 @@ public class NoDictColumnStatisticsCollectorTest {
   public Object[][] primitiveMVTypeTestData() {
     return new Object[][] {
         // Two MV rows with one duplicate across total 4 values -> cardinality 3
-        {new int[][]{new int[]{5, 10}, new int[]{5, 20}}},
-        {new long[][]{new long[]{1L, 15L}, new long[]{1L, 25L}}},
-        {new float[][]{new float[]{1.5f, 3.5f}, new float[]{1.5f, 7.5f}}},
-        {new double[][]{new double[]{2.5, 4.5}, new double[]{2.5, 8.5}}}
+        {FieldSpec.DataType.INT, new int[][]{new int[]{5, 10}, new int[]{5, 20}}},
+        {FieldSpec.DataType.LONG, new long[][]{new long[]{1L, 15L}, new long[]{1L, 25L}}},
+        {FieldSpec.DataType.FLOAT, new float[][]{new float[]{1.5f, 3.5f}, new float[]{1.5f, 7.5f}}},
+        {FieldSpec.DataType.DOUBLE, new double[][]{new double[]{2.5, 4.5}, new double[]{2.5, 8.5}}}
     };
   }
 
   @Test(dataProvider = "primitiveMVTypeTestData")
-  public void testMVPrimitiveTypes(Object entries) {
+  public void testMVPrimitiveTypes(FieldSpec.DataType dataType, Object entries) {
     // Validate MV behavior for numeric primitives using native arrays
     // - isSorted should be false for MV columns
     // - lengths are not tracked for native MV primitives (expect -1)
@@ -247,30 +249,28 @@ public class NoDictColumnStatisticsCollectorTest {
     NoDictColumnStatisticsCollector c;
     AbstractColumnStatisticsCollector expectedStatsCollector;
 
+    c = new NoDictColumnStatisticsCollector("col", newConfig(dataType, false));
+
     if (entries instanceof int[][]) {
-      c = new NoDictColumnStatisticsCollector("col", newConfig(FieldSpec.DataType.INT, false));
-      expectedStatsCollector = new IntColumnPreIndexStatsCollector("col", newConfig(FieldSpec.DataType.INT, false));
+      expectedStatsCollector = new IntColumnPreIndexStatsCollector("col", newConfig(dataType, false));
       for (int[] row : (int[][]) entries) {
         c.collect(row);
         expectedStatsCollector.collect(row);
       }
     } else if (entries instanceof long[][]) {
-      c = new NoDictColumnStatisticsCollector("col", newConfig(FieldSpec.DataType.LONG, false));
-      expectedStatsCollector = new LongColumnPreIndexStatsCollector("col", newConfig(FieldSpec.DataType.LONG, false));
+      expectedStatsCollector = new LongColumnPreIndexStatsCollector("col", newConfig(dataType, false));
       for (long[] row : (long[][]) entries) {
         c.collect(row);
         expectedStatsCollector.collect(row);
       }
     } else if (entries instanceof float[][]) {
-      c = new NoDictColumnStatisticsCollector("col", newConfig(FieldSpec.DataType.FLOAT, false));
-      expectedStatsCollector = new FloatColumnPreIndexStatsCollector("col", newConfig(FieldSpec.DataType.FLOAT, false));
+      expectedStatsCollector = new FloatColumnPreIndexStatsCollector("col", newConfig(dataType, false));
       for (float[] row : (float[][]) entries) {
         c.collect(row);
         expectedStatsCollector.collect(row);
       }
     } else {
-      c = new NoDictColumnStatisticsCollector("col", newConfig(FieldSpec.DataType.DOUBLE, false));
-      expectedStatsCollector = new DoubleColumnPreIndexStatsCollector("col", newConfig(FieldSpec.DataType.DOUBLE, false));
+      expectedStatsCollector = new DoubleColumnPreIndexStatsCollector("col", newConfig(dataType, false));
       for (double[] row : (double[][]) entries) {
         c.collect(row);
         expectedStatsCollector.collect(row);
@@ -376,5 +376,4 @@ public class NoDictColumnStatisticsCollectorTest {
       // expected: BigDecimal MV not supported by NoDict collector by design
     }
   }
-
 }
