@@ -38,7 +38,7 @@ public class PredicateEvaluatorProvider {
   }
 
   public static PredicateEvaluator getPredicateEvaluator(Predicate predicate, @Nullable Dictionary dictionary,
-      DataType dataType, int numDocs) {
+      DataType dataType, int numDocs, QueryContext queryContext) {
     return getPredicateEvaluator(predicate, dictionary, dataType, null, numDocs);
   }
 
