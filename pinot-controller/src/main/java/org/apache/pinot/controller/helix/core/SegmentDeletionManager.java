@@ -69,7 +69,7 @@ public class SegmentDeletionManager {
   // Retention date format will be written as suffix to deleted segments under `Deleted_Segments` folder. for example:
   // `Deleted_Segments/myTable/myTable_mySegment_0__RETENTION_UNTIL__202202021200` to indicate that this segment
   // file will be permanently deleted after Feb 2nd 2022 12PM.
-  private static final String DELETED_SEGMENTS = "Deleted_Segments";
+  public static final String DELETED_SEGMENTS = "Deleted_Segments";
   private static final String RETENTION_UNTIL_SEPARATOR = "__RETENTION_UNTIL__";
   private static final String RETENTION_DATE_FORMAT_STR = "yyyyMMddHHmm";
   private static final SimpleDateFormat RETENTION_DATE_FORMAT;

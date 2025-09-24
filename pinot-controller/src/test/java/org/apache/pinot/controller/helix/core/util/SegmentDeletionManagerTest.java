@@ -246,7 +246,7 @@ public class SegmentDeletionManagerTest {
     deletionManager.removeAgedDeletedSegments(leadControllerManager);
 
     // Create deleted directory
-    String deletedDirectoryPath = tempDir + File.separator + "Deleted_Segments";
+    String deletedDirectoryPath = tempDir + File.separator + SegmentDeletionManager.DELETED_SEGMENTS;
     File deletedDirectory = new File(deletedDirectoryPath);
     deletedDirectory.mkdir();
 
@@ -333,7 +333,7 @@ public class SegmentDeletionManagerTest {
     PinotFSFactory.register("fake", FakePinotFs.class.getName(), null);
     PinotFS pinotFS = PinotFSFactory.create("fake");
 
-    URI tableUri1 = new URI("fake://bucket/sc/managed/pinot/Deleted_Segments/table_1/");
+    URI tableUri1 = new URI("fake://bucket/sc/managed/pinot/" + SegmentDeletionManager.DELETED_SEGMENTS + "/table_1/");
     pinotFS.mkdir(tableUri1);
     for (int i = 0; i < 101; i++) {
       URI segmentURIForTable =
@@ -345,7 +345,7 @@ public class SegmentDeletionManagerTest {
     pinotFS.mkdir(segmentURIForTable);
 
     // Create dummy files
-    URI tableUri2 = new URI("fake://bucket/sc/managed/pinot/Deleted_Segments/table_2/");
+    URI tableUri2 = new URI("fake://bucket/sc/managed/pinot/" + SegmentDeletionManager.DELETED_SEGMENTS + "/table_2/");
     URI segment1ForTable2 = new URI(tableUri2.getPath() + "segment1" + RETENTION_UNTIL_SEPARATOR + "201901010000");
     URI segment2ForTable2 = new URI(tableUri2.getPath() + "segment1" + RETENTION_UNTIL_SEPARATOR + "201801010000");
     pinotFS.mkdir(tableUri2);
@@ -399,8 +399,9 @@ public class SegmentDeletionManagerTest {
     Set<String> segments = new HashSet<>(segmentsThatShouldBeDeleted());
     createTableAndSegmentFiles(tempDir, segmentsThatShouldBeDeleted());
     final File tableDir = new File(tempDir.getAbsolutePath() + File.separator + TABLE_NAME);
-    final File deletedTableDir = new File(tempDir.getAbsolutePath() + File.separator + "Deleted_Segments"
-        + File.separator + TABLE_NAME);
+    final File deletedTableDir =
+        new File(tempDir.getAbsolutePath() + File.separator + SegmentDeletionManager.DELETED_SEGMENTS
+            + File.separator + TABLE_NAME);
 
     // delete the segments instantly.
     SegmentsValidationAndRetentionConfig mockValidationConfig = mock(SegmentsValidationAndRetentionConfig.class);
@@ -455,8 +456,9 @@ public class SegmentDeletionManagerTest {
     Set<String> segments = new HashSet<>(segmentsThatShouldBeDeleted());
     createTableAndSegmentFilesWithGZExtension(tempDir, segmentsThatShouldBeDeleted());
     final File tableDir = new File(tempDir.getAbsolutePath() + File.separator + TABLE_NAME);
-    final File deletedTableDir = new File(tempDir.getAbsolutePath() + File.separator + "Deleted_Segments"
-        + File.separator + TABLE_NAME);
+    final File deletedTableDir =
+        new File(tempDir.getAbsolutePath() + File.separator + SegmentDeletionManager.DELETED_SEGMENTS
+            + File.separator + TABLE_NAME);
 
     // mock returning ZK Metadata for segment url
     ZNRecord znRecord1 = mock(org.apache.helix.ZNRecord.class);
@@ -523,8 +525,9 @@ public class SegmentDeletionManagerTest {
     List<String> segmentsThatShouldBeDeleted = segmentsThatShouldBeDeleted();
     createTableAndSegmentFiles(tempDir, segmentsThatShouldBeDeleted);
     final File tableDir = new File(tempDir.getAbsolutePath() + File.separator + TABLE_NAME);
-    final File deletedTableDir = new File(tempDir.getAbsolutePath() + File.separator + "Deleted_Segments"
-        + File.separator + TABLE_NAME);
+    final File deletedTableDir =
+        new File(tempDir.getAbsolutePath() + File.separator + SegmentDeletionManager.DELETED_SEGMENTS
+            + File.separator + TABLE_NAME);
 
     deletionManager.removeSegmentsFromStoreInBatch(TABLE_NAME, segmentsThatShouldBeDeleted, 0L);
 
@@ -669,13 +672,13 @@ public class SegmentDeletionManagerTest {
       if (uriPath.endsWith("/")) {
         uriPath = uriPath.substring(0, uriPath.lastIndexOf("/"));
       }
-      return uriPath.endsWith("Deleted_Segments") || _tableDirs.containsKey(uriPath + "/");
+      return uriPath.endsWith(SegmentDeletionManager.DELETED_SEGMENTS) || _tableDirs.containsKey(uriPath + "/");
     }
 
     @Override
     public String[] listFiles(URI fileUri, boolean recursive)
         throws IOException {
-      if (fileUri.getPath().endsWith("Deleted_Segments")) {
+      if (fileUri.getPath().endsWith(SegmentDeletionManager.DELETED_SEGMENTS)) {
         return _tableDirs.keySet().toArray(new String[0]);
       }
       // the call to list segments will come without the delimiter after the table name
@@ -699,7 +702,7 @@ public class SegmentDeletionManagerTest {
       if (_tableDirs.containsKey(uri.getPath() + "/")) {
         return true;
       }
-      return uri.getPath().endsWith("Deleted_Segments");
+      return uri.getPath().endsWith(SegmentDeletionManager.DELETED_SEGMENTS);
     }
   }
 }
