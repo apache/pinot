@@ -19,6 +19,7 @@
 package org.apache.pinot.plugin.filesystem;
 
 import com.google.api.gax.paging.Page;
+import com.google.api.gax.rpc.FixedHeaderProvider;
 import com.google.auth.Credentials;
 import com.google.auth.oauth2.GoogleCredentials;
 import com.google.cloud.storage.Blob;
@@ -33,6 +34,7 @@ import com.google.cloud.storage.StorageException;
 import com.google.cloud.storage.StorageOptions;
 import com.google.common.base.Strings;
 import com.google.common.collect.ImmutableList;
+import com.google.common.collect.ImmutableMap;
 import java.io.File;
 import java.io.IOException;
 import java.io.InputStream;
@@ -70,9 +72,15 @@ public class GcsPinotFS extends BasePinotFS {
 
   @Override
   public void init(PinotConfiguration config) {
+    String version = GcsPinotFS.class.getPackage().getImplementationVersion();
+    if (version == null) {
+      version = "unknown";
+    }
+    String userAgent = "apache-pinot/:" + version + "(GPN:apache-pinot)";
     Credentials credentials = null;
     try {
-      StorageOptions.Builder storageBuilder = StorageOptions.newBuilder();
+      StorageOptions.Builder storageBuilder = StorageOptions.newBuilder()
+          .setHeaderProvider(FixedHeaderProvider.create(ImmutableMap.of("User-agent", userAgent)));
       if (!Strings.isNullOrEmpty(config.getProperty(PROJECT_ID))) {
         LOGGER.info("Configs are: {}, {}", PROJECT_ID, config.getProperty(PROJECT_ID));
         String projectId = config.getProperty(PROJECT_ID);
