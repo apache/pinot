@@ -109,7 +109,7 @@ public class IngestionDelayTrackerTest {
       }
       Map<String, List<Long>> metricToValues = new HashMap<>();
       _partitionToMetricToValues.put(partitionId, metricToValues);
-      if (_streamMetadataProviderList.get(0).supportsOffsetLag()) {
+      if (_streamConfigIndexToStreamMetadataProvider.get(0).supportsOffsetLag()) {
         metricToValues.put(ServerGauge.REALTIME_INGESTION_OFFSET_LAG.getGaugeName(), new ArrayList<>());
         metricToValues.put(ServerGauge.REALTIME_INGESTION_CONSUMING_OFFSET.getGaugeName(), new ArrayList<>());
         metricToValues.put(ServerGauge.REALTIME_INGESTION_UPSTREAM_OFFSET.getGaugeName(), new ArrayList<>());
@@ -118,7 +118,7 @@ public class IngestionDelayTrackerTest {
 
       _scheduledExecutorService.scheduleWithFixedDelay(() -> _partitionToMetricToValues.compute(partitionId, (k, v) -> {
         Map<String, List<Long>> metricToValuesForPartition = _partitionToMetricToValues.get(partitionId);
-        if (_streamMetadataProviderList.get(0).supportsOffsetLag()) {
+        if (_streamConfigIndexToStreamMetadataProvider.get(0).supportsOffsetLag()) {
           metricToValuesForPartition.get(ServerGauge.REALTIME_INGESTION_OFFSET_LAG.getGaugeName())
               .add(getPartitionIngestionOffsetLag(partitionId));
           metricToValuesForPartition.get(ServerGauge.REALTIME_INGESTION_CONSUMING_OFFSET.getGaugeName())
