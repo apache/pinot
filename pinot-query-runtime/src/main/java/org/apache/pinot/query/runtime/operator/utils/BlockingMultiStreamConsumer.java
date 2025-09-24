@@ -33,6 +33,8 @@ import org.apache.pinot.query.runtime.plan.MultiStageQueryStats;
 import org.apache.pinot.query.runtime.plan.OpChainExecutionContext;
 import org.apache.pinot.segment.spi.memory.DataBuffer;
 import org.apache.pinot.spi.exception.QueryErrorCode;
+import org.apache.pinot.spi.exception.QueryException;
+import org.apache.pinot.spi.query.QueryThreadContext;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -234,8 +236,9 @@ public abstract class BlockingMultiStreamConsumer<E> implements AutoCloseable {
           return block;
         }
       }
-    } catch (InterruptedException ex) {
-      return onException(ex);
+    } catch (Exception e) {
+      _errorBlock = onException(e);
+      return _errorBlock;
     }
   }
 
@@ -384,6 +387,11 @@ public abstract class BlockingMultiStreamConsumer<E> implements AutoCloseable {
 
     @Override
     protected ReceivingMailbox.MseBlockWithStats onTimeout() {
+      // Use the terminate exception when query is explicitly terminated.
+      QueryException terminateException = QueryThreadContext.getTerminateException();
+      if (terminateException != null) {
+        return onException(terminateException.getErrorCode(), terminateException.getMessage());
+      }
       // TODO: Add the sender stage id to the error message
       String errMsg = "Timed out on stage " + _stageId + " waiting for data sent by a child stage";
       // We log this case as debug because:
@@ -397,6 +405,11 @@ public abstract class BlockingMultiStreamConsumer<E> implements AutoCloseable {
 
     @Override
     protected ReceivingMailbox.MseBlockWithStats onException(Exception e) {
+      // Use the terminate exception when query is explicitly terminated.
+      QueryException terminateException = QueryThreadContext.getTerminateException();
+      if (terminateException != null) {
+        return onException(terminateException.getErrorCode(), terminateException.getMessage());
+      }
       // TODO: Add the sender stage id to the error message
       String errMsg = "Found an error on stage " + _stageId + " while reading from a child stage";
       // We log this case as warn because contrary to the timeout case, it should be rare to finish an execution

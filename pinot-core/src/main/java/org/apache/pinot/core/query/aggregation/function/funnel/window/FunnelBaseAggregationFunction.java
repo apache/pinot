@@ -37,7 +37,7 @@ import org.apache.pinot.core.query.aggregation.function.AggregationFunction;
 import org.apache.pinot.core.query.aggregation.function.funnel.FunnelStepEvent;
 import org.apache.pinot.core.query.aggregation.groupby.GroupByResultHolder;
 import org.apache.pinot.core.query.aggregation.groupby.ObjectGroupByResultHolder;
-import org.apache.pinot.spi.trace.Tracing;
+import org.apache.pinot.spi.query.QueryThreadContext;
 
 
 public abstract class FunnelBaseAggregationFunction<F extends Comparable>
@@ -237,7 +237,7 @@ public abstract class FunnelBaseAggregationFunction<F extends Comparable>
       return intermediateResult1;
     }
 
-    Tracing.ThreadAccountantOps.sampleAndCheckInterruption();
+    QueryThreadContext.checkTerminationAndSampleUsage(this::getResultColumnName);
 
     intermediateResult1.addAll(intermediateResult2);
     return intermediateResult1;

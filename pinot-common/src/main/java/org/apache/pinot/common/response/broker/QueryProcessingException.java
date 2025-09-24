@@ -21,6 +21,7 @@ package org.apache.pinot.common.response.broker;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import org.apache.pinot.spi.exception.QueryErrorCode;
 import org.apache.pinot.spi.exception.QueryErrorMessage;
+import org.apache.pinot.spi.exception.QueryException;
 
 
 /**
@@ -50,6 +51,10 @@ public class QueryProcessingException {
 
   public static QueryProcessingException fromQueryErrorMessage(QueryErrorMessage queryErrorMessage) {
     return new QueryProcessingException(queryErrorMessage.getErrCode(), queryErrorMessage.getUsrMsg());
+  }
+
+  public static QueryProcessingException fromQueryException(QueryException queryException) {
+    return new QueryProcessingException(queryException.getErrorCode(), queryException.getMessage());
   }
 
   @JsonProperty("errorCode")

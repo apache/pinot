@@ -53,11 +53,18 @@ public class SelectionOnlyCombineOperator extends BaseSingleBlockCombineOperator
   protected BaseResultsBlock getNextBlock() {
     // For LIMIT 0 query, only process one segment to get the data schema
     if (_numRowsToKeep == 0) {
-      BaseResultsBlock resultsBlock = (BaseResultsBlock) _operators.get(0).nextBlock();
-      CombineOperatorUtils.setExecutionStatistics(resultsBlock, _operators, 0, 1, 0);
-      return resultsBlock;
+      try {
+        return checkTerminateExceptionAndAttachExecutionStats((BaseResultsBlock) _operators.get(0).nextBlock());
+      } catch (Exception e) {
+        return createExceptionResultsBlockAndAttachExecutionStats(e, "processing single segment");
+      }
     }
-
     return super.getNextBlock();
+  }
+
+  @Override
+  protected int getNumWorkerThreads() {
+    // For LIMIT 0 query, the segment is processed by the main thread
+    return _numRowsToKeep == 0 ? 1 : super.getNumWorkerThreads();
   }
 }

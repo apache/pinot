@@ -36,8 +36,8 @@ import org.apache.pinot.query.runtime.operator.MultiStageOperator;
 import org.apache.pinot.query.runtime.operator.OpChain;
 import org.apache.pinot.query.runtime.plan.OpChainExecutionContext;
 import org.apache.pinot.query.runtime.plan.PlanNodeToOpChain;
-import org.apache.pinot.spi.accounting.ThreadExecutionContext;
 import org.apache.pinot.spi.exception.QueryCancelledException;
+import org.apache.pinot.spi.exception.TerminationException;
 import org.apache.pinot.spi.query.QueryThreadContext;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -61,31 +61,6 @@ public class PipelineBreakerExecutor {
    * @param workerMetadata worker metadata for the current worker.
    * @param stagePlan the distributed stage plan to run pipeline breaker on.
    * @param opChainMetadata request metadata, including query options
-   * @param parentContext Parent thread metadata
-   * @return pipeline breaker result;
-   *   - If exception occurs, exception block will be wrapped in {@link MseBlock} and assigned to each PB node.
-   *   - Normal stats will be attached to each PB node and downstream execution should return with stats attached.
-   */
-  @Nullable
-  public static PipelineBreakerResult executePipelineBreakersFromQueryContext(OpChainSchedulerService scheduler,
-      MailboxService mailboxService, WorkerMetadata workerMetadata, StagePlan stagePlan,
-      Map<String, String> opChainMetadata,
-      @Nullable ThreadExecutionContext parentContext, boolean sendStats) {
-    return executePipelineBreakers(scheduler, mailboxService, workerMetadata, stagePlan, opChainMetadata,
-        QueryThreadContext.getRequestId(), QueryThreadContext.getActiveDeadlineMs(),
-        QueryThreadContext.getPassiveDeadlineMs(), parentContext, sendStats);
-  }
-
-  /**
-   * Execute a pipeline breaker and collect the results (synchronously). Currently, pipeline breaker executor can only
-   *    execute mailbox receive pipeline breaker.
-   *
-   * @param scheduler scheduler service to run the pipeline breaker main thread.
-   * @param mailboxService mailbox service to attach the {@link MailboxReceiveNode} against.
-   * @param workerMetadata worker metadata for the current worker.
-   * @param stagePlan the distributed stage plan to run pipeline breaker on.
-   * @param opChainMetadata request metadata, including query options
-   * @param parentContext Parent thread metadata
    * @return pipeline breaker result;
    *   - If exception occurs, exception block will be wrapped in {@link MseBlock} and assigned to each PB node.
    *   - Normal stats will be attached to each PB node and downstream execution should return with stats attached.
@@ -93,8 +68,7 @@ public class PipelineBreakerExecutor {
   @Nullable
   public static PipelineBreakerResult executePipelineBreakers(OpChainSchedulerService scheduler,
       MailboxService mailboxService, WorkerMetadata workerMetadata, StagePlan stagePlan,
-      Map<String, String> opChainMetadata, long requestId, long activeDeadlineMs, long passiveDeadlineMs,
-      @Nullable ThreadExecutionContext parentContext, boolean sendStats) {
+      Map<String, String> opChainMetadata, boolean sendStats) {
     PipelineBreakerContext pipelineBreakerContext = new PipelineBreakerContext();
     PipelineBreakerVisitor.visitPlanRoot(stagePlan.getRootNode(), pipelineBreakerContext);
     if (!pipelineBreakerContext.getPipelineBreakerMap().isEmpty()) {
@@ -103,11 +77,12 @@ public class PipelineBreakerExecutor {
         //     OpChain receive-mail callbacks.
         // see also: MailboxIdUtils TODOs, de-couple mailbox id from query information
         OpChainExecutionContext opChainExecutionContext =
-            new OpChainExecutionContext(mailboxService, requestId, activeDeadlineMs, passiveDeadlineMs, opChainMetadata,
-                stagePlan.getStageMetadata(), workerMetadata, null, parentContext, sendStats);
+            OpChainExecutionContext.fromQueryContext(mailboxService, opChainMetadata, stagePlan.getStageMetadata(),
+                workerMetadata, null, sendStats);
         return execute(scheduler, pipelineBreakerContext, opChainExecutionContext);
       } catch (Exception e) {
-        if (e instanceof QueryCancelledException) {
+        long requestId = QueryThreadContext.get().getExecutionContext().getRequestId();
+        if (e instanceof QueryCancelledException || e instanceof TerminationException) {
           LOGGER.debug("Pipeline breaker execution cancelled for request: {}, stage: {}", requestId,
               stagePlan.getStageMetadata().getStageId(), e);
         } else {
@@ -123,9 +98,9 @@ public class PipelineBreakerExecutor {
   }
 
   public static boolean hasPipelineBreakers(StagePlan stagePlan) {
-      PipelineBreakerContext pipelineBreakerContext = new PipelineBreakerContext();
-      PipelineBreakerVisitor.visitPlanRoot(stagePlan.getRootNode(), pipelineBreakerContext);
-      return !pipelineBreakerContext.getPipelineBreakerMap().isEmpty();
+    PipelineBreakerContext pipelineBreakerContext = new PipelineBreakerContext();
+    PipelineBreakerVisitor.visitPlanRoot(stagePlan.getRootNode(), pipelineBreakerContext);
+    return !pipelineBreakerContext.getPipelineBreakerMap().isEmpty();
   }
 
   private static PipelineBreakerResult execute(OpChainSchedulerService scheduler,

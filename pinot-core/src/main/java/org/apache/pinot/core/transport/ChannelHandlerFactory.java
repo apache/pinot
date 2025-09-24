@@ -27,11 +27,10 @@ import io.netty.handler.ssl.SslContext;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 import org.apache.pinot.common.config.TlsConfig;
-import org.apache.pinot.common.metrics.BrokerMetrics;
-import org.apache.pinot.common.metrics.ServerMetrics;
 import org.apache.pinot.common.utils.tls.TlsUtils;
 import org.apache.pinot.core.query.scheduler.QueryScheduler;
 import org.apache.pinot.server.access.AccessControl;
+import org.apache.pinot.spi.accounting.ThreadAccountant;
 import org.apache.pinot.spi.env.PinotConfiguration;
 
 
@@ -89,9 +88,9 @@ public class ChannelHandlerFactory {
    * The {@code getDataTableHandler} return a {@code DataTableHandler} Netty inbound handler on Pinot Broker side to
    * handle the serialized data table responses sent from Pinot Server.
    */
-  public static ChannelHandler getDataTableHandler(QueryRouter queryRouter, ServerRoutingInstance serverRoutingInstance,
-      BrokerMetrics brokerMetrics) {
-    return new DataTableHandler(queryRouter, serverRoutingInstance, brokerMetrics);
+  public static ChannelHandler getDataTableHandler(QueryRouter queryRouter, ThreadAccountant threadAccountant,
+      ServerRoutingInstance serverRoutingInstance) {
+    return new DataTableHandler(queryRouter, threadAccountant, serverRoutingInstance);
   }
 
   /**
@@ -99,8 +98,8 @@ public class ChannelHandlerFactory {
    * Server side to handle the serialized instance requests sent from Pinot Broker.
    */
   public static ChannelHandler getInstanceRequestHandler(String instanceName, PinotConfiguration config,
-      QueryScheduler queryScheduler, ServerMetrics serverMetrics, AccessControl accessControl) {
-    return new InstanceRequestHandler(instanceName, config, queryScheduler, serverMetrics, accessControl);
+      QueryScheduler queryScheduler, AccessControl accessControl, ThreadAccountant threadAccountant) {
+    return new InstanceRequestHandler(instanceName, config, queryScheduler, accessControl, threadAccountant);
   }
 
   public static ChannelHandler getDirectOOMHandler(QueryRouter queryRouter, ServerRoutingInstance serverRoutingInstance,
