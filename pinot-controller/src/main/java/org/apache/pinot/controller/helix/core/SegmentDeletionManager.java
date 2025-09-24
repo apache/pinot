@@ -379,7 +379,7 @@ public class SegmentDeletionManager {
               }
               continue;
             }
-            int numFilesDeleted = 0;
+            int numFilesScheduledForDeletion = 0;
             URI targetURI = null;
             List<URI> targetURIs = new ArrayList<>();
             for (FileMetadata targetFile : targetFiles) {
@@ -394,27 +394,29 @@ public class SegmentDeletionManager {
                       URIUtils.encode(URIUtils.getLastPart(targetFile.getFilePath())));
               long deletionTimeMs = getDeletionTimeMsFromFile(targetURI.toString(), targetFile.getLastModifiedTime());
               if (System.currentTimeMillis() >= deletionTimeMs) {
-                numFilesDeleted++;
+                numFilesScheduledForDeletion++;
                 targetURIs.add(targetURI);
-                if (numFilesDeleted == NUM_AGED_SEGMENTS_TO_DELETE_PER_ATTEMPT) {
+                if (numFilesScheduledForDeletion == NUM_AGED_SEGMENTS_TO_DELETE_PER_ATTEMPT) {
                   LOGGER.info(
-                      "Reached threshold of max aged segments to delete per attempt. Deleting: {} segment files "
-                          + "from directory: {}", numFilesDeleted, tableNameDir);
+                      "Reached threshold of max aged segments to schedule for deletion per attempt. Scheduling "
+                          + "deletion of: {} segment files "
+                          + "from directory: {}", numFilesScheduledForDeletion, tableNameDir);
                   break;
                 }
               }
             }
             try {
-              if (numFilesDeleted > 0) {
-                LOGGER.info("Submitting request to delete: {} segment files from directory: {}", numFilesDeleted,
-                    tableNameDir);
-                int finalNumFilesDeleted = numFilesDeleted;
+              if (numFilesScheduledForDeletion > 0) {
+                LOGGER.info("Submitting request to delete: {} segment files from directory: {}",
+                    numFilesScheduledForDeletion, tableNameDir);
+                int finalNumFilesScheduledForDeletion = numFilesScheduledForDeletion;
                 _executorService.submit(() -> {
                   try {
                     if (!pinotFS.deleteBatch(targetURIs, false)) {
                       LOGGER.warn("Failed to delete aged segment files from table: {}", tableName);
                     } else {
-                      LOGGER.info("Successfully deleted {} aged segment files from table: {}", finalNumFilesDeleted,
+                      LOGGER.info("Successfully deleted {} aged segment files from table: {}",
+                          finalNumFilesScheduledForDeletion,
                           tableName);
                     }
                   } catch (Exception e) {
