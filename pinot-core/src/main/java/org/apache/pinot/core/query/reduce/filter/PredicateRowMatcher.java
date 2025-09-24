@@ -44,7 +44,7 @@ public class PredicateRowMatcher implements RowMatcher {
     if (_predicateType == Predicate.Type.IS_NULL || _predicateType == Predicate.Type.IS_NOT_NULL) {
       _predicateEvaluator = null;
     } else {
-      _predicateEvaluator = PredicateEvaluatorProvider.getPredicateEvaluator(predicate, null, _valueType, 0, null);
+      _predicateEvaluator = PredicateEvaluatorProvider.getPredicateEvaluator(predicate, null, _valueType);
     }
     _nullHandlingEnabled = nullHandlingEnabled;
   }

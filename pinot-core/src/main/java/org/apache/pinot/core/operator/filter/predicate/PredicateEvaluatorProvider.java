@@ -38,8 +38,8 @@ public class PredicateEvaluatorProvider {
   }
 
   public static PredicateEvaluator getPredicateEvaluator(Predicate predicate, @Nullable Dictionary dictionary,
-      DataType dataType, int numDocs, QueryContext queryContext) {
-    return getPredicateEvaluator(predicate, dictionary, dataType, null, numDocs);
+      DataType dataType ) {
+    return getPredicateEvaluator(predicate, dictionary, dataType, null, 0);
   }
 
   public static PredicateEvaluator getPredicateEvaluator(Predicate predicate, @Nullable Dictionary dictionary,
@@ -65,7 +65,7 @@ public class PredicateEvaluatorProvider {
                 .newDictionaryBasedEvaluator((RangePredicate) predicate, dictionary, dataType);
           case REGEXP_LIKE:
             return RegexpLikePredicateEvaluatorFactory.newDictionaryBasedEvaluator((RegexpLikePredicate) predicate,
-                dictionary, dataType, numDocs, queryContext);
+                dictionary, dataType, queryContext, numDocs);
           default:
             throw new UnsupportedOperationException("Unsupported predicate type: " + predicate.getType());
         }
@@ -93,6 +93,12 @@ public class PredicateEvaluatorProvider {
       // Exception here is caused by mismatch between the column data type and the predicate value in the query
       throw new BadQueryRequestException(e);
     }
+  }
+
+  public static PredicateEvaluator getPredicateEvaluator(Predicate predicate, DataSource dataSource,
+      QueryContext queryContext) {
+    return getPredicateEvaluator(predicate, dataSource.getDictionary(),
+        dataSource.getDataSourceMetadata().getDataType(), queryContext, 0);
   }
 
   public static PredicateEvaluator getPredicateEvaluator(Predicate predicate, DataSource dataSource,
