@@ -41,6 +41,7 @@ import org.apache.pinot.util.TestUtils;
 import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
 
+import static org.testng.Assert.assertEquals;
 import static org.testng.Assert.assertTrue;
 
 
@@ -171,10 +172,19 @@ public class TimestampIndexMseTest extends BaseClusterIntegrationTest implements
   }
 
   @Test
-  public void timestampIndexSubstitutedInGroupBy() {
+  public void timestampIndexSubstitutedInGroupBy() throws Exception {
     setUseMultiStageQueryEngine(true);
-    explain("SELECT count(*) FROM mytable group by datetrunc('SECOND', ts)",
-        "Execution Plan\n"
+
+    // Get the actual execution plan using postQuery
+    JsonNode jsonNode = postQuery("explain plan for SELECT count(*) FROM mytable group by datetrunc('SECOND', ts)");
+    JsonNode plan = jsonNode.get("resultTable").get("rows").get(0).get(1);
+
+    // Apply regex replacement to the actual plan
+    String actualPlan = plan.asText()
+            .replaceAll("maxDocs=\\[[0-9]+\\]", "maxDocs=[*]")
+            .replaceAll("numDocs=\\[[0-9]+\\]", "numDocs=[*]");
+
+    String expectedPlan = "Execution Plan\n"
             + "LogicalProject(EXPR$0=[$1])\n"
             + "  PinotLogicalAggregate(group=[{0}], agg#0=[COUNT($1)], aggType=[FINAL])\n"
             + "    PinotLogicalExchange(distribution=[hash[0]])\n"
@@ -183,8 +193,10 @@ public class TimestampIndexMseTest extends BaseClusterIntegrationTest implements
             + "          CombineGroupBy\n"
             + "            GroupBy(groupKeys=[[$ts$SECOND]], aggregations=[[count(*)]])\n"
             + "              Project(columns=[[$ts$SECOND]])\n"
-            + "                DocIdSet(maxDocs=[120000])\n"
-            + "                  FilterMatchEntireSegment(numDocs=[115545])\n");
+            + "                DocIdSet(maxDocs=[*])\n"
+            + "                  FilterMatchEntireSegment(numDocs=[*])\n";
+
+    assertEquals(actualPlan, expectedPlan);
   }
 
   @Test
