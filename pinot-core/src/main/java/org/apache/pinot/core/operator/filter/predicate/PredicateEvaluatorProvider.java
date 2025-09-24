@@ -64,8 +64,8 @@ public class PredicateEvaluatorProvider {
             return RangePredicateEvaluatorFactory
                 .newDictionaryBasedEvaluator((RangePredicate) predicate, dictionary, dataType);
           case REGEXP_LIKE:
-            return RegexpLikePredicateEvaluatorFactory
-                .newDictionaryBasedEvaluator((RegexpLikePredicate) predicate, dictionary, dataType, numDocs, queryContext);
+            return RegexpLikePredicateEvaluatorFactory.newDictionaryBasedEvaluator((RegexpLikePredicate) predicate,
+                dictionary, dataType, numDocs, queryContext);
           default:
             throw new UnsupportedOperationException("Unsupported predicate type: " + predicate.getType());
         }
