@@ -18,14 +18,14 @@
  */
 package org.apache.pinot.segment.local.segment.creator.impl.stats;
 
+import com.dynatrace.hash4j.distinctcount.UltraLogLog;
 import java.math.BigDecimal;
 import java.nio.charset.StandardCharsets;
 import org.apache.commons.lang3.NotImplementedException;
+import org.apache.pinot.segment.local.utils.UltraLogLogUtils;
 import org.apache.pinot.segment.spi.creator.StatsCollectorConfig;
 import org.apache.pinot.spi.utils.BigDecimalUtils;
 import org.apache.pinot.spi.utils.ByteArray;
-import com.dynatrace.hash4j.distinctcount.UltraLogLog;
-import org.apache.pinot.segment.local.utils.UltraLogLogUtils;
 import org.apache.pinot.spi.utils.CommonConstants;
 
 
@@ -108,14 +108,15 @@ public class NoDictColumnStatisticsCollector extends AbstractColumnStatisticsCol
       _maxNumberOfMultiValues = Math.max(_maxNumberOfMultiValues, length);
       updateTotalNumberOfEntries(length);
     } else {
-      addressSorted(toComparable(entry));
+      Comparable value = toComparable(entry);
+      addressSorted(value);
       updateMinMax(entry);
       updateUll(entry);
       int len = getValueLength(entry);
       _minLength = Math.min(_minLength, len);
       _maxLength = Math.max(_maxLength, len);
       if (isPartitionEnabled()) {
-        updatePartition(entry.toString());
+        updatePartition(value.toString());
       }
       _maxRowLength = Math.max(_maxRowLength, len);
       _totalNumberOfEntries++;
@@ -153,7 +154,7 @@ public class NoDictColumnStatisticsCollector extends AbstractColumnStatisticsCol
       return BigDecimalUtils.byteSize((BigDecimal) value);
     }
     if (value instanceof Number) {
-      return 8; // fixed-width approximation; not used for fixed types' length assertions generally
+      return 8; // fixed-width approximation as it's not actually required for numeric fields which are of fixed length
     }
     throw new IllegalStateException("Unsupported value type " + value.getClass());
   }
@@ -198,7 +199,9 @@ public class NoDictColumnStatisticsCollector extends AbstractColumnStatisticsCol
   public int getCardinality() {
     // Return approximate distinct count estimate
     long estimate = Math.round(_ull.getDistinctCountEstimate());
-    return estimate >= Integer.MAX_VALUE ? Integer.MAX_VALUE : (int) estimate;
+    // There are cases where ULL can overshoot the actual number of entries.
+    // Returning a cardinality greater than total entries can break assumptions.
+    return estimate > getTotalNumberOfEntries() ? getTotalNumberOfEntries() : (int) estimate;
   }
 
   @Override

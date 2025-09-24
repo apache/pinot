@@ -294,7 +294,7 @@ public class InterSegmentAggregationMultiValueRawQueriesTest extends BaseMultiVa
         {DataSchema.ColumnDataType.INT});
     Object[] expectedResults = new Object[]{18499};
     ResultTable expectedResultTable = new ResultTable(expectedDataSchema, Collections.singletonList(expectedResults));
-    QueriesTestUtils.testInterSegmentsResult(brokerResponse, 400000L, 0L, 0L, 400000L, expectedResultTable);
+    QueriesTestUtils.testInterSegmentsResult(brokerResponse, 400000L, 0L, 400000L, 400000L, expectedResultTable);
 
     brokerResponse = getBrokerResponse(query + FILTER);
     expectedResults[0] = 1186;
@@ -327,7 +327,7 @@ public class InterSegmentAggregationMultiValueRawQueriesTest extends BaseMultiVa
         {DataSchema.ColumnDataType.LONG});
     Object[] expectedResults = new Object[]{20039L};
     ResultTable expectedResultTable = new ResultTable(expectedDataSchema, Collections.singletonList(expectedResults));
-    QueriesTestUtils.testInterSegmentsResult(brokerResponse, 400000L, 0L, 0L, 400000L, expectedResultTable);
+    QueriesTestUtils.testInterSegmentsResult(brokerResponse, 400000L, 0L, 400000L, 400000L, expectedResultTable);
 
     brokerResponse = getBrokerResponse(query + FILTER);
     expectedResults[0] = 1296L;
@@ -360,7 +360,7 @@ public class InterSegmentAggregationMultiValueRawQueriesTest extends BaseMultiVa
         {DataSchema.ColumnDataType.LONG});
     Object[] expectedResults = new Object[]{18651L};
     ResultTable expectedResultTable = new ResultTable(expectedDataSchema, Collections.singletonList(expectedResults));
-    QueriesTestUtils.testInterSegmentsResult(brokerResponse, 400000L, 0L, 0L, 400000L, expectedResultTable);
+    QueriesTestUtils.testInterSegmentsResult(brokerResponse, 400000L, 0L, 400000L, 400000L, expectedResultTable);
 
     brokerResponse = getBrokerResponse(query + FILTER);
     expectedResults[0] = 1176L;
@@ -395,7 +395,7 @@ public class InterSegmentAggregationMultiValueRawQueriesTest extends BaseMultiVa
         {DataSchema.ColumnDataType.LONG});
     Object[] expectedResults = new Object[]{20039L};
     ResultTable expectedResultTable = new ResultTable(expectedDataSchema, Collections.singletonList(expectedResults));
-    QueriesTestUtils.testInterSegmentsResult(brokerResponse, 400000L, 0L, 0L, 400000L, expectedResultTable,
+    QueriesTestUtils.testInterSegmentsResult(brokerResponse, 400000L, 0L, 400000L, 400000L, expectedResultTable,
         cardinalityExtractor);
 
     brokerResponse = getBrokerResponse(query + FILTER);
@@ -437,7 +437,7 @@ public class InterSegmentAggregationMultiValueRawQueriesTest extends BaseMultiVa
         {DataSchema.ColumnDataType.LONG});
     Object[] expectedResults = new Object[]{18651L};
     ResultTable expectedResultTable = new ResultTable(expectedDataSchema, Collections.singletonList(expectedResults));
-    QueriesTestUtils.testInterSegmentsResult(brokerResponse, 400000L, 0L, 0L, 400000L, expectedResultTable,
+    QueriesTestUtils.testInterSegmentsResult(brokerResponse, 400000L, 0L, 400000L, 400000L, expectedResultTable,
         cardinalityExtractor);
 
     brokerResponse = getBrokerResponse(query + FILTER);
