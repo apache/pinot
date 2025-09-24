@@ -34,6 +34,7 @@ import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.Executor;
@@ -54,6 +55,7 @@ import org.apache.hc.client5.http.io.HttpClientConnectionManager;
 import org.apache.helix.model.ExternalView;
 import org.apache.helix.model.IdealState;
 import org.apache.pinot.common.utils.DatabaseUtils;
+import org.apache.pinot.common.utils.SegmentUtils;
 import org.apache.pinot.controller.ControllerConf;
 import org.apache.pinot.controller.api.exception.ControllerApplicationException;
 import org.apache.pinot.controller.helix.core.PinotHelixResourceManager;
@@ -394,6 +396,69 @@ public class PinotRealtimeTableResource {
           Response.Status.INTERNAL_SERVER_ERROR, e);
     }
   }
+
+  @GET
+  @Path("/tables/{tableName}/partitionCount")
+  @Authorize(targetType = TargetType.TABLE, paramName = "tableName", action = Actions.Table.GET_METADATA)
+  @Produces(MediaType.APPLICATION_JSON)
+  @ApiOperation(value = "Get partition count for a realtime table",
+      notes = "Returns the numbers of consumers for a realtime table by checking "
+          + "the number of partitions in the table in"
+          + " IdealState")
+  @ApiResponses(value = {
+      @ApiResponse(code = 200, message = "Success"),
+      @ApiResponse(code = 404, message = "Table not found"),
+      @ApiResponse(code = 500, message = "Internal server error")
+  })
+  public Map<String, Integer> getTablePartitionCount(
+      @ApiParam(value = "Realtime table name with or without type", required = true, example = "myTable | "
+          + "myTable_REALTIME") @PathParam("tableName") String realtimeTableName,
+      @Context HttpHeaders headers) {
+    realtimeTableName = DatabaseUtils.translateTableName(realtimeTableName, headers);
+    try {
+      TableType tableType = TableNameBuilder.getTableTypeFromTableName(realtimeTableName);
+      if (TableType.OFFLINE == tableType) {
+        throw new IllegalStateException("Cannot get partition count for OFFLINE table: " + realtimeTableName);
+      }
+      String tableNameWithType = TableNameBuilder.forType(TableType.REALTIME).tableNameWithType(realtimeTableName);
+      int partitionCount = getPartitionCountFromSegment(tableNameWithType, _pinotHelixResourceManager);
+
+      Map<String, Integer> response = new HashMap<>();
+      response.put("partitionCount", partitionCount);
+      return response;
+    } catch (Exception e) {
+      throw new ControllerApplicationException(LOGGER,
+          String.format("Failed to get partition count for table %s. %s", realtimeTableName, e.getMessage()),
+          Response.Status.INTERNAL_SERVER_ERROR, e);
+    }
+  }
+  private int getPartitionCountFromSegment(
+      String tableNameWithType, PinotHelixResourceManager pinotHelixResourceManager) {
+    IdealState tableIdealState = pinotHelixResourceManager.getTableIdealState(tableNameWithType);
+    if (tableIdealState == null) {
+      throw new ControllerApplicationException(LOGGER, String.format("Ideal State for table '%s' is null",
+          tableNameWithType),
+        Response.Status.BAD_REQUEST);
+    }
+    Set<String> consumingSegments = pinotHelixResourceManager.getConsumingSegments(tableNameWithType);
+    Set<Integer> partitionIdSet;
+    if (!consumingSegments.isEmpty()) {
+      partitionIdSet = consumingSegments.stream()
+          .map(segmentName -> SegmentUtils.getSegmentPartitionId(segmentName, tableNameWithType,
+              pinotHelixResourceManager.getHelixZkManager(), null))
+          .filter(Objects::nonNull)
+          .collect(Collectors.toSet());
+    } else {
+      partitionIdSet = tableIdealState.getPartitionSet()
+          .stream()
+          .map(segmentName -> SegmentUtils.getSegmentPartitionId(segmentName, tableNameWithType,
+              pinotHelixResourceManager.getHelixZkManager(), null))
+          .filter(Objects::nonNull)
+          .collect(Collectors.toSet());
+    }
+    return partitionIdSet.size();
+  }
+
 
   @GET
   @Path("/tables/{tableName}/pauselessDebugInfo")
