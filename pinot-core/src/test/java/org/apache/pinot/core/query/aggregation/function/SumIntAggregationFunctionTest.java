@@ -25,7 +25,7 @@ import org.testng.annotations.DataProvider;
 import org.testng.annotations.Test;
 
 
-public class IntSumAggregationFunctionTest extends AbstractAggregationFunctionTest {
+public class SumIntAggregationFunctionTest extends AbstractAggregationFunctionTest {
 
   @DataProvider(name = "scenarios")
   Object[] scenarios() {
@@ -42,7 +42,7 @@ public class IntSumAggregationFunctionTest extends AbstractAggregationFunctionTe
             "null"
         ).andOnSecondInstance("myField",
             "null"
-        ).whenQuery("select intsum(myField) from testTable")
+        ).whenQuery("select sumint(myField) from testTable")
         .thenResultIs("LONG",
             String.valueOf(FieldSpec.getDefaultNullValue(FieldSpec.FieldType.METRIC, scenario.getDataType(), null)));
   }
@@ -55,7 +55,7 @@ public class IntSumAggregationFunctionTest extends AbstractAggregationFunctionTe
             "null"
         ).andOnSecondInstance("myField",
             "null"
-        ).whenQuery("select intsum(myField) from testTable")
+        ).whenQuery("select sumint(myField) from testTable")
         .thenResultIs("LONG", "null");
   }
 
@@ -67,7 +67,7 @@ public class IntSumAggregationFunctionTest extends AbstractAggregationFunctionTe
             "null"
         ).andOnSecondInstance("myField",
             "null"
-        ).whenQuery("select 'literal', intsum(myField) from testTable group by 'literal'")
+        ).whenQuery("select 'literal', sumint(myField) from testTable group by 'literal'")
         .thenResultIs("STRING | LONG", "literal | "
             + FieldSpec.getDefaultNullValue(FieldSpec.FieldType.METRIC, scenario.getDataType(), null));
   }
@@ -80,7 +80,7 @@ public class IntSumAggregationFunctionTest extends AbstractAggregationFunctionTe
             "null"
         ).andOnSecondInstance("myField",
             "null"
-        ).whenQuery("select 'literal', intsum(myField) from testTable group by 'literal'")
+        ).whenQuery("select 'literal', sumint(myField) from testTable group by 'literal'")
         .thenResultIs("STRING | LONG", "literal | null");
   }
 
@@ -94,7 +94,7 @@ public class IntSumAggregationFunctionTest extends AbstractAggregationFunctionTe
         ).andOnSecondInstance("myField",
             "null",
             "null"
-        ).whenQuery("select intsum(myField) from testTable")
+        ).whenQuery("select sumint(myField) from testTable")
         .thenResultIs("LONG", "8");
   }
 
@@ -109,7 +109,7 @@ public class IntSumAggregationFunctionTest extends AbstractAggregationFunctionTe
             "2",
             "null",
             "3"
-        ).whenQuery("select intsum(myField) from testTable")
+        ).whenQuery("select sumint(myField) from testTable")
         .thenResultIs("LONG", "10");
   }
 
@@ -124,7 +124,7 @@ public class IntSumAggregationFunctionTest extends AbstractAggregationFunctionTe
             "null",
             "2",
             "null"
-        ).whenQuery("select 'literal', intsum(myField) from testTable group by 'literal'")
+        ).whenQuery("select 'literal', sumint(myField) from testTable group by 'literal'")
         .thenResultIs("STRING | LONG", "literal | 10");
   }
 
@@ -139,7 +139,7 @@ public class IntSumAggregationFunctionTest extends AbstractAggregationFunctionTe
             "null",
             "null",
             "null"
-        ).whenQuery("select 'literal', intsum(myField) from testTable group by 'literal'")
+        ).whenQuery("select 'literal', sumint(myField) from testTable group by 'literal'")
         .thenResultIs("STRING | LONG", "literal | 8");
   }
 
@@ -161,14 +161,14 @@ public class IntSumAggregationFunctionTest extends AbstractAggregationFunctionTe
             new Object[]{"tag1;tag2", 2},
             new Object[]{"tag2;tag3", null}
         )
-        .whenQuery("select tags, INTSUM(value) from testTable group by tags order by tags")
+        .whenQuery("select tags, SUMINT(value) from testTable group by tags order by tags")
         .thenResultIs(
             "STRING | LONG",
             "tag1    | 3",
             "tag2    | 1",
             "tag3    | -2"
         )
-        .whenQueryWithNullHandlingEnabled("select tags, INTSUM(value) from testTable group by tags order by tags")
+        .whenQueryWithNullHandlingEnabled("select tags, SUMINT(value) from testTable group by tags order by tags")
         .thenResultIs(
             "STRING | LONG",
             "tag1    | 3",

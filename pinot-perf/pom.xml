@@ -199,8 +199,8 @@
               <name>pinot-StringDictionaryPerfTest</name>
             </program>
             <program>
-              <mainClass>org.apache.pinot.perf.aggregation.IntSumAggregationFunctionBenchmark</mainClass>
-              <name>pinot-IntSumAggregationFunctionBenchmark</name>
+              <mainClass>org.apache.pinot.perf.aggregation.SumIntAggregationFunctionBenchmark</mainClass>
+              <name>pinot-SumIntAggregationFunctionBenchmark</name>
             </program>
           </programs>
           <repositoryLayout>flat</repositoryLayout>

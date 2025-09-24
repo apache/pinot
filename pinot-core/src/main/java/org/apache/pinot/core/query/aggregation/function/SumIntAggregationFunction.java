@@ -42,16 +42,16 @@ import org.apache.pinot.spi.data.FieldSpec.DataType;
  * - Optimized for the specific case of INT column aggregation
  * - Proper null handling support using foldNotNull and forEachNotNull
  */
-public class IntSumAggregationFunction extends NullableSingleInputAggregationFunction<Long, Long> {
-  public static final String FUNCTION_NAME = "intSum";
+public class SumIntAggregationFunction extends NullableSingleInputAggregationFunction<Long, Long> {
+  public static final String FUNCTION_NAME = "sumInt";
 
-  public IntSumAggregationFunction(List<ExpressionContext> arguments, boolean nullHandlingEnabled) {
+  public SumIntAggregationFunction(List<ExpressionContext> arguments, boolean nullHandlingEnabled) {
     super(arguments.get(0), nullHandlingEnabled);
   }
 
   @Override
   public AggregationFunctionType getType() {
-    return AggregationFunctionType.INTSUM;
+    return AggregationFunctionType.SUMINT;
   }
 
   @Override
@@ -70,7 +70,7 @@ public class IntSumAggregationFunction extends NullableSingleInputAggregationFun
     BlockValSet blockValSet = blockValSetMap.get(_expression);
 
     if (blockValSet.getValueType().getStoredType() != DataType.INT) {
-      throw new IllegalArgumentException("IntSumAggregationFunction only supports INT columns");
+      throw new IllegalArgumentException("SumIntAggregationFunction only supports INT columns");
     }
 
     int[] values = blockValSet.getIntValuesSV();

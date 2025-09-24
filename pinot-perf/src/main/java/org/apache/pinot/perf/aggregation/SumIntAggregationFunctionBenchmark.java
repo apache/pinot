@@ -48,9 +48,9 @@ import org.openjdk.jmh.runner.options.OptionsBuilder;
 
 
 /**
- * JMH benchmark comparing IntSumAggregationFunction vs SumAggregationFunction performance.
+ * JMH benchmark comparing SumIntAggregationFunction vs SumAggregationFunction performance.
  *
- * This benchmark demonstrates the performance benefits of using IntSumAggregationFunction
+ * This benchmark demonstrates the performance benefits of using SumIntAggregationFunction
  * for INT column aggregations, avoiding type promotion and leveraging native integer arithmetic.
  */
 @Fork(1)
@@ -59,7 +59,7 @@ import org.openjdk.jmh.runner.options.OptionsBuilder;
 @Warmup(iterations = 10, time = 1)
 @Measurement(iterations = 10, time = 1)
 @State(Scope.Benchmark)
-public class IntSumAggregationFunctionBenchmark extends AbstractAggregationQueryBenchmark {
+public class SumIntAggregationFunctionBenchmark extends AbstractAggregationQueryBenchmark {
 
   @Param({"false", "true"})
   public boolean _nullHandling;
@@ -69,7 +69,7 @@ public class IntSumAggregationFunctionBenchmark extends AbstractAggregationQuery
 
   public static void main(String[] args) throws RunnerException {
     Options opt = new OptionsBuilder()
-        .include(IntSumAggregationFunctionBenchmark.class.getSimpleName())
+        .include(SumIntAggregationFunctionBenchmark.class.getSimpleName())
         .build();
 
     new Runner(opt).run();
@@ -126,7 +126,7 @@ public class IntSumAggregationFunctionBenchmark extends AbstractAggregationQuery
   }
 
   @Benchmark
-  public void testIntSumAggregation(Blackhole bh) {
-    executeQuery("SELECT INTSUM(col) FROM mytable", bh);
+  public void testSumIntAggregation(Blackhole bh) {
+    executeQuery("SELECT SUMINT(col) FROM mytable", bh);
   }
 }

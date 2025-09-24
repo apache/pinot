@@ -31,7 +31,7 @@ public class AggregationFunctionTypeTest {
     Assert.assertEquals(AggregationFunctionType.getAggregationFunctionType("MiN"), AggregationFunctionType.MIN);
     Assert.assertEquals(AggregationFunctionType.getAggregationFunctionType("MaX"), AggregationFunctionType.MAX);
     Assert.assertEquals(AggregationFunctionType.getAggregationFunctionType("SuM"), AggregationFunctionType.SUM);
-    Assert.assertEquals(AggregationFunctionType.getAggregationFunctionType("InTsUm"), AggregationFunctionType.INTSUM);
+    Assert.assertEquals(AggregationFunctionType.getAggregationFunctionType("SuMInT"), AggregationFunctionType.SUMINT);
     Assert.assertEquals(AggregationFunctionType.getAggregationFunctionType("AvG"), AggregationFunctionType.AVG);
     Assert.assertEquals(AggregationFunctionType.getAggregationFunctionType("MoDe"), AggregationFunctionType.MODE);
     Assert.assertEquals(AggregationFunctionType.getAggregationFunctionType("FiRsTwItHtImE"),
