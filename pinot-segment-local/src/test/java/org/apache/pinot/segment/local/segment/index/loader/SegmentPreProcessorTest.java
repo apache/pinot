@@ -386,17 +386,11 @@ public class SegmentPreProcessorTest implements PinotBuffersAfterClassCheckRule 
   @Test
   public void testSimpleEnableDictionarySV()
       throws Exception {
-    int totalNumberOfEntries = 100000;
-    // In the test, we are building the segment without dictionary enabled.
-    // Hence, bitsPerElement is calculated based on total docs
-    int bitsPerElement = (int) Math.ceil(Math.log(totalNumberOfEntries) / Math.log(2));
     // TEST 1. Check running forwardIndexHandler on a V1 segment. No-op for all existing raw columns.
     buildV1Segment();
-    checkForwardIndexCreation(EXISTING_STRING_COL_RAW, 100000, bitsPerElement, _schema, false,
-        false, false, 0, ChunkCompressionType.LZ4,
+    checkForwardIndexCreation(EXISTING_STRING_COL_RAW, 5, 3, _schema, false, false, false, 0, ChunkCompressionType.LZ4,
         true, 0, DataType.STRING, 100000);
-    validateIndex(StandardIndexes.forward(), EXISTING_INT_COL_RAW, 100000, bitsPerElement, false,
-        false, false, 0, true, 0,
+    validateIndex(StandardIndexes.forward(), EXISTING_INT_COL_RAW, 42242, 16, false, false, false, 0, true, 0,
         ChunkCompressionType.LZ4, false, DataType.INT, 100000);
 
     // Convert the segment to V3.
@@ -404,29 +398,21 @@ public class SegmentPreProcessorTest implements PinotBuffersAfterClassCheckRule 
 
     // TEST 2: Enable dictionary on EXISTING_STRING_COL_RAW
     _noDictionaryColumns.remove(EXISTING_STRING_COL_RAW);
-    checkForwardIndexCreation(EXISTING_STRING_COL_RAW, 5, bitsPerElement, _schema, false,
-        true, false, 4, null, true, 0,
+    checkForwardIndexCreation(EXISTING_STRING_COL_RAW, 5, 3, _schema, false, true, false, 4, null, true, 0,
         DataType.STRING, 100000);
 
     // TEST 3: Enable dictionary on EXISTING_INT_COL_RAW
     _noDictionaryColumns.remove(EXISTING_INT_COL_RAW);
-    checkForwardIndexCreation(EXISTING_INT_COL_RAW, 42242, bitsPerElement, _schema, false,
-        true, false, 0, null, true, 0,
+    checkForwardIndexCreation(EXISTING_INT_COL_RAW, 42242, 16, _schema, false, true, false, 0, null, true, 0,
         DataType.INT, 100000);
   }
 
   @Test
   public void testSimpleEnableDictionaryMV()
       throws Exception {
-    int totalNumberOfEntries = 106688;
-    // In the test, we are building the segment without dictionary enabled.
-    // Hence, bitsPerElement is calculated based on total docs
-    int bitsPerElement = (int) Math.ceil(Math.log(totalNumberOfEntries) / Math.log(2));
-
     // TEST 1. Check running forwardIndexHandler on a V1 segment. No-op for all existing raw columns.
     buildV1Segment();
-    checkForwardIndexCreation(EXISTING_INT_COL_RAW_MV, 106688, bitsPerElement, _schema, false,
-        false, false, 0,
+    checkForwardIndexCreation(EXISTING_INT_COL_RAW_MV, 18499, 15, _schema, false, false, false, 0,
         ChunkCompressionType.LZ4, false, 13, DataType.INT, 106688);
 
     // Convert the segment to V3.
@@ -434,19 +420,13 @@ public class SegmentPreProcessorTest implements PinotBuffersAfterClassCheckRule 
 
     // TEST 2: Enable dictionary on EXISTING_STRING_COL_RAW
     _noDictionaryColumns.remove(EXISTING_INT_COL_RAW_MV);
-    checkForwardIndexCreation(EXISTING_INT_COL_RAW_MV, 18499, bitsPerElement, _schema, false,
-        true, false, 0, null, false, 13,
+    checkForwardIndexCreation(EXISTING_INT_COL_RAW_MV, 18499, 15, _schema, false, true, false, 0, null, false, 13,
         DataType.INT, 106688);
   }
 
   @Test
   public void testEnableDictAndOtherIndexesSV()
       throws Exception {
-    int totalNumberOfEntries = 100000;
-    // In the test, we are building the segment without dictionary enabled.
-    // Hence, bitsPerElement is calculated based on total docs
-    int bitsPerElement = (int) Math.ceil(Math.log(totalNumberOfEntries) / Math.log(2));
-
     // TEST 1: EXISTING_STRING_COL_RAW. Enable dictionary. Also add inverted index and text index. Reload code path
     // will create dictionary, inverted index and text index.
     buildV3Segment();
@@ -455,14 +435,11 @@ public class SegmentPreProcessorTest implements PinotBuffersAfterClassCheckRule 
     _fieldConfigMap.put(EXISTING_STRING_COL_RAW,
         new FieldConfig(EXISTING_STRING_COL_RAW, FieldConfig.EncodingType.DICTIONARY,
             List.of(FieldConfig.IndexType.INVERTED, FieldConfig.IndexType.TEXT), null, null));
-    checkForwardIndexCreation(EXISTING_STRING_COL_RAW, 5, bitsPerElement, _schema, false,
-        true, false, 4, null, true, 0,
+    checkForwardIndexCreation(EXISTING_STRING_COL_RAW, 5, 3, _schema, false, true, false, 4, null, true, 0,
         DataType.STRING, 100000);
-    validateIndex(StandardIndexes.inverted(), EXISTING_STRING_COL_RAW, 5, bitsPerElement, false,
-        true, false, 4, true, 0, null,
+    validateIndex(StandardIndexes.inverted(), EXISTING_STRING_COL_RAW, 5, 3, false, true, false, 4, true, 0, null,
         false, DataType.STRING, 100000);
-    validateIndex(StandardIndexes.text(), EXISTING_STRING_COL_RAW, 5, bitsPerElement, false,
-        true, false, 4, true, 0, null, false,
+    validateIndex(StandardIndexes.text(), EXISTING_STRING_COL_RAW, 5, 3, false, true, false, 4, true, 0, null, false,
         DataType.STRING, 100000);
 
     // TEST 2: EXISTING_STRING_COL_RAW. Enable dictionary on a raw column that already has text index.
@@ -471,43 +448,33 @@ public class SegmentPreProcessorTest implements PinotBuffersAfterClassCheckRule 
         new FieldConfig(EXISTING_STRING_COL_RAW, FieldConfig.EncodingType.RAW, List.of(FieldConfig.IndexType.TEXT),
             null, null));
     buildV3Segment();
-    // Since dictionary isn't enabled and we're rebuilding segment, cardinality = total docs
-    validateIndex(StandardIndexes.text(), EXISTING_STRING_COL_RAW, 100000, bitsPerElement, false,
-        false, false, 0, true, 0, null, false,
+    validateIndex(StandardIndexes.text(), EXISTING_STRING_COL_RAW, 5, 3, false, false, false, 0, true, 0, null, false,
         DataType.STRING, 100000);
 
     // At this point, the segment has text index. Now, the reload path should create a dictionary.
-    // When its enabled back, cardinality will be updated to actual cardinality.
     _noDictionaryColumns.remove(EXISTING_STRING_COL_RAW);
     _fieldConfigMap.put(EXISTING_STRING_COL_RAW,
         new FieldConfig(EXISTING_STRING_COL_RAW, FieldConfig.EncodingType.DICTIONARY,
             List.of(FieldConfig.IndexType.TEXT), null, null));
-    checkForwardIndexCreation(EXISTING_STRING_COL_RAW, 5, bitsPerElement, _schema, false,
-        true, false, 4, null, true, 0,
+    checkForwardIndexCreation(EXISTING_STRING_COL_RAW, 5, 3, _schema, false, true, false, 4, null, true, 0,
         DataType.STRING, 100000);
-    validateIndex(StandardIndexes.text(), EXISTING_STRING_COL_RAW, 5, bitsPerElement, false,
-        true, false, 4, true, 0, null, false,
+    validateIndex(StandardIndexes.text(), EXISTING_STRING_COL_RAW, 5, 3, false, true, false, 4, true, 0, null, false,
         DataType.STRING, 100000);
 
     // TEST 3: EXISTING_INT_COL_RAW. Enable dictionary on a column that already has range index.
     resetIndexConfigs();
     _rangeIndexColumns.add(EXISTING_INT_COL_RAW);
     buildV3Segment();
-    // Since dictionary isn't enabled, cardinality = total docs
-    validateIndex(StandardIndexes.range(), EXISTING_INT_COL_RAW, 100000, bitsPerElement, false,
-        false, false, 0, true, 0,
+    validateIndex(StandardIndexes.range(), EXISTING_INT_COL_RAW, 42242, 16, false, false, false, 0, true, 0,
         ChunkCompressionType.LZ4, false, DataType.INT, 100000);
     long oldRangeIndexSize = new SegmentMetadataImpl(INDEX_DIR).getColumnMetadataFor(EXISTING_INT_COL_RAW)
         .getIndexSizeFor(StandardIndexes.range());
     // At this point, the segment has range index. Now the reload path should create a dictionary and rewrite the
     // range index.
-    // When its enabled back, cardinality will be updated to actual cardinality.
     _noDictionaryColumns.remove(EXISTING_INT_COL_RAW);
-    checkForwardIndexCreation(EXISTING_INT_COL_RAW, 42242, bitsPerElement, _schema, false,
-        true, false, 0, null, true, 0,
+    checkForwardIndexCreation(EXISTING_INT_COL_RAW, 42242, 16, _schema, false, true, false, 0, null, true, 0,
         DataType.INT, 100000);
-    validateIndex(StandardIndexes.range(), EXISTING_INT_COL_RAW, 42242, bitsPerElement, false,
-        true, false, 0, true, 0, null, false,
+    validateIndex(StandardIndexes.range(), EXISTING_INT_COL_RAW, 42242, 16, false, true, false, 0, true, 0, null, false,
         DataType.INT, 100000);
     long newRangeIndexSize = new SegmentMetadataImpl(INDEX_DIR).getColumnMetadataFor(EXISTING_INT_COL_RAW)
         .getIndexSizeFor(StandardIndexes.range());
@@ -517,48 +484,32 @@ public class SegmentPreProcessorTest implements PinotBuffersAfterClassCheckRule 
   @Test
   public void testEnableDictAndOtherIndexesMV()
       throws Exception {
-    int totalNumberOfEntries = 106688;
-    int cardinality = 18499;
-    // In the test, we are building the segment without dictionary enabled.
-    // Hence, bitsPerElement is calculated based on total docs
-    int bitsPerElement = (int) Math.ceil(Math.log(totalNumberOfEntries) / Math.log(2));
-
     // TEST 1: EXISTING_INT_COL_RAW_MV. Enable dictionary for an MV column. Also enable inverted index and range index.
     buildV3Segment();
     _noDictionaryColumns.remove(EXISTING_INT_COL_RAW_MV);
     _invertedIndexColumns.add(EXISTING_INT_COL_RAW_MV);
     _rangeIndexColumns.add(EXISTING_INT_COL_RAW_MV);
-    // The cardinality is updated after dictionary is enabled during segment preprocessing
-    // But bits per element can only be updated when new segment is built and not during preprocessing
-    checkForwardIndexCreation(EXISTING_INT_COL_RAW_MV, 18499, bitsPerElement, _schema, false,
-        true, false, 0, null, false, 13,
+    checkForwardIndexCreation(EXISTING_INT_COL_RAW_MV, 18499, 15, _schema, false, true, false, 0, null, false, 13,
         DataType.INT, 106688);
-    validateIndex(StandardIndexes.inverted(), EXISTING_INT_COL_RAW_MV, 18499, bitsPerElement, false,
-        true, false, 0, false, 13,
+    validateIndex(StandardIndexes.inverted(), EXISTING_INT_COL_RAW_MV, 18499, 15, false, true, false, 0, false, 13,
         null, false, DataType.INT, 106688);
-    validateIndex(StandardIndexes.range(), EXISTING_INT_COL_RAW_MV, 18499, bitsPerElement, false,
-        true, false, 0, false, 13, null,
+    validateIndex(StandardIndexes.range(), EXISTING_INT_COL_RAW_MV, 18499, 15, false, true, false, 0, false, 13, null,
         false, DataType.INT, 106688);
 
     // TEST 2: EXISTING_INT_COL_RAW_MV. Enable dictionary for an MV column that already has range index.
     resetIndexConfigs();
     _rangeIndexColumns.add(EXISTING_INT_COL_RAW_MV);
     buildV3Segment();
-    // Since dictionary isn't enabled, cardinality = total docs
-    validateIndex(StandardIndexes.forward(), EXISTING_INT_COL_RAW_MV, 106688, bitsPerElement, false,
-        false, false, 0, false, 13,
+    validateIndex(StandardIndexes.forward(), EXISTING_INT_COL_RAW_MV, 18499, 15, false, false, false, 0, false, 13,
         ChunkCompressionType.LZ4, false, DataType.INT, 106688);
-    validateIndex(StandardIndexes.range(), EXISTING_INT_COL_RAW_MV, 106688, bitsPerElement, false,
-        false, false, 0, false, 13,
+    validateIndex(StandardIndexes.range(), EXISTING_INT_COL_RAW_MV, 18499, 15, false, false, false, 0, false, 13,
         ChunkCompressionType.LZ4, false, DataType.INT, 106688);
 
-    // Enable dictionary. When its enabled back, cardinality will be updated to actual cardinality.
+    // Enable dictionary.
     _noDictionaryColumns.remove(EXISTING_INT_COL_RAW_MV);
-    checkForwardIndexCreation(EXISTING_INT_COL_RAW_MV, 18499, bitsPerElement, _schema, false,
-        true, false, 0, null, false, 13,
+    checkForwardIndexCreation(EXISTING_INT_COL_RAW_MV, 18499, 15, _schema, false, true, false, 0, null, false, 13,
         DataType.INT, 106688);
-    validateIndex(StandardIndexes.range(), EXISTING_INT_COL_RAW_MV, 18499, bitsPerElement, false,
-        true, false, 0, false, 13, null,
+    validateIndex(StandardIndexes.range(), EXISTING_INT_COL_RAW_MV, 18499, 15, false, true, false, 0, false, 13, null,
         false, DataType.INT, 106688);
   }
 
@@ -636,94 +587,63 @@ public class SegmentPreProcessorTest implements PinotBuffersAfterClassCheckRule 
   @Test
   public void testDisableDictAndOtherIndexesMV()
       throws Exception {
-    int totalNumberOfEntries = 106688;
-    // In the test, we are building the segment without dictionary enabled.
-    // Hence, bitsPerElement is calculated based on total docs
-    int bitsPerElement = (int) Math.ceil(Math.log(totalNumberOfEntries) / Math.log(2));
-
     // Set up: Enable dictionary on MV column6 and validate.
     buildV3Segment();
     _noDictionaryColumns.remove(EXISTING_INT_COL_RAW_MV);
     _rangeIndexColumns.add(EXISTING_INT_COL_RAW_MV);
-    // The cardinality is updated after dictionary is enabled during segment preprocessing
-    // But bits per element can only be updated when new segment is built and not during preprocessing
-    checkForwardIndexCreation(EXISTING_INT_COL_RAW_MV, 18499, bitsPerElement, _schema, false,
-        true, false, 0, null, false, 13,
+    checkForwardIndexCreation(EXISTING_INT_COL_RAW_MV, 18499, 15, _schema, false, true, false, 0, null, false, 13,
         DataType.INT, 106688);
-    validateIndex(StandardIndexes.range(), EXISTING_INT_COL_RAW_MV, 18499, bitsPerElement, false,
-        true, false, 0, false, 13, null,
+    validateIndex(StandardIndexes.range(), EXISTING_INT_COL_RAW_MV, 18499, 15, false, true, false, 0, false, 13, null,
         false, DataType.INT, 106688);
 
     // TEST 1: Disable dictionary on a column where range index is already enabled.
     _noDictionaryColumns.add(EXISTING_INT_COL_RAW_MV);
-    // Since we're not building segment after disabling dictionary,
-    // cardinality will not change even though dictionary is disabled
-    checkForwardIndexCreation(EXISTING_INT_COL_RAW_MV, 18499, bitsPerElement, _schema, false,
-        false, false, 0, null, false, 13,
+    checkForwardIndexCreation(EXISTING_INT_COL_RAW_MV, 18499, 15, _schema, false, false, false, 0, null, false, 13,
         DataType.INT, 106688);
-    validateIndex(StandardIndexes.range(), EXISTING_INT_COL_RAW_MV, 18499, bitsPerElement, false,
-        false, false, 0, false, 13, null,
+    validateIndex(StandardIndexes.range(), EXISTING_INT_COL_RAW_MV, 18499, 15, false, false, false, 0, false, 13, null,
         false, DataType.INT, 106688);
 
     // TEST 2. Disable dictionary on a column where inverted index is enabled. Should be a no-op.
-    // Since we're not building segment after disabling dictionary,
-    // cardinality will not change even though dictionary is disabled
-    validateIndex(StandardIndexes.forward(), COLUMN7_NAME, 359, 9, false, true,
-        false, 0, false, 24, null, false,
+    validateIndex(StandardIndexes.forward(), COLUMN7_NAME, 359, 9, false, true, false, 0, false, 24, null, false,
         DataType.INT, 134090);
-    validateIndex(StandardIndexes.inverted(), COLUMN7_NAME, 359, 9, false, true,
-        false, 0, false, 24, null, false,
+    validateIndex(StandardIndexes.inverted(), COLUMN7_NAME, 359, 9, false, true, false, 0, false, 24, null, false,
         DataType.INT, 134090);
     _noDictionaryColumns.add(COLUMN7_NAME);
-    checkForwardIndexCreation(COLUMN7_NAME, 359, 9, _schema, false, true,
-        false, 0, null, false, 24, DataType.INT,
+    checkForwardIndexCreation(COLUMN7_NAME, 359, 9, _schema, false, true, false, 0, null, false, 24, DataType.INT,
         134090);
-    validateIndex(StandardIndexes.inverted(), COLUMN7_NAME, 359, 9, false, true,
-        false, 0, false, 24, null, false,
+    validateIndex(StandardIndexes.inverted(), COLUMN7_NAME, 359, 9, false, true, false, 0, false, 24, null, false,
         DataType.INT, 134090);
 
     // TEST 3: Disable dictionary and disable inverted index on column7.
-    // Since we're not building segment after disabling dictionary,
-    // cardinality will not change even though dictionary is disabled
     _invertedIndexColumns.remove(COLUMN7_NAME);
-    checkForwardIndexCreation(COLUMN7_NAME, 359, 9, _schema, false, false,
-        false, 0, null, false, 24, DataType.INT,
+    checkForwardIndexCreation(COLUMN7_NAME, 359, 9, _schema, false, false, false, 0, null, false, 24, DataType.INT,
         134090);
   }
 
   @Test
   public void testForwardIndexHandlerChangeCompression()
       throws Exception {
-    int totalNumberOfEntries = 100000;
-    // In the test, we are building the segment without dictionary enabled.
-    // Hence, bitsPerElement is calculated based on total docs
-    int bitsPerElement = (int) Math.ceil(Math.log(totalNumberOfEntries) / Math.log(2));
-
     // Test1: Rewriting forward index will be a no-op for v1 segments. Default LZ4 compressionType will be retained.
     buildV1Segment();
     _fieldConfigMap.put(EXISTING_STRING_COL_RAW,
         new FieldConfig(EXISTING_STRING_COL_RAW, FieldConfig.EncodingType.RAW, List.of(), CompressionCodec.ZSTANDARD,
             null));
-    checkForwardIndexCreation(EXISTING_STRING_COL_RAW, 100000, bitsPerElement, _schema, false,
-        false, false, 0, ChunkCompressionType.LZ4,
+    checkForwardIndexCreation(EXISTING_STRING_COL_RAW, 5, 3, _schema, false, false, false, 0, ChunkCompressionType.LZ4,
         true, 0, DataType.STRING, 100000);
 
     // Convert the segment to V3.
     convertV1SegmentToV3();
 
     // Test2: Now forward index will be rewritten with ZSTANDARD compressionType.
-    checkForwardIndexCreation(EXISTING_STRING_COL_RAW, 100000, bitsPerElement, _schema, false,
-        false, false, 0,
+    checkForwardIndexCreation(EXISTING_STRING_COL_RAW, 5, 3, _schema, false, false, false, 0,
         ChunkCompressionType.ZSTANDARD, true, 0, DataType.STRING, 100000);
 
     // Test3: Change compression on existing raw index column. Also add text index on same column. Check correctness.
     _fieldConfigMap.put(EXISTING_STRING_COL_RAW,
         new FieldConfig(EXISTING_STRING_COL_RAW, FieldConfig.EncodingType.RAW, List.of(FieldConfig.IndexType.TEXT),
             CompressionCodec.SNAPPY, null));
-    checkTextIndexCreation(EXISTING_STRING_COL_RAW, 100000, bitsPerElement, _schema, false,
-        false, false, 0);
-    validateIndex(StandardIndexes.forward(), EXISTING_STRING_COL_RAW, 100000, bitsPerElement, false,
-        false, false, 0, true, 0,
+    checkTextIndexCreation(EXISTING_STRING_COL_RAW, 5, 3, _schema, false, false, false, 0);
+    validateIndex(StandardIndexes.forward(), EXISTING_STRING_COL_RAW, 5, 3, false, false, false, 0, true, 0,
         ChunkCompressionType.SNAPPY, false, DataType.STRING, 100000);
 
     // Test4: Change compression on RAW index column. Change another index on another column. Check correctness.
@@ -736,19 +656,16 @@ public class SegmentPreProcessorTest implements PinotBuffersAfterClassCheckRule 
         new FieldConfig(EXISTING_STRING_COL_DICT, FieldConfig.EncodingType.DICTIONARY,
             List.of(FieldConfig.IndexType.FST), null, null));
     // Check FST index
-    checkFSTIndexCreation(EXISTING_STRING_COL_DICT, 9, 4, _newColumnsSchemaWithFST, false,
-        false, 26);
+    checkFSTIndexCreation(EXISTING_STRING_COL_DICT, 9, 4, _newColumnsSchemaWithFST, false, false, 26);
     // Check forward index.
-    validateIndex(StandardIndexes.forward(), EXISTING_STRING_COL_RAW, 100000, bitsPerElement, false,
-        false, false, 0, true, 0,
+    validateIndex(StandardIndexes.forward(), EXISTING_STRING_COL_RAW, 5, 3, false, false, false, 0, true, 0,
         ChunkCompressionType.ZSTANDARD, false, DataType.STRING, 100000);
 
     // Test5: Change compressionType for an MV column
     _fieldConfigMap.put(EXISTING_INT_COL_RAW_MV,
         new FieldConfig(EXISTING_INT_COL_RAW_MV, FieldConfig.EncodingType.RAW, List.of(), CompressionCodec.ZSTANDARD,
             null));
-    checkForwardIndexCreation(EXISTING_INT_COL_RAW_MV, 106688, bitsPerElement, _schema, false,
-        false, false, 0,
+    checkForwardIndexCreation(EXISTING_INT_COL_RAW_MV, 18499, 15, _schema, false, false, false, 0,
         ChunkCompressionType.ZSTANDARD, false, 13, DataType.INT, 106688);
   }
 
@@ -787,7 +704,7 @@ public class SegmentPreProcessorTest implements PinotBuffersAfterClassCheckRule 
     _fieldConfigMap.put(EXISTING_STRING_COL_RAW,
         new FieldConfig(EXISTING_STRING_COL_RAW, FieldConfig.EncodingType.RAW, List.of(FieldConfig.IndexType.TEXT),
             null, null));
-    checkTextIndexCreation(EXISTING_STRING_COL_RAW, 100000, 17, _schema, false, false, false, 0);
+    checkTextIndexCreation(EXISTING_STRING_COL_RAW, 5, 3, _schema, false, false, false, 0);
   }
 
   /**
@@ -1184,9 +1101,8 @@ public class SegmentPreProcessorTest implements PinotBuffersAfterClassCheckRule 
     assertEquals(columnMetadata.getFieldSpec(), spec);
     assertTrue(columnMetadata.isAutoGenerated());
     originalColumnMetadata = segmentMetadata.getColumnMetadataFor("column3");
-    // cardinality will be equal to total number of entries as column is not a dict column
-    assertEquals(columnMetadata.getCardinality(), columnMetadata.getTotalNumberOfEntries());
-    assertEquals(columnMetadata.getBitsPerElement(), 17);
+    assertEquals(columnMetadata.getCardinality(), originalColumnMetadata.getCardinality());
+    assertEquals(columnMetadata.getBitsPerElement(), originalColumnMetadata.getBitsPerElement());
     assertEquals(columnMetadata.getTotalNumberOfEntries(), originalColumnMetadata.getTotalNumberOfEntries());
 
     columnMetadata = segmentMetadata.getColumnMetadataFor(NEW_NULL_RETURN_STRING_SV_DIMENSION_COLUMN_NAME);

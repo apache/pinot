@@ -76,6 +76,7 @@ public abstract class AbstractColumnStatisticsCollector implements ColumnStatist
     } else {
       _partitions = null;
     }
+
   }
 
   public int getMaxNumberOfMultiValues() {
