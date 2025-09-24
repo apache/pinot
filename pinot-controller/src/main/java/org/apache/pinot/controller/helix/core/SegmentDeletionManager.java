@@ -75,7 +75,6 @@ public class SegmentDeletionManager {
   private static final SimpleDateFormat RETENTION_DATE_FORMAT;
   private static final String DELIMITER = "/";
 
-  private static final int OBJECT_DELETION_TIMEOUT = 5;
   private static final int NUM_AGED_SEGMENTS_TO_DELETE_PER_ATTEMPT = 100;
 
   static {
@@ -323,11 +322,26 @@ public class SegmentDeletionManager {
       return null;
     }
   }
-
   /**
-   * Removes aged deleted segments from the deleted directory
+   * Removes aged deleted segments from the deleted directory using the default batch size.
+   * This method processes aged segments in batches to avoid overwhelming the system.
+   *
+   * @param leadControllerManager the lead controller manager to check if this controller is the leader for tables
    */
   public void removeAgedDeletedSegments(LeadControllerManager leadControllerManager) {
+    removeAgedDeletedSegments(leadControllerManager, NUM_AGED_SEGMENTS_TO_DELETE_PER_ATTEMPT);
+  }
+
+  /**
+   * Removes aged deleted segments from the deleted directory with a custom batch size.
+   * This method asynchronously deletes segments that have exceeded their retention period.
+   * Only the leader controller for each table will perform the deletion to avoid conflicts.
+   *
+   * @param leadControllerManager the lead controller manager to check if this controller is the leader for tables
+   * @param agedSegmentsDeletionBatchSize the maximum number of aged segments to process in a single batch
+   */
+  public void removeAgedDeletedSegments(LeadControllerManager leadControllerManager,
+      int agedSegmentsDeletionBatchSize) {
     if (_dataDir != null) {
       URI deletedDirURI = URIUtils.getUri(_dataDir, DELETED_SEGMENTS);
       PinotFS pinotFS = PinotFSFactory.create(deletedDirURI.getScheme());
@@ -396,7 +410,7 @@ public class SegmentDeletionManager {
               if (System.currentTimeMillis() >= deletionTimeMs) {
                 numFilesScheduledForDeletion++;
                 targetURIs.add(targetURI);
-                if (numFilesScheduledForDeletion == NUM_AGED_SEGMENTS_TO_DELETE_PER_ATTEMPT) {
+                if (numFilesScheduledForDeletion == agedSegmentsDeletionBatchSize) {
                   LOGGER.info(
                       "Reached threshold of max aged segments to schedule for deletion per attempt. Scheduling "
                           + "deletion of: {} segment files "
