@@ -18,37 +18,46 @@
  */
 package org.apache.pinot.core.operator.query;
 
-import com.google.common.base.Preconditions;
 import java.util.List;
 import java.util.function.IntFunction;
 import java.util.function.Supplier;
 import org.apache.pinot.common.request.context.ExpressionContext;
 import org.apache.pinot.core.common.BlockValSet;
 import org.apache.pinot.core.operator.BaseProjectOperator;
+import org.apache.pinot.core.operator.DocIdOrderedOperator;
 import org.apache.pinot.core.operator.blocks.ValueBlock;
 import org.apache.pinot.core.query.request.context.QueryContext;
 import org.apache.pinot.segment.spi.IndexSegment;
 
 
 /**
- * An operator for order-by queries ASC that are partially sorted over the sorting keys.
+ * The operator used when selecting with order-by on a way that the segment layout can be used to prune results.
+ *
+ * This requires that the first order-by expression is on a column that is sorted in the segment and:
+ * 1. The order-by is ASC
+ * 2. The order-by is DESC and the input operators support descending iteration (e.g. full scan)
+ *
  * @see LinearSelectionOrderByOperator
  */
-public class SelectionPartiallyOrderedByAscOperator extends LinearSelectionOrderByOperator {
+public class SelectionPartiallyOrderedByLinearOperator extends LinearSelectionOrderByOperator {
 
-  private static final String EXPLAIN_NAME = "SELECT_PARTIAL_ORDER_BY_ASC";
+  private static final String EXPLAIN_NAME = "SELECT_PARTIAL_ORDER_BY_LINEAR";
 
   private int _numDocsScanned = 0;
 
-  public SelectionPartiallyOrderedByAscOperator(IndexSegment indexSegment, QueryContext queryContext,
+  public SelectionPartiallyOrderedByLinearOperator(IndexSegment indexSegment, QueryContext queryContext,
       List<ExpressionContext> expressions, BaseProjectOperator<?> projectOperator, int numSortedExpressions) {
     super(indexSegment, queryContext, expressions, projectOperator, numSortedExpressions);
-    Preconditions.checkArgument(queryContext.getOrderByExpressions().stream()
-            .filter(expr -> expr.getExpression().getType() == ExpressionContext.Type.IDENTIFIER)
-            .findFirst()
-            .orElseThrow(() -> new IllegalArgumentException("The query is not order by identifiers"))
-            .isAsc(),
-        "%s can only be used when the first column in order by is ASC", EXPLAIN_NAME);
+    boolean firstColIsAsc = queryContext.getOrderByExpressions().stream()
+        .filter(expr -> expr.getExpression().getType() == ExpressionContext.Type.IDENTIFIER)
+        .findFirst()
+        .orElseThrow(() -> new IllegalArgumentException("The query is not order by identifiers"))
+        .isAsc();
+    DocIdOrderedOperator.DocIdOrder docIdOrder = DocIdOrderedOperator.DocIdOrder.fromAsc(firstColIsAsc);
+    if (!projectOperator.isCompatibleWith(docIdOrder)) {
+      throw new IllegalStateException(EXPLAIN_NAME + " requires the input operator to be compatible with order: "
+          + docIdOrder + ", but found: " + projectOperator.toExplainString());
+    }
   }
 
   @Override
