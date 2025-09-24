@@ -24,13 +24,16 @@ import org.apache.commons.lang3.NotImplementedException;
 import org.apache.pinot.segment.spi.creator.StatsCollectorConfig;
 import org.apache.pinot.spi.utils.BigDecimalUtils;
 import org.apache.pinot.spi.utils.ByteArray;
+import com.dynatrace.hash4j.distinctcount.UltraLogLog;
+import org.apache.pinot.segment.local.utils.UltraLogLogUtils;
+import org.apache.pinot.spi.utils.CommonConstants;
 
 
 /**
  * Column statistics collector for no-dictionary columns that avoids storing unique values and thus reduces memory
  * Behavior:
  * - getUniqueValuesSet() throws NotImplementedException
- * - getCardinality() returns total entries collected
+ * - getCardinality() returns approximate cardinality using ULL
  */
 @SuppressWarnings({"rawtypes", "unchecked"})
 public class NoDictColumnStatisticsCollector extends AbstractColumnStatisticsCollector {
@@ -40,9 +43,12 @@ public class NoDictColumnStatisticsCollector extends AbstractColumnStatisticsCol
   private int _maxLength = -1; // default return value is -1
   private int _maxRowLength = -1; // default return value is -1
   private boolean _sealed = false;
+  private final UltraLogLog _ull;
 
   public NoDictColumnStatisticsCollector(String column, StatsCollectorConfig statsCollectorConfig) {
     super(column, statsCollectorConfig);
+    // Use default p; can be made configurable via StatsCollectorConfig later if needed
+    _ull = UltraLogLog.create(CommonConstants.Helix.DEFAULT_ULTRALOGLOG_P);
   }
 
   @Override
@@ -57,6 +63,7 @@ public class NoDictColumnStatisticsCollector extends AbstractColumnStatisticsCol
           throw new UnsupportedOperationException();
         }
         updateMinMax(value);
+        updateUll(value);
         int len = getValueLength(value);
         _minLength = Math.min(_minLength, len);
         _maxLength = Math.max(_maxLength, len);
@@ -73,24 +80,28 @@ public class NoDictColumnStatisticsCollector extends AbstractColumnStatisticsCol
         int[] values = (int[]) entry;
         for (int value : values) {
           updateMinMax(value);
+          updateUll(value);
         }
         length = values.length;
       } else if (entry instanceof long[]) {
         long[] values = (long[]) entry;
         for (long value : values) {
           updateMinMax(value);
+          updateUll(value);
         }
         length = values.length;
       } else if (entry instanceof float[]) {
         float[] values = (float[]) entry;
         for (float value : values) {
           updateMinMax(value);
+          updateUll(value);
         }
         length = values.length;
       } else {
         double[] values = (double[]) entry;
         for (double value : values) {
           updateMinMax(value);
+          updateUll(value);
         }
         length = values.length;
       }
@@ -99,6 +110,7 @@ public class NoDictColumnStatisticsCollector extends AbstractColumnStatisticsCol
     } else {
       addressSorted(toComparable(entry));
       updateMinMax(entry);
+      updateUll(entry);
       int len = getValueLength(entry);
       _minLength = Math.min(_minLength, len);
       _maxLength = Math.max(_maxLength, len);
@@ -184,11 +196,18 @@ public class NoDictColumnStatisticsCollector extends AbstractColumnStatisticsCol
 
   @Override
   public int getCardinality() {
-    return _totalNumberOfEntries;
+    // Return approximate distinct count estimate
+    long estimate = Math.round(_ull.getDistinctCountEstimate());
+    return estimate >= Integer.MAX_VALUE ? Integer.MAX_VALUE : (int) estimate;
   }
 
   @Override
   public void seal() {
     _sealed = true;
+  }
+
+  private void updateUll(Object value) {
+    // Hash and add to ULL using shared utility to ensure deterministic canonicalization
+    UltraLogLogUtils.hashObject(value).ifPresent(_ull::add);
   }
 }
