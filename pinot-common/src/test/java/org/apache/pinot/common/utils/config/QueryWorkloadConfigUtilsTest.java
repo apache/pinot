@@ -306,10 +306,10 @@ public class QueryWorkloadConfigUtilsTest {
   public Object[][] enforcementProfileValidationProvider() {
     return new Object[][] {
         {null, Arrays.asList("enforcementProfile cannot be null")},
-        {new EnforcementProfile(-1, 100), Arrays.asList("enforcementProfile.cpuCostNs cannot be negative")},
-        {new EnforcementProfile(100, -1), Arrays.asList("enforcementProfile.memoryCostBytes cannot be negative")},
-        {new EnforcementProfile(-1, -1), Arrays.asList("enforcementProfile.cpuCostNs cannot be negative",
-            "enforcementProfile.memoryCostBytes cannot be negative")},
+        {new EnforcementProfile(-1, 100), Arrays.asList("enforcementProfile.cpuCostNs has to positive")},
+        {new EnforcementProfile(100, -1), Arrays.asList("enforcementProfile.memoryCostBytes has to positive")},
+        {new EnforcementProfile(-1, -1), Arrays.asList("enforcementProfile.cpuCostNs has to positive",
+            "enforcementProfile.memoryCostBytes has to positive")},
         {new EnforcementProfile(0, 0), Collections.emptyList()}, // Zero values are allowed
         {new EnforcementProfile(100, 100), Collections.emptyList()}
     };
@@ -392,7 +392,7 @@ public class QueryWorkloadConfigUtilsTest {
     // PropagationEntity with negative CPU cost
     PropagationEntity propagationEntityWithNegativeCpu = new PropagationEntity("test", -1L, 100L, null);
     data.add(new Object[]{Arrays.asList(propagationEntityWithNegativeCpu),
-        Arrays.asList("cpuCostNs cannot be negative")});
+        Arrays.asList("cpuCostNs has to positive")});
 
     // Duplicate propagationEntity IDs
     PropagationEntity entity1 = new PropagationEntity("duplicate", 100L, 100L, null);

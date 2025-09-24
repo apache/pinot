@@ -132,6 +132,8 @@ public class QueryWorkloadManager {
               QueryWorkloadRefreshMessage.REFRESH_QUERY_WORKLOAD_MSG_SUB_TYPE, entry.getValue())));
       instanceToRefreshMessageMap.putAll(nodeToRefreshMessageMap);
       // Sends the message only after all nodeConfigs are processed successfully
+      // TODO: See if we also need to send a delete message message to entities that were previously targeted but
+      //  are no longer targeted by the updated workload config.
       sendQueryWorkloadRefreshMessage(instanceToRefreshMessageMap);
       LOGGER.info("Successfully propagated workload update for: {} to {} instances", queryWorkloadName,
           instanceToRefreshMessageMap.size());
@@ -309,7 +311,7 @@ public class QueryWorkloadManager {
 
     try {
       List<QueryWorkloadConfig> queryWorkloadConfigs = _pinotHelixResourceManager.getAllQueryWorkloadConfigs();
-      if (queryWorkloadConfigs == null || queryWorkloadConfigs.isEmpty()) {
+      if (queryWorkloadConfigs.isEmpty()) {
         LOGGER.warn("No query workload configs found in zookeeper");
         return workloadToInstanceCostMap;
       }

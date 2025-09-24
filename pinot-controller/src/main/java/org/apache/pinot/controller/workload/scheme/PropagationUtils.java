@@ -75,22 +75,9 @@ public class PropagationUtils {
           PinotHelixResourceManager pinotResourceManager) {
     Map<String, Map<NodeConfig.Type, Set<String>>> tableToTags = new HashMap<>();
     List<TableConfig> tableConfigs = pinotResourceManager.getAllTableConfigs();
-    if (tableConfigs == null) {
-      LOGGER.warn("No table configs found, returning empty mapping");
-      return tableToTags;
-    }
     for (TableConfig tableConfig : tableConfigs) {
-      if (tableConfig == null) {
-        LOGGER.warn("Skipping null table config");
-        continue;
-      }
       TenantConfig tenantConfig = tableConfig.getTenantConfig();
       TableType tableType = tableConfig.getTableType();
-      if (tenantConfig == null || tableType == null) {
-        LOGGER.warn("Skipping table config with null tenant config or table type: {}", tableConfig.getTableName());
-        continue;
-      }
-
       // Gather all relevant tags for this tenant
       List<String> tenantTags = new ArrayList<>();
       try {
@@ -173,7 +160,7 @@ public class PropagationUtils {
     for (String table : tablesWithType) {
       try {
         TableConfig tableConfig = pinotResourceManager.getTableConfig(table);
-        if (tableConfig != null && tableConfig.getTenantConfig() != null && tableConfig.getTableType() != null) {
+        if (tableConfig != null) {
           collectHelixTagsForTable(combinedTags, tableConfig.getTenantConfig(), tableConfig.getTableType());
         }
       } catch (Exception e) {
@@ -193,23 +180,12 @@ public class PropagationUtils {
     Map<String, Set<String>> tagToInstances = new HashMap<>();
     try {
       List<InstanceConfig> instanceConfigs = pinotResourceManager.getAllHelixInstanceConfigs();
-      if (instanceConfigs == null) {
-        LOGGER.warn("No instance configs found, returning empty mapping");
-        return tagToInstances;
-      }
-
       for (InstanceConfig instanceConfig : instanceConfigs) {
-        if (instanceConfig == null) {
-          LOGGER.warn("Skipping null instance config");
-          continue;
-        }
         String instanceName = instanceConfig.getInstanceName();
         List<String> tags = instanceConfig.getTags();
-        if (tags != null) {
-          for (String helixTag : tags) {
-            if (helixTag != null && !helixTag.trim().isEmpty()) {
-              tagToInstances.computeIfAbsent(helixTag, tag -> new HashSet<>()).add(instanceName);
-            }
+        for (String helixTag : tags) {
+          if (!helixTag.trim().isEmpty()) {
+            tagToInstances.computeIfAbsent(helixTag, tag -> new HashSet<>()).add(instanceName);
           }
         }
       }
@@ -256,7 +232,7 @@ public class PropagationUtils {
     for (QueryWorkloadConfig queryWorkloadConfig : queryWorkloadConfigs) {
       for (NodeConfig nodeConfig : queryWorkloadConfig.getNodeConfigs()) {
         PropagationScheme scheme = nodeConfig.getPropagationScheme();
-        List<String> topLevelIds = getTopLevelCostIds(scheme);
+        List<String> topLevelIds = getAllPropagationEntitiesId(scheme);
         if (scheme.getPropagationType() == PropagationScheme.Type.TENANT) {
           for (String tenant : topLevelIds) {
             Set<String> resolvedTags = TagNameUtils.isOfflineServerTag(tenant)
@@ -308,20 +284,18 @@ public class PropagationUtils {
   }
 
   /**
-   * Extracts all top-level cost IDs from the given propagation scheme.
+   * Extracts all propagation entity IDs from the given propagation scheme.
    *
    * @param propagationScheme The propagation scheme containing cost splits.
-   * @return A list of top-level cost IDs (non-null).
+   * @return A list of top-level cost IDs.
    */
-  private static List<String> getTopLevelCostIds(PropagationScheme propagationScheme) {
-    List<String> topLevelCostIds = new ArrayList<>();
+  private static List<String> getAllPropagationEntitiesId(PropagationScheme propagationScheme) {
+    List<String> propagationEntityIds = new ArrayList<>();
     for (PropagationEntity propagationEntity : propagationScheme.getPropagationEntities()) {
       String propagationEntityId = propagationEntity.getEntity();
-      if (propagationEntityId != null) {
-        topLevelCostIds.add(propagationEntityId);
-      }
+      propagationEntityIds.add(propagationEntityId);
     }
-    return topLevelCostIds;
+    return propagationEntityIds;
   }
 
   /**

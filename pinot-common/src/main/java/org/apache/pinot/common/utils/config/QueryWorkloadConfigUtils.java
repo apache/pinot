@@ -217,11 +217,11 @@ public class QueryWorkloadConfigUtils {
         } else {
           long enforcementCpu = enforcementProfile.getCpuCostNs();
           long enforcementMem = enforcementProfile.getMemoryCostBytes();
-           if (enforcementCpu < 0) {
-             errors.add(prefix + ".enforcementProfile.cpuCostNs cannot be negative");
+           if (enforcementCpu <= 0) {
+             errors.add(prefix + ".enforcementProfile.cpuCostNs has to positive");
            }
-           if (enforcementMem < 0) {
-             errors.add(prefix + ".enforcementProfile.memoryCostBytes cannot be negative");
+           if (enforcementMem <= 0) {
+             errors.add(prefix + ".enforcementProfile.memoryCostBytes has to positive");
            }
           // Validate PropagationScheme
           PropagationScheme propagationScheme = nodeConfig.getPropagationScheme();
@@ -250,7 +250,7 @@ public class QueryWorkloadConfigUtils {
    * <ul>
    *   <li>Ensures the list is non-null and non-empty</li>
    *   <li>Checks for duplicate propagationEntity IDs</li>
-   *   <li>Validates cpuCostNs and memoryCostBytes for non-null/non-negative values</li>
+   *   <li>Validates cpuCostNs and memoryCostBytes for non-null/positive values</li>
    *   <li>Ensures consistency in cost definitions across all entities (either all or none define costs)</li>
    *   <li>Validates that total costs do not exceed provided limits (if any)</li>
    *   <li>Validates any overrides within each entity for the same cost rules</li>
@@ -305,7 +305,7 @@ public class QueryWorkloadConfigUtils {
     }
     validateLimits(totalCpu, totalMem, limitCpu, limitMem, prefix, errors);
     // If no errors and all entities have empty costs, rewrite to evenly distribute enforcementProfile costs
-    if (errors.isEmpty() && definedCount == 0 && emptyCount == entities.size()) {
+    if (errors.isEmpty() && definedCount == 0) {
       rewriteEmptyCosts(entities, limitCpu, limitMem);
     }
   }
@@ -372,10 +372,10 @@ public class QueryWorkloadConfigUtils {
       errors.add(prefix + "." + field + " cannot be null");
       return 0L;
     }
-    if (value < 0) {
-      errors.add(prefix + "." + field + " cannot be negative, got: " + value);
+    if (value <= 0) {
+      errors.add(prefix + "." + field + " has to positive, got: " + value);
       return 0L;
     }
-    return value > 0 ? value : 0L;
+    return value;
   }
 }
