@@ -658,7 +658,7 @@ public abstract class BaseControllerStarter implements ServiceStartable {
     });
 
     // Register audit services binder
-    _adminApp.registerBinder(new AuditServiceBinder(_clusterConfigChangeHandler, getServiceRole()));
+    _adminApp.registerBinder(new AuditServiceBinder(_clusterConfigChangeHandler, getServiceRole(), _controllerMetrics));
 
     LOGGER.info("Starting controller admin application on: {}", ListenerConfigUtil.toString(_listenerConfigs));
     _adminApp.start(_listenerConfigs, _controllerMetrics);

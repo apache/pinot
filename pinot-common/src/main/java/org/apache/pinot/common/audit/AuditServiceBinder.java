@@ -18,7 +18,9 @@
  */
 package org.apache.pinot.common.audit;
 
+import javax.inject.Singleton;
 import org.apache.pinot.common.config.DefaultClusterConfigChangeHandler;
+import org.apache.pinot.common.metrics.AbstractMetrics;
 import org.apache.pinot.spi.services.ServiceRole;
 import org.glassfish.hk2.utilities.binding.AbstractBinder;
 
@@ -30,23 +32,29 @@ import org.glassfish.hk2.utilities.binding.AbstractBinder;
 public class AuditServiceBinder extends AbstractBinder {
   private final DefaultClusterConfigChangeHandler _clusterConfigChangeHandler;
   private final ServiceRole _serviceRole;
+  private final AbstractMetrics<?, ?, ?, ?> _componentMetrics;
 
-  public AuditServiceBinder(DefaultClusterConfigChangeHandler clusterConfigChangeHandler, ServiceRole serviceRole) {
+  public AuditServiceBinder(DefaultClusterConfigChangeHandler clusterConfigChangeHandler, ServiceRole serviceRole,
+      AbstractMetrics<?, ?, ?, ?> componentMetrics) {
     _clusterConfigChangeHandler = clusterConfigChangeHandler;
     _serviceRole = serviceRole;
+    _componentMetrics = componentMetrics;
   }
 
   @Override
   protected void configure() {
-    // Create and initialize AuditConfigManager
+    bind(_componentMetrics).to(AbstractMetrics.class);
+    bind(_serviceRole).to(ServiceRole.class);
+
     AuditConfigManager auditConfigManager = new AuditConfigManager(_serviceRole);
 
     // Register with cluster config change handler
     _clusterConfigChangeHandler.registerClusterConfigChangeListener(auditConfigManager);
     bind(auditConfigManager).to(AuditConfigManager.class);
 
-    bindAsContract(AuditIdentityResolver.class);
-    bindAsContract(AuditRequestProcessor.class);
-    bindAsContract(AuditUrlPathFilter.class);
+    bindAsContract(AuditMetrics.class).in(Singleton.class);
+    bindAsContract(AuditIdentityResolver.class).in(Singleton.class);
+    bindAsContract(AuditRequestProcessor.class).in(Singleton.class);
+    bindAsContract(AuditUrlPathFilter.class).in(Singleton.class);
   }
 }

@@ -34,7 +34,10 @@ public enum ControllerTimer implements AbstractMetrics.Timer {
   // Time taken to read the segment from deep store
   DEEP_STORE_SEGMENT_READ_TIME_MS("deepStoreSegmentReadTimeMs", true),
   // Time taken to write the segment to deep store
-  DEEP_STORE_SEGMENT_WRITE_TIME_MS("deepStoreSegmentWriteTimeMs", true);
+  DEEP_STORE_SEGMENT_WRITE_TIME_MS("deepStoreSegmentWriteTimeMs", true),
+  // Audit logging timers
+  AUDIT_REQUEST_PROCESSING_TIME("auditRequestProcessingTime", true),
+  AUDIT_RESPONSE_PROCESSING_TIME("auditResponseProcessingTime", true);
 
 
   private final String _timerName;
