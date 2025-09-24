@@ -142,6 +142,10 @@ public class QueryOptionsUtils {
     return Boolean.parseBoolean(queryOptions.get(QueryOptionKey.SKIP_UPSERT_VIEW));
   }
 
+  public static boolean isTraceRuleProductions(Map<String, String> queryOptions) {
+    return Boolean.parseBoolean(queryOptions.get(QueryOptionKey.TRACE_RULE_PRODUCTIONS));
+  }
+
   public static long getUpsertViewFreshnessMs(Map<String, String> queryOptions) {
     String freshnessMsString = queryOptions.get(QueryOptionKey.UPSERT_VIEW_FRESHNESS_MS);
     return freshnessMsString != null ? Long.parseLong(freshnessMsString) : -1; //can blow up with NFE
@@ -157,6 +161,11 @@ public class QueryOptionsUtils {
 
   public static boolean isSkipScanFilterReorder(Map<String, String> queryOptions) {
     return "false".equalsIgnoreCase(queryOptions.get(QueryOptionKey.USE_SCAN_REORDER_OPTIMIZATION));
+  }
+
+  public static boolean isCollectGcStats(Map<String, String> queryOptions) {
+    // Disabled by default
+    return Boolean.parseBoolean(queryOptions.get(QueryOptionKey.COLLECT_GC_STATS));
   }
 
   @Nullable
@@ -338,11 +347,6 @@ public class QueryOptionsUtils {
   }
 
   @Nullable
-  public static String getOrderByAlgorithm(Map<String, String> queryOptions) {
-    return queryOptions.get(QueryOptionKey.ORDER_BY_ALGORITHM);
-  }
-
-  @Nullable
   public static Integer getMultiStageLeafLimit(Map<String, String> queryOptions) {
     String maxLeafLimitStr = queryOptions.get(QueryOptionKey.MULTI_STAGE_LEAF_LIMIT);
     return checkedParseIntNonNegative(QueryOptionKey.MULTI_STAGE_LEAF_LIMIT, maxLeafLimitStr);
@@ -390,6 +394,20 @@ public class QueryOptionsUtils {
   }
 
   @Nullable
+  public static Integer getSortAggregateLimitThreshold(Map<String, String> queryOptions) {
+    String sortAggregateLimitThreshold = queryOptions.get(QueryOptionKey.SORT_AGGREGATE_LIMIT_THRESHOLD);
+    return checkedParseIntPositive(QueryOptionKey.SORT_AGGREGATE_LIMIT_THRESHOLD, sortAggregateLimitThreshold);
+  }
+
+  @Nullable
+  public static Integer getSortAggregateSequentialCombineNumSegmentsThreshold(Map<String, String> queryOptions) {
+    String sortAggregateSingleThreadedNumSegmentsThreshold =
+        queryOptions.get(QueryOptionKey.SORT_AGGREGATE_SINGLE_THREADED_NUM_SEGMENTS_THRESHOLD);
+    return checkedParseIntPositive(QueryOptionKey.SORT_AGGREGATE_SINGLE_THREADED_NUM_SEGMENTS_THRESHOLD,
+        sortAggregateSingleThreadedNumSegmentsThreshold);
+  }
+
+  @Nullable
   public static Integer getMaxStreamingPendingBlocks(Map<String, String> queryOptions) {
     String maxStreamingPendingBlocks = queryOptions.get(QueryOptionKey.MAX_STREAMING_PENDING_BLOCKS);
     return checkedParseIntPositive(QueryOptionKey.MAX_STREAMING_PENDING_BLOCKS, maxStreamingPendingBlocks);
@@ -421,6 +439,10 @@ public class QueryOptionsUtils {
 
   public static boolean isSkipUnavailableServers(Map<String, String> queryOptions) {
     return Boolean.parseBoolean(queryOptions.get(QueryOptionKey.SKIP_UNAVAILABLE_SERVERS));
+  }
+
+  public static boolean isIgnoreMissingSegments(Map<String, String> queryOptions) {
+    return Boolean.parseBoolean(queryOptions.get(QueryOptionKey.IGNORE_MISSING_SEGMENTS));
   }
 
   public static boolean isSecondaryWorkload(Map<String, String> queryOptions) {
@@ -469,9 +491,15 @@ public class QueryOptionsUtils {
     return option != null ? Boolean.parseBoolean(option) : defaultValue;
   }
 
-  public static int getLiteModeServerStageLimit(Map<String, String> queryOptions, int defaultValue) {
-    String option = queryOptions.get(QueryOptionKey.LITE_MODE_SERVER_STAGE_LIMIT);
-    return option != null ? checkedParseIntPositive(QueryOptionKey.LITE_MODE_SERVER_STAGE_LIMIT, option) : defaultValue;
+  public static Integer getLiteModeLeafStageLimit(Map<String, String> queryOptions, int defaultValue) {
+    String option = queryOptions.get(QueryOptionKey.LITE_MODE_LEAF_STAGE_LIMIT);
+    return option != null ? checkedParseIntPositive(QueryOptionKey.LITE_MODE_LEAF_STAGE_LIMIT, option) : defaultValue;
+  }
+
+  public static Integer getLiteModeLeafStageFanOutAdjustedLimit(Map<String, String> queryOptions, int defaultValue) {
+    String option = queryOptions.get(QueryOptionKey.LITE_MODE_LEAF_STAGE_FANOUT_ADJUSTED_LIMIT);
+    return option != null ? checkedParseIntPositive(QueryOptionKey.LITE_MODE_LEAF_STAGE_FANOUT_ADJUSTED_LIMIT, option)
+        : defaultValue;
   }
 
   @Nullable
@@ -548,5 +576,13 @@ public class QueryOptionsUtils {
 
   public static String getWorkloadName(Map<String, String> queryOptions) {
     return queryOptions.getOrDefault(QueryOptionKey.WORKLOAD_NAME, CommonConstants.Accounting.DEFAULT_WORKLOAD_NAME);
+  }
+
+  public static boolean isReverseOrderAllowed(Map<String, String> queryOptions) {
+    String value = queryOptions.get(QueryOptionKey.ALLOW_REVERSE_ORDER);
+    if (value == null) {
+      return QueryOptionKey.DEFAULT_ALLOW_REVERSE_ORDER;
+    }
+    return Boolean.parseBoolean(value);
   }
 }

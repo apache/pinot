@@ -24,7 +24,6 @@ import java.util.Map;
 import org.apache.commons.io.FileUtils;
 import org.apache.pinot.common.metadata.segment.SegmentZKMetadataCustomMapModifier;
 import org.apache.pinot.common.metrics.MinionMeter;
-import org.apache.pinot.common.restlet.resources.ValidDocIdsType;
 import org.apache.pinot.core.common.MinionConstants;
 import org.apache.pinot.core.common.MinionConstants.UpsertCompactionTask;
 import org.apache.pinot.core.minion.PinotTaskConfig;
@@ -61,8 +60,8 @@ public class UpsertCompactionTaskExecutor extends BaseSingleSegmentConversionExe
     String tableNameWithType = configs.get(MinionConstants.TABLE_NAME_KEY);
     TableConfig tableConfig = getTableConfig(tableNameWithType);
 
-    String validDocIdsTypeStr =
-        configs.getOrDefault(UpsertCompactionTask.VALID_DOC_IDS_TYPE, ValidDocIdsType.SNAPSHOT.name());
+    String validDocIdsTypeStr = MinionTaskUtils.getValidDocIdsType(tableConfig.getUpsertConfig(), configs,
+        UpsertCompactionTask.VALID_DOC_IDS_TYPE).toString();
     SegmentMetadataImpl segmentMetadata = new SegmentMetadataImpl(indexDir);
     String originalSegmentCrcFromTaskGenerator = configs.get(MinionConstants.ORIGINAL_SEGMENT_CRC_KEY);
     String crcFromDeepStorageSegment = segmentMetadata.getCrc();

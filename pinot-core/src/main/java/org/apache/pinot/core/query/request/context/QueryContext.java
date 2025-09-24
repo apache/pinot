@@ -134,6 +134,11 @@ public class QueryContext {
   private int _numThreadsExtractFinalResult = InstancePlanMakerImplV2.DEFAULT_NUM_THREADS_EXTRACT_FINAL_RESULT;
   // Parallel chunk size for final reduce
   private int _chunkSizeExtractFinalResult = InstancePlanMakerImplV2.DEFAULT_CHUNK_SIZE_EXTRACT_FINAL_RESULT;
+  // Threshold to use sort aggregate for safeTrim case when LIMIT is below this
+  private int _sortAggregateLimitThreshold = Server.DEFAULT_SORT_AGGREGATE_LIMIT_THRESHOLD;
+  // Threshold of number of segments to combine to use single-threaded sequential combine instead pair-wise
+  private int _sortAggregateSequentialCombineNumSegmentsThreshold =
+      Server.DEFAULT_SORT_AGGREGATE_SEQUENTIAL_COMBINE_NUM_SEGMENTS_THRESHOLD;
   // Segment trim size for group by operator
   private int _effectiveSegmentGroupTrimSize;
   // Whether null handling is enabled
@@ -445,6 +450,10 @@ public class QueryContext {
     _effectiveSegmentGroupTrimSize = calculateEffectiveSegmentGroupTrimSize();
   }
 
+  public void setEffectiveSegmentGroupTrimSize(int effectiveSegmentGroupTrimSize) {
+    _effectiveSegmentGroupTrimSize = effectiveSegmentGroupTrimSize;
+  }
+
   public int getMinServerGroupTrimSize() {
     return _minServerGroupTrimSize;
   }
@@ -510,6 +519,24 @@ public class QueryContext {
     _serverReturnFinalResultKeyUnpartitioned = serverReturnFinalResultKeyUnpartitioned;
   }
 
+  public void setSortAggregateLimitThreshold(int sortAggregateLimitThreshold) {
+    _sortAggregateLimitThreshold = sortAggregateLimitThreshold;
+  }
+
+  public int getSortAggregateLimitThreshold() {
+    return _sortAggregateLimitThreshold;
+  }
+
+  public void setSortAggregateSequentialCombineNumSegmentsThreshold(
+      int sortAggregateSequentialCombineNumSegmentsThreshold) {
+    _sortAggregateSequentialCombineNumSegmentsThreshold =
+        sortAggregateSequentialCombineNumSegmentsThreshold;
+  }
+
+  public int getSortAggregateSequentialCombineNumSegmentsThreshold() {
+    return _sortAggregateSequentialCombineNumSegmentsThreshold;
+  }
+
   /**
    * Gets or computes a value of type {@code V} associated with a key of type {@code K} so that it can be shared
    * within the scope of a query.
@@ -531,7 +558,7 @@ public class QueryContext {
   private int calculateEffectiveSegmentGroupTrimSize() {
     int minGroupTrimSize = getMinSegmentGroupTrimSize();
     List<OrderByExpressionContext> orderByExpressions = getOrderByExpressions();
-    if (!isUnsafeTrim() && !hasFilteredAggregations()) {
+    if (!isUnsafeTrim()) {
       // if orderby key is groupby key, and there's no having clause, and there's no filtered aggr,
       // keep at most `limit` rows only
       return getLimit();
@@ -571,6 +598,18 @@ public class QueryContext {
 
   public boolean isUnsafeTrim() {
     return _isUnsafeTrim;
+  }
+
+  /**
+   * do sort aggregate when is safeTrim (order by group keys with no having clause)
+   * and limit is smaller than threshold
+   * TODO: we also want to do sort aggregate under order by group key with having case,
+   *   in this case we can check if the calculated Server trimSize is < sortAggregateLimitThreshold
+   *   if so, we do sort aggregate and trim to trimSize during combine.
+   *   This requires extracting Server trimSize calculation logic into QueryContext as pre-req
+   */
+  public boolean shouldSortAggregateUnderSafeTrim() {
+    return !isUnsafeTrim() && getLimit() < getSortAggregateLimitThreshold();
   }
 
   public static class Builder {
@@ -692,8 +731,26 @@ public class QueryContext {
       generateAggregationFunctions(queryContext);
       extractColumns(queryContext);
 
-      queryContext._isUnsafeTrim =
-          !queryContext.isSameOrderAndGroupByColumns(queryContext) || queryContext.getHavingFilter() != null;
+      // Pre-calculate group-by configs
+      if (queryContext.getGroupByExpressions() != null) {
+        queryContext._isUnsafeTrim =
+            !queryContext.isSameOrderAndGroupByColumns(queryContext) || queryContext.getHavingFilter() != null;
+        Integer sortAggregateLimitThreshold = QueryOptionsUtils.getSortAggregateLimitThreshold(_queryOptions);
+        if (sortAggregateLimitThreshold != null) {
+          queryContext.setSortAggregateLimitThreshold(sortAggregateLimitThreshold);
+        }
+        queryContext.setEffectiveSegmentGroupTrimSize(queryContext.calculateEffectiveSegmentGroupTrimSize());
+
+        // sortAggregateSequentialCombineNumSegmentsThreshold is defaulted to hardware concurrency
+        // if not specified. this allows one more parallel thread (the main thread) to do only combine
+        // while other worker threads process segments
+        Integer sortAggregateSequentialCombineNumSegmentsThreshold =
+            QueryOptionsUtils.getSortAggregateSequentialCombineNumSegmentsThreshold(_queryOptions);
+        if (sortAggregateSequentialCombineNumSegmentsThreshold != null) {
+          queryContext.setSortAggregateSequentialCombineNumSegmentsThreshold(
+              sortAggregateSequentialCombineNumSegmentsThreshold);
+        }
+      }
 
       return queryContext;
     }

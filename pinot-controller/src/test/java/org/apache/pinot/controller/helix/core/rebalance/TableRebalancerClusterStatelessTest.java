@@ -657,6 +657,31 @@ public class TableRebalancerClusterStatelessTest extends ControllerTest {
       assertNull(rebalanceResult.getRebalanceSummaryResult());
       assertNull(rebalanceResult.getPreChecksResult());
 
+      // Try pre-checks mode with disableSummary set - this should work and summary should still be returned
+      rebalanceConfig = new RebalanceConfig();
+      rebalanceConfig.setPreChecks(true);
+      rebalanceConfig.setDryRun(true);
+      rebalanceConfig.setDisableSummary(true);
+      rebalanceResult = tableRebalancer.rebalance(tableConfig, rebalanceConfig, null);
+      assertEquals(rebalanceResult.getStatus(), RebalanceResult.Status.NO_OP);
+      assertNotNull(rebalanceResult.getRebalanceSummaryResult());
+      assertNotNull(rebalanceResult.getPreChecksResult());
+
+      // Try dry-run mode with disableSummary set - this should work and summary should not be returned
+      rebalanceConfig = new RebalanceConfig();
+      rebalanceConfig.setDryRun(true);
+      rebalanceConfig.setDisableSummary(true);
+      rebalanceResult = tableRebalancer.rebalance(tableConfig, rebalanceConfig, null);
+      assertEquals(rebalanceResult.getStatus(), RebalanceResult.Status.NO_OP);
+      assertNull(rebalanceResult.getRebalanceSummaryResult());
+
+      // Try rebalance with disableSummary set - this should work and summary should not be returned
+      rebalanceConfig = new RebalanceConfig();
+      rebalanceConfig.setDisableSummary(true);
+      rebalanceResult = tableRebalancer.rebalance(tableConfig, rebalanceConfig, null);
+      assertEquals(rebalanceResult.getStatus(), RebalanceResult.Status.NO_OP);
+      assertNull(rebalanceResult.getRebalanceSummaryResult());
+
       _helixResourceManager.deleteOfflineTable(RAW_TABLE_NAME);
 
       for (int i = 0; i < numServers; i++) {
@@ -2223,7 +2248,7 @@ public class TableRebalancerClusterStatelessTest extends ControllerTest {
     assertEquals(consumingSegmentToBeMovedSummary.getNumConsumingSegmentsToBeMoved(),
         FakeStreamConfigUtils.DEFAULT_NUM_PARTITIONS * numReplica);
     assertEquals(consumingSegmentToBeMovedSummary.getNumServersGettingConsumingSegmentsAdded(), numServers);
-    Iterator<Integer> offsetToCatchUpIterator =
+    Iterator<Long> offsetToCatchUpIterator =
         consumingSegmentToBeMovedSummary.getConsumingSegmentsToBeMovedWithMostOffsetsToCatchUp().values().iterator();
     assertEquals(offsetToCatchUpIterator.next(), mockOffsetBig);
     if (FakeStreamConfigUtils.DEFAULT_NUM_PARTITIONS > 1) {

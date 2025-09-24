@@ -63,7 +63,7 @@ public class BlockListMultiStageOperator extends MultiStageOperator {
   }
 
   @Override
-  public void registerExecution(long time, int numRows) {
+  public void registerExecution(long time, int numRows, long memoryUsedBytes, long gcTimeMs) {
     _statMap.merge(LiteralValueOperator.StatKey.EXECUTION_TIME_MS, time);
     _statMap.merge(LiteralValueOperator.StatKey.EMITTED_ROWS, numRows);
   }

@@ -229,6 +229,7 @@ public class PulsarConsumerTest {
           consumer.fetchMessages(new MessageIdStreamOffset(startMessageId), CONSUMER_FETCH_TIMEOUT_MILLIS);
       int messageCount = messageBatch.getMessageCount();
       assertFalse(messageBatch.isEndOfPartitionGroup());
+      assertTrue(messageBatch.getSizeInBytes() > 0);
       for (int i = 0; i < messageCount; i++) {
         verifyMessage(messageBatch.getStreamMessage(i), numMessagesFetched + i, messageIds);
       }

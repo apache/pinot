@@ -24,6 +24,7 @@ import java.io.File;
 import java.io.FileWriter;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Collection;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -35,7 +36,6 @@ import java.util.Set;
 import java.util.stream.Collectors;
 import org.apache.avro.Schema;
 import org.apache.avro.file.DataFileReader;
-import org.apache.avro.generic.GenericData;
 import org.apache.avro.generic.GenericDatumReader;
 import org.apache.avro.generic.GenericRecord;
 import org.apache.commons.lang3.StringUtils;
@@ -255,13 +255,30 @@ public class QueryGenerator {
             Integer storedMaxNumElements = _multiValueColumnMaxNumElements.get(columnName);
             if (storedMaxNumElements != null) {
               // Multi-value column
-              GenericData.Array array = (GenericData.Array) avroValue;
-              int numElements = array.size();
-              if (storedMaxNumElements < numElements) {
-                _multiValueColumnMaxNumElements.put(columnName, numElements);
-              }
-              for (Object element : array) {
-                storeAvroValueIntoValueSet(values, element);
+              if (avroValue instanceof Collection) {
+                Collection<?> collection = (Collection<?>) avroValue;
+                int numElements = collection.size();
+                if (storedMaxNumElements < numElements) {
+                  _multiValueColumnMaxNumElements.put(columnName, numElements);
+                }
+                for (Object element : collection) {
+                  storeAvroValueIntoValueSet(values, element);
+                }
+              } else if (avroValue instanceof Iterable) {
+                List<Object> elements = new ArrayList<>();
+                for (Object element : (Iterable<?>) avroValue) {
+                  elements.add(element);
+                }
+                int numElements = elements.size();
+                if (storedMaxNumElements < numElements) {
+                  _multiValueColumnMaxNumElements.put(columnName, numElements);
+                }
+                for (Object element : elements) {
+                  storeAvroValueIntoValueSet(values, element);
+                }
+              } else {
+                // Fallback: treat it as single value
+                storeAvroValueIntoValueSet(values, avroValue);
               }
             } else {
               // Single-value column
@@ -377,16 +394,20 @@ public class QueryGenerator {
 
   public interface Query {
 
-    @Language("sql") String generatePinotQuery();
+    @Language("sql")
+    String generatePinotQuery();
 
-    @Language("sql") String generateH2Query();
+    @Language("sql")
+    String generateH2Query();
   }
 
   private interface QueryFragment {
 
-    @Language("sql") String generatePinotQuery();
+    @Language("sql")
+    String generatePinotQuery();
 
-    @Language("sql") String generateH2Query();
+    @Language("sql")
+    String generateH2Query();
   }
 
   /**
@@ -1028,8 +1049,11 @@ public class QueryGenerator {
         int indexToReplaceWithRegex = 1 + _random.nextInt(value.length() - 2);
         String regex = value.substring(1, indexToReplaceWithRegex) + ".*" + value.substring(indexToReplaceWithRegex + 1,
             value.length() - 1);
-        String regexpPredicate = String.format(" REGEXP_LIKE(%s, '%s')", columnName, regex);
-        String h2RegexpPredicate = String.format(" REGEXP_LIKE(`%s`, '%s', 'i')", columnName, regex);
+        boolean caseSensitive = _random.nextBoolean();
+        String regexpPredicate =
+            String.format(" REGEXP_LIKE(%s, '%s', '%s')", columnName, regex, caseSensitive ? "c" : "i");
+        String h2RegexpPredicate =
+            String.format(" REGEXP_LIKE(`%s`, '%s', '%s')", columnName, regex, caseSensitive ? "c" : "i");
         return new StringQueryFragment(regexpPredicate, h2RegexpPredicate);
       } else {
         String equalsPredicate = String.format("%s = %s", columnName, value);

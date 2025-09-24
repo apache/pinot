@@ -509,11 +509,20 @@ public class PinotTableRestletResource {
     }
     Map<String, Map<String, String>> taskTypeConfigsMap = tableConfig.getTaskConfig().getTaskTypeConfigsMap();
     Set<String> taskTypes = taskTypeConfigsMap.keySet();
+    boolean tableConfigChanged = false;
     for (String taskType : taskTypes) {
       // remove the task schedules to avoid task being scheduled during table deletion
-      taskTypeConfigsMap.get(taskType).remove(PinotTaskManager.SCHEDULE_KEY);
+      tableConfigChanged =
+          tableConfigChanged || taskTypeConfigsMap.get(taskType).remove(PinotTaskManager.SCHEDULE_KEY) != null;
     }
-    pinotHelixResourceManager.updateTableConfig(tableConfig);
+    if (tableConfigChanged) {
+      try {
+        pinotHelixResourceManager.updateTableConfig(tableConfig);
+      } catch (Exception e) {
+        LOGGER.warn("Unable to remove the task schedules, going ahead with table deletion anyways. "
+            + "Reason for failure : {}", e.getMessage());
+      }
+    }
     List<String> pendingTasks = new ArrayList<>();
     for (String taskType : taskTypes) {
       Map<String, TaskState> taskStates;
@@ -704,6 +713,8 @@ public class PinotTableRestletResource {
       boolean dryRun,
       @ApiParam(value = "Whether to enable pre-checks for table, must be in dry-run mode to enable")
       @DefaultValue("false") @QueryParam("preChecks") boolean preChecks,
+      @ApiParam(value = "Whether to disable summary calculation")
+      @DefaultValue("false") @QueryParam("disableSummary") boolean disableSummary,
       @ApiParam(value = "Whether to reassign instances before reassigning segments") @DefaultValue("true")
       @QueryParam("reassignInstances") boolean reassignInstances,
       @ApiParam(value = "Whether to reassign CONSUMING segments for real-time table") @DefaultValue("true")
@@ -781,6 +792,7 @@ public class PinotTableRestletResource {
     RebalanceConfig rebalanceConfig = new RebalanceConfig();
     rebalanceConfig.setDryRun(dryRun);
     rebalanceConfig.setPreChecks(preChecks);
+    rebalanceConfig.setDisableSummary(disableSummary);
     rebalanceConfig.setReassignInstances(reassignInstances);
     rebalanceConfig.setIncludeConsuming(includeConsuming);
     rebalanceConfig.setMinimizeDataMovement(minimizeDataMovement);

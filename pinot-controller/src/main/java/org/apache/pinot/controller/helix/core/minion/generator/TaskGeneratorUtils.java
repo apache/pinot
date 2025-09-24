@@ -33,9 +33,13 @@ import org.apache.pinot.core.minion.PinotTaskConfig;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.TableTaskConfig;
 import org.apache.pinot.spi.utils.CommonConstants;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 
 public class TaskGeneratorUtils {
+  private static final Logger LOGGER = LoggerFactory.getLogger(TaskGeneratorUtils.class);
+
   private TaskGeneratorUtils() {
   }
 
@@ -124,5 +128,71 @@ public class TaskGeneratorUtils {
       }
     }
     return CommonConstants.Helix.UNTAGGED_MINION_INSTANCE;
+  }
+
+  /**
+   * Generic method to get configuration values from ZK cluster config with fallback hierarchy:
+   * 1. Check minion tenant specific config (if minionTag provided)
+   * 2. Check task type specific config
+   * 3. Return default value
+   *
+   * @param taskType The task type to build config keys
+   * @param configKeySuffix The suffix to append to task type for config key
+   * @param minionTag The minion tag for tenant-specific config (can be null)
+   * @param defaultValue The default value to return if no config is found
+   * @param returnType The class type for parsing the config value. Currently supported: Integer, Long, Double, Float,
+   *                   String
+   * @param clusterInfoAccessor The cluster info accessor to get config values
+   * @param <T> The return type
+   * @return The parsed configuration value or default value
+   */
+  public static <T> T getClusterMinionConfigValue(String taskType, String configKeySuffix, String minionTag,
+      T defaultValue, Class<T> returnType, ClusterInfoAccessor clusterInfoAccessor) {
+    // Priority 1: Check minion tenant specific cluster config
+    if (minionTag != null) {
+      String tenantSpecificConfigKey = taskType + "." + minionTag + configKeySuffix;
+      String configValue = clusterInfoAccessor.getClusterConfig(tenantSpecificConfigKey);
+      if (configValue != null) {
+        try {
+          return parseConfigValue(configValue, returnType);
+        } catch (Exception e) {
+          LOGGER.error("Invalid config {}: '{}'", tenantSpecificConfigKey, configValue, e);
+        }
+      }
+    }
+
+    // Priority 2: Check task type specific cluster config
+    String taskTypeConfigKey = taskType + configKeySuffix;
+    String configValue = clusterInfoAccessor.getClusterConfig(taskTypeConfigKey);
+    if (configValue != null) {
+      try {
+        return parseConfigValue(configValue, returnType);
+      } catch (Exception e) {
+        LOGGER.error("Invalid config {}: '{}'", taskTypeConfigKey, configValue, e);
+      }
+    }
+
+    // Priority 3: Default value
+    return defaultValue;
+  }
+
+  /**
+   * Helper method to parse config values to the appropriate type
+   */
+  @SuppressWarnings("unchecked")
+  private static <T> T parseConfigValue(String configValue, Class<T> returnType) {
+    if (returnType == Integer.class || returnType == int.class) {
+      return (T) Integer.valueOf(configValue);
+    } else if (returnType == Long.class || returnType == long.class) {
+      return (T) Long.valueOf(configValue);
+    } else if (returnType == Double.class || returnType == double.class) {
+      return (T) Double.valueOf(configValue);
+    } else if (returnType == Float.class || returnType == float.class) {
+      return (T) Float.valueOf(configValue);
+    } else if (returnType == String.class) {
+      return (T) configValue;
+    } else {
+      throw new IllegalArgumentException("Unsupported return type: " + returnType.getName());
+    }
   }
 }

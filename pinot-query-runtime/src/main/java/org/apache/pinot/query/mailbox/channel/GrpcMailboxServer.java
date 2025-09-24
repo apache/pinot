@@ -27,6 +27,7 @@ import io.grpc.stub.StreamObserver;
 import java.io.IOException;
 import java.util.concurrent.TimeUnit;
 import javax.annotation.Nullable;
+import org.apache.arrow.util.Preconditions;
 import org.apache.pinot.common.config.TlsConfig;
 import org.apache.pinot.common.metrics.BrokerGauge;
 import org.apache.pinot.common.metrics.BrokerMetrics;
@@ -35,7 +36,10 @@ import org.apache.pinot.common.metrics.ServerMetrics;
 import org.apache.pinot.common.proto.Mailbox;
 import org.apache.pinot.common.proto.PinotMailboxGrpc;
 import org.apache.pinot.core.transport.grpc.GrpcQueryServer;
+import org.apache.pinot.query.access.AuthorizationInterceptor;
+import org.apache.pinot.query.access.QueryAccessControlFactory;
 import org.apache.pinot.query.mailbox.MailboxService;
+import org.apache.pinot.spi.config.instance.InstanceType;
 import org.apache.pinot.spi.env.PinotConfiguration;
 import org.apache.pinot.spi.utils.CommonConstants;
 
@@ -52,26 +56,21 @@ public class GrpcMailboxServer extends PinotMailboxGrpc.PinotMailboxImplBase {
   private final MailboxService _mailboxService;
   private final Server _server;
 
-  public GrpcMailboxServer(MailboxService mailboxService, PinotConfiguration config, @Nullable TlsConfig tlsConfig) {
+  public GrpcMailboxServer(MailboxService mailboxService, PinotConfiguration config, @Nullable TlsConfig tlsConfig,
+      @Nullable QueryAccessControlFactory accessControlFactory) {
     _mailboxService = mailboxService;
     int port = mailboxService.getPort();
+    if (accessControlFactory == null) {
+      accessControlFactory = QueryAccessControlFactory.fromConfig(config);
+    }
 
     PooledByteBufAllocator bufAllocator = new PooledByteBufAllocator(true);
     PooledByteBufAllocatorMetric metric = bufAllocator.metric();
 
-    // Register memory metrics - use ServerMetrics if available, otherwise use BrokerMetrics
-    ServerMetrics serverMetrics = ServerMetrics.get();
-    BrokerMetrics brokerMetrics = BrokerMetrics.get();
-    if (serverMetrics != null) {
-      serverMetrics.setOrUpdateGlobalGauge(ServerGauge.MAILBOX_SERVER_USED_DIRECT_MEMORY, metric::usedDirectMemory);
-      serverMetrics.setOrUpdateGlobalGauge(ServerGauge.MAILBOX_SERVER_USED_HEAP_MEMORY, metric::usedHeapMemory);
-      serverMetrics.setOrUpdateGlobalGauge(ServerGauge.MAILBOX_SERVER_ARENAS_DIRECT, metric::numDirectArenas);
-      serverMetrics.setOrUpdateGlobalGauge(ServerGauge.MAILBOX_SERVER_ARENAS_HEAP, metric::numHeapArenas);
-      serverMetrics.setOrUpdateGlobalGauge(ServerGauge.MAILBOX_SERVER_CACHE_SIZE_SMALL, metric::smallCacheSize);
-      serverMetrics.setOrUpdateGlobalGauge(ServerGauge.MAILBOX_SERVER_CACHE_SIZE_NORMAL, metric::normalCacheSize);
-      serverMetrics.setOrUpdateGlobalGauge(ServerGauge.MAILBOX_SERVER_THREADLOCALCACHE, metric::numThreadLocalCaches);
-      serverMetrics.setOrUpdateGlobalGauge(ServerGauge.MAILBOX_SERVER_CHUNK_SIZE, metric::chunkSize);
-    } else if (brokerMetrics != null) {
+    // Register memory metrics based on instance type
+    InstanceType instanceType = mailboxService.getInstanceType();
+    if (instanceType == InstanceType.BROKER) {
+      BrokerMetrics brokerMetrics = BrokerMetrics.get();
       brokerMetrics.setOrUpdateGlobalGauge(BrokerGauge.MAILBOX_SERVER_USED_DIRECT_MEMORY, metric::usedDirectMemory);
       brokerMetrics.setOrUpdateGlobalGauge(BrokerGauge.MAILBOX_SERVER_USED_HEAP_MEMORY, metric::usedHeapMemory);
       brokerMetrics.setOrUpdateGlobalGauge(BrokerGauge.MAILBOX_SERVER_ARENAS_DIRECT, metric::numDirectArenas);
@@ -80,11 +79,25 @@ public class GrpcMailboxServer extends PinotMailboxGrpc.PinotMailboxImplBase {
       brokerMetrics.setOrUpdateGlobalGauge(BrokerGauge.MAILBOX_SERVER_CACHE_SIZE_NORMAL, metric::normalCacheSize);
       brokerMetrics.setOrUpdateGlobalGauge(BrokerGauge.MAILBOX_SERVER_THREADLOCALCACHE, metric::numThreadLocalCaches);
       brokerMetrics.setOrUpdateGlobalGauge(BrokerGauge.MAILBOX_SERVER_CHUNK_SIZE, metric::chunkSize);
+    } else {
+      Preconditions.checkState(instanceType == InstanceType.SERVER, "Unexpected instance type: %s", instanceType);
+      ServerMetrics serverMetrics = ServerMetrics.get();
+      serverMetrics.setOrUpdateGlobalGauge(ServerGauge.MAILBOX_SERVER_USED_DIRECT_MEMORY, metric::usedDirectMemory);
+      serverMetrics.setOrUpdateGlobalGauge(ServerGauge.MAILBOX_SERVER_USED_HEAP_MEMORY, metric::usedHeapMemory);
+      serverMetrics.setOrUpdateGlobalGauge(ServerGauge.MAILBOX_SERVER_ARENAS_DIRECT, metric::numDirectArenas);
+      serverMetrics.setOrUpdateGlobalGauge(ServerGauge.MAILBOX_SERVER_ARENAS_HEAP, metric::numHeapArenas);
+      serverMetrics.setOrUpdateGlobalGauge(ServerGauge.MAILBOX_SERVER_CACHE_SIZE_SMALL, metric::smallCacheSize);
+      serverMetrics.setOrUpdateGlobalGauge(ServerGauge.MAILBOX_SERVER_CACHE_SIZE_NORMAL, metric::normalCacheSize);
+      serverMetrics.setOrUpdateGlobalGauge(ServerGauge.MAILBOX_SERVER_THREADLOCALCACHE, metric::numThreadLocalCaches);
+      serverMetrics.setOrUpdateGlobalGauge(ServerGauge.MAILBOX_SERVER_CHUNK_SIZE, metric::chunkSize);
     }
 
     NettyServerBuilder builder = NettyServerBuilder
-        .forPort(port)
-        .intercept(new MailboxServerInterceptor())
+        .forPort(port).intercept(new MailboxServerInterceptor());
+    if (accessControlFactory != null) {
+      builder.intercept(new AuthorizationInterceptor(accessControlFactory));
+    }
+    builder
         .addService(this)
         .withOption(ChannelOption.ALLOCATOR, bufAllocator)
         .withChildOption(ChannelOption.ALLOCATOR, bufAllocator)

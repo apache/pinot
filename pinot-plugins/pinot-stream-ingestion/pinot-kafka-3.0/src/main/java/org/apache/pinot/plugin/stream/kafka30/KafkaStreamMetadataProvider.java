@@ -35,6 +35,7 @@ import org.apache.kafka.clients.admin.AdminClient;
 import org.apache.kafka.clients.admin.ListTopicsResult;
 import org.apache.kafka.clients.consumer.OffsetAndTimestamp;
 import org.apache.kafka.common.PartitionInfo;
+import org.apache.kafka.common.TopicPartition;
 import org.apache.kafka.common.errors.TimeoutException;
 import org.apache.pinot.plugin.stream.kafka.KafkaConsumerPartitionLag;
 import org.apache.pinot.spi.stream.ConsumerPartitionState;
@@ -199,6 +200,45 @@ public class KafkaStreamMetadataProvider extends KafkaPartitionLevelConnectionHa
       return this;
     }
   }
+
+  @Override
+  public StreamPartitionMsgOffset getOffsetAtTimestamp(int partitionId, long timestampMillis, long timeoutMillis) {
+      return new LongMsgOffset(_consumer.offsetsForTimes(Map.of(_topicPartition, timestampMillis),
+              Duration.ofMillis(timeoutMillis)).get(_topicPartition).offset());
+  }
+
+  @Override
+  public Map<String, StreamPartitionMsgOffset> getStreamStartOffsets() {
+    List<PartitionInfo> partitionInfos = _consumer.partitionsFor(_topic);
+    Map<TopicPartition, Long> startOffsets = _consumer.beginningOffsets(
+        partitionInfos.stream()
+            .filter(info -> info != null)
+            .map(info -> new TopicPartition(_topic, info.partition()))
+            .collect(Collectors.toList()));
+    return startOffsets.entrySet().stream().collect(
+        Collectors.toMap(
+            entry -> String.valueOf(entry.getKey().partition()),
+            entry -> new LongMsgOffset(entry.getValue()),
+            (existingValue, newValue) -> newValue
+        ));
+  }
+
+  @Override
+  public Map<String, StreamPartitionMsgOffset> getStreamEndOffsets() {
+    List<PartitionInfo> partitionInfos = _consumer.partitionsFor(_topic);
+    Map<TopicPartition, Long> startOffsets = _consumer.endOffsets(
+        partitionInfos.stream()
+            .filter(info -> info != null)
+            .map(info -> new TopicPartition(_topic, info.partition()))
+            .collect(Collectors.toList()));
+    return startOffsets.entrySet().stream().collect(
+        Collectors.toMap(
+            entry -> String.valueOf(entry.getKey().partition()),
+            entry -> new LongMsgOffset(entry.getValue()),
+            (existingValue, newValue) -> newValue
+        ));
+  }
+
   @Override
   public void close()
       throws IOException {

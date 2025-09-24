@@ -95,4 +95,9 @@ public interface MessageBatch<T> {
   default boolean hasDataLoss() {
     return false;
   }
+
+  /**
+   * Returns the size of the serialized message batch in bytes
+   */
+  long getSizeInBytes();
 }

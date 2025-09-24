@@ -93,6 +93,7 @@ public class LeafOperator extends MultiStageOperator {
   private final String _tableName;
   private final StatMap<StatKey> _statMap = new StatMap<>(StatKey.class);
   private final AtomicReference<ErrorMseBlock> _errorBlock = new AtomicReference<>();
+  private final ResultsBlockStreamer _resultsBlockStreamer = this::addResultsBlock;
 
   // Use a limit-sized BlockingQueue to store the results blocks and apply back pressure to the single-stage threads
   @VisibleForTesting
@@ -128,9 +129,11 @@ public class LeafOperator extends MultiStageOperator {
   }
 
   @Override
-  public void registerExecution(long time, int numRows) {
+  public void registerExecution(long time, int numRows, long memoryUsedBytes, long gcTimeMs) {
     _statMap.merge(StatKey.EXECUTION_TIME_MS, time);
     _statMap.merge(StatKey.EMITTED_ROWS, numRows);
+    _statMap.merge(StatKey.ALLOCATED_MEMORY_BYTES, memoryUsedBytes);
+    _statMap.merge(StatKey.GC_TIME_MS, gcTimeMs);
   }
 
   @Override
@@ -422,42 +425,19 @@ public class LeafOperator extends MultiStageOperator {
   }
 
   @VisibleForTesting
-  void execute(ThreadExecutionContext parentContext) {
-    ResultsBlockConsumer resultsBlockConsumer = new ResultsBlockConsumer();
-    ServerQueryLogger queryLogger = ServerQueryLogger.getInstance();
+  void execute(@Nullable ThreadExecutionContext parentContext) {
     if (_requests.size() == 1) {
       ServerQueryRequest request = _requests.get(0);
-      Tracing.ThreadAccountantOps.setupWorker(1, parentContext);
-
-      InstanceResponseBlock instanceResponseBlock =
-          _queryExecutor.execute(request, _executorService, resultsBlockConsumer);
-      if (queryLogger != null) {
-        queryLogger.logQuery(request, instanceResponseBlock, "MultistageEngine");
-      }
-      // Collect the execution stats
-      mergeExecutionStats(instanceResponseBlock.getResponseMetadata());
-      // TODO: Revisit if we should treat all exceptions as query failure. Currently MERGE_RESPONSE_ERROR and
-      //       SERVER_SEGMENT_MISSING_ERROR are counted as query failure.
-      Map<Integer, String> exceptions = instanceResponseBlock.getExceptions();
-      if (!exceptions.isEmpty()) {
-        setErrorBlock(ErrorMseBlock.fromMap(QueryErrorCode.fromKeyMap(exceptions)));
-      } else {
-        // NOTE: Instance response block might contain data (not metadata only) when all the segments are pruned.
-        //       Add the results block if it contains data.
-        BaseResultsBlock resultsBlock = instanceResponseBlock.getResultsBlock();
-        if (resultsBlock != null && resultsBlock.getNumRows() > 0) {
-          try {
-            addResultsBlock(resultsBlock);
-          } catch (InterruptedException e) {
-            setErrorBlock(CANCELLED_BLOCK);
-          } catch (TimeoutException e) {
-            setErrorBlock(TIMEOUT_BLOCK);
-          } catch (Exception e) {
-            if (!(e instanceof EarlyTerminationException)) {
-              LOGGER.warn("Failed to add results block", e);
-            }
-          }
+      if (parentContext != null) {
+        // NOTE: Treat this as SSE runner (anchor) thread.
+        Tracing.ThreadAccountantOps.setupRunner(parentContext.getQueryId(), parentContext.getWorkloadName());
+        try {
+          executeOneRequest(request, null);
+        } finally {
+          Tracing.ThreadAccountantOps.clear();
         }
+      } else {
+        executeOneRequest(request, null);
       }
     } else {
       // Hit 2 physical tables, one REALTIME and one OFFLINE
@@ -469,43 +449,24 @@ public class LeafOperator extends MultiStageOperator {
       CountDownLatch latch = new CountDownLatch(2);
       for (int i = 0; i < 2; i++) {
         ServerQueryRequest request = _requests.get(i);
-        int taskId = i;
         futures[i] = _executorService.submit(() -> {
-          Tracing.ThreadAccountantOps.setupWorker(taskId, parentContext);
-
-          try {
-            InstanceResponseBlock instanceResponseBlock =
-                _queryExecutor.execute(request, _executorService, resultsBlockConsumer);
-            if (queryLogger != null) {
-              queryLogger.logQuery(request, instanceResponseBlock, "MultistageEngine");
-            }
-            // Collect the execution stats
-            mergeExecutionStats(instanceResponseBlock.getResponseMetadata());
-            Map<Integer, String> exceptions = instanceResponseBlock.getExceptions();
-            if (!exceptions.isEmpty()) {
-              setErrorBlock(ErrorMseBlock.fromMap(QueryErrorCode.fromKeyMap(exceptions)));
+          if (parentContext != null) {
+            // NOTE: Treat this as SSE runner (anchor) thread.
+            Tracing.ThreadAccountantOps.setupRunner(parentContext.getQueryId(), parentContext.getWorkloadName());
+            try {
               // Drain the latch when receiving exception block and not wait for the other thread to finish
+              executeOneRequest(request, latch::countDown);
+            } finally {
+              Tracing.ThreadAccountantOps.clear();
               latch.countDown();
-            } else {
-              // NOTE: Instance response block might contain data (not metadata only) when all the segments are
-              //       pruned. Add the results block if it contains data.
-              BaseResultsBlock resultsBlock = instanceResponseBlock.getResultsBlock();
-              if (resultsBlock != null && resultsBlock.getNumRows() > 0) {
-                try {
-                  addResultsBlock(resultsBlock);
-                } catch (InterruptedException e) {
-                  setErrorBlock(CANCELLED_BLOCK);
-                } catch (TimeoutException e) {
-                  setErrorBlock(TIMEOUT_BLOCK);
-                } catch (Exception e) {
-                  if (!(e instanceof EarlyTerminationException)) {
-                    LOGGER.warn("Failed to add results block", e);
-                  }
-                }
-              }
             }
-          } finally {
-            latch.countDown();
+          } else {
+            try {
+              // Drain the latch when receiving exception block and not wait for the other thread to finish
+              executeOneRequest(request, latch::countDown);
+            } finally {
+              latch.countDown();
+            }
           }
         });
       }
@@ -518,6 +479,43 @@ public class LeafOperator extends MultiStageOperator {
       } finally {
         for (Future<?> future : futures) {
           future.cancel(true);
+        }
+      }
+    }
+  }
+
+  private void executeOneRequest(ServerQueryRequest request, @Nullable Runnable onException) {
+    InstanceResponseBlock instanceResponseBlock =
+        _queryExecutor.execute(request, _executorService, _resultsBlockStreamer);
+    ServerQueryLogger queryLogger = ServerQueryLogger.getInstance();
+    if (queryLogger != null) {
+      queryLogger.logQuery(request, instanceResponseBlock, "MultistageEngine");
+    }
+    // Collect the execution stats
+    mergeExecutionStats(instanceResponseBlock.getResponseMetadata());
+    // TODO: Revisit if we should treat all exceptions as query failure. Currently MERGE_RESPONSE_ERROR and
+    //       SERVER_SEGMENT_MISSING_ERROR are counted as query failure.
+    Map<Integer, String> exceptions = instanceResponseBlock.getExceptions();
+    if (!exceptions.isEmpty()) {
+      setErrorBlock(ErrorMseBlock.fromMap(QueryErrorCode.fromKeyMap(exceptions)));
+      if (onException != null) {
+        onException.run();
+      }
+    } else {
+      // NOTE: Instance response block might contain data (not metadata only) when all the segments are pruned.
+      //       Add the results block if it contains data.
+      BaseResultsBlock resultsBlock = instanceResponseBlock.getResultsBlock();
+      if (resultsBlock != null && resultsBlock.getNumRows() > 0) {
+        try {
+          addResultsBlock(resultsBlock);
+        } catch (InterruptedException e) {
+          setErrorBlock(CANCELLED_BLOCK);
+        } catch (TimeoutException e) {
+          setErrorBlock(TIMEOUT_BLOCK);
+        } catch (Exception e) {
+          if (!(e instanceof EarlyTerminationException)) {
+            LOGGER.warn("Failed to add results block", e);
+          }
         }
       }
     }
@@ -670,15 +668,6 @@ public class LeafOperator extends MultiStageOperator {
     }
   }
 
-  private class ResultsBlockConsumer implements ResultsBlockStreamer {
-
-    @Override
-    public void send(BaseResultsBlock block)
-        throws InterruptedException, TimeoutException {
-      addResultsBlock(block);
-    }
-  }
-
   public enum StatKey implements StatMap.Key {
     TABLE(StatMap.Type.STRING, null),
     EXECUTION_TIME_MS(StatMap.Type.LONG, null) {
@@ -727,7 +716,19 @@ public class LeafOperator extends MultiStageOperator {
       public String getStatName() {
         return "responseSerializationCpuTimeNs";
       }
-    };
+    },
+    /**
+     * Allocated memory in bytes for this operator or its children in the same stage.
+     */
+    ALLOCATED_MEMORY_BYTES(StatMap.Type.LONG, null),
+    /**
+     * Time spent on GC while this operator or its children in the same stage were running.
+     */
+    GC_TIME_MS(StatMap.Type.LONG, null);
+    // IMPORTANT: When adding new StatKeys, make sure to either create the same key in BrokerResponseNativeV2.StatKey or
+    //  call the constructor that accepts a String as last argument and set it to null.
+    //  Otherwise the constructor will fail with an IllegalArgumentException which will not be caught and will
+    //  propagate to the caller, causing the query to timeout.
 
     private final StatMap.Type _type;
     @Nullable
@@ -735,7 +736,12 @@ public class LeafOperator extends MultiStageOperator {
 
     StatKey(StatMap.Type type) {
       _type = type;
-      _brokerKey = BrokerResponseNativeV2.StatKey.valueOf(name());
+      try {
+        _brokerKey = BrokerResponseNativeV2.StatKey.valueOf(name());
+      } catch (IllegalArgumentException e) {
+        LOGGER.error("Failed to map StatKey: {} to BrokerResponseNativeV2.StatKey", name(), e);
+        throw e;
+      }
     }
 
     StatKey(StatMap.Type type, @Nullable BrokerResponseNativeV2.StatKey brokerKey) {

@@ -176,6 +176,7 @@ public class MergeTaskUtilsTest {
   public void testGetSegmentConfig() {
     Map<String, String> taskConfig = new HashMap<>();
     taskConfig.put(MergeTask.MAX_NUM_RECORDS_PER_SEGMENT_KEY, "10000");
+    taskConfig.put(MergeTask.MAX_DISK_USAGE_PERCENTAGE, "80");
     taskConfig.put(MergeTask.SEGMENT_NAME_PREFIX_KEY, "myPrefix");
     taskConfig.put(MergeTask.SEGMENT_NAME_POSTFIX_KEY, "myPostfix");
     taskConfig.put(MergeTask.FIXED_SEGMENT_NAME_KEY, "mySegment");
@@ -187,9 +188,7 @@ public class MergeTaskUtilsTest {
     assertEquals(segmentConfig.getSegmentNamePostfix(), "myPostfix");
     assertEquals(segmentConfig.getFixedSegmentName(), "mySegment");
     assertEquals(segmentConfig.getIntermediateFileSizeThreshold(), 1000000000L);
-    assertEquals(segmentConfig.toString(),
-        "SegmentConfig{_maxNumRecordsPerSegment=10000, _segmentMapperFileSizeThresholdInBytes=1000000000, "
-            + "_segmentNamePrefix='myPrefix', _segmentNamePostfix='myPostfix', _fixedSegmentName='mySegment'}");
+    assertEquals(segmentConfig.getMaxDiskUsagePercentage(), 80);
 
     segmentConfig = MergeTaskUtils.getSegmentConfig(Collections.emptyMap());
     assertEquals(segmentConfig.getMaxNumRecordsPerSegment(), SegmentConfig.DEFAULT_MAX_NUM_RECORDS_PER_SEGMENT);

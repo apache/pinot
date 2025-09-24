@@ -531,7 +531,7 @@ public class GroupByOptionsIntegrationTest extends BaseClusterIntegrationTestSet
 
     String errorMessage = toResultStr(result);
 
-    Assert.assertTrue(errorMessage.contains("NUM_GROUPS_LIMIT has been reached at "), errorMessage);
+    Assert.assertTrue(errorMessage.contains("NUM_GROUPS_LIMIT has been reached"), errorMessage);
   }
 
   // for debug only

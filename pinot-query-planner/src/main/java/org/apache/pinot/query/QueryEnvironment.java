@@ -147,8 +147,12 @@ public class QueryEnvironment {
     String database = config.getDatabase();
     _catalog = new PinotCatalog(config.getTableCache(), database);
     CalciteSchema rootSchema = CalciteSchema.createRootSchema(false, false, database, _catalog);
-    _config = Frameworks.newConfigBuilder().traitDefs().operatorTable(PinotOperatorTable.instance())
-        .defaultSchema(rootSchema.plus()).sqlToRelConverterConfig(PinotRuleUtils.PINOT_SQL_TO_REL_CONFIG).build();
+    _config = Frameworks.newConfigBuilder()
+        .traitDefs()
+        .operatorTable(PinotOperatorTable.instance(config.isNullHandlingEnabled()))
+        .defaultSchema(rootSchema.plus())
+        .sqlToRelConverterConfig(PinotRuleUtils.PINOT_SQL_TO_REL_CONFIG)
+        .build();
     _catalogReader = new PinotCatalogReader(
         rootSchema, List.of(database), _typeFactory, CONNECTION_CONFIG, config.isCaseSensitive());
     // default optProgram with no skip rule options and no use rule options
@@ -156,11 +160,17 @@ public class QueryEnvironment {
   }
 
   public QueryEnvironment(String database, TableCache tableCache, @Nullable WorkerManager workerManager) {
+    this(database, tableCache, workerManager, true);
+  }
+
+  public QueryEnvironment(String database, TableCache tableCache, @Nullable WorkerManager workerManager,
+      boolean nullHandlingEnabled) {
     this(configBuilder()
         .requestId(-1L)
         .database(database)
         .tableCache(tableCache)
         .workerManager(workerManager)
+        .isNullHandlingEnabled(nullHandlingEnabled)
         .build());
   }
 
@@ -196,7 +206,8 @@ public class QueryEnvironment {
           workerManager.getHostName(), workerManager.getPort(), _envConfig.getRequestId(),
           workerManager.getInstanceId(), sqlNodeAndOptions.getOptions(),
           _envConfig.defaultUseLiteMode(), _envConfig.defaultRunInBroker(), _envConfig.defaultUseBrokerPruning(),
-          _envConfig.defaultLiteModeServerStageLimit(), _envConfig.defaultHashFunction());
+          _envConfig.defaultLiteModeLeafStageLimit(), _envConfig.defaultHashFunction(),
+          _envConfig.defaultLiteModeLeafStageFanOutAdjustedLimit());
     }
     return new PlannerContext(_config, _catalogReader, _typeFactory, optProgram, traitProgram,
         sqlNodeAndOptions.getOptions(), _envConfig, format, physicalPlannerContext);
@@ -647,6 +658,11 @@ public class QueryEnvironment {
     @Nullable
     TableCache getTableCache();
 
+    @Value.Default
+    default boolean isNullHandlingEnabled() {
+      return false;
+    }
+
     /**
      * Whether the schema should be considered case-insensitive.
      */
@@ -749,11 +765,23 @@ public class QueryEnvironment {
      *
      * This is treated as the default value for the broker and it is expected to be obtained from a Pinot configuration.
      * This default value can be always overridden at query level by the query option
-     * {@link CommonConstants.Broker.Request.QueryOptionKey#LITE_MODE_SERVER_STAGE_LIMIT}.
+     * {@link CommonConstants.Broker.Request.QueryOptionKey#LITE_MODE_LEAF_STAGE_LIMIT}.
      */
     @Value.Default
-    default int defaultLiteModeServerStageLimit() {
+    default int defaultLiteModeLeafStageLimit() {
       return CommonConstants.Broker.DEFAULT_LITE_MODE_LEAF_STAGE_LIMIT;
+    }
+
+    /**
+     * Default server stage limit for lite mode queries.
+     *
+     * This is treated as the default value for the broker and it is expected to be obtained from a Pinot configuration.
+     * This default value can be always overridden at query level by the query option
+     * {@link CommonConstants.Broker.Request.QueryOptionKey#LITE_MODE_LEAF_STAGE_LIMIT}.
+     */
+    @Value.Default
+    default int defaultLiteModeLeafStageFanOutAdjustedLimit() {
+      return CommonConstants.Broker.DEFAULT_LITE_MODE_LEAF_STAGE_FAN_OUT_ADJUSTED_LIMIT;
     }
 
     /**
