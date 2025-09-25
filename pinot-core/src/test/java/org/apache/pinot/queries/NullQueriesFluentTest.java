@@ -29,8 +29,6 @@ import org.apache.pinot.spi.config.table.TableType;
 import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.utils.builder.TableConfigBuilder;
-import org.joda.time.DateTime;
-import org.joda.time.DateTimeZone;
 import org.testng.annotations.AfterClass;
 import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
@@ -103,12 +101,12 @@ public class NullQueriesFluentTest {
             new Object[]{"2025-09-23T17:38:00"},
             new Object[]{null}
         )
-        .whenQuery("select cast(stringCol as timestamp) from testTable")
+        // The IS NOT NULL predicate is required when null handling is disabled, since the default string null value
+        // is "null", and that can't be cast to a valid timestamp.
+        .whenQuery("select cast(stringCol as timestamp) from testTable where stringCol is not null")
         .thenResultIs(
             new Object[]{"2025-09-23 17:38:00.0"},
-            new Object[]{new DateTime(0L, DateTimeZone.getDefault()).toString("yyyy-MM-dd HH:mm:ss.S")},
-            new Object[]{"2025-09-23 17:38:00.0"},
-            new Object[]{new DateTime(0L, DateTimeZone.getDefault()).toString("yyyy-MM-dd HH:mm:ss.S")}
+            new Object[]{"2025-09-23 17:38:00.0"}
         );
   }
 }
