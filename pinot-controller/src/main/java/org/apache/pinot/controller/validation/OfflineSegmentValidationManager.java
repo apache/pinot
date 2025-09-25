@@ -81,6 +81,13 @@ public class OfflineSegmentValidationManager extends ControllerPeriodicTask<Void
     }
   }
 
+  /**
+   * Updates the resource utilization metric for the given table.
+   * Sets the RESOURCE_UTILIZATION_LIMIT_EXCEEDED gauge to 1 if resource utilization is above limits (FAIL),
+   * or to 0 if within limits (PASS). The metric is not updated when the result is UNDETERMINED.
+   *
+   * @param tableNameWithType the table name with type for which to update the metric
+   */
   private void updateResourceUtilizationMetric(String tableNameWithType) {
     if (_resourceUtilizationManager.isResourceUtilizationWithinLimits(tableNameWithType,
         UtilizationChecker.CheckPurpose.TASK_GENERATION) == UtilizationChecker.CheckResult.FAIL) {
@@ -88,9 +95,11 @@ public class OfflineSegmentValidationManager extends ControllerPeriodicTask<Void
       _controllerMetrics.setOrUpdateTableGauge(tableNameWithType, ControllerGauge.RESOURCE_UTILIZATION_LIMIT_EXCEEDED,
           1L);
       return;
+    } else if (_resourceUtilizationManager.isResourceUtilizationWithinLimits(tableNameWithType,
+        UtilizationChecker.CheckPurpose.TASK_GENERATION) == UtilizationChecker.CheckResult.PASS) {
+      _controllerMetrics.setOrUpdateTableGauge(tableNameWithType, ControllerGauge.RESOURCE_UTILIZATION_LIMIT_EXCEEDED,
+          0L);
     }
-    _controllerMetrics.setOrUpdateTableGauge(tableNameWithType, ControllerGauge.RESOURCE_UTILIZATION_LIMIT_EXCEEDED,
-        0L);
   }
 
   // For offline segment pushes, validate that there are no missing segments, and update metrics
