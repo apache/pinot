@@ -44,21 +44,21 @@ public class LaunchDataIngestionJobCommand extends AbstractBaseAdminCommand impl
   private static final Logger LOGGER = LoggerFactory.getLogger(LaunchDataIngestionJobCommand.class);
   @CommandLine.Option(names = {"-jobSpecFile", "-jobSpec"}, required = true,
       description = "Ingestion job spec file")
-  private String _jobSpecFile;
+  protected String _jobSpecFile;
   @CommandLine.Option(names = {"-values"}, required = false, arity = "1..*",
       description = "Context values set to the job spec template")
-  private List<String> _values;
+  protected List<String> _values;
   @CommandLine.Option(names = {"-propertyFile"}, required = false,
       description = "A property file contains context values to set the job spec template")
-  private String _propertyFile;
+  protected String _propertyFile;
   @CommandLine.Option(names = {"-user"}, required = false, description = "Username for basic auth.")
-  private String _user;
+  protected String _user;
   @CommandLine.Option(names = {"-password"}, required = false, description = "Password for basic auth.")
-  private String _password;
+  protected String _password;
   @CommandLine.Option(names = {"-authToken"}, required = false, description = "Http auth token.")
-  private String _authToken;
+  protected String _authToken;
   @CommandLine.Option(names = {"-authTokenUrl"}, required = false, description = "Http auth token url.")
-  private String _authTokenUrl;
+  protected String _authTokenUrl;
 
   private AuthProvider _authProvider;
 

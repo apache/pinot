@@ -43,6 +43,7 @@ import org.apache.commons.lang3.StringUtils;
 import org.apache.hc.client5.http.ssl.SSLConnectionSocketFactory;
 import org.apache.hc.core5.ssl.SSLContexts;
 import org.apache.pinot.common.config.TlsConfig;
+import org.apache.pinot.common.utils.SegmentApiClient;
 import org.apache.pinot.spi.env.PinotConfiguration;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -251,6 +252,8 @@ public final class TlsUtils {
       // HttpsURLConnection
       HttpsURLConnection.setDefaultSSLSocketFactory(sc.getSocketFactory());
       setSslContext(sc);
+
+      SegmentApiClient.installDefaultSSLContext(sc);
     } catch (GenericSSLContextException | GeneralSecurityException e) {
       throw new IllegalStateException("Could not initialize SSL support", e);
     }
