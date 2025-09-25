@@ -16,36 +16,25 @@
  * specific language governing permissions and limitations
  * under the License.
  */
+
 package org.apache.pinot.core.query.aggregation;
 
-/**
- * AggregationResultHolder interface implementation for result type 'object'.
- */
-public class ObjectAggregationResultHolder implements AggregationResultHolder {
-  Object _value;
+public class LongAggregateResultHolder implements AggregationResultHolder {
 
-  /**
-   * {@inheritDoc}
-   * @param value
-   */
+  long _value;
+
+  public LongAggregateResultHolder(long defaultValue) {
+    _value = defaultValue;
+  }
+
   @Override
   public void setValue(double value) {
-    _value = value;
+    throw new RuntimeException("Method 'setValue' (with double value) not supported in LongAggregateResultHolder");
   }
-
-  /**
-   * {@inheritDoc}
-   * @param value
-   */
-  @Override
-  public void setValue(Object value) {
-    _value = value;
-  }
-
 
   @Override
   public void setValue(int value) {
-    _value = value;
+    throw new RuntimeException("Method 'setValue' (with int value) not supported in LongAggregateResultHolder");
   }
 
   @Override
@@ -53,42 +42,28 @@ public class ObjectAggregationResultHolder implements AggregationResultHolder {
     _value = value;
   }
 
-  /**
-   * {@inheritDoc}
-   * @return
-   */
+  @Override
+  public void setValue(Object value) {
+    throw new RuntimeException("Method 'setValue' (with object value) not supported in LongAggregateResultHolder");
+  }
+
   @Override
   public double getDoubleResult() {
-    throw new RuntimeException("Method 'getDoubleResult' not supported in ObjectAggregationResultHolder");
+    throw new RuntimeException("Method 'getDoubleResult' not supported in LongAggregateResultHolder");
   }
 
-  /**
-   * {@inheritDoc}
-   *
-   * @return
-   */
   @Override
   public int getIntResult() {
-    throw new RuntimeException("Method 'getIntResult' not supported in ObjectAggregationResultHolder");
+    throw new RuntimeException("Method 'getIntResult' not supported in LongAggregateResultHolder");
   }
 
-  /**
-   * {@inheritDoc}
-   *
-   * @return
-   */
   @Override
   public long getLongResult() {
-    throw new RuntimeException("Method 'getLongResult' not supported in ObjectAggregationResultHolder");
+    return _value;
   }
 
-  /**
-   * {@inheritDoc}
-   * @return
-   */
   @Override
-  @SuppressWarnings("unchecked")
   public <T> T getResult() {
-    return (T) _value;
+    throw new RuntimeException("Method 'getResult' not supported in LongAggregateResultHolder");
   }
 }
