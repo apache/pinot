@@ -20,12 +20,12 @@ package org.apache.pinot.controller.helix.core.rebalance.tenant;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.google.common.annotations.VisibleForTesting;
-import io.netty.util.internal.StringUtil;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.BiConsumer;
+import org.apache.commons.lang3.StringUtils;
 import org.apache.pinot.controller.helix.core.PinotHelixResourceManager;
 import org.apache.pinot.controller.helix.core.controllerjob.ControllerJobTypes;
 import org.apache.pinot.controller.helix.core.rebalance.RebalanceJobConstants;
@@ -96,7 +96,7 @@ public class ZkBasedTenantRebalanceObserver implements TenantRebalanceObserver {
   private void onFinish(String msg) {
     try {
       updateTenantRebalanceContextInZk((ctx, progressStats) -> {
-        if (StringUtil.isNullOrEmpty(progressStats.getCompletionStatusMsg())) {
+        if (StringUtils.isEmpty(progressStats.getCompletionStatusMsg())) {
           progressStats.setCompletionStatusMsg(msg);
           progressStats.setTimeToFinishInSeconds((System.currentTimeMillis() - progressStats.getStartTimeMs()) / 1000);
         }
