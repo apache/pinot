@@ -98,19 +98,21 @@ public class KafkaStreamMetadataProvider extends KafkaPartitionLevelConnectionHa
 
   @Override
   public Map<Integer, StreamPartitionMsgOffset> fetchLatestStreamOffset(Set<Integer> partitionIds, long timeoutMillis) {
-    List<TopicPartition> topicPartitions = new ArrayList<>();
+    List<TopicPartition> topicPartitions = new ArrayList<>(partitionIds.size());
     for (Integer streamPartition: partitionIds) {
       topicPartitions.add(new TopicPartition(_topic, streamPartition));
     }
     try {
-      Map<TopicPartition, Long> topicPartitionLongMap =
+      Map<TopicPartition, Long> topicPartitionToLatestOffsetMap =
           _consumer.endOffsets(topicPartitions, Duration.ofMillis(timeoutMillis));
-      Map<Integer, StreamPartitionMsgOffset> partitionIdToOffset = new HashMap<>();
-      for (TopicPartition topicPartition: topicPartitionLongMap.keySet()) {
-        partitionIdToOffset.put(topicPartition.partition(),
-            new LongMsgOffset(topicPartitionLongMap.get(topicPartition)));
+
+      Map<Integer, StreamPartitionMsgOffset> partitionIdToLatestOffset =
+          new HashMap<>(topicPartitionToLatestOffsetMap.size());
+      for (Map.Entry<TopicPartition, Long> entry : topicPartitionToLatestOffsetMap.entrySet()) {
+        partitionIdToLatestOffset.put(entry.getKey().partition(), new LongMsgOffset(entry.getValue()));
       }
-      return partitionIdToOffset;
+
+      return partitionIdToLatestOffset;
     } catch (TimeoutException e) {
       throw new TransientConsumerException(e);
     }
