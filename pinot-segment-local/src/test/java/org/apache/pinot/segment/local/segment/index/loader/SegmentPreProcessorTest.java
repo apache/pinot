@@ -386,7 +386,7 @@ public class SegmentPreProcessorTest implements PinotBuffersAfterClassCheckRule 
   @Test
   public void testSimpleEnableDictionarySV()
       throws Exception {
-    int approxCardinality = 42209; // derived via ULL in NoDictColumnStatisticsCollector
+    int approxCardinality = 44319; // derived via ULL in NoDictColumnStatisticsCollector
     // TEST 1. Check running forwardIndexHandler on a V1 segment. No-op for all existing raw columns.
     buildV1Segment();
     checkForwardIndexCreation(EXISTING_STRING_COL_RAW, 5, 3, _schema, false, false, false, 0, ChunkCompressionType.LZ4,
@@ -412,7 +412,7 @@ public class SegmentPreProcessorTest implements PinotBuffersAfterClassCheckRule 
   @Test
   public void testSimpleEnableDictionaryMV()
       throws Exception {
-    int approxCardinality = 18679; // derived via ULL in NoDictColumnStatisticsCollector
+    int approxCardinality = 19613; // derived via ULL in NoDictColumnStatisticsCollector
     // TEST 1. Check running forwardIndexHandler on a V1 segment. No-op for all existing raw columns.
     buildV1Segment();
     // since dictionary is disabled, the cardinality will be approximate cardinality.
@@ -431,7 +431,7 @@ public class SegmentPreProcessorTest implements PinotBuffersAfterClassCheckRule 
   @Test
   public void testEnableDictAndOtherIndexesSV()
       throws Exception {
-    int approxCardinality = 42209; // derived via ULL in NoDictColumnStatisticsCollector
+    int approxCardinality = 44319; // derived via ULL in NoDictColumnStatisticsCollector
 
     // TEST 1: EXISTING_STRING_COL_RAW. Enable dictionary. Also add inverted index and text index. Reload code path
     // will create dictionary, inverted index and text index.
@@ -491,7 +491,7 @@ public class SegmentPreProcessorTest implements PinotBuffersAfterClassCheckRule 
   @Test
   public void testEnableDictAndOtherIndexesMV()
       throws Exception {
-    int approxCardinality = 18679; // derived via ULL in NoDictColumnStatisticsCollector
+    int approxCardinality = 19613; // derived via ULL in NoDictColumnStatisticsCollector
 
     // TEST 1: EXISTING_INT_COL_RAW_MV. Enable dictionary for an MV column. Also enable inverted index and range index.
     buildV3Segment();
@@ -633,7 +633,7 @@ public class SegmentPreProcessorTest implements PinotBuffersAfterClassCheckRule 
   @Test
   public void testForwardIndexHandlerChangeCompression()
       throws Exception {
-    int approximateCardinality = 18679; // derived via ULL in NoDictColumnStatisticsCollector
+    int approximateCardinality = 19613; // derived via ULL in NoDictColumnStatisticsCollector
 
     // Test1: Rewriting forward index will be a no-op for v1 segments. Default LZ4 compressionType will be retained.
     buildV1Segment();

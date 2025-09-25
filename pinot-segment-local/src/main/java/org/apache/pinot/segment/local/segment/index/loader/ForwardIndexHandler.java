@@ -1039,7 +1039,9 @@ public class ForwardIndexHandler extends BaseIndexHandler {
     StatsCollectorConfig statsCollectorConfig = new StatsCollectorConfig(_tableConfig, _schema, null);
     boolean dictionaryEnabled = hasIndex(column, StandardIndexes.dictionary());
     if (!dictionaryEnabled) {
-      return new NoDictColumnStatisticsCollector(column, statsCollectorConfig);
+      if (_tableConfig.getIndexingConfig().canOptimiseNoDictStatsCollection()) {
+        return new NoDictColumnStatisticsCollector(column, statsCollectorConfig);
+      }
     }
     switch (storedType) {
       case INT:

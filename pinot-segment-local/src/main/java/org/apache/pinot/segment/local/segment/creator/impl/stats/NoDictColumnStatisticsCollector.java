@@ -229,8 +229,9 @@ public class NoDictColumnStatisticsCollector extends AbstractColumnStatisticsCol
 
   @Override
   public int getCardinality() {
-    // Return approximate distinct count estimate
-    long estimate = Math.round(_ull.getDistinctCountEstimate());
+    // Get approximate distinct count estimate
+    // Increase by 5% to increase probability of not returning lower than actual cardinality
+    long estimate = Math.round(_ull.getDistinctCountEstimate() * 1.05);
     // There are cases where ULL can overshoot the actual number of entries.
     // Returning a cardinality greater than total entries can break assumptions.
     return estimate > getTotalNumberOfEntries() ? getTotalNumberOfEntries() : (int) estimate;

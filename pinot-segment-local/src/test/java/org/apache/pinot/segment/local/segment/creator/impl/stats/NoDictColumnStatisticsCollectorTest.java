@@ -388,18 +388,27 @@ public class NoDictColumnStatisticsCollectorTest {
     m1.put("key1", 1);
     m1.put("largeKey1", 3);
     Map<String, Object> m2 = new HashMap<>();
-    // repeat key1
     m2.put("key1", 2);
-    m2.put("anotherkey", 4);
+    m2.put("largeKey2", 4);
+    Map<String, Object> m3 = new HashMap<>();
+    m3.put("key1", 5);
+    m3.put("largeKey2", 6);
+    Map<String, Object> m4 = new HashMap<>();
+    m4.put("key1", 7);
+    m4.put("largeKey1", 8);
 
     NoDictColumnStatisticsCollector c = new NoDictColumnStatisticsCollector("col", cfg);
     c.collect(m1);
     c.collect(m2);
+    c.collect(m3);
+    c.collect(m4);
     c.seal();
 
     MapColumnPreIndexStatsCollector mapStats = new MapColumnPreIndexStatsCollector("col", cfg);
     mapStats.collect(m1);
     mapStats.collect(m2);
+    mapStats.collect(m3);
+    mapStats.collect(m4);
     mapStats.seal();
 
     assertEquals(c.getCardinality(), mapStats.getCardinality());
