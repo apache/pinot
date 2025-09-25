@@ -35,6 +35,10 @@ public class DummyAggregationResultHolder implements AggregationResultHolder {
   }
 
   @Override
+  public void setValue(long value) {
+  }
+
+  @Override
   public void setValue(Object value) {
   }
 
@@ -45,6 +49,11 @@ public class DummyAggregationResultHolder implements AggregationResultHolder {
 
   @Override
   public int getIntResult() {
+    return 0;
+  }
+
+  @Override
+  public long getLongResult() {
     return 0;
   }
 
