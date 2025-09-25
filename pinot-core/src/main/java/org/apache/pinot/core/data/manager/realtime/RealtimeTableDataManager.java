@@ -303,7 +303,7 @@ public class RealtimeTableDataManager extends BaseTableDataManager {
       long firstStreamIngestionTimeMs, @Nullable StreamPartitionMsgOffset currentOffset,
       @Nullable StreamPartitionMsgOffset latestOffset) {
     _ingestionDelayTracker.updateIngestionMetrics(segmentName, partitionId, ingestionTimeMs, firstStreamIngestionTimeMs,
-        currentOffset, latestOffset);
+        currentOffset);
   }
 
   /**
