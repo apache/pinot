@@ -195,7 +195,7 @@ public class CastTransformFunction extends BaseTransformFunction {
       initLongValuesSV(length);
       String[] stringValues = _transformFunction.transformToStringValuesSV(valueBlock);
       RoaringBitmap nullBitmap = _transformFunction.getNullBitmap(valueBlock);
-      if (nullBitmap != null) {
+      if (_nullHandlingEnabled && nullBitmap != null && !nullBitmap.isEmpty()) {
         // Null string values can't be converted to valid timestamps, so we skip over those values.
         // Avoid using RoaringBitmap::contains API in a loop due to poor performance.
         // Avoid cloning + flipping the null bitmap to reduce allocation.
