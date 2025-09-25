@@ -75,7 +75,8 @@ public class AuditLogFilterTest {
   @BeforeMethod
   public void setUp() {
     MockitoAnnotations.openMocks(this);
-    _auditLogFilter = new AuditLogFilter(_requestProvider, _auditRequestProcessor, _configManager);
+    _auditLogFilter =
+        new AuditLogFilter(_requestProvider, _auditRequestProcessor, _configManager, mock(AuditMetrics.class));
     _auditLoggerMock = mockStatic(AuditLogger.class);
 
     _config = new AuditConfig();

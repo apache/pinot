@@ -164,7 +164,7 @@ public class MapColumnPreIndexStatsCollector extends AbstractColumnStatisticsCol
       FieldSpec valueFieldSpec = _colFieldSpec.getChildFieldSpec("value");
       for (Map.Entry<String, Integer> entry : _keyFrequencies.entrySet()) {
         if (entry.getValue() < _totalNumberOfEntries) {
-          _keyStats.get(entry.getKey()).collect(valueFieldSpec.getDefaultNullValue());
+          _keyStats.get(entry.getKey()).collect(_keyStats.get(entry.getKey())._fieldSpec.getDefaultNullValue());
         }
       }
       _sortedKeys = _keyStats.keySet().toArray(new String[0]);

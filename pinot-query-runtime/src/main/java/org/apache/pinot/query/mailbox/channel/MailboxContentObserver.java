@@ -48,16 +48,15 @@ public class MailboxContentObserver implements StreamObserver<MailboxContent> {
 
   private final MailboxService _mailboxService;
   private final StreamObserver<MailboxStatus> _responseObserver;
-  private final List<ByteBuffer> _mailboxBuffers;
+  private final List<ByteBuffer> _mailboxBuffers = Collections.synchronizedList(new ArrayList<>());
 
   private volatile ReceivingMailbox _mailbox;
 
-  public MailboxContentObserver(
-    MailboxService mailboxService, String mailboxId, StreamObserver<MailboxStatus> responseObserver) {
+  public MailboxContentObserver(MailboxService mailboxService, String mailboxId,
+      StreamObserver<MailboxStatus> responseObserver) {
     _mailboxService = mailboxService;
-    _mailbox = StringUtils.isNotBlank(mailboxId) ? _mailboxService.getReceivingMailbox(mailboxId) : null;
     _responseObserver = responseObserver;
-    _mailboxBuffers = new ArrayList<>();
+    _mailbox = StringUtils.isNotBlank(mailboxId) ? _mailboxService.getReceivingMailbox(mailboxId) : null;
   }
 
   @Override
@@ -72,9 +71,8 @@ public class MailboxContentObserver implements StreamObserver<MailboxContent> {
     }
     try {
       long timeoutMs = Context.current().getDeadline().timeRemaining(TimeUnit.MILLISECONDS);
-      List<ByteBuffer> buffers = new ArrayList<>(_mailboxBuffers);
+      ReceivingMailbox.ReceivingMailboxStatus status = _mailbox.offerRaw(_mailboxBuffers, timeoutMs);
       _mailboxBuffers.clear();
-      ReceivingMailbox.ReceivingMailboxStatus status = _mailbox.offerRaw(buffers, timeoutMs);
       switch (status) {
         case SUCCESS:
           _responseObserver.onNext(MailboxStatus.newBuilder().setMailboxId(mailboxId)
@@ -104,6 +102,7 @@ public class MailboxContentObserver implements StreamObserver<MailboxContent> {
           throw new IllegalStateException("Unsupported mailbox status: " + status);
       }
     } catch (Exception e) {
+      _mailboxBuffers.clear();
       String errorMessage = "Caught exception while processing blocks for mailbox: " + mailboxId;
       LOGGER.error(errorMessage, e);
       _mailbox.setErrorBlock(
@@ -125,6 +124,7 @@ public class MailboxContentObserver implements StreamObserver<MailboxContent> {
   @Override
   public void onError(Throwable t) {
     LOGGER.warn("Error on receiver side", t);
+    _mailboxBuffers.clear();
     if (_mailbox != null) {
       String msg = t != null ? t.getMessage() : "Unknown";
       _mailbox.setErrorBlock(ErrorMseBlock.fromError(
@@ -136,6 +136,7 @@ public class MailboxContentObserver implements StreamObserver<MailboxContent> {
 
   @Override
   public void onCompleted() {
+    _mailboxBuffers.clear();
     try {
       _responseObserver.onCompleted();
     } catch (Exception e) {
