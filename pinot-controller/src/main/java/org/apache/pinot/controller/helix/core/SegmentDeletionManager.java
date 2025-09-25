@@ -75,7 +75,7 @@ public class SegmentDeletionManager {
   private static final SimpleDateFormat RETENTION_DATE_FORMAT;
   private static final String DELIMITER = "/";
 
-  private static final int NUM_AGED_SEGMENTS_TO_DELETE_PER_ATTEMPT = 100;
+  private static final int NUM_AGED_SEGMENTS_TO_DELETE_PER_ATTEMPT = 1000;
 
   static {
     RETENTION_DATE_FORMAT = new SimpleDateFormat(RETENTION_DATE_FORMAT_STR);
