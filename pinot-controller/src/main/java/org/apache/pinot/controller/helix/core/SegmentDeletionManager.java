@@ -30,10 +30,13 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.TimeZone;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.ThreadFactory;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.TimeoutException;
 import javax.annotation.Nullable;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.helix.AccessOption;
@@ -75,7 +78,9 @@ public class SegmentDeletionManager {
   private static final SimpleDateFormat RETENTION_DATE_FORMAT;
   private static final String DELIMITER = "/";
 
-  private static final int NUM_AGED_SEGMENTS_TO_DELETE_PER_ATTEMPT = 1000;
+  public static final int NUM_AGED_SEGMENTS_TO_DELETE_PER_ATTEMPT = 1000;
+  private static final int OBJECT_DELETION_TIMEOUT = 5;
+  private static final int MAX_BATCH_DELETION_TIMEOUT_SECONDS = 600; // 10 minutes
 
   static {
     RETENTION_DATE_FORMAT = new SimpleDateFormat(RETENTION_DATE_FORMAT_STR);
@@ -423,14 +428,15 @@ public class SegmentDeletionManager {
               if (numFilesScheduledForDeletion > 0) {
                 LOGGER.info("Submitting request to delete: {} segment files from directory: {}",
                     numFilesScheduledForDeletion, tableNameDir);
-                int finalNumFilesScheduledForDeletion = numFilesScheduledForDeletion;
                 _executorService.submit(() -> {
                   try {
-                    if (!pinotFS.deleteBatch(targetURIs, false)) {
+                    long timeoutSeconds = Math.min(MAX_BATCH_DELETION_TIMEOUT_SECONDS,
+                        (long) OBJECT_DELETION_TIMEOUT * targetURIs.size());
+                    if (!deleteBatchWithTimeout(pinotFS, targetURIs, false, timeoutSeconds, TimeUnit.SECONDS)) {
                       LOGGER.warn("Failed to delete aged segment files from table: {}", tableName);
                     } else {
                       LOGGER.info("Successfully deleted {} aged segment files from table: {}",
-                          finalNumFilesScheduledForDeletion,
+                          targetURIs.size(),
                           tableName);
                     }
                   } catch (Exception e) {
@@ -452,6 +458,33 @@ public class SegmentDeletionManager {
       LOGGER.info("dataDir is not configured, won't delete any expired segments from deleted directory.");
     }
   }
+
+  private static boolean deleteBatchWithTimeout(PinotFS pinotFS, List<URI> targetURIs, boolean forceDelete,
+      long timeout, TimeUnit timeUnit) {
+    CompletableFuture<Boolean> deleteFuture = CompletableFuture.supplyAsync(() -> {
+          try {
+            return pinotFS.deleteBatch(targetURIs, forceDelete);
+          } catch (Exception e) {
+            LOGGER.warn("Failed to batch delete segments files", e);
+            return false;
+          }
+        }
+    );
+    try {
+      return deleteFuture.get(timeout, timeUnit);
+    } catch (InterruptedException e) {
+      Thread.currentThread().interrupt();
+      LOGGER.warn("Thread was interrupted while deleting resources", e);
+      return false;
+    } catch (TimeoutException e) {
+      LOGGER.warn("Timeout occurred while deleting resource", e);
+      return false;
+    } catch (ExecutionException e) {
+      LOGGER.warn("Exception occurred while deleting resource", e);
+      return false;
+    }
+  }
+
 
   private String getDeletedSegmentFileName(String fileName, long deletedSegmentsRetentionMs) {
     return fileName + RETENTION_UNTIL_SEPARATOR + RETENTION_DATE_FORMAT.format(new Date(

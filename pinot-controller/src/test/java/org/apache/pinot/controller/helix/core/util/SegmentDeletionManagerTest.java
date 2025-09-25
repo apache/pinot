@@ -335,7 +335,7 @@ public class SegmentDeletionManagerTest {
 
     URI tableUri1 = new URI("fake://bucket/sc/managed/pinot/" + SegmentDeletionManager.DELETED_SEGMENTS + "/table_1/");
     pinotFS.mkdir(tableUri1);
-    for (int i = 0; i < 101; i++) {
+    for (int i = 0; i < SegmentDeletionManager.NUM_AGED_SEGMENTS_TO_DELETE_PER_ATTEMPT + 1; i++) {
       URI segmentURIForTable =
           new URI(tableUri1.getPath() + "segment" + i + RETENTION_UNTIL_SEPARATOR + "201901010000");
       pinotFS.mkdir(segmentURIForTable);
@@ -362,7 +362,7 @@ public class SegmentDeletionManagerTest {
             throw new RuntimeException(e);
           }
         }, 1000, 10000,
-        "All the files in the tableUri2 could not be deleted");
+        "Could not delete all the files for table_2");
     Assert.assertTrue(pinotFS.exists(tableUri2));
 
     // One file that doesn't meet retention criteria, and another file due to the per attempt batch limit remains.
