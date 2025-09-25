@@ -18,23 +18,24 @@
  */
 package org.apache.pinot.core.operator.transform.function;
 
-/**
- * The <code>IsNotDistinctFromTransformFunction</code> extends <code>DistinctFromTransformFunction</code> to
- * implement the IS_NOT_DISTINCT_FROM operator.
- *
- * The results are in boolean format and stored as an integer array with 1 represents true and 0 represents false.
- * Expected result:
- * NUll IS_NOT_DISTINCT_FROM Value: 0
- * NUll IS_NOT_DISTINCT_FROM Null: 1
- * ValueA IS_NOT_DISTINCT_FROM ValueB: EQUALS(ValueA, ValueB)
- *
- * Note this operator only takes column names for now.
- * SQL Syntax:
- *    columnA IS_NOT_DISTINCT_FROM columnB
- *
- * Sample Usage:
- *    IS_NOT_DISTINCT_FROM(columnA, columnB)
- */
+///
+/// <code>IsNotDistinctFromTransformFunction</code> extends <code>DistinctFromTransformFunction</code> to implement the
+/// IS_NOT_DISTINCT_FROM operator.
+///
+/// The results are in boolean format and stored as an integer array where 1 represents true and 0 represents false.
+///
+/// Expected result:
+/// - NULL IS_NOT_DISTINCT_FROM Value: 0
+/// - NULL IS_NOT_DISTINCT_FROM NULL: 0
+/// - ValueA IS_NOT_DISTINCT_FROM ValueB: EQUALS(ValueA, ValueB)
+///
+/// Note that this operator only takes column names for now.
+/// SQL Syntax:
+///    columnA IS_NOT_DISTINCT_FROM columnB
+///
+/// Sample Usage:
+///    IS_NOT_DISTINCT_FROM(columnA, columnB)
+///
 public class IsNotDistinctFromTransformFunction extends DistinctFromTransformFunction {
   public IsNotDistinctFromTransformFunction() {
     super(false);

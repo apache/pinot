@@ -21,18 +21,17 @@ package org.apache.pinot.core.operator.transform.function;
 import javax.annotation.Nullable;
 import org.apache.pinot.common.function.TransformFunctionType;
 import org.apache.pinot.core.operator.blocks.ValueBlock;
-import org.apache.pinot.core.operator.transform.TransformResultMetadata;
 import org.roaringbitmap.IntConsumer;
 import org.roaringbitmap.RoaringBitmap;
 
 
-/**
- * <code>DistinctFromTransformFunction</code> abstracts the transform needed for IsDistinctFrom and IsNotDistinctFrom.
- * Null value is considered as distinct from non-null value.
- * When both values are not null, this function calls equal transform function to determined whether two values are
- * distinct.
- * This function only supports two arguments which are both column names.
- */
+///
+/// <code>DistinctFromTransformFunction</code> abstracts the transform needed for IsDistinctFrom and IsNotDistinctFrom.
+/// - NULL is considered as distinct from all non-null values.
+/// - When both values are non-null, this function calls the equal transform function to determined whether two values
+/// are distinct.
+/// - This function only supports two arguments which are both column names.
+///
 public class DistinctFromTransformFunction extends BinaryOperatorTransformFunction {
   // Result value to save when two values are distinct.
   // 1 for isDistinct, 0 for isNotDistinct
@@ -42,7 +41,7 @@ public class DistinctFromTransformFunction extends BinaryOperatorTransformFuncti
   private final int _notDistinctResult;
 
   /**
-   * Returns true when bitmap is null (null option is disabled) or bitmap is empty.
+   * Returns true when bitmap is null or empty.
    */
   private static boolean isEmpty(RoaringBitmap bitmap) {
     return bitmap == null || bitmap.isEmpty();
@@ -66,37 +65,36 @@ public class DistinctFromTransformFunction extends BinaryOperatorTransformFuncti
   }
 
   @Override
-  public TransformResultMetadata getResultMetadata() {
-    return BOOLEAN_SV_NO_DICTIONARY_METADATA;
-  }
-
-  @Override
   public int[] transformToIntValuesSV(ValueBlock valueBlock) {
     _intValuesSV = super.transformToIntValuesSV(valueBlock);
-    RoaringBitmap leftNull = _leftTransformFunction.getNullBitmap(valueBlock);
-    RoaringBitmap rightNull = _rightTransformFunction.getNullBitmap(valueBlock);
-    // Both sides are not null.
-    if (isEmpty(leftNull) && isEmpty(rightNull)) {
-      return _intValuesSV;
+
+    if (_nullHandlingEnabled) {
+      RoaringBitmap leftNull = _leftTransformFunction.getNullBitmap(valueBlock);
+      RoaringBitmap rightNull = _rightTransformFunction.getNullBitmap(valueBlock);
+      // Both sides are not null.
+      if (isEmpty(leftNull) && isEmpty(rightNull)) {
+        return _intValuesSV;
+      }
+      // Left side doesn't have nulls
+      if (isEmpty(leftNull)) {
+        // Mark right null rows as distinct.
+        rightNull.forEach((IntConsumer) i -> _intValuesSV[i] = _distinctResult);
+        return _intValuesSV;
+      }
+      // Right side doesn't have nulls
+      if (isEmpty(rightNull)) {
+        // Mark left null rows as distinct.
+        leftNull.forEach((IntConsumer) i -> _intValuesSV[i] = _distinctResult);
+        return _intValuesSV;
+      }
+      RoaringBitmap xorNull = RoaringBitmap.xor(leftNull, rightNull);
+      // For rows that with one null and one not null, mark them as distinct
+      xorNull.forEach((IntConsumer) i -> _intValuesSV[i] = _distinctResult);
+      RoaringBitmap andNull = RoaringBitmap.and(leftNull, rightNull);
+      // For rows that are both null, mark them as not distinct.
+      andNull.forEach((IntConsumer) i -> _intValuesSV[i] = _notDistinctResult);
     }
-    // Left side is not null.
-    if (isEmpty(leftNull)) {
-      // Mark right null rows as distinct.
-      rightNull.forEach((IntConsumer) i -> _intValuesSV[i] = _distinctResult);
-      return _intValuesSV;
-    }
-    // Right side is not null.
-    if (isEmpty(rightNull)) {
-      // Mark left null rows as distinct.
-      leftNull.forEach((IntConsumer) i -> _intValuesSV[i] = _distinctResult);
-      return _intValuesSV;
-    }
-    RoaringBitmap xorNull = RoaringBitmap.xor(leftNull, rightNull);
-    // For rows that with one null and one not null, mark them as distinct
-    xorNull.forEach((IntConsumer) i -> _intValuesSV[i] = _distinctResult);
-    RoaringBitmap andNull = RoaringBitmap.and(leftNull, rightNull);
-    // For rows that are both null, mark them as not distinct.
-    andNull.forEach((IntConsumer) i -> _intValuesSV[i] = _notDistinctResult);
+
     return _intValuesSV;
   }
 

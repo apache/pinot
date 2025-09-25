@@ -31,21 +31,20 @@ import org.apache.pinot.spi.utils.CommonConstants.NullValuePlaceHolder;
 import org.roaringbitmap.RoaringBitmap;
 
 
-/**
- * The <code>CoalesceTransformFunction</code> implements the Coalesce operator.
- *
- * The result is first non-null value in the argument list.
- * If all arguments are null, return null.
- *
- * Note: arguments have to be compatible type.
- * Number of arguments has to be greater than 0.
- *
- * Expected result:
- * Coalesce(nullColumn, columnA): columnA
- * Coalesce(columnA, nullColumn): columnA
- * Coalesce(nullColumnA, nullColumnB): null
- *
- */
+///
+/// <code>CoalesceTransformFunction</code> implements the SQL COALESCE operator.
+///
+/// The result is the first non-null value in the argument list.
+/// If all arguments are null, return null.
+///
+/// The arguments have to be of compatible types, and the number of arguments has to be greater than 0.
+///
+/// Expected result:
+/// - Coalesce(NULL, valueA): valueA
+/// - Coalesce(valueA, NULL): valueA
+/// - Coalesce(NULL, NULL): NULL
+/// - Coalesce(valueB, valueA): valueB
+///
 public class CoalesceTransformFunction extends BaseTransformFunction {
   private TransformFunction[] _transformFunctions;
   private DataType _dataType;
