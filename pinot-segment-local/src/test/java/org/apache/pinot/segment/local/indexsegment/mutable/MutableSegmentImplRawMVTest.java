@@ -50,6 +50,7 @@ import org.apache.pinot.spi.data.readers.RecordReader;
 import org.apache.pinot.spi.data.readers.RecordReaderFactory;
 import org.apache.pinot.spi.stream.StreamMessageMetadata;
 import org.apache.pinot.spi.utils.CommonConstants;
+import org.apache.pinot.spi.utils.CommonConstants.Segment.BuiltInVirtualColumn;
 import org.apache.pinot.spi.utils.ReadMode;
 import org.apache.pinot.spi.utils.builder.TableConfigBuilder;
 import org.testng.Assert;
@@ -190,6 +191,13 @@ public class MutableSegmentImplRawMVTest implements PinotBuffersAfterClassCheckR
     for (FieldSpec fieldSpec : _schema.getAllFieldSpecs()) {
       if (!fieldSpec.isSingleValueField()) {
         String column = fieldSpec.getName();
+        // Skip $partitionId virtual column because this test is specifically for "raw MV" columns
+        // (MV columns with NO dictionary). $partitionId always has a dictionary
+        // (MultiValueConstantStringDictionary), so it doesn't fit the "raw MV" test pattern
+        // where getDictionary() is expected to return null.
+        if (BuiltInVirtualColumn.PARTITIONID.equals(column)) {
+          continue;
+        }
         DataSource actualDataSource = _mutableSegmentImpl.getDataSource(column);
         DataSource expectedDataSource = _immutableSegment.getDataSource(column);
 

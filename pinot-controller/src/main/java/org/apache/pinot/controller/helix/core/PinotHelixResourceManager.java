@@ -2184,6 +2184,10 @@ public class PinotHelixResourceManager {
 
     // Update IdealState replication
     IdealState idealState = _helixAdmin.getResourceIdealState(_helixClusterName, tableNameWithType);
+    Preconditions.checkArgument(idealState != null,
+        "Ideal state is not present for the table " + tableNameWithType + ". "
+            + "Its possible due to ongoing/incomplete table deletion. "
+            + "Please re-trigger the table delete operation to clean it up and recreate the table");
     String replicationConfigured = Integer.toString(tableConfig.getReplication());
     if (!idealState.getReplicas().equals(replicationConfigured)) {
       HelixHelper.updateIdealState(_helixZkManager, tableNameWithType, is -> {
@@ -2479,6 +2483,7 @@ public class PinotHelixResourceManager {
    * @param jobId job's UUID
    * @param jobMetadata the job metadata
    * @param jobType the type of the job to figure out where job metadata is kept in ZK
+   * @param prevJobMetadataChecker an additional check to see if there's a need to update
    * @return boolean representing success / failure of the ZK write step
    */
   public boolean addControllerJobToZK(String jobId, Map<String, String> jobMetadata, ControllerJobType jobType,

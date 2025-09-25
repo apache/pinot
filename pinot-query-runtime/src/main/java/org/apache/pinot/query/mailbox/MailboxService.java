@@ -31,6 +31,7 @@ import org.apache.pinot.query.access.QueryAccessControlFactory;
 import org.apache.pinot.query.mailbox.channel.ChannelManager;
 import org.apache.pinot.query.mailbox.channel.GrpcMailboxServer;
 import org.apache.pinot.query.runtime.operator.MailboxSendOperator;
+import org.apache.pinot.spi.config.instance.InstanceType;
 import org.apache.pinot.spi.env.PinotConfiguration;
 import org.apache.pinot.spi.utils.CommonConstants;
 import org.slf4j.Logger;
@@ -64,6 +65,7 @@ public class MailboxService {
 
   private final String _hostname;
   private final int _port;
+  private final InstanceType _instanceType;
   private final PinotConfiguration _config;
   private final ChannelManager _channelManager;
   @Nullable private final TlsConfig _tlsConfig;
@@ -72,18 +74,20 @@ public class MailboxService {
 
   private GrpcMailboxServer _grpcMailboxServer;
 
-  public MailboxService(String hostname, int port, PinotConfiguration config) {
-    this(hostname, port, config, null, null);
+  public MailboxService(String hostname, int port, InstanceType instanceType, PinotConfiguration config) {
+    this(hostname, port, instanceType, config, null);
   }
 
-  public MailboxService(String hostname, int port, PinotConfiguration config, @Nullable TlsConfig tlsConfig) {
-    this(hostname, port, config, tlsConfig, null);
+  public MailboxService(String hostname, int port, InstanceType instanceType, PinotConfiguration config,
+      @Nullable TlsConfig tlsConfig) {
+    this(hostname, port, instanceType, config, tlsConfig, null);
   }
 
-  public MailboxService(String hostname, int port, PinotConfiguration config, @Nullable TlsConfig tlsConfig, @Nullable
-  QueryAccessControlFactory accessControlFactory) {
+  public MailboxService(String hostname, int port, InstanceType instanceType, PinotConfiguration config,
+      @Nullable TlsConfig tlsConfig, @Nullable QueryAccessControlFactory accessControlFactory) {
     _hostname = hostname;
     _port = port;
+    _instanceType = instanceType;
     _config = config;
     _tlsConfig = tlsConfig;
     int maxInboundMessageSize = config.getProperty(
@@ -129,6 +133,10 @@ public class MailboxService {
     return _port;
   }
 
+  public InstanceType getInstanceType() {
+    return _instanceType;
+  }
+
   /**
    * Returns a sending mailbox for the given mailbox id. The returned sending mailbox is uninitialized, i.e. it will
    * not open the underlying channel or acquire any additional resources. Instead, it will initialize lazily when the
@@ -139,8 +147,8 @@ public class MailboxService {
     if (_hostname.equals(hostname) && _port == port) {
       return new InMemorySendingMailbox(mailboxId, this, deadlineMs, statMap);
     } else {
-      return new GrpcSendingMailbox(
-          _config, mailboxId, _channelManager, hostname, port, deadlineMs, statMap, _maxByteStringSize);
+      return new GrpcSendingMailbox(mailboxId, _channelManager, hostname, port, deadlineMs, statMap,
+          _maxByteStringSize);
     }
   }
 

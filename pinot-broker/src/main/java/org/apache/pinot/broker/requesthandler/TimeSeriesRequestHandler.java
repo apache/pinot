@@ -43,7 +43,6 @@ import org.apache.pinot.common.config.provider.TableCache;
 import org.apache.pinot.common.metrics.BrokerMeter;
 import org.apache.pinot.common.metrics.BrokerTimer;
 import org.apache.pinot.common.response.BrokerResponse;
-import org.apache.pinot.common.response.PinotBrokerTimeSeriesResponse;
 import org.apache.pinot.common.utils.HumanReadableDuration;
 import org.apache.pinot.core.auth.Actions;
 import org.apache.pinot.core.auth.TargetType;
@@ -52,12 +51,15 @@ import org.apache.pinot.spi.accounting.ThreadResourceUsageAccountant;
 import org.apache.pinot.spi.auth.AuthorizationResult;
 import org.apache.pinot.spi.auth.broker.RequesterIdentity;
 import org.apache.pinot.spi.env.PinotConfiguration;
+import org.apache.pinot.spi.exception.QueryErrorCode;
+import org.apache.pinot.spi.exception.QueryException;
 import org.apache.pinot.spi.trace.RequestContext;
 import org.apache.pinot.sql.parsers.SqlNodeAndOptions;
 import org.apache.pinot.tsdb.planner.TimeSeriesQueryEnvironment;
 import org.apache.pinot.tsdb.planner.physical.TimeSeriesDispatchablePlan;
 import org.apache.pinot.tsdb.spi.RangeTimeSeriesRequest;
 import org.apache.pinot.tsdb.spi.TimeSeriesLogicalPlanResult;
+import org.apache.pinot.tsdb.spi.series.TimeSeriesBlock;
 import org.apache.pinot.tsdb.spi.series.TimeSeriesBuilderFactoryProvider;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -107,10 +109,10 @@ public class TimeSeriesRequestHandler extends BaseBrokerRequestHandler {
   }
 
   @Override
-  public PinotBrokerTimeSeriesResponse handleTimeSeriesRequest(String lang, String rawQueryParamString,
+  public TimeSeriesBlock handleTimeSeriesRequest(String lang, String rawQueryParamString,
       Map<String, String> queryParams, RequestContext requestContext, RequesterIdentity requesterIdentity,
-      HttpHeaders httpHeaders) {
-    PinotBrokerTimeSeriesResponse timeSeriesResponse = null;
+      HttpHeaders httpHeaders) throws QueryException {
+    TimeSeriesBlock timeSeriesBlock = null;
     long queryStartTime = System.currentTimeMillis();
     try {
       _brokerMetrics.addMeteredGlobalValue(BrokerMeter.TIME_SERIES_GLOBAL_QUERIES, 1);
@@ -121,31 +123,30 @@ public class TimeSeriesRequestHandler extends BaseBrokerRequestHandler {
       try {
         timeSeriesRequest = buildRangeTimeSeriesRequest(lang, rawQueryParamString, queryParams);
       } catch (URISyntaxException e) {
-        return PinotBrokerTimeSeriesResponse.newErrorResponse("BAD_REQUEST", "Error building RangeTimeSeriesRequest");
+        throw new QueryException(QueryErrorCode.TIMESERIES_PARSING, "Error building RangeTimeSeriesRequest", e);
       }
       TimeSeriesLogicalPlanResult logicalPlanResult = _queryEnvironment.buildLogicalPlan(timeSeriesRequest);
       // If there are no buckets in the logical plan, return an empty response.
       if (logicalPlanResult.getTimeBuckets().getNumBuckets() == 0) {
-        return PinotBrokerTimeSeriesResponse.newEmptyResponse();
+        return new TimeSeriesBlock(logicalPlanResult.getTimeBuckets(), new HashMap<>());
       }
       TimeSeriesDispatchablePlan dispatchablePlan =
           _queryEnvironment.buildPhysicalPlan(timeSeriesRequest, requestContext, logicalPlanResult);
 
       tableLevelAccessControlCheck(httpHeaders, dispatchablePlan.getTableNames());
-      timeSeriesResponse = _queryDispatcher.submitAndGet(requestContext, dispatchablePlan,
-          timeSeriesRequest.getTimeout().toMillis(), new HashMap<>());
-      return timeSeriesResponse;
+      timeSeriesBlock = _queryDispatcher.submitAndGet(requestContext.getRequestId(), dispatchablePlan,
+          timeSeriesRequest.getTimeout().toMillis(), requestContext);
+      return timeSeriesBlock;
+    } catch (Exception e) {
+      _brokerMetrics.addMeteredGlobalValue(BrokerMeter.TIME_SERIES_GLOBAL_QUERIES_FAILED, 1);
+      if (e instanceof QueryException) {
+        throw (QueryException) e;
+      } else {
+        throw new QueryException(QueryErrorCode.UNKNOWN, "Error processing time-series query", e);
+      }
     } finally {
       _brokerMetrics.addTimedValue(BrokerTimer.QUERY_TOTAL_TIME_MS, System.currentTimeMillis() - queryStartTime,
           TimeUnit.MILLISECONDS);
-      if (timeSeriesResponse == null
-          || timeSeriesResponse.getStatus().equals(PinotBrokerTimeSeriesResponse.ERROR_STATUS)) {
-        _brokerMetrics.addMeteredGlobalValue(BrokerMeter.TIME_SERIES_GLOBAL_QUERIES_FAILED, 1);
-        final String errorMessage = timeSeriesResponse == null ? "null time-series response"
-            : timeSeriesResponse.getError();
-        // TODO(timeseries): Remove logging for failed queries.
-        LOGGER.warn("time-series query failed with error: {}", errorMessage);
-      }
     }
   }
 

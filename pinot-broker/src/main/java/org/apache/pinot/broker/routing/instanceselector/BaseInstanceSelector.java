@@ -39,7 +39,6 @@ import org.apache.helix.store.zk.ZkHelixPropertyStore;
 import org.apache.helix.zookeeper.datamodel.ZNRecord;
 import org.apache.pinot.broker.routing.adaptiveserverselector.AdaptiveServerSelector;
 import org.apache.pinot.broker.routing.adaptiveserverselector.PriorityPoolInstanceSelector;
-import org.apache.pinot.broker.routing.segmentpreselector.SegmentPreSelector;
 import org.apache.pinot.common.metadata.ZKMetadataProvider;
 import org.apache.pinot.common.metadata.segment.SegmentZKMetadata;
 import org.apache.pinot.common.metrics.BrokerMeter;
@@ -47,7 +46,6 @@ import org.apache.pinot.common.metrics.BrokerMetrics;
 import org.apache.pinot.common.request.BrokerRequest;
 import org.apache.pinot.common.utils.HashUtil;
 import org.apache.pinot.common.utils.SegmentUtils;
-import org.apache.pinot.common.utils.config.QueryOptionsUtils;
 import org.apache.pinot.core.transport.ServerInstance;
 import org.apache.pinot.spi.utils.CommonConstants.Helix.StateModel.SegmentStateModel;
 import org.apache.pinot.spi.utils.builder.TableNameBuilder;
@@ -57,33 +55,32 @@ import org.slf4j.LoggerFactory;
 import static org.apache.pinot.spi.utils.CommonConstants.Broker.FALLBACK_POOL_ID;
 
 
-/**
- * Base implementation of instance selector. Selector maintains a map from segment to enabled ONLINE/CONSUMING server
- * instances that serves the segment and a set of unavailable segments (no enabled instance or all enabled instances are
- * in OFFLINE/ERROR state).
- * <p>
- * Special handling of new segment: It is common for new segment to be partially available or not available at all in
- * all instances.
- * 1) We don't report new segment as unavailable segments.
- * 2) To avoid creating hotspot instances, unavailable instances for new segment won't be excluded for instance
- * selection. When it is selected, we don't serve the new segment.
- * <p>
- * Definition of new segment:
- * 1) Segment created more than 5 minutes ago.
- * - If we first see a segment via initialization, we look up segment creation time from zookeeper.
- * - If we first see a segment via onAssignmentChange initialization, we use the calling time of onAssignmentChange
- * as approximation.
- * 2) We retire new segment as old when:
- * - The creation time is more than 5 minutes ago
- * - Any instance for new segment is in ERROR state
- * - External view for segment converges with ideal state
- *
- * Note that this implementation means:
- * 1) Inconsistent selection of new segments across queries (some queries will serve new segments and others won't).
- * 2) When there is no state update from helix, new segments won't be retired because of the time passing (those with
- * creation time more than 5 minutes ago).
- * TODO: refresh new/old segment state where there is no update from helix for long time.
- */
+/// Base implementation of instance selector. Selector maintains a map from segment to enabled ONLINE/CONSUMING server
+/// instances that serves the segment and a set of unavailable segments (no enabled instance or all enabled instances
+/// are in OFFLINE/ERROR state).
+///
+/// Special handling of new segment: It is common for new segment to be partially available or not available at all in
+/// all instances.
+/// 1) We don't report new segment as unavailable segments.
+/// 2) To avoid creating hotspot instances, unavailable instances for new segment won't be excluded for instance
+/// selection. When it is selected, we don't serve the new segment.
+///
+/// Definition of new segment:
+/// 1) Segment created more than 5 minutes ago.
+/// - If we first see a segment via initialization, we look up segment creation time from zookeeper.
+/// - If we first see a segment via onAssignmentChange initialization, we use the calling time of onAssignmentChange
+/// as approximation.
+/// 2) We retire new segment as old when:
+/// - The creation time is more than 5 minutes ago
+/// - Any instance for new segment is in ERROR state
+/// - External view for segment converges with ideal state
+///
+/// Note that this implementation means:
+/// 1) Inconsistent selection of new segments across queries (some queries will serve new segments and others won't).
+/// 2) When there is no state update from helix, new segments won't be retired because of the time passing (those with
+/// creation time more than 5 minutes ago).
+/// TODO: refresh new/old segment state where there is no update from helix for long time.
+///
 abstract class BaseInstanceSelector implements InstanceSelector {
   private static final Logger LOGGER = LoggerFactory.getLogger(BaseInstanceSelector.class);
   // To prevent int overflow, reset the request id once it reaches this value
@@ -96,7 +93,7 @@ abstract class BaseInstanceSelector implements InstanceSelector {
   // Will be null if and only if adaptiveServerSelector is null
   final PriorityPoolInstanceSelector _priorityPoolInstanceSelector;
   final Clock _clock;
-  final boolean _useFixedReplica;
+  final InstanceSelectorConfig _config;
   final long _newSegmentExpirationTimeInSeconds;
   final boolean _emitSinglePoolSegmentsMetric;
   final int _tableNameHashForFixedReplicaRouting;
@@ -120,7 +117,7 @@ abstract class BaseInstanceSelector implements InstanceSelector {
     _brokerMetrics = brokerMetrics;
     _adaptiveServerSelector = adaptiveServerSelector;
     _clock = clock;
-    _useFixedReplica = config.isUseFixedReplica();
+    _config = config;
     _newSegmentExpirationTimeInSeconds = config.getNewSegmentExpirationTimeInSeconds();
     _emitSinglePoolSegmentsMetric = config.shouldEmitSinglePoolSegmentsMetrics();
     // Using raw table name to ensure queries spanning across REALTIME and OFFLINE tables are routed to the same
@@ -131,7 +128,7 @@ abstract class BaseInstanceSelector implements InstanceSelector {
 
     _priorityPoolInstanceSelector =
         _adaptiveServerSelector == null ? null : new PriorityPoolInstanceSelector(_adaptiveServerSelector);
-    if (_adaptiveServerSelector != null && _useFixedReplica) {
+    if (_adaptiveServerSelector != null && config.isUseFixedReplica()) {
       throw new IllegalArgumentException(
           "AdaptiveServerSelector and consistent routing cannot be enabled at the same time");
     }
@@ -248,13 +245,11 @@ abstract class BaseInstanceSelector implements InstanceSelector {
     }
   }
 
-  /**
-   * Updates the segment maps based on the given ideal state, external view, online segments (segments with
-   * ONLINE/CONSUMING instances in the ideal state and pre-selected by the {@link SegmentPreSelector}) and new segments.
-   * After this update:
-   * - Old segments' online instances should be tracked in _oldSegmentCandidatesMap
-   * - New segments' state (creation time and candidate instances) should be tracked in _newSegmentStateMap
-   */
+  /// Updates the segment maps based on the given ideal state, external view, online segments (segments with
+  /// ONLINE/CONSUMING instances in the ideal state and pre-selected by the {@code SegmentPreSelector}) and new
+  /// segments. After this update:
+  /// - Old segments' online instances should be tracked in _oldSegmentCandidatesMap
+  /// - New segments' state (creation time and candidate instances) should be tracked in _newSegmentStateMap
   void updateSegmentMaps(IdealState idealState, ExternalView externalView, Set<String> onlineSegments,
       Map<String, Long> newSegmentCreationTimeMap) {
     _oldSegmentCandidatesMap.clear();
@@ -262,7 +257,7 @@ abstract class BaseInstanceSelector implements InstanceSelector {
 
     Map<String, Map<String, String>> idealStateAssignment = idealState.getRecord().getMapFields();
     Map<String, Map<String, String>> externalViewAssignment = externalView.getRecord().getMapFields();
-    int count = 0;
+    int numSinglePoolSegments = 0;
     Set<Integer> pools = new HashSet<>();
     for (String segment : onlineSegments) {
       Map<String, String> idealStateInstanceStateMap = idealStateAssignment.get(segment);
@@ -311,12 +306,12 @@ abstract class BaseInstanceSelector implements InstanceSelector {
           pools.add(getPool(instance));
         }
         if (pools.size() < 2) {
-          count++;
+          numSinglePoolSegments++;
         }
       }
     }
     if (_emitSinglePoolSegmentsMetric) {
-      _brokerMetrics.addMeteredTableValue(_tableNameWithType, BrokerMeter.SINGLE_POOL_SEGMENTS, count);
+      _brokerMetrics.addMeteredTableValue(_tableNameWithType, BrokerMeter.SINGLE_POOL_SEGMENTS, numSinglePoolSegments);
     }
     if (LOGGER.isDebugEnabled()) {
       LOGGER.debug("Got _newSegmentStateMap: {}, _oldSegmentCandidatesMap: {}", _newSegmentStateMap.keySet(),
@@ -393,8 +388,7 @@ abstract class BaseInstanceSelector implements InstanceSelector {
   /**
    * {@inheritDoc}
    *
-   * <p>Updates the cached enabled instances and re-calculates {@code segmentToEnabledInstancesMap} and
-   * {@code unavailableSegments} based on the cached states.
+   * <p>Updates the cached enabled instances and re-calculates {@link #_segmentStates}.
    */
   @Override
   public void onInstancesChange(Set<String> enabledInstances, List<String> changedInstances) {
@@ -405,9 +399,8 @@ abstract class BaseInstanceSelector implements InstanceSelector {
   /**
    * {@inheritDoc}
    *
-   * <p>Updates the cached maps ({@code segmentToOnlineInstancesMap}, {@code segmentToOfflineInstancesMap} and
-   * {@code instanceToSegmentsMap}) and re-calculates {@code segmentToEnabledInstancesMap} and
-   * {@code unavailableSegments} based on the cached states.
+   * <p>Updates the cached maps ({@link #_oldSegmentCandidatesMap} and {@link #_newSegmentStateMap}, and re-calculates
+   * {@link #_segmentStates} based on the cached states.
    */
   @Override
   public void onAssignmentChange(IdealState idealState, ExternalView externalView, Set<String> onlineSegments) {
@@ -477,11 +470,6 @@ abstract class BaseInstanceSelector implements InstanceSelector {
     }
   }
 
-  protected boolean isUseFixedReplica(Map<String, String> queryOptions) {
-    Boolean queryOption = QueryOptionsUtils.isUseFixedReplica(queryOptions);
-    return queryOption != null ? queryOption : _useFixedReplica;
-  }
-
   @Override
   public Set<String> getServingInstances() {
     return _segmentStates.getServingInstances();
@@ -503,7 +491,7 @@ abstract class BaseInstanceSelector implements InstanceSelector {
   /**
    * Selects the server instances for the given segments based on the request id and segment states. Returns two maps
    * from segment to selected server instance hosting the segment. The 2nd map is for optional segments. The optional
-   * segments are used to get the new segments that is not online yet. Instead of simply skipping them by broker at
+   * segments are used to get the new segments that are not online yet. Instead of simply skipping them by broker at
    * routing time, we can send them to servers and let servers decide how to handle them.
    */
   abstract Pair<Map<String, String>, Map<String, String>/*optional segments*/> select(List<String> segments,
