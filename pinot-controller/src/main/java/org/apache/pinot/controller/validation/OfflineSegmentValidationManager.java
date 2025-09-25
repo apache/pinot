@@ -120,7 +120,6 @@ public class OfflineSegmentValidationManager extends ControllerPeriodicTask<Offl
       LOGGER.warn("Resource utilization is above threshold for table: {}, setting metric to 1", tableNameWithType);
       _controllerMetrics.setOrUpdateTableGauge(tableNameWithType, ControllerGauge.RESOURCE_UTILIZATION_LIMIT_EXCEEDED,
           1L);
-      return;
     } else if (_resourceUtilizationManager.isResourceUtilizationWithinLimits(tableNameWithType,
         UtilizationChecker.CheckPurpose.TASK_GENERATION) == UtilizationChecker.CheckResult.PASS) {
       LOGGER.info("Resource utilization is within limits for table: {}, setting metric to 0", tableNameWithType);
