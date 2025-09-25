@@ -33,6 +33,7 @@ import org.apache.pinot.segment.spi.SegmentContext;
 import org.apache.pinot.spi.exception.EarlyTerminationException;
 import org.apache.pinot.spi.exception.QueryErrorCode;
 import org.apache.pinot.spi.exception.QueryErrorMessage;
+import org.apache.pinot.spi.exception.QueryException;
 import org.apache.pinot.spi.trace.Tracing;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -92,7 +93,10 @@ public class StreamingInstanceResponseOperator extends InstanceResponseOperator 
       }
     } catch (EarlyTerminationException e) {
       Exception killedErrorMsg = Tracing.getThreadAccountant().getErrorStatus();
-      QueryErrorMessage errMsg = QueryErrorMessage.safeMsg(QueryErrorCode.QUERY_CANCELLATION,
+      QueryErrorCode errorCode = (killedErrorMsg instanceof QueryException)
+          ? ((QueryException) killedErrorMsg).getErrorCode()
+          : QueryErrorCode.QUERY_CANCELLATION;
+      QueryErrorMessage errMsg = QueryErrorMessage.safeMsg(errorCode,
           "Cancelled while streaming results" + (killedErrorMsg == null ? StringUtils.EMPTY : " " + killedErrorMsg));
       return new InstanceResponseBlock(new ExceptionResultsBlock(errMsg));
     } catch (Exception e) {

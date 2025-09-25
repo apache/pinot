@@ -26,6 +26,7 @@ import java.util.concurrent.ConcurrentHashMap;
 import org.apache.pinot.spi.accounting.WorkloadBudgetManager;
 import org.apache.pinot.spi.config.instance.InstanceType;
 import org.apache.pinot.spi.env.PinotConfiguration;
+import org.apache.pinot.spi.exception.QueryErrorCode;
 import org.apache.pinot.spi.trace.Tracing;
 import org.apache.pinot.spi.utils.CommonConstants;
 import org.slf4j.Logger;
@@ -67,8 +68,9 @@ public class WorkloadAggregator implements ResourceAggregator {
     _workloadBudgetManager = Tracing.ThreadAccountantOps.getWorkloadBudgetManager();
     _sleepTimeMs = _config.getProperty(CommonConstants.Accounting.CONFIG_OF_WORKLOAD_SLEEP_TIME_MS,
         CommonConstants.Accounting.DEFAULT_WORKLOAD_SLEEP_TIME_MS);
-    _enableEnforcement = _config.getProperty(CommonConstants.Accounting.CONFIG_OF_WORKLOAD_ENABLE_COST_ENFORCEMENT,
-        CommonConstants.Accounting.DEFAULT_WORKLOAD_ENABLE_COST_ENFORCEMENT);
+//    _enableEnforcement = _config.getProperty(CommonConstants.Accounting.CONFIG_OF_WORKLOAD_ENABLE_COST_ENFORCEMENT,
+//        CommonConstants.Accounting.DEFAULT_WORKLOAD_ENABLE_COST_ENFORCEMENT);
+    _enableEnforcement = true;
 
     LOGGER.info("WorkloadAggregator initialized with isThreadCPUSamplingEnabled: {}, isThreadMemorySamplingEnabled: {}",
         _isThreadCPUSamplingEnabled, _isThreadMemorySamplingEnabled);
@@ -172,7 +174,7 @@ public class WorkloadAggregator implements ResourceAggregator {
                 anchorThread.getName(), budgetStats._cpuRemaining, budgetStats._memoryRemaining);
             String expMsg = String.format("Query %s on instance %s (type: %s) killed. Workload Cost exceeded.", queryId,
                 _instanceId, _instanceType);
-            threadEntry._errorStatus.set(new RuntimeException(expMsg));
+            threadEntry._errorStatus.set(QueryErrorCode.WORKLOAD_BUDGET_EXCEEDED.asException(expMsg));
             anchorThread.interrupt();
           }
         }

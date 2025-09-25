@@ -98,7 +98,6 @@ public class QueryWorkloadConfigUtils {
   public static void updateZNRecordWithInstanceCost(ZNRecord znRecord, String queryWorkloadName,
       InstanceCost instanceCost) {
     Preconditions.checkNotNull(znRecord, "ZNRecord cannot be null");
-    Preconditions.checkNotNull(instanceCost, "InstanceCost cannot be null");
     try {
       znRecord.setSimpleField(QueryWorkloadRefreshMessage.QUERY_WORKLOAD_NAME, queryWorkloadName);
       znRecord.setSimpleField(QueryWorkloadRefreshMessage.INSTANCE_COST, JsonUtils.objectToString(instanceCost));

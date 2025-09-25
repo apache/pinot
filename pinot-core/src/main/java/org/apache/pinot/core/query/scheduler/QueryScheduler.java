@@ -43,6 +43,7 @@ import org.apache.pinot.spi.env.PinotConfiguration;
 import org.apache.pinot.spi.exception.EarlyTerminationException;
 import org.apache.pinot.spi.exception.QueryErrorCode;
 import org.apache.pinot.spi.exception.QueryErrorMessage;
+import org.apache.pinot.spi.exception.QueryException;
 import org.apache.pinot.spi.query.QueryThreadContext;
 import org.apache.pinot.spi.trace.Tracing;
 import org.slf4j.Logger;
@@ -232,10 +233,13 @@ public abstract class QueryScheduler {
       responseByte = instanceResponse.toDataTable().toBytes();
     } catch (EarlyTerminationException e) {
       Exception killedErrorMsg = Tracing.getThreadAccountant().getErrorStatus();
+      QueryErrorCode errorCode = (killedErrorMsg instanceof QueryException)
+          ? ((QueryException) killedErrorMsg).getErrorCode()
+          : QueryErrorCode.QUERY_CANCELLATION;
       String userMsg =
           "Cancelled while building data table" + (killedErrorMsg == null ? StringUtils.EMPTY : " " + killedErrorMsg);
       LOGGER.error(userMsg);
-      QueryErrorMessage errMsg = QueryErrorMessage.safeMsg(QueryErrorCode.QUERY_CANCELLATION, userMsg);
+      QueryErrorMessage errMsg = QueryErrorMessage.safeMsg(errorCode, userMsg);
       Map<String, String> queryOptions = queryRequest.getQueryContext().getQueryOptions();
       String workloadName = QueryOptionsUtils.getWorkloadName(queryOptions);
       instanceResponse = new InstanceResponseBlock(new ExceptionResultsBlock(errMsg));

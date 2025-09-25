@@ -41,6 +41,7 @@ import org.apache.pinot.spi.env.PinotConfiguration;
 import org.apache.pinot.spi.exception.BadQueryRequestException;
 import org.apache.pinot.spi.exception.EarlyTerminationException;
 import org.apache.pinot.spi.exception.QueryErrorCode;
+import org.apache.pinot.spi.exception.QueryException;
 import org.apache.pinot.spi.trace.Tracing;
 import org.apache.pinot.spi.utils.CommonConstants;
 import org.apache.pinot.spi.utils.builder.TableNameBuilder;
@@ -179,8 +180,12 @@ public class BrokerReduceService extends BaseReduceService {
           new DataTableReducerContext(_reduceExecutorService, _maxReduceThreadsPerQuery, reduceTimeOutMs,
               groupTrimThreshold, minGroupTrimSize, minInitialIndexedTableCapacity), brokerMetrics);
     } catch (EarlyTerminationException e) {
+      Exception exception = Tracing.getThreadAccountant().getErrorStatus();
+      QueryErrorCode errorCode = (exception instanceof QueryException)
+          ? ((QueryException) exception).getErrorCode()
+          : QueryErrorCode.QUERY_CANCELLATION;
       brokerResponseNative.addException(
-          new QueryProcessingException(QueryErrorCode.QUERY_CANCELLATION, e.toString()));
+          new QueryProcessingException(errorCode, e.toString()));
     }
     QueryContext queryContext;
     if (brokerRequest == serverBrokerRequest) {
