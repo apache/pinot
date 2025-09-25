@@ -34,6 +34,11 @@ import org.apache.pinot.spi.utils.CommonConstants;
  * Behavior:
  * - getUniqueValuesSet() throws NotImplementedException
  * - getCardinality() returns approximate cardinality using ULL
+ * - Doesn't handle cases where values are of different types (e.g. int and long). This is expected.
+ *   Individual type collectors (e.g. IntColumnPreIndexStatsCollector) also don't handle this case.
+ *   At this point in the  Pinot process, the type consistency of a key should already be enforced.
+ *   So if such a case is encountered, it will be raised as an exception during collect()
+ * Doesn't handle MAP data type as MapColumnPreIndexStatsCollector is optimized for no-dictionary collection
  */
 @SuppressWarnings({"rawtypes"})
 public class NoDictColumnStatisticsCollector extends AbstractColumnStatisticsCollector {
@@ -74,7 +79,7 @@ public class NoDictColumnStatisticsCollector extends AbstractColumnStatisticsCol
       updateTotalNumberOfEntries(values);
     } else if (entry instanceof int[] || entry instanceof long[]
         || entry instanceof float[] || entry instanceof double[]) {
-      // Native multi-value types don't require length calculation
+      // Native multi-value types don't require length calculation because they're not variable-length
       int length;
       if (entry instanceof int[]) {
         int[] values = (int[]) entry;
