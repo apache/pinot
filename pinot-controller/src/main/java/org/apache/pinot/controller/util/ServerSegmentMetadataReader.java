@@ -39,6 +39,7 @@ import javax.annotation.Nullable;
 import javax.ws.rs.client.ClientBuilder;
 import javax.ws.rs.core.MediaType;
 import javax.ws.rs.core.Response;
+import org.apache.commons.collections.CollectionUtils;
 import org.apache.commons.lang3.tuple.Pair;
 import org.apache.hc.client5.http.impl.io.PoolingHttpClientConnectionManager;
 import org.apache.hc.client5.http.io.HttpClientConnectionManager;
@@ -65,6 +66,8 @@ import org.slf4j.LoggerFactory;
  */
 public class ServerSegmentMetadataReader {
   private static final Logger LOGGER = LoggerFactory.getLogger(ServerSegmentMetadataReader.class);
+  private static final String COLUMNS_KEY = "columns";
+  private static final String SEGMENTS_KEY = "segments";
 
   private final Executor _executor;
   private final HttpClientConnectionManager _connectionManager;
@@ -430,16 +433,23 @@ public class ServerSegmentMetadataReader {
   private String generateAggregateSegmentMetadataServerURL(String tableNameWithType, List<String> columns,
       String endpoint) {
     tableNameWithType = URLEncoder.encode(tableNameWithType, StandardCharsets.UTF_8);
-    String paramsStr = generateColumnsParam(columns);
+    String paramsStr = generateParam(COLUMNS_KEY, columns);
     return String.format("%s/tables/%s/metadata?%s", endpoint, tableNameWithType, paramsStr);
   }
 
-  private String generateSegmentMetadataServerURL(String tableNameWithType, String segmentName, List<String> columns,
-      String endpoint) {
+  public String generateSegmentMetadataServerURL(String tableNameWithType, String segmentName,
+      @Nullable List<String> columns, String endpoint) {
     tableNameWithType = URLEncoder.encode(tableNameWithType, StandardCharsets.UTF_8);
     segmentName = URLEncoder.encode(segmentName, StandardCharsets.UTF_8);
-    String paramsStr = generateColumnsParam(columns);
+    String paramsStr = generateParam(COLUMNS_KEY, columns);
     return String.format("%s/tables/%s/segments/%s/metadata?%s", endpoint, tableNameWithType, segmentName, paramsStr);
+  }
+
+  public String generateTableMetadataServerURL(String tableNameWithType, @Nullable List<String> columns,
+      @Nullable List<String> segmentsToInclude, String endpoint) {
+    tableNameWithType = URLEncoder.encode(tableNameWithType, StandardCharsets.UTF_8);
+    String paramsStr = generateParam(COLUMNS_KEY, columns) + "&" + generateParam(SEGMENTS_KEY, segmentsToInclude);
+    return String.format("%s/tables/%s/segments/metadata?%s", endpoint, tableNameWithType, paramsStr);
   }
 
   private String generateCheckReloadSegmentsServerURL(String tableNameWithType, String endpoint) {
@@ -488,22 +498,22 @@ public class ServerSegmentMetadataReader {
     return Pair.of(url, jsonTableSegments);
   }
 
-  private String generateColumnsParam(List<String> columns) {
-    String paramsStr = "";
-    if (columns == null || columns.isEmpty()) {
-      return paramsStr;
-    }
-    List<String> params = new ArrayList<>(columns.size());
-    for (String column : columns) {
-      params.add(String.format("columns=%s", column));
-    }
-    paramsStr = String.join("&", params);
-    return paramsStr;
-  }
-
   private String generateStaleSegmentsServerURL(String tableNameWithType, String endpoint) {
     tableNameWithType = URLEncoder.encode(tableNameWithType, StandardCharsets.UTF_8);
     return String.format("%s/tables/%s/segments/isStale", endpoint, tableNameWithType);
+  }
+
+  private String generateParam(String key, List<String> values) {
+    String paramsStr = "";
+    if (CollectionUtils.isEmpty(values)) {
+      return paramsStr;
+    }
+    List<String> params = new ArrayList<>(values.size());
+    for (String value : values) {
+      params.add(key + "=" + value);
+    }
+    paramsStr = String.join("&", params);
+    return paramsStr;
   }
 
   public class TableReloadResponse {

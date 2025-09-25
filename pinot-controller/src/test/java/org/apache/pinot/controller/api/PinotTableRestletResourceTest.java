@@ -24,6 +24,8 @@ import com.fasterxml.jackson.databind.node.ObjectNode;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.Lists;
 import java.io.IOException;
+import java.net.URLEncoder;
+import java.nio.charset.Charset;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashMap;
@@ -63,6 +65,7 @@ import org.apache.pinot.spi.utils.builder.TableConfigBuilder;
 import org.apache.pinot.spi.utils.builder.TableNameBuilder;
 import org.apache.pinot.util.TestUtils;
 import org.mockito.Mockito;
+import org.testng.Assert;
 import org.testng.annotations.AfterClass;
 import org.testng.annotations.AfterMethod;
 import org.testng.annotations.BeforeClass;
@@ -1050,6 +1053,39 @@ public class PinotTableRestletResourceTest extends ControllerTest {
     return new InstanceAssignmentConfig(instanceTagPoolConfig, instanceConstraintConfig,
         instanceReplicaGroupPartitionConfig,
         InstanceAssignmentConfig.PartitionSelector.FD_AWARE_INSTANCE_PARTITION_SELECTOR.name(), false);
+  }
+
+  @Test
+  public void testTableDeletionFromPreviousIncompleteDeletion()
+      throws Exception {
+    String tableName = "testTableDeletionValidation";
+    DEFAULT_INSTANCE.addDummySchema(tableName);
+
+    TableConfig offlineTableConfig = getOfflineTableBuilder(tableName)
+        .setTaskConfig(new TableTaskConfig(ImmutableMap.of(
+            MinionConstants.SegmentGenerationAndPushTask.TASK_TYPE, Map.of("schedule", "0 0 * * * ? *"))))
+        .build();
+
+    String tableNameWithType = offlineTableConfig.getTableName();
+    String creationResponse = sendPostRequest(_createTableUrl, offlineTableConfig.toJsonString());
+    assertEquals(creationResponse,
+        "{\"unrecognizedProperties\":{},\"status\":\"Table " + tableNameWithType + " successfully added\"}");
+
+    String encodedISPath =
+        URLEncoder.encode("/ControllerTest/IDEALSTATES/" + tableNameWithType, Charset.defaultCharset());
+    sendDeleteRequest(DEFAULT_INSTANCE.getControllerRequestURLBuilder().forZkDelete(encodedISPath));
+    // Table deletion will throw exception but internally it should clean up all the dangling table resources
+    Assert.expectThrows(IOException.class,
+        () -> sendDeleteRequest(DEFAULT_INSTANCE.getControllerRequestURLBuilder().forTableDelete(tableName)));
+
+    String encodedTableConfigPath = URLEncoder.encode("/ControllerTest/PROPERTYSTORE/CONFIGS/TABLE/"
+        + tableNameWithType, Charset.defaultCharset());
+    try {
+      sendGetRequest(DEFAULT_INSTANCE.getControllerRequestURLBuilder().forZkGet(encodedTableConfigPath));
+      fail("Table config node should be deleted so get request should fail");
+    } catch (IOException e) {
+      assertTrue(e.getMessage().contains(tableNameWithType + " does not exist"));
+    }
   }
 
   @Test

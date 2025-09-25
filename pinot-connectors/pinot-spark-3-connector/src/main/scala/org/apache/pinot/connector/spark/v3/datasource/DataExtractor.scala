@@ -54,10 +54,12 @@ private[pinot] object DataExtractor {
       case FieldSpec.DataType.LONG => LongType
       case FieldSpec.DataType.FLOAT => FloatType
       case FieldSpec.DataType.DOUBLE => DoubleType
+      case FieldSpec.DataType.BIG_DECIMAL => DecimalType(38, 18)
       case FieldSpec.DataType.STRING => StringType
       case FieldSpec.DataType.BYTES => ArrayType(ByteType)
       case FieldSpec.DataType.TIMESTAMP => LongType
       case FieldSpec.DataType.BOOLEAN => BooleanType
+      case FieldSpec.DataType.JSON => StringType
       case _ =>
         throw PinotException(s"Unsupported pinot data type '$dataType")
     }
@@ -116,6 +118,12 @@ private[pinot] object DataExtractor {
       dataTable.getFloat(rowIndex, colIndex)
     case ColumnDataType.DOUBLE =>
       dataTable.getDouble(rowIndex, colIndex)
+    case ColumnDataType.BIG_DECIMAL =>
+      val bd = dataTable.getBigDecimal(rowIndex, colIndex)
+      if (bd == null) null else Decimal(bd.setScale(18, java.math.RoundingMode.HALF_UP), 38, 18)
+    case ColumnDataType.JSON =>
+      // Use underlying string
+      UTF8String.fromString(dataTable.getString(rowIndex, colIndex))
     case ColumnDataType.TIMESTAMP =>
       dataTable.getLong(rowIndex, colIndex)
     case ColumnDataType.BOOLEAN =>

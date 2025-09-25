@@ -18,8 +18,8 @@
  */
 package org.apache.pinot.query.mailbox;
 
-import java.util.Collections;
 import java.util.List;
+import java.util.Map;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.atomic.AtomicInteger;
 import javax.annotation.Nullable;
@@ -34,9 +34,10 @@ import org.apache.pinot.query.runtime.operator.MailboxSendOperator;
 import org.apache.pinot.query.runtime.operator.OperatorTestUtil;
 import org.apache.pinot.query.runtime.plan.MultiStageQueryStats;
 import org.apache.pinot.query.testutils.QueryTestUtils;
+import org.apache.pinot.spi.config.instance.InstanceType;
 import org.apache.pinot.spi.env.PinotConfiguration;
 import org.apache.pinot.spi.exception.QueryErrorCode;
-import org.apache.pinot.spi.utils.CommonConstants;
+import org.apache.pinot.spi.utils.CommonConstants.MultiStageQueryRunner;
 import org.apache.pinot.util.TestUtils;
 import org.testng.annotations.AfterClass;
 import org.testng.annotations.BeforeClass;
@@ -61,11 +62,10 @@ public class MailboxServiceTest {
   @BeforeClass
   public void setUp() {
     PinotConfiguration config = new PinotConfiguration(
-        Collections.singletonMap(CommonConstants.MultiStageQueryRunner.KEY_OF_MAX_INBOUND_QUERY_DATA_BLOCK_SIZE_BYTES,
-            MAX_DATA_BLOCK_SIZE));
-    _mailboxService1 = new MailboxService("localhost", QueryTestUtils.getAvailablePort(), config);
+        Map.of(MultiStageQueryRunner.KEY_OF_MAX_INBOUND_QUERY_DATA_BLOCK_SIZE_BYTES, MAX_DATA_BLOCK_SIZE));
+    _mailboxService1 = new MailboxService("localhost", QueryTestUtils.getAvailablePort(), InstanceType.BROKER, config);
     _mailboxService1.start();
-    _mailboxService2 = new MailboxService("localhost", QueryTestUtils.getAvailablePort(), config);
+    _mailboxService2 = new MailboxService("localhost", QueryTestUtils.getAvailablePort(), InstanceType.SERVER, config);
     _mailboxService2.start();
   }
 
@@ -480,12 +480,13 @@ public class MailboxServiceTest {
   @Test
   public void testRemoteCancelledBecauseResourceExhausted()
     throws Exception {
-    PinotConfiguration config = new PinotConfiguration(
-      Collections.singletonMap(CommonConstants.MultiStageQueryRunner.KEY_OF_MAX_INBOUND_QUERY_DATA_BLOCK_SIZE_BYTES,
-        1));
-    var mailboxService3 = new MailboxService("localhost", QueryTestUtils.getAvailablePort(), config);
+    PinotConfiguration config =
+        new PinotConfiguration(Map.of(MultiStageQueryRunner.KEY_OF_MAX_INBOUND_QUERY_DATA_BLOCK_SIZE_BYTES, 1));
+    MailboxService mailboxService3 =
+        new MailboxService("localhost", QueryTestUtils.getAvailablePort(), InstanceType.BROKER, config);
     mailboxService3.start();
-    var mailboxService4 = new MailboxService("localhost", QueryTestUtils.getAvailablePort(), config);
+    MailboxService mailboxService4 =
+        new MailboxService("localhost", QueryTestUtils.getAvailablePort(), InstanceType.SERVER, config);
     mailboxService4.start();
 
     String mailboxId = MailboxIdUtils.toMailboxId(_requestId++, SENDER_STAGE_ID, 0, RECEIVER_STAGE_ID, 0);

@@ -19,6 +19,7 @@
 package org.apache.pinot.broker.routing;
 
 import com.google.common.base.Preconditions;
+import com.google.common.util.concurrent.ThreadFactoryBuilder;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
@@ -27,6 +28,14 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ConcurrentLinkedQueue;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
+import java.util.concurrent.ThreadFactory;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.locks.ReadWriteLock;
+import java.util.concurrent.locks.ReentrantReadWriteLock;
 import javax.annotation.Nullable;
 import org.apache.commons.lang3.tuple.Pair;
 import org.apache.helix.AccessOption;
@@ -100,6 +109,11 @@ import org.slf4j.LoggerFactory;
  *   <li>{@link #getQueryTimeoutMs(String)}: Returns the table-level query timeout in milliseconds for a table</li>
  * </ul>
  *
+ * LOCK ORDERING RULE: Always acquire locks in this order to prevent deadlocks:
+ * 1. _globalLock (read or write)
+ * 2. _routingTableBuildLocks (per rawTableName, grouping OFFLINE and REALTIME tables under a single lock)
+ * Never hold table locks when trying to acquire global lock.
+ *
  * TODO: Expose RoutingEntry class to get a consistent view in the broker request handler and save the redundant map
  *       lookups.
  */
@@ -109,11 +123,25 @@ public class BrokerRoutingManager implements RoutingManager, ClusterChangeHandle
   private final BrokerMetrics _brokerMetrics;
   private final Map<String, RoutingEntry> _routingEntryMap = new ConcurrentHashMap<>();
   private final Map<String, ServerInstance> _enabledServerInstanceMap = new ConcurrentHashMap<>();
-  // NOTE: _excludedServers doesn't need to be concurrent because it is only accessed within the synchronized block
+  // NOTE: _excludedServers doesn't need to be concurrent because it is only accessed within the _globalLock write lock
   private final Set<String> _excludedServers = new HashSet<>();
   private final ServerRoutingStatsManager _serverRoutingStatsManager;
   private final PinotConfiguration _pinotConfig;
   private final boolean _enablePartitionMetadataManager;
+  private final ExecutorService _executorService;
+
+  // Global read-write lock for protecting the global data structures such as _enabledServerInstanceMap,
+  // _excludedServers, and _routableServers. Write lock must be held if any of these are modified, read lock must be
+  // held otherwise
+  private final ReadWriteLock _globalLock = new ReentrantReadWriteLock();
+
+  // Per-table locks to allow concurrent routing builds across different tables while serializing per-table operations
+  // This must be keyed on the raw table name due to dependencies for TimeBoundaryManager creation between REALTIME
+  // and OFFLINE tables. LogicalTables will also use the raw table name of the table list underneath
+  private final Map<String, Object> _routingTableBuildLocks = new ConcurrentHashMap<>();
+
+  // Per-table build start time in millis. Any request before this time should be ignored
+  private final Map<String, Long> _routingTableBuildStartTimeMs = new ConcurrentHashMap<>();
 
   private BaseDataAccessor<ZNRecord> _zkDataAccessor;
   private String _externalViewPathPrefix;
@@ -123,6 +151,10 @@ public class BrokerRoutingManager implements RoutingManager, ClusterChangeHandle
 
   private Set<String> _routableServers;
 
+  // Process assignment change timestamp. Used to check if buildRouting needs to be re-run for a given table to avoid
+  // race conditions with processSegmentAssignmentChange()
+  private long _processAssignmentChangeSnapshotTimestampMs;
+
   public BrokerRoutingManager(BrokerMetrics brokerMetrics, ServerRoutingStatsManager serverRoutingStatsManager,
       PinotConfiguration pinotConfig) {
     _brokerMetrics = brokerMetrics;
@@ -131,6 +163,11 @@ public class BrokerRoutingManager implements RoutingManager, ClusterChangeHandle
     _enablePartitionMetadataManager =
         pinotConfig.getProperty(CommonConstants.Broker.CONFIG_OF_ENABLE_PARTITION_METADATA_MANAGER,
             CommonConstants.Broker.DEFAULT_ENABLE_PARTITION_METADATA_MANAGER);
+    int processSegmentAssignmentChangeNumThreads =
+        pinotConfig.getProperty(CommonConstants.Broker.CONFIG_OF_ROUTING_ASSIGNMENT_CHANGE_PROCESS_PARALLELISM,
+            CommonConstants.Broker.DEFAULT_ROUTING_ASSIGNMENT_CHANGE_PROCESS_PARALLELISM);
+    ThreadFactory threadFactory = new ThreadFactoryBuilder().setNameFormat("async-broker-assignment-change-%d").build();
+    _executorService = Executors.newFixedThreadPool(processSegmentAssignmentChangeNumThreads, threadFactory);
   }
 
   @Override
@@ -143,8 +180,21 @@ public class BrokerRoutingManager implements RoutingManager, ClusterChangeHandle
     _propertyStore = helixManager.getHelixPropertyStore();
   }
 
+  private Object getRoutingTableBuildLock(String tableNameWithType) {
+    String rawTableName = TableNameBuilder.extractRawTableName(tableNameWithType);
+    return _routingTableBuildLocks.computeIfAbsent(rawTableName, k -> new Object());
+  }
+
+  private long getLastRoutingTableBuildStartTimeMs(String tableNameWithType) {
+    return _routingTableBuildStartTimeMs.computeIfAbsent(tableNameWithType, k -> Long.MIN_VALUE);
+  }
+
+  /**
+   * This method is called from a method which is synchronized to prevent multiple calls to process cluster changes
+   * Thus, this cannot have contention with itself, but it can have contention with other methods in this class
+   */
   @Override
-  public synchronized void processClusterChange(ChangeType changeType) {
+  public void processClusterChange(ChangeType changeType) {
     if (changeType == ChangeType.IDEAL_STATE || changeType == ChangeType.EXTERNAL_VIEW) {
       processSegmentAssignmentChange();
     } else if (changeType == ChangeType.INSTANCE_CONFIG) {
@@ -156,20 +206,35 @@ public class BrokerRoutingManager implements RoutingManager, ClusterChangeHandle
   }
 
   private void processSegmentAssignmentChange() {
+    _globalLock.readLock().lock();
+    try {
+      processSegmentAssignmentChangeInternal();
+    } finally {
+      _globalLock.readLock().unlock();
+    }
+  }
+
+  private void processSegmentAssignmentChangeInternal() {
     LOGGER.info("Processing segment assignment change");
     long startTimeMs = System.currentTimeMillis();
 
-    int numTables = _routingEntryMap.size();
+    // Does not need to be protected by write lock because at a time, only one instance of this method can be running
+    // Do not change ordering of this with taking the routingEntry snapshot to avoid races with adding new entries
+    _processAssignmentChangeSnapshotTimestampMs = startTimeMs;
+
+    Map<String, RoutingEntry> routingEntrySnapshot = new HashMap<>(_routingEntryMap);
+
+    int numTables = routingEntrySnapshot.size();
     if (numTables == 0) {
       LOGGER.info("No table exists in the routing, skipping processing segment assignment change");
       return;
     }
 
-    List<RoutingEntry> routingEntries = new ArrayList<>(numTables);
+    List<String> cachedTableNames = new ArrayList<>(numTables);
     List<String> idealStatePaths = new ArrayList<>(numTables);
     List<String> externalViewPaths = new ArrayList<>(numTables);
-    for (Map.Entry<String, RoutingEntry> entry : _routingEntryMap.entrySet()) {
-      routingEntries.add(entry.getValue());
+    for (Map.Entry<String, RoutingEntry> entry : routingEntrySnapshot.entrySet()) {
+      cachedTableNames.add(entry.getValue().getTableNameWithType());
       idealStatePaths.add(entry.getValue()._idealStatePath);
       externalViewPaths.add(entry.getValue()._externalViewPath);
     }
@@ -177,44 +242,55 @@ public class BrokerRoutingManager implements RoutingManager, ClusterChangeHandle
     Stat[] externalViewStats = _zkDataAccessor.getStats(externalViewPaths, AccessOption.PERSISTENT);
     long fetchStatsEndTimeMs = System.currentTimeMillis();
 
-    List<String> tablesToUpdate = new ArrayList<>();
+    ConcurrentLinkedQueue<String> tablesUpdated = new ConcurrentLinkedQueue<>();
+    List<Future<?>> futures = new ArrayList<>();
     for (int i = 0; i < numTables; i++) {
       Stat idealStateStat = idealStateStats[i];
       Stat externalViewStat = externalViewStats[i];
       if (idealStateStat != null && externalViewStat != null) {
-        RoutingEntry routingEntry = routingEntries.get(i);
-        if (idealStateStat.getVersion() != routingEntry.getLastUpdateIdealStateVersion()
-            || externalViewStat.getVersion() != routingEntry.getLastUpdateExternalViewVersion()) {
-          String tableNameWithType = routingEntry.getTableNameWithType();
-          tablesToUpdate.add(tableNameWithType);
-          try {
-            IdealState idealState = getIdealState(routingEntry._idealStatePath);
-            if (idealState == null) {
-              LOGGER.warn("Failed to find ideal state for table: {}, skipping updating routing entry",
+        String tableNameWithType = cachedTableNames.get(i);
+        futures.add(_executorService.submit(() -> {
+          Object tableLock = getRoutingTableBuildLock(tableNameWithType);
+          synchronized (tableLock) {
+            // The routingEntry may have been removed from the _routingEntryMap by the time we get here in case
+            // one of the other functions such as 'removeRouting' was called since taking the snapshot. Check for
+            // existence before proceeding. Also note that if new entries were added since the snapshot was taken, we
+            // will miss processing them in this call. The buildRouting() method tries to handle that by checking for
+            // changes in the IS / EV version after adding a new entry
+            RoutingEntry routingEntry = _routingEntryMap.get(tableNameWithType);
+            if (routingEntry == null) {
+              LOGGER.info("Table {} was removed while processing segment assignment change, skipping",
                   tableNameWithType);
-              continue;
+              return;
             }
-            ExternalView externalView = getExternalView(routingEntry._externalViewPath);
-            if (externalView == null) {
-              LOGGER.warn("Failed to find external view for table: {}, skipping updating routing entry",
-                  tableNameWithType);
-              continue;
+            boolean hasISOrEVVersionChanged = processAssignmentChangeForTable(idealStateStat.getVersion(),
+                externalViewStat.getVersion(), routingEntry);
+            if (hasISOrEVVersionChanged) {
+              tablesUpdated.add(tableNameWithType);
             }
-            routingEntry.onAssignmentChange(idealState, externalView);
-          } catch (Exception e) {
-            LOGGER.error(
-                "Caught unexpected exception while updating routing entry on segment assignment change for table: {}",
-                tableNameWithType, e);
           }
-        }
+        }));
       }
     }
+
+    // Wait for all tasks to complete
+    for (Future<?> future : futures) {
+      try {
+        future.get();
+      } catch (InterruptedException e) {
+        Thread.currentThread().interrupt();
+        LOGGER.error("Thread interrupted while waiting for routing entry updates to complete", e);
+      } catch (Exception e) {
+        LOGGER.error("Unexpected exception during routing entry update task", e);
+      }
+    }
+
     long updateRoutingEntriesEndTimeMs = System.currentTimeMillis();
 
     LOGGER.info(
         "Processed segment assignment change in {}ms (fetch ideal state and external view stats for {} tables: {}ms, "
             + "update routing entry for {} tables ({}): {}ms)", updateRoutingEntriesEndTimeMs - startTimeMs, numTables,
-        fetchStatsEndTimeMs - startTimeMs, tablesToUpdate.size(), tablesToUpdate,
+        fetchStatsEndTimeMs - startTimeMs, tablesUpdated.size(), tablesUpdated,
         updateRoutingEntriesEndTimeMs - fetchStatsEndTimeMs);
   }
 
@@ -242,7 +318,47 @@ public class BrokerRoutingManager implements RoutingManager, ClusterChangeHandle
     }
   }
 
+  /**
+   * Returns true if the IS / EV version has changed (irrespective of whether the routing entry was updated), otherwise
+   * return false
+   */
+  private boolean processAssignmentChangeForTable(int idealStateVersion, int externalViewVersion,
+      RoutingEntry routingEntry) {
+    // Table lock must be held prior to calling this helper method
+    if (idealStateVersion != routingEntry.getLastUpdateIdealStateVersion()
+        || externalViewVersion != routingEntry.getLastUpdateExternalViewVersion()) {
+      String tableNameWithType = routingEntry.getTableNameWithType();
+      try {
+        IdealState idealState = getIdealState(routingEntry._idealStatePath);
+        if (idealState == null) {
+          LOGGER.warn("Failed to find ideal state for table: {}, skipping updating routing entry", tableNameWithType);
+          return true;
+        }
+        ExternalView externalView = getExternalView(routingEntry._externalViewPath);
+        if (externalView == null) {
+          LOGGER.warn("Failed to find external view for table: {}, skipping updating routing entry", tableNameWithType);
+          return true;
+        }
+        routingEntry.onAssignmentChange(idealState, externalView);
+      } catch (Exception e) {
+        LOGGER.error("Caught unexpected exception while updating routing entry on segment assignment change for "
+            + "table: {}", tableNameWithType, e);
+      }
+      return true;
+    }
+    return false;
+  }
+
   private void processInstanceConfigChange() {
+    _globalLock.writeLock().lock();
+    try {
+      processInstanceConfigChangeInternal();
+    } finally {
+      _globalLock.writeLock().unlock();
+    }
+  }
+
+  private void processInstanceConfigChangeInternal() {
     LOGGER.info("Processing instance config change");
     long startTimeMs = System.currentTimeMillis();
 
@@ -316,7 +432,10 @@ public class BrokerRoutingManager implements RoutingManager, ClusterChangeHandle
     // Update routing entry for all tables
     for (RoutingEntry routingEntry : _routingEntryMap.values()) {
       try {
-        routingEntry.onInstancesChange(_routableServers, changedServers);
+        Object tableLock = getRoutingTableBuildLock(routingEntry.getTableNameWithType());
+        synchronized (tableLock) {
+          routingEntry.onInstancesChange(_routableServers, changedServers);
+        }
       } catch (Exception e) {
         LOGGER.error("Caught unexpected exception while updating routing entry on instances change for table: {}",
             routingEntry.getTableNameWithType(), e);
@@ -361,7 +480,16 @@ public class BrokerRoutingManager implements RoutingManager, ClusterChangeHandle
   /**
    * Excludes a server from the routing.
    */
-  public synchronized void excludeServerFromRouting(String instanceId) {
+  public void excludeServerFromRouting(String instanceId) {
+    _globalLock.writeLock().lock();
+    try {
+      excludeServerFromRoutingInternal(instanceId);
+    } finally {
+      _globalLock.writeLock().unlock();
+    }
+  }
+
+  private void excludeServerFromRoutingInternal(String instanceId) {
     LOGGER.warn("Excluding server: {} from routing", instanceId);
     if (!_excludedServers.add(instanceId)) {
       LOGGER.info("Server: {} is already excluded from routing, skipping updating the routing", instanceId);
@@ -380,7 +508,10 @@ public class BrokerRoutingManager implements RoutingManager, ClusterChangeHandle
     List<String> changedServers = Collections.singletonList(instanceId);
     for (RoutingEntry routingEntry : _routingEntryMap.values()) {
       try {
-        routingEntry.onInstancesChange(_routableServers, changedServers);
+        Object tableLock = getRoutingTableBuildLock(routingEntry.getTableNameWithType());
+        synchronized (tableLock) {
+          routingEntry.onInstancesChange(_routableServers, changedServers);
+        }
       } catch (Exception e) {
         LOGGER.error("Caught unexpected exception while updating routing entry when excluding server: {} for table: {}",
             instanceId, routingEntry.getTableNameWithType(), e);
@@ -393,7 +524,16 @@ public class BrokerRoutingManager implements RoutingManager, ClusterChangeHandle
   /**
    * Includes a previous excluded server to the routing.
    */
-  public synchronized void includeServerToRouting(String instanceId) {
+  public void includeServerToRouting(String instanceId) {
+    _globalLock.writeLock().lock();
+    try {
+      includeServerToRoutingInternal(instanceId);
+    } finally {
+      _globalLock.writeLock().unlock();
+    }
+  }
+
+  private void includeServerToRoutingInternal(String instanceId) {
     LOGGER.info("Including server: {} to routing", instanceId);
     if (!_excludedServers.remove(instanceId)) {
       LOGGER.info("Server: {} is not previously excluded, skipping updating the routing", instanceId);
@@ -412,7 +552,10 @@ public class BrokerRoutingManager implements RoutingManager, ClusterChangeHandle
     List<String> changedServers = Collections.singletonList(instanceId);
     for (RoutingEntry routingEntry : _routingEntryMap.values()) {
       try {
-        routingEntry.onInstancesChange(_routableServers, changedServers);
+        Object tableLock = getRoutingTableBuildLock(routingEntry.getTableNameWithType());
+        synchronized (tableLock) {
+          routingEntry.onInstancesChange(_routableServers, changedServers);
+        }
       } catch (Exception e) {
         LOGGER.error("Caught unexpected exception while updating routing entry when including server: {} for table: {}",
             instanceId, routingEntry.getTableNameWithType(), e);
@@ -426,8 +569,18 @@ public class BrokerRoutingManager implements RoutingManager, ClusterChangeHandle
    * Builds the routing for a logical table. This method is called when a logical table is created or updated.
    * @param logicalTableName the name of the logical table
    */
-  public synchronized void buildRoutingForLogicalTable(String logicalTableName) {
-    LogicalTableConfig logicalTableConfig = ZKMetadataProvider.getLogicalTableConfig(_propertyStore, logicalTableName);
+  public void buildRoutingForLogicalTable(String logicalTableName) {
+    _globalLock.readLock().lock();
+    try {
+      buildRoutingForLogicalTableInternal(logicalTableName);
+    } finally {
+      _globalLock.readLock().unlock();
+    }
+  }
+
+  private void buildRoutingForLogicalTableInternal(String logicalTableName) {
+    LogicalTableConfig logicalTableConfig =
+        ZKMetadataProvider.getLogicalTableConfig(_propertyStore, logicalTableName);
     Preconditions.checkState(logicalTableConfig != null, "Failed to find logical table config for: %s",
         logicalTableConfig);
     if (!logicalTableConfig.isHybridLogicalTable()) {
@@ -445,42 +598,47 @@ public class BrokerRoutingManager implements RoutingManager, ClusterChangeHandle
     List<String> timeBoundaryTableNames = timeBoundaryStrategy.getTimeBoundaryTableNames(logicalTableConfig);
 
     for (String tableNameWithType : timeBoundaryTableNames) {
-      Preconditions.checkArgument(TableNameBuilder.isOfflineTableResource(tableNameWithType),
-          "Invalid table in the time boundary config: %s", tableNameWithType);
-      try {
-        // build routing if it does not exist for the offline table
-        if (!_routingEntryMap.containsKey(tableNameWithType)) {
-          buildRouting(tableNameWithType);
+      Object tableLock = getRoutingTableBuildLock(tableNameWithType);
+      synchronized (tableLock) {
+        Preconditions.checkArgument(TableNameBuilder.isOfflineTableResource(tableNameWithType),
+            "Invalid table in the time boundary config: %s", tableNameWithType);
+        try {
+          // build routing if it does not exist for the offline table
+          if (!_routingEntryMap.containsKey(tableNameWithType)) {
+            buildRouting(tableNameWithType);
+          }
+
+          if (_routingEntryMap.get(tableNameWithType).getTimeBoundaryManager() != null) {
+            LOGGER.info("Skip time boundary manager init for table: {}", tableNameWithType);
+            continue;
+          }
+
+          // init time boundary manager for the table
+          TableConfig tableConfig = ZKMetadataProvider.getTableConfig(_propertyStore, tableNameWithType);
+          Preconditions.checkState(tableConfig != null, "Failed to find table config for table: %s",
+              tableNameWithType);
+
+          String idealStatePath = getIdealStatePath(tableNameWithType);
+          IdealState idealState = getIdealState(idealStatePath);
+          Preconditions.checkState(idealState != null, "Failed to find ideal state for table: %s", tableNameWithType);
+
+          String externalViewPath = getExternalViewPath(tableNameWithType);
+          ExternalView externalView = getExternalView(externalViewPath);
+
+          Set<String> onlineSegments = getOnlineSegments(idealState);
+          SegmentPreSelector segmentPreSelector =
+              SegmentPreSelectorFactory.getSegmentPreSelector(tableConfig, _propertyStore);
+          Set<String> preSelectedOnlineSegments = segmentPreSelector.preSelect(onlineSegments);
+
+          TimeBoundaryManager timeBoundaryManager =
+              new TimeBoundaryManager(tableConfig, _propertyStore, _brokerMetrics);
+          timeBoundaryManager.init(idealState, externalView, preSelectedOnlineSegments);
+
+          _routingEntryMap.get(tableNameWithType).setTimeBoundaryManager(timeBoundaryManager);
+        } catch (Exception e) {
+          LOGGER.error("Caught unexpected exception while setting time boundary manager for table: {}",
+              tableNameWithType, e);
         }
-
-        if (_routingEntryMap.get(tableNameWithType).getTimeBoundaryManager() != null) {
-          LOGGER.info("Skip time boundary manager init for table: {}", tableNameWithType);
-          continue;
-        }
-
-        // init time boundary manager for the table
-        TableConfig tableConfig = ZKMetadataProvider.getTableConfig(_propertyStore, tableNameWithType);
-        Preconditions.checkState(tableConfig != null, "Failed to find table config for table: %s", tableNameWithType);
-
-        String idealStatePath = getIdealStatePath(tableNameWithType);
-        IdealState idealState = getIdealState(idealStatePath);
-        Preconditions.checkState(idealState != null, "Failed to find ideal state for table: %s", tableNameWithType);
-
-        String externalViewPath = getExternalViewPath(tableNameWithType);
-        ExternalView externalView = getExternalView(externalViewPath);
-
-        Set<String> onlineSegments = getOnlineSegments(idealState);
-        SegmentPreSelector segmentPreSelector =
-            SegmentPreSelectorFactory.getSegmentPreSelector(tableConfig, _propertyStore);
-        Set<String> preSelectedOnlineSegments = segmentPreSelector.preSelect(onlineSegments);
-
-        TimeBoundaryManager timeBoundaryManager = new TimeBoundaryManager(tableConfig, _propertyStore, _brokerMetrics);
-        timeBoundaryManager.init(idealState, externalView, preSelectedOnlineSegments);
-
-        _routingEntryMap.get(tableNameWithType).setTimeBoundaryManager(timeBoundaryManager);
-      } catch (Exception e) {
-        LOGGER.error("Caught unexpected exception while setting time boundary manager for table: {}", tableNameWithType,
-            e);
       }
     }
   }
@@ -489,132 +647,197 @@ public class BrokerRoutingManager implements RoutingManager, ClusterChangeHandle
    * Builds the routing for a table.
    * @param tableNameWithType the name of the table
    */
-  public synchronized void buildRouting(String tableNameWithType) {
-    LOGGER.info("Building routing for table: {}", tableNameWithType);
-
-    TableConfig tableConfig = ZKMetadataProvider.getTableConfig(_propertyStore, tableNameWithType);
-    Preconditions.checkState(tableConfig != null, "Failed to find table config for table: %s", tableNameWithType);
-
-    String idealStatePath = getIdealStatePath(tableNameWithType);
-    IdealState idealState = getIdealState(idealStatePath);
-    Preconditions.checkState(idealState != null, "Failed to find ideal state for table: %s", tableNameWithType);
-    int idealStateVersion = idealState.getRecord().getVersion();
-
-    String externalViewPath = getExternalViewPath(tableNameWithType);
-    ExternalView externalView = getExternalView(externalViewPath);
-    int externalViewVersion;
-    // NOTE: External view might be null for new created tables. In such case, create an empty one and set the version
-    // to -1 to ensure the version does not match the next external view
-    if (externalView == null) {
-      externalView = new ExternalView(tableNameWithType);
-      externalViewVersion = -1;
-    } else {
-      externalViewVersion = externalView.getRecord().getVersion();
+  public void buildRouting(String tableNameWithType) {
+    _globalLock.readLock().lock();
+    try {
+      buildRoutingInternal(tableNameWithType);
+    } finally {
+      _globalLock.readLock().unlock();
     }
+  }
 
-    Set<String> onlineSegments = getOnlineSegments(idealState);
-
-    SegmentPreSelector segmentPreSelector =
-        SegmentPreSelectorFactory.getSegmentPreSelector(tableConfig, _propertyStore);
-    Set<String> preSelectedOnlineSegments = segmentPreSelector.preSelect(onlineSegments);
-    SegmentSelector segmentSelector = SegmentSelectorFactory.getSegmentSelector(tableConfig);
-    segmentSelector.init(idealState, externalView, preSelectedOnlineSegments);
-
-    // Register segment pruners and initialize segment zk metadata fetcher.
-    List<SegmentPruner> segmentPruners = SegmentPrunerFactory.getSegmentPruners(tableConfig, _propertyStore);
-
-    AdaptiveServerSelector adaptiveServerSelector =
-        AdaptiveServerSelectorFactory.getAdaptiveServerSelector(_serverRoutingStatsManager, _pinotConfig);
-    InstanceSelector instanceSelector =
-        InstanceSelectorFactory.getInstanceSelector(tableConfig, _propertyStore, _brokerMetrics,
-            adaptiveServerSelector, _pinotConfig);
-    instanceSelector.init(_routableServers, _enabledServerInstanceMap, idealState, externalView,
-        preSelectedOnlineSegments);
-
-    // Add time boundary manager if both offline and real-time part exist for a hybrid table
-    TimeBoundaryManager timeBoundaryManager = null;
-    String rawTableName = TableNameBuilder.extractRawTableName(tableNameWithType);
-    if (TableNameBuilder.isOfflineTableResource(tableNameWithType)) {
-      // Current table is offline
-      String realtimeTableName = TableNameBuilder.REALTIME.tableNameWithType(rawTableName);
-      if (_routingEntryMap.containsKey(realtimeTableName)) {
-        LOGGER.info("Adding time boundary manager for table: {}", tableNameWithType);
-        timeBoundaryManager = new TimeBoundaryManager(tableConfig, _propertyStore, _brokerMetrics);
-        timeBoundaryManager.init(idealState, externalView, preSelectedOnlineSegments);
+  private void buildRoutingInternal(String tableNameWithType) {
+    long buildStartTimeMs = System.currentTimeMillis();
+    Object tableLock = getRoutingTableBuildLock(tableNameWithType);
+    synchronized (tableLock) {
+      long lastBuildStartTimeMs = getLastRoutingTableBuildStartTimeMs(tableNameWithType);
+      if (buildStartTimeMs <= lastBuildStartTimeMs) {
+        LOGGER.info("Skipping routing build for table: {} because the build routing request timestamp {} "
+                + "is earlier than the last build start time: {}",
+            tableNameWithType, buildStartTimeMs, lastBuildStartTimeMs);
+        return;
       }
-    } else {
-      // Current table is real-time
-      String offlineTableName = TableNameBuilder.OFFLINE.tableNameWithType(rawTableName);
-      RoutingEntry offlineTableRoutingEntry = _routingEntryMap.get(offlineTableName);
-      if (offlineTableRoutingEntry != null && offlineTableRoutingEntry.getTimeBoundaryManager() == null) {
-        LOGGER.info("Adding time boundary manager for table: {}", offlineTableName);
 
-        // NOTE: Add time boundary manager to the offline part before adding the routing for the real-time part to
-        // ensure no overlapping data getting queried
-        TableConfig offlineTableConfig = ZKMetadataProvider.getTableConfig(_propertyStore, offlineTableName);
-        Preconditions.checkState(offlineTableConfig != null, "Failed to find table config for table: %s",
-            offlineTableName);
-        IdealState offlineTableIdealState = getIdealState(getIdealStatePath(offlineTableName));
-        Preconditions.checkState(offlineTableIdealState != null, "Failed to find ideal state for table: %s",
-            offlineTableName);
-        // NOTE: External view might be null for new created tables. In such case, create an empty one.
-        ExternalView offlineTableExternalView = getExternalView(getExternalViewPath(offlineTableName));
-        if (offlineTableExternalView == null) {
-          offlineTableExternalView = new ExternalView(offlineTableName);
+      // Record build start time to gate older requests and to use to compare with the timestamp for when
+      // the global processSegmentAssignmentChange() was last called
+      _routingTableBuildStartTimeMs.put(tableNameWithType, System.currentTimeMillis());
+
+      LOGGER.info("Building routing for table: {}", tableNameWithType);
+
+      TableConfig tableConfig = ZKMetadataProvider.getTableConfig(_propertyStore, tableNameWithType);
+      Preconditions.checkState(tableConfig != null, "Failed to find table config for table: %s", tableNameWithType);
+
+      String idealStatePath = getIdealStatePath(tableNameWithType);
+      IdealState idealState = getIdealState(idealStatePath);
+      Preconditions.checkState(idealState != null, "Failed to find ideal state for table: %s", tableNameWithType);
+      int idealStateVersion = idealState.getRecord().getVersion();
+
+      String externalViewPath = getExternalViewPath(tableNameWithType);
+      ExternalView externalView = getExternalView(externalViewPath);
+      int externalViewVersion;
+      // NOTE: External view might be null for new created tables. In such case, create an empty one and set the
+      // version to -1 to ensure the version does not match the next external view
+      if (externalView == null) {
+        externalView = new ExternalView(tableNameWithType);
+        externalViewVersion = -1;
+      } else {
+        externalViewVersion = externalView.getRecord().getVersion();
+      }
+
+      Set<String> onlineSegments = getOnlineSegments(idealState);
+
+      SegmentPreSelector segmentPreSelector =
+          SegmentPreSelectorFactory.getSegmentPreSelector(tableConfig, _propertyStore);
+      Set<String> preSelectedOnlineSegments = segmentPreSelector.preSelect(onlineSegments);
+      SegmentSelector segmentSelector = SegmentSelectorFactory.getSegmentSelector(tableConfig);
+      segmentSelector.init(idealState, externalView, preSelectedOnlineSegments);
+
+      // Register segment pruners and initialize segment zk metadata fetcher.
+      List<SegmentPruner> segmentPruners = SegmentPrunerFactory.getSegmentPruners(tableConfig, _propertyStore);
+
+      AdaptiveServerSelector adaptiveServerSelector =
+          AdaptiveServerSelectorFactory.getAdaptiveServerSelector(_serverRoutingStatsManager, _pinotConfig);
+      InstanceSelector instanceSelector =
+          InstanceSelectorFactory.getInstanceSelector(tableConfig, _propertyStore, _brokerMetrics,
+              adaptiveServerSelector, _pinotConfig);
+      instanceSelector.init(_routableServers, _enabledServerInstanceMap, idealState, externalView,
+          preSelectedOnlineSegments);
+
+      // Add time boundary manager if both offline and real-time part exist for a hybrid table
+      TimeBoundaryManager timeBoundaryManager = null;
+      String rawTableName = TableNameBuilder.extractRawTableName(tableNameWithType);
+      if (TableNameBuilder.isOfflineTableResource(tableNameWithType)) {
+        // Current table is offline
+        String realtimeTableName = TableNameBuilder.REALTIME.tableNameWithType(rawTableName);
+        if (_routingEntryMap.containsKey(realtimeTableName)) {
+          LOGGER.info("Adding time boundary manager for table: {}", tableNameWithType);
+          timeBoundaryManager = new TimeBoundaryManager(tableConfig, _propertyStore, _brokerMetrics);
+          timeBoundaryManager.init(idealState, externalView, preSelectedOnlineSegments);
         }
-        Set<String> offlineTableOnlineSegments = getOnlineSegments(offlineTableIdealState);
-        SegmentPreSelector offlineTableSegmentPreSelector =
-            SegmentPreSelectorFactory.getSegmentPreSelector(offlineTableConfig, _propertyStore);
-        Set<String> offlineTablePreSelectedOnlineSegments =
-            offlineTableSegmentPreSelector.preSelect(offlineTableOnlineSegments);
-        TimeBoundaryManager offlineTableTimeBoundaryManager =
-            new TimeBoundaryManager(offlineTableConfig, _propertyStore, _brokerMetrics);
-        offlineTableTimeBoundaryManager.init(offlineTableIdealState, offlineTableExternalView,
-            offlineTablePreSelectedOnlineSegments);
-        offlineTableRoutingEntry.setTimeBoundaryManager(offlineTableTimeBoundaryManager);
-      }
-    }
+      } else {
+        // Current table is real-time
+        String offlineTableName = TableNameBuilder.OFFLINE.tableNameWithType(rawTableName);
+        RoutingEntry offlineTableRoutingEntry = _routingEntryMap.get(offlineTableName);
+        if (offlineTableRoutingEntry != null && offlineTableRoutingEntry.getTimeBoundaryManager() == null) {
+          LOGGER.info("Adding time boundary manager for table: {}", offlineTableName);
 
-    SegmentPartitionMetadataManager partitionMetadataManager = null;
-    // TODO: Support multiple partition columns
-    // TODO: Make partition pruner on top of the partition metadata manager to avoid keeping 2 copies of the metadata
-    if (_enablePartitionMetadataManager) {
-      SegmentPartitionConfig segmentPartitionConfig = tableConfig.getIndexingConfig().getSegmentPartitionConfig();
-      if (segmentPartitionConfig != null) {
-        Map<String, ColumnPartitionConfig> columnPartitionMap = segmentPartitionConfig.getColumnPartitionMap();
-        if (columnPartitionMap.size() == 1) {
-          Map.Entry<String, ColumnPartitionConfig> partitionConfig = columnPartitionMap.entrySet().iterator().next();
-          LOGGER.info("Enabling SegmentPartitionMetadataManager for table: {} on partition column: {}",
-              tableNameWithType, partitionConfig.getKey());
-          partitionMetadataManager = new SegmentPartitionMetadataManager(tableNameWithType, partitionConfig.getKey(),
-              partitionConfig.getValue().getFunctionName(), partitionConfig.getValue().getNumPartitions());
+          // NOTE: Add time boundary manager to the offline part before adding the routing for the real-time part to
+          // ensure no overlapping data getting queried
+          TableConfig offlineTableConfig = ZKMetadataProvider.getTableConfig(_propertyStore, offlineTableName);
+          Preconditions.checkState(offlineTableConfig != null, "Failed to find table config for table: %s",
+              offlineTableName);
+          IdealState offlineTableIdealState = getIdealState(getIdealStatePath(offlineTableName));
+          Preconditions.checkState(offlineTableIdealState != null, "Failed to find ideal state for table: %s",
+              offlineTableName);
+          // NOTE: External view might be null for new created tables. In such case, create an empty one.
+          ExternalView offlineTableExternalView = getExternalView(getExternalViewPath(offlineTableName));
+          if (offlineTableExternalView == null) {
+            offlineTableExternalView = new ExternalView(offlineTableName);
+          }
+          Set<String> offlineTableOnlineSegments = getOnlineSegments(offlineTableIdealState);
+          SegmentPreSelector offlineTableSegmentPreSelector =
+              SegmentPreSelectorFactory.getSegmentPreSelector(offlineTableConfig, _propertyStore);
+          Set<String> offlineTablePreSelectedOnlineSegments =
+              offlineTableSegmentPreSelector.preSelect(offlineTableOnlineSegments);
+          TimeBoundaryManager offlineTableTimeBoundaryManager =
+              new TimeBoundaryManager(offlineTableConfig, _propertyStore, _brokerMetrics);
+          offlineTableTimeBoundaryManager.init(offlineTableIdealState, offlineTableExternalView,
+              offlineTablePreSelectedOnlineSegments);
+          offlineTableRoutingEntry.setTimeBoundaryManager(offlineTableTimeBoundaryManager);
+        }
+      }
+
+      SegmentPartitionMetadataManager partitionMetadataManager = null;
+      // TODO: Support multiple partition columns
+      // TODO: Make partition pruner on top of the partition metadata manager to avoid keeping 2 copies of the
+      //       metadata
+      if (_enablePartitionMetadataManager) {
+        SegmentPartitionConfig segmentPartitionConfig = tableConfig.getIndexingConfig().getSegmentPartitionConfig();
+        if (segmentPartitionConfig != null) {
+          Map<String, ColumnPartitionConfig> columnPartitionMap = segmentPartitionConfig.getColumnPartitionMap();
+          if (columnPartitionMap.size() == 1) {
+            Map.Entry<String, ColumnPartitionConfig> partitionConfig =
+                columnPartitionMap.entrySet().iterator().next();
+            LOGGER.info("Enabling SegmentPartitionMetadataManager for table: {} on partition column: {}",
+                tableNameWithType, partitionConfig.getKey());
+            partitionMetadataManager =
+                new SegmentPartitionMetadataManager(tableNameWithType, partitionConfig.getKey(),
+                    partitionConfig.getValue().getFunctionName(), partitionConfig.getValue().getNumPartitions());
+          } else {
+            LOGGER.warn(
+                "Cannot enable SegmentPartitionMetadataManager for table: {} with multiple partition columns: {}",
+                tableNameWithType, columnPartitionMap.keySet());
+          }
+        }
+      }
+
+      QueryConfig queryConfig = tableConfig.getQueryConfig();
+      Long queryTimeoutMs = queryConfig != null ? queryConfig.getTimeoutMs() : null;
+
+      SegmentZkMetadataFetcher segmentZkMetadataFetcher =
+          new SegmentZkMetadataFetcher(tableNameWithType, _propertyStore);
+      for (SegmentZkMetadataFetchListener listener : segmentPruners) {
+        segmentZkMetadataFetcher.register(listener);
+      }
+      if (partitionMetadataManager != null) {
+        segmentZkMetadataFetcher.register(partitionMetadataManager);
+      }
+      segmentZkMetadataFetcher.init(idealState, externalView, preSelectedOnlineSegments);
+
+      RoutingEntry routingEntry =
+          new RoutingEntry(tableNameWithType, idealStatePath, externalViewPath, segmentPreSelector, segmentSelector,
+              segmentPruners, instanceSelector, idealStateVersion, externalViewVersion, segmentZkMetadataFetcher,
+              timeBoundaryManager, partitionMetadataManager, queryTimeoutMs, !idealState.isEnabled());
+      if (_routingEntryMap.put(tableNameWithType, routingEntry) == null) {
+        LOGGER.info("Built routing for table: {}", tableNameWithType);
+      } else {
+        LOGGER.info("Rebuilt routing for table: {}", tableNameWithType);
+      }
+
+      // Check for updates to the IS / EV after adding the routing entry, as it is possible that the
+      // processSegmentAssignmentChange() may have run and missed updating this newly added entry. Only update
+      // the entry if:
+      // - The calculated build time for this table is older than the processSegmentAssignmentChange() timestamp, and
+      // - The IS or EV version has changed since the entry was added
+      if (_routingTableBuildStartTimeMs.get(tableNameWithType) < _processAssignmentChangeSnapshotTimestampMs) {
+        LOGGER.info("processSegmentAssignmentChange started after build routing for table was started, check if "
+            + "routing entry needs to be updated for table: {} to prevent missed updates", tableNameWithType);
+        idealStatePath = getIdealStatePath(tableNameWithType);
+        idealState = getIdealState(idealStatePath);
+        Preconditions.checkState(idealState != null, "Failed to find ideal state for table: %s", tableNameWithType);
+        idealStateVersion = idealState.getRecord().getVersion();
+
+        externalViewPath = getExternalViewPath(tableNameWithType);
+        externalView = getExternalView(externalViewPath);
+        // NOTE: External view might be null for new created tables. In such case, create an empty one and set the
+        // version to -1 to ensure the version does not match the next external view
+        if (externalView == null) {
+          externalViewVersion = -1;
         } else {
-          LOGGER.warn("Cannot enable SegmentPartitionMetadataManager for table: {} with multiple partition columns: {}",
-              tableNameWithType, columnPartitionMap.keySet());
+          externalViewVersion = externalView.getRecord().getVersion();
+        }
+
+        // Okay to directly reuse the routingEntry here since the table-level lock is still held
+        boolean hasISOrEvVersionChanged = processAssignmentChangeForTable(idealStateVersion, externalViewVersion,
+            routingEntry);
+        if (!hasISOrEvVersionChanged) {
+          LOGGER.info("No need to update the routing entry for table {} as IS / EV version has not changed",
+              tableNameWithType);
+        } else {
+          LOGGER.info("The IS / EV version has changed since the routing entry was added for table: {}, updated "
+              + "it if both IS and EV exist", tableNameWithType);
         }
       }
-    }
-
-    QueryConfig queryConfig = tableConfig.getQueryConfig();
-    Long queryTimeoutMs = queryConfig != null ? queryConfig.getTimeoutMs() : null;
-
-    SegmentZkMetadataFetcher segmentZkMetadataFetcher = new SegmentZkMetadataFetcher(tableNameWithType, _propertyStore);
-    for (SegmentZkMetadataFetchListener listener : segmentPruners) {
-      segmentZkMetadataFetcher.register(listener);
-    }
-    if (partitionMetadataManager != null) {
-      segmentZkMetadataFetcher.register(partitionMetadataManager);
-    }
-    segmentZkMetadataFetcher.init(idealState, externalView, preSelectedOnlineSegments);
-
-    RoutingEntry routingEntry =
-        new RoutingEntry(tableNameWithType, idealStatePath, externalViewPath, segmentPreSelector, segmentSelector,
-            segmentPruners, instanceSelector, idealStateVersion, externalViewVersion, segmentZkMetadataFetcher,
-            timeBoundaryManager, partitionMetadataManager, queryTimeoutMs, !idealState.isEnabled());
-    if (_routingEntryMap.put(tableNameWithType, routingEntry) == null) {
-      LOGGER.info("Built routing for table: {}", tableNameWithType);
-    } else {
-      LOGGER.info("Rebuilt routing for table: {}", tableNameWithType);
     }
   }
 
@@ -637,28 +860,70 @@ public class BrokerRoutingManager implements RoutingManager, ClusterChangeHandle
   /**
    * Removes the routing for the given table.
    */
-  public synchronized void removeRouting(String tableNameWithType) {
-    LOGGER.info("Removing routing for table: {}", tableNameWithType);
-    if (_routingEntryMap.remove(tableNameWithType) != null) {
-      LOGGER.info("Removed routing for table: {}", tableNameWithType);
-
-      // Remove time boundary manager for the offline part routing if the removed routing is the real-time part of a
-      // hybrid table
-      if (TableNameBuilder.isRealtimeTableResource(tableNameWithType)) {
-        String offlineTableName =
-            TableNameBuilder.OFFLINE.tableNameWithType(TableNameBuilder.extractRawTableName(tableNameWithType));
-        RoutingEntry routingEntry = _routingEntryMap.get(offlineTableName);
-        if (routingEntry != null) {
-          routingEntry.setTimeBoundaryManager(null);
-          LOGGER.info("Removed time boundary manager for table: {}", offlineTableName);
-        }
-      }
-    } else {
-      LOGGER.warn("Routing does not exist for table: {}, skipping removing routing", tableNameWithType);
+  public void removeRouting(String tableNameWithType) {
+    _globalLock.readLock().lock();
+    try {
+      removeRoutingInternal(tableNameWithType);
+    } finally {
+      _globalLock.readLock().unlock();
     }
   }
 
-  public synchronized void removeRoutingForLogicalTable(String logicalTableName) {
+  private void removeRoutingInternal(String tableNameWithType) {
+    boolean tableCounterPartExists;
+    String rawTableName = TableNameBuilder.extractRawTableName(tableNameWithType);
+    Object tableLock = getRoutingTableBuildLock(tableNameWithType);
+    synchronized (tableLock) {
+      LOGGER.info("Removing routing for table: {}", tableNameWithType);
+
+      // Assess if the REALTIME / OFFLINE table counterpart exists, to decide whether it is safe to delete the
+      // table level lock or not (since this is shared by OFFLINE and REALTIME tables)
+      if (TableNameBuilder.isRealtimeTableResource(tableNameWithType)) {
+        tableCounterPartExists = _routingEntryMap.containsKey(TableNameBuilder.OFFLINE.tableNameWithType(rawTableName));
+      } else {
+        tableCounterPartExists = _routingEntryMap.containsKey(
+            TableNameBuilder.REALTIME.tableNameWithType(rawTableName));
+      }
+
+      if (_routingEntryMap.remove(tableNameWithType) != null) {
+        LOGGER.info("Removed routing for table: {}", tableNameWithType);
+
+        // Remove time boundary manager for the offline part routing if the removed routing is the real-time part of a
+        // hybrid table
+        if (TableNameBuilder.isRealtimeTableResource(tableNameWithType)) {
+          String offlineTableName =
+              TableNameBuilder.OFFLINE.tableNameWithType(TableNameBuilder.extractRawTableName(tableNameWithType));
+          RoutingEntry routingEntry = _routingEntryMap.get(offlineTableName);
+          if (routingEntry != null) {
+            routingEntry.setTimeBoundaryManager(null);
+            LOGGER.info("Removed time boundary manager for table: {}", offlineTableName);
+          }
+        }
+
+        // Clean up any per-table build data structures / locks as the routing for this table has been removed
+        _routingTableBuildStartTimeMs.remove(tableNameWithType);
+        if (!tableCounterPartExists) {
+          _routingTableBuildLocks.remove(rawTableName);
+        }
+      } else {
+        LOGGER.warn("Routing does not exist for table: {}, skipping removing routing", tableNameWithType);
+      }
+    }
+  }
+
+  /**
+   * Removes routing for logical tables
+   */
+  public void removeRoutingForLogicalTable(String logicalTableName) {
+    _globalLock.readLock().lock();
+    try {
+      removeRoutingForLogicalTableInternal(logicalTableName);
+    } finally {
+      _globalLock.readLock().unlock();
+    }
+  }
+
+  private void removeRoutingForLogicalTableInternal(String logicalTableName) {
     LOGGER.info("Removing time boundary manager for logical table: {}", logicalTableName);
     LogicalTableConfig logicalTableConfig =
         ZKMetadataProvider.getLogicalTableConfig(_propertyStore, logicalTableName);
@@ -674,24 +939,27 @@ public class BrokerRoutingManager implements RoutingManager, ClusterChangeHandle
     List<String> timeBoundaryTableNames = timeBoundaryStrategy.getTimeBoundaryTableNames(logicalTableConfig);
     for (String tableNameWithType : timeBoundaryTableNames) {
 
-      if (TableNameBuilder.isRealtimeTableResource(tableNameWithType)) {
-        LOGGER.info("Skipping removing time boundary manager for real-time table: {}", tableNameWithType);
-        continue;
-      }
+      Object tableLock = getRoutingTableBuildLock(tableNameWithType);
+      synchronized (tableLock) {
+        if (TableNameBuilder.isRealtimeTableResource(tableNameWithType)) {
+          LOGGER.info("Skipping removing time boundary manager for real-time table: {}", tableNameWithType);
+          continue;
+        }
 
-      String rawTableName = TableNameBuilder.extractRawTableName(tableNameWithType);
-      String realtimeTableName = TableNameBuilder.REALTIME.tableNameWithType(rawTableName);
-      if (_routingEntryMap.containsKey(realtimeTableName)) {
-        LOGGER.info("Skipping removing time boundary manager for hybrid physical table: {}", rawTableName);
-        continue;
-      }
+        String rawTableName = TableNameBuilder.extractRawTableName(tableNameWithType);
+        String realtimeTableName = TableNameBuilder.REALTIME.tableNameWithType(rawTableName);
+        if (_routingEntryMap.containsKey(realtimeTableName)) {
+          LOGGER.info("Skipping removing time boundary manager for hybrid physical table: {}", rawTableName);
+          continue;
+        }
 
-      RoutingEntry routingEntry = _routingEntryMap.get(tableNameWithType);
-      if (routingEntry != null) {
-        routingEntry.setTimeBoundaryManager(null);
-        LOGGER.info("Removed time boundary manager for table: {}", tableNameWithType);
-      } else {
-        LOGGER.warn("Routing does not exist for table: {}, skipping", tableNameWithType);
+        RoutingEntry routingEntry = _routingEntryMap.get(tableNameWithType);
+        if (routingEntry != null) {
+          routingEntry.setTimeBoundaryManager(null);
+          LOGGER.info("Removed time boundary manager for table: {}", tableNameWithType);
+        } else {
+          LOGGER.warn("Routing does not exist for table: {}, skipping", tableNameWithType);
+        }
       }
     }
   }
@@ -699,14 +967,26 @@ public class BrokerRoutingManager implements RoutingManager, ClusterChangeHandle
   /**
    * Refreshes the metadata for the given segment (called when segment is getting refreshed).
    */
-  public synchronized void refreshSegment(String tableNameWithType, String segment) {
-    LOGGER.info("Refreshing segment: {} for table: {}", segment, tableNameWithType);
-    RoutingEntry routingEntry = _routingEntryMap.get(tableNameWithType);
-    if (routingEntry != null) {
-      routingEntry.refreshSegment(segment);
-      LOGGER.info("Refreshed segment: {} for table: {}", segment, tableNameWithType);
-    } else {
-      LOGGER.warn("Routing does not exist for table: {}, skipping refreshing segment", tableNameWithType);
+  public void refreshSegment(String tableNameWithType, String segment) {
+    _globalLock.readLock().lock();
+    try {
+      refreshSegmentInternal(tableNameWithType, segment);
+    } finally {
+      _globalLock.readLock().unlock();
+    }
+  }
+
+  private void refreshSegmentInternal(String tableNameWithType, String segment) {
+    Object tableLock = getRoutingTableBuildLock(tableNameWithType);
+    synchronized (tableLock) {
+      LOGGER.info("Refreshing segment: {} for table: {}", segment, tableNameWithType);
+      RoutingEntry routingEntry = _routingEntryMap.get(tableNameWithType);
+      if (routingEntry != null) {
+        routingEntry.refreshSegment(segment);
+        LOGGER.info("Refreshed segment: {} for table: {}", segment, tableNameWithType);
+      } else {
+        LOGGER.warn("Routing does not exist for table: {}, skipping refreshing segment", tableNameWithType);
+      }
     }
   }
 
@@ -864,6 +1144,16 @@ public class BrokerRoutingManager implements RoutingManager, ClusterChangeHandle
   public Long getQueryTimeoutMs(String tableNameWithType) {
     RoutingEntry routingEntry = _routingEntryMap.get(tableNameWithType);
     return routingEntry != null ? routingEntry.getQueryTimeoutMs() : null;
+  }
+
+  public void stop() {
+    LOGGER.info("Stopping executor service for BrokerRoutingManager");
+    _executorService.shutdownNow();
+    try {
+      _executorService.awaitTermination(10L, TimeUnit.SECONDS);
+    } catch (InterruptedException e) {
+      LOGGER.warn("Interrupted while waiting termination for the BrokerRoutingManager executor service", e);
+    }
   }
 
   private static class RoutingEntry {

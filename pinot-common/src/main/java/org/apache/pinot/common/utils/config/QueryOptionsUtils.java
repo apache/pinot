@@ -163,6 +163,11 @@ public class QueryOptionsUtils {
     return "false".equalsIgnoreCase(queryOptions.get(QueryOptionKey.USE_SCAN_REORDER_OPTIMIZATION));
   }
 
+  public static boolean isCollectGcStats(Map<String, String> queryOptions) {
+    // Disabled by default
+    return Boolean.parseBoolean(queryOptions.get(QueryOptionKey.COLLECT_GC_STATS));
+  }
+
   @Nullable
   public static Map<String, Set<FieldConfig.IndexType>> getSkipIndexes(Map<String, String> queryOptions) {
     // Example config:  skipIndexes='col1=inverted,range&col2=inverted'
@@ -342,11 +347,6 @@ public class QueryOptionsUtils {
   }
 
   @Nullable
-  public static String getOrderByAlgorithm(Map<String, String> queryOptions) {
-    return queryOptions.get(QueryOptionKey.ORDER_BY_ALGORITHM);
-  }
-
-  @Nullable
   public static Integer getMultiStageLeafLimit(Map<String, String> queryOptions) {
     String maxLeafLimitStr = queryOptions.get(QueryOptionKey.MULTI_STAGE_LEAF_LIMIT);
     return checkedParseIntNonNegative(QueryOptionKey.MULTI_STAGE_LEAF_LIMIT, maxLeafLimitStr);
@@ -491,9 +491,15 @@ public class QueryOptionsUtils {
     return option != null ? Boolean.parseBoolean(option) : defaultValue;
   }
 
-  public static int getLiteModeServerStageLimit(Map<String, String> queryOptions, int defaultValue) {
-    String option = queryOptions.get(QueryOptionKey.LITE_MODE_SERVER_STAGE_LIMIT);
-    return option != null ? checkedParseIntPositive(QueryOptionKey.LITE_MODE_SERVER_STAGE_LIMIT, option) : defaultValue;
+  public static Integer getLiteModeLeafStageLimit(Map<String, String> queryOptions, int defaultValue) {
+    String option = queryOptions.get(QueryOptionKey.LITE_MODE_LEAF_STAGE_LIMIT);
+    return option != null ? checkedParseIntPositive(QueryOptionKey.LITE_MODE_LEAF_STAGE_LIMIT, option) : defaultValue;
+  }
+
+  public static Integer getLiteModeLeafStageFanOutAdjustedLimit(Map<String, String> queryOptions, int defaultValue) {
+    String option = queryOptions.get(QueryOptionKey.LITE_MODE_LEAF_STAGE_FANOUT_ADJUSTED_LIMIT);
+    return option != null ? checkedParseIntPositive(QueryOptionKey.LITE_MODE_LEAF_STAGE_FANOUT_ADJUSTED_LIMIT, option)
+        : defaultValue;
   }
 
   @Nullable
@@ -570,5 +576,41 @@ public class QueryOptionsUtils {
 
   public static String getWorkloadName(Map<String, String> queryOptions) {
     return queryOptions.getOrDefault(QueryOptionKey.WORKLOAD_NAME, CommonConstants.Accounting.DEFAULT_WORKLOAD_NAME);
+  }
+
+  public static boolean isReverseOrderAllowed(Map<String, String> queryOptions) {
+    String value = queryOptions.get(QueryOptionKey.ALLOW_REVERSE_ORDER);
+    if (value == null) {
+      return QueryOptionKey.DEFAULT_ALLOW_REVERSE_ORDER;
+    }
+    return Boolean.parseBoolean(value);
+  }
+
+  /**
+   * Get the REGEXP_LIKE adaptive threshold from query options.
+   * This threshold controls when to switch between dictionary-based and scan-based evaluation.
+   * When (dictionary_size / num_docs) < threshold, use dictionary-based evaluation.
+   * When (dictionary_size / num_docs) >= threshold, use scan-based evaluation.
+   *
+   * @param queryOptions Query options map
+   * @param defaultThreshold Default threshold to use if not specified in query options
+   * @return The adaptive threshold value (between 0.0 and 1.0)
+   */
+  public static double getRegexpLikeAdaptiveThreshold(Map<String, String> queryOptions, double defaultThreshold) {
+    String thresholdStr = queryOptions.get(QueryOptionKey.REGEXP_LIKE_ADAPTIVE_THRESHOLD);
+    if (thresholdStr != null) {
+      try {
+        double threshold = Double.parseDouble(thresholdStr);
+        if (threshold >= 0.0 && threshold <= 1.0) {
+          return threshold;
+        } else {
+          throw new IllegalArgumentException(
+              "REGEXP_LIKE adaptive threshold must be between 0.0 and 1.0, got: " + threshold);
+        }
+      } catch (NumberFormatException e) {
+        throw new IllegalArgumentException("Invalid REGEXP_LIKE adaptive threshold value: " + thresholdStr, e);
+      }
+    }
+    return defaultThreshold;
   }
 }

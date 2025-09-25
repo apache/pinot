@@ -792,9 +792,10 @@ const getNodeData = (path) => {
   });
 };
 
-const putNodeData = (data) => {
-  const serializedData = Utils.serialize(data);
-  return zookeeperPutData(serializedData).then((obj)=>{
+const putNodeData = (nodeParams) => {
+  const { data, ...queryParams } = nodeParams;
+  const serializedParams = Utils.serialize(queryParams);
+  return zookeeperPutData(serializedParams, data).then((obj)=>{
     return obj;
   });
 };

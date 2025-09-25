@@ -1,4 +1,33 @@
 {
+  "physical_opt_lite_mode_limit_options": {
+    "queries": [
+      {
+        "description": "Verify that override for lite mode leaf stage limit works.",
+        "sql": "SET usePhysicalOptimizer=true; SET useLiteMode=true; SET liteModeLeafStageLimit=1000; EXPLAIN PLAN FOR SELECT COUNT(*) FROM a WHERE col1 = 'foo'",
+        "output": [
+          "Execution Plan",
+          "\nPhysicalAggregate(group=[{}], agg#0=[COUNT($0)], aggType=[FINAL])",
+          "\n  PhysicalExchange(exchangeStrategy=[SINGLETON_EXCHANGE])",
+          "\n    PhysicalAggregate(group=[{}], agg#0=[COUNT()], aggType=[LEAF], limit=[1000])",
+          "\n      PhysicalFilter(condition=[=($0, _UTF-8'foo')])",
+          "\n        PhysicalTableScan(table=[[default, a]])",
+          "\n"
+        ]
+      },{
+        "description": "Verify that override for lite mode leaf stage fan-out adjusted limit works.",
+        "sql": "SET usePhysicalOptimizer=true; SET useLiteMode=true; SET liteModeLeafStageFanOutAdjustedLimit=1000; EXPLAIN PLAN FOR SELECT COUNT(*) FROM a WHERE col1 = 'foo'",
+        "output": [
+          "Execution Plan",
+          "\nPhysicalAggregate(group=[{}], agg#0=[COUNT($0)], aggType=[FINAL])",
+          "\n  PhysicalExchange(exchangeStrategy=[SINGLETON_EXCHANGE])",
+          "\n    PhysicalAggregate(group=[{}], agg#0=[COUNT()], aggType=[LEAF], limit=[500])",
+          "\n      PhysicalFilter(condition=[=($0, _UTF-8'foo')])",
+          "\n        PhysicalTableScan(table=[[default, a]])",
+          "\n"
+        ]
+      }
+    ]
+  },
   "physical_opt_constant_queries": {
     "queries": [
       {

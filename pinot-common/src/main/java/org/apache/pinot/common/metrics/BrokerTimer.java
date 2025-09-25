@@ -58,7 +58,10 @@ public enum BrokerTimer implements AbstractMetrics.Timer {
   // How long it took the server to start.
   STARTUP_SUCCESS_DURATION_MS(true),
   // GRPC query execution time
-  GRPC_QUERY_EXECUTION_MS(true);
+  GRPC_QUERY_EXECUTION_MS(true),
+  // Audit logging timers
+  AUDIT_REQUEST_PROCESSING_TIME(true),
+  AUDIT_RESPONSE_PROCESSING_TIME(true);
 
   private final String _timerName;
   private final boolean _global;

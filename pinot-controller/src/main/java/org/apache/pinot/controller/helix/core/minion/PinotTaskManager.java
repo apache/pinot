@@ -252,18 +252,20 @@ public class PinotTaskManager extends ControllerPeriodicTask<Void> {
                 + "controlled by the cluster config %s which is set based on controller's performance.", taskType,
             tableName, pinotTaskConfigs.size(), maxNumberOfSubTasks, MinionConstants.MAX_ALLOWED_SUB_TASKS_KEY);
         message += "Optimise the task config or reduce tableMaxNumTasks to avoid the error";
-          // We throw an exception to notify the user
-          // This is to ensure that the user is aware of the task generation limit
-          throw new RuntimeException(message);
+        // We throw an exception to notify the user
+        // This is to ensure that the user is aware of the task generation limit
+        throw new RuntimeException(message);
       }
       pinotTaskConfigs.forEach(pinotTaskConfig -> pinotTaskConfig.getConfigs()
           .computeIfAbsent(MinionConstants.TRIGGERED_BY, k -> CommonConstants.TaskTriggers.ADHOC_TRIGGER.name()));
+      addDefaultsToTaskConfig(pinotTaskConfigs);
       LOGGER.info("Submitting ad-hoc task for task type: {} with task configs: {}", taskType, pinotTaskConfigs);
       _controllerMetrics.addMeteredTableValue(taskType, ControllerMeter.NUMBER_ADHOC_TASKS_SUBMITTED, 1);
       responseMap.put(tableNameWithType,
           _helixTaskResourceManager.submitTask(parentTaskName, pinotTaskConfigs, minionInstanceTag,
-              taskGenerator.getTaskTimeoutMs(), taskGenerator.getNumConcurrentTasksPerInstance(),
-              taskGenerator.getMaxAttemptsPerTask()));
+              taskGenerator.getTaskTimeoutMs(minionInstanceTag),
+              taskGenerator.getNumConcurrentTasksPerInstance(minionInstanceTag),
+              taskGenerator.getMaxAttemptsPerTask(minionInstanceTag)));
     }
     if (responseMap.isEmpty()) {
       LOGGER.warn("No task submitted for tableName: {}", tableName);
@@ -727,7 +729,7 @@ public class PinotTaskManager extends ControllerPeriodicTask<Void> {
    */
   protected TaskSchedulingInfo scheduleTask(PinotTaskGenerator taskGenerator, List<TableConfig> enabledTableConfigs,
       boolean isLeader, @Nullable String minionInstanceTagForTask, String triggeredBy) {
-      TaskSchedulingInfo response = new TaskSchedulingInfo();
+    TaskSchedulingInfo response = new TaskSchedulingInfo();
     String taskType = taskGenerator.getTaskType();
     List<String> enabledTables =
         enabledTableConfigs.stream().map(TableConfig::getTableName).collect(Collectors.toList());
@@ -831,14 +833,16 @@ public class PinotTaskManager extends ControllerPeriodicTask<Void> {
                 numTasks, taskType, pinotTaskConfigs, minionInstanceTag);
             throw new IllegalArgumentException("No valid minion instance found for tag: " + minionInstanceTag);
           }
+          addDefaultsToTaskConfig(pinotTaskConfigs);
           // This might lead to lot of logs, maybe sum it up and move outside the loop
           LOGGER.info("Submitting {} tasks for task type: {} to minionInstance: {} with task configs: {}", numTasks,
               taskType, minionInstanceTag, pinotTaskConfigs);
           pinotTaskConfigs.forEach(pinotTaskConfig ->
               pinotTaskConfig.getConfigs().computeIfAbsent(MinionConstants.TRIGGERED_BY, k -> triggeredBy));
           String submittedTaskName = _helixTaskResourceManager.submitTask(pinotTaskConfigs, minionInstanceTag,
-              taskGenerator.getTaskTimeoutMs(), taskGenerator.getNumConcurrentTasksPerInstance(),
-              taskGenerator.getMaxAttemptsPerTask());
+              taskGenerator.getTaskTimeoutMs(minionInstanceTag),
+              taskGenerator.getNumConcurrentTasksPerInstance(minionInstanceTag),
+              taskGenerator.getMaxAttemptsPerTask(minionInstanceTag));
           submittedTaskNames.add(submittedTaskName);
           _controllerMetrics.addMeteredTableValue(taskType, ControllerMeter.NUMBER_TASKS_SUBMITTED, numTasks);
         }
@@ -934,5 +938,15 @@ public class PinotTaskManager extends ControllerPeriodicTask<Void> {
       return false;
     }
     return true;
+  }
+
+  protected void addDefaultsToTaskConfig(List<PinotTaskConfig> taskConfigs) {
+    String maxDiskUsagePercentageStr = getClusterInfoAccessor().getClusterConfig(
+        MinionConstants.MAX_DISK_USAGE_PERCENTAGE_KEY);
+    for (PinotTaskConfig taskConfig : taskConfigs) {
+      Map<String, String> configs = taskConfig.getConfigs();
+      // Add default configs if not present
+      configs.putIfAbsent(MinionConstants.MergeTask.MAX_DISK_USAGE_PERCENTAGE, maxDiskUsagePercentageStr);
+    };
   }
 }

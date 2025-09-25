@@ -129,7 +129,8 @@ public class SegmentMapper {
 
     // initialize adaptive writer.
     _adaptiveSizeBasedWriter =
-        new AdaptiveSizeBasedWriter(processorConfig.getSegmentConfig().getIntermediateFileSizeThreshold());
+        new AdaptiveSizeBasedWriter(processorConfig.getSegmentConfig().getIntermediateFileSizeThreshold(),
+            processorConfig.getSegmentConfig().getMaxDiskUsagePercentage(), mapperOutputDir);
   }
 
   /**
