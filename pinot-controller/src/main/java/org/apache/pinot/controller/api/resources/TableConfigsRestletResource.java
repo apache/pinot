@@ -217,7 +217,7 @@ public class TableConfigsRestletResource {
           String.format("TableConfigs: %s already exists. Use PUT to update existing config", rawTableName),
           Response.Status.BAD_REQUEST);
     }
-    
+
     validateConfig(tableConfigs, databaseName, typesToSkip);
     tableConfigs.setTableName(rawTableName);
 
