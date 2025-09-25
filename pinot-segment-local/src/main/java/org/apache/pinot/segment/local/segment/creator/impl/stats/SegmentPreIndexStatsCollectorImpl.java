@@ -53,15 +53,14 @@ public class SegmentPreIndexStatsCollectorImpl implements SegmentPreIndexStatsCo
     Schema dataSchema = _statsCollectorConfig.getSchema();
     for (FieldSpec fieldSpec : dataSchema.getAllFieldSpecs()) {
       String column = fieldSpec.getName();
-      boolean dictionaryEnabled = true;
-      // Determine dictionary from table/index configs
-      if (indexConfigsByCol.get(column) != null) {
-        dictionaryEnabled = indexConfigsByCol.get(column).getConfig(StandardIndexes.dictionary()).isEnabled();
-      }
+      boolean dictionaryEnabled = indexConfigsByCol.get(column).getConfig(StandardIndexes.dictionary()).isEnabled();
       if (!dictionaryEnabled) {
-        if (_statsCollectorConfig.getTableConfig().getIndexingConfig().canOptimiseNoDictStatsCollection()) {
-          _columnStatsCollectorMap.put(column, new NoDictColumnStatisticsCollector(column, _statsCollectorConfig));
-          continue;
+        // MAP collector is optimised for no-dictionary collection
+        if (!fieldSpec.getDataType().getStoredType().equals(FieldSpec.DataType.MAP)) {
+          if (_statsCollectorConfig.getTableConfig().getIndexingConfig().canOptimiseNoDictStatsCollection()) {
+            _columnStatsCollectorMap.put(column, new NoDictColumnStatisticsCollector(column, _statsCollectorConfig));
+            continue;
+          }
         }
       }
       switch (fieldSpec.getDataType().getStoredType()) {

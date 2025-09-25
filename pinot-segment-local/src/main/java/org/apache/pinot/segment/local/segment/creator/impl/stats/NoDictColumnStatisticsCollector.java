@@ -21,15 +21,12 @@ package org.apache.pinot.segment.local.segment.creator.impl.stats;
 import com.dynatrace.hash4j.distinctcount.UltraLogLog;
 import java.math.BigDecimal;
 import java.nio.charset.StandardCharsets;
-import java.util.Map;
 import org.apache.commons.lang3.NotImplementedException;
 import org.apache.pinot.segment.local.utils.UltraLogLogUtils;
 import org.apache.pinot.segment.spi.creator.StatsCollectorConfig;
-import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.utils.BigDecimalUtils;
 import org.apache.pinot.spi.utils.ByteArray;
 import org.apache.pinot.spi.utils.CommonConstants;
-import org.apache.pinot.spi.utils.MapUtils;
 
 
 /**
@@ -38,7 +35,7 @@ import org.apache.pinot.spi.utils.MapUtils;
  * - getUniqueValuesSet() throws NotImplementedException
  * - getCardinality() returns approximate cardinality using ULL
  */
-@SuppressWarnings({"rawtypes", "unchecked"})
+@SuppressWarnings({"rawtypes"})
 public class NoDictColumnStatisticsCollector extends AbstractColumnStatisticsCollector {
   private Comparable _minValue;
   private Comparable _maxValue;
@@ -57,27 +54,7 @@ public class NoDictColumnStatisticsCollector extends AbstractColumnStatisticsCol
   @Override
   public void collect(Object entry) {
     assert !_sealed;
-    if (entry instanceof Map) {
-      @SuppressWarnings("unchecked")
-      Map<String, Object> mapValue = (Map<String, Object>) entry;
-      int serializedLength = MapUtils.serializeMap(mapValue).length;
-      _minLength = Math.min(_minLength, serializedLength);
-      _maxLength = Math.max(_maxLength, serializedLength);
-      _maxRowLength = Math.max(_maxRowLength, serializedLength);
-
-      for (Map.Entry<String, Object> mapValueEntry : mapValue.entrySet()) {
-        String key = mapValueEntry.getKey();
-        // Track key-wise min/max without storing all keys
-        updateMinMax(key);
-        if (isPartitionEnabled()) {
-          updatePartition(key);
-        }
-        // Approximate distinct keys using ULL
-        updateUll(key);
-      }
-      // Total number of entries for MAP is number of records
-      _totalNumberOfEntries++;
-    } else if (entry instanceof Object[]) {
+    if (entry instanceof Object[]) {
       Object[] values = (Object[]) entry;
       int rowLength = 0;
       for (Object value : values) {
@@ -196,15 +173,6 @@ public class NoDictColumnStatisticsCollector extends AbstractColumnStatisticsCol
       return _maxValue;
     }
     throw new IllegalStateException("you must seal the collector first before asking for max value");
-  }
-
-  @Override
-  public boolean isSorted() {
-    if (_fieldSpec.getDataType().getStoredType().equals(FieldSpec.DataType.MAP)) {
-      // map is not sorted
-      return false;
-    }
-    return _sorted;
   }
 
   @Override
