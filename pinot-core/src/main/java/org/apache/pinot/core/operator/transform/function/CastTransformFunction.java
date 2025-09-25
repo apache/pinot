@@ -27,6 +27,7 @@ import org.apache.pinot.core.operator.blocks.ValueBlock;
 import org.apache.pinot.core.operator.transform.TransformResultMetadata;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
 import org.apache.pinot.spi.utils.ArrayCopyUtils;
+import org.roaringbitmap.IntConsumer;
 
 
 public class CastTransformFunction extends BaseTransformFunction {
@@ -191,7 +192,12 @@ public class CastTransformFunction extends BaseTransformFunction {
       int length = valueBlock.getNumDocs();
       initLongValuesSV(length);
       String[] stringValues = _transformFunction.transformToStringValuesSV(valueBlock);
-      ArrayCopyUtils.copyToTimestamp(stringValues, _longValuesSV, length, _transformFunction.getNullBitmap(valueBlock));
+      // Null string values can't be converted to timestamp, so replace with actual null to allow the util to skip
+      // those values
+      if (_transformFunction.getNullBitmap(valueBlock) != null) {
+        _transformFunction.getNullBitmap(valueBlock).forEach((IntConsumer) index -> stringValues[index] = null);
+      }
+      ArrayCopyUtils.copyToTimestamp(stringValues, _longValuesSV, length);
       return _longValuesSV;
     } else {
       return _transformFunction.transformToLongValuesSV(valueBlock);
