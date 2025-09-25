@@ -279,7 +279,7 @@ public class TenantRebalanceChecker extends BasePeriodicTask {
       TenantRebalanceContext tenantRebalanceContext,
       TenantRebalanceProgressStats progressStats, PinotHelixResourceManager resourceManager,
       boolean isCancelledByUser) {
-    LOGGER.info("Marking tenant rebalance job: {} as aborted", jobId);
+    LOGGER.info("Marking tenant rebalance job: {} as {}", jobId, isCancelledByUser ? "cancelled" : "aborted");
     TenantRebalanceProgressStats abortedProgressStats = new TenantRebalanceProgressStats(progressStats);
     for (Map.Entry<String, String> entry : abortedProgressStats.getTableStatusMap().entrySet()) {
       if (Objects.equals(entry.getValue(), TenantRebalanceProgressStats.TableStatus.IN_QUEUE.name())) {
