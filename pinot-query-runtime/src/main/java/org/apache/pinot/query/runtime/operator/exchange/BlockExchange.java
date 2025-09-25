@@ -40,7 +40,7 @@ import org.slf4j.LoggerFactory;
 /**
  * This class contains the shared logic across all different exchange types for exchanging data across servers.
  */
-public abstract class BlockExchange {
+public abstract class BlockExchange implements AutoCloseable {
   private static final Logger LOGGER = LoggerFactory.getLogger(BlockExchange.class);
   // TODO: Deduct this value via grpc config maximum byte size; and make it configurable with override.
   // TODO: Max block size is a soft limit. only counts fixedSize datatable byte buffer
@@ -174,9 +174,15 @@ public abstract class BlockExchange {
   protected abstract void route(List<SendingMailbox> destinations, MseBlock.Data block)
       throws IOException, TimeoutException;
 
-  // Called when the OpChain gracefully returns.
-  // TODO: This is a no-op right now.
+  @Override
   public void close() {
+    for (SendingMailbox sendingMailbox : _sendingMailboxes) {
+      try {
+        sendingMailbox.close();
+      } catch (Exception e) {
+        LOGGER.debug("Exception while cancelling mailbox: {}", sendingMailbox, e);
+      }
+    }
   }
 
   public void cancel(Throwable t) {
@@ -263,6 +269,11 @@ public abstract class BlockExchange {
     @Override
     public String toString() {
       return "e" + _id;
+    }
+
+    @Override
+    public void close() {
+      BlockExchange.this.close();
     }
   }
 }

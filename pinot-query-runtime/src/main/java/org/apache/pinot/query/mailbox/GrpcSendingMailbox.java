@@ -22,6 +22,7 @@ import com.google.common.collect.Maps;
 import com.google.protobuf.ByteString;
 import com.google.protobuf.UnsafeByteOperations;
 import io.grpc.Metadata;
+import io.grpc.Status;
 import io.grpc.stub.MetadataUtils;
 import io.grpc.stub.StreamObserver;
 import java.io.IOException;
@@ -303,6 +304,14 @@ public class GrpcSendingMailbox implements SendingMailbox {
     }
 
     return result;
+  }
+
+  @Override
+  public void close()
+      throws Exception {
+    if (!isTerminated()) {
+      _contentObserver.onError(Status.CANCELLED.asException());
+    }
   }
 
   private static abstract class Sender {
