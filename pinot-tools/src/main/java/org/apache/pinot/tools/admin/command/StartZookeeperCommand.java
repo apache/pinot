@@ -41,8 +41,19 @@ public class StartZookeeperCommand extends AbstractBaseAdminCommand implements C
   @CommandLine.Option(names = {"-zkPort"}, required = false, description = "Port to start zookeeper server on.")
   private int _zkPort = 2181;
 
-  @CommandLine.Option(names = {"-dataDir"}, required = false, description = "Directory for zookeper data.")
+  @CommandLine.Option(names = {"-dataDir"}, required = false, description = "Directory for zookeeper data.")
   private String _dataDir = PinotConfigUtils.TMP_DIR + "PinotAdmin/zkData";
+
+  @CommandLine.Option(names = {"-sslEnabled"}, required = false, description = "Enable SSL for zookeeper")
+  private boolean _sslEnabled;
+  @CommandLine.Option(names = {"-sslKeyStorePath"}, required = false, description = "SSL KeyStore path")
+  private String _keyStorePath;
+  @CommandLine.Option(names = {"-sslKeyStorePassword"}, required = false, description = "SSL KeyStore password")
+  private String _keyStorePassword;
+  @CommandLine.Option(names = {"-sslTrustStorePath"}, required = false, description = "SSL TrustStore path")
+  private String _trustStorePath;
+  @CommandLine.Option(names = {"-sslTrustStorePassword"}, required = false, description = "SSL TrustStore password")
+  private String _trustStorePassword;
 
   @Override
   public String getName() {
@@ -73,6 +84,39 @@ public class StartZookeeperCommand extends AbstractBaseAdminCommand implements C
     return this;
   }
 
+  public StartZookeeperCommand setSslEnabled(boolean sslEnabled) {
+    _sslEnabled = sslEnabled;
+    return this;
+  }
+
+  public StartZookeeperCommand setKeyStorePath(String keyStorePath) {
+    _keyStorePath = keyStorePath;
+    return this;
+  }
+
+  public StartZookeeperCommand setKeyStorePassword(String keyStorePassword) {
+    _keyStorePassword = keyStorePassword;
+    return this;
+  }
+
+  public StartZookeeperCommand setTrustStorePath(String trustStorePath) {
+    _trustStorePath = trustStorePath;
+    return this;
+  }
+
+  public StartZookeeperCommand setTrustStorePassword(String trustStorePassword) {
+    _trustStorePassword = trustStorePassword;
+    return this;
+  }
+
+  public ZkStarter.SSLConfig getSSLConfig() {
+    if (_sslEnabled) {
+      return new ZkStarter.SSLConfig(_keyStorePath, _keyStorePassword, _trustStorePath, _trustStorePassword);
+    } else {
+      return null;
+    }
+  }
+
   private ZkStarter.ZookeeperInstance _zookeeperInstance;
 
   public void init(int zkPort, String dataDir) {
@@ -83,7 +127,7 @@ public class StartZookeeperCommand extends AbstractBaseAdminCommand implements C
   @Override
   public boolean execute()
       throws IOException {
-    LOGGER.info("Executing command: {}", toString());
+    LOGGER.info("Executing command: {}", this);
 
     IDefaultNameSpace defaultNameSpace = new IDefaultNameSpace() {
       @Override
@@ -92,7 +136,13 @@ public class StartZookeeperCommand extends AbstractBaseAdminCommand implements C
       }
     };
 
-    _zookeeperInstance = ZkStarter.startLocalZkServer(_zkPort, _dataDir);
+    if (_sslEnabled) {
+      ZkStarter.SSLConfig sslConfig =
+          new ZkStarter.SSLConfig(_keyStorePath, _keyStorePassword, _trustStorePath, _trustStorePassword);
+      _zookeeperInstance = ZkStarter.startLocalZkServer(_zkPort, _dataDir, sslConfig);
+    } else {
+      _zookeeperInstance = ZkStarter.startLocalZkServer(_zkPort, _dataDir, null);
+    }
 
     LOGGER.info("Start zookeeper at localhost:{} in thread {}", _zkPort, Thread.currentThread().getName());
 

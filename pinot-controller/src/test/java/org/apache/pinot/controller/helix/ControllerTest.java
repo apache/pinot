@@ -28,6 +28,8 @@ import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Properties;
+import java.util.Random;
 import java.util.Set;
 import java.util.concurrent.atomic.AtomicInteger;
 import javax.annotation.Nullable;
@@ -59,6 +61,7 @@ import org.apache.helix.store.zk.ZkHelixPropertyStore;
 import org.apache.helix.zookeeper.datamodel.ZNRecord;
 import org.apache.pinot.common.exception.HttpErrorStatusException;
 import org.apache.pinot.common.utils.SimpleHttpResponse;
+import org.apache.pinot.common.utils.ZkSSLUtils;
 import org.apache.pinot.common.utils.ZkStarter;
 import org.apache.pinot.common.utils.config.TagNameUtils;
 import org.apache.pinot.common.utils.helix.HelixHelper;
@@ -112,6 +115,7 @@ public class ControllerTest {
 
   private static final Logger LOGGER = LoggerFactory.getLogger(ControllerTest.class);
 
+  public static final Random RANDOM = new Random();
   public static final String LOCAL_HOST = "localhost";
   public static final String DEFAULT_DATA_DIR = new File(FileUtils.getTempDirectoryPath(),
       "test-controller-data-dir" + System.currentTimeMillis()).getAbsolutePath();
@@ -134,7 +138,6 @@ public class ControllerTest {
    * default static instance used to access all wrapped static instances.
    */
   public static final ControllerTest DEFAULT_INSTANCE = new ControllerTest();
-
   protected static HttpClient _httpClient;
 
   protected final String _clusterName = getClass().getSimpleName();
@@ -146,7 +149,7 @@ public class ControllerTest {
   protected int _nextServerPort = _nextBrokerPort + 1000;
   protected int _nextMinionPort = _nextServerPort + 1000;
 
-  private ZkStarter.ZookeeperInstance _zookeeperInstance;
+  protected ZkStarter.ZookeeperInstance _zookeeperInstance;
 
   // The following fields need to be reset when stopping the controller.
   protected BaseControllerStarter _controllerStarter;
@@ -230,20 +233,36 @@ public class ControllerTest {
   public ControllerRequestClient getControllerRequestClient() {
     if (_controllerRequestClient == null) {
       _controllerRequestClient = new ControllerRequestClient(_controllerRequestURLBuilder, getHttpClient(),
-        getControllerRequestClientHeaders());
+          getControllerRequestClientHeaders());
     }
     return _controllerRequestClient;
   }
 
   public void startZk() {
     if (_zookeeperInstance == null) {
-      runWithHelixMock(() -> _zookeeperInstance = ZkStarter.startLocalZkServer());
+      runWithHelixMock(() -> {
+        // Randomly choose between SSL and non-SSL (50% chance each)
+        boolean useSSL = RANDOM.nextBoolean();
+        if (useSSL) {
+          _zookeeperInstance = ZkStarter.startLocalZkServerWithSSL();
+        } else {
+          _zookeeperInstance = ZkStarter.startLocalZkServer();
+        }
+      });
     }
   }
 
   public void startZk(int port) {
     if (_zookeeperInstance == null) {
-      runWithHelixMock(() -> _zookeeperInstance = ZkStarter.startLocalZkServer(port));
+      runWithHelixMock(() -> {
+        // Randomly choose between SSL and non-SSL (50% chance each)
+        boolean useSSL = RANDOM.nextBoolean();
+        if (useSSL) {
+          _zookeeperInstance = ZkStarter.startLocalZkServerWithSSL(port);
+        } else {
+          _zookeeperInstance = ZkStarter.startLocalZkServer(port);
+        }
+      });
     }
   }
 
@@ -260,6 +279,27 @@ public class ControllerTest {
 
   public String getZkUrl() {
     return _zookeeperInstance.getZkUrl();
+  }
+
+  /**
+   * Ensures SSL configuration is applied before creating Helix managers if ZooKeeper is SSL-enabled
+   */
+  protected void ensureSSLConfigured() {
+    if (_zookeeperInstance != null && _zookeeperInstance.isSSLEnabled()) {
+      ZkSSLUtils.configureSSL(_zookeeperInstance.getSSLConfig().getClientSSLProperties());
+    }
+  }
+
+  /**
+   * Adds SSL properties to a configuration if ZooKeeper is SSL-enabled
+   */
+  protected void addSSLPropertiesToConfig(PinotConfiguration config) {
+    if (_zookeeperInstance != null && _zookeeperInstance.isSSLEnabled()) {
+      Properties sslProperties = _zookeeperInstance.getSSLConfig().getClientSSLProperties();
+      for (String key : sslProperties.stringPropertyNames()) {
+        config.setProperty(key, sslProperties.getProperty(key));
+      }
+    }
   }
 
   public Map<String, Object> getDefaultControllerConfiguration() {
@@ -314,8 +354,21 @@ public class ControllerTest {
     runWithHelixMock(() -> {
       assertNull(_controllerStarter, "Controller is already started");
       assertTrue(_controllerPort > 0, "Controller port is not assigned");
+
+      // Ensure SSL configuration is applied if ZooKeeper is SSL-enabled
+      ensureSSLConfigured();
+
+      // Add SSL properties to controller configuration if ZooKeeper is SSL-enabled
+      Map<String, Object> controllerProperties = new HashMap<>(properties);
+      if (_zookeeperInstance != null && _zookeeperInstance.isSSLEnabled()) {
+        Properties sslProperties = _zookeeperInstance.getSSLConfig().getClientSSLProperties();
+        for (String key : sslProperties.stringPropertyNames()) {
+          controllerProperties.put(key, sslProperties.getProperty(key));
+        }
+      }
+
       _controllerStarter = createControllerStarter();
-      _controllerStarter.init(new PinotConfiguration(properties));
+      _controllerStarter.init(new PinotConfiguration(controllerProperties));
       _controllerStarter.start();
       _controllerConfig = _controllerStarter.getConfig();
       _controllerBaseApiUrl = _controllerConfig.generateVipUrl();
@@ -386,6 +439,7 @@ public class ControllerTest {
    */
   public void addFakeBrokerInstanceToAutoJoinHelixCluster(String instanceId, boolean isSingleTenant)
       throws Exception {
+    ensureSSLConfigured();
     HelixManager helixManager =
         HelixManagerFactory.getZKHelixManager(getHelixClusterName(), instanceId, InstanceType.PARTICIPANT, getZkUrl());
     helixManager.getStateMachineEngine()
@@ -492,6 +546,7 @@ public class ControllerTest {
 
   public void addFakeServerInstanceToAutoJoinHelixCluster(String instanceId, boolean isSingleTenant)
       throws Exception {
+    ensureSSLConfigured();
     HelixManager helixManager =
         HelixManagerFactory.getZKHelixManager(getHelixClusterName(), instanceId, InstanceType.PARTICIPANT, getZkUrl());
     helixManager.getStateMachineEngine()
@@ -515,6 +570,7 @@ public class ControllerTest {
 
   public void addFakeServerInstanceToAutoJoinHelixClusterWithEmptyTag(String instanceId, boolean isSingleTenant)
       throws Exception {
+    ensureSSLConfigured();
     HelixManager helixManager =
         HelixManagerFactory.getZKHelixManager(getHelixClusterName(), instanceId, InstanceType.PARTICIPANT, getZkUrl());
     helixManager.getStateMachineEngine()
@@ -626,6 +682,7 @@ public class ControllerTest {
 
   public void addFakeMinionInstanceToAutoJoinHelixCluster(String instanceId)
       throws Exception {
+    ensureSSLConfigured();
     HelixManager helixManager =
         HelixManagerFactory.getZKHelixManager(getHelixClusterName(), instanceId, InstanceType.PARTICIPANT, getZkUrl());
     helixManager.getStateMachineEngine()
@@ -965,7 +1022,7 @@ public class ControllerTest {
     LOGGER.info("Scheduled {} for table {} with id: {}", taskType, tableNameWithType, taskIds);
     assertEquals(taskIds.size(), 1,
         String.format("Task %s not scheduled as expected for table %s. Expected 1 task, but got: %s",
-        taskType, tableNameWithType, taskIds.size()));
+            taskType, tableNameWithType, taskIds.size()));
     return taskIds.get(0);
   }
 
