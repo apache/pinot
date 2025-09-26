@@ -19,6 +19,8 @@
 package org.apache.pinot.query.mailbox.channel;
 
 import io.grpc.Context;
+import io.grpc.Status;
+import io.grpc.StatusRuntimeException;
 import io.grpc.stub.StreamObserver;
 import java.nio.ByteBuffer;
 import java.util.ArrayList;
@@ -123,7 +125,13 @@ public class MailboxContentObserver implements StreamObserver<MailboxContent> {
 
   @Override
   public void onError(Throwable t) {
-    LOGGER.warn("Error on receiver side", t);
+    if (t instanceof StatusRuntimeException
+        && ((StatusRuntimeException) t).getStatus().getCode() == Status.Code.CANCELLED) {
+      // If the sender cancelled the stream, we should not treat it as an error.
+      LOGGER.trace("Stream cancelled by sender: {}", _mailbox != null ? _mailbox.getId() : "unknown", t);
+    } else {
+      LOGGER.warn("Receiving mailbox received an error from sender side", t);
+    }
     _mailboxBuffers.clear();
     if (_mailbox != null) {
       String msg = t != null ? t.getMessage() : "Unknown";

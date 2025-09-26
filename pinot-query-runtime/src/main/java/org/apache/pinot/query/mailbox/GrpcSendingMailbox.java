@@ -310,6 +310,7 @@ public class GrpcSendingMailbox implements SendingMailbox {
   public void close()
       throws Exception {
     if (!isTerminated()) {
+      LOGGER.debug("Closing gPRC mailbox without proper EOS message");
       _contentObserver.onError(Status.CANCELLED.asException());
     }
   }

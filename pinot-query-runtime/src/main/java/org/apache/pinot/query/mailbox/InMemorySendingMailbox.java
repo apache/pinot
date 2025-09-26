@@ -140,7 +140,9 @@ public class InMemorySendingMailbox implements SendingMailbox {
   @Override
   public void close() {
     if (!isTerminated()) {
-      cancel(new RuntimeException("Closed without being completed").fillInStackTrace());
+      String msg = "Closed without being completed";
+      LOGGER.debug(msg);
+      cancel(new RuntimeException(msg).fillInStackTrace());
     }
   }
 }
