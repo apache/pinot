@@ -414,7 +414,7 @@ public class PinotHelixResourceManager {
 
 /**
  * Instance related APIs
- * /
+ */
 
   /**
    * Get all instance Ids.
@@ -754,6 +754,15 @@ public class PinotHelixResourceManager {
   }
 
   /**
+   * Get all offline table names from all databases.
+   *
+   * @return List of offline table names
+   */
+  public List<String> getAllOfflineTables() {
+    return getAllResources().stream().filter(TableNameBuilder::isOfflineTableResource).collect(Collectors.toList());
+  }
+
+  /**
    * Get all offline table names from provided database name.
    *
    * @param databaseName database name
@@ -763,6 +772,15 @@ public class PinotHelixResourceManager {
     return getAllResources().stream().filter(
         resourceName -> TableNameBuilder.isOfflineTableResource(resourceName) && DatabaseUtils.isPartOfDatabase(
             resourceName, databaseName)).collect(Collectors.toList());
+  }
+
+  /**
+   * Get all dimension table names from all databases.
+   *
+   * @return List of dimension table names
+   */
+  public List<String> getAllDimensionTables() {
+    return _tableCache.getAllDimensionTables();
   }
 
   /**
@@ -777,6 +795,15 @@ public class PinotHelixResourceManager {
   }
 
   /**
+   * Get all realtime table names from all databases.
+   *
+   * @return List of realtime table names
+   */
+  public List<String> getAllRealtimeTables() {
+    return getAllResources().stream().filter(TableNameBuilder::isRealtimeTableResource).collect(Collectors.toList());
+  }
+
+  /**
    * Get all realtime table names from provided database name.
    *
    * @param databaseName database name
@@ -786,6 +813,16 @@ public class PinotHelixResourceManager {
     return getAllResources().stream().filter(
         resourceName -> TableNameBuilder.isRealtimeTableResource(resourceName) && DatabaseUtils.isPartOfDatabase(
             resourceName, databaseName)).collect(Collectors.toList());
+  }
+
+  /**
+   * Get all raw table names in all databases.
+   *
+   * @return List of raw table names
+   */
+  public List<String> getAllRawTables() {
+    return getAllResources().stream().filter(TableNameBuilder::isTableResource)
+        .map(TableNameBuilder::extractRawTableName).distinct().collect(Collectors.toList());
   }
 
   /**
@@ -2195,7 +2232,7 @@ public class PinotHelixResourceManager {
     LOGGER.info("Deleting table {}: Removed segment metadata", tableNameWithType);
 
     // Remove COMMITTING segment list
-    if (TableType.REALTIME.equals(tableType)) {
+    if (tableType == TableType.REALTIME) {
       if (ZKMetadataProvider.removePauselessDebugMetadata(_propertyStore, tableNameWithType)) {
         LOGGER.info("Deleting table {}: Removed pauseless debug metadata", tableNameWithType);
       } else {
