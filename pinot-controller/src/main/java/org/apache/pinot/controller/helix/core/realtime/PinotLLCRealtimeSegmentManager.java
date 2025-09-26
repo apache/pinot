@@ -2734,7 +2734,6 @@ public class PinotLLCRealtimeSegmentManager {
           LOGGER.error("Failed to call reingestSegment for segment: {} on server: {}", segmentName, aliveServer, e);
         }
       } else {
-        // Trigger reset for segment not in IN_PROGRESS state to download the segment from deep store or peer server
         _helixResourceManager.resetSegment(realtimeTableName, segmentName, null);
       }
     }
