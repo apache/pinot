@@ -40,6 +40,7 @@ import org.apache.helix.model.IdealState;
 import org.apache.helix.model.InstanceConfig;
 import org.apache.helix.model.MasterSlaveSMD;
 import org.apache.helix.zookeeper.datamodel.ZNRecord;
+import org.apache.helix.zookeeper.zkclient.exception.ZkInterruptedException;
 import org.apache.pinot.common.exception.InvalidConfigException;
 import org.apache.pinot.common.exception.TableNotFoundException;
 import org.apache.pinot.common.lineage.LineageEntryState;
@@ -81,14 +82,22 @@ import org.apache.pinot.spi.utils.CommonConstants.Segment;
 import org.apache.pinot.spi.utils.CommonConstants.Server;
 import org.apache.pinot.spi.utils.builder.TableConfigBuilder;
 import org.apache.pinot.spi.utils.builder.TableNameBuilder;
+import org.apache.pinot.spi.utils.retry.AttemptsExceededException;
+import org.apache.pinot.spi.utils.retry.RetriableOperationException;
 import org.apache.pinot.util.TestUtils;
 import org.joda.time.DateTimeZone;
 import org.joda.time.format.DateTimeFormatter;
 import org.joda.time.format.DateTimeFormatterBuilder;
+import org.mockito.MockedStatic;
 import org.testng.annotations.AfterClass;
 import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
 
+import static org.mockito.Mockito.CALLS_REAL_METHODS;
+import static org.mockito.Mockito.any;
+import static org.mockito.Mockito.eq;
+import static org.mockito.Mockito.mockStatic;
+import static org.mockito.Mockito.withSettings;
 import static org.testng.Assert.*;
 
 
@@ -1586,6 +1595,192 @@ public class PinotHelixResourceManagerStatelessTest extends ControllerTest {
     _helixResourceManager.deleteOfflineTable(RAW_TABLE_NAME);
     segmentLineage = SegmentLineageAccessHelper.getSegmentLineage(_propertyStore, OFFLINE_TABLE_NAME);
     assertNull(segmentLineage);
+  }
+
+  @Test
+  public void testAddNewSegment() throws Exception {
+    // Create and add the table first
+    TableConfig tableConfig = new TableConfigBuilder(TableType.OFFLINE)
+        .setTableName(RAW_TABLE_NAME)
+        .setBrokerTenant(BROKER_TENANT_NAME)
+        .setServerTenant(SERVER_TENANT_NAME)
+        .build();
+    waitForEVToDisappear(tableConfig.getTableName());
+    _helixResourceManager.addTable(tableConfig);
+
+    // Create a test segment
+    String segmentName = "testNewSegment";
+    String downloadUrl = getDownloadURL(_controllerDataDir, RAW_TABLE_NAME, segmentName);
+
+
+    // Add the new segment
+    _helixResourceManager.addNewSegment(OFFLINE_TABLE_NAME,
+        SegmentMetadataMockUtils.mockSegmentMetadata(OFFLINE_TABLE_NAME, segmentName), downloadUrl);
+
+    // Check that the ideal state contains the new segment
+    IdealState idealState = _helixResourceManager.getTableIdealState(OFFLINE_TABLE_NAME);
+    assertNotNull(idealState);
+    assertTrue(idealState.getPartitionSet().contains(segmentName));
+
+    // Check that the ZK metadata exists for the new segment
+    List<SegmentZKMetadata> segmentsZKMetadata = _helixResourceManager.getSegmentsZKMetadata(OFFLINE_TABLE_NAME);
+    assertEquals(segmentsZKMetadata.size(), 1);
+    SegmentZKMetadata segmentZKMetadata = segmentsZKMetadata.get(0);
+    assertEquals(segmentZKMetadata.getSegmentName(), segmentName);
+    assertEquals(segmentZKMetadata.getDownloadUrl(), downloadUrl);
+
+    // Clean up - delete the table
+    _helixResourceManager.deleteOfflineTable(RAW_TABLE_NAME);
+  }
+
+  @Test
+  public void testAddNewSegmentRecoversFromZkInterruptedException() throws Exception {
+
+    // Create and add the table first
+    TableConfig tableConfig = new TableConfigBuilder(TableType.OFFLINE)
+        .setTableName(RAW_TABLE_NAME)
+        .setBrokerTenant(BROKER_TENANT_NAME)
+        .setServerTenant(SERVER_TENANT_NAME)
+        .build();
+    waitForEVToDisappear(tableConfig.getTableName());
+    _helixResourceManager.addTable(tableConfig);
+
+    try (MockedStatic<HelixHelper> mockedHelixHelper = mockStatic(HelixHelper.class,
+        withSettings().defaultAnswer(CALLS_REAL_METHODS))) {
+
+      String segmentName = "testNewSegment";
+      String downloadUrl = getDownloadURL(_controllerDataDir, RAW_TABLE_NAME, segmentName);
+
+      // Set up mock to first throw a ZkInterruptedException and then return back to normal
+      mockedHelixHelper.when(() -> HelixHelper.updateIdealState(any(),
+       eq(tableConfig.getTableName()), any()))
+       .thenThrow(new RuntimeException("Failed because of ZkInterruptedException",
+           new RetriableOperationException(new ZkInterruptedException(new InterruptedException("interrupted.")))))
+           .thenCallRealMethod();
+
+      // Clear the interrupt status that was set by creating the InterruptedException
+      Thread.interrupted();
+
+      _helixResourceManager.addNewSegment(OFFLINE_TABLE_NAME,
+          SegmentMetadataMockUtils.mockSegmentMetadata(OFFLINE_TABLE_NAME, segmentName), downloadUrl);
+
+      // Check that the ideal state contains the new segment
+      IdealState idealState = _helixResourceManager.getTableIdealState(OFFLINE_TABLE_NAME);
+      assertNotNull(idealState);
+      assertTrue(idealState.getPartitionSet().contains(segmentName));
+
+      // Check that the ZK metadata exists for the new segment
+      List<SegmentZKMetadata> segmentsZKMetadata = _helixResourceManager.getSegmentsZKMetadata(OFFLINE_TABLE_NAME);
+      assertEquals(segmentsZKMetadata.size(), 1);
+      SegmentZKMetadata segmentZKMetadata = segmentsZKMetadata.get(0);
+      assertEquals(segmentZKMetadata.getSegmentName(), segmentName);
+      assertEquals(segmentZKMetadata.getDownloadUrl(), downloadUrl);
+    } finally {
+      // Clean up - delete the table
+      _helixResourceManager.deleteOfflineTable(RAW_TABLE_NAME);
+    }
+  }
+
+  @Test
+  public void testAddNewSegmentFailsWithMultipleZkInterruptedException() throws Exception {
+
+    // Create and add the table first
+    TableConfig tableConfig = new TableConfigBuilder(TableType.OFFLINE)
+        .setTableName(RAW_TABLE_NAME)
+        .setBrokerTenant(BROKER_TENANT_NAME)
+        .setServerTenant(SERVER_TENANT_NAME)
+        .build();
+    waitForEVToDisappear(tableConfig.getTableName());
+    _helixResourceManager.addTable(tableConfig);
+
+    try (MockedStatic<HelixHelper> mockedHelixHelper = mockStatic(HelixHelper.class,
+        withSettings().defaultAnswer(CALLS_REAL_METHODS))) {
+
+      String segmentName = "testNewSegment";
+      String downloadUrl = getDownloadURL(_controllerDataDir, RAW_TABLE_NAME, segmentName);
+
+      // Set up mock to first throw a ZkInterruptedException and then return back to normal
+      mockedHelixHelper.when(() -> HelixHelper.updateIdealState(any(),
+              eq(tableConfig.getTableName()), any()))
+          .thenThrow(new RuntimeException("Failed because of ZkInterruptedException",
+              new RetriableOperationException(new ZkInterruptedException(new InterruptedException("interrupted.")))))
+          .thenThrow(new RuntimeException("Failed because of ZkInterruptedException",
+              new RetriableOperationException(new ZkInterruptedException(new InterruptedException("interrupted.")))));
+
+      // Clear the interrupt status that was set by creating the InterruptedException
+      Thread.interrupted();
+
+      assertThrows(RuntimeException.class, () -> _helixResourceManager.addNewSegment(OFFLINE_TABLE_NAME,
+          SegmentMetadataMockUtils.mockSegmentMetadata(OFFLINE_TABLE_NAME, segmentName), downloadUrl));
+
+      // Check that the ideal state contains the new segment
+      IdealState idealState = _helixResourceManager.getTableIdealState(OFFLINE_TABLE_NAME);
+      assertNotNull(idealState);
+      assertFalse(idealState.getPartitionSet().contains(segmentName));
+
+      // Check that the ZK metadata does not exist for the new segment
+      List<SegmentZKMetadata> segmentsZKMetadata = _helixResourceManager.getSegmentsZKMetadata(OFFLINE_TABLE_NAME);
+      assertEquals(segmentsZKMetadata.size(), 0);
+    } finally {
+      // Clean up - delete the table
+      _helixResourceManager.deleteOfflineTable(RAW_TABLE_NAME);
+    }
+  }
+
+  @Test
+  public void testAddNewSegmentFailsWithAttemptsException() throws Exception {
+
+    // Create and add the table first
+    TableConfig tableConfig = new TableConfigBuilder(TableType.OFFLINE)
+        .setTableName(RAW_TABLE_NAME)
+        .setBrokerTenant(BROKER_TENANT_NAME)
+        .setServerTenant(SERVER_TENANT_NAME)
+        .build();
+    waitForEVToDisappear(tableConfig.getTableName());
+    _helixResourceManager.addTable(tableConfig);
+
+    try (MockedStatic<HelixHelper> mockedHelixHelper = mockStatic(HelixHelper.class,
+        withSettings().defaultAnswer(CALLS_REAL_METHODS))) {
+
+      String segmentName = "testNewSegment";
+      String downloadUrl = getDownloadURL(_controllerDataDir, RAW_TABLE_NAME, segmentName);
+
+      // Set up mock to throw an AttemptsExceededException
+      mockedHelixHelper.when(() -> HelixHelper.updateIdealState(any(),
+              eq(tableConfig.getTableName()), any()))
+          .thenThrow(new RuntimeException("Failed because of AttemptsExceededException",
+              new AttemptsExceededException("Too many attempts")));
+
+      assertThrows(RuntimeException.class, () -> _helixResourceManager.addNewSegment(OFFLINE_TABLE_NAME,
+          SegmentMetadataMockUtils.mockSegmentMetadata(OFFLINE_TABLE_NAME, segmentName), downloadUrl));
+
+      // Check that the ideal state contains the new segment
+      IdealState idealState = _helixResourceManager.getTableIdealState(OFFLINE_TABLE_NAME);
+      assertNotNull(idealState);
+      assertFalse(idealState.getPartitionSet().contains(segmentName));
+
+      // Check that the ZK metadata does not exist for the new segment
+      List<SegmentZKMetadata> segmentsZKMetadata = _helixResourceManager.getSegmentsZKMetadata(OFFLINE_TABLE_NAME);
+      assertEquals(segmentsZKMetadata.size(), 0);
+    } finally {
+      // Clean up - delete the table
+      _helixResourceManager.deleteOfflineTable(RAW_TABLE_NAME);
+    }
+  }
+
+  @Test
+  public void testContainsZkInterruptedException() {
+    ZkInterruptedException zkInterruptedException =
+        new ZkInterruptedException(new InterruptedException("interrupted test"));
+
+    assertTrue(PinotHelixResourceManager.containsException(zkInterruptedException,
+        ZkInterruptedException.class));
+
+    RetriableOperationException retriableOperationException =
+        new RetriableOperationException(zkInterruptedException, 5);
+
+    assertTrue(PinotHelixResourceManager.containsException(retriableOperationException,
+        ZkInterruptedException.class));
   }
 
   private String getDownloadURL(String controllerDataDir, String rawTableName, String segmentId) {

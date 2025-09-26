@@ -445,7 +445,7 @@ public class ZKOperator {
         finalSegmentLocationURI, enableParallelPushProtection, segmentUploadStartTime);
 
     try {
-      _pinotHelixResourceManager.assignSegment(tableConfig, segmentZKMetadata);
+      _pinotHelixResourceManager.assignSegmentWithRetry(tableConfig, segmentZKMetadata);
     } catch (Exception e) {
       // assignTableSegment removes the zk entry.
       // Call deleteSegment to remove the segment from permanent location if needed.
