@@ -27,11 +27,16 @@ import org.testng.annotations.Test;
  */
 public class HashFunctionSelectorTest {
 
+  private final HashFunctionSelector.SvHasher _abshashcode = HashFunctionSelector.getSvHasher("abshashcode");
+  private final HashFunctionSelector.SvHasher _murmur = HashFunctionSelector.getSvHasher("murmur");
+  private final HashFunctionSelector.SvHasher _murmur2 = HashFunctionSelector.getSvHasher("murmur2");
+  private final HashFunctionSelector.SvHasher _murmur3 = HashFunctionSelector.getSvHasher("murmur3");
+
   @Test
   public void testAbsHashCode() {
     String value = "test";
-    int hash1 = HashFunctionSelector.computeHash(value, "abshashcode");
-    int hash2 = HashFunctionSelector.computeHash(value, "abshashcode");
+    int hash1 = _abshashcode.hash(value);
+    int hash2 = _abshashcode.hash(value);
 
     // Same input should produce same hash
     Assert.assertEquals(hash1, hash2);
@@ -43,8 +48,8 @@ public class HashFunctionSelectorTest {
   @Test
   public void testMurmur2() {
     String value = "test";
-    int hash1 = HashFunctionSelector.computeHash(value, "murmur");
-    int hash2 = HashFunctionSelector.computeHash(value, "murmur");
+    int hash1 = _murmur.hash(value);
+    int hash2 = _murmur.hash(value);
 
     // Same input should produce same hash
     Assert.assertEquals(hash1, hash2);
@@ -53,15 +58,16 @@ public class HashFunctionSelectorTest {
     Assert.assertTrue(hash1 >= 0);
 
     // Should be different from absHashCode
-    int absHash = HashFunctionSelector.computeHash(value, "abshashcode");
+    int absHash = _abshashcode.hash(value);
     Assert.assertNotEquals(hash1, absHash);
   }
 
   @Test
   public void testMurmur3() {
     String value = "test";
-    int hash1 = HashFunctionSelector.computeHash(value, "murmur3");
-    int hash2 = HashFunctionSelector.computeHash(value, "murmur3");
+
+    int hash1 = _murmur3.hash(value);
+    int hash2 = _murmur3.hash(value);
 
     // Same input should produce same hash
     Assert.assertEquals(hash1, hash2);
@@ -70,8 +76,8 @@ public class HashFunctionSelectorTest {
     Assert.assertTrue(hash1 >= 0);
 
     // Should be different from other hash functions
-    int absHash = HashFunctionSelector.computeHash(value, "abshashcode");
-    int murmur2Hash = HashFunctionSelector.computeHash(value, "murmur2");
+    int absHash = _abshashcode.hash(value);
+    int murmur2Hash = _murmur2.hash(value);
     Assert.assertNotEquals(hash1, absHash);
     Assert.assertNotEquals(hash1, murmur2Hash);
   }
@@ -79,8 +85,9 @@ public class HashFunctionSelectorTest {
   @Test
   public void testHashCode() {
     String value = "test";
-    int hash1 = HashFunctionSelector.computeHash(value, "hashcode");
-    int hash2 = HashFunctionSelector.computeHash(value, "hashcode");
+    HashFunctionSelector.SvHasher svHasher = HashFunctionSelector.getSvHasher("hashcode");
+    int hash1 = svHasher.hash(value);
+    int hash2 = svHasher.hash(value);
 
     // Same input should produce same hash
     Assert.assertEquals(hash1, hash2);
@@ -89,9 +96,9 @@ public class HashFunctionSelectorTest {
     Assert.assertTrue(hash1 >= 0);
 
     // Should be different from murmur and murmur3 but same as absHashCode
-    int absHash = HashFunctionSelector.computeHash(value, "abshashcode");
-    int murmur2Hash = HashFunctionSelector.computeHash(value, "murmur");
-    int murmur3Hash = HashFunctionSelector.computeHash(value, "murmur3");
+    int absHash = _abshashcode.hash(value);
+    int murmur2Hash = _murmur.hash(value);
+    int murmur3Hash = _murmur3.hash(value);
     Assert.assertEquals(hash1, absHash);
     Assert.assertNotEquals(hash1, murmur2Hash);
     Assert.assertNotEquals(hash1, murmur3Hash);
@@ -100,26 +107,29 @@ public class HashFunctionSelectorTest {
   @Test
   public void testNullValue() {
     // Null values should return 0 for all hash functions
-    Assert.assertEquals(HashFunctionSelector.computeHash(null, "abshashcode"), 0);
-    Assert.assertEquals(HashFunctionSelector.computeHash(null, "murmur"), 0);
-    Assert.assertEquals(HashFunctionSelector.computeHash(null, "murmur3"), 0);
-    Assert.assertEquals(HashFunctionSelector.computeHash(null, "cityhash"), 0);
+    Assert.assertEquals(_abshashcode.hash(null), 0);
+    Assert.assertEquals(_murmur.hash(null), 0);
+    Assert.assertEquals(_murmur3.hash(null), 0);
+    HashFunctionSelector.SvHasher cityhash = HashFunctionSelector.getSvHasher("cityhash");
+    Assert.assertEquals(cityhash.hash(null), 0);
   }
 
   @Test
   public void testUnknownHashFunction() {
     String value = "test";
     // Unknown hash function should default to absHashCode
-    int hash = HashFunctionSelector.computeHash(value, "unknown");
-    int expectedHash = HashFunctionSelector.computeHash(value, "abshashcode");
+    HashFunctionSelector.SvHasher unknown = HashFunctionSelector.getSvHasher("unknown");
+    int hash = unknown.hash(value);
+    int expectedHash = _abshashcode.hash(value);
     Assert.assertEquals(hash, expectedHash);
   }
 
   @Test
   public void testCaseInsensitive() {
     String value = "test";
-    int hash1 = HashFunctionSelector.computeHash(value, "MURMUR");
-    int hash2 = HashFunctionSelector.computeHash(value, "murmur");
+    HashFunctionSelector.SvHasher upperCase = HashFunctionSelector.getSvHasher("MURMUR");
+    int hash1 = upperCase.hash(value);
+    int hash2 = _murmur.hash(value);
     Assert.assertEquals(hash1, hash2);
   }
 }

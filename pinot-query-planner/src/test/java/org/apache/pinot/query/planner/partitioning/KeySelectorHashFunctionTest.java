@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.query.planner.partitioning;
 
+import java.util.Locale;
 import org.testng.Assert;
 import org.testng.annotations.Test;
 
@@ -96,14 +97,14 @@ public class KeySelectorHashFunctionTest {
   public void testKeySelectorFactoryWithDefaultHashFunction() {
     // Test single column
     KeySelector<?> singleSelector = KeySelectorFactory.getKeySelector(java.util.List.of(0));
-    Assert.assertEquals(singleSelector.hashAlgorithm(), KeySelector.DEFAULT_HASH_ALGORITHM);
+    Assert.assertEquals(singleSelector.hashAlgorithm(), KeySelector.DEFAULT_HASH_ALGORITHM.toLowerCase(Locale.US));
 
     // Test multi column
     KeySelector<?> multiSelector = KeySelectorFactory.getKeySelector(java.util.List.of(0, 1));
-    Assert.assertEquals(multiSelector.hashAlgorithm(), KeySelector.DEFAULT_HASH_ALGORITHM);
+    Assert.assertEquals(multiSelector.hashAlgorithm(), KeySelector.DEFAULT_HASH_ALGORITHM.toLowerCase(Locale.US));
 
     // Test empty
     KeySelector<?> emptySelector = KeySelectorFactory.getKeySelector(java.util.List.of());
-    Assert.assertEquals(emptySelector.hashAlgorithm(), KeySelector.DEFAULT_HASH_ALGORITHM);
+    Assert.assertEquals(emptySelector.hashAlgorithm(), KeySelector.DEFAULT_HASH_ALGORITHM.toLowerCase(Locale.US));
   }
 }

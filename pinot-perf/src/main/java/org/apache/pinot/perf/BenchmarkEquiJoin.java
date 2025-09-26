@@ -124,7 +124,6 @@ public class BenchmarkEquiJoin extends BaseClusterIntegrationTest {
         + "JOIN MyTable t2 "
         + "ON t1.intCol = t2.intCol "
         + "WHERE t2.intCol % 10 = 0";
-    ;
     return query(query);
   }
 
