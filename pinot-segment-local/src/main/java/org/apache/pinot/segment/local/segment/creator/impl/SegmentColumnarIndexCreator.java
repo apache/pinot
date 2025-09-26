@@ -59,6 +59,7 @@ import org.apache.pinot.segment.spi.index.StandardIndexes;
 import org.apache.pinot.segment.spi.index.TextIndexConfig;
 import org.apache.pinot.segment.spi.index.creator.ForwardIndexCreator;
 import org.apache.pinot.segment.spi.index.creator.SegmentIndexCreationInfo;
+import org.apache.pinot.segment.spi.index.mutable.ThreadSafeMutableRoaringBitmap;
 import org.apache.pinot.segment.spi.partition.PartitionFunction;
 import org.apache.pinot.spi.config.table.IndexConfig;
 import org.apache.pinot.spi.config.table.SegmentZKPropsConfig;
@@ -355,8 +356,32 @@ public class SegmentColumnarIndexCreator implements SegmentCreator {
     _docIdCounter++;
   }
 
+  /**
+   * Indexes a column from the given segment.
+   *
+   * @param columnName The name of the column to index
+   * @param sortedDocIds If not null, provides the sorted order of documents for processing
+   * @param segment The segment containing the column data
+   */
   @Override
   public void indexColumn(String columnName, @Nullable int[] sortedDocIds, IndexSegment segment)
+      throws IOException {
+    indexColumn(columnName, sortedDocIds, segment, null);
+  }
+
+  /**
+   * Indexes a column from the given segment.
+   *
+   * @param columnName The name of the column to index
+   * @param sortedDocIds If not null, provides the sorted order of documents for processing
+   * @param segment The segment containing the column data
+   * @param validDocIds If not null, only processes documents that are marked as valid in this bitmap.
+   *                    When null, all documents in the segment are processed. This is used for
+   *                    commit-time compaction to skip invalid/deleted documents during indexing.
+   */
+  @Override
+  public void indexColumn(String columnName, @Nullable int[] sortedDocIds, IndexSegment segment,
+      @Nullable ThreadSafeMutableRoaringBitmap validDocIds)
       throws IOException {
     // Iterate over each value in the column
     int numDocs = segment.getSegmentMetadata().getTotalDocs();
@@ -371,13 +396,22 @@ public class SegmentColumnarIndexCreator implements SegmentCreator {
       if (sortedDocIds != null) {
         int onDiskDocId = 0;
         for (int docId : sortedDocIds) {
-          indexColumnValue(colReader, creatorsByIndex, columnName, fieldSpec, dictionaryCreator, docId, onDiskDocId,
-              nullVec);
-          onDiskDocId++;
+          // If validDodIds are provided, only index column if it's a valid doc
+          if (validDocIds == null || validDocIds.contains(docId)) {
+            indexColumnValue(colReader, creatorsByIndex, columnName, fieldSpec, dictionaryCreator, docId, onDiskDocId,
+                nullVec);
+            onDiskDocId++;
+          }
         }
       } else {
+        int onDiskDocId = 0;
         for (int docId = 0; docId < numDocs; docId++) {
-          indexColumnValue(colReader, creatorsByIndex, columnName, fieldSpec, dictionaryCreator, docId, docId, nullVec);
+          // If validDodIds are provided, only index column if it's a valid doc
+          if (validDocIds == null || validDocIds.contains(docId)) {
+            indexColumnValue(colReader, creatorsByIndex, columnName, fieldSpec, dictionaryCreator, docId, onDiskDocId,
+                nullVec);
+            onDiskDocId++;
+          }
         }
       }
     }

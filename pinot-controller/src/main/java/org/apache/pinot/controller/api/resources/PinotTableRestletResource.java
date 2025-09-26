@@ -509,11 +509,20 @@ public class PinotTableRestletResource {
     }
     Map<String, Map<String, String>> taskTypeConfigsMap = tableConfig.getTaskConfig().getTaskTypeConfigsMap();
     Set<String> taskTypes = taskTypeConfigsMap.keySet();
+    boolean tableConfigChanged = false;
     for (String taskType : taskTypes) {
       // remove the task schedules to avoid task being scheduled during table deletion
-      taskTypeConfigsMap.get(taskType).remove(PinotTaskManager.SCHEDULE_KEY);
+      tableConfigChanged =
+          tableConfigChanged || taskTypeConfigsMap.get(taskType).remove(PinotTaskManager.SCHEDULE_KEY) != null;
     }
-    pinotHelixResourceManager.updateTableConfig(tableConfig);
+    if (tableConfigChanged) {
+      try {
+        pinotHelixResourceManager.updateTableConfig(tableConfig);
+      } catch (Exception e) {
+        LOGGER.warn("Unable to remove the task schedules, going ahead with table deletion anyways. "
+            + "Reason for failure : {}", e.getMessage());
+      }
+    }
     List<String> pendingTasks = new ArrayList<>();
     for (String taskType : taskTypes) {
       Map<String, TaskState> taskStates;

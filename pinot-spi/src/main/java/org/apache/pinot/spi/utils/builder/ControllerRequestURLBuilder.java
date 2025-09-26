@@ -652,6 +652,10 @@ public class ControllerRequestURLBuilder {
     return StringUtil.join("/", _baseUrl, "zk/delete");
   }
 
+  public String forZkDelete(String path) {
+    return StringUtil.join("/", _baseUrl, "zk/delete", "?path=" + path);
+  }
+
   public String forZkGet(String path) {
     return StringUtil.join("/", _baseUrl, "zk/get", "?path=" + path);
   }
@@ -736,5 +740,13 @@ public class ControllerRequestURLBuilder {
 
   public String forClusterConfigDelete(String config) {
     return StringUtil.join("/", _baseUrl, "cluster", "configs", config);
+  }
+
+  public String forQueryWorkloadConfigUpdate() {
+    return StringUtil.join("/", _baseUrl, "queryWorkloadConfigs");
+  }
+
+  public String forBaseQueryWorkloadConfig(String config) {
+    return StringUtil.join("/", _baseUrl, "queryWorkloadConfigs", config);
   }
 }

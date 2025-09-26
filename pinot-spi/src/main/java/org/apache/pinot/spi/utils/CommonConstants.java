@@ -433,6 +433,11 @@ public class CommonConstants {
 
     public static final String DISABLE_GROOVY = "pinot.broker.disable.query.groovy";
     public static final boolean DEFAULT_DISABLE_GROOVY = true;
+
+    // REGEXP_LIKE adaptive threshold configuration
+    public static final String CONFIG_OF_REGEXP_LIKE_ADAPTIVE_THRESHOLD =
+        "pinot.broker.regexp.dict.cardinality.threshold";
+    public static final double DEFAULT_REGEXP_LIKE_ADAPTIVE_THRESHOLD = 0.1; // 10% threshold
     // Rewrite potential expensive functions to their approximation counterparts
     // - DISTINCT_COUNT -> DISTINCT_COUNT_SMART_HLL
     // - PERCENTILE -> PERCENTILE_SMART_TDIGEST
@@ -460,6 +465,11 @@ public class CommonConstants {
     public static final String CONFIG_OF_ENABLE_PARTITION_METADATA_MANAGER =
         "pinot.broker.enable.partition.metadata.manager";
     public static final boolean DEFAULT_ENABLE_PARTITION_METADATA_MANAGER = true;
+
+    public static final String CONFIG_OF_ROUTING_ASSIGNMENT_CHANGE_PROCESS_PARALLELISM =
+        "pinot.broker.routing.assignment.change.process.parallelism";
+    public static final int DEFAULT_ROUTING_ASSIGNMENT_CHANGE_PROCESS_PARALLELISM =
+        Runtime.getRuntime().availableProcessors();
 
       // When enabled, the broker will set a query option to ignore SERVER_SEGMENT_MISSING errors from servers.
       // This is useful to tolerate short windows where routing has not yet reflected recently deleted segments.
@@ -541,11 +551,20 @@ public class CommonConstants {
 
     /**
      * Default server stage limit for lite mode queries.
-     * This value can always be overridden by {@link Request.QueryOptionKey#LITE_MODE_SERVER_STAGE_LIMIT} query option
+     * This value can always be overridden by {@link Request.QueryOptionKey#LITE_MODE_LEAF_STAGE_LIMIT} query option
      */
     public static final String CONFIG_OF_LITE_MODE_LEAF_STAGE_LIMIT =
         "pinot.broker.multistage.lite.mode.leaf.stage.limit";
     public static final int DEFAULT_LITE_MODE_LEAF_STAGE_LIMIT = 100_000;
+
+    /**
+     * When fan-out adjusted limit is enabled for lite-mode, Pinot will divide the limit set in the leaf stage
+     * with the number of workers executing the leaf stage. This value can always be overridden by
+     * {@link Request.QueryOptionKey#LITE_MODE_LEAF_STAGE_FANOUT_ADJUSTED_LIMIT} query option.
+     */
+    public static final String CONFIG_OF_LITE_MODE_LEAF_STAGE_FANOUT_ADJUSTED_LIMIT =
+        "pinot.broker.multistage.lite.mode.leaf.stage.fanOutAdjustedLimit";
+    public static final int DEFAULT_LITE_MODE_LEAF_STAGE_FAN_OUT_ADJUSTED_LIMIT = -1;
 
     // Config for default hash function used in KeySelector for data shuffling
     public static final String CONFIG_OF_BROKER_DEFAULT_HASH_FUNCTION = "pinot.broker.multistage.default.hash.function";
@@ -673,7 +692,8 @@ public class CommonConstants {
         // Query option key used to enable a given set of defaultly disabled rules
         public static final String USE_PLANNER_RULES = "usePlannerRules";
 
-        public static final String ORDER_BY_ALGORITHM = "orderByAlgorithm";
+        public static final String ALLOW_REVERSE_ORDER = "allowReverseOrder";
+        public static final boolean DEFAULT_ALLOW_REVERSE_ORDER = false;
 
         public static final String MULTI_STAGE_LEAF_LIMIT = "multiStageLeafLimit";
 
@@ -692,6 +712,11 @@ public class CommonConstants {
 
         public static final String IN_PREDICATE_PRE_SORTED = "inPredicatePreSorted";
         public static final String IN_PREDICATE_LOOKUP_ALGORITHM = "inPredicateLookupAlgorithm";
+
+        // REGEXP_LIKE adaptive threshold - controls when to switch between dictionary-based and scan-based evaluation
+        // When (dictionary_size / num_docs) < threshold, use dictionary-based evaluation
+        // When (dictionary_size / num_docs) >= threshold, use scan-based evaluation
+        public static final String REGEXP_LIKE_ADAPTIVE_THRESHOLD = "regexpDictCardinalityThreshold";
 
         public static final String DROP_RESULTS = "dropResults";
 
@@ -771,7 +796,8 @@ public class CommonConstants {
         public static final String INFER_REALTIME_SEGMENT_PARTITION = "inferRealtimeSegmentPartition";
         public static final String USE_LITE_MODE = "useLiteMode";
         // Server stage limit for lite mode queries.
-        public static final String LITE_MODE_SERVER_STAGE_LIMIT = "liteModeServerStageLimit";
+        public static final String LITE_MODE_LEAF_STAGE_LIMIT = "liteModeLeafStageLimit";
+        public static final String LITE_MODE_LEAF_STAGE_FANOUT_ADJUSTED_LIMIT = "liteModeLeafStageFanOutAdjustedLimit";
         // Used by the MSE Engine to determine whether to use the broker pruning logic. Only supported by the
         // new MSE query optimizer.
         // TODO(mse-physical): Consider removing this query option and making this the default, since there's already

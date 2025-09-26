@@ -56,6 +56,8 @@ import org.apache.pinot.broker.requesthandler.SingleConnectionBrokerRequestHandl
 import org.apache.pinot.broker.requesthandler.TimeSeriesRequestHandler;
 import org.apache.pinot.broker.routing.BrokerRoutingManager;
 import org.apache.pinot.common.Utils;
+import org.apache.pinot.common.audit.AuditServiceBinder;
+import org.apache.pinot.common.config.DefaultClusterConfigChangeHandler;
 import org.apache.pinot.common.config.NettyConfig;
 import org.apache.pinot.common.config.TlsConfig;
 import org.apache.pinot.common.config.provider.TableCache;
@@ -129,6 +131,12 @@ public abstract class BaseBrokerStarter implements ServiceStartable {
   private volatile boolean _isStarting = false;
   private volatile boolean _isShuttingDown = false;
 
+  // Dedicated handler for listening to cluster config changes
+  protected final DefaultClusterConfigChangeHandler _defaultClusterConfigChangeHandler =
+      new DefaultClusterConfigChangeHandler();
+
+  // TODO To be removed in favor of _defaultClusterConfigChangeHandler to manage config related changes.
+  //      Please use this only if you are reliant specifically on the ClusterChangeMediator infra.
   protected final List<ClusterChangeHandler> _clusterConfigChangeHandlers = new ArrayList<>();
   protected final List<ClusterChangeHandler> _idealStateChangeHandlers = new ArrayList<>();
   protected final List<ClusterChangeHandler> _externalViewChangeHandlers = new ArrayList<>();
@@ -440,6 +448,10 @@ public abstract class BaseBrokerStarter implements ServiceStartable {
     } else {
       _sqlQueryExecutor = new SqlQueryExecutor(_spectatorHelixManager);
     }
+
+    LOGGER.info("Wiring up cluster config change handler with helix");
+    _spectatorHelixManager.addClusterfigChangeListener(_defaultClusterConfigChangeHandler);
+
     LOGGER.info("Starting broker admin application on: {}", ListenerConfigUtil.toString(_listenerConfigs));
     _brokerAdminApplication = createBrokerAdminApp();
     _brokerAdminApplication.start(_listenerConfigs);
@@ -550,9 +562,11 @@ public abstract class BaseBrokerStarter implements ServiceStartable {
 
   private QueryDispatcher createQueryDispatcher(PinotConfiguration brokerConf) {
     String hostname = _brokerConf.getProperty(CommonConstants.MultiStageQueryRunner.KEY_OF_QUERY_RUNNER_HOSTNAME);
-    int port = Integer.parseInt(_brokerConf.getProperty(
-        CommonConstants.MultiStageQueryRunner.KEY_OF_QUERY_RUNNER_PORT));
-    return new QueryDispatcher(new MailboxService(hostname, port, _brokerConf), _failureDetector);
+    int port =
+        Integer.parseInt(_brokerConf.getProperty(CommonConstants.MultiStageQueryRunner.KEY_OF_QUERY_RUNNER_PORT));
+    return new QueryDispatcher(
+        new MailboxService(hostname, port, org.apache.pinot.spi.config.instance.InstanceType.BROKER, _brokerConf),
+        _failureDetector);
   }
 
   private void updateInstanceConfigAndBrokerResourceIfNeeded() {
@@ -709,6 +723,9 @@ public abstract class BaseBrokerStarter implements ServiceStartable {
     _brokerRequestHandler.shutDown();
     _brokerAdminApplication.stop();
 
+    LOGGER.info("Stopping the broker routing manager");
+    _routingManager.stop();
+
     LOGGER.info("Close PinotFs");
     try {
       PinotFSFactory.shutdown();
@@ -763,6 +780,8 @@ public abstract class BaseBrokerStarter implements ServiceStartable {
         new BrokerAdminApiApplication(_routingManager, _brokerRequestHandler, _brokerMetrics, _brokerConf,
             _sqlQueryExecutor, _serverRoutingStatsManager, _accessControlFactory, _spectatorHelixManager,
             _queryQuotaManager, _responseStore);
+    brokerAdminApiApplication.register(new AuditServiceBinder(_defaultClusterConfigChangeHandler, getServiceRole(),
+        _brokerMetrics));
     registerExtraComponents(brokerAdminApiApplication);
     return brokerAdminApiApplication;
   }

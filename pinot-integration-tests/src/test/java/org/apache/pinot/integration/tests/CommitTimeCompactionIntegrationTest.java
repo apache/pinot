@@ -40,7 +40,6 @@ import org.testng.annotations.Test;
 
 import static org.testng.Assert.assertEquals;
 import static org.testng.Assert.assertTrue;
-import static org.testng.Assert.fail;
 
 
 /**
@@ -63,6 +62,7 @@ public class CommitTimeCompactionIntegrationTest extends BaseClusterIntegrationT
   public static final String UPSERT_SCHEMA_FILE_NAME = "upsert_table_test.schema";
   private static final List<String> COLUMNS_TO_COMPARE =
       List.of("name", "game", "score", "timestampInEpoch", "deleted");
+  private String _kafkaTopicName;
 
   @BeforeClass
   public void setUp()
@@ -97,65 +97,58 @@ public class CommitTimeCompactionIntegrationTest extends BaseClusterIntegrationT
       throws Exception {
     // Enhanced test to validate that enableCommitTimeCompaction=true removes invalid records
     // compared to enableCommitTimeCompaction=false, with comprehensive verification
+    // Now includes testing commit-time compaction with column-major segment builder
+    String kafkaTopicName = getKafkaTopic() + "-compaction-comparison";
+    setUpKafka(kafkaTopicName, INPUT_DATA_SMALL_TAR_FILE);
 
-    String kafkaTopicNameCompacted = getKafkaTopic() + "-commit-time-compaction-enabled";
-    String kafkaTopicNameNormal = getKafkaTopic() + "-commit-time-compaction-disabled";
-
-    // Set up identical data for both tables - using small dataset for faster test execution
-    setUpKafka(kafkaTopicNameCompacted, INPUT_DATA_SMALL_TAR_FILE);
-    setUpKafka(kafkaTopicNameNormal, INPUT_DATA_SMALL_TAR_FILE);
-
-    // TABLE 1: With commit-time compaction ENABLED
-    String tableNameWithCompaction = "gameScoresCommitTimeCompactionEnabled";
-    UpsertConfig upsertConfigWithCompaction = new UpsertConfig(UpsertConfig.Mode.FULL);
-    upsertConfigWithCompaction.setEnableCommitTimeCompaction(true);  // ENABLE commit-time compaction
-    TableConfig tableConfigWithCompaction =
-        setUpTable(tableNameWithCompaction, kafkaTopicNameCompacted, upsertConfigWithCompaction);
-
-    // Ensure _columnMajorSegmentBuilderEnabled = false as specified
-    tableConfigWithCompaction.getIndexingConfig().setColumnMajorSegmentBuilderEnabled(false);
-    updateTableConfig(tableConfigWithCompaction);
-
-    // TABLE 2: With commit-time compaction DISABLED (traditional behavior)
+    // TABLE 1: With commit-time compaction DISABLED (baseline)
     String tableNameWithoutCompaction = "gameScoresCommitTimeCompactionDisabled";
-    UpsertConfig upsertConfigWithoutCompaction = new UpsertConfig(UpsertConfig.Mode.FULL);
-    upsertConfigWithoutCompaction.setEnableCommitTimeCompaction(false);  // DISABLE commit-time compaction
-    TableConfig tableConfigWithoutCompaction =
-        setUpTable(tableNameWithoutCompaction, kafkaTopicNameNormal, upsertConfigWithoutCompaction);
+    createUpsertTable(tableNameWithoutCompaction, kafkaTopicName,
+        UpsertConfig.Mode.FULL, false, false);
 
-    // Ensure _columnMajorSegmentBuilderEnabled = false as specified
-    tableConfigWithoutCompaction.getIndexingConfig().setColumnMajorSegmentBuilderEnabled(false);
-    updateTableConfig(tableConfigWithoutCompaction);
+    // TABLE 2: With commit-time compaction ENABLED + row-major build
+    String tableNameWithCompaction = "gameScoresCommitTimeCompactionEnabled";
+    createUpsertTable(tableNameWithCompaction, kafkaTopicName,
+        UpsertConfig.Mode.FULL, true, false);
 
-    // Wait for both tables to load the same initial data (3 unique records after upserts)
-    waitForAllDocsLoadedInBothTables(tableNameWithCompaction, tableNameWithoutCompaction, 30_000L, 10);
+    // TABLE 3: With commit-time compaction ENABLED + column-major build
+    String tableNameWithCompactionColumnMajor = "gameScoresCommitTimeCompactionColumnMajor";
+    createUpsertTable(tableNameWithCompactionColumnMajor, kafkaTopicName,
+        UpsertConfig.Mode.FULL, true, true);
 
-    // Verify initial state - both tables should show the same upserted data count (3 unique records)
-    validateInitialState(tableNameWithCompaction, tableNameWithoutCompaction, 3);
+    // Wait for all three tables to load the same initial data (3 unique records after upserts)
+    waitForAllDocsLoaded(tableNameWithoutCompaction, tableNameWithCompaction,
+        tableNameWithCompactionColumnMajor, 30_000L, 10);
 
-    // Create update patterns to generate invalid records - simplified for faster test execution
-    // Use playerIds that match the initial data to ensure consistent partitioning
+    // Verify initial state - all three tables should show the same upserted data count (3 unique records)
+    validateInitialState(tableNameWithoutCompaction, tableNameWithCompaction,
+        tableNameWithCompactionColumnMajor, 3);
     List<String> updateRecords = List.of("100,Zook-Updated1,counter-strike,1000,1681300000000,false",
         "101,Alice-Updated1,dota,2000,1681300001000,false", "102,Bob-Updated1,cs2,3000,1681300002000,false",
         "100,Zook-Updated2,valorant,1500,1681300003000,false", "101,Alice-Updated2,lol,2500,1681300004000,false");
 
-    // Push all updates at once to reduce wait times and ensure consistent partitioning
-    pushDataWithKeyToBothTopics(updateRecords, kafkaTopicNameCompacted, kafkaTopicNameNormal, 0);
-    // Wait for all additional records to be processed (3 unique records after all upserts)
-    waitForAllDocsLoadedInBothTables(tableNameWithCompaction, tableNameWithoutCompaction, 90_000L, 15);
+    pushCsvIntoKafkaWithKey(updateRecords, kafkaTopicName, 0);
 
-    // Verify state before commit - both tables should still show the same logical result (3 unique records)
-    validatePreCommitState(tableNameWithCompaction, tableNameWithoutCompaction, 3);
+    // Wait for all additional records to be processed (3 unique records after all upserts)
+    waitForAllDocsLoaded(tableNameWithoutCompaction, tableNameWithCompaction,
+        tableNameWithCompactionColumnMajor, 90_000L, 15);
+
+    // Verify state before commit - all three tables should still show the same logical result (3 unique records)
+    validatePreCommitState(tableNameWithoutCompaction, tableNameWithCompaction,
+        tableNameWithCompactionColumnMajor, 3);
 
     // Perform commit and wait for completion
-    performCommitAndWait(tableNameWithCompaction, tableNameWithoutCompaction, 30_000L, 4, 2);
+    performCommitAndWait(tableNameWithoutCompaction, tableNameWithCompaction,
+        tableNameWithCompactionColumnMajor, 30_000L, 4, 2);
 
     // Validate post-commit compaction effectiveness and data integrity
-    validatePostCommitCompaction(tableNameWithCompaction, tableNameWithoutCompaction, 3, 2, 0.95);
+    validatePostCommitCompaction(tableNameWithoutCompaction, tableNameWithCompaction,
+        tableNameWithCompactionColumnMajor, 3, 2, 0.95);
 
     // Clean up
-    dropRealtimeTable(tableNameWithCompaction);
-    dropRealtimeTable(tableNameWithoutCompaction);
+    cleanupTablesAndSchemas(
+        List.of(tableNameWithoutCompaction, tableNameWithCompaction, tableNameWithCompactionColumnMajor),
+        List.of(tableNameWithoutCompaction, tableNameWithCompaction, tableNameWithCompactionColumnMajor));
   }
 
   @Test
@@ -165,14 +158,10 @@ public class CommitTimeCompactionIntegrationTest extends BaseClusterIntegrationT
     // Goal: Verify commit-time compaction correctly processes and optimizes segments
     // containing a mix of common primitive data types, specifically including a sorted column.
 
-    String kafkaTopicNameCompacted = getKafkaTopic() + "-sorted-compaction-enabled";
-    String kafkaTopicNameNormal = getKafkaTopic() + "-sorted-compaction-disabled";
-
-    // Set up identical data for both tables - using standard schema
-    setUpKafka(kafkaTopicNameCompacted, INPUT_DATA_SMALL_TAR_FILE);
-    setUpKafka(kafkaTopicNameNormal, INPUT_DATA_SMALL_TAR_FILE);
-
     // Create schemas for both tables
+    String kafkaTopicName = getKafkaTopic() + "-sorted-column";
+    setUpKafka(kafkaTopicName, INPUT_DATA_SMALL_TAR_FILE);
+
     Schema schema = createSchema();
     schema.setSchemaName("sortedCompactionEnabled");
     addSchema(schema);
@@ -181,17 +170,20 @@ public class CommitTimeCompactionIntegrationTest extends BaseClusterIntegrationT
     schema2.setSchemaName("sortedCompactionDisabled");
     addSchema(schema2);
 
+    Schema schema3 = createSchema();
+    schema3.setSchemaName("sortedCompactionEnabledAndColumnMajor");
+    addSchema(schema3);
+
+    Map<String, String> csvDecoderProperties = getCSVDecoderProperties(CSV_DELIMITER, CSV_SCHEMA_HEADER);
+
     // TABLE 1: With commit-time compaction ENABLED AND sorted column configured BEFORE data ingestion
     String tableNameWithCompaction = "sortedCompactionEnabled";
     UpsertConfig upsertConfigWithCompaction = new UpsertConfig(UpsertConfig.Mode.FULL);
     upsertConfigWithCompaction.setEnableCommitTimeCompaction(true);
 
-    Map<String, String> csvDecoderProperties = getCSVDecoderProperties(CSV_DELIMITER, CSV_SCHEMA_HEADER);
     TableConfig tableConfigWithCompaction =
-        createCSVUpsertTableConfig(tableNameWithCompaction, kafkaTopicNameCompacted, getNumKafkaPartitions(),
+        createCSVUpsertTableConfig(tableNameWithCompaction, kafkaTopicName, getNumKafkaPartitions(),
             csvDecoderProperties, upsertConfigWithCompaction, PRIMARY_KEY_COL);
-
-    // CRITICAL: Set sorted column BEFORE adding table config
     tableConfigWithCompaction.getIndexingConfig().setSortedColumn(Collections.singletonList("score"));
     tableConfigWithCompaction.getIndexingConfig().setColumnMajorSegmentBuilderEnabled(false);
     addTableConfig(tableConfigWithCompaction);
@@ -202,19 +194,28 @@ public class CommitTimeCompactionIntegrationTest extends BaseClusterIntegrationT
     upsertConfigWithoutCompaction.setEnableCommitTimeCompaction(false);
 
     TableConfig tableConfigWithoutCompaction =
-        createCSVUpsertTableConfig(tableNameWithoutCompaction, kafkaTopicNameNormal, getNumKafkaPartitions(),
+        createCSVUpsertTableConfig(tableNameWithoutCompaction, kafkaTopicName, getNumKafkaPartitions(),
             csvDecoderProperties, upsertConfigWithoutCompaction, PRIMARY_KEY_COL);
-
-    // Set same sorted column configuration BEFORE adding table config
     tableConfigWithoutCompaction.getIndexingConfig().setSortedColumn(Collections.singletonList("score"));
     tableConfigWithoutCompaction.getIndexingConfig().setColumnMajorSegmentBuilderEnabled(false);
     addTableConfig(tableConfigWithoutCompaction);
 
-    // Wait for both tables to load the same initial data (3 unique records after upserts)
-    waitForAllDocsLoadedInBothTables(tableNameWithCompaction, tableNameWithoutCompaction, 30_000L, 10);
+    // TABLE 3: With commit-time compaction ENABLED, with Column Major Build AND sorted column configured BEFORE data
+    // ingestion
+    String tableNameWithCompactionAndColumnMajor = "sortedCompactionEnabledAndColumnMajor";
+    TableConfig tableConfigWithCompactionAndColumnMajor =
+        createCSVUpsertTableConfig(tableNameWithCompactionAndColumnMajor, kafkaTopicName, getNumKafkaPartitions(),
+            csvDecoderProperties, upsertConfigWithCompaction, PRIMARY_KEY_COL);
+    tableConfigWithCompactionAndColumnMajor.getIndexingConfig().setSortedColumn(Collections.singletonList("score"));
+    tableConfigWithCompactionAndColumnMajor.getIndexingConfig().setColumnMajorSegmentBuilderEnabled(true);
+    addTableConfig(tableConfigWithCompactionAndColumnMajor);
 
-    // Verify initial state - both tables should show the same upserted data count (3 unique records)
-    validateInitialState(tableNameWithCompaction, tableNameWithoutCompaction, 3);
+    // Wait for both tables to load the same initial data (3 unique records after upserts)
+    waitForAllDocsLoaded(tableNameWithCompaction, tableNameWithoutCompaction,
+        tableNameWithCompactionAndColumnMajor, 30_000L, 10);
+
+    validatePreCommitState(tableNameWithoutCompaction, tableNameWithCompaction,
+        tableNameWithCompactionAndColumnMajor, 3);
 
     // Push additional updates using standard format to create more obsolete records
     // Add more diverse data with different primary keys and varying scores for better sorting validation
@@ -223,36 +224,37 @@ public class CommitTimeCompactionIntegrationTest extends BaseClusterIntegrationT
         "102,Charlie Updated,chess,45.2,1681354400000,false", // Mid score
         "103,David New,tennis,12.8,1681354500000,false",      // Very low score
         "104,Eva New,golf,78.9,1681354600000,false",          // High score
-        "105,Frank New,soccer,33.1,1681354700000,false"       // Mid-low score
-    );
-
-    pushDataToBothTopics(updateRecords, kafkaTopicNameCompacted, kafkaTopicNameNormal, 0);
-
-    // Push another round of updates to create more obsolete records
-    List<String> moreUpdates = List.of("100,Alice Final,chess,25.7,1681454200000,false",     // Low-mid score
+        "105,Frank New,soccer,33.1,1681354700000,false",       // Mid-low score
+        "100,Alice Final,chess,25.7,1681454200000,false",     // Low-mid score
         "101,Bob Final,poker,91.3,1681454300000,false",       // Very high score
         "103,David Final,tennis,8.4,1681454400000,false",     // Very low score
         "104,Eva Final,golf,67.8,1681454500000,false"         // High score
     );
 
-    pushDataToBothTopics(moreUpdates, kafkaTopicNameCompacted, kafkaTopicNameNormal, 0);
+    pushCsvIntoKafka(updateRecords, kafkaTopicName, 0);
 
     // Wait for all updates to be processed (6 unique records after all upserts)
-    waitForAllDocsLoadedInBothTables(tableNameWithCompaction, tableNameWithoutCompaction, 30_000L, 20);
+    waitForAllDocsLoaded(tableNameWithCompaction, tableNameWithoutCompaction,
+        tableNameWithCompactionAndColumnMajor, 30_000L, 20);
 
     // Perform simple commit and verify data identity between tables
-    performSimpleCommitAndVerify(tableNameWithCompaction, tableNameWithoutCompaction, 60_000L, 6);
+    performCommitAndWait(tableNameWithCompaction, tableNameWithoutCompaction,
+        tableNameWithCompactionAndColumnMajor, 30_000L, 4, 2);
 
     // Validate post-commit compaction effectiveness and data integrity (expecting 6 records, min 4 removed)
-    validatePostCommitCompaction(tableNameWithCompaction, tableNameWithoutCompaction, 6, 4, 1.0);
+    validatePostCommitCompaction(tableNameWithoutCompaction, tableNameWithCompaction,
+        tableNameWithCompactionAndColumnMajor, 6, 4, 1.0);
 
     // CRITICAL: Validate segment-level sorting
-    validateSegmentLevelSorting(tableNameWithCompaction, true);  // Should be sorted due to sorted column config
-    validateSegmentLevelSorting(tableNameWithoutCompaction, true); // Should NOT be sorted (no sorted column config)
+    validateSegmentLevelSorting(tableNameWithCompaction);  // Should be sorted due to sorted column config
+    validateSegmentLevelSorting(tableNameWithoutCompaction); // Should NOT be sorted (no sorted column config)
+    validateSegmentLevelSorting(
+        tableNameWithCompactionAndColumnMajor); // Should NOT be sorted (no sorted column config)
 
     // Clean up
-    dropRealtimeTable(tableNameWithCompaction);
-    dropRealtimeTable(tableNameWithoutCompaction);
+    cleanupTablesAndSchemas(
+        List.of(tableNameWithCompaction, tableNameWithoutCompaction, tableNameWithCompactionAndColumnMajor),
+        List.of(tableNameWithCompaction, tableNameWithoutCompaction, tableNameWithCompactionAndColumnMajor));
   }
 
   @Test
@@ -262,76 +264,65 @@ public class CommitTimeCompactionIntegrationTest extends BaseClusterIntegrationT
     // Goal: Ensure commit-time compaction handles columns configured without dictionary indices
     // (raw storage) on standard schema columns.
 
-    String kafkaTopicNameCompacted = getKafkaTopic() + "-raw-compaction-enabled";
-    String kafkaTopicNameNormal = getKafkaTopic() + "-raw-compaction-disabled";
-
-    // Set up identical data for both tables - using standard schema
-    setUpKafka(kafkaTopicNameCompacted, INPUT_DATA_SMALL_TAR_FILE);
-    setUpKafka(kafkaTopicNameNormal, INPUT_DATA_SMALL_TAR_FILE);
-
     // TABLE 1: With commit-time compaction ENABLED
-    String tableNameWithCompaction = "rawIndexCompactionEnabled";
-    UpsertConfig upsertConfigWithCompaction = new UpsertConfig(UpsertConfig.Mode.FULL);
-    upsertConfigWithCompaction.setEnableCommitTimeCompaction(true);
-    TableConfig tableConfigWithCompaction =
-        setUpTable(tableNameWithCompaction, kafkaTopicNameCompacted, upsertConfigWithCompaction);
+    String kafkaTopicName = getKafkaTopic() + "-no-dictonary";
+    setUpKafka(kafkaTopicName, INPUT_DATA_SMALL_TAR_FILE);
 
-    // Add raw index configuration for name and game columns (no dictionary - proper way)
+    String tableNameWithCompaction = "rawIndexCompactionEnabled";
+    TableConfig tableConfigWithCompaction = createUpsertTable(tableNameWithCompaction, kafkaTopicName,
+        UpsertConfig.Mode.FULL, true, false);
     tableConfigWithCompaction.getIndexingConfig().setNoDictionaryColumns(List.of("name", "game"));
-    tableConfigWithCompaction.getIndexingConfig().setColumnMajorSegmentBuilderEnabled(false);
     updateTableConfig(tableConfigWithCompaction);
 
     // TABLE 2: With commit-time compaction DISABLED
     String tableNameWithoutCompaction = "rawIndexCompactionDisabled";
-    UpsertConfig upsertConfigWithoutCompaction = new UpsertConfig(UpsertConfig.Mode.FULL);
-    upsertConfigWithoutCompaction.setEnableCommitTimeCompaction(false);
-    TableConfig tableConfigWithoutCompaction =
-        setUpTable(tableNameWithoutCompaction, kafkaTopicNameNormal, upsertConfigWithoutCompaction);
-
-    // Add same raw index configuration
-    tableConfigWithoutCompaction.getIndexingConfig().setNoDictionaryColumns(List.of("name", "game"));
-    tableConfigWithoutCompaction.getIndexingConfig().setColumnMajorSegmentBuilderEnabled(false);
+    TableConfig tableConfigWithoutCompaction = createUpsertTable(tableNameWithoutCompaction, kafkaTopicName,
+        UpsertConfig.Mode.FULL, false, false);
+    tableConfigWithCompaction.getIndexingConfig().setNoDictionaryColumns(List.of("name", "game"));
     updateTableConfig(tableConfigWithoutCompaction);
 
+    // TABLE 3: With commit-time compaction ENABLED + column-major build
+    String tableNameWithCompactionAndColumnMajor = "rawIndexCompactionAndColumnMajor";
+    TableConfig tableConfigWithCompactionAndColumnMajor =
+        createUpsertTable(tableNameWithCompactionAndColumnMajor, kafkaTopicName,
+            UpsertConfig.Mode.FULL, true, true);
+    tableConfigWithCompactionAndColumnMajor.getIndexingConfig().setNoDictionaryColumns(List.of("name", "game"));
+    updateTableConfig(tableConfigWithCompactionAndColumnMajor);
+
     // Wait for both tables to load the same initial data (3 unique records after upserts)
-    waitForAllDocsLoadedInBothTables(tableNameWithCompaction, tableNameWithoutCompaction, 30_000L, 10);
+    waitForAllDocsLoaded(tableNameWithCompaction, tableNameWithoutCompaction,
+        tableNameWithCompactionAndColumnMajor, 60_000L, 10);
 
     // Verify initial state - both tables should show the same upserted data count (3 unique records)
-    validateInitialState(tableNameWithCompaction, tableNameWithoutCompaction, 3);
+    validateInitialState(tableNameWithCompaction, tableNameWithoutCompaction,
+        tableNameWithCompactionAndColumnMajor, 3);
 
     // Push additional updates using standard format to test raw index columns
     List<String> updateRecords =
-        List.of("100,Alice Raw,chess,95.5,1681354200000,false", "101,Bob Raw,poker,88.0,1681354300000,false",
-            "102,Charlie Raw,chess,82.5,1681354400000,false");
+        List.of("100,Alice Raw,chess,95.5,1681354200000,false",
+            "101,Bob Raw,poker,88.0,1681354300000,false",
+            "102,Charlie Raw,chess,82.5,1681354400000,false",
+            "100,Alice NoDict,chess,99.5,1681454200000,false",
+            "101,Bob NoDict,poker,91.0,1681454300000,false");
 
-    pushDataToBothTopics(updateRecords, kafkaTopicNameCompacted, kafkaTopicNameNormal, 0);
-
-    // Push another round of updates to create more obsolete records
-    List<String> moreUpdates =
-        List.of("100,Alice NoDict,chess,99.5,1681454200000,false", "101,Bob NoDict,poker,91.0,1681454300000,false");
-
-    pushDataToBothTopics(moreUpdates, kafkaTopicNameCompacted, kafkaTopicNameNormal, 0);
+    pushCsvIntoKafka(updateRecords, kafkaTopicName, 0);
 
     // Wait for all updates to be processed (3 unique records after upserts)
-    waitForAllDocsLoadedInBothTables(tableNameWithCompaction, tableNameWithoutCompaction, 30_000L, 15);
+    waitForAllDocsLoaded(tableNameWithCompaction, tableNameWithoutCompaction,
+        tableNameWithCompactionAndColumnMajor, 30_000L, 15);
 
     // Perform simple commit operation
-    performSimpleCommitAndVerify(tableNameWithCompaction, tableNameWithoutCompaction, 60_000L, 3);
+    performCommitAndWait(tableNameWithoutCompaction, tableNameWithCompaction,
+        tableNameWithCompactionAndColumnMajor, 30_000L, 4, 2);
 
     // Validate post-commit compaction effectiveness and data integrity (expecting 3 records, min 2 removed)
-    validatePostCommitCompaction(tableNameWithCompaction, tableNameWithoutCompaction, 3, 2, 1.0);
+    validatePostCommitCompaction(tableNameWithoutCompaction, tableNameWithCompaction,
+        tableNameWithCompactionAndColumnMajor, 3, 2, 1.0);
 
-    // Verify data integrity for no-dictionary columns in compacted table
-    ResultSet noDictResult = getPinotConnection().execute(
-        "SELECT playerId, name, game FROM " + tableNameWithCompaction + " ORDER BY playerId").getResultSet(0);
-    assertEquals(noDictResult.getRowCount(), 3);
-
-    // Verify that no-dictionary configuration is maintained (raw storage for name and game columns)
-    ResultSet allData = getPinotConnection().execute("SELECT * FROM " + tableNameWithCompaction).getResultSet(0);
-    assertEquals(allData.getRowCount(), 3, "Should have 3 valid records after compaction");
     // Clean up
-    dropRealtimeTable(tableNameWithCompaction);
-    dropRealtimeTable(tableNameWithoutCompaction);
+    cleanupTablesAndSchemas(
+        List.of(tableNameWithCompaction, tableNameWithoutCompaction, tableNameWithCompactionAndColumnMajor),
+        List.of(tableNameWithCompaction, tableNameWithoutCompaction, tableNameWithCompactionAndColumnMajor));
   }
 
   @Test
@@ -341,11 +332,7 @@ public class CommitTimeCompactionIntegrationTest extends BaseClusterIntegrationT
     // Goal: Ensure commit-time compaction correctly handles multi-value dictionary columns
     // (like arrays/lists) during segment conversion, validating the fix for CompactedDictEncodedColumnStatistics
 
-    String kafkaTopicNameCompacted = getKafkaTopic() + "-mv-compaction-enabled";
-    String kafkaTopicNameNormal = getKafkaTopic() + "-mv-compaction-disabled";
-
     // Create test data with multi-value fields similar to user's "tags" column
-    // Use semicolon-separated format for multi-value fields in CSV
     List<String> testRecords = List.of("200,Player200,game1,85.5,1681054200000,false,action;shooter",
         "201,Player201,game2,92.0,1681054300000,false,strategy;puzzle",
         "202,Player202,game3,78.0,1681054400000,false,rpg;adventure;fantasy",
@@ -353,14 +340,31 @@ public class CommitTimeCompactionIntegrationTest extends BaseClusterIntegrationT
         "200,Player200Updated,game1,90.0,1681154200000,false,action;fps",
         "201,Player201Updated,game2,95.0,1681154300000,false,strategy;rts");
 
-    // Set up Kafka topics with multi-value test data
-    pushCsvIntoKafka(testRecords, kafkaTopicNameCompacted, 0);
-    pushCsvIntoKafka(testRecords, kafkaTopicNameNormal, 0);
+    String kafkaTopicName = getKafkaTopic() + "-multivalue";
 
-    // TABLE 1: With commit-time compaction ENABLED
+    // TABLE 1: With commit-time compaction DISABLED (baseline)
+    String tableNameWithoutCompaction = "gameScoresMVCompactionDisabled";
+    Schema mvSchemaBaseline = createSchema();
+    mvSchemaBaseline.setSchemaName(tableNameWithoutCompaction);
+    mvSchemaBaseline.addField(new DimensionFieldSpec("tags", FieldSpec.DataType.STRING, false));
+    addSchema(mvSchemaBaseline);
+
+    UpsertConfig upsertConfigWithoutCompaction = new UpsertConfig(UpsertConfig.Mode.FULL);
+    upsertConfigWithoutCompaction.setEnableCommitTimeCompaction(false);
+
+    Map<String, String> csvDecoderProperties =
+        getCSVDecoderProperties(CSV_DELIMITER, "playerId,name,game,score,timestampInEpoch,deleted,tags");
+    csvDecoderProperties.put("stream.kafka.decoder.prop.multiValueDelimiter", ";");
+    TableConfig tableConfigWithoutCompaction =
+        createCSVUpsertTableConfig(tableNameWithoutCompaction, kafkaTopicName, getNumKafkaPartitions(),
+            csvDecoderProperties, upsertConfigWithoutCompaction, PRIMARY_KEY_COL);
+
+    tableConfigWithoutCompaction.getIndexingConfig().setInvertedIndexColumns(List.of("tags", "name", "game"));
+    tableConfigWithoutCompaction.getIndexingConfig().setColumnMajorSegmentBuilderEnabled(false);
+    addTableConfig(tableConfigWithoutCompaction);
+
+    // TABLE 2: With commit-time compaction ENABLED + row-major build
     String tableNameWithCompaction = "gameScoresMVCompactionEnabled";
-
-    // Create schema with multi-value column (similar to user's "tags" field)
     Schema mvSchemaCompacted = createSchema();
     mvSchemaCompacted.setSchemaName(tableNameWithCompaction);
     mvSchemaCompacted.addField(new DimensionFieldSpec("tags", FieldSpec.DataType.STRING, false));
@@ -369,72 +373,57 @@ public class CommitTimeCompactionIntegrationTest extends BaseClusterIntegrationT
     UpsertConfig upsertConfigWithCompaction = new UpsertConfig(UpsertConfig.Mode.FULL);
     upsertConfigWithCompaction.setEnableCommitTimeCompaction(true);
 
-    Map<String, String> csvDecoderProperties =
+    Map<String, String> csvDecoderPropertiesCompacted =
         getCSVDecoderProperties(CSV_DELIMITER, "playerId,name,game,score,timestampInEpoch,deleted,tags");
-    // Configure multi-value delimiter for tags column
-    csvDecoderProperties.put("stream.kafka.decoder.prop.multiValueDelimiter", ";");
+    csvDecoderPropertiesCompacted.put("stream.kafka.decoder.prop.multiValueDelimiter", ";");
     TableConfig tableConfigWithCompaction =
-        createCSVUpsertTableConfig(tableNameWithCompaction, kafkaTopicNameCompacted, getNumKafkaPartitions(),
-            csvDecoderProperties, upsertConfigWithCompaction, PRIMARY_KEY_COL);
-
-    // Configure inverted indexes for multi-value column
+        createCSVUpsertTableConfig(tableNameWithCompaction, kafkaTopicName, getNumKafkaPartitions(),
+            csvDecoderPropertiesCompacted, upsertConfigWithCompaction, PRIMARY_KEY_COL);
     tableConfigWithCompaction.getIndexingConfig().setInvertedIndexColumns(List.of("tags", "name", "game"));
     tableConfigWithCompaction.getIndexingConfig().setColumnMajorSegmentBuilderEnabled(false);
     addTableConfig(tableConfigWithCompaction);
 
-    // TABLE 2: With commit-time compaction DISABLED
-    String tableNameWithoutCompaction = "gameScoresMVCompactionDisabled";
-
-    // Create separate schema for normal table
-    Schema mvSchemaNormal = createSchema();
-    mvSchemaNormal.setSchemaName(tableNameWithoutCompaction);
-    mvSchemaNormal.addField(new DimensionFieldSpec("tags", FieldSpec.DataType.STRING, false));
-    addSchema(mvSchemaNormal);
-
-    UpsertConfig upsertConfigWithoutCompaction = new UpsertConfig(UpsertConfig.Mode.FULL);
-    upsertConfigWithoutCompaction.setEnableCommitTimeCompaction(false);
-
-    Map<String, String> csvDecoderPropertiesNormal =
+    // TABLE 3: With commit-time compaction ENABLED + column-major build
+    String tableNameWithCompactionColumnMajor = "gameScoresMVCompactionColumnMajor";
+    Schema mvSchemaColumnMajor = createSchema();
+    mvSchemaColumnMajor.setSchemaName(tableNameWithCompactionColumnMajor);
+    mvSchemaColumnMajor.addField(new DimensionFieldSpec("tags", FieldSpec.DataType.STRING, false));
+    addSchema(mvSchemaColumnMajor);
+    UpsertConfig upsertConfigWithCompactionColumnMajor = new UpsertConfig(UpsertConfig.Mode.FULL);
+    upsertConfigWithCompactionColumnMajor.setEnableCommitTimeCompaction(true);
+    Map<String, String> csvDecoderPropertiesColumnMajor =
         getCSVDecoderProperties(CSV_DELIMITER, "playerId,name,game,score,timestampInEpoch,deleted,tags");
-    // Configure multi-value delimiter for tags column
-    csvDecoderPropertiesNormal.put("stream.kafka.decoder.prop.multiValueDelimiter", ";");
-    TableConfig tableConfigWithoutCompaction =
-        createCSVUpsertTableConfig(tableNameWithoutCompaction, kafkaTopicNameNormal, getNumKafkaPartitions(),
-            csvDecoderPropertiesNormal, upsertConfigWithoutCompaction, PRIMARY_KEY_COL);
+    csvDecoderPropertiesColumnMajor.put("stream.kafka.decoder.prop.multiValueDelimiter", ";");
+    TableConfig tableConfigWithCompactionColumnMajor =
+        createCSVUpsertTableConfig(tableNameWithCompactionColumnMajor, kafkaTopicName, getNumKafkaPartitions(),
+            csvDecoderPropertiesColumnMajor, upsertConfigWithCompactionColumnMajor, PRIMARY_KEY_COL);
+    tableConfigWithCompactionColumnMajor.getIndexingConfig().setInvertedIndexColumns(List.of("tags", "name", "game"));
+    tableConfigWithCompactionColumnMajor.getIndexingConfig().setColumnMajorSegmentBuilderEnabled(true);
+    addTableConfig(tableConfigWithCompactionColumnMajor);
 
-    tableConfigWithoutCompaction.getIndexingConfig().setInvertedIndexColumns(List.of("tags", "name", "game"));
-    tableConfigWithoutCompaction.getIndexingConfig().setColumnMajorSegmentBuilderEnabled(false);
-    addTableConfig(tableConfigWithoutCompaction);
+    pushCsvIntoKafka(testRecords, kafkaTopicName, 0);
+    waitForAllDocsLoaded(tableNameWithoutCompaction, tableNameWithCompaction,
+        tableNameWithCompactionColumnMajor, 30_000L, 5);
 
-    // Wait for data to load
-    waitForAllDocsLoadedInBothTables(tableNameWithCompaction, tableNameWithoutCompaction, 30_000L, 5);
-
-    // Verify initial state - both tables should show same logical record count (3 unique players after upserts)
-    validateInitialState(tableNameWithCompaction, tableNameWithoutCompaction, 3);
-
-    // Test multi-value column queries work correctly before commit
-    String mvQuery =
-        String.format("SELECT playerId, tags FROM %s WHERE tags = 'action' ORDER BY playerId", tableNameWithCompaction);
-    ResultSet resultSet = getPinotConnection().execute(mvQuery).getResultSet(0);
-    assertTrue(resultSet.getRowCount() > 0, "Should find records with 'action' tag");
-
-    // Verify data integrity before commit
-    verifyTablesHaveIdenticalData(tableNameWithCompaction, tableNameWithoutCompaction);
+    // Verify initial state - all three tables should show same logical record count (3 unique players after upserts)
+    validateInitialState(tableNameWithoutCompaction, tableNameWithCompaction,
+        tableNameWithCompactionColumnMajor, 3);
 
     // Force commit segments to trigger commit-time compaction
-    forceCommitBothTables(tableNameWithCompaction, tableNameWithoutCompaction);
+    forceCommit(tableNameWithoutCompaction, tableNameWithCompaction, tableNameWithCompactionColumnMajor);
 
     // Wait for commit completion
     waitForAllDocsLoaded(tableNameWithCompaction, 60_000L, 3);
+    waitForAllDocsLoaded(tableNameWithCompactionColumnMajor, 60_000L, 3);
 
     // Validate post-commit compaction effectiveness and data integrity (expecting 3 records, min 1 removed)
-    validatePostCommitCompaction(tableNameWithCompaction, tableNameWithoutCompaction, 3, 1, 1.0);
+    validatePostCommitCompaction(tableNameWithoutCompaction, tableNameWithCompaction,
+        tableNameWithCompactionColumnMajor, 3, 1, 1.0);
 
     // Clean up
-    dropRealtimeTable(tableNameWithCompaction);
-    dropRealtimeTable(tableNameWithoutCompaction);
-    deleteSchema(tableNameWithCompaction);
-    deleteSchema(tableNameWithoutCompaction);
+    cleanupTablesAndSchemas(
+        List.of(tableNameWithoutCompaction, tableNameWithCompaction, tableNameWithCompactionColumnMajor),
+        List.of(tableNameWithoutCompaction, tableNameWithCompaction, tableNameWithCompactionColumnMajor));
   }
 
   @Test
@@ -445,83 +434,77 @@ public class CommitTimeCompactionIntegrationTest extends BaseClusterIntegrationT
     // only specific columns are updated rather than entire records, and obsolete partial
     // updates are properly compacted away.
 
-    String kafkaTopicNameCompacted = getKafkaTopic() + "-partial-compaction-enabled";
-    String kafkaTopicNameNormal = getKafkaTopic() + "-partial-compaction-disabled";
+    // TABLE 1: With commit-time compaction DISABLED and PARTIAL upsert mode (baseline)
 
-    // Set up identical data for both tables - using small dataset for faster test execution
-    setUpKafka(kafkaTopicNameCompacted, INPUT_DATA_SMALL_TAR_FILE);
-    setUpKafka(kafkaTopicNameNormal, INPUT_DATA_SMALL_TAR_FILE);
+    String kafkaTopicName = getKafkaTopic() + "-partial-upsert";
+    setUpKafka(kafkaTopicName, INPUT_DATA_SMALL_TAR_FILE);
 
-    // TABLE 1: With commit-time compaction ENABLED and PARTIAL upsert mode
-    String tableNameWithCompaction = "gameScoresPartialCompactionEnabled";
+    Map<String, String> csvDecoderProperties = getCSVDecoderProperties(CSV_DELIMITER, CSV_SCHEMA_HEADER);
+    csvDecoderProperties.put("stream.kafka.decoder.prop.multiValueDelimiter", ";");
 
-    // Create schema for partial upsert - make game multi-value to support UNION strategy
-    Schema partialUpsertSchemaCompacted = new Schema.SchemaBuilder().setSchemaName(tableNameWithCompaction)
+    Schema.SchemaBuilder schemaBuilder = new Schema.SchemaBuilder()
         .addSingleValueDimension("playerId", FieldSpec.DataType.INT)
         .addSingleValueDimension("name", FieldSpec.DataType.STRING)
         .addMultiValueDimension("game", FieldSpec.DataType.STRING)  // Multi-value for UNION strategy
         .addSingleValueDimension("deleted", FieldSpec.DataType.BOOLEAN).addMetric("score", FieldSpec.DataType.FLOAT)
         .addDateTime("timestampInEpoch", FieldSpec.DataType.LONG, "1:MILLISECONDS:EPOCH", "1:MILLISECONDS")
-        .setPrimaryKeyColumns(Collections.singletonList("playerId")).build();
-    addSchema(partialUpsertSchemaCompacted);
+        .setPrimaryKeyColumns(Collections.singletonList("playerId"));
 
+    // Create schema for partial upsert - make game multi-value to support UNION strategy
+    String tableNameWithoutCompaction = "gameScoresPartialCompactionDisabled";
+    Schema partialUpsertSchemaBaseline = schemaBuilder.setSchemaName(tableNameWithoutCompaction).build();
+    addSchema(partialUpsertSchemaBaseline);
+
+    UpsertConfig upsertConfigWithoutCompaction = new UpsertConfig(UpsertConfig.Mode.PARTIAL);
+    upsertConfigWithoutCompaction.setEnableCommitTimeCompaction(false);  // DISABLE commit-time compaction
+    upsertConfigWithoutCompaction.setPartialUpsertStrategies(
+        Map.of("game", UpsertConfig.Strategy.UNION, "name", UpsertConfig.Strategy.OVERWRITE, "score",
+            UpsertConfig.Strategy.OVERWRITE));
+    TableConfig tableConfigWithoutCompaction =
+        createCSVUpsertTableConfig(tableNameWithoutCompaction, kafkaTopicName, getNumKafkaPartitions(),
+            csvDecoderProperties, upsertConfigWithoutCompaction, PRIMARY_KEY_COL);
+    tableConfigWithoutCompaction.getIndexingConfig().setColumnMajorSegmentBuilderEnabled(false);
+    addTableConfig(tableConfigWithoutCompaction);
+
+    // TABLE 2: With commit-time compaction ENABLED + row-major build and PARTIAL upsert mode
+    String tableNameWithCompaction = "gameScoresPartialCompactionEnabled";
+    Schema partialUpsertSchemaCompacted = schemaBuilder.setSchemaName(tableNameWithCompaction).build();
+    addSchema(partialUpsertSchemaCompacted);
     UpsertConfig upsertConfigWithCompaction = new UpsertConfig(UpsertConfig.Mode.PARTIAL);
     upsertConfigWithCompaction.setPartialUpsertStrategies(
         Map.of("game", UpsertConfig.Strategy.UNION, "name", UpsertConfig.Strategy.OVERWRITE, "score",
             UpsertConfig.Strategy.OVERWRITE));
-
     upsertConfigWithCompaction.setEnableCommitTimeCompaction(true);  // ENABLE commit-time compaction
-    // Changed from PARTIAL to FULL mode to test if this resolves the dictionary mapping issue
-
-    Map<String, String> csvDecoderProperties = getCSVDecoderProperties(CSV_DELIMITER, CSV_SCHEMA_HEADER);
-    // Configure multi-value delimiter for UNION strategy on game column
-    csvDecoderProperties.put("stream.kafka.decoder.prop.multiValueDelimiter", ";");
     TableConfig tableConfigWithCompaction =
-        createCSVUpsertTableConfig(tableNameWithCompaction, kafkaTopicNameCompacted, getNumKafkaPartitions(),
+        createCSVUpsertTableConfig(tableNameWithCompaction, kafkaTopicName, getNumKafkaPartitions(),
             csvDecoderProperties, upsertConfigWithCompaction, PRIMARY_KEY_COL);
-
-    // Ensure _columnMajorSegmentBuilderEnabled = false as specified
     tableConfigWithCompaction.getIndexingConfig().setColumnMajorSegmentBuilderEnabled(false);
     addTableConfig(tableConfigWithCompaction);
 
-    // TABLE 2: With commit-time compaction DISABLED and PARTIAL upsert mode (same configuration)
-    String tableNameWithoutCompaction = "gameScoresPartialCompactionDisabled";
-
-    // Create schema for partial upsert - make game multi-value to support UNION strategy
-    Schema partialUpsertSchemaNormal = new Schema.SchemaBuilder().setSchemaName(tableNameWithoutCompaction)
-        .addSingleValueDimension("playerId", FieldSpec.DataType.INT)
-        .addSingleValueDimension("name", FieldSpec.DataType.STRING)
-        .addMultiValueDimension("game", FieldSpec.DataType.STRING)  // Multi-value for UNION strategy
-        .addSingleValueDimension("deleted", FieldSpec.DataType.BOOLEAN).addMetric("score", FieldSpec.DataType.FLOAT)
-        .addDateTime("timestampInEpoch", FieldSpec.DataType.LONG, "1:MILLISECONDS:EPOCH", "1:MILLISECONDS")
-        .setPrimaryKeyColumns(Collections.singletonList("playerId")).build();
-    addSchema(partialUpsertSchemaNormal);
-
-    UpsertConfig upsertConfigWithoutCompaction = new UpsertConfig(UpsertConfig.Mode.PARTIAL);
-    upsertConfigWithoutCompaction.setEnableCommitTimeCompaction(false);  // DISABLE commit-time compaction
-    // For upsertConfigWithoutCompaction (line 641):
-    upsertConfigWithoutCompaction.setPartialUpsertStrategies(
+    // TABLE 3: With commit-time compaction ENABLED + column-major build and PARTIAL upsert mode
+    String tableNameWithCompactionColumnMajor = "gameScoresPartialCompactionColumnMajor";
+    Schema partialUpsertSchemaColumnMajor = schemaBuilder.setSchemaName(tableNameWithCompactionColumnMajor).build();
+    addSchema(partialUpsertSchemaColumnMajor);
+    UpsertConfig upsertConfigWithCompactionColumnMajor = new UpsertConfig(UpsertConfig.Mode.PARTIAL);
+    upsertConfigWithCompactionColumnMajor.setPartialUpsertStrategies(
         Map.of("game", UpsertConfig.Strategy.UNION, "name", UpsertConfig.Strategy.OVERWRITE, "score",
             UpsertConfig.Strategy.OVERWRITE));
-    // Changed from PARTIAL to FULL mode to test if this resolves the dictionary mapping issue
+    upsertConfigWithCompactionColumnMajor.setEnableCommitTimeCompaction(true);  // ENABLE commit-time compaction
+    TableConfig tableConfigWithCompactionColumnMajor =
+        createCSVUpsertTableConfig(tableNameWithCompactionColumnMajor, kafkaTopicName, getNumKafkaPartitions(),
+            csvDecoderProperties, upsertConfigWithCompactionColumnMajor, PRIMARY_KEY_COL);
 
-    Map<String, String> csvDecoderPropertiesNormal = getCSVDecoderProperties(CSV_DELIMITER, CSV_SCHEMA_HEADER);
-    // Configure multi-value delimiter for UNION strategy on game column
-    csvDecoderPropertiesNormal.put("stream.kafka.decoder.prop.multiValueDelimiter", ";");
-    TableConfig tableConfigWithoutCompaction =
-        createCSVUpsertTableConfig(tableNameWithoutCompaction, kafkaTopicNameNormal, getNumKafkaPartitions(),
-            csvDecoderPropertiesNormal, upsertConfigWithoutCompaction, PRIMARY_KEY_COL);
+    // Enable _columnMajorSegmentBuilderEnabled = true for this table
+    tableConfigWithCompactionColumnMajor.getIndexingConfig().setColumnMajorSegmentBuilderEnabled(true);
+    addTableConfig(tableConfigWithCompactionColumnMajor);
 
-    // Ensure _columnMajorSegmentBuilderEnabled = false as specified
-    tableConfigWithoutCompaction.getIndexingConfig().setColumnMajorSegmentBuilderEnabled(false);
-    addTableConfig(tableConfigWithoutCompaction);
+    // Wait for all three tables to load the same initial data (3 unique records after upserts)
+    waitForAllDocsLoaded(tableNameWithoutCompaction, tableNameWithCompaction,
+        tableNameWithCompactionColumnMajor, 30_000L, 10);
 
-    // Wait for both tables to load the same initial data (3 unique records after upserts)
-    waitForAllDocsLoaded(tableNameWithCompaction, 30_000L, 10);
-    waitForAllDocsLoaded(tableNameWithoutCompaction, 30_000L, 10);
-
-    // Verify initial state - both tables should show the same upserted data count (3 unique records)
-    validateInitialState(tableNameWithCompaction, tableNameWithoutCompaction, 3);
+    // Verify initial state - all three tables should show the same upserted data count (3 unique records)
+    validateInitialState(tableNameWithoutCompaction, tableNameWithCompaction,
+        tableNameWithCompactionColumnMajor, 3);
 
     // Create partial update patterns to generate invalid records
     // For partial upsert: score uses OVERWRITE strategy, name uses OVERWRITE strategy, game uses UNION strategy
@@ -538,103 +521,33 @@ public class CommitTimeCompactionIntegrationTest extends BaseClusterIntegrationT
         // name: OVERWRITE, game: UNION (strategy), score: OVERWRITE (2500)
     );
 
-    // Push all partial updates at once to reduce wait times and ensure consistent partitioning
-    pushCsvIntoKafkaWithKey(partialUpdateRecords, kafkaTopicNameCompacted, 0);
-    pushCsvIntoKafkaWithKey(partialUpdateRecords, kafkaTopicNameNormal, 0);
+    // Push all partial updates to the shared Kafka topic
+    pushCsvIntoKafkaWithKey(partialUpdateRecords, kafkaTopicName, 0);
 
     // Wait for all additional records to be processed (3 unique records after all partial upserts)
-    waitForAllDocsLoaded(tableNameWithCompaction, 90_000L, 15);
-    waitForAllDocsLoaded(tableNameWithoutCompaction, 90_000L, 15);
+    waitForAllDocsLoaded(tableNameWithoutCompaction, tableNameWithCompaction,
+        tableNameWithCompactionColumnMajor, 90_000L, 15);
 
-    // Verify state before commit - both tables should still show the same logical result (3 unique records)
-    validatePreCommitState(tableNameWithCompaction, tableNameWithoutCompaction, 3);
-
-    // Verify partial upsert behavior - check that non-updated columns retain original values
-    String partialUpsertQuery =
-        String.format("SELECT playerId, name, game, score FROM %s WHERE playerId = 100", tableNameWithCompaction);
-    ResultSet partialResult = getPinotConnection().execute(partialUpsertQuery).getResultSet(0);
-    assertEquals(partialResult.getRowCount(), 1, "Should have exactly one record for player 100");
-
-    // Score should be overwritten (latest partial update), name should be overwritten, game should be unioned
-    String updatedName = partialResult.getString(0, 1);
-    String updatedGame = partialResult.getString(0, 2);
-    assertEquals(partialResult.getFloat(0, 3), 1500.0f, "Score should be overwritten by partial upsert");
-
-    // With OVERWRITE strategy, name should contain only the latest value from partial updates
-    assertEquals(updatedName, "PartialUpdate2",
-        "Name should contain the latest overwritten value, got: " + updatedName);
-
-    // With UNION strategy, game should contain merged values from all partial updates for this player
-    assertTrue(updatedGame.contains("arcade") && updatedGame.contains("puzzle"),
-        "Game should contain merged values from UNION strategy (original + arcade + puzzle), got: " + updatedGame);
+    // Verify state before commit - all three tables should still show the same logical result (3 unique records)
+    validatePreCommitState(tableNameWithoutCompaction, tableNameWithCompaction,
+        tableNameWithCompactionColumnMajor, 3);
 
     // Perform commit and wait for completion
-    performCommitAndWait(tableNameWithCompaction, tableNameWithoutCompaction, 20_000L, 4, 2);
+    performCommitAndWait(tableNameWithoutCompaction, tableNameWithCompaction,
+        tableNameWithCompactionColumnMajor, 20_000L, 4, 2);
 
     // Brief wait to ensure all commit operations are complete
-    waitForAllDocsLoaded(tableNameWithCompaction, 90_000L, 3);
+    waitForAllDocsLoaded(tableNameWithCompaction, 60_000L, 3);
+    waitForAllDocsLoaded(tableNameWithCompactionColumnMajor, 60_000L, 3);
 
     // Validate post-commit compaction effectiveness and data integrity (expecting 3 records, min 2 removed)
-    validatePostCommitCompaction(tableNameWithCompaction, tableNameWithoutCompaction, 3, 2, 0.95);
-
-    // Re-verify partial upsert behavior is maintained after compaction
-    partialUpsertQuery =
-        String.format("SELECT playerId, name, game, score FROM %s WHERE playerId = 100", tableNameWithCompaction);
-    partialResult = getPinotConnection().execute(partialUpsertQuery).getResultSet(0);
-    assertEquals(partialResult.getRowCount(), 1,
-        "Should still have exactly one record for player 100 after compaction");
-    // Verify both OVERWRITE and UNION strategy behaviors are maintained after compaction
-    String postCompactionName = partialResult.getString(0, 1);
-    String postCompactionGame = partialResult.getString(0, 2);
-    assertEquals(postCompactionName, "PartialUpdate2",
-        "Name should still contain the latest overwritten value after compaction, got: " + postCompactionName);
-    assertTrue(postCompactionGame.contains("arcade") && postCompactionGame.contains("puzzle"),
-        "Game should still contain merged values from UNION strategy after compaction, got: " + postCompactionGame);
-    assertEquals(partialResult.getFloat(0, 3), 1500.0f,
-        "Score should still be the latest overwritten value after compaction");
+    validatePostCommitCompaction(tableNameWithoutCompaction, tableNameWithCompaction,
+        tableNameWithCompactionColumnMajor, 3, 2, 0.95);
 
     // Clean up
-    dropRealtimeTable(tableNameWithCompaction);
-    dropRealtimeTable(tableNameWithoutCompaction);
-    deleteSchema(tableNameWithCompaction);
-    deleteSchema(tableNameWithoutCompaction);
-  }
-
-  @Test
-  public void testCommitTimeCompactionNotAllowedWithColumnMajorValidation()
-      throws Exception {
-    // Test that enabling commit-time compaction with column major segment builder is rejected
-    String kafkaTopicName = getKafkaTopic() + "-validation-test";
-    createKafkaTopic(kafkaTopicName);
-
-    String tableName = "validationTestTable";
-    UpsertConfig upsertConfig = new UpsertConfig(UpsertConfig.Mode.FULL);
-    upsertConfig.setEnableCommitTimeCompaction(true);
-
-    Schema schema = createSchema();
-    schema.setSchemaName(tableName);
-    addSchema(schema);
-
-    Map<String, String> csvDecoderProperties = getCSVDecoderProperties(CSV_DELIMITER, CSV_SCHEMA_HEADER);
-    TableConfig tableConfig =
-        createCSVUpsertTableConfig(tableName, kafkaTopicName, getNumKafkaPartitions(), csvDecoderProperties,
-            upsertConfig, PRIMARY_KEY_COL);
-
-    // Enable column major segment builder - this should cause validation to fail
-    tableConfig.getIndexingConfig().setColumnMajorSegmentBuilderEnabled(true);
-
-    try {
-      addTableConfig(tableConfig);
-      fail("Expected table creation to fail when both commit-time compaction and column major segment builder are "
-          + "enabled");
-    } catch (Exception e) {
-      assertTrue(e.getMessage()
-              .contains("Commit-time compaction is not supported when column major segment builder is enabled"),
-          "Expected error message about commit-time compaction compatibility, but got: " + e.getMessage());
-    }
-
-    // Clean up - delete the schema since table creation failed
-    deleteSchema(tableName);
+    cleanupTablesAndSchemas(
+        List.of(tableNameWithoutCompaction, tableNameWithCompaction, tableNameWithCompactionColumnMajor),
+        List.of(tableNameWithoutCompaction, tableNameWithCompaction, tableNameWithCompactionColumnMajor));
   }
 
   @Test
@@ -647,8 +560,7 @@ public class CommitTimeCompactionIntegrationTest extends BaseClusterIntegrationT
     // - Different data types (String, Long, multi-value)
     // - Raw index writers for specific columns
 
-    String kafkaTopicNameCompacted = getKafkaTopic() + "-mixed-compaction-enabled";
-    String kafkaTopicNameNormal = getKafkaTopic() + "-mixed-compaction-disabled";
+    String kafkaTopicName = getKafkaTopic() + "-mixed-compaction-comparison";
 
     // Create test data with diverse column types
     // Use semicolon-separated format for multi-value fields in CSV
@@ -659,11 +571,40 @@ public class CommitTimeCompactionIntegrationTest extends BaseClusterIntegrationT
         "300,UpdatedName300,game1,88.0,1681154200000,false,1003,Region3,tag5",
         "301,UpdatedName301,game2,94.0,1681154300000,false,1002,Region2,tag3;tag6");
 
-    // Set up Kafka topics
-    pushCsvIntoKafka(testRecords, kafkaTopicNameCompacted, 0);
-    pushCsvIntoKafka(testRecords, kafkaTopicNameNormal, 0);
+    // Set up Kafka topic
+    pushCsvIntoKafka(testRecords, kafkaTopicName, 0);
 
-    // TABLE 1: With commit-time compaction ENABLED
+    // TABLE 1: With commit-time compaction DISABLED (baseline)
+    String tableNameWithoutCompaction = "gameScoresMixedCompactionDisabled";
+
+    Schema mixedSchemaBaseline = createSchema();
+    mixedSchemaBaseline.setSchemaName(tableNameWithoutCompaction);
+    mixedSchemaBaseline.addField(new DimensionFieldSpec("regionID", FieldSpec.DataType.LONG, true));
+    mixedSchemaBaseline.addField(new DimensionFieldSpec("regionName", FieldSpec.DataType.STRING, true));
+    mixedSchemaBaseline.addField(new DimensionFieldSpec("tags", FieldSpec.DataType.STRING, false));
+    addSchema(mixedSchemaBaseline);
+
+    UpsertConfig upsertConfigWithoutCompaction = new UpsertConfig(UpsertConfig.Mode.FULL);
+    upsertConfigWithoutCompaction.setEnableCommitTimeCompaction(false);
+
+    Map<String, String> csvDecoderProperties = getCSVDecoderProperties(CSV_DELIMITER,
+        "playerId,name,game,score,timestampInEpoch,deleted,regionID,regionName,tags");
+    // Configure multi-value delimiter for tags column
+    csvDecoderProperties.put("stream.kafka.decoder.prop.multiValueDelimiter", ";");
+    TableConfig tableConfigWithoutCompaction =
+        createCSVUpsertTableConfig(tableNameWithoutCompaction, kafkaTopicName, 1, csvDecoderProperties,
+            upsertConfigWithoutCompaction, PRIMARY_KEY_COL);
+
+    // Mixed configuration:
+    // - Inverted indexes on some columns (dictionary + inverted)
+    tableConfigWithoutCompaction.getIndexingConfig().setInvertedIndexColumns(List.of("regionID", "tags", "game"));
+    // - Raw storage (no dictionary) for name and regionName
+    tableConfigWithoutCompaction.getIndexingConfig().setNoDictionaryColumns(List.of("name", "regionName"));
+    // - Keep score as dictionary-encoded metric
+    tableConfigWithoutCompaction.getIndexingConfig().setColumnMajorSegmentBuilderEnabled(false);
+    addTableConfig(tableConfigWithoutCompaction);
+
+    // TABLE 2: With commit-time compaction ENABLED + row-major build
     String tableNameWithCompaction = "gameScoresMixedCompactionEnabled";
 
     // Create enhanced schema with various column types
@@ -677,106 +618,247 @@ public class CommitTimeCompactionIntegrationTest extends BaseClusterIntegrationT
     UpsertConfig upsertConfigWithCompaction = new UpsertConfig(UpsertConfig.Mode.FULL);
     upsertConfigWithCompaction.setEnableCommitTimeCompaction(true);
 
-    Map<String, String> csvDecoderProperties = getCSVDecoderProperties(CSV_DELIMITER,
+    Map<String, String> csvDecoderPropertiesCompacted = getCSVDecoderProperties(CSV_DELIMITER,
         "playerId,name,game,score,timestampInEpoch,deleted,regionID,regionName,tags");
     // Configure multi-value delimiter for tags column
-    csvDecoderProperties.put("stream.kafka.decoder.prop.multiValueDelimiter", ";");
+    csvDecoderPropertiesCompacted.put("stream.kafka.decoder.prop.multiValueDelimiter", ";");
     TableConfig tableConfigWithCompaction =
-        createCSVUpsertTableConfig(tableNameWithCompaction, kafkaTopicNameCompacted, 1, csvDecoderProperties,
+        createCSVUpsertTableConfig(tableNameWithCompaction, kafkaTopicName, 1, csvDecoderPropertiesCompacted,
             upsertConfigWithCompaction, PRIMARY_KEY_COL);
 
-    // Mixed configuration:
-    // - Inverted indexes on some columns (dictionary + inverted)
+    // Same mixed configuration
     tableConfigWithCompaction.getIndexingConfig().setInvertedIndexColumns(List.of("regionID", "tags", "game"));
-    // - Raw storage (no dictionary) for name and regionName
     tableConfigWithCompaction.getIndexingConfig().setNoDictionaryColumns(List.of("name", "regionName"));
-    // - Keep score as dictionary-encoded metric
     tableConfigWithCompaction.getIndexingConfig().setColumnMajorSegmentBuilderEnabled(false);
     addTableConfig(tableConfigWithCompaction);
 
-    // TABLE 2: With commit-time compaction DISABLED (same configuration)
-    String tableNameWithoutCompaction = "gameScoresMixedCompactionDisabled";
+    // TABLE 3: With commit-time compaction ENABLED + column-major build
+    String tableNameWithCompactionColumnMajor = "gameScoresMixedCompactionColumnMajor";
 
-    Schema mixedSchemaNormal = createSchema();
-    mixedSchemaNormal.setSchemaName(tableNameWithoutCompaction);
-    mixedSchemaNormal.addField(new DimensionFieldSpec("regionID", FieldSpec.DataType.LONG, true));
-    mixedSchemaNormal.addField(new DimensionFieldSpec("regionName", FieldSpec.DataType.STRING, true));
-    mixedSchemaNormal.addField(new DimensionFieldSpec("tags", FieldSpec.DataType.STRING, false));
-    addSchema(mixedSchemaNormal);
+    Schema mixedSchemaColumnMajor = createSchema();
+    mixedSchemaColumnMajor.setSchemaName(tableNameWithCompactionColumnMajor);
+    mixedSchemaColumnMajor.addField(new DimensionFieldSpec("regionID", FieldSpec.DataType.LONG, true));
+    mixedSchemaColumnMajor.addField(new DimensionFieldSpec("regionName", FieldSpec.DataType.STRING, true));
+    mixedSchemaColumnMajor.addField(new DimensionFieldSpec("tags", FieldSpec.DataType.STRING, false));
+    addSchema(mixedSchemaColumnMajor);
+
+    UpsertConfig upsertConfigWithCompactionColumnMajor = new UpsertConfig(UpsertConfig.Mode.FULL);
+    upsertConfigWithCompactionColumnMajor.setEnableCommitTimeCompaction(true);
+
+    Map<String, String> csvDecoderPropertiesColumnMajor = getCSVDecoderProperties(CSV_DELIMITER,
+        "playerId,name,game,score,timestampInEpoch,deleted,regionID,regionName,tags");
+    // Configure multi-value delimiter for tags column
+    csvDecoderPropertiesColumnMajor.put("stream.kafka.decoder.prop.multiValueDelimiter", ";");
+    TableConfig tableConfigWithCompactionColumnMajor =
+        createCSVUpsertTableConfig(tableNameWithCompactionColumnMajor, kafkaTopicName, 1,
+            csvDecoderPropertiesColumnMajor, upsertConfigWithCompactionColumnMajor, PRIMARY_KEY_COL);
+
+    // Same mixed configuration AND enable column-major segment builder
+    tableConfigWithCompactionColumnMajor.getIndexingConfig().setInvertedIndexColumns(
+        List.of("regionID", "tags", "game"));
+    tableConfigWithCompactionColumnMajor.getIndexingConfig().setNoDictionaryColumns(List.of("name", "regionName"));
+    tableConfigWithCompactionColumnMajor.getIndexingConfig().setColumnMajorSegmentBuilderEnabled(true);
+    addTableConfig(tableConfigWithCompactionColumnMajor);
+
+    // Wait for data to load
+    waitForAllDocsLoaded(tableNameWithoutCompaction, tableNameWithCompaction,
+        tableNameWithCompactionColumnMajor, 30_000L, 5);
+
+    // Verify initial state - all three tables should show correct logical record count
+    validateInitialState(tableNameWithoutCompaction, tableNameWithCompaction,
+        tableNameWithCompactionColumnMajor, 3);
+
+    // Force commit segments to trigger commit-time compaction
+    forceCommit(tableNameWithoutCompaction, tableNameWithCompaction, tableNameWithCompactionColumnMajor);
+
+    // Wait for segments to be committed - using simpler wait since partition count is 1
+    waitForAllDocsLoaded(tableNameWithCompaction, tableNameWithCompaction,
+        tableNameWithCompactionColumnMajor, 60_000L, 3);
+
+    // Validate post-commit compaction effectiveness and data integrity (expecting 3 records, min 1 removed)
+    validatePostCommitCompaction(tableNameWithoutCompaction, tableNameWithCompaction,
+        tableNameWithCompactionColumnMajor, 3, 1, 1.0);
+
+    // Clean up
+    cleanupTablesAndSchemas(
+        List.of(tableNameWithoutCompaction, tableNameWithCompaction, tableNameWithCompactionColumnMajor),
+        List.of(tableNameWithoutCompaction, tableNameWithCompaction, tableNameWithCompactionColumnMajor));
+  }
+
+  @Test
+  public void testCommitTimeCompactionMutableMapDataSourceFix()
+      throws Exception {
+    // Test Case: MAP Column Commit-Time Compaction
+    // Goal: Ensure commit-time compaction correctly handles MAP columns by only processing
+    // valid documents when collecting statistics, avoiding inflated cardinality and key frequencies
+    // from obsolete records that should be excluded during compaction.
+    // Now includes testing commit-time compaction with column-major segment builder
+
+    String kafkaTopicName = getKafkaTopic() + "-map-compaction-comparison";
+
+    // Create test data with MAP columns - using simplified JSON format for map values
+    // Format: "playerId,name,game,score,timestampInEpoch,deleted,userAttributes"
+    // Note: Using simple key-value pairs without commas to avoid CSV parsing conflicts
+    List<String> testRecords = List.of(
+        "400,Player400,game1,85.5,1681054200000,false,"
+            + "{\"level\":10}",
+        "401,Player401,game2,92.0,1681054300000,false,"
+            + "{\"level\":15}",
+        "402,Player402,game3,78.0,1681054400000,false,"
+            + "{\"level\":8}",
+        // Updates to create obsolete records with different MAP values
+        "400,Player400Updated,game1,90.0,1681154200000,false,"
+            + "{\"level\":12}",
+        "401,Player401Updated,game2,95.0,1681154300000,false,"
+            + "{\"level\":18}"
+    );
+
+    // Set up Kafka topic with MAP test data
+    pushCsvIntoKafka(testRecords, kafkaTopicName, 0);
+
+    // TABLE 1: With commit-time compaction DISABLED (baseline)
+    String tableNameWithoutCompaction = "gameScoresMapCompactionDisabled";
+
+    // Create schema for baseline table
+    Schema mapSchemaBaseline = createSchema();
+    mapSchemaBaseline.setSchemaName(tableNameWithoutCompaction);
+    mapSchemaBaseline.addField(new DimensionFieldSpec("userAttributes", FieldSpec.DataType.JSON, true));
+    addSchema(mapSchemaBaseline);
 
     UpsertConfig upsertConfigWithoutCompaction = new UpsertConfig(UpsertConfig.Mode.FULL);
     upsertConfigWithoutCompaction.setEnableCommitTimeCompaction(false);
 
-    Map<String, String> csvDecoderPropertiesNormal = getCSVDecoderProperties(CSV_DELIMITER,
-        "playerId,name,game,score,timestampInEpoch,deleted,regionID,regionName,tags");
-    // Configure multi-value delimiter for tags column
-    csvDecoderPropertiesNormal.put("stream.kafka.decoder.prop.multiValueDelimiter", ";");
+    Map<String, String> csvDecoderProperties =
+        getCSVDecoderProperties(CSV_DELIMITER, "playerId,name,game,score,timestampInEpoch,deleted,userAttributes");
     TableConfig tableConfigWithoutCompaction =
-        createCSVUpsertTableConfig(tableNameWithoutCompaction, kafkaTopicNameNormal, 1, csvDecoderPropertiesNormal,
-            upsertConfigWithoutCompaction, PRIMARY_KEY_COL);
+        createCSVUpsertTableConfig(tableNameWithoutCompaction, kafkaTopicName, getNumKafkaPartitions(),
+            csvDecoderProperties, upsertConfigWithoutCompaction, PRIMARY_KEY_COL);
 
-    // Same mixed configuration
-    tableConfigWithoutCompaction.getIndexingConfig().setInvertedIndexColumns(List.of("regionID", "tags", "game"));
-    tableConfigWithoutCompaction.getIndexingConfig().setNoDictionaryColumns(List.of("name", "regionName"));
     tableConfigWithoutCompaction.getIndexingConfig().setColumnMajorSegmentBuilderEnabled(false);
     addTableConfig(tableConfigWithoutCompaction);
 
+    // TABLE 2: With commit-time compaction ENABLED + row-major build
+    String tableNameWithCompaction = "gameScoresMapCompactionEnabled";
+
+    // Create schema with MAP column
+    Schema mapSchemaCompacted = createSchema();
+    mapSchemaCompacted.setSchemaName(tableNameWithCompaction);
+    mapSchemaCompacted.addField(new DimensionFieldSpec("userAttributes", FieldSpec.DataType.JSON, true));
+    addSchema(mapSchemaCompacted);
+
+    UpsertConfig upsertConfigWithCompaction = new UpsertConfig(UpsertConfig.Mode.FULL);
+    upsertConfigWithCompaction.setEnableCommitTimeCompaction(true);
+
+    Map<String, String> csvDecoderPropertiesCompacted =
+        getCSVDecoderProperties(CSV_DELIMITER, "playerId,name,game,score,timestampInEpoch,deleted,userAttributes");
+    TableConfig tableConfigWithCompaction =
+        createCSVUpsertTableConfig(tableNameWithCompaction, kafkaTopicName, getNumKafkaPartitions(),
+            csvDecoderPropertiesCompacted, upsertConfigWithCompaction, PRIMARY_KEY_COL);
+
+    tableConfigWithCompaction.getIndexingConfig().setColumnMajorSegmentBuilderEnabled(false);
+    addTableConfig(tableConfigWithCompaction);
+
+    // TABLE 3: With commit-time compaction ENABLED + column-major build
+    String tableNameWithCompactionColumnMajor = "gameScoresMapCompactionColumnMajor";
+
+    // Create schema for column-major table
+    Schema mapSchemaColumnMajor = createSchema();
+    mapSchemaColumnMajor.setSchemaName(tableNameWithCompactionColumnMajor);
+    mapSchemaColumnMajor.addField(new DimensionFieldSpec("userAttributes", FieldSpec.DataType.JSON, true));
+    addSchema(mapSchemaColumnMajor);
+
+    UpsertConfig upsertConfigWithCompactionColumnMajor = new UpsertConfig(UpsertConfig.Mode.FULL);
+    upsertConfigWithCompactionColumnMajor.setEnableCommitTimeCompaction(true);
+
+    Map<String, String> csvDecoderPropertiesColumnMajor =
+        getCSVDecoderProperties(CSV_DELIMITER, "playerId,name,game,score,timestampInEpoch,deleted,userAttributes");
+    TableConfig tableConfigWithCompactionColumnMajor =
+        createCSVUpsertTableConfig(tableNameWithCompactionColumnMajor, kafkaTopicName, getNumKafkaPartitions(),
+            csvDecoderPropertiesColumnMajor, upsertConfigWithCompactionColumnMajor, PRIMARY_KEY_COL);
+
+    tableConfigWithCompactionColumnMajor.getIndexingConfig().setColumnMajorSegmentBuilderEnabled(true);
+    addTableConfig(tableConfigWithCompactionColumnMajor);
+
     // Wait for data to load
-    waitForAllDocsLoadedInBothTables(tableNameWithCompaction, tableNameWithoutCompaction, 30_000L, 5);
+    waitForAllDocsLoaded(tableNameWithoutCompaction, tableNameWithCompaction,
+        tableNameWithCompactionColumnMajor, 30_000L, 5);
 
-    // Verify initial state - both tables should show correct logical record count
-    validateInitialState(tableNameWithCompaction, tableNameWithoutCompaction, 3);
+    // Verify initial state - all three tables should show same logical record count (3 unique players after upserts)
+    validateInitialState(tableNameWithoutCompaction, tableNameWithCompaction,
+        tableNameWithCompactionColumnMajor, 3);
 
-    // Test queries on different column types work correctly before commit:
-
-    // 1. Query on dictionary-encoded column with inverted index
-    String dictQuery = String.format("SELECT COUNT(*) FROM %s WHERE regionID = 1002", tableNameWithCompaction);
-    ResultSet dictResult = getPinotConnection().execute(dictQuery).getResultSet(0);
-    assertTrue(dictResult.getInt(0, 0) > 0, "Should find records for regionID 1002");
-
-    // 2. Query on raw (no-dictionary) column
-    String rawQuery = String.format("SELECT COUNT(*) FROM %s WHERE regionName = 'Region2'", tableNameWithCompaction);
-    ResultSet rawResult = getPinotConnection().execute(rawQuery).getResultSet(0);
-    assertTrue(rawResult.getInt(0, 0) > 0, "Should find records for Region2");
-
-    // 3. Query on multi-value column with inverted index
-    String mvQuery = String.format("SELECT COUNT(*) FROM %s WHERE tags = 'tag3'", tableNameWithCompaction);
-    ResultSet mvResult = getPinotConnection().execute(mvQuery).getResultSet(0);
-    assertTrue(mvResult.getInt(0, 0) > 0, "Should find records with tag3");
+    // Test JSON queries work correctly before commit
+    String jsonQuery = String.format(
+        "SELECT playerId, JSON_EXTRACT_SCALAR(userAttributes, '$.level', 'INT') as level FROM %s WHERE "
+            + "JSON_EXTRACT_SCALAR(userAttributes, '$.level', 'INT') > 10 ORDER BY playerId",
+        tableNameWithCompaction);
+    ResultSet resultSet = getPinotConnection().execute(jsonQuery).getResultSet(0);
+    assertTrue(resultSet.getRowCount() > 0, "Should find records with level > 10");
 
     // Verify data integrity before commit
-    verifyTablesHaveIdenticalData(tableNameWithCompaction, tableNameWithoutCompaction);
+    verifyTablesHaveIdenticalData(tableNameWithoutCompaction, tableNameWithCompaction);
+    verifyTablesHaveIdenticalData(tableNameWithoutCompaction, tableNameWithCompactionColumnMajor);
 
     // Force commit segments to trigger commit-time compaction
-    forceCommitBothTables(tableNameWithCompaction, tableNameWithoutCompaction);
+    forceCommit(tableNameWithoutCompaction, tableNameWithCompaction, tableNameWithCompactionColumnMajor);
 
-    // Wait for segments to be committed - using simpler wait since partition count is 1
+    // Wait for commit completion
     waitForAllDocsLoaded(tableNameWithCompaction, 60_000L, 3);
+    waitForAllDocsLoaded(tableNameWithCompactionColumnMajor, 60_000L, 3);
 
     // Validate post-commit compaction effectiveness and data integrity (expecting 3 records, min 1 removed)
-    validatePostCommitCompaction(tableNameWithCompaction, tableNameWithoutCompaction, 3, 1, 1.0);
+    validatePostCommitCompaction(tableNameWithoutCompaction, tableNameWithCompaction,
+        tableNameWithCompactionColumnMajor, 3, 1, 1.0);
 
-    // Verify queries still work correctly on all column types after compaction
-    // Re-test dictionary-encoded column
-    dictResult = getPinotConnection().execute(dictQuery).getResultSet(0);
-    assertTrue(dictResult.getInt(0, 0) > 0, "Should still find records for regionID 1002 after compaction");
+    // Verify JSON queries still work correctly after compaction
+    resultSet = getPinotConnection().execute(jsonQuery).getResultSet(0);
+    assertTrue(resultSet.getRowCount() > 0, "Should still find records with level > 10 after compaction");
 
-    // Re-test raw (no-dictionary) column
-    rawResult = getPinotConnection().execute(rawQuery).getResultSet(0);
-    assertTrue(rawResult.getInt(0, 0) > 0, "Should still find records for Region2 after compaction");
+    // Test specific JSON path queries to ensure MAP column statistics are correctly computed
+    String levelQuery = String.format(
+        "SELECT COUNT(*) FROM %s WHERE JSON_EXTRACT_SCALAR(userAttributes, '$.level', 'INT') > 10",
+        tableNameWithCompaction);
+    ResultSet levelResult = getPinotConnection().execute(levelQuery).getResultSet(0);
+    assertTrue(levelResult.getInt(0, 0) > 0, "Should find records with level > 10 after compaction");
 
-    // Re-test multi-value column
-    mvResult = getPinotConnection().execute(mvQuery).getResultSet(0);
-    assertTrue(mvResult.getInt(0, 0) > 0, "Should still find records with tag3 after compaction");
+    // Verify that obsolete MAP values are not affecting queries - test uniqueness
+    String uniqueQuery = String.format(
+        "SELECT COUNT(DISTINCT playerId) FROM %s WHERE "
+            + "JSON_EXTRACT_SCALAR(userAttributes, '$.level', 'INT') IS NOT NULL",
+        tableNameWithCompaction);
+    ResultSet uniqueResult = getPinotConnection().execute(uniqueQuery).getResultSet(0);
+    assertEquals(uniqueResult.getInt(0, 0), 3,
+        "Should find exactly 3 unique players with level data (after compaction)");
+
+    // Test same queries on column-major table
+    String jsonQueryColumnMajor = String.format(
+        "SELECT playerId, JSON_EXTRACT_SCALAR(userAttributes, '$.level', 'INT') as level FROM %s WHERE "
+            + "JSON_EXTRACT_SCALAR(userAttributes, '$.level', 'INT') > 10 ORDER BY playerId",
+        tableNameWithCompactionColumnMajor);
+    ResultSet resultSetColumnMajor = getPinotConnection().execute(jsonQueryColumnMajor).getResultSet(0);
+    assertTrue(resultSetColumnMajor.getRowCount() > 0,
+        "Should still find records with level > 10 after compaction (column-major)");
+
+    String levelQueryColumnMajor = String.format(
+        "SELECT COUNT(*) FROM %s WHERE JSON_EXTRACT_SCALAR(userAttributes, '$.level', 'INT') > 10",
+        tableNameWithCompactionColumnMajor);
+    ResultSet levelResultColumnMajor = getPinotConnection().execute(levelQueryColumnMajor).getResultSet(0);
+    assertTrue(levelResultColumnMajor.getInt(0, 0) > 0,
+        "Should find records with level > 10 after compaction (column-major)");
+
+    String uniqueQueryColumnMajor = String.format(
+        "SELECT COUNT(DISTINCT playerId) FROM %s WHERE "
+            + "JSON_EXTRACT_SCALAR(userAttributes, '$.level', 'INT') IS NOT NULL",
+        tableNameWithCompactionColumnMajor);
+    ResultSet uniqueResultColumnMajor = getPinotConnection().execute(uniqueQueryColumnMajor).getResultSet(0);
+    assertEquals(uniqueResultColumnMajor.getInt(0, 0), 3,
+        "Should find exactly 3 unique players with level data (after compaction, column-major)");
 
     // Clean up
-    dropRealtimeTable(tableNameWithCompaction);
-    dropRealtimeTable(tableNameWithoutCompaction);
-    deleteSchema(tableNameWithCompaction);
-    deleteSchema(tableNameWithoutCompaction);
+    cleanupTablesAndSchemas(
+        List.of(tableNameWithoutCompaction, tableNameWithCompaction, tableNameWithCompactionColumnMajor),
+        List.of(tableNameWithoutCompaction, tableNameWithCompaction, tableNameWithCompactionColumnMajor));
   }
-
-  // Helper methods - reuse from base class but add specific configurations
 
   @Override
   protected String getTimeColumnName() {
@@ -803,84 +885,6 @@ public class CommitTimeCompactionIntegrationTest extends BaseClusterIntegrationT
   }
 
   /**
-   * Validates initial state of both tables - they should have the same logical record count
-   */
-  protected void validateInitialState(String tableNameWithCompaction, String tableNameWithoutCompaction,
-      int expectedRecords) {
-    long initialLogicalCountCompacted = queryCountStar(tableNameWithCompaction);
-    long initialLogicalCountNormal = queryCountStar(tableNameWithoutCompaction);
-
-    assertEquals(initialLogicalCountCompacted, expectedRecords,
-        "Compacted table should have " + expectedRecords + " logical records initially");
-    assertEquals(initialLogicalCountNormal, expectedRecords,
-        "Normal table should have " + expectedRecords + " logical records initially");
-  }
-
-  /**
-   * Validates pre-commit state of both tables - they should still have the same logical record count
-   */
-  protected void validatePreCommitState(String tableNameWithCompaction, String tableNameWithoutCompaction,
-      int expectedRecords) {
-    long preCommitLogicalCountCompacted = queryCountStar(tableNameWithCompaction);
-    long preCommitLogicalCountNormal = queryCountStar(tableNameWithoutCompaction);
-
-    assertEquals(preCommitLogicalCountCompacted, expectedRecords,
-        "Both tables should show " + expectedRecords + " logical records before commit");
-    assertEquals(preCommitLogicalCountNormal, expectedRecords,
-        "Both tables should show " + expectedRecords + " logical records before commit");
-
-    // Verify both tables have the same data row by row
-    verifyTablesHaveIdenticalData(tableNameWithCompaction, tableNameWithoutCompaction);
-  }
-
-  /**
-   * Comprehensive post-commit validation including compaction effectiveness and data integrity
-   */
-  protected void validatePostCommitCompaction(String tableNameWithCompaction, String tableNameWithoutCompaction,
-      int expectedLogicalRecords, int minExpectedRemovedRecords,
-      double maxCompressionRatio) {
-    // Check the TOTAL document counts after commit (with skipUpsert=true to see all physical records)
-    long postCommitPhysicalCountCompacted = queryCountStarWithoutUpsert(tableNameWithCompaction);
-    long postCommitPhysicalCountNormal = queryCountStarWithoutUpsert(tableNameWithoutCompaction);
-    long postCommitLogicalCountCompacted = queryCountStar(tableNameWithCompaction);
-    long postCommitLogicalCountNormal = queryCountStar(tableNameWithoutCompaction);
-
-    // If counts are still the same, wait a bit longer for actual commit completion
-    if (postCommitPhysicalCountCompacted == postCommitPhysicalCountNormal) {
-      try {
-        Thread.sleep(10_000);
-        postCommitPhysicalCountCompacted = queryCountStarWithoutUpsert(tableNameWithCompaction);
-        postCommitPhysicalCountNormal = queryCountStarWithoutUpsert(tableNameWithoutCompaction);
-        postCommitLogicalCountCompacted = queryCountStar(tableNameWithCompaction);
-        postCommitLogicalCountNormal = queryCountStar(tableNameWithoutCompaction);
-      } catch (InterruptedException e) {
-        Thread.currentThread().interrupt();
-        throw new RuntimeException("Interrupted while waiting for commit completion", e);
-      }
-    }
-
-    // Key assertions for commit time compaction
-    assertTrue(postCommitPhysicalCountCompacted < postCommitPhysicalCountNormal, String.format(
-        "Expected table with commit-time compaction (%d docs) to have fewer physical docs than "
-            + "table without compaction (%d docs)", postCommitPhysicalCountCompacted, postCommitPhysicalCountNormal));
-
-    // Both should still return the same logical upserted results
-    assertEquals(postCommitLogicalCountCompacted, expectedLogicalRecords,
-        "Compacted table should still have " + expectedLogicalRecords + " logical records");
-    assertEquals(postCommitLogicalCountNormal, expectedLogicalRecords,
-        "Normal table should still have " + expectedLogicalRecords + " logical records");
-    assertEquals(postCommitLogicalCountCompacted, postCommitLogicalCountNormal,
-        "Both tables should have identical logical results");
-
-    // Verify data integrity - both tables should return identical data row by row
-    verifyTablesHaveIdenticalData(tableNameWithCompaction, tableNameWithoutCompaction);
-
-    // Calculate and validate compaction efficiency
-    validateCompactionEfficiency(postCommitPhysicalCountCompacted, postCommitPhysicalCountNormal,
-        minExpectedRemovedRecords, maxCompressionRatio);
-  }
-
-  /**
    * Validates compaction efficiency metrics
    */
   protected void validateCompactionEfficiency(long physicalCountCompacted, long physicalCountNormal,
@@ -893,63 +897,6 @@ public class CommitTimeCompactionIntegrationTest extends BaseClusterIntegrationT
     assertTrue(invalidRecordsRemoved >= minExpectedRemovedRecords,
         "At least " + minExpectedRemovedRecords + " invalid records should be removed, but only "
             + invalidRecordsRemoved + " were removed");
-  }
-
-  /**
-   * Performs force commit on both tables
-   */
-  protected void forceCommitBothTables(String tableNameWithCompaction, String tableNameWithoutCompaction)
-      throws Exception {
-    sendPostRequest(_controllerRequestURLBuilder.forTableForceCommit(tableNameWithCompaction));
-    sendPostRequest(_controllerRequestURLBuilder.forTableForceCommit(tableNameWithoutCompaction));
-  }
-
-  protected void pushDataToBothTopics(List<String> records, String kafkaTopicNameCompacted,
-      String kafkaTopicNameNormal, int partition)
-      throws Exception {
-    pushCsvIntoKafka(records, kafkaTopicNameCompacted, partition);
-    pushCsvIntoKafka(records, kafkaTopicNameNormal, partition);
-  }
-
-  protected void pushDataWithKeyToBothTopics(List<String> records, String kafkaTopicNameCompacted,
-      String kafkaTopicNameNormal, int partition)
-      throws Exception {
-    pushCsvIntoKafkaWithKey(records, kafkaTopicNameCompacted, partition);
-    pushCsvIntoKafkaWithKey(records, kafkaTopicNameNormal, partition);
-  }
-
-  protected void waitForAllDocsLoadedInBothTables(String tableNameWithCompaction, String tableNameWithoutCompaction,
-      long timeoutMs, int expectedRecords)
-      throws Exception {
-    waitForAllDocsLoaded(tableNameWithCompaction, timeoutMs, expectedRecords);
-    waitForAllDocsLoaded(tableNameWithoutCompaction, timeoutMs, expectedRecords);
-  }
-
-  protected void performSimpleCommitAndVerify(String tableNameWithCompaction, String tableNameWithoutCompaction,
-      long waitTimeoutMs, int expectedRecords)
-      throws Exception {
-    // Force commit segments on both tables
-    forceCommitBothTables(tableNameWithCompaction, tableNameWithoutCompaction);
-    waitForAllDocsLoaded(tableNameWithCompaction, waitTimeoutMs, expectedRecords);
-    verifyTablesHaveIdenticalData(tableNameWithCompaction, tableNameWithoutCompaction);
-  }
-
-  protected void performCommitAndWait(String tableNameWithCompaction, String tableNameWithoutCompaction,
-      long waitTimeoutMs, int expectedSegments, int expectedConsumingSegments)
-      throws Exception {
-    // Force commit segments on both tables to trigger commit-time behavior
-    forceCommitBothTables(tableNameWithCompaction, tableNameWithoutCompaction);
-
-    // Wait for segments to be committed
-    if (expectedConsumingSegments >= 0) {
-      waitForNumQueriedSegmentsToConverge(tableNameWithCompaction, waitTimeoutMs, expectedSegments,
-          expectedConsumingSegments);
-      waitForNumQueriedSegmentsToConverge(tableNameWithoutCompaction, waitTimeoutMs, expectedSegments,
-          expectedConsumingSegments);
-    } else {
-      waitForNumQueriedSegmentsToConverge(tableNameWithCompaction, waitTimeoutMs, expectedSegments);
-      waitForNumQueriedSegmentsToConverge(tableNameWithoutCompaction, waitTimeoutMs, expectedSegments);
-    }
   }
 
   protected void waitForAllDocsLoaded(String tableName, long timeoutMs, long expectedDocs)
@@ -997,17 +944,26 @@ public class CommitTimeCompactionIntegrationTest extends BaseClusterIntegrationT
     }
   }
 
-  private TableConfig setUpTable(String tableName, String kafkaTopicName, UpsertConfig upsertConfig)
+  private TableConfig createUpsertTable(String tableName, String kafkaTopicName, UpsertConfig.Mode upsertMode,
+      boolean enableCommitTimeCompaction, boolean enableColumnMajorSegmentBuilder)
       throws Exception {
+    // Create schema
     Schema schema = createSchema();
     schema.setSchemaName(tableName);
     addSchema(schema);
 
+    // Create upsert config
+    UpsertConfig upsertConfig = new UpsertConfig(upsertMode);
+    upsertConfig.setEnableCommitTimeCompaction(enableCommitTimeCompaction);
+
+    // Create table config
     Map<String, String> csvDecoderProperties = getCSVDecoderProperties(CSV_DELIMITER, CSV_SCHEMA_HEADER);
     TableConfig tableConfig =
         createCSVUpsertTableConfig(tableName, kafkaTopicName, getNumKafkaPartitions(), csvDecoderProperties,
             upsertConfig, PRIMARY_KEY_COL);
-    tableConfig.getIndexingConfig().setColumnMajorSegmentBuilderEnabled(false);
+
+    // Set column-major segment builder setting
+    tableConfig.getIndexingConfig().setColumnMajorSegmentBuilderEnabled(enableColumnMajorSegmentBuilder);
     addTableConfig(tableConfig);
 
     return tableConfig;
@@ -1033,10 +989,6 @@ public class CommitTimeCompactionIntegrationTest extends BaseClusterIntegrationT
     verifyTablesHaveIdenticalData(table1, table2, COLUMNS_TO_COMPARE, PRIMARY_KEY_COL);
   }
 
-  /**
-   * Verifies that two tables return identical data row by row for all queries
-   * Uses object-to-object comparison for all column values
-   */
   private void verifyTablesHaveIdenticalData(String table1, String table2, List<String> columnsToCompare,
       String pkColumnName) {
     // Use provided columns to dynamically build query with available columns
@@ -1072,9 +1024,6 @@ public class CommitTimeCompactionIntegrationTest extends BaseClusterIntegrationT
     }
   }
 
-  /**
-   * Helper method to get result value handling different data types
-   */
   private Object getResultValue(ResultSet resultSet, int row, int col) {
     try {
       // Try different data types
@@ -1092,10 +1041,7 @@ public class CommitTimeCompactionIntegrationTest extends BaseClusterIntegrationT
     }
   }
 
-  private void validateSegmentLevelSorting(String tableName, boolean shouldBeSorted)
-      throws Exception {
-    // Query to get all records with segment name and document order
-    // CRITICAL: ORDER BY $segmentName, $docId ensures we get physical document order within each segment
+  private void validateSegmentLevelSorting(String tableName) {
     ResultSet segmentData = getPinotConnection().execute(
             "SELECT $segmentName, $docId, playerId, score FROM " + tableName + " ORDER BY $segmentName, $docId")
         .getResultSet(0);
@@ -1107,7 +1053,6 @@ public class CommitTimeCompactionIntegrationTest extends BaseClusterIntegrationT
     for (int i = 0; i < segmentData.getRowCount(); i++) {
       String segmentName = segmentData.getString(i, 0);
       int docId = Integer.parseInt(segmentData.getString(i, 1));
-      int playerId = Integer.parseInt(segmentData.getString(i, 2));
       float score = Float.parseFloat(segmentData.getString(i, 3));
 
       segmentScoresMap.computeIfAbsent(segmentName, k -> new ArrayList<>()).add(score);
@@ -1115,13 +1060,12 @@ public class CommitTimeCompactionIntegrationTest extends BaseClusterIntegrationT
     }
 
     // Now validate each segment individually
-
     for (Map.Entry<String, List<Float>> entry : segmentScoresMap.entrySet()) {
       String segmentName = entry.getKey();
       List<Float> scores = entry.getValue();
       List<Integer> docIds = segmentDocIdsMap.get(segmentName);
 
-      if (shouldBeSorted && scores.size() > 1) {
+      if (scores.size() > 1) {
         boolean isSegmentSorted = true;
         String sortingIssue = null;
 
@@ -1141,131 +1085,140 @@ public class CommitTimeCompactionIntegrationTest extends BaseClusterIntegrationT
     }
   }
 
-  @Test
-  public void testCommitTimeCompactionMutableMapDataSourceFix()
+  protected void waitForAllDocsLoaded(String tableName1, String tableName2, String tableName3,
+      long timeoutMs, int expectedRecords)
       throws Exception {
-    // Test Case: MAP Column Commit-Time Compaction
-    // Goal: Ensure commit-time compaction correctly handles MAP columns by only processing
-    // valid documents when collecting statistics, avoiding inflated cardinality and key frequencies
-    // from obsolete records that should be excluded during compaction.
+    waitForAllDocsLoaded(tableName1, timeoutMs, expectedRecords);
+    waitForAllDocsLoaded(tableName2, timeoutMs, expectedRecords);
+    waitForAllDocsLoaded(tableName3, timeoutMs, expectedRecords);
+  }
 
-    String kafkaTopicNameCompacted = getKafkaTopic() + "-map-compaction-enabled";
-    String kafkaTopicNameNormal = getKafkaTopic() + "-map-compaction-disabled";
+  protected void validateInitialState(String tableName1, String tableName2, String tableName3,
+      int expectedRecords) {
+    long initialLogicalCount1 = queryCountStar(tableName1);
+    long initialLogicalCount2 = queryCountStar(tableName2);
+    long initialLogicalCount3 = queryCountStar(tableName3);
 
-    // Create test data with MAP columns - using simplified JSON format for map values
-    // Format: "playerId,name,game,score,timestampInEpoch,deleted,userAttributes"
-    // Note: Using simple key-value pairs without commas to avoid CSV parsing conflicts
-    List<String> testRecords = List.of(
-        "400,Player400,game1,85.5,1681054200000,false,"
-            + "{\"level\":10}",
-        "401,Player401,game2,92.0,1681054300000,false,"
-            + "{\"level\":15}",
-        "402,Player402,game3,78.0,1681054400000,false,"
-            + "{\"level\":8}",
-        // Updates to create obsolete records with different MAP values
-        "400,Player400Updated,game1,90.0,1681154200000,false,"
-            + "{\"level\":12}",
-        "401,Player401Updated,game2,95.0,1681154300000,false,"
-            + "{\"level\":18}"
-    );
+    assertEquals(initialLogicalCount1, expectedRecords,
+        "Table 1 should have " + expectedRecords + " logical records initially");
+    assertEquals(initialLogicalCount2, expectedRecords,
+        "Table 2 should have " + expectedRecords + " logical records initially");
+    assertEquals(initialLogicalCount3, expectedRecords,
+        "Table 3 should have " + expectedRecords + " logical records initially");
+  }
 
-    // Set up Kafka topics with MAP test data
-    pushCsvIntoKafka(testRecords, kafkaTopicNameCompacted, 0);
-    pushCsvIntoKafka(testRecords, kafkaTopicNameNormal, 0);
+  protected void validatePreCommitState(String tableName1, String tableName2, String tableName3,
+      int expectedRecords) {
+    long preCommitLogicalCount1 = queryCountStar(tableName1);
+    long preCommitLogicalCount2 = queryCountStar(tableName2);
+    long preCommitLogicalCount3 = queryCountStar(tableName3);
 
-    // TABLE 1: With commit-time compaction ENABLED
-    String tableNameWithCompaction = "gameScoresMapCompactionEnabled";
+    assertEquals(preCommitLogicalCount1, expectedRecords,
+        "All tables should show " + expectedRecords + " logical records before commit");
+    assertEquals(preCommitLogicalCount2, expectedRecords,
+        "All tables should show " + expectedRecords + " logical records before commit");
+    assertEquals(preCommitLogicalCount3, expectedRecords,
+        "All tables should show " + expectedRecords + " logical records before commit");
 
-    // Create schema with MAP column
-    Schema mapSchemaCompacted = createSchema();
-    mapSchemaCompacted.setSchemaName(tableNameWithCompaction);
-    mapSchemaCompacted.addField(new DimensionFieldSpec("userAttributes", FieldSpec.DataType.JSON, true));
-    addSchema(mapSchemaCompacted);
+    // Verify all tables have the same data row by row
+    verifyTablesHaveIdenticalData(tableName1, tableName2);
+    verifyTablesHaveIdenticalData(tableName1, tableName3);
+  }
 
-    UpsertConfig upsertConfigWithCompaction = new UpsertConfig(UpsertConfig.Mode.FULL);
-    upsertConfigWithCompaction.setEnableCommitTimeCompaction(true);
+  protected void performCommitAndWait(String tableName1, String tableName2, String tableName3,
+      long waitTimeoutMs, int expectedSegments, int expectedConsumingSegments)
+      throws Exception {
+    forceCommit(tableName1, tableName2, tableName3);
 
-    Map<String, String> csvDecoderProperties =
-        getCSVDecoderProperties(CSV_DELIMITER, "playerId,name,game,score,timestampInEpoch,deleted,userAttributes");
-    TableConfig tableConfigWithCompaction =
-        createCSVUpsertTableConfig(tableNameWithCompaction, kafkaTopicNameCompacted, getNumKafkaPartitions(),
-            csvDecoderProperties, upsertConfigWithCompaction, PRIMARY_KEY_COL);
+    // Wait for segments to be committed
+    if (expectedConsumingSegments >= 0) {
+      waitForNumQueriedSegmentsToConverge(tableName1, waitTimeoutMs, expectedSegments, expectedConsumingSegments);
+      waitForNumQueriedSegmentsToConverge(tableName2, waitTimeoutMs, expectedSegments, expectedConsumingSegments);
+      waitForNumQueriedSegmentsToConverge(tableName3, waitTimeoutMs, expectedSegments, expectedConsumingSegments);
+    } else {
+      waitForNumQueriedSegmentsToConverge(tableName1, waitTimeoutMs, expectedSegments);
+      waitForNumQueriedSegmentsToConverge(tableName2, waitTimeoutMs, expectedSegments);
+      waitForNumQueriedSegmentsToConverge(tableName3, waitTimeoutMs, expectedSegments);
+    }
+  }
 
-    tableConfigWithCompaction.getIndexingConfig().setColumnMajorSegmentBuilderEnabled(false);
-    addTableConfig(tableConfigWithCompaction);
+  protected void forceCommit(String tableName1, String tableName2, String tableName3)
+      throws Exception {
+    sendPostRequest(_controllerRequestURLBuilder.forTableForceCommit(tableName1));
+    sendPostRequest(_controllerRequestURLBuilder.forTableForceCommit(tableName2));
+    sendPostRequest(_controllerRequestURLBuilder.forTableForceCommit(tableName3));
+  }
 
-    // TABLE 2: With commit-time compaction DISABLED
-    String tableNameWithoutCompaction = "gameScoresMapCompactionDisabled";
+  protected void validatePostCommitCompaction(String tableNameBaseline, String tableNameCompacted1,
+      String tableNameCompacted2, int expectedLogicalRecords, int minExpectedRemovedRecords,
+      double maxCompressionRatio) {
+    // Check the TOTAL document counts after commit (with skipUpsert=true to see all physical records)
+    long postCommitPhysicalCountBaseline = queryCountStarWithoutUpsert(tableNameBaseline);
+    long postCommitPhysicalCountCompacted1 = queryCountStarWithoutUpsert(tableNameCompacted1);
+    long postCommitPhysicalCountCompacted2 = queryCountStarWithoutUpsert(tableNameCompacted2);
+    long postCommitLogicalCountBaseline = queryCountStar(tableNameBaseline);
+    long postCommitLogicalCountCompacted1 = queryCountStar(tableNameCompacted1);
+    long postCommitLogicalCountCompacted2 = queryCountStar(tableNameCompacted2);
 
-    // Create separate schema for normal table
-    Schema mapSchemaNormal = createSchema();
-    mapSchemaNormal.setSchemaName(tableNameWithoutCompaction);
-    mapSchemaNormal.addField(new DimensionFieldSpec("userAttributes", FieldSpec.DataType.JSON, true));
-    addSchema(mapSchemaNormal);
+    // If counts are still the same, wait a bit longer for actual commit completion
+    if (postCommitPhysicalCountCompacted1 == postCommitPhysicalCountBaseline
+        || postCommitPhysicalCountCompacted2 == postCommitPhysicalCountBaseline) {
+      try {
+        Thread.sleep(10_000);
+        postCommitPhysicalCountBaseline = queryCountStarWithoutUpsert(tableNameBaseline);
+        postCommitPhysicalCountCompacted1 = queryCountStarWithoutUpsert(tableNameCompacted1);
+        postCommitPhysicalCountCompacted2 = queryCountStarWithoutUpsert(tableNameCompacted2);
+        postCommitLogicalCountBaseline = queryCountStar(tableNameBaseline);
+        postCommitLogicalCountCompacted1 = queryCountStar(tableNameCompacted1);
+        postCommitLogicalCountCompacted2 = queryCountStar(tableNameCompacted2);
+      } catch (InterruptedException e) {
+        Thread.currentThread().interrupt();
+        throw new RuntimeException("Interrupted while waiting for commit completion", e);
+      }
+    }
 
-    UpsertConfig upsertConfigWithoutCompaction = new UpsertConfig(UpsertConfig.Mode.FULL);
-    upsertConfigWithoutCompaction.setEnableCommitTimeCompaction(false);
+    // Key assertions for commit time compaction - both compacted tables should have fewer physical docs
+    assertTrue(postCommitPhysicalCountCompacted1 < postCommitPhysicalCountBaseline, String.format(
+        "Expected table with commit-time compaction + row-major (%d docs) to have fewer physical docs than "
+            + "baseline table (%d docs)", postCommitPhysicalCountCompacted1, postCommitPhysicalCountBaseline));
 
-    Map<String, String> csvDecoderPropertiesNormal =
-        getCSVDecoderProperties(CSV_DELIMITER, "playerId,name,game,score,timestampInEpoch,deleted,userAttributes");
-    TableConfig tableConfigWithoutCompaction =
-        createCSVUpsertTableConfig(tableNameWithoutCompaction, kafkaTopicNameNormal, getNumKafkaPartitions(),
-            csvDecoderPropertiesNormal, upsertConfigWithoutCompaction, PRIMARY_KEY_COL);
+    assertTrue(postCommitPhysicalCountCompacted2 < postCommitPhysicalCountBaseline, String.format(
+        "Expected table with commit-time compaction + column-major (%d docs) to have fewer physical docs than "
+            + "baseline table (%d docs)", postCommitPhysicalCountCompacted2, postCommitPhysicalCountBaseline));
 
-    tableConfigWithoutCompaction.getIndexingConfig().setColumnMajorSegmentBuilderEnabled(false);
-    addTableConfig(tableConfigWithoutCompaction);
+    // All tables should still return the same logical upserted results
+    assertEquals(postCommitLogicalCountBaseline, expectedLogicalRecords,
+        "Baseline table should have " + expectedLogicalRecords + " logical records");
+    assertEquals(postCommitLogicalCountCompacted1, expectedLogicalRecords,
+        "Compacted table (row-major) should have " + expectedLogicalRecords + " logical records");
+    assertEquals(postCommitLogicalCountCompacted2, expectedLogicalRecords,
+        "Compacted table (column-major) should have " + expectedLogicalRecords + " logical records");
 
-    // Wait for data to load
-    waitForAllDocsLoadedInBothTables(tableNameWithCompaction, tableNameWithoutCompaction, 30_000L, 5);
+    // Verify data integrity - all tables should return identical data row by row
+    verifyTablesHaveIdenticalData(tableNameBaseline, tableNameCompacted1);
+    verifyTablesHaveIdenticalData(tableNameBaseline, tableNameCompacted2);
 
-    // Verify initial state - both tables should show same logical record count (3 unique players after upserts)
-    validateInitialState(tableNameWithCompaction, tableNameWithoutCompaction, 3);
+    // Calculate and validate compaction efficiency for both compacted tables
+    validateCompactionEfficiency(postCommitPhysicalCountCompacted1, postCommitPhysicalCountBaseline,
+        minExpectedRemovedRecords, maxCompressionRatio);
+    validateCompactionEfficiency(postCommitPhysicalCountCompacted2, postCommitPhysicalCountBaseline,
+        minExpectedRemovedRecords, maxCompressionRatio);
+  }
 
-    // Test JSON queries work correctly before commit
-    String jsonQuery = String.format(
-        "SELECT playerId, JSON_EXTRACT_SCALAR(userAttributes, '$.level', 'INT') as level FROM %s WHERE "
-            + "JSON_EXTRACT_SCALAR(userAttributes, '$.level', 'INT') > 10 ORDER BY playerId",
-        tableNameWithCompaction);
-    ResultSet resultSet = getPinotConnection().execute(jsonQuery).getResultSet(0);
-    assertTrue(resultSet.getRowCount() > 0, "Should find records with level > 10");
+  protected void cleanupTablesAndSchemas(List<String> tableNames, List<String> schemaNames) {
+    tableNames.forEach(name -> {
+      try {
+        dropRealtimeTable(name);
+      } catch (IOException ignored) {
+      }
+    });
 
-    // Verify data integrity before commit
-    verifyTablesHaveIdenticalData(tableNameWithCompaction, tableNameWithoutCompaction);
-
-    // Force commit segments to trigger commit-time compaction
-    forceCommitBothTables(tableNameWithCompaction, tableNameWithoutCompaction);
-
-    // Wait for commit completion
-    waitForAllDocsLoaded(tableNameWithCompaction, 60_000L, 3);
-
-    // Validate post-commit compaction effectiveness and data integrity (expecting 3 records, min 1 removed)
-    validatePostCommitCompaction(tableNameWithCompaction, tableNameWithoutCompaction, 3, 1, 1.0);
-
-    // Verify JSON queries still work correctly after compaction
-    resultSet = getPinotConnection().execute(jsonQuery).getResultSet(0);
-    assertTrue(resultSet.getRowCount() > 0, "Should still find records with level > 10 after compaction");
-
-    // Test specific JSON path queries to ensure MAP column statistics are correctly computed
-    String levelQuery = String.format(
-        "SELECT COUNT(*) FROM %s WHERE JSON_EXTRACT_SCALAR(userAttributes, '$.level', 'INT') > 10",
-        tableNameWithCompaction);
-    ResultSet levelResult = getPinotConnection().execute(levelQuery).getResultSet(0);
-    assertTrue(levelResult.getInt(0, 0) > 0, "Should find records with level > 10 after compaction");
-
-    // Verify that obsolete MAP values are not affecting queries - test uniqueness
-    String uniqueQuery = String.format(
-        "SELECT COUNT(DISTINCT playerId) FROM %s WHERE "
-            + "JSON_EXTRACT_SCALAR(userAttributes, '$.level', 'INT') IS NOT NULL",
-        tableNameWithCompaction);
-    ResultSet uniqueResult = getPinotConnection().execute(uniqueQuery).getResultSet(0);
-    assertEquals(uniqueResult.getInt(0, 0), 3,
-        "Should find exactly 3 unique players with level data (after compaction)");
-
-    // Clean up
-    dropRealtimeTable(tableNameWithCompaction);
-    dropRealtimeTable(tableNameWithoutCompaction);
-    deleteSchema(tableNameWithCompaction);
-    deleteSchema(tableNameWithoutCompaction);
+    schemaNames.forEach(name -> {
+      try {
+        deleteSchema(name);
+      } catch (IOException ignored) {
+      }
+    });
   }
 
   @Test
@@ -1275,43 +1228,42 @@ public class CommitTimeCompactionIntegrationTest extends BaseClusterIntegrationT
     // Goal: Ensure commit-time compaction preserves deleted records (soft deletes) in the committed
     // segment to maintain data consistency. Deleted records should not be physically removed during
     // compaction as this could lead to data inconsistency issues.
+    // Now includes testing commit-time compaction with column-major segment builder
 
-    String kafkaTopicNameCompacted = getKafkaTopic() + "-deleted-records-compaction-enabled";
-    String kafkaTopicNameNormal = getKafkaTopic() + "-deleted-records-compaction-disabled";
+    String kafkaTopicName = getKafkaTopic() + "-deleted-records-preservation";
+    setUpKafka(kafkaTopicName, INPUT_DATA_SMALL_TAR_FILE);
 
-    // Set up identical data for both tables - using small dataset for faster test execution
-    setUpKafka(kafkaTopicNameCompacted, INPUT_DATA_SMALL_TAR_FILE);
-    setUpKafka(kafkaTopicNameNormal, INPUT_DATA_SMALL_TAR_FILE);
-
-    // TABLE 1: With commit-time compaction ENABLED and delete record column configured
-    String tableNameWithCompaction = "gameScoresDeletedRecordsCompactionEnabled";
-    UpsertConfig upsertConfigWithCompaction = new UpsertConfig(UpsertConfig.Mode.FULL);
-    upsertConfigWithCompaction.setEnableCommitTimeCompaction(true);  // ENABLE commit-time compaction
-    upsertConfigWithCompaction.setDeleteRecordColumn("deleted");     // Configure delete record column
-    TableConfig tableConfigWithCompaction =
-        setUpTable(tableNameWithCompaction, kafkaTopicNameCompacted, upsertConfigWithCompaction);
-
-    // Ensure _columnMajorSegmentBuilderEnabled = false as specified
-    tableConfigWithCompaction.getIndexingConfig().setColumnMajorSegmentBuilderEnabled(false);
-    updateTableConfig(tableConfigWithCompaction);
-
-    // TABLE 2: With commit-time compaction DISABLED but same delete record column configuration
+    // TABLE 1: With commit-time compaction DISABLED (baseline) and delete record column configured
     String tableNameWithoutCompaction = "gameScoresDeletedRecordsCompactionDisabled";
-    UpsertConfig upsertConfigWithoutCompaction = new UpsertConfig(UpsertConfig.Mode.FULL);
-    upsertConfigWithoutCompaction.setEnableCommitTimeCompaction(false);  // DISABLE commit-time compaction
-    upsertConfigWithoutCompaction.setDeleteRecordColumn("deleted");      // Configure delete record column
-    TableConfig tableConfigWithoutCompaction =
-        setUpTable(tableNameWithoutCompaction, kafkaTopicNameNormal, upsertConfigWithoutCompaction);
-
-    // Ensure _columnMajorSegmentBuilderEnabled = false as specified
-    tableConfigWithoutCompaction.getIndexingConfig().setColumnMajorSegmentBuilderEnabled(false);
+    TableConfig tableConfigWithoutCompaction = createUpsertTable(tableNameWithoutCompaction, kafkaTopicName,
+        UpsertConfig.Mode.FULL, false, false);
+    // Configure delete record column for soft deletes
+    tableConfigWithoutCompaction.getUpsertConfig().setDeleteRecordColumn("deleted");
     updateTableConfig(tableConfigWithoutCompaction);
 
-    // Wait for both tables to load the same initial data (3 unique records after upserts)
-    waitForAllDocsLoadedInBothTables(tableNameWithCompaction, tableNameWithoutCompaction, 30_000L, 10);
+    // TABLE 2: With commit-time compaction ENABLED + row-major build and delete record column configured
+    String tableNameWithCompaction = "gameScoresDeletedRecordsCompactionEnabled";
+    TableConfig tableConfigWithCompaction = createUpsertTable(tableNameWithCompaction, kafkaTopicName,
+        UpsertConfig.Mode.FULL, true, false);
+    // Configure delete record column for soft deletes
+    tableConfigWithCompaction.getUpsertConfig().setDeleteRecordColumn("deleted");
+    updateTableConfig(tableConfigWithCompaction);
 
-    // Verify initial state - both tables should show the same upserted data count (3 unique records)
-    validateInitialState(tableNameWithCompaction, tableNameWithoutCompaction, 3);
+    // TABLE 3: With commit-time compaction ENABLED + column-major build and delete record column configured
+    String tableNameWithCompactionColumnMajor = "gameScoresDeletedRecordsCompactionColumnMajor";
+    TableConfig tableConfigWithCompactionColumnMajor = createUpsertTable(tableNameWithCompactionColumnMajor,
+        kafkaTopicName, UpsertConfig.Mode.FULL, true, true);
+    // Configure delete record column for soft deletes
+    tableConfigWithCompactionColumnMajor.getUpsertConfig().setDeleteRecordColumn("deleted");
+    updateTableConfig(tableConfigWithCompactionColumnMajor);
+
+    // Wait for all three tables to load the same initial data (3 unique records after upserts)
+    waitForAllDocsLoaded(tableNameWithoutCompaction, tableNameWithCompaction,
+        tableNameWithCompactionColumnMajor, 30_000L, 10);
+
+    // Verify initial state - all three tables should show the same upserted data count (3 unique records)
+    validateInitialState(tableNameWithoutCompaction, tableNameWithCompaction,
+        tableNameWithCompactionColumnMajor, 3);
 
     // Create update patterns including some deleted records to test preservation
     // Use playerIds that match the initial data to ensure consistent partitioning
@@ -1323,48 +1275,48 @@ public class CommitTimeCompactionIntegrationTest extends BaseClusterIntegrationT
         "103,Charlie-New,chess,2500,1681300004000,true"              // New record marked as deleted
     );
 
-    // Push all updates at once to reduce wait times and ensure consistent partitioning
-    pushDataWithKeyToBothTopics(updateRecords, kafkaTopicNameCompacted, kafkaTopicNameNormal, 0);
+    pushCsvIntoKafkaWithKey(updateRecords, kafkaTopicName, 0);
+
     // Wait for all additional records to be processed
-    waitForAllDocsLoadedInBothTables(tableNameWithCompaction, tableNameWithoutCompaction, 90_000L, 15);
+    waitForAllDocsLoaded(tableNameWithoutCompaction, tableNameWithCompaction,
+        tableNameWithCompactionColumnMajor, 90_000L, 15);
 
-    // Verify state before commit - both tables should show the same logical result
+    // Verify state before commit - all three tables should show the same logical result
     // Note: Deleted records should not be counted in regular queries (logical view)
-    long preCommitLogicalCountCompacted = queryCountStar(tableNameWithCompaction);
-    long preCommitLogicalCountNormal = queryCountStar(tableNameWithoutCompaction);
-
-    assertEquals(preCommitLogicalCountCompacted, 2, "Compacted table should show 2 non-deleted logical records");
-    assertEquals(preCommitLogicalCountNormal, 2, "Normal table should show 2 non-deleted logical records");
-    assertEquals(preCommitLogicalCountCompacted, preCommitLogicalCountNormal,
-        "Both tables should have same logical count before commit");
+    validatePreCommitState(tableNameWithoutCompaction, tableNameWithCompaction,
+        tableNameWithCompactionColumnMajor, 2);
 
     // Perform commit and wait for completion
-    performCommitAndWait(tableNameWithCompaction, tableNameWithoutCompaction, 30_000L, 4, 2);
+    performCommitAndWait(tableNameWithoutCompaction, tableNameWithCompaction,
+        tableNameWithCompactionColumnMajor, 30_000L, 4, 2);
 
-    // Validate post-commit state
-    long postCommitLogicalCountCompacted = queryCountStar(tableNameWithCompaction);
-    long postCommitLogicalCountNormal = queryCountStar(tableNameWithoutCompaction);
-    long postCommitPhysicalCountCompacted = queryCountStarWithoutUpsert(tableNameWithCompaction);
-    long postCommitPhysicalCountNormal = queryCountStarWithoutUpsert(tableNameWithoutCompaction);
+    // Validate post-commit state with custom validation for deleted records
+    long postCommitLogicalCountBaseline = queryCountStar(tableNameWithoutCompaction);
+    long postCommitLogicalCountCompacted1 = queryCountStar(tableNameWithCompaction);
+    long postCommitLogicalCountCompacted2 = queryCountStar(tableNameWithCompactionColumnMajor);
+    long postCommitPhysicalCountBaseline = queryCountStarWithoutUpsert(tableNameWithoutCompaction);
+    long postCommitPhysicalCountCompacted1 = queryCountStarWithoutUpsert(tableNameWithCompaction);
+    long postCommitPhysicalCountCompacted2 = queryCountStarWithoutUpsert(tableNameWithCompactionColumnMajor);
 
     // Key assertions for deleted records preservation:
     // 1. Logical counts should remain the same (2 non-deleted records)
-    assertEquals(postCommitLogicalCountCompacted, 2,
-        "Compacted table should still show 2 non-deleted logical records after commit");
-    assertEquals(postCommitLogicalCountNormal, 2,
-        "Normal table should still show 2 non-deleted logical records after commit");
+    assertEquals(postCommitLogicalCountBaseline, 2,
+        "Baseline table should show 2 non-deleted logical records after commit");
+    assertEquals(postCommitLogicalCountCompacted1, 2,
+        "Compacted table (row-major) should show 2 non-deleted logical records after commit");
+    assertEquals(postCommitLogicalCountCompacted2, 2,
+        "Compacted table (column-major) should show 2 non-deleted logical records after commit");
 
-    assertEquals(postCommitPhysicalCountCompacted, 4,
-        "Compacted table should still show 3 physical records(2 valid + 2 deleted) after commit");
-    assertEquals(postCommitPhysicalCountNormal, 15,
-        "Normal table should still have 15 physical records after commit");
-
-    // 2. Physical count for compacted table should still include deleted records
-    // The compacted table should have fewer physical records than normal table (due to obsolete record removal)
+    // 2. Physical count for compacted tables should still include deleted records
+    // The compacted tables should have fewer physical records than baseline table (due to obsolete record removal)
     // but should still contain the deleted records
-    assertTrue(postCommitPhysicalCountCompacted < postCommitPhysicalCountNormal,
-        String.format("Compacted table (%d) should have fewer physical docs than normal table (%d) due to compaction",
-            postCommitPhysicalCountCompacted, postCommitPhysicalCountNormal));
+    assertTrue(postCommitPhysicalCountCompacted1 < postCommitPhysicalCountBaseline,
+        String.format("Compacted table (row-major) (%d) should have fewer physical docs than baseline table (%d) "
+            + "due to compaction", postCommitPhysicalCountCompacted1, postCommitPhysicalCountBaseline));
+
+    assertTrue(postCommitPhysicalCountCompacted2 < postCommitPhysicalCountBaseline,
+        String.format("Compacted table (column-major) (%d) should have fewer physical docs than baseline table (%d) "
+            + "due to compaction", postCommitPhysicalCountCompacted2, postCommitPhysicalCountBaseline));
 
     // 3. Verify that we can still query for deleted records using skipUpsert=true
     String deletedRecordsQuery = String.format(
@@ -1375,7 +1327,16 @@ public class CommitTimeCompactionIntegrationTest extends BaseClusterIntegrationT
     assertTrue(deletedRecordsCount > 0,
         "Should be able to find deleted records in compacted table using skipUpsert=true");
 
-    // 5. Verify that deleted records are not visible in regular queries (logical view)
+    // Test same query on column-major table
+    String deletedRecordsQueryColumnMajor = String.format(
+        "SELECT COUNT(*) FROM %s WHERE deleted = true OPTION(skipUpsert=true)",
+        tableNameWithCompactionColumnMajor);
+    ResultSet deletedResultColumnMajor = getPinotConnection().execute(deletedRecordsQueryColumnMajor).getResultSet(0);
+    long deletedRecordsCountColumnMajor = deletedResultColumnMajor.getLong(0, 0);
+    assertTrue(deletedRecordsCountColumnMajor > 0,
+        "Should be able to find deleted records in compacted table (column-major) using skipUpsert=true");
+
+    // 4. Verify that deleted records are not visible in regular queries (logical view)
     String regularQuery = String.format(
         "SELECT COUNT(*) FROM %s WHERE deleted = true",
         tableNameWithCompaction);
@@ -1384,11 +1345,21 @@ public class CommitTimeCompactionIntegrationTest extends BaseClusterIntegrationT
     assertEquals(visibleDeletedCount, 0,
         "Deleted records should not be visible in regular queries (logical view)");
 
-    // 6. Verify data integrity for non-deleted records
-    verifyTablesHaveIdenticalData(tableNameWithCompaction, tableNameWithoutCompaction);
+    String regularQueryColumnMajor = String.format(
+        "SELECT COUNT(*) FROM %s WHERE deleted = true",
+        tableNameWithCompactionColumnMajor);
+    ResultSet regularResultColumnMajor = getPinotConnection().execute(regularQueryColumnMajor).getResultSet(0);
+    long visibleDeletedCountColumnMajor = regularResultColumnMajor.getLong(0, 0);
+    assertEquals(visibleDeletedCountColumnMajor, 0,
+        "Deleted records should not be visible in regular queries (logical view, column-major)");
+
+    // 5. Verify data integrity for non-deleted records
+    verifyTablesHaveIdenticalData(tableNameWithoutCompaction, tableNameWithCompaction);
+    verifyTablesHaveIdenticalData(tableNameWithoutCompaction, tableNameWithCompactionColumnMajor);
 
     // Clean up
-    dropRealtimeTable(tableNameWithCompaction);
-    dropRealtimeTable(tableNameWithoutCompaction);
+    cleanupTablesAndSchemas(
+        List.of(tableNameWithoutCompaction, tableNameWithCompaction, tableNameWithCompactionColumnMajor),
+        List.of(tableNameWithoutCompaction, tableNameWithCompaction, tableNameWithCompactionColumnMajor));
   }
 }

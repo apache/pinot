@@ -81,6 +81,7 @@ public class RetentionManager extends ControllerPeriodicTask<Void> {
   private static final RetryPolicy DEFAULT_RETRY_POLICY = RetryPolicies.randomDelayRetryPolicy(20, 100L, 200L);
   private final boolean _untrackedSegmentDeletionEnabled;
   private final int _untrackedSegmentsRetentionTimeInDays;
+  private final int _agedSegmentsDeletionBatchSize;
 
   private static final Logger LOGGER = LoggerFactory.getLogger(RetentionManager.class);
   private final boolean _isHybridTableRetentionStrategyEnabled;
@@ -94,6 +95,7 @@ public class RetentionManager extends ControllerPeriodicTask<Void> {
         controllerMetrics);
     _untrackedSegmentDeletionEnabled = config.getUntrackedSegmentDeletionEnabled();
     _untrackedSegmentsRetentionTimeInDays = config.getUntrackedSegmentsRetentionTimeInDays();
+    _agedSegmentsDeletionBatchSize = config.getAgedSegmentsDeletionBatchSize();
     _isHybridTableRetentionStrategyEnabled = config.isHybridTableRetentionStrategyEnabled();
     _brokerServiceHelper = brokerServiceHelper;
     LOGGER.info("Starting RetentionManager with runFrequencyInSeconds: {}", getIntervalInSeconds());
@@ -120,7 +122,8 @@ public class RetentionManager extends ControllerPeriodicTask<Void> {
   @Override
   protected void postprocess() {
     LOGGER.info("Removing aged deleted segments for all tables");
-    _pinotHelixResourceManager.getSegmentDeletionManager().removeAgedDeletedSegments(_leadControllerManager);
+    _pinotHelixResourceManager.getSegmentDeletionManager()
+        .removeAgedDeletedSegments(_leadControllerManager, _agedSegmentsDeletionBatchSize);
   }
 
   private void manageRetentionForTable(TableConfig tableConfig) {
@@ -338,18 +341,18 @@ public class RetentionManager extends ControllerPeriodicTask<Void> {
       return segmentsToDelete;
     }
 
-    List<String> segmentsPresentInZK;
+    Set<String> segmentsPresentInZK;
     if (isHybridTable) {
-      segmentsPresentInZK = new ArrayList<>();
+      segmentsPresentInZK = new HashSet<>();
       // This must be the OFFLINE table
       segmentsPresentInZK.addAll(
-          segmentZKMetadataList.stream().map(SegmentZKMetadata::getSegmentName).collect(Collectors.toList()));
+          segmentZKMetadataList.stream().map(SegmentZKMetadata::getSegmentName).collect(Collectors.toSet()));
       // Add segments from the REALTIME table as well
       segmentsPresentInZK.addAll(
           _pinotHelixResourceManager.getSegmentsFor(TableNameBuilder.REALTIME.tableNameWithType(rawTableName), false));
     } else {
       segmentsPresentInZK =
-          segmentZKMetadataList.stream().map(SegmentZKMetadata::getSegmentName).collect(Collectors.toList());
+          segmentZKMetadataList.stream().map(SegmentZKMetadata::getSegmentName).collect(Collectors.toSet());
     }
 
     try {
@@ -384,13 +387,13 @@ public class RetentionManager extends ControllerPeriodicTask<Void> {
    *
    * @param tableNameWithType   Name of the offline table
    * @param retentionStrategy  Strategy to determine if a segment should be purged
-   * @param segmentsToExclude  List of segment names that should be excluded from deletion
+   * @param segmentsToExclude  Set of segment names that should be excluded from deletion
    * @return List of segment names that should be deleted from deepstore
    * @throws IOException If there's an error accessing the filesystem
    */
-  private List<String> findUntrackedSegmentsToDeleteFromDeepstore(String tableNameWithType,
-      RetentionStrategy retentionStrategy, List<String> segmentsToExclude,
-      RetentionStrategy untrackedSegmentsRetentionStrategy)
+  @VisibleForTesting
+  List<String> findUntrackedSegmentsToDeleteFromDeepstore(String tableNameWithType, RetentionStrategy retentionStrategy,
+      Set<String> segmentsToExclude, RetentionStrategy untrackedSegmentsRetentionStrategy)
       throws IOException {
 
     List<String> segmentsToDelete = new ArrayList<>();
