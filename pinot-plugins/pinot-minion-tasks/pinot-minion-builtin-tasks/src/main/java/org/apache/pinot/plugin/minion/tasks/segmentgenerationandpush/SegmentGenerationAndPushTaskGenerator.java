@@ -290,7 +290,7 @@ public class SegmentGenerationAndPushTaskGenerator extends BaseTaskGenerator {
     // segments with same names, and override existing segments again... It becomes an endless loop
     // We add uuid to segment name to avoid segment collision across multiple rounds of task generation to solve the
     // problem.
-    singleFileGenerationTaskConfig.put(BatchConfigProperties.APPEND_UUID_TO_SEGMENT_NAME, 
+    singleFileGenerationTaskConfig.put(BatchConfigProperties.APPEND_UUID_TO_SEGMENT_NAME,
         batchConfigMap.getOrDefault(BatchConfigProperties.APPEND_UUID_TO_SEGMENT_NAME, Boolean.toString(false)));
     if ((outputDirURI == null) || (pushMode == null)) {
       singleFileGenerationTaskConfig.put(BatchConfigProperties.PUSH_MODE, DEFAULT_SEGMENT_PUSH_TYPE.toString());
