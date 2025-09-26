@@ -63,12 +63,10 @@ import org.apache.commons.lang3.StringUtils;
 import org.apache.commons.lang3.tuple.Pair;
 import org.apache.helix.AccessOption;
 import org.apache.helix.ClusterMessagingService;
-import org.apache.helix.Criteria;
 import org.apache.helix.HelixAdmin;
 import org.apache.helix.HelixDataAccessor;
 import org.apache.helix.HelixException;
 import org.apache.helix.HelixManager;
-import org.apache.helix.InstanceType;
 import org.apache.helix.NotificationContext;
 import org.apache.helix.PropertyKey;
 import org.apache.helix.PropertyKey.Builder;
@@ -106,7 +104,6 @@ import org.apache.pinot.common.lineage.SegmentLineageUtils;
 import org.apache.pinot.common.messages.ApplicationQpsQuotaRefreshMessage;
 import org.apache.pinot.common.messages.DatabaseConfigRefreshMessage;
 import org.apache.pinot.common.messages.LogicalTableConfigRefreshMessage;
-import org.apache.pinot.common.messages.QueryWorkloadRefreshMessage;
 import org.apache.pinot.common.messages.RoutingTableRebuildMessage;
 import org.apache.pinot.common.messages.RunPeriodicTaskMessage;
 import org.apache.pinot.common.messages.SegmentRefreshMessage;
@@ -4749,27 +4746,19 @@ public class PinotHelixResourceManager {
   }
 
   public void setQueryWorkloadConfig(QueryWorkloadConfig queryWorkloadConfig) {
-    if (!ZKMetadataProvider.setQueryWorkloadConfig(_propertyStore, queryWorkloadConfig)) {
-      throw new RuntimeException("Failed to set workload config for queryWorkloadName: "
-          + queryWorkloadConfig.getQueryWorkloadName());
-    }
-    _queryWorkloadManager.propagateWorkloadUpdateMessage(queryWorkloadConfig);
-  }
-
-  public void sendQueryWorkloadRefreshMessage(Map<String, QueryWorkloadRefreshMessage> instanceToRefreshMessageMap) {
-    ClusterMessagingService messagingService = _helixZkManager.getMessagingService();
-    instanceToRefreshMessageMap.forEach((instance, message) -> {
-      Criteria criteria = new Criteria();
-      criteria.setRecipientInstanceType(InstanceType.PARTICIPANT);
-      criteria.setInstanceName(instance);
-      criteria.setSessionSpecific(true);
-      int numMessagesSent = MessagingServiceUtils.send(messagingService, message, criteria);
-      if (numMessagesSent > 0) {
-        LOGGER.info("Sent {} query workload config refresh messages to instance: {}", numMessagesSent, instance);
-      } else {
-        LOGGER.warn("No query workload config refresh message sent to instance: {}", instance);
+    String workloadName = queryWorkloadConfig.getQueryWorkloadName();
+    try {
+      _queryWorkloadManager.propagateWorkloadUpdateMessage(queryWorkloadConfig);
+      // Update the workload config in property store only if the propagation is successful
+      if (!ZKMetadataProvider.setQueryWorkloadConfig(_propertyStore, queryWorkloadConfig)) {
+        throw new RuntimeException("Failed to set workload config for queryWorkloadName: "
+            + queryWorkloadConfig.getQueryWorkloadName());
       }
-    });
+    } catch (Exception e) {
+      String errorMsg = "Failed to propagate workload update message for queryWorkloadName: " + workloadName;
+      LOGGER.error(errorMsg, e);
+      throw new RuntimeException(errorMsg, e);
+    }
   }
 
   public void deleteQueryWorkloadConfig(String workload) {

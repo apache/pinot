@@ -45,7 +45,19 @@ import org.apache.pinot.spi.config.BaseJsonConfig;
  *       },
  *       "propagationScheme": {
  *         "propagationType": "TABLE",
- *         "values": ["airlineStats"]
+ *         "costSplits":
+ *         [
+ *           {
+ *           "costId": "tableA",
+ *           "cpuCostNs": 500000,
+ *           "memoryCostBytes": 5000000
+ *           },
+ *           {
+ *           "costId": "tableB",
+ *           "cpuCostNs": 500000,
+ *           "memoryCostBytes": 5000000
+ *           }
+ *         ]
  *       }
  *      },
  *     {
@@ -56,7 +68,19 @@ import org.apache.pinot.spi.config.BaseJsonConfig;
  *       },
  *       "propagationScheme": {
  *        "propagationType": "TENANT",
- *        "values": ["tenantA", "tenantB"]
+ *        "costSplits":
+ *        [
+ *         {
+ *          "costId": "tenantA",
+ *          "cpuCostNs": 1000000,
+ *          "memoryCostBytes": 10000000
+ *          },
+ *          {
+ *           "costId": "tenantB",
+ *           "cpuCostNs": 1000000,
+ *           "memoryCostBytes": 10000000
+ *          }
+ *        ]
  *       }
  *     }
  *   ]

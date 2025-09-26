@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.spi.accounting;
 
+import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
@@ -149,15 +150,14 @@ public class WorkloadBudgetManager {
   }
 
   /**
-   * Retrieves the remaining budget for a specific workload.
+   * Retrieves the initial and remaining budget for a workload.
    */
-  public BudgetStats getRemainingBudgetForWorkload(String workload) {
+  public BudgetStats getBudgetStats(String workload) {
     if (!_isEnabled) {
-      return new BudgetStats(Long.MAX_VALUE, Long.MAX_VALUE, Long.MAX_VALUE, Long.MAX_VALUE);
+      return null;
     }
-
     Budget budget = _workloadBudgets.get(workload);
-    return budget != null ? budget.getStats() : new BudgetStats(0, 0, 0, 0);
+    return budget != null ? budget.getStats() : null;
   }
 
   /**
@@ -227,6 +227,15 @@ public class WorkloadBudgetManager {
     BudgetStats stats = budget.getStats();
     return stats._cpuRemaining > 0 && stats._memoryRemaining > 0;
   }
+
+  public Map<String, BudgetStats> getAllBudgetStats() {
+    if (!_isEnabled) {
+      return null;
+    }
+    Map<String, BudgetStats> allStats = new ConcurrentHashMap<>();
+    _workloadBudgets.forEach((workload, budget) -> allStats.put(workload, budget.getStats()));
+    return allStats;
+  }
   /**
    * Internal class representing budget statistics.
    * It contains initial CPU and memory budgets that are configured during workload registration,
@@ -286,7 +295,7 @@ public class WorkloadBudgetManager {
     }
 
     /**
-     * Gets the current remaining budget.
+     * Gets the budget stats that provides initial and remaining CPU and memory budgets.
      */
     public BudgetStats getStats() {
       return new BudgetStats(_initialCpuBudget, _initialMemoryBudget, _cpuRemaining.get(), _memoryRemaining.get());
