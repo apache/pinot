@@ -31,6 +31,7 @@ import java.util.Map;
 import java.util.Set;
 import javax.annotation.Nullable;
 import org.apache.commons.io.FileUtils;
+import org.apache.pinot.segment.local.io.util.PinotDataBitSet;
 import org.apache.pinot.segment.local.segment.creator.impl.SegmentDictionaryCreator;
 import org.apache.pinot.segment.local.segment.creator.impl.fwd.MultiValueVarByteRawIndexCreator;
 import org.apache.pinot.segment.local.segment.creator.impl.stats.AbstractColumnStatisticsCollector;
@@ -41,6 +42,7 @@ import org.apache.pinot.segment.local.segment.creator.impl.stats.FloatColumnPreI
 import org.apache.pinot.segment.local.segment.creator.impl.stats.IntColumnPreIndexStatsCollector;
 import org.apache.pinot.segment.local.segment.creator.impl.stats.LongColumnPreIndexStatsCollector;
 import org.apache.pinot.segment.local.segment.creator.impl.stats.MapColumnPreIndexStatsCollector;
+import org.apache.pinot.segment.local.segment.creator.impl.stats.NoDictColumnStatisticsCollector;
 import org.apache.pinot.segment.local.segment.creator.impl.stats.StringColumnPreIndexStatsCollector;
 import org.apache.pinot.segment.local.segment.index.dictionary.DictionaryIndexType;
 import org.apache.pinot.segment.local.segment.readers.PinotSegmentColumnReader;
@@ -72,10 +74,7 @@ import org.apache.pinot.spi.data.Schema;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import static org.apache.pinot.segment.spi.V1Constants.MetadataKeys.Column.CARDINALITY;
-import static org.apache.pinot.segment.spi.V1Constants.MetadataKeys.Column.DICTIONARY_ELEMENT_SIZE;
-import static org.apache.pinot.segment.spi.V1Constants.MetadataKeys.Column.HAS_DICTIONARY;
-import static org.apache.pinot.segment.spi.V1Constants.MetadataKeys.Column.getKeyFor;
+import static org.apache.pinot.segment.spi.V1Constants.MetadataKeys.Column.*;
 
 
 /**
@@ -852,6 +851,8 @@ public class ForwardIndexHandler extends BaseIndexHandler {
     // .MIN_VALUE. When dictionary is enabled for this column later, cardinality value should be rightly populated so
     // that the dictionary can be loaded.
     metadataProperties.put(getKeyFor(column, CARDINALITY), String.valueOf(statsCollector.getCardinality()));
+    metadataProperties.put(getKeyFor(column, BITS_PER_ELEMENT),
+        String.valueOf(PinotDataBitSet.getNumBitsPerValue(statsCollector.getCardinality() - 1)));
     SegmentMetadataUtils.updateMetadataProperties(_segmentDirectory, metadataProperties);
 
     // We remove indexes that have to be rewritten when a dictEnabled is toggled. Note that the respective index
@@ -1036,6 +1037,13 @@ public class ForwardIndexHandler extends BaseIndexHandler {
 
   private AbstractColumnStatisticsCollector getStatsCollector(String column, DataType storedType) {
     StatsCollectorConfig statsCollectorConfig = new StatsCollectorConfig(_tableConfig, _schema, null);
+    boolean dictionaryEnabled = hasIndex(column, StandardIndexes.dictionary());
+    // MAP collector is optimised for no-dictionary collection
+    if (!dictionaryEnabled && storedType != DataType.MAP) {
+      if (_tableConfig.getIndexingConfig().canOptimiseNoDictStatsCollection()) {
+        return new NoDictColumnStatisticsCollector(column, statsCollectorConfig);
+      }
+    }
     switch (storedType) {
       case INT:
         return new IntColumnPreIndexStatsCollector(column, statsCollectorConfig);

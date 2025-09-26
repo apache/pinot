@@ -69,8 +69,8 @@ import org.apache.pinot.spi.utils.ByteArray;
 import org.apache.pinot.spi.utils.ReadMode;
 import org.apache.pinot.util.TestUtils;
 import org.testng.Assert;
-import org.testng.annotations.AfterClass;
-import org.testng.annotations.BeforeClass;
+import org.testng.annotations.AfterMethod;
+import org.testng.annotations.BeforeMethod;
 import org.testng.annotations.Test;
 
 
@@ -83,12 +83,12 @@ public class DictionariesTest implements PinotBuffersAfterMethodCheckRule {
 
   private static TableConfig _tableConfig;
 
-  @AfterClass
+  @AfterMethod
   public static void cleanup() {
     FileUtils.deleteQuietly(INDEX_DIR);
   }
 
-  @BeforeClass
+  @BeforeMethod
   public static void before()
       throws Exception {
     final String filePath =
