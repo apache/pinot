@@ -435,9 +435,9 @@ public class CommonConstants {
     public static final boolean DEFAULT_DISABLE_GROOVY = true;
 
     // REGEXP_LIKE adaptive threshold configuration
-    public static final String CONFIG_OF_REGEXP_LIKE_ADAPTIVE_THRESHOLD =
+    public static final String CONFIG_OF_REGEXP_LIKE_DICTIONARY_THRESHOLD =
         "pinot.broker.regexp.dict.cardinality.threshold";
-    public static final double DEFAULT_REGEXP_LIKE_ADAPTIVE_THRESHOLD = 0.1; // 10% threshold
+    public static final double DEFAULT_REGEXP_LIKE_DICTIONARY_THRESHOLD = 0.1; // 10% threshold
     // Rewrite potential expensive functions to their approximation counterparts
     // - DISTINCT_COUNT -> DISTINCT_COUNT_SMART_HLL
     // - PERCENTILE -> PERCENTILE_SMART_TDIGEST
@@ -714,9 +714,9 @@ public class CommonConstants {
         public static final String IN_PREDICATE_LOOKUP_ALGORITHM = "inPredicateLookupAlgorithm";
 
         // REGEXP_LIKE adaptive threshold - controls when to switch between dictionary-based and scan-based evaluation
-        // When (dictionary_size / num_docs) < threshold, use dictionary-based evaluation
-        // When (dictionary_size / num_docs) >= threshold, use scan-based evaluation
-        public static final String REGEXP_LIKE_ADAPTIVE_THRESHOLD = "regexpDictCardinalityThreshold";
+        // When (dictionary_size) < threshold, use dictionary-based evaluation
+        // When (dictionary_size) >= threshold, use scan-based evaluation
+        public static final String REGEXP_LIKE_DICTIONARY_THRESHOLD = "regexpDictCardinalityThreshold";
 
         public static final String DROP_RESULTS = "dropResults";
 

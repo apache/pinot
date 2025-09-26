@@ -1212,9 +1212,9 @@ public abstract class BaseSingleStageBrokerRequestHandler extends BaseBrokerRequ
             .putIfAbsent(Broker.Request.QueryOptionKey.ENABLE_NULL_HANDLING, _enableNullHandling);
       }
 
-      sqlNodeAndOptions.getOptions().putIfAbsent(QueryOptionKey.REGEXP_LIKE_ADAPTIVE_THRESHOLD, String.valueOf(
-          _config.getProperty(Broker.CONFIG_OF_REGEXP_LIKE_ADAPTIVE_THRESHOLD,
-              Broker.DEFAULT_REGEXP_LIKE_ADAPTIVE_THRESHOLD)));
+      sqlNodeAndOptions.getOptions().putIfAbsent(QueryOptionKey.REGEXP_LIKE_DICTIONARY_THRESHOLD, String.valueOf(
+          _config.getProperty(Broker.CONFIG_OF_REGEXP_LIKE_DICTIONARY_THRESHOLD,
+              Broker.DEFAULT_REGEXP_LIKE_DICTIONARY_THRESHOLD)));
 
       BrokerResponse response =
           doHandleRequest(requestId, subquery, sqlNodeAndOptions, jsonRequest, requesterIdentity, requestContext,
