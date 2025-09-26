@@ -176,15 +176,15 @@ public class ZkBasedTenantRebalanceObserver implements TenantRebalanceObserver {
     return pollQueue(false);
   }
 
-  public void onJobError(TenantRebalancer.TenantTableRebalanceJobContext jobContext, String errorMessage) {
-    onJobComplete(jobContext, errorMessage);
+  public void onTableJobError(TenantRebalancer.TenantTableRebalanceJobContext jobContext, String errorMessage) {
+    onTableJobComplete(jobContext, errorMessage);
   }
 
-  public void onJobDone(TenantRebalancer.TenantTableRebalanceJobContext jobContext) {
-    onJobComplete(jobContext, TenantRebalanceProgressStats.TableStatus.DONE.name());
+  public void onTableJobDone(TenantRebalancer.TenantTableRebalanceJobContext jobContext) {
+    onTableJobComplete(jobContext, TenantRebalanceProgressStats.TableStatus.DONE.name());
   }
 
-  private void onJobComplete(TenantRebalancer.TenantTableRebalanceJobContext jobContext, String message) {
+  private void onTableJobComplete(TenantRebalancer.TenantTableRebalanceJobContext jobContext, String message) {
     try {
       updateTenantRebalanceJobMetadataInZk((ctx, progressStats) -> {
         ctx.getOngoingJobsQueue().remove(jobContext);
