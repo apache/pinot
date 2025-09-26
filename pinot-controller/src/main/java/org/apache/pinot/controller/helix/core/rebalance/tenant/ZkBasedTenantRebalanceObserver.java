@@ -187,10 +187,7 @@ public class ZkBasedTenantRebalanceObserver implements TenantRebalanceObserver {
   private void onTableJobComplete(TenantRebalancer.TenantTableRebalanceJobContext jobContext, String message) {
     try {
       updateTenantRebalanceJobMetadataInZk((ctx, progressStats) -> {
-        ctx.getOngoingJobsQueue().remove(jobContext);
-        if (progressStats.getTableStatusMap()
-            .get(jobContext.getTableName())
-            .equals(TenantRebalanceProgressStats.TableStatus.REBALANCING.name())) {
+        if (ctx.getOngoingJobsQueue().remove(jobContext)) {
           progressStats.updateTableStatus(jobContext.getTableName(), message);
           progressStats.setRemainingTables(progressStats.getRemainingTables() - 1);
         }
