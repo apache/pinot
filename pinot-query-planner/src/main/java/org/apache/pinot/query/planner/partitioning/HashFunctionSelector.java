@@ -86,27 +86,27 @@ public class HashFunctionSelector {
   public static MvHasher getMvHasher(String hashFunction) {
     switch (hashFunction.toLowerCase()) {
       case MURMUR2:
-        return (values, keys) -> {
+        return (values, keyIds) -> {
           if (values == null || values.length == 0) {
             return 0;
           }
-          return HashFunctionSelector.murmur2(values, keys);
+          return murmur2(values, keyIds);
         };
       case MURMUR3:
-        return (values, keys) -> {
+        return (values, keyIds) -> {
           if (values == null || values.length == 0) {
             return 0;
           }
-          return HashFunctionSelector.murmur3(values, keys);
+          return murmur3(values, keyIds);
         };
       case HASH_CODE:
         // We should hashCode instead of absHashCode for multi hash to maintain consistency with legacy behavior.
       default:
-        return (values, keys) -> {
+        return (values, keyIds) -> {
           if (values == null || values.length == 0) {
             return 0;
           }
-          return HashFunctionSelector.hashCode(values, keys);
+          return hashCode(values, keyIds);
         };
     }
   }
