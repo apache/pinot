@@ -46,12 +46,12 @@ import org.slf4j.LoggerFactory;
 @ThreadSafe
 public abstract class ControllerPeriodicTask<C> extends BasePeriodicTask {
   private static final Logger LOGGER = LoggerFactory.getLogger(ControllerPeriodicTask.class);
+  public static final String RUN_SEGMENT_LEVEL_VALIDATION = "runSegmentLevelValidation";
 
   protected final PinotHelixResourceManager _pinotHelixResourceManager;
   protected final LeadControllerManager _leadControllerManager;
   protected final ControllerMetrics _controllerMetrics;
   protected Set<String> _prevLeaderOfTables = new HashSet<>();
-  public static final String RUN_SEGMENT_LEVEL_VALIDATION = "runSegmentLevelValidation";
 
   public ControllerPeriodicTask(String taskName, long runFrequencyInSeconds, long initialDelayInSeconds,
       PinotHelixResourceManager pinotHelixResourceManager, LeadControllerManager leadControllerManager,

@@ -65,7 +65,7 @@ public class OfflineSegmentValidationManager extends ControllerPeriodicTask<Offl
   public OfflineSegmentValidationManager(ControllerConf config, PinotHelixResourceManager pinotHelixResourceManager,
       LeadControllerManager leadControllerManager, ValidationMetrics validationMetrics,
       ControllerMetrics controllerMetrics, ResourceUtilizationManager resourceUtilizationManager) {
-    super("OfflineSegmentIntervalChecker", config.getOfflineSegmentValidationFrequencyInSeconds(),
+    super("OfflineSegmentValidationManager", config.getOfflineSegmentValidationFrequencyInSeconds(),
         config.getPeriodicTaskInitialDelayInSeconds(), pinotHelixResourceManager,
         leadControllerManager, controllerMetrics);
     _validationMetrics = validationMetrics;
