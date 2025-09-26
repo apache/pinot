@@ -1760,7 +1760,7 @@ public class PinotHelixResourceManager {
     if (getTableConfig(tableNameWithType) != null) {
       throw new TableAlreadyExistsException("Table config for " + tableNameWithType
           + " already exists. If this is unexpected, try deleting the table to remove all metadata associated"
-          + " with it.");
+          + " with it before attempting to recreate.");
     }
 
     String rawTableName = TableNameBuilder.extractRawTableName(tableNameWithType);
