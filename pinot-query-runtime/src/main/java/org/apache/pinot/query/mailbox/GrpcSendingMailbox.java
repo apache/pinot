@@ -70,6 +70,7 @@ public class GrpcSendingMailbox implements SendingMailbox {
   private final StatMap<MailboxSendOperator.StatKey> _statMap;
   private final MailboxStatusObserver _statusObserver = new MailboxStatusObserver();
   private final Sender _sender;
+  private volatile boolean _terminated;
 
   private StreamObserver<MailboxContent> _contentObserver;
 
@@ -147,6 +148,7 @@ public class GrpcSendingMailbox implements SendingMailbox {
       LOGGER.debug("Already terminated mailbox: {}", _id);
       return;
     }
+    _terminated = true;
     LOGGER.debug("Completing mailbox: {}", _id);
     _contentObserver.onCompleted();
   }
@@ -157,6 +159,7 @@ public class GrpcSendingMailbox implements SendingMailbox {
       LOGGER.debug("Already terminated mailbox: {}", _id);
       return;
     }
+    _terminated = true;
     LOGGER.debug("Cancelling mailbox: {}", _id);
     if (_contentObserver == null) {
       _contentObserver = getContentObserver();
@@ -181,7 +184,7 @@ public class GrpcSendingMailbox implements SendingMailbox {
 
   @Override
   public boolean isTerminated() {
-    return _statusObserver.isFinished();
+    return _terminated;
   }
 
   private StreamObserver<MailboxContent> getContentObserver() {
