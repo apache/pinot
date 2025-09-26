@@ -32,7 +32,7 @@ public class MultiColumnKeySelector implements KeySelector<Key> {
 
   public MultiColumnKeySelector(int[] keyIds, String hashFunction) {
     _keyIds = keyIds;
-    _hashFunction = hashFunction;
+    _hashFunction = hashFunction.toLowerCase();
     _hasher = HashFunctionSelector.getMvHasher(_hashFunction);
   }
 
