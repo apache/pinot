@@ -205,6 +205,7 @@ public class PinotTableRestletResourceTest extends ControllerTest {
     }
 
     // Create an OFFLINE table with invalid replication config
+    offlineTableConfig = _offlineBuilder.setTableName("invalid_replication_config").build();
     offlineTableConfig.getValidationConfig().setReplication("abc");
     try {
       sendPostRequest(_createTableUrl, offlineTableConfig.toJsonString());
@@ -901,6 +902,7 @@ public class PinotTableRestletResourceTest extends ControllerTest {
 
     try {
       sendPostRequest(_createTableUrl, realtimeTableConfig.toJsonString());
+      fail("Should fail due to invalid replication factor");
     } catch (Exception e) {
       assertTrue(e.getMessage().contains("Failed to calculate instance partitions for table: " + tableNameWithType));
     }
@@ -928,7 +930,8 @@ public class PinotTableRestletResourceTest extends ControllerTest {
         getInstanceAssignmentConfig("DefaultTenant_REALTIME", 1, 8));
 
     try {
-      sendPostRequest(_createTableUrl, realtimeTableConfig.toJsonString());
+      sendPutRequest(_createTableUrl + "/" + realtimeTableConfig.getTableName(), realtimeTableConfig.toJsonString());
+      fail("Table update should fail due to invalid RG config");
     } catch (Exception e) {
       assertTrue(e.getMessage().contains("Failed to calculate instance partitions for table: " + tableNameWithType));
     }
@@ -1000,7 +1003,8 @@ public class PinotTableRestletResourceTest extends ControllerTest {
         .build();
 
     try {
-      sendPostRequest(_createTableUrl, tableConfig.toJsonString());
+      sendPutRequest(_createTableUrl + "/" + tableConfig.getTableName(), tableConfig.toJsonString());
+      fail("Table update should fail due to invalid replication factor");
     } catch (Exception e) {
       assertTrue(e.getMessage().contains("Failed to calculate instance partitions for table: " + tableNameWithType));
     }
@@ -1036,6 +1040,7 @@ public class PinotTableRestletResourceTest extends ControllerTest {
 
     try {
       sendPostRequest(_createTableUrl, tableConfig.toJsonString());
+      fail("Table create should fail due to invalid replication factor");
     } catch (Exception e) {
       assertTrue(e.getMessage().contains("Failed to calculate instance partitions for table: " + tableNameWithType));
     }
