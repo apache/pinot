@@ -35,8 +35,6 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
-import java.util.Objects;
-import java.util.function.IntFunction;
 import javax.annotation.Nullable;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.pinot.common.function.JsonPathCache;
@@ -368,7 +366,7 @@ public class JsonFunctions {
         case "DOUBLE":
           return jsonPathDouble(jsonInput, jsonPath, objToDouble(defaultValue, 0D));
         case "BOOLEAN":
-          return jsonPathBoolean(jsonInput, jsonPath, Objects.isNull(defaultValue) ? Boolean.FALSE : (Boolean) defaultValue);
+          return jsonPathBoolean(jsonInput, jsonPath, objToBoolean(defaultValue, false));
         case "STRING_ARRAY":
           return jsonPathStringArray(jsonInput, jsonPath, defaultValue);
         case "INT_ARRAY":
@@ -509,7 +507,7 @@ public class JsonFunctions {
     if (obj != null) {
       if (obj instanceof Boolean) {
         return (Boolean) obj;
-      }else {
+      } else {
         try {
           res = Boolean.parseBoolean(obj.toString());
         } catch (Exception ignored) {
