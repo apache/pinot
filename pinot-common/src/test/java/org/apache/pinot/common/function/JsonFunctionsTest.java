@@ -709,4 +709,17 @@ public class JsonFunctionsTest {
     Assert.assertTrue(jsonPathResult.contains("$['field_with_underscores']"));
     Assert.assertTrue(jsonPathResult.contains("$['field with spaces']"));
   }
+
+  @Test
+  public void testJsonExtractScalar() {
+    String json = "{\"int-key\":123,\"string-key\":\"value\",\"bool-key\":true,\"double-key\":12.3}";
+    assertEquals(JsonFunctions.jsonExtractScalar(json, "$.string-key", "STRING", "unknown"), "value");
+    assertEquals(JsonFunctions.jsonExtractScalar(json, "$.int-key", "INT", -1), 123);
+    assertEquals(JsonFunctions.jsonExtractScalar(json, "$.double-key", "DOUBLE", -1.0), 12.3);
+    assertEquals(JsonFunctions.jsonExtractScalar(json, "$.bool-key", "BOOLEAN", false), true);
+    assertEquals(JsonFunctions.jsonExtractScalar(json, "$.nonexistent", "STRING", "missing"), "missing");
+    assertNull(JsonFunctions.jsonExtractScalar(json, "$.nonexistent", "STRING"));
+    assertEquals(JsonFunctions.jsonExtractScalar(json, "$.nonexistent", "INT"), Integer.MIN_VALUE);
+    assertNull(JsonFunctions.jsonExtractScalar(json, "$.nonexistent", "STRING"));
+  }
 }

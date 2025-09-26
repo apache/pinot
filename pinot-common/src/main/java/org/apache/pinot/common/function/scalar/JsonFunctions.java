@@ -35,6 +35,7 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import javax.annotation.Nullable;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.pinot.common.function.JsonPathCache;
@@ -211,6 +212,33 @@ public class JsonFunctions {
   }
 
   /**
+   * Extract from Json with path to Int
+   */
+  @ScalarFunction
+  public static long jsonPathInt(Object object, String jsonPath) {
+    return jsonPathInt(object, jsonPath, Integer.MIN_VALUE);
+  }
+
+  /**
+   * Extract from Json with path to Int
+   */
+  @ScalarFunction(nullableParameters = true)
+  public static int jsonPathInt(@Nullable Object object, String jsonPath, int defaultValue) {
+    try {
+      Object jsonValue = jsonPath(object, jsonPath);
+      if (jsonValue == null) {
+        return defaultValue;
+      }
+      if (jsonValue instanceof Number) {
+        return ((Number) jsonValue).intValue();
+      }
+      return Integer.parseInt(jsonValue.toString());
+    } catch (Exception ignore) {
+      return defaultValue;
+    }
+  }
+
+  /**
    * Extract from Json with path to Double
    */
   @ScalarFunction
@@ -321,6 +349,40 @@ public class JsonFunctions {
       // Ignore
     }
     return null;
+  }
+
+  @ScalarFunction
+  public static Object jsonExtractScalar(Object jsonInput, String jsonPath, String dataType) {
+    return jsonExtractScalar(jsonInput, jsonPath, dataType, null);
+  }
+
+  @ScalarFunction
+  public static Object jsonExtractScalar(Object jsonInput, String jsonPath, String dataType, Object defaultValue) {
+    try {
+      switch (dataType.toUpperCase()) {
+        case "STRING":
+          return jsonPathString(jsonInput, jsonPath, (String) defaultValue);
+        case "INT":
+          return jsonPathInt(jsonInput, jsonPath,
+                  Objects.isNull(defaultValue) ? Integer.MIN_VALUE : (Integer) defaultValue);
+        case "LONG":
+        case "TIMESTAMP":
+          return jsonPathLong(jsonInput, jsonPath,
+                  Objects.isNull(defaultValue) ? Long.MIN_VALUE : (Long) defaultValue);
+        case "DOUBLE":
+          return jsonPathDouble(jsonInput, jsonPath,
+                  Objects.isNull(defaultValue) ? Double.MIN_VALUE : (Double) defaultValue);
+        case "BOOLEAN":
+          return jsonPathBoolean(jsonInput, jsonPath,
+                  Objects.isNull(defaultValue) ? Boolean.FALSE : (Boolean) defaultValue);
+        default:
+          throw new IllegalArgumentException(String.format(
+            "Unsupported results type: %s for jsonExtractScalar function. Supported types are: "
+            + "INT/LONG/FLOAT/DOUBLE/BOOLEAN/BIG_DECIMAL/TIMESTAMP/STRING", dataType.toUpperCase()));
+      }
+    } catch (Exception e) {
+      return defaultValue;
+    }
   }
 
   private static void setValuesToMap(String keyColumnName, String valueColumnName, Object obj,
@@ -583,6 +645,21 @@ public class JsonFunctions {
         return Arrays.asList((Object[]) obj);
       }
       return super.toIterable(obj);
+    }
+  }
+
+  private static boolean jsonPathBoolean(@Nullable Object object, String jsonPath, boolean defaultValue) {
+    try {
+      Object jsonValue = jsonPath(object, jsonPath);
+      if (jsonValue == null) {
+        return defaultValue;
+      }
+      if (jsonValue instanceof Boolean) {
+        return (Boolean) jsonValue;
+      }
+      return Boolean.parseBoolean(jsonValue.toString());
+    } catch (Exception ignore) {
+      return defaultValue;
     }
   }
 
