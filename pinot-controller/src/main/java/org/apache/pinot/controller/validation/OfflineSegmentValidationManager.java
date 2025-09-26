@@ -115,16 +115,20 @@ public class OfflineSegmentValidationManager extends ControllerPeriodicTask<Offl
    * @param tableNameWithType the table name with type for which to update the metric
    */
   private void updateResourceUtilizationMetric(String tableNameWithType) {
-    if (_resourceUtilizationManager.isResourceUtilizationWithinLimits(tableNameWithType,
-        UtilizationChecker.CheckPurpose.TASK_GENERATION) == UtilizationChecker.CheckResult.FAIL) {
+    UtilizationChecker.CheckResult result =
+        _resourceUtilizationManager.isResourceUtilizationWithinLimits(tableNameWithType,
+            UtilizationChecker.CheckPurpose.TASK_GENERATION);
+    if (result == UtilizationChecker.CheckResult.FAIL) {
       LOGGER.warn("Resource utilization is above threshold for table: {}, setting metric to 1", tableNameWithType);
       _controllerMetrics.setOrUpdateTableGauge(tableNameWithType, ControllerGauge.RESOURCE_UTILIZATION_LIMIT_EXCEEDED,
           1L);
-    } else if (_resourceUtilizationManager.isResourceUtilizationWithinLimits(tableNameWithType,
-        UtilizationChecker.CheckPurpose.TASK_GENERATION) == UtilizationChecker.CheckResult.PASS) {
+    } else if (result == UtilizationChecker.CheckResult.PASS) {
       LOGGER.info("Resource utilization is within limits for table: {}, setting metric to 0", tableNameWithType);
       _controllerMetrics.setOrUpdateTableGauge(tableNameWithType, ControllerGauge.RESOURCE_UTILIZATION_LIMIT_EXCEEDED,
           0L);
+    } else {
+      LOGGER.debug("Resource utilization check result is UNDETERMINED for table: {}, no action taken",
+          tableNameWithType);
     }
   }
 
