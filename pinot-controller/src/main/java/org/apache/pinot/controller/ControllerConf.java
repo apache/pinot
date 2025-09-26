@@ -274,6 +274,9 @@ public class ControllerConf extends PinotConfiguration {
     public static final String UNTRACKED_SEGMENTS_RETENTION_TIME_IN_DAYS =
         "controller.retentionManager.untrackedSegmentsRetentionTimeInDays";
     public static final int DEFAULT_UNTRACKED_SEGMENTS_RETENTION_TIME_IN_DAYS = 3;
+    public static final String AGED_SEGMENTS_DELETION_BATCH_SIZE =
+        "controller.retentionManager.agedSegmentsDeletionBatchSize";
+    public static final int DEFAULT_AGED_SEGMENTS_DELETION_BATCH_SIZE = 1000;
     public static final int MIN_INITIAL_DELAY_IN_SECONDS = 120;
     public static final int MAX_INITIAL_DELAY_IN_SECONDS = 300;
     public static final int DEFAULT_SPLIT_COMMIT_TMP_SEGMENT_LIFETIME_SECOND = 60 * 60; // 1 Hour.
@@ -1235,6 +1238,15 @@ public class ControllerConf extends PinotConfiguration {
 
   public void setUntrackedSegmentDeletionEnabled(boolean untrackedSegmentDeletionEnabled) {
     setProperty(ControllerPeriodicTasksConf.ENABLE_UNTRACKED_SEGMENT_DELETION, untrackedSegmentDeletionEnabled);
+  }
+
+  public int getAgedSegmentsDeletionBatchSize() {
+    return getProperty(ControllerPeriodicTasksConf.AGED_SEGMENTS_DELETION_BATCH_SIZE,
+        ControllerPeriodicTasksConf.DEFAULT_AGED_SEGMENTS_DELETION_BATCH_SIZE);
+  }
+
+  public void setAgedSegmentsDeletionBatchSize(int agedSegmentsDeletionBatchSize) {
+    setProperty(ControllerPeriodicTasksConf.AGED_SEGMENTS_DELETION_BATCH_SIZE, agedSegmentsDeletionBatchSize);
   }
 
   public long getPinotTaskManagerInitialDelaySeconds() {
