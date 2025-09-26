@@ -19,6 +19,8 @@
 package org.apache.pinot.core.operator.filter.predicate;
 
 import com.google.common.base.Preconditions;
+import it.unimi.dsi.fastutil.ints.Int2BooleanMap;
+import it.unimi.dsi.fastutil.ints.Int2BooleanOpenHashMap;
 import it.unimi.dsi.fastutil.ints.IntArrayList;
 import it.unimi.dsi.fastutil.ints.IntList;
 import it.unimi.dsi.fastutil.ints.IntOpenHashSet;
@@ -31,17 +33,12 @@ import org.apache.pinot.segment.spi.index.reader.Dictionary;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
 import org.apache.pinot.spi.utils.CommonConstants.Broker;
 
-
 /**
  * Factory for REGEXP_LIKE predicate evaluators.
  */
 public class RegexpLikePredicateEvaluatorFactory {
   private RegexpLikePredicateEvaluatorFactory() {
   }
-
-  /// Default threshold when the cardinality of the dictionary is less than this threshold,
-  // scan the dictionary to get the matching ids.
-  public static final int DEFAULT_DICTIONARY_CARDINALITY_THRESHOLD_FOR_SCAN = 10000;
 
   /**
    * Create a new instance of dictionary based REGEXP_LIKE predicate evaluator with configurable threshold.
@@ -50,38 +47,23 @@ public class RegexpLikePredicateEvaluatorFactory {
    * @param dictionary          Dictionary for the column
    * @param dataType            Data type for the column
    * @param queryContext        Query context containing query options (can be null)
-   * @param numDocs
    * @return Dictionary based REGEXP_LIKE predicate evaluator
    */
   public static BaseDictionaryBasedPredicateEvaluator newDictionaryBasedEvaluator(
-      RegexpLikePredicate regexpLikePredicate, Dictionary dictionary, DataType dataType, QueryContext queryContext,
-      int numDocs) {
+      RegexpLikePredicate regexpLikePredicate, Dictionary dictionary, DataType dataType, QueryContext queryContext) {
     Preconditions.checkArgument(dataType.getStoredType() == DataType.STRING, "Unsupported data type: " + dataType);
 
     // Get threshold from query options or use default
-    double threshold = Broker.DEFAULT_REGEXP_LIKE_ADAPTIVE_THRESHOLD;
+    long threshold = Broker.DEFAULT_REGEXP_LIKE_DICTIONARY_THRESHOLD;
     if (queryContext != null && queryContext.getQueryOptions() != null) {
       threshold = QueryOptionsUtils.getRegexpLikeAdaptiveThreshold(queryContext.getQueryOptions(),
-          Broker.DEFAULT_REGEXP_LIKE_ADAPTIVE_THRESHOLD);
+          Broker.DEFAULT_REGEXP_LIKE_DICTIONARY_THRESHOLD);
     }
-    if (checkForDictionaryBasedScan(dictionary, numDocs, threshold)) {
+    if (dictionary.length() < threshold) {
       return new DictIdBasedRegexpLikePredicateEvaluator(regexpLikePredicate, dictionary);
     } else {
       return new ScanBasedRegexpLikePredicateEvaluator(regexpLikePredicate, dictionary);
     }
-  }
-
-  private static boolean checkForDictionaryBasedScan(Dictionary dictionary, int numDocs, double threshold) {
-    return dictionary.length() < DEFAULT_DICTIONARY_CARDINALITY_THRESHOLD_FOR_SCAN
-        || (double) dictionary.length() / numDocs < threshold;
-  }
-
-  /**
-   * This method maintains backward compatibility.
-   */
-  public static BaseDictionaryBasedPredicateEvaluator newDictionaryBasedEvaluator(
-      RegexpLikePredicate regexpLikePredicate, Dictionary dictionary, DataType dataType) {
-    return newDictionaryBasedEvaluator(regexpLikePredicate, dictionary, dataType, null, 0);
   }
 
   /**
@@ -149,15 +131,32 @@ public class RegexpLikePredicateEvaluatorFactory {
     // Reuse matcher to avoid excessive allocation. This is safe to do because the evaluator is always used
     // within the scope of a single thread.
     final Matcher _matcher;
+    Int2BooleanMap _dictIdMap;
+    int _matchingIds;
 
     public ScanBasedRegexpLikePredicateEvaluator(RegexpLikePredicate regexpLikePredicate, Dictionary dictionary) {
       super(regexpLikePredicate, dictionary);
       _matcher = regexpLikePredicate.getPattern().matcher("");
+      _dictIdMap = new Int2BooleanOpenHashMap();
+      _matchingIds = 0;
     }
 
     @Override
     public boolean applySV(int dictId) {
-      return _matcher.reset(_dictionary.getStringValue(dictId)).find();
+      if (_dictIdMap.containsKey(dictId)) {
+        return _dictIdMap.get(dictId);
+      }
+      boolean match = _matcher.reset(_dictionary.getStringValue(dictId)).find();
+      _dictIdMap.put(dictId, match);
+      if (match) {
+        _matchingIds++;
+      }
+      return match;
+    }
+
+    @Override
+    public int getNumMatchingItems() {
+      return _matchingIds;
     }
 
     @Override
