@@ -233,7 +233,7 @@ public class SegmentApiClient implements Closeable {
   }
 
   /**
-   * Install a default SSLContext for all FileUploadDownloadClients instantiated.
+   * Install a default SSLContext for all SegmentApiClient instances.
    *
    * @param sslContext default ssl context
    */
