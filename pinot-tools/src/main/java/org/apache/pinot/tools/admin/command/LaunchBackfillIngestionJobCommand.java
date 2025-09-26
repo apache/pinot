@@ -136,7 +136,7 @@ public class LaunchBackfillIngestionJobCommand extends LaunchDataIngestionJobCom
       nameGeneratorSpec.setConfigs(configs);
       spec.setSegmentNameGeneratorSpec(nameGeneratorSpec);
     } catch (Exception e) {
-      LOGGER.error("Got exception to generate IngestionJobSpec for backill ingestion job - ", e);
+      LOGGER.error("Got exception to generate IngestionJobSpec for backfill ingestion job - ", e);
       throw e;
     }
 
