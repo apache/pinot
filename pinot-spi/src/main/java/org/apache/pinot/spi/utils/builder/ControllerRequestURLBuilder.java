@@ -742,6 +742,10 @@ public class ControllerRequestURLBuilder {
     return StringUtil.join("/", _baseUrl, "cluster", "configs", config);
   }
 
+  public String forClusterConfigGet() {
+    return StringUtil.join("/", _baseUrl, "cluster", "configs");
+  }
+
   public String forQueryWorkloadConfigUpdate() {
     return StringUtil.join("/", _baseUrl, "queryWorkloadConfigs");
   }

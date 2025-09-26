@@ -947,6 +947,10 @@ public class ControllerTest {
     getControllerRequestClient().deleteClusterConfig(clusterConfig);
   }
 
+  public Map<String, String> getClusterConfig() {
+    getControllerRequestClient().g
+  }
+
   /**
    * Trigger a task on a table and wait for completion
    */
