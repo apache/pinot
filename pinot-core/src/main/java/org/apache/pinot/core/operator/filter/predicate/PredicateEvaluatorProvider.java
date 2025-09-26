@@ -39,11 +39,11 @@ public class PredicateEvaluatorProvider {
 
   public static PredicateEvaluator getPredicateEvaluator(Predicate predicate, @Nullable Dictionary dictionary,
       DataType dataType) {
-    return getPredicateEvaluator(predicate, dictionary, dataType, null);
+    return getPredicateEvaluator(predicate, dictionary, dataType, null, 0);
   }
 
   public static PredicateEvaluator getPredicateEvaluator(Predicate predicate, @Nullable Dictionary dictionary,
-      DataType dataType, @Nullable QueryContext queryContext) {
+      DataType dataType, @Nullable QueryContext queryContext, int numDocs) {
     try {
       if (dictionary != null) {
         // dictionary based predicate evaluators
@@ -98,6 +98,6 @@ public class PredicateEvaluatorProvider {
   public static PredicateEvaluator getPredicateEvaluator(Predicate predicate, DataSource dataSource,
       QueryContext queryContext) {
     return getPredicateEvaluator(predicate, dataSource.getDictionary(),
-        dataSource.getDataSourceMetadata().getDataType(), queryContext);
+        dataSource.getDataSourceMetadata().getDataType(), queryContext, 0);
   }
 }

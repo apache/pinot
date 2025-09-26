@@ -65,7 +65,8 @@ public class AuditRequestProcessorTest {
   @BeforeMethod
   public void setUp() {
     MockitoAnnotations.openMocks(this);
-    _processor = new AuditRequestProcessor(_configManager, mock(AuditIdentityResolver.class), _auditUrlPathFilter);
+    _processor = new AuditRequestProcessor(_configManager, mock(AuditIdentityResolver.class), _auditUrlPathFilter,
+        mock(AuditMetrics.class));
 
     _defaultConfig = new AuditConfig();
     _defaultConfig.setEnabled(true);

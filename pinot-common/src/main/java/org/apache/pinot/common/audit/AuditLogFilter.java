@@ -21,6 +21,7 @@ package org.apache.pinot.common.audit;
 import java.io.IOException;
 import java.time.Instant;
 import java.util.UUID;
+import java.util.concurrent.TimeUnit;
 import javax.inject.Inject;
 import javax.inject.Provider;
 import javax.inject.Singleton;
@@ -48,13 +49,15 @@ public class AuditLogFilter implements ContainerRequestFilter, ContainerResponse
   private final Provider<Request> _requestProvider;
   private final AuditRequestProcessor _auditRequestProcessor;
   private final AuditConfigManager _configManager;
+  private final AuditMetrics _auditMetrics;
 
   @Inject
   public AuditLogFilter(Provider<Request> requestProvider, AuditRequestProcessor auditRequestProcessor,
-      AuditConfigManager configManager) {
+      AuditConfigManager configManager, AuditMetrics auditMetrics) {
     _requestProvider = requestProvider;
     _auditRequestProcessor = auditRequestProcessor;
     _configManager = configManager;
+    _auditMetrics = auditMetrics;
   }
 
   @Override
@@ -66,6 +69,11 @@ public class AuditLogFilter implements ContainerRequestFilter, ContainerResponse
       return;
     }
 
+    measure(() -> filterRequest(requestContext, config), AuditMetrics.AuditTimer.AUDIT_REQUEST_PROCESSING_TIME,
+        AuditMetrics.AuditMeter.AUDIT_REQUEST_FAILURES);
+  }
+
+  private void filterRequest(ContainerRequestContext requestContext, AuditConfig config) {
     AuditResponseContext responseContext = null;
     // Only create and store the context if response auditing is enabled
     if (config.isCaptureResponseEnabled()) {
@@ -96,6 +104,11 @@ public class AuditLogFilter implements ContainerRequestFilter, ContainerResponse
       return;
     }
 
+    measure(() -> filterResponse(requestContext, responseContext),
+        AuditMetrics.AuditTimer.AUDIT_RESPONSE_PROCESSING_TIME, AuditMetrics.AuditMeter.AUDIT_RESPONSE_FAILURES);
+  }
+
+  private void filterResponse(ContainerRequestContext requestContext, ContainerResponseContext responseContext) {
     // Retrieve the audit response context that was stored during request processing
     AuditResponseContext auditContext =
         (AuditResponseContext) requestContext.getProperty(PROPERTY_KEY_AUDIT_RESPONSE_CONTEXT);
@@ -109,20 +122,29 @@ public class AuditLogFilter implements ContainerRequestFilter, ContainerResponse
     if (requestId == null) {
       return;
     }
+    long durationMs = TimeUnit.NANOSECONDS.toMillis(System.nanoTime() - auditContext.getStartTimeNanos());
+    final AuditEvent auditEvent = new AuditEvent().setRequestId(requestId)
+        .setTimestamp(Instant.now().toString())
+        .setResponseCode(responseContext.getStatus())
+        .setDurationMs(durationMs)
+        .setEndpoint(requestContext.getUriInfo().getPath())
+        .setMethod(requestContext.getMethod());
+
+    AuditLogger.auditLog(auditEvent);
+  }
+
+  private void measure(Runnable operation, AuditMetrics.AuditTimer timer, AuditMetrics.AuditMeter failureMeter) {
+    long startTime = System.nanoTime();
     try {
-      long durationMs = (System.nanoTime() - auditContext.getStartTimeNanos()) / 1_000_000;
-
-      final AuditEvent auditEvent = new AuditEvent().setRequestId(requestId)
-          .setTimestamp(Instant.now().toString())
-          .setResponseCode(responseContext.getStatus())
-          .setDurationMs(durationMs)
-          .setEndpoint(requestContext.getUriInfo().getPath())
-          .setMethod(requestContext.getMethod());
-
-      AuditLogger.auditLog(auditEvent);
+      operation.run();
     } catch (Exception e) {
       // Graceful degradation: Never let audit logging failures affect the main response
-      LOG.warn("Failed to process audit logging for response", e);
+      // logging the failure meter provides additional context if request/response
+      LOG.warn("Failed to process audit logging. Incrementing {}", failureMeter, e);
+      _auditMetrics.addMeteredGlobalValue(failureMeter, 1L);
+    } finally {
+      long durationMs = TimeUnit.NANOSECONDS.toMillis(System.nanoTime() - startTime);
+      _auditMetrics.addTimedValue(timer, durationMs);
     }
   }
 

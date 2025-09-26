@@ -780,7 +780,8 @@ public abstract class BaseBrokerStarter implements ServiceStartable {
         new BrokerAdminApiApplication(_routingManager, _brokerRequestHandler, _brokerMetrics, _brokerConf,
             _sqlQueryExecutor, _serverRoutingStatsManager, _accessControlFactory, _spectatorHelixManager,
             _queryQuotaManager, _responseStore);
-    brokerAdminApiApplication.register(new AuditServiceBinder(_defaultClusterConfigChangeHandler, getServiceRole()));
+    brokerAdminApiApplication.register(new AuditServiceBinder(_defaultClusterConfigChangeHandler, getServiceRole(),
+        _brokerMetrics));
     registerExtraComponents(brokerAdminApiApplication);
     return brokerAdminApiApplication;
   }

@@ -56,13 +56,15 @@ public class AuditRequestProcessor {
   private final AuditConfigManager _configManager;
   private final AuditIdentityResolver _identityResolver;
   private final AuditUrlPathFilter _auditUrlPathFilter;
+  private final AuditMetrics _auditMetrics;
 
   @Inject
   public AuditRequestProcessor(AuditConfigManager configManager, AuditIdentityResolver identityResolver,
-      AuditUrlPathFilter auditUrlPathFilter) {
+      AuditUrlPathFilter auditUrlPathFilter, AuditMetrics auditMetrics) {
     _configManager = configManager;
     _identityResolver = identityResolver;
     _auditUrlPathFilter = auditUrlPathFilter;
+    _auditMetrics = auditMetrics;
   }
 
   /**
@@ -259,6 +261,7 @@ public class AuditRequestProcessor {
         String requestBody = new String(capturedBytes, StandardCharsets.UTF_8);
         if (capturedBytes.length >= maxPayloadSize) {
           requestBody += TRUNCATION_MARKER;
+          _auditMetrics.addMeteredGlobalValue(AuditMetrics.AuditMeter.AUDIT_REQUEST_PAYLOAD_TRUNCATED, 1L);
         }
         return requestBody;
       }

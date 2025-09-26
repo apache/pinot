@@ -434,7 +434,7 @@ public class CommonConstants {
     public static final String DISABLE_GROOVY = "pinot.broker.disable.query.groovy";
     public static final boolean DEFAULT_DISABLE_GROOVY = true;
 
-    // REGEXP_LIKE adaptive threshold configuration
+    // REGEXP_LIKE dictionary configuration
     public static final String CONFIG_OF_REGEXP_LIKE_DICTIONARY_THRESHOLD =
         "pinot.broker.regexp.dict.cardinality.threshold";
     public static final long DEFAULT_REGEXP_LIKE_DICTIONARY_THRESHOLD = 10000;

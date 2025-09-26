@@ -66,6 +66,19 @@ public class RegexpLikePredicateEvaluatorFactory {
     }
   }
 
+  private static boolean checkForDictionaryBasedScan(Dictionary dictionary, int numDocs, double threshold) {
+    return dictionary.length() < DEFAULT_DICTIONARY_CARDINALITY_THRESHOLD_FOR_SCAN
+        || (double) dictionary.length() / numDocs < threshold;
+  }
+
+  /**
+   * This method maintains backward compatibility.
+   */
+  public static BaseDictionaryBasedPredicateEvaluator newDictionaryBasedEvaluator(
+      RegexpLikePredicate regexpLikePredicate, Dictionary dictionary, DataType dataType) {
+    return newDictionaryBasedEvaluator(regexpLikePredicate, dictionary, dataType, null, 0);
+  }
+
   /**
    * Create a new instance of raw value based REGEXP_LIKE predicate evaluator.
    *
