@@ -259,18 +259,18 @@ public class TenantRebalancer {
         if (result.getStatus().equals(RebalanceResult.Status.DONE)) {
           LOGGER.info("Completed rebalance for table: {} with table rebalance job ID: {} in tenant rebalance job: {}",
               tableName, rebalanceJobId, observer.getJobId());
-          observer.onJobDone(jobContext);
+          observer.onTableJobDone(jobContext);
         } else {
           LOGGER.warn(
               "Rebalance for table: {} with table rebalance job ID: {} in tenant rebalance job: {} is not done."
                   + "Status: {}, Description: {}", tableName, rebalanceJobId, observer.getJobId(), result.getStatus(),
               result.getDescription());
-          observer.onJobError(jobContext, result.getDescription());
+          observer.onTableJobError(jobContext, result.getDescription());
         }
       } catch (Throwable t) {
         LOGGER.error("Caught exception while rebalancing table: {} with table rebalance job ID: {} in tenant "
             + "rebalance job: {}", tableName, rebalanceJobId, observer.getJobId(), t);
-        observer.onJobError(jobContext, t.getMessage());
+        observer.onTableJobError(jobContext, t.getMessage());
       }
     }
   }
