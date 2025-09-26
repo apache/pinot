@@ -210,7 +210,8 @@ public class RetentionManagerTest {
     SegmentDeletionManager deletionManager = pinotHelixResourceManager.getSegmentDeletionManager();
 
     // Verify that the removeAgedDeletedSegments() method in deletion manager is called
-    verify(deletionManager, times(1)).removeAgedDeletedSegments(leadControllerManager);
+    verify(deletionManager, times(1)).removeAgedDeletedSegments(leadControllerManager,
+        ControllerConf.ControllerPeriodicTasksConf.DEFAULT_AGED_SEGMENTS_DELETION_BATCH_SIZE);
 
     // Verify deleteSegments is called
     verify(pinotHelixResourceManager, times(1)).deleteSegments(eq(OFFLINE_TABLE_NAME), anyList());
@@ -410,7 +411,8 @@ public class RetentionManagerTest {
     SegmentDeletionManager deletionManager = pinotHelixResourceManager.getSegmentDeletionManager();
 
     // Verify that the removeAgedDeletedSegments() method in deletion manager is called
-    verify(deletionManager, times(1)).removeAgedDeletedSegments(leadControllerManager);
+    verify(deletionManager, times(1)).removeAgedDeletedSegments(leadControllerManager,
+        ControllerConf.ControllerPeriodicTasksConf.DEFAULT_AGED_SEGMENTS_DELETION_BATCH_SIZE);
 
     // Verify deleteSegments is called
     verify(pinotHelixResourceManager, times(1)).deleteSegments(eq(OFFLINE_TABLE_NAME), anyList());
@@ -523,7 +525,9 @@ public class RetentionManagerTest {
     SegmentDeletionManager deletionManager = mock(SegmentDeletionManager.class);
     // Ignore the call to SegmentDeletionManager.removeAgedDeletedSegments. we only test that the call is made once per
     // run of the retention manager
-    doAnswer(invocationOnMock -> null).when(deletionManager).removeAgedDeletedSegments(leadControllerManager);
+    doAnswer(invocationOnMock -> null).when(deletionManager)
+        .removeAgedDeletedSegments(leadControllerManager,
+            ControllerConf.ControllerPeriodicTasksConf.DEFAULT_AGED_SEGMENTS_DELETION_BATCH_SIZE);
     when(resourceManager.getSegmentDeletionManager()).thenReturn(deletionManager);
 
     // If and when PinotHelixResourceManager.deleteSegments() is invoked, make sure that the segments deleted
@@ -552,7 +556,9 @@ public class RetentionManagerTest {
     when(resourceManager.getPropertyStore()).thenReturn(propertyStore);
 
     SegmentDeletionManager deletionManager = mock(SegmentDeletionManager.class);
-    doAnswer(invocationOnMock -> null).when(deletionManager).removeAgedDeletedSegments(leadControllerManager);
+    doAnswer(invocationOnMock -> null).when(deletionManager)
+        .removeAgedDeletedSegments(leadControllerManager,
+            ControllerConf.ControllerPeriodicTasksConf.DEFAULT_AGED_SEGMENTS_DELETION_BATCH_SIZE);
     when(resourceManager.getSegmentDeletionManager()).thenReturn(deletionManager);
 
     // Set up verification for deleteSegments with focus on the count and segment inclusion rules
@@ -615,7 +621,8 @@ public class RetentionManagerTest {
     SegmentDeletionManager deletionManager = pinotHelixResourceManager.getSegmentDeletionManager();
 
     // Verify that the removeAgedDeletedSegments() method in deletion manager is actually called.
-    verify(deletionManager, times(1)).removeAgedDeletedSegments(leadControllerManager);
+    verify(deletionManager, times(1)).removeAgedDeletedSegments(leadControllerManager,
+        ControllerConf.ControllerPeriodicTasksConf.DEFAULT_AGED_SEGMENTS_DELETION_BATCH_SIZE);
 
     // Verify that the deleteSegments method is actually called.
     verify(pinotHelixResourceManager, times(1)).deleteSegments(anyString(), anyList());
@@ -652,7 +659,8 @@ public class RetentionManagerTest {
     SegmentDeletionManager deletionManager = pinotHelixResourceManager.getSegmentDeletionManager();
 
     // Verify that the removeAgedDeletedSegments() method in deletion manager is actually called.
-    verify(deletionManager, times(1)).removeAgedDeletedSegments(leadControllerManager);
+    verify(deletionManager, times(1)).removeAgedDeletedSegments(leadControllerManager,
+        ControllerConf.ControllerPeriodicTasksConf.DEFAULT_AGED_SEGMENTS_DELETION_BATCH_SIZE);
 
     // Verify that the deleteSegments method is actually called.
     verify(pinotHelixResourceManager, times(1)).deleteSegments(anyString(), anyList());
