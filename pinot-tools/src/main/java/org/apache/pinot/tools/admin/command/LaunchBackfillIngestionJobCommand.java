@@ -119,7 +119,7 @@ public class LaunchBackfillIngestionJobCommand extends LaunchDataIngestionJobCom
   private SegmentGenerationJobSpec prepareSegmentGeneratorSpec() throws Exception {
     SegmentGenerationJobSpec spec;
     try {
-       spec = IngestionJobLauncher.getSegmentGenerationJobSpec(
+      spec = IngestionJobLauncher.getSegmentGenerationJobSpec(
           _jobSpecFile, _propertyFile, GroovyTemplateUtils.getTemplateContext(_values), System.getenv());
 
       long currentTime = System.currentTimeMillis();
