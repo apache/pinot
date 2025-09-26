@@ -54,6 +54,7 @@ import javax.ws.rs.core.Context;
 import javax.ws.rs.core.HttpHeaders;
 import javax.ws.rs.core.MediaType;
 import javax.ws.rs.core.Response;
+import org.apache.commons.lang3.tuple.Pair;
 import org.apache.helix.model.IdealState;
 import org.apache.helix.model.InstanceConfig;
 import org.apache.pinot.common.assignment.InstancePartitions;
@@ -67,15 +68,12 @@ import org.apache.pinot.controller.helix.core.PinotHelixResourceManager;
 import org.apache.pinot.controller.helix.core.PinotResourceManagerResponse;
 import org.apache.pinot.controller.helix.core.controllerjob.ControllerJobTypes;
 import org.apache.pinot.controller.helix.core.rebalance.RebalanceJobConstants;
-import org.apache.pinot.controller.helix.core.rebalance.RebalanceResult;
-import org.apache.pinot.controller.helix.core.rebalance.TableRebalanceManager;
-import org.apache.pinot.controller.helix.core.rebalance.tenant.TenantRebalanceChecker;
 import org.apache.pinot.controller.helix.core.rebalance.tenant.TenantRebalanceConfig;
-import org.apache.pinot.controller.helix.core.rebalance.tenant.TenantRebalanceContext;
 import org.apache.pinot.controller.helix.core.rebalance.tenant.TenantRebalanceProgressStats;
 import org.apache.pinot.controller.helix.core.rebalance.tenant.TenantRebalanceResult;
 import org.apache.pinot.controller.helix.core.rebalance.tenant.TenantRebalancer;
 import org.apache.pinot.controller.helix.core.rebalance.tenant.TenantTableWithProperties;
+import org.apache.pinot.controller.helix.core.rebalance.tenant.ZkBasedTenantRebalanceObserver;
 import org.apache.pinot.controller.util.TableSizeReader;
 import org.apache.pinot.core.auth.Actions;
 import org.apache.pinot.core.auth.Authorize;
@@ -725,20 +723,20 @@ public class PinotTenantRestletResource {
           Response.Status.NOT_FOUND);
     }
     try {
-      TenantRebalanceContext originalContext = TenantRebalanceContext.fromTenantRebalanceJobMetadata(jobMetadata);
-      TenantRebalanceProgressStats progressStats =
-          JsonUtils.stringToObject(jobMetadata.get(RebalanceJobConstants.JOB_METADATA_KEY_REBALANCE_PROGRESS_STATS),
-              TenantRebalanceProgressStats.class);
-      originalContext.getParallelQueue().clear();
-      originalContext.getSequentialQueue().clear();
-      TenantRebalancer.TenantTableRebalanceJobContext ctx;
-      while ((ctx = originalContext.getOngoingJobsQueue().poll()) != null) {
-        TableRebalanceManager.cancelRebalance(ctx.getTableName(), _pinotHelixResourceManager,
-            RebalanceResult.Status.CANCELLED);
+      ZkBasedTenantRebalanceObserver observer =
+          new ZkBasedTenantRebalanceObserver(jobId, jobMetadata.get(CommonConstants.ControllerJob.TENANT_NAME),
+              _pinotHelixResourceManager);
+      Pair<List<String>, Boolean> result = observer.cancelJob(true);
+      if (result.getRight()) {
+        return new SuccessResponse(
+            "Successfully cancelled tenant rebalance job: " + jobId + ". Cancelled " + result.getLeft().size()
+                + " table rebalance jobs: " + result.getLeft());
+      } else {
+        throw new ControllerApplicationException(LOGGER,
+            "Failed to cancel tenant rebalance job: " + jobId + ", yet " + result.getLeft().size()
+                + " table rebalance jobs are cancelled successfully: " + result.getLeft(),
+            Response.Status.INTERNAL_SERVER_ERROR);
       }
-      TenantRebalanceChecker.markTenantRebalanceJobAsCancelled(jobId, jobMetadata, originalContext, progressStats,
-          _pinotHelixResourceManager, true);
-      return new SuccessResponse("Successfully cancelled tenant rebalance job: " + jobId);
     } catch (Exception e) {
       throw new ControllerApplicationException(LOGGER, "Failed to cancel tenant rebalance job: " + jobId,
           Response.Status.INTERNAL_SERVER_ERROR, e);

@@ -123,6 +123,8 @@ public class TenantRebalanceCheckerTest extends ControllerTest {
     // Setup mocks
     doReturn(allJobMetadata).when(_mockPinotHelixResourceManager)
         .getAllJobs(eq(Set.of(ControllerJobTypes.TENANT_REBALANCE)), any());
+    doReturn(allJobMetadata.get(JOB_ID)).when(_mockPinotHelixResourceManager)
+        .getControllerJobZKMetadata(eq(JOB_ID), eq(ControllerJobTypes.TENANT_REBALANCE));
     doReturn(stuckTableJobMetadata).when(_mockPinotHelixResourceManager)
         .getControllerJobZKMetadata(eq(STUCK_TABLE_JOB_ID), eq(ControllerJobTypes.TABLE_REBALANCE));
 
@@ -183,6 +185,8 @@ public class TenantRebalanceCheckerTest extends ControllerTest {
     // Setup mocks
     doReturn(allJobMetadata).when(_mockPinotHelixResourceManager)
         .getAllJobs(eq(Set.of(ControllerJobTypes.TENANT_REBALANCE)), any());
+    doReturn(allJobMetadata.get(JOB_ID)).when(_mockPinotHelixResourceManager)
+        .getControllerJobZKMetadata(eq(JOB_ID), eq(ControllerJobTypes.TENANT_REBALANCE));
     doReturn(stuckTableJobMetadata1).when(_mockPinotHelixResourceManager)
         .getControllerJobZKMetadata(eq(STUCK_TABLE_JOB_ID), eq(ControllerJobTypes.TABLE_REBALANCE));
     doReturn(stuckTableJobMetadata2).when(_mockPinotHelixResourceManager)
@@ -345,12 +349,14 @@ public class TenantRebalanceCheckerTest extends ControllerTest {
     // Setup mocks
     doReturn(allJobMetadata).when(_mockPinotHelixResourceManager)
         .getAllJobs(eq(Set.of(ControllerJobTypes.TENANT_REBALANCE)), any());
+    doReturn(allJobMetadata.get(JOB_ID)).when(_mockPinotHelixResourceManager)
+        .getControllerJobZKMetadata(eq(JOB_ID), eq(ControllerJobTypes.TENANT_REBALANCE));
+    doReturn(allJobMetadata.get(JOB_ID_2)).when(_mockPinotHelixResourceManager)
+        .getControllerJobZKMetadata(eq(JOB_ID_2), eq(ControllerJobTypes.TENANT_REBALANCE));
     doReturn(stuckTableJobMetadata).when(_mockPinotHelixResourceManager)
         .getControllerJobZKMetadata(eq(STUCK_TABLE_JOB_ID), eq(ControllerJobTypes.TABLE_REBALANCE));
 
     // Mock the tenant rebalancer to capture the resumed context
-    ArgumentCaptor<TenantRebalanceContext> contextCaptor =
-        ArgumentCaptor.forClass(TenantRebalanceContext.class);
     ArgumentCaptor<ZkBasedTenantRebalanceObserver> observerCaptor =
         ArgumentCaptor.forClass(ZkBasedTenantRebalanceObserver.class);
 

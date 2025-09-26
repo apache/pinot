@@ -26,6 +26,8 @@ import java.util.Objects;
 import java.util.Set;
 import java.util.function.Function;
 import java.util.stream.Collectors;
+import javax.annotation.Nullable;
+import org.apache.commons.lang3.StringUtils;
 import org.apache.pinot.controller.helix.core.rebalance.RebalanceJobConstants;
 import org.apache.pinot.spi.utils.JsonUtils;
 
@@ -64,9 +66,13 @@ public class TenantRebalanceProgressStats {
     _completionStatusMsg = other._completionStatusMsg;
   }
 
+  @Nullable
   public static TenantRebalanceProgressStats fromTenantRebalanceJobMetadata(Map<String, String> jobMetadata)
       throws JsonProcessingException {
     String tenantRebalanceContextStr = jobMetadata.get(RebalanceJobConstants.JOB_METADATA_KEY_REBALANCE_PROGRESS_STATS);
+    if (StringUtils.isEmpty(tenantRebalanceContextStr)) {
+      return null;
+    }
     return JsonUtils.stringToObject(tenantRebalanceContextStr, TenantRebalanceProgressStats.class);
   }
 

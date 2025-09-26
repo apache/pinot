@@ -27,6 +27,8 @@ import java.util.Objects;
 import java.util.Queue;
 import java.util.concurrent.ConcurrentLinkedDeque;
 import java.util.concurrent.ConcurrentLinkedQueue;
+import javax.annotation.Nullable;
+import org.apache.commons.lang3.StringUtils;
 import org.apache.pinot.controller.helix.core.rebalance.RebalanceJobConstants;
 import org.apache.pinot.spi.utils.JsonUtils;
 
@@ -163,9 +165,13 @@ public class TenantRebalanceContext {
     return originalJobId + "_" + attemptId;
   }
 
+  @Nullable
   public static TenantRebalanceContext fromTenantRebalanceJobMetadata(Map<String, String> jobMetadata)
       throws JsonProcessingException {
     String tenantRebalanceContextStr = jobMetadata.get(RebalanceJobConstants.JOB_METADATA_KEY_REBALANCE_CONTEXT);
+    if (StringUtils.isEmpty(tenantRebalanceContextStr)) {
+      return null;
+    }
     return JsonUtils.stringToObject(tenantRebalanceContextStr, TenantRebalanceContext.class);
   }
 }
