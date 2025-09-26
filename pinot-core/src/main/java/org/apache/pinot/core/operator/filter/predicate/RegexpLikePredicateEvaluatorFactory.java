@@ -30,7 +30,7 @@ import org.apache.pinot.common.utils.regex.Matcher;
 import org.apache.pinot.core.query.request.context.QueryContext;
 import org.apache.pinot.segment.spi.index.reader.Dictionary;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
-
+import org.apache.pinot.spi.utils.CommonConstants.Broker;
 
 /**
  * Factory for REGEXP_LIKE predicate evaluators.
@@ -38,10 +38,6 @@ import org.apache.pinot.spi.data.FieldSpec.DataType;
 public class RegexpLikePredicateEvaluatorFactory {
   private RegexpLikePredicateEvaluatorFactory() {
   }
-
-  /// Default threshold when the cardinality of the dictionary is less than this threshold,
-  // scan the dictionary to get the matching ids.
-  public static final int DEFAULT_DICTIONARY_CARDINALITY_THRESHOLD_FOR_SCAN = 10000;
 
   /**
    * Create a new instance of dictionary based REGEXP_LIKE predicate evaluator with configurable threshold.
@@ -57,10 +53,10 @@ public class RegexpLikePredicateEvaluatorFactory {
     Preconditions.checkArgument(dataType.getStoredType() == DataType.STRING, "Unsupported data type: " + dataType);
 
     // Get threshold from query options or use default
-    long threshold = DEFAULT_DICTIONARY_CARDINALITY_THRESHOLD_FOR_SCAN;
+    long threshold = Broker.DEFAULT_REGEXP_LIKE_DICTIONARY_THRESHOLD;
     if (queryContext != null && queryContext.getQueryOptions() != null) {
       threshold = QueryOptionsUtils.getRegexpLikeAdaptiveThreshold(queryContext.getQueryOptions(),
-          DEFAULT_DICTIONARY_CARDINALITY_THRESHOLD_FOR_SCAN);
+          Broker.DEFAULT_REGEXP_LIKE_DICTIONARY_THRESHOLD);
     }
     if (dictionary.length() < threshold) {
       return new DictIdBasedRegexpLikePredicateEvaluator(regexpLikePredicate, dictionary);

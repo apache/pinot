@@ -437,7 +437,7 @@ public class CommonConstants {
     // REGEXP_LIKE adaptive threshold configuration
     public static final String CONFIG_OF_REGEXP_LIKE_DICTIONARY_THRESHOLD =
         "pinot.broker.regexp.dict.cardinality.threshold";
-    public static final double DEFAULT_REGEXP_LIKE_DICTIONARY_THRESHOLD = 0.1; // 10% threshold
+    public static final long DEFAULT_REGEXP_LIKE_DICTIONARY_THRESHOLD = 10000;
     // Rewrite potential expensive functions to their approximation counterparts
     // - DISTINCT_COUNT -> DISTINCT_COUNT_SMART_HLL
     // - PERCENTILE -> PERCENTILE_SMART_TDIGEST
