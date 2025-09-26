@@ -72,12 +72,6 @@ public class HashFunctionSelector {
           return HashFunctionSelector.murmur3(value);
         };
       case HASH_CODE:
-        return value -> {
-          if (value == null) {
-            return 0;
-          }
-          return HashFunctionSelector.hashCode(value);
-        };
       // Default hash is absHashCode.
       default:
         return value -> {
@@ -106,6 +100,7 @@ public class HashFunctionSelector {
           return HashFunctionSelector.murmur3(values, keys);
         };
       case HASH_CODE:
+        // We should hashCode instead of absHashCode for multi hash to maintain consistency with legacy behavior.
       default:
         return (values, keys) -> {
           if (values == null || values.length == 0) {
