@@ -2687,17 +2687,12 @@ public class PinotLLCRealtimeSegmentManager {
         segmentsInErrorStateInAtLeastOneReplica.size(), segmentsInErrorStateInAtLeastOneReplica,
         segmentsInErrorStateInAllReplicas.size(), segmentsInErrorStateInAllReplicas, realtimeTableName);
 
-    if (!allowRepairOfErrorSegments(repairErrorSegmentsForPartialUpsertOrDedup, tableConfig)) {
-      // We do not run reingestion for dedup and partial upsert tables in pauseless as it can
-      // lead to data inconsistencies
-      _controllerMetrics.setOrUpdateTableGauge(realtimeTableName,
-          ControllerGauge.PAUSELESS_SEGMENTS_IN_UNRECOVERABLE_ERROR_COUNT, segmentsInErrorStateInAllReplicas.size());
-      return;
-    } else {
-      LOGGER.info("Repairing error segments in table: {}.", realtimeTableName);
-      _controllerMetrics.setOrUpdateTableGauge(realtimeTableName, ControllerGauge.PAUSELESS_SEGMENTS_IN_ERROR_COUNT,
-          segmentsInErrorStateInAllReplicas.size());
-    }
+    LOGGER.info("Repairing error segments in table: {}.", realtimeTableName);
+    _controllerMetrics.setOrUpdateTableGauge(realtimeTableName, ControllerGauge.PAUSELESS_SEGMENTS_IN_ERROR_COUNT,
+        segmentsInErrorStateInAllReplicas.size());
+
+    boolean repairErrorSegments = allowRepairOfErrorSegments(repairErrorSegmentsForPartialUpsertOrDedup, tableConfig);
+    int segmentsInUnRecoverableState = 0;
 
     for (String segmentName : segmentsInErrorStateInAtLeastOneReplica) {
       SegmentZKMetadata segmentZKMetadata = _helixResourceManager.getSegmentZKMetadata(realtimeTableName, segmentName);
@@ -2709,6 +2704,16 @@ public class PinotLLCRealtimeSegmentManager {
       // We only consider segments that are in COMMITTING state for reingestion
       if (segmentZKMetadata.getStatus() == Status.COMMITTING && segmentsInErrorStateInAllReplicas.contains(
           segmentName)) {
+
+        if (!repairErrorSegments) {
+          segmentsInUnRecoverableState += 1;
+          LOGGER.info(
+              "Segment: {} in table: {} is COMMITTING with all replicas in ERROR state. Skipping re-ingestion since "
+                  + "repairErrorSegments is false.",
+              segmentName, realtimeTableName);
+          continue;
+        }
+
         LOGGER.info("Segment: {} in table: {} is COMMITTING with all replicas in ERROR state. Triggering re-ingestion.",
             segmentName, realtimeTableName);
 
@@ -2728,15 +2733,18 @@ public class PinotLLCRealtimeSegmentManager {
         } catch (Exception e) {
           LOGGER.error("Failed to call reingestSegment for segment: {} on server: {}", segmentName, aliveServer, e);
         }
-      } else if (segmentZKMetadata.getStatus() != Status.IN_PROGRESS) {
+      } else {
         // Trigger reset for segment not in IN_PROGRESS state to download the segment from deep store or peer server
         _helixResourceManager.resetSegment(realtimeTableName, segmentName, null);
       }
     }
+
+    _controllerMetrics.setOrUpdateTableGauge(realtimeTableName,
+        ControllerGauge.PAUSELESS_SEGMENTS_IN_UNRECOVERABLE_ERROR_COUNT, segmentsInUnRecoverableState);
   }
 
   /**
-   * Whether to allow repairing the ERROR segment or not
+   * Whether to allow repairing the ERROR segments which are ONLINE in IS
    * @param repairErrorSegmentsForPartialUpsertOrDedup API context flag, if true then always allow repair
    * @param tableConfig tableConfig
    * @return Returns true if repair is allowed for ERROR segments or not
