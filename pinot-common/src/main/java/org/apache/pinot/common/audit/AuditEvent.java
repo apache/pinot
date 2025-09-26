@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.common.audit;
 
+import com.fasterxml.jackson.annotation.JsonAutoDetect;
 import com.fasterxml.jackson.annotation.JsonInclude;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import java.util.Map;
@@ -28,6 +29,7 @@ import java.util.Map;
  * Contains all required fields as specified in the Phase 1 audit logging specification.
  */
 @JsonInclude(JsonInclude.Include.NON_NULL)
+@JsonAutoDetect(getterVisibility = JsonAutoDetect.Visibility.NONE, isGetterVisibility = JsonAutoDetect.Visibility.NONE)
 public class AuditEvent {
 
   @JsonProperty("timestamp")
@@ -45,11 +47,20 @@ public class AuditEvent {
   @JsonProperty("origin_ip_address")
   private String _originIpAddress;
 
-  @JsonProperty("userid")
+  @JsonProperty("user_id")
   private UserIdentity _userid;
 
   @JsonProperty("request")
   private AuditRequestPayload _request;
+
+  @JsonProperty("request_id")
+  private String _requestId;
+
+  @JsonProperty("response_code")
+  private Integer _responseCode;
+
+  @JsonProperty("duration_ms")
+  private Long _durationMs;
 
   public String getTimestamp() {
     return _timestamp;
@@ -114,6 +125,33 @@ public class AuditEvent {
     return this;
   }
 
+  public String getRequestId() {
+    return _requestId;
+  }
+
+  public AuditEvent setRequestId(String requestId) {
+    _requestId = requestId;
+    return this;
+  }
+
+  public Integer getResponseCode() {
+    return _responseCode;
+  }
+
+  public AuditEvent setResponseCode(Integer responseCode) {
+    _responseCode = responseCode;
+    return this;
+  }
+
+  public Long getDurationMs() {
+    return _durationMs;
+  }
+
+  public AuditEvent setDurationMs(Long durationMs) {
+    _durationMs = durationMs;
+    return this;
+  }
+
   /**
    * Strongly-typed data class representing the request payload portion of an audit event.
    * Contains captured request data such as query parameters, headers, and body content.
@@ -121,7 +159,7 @@ public class AuditEvent {
   @JsonInclude(JsonInclude.Include.NON_NULL)
   public static class AuditRequestPayload {
 
-    @JsonProperty("queryParameters")
+    @JsonProperty("query_params")
     private Map<String, Object> _queryParameters;
 
     @JsonProperty("headers")

@@ -35,6 +35,7 @@ import java.util.TreeMap;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.function.BiConsumer;
 import javax.inject.Inject;
+import javax.inject.Named;
 import javax.ws.rs.GET;
 import javax.ws.rs.Path;
 import javax.ws.rs.PathParam;
@@ -46,10 +47,12 @@ import javax.ws.rs.core.HttpHeaders;
 import javax.ws.rs.core.MediaType;
 import javax.ws.rs.core.Response;
 import org.apache.pinot.broker.broker.AccessControlFactory;
+import org.apache.pinot.broker.broker.BrokerAdminApiApplication;
 import org.apache.pinot.broker.queryquota.QueryQuotaManager;
 import org.apache.pinot.broker.routing.BrokerRoutingManager;
 import org.apache.pinot.common.request.BrokerRequest;
 import org.apache.pinot.common.utils.DatabaseUtils;
+import org.apache.pinot.common.utils.WorkloadBudgetUtils;
 import org.apache.pinot.core.auth.Actions;
 import org.apache.pinot.core.auth.Authorize;
 import org.apache.pinot.core.auth.ManualAuthorization;
@@ -85,6 +88,7 @@ import static org.apache.pinot.spi.utils.CommonConstants.SWAGGER_AUTHORIZATION_K
 // TODO: Add APIs to return the RoutingTable (with unavailable segments)
 public class PinotBrokerDebug {
 
+  private static final org.slf4j.Logger LOGGER = org.slf4j.LoggerFactory.getLogger(PinotBrokerDebug.class);
   // Request ID is passed to the RoutingManager to rotate the selected replica-group.
   private final static AtomicLong REQUEST_ID_GENERATOR = new AtomicLong();
 
@@ -99,6 +103,10 @@ public class PinotBrokerDebug {
 
   @Inject
   AccessControlFactory _accessControlFactory;
+
+  @Inject
+  @Named(BrokerAdminApiApplication.BROKER_INSTANCE_ID)
+  private String _instanceId;
 
   @GET
   @Produces(MediaType.APPLICATION_JSON)
@@ -338,5 +346,32 @@ public class PinotBrokerDebug {
   public String getApplicationQueryQuota(
       @ApiParam(value = "Name of the application") @PathParam("applicationName") String applicationName) {
     return String.valueOf(_queryQuotaManager.getApplicationQueryQuota(applicationName));
+  }
+
+  @GET
+  @Path("debug/queryWorkloadCost/{workloadName}")
+  @ApiOperation(value = "Get instance cost information for a specific workload")
+  @ApiResponses(value = {
+      @ApiResponse(code = 200, message = "Success"),
+      @ApiResponse(code = 404, message = "Workload not found"),
+      @ApiResponse(code = 500, message = "Internal server error")
+  })
+  @Produces(MediaType.APPLICATION_JSON)
+  public String getWorkloadBudgetStats(
+      @ApiParam(value = "Name of the workload", required = true) @PathParam("workloadName") String workloadName
+  ) {
+    return WorkloadBudgetUtils.getWorkloadBudgetStats(workloadName, _instanceId);
+  }
+
+  @GET
+  @Path("debug/queryWorkloadCosts")
+  @ApiOperation(value = "Get instance cost information for all workloads")
+  @ApiResponses(value = {
+      @ApiResponse(code = 200, message = "Success"),
+      @ApiResponse(code = 500, message = "Internal server error")
+  })
+  @Produces(MediaType.APPLICATION_JSON)
+  public String getAllWorkloadBudgetStats() {
+    return WorkloadBudgetUtils.getAllWorkloadBudgetStats(_instanceId);
   }
 }

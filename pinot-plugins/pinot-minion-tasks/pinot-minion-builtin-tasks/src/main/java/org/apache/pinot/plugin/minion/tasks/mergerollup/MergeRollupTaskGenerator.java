@@ -789,9 +789,9 @@ public class MergeRollupTaskGenerator extends BaseTaskGenerator {
     return pinotTaskConfigs;
   }
 
-  private long getMergeRollupTaskDelayInNumTimeBuckets(long watermarkMs, long maxEndTimeMsOfCurrentLevel,
+  private long getMergeRollupTaskDelayInNumTimeBuckets(long watermarkMs, @Nullable Long maxEndTimeMsOfCurrentLevel,
       long bufferTimeMs, long bucketTimeMs) {
-    if (watermarkMs == -1 || maxEndTimeMsOfCurrentLevel == Long.MIN_VALUE) {
+    if (watermarkMs == -1 || maxEndTimeMsOfCurrentLevel == null || maxEndTimeMsOfCurrentLevel == Long.MIN_VALUE) {
       return 0;
     }
     return (Math.min(System.currentTimeMillis() - bufferTimeMs, maxEndTimeMsOfCurrentLevel) - watermarkMs)

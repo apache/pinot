@@ -68,9 +68,8 @@ public class WorkloadAggregator implements ResourceAggregator {
     _workloadBudgetManager = Tracing.ThreadAccountantOps.getWorkloadBudgetManager();
     _sleepTimeMs = _config.getProperty(CommonConstants.Accounting.CONFIG_OF_WORKLOAD_SLEEP_TIME_MS,
         CommonConstants.Accounting.DEFAULT_WORKLOAD_SLEEP_TIME_MS);
-//    _enableEnforcement = _config.getProperty(CommonConstants.Accounting.CONFIG_OF_WORKLOAD_ENABLE_COST_ENFORCEMENT,
-//        CommonConstants.Accounting.DEFAULT_WORKLOAD_ENABLE_COST_ENFORCEMENT);
-    _enableEnforcement = true;
+    _enableEnforcement = _config.getProperty(CommonConstants.Accounting.CONFIG_OF_WORKLOAD_ENABLE_COST_ENFORCEMENT,
+        CommonConstants.Accounting.DEFAULT_WORKLOAD_ENABLE_COST_ENFORCEMENT);
 
     LOGGER.info("WorkloadAggregator initialized with isThreadCPUSamplingEnabled: {}, isThreadMemorySamplingEnabled: {}",
         _isThreadCPUSamplingEnabled, _isThreadMemorySamplingEnabled);
@@ -168,8 +167,8 @@ public class WorkloadAggregator implements ResourceAggregator {
         for (CPUMemThreadLevelAccountingObjects.ThreadEntry threadEntry : threadEntries) {
           String queryId = threadEntry.getQueryId();
           CPUMemThreadLevelAccountingObjects.TaskEntry taskEntry = threadEntry.getCurrentThreadTaskStatus();
-          Thread anchorThread = taskEntry.getAnchorThread();
-          if (!anchorThread.isInterrupted()) {
+          Thread anchorThread = taskEntry != null ? taskEntry.getAnchorThread() : null;
+          if (anchorThread != null && !anchorThread.isInterrupted()) {
             LOGGER.info("Killing query: {} and anchorThread:{}, Remaining budget CPU: {}, Memory: {}", queryId,
                 anchorThread.getName(), budgetStats._cpuRemaining, budgetStats._memoryRemaining);
             String expMsg = String.format("Query %s on instance %s (type: %s) killed. Workload Cost exceeded.", queryId,

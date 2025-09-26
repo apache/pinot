@@ -59,6 +59,7 @@ import org.apache.helix.task.TaskDriver;
 import org.apache.helix.zookeeper.constant.ZkSystemPropertyKeys;
 import org.apache.helix.zookeeper.datamodel.ZNRecord;
 import org.apache.pinot.common.Utils;
+import org.apache.pinot.common.audit.AuditServiceBinder;
 import org.apache.pinot.common.config.DefaultClusterConfigChangeHandler;
 import org.apache.pinot.common.config.TlsConfig;
 import org.apache.pinot.common.function.FunctionRegistry;
@@ -87,7 +88,6 @@ import org.apache.pinot.common.utils.tls.TlsUtils;
 import org.apache.pinot.common.version.PinotVersion;
 import org.apache.pinot.controller.api.ControllerAdminApiApplication;
 import org.apache.pinot.controller.api.access.AccessControlFactory;
-import org.apache.pinot.controller.api.audit.AuditServiceBinder;
 import org.apache.pinot.controller.api.events.MetadataEventNotifierFactory;
 import org.apache.pinot.controller.api.resources.ControllerFilePathProvider;
 import org.apache.pinot.controller.api.resources.InvalidControllerConfigException;
@@ -119,7 +119,8 @@ import org.apache.pinot.controller.util.BrokerServiceHelper;
 import org.apache.pinot.controller.util.TableSizeReader;
 import org.apache.pinot.controller.validation.BrokerResourceValidationManager;
 import org.apache.pinot.controller.validation.DiskUtilizationChecker;
-import org.apache.pinot.controller.validation.OfflineSegmentIntervalChecker;
+import org.apache.pinot.controller.validation.OfflineSegmentValidationManager;
+import org.apache.pinot.controller.validation.RealtimeOffsetAutoResetManager;
 import org.apache.pinot.controller.validation.RealtimeSegmentValidationManager;
 import org.apache.pinot.controller.validation.ResourceUtilizationChecker;
 import org.apache.pinot.controller.validation.ResourceUtilizationManager;
@@ -190,7 +191,8 @@ public abstract class BaseControllerStarter implements ServiceStartable {
   protected ValidationMetrics _validationMetrics;
   protected SqlQueryExecutor _sqlQueryExecutor;
   // Can only be constructed after resource manager getting started
-  protected OfflineSegmentIntervalChecker _offlineSegmentIntervalChecker;
+  protected OfflineSegmentValidationManager _offlineSegmentValidationManager;
+  protected RealtimeOffsetAutoResetManager _realtimeOffsetAutoResetManager;
   protected RealtimeSegmentValidationManager _realtimeSegmentValidationManager;
   protected BrokerResourceValidationManager _brokerResourceValidationManager;
   protected SegmentRelocator _segmentRelocator;
@@ -380,8 +382,12 @@ public abstract class BaseControllerStarter implements ServiceStartable {
     return _leadControllerManager;
   }
 
-  public OfflineSegmentIntervalChecker getOfflineSegmentIntervalChecker() {
-    return _offlineSegmentIntervalChecker;
+  public OfflineSegmentValidationManager getOfflineSegmentValidationManager() {
+    return _offlineSegmentValidationManager;
+  }
+
+  public RealtimeOffsetAutoResetManager getRealtimeOffsetAutoResetManager() {
+    return _realtimeOffsetAutoResetManager;
   }
 
   public RealtimeSegmentValidationManager getRealtimeSegmentValidationManager() {
@@ -652,7 +658,7 @@ public abstract class BaseControllerStarter implements ServiceStartable {
     });
 
     // Register audit services binder
-    _adminApp.registerBinder(new AuditServiceBinder(_clusterConfigChangeHandler));
+    _adminApp.registerBinder(new AuditServiceBinder(_clusterConfigChangeHandler, getServiceRole(), _controllerMetrics));
 
     LOGGER.info("Starting controller admin application on: {}", ListenerConfigUtil.toString(_listenerConfigs));
     _adminApp.start(_listenerConfigs, _controllerMetrics);
@@ -884,15 +890,16 @@ public abstract class BaseControllerStarter implements ServiceStartable {
     _taskManager = createTaskManager();
     _taskManager.init();
     periodicTasks.add(_taskManager);
+    initRealtimeOffsetAutoResetManager(periodicTasks);
     BrokerServiceHelper brokerServiceHelper =
         new BrokerServiceHelper(_helixResourceManager, _config, _executorService, _connectionManager);
     _retentionManager = new RetentionManager(_helixResourceManager, _leadControllerManager, _config, _controllerMetrics,
         brokerServiceHelper);
     periodicTasks.add(_retentionManager);
-    _offlineSegmentIntervalChecker =
-        new OfflineSegmentIntervalChecker(_config, _helixResourceManager, _leadControllerManager,
-            new ValidationMetrics(_metricsRegistry), _controllerMetrics);
-    periodicTasks.add(_offlineSegmentIntervalChecker);
+    _offlineSegmentValidationManager =
+        new OfflineSegmentValidationManager(_config, _helixResourceManager, _leadControllerManager,
+            new ValidationMetrics(_metricsRegistry), _controllerMetrics, _resourceUtilizationManager);
+    periodicTasks.add(_offlineSegmentValidationManager);
     _realtimeSegmentValidationManager =
         new RealtimeSegmentValidationManager(_config, _helixResourceManager, _leadControllerManager,
             _pinotLLCRealtimeSegmentManager, _validationMetrics, _controllerMetrics, _storageQuotaChecker,
@@ -935,6 +942,17 @@ public abstract class BaseControllerStarter implements ServiceStartable {
     periodicTasks.add(tenantRebalanceChecker);
 
     return periodicTasks;
+  }
+
+  private void initRealtimeOffsetAutoResetManager(List<PeriodicTask> periodicTasks) {
+    if (!_config.isRealtimeOffsetAutoResetBackfillEnabled()) {
+      LOGGER.info("Realtime offset auto reset is disabled, skipping initialization");
+      return;
+    }
+    _realtimeOffsetAutoResetManager =
+        new RealtimeOffsetAutoResetManager(_config, _helixResourceManager, _leadControllerManager,
+            _pinotLLCRealtimeSegmentManager, _controllerMetrics);
+    periodicTasks.add(_realtimeOffsetAutoResetManager);
   }
 
   /**

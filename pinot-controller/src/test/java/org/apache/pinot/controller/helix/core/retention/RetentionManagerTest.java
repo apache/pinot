@@ -20,6 +20,7 @@ package org.apache.pinot.controller.helix.core.retention;
 
 import java.io.File;
 import java.io.IOException;
+import java.net.URI;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.attribute.FileTime;
@@ -27,8 +28,10 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.concurrent.TimeUnit;
 import org.apache.commons.io.FileUtils;
 import org.apache.helix.AccessOption;
@@ -56,6 +59,9 @@ import org.apache.pinot.spi.config.table.ingestion.IngestionConfig;
 import org.apache.pinot.spi.data.DateTimeFieldSpec;
 import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.Schema;
+import org.apache.pinot.spi.filesystem.FileMetadata;
+import org.apache.pinot.spi.filesystem.LocalPinotFS;
+import org.apache.pinot.spi.filesystem.PinotFSFactory;
 import org.apache.pinot.spi.metrics.PinotMetricUtils;
 import org.apache.pinot.spi.stream.LongMsgOffset;
 import org.apache.pinot.spi.utils.CommonConstants;
@@ -79,6 +85,7 @@ public class RetentionManagerTest {
   private static final String TEST_TABLE_NAME = "testTable";
   private static final String OFFLINE_TABLE_NAME = TableNameBuilder.OFFLINE.tableNameWithType(TEST_TABLE_NAME);
   private static final String REALTIME_TABLE_NAME = TableNameBuilder.REALTIME.tableNameWithType(TEST_TABLE_NAME);
+  private static final int LARGE_SEGMENT_COUNT = 400_000;
 
   // Variables for real file test
   private Path _tempDir;
@@ -203,7 +210,8 @@ public class RetentionManagerTest {
     SegmentDeletionManager deletionManager = pinotHelixResourceManager.getSegmentDeletionManager();
 
     // Verify that the removeAgedDeletedSegments() method in deletion manager is called
-    verify(deletionManager, times(1)).removeAgedDeletedSegments(leadControllerManager);
+    verify(deletionManager, times(1)).removeAgedDeletedSegments(leadControllerManager,
+        ControllerConf.ControllerPeriodicTasksConf.DEFAULT_AGED_SEGMENTS_DELETION_BATCH_SIZE);
 
     // Verify deleteSegments is called
     verify(pinotHelixResourceManager, times(1)).deleteSegments(eq(OFFLINE_TABLE_NAME), anyList());
@@ -382,7 +390,7 @@ public class RetentionManagerTest {
     when(leadControllerManager.isLeaderForTable(anyString())).thenReturn(true);
     PinotHelixResourceManager pinotHelixResourceManager = mock(PinotHelixResourceManager.class);
 
-      setupPinotHelixResourceManager(tableConfig, removedSegments, pinotHelixResourceManager, leadControllerManager);
+    setupPinotHelixResourceManager(tableConfig, removedSegments, pinotHelixResourceManager, leadControllerManager);
 
     when(pinotHelixResourceManager.getTableConfig(OFFLINE_TABLE_NAME)).thenReturn(tableConfig);
     when(pinotHelixResourceManager.getSegmentsZKMetadata(OFFLINE_TABLE_NAME)).thenReturn(segmentsZKMetadata);
@@ -403,7 +411,8 @@ public class RetentionManagerTest {
     SegmentDeletionManager deletionManager = pinotHelixResourceManager.getSegmentDeletionManager();
 
     // Verify that the removeAgedDeletedSegments() method in deletion manager is called
-    verify(deletionManager, times(1)).removeAgedDeletedSegments(leadControllerManager);
+    verify(deletionManager, times(1)).removeAgedDeletedSegments(leadControllerManager,
+        ControllerConf.ControllerPeriodicTasksConf.DEFAULT_AGED_SEGMENTS_DELETION_BATCH_SIZE);
 
     // Verify deleteSegments is called
     verify(pinotHelixResourceManager, times(1)).deleteSegments(eq(OFFLINE_TABLE_NAME), anyList());
@@ -516,7 +525,9 @@ public class RetentionManagerTest {
     SegmentDeletionManager deletionManager = mock(SegmentDeletionManager.class);
     // Ignore the call to SegmentDeletionManager.removeAgedDeletedSegments. we only test that the call is made once per
     // run of the retention manager
-    doAnswer(invocationOnMock -> null).when(deletionManager).removeAgedDeletedSegments(leadControllerManager);
+    doAnswer(invocationOnMock -> null).when(deletionManager)
+        .removeAgedDeletedSegments(leadControllerManager,
+            ControllerConf.ControllerPeriodicTasksConf.DEFAULT_AGED_SEGMENTS_DELETION_BATCH_SIZE);
     when(resourceManager.getSegmentDeletionManager()).thenReturn(deletionManager);
 
     // If and when PinotHelixResourceManager.deleteSegments() is invoked, make sure that the segments deleted
@@ -545,7 +556,9 @@ public class RetentionManagerTest {
     when(resourceManager.getPropertyStore()).thenReturn(propertyStore);
 
     SegmentDeletionManager deletionManager = mock(SegmentDeletionManager.class);
-    doAnswer(invocationOnMock -> null).when(deletionManager).removeAgedDeletedSegments(leadControllerManager);
+    doAnswer(invocationOnMock -> null).when(deletionManager)
+        .removeAgedDeletedSegments(leadControllerManager,
+            ControllerConf.ControllerPeriodicTasksConf.DEFAULT_AGED_SEGMENTS_DELETION_BATCH_SIZE);
     when(resourceManager.getSegmentDeletionManager()).thenReturn(deletionManager);
 
     // Set up verification for deleteSegments with focus on the count and segment inclusion rules
@@ -608,7 +621,8 @@ public class RetentionManagerTest {
     SegmentDeletionManager deletionManager = pinotHelixResourceManager.getSegmentDeletionManager();
 
     // Verify that the removeAgedDeletedSegments() method in deletion manager is actually called.
-    verify(deletionManager, times(1)).removeAgedDeletedSegments(leadControllerManager);
+    verify(deletionManager, times(1)).removeAgedDeletedSegments(leadControllerManager,
+        ControllerConf.ControllerPeriodicTasksConf.DEFAULT_AGED_SEGMENTS_DELETION_BATCH_SIZE);
 
     // Verify that the deleteSegments method is actually called.
     verify(pinotHelixResourceManager, times(1)).deleteSegments(anyString(), anyList());
@@ -645,10 +659,53 @@ public class RetentionManagerTest {
     SegmentDeletionManager deletionManager = pinotHelixResourceManager.getSegmentDeletionManager();
 
     // Verify that the removeAgedDeletedSegments() method in deletion manager is actually called.
-    verify(deletionManager, times(1)).removeAgedDeletedSegments(leadControllerManager);
+    verify(deletionManager, times(1)).removeAgedDeletedSegments(leadControllerManager,
+        ControllerConf.ControllerPeriodicTasksConf.DEFAULT_AGED_SEGMENTS_DELETION_BATCH_SIZE);
 
     // Verify that the deleteSegments method is actually called.
     verify(pinotHelixResourceManager, times(1)).deleteSegments(anyString(), anyList());
+  }
+
+  @Test
+  public void testPerformanceWithLargeNumberOfSegments()
+      throws Exception {
+    // Test that the optimized Set-based lookup can handle 400,000 segments within 30 seconds
+    final long maxTestExecutionTimeMs = 30_000; // 30 seconds
+
+    long startTime = System.currentTimeMillis();
+
+    PinotFSFactory.register("fake", RetentionManagerTest.FakePinotFs.class.getName(), null);
+
+    Set<String> segmentsToExclude = new HashSet<>();
+
+    for (int i = 0; i < LARGE_SEGMENT_COUNT; i++) {
+      String segmentName = "segment" + i;
+      segmentsToExclude.add(segmentName);
+    }
+
+    LeadControllerManager leadControllerManager = mock(LeadControllerManager.class);
+    when(leadControllerManager.isLeaderForTable(anyString())).thenReturn(true);
+
+    PinotHelixResourceManager pinotHelixResourceManager = mock(PinotHelixResourceManager.class);
+    when(pinotHelixResourceManager.getDataDir()).thenReturn("fake://bucket/sc/managed/pinot/");
+
+    ControllerConf conf = new ControllerConf();
+    ControllerMetrics controllerMetrics = new ControllerMetrics(PinotMetricUtils.getPinotMetricsRegistry());
+    conf.setRetentionControllerFrequencyInSeconds(0);
+    conf.setDeletedSegmentsRetentionInDays(0);
+    conf.setUntrackedSegmentDeletionEnabled(true);
+    PinotHelixResourceManager mockResourceManager = mock(PinotHelixResourceManager.class);
+    BrokerServiceHelper brokerServiceHelper =
+        new BrokerServiceHelper(mockResourceManager, conf, null, null);
+    RetentionManager retentionManager =
+        new RetentionManager(pinotHelixResourceManager, leadControllerManager, conf, controllerMetrics,
+            brokerServiceHelper);
+
+    retentionManager.findUntrackedSegmentsToDeleteFromDeepstore("table1_REALTIME", null, segmentsToExclude, null);
+
+    long executionTime = System.currentTimeMillis() - startTime;
+    assertTrue(executionTime < maxTestExecutionTimeMs,
+        "Test should complete within 30 seconds but took " + executionTime + "ms");
   }
 
   private PinotHelixResourceManager setupSegmentMetadata(TableConfig tableConfig, final long now, final int nSegments,
@@ -799,6 +856,31 @@ public class RetentionManagerTest {
       Files.setLastModifiedTime(file.toPath(), fileTime);
     } catch (IOException e) {
       throw new RuntimeException(e);
+    }
+  }
+
+  public static class FakePinotFs extends LocalPinotFS {
+
+    @Override
+    public List<FileMetadata> listFilesWithMetadata(URI fileUri, boolean recursive)
+        throws IOException {
+
+      URI tableUri1 = null;
+      List<FileMetadata> fileMetadataList = new ArrayList<>();
+      try {
+        tableUri1 = new URI("fake://bucket/sc/managed/pinot/table1/");
+
+        for (int i = 0; i < LARGE_SEGMENT_COUNT; i++) {
+          String segmentName = "segment" + i;
+          URI segmentURIForTable =
+              new URI(tableUri1.getPath() + segmentName);
+          fileMetadataList.add(
+              new FileMetadata.Builder().setFilePath(segmentURIForTable.getPath()).setIsDirectory(false).build());
+        }
+        return fileMetadataList;
+      } catch (Exception e) {
+        throw new RuntimeException(e);
+      }
     }
   }
 }

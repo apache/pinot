@@ -35,6 +35,7 @@ import org.apache.helix.HelixManager;
 import org.apache.pinot.broker.queryquota.QueryQuotaManager;
 import org.apache.pinot.broker.requesthandler.BrokerRequestHandler;
 import org.apache.pinot.broker.routing.BrokerRoutingManager;
+import org.apache.pinot.common.audit.AuditLogFilter;
 import org.apache.pinot.common.cursors.AbstractResponseStore;
 import org.apache.pinot.common.http.PoolingHttpClientConnectionManagerHelper;
 import org.apache.pinot.common.metrics.BrokerMetrics;
@@ -131,6 +132,7 @@ public class BrokerAdminApiApplication extends ResourceConfig {
     register(SwaggerApiListingResource.class);
     register(SwaggerSerializers.class);
     register(AuthenticationFilter.class);
+    register(AuditLogFilter.class);
   }
 
   public void start(List<ListenerConfig> listenerConfigs) {

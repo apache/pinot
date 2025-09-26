@@ -24,7 +24,7 @@
   <parent>
     <artifactId>pinot</artifactId>
     <groupId>org.apache.pinot</groupId>
-    <version>1.4.0-SNAPSHOT</version>
+    <version>1.5.0-SNAPSHOT</version>
   </parent>
   <artifactId>pinot-perf</artifactId>
   <name>Pinot Perf</name>
@@ -197,6 +197,10 @@
             <program>
               <mainClass>org.apache.pinot.perf.StringDictionaryPerfTest</mainClass>
               <name>pinot-StringDictionaryPerfTest</name>
+            </program>
+            <program>
+              <mainClass>org.apache.pinot.perf.aggregation.SumIntAggregationFunctionBenchmark</mainClass>
+              <name>pinot-SumIntAggregationFunctionBenchmark</name>
             </program>
           </programs>
           <repositoryLayout>flat</repositoryLayout>

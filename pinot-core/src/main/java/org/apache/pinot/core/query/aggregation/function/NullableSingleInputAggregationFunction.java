@@ -21,6 +21,7 @@ package org.apache.pinot.core.query.aggregation.function;
 import java.util.NoSuchElementException;
 import javax.annotation.Nullable;
 import org.apache.pinot.common.request.context.ExpressionContext;
+import org.apache.pinot.common.utils.RoaringBitmapUtils;
 import org.apache.pinot.core.common.BlockValSet;
 import org.roaringbitmap.IntIterator;
 import org.roaringbitmap.RoaringBitmap;
@@ -33,19 +34,6 @@ public abstract class NullableSingleInputAggregationFunction<I, F extends Compar
   public NullableSingleInputAggregationFunction(ExpressionContext expression, boolean nullHandlingEnabled) {
     super(expression);
     _nullHandlingEnabled = nullHandlingEnabled;
-  }
-
-  /**
-   * A consumer that is being used to consume batch of indexes.
-   */
-  @FunctionalInterface
-  public interface BatchConsumer {
-    /**
-     * Consumes a batch of indexes.
-     * @param fromInclusive the start index (inclusive)
-     * @param toExclusive the end index (exclusive)
-     */
-    void consume(int fromInclusive, int toExclusive);
   }
 
   /**
@@ -69,7 +57,7 @@ public abstract class NullableSingleInputAggregationFunction<I, F extends Compar
    * @param blockValSet the blockValSet to iterate over
    * @param consumer the consumer to call for each non-null range
    */
-  public void forEachNotNull(int length, BlockValSet blockValSet, BatchConsumer consumer) {
+  public void forEachNotNull(int length, BlockValSet blockValSet, RoaringBitmapUtils.BatchConsumer consumer) {
     if (!_nullHandlingEnabled) {
       consumer.consume(0, length);
       return;
@@ -83,26 +71,7 @@ public abstract class NullableSingleInputAggregationFunction<I, F extends Compar
 
     // Skip if entire block is null
     if (!roaringBitmap.contains(0, length)) {
-      forEachNotNull(length, roaringBitmap.getIntIterator(), consumer);
-    }
-  }
-
-  /**
-   * Iterates over the non-null ranges of the nullIndexIterator and calls the consumer for each range.
-   * @param nullIndexIterator an int iterator that returns values in ascending order whose min value is 0.
-   *                          Rows are considered null if and only if their index is emitted.
-   */
-  public void forEachNotNull(int length, IntIterator nullIndexIterator, BatchConsumer consumer) {
-    int prev = 0;
-    while (nullIndexIterator.hasNext() && prev < length) {
-      int nextNull = Math.min(nullIndexIterator.next(), length);
-      if (nextNull > prev) {
-        consumer.consume(prev, nextNull);
-      }
-      prev = nextNull + 1;
-    }
-    if (prev < length) {
-      consumer.consume(prev, length);
+      RoaringBitmapUtils.forEachUnset(length, roaringBitmap.getIntIterator(), consumer);
     }
   }
 

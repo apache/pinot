@@ -245,7 +245,8 @@ public class ServerQueryExecutorV1Impl implements QueryExecutor {
             "Query cancelled on: " + _instanceDataManager.getInstanceId() + " " + e);
       } else if (e instanceof QueryException) {
         LOGGER.info("Caught QueryException while processing requestId: {}, {}", requestId, e.getMessage());
-        instanceResponse.addException(QueryErrorCode.QUERY_VALIDATION, e.getMessage());
+        // QueryException contains error code and message suitable to be returned to the end user, so use it directly
+        instanceResponse.addException(((QueryException) e).getErrorCode(), e.getMessage());
       } else {
         LOGGER.error("Exception processing requestId {}", requestId, e);
         instanceResponse.addException(QueryErrorCode.QUERY_EXECUTION,

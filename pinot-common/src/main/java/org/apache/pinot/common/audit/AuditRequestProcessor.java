@@ -19,6 +19,11 @@
 package org.apache.pinot.common.audit;
 
 import com.google.common.annotations.VisibleForTesting;
+import com.google.common.io.ByteStreams;
+import java.io.BufferedInputStream;
+import java.io.IOException;
+import java.io.InputStream;
+import java.nio.charset.StandardCharsets;
 import java.time.Instant;
 import java.util.Collections;
 import java.util.HashMap;
@@ -46,14 +51,20 @@ import org.slf4j.LoggerFactory;
 public class AuditRequestProcessor {
 
   private static final Logger LOG = LoggerFactory.getLogger(AuditRequestProcessor.class);
+  static final String TRUNCATION_MARKER = "...[truncated]";
 
   private final AuditConfigManager _configManager;
   private final AuditIdentityResolver _identityResolver;
+  private final AuditUrlPathFilter _auditUrlPathFilter;
+  private final AuditMetrics _auditMetrics;
 
   @Inject
-  public AuditRequestProcessor(AuditConfigManager configManager, AuditIdentityResolver identityResolver) {
+  public AuditRequestProcessor(AuditConfigManager configManager, AuditIdentityResolver identityResolver,
+      AuditUrlPathFilter auditUrlPathFilter, AuditMetrics auditMetrics) {
     _configManager = configManager;
     _identityResolver = identityResolver;
+    _auditUrlPathFilter = auditUrlPathFilter;
+    _auditMetrics = auditMetrics;
   }
 
   /**
@@ -100,7 +111,7 @@ public class AuditRequestProcessor {
 
   public AuditEvent processRequest(ContainerRequestContext requestContext, String remoteAddr) {
     // Check if auditing is enabled (if config manager is available)
-    if (!isEnabled()) {
+    if (!_configManager.isEnabled()) {
       return null;
     }
 
@@ -108,8 +119,8 @@ public class AuditRequestProcessor {
       UriInfo uriInfo = requestContext.getUriInfo();
       String endpoint = uriInfo.getPath();
 
-      // Check endpoint exclusions
-      if (_configManager.isEndpointExcluded(endpoint)) {
+      // Check if endpoint should be audited based on include/exclude patterns
+      if (!_auditUrlPathFilter.shouldAudit(endpoint)) {
         return null;
       }
 
@@ -126,10 +137,6 @@ public class AuditRequestProcessor {
       LOG.warn("Failed to process audit logging for request", e);
     }
     return null;
-  }
-
-  public boolean isEnabled() {
-    return _configManager.isEnabled();
   }
 
   private String extractClientIpAddress(ContainerRequestContext requestContext, String remoteAddr) {
@@ -189,15 +196,7 @@ public class AuditRequestProcessor {
     }
   }
 
-  /**
-   * Reads the request body from the entity input stream.
-   * Restores the input stream for downstream processing.
-   * Limits the amount of data read based on configuration.
-   *
-   * @param requestContext the request context
-   * @param maxPayloadSize maximum bytes to read from the request body
-   * @return the request body as string (potentially truncated)
-   */
+
   /**
    * Parses a comma-separated list of headers into a Set of lowercase header names
    * for case-insensitive comparison.
@@ -222,8 +221,53 @@ public class AuditRequestProcessor {
     return headers;
   }
 
-  private String readRequestBody(ContainerRequestContext requestContext, int maxPayloadSize) {
-    // TODO spyne to be implemented
+  /**
+   * Reads the request body from the entity input stream.
+   * Restores the input stream for downstream processing.
+   * Limits the amount of data read based on configuration.
+   *
+   * @param requestContext the request context
+   * @param maxPayloadSize maximum bytes to read from the request body
+   * @return the request body as string (potentially truncated)
+   */
+  @VisibleForTesting
+  String readRequestBody(ContainerRequestContext requestContext, int maxPayloadSize) {
+    if (!requestContext.hasEntity()) {
+      return null;
+    }
+
+    final InputStream originalStream = requestContext.getEntityStream();
+    if (originalStream == null) {
+      return null;
+    }
+
+    try {
+      final int bufferSize = Math.min(maxPayloadSize + 1024, AuditConfig.MAX_AUDIT_PAYLOAD_SIZE_BYTES);
+      final BufferedInputStream bufferedStream = new BufferedInputStream(originalStream, bufferSize);
+      requestContext.setEntityStream(bufferedStream);
+      bufferedStream.mark(maxPayloadSize + 1);
+
+      final InputStream limitedStream = ByteStreams.limit(bufferedStream, maxPayloadSize);
+      final byte[] capturedBytes = ByteStreams.toByteArray(limitedStream);
+
+      try {
+        bufferedStream.reset();
+      } catch (IOException resetException) {
+        // error because it can affect downstream consumers from processing the request. This API call will fail.
+        LOG.error("Failed to reset stream for downstream consumers", resetException);
+      }
+
+      if (capturedBytes.length > 0) {
+        String requestBody = new String(capturedBytes, StandardCharsets.UTF_8);
+        if (capturedBytes.length >= maxPayloadSize) {
+          requestBody += TRUNCATION_MARKER;
+          _auditMetrics.addMeteredGlobalValue(AuditMetrics.AuditMeter.AUDIT_REQUEST_PAYLOAD_TRUNCATED, 1L);
+        }
+        return requestBody;
+      }
+    } catch (IOException e) {
+      LOG.warn("Failed to capture request body", e);
+    }
     return null;
   }
 }
