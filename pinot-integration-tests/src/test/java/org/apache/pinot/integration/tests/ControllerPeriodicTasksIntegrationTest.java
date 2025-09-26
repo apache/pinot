@@ -425,7 +425,7 @@ public class ControllerPeriodicTasksIntegrationTest extends BaseClusterIntegrati
   @Test
   public void testOfflineSegmentIntervalChecker() {
     OfflineSegmentValidationManager offlineSegmentValidationManager =
-        _controllerStarter.getOfflineSegmentIntervalChecker();
+        _controllerStarter.getOfflineSegmentValidationManager();
     ValidationMetrics validationMetrics = offlineSegmentValidationManager.getValidationMetrics();
     String tableNameWithType = TableNameBuilder.OFFLINE.tableNameWithType(getTableName());
 

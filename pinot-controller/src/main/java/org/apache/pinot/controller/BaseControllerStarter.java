@@ -382,7 +382,7 @@ public abstract class BaseControllerStarter implements ServiceStartable {
     return _leadControllerManager;
   }
 
-  public OfflineSegmentValidationManager getOfflineSegmentIntervalChecker() {
+  public OfflineSegmentValidationManager getOfflineSegmentValidationManager() {
     return _offlineSegmentValidationManager;
   }
 

@@ -127,7 +127,7 @@ public class OfflineSegmentValidationManager extends ControllerPeriodicTask<Offl
       _controllerMetrics.setOrUpdateTableGauge(tableNameWithType, ControllerGauge.RESOURCE_UTILIZATION_LIMIT_EXCEEDED,
           0L);
     } else {
-      LOGGER.debug("Resource utilization check result is UNDETERMINED for table: {}, no action taken",
+      LOGGER.info("Resource utilization check result is UNDETERMINED for table: {}, no action taken",
           tableNameWithType);
     }
   }
