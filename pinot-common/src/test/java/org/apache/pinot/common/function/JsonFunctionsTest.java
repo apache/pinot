@@ -37,6 +37,7 @@ import static org.testng.Assert.assertEquals;
 import static org.testng.Assert.assertFalse;
 import static org.testng.Assert.assertNull;
 import static org.testng.Assert.assertTrue;
+import static org.testng.internal.junit.ArrayAsserts.assertArrayEquals;
 
 
 public class JsonFunctionsTest {
@@ -719,7 +720,23 @@ public class JsonFunctionsTest {
     assertEquals(JsonFunctions.jsonExtractScalar(json, "$.bool-key", "BOOLEAN", false), true);
     assertEquals(JsonFunctions.jsonExtractScalar(json, "$.nonexistent", "STRING", "missing"), "missing");
     assertNull(JsonFunctions.jsonExtractScalar(json, "$.nonexistent", "STRING"));
-    assertEquals(JsonFunctions.jsonExtractScalar(json, "$.nonexistent", "INT"), Integer.MIN_VALUE);
+    assertEquals(JsonFunctions.jsonExtractScalar(json, "$.nonexistent", "INT"), 0);
     assertNull(JsonFunctions.jsonExtractScalar(json, "$.nonexistent", "STRING"));
+
+
+    json = String.format(
+            "{\"intVal\":%s, \"longVal\":%s, \"floatVal\":%s, \"doubleVal\":%s, \"bigDecimalVal\":%s, "
+                    + "\"stringVal\":\"%s\", \"arrayField\": [{\"arrIntField\": 1, \"arrStringField\": \"abc\"}, "
+                    + "{\"arrIntField\": 2, \"arrStringField\": \"xyz\"},"
+                    + "{\"arrIntField\": 5, \"arrStringField\": \"wxy\"},"
+                    + "{\"arrIntField\": 0}], "
+                    + "\"intVals\":[0,1], \"longVals\":[0,1], \"floatVals\":[0.0,1.0], \"doubleVals\":[0.0,1.0], "
+                    + "\"bigDecimalVals\":[0.0,1.0], \"stringVals\":[\"0\",\"1\"]}",
+            42, 9999999999L, 3.14f, 6.28d, 123.456, "hello");
+
+    Object result = JsonFunctions.jsonExtractScalar(json, "$.arrayField[*].arrIntField", "INT_ARRAY", -1);
+    int[] arrIntField = (int[]) result;
+
+    assertArrayEquals(new int[]{1, 2, 5, 0}, arrIntField);
   }
 }
