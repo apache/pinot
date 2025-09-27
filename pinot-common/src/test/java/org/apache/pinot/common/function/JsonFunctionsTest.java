@@ -735,8 +735,9 @@ public class JsonFunctionsTest {
             42, 9999999999L, 3.14f, 6.28d, 123.456, "hello");
 
     Object result = JsonFunctions.jsonExtractScalar(json, "$.arrayField[*].arrIntField", "INT_ARRAY", -1);
-    int[] arrIntField = (int[]) result;
+    assertArrayEquals(new int[]{1, 2, 5, 0}, (int[]) result);
 
-    assertArrayEquals(new int[]{1, 2, 5, 0}, arrIntField);
+    result = JsonFunctions.jsonExtractScalar(json, "$.arrayWrongField[*].arrIntField", "INT_ARRAY", -1);
+    assertArrayEquals(new int[0], (int[]) result);
   }
 }
