@@ -454,7 +454,7 @@ public class QueryAggregator implements ResourceAggregator {
   }
 
   protected void logQueryResourceUsage(Map<String, ? extends QueryResourceTracker> aggregatedUsagePerActiveQuery) {
-    LOGGER.warn("Query aggregation results {} for the previous kill.", aggregatedUsagePerActiveQuery);
+    LOGGER.debug("Query aggregation results {} for the previous kill.", aggregatedUsagePerActiveQuery);
   }
 
   protected void logTerminatedQuery(QueryResourceTracker queryResourceTracker, long totalHeapMemoryUsage) {

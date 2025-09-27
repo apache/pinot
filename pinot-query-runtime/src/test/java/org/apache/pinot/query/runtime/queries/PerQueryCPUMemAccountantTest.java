@@ -25,15 +25,17 @@ import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
+import org.apache.pinot.common.response.broker.QueryProcessingException;
 import org.apache.pinot.common.response.broker.ResultTable;
 import org.apache.pinot.core.accounting.PerQueryCPUMemAccountantFactory;
 import org.apache.pinot.query.planner.physical.DispatchableSubPlan;
+import org.apache.pinot.query.service.dispatch.QueryDispatcher;
 import org.apache.pinot.spi.accounting.QueryResourceTracker;
 import org.apache.pinot.spi.accounting.ThreadResourceUsageAccountant;
 import org.apache.pinot.spi.accounting.ThreadResourceUsageProvider;
 import org.apache.pinot.spi.config.instance.InstanceType;
 import org.apache.pinot.spi.env.PinotConfiguration;
-import org.apache.pinot.spi.exception.EarlyTerminationException;
+import org.apache.pinot.spi.exception.QueryErrorCode;
 import org.apache.pinot.spi.trace.Tracing;
 import org.apache.pinot.spi.utils.CommonConstants;
 import org.mockito.MockedStatic;
@@ -41,6 +43,8 @@ import org.mockito.Mockito;
 import org.testng.Assert;
 import org.testng.annotations.Test;
 
+import static org.testng.Assert.assertEquals;
+import static org.testng.Assert.assertNotNull;
 import static org.testng.Assert.assertTrue;
 
 
@@ -110,7 +114,7 @@ public class PerQueryCPUMemAccountantTest extends QueryRunnerAccountingTest {
     }
   }
 
-  @Test(expectedExceptions = EarlyTerminationException.class)
+  @Test
   void testInterrupt() {
     HashMap<String, Object> configs = getAccountingConfig();
 
@@ -121,7 +125,10 @@ public class PerQueryCPUMemAccountantTest extends QueryRunnerAccountingTest {
 
     try (MockedStatic<Tracing> tracing = Mockito.mockStatic(Tracing.class, Mockito.CALLS_REAL_METHODS)) {
       tracing.when(Tracing::getThreadAccountant).thenReturn(accountant);
-      queryRunner("SELECT * FROM a LIMIT 2", false).getResultTable();
+      QueryDispatcher.QueryResult queryResult = queryRunner("SELECT * FROM a LIMIT 2", false);
+      QueryProcessingException processingException = queryResult.getProcessingException();
+      assertNotNull(processingException);
+      assertEquals(processingException.getErrorCode(), QueryErrorCode.INTERNAL.getId());
     }
   }
 

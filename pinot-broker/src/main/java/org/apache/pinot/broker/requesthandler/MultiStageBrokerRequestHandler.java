@@ -88,6 +88,7 @@ import org.apache.pinot.spi.accounting.ThreadExecutionContext;
 import org.apache.pinot.spi.accounting.ThreadResourceUsageAccountant;
 import org.apache.pinot.spi.auth.TableAuthorizationResult;
 import org.apache.pinot.spi.auth.broker.RequesterIdentity;
+import org.apache.pinot.spi.config.instance.InstanceType;
 import org.apache.pinot.spi.env.PinotConfiguration;
 import org.apache.pinot.spi.exception.QueryErrorCode;
 import org.apache.pinot.spi.exception.QueryException;
@@ -156,8 +157,8 @@ public class MultiStageBrokerRequestHandler extends BaseBrokerRequestHandler {
         CommonConstants.MultiStageQueryRunner.DEFAULT_OF_CANCEL_TIMEOUT_MS);
     Duration cancelTimeout = Duration.ofMillis(cancelMillis);
     _queryDispatcher =
-        new QueryDispatcher(new MailboxService(hostname, port, config, tlsConfig), failureDetector, tlsConfig,
-            this.isQueryCancellationEnabled(), cancelTimeout);
+        new QueryDispatcher(new MailboxService(hostname, port, InstanceType.BROKER, config, tlsConfig), failureDetector,
+            tlsConfig, isQueryCancellationEnabled(), cancelTimeout);
     LOGGER.info("Initialized MultiStageBrokerRequestHandler on host: {}, port: {} with broker id: {}, timeout: {}ms, "
             + "query log max length: {}, query log max rate: {}, query cancellation enabled: {}", hostname, port,
         _brokerId, _brokerTimeoutMs, _queryLogger.getMaxQueryLengthToLog(), _queryLogger.getLogRateLimit(),
@@ -403,9 +404,12 @@ public class MultiStageBrokerRequestHandler extends BaseBrokerRequestHandler {
     boolean defaultUseBrokerPruning = _config.getProperty(
         CommonConstants.Broker.CONFIG_OF_USE_BROKER_PRUNING,
         CommonConstants.Broker.DEFAULT_USE_BROKER_PRUNING);
-    int defaultLiteModeServerStageLimit = _config.getProperty(
+    int defaultLiteModeLeafStageLimit = _config.getProperty(
         CommonConstants.Broker.CONFIG_OF_LITE_MODE_LEAF_STAGE_LIMIT,
         CommonConstants.Broker.DEFAULT_LITE_MODE_LEAF_STAGE_LIMIT);
+    int defaultLiteModeFanoutAdjustedLimit = _config.getProperty(
+        CommonConstants.Broker.CONFIG_OF_LITE_MODE_LEAF_STAGE_FANOUT_ADJUSTED_LIMIT,
+        CommonConstants.Broker.DEFAULT_LITE_MODE_LEAF_STAGE_FAN_OUT_ADJUSTED_LIMIT);
     String defaultHashFunction = _config.getProperty(
         CommonConstants.Broker.CONFIG_OF_BROKER_DEFAULT_HASH_FUNCTION,
         CommonConstants.Broker.DEFAULT_BROKER_DEFAULT_HASH_FUNCTION);
@@ -419,6 +423,7 @@ public class MultiStageBrokerRequestHandler extends BaseBrokerRequestHandler {
         .tableCache(_tableCache)
         .workerManager(_workerManager)
         .isCaseSensitive(caseSensitive)
+        .isNullHandlingEnabled(QueryOptionsUtils.isNullHandlingEnabled(queryOptions))
         .defaultInferPartitionHint(inferPartitionHint)
         .defaultUseSpools(defaultUseSpool)
         .defaultUseLeafServerForIntermediateStage(defaultUseLeafServerForIntermediateStage)
@@ -428,7 +433,8 @@ public class MultiStageBrokerRequestHandler extends BaseBrokerRequestHandler {
         .defaultUseLiteMode(defaultUseLiteMode)
         .defaultRunInBroker(defaultRunInBroker)
         .defaultUseBrokerPruning(defaultUseBrokerPruning)
-        .defaultLiteModeServerStageLimit(defaultLiteModeServerStageLimit)
+        .defaultLiteModeLeafStageLimit(defaultLiteModeLeafStageLimit)
+        .defaultLiteModeLeafStageFanOutAdjustedLimit(defaultLiteModeFanoutAdjustedLimit)
         .defaultHashFunction(defaultHashFunction)
         .build();
   }

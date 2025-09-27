@@ -75,7 +75,10 @@ import static org.testng.Assert.assertTrue;
 
 
 public abstract class BaseResourceTest {
-  private static final String AVRO_DATA_PATH = "data/test_data-mv.avro";
+  protected String getAvroFileName() {
+    return "data/test_data-mv.avro";
+  }
+
   private static final File TEMP_DIR = new File(FileUtils.getTempDirectory(), "BaseResourceTest");
   protected static final String TABLE_NAME = "testTable";
   protected static final String LLC_SEGMENT_NAME_FOR_UPLOAD_SUCCESS =
@@ -104,7 +107,7 @@ public abstract class BaseResourceTest {
 
     FileUtils.deleteQuietly(TEMP_DIR);
     assertTrue(TEMP_DIR.mkdirs());
-    URL resourceUrl = getClass().getClassLoader().getResource(AVRO_DATA_PATH);
+    URL resourceUrl = getClass().getClassLoader().getResource(getAvroFileName());
     assertNotNull(resourceUrl);
     _avroFile = new File(resourceUrl.getFile());
 

@@ -18,10 +18,19 @@
  */
 package org.apache.pinot.common.audit;
 
+import com.google.common.annotations.VisibleForTesting;
+import com.google.common.io.ByteStreams;
+import java.io.BufferedInputStream;
+import java.io.IOException;
+import java.io.InputStream;
+import java.nio.charset.StandardCharsets;
 import java.time.Instant;
+import java.util.Collections;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import javax.inject.Inject;
 import javax.inject.Singleton;
 import javax.ws.rs.container.ContainerRequestContext;
@@ -42,9 +51,21 @@ import org.slf4j.LoggerFactory;
 public class AuditRequestProcessor {
 
   private static final Logger LOG = LoggerFactory.getLogger(AuditRequestProcessor.class);
+  static final String TRUNCATION_MARKER = "...[truncated]";
+
+  private final AuditConfigManager _configManager;
+  private final AuditIdentityResolver _identityResolver;
+  private final AuditUrlPathFilter _auditUrlPathFilter;
+  private final AuditMetrics _auditMetrics;
 
   @Inject
-  private AuditConfigManager _configManager;
+  public AuditRequestProcessor(AuditConfigManager configManager, AuditIdentityResolver identityResolver,
+      AuditUrlPathFilter auditUrlPathFilter, AuditMetrics auditMetrics) {
+    _configManager = configManager;
+    _identityResolver = identityResolver;
+    _auditUrlPathFilter = auditUrlPathFilter;
+    _auditMetrics = auditMetrics;
+  }
 
   /**
    * Converts a MultivaluedMap into a Map of query parameters.
@@ -52,24 +73,45 @@ public class AuditRequestProcessor {
    * If a key has multiple values, the list of values is added instead.
    *
    * @param multimap the input MultivaluedMap containing keys and their associated values
+   * @param allowedKeys optional set of allowed keys for case-insensitive filtering.
+   *                    If null or empty, all keys are included
+   * @return a Map where each key is mapped to either a single value or a list of values
+   */
+  private static Map<String, Object> toMap(MultivaluedMap<String, String> multimap, Set<String> allowedKeys) {
+    Map<String, Object> resultMap = new HashMap<>();
+    boolean filterKeys = allowedKeys != null && !allowedKeys.isEmpty();
+
+    for (Map.Entry<String, List<String>> entry : multimap.entrySet()) {
+      String key = entry.getKey();
+      // Skip if filtering is enabled and key is not in allowed list (case-insensitive)
+      if (filterKeys && !allowedKeys.contains(key.toLowerCase())) {
+        continue;
+      }
+
+      List<String> values = entry.getValue();
+      if (values.size() == 1) {
+        resultMap.put(key, values.get(0));
+      } else {
+        resultMap.put(key, values);
+      }
+    }
+    return resultMap;
+  }
+
+  /**
+   * Converts a MultivaluedMap into a Map of query parameters without filtering.
+   * Backward compatibility method.
+   *
+   * @param multimap the input MultivaluedMap containing keys and their associated values
    * @return a Map where each key is mapped to either a single value or a list of values
    */
   private static Map<String, Object> toMap(MultivaluedMap<String, String> multimap) {
-    Map<String, Object> queryMap = new HashMap<>();
-    for (Map.Entry<String, List<String>> entry : multimap.entrySet()) {
-      List<String> values = entry.getValue();
-      if (values.size() == 1) {
-        queryMap.put(entry.getKey(), values.get(0));
-      } else {
-        queryMap.put(entry.getKey(), values);
-      }
-    }
-    return queryMap;
+    return toMap(multimap, null);
   }
 
   public AuditEvent processRequest(ContainerRequestContext requestContext, String remoteAddr) {
     // Check if auditing is enabled (if config manager is available)
-    if (!isEnabled()) {
+    if (!_configManager.isEnabled()) {
       return null;
     }
 
@@ -77,8 +119,8 @@ public class AuditRequestProcessor {
       UriInfo uriInfo = requestContext.getUriInfo();
       String endpoint = uriInfo.getPath();
 
-      // Check endpoint exclusions
-      if (_configManager.isEndpointExcluded(endpoint)) {
+      // Check if endpoint should be audited based on include/exclude patterns
+      if (!_auditUrlPathFilter.shouldAudit(endpoint)) {
         return null;
       }
 
@@ -88,7 +130,7 @@ public class AuditRequestProcessor {
           .setServiceId(extractServiceId(requestContext))
           .setMethod(requestContext.getMethod())
           .setOriginIpAddress(extractClientIpAddress(requestContext, remoteAddr))
-          .setUserId(extractUserId(requestContext))
+          .setUserid(_identityResolver.resolveIdentity(requestContext))
           .setRequest(captureRequestPayload(requestContext));
     } catch (Exception e) {
       // Graceful degradation: Never let audit logging failures affect the main request
@@ -97,23 +139,7 @@ public class AuditRequestProcessor {
     return null;
   }
 
-  public boolean isEnabled() {
-    return _configManager.isEnabled();
-  }
-
   private String extractClientIpAddress(ContainerRequestContext requestContext, String remoteAddr) {
-    // TODO spyne to be implemented
-    return null;
-  }
-
-  /**
-   * Extracts user ID from request headers.
-   * Looks for common authentication headers.
-   *
-   * @param requestContext the container request context
-   * @return the user ID or "anonymous" if not found
-   */
-  private String extractUserId(ContainerRequestContext requestContext) {
     // TODO spyne to be implemented
     return null;
   }
@@ -140,10 +166,15 @@ public class AuditRequestProcessor {
       }
 
       final AuditConfig config = _configManager.getCurrentConfig();
-      if (config.isCaptureRequestHeaders()) {
-        MultivaluedMap<String, String> headers = requestContext.getHeaders();
-        if (!headers.isEmpty()) {
-          payload.setHeaders(toMap(headers));
+
+      Set<String> allowedHeaders = parseAllowedHeaders(config.getCaptureRequestHeaders());
+      if (!allowedHeaders.isEmpty()) {
+        MultivaluedMap<String, String> allHeaders = requestContext.getHeaders();
+        if (!allHeaders.isEmpty()) {
+          Map<String, Object> filteredHeaders = toMap(allHeaders, allowedHeaders);
+          if (!filteredHeaders.isEmpty()) {
+            payload.setHeaders(filteredHeaders);
+          }
         }
       }
 
@@ -165,6 +196,31 @@ public class AuditRequestProcessor {
     }
   }
 
+
+  /**
+   * Parses a comma-separated list of headers into a Set of lowercase header names
+   * for case-insensitive comparison.
+   *
+   * @param headerList comma-separated list of header names
+   * @return Set of lowercase header names, empty if headerList is blank
+   */
+  @VisibleForTesting
+  static Set<String> parseAllowedHeaders(String headerList) {
+    if (StringUtils.isBlank(headerList)) {
+      return Collections.emptySet();
+    }
+
+    Set<String> headers = new HashSet<>();
+    for (String header : headerList.split(",")) {
+      String trimmed = header.trim();
+      if (!trimmed.isEmpty()) {
+        // Store as lowercase for case-insensitive comparison
+        headers.add(trimmed.toLowerCase());
+      }
+    }
+    return headers;
+  }
+
   /**
    * Reads the request body from the entity input stream.
    * Restores the input stream for downstream processing.
@@ -174,8 +230,44 @@ public class AuditRequestProcessor {
    * @param maxPayloadSize maximum bytes to read from the request body
    * @return the request body as string (potentially truncated)
    */
-  private String readRequestBody(ContainerRequestContext requestContext, int maxPayloadSize) {
-    // TODO spyne to be implemented
+  @VisibleForTesting
+  String readRequestBody(ContainerRequestContext requestContext, int maxPayloadSize) {
+    if (!requestContext.hasEntity()) {
+      return null;
+    }
+
+    final InputStream originalStream = requestContext.getEntityStream();
+    if (originalStream == null) {
+      return null;
+    }
+
+    try {
+      final int bufferSize = Math.min(maxPayloadSize + 1024, AuditConfig.MAX_AUDIT_PAYLOAD_SIZE_BYTES);
+      final BufferedInputStream bufferedStream = new BufferedInputStream(originalStream, bufferSize);
+      requestContext.setEntityStream(bufferedStream);
+      bufferedStream.mark(maxPayloadSize + 1);
+
+      final InputStream limitedStream = ByteStreams.limit(bufferedStream, maxPayloadSize);
+      final byte[] capturedBytes = ByteStreams.toByteArray(limitedStream);
+
+      try {
+        bufferedStream.reset();
+      } catch (IOException resetException) {
+        // error because it can affect downstream consumers from processing the request. This API call will fail.
+        LOG.error("Failed to reset stream for downstream consumers", resetException);
+      }
+
+      if (capturedBytes.length > 0) {
+        String requestBody = new String(capturedBytes, StandardCharsets.UTF_8);
+        if (capturedBytes.length >= maxPayloadSize) {
+          requestBody += TRUNCATION_MARKER;
+          _auditMetrics.addMeteredGlobalValue(AuditMetrics.AuditMeter.AUDIT_REQUEST_PAYLOAD_TRUNCATED, 1L);
+        }
+        return requestBody;
+      }
+    } catch (IOException e) {
+      LOG.warn("Failed to capture request body", e);
+    }
     return null;
   }
 }

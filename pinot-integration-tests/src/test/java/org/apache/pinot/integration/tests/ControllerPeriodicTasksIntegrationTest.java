@@ -45,7 +45,7 @@ import org.apache.pinot.common.utils.config.TagNameUtils;
 import org.apache.pinot.common.utils.helix.HelixHelper;
 import org.apache.pinot.controller.ControllerConf;
 import org.apache.pinot.controller.ControllerConf.ControllerPeriodicTasksConf;
-import org.apache.pinot.controller.validation.OfflineSegmentIntervalChecker;
+import org.apache.pinot.controller.validation.OfflineSegmentValidationManager;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.TagOverrideConfig;
 import org.apache.pinot.spi.config.table.TenantConfig;
@@ -424,8 +424,9 @@ public class ControllerPeriodicTasksIntegrationTest extends BaseClusterIntegrati
 
   @Test
   public void testOfflineSegmentIntervalChecker() {
-    OfflineSegmentIntervalChecker offlineSegmentIntervalChecker = _controllerStarter.getOfflineSegmentIntervalChecker();
-    ValidationMetrics validationMetrics = offlineSegmentIntervalChecker.getValidationMetrics();
+    OfflineSegmentValidationManager offlineSegmentValidationManager =
+        _controllerStarter.getOfflineSegmentValidationManager();
+    ValidationMetrics validationMetrics = offlineSegmentValidationManager.getValidationMetrics();
     String tableNameWithType = TableNameBuilder.OFFLINE.tableNameWithType(getTableName());
 
     // Wait until OfflineSegmentIntervalChecker gets executed

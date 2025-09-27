@@ -25,6 +25,7 @@ import org.apache.pinot.common.utils.LLCSegmentName;
 import org.apache.pinot.spi.env.PinotConfiguration;
 import org.apache.pinot.spi.stream.LongMsgOffset;
 import org.apache.pinot.spi.stream.LongMsgOffsetFactory;
+import org.apache.pinot.spi.utils.CommonConstants;
 import org.testng.Assert;
 import org.testng.annotations.AfterMethod;
 import org.testng.annotations.Test;
@@ -69,6 +70,11 @@ public class SegmentCompletionFSMFactoryTest {
     SegmentZKMetadata segmentZKMetadata = mock(SegmentZKMetadata.class);
     when(segmentZKMetadata.getNumReplicas()).thenReturn(3);
     when(segmentZKMetadata.getEndOffset()).thenReturn("100");
+    if (Math.random() < 0.5) {
+      when(segmentZKMetadata.getStatus()).thenReturn(CommonConstants.Segment.Realtime.Status.IN_PROGRESS);
+    } else {
+      when(segmentZKMetadata.getStatus()).thenReturn(CommonConstants.Segment.Realtime.Status.DONE);
+    }
 
     PinotLLCRealtimeSegmentManager pinotLLCRealtimeSegmentManager = mock(PinotLLCRealtimeSegmentManager.class);
     when(pinotLLCRealtimeSegmentManager.getCommitTimeoutMS(anyString())).thenReturn(System.currentTimeMillis());
@@ -108,6 +114,11 @@ public class SegmentCompletionFSMFactoryTest {
     SegmentZKMetadata segmentZKMetadata = mock(SegmentZKMetadata.class);
     when(segmentZKMetadata.getNumReplicas()).thenReturn(3);
     when(segmentZKMetadata.getEndOffset()).thenReturn("100");
+    if (Math.random() < 0.5) {
+      when(segmentZKMetadata.getStatus()).thenReturn(CommonConstants.Segment.Realtime.Status.DONE);
+    } else {
+      when(segmentZKMetadata.getStatus()).thenReturn(CommonConstants.Segment.Realtime.Status.COMMITTING);
+    }
 
     PinotLLCRealtimeSegmentManager pinotLLCRealtimeSegmentManager = mock(PinotLLCRealtimeSegmentManager.class);
     when(pinotLLCRealtimeSegmentManager.getCommitTimeoutMS(anyString())).thenReturn(System.currentTimeMillis());

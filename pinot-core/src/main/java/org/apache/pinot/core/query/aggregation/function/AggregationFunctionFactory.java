@@ -223,6 +223,8 @@ public class AggregationFunctionFactory {
           case SUM:
           case SUM0:
             return new SumAggregationFunction(arguments, nullHandlingEnabled);
+          case SUMINT:
+            return new SumIntAggregationFunction(arguments, nullHandlingEnabled);
           case SUMPRECISION:
             return new SumPrecisionAggregationFunction(arguments, nullHandlingEnabled);
           case AVG:

@@ -133,6 +133,16 @@ public interface StreamMetadataProvider extends Closeable {
     return null;
   }
 
+  @Nullable
+  default Map<String, StreamPartitionMsgOffset> getStreamStartOffsets() {
+    return null;
+  }
+
+  @Nullable
+  default Map<String, StreamPartitionMsgOffset> getStreamEndOffsets() {
+    return null;
+  }
+
   /**
    * Fetches the list of available topics/streams
    *

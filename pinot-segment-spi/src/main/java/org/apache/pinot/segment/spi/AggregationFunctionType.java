@@ -57,6 +57,7 @@ public enum AggregationFunctionType {
   MAXSTRING("maxString", SqlTypeName.VARCHAR, SqlTypeName.VARCHAR),
   SUM("sum", SqlTypeName.DOUBLE, SqlTypeName.DOUBLE),
   SUM0("$sum0", SqlTypeName.DOUBLE, SqlTypeName.DOUBLE),
+  SUMINT("sumInt", SqlTypeName.BIGINT, SqlTypeName.BIGINT),
   SUMPRECISION("sumPrecision", ReturnTypes.explicit(SqlTypeName.DECIMAL), OperandTypes.ANY, SqlTypeName.OTHER),
   AVG("avg", SqlTypeName.OTHER, SqlTypeName.DOUBLE),
   MODE("mode", SqlTypeName.OTHER, SqlTypeName.DOUBLE),

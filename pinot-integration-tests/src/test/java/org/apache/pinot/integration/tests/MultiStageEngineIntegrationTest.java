@@ -20,6 +20,8 @@ package org.apache.pinot.integration.tests;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.node.ObjectNode;
+import com.jayway.jsonpath.DocumentContext;
+import com.jayway.jsonpath.JsonPath;
 import java.io.File;
 import java.io.IOException;
 import java.time.Duration;
@@ -27,6 +29,7 @@ import java.time.Instant;
 import java.time.ZoneId;
 import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -45,8 +48,13 @@ import org.apache.commons.io.FileUtils;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.helix.model.HelixConfigScope;
 import org.apache.helix.model.builder.HelixConfigScopeBuilder;
+import org.apache.pinot.controller.api.resources.PinotQueryResource.MultiStageQueryValidationRequest;
+import org.apache.pinot.spi.config.table.HashFunction;
+import org.apache.pinot.spi.config.table.RoutingConfig;
 import org.apache.pinot.spi.config.table.TableConfig;
+import org.apache.pinot.spi.config.table.TableType;
 import org.apache.pinot.spi.config.table.TenantConfig;
+import org.apache.pinot.spi.config.table.UpsertConfig;
 import org.apache.pinot.spi.config.table.ingestion.IngestionConfig;
 import org.apache.pinot.spi.config.table.ingestion.TransformConfig;
 import org.apache.pinot.spi.data.FieldSpec;
@@ -55,7 +63,9 @@ import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.data.readers.FileFormat;
 import org.apache.pinot.spi.exception.QueryErrorCode;
 import org.apache.pinot.spi.utils.CommonConstants;
+import org.apache.pinot.spi.utils.Enablement;
 import org.apache.pinot.spi.utils.JsonUtils;
+import org.apache.pinot.spi.utils.builder.TableConfigBuilder;
 import org.apache.pinot.util.TestUtils;
 import org.assertj.core.api.Assertions;
 import org.joda.time.DateTime;
@@ -72,7 +82,6 @@ import static org.testng.Assert.assertEquals;
 import static org.testng.Assert.assertFalse;
 import static org.testng.Assert.assertNotNull;
 import static org.testng.Assert.assertTrue;
-
 
 public class MultiStageEngineIntegrationTest extends BaseClusterIntegrationTestSet {
   private static final String SCHEMA_FILE_NAME = "On_Time_On_Time_Performance_2014_100k_subset_nonulls.schema";
@@ -897,6 +906,19 @@ public class MultiStageEngineIntegrationTest extends BaseClusterIntegrationTestS
   }
 
   @Test
+  public void incorrectMultiValueColumnGroupBy()
+      throws Exception {
+    String pinotQuery = "SELECT count(*) FROM mytable "
+        + "GROUP BY RandomAirports";
+    JsonNode jsonNode = postQuery(pinotQuery);
+    DocumentContext docContext = JsonPath.parse(jsonNode.toString());
+    List<String> messages = docContext.read("$.exceptions[*].message");
+    Assertions.assertThat(messages)
+        .anySatisfy(message ->
+            Assertions.assertThat(message).contains("Use ARRAY_TO_MV() to group by multi-value column"));
+  }
+
+  @Test
   public void testVariadicFunction()
       throws Exception {
     String sqlQuery = "SELECT ARRAY_TO_MV(VALUE_IN(RandomAirports, 'MFR', 'SUN', 'GTR')) as airport, count(*) "
@@ -1695,30 +1717,357 @@ public class MultiStageEngineIntegrationTest extends BaseClusterIntegrationTestS
   @Test
   public void testValidateQueryApiSuccess()
       throws Exception {
+    MultiStageQueryValidationRequest request =
+        new MultiStageQueryValidationRequest("SELECT * FROM mytable", null, null, null, null, false);
+    String requestJson = JsonUtils.objectToString(request);
     JsonNode result = JsonUtils.stringToJsonNode(
-        sendPostRequest(getControllerBaseApiUrl() + "/validateMultiStageQuery",
-            "{\"sql\": \"SELECT * FROM mytable\"}", null));
-    assertTrue(result.get("compiledSuccessfully").asBoolean());
-    assertTrue(result.get("errorCode").isNull());
-    assertTrue(result.get("errorMessage").isNull());
+        sendPostRequest(getControllerBaseApiUrl() + "/validateMultiStageQuery", requestJson, null));
+
+    assertTrue(result.isArray(), "Response should be an array");
+    assertEquals(1, result.size(), "Should have exactly one response");
+    JsonNode queryResponse = result.get(0);
+    assertTrue(queryResponse.get("compiledSuccessfully").asBoolean());
+    assertTrue(queryResponse.get("errorCode").isNull());
+    assertTrue(queryResponse.get("errorMessage").isNull());
+    assertEquals("SELECT * FROM mytable", queryResponse.get("sql").asText());
   }
 
   @Test
   public void testValidateQueryApiError()
       throws Exception {
+    MultiStageQueryValidationRequest request =
+        new MultiStageQueryValidationRequest("SELECT invalidColumn FROM invalidTable", null, null, null, null, false);
+    String requestJson = JsonUtils.objectToString(request);
     JsonNode result = JsonUtils.stringToJsonNode(
-        sendPostRequest(getControllerBaseApiUrl() + "/validateMultiStageQuery",
-            "{\"sql\": \"SELECT invalidColumn FROM invalidTable\"}", null));
-    assertFalse(result.get("compiledSuccessfully").asBoolean());
-    assertEquals(result.get("errorCode").asText(), QueryErrorCode.TABLE_DOES_NOT_EXIST.name());
-    assertFalse(result.get("errorMessage").isNull());
+        sendPostRequest(getControllerBaseApiUrl() + "/validateMultiStageQuery", requestJson, null));
+    assertTrue(result.isArray(), "Response should be an array");
+    assertEquals(1, result.size(), "Should have exactly one response");
 
+    JsonNode queryResponse = result.get(0);
+    assertFalse(queryResponse.get("compiledSuccessfully").asBoolean());
+    assertEquals(queryResponse.get("errorCode").asText(), QueryErrorCode.TABLE_DOES_NOT_EXIST.name());
+    assertFalse(queryResponse.get("errorMessage").isNull());
+    assertEquals("SELECT invalidColumn FROM invalidTable", queryResponse.get("sql").asText());
+
+    request = new MultiStageQueryValidationRequest("SELECT CAST('abc' AS INT)", null, null, null, null, false);
+
+    requestJson = JsonUtils.objectToString(request);
     result = JsonUtils.stringToJsonNode(
-        sendPostRequest(getControllerBaseApiUrl() + "/validateMultiStageQuery",
-            "{\"sql\": \"SELECT CAST('abc' AS INT)\"}", null));
-    assertFalse(result.get("compiledSuccessfully").asBoolean());
-    assertEquals(result.get("errorCode").asText(), QueryErrorCode.QUERY_PLANNING.name());
-    assertFalse(result.get("errorMessage").isNull());
+        sendPostRequest(getControllerBaseApiUrl() + "/validateMultiStageQuery", requestJson, null));
+
+    assertTrue(result.isArray(), "Response should be an array");
+    assertEquals(1, result.size(), "Should have exactly one response");
+
+    queryResponse = result.get(0);
+    assertFalse(queryResponse.get("compiledSuccessfully").asBoolean());
+    assertEquals(queryResponse.get("errorCode").asText(), QueryErrorCode.QUERY_PLANNING.name());
+    assertFalse(queryResponse.get("errorMessage").isNull());
+    assertEquals("SELECT CAST('abc' AS INT)", queryResponse.get("sql").asText());
+  }
+
+  @Test
+  public void testValidateQueryApiSuccessfulQueries()
+      throws Exception {
+    JsonNode tableConfigsNode =
+        JsonUtils.stringToJsonNode(sendGetRequest(getControllerBaseApiUrl() + "/tables/mytable"));
+    JsonNode schemaNode = JsonUtils.stringToJsonNode(sendGetRequest(getControllerBaseApiUrl() + "/schemas/mytable"));
+    List<String> successfulQueries = Arrays.asList("SELECT COUNT(*) FROM mytable",
+        "SELECT DivAirportSeqIDs, COUNT(*) FROM mytable GROUP BY DivAirportSeqIDs",
+        "SELECT DivAirportSeqIDs FROM mytable WHERE arrayToMV(DivAirportSeqIDs) > 0 LIMIT 10",
+        "SELECT DivAirportSeqIDs, AirlineID FROM mytable ORDER BY DivAirportSeqIDs LIMIT 5",
+        "SELECT SUM(arrayToMV(DivAirportSeqIDs)) AS total FROM mytable",
+        "SELECT AVG(arrayToMV(DivAirportSeqIDs)) FROM mytable WHERE AirlineID IS NOT NULL");
+
+    List<TableConfig> tableConfigs = new ArrayList<>();
+    JsonNode offlineConfig = tableConfigsNode.get("OFFLINE");
+    if (offlineConfig != null && !offlineConfig.isMissingNode() && !offlineConfig.isEmpty()) {
+      tableConfigs.add(JsonUtils.jsonNodeToObject(offlineConfig, TableConfig.class));
+    }
+    JsonNode realtimeConfig = tableConfigsNode.get("REALTIME");
+    if (realtimeConfig != null && !realtimeConfig.isMissingNode() && !realtimeConfig.isEmpty()) {
+      tableConfigs.add(JsonUtils.jsonNodeToObject(realtimeConfig, TableConfig.class));
+    }
+
+    Schema schema = JsonUtils.jsonNodeToObject(schemaNode, Schema.class);
+    List<Schema> schemas = Collections.singletonList(schema);
+
+    MultiStageQueryValidationRequest request =
+        new MultiStageQueryValidationRequest(null, tableConfigs, schemas, null, successfulQueries, false);
+
+    String requestJson = JsonUtils.objectToString(request);
+    JsonNode result = JsonUtils.stringToJsonNode(
+        sendPostRequest(getControllerBaseApiUrl() + "/validateMultiStageQuery", requestJson, null));
+
+    assertTrue(result.isArray(), "Response should be an array");
+    assertEquals(successfulQueries.size(), result.size(), "Should have response for each query");
+
+    for (int i = 0; i < result.size(); i++) {
+      JsonNode queryResponse = result.get(i);
+      String expectedQuery = successfulQueries.get(i);
+
+      assertTrue(queryResponse.get("compiledSuccessfully").asBoolean(),
+          "Query should compile successfully: " + expectedQuery);
+      assertTrue(queryResponse.get("errorCode").isNull(), "Error code should be null for query: " + expectedQuery);
+      assertTrue(queryResponse.get("errorMessage").isNull(),
+          "Error message should be null for query: " + expectedQuery);
+      assertEquals(expectedQuery, queryResponse.get("sql").asText(), "SQL should match the input query");
+    }
+  }
+
+  @Test
+  public void testValidateQueryApiBatchMixedResults()
+      throws Exception {
+    JsonNode tableConfigsNode =
+        JsonUtils.stringToJsonNode(sendGetRequest(getControllerBaseApiUrl() + "/tables/mytable"));
+    JsonNode schemaNode = JsonUtils.stringToJsonNode(sendGetRequest(getControllerBaseApiUrl() + "/schemas/mytable"));
+    List<String> mixedQueries = Arrays.asList("SELECT COUNT(*) FROM mytable", "SELECT invalidColumn FROM mytable",
+        "SELECT DivAirportSeqIDs FROM mytable LIMIT 10", "SELECT * FROM nonExistentTable");
+
+    List<TableConfig> tableConfigs = new ArrayList<>();
+    JsonNode offlineConfig = tableConfigsNode.get("OFFLINE");
+    if (offlineConfig != null && !offlineConfig.isMissingNode() && !offlineConfig.isEmpty()) {
+      tableConfigs.add(JsonUtils.jsonNodeToObject(offlineConfig, TableConfig.class));
+    }
+
+    Schema schema = JsonUtils.jsonNodeToObject(schemaNode, Schema.class);
+    List<Schema> schemas = Collections.singletonList(schema);
+
+    MultiStageQueryValidationRequest request =
+        new MultiStageQueryValidationRequest(null, tableConfigs, schemas, null, mixedQueries, false);
+
+    String requestJson = JsonUtils.objectToString(request);
+    JsonNode result = JsonUtils.stringToJsonNode(
+        sendPostRequest(getControllerBaseApiUrl() + "/validateMultiStageQuery", requestJson, null));
+
+    assertTrue(result.isArray(), "Response should be an array");
+    assertEquals(4, result.size(), "Should have 4 result entries");
+
+    JsonNode result1 = result.get(0);
+    assertTrue(result1.get("compiledSuccessfully").asBoolean(), "First query should succeed");
+    assertEquals("SELECT COUNT(*) FROM mytable", result1.get("sql").asText());
+
+    JsonNode result2 = result.get(1);
+    assertFalse(result2.get("compiledSuccessfully").asBoolean(), "Second query should fail");
+    assertEquals("SELECT invalidColumn FROM mytable", result2.get("sql").asText());
+    assertNotNull(result2.get("errorMessage").asText());
+
+    JsonNode result3 = result.get(2);
+    assertTrue(result3.get("compiledSuccessfully").asBoolean(), "Third query should succeed");
+    assertEquals("SELECT DivAirportSeqIDs FROM mytable LIMIT 10", result3.get("sql").asText());
+
+    JsonNode result4 = result.get(3);
+    assertFalse(result4.get("compiledSuccessfully").asBoolean(), "Fourth query should fail");
+    assertEquals("SELECT * FROM nonExistentTable", result4.get("sql").asText());
+    assertNotNull(result4.get("errorMessage").asText());
+  }
+
+  @Test
+  public void testValidateQueryApiUnsuccessfulQueries()
+      throws Exception {
+    JsonNode tableConfigsNode =
+        JsonUtils.stringToJsonNode(sendGetRequest(getControllerBaseApiUrl() + "/tables/mytable"));
+    JsonNode schemaNode = JsonUtils.stringToJsonNode(sendGetRequest(getControllerBaseApiUrl() + "/schemas/mytable"));
+
+    List<TableConfig> tableConfigs = new ArrayList<>();
+    JsonNode offlineConfig = tableConfigsNode.get("OFFLINE");
+    if (offlineConfig != null && !offlineConfig.isMissingNode() && !offlineConfig.isEmpty()) {
+      tableConfigs.add(JsonUtils.jsonNodeToObject(offlineConfig, TableConfig.class));
+    }
+    JsonNode realtimeConfig = tableConfigsNode.get("REALTIME");
+    if (realtimeConfig != null && !realtimeConfig.isMissingNode() && !realtimeConfig.isEmpty()) {
+      tableConfigs.add(JsonUtils.jsonNodeToObject(realtimeConfig, TableConfig.class));
+    }
+
+    Schema schema = JsonUtils.jsonNodeToObject(schemaNode, Schema.class);
+    List<Schema> schemas = Collections.singletonList(schema);
+
+    MultiStageQueryValidationRequest request =
+        new MultiStageQueryValidationRequest("SELECT nonExistentColumn FROM mytable",
+            tableConfigs, schemas, null, null, true);
+
+    String requestJson = JsonUtils.objectToString(request);
+    JsonNode result = JsonUtils.stringToJsonNode(
+        sendPostRequest(getControllerBaseApiUrl() + "/validateMultiStageQuery", requestJson, null));
+
+    assertTrue(result.isArray(), "Response should be an array");
+    assertEquals(1, result.size(), "Should have exactly one response");
+    JsonNode queryResponse = result.get(0);
+    assertFalse(queryResponse.get("compiledSuccessfully").asBoolean());
+    assertEquals(queryResponse.get("errorCode").asText(), QueryErrorCode.QUERY_VALIDATION.name());
+
+    String query = "SELECT DivAirportSeqIDs FROM mytable WHERE DivAirportSeqIDs > 0 LIMIT 10";
+    request = new MultiStageQueryValidationRequest(query, tableConfigs, schemas, null, null, false);
+
+    requestJson = JsonUtils.objectToString(request);
+    result = JsonUtils.stringToJsonNode(
+        sendPostRequest(getControllerBaseApiUrl() + "/validateMultiStageQuery", requestJson, null));
+
+    assertTrue(result.isArray(), "Response should be an array");
+    assertEquals(1, result.size(), "Should have exactly one response");
+    queryResponse = result.get(0);
+    assertFalse(queryResponse.get("compiledSuccessfully").asBoolean(),
+        "Query should not compile successfully: " + query);
+    assertEquals(queryResponse.get("errorCode").asText(), QueryErrorCode.QUERY_VALIDATION.name());
+    assertFalse(queryResponse.get("errorMessage").isNull(), "Error message should not be null for: " + query);
+
+    query = "SELECT count(*) FROM nonExistentTable";
+    request = new MultiStageQueryValidationRequest(query, tableConfigs, schemas, null, null, false);
+
+    requestJson = JsonUtils.objectToString(request);
+    result = JsonUtils.stringToJsonNode(
+        sendPostRequest(getControllerBaseApiUrl() + "/validateMultiStageQuery", requestJson, null));
+
+    assertTrue(result.isArray(), "Response should be an array");
+    assertEquals(1, result.size(), "Should have exactly one response");
+    queryResponse = result.get(0);
+    assertFalse(queryResponse.get("compiledSuccessfully").asBoolean(),
+        "Query should not compile successfully: " + query);
+    assertEquals(queryResponse.get("errorCode").asText(), QueryErrorCode.TABLE_DOES_NOT_EXIST.name());
+    assertFalse(queryResponse.get("errorMessage").isNull(), "Error message should not be null for: " + query);
+  }
+
+  @Test
+  public void testValidateQueryApiWithStaticTable()
+      throws Exception {
+
+    Schema schema = new Schema.SchemaBuilder().setSchemaName("staticTableTest").setEnableColumnBasedNullHandling(false)
+        .addSingleValueDimension("event_id", FieldSpec.DataType.STRING)
+        .addSingleValueDimension("dummy_realtime", FieldSpec.DataType.STRING)
+        .addDateTime("mtime", FieldSpec.DataType.LONG, "1:MILLISECONDS:EPOCH", "1:MILLISECONDS")
+        .setPrimaryKeyColumns(Collections.singletonList("event_id")).build();
+
+    Map<String, String> streamConfigs = new HashMap<>();
+    streamConfigs.put("streamType", "fake");
+    streamConfigs.put("stream.fake.num.partitions", "2");
+    streamConfigs.put("stream.fake.topic.name", "fake_topic");
+    streamConfigs.put("stream.fake.consumer.factory.class.name",
+        "ai.startree.pinot.plugin.fakestream.FakeStreamConsumerFactory");
+    streamConfigs.put("stream.fake.decoder.class.name", "ai.startree.pinot.plugin.fakestream.FakeStreamMessageDecoder");
+    streamConfigs.put("stream.fake.decoder.prop.colval.event_id", "$partitionLongRange,1,100000000");
+    streamConfigs.put("stream.fake.decoder.prop.colval.mtime", "$timestamp");
+    streamConfigs.put("stream.fake.decoder.prop.partition.specific.colvals", "event_id");
+    streamConfigs.put("stream.fake.decoder.prop.pad.colvals", "event_id");
+    streamConfigs.put("stream.fake.decoder.prop.pad.content", "dummy_realtime");
+    streamConfigs.put("stream.fake.decoder.prop.pad.times", "1");
+    streamConfigs.put("stream.fake.consumer.fetch.interval.ms", "1");
+    streamConfigs.put("realtime.segment.flush.threshold.rows", "500000");
+
+    UpsertConfig upsertConfig = new UpsertConfig(UpsertConfig.Mode.FULL);
+    upsertConfig.setSnapshot(Enablement.ENABLE);
+    upsertConfig.setPreload(Enablement.ENABLE);
+    upsertConfig.setHashFunction(HashFunction.NONE);
+    upsertConfig.setComparisonColumns(Collections.singletonList("mtime"));
+    upsertConfig.setDeleteRecordColumn("event_id");
+    upsertConfig.setMetadataTTL(0);
+    upsertConfig.setDeletedKeysTTL(0);
+    upsertConfig.setConsistencyMode(UpsertConfig.ConsistencyMode.NONE);
+    upsertConfig.setEnableSnapshot(true);
+    upsertConfig.setEnablePreload(true);
+    upsertConfig.setDropOutOfOrderRecord(false);
+    upsertConfig.setNewSegmentTrackingTimeMs(10000L);
+
+    upsertConfig.setDefaultPartialUpsertStrategy(UpsertConfig.Strategy.OVERWRITE);
+    upsertConfig.setUpsertViewRefreshIntervalMs(3000L);
+
+    RoutingConfig routingConfig =
+        new RoutingConfig(null, Collections.singletonList(RoutingConfig.PARTITION_SEGMENT_PRUNER_TYPE),
+            RoutingConfig.STRICT_REPLICA_GROUP_INSTANCE_SELECTOR_TYPE, true);
+
+    TableConfig tableConfig =
+        new TableConfigBuilder(TableType.REALTIME).setTableName("staticTableTest").setTimeColumnName("mtime")
+            .setTimeType("MILLISECONDS").setRetentionTimeUnit("DAYS").setRetentionTimeValue("5000")
+            .setDeletedSegmentsRetentionPeriod("7d").setSegmentAssignmentStrategy("BalanceNumSegmentAssignmentStrategy")
+            .setNumReplicas(1).setSegmentPushType("APPEND").setBrokerTenant("DefaultTenant")
+            .setServerTenant("DefaultTenant").setLoadMode("MMAP").setAggregateMetrics(false)
+            .setOptimizeDictionary(false).setOptimizeDictionaryForMetrics(false).setNoDictionarySizeRatioThreshold(0.85)
+            .setNullHandlingEnabled(false).setSkipSegmentPreprocess(false).setOptimizeDictionaryType(false)
+            .setCreateInvertedIndexDuringSegmentGeneration(false).setColumnMajorSegmentBuilderEnabled(false)
+            .setStreamConfigs(streamConfigs).setRoutingConfig(routingConfig).setUpsertConfig(upsertConfig)
+            .setIsDimTable(false).build();
+
+    List<TableConfig> tableConfigs = Collections.singletonList(tableConfig);
+    List<Schema> schemas = Collections.singletonList(schema);
+
+    String query = "SELECT nonExistentColumn FROM staticTableTest";
+
+    MultiStageQueryValidationRequest request =
+        new MultiStageQueryValidationRequest(query, tableConfigs, schemas, null, null, true);
+
+    String requestJson = JsonUtils.objectToString(request);
+    JsonNode result = JsonUtils.stringToJsonNode(
+        sendPostRequest(getControllerBaseApiUrl() + "/validateMultiStageQuery", requestJson, null));
+
+    assertTrue(result.isArray(), "Response should be an array");
+    assertEquals(1, result.size(), "Should have exactly one response");
+    JsonNode queryResponse = result.get(0);
+    assertFalse(queryResponse.get("compiledSuccessfully").asBoolean());
+    assertEquals(queryResponse.get("errorCode").asText(), QueryErrorCode.QUERY_VALIDATION.name());
+
+    query = "SELECT event_id FROM staticTableTest";
+    request = new MultiStageQueryValidationRequest(query, tableConfigs, schemas, null, null, false);
+
+    requestJson = JsonUtils.objectToString(request);
+    result = JsonUtils.stringToJsonNode(
+        sendPostRequest(getControllerBaseApiUrl() + "/validateMultiStageQuery", requestJson, null));
+
+    assertTrue(result.isArray(), "Response should be an array");
+    assertEquals(1, result.size(), "Should have exactly one response");
+    queryResponse = result.get(0);
+    assertTrue(queryResponse.get("compiledSuccessfully").asBoolean(), "Query should compile successfully: " + query);
+    assertTrue(queryResponse.get("errorCode").isNull());
+    assertTrue(queryResponse.get("errorMessage").isNull());
+  }
+
+  @Test
+  public void testValidateQueryApiWithIgnoreCaseOption()
+      throws Exception {
+    JsonNode tableConfigsNode =
+        JsonUtils.stringToJsonNode(sendGetRequest(getControllerBaseApiUrl() + "/tables/mytable"));
+    JsonNode schemaNode = JsonUtils.stringToJsonNode(sendGetRequest(getControllerBaseApiUrl() + "/schemas/mytable"));
+
+    List<TableConfig> tableConfigs = new ArrayList<>();
+    JsonNode offlineConfig = tableConfigsNode.get("OFFLINE");
+    if (offlineConfig != null && !offlineConfig.isMissingNode() && !offlineConfig.isEmpty()) {
+      tableConfigs.add(JsonUtils.jsonNodeToObject(offlineConfig, TableConfig.class));
+    }
+    JsonNode realtimeConfig = tableConfigsNode.get("REALTIME");
+    if (realtimeConfig != null && !realtimeConfig.isMissingNode() && !realtimeConfig.isEmpty()) {
+      tableConfigs.add(JsonUtils.jsonNodeToObject(realtimeConfig, TableConfig.class));
+    }
+    Schema schema = JsonUtils.jsonNodeToObject(schemaNode, Schema.class);
+    List<Schema> schemas = Collections.singletonList(schema);
+
+    MultiStageQueryValidationRequest request =
+        new MultiStageQueryValidationRequest("SELECT divairportseqids FROM mytable", tableConfigs, schemas, null, null,
+            false);
+
+    String requestJson = JsonUtils.objectToString(request);
+    JsonNode result = JsonUtils.stringToJsonNode(
+        sendPostRequest(getControllerBaseApiUrl() + "/validateMultiStageQuery", requestJson, null));
+
+    assertTrue(result.isArray(), "Response should be an array");
+    assertEquals(1, result.size(), "Should have exactly one response");
+    JsonNode queryResponse = result.get(0);
+    assertTrue(queryResponse.get("compiledSuccessfully").asBoolean(),
+        "Query should compile successfully in case-sensitive mode");
+    assertTrue(queryResponse.get("errorCode").isNull(), "Error code should be null in case-sensitive mode");
+    assertTrue(queryResponse.get("errorMessage").isNull(), "Error message should be null in case-sensitive mode");
+
+    request =
+        new MultiStageQueryValidationRequest("SELECT divairportseqids FROM mytable", tableConfigs, schemas, null, null,
+            true);
+
+    requestJson = JsonUtils.objectToString(request);
+    result = JsonUtils.stringToJsonNode(
+        sendPostRequest(getControllerBaseApiUrl() + "/validateMultiStageQuery", requestJson, null));
+
+    assertTrue(result.isArray(), "Response should be an array");
+    assertEquals(1, result.size(), "Should have exactly one response");
+    queryResponse = result.get(0);
+    assertTrue(queryResponse.get("compiledSuccessfully").asBoolean(),
+        "Query should compile successfully in case-insensitive mode");
+    assertTrue(queryResponse.get("errorCode").isNull(), "Error code should be null in case-insensitive mode");
+    assertTrue(queryResponse.get("errorMessage").isNull(), "Error message should be null in case-insensitive mode");
   }
 
   private void checkQueryResultForDBTest(String column, String tableName)

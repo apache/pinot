@@ -21,6 +21,7 @@ package org.apache.pinot.query.mailbox;
 import com.google.common.cache.Cache;
 import com.google.common.cache.CacheBuilder;
 import com.google.common.cache.RemovalListener;
+import java.time.Duration;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.TimeUnit;
 import javax.annotation.Nullable;
@@ -30,6 +31,7 @@ import org.apache.pinot.query.access.QueryAccessControlFactory;
 import org.apache.pinot.query.mailbox.channel.ChannelManager;
 import org.apache.pinot.query.mailbox.channel.GrpcMailboxServer;
 import org.apache.pinot.query.runtime.operator.MailboxSendOperator;
+import org.apache.pinot.spi.config.instance.InstanceType;
 import org.apache.pinot.spi.env.PinotConfiguration;
 import org.apache.pinot.spi.utils.CommonConstants;
 import org.slf4j.Logger;
@@ -63,6 +65,7 @@ public class MailboxService {
 
   private final String _hostname;
   private final int _port;
+  private final InstanceType _instanceType;
   private final PinotConfiguration _config;
   private final ChannelManager _channelManager;
   @Nullable private final TlsConfig _tlsConfig;
@@ -71,25 +74,27 @@ public class MailboxService {
 
   private GrpcMailboxServer _grpcMailboxServer;
 
-  public MailboxService(String hostname, int port, PinotConfiguration config) {
-    this(hostname, port, config, null, null);
+  public MailboxService(String hostname, int port, InstanceType instanceType, PinotConfiguration config) {
+    this(hostname, port, instanceType, config, null);
   }
 
-  public MailboxService(String hostname, int port, PinotConfiguration config, @Nullable TlsConfig tlsConfig) {
-    this(hostname, port, config, tlsConfig, null);
+  public MailboxService(String hostname, int port, InstanceType instanceType, PinotConfiguration config,
+      @Nullable TlsConfig tlsConfig) {
+    this(hostname, port, instanceType, config, tlsConfig, null);
   }
 
-  public MailboxService(String hostname, int port, PinotConfiguration config, @Nullable TlsConfig tlsConfig, @Nullable
-  QueryAccessControlFactory accessControlFactory) {
+  public MailboxService(String hostname, int port, InstanceType instanceType, PinotConfiguration config,
+      @Nullable TlsConfig tlsConfig, @Nullable QueryAccessControlFactory accessControlFactory) {
     _hostname = hostname;
     _port = port;
+    _instanceType = instanceType;
     _config = config;
     _tlsConfig = tlsConfig;
     int maxInboundMessageSize = config.getProperty(
         CommonConstants.MultiStageQueryRunner.KEY_OF_MAX_INBOUND_QUERY_DATA_BLOCK_SIZE_BYTES,
         CommonConstants.MultiStageQueryRunner.DEFAULT_MAX_INBOUND_QUERY_DATA_BLOCK_SIZE_BYTES
     );
-    _channelManager = new ChannelManager(tlsConfig, maxInboundMessageSize);
+    _channelManager = new ChannelManager(tlsConfig, maxInboundMessageSize, getIdleTimeout(config));
     _accessControlFactory = accessControlFactory;
     boolean splitBlocks = config.getProperty(
         CommonConstants.MultiStageQueryRunner.KEY_OF_ENABLE_DATA_BLOCK_PAYLOAD_SPLIT,
@@ -128,6 +133,10 @@ public class MailboxService {
     return _port;
   }
 
+  public InstanceType getInstanceType() {
+    return _instanceType;
+  }
+
   /**
    * Returns a sending mailbox for the given mailbox id. The returned sending mailbox is uninitialized, i.e. it will
    * not open the underlying channel or acquire any additional resources. Instead, it will initialize lazily when the
@@ -138,8 +147,8 @@ public class MailboxService {
     if (_hostname.equals(hostname) && _port == port) {
       return new InMemorySendingMailbox(mailboxId, this, deadlineMs, statMap);
     } else {
-      return new GrpcSendingMailbox(
-          _config, mailboxId, _channelManager, hostname, port, deadlineMs, statMap, _maxByteStringSize);
+      return new GrpcSendingMailbox(mailboxId, _channelManager, hostname, port, deadlineMs, statMap,
+          _maxByteStringSize);
     }
   }
 
@@ -167,5 +176,16 @@ public class MailboxService {
    */
   public void releaseReceivingMailbox(ReceivingMailbox mailbox) {
     _receivingMailboxCache.invalidate(mailbox.getId());
+  }
+
+  private static Duration getIdleTimeout(PinotConfiguration config) {
+    long channelIdleTimeoutSeconds = config.getProperty(
+        CommonConstants.MultiStageQueryRunner.KEY_OF_CHANNEL_IDLE_TIMEOUT_SECONDS,
+        CommonConstants.MultiStageQueryRunner.DEFAULT_CHANNEL_IDLE_TIMEOUT_SECONDS);
+    if (channelIdleTimeoutSeconds > 0) {
+      return Duration.ofSeconds(channelIdleTimeoutSeconds);
+    }
+    // Use a reasonable maximum idle timeout (1 year) to avoid overflow.
+    return Duration.ofDays(365);
   }
 }

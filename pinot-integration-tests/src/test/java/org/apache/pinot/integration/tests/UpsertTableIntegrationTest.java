@@ -491,7 +491,7 @@ public class UpsertTableIntegrationTest extends BaseClusterIntegrationTest {
     TableConfig tableConfig = setUpTable(tableName, kafkaTopicName, upsertConfig);
     TableTaskConfig taskConfig = getCompactionTaskConfig();
     taskConfig.getConfigsForTaskType(MinionConstants.UpsertCompactionTask.TASK_TYPE)
-        .put("validDocIdsType", ValidDocIdsType.IN_MEMORY.name());
+        .put("validDocIdsType", ValidDocIdsType.IN_MEMORY_WITH_DELETE.name());
     tableConfig.setTaskConfig(taskConfig);
     updateTableConfig(tableConfig);
 

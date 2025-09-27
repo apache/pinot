@@ -72,17 +72,6 @@ public class CommonConstants {
   public static final String CONFIG_OF_PINOT_TAR_COMPRESSION_CODEC_NAME = "pinot.tar.compression.codec.name";
   public static final String QUERY_WORKLOAD = "queryWorkload";
 
-  // Audit logging configuration constants
-  public static class AuditLogConstants {
-    public static final String PREFIX = "pinot.audit";
-    public static final String CONFIG_OF_AUDIT_LOG_ENABLED = PREFIX + ".enabled";
-    public static final String CONFIG_OF_AUDIT_LOG_CAPTURE_REQUEST_PAYLOAD = PREFIX + ".capture.request.payload";
-    public static final String CONFIG_OF_AUDIT_LOG_EXCLUDED_ENDPOINTS = PREFIX + ".excluded.endpoints";
-    public static final String CONFIG_OF_AUDIT_LOG_CAPTURE_REQUEST_HEADERS = PREFIX + ".capture.request.headers";
-    public static final String CONFIG_OF_AUDIT_LOG_MAX_PAYLOAD_SIZE = PREFIX + ".max.payload.size";
-    public static final String CONFIG_OF_AUDIT_LOG_LOGGER_NAME = PREFIX + ".logger.name";
-  }
-
   public static class Lucene {
     public static final String CONFIG_OF_LUCENE_MAX_CLAUSE_COUNT = "pinot.lucene.max.clause.count";
     public static final int DEFAULT_LUCENE_MAX_CLAUSE_COUNT = 1024;
@@ -444,6 +433,11 @@ public class CommonConstants {
 
     public static final String DISABLE_GROOVY = "pinot.broker.disable.query.groovy";
     public static final boolean DEFAULT_DISABLE_GROOVY = true;
+
+    // REGEXP_LIKE adaptive threshold configuration
+    public static final String CONFIG_OF_REGEXP_LIKE_ADAPTIVE_THRESHOLD =
+        "pinot.broker.regexp.dict.cardinality.threshold";
+    public static final double DEFAULT_REGEXP_LIKE_ADAPTIVE_THRESHOLD = 0.1; // 10% threshold
     // Rewrite potential expensive functions to their approximation counterparts
     // - DISTINCT_COUNT -> DISTINCT_COUNT_SMART_HLL
     // - PERCENTILE -> PERCENTILE_SMART_TDIGEST
@@ -471,6 +465,11 @@ public class CommonConstants {
     public static final String CONFIG_OF_ENABLE_PARTITION_METADATA_MANAGER =
         "pinot.broker.enable.partition.metadata.manager";
     public static final boolean DEFAULT_ENABLE_PARTITION_METADATA_MANAGER = true;
+
+    public static final String CONFIG_OF_ROUTING_ASSIGNMENT_CHANGE_PROCESS_PARALLELISM =
+        "pinot.broker.routing.assignment.change.process.parallelism";
+    public static final int DEFAULT_ROUTING_ASSIGNMENT_CHANGE_PROCESS_PARALLELISM =
+        Runtime.getRuntime().availableProcessors();
 
       // When enabled, the broker will set a query option to ignore SERVER_SEGMENT_MISSING errors from servers.
       // This is useful to tolerate short windows where routing has not yet reflected recently deleted segments.
@@ -552,15 +551,29 @@ public class CommonConstants {
 
     /**
      * Default server stage limit for lite mode queries.
-     * This value can always be overridden by {@link Request.QueryOptionKey#LITE_MODE_SERVER_STAGE_LIMIT} query option
+     * This value can always be overridden by {@link Request.QueryOptionKey#LITE_MODE_LEAF_STAGE_LIMIT} query option
      */
     public static final String CONFIG_OF_LITE_MODE_LEAF_STAGE_LIMIT =
         "pinot.broker.multistage.lite.mode.leaf.stage.limit";
     public static final int DEFAULT_LITE_MODE_LEAF_STAGE_LIMIT = 100_000;
 
+    /**
+     * When fan-out adjusted limit is enabled for lite-mode, Pinot will divide the limit set in the leaf stage
+     * with the number of workers executing the leaf stage. This value can always be overridden by
+     * {@link Request.QueryOptionKey#LITE_MODE_LEAF_STAGE_FANOUT_ADJUSTED_LIMIT} query option.
+     */
+    public static final String CONFIG_OF_LITE_MODE_LEAF_STAGE_FANOUT_ADJUSTED_LIMIT =
+        "pinot.broker.multistage.lite.mode.leaf.stage.fanOutAdjustedLimit";
+    public static final int DEFAULT_LITE_MODE_LEAF_STAGE_FAN_OUT_ADJUSTED_LIMIT = -1;
+
     // Config for default hash function used in KeySelector for data shuffling
     public static final String CONFIG_OF_BROKER_DEFAULT_HASH_FUNCTION = "pinot.broker.multistage.default.hash.function";
     public static final String DEFAULT_BROKER_DEFAULT_HASH_FUNCTION = "absHashCode";
+
+    // Config for default single pool segments metric
+    public static final String CONFIG_OF_BROKER_ENABLE_SINGLE_POOL_SEGMENTS_METRIC =
+        "pinot.broker.enable.single.pool.segments.metric";
+    public static final boolean DEFAULT_ENABLE_SINGLE_POOL_SEGMENTS_METRIC = false;
 
     // When the server instance's pool field is null or the pool contains multi distinguished group value, the broker
     // would set the pool to -1 in the routing table for that server.
@@ -589,6 +602,7 @@ public class CommonConstants {
         public static final String ROUTING_OPTIONS = "routingOptions";
         public static final String USE_SCAN_REORDER_OPTIMIZATION = "useScanReorderOpt";
         public static final String MAX_EXECUTION_THREADS = "maxExecutionThreads";
+        public static final String COLLECT_GC_STATS = "collectGCStats";
 
         // For group-by queries with order-by clause, the tail groups are trimmed off to reduce the memory footprint. To
         // ensure the accuracy of the result, {@code max(limit * 5, minTrimSize)} groups are retained. When
@@ -678,7 +692,8 @@ public class CommonConstants {
         // Query option key used to enable a given set of defaultly disabled rules
         public static final String USE_PLANNER_RULES = "usePlannerRules";
 
-        public static final String ORDER_BY_ALGORITHM = "orderByAlgorithm";
+        public static final String ALLOW_REVERSE_ORDER = "allowReverseOrder";
+        public static final boolean DEFAULT_ALLOW_REVERSE_ORDER = false;
 
         public static final String MULTI_STAGE_LEAF_LIMIT = "multiStageLeafLimit";
 
@@ -697,6 +712,11 @@ public class CommonConstants {
 
         public static final String IN_PREDICATE_PRE_SORTED = "inPredicatePreSorted";
         public static final String IN_PREDICATE_LOOKUP_ALGORITHM = "inPredicateLookupAlgorithm";
+
+        // REGEXP_LIKE adaptive threshold - controls when to switch between dictionary-based and scan-based evaluation
+        // When (dictionary_size / num_docs) < threshold, use dictionary-based evaluation
+        // When (dictionary_size / num_docs) >= threshold, use scan-based evaluation
+        public static final String REGEXP_LIKE_ADAPTIVE_THRESHOLD = "regexpDictCardinalityThreshold";
 
         public static final String DROP_RESULTS = "dropResults";
 
@@ -776,7 +796,8 @@ public class CommonConstants {
         public static final String INFER_REALTIME_SEGMENT_PARTITION = "inferRealtimeSegmentPartition";
         public static final String USE_LITE_MODE = "useLiteMode";
         // Server stage limit for lite mode queries.
-        public static final String LITE_MODE_SERVER_STAGE_LIMIT = "liteModeServerStageLimit";
+        public static final String LITE_MODE_LEAF_STAGE_LIMIT = "liteModeLeafStageLimit";
+        public static final String LITE_MODE_LEAF_STAGE_FANOUT_ADJUSTED_LIMIT = "liteModeLeafStageFanOutAdjustedLimit";
         // Used by the MSE Engine to determine whether to use the broker pruning logic. Only supported by the
         // new MSE query optimizer.
         // TODO(mse-physical): Consider removing this query option and making this the default, since there's already
@@ -1273,6 +1294,8 @@ public class CommonConstants {
 
     // Config for realtime consumption message rate limit
     public static final String CONFIG_OF_SERVER_CONSUMPTION_RATE_LIMIT = "pinot.server.consumption.rate.limit";
+    public static final String CONFIG_OF_SERVER_CONSUMPTION_RATE_LIMIT_BYTES =
+        "pinot.server.consumption.rate.limit.bytes";
     // Default to 0.0 (no limit)
     public static final double DEFAULT_SERVER_CONSUMPTION_RATE_LIMIT = 0.0;
 
@@ -1755,7 +1778,8 @@ public class CommonConstants {
       public static final String DOCID = "$docId";
       public static final String HOSTNAME = "$hostName";
       public static final String SEGMENTNAME = "$segmentName";
-      public static final Set<String> BUILT_IN_VIRTUAL_COLUMNS = Set.of(DOCID, HOSTNAME, SEGMENTNAME);
+      public static final String PARTITIONID = "$partitionId";
+      public static final Set<String> BUILT_IN_VIRTUAL_COLUMNS = Set.of(DOCID, HOSTNAME, SEGMENTNAME, PARTITIONID);
     }
   }
 
@@ -1801,6 +1825,29 @@ public class CommonConstants {
         public static final String ENABLE_TRACE = "enableTrace";
         public static final String ENABLE_STREAMING = "enableStreaming";
         public static final String PAYLOAD_TYPE = "payloadType";
+
+        public static class TimeSeries {
+          public static final String LANGUAGE = "language";
+          public static final String START_TIME_SECONDS = "startTimeSeconds";
+          public static final String WINDOW_SECONDS = "windowSeconds";
+          public static final String NUM_ELEMENTS = "numElements";
+          public static final String DEADLINE_MS = "deadlineMs";
+
+          public static final String SEGMENT_MAP_ENTRY_PREFIX = "$segmentMapEntry#";
+
+          public static boolean isKeySegmentList(String key) {
+            return key.startsWith(SEGMENT_MAP_ENTRY_PREFIX);
+          }
+
+          public static String encodeSegmentListKey(String planId) {
+            return SEGMENT_MAP_ENTRY_PREFIX + planId;
+          }
+
+          /// Returns the plan-id corresponding to the encoded key.
+          public static String decodeSegmentListKey(String key) {
+            return key.substring(SEGMENT_MAP_ENTRY_PREFIX.length());
+          }
+        }
       }
 
       public static class PayloadType {
@@ -1812,6 +1859,12 @@ public class CommonConstants {
     public static class Response {
       public static class MetadataKeys {
         public static final String RESPONSE_TYPE = "responseType";
+
+        public static class TimeSeries {
+          public static final String PLAN_ID = "planId";
+          public static final String ERROR_TYPE = "errorType";
+          public static final String ERROR_MESSAGE = "error";
+        }
       }
 
       public static class ResponseType {
@@ -1868,6 +1921,22 @@ public class CommonConstants {
      */
     public static final String KEY_OF_MAX_INBOUND_QUERY_DATA_BLOCK_SIZE_BYTES = "pinot.query.runner.max.msg.size.bytes";
     public static final int DEFAULT_MAX_INBOUND_QUERY_DATA_BLOCK_SIZE_BYTES = 16 * 1024 * 1024;
+
+
+    /**
+     * Configuration for channel idle timeout in seconds.
+     *
+     * gRPC channels go idle after a period of inactivity. When a channel is idle, its resources are released. The next
+     * query using the channel will need to re-establish the connection. This includes the TLS negotiation and therefore
+     * can increase the latency of the query by some milliseconds.
+     *
+     * In normal Pinot clusters that are continuously serving queries, channels should never go idle.
+     * But it could affect clusters that are not continuously serving queries.
+     * This is why by default the channel idle timeout is set to -1, which means that the channel idle timeout is
+     * disabled.
+     */
+    public static final String KEY_OF_CHANNEL_IDLE_TIMEOUT_SECONDS = "pinot.query.runner.channel.idle.timeout.seconds";
+    public static final long DEFAULT_CHANNEL_IDLE_TIMEOUT_SECONDS = -1;
 
     /**
      * Enable splitting of data block payload during mailbox transfer.
