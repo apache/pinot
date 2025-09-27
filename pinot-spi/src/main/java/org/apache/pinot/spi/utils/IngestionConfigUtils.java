@@ -20,8 +20,10 @@ package org.apache.pinot.spi.utils;
 
 import com.google.common.base.Preconditions;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.stream.Collectors;
 import org.apache.commons.collections4.CollectionUtils;
 import org.apache.commons.lang3.StringUtils;
@@ -34,6 +36,7 @@ import org.apache.pinot.spi.config.table.ingestion.IngestionConfig;
 import org.apache.pinot.spi.env.PinotConfiguration;
 import org.apache.pinot.spi.ingestion.batch.BatchConfigProperties;
 import org.apache.pinot.spi.stream.StreamConfig;
+import org.apache.pinot.spi.stream.StreamConsumerFactory;
 
 
 /**
@@ -312,5 +315,26 @@ public final class IngestionConfigUtils {
       return Long.parseLong(pushRetryIntervalMillis);
     }
     return DEFAULT_PUSH_RETRY_INTERVAL_MILLIS;
+  }
+
+  /**
+   * Returns a unique client id which can be used for Stream providers
+   */
+  public static String getTableTopicUniqueClientId(String className, StreamConfig streamConfig) {
+    return StreamConsumerFactory.getUniqueClientId(
+        className + "-" + streamConfig.getTableNameWithType() + "-" + streamConfig.getTopicName());
+  }
+
+  /**
+   * Returns a Map of stream config index to Set of stream partition Ids.
+   * @param pinotPartitionIds Set of pinot partition ids.
+   */
+  public static Map<Integer, Set<Integer>> getStreamConfigIndexToStreamPartitions(Set<Integer> pinotPartitionIds) {
+    Map<Integer, Set<Integer>> streamIndexToPartitions = new HashMap<>();
+    for (Integer partition : pinotPartitionIds) {
+      streamIndexToPartitions.computeIfAbsent(getStreamConfigIndexFromPinotPartitionId(partition),
+          k -> new HashSet<>()).add(getStreamPartitionIdFromPinotPartitionId(partition));
+    }
+    return streamIndexToPartitions;
   }
 }
