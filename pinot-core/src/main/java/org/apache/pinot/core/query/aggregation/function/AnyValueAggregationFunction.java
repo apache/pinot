@@ -117,11 +117,8 @@ public class AnyValueAggregationFunction extends NullableSingleInputAggregationF
     BlockValSet bvs = blockValSetMap.get(_expression);
     ensureResultType(bvs);
     aggregateHelper(length, bvs, (i, value) -> {
-      if (holder.getResult() == null) {
-        holder.setValue(value);
-        return false; // Stop after first value found
-      }
-      return true;
+      holder.setValue(value);
+      return true; // Stop after first value found
     });
   }
 
@@ -135,7 +132,7 @@ public class AnyValueAggregationFunction extends NullableSingleInputAggregationF
       if (holder.getResult(g) == null) {
         holder.setValueForKey(g, value);
       }
-      return true; // Continue processing for other groups
+      return false; // Continue processing for other groups
     });
   }
 
@@ -151,7 +148,7 @@ public class AnyValueAggregationFunction extends NullableSingleInputAggregationF
           holder.setValueForKey(g, value);
         }
       }
-      return true; // Continue processing for other groups
+      return false; // Continue processing for other groups
     });
   }
 
@@ -282,119 +279,24 @@ public class AnyValueAggregationFunction extends NullableSingleInputAggregationF
     }
 
     if (value instanceof Integer) {
-      ByteBuffer buffer = ByteBuffer.allocate(5); // 1 byte type + 4 bytes int
-      buffer.put((byte) 1); // Type 1 = Integer
-      buffer.putInt((Integer) value);
-      return buffer.array();
+      return serializeFixedValue((byte) 1, 4, buffer -> buffer.putInt((Integer) value));
     } else if (value instanceof Long) {
-      ByteBuffer buffer = ByteBuffer.allocate(9); // 1 byte type + 8 bytes long
-      buffer.put((byte) 2); // Type 2 = Long
-      buffer.putLong((Long) value);
-      return buffer.array();
+      return serializeFixedValue((byte) 2, 8, buffer -> buffer.putLong((Long) value));
     } else if (value instanceof Float) {
-      ByteBuffer buffer = ByteBuffer.allocate(5); // 1 byte type + 4 bytes float
-      buffer.put((byte) 3); // Type 3 = Float
-      buffer.putFloat((Float) value);
-      return buffer.array();
+      return serializeFixedValue((byte) 3, 4, buffer -> buffer.putFloat((Float) value));
     } else if (value instanceof Double) {
-      ByteBuffer buffer = ByteBuffer.allocate(9); // 1 byte type + 8 bytes double
-      buffer.put((byte) 4); // Type 4 = Double
-      buffer.putDouble((Double) value);
-      return buffer.array();
+      return serializeFixedValue((byte) 4, 8, buffer -> buffer.putDouble((Double) value));
     } else if (value instanceof String) {
-      byte[] stringBytes = ((String) value).getBytes(StandardCharsets.UTF_8);
-      ByteBuffer buffer = ByteBuffer.allocate(5 + stringBytes.length); // 1 byte type + 4 bytes length + string
-      buffer.put((byte) 5); // Type 5 = String
-      buffer.putInt(stringBytes.length);
-      buffer.put(stringBytes);
-      return buffer.array();
+      return serializeVariableValue((byte) 5, ((String) value).getBytes(StandardCharsets.UTF_8));
     } else if (value instanceof BigDecimal) {
-      String bigDecimalStr = value.toString();
-      byte[] stringBytes = bigDecimalStr.getBytes(StandardCharsets.UTF_8);
-      ByteBuffer buffer = ByteBuffer.allocate(5 + stringBytes.length); // 1 byte type + 4 bytes length + string
-      buffer.put((byte) 6); // Type 6 = BigDecimal
-      buffer.putInt(stringBytes.length);
-      buffer.put(stringBytes);
-      return buffer.array();
+      return serializeVariableValue((byte) 6, value.toString().getBytes(StandardCharsets.UTF_8));
+    } else if (value instanceof byte[]) {
+      return serializeVariableValue((byte) 8, (byte[]) value);
     } else {
       // Fallback to string representation for unknown types
-      String stringValue = value.toString();
-      byte[] stringBytes = stringValue.getBytes(StandardCharsets.UTF_8);
-      ByteBuffer buffer = ByteBuffer.allocate(5 + stringBytes.length); // 1 byte type + 4 bytes length + string
-      buffer.put((byte) 7); // Type 7 = Object toString
-      buffer.putInt(stringBytes.length);
-      buffer.put(stringBytes);
-      return buffer.array();
+      return serializeVariableValue((byte) 7, value.toString().getBytes(StandardCharsets.UTF_8));
     }
   }
-
-  /**
-   * Custom deserialization for ANY_VALUE that handles all supported data types efficiently
-   */
-  private Object deserializeValue(ByteBuffer buffer) {
-    if (!buffer.hasRemaining()) {
-      return null;
-    }
-
-    byte type = buffer.get();
-    switch (type) {
-      case 0: // null
-        return null;
-      case 1: // Integer
-        return buffer.getInt();
-      case 2: // Long
-        return buffer.getLong();
-      case 3: // Float
-        return buffer.getFloat();
-      case 4: // Double
-        return buffer.getDouble();
-      case 5: // String
-        int stringLength = buffer.getInt();
-        byte[] stringBytes = new byte[stringLength];
-        buffer.get(stringBytes);
-        return new String(stringBytes, StandardCharsets.UTF_8);
-      case 6: // BigDecimal
-        int bigDecimalLength = buffer.getInt();
-        byte[] bigDecimalBytes = new byte[bigDecimalLength];
-        buffer.get(bigDecimalBytes);
-        return new BigDecimal(new String(bigDecimalBytes, StandardCharsets.UTF_8));
-      case 7: // Object toString fallback
-        int objectLength = buffer.getInt();
-        byte[] objectBytes = new byte[objectLength];
-        buffer.get(objectBytes);
-        return new String(objectBytes, StandardCharsets.UTF_8);
-      default:
-        throw new IllegalStateException("Unknown serialization type: " + type);
-    }
-  }
-
-  /**
-   * Custom serialization for ANY_VALUE that handles all supported data types efficiently
-   */
-//  private byte[] serializeValue(Object value) {
-//    if (value == null) {
-//      return new byte[]{0}; // Type 0 = null
-//    }
-//
-//    if (value instanceof Integer) {
-//      return serializeFixedValue((byte) 1, 4, buffer -> buffer.putInt((Integer) value));
-//    } else if (value instanceof Long) {
-//      return serializeFixedValue((byte) 2, 8, buffer -> buffer.putLong((Long) value));
-//    } else if (value instanceof Float) {
-//      return serializeFixedValue((byte) 3, 4, buffer -> buffer.putFloat((Float) value));
-//    } else if (value instanceof Double) {
-//      return serializeFixedValue((byte) 4, 8, buffer -> buffer.putDouble((Double) value));
-//    } else if (value instanceof String) {
-//      return serializeVariableValue((byte) 5, ((String) value).getBytes(StandardCharsets.UTF_8));
-//    } else if (value instanceof BigDecimal) {
-//      return serializeVariableValue((byte) 6, value.toString().getBytes(StandardCharsets.UTF_8));
-//    } else if (value instanceof byte[]) {
-//      return serializeVariableValue((byte) 8, (byte[]) value);
-//    } else {
-//      // Fallback to string representation for unknown types
-//      return serializeVariableValue((byte) 7, value.toString().getBytes(StandardCharsets.UTF_8));
-//    }
-//  }
 
   /**
    * Helper method for serializing fixed-length values
@@ -420,34 +322,34 @@ public class AnyValueAggregationFunction extends NullableSingleInputAggregationF
   /**
    * Custom deserialization for ANY_VALUE that handles all supported data types efficiently
    */
-//  private Object deserializeValue(ByteBuffer buffer) {
-//    if (!buffer.hasRemaining()) {
-//      return null;
-//    }
-//    byte type = buffer.get();
-//    switch (type) {
-//      case 0: // null
-//        return null;
-//      case 1: // Integer
-//        return buffer.getInt();
-//      case 2: // Long
-//        return buffer.getLong();
-//      case 3: // Float
-//        return buffer.getFloat();
-//      case 4: // Double
-//        return buffer.getDouble();
-//      case 5: // String
-//        return new String(deserializeVariableBytes(buffer), StandardCharsets.UTF_8);
-//      case 6: // BigDecimal
-//        return new BigDecimal(new String(deserializeVariableBytes(buffer), StandardCharsets.UTF_8));
-//      case 7: // Object toString fallback
-//        return new String(deserializeVariableBytes(buffer), StandardCharsets.UTF_8);
-//      case 8: // BYTES
-//        return deserializeVariableBytes(buffer);
-//      default:
-//        throw new IllegalStateException("Unknown serialization type: " + type);
-//    }
-//  }
+  private Object deserializeValue(ByteBuffer buffer) {
+    if (!buffer.hasRemaining()) {
+      return null;
+    }
+    byte type = buffer.get();
+    switch (type) {
+      case 0: // null
+        return null;
+      case 1: // Integer
+        return buffer.getInt();
+      case 2: // Long
+        return buffer.getLong();
+      case 3: // Float
+        return buffer.getFloat();
+      case 4: // Double
+        return buffer.getDouble();
+      case 5: // String
+        return new String(deserializeVariableBytes(buffer), StandardCharsets.UTF_8);
+      case 6: // BigDecimal
+        return new BigDecimal(new String(deserializeVariableBytes(buffer), StandardCharsets.UTF_8));
+      case 7: // Object toString fallback
+        return new String(deserializeVariableBytes(buffer), StandardCharsets.UTF_8);
+      case 8: // BYTES
+        return deserializeVariableBytes(buffer);
+      default:
+        throw new IllegalStateException("Unknown serialization type: " + type);
+    }
+  }
 
   /**
    * Helper method for deserializing variable-length byte arrays
