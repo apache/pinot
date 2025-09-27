@@ -22,6 +22,7 @@ import com.google.common.collect.Maps;
 import com.google.protobuf.ByteString;
 import com.google.protobuf.UnsafeByteOperations;
 import io.grpc.Metadata;
+import io.grpc.Status;
 import io.grpc.stub.MetadataUtils;
 import io.grpc.stub.StreamObserver;
 import java.io.IOException;
@@ -69,6 +70,8 @@ public class GrpcSendingMailbox implements SendingMailbox {
   private final StatMap<MailboxSendOperator.StatKey> _statMap;
   private final MailboxStatusObserver _statusObserver = new MailboxStatusObserver();
   private final Sender _sender;
+  /// Indicates whether the sending side has attempted to close the mailbox (either via complete() or cancel()).
+  private volatile boolean _closeAttempted;
 
   private StreamObserver<MailboxContent> _contentObserver;
 
@@ -146,6 +149,7 @@ public class GrpcSendingMailbox implements SendingMailbox {
       LOGGER.debug("Already terminated mailbox: {}", _id);
       return;
     }
+    _closeAttempted = true;
     LOGGER.debug("Completing mailbox: {}", _id);
     _contentObserver.onCompleted();
   }
@@ -156,6 +160,7 @@ public class GrpcSendingMailbox implements SendingMailbox {
       LOGGER.debug("Already terminated mailbox: {}", _id);
       return;
     }
+    _closeAttempted = true;
     LOGGER.debug("Cancelling mailbox: {}", _id);
     if (_contentObserver == null) {
       _contentObserver = getContentObserver();
@@ -180,7 +185,10 @@ public class GrpcSendingMailbox implements SendingMailbox {
 
   @Override
   public boolean isTerminated() {
-    return _statusObserver.isFinished();
+    // _closeAttempted is set when the sending side has attempted to close the mailbox (either via complete() or
+    // cancel()). But we also need to return true the gRPC status observer has observed that the connection is closed
+    // (ie due to timeout)
+    return _closeAttempted || _statusObserver.isFinished();
   }
 
   private StreamObserver<MailboxContent> getContentObserver() {
@@ -303,6 +311,16 @@ public class GrpcSendingMailbox implements SendingMailbox {
     }
 
     return result;
+  }
+
+  @Override
+  public void close()
+      throws Exception {
+    if (!isTerminated()) {
+      LOGGER.debug("Closing gPRC mailbox without proper EOS message");
+      _closeAttempted = true;
+      _contentObserver.onError(Status.CANCELLED.asException());
+    }
   }
 
   private static abstract class Sender {
