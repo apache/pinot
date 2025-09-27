@@ -100,6 +100,7 @@ import org.apache.pinot.controller.helix.core.controllerjob.ControllerJobTypes;
 import org.apache.pinot.controller.helix.core.minion.PinotHelixTaskResourceManager;
 import org.apache.pinot.controller.helix.core.minion.PinotTaskManager;
 import org.apache.pinot.controller.helix.core.minion.TaskMetricsEmitter;
+import org.apache.pinot.controller.helix.core.periodictask.ControllerPeriodicTask;
 import org.apache.pinot.controller.helix.core.realtime.PinotLLCRealtimeSegmentManager;
 import org.apache.pinot.controller.helix.core.realtime.SegmentCompletionConfig;
 import org.apache.pinot.controller.helix.core.realtime.SegmentCompletionManager;
@@ -594,6 +595,16 @@ public abstract class BaseControllerStarter implements ServiceStartable {
 
     // Setting up periodic tasks
     List<PeriodicTask> controllerPeriodicTasks = setupControllerPeriodicTasks();
+
+    // Register ControllerPeriodicTasks as cluster config change listeners
+    LOGGER.info("Registering ControllerPeriodicTasks as cluster config change listeners");
+    for (PeriodicTask periodicTask : controllerPeriodicTasks) {
+      if (periodicTask instanceof ControllerPeriodicTask) {
+        ControllerPeriodicTask<?> controllerPeriodicTask = (ControllerPeriodicTask<?>) periodicTask;
+        _clusterConfigChangeHandler.registerClusterConfigChangeListener(controllerPeriodicTask);
+        LOGGER.info("Registered {} as config change listener", controllerPeriodicTask.getTaskName());
+      }
+    }
     LOGGER.info("Init controller periodic tasks scheduler");
     _periodicTaskScheduler = new PeriodicTaskScheduler();
     _periodicTaskScheduler.init(controllerPeriodicTasks);

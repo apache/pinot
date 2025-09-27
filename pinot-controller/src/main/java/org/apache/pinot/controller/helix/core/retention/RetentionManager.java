@@ -79,12 +79,12 @@ public class RetentionManager extends ControllerPeriodicTask<Void> {
   public static final long OLD_LLC_SEGMENTS_RETENTION_IN_MILLIS = TimeUnit.DAYS.toMillis(5L);
   public static final int DEFAULT_UNTRACKED_SEGMENTS_DELETION_BATCH_SIZE = 100;
   private static final RetryPolicy DEFAULT_RETRY_POLICY = RetryPolicies.randomDelayRetryPolicy(20, 100L, 200L);
-  private final boolean _untrackedSegmentDeletionEnabled;
-  private final int _untrackedSegmentsRetentionTimeInDays;
+  private boolean _untrackedSegmentDeletionEnabled;
+  private int _untrackedSegmentsRetentionTimeInDays;
   private final int _agedSegmentsDeletionBatchSize;
 
   private static final Logger LOGGER = LoggerFactory.getLogger(RetentionManager.class);
-  private final boolean _isHybridTableRetentionStrategyEnabled;
+  private boolean _isHybridTableRetentionStrategyEnabled;
   private final BrokerServiceHelper _brokerServiceHelper;
 
   public RetentionManager(PinotHelixResourceManager pinotHelixResourceManager,
@@ -516,5 +516,75 @@ public class RetentionManager extends ControllerPeriodicTask<Void> {
       }
     }
     return new TimeRetentionStrategy(TimeUnit.DAYS, _untrackedSegmentsRetentionTimeInDays);
+  }
+
+  @Override
+  public void onChange(Set<String> changedConfigs, Map<String, String> clusterConfigs) {
+    if (changedConfigs.contains(ControllerConf.ControllerPeriodicTasksConf.ENABLE_UNTRACKED_SEGMENT_DELETION)) {
+      updateUntrackedSegmentDeletionEnabled(
+          clusterConfigs.get(ControllerConf.ControllerPeriodicTasksConf.ENABLE_UNTRACKED_SEGMENT_DELETION));
+    }
+
+    if (changedConfigs.contains(ControllerConf.ControllerPeriodicTasksConf.UNTRACKED_SEGMENTS_RETENTION_TIME_IN_DAYS)) {
+      updateUntrackedSegmentsRetentionTimeInDays(
+          clusterConfigs.get(ControllerConf.ControllerPeriodicTasksConf.UNTRACKED_SEGMENTS_RETENTION_TIME_IN_DAYS));
+    }
+
+    if (changedConfigs.contains(ControllerConf.ENABLE_HYBRID_TABLE_RETENTION_STRATEGY)) {
+      updateHybridTableRetentionStrategyEnabled(
+          clusterConfigs.get(ControllerConf.ENABLE_HYBRID_TABLE_RETENTION_STRATEGY));
+    }
+  }
+
+  private void updateUntrackedSegmentDeletionEnabled(String newValue) {
+    boolean oldValue = _untrackedSegmentDeletionEnabled;
+    try {
+      boolean parsedValue = Boolean.parseBoolean(newValue);
+      if (oldValue == parsedValue) {
+        LOGGER.info("No change in untrackedSegmentDeletionEnabled, current value: {}", oldValue);
+      } else {
+        _untrackedSegmentDeletionEnabled = parsedValue;
+        LOGGER.info("Updated untrackedSegmentDeletionEnabled from {} to {}", oldValue, parsedValue);
+      }
+    } catch (Exception e) {
+      LOGGER.warn("Invalid value for untrackedSegmentDeletionEnabled: {}, keeping current value: {}", newValue,
+          oldValue);
+    }
+  }
+
+  private void updateUntrackedSegmentsRetentionTimeInDays(String newValue) {
+    int oldValue = _untrackedSegmentsRetentionTimeInDays;
+    try {
+      int parsedValue = Integer.parseInt(newValue);
+      if (parsedValue <= 0) {
+        LOGGER.warn(
+            "Invalid value for untrackedSegmentsRetentionTimeInDays: {}, must be positive, keeping current value: {}",
+            parsedValue, oldValue);
+      } else if (oldValue == parsedValue) {
+        LOGGER.info("No change in untrackedSegmentsRetentionTimeInDays, current value: {}", oldValue);
+      } else {
+        _untrackedSegmentsRetentionTimeInDays = parsedValue;
+        LOGGER.info("Updated untrackedSegmentsRetentionTimeInDays from {} to {}", oldValue, parsedValue);
+      }
+    } catch (NumberFormatException e) {
+      LOGGER.warn("Invalid value for untrackedSegmentsRetentionTimeInDays: {}, keeping current value: {}", newValue,
+          oldValue);
+    }
+  }
+
+  private void updateHybridTableRetentionStrategyEnabled(String newValue) {
+    boolean oldValue = _isHybridTableRetentionStrategyEnabled;
+    try {
+      boolean parsedValue = Boolean.parseBoolean(newValue);
+      if (oldValue == parsedValue) {
+        LOGGER.info("No change in isHybridTableRetentionStrategyEnabled, current value: {}", oldValue);
+      } else {
+        _isHybridTableRetentionStrategyEnabled = parsedValue;
+        LOGGER.info("Updated isHybridTableRetentionStrategyEnabled from {} to {}", oldValue, parsedValue);
+      }
+    } catch (Exception e) {
+      LOGGER.warn("Invalid value for isHybridTableRetentionStrategyEnabled: {}, keeping current value: {}", newValue,
+          oldValue);
+    }
   }
 }
