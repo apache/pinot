@@ -158,13 +158,9 @@ public class JsonFunctions {
    */
   @Nullable
   @ScalarFunction
-  public static String jsonPathString(Object object, String jsonPath)
-      throws JsonProcessingException {
+  public static String jsonPathString(Object object, String jsonPath) {
     Object jsonValue = jsonPath(object, jsonPath);
-    if (jsonValue instanceof String) {
-      return (String) jsonValue;
-    }
-    return jsonValue == null ? null : JsonUtils.objectToString(jsonValue);
+    return objToString(jsonValue, null);
   }
 
   /**
@@ -174,10 +170,7 @@ public class JsonFunctions {
   public static String jsonPathString(@Nullable Object object, String jsonPath, String defaultValue) {
     try {
       Object jsonValue = jsonPath(object, jsonPath);
-      if (jsonValue instanceof String) {
-        return (String) jsonValue;
-      }
-      return jsonValue == null ? defaultValue : JsonUtils.objectToString(jsonValue);
+      return objToString(jsonValue, defaultValue);
     } catch (Exception ignore) {
       return defaultValue;
     }
@@ -198,13 +191,28 @@ public class JsonFunctions {
   public static long jsonPathLong(@Nullable Object object, String jsonPath, long defaultValue) {
     try {
       Object jsonValue = jsonPath(object, jsonPath);
-      if (jsonValue == null) {
-        return defaultValue;
-      }
-      if (jsonValue instanceof Number) {
-        return ((Number) jsonValue).longValue();
-      }
-      return Long.parseLong(jsonValue.toString());
+      return objToLong(jsonValue, defaultValue);
+    } catch (Exception ignore) {
+      return defaultValue;
+    }
+  }
+
+  /**
+   * Extract from Json with path to Int
+   */
+  @ScalarFunction
+  public static int jsonPathInt(Object object, String jsonPath) {
+    return jsonPathInt(object, jsonPath, Integer.MIN_VALUE);
+  }
+
+  /**
+   * Extract from Json with path to Int
+   */
+  @ScalarFunction(nullableParameters = true)
+  public static int jsonPathInt(@Nullable Object object, String jsonPath, int defaultValue) {
+    try {
+      Object jsonValue = jsonPath(object, jsonPath);
+      return objToInt(jsonValue, defaultValue);
     } catch (Exception ignore) {
       return defaultValue;
     }
@@ -225,13 +233,28 @@ public class JsonFunctions {
   public static double jsonPathDouble(@Nullable Object object, String jsonPath, double defaultValue) {
     try {
       Object jsonValue = jsonPath(object, jsonPath);
-      if (jsonValue == null) {
-        return defaultValue;
-      }
-      if (jsonValue instanceof Number) {
-        return ((Number) jsonValue).doubleValue();
-      }
-      return Double.parseDouble(jsonValue.toString());
+      return objToDouble(jsonValue, defaultValue);
+    } catch (Exception ignore) {
+      return defaultValue;
+    }
+  }
+
+  /**
+   * Extract from Json with path to Boolean
+   */
+  @ScalarFunction
+  public static boolean jsonPathBoolean(@Nullable Object object, String jsonPath) {
+    return jsonPathBoolean(object, jsonPath, Boolean.FALSE);
+  }
+
+  /**
+   * Extract from Json with path to Boolean
+   */
+  @ScalarFunction
+  public static boolean jsonPathBoolean(@Nullable Object object, String jsonPath, boolean defaultValue) {
+    try {
+      Object jsonValue = jsonPath(object, jsonPath);
+      return objToBoolean(jsonValue, defaultValue);
     } catch (Exception ignore) {
       return defaultValue;
     }
@@ -321,6 +344,177 @@ public class JsonFunctions {
       // Ignore
     }
     return null;
+  }
+
+  @ScalarFunction
+  public static Object jsonExtractScalar(Object jsonInput, String jsonPath, String dataType) {
+    return jsonExtractScalar(jsonInput, jsonPath, dataType, null);
+  }
+
+  @ScalarFunction
+  public static Object jsonExtractScalar(Object jsonInput, String jsonPath, String dataType, Object defaultValue) {
+    try {
+      switch (dataType.toUpperCase()) {
+        case "STRING":
+          return jsonPathString(jsonInput, jsonPath, (String) defaultValue);
+        case "INT":
+          return jsonPathInt(jsonInput, jsonPath, objToInt(defaultValue, 0));
+        case "LONG":
+        case "TIMESTAMP":
+          return jsonPathLong(jsonInput, jsonPath, objToLong(defaultValue, 0L));
+        case "FLOAT":
+        case "DOUBLE":
+          return jsonPathDouble(jsonInput, jsonPath, objToDouble(defaultValue, 0D));
+        case "BOOLEAN":
+          return jsonPathBoolean(jsonInput, jsonPath, objToBoolean(defaultValue, false));
+        case "STRING_ARRAY":
+          return jsonPathStringArray(jsonInput, jsonPath, defaultValue);
+        case "INT_ARRAY":
+          return jsonPathIntArray(jsonInput, jsonPath, defaultValue);
+        case "LONG_ARRAY":
+          return jsonPathLongArray(jsonInput, jsonPath, defaultValue);
+        case "FLOAT_ARRAY":
+        case "DOUBLE_ARRAY":
+          return jsonPathDoubleArray(jsonInput, jsonPath, defaultValue);
+        default:
+          throw new IllegalArgumentException(String.format(
+            "Unsupported results type: %s for jsonExtractScalar function. Supported types are: "
+            + "INT/LONG/FLOAT/DOUBLE/BOOLEAN/BIG_DECIMAL/TIMESTAMP/STRING", dataType.toUpperCase()));
+      }
+    } catch (Exception e) {
+      return defaultValue;
+    }
+  }
+
+  private static String[] jsonPathStringArray(Object jsonInput, String jsonPath, Object defaultValue) {
+    Object[] array = jsonPathArray(jsonInput, jsonPath);
+    if (array == null) {
+      return new String[0];
+    }
+
+    String[] result = new String[array.length];
+    for (int i = 0; i < array.length; i++) {
+      Object o = array[i];
+      result[i] = objToString(o, (String) defaultValue);
+    }
+    return result;
+  }
+
+  private static int[] jsonPathIntArray(Object jsonInput, String jsonPath, Object defaultValue) {
+    Object[] array = jsonPathArray(jsonInput, jsonPath);
+    if (array == null) {
+      return new int[0];
+    }
+
+    int[] result = new int[array.length];
+    for (int i = 0; i < array.length; i++) {
+      Object o = array[i];
+      result[i] = objToInt(o, objToInt(defaultValue, 0));
+    }
+    return result;
+  }
+
+  private static double[] jsonPathDoubleArray(Object jsonInput, String jsonPath, Object defaultValue) {
+    Object[] array = jsonPathArray(jsonInput, jsonPath);
+    if (array == null) {
+      return new double[0];
+    }
+
+    double[] result = new double[array.length];
+    for (int i = 0; i < array.length; i++) {
+      Object o = array[i];
+      result[i] = objToDouble(o, objToDouble(defaultValue, 0D));
+    }
+    return result;
+  }
+
+  private static long[] jsonPathLongArray(Object jsonInput, String jsonPath, Object defaultValue) {
+    Object[] array = jsonPathArray(jsonInput, jsonPath);
+    if (array == null) {
+      return new long[0];
+    }
+
+    long[] result = new long[array.length];
+    for (int i = 0; i < array.length; i++) {
+      Object o = array[i];
+      result[i] = objToLong(o, objToLong(defaultValue, 0L));
+    }
+    return result;
+  }
+
+  private static String objToString(Object obj, String defaultValue) {
+    String res = defaultValue;
+    if (obj != null) {
+      if (obj instanceof String) {
+        res = (String) obj;
+      } else {
+          try {
+              res = JsonUtils.objectToString(obj);
+          } catch (JsonProcessingException ignored) {
+          }
+      }
+    }
+    return res;
+  }
+
+  private static int objToInt(Object obj, int defaultValue) {
+    int res = defaultValue;
+    if (obj != null) {
+      if (obj instanceof Number) {
+        res = ((Number) obj).intValue();
+      } else {
+        try {
+          res = Integer.parseInt(obj.toString());
+        } catch (Exception ignored) {
+        }
+      }
+    }
+    return res;
+  }
+
+  private static double objToDouble(Object obj, double defaultValue) {
+    double res = defaultValue;
+    if (obj != null) {
+      if (obj instanceof Number) {
+        res = ((Number) obj).doubleValue();
+      } else {
+        try {
+          res = Double.parseDouble(obj.toString());
+        } catch (Exception ignored) {
+        }
+      }
+    }
+    return res;
+  }
+
+  private static long objToLong(Object obj, long defaultValue) {
+    long res = defaultValue;
+    if (obj != null) {
+      if (obj instanceof Number) {
+        res = ((Number) obj).longValue();
+      } else {
+        try {
+          res = Long.parseLong(obj.toString());
+        } catch (Exception ignored) {
+        }
+      }
+    }
+    return res;
+  }
+
+  private static boolean objToBoolean(Object obj, boolean defaultValue) {
+    boolean res = defaultValue;
+    if (obj != null) {
+      if (obj instanceof Boolean) {
+        return (Boolean) obj;
+      } else {
+        try {
+          res = Boolean.parseBoolean(obj.toString());
+        } catch (Exception ignored) {
+        }
+      }
+    }
+    return res;
   }
 
   private static void setValuesToMap(String keyColumnName, String valueColumnName, Object obj,

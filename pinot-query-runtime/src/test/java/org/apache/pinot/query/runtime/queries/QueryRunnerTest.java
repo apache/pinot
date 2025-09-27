@@ -337,11 +337,6 @@ public class QueryRunnerTest extends QueryRunnerTestBase {
     //    - checked "Illegal Json Path" as col1 is not actually a json string, but the call is correctly triggered.
     testCases.add(
         new Object[]{"SELECT CAST(jsonExtractScalar(col1, 'path', 'INT') AS INT) FROM a", "Cannot resolve JSON path"});
-    //    - checked function cannot be found b/c there's no intermediate stage impl for json_extract_scalar
-    testCases.add(new Object[]{
-        "SELECT CAST(json_extract_scalar(a.col1, b.col2, 'INT') AS INT) FROM a JOIN b ON a.col1 = b.col1",
-        "Unsupported function: JSONEXTRACTSCALAR"
-    });
 
     // Positive int keys (only included ones that will be parsed for this query)
     for (String key : new String[]{
