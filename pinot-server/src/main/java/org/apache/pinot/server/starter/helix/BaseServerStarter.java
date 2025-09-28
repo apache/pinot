@@ -686,6 +686,14 @@ public abstract class BaseServerStarter implements ServiceStartable {
     ThreadResourceUsageProvider.setThreadMemoryMeasurementEnabled(
         _serverConf.getProperty(Server.CONFIG_OF_ENABLE_THREAD_ALLOCATED_BYTES_MEASUREMENT,
             Server.DEFAULT_THREAD_ALLOCATED_BYTES_MEASUREMENT));
+    // If JVM does not enable thread allocated bytes measurement, disable OOM protection to avoid false actions.
+    if (!ThreadResourceUsageProvider.isThreadMemoryMeasurementEnabled()) {
+      LOGGER.warn("Thread allocated bytes measurement is not enabled by JVM. Disabling OOM protection.");
+      _serverConf.setProperty(
+          CommonConstants.PINOT_QUERY_SCHEDULER_PREFIX + "."
+              + CommonConstants.Accounting.CONFIG_OF_OOM_PROTECTION_KILLING_QUERY,
+          false);
+    }
     // Initialize the thread accountant for query killing
     PinotConfiguration threadAccountantConfigs = _serverConf.subset(CommonConstants.PINOT_QUERY_SCHEDULER_PREFIX);
     // This allows for custom implementations of WorkloadBudgetManager.
