@@ -1578,6 +1578,9 @@ public class CommonConstants {
     public static final String CONFIG_OF_OOM_PROTECTION_KILLING_QUERY = "accounting.oom.enable.killing.query";
     public static final boolean DEFAULT_ENABLE_OOM_PROTECTION_KILLING_QUERY = false;
 
+    public static final String FULLY_QUALIFIED_CONFIG_OF_OOM_PROTECTION_KILLING_QUERY =
+        CommonConstants.PINOT_QUERY_SCHEDULER_PREFIX + "." + CONFIG_OF_OOM_PROTECTION_KILLING_QUERY;
+
     public static final String CONFIG_OF_PUBLISHING_JVM_USAGE = "accounting.publishing.jvm.heap.usage";
     public static final boolean DEFAULT_PUBLISHING_JVM_USAGE = false;
 
