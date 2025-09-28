@@ -382,7 +382,8 @@ public class JsonFunctions {
     }
   }
 
-  private static String jsonPathStringOrThrowIfNoDefault(@Nullable Object object, String jsonPath, Object defaultValue) {
+  private static String jsonPathStringOrThrowIfNoDefault(@Nullable Object object, String jsonPath,
+      Object defaultValue) {
     Object res = null;
     try {
       res = jsonPath(object, jsonPath);
@@ -430,7 +431,8 @@ public class JsonFunctions {
     return objToInt(res, objToInt(defaultValue, 0));
   }
 
-  private static double jsonPathDoubleOrThrowIfNoDefault(@Nullable Object object, String jsonPath, Object defaultValue) {
+  private static double jsonPathDoubleOrThrowIfNoDefault(@Nullable Object object, String jsonPath,
+      Object defaultValue) {
     Object res = null;
     try {
       res = jsonPath(object, jsonPath);
@@ -446,7 +448,8 @@ public class JsonFunctions {
     return objToDouble(res, objToDouble(defaultValue, Double.NaN));
   }
 
-  private static boolean jsonPathBooleanOrThrowIfNoDefault(@Nullable Object object, String jsonPath, Object defaultValue) {
+  private static boolean jsonPathBooleanOrThrowIfNoDefault(@Nullable Object object, String jsonPath,
+      Object defaultValue) {
     Object res = null;
     try {
       res = jsonPath(object, jsonPath);
