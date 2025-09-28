@@ -25,9 +25,13 @@ java -version
 ifconfig
 netstat -i
 
+# Ensure Maven uses tuned GC options in GitHub Actions
+export MAVEN_OPTS="${MAVEN_OPTS:-} -XX:+UseG1GC -XX:-G1UseAdaptiveIHOP -XX:InitiatingHeapOccupancyPercent=60 -XX:G1PeriodicGCInterval=2000 -XX:MaxGCPauseMillis=200"
+
 if [ "$RUN_INTEGRATION_TESTS" != false ]; then
   # Integration Tests
   mvn clean install \
+    -DargLine="-XX:+UseG1GC -XX:-G1UseAdaptiveIHOP -XX:InitiatingHeapOccupancyPercent=60 -XX:G1PeriodicGCInterval=2000 -XX:MaxGCPauseMillis=200" \
     -DskipTests -Dcheckstyle.skip -Dspotless.skip -Denforcer.skip -Dlicense.skip -Dmaven.plugin.appassembler.skip=true \
     -am -B -T 16 -ntp \
     -P github-actions,integration-tests \
@@ -38,6 +42,7 @@ else
   #     due to the -am flag (include dependency modules)
   if [ "$RUN_TEST_SET" == "1" ]; then
     mvn clean install \
+      -DargLine="-XX:+UseG1GC -XX:-G1UseAdaptiveIHOP -XX:InitiatingHeapOccupancyPercent=60 -XX:G1PeriodicGCInterval=2000 -XX:MaxGCPauseMillis=200" \
       -DskipTests -Dcheckstyle.skip -Dspotless.skip -Denforcer.skip -Dlicense.skip -Dmaven.plugin.appassembler.skip=true \
       -am -B -T 16 -ntp \
       -P github-actions \
@@ -51,6 +56,7 @@ else
   fi
   if [ "$RUN_TEST_SET" == "2" ]; then
     mvn clean install \
+      -DargLine="-XX:+UseG1GC -XX:-G1UseAdaptiveIHOP -XX:InitiatingHeapOccupancyPercent=60 -XX:G1PeriodicGCInterval=2000 -XX:MaxGCPauseMillis=200" \
       -DskipTests -Dcheckstyle.skip -Dspotless.skip -Denforcer.skip -Dlicense.skip -Dmaven.plugin.appassembler.skip=true \
       -am -B -T 16 -ntp \
       -P github-actions \
