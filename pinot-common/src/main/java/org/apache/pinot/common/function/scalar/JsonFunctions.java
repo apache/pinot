@@ -353,41 +353,122 @@ public class JsonFunctions {
 
   @ScalarFunction
   public static Object jsonExtractScalar(Object jsonInput, String jsonPath, String dataType, Object defaultValue) {
-    try {
-      switch (dataType.toUpperCase()) {
-        case "STRING":
-          return jsonPathString(jsonInput, jsonPath, (String) defaultValue);
-        case "INT":
-          return jsonPathInt(jsonInput, jsonPath, objToInt(defaultValue, 0));
-        case "LONG":
-        case "TIMESTAMP":
-          return jsonPathLong(jsonInput, jsonPath, objToLong(defaultValue, 0L));
-        case "FLOAT":
-        case "DOUBLE":
-          return jsonPathDouble(jsonInput, jsonPath, objToDouble(defaultValue, 0D));
-        case "BOOLEAN":
-          return jsonPathBoolean(jsonInput, jsonPath, objToBoolean(defaultValue, false));
-        case "STRING_ARRAY":
-          return jsonPathStringArray(jsonInput, jsonPath, defaultValue);
-        case "INT_ARRAY":
-          return jsonPathIntArray(jsonInput, jsonPath, defaultValue);
-        case "LONG_ARRAY":
-          return jsonPathLongArray(jsonInput, jsonPath, defaultValue);
-        case "FLOAT_ARRAY":
-        case "DOUBLE_ARRAY":
-          return jsonPathDoubleArray(jsonInput, jsonPath, defaultValue);
-        default:
-          throw new IllegalArgumentException(String.format(
-            "Unsupported results type: %s for jsonExtractScalar function. Supported types are: "
-            + "INT/LONG/FLOAT/DOUBLE/BOOLEAN/BIG_DECIMAL/TIMESTAMP/STRING", dataType.toUpperCase()));
-      }
-    } catch (Exception e) {
-      return defaultValue;
+    switch (dataType.toUpperCase()) {
+      case "STRING":
+        return jsonPathStringOrThrowIfNoDefault(jsonInput, jsonPath, defaultValue);
+      case "INT":
+        return jsonPathIntOrThrowIfNoDefault(jsonInput, jsonPath, defaultValue);
+      case "LONG":
+      case "TIMESTAMP":
+        return jsonPathLongOrThrowIfNoDefault(jsonInput, jsonPath, defaultValue);
+      case "FLOAT":
+      case "DOUBLE":
+        return jsonPathDoubleOrThrowIfNoDefault(jsonInput, jsonPath, defaultValue);
+      case "BOOLEAN":
+        return jsonPathBooleanOrThrowIfNoDefault(jsonInput, jsonPath, defaultValue);
+      case "STRING_ARRAY":
+        return jsonPathStringArray(jsonInput, jsonPath, defaultValue);
+      case "INT_ARRAY":
+        return jsonPathIntArray(jsonInput, jsonPath, defaultValue);
+      case "LONG_ARRAY":
+        return jsonPathLongArray(jsonInput, jsonPath, defaultValue);
+      case "FLOAT_ARRAY":
+      case "DOUBLE_ARRAY":
+        return jsonPathDoubleArray(jsonInput, jsonPath, defaultValue);
+      default:
+        throw new IllegalArgumentException(String.format(
+          "Unsupported results type: %s for jsonExtractScalar function. Supported types are: "
+          + "INT/LONG/FLOAT/DOUBLE/BOOLEAN/BIG_DECIMAL/TIMESTAMP/STRING", dataType.toUpperCase()));
     }
   }
 
+  private static String jsonPathStringOrThrowIfNoDefault(@Nullable Object object, String jsonPath, Object defaultValue) {
+    Object res = null;
+    try {
+      res = jsonPath(object, jsonPath);
+    } catch (Exception ignored) {
+    }
+
+    if (res == null) {
+      if (defaultValue == null) {
+        throw new IllegalArgumentException(
+                "Cannot resolve JSON path on some records. Consider setting a default value.");
+      }
+    }
+    return objToString(res, objToString(defaultValue, null));
+  }
+
+  private static long jsonPathLongOrThrowIfNoDefault(@Nullable Object object, String jsonPath, Object defaultValue) {
+    Object res = null;
+    try {
+      res = jsonPath(object, jsonPath);
+    } catch (Exception ignored) {
+    }
+
+    if (res == null) {
+      if (defaultValue == null) {
+        throw new IllegalArgumentException(
+                "Cannot resolve JSON path on some records. Consider setting a default value.");
+      }
+    }
+    return objToLong(res, objToLong(defaultValue, 0L));
+  }
+
+  private static int jsonPathIntOrThrowIfNoDefault(@Nullable Object object, String jsonPath, Object defaultValue) {
+    Object res = null;
+    try {
+      res = jsonPath(object, jsonPath);
+    } catch (Exception ignored) {
+    }
+
+    if (res == null) {
+      if (defaultValue == null) {
+        throw new IllegalArgumentException(
+                "Cannot resolve JSON path on some records. Consider setting a default value.");
+      }
+    }
+    return objToInt(res, objToInt(defaultValue, 0));
+  }
+
+  private static double jsonPathDoubleOrThrowIfNoDefault(@Nullable Object object, String jsonPath, Object defaultValue) {
+    Object res = null;
+    try {
+      res = jsonPath(object, jsonPath);
+    } catch (Exception ignored) {
+    }
+
+    if (res == null) {
+      if (defaultValue == null) {
+        throw new IllegalArgumentException(
+                "Cannot resolve JSON path on some records. Consider setting a default value.");
+      }
+    }
+    return objToDouble(res, objToDouble(defaultValue, Double.NaN));
+  }
+
+  private static boolean jsonPathBooleanOrThrowIfNoDefault(@Nullable Object object, String jsonPath, Object defaultValue) {
+    Object res = null;
+    try {
+      res = jsonPath(object, jsonPath);
+    } catch (Exception ignored) {
+    }
+
+    if (res == null) {
+      if (defaultValue == null) {
+        throw new IllegalArgumentException(
+                "Cannot resolve JSON path on some records. Consider setting a default value.");
+      }
+    }
+    return objToBoolean(res, objToBoolean(defaultValue, Boolean.FALSE));
+  }
+
   private static String[] jsonPathStringArray(Object jsonInput, String jsonPath, Object defaultValue) {
-    Object[] array = jsonPathArray(jsonInput, jsonPath);
+    Object[] array = null;
+    try {
+      array = jsonPathArray(jsonInput, jsonPath);
+    } catch (Exception ignored) {
+    }
+
     if (array == null) {
       return new String[0];
     }
@@ -395,13 +476,25 @@ public class JsonFunctions {
     String[] result = new String[array.length];
     for (int i = 0; i < array.length; i++) {
       Object o = array[i];
+      if (o == null) {
+        if (defaultValue == null) {
+          throw new IllegalArgumentException(
+                  "At least one of the resolved JSON arrays include nulls, which is not supported in Pinot. "
+                          + "Consider setting a default value as the fourth argument of json_extract_scalar.");
+        }
+      }
       result[i] = objToString(o, (String) defaultValue);
     }
     return result;
   }
 
   private static int[] jsonPathIntArray(Object jsonInput, String jsonPath, Object defaultValue) {
-    Object[] array = jsonPathArray(jsonInput, jsonPath);
+    Object[] array = null;
+    try {
+      array = jsonPathArray(jsonInput, jsonPath);
+    } catch (Exception ignored) {
+    }
+
     if (array == null) {
       return new int[0];
     }
@@ -409,13 +502,25 @@ public class JsonFunctions {
     int[] result = new int[array.length];
     for (int i = 0; i < array.length; i++) {
       Object o = array[i];
+      if (o == null) {
+        if (defaultValue == null) {
+          throw new IllegalArgumentException(
+                  "At least one of the resolved JSON arrays include nulls, which is not supported in Pinot. "
+                          + "Consider setting a default value as the fourth argument of json_extract_scalar.");
+        }
+      }
       result[i] = objToInt(o, objToInt(defaultValue, 0));
     }
     return result;
   }
 
   private static double[] jsonPathDoubleArray(Object jsonInput, String jsonPath, Object defaultValue) {
-    Object[] array = jsonPathArray(jsonInput, jsonPath);
+    Object[] array = null;
+    try {
+      array = jsonPathArray(jsonInput, jsonPath);
+    } catch (Exception ignored) {
+    }
+
     if (array == null) {
       return new double[0];
     }
@@ -423,13 +528,25 @@ public class JsonFunctions {
     double[] result = new double[array.length];
     for (int i = 0; i < array.length; i++) {
       Object o = array[i];
-      result[i] = objToDouble(o, objToDouble(defaultValue, 0D));
+      if (o == null) {
+        if (defaultValue == null) {
+          throw new IllegalArgumentException(
+                  "At least one of the resolved JSON arrays include nulls, which is not supported in Pinot. "
+                          + "Consider setting a default value as the fourth argument of json_extract_scalar.");
+        }
+      }
+      result[i] = objToDouble(o, objToDouble(defaultValue, Double.NaN));
     }
     return result;
   }
 
   private static long[] jsonPathLongArray(Object jsonInput, String jsonPath, Object defaultValue) {
-    Object[] array = jsonPathArray(jsonInput, jsonPath);
+    Object[] array = null;
+    try {
+      array = jsonPathArray(jsonInput, jsonPath);
+    } catch (Exception ignored) {
+    }
+
     if (array == null) {
       return new long[0];
     }
@@ -437,6 +554,13 @@ public class JsonFunctions {
     long[] result = new long[array.length];
     for (int i = 0; i < array.length; i++) {
       Object o = array[i];
+      if (o == null) {
+        if (defaultValue == null) {
+          throw new IllegalArgumentException(
+                  "At least one of the resolved JSON arrays include nulls, which is not supported in Pinot. "
+                          + "Consider setting a default value as the fourth argument of json_extract_scalar.");
+        }
+      }
       result[i] = objToLong(o, objToLong(defaultValue, 0L));
     }
     return result;
