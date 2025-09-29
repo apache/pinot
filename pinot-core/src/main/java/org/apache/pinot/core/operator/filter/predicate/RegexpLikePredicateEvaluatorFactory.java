@@ -19,14 +19,21 @@
 package org.apache.pinot.core.operator.filter.predicate;
 
 import com.google.common.base.Preconditions;
+import it.unimi.dsi.fastutil.ints.Int2BooleanMap;
+import it.unimi.dsi.fastutil.ints.Int2BooleanOpenHashMap;
 import it.unimi.dsi.fastutil.ints.IntArrayList;
 import it.unimi.dsi.fastutil.ints.IntList;
 import it.unimi.dsi.fastutil.ints.IntOpenHashSet;
 import it.unimi.dsi.fastutil.ints.IntSet;
 import org.apache.pinot.common.request.context.predicate.RegexpLikePredicate;
+import org.apache.pinot.common.utils.config.QueryOptionsUtils;
 import org.apache.pinot.common.utils.regex.Matcher;
+import org.apache.pinot.core.query.request.context.QueryContext;
 import org.apache.pinot.segment.spi.index.reader.Dictionary;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
+import org.apache.pinot.spi.utils.CommonConstants;
+import org.apache.pinot.spi.utils.CommonConstants.Broker;
+
 
 /**
  * Factory for REGEXP_LIKE predicate evaluators.
@@ -42,14 +49,23 @@ public class RegexpLikePredicateEvaluatorFactory {
    * Create a new instance of dictionary based REGEXP_LIKE predicate evaluator.
    *
    * @param regexpLikePredicate REGEXP_LIKE predicate to evaluate
-   * @param dictionary Dictionary for the column
-   * @param dataType Data type for the column
+   * @param dictionary          Dictionary for the column
+   * @param dataType            Data type for the column
+   * @param queryContext
    * @return Dictionary based REGEXP_LIKE predicate evaluator
    */
   public static BaseDictionaryBasedPredicateEvaluator newDictionaryBasedEvaluator(
-      RegexpLikePredicate regexpLikePredicate, Dictionary dictionary, DataType dataType) {
+      RegexpLikePredicate regexpLikePredicate, Dictionary dictionary, DataType dataType, QueryContext queryContext) {
     Preconditions.checkArgument(dataType.getStoredType() == DataType.STRING, "Unsupported data type: " + dataType);
-    if (dictionary.length() < DICTIONARY_CARDINALITY_THRESHOLD_FOR_SCAN) {
+
+    // Get threshold from query options or use default
+    long threshold = Broker.DEFAULT_REGEXP_LIKE_DICTIONARY_THRESHOLD;
+    if (queryContext != null && queryContext.getQueryOptions() != null) {
+      threshold = QueryOptionsUtils.getRegexpLikeAdaptiveThreshold(queryContext.getQueryOptions(),
+          Broker.DEFAULT_REGEXP_LIKE_DICTIONARY_THRESHOLD);
+    }
+
+    if (dictionary.length() < threshold) {
       return new DictIdBasedRegexpLikePredicateEvaluator(regexpLikePredicate, dictionary);
     } else {
       return new ScanBasedRegexpLikePredicateEvaluator(regexpLikePredicate, dictionary);
@@ -121,15 +137,32 @@ public class RegexpLikePredicateEvaluatorFactory {
     // Reuse matcher to avoid excessive allocation. This is safe to do because the evaluator is always used
     // within the scope of a single thread.
     final Matcher _matcher;
+    Int2BooleanMap _dictIdMap;
+    int _matchingIds;
 
     public ScanBasedRegexpLikePredicateEvaluator(RegexpLikePredicate regexpLikePredicate, Dictionary dictionary) {
       super(regexpLikePredicate, dictionary);
       _matcher = regexpLikePredicate.getPattern().matcher("");
+      _dictIdMap = new Int2BooleanOpenHashMap();
+      _matchingIds = 0;
     }
 
     @Override
     public boolean applySV(int dictId) {
-      return _matcher.reset(_dictionary.getStringValue(dictId)).find();
+      if (_dictIdMap.containsKey(dictId)) {
+        return _dictIdMap.get(dictId);
+      }
+      boolean match = _matcher.reset(_dictionary.getStringValue(dictId)).find();
+      _dictIdMap.put(dictId, match);
+      if (match) {
+        _matchingIds++;
+      }
+      return match;
+    }
+
+    @Override
+    public int getNumMatchingItems() {
+      return _matchingIds;
     }
 
     @Override
