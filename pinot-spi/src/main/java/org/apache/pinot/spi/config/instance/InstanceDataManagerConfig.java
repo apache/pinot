@@ -55,6 +55,8 @@ public interface InstanceDataManagerConfig {
 
   int getMaxParallelRefreshThreads();
 
+  boolean isEnableSegmentRefreshAsynchronousHandling();
+
   int getMaxSegmentPreloadThreads();
 
   int getMaxParallelSegmentBuilds();

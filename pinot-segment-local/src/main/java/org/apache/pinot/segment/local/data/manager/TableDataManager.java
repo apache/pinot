@@ -55,6 +55,7 @@ public interface TableDataManager {
   void init(InstanceDataManagerConfig instanceDataManagerConfig, HelixManager helixManager, SegmentLocks segmentLocks,
       TableConfig tableConfig, Schema schema, SegmentReloadSemaphore segmentReloadSemaphore,
       ExecutorService segmentReloadExecutor, @Nullable ExecutorService segmentPreloadExecutor,
+      @Nullable ExecutorService segmentRefreshExecutor,
       @Nullable Cache<Pair<String, String>, SegmentErrorInfo> errorCache,
       @Nullable SegmentOperationsThrottler segmentOperationsThrottler);
 
@@ -160,6 +161,13 @@ public interface TableDataManager {
    * This method is triggered by state transition to CONSUMING state.
    */
   void addConsumingSegment(String segmentName)
+      throws Exception;
+
+  /**
+   * Enqueues a segment to be replaced by a background thread and is to be called instead of replaceSegment() if
+   * background processing is enabled for refresh messages.
+   */
+  void enqueueSegmentToReplace(String segmentName)
       throws Exception;
 
   /**

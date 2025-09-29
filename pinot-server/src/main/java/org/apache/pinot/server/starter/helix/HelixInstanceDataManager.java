@@ -112,6 +112,10 @@ public class HelixInstanceDataManager implements InstanceDataManager {
   private ExecutorService _segmentReloadExecutor;
 
   @Nullable
+  private ExecutorService _segmentRefreshExecutor;
+  private boolean _enableSegmentRefreshAsynchronousHandling;
+
+  @Nullable
   private ExecutorService _segmentPreloadExecutor;
 
   @Override
@@ -159,6 +163,16 @@ public class HelixInstanceDataManager implements InstanceDataManager {
       LOGGER.info("Created SegmentPreloadExecutor with pool size: {}", maxSegmentPreloadThreads);
     } else {
       LOGGER.info("SegmentPreloadExecutor was not created with pool size: {}", maxSegmentPreloadThreads);
+    }
+    _enableSegmentRefreshAsynchronousHandling = isEnableSegmentRefreshAsynchronousHandling();
+    if (_enableSegmentRefreshAsynchronousHandling) {
+      _segmentRefreshExecutor = Executors.newFixedThreadPool(maxParallelRefreshThreads,
+          new ThreadFactoryBuilder().setNameFormat("segment-refresh-thread-%d").build());
+      LOGGER.info("Segment refresh asynchronous handling is enabled, created executor service of size: {}",
+          maxParallelRefreshThreads);
+    } else {
+      LOGGER.info("Segment refresh asynchronous handling is disabled, not creating executor service");
+      _segmentRefreshExecutor = null;
     }
     LOGGER.info("Initialized Helix instance data manager");
 
@@ -245,6 +259,9 @@ public class HelixInstanceDataManager implements InstanceDataManager {
     if (_segmentPreloadExecutor != null) {
       _segmentPreloadExecutor.shutdownNow();
     }
+    if (_segmentRefreshExecutor != null) {
+      _segmentRefreshExecutor.shutdownNow();
+    }
     if (!_tableDataManagerMap.isEmpty()) {
       int numThreads = Math.min(Runtime.getRuntime().availableProcessors(), _tableDataManagerMap.size());
       ExecutorService stopExecutorService = Executors.newFixedThreadPool(numThreads);
@@ -328,7 +345,8 @@ public class HelixInstanceDataManager implements InstanceDataManager {
     TimestampIndexUtils.applyTimestampIndex(tableConfig, schema);
     TableDataManager tableDataManager =
         _tableDataManagerProvider.getTableDataManager(tableConfig, schema, _segmentReloadSemaphore,
-            _segmentReloadExecutor, _segmentPreloadExecutor, _errorCache, _isServerReadyToServeQueries);
+            _segmentReloadExecutor, _segmentPreloadExecutor, _segmentRefreshExecutor, _errorCache,
+            _isServerReadyToServeQueries);
     tableDataManager.start();
     LOGGER.info("Created table data manager for table: {}", tableNameWithType);
     return tableDataManager;
@@ -340,7 +358,13 @@ public class HelixInstanceDataManager implements InstanceDataManager {
     LOGGER.info("Replacing segment: {} in table: {}", segmentName, tableNameWithType);
     TableDataManager tableDataManager = _tableDataManagerMap.get(tableNameWithType);
     if (tableDataManager != null) {
-      tableDataManager.replaceSegment(segmentName);
+      if (_enableSegmentRefreshAsynchronousHandling) {
+        LOGGER.info("Asynchronous segment refresh handling enabled, enqueuing segment: {} to be replaced in table: {}",
+            segmentName, tableNameWithType);
+        tableDataManager.enqueueSegmentToReplace(segmentName);
+      } else {
+        tableDataManager.replaceSegment(segmentName);
+      }
     } else {
       LOGGER.warn("Failed to find data manager for table: {}, skipping replacing segment: {}", tableNameWithType,
           segmentName);
@@ -510,6 +534,11 @@ public class HelixInstanceDataManager implements InstanceDataManager {
   @Override
   public int getMaxParallelRefreshThreads() {
     return _instanceDataManagerConfig.getMaxParallelRefreshThreads();
+  }
+
+  @Override
+  public boolean isEnableSegmentRefreshAsynchronousHandling() {
+    return _instanceDataManagerConfig.isEnableSegmentRefreshAsynchronousHandling();
   }
 
   @Override

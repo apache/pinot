@@ -170,6 +170,11 @@ public interface InstanceDataManager {
   int getMaxParallelRefreshThreads();
 
   /**
+   * Returns true if background processing for SEGMENT_REFRESH is enabled, false otherwise
+   */
+  boolean isEnableSegmentRefreshAsynchronousHandling();
+
+  /**
    * Returns the Helix property store.
    */
   ZkHelixPropertyStore<ZNRecord> getPropertyStore();

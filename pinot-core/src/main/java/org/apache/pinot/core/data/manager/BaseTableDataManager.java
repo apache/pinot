@@ -156,10 +156,15 @@ public abstract class BaseTableDataManager implements TableDataManager {
   protected volatile boolean _shutDown;
   protected volatile boolean _isDeleted;
 
+  // Executor service to process segment refresh if asynchronous handling is enabled
+  @Nullable
+  protected ExecutorService _segmentRefreshExecutor;
+
   @Override
   public void init(InstanceDataManagerConfig instanceDataManagerConfig, HelixManager helixManager,
       SegmentLocks segmentLocks, TableConfig tableConfig, Schema schema, SegmentReloadSemaphore segmentReloadSemaphore,
       ExecutorService segmentReloadExecutor, @Nullable ExecutorService segmentPreloadExecutor,
+      @Nullable ExecutorService segmentRefreshExecutor,
       @Nullable Cache<Pair<String, String>, SegmentErrorInfo> errorCache,
       @Nullable SegmentOperationsThrottler segmentOperationsThrottler) {
     LOGGER.info("Initializing table data manager for table: {}", tableConfig.getTableName());
@@ -172,6 +177,7 @@ public abstract class BaseTableDataManager implements TableDataManager {
     _segmentReloadSemaphore = segmentReloadSemaphore;
     _segmentReloadExecutor = segmentReloadExecutor;
     _segmentPreloadExecutor = segmentPreloadExecutor;
+    _segmentRefreshExecutor = segmentRefreshExecutor;
     _authProvider = AuthProviderUtils.extractAuthProvider(instanceDataManagerConfig.getAuthConfig(), null);
 
     _tableNameWithType = tableConfig.getTableName();
@@ -230,7 +236,11 @@ public abstract class BaseTableDataManager implements TableDataManager {
     } else {
       _segmentDownloadSemaphore = null;
     }
+
     _logger = LoggerFactory.getLogger(_tableNameWithType + "-" + getClass().getSimpleName());
+
+    _logger.info("Asynchronous handling for segment refresh is {}!",
+        _segmentRefreshExecutor == null ? "disabled" : "enabled");
 
     doInit();
 
@@ -446,6 +456,23 @@ public abstract class BaseTableDataManager implements TableDataManager {
     addSegment(ImmutableSegmentLoader.load(indexDir, indexLoadingConfig, _segmentOperationsThrottler), zkMetadata);
     _logger.info("Downloaded and loaded segment: {} with CRC: {} on tier: {}", segmentName, zkMetadata.getCrc(),
         TierConfigUtils.normalizeTierName(zkMetadata.getTier()));
+  }
+
+  @Override
+  public void enqueueSegmentToReplace(String segmentName) {
+    assert _segmentRefreshExecutor != null;
+    if (_shutDown) {
+      _logger.warn("Shutdown in progress, skip enqueuing segment: {} to replace", segmentName);
+      return;
+    }
+    _logger.info("Enqueuing segment: {} to be replaced", segmentName);
+    _segmentRefreshExecutor.submit(() -> {
+      try {
+        replaceSegment(segmentName);
+      } catch (Exception e) {
+        _serverMetrics.addMeteredTableValue(_tableNameWithType, ServerMeter.REFRESH_FAILURES, 1);
+      }
+    });
   }
 
   @Override

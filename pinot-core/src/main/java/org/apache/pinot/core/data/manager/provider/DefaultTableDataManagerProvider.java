@@ -67,7 +67,7 @@ public class DefaultTableDataManagerProvider implements TableDataManagerProvider
   @Override
   public TableDataManager getTableDataManager(TableConfig tableConfig, Schema schema,
       SegmentReloadSemaphore segmentReloadSemaphore, ExecutorService segmentReloadExecutor,
-      @Nullable ExecutorService segmentPreloadExecutor,
+      @Nullable ExecutorService segmentPreloadExecutor, @Nullable ExecutorService segmentRefreshExecutor,
       @Nullable Cache<Pair<String, String>, SegmentErrorInfo> errorCache,
       Supplier<Boolean> isServerReadyToServeQueries) {
     TableDataManager tableDataManager;
@@ -93,7 +93,8 @@ public class DefaultTableDataManagerProvider implements TableDataManagerProvider
         throw new IllegalStateException();
     }
     tableDataManager.init(_instanceDataManagerConfig, _helixManager, _segmentLocks, tableConfig, schema,
-        segmentReloadSemaphore, segmentReloadExecutor, segmentPreloadExecutor, errorCache, _segmentOperationsThrottler);
+        segmentReloadSemaphore, segmentReloadExecutor, segmentPreloadExecutor, segmentRefreshExecutor, errorCache,
+        _segmentOperationsThrottler);
     return tableDataManager;
   }
 }
