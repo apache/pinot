@@ -149,8 +149,8 @@ public class ConsumingSegmentInfoReader {
   /**
    * Calculate partition count from consuming segments using SegmentUtils.
    */
-  private int getPartitionCount(Set<String> consumingSegments, String tableNameWithType) {
-    Set<Integer> uniquePartitionIds = consumingSegments.stream()
+  public int getPartitionCount(Set<String> segmentsList, String tableNameWithType) {
+    Set<Integer> uniquePartitionIds = segmentsList.stream()
         .map(segmentName -> SegmentUtils.getSegmentPartitionId(segmentName, tableNameWithType,
             _pinotHelixResourceManager.getHelixZkManager(), null))
         .filter(Objects::nonNull)

@@ -34,7 +34,6 @@ import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
-import java.util.Objects;
 import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.Executor;
@@ -55,7 +54,6 @@ import org.apache.hc.client5.http.io.HttpClientConnectionManager;
 import org.apache.helix.model.ExternalView;
 import org.apache.helix.model.IdealState;
 import org.apache.pinot.common.utils.DatabaseUtils;
-import org.apache.pinot.common.utils.SegmentUtils;
 import org.apache.pinot.controller.ControllerConf;
 import org.apache.pinot.controller.api.exception.ControllerApplicationException;
 import org.apache.pinot.controller.helix.core.PinotHelixResourceManager;
@@ -437,14 +435,10 @@ public class PinotRealtimeTableResource {
       throw new ControllerApplicationException(LOGGER, String.format("Table %s not found", tableNameWithType),
           Response.Status.NOT_FOUND);
     }
-    Set<Integer> partitionIdSet;
-    partitionIdSet = tableIdealState.getPartitionSet()
-          .stream()
-          .map(segmentName -> SegmentUtils.getSegmentPartitionId(segmentName, tableNameWithType,
-              pinotHelixResourceManager.getHelixZkManager(), null))
-          .filter(Objects::nonNull)
-          .collect(Collectors.toSet());
-    return partitionIdSet.size();
+    Set<String> segmentsList = tableIdealState.getPartitionSet();
+    ConsumingSegmentInfoReader consumingSegmentInfoReader = new ConsumingSegmentInfoReader(_executor,
+        _connectionManager, _pinotHelixResourceManager);
+    return consumingSegmentInfoReader.getPartitionCount(segmentsList, tableNameWithType);
   }
 
 
