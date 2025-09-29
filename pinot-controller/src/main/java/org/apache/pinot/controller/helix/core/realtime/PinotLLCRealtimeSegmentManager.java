@@ -2599,18 +2599,18 @@ public class PinotLLCRealtimeSegmentManager {
 
   /**
    * Re-ingests segments that are in ERROR state in EV but ONLINE in IS with no peer copy on any server. This method
-   * will call the server reingestSegment API
-   * on one of the alive servers that are supposed to host that segment according to IdealState.
-   *
-   * API signature:
-   *   POST http://[serverURL]/reingestSegment/[segmentName]
-   *   Request body (JSON):
-   *
+   * will call the server reingestSegment API on one of the alive servers that are supposed to host that segment
+   * according to IdealState.
+   * <p>
+   * API signature: POST http://[serverURL]/reingestSegment/[segmentName] Request body (JSON):
+   * <p>
    * If segment is in ERROR state in only few replicas but has download URL, we instead trigger a segment reset
-   * @param tableConfig The table config
+   *
+   * @param tableConfig                         The table config
+   * @param segmentAutoResetOnErrorAtValidation flag to determine the reset of segments or not
    */
   public void repairSegmentsInErrorStateForPauselessConsumption(TableConfig tableConfig,
-      boolean repairErrorSegmentsForPartialUpsertOrDedup) {
+      boolean repairErrorSegmentsForPartialUpsertOrDedup, boolean segmentAutoResetOnErrorAtValidation) {
     String realtimeTableName = tableConfig.getTableName();
     // Fetch ideal state and external view
     IdealState idealState = getIdealState(realtimeTableName);
@@ -2654,18 +2654,6 @@ public class PinotLLCRealtimeSegmentManager {
         continue;
       }
 
-      // Skip segments that are not ONLINE in ideal state
-      boolean hasOnlineInstance = false;
-      for (String state : idealStateMap.values()) {
-        if (SegmentStateModel.ONLINE.equals(state)) {
-          hasOnlineInstance = true;
-          break;
-        }
-      }
-      if (!hasOnlineInstance) {
-        continue;
-      }
-
       if (numReplicasInError > 0) {
         segmentsInErrorStateInAtLeastOneReplica.add(segmentName);
       }
@@ -2687,7 +2675,6 @@ public class PinotLLCRealtimeSegmentManager {
         segmentsInErrorStateInAtLeastOneReplica.size(), segmentsInErrorStateInAtLeastOneReplica,
         segmentsInErrorStateInAllReplicas.size(), segmentsInErrorStateInAllReplicas, realtimeTableName);
 
-    LOGGER.info("Repairing error segments in table: {}.", realtimeTableName);
     _controllerMetrics.setOrUpdateTableGauge(realtimeTableName, ControllerGauge.PAUSELESS_SEGMENTS_IN_ERROR_COUNT,
         segmentsInErrorStateInAllReplicas.size());
 
@@ -2733,7 +2720,7 @@ public class PinotLLCRealtimeSegmentManager {
         } catch (Exception e) {
           LOGGER.error("Failed to call reingestSegment for segment: {} on server: {}", segmentName, aliveServer, e);
         }
-      } else {
+      } else if (segmentAutoResetOnErrorAtValidation) {
         _helixResourceManager.resetSegment(realtimeTableName, segmentName, null);
       }
     }

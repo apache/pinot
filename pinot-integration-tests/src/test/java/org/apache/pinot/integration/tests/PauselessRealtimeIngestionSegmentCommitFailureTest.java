@@ -33,6 +33,8 @@ import org.apache.pinot.controller.ControllerConf;
 import org.apache.pinot.controller.helix.core.realtime.PinotLLCRealtimeSegmentManager;
 import org.apache.pinot.integration.tests.realtime.utils.FailureInjectingControllerStarter;
 import org.apache.pinot.integration.tests.realtime.utils.FailureInjectingPinotLLCRealtimeSegmentManager;
+import org.apache.pinot.integration.tests.realtime.utils.FailureInjectingTableConfig;
+import org.apache.pinot.integration.tests.realtime.utils.FailureInjectingTableDataManagerProvider;
 import org.apache.pinot.server.starter.helix.HelixInstanceDataManagerConfig;
 import org.apache.pinot.spi.config.table.IndexingConfig;
 import org.apache.pinot.spi.config.table.TableConfig;
@@ -49,7 +51,6 @@ import org.testng.annotations.AfterClass;
 import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
 
-import static org.apache.pinot.integration.tests.realtime.utils.FailureInjectingRealtimeTableDataManager.MAX_NUMBER_OF_FAILURES;
 import static org.testng.Assert.assertEquals;
 import static org.testng.Assert.assertFalse;
 import static org.testng.Assert.assertNotNull;
@@ -75,6 +76,8 @@ public class PauselessRealtimeIngestionSegmentCommitFailureTest extends BaseClus
         "true");
     serverConf.setProperty("pinot.server.instance." + CommonConstants.Server.TABLE_DATA_MANAGER_PROVIDER_CLASS,
         "org.apache.pinot.integration.tests.realtime.utils.FailureInjectingTableDataManagerProvider");
+    serverConf.setProperty("pinot.server.instance." + FailureInjectingTableDataManagerProvider.FAILURE_CONFIG_KEY + "."
+        + getPauselessTableName(), new FailureInjectingTableConfig(true, false, getExpectedMaxFailures()).toJson());
   }
 
   @Override
@@ -115,7 +118,7 @@ public class PauselessRealtimeIngestionSegmentCommitFailureTest extends BaseClus
     waitForDocsLoaded(600_000L, true, tableConfig2.getTableName());
 
     // create schema for pauseless table
-    schema.setSchemaName(DEFAULT_TABLE_NAME);
+    schema.setSchemaName(getPauselessTableName());
     addSchema(schema);
 
     // add pauseless table
@@ -136,8 +139,12 @@ public class PauselessRealtimeIngestionSegmentCommitFailureTest extends BaseClus
 
     addTableConfig(tableConfig);
     String realtimeTableName = tableConfig.getTableName();
-    TestUtils.waitForCondition(aVoid -> getNumErrorSegmentsInEV(realtimeTableName) == MAX_NUMBER_OF_FAILURES, 600_000L,
-        "Segments still not in error state");
+    TestUtils.waitForCondition(aVoid -> getNumErrorSegmentsInEV(realtimeTableName) == getExpectedMaxFailures(),
+        600_000L, "Segments still not in error state");
+  }
+
+  protected int getExpectedMaxFailures() {
+    return 10;
   }
 
   protected void setMaxSegmentCompletionTimeMillis() {
@@ -168,10 +175,10 @@ public class PauselessRealtimeIngestionSegmentCommitFailureTest extends BaseClus
   @Test
   public void testSegmentAssignment()
       throws Exception {
-    String realtimeTableName = TableNameBuilder.REALTIME.tableNameWithType(getTableName());
+    String pauselessTableName = TableNameBuilder.REALTIME.tableNameWithType(getPauselessTableName());
 
     // 1) Capture which segments went into the ERROR state
-    List<String> erroredSegments = getErrorSegmentsInEV(realtimeTableName);
+    List<String> erroredSegments = getSegmentsInEV(pauselessTableName, SegmentStateModel.ERROR);
     assertFalse(erroredSegments.isEmpty(), "No segments found in ERROR state, expected at least one.");
 
     // Let the RealtimeSegmentValidationManager run so it can fix up segments
@@ -179,30 +186,34 @@ public class PauselessRealtimeIngestionSegmentCommitFailureTest extends BaseClus
     _controllerStarter.getRealtimeSegmentValidationManager().run();
 
     // Wait until there are no ERROR segments in the ExternalView
-    TestUtils.waitForCondition(aVoid -> getErrorSegmentsInEV(realtimeTableName).isEmpty(), 600_000L,
-        "Some segments are still in ERROR state after resetSegments()");
+    TestUtils.waitForCondition(aVoid -> getSegmentsInEV(pauselessTableName, SegmentStateModel.ERROR).isEmpty(),
+        600_000L, "Some segments are still in ERROR state after resetSegments()");
+    // Segment in EV must not be offline for pauseless table
+    TestUtils.waitForCondition(aVoid -> getSegmentsInEV(pauselessTableName, SegmentStateModel.OFFLINE).isEmpty(),
+        30_000L, "Some segments are in OFFLINE state after resetSegments()");
 
     // Finally compare metadata across your two tables
-    compareZKMetadataForSegments(_helixResourceManager.getSegmentsZKMetadata(realtimeTableName),
-        _helixResourceManager.getSegmentsZKMetadata(TableNameBuilder.REALTIME.tableNameWithType(DEFAULT_TABLE_NAME_2)));
+    compareZKMetadataForSegments(_helixResourceManager.getSegmentsZKMetadata(pauselessTableName),
+        _helixResourceManager.getSegmentsZKMetadata(
+            TableNameBuilder.REALTIME.tableNameWithType(getNonPauselessTableName())));
   }
 
   /**
    * Returns the list of segment names in ERROR state from the ExternalView of the given table.
    */
-  private List<String> getErrorSegmentsInEV(String realtimeTableName) {
+  private List<String> getSegmentsInEV(String realtimeTableName, String status) {
     ExternalView externalView = _helixResourceManager.getHelixAdmin()
         .getResourceExternalView(_helixResourceManager.getHelixClusterName(), realtimeTableName);
     if (externalView == null) {
       return List.of();
     }
-    List<String> errorSegments = new ArrayList<>();
+    List<String> segmentsToReturn = new ArrayList<>();
     for (Map.Entry<String, Map<String, String>> entry : externalView.getRecord().getMapFields().entrySet()) {
-      if (entry.getValue().containsValue(SegmentStateModel.ERROR)) {
-        errorSegments.add(entry.getKey());
+      if (entry.getValue().containsValue(status)) {
+        segmentsToReturn.add(entry.getKey());
       }
     }
-    return errorSegments;
+    return segmentsToReturn;
   }
 
   private void compareZKMetadataForSegments(List<SegmentZKMetadata> segmentsZKMetadata,
