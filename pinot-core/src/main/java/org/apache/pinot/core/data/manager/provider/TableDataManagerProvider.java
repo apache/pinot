@@ -47,14 +47,14 @@ public interface TableDataManagerProvider {
       @Nullable SegmentOperationsThrottler segmentOperationsThrottler);
 
   TableDataManager getTableDataManager(TableConfig tableConfig, Schema schema,
-      SegmentReloadSemaphore segmentRefreshSemaphore, ExecutorService segmentRefreshExecutor,
-      @Nullable ExecutorService segmentPreloadExecutor,
+      SegmentReloadSemaphore segmentRefreshSemaphore, ExecutorService segmentReloadExecutor,
+      @Nullable ExecutorService segmentPreloadExecutor, @Nullable ExecutorService segmentRefreshExecutor,
       @Nullable Cache<Pair<String, String>, SegmentErrorInfo> errorCache,
       Supplier<Boolean> isServerReadyToServeQueries);
 
   @VisibleForTesting
   default TableDataManager getTableDataManager(TableConfig tableConfig, Schema schema) {
     return getTableDataManager(tableConfig, schema, new SegmentReloadSemaphore(1), Executors.newSingleThreadExecutor(),
-        null, null, () -> true);
+        null, null, null, () -> true);
   }
 }

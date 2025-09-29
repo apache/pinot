@@ -35,9 +35,9 @@ public class SegmentReloadSemaphore {
   public void acquire(String segmentName, Logger logger)
       throws InterruptedException {
     long startTimeMs = System.currentTimeMillis();
-    logger.info("Waiting for lock to reload: {}, queue-length: {}", segmentName, _semaphore.getQueueLength());
+    logger.info("Waiting for lock to reload/refresh: {}, queue-length: {}", segmentName, _semaphore.getQueueLength());
     _semaphore.acquire();
-    logger.info("Acquired lock to reload segment: {} (lock-time={}ms, queue-length={})", segmentName,
+    logger.info("Acquired lock to reload/refresh segment: {} (lock-time={}ms, queue-length={})", segmentName,
         System.currentTimeMillis() - startTimeMs, _semaphore.getQueueLength());
   }
 
