@@ -211,7 +211,6 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
             .putIfAbsent(Broker.Request.QueryOptionKey.ENABLE_NULL_HANDLING, _enableNullHandling);
       }
 
-
       BrokerResponse brokerResponse =
           handleRequest(requestId, query, sqlNodeAndOptions, request, requesterIdentity, requestContext, httpHeaders,
               accessControl);
