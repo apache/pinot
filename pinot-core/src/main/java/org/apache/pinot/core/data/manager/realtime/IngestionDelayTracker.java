@@ -95,6 +95,7 @@ public class IngestionDelayTracker {
 
   private static class IngestionInfo {
     volatile long _ingestionTimeMs;
+    @Nullable
     volatile StreamPartitionMsgOffset _currentOffset;
 
     IngestionInfo(long ingestionTimeMs, @Nullable StreamPartitionMsgOffset currentOffset) {
@@ -556,8 +557,16 @@ public class IngestionDelayTracker {
     IngestionInfo ingestionInfo = _ingestionInfoMap.get(partitionId);
     long currentOffset = 0;
     if (ingestionInfo != null) {
-      assert ingestionInfo._currentOffset instanceof LongMsgOffset;
-      currentOffset = ((LongMsgOffset) (ingestionInfo._currentOffset)).getOffset();
+      StreamPartitionMsgOffset currentMsgOffset = ingestionInfo._currentOffset;
+      if (currentMsgOffset == null) {
+        // If currentOffset is set to null, it means:
+        // 1. The stream does not support offset lag (example: Kinesis). But if this was true,
+        // IngestionOffsetLag gauge will not be created and this method will never be called.
+        // 2. Server has caught up. Think of scenario where server restarts and server is already caught up.
+        return 0;
+      }
+      assert currentMsgOffset instanceof LongMsgOffset;
+      currentOffset = ((LongMsgOffset) currentMsgOffset).getOffset();
     }
     assert latestOffset instanceof LongMsgOffset;
     return Math.max(0, ((LongMsgOffset) latestOffset).getOffset() - currentOffset);
@@ -574,10 +583,16 @@ public class IngestionDelayTracker {
     if (ingestionInfo == null) {
       return 0;
     }
-    StreamPartitionMsgOffset currentOffset = ingestionInfo._currentOffset;
-    assert currentOffset != null;
-    assert currentOffset instanceof LongMsgOffset;
-    return ((LongMsgOffset) currentOffset).getOffset();
+    StreamPartitionMsgOffset currentMsgOffset = ingestionInfo._currentOffset;
+    if (currentMsgOffset == null) {
+      // If currentOffset is set to null, it means:
+      // 1. The stream does not support offset lag (example: Kinesis). But if this was true,
+      // IngestionOffsetLag gauge will not be created and this method will never be called.
+      // 2. Server has caught up. Think of scenario where server restarts and server is already caught up.
+      return 0;
+    }
+    assert currentMsgOffset instanceof LongMsgOffset;
+    return ((LongMsgOffset) currentMsgOffset).getOffset();
   }
 
   /**
