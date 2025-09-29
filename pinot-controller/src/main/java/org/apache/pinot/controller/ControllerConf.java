@@ -240,6 +240,10 @@ public class ControllerConf extends PinotConfiguration {
         "controller.retentionManager.initialDelayInSeconds";
     public static final String OFFLINE_SEGMENT_INTERVAL_CHECKER_INITIAL_DELAY_IN_SECONDS =
         "controller.offlineSegmentIntervalChecker.initialDelayInSeconds";
+    public static final String OFFLINE_SEGMENT_VALIDATION_FREQUENCY_PERIOD =
+        "controller.offline.segment.validation.frequencyPeriod";
+
+
     @Deprecated
     // RealtimeSegmentRelocator has been rebranded as SegmentRelocator
     public static final String DEPRECATED_REALTIME_SEGMENT_RELOCATION_INITIAL_DELAY_IN_SECONDS =
@@ -274,6 +278,9 @@ public class ControllerConf extends PinotConfiguration {
     public static final String UNTRACKED_SEGMENTS_RETENTION_TIME_IN_DAYS =
         "controller.retentionManager.untrackedSegmentsRetentionTimeInDays";
     public static final int DEFAULT_UNTRACKED_SEGMENTS_RETENTION_TIME_IN_DAYS = 3;
+    public static final String AGED_SEGMENTS_DELETION_BATCH_SIZE =
+        "controller.retentionManager.agedSegmentsDeletionBatchSize";
+    public static final int DEFAULT_AGED_SEGMENTS_DELETION_BATCH_SIZE = 1000;
     public static final int MIN_INITIAL_DELAY_IN_SECONDS = 120;
     public static final int MAX_INITIAL_DELAY_IN_SECONDS = 300;
     public static final int DEFAULT_SPLIT_COMMIT_TMP_SEGMENT_LIFETIME_SECOND = 60 * 60; // 1 Hour.
@@ -287,6 +294,7 @@ public class ControllerConf extends PinotConfiguration {
     // Default values
     public static final int DEFAULT_RETENTION_MANAGER_FREQUENCY_IN_SECONDS = 6 * 60 * 60; // 6 Hours.
     public static final int DEFAULT_OFFLINE_SEGMENT_INTERVAL_CHECKER_FREQUENCY_IN_SECONDS = 24 * 60 * 60; // 24 Hours.
+    public static final int DEFAULT_OFFLINE_SEGMENT_VALIDATION_FREQUENCY_IN_SECONDS = 60 * 60; // 1 Hour.
     public static final int DEFAULT_REALTIME_SEGMENT_VALIDATION_FREQUENCY_IN_SECONDS = 60 * 60; // 1 Hour.
     public static final int DEFAULT_REALTIME_OFFSET_AUTO_RESET_BACKFILL_FREQUENCY_IN_SECONDS = 60 * 60; // 1 Hour.
     public static final int DEFAULT_BROKER_RESOURCE_VALIDATION_FREQUENCY_IN_SECONDS = 60 * 60; // 1 Hour.
@@ -1193,6 +1201,19 @@ public class ControllerConf extends PinotConfiguration {
         ControllerPeriodicTasksConf.getRandomInitialDelayInSeconds());
   }
 
+  public int getOfflineSegmentValidationFrequencyInSeconds() {
+    return Optional.ofNullable(getProperty(ControllerPeriodicTasksConf.OFFLINE_SEGMENT_VALIDATION_FREQUENCY_PERIOD))
+        .filter(period -> isValidPeriodWithLogging(
+            ControllerPeriodicTasksConf.OFFLINE_SEGMENT_VALIDATION_FREQUENCY_PERIOD, period))
+        .map(period -> (int) convertPeriodToSeconds(period))
+        .orElse(ControllerPeriodicTasksConf.DEFAULT_OFFLINE_SEGMENT_VALIDATION_FREQUENCY_IN_SECONDS);
+  }
+
+  public void setOfflineSegmentValidationFrequencyInSeconds(int validationFrequencyInSeconds) {
+    setProperty(ControllerPeriodicTasksConf.OFFLINE_SEGMENT_VALIDATION_FREQUENCY_PERIOD,
+        TimeUtils.convertMillisToPeriod(validationFrequencyInSeconds * 1000L));
+  }
+
   public long getRealtimeSegmentValidationManagerInitialDelaySeconds() {
     return getProperty(ControllerPeriodicTasksConf.REALTIME_SEGMENT_VALIDATION_INITIAL_DELAY_IN_SECONDS,
         getPeriodicTaskInitialDelayInSeconds());
@@ -1235,6 +1256,15 @@ public class ControllerConf extends PinotConfiguration {
 
   public void setUntrackedSegmentDeletionEnabled(boolean untrackedSegmentDeletionEnabled) {
     setProperty(ControllerPeriodicTasksConf.ENABLE_UNTRACKED_SEGMENT_DELETION, untrackedSegmentDeletionEnabled);
+  }
+
+  public int getAgedSegmentsDeletionBatchSize() {
+    return getProperty(ControllerPeriodicTasksConf.AGED_SEGMENTS_DELETION_BATCH_SIZE,
+        ControllerPeriodicTasksConf.DEFAULT_AGED_SEGMENTS_DELETION_BATCH_SIZE);
+  }
+
+  public void setAgedSegmentsDeletionBatchSize(int agedSegmentsDeletionBatchSize) {
+    setProperty(ControllerPeriodicTasksConf.AGED_SEGMENTS_DELETION_BATCH_SIZE, agedSegmentsDeletionBatchSize);
   }
 
   public long getPinotTaskManagerInitialDelaySeconds() {

@@ -741,4 +741,12 @@ public class ControllerRequestURLBuilder {
   public String forClusterConfigDelete(String config) {
     return StringUtil.join("/", _baseUrl, "cluster", "configs", config);
   }
+
+  public String forQueryWorkloadConfigUpdate() {
+    return StringUtil.join("/", _baseUrl, "queryWorkloadConfigs");
+  }
+
+  public String forBaseQueryWorkloadConfig(String config) {
+    return StringUtil.join("/", _baseUrl, "queryWorkloadConfigs", config);
+  }
 }

@@ -24,8 +24,10 @@ import org.apache.pinot.common.request.context.ExpressionContext;
 import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.core.common.BlockValSet;
 import org.apache.pinot.core.query.aggregation.AggregationResultHolder;
+import org.apache.pinot.core.query.aggregation.LongAggregateResultHolder;
 import org.apache.pinot.core.query.aggregation.ObjectAggregationResultHolder;
 import org.apache.pinot.core.query.aggregation.groupby.GroupByResultHolder;
+import org.apache.pinot.core.query.aggregation.groupby.LongGroupByResultHolder;
 import org.apache.pinot.core.query.aggregation.groupby.ObjectGroupByResultHolder;
 import org.apache.pinot.segment.spi.AggregationFunctionType;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
@@ -44,6 +46,7 @@ import org.apache.pinot.spi.data.FieldSpec.DataType;
  */
 public class SumIntAggregationFunction extends NullableSingleInputAggregationFunction<Long, Long> {
   public static final String FUNCTION_NAME = "sumInt";
+  private static final long DEFAULT_VALUE = 0L;
 
   public SumIntAggregationFunction(List<ExpressionContext> arguments, boolean nullHandlingEnabled) {
     super(arguments.get(0), nullHandlingEnabled);
@@ -56,12 +59,20 @@ public class SumIntAggregationFunction extends NullableSingleInputAggregationFun
 
   @Override
   public AggregationResultHolder createAggregationResultHolder() {
-    return new ObjectAggregationResultHolder();
+    if (_nullHandlingEnabled) {
+      return new ObjectAggregationResultHolder();
+    } else {
+      return new LongAggregateResultHolder(DEFAULT_VALUE);
+    }
   }
 
   @Override
   public GroupByResultHolder createGroupByResultHolder(int initialCapacity, int maxCapacity) {
-    return new ObjectGroupByResultHolder(initialCapacity, maxCapacity);
+    if (_nullHandlingEnabled) {
+      return new ObjectGroupByResultHolder(initialCapacity, maxCapacity);
+    } else {
+      return new LongGroupByResultHolder(initialCapacity, maxCapacity, DEFAULT_VALUE);
+    }
   }
 
   @Override
@@ -84,20 +95,18 @@ public class SumIntAggregationFunction extends NullableSingleInputAggregationFun
       return acum == null ? innerSum : acum + innerSum;
     });
 
-    // Update the result holder
-    ObjectAggregationResultHolder objectHolder = (ObjectAggregationResultHolder) aggregationResultHolder;
-    Long existingResult = (Long) objectHolder.getResult();
-    long existingSum = existingResult == null ? 0L : existingResult;
+    updateAggregationResultHolder(aggregationResultHolder, sum);
+  }
 
-    // If sum is null (no non-null values processed), handle according to null handling setting
-    if (sum == null) {
+  private void updateAggregationResultHolder(AggregationResultHolder aggregationResultHolder, Long sum) {
+    if (sum != null) {
       if (_nullHandlingEnabled) {
-        objectHolder.setValue((Object) null);
+        Long otherSum = aggregationResultHolder.getResult();
+        aggregationResultHolder.setValue(otherSum == null ? sum : otherSum + sum);
       } else {
-        objectHolder.setValue((Object) existingSum);
+        long otherSum = aggregationResultHolder.getLongResult();
+        aggregationResultHolder.setValue(otherSum + sum);
       }
-    } else {
-      objectHolder.setValue((Object) (existingSum + sum));
     }
   }
 
@@ -112,20 +121,16 @@ public class SumIntAggregationFunction extends NullableSingleInputAggregationFun
       forEachNotNull(length, blockValSet, (from, to) -> {
         for (int i = from; i < to; i++) {
           int groupKey = groupKeyArray[i];
-          Long existingResult = (Long) groupByResultHolder.getResult(groupKey);
-          long existingSum = existingResult == null ? 0L : existingResult;
-          long newSum = existingSum + values[i];
-          groupByResultHolder.setValueForKey(groupKey, (Object) newSum);
+          Long existingResult = groupByResultHolder.getResult(groupKey);
+          groupByResultHolder.setValueForKey(groupKey,
+              (existingResult == null ? values[i] : values[i] + existingResult));
         }
       });
     } else {
       // Process all values when null handling is disabled
       for (int i = 0; i < length; i++) {
         int groupKey = groupKeyArray[i];
-        Long existingResult = (Long) groupByResultHolder.getResult(groupKey);
-        long existingSum = existingResult == null ? 0L : existingResult;
-        long newSum = existingSum + values[i];
-        groupByResultHolder.setValueForKey(groupKey, (Object) newSum);
+        groupByResultHolder.setValueForKey(groupKey, groupByResultHolder.getLongResult(groupKey) + values[i]);
       }
     }
   }
@@ -142,10 +147,8 @@ public class SumIntAggregationFunction extends NullableSingleInputAggregationFun
         for (int i = from; i < to; i++) {
           int value = values[i];
           for (int groupKey : groupKeysArray[i]) {
-            Long existingResult = (Long) groupByResultHolder.getResult(groupKey);
-            long existingSum = existingResult == null ? 0L : existingResult;
-            long newSum = existingSum + value;
-            groupByResultHolder.setValueForKey(groupKey, (Object) newSum);
+            Long existingResult = groupByResultHolder.getResult(groupKey);
+            groupByResultHolder.setValueForKey(groupKey, existingResult == null ? value : existingResult + value);
           }
         }
       });
@@ -154,10 +157,7 @@ public class SumIntAggregationFunction extends NullableSingleInputAggregationFun
       for (int i = 0; i < length; i++) {
         int value = values[i];
         for (int groupKey : groupKeysArray[i]) {
-          Long existingResult = (Long) groupByResultHolder.getResult(groupKey);
-          long existingSum = existingResult == null ? 0L : existingResult;
-          long newSum = existingSum + value;
-          groupByResultHolder.setValueForKey(groupKey, (Object) newSum);
+          groupByResultHolder.setValueForKey(groupKey, groupByResultHolder.getLongResult(groupKey) + value);
         }
       }
     }
@@ -165,22 +165,18 @@ public class SumIntAggregationFunction extends NullableSingleInputAggregationFun
 
   @Override
   public Long extractAggregationResult(AggregationResultHolder aggregationResultHolder) {
-    Long result = (Long) aggregationResultHolder.getResult();
-    if (result == null) {
-      // Return null when null handling is enabled, 0L when disabled
-      return _nullHandlingEnabled ? null : 0L;
+    if (_nullHandlingEnabled) {
+      return aggregationResultHolder.getResult();
     }
-    return result;
+    return aggregationResultHolder.getLongResult();
   }
 
   @Override
   public Long extractGroupByResult(GroupByResultHolder groupByResultHolder, int groupKey) {
-    Long result = (Long) groupByResultHolder.getResult(groupKey);
-    if (result == null) {
-      // Return null when null handling is enabled, 0L when disabled
-      return _nullHandlingEnabled ? null : 0L;
+    if (_nullHandlingEnabled) {
+      return groupByResultHolder.getResult(groupKey);
     }
-    return result;
+    return groupByResultHolder.getLongResult(groupKey);
   }
 
   @Override
