@@ -97,7 +97,12 @@ public class GrpcSendingMailbox implements SendingMailbox {
   @Override
   public void send(MseBlock.Eos block, List<DataBuffer> serializedStats)
       throws IOException, TimeoutException {
-    sendInternal(block, serializedStats);
+    try {
+      sendInternal(block, serializedStats);
+    } finally {
+      LOGGER.debug("Completing mailbox: {}", _id);
+      _contentObserver.onCompleted();
+    }
   }
 
   private void sendInternal(MseBlock block, List<DataBuffer> serializedStats)
@@ -138,16 +143,6 @@ public class GrpcSendingMailbox implements SendingMailbox {
     } finally {
       _statMap.merge(MailboxSendOperator.StatKey.SERIALIZATION_TIME_MS, System.currentTimeMillis() - start);
     }
-  }
-
-  @Override
-  public void complete() {
-    if (isTerminated()) {
-      LOGGER.debug("Already terminated mailbox: {}", _id);
-      return;
-    }
-    LOGGER.debug("Completing mailbox: {}", _id);
-    _contentObserver.onCompleted();
   }
 
   @Override
