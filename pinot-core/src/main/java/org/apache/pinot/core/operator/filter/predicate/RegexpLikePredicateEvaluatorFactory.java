@@ -42,9 +42,6 @@ public class RegexpLikePredicateEvaluatorFactory {
   private RegexpLikePredicateEvaluatorFactory() {
   }
 
-  /// When the cardinality of the dictionary is less than this threshold, scan the dictionary to get the matching ids.
-  public static final int DICTIONARY_CARDINALITY_THRESHOLD_FOR_SCAN = 10000;
-
   /**
    * Create a new instance of dictionary based REGEXP_LIKE predicate evaluator.
    *
