@@ -55,7 +55,7 @@ public class SortedMergeJoinOperator extends MultiStageOperator {
   @Nullable
   private MseBlock.Eos _eos;
 
-  public SortedMergeJoinOperator(OpChainExecutionContext context, MultiStageOperator leftInput, DataSchema leftSchema,
+  public SortedMergeJoinOperator(OpChainExecutionContext context, MultiStageOperator leftInput,
       MultiStageOperator rightInput, JoinNode node) {
     super(context);
     _leftInput = leftInput;
@@ -100,7 +100,7 @@ public class SortedMergeJoinOperator extends MultiStageOperator {
       case LEFT:
         return computeLeftJoin();
       default:
-        throw new UnsupportedOperationException("");
+        throw new UnsupportedOperationException("Only left join supported right now");
     }
   }
 

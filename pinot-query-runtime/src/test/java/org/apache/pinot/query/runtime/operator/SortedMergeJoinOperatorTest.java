@@ -152,8 +152,7 @@ public class SortedMergeJoinOperatorTest {
     when(leftInputNode.getDataSchema()).thenReturn(DEFAULT_CHILD_SCHEMA);
     when(rightInputNode.getDataSchema()).thenReturn(DEFAULT_CHILD_SCHEMA);
 
-    return new SortedMergeJoinOperator(OperatorTestUtil.getTracingContext(), _leftInput, DEFAULT_CHILD_SCHEMA,
-        _rightInput, new JoinNode(-1, resultSchema, PlanNode.NodeHint.EMPTY, List.of(leftInputNode, rightInputNode), 
+    return new SortedMergeJoinOperator(OperatorTestUtil.getTracingContext(), _leftInput, _rightInput, new JoinNode(-1, resultSchema, PlanNode.NodeHint.EMPTY, List.of(leftInputNode, rightInputNode),
         joinType, leftKeys, rightKeys, List.<RexExpression>of(), JoinNode.JoinStrategy.HASH));
   }
 }

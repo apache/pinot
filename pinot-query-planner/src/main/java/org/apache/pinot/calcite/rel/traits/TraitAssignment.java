@@ -25,6 +25,7 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 import java.util.function.Supplier;
+import javax.annotation.Nullable;
 import org.apache.calcite.plan.RelTraitSet;
 import org.apache.calcite.rel.RelCollation;
 import org.apache.calcite.rel.RelCollations;
@@ -47,6 +48,7 @@ import org.apache.pinot.query.planner.physical.v2.nodes.PhysicalProject;
 import org.apache.pinot.query.planner.physical.v2.nodes.PhysicalSort;
 import org.apache.pinot.query.planner.physical.v2.nodes.PhysicalTableScan;
 import org.apache.pinot.query.planner.physical.v2.nodes.PhysicalWindow;
+import org.apache.pinot.query.planner.plannode.JoinNode;
 
 
 /**
@@ -148,14 +150,25 @@ public class TraitAssignment {
     Preconditions.checkState(joinInfo.leftKeys.size() == joinInfo.rightKeys.size(),
         "Always expect left and right keys to be same size. Found: %s and %s",
         joinInfo.leftKeys, joinInfo.rightKeys);
-    // Case-3: Default case.
+    Join sortedJoin = assignSortedJoin(join);
     RelDistribution rightDistribution = !joinInfo.rightKeys.isEmpty() ? RelDistributions.hash(joinInfo.rightKeys)
         : RelDistributions.BROADCAST_DISTRIBUTED;
     RelDistribution leftDistribution;
-    if (joinInfo.leftKeys.isEmpty() || rightDistribution == RelDistributions.BROADCAST_DISTRIBUTED) {
-      leftDistribution = RelDistributions.RANDOM_DISTRIBUTED;
-    } else {
+    if (sortedJoin != null) {
+      // We support sorted join only for single key conditions. And we push down collation and hash-dist trait on
+      // both sides.
+      join = sortedJoin;
+      joinInfo = sortedJoin.analyzeCondition();
+      Preconditions.checkState(joinInfo.leftKeys.size() == 1,
+          "Expecting single key for sorted join. Found: %s", joinInfo.leftKeys.size());
       leftDistribution = RelDistributions.hash(joinInfo.leftKeys);
+      rightDistribution = RelDistributions.hash(joinInfo.rightKeys);
+    } else {
+      if (joinInfo.leftKeys.isEmpty() || rightDistribution == RelDistributions.BROADCAST_DISTRIBUTED) {
+        leftDistribution = RelDistributions.RANDOM_DISTRIBUTED;
+      } else {
+        leftDistribution = RelDistributions.hash(joinInfo.leftKeys);
+      }
     }
     // left-input
     RelNode leftInput = join.getInput(0);
@@ -287,5 +300,27 @@ public class TraitAssignment {
         .plus(PinotExecStrategyTrait.PIPELINE_BREAKER);
     rightInput = rightInput.copy(rightTraitSet, rightInput.getInputs());
     return join.copy(join.getTraitSet(), ImmutableList.of(leftInput, rightInput));
+  }
+
+  @Nullable
+  private Join assignSortedJoin(Join join) {
+    String joinStrategyHint = PinotHintOptions.JoinHintOptions.getJoinStrategyHint(join);
+    if (joinStrategyHint == null || !joinStrategyHint.equalsIgnoreCase(PinotHintOptions.JoinHintOptions.SORTED_JOIN_STRATEGY)) {
+      return null;
+    }
+    JoinInfo joinInfo = join.analyzeCondition();
+    if (joinInfo.leftKeys.size() != 1) {
+      return null;
+    }
+    RelNode leftInput = join.getInput(0);
+    RelNode rightInput = join.getInput(1);
+    RelTraitSet leftTraitSet = leftInput.getTraitSet();
+    RelTraitSet rightTraitSet = rightInput.getTraitSet();
+    if (leftTraitSet.getCollation() != null || rightTraitSet.getCollation() != null) {
+      return null;
+    }
+    RelNode newLeftInput = leftInput.copy(leftTraitSet.plus(RelCollations.of(joinInfo.leftKeys.get(0))), leftInput.getInputs());
+    RelNode newRightInput = rightInput.copy(rightTraitSet.plus(RelCollations.of(joinInfo.rightKeys.get(0))), rightInput.getInputs());
+    return join.copy(join.getTraitSet(), ImmutableList.of(newLeftInput, newRightInput));
   }
 }

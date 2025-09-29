@@ -93,6 +93,7 @@ enum JoinStrategy {
   HASH = 0;
   LOOKUP = 1;
   AS_OF = 2;
+  SORTED = 3;
 }
 
 message JoinNode {
