@@ -1,3 +1,21 @@
+/**
+ * Licensed to the Apache Software Foundation (ASF) under one
+ * or more contributor license agreements.  See the NOTICE file
+ * distributed with this work for additional information
+ * regarding copyright ownership.  The ASF licenses this file
+ * to you under the Apache License, Version 2.0 (the
+ * "License"); you may not use this file except in compliance
+ * with the License.  You may obtain a copy of the License at
+ *
+ *   http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing,
+ * software distributed under the License is distributed on an
+ * "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+ * KIND, either express or implied.  See the License for the
+ * specific language governing permissions and limitations
+ * under the License.
+ */
 package org.apache.pinot.queries;
 
 import java.io.File;
@@ -101,10 +119,10 @@ public class CustomReloadQueriesTest extends BaseQueriesTest {
       throws Exception {
 
     // Common variables - schema, data file, etc
-    File _csvFile = new File(FileUtils.getTempDirectory(), "data.csv");
+    File csvFile = new File(FileUtils.getTempDirectory(), "data.csv");
     List<String> values = new ArrayList<>(Arrays.asList(alphabets));
     String columnName = "column1";
-    writeCsv(_csvFile, values, columnName);
+    writeCsv(csvFile, values, columnName);
     Schema schema = new Schema.SchemaBuilder().setSchemaName(RAW_TABLE_NAME)
         .addSingleValueDimension(columnName, FieldSpec.DataType.STRING)
         .build();
@@ -114,7 +132,7 @@ public class CustomReloadQueriesTest extends BaseQueriesTest {
     fieldConfigs.add(new FieldConfig(
         columnName, FieldConfig.EncodingType.RAW, List.of(), FieldConfig.CompressionCodec.SNAPPY, null));
     TableConfig tableConfig = createTableConfig(List.of(), List.of(), List.of(), fieldConfigs);
-    ImmutableSegment segment = buildNewSegment(tableConfig, schema, _csvFile.getAbsolutePath());
+    ImmutableSegment segment = buildNewSegment(tableConfig, schema, csvFile.getAbsolutePath());
     Map<String, ColumnMetadata> columnMetadataMap = segment.getSegmentMetadata().getColumnMetadataMap();
 
     ColumnMetadata columnMetadata1 = columnMetadataMap.get(columnName);
@@ -157,7 +175,8 @@ public class CustomReloadQueriesTest extends BaseQueriesTest {
     driver.init(generatorConfig);
     driver.build();
 
-    ImmutableSegment segment = ImmutableSegmentLoader.load(new File(INDEX_DIR, SEGMENT_NAME), new IndexLoadingConfig(tableConfig, schema));
+    ImmutableSegment segment = ImmutableSegmentLoader.load(
+        new File(INDEX_DIR, SEGMENT_NAME), new IndexLoadingConfig(tableConfig, schema));
     if (_indexSegment != null) {
       _indexSegment.destroy();
     }

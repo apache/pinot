@@ -834,7 +834,8 @@ public class ForwardIndexHandler extends BaseIndexHandler {
 
     LOGGER.info("Built dictionary. Rewriting dictionary enabled forward index for segment={} and column={}",
         segmentName, column);
-    writeDictEnabledForwardIndex(column, existingColMetadata, segmentWriter, indexDir, dictionaryCreator, statsCollector);
+    writeDictEnabledForwardIndex(column, existingColMetadata, segmentWriter, indexDir, dictionaryCreator,
+        statsCollector);
     // We used the existing forward index to generate a new forward index. The existing forward index will be in V3
     // format and the new forward index will be in V1 format. Remove the existing forward index as it is not needed
     // anymore. Note that removeIndex() will only mark an index for removal and remove the in-memory state. The

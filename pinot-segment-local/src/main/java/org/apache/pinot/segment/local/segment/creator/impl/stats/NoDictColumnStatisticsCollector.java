@@ -27,6 +27,8 @@ import org.apache.pinot.segment.spi.creator.StatsCollectorConfig;
 import org.apache.pinot.spi.utils.BigDecimalUtils;
 import org.apache.pinot.spi.utils.ByteArray;
 import org.apache.pinot.spi.utils.CommonConstants;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 
 /**
@@ -42,6 +44,7 @@ import org.apache.pinot.spi.utils.CommonConstants;
  */
 @SuppressWarnings({"rawtypes"})
 public class NoDictColumnStatisticsCollector extends AbstractColumnStatisticsCollector {
+  private static final Logger LOGGER = LoggerFactory.getLogger(NoDictColumnStatisticsCollector.class);
   private Comparable _minValue;
   private Comparable _maxValue;
   private int _minLength = Integer.MAX_VALUE;
@@ -54,6 +57,7 @@ public class NoDictColumnStatisticsCollector extends AbstractColumnStatisticsCol
     super(column, statsCollectorConfig);
     // Use default p; can be made configurable via StatsCollectorConfig later if needed
     _ull = UltraLogLog.create(CommonConstants.Helix.DEFAULT_ULTRALOGLOG_P);
+    LOGGER.info("Initialized NoDictColumnStatisticsCollector for column: {}", column);
   }
 
   @Override
