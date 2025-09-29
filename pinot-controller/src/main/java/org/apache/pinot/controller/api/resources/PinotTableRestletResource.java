@@ -209,7 +209,7 @@ public class PinotTableRestletResource {
   public ConfigSuccessResponse addTable(String tableConfigStr,
       @ApiParam(value = "comma separated list of validation type(s) to skip. supported types: (ALL|TASK|UPSERT)")
       @QueryParam("validationTypesToSkip") @Nullable String typesToSkip,
-      @ApiParam(defaultValue = "false") @QueryParam("ignoreActiveTasks") boolean ignoreActiveTasks,
+      @DefaultValue("false") @QueryParam("ignoreActiveTasks") boolean ignoreActiveTasks,
       @Context HttpHeaders httpHeaders, @Context Request request)
       throws IOException {
     // TODO introduce a table config ctor with json string.
@@ -228,6 +228,13 @@ public class PinotTableRestletResource {
       ResourceUtils.checkPermissionAndAccess(tableNameWithType, request, httpHeaders,
           AccessType.CREATE, Actions.Table.CREATE_TABLE, _accessControlFactory, LOGGER);
 
+      // fail if table entry is present in IS. This saves all the validation checks if table already exists
+      if (_pinotHelixResourceManager.hasTable(tableNameWithType)) {
+        throw new TableAlreadyExistsException("Table config for " + tableNameWithType
+            + " already exists. If this is unexpected, try deleting the table to remove all metadata associated"
+            + " with it before attempting to recreate.");
+      }
+
       schema = _pinotHelixResourceManager.getTableSchema(tableNameWithType);
       Preconditions.checkState(schema != null, "Failed to find schema for table: %s", tableNameWithType);
 
@@ -236,6 +243,8 @@ public class PinotTableRestletResource {
       // TableConfigUtils.validate(...) is used across table create/update.
       TableConfigUtils.validate(tableConfig, schema, typesToSkip);
       TableConfigUtils.validateTableName(tableConfig);
+    } catch (TableAlreadyExistsException e) {
+      throw new ControllerApplicationException(LOGGER, e.getMessage(), Response.Status.CONFLICT, e);
     } catch (Exception e) {
       throw new ControllerApplicationException(LOGGER, e.getMessage(), Response.Status.BAD_REQUEST, e);
     }
@@ -434,7 +443,7 @@ public class PinotTableRestletResource {
       @ApiParam(value = "Retention period for the table segments (e.g. 12h, 3d); If not set, the retention period "
           + "will default to the first config that's not null: the cluster setting, then '7d'. Using 0d or -1d will "
           + "instantly delete segments without retention") @QueryParam("retention") String retentionPeriod,
-      @ApiParam(defaultValue = "false") @QueryParam("ignoreActiveTasks") boolean ignoreActiveTasks,
+      @DefaultValue("false") @QueryParam("ignoreActiveTasks") boolean ignoreActiveTasks,
       @Context HttpHeaders headers) {
     TableType tableType = Constants.validateTableType(tableTypeStr);
 
