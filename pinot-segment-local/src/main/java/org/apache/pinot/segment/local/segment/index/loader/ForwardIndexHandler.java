@@ -50,6 +50,7 @@ import org.apache.pinot.segment.spi.ColumnMetadata;
 import org.apache.pinot.segment.spi.V1Constants;
 import org.apache.pinot.segment.spi.compression.ChunkCompressionType;
 import org.apache.pinot.segment.spi.compression.DictIdCompressionType;
+import org.apache.pinot.segment.spi.creator.ColumnStatistics;
 import org.apache.pinot.segment.spi.creator.IndexCreationContext;
 import org.apache.pinot.segment.spi.creator.SegmentVersion;
 import org.apache.pinot.segment.spi.creator.StatsCollectorConfig;
@@ -833,7 +834,7 @@ public class ForwardIndexHandler extends BaseIndexHandler {
 
     LOGGER.info("Built dictionary. Rewriting dictionary enabled forward index for segment={} and column={}",
         segmentName, column);
-    writeDictEnabledForwardIndex(column, existingColMetadata, segmentWriter, indexDir, dictionaryCreator);
+    writeDictEnabledForwardIndex(column, existingColMetadata, segmentWriter, indexDir, dictionaryCreator, statsCollector);
     // We used the existing forward index to generate a new forward index. The existing forward index will be in V3
     // format and the new forward index will be in V1 format. Remove the existing forward index as it is not needed
     // anymore. Note that removeIndex() will only mark an index for removal and remove the in-memory state. The
@@ -900,7 +901,8 @@ public class ForwardIndexHandler extends BaseIndexHandler {
   }
 
   private void writeDictEnabledForwardIndex(String column, ColumnMetadata existingColMetadata,
-      SegmentDirectory.Writer segmentWriter, File indexDir, SegmentDictionaryCreator dictionaryCreator)
+      SegmentDirectory.Writer segmentWriter, File indexDir, SegmentDictionaryCreator dictionaryCreator,
+      ColumnStatistics columnStats)
       throws Exception {
     // Get the forward index reader factory and create a reader
     IndexReaderFactory<ForwardIndexReader> readerFactory = StandardIndexes.forward().getReaderFactory();
@@ -913,6 +915,9 @@ public class ForwardIndexHandler extends BaseIndexHandler {
                   && _tableConfig.getIngestionConfig().isContinueOnError());
       // existingColMetadata has dictEnable=false. Overwrite the value.
       builder.withDictionary(true);
+      // Ensure cardinality reflects the actual column stats rather than existing column metadata (which could have
+      // approximate cardinality for RAW columns)
+       builder.withCardinality(columnStats.getCardinality());
       IndexCreationContext context = builder.build();
       ForwardIndexConfig config = _fieldIndexConfigs.get(column).getConfig(StandardIndexes.forward());
 
