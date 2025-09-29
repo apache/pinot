@@ -267,10 +267,11 @@ public class TenantRebalancer {
               result.getDescription());
           observer.onTableJobError(jobContext, result.getDescription());
         }
-      } catch (Throwable t) {
+      } catch (Exception e) {
         LOGGER.error("Caught exception while rebalancing table: {} with table rebalance job ID: {} in tenant "
-            + "rebalance job: {}", tableName, rebalanceJobId, observer.getJobId(), t);
-        observer.onTableJobError(jobContext, t.getMessage());
+            + "rebalance job: {}", tableName, rebalanceJobId, observer.getJobId(), e);
+        observer.onTableJobError(jobContext,
+            String.format("Caught exception/error while rebalancing table: %s. %s", tableName, e.getMessage()));
       }
     }
   }

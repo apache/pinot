@@ -225,10 +225,15 @@ public class TableRebalanceManager {
    * Cancels ongoing rebalance jobs (if any) for the given table.
    *
    * @param tableNameWithType name of the table for which to cancel any ongoing rebalance job
+   * @param resourceManager resource manager to use for updating the job metadata in ZK
+   * @param setToStatus status to set the cancelled jobs to. Must be either {@link RebalanceResult.Status#ABORTED}
+   *                    or {@link RebalanceResult.Status#CANCELLED}
    * @return the list of job IDs that were cancelled
    */
   public static List<String> cancelRebalance(String tableNameWithType, PinotHelixResourceManager resourceManager,
       RebalanceResult.Status setToStatus) {
+    Preconditions.checkState(setToStatus.equals(RebalanceResult.Status.ABORTED) || setToStatus.equals(
+        RebalanceResult.Status.CANCELLED));
     List<String> cancelledJobIds = new ArrayList<>();
     boolean updated = resourceManager.updateJobsForTable(tableNameWithType, ControllerJobTypes.TABLE_REBALANCE,
         jobMetadata -> {
@@ -241,8 +246,9 @@ public class TableRebalanceManager {
               return;
             }
 
-            LOGGER.info("Cancelling rebalance job: {} for table: {}, setting status to: {}", jobId, tableNameWithType,
-                setToStatus);
+            LOGGER.info("{} rebalance job: {} for table: {}",
+                setToStatus.equals(RebalanceResult.Status.ABORTED) ? "Aborting" : "Cancelling", jobId,
+                tableNameWithType);
             jobStats.setStatus(setToStatus);
             jobMetadata.put(RebalanceJobConstants.JOB_METADATA_KEY_REBALANCE_PROGRESS_STATS,
                 JsonUtils.objectToString(jobStats));
@@ -251,9 +257,9 @@ public class TableRebalanceManager {
             LOGGER.error("Failed to cancel rebalance job: {} for table: {}", jobId, tableNameWithType, e);
           }
         });
-    LOGGER.info("Tried to cancel existing rebalance jobs for table: {} at best effort and done: {}. Status set to: {}",
-        tableNameWithType,
-        updated, setToStatus);
+    LOGGER.info("Tried to {} existing rebalance jobs for table: {} at best effort and done: {}.",
+        setToStatus.equals(RebalanceResult.Status.ABORTED) ? "abort" : "cancel", tableNameWithType,
+        updated);
     return cancelledJobIds;
   }
 

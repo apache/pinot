@@ -26,6 +26,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.atomic.AtomicInteger;
+import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.BiConsumer;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.commons.lang3.tuple.Pair;
@@ -143,8 +144,7 @@ public class ZkBasedTenantRebalanceObserver implements TenantRebalanceObserver {
   }
 
   public TenantRebalancer.TenantTableRebalanceJobContext pollQueue(boolean isParallel) {
-    final TenantRebalancer.TenantTableRebalanceJobContext[] ret =
-        new TenantRebalancer.TenantTableRebalanceJobContext[1];
+    AtomicReference<TenantRebalancer.TenantTableRebalanceJobContext> ret = new AtomicReference<>();
     try {
       updateTenantRebalanceJobMetadataInZk((ctx, progressStats) -> {
         TenantRebalancer.TenantTableRebalanceJobContext polled =
@@ -156,7 +156,7 @@ public class ZkBasedTenantRebalanceObserver implements TenantRebalanceObserver {
           progressStats.updateTableStatus(tableName, TenantRebalanceProgressStats.TableStatus.REBALANCING.name());
           progressStats.putTableRebalanceJobId(tableName, rebalanceJobId);
         }
-        ret[0] = polled;
+        ret.set(polled);
       });
     } catch (AttemptFailureException e) {
       LOGGER.error("Error updating ZK for jobId: {} while polling from {} queue", _jobId,
@@ -165,7 +165,7 @@ public class ZkBasedTenantRebalanceObserver implements TenantRebalanceObserver {
           "Error updating ZK for jobId: " + _jobId + " while polling from " + (isParallel ? "parallel" : "sequential")
               + " queue", e);
     }
-    return ret[0];
+    return ret.get();
   }
 
   public TenantRebalancer.TenantTableRebalanceJobContext pollParallel() {
@@ -199,6 +199,14 @@ public class ZkBasedTenantRebalanceObserver implements TenantRebalanceObserver {
     }
   }
 
+  /**
+   * Cancel the tenant rebalance job.
+   * @param isCancelledByUser true if the cancellation is triggered by user, false if it is triggered by system
+   *                           (e.g. tenant rebalance checker retrying a job)
+   * @return a pair of "list of TABLE rebalance job IDs that are successfully cancelled" and "whether the TENANT
+   * rebalance
+   * job cancellation is successful"
+   */
   public Pair<List<String>, Boolean> cancelJob(boolean isCancelledByUser) {
     List<String> cancelledJobs = new ArrayList<>();
     try {
