@@ -95,6 +95,7 @@ public class InMemorySendingMailbox implements SendingMailbox {
         throw new QueryException(QueryErrorCode.EXECUTION_TIMEOUT,
             String.format("Timed out adding block into mailbox: %s with timeout: %dms", _id, timeoutMs));
       case EARLY_TERMINATED:
+      case FIRST_ERROR:
         _isEarlyTerminated = true;
         break;
       default:

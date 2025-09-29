@@ -84,6 +84,9 @@ public class MailboxContentObserver implements StreamObserver<MailboxContent> {
           cancelStream();
           break;
         case FIRST_ERROR:
+          _responseObserver.onNext(MailboxStatus.newBuilder().setMailboxId(mailboxId)
+              .putMetadata(ChannelUtils.MAILBOX_METADATA_REQUEST_EARLY_TERMINATE, "true").build());
+          cancelStream();
           return;
         case ERROR:
           LOGGER.warn("Mailbox: {} already errored out (received error block before)", mailboxId);
