@@ -71,6 +71,11 @@ public class ObjectGroupByResultHolder implements GroupByResultHolder {
   }
 
   @Override
+  public long getLongResult(int groupKey) {
+    throw new UnsupportedOperationException();
+  }
+
+  @Override
   @SuppressWarnings("unchecked")
   public <T> T getResult(int groupKey) {
     if (groupKey == GroupKeyGenerator.INVALID_ID) {
@@ -89,6 +94,13 @@ public class ObjectGroupByResultHolder implements GroupByResultHolder {
 
   @Override
   public void setValueForKey(int groupKey, int newValue) {
+    if (groupKey != GroupKeyGenerator.INVALID_ID) {
+      _resultArray[groupKey] = newValue;
+    }
+  }
+
+  @Override
+  public void setValueForKey(int groupKey, long newValue) {
     if (groupKey != GroupKeyGenerator.INVALID_ID) {
       _resultArray[groupKey] = newValue;
     }

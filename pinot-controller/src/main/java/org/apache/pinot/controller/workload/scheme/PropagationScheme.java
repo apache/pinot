@@ -19,7 +19,10 @@
 package org.apache.pinot.controller.workload.scheme;
 
 import java.util.Set;
+import javax.annotation.Nullable;
 import org.apache.pinot.spi.config.workload.NodeConfig;
+import org.apache.pinot.spi.config.workload.PropagationEntity;
+import org.apache.pinot.spi.config.workload.PropagationEntityOverrides;
 
 /**
  * PropagationScheme is used to resolve instances based on the {@link NodeConfig}
@@ -28,9 +31,22 @@ import org.apache.pinot.spi.config.workload.NodeConfig;
  */
 public interface PropagationScheme {
   /**
-   * Resolve the instances based on the node type and node configuration
-   * @param nodeConfig The {@link NodeConfig} to resolve the instances
-   * @return The set of instances to propagate the workload
+   * Resolves the set of instances to which the workload should be propagated based on the given entity and node type.
+   *
+   * @param entity The propagation entity containing scope and other relevant information.
+   * @param nodeType The type of node (e.g., BROKER, SERVER) for which instances are to be resolved.
+   * @param override Optional overrides that may affect instance resolution.
+   * @return A set of instance names that match the criteria defined by the entity and node type.
    */
-  Set<String> resolveInstances(NodeConfig nodeConfig);
+  Set<String> resolveInstances(PropagationEntity entity, NodeConfig.Type nodeType,
+                               @Nullable PropagationEntityOverrides override);
+
+  /**
+   * Instance resolution can be different for overrides.
+   * This method indicates if the current scheme supports overrides.
+   * @return true if overrides are supported, false otherwise.
+   */
+  default boolean isOverrideSupported(PropagationEntity entity) {
+    return false;
+  }
 }
