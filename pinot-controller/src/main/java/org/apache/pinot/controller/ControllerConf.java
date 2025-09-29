@@ -240,6 +240,10 @@ public class ControllerConf extends PinotConfiguration {
         "controller.retentionManager.initialDelayInSeconds";
     public static final String OFFLINE_SEGMENT_INTERVAL_CHECKER_INITIAL_DELAY_IN_SECONDS =
         "controller.offlineSegmentIntervalChecker.initialDelayInSeconds";
+    public static final String OFFLINE_SEGMENT_VALIDATION_FREQUENCY_PERIOD =
+        "controller.offline.segment.validation.frequencyPeriod";
+
+
     @Deprecated
     // RealtimeSegmentRelocator has been rebranded as SegmentRelocator
     public static final String DEPRECATED_REALTIME_SEGMENT_RELOCATION_INITIAL_DELAY_IN_SECONDS =
@@ -290,6 +294,7 @@ public class ControllerConf extends PinotConfiguration {
     // Default values
     public static final int DEFAULT_RETENTION_MANAGER_FREQUENCY_IN_SECONDS = 6 * 60 * 60; // 6 Hours.
     public static final int DEFAULT_OFFLINE_SEGMENT_INTERVAL_CHECKER_FREQUENCY_IN_SECONDS = 24 * 60 * 60; // 24 Hours.
+    public static final int DEFAULT_OFFLINE_SEGMENT_VALIDATION_FREQUENCY_IN_SECONDS = 60 * 60; // 1 Hour.
     public static final int DEFAULT_REALTIME_SEGMENT_VALIDATION_FREQUENCY_IN_SECONDS = 60 * 60; // 1 Hour.
     public static final int DEFAULT_REALTIME_OFFSET_AUTO_RESET_BACKFILL_FREQUENCY_IN_SECONDS = 60 * 60; // 1 Hour.
     public static final int DEFAULT_BROKER_RESOURCE_VALIDATION_FREQUENCY_IN_SECONDS = 60 * 60; // 1 Hour.
@@ -1194,6 +1199,19 @@ public class ControllerConf extends PinotConfiguration {
   public long getOfflineSegmentIntervalCheckerInitialDelayInSeconds() {
     return getProperty(ControllerPeriodicTasksConf.OFFLINE_SEGMENT_INTERVAL_CHECKER_INITIAL_DELAY_IN_SECONDS,
         ControllerPeriodicTasksConf.getRandomInitialDelayInSeconds());
+  }
+
+  public int getOfflineSegmentValidationFrequencyInSeconds() {
+    return Optional.ofNullable(getProperty(ControllerPeriodicTasksConf.OFFLINE_SEGMENT_VALIDATION_FREQUENCY_PERIOD))
+        .filter(period -> isValidPeriodWithLogging(
+            ControllerPeriodicTasksConf.OFFLINE_SEGMENT_VALIDATION_FREQUENCY_PERIOD, period))
+        .map(period -> (int) convertPeriodToSeconds(period))
+        .orElse(ControllerPeriodicTasksConf.DEFAULT_OFFLINE_SEGMENT_VALIDATION_FREQUENCY_IN_SECONDS);
+  }
+
+  public void setOfflineSegmentValidationFrequencyInSeconds(int validationFrequencyInSeconds) {
+    setProperty(ControllerPeriodicTasksConf.OFFLINE_SEGMENT_VALIDATION_FREQUENCY_PERIOD,
+        TimeUtils.convertMillisToPeriod(validationFrequencyInSeconds * 1000L));
   }
 
   public long getRealtimeSegmentValidationManagerInitialDelaySeconds() {

@@ -24,6 +24,7 @@ import javax.annotation.Nullable;
 public class SingleColumnKeySelector implements KeySelector<Object> {
   private final int _keyId;
   private final String _hashFunction;
+  private final HashFunctionSelector.SvHasher _hasher;
 
   public SingleColumnKeySelector(int keyId) {
     this(keyId, KeySelector.DEFAULT_HASH_ALGORITHM);
@@ -31,7 +32,8 @@ public class SingleColumnKeySelector implements KeySelector<Object> {
 
   public SingleColumnKeySelector(int keyId, String hashFunction) {
     _keyId = keyId;
-    _hashFunction = hashFunction;
+    _hashFunction = hashFunction.toLowerCase();
+    _hasher = HashFunctionSelector.getSvHasher(_hashFunction);
   }
 
   @Nullable
@@ -43,7 +45,7 @@ public class SingleColumnKeySelector implements KeySelector<Object> {
   @Override
   public int computeHash(Object[] input) {
     Object key = input[_keyId];
-    return HashFunctionSelector.computeHash(key, _hashFunction);
+    return _hasher.hash(key);
   }
 
   @Override
