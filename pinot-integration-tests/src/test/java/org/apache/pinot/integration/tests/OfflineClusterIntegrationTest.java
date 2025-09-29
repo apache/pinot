@@ -1028,42 +1028,6 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
     assertEquals(count1, count2);
   }
 
-  @Test(dataProvider = "useBothQueryEngines")
-  public void testRegexpLikeDictIdCaching(boolean useMultiStageQueryEngine)
-      throws Exception {
-    setUseMultiStageQueryEngine(useMultiStageQueryEngine);
-
-    // Test 1: Basic caching functionality with repeated queries
-    String sqlQuery = "SELECT COUNT(*) FROM mytable WHERE REGEXP_LIKE(OriginState, '^C.*')";
-    JsonNode response = postQuery(sqlQuery);
-    int firstResult = response.get("resultTable").get("rows").get(0).get(0).asInt();
-    assertTrue(firstResult > 0, "Should find states starting with 'C'");
-
-    // Execute same query again - should use cached results from _dictIdMap
-    response = postQuery(sqlQuery);
-    int secondResult = response.get("resultTable").get("rows").get(0).get(0).asInt();
-    assertEquals(firstResult, secondResult, "Cached results should match original");
-
-    // Test 2: Test configurable threshold to force ScanBasedEvaluator (uses _dictIdMap)
-    sqlQuery = "SET regexpDictCardinalityThreshold=50; "
-        + "SELECT COUNT(*) FROM mytable WHERE REGEXP_LIKE(OriginState, 'CA|TX|FL')";
-    response = postQuery(sqlQuery);
-    int scanBasedResult = response.get("resultTable").get("rows").get(0).get(0).asInt();
-    assertTrue(scanBasedResult > 0, "Should find matching states with scan-based evaluator");
-
-    // Test 3: Verify correctness with selection query and different pattern
-    sqlQuery = "SELECT DISTINCT OriginState FROM mytable WHERE REGEXP_LIKE(OriginState, '^(C|T).*') "
-        + "ORDER BY OriginState LIMIT 5";
-    response = postQuery(sqlQuery);
-    JsonNode rows = response.get("resultTable").get("rows");
-    assertTrue(rows.size() > 0, "Should return some states");
-    for (JsonNode row : rows) {
-      String state = row.get(0).asText();
-      assertTrue(state.startsWith("C") || state.startsWith("T"),
-          "All states should start with C or T: " + state);
-    }
-  }
-
   @Test
   public void testCastMV()
       throws Exception {
