@@ -119,7 +119,7 @@ import org.apache.pinot.controller.util.BrokerServiceHelper;
 import org.apache.pinot.controller.util.TableSizeReader;
 import org.apache.pinot.controller.validation.BrokerResourceValidationManager;
 import org.apache.pinot.controller.validation.DiskUtilizationChecker;
-import org.apache.pinot.controller.validation.OfflineSegmentIntervalChecker;
+import org.apache.pinot.controller.validation.OfflineSegmentValidationManager;
 import org.apache.pinot.controller.validation.RealtimeOffsetAutoResetManager;
 import org.apache.pinot.controller.validation.RealtimeSegmentValidationManager;
 import org.apache.pinot.controller.validation.ResourceUtilizationChecker;
@@ -191,7 +191,7 @@ public abstract class BaseControllerStarter implements ServiceStartable {
   protected ValidationMetrics _validationMetrics;
   protected SqlQueryExecutor _sqlQueryExecutor;
   // Can only be constructed after resource manager getting started
-  protected OfflineSegmentIntervalChecker _offlineSegmentIntervalChecker;
+  protected OfflineSegmentValidationManager _offlineSegmentValidationManager;
   protected RealtimeOffsetAutoResetManager _realtimeOffsetAutoResetManager;
   protected RealtimeSegmentValidationManager _realtimeSegmentValidationManager;
   protected BrokerResourceValidationManager _brokerResourceValidationManager;
@@ -382,8 +382,8 @@ public abstract class BaseControllerStarter implements ServiceStartable {
     return _leadControllerManager;
   }
 
-  public OfflineSegmentIntervalChecker getOfflineSegmentIntervalChecker() {
-    return _offlineSegmentIntervalChecker;
+  public OfflineSegmentValidationManager getOfflineSegmentValidationManager() {
+    return _offlineSegmentValidationManager;
   }
 
   public RealtimeOffsetAutoResetManager getRealtimeOffsetAutoResetManager() {
@@ -896,10 +896,10 @@ public abstract class BaseControllerStarter implements ServiceStartable {
     _retentionManager = new RetentionManager(_helixResourceManager, _leadControllerManager, _config, _controllerMetrics,
         brokerServiceHelper);
     periodicTasks.add(_retentionManager);
-    _offlineSegmentIntervalChecker =
-        new OfflineSegmentIntervalChecker(_config, _helixResourceManager, _leadControllerManager,
-            new ValidationMetrics(_metricsRegistry), _controllerMetrics);
-    periodicTasks.add(_offlineSegmentIntervalChecker);
+    _offlineSegmentValidationManager =
+        new OfflineSegmentValidationManager(_config, _helixResourceManager, _leadControllerManager,
+            new ValidationMetrics(_metricsRegistry), _controllerMetrics, _resourceUtilizationManager);
+    periodicTasks.add(_offlineSegmentValidationManager);
     _realtimeSegmentValidationManager =
         new RealtimeSegmentValidationManager(_config, _helixResourceManager, _leadControllerManager,
             _pinotLLCRealtimeSegmentManager, _validationMetrics, _controllerMetrics, _storageQuotaChecker,
