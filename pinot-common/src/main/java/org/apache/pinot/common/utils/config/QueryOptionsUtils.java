@@ -591,9 +591,6 @@ public class QueryOptionsUtils {
    * This threshold controls when to switch between dictionary-based and scan-based evaluation.
    * When (dictionary_size) < threshold, use dictionary-based evaluation.
    * When (dictionary_size) >= threshold, use scan-based evaluation.
-   *
-   * @param queryOptions Query options map
-   * @param defaultThreshold Default threshold to use if not specified in query options
    */
   public static long getRegexpLikeAdaptiveThreshold(Map<String, String> queryOptions, long defaultThreshold) {
     String thresholdStr = queryOptions.get(QueryOptionKey.REGEXP_LIKE_DICTIONARY_THRESHOLD);
