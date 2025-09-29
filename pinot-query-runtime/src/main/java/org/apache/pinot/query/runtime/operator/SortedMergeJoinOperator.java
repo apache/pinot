@@ -22,10 +22,6 @@ import org.apache.pinot.query.runtime.plan.OpChainExecutionContext;
 import org.apache.pinot.spi.utils.CommonConstants.MultiStageQueryRunner.JoinOverFlowMode;
 import org.slf4j.Logger;
 
-import static org.apache.pinot.query.runtime.operator.BaseJoinOperator.DEFAULT_JOIN_OVERFLOW_MODE;
-import static org.apache.pinot.query.runtime.operator.BaseJoinOperator.DEFAULT_MAX_ROWS_IN_JOIN;
-import static org.apache.pinot.query.runtime.operator.BaseJoinOperator.LOGGER;
-
 
 /**
  * Assumes input is sorted appropriately, and runs a merge join algorithm.
@@ -74,7 +70,7 @@ public class SortedMergeJoinOperator extends MultiStageOperator {
 
   @Override
   protected Logger logger() {
-    return LOGGER;
+    return BaseJoinOperator.LOGGER;
   }
 
   @Override
@@ -139,13 +135,15 @@ public class SortedMergeJoinOperator extends MultiStageOperator {
         if (c == 0) {
           Object[] newRow = new Object[_resultColumnSize];
           System.arraycopy(leftRows.get(leftIndex), 0, newRow, 0, _leftColumnSize);
-          System.arraycopy(rightRows.get(rightIndex), 0, newRow, _leftColumnSize, _resultColumnSize - _leftColumnSize);
+          System.arraycopy(rightRows.get(rightIndex), 0, newRow, _leftColumnSize,
+              _resultColumnSize - _leftColumnSize);
           result.add(newRow);
           leftIndex++;
           rightIndex++;
           // Breeze past duplicates on left.
           Comparable newLeftKey = null;
-          while (leftIndex < leftRows.size() && (newLeftKey = (Comparable) _leftKeySelector.getKey(leftRows.get(leftIndex))) != null) {
+          while (leftIndex < leftRows.size()
+              && (newLeftKey = (Comparable) _leftKeySelector.getKey(leftRows.get(leftIndex))) != null) {
             if (!newLeftKey.equals(leftKey)) {
               break;
             }
@@ -154,7 +152,8 @@ public class SortedMergeJoinOperator extends MultiStageOperator {
           leftKey = newLeftKey;
           // Breeze past duplicates on right.
           Comparable newRightKey = null;
-          while (rightIndex < rightRows.size() && (newRightKey = (Comparable) _rightKeySelector.getKey(rightRows.get(rightIndex))) != null) {
+          while (rightIndex < rightRows.size()
+              && (newRightKey = (Comparable) _rightKeySelector.getKey(rightRows.get(rightIndex))) != null) {
             if (!newRightKey.equals(rightKey)) {
               break;
             }
@@ -231,7 +230,7 @@ public class SortedMergeJoinOperator extends MultiStageOperator {
       }
     }
     Integer maxRowsInJoin = QueryOptionsUtils.getMaxRowsInJoin(opChainMetadata);
-    return maxRowsInJoin != null ? maxRowsInJoin : DEFAULT_MAX_ROWS_IN_JOIN;
+    return maxRowsInJoin != null ? maxRowsInJoin : BaseJoinOperator.DEFAULT_MAX_ROWS_IN_JOIN;
   }
 
   protected static JoinOverFlowMode getJoinOverflowMode(Map<String, String> contextMetadata,
@@ -246,7 +245,7 @@ public class SortedMergeJoinOperator extends MultiStageOperator {
       }
     }
     JoinOverFlowMode joinOverflowMode = QueryOptionsUtils.getJoinOverflowMode(contextMetadata);
-    return joinOverflowMode != null ? joinOverflowMode : DEFAULT_JOIN_OVERFLOW_MODE;
+    return joinOverflowMode != null ? joinOverflowMode : BaseJoinOperator.DEFAULT_JOIN_OVERFLOW_MODE;
   }
 
   /**

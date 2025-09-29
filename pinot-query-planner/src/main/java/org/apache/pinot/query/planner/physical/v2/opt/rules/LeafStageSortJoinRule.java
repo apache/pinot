@@ -8,14 +8,10 @@ import org.apache.calcite.rel.RelCollations;
 import org.apache.calcite.rel.RelDistribution;
 import org.apache.calcite.rel.core.Filter;
 import org.apache.calcite.rel.core.JoinInfo;
-import org.apache.calcite.rel.core.JoinRelType;
 import org.apache.calcite.rel.core.Project;
 import org.apache.calcite.rel.core.TableScan;
 import org.apache.commons.lang3.tuple.Pair;
 import org.apache.pinot.calcite.rel.hint.PinotHintOptions;
-import org.apache.pinot.calcite.rel.rules.PinotRuleUtils;
-import org.apache.pinot.common.proto.Plan;
-import org.apache.pinot.common.request.Join;
 import org.apache.pinot.query.context.PhysicalPlannerContext;
 import org.apache.pinot.query.planner.physical.v2.PRelNode;
 import org.apache.pinot.query.planner.physical.v2.PinotDataDistribution;
@@ -80,18 +76,18 @@ public class LeafStageSortJoinRule extends PRelOptRule {
     }
     if (node.unwrap() instanceof TableScan || node.unwrap() instanceof Filter || node.unwrap() instanceof Project) {
       PinotDataDistribution pdd = node.getPinotDataDistributionOrThrow().withCollation(collation);
-      return new PhysicalSort(node.unwrap().getCluster(), RelTraitSet.createEmpty(), List.of(), collation,
-          null, null, node, _physicalPlannerContext.getNodeIdGenerator().get(), pdd, true);
+      return new PhysicalSort(node.unwrap().getCluster(), RelTraitSet.createEmpty(), List.of(), collation, null, null,
+          node, _physicalPlannerContext.getNodeIdGenerator().get(), pdd, true);
     }
     return null;
   }
-  
+
   private boolean satisfiesDistTrait(PRelNode node) {
     PinotDataDistribution pdd = node.getPinotDataDistributionOrThrow();
     RelDistribution distConstraint = node.unwrap().getTraitSet().getDistribution();
     return pdd.satisfies(distConstraint);
   }
-  
+
   @Nullable
   private Pair<RelCollation, RelCollation> getSortConstraints(PhysicalJoin join) {
     JoinInfo joinInfo = join.analyzeCondition();

@@ -38,7 +38,7 @@ import org.apache.calcite.rel.core.SetOp;
 import org.apache.calcite.rel.core.Union;
 import org.apache.calcite.rel.core.Window;
 import org.apache.calcite.util.ImmutableIntList;
-import org.apache.pinot.calcite.rel.hint.PinotHintOptions;
+import org.apache.pinot.calcite.rel.hint.PinotHintOptions.JoinHintOptions;
 import org.apache.pinot.query.context.PhysicalPlannerContext;
 import org.apache.pinot.query.planner.physical.v2.PRelNode;
 import org.apache.pinot.query.planner.physical.v2.nodes.PhysicalAggregate;
@@ -48,7 +48,6 @@ import org.apache.pinot.query.planner.physical.v2.nodes.PhysicalProject;
 import org.apache.pinot.query.planner.physical.v2.nodes.PhysicalSort;
 import org.apache.pinot.query.planner.physical.v2.nodes.PhysicalTableScan;
 import org.apache.pinot.query.planner.physical.v2.nodes.PhysicalWindow;
-import org.apache.pinot.query.planner.plannode.JoinNode;
 
 
 /**
@@ -137,7 +136,7 @@ public class TraitAssignment {
   @VisibleForTesting
   RelNode assignJoin(Join join) {
     // Case-1: Handle lookup joins.
-    if (PinotHintOptions.JoinHintOptions.useLookupJoinStrategy(join)) {
+    if (JoinHintOptions.useLookupJoinStrategy(join)) {
       return assignLookupJoin(join);
     }
     // Case-2: Handle dynamic filter for semi joins.
@@ -293,7 +292,7 @@ public class TraitAssignment {
     Preconditions.checkState(rightInput.getTraitSet().getDistribution() == null,
         "Found existing dist trait on right input of semi-join");
     RelDistribution distribution = RelDistributions.BROADCAST_DISTRIBUTED;
-    if (Boolean.TRUE.equals(PinotHintOptions.JoinHintOptions.isColocatedByJoinKeys(join))) {
+    if (Boolean.TRUE.equals(JoinHintOptions.isColocatedByJoinKeys(join))) {
       distribution = RelDistributions.hash(joinInfo.rightKeys);
     }
     RelTraitSet rightTraitSet = rightInput.getTraitSet().plus(distribution)
@@ -304,8 +303,8 @@ public class TraitAssignment {
 
   @Nullable
   private Join assignSortedJoin(Join join) {
-    String joinStrategyHint = PinotHintOptions.JoinHintOptions.getJoinStrategyHint(join);
-    if (joinStrategyHint == null || !joinStrategyHint.equalsIgnoreCase(PinotHintOptions.JoinHintOptions.SORTED_JOIN_STRATEGY)) {
+    String joinStrategyHint = JoinHintOptions.getJoinStrategyHint(join);
+    if (joinStrategyHint == null || !joinStrategyHint.equalsIgnoreCase(JoinHintOptions.SORTED_JOIN_STRATEGY)) {
       return null;
     }
     JoinInfo joinInfo = join.analyzeCondition();
@@ -319,8 +318,10 @@ public class TraitAssignment {
     if (leftTraitSet.getCollation() != null || rightTraitSet.getCollation() != null) {
       return null;
     }
-    RelNode newLeftInput = leftInput.copy(leftTraitSet.plus(RelCollations.of(joinInfo.leftKeys.get(0))), leftInput.getInputs());
-    RelNode newRightInput = rightInput.copy(rightTraitSet.plus(RelCollations.of(joinInfo.rightKeys.get(0))), rightInput.getInputs());
+    RelNode newLeftInput = leftInput.copy(leftTraitSet.plus(RelCollations.of(joinInfo.leftKeys.get(0))),
+        leftInput.getInputs());
+    RelNode newRightInput = rightInput.copy(rightTraitSet.plus(RelCollations.of(joinInfo.rightKeys.get(0))),
+        rightInput.getInputs());
     return join.copy(join.getTraitSet(), ImmutableList.of(newLeftInput, newRightInput));
   }
 }
