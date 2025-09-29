@@ -134,13 +134,11 @@ public class RegexpLikePredicateEvaluatorFactory {
     // within the scope of a single thread.
     final Matcher _matcher;
     Int2BooleanMap _dictIdMap;
-    int _matchingIds;
 
     public ScanBasedRegexpLikePredicateEvaluator(RegexpLikePredicate regexpLikePredicate, Dictionary dictionary) {
       super(regexpLikePredicate, dictionary);
       _matcher = regexpLikePredicate.getPattern().matcher("");
       _dictIdMap = new Int2BooleanOpenHashMap();
-      _matchingIds = 0;
     }
 
     @Override
@@ -150,15 +148,7 @@ public class RegexpLikePredicateEvaluatorFactory {
       }
       boolean match = _matcher.reset(_dictionary.getStringValue(dictId)).find();
       _dictIdMap.put(dictId, match);
-      if (match) {
-        _matchingIds++;
-      }
       return match;
-    }
-
-    @Override
-    public int getNumMatchingItems() {
-      return _matchingIds;
     }
 
     @Override
