@@ -2607,7 +2607,7 @@ public class PinotLLCRealtimeSegmentManager {
    * If segment is in ERROR state in only few replicas but has download URL, we instead trigger a segment reset
    *
    * @param tableConfig                         The table config
-   * @param segmentAutoResetOnErrorAtValidation flag to determine the reset of segments or not
+   * @param segmentAutoResetOnErrorAtValidation flag to determine whether to reset the error segments or not
    */
   public void repairSegmentsInErrorStateForPauselessConsumption(TableConfig tableConfig,
       boolean repairErrorSegmentsForPartialUpsertOrDedup, boolean segmentAutoResetOnErrorAtValidation) {
@@ -2678,7 +2678,8 @@ public class PinotLLCRealtimeSegmentManager {
     _controllerMetrics.setOrUpdateTableGauge(realtimeTableName, ControllerGauge.PAUSELESS_SEGMENTS_IN_ERROR_COUNT,
         segmentsInErrorStateInAllReplicas.size());
 
-    boolean repairErrorSegments = allowRepairOfErrorSegments(repairErrorSegmentsForPartialUpsertOrDedup, tableConfig);
+    boolean repairCommittingSegments =
+        allowRepairOfCommittingSegments(repairErrorSegmentsForPartialUpsertOrDedup, tableConfig);
     int segmentsInUnRecoverableState = 0;
 
     for (String segmentName : segmentsInErrorStateInAtLeastOneReplica) {
@@ -2692,7 +2693,7 @@ public class PinotLLCRealtimeSegmentManager {
       if (segmentZKMetadata.getStatus() == Status.COMMITTING && segmentsInErrorStateInAllReplicas.contains(
           segmentName)) {
 
-        if (!repairErrorSegments) {
+        if (!repairCommittingSegments) {
           segmentsInUnRecoverableState += 1;
           LOGGER.info(
               "Segment: {} in table: {} is COMMITTING with all replicas in ERROR state. Skipping re-ingestion since "
@@ -2730,12 +2731,14 @@ public class PinotLLCRealtimeSegmentManager {
   }
 
   /**
-   * Whether to allow repairing the ERROR segments which are ONLINE in IS
+   * Whether to allow repairing the ERROR segments with ZK status: COMMITTING
+   * This method is only useful for pauseless ingestion with features like dedup enabled (Since repairing committing
+   * segments for such tables can lead to incorrect data).
    * @param repairErrorSegmentsForPartialUpsertOrDedup API context flag, if true then always allow repair
    * @param tableConfig tableConfig
-   * @return Returns true if repair is allowed for ERROR segments or not
+   * @return Returns true if repair is allowed
    */
-  public boolean allowRepairOfErrorSegments(boolean repairErrorSegmentsForPartialUpsertOrDedup,
+  public boolean allowRepairOfCommittingSegments(boolean repairErrorSegmentsForPartialUpsertOrDedup,
       TableConfig tableConfig) {
     if (repairErrorSegmentsForPartialUpsertOrDedup) {
       // If API context has repairErrorSegmentsForPartialUpsertOrDedup=true, allow repair.

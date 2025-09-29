@@ -199,7 +199,7 @@ public class PauselessRealtimeIngestionSegmentCommitFailureTest extends BaseClus
   }
 
   /**
-   * Returns the list of segment names in ERROR state from the ExternalView of the given table.
+   * Returns the list of segment names in the given state from the ExternalView of the given table.
    */
   private List<String> getSegmentsInEV(String realtimeTableName, String status) {
     ExternalView externalView = _helixResourceManager.getHelixAdmin()
