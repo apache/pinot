@@ -57,6 +57,10 @@ public class RealtimeNgramFilteringIndex implements MutableTextIndex {
     _column = column;
     _invertedIndex = new RealtimeInvertedIndex();
     _ngramToDictIdMapping = new Object2IntOpenHashMap<>();
+    _ngramToDictIdMapping.defaultReturnValue(-1);
+    if (minNgramLength <= 0 || maxNgramLength <= 0 || minNgramLength > maxNgramLength) {
+      throw new IllegalArgumentException("Invalid n-gram settings: " + minNgramLength + "..." + maxNgramLength);
+    }
     _minNgramLength = minNgramLength;
     _maxNgramLength = maxNgramLength;
 
@@ -154,6 +158,7 @@ public class RealtimeNgramFilteringIndex implements MutableTextIndex {
   @Override
   public void close()
       throws IOException {
+    _ngramToDictIdMapping.clear();
   }
 
   private void addHelper(String value) {

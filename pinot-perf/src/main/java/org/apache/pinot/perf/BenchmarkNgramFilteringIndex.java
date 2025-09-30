@@ -30,6 +30,7 @@ import org.openjdk.jmh.annotations.OutputTimeUnit;
 import org.openjdk.jmh.annotations.Scope;
 import org.openjdk.jmh.annotations.Setup;
 import org.openjdk.jmh.annotations.State;
+import org.openjdk.jmh.annotations.TearDown;
 import org.openjdk.jmh.annotations.Warmup;
 import org.openjdk.jmh.runner.Runner;
 import org.openjdk.jmh.runner.options.ChainedOptionsBuilder;
@@ -76,7 +77,7 @@ public class BenchmarkNgramFilteringIndex {
     // Next doing regex matching on the docIds to validate the results
     while (intIterator.hasNext()) {
       int docId = intIterator.next();
-      // Simulate regex validate on th
+      // Simulate regex validate on the actual document.
       (PREFIX + docId).matches(".*ord78.*");
     }
     return 0;
@@ -93,6 +94,7 @@ public class BenchmarkNgramFilteringIndex {
     return 0;
   }
 
+  @TearDown
   public void tearDown()
       throws Exception {
     _realtimeNgramFilteringIndex.close();
