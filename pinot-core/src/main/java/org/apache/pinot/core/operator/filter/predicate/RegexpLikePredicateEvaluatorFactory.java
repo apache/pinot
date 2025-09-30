@@ -25,6 +25,7 @@ import it.unimi.dsi.fastutil.ints.IntArrayList;
 import it.unimi.dsi.fastutil.ints.IntList;
 import it.unimi.dsi.fastutil.ints.IntOpenHashSet;
 import it.unimi.dsi.fastutil.ints.IntSet;
+import javax.annotation.Nullable;
 import org.apache.pinot.common.request.context.predicate.RegexpLikePredicate;
 import org.apache.pinot.common.utils.config.QueryOptionsUtils;
 import org.apache.pinot.common.utils.regex.Matcher;
@@ -51,14 +52,15 @@ public class RegexpLikePredicateEvaluatorFactory {
    * @return Dictionary based REGEXP_LIKE predicate evaluator
    */
   public static BaseDictionaryBasedPredicateEvaluator newDictionaryBasedEvaluator(
-      RegexpLikePredicate regexpLikePredicate, Dictionary dictionary, DataType dataType, QueryContext queryContext) {
+      RegexpLikePredicate regexpLikePredicate, Dictionary dictionary, DataType dataType,
+      @Nullable QueryContext queryContext) {
     Preconditions.checkArgument(dataType.getStoredType() == DataType.STRING, "Unsupported data type: " + dataType);
 
     // Get threshold from query options or use default
-    long threshold = Broker.DEFAULT_REGEXP_LIKE_DICTIONARY_THRESHOLD;
+    long threshold = Broker.DEFAULT_REGEXP_LIKE_DICTIONARY_CARDINALITY_THRESHOLD;
     if (queryContext != null && queryContext.getQueryOptions() != null) {
       threshold = QueryOptionsUtils.getRegexpLikeAdaptiveThreshold(queryContext.getQueryOptions(),
-          Broker.DEFAULT_REGEXP_LIKE_DICTIONARY_THRESHOLD);
+          Broker.DEFAULT_REGEXP_LIKE_DICTIONARY_CARDINALITY_THRESHOLD);
     }
 
     if (dictionary.length() < threshold) {
@@ -133,7 +135,10 @@ public class RegexpLikePredicateEvaluatorFactory {
     // Reuse matcher to avoid excessive allocation. This is safe to do because the evaluator is always used
     // within the scope of a single thread.
     final Matcher _matcher;
-    Int2BooleanMap _dictIdMap;
+
+    // Maintains a cache to quickly look through if the dictionary Id matches with the given regex. Helps us to avoid
+    // heavy computations for the same dictionaryId once it's identified.
+    final Int2BooleanMap _dictIdMap;
 
     public ScanBasedRegexpLikePredicateEvaluator(RegexpLikePredicate regexpLikePredicate, Dictionary dictionary) {
       super(regexpLikePredicate, dictionary);
@@ -143,6 +148,7 @@ public class RegexpLikePredicateEvaluatorFactory {
 
     @Override
     public boolean applySV(int dictId) {
+
       if (_dictIdMap.containsKey(dictId)) {
         return _dictIdMap.get(dictId);
       }

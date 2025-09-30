@@ -593,7 +593,7 @@ public class QueryOptionsUtils {
    * When (dictionary_size) >= threshold, use scan-based evaluation.
    */
   public static long getRegexpLikeAdaptiveThreshold(Map<String, String> queryOptions, long defaultThreshold) {
-    String thresholdStr = queryOptions.get(QueryOptionKey.REGEXP_LIKE_DICTIONARY_THRESHOLD);
+    String thresholdStr = queryOptions.get(QueryOptionKey.REGEXP_DICT_CARDINALITY_THRESHOLD);
     if (thresholdStr != null) {
       try {
         return Long.parseLong(thresholdStr);

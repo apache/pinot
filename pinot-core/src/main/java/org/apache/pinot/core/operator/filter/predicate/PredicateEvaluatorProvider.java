@@ -61,8 +61,8 @@ public class PredicateEvaluatorProvider {
             return NotInPredicateEvaluatorFactory.newDictionaryBasedEvaluator((NotInPredicate) predicate, dictionary,
                 dataType, queryContext);
           case RANGE:
-            return RangePredicateEvaluatorFactory
-                .newDictionaryBasedEvaluator((RangePredicate) predicate, dictionary, dataType);
+            return RangePredicateEvaluatorFactory.newDictionaryBasedEvaluator((RangePredicate) predicate, dictionary,
+                dataType);
           case REGEXP_LIKE:
             return RegexpLikePredicateEvaluatorFactory.newDictionaryBasedEvaluator((RegexpLikePredicate) predicate,
                 dictionary, dataType, queryContext);
