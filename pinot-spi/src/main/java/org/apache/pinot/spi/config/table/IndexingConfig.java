@@ -358,7 +358,7 @@ public class IndexingConfig extends BaseJsonConfig {
     _skipSegmentPreprocess = skipSegmentPreprocess;
   }
 
-  public boolean canOptimiseNoDictStatsCollection() {
+  public boolean isOptimiseNoDictStatsCollection() {
     return _optimiseNoDictStatsCollection;
   }
 

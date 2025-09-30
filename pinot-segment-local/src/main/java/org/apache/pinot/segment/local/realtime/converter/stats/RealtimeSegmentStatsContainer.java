@@ -106,7 +106,6 @@ public class RealtimeSegmentStatsContainer implements SegmentPreIndexStatsContai
   private ColumnStatistics createMapColumnStatistics(DataSource dataSource, boolean useCompactedStatistics,
       ThreadSafeMutableRoaringBitmap validDocIds, StatsCollectorConfig statsCollectorConfig) {
     ForwardIndexReader reader = dataSource.getForwardIndex();
-    // TODO - Can we use NoDictColumnStatisticsCollector here for non dictionary columns ?
     MapColumnPreIndexStatsCollector mapColumnPreIndexStatsCollector =
         new MapColumnPreIndexStatsCollector(dataSource.getColumnName(), statsCollectorConfig);
 
