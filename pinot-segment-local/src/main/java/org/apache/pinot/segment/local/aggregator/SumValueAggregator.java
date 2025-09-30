@@ -45,8 +45,21 @@ public class SumValueAggregator implements ValueAggregator<Object, Double> {
   }
 
   @Override
+  public Double getInitialAggregatedValue(@Nullable Object rawValue, @Nullable DataType sourceDataType) {
+    if (rawValue == null) {
+      return 0.0;
+    }
+    return ValueAggregatorUtils.toDouble(rawValue, sourceDataType);
+  }
+
+  @Override
+  public Double applyRawValue(Double value, Object rawValue, @Nullable DataType sourceDataType) {
+    return value + ValueAggregatorUtils.toDouble(rawValue, sourceDataType);
+  }
+
+  @Override
   public Double applyRawValue(Double value, Object rawValue) {
-    return value + ValueAggregatorUtils.toDouble(rawValue);
+    return applyRawValue(value, rawValue, null);
   }
 
   @Override
