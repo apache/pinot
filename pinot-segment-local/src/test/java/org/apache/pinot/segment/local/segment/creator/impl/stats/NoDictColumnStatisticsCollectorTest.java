@@ -430,16 +430,16 @@ public class NoDictColumnStatisticsCollectorTest {
     MEDIUM(50, 100), // 50-100 unique values
     HIGH(200, 500);  // 200-500 unique values
 
-    private final int minUnique;
-    private final int maxUnique;
+    private final int _minUnique;
+    private final int _maxUnique;
 
     CardinalityLevel(int minUnique, int maxUnique) {
-      this.minUnique = minUnique;
-      this.maxUnique = maxUnique;
+      _minUnique = minUnique;
+      _maxUnique = maxUnique;
     }
 
     public int getUniqueCount(Random random) {
-      return minUnique + random.nextInt(maxUnique - minUnique + 1);
+      return _minUnique + random.nextInt(_maxUnique - _minUnique + 1);
     }
   }
 
@@ -450,7 +450,7 @@ public class NoDictColumnStatisticsCollectorTest {
     int totalEntries = uniqueValueCount + random.nextInt(uniqueValueCount * 2); // Add some duplicates
 
     // Generate test data
-    Object[] testData = generateRandomData(dataType, isSingleValue, uniqueValueCount, totalEntries, shouldBeSorted, random);
+    Object[] testData = generateData(dataType, isSingleValue, uniqueValueCount, totalEntries, shouldBeSorted, random);
 
     // Skip if we can't generate valid test data
     if (testData == null) {
@@ -461,7 +461,7 @@ public class NoDictColumnStatisticsCollectorTest {
     NoDictColumnStatisticsCollector noDictCollector =
         new NoDictColumnStatisticsCollector("col", newConfig(dataType, isSingleValue));
     AbstractColumnStatisticsCollector expectedCollector =
-        createExpectedCollector(dataType, isSingleValue);
+        createDictCollector(dataType, isSingleValue);
 
     // Collect stats from both collectors
     for (Object entry : testData) {
@@ -476,7 +476,7 @@ public class NoDictColumnStatisticsCollectorTest {
     compareCollectorStats(noDictCollector, expectedCollector, dataType, isSingleValue, iteration, testData);
   }
 
-  private Object[] generateRandomData(FieldSpec.DataType dataType, boolean isSingleValue,
+  private Object[] generateData(FieldSpec.DataType dataType, boolean isSingleValue,
       int uniqueValueCount, int totalEntries, boolean shouldBeSorted, Random random) {
 
     try {
@@ -753,7 +753,7 @@ public class NoDictColumnStatisticsCollectorTest {
     return bytes;
   }
 
-  private AbstractColumnStatisticsCollector createExpectedCollector(FieldSpec.DataType dataType, boolean isSingleValue) {
+  private AbstractColumnStatisticsCollector createDictCollector(FieldSpec.DataType dataType, boolean isSingleValue) {
     switch (dataType) {
       case INT:
         return new IntColumnPreIndexStatsCollector("col", newConfig(dataType, isSingleValue));
@@ -794,8 +794,8 @@ public class NoDictColumnStatisticsCollectorTest {
         "MaxNumberOfMultiValues mismatch - " + context);
     assertEquals(noDictCollector.isSorted(), expectedCollector.isSorted(),
         "isSorted mismatch - " + context);
-    if (dataType != FieldSpec.DataType.INT && dataType != FieldSpec.DataType.LONG && dataType != FieldSpec.DataType.FLOAT
-        && dataType != FieldSpec.DataType.DOUBLE) {
+    if (dataType != FieldSpec.DataType.INT && dataType != FieldSpec.DataType.LONG
+        && dataType != FieldSpec.DataType.FLOAT && dataType != FieldSpec.DataType.DOUBLE) {
       if (dataType != FieldSpec.DataType.STRING) {
         // StringCollector currently does not return shortest element length
         assertEquals(noDictCollector.getLengthOfShortestElement(), expectedCollector.getLengthOfShortestElement(),
@@ -809,5 +809,4 @@ public class NoDictColumnStatisticsCollectorTest {
     assertEquals(noDictCollector.getPartitions(), expectedCollector.getPartitions(),
         "Partitions mismatch - " + context);
   }
-
 }
