@@ -137,7 +137,7 @@ public class RegexpLikePredicateEvaluatorFactory {
     final Matcher _matcher;
 
     // Maintains a cache to quickly look through if the dictionary Id matches with the given regex. Helps us to avoid
-    // repeated checks on the same dictionary Id once it's computed.
+    // doing repeated matchers on the same dictionary Id once it's computed.
     final Int2BooleanMap _dictIdMap;
 
     public ScanBasedRegexpLikePredicateEvaluator(RegexpLikePredicate regexpLikePredicate, Dictionary dictionary) {
@@ -148,13 +148,7 @@ public class RegexpLikePredicateEvaluatorFactory {
 
     @Override
     public boolean applySV(int dictId) {
-
-      if (_dictIdMap.containsKey(dictId)) {
-        return _dictIdMap.get(dictId);
-      }
-      boolean match = _matcher.reset(_dictionary.getStringValue(dictId)).find();
-      _dictIdMap.put(dictId, match);
-      return match;
+      return _dictIdMap.computeIfAbsent(dictId, k -> _matcher.reset(_dictionary.getStringValue(k)).find());
     }
 
     @Override
