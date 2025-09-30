@@ -18,9 +18,7 @@
  */
 package org.apache.pinot.query.mailbox;
 
-import java.io.IOException;
 import java.util.List;
-import java.util.concurrent.TimeoutException;
 import org.apache.pinot.query.runtime.blocks.MseBlock;
 import org.apache.pinot.query.runtime.operator.exchange.BlockExchange;
 import org.apache.pinot.segment.spi.memory.DataBuffer;

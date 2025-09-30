@@ -20,10 +20,8 @@ package org.apache.pinot.query.runtime.operator.exchange;
 
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.Iterators;
-import java.io.IOException;
 import java.util.Collections;
 import java.util.List;
-import java.util.concurrent.TimeoutException;
 import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.common.utils.DataSchema.ColumnDataType;
 import org.apache.pinot.query.mailbox.SendingMailbox;

@@ -24,7 +24,6 @@ import java.util.Collections;
 import java.util.Iterator;
 import java.util.List;
 import java.util.concurrent.ThreadLocalRandom;
-import java.util.concurrent.TimeoutException;
 import java.util.function.Function;
 import org.apache.calcite.rel.RelDistribution;
 import org.apache.pinot.query.mailbox.ReceivingMailbox;
@@ -123,7 +122,7 @@ public abstract class BlockExchange {
    * @return true if all the mailboxes has been early terminated.
    * @throws org.apache.pinot.spi.exception.QueryException if any mailbox fails to send the block, including on timeout.
    */
-  public boolean send(MseBlock.Eos eosBlock, List<DataBuffer> serializedStats)  {
+  public boolean send(MseBlock.Eos eosBlock, List<DataBuffer> serializedStats) {
     int numMailboxes = _sendingMailboxes.size();
     int mailboxIdToSendMetadata;
     if (!serializedStats.isEmpty()) {

@@ -111,6 +111,7 @@ public class InMemorySendingMailbox implements SendingMailbox {
           throw new QueryException(QueryErrorCode.INTERNAL, String.format(
               "Mailbox: %s already errored out (received error block before)", _id));
         }
+        break;
       default:
         throw new IllegalStateException("Unsupported mailbox status: " + status);
     }

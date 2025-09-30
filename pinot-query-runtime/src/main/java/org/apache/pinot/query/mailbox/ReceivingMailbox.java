@@ -155,7 +155,7 @@ public class ReceivingMailbox {
    * added.
    */
   private ReceivingMailboxStatus offerPrivate(MseBlock block, List<DataBuffer> stats, long timeoutMs)
-      throws InterruptedException, TimeoutException{
+      throws InterruptedException, TimeoutException {
     long start = System.currentTimeMillis();
     try {
       ReceivingMailboxStatus result;
@@ -473,10 +473,13 @@ public class ReceivingMailbox {
             case UPSTREAM_FINISHED:
               // Another thread offered the EOS while we were waiting for space.
               assert _eos != null;
-              if (_eos._block.isSuccess()) {// If closed with EOS, the reader is still interested in reading our block
+              if (_eos._block.isSuccess()) { // If closed with EOS, the reader is still interested in reading our block
                 continue;
-              } // if closed with an error, the reader is not interested in reading our block
+              }
+              // if closed with an error, the reader is not interested in reading our block
               return false;
+            default:
+              throw new IllegalStateException("Unexpected state: " + _state);
           }
         }
         if (nanos <= 0L) { // timed out
