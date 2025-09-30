@@ -367,6 +367,8 @@ public class ReceivingMailbox {
   /// - Can be [closed for write][#closeForWrite(MseBlock.Eos, List)].
   /// - Can be [#earlyTerminate()]d.
   ///
+  /// Read the [State] enum to understand the different states and their transitions.
+  ///
   /// All methods of this class are thread-safe and may block, although only [#offer] should block for a long time.
   @ThreadSafe
   private class CancellableBlockingQueue {
@@ -376,13 +378,14 @@ public class ReceivingMailbox {
     private MseBlockWithStats _eos;
     /// The current state of the queue.
     ///
-    /// All changes to this field must be done by calling [#changeState(State, String)].
+    /// All changes to this field must be done by calling [#changeState(State, String)] in order to log the state
+    /// transitions.
     @GuardedBy("_lock")
     private State _state = State.FULL_OPEN;
     /// The items in the queue.
     ///
     /// This is a circular array where [#_putIndex] is the index to add the next item and [#_takeIndex] is the index to
-    /// take the next item from.
+    /// take the next item from. Only data blocks are stored in this array, the EOS block is stored in [#_eos].
     ///
     /// Like in normal blocking queues, elements are added when upstream threads call [#offer] and removed when the
     /// downstream thread calls [#poll]. Unlike normal blocking queues, elements will be [removed][#drainDataBlocks()]
@@ -471,7 +474,8 @@ public class ReceivingMailbox {
               if (offerDataToBuffer(block, timeout, timeUnit)) {
                 return ReceivingMailboxStatus.SUCCESS;
               }
-              // otherwise iterate again
+              // otherwise transitioned to FULL_CLOSED or WAITING_EOS while waiting for space in the queue
+              // and we need to re-evaluate the state
               break;
             default:
               throw new IllegalStateException("Unexpected state: " + _state);
