@@ -105,11 +105,6 @@ public class ErrorMseBlock implements MseBlock.Eos {
     return _errorMessages;
   }
 
-  public QueryErrorCode getSomeErrorCode() {
-    Preconditions.checkState(!_errorMessages.isEmpty(), "Error messages cannot be empty");
-    return _errorMessages.keySet().iterator().next();
-  }
-
   /// Returns the stage where the error occurred, or -1 if the server wasn't able to calculate that.
   public int getStageId() {
     return _stageId;
