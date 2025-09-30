@@ -496,15 +496,6 @@ public class ControllerRequestClient {
     }
   }
 
-  public void getClusterConfig() throws IOException {
-    try {
-      HttpClient.wrapAndThrowHttpException(_httpClient.sendGetRequest(
-          new URI(_controllerRequestURLBuilder.forClusterConfigDelete(config)), _headers));
-    } catch (HttpErrorStatusException | URISyntaxException e) {
-      throw new IOException(e);
-    }
-  }
-
   public void updateQueryWorkloadConfig(QueryWorkloadConfig queryWorkloadConfig)
       throws IOException {
     try {

@@ -79,12 +79,12 @@ public class RetentionManager extends ControllerPeriodicTask<Void> {
   public static final long OLD_LLC_SEGMENTS_RETENTION_IN_MILLIS = TimeUnit.DAYS.toMillis(5L);
   public static final int DEFAULT_UNTRACKED_SEGMENTS_DELETION_BATCH_SIZE = 100;
   private static final RetryPolicy DEFAULT_RETRY_POLICY = RetryPolicies.randomDelayRetryPolicy(20, 100L, 200L);
-  private boolean _untrackedSegmentDeletionEnabled;
-  private int _untrackedSegmentsRetentionTimeInDays;
+  private volatile boolean _untrackedSegmentDeletionEnabled;
+  private volatile int _untrackedSegmentsRetentionTimeInDays;
   private final int _agedSegmentsDeletionBatchSize;
 
   private static final Logger LOGGER = LoggerFactory.getLogger(RetentionManager.class);
-  private boolean _isHybridTableRetentionStrategyEnabled;
+  private volatile boolean _isHybridTableRetentionStrategyEnabled;
   private final BrokerServiceHelper _brokerServiceHelper;
 
   public RetentionManager(PinotHelixResourceManager pinotHelixResourceManager,
@@ -586,5 +586,10 @@ public class RetentionManager extends ControllerPeriodicTask<Void> {
       LOGGER.warn("Invalid value for isHybridTableRetentionStrategyEnabled: {}, keeping current value: {}", newValue,
           oldValue);
     }
+  }
+
+  @VisibleForTesting
+  public boolean isUntrackedSegmentDeletionEnabled() {
+    return _untrackedSegmentDeletionEnabled;
   }
 }

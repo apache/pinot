@@ -395,6 +395,10 @@ public abstract class BaseControllerStarter implements ServiceStartable {
     return _realtimeSegmentValidationManager;
   }
 
+  public RetentionManager getRetentionManager() {
+    return _retentionManager;
+  }
+
   public BrokerResourceValidationManager getBrokerResourceValidationManager() {
     return _brokerResourceValidationManager;
   }
