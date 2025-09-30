@@ -316,6 +316,36 @@ public class ReceivingMailbox {
     }
   }
 
+  /// The state of the queue.
+  ///
+  /// ```
+  /// +-------------------+   offerEos    +-------------------+
+  /// |    FULL_OPEN      | ----------->  |  UPSTREAM_FINISHED|
+  /// +-------------------+               +-------------------+
+  ///       |                                 |
+  ///       | earlyTerminate                  | poll -- when all pending data is read
+  ///       v                                 v
+  /// +-------------------+   offerEos   +-------------------+
+  /// |   WAITING_EOS     | -----------> |   FULL_CLOSED     |
+  /// +-------------------+              +-------------------+
+  /// ```
+  private enum State {
+    /// The queue is open for both read and write.
+    FULL_OPEN,
+    /// The downstream is not interested in reading more data but is waiting for an EOS block to get the stats.
+    ///
+    /// Polls return null and only EOS blocks are accepted by offer.
+    WAITING_EOS,
+    /// The upstream has indicated that no more data will be sent.
+    ///
+    /// Offer fails while poll returns pending blocks and then the EOS block.
+    UPSTREAM_FINISHED,
+    /// The queue is closed for both read and write.
+    ///
+    /// Offers are rejected and polls return the EOS block, which is always not null.
+    FULL_CLOSED
+  }
+
   /// This is a special bounded blocking queue implementation similar to ArrayBlockingQueue, but:
   /// - Only accepts a single reader (aka downstream).
   /// - Only accepts a multiple concurrent writers (aka upstream)
@@ -608,35 +638,5 @@ public class ReceivingMailbox {
         lock.unlock();
       }
     }
-  }
-
-  /// The state of the queue.
-  ///
-  /// ```
-  /// +-------------------+   offerEos    +-------------------+
-  /// |    FULL_OPEN      | ----------->  |  UPSTREAM_FINISHED|
-  /// +-------------------+               +-------------------+
-  ///       |                                 |
-  ///       | earlyTerminate                  | poll -- when all pending data is read
-  ///       v                                 v
-  /// +-------------------+   offerEos   +-------------------+
-  /// |   WAITING_EOS     | -----------> |   FULL_CLOSED     |
-  /// +-------------------+              +-------------------+
-  /// ```
-  private enum State {
-    /// The queue is open for both read and write.
-    FULL_OPEN,
-    /// The downstream is not interested in reading more data but is waiting for an EOS block to get the stats.
-    ///
-    /// Polls return null and only EOS blocks are accepted by offer.
-    WAITING_EOS,
-    /// The upstream has indicated that no more data will be sent.
-    ///
-    /// Offer fails while poll returns pending blocks and then the EOS block.
-    UPSTREAM_FINISHED,
-    /// The queue is closed for both read and write.
-    ///
-    /// Offers are rejected and polls return the EOS block, which is always not null.
-    FULL_CLOSED
   }
 }
