@@ -19,12 +19,11 @@
 package org.apache.pinot.core.operator.filter.predicate;
 
 import com.google.common.base.Preconditions;
-import it.unimi.dsi.fastutil.ints.Int2BooleanMap;
-import it.unimi.dsi.fastutil.ints.Int2BooleanOpenHashMap;
 import it.unimi.dsi.fastutil.ints.IntArrayList;
 import it.unimi.dsi.fastutil.ints.IntList;
 import it.unimi.dsi.fastutil.ints.IntOpenHashSet;
 import it.unimi.dsi.fastutil.ints.IntSet;
+import java.util.BitSet;
 import javax.annotation.Nullable;
 import org.apache.pinot.common.request.context.predicate.RegexpLikePredicate;
 import org.apache.pinot.common.utils.config.QueryOptionsUtils;
@@ -136,19 +135,31 @@ public class RegexpLikePredicateEvaluatorFactory {
     // within the scope of a single thread.
     final Matcher _matcher;
 
-    // Maintains a cache to quickly look through if the dictionary Id matches with the given regex. Helps us to avoid
-    // doing repeated matchers on the same dictionary Id once it's computed.
-    final Int2BooleanMap _dictIdMap;
+    // _evaluatedIds: tracks which dictionary IDs have been evaluated
+    // _matchingIds: tracks which dictionary IDs match the regex pattern
+    final BitSet _evaluatedIds;
+    final BitSet _matchingIds;
 
     public ScanBasedRegexpLikePredicateEvaluator(RegexpLikePredicate regexpLikePredicate, Dictionary dictionary) {
       super(regexpLikePredicate, dictionary);
       _matcher = regexpLikePredicate.getPattern().matcher("");
-      _dictIdMap = new Int2BooleanOpenHashMap();
+      _evaluatedIds = new BitSet();
+      _matchingIds = new BitSet();
     }
 
     @Override
     public boolean applySV(int dictId) {
-      return _dictIdMap.computeIfAbsent(dictId, k -> _matcher.reset(_dictionary.getStringValue(k)).find());
+      // Check if already evaluated
+      if (_evaluatedIds.get(dictId)) {
+        return _matchingIds.get(dictId);
+      }
+
+      boolean match = _matcher.reset(_dictionary.getStringValue(dictId)).find();
+      _evaluatedIds.set(dictId);
+      if (match) {
+        _matchingIds.set(dictId);
+      }
+      return match;
     }
 
     @Override
