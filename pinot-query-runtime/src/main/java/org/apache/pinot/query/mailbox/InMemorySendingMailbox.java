@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.query.mailbox;
 
+import java.io.IOException;
 import java.util.Collections;
 import java.util.List;
 import java.util.concurrent.TimeoutException;
@@ -67,12 +68,14 @@ public class InMemorySendingMailbox implements SendingMailbox {
   }
 
   @Override
-  public void send(MseBlock.Data data) {
+  public void send(MseBlock.Data data)
+      throws IOException, TimeoutException {
     sendPrivate(data, Collections.emptyList());
   }
 
   @Override
-  public void send(MseBlock.Eos block, List<DataBuffer> serializedStats) {
+  public void send(MseBlock.Eos block, List<DataBuffer> serializedStats)
+      throws IOException, TimeoutException {
     sendPrivate(block, serializedStats);
   }
 

@@ -19,8 +19,10 @@
 package org.apache.pinot.query.runtime.operator.exchange;
 
 import com.google.common.annotations.VisibleForTesting;
+import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.concurrent.TimeoutException;
 import java.util.function.Function;
 import org.apache.pinot.core.query.aggregation.function.AggregationFunction;
 import org.apache.pinot.query.mailbox.SendingMailbox;
@@ -52,7 +54,8 @@ class HashExchange extends BlockExchange {
 
   @SuppressWarnings({"rawtypes", "unchecked"})
   @Override
-  protected void route(List<SendingMailbox> destinations, MseBlock.Data block) {
+  protected void route(List<SendingMailbox> destinations, MseBlock.Data block)
+      throws IOException, TimeoutException {
     int numMailboxes = destinations.size();
     if (numMailboxes == 1 || _keySelector == EmptyKeySelector.INSTANCE) {
       sendBlock(destinations.get(0), block);
