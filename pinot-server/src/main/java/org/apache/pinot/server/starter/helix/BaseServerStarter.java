@@ -264,6 +264,9 @@ public abstract class BaseServerStarter implements ServiceStartable {
     // Register configuration change listener for dynamic max clause count updates
     _clusterConfigChangeHandler.registerClusterConfigChangeListener(
         new TextIndexUtils.LuceneMaxClauseCountConfigChangeListener());
+    // Register cluster-level override for no-dict stats collection
+    _clusterConfigChangeHandler.registerClusterConfigChangeListener(
+        new org.apache.pinot.segment.local.utils.NoDictStatsCollectionUtils.ConfigChangeListener());
     LOGGER.info("Registered Lucene max clause count configuration change listener");
 
     LOGGER.info("Initializing Helix manager with zkAddress: {}, clusterName: {}, instanceId: {}", _zkAddress,

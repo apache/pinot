@@ -57,7 +57,8 @@ public class SegmentPreIndexStatsCollectorImpl implements SegmentPreIndexStatsCo
       if (!dictionaryEnabled) {
         // MAP collector is optimised for no-dictionary collection
         if (!fieldSpec.getDataType().getStoredType().equals(FieldSpec.DataType.MAP)) {
-          if (_statsCollectorConfig.getTableConfig().getIndexingConfig().canOptimiseNoDictStatsCollection()) {
+          if (org.apache.pinot.segment.local.utils.NoDictStatsCollectionUtils
+              .useOptimizedNoDictCollector(_statsCollectorConfig.getTableConfig())) {
             _columnStatsCollectorMap.put(column, new NoDictColumnStatisticsCollector(column, _statsCollectorConfig));
             continue;
           }

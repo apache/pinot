@@ -76,6 +76,16 @@ public class CommonConstants {
     public static final String CONFIG_OF_LUCENE_MAX_CLAUSE_COUNT = "pinot.lucene.max.clause.count";
     public static final int DEFAULT_LUCENE_MAX_CLAUSE_COUNT = 1024;
   }
+  /**
+   * Cluster-wide stats related configs.
+   */
+  public static class Stats {
+    // Controls whether to use NoDictColumnStatisticsCollector for no-dictionary columns globally.
+    // If unset at cluster level, table-level IndexingConfig.canOptimiseNoDictStatsCollection() is used.
+    public static final String CONFIG_OF_OPTIMISE_NO_DICT_STATS_COLLECTION =
+        "pinot.stats.optimize.no.dict.collection";
+    public static final boolean DEFAULT_OPTIMISE_NO_DICT_STATS_COLLECTION = true;
+  }
   public static final String JFR = "pinot.jfr";
 
   public static final String RLS_FILTERS = "rlsFilters";

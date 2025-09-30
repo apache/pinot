@@ -1046,7 +1046,8 @@ public class ForwardIndexHandler extends BaseIndexHandler {
     boolean dictionaryEnabled = hasIndex(column, StandardIndexes.dictionary());
     // MAP collector is optimised for no-dictionary collection
     if (!dictionaryEnabled && storedType != DataType.MAP) {
-      if (_tableConfig.getIndexingConfig().canOptimiseNoDictStatsCollection()) {
+      if (org.apache.pinot.segment.local.utils.NoDictStatsCollectionUtils
+          .useOptimizedNoDictCollector(_tableConfig)) {
         return new NoDictColumnStatisticsCollector(column, statsCollectorConfig);
       }
     }
