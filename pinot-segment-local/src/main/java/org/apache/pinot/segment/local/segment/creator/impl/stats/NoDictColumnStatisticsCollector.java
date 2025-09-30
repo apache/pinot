@@ -18,11 +18,10 @@
  */
 package org.apache.pinot.segment.local.segment.creator.impl.stats;
 
-import com.dynatrace.hash4j.distinctcount.UltraLogLog;
+import com.clearspring.analytics.stream.cardinality.HyperLogLogPlus;
 import java.math.BigDecimal;
 import java.nio.charset.StandardCharsets;
 import org.apache.commons.lang3.NotImplementedException;
-import org.apache.pinot.segment.local.utils.UltraLogLogUtils;
 import org.apache.pinot.segment.spi.creator.StatsCollectorConfig;
 import org.apache.pinot.spi.utils.BigDecimalUtils;
 import org.apache.pinot.spi.utils.ByteArray;
@@ -35,10 +34,10 @@ import org.slf4j.LoggerFactory;
  * Column statistics collector for no-dictionary columns that avoids storing unique values and thus reduces memory
  * Behavior:
  * - getUniqueValuesSet() throws NotImplementedException
- * - getCardinality() returns approximate cardinality using ULL
+ * - getCardinality() returns approximate cardinality using HLL++
  * - Doesn't handle cases where values are of different types (e.g. int and long). This is expected.
  *   Individual type collectors (e.g. IntColumnPreIndexStatsCollector) also don't handle this case.
- *   At this point in the  Pinot process, the type consistency of a key should already be enforced.
+ *   At this point in the Pinot process, the type consistency of a key should already be enforced.
  *   So if such a case is encountered, it will be raised as an exception during collect()
  * Doesn't handle MAP data type as MapColumnPreIndexStatsCollector is optimized for no-dictionary collection
  */
@@ -51,12 +50,15 @@ public class NoDictColumnStatisticsCollector extends AbstractColumnStatisticsCol
   private int _maxLength = -1; // default return value is -1
   private int _maxRowLength = -1; // default return value is -1
   private boolean _sealed = false;
-  private final UltraLogLog _ull;
+  // HLL Plus generally returns approximate cardinality >= actual cardinality which is desired
+  private final HyperLogLogPlus _hllPlus;
 
   public NoDictColumnStatisticsCollector(String column, StatsCollectorConfig statsCollectorConfig) {
     super(column, statsCollectorConfig);
-    // Use default p; can be made configurable via StatsCollectorConfig later if needed
-    _ull = UltraLogLog.create(CommonConstants.Helix.DEFAULT_ULTRALOGLOG_P);
+    // Use default p and sp; can be made configurable via StatsCollectorConfig later if needed
+    _hllPlus = new HyperLogLogPlus(
+        CommonConstants.Helix.DEFAULT_HYPERLOGLOG_PLUS_P,
+        CommonConstants.Helix.DEFAULT_HYPERLOGLOG_PLUS_SP);
     LOGGER.info("Initialized NoDictColumnStatisticsCollector for column: {}", column);
   }
 
@@ -72,7 +74,7 @@ public class NoDictColumnStatisticsCollector extends AbstractColumnStatisticsCol
           throw new UnsupportedOperationException();
         }
         updateMinMax(value);
-        updateUll(value);
+        updateHllPlus(value);
         int len = getValueLength(value);
         _minLength = Math.min(_minLength, len);
         _maxLength = Math.max(_maxLength, len);
@@ -89,28 +91,28 @@ public class NoDictColumnStatisticsCollector extends AbstractColumnStatisticsCol
         int[] values = (int[]) entry;
         for (int value : values) {
           updateMinMax(value);
-          updateUll(value);
+          updateHllPlus(value);
         }
         length = values.length;
       } else if (entry instanceof long[]) {
         long[] values = (long[]) entry;
         for (long value : values) {
           updateMinMax(value);
-          updateUll(value);
+          updateHllPlus(value);
         }
         length = values.length;
       } else if (entry instanceof float[]) {
         float[] values = (float[]) entry;
         for (float value : values) {
           updateMinMax(value);
-          updateUll(value);
+          updateHllPlus(value);
         }
         length = values.length;
       } else {
         double[] values = (double[]) entry;
         for (double value : values) {
           updateMinMax(value);
-          updateUll(value);
+          updateHllPlus(value);
         }
         length = values.length;
       }
@@ -120,7 +122,7 @@ public class NoDictColumnStatisticsCollector extends AbstractColumnStatisticsCol
       Comparable value = toComparable(entry);
       addressSorted(value);
       updateMinMax(entry);
-      updateUll(entry);
+      updateHllPlus(entry);
       int len = getValueLength(entry);
       _minLength = Math.min(_minLength, len);
       _maxLength = Math.max(_maxLength, len);
@@ -206,10 +208,10 @@ public class NoDictColumnStatisticsCollector extends AbstractColumnStatisticsCol
 
   @Override
   public int getCardinality() {
-    // Get approximate distinct count estimate
-    // Increase by 5% to increase probability of not returning lower than actual cardinality
-    long estimate = Math.round(_ull.getDistinctCountEstimate() * 1.05);
-    // There are cases where ULL can overshoot the actual number of entries.
+    // Get approximate distinct count estimate using HLL++
+    // Increase by 10% to increase probability of not returning lower than actual cardinality
+    long estimate = Math.round(_hllPlus.cardinality() * 1.1);
+    // There are cases where approximation can overshoot the actual number of entries.
     // Returning a cardinality greater than total entries can break assumptions.
     return estimate > getTotalNumberOfEntries() ? getTotalNumberOfEntries() : (int) estimate;
   }
@@ -219,8 +221,12 @@ public class NoDictColumnStatisticsCollector extends AbstractColumnStatisticsCol
     _sealed = true;
   }
 
-  private void updateUll(Object value) {
-    // Hash and add to ULL using shared utility to ensure deterministic canonicalization
-    UltraLogLogUtils.hashObject(value).ifPresent(_ull::add);
+  private void updateHllPlus(Object value) {
+    if (value instanceof BigDecimal) {
+      // Canonicalize BigDecimal as string to avoid scale-related equality issues
+      _hllPlus.offer(((BigDecimal) value).toString());
+    } else {
+      _hllPlus.offer(value);
+    }
   }
 }

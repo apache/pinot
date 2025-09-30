@@ -50,7 +50,7 @@ public class MemoryEstimatorTest {
       assertEquals(extract(metadata, "column.colFloatMV.cardinality = (\\d+)"), "250");
       assertEquals(extract(metadata, "column.colString.cardinality = (\\d+)"), "300");
       assertEquals(extract(metadata, "column.colStringMV.cardinality = (\\d+)"), "350");
-      assertEquals(extract(metadata, "column.colBytes.cardinality = (\\d+)"), "416");
+      assertEquals(extract(metadata, "column.colBytes.cardinality = (\\d+)"), "423");
       assertEquals(extract(metadata, "column.colLong.cardinality = (\\d+)"), "500");
       assertEquals(extract(metadata, "column.colLongMV.cardinality = (\\d+)"), "550");
       assertEquals(extract(metadata, "column.colDouble.cardinality = (\\d+)"), "600");
@@ -83,7 +83,7 @@ public class MemoryEstimatorTest {
       assertEquals(extract(metadata, "column.colInt.cardinality = (\\d+)"), "500");
       assertEquals(extract(metadata, "column.colFloat.cardinality = (\\d+)"), "600");
       assertEquals(extract(metadata, "column.colString.cardinality = (\\d+)"), "700");
-      assertEquals(extract(metadata, "column.colBytes.cardinality = (\\d+)"), "841");
+      assertEquals(extract(metadata, "column.colBytes.cardinality = (\\d+)"), "855");
       assertEquals(extract(metadata, "column.colMetric.cardinality = (\\d+)"), "900");
       assertEquals(extract(metadata, "column.colTime.cardinality = (\\d+)"), "250");
       assertEquals(extract(metadata, "column.colTime2.cardinality = (\\d+)"), "750");
