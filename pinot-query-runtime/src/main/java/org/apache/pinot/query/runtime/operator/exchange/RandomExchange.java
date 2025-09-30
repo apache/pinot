@@ -56,8 +56,7 @@ class RandomExchange extends BlockExchange {
   }
 
   @Override
-  protected void route(List<SendingMailbox> destinations, MseBlock.Data block)
-      throws IOException, TimeoutException {
+  protected void route(List<SendingMailbox> destinations, MseBlock.Data block) {
     int destinationIdx = _rand.apply(destinations.size());
     sendBlock(destinations.get(destinationIdx), block);
   }

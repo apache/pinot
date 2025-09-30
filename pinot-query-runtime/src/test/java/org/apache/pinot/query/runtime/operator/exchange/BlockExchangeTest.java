@@ -179,8 +179,7 @@ public class BlockExchangeTest {
     }
 
     @Override
-    protected void route(List<SendingMailbox> destinations, MseBlock.Data block)
-        throws IOException, TimeoutException {
+    protected void route(List<SendingMailbox> destinations, MseBlock.Data block) {
       for (SendingMailbox mailbox : destinations) {
         sendBlock(mailbox, block);
       }

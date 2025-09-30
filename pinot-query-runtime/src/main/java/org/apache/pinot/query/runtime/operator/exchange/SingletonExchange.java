@@ -45,8 +45,7 @@ class SingletonExchange extends BlockExchange {
   }
 
   @Override
-  protected void route(List<SendingMailbox> sendingMailboxes, MseBlock.Data block)
-      throws IOException, TimeoutException {
+  protected void route(List<SendingMailbox> sendingMailboxes, MseBlock.Data block) {
     sendBlock(sendingMailboxes.get(0), block);
   }
 }

@@ -101,10 +101,9 @@ public abstract class BlockExchange {
    * @param block the block to be transferred
    * @return true if all the mailboxes has been early terminated.
    * @throws IOException when sending stream unexpectedly closed.
-   * @throws TimeoutException when sending stream timeout.
+   * @throws org.apache.pinot.spi.exception.QueryException if any mailbox fails to send the block, including on timeout.
    */
-  public boolean send(MseBlock.Data block)
-      throws IOException, TimeoutException {
+  public boolean send(MseBlock.Data block) {
     boolean isEarlyTerminated = true;
     for (SendingMailbox sendingMailbox : _sendingMailboxes) {
       if (!sendingMailbox.isEarlyTerminated()) {
@@ -122,11 +121,9 @@ public abstract class BlockExchange {
    * API to send a block to the destination mailboxes.
    * @param eosBlock the block to be transferred
    * @return true if all the mailboxes has been early terminated.
-   * @throws IOException when sending stream unexpectedly closed.
-   * @throws TimeoutException when sending stream timeout.
+   * @throws org.apache.pinot.spi.exception.QueryException if any mailbox fails to send the block, including on timeout.
    */
-  public boolean send(MseBlock.Eos eosBlock, List<DataBuffer> serializedStats)
-      throws IOException, TimeoutException {
+  public boolean send(MseBlock.Eos eosBlock, List<DataBuffer> serializedStats)  {
     int numMailboxes = _sendingMailboxes.size();
     int mailboxIdToSendMetadata;
     if (!serializedStats.isEmpty()) {
@@ -152,8 +149,7 @@ public abstract class BlockExchange {
     return false;
   }
 
-  protected void sendBlock(SendingMailbox sendingMailbox, MseBlock.Data block)
-      throws IOException, TimeoutException {
+  protected void sendBlock(SendingMailbox sendingMailbox, MseBlock.Data block) {
     if (LOGGER.isTraceEnabled()) {
       LOGGER.trace("Sending block: {} {} to {}", block, System.identityHashCode(block), sendingMailbox);
     }
@@ -171,8 +167,7 @@ public abstract class BlockExchange {
     }
   }
 
-  protected abstract void route(List<SendingMailbox> destinations, MseBlock.Data block)
-      throws IOException, TimeoutException;
+  protected abstract void route(List<SendingMailbox> destinations, MseBlock.Data block);
 
   // Called when the OpChain gracefully returns.
   // TODO: This is a no-op right now.
@@ -216,19 +211,16 @@ public abstract class BlockExchange {
     }
 
     @Override
-    public void send(MseBlock.Data data)
-        throws IOException, TimeoutException {
+    public void send(MseBlock.Data data) {
       sendPrivate(data, Collections.emptyList());
     }
 
     @Override
-    public void send(MseBlock.Eos block, List<DataBuffer> serializedStats)
-        throws IOException, TimeoutException {
+    public void send(MseBlock.Eos block, List<DataBuffer> serializedStats) {
       sendPrivate(block, serializedStats);
     }
 
-    private void sendPrivate(MseBlock block, List<DataBuffer> serializedStats)
-        throws IOException, TimeoutException {
+    private void sendPrivate(MseBlock block, List<DataBuffer> serializedStats) {
       if (LOGGER.isTraceEnabled()) {
         LOGGER.trace("Exchange mailbox {} echoing {} {}", this, block, System.identityHashCode(block));
       }

@@ -20,6 +20,7 @@ package org.apache.pinot.query.runtime.operator;
 
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
+import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.EnumSet;
@@ -45,6 +46,7 @@ import org.apache.pinot.query.runtime.plan.MultiStageQueryStats;
 import org.apache.pinot.query.runtime.plan.OpChainExecutionContext;
 import org.apache.pinot.segment.spi.memory.DataBuffer;
 import org.apache.pinot.spi.exception.QueryCancelledException;
+import org.apache.pinot.spi.exception.QueryException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -221,8 +223,8 @@ public class MailboxSendOperator extends MultiStageOperator {
     } catch (QueryCancelledException e) {
       LOGGER.debug("Query was cancelled! for opChain: {}", _context.getId());
       return SuccessMseBlock.INSTANCE;
-    } catch (TimeoutException e) {
-      LOGGER.warn("Timed out transferring data on opChain: {}", _context.getId(), e);
+    } catch (QueryException e) {
+      LOGGER.warn("Error while sending data on opChain: {}", _context.getId(), e);
       return ErrorMseBlock.fromException(e);
     } catch (Exception e) {
       ErrorMseBlock errorBlock = ErrorMseBlock.fromException(e);
@@ -243,7 +245,7 @@ public class MailboxSendOperator extends MultiStageOperator {
   }
 
   private void sendEos(MseBlock.Eos eosBlockWithoutStats)
-      throws Exception {
+      throws QueryCancelledException {
 
     MultiStageQueryStats stats = null;
     List<DataBuffer> serializedStats;
@@ -273,7 +275,7 @@ public class MailboxSendOperator extends MultiStageOperator {
   }
 
   private boolean sendMseBlock(MseBlock.Data block)
-      throws Exception {
+      throws QueryException {
     boolean isEarlyTerminated = _exchange.send(block);
     if (LOGGER.isDebugEnabled()) {
       LOGGER.debug("==[SEND]== Block " + block + " sent from: " + _context.getId());
@@ -282,7 +284,7 @@ public class MailboxSendOperator extends MultiStageOperator {
   }
 
   private boolean sendMseBlock(MseBlock.Eos block, List<DataBuffer> serializedStats)
-      throws Exception {
+      throws QueryException {
     boolean isEarlyTerminated = _exchange.send(block, serializedStats);
     if (LOGGER.isDebugEnabled()) {
       LOGGER.debug("==[SEND]== Block " + block + " sent from: " + _context.getId());

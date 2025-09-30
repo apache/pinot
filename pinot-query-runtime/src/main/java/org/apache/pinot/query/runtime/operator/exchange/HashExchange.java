@@ -54,8 +54,7 @@ class HashExchange extends BlockExchange {
 
   @SuppressWarnings({"rawtypes", "unchecked"})
   @Override
-  protected void route(List<SendingMailbox> destinations, MseBlock.Data block)
-      throws IOException, TimeoutException {
+  protected void route(List<SendingMailbox> destinations, MseBlock.Data block) {
     int numMailboxes = destinations.size();
     if (numMailboxes == 1 || _keySelector == EmptyKeySelector.INSTANCE) {
       sendBlock(destinations.get(0), block);

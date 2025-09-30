@@ -50,6 +50,7 @@ import org.apache.pinot.query.runtime.blocks.SuccessMseBlock;
 import org.apache.pinot.query.runtime.operator.MailboxSendOperator;
 import org.apache.pinot.segment.spi.memory.DataBuffer;
 import org.apache.pinot.spi.exception.QueryErrorCode;
+import org.apache.pinot.spi.exception.QueryException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -89,19 +90,16 @@ public class GrpcSendingMailbox implements SendingMailbox {
   }
 
   @Override
-  public void send(MseBlock.Data data)
-      throws IOException, TimeoutException {
+  public void send(MseBlock.Data data) {
     sendInternal(data, List.of());
   }
 
   @Override
-  public void send(MseBlock.Eos block, List<DataBuffer> serializedStats)
-      throws IOException, TimeoutException {
+  public void send(MseBlock.Eos block, List<DataBuffer> serializedStats) {
     sendInternal(block, serializedStats);
   }
 
-  private void sendInternal(MseBlock block, List<DataBuffer> serializedStats)
-      throws IOException {
+  private void sendInternal(MseBlock block, List<DataBuffer> serializedStats) {
     if (isTerminated() || (isEarlyTerminated() && block.isData())) {
       LOGGER.debug("==[GRPC SEND]== terminated or early terminated mailbox. Skipping sending message {} to: {}",
           block, _id);
@@ -116,8 +114,7 @@ public class GrpcSendingMailbox implements SendingMailbox {
     try {
       processAndSend(block, serializedStats);
     } catch (IOException e) {
-      LOGGER.warn("Failed to split and send mailbox", e);
-      throw e;
+      throw new QueryException(QueryErrorCode.INTERNAL, "Failed to split and send mailbox", e);
     }
     if (LOGGER.isDebugEnabled()) {
       LOGGER.debug("==[GRPC SEND]== message " + block + " sent to: " + _id);

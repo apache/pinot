@@ -18,7 +18,6 @@
  */
 package org.apache.pinot.query.mailbox;
 
-import java.io.IOException;
 import java.util.Collections;
 import java.util.List;
 import java.util.concurrent.TimeoutException;
@@ -42,7 +41,15 @@ public class InMemorySendingMailbox implements SendingMailbox {
   private final long _deadlineMs;
 
   private ReceivingMailbox _receivingMailbox;
+  /**
+   * Set to true when the send operation completes calling {@link #complete()}
+   */
   private volatile boolean _isTerminated;
+  /**
+   * Set to true when the receiver waits for EOS but discards any further data blocks. This can happen when the receiver
+   * has already early terminated, for example, when the {@link org.apache.pinot.query.runtime.operator.SortOperator}
+   * limit has been reached.
+   */
   private volatile boolean _isEarlyTerminated;
   private final StatMap<MailboxSendOperator.StatKey> _statMap;
 
@@ -60,19 +67,16 @@ public class InMemorySendingMailbox implements SendingMailbox {
   }
 
   @Override
-  public void send(MseBlock.Data data)
-      throws IOException, TimeoutException {
+  public void send(MseBlock.Data data) {
     sendPrivate(data, Collections.emptyList());
   }
 
   @Override
-  public void send(MseBlock.Eos block, List<DataBuffer> serializedStats)
-      throws IOException, TimeoutException {
+  public void send(MseBlock.Eos block, List<DataBuffer> serializedStats) {
     sendPrivate(block, serializedStats);
   }
 
-  private void sendPrivate(MseBlock block, List<DataBuffer> serializedStats)
-      throws TimeoutException {
+  private void sendPrivate(MseBlock block, List<DataBuffer> serializedStats) {
     if (isTerminated() || (isEarlyTerminated() && block.isData())) {
       return;
     }
@@ -81,22 +85,32 @@ public class InMemorySendingMailbox implements SendingMailbox {
     }
     _statMap.merge(MailboxSendOperator.StatKey.IN_MEMORY_MESSAGES, 1);
     long timeoutMs = _deadlineMs - System.currentTimeMillis();
-    ReceivingMailbox.ReceivingMailboxStatus status = _receivingMailbox.offer(block, serializedStats, timeoutMs);
-
+    ReceivingMailbox.ReceivingMailboxStatus status;
+    try {
+      status = _receivingMailbox.offer(block, serializedStats, timeoutMs);
+    } catch (InterruptedException e) {
+      Thread.currentThread().interrupt();
+      throw new QueryException(QueryErrorCode.INTERNAL, "Interrupted while sending data to mailbox: " + _id, e);
+    } catch (TimeoutException e) {
+      throw new QueryException(QueryErrorCode.EXECUTION_TIMEOUT,
+          String.format("Timed out adding block into mailbox: %s with timeout: %dms", _id, timeoutMs));
+    }
+    _isEarlyTerminated = status != ReceivingMailbox.ReceivingMailboxStatus.SUCCESS;
     switch (status) {
       case SUCCESS:
+      case WAITING_EOS:
         break;
-      case CANCELLED:
-        throw new QueryCancelledException(String.format("Mailbox: %s already cancelled from upstream", _id));
-      case ERROR:
-        throw new QueryException(QueryErrorCode.INTERNAL, String.format(
-            "Mailbox: %s already errored out (received error block before)", _id));
-      case TIMEOUT:
-        throw new QueryException(QueryErrorCode.EXECUTION_TIMEOUT,
-            String.format("Timed out adding block into mailbox: %s with timeout: %dms", _id, timeoutMs));
-      case EARLY_TERMINATED:
-        _isEarlyTerminated = true;
+      case LAST_BLOCK:
+        _isTerminated = true;
         break;
+      case ALREADY_TERMINATED:
+        if (_isTerminated) {
+          LOGGER.debug("Local mailbox received a late message once the stream was closed. This can happen due to "
+              + "race condition between sending the last block and closing the stream on the sender side");
+        } else {
+          throw new QueryException(QueryErrorCode.INTERNAL, String.format(
+              "Mailbox: %s already errored out (received error block before)", _id));
+        }
       default:
         throw new IllegalStateException("Unsupported mailbox status: " + status);
     }

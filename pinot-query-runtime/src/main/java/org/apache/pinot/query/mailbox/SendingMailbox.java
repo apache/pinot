@@ -42,16 +42,14 @@ public interface SendingMailbox {
    * and they should <b>not</b> acquire any resources when they are created. This method should throw if there was an
    * error sending the data, since that would allow {@link BlockExchange} to exit early.
    */
-  void send(MseBlock.Data data)
-      throws IOException, TimeoutException;
+  void send(MseBlock.Data data);
 
   /**
    * Sends an EOS block to the receiver. Note that SendingMailbox are required to acquire resources lazily in this call,
    * and they should <b>not</b> acquire any resources when they are created. This method should throw if there was an
    * error sending the data, since that would allow {@link BlockExchange} to exit early.
    */
-  void send(MseBlock.Eos block, List<DataBuffer> serializedStats)
-      throws IOException, TimeoutException;
+  void send(MseBlock.Eos block, List<DataBuffer> serializedStats);
 
   /**
    * Called when there is no more data to be sent by the {@link BlockExchange}. This is also a signal for the
