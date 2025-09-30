@@ -331,18 +331,33 @@ public class ReceivingMailbox {
   /// ```
   private enum State {
     /// The queue is open for both read and write.
+    ///
+    /// - [#poll()] returns the pending blocks in the queue, or null if the queue is empty.
+    /// - [#offer] accepts both data and EOS blocks.
+    ///
+    /// Transitions to [State#UPSTREAM_FINISHED] when an EOS block is offered or to [State#WAITING_EOS] when
+    /// [#earlyTerminate()] is called.
     FULL_OPEN,
     /// The downstream is not interested in reading more data but is waiting for an EOS block to get the stats.
     ///
-    /// Polls return null and only EOS blocks are accepted by offer.
+    /// - [#poll()] returns null.
+    /// - [#offer] rejects all data blocks.
+    ///
+    /// Transitions to [State#FULL_CLOSED] when an EOS block is offered.
     WAITING_EOS,
     /// The upstream has indicated that no more data will be sent.
     ///
-    /// Offer fails while poll returns pending blocks and then the EOS block.
+    /// - [#poll()] returns the pending blocks in the queue and then the EOS block.
+    /// - [#offer] rejects all blocks.
+    ///
+    /// Transitions to [State#FULL_CLOSED] when the EOS block is read by [#poll()].
     UPSTREAM_FINISHED,
     /// The queue is closed for both read and write.
     ///
-    /// Offers are rejected and polls return the EOS block, which is always not null.
+    /// - [#poll()] always returns the EOS block, which is always not null.
+    /// - [#offer] rejects all blocks.
+    ///
+    /// No transitions out of this state.
     FULL_CLOSED
   }
 
