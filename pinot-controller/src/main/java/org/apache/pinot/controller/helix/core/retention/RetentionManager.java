@@ -538,17 +538,20 @@ public class RetentionManager extends ControllerPeriodicTask<Void> {
 
   private void updateUntrackedSegmentDeletionEnabled(String newValue) {
     boolean oldValue = _untrackedSegmentDeletionEnabled;
-    try {
-      boolean parsedValue = Boolean.parseBoolean(newValue);
-      if (oldValue == parsedValue) {
-        LOGGER.info("No change in untrackedSegmentDeletionEnabled, current value: {}", oldValue);
-      } else {
-        _untrackedSegmentDeletionEnabled = parsedValue;
-        LOGGER.info("Updated untrackedSegmentDeletionEnabled from {} to {}", oldValue, parsedValue);
-      }
-    } catch (Exception e) {
+
+    // Validate that the value is a proper boolean string
+    if (!"true".equalsIgnoreCase(newValue) && !"false".equalsIgnoreCase(newValue)) {
       LOGGER.warn("Invalid value for untrackedSegmentDeletionEnabled: {}, keeping current value: {}", newValue,
           oldValue);
+      return;
+    }
+
+    boolean parsedValue = Boolean.parseBoolean(newValue);
+    if (oldValue == parsedValue) {
+      LOGGER.info("No change in untrackedSegmentDeletionEnabled, current value: {}", oldValue);
+    } else {
+      _untrackedSegmentDeletionEnabled = parsedValue;
+      LOGGER.info("Updated untrackedSegmentDeletionEnabled from {} to {}", oldValue, parsedValue);
     }
   }
 
