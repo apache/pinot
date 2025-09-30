@@ -22,7 +22,11 @@ import com.google.common.annotations.VisibleForTesting;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;
+import java.util.Optional;
+import java.util.Properties;
+import java.util.concurrent.TimeUnit;
 import org.apache.pinot.common.metadata.segment.SegmentZKMetadata;
+import org.apache.pinot.common.metrics.ControllerGauge;
 import org.apache.pinot.common.metrics.ControllerMetrics;
 import org.apache.pinot.common.metrics.ValidationMetrics;
 import org.apache.pinot.controller.ControllerConf;
@@ -47,24 +51,44 @@ import org.slf4j.LoggerFactory;
  * Manages the segment validation metrics, to ensure that all offline segments are contiguous (no missing segments) and
  * that the offline push delay isn't too high.
  */
-public class OfflineSegmentIntervalChecker extends ControllerPeriodicTask<Void> {
-  private static final Logger LOGGER = LoggerFactory.getLogger(OfflineSegmentIntervalChecker.class);
+public class OfflineSegmentValidationManager extends ControllerPeriodicTask<OfflineSegmentValidationManager.Context> {
+  private static final Logger LOGGER = LoggerFactory.getLogger(OfflineSegmentValidationManager.class);
 
   private final ValidationMetrics _validationMetrics;
   private final boolean _segmentAutoResetOnErrorAtValidation;
+  private final ResourceUtilizationManager _resourceUtilizationManager;
+  private final int _segmentLevelValidationIntervalInSeconds;
+  // Legacy frequency setting maintained for backward compatibility
+  private final int _offlineSegmentIntervalCheckerFrequencyInSeconds;
+  private long _lastSegmentLevelValidationRunTimeMs = 0L;
 
-  public OfflineSegmentIntervalChecker(ControllerConf config, PinotHelixResourceManager pinotHelixResourceManager,
+  public OfflineSegmentValidationManager(ControllerConf config, PinotHelixResourceManager pinotHelixResourceManager,
       LeadControllerManager leadControllerManager, ValidationMetrics validationMetrics,
-      ControllerMetrics controllerMetrics) {
-    super("OfflineSegmentIntervalChecker", config.getOfflineSegmentIntervalCheckerFrequencyInSeconds(),
-        config.getOfflineSegmentIntervalCheckerInitialDelayInSeconds(), pinotHelixResourceManager,
+      ControllerMetrics controllerMetrics, ResourceUtilizationManager resourceUtilizationManager) {
+    super("OfflineSegmentValidationManager", config.getOfflineSegmentValidationFrequencyInSeconds(),
+        config.getPeriodicTaskInitialDelayInSeconds(), pinotHelixResourceManager,
         leadControllerManager, controllerMetrics);
     _validationMetrics = validationMetrics;
     _segmentAutoResetOnErrorAtValidation = config.isAutoResetErrorSegmentsOnValidationEnabled();
+    _resourceUtilizationManager = resourceUtilizationManager;
+    _segmentLevelValidationIntervalInSeconds = config.getSegmentLevelValidationIntervalInSeconds();
+    _offlineSegmentIntervalCheckerFrequencyInSeconds = config.getOfflineSegmentIntervalCheckerFrequencyInSeconds();
   }
 
   @Override
-  protected void processTable(String tableNameWithType) {
+  protected Context preprocess(Properties periodicTaskProperties) {
+    Context context = new Context();
+    long currentTimeMs = System.currentTimeMillis();
+    if (shouldRunSegmentValidation(periodicTaskProperties, currentTimeMs)) {
+      LOGGER.info("Run segment-level validation");
+      context._runSegmentLevelValidation = true;
+      _lastSegmentLevelValidationRunTimeMs = currentTimeMs;
+    }
+    return context;
+  }
+
+  @Override
+  protected void processTable(String tableNameWithType, Context context) {
     TableType tableType = TableNameBuilder.getTableTypeFromTableName(tableNameWithType);
     if (tableType == TableType.OFFLINE) {
 
@@ -73,7 +97,38 @@ public class OfflineSegmentIntervalChecker extends ControllerPeriodicTask<Void> 
         LOGGER.warn("Failed to find table config for table: {}, skipping validation", tableNameWithType);
         return;
       }
-      validateOfflineSegmentPush(tableConfig);
+      updateResourceUtilizationMetric(tableNameWithType);
+
+      // Validations that involve fetching segment ZK metadata for all the segments are run at a lower frequency
+      // than operations that are done at table level
+      if (context._runSegmentLevelValidation) {
+        validateOfflineSegmentPush(tableConfig);
+      }
+    }
+  }
+
+  /**
+   * Updates the resource utilization metric for the given table.
+   * Sets the RESOURCE_UTILIZATION_LIMIT_EXCEEDED gauge to 1 if resource utilization is above limits (FAIL),
+   * or to 0 if within limits (PASS). The metric is not updated when the result is UNDETERMINED.
+   *
+   * @param tableNameWithType the table name with type for which to update the metric
+   */
+  private void updateResourceUtilizationMetric(String tableNameWithType) {
+    UtilizationChecker.CheckResult result =
+        _resourceUtilizationManager.isResourceUtilizationWithinLimits(tableNameWithType,
+            UtilizationChecker.CheckPurpose.TASK_GENERATION);
+    if (result == UtilizationChecker.CheckResult.FAIL) {
+      LOGGER.warn("Resource utilization is above threshold for table: {}, setting metric to 1", tableNameWithType);
+      _controllerMetrics.setOrUpdateTableGauge(tableNameWithType, ControllerGauge.RESOURCE_UTILIZATION_LIMIT_EXCEEDED,
+          1L);
+    } else if (result == UtilizationChecker.CheckResult.PASS) {
+      LOGGER.info("Resource utilization is within limits for table: {}, setting metric to 0", tableNameWithType);
+      _controllerMetrics.setOrUpdateTableGauge(tableNameWithType, ControllerGauge.RESOURCE_UTILIZATION_LIMIT_EXCEEDED,
+          0L);
+    } else {
+      LOGGER.info("Resource utilization check result is UNDETERMINED for table: {}, no action taken",
+          tableNameWithType);
     }
   }
 
@@ -219,5 +274,36 @@ public class OfflineSegmentIntervalChecker extends ControllerPeriodicTask<Void> 
   public void cleanUpTask() {
     LOGGER.info("Unregister all the validation metrics.");
     _validationMetrics.unregisterAllMetrics();
+  }
+
+  private boolean shouldRunSegmentValidation(Properties periodicTaskProperties, long currentTimeMs) {
+    boolean runValidation = Optional.ofNullable(
+            periodicTaskProperties.getProperty(RUN_SEGMENT_LEVEL_VALIDATION))
+        .map(value -> {
+          try {
+            return Boolean.parseBoolean(value);
+          } catch (Exception e) {
+            return false;
+          }
+        })
+        .orElse(false);
+
+    // Use the faster frequency (smaller value) to maintain backward compatibility.
+    // If the legacy getOfflineSegmentIntervalCheckerFrequencyInSeconds is configured, we ensure
+    // segment validation runs at least as frequently as before by taking the minimum of both frequencies.
+    int frequencyToUse = _segmentLevelValidationIntervalInSeconds;
+    if (_offlineSegmentIntervalCheckerFrequencyInSeconds > 0) {
+      frequencyToUse =
+          Math.min(_offlineSegmentIntervalCheckerFrequencyInSeconds, _segmentLevelValidationIntervalInSeconds);
+    }
+
+    boolean timeThresholdMet = TimeUnit.MILLISECONDS.toSeconds(currentTimeMs - _lastSegmentLevelValidationRunTimeMs)
+        >= frequencyToUse;
+
+    return runValidation || timeThresholdMet;
+  }
+
+  public static final class Context {
+    private boolean _runSegmentLevelValidation;
   }
 }

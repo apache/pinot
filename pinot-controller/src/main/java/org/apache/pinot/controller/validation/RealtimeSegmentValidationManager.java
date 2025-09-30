@@ -66,7 +66,6 @@ public class RealtimeSegmentValidationManager extends ControllerPeriodicTask<Rea
   private final boolean _segmentAutoResetOnErrorAtValidation;
 
   public static final String OFFSET_CRITERIA = "offsetCriteria";
-  public static final String RUN_SEGMENT_LEVEL_VALIDATION = "runSegmentLevelValidation";
   public static final String REPAIR_ERROR_SEGMENTS_FOR_PARTIAL_UPSERT_OR_DEDUP =
       "repairErrorSegmentsForPartialUpsertOrDedup";
 

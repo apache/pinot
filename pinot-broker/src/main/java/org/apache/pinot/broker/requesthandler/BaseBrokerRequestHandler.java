@@ -211,11 +211,6 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
             .putIfAbsent(Broker.Request.QueryOptionKey.ENABLE_NULL_HANDLING, _enableNullHandling);
       }
 
-      // Only set the threshold if not already specified in query options
-      sqlNodeAndOptions.getOptions().putIfAbsent(Broker.Request.QueryOptionKey.REGEXP_LIKE_ADAPTIVE_THRESHOLD,
-          String.valueOf(_config.getProperty(Broker.CONFIG_OF_REGEXP_LIKE_ADAPTIVE_THRESHOLD,
-              Broker.DEFAULT_REGEXP_LIKE_ADAPTIVE_THRESHOLD)));
-
       BrokerResponse brokerResponse =
           handleRequest(requestId, query, sqlNodeAndOptions, request, requesterIdentity, requestContext, httpHeaders,
               accessControl);

@@ -75,7 +75,7 @@ public class ExpressionFilterOperator extends BaseFilterOperator {
     } else {
       _predicateEvaluator =
           PredicateEvaluatorProvider.getPredicateEvaluator(predicate, _transformFunction.getDictionary(),
-              _transformFunction.getResultMetadata().getDataType(), _queryContext, numDocs);
+              _transformFunction.getResultMetadata().getDataType(), _queryContext);
     }
   }
 

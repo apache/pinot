@@ -47,7 +47,7 @@ public class WorkloadBudgetManagerTest {
     WorkloadBudgetManager manager = new WorkloadBudgetManager(_config);
     manager.addOrUpdateWorkload("test-workload", 1_000_000L, 1_000_000L);
 
-    WorkloadBudgetManager.BudgetStats stats = manager.getRemainingBudgetForWorkload("test-workload");
+    WorkloadBudgetManager.BudgetStats stats = manager.getBudgetStats("test-workload");
     assertEquals(1_000_000L, stats._cpuRemaining);
     assertEquals(1_000_000L, stats._memoryRemaining);
   }
@@ -67,7 +67,7 @@ public class WorkloadBudgetManagerTest {
     mgr.tryCharge("reset-test", 500_000L, 500_000L);
 
     // Ensure budget is charged
-    WorkloadBudgetManager.BudgetStats usedStats = mgr.getRemainingBudgetForWorkload("reset-test");
+    WorkloadBudgetManager.BudgetStats usedStats = mgr.getBudgetStats("reset-test");
     assertEquals(500_000L, usedStats._cpuRemaining);
     assertEquals(500_000L, usedStats._memoryRemaining);
 
@@ -75,7 +75,7 @@ public class WorkloadBudgetManagerTest {
     Thread.sleep(_enforcementWindowMs + 1000L);
 
     // Check if reset occurred
-    WorkloadBudgetManager.BudgetStats resetStats = mgr.getRemainingBudgetForWorkload("reset-test");
+    WorkloadBudgetManager.BudgetStats resetStats = mgr.getBudgetStats("reset-test");
     assertEquals(1_000_000L, resetStats._cpuRemaining);
     assertEquals(1_000_000L, resetStats._memoryRemaining);
   }
@@ -111,7 +111,7 @@ public class WorkloadBudgetManagerTest {
     long totalCpuCharged = numThreads * chargesPerThread * cpuChargePerCall;
     long totalMemCharged = numThreads * chargesPerThread * memChargePerCall;
 
-    WorkloadBudgetManager.BudgetStats remaining = manager.getRemainingBudgetForWorkload(workload);
+    WorkloadBudgetManager.BudgetStats remaining = manager.getBudgetStats(workload);
     assertEquals(initialCpuBudget - totalCpuCharged, remaining._cpuRemaining,
         "CPU budget mismatch after concurrent updates");
     assertEquals(initialMemBudget - totalMemCharged, remaining._memoryRemaining,
