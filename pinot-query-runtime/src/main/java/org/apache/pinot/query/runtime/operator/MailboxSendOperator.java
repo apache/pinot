@@ -243,7 +243,7 @@ public class MailboxSendOperator extends MultiStageOperator {
   }
 
   private void sendEos(MseBlock.Eos eosBlockWithoutStats)
-      throws QueryCancelledException {
+      throws QueryException {
 
     MultiStageQueryStats stats = null;
     List<DataBuffer> serializedStats;
