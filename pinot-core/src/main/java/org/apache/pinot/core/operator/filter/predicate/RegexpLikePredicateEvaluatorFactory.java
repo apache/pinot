@@ -137,7 +137,7 @@ public class RegexpLikePredicateEvaluatorFactory {
     final Matcher _matcher;
 
     // Maintains a cache to quickly look through if the dictionary Id matches with the given regex. Helps us to avoid
-    // heavy computations for the same dictionaryId once it's identified.
+    // repeated checks on the same dictionary Id once it's computed.
     final Int2BooleanMap _dictIdMap;
 
     public ScanBasedRegexpLikePredicateEvaluator(RegexpLikePredicate regexpLikePredicate, Dictionary dictionary) {
