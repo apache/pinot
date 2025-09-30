@@ -75,10 +75,23 @@ public class MailboxContentObserver implements StreamObserver<MailboxContent> {
     if (mailboxContent.getWaitForMore()) {
       return;
     }
-    long timeoutMs = Context.current().getDeadline().timeRemaining(TimeUnit.MILLISECONDS);
     try {
-      ReceivingMailbox.ReceivingMailboxStatus result = _mailbox.offerRaw(_mailboxBuffers, timeoutMs);
-      switch (result) {
+      long timeoutMs = Context.current().getDeadline().timeRemaining(TimeUnit.MILLISECONDS);
+      ReceivingMailbox.ReceivingMailboxStatus status = null;
+      try {
+        status = _mailbox.offerRaw(_mailboxBuffers, timeoutMs);
+      } catch (TimeoutException e) {
+        LOGGER.debug("Timed out adding block into mailbox: {} with timeout: {}ms", mailboxId, timeoutMs);
+        closeStream();
+      } catch (InterruptedException e) {
+        Thread.currentThread().interrupt();
+        LOGGER.debug("Interrupted while processing blocks for mailbox: {}", mailboxId, e);
+        closeStream();
+      }
+      if (status == null) {
+        return;
+      }
+      switch (status) {
         case SUCCESS:
           _responseObserver.onNext(MailboxStatus.newBuilder().setMailboxId(mailboxId)
               .putMetadata(ChannelUtils.MAILBOX_METADATA_BUFFER_SIZE_KEY,
@@ -99,15 +112,8 @@ public class MailboxContentObserver implements StreamObserver<MailboxContent> {
           closeStream();
           break;
         default:
-          throw new IllegalStateException("Unsupported mailbox status: " + result);
+          throw new IllegalStateException("Unsupported mailbox status: " + status);
       }
-    } catch (TimeoutException e) {
-      LOGGER.debug("Timed out adding block into mailbox: {} with timeout: {}ms", mailboxId, timeoutMs);
-      closeStream();
-    } catch (InterruptedException e) {
-      Thread.currentThread().interrupt();
-      LOGGER.debug("Interrupted while processing blocks for mailbox: {}", mailboxId, e);
-      closeStream();
     } catch (Exception e) {
       String errorMessage = "Caught exception while processing blocks for mailbox: " + mailboxId;
       LOGGER.error(errorMessage, e);
