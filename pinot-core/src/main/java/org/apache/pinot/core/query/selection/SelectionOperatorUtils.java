@@ -44,7 +44,7 @@ import org.apache.pinot.core.common.datatable.DataTableBuilderFactory;
 import org.apache.pinot.core.operator.blocks.results.SelectionResultsBlock;
 import org.apache.pinot.core.query.request.context.QueryContext;
 import org.apache.pinot.segment.spi.IndexSegment;
-import org.apache.pinot.spi.trace.Tracing;
+import org.apache.pinot.spi.query.QueryThreadContext;
 import org.apache.pinot.spi.utils.ByteArray;
 import org.roaringbitmap.RoaringBitmap;
 
@@ -330,6 +330,8 @@ public class SelectionOperatorUtils {
     int i2 = 0;
     int numMergedRows = 0;
     while (i1 < numSortedRows1 && i2 < numSortedRows2 && numMergedRows < numRowsToMerge) {
+      QueryThreadContext.checkTerminationAndSampleUsagePeriodically(numMergedRows++,
+          "SelectionOperatorUtils#mergeWithOrdering");
       Object[] row1 = sortedRows1.get(i1);
       Object[] row2 = sortedRows2.get(i2);
       if (comparator.compare(row1, row2) <= 0) {
@@ -339,7 +341,6 @@ public class SelectionOperatorUtils {
         mergedRows.add(row2);
         i2++;
       }
-      Tracing.ThreadAccountantOps.sampleAndCheckInterruptionPeriodically(numMergedRows++);
     }
     if (numMergedRows < numRowsToMerge) {
       if (i1 < numSortedRows1) {
@@ -388,7 +389,8 @@ public class SelectionOperatorUtils {
 
     int numRowsAdded = 0;
     for (Object[] row : rows) {
-      Tracing.ThreadAccountantOps.sampleAndCheckInterruptionPeriodically(numRowsAdded);
+      QueryThreadContext.checkTerminationAndSampleUsagePeriodically(numRowsAdded++,
+          "SelectionOperatorUtils#getDataTableFromRows");
       dataTableBuilder.startRow();
       for (int i = 0; i < numColumns; i++) {
         Object columnValue = row[i];
@@ -445,7 +447,6 @@ public class SelectionOperatorUtils {
         }
       }
       dataTableBuilder.finishRow();
-      numRowsAdded++;
     }
 
     if (nullHandlingEnabled) {
@@ -560,21 +561,23 @@ public class SelectionOperatorUtils {
           nullBitmaps[coldId] = dataTable.getNullRowIds(coldId);
         }
         for (int rowId = 0; rowId < numRows; rowId++) {
+          QueryThreadContext.checkTerminationAndSampleUsagePeriodically(rowId,
+              "SelectionOperatorUtils#reduceWithoutOrdering");
           if (rows.size() < limit) {
             rows.add(extractRowFromDataTableWithNullHandling(dataTable, rowId, nullBitmaps));
           } else {
             break;
           }
-          Tracing.ThreadAccountantOps.sampleAndCheckInterruptionPeriodically(rowId);
         }
       } else {
         for (int rowId = 0; rowId < numRows; rowId++) {
+          QueryThreadContext.checkTerminationAndSampleUsagePeriodically(rowId,
+              "SelectionOperatorUtils#reduceWithoutOrdering");
           if (rows.size() < limit) {
             rows.add(extractRowFromDataTable(dataTable, rowId));
           } else {
             break;
           }
-          Tracing.ThreadAccountantOps.sampleAndCheckInterruptionPeriodically(rowId);
         }
       }
     }

@@ -27,10 +27,7 @@ import org.apache.pinot.common.request.InstanceRequest;
 import org.apache.pinot.core.transport.ServerInstance;
 import org.apache.pinot.core.transport.ServerRoutingInstance;
 import org.apache.pinot.spi.config.table.TableType;
-import org.apache.pinot.spi.query.QueryThreadContext;
 import org.apache.pinot.spi.utils.builder.TableNameBuilder;
-import org.testng.annotations.AfterMethod;
-import org.testng.annotations.BeforeMethod;
 import org.testng.annotations.Test;
 
 import static org.testng.Assert.*;
@@ -40,20 +37,6 @@ import static org.testng.Assert.*;
  * Test class for {@link ImplicitHybridTableRouteProvider} to test the routing table calculation (calculateRoutes)
  */
 public class ImplicitHybridTableRouteProviderCalculateRouteTest extends BaseTableRouteTest {
-  private QueryThreadContext.CloseableContext _closeableContext;
-
-  @BeforeMethod
-  public void setupQueryThreadContext() {
-    _closeableContext = QueryThreadContext.open();
-  }
-
-  @AfterMethod
-  void closeQueryThreadContext() {
-    if (_closeableContext != null) {
-      _closeableContext.close();
-      _closeableContext = null;
-    }
-  }
 
   private TableRouteInfo getImplicitHybridTableRouteInfo(String tableName) {
     TableRouteInfo routeInfo = _hybridTableRouteProvider.getTableRouteInfo(tableName, _tableCache, _routingManager);

@@ -45,6 +45,7 @@ import org.apache.pinot.query.runtime.plan.MultiStageQueryStats;
 import org.apache.pinot.query.runtime.plan.OpChainExecutionContext;
 import org.apache.pinot.segment.spi.memory.DataBuffer;
 import org.apache.pinot.spi.exception.QueryCancelledException;
+import org.apache.pinot.spi.exception.TerminationException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -216,11 +217,14 @@ public class MailboxSendOperator extends MultiStageOperator {
           earlyTerminate();
         }
       }
-      sampleAndCheckInterruption();
+      checkTerminationAndSampleUsage();
       return block;
     } catch (QueryCancelledException e) {
-      LOGGER.debug("Query was cancelled! for opChain: {}", _context.getId());
+      LOGGER.debug("Query was cancelled for opChain: {}", _context.getId());
       return SuccessMseBlock.INSTANCE;
+    } catch (TerminationException e) {
+      LOGGER.info("Query was terminated for opChain: {}", _context.getId(), e);
+      return ErrorMseBlock.fromException(e);
     } catch (TimeoutException e) {
       LOGGER.warn("Timed out transferring data on opChain: {}", _context.getId(), e);
       return ErrorMseBlock.fromException(e);

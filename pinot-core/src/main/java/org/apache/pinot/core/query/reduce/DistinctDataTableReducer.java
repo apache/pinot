@@ -38,7 +38,7 @@ import org.apache.pinot.core.query.distinct.table.MultiColumnDistinctTable;
 import org.apache.pinot.core.query.distinct.table.StringDistinctTable;
 import org.apache.pinot.core.query.request.context.QueryContext;
 import org.apache.pinot.core.transport.ServerRoutingInstance;
-import org.apache.pinot.spi.trace.Tracing;
+import org.apache.pinot.spi.query.QueryThreadContext;
 
 
 /**
@@ -63,7 +63,7 @@ public class DistinctDataTableReducer implements DataTableReducer {
     }
     DistinctTable distinctTable = null;
     for (DataTable dataTable : dataTableMap.values()) {
-      Tracing.ThreadAccountantOps.sampleAndCheckInterruption();
+      QueryThreadContext.checkTerminationAndSampleUsage("DistinctDataTableReducer");
       if (distinctTable == null) {
         distinctTable = createDistinctTable(dataSchema, dataTable);
         if (distinctTable.isSatisfied()) {
