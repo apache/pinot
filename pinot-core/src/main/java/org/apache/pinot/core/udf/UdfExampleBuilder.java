@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.core.udf;
 
+import com.google.common.base.Preconditions;
 import com.google.common.collect.Maps;
 import java.math.BigDecimal;
 import java.util.Arrays;
@@ -28,7 +29,6 @@ import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
 import java.util.stream.Collectors;
-import org.apache.arrow.util.Preconditions;
 import org.apache.pinot.spi.data.FieldSpec;
 
 /// A builder for generating test cases for [UDFs][Udf] (User Defined Functions).

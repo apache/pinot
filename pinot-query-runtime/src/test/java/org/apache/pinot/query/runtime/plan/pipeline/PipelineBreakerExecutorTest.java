@@ -18,8 +18,6 @@
  */
 package org.apache.pinot.query.runtime.plan.pipeline;
 
-import com.google.common.collect.ImmutableList;
-import com.google.common.collect.ImmutableMap;
 import java.io.IOException;
 import java.util.Iterator;
 import java.util.List;
@@ -49,7 +47,11 @@ import org.apache.pinot.query.runtime.blocks.MseBlock;
 import org.apache.pinot.query.runtime.blocks.SuccessMseBlock;
 import org.apache.pinot.query.runtime.executor.OpChainSchedulerService;
 import org.apache.pinot.query.runtime.operator.OperatorTestUtil;
+import org.apache.pinot.spi.accounting.ThreadAccountantUtils;
 import org.apache.pinot.spi.executor.ExecutorServiceUtils;
+import org.apache.pinot.spi.query.QueryExecutionContext;
+import org.apache.pinot.spi.query.QueryThreadContext;
+import org.apache.pinot.spi.utils.CommonConstants.Accounting;
 import org.mockito.Mock;
 import org.mockito.MockitoAnnotations;
 import org.testng.Assert;
@@ -68,14 +70,13 @@ public class PipelineBreakerExecutorTest {
   private static final String MAILBOX_ID_1 = MailboxIdUtils.toMailboxId(0, 1, 0, 0, 0);
   private static final String MAILBOX_ID_2 = MailboxIdUtils.toMailboxId(0, 2, 0, 0, 0);
 
-  private final ExecutorService _executor = Executors.newCachedThreadPool();
+  private final ExecutorService _executor =
+      QueryThreadContext.contextAwareExecutorService(Executors.newCachedThreadPool());
   private final OpChainSchedulerService _scheduler = new OpChainSchedulerService(_executor);
-  private final MailboxInfos _mailboxInfos =
-      new SharedMailboxInfos(new MailboxInfo("localhost", 123, ImmutableList.of(0)));
+  private final MailboxInfos _mailboxInfos = new SharedMailboxInfos(new MailboxInfo("localhost", 123, List.of(0)));
   private final WorkerMetadata _workerMetadata =
-      new WorkerMetadata(0, ImmutableMap.of(1, _mailboxInfos, 2, _mailboxInfos), ImmutableMap.of());
-  private final StageMetadata _stageMetadata =
-      new StageMetadata(0, ImmutableList.of(_workerMetadata), ImmutableMap.of());
+      new WorkerMetadata(0, Map.of(1, _mailboxInfos, 2, _mailboxInfos), Map.of());
+  private final StageMetadata _stageMetadata = new StageMetadata(0, List.of(_workerMetadata), Map.of());
 
   private AutoCloseable _mocks;
   @Mock
@@ -107,8 +108,16 @@ public class PipelineBreakerExecutorTest {
   public static PipelineBreakerResult executePipelineBreakers(OpChainSchedulerService scheduler,
       MailboxService mailboxService, WorkerMetadata workerMetadata, StagePlan stagePlan,
       Map<String, String> opChainMetadata, long requestId, long deadlineMs) {
-    return PipelineBreakerExecutor.executePipelineBreakers(scheduler, mailboxService, workerMetadata, stagePlan,
-        opChainMetadata, requestId, deadlineMs, deadlineMs, null, true);
+    QueryExecutionContext executionContext =
+        new QueryExecutionContext(QueryExecutionContext.QueryType.MSE, requestId, Long.toString(requestId),
+            Accounting.DEFAULT_WORKLOAD_NAME, System.currentTimeMillis(), deadlineMs, deadlineMs, "brokerId",
+            "serverId");
+    QueryThreadContext.MseWorkerInfo workerInfo = new QueryThreadContext.MseWorkerInfo(1, 2);
+    try (QueryThreadContext ignore = QueryThreadContext.open(executionContext, workerInfo,
+        ThreadAccountantUtils.getNoOpAccountant())) {
+      return PipelineBreakerExecutor.executePipelineBreakers(scheduler, mailboxService, workerMetadata, stagePlan,
+          opChainMetadata, true);
+    }
   }
 
   @AfterClass
@@ -126,14 +135,12 @@ public class PipelineBreakerExecutorTest {
     when(_mailboxService.getReceivingMailbox(MAILBOX_ID_1)).thenReturn(_mailbox1);
     Object[] row1 = new Object[]{1, 1};
     Object[] row2 = new Object[]{2, 3};
-    when(_mailbox1.poll()).thenReturn(
-        OperatorTestUtil.blockWithStats(DATA_SCHEMA, row1),
+    when(_mailbox1.poll()).thenReturn(OperatorTestUtil.blockWithStats(DATA_SCHEMA, row1),
         OperatorTestUtil.blockWithStats(DATA_SCHEMA, row2),
         OperatorTestUtil.eosWithStats(OperatorTestUtil.getDummyStats(1).serialize()));
 
     PipelineBreakerResult pipelineBreakerResult =
-        executePipelineBreakers(_scheduler, _mailboxService, _workerMetadata, stagePlan,
-            ImmutableMap.of(), 0, Long.MAX_VALUE);
+        executePipelineBreakers(_scheduler, _mailboxService, _workerMetadata, stagePlan, Map.of(), 0, Long.MAX_VALUE);
 
     // then
     // should have single PB result, receive 2 data blocks, EOS block shouldn't be included
@@ -163,16 +170,13 @@ public class PipelineBreakerExecutorTest {
     when(_mailboxService.getReceivingMailbox(MAILBOX_ID_2)).thenReturn(_mailbox2);
     Object[] row1 = new Object[]{1, 1};
     Object[] row2 = new Object[]{2, 3};
-    when(_mailbox1.poll()).thenReturn(
-        OperatorTestUtil.blockWithStats(DATA_SCHEMA, row1),
+    when(_mailbox1.poll()).thenReturn(OperatorTestUtil.blockWithStats(DATA_SCHEMA, row1),
         OperatorTestUtil.eosWithStats(OperatorTestUtil.getDummyStats(1).serialize()));
-    when(_mailbox2.poll()).thenReturn(
-        OperatorTestUtil.blockWithStats(DATA_SCHEMA, row2),
+    when(_mailbox2.poll()).thenReturn(OperatorTestUtil.blockWithStats(DATA_SCHEMA, row2),
         OperatorTestUtil.eosWithStats(OperatorTestUtil.getDummyStats(2).serialize()));
 
     PipelineBreakerResult pipelineBreakerResult =
-        executePipelineBreakers(_scheduler, _mailboxService, _workerMetadata, stagePlan,
-            ImmutableMap.of(), 0, Long.MAX_VALUE);
+        executePipelineBreakers(_scheduler, _mailboxService, _workerMetadata, stagePlan, Map.of(), 0, Long.MAX_VALUE);
 
     // then
     // should have two PB result, receive 2 data blocks, one each, EOS block shouldn't be included
@@ -199,8 +203,7 @@ public class PipelineBreakerExecutorTest {
 
     // when
     PipelineBreakerResult pipelineBreakerResult =
-        executePipelineBreakers(_scheduler, _mailboxService, _workerMetadata, stagePlan,
-            ImmutableMap.of(), 0, Long.MAX_VALUE);
+        executePipelineBreakers(_scheduler, _mailboxService, _workerMetadata, stagePlan, Map.of(), 0, Long.MAX_VALUE);
 
     // then
     // should return empty block list
@@ -227,8 +230,8 @@ public class PipelineBreakerExecutorTest {
     });
 
     PipelineBreakerResult pipelineBreakerResult =
-        executePipelineBreakers(_scheduler, _mailboxService, _workerMetadata, stagePlan,
-            ImmutableMap.of(), 0, System.currentTimeMillis() + 100);
+        executePipelineBreakers(_scheduler, _mailboxService, _workerMetadata, stagePlan, Map.of(), 0,
+            System.currentTimeMillis() + 100);
 
     // then
     // should contain only failure error blocks
@@ -254,16 +257,13 @@ public class PipelineBreakerExecutorTest {
     when(_mailboxService.getReceivingMailbox(MAILBOX_ID_2)).thenReturn(_mailbox2);
     Object[] row1 = new Object[]{1, 1};
     Object[] row2 = new Object[]{2, 3};
-    when(_mailbox1.poll()).thenReturn(
-        OperatorTestUtil.blockWithStats(DATA_SCHEMA, row1),
+    when(_mailbox1.poll()).thenReturn(OperatorTestUtil.blockWithStats(DATA_SCHEMA, row1),
         OperatorTestUtil.eosWithStats(List.of()));
-    when(_mailbox2.poll()).thenReturn(
-        OperatorTestUtil.blockWithStats(DATA_SCHEMA, row2),
+    when(_mailbox2.poll()).thenReturn(OperatorTestUtil.blockWithStats(DATA_SCHEMA, row2),
         OperatorTestUtil.eosWithStats(List.of()));
 
     PipelineBreakerResult pipelineBreakerResult =
-        executePipelineBreakers(_scheduler, _mailboxService, _workerMetadata, stagePlan,
-            ImmutableMap.of(), 0, Long.MAX_VALUE);
+        executePipelineBreakers(_scheduler, _mailboxService, _workerMetadata, stagePlan, Map.of(), 0, Long.MAX_VALUE);
 
     // then
     // should pass when one PB returns result, the other returns empty.
@@ -289,16 +289,13 @@ public class PipelineBreakerExecutorTest {
     when(_mailboxService.getReceivingMailbox(MAILBOX_ID_2)).thenReturn(_mailbox2);
     Object[] row1 = new Object[]{1, 1};
     Object[] row2 = new Object[]{2, 3};
-    when(_mailbox1.poll()).thenReturn(
-        OperatorTestUtil.blockWithStats(DATA_SCHEMA, row1),
+    when(_mailbox1.poll()).thenReturn(OperatorTestUtil.blockWithStats(DATA_SCHEMA, row1),
         OperatorTestUtil.errorWithStats(new RuntimeException("ERROR ON 1"), List.of()));
-    when(_mailbox2.poll()).thenReturn(
-        OperatorTestUtil.blockWithStats(DATA_SCHEMA, row2),
+    when(_mailbox2.poll()).thenReturn(OperatorTestUtil.blockWithStats(DATA_SCHEMA, row2),
         OperatorTestUtil.eosWithStats(List.of()));
 
     PipelineBreakerResult pipelineBreakerResult =
-        executePipelineBreakers(_scheduler, _mailboxService, _workerMetadata, stagePlan,
-            ImmutableMap.of(), 0, Long.MAX_VALUE);
+        executePipelineBreakers(_scheduler, _mailboxService, _workerMetadata, stagePlan, Map.of(), 0, Long.MAX_VALUE);
 
     // then
     // should fail even if one of the 2 PB doesn't contain error block from sender.
