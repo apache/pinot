@@ -47,6 +47,7 @@ import org.apache.pinot.segment.spi.memory.DataBuffer;
 import org.apache.pinot.spi.exception.QueryCancelledException;
 import org.apache.pinot.spi.exception.QueryErrorCode;
 import org.apache.pinot.spi.exception.QueryException;
+import org.apache.pinot.spi.exception.TerminationException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -218,11 +219,14 @@ public class MailboxSendOperator extends MultiStageOperator {
           earlyTerminate();
         }
       }
-      sampleAndCheckInterruption();
+      checkTerminationAndSampleUsage();
       return block;
     } catch (QueryCancelledException e) {
-      LOGGER.debug("Query was cancelled! for opChain: {}", _context.getId());
+      LOGGER.debug("Query was cancelled for opChain: {}", _context.getId());
       return SuccessMseBlock.INSTANCE;
+    } catch (TerminationException e) {
+      LOGGER.info("Query was terminated for opChain: {}", _context.getId(), e);
+      return ErrorMseBlock.fromException(e);
     } catch (TimeoutException e) {
       // TODO: This exception isn't actually thrown in the current implementation.
       //  Instead we throw QueryException. We should remove it from the signature.

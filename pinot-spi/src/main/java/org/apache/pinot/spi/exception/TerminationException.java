@@ -16,37 +16,12 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.pinot.spi.accounting;
+package org.apache.pinot.spi.exception;
 
-/**
- * The context for task execution information of a thread
- */
-public interface ThreadExecutionContext {
+/// Special exception to be used to explicitly terminate a query, e.g. query cancellation, OOM kill etc.
+public class TerminationException extends QueryException {
 
-   /**
-    * SSE: Single Stage Engine
-    * MSE: Multi Stage Engine
-    * UNKNOWN: Default
-    */
-   enum TaskType {
-      SSE,
-      MSE,
-      UNKNOWN
-   }
-
-   /**
-    * get query id of the execution context
-    * @return query id in string
-    */
-   String getQueryId();
-
-   /**
-    *
-    * @return get the anchor thread of execution context
-    */
-   Thread getAnchorThread();
-
-   TaskType getTaskType();
-
-   String getWorkloadName();
+  public TerminationException(QueryErrorCode errorCode, String message) {
+    super(errorCode, message);
+  }
 }

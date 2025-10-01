@@ -45,7 +45,6 @@ import org.apache.pinot.common.utils.config.QueryOptionsUtils;
 import org.apache.pinot.core.data.manager.InstanceDataManager;
 import org.apache.pinot.core.query.executor.QueryExecutor;
 import org.apache.pinot.core.query.executor.ServerQueryExecutorV1Impl;
-import org.apache.pinot.query.MseWorkerThreadContext;
 import org.apache.pinot.query.mailbox.MailboxService;
 import org.apache.pinot.query.mailbox.SendingMailbox;
 import org.apache.pinot.query.planner.physical.MailboxIdUtils;
@@ -72,15 +71,13 @@ import org.apache.pinot.query.runtime.plan.server.ServerPlanRequestUtils;
 import org.apache.pinot.query.runtime.timeseries.PhysicalTimeSeriesServerPlanVisitor;
 import org.apache.pinot.query.runtime.timeseries.TimeSeriesExecutionContext;
 import org.apache.pinot.query.runtime.timeseries.serde.TimeSeriesBlockSerde;
-import org.apache.pinot.spi.accounting.MseCancelCallback;
-import org.apache.pinot.spi.accounting.ThreadExecutionContext;
-import org.apache.pinot.spi.accounting.ThreadResourceUsageAccountant;
 import org.apache.pinot.spi.config.instance.InstanceType;
 import org.apache.pinot.spi.env.PinotConfiguration;
 import org.apache.pinot.spi.executor.ExecutorServiceUtils;
 import org.apache.pinot.spi.executor.HardLimitExecutor;
 import org.apache.pinot.spi.executor.MetricsExecutor;
 import org.apache.pinot.spi.executor.ThrottleOnCriticalHeapUsageExecutor;
+import org.apache.pinot.spi.query.QueryExecutionContext;
 import org.apache.pinot.spi.query.QueryThreadContext;
 import org.apache.pinot.spi.query.QueryThreadExceedStrategy;
 import org.apache.pinot.spi.utils.CommonConstants.Broker.Request.QueryOptionKey;
@@ -141,17 +138,13 @@ public class QueryRunner {
   @Nullable
   private PhysicalTimeSeriesServerPlanVisitor _timeSeriesPhysicalPlanVisitor;
   private BooleanSupplier _sendStats;
-  private ThreadResourceUsageAccountant _resourceUsageAccountant;
-  private final MseCancelCallback _mseCancelCallback = (requestId -> {
-    _opChainScheduler.cancel(requestId);
-  });
 
   /**
    * Initializes the query executor.
    * <p>Should be called only once and before calling any other method.
    */
   public void init(PinotConfiguration serverConf, InstanceDataManager instanceDataManager,
-      @Nullable TlsConfig tlsConfig, BooleanSupplier sendStats, ThreadResourceUsageAccountant resourceUsageAccountant) {
+      @Nullable TlsConfig tlsConfig, BooleanSupplier sendStats) {
     String hostname = serverConf.getProperty(MultiStageQueryRunner.KEY_OF_QUERY_RUNNER_HOSTNAME);
     if (hostname.startsWith(Helix.PREFIX_OF_SERVER_INSTANCE)) {
       hostname = hostname.substring(Helix.SERVER_INSTANCE_PREFIX_LENGTH);
@@ -204,8 +197,7 @@ public class QueryRunner {
     MetricsExecutor metricsExecutor = new MetricsExecutor(baseExecutorService,
         serverMetrics.getMeteredValue(ServerMeter.MULTI_STAGE_RUNNER_STARTED_TASKS),
         serverMetrics.getMeteredValue(ServerMeter.MULTI_STAGE_RUNNER_COMPLETED_TASKS));
-    _executorService = MseWorkerThreadContext.contextAwareExecutorService(
-        QueryThreadContext.contextAwareExecutorService(metricsExecutor));
+    _executorService = QueryThreadContext.contextAwareExecutorService(metricsExecutor);
 
     int hardLimit = HardLimitExecutor.getMultiStageExecutorHardLimit(serverConf);
     if (hardLimit > 0) {
@@ -227,7 +219,7 @@ public class QueryRunner {
     if (serverConf.getProperty(Server.CONFIG_OF_ENABLE_QUERY_SCHEDULER_THROTTLING_ON_HEAP_USAGE,
         Server.DEFAULT_ENABLE_QUERY_SCHEDULER_THROTTLING_ON_HEAP_USAGE)) {
       LOGGER.info("Enable OOM Throttling on critical heap usage for multi-stage executor");
-      _executorService = new ThrottleOnCriticalHeapUsageExecutor(_executorService, resourceUsageAccountant);
+      _executorService = new ThrottleOnCriticalHeapUsageExecutor(_executorService);
     }
 
     _opChainScheduler = new OpChainSchedulerService(_executorService, serverConf);
@@ -247,7 +239,6 @@ public class QueryRunner {
 
     _sendStats = sendStats;
 
-    _resourceUsageAccountant = resourceUsageAccountant;
     LOGGER.info("Initialized QueryRunner with hostname: {}, port: {}", hostname, port);
   }
 
@@ -267,12 +258,9 @@ public class QueryRunner {
   /// This method will not block the current thread but use [#_executorService] instead.
   /// If any error happened during the asynchronous execution, an error block will be sent to all receiver mailboxes.
   public CompletableFuture<Void> processQuery(WorkerMetadata workerMetadata, StagePlan stagePlan,
-      Map<String, String> requestMetadata, @Nullable ThreadExecutionContext parentContext) {
-    String requestIdStr = Long.toString(QueryThreadContext.getRequestId());
-    _resourceUsageAccountant.registerMseCancelCallback(requestIdStr, _mseCancelCallback);
-
-    Runnable runnable = () -> processQueryBlocking(workerMetadata, stagePlan, requestMetadata, parentContext);
-    return CompletableFuture.runAsync(runnable, _executorService);
+      Map<String, String> requestMetadata) {
+    return CompletableFuture.runAsync(() -> processQueryBlocking(workerMetadata, stagePlan, requestMetadata),
+        _executorService);
   }
 
   /// Executes a {@link StagePlan} pseudo-synchronously.
@@ -282,17 +270,14 @@ public class QueryRunner {
   ///
   /// If the pipeline breaker success, the rest of the stage is asynchronously executed on the [#_opChainScheduler].
   private void processQueryBlocking(WorkerMetadata workerMetadata, StagePlan stagePlan,
-      Map<String, String> requestMetadata, @Nullable ThreadExecutionContext parentContext) {
-    MseWorkerThreadContext.setStageId(stagePlan.getStageMetadata().getStageId());
-    MseWorkerThreadContext.setWorkerId(workerMetadata.getWorkerId());
-
+      Map<String, String> requestMetadata) {
     StageMetadata stageMetadata = stagePlan.getStageMetadata();
     Map<String, String> opChainMetadata = consolidateMetadata(stageMetadata.getCustomProperties(), requestMetadata);
 
     // run pre-stage execution for all pipeline breakers
     PipelineBreakerResult pipelineBreakerResult =
-        PipelineBreakerExecutor.executePipelineBreakersFromQueryContext(_opChainScheduler, _mailboxService,
-            workerMetadata, stagePlan, opChainMetadata, parentContext, _sendStats.getAsBoolean());
+        PipelineBreakerExecutor.executePipelineBreakers(_opChainScheduler, _mailboxService,
+            workerMetadata, stagePlan, opChainMetadata, _sendStats.getAsBoolean());
 
     // Send error block to all the receivers if pipeline breaker fails
     if (pipelineBreakerResult != null && pipelineBreakerResult.getErrorBlock() != null) {
@@ -304,7 +289,7 @@ public class QueryRunner {
     // run OpChain
     OpChainExecutionContext executionContext =
         OpChainExecutionContext.fromQueryContext(_mailboxService, opChainMetadata, stageMetadata, workerMetadata,
-            pipelineBreakerResult, parentContext, _sendStats.getAsBoolean());
+            pipelineBreakerResult, _sendStats.getAsBoolean());
     OpChain opChain;
     if (workerMetadata.isLeafStageWorker()) {
       Map<String, String> rlsFilters = RlsUtils.extractRlsFilters(requestMetadata);
@@ -325,7 +310,8 @@ public class QueryRunner {
 
   private void notifyErrorAfterSubmission(int stageId, ErrorMseBlock errorBlock, WorkerMetadata workerMetadata,
       StagePlan stagePlan) {
-    long requestId = QueryThreadContext.getRequestId();
+    QueryExecutionContext executionContext = QueryThreadContext.get().getExecutionContext();
+    long requestId = executionContext.getRequestId();
     LOGGER.error("Error executing pipeline breaker for request: {}, stage: {}, sending error block: {}", requestId,
         stageId, errorBlock);
     MailboxSendNode rootNode = (MailboxSendNode) stagePlan.getRootNode();
@@ -338,7 +324,7 @@ public class QueryRunner {
               receiverMailboxInfos);
       routingInfos.addAll(stageRoutingInfos);
     }
-    long deadlineMs = QueryThreadContext.getPassiveDeadlineMs();
+    long deadlineMs = executionContext.getPassiveDeadlineMs();
     for (RoutingInfo routingInfo : routingInfos) {
       try {
         StatMap<MailboxSendOperator.StatKey> statMap = new StatMap<>(MailboxSendOperator.StatKey.class);
@@ -544,7 +530,7 @@ public class QueryRunner {
     // compile OpChain
     OpChainExecutionContext executionContext =
         OpChainExecutionContext.fromQueryContext(_mailboxService, opChainMetadata, stageMetadata, workerMetadata, null,
-            null, false);
+            false);
 
     OpChain opChain =
         ServerPlanRequestUtils.compileLeafStage(executionContext, stagePlan, _leafQueryExecutor, _executorService,

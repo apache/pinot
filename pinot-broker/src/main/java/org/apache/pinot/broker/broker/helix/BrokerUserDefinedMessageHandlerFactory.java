@@ -33,8 +33,8 @@ import org.apache.pinot.common.messages.RoutingTableRebuildMessage;
 import org.apache.pinot.common.messages.SegmentRefreshMessage;
 import org.apache.pinot.common.messages.TableConfigRefreshMessage;
 import org.apache.pinot.common.utils.DatabaseUtils;
+import org.apache.pinot.spi.accounting.WorkloadBudgetManager;
 import org.apache.pinot.spi.config.workload.InstanceCost;
-import org.apache.pinot.spi.trace.Tracing;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -284,14 +284,15 @@ public class BrokerUserDefinedMessageHandlerFactory implements MessageHandlerFac
       LOGGER.info("Handling query workload message: {}", _message);
       try {
         if (_messageType.equals(QueryWorkloadRefreshMessage.DELETE_QUERY_WORKLOAD_MSG_SUB_TYPE)) {
-          Tracing.ThreadAccountantOps.getWorkloadBudgetManager().deleteWorkload(_queryWorkloadName);
+          WorkloadBudgetManager.get().deleteWorkload(_queryWorkloadName);
         } else if (_messageType.equals(QueryWorkloadRefreshMessage.REFRESH_QUERY_WORKLOAD_MSG_SUB_TYPE)) {
           if (_instanceCost == null) {
             throw new IllegalStateException(
                 "Instance cost is not provided for refreshing query workload: " + _queryWorkloadName);
           }
-          Tracing.ThreadAccountantOps.getWorkloadBudgetManager()
-            .addOrUpdateWorkload(_queryWorkloadName, _instanceCost.getCpuCostNs(), _instanceCost.getMemoryCostBytes());
+          WorkloadBudgetManager.get()
+              .addOrUpdateWorkload(_queryWorkloadName, _instanceCost.getCpuCostNs(),
+                  _instanceCost.getMemoryCostBytes());
         } else {
           throw new IllegalStateException("Unknown message type: " + _messageType);
         }

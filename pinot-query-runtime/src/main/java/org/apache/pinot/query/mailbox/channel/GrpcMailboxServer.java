@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.query.mailbox.channel;
 
+import com.google.common.base.Preconditions;
 import io.grpc.Server;
 import io.grpc.netty.shaded.io.grpc.netty.NettyServerBuilder;
 import io.grpc.netty.shaded.io.netty.buffer.PooledByteBufAllocator;
@@ -27,7 +28,6 @@ import io.grpc.stub.StreamObserver;
 import java.io.IOException;
 import java.util.concurrent.TimeUnit;
 import javax.annotation.Nullable;
-import org.apache.arrow.util.Preconditions;
 import org.apache.pinot.common.config.TlsConfig;
 import org.apache.pinot.common.metrics.BrokerGauge;
 import org.apache.pinot.common.metrics.BrokerMetrics;
