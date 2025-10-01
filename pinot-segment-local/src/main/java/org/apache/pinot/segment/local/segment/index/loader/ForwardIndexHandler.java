@@ -31,6 +31,7 @@ import java.util.Map;
 import java.util.Set;
 import javax.annotation.Nullable;
 import org.apache.commons.io.FileUtils;
+import org.apache.pinot.segment.local.io.util.PinotDataBitSet;
 import org.apache.pinot.segment.local.segment.creator.impl.SegmentDictionaryCreator;
 import org.apache.pinot.segment.local.segment.creator.impl.fwd.MultiValueVarByteRawIndexCreator;
 import org.apache.pinot.segment.local.segment.creator.impl.stats.AbstractColumnStatisticsCollector;
@@ -48,6 +49,7 @@ import org.apache.pinot.segment.spi.ColumnMetadata;
 import org.apache.pinot.segment.spi.V1Constants;
 import org.apache.pinot.segment.spi.compression.ChunkCompressionType;
 import org.apache.pinot.segment.spi.compression.DictIdCompressionType;
+import org.apache.pinot.segment.spi.creator.ColumnIndexCreationInfo;
 import org.apache.pinot.segment.spi.creator.IndexCreationContext;
 import org.apache.pinot.segment.spi.creator.SegmentVersion;
 import org.apache.pinot.segment.spi.creator.StatsCollectorConfig;
@@ -59,6 +61,7 @@ import org.apache.pinot.segment.spi.index.IndexReaderFactory;
 import org.apache.pinot.segment.spi.index.IndexType;
 import org.apache.pinot.segment.spi.index.StandardIndexes;
 import org.apache.pinot.segment.spi.index.creator.ForwardIndexCreator;
+import org.apache.pinot.segment.spi.index.metadata.SegmentMetadataImpl;
 import org.apache.pinot.segment.spi.index.reader.Dictionary;
 import org.apache.pinot.segment.spi.index.reader.ForwardIndexReader;
 import org.apache.pinot.segment.spi.index.reader.ForwardIndexReaderContext;
@@ -72,10 +75,7 @@ import org.apache.pinot.spi.data.Schema;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import static org.apache.pinot.segment.spi.V1Constants.MetadataKeys.Column.CARDINALITY;
-import static org.apache.pinot.segment.spi.V1Constants.MetadataKeys.Column.DICTIONARY_ELEMENT_SIZE;
-import static org.apache.pinot.segment.spi.V1Constants.MetadataKeys.Column.HAS_DICTIONARY;
-import static org.apache.pinot.segment.spi.V1Constants.MetadataKeys.Column.getKeyFor;
+import static org.apache.pinot.segment.spi.V1Constants.MetadataKeys.Column.*;
 
 
 /**
@@ -342,6 +342,8 @@ public class ForwardIndexHandler extends BaseIndexHandler {
     Map<String, String> metadataProperties = new HashMap<>();
     metadataProperties.put(getKeyFor(column, HAS_DICTIONARY), String.valueOf(false));
     metadataProperties.put(getKeyFor(column, DICTIONARY_ELEMENT_SIZE), String.valueOf(0));
+    // TODO: See https://github.com/apache/pinot/pull/16921 for details
+    // metadataProperties.put(getKeyFor(column, BITS_PER_ELEMENT), String.valueOf(-1));
     SegmentMetadataUtils.updateMetadataProperties(_segmentDirectory, metadataProperties);
 
     // Remove the inverted index, FST index and range index
@@ -795,15 +797,16 @@ public class ForwardIndexHandler extends BaseIndexHandler {
 
   private void createDictBasedForwardIndex(String column, SegmentDirectory.Writer segmentWriter)
       throws Exception {
-    ColumnMetadata existingColMetadata = _segmentDirectory.getSegmentMetadata().getColumnMetadataFor(column);
-    boolean isSingleValue = existingColMetadata.isSingleValue();
-
-    File indexDir = _segmentDirectory.getSegmentMetadata().getIndexDir();
-    String segmentName = _segmentDirectory.getSegmentMetadata().getName();
+    SegmentMetadataImpl segmentMetadata = _segmentDirectory.getSegmentMetadata();
+    File indexDir = segmentMetadata.getIndexDir();
+    String segmentName = segmentMetadata.getName();
     File inProgress = new File(indexDir, column + ".dict.inprogress");
     File dictionaryFile = new File(indexDir, column + V1Constants.Dict.FILE_EXTENSION);
+
+    ColumnMetadata existingColMetadata = segmentMetadata.getColumnMetadataFor(column);
+    FieldSpec fieldSpec = existingColMetadata.getFieldSpec();
     String fwdIndexFileExtension;
-    if (isSingleValue) {
+    if (fieldSpec.isSingleValueField()) {
       if (existingColMetadata.isSorted()) {
         fwdIndexFileExtension = V1Constants.Indexes.SORTED_SV_FORWARD_INDEX_FILE_EXTENSION;
       } else {
@@ -825,22 +828,62 @@ public class ForwardIndexHandler extends BaseIndexHandler {
       FileUtils.deleteQuietly(dictionaryFile);
     }
 
-    LOGGER.info("Creating a new dictionary for segment={} and column={}", segmentName, column);
-    AbstractColumnStatisticsCollector statsCollector =
-        getStatsCollector(column, existingColMetadata.getDataType().getStoredType());
-    SegmentDictionaryCreator dictionaryCreator =
-        buildDictionary(column, existingColMetadata, segmentWriter, statsCollector);
-    LoaderUtils.writeIndexToV3Format(segmentWriter, column, dictionaryFile, StandardIndexes.dictionary());
+    AbstractColumnStatisticsCollector statsCollector;
+    SegmentDictionaryCreator dictionaryCreator;
+    try (ForwardIndexReader<?> reader = StandardIndexes.forward()
+        .getReaderFactory()
+        .createIndexReader(segmentWriter, _fieldIndexConfigs.get(column), existingColMetadata)) {
+      assert reader != null;
 
-    LOGGER.info("Built dictionary. Rewriting dictionary enabled forward index for segment={} and column={}",
-        segmentName, column);
-    writeDictEnabledForwardIndex(column, existingColMetadata, segmentWriter, indexDir, dictionaryCreator);
+      LOGGER.info("Creating a new dictionary for segment={} and column={}", segmentName, column);
+      int numDocs = existingColMetadata.getTotalDocs();
+      statsCollector = getStatsCollector(column, fieldSpec.getDataType().getStoredType());
+      // NOTE:
+      //   Special null handling is not necessary here. This is because, the existing default null value in the raw
+      //   forwardIndex will be retained as such while created the dictionary and dict-based forward index. Also, null
+      //   value vectors maintain a bitmap of docIds. No handling is necessary there.
+      try (PinotSegmentColumnReader columnReader = new PinotSegmentColumnReader(reader, null, null,
+          existingColMetadata.getMaxNumberOfMultiValues())) {
+        for (int i = 0; i < numDocs; i++) {
+          statsCollector.collect(columnReader.getValue(i));
+        }
+        statsCollector.seal();
+      }
+      DictionaryIndexConfig dictConf = _fieldIndexConfigs.get(column).getConfig(StandardIndexes.dictionary());
+      boolean optimizeDictionaryType = _tableConfig.getIndexingConfig().isOptimizeDictionaryType();
+      boolean useVarLength = dictConf.getUseVarLengthDictionary() || DictionaryIndexType.shouldUseVarLengthDictionary(
+          reader.getStoredType(), statsCollector) || (optimizeDictionaryType
+          && DictionaryIndexType.optimizeTypeShouldUseVarLengthDictionary(reader.getStoredType(), statsCollector));
+      dictionaryCreator = new SegmentDictionaryCreator(fieldSpec, segmentMetadata.getIndexDir(), useVarLength);
+      dictionaryCreator.build(statsCollector.getUniqueValuesSet());
+
+      LOGGER.info("Built dictionary. Rewriting dictionary enabled forward index for segment={} and column={}",
+          segmentName, column);
+      ColumnIndexCreationInfo creationInfo =
+          new ColumnIndexCreationInfo(statsCollector, true, useVarLength, false, fieldSpec.getDefaultNullValue());
+      IndexCreationContext context = IndexCreationContext.builder()
+          .withIndexDir(indexDir)
+          .withFieldSpec(fieldSpec)
+          .withColumnIndexCreationInfo(creationInfo)
+          .withTotalDocs(numDocs)
+          .withDictionary(true)
+          .withTableNameWithType(_tableConfig.getTableName())
+          .withContinueOnError(
+              _tableConfig.getIngestionConfig() != null && _tableConfig.getIngestionConfig().isContinueOnError())
+          .build();
+      ForwardIndexConfig config = _fieldIndexConfigs.get(column).getConfig(StandardIndexes.forward());
+      try (ForwardIndexCreator creator = StandardIndexes.forward().createIndexCreator(context, config)) {
+        forwardIndexRewriteHelper(column, existingColMetadata, reader, creator, numDocs, dictionaryCreator, null);
+      }
+    }
+
     // We used the existing forward index to generate a new forward index. The existing forward index will be in V3
     // format and the new forward index will be in V1 format. Remove the existing forward index as it is not needed
     // anymore. Note that removeIndex() will only mark an index for removal and remove the in-memory state. The
     // actual cleanup from columns.psf file will happen when singleFileIndexDirectory.cleanupRemovedIndices() is
     // called during segmentWriter.close().
     segmentWriter.removeIndex(column, StandardIndexes.forward());
+    LoaderUtils.writeIndexToV3Format(segmentWriter, column, dictionaryFile, StandardIndexes.dictionary());
     LoaderUtils.writeIndexToV3Format(segmentWriter, column, fwdIndexFile, StandardIndexes.forward());
 
     LOGGER.info("Created forwardIndex. Updating metadata properties for segment={} and column={}", segmentName, column);
@@ -851,7 +894,10 @@ public class ForwardIndexHandler extends BaseIndexHandler {
     // If realtime segments were completed when the column was RAW, the cardinality value is populated as Integer
     // .MIN_VALUE. When dictionary is enabled for this column later, cardinality value should be rightly populated so
     // that the dictionary can be loaded.
-    metadataProperties.put(getKeyFor(column, CARDINALITY), String.valueOf(statsCollector.getCardinality()));
+    int cardinality = statsCollector.getCardinality();
+    metadataProperties.put(getKeyFor(column, CARDINALITY), String.valueOf(cardinality));
+    metadataProperties.put(getKeyFor(column, BITS_PER_ELEMENT),
+        String.valueOf(PinotDataBitSet.getNumBitsPerValue(cardinality - 1)));
     SegmentMetadataUtils.updateMetadataProperties(_segmentDirectory, metadataProperties);
 
     // We remove indexes that have to be rewritten when a dictEnabled is toggled. Note that the respective index
@@ -862,64 +908,6 @@ public class ForwardIndexHandler extends BaseIndexHandler {
     FileUtils.deleteQuietly(inProgress);
 
     LOGGER.info("Created dictionary based forward index for segment: {}, column: {}", segmentName, column);
-  }
-
-  private SegmentDictionaryCreator buildDictionary(String column, ColumnMetadata existingColMetadata,
-      SegmentDirectory.Writer segmentWriter, AbstractColumnStatisticsCollector statsCollector)
-      throws Exception {
-    int numDocs = existingColMetadata.getTotalDocs();
-
-    // Get the forward index reader factory and create a reader
-    IndexReaderFactory<ForwardIndexReader> readerFactory = StandardIndexes.forward().getReaderFactory();
-    try (ForwardIndexReader<?> reader = readerFactory.createIndexReader(segmentWriter, _fieldIndexConfigs.get(column),
-        existingColMetadata)) {
-      // Note: Special Null handling is not necessary here. This is because, the existing default null value in the
-      // raw forwardIndex will be retained as such while created the dictionary and dict-based forward index. Also,
-      // null value vectors maintain a bitmap of docIds. No handling is necessary there.
-      PinotSegmentColumnReader columnReader =
-          new PinotSegmentColumnReader(reader, null, null, existingColMetadata.getMaxNumberOfMultiValues());
-      for (int i = 0; i < numDocs; i++) {
-        Object obj = columnReader.getValue(i);
-        statsCollector.collect(obj);
-      }
-      statsCollector.seal();
-
-      DictionaryIndexConfig dictConf = _fieldIndexConfigs.get(column).getConfig(StandardIndexes.dictionary());
-
-      boolean optimizeDictionaryType = _tableConfig.getIndexingConfig().isOptimizeDictionaryType();
-      boolean useVarLength = dictConf.getUseVarLengthDictionary() || DictionaryIndexType.shouldUseVarLengthDictionary(
-          reader.getStoredType(), statsCollector) || (optimizeDictionaryType
-          && DictionaryIndexType.optimizeTypeShouldUseVarLengthDictionary(reader.getStoredType(), statsCollector));
-      SegmentDictionaryCreator dictionaryCreator = new SegmentDictionaryCreator(existingColMetadata.getFieldSpec(),
-          _segmentDirectory.getSegmentMetadata().getIndexDir(), useVarLength);
-
-      dictionaryCreator.build(statsCollector.getUniqueValuesSet());
-      return dictionaryCreator;
-    }
-  }
-
-  private void writeDictEnabledForwardIndex(String column, ColumnMetadata existingColMetadata,
-      SegmentDirectory.Writer segmentWriter, File indexDir, SegmentDictionaryCreator dictionaryCreator)
-      throws Exception {
-    // Get the forward index reader factory and create a reader
-    IndexReaderFactory<ForwardIndexReader> readerFactory = StandardIndexes.forward().getReaderFactory();
-    try (ForwardIndexReader<?> reader = readerFactory.createIndexReader(segmentWriter, _fieldIndexConfigs.get(column),
-        existingColMetadata)) {
-      IndexCreationContext.Builder builder =
-          IndexCreationContext.builder().withIndexDir(indexDir).withColumnMetadata(existingColMetadata)
-              .withTableNameWithType(_tableConfig.getTableName())
-              .withContinueOnError(_tableConfig.getIngestionConfig() != null
-                  && _tableConfig.getIngestionConfig().isContinueOnError());
-      // existingColMetadata has dictEnable=false. Overwrite the value.
-      builder.withDictionary(true);
-      IndexCreationContext context = builder.build();
-      ForwardIndexConfig config = _fieldIndexConfigs.get(column).getConfig(StandardIndexes.forward());
-
-      try (ForwardIndexCreator creator = StandardIndexes.forward().createIndexCreator(context, config)) {
-        int numDocs = existingColMetadata.getTotalDocs();
-        forwardIndexRewriteHelper(column, existingColMetadata, reader, creator, numDocs, dictionaryCreator, null);
-      }
-    }
   }
 
   static void removeDictRelatedIndexes(String column, SegmentDirectory.Writer segmentWriter) {
@@ -965,6 +953,8 @@ public class ForwardIndexHandler extends BaseIndexHandler {
     Map<String, String> metadataProperties = new HashMap<>();
     metadataProperties.put(getKeyFor(column, HAS_DICTIONARY), String.valueOf(false));
     metadataProperties.put(getKeyFor(column, DICTIONARY_ELEMENT_SIZE), String.valueOf(0));
+    // TODO: See https://github.com/apache/pinot/pull/16921 for details
+    // metadataProperties.put(getKeyFor(column, BITS_PER_ELEMENT), String.valueOf(-1));
     SegmentMetadataUtils.updateMetadataProperties(_segmentDirectory, metadataProperties);
 
     // Remove range index, inverted index and FST index.

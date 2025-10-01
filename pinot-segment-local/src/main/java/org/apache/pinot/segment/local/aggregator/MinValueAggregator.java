@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.segment.local.aggregator;
 
+import javax.annotation.Nullable;
 import org.apache.pinot.segment.spi.AggregationFunctionType;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
 
@@ -36,7 +37,10 @@ public class MinValueAggregator implements ValueAggregator<Object, Double> {
   }
 
   @Override
-  public Double getInitialAggregatedValue(Object rawValue) {
+  public Double getInitialAggregatedValue(@Nullable Object rawValue) {
+    if (rawValue == null) {
+      return Double.POSITIVE_INFINITY;
+    }
     return ValueAggregatorUtils.toDouble(rawValue);
   }
 
@@ -53,6 +57,11 @@ public class MinValueAggregator implements ValueAggregator<Object, Double> {
   @Override
   public Double cloneAggregatedValue(Double value) {
     return value;
+  }
+
+  @Override
+  public boolean isAggregatedValueFixedSize() {
+    return true;
   }
 
   @Override

@@ -455,8 +455,8 @@ public class DictionaryBasedGroupKeyGeneratorTest {
 
   @Test(dataProvider = "groupByResultHolderCapacityDataProvider")
   public void testGetGroupByResultHolderCapacity(String query, Integer expectedCapacity) {
-    query = query + "SET optimizeMaxInitialResultHolderCapacity=true";
     QueryContext queryContext = QueryContextConverterUtils.getQueryContext(query);
+    queryContext.setOptimizeMaxInitialResultHolderCapacity(true);
     List<ExpressionContext> expressionContextList = queryContext.getGroupByExpressions();
     ExpressionContext[] expressions =
         expressionContextList.toArray(new ExpressionContext[expressionContextList.size()]);

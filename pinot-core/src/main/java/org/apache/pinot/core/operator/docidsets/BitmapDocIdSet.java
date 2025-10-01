@@ -24,13 +24,16 @@ import org.roaringbitmap.buffer.ImmutableRoaringBitmap;
 
 
 public class BitmapDocIdSet implements BlockDocIdSet {
+  private final ImmutableRoaringBitmap _bitmap;
   private final BitmapDocIdIterator _iterator;
 
   public BitmapDocIdSet(ImmutableRoaringBitmap docIds, int numDocs) {
+    _bitmap = docIds;
     _iterator = new BitmapDocIdIterator(docIds, numDocs);
   }
 
   public BitmapDocIdSet(BitmapDocIdIterator iterator) {
+    _bitmap = null;
     _iterator = iterator;
   }
 
@@ -42,5 +45,13 @@ public class BitmapDocIdSet implements BlockDocIdSet {
   @Override
   public long getNumEntriesScannedInFilter() {
     return 0L;
+  }
+
+  @Override
+  public BlockDocIdSet getOptimizedDocIdSet() {
+    if (_bitmap != null && _bitmap.isEmpty()) {
+      return EmptyDocIdSet.getInstance();
+    }
+    return this;
   }
 }

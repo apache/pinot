@@ -52,16 +52,16 @@ import org.apache.pinot.query.service.dispatch.QueryDispatcher;
 import org.apache.pinot.query.testutils.MockInstanceDataManagerFactory;
 import org.apache.pinot.query.testutils.QueryTestUtils;
 import org.apache.pinot.segment.spi.ImmutableSegment;
+import org.apache.pinot.spi.config.instance.InstanceType;
 import org.apache.pinot.spi.config.table.TableType;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.data.readers.GenericRow;
 import org.apache.pinot.spi.env.PinotConfiguration;
-import org.apache.pinot.spi.utils.CommonConstants;
+import org.apache.pinot.spi.utils.CommonConstants.MultiStageQueryRunner;
 import org.apache.pinot.spi.utils.JsonUtils;
 import org.apache.pinot.spi.utils.builder.TableNameBuilder;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 import org.testng.Assert;
+import org.testng.SkipException;
 import org.testng.annotations.AfterClass;
 import org.testng.annotations.BeforeClass;
 import org.testng.annotations.DataProvider;
@@ -69,7 +69,6 @@ import org.testng.annotations.Test;
 
 
 public class ResourceBasedQueriesTest extends QueryRunnerTestBase {
-  private static final Logger LOGGER = LoggerFactory.getLogger(ResourceBasedQueriesTest.class);
   private static final ObjectMapper MAPPER = new ObjectMapper();
   private static final Pattern TABLE_NAME_REPLACE_PATTERN = Pattern.compile("\\{([\\w\\d]+)\\}");
   private static final String QUERY_TEST_RESOURCE_FOLDER = "queries";
@@ -212,9 +211,10 @@ public class ResourceBasedQueriesTest extends QueryRunnerTestBase {
     _reducerHostname = "localhost";
     _reducerPort = QueryTestUtils.getAvailablePort();
     Map<String, Object> reducerConfig = new HashMap<>();
-    reducerConfig.put(CommonConstants.MultiStageQueryRunner.KEY_OF_QUERY_RUNNER_HOSTNAME, _reducerHostname);
-    reducerConfig.put(CommonConstants.MultiStageQueryRunner.KEY_OF_QUERY_RUNNER_PORT, _reducerPort);
-    _mailboxService = new MailboxService(_reducerHostname, _reducerPort, new PinotConfiguration(reducerConfig));
+    reducerConfig.put(MultiStageQueryRunner.KEY_OF_QUERY_RUNNER_HOSTNAME, _reducerHostname);
+    reducerConfig.put(MultiStageQueryRunner.KEY_OF_QUERY_RUNNER_PORT, _reducerPort);
+    _mailboxService =
+        new MailboxService(_reducerHostname, _reducerPort, InstanceType.BROKER, new PinotConfiguration(reducerConfig));
     _mailboxService.start();
 
     QueryServerEnclosure server1 = new QueryServerEnclosure(factory1);
@@ -287,8 +287,8 @@ public class ResourceBasedQueriesTest extends QueryRunnerTestBase {
       throws Exception {
     // query pinot
     if (ignoreV2Optimizer) {
-      LOGGER.warn("Ignoring query for test-case ({}): with v2 optimizer: {}", testCaseName, sql);
-      return;
+      throw new SkipException(
+          "Ignoring query for test-case with v2 optimizer, testCase: " + testCaseName + ", SQL: " + sql);
     }
     sql = String.format("SET usePhysicalOptimizer=true; %s", sql);
     runQuery(sql, expect, false).ifPresent(queryResult -> {
@@ -302,7 +302,7 @@ public class ResourceBasedQueriesTest extends QueryRunnerTestBase {
 
   @Test(dataProvider = "testResourceQueryTestCaseProviderBoth")
   public void testQueryTestCasesWithOutput(String testCaseName, boolean isIgnored, String sql, String h2Sql,
-      List<Object[]> expectedRows, String expect, boolean keepOutputRowOrder)
+      List<Object[]> expectedRows, String expect, boolean keepOutputRowOrder, boolean ignoreV2Optimizer)
       throws Exception {
     runQuery(sql, expect, false).ifPresent(
         queryResult -> compareRowEquals(queryResult.getResultTable(), expectedRows, keepOutputRowOrder));
@@ -310,8 +310,12 @@ public class ResourceBasedQueriesTest extends QueryRunnerTestBase {
 
   @Test(dataProvider = "testResourceQueryTestCaseProviderBoth")
   public void testQueryTestCasesWithNewOptimizerWithOutput(String testCaseName, boolean isIgnored, String sql,
-      String h2Sql, List<Object[]> expectedRows, String expect, boolean keepOutputRowOrder)
+      String h2Sql, List<Object[]> expectedRows, String expect, boolean keepOutputRowOrder, boolean ignoreV2Optimizer)
       throws Exception {
+    if (ignoreV2Optimizer) {
+      throw new SkipException(
+          "Ignoring query for test-case with v2 optimizer, testCase: " + testCaseName + ", SQL: " + sql);
+    }
     final String finalSql = String.format("SET usePhysicalOptimizer=true; %s", sql);
     runQuery(finalSql, expect, false).ifPresent(
         queryResult -> compareRowEquals(queryResult.getResultTable(), expectedRows, keepOutputRowOrder));
@@ -319,8 +323,12 @@ public class ResourceBasedQueriesTest extends QueryRunnerTestBase {
 
   @Test(dataProvider = "testResourceQueryTestCaseProviderBoth")
   public void testQueryTestCasesWithLiteModeWithOutput(String testCaseName, boolean isIgnored, String sql,
-      String h2Sql, List<Object[]> expectedRows, String expect, boolean keepOutputRowOrder)
+      String h2Sql, List<Object[]> expectedRows, String expect, boolean keepOutputRowOrder, boolean ignoreV2Optimizer)
       throws Exception {
+    if (ignoreV2Optimizer) {
+      throw new SkipException(
+          "Ignoring query for test-case with v2 optimizer, testCase: " + testCaseName + ", SQL: " + sql);
+    }
     final String finalSql = String.format("SET usePhysicalOptimizer=true; SET useLiteMode=true; %s", sql);
     runQuery(finalSql, expect, false).ifPresent(
         queryResult -> compareRowEquals(queryResult.getResultTable(), expectedRows, keepOutputRowOrder));
@@ -435,7 +443,7 @@ public class ResourceBasedQueriesTest extends QueryRunnerTestBase {
           }
           Object[] testEntry = new Object[]{
               testCaseName, queryCase._ignored, sql, h2Sql, expectedRows, queryCase._expectedException,
-              queryCase._keepOutputRowOrder
+              queryCase._keepOutputRowOrder, queryCase._ignoreV2Optimizer
           };
           providerContent.add(testEntry);
         }
@@ -570,12 +578,5 @@ public class ResourceBasedQueriesTest extends QueryRunnerTestBase {
       }
     }
     return testCaseMap;
-  }
-
-  private static Object extractExtraProps(Map<String, Object> extraProps, String propKey) {
-    if (extraProps == null) {
-      return null;
-    }
-    return extraProps.getOrDefault(propKey, null);
   }
 }

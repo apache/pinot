@@ -39,7 +39,6 @@ import org.apache.pinot.query.runtime.operator.join.LongLookupTable;
 import org.apache.pinot.query.runtime.operator.join.LookupTable;
 import org.apache.pinot.query.runtime.operator.join.ObjectLookupTable;
 import org.apache.pinot.query.runtime.plan.OpChainExecutionContext;
-import org.apache.pinot.spi.trace.Tracing;
 
 
 /**
@@ -49,19 +48,22 @@ import org.apache.pinot.spi.trace.Tracing;
 @SuppressWarnings("unchecked")
 public class HashJoinOperator extends BaseJoinOperator {
   private static final String EXPLAIN_NAME = "HASH_JOIN";
+  private static final String ADD_ROWS_TO_RIGHT_TABLE_SCOPE = "HashJoinOperator#addRowsToRightTable";
+  private static final String BUILD_JOINED_ROWS_SCOPE = "HashJoinOperator#buildJoinedRows";
+  private static final String BUILD_NON_MATCH_RIGHT_ROWS_SCOPE = "HashJoinOperator#buildNonMatchRightRows";
 
   // Placeholder for BitSet in _matchedRightRows when all keys are unique in the right table.
-  private static final BitSet BIT_SET_PLACEHOLDER = new BitSet(0);
+  protected static final BitSet BIT_SET_PLACEHOLDER = new BitSet(0);
 
-  private final KeySelector<?> _leftKeySelector;
-  private final KeySelector<?> _rightKeySelector;
+  protected final KeySelector<?> _leftKeySelector;
+  protected final KeySelector<?> _rightKeySelector;
   @Nullable
-  private LookupTable _rightTable;
+  protected LookupTable _rightTable;
   // Track matched right rows for right join and full join to output non-matched right rows.
   // TODO: Revisit whether we should use IntList or RoaringBitmap for smaller memory footprint.
   // TODO: Optimize this
   @Nullable
-  private Map<Object, BitSet> _matchedRightRows;
+  protected Map<Object, BitSet> _matchedRightRows;
   // Store null key rows separately for RIGHT and FULL JOINs
   @Nullable
   private List<Object[]> _nullKeyRightRows;
@@ -77,6 +79,18 @@ public class HashJoinOperator extends BaseJoinOperator {
     _matchedRightRows = needUnmatchedRightRows() ? new HashMap<>() : null;
     // Initialize _nullKeyRightRows for both RIGHT and FULL JOINs
     _nullKeyRightRows = needUnmatchedRightRows() ? new ArrayList<>() : null;
+  }
+
+  /// Constructor that takes the schema for NonEquiEvaluator as an argument
+  public HashJoinOperator(OpChainExecutionContext context, MultiStageOperator leftInput, DataSchema leftSchema,
+      MultiStageOperator rightInput, JoinNode node, DataSchema nonEquiEvaluationSchema) {
+    super(context, leftInput, leftSchema, rightInput, node, nonEquiEvaluationSchema);
+    List<Integer> leftKeys = node.getLeftKeys();
+    Preconditions.checkState(!leftKeys.isEmpty(), "Hash join operator requires join keys");
+    _leftKeySelector = KeySelectorFactory.getKeySelector(leftKeys);
+    _rightKeySelector = KeySelectorFactory.getKeySelector(node.getRightKeys());
+    _rightTable = createLookupTable(leftKeys, leftSchema);
+    _matchedRightRows = needUnmatchedRightRows() ? new HashMap<>() : null;
   }
 
   private static LookupTable createLookupTable(List<Integer> joinKeys, DataSchema schema) {
@@ -115,7 +129,7 @@ public class HashJoinOperator extends BaseJoinOperator {
         }
         continue;
       }
-      Tracing.ThreadAccountantOps.sampleAndCheckInterruptionPeriodically(_rightTable.size());
+      checkTerminationAndSampleUsagePeriodically(_rightTable.size(), ADD_ROWS_TO_RIGHT_TABLE_SCOPE);
       _rightTable.addRow(key, row);
     }
   }
@@ -203,7 +217,7 @@ public class HashJoinOperator extends BaseJoinOperator {
             break;
           }
           // defer copying of the content until row matches
-          Tracing.ThreadAccountantOps.sampleAndCheckInterruptionPeriodically(rows.size());
+          checkTerminationAndSampleUsagePeriodically(rows.size(), BUILD_JOINED_ROWS_SCOPE);
           rows.add(resultRowView.toArray());
           if (_matchedRightRows != null) {
             _matchedRightRows.put(key, BIT_SET_PLACEHOLDER);
@@ -223,7 +237,6 @@ public class HashJoinOperator extends BaseJoinOperator {
     List<Object[]> rows = new ArrayList<>(leftRows.size());
 
     for (Object[] leftRow : leftRows) {
-      Tracing.ThreadAccountantOps.sampleAndCheckInterruptionPeriodically(rows.size());
       Object key = _leftKeySelector.getKey(leftRow);
       // Skip rows with null join keys - they should not participate in equi-joins per SQL standard
       if (handleNullKey(key, leftRow, rows)) {
@@ -243,7 +256,7 @@ public class HashJoinOperator extends BaseJoinOperator {
               maxRowsLimitReached = true;
               break;
             }
-            Tracing.ThreadAccountantOps.sampleAndCheckInterruptionPeriodically(rows.size());
+            checkTerminationAndSampleUsagePeriodically(rows.size(), BUILD_JOINED_ROWS_SCOPE);
             rows.add(resultRowView.toArray());
             hasMatchForLeftRow = true;
             if (_matchedRightRows != null) {
@@ -268,7 +281,7 @@ public class HashJoinOperator extends BaseJoinOperator {
       if (isMaxRowsLimitReached(rows.size())) {
         return;
       }
-      Tracing.ThreadAccountantOps.sampleAndCheckInterruptionPeriodically(rows.size());
+      checkTerminationAndSampleUsagePeriodically(rows.size(), BUILD_JOINED_ROWS_SCOPE);
       rows.add(joinRow(leftRow, null));
     }
   }
@@ -281,7 +294,7 @@ public class HashJoinOperator extends BaseJoinOperator {
     for (Object[] leftRow : leftRows) {
       Object key = _leftKeySelector.getKey(leftRow);
       if (_rightTable.containsKey(key)) {
-        Tracing.ThreadAccountantOps.sampleAndCheckInterruptionPeriodically(rows.size());
+        checkTerminationAndSampleUsagePeriodically(rows.size(), BUILD_JOINED_ROWS_SCOPE);
         rows.add(leftRow);
       }
     }
@@ -297,7 +310,7 @@ public class HashJoinOperator extends BaseJoinOperator {
     for (Object[] leftRow : leftRows) {
       Object key = _leftKeySelector.getKey(leftRow);
       if (!_rightTable.containsKey(key)) {
-        Tracing.ThreadAccountantOps.sampleAndCheckInterruptionPeriodically(rows.size());
+        checkTerminationAndSampleUsagePeriodically(rows.size(), BUILD_JOINED_ROWS_SCOPE);
         rows.add(leftRow);
       }
     }
@@ -314,7 +327,7 @@ public class HashJoinOperator extends BaseJoinOperator {
       for (Map.Entry<Object, Object> entry : _rightTable.entrySet()) {
         Object[] rightRow = (Object[]) entry.getValue();
         if (!_matchedRightRows.containsKey(entry.getKey())) {
-          Tracing.ThreadAccountantOps.sampleAndCheckInterruptionPeriodically(rows.size());
+          checkTerminationAndSampleUsagePeriodically(rows.size(), BUILD_NON_MATCH_RIGHT_ROWS_SCOPE);
           rows.add(joinRow(null, rightRow));
         }
       }
@@ -324,14 +337,14 @@ public class HashJoinOperator extends BaseJoinOperator {
         BitSet matchedIndices = _matchedRightRows.get(entry.getKey());
         if (matchedIndices == null) {
           for (Object[] rightRow : rightRows) {
-            Tracing.ThreadAccountantOps.sampleAndCheckInterruptionPeriodically(rows.size());
+            checkTerminationAndSampleUsagePeriodically(rows.size(), BUILD_NON_MATCH_RIGHT_ROWS_SCOPE);
             rows.add(joinRow(null, rightRow));
           }
         } else {
           int numRightRows = rightRows.size();
           int unmatchedIndex = 0;
           while ((unmatchedIndex = matchedIndices.nextClearBit(unmatchedIndex)) < numRightRows) {
-            Tracing.ThreadAccountantOps.sampleAndCheckInterruptionPeriodically(rows.size());
+            checkTerminationAndSampleUsagePeriodically(rows.size(), BUILD_NON_MATCH_RIGHT_ROWS_SCOPE);
             rows.add(joinRow(null, rightRows.get(unmatchedIndex++)));
           }
         }
@@ -340,7 +353,7 @@ public class HashJoinOperator extends BaseJoinOperator {
     // Add unmatched null key rows from right side for RIGHT and FULL JOIN
     if (_nullKeyRightRows != null) {
       for (Object[] nullKeyRow : _nullKeyRightRows) {
-        Tracing.ThreadAccountantOps.sampleAndCheckInterruptionPeriodically(rows.size());
+        checkTerminationAndSampleUsagePeriodically(rows.size(), BUILD_NON_MATCH_RIGHT_ROWS_SCOPE);
         rows.add(joinRow(null, nullKeyRow));
       }
     }

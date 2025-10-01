@@ -43,7 +43,6 @@ import org.apache.pinot.query.runtime.operator.window.WindowFunction;
 import org.apache.pinot.query.runtime.operator.window.WindowFunctionFactory;
 import org.apache.pinot.query.runtime.plan.OpChainExecutionContext;
 import org.apache.pinot.spi.exception.QueryErrorCode;
-import org.apache.pinot.spi.trace.Tracing;
 import org.apache.pinot.spi.utils.CommonConstants.MultiStageQueryRunner.WindowOverFlowMode;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -148,9 +147,11 @@ public class WindowAggregateOperator extends MultiStageOperator {
   }
 
   @Override
-  public void registerExecution(long time, int numRows) {
+  public void registerExecution(long time, int numRows, long memoryUsedBytes, long gcTimeMs) {
     _statMap.merge(StatKey.EXECUTION_TIME_MS, time);
     _statMap.merge(StatKey.EMITTED_ROWS, numRows);
+    _statMap.merge(StatKey.ALLOCATED_MEMORY_BYTES, memoryUsedBytes);
+    _statMap.merge(StatKey.GC_TIME_MS, gcTimeMs);
   }
 
   @Override
@@ -231,11 +232,11 @@ public class WindowAggregateOperator extends MultiStageOperator {
       for (Object[] row : container) {
         // TODO: Revisit null direction handling for all query types
         Key key = AggregationUtils.extractRowKey(row, _keys);
-        Tracing.ThreadAccountantOps.sampleAndCheckInterruptionPeriodically(_numRows);
+        checkTerminationAndSampleUsagePeriodically(_numRows, EXPLAIN_NAME);
         partitionRows.computeIfAbsent(key, k -> new ArrayList<>()).add(row);
       }
       _numRows += containerSize;
-      sampleAndCheckInterruption();
+      checkTerminationAndSampleUsage();
       block = _input.nextBlock();
     }
     MseBlock.Eos eosBlock = (MseBlock.Eos) block;
@@ -255,7 +256,7 @@ public class WindowAggregateOperator extends MultiStageOperator {
       for (WindowFunction windowFunction : _windowFunctions) {
         List<Object> processRows = windowFunction.processRows(rowList);
         assert processRows.size() == rowList.size();
-        Tracing.ThreadAccountantOps.sampleAndCheckInterruptionPeriodically(windowFunctionResults.size());
+        checkTerminationAndSampleUsagePeriodically(windowFunctionResults.size(), EXPLAIN_NAME);
         windowFunctionResults.add(processRows);
       }
 
@@ -268,7 +269,7 @@ public class WindowAggregateOperator extends MultiStageOperator {
         }
         // Convert the results from WindowFunction to the desired type
         TypeUtils.convertRow(row, resultStoredTypes);
-        Tracing.ThreadAccountantOps.sampleAndCheckInterruptionPeriodically(rows.size());
+        checkTerminationAndSampleUsagePeriodically(rows.size(), EXPLAIN_NAME);
         rows.add(row);
       }
     }
@@ -287,7 +288,6 @@ public class WindowAggregateOperator extends MultiStageOperator {
   }
 
   public enum StatKey implements StatMap.Key {
-    //@formatter:off
     EXECUTION_TIME_MS(StatMap.Type.LONG) {
       @Override
       public boolean includeDefaultInJson() {
@@ -300,8 +300,15 @@ public class WindowAggregateOperator extends MultiStageOperator {
         return true;
       }
     },
-    MAX_ROWS_IN_WINDOW_REACHED(StatMap.Type.BOOLEAN);
-    //@formatter:on
+    MAX_ROWS_IN_WINDOW_REACHED(StatMap.Type.BOOLEAN),
+    /**
+     * Allocated memory in bytes for this operator or its children in the same stage.
+     */
+    ALLOCATED_MEMORY_BYTES(StatMap.Type.LONG),
+    /**
+     * Time spent on GC while this operator or its children in the same stage were running.
+     */
+    GC_TIME_MS(StatMap.Type.LONG);
 
     private final StatMap.Type _type;
 

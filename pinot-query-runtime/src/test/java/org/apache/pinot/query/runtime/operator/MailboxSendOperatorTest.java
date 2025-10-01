@@ -32,6 +32,7 @@ import org.apache.pinot.query.runtime.blocks.SuccessMseBlock;
 import org.apache.pinot.query.runtime.operator.exchange.BlockExchange;
 import org.apache.pinot.query.runtime.plan.MultiStageQueryStats;
 import org.apache.pinot.query.runtime.plan.OpChainExecutionContext;
+import org.apache.pinot.spi.query.QueryExecutionContext;
 import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.testng.annotations.AfterMethod;
@@ -98,7 +99,6 @@ public class MailboxSendOperatorTest {
 
     // Then:
     assertTrue(block.isError(), "expected error block to propagate");
-    ErrorMseBlock errorMseBlock = (ErrorMseBlock) block;
     ArgumentCaptor<MseBlock.Eos> captor = ArgumentCaptor.forClass(MseBlock.Eos.class);
     verify(_exchange).send(captor.capture(), anyList());
     assertTrue(captor.getValue().isError(), "expected to send error block to exchange");
@@ -196,8 +196,8 @@ public class MailboxSendOperatorTest {
     WorkerMetadata workerMetadata = new WorkerMetadata(0, Map.of(), Map.of());
     StageMetadata stageMetadata = new StageMetadata(SENDER_STAGE_ID, List.of(workerMetadata), Map.of());
     OpChainExecutionContext context =
-        new OpChainExecutionContext(_mailboxService, 123L, Long.MAX_VALUE, Map.of(), stageMetadata, workerMetadata,
-            null, null, true);
+        OpChainExecutionContext.fromQueryContext(_mailboxService, Map.of(), stageMetadata, workerMetadata, null, true,
+            QueryExecutionContext.forMseTest());
     return new MailboxSendOperator(context, _input, statMap -> _exchange);
   }
 

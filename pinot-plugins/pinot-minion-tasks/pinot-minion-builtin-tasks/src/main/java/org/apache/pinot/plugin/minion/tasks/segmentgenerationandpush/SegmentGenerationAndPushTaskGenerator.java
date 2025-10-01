@@ -112,18 +112,8 @@ public class SegmentGenerationAndPushTaskGenerator extends BaseTaskGenerator {
           tableTaskConfig.getConfigsForTaskType(MinionConstants.SegmentGenerationAndPushTask.TASK_TYPE);
       Preconditions.checkNotNull(taskConfigs, "Task config shouldn't be null for Table: %s", tableNameWithType);
 
-      // Get max number of tasks for this table
-      int tableMaxNumTasks;
-      String tableMaxNumTasksConfig = taskConfigs.get(MinionConstants.TABLE_MAX_NUM_TASKS_KEY);
-      if (tableMaxNumTasksConfig != null) {
-        try {
-          tableMaxNumTasks = Integer.parseInt(tableMaxNumTasksConfig);
-        } catch (NumberFormatException e) {
-          tableMaxNumTasks = Integer.MAX_VALUE;
-        }
-      } else {
-        tableMaxNumTasks = Integer.MAX_VALUE;
-      }
+      // Get max number of subtasks for this table
+      int tableMaxNumTasks = getAndUpdateMaxNumSubTasks(taskConfigs, Integer.MAX_VALUE, tableNameWithType);
 
       // Generate tasks
       int tableNumTasks = 0;

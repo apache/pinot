@@ -30,6 +30,9 @@ public interface GroupIdGenerator {
    * reaching the groups limit, or returns {@link #INVALID_ID} when the limit is reached.
    * For single key column, the input is a single Object. For multi key columns, the input is an Object[] containing
    * the values for each key column.
+   *
+   * This method is called once per input row, so the implementation should be as fast as possible and reduce memory
+   * allocation.
    */
   int getGroupId(Object key);
 

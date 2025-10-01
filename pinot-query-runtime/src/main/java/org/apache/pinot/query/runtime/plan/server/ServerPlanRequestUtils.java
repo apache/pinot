@@ -59,7 +59,6 @@ import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.TableType;
 import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.Schema;
-import org.apache.pinot.spi.query.QueryThreadContext;
 import org.apache.pinot.spi.utils.ByteArray;
 import org.apache.pinot.spi.utils.CommonConstants;
 import org.apache.pinot.spi.utils.builder.TableNameBuilder;
@@ -88,16 +87,6 @@ public class ServerPlanRequestUtils {
     return compileLeafStage(executionContext, stagePlan, leafQueryExecutor, executorService,
         (planNode, multiStageOperator) -> {
         }, false, rowFilters);
-  }
-
-  public static OpChain compileLeafStage(
-      OpChainExecutionContext executionContext,
-      StagePlan stagePlan,
-      QueryExecutor leafQueryExecutor,
-      ExecutorService executorService) {
-    return compileLeafStage(executionContext, stagePlan, leafQueryExecutor, executorService,
-        (planNode, multiStageOperator) -> {
-        }, false, null);
   }
 
   /**
@@ -237,9 +226,6 @@ public class ServerPlanRequestUtils {
     Preconditions.checkArgument(segmentList == null || tableRouteInfoList == null,
         "Either segmentList OR tableRouteInfoList should be set");
 
-    // Making a unique requestId for leaf stages otherwise it causes problem on stats/metrics/tracing.
-    long requestId = (executionContext.getRequestId() << 16) + ((long) executionContext.getStageId() << 8) + (
-        tableType == TableType.REALTIME ? 1 : 0);
     // 1. Modify the PinotQuery
     pinotQuery.getDataSource().setTableName(tableNameWithType);
     if (timeBoundaryInfo != null) {
@@ -262,9 +248,13 @@ public class ServerPlanRequestUtils {
 
     // 4. Create InstanceRequest with segmentList
     InstanceRequest instanceRequest = new InstanceRequest();
+    // Making a unique requestId for leaf stages otherwise it causes problem on stats/metrics/tracing.
+    // TODO: Revisit if this is still necessary
+    long requestId = (executionContext.getRequestId() << 16) + ((long) executionContext.getStageId() << 8) + (
+        tableType == TableType.REALTIME ? 1 : 0);
     instanceRequest.setRequestId(requestId);
-    instanceRequest.setCid(QueryThreadContext.getCid());
-    instanceRequest.setBrokerId("unknown");
+    instanceRequest.setCid(executionContext.getCid());
+    instanceRequest.setBrokerId(executionContext.getBrokerId());
     instanceRequest.setEnableTrace(executionContext.isTraceEnabled());
     /*
      * If segmentList is not null, it means that the query is for a single table and we can directly set the segments.
@@ -439,7 +429,7 @@ public class ServerPlanRequestUtils {
     LogicalTableContext logicalTableContext = instanceDataManager.getLogicalTableContext(logicalTableName);
     Preconditions.checkNotNull(logicalTableContext,
         String.format("LogicalTableContext not found for logical table name: %s, query context id: %s",
-            logicalTableName, QueryThreadContext.getCid()));
+            logicalTableName, executionContext.getCid()));
 
     Map<String, List<String>> logicalTableSegmentsMap =
         executionContext.getWorkerMetadata().getLogicalTableSegmentsMap();

@@ -108,6 +108,27 @@ public abstract class BaseJoinOperator extends MultiStageOperator {
     _joinOverflowMode = getJoinOverflowMode(metadata, nodeHint);
   }
 
+  /// Constructor that takes the schema for NonEquiEvaluator as an argument
+  public BaseJoinOperator(OpChainExecutionContext context, MultiStageOperator leftInput, DataSchema leftSchema,
+      MultiStageOperator rightInput, JoinNode node, DataSchema nonEquiEvaluationSchema) {
+    super(context);
+    _leftInput = leftInput;
+    _rightInput = rightInput;
+    _joinType = node.getJoinType();
+    _leftColumnSize = leftSchema.size();
+    _resultSchema = node.getDataSchema();
+    _resultColumnSize = _resultSchema.size();
+    List<RexExpression> nonEquiConditions = node.getNonEquiConditions();
+    _nonEquiEvaluators = new ArrayList<>(nonEquiConditions.size());
+    for (RexExpression nonEquiCondition : nonEquiConditions) {
+      _nonEquiEvaluators.add(TransformOperandFactory.getTransformOperand(nonEquiCondition, nonEquiEvaluationSchema));
+    }
+    Map<String, String> metadata = context.getOpChainMetadata();
+    PlanNode.NodeHint nodeHint = node.getNodeHint();
+    _maxRowsInJoin = getMaxRowsInJoin(metadata, nodeHint);
+    _joinOverflowMode = getJoinOverflowMode(metadata, nodeHint);
+  }
+
   protected static int getMaxRowsInJoin(Map<String, String> opChainMetadata, @Nullable PlanNode.NodeHint nodeHint) {
     if (nodeHint != null) {
       Map<String, String> joinOptions = nodeHint.getHintOptions().get(PinotHintOptions.JOIN_HINT_OPTIONS);
@@ -138,9 +159,11 @@ public abstract class BaseJoinOperator extends MultiStageOperator {
   }
 
   @Override
-  public void registerExecution(long time, int numRows) {
+  public void registerExecution(long time, int numRows, long memoryUsedBytes, long gcTimeMs) {
     _statMap.merge(StatKey.EXECUTION_TIME_MS, time);
     _statMap.merge(StatKey.EMITTED_ROWS, numRows);
+    _statMap.merge(StatKey.ALLOCATED_MEMORY_BYTES, memoryUsedBytes);
+    _statMap.merge(StatKey.GC_TIME_MS, gcTimeMs);
   }
 
   @Override
@@ -203,7 +226,7 @@ public abstract class BaseJoinOperator extends MultiStageOperator {
 
       addRowsToRightTable(rows);
       numRows += rows.size();
-      sampleAndCheckInterruption();
+      checkTerminationAndSampleUsage();
       rightBlock = _rightInput.nextBlock();
     }
 
@@ -249,7 +272,7 @@ public abstract class BaseJoinOperator extends MultiStageOperator {
         }
       }
       List<Object[]> rows = buildJoinedRows((MseBlock.Data) leftBlock);
-      sampleAndCheckInterruption();
+      checkTerminationAndSampleUsage();
       if (!rows.isEmpty()) {
         return new RowHeapDataBlock(rows, _resultSchema);
       }
@@ -350,7 +373,6 @@ public abstract class BaseJoinOperator extends MultiStageOperator {
   }
 
   public enum StatKey implements StatMap.Key {
-    //@formatter:off
     EXECUTION_TIME_MS(StatMap.Type.LONG) {
       @Override
       public boolean includeDefaultInJson() {
@@ -367,8 +389,15 @@ public abstract class BaseJoinOperator extends MultiStageOperator {
     /**
      * How long (CPU time) has been spent on building the hash table.
      */
-    TIME_BUILDING_HASH_TABLE_MS(StatMap.Type.LONG);
-    //@formatter:on
+    TIME_BUILDING_HASH_TABLE_MS(StatMap.Type.LONG),
+    /**
+     * Allocated memory in bytes for this operator or its children in the same stage.
+     */
+    ALLOCATED_MEMORY_BYTES(StatMap.Type.LONG),
+    /**
+     * Time spent on GC while this operator or its children in the same stage were running.
+     */
+    GC_TIME_MS(StatMap.Type.LONG);
 
     private final StatMap.Type _type;
 
@@ -383,13 +412,11 @@ public abstract class BaseJoinOperator extends MultiStageOperator {
   }
 
   /**
-   * This util class is a view over the left and right row joined together
-   * currently this is used for filtering and input of projection. So if the joined
-   * tuple doesn't pass the predicate, the join result is not materialized into Object[].
-   *
-   * It is debatable whether we always want to use this instead of copying the tuple
+   * This util class is a view over the left and right row joined together.
+   * Currently, this is used for filtering and input of projection. So if the joined
+   * tuple doesn't pass the predicate, the join result is not materialized into {@code Object[]}.
    */
-  private abstract static class JoinedRowView extends AbstractList<Object> implements List<Object> {
+  protected abstract static class JoinedRowView extends AbstractList<Object> implements List<Object> {
     protected final int _leftSize;
     protected final int _size;
 

@@ -85,6 +85,11 @@ public class IntGroupByResultHolder implements GroupByResultHolder {
   }
 
   @Override
+  public long getLongResult(int groupKey) {
+    throw new UnsupportedOperationException();
+  }
+
+  @Override
   public <T> T getResult(int groupKey) {
     throw new UnsupportedOperationException();
   }
@@ -99,6 +104,11 @@ public class IntGroupByResultHolder implements GroupByResultHolder {
     if (groupKey != GroupKeyGenerator.INVALID_ID) {
       _resultArray[groupKey] = newValue;
     }
+  }
+
+  @Override
+  public void setValueForKey(int groupKey, long newValue) {
+    throw new UnsupportedOperationException();
   }
 
   @Override

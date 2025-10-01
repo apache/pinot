@@ -83,7 +83,6 @@ import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
 import org.apache.pinot.spi.data.MetricFieldSpec;
 import org.apache.pinot.spi.data.Schema;
-import org.apache.pinot.spi.env.PinotConfiguration;
 import org.apache.pinot.spi.exception.QueryErrorCode;
 import org.apache.pinot.spi.utils.CommonConstants;
 import org.apache.pinot.spi.utils.InstanceTypeUtils;
@@ -199,18 +198,6 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
         new FieldConfig("DivAirports", FieldConfig.EncodingType.DICTIONARY, List.of(), CompressionCodec.MV_ENTRY_DICT,
             null));
     return fieldConfigs;
-  }
-
-  @Override
-  protected void overrideBrokerConf(PinotConfiguration brokerConf) {
-    super.overrideBrokerConf(brokerConf);
-    brokerConf.setProperty(CommonConstants.Broker.CONFIG_OF_BROKER_ENABLE_QUERY_CANCELLATION, "true");
-  }
-
-  @Override
-  protected void overrideServerConf(PinotConfiguration serverConf) {
-    super.overrideServerConf(serverConf);
-    serverConf.setProperty(CommonConstants.Server.CONFIG_OF_ENABLE_QUERY_CANCELLATION, "true");
   }
 
   @BeforeClass
@@ -3520,7 +3507,7 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
         + "    LogicalProject(count=[$1], name=[$0])\n"
         + "      PinotLogicalAggregate(group=[{0}], agg#0=[COUNT($1)], aggType=[FINAL])\n"
         + "        PinotLogicalExchange(distribution=[hash[0]])\n"
-        + "          PinotLogicalAggregate(group=[{17}], agg#0=[COUNT()], aggType=[LEAF])\n"
+        + "          PinotLogicalAggregate(group=[{18}], agg#0=[COUNT()], aggType=[LEAF])\n"
         + "            PinotLogicalTableScan(table=[[default, mytable]])\n");
     assertEquals(response1Json.get("rows").get(0).get(2).asText(), "Rule Execution Times\n"
         + "Rule: SortRemove -> Time:*\n"
@@ -3798,26 +3785,26 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
 
     JsonNode starColumnResponse =
         JsonUtils.stringToJsonNode(sendGetRequest(getControllerBaseApiUrl() + "/tables/mytable/metadata?columns=*"));
-    validateMetadataResponse(starColumnResponse, 82, 9);
+    validateMetadataResponse(starColumnResponse, 83, 10);
 
     JsonNode starEncodedColumnResponse =
         JsonUtils.stringToJsonNode(sendGetRequest(getControllerBaseApiUrl() + "/tables/mytable/metadata?columns=%2A"));
-    validateMetadataResponse(starEncodedColumnResponse, 82, 9);
+    validateMetadataResponse(starEncodedColumnResponse, 83, 10);
 
     JsonNode starWithExtraColumnResponse = JsonUtils.stringToJsonNode(sendGetRequest(
         getControllerBaseApiUrl() + "/tables/mytable/metadata?columns="
             + "CRSElapsedTime&columns=*&columns=OriginStateName"));
-    validateMetadataResponse(starWithExtraColumnResponse, 82, 9);
+    validateMetadataResponse(starWithExtraColumnResponse, 83, 10);
 
     JsonNode starWithExtraEncodedColumnResponse = JsonUtils.stringToJsonNode(sendGetRequest(
         getControllerBaseApiUrl() + "/tables/mytable/metadata?columns="
             + "CRSElapsedTime&columns=%2A&columns=OriginStateName"));
-    validateMetadataResponse(starWithExtraEncodedColumnResponse, 82, 9);
+    validateMetadataResponse(starWithExtraEncodedColumnResponse, 83, 10);
 
     JsonNode starWithExtraColumnWholeEncodedResponse = JsonUtils.stringToJsonNode(sendGetRequest(
         getControllerBaseApiUrl() + "/tables/mytable/metadata?columns="
             + "CRSElapsedTime%26columns%3D%2A%26columns%3DOriginStateName"));
-    validateMetadataResponse(starWithExtraColumnWholeEncodedResponse, 82, 9);
+    validateMetadataResponse(starWithExtraColumnWholeEncodedResponse, 83, 10);
   }
 
   private void validateMetadataResponse(JsonNode response, int numTotalColumn, int numMVColumn) {
@@ -4273,7 +4260,8 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
     }, 600_000L, "Reload job did not complete in 10 minutes");
   }
 
-  private void runQueryAndAssert(String query, String newAddedColumn, FieldSpec fieldSpec) throws Exception {
+  private void runQueryAndAssert(String query, String newAddedColumn, FieldSpec fieldSpec)
+      throws Exception {
     JsonNode response = postQuery(query);
     assertNoError(response);
     JsonNode rows = response.get("resultTable").get("rows");

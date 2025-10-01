@@ -38,14 +38,13 @@ import org.apache.pinot.core.routing.RoutingTable;
 import org.apache.pinot.core.routing.SegmentsToQuery;
 import org.apache.pinot.core.routing.TableRouteInfo;
 import org.apache.pinot.core.transport.ServerInstance;
+import org.apache.pinot.spi.accounting.ThreadAccountantUtils;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.TenantConfig;
 import org.apache.pinot.spi.env.PinotConfiguration;
 import org.apache.pinot.spi.eventlistener.query.BrokerQueryEventListenerFactory;
 import org.apache.pinot.spi.exception.BadQueryRequestException;
 import org.apache.pinot.spi.trace.RequestContext;
-import org.apache.pinot.spi.trace.Tracing;
-import org.apache.pinot.spi.utils.CommonConstants.Broker;
 import org.apache.pinot.sql.parsers.CalciteSqlParser;
 import org.apache.pinot.util.TestUtils;
 import org.mockito.Mockito;
@@ -178,13 +177,12 @@ public class BaseSingleStageBrokerRequestHandlerTest {
     CountDownLatch latch = new CountDownLatch(1);
     long[] testRequestId = {-1};
     BrokerMetrics.register(mock(BrokerMetrics.class));
-    PinotConfiguration config =
-        new PinotConfiguration(Map.of(Broker.CONFIG_OF_BROKER_ENABLE_QUERY_CANCELLATION, "true"));
+    PinotConfiguration config = new PinotConfiguration();
     BrokerQueryEventListenerFactory.init(config);
     BaseSingleStageBrokerRequestHandler requestHandler =
-        new BaseSingleStageBrokerRequestHandler(config, "testBrokerId", routingManager,
+        new BaseSingleStageBrokerRequestHandler(config, "testBrokerId", new BrokerRequestIdGenerator(), routingManager,
             new AllowAllAccessControlFactory(), queryQuotaManager, tableCache,
-            new Tracing.DefaultThreadResourceUsageAccountant()) {
+            ThreadAccountantUtils.getNoOpAccountant()) {
           @Override
           public void start() {
           }
@@ -195,8 +193,8 @@ public class BaseSingleStageBrokerRequestHandlerTest {
 
           @Override
           protected BrokerResponseNative processBrokerRequest(long requestId, BrokerRequest originalBrokerRequest,
-              BrokerRequest serverBrokerRequest, TableRouteInfo route, long timeoutMs,
-              ServerStats serverStats, RequestContext requestContext)
+              BrokerRequest serverBrokerRequest, TableRouteInfo route, long timeoutMs, ServerStats serverStats,
+              RequestContext requestContext)
               throws Exception {
             testRequestId[0] = requestId;
             latch.await();

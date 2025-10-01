@@ -158,6 +158,11 @@ public class JsonUtils {
     return DEFAULT_READER.readTree(jsonString);
   }
 
+  public static Map<String, String> jsonNodeToStringMap(JsonNode jsonNode)
+      throws IOException {
+    return DEFAULT_READER.forType(MAP_TYPE_REFERENCE).readValue(jsonNode);
+  }
+
   public static JsonNode stringToJsonNodeWithBigDecimal(String jsonString)
       throws IOException {
     return READER_WITH_BIG_DECIMAL.readTree(jsonString);

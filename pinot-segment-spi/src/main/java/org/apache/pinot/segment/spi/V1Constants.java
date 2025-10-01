@@ -26,6 +26,7 @@ public class V1Constants {
   public static final String INDEX_MAP_FILE_NAME = "index_map";
   public static final String INDEX_FILE_NAME = "columns.psf";
   public static final String VALID_DOC_IDS_SNAPSHOT_FILE_NAME = "validdocids.bitmap.snapshot";
+  public static final String QUERYABLE_DOC_IDS_SNAPSHOT_FILE_NAME = "queryabledocids.bitmap.snapshot";
   public static final String TTL_WATERMARK_TABLE_PARTITION = "ttl.watermark.partition.";
 
   public static class Str {
@@ -51,6 +52,7 @@ public class V1Constants {
     public static final String NULLVALUE_VECTOR_FILE_EXTENSION = ".bitmap.nullvalue";
     public static final String LUCENE_FST_INDEX_FILE_EXTENSION = ".lucene.fst";
     public static final String LUCENE_TEXT_INDEX_DOCID_MAPPING_FILE_EXTENSION = ".lucene.mapping";
+    public static final String LUCENE_COMBINE_TEXT_INDEX_FILE_EXTENSION = ".text.index";
     public static final String LUCENE_TEXT_INDEX_FILE_EXTENSION = ".lucene.index";
     public static final String LUCENE_V9_FST_INDEX_FILE_EXTENSION = ".lucene.v9.fst";
     public static final String LUCENE_V9_TEXT_INDEX_FILE_EXTENSION = ".lucene.v9.index";

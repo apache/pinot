@@ -19,17 +19,15 @@
 package org.apache.pinot.core.query.scheduler.fcfs;
 
 import java.util.concurrent.atomic.LongAccumulator;
-import org.apache.pinot.common.metrics.ServerMetrics;
 import org.apache.pinot.core.query.executor.QueryExecutor;
 import org.apache.pinot.core.query.scheduler.MultiLevelPriorityQueue;
 import org.apache.pinot.core.query.scheduler.PriorityScheduler;
 import org.apache.pinot.core.query.scheduler.SchedulerGroup;
 import org.apache.pinot.core.query.scheduler.SchedulerGroupFactory;
-import org.apache.pinot.core.query.scheduler.SchedulerPriorityQueue;
 import org.apache.pinot.core.query.scheduler.TableBasedGroupMapper;
 import org.apache.pinot.core.query.scheduler.resources.PolicyBasedResourceManager;
 import org.apache.pinot.core.query.scheduler.resources.ResourceManager;
-import org.apache.pinot.spi.accounting.ThreadResourceUsageAccountant;
+import org.apache.pinot.spi.accounting.ThreadAccountant;
 import org.apache.pinot.spi.env.PinotConfiguration;
 
 
@@ -39,23 +37,23 @@ import org.apache.pinot.spi.env.PinotConfiguration;
  * concrete classes. All the scheduling logic resides in {@link PriorityScheduler}
  */
 public class BoundedFCFSScheduler extends PriorityScheduler {
-  public static BoundedFCFSScheduler create(PinotConfiguration config, QueryExecutor queryExecutor,
-      ServerMetrics serverMetrics, LongAccumulator latestQueryTime,
-      ThreadResourceUsageAccountant resourceUsageAccountant) {
-    final ResourceManager rm = new PolicyBasedResourceManager(config, resourceUsageAccountant);
-    final SchedulerGroupFactory groupFactory = new SchedulerGroupFactory() {
+  public static BoundedFCFSScheduler create(PinotConfiguration config, String instanceId, QueryExecutor queryExecutor,
+      ThreadAccountant threadAccountant, LongAccumulator latestQueryTime) {
+    ResourceManager rm = new PolicyBasedResourceManager(config);
+    SchedulerGroupFactory groupFactory = new SchedulerGroupFactory() {
       @Override
       public SchedulerGroup create(PinotConfiguration config, String groupName) {
         return new FCFSSchedulerGroup(groupName);
       }
     };
     MultiLevelPriorityQueue queue = new MultiLevelPriorityQueue(config, rm, groupFactory, new TableBasedGroupMapper());
-    return new BoundedFCFSScheduler(config, rm, queryExecutor, queue, serverMetrics, latestQueryTime);
+    return new BoundedFCFSScheduler(config, instanceId, queryExecutor, threadAccountant, latestQueryTime, rm, queue);
   }
 
-  private BoundedFCFSScheduler(PinotConfiguration config, ResourceManager resourceManager, QueryExecutor queryExecutor,
-      SchedulerPriorityQueue queue, ServerMetrics metrics, LongAccumulator latestQueryTime) {
-    super(config, resourceManager, queryExecutor, queue, metrics, latestQueryTime);
+  private BoundedFCFSScheduler(PinotConfiguration config, String instanceId, QueryExecutor queryExecutor,
+      ThreadAccountant threadAccountant, LongAccumulator latestQueryTime, ResourceManager resourceManager,
+      MultiLevelPriorityQueue queue) {
+    super(config, instanceId, queryExecutor, threadAccountant, latestQueryTime, resourceManager, queue);
   }
 
   @Override

@@ -25,8 +25,9 @@ import java.util.Map;
 import java.util.OptionalInt;
 import javax.annotation.Nullable;
 import org.apache.pinot.core.common.Operator;
-import org.apache.pinot.core.operator.BaseOperator;
+import org.apache.pinot.core.operator.BaseDocIdSetOperator;
 import org.apache.pinot.core.operator.BitmapDocIdSetOperator;
+import org.apache.pinot.core.operator.DocIdOrderedOperator;
 import org.apache.pinot.core.operator.ProjectionOperator;
 import org.apache.pinot.core.operator.ProjectionOperatorUtils;
 import org.apache.pinot.core.operator.blocks.DocIdSetBlock;
@@ -35,6 +36,7 @@ import org.apache.pinot.core.operator.filter.predicate.PredicateEvaluator;
 import org.apache.pinot.core.operator.transform.TransformResultMetadata;
 import org.apache.pinot.core.operator.transform.function.TransformFunction;
 import org.apache.pinot.core.plan.DocIdSetPlanNode;
+import org.apache.pinot.core.query.request.context.QueryContext;
 import org.apache.pinot.segment.spi.Constants;
 import org.apache.pinot.segment.spi.datasource.DataSource;
 import org.roaringbitmap.BatchIterator;
@@ -58,6 +60,7 @@ public final class ExpressionScanDocIdIterator implements ScanBasedDocIdIterator
   private final int[] _docIdBuffer = new int[DocIdSetPlanNode.MAX_DOC_PER_CALL];
   private final boolean _nullHandlingEnabled;
   private final PredicateEvaluationResult _predicateEvaluationResult;
+  private final QueryContext _queryContext;
 
   private int _blockEndDocId = 0;
   private PeekableIntIterator _docIdIterator;
@@ -68,13 +71,14 @@ public final class ExpressionScanDocIdIterator implements ScanBasedDocIdIterator
 
   public ExpressionScanDocIdIterator(TransformFunction transformFunction,
       @Nullable PredicateEvaluator predicateEvaluator, Map<String, DataSource> dataSourceMap, int numDocs,
-      boolean nullHandlingEnabled, PredicateEvaluationResult predicateEvaluationResult) {
+      PredicateEvaluationResult predicateEvaluationResult, QueryContext queryContext) {
     _transformFunction = transformFunction;
     _predicateEvaluator = predicateEvaluator;
     _dataSourceMap = dataSourceMap;
     _endDocId = numDocs;
-    _nullHandlingEnabled = nullHandlingEnabled;
     _predicateEvaluationResult = predicateEvaluationResult;
+    _queryContext = queryContext;
+    _nullHandlingEnabled = _queryContext.isNullHandlingEnabled();
   }
 
   @Override
@@ -89,7 +93,7 @@ public final class ExpressionScanDocIdIterator implements ScanBasedDocIdIterator
       int blockStartDocId = _blockEndDocId;
       _blockEndDocId = Math.min(blockStartDocId + DocIdSetPlanNode.MAX_DOC_PER_CALL, _endDocId);
       try (ProjectionOperator projectionOperator = ProjectionOperatorUtils.getProjectionOperator(_dataSourceMap,
-          new RangeDocIdSetOperator(blockStartDocId, _blockEndDocId))) {
+          new RangeDocIdSetOperator(blockStartDocId, _blockEndDocId), _queryContext)) {
         ProjectionBlock projectionBlock = projectionOperator.nextBlock();
         RoaringBitmap matchingDocIds = new RoaringBitmap();
         processProjectionBlock(projectionBlock, matchingDocIds);
@@ -124,8 +128,10 @@ public final class ExpressionScanDocIdIterator implements ScanBasedDocIdIterator
   @Override
   public MutableRoaringBitmap applyAnd(BatchIterator batchIterator, OptionalInt firstDoc, OptionalInt lastDoc) {
     IntIterator intIterator = batchIterator.asIntIterator(new int[OPTIMAL_ITERATOR_BATCH_SIZE]);
+    BaseDocIdSetOperator docIdSetOperator =
+        new BitmapDocIdSetOperator(intIterator, _docIdBuffer, DocIdOrderedOperator.DocIdOrder.ASC);
     try (ProjectionOperator projectionOperator = ProjectionOperatorUtils.getProjectionOperator(_dataSourceMap,
-        new BitmapDocIdSetOperator(intIterator, _docIdBuffer))) {
+        docIdSetOperator, _queryContext)) {
       MutableRoaringBitmap matchingDocIds = new MutableRoaringBitmap();
       ProjectionBlock projectionBlock;
       while ((projectionBlock = projectionOperator.nextBlock()) != null) {
@@ -138,7 +144,7 @@ public final class ExpressionScanDocIdIterator implements ScanBasedDocIdIterator
   @Override
   public MutableRoaringBitmap applyAnd(ImmutableRoaringBitmap docIds) {
     try (ProjectionOperator projectionOperator = ProjectionOperatorUtils.getProjectionOperator(_dataSourceMap,
-        new BitmapDocIdSetOperator(docIds, _docIdBuffer))) {
+        new BitmapDocIdSetOperator(docIds, _docIdBuffer, DocIdOrderedOperator.DocIdOrder.ASC), _queryContext)) {
       MutableRoaringBitmap matchingDocIds = new MutableRoaringBitmap();
       ProjectionBlock projectionBlock;
       while ((projectionBlock = projectionOperator.nextBlock()) != null) {
@@ -417,7 +423,7 @@ public final class ExpressionScanDocIdIterator implements ScanBasedDocIdIterator
   /**
    * NOTE: This operator contains only one block.
    */
-  private class RangeDocIdSetOperator extends BaseOperator<DocIdSetBlock> {
+  private class RangeDocIdSetOperator extends BaseDocIdSetOperator {
     static final String EXPLAIN_NAME = "DOC_ID_SET_RANGE";
 
     DocIdSetBlock _docIdSetBlock;
@@ -445,6 +451,20 @@ public final class ExpressionScanDocIdIterator implements ScanBasedDocIdIterator
     @Override
     public List<Operator> getChildOperators() {
       return Collections.emptyList();
+    }
+
+    @Override
+    public boolean isCompatibleWith(DocIdOrder order) {
+      return DocIdOrder.ASC == order;
+    }
+
+    @Override
+    public BaseDocIdSetOperator withOrder(DocIdOrder order)
+        throws UnsupportedOperationException {
+      if (order == DocIdOrder.ASC) {
+        return this;
+      }
+      throw new UnsupportedOperationException(EXPLAIN_NAME + " doesn't support descending order");
     }
   }
 

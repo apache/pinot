@@ -28,7 +28,6 @@ import org.apache.pinot.common.utils.regex.Matcher;
 import org.apache.pinot.segment.spi.index.reader.Dictionary;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
 
-
 /**
  * Factory for REGEXP_LIKE predicate evaluators.
  */

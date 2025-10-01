@@ -59,6 +59,7 @@ import org.apache.pinot.segment.spi.index.StandardIndexes;
 import org.apache.pinot.segment.spi.index.TextIndexConfig;
 import org.apache.pinot.segment.spi.index.creator.ForwardIndexCreator;
 import org.apache.pinot.segment.spi.index.creator.SegmentIndexCreationInfo;
+import org.apache.pinot.segment.spi.index.mutable.ThreadSafeMutableRoaringBitmap;
 import org.apache.pinot.segment.spi.partition.PartitionFunction;
 import org.apache.pinot.spi.config.table.IndexConfig;
 import org.apache.pinot.spi.config.table.SegmentZKPropsConfig;
@@ -355,8 +356,32 @@ public class SegmentColumnarIndexCreator implements SegmentCreator {
     _docIdCounter++;
   }
 
+  /**
+   * Indexes a column from the given segment.
+   *
+   * @param columnName The name of the column to index
+   * @param sortedDocIds If not null, provides the sorted order of documents for processing
+   * @param segment The segment containing the column data
+   */
   @Override
   public void indexColumn(String columnName, @Nullable int[] sortedDocIds, IndexSegment segment)
+      throws IOException {
+    indexColumn(columnName, sortedDocIds, segment, null);
+  }
+
+  /**
+   * Indexes a column from the given segment.
+   *
+   * @param columnName The name of the column to index
+   * @param sortedDocIds If not null, provides the sorted order of documents for processing
+   * @param segment The segment containing the column data
+   * @param validDocIds If not null, only processes documents that are marked as valid in this bitmap.
+   *                    When null, all documents in the segment are processed. This is used for
+   *                    commit-time compaction to skip invalid/deleted documents during indexing.
+   */
+  @Override
+  public void indexColumn(String columnName, @Nullable int[] sortedDocIds, IndexSegment segment,
+      @Nullable ThreadSafeMutableRoaringBitmap validDocIds)
       throws IOException {
     // Iterate over each value in the column
     int numDocs = segment.getSegmentMetadata().getTotalDocs();
@@ -371,13 +396,22 @@ public class SegmentColumnarIndexCreator implements SegmentCreator {
       if (sortedDocIds != null) {
         int onDiskDocId = 0;
         for (int docId : sortedDocIds) {
-          indexColumnValue(colReader, creatorsByIndex, columnName, fieldSpec, dictionaryCreator, docId, onDiskDocId,
-              nullVec);
-          onDiskDocId++;
+          // If validDodIds are provided, only index column if it's a valid doc
+          if (validDocIds == null || validDocIds.contains(docId)) {
+            indexColumnValue(colReader, creatorsByIndex, columnName, fieldSpec, dictionaryCreator, docId, onDiskDocId,
+                nullVec);
+            onDiskDocId++;
+          }
         }
       } else {
+        int onDiskDocId = 0;
         for (int docId = 0; docId < numDocs; docId++) {
-          indexColumnValue(colReader, creatorsByIndex, columnName, fieldSpec, dictionaryCreator, docId, docId, nullVec);
+          // If validDodIds are provided, only index column if it's a valid doc
+          if (validDocIds == null || validDocIds.contains(docId)) {
+            indexColumnValue(colReader, creatorsByIndex, columnName, fieldSpec, dictionaryCreator, docId, onDiskDocId,
+                nullVec);
+            onDiskDocId++;
+          }
         }
       }
     }
@@ -498,62 +532,96 @@ public class SegmentColumnarIndexCreator implements SegmentCreator {
     if (timeColumnName != null) {
       ColumnIndexCreationInfo timeColumnIndexCreationInfo = _indexCreationInfoMap.get(timeColumnName);
       if (timeColumnIndexCreationInfo != null) {
-        long startTime;
-        long endTime;
-        TimeUnit timeUnit;
+        try {
+          long startTime;
+          long endTime;
+          TimeUnit timeUnit;
 
-        // Use start/end time in config if defined
-        if (_config.getStartTime() != null) {
-          startTime = Long.parseLong(_config.getStartTime());
-          endTime = Long.parseLong(_config.getEndTime());
-          timeUnit = Preconditions.checkNotNull(_config.getSegmentTimeUnit());
-        } else {
-          if (_totalDocs > 0) {
-            String startTimeStr = timeColumnIndexCreationInfo.getMin().toString();
-            String endTimeStr = timeColumnIndexCreationInfo.getMax().toString();
-
-            if (_config.getTimeColumnType() == SegmentGeneratorConfig.TimeColumnType.SIMPLE_DATE) {
-              // For TimeColumnType.SIMPLE_DATE_FORMAT, convert time value into millis since epoch
-              // Use DateTimeFormatter from DateTimeFormatSpec to handle default time zone consistently.
-              DateTimeFormatSpec formatSpec = _config.getDateTimeFormatSpec();
-              Preconditions.checkNotNull(formatSpec, "DateTimeFormatSpec must exist for SimpleDate");
-              DateTimeFormatter dateTimeFormatter = formatSpec.getDateTimeFormatter();
-              startTime = dateTimeFormatter.parseMillis(startTimeStr);
-              endTime = dateTimeFormatter.parseMillis(endTimeStr);
-              timeUnit = TimeUnit.MILLISECONDS;
-            } else {
-              // by default, time column type is TimeColumnType.EPOCH
-              startTime = Long.parseLong(startTimeStr);
-              endTime = Long.parseLong(endTimeStr);
-              timeUnit = Preconditions.checkNotNull(_config.getSegmentTimeUnit());
-            }
+          // Use start/end time in config if defined
+          if (_config.getStartTime() != null) {
+            startTime = Long.parseLong(_config.getStartTime());
+            endTime = Long.parseLong(_config.getEndTime());
+            timeUnit = Preconditions.checkNotNull(_config.getSegmentTimeUnit());
           } else {
-            // No records in segment. Use current time as start/end
-            long now = System.currentTimeMillis();
-            if (_config.getTimeColumnType() == SegmentGeneratorConfig.TimeColumnType.SIMPLE_DATE) {
-              startTime = now;
-              endTime = now;
-              timeUnit = TimeUnit.MILLISECONDS;
+            if (_totalDocs > 0) {
+              String startTimeStr = timeColumnIndexCreationInfo.getMin().toString();
+              String endTimeStr = timeColumnIndexCreationInfo.getMax().toString();
+
+              if (_config.getTimeColumnType() == SegmentGeneratorConfig.TimeColumnType.SIMPLE_DATE) {
+                // For TimeColumnType.SIMPLE_DATE_FORMAT, convert time value into millis since epoch
+                // Use DateTimeFormatter from DateTimeFormatSpec to handle default time zone consistently.
+                DateTimeFormatSpec formatSpec = _config.getDateTimeFormatSpec();
+                Preconditions.checkNotNull(formatSpec, "DateTimeFormatSpec must exist for SimpleDate");
+                DateTimeFormatter dateTimeFormatter = formatSpec.getDateTimeFormatter();
+                startTime = dateTimeFormatter.parseMillis(startTimeStr);
+                endTime = dateTimeFormatter.parseMillis(endTimeStr);
+                timeUnit = TimeUnit.MILLISECONDS;
+              } else {
+                // by default, time column type is TimeColumnType.EPOCH
+                startTime = Long.parseLong(startTimeStr);
+                endTime = Long.parseLong(endTimeStr);
+                timeUnit = Preconditions.checkNotNull(_config.getSegmentTimeUnit());
+              }
             } else {
-              timeUnit = Preconditions.checkNotNull(_config.getSegmentTimeUnit());
-              startTime = timeUnit.convert(now, TimeUnit.MILLISECONDS);
-              endTime = timeUnit.convert(now, TimeUnit.MILLISECONDS);
+              // No records in segment. Use current time as start/end
+              long now = System.currentTimeMillis();
+              if (_config.getTimeColumnType() == SegmentGeneratorConfig.TimeColumnType.SIMPLE_DATE) {
+                startTime = now;
+                endTime = now;
+                timeUnit = TimeUnit.MILLISECONDS;
+              } else {
+                timeUnit = Preconditions.checkNotNull(_config.getSegmentTimeUnit());
+                startTime = timeUnit.convert(now, TimeUnit.MILLISECONDS);
+                endTime = timeUnit.convert(now, TimeUnit.MILLISECONDS);
+              }
             }
           }
-        }
 
-        if (!_config.isSkipTimeValueCheck()) {
-          Interval timeInterval =
-              new Interval(timeUnit.toMillis(startTime), timeUnit.toMillis(endTime), DateTimeZone.UTC);
-          Preconditions.checkState(TimeUtils.isValidTimeInterval(timeInterval),
-              "Invalid segment start/end time: %s (in millis: %s/%s) for time column: %s, must be between: %s",
-              timeInterval, timeInterval.getStartMillis(), timeInterval.getEndMillis(), timeColumnName,
-              TimeUtils.VALID_TIME_INTERVAL);
-        }
+          if (!_config.isSkipTimeValueCheck()) {
+            Interval timeInterval =
+                new Interval(timeUnit.toMillis(startTime), timeUnit.toMillis(endTime), DateTimeZone.UTC);
+            Preconditions.checkState(TimeUtils.isValidTimeInterval(timeInterval),
+                "Invalid segment start/end time: %s (in millis: %s/%s) for time column: %s, must be between: %s",
+                timeInterval, timeInterval.getStartMillis(), timeInterval.getEndMillis(), timeColumnName,
+                TimeUtils.VALID_TIME_INTERVAL);
+          }
 
-        properties.setProperty(SEGMENT_START_TIME, startTime);
-        properties.setProperty(SEGMENT_END_TIME, endTime);
-        properties.setProperty(TIME_UNIT, timeUnit);
+          properties.setProperty(SEGMENT_START_TIME, startTime);
+          properties.setProperty(SEGMENT_END_TIME, endTime);
+          properties.setProperty(TIME_UNIT, timeUnit);
+        } catch (Exception e) {
+          if (!_config.isContinueOnError()) {
+            throw e;
+          }
+          TimeUnit timeUnit;
+          long now = System.currentTimeMillis();
+          long convertedStartTime;
+          long convertedEndTime;
+          if (_config.getTimeColumnType() == SegmentGeneratorConfig.TimeColumnType.SIMPLE_DATE) {
+            convertedEndTime = now;
+            convertedStartTime = TimeUtils.getValidMinTimeMillis();
+            timeUnit = TimeUnit.MILLISECONDS;
+          } else {
+            timeUnit = _config.getSegmentTimeUnit();
+            if (timeUnit != null) {
+              convertedEndTime = timeUnit.convert(now, TimeUnit.MILLISECONDS);
+              convertedStartTime = timeUnit.convert(TimeUtils.getValidMinTimeMillis(), TimeUnit.MILLISECONDS);
+            } else {
+              // Use millis as the time unit if not able to infer from config
+              timeUnit = TimeUnit.MILLISECONDS;
+              convertedEndTime = now;
+              convertedStartTime = TimeUtils.getValidMinTimeMillis();
+            }
+          }
+          LOGGER.warn(
+              "Caught exception while writing time metadata for segment: {}, time column: {}, total docs: {}. "
+                  + "Continuing using current time ({}) as the end time, and min valid time ({}) as the start time "
+                  + "for the segment (time unit: {}).",
+              _segmentName, timeColumnName, _totalDocs, convertedEndTime, convertedStartTime, timeUnit, e);
+          properties.setProperty(SEGMENT_START_TIME, convertedStartTime);
+          properties.setProperty(SEGMENT_END_TIME, convertedEndTime);
+          properties.setProperty(TIME_UNIT, timeUnit);
+        }
       }
     }
 
@@ -587,10 +655,16 @@ public class SegmentColumnarIndexCreator implements SegmentCreator {
     properties.setProperty(getKeyFor(column, TOTAL_DOCS), String.valueOf(totalDocs));
     DataType dataType = fieldSpec.getDataType();
     properties.setProperty(getKeyFor(column, DATA_TYPE), String.valueOf(dataType));
+    // TODO: When the column is raw (no dictionary), we should set BITS_PER_ELEMENT to -1 (invalid). Currently we set it
+    //       regardless of whether dictionary is created or not for backward compatibility because ForwardIndexHandler
+    //       doesn't update this value when converting a raw column to dictionary encoded.
+    //       Consider changing it after releasing 1.5.0.
+    //       See https://github.com/apache/pinot/pull/16921 for details
     properties.setProperty(getKeyFor(column, BITS_PER_ELEMENT),
         String.valueOf(PinotDataBitSet.getNumBitsPerValue(cardinality - 1)));
+    FieldType fieldType = fieldSpec.getFieldType();
     properties.setProperty(getKeyFor(column, DICTIONARY_ELEMENT_SIZE), String.valueOf(dictionaryElementSize));
-    properties.setProperty(getKeyFor(column, COLUMN_TYPE), String.valueOf(fieldSpec.getFieldType()));
+    properties.setProperty(getKeyFor(column, COLUMN_TYPE), String.valueOf(fieldType));
     properties.setProperty(getKeyFor(column, IS_SORTED), String.valueOf(columnIndexCreationInfo.isSorted()));
     properties.setProperty(getKeyFor(column, HAS_DICTIONARY), String.valueOf(hasDictionary));
     properties.setProperty(getKeyFor(column, IS_SINGLE_VALUED), String.valueOf(fieldSpec.isSingleValueField()));
@@ -600,7 +674,8 @@ public class SegmentColumnarIndexCreator implements SegmentCreator {
         String.valueOf(columnIndexCreationInfo.getTotalNumberOfEntries()));
     properties.setProperty(getKeyFor(column, IS_AUTO_GENERATED),
         String.valueOf(columnIndexCreationInfo.isAutoGenerated()));
-    if (dataType.equals(DataType.STRING) || dataType.equals(DataType.BYTES) || dataType.equals(DataType.JSON)) {
+    DataType storedType = dataType.getStoredType();
+    if (storedType == DataType.STRING || storedType == DataType.BYTES) {
       properties.setProperty(getKeyFor(column, SCHEMA_MAX_LENGTH), fieldSpec.getEffectiveMaxLength());
       // TODO let's revisit writing effective maxLengthStrategy into metadata, as changing it right now may affect
       //  segment's CRC value
@@ -624,15 +699,28 @@ public class SegmentColumnarIndexCreator implements SegmentCreator {
       }
     }
 
-    // datetime field
-    if (fieldSpec.getFieldType() == FieldType.DATE_TIME) {
+    // Datetime field
+    if (fieldType == FieldType.DATE_TIME) {
       DateTimeFieldSpec dateTimeFieldSpec = (DateTimeFieldSpec) fieldSpec;
       properties.setProperty(getKeyFor(column, DATETIME_FORMAT), dateTimeFieldSpec.getFormat());
       properties.setProperty(getKeyFor(column, DATETIME_GRANULARITY), dateTimeFieldSpec.getGranularity());
     }
 
-    // complex field
-    if (fieldSpec.getFieldType() == FieldType.COMPLEX) {
+    if (fieldType != FieldType.COMPLEX) {
+      // Regular (non-complex) field
+      if (totalDocs > 0) {
+        Object min = columnIndexCreationInfo.getMin();
+        Object max = columnIndexCreationInfo.getMax();
+        // NOTE:
+        // Min/max could be null for real-time aggregate metrics. We don't directly call addColumnMinMaxValueInfo() to
+        // avoid setting MIN_MAX_VALUE_INVALID flag, which will prevent ColumnMinMaxValueGenerator from generating them
+        // when loading the segment.
+        if (min != null && max != null) {
+          addColumnMinMaxValueInfo(properties, column, min, max, storedType);
+        }
+      }
+    } else {
+      // Complex field
       ComplexFieldSpec complexFieldSpec = (ComplexFieldSpec) fieldSpec;
       properties.setProperty(getKeyFor(column, COMPLEX_CHILD_FIELD_NAMES),
           new ArrayList<>(complexFieldSpec.getChildFieldSpecs().keySet()));
@@ -641,17 +729,9 @@ public class SegmentColumnarIndexCreator implements SegmentCreator {
       }
     }
 
-    // NOTE: Min/max could be null for real-time aggregate metrics.
-    if ((fieldSpec.getFieldType() != FieldType.COMPLEX) && (totalDocs > 0)) {
-      Object min = columnIndexCreationInfo.getMin();
-      Object max = columnIndexCreationInfo.getMax();
-      if (min != null && max != null) {
-        addColumnMinMaxValueInfo(properties, column, min, max, dataType.getStoredType());
-      }
-    }
-
+    // TODO: Revisit whether we should set default null value for complex field
     String defaultNullValue = columnIndexCreationInfo.getDefaultNullValue().toString();
-    if (dataType.getStoredType() == DataType.STRING) {
+    if (storedType == DataType.STRING) {
       // NOTE: Do not limit length of default null value because we need exact value to determine whether the default
       //       null value changes
       defaultNullValue = CommonsConfigurationUtils.replaceSpecialCharacterInPropertyValue(defaultNullValue);

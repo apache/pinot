@@ -45,6 +45,7 @@ import org.testng.collections.Lists;
 public abstract class AbstractRecordReaderTest {
   private final static Random RANDOM = new Random(System.currentTimeMillis());
   protected final static int SAMPLE_RECORDS_SIZE = 10000;
+  private static final double EPSILON = 1e-6d;
 
   protected final File _tempDir = new File(FileUtils.getTempDirectory(), getClass().getSimpleName());
   protected final File _dataFile = new File(_tempDir, getDataFileName());
@@ -121,14 +122,14 @@ public abstract class AbstractRecordReaderTest {
       for (FieldSpec fieldSpec : _pinotSchema.getAllFieldSpecs()) {
         String fieldSpecName = fieldSpec.getName();
         if (fieldSpec.isSingleValueField()) {
-          Assert.assertEquals(actualRecord.getValue(fieldSpecName), expectedRecord.get(fieldSpecName));
+          assertValueEquals(actualRecord.getValue(fieldSpecName), expectedRecord.get(fieldSpecName));
         } else {
           Object[] actualRecords = (Object[]) actualRecord.getValue(fieldSpecName);
           List expectedRecords = (List) expectedRecord.get(fieldSpecName);
           if (expectedRecords != null) {
             Assert.assertEquals(actualRecords.length, expectedRecords.size());
             for (int j = 0; j < actualRecords.length; j++) {
-              Assert.assertEquals(actualRecords[j], expectedRecords.get(j));
+              assertValueEquals(actualRecords[j], expectedRecords.get(j));
             }
           }
         }
@@ -137,6 +138,24 @@ public abstract class AbstractRecordReaderTest {
       Assert.assertEquals(primaryKey.getValues(), expectedPrimaryKeys.get(i));
     }
     Assert.assertFalse(recordReader.hasNext());
+  }
+
+  private void assertValueEquals(Object actualValue, Object expectedValue) {
+    if (expectedValue == null) {
+      Assert.assertNull(actualValue);
+      return;
+    }
+    if (actualValue == null) {
+      Assert.fail("Actual value is null while expected is " + expectedValue);
+      return;
+    }
+    boolean isFloating = expectedValue instanceof Float || expectedValue instanceof Double
+        || actualValue instanceof Float || actualValue instanceof Double;
+    if (isFloating) {
+      Assert.assertEquals(((Number) actualValue).doubleValue(), ((Number) expectedValue).doubleValue(), EPSILON);
+    } else {
+      Assert.assertEquals(actualValue, expectedValue);
+    }
   }
 
   protected org.apache.pinot.spi.data.Schema getPinotSchema() {

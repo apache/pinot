@@ -29,10 +29,10 @@ import org.apache.pinot.common.response.BrokerResponse;
 import org.apache.pinot.common.response.broker.ResultTable;
 import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.core.transport.server.routing.stats.ServerRoutingStatsManager;
+import org.apache.pinot.spi.accounting.ThreadAccountantUtils;
 import org.apache.pinot.spi.env.PinotConfiguration;
 import org.apache.pinot.spi.eventlistener.query.BrokerQueryEventListenerFactory;
 import org.apache.pinot.spi.exception.QueryErrorCode;
-import org.apache.pinot.spi.trace.Tracing;
 import org.apache.pinot.spi.utils.BytesUtils;
 import org.apache.pinot.sql.parsers.CalciteSqlParser;
 import org.testng.annotations.BeforeClass;
@@ -171,9 +171,10 @@ public class LiteralOnlyBrokerRequestTest {
   public void testBrokerRequestHandler()
       throws Exception {
     SingleConnectionBrokerRequestHandler requestHandler =
-        new SingleConnectionBrokerRequestHandler(new PinotConfiguration(), "testBrokerId", null, ACCESS_CONTROL_FACTORY,
-            null, null, null, null, mock(ServerRoutingStatsManager.class), mock(FailureDetector.class),
-            new Tracing.DefaultThreadResourceUsageAccountant());
+        new SingleConnectionBrokerRequestHandler(new PinotConfiguration(), "testBrokerId",
+            new BrokerRequestIdGenerator(), null, ACCESS_CONTROL_FACTORY, null, null, null, null,
+            mock(ServerRoutingStatsManager.class), mock(FailureDetector.class),
+            ThreadAccountantUtils.getNoOpAccountant());
 
     long randNum = RANDOM.nextLong();
     byte[] randBytes = new byte[12];
@@ -196,9 +197,10 @@ public class LiteralOnlyBrokerRequestTest {
   public void testBrokerRequestHandlerWithAsFunction()
       throws Exception {
     SingleConnectionBrokerRequestHandler requestHandler =
-        new SingleConnectionBrokerRequestHandler(new PinotConfiguration(), "testBrokerId", null, ACCESS_CONTROL_FACTORY,
-            null, null, null, null, mock(ServerRoutingStatsManager.class), mock(FailureDetector.class),
-            new Tracing.DefaultThreadResourceUsageAccountant());
+        new SingleConnectionBrokerRequestHandler(new PinotConfiguration(), "testBrokerId",
+            new BrokerRequestIdGenerator(), null, ACCESS_CONTROL_FACTORY, null, null, null, null,
+            mock(ServerRoutingStatsManager.class), mock(FailureDetector.class),
+            ThreadAccountantUtils.getNoOpAccountant());
     long currentTsMin = System.currentTimeMillis();
     BrokerResponse brokerResponse = requestHandler.handleRequest(
         "SELECT now() AS currentTs, fromDateTime('2020-01-01 UTC', 'yyyy-MM-dd z') AS firstDayOf2020");
@@ -351,9 +353,10 @@ public class LiteralOnlyBrokerRequestTest {
   public void testExplainPlanLiteralOnly()
       throws Exception {
     SingleConnectionBrokerRequestHandler requestHandler =
-        new SingleConnectionBrokerRequestHandler(new PinotConfiguration(), "testBrokerId", null, ACCESS_CONTROL_FACTORY,
-            null, null, null, null, mock(ServerRoutingStatsManager.class), mock(FailureDetector.class),
-            new Tracing.DefaultThreadResourceUsageAccountant());
+        new SingleConnectionBrokerRequestHandler(new PinotConfiguration(), "testBrokerId",
+            new BrokerRequestIdGenerator(), null, ACCESS_CONTROL_FACTORY, null, null, null, null,
+            mock(ServerRoutingStatsManager.class), mock(FailureDetector.class),
+            ThreadAccountantUtils.getNoOpAccountant());
 
     // Test 1: select constant
     BrokerResponse brokerResponse = requestHandler.handleRequest("EXPLAIN PLAN FOR SELECT 1.5, 'test'");

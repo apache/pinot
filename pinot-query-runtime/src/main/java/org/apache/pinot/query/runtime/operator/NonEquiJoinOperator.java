@@ -28,7 +28,6 @@ import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.query.planner.plannode.JoinNode;
 import org.apache.pinot.query.runtime.blocks.MseBlock;
 import org.apache.pinot.query.runtime.plan.OpChainExecutionContext;
-import org.apache.pinot.spi.trace.Tracing;
 
 
 /**
@@ -37,6 +36,8 @@ import org.apache.pinot.spi.trace.Tracing;
  */
 public class NonEquiJoinOperator extends BaseJoinOperator {
   private static final String EXPLAIN_NAME = "NON_EQUI_JOIN";
+  private static final String BUILD_JOINED_ROWS_SCOPE = "NonEquiJoinOperator#buildJoinedRows";
+  private static final String BUILD_NON_MATCH_RIGHT_ROWS_SCOPE = "NonEquiJoinOperator#buildNonMatchRightRows";
 
   private final List<Object[]> _rightTable;
   // Track matched right rows for right join and full join to output non-matched right rows.
@@ -91,7 +92,7 @@ public class NonEquiJoinOperator extends BaseJoinOperator {
             maxRowsLimitReached = true;
             break;
           }
-          Tracing.ThreadAccountantOps.sampleAndCheckInterruptionPeriodically(rows.size());
+          checkTerminationAndSampleUsagePeriodically(rows.size(), BUILD_JOINED_ROWS_SCOPE);
           rows.add(joinRowView.toArray());
           hasMatchForLeftRow = true;
           if (_matchedRightRows != null) {
@@ -106,7 +107,7 @@ public class NonEquiJoinOperator extends BaseJoinOperator {
         if (isMaxRowsLimitReached(rows.size())) {
           break;
         }
-        Tracing.ThreadAccountantOps.sampleAndCheckInterruptionPeriodically(rows.size());
+        checkTerminationAndSampleUsagePeriodically(rows.size(), BUILD_JOINED_ROWS_SCOPE);
         rows.add(joinRow(leftRow, null));
       }
     }
@@ -124,7 +125,7 @@ public class NonEquiJoinOperator extends BaseJoinOperator {
     List<Object[]> rows = new ArrayList<>(numRightRows - numMatchedRightRows);
     int unmatchedIndex = 0;
     while ((unmatchedIndex = _matchedRightRows.nextClearBit(unmatchedIndex)) < numRightRows) {
-      Tracing.ThreadAccountantOps.sampleAndCheckInterruptionPeriodically(rows.size());
+      checkTerminationAndSampleUsagePeriodically(rows.size(), BUILD_NON_MATCH_RIGHT_ROWS_SCOPE);
       rows.add(joinRow(null, _rightTable.get(unmatchedIndex++)));
     }
     return rows;

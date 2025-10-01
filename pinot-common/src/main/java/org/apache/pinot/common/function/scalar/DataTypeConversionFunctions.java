@@ -25,6 +25,7 @@ import org.apache.pinot.common.utils.PinotDataType;
 import org.apache.pinot.spi.annotations.ScalarFunction;
 import org.apache.pinot.spi.utils.BigDecimalUtils;
 import org.apache.pinot.spi.utils.BytesUtils;
+import org.apache.pinot.spi.utils.TimestampUtils;
 
 import static org.apache.pinot.common.utils.PinotDataType.*;
 
@@ -69,9 +70,22 @@ public class DataTypeConversionFunctions {
         break;
     }
     if (sourceType == STRING && (targetDataType == INTEGER || targetDataType == LONG)) {
-      if (String.valueOf(value).contains(".")) {
-        // convert integers via double to avoid parse errors
-        return targetDataType.convert(DOUBLE.convert(value, sourceType), DOUBLE);
+      String stringValue = value.toString().trim();
+      if (targetDataType == INTEGER) {
+        try {
+          return Integer.parseInt(stringValue);
+        } catch (NumberFormatException e) {
+          // If the value is not parseable as an integer, try to parse it as a double.
+          return (int) Double.parseDouble(stringValue);
+        }
+      } else {
+        try {
+          // This step will try to parse the string as a timestamp or a long.
+          return TimestampUtils.toMillisSinceEpoch(stringValue);
+        } catch (Exception e) {
+          // If the value is not parseable as a timestamp or a long, try to parse it as a double.
+          return (long) Double.parseDouble(stringValue);
+        }
       }
     }
     return targetDataType.convert(value, sourceType);

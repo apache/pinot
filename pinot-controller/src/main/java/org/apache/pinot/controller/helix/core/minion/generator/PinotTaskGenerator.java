@@ -58,26 +58,48 @@ public interface PinotTaskGenerator {
   /**
    * Generates a list of task based on the given table configs, it also gets list of existing task configs
    */
-  void generateTasks(List<TableConfig> tableConfigs, List<PinotTaskConfig> pinotTaskConfigs) throws Exception;
+  void generateTasks(List<TableConfig> tableConfigs, List<PinotTaskConfig> pinotTaskConfigs)
+      throws Exception;
 
   /**
    * Returns the timeout in milliseconds for each task, 3600000 (1 hour) by default.
    */
-  default long getTaskTimeoutMs() {
+  default long getTaskTimeoutMs(String minionTag) {
     return JobConfig.DEFAULT_TIMEOUT_PER_TASK;
   }
 
   /**
    * Returns the maximum number of concurrent tasks allowed per instance, 1 by default.
+   * Priority order (highest to lowest):
+   * 1. Minion tenant specific cluster config: taskType.minionTag.numConcurrentTasksPerInstance
+   * 2. Task type cluster config: taskType.numConcurrentTasksPerInstance
+   * 3. Default value
+   *
+   * @param minionTag Minion instance tag/tenant (can be null)
+   * @return Number of concurrent tasks per instance
    */
-  default int getNumConcurrentTasksPerInstance() {
+  default int getNumConcurrentTasksPerInstance(String minionTag) {
     return JobConfig.DEFAULT_NUM_CONCURRENT_TASKS_PER_INSTANCE;
+  }
+
+  /**
+   * Returns the max number of subtasks allowed per task.
+   * This overrides individual task level configs like MinionConstants.TABLE_MAX_NUM_TASKS_KEY
+   * Number of subtasks directly impacts the performance of the helix leader and thus the controller
+   * So limiting the number of subtasks helps to avoid performance issues
+   *
+   * Usage
+   * 1. This method is used by the scheduling framework to limit the number of subtasks across task types
+   * 2. This method can also be used by individual task generators to consider the limit while generating subtasks
+   */
+  default int getMaxAllowedSubTasksPerTask() {
+    return MinionConstants.DEFAULT_MINION_MAX_NUM_OF_SUBTASKS_LIMIT;
   }
 
   /**
    * Returns the maximum number of attempts per task, 1 by default.
    */
-  default int getMaxAttemptsPerTask() {
+  default int getMaxAttemptsPerTask(String minionTag) {
     return MinionConstants.DEFAULT_MAX_ATTEMPTS_PER_TASK;
   }
 

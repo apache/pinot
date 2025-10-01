@@ -31,6 +31,7 @@ import {
   TableSchema,
   SQLResult,
   ClusterName,
+  PackageVersions,
   ZKGetList,
   ZKConfig,
   OperationResponse,
@@ -244,6 +245,9 @@ export const getTimeSeriesLanguages = (): Promise<AxiosResponse<string[]>> =>
 export const getClusterInfo = (): Promise<AxiosResponse<ClusterName>> =>
   baseApi.get('/cluster/info');
 
+export const getVersions = (): Promise<AxiosResponse<PackageVersions>> =>
+  baseApi.get('/version');
+
 export const zookeeperGetList = (params: string): Promise<AxiosResponse<ZKGetList>> =>
   baseApi.get(`/zk/ls?path=${params}`);
 
@@ -256,8 +260,8 @@ export const zookeeperGetStat = (params: string): Promise<AxiosResponse<ZKConfig
 export const zookeeperGetListWithStat = (params: string): Promise<AxiosResponse<ZKConfig>> =>
   baseApi.get(`/zk/lsl?path=${params}`);
 
-export const zookeeperPutData = (params: string): Promise<AxiosResponse<OperationResponse>> =>
-  baseApi.put(`/zk/put?${params}`, null, { headers });
+export const zookeeperPutData = (params: string, data?: any): Promise<AxiosResponse<OperationResponse>> =>
+  baseApi.put(`/zk/put?${params}`, data, { headers });
 
 export const zookeeperDeleteNode = (params: string): Promise<AxiosResponse<OperationResponse>> =>
   baseApi.delete(`/zk/delete?path=${params}`);

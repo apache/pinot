@@ -99,8 +99,7 @@ import org.apache.pinot.core.transport.ServerInstance;
 import org.apache.pinot.core.util.GapfillUtils;
 import org.apache.pinot.query.parser.utils.ParserUtils;
 import org.apache.pinot.segment.local.function.GroovyFunctionEvaluator;
-import org.apache.pinot.spi.accounting.ThreadExecutionContext;
-import org.apache.pinot.spi.accounting.ThreadResourceUsageAccountant;
+import org.apache.pinot.spi.accounting.ThreadAccountant;
 import org.apache.pinot.spi.auth.AuthorizationResult;
 import org.apache.pinot.spi.auth.TableRowColAccessResult;
 import org.apache.pinot.spi.auth.broker.RequesterIdentity;
@@ -115,9 +114,9 @@ import org.apache.pinot.spi.env.PinotConfiguration;
 import org.apache.pinot.spi.exception.BadQueryRequestException;
 import org.apache.pinot.spi.exception.DatabaseConflictException;
 import org.apache.pinot.spi.exception.QueryErrorCode;
+import org.apache.pinot.spi.query.QueryExecutionContext;
 import org.apache.pinot.spi.query.QueryThreadContext;
 import org.apache.pinot.spi.trace.RequestContext;
-import org.apache.pinot.spi.trace.Tracing;
 import org.apache.pinot.spi.utils.CommonConstants;
 import org.apache.pinot.spi.utils.CommonConstants.Broker;
 import org.apache.pinot.spi.utils.CommonConstants.Broker.Request.QueryOptionKey;
@@ -170,9 +169,11 @@ public abstract class BaseSingleStageBrokerRequestHandler extends BaseBrokerRequ
   protected LogicalTableRouteProvider _logicalTableRouteProvider;
 
   public BaseSingleStageBrokerRequestHandler(PinotConfiguration config, String brokerId,
-      RoutingManager routingManager, AccessControlFactory accessControlFactory,
-      QueryQuotaManager queryQuotaManager, TableCache tableCache, ThreadResourceUsageAccountant accountant) {
-    super(config, brokerId, routingManager, accessControlFactory, queryQuotaManager, tableCache, accountant);
+      BrokerRequestIdGenerator requestIdGenerator, RoutingManager routingManager,
+      AccessControlFactory accessControlFactory, QueryQuotaManager queryQuotaManager, TableCache tableCache,
+      ThreadAccountant threadAccountant) {
+    super(config, brokerId, requestIdGenerator, routingManager, accessControlFactory, queryQuotaManager, tableCache,
+        threadAccountant);
     _disableGroovy = _config.getProperty(Broker.DISABLE_GROOVY, Broker.DEFAULT_DISABLE_GROOVY);
     _useApproximateFunction = _config.getProperty(Broker.USE_APPROXIMATE_FUNCTION, false);
     _defaultHllLog2m = _config.getProperty(CommonConstants.Helix.DEFAULT_HYPERLOGLOG_LOG2M_KEY,
@@ -182,15 +183,13 @@ public abstract class BaseSingleStageBrokerRequestHandler extends BaseBrokerRequ
         _config.getProperty(CommonConstants.Helix.ENABLE_DISTINCT_COUNT_BITMAP_OVERRIDE_KEY, false);
     _queryResponseLimit =
         config.getProperty(Broker.CONFIG_OF_BROKER_QUERY_RESPONSE_LIMIT, Broker.DEFAULT_BROKER_QUERY_RESPONSE_LIMIT);
-    if (this.isQueryCancellationEnabled()) {
+    if (isQueryCancellationEnabled()) {
       _serversById = new ConcurrentHashMap<>();
     } else {
       _serversById = null;
     }
     _defaultQueryLimit = config.getProperty(Broker.CONFIG_OF_BROKER_DEFAULT_QUERY_LIMIT,
         Broker.DEFAULT_BROKER_QUERY_LIMIT);
-    boolean enableQueryCancellation =
-        Boolean.parseBoolean(config.getProperty(Broker.CONFIG_OF_BROKER_ENABLE_QUERY_CANCELLATION));
 
     _enableMultistageMigrationMetric = _config.getProperty(Broker.CONFIG_OF_BROKER_ENABLE_MULTISTAGE_MIGRATION_METRIC,
         Broker.DEFAULT_ENABLE_MULTISTAGE_MIGRATION_METRIC);
@@ -209,7 +208,7 @@ public abstract class BaseSingleStageBrokerRequestHandler extends BaseBrokerRequ
             + "default query limit {}, query log max length: {}, query log max rate: {}, query cancellation "
             + "enabled: {}", getClass().getSimpleName(), _brokerId, _brokerTimeoutMs, _queryResponseLimit,
         _defaultQueryLimit, _queryLogger.getMaxQueryLengthToLog(), _queryLogger.getLogRateLimit(),
-        enableQueryCancellation);
+        _enableQueryCancellation);
   }
 
   @Override
@@ -323,16 +322,21 @@ public abstract class BaseSingleStageBrokerRequestHandler extends BaseBrokerRequ
       throws Exception {
     _queryLogger.log(requestId, query);
 
-    //Start instrumentation context. This must not be moved further below interspersed into the code.
+    String cid = extractClientRequestId(sqlNodeAndOptions);
+    if (cid == null) {
+      cid = Long.toString(requestId);
+    }
     String workloadName = QueryOptionsUtils.getWorkloadName(sqlNodeAndOptions.getOptions());
-    _resourceUsageAccountant.setupRunner(QueryThreadContext.getCid(), CommonConstants.Accounting.ANCHOR_TASK_ID,
-        ThreadExecutionContext.TaskType.SSE, workloadName);
 
-    try {
+    // NOTE: Timeout hasn't been resolved at this point, so we don't set deadline in the execution context here.
+    //       Timeout is currently handled by processBrokerRequest().
+    // TODO: Revisit whether we should set deadline here
+    QueryExecutionContext executionContext =
+        new QueryExecutionContext(QueryExecutionContext.QueryType.SSE, requestId, cid, workloadName,
+            requestContext.getRequestArrivalTimeMillis(), Long.MAX_VALUE, Long.MAX_VALUE, _brokerId, _brokerId);
+    try (QueryThreadContext ignore = QueryThreadContext.open(executionContext, _threadAccountant)) {
       return doHandleRequest(requestId, query, sqlNodeAndOptions, request, requesterIdentity, requestContext,
           httpHeaders, accessControl);
-    } finally {
-      _resourceUsageAccountant.clear();
     }
   }
 
@@ -401,7 +405,7 @@ public abstract class BaseSingleStageBrokerRequestHandler extends BaseBrokerRequ
     _brokerMetrics.addPhaseTiming(rawTableName, BrokerQueryPhase.REQUEST_COMPILATION,
         (compilationEndTimeNs - compilationStartTimeNs) + sqlNodeAndOptions.getParseTimeNs());
     // Accounts for resource usage of the compilation phase, since compilation for some queries can be expensive.
-    Tracing.ThreadAccountantOps.sampleAndCheckInterruption(_resourceUsageAccountant);
+    QueryThreadContext.checkTerminationAndSampleUsage("Broker request compilation");
 
     // Second-stage table-level access control
     // TODO: Modify AccessControl interface to directly take PinotQuery
@@ -442,7 +446,7 @@ public abstract class BaseSingleStageBrokerRequestHandler extends BaseBrokerRequ
       _brokerMetrics.addPhaseTiming(rawTableName, BrokerQueryPhase.AUTHORIZATION,
           System.nanoTime() - compilationEndTimeNs);
       // Accounts for resource usage of the authorization phase.
-      Tracing.ThreadAccountantOps.sampleAndCheckInterruption(_resourceUsageAccountant);
+      QueryThreadContext.checkTerminationAndSampleUsage("Broker request authorization");
 
       if (!authorizationResult.hasAccess()) {
         throwAccessDeniedError(requestId, query, requestContext, tableName, authorizationResult);
@@ -693,7 +697,7 @@ public abstract class BaseSingleStageBrokerRequestHandler extends BaseBrokerRequ
         routingEndTimeNs - routingStartTimeNs);
     // Account the resource used for routing phase, since for single stage queries with multiple segments, routing
     // can be expensive.
-    Tracing.ThreadAccountantOps.sampleAndCheckInterruption(_resourceUsageAccountant);
+    QueryThreadContext.checkTerminationAndSampleUsage("Broker request routing");
 
     // Set timeout in the requests
     long timeSpentMs = TimeUnit.NANOSECONDS.toMillis(routingEndTimeNs - compilationStartTimeNs);
@@ -744,6 +748,8 @@ public abstract class BaseSingleStageBrokerRequestHandler extends BaseBrokerRequ
           serverBrokerRequest.getPinotQuery().getQueryOptions()
               .put(QueryOptionKey.SERVER_RETURN_FINAL_RESULT, "true");
         }
+        // Optionally set ignoreMissingSegments based on broker config
+        setIgnoreMissingSegmentsIfConfigured(queryOptions);
       }
     }
     if (realtimeBrokerRequest != null) {
@@ -757,6 +763,8 @@ public abstract class BaseSingleStageBrokerRequestHandler extends BaseBrokerRequ
           serverBrokerRequest.getPinotQuery().getQueryOptions()
               .put(QueryOptionKey.SERVER_RETURN_FINAL_RESULT, "true");
         }
+        // Optionally set ignoreMissingSegments based on broker config
+        setIgnoreMissingSegmentsIfConfigured(queryOptions);
       }
     }
 
@@ -1040,9 +1048,8 @@ public abstract class BaseSingleStageBrokerRequestHandler extends BaseBrokerRequ
   }
 
   @Override
-  protected void onQueryStart(long requestId, String clientRequestId, String query, Object... extras) {
+  protected void onQueryStart(long requestId, @Nullable String clientRequestId, String query, Object... extras) {
     super.onQueryStart(requestId, clientRequestId, query, extras);
-    QueryThreadContext.setQueryEngine("sse");
     if (isQueryCancellationEnabled() && extras.length > 0 && extras[0] instanceof QueryServers) {
       _serversById.put(requestId, (QueryServers) extras[0]);
     }
@@ -1913,24 +1920,6 @@ public abstract class BaseSingleStageBrokerRequestHandler extends BaseBrokerRequ
   }
 
   /**
-   * Helper function to decide whether to force the log
-   *
-   * TODO: come up with other criteria for forcing a log and come up with better numbers
-   */
-  private boolean forceLog(BrokerResponse brokerResponse, long totalTimeMs) {
-    if (brokerResponse.isNumGroupsLimitReached() || brokerResponse.isGroupsTrimmed()) {
-      return true;
-    }
-
-    if (brokerResponse.getExceptionsSize() > 0) {
-      return true;
-    }
-
-    // If response time is more than 1 sec, force the log
-    return totalTimeMs > 1000L;
-  }
-
-  /**
    * Sets the query timeout (remaining time in milliseconds) into the query options, and returns the remaining time in
    * milliseconds.
    * <p>For the overall query timeout, use query-level timeout (in the query options) if exists, or use table-level
@@ -2080,6 +2069,13 @@ public abstract class BaseSingleStageBrokerRequestHandler extends BaseBrokerRequ
 
   private String getGlobalQueryId(long requestId) {
     return _brokerId + "_" + requestId;
+  }
+
+  private void setIgnoreMissingSegmentsIfConfigured(Map<String, String> queryOptions) {
+    if (_config.getProperty(CommonConstants.Broker.CONFIG_OF_IGNORE_MISSING_SEGMENTS,
+        CommonConstants.Broker.DEFAULT_IGNORE_MISSING_SEGMENTS)) {
+      queryOptions.putIfAbsent(QueryOptionKey.IGNORE_MISSING_SEGMENTS, "true");
+    }
   }
 
   /**

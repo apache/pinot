@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.core.udf;
 
+import com.google.common.base.Preconditions;
 import com.google.common.collect.Maps;
 import java.math.BigDecimal;
 import java.util.Arrays;
@@ -28,7 +29,6 @@ import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
 import java.util.stream.Collectors;
-import org.apache.arrow.util.Preconditions;
 import org.apache.pinot.spi.data.FieldSpec;
 
 /// A builder for generating test cases for [UDFs][Udf] (User Defined Functions).
@@ -71,6 +71,10 @@ public interface UdfExampleBuilder {
       Preconditions.checkArgument(example.getInputValues().size() == _signature.getArity(),
           "Expected %s input values for signature %s, but got %s",
           _signature.getArity(), _signature, example.getInputValues().size());
+      if (_examples.stream().anyMatch(e -> e.getId().equals(example.getId()))) {
+        throw new IllegalArgumentException(
+            "Example with id '" + example.getId() + "' already exists for signature " + _signature);
+      }
       _examples.add(example);
       return this;
     }

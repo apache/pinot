@@ -22,6 +22,7 @@ import com.google.common.collect.Sets;
 import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Map;
 import java.util.Properties;
 import java.util.Set;
 import java.util.stream.Collectors;
@@ -33,6 +34,7 @@ import org.apache.pinot.controller.LeadControllerManager;
 import org.apache.pinot.controller.helix.core.PinotHelixResourceManager;
 import org.apache.pinot.core.periodictask.BasePeriodicTask;
 import org.apache.pinot.core.periodictask.PeriodicTask;
+import org.apache.pinot.spi.config.provider.PinotClusterConfigChangeListener;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -44,8 +46,9 @@ import org.slf4j.LoggerFactory;
  * @param <C> the context type
  */
 @ThreadSafe
-public abstract class ControllerPeriodicTask<C> extends BasePeriodicTask {
+public abstract class ControllerPeriodicTask<C> extends BasePeriodicTask implements PinotClusterConfigChangeListener {
   private static final Logger LOGGER = LoggerFactory.getLogger(ControllerPeriodicTask.class);
+  public static final String RUN_SEGMENT_LEVEL_VALIDATION = "runSegmentLevelValidation";
 
   protected final PinotHelixResourceManager _pinotHelixResourceManager;
   protected final LeadControllerManager _leadControllerManager;
@@ -173,5 +176,9 @@ public abstract class ControllerPeriodicTask<C> extends BasePeriodicTask {
    * @param tableNamesWithType the table names that the current controller isn't the leader for
    */
   protected void nonLeaderCleanup(List<String> tableNamesWithType) {
+  }
+
+  @Override
+  public void onChange(Set<String> changedConfigs, Map<String, String> clusterConfigs) {
   }
 }

@@ -21,12 +21,13 @@ package org.apache.pinot.query.mailbox.channel;
 import io.grpc.ManagedChannel;
 import io.grpc.ManagedChannelBuilder;
 import io.grpc.netty.shaded.io.grpc.netty.NettyChannelBuilder;
+import java.time.Duration;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.TimeUnit;
 import javax.annotation.Nullable;
 import org.apache.commons.lang3.tuple.Pair;
 import org.apache.pinot.common.config.TlsConfig;
 import org.apache.pinot.common.utils.grpc.ServerGrpcQueryClient;
-import org.apache.pinot.spi.utils.CommonConstants;
 
 
 /**
@@ -36,32 +37,54 @@ import org.apache.pinot.spi.utils.CommonConstants;
  * query/job/stages.
  */
 public class ChannelManager {
+  /**
+   * Map from (hostname, port) to the ManagedChannel with all known channels
+   */
   private final ConcurrentHashMap<Pair<String, Integer>, ManagedChannel> _channelMap = new ConcurrentHashMap<>();
   private final TlsConfig _tlsConfig;
+  /**
+   * The idle timeout for the channel, which cannot be disabled in gRPC.
+   *
+   * In general we want to prevent the channel from going idle, so that we don't have to re-establish the connection
+   * (including TLS negotiation) before sending any message, which increases the latency of the first query sent after a
+   * period of inactivity. In order to achieve that, we set the idle timeout to a very large value by default.
+   */
+  private final Duration _idleTimeout;
+  private final int _maxInboundMessageSize;
 
-  public ChannelManager(@Nullable TlsConfig tlsConfig) {
+  public ChannelManager(@Nullable TlsConfig tlsConfig, int maxInboundMessageSize, Duration idleTimeout) {
     _tlsConfig = tlsConfig;
+    _maxInboundMessageSize = maxInboundMessageSize;
+    _idleTimeout = idleTimeout;
   }
 
   public ManagedChannel getChannel(String hostname, int port) {
     // TODO: Revisit parameters
     if (_tlsConfig != null) {
       return _channelMap.computeIfAbsent(Pair.of(hostname, port),
-          (k) -> NettyChannelBuilder
-              .forAddress(k.getLeft(), k.getRight())
-              .maxInboundMessageSize(
-                  CommonConstants.MultiStageQueryRunner.DEFAULT_MAX_INBOUND_QUERY_DATA_BLOCK_SIZE_BYTES)
-              .sslContext(ServerGrpcQueryClient.buildSslContext(_tlsConfig))
-              .build()
+          (k) -> {
+            NettyChannelBuilder channelBuilder = NettyChannelBuilder
+                .forAddress(k.getLeft(), k.getRight())
+                .maxInboundMessageSize(
+                    _maxInboundMessageSize)
+                .sslContext(ServerGrpcQueryClient.buildSslContext(_tlsConfig));
+            return decorate(channelBuilder).build();
+          }
       );
     } else {
       return _channelMap.computeIfAbsent(Pair.of(hostname, port),
-          (k) -> ManagedChannelBuilder
-              .forAddress(k.getLeft(), k.getRight())
-              .maxInboundMessageSize(
-                  CommonConstants.MultiStageQueryRunner.DEFAULT_MAX_INBOUND_QUERY_DATA_BLOCK_SIZE_BYTES)
-              .usePlaintext()
-              .build());
+          (k) -> {
+            ManagedChannelBuilder<?> channelBuilder = ManagedChannelBuilder
+                .forAddress(k.getLeft(), k.getRight())
+                .maxInboundMessageSize(
+                    _maxInboundMessageSize)
+                .usePlaintext();
+            return decorate(channelBuilder).build();
+          });
     }
+  }
+
+  private ManagedChannelBuilder<?> decorate(ManagedChannelBuilder<?> builder) {
+    return builder.idleTimeout(_idleTimeout.getSeconds(), TimeUnit.SECONDS);
   }
 }
