@@ -23,6 +23,7 @@ import com.jayway.jsonpath.DocumentContext;
 import com.jayway.jsonpath.JsonPath;
 import java.io.File;
 import java.util.List;
+import org.apache.pinot.core.query.utils.QueryIdUtils;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.env.PinotConfiguration;
@@ -117,14 +118,15 @@ public class QueryThreadContextIntegrationTest extends BaseClusterIntegrationTes
   public void testCidOnServer(boolean useMse)
       throws Exception {
     setUseMultiStageQueryEngine(useMse);
-    String clientRequestId = "testCid";
-    JsonNode jsonNode = postQuery("SET clientQueryId='" + clientRequestId + "'; "
+    String cid = "testCid";
+    JsonNode jsonNode = postQuery("SET clientQueryId='" + cid + "'; "
         + "SELECT cid(Dest), count(*) "
         + "FROM mytable "
         + "GROUP BY 1");
     DocumentContext parsed = JsonPath.parse(jsonNode.toString());
     Assert.assertEquals(parsed.read("$.numRowsResultSet", Integer.class), 1, "Unexpected number of rows");
-    Assert.assertEquals(parsed.read("$.resultTable.rows[0][0]", String.class), clientRequestId, "Unexpected cid");
+    Assert.assertEquals(parsed.read("$.resultTable.rows[0][0]", String.class),
+        useMse ? cid : QueryIdUtils.withOfflineSuffix(cid), "Unexpected cid");
     Assert.assertEquals(parsed.read("$.resultTable.rows[0][1]", Integer.class), 115545, "Unexpected count");
   }
 
@@ -132,14 +134,14 @@ public class QueryThreadContextIntegrationTest extends BaseClusterIntegrationTes
   public void testCidOnBroker(boolean useMse)
       throws Exception {
     setUseMultiStageQueryEngine(useMse);
-    String clientRequestId = "testCid";
-    JsonNode jsonNode = postQuery("SET clientQueryId='" + clientRequestId + "'; "
+    String cid = "testCid";
+    JsonNode jsonNode = postQuery("SET clientQueryId='" + cid + "'; "
         + "SELECT cid('cte'), count(*) "
         + "FROM mytable "
         + "GROUP BY 1");
     DocumentContext parsed = JsonPath.parse(jsonNode.toString());
     Assert.assertEquals(parsed.read("$.numRowsResultSet", Integer.class), 1, "Unexpected number of rows");
-    Assert.assertEquals(parsed.read("$.resultTable.rows[0][0]", String.class), clientRequestId, "Unexpected cid");
+    Assert.assertEquals(parsed.read("$.resultTable.rows[0][0]", String.class), cid, "Unexpected cid");
     Assert.assertEquals(parsed.read("$.resultTable.rows[0][1]", Integer.class), 115545, "Unexpected count");
   }
 
@@ -148,14 +150,15 @@ public class QueryThreadContextIntegrationTest extends BaseClusterIntegrationTes
       throws Exception {
     setUseMultiStageQueryEngine(useMse);
     String varcharType = useMse ? "VARCHAR" : "String";
-    String clientRequestId = "testCid";
-    JsonNode jsonNode = postQuery("SET clientQueryId='" + clientRequestId + "'; "
+    String cid = "testCid";
+    JsonNode jsonNode = postQuery("SET clientQueryId='" + cid + "'; "
         + "SELECT cid(Dest), cid(CAST (SUM(ArrTime) AS " + varcharType + ")) "
         + "FROM mytable "
         + "GROUP BY 1");
     DocumentContext parsed = JsonPath.parse(jsonNode.toString());
-    Assert.assertEquals(parsed.read("$.resultTable.rows[0][0]", String.class), clientRequestId, "Unexpected cid");
-    Assert.assertEquals(parsed.read("$.resultTable.rows[0][1]", String.class), clientRequestId,
+    Assert.assertEquals(parsed.read("$.resultTable.rows[0][0]", String.class),
+        useMse ? cid : QueryIdUtils.withOfflineSuffix(cid), "Unexpected cid");
+    Assert.assertEquals(parsed.read("$.resultTable.rows[0][1]", String.class), cid,
         "Unexpected cid post GROUP BY");
   }
 
@@ -183,8 +186,7 @@ public class QueryThreadContextIntegrationTest extends BaseClusterIntegrationTes
         + "GROUP BY 1");
     DocumentContext parsed = JsonPath.parse(jsonNode.toString());
     Assert.assertEquals(parsed.read("$.numRowsResultSet", Integer.class), 1, "Unexpected number of rows");
-    // When stageId is simplified in broker, stageId always returns -1
-    Assert.assertEquals(parsed.read("$.resultTable.rows[0][0]", Integer.class), -1, "Unexpected stageId");
+    Assert.assertEquals(parsed.read("$.resultTable.rows[0][0]", Integer.class), useMse ? 0 : -1, "Unexpected stageId");
   }
 
   @Test(dataProvider = "useBothQueryEngines")

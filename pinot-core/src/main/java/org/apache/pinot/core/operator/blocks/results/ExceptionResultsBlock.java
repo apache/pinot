@@ -25,11 +25,17 @@ import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.core.common.datatable.DataTableBuilderFactory;
 import org.apache.pinot.core.query.request.context.QueryContext;
 import org.apache.pinot.spi.exception.QueryErrorMessage;
+import org.apache.pinot.spi.exception.QueryException;
 
 
 public class ExceptionResultsBlock extends BaseResultsBlock {
+
   public ExceptionResultsBlock(QueryErrorMessage queryErrorMessage) {
     addErrorMessage(queryErrorMessage);
+  }
+
+  public ExceptionResultsBlock(QueryException queryException) {
+    addErrorMessage(QueryErrorMessage.safeMsg(queryException.getErrorCode(), queryException.getMessage()));
   }
 
   @Override

@@ -34,7 +34,7 @@ import org.apache.pinot.core.query.request.context.QueryContext;
 import org.apache.pinot.core.query.utils.rewriter.ResultRewriteUtils;
 import org.apache.pinot.core.query.utils.rewriter.RewriterResult;
 import org.apache.pinot.core.transport.ServerRoutingInstance;
-import org.apache.pinot.spi.trace.Tracing;
+import org.apache.pinot.spi.query.QueryThreadContext;
 import org.roaringbitmap.RoaringBitmap;
 
 
@@ -85,7 +85,7 @@ public class AggregationDataTableReducer implements DataTableReducer {
     int numAggregationFunctions = _aggregationFunctions.length;
     Object[] intermediateResults = new Object[numAggregationFunctions];
     for (DataTable dataTable : dataTables) {
-      Tracing.ThreadAccountantOps.sampleAndCheckInterruption();
+      QueryThreadContext.checkTerminationAndSampleUsage("AggregationDataTableReducer");
       for (int i = 0; i < numAggregationFunctions; i++) {
         AggregationFunction aggregationFunction = _aggregationFunctions[i];
         Object intermediateResultToMerge;
@@ -145,7 +145,7 @@ public class AggregationDataTableReducer implements DataTableReducer {
     Comparable[] finalResults = new Comparable[numAggregationFunctions];
     for (DataTable dataTable : dataTables) {
       for (int i = 0; i < numAggregationFunctions; i++) {
-        Tracing.ThreadAccountantOps.sampleAndCheckInterruption();
+        QueryThreadContext.checkTerminationAndSampleUsage("AggregationDataTableReducer");
         Comparable finalResultToMerge;
         ColumnDataType columnDataType = dataSchema.getColumnDataType(i);
         if (_queryContext.isNullHandlingEnabled()) {

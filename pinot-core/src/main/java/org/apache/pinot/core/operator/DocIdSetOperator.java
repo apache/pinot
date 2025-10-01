@@ -28,7 +28,7 @@ import org.apache.pinot.core.operator.blocks.DocIdSetBlock;
 import org.apache.pinot.core.operator.filter.BaseFilterOperator;
 import org.apache.pinot.core.plan.DocIdSetPlanNode;
 import org.apache.pinot.segment.spi.Constants;
-import org.apache.pinot.spi.trace.Tracing;
+import org.apache.pinot.spi.query.QueryThreadContext;
 
 
 /**
@@ -68,7 +68,7 @@ public class DocIdSetOperator extends BaseDocIdSetOperator {
       _blockDocIdIterator = _blockDocIdSet.iterator();
     }
 
-    Tracing.ThreadAccountantOps.sample();
+    QueryThreadContext.sampleUsage();
 
     int pos = 0;
     int[] docIds = THREAD_LOCAL_DOC_IDS.get();

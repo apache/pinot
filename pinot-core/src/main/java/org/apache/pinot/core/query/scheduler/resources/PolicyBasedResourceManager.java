@@ -21,7 +21,6 @@ package org.apache.pinot.core.query.scheduler.resources;
 import com.google.common.base.Preconditions;
 import org.apache.pinot.core.query.request.ServerQueryRequest;
 import org.apache.pinot.core.query.scheduler.SchedulerGroupAccountant;
-import org.apache.pinot.spi.accounting.ThreadResourceUsageAccountant;
 import org.apache.pinot.spi.env.PinotConfiguration;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -35,8 +34,8 @@ public class PolicyBasedResourceManager extends ResourceManager {
 
   private final ResourceLimitPolicy _resourcePolicy;
 
-  public PolicyBasedResourceManager(PinotConfiguration config, ThreadResourceUsageAccountant resourceUsageAccountant) {
-    super(config, resourceUsageAccountant);
+  public PolicyBasedResourceManager(PinotConfiguration config) {
+    super(config);
     _resourcePolicy = new ResourceLimitPolicy(config, _numQueryWorkerThreads);
   }
 

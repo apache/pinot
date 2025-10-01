@@ -48,6 +48,9 @@ import org.apache.pinot.query.runtime.plan.OpChainExecutionContext;
 @SuppressWarnings("unchecked")
 public class HashJoinOperator extends BaseJoinOperator {
   private static final String EXPLAIN_NAME = "HASH_JOIN";
+  private static final String ADD_ROWS_TO_RIGHT_TABLE_SCOPE = "HashJoinOperator#addRowsToRightTable";
+  private static final String BUILD_JOINED_ROWS_SCOPE = "HashJoinOperator#buildJoinedRows";
+  private static final String BUILD_NON_MATCH_RIGHT_ROWS_SCOPE = "HashJoinOperator#buildNonMatchRightRows";
 
   // Placeholder for BitSet in _matchedRightRows when all keys are unique in the right table.
   protected static final BitSet BIT_SET_PLACEHOLDER = new BitSet(0);
@@ -126,7 +129,7 @@ public class HashJoinOperator extends BaseJoinOperator {
         }
         continue;
       }
-      sampleAndCheckInterruptionPeriodically(_rightTable.size());
+      checkTerminationAndSampleUsagePeriodically(_rightTable.size(), ADD_ROWS_TO_RIGHT_TABLE_SCOPE);
       _rightTable.addRow(key, row);
     }
   }
@@ -214,7 +217,7 @@ public class HashJoinOperator extends BaseJoinOperator {
             break;
           }
           // defer copying of the content until row matches
-          sampleAndCheckInterruptionPeriodically(rows.size());
+          checkTerminationAndSampleUsagePeriodically(rows.size(), BUILD_JOINED_ROWS_SCOPE);
           rows.add(resultRowView.toArray());
           if (_matchedRightRows != null) {
             _matchedRightRows.put(key, BIT_SET_PLACEHOLDER);
@@ -234,7 +237,6 @@ public class HashJoinOperator extends BaseJoinOperator {
     List<Object[]> rows = new ArrayList<>(leftRows.size());
 
     for (Object[] leftRow : leftRows) {
-      sampleAndCheckInterruptionPeriodically(rows.size());
       Object key = _leftKeySelector.getKey(leftRow);
       // Skip rows with null join keys - they should not participate in equi-joins per SQL standard
       if (handleNullKey(key, leftRow, rows)) {
@@ -254,7 +256,7 @@ public class HashJoinOperator extends BaseJoinOperator {
               maxRowsLimitReached = true;
               break;
             }
-            sampleAndCheckInterruptionPeriodically(rows.size());
+            checkTerminationAndSampleUsagePeriodically(rows.size(), BUILD_JOINED_ROWS_SCOPE);
             rows.add(resultRowView.toArray());
             hasMatchForLeftRow = true;
             if (_matchedRightRows != null) {
@@ -279,7 +281,7 @@ public class HashJoinOperator extends BaseJoinOperator {
       if (isMaxRowsLimitReached(rows.size())) {
         return;
       }
-      sampleAndCheckInterruptionPeriodically(rows.size());
+      checkTerminationAndSampleUsagePeriodically(rows.size(), BUILD_JOINED_ROWS_SCOPE);
       rows.add(joinRow(leftRow, null));
     }
   }
@@ -292,7 +294,7 @@ public class HashJoinOperator extends BaseJoinOperator {
     for (Object[] leftRow : leftRows) {
       Object key = _leftKeySelector.getKey(leftRow);
       if (_rightTable.containsKey(key)) {
-        sampleAndCheckInterruptionPeriodically(rows.size());
+        checkTerminationAndSampleUsagePeriodically(rows.size(), BUILD_JOINED_ROWS_SCOPE);
         rows.add(leftRow);
       }
     }
@@ -308,7 +310,7 @@ public class HashJoinOperator extends BaseJoinOperator {
     for (Object[] leftRow : leftRows) {
       Object key = _leftKeySelector.getKey(leftRow);
       if (!_rightTable.containsKey(key)) {
-        sampleAndCheckInterruptionPeriodically(rows.size());
+        checkTerminationAndSampleUsagePeriodically(rows.size(), BUILD_JOINED_ROWS_SCOPE);
         rows.add(leftRow);
       }
     }
@@ -325,7 +327,7 @@ public class HashJoinOperator extends BaseJoinOperator {
       for (Map.Entry<Object, Object> entry : _rightTable.entrySet()) {
         Object[] rightRow = (Object[]) entry.getValue();
         if (!_matchedRightRows.containsKey(entry.getKey())) {
-          sampleAndCheckInterruptionPeriodically(rows.size());
+          checkTerminationAndSampleUsagePeriodically(rows.size(), BUILD_NON_MATCH_RIGHT_ROWS_SCOPE);
           rows.add(joinRow(null, rightRow));
         }
       }
@@ -335,14 +337,14 @@ public class HashJoinOperator extends BaseJoinOperator {
         BitSet matchedIndices = _matchedRightRows.get(entry.getKey());
         if (matchedIndices == null) {
           for (Object[] rightRow : rightRows) {
-            sampleAndCheckInterruptionPeriodically(rows.size());
+            checkTerminationAndSampleUsagePeriodically(rows.size(), BUILD_NON_MATCH_RIGHT_ROWS_SCOPE);
             rows.add(joinRow(null, rightRow));
           }
         } else {
           int numRightRows = rightRows.size();
           int unmatchedIndex = 0;
           while ((unmatchedIndex = matchedIndices.nextClearBit(unmatchedIndex)) < numRightRows) {
-            sampleAndCheckInterruptionPeriodically(rows.size());
+            checkTerminationAndSampleUsagePeriodically(rows.size(), BUILD_NON_MATCH_RIGHT_ROWS_SCOPE);
             rows.add(joinRow(null, rightRows.get(unmatchedIndex++)));
           }
         }
@@ -351,7 +353,7 @@ public class HashJoinOperator extends BaseJoinOperator {
     // Add unmatched null key rows from right side for RIGHT and FULL JOIN
     if (_nullKeyRightRows != null) {
       for (Object[] nullKeyRow : _nullKeyRightRows) {
-        sampleAndCheckInterruptionPeriodically(rows.size());
+        checkTerminationAndSampleUsagePeriodically(rows.size(), BUILD_NON_MATCH_RIGHT_ROWS_SCOPE);
         rows.add(joinRow(null, nullKeyRow));
       }
     }

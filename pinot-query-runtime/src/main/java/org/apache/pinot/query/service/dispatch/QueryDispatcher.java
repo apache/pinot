@@ -62,7 +62,6 @@ import org.apache.pinot.common.utils.DataSchema.ColumnDataType;
 import org.apache.pinot.core.transport.ServerInstance;
 import org.apache.pinot.core.util.DataBlockExtractUtils;
 import org.apache.pinot.core.util.trace.TracedThreadFactory;
-import org.apache.pinot.query.MseWorkerThreadContext;
 import org.apache.pinot.query.mailbox.MailboxService;
 import org.apache.pinot.query.planner.PlanFragment;
 import org.apache.pinot.query.planner.physical.DispatchablePlanFragment;
@@ -86,12 +85,11 @@ import org.apache.pinot.query.runtime.timeseries.PhysicalTimeSeriesBrokerPlanVis
 import org.apache.pinot.query.runtime.timeseries.TimeSeriesExecutionContext;
 import org.apache.pinot.query.service.dispatch.timeseries.TimeSeriesDispatchClient;
 import org.apache.pinot.query.service.dispatch.timeseries.TimeSeriesDispatchObserver;
-import org.apache.pinot.spi.accounting.ThreadExecutionContext;
 import org.apache.pinot.spi.exception.QueryErrorCode;
 import org.apache.pinot.spi.exception.QueryException;
+import org.apache.pinot.spi.query.QueryExecutionContext;
 import org.apache.pinot.spi.query.QueryThreadContext;
 import org.apache.pinot.spi.trace.RequestContext;
-import org.apache.pinot.spi.trace.Tracing;
 import org.apache.pinot.spi.utils.CommonConstants.Broker.Request.QueryOptionKey;
 import org.apache.pinot.spi.utils.CommonConstants.MultiStageQueryRunner.PlanVersions;
 import org.apache.pinot.spi.utils.CommonConstants.Query.Request.MetadataKeys;
@@ -315,7 +313,7 @@ public class QueryDispatcher {
     }
 
     Map<String, String> requestMetadata =
-        prepareRequestMetadata(requestId, QueryThreadContext.getCid(), queryOptions, deadline);
+        prepareRequestMetadata(QueryThreadContext.get().getExecutionContext(), queryOptions, deadline);
     ByteString protoRequestMetadata = QueryPlanSerDeUtils.toProtoProperties(requestMetadata);
 
     // Submit the query plan to all servers in parallel
@@ -435,15 +433,14 @@ public class QueryDispatcher {
     return requestBuilder.build();
   }
 
-  private static Map<String, String> prepareRequestMetadata(long requestId, String cid,
+  private static Map<String, String> prepareRequestMetadata(QueryExecutionContext executionContext,
       Map<String, String> queryOptions, Deadline deadline) {
-    Map<String, String> requestMetadata = new HashMap<>();
-    requestMetadata.put(MetadataKeys.REQUEST_ID, Long.toString(requestId));
-    requestMetadata.put(MetadataKeys.CORRELATION_ID, cid);
+    Map<String, String> requestMetadata = new HashMap<>(queryOptions);
+    requestMetadata.put(MetadataKeys.REQUEST_ID, Long.toString(executionContext.getRequestId()));
+    requestMetadata.put(MetadataKeys.CORRELATION_ID, executionContext.getCid());
     requestMetadata.put(QueryOptionKey.TIMEOUT_MS, Long.toString(deadline.timeRemaining(TimeUnit.MILLISECONDS)));
     requestMetadata.put(QueryOptionKey.EXTRA_PASSIVE_TIMEOUT_MS,
-        Long.toString(QueryThreadContext.getPassiveDeadlineMs() - QueryThreadContext.getActiveDeadlineMs()));
-    requestMetadata.putAll(queryOptions);
+        Long.toString(executionContext.getPassiveDeadlineMs() - executionContext.getActiveDeadlineMs()));
     return requestMetadata;
   }
 
@@ -566,23 +563,10 @@ public class QueryDispatcher {
   }
 
   /// Concatenates the results of the sub-plan and returns a [QueryResult] with the concatenated result.
-  ///
-  /// This method assumes the caller thread is a query thread and therefore [QueryThreadContext] has been initialized.
-  private static QueryResult runReducer(DispatchableSubPlan subPlan, Map<String, String> queryOptions,
-      MailboxService mailboxService) {
-    return runReducer(QueryThreadContext.getRequestId(), subPlan, QueryThreadContext.getActiveDeadlineMs(),
-        QueryThreadContext.getPassiveDeadlineMs(), queryOptions, mailboxService);
-  }
-
-  /// Concatenates the results of the sub-plan and returns a [QueryResult] with the concatenated result.
-  ///
-  /// This method should be called from a query thread and therefore using
-  /// [#runReducer(DispatchableSubPlan, Map, MailboxService)] is preferred.
-  ///
-  /// Remember that in MSE there is no actual reduce but rather a single stage that concatenates the results.
+  /// [QueryThreadContext] must already be set up before calling this method.
   @VisibleForTesting
-  public static QueryResult runReducer(long requestId, DispatchableSubPlan subPlan, long activeDeadlineMs,
-      long passiveDeadlineMs, Map<String, String> queryOptions, MailboxService mailboxService) {
+  public static QueryResult runReducer(DispatchableSubPlan subPlan, Map<String, String> queryOptions,
+      MailboxService mailboxService) {
     long startTimeMs = System.currentTimeMillis();
     // NOTE: Reduce stage is always stage 0
     DispatchablePlanFragment stagePlan = subPlan.getQueryStageMap().get(0);
@@ -593,10 +577,9 @@ public class QueryDispatcher {
         workerMetadata.size());
 
     StageMetadata stageMetadata = new StageMetadata(0, workerMetadata, stagePlan.getCustomProperties());
-    ThreadExecutionContext parentContext = Tracing.getThreadAccountant().getThreadExecutionContext();
-    OpChainExecutionContext executionContext =
-        new OpChainExecutionContext(mailboxService, requestId, activeDeadlineMs, passiveDeadlineMs, queryOptions,
-            stageMetadata, workerMetadata.get(0), null, parentContext, true);
+    OpChainExecutionContext opChainExecutionContext =
+        OpChainExecutionContext.fromQueryContext(mailboxService, queryOptions, stageMetadata, workerMetadata.get(0),
+            null, true);
 
     PairList<Integer, String> resultFields = subPlan.getQueryResultFields();
     DataSchema sourceSchema = rootNode.getDataSchema();
@@ -613,11 +596,8 @@ public class QueryDispatcher {
     ArrayList<Object[]> resultRows = new ArrayList<>();
     MseBlock block;
     MultiStageQueryStats queryStats;
-    try (QueryThreadContext.CloseableContext mseCloseableCtx = MseWorkerThreadContext.open();
-        OpChain opChain = PlanNodeToOpChain.convert(rootNode, executionContext, (a, b) -> {
-        })) {
-      MseWorkerThreadContext.setStageId(0);
-      MseWorkerThreadContext.setWorkerId(0);
+    try (OpChain opChain = PlanNodeToOpChain.convert(rootNode, opChainExecutionContext, (a, b) -> {
+    })) {
       MultiStageOperator rootOperator = opChain.getRoot();
       block = rootOperator.nextBlock();
       while (block.isData()) {

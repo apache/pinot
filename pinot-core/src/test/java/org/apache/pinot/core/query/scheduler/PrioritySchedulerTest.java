@@ -49,10 +49,11 @@ import org.apache.pinot.core.query.request.ServerQueryRequest;
 import org.apache.pinot.core.query.scheduler.resources.PolicyBasedResourceManager;
 import org.apache.pinot.core.query.scheduler.resources.ResourceLimitPolicy;
 import org.apache.pinot.core.query.scheduler.resources.ResourceManager;
+import org.apache.pinot.spi.accounting.ThreadAccountant;
+import org.apache.pinot.spi.accounting.ThreadAccountantUtils;
 import org.apache.pinot.spi.env.PinotConfiguration;
 import org.apache.pinot.spi.exception.QueryErrorCode;
 import org.apache.pinot.spi.metrics.PinotMetricUtils;
-import org.apache.pinot.spi.trace.Tracing;
 import org.testng.annotations.AfterMethod;
 import org.testng.annotations.Test;
 
@@ -65,6 +66,10 @@ import static org.testng.Assert.assertTrue;
 
 public class PrioritySchedulerTest {
   private static final ServerMetrics METRICS = new ServerMetrics(PinotMetricUtils.getPinotMetricsRegistry());
+
+  static {
+    ServerMetrics.register(METRICS);
+  }
 
   private static boolean _useBarrier = false;
   private static CyclicBarrier _startupBarrier;
@@ -235,20 +240,21 @@ public class PrioritySchedulerTest {
     static LongAccumulator _latestQueryTime;
 
     // store locally for easy access
-    public TestPriorityScheduler(PinotConfiguration config, ResourceManager resourceManager,
-        QueryExecutor queryExecutor, SchedulerPriorityQueue queue, ServerMetrics metrics,
-        LongAccumulator latestQueryTime) {
-      super(config, resourceManager, queryExecutor, queue, metrics, latestQueryTime);
+    public TestPriorityScheduler(PinotConfiguration config, QueryExecutor queryExecutor,
+        ThreadAccountant threadAccountant, LongAccumulator latestQueryTime, ResourceManager resourceManager,
+        SchedulerPriorityQueue queue) {
+      super(config, "serverId", queryExecutor, threadAccountant, latestQueryTime, resourceManager, queue);
     }
 
     public static TestPriorityScheduler create(PinotConfiguration config) {
-      ResourceManager rm = new PolicyBasedResourceManager(config, new Tracing.DefaultThreadResourceUsageAccountant());
+      ResourceManager rm = new PolicyBasedResourceManager(config);
       QueryExecutor qe = new TestQueryExecutor();
+      _latestQueryTime = new LongAccumulator(Long::max, 0);
       _groupFactory = new TestSchedulerGroupFactory();
       MultiLevelPriorityQueue queue =
           new MultiLevelPriorityQueue(config, rm, _groupFactory, new TableBasedGroupMapper());
-      _latestQueryTime = new LongAccumulator(Long::max, 0);
-      return new TestPriorityScheduler(config, rm, qe, queue, METRICS, _latestQueryTime);
+      return new TestPriorityScheduler(config, qe, ThreadAccountantUtils.getNoOpAccountant(), _latestQueryTime, rm,
+          queue);
     }
 
     public static TestPriorityScheduler create() {
