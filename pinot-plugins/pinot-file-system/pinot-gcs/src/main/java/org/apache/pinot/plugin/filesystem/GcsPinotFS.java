@@ -80,7 +80,7 @@ public class GcsPinotFS extends BasePinotFS {
     Credentials credentials = null;
     try {
       StorageOptions.Builder storageBuilder = StorageOptions.newBuilder()
-          .setHeaderProvider(FixedHeaderProvider.create(ImmutableMap.of("User-agent", userAgent)));
+          .setHeaderProvider(FixedHeaderProvider.create(Map.of("User-agent", userAgent)));
       if (!Strings.isNullOrEmpty(config.getProperty(PROJECT_ID))) {
         LOGGER.info("Configs are: {}, {}", PROJECT_ID, config.getProperty(PROJECT_ID));
         String projectId = config.getProperty(PROJECT_ID);
