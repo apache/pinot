@@ -721,8 +721,11 @@ public class JsonFunctionsTest {
     assertEquals(JsonFunctions.jsonExtractScalar(json, "$.bool-key", "BOOLEAN", false), true);
     assertEquals(JsonFunctions.jsonExtractScalar(json, "$.nonexistent", "STRING", "missing"), "missing");
 
-    assertThrows(() -> JsonFunctions.jsonExtractScalar(json, "$.nonexistent", "STRING", null));
+    assertEquals(JsonFunctions.jsonExtractScalar(json, "$.nonexistent", "STRING", null), "");
+    assertThrows(() -> JsonFunctions.jsonExtractScalar(json, "$.nonexistent", "STRING"));
     assertThrows(() -> JsonFunctions.jsonExtractScalar(json, "$.nonexistent", "INT"));
+    assertThrows(() -> JsonFunctions.jsonExtractScalar(json, "$.nonexistent", "INT", ""));
+    assertEquals(JsonFunctions.jsonExtractScalar(json, "$.nonexistent", "INT", 0), 0);
 
     String nestedJson = String.format(
             "{\"intVal\":%s, \"longVal\":%s, \"floatVal\":%s, \"doubleVal\":%s, \"bigDecimalVal\":%s, "

@@ -348,11 +348,19 @@ public class JsonFunctions {
 
   @ScalarFunction
   public static Object jsonExtractScalar(Object jsonInput, String jsonPath, String dataType) {
-    return jsonExtractScalar(jsonInput, jsonPath, dataType, null);
+    return doJsonExtractScalar(jsonInput, jsonPath, dataType, null);
   }
 
   @ScalarFunction
   public static Object jsonExtractScalar(Object jsonInput, String jsonPath, String dataType, Object defaultValue) {
+    /*
+     * If a default value is explicitly provided as null, it is converted to an empty string literal ("").
+     * This behavior exactly matches the semantics of JsonExtractTransformationFunction.
+     */
+    return doJsonExtractScalar(jsonInput, jsonPath, dataType, defaultValue == null ? "" : defaultValue);
+  }
+
+  private static Object doJsonExtractScalar(Object jsonInput, String jsonPath, String dataType, Object defaultValue) {
     switch (dataType.toUpperCase()) {
       case "STRING":
         return jsonPathStringOrThrowIfNoDefault(jsonInput, jsonPath, defaultValue);
@@ -396,7 +404,7 @@ public class JsonFunctions {
                 "Cannot resolve JSON path on some records. Consider setting a default value.");
       }
     }
-    return objToString(res, objToString(defaultValue, null));
+    return objToString(res, (String) defaultValue);
   }
 
   private static long jsonPathLongOrThrowIfNoDefault(@Nullable Object object, String jsonPath, Object defaultValue) {
@@ -412,7 +420,7 @@ public class JsonFunctions {
                 "Cannot resolve JSON path on some records. Consider setting a default value.");
       }
     }
-    return objToLong(res, objToLong(defaultValue, 0L));
+    return objToLong(res, defaultValue);
   }
 
   private static int jsonPathIntOrThrowIfNoDefault(@Nullable Object object, String jsonPath, Object defaultValue) {
@@ -428,7 +436,7 @@ public class JsonFunctions {
                 "Cannot resolve JSON path on some records. Consider setting a default value.");
       }
     }
-    return objToInt(res, objToInt(defaultValue, 0));
+    return objToInt(res, defaultValue);
   }
 
   private static double jsonPathDoubleOrThrowIfNoDefault(@Nullable Object object, String jsonPath,
@@ -445,7 +453,7 @@ public class JsonFunctions {
                 "Cannot resolve JSON path on some records. Consider setting a default value.");
       }
     }
-    return objToDouble(res, objToDouble(defaultValue, Double.NaN));
+    return objToDouble(res, defaultValue);
   }
 
   private static boolean jsonPathBooleanOrThrowIfNoDefault(@Nullable Object object, String jsonPath,
@@ -462,7 +470,7 @@ public class JsonFunctions {
                 "Cannot resolve JSON path on some records. Consider setting a default value.");
       }
     }
-    return objToBoolean(res, objToBoolean(defaultValue, Boolean.FALSE));
+    return objToBoolean(res, defaultValue);
   }
 
   private static String[] jsonPathStringArray(Object jsonInput, String jsonPath, Object defaultValue) {
@@ -512,7 +520,7 @@ public class JsonFunctions {
                           + "Consider setting a default value as the fourth argument of json_extract_scalar.");
         }
       }
-      result[i] = objToInt(o, objToInt(defaultValue, 0));
+      result[i] = objToInt(o, defaultValue);
     }
     return result;
   }
@@ -538,7 +546,7 @@ public class JsonFunctions {
                           + "Consider setting a default value as the fourth argument of json_extract_scalar.");
         }
       }
-      result[i] = objToDouble(o, objToDouble(defaultValue, Double.NaN));
+      result[i] = objToDouble(o, defaultValue);
     }
     return result;
   }
@@ -564,7 +572,7 @@ public class JsonFunctions {
                           + "Consider setting a default value as the fourth argument of json_extract_scalar.");
         }
       }
-      result[i] = objToLong(o, objToLong(defaultValue, 0L));
+      result[i] = objToLong(o, defaultValue);
     }
     return result;
   }
@@ -584,8 +592,8 @@ public class JsonFunctions {
     return res;
   }
 
-  private static int objToInt(Object obj, int defaultValue) {
-    int res = defaultValue;
+  private static Integer objToInt(Object obj, Object defaultValue) {
+    Integer res = null;
     if (obj != null) {
       if (obj instanceof Number) {
         res = ((Number) obj).intValue();
@@ -596,11 +604,14 @@ public class JsonFunctions {
         }
       }
     }
+    if (res == null) {
+      return Integer.parseInt(defaultValue.toString());
+    }
     return res;
   }
 
-  private static double objToDouble(Object obj, double defaultValue) {
-    double res = defaultValue;
+  private static Double objToDouble(Object obj, Object defaultValue) {
+    Double res = null;
     if (obj != null) {
       if (obj instanceof Number) {
         res = ((Number) obj).doubleValue();
@@ -611,11 +622,14 @@ public class JsonFunctions {
         }
       }
     }
+    if (res == null) {
+      return Double.parseDouble(defaultValue.toString());
+    }
     return res;
   }
 
-  private static long objToLong(Object obj, long defaultValue) {
-    long res = defaultValue;
+  private static Long objToLong(Object obj, Object defaultValue) {
+    Long res = null;
     if (obj != null) {
       if (obj instanceof Number) {
         res = ((Number) obj).longValue();
@@ -626,11 +640,14 @@ public class JsonFunctions {
         }
       }
     }
+    if (res == null) {
+      return Long.parseLong(defaultValue.toString());
+    }
     return res;
   }
 
-  private static boolean objToBoolean(Object obj, boolean defaultValue) {
-    boolean res = defaultValue;
+  private static Boolean objToBoolean(Object obj, Object defaultValue) {
+    Boolean res = null;
     if (obj != null) {
       if (obj instanceof Boolean) {
         return (Boolean) obj;
@@ -640,6 +657,9 @@ public class JsonFunctions {
         } catch (Exception ignored) {
         }
       }
+    }
+    if (res == null) {
+      return Boolean.parseBoolean(defaultValue.toString());
     }
     return res;
   }
