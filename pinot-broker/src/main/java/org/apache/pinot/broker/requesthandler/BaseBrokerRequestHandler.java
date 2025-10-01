@@ -66,7 +66,6 @@ import org.apache.pinot.spi.query.QueryThreadContext;
 import org.apache.pinot.spi.trace.RequestContext;
 import org.apache.pinot.spi.utils.CommonConstants;
 import org.apache.pinot.spi.utils.CommonConstants.Broker;
-import org.apache.pinot.spi.utils.CommonConstants.Broker.Request.QueryOptionKey;
 import org.apache.pinot.spi.utils.builder.TableNameBuilder;
 import org.apache.pinot.sql.parsers.SqlNodeAndOptions;
 import org.slf4j.Logger;
@@ -210,13 +209,6 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
       if (_enableNullHandling != null) {
         sqlNodeAndOptions.getOptions()
             .putIfAbsent(Broker.Request.QueryOptionKey.ENABLE_NULL_HANDLING, _enableNullHandling);
-      }
-
-      String regexLikeDictionaryThreshold =
-          _config.getProperty(Broker.CONFIG_OF_REGEXP_LIKE_DICTIONARY_CARDINALITY_THRESHOLD);
-      if (regexLikeDictionaryThreshold != null) {
-        sqlNodeAndOptions.getOptions().putIfAbsent(QueryOptionKey.REGEXP_DICT_CARDINALITY_THRESHOLD,
-            _config.getProperty(Broker.CONFIG_OF_REGEXP_LIKE_DICTIONARY_CARDINALITY_THRESHOLD));
       }
 
       BrokerResponse brokerResponse =
