@@ -709,6 +709,7 @@ public class CommonConstants {
         public static final String IN_PREDICATE_PRE_SORTED = "inPredicatePreSorted";
         public static final String IN_PREDICATE_LOOKUP_ALGORITHM = "inPredicateLookupAlgorithm";
 
+        
         public static final String DROP_RESULTS = "dropResults";
 
         // Maximum number of pending results blocks allowed in the streaming operator
