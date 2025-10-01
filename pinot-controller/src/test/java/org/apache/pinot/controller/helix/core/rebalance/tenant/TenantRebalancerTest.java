@@ -1587,7 +1587,7 @@ public class TenantRebalancerTest extends ControllerTest {
     }
 
     // Verify remaining tables in parallel queue
-    assertEquals(updatedContext.getParallelQueue().size(), offlineTableNames.size() - polledJobs.size());
+    assertEquals(updatedContext.getParallelQueue().size(), 0);
 
     // Cleanup
     concurrentExecutor.shutdown();
