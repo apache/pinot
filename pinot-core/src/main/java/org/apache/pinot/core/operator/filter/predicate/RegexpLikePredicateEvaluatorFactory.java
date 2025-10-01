@@ -37,8 +37,8 @@ public class RegexpLikePredicateEvaluatorFactory {
    * Create a new instance of dictionary based REGEXP_LIKE predicate evaluator.
    *
    * @param regexpLikePredicate REGEXP_LIKE predicate to evaluate
-   * @param dictionary          Dictionary for the column
-   * @param dataType            Data type for the column
+   * @param dictionary Dictionary for the column
+   * @param dataType Data type for the column
    * @return Dictionary based REGEXP_LIKE predicate evaluator
    */
   public static BaseDictionaryBasedPredicateEvaluator newDictionaryBasedEvaluator(
@@ -73,8 +73,9 @@ public class RegexpLikePredicateEvaluatorFactory {
     public ScanBasedRegexpLikePredicateEvaluator(RegexpLikePredicate regexpLikePredicate, Dictionary dictionary) {
       super(regexpLikePredicate, dictionary);
       _matcher = regexpLikePredicate.getPattern().matcher("");
-      _evaluatedIds = new BitSet();
-      _matchingIds = new BitSet();
+      int dictionarySize = dictionary.length();
+      _evaluatedIds = new BitSet(dictionarySize);
+      _matchingIds = new BitSet(dictionarySize);
     }
 
     @Override
