@@ -44,7 +44,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 
-public class ZkBasedTenantRebalanceObserver implements TenantRebalanceObserver {
+public class ZkBasedTenantRebalanceObserver {
   private static final Logger LOGGER = LoggerFactory.getLogger(ZkBasedTenantRebalanceObserver.class);
   public static final int DEFAULT_ZK_UPDATE_MAX_RETRIES = 3;
   private static final int MIN_ZK_UPDATE_RETRY_DELAY_MS = 100;
@@ -95,10 +95,6 @@ public class ZkBasedTenantRebalanceObserver implements TenantRebalanceObserver {
         DEFAULT_ZK_UPDATE_MAX_RETRIES);
   }
 
-  @Override
-  public void onTrigger(Trigger trigger, String tableName, String description) {
-  }
-
   public void onStart() {
     try {
       updateTenantRebalanceJobMetadataInZk(
@@ -109,12 +105,10 @@ public class ZkBasedTenantRebalanceObserver implements TenantRebalanceObserver {
     }
   }
 
-  @Override
   public void onSuccess(String msg) {
     onFinish(msg);
   }
 
-  @Override
   public void onError(String errorMsg) {
     onFinish(errorMsg);
   }
