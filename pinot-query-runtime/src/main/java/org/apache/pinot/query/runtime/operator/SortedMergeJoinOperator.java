@@ -1,8 +1,13 @@
 package org.apache.pinot.query.runtime.operator;
 
+import com.google.common.base.Preconditions;
 import java.util.ArrayList;
+import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
+import java.util.function.Function;
+import java.util.stream.Stream;
 import javax.annotation.Nullable;
 import org.apache.calcite.rel.core.JoinRelType;
 import org.apache.pinot.calcite.rel.hint.PinotHintOptions;
@@ -101,103 +106,69 @@ public class SortedMergeJoinOperator extends MultiStageOperator {
   }
 
   protected MseBlock computeLeftJoin() {
-    MseBlock leftBlock = _leftInput.nextBlock();
-    MseBlock rightBlock = _rightInput.nextBlock();
-    if (leftBlock.isError()) {
-      _eos = (MseBlock.Eos) leftBlock;
+    Function<MultiStageOperator, List<List<Object[]>>> fetchAllRows = (input) -> {
+      List<List<Object[]>> rows = new ArrayList<>();
+      MseBlock block = input.nextBlock();
+      while (block.isData()) {
+        rows.add((((MseBlock.Data) block).asRowHeap().getRows()));
+        block = input.nextBlock();
+      }
+      if (_eos == null && block.isEos()) {
+        _eos = (MseBlock.Eos) block;
+      }
+      return rows;
+    };
+    List<List<Object[]>> leftRows = fetchAllRows.apply(_leftInput);
+    List<List<Object[]>> rightRows = fetchAllRows.apply(_rightInput);
+    if (_eos != null && _eos.isError()) {
       return _eos;
     }
-    if (rightBlock.isError()) {
-      _eos = (MseBlock.Eos) rightBlock;
-      return _eos;
-    }
-    List<Object[]> leftRows = leftBlock.isData() ? ((MseBlock.Data) leftBlock).asRowHeap().getRows() : null;
-    List<Object[]> rightRows = rightBlock.isData() ? ((MseBlock.Data) rightBlock).asRowHeap().getRows() : null;
-    int leftIndex = 0;
-    int rightIndex = 0;
+    Stream<Object[]> leftStream = leftRows.stream().flatMap(List::stream);
+    Stream<Object[]> rightStream = rightRows.stream().flatMap(List::stream);
+    Iterator<Object[]> leftIterator = new DedupIterator(_leftKeySelector, leftStream.iterator());
+    Iterator<Object[]> rightIterator = new DedupIterator(_rightKeySelector, rightStream.iterator());
+    Object[] leftRow = null;
+    Object[] rightRow = null;
     Comparable leftKey = null;
     Comparable rightKey = null;
     List<Object[]> result = new ArrayList<>(10_000);
-    while (leftRows != null && rightRows != null) {
-      while (leftIndex < leftRows.size() && rightIndex < rightRows.size()) {
-        leftKey = leftKey == null ? (Comparable) _leftKeySelector.getKey(leftRows.get(leftIndex)) : leftKey;
-        rightKey = rightKey == null ? (Comparable) _rightKeySelector.getKey(rightRows.get(rightIndex)) : rightKey;
-        if (isNullKey(rightKey)) {
-          rightIndex++;
-          rightKey = null;
-          continue;
-        } else if (isNullKey(leftKey)) {
-          leftIndex++;
-          leftKey = null;
-          continue;
-        }
-        int c = leftKey.compareTo(rightKey);
-        if (c == 0) {
-          Object[] newRow = new Object[_resultColumnSize];
-          System.arraycopy(leftRows.get(leftIndex), 0, newRow, 0, _leftColumnSize);
-          System.arraycopy(rightRows.get(rightIndex), 0, newRow, _leftColumnSize,
-              _resultColumnSize - _leftColumnSize);
-          result.add(newRow);
-          leftIndex++;
-          rightIndex++;
-          // Breeze past duplicates on left.
-          Comparable newLeftKey = null;
-          while (leftIndex < leftRows.size()
-              && (newLeftKey = (Comparable) _leftKeySelector.getKey(leftRows.get(leftIndex))) != null) {
-            if (!newLeftKey.equals(leftKey)) {
-              break;
-            }
-            leftIndex++;
-          }
-          leftKey = newLeftKey;
-          // Breeze past duplicates on right.
-          Comparable newRightKey = null;
-          while (rightIndex < rightRows.size()
-              && (newRightKey = (Comparable) _rightKeySelector.getKey(rightRows.get(rightIndex))) != null) {
-            if (!newRightKey.equals(rightKey)) {
-              break;
-            }
-            rightIndex++;
-          }
-          rightKey = newRightKey;
-        } else if (c > 0) {
-          rightIndex++;
-          rightKey = null;
-        } else {
-          leftIndex++;
-          leftKey = null;
-        }
-      }
-      if (leftIndex == leftRows.size()) {
-        leftBlock = _leftInput.nextBlock();
-        leftRows = leftBlock.isData() ? ((MseBlock.Data) leftBlock).asRowHeap().getRows() : null;
-      }
-      if (rightIndex == rightRows.size()) {
-        rightBlock = _rightInput.nextBlock();
-        rightRows = rightBlock.isData() ? ((MseBlock.Data) rightBlock).asRowHeap().getRows() : null;
-      }
-    }
-    if (leftBlock.isError()) {
-      _eos = (MseBlock.Eos) leftBlock;
-      return _eos;
-    } else if (rightBlock.isError()) {
-      _eos = (MseBlock.Eos) rightBlock;
-      return _eos;
-    }
-    // Drain left-input if required.
-    while (leftRows != null) {
-      while (leftIndex < leftRows.size()) {
+    while (leftRow != null || leftIterator.hasNext()) {
+      leftRow = leftRow == null ? leftIterator.next() : leftRow;
+      rightRow = rightRow == null ? (rightIterator.hasNext() ? rightIterator.next() : null) : rightRow;
+      if (rightRow == null) {
         Object[] newRow = new Object[_resultColumnSize];
-        System.arraycopy(leftRows.get(leftIndex), 0, newRow, 0, _leftColumnSize);
+        System.arraycopy(leftRow, 0, newRow, 0, _leftColumnSize);
         result.add(newRow);
-        leftIndex++;
+        leftRow = null;
+        continue;
       }
-      leftBlock = _leftInput.nextBlock();
-      leftRows = leftBlock.isData() ? ((MseBlock.Data) leftBlock).asRowHeap().getRows() : null;
-    }
-    if (leftBlock.isError()) {
-      _eos = (MseBlock.Eos) leftBlock;
-      return _eos;
+      leftKey = (Comparable) _leftKeySelector.getKey(leftRow);
+      rightKey = (Comparable) _rightKeySelector.getKey(rightRow);
+      if (isNullKey(leftKey)) {
+        leftRow = null;
+      }
+      if (isNullKey(rightKey)) {
+        rightRow = null;
+      }
+      if (leftRow == null || rightRow == null) {
+        continue;
+      }
+      int c = leftKey.compareTo(rightKey);
+      if (c == 0) {
+        Object[] newRow = new Object[_resultColumnSize];
+        System.arraycopy(leftRow, 0, newRow, 0, _leftColumnSize);
+        System.arraycopy(rightRow, 0, newRow, _leftColumnSize, _resultColumnSize - _leftColumnSize);
+        result.add(newRow);
+        leftRow = null;
+        rightRow = null;
+      } else if (c > 0) {
+        rightRow = null;
+      } else {
+        Object[] newRow = new Object[_resultColumnSize];
+        System.arraycopy(leftRow, 0, newRow, 0, _leftColumnSize);
+        result.add(newRow);
+        leftRow = null;
+      }
     }
     // reaching here means that we have completed consumption on at least one side.
     return new RowHeapDataBlock(result, _resultSchema);
@@ -266,5 +237,56 @@ public class SortedMergeJoinOperator extends MultiStageOperator {
     }
     // For single keys (non-composite), key == null is already checked above
     return false;
+  }
+
+  static class DedupIterator implements Iterator<Object[]> {
+    private final KeySelector<?> _keySelector;
+    private final Iterator<Object[]> _iterator;
+    Holder _cached = new Holder();
+
+    DedupIterator(KeySelector<?> keySelector, Iterator<Object[]> iterator) {
+      _keySelector = keySelector;
+      _iterator = iterator;
+    }
+
+    @Override
+    public boolean hasNext() {
+      return _cached._isSet || _iterator.hasNext();
+    }
+
+    @Override
+    public Object[] next() {
+      Object[] ret = null;
+      if (_cached._isSet) {
+        ret = _cached._row;
+        _cached.clear();
+      } else {
+        Preconditions.checkState(_iterator.hasNext(), "No more elements");
+        ret = _iterator.next();
+      }
+      while (_iterator.hasNext()) {
+        Object[] tmp = _iterator.next();
+        if (!Objects.equals(_keySelector.getKey(ret), _keySelector.getKey(tmp))) {
+          _cached.set(tmp);
+          break;
+        }
+      }
+      return ret;
+    }
+  }
+
+  static class Holder {
+    Object[] _row = null;
+    boolean _isSet = false;
+
+    void set(Object[] row) {
+      _row = row;
+      _isSet = true;
+    }
+
+    void clear() {
+      _row = null;
+      _isSet = false;
+    }
   }
 }

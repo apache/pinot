@@ -92,8 +92,7 @@ public class SortedMergeJoinOperatorTest {
   }
 
   @Test
-  public void shouldHandleLeftJoinWithNulls() {
-    // Test LEFT join with null keys
+  public void shouldHandleBasicLeftJoin2() {
     _leftInput = new BlockListMultiStageOperator.Builder(DEFAULT_CHILD_SCHEMA)
         .addRow(1, "Aa")
         .addRow(2, null)
@@ -113,13 +112,40 @@ public class SortedMergeJoinOperatorTest {
     SortedMergeJoinOperator operator = getOperator(resultSchema, JoinRelType.LEFT, List.of(0), List.of(0));
     List<Object[]> resultRows = ((MseBlock.Data) operator.nextBlock()).asRowHeap().getRows();
 
-    // Expected per SQL standard - null keys don't match:
-    // - (1, "Aa") matches (1, "Xx") -> (1, "Aa", 1, "Xx")
-    // - (2, null) doesn't match (2, null) -> (2, null, null, null)
-    // - (3, "CC") has no match -> (3, "CC", null, null)
-    assertEquals(resultRows.size(), 2);
+    assertEquals(resultRows.size(), 3);
     assertEquals(resultRows.get(0), new Object[]{1, "Aa", 1, "Xx"});
     assertEquals(resultRows.get(1), new Object[]{2, null, 2, null});
+    assertEquals(resultRows.get(2), new Object[]{3, "CC", null, null});
+  }
+
+  @Test
+  public void shouldHandleDedupAndNullKeys() {
+    _leftInput = new BlockListMultiStageOperator.Builder(DEFAULT_CHILD_SCHEMA)
+        .addRow(1, null)
+        .addRow(2, null)
+        .addRow(3, "aa")
+        .addRow(4, "aa")
+        .addRow(4, "cc")
+        .buildWithEos();
+
+    _rightInput = new BlockListMultiStageOperator.Builder(DEFAULT_CHILD_SCHEMA)
+        .addRow(1, null)
+        .addRow(2, "aa")
+        .addRow(3, "aa")
+        .addRow(4, "cc")
+        .buildWithEos();
+
+    DataSchema resultSchema = new DataSchema(
+        new String[]{"int_col1", "string_col1", "int_col2", "string_col2"},
+        new ColumnDataType[]{ColumnDataType.INT, ColumnDataType.STRING, ColumnDataType.INT, ColumnDataType.STRING});
+
+    SortedMergeJoinOperator operator = getOperator(resultSchema, JoinRelType.LEFT, List.of(1), List.of(1));
+    List<Object[]> resultRows = ((MseBlock.Data) operator.nextBlock()).asRowHeap().getRows();
+
+    assertEquals(resultRows.size(), 3);
+    assertEquals(resultRows.get(0), new Object[]{1, "Aa", 1, "Xx"});
+    assertEquals(resultRows.get(1), new Object[]{2, null, 2, null});
+    assertEquals(resultRows.get(2), new Object[]{3, "CC", null, null});
   }
 
   @Test
