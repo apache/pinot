@@ -232,7 +232,7 @@ public class TableRebalanceManager {
    */
   public static List<String> cancelRebalance(String tableNameWithType, PinotHelixResourceManager resourceManager,
       RebalanceResult.Status setToStatus) {
-    Preconditions.checkState(setToStatus.equals(RebalanceResult.Status.ABORTED) || setToStatus.equals(
+    Preconditions.checkArgument(setToStatus.equals(RebalanceResult.Status.ABORTED) || setToStatus.equals(
         RebalanceResult.Status.CANCELLED));
     List<String> cancelledJobIds = new ArrayList<>();
     boolean updated = resourceManager.updateJobsForTable(tableNameWithType, ControllerJobTypes.TABLE_REBALANCE,

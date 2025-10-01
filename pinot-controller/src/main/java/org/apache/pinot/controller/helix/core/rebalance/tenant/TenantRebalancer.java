@@ -156,9 +156,12 @@ public class TenantRebalancer {
         TenantRebalanceContext.forInitialRebalance(tenantRebalanceJobId, config, parallelQueue,
             sequentialQueue);
 
+    // ZK observer would likely to fail to update if the allowed retries is lower than the degree of parallelism,
+    // because all threads would poll when the tenant rebalance job starts at the same time.
+    int observerUpdaterMaxRetries = Math.max(config.getDegreeOfParallelism(), 1) * 3;
     ZkBasedTenantRebalanceObserver observer =
         new ZkBasedTenantRebalanceObserver(tenantRebalanceContext.getJobId(), config.getTenantName(),
-            tables, tenantRebalanceContext, _pinotHelixResourceManager);
+            tables, tenantRebalanceContext, _pinotHelixResourceManager, observerUpdaterMaxRetries);
     // Step 4: Spin up threads to consume the parallel queue and sequential queue.
     rebalanceWithObserver(observer, config);
 
