@@ -34,7 +34,6 @@ import com.google.cloud.storage.StorageException;
 import com.google.cloud.storage.StorageOptions;
 import com.google.common.base.Strings;
 import com.google.common.collect.ImmutableList;
-import com.google.common.collect.ImmutableMap;
 import java.io.File;
 import java.io.IOException;
 import java.io.InputStream;
@@ -48,6 +47,7 @@ import java.util.ArrayList;
 import java.util.Base64;
 import java.util.Iterator;
 import java.util.List;
+import java.util.Map;
 import java.util.function.Consumer;
 import org.apache.commons.io.FileUtils;
 import org.apache.commons.io.IOUtils;
@@ -80,7 +80,7 @@ public class GcsPinotFS extends BasePinotFS {
     Credentials credentials = null;
     try {
       StorageOptions.Builder storageBuilder = StorageOptions.newBuilder()
-          .setHeaderProvider(FixedHeaderProvider.create(Map.of("User-agent", userAgent)));
+          .setHeaderProvider(FixedHeaderProvider.create(Map.of("User-Agent", userAgent)));
       if (!Strings.isNullOrEmpty(config.getProperty(PROJECT_ID))) {
         LOGGER.info("Configs are: {}, {}", PROJECT_ID, config.getProperty(PROJECT_ID));
         String projectId = config.getProperty(PROJECT_ID);
