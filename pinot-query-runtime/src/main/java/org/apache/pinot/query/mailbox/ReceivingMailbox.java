@@ -76,13 +76,11 @@ public class ReceivingMailbox {
   private final CancellableBlockingQueue _blocks;
   private long _lastArriveTime = System.currentTimeMillis();
 
-  @Nullable
-  private volatile Reader _reader;
   private final StatMap<StatKey> _stats = new StatMap<>(StatKey.class);
 
   public ReceivingMailbox(String id, int maxPendingBlocks) {
     _id = id;
-    _blocks = new CancellableBlockingQueue(maxPendingBlocks);
+    _blocks = new CancellableBlockingQueue(id, maxPendingBlocks);
   }
 
   public ReceivingMailbox(String id) {
@@ -90,13 +88,7 @@ public class ReceivingMailbox {
   }
 
   public void registeredReader(Reader reader) {
-    if (_reader != null) {
-      throw new IllegalArgumentException("Only one reader is supported");
-    }
-    if (LOGGER.isDebugEnabled()) {
-      LOGGER.debug("==[MAILBOX]== Reader registered for mailbox: " + _id);
-    }
-    _reader = reader;
+    _blocks.registerReader(reader);
   }
 
   public String getId() {
@@ -168,7 +160,6 @@ public class ReceivingMailbox {
       switch (result) {
         case SUCCESS:
         case LAST_BLOCK:
-          notifyReader();
           _stats.merge(StatKey.OFFER_CPU_TIME_MS, System.currentTimeMillis() - start);
           if (LOGGER.isDebugEnabled()) {
             LOGGER.debug("==[MAILBOX]== Block " + block + " ready to read from mailbox: " + _id);
@@ -208,7 +199,6 @@ public class ReceivingMailbox {
    */
   @Nullable
   public MseBlockWithStats poll() {
-    Preconditions.checkState(_reader != null, "A reader must be registered");
     return _blocks.poll();
   }
 
@@ -228,19 +218,12 @@ public class ReceivingMailbox {
     _blocks.offerEos(ErrorMseBlock.fromException(null), List.of());
   }
 
+  /// Returns the number of pending **data** blocks in the mailbox.
+  ///
+  /// EOS blocks are not counted because they will be stored separately and once returned, following calls to [poll]
+  /// will always return the same EOS block.
   public int getNumPendingBlocks() {
     return _blocks.exactSize();
-  }
-
-  /// Notifies the downstream that there is data to read.
-  private void notifyReader() {
-    Reader reader = _reader;
-    if (reader != null) {
-      LOGGER.debug("Notifying reader");
-      reader.blockReadyToRead();
-    } else {
-      LOGGER.debug("No reader to notify");
-    }
   }
 
   public StatMap<StatKey> getStatMap() {
@@ -371,7 +354,10 @@ public class ReceivingMailbox {
   ///
   /// All methods of this class are thread-safe and may block, although only [#offer] should block for a long time.
   @ThreadSafe
-  private class CancellableBlockingQueue {
+  private static class CancellableBlockingQueue {
+    private final String _id;
+    @Nullable
+    private volatile Reader _reader;
     /// This is set when the queue is in [State#FULL_CLOSED] or [State#UPSTREAM_FINISHED].
     @Nullable
     @GuardedBy("_lock")
@@ -415,8 +401,20 @@ public class ReceivingMailbox {
     private final ReentrantLock _fullLock = new ReentrantLock();
     private final Condition _notFull = _fullLock.newCondition();
 
-    public CancellableBlockingQueue(int capacity) {
+    public CancellableBlockingQueue(String id, int capacity) {
+      _id = id;
       _dataBlocks = new MseBlock.Data[capacity];
+    }
+
+    /// Notifies the downstream that there is data to read.
+    private void notifyReader() {
+      Reader reader = _reader;
+      if (reader != null) {
+        LOGGER.debug("Notifying reader");
+        reader.blockReadyToRead();
+      } else {
+        LOGGER.debug("No reader to notify");
+      }
     }
 
     /// Offers a successful or erroneous EOS block into the queue, returning the status of the operation.
@@ -436,10 +434,12 @@ public class ReceivingMailbox {
             // We got the EOS block we expected. Close the queue for both read and write.
             changeState(State.FULL_CLOSED, "received EOS block");
             _eos = new MseBlockWithStats(block, stats);
+            notifyReader();
             return ReceivingMailboxStatus.LAST_BLOCK;
           case FULL_OPEN:
             changeState(State.UPSTREAM_FINISHED, "received EOS block");
             _eos = new MseBlockWithStats(block, stats);
+            notifyReader();
             if (block.isError()) {
               drainDataBlocks();
               _notFull.signal();
@@ -472,6 +472,7 @@ public class ReceivingMailbox {
               return ReceivingMailboxStatus.WAITING_EOS;
             case FULL_OPEN:
               if (offerDataToBuffer(block, timeout, timeUnit)) {
+                notifyReader();
                 return ReceivingMailboxStatus.SUCCESS;
               }
               // otherwise transitioned to FULL_CLOSED or WAITING_EOS while waiting for space in the queue
@@ -537,6 +538,7 @@ public class ReceivingMailbox {
           changeState(State.FULL_CLOSED, "timed out while waiting to offer data block");
           drainDataBlocks();
           _eos = new MseBlockWithStats(timeoutBlock, List.of());
+          notifyReader();
           throw new TimeoutException();
         }
         items[_putIndex] = block;
@@ -557,6 +559,7 @@ public class ReceivingMailbox {
     /// queue.
     @Nullable
     public MseBlockWithStats poll() {
+      Preconditions.checkState(_reader != null, "A reader must be registered");
       ReentrantLock lock = _fullLock;
       if (!lock.tryLock()) {
         return null;
@@ -656,6 +659,16 @@ public class ReceivingMailbox {
       } finally {
         lock.unlock();
       }
+    }
+
+    public void registerReader(Reader reader) {
+      if (_reader != null) {
+        throw new IllegalArgumentException("Only one reader is supported");
+      }
+      if (LOGGER.isDebugEnabled()) {
+        LOGGER.debug("==[MAILBOX]== Reader registered for mailbox: " + _id);
+      }
+      _reader = reader;
     }
   }
 }
