@@ -296,14 +296,15 @@ public class RealtimeTableDataManager extends BaseTableDataManager {
    * @param ingestionTimeMs ingestion time of the last consumed message (from {@link StreamMessageMetadata})
    * @param firstStreamIngestionTimeMs ingestion time of the last consumed message in the first stream (from
    *                                   {@link StreamMessageMetadata})
+   * @oaram isBackfillTopic true if the partition is consuming from a backfill topic
    * @param currentOffset offset of the last consumed message (from {@link StreamMessageMetadata})
    * @param latestOffset offset of the latest message in the partition (from {@link StreamMetadataProvider})
    */
   public void updateIngestionMetrics(String segmentName, int partitionId, long ingestionTimeMs,
-      long firstStreamIngestionTimeMs, @Nullable StreamPartitionMsgOffset currentOffset,
+      long firstStreamIngestionTimeMs, boolean isBackfillTopic, @Nullable StreamPartitionMsgOffset currentOffset,
       @Nullable StreamPartitionMsgOffset latestOffset) {
     _ingestionDelayTracker.updateIngestionMetrics(segmentName, partitionId, ingestionTimeMs, firstStreamIngestionTimeMs,
-        currentOffset, latestOffset);
+        currentOffset, latestOffset, isBackfillTopic ? ServerGauge.BACKFILL_REALTIME_INGESTION_DELAY_MS : null);
   }
 
   /**

@@ -87,6 +87,7 @@ public enum ServerGauge implements AbstractMetrics.Gauge {
   NETTY_POOLED_CHUNK_SIZE("bytes", true),
   // Ingestion delay metrics
   REALTIME_INGESTION_DELAY_MS("milliseconds", false),
+  BACKFILL_REALTIME_INGESTION_DELAY_MS("milliseconds", false),
   END_TO_END_REALTIME_INGESTION_DELAY_MS("milliseconds", false),
   LUCENE_INDEXING_DELAY_MS("milliseconds", false),
   LUCENE_INDEXING_DELAY_DOCS("documents", false),
