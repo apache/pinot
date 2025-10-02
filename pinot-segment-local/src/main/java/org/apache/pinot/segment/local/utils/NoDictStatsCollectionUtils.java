@@ -69,7 +69,7 @@ public final class NoDictStatsCollectionUtils {
     if (override != null) {
       return override;
     }
-    return tableConfig.getIndexingConfig().canOptimiseNoDictStatsCollection();
+    return tableConfig.getIndexingConfig().isOptimiseNoDictStatsCollection();
   }
 
   /** Exposed for tests. */

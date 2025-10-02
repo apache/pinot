@@ -25,7 +25,6 @@ import java.util.List;
 import java.util.Set;
 import java.util.concurrent.TimeUnit;
 import org.apache.commons.io.FileUtils;
-import org.apache.pinot.spi.query.QueryThreadContext;
 
 
 public class CommonConstants {
@@ -356,6 +355,7 @@ public class CommonConstants {
     public static final boolean DEFAULT_BROKER_QUERY_LOG_BEFORE_PROCESSING = true;
     public static final String CONFIG_OF_BROKER_QUERY_ENABLE_NULL_HANDLING = "pinot.broker.query.enable.null.handling";
     public static final String CONFIG_OF_BROKER_ENABLE_QUERY_CANCELLATION = "pinot.broker.enable.query.cancellation";
+    public static final boolean DEFAULT_BROKER_ENABLE_QUERY_CANCELLATION = true;
     public static final double DEFAULT_BROKER_QUERY_LOG_MAX_RATE_PER_SECOND = 10_000d;
     public static final String CONFIG_OF_BROKER_TIMEOUT_MS = "pinot.broker.timeoutMs";
     public static final long DEFAULT_BROKER_TIMEOUT_MS = 10_000L;
@@ -444,10 +444,6 @@ public class CommonConstants {
     public static final String DISABLE_GROOVY = "pinot.broker.disable.query.groovy";
     public static final boolean DEFAULT_DISABLE_GROOVY = true;
 
-    // REGEXP_LIKE adaptive threshold configuration
-    public static final String CONFIG_OF_REGEXP_LIKE_ADAPTIVE_THRESHOLD =
-        "pinot.broker.regexp.dict.cardinality.threshold";
-    public static final double DEFAULT_REGEXP_LIKE_ADAPTIVE_THRESHOLD = 0.1; // 10% threshold
     // Rewrite potential expensive functions to their approximation counterparts
     // - DISTINCT_COUNT -> DISTINCT_COUNT_SMART_HLL
     // - PERCENTILE -> PERCENTILE_SMART_TDIGEST
@@ -723,10 +719,6 @@ public class CommonConstants {
         public static final String IN_PREDICATE_PRE_SORTED = "inPredicatePreSorted";
         public static final String IN_PREDICATE_LOOKUP_ALGORITHM = "inPredicateLookupAlgorithm";
 
-        // REGEXP_LIKE adaptive threshold - controls when to switch between dictionary-based and scan-based evaluation
-        // When (dictionary_size / num_docs) < threshold, use dictionary-based evaluation
-        // When (dictionary_size / num_docs) >= threshold, use scan-based evaluation
-        public static final String REGEXP_LIKE_ADAPTIVE_THRESHOLD = "regexpDictCardinalityThreshold";
 
         public static final String DROP_RESULTS = "dropResults";
 
@@ -1238,6 +1230,7 @@ public class CommonConstants {
     public static final String CONFIG_OF_SERVER_QUERY_REGEX_CLASS = "pinot.server.query.regex.class";
     public static final String DEFAULT_SERVER_QUERY_REGEX_CLASS = "JAVA_UTIL";
     public static final String CONFIG_OF_ENABLE_QUERY_CANCELLATION = "pinot.server.enable.query.cancellation";
+    public static final boolean DEFAULT_ENABLE_QUERY_CANCELLATION = true;
     public static final String CONFIG_OF_NETTY_SERVER_ENABLED = "pinot.server.netty.enabled";
     public static final boolean DEFAULT_NETTY_SERVER_ENABLED = true;
     public static final String CONFIG_OF_ENABLE_GRPC_SERVER = "pinot.server.grpc.enable";
@@ -1563,7 +1556,6 @@ public class CommonConstants {
   public static final String PINOT_QUERY_SCHEDULER_PREFIX = "pinot.query.scheduler";
 
   public static class Accounting {
-    public static final int ANCHOR_TASK_ID = -1;
     public static final String CONFIG_OF_FACTORY_NAME = "accounting.factory.name";
 
     public static final String CONFIG_OF_ENABLE_THREAD_CPU_SAMPLING = "accounting.enable.thread.cpu.sampling";
@@ -1586,14 +1578,10 @@ public class CommonConstants {
     public static final int DEFAULT_CPU_TIME_BASED_KILLING_THRESHOLD_MS = 30_000;
 
     public static final String CONFIG_OF_PANIC_LEVEL_HEAP_USAGE_RATIO = "accounting.oom.panic.heap.usage.ratio";
-    public static final float DFAULT_PANIC_LEVEL_HEAP_USAGE_RATIO = 0.99f;
+    public static final float DEFAULT_PANIC_LEVEL_HEAP_USAGE_RATIO = 0.99f;
 
     public static final String CONFIG_OF_CRITICAL_LEVEL_HEAP_USAGE_RATIO = "accounting.oom.critical.heap.usage.ratio";
     public static final float DEFAULT_CRITICAL_LEVEL_HEAP_USAGE_RATIO = 0.96f;
-
-    public static final String CONFIG_OF_CRITICAL_LEVEL_HEAP_USAGE_RATIO_DELTA_AFTER_GC =
-        "accounting.oom.critical.heap.usage.ratio.delta.after.gc";
-    public static final float DEFAULT_CONFIG_OF_CRITICAL_LEVEL_HEAP_USAGE_RATIO_DELTA_AFTER_GC = 0.15f;
 
     public static final String CONFIG_OF_ALARMING_LEVEL_HEAP_USAGE_RATIO = "accounting.oom.alarming.usage.ratio";
     public static final float DEFAULT_ALARMING_LEVEL_HEAP_USAGE_RATIO = 0.75f;
@@ -1611,25 +1599,8 @@ public class CommonConstants {
         "accounting.min.memory.footprint.to.kill.ratio";
     public static final double DEFAULT_MEMORY_FOOTPRINT_TO_KILL_RATIO = 0.025;
 
-    public static final String CONFIG_OF_GC_BACKOFF_COUNT = "accounting.gc.backoff.count";
-    public static final int DEFAULT_GC_BACKOFF_COUNT = 5;
-
-    public static final String CONFIG_OF_GC_WAIT_TIME_MS = "accounting.gc.wait.time.ms";
-    public static final int DEFAULT_CONFIG_OF_GC_WAIT_TIME_MS = 0;
-
     public static final String CONFIG_OF_QUERY_KILLED_METRIC_ENABLED = "accounting.query.killed.metric.enabled";
     public static final boolean DEFAULT_QUERY_KILLED_METRIC_ENABLED = false;
-
-    public static final String CONFIG_OF_CANCEL_CALLBACK_CACHE_MAX_SIZE = "accounting.cancel.callback.cache.max.size";
-    public static final int DEFAULT_CANCEL_CALLBACK_CACHE_MAX_SIZE = 500;
-
-    public static final String CONFIG_OF_CANCEL_CALLBACK_CACHE_EXPIRY_SECONDS =
-        "accounting.cancel.callback.cache.expiry.seconds";
-    public static final int DEFAULT_CANCEL_CALLBACK_CACHE_EXPIRY_SECONDS = 1200;
-
-    public static final String CONFIG_OF_THREAD_SELF_TERMINATE =
-        "accounting.thread.self.terminate";
-    public static final boolean DEFAULT_THREAD_SELF_TERMINATE = false;
 
     /**
      * QUERY WORKLOAD ISOLATION Configs
@@ -1808,28 +1779,13 @@ public class CommonConstants {
 
   public static class Query {
 
-    /**
-     * Configuration keys for query context mode.
-     *
-     * Valid values are 'strict' (ignoring case) or empty.
-     *
-     * In strict mode, if the {@link QueryThreadContext} is not initialized, an {@link IllegalStateException} will be
-     * thrown when setter and getter methods are used. Otherwise a warning will be logged and the fake instance will be
-     * returned.
-     */
-    public static final String CONFIG_OF_QUERY_CONTEXT_MODE = "pinot.query.context.mode";
-
     public static class Request {
       public static class MetadataKeys {
         /// This is the request id, which may change during the execution.
-        ///
-        /// See [QueryThreadContext#getRequestId()] for more details.
         public static final String REQUEST_ID = "requestId";
         /// Ths is the correlation id, which is set when the query starts and will not change during the execution.
         /// This value is either set by the client or generated by the broker, in which case it will be equal to the
         /// original request id.
-        ///
-        /// See [QueryThreadContext#getCid()] for more details.
         public static final String CORRELATION_ID = "correlationId";
         public static final String BROKER_ID = "brokerId";
         public static final String ENABLE_TRACE = "enableTrace";
@@ -1886,9 +1842,7 @@ public class CommonConstants {
         public static final String NON_STREAMING = "nonStreaming";
       }
 
-      /**
-       * Configuration keys for {@link org.apache.pinot.common.proto.Worker.QueryResponse} extra metadata.
-       */
+      /// Configuration keys for `org.apache.pinot.common.proto.Worker.QueryResponse` extra metadata.
       public static class ServerResponseStatus {
         public static final String STATUS_ERROR = "ERROR";
         public static final String STATUS_OK = "OK";
@@ -1955,17 +1909,11 @@ public class CommonConstants {
         "pinot.query.runner.enable.data.block.payload.split";
     public static final boolean DEFAULT_ENABLE_DATA_BLOCK_PAYLOAD_SPLIT = false;
 
-    /**
-     * Configuration for server port, port that opens and accepts
-     * {@link org.apache.pinot.query.runtime.plan.DistributedStagePlan} and start executing query stages.
-     */
+    /// Configuration for server port used to receive query plans.
     public static final String KEY_OF_QUERY_SERVER_PORT = "pinot.query.server.port";
     public static final int DEFAULT_QUERY_SERVER_PORT = 0;
 
-    /**
-     * Configuration for mailbox hostname and port, this hostname and port opens streaming channel to receive
-     * {@link org.apache.pinot.common.datablock.DataBlock}.
-     */
+    /// Configuration for mailbox hostname and port used to receive data blocks.
     public static final String KEY_OF_QUERY_RUNNER_HOSTNAME = "pinot.query.runner.hostname";
     public static final String KEY_OF_QUERY_RUNNER_PORT = "pinot.query.runner.port";
     public static final int DEFAULT_QUERY_RUNNER_PORT = 0;
@@ -2029,11 +1977,11 @@ public class CommonConstants {
     /// Max number of rows operators stored in the op stats cache.
     /// Although the cache stores stages, each entry has a weight equal to the number of operators in the stage.
     public static final String KEY_OF_OP_STATS_CACHE_SIZE = "pinot.server.query.op.stats.cache.size";
-    public static final int DEFAULT_OF_OP_STATS_CACHE_SIZE = 1000;
+    public static final int DEFAULT_OF_OP_STATS_CACHE_SIZE = 10000;
 
     /// Max time to keep the op stats in the cache.
     public static final String KEY_OF_OP_STATS_CACHE_EXPIRE_MS = "pinot.server.query.op.stats.cache.ms";
-    public static final int DEFAULT_OF_OP_STATS_CACHE_EXPIRE_MS = 60 * 1000;
+    public static final int DEFAULT_OF_OP_STATS_CACHE_EXPIRE_MS = 600 * 1000;
 
     /// Max number of cancelled queries to keep in the cache.
     public static final String KEY_OF_CANCELLED_QUERY_CACHE_SIZE = "pinot.server.query.cancelled.cache.size";
@@ -2041,7 +1989,7 @@ public class CommonConstants {
 
     /// Max time to keep the cancelled queries in the cache.
     public static final String KEY_OF_CANCELLED_QUERY_CACHE_EXPIRE_MS = "pinot.server.query.cancelled.cache.ms";
-    public static final int DEFAULT_OF_CANCELLED_QUERY_CACHE_EXPIRE_MS = 60 * 1000;
+    public static final int DEFAULT_OF_CANCELLED_QUERY_CACHE_EXPIRE_MS = 600 * 1000;
 
     /// Timeout of the cancel request, in milliseconds.
     /// TODO: This is used by the broker. Consider renaming it.

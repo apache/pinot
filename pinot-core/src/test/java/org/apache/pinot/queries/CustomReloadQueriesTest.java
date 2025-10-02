@@ -75,7 +75,9 @@ public class CustomReloadQueriesTest extends BaseQueriesTest {
       List<String> rangeIndexColumns, List<FieldConfig> fieldConfigs) {
     return new TableConfigBuilder(TableType.OFFLINE).setTableName(RAW_TABLE_NAME)
         .setNoDictionaryColumns(noDictionaryColumns).setInvertedIndexColumns(invertedIndexColumns)
-        .setRangeIndexColumns(rangeIndexColumns).setFieldConfigList(fieldConfigs).build();
+        .setRangeIndexColumns(rangeIndexColumns).setFieldConfigList(fieldConfigs)
+        .setOptimiseNoDictStatsCollection(true)
+        .build();
   }
 
   @AfterMethod

@@ -20,6 +20,7 @@ package org.apache.pinot.controller.recommender.data.generator;
 
 import com.google.common.base.Preconditions;
 import java.util.Random;
+import org.apache.commons.lang3.RandomStringUtils;
 import org.apache.commons.lang3.StringUtils;
 
 
@@ -50,8 +51,8 @@ public class StringGenerator implements Generator {
     int initValueSize = lengthOfEachString - _counterLength;
     Preconditions.checkState(initValueSize >= 0,
         String.format("Cannot generate %d unique string with length %d", _cardinality, lengthOfEachString));
-    _rand = new Random(0L);
-    _initialValue = generateAlphabetic(initValueSize);
+    _initialValue = RandomStringUtils.randomAlphabetic(initValueSize);
+    _rand = new Random(System.currentTimeMillis());
   }
 
   @Override
@@ -72,18 +73,6 @@ public class StringGenerator implements Generator {
     }
     _counter++;
     return _initialValue + StringUtils.leftPad(String.valueOf(_counter), _counterLength, '0');
-  }
-
-  private String generateAlphabetic(int length) {
-    if (length <= 0) {
-      return "";
-    }
-    final char[] alphabet = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ".toCharArray();
-    StringBuilder sb = new StringBuilder(length);
-    for (int i = 0; i < length; i++) {
-      sb.append(alphabet[_rand.nextInt(alphabet.length)]);
-    }
-    return sb.toString();
   }
 
   public static void main(String[] args) {

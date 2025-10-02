@@ -107,7 +107,7 @@ public class TableConfigBuilder {
   private boolean _nullHandlingEnabled;
   private boolean _columnMajorSegmentBuilderEnabled = true;
   private boolean _skipSegmentPreprocess;
-  private boolean _optimiseNoDictStatsCollection = true;
+  private boolean _optimiseNoDictStatsCollection = false;
   private List<String> _varLengthDictionaryColumns;
   private List<StarTreeIndexConfig> _starTreeIndexConfigs;
   private List<String> _jsonIndexColumns;

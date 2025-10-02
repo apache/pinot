@@ -36,7 +36,8 @@
       "stream.kafka.decoder.class.name": "com.linkedin.pinot.v2.server.LiKafkaDecoder",
       "stream.kafka.topic.name": "UserGeneratedContentGestureCountEvent",
       "streamType": "kafka"
-    }
+    },
+    "optimiseNoDictStatsCollection": false
   },
   "tableName": "testTable",
   "tableType": "REALTIME",

@@ -576,6 +576,7 @@ public class ForwardIndexHandlerTest {
         .setNoDictionaryColumns(new ArrayList<>(noDictionaryColumns))
         .setInvertedIndexColumns(new ArrayList<>(invertedIndexColumns))
         .setCreateInvertedIndexDuringSegmentGeneration(true).setRangeIndexColumns(new ArrayList<>(rangeIndexColumns))
+        .setOptimiseNoDictStatsCollection(true)
         .setFieldConfigList(new ArrayList<>(fieldConfigMap.values())).build();
   }
 

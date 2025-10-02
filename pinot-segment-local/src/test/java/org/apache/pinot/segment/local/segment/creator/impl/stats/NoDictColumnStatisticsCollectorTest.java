@@ -19,7 +19,13 @@
 package org.apache.pinot.segment.local.segment.creator.impl.stats;
 
 import java.math.BigDecimal;
+import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Collections;
+import java.util.HashSet;
+import java.util.List;
+import java.util.Random;
+import java.util.Set;
 import org.apache.pinot.segment.spi.creator.StatsCollectorConfig;
 import org.apache.pinot.spi.config.table.ColumnPartitionConfig;
 import org.apache.pinot.spi.config.table.SegmentPartitionConfig;
@@ -27,6 +33,7 @@ import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.data.DimensionFieldSpec;
 import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.Schema;
+import org.apache.pinot.spi.utils.ByteArray;
 import org.apache.pinot.spi.utils.builder.TableConfigBuilder;
 import org.testng.annotations.DataProvider;
 import org.testng.annotations.Test;
@@ -375,5 +382,431 @@ public class NoDictColumnStatisticsCollectorTest {
     } catch (UnsupportedOperationException expected) {
       // expected: BigDecimal MV not supported by NoDict collector by design
     }
+  }
+
+  // A test that picks a random data type, generates random data for that type (sorted or unsorted,
+  // single or multi value, high or low or medium cardinality), collects stats using NoDictColumnStatisticsCollector
+  // and the corresponding PreIndexStatsCollector, and compares the stats.
+  // Runs this setup multiple times to cover different scenarios.
+  @Test
+  public void testRandomizedDataComparison() throws Exception {
+    Random random = new Random();
+
+    // Run multiple iterations with different random scenarios
+    for (int iteration = 0; iteration < 100; iteration++) {
+      runRandomizedTest(random, iteration);
+    }
+  }
+
+  private void runRandomizedTest(Random random, int iteration) throws Exception {
+    // Randomly select data type (excluding BIG_DECIMAL for MV as it's unsupported)
+    FieldSpec.DataType[] supportedTypes = {
+        FieldSpec.DataType.INT, FieldSpec.DataType.LONG, FieldSpec.DataType.FLOAT,
+        FieldSpec.DataType.DOUBLE, FieldSpec.DataType.STRING, FieldSpec.DataType.BYTES,
+        FieldSpec.DataType.BIG_DECIMAL
+    };
+    FieldSpec.DataType dataType = supportedTypes[random.nextInt(supportedTypes.length)];
+
+    // Randomly choose single vs multi-value (skip MV for BIG_DECIMAL)
+    boolean isSingleValue = dataType == FieldSpec.DataType.BIG_DECIMAL || random.nextBoolean();
+
+    // Randomly choose cardinality level
+    CardinalityLevel cardinalityLevel = CardinalityLevel.values()[random.nextInt(CardinalityLevel.values().length)];
+
+    // Randomly choose if data should be sorted
+    boolean shouldBeSorted = random.nextBoolean();
+
+    try {
+      runTestForConfiguration(dataType, isSingleValue, cardinalityLevel, shouldBeSorted, random, iteration);
+    } catch (Exception e) {
+      throw new RuntimeException(String.format(
+          "Test failed for iteration %d: dataType=%s, isSingleValue=%s, cardinality=%s, sorted=%s",
+          iteration, dataType, isSingleValue, cardinalityLevel, shouldBeSorted), e);
+    }
+  }
+
+  private enum CardinalityLevel {
+    LOW(1, 20),      // 5-20 unique values
+    MEDIUM(50, 100), // 50-100 unique values
+    HIGH(200, 500);  // 200-500 unique values
+
+    private final int _minUnique;
+    private final int _maxUnique;
+
+    CardinalityLevel(int minUnique, int maxUnique) {
+      _minUnique = minUnique;
+      _maxUnique = maxUnique;
+    }
+
+    public int getUniqueCount(Random random) {
+      return _minUnique + random.nextInt(_maxUnique - _minUnique + 1);
+    }
+  }
+
+  private void runTestForConfiguration(FieldSpec.DataType dataType, boolean isSingleValue,
+      CardinalityLevel cardinalityLevel, boolean shouldBeSorted, Random random, int iteration) throws Exception {
+
+    int uniqueValueCount = cardinalityLevel.getUniqueCount(random);
+    int totalEntries = uniqueValueCount + random.nextInt(uniqueValueCount * 2); // Add some duplicates
+
+    // Generate test data
+    Object[] testData = generateData(dataType, isSingleValue, uniqueValueCount, totalEntries, shouldBeSorted, random);
+
+    // Skip if we can't generate valid test data
+    if (testData == null) {
+      return;
+    }
+
+    // Create collectors
+    NoDictColumnStatisticsCollector noDictCollector =
+        new NoDictColumnStatisticsCollector("col", newConfig(dataType, isSingleValue));
+    AbstractColumnStatisticsCollector expectedCollector =
+        createDictCollector(dataType, isSingleValue);
+
+    // Collect stats from both collectors
+    for (Object entry : testData) {
+      noDictCollector.collect(entry);
+      expectedCollector.collect(entry);
+    }
+
+    noDictCollector.seal();
+    expectedCollector.seal();
+
+    // Compare all stats
+    compareCollectorStats(noDictCollector, expectedCollector, dataType, isSingleValue, iteration, testData);
+  }
+
+  private Object[] generateData(FieldSpec.DataType dataType, boolean isSingleValue,
+      int uniqueValueCount, int totalEntries, boolean shouldBeSorted, Random random) {
+
+    try {
+      switch (dataType) {
+        case INT:
+          return generateIntData(isSingleValue, uniqueValueCount, totalEntries, shouldBeSorted, random);
+        case LONG:
+          return generateLongData(isSingleValue, uniqueValueCount, totalEntries, shouldBeSorted, random);
+        case FLOAT:
+          return generateFloatData(isSingleValue, uniqueValueCount, totalEntries, shouldBeSorted, random);
+        case DOUBLE:
+          return generateDoubleData(isSingleValue, uniqueValueCount, totalEntries, shouldBeSorted, random);
+        case STRING:
+          return generateStringData(isSingleValue, uniqueValueCount, totalEntries, shouldBeSorted, random);
+        case BYTES:
+          return generateBytesData(isSingleValue, uniqueValueCount, totalEntries, shouldBeSorted, random);
+        case BIG_DECIMAL:
+          return generateBigDecimalData(isSingleValue, uniqueValueCount, totalEntries, shouldBeSorted, random);
+        default:
+          return null;
+      }
+    } catch (Exception e) {
+      // Return null for unsupported combinations
+      return null;
+    }
+  }
+
+  private Object[] generateIntData(boolean isSingleValue, int uniqueValueCount, int totalEntries,
+      boolean shouldBeSorted, Random random) {
+    Set<Integer> uniqueValues = new HashSet<>();
+    while (uniqueValues.size() < uniqueValueCount) {
+      uniqueValues.add(random.nextInt(10000));
+    }
+    List<Integer> values = new ArrayList<>(uniqueValues);
+
+    if (isSingleValue) {
+      return generateSingleValueData(values, totalEntries, shouldBeSorted, random).toArray();
+    } else {
+      return generateMultiValueIntData(values, totalEntries, random);
+    }
+  }
+
+  private Object[] generateLongData(boolean isSingleValue, int uniqueValueCount, int totalEntries,
+      boolean shouldBeSorted, Random random) {
+    Set<Long> uniqueValues = new HashSet<>();
+    while (uniqueValues.size() < uniqueValueCount) {
+      uniqueValues.add(random.nextLong() % 100000L);
+    }
+    List<Long> values = new ArrayList<>(uniqueValues);
+
+    if (isSingleValue) {
+      return generateSingleValueData(values, totalEntries, shouldBeSorted, random).toArray();
+    } else {
+      return generateMultiValueLongData(values, totalEntries, random);
+    }
+  }
+
+  private Object[] generateFloatData(boolean isSingleValue, int uniqueValueCount, int totalEntries,
+      boolean shouldBeSorted, Random random) {
+    Set<Float> uniqueValues = new HashSet<>();
+    while (uniqueValues.size() < uniqueValueCount) {
+      uniqueValues.add(random.nextFloat() * 1000);
+    }
+    List<Float> values = new ArrayList<>(uniqueValues);
+
+    if (isSingleValue) {
+      return generateSingleValueData(values, totalEntries, shouldBeSorted, random).toArray();
+    } else {
+      return generateMultiValueFloatData(values, totalEntries, random);
+    }
+  }
+
+  private Object[] generateDoubleData(boolean isSingleValue, int uniqueValueCount, int totalEntries,
+      boolean shouldBeSorted, Random random) {
+    Set<Double> uniqueValues = new HashSet<>();
+    while (uniqueValues.size() < uniqueValueCount) {
+      uniqueValues.add(random.nextDouble() * 1000);
+    }
+    List<Double> values = new ArrayList<>(uniqueValues);
+
+    if (isSingleValue) {
+      return generateSingleValueData(values, totalEntries, shouldBeSorted, random).toArray();
+    } else {
+      return generateMultiValueDoubleData(values, totalEntries, random);
+    }
+  }
+
+  private Object[] generateStringData(boolean isSingleValue, int uniqueValueCount, int totalEntries,
+      boolean shouldBeSorted, Random random) {
+    Set<String> uniqueValues = new HashSet<>();
+    while (uniqueValues.size() < uniqueValueCount) {
+      uniqueValues.add(generateRandomString(random));
+    }
+    List<String> values = new ArrayList<>(uniqueValues);
+
+    if (isSingleValue) {
+      return generateSingleValueData(values, totalEntries, shouldBeSorted, random).toArray();
+    } else {
+      return generateMultiValueStringData(values, totalEntries, random);
+    }
+  }
+
+  private Object[] generateBytesData(boolean isSingleValue, int uniqueValueCount, int totalEntries,
+      boolean shouldBeSorted, Random random) {
+    List<byte[]> uniqueValues = new ArrayList<>();
+    Set<String> seen = new HashSet<>(); // Use string representation to avoid duplicate byte arrays
+    while (uniqueValues.size() < uniqueValueCount) {
+      byte[] bytes = generateRandomBytes(random);
+      String key = Arrays.toString(bytes);
+      if (!seen.contains(key)) {
+        uniqueValues.add(bytes);
+        seen.add(key);
+      }
+    }
+
+    if (isSingleValue) {
+      return generateSingleValueByteArrayData(uniqueValues, totalEntries, shouldBeSorted, random);
+    } else {
+      return generateMultiValueBytesData(uniqueValues, totalEntries, random);
+    }
+  }
+
+  private Object[] generateBigDecimalData(boolean isSingleValue, int uniqueValueCount, int totalEntries,
+      boolean shouldBeSorted, Random random) {
+    if (!isSingleValue) {
+      throw new UnsupportedOperationException("BigDecimal MV not supported");
+    }
+
+    Set<BigDecimal> uniqueValues = new HashSet<>();
+    while (uniqueValues.size() < uniqueValueCount) {
+      uniqueValues.add(new BigDecimal(random.nextDouble() * 1000).setScale(2, BigDecimal.ROUND_HALF_UP));
+    }
+    List<BigDecimal> values = new ArrayList<>(uniqueValues);
+
+    return generateSingleValueData(values, totalEntries, shouldBeSorted, random).toArray();
+  }
+
+  private <T extends Comparable<T>> List<T> generateSingleValueData(List<T> uniqueValues,
+      int totalEntries, boolean shouldBeSorted, Random random) {
+    List<T> result = new ArrayList<>();
+    for (int i = 0; i < totalEntries; i++) {
+      result.add(uniqueValues.get(random.nextInt(uniqueValues.size())));
+    }
+
+    if (shouldBeSorted) {
+      Collections.sort(result);
+    }
+
+    return result;
+  }
+
+  private Object[] generateSingleValueByteArrayData(List<byte[]> uniqueValues,
+      int totalEntries, boolean shouldBeSorted, Random random) {
+    List<byte[]> result = new ArrayList<>();
+    for (int i = 0; i < totalEntries; i++) {
+      result.add(uniqueValues.get(random.nextInt(uniqueValues.size())));
+    }
+
+    if (shouldBeSorted) {
+      // sort result by comparing ByteArray representation of each entry
+      result.sort((a, b) -> {
+        ByteArray a1 = new ByteArray(a);
+        ByteArray b1 = new ByteArray(b);
+        return a1.compareTo(b1);
+      });
+    }
+
+    return result.toArray();
+  }
+
+  private Object[] generateMultiValueIntData(List<Integer> values, int totalEntries, Random random) {
+    List<int[]> result = new ArrayList<>();
+    int entriesAdded = 0;
+    while (entriesAdded < totalEntries) {
+      int mvSize = 1 + random.nextInt(3); // 1-3 values per MV entry
+      int[] mvEntry = new int[Math.min(mvSize, totalEntries - entriesAdded)];
+      for (int i = 0; i < mvEntry.length; i++) {
+        mvEntry[i] = values.get(random.nextInt(values.size()));
+      }
+      result.add(mvEntry);
+      entriesAdded += mvEntry.length;
+    }
+    return result.toArray();
+  }
+
+  private Object[] generateMultiValueLongData(List<Long> values, int totalEntries, Random random) {
+    List<long[]> result = new ArrayList<>();
+    int entriesAdded = 0;
+    while (entriesAdded < totalEntries) {
+      int mvSize = 1 + random.nextInt(3);
+      long[] mvEntry = new long[Math.min(mvSize, totalEntries - entriesAdded)];
+      for (int i = 0; i < mvEntry.length; i++) {
+        mvEntry[i] = values.get(random.nextInt(values.size()));
+      }
+      result.add(mvEntry);
+      entriesAdded += mvEntry.length;
+    }
+    return result.toArray();
+  }
+
+  private Object[] generateMultiValueFloatData(List<Float> values, int totalEntries, Random random) {
+    List<float[]> result = new ArrayList<>();
+    int entriesAdded = 0;
+    while (entriesAdded < totalEntries) {
+      int mvSize = 1 + random.nextInt(3);
+      float[] mvEntry = new float[Math.min(mvSize, totalEntries - entriesAdded)];
+      for (int i = 0; i < mvEntry.length; i++) {
+        mvEntry[i] = values.get(random.nextInt(values.size()));
+      }
+      result.add(mvEntry);
+      entriesAdded += mvEntry.length;
+    }
+    return result.toArray();
+  }
+
+  private Object[] generateMultiValueDoubleData(List<Double> values, int totalEntries, Random random) {
+    List<double[]> result = new ArrayList<>();
+    int entriesAdded = 0;
+    while (entriesAdded < totalEntries) {
+      int mvSize = 1 + random.nextInt(3);
+      double[] mvEntry = new double[Math.min(mvSize, totalEntries - entriesAdded)];
+      for (int i = 0; i < mvEntry.length; i++) {
+        mvEntry[i] = values.get(random.nextInt(values.size()));
+      }
+      result.add(mvEntry);
+      entriesAdded += mvEntry.length;
+    }
+    return result.toArray();
+  }
+
+  private Object[] generateMultiValueStringData(List<String> values, int totalEntries, Random random) {
+    List<String[]> result = new ArrayList<>();
+    int entriesAdded = 0;
+    while (entriesAdded < totalEntries) {
+      int mvSize = 1 + random.nextInt(3);
+      String[] mvEntry = new String[Math.min(mvSize, totalEntries - entriesAdded)];
+      for (int i = 0; i < mvEntry.length; i++) {
+        mvEntry[i] = values.get(random.nextInt(values.size()));
+      }
+      result.add(mvEntry);
+      entriesAdded += mvEntry.length;
+    }
+    return result.toArray();
+  }
+
+  private Object[] generateMultiValueBytesData(List<byte[]> values, int totalEntries, Random random) {
+    List<byte[][]> result = new ArrayList<>();
+    int entriesAdded = 0;
+    while (entriesAdded < totalEntries) {
+      int mvSize = 1 + random.nextInt(3);
+      byte[][] mvEntry = new byte[Math.min(mvSize, totalEntries - entriesAdded)][];
+      for (int i = 0; i < mvEntry.length; i++) {
+        mvEntry[i] = values.get(random.nextInt(values.size()));
+      }
+      result.add(mvEntry);
+      entriesAdded += mvEntry.length;
+    }
+    return result.toArray();
+  }
+
+  private String generateRandomString(Random random) {
+    int length = 1 + random.nextInt(10); // 1-10 characters
+    StringBuilder sb = new StringBuilder();
+    for (int i = 0; i < length; i++) {
+      sb.append((char) ('a' + random.nextInt(26)));
+    }
+    return sb.toString();
+  }
+
+  private byte[] generateRandomBytes(Random random) {
+    int length = 1 + random.nextInt(5); // 1-5 bytes
+    byte[] bytes = new byte[length];
+    random.nextBytes(bytes);
+    return bytes;
+  }
+
+  private AbstractColumnStatisticsCollector createDictCollector(FieldSpec.DataType dataType, boolean isSingleValue) {
+    switch (dataType) {
+      case INT:
+        return new IntColumnPreIndexStatsCollector("col", newConfig(dataType, isSingleValue));
+      case LONG:
+        return new LongColumnPreIndexStatsCollector("col", newConfig(dataType, isSingleValue));
+      case FLOAT:
+        return new FloatColumnPreIndexStatsCollector("col", newConfig(dataType, isSingleValue));
+      case DOUBLE:
+        return new DoubleColumnPreIndexStatsCollector("col", newConfig(dataType, isSingleValue));
+      case STRING:
+        return new StringColumnPreIndexStatsCollector("col", newConfig(dataType, isSingleValue));
+      case BYTES:
+        return new BytesColumnPredIndexStatsCollector("col", newConfig(dataType, isSingleValue));
+      case BIG_DECIMAL:
+        return new BigDecimalColumnPreIndexStatsCollector("col", newConfig(dataType, isSingleValue));
+      default:
+        throw new IllegalArgumentException("Unsupported data type: " + dataType);
+    }
+  }
+
+  private void compareCollectorStats(NoDictColumnStatisticsCollector noDictCollector,
+      AbstractColumnStatisticsCollector expectedCollector, FieldSpec.DataType dataType,
+      boolean isSingleValue, int iteration, Object[] testData) {
+
+    String context = String.format("Iteration %d, DataType: %s, SingleValue: %s, Data: %s",
+        iteration, dataType, isSingleValue, Arrays.deepToString(testData));
+
+    assertTrue(noDictCollector.getCardinality() >= expectedCollector.getCardinality(),
+        "Approx Cardinality " + noDictCollector.getCardinality() + " is lower than actual cardinality "
+            + expectedCollector.getCardinality() + " for " + context);
+    assertEquals(noDictCollector.getMinValue(), expectedCollector.getMinValue(),
+        "MinValue mismatch - " + context);
+    assertEquals(noDictCollector.getMaxValue(), expectedCollector.getMaxValue(),
+        "MaxValue mismatch - " + context);
+    assertEquals(noDictCollector.getTotalNumberOfEntries(), expectedCollector.getTotalNumberOfEntries(),
+        "TotalNumberOfEntries mismatch - " + context);
+    assertEquals(noDictCollector.getMaxNumberOfMultiValues(), expectedCollector.getMaxNumberOfMultiValues(),
+        "MaxNumberOfMultiValues mismatch - " + context);
+    assertEquals(noDictCollector.isSorted(), expectedCollector.isSorted(),
+        "isSorted mismatch - " + context);
+    if (dataType != FieldSpec.DataType.INT && dataType != FieldSpec.DataType.LONG
+        && dataType != FieldSpec.DataType.FLOAT && dataType != FieldSpec.DataType.DOUBLE) {
+      if (dataType != FieldSpec.DataType.STRING) {
+        // StringCollector currently does not return shortest element length
+        assertEquals(noDictCollector.getLengthOfShortestElement(), expectedCollector.getLengthOfShortestElement(),
+            "LengthOfShortestElement mismatch - " + context);
+      }
+      assertEquals(noDictCollector.getLengthOfLargestElement(), expectedCollector.getLengthOfLargestElement(),
+          "LengthOfLargestElement mismatch - " + context);
+      assertEquals(noDictCollector.getMaxRowLengthInBytes(), expectedCollector.getMaxRowLengthInBytes(),
+          "MaxRowLengthInBytes mismatch - " + context);
+    }
+    assertEquals(noDictCollector.getPartitions(), expectedCollector.getPartitions(),
+        "Partitions mismatch - " + context);
   }
 }

@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.queries;
 
+import java.io.IOException;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
@@ -50,6 +51,7 @@ import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.TableType;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.env.PinotConfiguration;
+import org.apache.pinot.spi.query.QueryThreadContext;
 import org.apache.pinot.spi.utils.CommonConstants.Broker;
 import org.apache.pinot.spi.utils.CommonConstants.Server;
 import org.apache.pinot.sql.parsers.CalciteSqlCompiler;
@@ -66,7 +68,8 @@ import static org.testng.Assert.assertEquals;
 public abstract class BaseQueriesTest {
   protected static final PlanMaker PLAN_MAKER = new InstancePlanMakerImplV2();
   protected static final QueryOptimizer OPTIMIZER = new QueryOptimizer();
-  protected static final ExecutorService EXECUTOR_SERVICE = Executors.newFixedThreadPool(2);
+  protected static final ExecutorService EXECUTOR_SERVICE =
+      QueryThreadContext.contextAwareExecutorService(Executors.newFixedThreadPool(2));
   protected static final BrokerMetrics BROKER_METRICS = mock(BrokerMetrics.class);
 
   public final void shutdownExecutor() {
@@ -157,8 +160,8 @@ public abstract class BaseQueriesTest {
    * This can be particularly useful to test statistical aggregation functions.
    * @see StatisticalQueriesTest for an example use case.
    */
-  protected BrokerResponseNative getBrokerResponse(
-      @Language("sql") String query, @Nullable Map<String, String> extraQueryOptions) {
+  protected BrokerResponseNative getBrokerResponse(@Language("sql") String query,
+      @Nullable Map<String, String> extraQueryOptions) {
     return getBrokerResponse(query, PLAN_MAKER, extraQueryOptions);
   }
 
@@ -197,26 +200,27 @@ public abstract class BaseQueriesTest {
    * @see StatisticalQueriesTest for an example use case.
    */
   private BrokerResponseNative getBrokerResponse(PinotQuery pinotQuery, PlanMaker planMaker) {
-    PinotQuery serverPinotQuery = GapfillUtils.stripGapfill(pinotQuery);
-    QueryContext queryContext = QueryContextConverterUtils.getQueryContext(pinotQuery);
-    QueryContext serverQueryContext =
-        serverPinotQuery == pinotQuery ? queryContext : QueryContextConverterUtils.getQueryContext(serverPinotQuery);
-
     List<List<IndexSegment>> instances = getDistinctInstances();
     if (instances.size() == 2) {
       return getBrokerResponseDistinctInstances(pinotQuery, planMaker);
     }
 
     // Server side
+    PinotQuery serverPinotQuery = GapfillUtils.stripGapfill(pinotQuery);
+    QueryContext queryContext = QueryContextConverterUtils.getQueryContext(pinotQuery);
+    QueryContext serverQueryContext =
+        serverPinotQuery == pinotQuery ? queryContext : QueryContextConverterUtils.getQueryContext(serverPinotQuery);
     serverQueryContext.setEndTimeMs(System.currentTimeMillis() + Server.DEFAULT_QUERY_EXECUTOR_TIMEOUT_MS);
-    Plan plan =
-        planMaker.makeInstancePlan(getSegmentContexts(getIndexSegments()), serverQueryContext, EXECUTOR_SERVICE, null);
-    InstanceResponseBlock instanceResponse;
-    try {
-      instanceResponse = queryContext.isExplain()
-          ? ServerQueryExecutorV1Impl.executeDescribeExplain(plan, queryContext)
-          : plan.execute();
-    } catch (TimeoutException e) {
+    byte[] serializedResponse;
+    try (QueryThreadContext ignore = QueryThreadContext.openForSseTest()) {
+      Plan plan =
+          planMaker.makeInstancePlan(getSegmentContexts(getIndexSegments()), serverQueryContext, EXECUTOR_SERVICE,
+              null);
+      InstanceResponseBlock instanceResponse =
+          queryContext.isExplain() ? ServerQueryExecutorV1Impl.executeDescribeExplain(plan, queryContext)
+              : plan.execute();
+      serializedResponse = instanceResponse.toDataTable().toBytes();
+    } catch (TimeoutException | IOException e) {
       throw new RuntimeException(e);
     }
 
@@ -224,7 +228,6 @@ public abstract class BaseQueriesTest {
     Map<ServerRoutingInstance, DataTable> dataTableMap = new HashMap<>();
     try {
       // For multi-threaded BrokerReduceService, we cannot reuse the same data-table
-      byte[] serializedResponse = instanceResponse.toDataTable().toBytes();
       dataTableMap.put(new ServerRoutingInstance("localhost", 1234, TableType.OFFLINE),
           DataTableFactory.getDataTable(serializedResponse));
       dataTableMap.put(new ServerRoutingInstance("localhost", 1234, TableType.REALTIME),
@@ -248,11 +251,12 @@ public abstract class BaseQueriesTest {
       Map<ServerRoutingInstance, DataTable> dataTableMap) {
     BrokerReduceService brokerReduceService =
         new BrokerReduceService(new PinotConfiguration(Map.of(Broker.CONFIG_OF_MAX_REDUCE_THREADS_PER_QUERY, 2)));
-    BrokerResponseNative brokerResponse =
-        brokerReduceService.reduceOnDataTable(brokerRequest, serverBrokerRequest, dataTableMap,
-            Broker.DEFAULT_BROKER_TIMEOUT_MS, BROKER_METRICS);
-    brokerReduceService.shutDown();
-    return brokerResponse;
+    try (QueryThreadContext ignore = QueryThreadContext.openForSseTest()) {
+      return brokerReduceService.reduceOnDataTable(brokerRequest, serverBrokerRequest, dataTableMap,
+          Broker.DEFAULT_BROKER_TIMEOUT_MS, BROKER_METRICS);
+    } finally {
+      brokerReduceService.shutDown();
+    }
   }
 
   /**
@@ -265,8 +269,8 @@ public abstract class BaseQueriesTest {
    * This can be particularly useful to test statistical aggregation functions.
    * @see StatisticalQueriesTest for an example use case.
    */
-  protected BrokerResponseNative getBrokerResponseForOptimizedQuery(
-      @Language("sql") String query, @Nullable TableConfig config, @Nullable Schema schema) {
+  protected BrokerResponseNative getBrokerResponseForOptimizedQuery(@Language("sql") String query,
+      @Nullable TableConfig config, @Nullable Schema schema) {
     PinotQuery pinotQuery = CalciteSqlParser.compileToPinotQuery(query);
     OPTIMIZER.optimize(pinotQuery, config, schema);
     return getBrokerResponse(pinotQuery, PLAN_MAKER);
@@ -283,46 +287,37 @@ public abstract class BaseQueriesTest {
    * @see StatisticalQueriesTest for an example use case.
    */
   private BrokerResponseNative getBrokerResponseDistinctInstances(PinotQuery pinotQuery, PlanMaker planMaker) {
+    // Server side
     PinotQuery serverPinotQuery = GapfillUtils.stripGapfill(pinotQuery);
     QueryContext queryContext = QueryContextConverterUtils.getQueryContext(pinotQuery);
     QueryContext serverQueryContext =
         serverPinotQuery == pinotQuery ? queryContext : QueryContextConverterUtils.getQueryContext(serverPinotQuery);
-
-    List<List<IndexSegment>> instances = getDistinctInstances();
-    // Server side
     serverQueryContext.setEndTimeMs(System.currentTimeMillis() + Server.DEFAULT_QUERY_EXECUTOR_TIMEOUT_MS);
-    Plan plan1 =
-        planMaker.makeInstancePlan(getSegmentContexts(instances.get(0)), serverQueryContext, EXECUTOR_SERVICE, null);
-    Plan plan2 =
-        planMaker.makeInstancePlan(getSegmentContexts(instances.get(1)), serverQueryContext, EXECUTOR_SERVICE, null);
-
-    InstanceResponseBlock instanceResponse1;
-    try {
-      instanceResponse1 = queryContext.isExplain()
-          ? ServerQueryExecutorV1Impl.executeDescribeExplain(plan1, queryContext)
-          : plan1.execute();
-    } catch (TimeoutException e) {
-      throw new RuntimeException(e);
-    }
-    InstanceResponseBlock instanceResponse2;
-    try {
-      instanceResponse2 = queryContext.isExplain()
-          ? ServerQueryExecutorV1Impl.executeDescribeExplain(plan2, queryContext)
-          : plan2.execute();
-    } catch (TimeoutException e) {
-      throw new RuntimeException(e);
+    List<List<IndexSegment>> instances = getDistinctInstances();
+    assert instances.size() == 2;
+    byte[][] serializedResponses = new byte[2][];
+    for (int i = 0; i < 2; i++) {
+      try (QueryThreadContext ignore = QueryThreadContext.openForSseTest()) {
+        Plan plan =
+            planMaker.makeInstancePlan(getSegmentContexts(instances.get(i)), serverQueryContext, EXECUTOR_SERVICE,
+                null);
+        InstanceResponseBlock instanceResponse =
+            queryContext.isExplain() ? ServerQueryExecutorV1Impl.executeDescribeExplain(plan, queryContext)
+                : plan.execute();
+        serializedResponses[i] = instanceResponse.toDataTable().toBytes();
+      } catch (Exception e) {
+        throw new RuntimeException(e);
+      }
     }
 
     // Broker side
     Map<ServerRoutingInstance, DataTable> dataTableMap = new HashMap<>();
     try {
       // For multi-threaded BrokerReduceService, we cannot reuse the same data-table
-      byte[] serializedResponse1 = instanceResponse1.toDataTable().toBytes();
-      byte[] serializedResponse2 = instanceResponse2.toDataTable().toBytes();
       dataTableMap.put(new ServerRoutingInstance("localhost", 1234, TableType.OFFLINE),
-          DataTableFactory.getDataTable(serializedResponse1));
+          DataTableFactory.getDataTable(serializedResponses[0]));
       dataTableMap.put(new ServerRoutingInstance("localhost", 1234, TableType.REALTIME),
-          DataTableFactory.getDataTable(serializedResponse2));
+          DataTableFactory.getDataTable(serializedResponses[1]));
     } catch (Exception e) {
       throw new RuntimeException(e);
     }
