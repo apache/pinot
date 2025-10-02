@@ -31,7 +31,7 @@ import org.apache.pinot.common.response.broker.ResultTable;
 import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.core.query.request.context.QueryContext;
 import org.apache.pinot.core.query.utils.OrderByComparatorFactory;
-import org.apache.pinot.spi.trace.Tracing;
+import org.apache.pinot.spi.query.QueryThreadContext;
 import org.roaringbitmap.RoaringBitmap;
 
 
@@ -198,18 +198,20 @@ public class SelectionOperatorService {
     if (_queryContext.isNullHandlingEnabled()) {
       RoaringBitmap[] nullBitmaps = getNullBitmap(dataTable);
       for (int rowId = start; rowId < end; rowId++) {
+        QueryThreadContext.checkTerminationAndSampleUsagePeriodically(rowId,
+            "SelectionOperatorService#processSingleDataTable");
         Object[] row = SelectionOperatorUtils.extractRowFromDataTable(dataTable, rowId);
         setNullsForRow(nullBitmaps, rowId, row);
         Object[] resultRow = formatRow(numColumns, row, columnDataTypes);
         resultRows.add(resultRow);
-        Tracing.ThreadAccountantOps.sampleAndCheckInterruptionPeriodically(rowId);
       }
     } else {
       for (int rowId = start; rowId < end; rowId++) {
+        QueryThreadContext.checkTerminationAndSampleUsagePeriodically(rowId,
+            "SelectionOperatorService#processSingleDataTable");
         Object[] row = SelectionOperatorUtils.extractRowFromDataTable(dataTable, rowId);
         Object[] resultRow = formatRow(numColumns, row, columnDataTypes);
         resultRows.add(resultRow);
-        Tracing.ThreadAccountantOps.sampleAndCheckInterruptionPeriodically(rowId);
       }
     }
     return resultRows;
@@ -230,10 +232,10 @@ public class SelectionOperatorService {
 
   /** get a single row from dataTable with null handling if nullBitmaps provided */
   private Object[] getDataTableRow(DataTable dataTable, int rowId, @Nullable RoaringBitmap[] nullBitmaps) {
+    QueryThreadContext.checkTerminationAndSampleUsagePeriodically(rowId, "SelectionOperatorService#getDataTableRow");
     Object[] row = SelectionOperatorUtils.extractRowFromDataTable(dataTable, rowId);
     if (nullBitmaps != null) {
       setNullsForRow(nullBitmaps, rowId, row);
-      Tracing.ThreadAccountantOps.sampleAndCheckInterruptionPeriodically(rowId);
     }
     return row;
   }
@@ -284,16 +286,18 @@ public class SelectionOperatorService {
       if (_queryContext.isNullHandlingEnabled()) {
         RoaringBitmap[] nullBitmaps = getNullBitmap(dataTable);
         for (int rowId = 0; rowId < numRows; rowId++) {
+          QueryThreadContext.checkTerminationAndSampleUsagePeriodically(rowId,
+              "SelectionOperatorService#heapSortDataTable");
           Object[] row = SelectionOperatorUtils.extractRowFromDataTable(dataTable, rowId);
           setNullsForRow(nullBitmaps, rowId, row);
           SelectionOperatorUtils.addToPriorityQueue(row, heapSortRows, _numRowsToKeep);
-          Tracing.ThreadAccountantOps.sampleAndCheckInterruptionPeriodically(rowId);
         }
       } else {
         for (int rowId = 0; rowId < numRows; rowId++) {
+          QueryThreadContext.checkTerminationAndSampleUsagePeriodically(rowId,
+              "SelectionOperatorService#heapSortDataTable");
           Object[] row = SelectionOperatorUtils.extractRowFromDataTable(dataTable, rowId);
           SelectionOperatorUtils.addToPriorityQueue(row, heapSortRows, _numRowsToKeep);
-          Tracing.ThreadAccountantOps.sampleAndCheckInterruptionPeriodically(rowId);
         }
       }
     }

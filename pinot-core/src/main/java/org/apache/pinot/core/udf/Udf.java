@@ -18,13 +18,13 @@
  */
 package org.apache.pinot.core.udf;
 
+import com.google.common.base.Preconditions;
 import java.lang.reflect.Method;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.stream.Collectors;
 import javax.annotation.Nullable;
-import org.apache.arrow.util.Preconditions;
 import org.apache.commons.lang3.tuple.Pair;
 import org.apache.pinot.common.function.FunctionRegistry;
 import org.apache.pinot.common.function.PinotScalarFunction;
