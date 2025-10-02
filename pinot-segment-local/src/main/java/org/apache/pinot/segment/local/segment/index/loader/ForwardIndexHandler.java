@@ -42,6 +42,7 @@ import org.apache.pinot.segment.local.segment.creator.impl.stats.FloatColumnPreI
 import org.apache.pinot.segment.local.segment.creator.impl.stats.IntColumnPreIndexStatsCollector;
 import org.apache.pinot.segment.local.segment.creator.impl.stats.LongColumnPreIndexStatsCollector;
 import org.apache.pinot.segment.local.segment.creator.impl.stats.MapColumnPreIndexStatsCollector;
+import org.apache.pinot.segment.local.segment.creator.impl.stats.NoDictColumnStatisticsCollector;
 import org.apache.pinot.segment.local.segment.creator.impl.stats.StringColumnPreIndexStatsCollector;
 import org.apache.pinot.segment.local.segment.index.dictionary.DictionaryIndexType;
 import org.apache.pinot.segment.local.segment.readers.PinotSegmentColumnReader;
@@ -1026,6 +1027,13 @@ public class ForwardIndexHandler extends BaseIndexHandler {
 
   private AbstractColumnStatisticsCollector getStatsCollector(String column, DataType storedType) {
     StatsCollectorConfig statsCollectorConfig = new StatsCollectorConfig(_tableConfig, _schema, null);
+    boolean dictionaryEnabled = hasIndex(column, StandardIndexes.dictionary());
+    // MAP collector is optimised for no-dictionary collection
+    if (!dictionaryEnabled && storedType != DataType.MAP) {
+      if (_tableConfig.getIndexingConfig().canOptimiseNoDictStatsCollection()) {
+        return new NoDictColumnStatisticsCollector(column, statsCollectorConfig);
+      }
+    }
     switch (storedType) {
       case INT:
         return new IntColumnPreIndexStatsCollector(column, statsCollectorConfig);

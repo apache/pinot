@@ -386,12 +386,14 @@ public class SegmentPreProcessorTest implements PinotBuffersAfterClassCheckRule 
   @Test
   public void testSimpleEnableDictionarySV()
       throws Exception {
+    int approxCardinality = 44319; // derived via ULL in NoDictColumnStatisticsCollector
     // TEST 1. Check running forwardIndexHandler on a V1 segment. No-op for all existing raw columns.
     buildV1Segment();
     checkForwardIndexCreation(EXISTING_STRING_COL_RAW, 5, 3, _schema, false, false, false, 0, ChunkCompressionType.LZ4,
         true, 0, DataType.STRING, 100000);
-    validateIndex(StandardIndexes.forward(), EXISTING_INT_COL_RAW, 42242, 16, false, false, false, 0, true, 0,
-        ChunkCompressionType.LZ4, false, DataType.INT, 100000);
+    // since dictionary is disabled, the cardinality will be approximate cardinality.
+    validateIndex(StandardIndexes.forward(), EXISTING_INT_COL_RAW, approxCardinality, 16, false, false, false, 0,
+        true, 0, ChunkCompressionType.LZ4, false, DataType.INT, 100000);
 
     // Convert the segment to V3.
     convertV1SegmentToV3();
@@ -410,9 +412,11 @@ public class SegmentPreProcessorTest implements PinotBuffersAfterClassCheckRule 
   @Test
   public void testSimpleEnableDictionaryMV()
       throws Exception {
+    int approxCardinality = 19613; // derived via ULL in NoDictColumnStatisticsCollector
     // TEST 1. Check running forwardIndexHandler on a V1 segment. No-op for all existing raw columns.
     buildV1Segment();
-    checkForwardIndexCreation(EXISTING_INT_COL_RAW_MV, 18499, 15, _schema, false, false, false, 0,
+    // since dictionary is disabled, the cardinality will be approximate cardinality.
+    checkForwardIndexCreation(EXISTING_INT_COL_RAW_MV, approxCardinality, 15, _schema, false, false, false, 0,
         ChunkCompressionType.LZ4, false, 13, DataType.INT, 106688);
 
     // Convert the segment to V3.
@@ -427,6 +431,8 @@ public class SegmentPreProcessorTest implements PinotBuffersAfterClassCheckRule 
   @Test
   public void testEnableDictAndOtherIndexesSV()
       throws Exception {
+    int approxCardinality = 44319; // derived via ULL in NoDictColumnStatisticsCollector
+
     // TEST 1: EXISTING_STRING_COL_RAW. Enable dictionary. Also add inverted index and text index. Reload code path
     // will create dictionary, inverted index and text index.
     buildV3Segment();
@@ -465,7 +471,8 @@ public class SegmentPreProcessorTest implements PinotBuffersAfterClassCheckRule 
     resetIndexConfigs();
     _rangeIndexColumns.add(EXISTING_INT_COL_RAW);
     buildV3Segment();
-    validateIndex(StandardIndexes.range(), EXISTING_INT_COL_RAW, 42242, 16, false, false, false, 0, true, 0,
+    // Since dictionary is disabled, the cardinality will be approximate cardinality.
+    validateIndex(StandardIndexes.range(), EXISTING_INT_COL_RAW, approxCardinality, 16, false, false, false, 0, true, 0,
         ChunkCompressionType.LZ4, false, DataType.INT, 100000);
     long oldRangeIndexSize = new SegmentMetadataImpl(INDEX_DIR).getColumnMetadataFor(EXISTING_INT_COL_RAW)
         .getIndexSizeFor(StandardIndexes.range());
@@ -484,6 +491,8 @@ public class SegmentPreProcessorTest implements PinotBuffersAfterClassCheckRule 
   @Test
   public void testEnableDictAndOtherIndexesMV()
       throws Exception {
+    int approxCardinality = 19613; // derived via ULL in NoDictColumnStatisticsCollector
+
     // TEST 1: EXISTING_INT_COL_RAW_MV. Enable dictionary for an MV column. Also enable inverted index and range index.
     buildV3Segment();
     _noDictionaryColumns.remove(EXISTING_INT_COL_RAW_MV);
@@ -500,10 +509,11 @@ public class SegmentPreProcessorTest implements PinotBuffersAfterClassCheckRule 
     resetIndexConfigs();
     _rangeIndexColumns.add(EXISTING_INT_COL_RAW_MV);
     buildV3Segment();
-    validateIndex(StandardIndexes.forward(), EXISTING_INT_COL_RAW_MV, 18499, 15, false, false, false, 0, false, 13,
-        ChunkCompressionType.LZ4, false, DataType.INT, 106688);
-    validateIndex(StandardIndexes.range(), EXISTING_INT_COL_RAW_MV, 18499, 15, false, false, false, 0, false, 13,
-        ChunkCompressionType.LZ4, false, DataType.INT, 106688);
+    // Since dictionary is disabled, the cardinality will be approximate cardinality.
+    validateIndex(StandardIndexes.forward(), EXISTING_INT_COL_RAW_MV, approxCardinality, 15, false, false, false, 0,
+        false, 13, ChunkCompressionType.LZ4, false, DataType.INT, 106688);
+    validateIndex(StandardIndexes.range(), EXISTING_INT_COL_RAW_MV, approxCardinality, 15, false, false, false, 0,
+        false, 13, ChunkCompressionType.LZ4, false, DataType.INT, 106688);
 
     // Enable dictionary.
     _noDictionaryColumns.remove(EXISTING_INT_COL_RAW_MV);
@@ -623,6 +633,8 @@ public class SegmentPreProcessorTest implements PinotBuffersAfterClassCheckRule 
   @Test
   public void testForwardIndexHandlerChangeCompression()
       throws Exception {
+    int approximateCardinality = 19613; // derived via ULL in NoDictColumnStatisticsCollector
+
     // Test1: Rewriting forward index will be a no-op for v1 segments. Default LZ4 compressionType will be retained.
     buildV1Segment();
     _fieldConfigMap.put(EXISTING_STRING_COL_RAW,
@@ -665,7 +677,8 @@ public class SegmentPreProcessorTest implements PinotBuffersAfterClassCheckRule 
     _fieldConfigMap.put(EXISTING_INT_COL_RAW_MV,
         new FieldConfig(EXISTING_INT_COL_RAW_MV, FieldConfig.EncodingType.RAW, List.of(), CompressionCodec.ZSTANDARD,
             null));
-    checkForwardIndexCreation(EXISTING_INT_COL_RAW_MV, 18499, 15, _schema, false, false, false, 0,
+    // Since dictionary is disabled, the cardinality will be approximate cardinality.
+    checkForwardIndexCreation(EXISTING_INT_COL_RAW_MV, approximateCardinality, 15, _schema, false, false, false, 0,
         ChunkCompressionType.ZSTANDARD, false, 13, DataType.INT, 106688);
   }
 

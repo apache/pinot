@@ -107,6 +107,7 @@ public class TableConfigBuilder {
   private boolean _nullHandlingEnabled;
   private boolean _columnMajorSegmentBuilderEnabled = true;
   private boolean _skipSegmentPreprocess;
+  private boolean _optimiseNoDictStatsCollection = true;
   private List<String> _varLengthDictionaryColumns;
   private List<StarTreeIndexConfig> _starTreeIndexConfigs;
   private List<String> _jsonIndexColumns;
@@ -381,6 +382,11 @@ public class TableConfigBuilder {
     return this;
   }
 
+  public TableConfigBuilder setOptimiseNoDictStatsCollection(boolean optimiseNoDictStatsCollection) {
+    _optimiseNoDictStatsCollection = optimiseNoDictStatsCollection;
+    return this;
+  }
+
   public TableConfigBuilder setCustomConfig(TableCustomConfig customConfig) {
     _customConfig = customConfig;
     return this;
@@ -511,6 +517,7 @@ public class TableConfigBuilder {
     indexingConfig.setNullHandlingEnabled(_nullHandlingEnabled);
     indexingConfig.setColumnMajorSegmentBuilderEnabled(_columnMajorSegmentBuilderEnabled);
     indexingConfig.setSkipSegmentPreprocess(_skipSegmentPreprocess);
+    indexingConfig.setOptimiseNoDictStatsCollection(_optimiseNoDictStatsCollection);
     indexingConfig.setVarLengthDictionaryColumns(_varLengthDictionaryColumns);
     indexingConfig.setStarTreeIndexConfigs(_starTreeIndexConfigs);
     indexingConfig.setMultiColumnTextIndexConfig(_multiColumnTextIndexConfig);

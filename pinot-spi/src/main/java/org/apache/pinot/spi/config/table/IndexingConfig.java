@@ -65,6 +65,9 @@ public class IndexingConfig extends BaseJsonConfig {
   private boolean _nullHandlingEnabled;
   private boolean _columnMajorSegmentBuilderEnabled = true;
   private boolean _skipSegmentPreprocess;
+  // Use NoDictColumnStatisticsCollector for stats collection for no-dictionary columns
+  // We can deprecate this config once we are confident about the stability of NoDictColumnStatisticsCollector
+  private boolean _optimiseNoDictStatsCollection = true;
 
   /**
    * If `optimizeDictionary` enabled, dictionary is not created for the high-cardinality
@@ -352,6 +355,14 @@ public class IndexingConfig extends BaseJsonConfig {
 
   public void setSkipSegmentPreprocess(boolean skipSegmentPreprocess) {
     _skipSegmentPreprocess = skipSegmentPreprocess;
+  }
+
+  public boolean canOptimiseNoDictStatsCollection() {
+    return _optimiseNoDictStatsCollection;
+  }
+
+  public void setOptimiseNoDictStatsCollection(boolean optimiseNoDictStatsCollection) {
+    _optimiseNoDictStatsCollection = optimiseNoDictStatsCollection;
   }
 
   public boolean isOptimizeDictionary() {

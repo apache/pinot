@@ -23,6 +23,9 @@ import java.util.Arrays;
 import java.util.Map;
 import org.apache.pinot.common.utils.PinotDataType;
 import org.apache.pinot.segment.spi.creator.StatsCollectorConfig;
+import org.apache.pinot.segment.spi.index.FieldIndexConfigs;
+import org.apache.pinot.segment.spi.index.FieldIndexConfigsUtil;
+import org.apache.pinot.segment.spi.index.StandardIndexes;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.TableType;
 import org.apache.pinot.spi.data.ComplexFieldSpec;
@@ -51,16 +54,24 @@ public class MapColumnPreIndexStatsCollector extends AbstractColumnStatisticsCol
   private final Object2ObjectOpenHashMap<String, AbstractColumnStatisticsCollector> _keyStats =
       new Object2ObjectOpenHashMap<>(INITIAL_HASH_SET_SIZE);
   private final Map<String, Integer> _keyFrequencies = new Object2ObjectOpenHashMap<>(INITIAL_HASH_SET_SIZE);
-  private String[] _sortedValues;
+  private String[] _sortedKeys;
   private int _minLength = Integer.MAX_VALUE;
   private int _maxLength = 0;
   private boolean _sealed = false;
   private ComplexFieldSpec _colFieldSpec;
+  private boolean _createNoDictCollectorsForKeys = false;
 
   public MapColumnPreIndexStatsCollector(String column, StatsCollectorConfig statsCollectorConfig) {
     super(column, statsCollectorConfig);
     _sorted = false;
     _colFieldSpec = (ComplexFieldSpec) statsCollectorConfig.getFieldSpecForColumn(column);
+    Map<String, FieldIndexConfigs> indexConfigsByCol = FieldIndexConfigsUtil.createIndexConfigsByColName(
+        statsCollectorConfig.getTableConfig(), statsCollectorConfig.getSchema());
+    boolean isDictionaryEnabled = indexConfigsByCol.get(column).getConfig(StandardIndexes.dictionary()).isEnabled();
+    if (!isDictionaryEnabled) {
+      _createNoDictCollectorsForKeys = statsCollectorConfig.getTableConfig().getIndexingConfig()
+          .canOptimiseNoDictStatsCollection();
+    }
   }
 
   public AbstractColumnStatisticsCollector getKeyStatistics(String key) {
@@ -105,7 +116,7 @@ public class MapColumnPreIndexStatsCollector extends AbstractColumnStatisticsCol
   @Override
   public String getMinValue() {
     if (_sealed) {
-      return _sortedValues[0];
+      return _sortedKeys[0];
     }
     throw new IllegalStateException("you must seal the collector first before asking for min value");
   }
@@ -113,7 +124,7 @@ public class MapColumnPreIndexStatsCollector extends AbstractColumnStatisticsCol
   @Override
   public String getMaxValue() {
     if (_sealed) {
-      return _sortedValues[_sortedValues.length - 1];
+      return _sortedKeys[_sortedKeys.length - 1];
     }
     throw new IllegalStateException("you must seal the collector first before asking for max value");
   }
@@ -121,7 +132,7 @@ public class MapColumnPreIndexStatsCollector extends AbstractColumnStatisticsCol
   @Override
   public String[] getUniqueValuesSet() {
     if (_sealed) {
-      return _sortedValues;
+      return _sortedKeys;
     }
     throw new IllegalStateException("you must seal the collector first before asking for unique values set");
   }
@@ -156,8 +167,8 @@ public class MapColumnPreIndexStatsCollector extends AbstractColumnStatisticsCol
           _keyStats.get(entry.getKey()).collect(_keyStats.get(entry.getKey())._fieldSpec.getDefaultNullValue());
         }
       }
-      _sortedValues = _keyStats.keySet().toArray(new String[0]);
-      Arrays.sort(_sortedValues);
+      _sortedKeys = _keyStats.keySet().toArray(new String[0]);
+      Arrays.sort(_sortedKeys);
 
       // Iterate through every key stats collector and seal them
       for (AbstractColumnStatisticsCollector keyStatsCollector : _keyStats.values()) {
@@ -182,6 +193,10 @@ public class MapColumnPreIndexStatsCollector extends AbstractColumnStatisticsCol
         .addField(new DimensionFieldSpec(key, convertToDataType(type), false)).build();
     StatsCollectorConfig config = new StatsCollectorConfig(tableConfig, keySchema, null);
 
+    if (_createNoDictCollectorsForKeys) {
+      return new NoDictColumnStatisticsCollector(key, config);
+    }
+
     switch (type) {
       case INTEGER:
         return new IntColumnPreIndexStatsCollector(key, config);
@@ -200,7 +215,7 @@ public class MapColumnPreIndexStatsCollector extends AbstractColumnStatisticsCol
     }
   }
 
-  static FieldSpec.DataType convertToDataType(PinotDataType ty) {
+  private static FieldSpec.DataType convertToDataType(PinotDataType ty) {
     // TODO: I've been told that we already have a function to do this, so find that function and replace this
     switch (ty) {
       case BOOLEAN:
