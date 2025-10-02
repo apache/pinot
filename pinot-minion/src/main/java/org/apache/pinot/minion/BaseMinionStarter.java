@@ -309,6 +309,12 @@ public abstract class BaseMinionStarter implements ServiceStartable {
             () -> _helixManager.isConnected() ? 1L : 0L);
     minionContext.setHelixPropertyStore(_helixManager.getHelixPropertyStore());
     minionContext.setHelixManager(_helixManager);
+    LOGGER.info("Initializing and registering the DefaultClusterConfigChangeHandler");
+    try {
+      _helixManager.addClusterfigChangeListener(_clusterConfigChangeHandler);
+    } catch (Exception e) {
+      LOGGER.error("Failed to register DefaultClusterConfigChangeHandler as the Helix ClusterConfigChangeListener", e);
+    }
     LOGGER.info("Starting minion admin application on: {}", ListenerConfigUtil.toString(_listenerConfigs));
     _minionAdminApplication = createMinionAdminApp();
     _minionAdminApplication.start(_listenerConfigs);
