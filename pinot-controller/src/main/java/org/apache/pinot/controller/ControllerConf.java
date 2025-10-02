@@ -304,6 +304,11 @@ public class ControllerConf extends PinotConfiguration {
     public static final int DEFAULT_TASK_METRICS_EMITTER_FREQUENCY_IN_SECONDS = 5 * 60; // 5 minutes
     public static final int DEFAULT_STATUS_CONTROLLER_WAIT_FOR_PUSH_TIME_IN_SECONDS = 10 * 60; // 10 minutes
     public static final int DEFAULT_TASK_MANAGER_FREQUENCY_IN_SECONDS = -1; // Disabled
+    // NOTE:
+    //   StaleInstancesCleanupTask is disabled by default because there is a race condition between this task removing
+    //   instance and instance of the same name joining the cluster, which could end up leaving a live instance without
+    //   InstanceConfig, and breaks Helix controller.
+    public static final int DEFAULT_STALE_INSTANCES_CLEANUP_TASK_FREQUENCY_IN_SECONDS = -1; // Disabled
     @Deprecated
     public static final int DEFAULT_MINION_INSTANCES_CLEANUP_TASK_FREQUENCY_IN_SECONDS = 60 * 60; // 1 Hour.
     @Deprecated
@@ -982,7 +987,7 @@ public class ControllerConf extends PinotConfiguration {
             ControllerPeriodicTasksConf.MINION_INSTANCES_CLEANUP_TASK_FREQUENCY_PERIOD, period))
         .map(period -> (int) convertPeriodToSeconds(period)).orElseGet(
             () -> getProperty(ControllerPeriodicTasksConf.DEPRECATED_MINION_INSTANCES_CLEANUP_TASK_FREQUENCY_IN_SECONDS,
-                ControllerPeriodicTasksConf.DEFAULT_MINION_INSTANCES_CLEANUP_TASK_FREQUENCY_IN_SECONDS));
+                ControllerPeriodicTasksConf.DEFAULT_STALE_INSTANCES_CLEANUP_TASK_FREQUENCY_IN_SECONDS));
   }
 
   @Deprecated
