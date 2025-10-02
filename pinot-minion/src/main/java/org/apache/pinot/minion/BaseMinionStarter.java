@@ -39,6 +39,7 @@ import org.apache.helix.task.TaskStateModelFactory;
 import org.apache.helix.zookeeper.constant.ZkSystemPropertyKeys;
 import org.apache.pinot.common.Utils;
 import org.apache.pinot.common.auth.AuthProviderUtils;
+import org.apache.pinot.common.config.DefaultClusterConfigChangeHandler;
 import org.apache.pinot.common.config.TlsConfig;
 import org.apache.pinot.common.metrics.MinionGauge;
 import org.apache.pinot.common.metrics.MinionMeter;
@@ -64,6 +65,7 @@ import org.apache.pinot.minion.executor.MinionTaskZkMetadataManager;
 import org.apache.pinot.minion.executor.PinotTaskExecutorFactory;
 import org.apache.pinot.minion.executor.TaskExecutorFactoryRegistry;
 import org.apache.pinot.minion.taskfactory.TaskFactoryRegistry;
+import org.apache.pinot.segment.local.utils.ClusterConfigForTable;
 import org.apache.pinot.spi.crypt.PinotCrypterFactory;
 import org.apache.pinot.spi.env.PinotConfiguration;
 import org.apache.pinot.spi.filesystem.PinotFSFactory;
@@ -99,6 +101,7 @@ public abstract class BaseMinionStarter implements ServiceStartable {
   protected MinionAdminApiApplication _minionAdminApplication;
   protected List<ListenerConfig> _listenerConfigs;
   protected ExecutorService _executorService;
+  protected DefaultClusterConfigChangeHandler _clusterConfigChangeHandler;
 
   @Override
   public void init(PinotConfiguration config)
@@ -124,6 +127,11 @@ public abstract class BaseMinionStarter implements ServiceStartable {
     }
     _listenerConfigs = ListenerConfigUtil.buildMinionConfigs(_config);
     _tlsPort = ListenerConfigUtil.findLastTlsPort(_listenerConfigs, -1);
+    _clusterConfigChangeHandler = new DefaultClusterConfigChangeHandler();
+    // Register cluster-level override for table configs
+    _clusterConfigChangeHandler.registerClusterConfigChangeListener(
+        new ClusterConfigForTable.ConfigChangeListener());
+    LOGGER.info("Registered ClusterConfigForTable change listener");
     _helixManager = new ZKHelixManager(helixClusterName, _instanceId, InstanceType.PARTICIPANT, zkAddress);
     MinionTaskZkMetadataManager minionTaskZkMetadataManager = new MinionTaskZkMetadataManager(_helixManager);
     _taskExecutorFactoryRegistry = new TaskExecutorFactoryRegistry(minionTaskZkMetadataManager, _config);

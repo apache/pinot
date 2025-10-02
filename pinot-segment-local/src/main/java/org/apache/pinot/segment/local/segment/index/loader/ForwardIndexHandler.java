@@ -46,7 +46,7 @@ import org.apache.pinot.segment.local.segment.creator.impl.stats.NoDictColumnSta
 import org.apache.pinot.segment.local.segment.creator.impl.stats.StringColumnPreIndexStatsCollector;
 import org.apache.pinot.segment.local.segment.index.dictionary.DictionaryIndexType;
 import org.apache.pinot.segment.local.segment.readers.PinotSegmentColumnReader;
-import org.apache.pinot.segment.local.utils.NoDictStatsCollectionUtils;
+import org.apache.pinot.segment.local.utils.ClusterConfigForTable;
 import org.apache.pinot.segment.spi.ColumnMetadata;
 import org.apache.pinot.segment.spi.V1Constants;
 import org.apache.pinot.segment.spi.compression.ChunkCompressionType;
@@ -1031,7 +1031,7 @@ public class ForwardIndexHandler extends BaseIndexHandler {
     boolean dictionaryEnabled = hasIndex(column, StandardIndexes.dictionary());
     // MAP collector is optimised for no-dictionary collection
     if (!dictionaryEnabled && storedType != DataType.MAP) {
-      if (NoDictStatsCollectionUtils.useOptimizedNoDictCollector(_tableConfig)) {
+      if (ClusterConfigForTable.useOptimizedNoDictCollector(_tableConfig)) {
         return new NoDictColumnStatisticsCollector(column, statsCollectorConfig);
       }
     }

@@ -20,62 +20,68 @@ package org.apache.pinot.segment.local.utils;
 
 import java.util.Map;
 import java.util.Set;
-import java.util.concurrent.atomic.AtomicReference;
-import javax.annotation.Nullable;
+import java.util.concurrent.ConcurrentHashMap;
 import org.apache.pinot.spi.config.provider.PinotClusterConfigChangeListener;
 import org.apache.pinot.spi.config.table.TableConfig;
-import org.apache.pinot.spi.utils.CommonConstants;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 
 /**
- * Utility for deciding whether to use the optimized no-dictionary stats collector.
- *
- * Precedence:
- * 1) Cluster-level override if present
- * 2) Table-level IndexingConfig.canOptimiseNoDictStatsCollection()
+ * Contains cluster level config for certain table config attributes.
+ * This is useful for enabling/disabling certain features across the cluster
+ * Each individual config will have its own precedence rules.
  */
-public final class NoDictStatsCollectionUtils {
+public final class ClusterConfigForTable {
 
-  private NoDictStatsCollectionUtils() {
+  // Controls whether to use NoDictColumnStatisticsCollector for no-dictionary columns globally.
+  // If unset at cluster level, table-level config is used.
+  // If cluster level is set to true/false, it overrides the table-level config.
+  private static final String OPTIMISE_NO_DICT_STATS_COLLECTION_CONF = "pinot.stats.optimize.no.dict.collection";
+
+  private ClusterConfigForTable() {
   }
 
-  // null means not set at cluster level
-  private static final AtomicReference<Boolean> CLUSTER_OVERRIDE = new AtomicReference<>(null);
+  private static final Logger LOGGER = LoggerFactory.getLogger(ClusterConfigForTable.class);
+  // if a key isn't present, it means it is not set at cluster level
+  private static final Map<String, Boolean> CLUSTER_BOOLEAN_FLAGS = new ConcurrentHashMap<>();
 
   /** Listener that updates the cached cluster override on config changes. */
   public static class ConfigChangeListener implements PinotClusterConfigChangeListener {
     @Override
     public void onChange(Set<String> changedConfigs, Map<String, String> clusterConfigs) {
-      String v = clusterConfigs.get(CommonConstants.Stats.CONFIG_OF_OPTIMISE_NO_DICT_STATS_COLLECTION);
+      checkNoDictStatsCollectorConfig(changedConfigs, clusterConfigs);
+    }
+
+    private void checkNoDictStatsCollectorConfig(Set<String> changedConfigs, Map<String, String> clusterConfigs) {
+      if (!changedConfigs.contains(OPTIMISE_NO_DICT_STATS_COLLECTION_CONF)) {
+        return;
+      }
+      String v = clusterConfigs.get(OPTIMISE_NO_DICT_STATS_COLLECTION_CONF);
       if (v == null) {
-        CLUSTER_OVERRIDE.set(null);
+        CLUSTER_BOOLEAN_FLAGS.remove(OPTIMISE_NO_DICT_STATS_COLLECTION_CONF);
         return;
       }
       // Accept only explicit true/false, ignore invalid values by resetting to null to fall back to table config
       String lower = v.trim().toLowerCase();
       if ("true".equals(lower)) {
-        CLUSTER_OVERRIDE.set(Boolean.TRUE);
+        CLUSTER_BOOLEAN_FLAGS.put(OPTIMISE_NO_DICT_STATS_COLLECTION_CONF, Boolean.TRUE);
       } else if ("false".equals(lower)) {
-        CLUSTER_OVERRIDE.set(Boolean.FALSE);
+        CLUSTER_BOOLEAN_FLAGS.put(OPTIMISE_NO_DICT_STATS_COLLECTION_CONF, Boolean.FALSE);
       } else {
-        CLUSTER_OVERRIDE.set(null);
+        LOGGER.warn("Invalid value: {} for config: {}, ignoring and falling back to table config", v,
+            OPTIMISE_NO_DICT_STATS_COLLECTION_CONF);
+        CLUSTER_BOOLEAN_FLAGS.remove(OPTIMISE_NO_DICT_STATS_COLLECTION_CONF);
       }
     }
   }
 
   /** Returns whether we should use the optimized collector, applying cluster-level override if set. */
   public static boolean useOptimizedNoDictCollector(TableConfig tableConfig) {
-    Boolean override = CLUSTER_OVERRIDE.get();
+    Boolean override = CLUSTER_BOOLEAN_FLAGS.get(OPTIMISE_NO_DICT_STATS_COLLECTION_CONF);
     if (override != null) {
       return override;
     }
     return tableConfig.getIndexingConfig().isOptimiseNoDictStatsCollection();
   }
-
-  /** Exposed for tests. */
-  static void setClusterOverrideForTests(@Nullable Boolean value) {
-    CLUSTER_OVERRIDE.set(value);
-  }
 }
-
-
