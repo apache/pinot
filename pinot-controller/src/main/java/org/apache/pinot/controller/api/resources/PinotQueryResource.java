@@ -46,8 +46,10 @@ import javax.inject.Inject;
 import javax.ws.rs.GET;
 import javax.ws.rs.POST;
 import javax.ws.rs.Path;
+import javax.ws.rs.Produces;
 import javax.ws.rs.QueryParam;
 import javax.ws.rs.WebApplicationException;
+import javax.ws.rs.core.MediaType;
 import javax.ws.rs.core.Context;
 import javax.ws.rs.core.HttpHeaders;
 import javax.ws.rs.core.Response;
@@ -156,6 +158,25 @@ public class PinotQueryResource {
     @QueryParam("query") String query, @QueryParam("start") String start, @QueryParam("end") String end,
     @QueryParam("step") String step, @Context HttpHeaders httpHeaders) {
     return executeTimeSeriesQueryCatching(httpHeaders, language, query, start, end, step);
+  }
+
+  @GET
+  @Path("/query/tableNames")
+  @Produces(MediaType.APPLICATION_JSON)
+  @ApiOperation(value = "Get the table names from the query")
+  public List<String> getTableNamesFromQuery(@QueryParam("sql") String query, @Context HttpHeaders httpHeaders) {
+    try {
+      Map<String, String> queryOptionsMap = RequestUtils.parseQuery(query).getOptions();
+      String database = DatabaseUtils.extractDatabaseFromQueryRequest(queryOptionsMap, httpHeaders);
+      if (query == null || query.trim().isEmpty()) {
+        return new ArrayList<>();
+      }
+      return getTableNames(query, database);
+    } catch (Exception e) {
+      LOGGER.error("Error extracting table names from query: {}", query, e);
+      throw new WebApplicationException("Failed to extract table names from query: " + e.getMessage(),
+          Response.Status.BAD_REQUEST);
+    }
   }
 
   @POST
@@ -376,7 +397,7 @@ public class PinotQueryResource {
     return sendRequestToBroker(query, instanceId, traceEnabled, queryOptions, httpHeaders);
   }
 
-  private List<String> getTableNames(String query, String database) {
+  public List<String> getTableNames(String query, String database) {
     QueryEnvironment queryEnvironment =
         new QueryEnvironment(database, _pinotHelixResourceManager.getTableCache(), null);
     List<String> tableNames;
