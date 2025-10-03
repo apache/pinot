@@ -1414,7 +1414,8 @@ public class PinotLLCRealtimeSegmentManager {
     }
     LOGGER.info("Updating the ideal state for table: {}, committing segment: {}, new consuming segment: {}",
         realtimeTableName, committingSegmentName, newSegmentName);
-    return IdealStateSingleCommit.updateIdealState(_helixManager, realtimeTableName, updater, DEFAULT_RETRY_POLICY, false);
+    return IdealStateSingleCommit.updateIdealState(_helixManager, realtimeTableName, updater, DEFAULT_RETRY_POLICY,
+        false);
   }
 
   public static boolean isTablePaused(IdealState idealState) {
