@@ -409,9 +409,10 @@ public class ResourceBasedQueriesTest extends QueryRunnerTestBase {
         Assertions.assertThat(queryResult.getProcessingException().getMessage()).matches(pattern);
         return Optional.empty();
       }
-      Assert.assertNull(expectedErrorMsg, "Expected error with message '" + expectedErrorMsg + "'. But instead rows were returned: "
-          + JsonUtils.objectToPrettyString(queryResult.getResultTable()));
-      Assert.assertNotNull(queryResult.getResultTable(), "Result table is null: " + JsonUtils.objectToPrettyString(queryResult));
+      Assert.assertNull(expectedErrorMsg, "Expected error with message '" + expectedErrorMsg
+          + "'. But instead rows were returned: " + JsonUtils.objectToPrettyString(queryResult.getResultTable()));
+      Assert.assertNotNull(queryResult.getResultTable(),
+          "Result table is null: " + JsonUtils.objectToPrettyString(queryResult));
       return Optional.of(queryResult);
     } catch (Exception e) {
       if (expectedErrorMsg == null) {
