@@ -1482,18 +1482,18 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
     columnIndexSize = getColumnIndexSize(column);
     assertFalse(columnIndexSize.has(StandardIndexes.DICTIONARY_ID));
     assertTrue(columnIndexSize.has(StandardIndexes.FORWARD_ID));
-    double v2rawIndexSize = columnIndexSize.get(StandardIndexes.FORWARD_ID).asDouble();
-    assertTrue(v2rawIndexSize > forwardIndexSize);
+    double v4rawIndexSize = columnIndexSize.get(StandardIndexes.FORWARD_ID).asDouble();
+    assertTrue(v4rawIndexSize > forwardIndexSize);
 
     // NOTE: Currently Pinot doesn't support directly changing raw index version, so we need to first reset it back to
     //       dictionary encoding.
     // TODO: Support it
     resetForwardIndex(dictionarySize, forwardIndexSize);
 
-    // Convert 'DestCityName' to v4 raw index
+    // Convert 'DestCityName' to v2 raw index
     List<FieldConfig> fieldConfigs = tableConfig.getFieldConfigList();
     assertNotNull(fieldConfigs);
-    ForwardIndexConfig forwardIndexConfig = new ForwardIndexConfig.Builder().withRawIndexWriterVersion(4).build();
+    ForwardIndexConfig forwardIndexConfig = new ForwardIndexConfig.Builder().withRawIndexWriterVersion(2).build();
     ObjectNode indexes = JsonUtils.newObjectNode();
     indexes.set("forward", forwardIndexConfig.toJsonNode());
     FieldConfig fieldConfig =
@@ -1504,13 +1504,11 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
     columnIndexSize = getColumnIndexSize(column);
     assertFalse(columnIndexSize.has(StandardIndexes.DICTIONARY_ID));
     assertTrue(columnIndexSize.has(StandardIndexes.FORWARD_ID));
-    double v4RawIndexSize = columnIndexSize.get(StandardIndexes.FORWARD_ID).asDouble();
-    assertTrue(v4RawIndexSize < v2rawIndexSize && v4RawIndexSize > forwardIndexSize);
+    double v2RawIndexSize = columnIndexSize.get(StandardIndexes.FORWARD_ID).asDouble();
+    assertTrue(v2RawIndexSize > v4rawIndexSize);
 
     // Convert 'DestCityName' to SNAPPY compression
-    forwardIndexConfig =
-        new ForwardIndexConfig.Builder().withCompressionCodec(CompressionCodec.SNAPPY).withRawIndexWriterVersion(4)
-            .build();
+    forwardIndexConfig = new ForwardIndexConfig.Builder().withCompressionCodec(CompressionCodec.SNAPPY).build();
     indexes.set("forward", forwardIndexConfig.toJsonNode());
     fieldConfig =
         new FieldConfig.Builder(column).withEncodingType(FieldConfig.EncodingType.RAW).withIndexes(indexes).build();
@@ -1521,7 +1519,7 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
     assertFalse(columnIndexSize.has(StandardIndexes.DICTIONARY_ID));
     assertTrue(columnIndexSize.has(StandardIndexes.FORWARD_ID));
     double v4SnappyRawIndexSize = columnIndexSize.get(StandardIndexes.FORWARD_ID).asDouble();
-    assertTrue(v4SnappyRawIndexSize > v2rawIndexSize);
+    assertTrue(v4SnappyRawIndexSize > v4rawIndexSize);
 
     // Removing FieldConfig should be no-op because compression is not explicitly set
     fieldConfigs.remove(fieldConfigs.size() - 1);
@@ -1543,7 +1541,7 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
     columnIndexSize = getColumnIndexSize(column);
     assertFalse(columnIndexSize.has(StandardIndexes.DICTIONARY_ID));
     assertTrue(columnIndexSize.has(StandardIndexes.FORWARD_ID));
-    assertEquals(columnIndexSize.get(StandardIndexes.FORWARD_ID).asDouble(), v2rawIndexSize);
+    assertEquals(columnIndexSize.get(StandardIndexes.FORWARD_ID).asDouble(), v4rawIndexSize);
 
     resetForwardIndex(dictionarySize, forwardIndexSize);
   }
