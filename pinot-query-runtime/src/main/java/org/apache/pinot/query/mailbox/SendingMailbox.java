@@ -33,10 +33,12 @@ import org.apache.pinot.segment.spi.memory.DataBuffer;
  *
  * <ol>
  *   <li>Zero or more calls to {@link #send(MseBlock.Data)}</li>
- *   <ul>
- *     <li>And exactly one call to {@link #send(MseBlock.Eos, List)} if the receiver is not early terminated</li>
- *     <li>Or exactly one call to {@link #cancel(Throwable)} if the sender wants to cancel the receiver</li>
- *   </ul>
+ *   <li>Then exactly one of:
+ *     <ul>
+ *       <li>One call to {@link #send(MseBlock.Eos, List)} if the receiver is not early terminated</li>
+ *       <li>One call to {@link #cancel(Throwable)} if the sender wants to cancel the receiver</li>
+ *     </ul>
+ *   </li>
  * </ol>
  */
 public interface SendingMailbox {
