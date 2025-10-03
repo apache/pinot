@@ -46,7 +46,7 @@ import org.slf4j.LoggerFactory;
 
 public class ZkBasedTenantRebalanceObserver {
   private static final Logger LOGGER = LoggerFactory.getLogger(ZkBasedTenantRebalanceObserver.class);
-  public static final int DEFAULT_ZK_UPDATE_MAX_RETRIES = 3;
+  public static int DEFAULT_ZK_UPDATE_MAX_RETRIES = 3;
   private static final int MIN_ZK_UPDATE_RETRY_DELAY_MS = 100;
   private static final int MAX_ZK_UPDATE_RETRY_DELAY_MS = 200;
 
