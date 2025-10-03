@@ -45,24 +45,21 @@ import org.apache.pinot.spi.exception.QueryErrorCode;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-
-/**
- * Mailbox that's used to receive data. Ownership of the ReceivingMailbox is with the MailboxService, which is unlike
- * the {@link SendingMailbox} whose ownership lies with the send operator. This is because the ReceivingMailbox can be
- * initialized even before the corresponding OpChain is registered on the receiver, whereas the SendingMailbox is
- * initialized when the send operator is running.
- *
- * There is a single ReceivingMailbox for each pair of (sender, receiver) opchains. This means that each receive
- * operator will have multiple ReceivingMailbox instances, one for each sender. They are coordinated by a
- * {@link BlockingMultiStreamConsumer}.
- *
- * A ReceivingMailbox can have at most one reader and one writer at any given time. This means that different threads
- * writing to the same mailbox must be externally synchronized.
- *
- * The offer methods will be called when new blocks are received from different sources. For example local workers will
- * directly call {@link #offer(MseBlock, List, long)} while each remote worker opens a GPRC channel where messages
- * are sent in raw format and {@link #offerRaw(List, long)} is called from them.
- */
+/// Mailbox that's used to receive data. Ownership of the ReceivingMailbox is with the MailboxService, which is unlike
+/// the [SendingMailbox] whose ownership lies with the send operator. This is because the ReceivingMailbox can be
+/// initialized even before the corresponding OpChain is registered on the receiver, whereas the SendingMailbox is
+/// initialized when the send operator is running.
+///
+/// There is a single ReceivingMailbox for each pair of (sender, receiver) opchains. This means that each receive
+/// operator will have multiple ReceivingMailbox instances, one for each sender. They are coordinated by a
+/// [BlockingMultiStreamConsumer].
+///
+/// A ReceivingMailbox can have at most one reader and one writer at any given time. This means that different threads
+/// writing to the same mailbox must be externally synchronized.
+///
+/// The offer methods will be called when new blocks are received from different sources. For example local workers will
+/// directly call [#offer(MseBlock, List, long)] while each remote worker opens a GPRC channel where messages
+/// are sent in raw format and [#offerRaw(List, long)] is called from them.
 @ThreadSafe
 public class ReceivingMailbox {
   public static final int DEFAULT_MAX_PENDING_BLOCKS = 5;
@@ -95,11 +92,9 @@ public class ReceivingMailbox {
     return _id;
   }
 
-  /**
-   * Offers a raw block into the mailbox within the timeout specified, returns whether the block is successfully added.
-   * <p>
-   * Contrary to {@link #offer(MseBlock, List, long)}, the block may be an error block.
-   */
+  ///Offers a raw block into the mailbox within the timeout specified, returns whether the block is successfully added.
+  ///
+  ///Contrary to [#offer(MseBlock, List, long)], the block may be an error block.
   public ReceivingMailboxStatus offerRaw(List<ByteBuffer> byteBuffers, long timeoutMs)
       throws IOException, InterruptedException, TimeoutException {
     updateWaitCpuTime();
@@ -131,10 +126,8 @@ public class ReceivingMailbox {
     return offerPrivate(block, dataBlock.getStatsByStage(), timeoutMs);
   }
 
-  /**
-   * Offers a non-error block into the mailbox within the timeout specified, returns whether the block is successfully
-   * added.
-   */
+  /// Offers a non-error block into the mailbox within the timeout specified, returns whether the block is successfully
+  /// added.
   public ReceivingMailboxStatus offer(MseBlock block, List<DataBuffer> serializedStats, long timeoutMs)
       throws InterruptedException, TimeoutException {
     updateWaitCpuTime();
@@ -142,10 +135,8 @@ public class ReceivingMailbox {
     return offerPrivate(block, serializedStats, timeoutMs);
   }
 
-  /**
-   * Offers a non-error block into the mailbox within the timeout specified, returns whether the block is successfully
-   * added.
-   */
+  /// Offers a non-error block into the mailbox within the timeout specified, returns whether the block is successfully
+  /// added.
   private ReceivingMailboxStatus offerPrivate(MseBlock block, List<DataBuffer> stats, long timeoutMs)
       throws InterruptedException, TimeoutException {
     long start = System.currentTimeMillis();
@@ -187,32 +178,24 @@ public class ReceivingMailbox {
     _lastArriveTime = now;
   }
 
-  /**
-   * Sets an error block into the mailbox. No more blocks are accepted after calling this method.
-   */
+  /// Sets an error block into the mailbox. No more blocks are accepted after calling this method.
   public void setErrorBlock(ErrorMseBlock errorBlock, List<DataBuffer> serializedStats) {
     _blocks.offerEos(errorBlock, serializedStats);
   }
 
-  /**
-   * Returns the first block from the mailbox, or {@code null} if there is no block received yet.
-   */
+  /// Returns the first block from the mailbox, or {@code null} if there is no block received yet.
   @Nullable
   public MseBlockWithStats poll() {
     return _blocks.poll();
   }
 
-  /**
-   * Early terminate the mailbox, called when upstream doesn't expect any more <em>data</em> block.
-   */
+  /// Early terminate the mailbox, called when upstream doesn't expect any more *data* block.
   public void earlyTerminate() {
     _blocks.earlyTerminate();
   }
 
-  /**
-   * Cancels the mailbox. No more blocks are accepted after calling this method and {@link #poll()} will always return
-   * an error block.
-   */
+  /// Cancels the mailbox. No more blocks are accepted after calling this method and [#poll] will always return
+  /// an error block.
   public void cancel() {
     LOGGER.debug("Cancelling mailbox: {}", _id);
     _blocks.offerEos(ErrorMseBlock.fromException(null), List.of());
@@ -220,7 +203,6 @@ public class ReceivingMailbox {
 
   /// Returns the number of pending **data** blocks in the mailbox.
   ///
-  /// EOS blocks are not counted because they will be stored separately and once returned, following calls to [poll]
   /// will always return the same EOS block.
   public int getNumPendingBlocks() {
     return _blocks.exactSize();
