@@ -46,9 +46,9 @@ import org.slf4j.LoggerFactory;
 
 public class ZkBasedTenantRebalanceObserver {
   private static final Logger LOGGER = LoggerFactory.getLogger(ZkBasedTenantRebalanceObserver.class);
-  public static int DEFAULT_ZK_UPDATE_MAX_RETRIES = 3;
   private static final int MIN_ZK_UPDATE_RETRY_DELAY_MS = 100;
   private static final int MAX_ZK_UPDATE_RETRY_DELAY_MS = 200;
+  public static int _defaultZkUpdateMaxRetries = 3;
 
   private final PinotHelixResourceManager _pinotHelixResourceManager;
   private final String _jobId;
@@ -86,13 +86,13 @@ public class ZkBasedTenantRebalanceObserver {
 
   public ZkBasedTenantRebalanceObserver(String jobId, String tenantName,
       PinotHelixResourceManager pinotHelixResourceManager) {
-    this(jobId, tenantName, pinotHelixResourceManager, DEFAULT_ZK_UPDATE_MAX_RETRIES);
+    this(jobId, tenantName, pinotHelixResourceManager, _defaultZkUpdateMaxRetries);
   }
 
   public ZkBasedTenantRebalanceObserver(String jobId, String tenantName, TenantRebalanceProgressStats progressStats,
       TenantRebalanceContext tenantRebalanceContext, PinotHelixResourceManager pinotHelixResourceManager) {
     this(jobId, tenantName, progressStats, tenantRebalanceContext, pinotHelixResourceManager,
-        DEFAULT_ZK_UPDATE_MAX_RETRIES);
+        _defaultZkUpdateMaxRetries);
   }
 
   public void onStart() {
