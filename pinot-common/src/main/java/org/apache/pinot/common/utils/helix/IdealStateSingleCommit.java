@@ -125,28 +125,7 @@ public class IdealStateSingleCommit {
         }
 
         private boolean shouldCompress(IdealState is) {
-          if (is.getNumPartitions() > NUM_PARTITIONS_THRESHOLD_TO_ENABLE_COMPRESSION) {
-            return true;
-          }
-
-          // Find the number of characters in one partition in idealstate, and extrapolate
-          // to estimate the number of characters.
-          // We could serialize the znode to determine the exact size, but that would mean serializing every
-          // idealstate znode twice. We avoid some extra GC by estimating the size instead. Such estimations
-          // should be good for most installations that have similar segment and instance names.
-          Iterator<String> it = is.getPartitionSet().iterator();
-          if (it.hasNext()) {
-            String partitionName = it.next();
-            int numChars = partitionName.length();
-            Map<String, String> stateMap = is.getInstanceStateMap(partitionName);
-            for (Map.Entry<String, String> entry : stateMap.entrySet()) {
-              numChars += entry.getKey().length();
-              numChars += entry.getValue().length();
-            }
-            numChars *= is.getNumPartitions();
-            return (_minNumCharsInISToTurnOnCompression > 0) && (numChars > _minNumCharsInISToTurnOnCompression);
-          }
-          return false;
+          return is.getNumPartitions() > NUM_PARTITIONS_THRESHOLD_TO_ENABLE_COMPRESSION;
         }
       });
       if (controllerMetrics != null) {
