@@ -60,6 +60,8 @@ import org.apache.pinot.core.query.request.ServerQueryRequest;
 import org.apache.pinot.core.query.scheduler.resources.ResourceManager;
 import org.apache.pinot.server.access.AccessControl;
 import org.apache.pinot.server.access.GrpcRequesterIdentity;
+import org.apache.pinot.spi.accounting.ThreadAccountant;
+import org.apache.pinot.spi.query.QueryExecutionContext;
 import org.apache.pinot.spi.query.QueryThreadContext;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -78,14 +80,15 @@ public class GrpcQueryServer extends PinotQueryServerGrpc.PinotQueryServerImplBa
 
   private final String _instanceId;
   private final QueryExecutor _queryExecutor;
-  private final ServerMetrics _serverMetrics;
   private final Server _server;
   private final ExecutorService _executorService;
   private final AccessControl _accessControl;
-  private final ServerQueryLogger _queryLogger = ServerQueryLogger.getInstance();
+  private final ThreadAccountant _threadAccountant;
   // Memory allocator and throttling configuration
   private final PooledByteBufAllocator _bufAllocator;
   private final long _memoryThresholdBytes;
+  private final ServerMetrics _serverMetrics = ServerMetrics.get();
+  private final ServerQueryLogger _queryLogger = ServerQueryLogger.getInstance();
 
   // Filter to keep track of gRPC connections.
   private class GrpcQueryTransportFilter extends ServerTransportFilter {
@@ -108,14 +111,8 @@ public class GrpcQueryServer extends PinotQueryServerGrpc.PinotQueryServerImplBa
     }
   }
 
-  @Deprecated
-  public GrpcQueryServer(int port, GrpcConfig config, TlsConfig tlsConfig,
-      QueryExecutor queryExecutor, ServerMetrics serverMetrics, AccessControl accessControl) {
-    this("unknown-server", port, config, tlsConfig, queryExecutor, serverMetrics, accessControl);
-  }
-
   public GrpcQueryServer(String instanceId, int port, GrpcConfig config, TlsConfig tlsConfig,
-        QueryExecutor queryExecutor, ServerMetrics serverMetrics, AccessControl accessControl) {
+      QueryExecutor queryExecutor, AccessControl accessControl, ThreadAccountant threadAccountant) {
     _instanceId = instanceId;
     _executorService = QueryThreadContext.contextAwareExecutorService(
         Executors.newFixedThreadPool(config.isQueryWorkerThreadsSet()
@@ -123,7 +120,6 @@ public class GrpcQueryServer extends PinotQueryServerGrpc.PinotQueryServerImplBa
             : DEFAULT_GRPC_QUERY_WORKER_THREAD)
     );
     _queryExecutor = queryExecutor;
-    _serverMetrics = serverMetrics;
 
     _bufAllocator = new PooledByteBufAllocator(true);
 
@@ -163,6 +159,7 @@ public class GrpcQueryServer extends PinotQueryServerGrpc.PinotQueryServerImplBa
     }
 
     _accessControl = accessControl;
+    _threadAccountant = threadAccountant;
     LOGGER.info("Initialized GrpcQueryServer on port: {} with numWorkerThreads: {}", port,
         ResourceManager.DEFAULT_QUERY_WORKER_THREADS);
   }
@@ -228,36 +225,35 @@ public class GrpcQueryServer extends PinotQueryServerGrpc.PinotQueryServerImplBa
       return;
     }
 
-    try (QueryThreadContext.CloseableContext closeme = QueryThreadContext.open(_instanceId)) {
-      QueryThreadContext.setQueryEngine("sse-grpc");
-      // Deserialize the request
-      ServerQueryRequest queryRequest;
-      try {
-        queryRequest = new ServerQueryRequest(request, _serverMetrics);
-      } catch (Exception e) {
-        LOGGER.error("Caught exception while deserializing the request: {}", request, e);
-        _serverMetrics.addMeteredGlobalValue(ServerMeter.REQUEST_DESERIALIZATION_EXCEPTIONS, 1);
-        responseObserver.onError(Status.INVALID_ARGUMENT.withDescription("Bad request").withCause(e).asException());
-        return;
-      }
-      queryRequest.registerOnQueryThreadLocal();
+    // Deserialize the request
+    ServerQueryRequest queryRequest;
+    try {
+      queryRequest = new ServerQueryRequest(request, _serverMetrics);
+    } catch (Exception e) {
+      LOGGER.error("Caught exception while deserializing the request: {}", request, e);
+      _serverMetrics.addMeteredGlobalValue(ServerMeter.REQUEST_DESERIALIZATION_EXCEPTIONS, 1);
+      responseObserver.onError(Status.INVALID_ARGUMENT.withDescription("Bad request").withCause(e).asException());
+      return;
+    }
 
-      // Table level access control
-      GrpcRequesterIdentity requestIdentity = new GrpcRequesterIdentity(request.getMetadataMap());
-      if (!_accessControl.hasDataAccess(requestIdentity, queryRequest.getTableNameWithType())) {
-        Exception unsupportedOperationException = new UnsupportedOperationException(
-            String.format("No access to table %s while processing request %d: %s from broker: %s",
-                queryRequest.getTableNameWithType(), queryRequest.getRequestId(), queryRequest.getQueryContext(),
-                queryRequest.getBrokerId()));
-        final String exceptionMsg = String.format("Table not found: %s", queryRequest.getTableNameWithType());
-        LOGGER.error(exceptionMsg, unsupportedOperationException);
-        _serverMetrics.addMeteredGlobalValue(ServerMeter.NO_TABLE_ACCESS, 1);
-        responseObserver.onError(
-            Status.NOT_FOUND.withDescription(exceptionMsg).withCause(unsupportedOperationException).asException());
-        return;
-      }
+    // Table level access control
+    GrpcRequesterIdentity requestIdentity = new GrpcRequesterIdentity(request.getMetadataMap());
+    if (!_accessControl.hasDataAccess(requestIdentity, queryRequest.getTableNameWithType())) {
+      Exception unsupportedOperationException = new UnsupportedOperationException(
+          String.format("No access to table %s while processing request %d: %s from broker: %s",
+              queryRequest.getTableNameWithType(), queryRequest.getRequestId(), queryRequest.getQueryContext(),
+              queryRequest.getBrokerId()));
+      String exceptionMsg = String.format("Table not found: %s", queryRequest.getTableNameWithType());
+      LOGGER.error(exceptionMsg, unsupportedOperationException);
+      _serverMetrics.addMeteredGlobalValue(ServerMeter.NO_TABLE_ACCESS, 1);
+      responseObserver.onError(
+          Status.NOT_FOUND.withDescription(exceptionMsg).withCause(unsupportedOperationException).asException());
+      return;
+    }
 
-      // Process the query
+    // Process the query
+    QueryExecutionContext executionContext = queryRequest.toExecutionContext(_instanceId);
+    try (QueryThreadContext ignore = QueryThreadContext.open(executionContext, _threadAccountant)) {
       InstanceResponseBlock instanceResponse;
       try {
         LOGGER.info("Executing gRPC query request {}: {} received from broker: {}", queryRequest.getRequestId(),

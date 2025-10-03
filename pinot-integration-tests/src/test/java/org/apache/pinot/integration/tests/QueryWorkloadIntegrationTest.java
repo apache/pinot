@@ -40,7 +40,6 @@ import org.apache.pinot.spi.config.workload.PropagationScheme;
 import org.apache.pinot.spi.config.workload.QueryWorkloadConfig;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.env.PinotConfiguration;
-import org.apache.pinot.spi.trace.Tracing;
 import org.apache.pinot.spi.utils.CommonConstants;
 import org.apache.pinot.spi.utils.JsonUtils;
 import org.apache.pinot.util.TestUtils;
@@ -75,7 +74,6 @@ public class QueryWorkloadIntegrationTest extends BaseClusterIntegrationTest {
     startZk();
     startController();
     startBroker();
-    Tracing.unregisterThreadAccountant();
     startServer();
     startKafka();
 

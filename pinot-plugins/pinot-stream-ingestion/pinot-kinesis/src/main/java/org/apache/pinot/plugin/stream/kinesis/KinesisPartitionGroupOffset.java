@@ -50,7 +50,7 @@ public class KinesisPartitionGroupOffset implements StreamPartitionMsgOffset {
     try {
       ObjectNode objectNode = (ObjectNode) JsonUtils.stringToJsonNode(offsetStr);
       Preconditions.checkArgument(objectNode.size() == 1);
-      Map.Entry<String, JsonNode> entry = objectNode.fields().next();
+      Map.Entry<String, JsonNode> entry = objectNode.properties().iterator().next();
       _shardId = entry.getKey();
       _sequenceNumber = entry.getValue().asText();
     } catch (Exception e) {

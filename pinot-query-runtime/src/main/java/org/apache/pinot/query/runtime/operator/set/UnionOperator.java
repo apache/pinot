@@ -58,7 +58,7 @@ public class UnionOperator extends RightRowSetBasedSetOperator {
           _rightRowSet.add(record);
         }
       }
-      sampleAndCheckInterruption();
+      checkTerminationAndSampleUsage();
       // If we have collected some rows, return them as a new block.
       if (!rows.isEmpty()) {
         return new RowHeapDataBlock(rows, _dataSchema);
