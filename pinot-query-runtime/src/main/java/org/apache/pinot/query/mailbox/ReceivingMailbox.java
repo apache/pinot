@@ -203,7 +203,7 @@ public class ReceivingMailbox {
 
   /// Returns the number of pending **data** blocks in the mailbox.
   ///
-  /// will always return the same EOS block.
+  /// Remember that the EOS block is not counted here.
   public int getNumPendingBlocks() {
     return _blocks.exactSize();
   }
