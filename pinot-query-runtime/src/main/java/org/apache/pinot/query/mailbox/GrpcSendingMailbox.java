@@ -97,12 +97,9 @@ public class GrpcSendingMailbox implements SendingMailbox {
   @Override
   public void send(MseBlock.Eos block, List<DataBuffer> serializedStats)
       throws IOException, TimeoutException {
-    try {
-      sendInternal(block, serializedStats);
-    } finally {
-      LOGGER.debug("Completing mailbox: {}", _id);
-      _contentObserver.onCompleted();
-    }
+    sendInternal(block, serializedStats);
+    LOGGER.debug("Completing mailbox: {}", _id);
+    _contentObserver.onCompleted();
   }
 
   private void sendInternal(MseBlock block, List<DataBuffer> serializedStats)
