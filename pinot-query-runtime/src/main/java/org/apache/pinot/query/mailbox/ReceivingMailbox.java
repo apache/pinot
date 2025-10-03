@@ -428,7 +428,7 @@ public class ReceivingMailbox {
           case FULL_CLOSED:
           case UPSTREAM_FINISHED:
             // The queue is closed for write. Always reject the block.
-            LOGGER.debug("Mailbox: {} is already closed for write, ignoring the late EOS block", _id);
+            LOGGER.debug("Mailbox: {} is already closed for write, ignoring the late {} block", _id, block);
             return ReceivingMailboxStatus.ALREADY_TERMINATED;
           case WAITING_EOS:
             // We got the EOS block we expected. Close the queue for both read and write.
@@ -533,13 +533,13 @@ public class ReceivingMailbox {
           }
         }
         if (nanos <= 0L) { // timed out
-          ErrorMseBlock timeoutBlock = ErrorMseBlock.fromError(QueryErrorCode.EXECUTION_TIMEOUT,
-              "Timed out while waiting for receive operator to consume data from mailbox: " + _id);
+          String errorMessage = "Timed out while waiting for receive operator to consume data from mailbox: " + _id;
+          ErrorMseBlock timeoutBlock = ErrorMseBlock.fromError(QueryErrorCode.EXECUTION_TIMEOUT, errorMessage);
           changeState(State.FULL_CLOSED, "timed out while waiting to offer data block");
           drainDataBlocks();
           _eos = new MseBlockWithStats(timeoutBlock, List.of());
           notifyReader();
-          throw new TimeoutException();
+          throw new TimeoutException(errorMessage);
         }
         items[_putIndex] = block;
         if (++_putIndex == items.length) {

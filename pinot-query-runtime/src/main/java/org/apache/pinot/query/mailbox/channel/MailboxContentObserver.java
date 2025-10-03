@@ -83,12 +83,11 @@ public class MailboxContentObserver implements StreamObserver<MailboxContent> {
       } catch (TimeoutException e) {
         LOGGER.debug("Timed out adding block into mailbox: {} with timeout: {}ms", mailboxId, timeoutMs);
         closeStream();
+        return;
       } catch (InterruptedException e) {
         Thread.currentThread().interrupt();
         LOGGER.debug("Interrupted while processing blocks for mailbox: {}", mailboxId, e);
         closeStream();
-      }
-      if (status == null) {
         return;
       }
       switch (status) {

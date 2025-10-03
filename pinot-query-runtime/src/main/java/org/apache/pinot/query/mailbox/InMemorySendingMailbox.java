@@ -81,6 +81,7 @@ public class InMemorySendingMailbox implements SendingMailbox {
 
   private void sendPrivate(MseBlock block, List<DataBuffer> serializedStats) {
     if (isTerminated() || (isEarlyTerminated() && block.isData())) {
+      LOGGER.debug("Mailbox {} already terminated, ignoring block {}", _id, block);
       return;
     }
     if (_receivingMailbox == null) {
