@@ -667,7 +667,7 @@ public class BaseTableDataManagerTest {
   private static OfflineTableDataManager createTableManager(InstanceDataManagerConfig instanceDataManagerConfig) {
     OfflineTableDataManager tableDataManager = new OfflineTableDataManager();
     tableDataManager.init(instanceDataManagerConfig, mock(HelixManager.class), new SegmentLocks(), DEFAULT_TABLE_CONFIG,
-        SCHEMA, new SegmentReloadSemaphore(1), Executors.newSingleThreadExecutor(), null, null,
+        SCHEMA, new SegmentReloadSemaphore(1), Executors.newSingleThreadExecutor(), null, null, null,
         SEGMENT_OPERATIONS_THROTTLER);
     return tableDataManager;
   }
