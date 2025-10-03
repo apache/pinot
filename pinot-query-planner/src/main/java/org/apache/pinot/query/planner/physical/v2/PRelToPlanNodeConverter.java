@@ -241,6 +241,8 @@ public class PRelToPlanNodeConverter {
     JoinNode.JoinStrategy joinStrategy;
     if (PinotHintOptions.JoinHintOptions.useLookupJoinStrategy(join)) {
       joinStrategy = JoinNode.JoinStrategy.LOOKUP;
+    } else if (PinotHintOptions.JoinHintOptions.useSortedJoinStrategy(join)) {
+      joinStrategy = JoinNode.JoinStrategy.SORTED;
     } else {
       joinStrategy = JoinNode.JoinStrategy.HASH;
     }
