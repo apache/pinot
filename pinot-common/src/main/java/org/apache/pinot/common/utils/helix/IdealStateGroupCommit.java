@@ -34,6 +34,7 @@ import org.apache.helix.PropertyKey;
 import org.apache.helix.model.IdealState;
 import org.apache.helix.zookeeper.datamodel.ZNRecord;
 import org.apache.helix.zookeeper.zkclient.exception.ZkBadVersionException;
+import org.apache.helix.zookeeper.zkclient.exception.ZkInterruptedException;
 import org.apache.pinot.common.metrics.ControllerMeter;
 import org.apache.pinot.common.metrics.ControllerMetrics;
 import org.apache.pinot.common.metrics.ControllerTimer;
@@ -258,6 +259,24 @@ public class IdealStateGroupCommit {
             } catch (ZkBadVersionException e) {
               LOGGER.warn("Version changed while updating ideal state for resource: {}", resourceName);
               return false;
+            } catch (ZkInterruptedException e) {
+              LOGGER.warn("Caught ZkInterruptedException while updating resource: {}, verifying...",
+                  resourceName);
+              IdealState writtenIdealState = dataAccessor.getProperty(idealStateKey);
+              if (writtenIdealState == null) {
+                LOGGER.warn("IdealState not found after interrupt for resource: {}", resourceName);
+                return false;
+              }
+              int previousVersion = idealState.getRecord().getVersion();
+              if (writtenIdealState.getRecord().getVersion() <= previousVersion
+                  || !writtenIdealState.equals(updatedIdealState)) {
+                LOGGER.warn("New IdealState was not written successfully for resource: {}", resourceName);
+                return false;
+              } else {
+                LOGGER.info("IdealState was written successfully after interrupt for resource: {}", resourceName);
+                idealStateWrapper._idealState = updatedIdealState;
+                return true;
+              }
             } catch (Exception e) {
               LOGGER.warn("Caught exception while updating ideal state for resource: {} (compressed={})", resourceName,
                   enableCompression, e);
