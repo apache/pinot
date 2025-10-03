@@ -317,9 +317,11 @@ public class GrpcSendingMailbox implements SendingMailbox {
   public void close()
       throws Exception {
     if (!isTerminated()) {
-      LOGGER.debug("Closing gPRC mailbox without proper EOS message");
+      String errorMsg = "Closing gPRC mailbox without proper EOS message";
+      LOGGER.warn(errorMsg);
       _closeAttempted = true;
-      _contentObserver.onError(Status.CANCELLED.asException());
+      MseBlock errorBlock = ErrorMseBlock.fromError(QueryErrorCode.INTERNAL, errorMsg);
+      processAndSend(errorBlock, List.of());
     }
   }
 

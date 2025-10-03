@@ -140,8 +140,8 @@ public class InMemorySendingMailbox implements SendingMailbox {
   @Override
   public void close() {
     if (!isTerminated()) {
-      String msg = "Closed without being completed";
-      LOGGER.debug(msg);
+      String msg = "Closing in-memory mailbox without proper EOS message";
+      LOGGER.warn(msg);
       cancel(new RuntimeException(msg).fillInStackTrace());
     }
   }
