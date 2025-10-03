@@ -175,14 +175,18 @@ public abstract class BlockExchange implements AutoCloseable {
       throws IOException, TimeoutException;
 
   @Override
-  public void close() throws Exception {
-    Exception firstException = null;
+  public void close() {
+    RuntimeException firstException = null;
     for (SendingMailbox sendingMailbox : _sendingMailboxes) {
       try {
         sendingMailbox.close();
       } catch (Exception e) {
         if (firstException == null) {
-          firstException = e;
+          if (firstException instanceof RuntimeException) {
+            firstException = (RuntimeException) e;
+          } else {
+            firstException = new RuntimeException(e);
+          }
         } else {
           firstException.addSuppressed(e);
         }
@@ -280,8 +284,7 @@ public abstract class BlockExchange implements AutoCloseable {
     }
 
     @Override
-    public void close()
-        throws Exception {
+    public void close() {
       BlockExchange.this.close();
     }
   }
