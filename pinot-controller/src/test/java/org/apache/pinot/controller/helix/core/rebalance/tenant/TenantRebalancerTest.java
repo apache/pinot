@@ -307,54 +307,56 @@ public class TenantRebalancerTest extends ControllerTest {
 
     try {
       // table A set tenantConfig.tenants.server to tenantName
-    // SHOULD be selected as tenant's table
-    TableConfig tableConfigA = new TableConfigBuilder(TableType.OFFLINE).setTableName(tableNameA)
-        .setServerTenant(TENANT_NAME).setBrokerTenant(DEFAULT_TENANT_NAME).build();
-    // table B set tenantConfig.tagOverrideConfig.realtimeConsuming to tenantName
-    // SHOULD be selected as tenant's table
-    TableConfig tableConfigB = new TableConfigBuilder(TableType.REALTIME).setTableName(tableNameB)
-        .setServerTenant(DEFAULT_TENANT_NAME)
-        .setBrokerTenant(DEFAULT_TENANT_NAME)
-        .setTagOverrideConfig(new TagOverrideConfig(TagNameUtils.getRealtimeTagForTenant(TENANT_NAME), null))
-        .setStreamConfigs(FakeStreamConfigUtils.getDefaultLowLevelStreamConfigs().getStreamConfigsMap())
-        .build();
-    // table C set instanceAssignmentConfigMap.OFFLINE.tagPoolConfig.tag to tenantName
-    // SHOULD be selected as tenant's table
-    TableConfig tableConfigC = new TableConfigBuilder(TableType.OFFLINE).setTableName(tableNameC)
-        .setServerTenant(DEFAULT_TENANT_NAME)
-        .setBrokerTenant(DEFAULT_TENANT_NAME)
-        .setInstanceAssignmentConfigMap(
-            Collections.singletonMap("OFFLINE", new InstanceAssignmentConfig(
-                new InstanceTagPoolConfig(TagNameUtils.getOfflineTagForTenant(TENANT_NAME), false, 0, null), null,
-                new InstanceReplicaGroupPartitionConfig(true, 0, 1, 0, 0, 0, false, null), null, true
-            ))).build();
-    // table D set tierConfigList[0].serverTag to tenantName
-    // SHOULD be selected as tenant's table
-    TableConfig tableConfigD = new TableConfigBuilder(TableType.OFFLINE).setTableName(tableNameD)
-        .setServerTenant(DEFAULT_TENANT_NAME)
-        .setBrokerTenant(DEFAULT_TENANT_NAME)
-        .setTierConfigList(Collections.singletonList(
-            new TierConfig("dummyTier", TierFactory.TIME_SEGMENT_SELECTOR_TYPE, "7d", null,
-                TierFactory.PINOT_SERVER_STORAGE_TYPE,
-                TagNameUtils.getOfflineTagForTenant(TENANT_NAME), null, null))).build();
-    // table E set to default tenant
-    // SHOULD NOT be selected as tenant's table
-    TableConfig tableConfigE = new TableConfigBuilder(TableType.OFFLINE).setTableName(tableNameE)
-        .setServerTenant(DEFAULT_TENANT_NAME).setBrokerTenant(DEFAULT_TENANT_NAME).setNumReplicas(NUM_REPLICAS).build();
-    // Create the table
-    _helixResourceManager.addTable(tableConfigA);
-    _helixResourceManager.addTable(tableConfigB);
-    _helixResourceManager.addTable(tableConfigC);
-    _helixResourceManager.addTable(tableConfigD);
-    _helixResourceManager.addTable(tableConfigE);
-    Set<String> tenantTables = tenantRebalancer.getTenantTables(TENANT_NAME);
-    assertEquals(tenantTables.size(), 4);
-    assertTrue(tenantTables.contains(TableNameBuilder.OFFLINE.tableNameWithType(tableNameA)));
-    assertTrue(tenantTables.contains(TableNameBuilder.REALTIME.tableNameWithType(tableNameB)));
-    assertTrue(tenantTables.contains(TableNameBuilder.OFFLINE.tableNameWithType(tableNameC)));
-    assertTrue(tenantTables.contains(TableNameBuilder.OFFLINE.tableNameWithType(tableNameD)));
-    assertFalse(tenantTables.contains(TableNameBuilder.OFFLINE.tableNameWithType(tableNameE)));
-
+      // SHOULD be selected as tenant's table
+      TableConfig tableConfigA = new TableConfigBuilder(TableType.OFFLINE).setTableName(tableNameA)
+          .setServerTenant(TENANT_NAME).setBrokerTenant(DEFAULT_TENANT_NAME).build();
+      // table B set tenantConfig.tagOverrideConfig.realtimeConsuming to tenantName
+      // SHOULD be selected as tenant's table
+      TableConfig tableConfigB = new TableConfigBuilder(TableType.REALTIME).setTableName(tableNameB)
+          .setServerTenant(DEFAULT_TENANT_NAME)
+          .setBrokerTenant(DEFAULT_TENANT_NAME)
+          .setTagOverrideConfig(new TagOverrideConfig(TagNameUtils.getRealtimeTagForTenant(TENANT_NAME), null))
+          .setStreamConfigs(FakeStreamConfigUtils.getDefaultLowLevelStreamConfigs().getStreamConfigsMap())
+          .build();
+      // table C set instanceAssignmentConfigMap.OFFLINE.tagPoolConfig.tag to tenantName
+      // SHOULD be selected as tenant's table
+      TableConfig tableConfigC = new TableConfigBuilder(TableType.OFFLINE).setTableName(tableNameC)
+          .setServerTenant(DEFAULT_TENANT_NAME)
+          .setBrokerTenant(DEFAULT_TENANT_NAME)
+          .setInstanceAssignmentConfigMap(
+              Collections.singletonMap("OFFLINE", new InstanceAssignmentConfig(
+                  new InstanceTagPoolConfig(TagNameUtils.getOfflineTagForTenant(TENANT_NAME), false, 0, null), null,
+                  new InstanceReplicaGroupPartitionConfig(true, 0, 1, 0, 0, 0, false, null), null, true
+              ))).build();
+      // table D set tierConfigList[0].serverTag to tenantName
+      // SHOULD be selected as tenant's table
+      TableConfig tableConfigD = new TableConfigBuilder(TableType.OFFLINE).setTableName(tableNameD)
+          .setServerTenant(DEFAULT_TENANT_NAME)
+          .setBrokerTenant(DEFAULT_TENANT_NAME)
+          .setTierConfigList(Collections.singletonList(
+              new TierConfig("dummyTier", TierFactory.TIME_SEGMENT_SELECTOR_TYPE, "7d", null,
+                  TierFactory.PINOT_SERVER_STORAGE_TYPE,
+                  TagNameUtils.getOfflineTagForTenant(TENANT_NAME), null, null))).build();
+      // table E set to default tenant
+      // SHOULD NOT be selected as tenant's table
+      TableConfig tableConfigE = new TableConfigBuilder(TableType.OFFLINE).setTableName(tableNameE)
+          .setServerTenant(DEFAULT_TENANT_NAME)
+          .setBrokerTenant(DEFAULT_TENANT_NAME)
+          .setNumReplicas(NUM_REPLICAS)
+          .build();
+      // Create the table
+      _helixResourceManager.addTable(tableConfigA);
+      _helixResourceManager.addTable(tableConfigB);
+      _helixResourceManager.addTable(tableConfigC);
+      _helixResourceManager.addTable(tableConfigD);
+      _helixResourceManager.addTable(tableConfigE);
+      Set<String> tenantTables = tenantRebalancer.getTenantTables(TENANT_NAME);
+      assertEquals(tenantTables.size(), 4);
+      assertTrue(tenantTables.contains(TableNameBuilder.OFFLINE.tableNameWithType(tableNameA)));
+      assertTrue(tenantTables.contains(TableNameBuilder.REALTIME.tableNameWithType(tableNameB)));
+      assertTrue(tenantTables.contains(TableNameBuilder.OFFLINE.tableNameWithType(tableNameC)));
+      assertTrue(tenantTables.contains(TableNameBuilder.OFFLINE.tableNameWithType(tableNameD)));
+      assertFalse(tenantTables.contains(TableNameBuilder.OFFLINE.tableNameWithType(tableNameE)));
     } finally {
       _helixResourceManager.deleteOfflineTable(tableNameA);
       _helixResourceManager.deleteRealtimeTable(tableNameB);
@@ -398,112 +400,111 @@ public class TenantRebalancerTest extends ControllerTest {
 
     try {
       // rebalance the tables on test tenant, this should be a pure scale out
-    TenantRebalanceConfig config = new TenantRebalanceConfig();
-    config.setTenantName(TENANT_NAME);
-    config.setVerboseResult(true);
-    config.setDryRun(true);
-    TenantRebalanceResult dryRunResult = tenantRebalancer.rebalance(config);
+      TenantRebalanceConfig config = new TenantRebalanceConfig();
+      config.setTenantName(TENANT_NAME);
+      config.setVerboseResult(true);
+      config.setDryRun(true);
+      TenantRebalanceResult dryRunResult = tenantRebalancer.rebalance(config);
 
-    RebalanceSummaryResult.ServerInfo serverInfo =
-        dryRunResult.getRebalanceTableResults().get(OFFLINE_TABLE_NAME_B).getRebalanceSummaryResult().getServerInfo();
-    assertEquals(serverInfo.getServersAdded().size(), 3);
-    assertEquals(serverInfo.getServersRemoved().size(), 0);
+      RebalanceSummaryResult.ServerInfo serverInfo =
+          dryRunResult.getRebalanceTableResults().get(OFFLINE_TABLE_NAME_B).getRebalanceSummaryResult().getServerInfo();
+      assertEquals(serverInfo.getServersAdded().size(), 3);
+      assertEquals(serverInfo.getServersRemoved().size(), 0);
 
-    Queue<TenantRebalancer.TenantTableRebalanceJobContext> tableQueue =
-        tenantRebalancer.createTableQueue(config, dryRunResult.getRebalanceTableResults());
-    // Dimension Table B should be rebalance first since it is a dim table, and we're doing scale out
-    TenantRebalancer.TenantTableRebalanceJobContext jobContext = tableQueue.poll();
-    assertNotNull(jobContext);
-    assertEquals(jobContext.getTableName(), OFFLINE_TABLE_NAME_B);
-    jobContext = tableQueue.poll();
-    assertNotNull(jobContext);
-    assertEquals(jobContext.getTableName(), OFFLINE_TABLE_NAME_A);
+      Queue<TenantRebalancer.TenantTableRebalanceJobContext> tableQueue =
+          tenantRebalancer.createTableQueue(config, dryRunResult.getRebalanceTableResults());
+      // Dimension Table B should be rebalance first since it is a dim table, and we're doing scale out
+      TenantRebalancer.TenantTableRebalanceJobContext jobContext = tableQueue.poll();
+      assertNotNull(jobContext);
+      assertEquals(jobContext.getTableName(), OFFLINE_TABLE_NAME_B);
+      jobContext = tableQueue.poll();
+      assertNotNull(jobContext);
+      assertEquals(jobContext.getTableName(), OFFLINE_TABLE_NAME_A);
 
-    // untag server 0, now the rebalance is not a pure scale in/out
-    _helixResourceManager.updateInstanceTags(SERVER_INSTANCE_ID_PREFIX + 0, "", false);
-    dryRunResult = tenantRebalancer.rebalance(config);
+      // untag server 0, now the rebalance is not a pure scale in/out
+      _helixResourceManager.updateInstanceTags(SERVER_INSTANCE_ID_PREFIX + 0, "", false);
+      dryRunResult = tenantRebalancer.rebalance(config);
 
-    serverInfo =
-        dryRunResult.getRebalanceTableResults().get(OFFLINE_TABLE_NAME_B).getRebalanceSummaryResult().getServerInfo();
-    assertEquals(serverInfo.getServersAdded().size(), 3);
-    assertEquals(serverInfo.getServersRemoved().size(), 1);
+      serverInfo =
+          dryRunResult.getRebalanceTableResults().get(OFFLINE_TABLE_NAME_B).getRebalanceSummaryResult().getServerInfo();
+      assertEquals(serverInfo.getServersAdded().size(), 3);
+      assertEquals(serverInfo.getServersRemoved().size(), 1);
 
-    tableQueue = tenantRebalancer.createTableQueue(config, dryRunResult.getRebalanceTableResults());
-    // Dimension table B should be rebalance first in this case. (it does not matter whether dimension tables are
-    // rebalanced first or last in this case, simply because we defaulted it to be first while non-pure scale in/out)
-    jobContext = tableQueue.poll();
-    assertNotNull(jobContext);
-    assertEquals(jobContext.getTableName(), OFFLINE_TABLE_NAME_B);
-    jobContext = tableQueue.poll();
-    assertNotNull(jobContext);
-    assertEquals(jobContext.getTableName(), OFFLINE_TABLE_NAME_A);
+      tableQueue = tenantRebalancer.createTableQueue(config, dryRunResult.getRebalanceTableResults());
+      // Dimension table B should be rebalance first in this case. (it does not matter whether dimension tables are
+      // rebalanced first or last in this case, simply because we defaulted it to be first while non-pure scale in/out)
+      jobContext = tableQueue.poll();
+      assertNotNull(jobContext);
+      assertEquals(jobContext.getTableName(), OFFLINE_TABLE_NAME_B);
+      jobContext = tableQueue.poll();
+      assertNotNull(jobContext);
+      assertEquals(jobContext.getTableName(), OFFLINE_TABLE_NAME_A);
 
-    // untag the added servers, now the rebalance is a pure scale in
-    for (int i = numServers; i < numServers + numServersToAdd; i++) {
-      _helixResourceManager.updateInstanceTags(SERVER_INSTANCE_ID_PREFIX + i, "", false);
-    }
-    dryRunResult = tenantRebalancer.rebalance(config);
+      // untag the added servers, now the rebalance is a pure scale in
+      for (int i = numServers; i < numServers + numServersToAdd; i++) {
+        _helixResourceManager.updateInstanceTags(SERVER_INSTANCE_ID_PREFIX + i, "", false);
+      }
+      dryRunResult = tenantRebalancer.rebalance(config);
 
-    serverInfo =
-        dryRunResult.getRebalanceTableResults().get(OFFLINE_TABLE_NAME_B).getRebalanceSummaryResult().getServerInfo();
-    assertEquals(serverInfo.getServersAdded().size(), 0);
-    assertEquals(serverInfo.getServersRemoved().size(), 1);
+      serverInfo =
+          dryRunResult.getRebalanceTableResults().get(OFFLINE_TABLE_NAME_B).getRebalanceSummaryResult().getServerInfo();
+      assertEquals(serverInfo.getServersAdded().size(), 0);
+      assertEquals(serverInfo.getServersRemoved().size(), 1);
 
-    tableQueue = tenantRebalancer.createTableQueue(config, dryRunResult.getRebalanceTableResults());
-    // Dimension table B should be rebalance last in this case
-    jobContext = tableQueue.poll();
-    assertNotNull(jobContext);
-    assertEquals(jobContext.getTableName(), OFFLINE_TABLE_NAME_A);
-    jobContext = tableQueue.poll();
-    assertNotNull(jobContext);
-    assertEquals(jobContext.getTableName(), OFFLINE_TABLE_NAME_B);
+      tableQueue = tenantRebalancer.createTableQueue(config, dryRunResult.getRebalanceTableResults());
+      // Dimension table B should be rebalance last in this case
+      jobContext = tableQueue.poll();
+      assertNotNull(jobContext);
+      assertEquals(jobContext.getTableName(), OFFLINE_TABLE_NAME_A);
+      jobContext = tableQueue.poll();
+      assertNotNull(jobContext);
+      assertEquals(jobContext.getTableName(), OFFLINE_TABLE_NAME_B);
 
-    // set table B in parallel blacklist, so that it ends up in sequential queue, and table A in parallel queue
-    Pair<ConcurrentLinkedDeque<TenantRebalancer.TenantTableRebalanceJobContext>,
-        Queue<TenantRebalancer.TenantTableRebalanceJobContext>>
-        queues =
-        tenantRebalancer.createParallelAndSequentialQueues(config, dryRunResult.getRebalanceTableResults(), null,
-            Collections.singleton(OFFLINE_TABLE_NAME_B));
-    Queue<TenantRebalancer.TenantTableRebalanceJobContext> parallelQueue = queues.getLeft();
-    Queue<TenantRebalancer.TenantTableRebalanceJobContext> sequentialQueue = queues.getRight();
-    jobContext = parallelQueue.poll();
-    assertNotNull(jobContext);
-    assertEquals(jobContext.getTableName(), OFFLINE_TABLE_NAME_A);
-    assertNull(parallelQueue.poll());
-    jobContext = sequentialQueue.poll();
-    assertNotNull(jobContext);
-    assertEquals(jobContext.getTableName(), OFFLINE_TABLE_NAME_B);
-    assertNull(sequentialQueue.poll());
+      // set table B in parallel blacklist, so that it ends up in sequential queue, and table A in parallel queue
+      Pair<ConcurrentLinkedDeque<TenantRebalancer.TenantTableRebalanceJobContext>,
+          Queue<TenantRebalancer.TenantTableRebalanceJobContext>>
+          queues =
+          tenantRebalancer.createParallelAndSequentialQueues(config, dryRunResult.getRebalanceTableResults(), null,
+              Collections.singleton(OFFLINE_TABLE_NAME_B));
+      Queue<TenantRebalancer.TenantTableRebalanceJobContext> parallelQueue = queues.getLeft();
+      Queue<TenantRebalancer.TenantTableRebalanceJobContext> sequentialQueue = queues.getRight();
+      jobContext = parallelQueue.poll();
+      assertNotNull(jobContext);
+      assertEquals(jobContext.getTableName(), OFFLINE_TABLE_NAME_A);
+      assertNull(parallelQueue.poll());
+      jobContext = sequentialQueue.poll();
+      assertNotNull(jobContext);
+      assertEquals(jobContext.getTableName(), OFFLINE_TABLE_NAME_B);
+      assertNull(sequentialQueue.poll());
 
-    // set table B in parallel whitelist, so that it ends up in parallel queue, and table A in sequential queue
-    queues = tenantRebalancer.createParallelAndSequentialQueues(config, dryRunResult.getRebalanceTableResults(),
-        Collections.singleton(OFFLINE_TABLE_NAME_B), null);
-    parallelQueue = queues.getLeft();
-    sequentialQueue = queues.getRight();
-    jobContext = parallelQueue.poll();
-    assertNotNull(jobContext);
-    assertEquals(jobContext.getTableName(), OFFLINE_TABLE_NAME_B);
-    assertNull(parallelQueue.poll());
-    jobContext = sequentialQueue.poll();
-    assertNotNull(jobContext);
-    assertEquals(jobContext.getTableName(), OFFLINE_TABLE_NAME_A);
-    assertNull(sequentialQueue.poll());
+      // set table B in parallel whitelist, so that it ends up in parallel queue, and table A in sequential queue
+      queues = tenantRebalancer.createParallelAndSequentialQueues(config, dryRunResult.getRebalanceTableResults(),
+          Collections.singleton(OFFLINE_TABLE_NAME_B), null);
+      parallelQueue = queues.getLeft();
+      sequentialQueue = queues.getRight();
+      jobContext = parallelQueue.poll();
+      assertNotNull(jobContext);
+      assertEquals(jobContext.getTableName(), OFFLINE_TABLE_NAME_B);
+      assertNull(parallelQueue.poll());
+      jobContext = sequentialQueue.poll();
+      assertNotNull(jobContext);
+      assertEquals(jobContext.getTableName(), OFFLINE_TABLE_NAME_A);
+      assertNull(sequentialQueue.poll());
 
-    // set both tables in parallel whitelist, and table B in parallel blacklist, so that B ends up in sequential
-    // queue, and table A in parallel queue
-    queues = tenantRebalancer.createParallelAndSequentialQueues(config, dryRunResult.getRebalanceTableResults(),
-        Set.of(OFFLINE_TABLE_NAME_A, OFFLINE_TABLE_NAME_B), Collections.singleton(OFFLINE_TABLE_NAME_B));
-    parallelQueue = queues.getLeft();
-    sequentialQueue = queues.getRight();
-    jobContext = parallelQueue.poll();
-    assertNotNull(jobContext);
-    assertEquals(jobContext.getTableName(), OFFLINE_TABLE_NAME_A);
-    assertNull(parallelQueue.poll());
-    jobContext = sequentialQueue.poll();
-    assertNotNull(jobContext);
-    assertEquals(jobContext.getTableName(), OFFLINE_TABLE_NAME_B);
-    assertNull(sequentialQueue.poll());
-
+      // set both tables in parallel whitelist, and table B in parallel blacklist, so that B ends up in sequential
+      // queue, and table A in parallel queue
+      queues = tenantRebalancer.createParallelAndSequentialQueues(config, dryRunResult.getRebalanceTableResults(),
+          Set.of(OFFLINE_TABLE_NAME_A, OFFLINE_TABLE_NAME_B), Collections.singleton(OFFLINE_TABLE_NAME_B));
+      parallelQueue = queues.getLeft();
+      sequentialQueue = queues.getRight();
+      jobContext = parallelQueue.poll();
+      assertNotNull(jobContext);
+      assertEquals(jobContext.getTableName(), OFFLINE_TABLE_NAME_A);
+      assertNull(parallelQueue.poll());
+      jobContext = sequentialQueue.poll();
+      assertNotNull(jobContext);
+      assertEquals(jobContext.getTableName(), OFFLINE_TABLE_NAME_B);
+      assertNull(sequentialQueue.poll());
     } finally {
       _helixResourceManager.deleteOfflineTable(RAW_TABLE_NAME_A);
       _helixResourceManager.deleteOfflineTable(RAW_TABLE_NAME_B);
@@ -1137,50 +1138,50 @@ public class TenantRebalancerTest extends ControllerTest {
     try {
       String jobId = "test-poll-job-123";
 
-    // Create tenant rebalance context with tables in queues
-    TenantRebalanceConfig config = new TenantRebalanceConfig();
-    config.setTenantName(TENANT_NAME);
-    config.setVerboseResult(true);
-    config.setDryRun(true);
+      // Create tenant rebalance context with tables in queues
+      TenantRebalanceConfig config = new TenantRebalanceConfig();
+      config.setTenantName(TENANT_NAME);
+      config.setVerboseResult(true);
+      config.setDryRun(true);
 
-    TenantRebalanceResult dryRunResult = tenantRebalancer.rebalance(config);
-    TenantRebalanceContext context = new TenantRebalanceContext(
-        jobId, config, 1,
-        dryRunResult.getRebalanceTableResults().keySet().stream()
-            .map(tableName -> new TenantRebalancer.TenantTableRebalanceJobContext(tableName, tableName + "_job", false))
-            .collect(Collectors.toCollection(ConcurrentLinkedDeque::new)),
-        new LinkedList<>(),
-        new ConcurrentLinkedQueue<>()
-    );
+      TenantRebalanceResult dryRunResult = tenantRebalancer.rebalance(config);
+      TenantRebalanceContext context = new TenantRebalanceContext(
+          jobId, config, 1,
+          dryRunResult.getRebalanceTableResults().keySet().stream()
+              .map(tableName -> new TenantRebalancer.TenantTableRebalanceJobContext(tableName, tableName + "_job",
+                  false))
+              .collect(Collectors.toCollection(ConcurrentLinkedDeque::new)),
+          new LinkedList<>(),
+          new ConcurrentLinkedQueue<>()
+      );
 
-    TenantRebalanceProgressStats progressStats =
-        new TenantRebalanceProgressStats(dryRunResult.getRebalanceTableResults().keySet());
+      TenantRebalanceProgressStats progressStats =
+          new TenantRebalanceProgressStats(dryRunResult.getRebalanceTableResults().keySet());
 
-    // Test polling from parallel queue
-    ZkBasedTenantRebalanceObserver observer =
-        new ZkBasedTenantRebalanceObserver(jobId, TENANT_NAME, progressStats, context, _helixResourceManager);
-    TenantRebalancer.TenantTableRebalanceJobContext polledJob = observer.pollParallel();
-    assertNotNull(polledJob);
-    assertTrue(dryRunResult.getRebalanceTableResults().containsKey(polledJob.getTableName()));
+      // Test polling from parallel queue
+      ZkBasedTenantRebalanceObserver observer =
+          new ZkBasedTenantRebalanceObserver(jobId, TENANT_NAME, progressStats, context, _helixResourceManager);
+      TenantRebalancer.TenantTableRebalanceJobContext polledJob = observer.pollParallel();
+      assertNotNull(polledJob);
+      assertTrue(dryRunResult.getRebalanceTableResults().containsKey(polledJob.getTableName()));
 
-    // Test polling from sequential queue (should be empty)
-    TenantRebalancer.TenantTableRebalanceJobContext sequentialJob = observer.pollSequential();
-    assertNull(sequentialJob);
+      // Test polling from sequential queue (should be empty)
+      TenantRebalancer.TenantTableRebalanceJobContext sequentialJob = observer.pollSequential();
+      assertNull(sequentialJob);
 
-    // Verify the job was moved to ongoing queue and status was updated
-    Map<String, String> updatedMetadata =
-        _helixResourceManager.getControllerJobZKMetadata(jobId, ControllerJobTypes.TENANT_REBALANCE);
-    assertNotNull(updatedMetadata);
-    TenantRebalanceContext updatedContext = TenantRebalanceContext.fromTenantRebalanceJobMetadata(updatedMetadata);
-    TenantRebalanceProgressStats updatedStats =
-        TenantRebalanceProgressStats.fromTenantRebalanceJobMetadata(updatedMetadata);
+      // Verify the job was moved to ongoing queue and status was updated
+      Map<String, String> updatedMetadata =
+          _helixResourceManager.getControllerJobZKMetadata(jobId, ControllerJobTypes.TENANT_REBALANCE);
+      assertNotNull(updatedMetadata);
+      TenantRebalanceContext updatedContext = TenantRebalanceContext.fromTenantRebalanceJobMetadata(updatedMetadata);
+      TenantRebalanceProgressStats updatedStats =
+          TenantRebalanceProgressStats.fromTenantRebalanceJobMetadata(updatedMetadata);
 
-    assertNotNull(updatedContext);
-    assertNotNull(updatedStats);
-    assertEquals(updatedContext.getOngoingJobsQueue().size(), 1);
-    assertEquals(updatedStats.getTableStatusMap().get(polledJob.getTableName()),
-        TenantRebalanceProgressStats.TableStatus.REBALANCING.name());
-
+      assertNotNull(updatedContext);
+      assertNotNull(updatedStats);
+      assertEquals(updatedContext.getOngoingJobsQueue().size(), 1);
+      assertEquals(updatedStats.getTableStatusMap().get(polledJob.getTableName()),
+          TenantRebalanceProgressStats.TableStatus.REBALANCING.name());
     } finally {
       _helixResourceManager.deleteOfflineTable(RAW_TABLE_NAME_A);
       _helixResourceManager.deleteOfflineTable(RAW_TABLE_NAME_B);
@@ -1224,70 +1225,70 @@ public class TenantRebalancerTest extends ControllerTest {
       // Create observer and test cancellation
       String jobId = "test-cancel-job-456";
 
-    // Create tenant rebalance context with tables in queues
-    TenantRebalanceConfig config = new TenantRebalanceConfig();
-    config.setTenantName(TENANT_NAME);
-    config.setVerboseResult(true);
-    config.setDryRun(true);
+      // Create tenant rebalance context with tables in queues
+      TenantRebalanceConfig config = new TenantRebalanceConfig();
+      config.setTenantName(TENANT_NAME);
+      config.setVerboseResult(true);
+      config.setDryRun(true);
 
-    TenantRebalanceResult dryRunResult = tenantRebalancer.rebalance(config);
-    Set<String> tableNames = dryRunResult.getRebalanceTableResults().keySet();
+      TenantRebalanceResult dryRunResult = tenantRebalancer.rebalance(config);
+      Set<String> tableNames = dryRunResult.getRebalanceTableResults().keySet();
 
-    TenantRebalanceContext context = new TenantRebalanceContext(
-        jobId, config, 1,
-        tableNames.stream()
-            .map(tableName -> new TenantRebalancer.TenantTableRebalanceJobContext(tableName, tableName + "_job", false))
-            .collect(Collectors.toCollection(ConcurrentLinkedDeque::new)),
-        new LinkedList<>(),
-        new ConcurrentLinkedQueue<>()
-    );
+      TenantRebalanceContext context = new TenantRebalanceContext(
+          jobId, config, 1,
+          tableNames.stream()
+              .map(tableName -> new TenantRebalancer.TenantTableRebalanceJobContext(tableName, tableName + "_job",
+                  false))
+              .collect(Collectors.toCollection(ConcurrentLinkedDeque::new)),
+          new LinkedList<>(),
+          new ConcurrentLinkedQueue<>()
+      );
 
-    TenantRebalanceProgressStats progressStats = new TenantRebalanceProgressStats(tableNames);
+      TenantRebalanceProgressStats progressStats = new TenantRebalanceProgressStats(tableNames);
 
-    // Test cancellation by user
-    ZkBasedTenantRebalanceObserver observer =
-        new ZkBasedTenantRebalanceObserver(jobId, TENANT_NAME, progressStats, context, _helixResourceManager);
+      // Test cancellation by user
+      ZkBasedTenantRebalanceObserver observer =
+          new ZkBasedTenantRebalanceObserver(jobId, TENANT_NAME, progressStats, context, _helixResourceManager);
 
-    // move one job to ongoing to test cancellation from that state
-    TenantRebalancer.TenantTableRebalanceJobContext polledJob = observer.pollParallel();
-    assertNotNull(polledJob);
-    assertTrue(dryRunResult.getRebalanceTableResults().containsKey(polledJob.getTableName()));
+      // move one job to ongoing to test cancellation from that state
+      TenantRebalancer.TenantTableRebalanceJobContext polledJob = observer.pollParallel();
+      assertNotNull(polledJob);
+      assertTrue(dryRunResult.getRebalanceTableResults().containsKey(polledJob.getTableName()));
 
-    Pair<List<String>, Boolean> cancelResult = observer.cancelJob(true);
-    assertTrue(cancelResult.getRight()); // cancellation was successful
-    assertTrue(cancelResult.getLeft()
-        .isEmpty()); // no jobs were cancelled (the polled job hasn't started its table rebalance job yet thus won't
-    // show in the cancelled list)
+      Pair<List<String>, Boolean> cancelResult = observer.cancelJob(true);
+      assertTrue(cancelResult.getRight()); // cancellation was successful
+      assertTrue(cancelResult.getLeft()
+          .isEmpty()); // no jobs were cancelled (the polled job hasn't started its table rebalance job yet thus won't
+      // show in the cancelled list)
 
-    // Verify that queues are emptied and status is updated
-    Map<String, String> updatedMetadata =
-        _helixResourceManager.getControllerJobZKMetadata(jobId, ControllerJobTypes.TENANT_REBALANCE);
-    assertNotNull(updatedMetadata);
-    TenantRebalanceContext updatedContext = TenantRebalanceContext.fromTenantRebalanceJobMetadata(updatedMetadata);
-    TenantRebalanceProgressStats updatedStats =
-        TenantRebalanceProgressStats.fromTenantRebalanceJobMetadata(updatedMetadata);
+      // Verify that queues are emptied and status is updated
+      Map<String, String> updatedMetadata =
+          _helixResourceManager.getControllerJobZKMetadata(jobId, ControllerJobTypes.TENANT_REBALANCE);
+      assertNotNull(updatedMetadata);
+      TenantRebalanceContext updatedContext = TenantRebalanceContext.fromTenantRebalanceJobMetadata(updatedMetadata);
+      TenantRebalanceProgressStats updatedStats =
+          TenantRebalanceProgressStats.fromTenantRebalanceJobMetadata(updatedMetadata);
 
-    assertNotNull(updatedContext);
-    assertNotNull(updatedStats);
-    assertTrue(updatedContext.getParallelQueue().isEmpty());
-    assertTrue(updatedContext.getSequentialQueue().isEmpty());
-    assertTrue(updatedContext.getOngoingJobsQueue().isEmpty());
-    assertEquals(updatedStats.getRemainingTables(), 0);
-    assertEquals(updatedStats.getCompletionStatusMsg(), "Tenant rebalance job has been cancelled.");
-    assertTrue(updatedStats.getTimeToFinishInSeconds() >= 0);
+      assertNotNull(updatedContext);
+      assertNotNull(updatedStats);
+      assertTrue(updatedContext.getParallelQueue().isEmpty());
+      assertTrue(updatedContext.getSequentialQueue().isEmpty());
+      assertTrue(updatedContext.getOngoingJobsQueue().isEmpty());
+      assertEquals(updatedStats.getRemainingTables(), 0);
+      assertEquals(updatedStats.getCompletionStatusMsg(), "Tenant rebalance job has been cancelled.");
+      assertTrue(updatedStats.getTimeToFinishInSeconds() >= 0);
 
-    // Verify all tables are marked as not scheduled
-    for (String tableName : tableNames) {
-      if (tableName.equals(polledJob.getTableName())) {
-        // the polled job was in ongoing, so should be marked as CANCELLED
-        assertEquals(updatedStats.getTableStatusMap().get(tableName),
-            TenantRebalanceProgressStats.TableStatus.CANCELLED.name());
-      } else {
-        assertEquals(updatedStats.getTableStatusMap().get(tableName),
-            TenantRebalanceProgressStats.TableStatus.NOT_SCHEDULED.name());
+      // Verify all tables are marked as not scheduled
+      for (String tableName : tableNames) {
+        if (tableName.equals(polledJob.getTableName())) {
+          // the polled job was in ongoing, so should be marked as CANCELLED
+          assertEquals(updatedStats.getTableStatusMap().get(tableName),
+              TenantRebalanceProgressStats.TableStatus.CANCELLED.name());
+        } else {
+          assertEquals(updatedStats.getTableStatusMap().get(tableName),
+              TenantRebalanceProgressStats.TableStatus.NOT_SCHEDULED.name());
+        }
       }
-    }
-
     } finally {
       _helixResourceManager.deleteOfflineTable(RAW_TABLE_NAME_A);
       _helixResourceManager.deleteOfflineTable(RAW_TABLE_NAME_B);
@@ -1331,58 +1332,60 @@ public class TenantRebalancerTest extends ControllerTest {
       // Create observer and test table job completion
       String jobId = "test-table-done-job-789";
 
-    // Create tenant rebalance context with tables in ongoing queue
-    TenantRebalanceConfig config = new TenantRebalanceConfig();
-    config.setTenantName(TENANT_NAME);
-    config.setVerboseResult(true);
-    config.setDryRun(true);
+      // Create tenant rebalance context with tables in ongoing queue
+      TenantRebalanceConfig config = new TenantRebalanceConfig();
+      config.setTenantName(TENANT_NAME);
+      config.setVerboseResult(true);
+      config.setDryRun(true);
 
-    TenantRebalanceResult dryRunResult = tenantRebalancer.rebalance(config);
-    Set<String> tableNames = dryRunResult.getRebalanceTableResults().keySet();
+      TenantRebalanceResult dryRunResult = tenantRebalancer.rebalance(config);
+      Set<String> tableNames = dryRunResult.getRebalanceTableResults().keySet();
 
-    TenantRebalanceContext context = new TenantRebalanceContext(
-        jobId, config, 1,
-        new ConcurrentLinkedDeque<>(),
-        new LinkedList<>(),
-        tableNames.stream()
-            .map(tableName -> new TenantRebalancer.TenantTableRebalanceJobContext(tableName, tableName + "_job", false))
-            .collect(Collectors.toCollection(ConcurrentLinkedQueue::new))
-    );
+      TenantRebalanceContext context = new TenantRebalanceContext(
+          jobId, config, 1,
+          new ConcurrentLinkedDeque<>(),
+          new LinkedList<>(),
+          tableNames.stream()
+              .map(tableName -> new TenantRebalancer.TenantTableRebalanceJobContext(tableName, tableName + "_job",
+                  false))
+              .collect(Collectors.toCollection(ConcurrentLinkedQueue::new))
+      );
 
-    TenantRebalanceProgressStats progressStats = new TenantRebalanceProgressStats(tableNames);
-    // Set initial status to REBALANCING for the tables
-    for (String tableName : tableNames) {
-      progressStats.updateTableStatus(tableName, TenantRebalanceProgressStats.TableStatus.REBALANCING.name());
-    }
+      TenantRebalanceProgressStats progressStats = new TenantRebalanceProgressStats(tableNames);
+      // Set initial status to REBALANCING for the tables
+      for (String tableName : tableNames) {
+        progressStats.updateTableStatus(tableName, TenantRebalanceProgressStats.TableStatus.REBALANCING.name());
+      }
 
-    // Test onTableJobDone
-    ZkBasedTenantRebalanceObserver observer =
-        new ZkBasedTenantRebalanceObserver(jobId, TENANT_NAME, progressStats, context, _helixResourceManager);
-    TenantRebalancer.TenantTableRebalanceJobContext jobContextA =
-        new TenantRebalancer.TenantTableRebalanceJobContext(OFFLINE_TABLE_NAME_A, OFFLINE_TABLE_NAME_A + "_job", false);
-    observer.onTableJobDone(jobContextA);
-    TenantRebalancer.TenantTableRebalanceJobContext jobContextB =
-        new TenantRebalancer.TenantTableRebalanceJobContext(OFFLINE_TABLE_NAME_B, OFFLINE_TABLE_NAME_B + "_job", false);
-    String errorMessage = "Test error message";
-    observer.onTableJobError(jobContextB, errorMessage);
+      // Test onTableJobDone
+      ZkBasedTenantRebalanceObserver observer =
+          new ZkBasedTenantRebalanceObserver(jobId, TENANT_NAME, progressStats, context, _helixResourceManager);
+      TenantRebalancer.TenantTableRebalanceJobContext jobContextA =
+          new TenantRebalancer.TenantTableRebalanceJobContext(OFFLINE_TABLE_NAME_A, OFFLINE_TABLE_NAME_A + "_job",
+              false);
+      observer.onTableJobDone(jobContextA);
+      TenantRebalancer.TenantTableRebalanceJobContext jobContextB =
+          new TenantRebalancer.TenantTableRebalanceJobContext(OFFLINE_TABLE_NAME_B, OFFLINE_TABLE_NAME_B + "_job",
+              false);
+      String errorMessage = "Test error message";
+      observer.onTableJobError(jobContextB, errorMessage);
 
-    // Verify that the job was removed from ongoing queue and status was updated
-    Map<String, String> updatedMetadata =
-        _helixResourceManager.getControllerJobZKMetadata(jobId, ControllerJobTypes.TENANT_REBALANCE);
-    assertNotNull(updatedMetadata);
-    TenantRebalanceContext updatedContext = TenantRebalanceContext.fromTenantRebalanceJobMetadata(updatedMetadata);
-    TenantRebalanceProgressStats updatedStats =
-        TenantRebalanceProgressStats.fromTenantRebalanceJobMetadata(updatedMetadata);
+      // Verify that the job was removed from ongoing queue and status was updated
+      Map<String, String> updatedMetadata =
+          _helixResourceManager.getControllerJobZKMetadata(jobId, ControllerJobTypes.TENANT_REBALANCE);
+      assertNotNull(updatedMetadata);
+      TenantRebalanceContext updatedContext = TenantRebalanceContext.fromTenantRebalanceJobMetadata(updatedMetadata);
+      TenantRebalanceProgressStats updatedStats =
+          TenantRebalanceProgressStats.fromTenantRebalanceJobMetadata(updatedMetadata);
 
-    assertNotNull(updatedContext);
-    assertNotNull(updatedStats);
-    assertFalse(updatedContext.getOngoingJobsQueue().contains(jobContextA));
-    assertFalse(updatedContext.getOngoingJobsQueue().contains(jobContextB));
-    assertEquals(updatedStats.getTableStatusMap().get(OFFLINE_TABLE_NAME_A),
-        TenantRebalanceProgressStats.TableStatus.DONE.name());
-    assertEquals(updatedStats.getTableStatusMap().get(OFFLINE_TABLE_NAME_B), errorMessage);
-    assertEquals(updatedStats.getRemainingTables(), tableNames.size() - 2);
-
+      assertNotNull(updatedContext);
+      assertNotNull(updatedStats);
+      assertFalse(updatedContext.getOngoingJobsQueue().contains(jobContextA));
+      assertFalse(updatedContext.getOngoingJobsQueue().contains(jobContextB));
+      assertEquals(updatedStats.getTableStatusMap().get(OFFLINE_TABLE_NAME_A),
+          TenantRebalanceProgressStats.TableStatus.DONE.name());
+      assertEquals(updatedStats.getTableStatusMap().get(OFFLINE_TABLE_NAME_B), errorMessage);
+      assertEquals(updatedStats.getRemainingTables(), tableNames.size() - 2);
     } finally {
       _helixResourceManager.deleteOfflineTable(RAW_TABLE_NAME_A);
       _helixResourceManager.deleteOfflineTable(RAW_TABLE_NAME_B);
@@ -1426,51 +1429,51 @@ public class TenantRebalancerTest extends ControllerTest {
       // Create observer and test lifecycle methods
       String jobId = "test-lifecycle-job-202";
 
-    // Create tenant rebalance context
-    TenantRebalanceConfig config = new TenantRebalanceConfig();
-    config.setTenantName(TENANT_NAME);
-    config.setVerboseResult(true);
-    config.setDryRun(true);
+      // Create tenant rebalance context
+      TenantRebalanceConfig config = new TenantRebalanceConfig();
+      config.setTenantName(TENANT_NAME);
+      config.setVerboseResult(true);
+      config.setDryRun(true);
 
-    TenantRebalanceResult dryRunResult = tenantRebalancer.rebalance(config);
-    Set<String> tableNames = dryRunResult.getRebalanceTableResults().keySet();
+      TenantRebalanceResult dryRunResult = tenantRebalancer.rebalance(config);
+      Set<String> tableNames = dryRunResult.getRebalanceTableResults().keySet();
 
-    TenantRebalanceContext context = new TenantRebalanceContext(
-        jobId, config, 1,
-        tableNames.stream()
-            .map(tableName -> new TenantRebalancer.TenantTableRebalanceJobContext(tableName, tableName + "_job", false))
-            .collect(Collectors.toCollection(ConcurrentLinkedDeque::new)),
-        new LinkedList<>(),
-        new ConcurrentLinkedQueue<>()
-    );
+      TenantRebalanceContext context = new TenantRebalanceContext(
+          jobId, config, 1,
+          tableNames.stream()
+              .map(tableName -> new TenantRebalancer.TenantTableRebalanceJobContext(tableName, tableName + "_job",
+                  false))
+              .collect(Collectors.toCollection(ConcurrentLinkedDeque::new)),
+          new LinkedList<>(),
+          new ConcurrentLinkedQueue<>()
+      );
 
-    TenantRebalanceProgressStats progressStats = new TenantRebalanceProgressStats(tableNames);
+      TenantRebalanceProgressStats progressStats = new TenantRebalanceProgressStats(tableNames);
 
-    // Test onStart
-    ZkBasedTenantRebalanceObserver observer =
-        new ZkBasedTenantRebalanceObserver(jobId, TENANT_NAME, progressStats, context, _helixResourceManager);
-    observer.onStart();
-    Map<String, String> startMetadata =
-        _helixResourceManager.getControllerJobZKMetadata(jobId, ControllerJobTypes.TENANT_REBALANCE);
-    assertNotNull(startMetadata);
-    TenantRebalanceProgressStats startStats =
-        TenantRebalanceProgressStats.fromTenantRebalanceJobMetadata(startMetadata);
-    assertNotNull(startStats);
-    assertTrue(startStats.getStartTimeMs() > 0);
+      // Test onStart
+      ZkBasedTenantRebalanceObserver observer =
+          new ZkBasedTenantRebalanceObserver(jobId, TENANT_NAME, progressStats, context, _helixResourceManager);
+      observer.onStart();
+      Map<String, String> startMetadata =
+          _helixResourceManager.getControllerJobZKMetadata(jobId, ControllerJobTypes.TENANT_REBALANCE);
+      assertNotNull(startMetadata);
+      TenantRebalanceProgressStats startStats =
+          TenantRebalanceProgressStats.fromTenantRebalanceJobMetadata(startMetadata);
+      assertNotNull(startStats);
+      assertTrue(startStats.getStartTimeMs() > 0);
 
-    // Test onSuccess
-    String successMessage = "Tenant rebalance completed successfully";
-    observer.onSuccess(successMessage);
-    Map<String, String> successMetadata =
-        _helixResourceManager.getControllerJobZKMetadata(jobId, ControllerJobTypes.TENANT_REBALANCE);
-    assertNotNull(successMetadata);
-    TenantRebalanceProgressStats successStats =
-        TenantRebalanceProgressStats.fromTenantRebalanceJobMetadata(successMetadata);
-    assertNotNull(successStats);
-    assertEquals(successStats.getCompletionStatusMsg(), successMessage);
-    assertTrue(successStats.getTimeToFinishInSeconds() >= 0);
-    assertTrue(observer.isDone());
-
+      // Test onSuccess
+      String successMessage = "Tenant rebalance completed successfully";
+      observer.onSuccess(successMessage);
+      Map<String, String> successMetadata =
+          _helixResourceManager.getControllerJobZKMetadata(jobId, ControllerJobTypes.TENANT_REBALANCE);
+      assertNotNull(successMetadata);
+      TenantRebalanceProgressStats successStats =
+          TenantRebalanceProgressStats.fromTenantRebalanceJobMetadata(successMetadata);
+      assertNotNull(successStats);
+      assertEquals(successStats.getCompletionStatusMsg(), successMessage);
+      assertTrue(successStats.getTimeToFinishInSeconds() >= 0);
+      assertTrue(observer.isDone());
     } finally {
       _helixResourceManager.deleteOfflineTable(RAW_TABLE_NAME_A);
       _helixResourceManager.deleteOfflineTable(RAW_TABLE_NAME_B);
@@ -1511,7 +1514,6 @@ public class TenantRebalancerTest extends ControllerTest {
       for (int i = 0; i < 3; i++) {
         runZkBasedTenantRebalanceObserverConcurrentPoll();
       }
-
     } finally {
       // Clean up tables
       for (String tableName : tableNames) {
