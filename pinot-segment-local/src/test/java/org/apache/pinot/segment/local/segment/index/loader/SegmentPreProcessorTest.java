@@ -1506,6 +1506,32 @@ public class SegmentPreProcessorTest implements PinotBuffersAfterClassCheckRule 
     });
   }
 
+  @Test(dataProvider = "bothV1AndV3")
+  public void testH3IndexResolutionUpdate(SegmentVersion segmentVersion)
+      throws Exception {
+    buildSegment(segmentVersion);
+
+    // Create H3 index with resolution 5.
+    _fieldConfigMap.put("newH3Col",
+        new FieldConfig("newH3Col", FieldConfig.EncodingType.DICTIONARY, List.of(FieldConfig.IndexType.H3), null,
+            Map.of("resolutions", "5")));
+    runPreProcessor(_newColumnsSchemaWithH3Json);
+
+    verifyProcessNotNeeded();
+
+    // Update H3 index resolution to 4
+    _fieldConfigMap.put("newH3Col",
+        new FieldConfig("newH3Col", FieldConfig.EncodingType.DICTIONARY, List.of(FieldConfig.IndexType.H3), null,
+            Map.of("resolutions", "4")));
+
+    // Verify that preprocessing is needed, update the index, and verify again that no more processing is needed
+    verifyProcessNeeded();
+
+    // Remove new indexes
+    resetIndexConfigs();
+    runPreProcessor(_newColumnsSchemaWithH3Json);
+  }
+
   private void verifyProcessNeeded()
       throws Exception {
     try (SegmentDirectory segmentDirectory = new SegmentLocalFSDirectory(INDEX_DIR, ReadMode.mmap);
