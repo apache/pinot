@@ -483,7 +483,7 @@ public class ReceivingMailbox {
     /// @throws InterruptedException if the thread is interrupted while waiting for space in the queue.
     /// @throws TimeoutException if the timeout specified elapsed before space was available in the queue.
     @GuardedBy("_lock")
-    private synchronized boolean offerDataToBuffer(MseBlock.Data block, long timeout, TimeUnit timeUnit)
+    private boolean offerDataToBuffer(MseBlock.Data block, long timeout, TimeUnit timeUnit)
         throws InterruptedException, TimeoutException {
 
       assert _state == State.FULL_OPEN;
