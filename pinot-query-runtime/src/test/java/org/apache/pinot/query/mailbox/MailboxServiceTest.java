@@ -92,7 +92,6 @@ public class MailboxServiceTest {
       sendingMailbox.send(OperatorTestUtil.block(DATA_SCHEMA, new Object[]{Integer.toString(i)}));
     }
     sendingMailbox.send(SuccessMseBlock.INSTANCE, MultiStageQueryStats.emptyStats(SENDER_STAGE_ID).serialize());
-    sendingMailbox.complete();
 
     ReceivingMailbox receivingMailbox = _mailboxService1.getReceivingMailbox(mailboxId);
     receivingMailbox.registeredReader(() -> {
@@ -129,7 +128,6 @@ public class MailboxServiceTest {
       sendingMailbox.send(OperatorTestUtil.block(DATA_SCHEMA, new Object[]{Integer.toString(i)}));
     }
     sendingMailbox.send(SuccessMseBlock.INSTANCE, MultiStageQueryStats.emptyStats(SENDER_STAGE_ID).serialize());
-    sendingMailbox.complete();
 
     assertEquals(numCallbacks.get(), ReceivingMailbox.DEFAULT_MAX_PENDING_BLOCKS);
 
@@ -342,7 +340,6 @@ public class MailboxServiceTest {
       sendingMailbox.send(OperatorTestUtil.block(DATA_SCHEMA, new Object[]{Integer.toString(i)}));
     }
     sendingMailbox.send(SuccessMseBlock.INSTANCE, MultiStageQueryStats.emptyStats(SENDER_STAGE_ID).serialize());
-    sendingMailbox.complete();
 
     // Wait until all the mails are delivered
     ReceivingMailbox receivingMailbox = _mailboxService1.getReceivingMailbox(mailboxId);
@@ -388,7 +385,6 @@ public class MailboxServiceTest {
       sendingMailbox.send(OperatorTestUtil.block(DATA_SCHEMA, new Object[]{Integer.toString(i)}));
     }
     sendingMailbox.send(SuccessMseBlock.INSTANCE, MultiStageQueryStats.emptyStats(SENDER_STAGE_ID).serialize());
-    sendingMailbox.complete();
 
     // Wait until all the mails are delivered
     receiveMailLatch.await();
@@ -669,7 +665,6 @@ public class MailboxServiceTest {
     sendingMailbox.send(OperatorTestUtil.block(DATA_SCHEMA, new Object[]{"0"}));
     // send a metadata block
     sendingMailbox.send(SuccessMseBlock.INSTANCE, MultiStageQueryStats.emptyStats(SENDER_STAGE_ID).serialize());
-    sendingMailbox.complete();
 
     // sending side should early terminate
     TestUtils.waitForCondition(aVoid -> sendingMailbox.isEarlyTerminated(), 1000L, "Failed to early-terminate sender");

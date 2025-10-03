@@ -127,7 +127,6 @@ public abstract class BlockExchange {
    */
   public boolean send(MseBlock.Eos eosBlock, List<DataBuffer> serializedStats)
       throws IOException, TimeoutException {
-    int numMailboxes = _sendingMailboxes.size();
     int mailboxIdToSendMetadata;
     if (!serializedStats.isEmpty()) {
       mailboxIdToSendMetadata = _statsIndexChooser.apply(_sendingMailboxes);
@@ -139,15 +138,28 @@ public abstract class BlockExchange {
       // this may happen when the block exchange is itself used as a sending mailbox, like when using spools
       mailboxIdToSendMetadata = -1;
     }
+    RuntimeException firstException = null;
+    int numMailboxes = _sendingMailboxes.size();
     for (int i = 0; i < numMailboxes; i++) {
-      SendingMailbox sendingMailbox = _sendingMailboxes.get(i);
-      List<DataBuffer> statsToSend = i == mailboxIdToSendMetadata ? serializedStats : Collections.emptyList();
+      try {
+        SendingMailbox sendingMailbox = _sendingMailboxes.get(i);
+        List<DataBuffer> statsToSend = i == mailboxIdToSendMetadata ? serializedStats : Collections.emptyList();
 
-      sendingMailbox.send(eosBlock, statsToSend);
-      sendingMailbox.complete();
-      if (LOGGER.isTraceEnabled()) {
-        LOGGER.trace("Block sent: {} {} to {}", eosBlock, System.identityHashCode(eosBlock), sendingMailbox);
+        sendingMailbox.send(eosBlock, statsToSend);
+        if (LOGGER.isTraceEnabled()) {
+          LOGGER.trace("Block sent: {} {} to {}", eosBlock, System.identityHashCode(eosBlock), sendingMailbox);
+        }
+      } catch (IOException | TimeoutException | RuntimeException e) {
+        // We want to try to send EOS to all mailboxes, so we catch the exception and rethrow it at the end.
+        if (firstException == null) {
+          firstException = new RuntimeException("Failed to send EOS block to mailbox #" + i, e);
+        } else {
+          firstException.addSuppressed(e);
+        }
       }
+    }
+    if (firstException != null) {
+      throw firstException;
     }
     return false;
   }
@@ -237,12 +249,8 @@ public abstract class BlockExchange {
         _earlyTerminated = BlockExchange.this.send(((MseBlock.Data) block));
       } else {
         _earlyTerminated = BlockExchange.this.send(((MseBlock.Eos) block), serializedStats);
+        _completed = true;
       }
-    }
-
-    @Override
-    public void complete() {
-      _completed = true;
     }
 
     @Override
