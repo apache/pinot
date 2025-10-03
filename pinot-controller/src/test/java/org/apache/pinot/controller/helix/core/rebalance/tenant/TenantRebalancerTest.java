@@ -90,6 +90,7 @@ public class TenantRebalancerTest extends ControllerTest {
     startController();
     addFakeBrokerInstancesToAutoJoinHelixCluster(1, true);
     _executorService = Executors.newFixedThreadPool(3);
+    ZkBasedTenantRebalanceObserver.DEFAULT_ZK_UPDATE_MAX_RETRIES = 15;
   }
 
   @Test
