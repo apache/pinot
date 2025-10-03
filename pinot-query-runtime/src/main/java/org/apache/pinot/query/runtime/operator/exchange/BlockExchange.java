@@ -127,7 +127,6 @@ public abstract class BlockExchange {
    */
   public boolean send(MseBlock.Eos eosBlock, List<DataBuffer> serializedStats)
       throws IOException, TimeoutException {
-    int numMailboxes = _sendingMailboxes.size();
     int mailboxIdToSendMetadata;
     if (!serializedStats.isEmpty()) {
       mailboxIdToSendMetadata = _statsIndexChooser.apply(_sendingMailboxes);
@@ -140,6 +139,7 @@ public abstract class BlockExchange {
       mailboxIdToSendMetadata = -1;
     }
     RuntimeException firstException = null;
+    int numMailboxes = _sendingMailboxes.size();
     for (int i = 0; i < numMailboxes; i++) {
       try {
         SendingMailbox sendingMailbox = _sendingMailboxes.get(i);
@@ -149,7 +149,7 @@ public abstract class BlockExchange {
         if (LOGGER.isTraceEnabled()) {
           LOGGER.trace("Block sent: {} {} to {}", eosBlock, System.identityHashCode(eosBlock), sendingMailbox);
         }
-      } catch (IOException | TimeoutException e) {
+      } catch (IOException | TimeoutException | RuntimeException e) {
         // We want to try to send EOS to all mailboxes, so we catch the exception and rethrow it at the end.
         if (firstException == null) {
           firstException = new RuntimeException("Failed to send EOS block to mailbox #" + i, e);
