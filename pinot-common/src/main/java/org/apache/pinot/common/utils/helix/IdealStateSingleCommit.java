@@ -38,6 +38,7 @@ import org.apache.pinot.spi.utils.retry.RetryPolicy;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+
 /**
  * A utility class for committing ideal states in a single commit operation.
  */
