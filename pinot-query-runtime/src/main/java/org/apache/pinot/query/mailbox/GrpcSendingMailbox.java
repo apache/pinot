@@ -22,7 +22,6 @@ import com.google.common.collect.Maps;
 import com.google.protobuf.ByteString;
 import com.google.protobuf.UnsafeByteOperations;
 import io.grpc.Metadata;
-import io.grpc.Status;
 import io.grpc.stub.MetadataUtils;
 import io.grpc.stub.StreamObserver;
 import java.io.IOException;
