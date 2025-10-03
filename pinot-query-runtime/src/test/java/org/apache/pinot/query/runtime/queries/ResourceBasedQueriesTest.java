@@ -60,6 +60,7 @@ import org.apache.pinot.spi.env.PinotConfiguration;
 import org.apache.pinot.spi.utils.CommonConstants.MultiStageQueryRunner;
 import org.apache.pinot.spi.utils.JsonUtils;
 import org.apache.pinot.spi.utils.builder.TableNameBuilder;
+import org.assertj.core.api.Assertions;
 import org.testng.Assert;
 import org.testng.SkipException;
 import org.testng.annotations.AfterClass;
@@ -267,11 +268,11 @@ public class ResourceBasedQueriesTest extends QueryRunnerTestBase {
 
   // TODO: name the test using testCaseName for testng reports
   @Test(dataProvider = "testResourceQueryTestCaseProviderInputOnly")
-  public void testQueryTestCasesWithH2(String testCaseName, boolean isIgnored, String sql, String h2Sql, String expect,
-      boolean keepOutputRowOrder, boolean ignoreV2Optimizer)
+  public void testQueryTestCasesWithH2(String testCaseName, boolean isIgnored, String sql, String h2Sql,
+      @Nullable String expectErrorMsg, boolean keepOutputRowOrder, boolean ignoreV2Optimizer)
       throws Exception {
     // query pinot
-    runQuery(sql, expect, false).ifPresent(queryResult -> {
+    runQuery(sql, expectErrorMsg, false).ifPresent(queryResult -> {
       try {
         compareRowEquals(queryResult.getResultTable(), queryH2(h2Sql), keepOutputRowOrder);
       } catch (Exception e) {
@@ -393,22 +394,34 @@ public class ResourceBasedQueriesTest extends QueryRunnerTestBase {
     });
   }
 
-  private Optional<QueryDispatcher.QueryResult> runQuery(String sql, final String except, boolean trace)
+  private Optional<QueryDispatcher.QueryResult> runQuery(String sql, @Nullable String expectedErrorMsg, boolean trace)
       throws Exception {
     try {
       // query pinot
       QueryDispatcher.QueryResult queryResult = queryRunner(sql, trace);
-      Assert.assertNull(except, "Expected error with message '" + except + "'. But instead rows were returned: "
-          + JsonUtils.objectToPrettyString(queryResult.getResultTable()));
+      if (expectedErrorMsg == null) {
+        Assert.assertTrue(queryResult.getProcessingException() == null,
+            "Unexpected exception: " + JsonUtils.objectToPrettyString(queryResult.getProcessingException()));
+      } else {
+        Assert.assertTrue(queryResult.getProcessingException() != null,
+            "Expected error with message '" + expectedErrorMsg + "'. But instead no error was thrown.");
+        Pattern pattern = Pattern.compile(expectedErrorMsg, Pattern.DOTALL);
+        Assertions.assertThat(queryResult.getProcessingException().getMessage()).matches(pattern);
+        return Optional.empty();
+      }
+      Assert.assertNull(expectedErrorMsg, "Expected error with message '" + expectedErrorMsg
+          + "'. But instead rows were returned: " + JsonUtils.objectToPrettyString(queryResult.getResultTable()));
+      Assert.assertNotNull(queryResult.getResultTable(),
+          "Result table is null: " + JsonUtils.objectToPrettyString(queryResult));
       return Optional.of(queryResult);
     } catch (Exception e) {
-      if (except == null) {
+      if (expectedErrorMsg == null) {
         throw e;
       } else {
-        Pattern pattern = Pattern.compile(except, Pattern.DOTALL);
+        Pattern pattern = Pattern.compile(expectedErrorMsg, Pattern.DOTALL);
         Assert.assertTrue(pattern.matcher(e.getMessage()).matches(),
             String.format("Caught exception '%s', but it did not match the expected pattern '%s'.", e.getMessage(),
-                except));
+                expectedErrorMsg));
       }
     }
 

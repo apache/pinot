@@ -28,7 +28,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutorService;
-import java.util.concurrent.TimeoutException;
 import java.util.function.BiConsumer;
 import java.util.function.BooleanSupplier;
 import java.util.function.Consumer;
@@ -336,9 +335,6 @@ public class QueryRunner {
         //  current stage. We will need to fix this in future, but for now, we are sending the error block without
         //  the stats.
         sendingMailbox.send(errorBlock, Collections.emptyList());
-      } catch (TimeoutException e) {
-        LOGGER.warn("Timed out sending error block to mailbox: {} for request: {}, stage: {}",
-            routingInfo.getMailboxId(), requestId, stageId, e);
       } catch (Exception e) {
         LOGGER.error("Caught exception sending error block to mailbox: {} for request: {}, stage: {}",
             routingInfo.getMailboxId(), requestId, stageId, e);

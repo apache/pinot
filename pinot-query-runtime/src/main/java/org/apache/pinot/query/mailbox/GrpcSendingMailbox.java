@@ -50,6 +50,7 @@ import org.apache.pinot.query.runtime.blocks.SuccessMseBlock;
 import org.apache.pinot.query.runtime.operator.MailboxSendOperator;
 import org.apache.pinot.segment.spi.memory.DataBuffer;
 import org.apache.pinot.spi.exception.QueryErrorCode;
+import org.apache.pinot.spi.exception.QueryException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -116,8 +117,7 @@ public class GrpcSendingMailbox implements SendingMailbox {
     try {
       processAndSend(block, serializedStats);
     } catch (IOException e) {
-      LOGGER.warn("Failed to split and send mailbox", e);
-      throw e;
+      throw new QueryException(QueryErrorCode.INTERNAL, "Failed to split and send mailbox", e);
     }
     if (LOGGER.isDebugEnabled()) {
       LOGGER.debug("==[GRPC SEND]== message " + block + " sent to: " + _id);

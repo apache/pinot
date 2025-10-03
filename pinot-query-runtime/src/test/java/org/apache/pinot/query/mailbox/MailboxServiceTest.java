@@ -98,17 +98,21 @@ public class MailboxServiceTest {
     receivingMailbox.registeredReader(() -> {
     });
     for (int i = 0; i < ReceivingMailbox.DEFAULT_MAX_PENDING_BLOCKS - 1; i++) {
-      assertEquals(receivingMailbox.getNumPendingBlocks(), ReceivingMailbox.DEFAULT_MAX_PENDING_BLOCKS - i);
+      assertEquals(receivingMailbox.getNumPendingBlocks(), ReceivingMailbox.DEFAULT_MAX_PENDING_BLOCKS - i - 1);
       List<Object[]> rows = getRows(receivingMailbox);
       assertEquals(rows.size(), 1);
       assertEquals(rows.get(0), new Object[]{Integer.toString(i)});
     }
-    assertEquals(receivingMailbox.getNumPendingBlocks(), 1);
+    assertEquals(receivingMailbox.getNumPendingBlocks(), 0);
     ReceivingMailbox.MseBlockWithStats block = receivingMailbox.poll();
     assertNotNull(block);
     assertTrue(block.getBlock().isSuccess());
     assertEquals(receivingMailbox.getNumPendingBlocks(), 0);
-    assertNull(receivingMailbox.poll());
+
+    // Following calls to poll() should return the same eos block
+    block = receivingMailbox.poll();
+    assertNotNull(block);
+    assertTrue(block.getBlock().isSuccess());
   }
 
   @Test
@@ -134,17 +138,16 @@ public class MailboxServiceTest {
     assertEquals(numCallbacks.get(), ReceivingMailbox.DEFAULT_MAX_PENDING_BLOCKS);
 
     for (int i = 0; i < ReceivingMailbox.DEFAULT_MAX_PENDING_BLOCKS - 1; i++) {
-      assertEquals(receivingMailbox.getNumPendingBlocks(), ReceivingMailbox.DEFAULT_MAX_PENDING_BLOCKS - i);
+      assertEquals(receivingMailbox.getNumPendingBlocks(), ReceivingMailbox.DEFAULT_MAX_PENDING_BLOCKS - i - 1);
       List<Object[]> rows = getRows(receivingMailbox);
       assertEquals(rows.size(), 1);
       assertEquals(rows.get(0), new Object[]{Integer.toString(i)});
     }
-    assertEquals(receivingMailbox.getNumPendingBlocks(), 1);
+    assertEquals(receivingMailbox.getNumPendingBlocks(), 0);
     MseBlock block = readBlock(receivingMailbox);
     assertNotNull(block);
     assertTrue(block.isEos());
     assertEquals(receivingMailbox.getNumPendingBlocks(), 0);
-    assertNull(receivingMailbox.poll());
   }
 
   @Test
@@ -215,7 +218,7 @@ public class MailboxServiceTest {
     // Send one data block and then cancel
     sendingMailbox.send(OperatorTestUtil.block(DATA_SCHEMA, new Object[]{"0"}));
     receivingMailbox.cancel();
-    assertEquals(numCallbacks.get(), 1);
+    assertEquals(numCallbacks.get(), 2);
 
     // Data blocks will be cleaned up
     assertEquals(receivingMailbox.getNumPendingBlocks(), 0);
@@ -226,7 +229,7 @@ public class MailboxServiceTest {
     // Cancel is idempotent for both sending and receiving mailbox, so safe to call multiple times
     sendingMailbox.cancel(new Exception("TEST ERROR"));
     receivingMailbox.cancel();
-    assertEquals(numCallbacks.get(), 1);
+    assertEquals(numCallbacks.get(), 2);
     assertEquals(receivingMailbox.getNumPendingBlocks(), 0);
   }
 
@@ -283,7 +286,8 @@ public class MailboxServiceTest {
 
     // Next send will throw exception because buffer is full
     try {
-      sendingMailbox.send(SuccessMseBlock.INSTANCE, MultiStageQueryStats.emptyStats(SENDER_STAGE_ID).serialize());
+      // The block sent must be a data block, as error and eos blocks are always accepted
+      sendingMailbox.send(OperatorTestUtil.block(DATA_SCHEMA, new Object[]{Integer.toString(1)}));
       fail("Except exception when sending data after buffer is full");
     } catch (Exception e) {
       // Expected
@@ -338,7 +342,7 @@ public class MailboxServiceTest {
     // Sends are non-blocking as long as channel capacity is not breached
     SendingMailbox sendingMailbox =
         _mailboxService2.getSendingMailbox("localhost", _mailboxService1.getPort(), mailboxId, Long.MAX_VALUE, _stats);
-    for (int i = 0; i < ReceivingMailbox.DEFAULT_MAX_PENDING_BLOCKS - 1; i++) {
+    for (int i = 0; i < ReceivingMailbox.DEFAULT_MAX_PENDING_BLOCKS; i++) {
       sendingMailbox.send(OperatorTestUtil.block(DATA_SCHEMA, new Object[]{Integer.toString(i)}));
     }
     sendingMailbox.send(SuccessMseBlock.INSTANCE, MultiStageQueryStats.emptyStats(SENDER_STAGE_ID).serialize());
@@ -352,18 +356,16 @@ public class MailboxServiceTest {
         aVoid -> receivingMailbox.getNumPendingBlocks() == ReceivingMailbox.DEFAULT_MAX_PENDING_BLOCKS, 1000L,
         "Failed to deliver mails");
 
-    for (int i = 0; i < ReceivingMailbox.DEFAULT_MAX_PENDING_BLOCKS - 1; i++) {
+    for (int i = 0; i < ReceivingMailbox.DEFAULT_MAX_PENDING_BLOCKS; i++) {
       assertEquals(receivingMailbox.getNumPendingBlocks(), ReceivingMailbox.DEFAULT_MAX_PENDING_BLOCKS - i);
       List<Object[]> rows = getRows(receivingMailbox);
       assertEquals(rows.size(), 1);
       assertEquals(rows.get(0), new Object[]{Integer.toString(i)});
     }
-    assertEquals(receivingMailbox.getNumPendingBlocks(), 1);
+    assertEquals(receivingMailbox.getNumPendingBlocks(), 0);
     MseBlock block = readBlock(receivingMailbox);
     assertNotNull(block);
     assertTrue(block.isSuccess());
-    assertEquals(receivingMailbox.getNumPendingBlocks(), 0);
-    assertNull(receivingMailbox.poll());
   }
 
   @Test
@@ -395,17 +397,16 @@ public class MailboxServiceTest {
     assertEquals(numCallbacks.get(), ReceivingMailbox.DEFAULT_MAX_PENDING_BLOCKS);
 
     for (int i = 0; i < ReceivingMailbox.DEFAULT_MAX_PENDING_BLOCKS - 1; i++) {
-      assertEquals(receivingMailbox.getNumPendingBlocks(), ReceivingMailbox.DEFAULT_MAX_PENDING_BLOCKS - i);
+      assertEquals(receivingMailbox.getNumPendingBlocks(), ReceivingMailbox.DEFAULT_MAX_PENDING_BLOCKS - i - 1);
       List<Object[]> rows = getRows(receivingMailbox);
       assertEquals(rows.size(), 1);
       assertEquals(rows.get(0), new Object[]{Integer.toString(i)});
     }
-    assertEquals(receivingMailbox.getNumPendingBlocks(), 1);
+    assertEquals(receivingMailbox.getNumPendingBlocks(), 0);
     MseBlock block = readBlock(receivingMailbox);
     assertNotNull(block);
     assertTrue(block.isSuccess());
     assertEquals(receivingMailbox.getNumPendingBlocks(), 0);
-    assertNull(receivingMailbox.poll());
   }
 
   @Test
@@ -540,7 +541,7 @@ public class MailboxServiceTest {
     sendingMailbox.send(OperatorTestUtil.block(DATA_SCHEMA, new Object[]{"0"}));
     receiveMailLatch.await();
     receivingMailbox.cancel();
-    assertEquals(numCallbacks.get(), 1);
+    assertEquals(numCallbacks.get(), 2);
 
     // Data blocks will be cleaned up
     assertEquals(receivingMailbox.getNumPendingBlocks(), 0);
@@ -551,7 +552,7 @@ public class MailboxServiceTest {
     // Cancel is idempotent for both sending and receiving mailbox, so safe to call multiple times
     sendingMailbox.cancel(new Exception("TEST ERROR"));
     receivingMailbox.cancel();
-    assertEquals(numCallbacks.get(), 1);
+    assertEquals(numCallbacks.get(), 2);
     assertEquals(receivingMailbox.getNumPendingBlocks(), 0);
   }
 
@@ -623,7 +624,8 @@ public class MailboxServiceTest {
     }
 
     // Next send will be blocked on the receiver side and cause exception after timeout
-    sendingMailbox.send(SuccessMseBlock.INSTANCE, MultiStageQueryStats.emptyStats(SENDER_STAGE_ID).serialize());
+    // We need to send a data block, given we don't block on EOS
+    sendingMailbox.send(OperatorTestUtil.block(DATA_SCHEMA, new Object[]{payload}));
     receiveMailLatch.await();
     assertEquals(numCallbacks.get(), ReceivingMailbox.DEFAULT_MAX_PENDING_BLOCKS + 1);
 

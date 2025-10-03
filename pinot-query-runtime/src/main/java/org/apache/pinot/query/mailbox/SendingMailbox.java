@@ -42,6 +42,7 @@ public interface SendingMailbox {
    * and they should <b>not</b> acquire any resources when they are created. This method should throw if there was an
    * error sending the data, since that would allow {@link BlockExchange} to exit early.
    */
+  // TODO: Remove throws as we don't throw these exceptions anymore
   void send(MseBlock.Data data)
       throws IOException, TimeoutException;
 
@@ -50,6 +51,7 @@ public interface SendingMailbox {
    * and they should <b>not</b> acquire any resources when they are created. This method should throw if there was an
    * error sending the data, since that would allow {@link BlockExchange} to exit early.
    */
+  // TODO: Remove throws as we don't throw these exceptions anymore
   void send(MseBlock.Eos block, List<DataBuffer> serializedStats)
       throws IOException, TimeoutException;
 

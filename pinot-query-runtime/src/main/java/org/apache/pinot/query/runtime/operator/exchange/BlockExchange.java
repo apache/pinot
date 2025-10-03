@@ -101,8 +101,10 @@ public abstract class BlockExchange {
    * @param block the block to be transferred
    * @return true if all the mailboxes has been early terminated.
    * @throws IOException when sending stream unexpectedly closed.
-   * @throws TimeoutException when sending stream timeout.
+   * @throws TimeoutException Is never thrown
+   * @throws org.apache.pinot.spi.exception.QueryException if any mailbox fails to send the block, including on timeout.
    */
+  // TODO: Remove throws, as they are never thrown
   public boolean send(MseBlock.Data block)
       throws IOException, TimeoutException {
     boolean isEarlyTerminated = true;
@@ -122,9 +124,11 @@ public abstract class BlockExchange {
    * API to send a block to the destination mailboxes.
    * @param eosBlock the block to be transferred
    * @return true if all the mailboxes has been early terminated.
-   * @throws IOException when sending stream unexpectedly closed.
-   * @throws TimeoutException when sending stream timeout.
+   * @throws IOException Never thrown
+   * @throws TimeoutException Never thrown
+   * @throws org.apache.pinot.spi.exception.QueryException if any mailbox fails to send the block, including on timeout.
    */
+  // TODO: Remove throws, as they are never thrown
   public boolean send(MseBlock.Eos eosBlock, List<DataBuffer> serializedStats)
       throws IOException, TimeoutException {
     int numMailboxes = _sendingMailboxes.size();

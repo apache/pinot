@@ -45,6 +45,8 @@ import org.apache.pinot.query.runtime.plan.MultiStageQueryStats;
 import org.apache.pinot.query.runtime.plan.OpChainExecutionContext;
 import org.apache.pinot.segment.spi.memory.DataBuffer;
 import org.apache.pinot.spi.exception.QueryCancelledException;
+import org.apache.pinot.spi.exception.QueryErrorCode;
+import org.apache.pinot.spi.exception.QueryException;
 import org.apache.pinot.spi.exception.TerminationException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -226,7 +228,11 @@ public class MailboxSendOperator extends MultiStageOperator {
       LOGGER.info("Query was terminated for opChain: {}", _context.getId(), e);
       return ErrorMseBlock.fromException(e);
     } catch (TimeoutException e) {
-      LOGGER.warn("Timed out transferring data on opChain: {}", _context.getId(), e);
+      // TODO: This exception isn't actually thrown in the current implementation.
+      //  Instead we throw QueryException. We should remove it from the signature.
+      String errorMessage = "Timed out transferring data on opChain: " + _context.getId();
+      return ErrorMseBlock.fromError(QueryErrorCode.EXECUTION_TIMEOUT, errorMessage);
+    } catch (QueryException e) {
       return ErrorMseBlock.fromException(e);
     } catch (Exception e) {
       ErrorMseBlock errorBlock = ErrorMseBlock.fromException(e);
@@ -247,6 +253,7 @@ public class MailboxSendOperator extends MultiStageOperator {
   }
 
   private void sendEos(MseBlock.Eos eosBlockWithoutStats)
+      //TODO Remove Exception, as we only throw QueryException and other runtime exceptions
       throws Exception {
 
     MultiStageQueryStats stats = null;
@@ -277,6 +284,7 @@ public class MailboxSendOperator extends MultiStageOperator {
   }
 
   private boolean sendMseBlock(MseBlock.Data block)
+      //TODO Remove Exception, as we only throw QueryException and other runtime exceptions
       throws Exception {
     boolean isEarlyTerminated = _exchange.send(block);
     if (LOGGER.isDebugEnabled()) {
@@ -286,6 +294,7 @@ public class MailboxSendOperator extends MultiStageOperator {
   }
 
   private boolean sendMseBlock(MseBlock.Eos block, List<DataBuffer> serializedStats)
+      //TODO Remove Exception, as we only throw QueryException and other runtime exceptions
       throws Exception {
     boolean isEarlyTerminated = _exchange.send(block, serializedStats);
     if (LOGGER.isDebugEnabled()) {
