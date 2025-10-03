@@ -398,8 +398,8 @@ public class ReceivingMailbox {
     /// queue is empty but there are still threads trying to add data to the queue.
     @GuardedBy("_lock")
     private int _pendingData;
-    private final ReentrantLock _fullLock = new ReentrantLock();
-    private final Condition _notFull = _fullLock.newCondition();
+    private final ReentrantLock _lock = new ReentrantLock();
+    private final Condition _notFull = _lock.newCondition();
 
     public CancellableBlockingQueue(String id, int capacity) {
       _id = id;
@@ -421,7 +421,7 @@ public class ReceivingMailbox {
     ///
     /// This method never blocks for long, as it doesn't need to wait for space in the queue.
     public ReceivingMailboxStatus offerEos(MseBlock.Eos block, List<DataBuffer> stats) {
-      ReentrantLock lock = _fullLock;
+      ReentrantLock lock = _lock;
       lock.lock();
       try {
         switch (_state) {
@@ -456,7 +456,7 @@ public class ReceivingMailbox {
     /// Offers a data block into the queue within the timeout specified, returning the status of the operation.
     public ReceivingMailboxStatus offerData(MseBlock.Data block, long timeout, TimeUnit timeUnit)
         throws InterruptedException, TimeoutException {
-      ReentrantLock lock = _fullLock;
+      ReentrantLock lock = _lock;
       lock.lockInterruptibly();
       try {
         while (true) {
@@ -560,10 +560,8 @@ public class ReceivingMailbox {
     @Nullable
     public MseBlockWithStats poll() {
       Preconditions.checkState(_reader != null, "A reader must be registered");
-      ReentrantLock lock = _fullLock;
-      if (!lock.tryLock()) {
-        return null;
-      }
+      ReentrantLock lock = _lock;
+      lock.lock();
       try {
         switch (_state) {
           case FULL_CLOSED:
@@ -581,6 +579,7 @@ public class ReceivingMailbox {
             if (_count == 0) {
               if (_pendingData > 0) {
                 // There are still threads trying to add data to the queue. We should wait for them to finish.
+                LOGGER.debug("Mailbox: {} has pending {} data blocks, waiting for them to finish", _id, _pendingData);
                 return null;
               } else {
                 changeState(State.FULL_CLOSED, "read all data blocks");
@@ -600,6 +599,7 @@ public class ReceivingMailbox {
         assert _count > 0 : "if we reach here, there must be data in the queue";
         MseBlock.Data[] items = _dataBlocks;
         MseBlock.Data block = items[_takeIndex];
+        assert block != null : "data block in the queue must not be null";
         items[_takeIndex] = null;
         if (++_takeIndex == items.length) {
           _takeIndex = 0;
@@ -626,7 +626,7 @@ public class ReceivingMailbox {
     }
 
     public int exactSize() {
-      ReentrantLock lock = _fullLock;
+      ReentrantLock lock = _lock;
       lock.lock();
       try {
         return _count;
@@ -637,7 +637,7 @@ public class ReceivingMailbox {
 
     /// Called by the downstream to indicate that no more data blocks will be read.
     public void earlyTerminate() {
-      ReentrantLock lock = _fullLock;
+      ReentrantLock lock = _lock;
       lock.lock();
       try {
         switch (_state) {
