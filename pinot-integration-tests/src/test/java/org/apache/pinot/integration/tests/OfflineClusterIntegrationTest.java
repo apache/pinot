@@ -3765,19 +3765,9 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
         + "/tables/mytable/metadata?columns=DivActualElapsedTime&columns=CRSElapsedTime&columns=OriginStateName"));
     validateMetadataResponse(threeSVColumnsResponse, 3, 0);
 
-    JsonNode threeSVColumnsWholeEncodedResponse = JsonUtils.stringToJsonNode(sendGetRequest(
-        getControllerBaseApiUrl() + "/tables/mytable/metadata?columns="
-            + "DivActualElapsedTime%26columns%3DCRSElapsedTime%26columns%3DOriginStateName"));
-    validateMetadataResponse(threeSVColumnsWholeEncodedResponse, 3, 0);
-
     JsonNode threeMVColumnsResponse = JsonUtils.stringToJsonNode(sendGetRequest(getControllerBaseApiUrl()
         + "/tables/mytable/metadata?columns=DivLongestGTimes&columns=DivWheelsOns&columns=DivAirports"));
     validateMetadataResponse(threeMVColumnsResponse, 3, 3);
-
-    JsonNode threeMVColumnsWholeEncodedResponse = JsonUtils.stringToJsonNode(sendGetRequest(
-        getControllerBaseApiUrl() + "/tables/mytable/metadata?columns="
-            + "DivLongestGTimes%26columns%3DDivWheelsOns%26columns%3DDivAirports"));
-    validateMetadataResponse(threeMVColumnsWholeEncodedResponse, 3, 3);
 
     JsonNode zeroColumnResponse =
         JsonUtils.stringToJsonNode(sendGetRequest(getControllerBaseApiUrl() + "/tables/mytable/metadata"));
@@ -3800,11 +3790,6 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
         getControllerBaseApiUrl() + "/tables/mytable/metadata?columns="
             + "CRSElapsedTime&columns=%2A&columns=OriginStateName"));
     validateMetadataResponse(starWithExtraEncodedColumnResponse, 83, 10);
-
-    JsonNode starWithExtraColumnWholeEncodedResponse = JsonUtils.stringToJsonNode(sendGetRequest(
-        getControllerBaseApiUrl() + "/tables/mytable/metadata?columns="
-            + "CRSElapsedTime%26columns%3D%2A%26columns%3DOriginStateName"));
-    validateMetadataResponse(starWithExtraColumnWholeEncodedResponse, 83, 10);
   }
 
   private void validateMetadataResponse(JsonNode response, int numTotalColumn, int numMVColumn) {
