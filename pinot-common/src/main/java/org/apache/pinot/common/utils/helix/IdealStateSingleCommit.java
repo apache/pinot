@@ -18,8 +18,6 @@
  */
 package org.apache.pinot.common.utils.helix;
 
-import java.util.Iterator;
-import java.util.Map;
 import java.util.concurrent.Callable;
 import java.util.concurrent.TimeUnit;
 import java.util.function.Function;
@@ -46,8 +44,10 @@ public class IdealStateSingleCommit {
   private static final Logger LOGGER = LoggerFactory.getLogger(IdealStateSingleCommit.class);
   private static final String ENABLE_COMPRESSIONS_KEY = "enableCompression";
   private static final int NUM_PARTITIONS_THRESHOLD_TO_ENABLE_COMPRESSION = 1000;
-  private static final int _minNumCharsInISToTurnOnCompression = -1;
   private static final ZNRecordSerializer ZN_RECORD_SERIALIZER = new ZNRecordSerializer();
+
+  private IdealStateSingleCommit() {
+  }
 
   public static IdealState updateIdealState(HelixManager helixManager, String resourceName,
       Function<IdealState, IdealState> updater, RetryPolicy policy, boolean noChangeOk) {
