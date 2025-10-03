@@ -112,6 +112,7 @@ public class InMemorySendingMailbox implements SendingMailbox {
     if (_isTerminated) {
       return;
     }
+    _isTerminated = true;
     LOGGER.debug("Cancelling mailbox: {}", _id);
     if (_receivingMailbox == null) {
       _receivingMailbox = _mailboxService.getReceivingMailbox(_id);
@@ -134,5 +135,14 @@ public class InMemorySendingMailbox implements SendingMailbox {
   @Override
   public String toString() {
     return "m" + _id;
+  }
+
+  @Override
+  public void close() {
+    if (!isTerminated()) {
+      String msg = "Closing in-memory mailbox without proper EOS message";
+      LOGGER.warn(msg);
+      cancel(new RuntimeException(msg).fillInStackTrace());
+    }
   }
 }
