@@ -19,14 +19,12 @@
 package org.apache.pinot.core.operator.filter.predicate;
 
 import com.google.common.base.Preconditions;
-import it.unimi.dsi.fastutil.ints.IntArrayList;
-import it.unimi.dsi.fastutil.ints.IntList;
-import it.unimi.dsi.fastutil.ints.IntOpenHashSet;
-import it.unimi.dsi.fastutil.ints.IntSet;
+import java.util.BitSet;
 import org.apache.pinot.common.request.context.predicate.RegexpLikePredicate;
 import org.apache.pinot.common.utils.regex.Matcher;
 import org.apache.pinot.segment.spi.index.reader.Dictionary;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
+
 
 /**
  * Factory for REGEXP_LIKE predicate evaluators.
@@ -34,9 +32,6 @@ import org.apache.pinot.spi.data.FieldSpec.DataType;
 public class RegexpLikePredicateEvaluatorFactory {
   private RegexpLikePredicateEvaluatorFactory() {
   }
-
-  /// When the cardinality of the dictionary is less than this threshold, scan the dictionary to get the matching ids.
-  public static final int DICTIONARY_CARDINALITY_THRESHOLD_FOR_SCAN = 10000;
 
   /**
    * Create a new instance of dictionary based REGEXP_LIKE predicate evaluator.
@@ -49,11 +44,7 @@ public class RegexpLikePredicateEvaluatorFactory {
   public static BaseDictionaryBasedPredicateEvaluator newDictionaryBasedEvaluator(
       RegexpLikePredicate regexpLikePredicate, Dictionary dictionary, DataType dataType) {
     Preconditions.checkArgument(dataType.getStoredType() == DataType.STRING, "Unsupported data type: " + dataType);
-    if (dictionary.length() < DICTIONARY_CARDINALITY_THRESHOLD_FOR_SCAN) {
-      return new DictIdBasedRegexpLikePredicateEvaluator(regexpLikePredicate, dictionary);
-    } else {
-      return new ScanBasedRegexpLikePredicateEvaluator(regexpLikePredicate, dictionary);
-    }
+    return new ScanBasedRegexpLikePredicateEvaluator(regexpLikePredicate, dictionary);
   }
 
   /**
@@ -69,67 +60,36 @@ public class RegexpLikePredicateEvaluatorFactory {
     return new RawValueBasedRegexpLikePredicateEvaluator(regexpLikePredicate);
   }
 
-  private static final class DictIdBasedRegexpLikePredicateEvaluator
-      extends BaseDictIdBasedRegexpLikePredicateEvaluator {
-    final IntSet _matchingDictIdSet;
-
-    public DictIdBasedRegexpLikePredicateEvaluator(RegexpLikePredicate regexpLikePredicate, Dictionary dictionary) {
-      super(regexpLikePredicate, dictionary);
-      Matcher matcher = regexpLikePredicate.getPattern().matcher("");
-      IntList matchingDictIds = new IntArrayList();
-      int dictionarySize = _dictionary.length();
-      for (int dictId = 0; dictId < dictionarySize; dictId++) {
-        if (matcher.reset(dictionary.getStringValue(dictId)).find()) {
-          matchingDictIds.add(dictId);
-        }
-      }
-      int numMatchingDictIds = matchingDictIds.size();
-      if (numMatchingDictIds == 0) {
-        _alwaysFalse = true;
-      } else if (dictionarySize == numMatchingDictIds) {
-        _alwaysTrue = true;
-      }
-      _matchingDictIds = matchingDictIds.toIntArray();
-      _matchingDictIdSet = new IntOpenHashSet(_matchingDictIds);
-    }
-
-    @Override
-    public int getNumMatchingItems() {
-      return _matchingDictIdSet.size();
-    }
-
-    @Override
-    public boolean applySV(int dictId) {
-      return _matchingDictIdSet.contains(dictId);
-    }
-
-    @Override
-    public int applySV(int limit, int[] docIds, int[] values) {
-      // reimplemented here to ensure applySV can be inlined
-      int matches = 0;
-      for (int i = 0; i < limit; i++) {
-        int value = values[i];
-        if (applySV(value)) {
-          docIds[matches++] = docIds[i];
-        }
-      }
-      return matches;
-    }
-  }
-
   private static final class ScanBasedRegexpLikePredicateEvaluator extends BaseDictionaryBasedPredicateEvaluator {
     // Reuse matcher to avoid excessive allocation. This is safe to do because the evaluator is always used
     // within the scope of a single thread.
     final Matcher _matcher;
 
+    // _evaluatedIds: tracks which dictionary IDs have been evaluated
+    // _matchingIds: tracks which dictionary IDs match the regex pattern
+    final BitSet _evaluatedIds;
+    final BitSet _matchingIds;
+
     public ScanBasedRegexpLikePredicateEvaluator(RegexpLikePredicate regexpLikePredicate, Dictionary dictionary) {
       super(regexpLikePredicate, dictionary);
       _matcher = regexpLikePredicate.getPattern().matcher("");
+      int dictionarySize = dictionary.length();
+      _evaluatedIds = new BitSet(dictionarySize);
+      _matchingIds = new BitSet(dictionarySize);
     }
 
     @Override
     public boolean applySV(int dictId) {
-      return _matcher.reset(_dictionary.getStringValue(dictId)).find();
+      // Check if already evaluated
+      if (_evaluatedIds.get(dictId)) {
+        return _matchingIds.get(dictId);
+      }
+      boolean match = _matcher.reset(_dictionary.getStringValue(dictId)).find();
+      _evaluatedIds.set(dictId);
+      if (match) {
+        _matchingIds.set(dictId);
+      }
+      return match;
     }
 
     @Override
