@@ -140,7 +140,7 @@ public class ReceivingMailbox {
     _stats.merge(StatKey.IN_MEMORY_MESSAGES, 1);
     if (block instanceof ErrorMseBlock) {
       setErrorBlock((ErrorMseBlock) block, serializedStats);
-      return ReceivingMailboxStatus.EARLY_TERMINATED;
+      return ReceivingMailboxStatus.FIRST_ERROR;
     }
     return offerPrivate(block, serializedStats, timeoutMs);
   }
@@ -268,7 +268,12 @@ public class ReceivingMailbox {
   }
 
   public enum ReceivingMailboxStatus {
-    SUCCESS, FIRST_ERROR, ERROR, TIMEOUT, CANCELLED, EARLY_TERMINATED
+    SUCCESS,
+    /**
+     * Indicates that the block that is being offered is an error. No more blocks are expected after this status.
+     */
+    FIRST_ERROR,
+    ERROR, TIMEOUT, CANCELLED, EARLY_TERMINATED
   }
 
   public enum StatKey implements StatMap.Key {
