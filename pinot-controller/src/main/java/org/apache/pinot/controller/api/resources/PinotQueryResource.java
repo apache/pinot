@@ -310,6 +310,13 @@ public class PinotQueryResource {
       _includeTableNames = includeTableNames;
     }
 
+    // Backward-compatible constructor for existing tests
+    public MultiStageQueryValidationRequest(String sql, @Nullable List<TableConfig> tableConfigs,
+        @Nullable List<Schema> schemas, @Nullable List<LogicalTableConfig> logicalTableConfigs,
+        List<String> sqls, boolean ignoreCase) {
+      this(sql, tableConfigs, schemas, logicalTableConfigs, sqls, ignoreCase, false);
+    }
+
     @Nullable
     public List<String> getSqls() {
       return _sqls;
