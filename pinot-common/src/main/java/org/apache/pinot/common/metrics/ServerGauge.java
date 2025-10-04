@@ -131,7 +131,19 @@ public enum ServerGauge implements AbstractMetrics.Gauge {
       "Indicates the time consumer spends while waiting on the consumer lock."),
 
   // commit-time compaction gauge metrics
-  COMMIT_TIME_COMPACTION_RATIO_PERCENT("percentage", false, "Percentage of rows removed during commit-time compaction");
+  COMMIT_TIME_COMPACTION_RATIO_PERCENT("percentage", false, "Percentage of rows removed during commit-time compaction"),
+
+  // ThrottleOnCriticalHeapUsageExecutor metrics
+  THROTTLE_EXECUTOR_QUEUE_SIZE("count", true,
+      "Current number of tasks in the throttle executor queue"),
+  THROTTLE_EXECUTOR_QUEUED_TASKS_TOTAL("count", true,
+      "Total number of tasks that have been queued in the throttle executor"),
+  THROTTLE_EXECUTOR_PROCESSED_TASKS_TOTAL("count", true,
+      "Total number of tasks processed from the throttle executor queue"),
+  THROTTLE_EXECUTOR_TIMED_OUT_TASKS_TOTAL("count", true,
+      "Total number of tasks that timed out in the throttle executor queue"),
+  THROTTLE_EXECUTOR_SHUTDOWN_CANCELED_TASKS_TOTAL("count", true,
+      "Total number of tasks canceled during throttle executor shutdown");
 
   private final String _gaugeName;
   private final String _unit;

@@ -219,8 +219,18 @@ public class QueryRunner {
 
     if (serverConf.getProperty(Server.CONFIG_OF_ENABLE_QUERY_SCHEDULER_THROTTLING_ON_HEAP_USAGE,
         Server.DEFAULT_ENABLE_QUERY_SCHEDULER_THROTTLING_ON_HEAP_USAGE)) {
-      LOGGER.info("Enable OOM Throttling on critical heap usage for multi-stage executor");
-      _executorService = new ThrottleOnCriticalHeapUsageExecutor(_executorService);
+      int maxSize = serverConf.getProperty(Server.CONFIG_OF_OOM_THROTTLE_QUEUE_MAX_SIZE,
+          Server.DEFAULT_OOM_THROTTLE_QUEUE_MAX_SIZE);
+      long timeoutMs = serverConf.getProperty(Server.CONFIG_OF_OOM_THROTTLE_QUEUE_TIMEOUT_MS,
+          Server.DEFAULT_OOM_THROTTLE_QUEUE_TIMEOUT_MS);
+      long monitorIntervalMs = serverConf.getProperty(Server.CONFIG_OF_OOM_THROTTLE_MONITOR_INTERVAL_MS,
+          Server.DEFAULT_OOM_THROTTLE_MONITOR_INTERVAL_MS);
+      LOGGER.info(
+          "Enable OOM Throttling on critical heap usage for multi-stage executor. maxSize={}, timeoutMs={}, "
+              + "monitorIntervalMs={} (maxSize=0 => reject)",
+          maxSize, timeoutMs, monitorIntervalMs);
+      _executorService =
+          new ThrottleOnCriticalHeapUsageExecutor(_executorService, maxSize, timeoutMs, monitorIntervalMs);
     }
 
     _opChainScheduler = new OpChainSchedulerService(_executorService, serverConf);
