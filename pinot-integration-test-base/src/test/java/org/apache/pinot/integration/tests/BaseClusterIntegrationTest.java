@@ -346,6 +346,7 @@ public abstract class BaseClusterIntegrationTest extends ClusterTest {
         .setQueryConfig(getQueryConfig())
         .setNullHandlingEnabled(getNullHandlingEnabled())
         .setSegmentPartitionConfig(getSegmentPartitionConfig())
+        .setOptimizeNoDictStatsCollection(true)
         .build();
     // @formatter:on
   }
@@ -420,6 +421,7 @@ public abstract class BaseClusterIntegrationTest extends ClusterTest {
         .setStreamConfigs(getStreamConfigs())
         .setNullHandlingEnabled(getNullHandlingEnabled())
         .setSegmentPartitionConfig(getSegmentPartitionConfig())
+        .setOptimizeNoDictStatsCollection(true)
         .setReplicaGroupStrategyConfig(getReplicaGroupStrategyConfig());
   }
 
@@ -443,6 +445,7 @@ public abstract class BaseClusterIntegrationTest extends ClusterTest {
             new RoutingConfig(null, null, RoutingConfig.STRICT_REPLICA_GROUP_INSTANCE_SELECTOR_TYPE, false))
         .setSegmentPartitionConfig(new SegmentPartitionConfig(columnPartitionConfigMap))
         .setReplicaGroupStrategyConfig(new ReplicaGroupStrategyConfig(primaryKeyColumn, 1))
+        .setOptimizeNoDictStatsCollection(true)
         .setUpsertConfig(upsertConfig).build();
   }
 
@@ -495,6 +498,7 @@ public abstract class BaseClusterIntegrationTest extends ClusterTest {
             new RoutingConfig(null, null, RoutingConfig.STRICT_REPLICA_GROUP_INSTANCE_SELECTOR_TYPE, false))
         .setSegmentPartitionConfig(new SegmentPartitionConfig(columnPartitionConfigMap))
         .setReplicaGroupStrategyConfig(new ReplicaGroupStrategyConfig(primaryKeyColumn, 1))
+        .setOptimizeNoDictStatsCollection(true)
         .setUpsertConfig(upsertConfig).build();
   }
 
@@ -522,6 +526,7 @@ public abstract class BaseClusterIntegrationTest extends ClusterTest {
         .setSegmentPartitionConfig(new SegmentPartitionConfig(columnPartitionConfigMap))
         .setReplicaGroupStrategyConfig(new ReplicaGroupStrategyConfig(primaryKeyColumn, 1))
         .setDedupConfig(new DedupConfig())
+        .setOptimizeNoDictStatsCollection(true)
         .build();
   }
 

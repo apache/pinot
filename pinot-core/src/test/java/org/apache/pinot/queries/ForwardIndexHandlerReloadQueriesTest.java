@@ -621,18 +621,6 @@ public class ForwardIndexHandlerReloadQueriesTest extends BaseQueriesTest {
     validateBeforeAfterQueryResults(resultRows1, resultRows2);
   }
 
-  private void validateBeforeAfterQueryResults(List<Object[]> beforeResults, List<Object[]> afterResults) {
-    assertEquals(beforeResults.size(), afterResults.size());
-    for (int i = 0; i < beforeResults.size(); i++) {
-      Object[] resultRow1 = beforeResults.get(i);
-      Object[] resultRow2 = afterResults.get(i);
-      assertEquals(resultRow1.length, resultRow2.length);
-      for (int j = 0; j < resultRow1.length; j++) {
-        assertEquals(resultRow1[j], resultRow2[j]);
-      }
-    }
-  }
-
   /**
    * As a part of segmentReload, the ForwardIndexHandler will perform the following operations:
    *
