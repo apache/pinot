@@ -30,6 +30,7 @@ import org.apache.pinot.core.query.scheduler.resources.QueryExecutorService;
 import org.apache.pinot.core.query.scheduler.resources.UnboundedResourceManager;
 import org.apache.pinot.spi.accounting.ThreadAccountant;
 import org.apache.pinot.spi.accounting.WorkloadBudgetManager;
+import org.apache.pinot.spi.accounting.WorkloadBudgetManagerFactory;
 import org.apache.pinot.spi.env.PinotConfiguration;
 import org.apache.pinot.spi.utils.CommonConstants.Accounting;
 import org.apache.pinot.spi.utils.builder.TableNameBuilder;
@@ -56,7 +57,7 @@ public class WorkloadScheduler extends QueryScheduler {
   public WorkloadScheduler(PinotConfiguration config, String instanceId, QueryExecutor queryExecutor,
       ThreadAccountant threadAccountant, LongAccumulator latestQueryTime) {
     super(config, instanceId, queryExecutor, threadAccountant, latestQueryTime, new UnboundedResourceManager(config));
-    _workloadBudgetManager = WorkloadBudgetManager.get();
+    _workloadBudgetManager = WorkloadBudgetManagerFactory.get();
     _secondaryWorkloadName =
         config.getProperty(Accounting.CONFIG_OF_SECONDARY_WORKLOAD_NAME, Accounting.DEFAULT_SECONDARY_WORKLOAD_NAME);
   }

@@ -62,6 +62,7 @@ import org.apache.pinot.server.starter.ServerInstance;
 import org.apache.pinot.spi.accounting.QueryResourceTracker;
 import org.apache.pinot.spi.accounting.ThreadResourceTracker;
 import org.apache.pinot.spi.accounting.WorkloadBudgetManager;
+import org.apache.pinot.spi.accounting.WorkloadBudgetManagerFactory;
 import org.apache.pinot.spi.config.table.TableType;
 import org.apache.pinot.spi.stream.ConsumerPartitionState;
 import org.apache.pinot.spi.utils.builder.TableNameBuilder;
@@ -352,7 +353,7 @@ public class DebugResource {
 
   /** Returns a non-null WorkloadBudgetManager or throws a 500 WebApplicationException (and logs a warning). */
   private WorkloadBudgetManager requireWorkloadBudgetManager() {
-    WorkloadBudgetManager workloadBudgetManager = WorkloadBudgetManager.get();
+    WorkloadBudgetManager workloadBudgetManager = WorkloadBudgetManagerFactory.get();
     if (workloadBudgetManager == null) {
       LOGGER.warn("WorkloadBudgetManager is not available on instance: {}", _instanceId);
       throw new WebApplicationException("WorkloadBudgetManager is not available",

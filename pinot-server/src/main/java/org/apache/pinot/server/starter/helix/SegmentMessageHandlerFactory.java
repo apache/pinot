@@ -45,6 +45,7 @@ import org.apache.pinot.core.data.manager.InstanceDataManager;
 import org.apache.pinot.core.data.manager.realtime.RealtimeTableDataManager;
 import org.apache.pinot.segment.local.data.manager.TableDataManager;
 import org.apache.pinot.spi.accounting.WorkloadBudgetManager;
+import org.apache.pinot.spi.accounting.WorkloadBudgetManagerFactory;
 import org.apache.pinot.spi.config.workload.InstanceCost;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -296,16 +297,16 @@ public class SegmentMessageHandlerFactory implements MessageHandlerFactory {
     public HelixTaskResult handleMessage() {
       LOGGER.info("Handling query workload message: {}", _message);
       try {
+        WorkloadBudgetManager workloadBudgetManager = WorkloadBudgetManagerFactory.get();
         if (_messageType.equals(QueryWorkloadRefreshMessage.DELETE_QUERY_WORKLOAD_MSG_SUB_TYPE)) {
-          WorkloadBudgetManager.get().deleteWorkload(_queryWorkloadName);
+          workloadBudgetManager.deleteWorkload(_queryWorkloadName);
         } else if (_messageType.equals(QueryWorkloadRefreshMessage.REFRESH_QUERY_WORKLOAD_MSG_SUB_TYPE)) {
           if (_instanceCost == null) {
             throw new IllegalStateException(
                 "Instance cost is not provided for refreshing query workload: " + _queryWorkloadName);
           }
-          WorkloadBudgetManager.get()
-              .addOrUpdateWorkload(_queryWorkloadName, _instanceCost.getCpuCostNs(),
-                  _instanceCost.getMemoryCostBytes());
+          workloadBudgetManager.addOrUpdateWorkload(_queryWorkloadName, _instanceCost.getCpuCostNs(),
+              _instanceCost.getMemoryCostBytes());
         } else {
           throw new IllegalStateException("Unknown message type: " + _messageType);
         }
