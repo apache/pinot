@@ -22,8 +22,10 @@ import com.google.common.collect.ImmutableMap;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import org.apache.pinot.spi.config.table.IndexingConfig;
 import org.apache.pinot.spi.config.table.SegmentsValidationAndRetentionConfig;
 import org.apache.pinot.spi.config.table.TableConfig;
@@ -157,5 +159,28 @@ public class IngestionConfigUtilsTest {
     Map<String, String> testMap = ImmutableMap.of("k1", "v1", "k1.k2", "v2", "k1.k3", "v3", "k4", "v4");
     Assert.assertEquals(2, IngestionConfigUtils.getConfigMapWithPrefix(testMap, "k1").size());
     Assert.assertEquals(2, IngestionConfigUtils.getConfigMapWithPrefix(testMap, "k1.").size());
+  }
+
+  @Test
+  public void testGetStreamConfigIndexToStreamPartitions() {
+    Set<Integer> pinotPartitionIds = new HashSet<>(2);
+    pinotPartitionIds.add(0);
+    pinotPartitionIds.add(1);
+    Map<Integer, Set<Integer>> streamConfigIndexToStreamPartitions =
+        IngestionConfigUtils.getStreamConfigIndexToStreamPartitions(pinotPartitionIds);
+    Assert.assertEquals(streamConfigIndexToStreamPartitions.size(), 1);
+    Assert.assertEquals(streamConfigIndexToStreamPartitions.get(0), new HashSet<>(Arrays.asList(0, 1)));
+
+    pinotPartitionIds = new HashSet<>(4);
+    pinotPartitionIds.add(2);
+    pinotPartitionIds.add(IngestionConfigUtils.getPinotPartitionIdFromStreamPartitionId(100, 1));
+    pinotPartitionIds.add(IngestionConfigUtils.getPinotPartitionIdFromStreamPartitionId(1, 1));
+    pinotPartitionIds.add(IngestionConfigUtils.getPinotPartitionIdFromStreamPartitionId(400, 3));
+    streamConfigIndexToStreamPartitions =
+        IngestionConfigUtils.getStreamConfigIndexToStreamPartitions(pinotPartitionIds);
+    Assert.assertEquals(streamConfigIndexToStreamPartitions.size(), 3);
+    Assert.assertEquals(streamConfigIndexToStreamPartitions.get(0), new HashSet<>(Arrays.asList(2)));
+    Assert.assertEquals(streamConfigIndexToStreamPartitions.get(1), new HashSet<>(Arrays.asList(100, 1)));
+    Assert.assertEquals(streamConfigIndexToStreamPartitions.get(3), new HashSet<>(Arrays.asList(400)));
   }
 }
