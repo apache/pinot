@@ -94,6 +94,7 @@ import org.apache.pinot.tsdb.planner.TimeSeriesTableMetadataProvider;
 import org.apache.pinot.tsdb.spi.RangeTimeSeriesRequest;
 import org.apache.pinot.tsdb.spi.TimeSeriesLogicalPlanResult;
 import org.apache.pinot.tsdb.spi.TimeSeriesLogicalPlanner;
+import org.jvnet.hk2.annotations.Optional;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -300,7 +301,7 @@ public class PinotQueryResource {
         @JsonProperty("schemas") @Nullable List<Schema> schemas,
         @JsonProperty("logicalTableConfigs") @Nullable List<LogicalTableConfig> logicalTableConfigs,
         @JsonProperty("sqls") List<String> sqls, @JsonProperty("ignoreCase") boolean ignoreCase,
-        @JsonProperty("includeTableNames") boolean includeTableNames) {
+        @Optional @JsonProperty("includeTableNames") boolean includeTableNames) {
       _sql = sql;
       _tableConfigs = tableConfigs;
       _schemas = schemas;
@@ -310,10 +311,13 @@ public class PinotQueryResource {
       _includeTableNames = includeTableNames;
     }
 
+    @JsonCreator
     // Backward-compatible constructor for existing tests
-    public MultiStageQueryValidationRequest(String sql, @Nullable List<TableConfig> tableConfigs,
-        @Nullable List<Schema> schemas, @Nullable List<LogicalTableConfig> logicalTableConfigs,
-        List<String> sqls, boolean ignoreCase) {
+    public MultiStageQueryValidationRequest(@JsonProperty("sql") String sql,
+        @JsonProperty("tableConfigs") @Nullable List<TableConfig> tableConfigs,
+        @JsonProperty("schemas") @Nullable List<Schema> schemas,
+        @JsonProperty("logicalTableConfigs") @Nullable List<LogicalTableConfig> logicalTableConfigs,
+        @JsonProperty("sqls") List<String> sqls, @JsonProperty("ignoreCase") boolean ignoreCase) {
       this(sql, tableConfigs, schemas, logicalTableConfigs, sqls, ignoreCase, false);
     }
 
