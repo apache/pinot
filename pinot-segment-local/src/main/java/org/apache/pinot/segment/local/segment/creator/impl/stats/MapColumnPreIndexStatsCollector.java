@@ -70,7 +70,7 @@ public class MapColumnPreIndexStatsCollector extends AbstractColumnStatisticsCol
     boolean isDictionaryEnabled = indexConfigsByCol.get(column).getConfig(StandardIndexes.dictionary()).isEnabled();
     if (!isDictionaryEnabled) {
       _createNoDictCollectorsForKeys = statsCollectorConfig.getTableConfig().getIndexingConfig()
-          .isOptimiseNoDictStatsCollection();
+          .isOptimizeNoDictStatsCollection();
     }
   }
 

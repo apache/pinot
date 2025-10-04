@@ -672,7 +672,7 @@ public abstract class BaseDefaultColumnHandler implements DefaultColumnHandler {
       boolean createDictionary = dictionaryIndexConfig.isEnabled();
       boolean useNoDictColumnStatsCollector = false;
       if (!dictionaryIndexConfig.isEnabled()) {
-        useNoDictColumnStatsCollector = _tableConfig.getIndexingConfig().isOptimiseNoDictStatsCollection();
+        useNoDictColumnStatsCollector = _tableConfig.getIndexingConfig().isOptimizeNoDictStatsCollection();
       }
       StatsCollectorConfig statsCollectorConfig = new StatsCollectorConfig(_tableConfig, _schema, null);
       ColumnIndexCreationInfo indexCreationInfo;

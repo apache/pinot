@@ -291,7 +291,7 @@ public class SegmentPreProcessorTest implements PinotBuffersAfterClassCheckRule 
         .setRangeIndexColumns(new ArrayList<>(_rangeIndexColumns))
         .setFieldConfigList(new ArrayList<>(_fieldConfigMap.values()))
         .setNullHandlingEnabled(true)
-        .setOptimiseNoDictStatsCollection(true)
+        .setOptimizeNoDictStatsCollection(true)
         .setIngestionConfig(_ingestionConfig)
         .build();
     IndexingConfig indexingConfig = tableConfig.getIndexingConfig();
