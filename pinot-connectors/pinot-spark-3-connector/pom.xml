@@ -56,6 +56,7 @@
                       <includes>
                         <include>com.google.protobuf.**</include>
                         <include>com.google.common.**</include>
+                        <include>io.grpc.**</include>
                       </includes>
                     </relocation>
                   </relocations>
