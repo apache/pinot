@@ -397,7 +397,7 @@ public class PinotQueryResource {
     return sendRequestToBroker(query, instanceId, traceEnabled, queryOptions, httpHeaders);
   }
 
-  public List<String> getTableNames(String query, String database) {
+  private List<String> getTableNames(String query, String database) {
     QueryEnvironment queryEnvironment =
         new QueryEnvironment(database, _pinotHelixResourceManager.getTableCache(), null);
     List<String> tableNames;
