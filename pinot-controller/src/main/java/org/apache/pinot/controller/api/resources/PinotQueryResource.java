@@ -160,8 +160,7 @@ public class PinotQueryResource {
 
   @POST
   @Path("validateMultiStageQuery")
-  public MultiStageQueryValidationResponses validateMultiStageQuery(MultiStageQueryValidationRequest request,
-      @Context HttpHeaders httpHeaders) {
+  public Object validateMultiStageQuery(MultiStageQueryValidationRequest request, @Context HttpHeaders httpHeaders) {
 
     List<String> sqlQueries = request.getSqls();
     String sql = request.getSql();
@@ -172,7 +171,13 @@ public class PinotQueryResource {
       MultiStageQueryValidationResponse multiStageQueryValidationResponse =
           new MultiStageQueryValidationResponse(false, "Request is missing the queries string field 'sql'", null, null);
       multiStageQueryValidationResponses.add(multiStageQueryValidationResponse);
-      return new MultiStageQueryValidationResponses(multiStageQueryValidationResponses, allTableNames);
+
+      // Return based on includeTableNames flag
+      if (request.isIncludeTableNames()) {
+        return new MultiStageQueryValidationResponses(multiStageQueryValidationResponses, allTableNames);
+      } else {
+        return multiStageQueryValidationResponses;
+      }
     }
     if (sqlQueries == null || sqlQueries.isEmpty()) {
       sqlQueries = new ArrayList<>();
@@ -196,8 +201,10 @@ public class PinotQueryResource {
         }
         try (QueryEnvironment.CompiledQuery compiledQuery = new QueryEnvironment(database, tableCache, null).compile(
             sqlQuery)) {
-          tableNames = new HashSet<>(compiledQuery.getTableNames());
-          allTableNames.addAll(tableNames);
+          if (request.isIncludeTableNames()) {
+            tableNames = new HashSet<>(compiledQuery.getTableNames());
+            allTableNames.addAll(tableNames);
+          }
           MultiStageQueryValidationResponse multiStageQueryValidationResponse =
               new MultiStageQueryValidationResponse(true, null, null, sqlQuery);
           multiStageQueryValidationResponses.add(multiStageQueryValidationResponse);
@@ -215,7 +222,13 @@ public class PinotQueryResource {
         multiStageQueryValidationResponses.add(multiStageQueryValidationResponse);
       }
     }
-    return new MultiStageQueryValidationResponses(multiStageQueryValidationResponses, allTableNames);
+
+    // Return based on includeTableNames flag
+    if (request.isIncludeTableNames()) {
+      return new MultiStageQueryValidationResponses(multiStageQueryValidationResponses, allTableNames);
+    } else {
+      return multiStageQueryValidationResponses;
+    }
   }
 
   public static class MultiStageQueryValidationResponse {
@@ -279,19 +292,22 @@ public class PinotQueryResource {
     private final List<LogicalTableConfig> _logicalTableConfigs;
     private final boolean _ignoreCase;
     private final List<String> _sqls;
+    private final boolean _includeTableNames;
 
     @JsonCreator
     public MultiStageQueryValidationRequest(@JsonProperty("sql") String sql,
         @JsonProperty("tableConfigs") @Nullable List<TableConfig> tableConfigs,
         @JsonProperty("schemas") @Nullable List<Schema> schemas,
         @JsonProperty("logicalTableConfigs") @Nullable List<LogicalTableConfig> logicalTableConfigs,
-        @JsonProperty("sqls") List<String> sqls, @JsonProperty("ignoreCase") boolean ignoreCase) {
+        @JsonProperty("sqls") List<String> sqls, @JsonProperty("ignoreCase") boolean ignoreCase,
+        @JsonProperty("includeTableNames") boolean includeTableNames) {
       _sql = sql;
       _tableConfigs = tableConfigs;
       _schemas = schemas;
       _logicalTableConfigs = logicalTableConfigs;
       _ignoreCase = ignoreCase;
       _sqls = sqls;
+      _includeTableNames = includeTableNames;
     }
 
     @Nullable
@@ -321,6 +337,10 @@ public class PinotQueryResource {
 
     public boolean isIgnoreCase() {
       return _ignoreCase;
+    }
+
+    public boolean isIncludeTableNames() {
+      return _includeTableNames;
     }
   }
 
