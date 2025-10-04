@@ -46,10 +46,8 @@ import javax.inject.Inject;
 import javax.ws.rs.GET;
 import javax.ws.rs.POST;
 import javax.ws.rs.Path;
-import javax.ws.rs.Produces;
 import javax.ws.rs.QueryParam;
 import javax.ws.rs.WebApplicationException;
-import javax.ws.rs.core.MediaType;
 import javax.ws.rs.core.Context;
 import javax.ws.rs.core.HttpHeaders;
 import javax.ws.rs.core.Response;
@@ -160,37 +158,21 @@ public class PinotQueryResource {
     return executeTimeSeriesQueryCatching(httpHeaders, language, query, start, end, step);
   }
 
-  @GET
-  @Path("/query/tableNames")
-  @Produces(MediaType.APPLICATION_JSON)
-  @ApiOperation(value = "Get the table names from the query")
-  public List<String> getTableNamesFromQuery(@QueryParam("sql") String query, @Context HttpHeaders httpHeaders) {
-    try {
-      Map<String, String> queryOptionsMap = RequestUtils.parseQuery(query).getOptions();
-      String database = DatabaseUtils.extractDatabaseFromQueryRequest(queryOptionsMap, httpHeaders);
-      if (query == null || query.trim().isEmpty()) {
-        return new ArrayList<>();
-      }
-      return getTableNames(query, database);
-    } catch (Exception e) {
-      LOGGER.error("Error extracting table names from query: {}", query, e);
-      throw new WebApplicationException("Failed to extract table names from query: " + e.getMessage(),
-          Response.Status.BAD_REQUEST);
-    }
-  }
-
   @POST
   @Path("validateMultiStageQuery")
-  public List<MultiStageQueryValidationResponse> validateMultiStageQuery(MultiStageQueryValidationRequest request,
+  public MultiStageQueryValidationResponses validateMultiStageQuery(MultiStageQueryValidationRequest request,
       @Context HttpHeaders httpHeaders) {
 
     List<String> sqlQueries = request.getSqls();
     String sql = request.getSql();
     List<MultiStageQueryValidationResponse> multiStageQueryValidationResponses = new ArrayList<>();
+    Set<String> allTableNames = new HashSet<>();
+
     if ((sql == null || sql.isEmpty()) && (sqlQueries == null || sqlQueries.isEmpty())) {
       MultiStageQueryValidationResponse multiStageQueryValidationResponse =
           new MultiStageQueryValidationResponse(false, "Request is missing the queries string field 'sql'", null, null);
       multiStageQueryValidationResponses.add(multiStageQueryValidationResponse);
+      return new MultiStageQueryValidationResponses(multiStageQueryValidationResponses, allTableNames);
     }
     if (sqlQueries == null || sqlQueries.isEmpty()) {
       sqlQueries = new ArrayList<>();
@@ -199,6 +181,7 @@ public class PinotQueryResource {
     for (String sqlQuery : sqlQueries) {
       Map<String, String> queryOptionsMap = RequestUtils.parseQuery(sqlQuery).getOptions();
       String database = DatabaseUtils.extractDatabaseFromQueryRequest(queryOptionsMap, httpHeaders);
+      Set<String> tableNames = new HashSet<>();
       try {
         TableCache tableCache;
         if (CollectionUtils.isNotEmpty(request.getTableConfigs()) && CollectionUtils.isNotEmpty(request.getSchemas())) {
@@ -213,6 +196,8 @@ public class PinotQueryResource {
         }
         try (QueryEnvironment.CompiledQuery compiledQuery = new QueryEnvironment(database, tableCache, null).compile(
             sqlQuery)) {
+          tableNames = new HashSet<>(compiledQuery.getTableNames());
+          allTableNames.addAll(tableNames);
           MultiStageQueryValidationResponse multiStageQueryValidationResponse =
               new MultiStageQueryValidationResponse(true, null, null, sqlQuery);
           multiStageQueryValidationResponses.add(multiStageQueryValidationResponse);
@@ -230,7 +215,7 @@ public class PinotQueryResource {
         multiStageQueryValidationResponses.add(multiStageQueryValidationResponse);
       }
     }
-    return multiStageQueryValidationResponses;
+    return new MultiStageQueryValidationResponses(multiStageQueryValidationResponses, allTableNames);
   }
 
   public static class MultiStageQueryValidationResponse {
@@ -263,6 +248,27 @@ public class PinotQueryResource {
 
     public String getSql() {
       return _sql;
+    }
+  }
+
+  public static class MultiStageQueryValidationResponses {
+    private final List<MultiStageQueryValidationResponse> _queryResponses;
+    private final Set<String> _tableNames;
+
+    public MultiStageQueryValidationResponses(List<MultiStageQueryValidationResponse> queryResponses,
+        Set<String> tableNames) {
+      _queryResponses = queryResponses;
+      _tableNames = tableNames;
+    }
+
+    @JsonProperty("queryResponses")
+    public List<MultiStageQueryValidationResponse> getQueryResponses() {
+      return _queryResponses;
+    }
+
+    @JsonProperty("tableNames")
+    public Set<String> getTableNames() {
+      return _tableNames;
     }
   }
 
