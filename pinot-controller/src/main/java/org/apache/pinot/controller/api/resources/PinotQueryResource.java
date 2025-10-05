@@ -218,7 +218,7 @@ public class PinotQueryResource {
   }
 
   @POST
-  @Path("extractTableNames")
+  @Path("/query/tableNames")
   @Consumes(MediaType.APPLICATION_JSON)
   @Produces(MediaType.APPLICATION_JSON)
   @ApiOperation(value = "Extract table names from SQL queries")
