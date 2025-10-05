@@ -234,10 +234,16 @@ public class CommonConstants {
     public static final String CONFIG_OF_BROKER_FLAPPING_TIME_WINDOW_MS = "pinot.broker.flapping.timeWindowMs";
     public static final String CONFIG_OF_SERVER_FLAPPING_TIME_WINDOW_MS = "pinot.server.flapping.timeWindowMs";
     public static final String CONFIG_OF_MINION_FLAPPING_TIME_WINDOW_MS = "pinot.minion.flapping.timeWindowMs";
+    public static final String DEFAULT_FLAPPING_TIME_WINDOW_MS = "1";
+    // Max state transitions per-instance across all resources
     public static final String CONFIG_OF_HELIX_INSTANCE_MAX_STATE_TRANSITIONS =
         "pinot.helix.instance.state.maxStateTransitions";
     public static final String DEFAULT_HELIX_INSTANCE_MAX_STATE_TRANSITIONS = "100000";
-    public static final String DEFAULT_FLAPPING_TIME_WINDOW_MS = "1";
+    // Max state transitions per-resource per-instance. Used to provide more fairness in case a large number of state
+    // transitions come in for a single resource
+    public static final String CONFIG_OF_MAX_STATE_TRANSITIONS_PER_RESOURCE =
+        "pinot.helix.instance.state.maxStateTransitionsPerResource";
+    public static final String DEFAULT_HELIX_INSTANCE_MAX_STATE_TRANSITIONS_PER_RESOURCE = "100000";
     public static final String PINOT_SERVICE_ROLE = "pinot.service.role";
     public static final String CONFIG_OF_CLUSTER_NAME = "pinot.cluster.name";
     public static final String CONFIG_OF_ZOOKEEPER_SERVER = "pinot.zk.server";
