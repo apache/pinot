@@ -2203,15 +2203,15 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
       throws Exception {
     int numTotalDocs = (int) getCountStarResult();
 
-    // REGEXP_LIKE on new added dictionary-encoded columns scans row entries by caching with bit set
+    // REGEXP_LIKE on new added dictionary-encoded columns should not scan the table when it matches all or nothing
     for (String column : List.of("NewAddedSVJSONDimension", "NewAddedDerivedNullString")) {
       JsonNode response = postQuery("SELECT COUNT(*) FROM mytable WHERE REGEXP_LIKE(" + column + ", 'foo')");
       assertEquals(response.get("resultTable").get("rows").get(0).get(0).asInt(), 0);
-      assertEquals(response.get("numEntriesScannedInFilter").asInt(), 115545);
+      assertEquals(response.get("numEntriesScannedInFilter").asInt(), 0);
 
       response = postQuery("SELECT COUNT(*) FROM mytable WHERE REGEXP_LIKE(" + column + ", '.*')");
       assertEquals(response.get("resultTable").get("rows").get(0).get(0).asInt(), numTotalDocs);
-      assertEquals(response.get("numEntriesScannedInFilter").asInt(), 115545);
+      assertEquals(response.get("numEntriesScannedInFilter").asInt(), 0);
     }
   }
 
