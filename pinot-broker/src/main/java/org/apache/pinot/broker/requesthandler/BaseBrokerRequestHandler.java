@@ -203,6 +203,13 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
       sqlNodeAndOptions.getOptions().putIfAbsent(QueryOptionKey.ENABLE_NULL_HANDLING, _enableNullHandling);
     }
 
+    String regexLikeDictionaryThreshold =
+        _config.getProperty(Broker.CONFIG_OF_REGEXP_LIKE_DICTIONARY_CARDINALITY_THRESHOLD);
+    if (regexLikeDictionaryThreshold != null) {
+      sqlNodeAndOptions.getOptions().putIfAbsent(QueryOptionKey.REGEXP_DICT_CARDINALITY_THRESHOLD,
+          _config.getProperty(Broker.CONFIG_OF_REGEXP_LIKE_DICTIONARY_CARDINALITY_THRESHOLD));
+    }
+
     BrokerResponse brokerResponse =
         handleRequest(requestId, query, sqlNodeAndOptions, request, requesterIdentity, requestContext, httpHeaders,
             accessControl);
