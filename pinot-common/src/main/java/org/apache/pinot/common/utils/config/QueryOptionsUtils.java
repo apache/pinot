@@ -586,21 +586,14 @@ public class QueryOptionsUtils {
     return Boolean.parseBoolean(value);
   }
 
-  /**
-   * Get the REGEXP_LIKE adaptive threshold from query options.
-   * This threshold controls when to switch between dictionary-based and scan-based evaluation.
-   * When (dictionary_size) < threshold, use dictionary-based evaluation.
-   * When (dictionary_size) >= threshold, use scan-based evaluation.
-   */
-  public static long getRegexpLikeAdaptiveThreshold(Map<String, String> queryOptions, long defaultThreshold) {
-    String thresholdStr = queryOptions.get(QueryOptionKey.REGEXP_DICT_CARDINALITY_THRESHOLD);
-    if (thresholdStr != null) {
-      try {
-        return Long.parseLong(thresholdStr);
-      } catch (NumberFormatException e) {
-        throw new IllegalArgumentException("Invalid REGEXP_LIKE adaptive threshold value: " + thresholdStr, e);
-      }
-    }
-    return defaultThreshold;
+  /// When evaluating REGEXP_LIKE predicate on a dictionary encoded column:
+  /// - If dictionary size is smaller than this threshold, scan the dictionary to get the matching dictionary ids
+  ///   first, where inverted index can be applied if exists
+  /// - Otherwise, read dictionary while scanning the forward index, cache the matching/unmatching dictionary ids
+  ///   during the scan
+  @Nullable
+  public static Integer getRegexDictSizeThreshold(Map<String, String> queryOptions) {
+    String regexDictSizeThreshold = queryOptions.get(QueryOptionKey.REGEX_DICT_SIZE_THRESHOLD);
+    return uncheckedParseInt(QueryOptionKey.REGEX_DICT_SIZE_THRESHOLD, regexDictSizeThreshold);
   }
 }

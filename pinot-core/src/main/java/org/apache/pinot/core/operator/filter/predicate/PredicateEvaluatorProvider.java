@@ -49,11 +49,11 @@ public class PredicateEvaluatorProvider {
         // dictionary based predicate evaluators
         switch (predicate.getType()) {
           case EQ:
-            return EqualsPredicateEvaluatorFactory
-                .newDictionaryBasedEvaluator((EqPredicate) predicate, dictionary, dataType);
+            return EqualsPredicateEvaluatorFactory.newDictionaryBasedEvaluator((EqPredicate) predicate, dictionary,
+                dataType);
           case NOT_EQ:
-            return NotEqualsPredicateEvaluatorFactory
-                .newDictionaryBasedEvaluator((NotEqPredicate) predicate, dictionary, dataType);
+            return NotEqualsPredicateEvaluatorFactory.newDictionaryBasedEvaluator((NotEqPredicate) predicate,
+                dictionary, dataType);
           case IN:
             return InPredicateEvaluatorFactory.newDictionaryBasedEvaluator((InPredicate) predicate, dictionary,
                 dataType, queryContext);

@@ -1213,11 +1213,9 @@ public abstract class BaseSingleStageBrokerRequestHandler extends BaseBrokerRequ
             .putIfAbsent(Broker.Request.QueryOptionKey.ENABLE_NULL_HANDLING, _enableNullHandling);
       }
 
-      String regexLikeDictionaryThreshold =
-          _config.getProperty(Broker.CONFIG_OF_REGEXP_LIKE_DICTIONARY_CARDINALITY_THRESHOLD);
-      if (regexLikeDictionaryThreshold != null) {
-        sqlNodeAndOptions.getOptions().putIfAbsent(QueryOptionKey.REGEXP_DICT_CARDINALITY_THRESHOLD,
-            _config.getProperty(Broker.CONFIG_OF_REGEXP_LIKE_DICTIONARY_CARDINALITY_THRESHOLD));
+      if (_regexDictCardinalityThreshold != null) {
+        sqlNodeAndOptions.getOptions().putIfAbsent(QueryOptionKey.REGEX_DICT_SIZE_THRESHOLD,
+            _regexDictCardinalityThreshold);
       }
 
       BrokerResponse response =

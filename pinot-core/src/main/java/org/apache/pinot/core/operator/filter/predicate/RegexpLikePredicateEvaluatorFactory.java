@@ -24,13 +24,14 @@ import it.unimi.dsi.fastutil.ints.IntList;
 import it.unimi.dsi.fastutil.ints.IntOpenHashSet;
 import it.unimi.dsi.fastutil.ints.IntSet;
 import java.util.BitSet;
+import javax.annotation.Nullable;
 import org.apache.pinot.common.request.context.predicate.RegexpLikePredicate;
 import org.apache.pinot.common.utils.config.QueryOptionsUtils;
 import org.apache.pinot.common.utils.regex.Matcher;
 import org.apache.pinot.core.query.request.context.QueryContext;
 import org.apache.pinot.segment.spi.index.reader.Dictionary;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
-import org.apache.pinot.spi.utils.CommonConstants.Broker;
+import org.apache.pinot.spi.utils.CommonConstants.Broker.Request.QueryOptionValue;
 
 
 /**
@@ -50,14 +51,17 @@ public class RegexpLikePredicateEvaluatorFactory {
    * @return Dictionary based REGEXP_LIKE predicate evaluator
    */
   public static BaseDictionaryBasedPredicateEvaluator newDictionaryBasedEvaluator(
-      RegexpLikePredicate regexpLikePredicate, Dictionary dictionary, DataType dataType, QueryContext queryContext) {
+      RegexpLikePredicate regexpLikePredicate, Dictionary dictionary, DataType dataType,
+      @Nullable QueryContext queryContext) {
     Preconditions.checkArgument(dataType.getStoredType() == DataType.STRING, "Unsupported data type: " + dataType);
-    long threshold = Broker.DEFAULT_REGEXP_LIKE_DICTIONARY_CARDINALITY_THRESHOLD;
-    if (queryContext != null && queryContext.getQueryOptions() != null) {
-      threshold = QueryOptionsUtils.getRegexpLikeAdaptiveThreshold(queryContext.getQueryOptions(),
-          Broker.DEFAULT_REGEXP_LIKE_DICTIONARY_CARDINALITY_THRESHOLD);
+    Integer regexDictSizeThreshold = null;
+    if (queryContext != null) {
+      regexDictSizeThreshold = QueryOptionsUtils.getRegexDictSizeThreshold(queryContext.getQueryOptions());
     }
-    if (dictionary.length() < threshold) {
+    if (regexDictSizeThreshold == null) {
+      regexDictSizeThreshold = QueryOptionValue.DEFAULT_REGEX_DICT_SIZE_THRESHOLD;
+    }
+    if (dictionary.length() < regexDictSizeThreshold) {
       return new DictIdBasedRegexpLikePredicateEvaluator(regexpLikePredicate, dictionary);
     } else {
       return new ScanBasedRegexpLikePredicateEvaluator(regexpLikePredicate, dictionary);
