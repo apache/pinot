@@ -3559,11 +3559,15 @@ public class PinotHelixResourceManager {
     return tableConfigs;
   }
 
+  /** Get all server instances that host at least a segment for a given table based on the ideal state.
+   *
+   * @param tableName Table name with or without type suffix
+   * @param tableType Table type
+   * @return List of server instances
+   */
   public List<String> getServerInstancesForTable(String tableName, TableType tableType) {
-    TableConfig tableConfig = getTableConfig(tableName, tableType);
-    Preconditions.checkNotNull(tableConfig);
     Set<String> serverInstances = new HashSet<>();
-    IdealState idealState = getTableIdealState(tableConfig.getTableName());
+    IdealState idealState = getTableIdealState(TableNameBuilder.forType(tableType).tableNameWithType(tableName));
     ZNRecord record = idealState.getRecord();
     if (record == null) {
       return new ArrayList<>();
