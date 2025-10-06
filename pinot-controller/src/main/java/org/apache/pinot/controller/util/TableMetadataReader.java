@@ -86,11 +86,9 @@ public class TableMetadataReader {
    * needReload throws an exception for servers that don't contain segments for the given table
    */
   public ServerSegmentMetadataReader.TableReloadResponse getReloadCheckResponses(String tableNameWithType,
-      int timeoutMs)
-      throws InvalidConfigException {
+      int timeoutMs) throws InvalidConfigException {
     Set<String> serverInstanceSet =
-        new HashSet<>(_pinotHelixResourceManager.getServerInstancesForTable(
-            TableNameBuilder.extractRawTableName(tableNameWithType),
+        new HashSet<>(_pinotHelixResourceManager.getServerInstancesForTable(TableNameBuilder.extractRawTableName(tableNameWithType),
             TableNameBuilder.getTableTypeFromTableName(tableNameWithType)));
     return getServerSetReloadCheckResponses(tableNameWithType, timeoutMs, serverInstanceSet);
   }
