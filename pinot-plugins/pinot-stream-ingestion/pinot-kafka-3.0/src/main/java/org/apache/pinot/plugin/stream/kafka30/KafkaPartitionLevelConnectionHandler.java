@@ -80,10 +80,6 @@ public abstract class KafkaPartitionLevelConnectionHandler {
       consumerProp.put(ConsumerConfig.ISOLATION_LEVEL_CONFIG, _config.getKafkaIsolationLevel());
     }
     consumerProp.put(ConsumerConfig.CLIENT_ID_CONFIG, _clientId);
-    if (consumerProp.containsKey(ConsumerConfig.AUTO_OFFSET_RESET_CONFIG)
-        && consumerProp.getProperty(ConsumerConfig.AUTO_OFFSET_RESET_CONFIG).equals("smallest")) {
-      consumerProp.put(ConsumerConfig.AUTO_OFFSET_RESET_CONFIG, "earliest");
-    }
     return consumerProp;
   }
 
