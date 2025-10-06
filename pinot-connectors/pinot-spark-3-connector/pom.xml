@@ -156,6 +156,9 @@
             --add-opens=java.base/java.lang=ALL-UNNAMED
             --add-opens=java.base/java.util=ALL-UNNAMED
             --add-opens=java.base/java.lang.reflect=ALL-UNNAMED
+            --add-opens=java.base/jdk.internal.misc=ALL-UNNAMED
+            -Dio.netty.tryReflectionSetAccessible=true
+            -Dio.grpc.netty.shaded.io.netty.tryReflectionSetAccessible=true
           </argLine>
         </configuration>
       </plugin>

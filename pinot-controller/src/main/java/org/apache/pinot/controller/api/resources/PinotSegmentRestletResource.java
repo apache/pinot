@@ -350,7 +350,7 @@ public class PinotSegmentRestletResource {
 
     if (segmentMetadata != null) {
       Map<String, Object> result = new HashMap<>(segmentMetadata);
-      if (columns.size() > 0) {
+      if (!columns.isEmpty()) {
         JsonNode segmentsMetadataJson = getExtraMetaData(tableName, segmentName, columns);
         if (segmentsMetadataJson.has("indexes")) {
           result.put("indexes", segmentsMetadataJson.get("indexes"));
@@ -815,7 +815,7 @@ public class PinotSegmentRestletResource {
     }
     String tableNameWithType =
         ResourceUtils.getExistingTableNamesWithType(_pinotHelixResourceManager, tableName, tableType, LOGGER).get(0);
-    if (segments == null || segments.isEmpty()) {
+    if (segments.isEmpty()) {
       deleteSegmentsInternal(tableNameWithType,
           _pinotHelixResourceManager.getSegmentsFromPropertyStore(tableNameWithType), retentionPeriod);
       return new SuccessResponse("All segments of table " + tableNameWithType + " deleted");
@@ -876,9 +876,9 @@ public class PinotSegmentRestletResource {
           + " specified in the segment lineage entries and cannot be queried from the table, false by default")
       @QueryParam("excludeReplacedSegments") @DefaultValue("false") boolean excludeReplacedSegments,
       @ApiParam(value = "Start timestamp (inclusive) in milliseconds", required = true) @QueryParam("startTimestamp")
-          String startTimestampStr,
+      String startTimestampStr,
       @ApiParam(value = "End timestamp (exclusive) in milliseconds", required = true) @QueryParam("endTimestamp")
-          String endTimestampStr,
+      String endTimestampStr,
       @ApiParam(value = "Whether to ignore segments that are partially overlapping with the [start, end)"
           + "for deletion, true by default")
       @QueryParam("excludeOverlapping") @DefaultValue("true") boolean excludeOverlapping,
@@ -926,12 +926,13 @@ public class PinotSegmentRestletResource {
   public String getServerMetadata(
       @ApiParam(value = "Name of the table", required = true) @PathParam("tableName") String tableName,
       @ApiParam(value = "OFFLINE|REALTIME") @QueryParam("type") String tableTypeStr,
-      @Encoded @ApiParam(value = "Segments to include (all if not specified)", allowMultiple = true)
-      @QueryParam("segments") @Nullable List<String> segments,
-      @Encoded @ApiParam(value = "Columns name", allowMultiple = true) @QueryParam("columns")
-      @Nullable List<String> columns, @Context HttpHeaders headers) {
+      @ApiParam(value = "Segments to include (all if not specified)", allowMultiple = true) @QueryParam("segments")
+      List<String> segments,
+      @ApiParam(value = "Columns to include (use '*' to include all)", allowMultiple = true) @QueryParam("columns")
+      List<String> columns,
+      @Context HttpHeaders headers) {
     tableName = DatabaseUtils.translateTableName(tableName, headers);
-    String segmentCount = (segments == null) ? "all" : String.valueOf(segments.size());
+    String segmentCount = segments.isEmpty() ? "all" : String.valueOf(segments.size());
     LOGGER.info("Received a request to fetch metadata for {} segments for table {}", segmentCount, tableName);
     TableType tableType = Constants.validateTableType(tableTypeStr);
 
@@ -1162,14 +1163,12 @@ public class PinotSegmentRestletResource {
    * @param segments name of the segments to include in metadata
    * @return Map<String, String>  metadata of the table segments -> map of segment name to its metadata
    */
-  private JsonNode getSegmentsMetadataFromServer(String tableNameWithType, @Nullable List<String> columns,
-      @Nullable List<String> segments)
+  private JsonNode getSegmentsMetadataFromServer(String tableNameWithType, List<String> columns, List<String> segments)
       throws InvalidConfigException, IOException {
     TableMetadataReader tableMetadataReader =
         new TableMetadataReader(_executor, _connectionManager, _pinotHelixResourceManager);
-    return tableMetadataReader
-        .getSegmentsMetadata(tableNameWithType, columns, segments,
-            _controllerConf.getServerAdminRequestTimeoutSeconds() * 1000);
+    return tableMetadataReader.getSegmentsMetadata(tableNameWithType, columns, segments,
+        _controllerConf.getServerAdminRequestTimeoutSeconds() * 1000);
   }
 
   @POST
