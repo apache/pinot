@@ -29,12 +29,12 @@ import org.apache.pinot.spi.data.readers.GenericRow;
  */
 public class StreamMessageMetadata {
   private final long _recordIngestionTimeMs;
+  private final long _firstStreamRecordIngestionTimeMs;
   private final int _recordSerializedSize;
   private final StreamPartitionMsgOffset _offset;
   private final StreamPartitionMsgOffset _nextOffset;
   private final GenericRow _headers;
   private final Map<String, String> _metadata;
-  private final long _firstStreamRecordIngestionTimeMs;
 
   private StreamMessageMetadata(long recordIngestionTimeMs, long firstStreamRecordIngestionTimeMs,
       StreamPartitionMsgOffset offset, StreamPartitionMsgOffset nextOffset, int recordSerializedSize,
@@ -48,12 +48,12 @@ public class StreamMessageMetadata {
     _metadata = metadata;
   }
 
-  public long getFirstStreamRecordIngestionTimeMs() {
-    return _firstStreamRecordIngestionTimeMs;
-  }
-
   public long getRecordIngestionTimeMs() {
     return _recordIngestionTimeMs;
+  }
+
+  public long getFirstStreamRecordIngestionTimeMs() {
+    return _firstStreamRecordIngestionTimeMs;
   }
 
   public int getRecordSerializedSize() {
@@ -87,13 +87,13 @@ public class StreamMessageMetadata {
     private GenericRow _headers;
     private Map<String, String> _metadata;
 
-    public Builder setFirstStreamRecordIngestionTimeMs(long firstStreamRecordIngestionTimeMs) {
-      _firstStreamRecordIngestionTimeMs = firstStreamRecordIngestionTimeMs;
+    public Builder setRecordIngestionTimeMs(long recordIngestionTimeMs) {
+      _recordIngestionTimeMs = recordIngestionTimeMs;
       return this;
     }
 
-    public Builder setRecordIngestionTimeMs(long recordIngestionTimeMs) {
-      _recordIngestionTimeMs = recordIngestionTimeMs;
+    public Builder setFirstStreamRecordIngestionTimeMs(long firstStreamRecordIngestionTimeMs) {
+      _firstStreamRecordIngestionTimeMs = firstStreamRecordIngestionTimeMs;
       return this;
     }
 
