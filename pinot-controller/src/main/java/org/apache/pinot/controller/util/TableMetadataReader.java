@@ -87,11 +87,9 @@ public class TableMetadataReader {
    */
   public ServerSegmentMetadataReader.TableReloadResponse getReloadCheckResponses(String tableNameWithType,
       int timeoutMs) throws InvalidConfigException {
-    ExternalView externalView = _pinotHelixResourceManager.getTableExternalView(tableNameWithType);
-    Set<String> serverInstanceSet = new HashSet<>();
-    if (externalView != null) {
-      serverInstanceSet = getCurrentlyAssignedServersFromExternalView(externalView);
-    }
+    Set<String> serverInstanceSet =
+        new HashSet<>(_pinotHelixResourceManager.getServerInstancesForTable(TableNameBuilder.extractRawTableName(tableNameWithType),
+            TableNameBuilder.getTableTypeFromTableName(tableNameWithType)));
     return getServerSetReloadCheckResponses(tableNameWithType, timeoutMs, serverInstanceSet);
   }
 
@@ -112,7 +110,8 @@ public class TableMetadataReader {
   }
 
   public ServerSegmentMetadataReader.TableReloadResponse getServerSetReloadCheckResponses(String tableNameWithType,
-      int timeoutMs, Set<String> serverInstanceSet) throws InvalidConfigException {
+      int timeoutMs, Set<String> serverInstanceSet)
+      throws InvalidConfigException {
     BiMap<String, String> endpoints = _pinotHelixResourceManager.getDataInstanceAdminEndpoints(serverInstanceSet);
     ServerSegmentMetadataReader serverSegmentMetadataReader =
         new ServerSegmentMetadataReader(_executor, _connectionManager);
@@ -215,7 +214,7 @@ public class TableMetadataReader {
           tableNameWithType, timeoutMs);
     } catch (RuntimeException e) {
       log.warn("Failed to fetch table metadata for table {} using new server endpoint, falling back to legacy "
-              + "per-segment endpoint", tableNameWithType, e);
+          + "per-segment endpoint", tableNameWithType, e);
     }
 
     // legacy per segment endpoint

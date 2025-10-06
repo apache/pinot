@@ -3559,12 +3559,15 @@ public class PinotHelixResourceManager {
     return tableConfigs;
   }
 
+  /**
+   * Get all server instances currently hosting a segment of the given table, based on the external view.
+   */
   public List<String> getServerInstancesForTable(String tableName, TableType tableType) {
     TableConfig tableConfig = getTableConfig(tableName, tableType);
     Preconditions.checkNotNull(tableConfig);
     Set<String> serverInstances = new HashSet<>();
-    IdealState idealState = getTableIdealState(tableConfig.getTableName());
-    ZNRecord record = idealState.getRecord();
+    ExternalView externalView = getTableExternalView(tableConfig.getTableName());
+    ZNRecord record = externalView.getRecord();
     if (record == null) {
       return new ArrayList<>();
     }
