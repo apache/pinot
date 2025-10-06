@@ -78,16 +78,64 @@ public abstract class KafkaPartitionLevelConnectionHandler {
       consumerProp.put(ConsumerConfig.ISOLATION_LEVEL_CONFIG, _config.getKafkaIsolationLevel());
     }
     consumerProp.put(ConsumerConfig.CLIENT_ID_CONFIG, _clientId);
+    if (consumerProp.containsKey(ConsumerConfig.AUTO_OFFSET_RESET_CONFIG)
+        && consumerProp.getProperty(ConsumerConfig.AUTO_OFFSET_RESET_CONFIG).equals("smallest")) {
+      consumerProp.put(ConsumerConfig.AUTO_OFFSET_RESET_CONFIG, "earliest");
+    }
     return consumerProp;
+  }
+
+  /**
+   * Filter properties to only include Kafka-recognized configurations.
+   * This prevents "was supplied but isn't a known config" warnings from Kafka clients.
+   */
+  private Properties filterKafkaProperties(Properties props) {
+    Properties kafkaProps = new Properties();
+    for (String key : props.stringPropertyNames()) {
+      // Only include properties that start with standard Kafka prefixes
+      // or are known Kafka configurations
+      if (key.startsWith("bootstrap.")
+          || key.startsWith("ssl.")
+          || key.startsWith("sasl.")
+          || key.startsWith("security.")
+          || key.startsWith("client.")
+          || key.startsWith("group.")
+          || key.startsWith("isolation.")
+          || key.startsWith("request.")
+          || key.startsWith("retry.")
+          || key.startsWith("reconnect.")
+          || key.startsWith("connections.")
+          || key.startsWith("session.")
+          || key.startsWith("heartbeat.")
+          || key.startsWith("metadata.")
+          || key.startsWith("fetch.")
+          || key.startsWith("send.")
+          || key.startsWith("receive.")
+          || key.startsWith("buffer.")
+          || key.startsWith("metric.")
+          || key.startsWith("interceptor.")
+          || key.equals("key.deserializer")
+          || key.equals("value.deserializer")
+          || key.equals("key.serializer")
+          || key.equals("value.serializer")
+          || key.equals("auto.offset.reset")
+          || key.equals("enable.auto.commit")
+          || key.equals("auto.commit.interval.ms")
+          || key.equals("max.poll.records")
+          || key.equals("max.poll.interval.ms")) {
+        kafkaProps.put(key, props.get(key));
+      }
+    }
+    return kafkaProps;
   }
 
   @VisibleForTesting
   protected Consumer<String, Bytes> createConsumer(Properties consumerProp) {
-    return retry(() -> new KafkaConsumer<>(consumerProp), 5);
+    return retry(() -> new KafkaConsumer<>(filterKafkaProperties(consumerProp)), 5);
   }
 
   protected AdminClient createAdminClient() {
-    return retry(() -> AdminClient.create(_consumerProp), 5);
+    return retry(() -> AdminClient.create(filterKafkaProperties(_consumerProp)), 5);
   }
 
   private static <T> T retry(Supplier<T> s, int nRetries) {
