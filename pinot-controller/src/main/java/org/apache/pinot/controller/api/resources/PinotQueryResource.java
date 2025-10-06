@@ -329,7 +329,6 @@ public class PinotQueryResource {
     }
   }
 
-
   private StreamingOutput executeSqlQueryCatching(HttpHeaders httpHeaders, String sqlQuery, String traceEnabled,
       String queryOptions) {
     try {
