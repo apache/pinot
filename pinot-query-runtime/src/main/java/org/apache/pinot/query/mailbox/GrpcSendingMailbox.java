@@ -150,7 +150,9 @@ public class GrpcSendingMailbox implements SendingMailbox {
     }
     _closeAttempted = true;
     LOGGER.debug("Completing mailbox: {}", _id);
-    _contentObserver.onCompleted();
+    if (_contentObserver != null) {
+      _contentObserver.onCompleted();
+    }
   }
 
   @Override
@@ -320,7 +322,9 @@ public class GrpcSendingMailbox implements SendingMailbox {
       LOGGER.warn(errorMsg);
       _closeAttempted = true;
       MseBlock errorBlock = ErrorMseBlock.fromError(QueryErrorCode.INTERNAL, errorMsg);
-      processAndSend(errorBlock, List.of());
+      if (_contentObserver != null) {
+        processAndSend(errorBlock, List.of());
+      }
     }
   }
 
