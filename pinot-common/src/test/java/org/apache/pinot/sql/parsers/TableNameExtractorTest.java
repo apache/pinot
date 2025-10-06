@@ -16,7 +16,7 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.pinot.client;
+package org.apache.pinot.sql.parsers;
 
 import java.util.Arrays;
 import java.util.HashSet;
