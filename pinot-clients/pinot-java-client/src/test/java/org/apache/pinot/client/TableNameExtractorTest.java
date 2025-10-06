@@ -21,6 +21,7 @@ package org.apache.pinot.client;
 import java.util.Arrays;
 import java.util.HashSet;
 import java.util.Set;
+import org.apache.pinot.sql.parsers.parser.TableNameExtractor;
 import org.testng.annotations.DataProvider;
 import org.testng.annotations.Test;
 

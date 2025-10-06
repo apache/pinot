@@ -61,7 +61,7 @@ import org.apache.commons.collections.CollectionUtils;
 import org.apache.commons.io.IOUtils;
 import org.apache.hc.core5.net.URIBuilder;
 import org.apache.helix.model.InstanceConfig;
-import org.apache.pinot.client.TableNameExtractor;
+import org.apache.pinot.sql.parsers.parser.TableNameExtractor;
 import org.apache.pinot.common.Utils;
 import org.apache.pinot.common.config.provider.StaticTableCache;
 import org.apache.pinot.common.config.provider.TableCache;
@@ -228,19 +228,18 @@ public class PinotQueryResource {
     Set<String> allTableNames = new HashSet<>();
 
     if ((sqlQueries == null || sqlQueries.isEmpty())) {
-      return allTableNames; // Return empty set if no queries provided
+      return allTableNames;
     }
 
     for (String sqlQuery : sqlQueries) {
       try {
-        // Use TableNameExtractor to parse SQL and extract table names (no validation against cluster)
         String[] tableNamesArray = TableNameExtractor.resolveTableName(sqlQuery);
         if (tableNamesArray != null) {
           Collections.addAll(allTableNames, tableNamesArray);
         }
       } catch (Exception e) {
         LOGGER.error("Failed to extract table names from query: {}", sqlQuery, e);
-        // Continue processing other queries even if one fails
+        throw e;
       }
     }
     return allTableNames;
