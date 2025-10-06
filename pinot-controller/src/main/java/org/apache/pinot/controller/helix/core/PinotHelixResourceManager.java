@@ -153,6 +153,7 @@ import org.apache.pinot.controller.helix.core.realtime.PinotLLCRealtimeSegmentMa
 import org.apache.pinot.controller.helix.core.util.ControllerZkHelixUtils;
 import org.apache.pinot.controller.helix.core.util.MessagingServiceUtils;
 import org.apache.pinot.controller.workload.QueryWorkloadManager;
+import org.apache.pinot.segment.local.utils.TableConfigUtils;
 import org.apache.pinot.segment.spi.SegmentMetadata;
 import org.apache.pinot.spi.config.DatabaseConfig;
 import org.apache.pinot.spi.config.instance.Instance;
@@ -3562,18 +3563,13 @@ public class PinotHelixResourceManager {
   public List<String> getServerInstancesForTable(String tableName, TableType tableType) {
     TableConfig tableConfig = getTableConfig(tableName, tableType);
     Preconditions.checkNotNull(tableConfig);
-    TenantConfig tenantConfig = tableConfig.getTenantConfig();
     Set<String> serverInstances = new HashSet<>();
-    List<InstanceConfig> instanceConfigs = HelixHelper.getInstanceConfigs(_helixZkManager);
-    if (tableType == TableType.OFFLINE) {
-      serverInstances.addAll(
-          HelixHelper.getInstancesWithTag(instanceConfigs, TagNameUtils.extractOfflineServerTag(tenantConfig)));
-    } else if (TableType.REALTIME.equals(tableType)) {
-      serverInstances.addAll(
-          HelixHelper.getInstancesWithTag(instanceConfigs, TagNameUtils.extractConsumingServerTag(tenantConfig)));
-      serverInstances.addAll(
-          HelixHelper.getInstancesWithTag(instanceConfigs, TagNameUtils.extractCompletedServerTag(tenantConfig)));
+    IdealState idealState = getTableIdealState(tableConfig.getTableName());
+    ZNRecord record = idealState.getRecord();
+    if (record == null) {
+      return new ArrayList<>();
     }
+    record.getMapFields().forEach((key, value) -> serverInstances.addAll(value.keySet()));
     return new ArrayList<>(serverInstances);
   }
 
