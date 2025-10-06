@@ -16,12 +16,11 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.pinot.sql.parsers;
+package org.apache.pinot.sql.parsers.parser;
 
 import java.util.Arrays;
 import java.util.HashSet;
 import java.util.Set;
-import org.apache.pinot.sql.parsers.parser.TableNameExtractor;
 import org.testng.annotations.DataProvider;
 import org.testng.annotations.Test;
 
