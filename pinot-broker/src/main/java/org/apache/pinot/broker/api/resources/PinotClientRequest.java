@@ -83,7 +83,6 @@ import org.apache.pinot.spi.auth.broker.RequesterIdentity;
 import org.apache.pinot.spi.env.PinotConfiguration;
 import org.apache.pinot.spi.exception.QueryErrorCode;
 import org.apache.pinot.spi.exception.QueryException;
-import org.apache.pinot.spi.query.QueryThreadContext;
 import org.apache.pinot.spi.trace.RequestContext;
 import org.apache.pinot.spi.trace.RequestScope;
 import org.apache.pinot.spi.trace.Tracing;
@@ -452,11 +451,9 @@ public class PinotClientRequest {
       @DefaultValue("3000") int timeoutMs,
       @ApiParam(value = "Return server responses for troubleshooting") @QueryParam("verbose") @DefaultValue("false")
       boolean verbose) {
-    try (QueryThreadContext.CloseableContext closeMe = QueryThreadContext.open(_instanceId)) {
+    try {
       Map<String, Integer> serverResponses = verbose ? new HashMap<>() : null;
       if (isClient) {
-        long reqId = _requestHandler.getRequestIdByClientId(id).orElse(-1L);
-        QueryThreadContext.setIds(reqId, id);
         if (_requestHandler.cancelQueryByClientId(id, timeoutMs, _executor, _httpConnMgr, serverResponses)) {
           String resp = "Cancelled client query: " + id;
           if (verbose) {
@@ -467,7 +464,6 @@ public class PinotClientRequest {
       } else {
         long reqId = Long.parseLong(id);
         if (_requestHandler.cancelQuery(reqId, timeoutMs, _executor, _httpConnMgr, serverResponses)) {
-          QueryThreadContext.setIds(reqId, id);
           String resp = "Cancelled query: " + id;
           if (verbose) {
             resp += " with responses from servers: " + serverResponses;

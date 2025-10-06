@@ -41,7 +41,6 @@ import org.apache.pinot.core.util.GroupByUtils;
 import org.apache.pinot.spi.exception.QueryErrorCode;
 import org.apache.pinot.spi.exception.QueryErrorMessage;
 import org.apache.pinot.spi.exception.QueryException;
-import org.apache.pinot.spi.trace.Tracing;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -162,7 +161,7 @@ public class SortedGroupByCombineOperator extends BaseSingleBlockCombineOperator
         } else {
           records = mergeRecords(records, (SortedRecords) waitingObject);
         }
-        Tracing.ThreadAccountantOps.sampleAndCheckInterruption();
+        checkTerminationAndSampleUsage();
 
         while (true) {
           SortedRecords finalRecords = records;
@@ -176,7 +175,7 @@ public class SortedGroupByCombineOperator extends BaseSingleBlockCombineOperator
           } else {
             records = mergeRecords(records, (SortedRecords) waitingObject);
           }
-          Tracing.ThreadAccountantOps.sampleAndCheckInterruption();
+          checkTerminationAndSampleUsage();
         }
       } catch (RuntimeException e) {
         throw wrapOperatorException(operator, e);

@@ -123,6 +123,23 @@ public enum ServerGauge implements AbstractMetrics.Gauge {
   MAILBOX_SERVER_THREADLOCALCACHE("bytes", true),
   MAILBOX_SERVER_CHUNK_SIZE("bytes", true),
 
+  /// Exports the max amount of direct memory that can be allocated by Netty
+  /// It is basically an adaptor for io.netty.util.internal.PlatformDependent.maxDirectMemory()
+  ///
+  /// This value can be changed by setting the JVM option -Dio.netty.maxDirectMemory
+  NETTY_TOTAL_MAX_DIRECT_MEMORY("bytes", true),
+  /// Exports the total amount of direct memory allocated by Netty
+  /// It is basically an adaptor for io.netty.util.internal.PlatformDependent.usedDirectMemory()
+  NETTY_TOTAL_USED_DIRECT_MEMORY("bytes", true),
+  /// Exports the max amount of direct memory that can be allocated by the shaded Netty code used by gRPC
+  /// It is basically an adaptor for io.grpc.netty.shaded.io.netty.util.internal.PlatformDependent.maxDirectMemory()
+  ///
+  /// This value can be changed by setting the JVM option -Dio.grpc.netty.shaded.io.netty.maxDirectMemory
+  GRPC_TOTAL_MAX_DIRECT_MEMORY("bytes", true),
+  /// Exports the total amount of direct memory allocated by the shaded Netty code used by gRPC
+  /// It is basically an adaptor for io.grpc.netty.shaded.io.netty.util.internal.PlatformDependent.usedDirectMemory()
+  GRPC_TOTAL_USED_DIRECT_MEMORY("bytes", true),
+
   // how many message are there in the server's message queue in helix
   HELIX_MESSAGES_COUNT("count", true),
   STARTUP_STATUS_CHECK_IN_PROGRESS("state", true,

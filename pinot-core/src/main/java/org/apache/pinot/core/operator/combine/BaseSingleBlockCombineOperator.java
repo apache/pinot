@@ -29,8 +29,6 @@ import org.apache.pinot.core.operator.blocks.results.BaseResultsBlock;
 import org.apache.pinot.core.operator.blocks.results.ExceptionResultsBlock;
 import org.apache.pinot.core.operator.combine.merger.ResultsBlockMerger;
 import org.apache.pinot.core.query.request.context.QueryContext;
-import org.apache.pinot.core.query.scheduler.resources.ResourceManager;
-import org.apache.pinot.spi.exception.EarlyTerminationException;
 import org.apache.pinot.spi.exception.QueryErrorCode;
 import org.apache.pinot.spi.exception.QueryErrorMessage;
 import org.apache.pinot.spi.exception.QueryException;
@@ -56,32 +54,19 @@ public abstract class BaseSingleBlockCombineOperator<T extends BaseResultsBlock>
     super(resultsBlockMerger, operators, queryContext, executorService);
   }
 
+  /// @inheritDoc
+  ///
+  /// Handles exceptions here so that execution stats can be attached.
   @Override
   protected BaseResultsBlock getNextBlock() {
-    BaseResultsBlock mergedBlock;
     try {
       startProcess();
-      mergedBlock = mergeResults();
-    } catch (InterruptedException e) {
-      throw new EarlyTerminationException("Interrupted while merging results blocks", e);
+      return checkTerminateExceptionAndAttachExecutionStats(mergeResults());
     } catch (Exception e) {
-      LOGGER.error("Caught exception while merging results blocks (query: {})", _queryContext, e);
-      mergedBlock = new ExceptionResultsBlock(QueryErrorMessage.safeMsg(QueryErrorCode.INTERNAL,
-          "Caught exception while merging results blocks: " + e.getMessage()));
+      return createExceptionResultsBlockAndAttachExecutionStats(e, "merging results blocks");
     } finally {
       stopProcess();
     }
-    /*
-     * _numTasks are number of async tasks submitted to the _executorService, but it does not mean Pinot server
-     * use those number of threads to concurrently process segments. Instead, if _executorService thread pool has
-     * less number of threads than _numTasks, the number of threads that used to concurrently process segments equals
-     * to the pool size.
-     * TODO: Get the actual number of query worker threads instead of using the default value.
-     */
-    int numServerThreads = Math.min(_numTasks, ResourceManager.DEFAULT_QUERY_WORKER_THREADS);
-    CombineOperatorUtils.setExecutionStatistics(mergedBlock, _operators, _totalWorkerThreadCpuTimeNs.get(),
-        numServerThreads, _totalWorkerThreadMemAllocatedBytes.get());
-    return mergedBlock;
   }
 
   @Override
@@ -116,9 +101,7 @@ public abstract class BaseSingleBlockCombineOperator<T extends BaseResultsBlock>
     _processingException.compareAndSet(null, t);
     ExceptionResultsBlock errBlock;
     if (t instanceof QueryException) {
-      QueryException queryException = (QueryException) t;
-      QueryErrorMessage errMsg = QueryErrorMessage.safeMsg(queryException.getErrorCode(), queryException.getMessage());
-      errBlock = new ExceptionResultsBlock(errMsg);
+      errBlock = new ExceptionResultsBlock((QueryException) t);
     } else {
       LOGGER.warn("Caught exception while processing query: {}", _queryContext, t);
       QueryErrorMessage errMsg = QueryErrorMessage.safeMsg(QueryErrorCode.QUERY_EXECUTION, t.getMessage());

@@ -18,9 +18,7 @@
  */
 package org.apache.pinot.spi.accounting;
 
-/**
- * Scope for tracking resources in ThreadResourceUsageAccountant.
- */
+/// Scope for tracking resources in ThreadAccountant.
 public enum TrackingScope {
   QUERY,
   WORKLOAD

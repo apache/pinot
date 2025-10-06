@@ -57,7 +57,7 @@ public class PinotBrokerTimeSeriesResponse {
   private String _error;
 
   static {
-    OBJECT_MAPPER.setSerializationInclusion(JsonInclude.Include.NON_NULL);
+    OBJECT_MAPPER.setDefaultPropertyInclusion(JsonInclude.Include.NON_NULL);
   }
 
   @JsonCreator
