@@ -61,7 +61,6 @@ import org.apache.commons.collections.CollectionUtils;
 import org.apache.commons.io.IOUtils;
 import org.apache.hc.core5.net.URIBuilder;
 import org.apache.helix.model.InstanceConfig;
-import org.apache.pinot.sql.parsers.parser.TableNameExtractor;
 import org.apache.pinot.common.Utils;
 import org.apache.pinot.common.config.provider.StaticTableCache;
 import org.apache.pinot.common.config.provider.TableCache;
@@ -94,6 +93,7 @@ import org.apache.pinot.sql.parsers.CalciteSqlCompiler;
 import org.apache.pinot.sql.parsers.CalciteSqlParser;
 import org.apache.pinot.sql.parsers.PinotSqlType;
 import org.apache.pinot.sql.parsers.SqlNodeAndOptions;
+import org.apache.pinot.sql.parsers.parser.TableNameExtractor;
 import org.apache.pinot.tsdb.planner.TimeSeriesQueryEnvironment;
 import org.apache.pinot.tsdb.planner.TimeSeriesTableMetadataProvider;
 import org.apache.pinot.tsdb.spi.RangeTimeSeriesRequest;
@@ -218,13 +218,12 @@ public class PinotQueryResource {
   }
 
   @POST
-  @Path("/query/tableNames")
+  @Path("query/tableNames")
   @Consumes(MediaType.APPLICATION_JSON)
   @Produces(MediaType.APPLICATION_JSON)
   @ApiOperation(value = "Extract table names from SQL queries")
-  public Set<String> extractTableNames(TableNamesExtractionRequest request, @Context HttpHeaders httpHeaders) {
+  public Set<String> extractTableNames(List<String> sqlQueries, @Context HttpHeaders httpHeaders) {
 
-    List<String> sqlQueries = request.getSqls();
     Set<String> allTableNames = new HashSet<>();
 
     if ((sqlQueries == null || sqlQueries.isEmpty())) {
@@ -330,19 +329,6 @@ public class PinotQueryResource {
     }
   }
 
-  public static class TableNamesExtractionRequest {
-    private final List<String> _sqls;
-
-    @JsonCreator
-    public TableNamesExtractionRequest(@JsonProperty("sqls") List<String> sqls) {
-      _sqls = sqls;
-    }
-
-    @Nullable
-    public List<String> getSqls() {
-      return _sqls;
-    }
-  }
 
   private StreamingOutput executeSqlQueryCatching(HttpHeaders httpHeaders, String sqlQuery, String traceEnabled,
       String queryOptions) {
