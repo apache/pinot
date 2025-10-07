@@ -18,7 +18,7 @@
  */
 
 import React, { useEffect, useState } from 'react';
-import { get, map } from 'lodash';
+import { get } from 'lodash';
 import { TableData } from 'Models';
 import { Grid, makeStyles } from '@material-ui/core';
 import SimpleAccordion from '../components/SimpleAccordion';
@@ -66,9 +66,33 @@ const TaskQueue = (props) => {
     setFetching(true);
     const taskInfoRes = await PinotMethodUtils.getTaskInfo(taskType);
     const tablesResponse:any = await PinotMethodUtils.getTableData({ taskType });
+    const responseTables = get(tablesResponse, 'tables', []);
+    const initialTables = Array.isArray(responseTables)
+      ? responseTables.filter((table): table is string => typeof table === 'string')
+      : [];
+    const tableSet = new Set<string>(initialTables);
+
+    try {
+      const debugResponse:any = await PinotMethodUtils.getTaskTypeDebugData(taskType);
+      Object.values(debugResponse || {}).forEach((taskDebug: any) => {
+        (get(taskDebug, 'subtaskInfos', []) || []).forEach((subtask: any) => {
+          const taskConfig = get(subtask, 'taskConfig', {});
+          const tableName = get(taskConfig, 'tableName') || get(taskConfig, 'configs.tableName');
+          if (typeof tableName === 'string') {
+            tableSet.add(tableName);
+          }
+        });
+      });
+    } catch (error) {
+      // Debug endpoint might be disabled; ignore and fall back to configured tables only.
+      // eslint-disable-next-line no-console
+      console.warn(`Unable to retrieve adhoc task tables for ${taskType}:`, error);
+    }
+
     setTaskInfo(taskInfoRes);
     setTables((prevState): TableData => {
-      const _records = map(get(tablesResponse, 'tables', []), table => [table]);
+      const tableList = Array.from(tableSet).sort();
+      const _records = tableList.map(table => [table]);
       return { ...prevState, records: _records };
     });
     setFetching(false);
