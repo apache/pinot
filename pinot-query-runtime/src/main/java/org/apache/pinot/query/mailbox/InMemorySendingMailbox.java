@@ -68,11 +68,8 @@ public class InMemorySendingMailbox implements SendingMailbox {
   @Override
   public void send(MseBlock.Eos block, List<DataBuffer> serializedStats)
       throws IOException, TimeoutException {
-    try {
-      sendPrivate(block, serializedStats);
-    } finally {
-      _isTerminated = true;
-    }
+    sendPrivate(block, serializedStats);
+    _isTerminated = true;
   }
 
   private void sendPrivate(MseBlock block, List<DataBuffer> serializedStats)
