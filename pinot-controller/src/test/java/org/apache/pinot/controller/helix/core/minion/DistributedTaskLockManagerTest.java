@@ -18,17 +18,18 @@
  */
 package org.apache.pinot.controller.helix.core.minion;
 
-import java.util.Arrays;
-import java.util.Collections;
-import java.util.UUID;
+import java.util.concurrent.TimeUnit;
 import org.apache.helix.AccessOption;
 import org.apache.helix.store.zk.ZkHelixPropertyStore;
 import org.apache.helix.zookeeper.datamodel.ZNRecord;
-import org.mockito.MockedStatic;
+import org.apache.pinot.common.metrics.ControllerMetrics;
+import org.apache.pinot.common.metrics.ControllerTimer;
+import org.apache.zookeeper.data.Stat;
 import org.testng.Assert;
 import org.testng.annotations.Test;
 
 import static org.mockito.Mockito.any;
+import static org.mockito.Mockito.anyLong;
 import static org.mockito.Mockito.anyString;
 import static org.mockito.Mockito.contains;
 import static org.mockito.Mockito.eq;
@@ -48,41 +49,31 @@ public class DistributedTaskLockManagerTest {
     // Mock the property store and data accessor
     ZkHelixPropertyStore<ZNRecord> mockPropertyStore = mock(ZkHelixPropertyStore.class);
 
-    // Define the specific UUID to use for the lock
-    UUID expectedUuid = UUID.fromString("123e4567-e89b-42d3-a456-426614174000");
-
-    // Configure mocks for ephemeral sequential node creation
+    // Configure mocks for ephemeral node creation
     when(mockPropertyStore.exists(anyString(), eq(AccessOption.PERSISTENT))).thenReturn(true);
-    when(mockPropertyStore.create(anyString(), any(ZNRecord.class), eq(AccessOption.EPHEMERAL_SEQUENTIAL)))
-        .thenReturn(true);
-    // Use the expectedUuid in the lock name to be returned
-    // Return just one controller, with the first sequence number
-    when(mockPropertyStore.getChildNames(anyString(), eq(AccessOption.PERSISTENT)))
-        .thenReturn(Arrays.asList("controller1-" + expectedUuid + "-lock-0000000001"));
+    when(mockPropertyStore.create(anyString(), any(ZNRecord.class), eq(AccessOption.EPHEMERAL))).thenReturn(true);
     when(mockPropertyStore.remove(anyString(), eq(AccessOption.EPHEMERAL))).thenReturn(true);
-    when(mockPropertyStore.set(anyString(), any(ZNRecord.class), eq(AccessOption.PERSISTENT))).thenReturn(true);
 
     DistributedTaskLockManager lockManager = new DistributedTaskLockManager(mockPropertyStore, "controller1");
 
-    try (MockedStatic<UUID> mockedUuid = mockStatic(UUID.class)) {
-      // Configure the mock to return the specific UUID when randomUUID() is called
-      mockedUuid.when(UUID::randomUUID).thenReturn(expectedUuid);
+    // Test lock acquisition
+    DistributedTaskLockManager.TaskLock lock = lockManager.acquireLock("testTable");
+    Assert.assertNotNull(lock, "Should successfully acquire lock");
+    assertEquals(lock.getOwner(), "controller1");
+    Assert.assertNotNull(lock.getLockZNodePath(), "Lock ZNode path should not be null");
+    assertEquals(lock.getLockZNodePath(), "/MINION_TASK_METADATA/testTable-Lock");
+    assertTrue(lock.getAge() >= 0, "Lock should have valid age");
 
-      // Test lock acquisition
-      DistributedTaskLockManager.TaskLock lock = lockManager.acquireLock("testTable");
-      Assert.assertNotNull(lock, "Should successfully acquire lock");
-      assertEquals(lock.getOwner(), "controller1");
-      assertTrue(lock.getAge() >= 0, "Lock should have valid age");
-
-      // Test lock release
-      boolean released = lockManager.releaseLock(lock, true);
-      Assert.assertTrue(released, "Should successfully release lock");
-    }
+    // Test lock release
+    when(mockPropertyStore.exists(eq(lock.getLockZNodePath()), eq(AccessOption.EPHEMERAL))).thenReturn(true);
+    boolean released = lockManager.releaseLock(lock);
+    Assert.assertTrue(released, "Should successfully release lock");
 
     // Verify ephemeral node interactions
-    verify(mockPropertyStore, times(1)).create(anyString(), any(ZNRecord.class),
-        eq(AccessOption.EPHEMERAL_SEQUENTIAL));
-    verify(mockPropertyStore, times(1)).remove(anyString(), eq(AccessOption.EPHEMERAL));
+    verify(mockPropertyStore, times(1)).create(eq(lock.getLockZNodePath()), any(ZNRecord.class),
+        eq(AccessOption.EPHEMERAL));
+    verify(mockPropertyStore, times(1)).remove(eq(lock.getLockZNodePath()),
+        eq(AccessOption.EPHEMERAL));
   }
 
   @Test
@@ -90,69 +81,21 @@ public class DistributedTaskLockManagerTest {
     // Mock the property store and data accessor
     ZkHelixPropertyStore<ZNRecord> mockPropertyStore = mock(ZkHelixPropertyStore.class);
 
-    // Define the specific UUID to use for the lock
-    UUID expectedUuid1 = UUID.fromString("123e4567-e89b-42d3-a456-426614174000");
-    UUID expectedUuid2 = UUID.fromString("543e4239-e89b-53d4-b474-24423374adf6");
-
     // Configure mocks to simulate another controller already has the lock
     when(mockPropertyStore.exists(anyString(), eq(AccessOption.PERSISTENT))).thenReturn(true);
-    when(mockPropertyStore.create(anyString(), any(ZNRecord.class), eq(AccessOption.EPHEMERAL_SEQUENTIAL)))
-        .thenReturn(true);
-    // Use the expectedUuid in the lock name to be returned
-    // Have controller2 have the lower sequence number
-    when(mockPropertyStore.getChildNames(anyString(), eq(AccessOption.PERSISTENT)))
-        .thenReturn(Arrays.asList("controller2-" + expectedUuid2 + "-lock-0000000001",
-            "controller1-" + expectedUuid1 + "-lock-0000000002"));
+    when(mockPropertyStore.create(anyString(), any(ZNRecord.class), eq(AccessOption.EPHEMERAL))).thenReturn(false);
     when(mockPropertyStore.remove(anyString(), eq(AccessOption.EPHEMERAL))).thenReturn(true);
 
     DistributedTaskLockManager lockManager = new DistributedTaskLockManager(mockPropertyStore, "controller1");
 
-    try (MockedStatic<UUID> mockedUuid = mockStatic(UUID.class)) {
-      // Configure the mock to return the specific UUID when randomUUID() is called
-      mockedUuid.when(UUID::randomUUID).thenReturn(expectedUuid1);
+    // Test lock acquisition should fail because create returned false
+    DistributedTaskLockManager.TaskLock lock = lockManager.acquireLock("testTable");
+    Assert.assertNull(lock, "Should fail to acquire lock when create returns false");
 
-      // Test lock acquisition should fail because controller2 has lower sequence number
-      DistributedTaskLockManager.TaskLock lock = lockManager.acquireLock("testTable");
-      Assert.assertNull(lock, "Should fail to acquire lock when another controller has lower sequence number");
-    }
-
-    // Verify that we cleaned up our node after failing to get the lock
+    // Verify that create was called. No need to clean-up the lock so remove should not have been called
     verify(mockPropertyStore, times(1)).create(anyString(), any(ZNRecord.class),
-        eq(AccessOption.EPHEMERAL_SEQUENTIAL));
-    verify(mockPropertyStore, times(1)).remove(anyString(), eq(AccessOption.EPHEMERAL));
-  }
-
-  @Test
-  public void testEphemeralNodeAutomaticCleanup() {
-    // Mock the property store and data accessor
-    ZkHelixPropertyStore<ZNRecord> mockPropertyStore = mock(ZkHelixPropertyStore.class);
-
-    // Define the specific UUID to use for the lock
-    UUID expectedUuid = UUID.fromString("123e4567-e89b-42d3-a456-426614174000");
-
-    // Simulate a scenario where ephemeral nodes from dead sessions are automatically cleaned up
-    when(mockPropertyStore.exists(anyString(), eq(AccessOption.PERSISTENT))).thenReturn(true);
-    // First return: No existing locks - dead sessions cleaned up automatically
-    // Then return: lock which we created with provided UUID
-    when(mockPropertyStore.getChildNames(anyString(), eq(AccessOption.PERSISTENT)))
-        .thenReturn(Collections.emptyList())
-        .thenReturn(Arrays.asList("controller1-" + expectedUuid + "-lock-0000000001"));
-    when(mockPropertyStore.create(anyString(), any(ZNRecord.class), eq(AccessOption.EPHEMERAL_SEQUENTIAL)))
-        .thenReturn(true);
-
-    when(mockPropertyStore.set(anyString(), any(ZNRecord.class), eq(AccessOption.PERSISTENT))).thenReturn(true);
-
-    DistributedTaskLockManager lockManager = new DistributedTaskLockManager(mockPropertyStore, "controller1");
-
-    try (MockedStatic<UUID> mockedUuid = mockStatic(UUID.class)) {
-      // Configure the mock to return the specific UUID when randomUUID() is called
-      mockedUuid.when(UUID::randomUUID).thenReturn(expectedUuid);
-
-      // Test that we can acquire lock when no other ephemeral nodes exist (automatic cleanup)
-      DistributedTaskLockManager.TaskLock lock = lockManager.acquireLock("testTable");
-      Assert.assertNotNull(lock, "Should successfully acquire lock when dead sessions are automatically cleaned up");
-      assertEquals(lock.getOwner(), "controller1");
-    }
+        eq(AccessOption.EPHEMERAL));
+    verify(mockPropertyStore, times(0)).remove(anyString(), eq(AccessOption.EPHEMERAL));
   }
 
   @Test
@@ -160,26 +103,89 @@ public class DistributedTaskLockManagerTest {
     // Mock the property store and data accessor
     ZkHelixPropertyStore<ZNRecord> mockPropertyStore = mock(ZkHelixPropertyStore.class);
 
-    // Define the specific UUID to use for the lock
-    UUID expectedUuid = UUID.fromString("123e4567-e89b-42d3-a456-426614174000");
+    String controllerId = "controller1";
+
+    // Construct a record to return when propertyStore.get() is called on the lock ZNode
+    ZNRecord record = new ZNRecord(controllerId);
+    record.setSimpleField("lockCreationTimeMs", String.valueOf(System.currentTimeMillis()));
+    record.setSimpleField("lockOwner", controllerId);
 
     // Simulate active ephemeral nodes indicating task generation in progress
     when(mockPropertyStore.exists(anyString(), eq(AccessOption.PERSISTENT))).thenReturn(true);
-    // Use the expectedUuid in the lock name to be returned
-    when(mockPropertyStore.getChildNames(anyString(), eq(AccessOption.PERSISTENT)))
-        .thenReturn(Arrays.asList("controller2-" + expectedUuid + "-lock-0000000001"));
-    when(mockPropertyStore.exists(contains("controller2-" + expectedUuid + "-lock-0000000001"),
-        eq(AccessOption.EPHEMERAL))).thenReturn(true);
+    when(mockPropertyStore.get(contains("testTable"), any(Stat.class), eq(AccessOption.EPHEMERAL))).thenReturn(record);
 
-    DistributedTaskLockManager lockManager = new DistributedTaskLockManager(mockPropertyStore, "controller1");
+    DistributedTaskLockManager lockManager = new DistributedTaskLockManager(mockPropertyStore, controllerId);
 
     // Test that we can detect task generation in progress
     boolean inProgress = lockManager.isTaskGenerationInProgress("testTable");
     Assert.assertTrue(inProgress, "Should detect task generation in progress when ephemeral nodes exist");
 
-    // Test that we detect that the task generation is not in progress when we don't have any task locks
-    when(mockPropertyStore.getChildNames(anyString(), eq(AccessOption.PERSISTENT))).thenReturn(Collections.emptyList());
+    // Test that we detect that the task generation is not in progress when we don't have any task lock
+    when(mockPropertyStore.get(contains("testTable"), any(Stat.class), eq(AccessOption.EPHEMERAL))).thenReturn(null);
     inProgress = lockManager.isTaskGenerationInProgress("testTable");
     Assert.assertFalse(inProgress, "Should detect task generation in not progress when ephemeral nodes don't exist");
+  }
+
+  @Test
+  public void testMinionTaskGenerationLockHeldMetric() {
+    // Mock the property store
+    ZkHelixPropertyStore<ZNRecord> mockPropertyStore = mock(ZkHelixPropertyStore.class);
+
+    // Mock ControllerMetrics to verify metric calls
+    ControllerMetrics mockControllerMetrics = mock(ControllerMetrics.class);
+
+    String controllerId = "controller1";
+    String tableNameWithType = "testTable";
+
+    // Test case 1: Lock is held (record exists with creation time)
+    long lockCreationTime = System.currentTimeMillis() - 5000; // 5 seconds ago
+    ZNRecord lockRecord = new ZNRecord(controllerId);
+    lockRecord.setSimpleField("lockCreationTimeMs", String.valueOf(lockCreationTime));
+    lockRecord.setSimpleField("lockOwner", controllerId);
+
+    when(mockPropertyStore.get(contains(tableNameWithType), any(Stat.class), eq(AccessOption.EPHEMERAL)))
+        .thenReturn(lockRecord);
+
+    // Mock ControllerMetrics.get() to return our mock
+    try (var mockedStatic = mockStatic(ControllerMetrics.class)) {
+      mockedStatic.when(ControllerMetrics::get).thenReturn(mockControllerMetrics);
+
+      DistributedTaskLockManager lockManager = new DistributedTaskLockManager(mockPropertyStore, controllerId);
+
+      // Call the method that should update the metric
+      boolean inProgress = lockManager.isTaskGenerationInProgress(tableNameWithType);
+      Assert.assertTrue(inProgress, "Should detect task generation in progress when lock record exists");
+
+      // Verify that addTimedValue was called with a non-zero duration (approximately 5000ms)
+      verify(mockControllerMetrics, times(1)).addTimedValue(
+          eq(tableNameWithType),
+          eq(ControllerTimer.MINION_TASK_GENERATION_LOCK_HELD_ELAPSED_TIME_MS),
+          anyLong(), // We can't predict the exact value due to timing, but it should be > 0
+          eq(TimeUnit.MILLISECONDS)
+      );
+    }
+
+    // Test case 2: No lock held (record is null)
+    when(mockPropertyStore.get(contains(tableNameWithType), any(Stat.class), eq(AccessOption.EPHEMERAL)))
+        .thenReturn(null);
+
+    try (var mockedStatic = mockStatic(ControllerMetrics.class)) {
+      mockedStatic.when(ControllerMetrics::get).thenReturn(mockControllerMetrics);
+
+      DistributedTaskLockManager lockManager = new DistributedTaskLockManager(mockPropertyStore, controllerId);
+
+      // Call the method that should update the metric
+      boolean inProgress = lockManager.isTaskGenerationInProgress(tableNameWithType);
+      Assert.assertFalse(inProgress, "Should detect task generation not in progress when no lock record exists");
+
+
+      // Verify that addTimedValue was called with 0 duration (no lock held)
+      verify(mockControllerMetrics, times(1)).addTimedValue(
+          eq(tableNameWithType),
+          eq(ControllerTimer.MINION_TASK_GENERATION_LOCK_HELD_ELAPSED_TIME_MS),
+          eq(0L), // Should be 0 when no lock is held
+          eq(TimeUnit.MILLISECONDS)
+      );
+    }
   }
 }

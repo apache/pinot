@@ -186,7 +186,7 @@ public class PinotTaskManager extends ControllerPeriodicTask<Void> {
     }
   }
 
-  public Map<String, String> createTask(String taskType, String tableName, @Nullable String taskName,
+  public synchronized Map<String, String> createTask(String taskType, String tableName, @Nullable String taskName,
       Map<String, String> taskConfigs)
       throws Exception {
     if (taskName == null) {
@@ -260,12 +260,11 @@ public class PinotTaskManager extends ControllerPeriodicTask<Void> {
       // 2. Multiple simultaneous ad-hoc requests
       // 3. Leadership changes during task generation
       DistributedTaskLockManager.TaskLock lock = null;
-      boolean taskCreationSuccess = true;
       if (_distributedTaskLockManager != null) {
         lock = _distributedTaskLockManager.acquireLock(tableNameWithType);
         if (lock == null) {
           String message = String.format("Could not acquire table level distributed lock for ad-hoc task type: %s, "
-                  + "table: %s. Another controller is likely generating tasks for this type. Please try again later.",
+                  + "table: %s. Another controller is likely generating tasks for this table. Please try again later.",
               taskType, tableNameWithType);
           LOGGER.warn(message);
           throw new RuntimeException(message);
@@ -290,7 +289,6 @@ public class PinotTaskManager extends ControllerPeriodicTask<Void> {
           message += "Optimise the task config or reduce tableMaxNumTasks to avoid the error";
           // We throw an exception to notify the user
           // This is to ensure that the user is aware of the task generation limit
-          taskCreationSuccess = false;
           throw new RuntimeException(message);
         }
         pinotTaskConfigs.forEach(pinotTaskConfig -> pinotTaskConfig.getConfigs()
@@ -306,10 +304,9 @@ public class PinotTaskManager extends ControllerPeriodicTask<Void> {
       } finally {
         if (!responseMap.containsKey(tableNameWithType)) {
           LOGGER.warn("No task submitted for tableNameWithType: {}", tableNameWithType);
-          taskCreationSuccess = false;
         }
         if (lock != null) {
-          _distributedTaskLockManager.releaseLock(lock, taskCreationSuccess);
+          _distributedTaskLockManager.releaseLock(lock);
         }
       }
     }
@@ -755,19 +752,16 @@ public class PinotTaskManager extends ControllerPeriodicTask<Void> {
         List<String> enabledTables =
             enabledTableConfigs.stream().map(TableConfig::getTableName).collect(Collectors.toList());
         Map<String, DistributedTaskLockManager.TaskLock> acquiredTaskLocks = new HashMap<>();
-        Map<String, Boolean> taskGenerationSuccesses = new HashMap<>();
         for (String tableName : enabledTables) {
           DistributedTaskLockManager.TaskLock lock;
           if (_distributedTaskLockManager != null) {
             lock = _distributedTaskLockManager.acquireLock(tableName);
             if (lock == null) {
               LOGGER.warn("Could not acquire table level distributed lock for scheduled task type: {} on table: {}, "
-                      + "skipping lock acquisition", taskType, tableName);
-              taskGenerationSuccesses.put(tableName, false);
+                  + "skipping lock acquisition", taskType, tableName);
               continue;
             }
             acquiredTaskLocks.put(tableName, lock);
-            taskGenerationSuccesses.put(tableName, true);
             LOGGER.info("Acquired table level distributed lock for scheduled task type: {} on table: {}", taskType,
                 tableName);
           }
@@ -775,14 +769,16 @@ public class PinotTaskManager extends ControllerPeriodicTask<Void> {
 
         try {
           tasksScheduled.put(taskType, scheduleTask(taskGenerator, enabledTableConfigs, context.isLeader(),
-              context.getMinionInstanceTag(), context.getTriggeredBy(), acquiredTaskLocks, taskGenerationSuccesses));
+              context.getMinionInstanceTag(), context.getTriggeredBy(), acquiredTaskLocks));
+        } catch (RuntimeException e) {
+          LOGGER.error("Caught exception while trying to schedule task type: {} for tables: {}, gathered responses: {}",
+              taskType, enabledTables, tasksScheduled, e);
+          throw e;
         } finally {
-          // Release all the distributed table locks
-          if (_distributedTaskLockManager != null) {
-            for (Map.Entry<String, DistributedTaskLockManager.TaskLock> taskLockEntry : acquiredTaskLocks.entrySet()) {
-              _distributedTaskLockManager.releaseLock(taskLockEntry.getValue(),
-                  taskGenerationSuccesses.getOrDefault(taskLockEntry.getKey(), true));
-            }
+          // Release all the distributed table locks if any exist
+          assert acquiredTaskLocks.isEmpty() || _distributedTaskLockManager != null;
+          for (Map.Entry<String, DistributedTaskLockManager.TaskLock> taskLockEntry : acquiredTaskLocks.entrySet()) {
+            _distributedTaskLockManager.releaseLock(taskLockEntry.getValue());
           }
         }
       } else {
@@ -821,8 +817,7 @@ public class PinotTaskManager extends ControllerPeriodicTask<Void> {
    */
   protected TaskSchedulingInfo scheduleTask(PinotTaskGenerator taskGenerator, List<TableConfig> enabledTableConfigs,
       boolean isLeader, @Nullable String minionInstanceTagForTask, String triggeredBy,
-      Map<String, DistributedTaskLockManager.TaskLock> acquiredTaskLocks,
-      Map<String, Boolean> taskGenerationSuccesses) {
+      Map<String, DistributedTaskLockManager.TaskLock> acquiredTaskLocks) {
     TaskSchedulingInfo response = new TaskSchedulingInfo();
     String taskType = taskGenerator.getTaskType();
     List<String> enabledTables =
@@ -844,7 +839,6 @@ public class PinotTaskManager extends ControllerPeriodicTask<Void> {
               + "Tasks won't be generated until the issue is mitigated.", tableName);
           LOGGER.warn(message);
           response.addGenerationError(message);
-          taskGenerationSuccesses.put(tableName, false);
           _controllerMetrics.setOrUpdateTableGauge(tableName, ControllerGauge.RESOURCE_UTILIZATION_LIMIT_EXCEEDED, 1L);
           continue;
         }
@@ -874,7 +868,6 @@ public class PinotTaskManager extends ControllerPeriodicTask<Void> {
             if (TaskSchedulingContext.isUserTriggeredTask(triggeredBy)) {
               message += "Optimise the task config or reduce tableMaxNumTasks to avoid the error";
               presentTaskConfig.clear();
-              taskGenerationSuccesses.put(tableName, false);
               // If the task is user-triggered, we throw an exception to notify the user
               // This is to ensure that the user is aware of the task generation limit
               throw new RuntimeException(message);
@@ -899,11 +892,10 @@ public class PinotTaskManager extends ControllerPeriodicTask<Void> {
               ControllerGauge.LAST_MINION_TASK_GENERATION_ENCOUNTERS_ERROR, 0L);
         } else {
           String message = String.format("Could not acquire table level distributed lock for scheduled task type: "
-              + "%s, table: %s. Another controller is likely generating tasks for this type. Please try again later.",
+              + "%s, table: %s. Another controller is likely generating tasks for this table. Please try again later.",
               taskType, tableName);
           LOGGER.warn(message);
           response.addGenerationError(message);
-          taskGenerationSuccesses.put(tableName, false);
         }
       } catch (Exception e) {
         StringWriter errors = new StringWriter();
@@ -920,7 +912,6 @@ public class PinotTaskManager extends ControllerPeriodicTask<Void> {
         // TODO: find a better way to report task generation information
         _controllerMetrics.setOrUpdateTableGauge(tableName, taskType,
             ControllerGauge.LAST_MINION_TASK_GENERATION_ENCOUNTERS_ERROR, 1L);
-        taskGenerationSuccesses.put(tableName, false);
         LOGGER.error("Failed to generate tasks for task type {} for table {}", taskType, tableName, e);
       }
     }

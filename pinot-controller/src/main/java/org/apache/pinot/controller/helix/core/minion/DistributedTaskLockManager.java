@@ -19,98 +19,61 @@
 package org.apache.pinot.controller.helix.core.minion;
 
 import com.google.common.annotations.VisibleForTesting;
-import java.util.ArrayList;
-import java.util.Comparator;
-import java.util.List;
-import java.util.UUID;
-import java.util.regex.Matcher;
-import java.util.regex.Pattern;
+import java.util.concurrent.TimeUnit;
 import javax.annotation.Nullable;
 import org.apache.helix.AccessOption;
 import org.apache.helix.store.zk.ZkHelixPropertyStore;
 import org.apache.helix.zookeeper.datamodel.ZNRecord;
 import org.apache.pinot.common.metadata.ZKMetadataProvider;
+import org.apache.pinot.common.metrics.ControllerMetrics;
+import org.apache.pinot.common.metrics.ControllerTimer;
+import org.apache.zookeeper.data.Stat;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 
 /**
- * Manages distributed locks for minion task generation using ZooKeeper ephemeral sequential nodes.
- * Uses ephemeral nodes that automatically disappear when the controller session ends.
- * This approach provides automatic cleanup and is suitable for long-running task generation.
- * Locks are held until explicitly released or the controller session terminates.
+ * Manages distributed locks for minion task generation using ZooKeeper ephemeral nodes that automatically disappear
+ * when the controller session ends or when the lock is explicitly released. This approach provides automatic cleanup
+ * and is suitable for long-running task generation.
  * Locks are at the table level, to ensure that only one type of task can be generated per table at any given time.
+ * This is to prevent task types which shouldn't run in parallel from being generated at the same time.
  * <p>
- * ZK EPHEMERAL_SEQUENTIAL Locks (see <a href="https://zookeeper.apache.org/doc/current/recipes.html#sc_recipes_Locks">
- *   ZooKeeper Lock Recipe.</a> for more details):
+ * ZK EPHEMERAL Lock Node:
  *   <ul>
- *     <li>Every lock is created with a lock prefix. Lock prefix used: [controllerName]-lock-[UUID]. The UUID helps
- *     differentiate between requests originating from the same controller at the same time
- *     <li>When ZK creates the ZNode, it appends a sequence number at the end. E.g.
- *     [controllerName]-lock-[UUID]-00000001
- *     <li>The sequence number is used to identify the lock winner in case more than one lock node is created at the
- *     same time. The smallest sequence number always wins
+ *     <li>Every lock is created at the table level with the name: {tableName}-Lock, under the base path
+ *     MINION_TASK_METADATA within the PROPERTYSTORE.
+ *     <li>If the propertyStore::create() call returns true, that means the lock node was successfully created and the
+ *     lock belongs to the current controller, otherwise it was not. If the lock node already exists, this will return
+ *     false. No clean-up of the lock node is needed if the propertyStore::create() call returns false.
  *     <li>The locks are EPHEMERAL in nature, meaning that once the session with ZK is lost, the lock is automatically
  *     cleaned up. Scenarios when the ZK session can be lost: a) controller shutdown, b) controller crash, c) ZK session
- *     expiry (e.g. long GC pauses can cause this)
- *     <li>This implementation does not set up watches as described in the recipe as the task lock is released whenever
- *     we identify that the lock is already acquired. Do not expect lock ownership to automatically change for the
- *     time being. If such support is needed in the future, this can be enhanced to add a watch on the neighboring
- *     lock node
+ *     expiry (e.g. long GC pauses can cause this). This property helps ensure that the lock is released under
+ *     controller failure.
  *   </ul>
  * <p>
- * Example of how the locks will work:
- * <p>
- * Say we have two controllers, and one controller happens to run 2 threads at the same time, all of which need to take
- * the distributed lock. Each thread will create a distributed lock node, and the "-Lock" ZNode getChildren will return:
- * <ul>
- *   <li>controller2-lock-xyzwx-00000002
- *   <li>controller1-lock-abcde-00000001
- *   <li>controller1-lock-ab345-00000003
- * </ul>
- * <p>
- * In the above, the controller1 with UUID abcde will win the lock as it has the smallest sequence number. The other
- * two threads will clean up their locks and return error that the distributed lock could not be acquired. Controller1
- * will proceed with performing its tasks, and when done will release the lock.
  */
 public class DistributedTaskLockManager {
   private static final Logger LOGGER = LoggerFactory.getLogger(DistributedTaskLockManager.class);
 
   // Lock paths are constructed using ZKMetadataProvider
   private static final String LOCK_OWNER_KEY = "lockOwner";
-  private static final String LOCK_UUID_KEY = "lockUuid";
-  private static final String LOCK_TIMESTAMP_MILLIS_KEY = "lockTimestampMillis";
-
-  // Define a custom comparator to compare strings of format '<controllerName>-lock-<uuid>-<sequenceNumber>' and sort
-  // them by the sequence number at the end
-  private static final Comparator<String> TASK_LOCK_SEQUENCE_ID_COMPARATOR = (s1, s2) -> {
-    // Regex to find the trailing sequence of digits
-    Pattern p = Pattern.compile("\\d+$");
-
-    // Extract the number from the first string
-    Matcher m1 = p.matcher(s1);
-    long num1 = m1.find() ? Long.parseLong(m1.group()) : 0;
-
-    // Extract the number from the second string
-    Matcher m2 = p.matcher(s2);
-    long num2 = m2.find() ? Long.parseLong(m2.group()) : 0;
-
-    return Long.compare(num1, num2);
-  };
+  private static final String LOCK_CREATION_TIME_MS = "lockCreationTimeMs";
 
   private final ZkHelixPropertyStore<ZNRecord> _propertyStore;
   private final String _controllerInstanceId;
+  private final ControllerMetrics _controllerMetrics;
 
   public DistributedTaskLockManager(ZkHelixPropertyStore<ZNRecord> propertyStore, String controllerInstanceId) {
     _propertyStore = propertyStore;
     _controllerInstanceId = controllerInstanceId;
-
-    // Ensure base paths exist
-    ensureBasePaths();
+    _controllerMetrics = ControllerMetrics.get();
   }
 
   /**
    * Attempts to acquire a distributed lock at the table level for task generation using session-based locking.
+   * The lock is at the table level instead of the task level to ensure that only a single task can be generated for
+   * a given table at any time. Certain tasks depend on other tasks not being generated at the same time
    * The lock is held until explicitly released or the controller session ends.
    *
    * @param tableNameWithType the table name with type
@@ -118,82 +81,70 @@ public class DistributedTaskLockManager {
    */
   @Nullable
   public TaskLock acquireLock(String tableNameWithType) {
-    String lockBasePath = getLockBasePath(tableNameWithType);
-
-    LOGGER.info("Attempting to acquire task generation lock: {} by controller: {}", tableNameWithType,
+    LOGGER.info("Attempting to acquire task generation lock for table: {} by controller: {}", tableNameWithType,
         _controllerInstanceId);
 
     try {
       // Check if task generation is already in progress
-      if (isTaskGenerationInProgress(tableNameWithType, lockBasePath)) {
+      if (isTaskGenerationInProgress(tableNameWithType)) {
         LOGGER.info("Task generation already in progress for: {} by this or another controller", tableNameWithType);
         return null;
       }
 
-      // Try to acquire the lock using ephemeral sequential node
-      TaskLock lock = tryAcquireSessionBasedLock(lockBasePath, tableNameWithType);
+      // Try to acquire the lock using ephemeral node
+      TaskLock lock = tryAcquireSessionBasedLock(tableNameWithType);
       if (lock != null) {
-        LOGGER.info("Successfully acquired task generation lock: {} by controller: {}", tableNameWithType,
+        LOGGER.info("Successfully acquired task generation lock for table: {} by controller: {}", tableNameWithType,
             _controllerInstanceId);
         return lock;
       } else {
-        LOGGER.warn("Could not acquire lock: {} - another controller holds it", tableNameWithType);
-        return null;
+        LOGGER.warn("Could not acquire lock for table: {} - another controller must hold it", tableNameWithType);
       }
     } catch (Exception e) {
-      LOGGER.error("Error while trying to acquire lock: {}", tableNameWithType, e);
-      return null;
+      LOGGER.error("Error while trying to acquire task lock for table: {}", tableNameWithType, e);
     }
+    return null;
   }
 
-  private String getLockBasePath(String tableNameForPath) {
+  private String getLockPath(String tableNameForPath) {
     return ZKMetadataProvider.constructPropertyStorePathForMinionTaskGenerationLock(tableNameForPath);
-  }
-
-  private String getBasePath() {
-    return ZKMetadataProvider.getPropertyStorePathForMinionTaskMetadataPrefix();
-  }
-
-  /**
-   * Releases a lock assuming successful completion.
-   */
-  public boolean releaseLock(TaskLock lock) {
-    return releaseLock(lock, true);
   }
 
   /**
    * Releases a previously acquired session-based lock and marks task generation as completed.
    *
    * @param lock the lock to release
-   * @param success whether task generation completed successfully
    * @return true if successfully released, false otherwise
    */
-  public boolean releaseLock(TaskLock lock, boolean success) {
+  public boolean releaseLock(TaskLock lock) {
     if (lock == null) {
       return true;
     }
 
-    String lockKey = lock.getLockKey();
+    String tableNameWithType = lock.getTableNameWithType();
+    String lockNode = lock.getLockZNodePath();
 
-    try {
-      // Remove the ephemeral lock node
-      if (lock.getLockNodePath() != null) {
-        try {
-          boolean status = _propertyStore.remove(lock.getLockNodePath(), AccessOption.EPHEMERAL);
-          LOGGER.info("Removed ephemeral lock node: {}, removal success: {}", lock.getLockNodePath(), status);
-        } catch (Exception e) {
-          // Lock node might have already been removed due to session timeout - this is OK
-          LOGGER.warn("Ephemeral lock node already removed or session expired: {}", lock.getLockNodePath(), e);
+    // Remove the ephemeral lock node
+    boolean status = true;
+    if (lockNode != null) {
+      try {
+        if (_propertyStore.exists(lockNode, AccessOption.EPHEMERAL)) {
+          status = _propertyStore.remove(lockNode, AccessOption.EPHEMERAL);
+          LOGGER.info("Tried to removed ephemeral lock node: {}, for table: {} by controller: {}, removal success: {}",
+              lockNode, tableNameWithType, _controllerInstanceId, status);
+        } else {
+          LOGGER.warn("Ephemeral lock node: {} does not exist for table: {}, nothing to remove",
+              lockNode, tableNameWithType);
         }
+      } catch (Exception e) {
+        status = false;
+        LOGGER.warn("Exception while trying to remove ephemeral lock node: {}", lockNode, e);
       }
-
-      LOGGER.info("Successfully released task generation lock: {} by controller: {} (success: {})", lockKey,
-          _controllerInstanceId, success);
-      return true;
-    } catch (Exception e) {
-      LOGGER.error("Error while releasing lock: {}", lockKey, e);
-      return false;
+    } else {
+      LOGGER.warn("Lock node path seems to be null for task lock: {}, treating release as a no-op", lock);
     }
+
+    return status;
   }
 
   /**
@@ -201,31 +152,19 @@ public class DistributedTaskLockManager {
    */
   public boolean forceReleaseLock(String tableNameWithType) {
     LOGGER.info("Trying to force release the lock for table: {}", tableNameWithType);
-    String lockBasePath = getLockBasePath(tableNameWithType);
+    String lockPath = getLockPath(tableNameWithType);
 
     boolean released = true;
-    if (_propertyStore.exists(lockBasePath, AccessOption.PERSISTENT)) {
-      List<String> lockNodes = _propertyStore.getChildNames(lockBasePath, AccessOption.PERSISTENT);
-      if (lockNodes != null && !lockNodes.isEmpty()) {
-        // There are active ephemeral lock nodes, check if any are still valid and delete them
-        for (String nodeName : lockNodes) {
-          String nodePath = lockBasePath + "/" + nodeName;
-          if (_propertyStore.exists(nodePath, AccessOption.EPHEMERAL)) {
-            LOGGER.info("Lock for table: {} found at path: {}, trying to remove", tableNameWithType, nodePath);
-            boolean result = _propertyStore.remove(nodePath, AccessOption.EPHEMERAL);
-            if (!result) {
-              LOGGER.warn("Could not force release lock: {}", nodePath);
-              released = false;
-            }
-          }
-        }
-      } else {
-        LOGGER.info("No locks to force release, no child lock ZNodes found for table: {} under base: {}",
-            tableNameWithType, lockBasePath);
-      }
-    } else {
-      LOGGER.info("No locks to force release, no base lock ZNode: {} found for table: {}", lockBasePath,
-          tableNameWithType);
+    if (!_propertyStore.exists(lockPath, AccessOption.EPHEMERAL)) {
+      LOGGER.info("No lock ZNode: {} found for table: {}, nothing to force release", lockPath, tableNameWithType);
+      return released;
+    }
+
+    LOGGER.info("Lock for table: {} found at path: {}, trying to remove", tableNameWithType, lockPath);
+    boolean result = _propertyStore.remove(lockPath, AccessOption.EPHEMERAL);
+    if (!result) {
+      LOGGER.warn("Could not force release lock: {} for table: {}", lockPath, tableNameWithType);
+      released = false;
     }
     return released;
   }
@@ -238,142 +177,68 @@ public class DistributedTaskLockManager {
    */
   @VisibleForTesting
   boolean isTaskGenerationInProgress(String tableNameWithType) {
-    String lockBasePath = getLockBasePath(tableNameWithType);
-    return isTaskGenerationInProgress(tableNameWithType, lockBasePath);
-  }
+    String lockPath = getLockPath(tableNameWithType);
 
-  /**
-   * Internal method to check if task generation is in progress for a lock key.
-   */
-  private boolean isTaskGenerationInProgress(String tableNameWithType, String lockBasePath) {
     try {
-      if (!_propertyStore.exists(lockBasePath, AccessOption.PERSISTENT)) {
-        return false;
-      }
-
-      // Check if there are any active ephemeral lock nodes
-      List<String> lockNodes = _propertyStore.getChildNames(lockBasePath, AccessOption.PERSISTENT);
-      if (lockNodes != null && !lockNodes.isEmpty()) {
-        // There are active ephemeral lock nodes, check if any are still valid
-        for (String nodeName : lockNodes) {
-          String nodePath = lockBasePath + "/" + nodeName;
-          if (_propertyStore.exists(nodePath, AccessOption.EPHEMERAL)) {
-            // Ephemeral node exists, meaning session is still alive and task should be in progress
-            return true;
+      long durationLockHeldMs = 0;
+      Stat stat = new Stat();
+      // Get the node instead of checking for existence to update the time held metric in case the node exists
+      ZNRecord zNRecord = _propertyStore.get(lockPath, stat, AccessOption.EPHEMERAL);
+      if (zNRecord != null) {
+        String creationTimeMsString = zNRecord.getSimpleField(LOCK_CREATION_TIME_MS);
+        long creationTimeMs = stat.getCtime();
+        if (creationTimeMsString != null) {
+          try {
+            creationTimeMs = Long.parseLong(creationTimeMsString);
+          } catch (NumberFormatException e) {
+            LOGGER.warn("Could not parse creationTimeMs string: {} into long from ZNode, using ZNode creation time",
+                creationTimeMsString);
+            creationTimeMs = stat.getCtime();
           }
         }
+        durationLockHeldMs = System.currentTimeMillis() - creationTimeMs;
       }
-      return false;
+      _controllerMetrics.addTimedValue(tableNameWithType,
+          ControllerTimer.MINION_TASK_GENERATION_LOCK_HELD_ELAPSED_TIME_MS, durationLockHeldMs, TimeUnit.MILLISECONDS);
+      return zNRecord != null;
     } catch (Exception e) {
-      LOGGER.error("Error checking task generation status for: {}", tableNameWithType, e);
+      LOGGER.error("Error checking task generation status for: {} with lock path: {}", tableNameWithType, lockPath, e);
       return false;
     }
   }
 
   /**
-   * Attempts to acquire a lock using ephemeral sequential nodes.
-   * Uses the ZooKeeper recipe for distributed locking with automatic cleanup.
+   * Attempts to acquire a lock using ephemeral nodes.
    */
   @VisibleForTesting
-  TaskLock tryAcquireSessionBasedLock(String lockBasePath, String lockKey) {
+  TaskLock tryAcquireSessionBasedLock(String tableNameWithType) {
+    String lockPath = getLockPath(tableNameWithType);
+
     try {
       long currentTimeMs = System.currentTimeMillis();
 
-      // Ensure the base lock directory exists
-      if (!_propertyStore.exists(lockBasePath, AccessOption.PERSISTENT)) {
-        ZNRecord baseRecord = new ZNRecord(lockKey);
-        _propertyStore.create(lockBasePath, baseRecord, AccessOption.PERSISTENT);
-      }
-
-      // Create ephemeral sequential node for this controller, add an UUID to ensure that the path is unique in case
-      // multiple controller threads run at the same time
-      UUID uuid = UUID.randomUUID();
-      String lockNodePrefix = lockBasePath + "/" + _controllerInstanceId + "-" + uuid + "-lock-";
+      // Create ephemeral node for this table, owned by this controller
       ZNRecord lockRecord = new ZNRecord(_controllerInstanceId);
       lockRecord.setSimpleField(LOCK_OWNER_KEY, _controllerInstanceId);
-      lockRecord.setSimpleField(LOCK_TIMESTAMP_MILLIS_KEY, String.valueOf(currentTimeMs));
-      lockRecord.setSimpleField(LOCK_UUID_KEY, uuid.toString());
+      lockRecord.setSimpleField(LOCK_CREATION_TIME_MS, String.valueOf(currentTimeMs));
 
-      // ZK will assign the sequence when creating EPHEMERAL_SEQUENTIAL ZNodes
-      boolean created = _propertyStore.create(lockNodePrefix, lockRecord, AccessOption.EPHEMERAL_SEQUENTIAL);
+      boolean created = _propertyStore.create(lockPath, lockRecord, AccessOption.EPHEMERAL);
 
       if (created) {
-        // Find our actual node path by listing children and finding the one we just created, the UUID makes the path
-        // unique, even if we have multiple requests from the same controller
-        List<String> children = _propertyStore.getChildNames(lockBasePath, AccessOption.PERSISTENT);
-        List<String> allLockNodePathsForController = new ArrayList<>();
-        String lockNodePath = null;
-        if (children != null) {
-          // Find any node that starts with our controller ID and contains "-lock-"
-          for (String child : children) {
-            if (child.startsWith(_controllerInstanceId) && child.contains("-lock-")) {
-              if (child.startsWith(_controllerInstanceId + "-" + uuid)) {
-                // If the node also contains the UUID, it's the lock we created
-                lockNodePath = lockBasePath + "/" + child;
-              }
-              allLockNodePathsForController.add(lockBasePath + "/" + child);
-            }
-          }
-        }
-
-        LOGGER.info("Found {} lockNodePaths for controller instance: {}, list: {}, first lockNodePath cached: {}",
-            allLockNodePathsForController.size(), _controllerInstanceId, allLockNodePathsForController, lockNodePath);
-
-        if (lockNodePath != null && allLockNodePathsForController.size() == 1) {
-          // Check if we got the lowest sequence number (i.e., we're first in line)
-          List<String> allChildren = _propertyStore.getChildNames(lockBasePath, AccessOption.PERSISTENT);
-          if (allChildren != null && !allChildren.isEmpty()) {
-            allChildren.sort(TASK_LOCK_SEQUENCE_ID_COMPARATOR); // Sort by sequence number
-            String ourNode = lockNodePath.substring(lockNodePath.lastIndexOf('/') + 1);
-            if (ourNode.equals(allChildren.get(0))) {
-              // We have the lock!
-              LOGGER.info("Acquired lock with ephemeral node: {}", lockNodePath);
-              return new TaskLock(lockKey, _controllerInstanceId, currentTimeMs, lockNodePath);
-            } else {
-              // Someone else has the lock, clean up our node
-              boolean status = _propertyStore.remove(lockNodePath, AccessOption.EPHEMERAL);
-              LOGGER.info("Did not get lock, removing ephemeral node: {}, return status: {}", lockNodePath, status);
-              return null;
-            }
-          } else {
-            // No children found, something went wrong, clean up
-            boolean status = _propertyStore.remove(lockNodePath, AccessOption.EPHEMERAL);
-            LOGGER.warn("No children found under {}. Remove lockNodePath status: {} for node: {}. Something must have "
-                    + "gone wrong", lockBasePath, status, lockNodePath);
-            return null;
-          }
-        } else {
-          // Could not find our node path, or found too many paths for the same controller, cleanup failed creation
-          LOGGER.warn("Either lockNodePath: {} wasn't found, or too many locks ({}) found for the same controller: {},"
-                  + "list of locks: {}", lockNodePath, allLockNodePathsForController.size(), _controllerInstanceId,
-              allLockNodePathsForController);
-
-          if (lockNodePath != null) {
-            boolean status = _propertyStore.remove(lockNodePath, AccessOption.EPHEMERAL);
-            LOGGER.warn("Remove lockNodePath status: {} for path: {}", status, lockNodePath);
-          }
-          return null;
-        }
+        LOGGER.info("Successfully created lock node at path: {}, for controller: {}, for table: {}", lockPath,
+            _controllerInstanceId, tableNameWithType);
+        return new TaskLock(tableNameWithType, _controllerInstanceId, currentTimeMs, lockPath);
       }
-      return null;
-    } catch (Exception e) {
-      LOGGER.error("Error creating ephemeral lock under path: {}, lockKey: {}", lockBasePath, lockKey, e);
-      return null;
-    }
-  }
 
-  private void ensureBasePaths() {
-    try {
-      // Ensure minion task metadata base path exists
-      String basePath = getBasePath();
-      if (!_propertyStore.exists(basePath, AccessOption.PERSISTENT)) {
-        ZNRecord baseRecord = new ZNRecord("MINION_TASK_METADATA");
-        _propertyStore.create(basePath, baseRecord, AccessOption.PERSISTENT);
-        LOGGER.info("Created base path for minion task metadata: {}", basePath);
-      }
+      // We could not create the lock node, returning null
+      LOGGER.warn("Could not create lock node at path: {} for controller: {}, for table: {}", lockPath,
+          _controllerInstanceId, tableNameWithType);
     } catch (Exception e) {
-      LOGGER.warn("Error ensuring base paths exist", e);
+      LOGGER.error("Error creating lock under path: {}, for controller: {}, for table: {}", lockPath,
+          _controllerInstanceId, tableNameWithType, e);
     }
+
+    return null;
   }
 
   /**
@@ -382,20 +247,20 @@ public class DistributedTaskLockManager {
    * The state node is periodically cleaned up
    */
   public static class TaskLock {
-    private final String _lockKey;
+    private final String _tableNameWithType;
     private final String _owner;
     private final long _creationTimeMs;
-    private final String _lockNodePath; // Path to the ephemeral lock node
+    private final String _lockZNodePath; // Path to the ephemeral lock node
 
-    public TaskLock(String lockKey, String owner, long creationTimeMs, String lockNodePath) {
-      _lockKey = lockKey;
+    public TaskLock(String tableNameWithType, String owner, long creationTimeMs, String lockZNodePath) {
+      _tableNameWithType = tableNameWithType;
       _owner = owner;
       _creationTimeMs = creationTimeMs;
-      _lockNodePath = lockNodePath;
+      _lockZNodePath = lockZNodePath;
     }
 
-    public String getLockKey() {
-      return _lockKey;
+    public String getTableNameWithType() {
+      return _tableNameWithType;
     }
 
     public String getOwner() {
@@ -406,8 +271,8 @@ public class DistributedTaskLockManager {
       return _creationTimeMs;
     }
 
-    public String getLockNodePath() {
-      return _lockNodePath;
+    public String getLockZNodePath() {
+      return _lockZNodePath;
     }
 
     public long getAge() {
@@ -416,8 +281,8 @@ public class DistributedTaskLockManager {
 
     @Override
     public String toString() {
-      return String.format("TaskLock{key='%s', owner='%s', creationTimeMs=%d, age=%dms, nodePath='%s'}",
-          _lockKey, _owner, _creationTimeMs, getAge(), _lockNodePath);
+      return "TaskLock{tableNameWithType='" + _tableNameWithType + "', owner='" + _owner + "', creationTimeMs="
+          + _creationTimeMs + ", age=" + getAge() + ", lockZNodePath='" + _lockZNodePath + "'}";
     }
   }
 }
