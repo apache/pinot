@@ -79,7 +79,7 @@ public class AnyValueAggregationFunction extends NullableSingleInputAggregationF
 
   @Override
   public ColumnDataType getIntermediateResultColumnType() {
-    return _resultType != null ? _resultType : ColumnDataType.STRING;
+    return _resultType != null ? _resultType : ColumnDataType.UNKNOWN;
   }
 
   @Override
@@ -182,43 +182,24 @@ public class AnyValueAggregationFunction extends NullableSingleInputAggregationF
     if (bvs.getDictionary() != null) {
       final int[] dictIds = bvs.getDictionaryIdsSV();
       final Dictionary dict = bvs.getDictionary();
-
-      if (bvs.getNullBitmap() == null) {
-        for (int i = 0; i < length; i++) {
+      forEachNotNull(length, bvs, (from, to) -> {
+        for (int i = from; i < to; i++) {
           Object value = getDictionaryValue(dict, dictIds[i], bvs.getValueType().getStoredType());
           if (processor.process(i, value)) {
             break;
           }
         }
-      } else {
-        forEachNotNull(length, bvs, (from, to) -> {
-          for (int i = from; i < to; i++) {
-            Object value = getDictionaryValue(dict, dictIds[i], bvs.getValueType().getStoredType());
-            if (processor.process(i, value)) {
-              break;
-            }
-          }
-        });
-      }
+      });
     } else {
       // Fall back to direct value access based on type
-      if (bvs.getNullBitmap() == null) {
-        for (int i = 0; i < length; i++) {
+      forEachNotNull(length, bvs, (from, to) -> {
+        for (int i = from; i < to; i++) {
           Object value = getDirectValue(bvs, i);
-          if (processor.process(i, value)) {
+          if (value != null && processor.process(i, value)) {
             break;
           }
         }
-      } else {
-        forEachNotNull(length, bvs, (from, to) -> {
-          for (int i = from; i < to; i++) {
-            Object value = getDirectValue(bvs, i);
-            if (value != null && processor.process(i, value)) {
-              break;
-            }
-          }
-        });
-      }
+      });
     }
   }
 
