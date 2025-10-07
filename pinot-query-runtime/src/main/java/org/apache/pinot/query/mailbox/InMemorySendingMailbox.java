@@ -42,15 +42,13 @@ public class InMemorySendingMailbox implements SendingMailbox {
   private final long _deadlineMs;
 
   private ReceivingMailbox _receivingMailbox;
-  /**
-   * Set to true when the send operation completes calling {@link #complete()}
-   */
+
+  /// Set to true when the send operation completes calling [#complete()]
   private volatile boolean _isTerminated;
-  /**
-   * Set to true when the receiver waits for EOS but discards any further data blocks. This can happen when the receiver
-   * has already early terminated, for example, when the {@link org.apache.pinot.query.runtime.operator.SortOperator}
-   * limit has been reached.
-   */
+
+  /// Set to true when the receiver waits for EOS but discards any further data blocks.
+  /// This can happen when the receiver has already early terminated, for example,
+  /// when the [org.apache.pinot.query.runtime.operator.SortOperator] limit has been reached.
   private volatile boolean _isEarlyTerminated;
   private final StatMap<MailboxSendOperator.StatKey> _statMap;
 
