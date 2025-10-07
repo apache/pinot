@@ -3559,21 +3559,20 @@ public class PinotHelixResourceManager {
     return tableConfigs;
   }
 
+  /** Get all server instances that host at least a segment for a given table based on the ideal state.
+   *
+   * @param tableName Table name with or without type suffix
+   * @param tableType Table type
+   * @return List of server instances
+   */
   public List<String> getServerInstancesForTable(String tableName, TableType tableType) {
-    TableConfig tableConfig = getTableConfig(tableName, tableType);
-    Preconditions.checkNotNull(tableConfig);
-    TenantConfig tenantConfig = tableConfig.getTenantConfig();
     Set<String> serverInstances = new HashSet<>();
-    List<InstanceConfig> instanceConfigs = HelixHelper.getInstanceConfigs(_helixZkManager);
-    if (tableType == TableType.OFFLINE) {
-      serverInstances.addAll(
-          HelixHelper.getInstancesWithTag(instanceConfigs, TagNameUtils.extractOfflineServerTag(tenantConfig)));
-    } else if (TableType.REALTIME.equals(tableType)) {
-      serverInstances.addAll(
-          HelixHelper.getInstancesWithTag(instanceConfigs, TagNameUtils.extractConsumingServerTag(tenantConfig)));
-      serverInstances.addAll(
-          HelixHelper.getInstancesWithTag(instanceConfigs, TagNameUtils.extractCompletedServerTag(tenantConfig)));
+    IdealState idealState = getTableIdealState(TableNameBuilder.forType(tableType).tableNameWithType(tableName));
+    ZNRecord record = idealState.getRecord();
+    if (record == null) {
+      return new ArrayList<>();
     }
+    record.getMapFields().forEach((key, value) -> serverInstances.addAll(value.keySet()));
     return new ArrayList<>(serverInstances);
   }
 
