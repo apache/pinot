@@ -222,6 +222,8 @@ public class ReceivingMailbox {
     SUCCESS,
     /// The block is rejected because downstream has early terminated and now is only waiting for EOS in order to
     /// get the stats.
+    ///
+    /// More blocks can be sent, but data blocks will be rejected.
     WAITING_EOS,
     /// The received message is the last block the mailbox will ever read.
     ///
@@ -229,7 +231,8 @@ public class ReceivingMailbox {
     ///
     /// No more blocks can be sent.
     LAST_BLOCK,
-    /// The mailbox has been closed for write. Only EOS blocks are expected.
+    /// The mailbox has been closed for write. There may still be pending blocks to read, but no more blocks
+    /// can be added.
     ///
     /// No more blocks can be sent.
     ALREADY_TERMINATED
