@@ -133,7 +133,7 @@ public class BrokerRoutingManager implements RoutingManager, ClusterChangeHandle
   // Global read-write lock for protecting the global data structures such as _enabledServerInstanceMap,
   // _excludedServers, and _routableServers. Write lock must be held if any of these are modified, read lock must be
   // held otherwise
-  private final ReadWriteLock _globalLock = new ReentrantReadWriteLock();
+  private final ReadWriteLock _globalLock = new ReentrantReadWriteLock(true);
 
   // Per-table locks to allow concurrent routing builds across different tables while serializing per-table operations
   // This must be keyed on the raw table name due to dependencies for TimeBoundaryManager creation between REALTIME

@@ -18,30 +18,33 @@
  */
 package org.apache.pinot.core.accounting;
 
-import java.util.ArrayList;
 import java.util.Collection;
 import java.util.EnumMap;
-import java.util.List;
+import java.util.Iterator;
 import java.util.Map;
+import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
-import javax.annotation.Nullable;
+import java.util.concurrent.atomic.AtomicReference;
+import java.util.stream.Collectors;
 import org.apache.pinot.spi.accounting.QueryResourceTracker;
+import org.apache.pinot.spi.accounting.ThreadAccountant;
 import org.apache.pinot.spi.accounting.ThreadAccountantFactory;
-import org.apache.pinot.spi.accounting.ThreadExecutionContext;
 import org.apache.pinot.spi.accounting.ThreadResourceTracker;
-import org.apache.pinot.spi.accounting.ThreadResourceUsageAccountant;
 import org.apache.pinot.spi.accounting.ThreadResourceUsageProvider;
 import org.apache.pinot.spi.accounting.TrackingScope;
 import org.apache.pinot.spi.config.instance.InstanceType;
+import org.apache.pinot.spi.config.provider.PinotClusterConfigChangeListener;
 import org.apache.pinot.spi.env.PinotConfiguration;
+import org.apache.pinot.spi.query.QueryExecutionContext;
+import org.apache.pinot.spi.query.QueryThreadContext;
 import org.apache.pinot.spi.utils.CommonConstants;
+import org.apache.pinot.spi.utils.ResourceUsageUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 
-// TODO: Incorporate query OOM kill handling in PerQueryCPUMemAccountantFactory into this class
 public class ResourceUsageAccountantFactory implements ThreadAccountantFactory {
 
   @Override
@@ -49,11 +52,11 @@ public class ResourceUsageAccountantFactory implements ThreadAccountantFactory {
     return new ResourceUsageAccountant(config, instanceId, instanceType);
   }
 
-  public static class ResourceUsageAccountant implements ThreadResourceUsageAccountant {
+  public static class ResourceUsageAccountant implements ThreadAccountant {
     private static final Logger LOGGER = LoggerFactory.getLogger(ResourceUsageAccountant.class);
+
     private static final String ACCOUNTANT_TASK_NAME = "ResourceUsageAccountant";
     private static final int ACCOUNTANT_PRIORITY = 4;
-
     private final ExecutorService _executorService = Executors.newSingleThreadExecutor(r -> {
       Thread thread = new Thread(r);
       thread.setPriority(ACCOUNTANT_PRIORITY);
@@ -62,168 +65,103 @@ public class ResourceUsageAccountantFactory implements ThreadAccountantFactory {
       return thread;
     });
 
-    // the map to track stats entry for each thread, the entry will automatically be added when one calls
-    // setThreadResourceUsageProvider on the thread, including but not limited to
-    // server worker thread, runner thread, broker jetty thread, or broker netty thread
-    private final ConcurrentHashMap<Thread, CPUMemThreadLevelAccountingObjects.ThreadEntry> _threadEntriesMap =
-        new ConcurrentHashMap<>();
+    // Map from the thread executing the query to the thread resource tracker.
+    private final ConcurrentHashMap<Thread, ThreadResourceTrackerImpl> _threadTrackers = new ConcurrentHashMap<>();
 
-    private final ThreadLocal<CPUMemThreadLevelAccountingObjects.ThreadEntry> _threadLocalEntry =
-        ThreadLocal.withInitial(() -> {
-          CPUMemThreadLevelAccountingObjects.ThreadEntry ret = new CPUMemThreadLevelAccountingObjects.ThreadEntry();
-          _threadEntriesMap.put(Thread.currentThread(), ret);
-          LOGGER.debug("Adding thread to _threadLocalEntry: {}", Thread.currentThread().getName());
-          return ret;
-        });
+    private final ThreadLocal<ThreadResourceTrackerImpl> _threadLocalEntry = ThreadLocal.withInitial(() -> {
+      ThreadResourceTrackerImpl threadTracker = new ThreadResourceTrackerImpl();
+      _threadTrackers.put(Thread.currentThread(), threadTracker);
+      LOGGER.debug("Adding thread to _threadLocalEntry: {}", Thread.currentThread().getName());
+      return threadTracker;
+    });
 
-    // track thread cpu time
-    private final boolean _isThreadCPUSamplingEnabled;
-
-    // track memory usage
-    private final boolean _isThreadMemorySamplingEnabled;
-
+    private final boolean _cpuSamplingEnabled;
+    private final boolean _memorySamplingEnabled;
     private final WatcherTask _watcherTask;
-
-    private final EnumMap<TrackingScope, ResourceAggregator> _resourceAggregators;
+    private final QueryResourceAggregator _queryResourceAggregator;
+    private final WorkloadResourceAggregator _workloadResourceAggregator;
+    private final EnumMap<TrackingScope, ResourceAggregator> _resourceAggregators = new EnumMap<>(TrackingScope.class);
 
     public ResourceUsageAccountant(PinotConfiguration config, String instanceId, InstanceType instanceType) {
       LOGGER.info("Initializing ResourceUsageAccountant");
-
-      boolean threadCpuTimeMeasurementEnabled = ThreadResourceUsageProvider.isThreadCpuTimeMeasurementEnabled();
-      boolean threadMemoryMeasurementEnabled = ThreadResourceUsageProvider.isThreadMemoryMeasurementEnabled();
-      LOGGER.info("threadCpuTimeMeasurementEnabled: {}, threadMemoryMeasurementEnabled: {}",
-          threadCpuTimeMeasurementEnabled, threadMemoryMeasurementEnabled);
-
-      boolean cpuSamplingConfig = config.getProperty(CommonConstants.Accounting.CONFIG_OF_ENABLE_THREAD_CPU_SAMPLING,
+      boolean cpuSamplingEnabled = config.getProperty(CommonConstants.Accounting.CONFIG_OF_ENABLE_THREAD_CPU_SAMPLING,
           CommonConstants.Accounting.DEFAULT_ENABLE_THREAD_CPU_SAMPLING);
-      boolean memorySamplingConfig =
+      if (cpuSamplingEnabled && !ThreadResourceUsageProvider.isThreadCpuTimeMeasurementEnabled()) {
+        LOGGER.warn("Thread CPU time measurement is not enabled in the JVM, disabling CPU sampling");
+        cpuSamplingEnabled = false;
+      }
+      _cpuSamplingEnabled = cpuSamplingEnabled;
+      boolean memorySamplingEnabled =
           config.getProperty(CommonConstants.Accounting.CONFIG_OF_ENABLE_THREAD_MEMORY_SAMPLING,
               CommonConstants.Accounting.DEFAULT_ENABLE_THREAD_MEMORY_SAMPLING);
-      LOGGER.info("cpuSamplingConfig: {}, memorySamplingConfig: {}", cpuSamplingConfig, memorySamplingConfig);
+      if (memorySamplingEnabled && !ThreadResourceUsageProvider.isThreadMemoryMeasurementEnabled()) {
+        LOGGER.warn("Thread memory measurement is not enabled in the JVM, disabling memory sampling");
+        memorySamplingEnabled = false;
+      }
+      _memorySamplingEnabled = memorySamplingEnabled;
+      _watcherTask = new WatcherTask(config);
+      _queryResourceAggregator =
+          new QueryResourceAggregator(instanceId, instanceType, cpuSamplingEnabled, memorySamplingEnabled,
+              _watcherTask._queryMonitorConfig);
+      _workloadResourceAggregator =
+          new WorkloadResourceAggregator(instanceId, instanceType, cpuSamplingEnabled, memorySamplingEnabled,
+              _watcherTask._queryMonitorConfig);
+      _resourceAggregators.put(TrackingScope.QUERY, _queryResourceAggregator);
+      _resourceAggregators.put(TrackingScope.WORKLOAD, _workloadResourceAggregator);
+      LOGGER.info(
+          "Initialized ResourceUsageAccountant for {}: {} with cpuSamplingEnabled: {}, memorySamplingEnabled: {}",
+          instanceType, instanceId, cpuSamplingEnabled, memorySamplingEnabled);
+    }
 
-      _isThreadCPUSamplingEnabled = cpuSamplingConfig && threadCpuTimeMeasurementEnabled;
-      _isThreadMemorySamplingEnabled = memorySamplingConfig && threadMemoryMeasurementEnabled;
-      LOGGER.info("_isThreadCPUSamplingEnabled: {}, _isThreadMemorySamplingEnabled: {}", _isThreadCPUSamplingEnabled,
-          _isThreadMemorySamplingEnabled);
-
-      _watcherTask = new WatcherTask();
-
-      _resourceAggregators = new EnumMap<>(TrackingScope.class);
-
-      // Add all aggregators. Configs of enabling/disabling cost collection/enforcement are handled in the aggregators.
-      _resourceAggregators.put(TrackingScope.WORKLOAD,
-          new WorkloadAggregator(_isThreadCPUSamplingEnabled, _isThreadMemorySamplingEnabled, config, instanceType,
-              instanceId));
-      _resourceAggregators.put(TrackingScope.QUERY,
-          new QueryAggregator(_isThreadCPUSamplingEnabled, _isThreadMemorySamplingEnabled, config, instanceType,
-              instanceId));
+    public QueryMonitorConfig getQueryMonitorConfig() {
+      return _watcherTask.getQueryMonitorConfig();
     }
 
     @Override
-    public Collection<? extends ThreadResourceTracker> getThreadResources() {
-      return _threadEntriesMap.values();
+    public void setupTask(QueryThreadContext threadContext) {
+      _threadLocalEntry.get().setThreadContext(threadContext);
     }
 
     @Override
     public void sampleUsage() {
-      sampleThreadBytesAllocated();
-      sampleThreadCPUTime();
-    }
-
-    @Override
-    public boolean isAnchorThreadInterrupted() {
-      ThreadExecutionContext context = _threadLocalEntry.get().getCurrentThreadTaskStatus();
-      if (context != null && context.getAnchorThread() != null) {
-        return context.getAnchorThread().isInterrupted();
+      ThreadResourceTrackerImpl threadTracker = _threadLocalEntry.get();
+      if (_cpuSamplingEnabled) {
+        threadTracker.updateCpuSnapshot();
       }
-
-      return false;
-    }
-
-    @Override
-    public void setupRunner(@Nullable String queryId, ThreadExecutionContext.TaskType taskType, String workloadName) {
-      _threadLocalEntry.get()._errorStatus.set(null);
-      if (queryId != null) {
-        _threadLocalEntry.get()
-            .setThreadTaskStatus(queryId, CommonConstants.Accounting.ANCHOR_TASK_ID, taskType, Thread.currentThread(),
-                workloadName);
+      if (_memorySamplingEnabled) {
+        threadTracker.updateMemorySnapshot();
       }
     }
 
-    @Override
-    public void setupWorker(int taskId, ThreadExecutionContext.TaskType taskType,
-        @Nullable ThreadExecutionContext parentContext) {
-      _threadLocalEntry.get()._errorStatus.set(null);
-      if (parentContext != null && parentContext.getQueryId() != null && parentContext.getAnchorThread() != null) {
-        _threadLocalEntry.get()
-            .setThreadTaskStatus(parentContext.getQueryId(), taskId, parentContext.getTaskType(),
-                parentContext.getAnchorThread(), parentContext.getWorkloadName());
-      }
-    }
-
-    /**
-     * for testing only
-     */
-    public int getEntryCount() {
-      return _threadEntriesMap.size();
-    }
-
-    /**
-     * This function aggregates resource usage from all active threads and groups by queryId.
-     * @return A map of query id, QueryResourceTracker.
-     */
-    @Override
-    public Map<String, ? extends QueryResourceTracker> getQueryResources() {
-      QueryAggregator queryAggregator = (QueryAggregator) _resourceAggregators.get(TrackingScope.QUERY);
-      return queryAggregator.getQueryResources(_threadEntriesMap);
-    }
-
-    @Override
-    public void updateQueryUsageConcurrently(String identifier, long cpuTimeNs, long memoryAllocatedBytes,
-                                             TrackingScope trackingScope) {
-      ResourceAggregator resourceAggregator = _resourceAggregators.get(trackingScope);
-      if (_isThreadCPUSamplingEnabled) {
-        resourceAggregator.updateConcurrentCpuUsage(identifier, cpuTimeNs);
-      }
-      if (_isThreadMemorySamplingEnabled) {
-        resourceAggregator.updateConcurrentMemUsage(identifier, memoryAllocatedBytes);
-      }
-    }
-
-    /**
-     * This is to be called from a worker or a runner thread to update its corresponding cpu usage entry
-     */
-    @SuppressWarnings("ConstantConditions")
-    public void sampleThreadCPUTime() {
-      if (_isThreadCPUSamplingEnabled) {
-        _threadLocalEntry.get().updateCpuSnapshot();
-      }
-    }
-
-    /**
-     * This is to be called from a worker or a runner thread to update its corresponding memory usage entry
-     */
-    @SuppressWarnings("ConstantConditions")
-    public void sampleThreadBytesAllocated() {
-      if (_isThreadMemorySamplingEnabled) {
-        _threadLocalEntry.get().updateMemorySnapshot();
-      }
-    }
-
-    @Override
-    public ThreadExecutionContext getThreadExecutionContext() {
-      return _threadLocalEntry.get().getCurrentThreadTaskStatus();
-    }
-
-    /**
-     * clears thread accounting info once a runner/worker thread has finished a particular run
-     */
-    @SuppressWarnings("ConstantConditions")
     @Override
     public void clear() {
-      CPUMemThreadLevelAccountingObjects.ThreadEntry threadEntry = _threadLocalEntry.get();
-      // clear task info + stats
-      threadEntry.setToIdle();
+      ThreadResourceTrackerImpl threadTracker = _threadLocalEntry.get();
+      assert threadTracker.getThreadContext() != null;
+      QueryExecutionContext executionContext = threadTracker.getThreadContext().getExecutionContext();
+      String queryId = executionContext.getCid();
+      String workloadName = executionContext.getWorkloadName();
+      long cpuTimeNs = threadTracker.getCpuTimeNs();
+      long allocatedBytes = threadTracker.getAllocatedBytes();
+      _queryResourceAggregator.updateUntrackedResourceUsage(queryId, cpuTimeNs, allocatedBytes);
+      _workloadResourceAggregator.updateUntrackedResourceUsage(workloadName, cpuTimeNs, allocatedBytes);
+      threadTracker.clear();
+    }
+
+    @Override
+    public void updateUntrackedResourceUsage(String identifier, long cpuTimeNs, long allocatedBytes,
+        TrackingScope trackingScope) {
+      if (!_cpuSamplingEnabled) {
+        cpuTimeNs = 0;
+      }
+      if (!_memorySamplingEnabled) {
+        allocatedBytes = 0;
+      }
+      _resourceAggregators.get(trackingScope).updateUntrackedResourceUsage(identifier, cpuTimeNs, allocatedBytes);
+    }
+
+    @Override
+    public boolean throttleQuerySubmission() {
+      return _queryResourceAggregator.getHeapUsageBytes() > _watcherTask.getQueryMonitorConfig().getAlarmingLevel();
     }
 
     @Override
@@ -237,93 +175,94 @@ public class ResourceUsageAccountantFactory implements ThreadAccountantFactory {
     }
 
     @Override
-    public Exception getErrorStatus() {
-      return _threadLocalEntry.get()._errorStatus.getAndSet(null);
+    public PinotClusterConfigChangeListener getClusterConfigChangeListener() {
+      return _watcherTask;
     }
 
-    public List<CPUMemThreadLevelAccountingObjects.ThreadEntry> getAnchorThreadEntries() {
-      List<CPUMemThreadLevelAccountingObjects.ThreadEntry> anchorThreadEntries = new ArrayList<>();
+    @Override
+    public Collection<? extends ThreadResourceTracker> getThreadResources() {
+      return _threadTrackers.values();
+    }
 
-      for (Map.Entry<Thread, CPUMemThreadLevelAccountingObjects.ThreadEntry> entry : _threadEntriesMap.entrySet()) {
-        CPUMemThreadLevelAccountingObjects.ThreadEntry threadEntry = entry.getValue();
-        CPUMemThreadLevelAccountingObjects.TaskEntry taskEntry = threadEntry.getCurrentThreadTaskStatus();
-        if (taskEntry != null && taskEntry.isAnchorThread()) {
-          anchorThreadEntries.add(threadEntry);
-        }
+    @Override
+    public Map<String, ? extends QueryResourceTracker> getQueryResources() {
+      return _queryResourceAggregator.getQueryResources(_threadTrackers);
+    }
+
+    private class WatcherTask implements Runnable, PinotClusterConfigChangeListener {
+      final AtomicReference<QueryMonitorConfig> _queryMonitorConfig = new AtomicReference<>();
+
+      int _sleepTime;
+
+      WatcherTask(PinotConfiguration config) {
+        QueryMonitorConfig queryMonitorConfig = new QueryMonitorConfig(config, ResourceUsageUtils.getMaxHeapSize());
+        _queryMonitorConfig.set(queryMonitorConfig);
+        logQueryMonitorConfig(queryMonitorConfig);
       }
-      return anchorThreadEntries;
-    }
 
-    class WatcherTask implements Runnable {
-      WatcherTask() {
+      QueryMonitorConfig getQueryMonitorConfig() {
+        return _queryMonitorConfig.get();
       }
 
       @Override
       public void run() {
-        LOGGER.debug("Running timed task for {}", this.getClass().getName());
-        while (!Thread.currentThread().isInterrupted()) {
-          try {
-            // Preaggregation.
-            runPreAggregation();
-
-            // Aggregation
-            runAggregation();
-
-            // Postaggregation
-            runPostAggregation();
-          } catch (Exception e) {
-            LOGGER.error("Error in WatcherTask", e);
-            // TODO: Add a metric to track the number of watcher task errors.
-          } finally {
+        try {
+          //noinspection InfiniteLoopStatement
+          while (true) {
             try {
-              LOGGER.debug("_threadEntriesMap size: {}", _threadEntriesMap.size());
-
-              for (ResourceAggregator resourceAggregator : _resourceAggregators.values()) {
-                resourceAggregator.cleanUpPostAggregation();
-              }
-              // Get sleeptime from both resourceAggregators. Pick the minimum. PerQuery Accountant modifies the sleep
-              // time when condition is critical.
-              int sleepTime = Integer.MAX_VALUE;
-              for (ResourceAggregator resourceAggregator : _resourceAggregators.values()) {
-                sleepTime = Math.min(sleepTime, resourceAggregator.getAggregationSleepTimeMs());
-              }
-
-              Thread.sleep(sleepTime);
-            } catch (InterruptedException e) {
-              throw new RuntimeException(e);
+              runOnce();
+            } finally {
+              //noinspection BusyWait
+              Thread.sleep(_sleepTime);
             }
           }
+        } catch (InterruptedException e) {
+          LOGGER.warn("WatcherTask interrupted, exiting.");
+        }
+      }
+
+      private void runOnce() {
+        try {
+          runPreAggregation();
+          runAggregation();
+          runPostAggregation();
+        } catch (Exception e) {
+          LOGGER.error("Caught exception while executing stats aggregation and query kill", e);
+          // TODO: Add a metric to track the number of watcher task errors.
+        } finally {
+          LOGGER.debug("_threadTrackers size: {}", _threadTrackers.size());
+          for (ResourceAggregator resourceAggregator : _resourceAggregators.values()) {
+            resourceAggregator.cleanUpPostAggregation();
+          }
+          // Get sleeptime from both resourceAggregators. Pick the minimum. PerQuery Accountant modifies the sleep
+          // time when condition is critical.
+          int sleepTime = Integer.MAX_VALUE;
+          for (ResourceAggregator resourceAggregator : _resourceAggregators.values()) {
+            sleepTime = Math.min(sleepTime, resourceAggregator.getAggregationSleepTimeMs());
+          }
+          _sleepTime = sleepTime;
         }
       }
 
       private void runPreAggregation() {
         // Call the pre-aggregation methods for each ResourceAggregator.
         for (ResourceAggregator resourceAggregator : _resourceAggregators.values()) {
-          resourceAggregator.preAggregate(getAnchorThreadEntries());
+          resourceAggregator.preAggregate(_threadTrackers.values());
         }
       }
 
       private void runAggregation() {
-        for (Map.Entry<Thread, CPUMemThreadLevelAccountingObjects.ThreadEntry> entry : _threadEntriesMap.entrySet()) {
-          CPUMemThreadLevelAccountingObjects.ThreadEntry threadEntry = entry.getValue();
-          CPUMemThreadLevelAccountingObjects.TaskEntry currentQueryTask = threadEntry.getCurrentThreadTaskStatus();
+        Iterator<Map.Entry<Thread, ThreadResourceTrackerImpl>> iterator = _threadTrackers.entrySet().iterator();
+        while (iterator.hasNext()) {
+          Map.Entry<Thread, ThreadResourceTrackerImpl> entry = iterator.next();
           Thread thread = entry.getKey();
-          LOGGER.trace("tid: {}, task: {}", thread.getId(), currentQueryTask);
-
-          for (ResourceAggregator resourceAggregator : _resourceAggregators.values()) {
-            resourceAggregator.aggregate(entry.getKey(), threadEntry);
-          }
-
-          long currentCPUCost = _isThreadCPUSamplingEnabled ? threadEntry._currentThreadCPUTimeSampleMS : 0;
-          long currentMemoryCost =
-              _isThreadMemorySamplingEnabled ? threadEntry._currentThreadMemoryAllocationSampleBytes : 0;
-          threadEntry._previousThreadTaskStatus = currentQueryTask;
-          threadEntry._previousThreadCPUTimeSampleMS = currentCPUCost;
-          threadEntry._previousThreadMemoryAllocationSampleBytes = currentMemoryCost;
-
           if (!thread.isAlive()) {
-            _threadEntriesMap.remove(thread);
-            LOGGER.debug("Removing thread from _threadLocalEntry: {}", thread.getName());
+            LOGGER.debug("Thread: {} is no longer alive, removing it from _threadTrackers", thread.getName());
+            iterator.remove();
+          } else {
+            for (ResourceAggregator resourceAggregator : _resourceAggregators.values()) {
+              resourceAggregator.aggregate(entry.getValue());
+            }
           }
         }
       }
@@ -332,6 +271,50 @@ public class ResourceUsageAccountantFactory implements ThreadAccountantFactory {
         for (ResourceAggregator resourceAggregator : _resourceAggregators.values()) {
           resourceAggregator.postAggregate();
         }
+      }
+
+      @Override
+      public synchronized void onChange(Set<String> changedConfigs,
+          Map<String, String> clusterConfigs) {        // Filter configs that have CommonConstants
+        // .PREFIX_SCHEDULER_PREFIX
+        Set<String> filteredChangedConfigs = changedConfigs.stream()
+            .filter(config -> config.startsWith(CommonConstants.PINOT_QUERY_SCHEDULER_PREFIX))
+            .map(config -> config.replace(CommonConstants.PINOT_QUERY_SCHEDULER_PREFIX + ".", ""))
+            .collect(Collectors.toSet());
+
+        if (filteredChangedConfigs.isEmpty()) {
+          LOGGER.debug("No relevant configs changed, skipping update for QueryMonitorConfig.");
+          return;
+        }
+
+        Map<String, String> filteredClusterConfigs = clusterConfigs.entrySet()
+            .stream()
+            .filter(entry -> entry.getKey().startsWith(CommonConstants.PINOT_QUERY_SCHEDULER_PREFIX))
+            .collect(Collectors.toMap(
+                entry -> entry.getKey().replace(CommonConstants.PINOT_QUERY_SCHEDULER_PREFIX + ".", ""),
+                Map.Entry::getValue));
+
+        QueryMonitorConfig oldConfig = getQueryMonitorConfig();
+        QueryMonitorConfig newConfig =
+            new QueryMonitorConfig(oldConfig, filteredChangedConfigs, filteredClusterConfigs);
+        _queryMonitorConfig.set(newConfig);
+        logQueryMonitorConfig(newConfig);
+      }
+
+      private void logQueryMonitorConfig(QueryMonitorConfig queryMonitorConfig) {
+        LOGGER.info("Updated Configuration for Query Monitor");
+        LOGGER.info("Xmx is {}", queryMonitorConfig.getMaxHeapSize());
+        LOGGER.info("_alarmingLevel of on heap memory is {}", queryMonitorConfig.getAlarmingLevel());
+        LOGGER.info("_criticalLevel of on heap memory is {}", queryMonitorConfig.getCriticalLevel());
+        LOGGER.info("_panicLevel of on heap memory is {}", queryMonitorConfig.getPanicLevel());
+        LOGGER.info("_normalSleepTime is {}", queryMonitorConfig.getNormalSleepTime());
+        LOGGER.info("_alarmingSleepTime is {}", queryMonitorConfig.getAlarmingSleepTime());
+        LOGGER.info("_oomKillQueryEnabled: {}", queryMonitorConfig.isOomKillQueryEnabled());
+        LOGGER.info("_minMemoryFootprintForKill: {}", queryMonitorConfig.getMinMemoryFootprintForKill());
+        LOGGER.info("_cpuTimeBasedKillingEnabled: {}", queryMonitorConfig.isCpuTimeBasedKillingEnabled());
+        LOGGER.info("_cpuTimeBasedKillingThresholdNs: {}", queryMonitorConfig.getCpuTimeBasedKillingThresholdNs());
+        LOGGER.info("_workloadSleepTimeMs: {}", queryMonitorConfig.getWorkloadSleepTimeMs());
+        LOGGER.info("_workloadCostEnforcementEnabled: {}", queryMonitorConfig.isWorkloadCostEnforcementEnabled());
       }
     }
   }

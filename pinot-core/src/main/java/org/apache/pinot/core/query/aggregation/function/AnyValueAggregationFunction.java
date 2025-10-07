@@ -79,7 +79,9 @@ public class AnyValueAggregationFunction extends NullableSingleInputAggregationF
 
   @Override
   public ColumnDataType getIntermediateResultColumnType() {
-    return _resultType != null ? _resultType : ColumnDataType.UNKNOWN;
+    // Default to STRING if result type is not yet determined
+    // TODO: See if UNKNOWN can be used instead
+    return _resultType != null ? _resultType : ColumnDataType.STRING;
   }
 
   @Override

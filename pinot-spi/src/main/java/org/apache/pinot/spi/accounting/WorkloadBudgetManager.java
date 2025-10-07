@@ -33,6 +33,17 @@ import org.slf4j.LoggerFactory;
 public class WorkloadBudgetManager {
   private static final Logger LOGGER = LoggerFactory.getLogger(WorkloadBudgetManager.class);
 
+  // TODO: Pass it as a regular instance instead of a static singleton.
+  private static WorkloadBudgetManager _instance;
+
+  public static void set(WorkloadBudgetManager instance) {
+    _instance = instance;
+  }
+
+  public static WorkloadBudgetManager get() {
+    return _instance;
+  }
+
   private long _enforcementWindowMs;
   private ConcurrentHashMap<String, Budget> _workloadBudgets;
   private final ScheduledExecutorService _resetScheduler = Executors.newSingleThreadScheduledExecutor();
@@ -100,7 +111,6 @@ public class WorkloadBudgetManager {
     LOGGER.info("WorkloadBudgetManager has been shut down.");
   }
 
-
   /**
    * Adds or updates budget for a workload (Thread-Safe).
    */
@@ -141,7 +151,7 @@ public class WorkloadBudgetManager {
       return new BudgetStats(Long.MAX_VALUE, Long.MAX_VALUE, Long.MAX_VALUE, Long.MAX_VALUE);
     }
 
-      Budget budget = _workloadBudgets.get(workload);
+    Budget budget = _workloadBudgets.get(workload);
     if (budget == null) {
       LOGGER.warn("No budget found for workload: {}", workload);
       return new BudgetStats(Long.MAX_VALUE, Long.MAX_VALUE, Long.MAX_VALUE, Long.MAX_VALUE);
@@ -236,6 +246,7 @@ public class WorkloadBudgetManager {
     _workloadBudgets.forEach((workload, budget) -> allStats.put(workload, budget.getStats()));
     return allStats;
   }
+
   /**
    * Internal class representing budget statistics.
    * It contains initial CPU and memory budgets that are configured during workload registration,

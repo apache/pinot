@@ -16,23 +16,12 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.pinot.controller.helix.core.rebalance.tenant;
+package org.apache.pinot.spi.exception;
 
-public interface TenantRebalanceObserver {
-  enum Trigger {
-    // Start of tenant rebalance Trigger
-    START_TRIGGER,
-    // rebalance of a table is started
-    REBALANCE_STARTED_TRIGGER,
-    // rebalance of a table is completed
-    REBALANCE_COMPLETED_TRIGGER,
-    // rebalance of a table is failed
-    REBALANCE_ERRORED_TRIGGER
+/// Special exception to be used to explicitly terminate a query, e.g. query cancellation, OOM kill etc.
+public class TerminationException extends QueryException {
+
+  public TerminationException(QueryErrorCode errorCode, String message) {
+    super(errorCode, message);
   }
-
-  void onTrigger(TenantRebalanceObserver.Trigger trigger, String tableName, String description);
-
-  void onSuccess(String msg);
-
-  void onError(String errorMsg);
 }

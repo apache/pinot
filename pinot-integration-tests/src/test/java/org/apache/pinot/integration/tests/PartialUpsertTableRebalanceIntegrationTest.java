@@ -131,16 +131,12 @@ public class PartialUpsertTableRebalanceIntegrationTest extends BaseClusterInteg
     BaseServerStarter serverStarter2 = startOneServer(NUM_SERVERS + 1);
     rebalanceResult = _tableRebalancer.rebalance(tableConfig, rebalanceConfig, null);
 
-    // Check the number of servers after rebalancing
-    finalServers = _resourceManager.getServerInstancesForTable(getTableName(), TableType.REALTIME).size();
-
-    // Check that a server has been added
-    assertEquals(finalServers, NUM_SERVERS + 2, "Rebalancing didn't correctly add the new server");
-
     waitForRebalanceToComplete(rebalanceResult, 600_000L);
     waitForAllDocsLoaded(600_000L);
 
     // number of instances assigned can't be more than number of partitions for rf = 1
+    finalServers = _resourceManager.getServerInstancesForTable(getTableName(), TableType.REALTIME).size();
+    assertEquals(finalServers, getNumKafkaPartitions(), "Rebalancing didn't correctly add the new server");
     verifySegmentAssignment(rebalanceResult.getSegmentAssignment(), 5, getNumKafkaPartitions());
 
     _resourceManager.updateInstanceTags(serverStarter1.getInstanceId(), "", false);
@@ -199,16 +195,12 @@ public class PartialUpsertTableRebalanceIntegrationTest extends BaseClusterInteg
     BaseServerStarter serverStarter2 = startOneServer(NUM_SERVERS + 1);
     rebalanceResult = _tableRebalancer.rebalance(tableConfig, rebalanceConfig, null);
 
-    // Check the number of servers after rebalancing
-    finalServers = _resourceManager.getServerInstancesForTable(getTableName(), TableType.REALTIME).size();
-
-    // Check that a server has been added
-    assertEquals(finalServers, NUM_SERVERS + 2, "Rebalancing didn't correctly add the new server");
-
     waitForRebalanceToComplete(rebalanceResult, 600_000L);
     waitForAllDocsLoaded(600_000L);
 
     // number of instances assigned can't be more than number of partitions for rf = 1
+    finalServers = _resourceManager.getServerInstancesForTable(getTableName(), TableType.REALTIME).size();
+    assertEquals(finalServers, getNumKafkaPartitions(), "Rebalancing didn't correctly add the new server");
     verifySegmentAssignment(rebalanceResult.getSegmentAssignment(), 5, getNumKafkaPartitions());
 
     _resourceManager.updateInstanceTags(serverStarter1.getInstanceId(), "", false);

@@ -49,6 +49,7 @@ import org.apache.pinot.common.metrics.BrokerMetrics;
 import org.apache.pinot.common.metrics.BrokerTimer;
 import org.apache.pinot.common.request.InstanceRequest;
 import org.apache.pinot.core.util.OsCheck;
+import org.apache.pinot.spi.accounting.ThreadAccountant;
 import org.apache.thrift.TSerializer;
 import org.apache.thrift.protocol.TCompactProtocol;
 import org.apache.thrift.transport.TTransportException;
@@ -67,24 +68,32 @@ public class ServerChannels {
   public static final String CHANNEL_LOCK_TIMEOUT_MSG = "Timeout while acquiring channel lock";
   private static final long TRY_CONNECT_CHANNEL_LOCK_TIMEOUT_MS = 5_000L;
 
-  private final QueryRouter _queryRouter;
-  private final BrokerMetrics _brokerMetrics;
   // TSerializer currently is not thread safe, must be put into a ThreadLocal.
-  private final ThreadLocal<TSerializer> _threadLocalTSerializer;
-  private final ConcurrentHashMap<ServerRoutingInstance, ServerChannel> _serverToChannelMap = new ConcurrentHashMap<>();
+  private static final ThreadLocal<TSerializer> THREAD_LOCAL_T_SERIALIZER = ThreadLocal.withInitial(() -> {
+    try {
+      return new TSerializer(new TCompactProtocol.Factory());
+    } catch (TTransportException e) {
+      throw new RuntimeException("Failed to initialize Thrift Serializer", e);
+    }
+  });
+
+  private final QueryRouter _queryRouter;
   private final TlsConfig _tlsConfig;
   private final EventLoopGroup _eventLoopGroup;
   private final Class<? extends SocketChannel> _channelClass;
+  private final ThreadAccountant _threadAccountant;
+
+  private final BrokerMetrics _brokerMetrics = BrokerMetrics.get();
+  private final ConcurrentHashMap<ServerRoutingInstance, ServerChannel> _serverToChannelMap = new ConcurrentHashMap<>();
 
   /**
    * Create a server channel with TLS config
    *
    * @param queryRouter query router
-   * @param brokerMetrics broker metrics
    * @param tlsConfig TLS/SSL config
    */
-  public ServerChannels(QueryRouter queryRouter, BrokerMetrics brokerMetrics, @Nullable NettyConfig nettyConfig,
-      @Nullable TlsConfig tlsConfig) {
+  public ServerChannels(QueryRouter queryRouter, @Nullable NettyConfig nettyConfig, @Nullable TlsConfig tlsConfig,
+      ThreadAccountant threadAccountant) {
     boolean enableNativeTransports = nettyConfig != null && nettyConfig.isNativeTransportsEnabled();
     OsCheck.OSType operatingSystemType = OsCheck.getOperatingSystemType();
     if (enableNativeTransports
@@ -114,21 +123,14 @@ public class ServerChannels {
     }
 
     _queryRouter = queryRouter;
-    _brokerMetrics = brokerMetrics;
     _tlsConfig = tlsConfig;
-    _threadLocalTSerializer = ThreadLocal.withInitial(() -> {
-      try {
-        return new TSerializer(new TCompactProtocol.Factory());
-      } catch (TTransportException e) {
-        throw new RuntimeException("Failed to initialize Thrift Serializer", e);
-      }
-    });
+    _threadAccountant = threadAccountant;
   }
 
   public void sendRequest(String rawTableName, AsyncQueryResponse asyncQueryResponse,
       ServerRoutingInstance serverRoutingInstance, InstanceRequest instanceRequest, long timeoutMs)
       throws Exception {
-    byte[] requestBytes = _threadLocalTSerializer.get().serialize(instanceRequest);
+    byte[] requestBytes = THREAD_LOCAL_T_SERIALIZER.get().serialize(instanceRequest);
     _serverToChannelMap.computeIfAbsent(serverRoutingInstance, ServerChannel::new)
         .sendRequest(rawTableName, asyncQueryResponse, serverRoutingInstance, requestBytes, timeoutMs);
   }
@@ -189,8 +191,9 @@ public class ServerChannels {
                       null, null));
               // NOTE: data table de-serialization happens inside this handler
               // Revisit if this becomes a bottleneck
-              ch.pipeline().addLast(
-                  ChannelHandlerFactory.getDataTableHandler(_queryRouter, _serverRoutingInstance, _brokerMetrics));
+              ch.pipeline()
+                  .addLast(ChannelHandlerFactory.getDataTableHandler(_queryRouter, _threadAccountant,
+                      _serverRoutingInstance));
             }
           });
     }

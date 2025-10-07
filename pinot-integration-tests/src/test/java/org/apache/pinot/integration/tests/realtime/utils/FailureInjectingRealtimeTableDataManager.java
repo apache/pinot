@@ -22,9 +22,9 @@ import java.util.concurrent.Semaphore;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.BooleanSupplier;
 import java.util.function.Supplier;
+import javax.annotation.Nullable;
 import org.apache.pinot.common.metadata.segment.SegmentZKMetadata;
 import org.apache.pinot.common.utils.LLCSegmentName;
-import org.apache.pinot.common.utils.PauselessConsumptionUtils;
 import org.apache.pinot.core.data.manager.realtime.ConsumerCoordinator;
 import org.apache.pinot.core.data.manager.realtime.RealtimeSegmentDataManager;
 import org.apache.pinot.core.data.manager.realtime.RealtimeTableDataManager;
@@ -38,16 +38,18 @@ import org.apache.pinot.spi.utils.retry.RetriableOperationException;
 
 
 public class FailureInjectingRealtimeTableDataManager extends RealtimeTableDataManager {
-  public static final int MAX_NUMBER_OF_FAILURES = 10;
   private final AtomicInteger _numberOfFailures = new AtomicInteger(0);
+  private final FailureInjectingTableConfig _failureInjectingTableConfig;
 
   public FailureInjectingRealtimeTableDataManager(Semaphore segmentBuildSemaphore) {
-    this(segmentBuildSemaphore, () -> true);
+    this(segmentBuildSemaphore, () -> true, null);
   }
 
   public FailureInjectingRealtimeTableDataManager(Semaphore segmentBuildSemaphore,
-      Supplier<Boolean> isServerReadyToServeQueries) {
+      Supplier<Boolean> isServerReadyToServeQueries,
+      @Nullable FailureInjectingTableConfig failureInjectingTableConfig) {
     super(segmentBuildSemaphore, isServerReadyToServeQueries);
+    _failureInjectingTableConfig = failureInjectingTableConfig;
   }
 
   @Override
@@ -57,12 +59,19 @@ public class FailureInjectingRealtimeTableDataManager extends RealtimeTableDataM
       PartitionDedupMetadataManager partitionDedupMetadataManager, BooleanSupplier isTableReadyToConsumeData)
       throws AttemptsExceededException, RetriableOperationException {
 
-    boolean addFailureToCommits = PauselessConsumptionUtils.isPauselessEnabled(tableConfig);
-    if (addFailureToCommits && _numberOfFailures.getAndIncrement() >= MAX_NUMBER_OF_FAILURES) {
+    boolean addFailureToCommits =
+        (_failureInjectingTableConfig != null) && (_failureInjectingTableConfig.isFailCommit());
+    if (addFailureToCommits && (_numberOfFailures.getAndIncrement() >= _failureInjectingTableConfig.getMaxFailures())) {
       addFailureToCommits = false;
+    }
+    boolean failConsumingTransition =
+        (_failureInjectingTableConfig != null) && (_failureInjectingTableConfig.isFailConsumingSegment());
+    if (failConsumingTransition && (_numberOfFailures.getAndIncrement()
+        >= _failureInjectingTableConfig.getMaxFailures())) {
+      failConsumingTransition = false;
     }
     return new FailureInjectingRealtimeSegmentDataManager(zkMetadata, tableConfig, this, _indexDir.getAbsolutePath(),
         indexLoadingConfig, schema, llcSegmentName, consumerCoordinator, _serverMetrics, addFailureToCommits,
-        partitionDedupMetadataManager, isTableReadyToConsumeData);
+        partitionDedupMetadataManager, isTableReadyToConsumeData, failConsumingTransition);
   }
 }

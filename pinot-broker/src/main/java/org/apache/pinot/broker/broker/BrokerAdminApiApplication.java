@@ -49,6 +49,7 @@ import org.apache.pinot.core.query.executor.sql.SqlQueryExecutor;
 import org.apache.pinot.core.transport.ListenerConfig;
 import org.apache.pinot.core.transport.server.routing.stats.ServerRoutingStatsManager;
 import org.apache.pinot.core.util.ListenerConfigUtil;
+import org.apache.pinot.spi.accounting.ThreadAccountant;
 import org.apache.pinot.spi.env.PinotConfiguration;
 import org.apache.pinot.spi.utils.CommonConstants;
 import org.apache.pinot.spi.utils.PinotReflectionUtils;
@@ -77,7 +78,8 @@ public class BrokerAdminApiApplication extends ResourceConfig {
   public BrokerAdminApiApplication(BrokerRoutingManager routingManager, BrokerRequestHandler brokerRequestHandler,
       BrokerMetrics brokerMetrics, PinotConfiguration brokerConf, SqlQueryExecutor sqlQueryExecutor,
       ServerRoutingStatsManager serverRoutingStatsManager, AccessControlFactory accessFactory,
-      HelixManager helixManager, QueryQuotaManager queryQuotaManager, AbstractResponseStore responseStore) {
+      HelixManager helixManager, QueryQuotaManager queryQuotaManager, ThreadAccountant threadAccountant,
+      AbstractResponseStore responseStore) {
     _brokerResourcePackages = brokerConf.getProperty(CommonConstants.Broker.BROKER_RESOURCE_PACKAGES,
         CommonConstants.Broker.DEFAULT_BROKER_RESOURCE_PACKAGES);
     String[] pkgs = _brokerResourcePackages.split(",");
@@ -118,6 +120,7 @@ public class BrokerAdminApiApplication extends ResourceConfig {
         bind(queryQuotaManager).to(QueryQuotaManager.class);
         bind(accessFactory).to(AccessControlFactory.class);
         bind(startTime).named(BrokerAdminApiApplication.START_TIME);
+        bind(threadAccountant).to(ThreadAccountant.class);
         bind(responseStore).to(AbstractResponseStore.class);
         bind(brokerConf).to(PinotConfiguration.class);
       }

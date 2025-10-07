@@ -20,12 +20,14 @@ package org.apache.pinot.segment.local.segment.index.loader.invertedindex;
 
 import com.google.common.base.Preconditions;
 import java.io.File;
+import java.io.IOException;
 import java.util.HashSet;
 import java.util.Map;
 import java.util.Set;
 import org.apache.commons.io.FileUtils;
 import org.apache.pinot.segment.local.segment.index.loader.BaseIndexHandler;
 import org.apache.pinot.segment.local.segment.index.loader.LoaderUtils;
+import org.apache.pinot.segment.local.segment.index.readers.geospatial.ImmutableH3IndexReader;
 import org.apache.pinot.segment.local.utils.GeometrySerializer;
 import org.apache.pinot.segment.spi.ColumnMetadata;
 import org.apache.pinot.segment.spi.V1Constants;
@@ -40,6 +42,7 @@ import org.apache.pinot.segment.spi.index.creator.H3IndexConfig;
 import org.apache.pinot.segment.spi.index.reader.Dictionary;
 import org.apache.pinot.segment.spi.index.reader.ForwardIndexReader;
 import org.apache.pinot.segment.spi.index.reader.ForwardIndexReaderContext;
+import org.apache.pinot.segment.spi.index.reader.H3IndexReader;
 import org.apache.pinot.segment.spi.store.SegmentDirectory;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
@@ -70,6 +73,23 @@ public class H3IndexHandler extends BaseIndexHandler {
       if (!columnsToAddIdx.remove(column)) {
         LOGGER.info("Need to remove existing H3 index from segment: {}, column: {}", segmentName, column);
         return true;
+      } else {
+        // Index already exists, check for change in resolution config
+        short newResolution = _h3Configs.get(column).getResolution().serialize();
+        short oldResolution;
+        try (H3IndexReader indexReader = new ImmutableH3IndexReader(
+            segmentReader.getIndexFor(column, StandardIndexes.h3()))) {
+          oldResolution = indexReader.getH3IndexResolution().serialize();
+        } catch (IOException e) {
+          LOGGER.warn("Failed to read existing H3 index for segment: {}, column: {}", segmentName, column, e);
+          continue;
+        }
+        if (newResolution != oldResolution) {
+          LOGGER.info(
+              "H3 index resolution changed for segment: {}, column: {}, old resolution: {}, new resolution: {}."
+                  + " Index needs to be rebuilt.", segmentName, column, oldResolution, newResolution);
+          return true;
+        }
       }
     }
     // Check if any new index need to be added.
@@ -95,6 +115,30 @@ public class H3IndexHandler extends BaseIndexHandler {
         LOGGER.info("Removing existing H3 index from segment: {}, column: {}", segmentName, column);
         segmentWriter.removeIndex(column, StandardIndexes.h3());
         LOGGER.info("Removed existing H3 index from segment: {}, column: {}", segmentName, column);
+      } else {
+        // Index already exists, check for change in resolution config
+        short newResolution = _h3Configs.get(column).getResolution().serialize();
+        short oldResolution;
+
+        try (H3IndexReader indexReader = new ImmutableH3IndexReader(
+            segmentWriter.getIndexFor(column, StandardIndexes.h3()))) {
+          oldResolution = indexReader.getH3IndexResolution().serialize();
+        } catch (IOException e) {
+          LOGGER.warn("Failed to read existing H3 index for segment: {}, column: {}", segmentName, column, e);
+          segmentWriter.removeIndex(column, StandardIndexes.h3());
+          columnsToAddIdx.add(column);
+          continue;
+        }
+
+        if (newResolution != oldResolution) {
+          LOGGER.info(
+              "H3 index resolution changed for segment: {}, column: {}, old resolution: {}, new resolution: {}. "
+                  + "Deleting existing H3 index before rebuilding a new one.",
+              segmentName, column, oldResolution, newResolution);
+          segmentWriter.removeIndex(column, StandardIndexes.h3());
+          LOGGER.info("Removed existing H3 index from segment: {}, column: {}", segmentName, column);
+          columnsToAddIdx.add(column);
+        }
       }
     }
     for (String column : columnsToAddIdx) {

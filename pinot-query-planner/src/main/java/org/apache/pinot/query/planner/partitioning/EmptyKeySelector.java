@@ -29,13 +29,13 @@ public class EmptyKeySelector implements KeySelector<Integer> {
   }
 
   private EmptyKeySelector(String hashFunction) {
-    _hashFunction = hashFunction;
+    _hashFunction = hashFunction.toLowerCase();
   }
 
   public static final EmptyKeySelector INSTANCE = new EmptyKeySelector();
 
   public static EmptyKeySelector getInstance(String hashFunction) {
-    if (KeySelector.DEFAULT_HASH_ALGORITHM.equals(hashFunction)) {
+    if (KeySelector.DEFAULT_HASH_ALGORITHM.equalsIgnoreCase(hashFunction)) {
       return INSTANCE;
     }
     return new EmptyKeySelector(hashFunction);
