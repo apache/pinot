@@ -51,6 +51,8 @@ import org.slf4j.LoggerFactory;
 public abstract class KafkaPartitionLevelConnectionHandler {
 
   private static final Logger LOGGER = LoggerFactory.getLogger(KafkaPartitionLevelConnectionHandler.class);
+  private static final Set<String> CONSUMER_CONFIG_NAMES = ConsumerConfig.configNames();
+  private static final Set<String> ADMIN_CLIENT_CONFIG_NAMES = AdminClientConfig.configNames();
   protected final KafkaPartitionLevelStreamConfig _config;
   protected final String _clientId;
   protected final int _partition;
@@ -104,11 +106,11 @@ public abstract class KafkaPartitionLevelConnectionHandler {
 
   @VisibleForTesting
   protected Consumer<String, Bytes> createConsumer(Properties consumerProp) {
-    return retry(() -> new KafkaConsumer<>(filterKafkaProperties(consumerProp, ConsumerConfig.configNames())), 5);
+    return retry(() -> new KafkaConsumer<>(filterKafkaProperties(consumerProp, CONSUMER_CONFIG_NAMES)), 5);
   }
 
   protected AdminClient createAdminClient() {
-    return retry(() -> AdminClient.create(filterKafkaProperties(_consumerProp, AdminClientConfig.configNames())), 5);
+    return retry(() -> AdminClient.create(filterKafkaProperties(_consumerProp, ADMIN_CLIENT_CONFIG_NAMES)), 5);
   }
 
   private static <T> T retry(Supplier<T> s, int nRetries) {
