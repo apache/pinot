@@ -350,6 +350,9 @@ public class CommonConstants {
         "pinot.broker.query.log.logBeforeProcessing";
     public static final boolean DEFAULT_BROKER_QUERY_LOG_BEFORE_PROCESSING = true;
     public static final String CONFIG_OF_BROKER_QUERY_ENABLE_NULL_HANDLING = "pinot.broker.query.enable.null.handling";
+    /// Provide broker level default for query option [Request.QueryOptionKey#REGEX_DICT_SIZE_THRESHOLD]
+    public static final String CONFIG_OF_BROKER_QUERY_REGEX_DICT_SIZE_THRESHOLD =
+        "pinot.broker.query.regex.dict.size.threshold";
     public static final String CONFIG_OF_BROKER_ENABLE_QUERY_CANCELLATION = "pinot.broker.enable.query.cancellation";
     public static final boolean DEFAULT_BROKER_ENABLE_QUERY_CANCELLATION = true;
     public static final double DEFAULT_BROKER_QUERY_LOG_MAX_RATE_PER_SECOND = 10_000d;
@@ -715,6 +718,12 @@ public class CommonConstants {
         public static final String IN_PREDICATE_PRE_SORTED = "inPredicatePreSorted";
         public static final String IN_PREDICATE_LOOKUP_ALGORITHM = "inPredicateLookupAlgorithm";
 
+        // When evaluating REGEXP_LIKE predicate on a dictionary encoded column:
+        // - If dictionary size is smaller than this threshold, scan the dictionary to get the matching dictionary ids
+        //   first, where inverted index can be applied if exists
+        // - Otherwise, read dictionary while scanning the forward index, cache the matching/unmatching dictionary ids
+        //   during the scan
+        public static final String REGEX_DICT_SIZE_THRESHOLD = "regexDictSizeThreshold";
 
         public static final String DROP_RESULTS = "dropResults";
 
@@ -816,6 +825,7 @@ public class CommonConstants {
 
       public static class QueryOptionValue {
         public static final int DEFAULT_MAX_STREAMING_PENDING_BLOCKS = 100;
+        public static final int DEFAULT_REGEX_DICT_SIZE_THRESHOLD = 10000;
       }
     }
 
