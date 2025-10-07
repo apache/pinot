@@ -97,10 +97,11 @@ public class InMemorySendingMailbox implements SendingMailbox {
       throw new QueryException(QueryErrorCode.EXECUTION_TIMEOUT,
           String.format("Timed out adding block into mailbox: %s with timeout: %dms", _id, timeoutMs));
     }
-    _isEarlyTerminated = status != ReceivingMailbox.ReceivingMailboxStatus.SUCCESS;
     switch (status) {
       case SUCCESS:
+        break;
       case WAITING_EOS:
+        _isEarlyTerminated = true;
         break;
       case LAST_BLOCK:
         _isTerminated = true;
