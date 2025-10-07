@@ -82,6 +82,6 @@ public final class ClusterConfigForTable {
     if (override != null) {
       return override;
     }
-    return tableConfig.getIndexingConfig().isOptimiseNoDictStatsCollection();
+    return tableConfig.getIndexingConfig().isOptimizeNoDictStatsCollection();
   }
 }
