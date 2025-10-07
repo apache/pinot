@@ -138,7 +138,7 @@ public abstract class BlockExchange {
       // this may happen when the block exchange is itself used as a sending mailbox, like when using spools
       mailboxIdToSendMetadata = -1;
     }
-    RuntimeException firstException = null;
+    Exception firstException = null;
     int numMailboxes = _sendingMailboxes.size();
     for (int i = 0; i < numMailboxes; i++) {
       try {
@@ -152,14 +152,23 @@ public abstract class BlockExchange {
       } catch (IOException | TimeoutException | RuntimeException e) {
         // We want to try to send EOS to all mailboxes, so we catch the exception and rethrow it at the end.
         if (firstException == null) {
-          firstException = new RuntimeException("Failed to send EOS block to mailbox #" + i, e);
+          firstException = e;
         } else {
           firstException.addSuppressed(e);
         }
       }
     }
     if (firstException != null) {
-      throw firstException;
+      // This is ugly, but necessary to be sure we throw the right exception, which is later caught by the
+      // QueryRunner and handled properly.
+      if (firstException instanceof IOException) {
+        throw (IOException) firstException;
+      } else if (firstException instanceof TimeoutException) {
+        throw (TimeoutException) firstException;
+      } else {
+        Preconditions.checkState(firstException instanceof RuntimeException);
+        throw (RuntimeException) firstException;
+      }
     }
     return false;
   }
