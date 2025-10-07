@@ -43,7 +43,7 @@ public class MapColumnPreIndexStatsCollectorTest {
   private static StatsCollectorConfig newConfig(boolean optimiseNoDictStatsCollection) {
     TableConfig tableConfig = new TableConfigBuilder(org.apache.pinot.spi.config.table.TableType.OFFLINE)
         .setTableName("testTable")
-        .setOptimiseNoDictStatsCollection(optimiseNoDictStatsCollection)
+        .setOptimizeNoDictStatsCollection(optimiseNoDictStatsCollection)
         .setSegmentPartitionConfig(new SegmentPartitionConfig(
             Collections.singletonMap("col", new ColumnPartitionConfig("murmur", 4))))
         .setNoDictionaryColumns(java.util.List.of("col"))

@@ -18,6 +18,8 @@
  */
 package org.apache.pinot.integration.tests.realtime.utils;
 
+import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.google.common.cache.Cache;
 import java.util.Map;
 import java.util.concurrent.ExecutorService;
@@ -38,19 +40,25 @@ import org.apache.pinot.segment.local.utils.SegmentReloadSemaphore;
 import org.apache.pinot.spi.config.instance.InstanceDataManagerConfig;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.data.Schema;
+import org.apache.pinot.spi.env.PinotConfiguration;
 import org.apache.pinot.spi.stream.StreamConfigProperties;
 import org.apache.pinot.spi.utils.CommonConstants;
 import org.apache.pinot.spi.utils.IngestionConfigUtils;
+import org.apache.pinot.spi.utils.builder.TableNameBuilder;
 
 
 /**
  * Default implementation of {@link TableDataManagerProvider}.
  */
 public class FailureInjectingTableDataManagerProvider implements TableDataManagerProvider {
+  public static final String FAILURE_CONFIG_KEY = "failure.config";
+
   private InstanceDataManagerConfig _instanceDataManagerConfig;
   private HelixManager _helixManager;
   private SegmentLocks _segmentLocks;
   private Semaphore _segmentBuildSemaphore;
+  private Map<String, FailureInjectingTableConfig> _tableNameToFailureInjectingConfig;
+  private PinotConfiguration _pinotConfiguration;
 
   @Override
   public void init(InstanceDataManagerConfig instanceDataManagerConfig, HelixManager helixManager,
@@ -60,6 +68,7 @@ public class FailureInjectingTableDataManagerProvider implements TableDataManage
     _segmentLocks = segmentLocks;
     int maxParallelSegmentBuilds = instanceDataManagerConfig.getMaxParallelSegmentBuilds();
     _segmentBuildSemaphore = maxParallelSegmentBuilds > 0 ? new Semaphore(maxParallelSegmentBuilds, true) : null;
+    _pinotConfiguration = instanceDataManagerConfig.getConfig();
   }
 
   @Override
@@ -85,8 +94,21 @@ public class FailureInjectingTableDataManagerProvider implements TableDataManage
                   + "configured the segmentstore uri. Configure the server config %s",
               StreamConfigProperties.SERVER_UPLOAD_TO_DEEPSTORE, CommonConstants.Server.CONFIG_OF_SEGMENT_STORE_URI));
         }
+        String failureConfigKey =
+            FAILURE_CONFIG_KEY + "." + TableNameBuilder.extractRawTableName(tableConfig.getTableName());
+        FailureInjectingTableConfig failureInjectingTableConfig = null;
+        if (_pinotConfiguration.containsKey(failureConfigKey)) {
+          try {
+            failureInjectingTableConfig =
+                new ObjectMapper().readValue(_pinotConfiguration.getProperty(failureConfigKey),
+                    FailureInjectingTableConfig.class);
+          } catch (JsonProcessingException e) {
+            throw new RuntimeException(e);
+          }
+        }
         tableDataManager =
-            new FailureInjectingRealtimeTableDataManager(_segmentBuildSemaphore, isServerReadyToServeQueries);
+            new FailureInjectingRealtimeTableDataManager(_segmentBuildSemaphore, isServerReadyToServeQueries,
+                failureInjectingTableConfig);
         break;
       default:
         throw new IllegalStateException();

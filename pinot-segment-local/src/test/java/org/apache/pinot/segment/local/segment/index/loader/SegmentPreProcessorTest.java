@@ -291,7 +291,7 @@ public class SegmentPreProcessorTest implements PinotBuffersAfterClassCheckRule 
         .setRangeIndexColumns(new ArrayList<>(_rangeIndexColumns))
         .setFieldConfigList(new ArrayList<>(_fieldConfigMap.values()))
         .setNullHandlingEnabled(true)
-        .setOptimiseNoDictStatsCollection(true)
+        .setOptimizeNoDictStatsCollection(true)
         .setIngestionConfig(_ingestionConfig)
         .build();
     IndexingConfig indexingConfig = tableConfig.getIndexingConfig();
@@ -1530,6 +1530,32 @@ public class SegmentPreProcessorTest implements PinotBuffersAfterClassCheckRule 
       assertNotNull(v.getMinValue(), "checking column: " + k);
       assertNotNull(v.getMaxValue(), "checking column: " + k);
     });
+  }
+
+  @Test(dataProvider = "bothV1AndV3")
+  public void testH3IndexResolutionUpdate(SegmentVersion segmentVersion)
+      throws Exception {
+    buildSegment(segmentVersion);
+
+    // Create H3 index with resolution 5.
+    _fieldConfigMap.put("newH3Col",
+        new FieldConfig("newH3Col", FieldConfig.EncodingType.DICTIONARY, List.of(FieldConfig.IndexType.H3), null,
+            Map.of("resolutions", "5")));
+    runPreProcessor(_newColumnsSchemaWithH3Json);
+
+    verifyProcessNotNeeded();
+
+    // Update H3 index resolution to 4
+    _fieldConfigMap.put("newH3Col",
+        new FieldConfig("newH3Col", FieldConfig.EncodingType.DICTIONARY, List.of(FieldConfig.IndexType.H3), null,
+            Map.of("resolutions", "4")));
+
+    // Verify that preprocessing is needed, update the index, and verify again that no more processing is needed
+    verifyProcessNeeded();
+
+    // Remove new indexes
+    resetIndexConfigs();
+    runPreProcessor(_newColumnsSchemaWithH3Json);
   }
 
   private void verifyProcessNeeded()

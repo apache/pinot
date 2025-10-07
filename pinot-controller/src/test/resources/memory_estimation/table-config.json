@@ -37,7 +37,7 @@
       "stream.kafka.topic.name": "UserGeneratedContentGestureCountEvent",
       "streamType": "kafka"
     },
-    "optimiseNoDictStatsCollection": false
+    "optimizeNoDictStatsCollection": false
   },
   "tableName": "testTable",
   "tableType": "REALTIME",

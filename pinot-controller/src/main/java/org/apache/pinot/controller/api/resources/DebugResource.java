@@ -42,6 +42,7 @@ import java.util.function.Function;
 import java.util.stream.Collectors;
 import javax.inject.Inject;
 import javax.ws.rs.DefaultValue;
+import javax.ws.rs.Encoded;
 import javax.ws.rs.GET;
 import javax.ws.rs.Path;
 import javax.ws.rs.PathParam;
@@ -63,6 +64,7 @@ import org.apache.pinot.common.restlet.resources.SegmentConsumerInfo;
 import org.apache.pinot.common.restlet.resources.SegmentErrorInfo;
 import org.apache.pinot.common.restlet.resources.SegmentServerDebugInfo;
 import org.apache.pinot.common.utils.DatabaseUtils;
+import org.apache.pinot.common.utils.URIUtils;
 import org.apache.pinot.controller.ControllerConf;
 import org.apache.pinot.controller.api.debug.TableDebugInfo;
 import org.apache.pinot.controller.api.exception.ControllerApplicationException;
@@ -168,12 +170,12 @@ public class DebugResource {
   })
   public TableDebugInfo.SegmentDebugInfo getSegmentDebugInfo(
       @ApiParam(value = "Name of the table (with type)", required = true) @PathParam("tableName")
-          String tableNameWithType,
-      @ApiParam(value = "Name of the segment", required = true) @PathParam("segmentName") String segmentName,
+      String tableNameWithType,
+      @ApiParam(value = "Name of the segment", required = true) @PathParam("segmentName") @Encoded String segmentName,
       @Context HttpHeaders headers)
       throws Exception {
     tableNameWithType = DatabaseUtils.translateTableName(tableNameWithType, headers);
-    return debugSegment(tableNameWithType, segmentName);
+    return debugSegment(tableNameWithType, URIUtils.decode(segmentName));
   }
 
   /**

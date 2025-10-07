@@ -48,7 +48,7 @@ public class SegmentPreIndexStatsCollectorImplTest {
     Schema schema = new Schema.SchemaBuilder().addSingleValueDimension("c1", FieldSpec.DataType.STRING).build();
     TableConfig tableConfig = new TableConfigBuilder(org.apache.pinot.spi.config.table.TableType.OFFLINE)
         .setTableName("t").setNoDictionaryColumns(java.util.List.of("c1"))
-        .setOptimiseNoDictStatsCollection(true).build();
+        .setOptimizeNoDictStatsCollection(true).build();
     SegmentPreIndexStatsCollectorImpl impl = new SegmentPreIndexStatsCollectorImpl(newConfig(schema, tableConfig));
     impl.init();
     assertTrue(impl.getColumnProfileFor("c1") instanceof NoDictColumnStatisticsCollector);

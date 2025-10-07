@@ -346,7 +346,7 @@ public abstract class BaseClusterIntegrationTest extends ClusterTest {
         .setQueryConfig(getQueryConfig())
         .setNullHandlingEnabled(getNullHandlingEnabled())
         .setSegmentPartitionConfig(getSegmentPartitionConfig())
-        .setOptimiseNoDictStatsCollection(true)
+        .setOptimizeNoDictStatsCollection(true)
         .build();
     // @formatter:on
   }
@@ -421,7 +421,7 @@ public abstract class BaseClusterIntegrationTest extends ClusterTest {
         .setStreamConfigs(getStreamConfigs())
         .setNullHandlingEnabled(getNullHandlingEnabled())
         .setSegmentPartitionConfig(getSegmentPartitionConfig())
-        .setOptimiseNoDictStatsCollection(true)
+        .setOptimizeNoDictStatsCollection(true)
         .setReplicaGroupStrategyConfig(getReplicaGroupStrategyConfig());
   }
 
@@ -445,7 +445,7 @@ public abstract class BaseClusterIntegrationTest extends ClusterTest {
             new RoutingConfig(null, null, RoutingConfig.STRICT_REPLICA_GROUP_INSTANCE_SELECTOR_TYPE, false))
         .setSegmentPartitionConfig(new SegmentPartitionConfig(columnPartitionConfigMap))
         .setReplicaGroupStrategyConfig(new ReplicaGroupStrategyConfig(primaryKeyColumn, 1))
-        .setOptimiseNoDictStatsCollection(true)
+        .setOptimizeNoDictStatsCollection(true)
         .setUpsertConfig(upsertConfig).build();
   }
 
@@ -498,7 +498,7 @@ public abstract class BaseClusterIntegrationTest extends ClusterTest {
             new RoutingConfig(null, null, RoutingConfig.STRICT_REPLICA_GROUP_INSTANCE_SELECTOR_TYPE, false))
         .setSegmentPartitionConfig(new SegmentPartitionConfig(columnPartitionConfigMap))
         .setReplicaGroupStrategyConfig(new ReplicaGroupStrategyConfig(primaryKeyColumn, 1))
-        .setOptimiseNoDictStatsCollection(true)
+        .setOptimizeNoDictStatsCollection(true)
         .setUpsertConfig(upsertConfig).build();
   }
 
@@ -526,7 +526,7 @@ public abstract class BaseClusterIntegrationTest extends ClusterTest {
         .setSegmentPartitionConfig(new SegmentPartitionConfig(columnPartitionConfigMap))
         .setReplicaGroupStrategyConfig(new ReplicaGroupStrategyConfig(primaryKeyColumn, 1))
         .setDedupConfig(new DedupConfig())
-        .setOptimiseNoDictStatsCollection(true)
+        .setOptimizeNoDictStatsCollection(true)
         .build();
   }
 

@@ -1977,7 +1977,7 @@ public class TableRebalancer {
       //       best to return that there is a risk of data loss for pauseless enabled tables for segments in COMMITTING
       //       state
       if (_isPauselessEnabled && segmentZKMetadata.getStatus() == CommonConstants.Segment.Realtime.Status.COMMITTING
-          && !_pinotLLCRealtimeSegmentManager.allowRepairOfErrorSegments(false, _tableConfig)) {
+          && !_pinotLLCRealtimeSegmentManager.allowRepairOfCommittingSegments(false, _tableConfig)) {
         return Pair.of(true, generateDataLossRiskMessage(segmentName, false));
       }
       return NO_DATA_LOSS_RISK_RESULT;

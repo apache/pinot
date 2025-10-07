@@ -1097,8 +1097,8 @@ public class PinotTableRestletResource {
   public String getTableAggregateMetadata(
       @ApiParam(value = "Name of the table", required = true) @PathParam("tableName") String tableName,
       @ApiParam(value = "OFFLINE|REALTIME") @QueryParam("type") String tableTypeStr,
-      @ApiParam(value = "Columns name", allowMultiple = true) @QueryParam("columns") @DefaultValue("")
-      List<String> columns, @Context HttpHeaders headers) {
+      @ApiParam(value = "Columns name", allowMultiple = true) @QueryParam("columns") List<String> columns,
+      @Context HttpHeaders headers) {
     tableName = DatabaseUtils.translateTableName(tableName, headers);
     LOGGER.info("Received a request to fetch aggregate metadata for a table {}", tableName);
     TableType tableType = Constants.validateTableType(tableTypeStr);

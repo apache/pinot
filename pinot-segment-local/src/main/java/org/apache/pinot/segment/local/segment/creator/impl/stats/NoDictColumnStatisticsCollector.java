@@ -70,7 +70,7 @@ public class NoDictColumnStatisticsCollector extends AbstractColumnStatisticsCol
       int rowLength = 0;
       for (Object value : values) {
         if (value instanceof BigDecimal) {
-          // BigDecimalColumnPreIndexStatsCollector doesn't support multi-value
+          // Pinot doesn't support multi-value BigDecimal as of now
           throw new UnsupportedOperationException();
         }
         updateMinMax(value);
