@@ -230,27 +230,20 @@ public abstract class BlockExchange {
     @Override
     public void send(MseBlock.Data data)
         throws IOException, TimeoutException {
-      sendPrivate(data, Collections.emptyList());
+      if (LOGGER.isTraceEnabled()) {
+        LOGGER.trace("Exchange mailbox {} echoing data block {} {}", this, data, System.identityHashCode(data));
+      }
+      _earlyTerminated = BlockExchange.this.send(data);
     }
 
     @Override
     public void send(MseBlock.Eos block, List<DataBuffer> serializedStats)
         throws IOException, TimeoutException {
-      sendPrivate(block, serializedStats);
-    }
-
-    private void sendPrivate(MseBlock block, List<DataBuffer> serializedStats)
-        throws IOException, TimeoutException {
       if (LOGGER.isTraceEnabled()) {
-        LOGGER.trace("Exchange mailbox {} echoing {} {}", this, block, System.identityHashCode(block));
+        LOGGER.trace("Exchange mailbox {} echoing EOS block {} {}", this, block, System.identityHashCode(block));
       }
-      if (block.isData()) {
-        Preconditions.checkArgument(serializedStats.isEmpty(), "Data block cannot have stats");
-        _earlyTerminated = BlockExchange.this.send(((MseBlock.Data) block));
-      } else {
-        _earlyTerminated = BlockExchange.this.send(((MseBlock.Eos) block), serializedStats);
-        _completed = true;
-      }
+      _earlyTerminated = BlockExchange.this.send(block, serializedStats);
+      _completed = true;
     }
 
     @Override
