@@ -19,12 +19,18 @@
 package org.apache.pinot.query.mailbox;
 
 import java.util.List;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.ExecutionException;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.query.runtime.blocks.ErrorMseBlock;
 import org.apache.pinot.query.runtime.blocks.MseBlock;
 import org.apache.pinot.query.runtime.blocks.RowHeapDataBlock;
 import org.apache.pinot.query.runtime.blocks.SuccessMseBlock;
+import org.apache.pinot.spi.exception.QueryErrorCode;
 import org.mockito.Mockito;
 import org.testng.annotations.BeforeMethod;
 import org.testng.annotations.Test;
@@ -45,7 +51,7 @@ public class ReceivingMailboxTest {
   }
 
   @Test
-  public void tooManyDataBlockTheWriter()
+  public void tooManyDataBlocksTheWriter()
       throws InterruptedException, TimeoutException {
     int size = 2;
     ReceivingMailbox receivingMailbox = new ReceivingMailbox("id", size);
@@ -74,8 +80,18 @@ public class ReceivingMailboxTest {
     status = receivingMailbox.offer(SuccessMseBlock.INSTANCE, List.of(), 10);
     assertEquals(status, ReceivingMailbox.ReceivingMailboxStatus.LAST_BLOCK, "Should be able to offer EOS");
 
-    // Offer after EOS should be rejected
+    // Data offer after EOS should be rejected
     status = receivingMailbox.offer(DATA_BLOCK, List.of(), 10);
+    assertEquals(status, ReceivingMailbox.ReceivingMailboxStatus.ALREADY_TERMINATED,
+        "Should not be able to offer after EOS");
+
+    // Success offer after EOS should be rejected
+    status = receivingMailbox.offer(SuccessMseBlock.INSTANCE, List.of(), 10);
+    assertEquals(status, ReceivingMailbox.ReceivingMailboxStatus.ALREADY_TERMINATED,
+        "Should not be able to offer after EOS");
+
+    // Error offer after EOS should be rejected
+    status = receivingMailbox.offer(ErrorMseBlock.fromError(QueryErrorCode.INTERNAL, "test"), List.of(), 10);
     assertEquals(status, ReceivingMailbox.ReceivingMailboxStatus.ALREADY_TERMINATED,
         "Should not be able to offer after EOS");
   }
@@ -243,5 +259,75 @@ public class ReceivingMailboxTest {
     ReceivingMailbox.MseBlockWithStats latePoll = receivingMailbox.poll();
     assertNotNull(latePoll, "Should be able to read EOS");
     assertEquals(latePoll.getBlock(), errorBlock, "Should read EOS block");
+  }
+
+  @Test(timeOut = 10_000)
+  public void earlyTerminateUnblocksOffers()
+      throws ExecutionException, InterruptedException, TimeoutException {
+    int maxPendingBlocks = 2;
+    ReceivingMailbox mailbox = new ReceivingMailbox("id", maxPendingBlocks);
+
+    ExecutorService offerEx = Executors.newCachedThreadPool();
+    try {
+      for (int i = 0; i < maxPendingBlocks; i++) {
+        CompletableFuture<ReceivingMailbox.ReceivingMailboxStatus> future = offer(DATA_BLOCK, mailbox, offerEx);
+        future.join();
+      }
+      CompletableFuture<ReceivingMailbox.ReceivingMailboxStatus> blocked = offer(DATA_BLOCK, mailbox, offerEx);
+      Thread.sleep(100); // a little wait to facilitate the offer to be blocked
+      mailbox.earlyTerminate();
+      ReceivingMailbox.ReceivingMailboxStatus status = blocked.get(10_000, TimeUnit.MILLISECONDS);
+      assertEquals(status, ReceivingMailbox.ReceivingMailboxStatus.WAITING_EOS);
+    } finally {
+      offerEx.shutdownNow();
+    }
+  }
+
+  @Test(timeOut = 10_000)
+  public void readingUnblocksWriters()
+      throws ExecutionException, InterruptedException, TimeoutException {
+    int maxPendingBlocks = 2;
+    ReceivingMailbox mailbox = new ReceivingMailbox("id", maxPendingBlocks);
+    mailbox.registeredReader(_reader);
+
+    ExecutorService offerEx = Executors.newSingleThreadExecutor();
+    try {
+      for (int i = 0; i < maxPendingBlocks; i++) {
+        offer(DATA_BLOCK, mailbox, offerEx);
+      }
+      CompletableFuture<ReceivingMailbox.ReceivingMailboxStatus> blocked = offer(DATA_BLOCK, mailbox, offerEx);
+
+      int numRead = 0;
+      do {
+        ReceivingMailbox.MseBlockWithStats poll = mailbox.poll();
+        if (poll == null) {
+          // No more to read
+          Thread.sleep(10);
+        } else {
+          numRead++;
+          assertEquals(poll.getBlock(), DATA_BLOCK, "The read block should match the sent block");
+        }
+      } while (numRead < maxPendingBlocks + 1);
+      assertEquals(mailbox.getNumPendingBlocks(), 0, "All blocks should have been read");
+      assertTrue(blocked.isDone(), "The blocked offer should be unblocked by reading");
+      assertEquals(blocked.get(), ReceivingMailbox.ReceivingMailboxStatus.SUCCESS,
+          "The unblocked offer should succeed");
+    } finally {
+      offerEx.shutdownNow();
+    }
+  }
+
+  CompletableFuture<ReceivingMailbox.ReceivingMailboxStatus> offer(MseBlock block, ReceivingMailbox receivingMailbox,
+      ExecutorService executor) {
+    return CompletableFuture.supplyAsync(() -> {
+      try {
+        return receivingMailbox.offer(block, List.of(), 10_000);
+      } catch (InterruptedException e) {
+        Thread.currentThread().interrupt();
+        throw new RuntimeException(e);
+      } catch (TimeoutException e) {
+        throw new RuntimeException(e);
+      }
+    }, executor);
   }
 }

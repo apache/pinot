@@ -426,7 +426,6 @@ public class ReceivingMailbox {
             notifyReader();
             if (block.isError()) {
               drainDataBlocks();
-              _notFull.signal();
             }
             return ReceivingMailboxStatus.LAST_BLOCK;
           default:
@@ -606,6 +605,7 @@ public class ReceivingMailbox {
     @GuardedBy("_lock")
     private void drainDataBlocks() {
       Arrays.fill(_dataBlocks, null);
+      _notFull.signalAll();
       _count = 0;
     }
 
