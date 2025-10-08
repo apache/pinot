@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.controller.helix.core.rebalance;
 
+import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import com.google.common.base.Preconditions;
 import io.swagger.annotations.ApiModel;
@@ -27,6 +28,7 @@ import org.apache.pinot.controller.api.resources.ForceCommitBatchConfig;
 import org.apache.pinot.spi.utils.Enablement;
 
 
+@JsonIgnoreProperties(ignoreUnknown = true)
 @ApiModel
 public class RebalanceConfig {
   public static final int DISABLE_BATCH_SIZE_PER_SERVER = -1;
