@@ -80,12 +80,12 @@ const useStyles = makeStyles(() => ({
 const TaskDetail = (props) => {
   const classes = useStyles();
   const { currentTimezone } = useTimezone();
-  const { subTaskID, taskID } = props.match.params;
+  const { subTaskID, taskID, queueTableName } = props.match.params;
   const [taskDebugData, setTaskDebugData] = useState({});
   const [taskProgressData, setTaskProgressData] = useState<TaskProgressStatus[] | string>("");
 
   const fetchTaskDebugData = async () => {
-    const debugRes = await PinotMethodUtils.getTaskDebugData(taskID);
+    const debugRes = await PinotMethodUtils.getTaskDebugData(taskID, queueTableName);
     const subTaskData = find(debugRes.data.subtaskInfos, (subTask) => get(subTask, 'taskId', '') === subTaskID);
     setTaskDebugData(subTaskData);
   };

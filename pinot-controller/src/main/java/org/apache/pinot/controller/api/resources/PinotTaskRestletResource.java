@@ -384,8 +384,14 @@ public class PinotTaskRestletResource {
       @ApiParam(value = "verbosity (Prints information for the given task name."
           + "By default, only prints subtask details for running and error tasks. "
           + "Value of > 0 prints subtask details for all tasks)")
-      @DefaultValue("0") @QueryParam("verbosity") int verbosity) {
-    return _pinotHelixTaskResourceManager.getTaskDebugInfo(taskName, verbosity);
+      @DefaultValue("0") @QueryParam("verbosity") int verbosity,
+      @ApiParam(value = "Table name with type (e.g., 'myTable_OFFLINE') to filter subtasks by table. "
+          + "Only subtasks for this table will be returned.")
+      @QueryParam("tableName") @Nullable String tableNameWithType, @Context HttpHeaders httpHeaders) {
+    if (tableNameWithType != null) {
+      tableNameWithType = DatabaseUtils.translateTableName(tableNameWithType, httpHeaders);
+    }
+    return _pinotHelixTaskResourceManager.getTaskDebugInfo(taskName, tableNameWithType, verbosity);
   }
 
   @GET
