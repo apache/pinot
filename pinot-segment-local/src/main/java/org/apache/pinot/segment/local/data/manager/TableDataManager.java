@@ -54,7 +54,7 @@ public interface TableDataManager {
    */
   void init(InstanceDataManagerConfig instanceDataManagerConfig, HelixManager helixManager, SegmentLocks segmentLocks,
       TableConfig tableConfig, Schema schema, SegmentReloadSemaphore segmentReloadSemaphore,
-      ExecutorService segmentReloadExecutor, @Nullable ExecutorService segmentPreloadExecutor,
+      ExecutorService segmentReloadRefreshExecutor, @Nullable ExecutorService segmentPreloadExecutor,
       @Nullable Cache<Pair<String, String>, SegmentErrorInfo> errorCache,
       @Nullable SegmentOperationsThrottler segmentOperationsThrottler, boolean enableAsyncSegmentRefresh);
 

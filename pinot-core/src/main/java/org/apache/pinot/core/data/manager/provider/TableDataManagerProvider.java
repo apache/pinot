@@ -47,7 +47,7 @@ public interface TableDataManagerProvider {
       @Nullable SegmentOperationsThrottler segmentOperationsThrottler);
 
   TableDataManager getTableDataManager(TableConfig tableConfig, Schema schema,
-      SegmentReloadSemaphore segmentRefreshSemaphore, ExecutorService segmentReloadExecutor,
+      SegmentReloadSemaphore segmentRefreshSemaphore, ExecutorService segmentReloadRefreshExecutor,
       @Nullable ExecutorService segmentPreloadExecutor,
       @Nullable Cache<Pair<String, String>, SegmentErrorInfo> errorCache,
       Supplier<Boolean> isServerReadyToServeQueries, boolean enableAsyncSegmentRefresh);
