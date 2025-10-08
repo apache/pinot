@@ -37,16 +37,19 @@ public class DefaultWorkloadBudgetManager implements WorkloadBudgetManager {
   private long _enforcementWindowMs;
   private ConcurrentHashMap<String, WorkloadBudgetManager.Budget> _workloadBudgets;
   private final ScheduledExecutorService _resetScheduler = Executors.newSingleThreadScheduledExecutor();
-  private volatile boolean _isEnabled;
+  private volatile boolean _isCostCollectionEnabled;
+  private volatile boolean _isCostEmissionEnabled;
 
   public DefaultWorkloadBudgetManager(PinotConfiguration config) {
-    _isEnabled = config.getProperty(CommonConstants.Accounting.CONFIG_OF_WORKLOAD_ENABLE_COST_COLLECTION,
+    _isCostCollectionEnabled = config.getProperty(CommonConstants.Accounting.CONFIG_OF_WORKLOAD_ENABLE_COST_COLLECTION,
         CommonConstants.Accounting.DEFAULT_WORKLOAD_ENABLE_COST_COLLECTION);
     // Return an object even if disabled. All functionalities of this class will be noops.
-    if (!_isEnabled) {
+    if (!_isCostCollectionEnabled) {
       LOGGER.info("WorkloadBudgetManager is disabled. Creating a no-op instance.");
       return;
     }
+    _isCostEmissionEnabled = config.getProperty(CommonConstants.Accounting.CONFIG_OF_WORKLOAD_ENABLE_COST_EMISSION,
+        CommonConstants.Accounting.DEFAULT_WORKLOAD_ENABLE_COST_EMISSION);
     _workloadBudgets = new ConcurrentHashMap<>();
     _enforcementWindowMs = config.getProperty(CommonConstants.Accounting.CONFIG_OF_WORKLOAD_ENFORCEMENT_WINDOW_MS,
         CommonConstants.Accounting.DEFAULT_WORKLOAD_ENFORCEMENT_WINDOW_MS);
@@ -86,10 +89,10 @@ public class DefaultWorkloadBudgetManager implements WorkloadBudgetManager {
   }
 
   public void shutdown() {
-    if (!_isEnabled) {
+    if (!_isCostCollectionEnabled) {
       return;
     }
-    _isEnabled = false;
+    _isCostCollectionEnabled = false;
     _resetScheduler.shutdownNow();
     try {
       if (!_resetScheduler.awaitTermination(5, TimeUnit.SECONDS)) {
@@ -102,7 +105,7 @@ public class DefaultWorkloadBudgetManager implements WorkloadBudgetManager {
   }
 
   public void addOrUpdateWorkload(String workload, long cpuBudgetNs, long memoryBudgetBytes) {
-    if (!_isEnabled) {
+    if (!_isCostCollectionEnabled) {
       LOGGER.info("WorkloadBudgetManager is disabled. Not adding/updating workload: {}", workload);
       return;
     }
@@ -113,7 +116,7 @@ public class DefaultWorkloadBudgetManager implements WorkloadBudgetManager {
   }
 
   public void deleteWorkload(String workload) {
-    if (!_isEnabled) {
+    if (!_isCostCollectionEnabled) {
       LOGGER.info("WorkloadBudgetManager is disabled. Not deleting workload: {}", workload);
       return;
     }
@@ -134,7 +137,7 @@ public class DefaultWorkloadBudgetManager implements WorkloadBudgetManager {
   }
 
   public BudgetStats tryCharge(String workload, long cpuUsedNs, long memoryUsedBytes) {
-    if (!_isEnabled) {
+    if (!_isCostCollectionEnabled) {
       return new BudgetStats(Long.MAX_VALUE, Long.MAX_VALUE, Long.MAX_VALUE, Long.MAX_VALUE);
     }
 
@@ -150,7 +153,7 @@ public class DefaultWorkloadBudgetManager implements WorkloadBudgetManager {
    * Retrieves the initial and remaining budget for a workload.
    */
   public BudgetStats getBudgetStats(String workload) {
-    if (!_isEnabled) {
+    if (!_isCostCollectionEnabled) {
       return null;
     }
     Budget budget = _workloadBudgets.get(workload);
@@ -161,7 +164,7 @@ public class DefaultWorkloadBudgetManager implements WorkloadBudgetManager {
    * Retrieves the total remaining budget across all workloads (Thread-Safe).
    */
   public BudgetStats getRemainingBudgetAcrossAllWorkloads() {
-    if (!_isEnabled) {
+    if (!_isCostCollectionEnabled) {
       return new BudgetStats(Long.MAX_VALUE, Long.MAX_VALUE, Long.MAX_VALUE, Long.MAX_VALUE);
     }
     long totalCpuBudget =
@@ -187,7 +190,9 @@ public class DefaultWorkloadBudgetManager implements WorkloadBudgetManager {
         BudgetStats stats = budget.getStats();
         LOGGER.debug("Workload: {} -> CPU: {}ns, Memory: {} bytes", workload, stats._cpuRemaining,
             stats._memoryRemaining);
-        collectWorkloadStats(workload, stats);
+        if (_isCostEmissionEnabled) {
+          collectWorkloadStats(workload, stats);
+        }
         // Reset the budget.
         budget.reset();
       });
@@ -196,7 +201,7 @@ public class DefaultWorkloadBudgetManager implements WorkloadBudgetManager {
 
   public boolean canAdmitQuery(String workload) {
     // If disabled or no budget configured, always admit
-    if (!_isEnabled) {
+    if (!_isCostCollectionEnabled) {
       return true;
     }
     Budget budget = _workloadBudgets.get(workload);
@@ -209,7 +214,7 @@ public class DefaultWorkloadBudgetManager implements WorkloadBudgetManager {
   }
 
   public Map<String, BudgetStats> getAllBudgetStats() {
-    if (!_isEnabled) {
+    if (!_isCostCollectionEnabled) {
       return null;
     }
     Map<String, BudgetStats> allStats = new ConcurrentHashMap<>();

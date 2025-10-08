@@ -1694,6 +1694,10 @@ public class CommonConstants {
         "accounting.workload.sleep.time.ms";
     public static final int DEFAULT_WORKLOAD_SLEEP_TIME_MS = 1;
 
+    public static final String CONFIG_OF_WORKLOAD_ENABLE_COST_EMISSION =
+        "accounting.workload.enable.cost.emission";
+    public static final boolean DEFAULT_WORKLOAD_ENABLE_COST_EMISSION = false;
+
     public static final String DEFAULT_WORKLOAD_NAME = "default";
     public static final String CONFIG_OF_SECONDARY_WORKLOAD_NAME = "accounting.secondary.workload.name";
     public static final String DEFAULT_SECONDARY_WORKLOAD_NAME = "defaultSecondary";
