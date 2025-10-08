@@ -188,4 +188,178 @@ public class DistributedTaskLockManagerTest {
       );
     }
   }
+
+  @Test
+  public void testLockReleaseRetriesOnFailure() throws InterruptedException {
+    // Mock the property store
+    ZkHelixPropertyStore<ZNRecord> mockPropertyStore = mock(ZkHelixPropertyStore.class);
+    String controllerId = "controller1";
+    String tableNameWithType = "testTable";
+
+    // Configure mocks for lock acquisition
+    when(mockPropertyStore.exists(anyString(), eq(AccessOption.PERSISTENT))).thenReturn(true);
+    when(mockPropertyStore.create(anyString(), any(ZNRecord.class), eq(AccessOption.EPHEMERAL))).thenReturn(true);
+    // Mock isTaskGenerationInProgress to return null (no task in progress)
+    when(mockPropertyStore.get(anyString(), any(Stat.class), eq(AccessOption.EPHEMERAL))).thenReturn(null);
+
+    DistributedTaskLockManager lockManager = new DistributedTaskLockManager(mockPropertyStore, controllerId);
+
+    // Acquire a lock first
+    DistributedTaskLockManager.TaskLock lock = lockManager.acquireLock(tableNameWithType);
+    Assert.assertNotNull(lock, "Should successfully acquire lock");
+
+    // Configure mock for lock release - simulate failure on first 2 attempts, success on 3rd attempt
+    when(mockPropertyStore.exists(eq(lock.getLockZNodePath()), eq(AccessOption.EPHEMERAL)))
+        .thenReturn(true); // Lock exists for all attempts
+
+    when(mockPropertyStore.remove(eq(lock.getLockZNodePath()), eq(AccessOption.EPHEMERAL)))
+        .thenReturn(false) // First attempt fails
+        .thenReturn(false) // Second attempt fails
+        .thenReturn(true); // Third attempt succeeds
+
+    // Record start time to verify retry delays
+    long startTime = System.currentTimeMillis();
+
+    // Test lock release with retries
+    boolean released = lockManager.releaseLock(lock);
+
+    long elapsedTime = System.currentTimeMillis() - startTime;
+
+    // Verify that the lock was eventually released
+    Assert.assertTrue(released, "Should successfully release lock after retries");
+
+    // Verify that remove was called 3 times (2 failures + 1 success)
+    verify(mockPropertyStore, times(3)).remove(eq(lock.getLockZNodePath()), eq(AccessOption.EPHEMERAL));
+
+    // Verify that the total time includes retry delays
+    // Expected delays: 100ms + 200ms = 300ms minimum (plus some execution overhead)
+    Assert.assertTrue(elapsedTime >= 250,
+        "Should have waited for retry delays. Elapsed time: " + elapsedTime + "ms");
+
+    // Should not take too long (max 3 seconds for safety, accounting for test environment variability)
+    Assert.assertTrue(elapsedTime < 3000,
+        "Should not take too long. Elapsed time: " + elapsedTime + "ms");
+  }
+
+  @Test
+  public void testLockReleaseFailsAfterMaxRetries() {
+    // Mock the property store
+    ZkHelixPropertyStore<ZNRecord> mockPropertyStore = mock(ZkHelixPropertyStore.class);
+    String controllerId = "controller1";
+    String tableNameWithType = "testTable";
+
+    // Configure mocks for lock acquisition
+    when(mockPropertyStore.exists(anyString(), eq(AccessOption.PERSISTENT))).thenReturn(true);
+    when(mockPropertyStore.create(anyString(), any(ZNRecord.class), eq(AccessOption.EPHEMERAL))).thenReturn(true);
+    // Mock isTaskGenerationInProgress to return null (no task in progress)
+    when(mockPropertyStore.get(anyString(), any(Stat.class), eq(AccessOption.EPHEMERAL))).thenReturn(null);
+
+    DistributedTaskLockManager lockManager = new DistributedTaskLockManager(mockPropertyStore, controllerId);
+
+    // Acquire a lock first
+    DistributedTaskLockManager.TaskLock lock = lockManager.acquireLock(tableNameWithType);
+    Assert.assertNotNull(lock, "Should successfully acquire lock");
+
+    // Configure mock for lock release - simulate failure on all attempts
+    when(mockPropertyStore.exists(eq(lock.getLockZNodePath()), eq(AccessOption.EPHEMERAL)))
+        .thenReturn(true); // Lock exists for all attempts
+
+    when(mockPropertyStore.remove(eq(lock.getLockZNodePath()), eq(AccessOption.EPHEMERAL)))
+        .thenReturn(false); // All attempts fail
+
+    // Test lock release with retries - should fail after max retries
+    boolean released = lockManager.releaseLock(lock);
+
+    // Verify that the lock release failed
+    Assert.assertFalse(released, "Should fail to release lock after max retries");
+
+    // Verify that remove was called exactly MAX_RETRIES times (3 times)
+    verify(mockPropertyStore, times(3)).remove(eq(lock.getLockZNodePath()), eq(AccessOption.EPHEMERAL));
+  }
+
+  @Test
+  public void testLockReleaseSucceedsWhenLockDisappearsBeforeRetry() {
+    // Mock the property store
+    ZkHelixPropertyStore<ZNRecord> mockPropertyStore = mock(ZkHelixPropertyStore.class);
+    String controllerId = "controller1";
+    String tableNameWithType = "testTable";
+
+    // Configure mocks for lock acquisition
+    when(mockPropertyStore.exists(anyString(), eq(AccessOption.PERSISTENT))).thenReturn(true);
+    when(mockPropertyStore.create(anyString(), any(ZNRecord.class), eq(AccessOption.EPHEMERAL))).thenReturn(true);
+    // Mock isTaskGenerationInProgress to return null (no task in progress)
+    when(mockPropertyStore.get(anyString(), any(Stat.class), eq(AccessOption.EPHEMERAL))).thenReturn(null);
+
+    DistributedTaskLockManager lockManager = new DistributedTaskLockManager(mockPropertyStore, controllerId);
+
+    // Acquire a lock first
+    DistributedTaskLockManager.TaskLock lock = lockManager.acquireLock(tableNameWithType);
+    Assert.assertNotNull(lock, "Should successfully acquire lock");
+
+    // Configure mock for lock release - simulate:
+    // 1. First exists() call in releaseLock(): lock exists, so it calls removeWithRetries()
+    // 2. Second exists() call in removeWithRetries(): lock no longer exists (disappeared between attempts)
+    when(mockPropertyStore.exists(eq(lock.getLockZNodePath()), eq(AccessOption.EPHEMERAL)))
+        .thenReturn(true)  // First check in releaseLock(): lock exists
+        .thenReturn(false); // Second check in removeWithRetries(): lock disappeared
+
+    // Since the lock disappears, remove() should never be called
+
+    // Test lock release - should succeed when lock disappears
+    boolean released = lockManager.releaseLock(lock);
+
+    // Verify that the lock release succeeded
+    Assert.assertTrue(released, "Should succeed when lock disappears between retry attempts");
+
+    // Verify that remove was never called because lock disappeared before retry
+    verify(mockPropertyStore, times(0)).remove(eq(lock.getLockZNodePath()), eq(AccessOption.EPHEMERAL));
+
+    // Verify that exists was called twice (releaseLock() + removeWithRetries() first attempt)
+    verify(mockPropertyStore, times(2)).exists(eq(lock.getLockZNodePath()), eq(AccessOption.EPHEMERAL));
+  }
+
+  @Test
+  public void testLockReleaseWithMultipleExistsChecks() {
+    // Mock the property store
+    ZkHelixPropertyStore<ZNRecord> mockPropertyStore = mock(ZkHelixPropertyStore.class);
+    String controllerId = "controller1";
+    String tableNameWithType = "testTable";
+
+    // Configure mocks for lock acquisition
+    when(mockPropertyStore.exists(anyString(), eq(AccessOption.PERSISTENT))).thenReturn(true);
+    when(mockPropertyStore.create(anyString(), any(ZNRecord.class), eq(AccessOption.EPHEMERAL))).thenReturn(true);
+    // Mock isTaskGenerationInProgress to return null (no task in progress)
+    when(mockPropertyStore.get(anyString(), any(Stat.class), eq(AccessOption.EPHEMERAL))).thenReturn(null);
+
+    DistributedTaskLockManager lockManager = new DistributedTaskLockManager(mockPropertyStore, controllerId);
+
+    // Acquire a lock first
+    DistributedTaskLockManager.TaskLock lock = lockManager.acquireLock(tableNameWithType);
+    Assert.assertNotNull(lock, "Should successfully acquire lock");
+
+    // Configure mock for lock release - simulate:
+    // 1. First exists() call in releaseLock(): lock exists
+    // 2. Second exists() call in removeWithRetries() attempt 1: lock exists, remove fails
+    // 3. Third exists() call in removeWithRetries() attempt 2: lock exists, remove succeeds
+    when(mockPropertyStore.exists(eq(lock.getLockZNodePath()), eq(AccessOption.EPHEMERAL)))
+        .thenReturn(true)  // First check in releaseLock(): lock exists
+        .thenReturn(true)  // Second check in removeWithRetries() attempt 1: lock exists
+        .thenReturn(true); // Third check in removeWithRetries() attempt 2: lock exists
+
+    when(mockPropertyStore.remove(eq(lock.getLockZNodePath()), eq(AccessOption.EPHEMERAL)))
+        .thenReturn(false) // First remove attempt fails
+        .thenReturn(true); // Second remove attempt succeeds
+
+    // Test lock release - should succeed after retry
+    boolean released = lockManager.releaseLock(lock);
+
+    // Verify that the lock release succeeded
+    Assert.assertTrue(released, "Should succeed after retry");
+
+    // Verify that remove was called twice (first fails, second succeeds)
+    verify(mockPropertyStore, times(2)).remove(eq(lock.getLockZNodePath()), eq(AccessOption.EPHEMERAL));
+
+    // Verify that exists was called 3 times (releaseLock() + removeWithRetries() attempt 1 + attempt 2)
+    verify(mockPropertyStore, times(3)).exists(eq(lock.getLockZNodePath()), eq(AccessOption.EPHEMERAL));
+  }
 }

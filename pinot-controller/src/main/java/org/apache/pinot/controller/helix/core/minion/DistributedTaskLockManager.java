@@ -60,6 +60,10 @@ public class DistributedTaskLockManager {
   private static final String LOCK_OWNER_KEY = "lockOwner";
   private static final String LOCK_CREATION_TIME_MS = "lockCreationTimeMs";
 
+  // Retry constants
+  private static final int MAX_RETRIES = 3;
+  private static final int BASE_RETRY_DELAY_MS = 100;
+
   private final ZkHelixPropertyStore<ZNRecord> _propertyStore;
   private final String _controllerInstanceId;
   private final ControllerMetrics _controllerMetrics;
@@ -129,9 +133,7 @@ public class DistributedTaskLockManager {
     if (lockNode != null) {
       try {
         if (_propertyStore.exists(lockNode, AccessOption.EPHEMERAL)) {
-          status = _propertyStore.remove(lockNode, AccessOption.EPHEMERAL);
-          LOGGER.info("Tried to removed ephemeral lock node: {}, for table: {} by controller: {}, removal success: {}",
-              lockNode, tableNameWithType, _controllerInstanceId, status);
+          status = removeWithRetries(lockNode, tableNameWithType);
         } else {
           LOGGER.warn("Ephemeral lock node: {} does not exist for table: {}, nothing to remove",
               lockNode, tableNameWithType);
@@ -145,6 +147,68 @@ public class DistributedTaskLockManager {
     }
 
     return status;
+  }
+
+  /**
+   * Attempts to remove a lock node with retries and exponential backoff.
+   * Only retries if the lock exists and the remove operation returns false.
+   */
+  private boolean removeWithRetries(String lockNode, String tableNameWithType) {
+    for (int attempt = 1; attempt <= MAX_RETRIES; attempt++) {
+      try {
+        // Check if lock still exists before attempting removal
+        if (!_propertyStore.exists(lockNode, AccessOption.EPHEMERAL)) {
+          LOGGER.info("Lock node: {} no longer exists for table: {}, considering removal successful", lockNode,
+              tableNameWithType);
+          return true;
+        }
+
+        boolean removed = _propertyStore.remove(lockNode, AccessOption.EPHEMERAL);
+
+        if (removed) {
+          LOGGER.info("Successfully removed ephemeral lock node: {} for table: {} by controller: {} on attempt: {}",
+              lockNode, tableNameWithType, _controllerInstanceId, attempt);
+          return true;
+        } else {
+          LOGGER.warn("Failed to remove ephemeral lock node: {} for table: {} by controller: {} on attempt: {}/{}",
+              lockNode, tableNameWithType, _controllerInstanceId, attempt, MAX_RETRIES);
+
+          // If this is not the last attempt, wait before retrying
+          if (attempt < MAX_RETRIES) {
+            // Exponential backoff: 100ms, 200ms, 400ms
+            long delayMs = BASE_RETRY_DELAY_MS * (1L << (attempt - 1));
+            LOGGER.info("Retrying lock removal for table: {} after {}ms delay", tableNameWithType, delayMs);
+            Thread.sleep(delayMs);
+          }
+        }
+      } catch (InterruptedException e) {
+        LOGGER.warn("Interrupted while waiting to retry lock removal for table: {}", tableNameWithType);
+        Thread.currentThread().interrupt();
+        return false;
+      } catch (Exception e) {
+        LOGGER.warn("Exception while trying to remove ephemeral lock node: {} on attempt: {}/{}", lockNode, attempt,
+            MAX_RETRIES, e);
+
+        // If this is not the last attempt, wait before retrying
+        if (attempt < MAX_RETRIES) {
+          try {
+            // Exponential backoff: 100ms, 200ms, 400ms
+            long delayMs = BASE_RETRY_DELAY_MS * (1L << (attempt - 1));
+            LOGGER.info("Retrying lock removal for table: {} after {}ms delay due to exception", tableNameWithType,
+                delayMs);
+            Thread.sleep(delayMs);
+          } catch (InterruptedException ie) {
+            LOGGER.warn("Interrupted while waiting to retry lock removal for table: {}", tableNameWithType);
+            Thread.currentThread().interrupt();
+            return false;
+          }
+        }
+      }
+    }
+
+    LOGGER.error("Failed to remove ephemeral lock node: {} for table: {} after {} attempts", lockNode,
+        tableNameWithType, MAX_RETRIES);
+    return false;
   }
 
   /**
