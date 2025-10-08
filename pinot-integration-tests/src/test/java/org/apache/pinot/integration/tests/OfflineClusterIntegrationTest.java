@@ -3943,6 +3943,43 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
   }
 
   @Test(dataProvider = "useBothQueryEngines")
+  public void testMinMaxString(boolean useMultiStageQueryEngine)
+      throws Exception {
+    setUseMultiStageQueryEngine(useMultiStageQueryEngine);
+
+    String sqlQuery = "SELECT MIN_STRING(DestCityName), MAX_STRING(DestCityName) FROM mytable";
+    JsonNode response = postQuery(sqlQuery);
+    assertTrue(response.get("exceptions").isEmpty());
+    JsonNode resultTable = response.get("resultTable");
+    JsonNode columnDataTypes = resultTable.get("dataSchema").get("columnDataTypes");
+    assertEquals(columnDataTypes.size(), 2);
+    assertEquals(columnDataTypes.get(0).asText(), "STRING");
+    assertEquals(columnDataTypes.get(1).asText(), "STRING");
+    JsonNode row = resultTable.get("rows").get(0);
+    assertEquals(row.size(), 2);
+    assertEquals(row.get(0).asText(), "Aberdeen, SD");
+    assertEquals(row.get(1).asText(), "Yuma, AZ");
+  }
+
+  @Test(dataProvider = "useBothQueryEngines")
+  public void testSumInt(boolean useMultiStageQueryEngine)
+      throws Exception {
+    setUseMultiStageQueryEngine(useMultiStageQueryEngine);
+
+    String sqlQuery = "SELECT SUM_INT(ArrTime), SUM(ArrTime) FROM mytable";
+    JsonNode response = postQuery(sqlQuery);
+    assertTrue(response.get("exceptions").isEmpty());
+    JsonNode resultTable = response.get("resultTable");
+    JsonNode columnDataTypes = resultTable.get("dataSchema").get("columnDataTypes");
+    assertEquals(columnDataTypes.size(), 2);
+    assertEquals(columnDataTypes.get(0).asText(), "LONG");
+    JsonNode row = resultTable.get("rows").get(0);
+    assertEquals(row.size(), 2);
+    assertTrue(row.get(0).isLong());
+    assertEquals(row.get(0).asLong(), row.get(1).asLong());
+  }
+
+  @Test(dataProvider = "useBothQueryEngines")
   public void testFilteredAggregationWithGroupByOrdering(boolean useMultiStageQueryEngine)
       throws Exception {
     setUseMultiStageQueryEngine(useMultiStageQueryEngine);
