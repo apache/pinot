@@ -42,6 +42,7 @@ import java.util.concurrent.Semaphore;
 import java.util.concurrent.atomic.AtomicBoolean;
 import javax.annotation.Nullable;
 import javax.inject.Inject;
+import javax.ws.rs.Encoded;
 import javax.ws.rs.GET;
 import javax.ws.rs.POST;
 import javax.ws.rs.Path;
@@ -54,6 +55,7 @@ import javax.ws.rs.core.Response;
 import org.apache.pinot.common.metadata.segment.SegmentZKMetadata;
 import org.apache.pinot.common.metrics.ServerMeter;
 import org.apache.pinot.common.utils.LLCSegmentName;
+import org.apache.pinot.common.utils.URIUtils;
 import org.apache.pinot.core.data.manager.realtime.RealtimeTableDataManager;
 import org.apache.pinot.segment.local.realtime.writer.StatelessRealtimeSegmentWriter;
 import org.apache.pinot.segment.local.segment.index.loader.IndexLoadingConfig;
@@ -148,7 +150,8 @@ public class ReingestionResource {
       @ApiResponse(code = 200, message = "Success", response = ReingestionJob.class),
       @ApiResponse(code = 500, message = "Internal server error", response = ErrorInfo.class)
   })
-  public Response reingestSegment(@PathParam("segmentName") String segmentName) {
+  public Response reingestSegment(@PathParam("segmentName") @Encoded String encodedSegmentName) {
+    String segmentName = URIUtils.decode(encodedSegmentName);
     LOGGER.info("Re-ingesting segment: {}", segmentName);
 
     // if segment is not in LLC format, return error

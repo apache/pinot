@@ -39,21 +39,21 @@ public class PredicateEvaluatorProvider {
 
   public static PredicateEvaluator getPredicateEvaluator(Predicate predicate, @Nullable Dictionary dictionary,
       DataType dataType) {
-    return getPredicateEvaluator(predicate, dictionary, dataType, null, 0);
+    return getPredicateEvaluator(predicate, dictionary, dataType, null);
   }
 
   public static PredicateEvaluator getPredicateEvaluator(Predicate predicate, @Nullable Dictionary dictionary,
-      DataType dataType, @Nullable QueryContext queryContext, int numDocs) {
+      DataType dataType, @Nullable QueryContext queryContext) {
     try {
       if (dictionary != null) {
         // dictionary based predicate evaluators
         switch (predicate.getType()) {
           case EQ:
-            return EqualsPredicateEvaluatorFactory
-                .newDictionaryBasedEvaluator((EqPredicate) predicate, dictionary, dataType);
+            return EqualsPredicateEvaluatorFactory.newDictionaryBasedEvaluator((EqPredicate) predicate, dictionary,
+                dataType);
           case NOT_EQ:
-            return NotEqualsPredicateEvaluatorFactory
-                .newDictionaryBasedEvaluator((NotEqPredicate) predicate, dictionary, dataType);
+            return NotEqualsPredicateEvaluatorFactory.newDictionaryBasedEvaluator((NotEqPredicate) predicate,
+                dictionary, dataType);
           case IN:
             return InPredicateEvaluatorFactory.newDictionaryBasedEvaluator((InPredicate) predicate, dictionary,
                 dataType, queryContext);
@@ -61,11 +61,11 @@ public class PredicateEvaluatorProvider {
             return NotInPredicateEvaluatorFactory.newDictionaryBasedEvaluator((NotInPredicate) predicate, dictionary,
                 dataType, queryContext);
           case RANGE:
-            return RangePredicateEvaluatorFactory
-                .newDictionaryBasedEvaluator((RangePredicate) predicate, dictionary, dataType);
+            return RangePredicateEvaluatorFactory.newDictionaryBasedEvaluator((RangePredicate) predicate, dictionary,
+                dataType);
           case REGEXP_LIKE:
             return RegexpLikePredicateEvaluatorFactory.newDictionaryBasedEvaluator((RegexpLikePredicate) predicate,
-                dictionary, dataType, queryContext, numDocs);
+                dictionary, dataType, queryContext);
           default:
             throw new UnsupportedOperationException("Unsupported predicate type: " + predicate.getType());
         }
@@ -98,6 +98,6 @@ public class PredicateEvaluatorProvider {
   public static PredicateEvaluator getPredicateEvaluator(Predicate predicate, DataSource dataSource,
       QueryContext queryContext) {
     return getPredicateEvaluator(predicate, dataSource.getDictionary(),
-        dataSource.getDataSourceMetadata().getDataType(), queryContext, 0);
+        dataSource.getDataSourceMetadata().getDataType(), queryContext);
   }
 }

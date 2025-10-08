@@ -22,6 +22,7 @@ import com.fasterxml.jackson.annotation.JsonIgnore;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import io.swagger.annotations.ApiModelProperty;
 import java.util.HashSet;
+import java.util.Objects;
 import java.util.Set;
 import org.apache.pinot.controller.helix.core.rebalance.RebalanceConfig;
 
@@ -113,5 +114,24 @@ public class TenantRebalanceConfig extends RebalanceConfig {
 
   public void setVerboseResult(boolean verboseResult) {
     _verboseResult = verboseResult;
+  }
+
+  @Override
+  public boolean equals(Object o) {
+    if (!(o instanceof TenantRebalanceConfig)) {
+      return false;
+    }
+    TenantRebalanceConfig that = (TenantRebalanceConfig) o;
+    return super.equals(o) && _degreeOfParallelism == that._degreeOfParallelism && _verboseResult == that._verboseResult
+        && Objects.equals(_tenantName, that._tenantName) && Objects.equals(_parallelBlacklist,
+        that._parallelBlacklist) && Objects.equals(_parallelWhitelist, that._parallelWhitelist)
+        && Objects.equals(_includeTables, that._includeTables) && Objects.equals(_excludeTables,
+        that._excludeTables);
+  }
+
+  @Override
+  public int hashCode() {
+    return Objects.hash(_tenantName, _degreeOfParallelism, _parallelBlacklist, _parallelWhitelist, _includeTables,
+        _excludeTables, _verboseResult);
   }
 }

@@ -84,7 +84,6 @@ import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.stream.StreamConfigProperties;
 import org.apache.pinot.spi.stream.StreamMessageMetadata;
-import org.apache.pinot.spi.stream.StreamMetadataProvider;
 import org.apache.pinot.spi.stream.StreamPartitionMsgOffset;
 import org.apache.pinot.spi.utils.CommonConstants;
 import org.apache.pinot.spi.utils.CommonConstants.Segment.Realtime.Status;
@@ -160,8 +159,7 @@ public class RealtimeTableDataManager extends BaseTableDataManager {
   protected void doInit() {
     _leaseExtender = SegmentBuildTimeLeaseExtender.getOrCreate(_instanceId, _serverMetrics, _tableNameWithType);
     // Tracks ingestion delay of all partitions being served for this table
-    _ingestionDelayTracker =
-        new IngestionDelayTracker(_serverMetrics, _tableNameWithType, this, _isServerReadyToServeQueries);
+    _ingestionDelayTracker = new IngestionDelayTracker(_serverMetrics, _tableNameWithType, this);
     File statsFile = new File(_tableDataDir, STATS_FILE_NAME);
     try {
       _statsHistory = RealtimeSegmentStatsHistory.deserialzeFrom(statsFile);
@@ -294,16 +292,11 @@ public class RealtimeTableDataManager extends BaseTableDataManager {
    * @param segmentName name of the consuming segment
    * @param partitionId partition id of the consuming segment (directly passed in to avoid parsing the segment name)
    * @param ingestionTimeMs ingestion time of the last consumed message (from {@link StreamMessageMetadata})
-   * @param firstStreamIngestionTimeMs ingestion time of the last consumed message in the first stream (from
-   *                                   {@link StreamMessageMetadata})
    * @param currentOffset offset of the last consumed message (from {@link StreamMessageMetadata})
-   * @param latestOffset offset of the latest message in the partition (from {@link StreamMetadataProvider})
    */
   public void updateIngestionMetrics(String segmentName, int partitionId, long ingestionTimeMs,
-      long firstStreamIngestionTimeMs, @Nullable StreamPartitionMsgOffset currentOffset,
-      @Nullable StreamPartitionMsgOffset latestOffset) {
-    _ingestionDelayTracker.updateIngestionMetrics(segmentName, partitionId, ingestionTimeMs, firstStreamIngestionTimeMs,
-        currentOffset, latestOffset);
+      @Nullable StreamPartitionMsgOffset currentOffset) {
+    _ingestionDelayTracker.updateMetrics(segmentName, partitionId, ingestionTimeMs, currentOffset);
   }
 
   /**
@@ -320,7 +313,7 @@ public class RealtimeTableDataManager extends BaseTableDataManager {
    * still be consuming, e.g. when the new consuming segment is created on a different server.
    */
   public void removeIngestionMetrics(String segmentName) {
-    _ingestionDelayTracker.stopTrackingPartitionIngestionDelay(segmentName);
+    _ingestionDelayTracker.stopTrackingPartition(segmentName);
   }
 
   /**
@@ -332,7 +325,7 @@ public class RealtimeTableDataManager extends BaseTableDataManager {
   @Override
   public void onConsumingToDropped(String segmentName) {
     // NOTE: No need to mark segment ignored here because it should have already been dropped.
-    _ingestionDelayTracker.stopTrackingPartitionIngestionDelay(new LLCSegmentName(segmentName).getPartitionGroupId());
+    _ingestionDelayTracker.stopTrackingPartition(new LLCSegmentName(segmentName).getPartitionGroupId());
   }
 
   /**
@@ -345,7 +338,7 @@ public class RealtimeTableDataManager extends BaseTableDataManager {
    */
   @Override
   public void onConsumingToOffline(String segmentName) {
-    _ingestionDelayTracker.stopTrackingPartitionIngestionDelay(segmentName);
+    _ingestionDelayTracker.stopTrackingPartition(segmentName);
   }
 
   @Override
@@ -511,10 +504,10 @@ public class RealtimeTableDataManager extends BaseTableDataManager {
 
   public Set<Integer> stopTrackingPartitionIngestionDelay(@Nullable Set<Integer> partitionIds) {
     if (CollectionUtils.isEmpty(partitionIds)) {
-      return _ingestionDelayTracker.stopTrackingIngestionDelayForAllPartitions();
+      return _ingestionDelayTracker.stopTrackingAllPartitions();
     }
     for (Integer partitionId: partitionIds) {
-      _ingestionDelayTracker.stopTrackingPartitionIngestionDelay(partitionId);
+      _ingestionDelayTracker.stopTrackingPartition(partitionId);
     }
     return partitionIds;
   }
@@ -924,6 +917,10 @@ public class RealtimeTableDataManager extends BaseTableDataManager {
   @VisibleForTesting
   void setEnforceConsumptionInOrder(boolean enforceConsumptionInOrder) {
     _enforceConsumptionInOrder = enforceConsumptionInOrder;
+  }
+
+  public Supplier<Boolean> getIsServerReadyToServeQueries() {
+    return _isServerReadyToServeQueries;
   }
 
   /**

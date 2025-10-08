@@ -67,6 +67,7 @@ import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.data.readers.FileFormat;
 import org.apache.pinot.spi.env.CommonsConfigurationUtils;
 import org.apache.pinot.spi.env.PinotConfiguration;
+import org.apache.pinot.spi.query.QueryThreadContext;
 import org.apache.pinot.spi.utils.ReadMode;
 import org.apache.pinot.spi.utils.builder.TableConfigBuilder;
 import org.apache.pinot.spi.utils.builder.TableNameBuilder;
@@ -99,7 +100,8 @@ public class QueryExecutorTest {
   private static final String OFFLINE_TABLE_NAME = TableNameBuilder.OFFLINE.tableNameWithType(RAW_TABLE_NAME);
   private static final int NUM_SEGMENTS_TO_GENERATE = 2;
   private static final int NUM_EMPTY_SEGMENTS_TO_GENERATE = 2;
-  private static final ExecutorService QUERY_RUNNERS = Executors.newFixedThreadPool(20);
+  private static final ExecutorService QUERY_RUNNERS =
+      QueryThreadContext.contextAwareExecutorService(Executors.newFixedThreadPool(2));
   private static final String TIME_SERIES_LANGUAGE_NAME = "QueryExecutorTest";
   private static final String TIME_SERIES_TIME_COL_NAME = "orderCreatedTimestamp";
   private static final Long TIME_SERIES_TEST_START_TIME = 1726228400L;
@@ -185,7 +187,7 @@ public class QueryExecutorTest {
     String query = "SELECT COUNT(*) FROM " + OFFLINE_TABLE_NAME;
     InstanceRequest instanceRequest = new InstanceRequest(0L, CalciteSqlCompiler.compileToBrokerRequest(query));
     instanceRequest.setSearchSegments(_segmentNames);
-    InstanceResponseBlock instanceResponse = _queryExecutor.execute(getQueryRequest(instanceRequest), QUERY_RUNNERS);
+    InstanceResponseBlock instanceResponse = execute(instanceRequest);
     assertTrue(instanceResponse.getResultsBlock() instanceof AggregationResultsBlock);
     assertEquals(((AggregationResultsBlock) instanceResponse.getResultsBlock()).getResults().get(0), 60000L);
   }
@@ -195,7 +197,7 @@ public class QueryExecutorTest {
     String query = "SELECT SUM(orderItemCount) FROM " + OFFLINE_TABLE_NAME;
     InstanceRequest instanceRequest = new InstanceRequest(0L, CalciteSqlCompiler.compileToBrokerRequest(query));
     instanceRequest.setSearchSegments(_segmentNames);
-    InstanceResponseBlock instanceResponse = _queryExecutor.execute(getQueryRequest(instanceRequest), QUERY_RUNNERS);
+    InstanceResponseBlock instanceResponse = execute(instanceRequest);
     assertTrue(instanceResponse.getResultsBlock() instanceof AggregationResultsBlock);
     assertEquals(((AggregationResultsBlock) instanceResponse.getResultsBlock()).getResults().get(0), 120306.0);
   }
@@ -205,7 +207,7 @@ public class QueryExecutorTest {
     String query = "SELECT MAX(orderAmount) FROM " + OFFLINE_TABLE_NAME;
     InstanceRequest instanceRequest = new InstanceRequest(0L, CalciteSqlCompiler.compileToBrokerRequest(query));
     instanceRequest.setSearchSegments(_segmentNames);
-    InstanceResponseBlock instanceResponse = _queryExecutor.execute(getQueryRequest(instanceRequest), QUERY_RUNNERS);
+    InstanceResponseBlock instanceResponse = execute(instanceRequest);
     assertTrue(instanceResponse.getResultsBlock() instanceof AggregationResultsBlock);
     assertEquals(((AggregationResultsBlock) instanceResponse.getResultsBlock()).getResults().get(0), 999.0);
   }
@@ -215,7 +217,7 @@ public class QueryExecutorTest {
     String query = "SELECT MIN(orderAmount) FROM " + OFFLINE_TABLE_NAME;
     InstanceRequest instanceRequest = new InstanceRequest(0L, CalciteSqlCompiler.compileToBrokerRequest(query));
     instanceRequest.setSearchSegments(_segmentNames);
-    InstanceResponseBlock instanceResponse = _queryExecutor.execute(getQueryRequest(instanceRequest), QUERY_RUNNERS);
+    InstanceResponseBlock instanceResponse = execute(instanceRequest);
     assertTrue(instanceResponse.getResultsBlock() instanceof AggregationResultsBlock);
     assertEquals(((AggregationResultsBlock) instanceResponse.getResultsBlock()).getResults().get(0), 0.0);
   }
@@ -223,11 +225,12 @@ public class QueryExecutorTest {
   @Test
   public void testTimeSeriesSumQuery() {
     TimeBuckets timeBuckets = TimeBuckets.ofSeconds(TIME_SERIES_TEST_START_TIME, Duration.ofHours(2), 2);
-    QueryContext queryContext = getQueryContextForTimeSeries("orderAmount", timeBuckets, 0L,
-        new AggInfo("SUM", false, Collections.emptyMap()), Collections.emptyList());
-    ServerQueryRequest serverQueryRequest =
+    QueryContext queryContext =
+        getQueryContextForTimeSeries("orderAmount", timeBuckets, 0L, new AggInfo("SUM", false, Collections.emptyMap()),
+            Collections.emptyList());
+    ServerQueryRequest queryRequest =
         new ServerQueryRequest(queryContext, _segmentNames, new HashMap<>(), ServerMetrics.get());
-    InstanceResponseBlock instanceResponse = _queryExecutor.execute(serverQueryRequest, QUERY_RUNNERS);
+    InstanceResponseBlock instanceResponse = execute(queryRequest);
     assertTrue(instanceResponse.getResultsBlock() instanceof AggregationResultsBlock);
     TimeSeriesBlock timeSeriesBlock = TimeSeriesOperatorUtils.buildTimeSeriesBlock(timeBuckets,
         (AggregationResultsBlock) instanceResponse.getResultsBlock());
@@ -241,9 +244,9 @@ public class QueryExecutorTest {
     TimeBuckets timeBuckets = TimeBuckets.ofSeconds(TIME_SERIES_TEST_START_TIME, Duration.ofMinutes(1), 100);
     QueryContext queryContext = getQueryContextForTimeSeries("orderItemCount", timeBuckets, 0L,
         new AggInfo("MAX", false, Collections.emptyMap()), List.of("cityName"));
-    ServerQueryRequest serverQueryRequest =
+    ServerQueryRequest queryRequest =
         new ServerQueryRequest(queryContext, _segmentNames, new HashMap<>(), ServerMetrics.get());
-    InstanceResponseBlock instanceResponse = _queryExecutor.execute(serverQueryRequest, QUERY_RUNNERS);
+    InstanceResponseBlock instanceResponse = execute(queryRequest);
     assertTrue(instanceResponse.getResultsBlock() instanceof GroupByResultsBlock);
     GroupByResultsBlock resultsBlock = (GroupByResultsBlock) instanceResponse.getResultsBlock();
     TimeSeriesBlock timeSeriesBlock = TimeSeriesOperatorUtils.buildTimeSeriesBlock(timeBuckets, resultsBlock);
@@ -270,9 +273,9 @@ public class QueryExecutorTest {
     TimeBuckets timeBuckets = TimeBuckets.ofSeconds(TIME_SERIES_TEST_START_TIME, Duration.ofMinutes(1), 100);
     QueryContext queryContext = getQueryContextForTimeSeries("orderItemCount", timeBuckets, 0L,
         new AggInfo("MIN", false, Collections.emptyMap()), List.of("cityName"));
-    ServerQueryRequest serverQueryRequest =
+    ServerQueryRequest queryRequest =
         new ServerQueryRequest(queryContext, _segmentNames, new HashMap<>(), ServerMetrics.get());
-    InstanceResponseBlock instanceResponse = _queryExecutor.execute(serverQueryRequest, QUERY_RUNNERS);
+    InstanceResponseBlock instanceResponse = execute(queryRequest);
     assertTrue(instanceResponse.getResultsBlock() instanceof GroupByResultsBlock);
     TimeSeriesBlock timeSeriesBlock = TimeSeriesOperatorUtils.buildTimeSeriesBlock(timeBuckets,
         (GroupByResultsBlock) instanceResponse.getResultsBlock());
@@ -302,17 +305,24 @@ public class QueryExecutorTest {
     FileUtils.deleteQuietly(TEMP_DIR);
   }
 
-  private ServerQueryRequest getQueryRequest(InstanceRequest instanceRequest) {
-    return new ServerQueryRequest(instanceRequest, ServerMetrics.get(), System.currentTimeMillis());
+  private InstanceResponseBlock execute(InstanceRequest instanceRequest) {
+    return execute(new ServerQueryRequest(instanceRequest, ServerMetrics.get(), System.currentTimeMillis()));
+  }
+
+  private InstanceResponseBlock execute(ServerQueryRequest queryRequest) {
+    try (QueryThreadContext ignore = QueryThreadContext.openForSseTest()) {
+      return _queryExecutor.execute(queryRequest, QUERY_RUNNERS);
+    }
   }
 
   private QueryContext getQueryContextForTimeSeries(String valueExpression, TimeBuckets timeBuckets, long offsetSeconds,
       AggInfo aggInfo, List<String> groupBy) {
-    List<ExpressionContext> groupByExpList = groupBy.stream().map(RequestContextUtils::getExpression)
-        .collect(Collectors.toList());
+    List<ExpressionContext> groupByExpList =
+        groupBy.stream().map(RequestContextUtils::getExpression).collect(Collectors.toList());
     ExpressionContext timeExpression = RequestContextUtils.getExpression(TIME_SERIES_TIME_COL_NAME);
-    ExpressionContext aggregateExpr = TimeSeriesAggregationFunction.create(TIME_SERIES_LANGUAGE_NAME, valueExpression,
-        timeExpression, TimeUnit.SECONDS, offsetSeconds, timeBuckets, aggInfo);
+    ExpressionContext aggregateExpr =
+        TimeSeriesAggregationFunction.create(TIME_SERIES_LANGUAGE_NAME, valueExpression, timeExpression,
+            TimeUnit.SECONDS, offsetSeconds, timeBuckets, aggInfo);
     QueryContext.Builder builder = new QueryContext.Builder();
     builder.setTableName(OFFLINE_TABLE_NAME);
     builder.setAliasList(Collections.emptyList());

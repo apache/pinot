@@ -113,9 +113,9 @@ public class QueryOptionsUtils {
   }
 
   @Nullable
-  public static Long getPassiveTimeoutMs(Map<String, String> queryOptions) {
-    String passiveTimeoutMsString = queryOptions.get(QueryOptionKey.EXTRA_PASSIVE_TIMEOUT_MS);
-    return checkedParseLong(QueryOptionKey.EXTRA_PASSIVE_TIMEOUT_MS, passiveTimeoutMsString, 0);
+  public static Long getExtraPassiveTimeoutMs(Map<String, String> queryOptions) {
+    String extraPassiveTimeoutMsString = queryOptions.get(QueryOptionKey.EXTRA_PASSIVE_TIMEOUT_MS);
+    return checkedParseLong(QueryOptionKey.EXTRA_PASSIVE_TIMEOUT_MS, extraPassiveTimeoutMsString, 0);
   }
 
   @Nullable
@@ -586,31 +586,14 @@ public class QueryOptionsUtils {
     return Boolean.parseBoolean(value);
   }
 
-  /**
-   * Get the REGEXP_LIKE adaptive threshold from query options.
-   * This threshold controls when to switch between dictionary-based and scan-based evaluation.
-   * When (dictionary_size / num_docs) < threshold, use dictionary-based evaluation.
-   * When (dictionary_size / num_docs) >= threshold, use scan-based evaluation.
-   *
-   * @param queryOptions Query options map
-   * @param defaultThreshold Default threshold to use if not specified in query options
-   * @return The adaptive threshold value (between 0.0 and 1.0)
-   */
-  public static double getRegexpLikeAdaptiveThreshold(Map<String, String> queryOptions, double defaultThreshold) {
-    String thresholdStr = queryOptions.get(QueryOptionKey.REGEXP_LIKE_ADAPTIVE_THRESHOLD);
-    if (thresholdStr != null) {
-      try {
-        double threshold = Double.parseDouble(thresholdStr);
-        if (threshold >= 0.0 && threshold <= 1.0) {
-          return threshold;
-        } else {
-          throw new IllegalArgumentException(
-              "REGEXP_LIKE adaptive threshold must be between 0.0 and 1.0, got: " + threshold);
-        }
-      } catch (NumberFormatException e) {
-        throw new IllegalArgumentException("Invalid REGEXP_LIKE adaptive threshold value: " + thresholdStr, e);
-      }
-    }
-    return defaultThreshold;
+  /// When evaluating REGEXP_LIKE predicate on a dictionary encoded column:
+  /// - If dictionary size is smaller than this threshold, scan the dictionary to get the matching dictionary ids
+  ///   first, where inverted index can be applied if exists
+  /// - Otherwise, read dictionary while scanning the forward index, cache the matching/unmatching dictionary ids
+  ///   during the scan
+  @Nullable
+  public static Integer getRegexDictSizeThreshold(Map<String, String> queryOptions) {
+    String regexDictSizeThreshold = queryOptions.get(QueryOptionKey.REGEX_DICT_SIZE_THRESHOLD);
+    return uncheckedParseInt(QueryOptionKey.REGEX_DICT_SIZE_THRESHOLD, regexDictSizeThreshold);
   }
 }

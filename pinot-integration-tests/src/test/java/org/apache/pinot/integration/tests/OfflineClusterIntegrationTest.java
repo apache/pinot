@@ -83,7 +83,6 @@ import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
 import org.apache.pinot.spi.data.MetricFieldSpec;
 import org.apache.pinot.spi.data.Schema;
-import org.apache.pinot.spi.env.PinotConfiguration;
 import org.apache.pinot.spi.exception.QueryErrorCode;
 import org.apache.pinot.spi.utils.CommonConstants;
 import org.apache.pinot.spi.utils.InstanceTypeUtils;
@@ -199,18 +198,6 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
         new FieldConfig("DivAirports", FieldConfig.EncodingType.DICTIONARY, List.of(), CompressionCodec.MV_ENTRY_DICT,
             null));
     return fieldConfigs;
-  }
-
-  @Override
-  protected void overrideBrokerConf(PinotConfiguration brokerConf) {
-    super.overrideBrokerConf(brokerConf);
-    brokerConf.setProperty(CommonConstants.Broker.CONFIG_OF_BROKER_ENABLE_QUERY_CANCELLATION, "true");
-  }
-
-  @Override
-  protected void overrideServerConf(PinotConfiguration serverConf) {
-    super.overrideServerConf(serverConf);
-    serverConf.setProperty(CommonConstants.Server.CONFIG_OF_ENABLE_QUERY_CANCELLATION, "true");
   }
 
   @BeforeClass
@@ -1495,18 +1482,18 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
     columnIndexSize = getColumnIndexSize(column);
     assertFalse(columnIndexSize.has(StandardIndexes.DICTIONARY_ID));
     assertTrue(columnIndexSize.has(StandardIndexes.FORWARD_ID));
-    double v2rawIndexSize = columnIndexSize.get(StandardIndexes.FORWARD_ID).asDouble();
-    assertTrue(v2rawIndexSize > forwardIndexSize);
+    double v4rawIndexSize = columnIndexSize.get(StandardIndexes.FORWARD_ID).asDouble();
+    assertTrue(v4rawIndexSize > forwardIndexSize);
 
     // NOTE: Currently Pinot doesn't support directly changing raw index version, so we need to first reset it back to
     //       dictionary encoding.
     // TODO: Support it
     resetForwardIndex(dictionarySize, forwardIndexSize);
 
-    // Convert 'DestCityName' to v4 raw index
+    // Convert 'DestCityName' to v2 raw index
     List<FieldConfig> fieldConfigs = tableConfig.getFieldConfigList();
     assertNotNull(fieldConfigs);
-    ForwardIndexConfig forwardIndexConfig = new ForwardIndexConfig.Builder().withRawIndexWriterVersion(4).build();
+    ForwardIndexConfig forwardIndexConfig = new ForwardIndexConfig.Builder().withRawIndexWriterVersion(2).build();
     ObjectNode indexes = JsonUtils.newObjectNode();
     indexes.set("forward", forwardIndexConfig.toJsonNode());
     FieldConfig fieldConfig =
@@ -1517,13 +1504,11 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
     columnIndexSize = getColumnIndexSize(column);
     assertFalse(columnIndexSize.has(StandardIndexes.DICTIONARY_ID));
     assertTrue(columnIndexSize.has(StandardIndexes.FORWARD_ID));
-    double v4RawIndexSize = columnIndexSize.get(StandardIndexes.FORWARD_ID).asDouble();
-    assertTrue(v4RawIndexSize < v2rawIndexSize && v4RawIndexSize > forwardIndexSize);
+    double v2RawIndexSize = columnIndexSize.get(StandardIndexes.FORWARD_ID).asDouble();
+    assertTrue(v2RawIndexSize > v4rawIndexSize);
 
     // Convert 'DestCityName' to SNAPPY compression
-    forwardIndexConfig =
-        new ForwardIndexConfig.Builder().withCompressionCodec(CompressionCodec.SNAPPY).withRawIndexWriterVersion(4)
-            .build();
+    forwardIndexConfig = new ForwardIndexConfig.Builder().withCompressionCodec(CompressionCodec.SNAPPY).build();
     indexes.set("forward", forwardIndexConfig.toJsonNode());
     fieldConfig =
         new FieldConfig.Builder(column).withEncodingType(FieldConfig.EncodingType.RAW).withIndexes(indexes).build();
@@ -1534,7 +1519,7 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
     assertFalse(columnIndexSize.has(StandardIndexes.DICTIONARY_ID));
     assertTrue(columnIndexSize.has(StandardIndexes.FORWARD_ID));
     double v4SnappyRawIndexSize = columnIndexSize.get(StandardIndexes.FORWARD_ID).asDouble();
-    assertTrue(v4SnappyRawIndexSize > v2rawIndexSize);
+    assertTrue(v4SnappyRawIndexSize > v4rawIndexSize);
 
     // Removing FieldConfig should be no-op because compression is not explicitly set
     fieldConfigs.remove(fieldConfigs.size() - 1);
@@ -1556,7 +1541,7 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
     columnIndexSize = getColumnIndexSize(column);
     assertFalse(columnIndexSize.has(StandardIndexes.DICTIONARY_ID));
     assertTrue(columnIndexSize.has(StandardIndexes.FORWARD_ID));
-    assertEquals(columnIndexSize.get(StandardIndexes.FORWARD_ID).asDouble(), v2rawIndexSize);
+    assertEquals(columnIndexSize.get(StandardIndexes.FORWARD_ID).asDouble(), v4rawIndexSize);
 
     resetForwardIndex(dictionarySize, forwardIndexSize);
   }
@@ -3778,19 +3763,9 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
         + "/tables/mytable/metadata?columns=DivActualElapsedTime&columns=CRSElapsedTime&columns=OriginStateName"));
     validateMetadataResponse(threeSVColumnsResponse, 3, 0);
 
-    JsonNode threeSVColumnsWholeEncodedResponse = JsonUtils.stringToJsonNode(sendGetRequest(
-        getControllerBaseApiUrl() + "/tables/mytable/metadata?columns="
-            + "DivActualElapsedTime%26columns%3DCRSElapsedTime%26columns%3DOriginStateName"));
-    validateMetadataResponse(threeSVColumnsWholeEncodedResponse, 3, 0);
-
     JsonNode threeMVColumnsResponse = JsonUtils.stringToJsonNode(sendGetRequest(getControllerBaseApiUrl()
         + "/tables/mytable/metadata?columns=DivLongestGTimes&columns=DivWheelsOns&columns=DivAirports"));
     validateMetadataResponse(threeMVColumnsResponse, 3, 3);
-
-    JsonNode threeMVColumnsWholeEncodedResponse = JsonUtils.stringToJsonNode(sendGetRequest(
-        getControllerBaseApiUrl() + "/tables/mytable/metadata?columns="
-            + "DivLongestGTimes%26columns%3DDivWheelsOns%26columns%3DDivAirports"));
-    validateMetadataResponse(threeMVColumnsWholeEncodedResponse, 3, 3);
 
     JsonNode zeroColumnResponse =
         JsonUtils.stringToJsonNode(sendGetRequest(getControllerBaseApiUrl() + "/tables/mytable/metadata"));
@@ -3813,11 +3788,6 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
         getControllerBaseApiUrl() + "/tables/mytable/metadata?columns="
             + "CRSElapsedTime&columns=%2A&columns=OriginStateName"));
     validateMetadataResponse(starWithExtraEncodedColumnResponse, 83, 10);
-
-    JsonNode starWithExtraColumnWholeEncodedResponse = JsonUtils.stringToJsonNode(sendGetRequest(
-        getControllerBaseApiUrl() + "/tables/mytable/metadata?columns="
-            + "CRSElapsedTime%26columns%3D%2A%26columns%3DOriginStateName"));
-    validateMetadataResponse(starWithExtraColumnWholeEncodedResponse, 83, 10);
   }
 
   private void validateMetadataResponse(JsonNode response, int numTotalColumn, int numMVColumn) {
@@ -4273,7 +4243,8 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
     }, 600_000L, "Reload job did not complete in 10 minutes");
   }
 
-  private void runQueryAndAssert(String query, String newAddedColumn, FieldSpec fieldSpec) throws Exception {
+  private void runQueryAndAssert(String query, String newAddedColumn, FieldSpec fieldSpec)
+      throws Exception {
     JsonNode response = postQuery(query);
     assertNoError(response);
     JsonNode rows = response.get("resultTable").get("rows");
@@ -4296,104 +4267,5 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
       }
     }
     Assert.assertTrue(columnPresent, "Column " + newAddedColumn + " not present in result set");
-  }
-
-  @Test(dataProvider = "useBothQueryEngines")
-  public void testAdaptiveRegexpLike(boolean useMultiStageQueryEngine)
-      throws Exception {
-    setUseMultiStageQueryEngine(useMultiStageQueryEngine);
-    testRegexpLikeSmallDictionary();
-    testRegexpLikeLargeDictionary();
-    testRegexpLikeWithCaseSensitivity();
-    testRegexpLikeConfigurableThreshold();
-  }
-
-  private void testRegexpLikeSmallDictionary()
-      throws Exception {
-    JsonNode response = postQuery("SELECT COUNT(*) FROM mytable WHERE REGEXP_LIKE(Origin, '^[A-C].*')");
-    int matchCount = response.get("resultTable").get("rows").get(0).get(0).asInt();
-    assertTrue(matchCount > 0, "Should find matches for origins starting with A-C");
-
-    int entriesScanned = response.get("numEntriesScannedInFilter").asInt();
-    assertTrue(entriesScanned < 1000, "Dictionary-based evaluation should scan few entries");
-
-    response = postQuery("SELECT COUNT(*) FROM mytable WHERE REGEXP_LIKE(Origin, '^ZZZ.*')");
-    assertEquals(response.get("resultTable").get("rows").get(0).get(0).asInt(), 0);
-    entriesScanned = response.get("numEntriesScannedInFilter").asInt();
-    assertEquals(entriesScanned, 0, "Non-matching pattern should scan 0 entries");
-  }
-
-  private void testRegexpLikeLargeDictionary()
-      throws Exception {
-    JsonNode response = postQuery("SELECT COUNT(*) FROM mytable WHERE REGEXP_LIKE(TailNum, '^N[0-9]{3}.*')");
-    int matchCount = response.get("resultTable").get("rows").get(0).get(0).asInt();
-    assertTrue(matchCount >= 0, "Should handle tail number pattern matching");
-
-    int entriesScanned = response.get("numEntriesScannedInFilter").asInt();
-    assertTrue(entriesScanned >= matchCount, "Scan-based evaluation should scan at least as many entries as matches");
-
-    response = postQuery("SELECT COUNT(*) FROM mytable WHERE REGEXP_LIKE(TailNum, '^N[1-5][0-9][0-9][A-Z]{2}$')");
-    matchCount = response.get("resultTable").get("rows").get(0).get(0).asInt();
-    assertTrue(matchCount >= 0, "Should handle complex tail number pattern");
-  }
-
-  private void testRegexpLikeWithCaseSensitivity()
-      throws Exception {
-    JsonNode response = postQuery("SELECT COUNT(*) FROM mytable WHERE REGEXP_LIKE(Origin, '.*')");
-    int totalDocs = (int) getCountStarResult();
-    assertEquals(response.get("resultTable").get("rows").get(0).get(0).asInt(), totalDocs);
-    int entriesScanned = response.get("numEntriesScannedInFilter").asInt();
-    assertTrue(entriesScanned <= totalDocs, "Universal match should be optimized");
-
-    response = postQuery("SELECT COUNT(*) FROM mytable WHERE REGEXP_LIKE(Origin, 'NONEXISTENT_PATTERN_XYZ123')");
-    assertEquals(response.get("resultTable").get("rows").get(0).get(0).asInt(), 0);
-    entriesScanned = response.get("numEntriesScannedInFilter").asInt();
-    assertTrue(entriesScanned <= 100, "Non-matching pattern should scan minimal entries");
-
-    response = postQuery("SELECT COUNT(*) FROM mytable WHERE REGEXP_LIKE(Origin, '^lax$')");
-    int caseSensitiveCount = response.get("resultTable").get("rows").get(0).get(0).asInt();
-
-    response = postQuery("SELECT COUNT(*) FROM mytable WHERE REGEXP_LIKE(Origin, '^lax$', 'i')");
-    int caseInsensitiveCount = response.get("resultTable").get("rows").get(0).get(0).asInt();
-
-    assertTrue(caseInsensitiveCount >= caseSensitiveCount, "Case-insensitive should match at least as many");
-  }
-
-  private void testRegexpLikeConfigurableThreshold()
-      throws Exception {
-    String queryLowThreshold = "SELECT COUNT(*) FROM mytable WHERE REGEXP_LIKE(Origin, '^[A-C].*') "
-        + "OPTION(regexpLikeAdaptiveThreshold=0.01)";
-    JsonNode response = postQuery(queryLowThreshold);
-    int matchCount = response.get("resultTable").get("rows").get(0).get(0).asInt();
-    assertTrue(matchCount > 0, "Should find matches with low threshold");
-
-    String queryHighThreshold = "SELECT COUNT(*) FROM mytable WHERE REGEXP_LIKE(Origin, '^[A-C].*') "
-        + "OPTION(regexpLikeAdaptiveThreshold=0.99)";
-    response = postQuery(queryHighThreshold);
-    int matchCountHighThreshold = response.get("resultTable").get("rows").get(0).get(0).asInt();
-    assertEquals(matchCountHighThreshold, matchCount, "Results should be same regardless of threshold");
-
-    try {
-      String queryInvalidThreshold = "SELECT COUNT(*) FROM mytable WHERE REGEXP_LIKE(Origin, '^[A-C].*') "
-          + "OPTION(regexpLikeAdaptiveThreshold=1.5)";
-      response = postQuery(queryInvalidThreshold);
-      assertTrue(response.has("resultTable") || response.has("exceptions"),
-          "Should handle invalid threshold gracefully");
-    } catch (Exception e) {
-      assertTrue(e.getMessage().contains("threshold") || e.getMessage().contains("1.5"),
-          "Error should mention threshold");
-    }
-
-    String queryZeroThreshold = "SELECT COUNT(*) FROM mytable WHERE REGEXP_LIKE(Origin, '^[A-C].*') "
-        + "OPTION(regexpLikeAdaptiveThreshold=0.0)";
-    response = postQuery(queryZeroThreshold);
-    int matchCountZeroThreshold = response.get("resultTable").get("rows").get(0).get(0).asInt();
-    assertEquals(matchCountZeroThreshold, matchCount, "Results should be same with zero threshold");
-
-    String queryMaxThreshold = "SELECT COUNT(*) FROM mytable WHERE REGEXP_LIKE(Origin, '^[A-C].*') "
-        + "OPTION(regexpLikeAdaptiveThreshold=1.0)";
-    response = postQuery(queryMaxThreshold);
-    int matchCountMaxThreshold = response.get("resultTable").get("rows").get(0).get(0).asInt();
-    assertEquals(matchCountMaxThreshold, matchCount, "Results should be same with max threshold");
   }
 }

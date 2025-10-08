@@ -30,7 +30,6 @@ import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.HashSet;
-import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
@@ -87,12 +86,9 @@ public class ExternalViewReader {
       JsonNode jsonObject = OBJECT_READER.readTree(getInputStream(brokerResourceNodeData));
       JsonNode brokerResourceNode = jsonObject.get("mapFields");
 
-      Iterator<Entry<String, JsonNode>> resourceEntries = brokerResourceNode.fields();
-      while (resourceEntries.hasNext()) {
-        JsonNode resource = resourceEntries.next().getValue();
-        Iterator<Entry<String, JsonNode>> brokerEntries = resource.fields();
-        while (brokerEntries.hasNext()) {
-          Entry<String, JsonNode> brokerEntry = brokerEntries.next();
+      for (Entry<String, JsonNode> stringJsonNodeEntry : brokerResourceNode.properties()) {
+        JsonNode resource = stringJsonNodeEntry.getValue();
+        for (Entry<String, JsonNode> brokerEntry : resource.properties()) {
           String brokerName = brokerEntry.getKey();
           if (brokerName.startsWith("Broker_") && "ONLINE".equals(brokerEntry.getValue().asText())) {
             brokerUrls.add(getHostPort(brokerName));
@@ -160,16 +156,12 @@ public class ExternalViewReader {
       JsonNode jsonObject = OBJECT_READER.readTree(getInputStream(brokerResourceNodeData));
       JsonNode brokerResourceNode = jsonObject.get("mapFields");
 
-      Iterator<Entry<String, JsonNode>> resourceEntries = brokerResourceNode.fields();
-      while (resourceEntries.hasNext()) {
-        Entry<String, JsonNode> resourceEntry = resourceEntries.next();
+      for (Entry<String, JsonNode> resourceEntry : brokerResourceNode.properties()) {
         String resourceName = resourceEntry.getKey();
         String tableName = resourceName.replace(OFFLINE_SUFFIX, "").replace(REALTIME_SUFFIX, "");
         Set<String> brokerUrls = brokerUrlsMap.computeIfAbsent(tableName, k -> new HashSet<>());
         JsonNode resource = resourceEntry.getValue();
-        Iterator<Entry<String, JsonNode>> brokerEntries = resource.fields();
-        while (brokerEntries.hasNext()) {
-          Entry<String, JsonNode> brokerEntry = brokerEntries.next();
+        for (Entry<String, JsonNode> brokerEntry : resource.properties()) {
           String brokerName = brokerEntry.getKey();
           if (brokerName.startsWith("Broker_") && "ONLINE".equals(brokerEntry.getValue().asText())) {
             brokerUrls.add(getHostPort(brokerName));

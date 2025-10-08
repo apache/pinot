@@ -54,6 +54,17 @@ public interface StreamMetadataProvider extends Closeable {
   }
 
   /**
+   * Fetches the latest offset for a set of given partition Ids.
+   * @param partitionIds partition Ids of the stream
+   * @param timeoutMillis fetch timeout
+   * @return latest {@link StreamPartitionMsgOffset} for each partition Id.
+   */
+  default Map<Integer, StreamPartitionMsgOffset> fetchLatestStreamOffset(Set<Integer> partitionIds,
+      long timeoutMillis) {
+    throw new UnsupportedOperationException();
+  }
+
+  /**
    * Fetches the offset for a given partition and offset criteria
    * @param offsetCriteria offset criteria to fetch{@link StreamPartitionMsgOffset}.
    *                       Depends on the semantics of the stream e.g. smallest, largest for Kafka
@@ -151,6 +162,12 @@ public interface StreamMetadataProvider extends Closeable {
   default List<TopicMetadata> getTopics() {
     throw new UnsupportedOperationException();
   }
+
+  /**
+   * @return true if the stream supports computing ingestion lag by subtracting the last consumed offset from the
+   * latest offset.
+   */
+  boolean supportsOffsetLag();
 
   /**
    * Represents the metadata of a topic. This can be used to represent the topic name and other metadata in the future.

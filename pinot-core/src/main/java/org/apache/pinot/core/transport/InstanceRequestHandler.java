@@ -35,7 +35,6 @@ import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.CancellationException;
 import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
 import javax.annotation.Nullable;
 import org.apache.pinot.common.datatable.DataTable;
@@ -49,13 +48,14 @@ import org.apache.pinot.core.common.datatable.DataTableBuilderFactory;
 import org.apache.pinot.core.query.request.ServerQueryRequest;
 import org.apache.pinot.core.query.scheduler.QueryScheduler;
 import org.apache.pinot.server.access.AccessControl;
+import org.apache.pinot.spi.accounting.ThreadAccountant;
 import org.apache.pinot.spi.env.PinotConfiguration;
 import org.apache.pinot.spi.exception.QueryErrorCode;
+import org.apache.pinot.spi.query.QueryExecutionContext;
 import org.apache.pinot.spi.query.QueryThreadContext;
 import org.apache.pinot.spi.utils.BytesUtils;
-import org.apache.pinot.spi.utils.CommonConstants;
+import org.apache.pinot.spi.utils.CommonConstants.Server;
 import org.apache.thrift.TDeserializer;
-import org.apache.thrift.TException;
 import org.apache.thrift.protocol.TCompactProtocol;
 import org.apache.thrift.transport.TTransportException;
 import org.slf4j.Logger;
@@ -74,32 +74,34 @@ public class InstanceRequestHandler extends SimpleChannelInboundHandler<ByteBuf>
   private static final int SLOW_QUERY_LATENCY_THRESHOLD_MS = 100;
   private static final int LARGE_RESPONSE_SIZE_THRESHOLD_BYTES = 100 * 1024 * 1024; // 100 MB
 
+  // TDeserializer currently is not thread safe, must be put into a ThreadLocal.
+  private static final ThreadLocal<TDeserializer> THREAD_LOCAL_T_DESERIALIZER = ThreadLocal.withInitial(() -> {
+    try {
+      return new TDeserializer(new TCompactProtocol.Factory());
+    } catch (TTransportException e) {
+      throw new RuntimeException("Failed to initialize Thrift Deserializer", e);
+    }
+  });
+
   private final String _instanceName;
-  private final ThreadLocal<TDeserializer> _deserializer;
   private final QueryScheduler _queryScheduler;
-  private final ServerMetrics _serverMetrics;
   private final AccessControl _accessControl;
-  private final Map<String, Future<byte[]>> _queryFuturesById;
+  private final ThreadAccountant _threadAccountant;
+  private final ConcurrentHashMap<String, QueryExecutionContext> _executionContexts;
+  private final ServerMetrics _serverMetrics = ServerMetrics.get();
 
   public InstanceRequestHandler(String instanceName, PinotConfiguration config, QueryScheduler queryScheduler,
-      ServerMetrics serverMetrics, AccessControl accessControl) {
+      AccessControl accessControl, ThreadAccountant threadAccountant) {
     _instanceName = instanceName;
     _queryScheduler = queryScheduler;
-    _serverMetrics = serverMetrics;
     _accessControl = accessControl;
-    _deserializer = ThreadLocal.withInitial(() -> {
-      try {
-        return new TDeserializer(new TCompactProtocol.Factory());
-      } catch (TTransportException e) {
-        throw new RuntimeException("Failed to initialize Thrift Deserializer", e);
-      }
-    });
+    _threadAccountant = threadAccountant;
 
-    if (Boolean.parseBoolean(config.getProperty(CommonConstants.Server.CONFIG_OF_ENABLE_QUERY_CANCELLATION))) {
-      _queryFuturesById = new ConcurrentHashMap<>();
+    if (config.getProperty(Server.CONFIG_OF_ENABLE_QUERY_CANCELLATION, Server.DEFAULT_ENABLE_QUERY_CANCELLATION)) {
+      _executionContexts = new ConcurrentHashMap<>();
       LOGGER.info("Enable query cancellation");
     } else {
-      _queryFuturesById = null;
+      _executionContexts = null;
     }
   }
 
@@ -115,49 +117,33 @@ public class InstanceRequestHandler extends SimpleChannelInboundHandler<ByteBuf>
     }
   }
 
-  /**
-   * Always return a response even when query execution throws exception; otherwise, broker
-   * will keep waiting until timeout.
-   */
   @Override
   protected void channelRead0(ChannelHandlerContext ctx, ByteBuf msg) {
-    long queryArrivalTimeMs = 0;
-    InstanceRequest instanceRequest = null;
-    byte[] requestBytes = null;
-    String tableNameWithType = null;
-
-    try (QueryThreadContext.CloseableContext closeme = QueryThreadContext.open(_instanceName)) {
-      // Put all code inside try block to catch all exceptions.
-      int requestSize = msg.readableBytes();
-      QueryThreadContext.setQueryEngine("sse");
-
-      instanceRequest = new InstanceRequest();
-      ServerQueryRequest queryRequest;
-      requestBytes = new byte[requestSize];
-
-      queryArrivalTimeMs = System.currentTimeMillis();
-      _serverMetrics.addMeteredGlobalValue(ServerMeter.QUERIES, 1);
-      _serverMetrics.addMeteredGlobalValue(ServerMeter.NETTY_CONNECTION_BYTES_RECEIVED, requestSize);
-
-      // Parse instance request into ServerQueryRequest.
-      msg.readBytes(requestBytes);
-      _deserializer.get().deserialize(instanceRequest, requestBytes);
+    long queryArrivalTimeMs = System.currentTimeMillis();
+    int requestSize = msg.readableBytes();
+    _serverMetrics.addMeteredGlobalValue(ServerMeter.QUERIES, 1);
+    _serverMetrics.addMeteredGlobalValue(ServerMeter.NETTY_CONNECTION_BYTES_RECEIVED, requestSize);
+    byte[] requestBytes = new byte[requestSize];
+    msg.readBytes(requestBytes);
+    ServerQueryRequest queryRequest;
+    try {
+      InstanceRequest instanceRequest = new InstanceRequest();
+      THREAD_LOCAL_T_DESERIALIZER.get().deserialize(instanceRequest, requestBytes);
       queryRequest = new ServerQueryRequest(instanceRequest, _serverMetrics, queryArrivalTimeMs);
-      queryRequest.registerOnQueryThreadLocal();
       queryRequest.getTimerContext().startNewPhaseTimer(ServerQueryPhase.REQUEST_DESERIALIZATION, queryArrivalTimeMs)
           .stopAndRecord();
-      tableNameWithType = queryRequest.getTableNameWithType();
-      submitQuery(queryRequest, ctx, tableNameWithType, queryArrivalTimeMs, instanceRequest);
     } catch (Exception e) {
-      if (e instanceof TException) {
-        // Deserialization exception
-        _serverMetrics.addMeteredGlobalValue(ServerMeter.REQUEST_DESERIALIZATION_EXCEPTIONS, 1);
-      }
-
-      // Send error response
-      String hexString = requestBytes != null ? BytesUtils.toHexString(requestBytes) : "";
-      long requestId = instanceRequest != null ? instanceRequest.getRequestId() : 0;
-      LOGGER.error("Exception while processing instance request: {}", hexString, e);
+      // Do not send error response because request id is unknown.
+      LOGGER.error("Failed to deserialize instance request: {}", BytesUtils.toHexString(requestBytes), e);
+      _serverMetrics.addMeteredGlobalValue(ServerMeter.REQUEST_DESERIALIZATION_EXCEPTIONS, 1);
+      return;
+    }
+    try {
+      submitQuery(queryRequest, ctx, queryArrivalTimeMs);
+    } catch (Exception e) {
+      long requestId = queryRequest.getRequestId();
+      String tableNameWithType = queryRequest.getTableNameWithType();
+      LOGGER.error("Caught exception while submitting query request: {}", requestId, e);
       sendErrorResponse(ctx, requestId, tableNameWithType, queryArrivalTimeMs,
           DataTableBuilderFactory.getEmptyDataTable(), e);
     }
@@ -168,53 +154,55 @@ public class InstanceRequestHandler extends SimpleChannelInboundHandler<ByteBuf>
    * If query cancellation is enabled, the query future is tracked as well.
    */
   @VisibleForTesting
-  void submitQuery(ServerQueryRequest queryRequest, ChannelHandlerContext ctx, String tableNameWithType,
-      long queryArrivalTimeMs, InstanceRequest instanceRequest) {
-    ListenableFuture<byte[]> future = _queryScheduler.submit(queryRequest);
-    if (_queryFuturesById != null) {
-      String queryId = queryRequest.getQueryId();
-      // Track the running query for cancellation.
-      if (LOGGER.isDebugEnabled()) {
-        LOGGER.debug("Keep track of running query: {}", queryId);
+  void submitQuery(ServerQueryRequest queryRequest, ChannelHandlerContext ctx, long queryArrivalTimeMs) {
+    QueryExecutionContext executionContext = queryRequest.toExecutionContext(_instanceName);
+    try (QueryThreadContext ignore = QueryThreadContext.open(executionContext, _threadAccountant)) {
+      ListenableFuture<byte[]> future = _queryScheduler.submit(queryRequest);
+      if (_executionContexts != null) {
+        String queryId = queryRequest.getQueryId();
+        // Track the running query for cancellation.
+        if (LOGGER.isDebugEnabled()) {
+          LOGGER.debug("Keep track of running query: {}", queryId);
+        }
+        _executionContexts.put(queryId, executionContext);
       }
-      _queryFuturesById.put(queryId, future);
+      Futures.addCallback(future, createCallback(queryRequest, ctx, queryArrivalTimeMs),
+          MoreExecutors.directExecutor());
     }
-    Futures.addCallback(future,
-        createCallback(ctx, tableNameWithType, queryArrivalTimeMs, instanceRequest, queryRequest),
-        MoreExecutors.directExecutor());
   }
 
-  private FutureCallback<byte[]> createCallback(ChannelHandlerContext ctx, String tableNameWithType,
-      long queryArrivalTimeMs, InstanceRequest instanceRequest, ServerQueryRequest queryRequest) {
+  private FutureCallback<byte[]> createCallback(ServerQueryRequest queryRequest, ChannelHandlerContext ctx,
+      long queryArrivalTimeMs) {
     return new FutureCallback<>() {
       @Override
       public void onSuccess(@Nullable byte[] responseBytes) {
-        if (_queryFuturesById != null) {
+        if (_executionContexts != null) {
           String queryId = queryRequest.getQueryId();
           if (LOGGER.isDebugEnabled()) {
             LOGGER.debug("Remove track of running query: {} on success", queryId);
           }
-          _queryFuturesById.remove(queryId);
+          _executionContexts.remove(queryId);
         }
+        long requestId = queryRequest.getRequestId();
+        String tableNameWithType = queryRequest.getTableNameWithType();
         if (responseBytes != null) {
           // responseBytes contains either query results or exception.
-          sendResponse(ctx, queryRequest.getRequestId(), queryRequest.getTableNameWithType(), queryArrivalTimeMs,
-              responseBytes);
+          sendResponse(ctx, requestId, tableNameWithType, queryArrivalTimeMs, responseBytes);
         } else {
           // Send exception response.
-          sendErrorResponse(ctx, queryRequest.getRequestId(), tableNameWithType, queryArrivalTimeMs,
+          sendErrorResponse(ctx, requestId, tableNameWithType, queryArrivalTimeMs,
               DataTableBuilderFactory.getEmptyDataTable(), new Exception("Null query response."));
         }
       }
 
       @Override
       public void onFailure(Throwable t) {
-        if (_queryFuturesById != null) {
+        if (_executionContexts != null) {
           String queryId = queryRequest.getQueryId();
           if (LOGGER.isDebugEnabled()) {
             LOGGER.debug("Remove track of running query: {} on failure", queryId);
           }
-          _queryFuturesById.remove(queryId);
+          _executionContexts.remove(queryId);
         }
         // Send exception response.
         Exception e;
@@ -229,7 +217,7 @@ public class InstanceRequestHandler extends SimpleChannelInboundHandler<ByteBuf>
           LOGGER.error("Error while processing instance request", t);
           e = new Exception(t);
         }
-        sendErrorResponse(ctx, instanceRequest.getRequestId(), tableNameWithType, queryArrivalTimeMs,
+        sendErrorResponse(ctx, queryRequest.getRequestId(), queryRequest.getTableNameWithType(), queryArrivalTimeMs,
             DataTableBuilderFactory.getEmptyDataTable(), e);
       }
     };
@@ -253,18 +241,18 @@ public class InstanceRequestHandler extends SimpleChannelInboundHandler<ByteBuf>
    * @return true if a running query exists for the given queryId.
    */
   public boolean cancelQuery(String queryId) {
-    Preconditions.checkState(_queryFuturesById != null, "Query cancellation is not enabled on server");
-    // Keep the future as it'll be cleaned up by the thread executing the query.
-    Future<byte[]> future = _queryFuturesById.get(queryId);
-    if (future == null) {
+    Preconditions.checkState(_executionContexts != null, "Query cancellation is not enabled on server");
+    QueryExecutionContext executionContext = _executionContexts.get(queryId);
+    if (executionContext == null) {
       return false;
     }
-    boolean done = future.isDone();
-    if (!done) {
-      future.cancel(true);
-    }
+    boolean cancelled = executionContext.terminate(QueryErrorCode.QUERY_CANCELLATION, "Cancelled by user");
     if (LOGGER.isDebugEnabled()) {
-      LOGGER.debug("Cancelled query: {} that's done: {}", queryId, done);
+      if (cancelled) {
+        LOGGER.debug("Cancelled query: {}", queryId);
+      } else {
+        LOGGER.debug("Query: {} was already terminated", queryId);
+      }
     }
     return true;
   }
@@ -273,8 +261,8 @@ public class InstanceRequestHandler extends SimpleChannelInboundHandler<ByteBuf>
    * @return list of ids of the queries currently running on the server.
    */
   public Set<String> getRunningQueryIds() {
-    Preconditions.checkState(_queryFuturesById != null, "Query cancellation is not enabled on server");
-    return new HashSet<>(_queryFuturesById.keySet());
+    Preconditions.checkState(_executionContexts != null, "Query cancellation is not enabled on server");
+    return new HashSet<>(_executionContexts.keySet());
   }
 
   /**

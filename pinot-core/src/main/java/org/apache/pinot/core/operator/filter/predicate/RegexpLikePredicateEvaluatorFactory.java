@@ -23,13 +23,15 @@ import it.unimi.dsi.fastutil.ints.IntArrayList;
 import it.unimi.dsi.fastutil.ints.IntList;
 import it.unimi.dsi.fastutil.ints.IntOpenHashSet;
 import it.unimi.dsi.fastutil.ints.IntSet;
+import java.util.BitSet;
+import javax.annotation.Nullable;
 import org.apache.pinot.common.request.context.predicate.RegexpLikePredicate;
 import org.apache.pinot.common.utils.config.QueryOptionsUtils;
 import org.apache.pinot.common.utils.regex.Matcher;
 import org.apache.pinot.core.query.request.context.QueryContext;
 import org.apache.pinot.segment.spi.index.reader.Dictionary;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
-import org.apache.pinot.spi.utils.CommonConstants.Broker;
+import org.apache.pinot.spi.utils.CommonConstants.Broker.Request.QueryOptionValue;
 
 
 /**
@@ -39,49 +41,31 @@ public class RegexpLikePredicateEvaluatorFactory {
   private RegexpLikePredicateEvaluatorFactory() {
   }
 
-  /// Default threshold when the cardinality of the dictionary is less than this threshold,
-  // scan the dictionary to get the matching ids.
-  public static final int DEFAULT_DICTIONARY_CARDINALITY_THRESHOLD_FOR_SCAN = 10000;
-
   /**
-   * Create a new instance of dictionary based REGEXP_LIKE predicate evaluator with configurable threshold.
+   * Create a new instance of dictionary based REGEXP_LIKE predicate evaluator.
    *
    * @param regexpLikePredicate REGEXP_LIKE predicate to evaluate
    * @param dictionary          Dictionary for the column
    * @param dataType            Data type for the column
-   * @param queryContext        Query context containing query options (can be null)
-   * @param numDocs
+   * @param queryContext
    * @return Dictionary based REGEXP_LIKE predicate evaluator
    */
   public static BaseDictionaryBasedPredicateEvaluator newDictionaryBasedEvaluator(
-      RegexpLikePredicate regexpLikePredicate, Dictionary dictionary, DataType dataType, QueryContext queryContext,
-      int numDocs) {
+      RegexpLikePredicate regexpLikePredicate, Dictionary dictionary, DataType dataType,
+      @Nullable QueryContext queryContext) {
     Preconditions.checkArgument(dataType.getStoredType() == DataType.STRING, "Unsupported data type: " + dataType);
-
-    // Get threshold from query options or use default
-    double threshold = Broker.DEFAULT_REGEXP_LIKE_ADAPTIVE_THRESHOLD;
-    if (queryContext != null && queryContext.getQueryOptions() != null) {
-      threshold = QueryOptionsUtils.getRegexpLikeAdaptiveThreshold(queryContext.getQueryOptions(),
-          Broker.DEFAULT_REGEXP_LIKE_ADAPTIVE_THRESHOLD);
+    Integer regexDictSizeThreshold = null;
+    if (queryContext != null) {
+      regexDictSizeThreshold = QueryOptionsUtils.getRegexDictSizeThreshold(queryContext.getQueryOptions());
     }
-    if (checkForDictionaryBasedScan(dictionary, numDocs, threshold)) {
+    if (regexDictSizeThreshold == null) {
+      regexDictSizeThreshold = QueryOptionValue.DEFAULT_REGEX_DICT_SIZE_THRESHOLD;
+    }
+    if (dictionary.length() < regexDictSizeThreshold) {
       return new DictIdBasedRegexpLikePredicateEvaluator(regexpLikePredicate, dictionary);
     } else {
       return new ScanBasedRegexpLikePredicateEvaluator(regexpLikePredicate, dictionary);
     }
-  }
-
-  private static boolean checkForDictionaryBasedScan(Dictionary dictionary, int numDocs, double threshold) {
-    return dictionary.length() < DEFAULT_DICTIONARY_CARDINALITY_THRESHOLD_FOR_SCAN
-        || (double) dictionary.length() / numDocs < threshold;
-  }
-
-  /**
-   * This method maintains backward compatibility.
-   */
-  public static BaseDictionaryBasedPredicateEvaluator newDictionaryBasedEvaluator(
-      RegexpLikePredicate regexpLikePredicate, Dictionary dictionary, DataType dataType) {
-    return newDictionaryBasedEvaluator(regexpLikePredicate, dictionary, dataType, null, 0);
   }
 
   /**
@@ -150,14 +134,31 @@ public class RegexpLikePredicateEvaluatorFactory {
     // within the scope of a single thread.
     final Matcher _matcher;
 
+    // _evaluatedIds: tracks which dictionary IDs have been evaluated
+    // _matchingIds: tracks which dictionary IDs match the regex pattern
+    final BitSet _evaluatedIds;
+    final BitSet _matchingIds;
+
     public ScanBasedRegexpLikePredicateEvaluator(RegexpLikePredicate regexpLikePredicate, Dictionary dictionary) {
       super(regexpLikePredicate, dictionary);
       _matcher = regexpLikePredicate.getPattern().matcher("");
+      int dictionarySize = dictionary.length();
+      _evaluatedIds = new BitSet(dictionarySize);
+      _matchingIds = new BitSet(dictionarySize);
     }
 
     @Override
     public boolean applySV(int dictId) {
-      return _matcher.reset(_dictionary.getStringValue(dictId)).find();
+      // Check if already evaluated
+      if (_evaluatedIds.get(dictId)) {
+        return _matchingIds.get(dictId);
+      }
+      boolean match = _matcher.reset(_dictionary.getStringValue(dictId)).find();
+      _evaluatedIds.set(dictId);
+      if (match) {
+        _matchingIds.set(dictId);
+      }
+      return match;
     }
 
     @Override
