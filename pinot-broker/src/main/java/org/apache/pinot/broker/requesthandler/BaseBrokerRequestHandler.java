@@ -90,6 +90,8 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
   protected final QueryLogger _queryLogger;
   @Nullable
   protected final String _enableNullHandling;
+  @Nullable
+  protected final String _regexDictSizeThreshold;
   protected final boolean _enableQueryCancellation;
 
   /**
@@ -121,6 +123,7 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
         Broker.DEFAULT_BROKER_ENABLE_ROW_COLUMN_LEVEL_AUTH);
     _queryLogger = new QueryLogger(config);
     _enableNullHandling = config.getProperty(Broker.CONFIG_OF_BROKER_QUERY_ENABLE_NULL_HANDLING);
+    _regexDictSizeThreshold = config.getProperty(Broker.CONFIG_OF_BROKER_QUERY_REGEX_DICT_SIZE_THRESHOLD);
     _enableQueryCancellation = config.getProperty(Broker.CONFIG_OF_BROKER_ENABLE_QUERY_CANCELLATION,
         Broker.DEFAULT_BROKER_ENABLE_QUERY_CANCELLATION);
     if (_enableQueryCancellation) {
@@ -201,6 +204,10 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
     // Add null handling option from broker config only if there is no override in the query
     if (_enableNullHandling != null) {
       sqlNodeAndOptions.getOptions().putIfAbsent(QueryOptionKey.ENABLE_NULL_HANDLING, _enableNullHandling);
+    }
+
+    if (_regexDictSizeThreshold != null) {
+      sqlNodeAndOptions.getOptions().putIfAbsent(QueryOptionKey.REGEX_DICT_SIZE_THRESHOLD, _regexDictSizeThreshold);
     }
 
     BrokerResponse brokerResponse =

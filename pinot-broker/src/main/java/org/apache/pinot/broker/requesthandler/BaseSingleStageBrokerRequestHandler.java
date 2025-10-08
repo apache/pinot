@@ -1213,6 +1213,10 @@ public abstract class BaseSingleStageBrokerRequestHandler extends BaseBrokerRequ
             .putIfAbsent(Broker.Request.QueryOptionKey.ENABLE_NULL_HANDLING, _enableNullHandling);
       }
 
+      if (_regexDictSizeThreshold != null) {
+        sqlNodeAndOptions.getOptions().putIfAbsent(QueryOptionKey.REGEX_DICT_SIZE_THRESHOLD, _regexDictSizeThreshold);
+      }
+
       BrokerResponse response =
           doHandleRequest(requestId, subquery, sqlNodeAndOptions, jsonRequest, requesterIdentity, requestContext,
               httpHeaders, accessControl);

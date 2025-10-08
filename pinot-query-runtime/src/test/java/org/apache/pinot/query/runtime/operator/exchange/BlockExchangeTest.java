@@ -21,7 +21,6 @@ package org.apache.pinot.query.runtime.operator.exchange;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.Iterators;
 import java.io.IOException;
-import java.util.Collections;
 import java.util.List;
 import java.util.concurrent.TimeoutException;
 import org.apache.pinot.common.utils.DataSchema;
@@ -71,16 +70,16 @@ public class BlockExchangeTest {
     BlockExchange exchange = new TestBlockExchange(destinations);
 
     // When:
-    exchange.send(SuccessMseBlock.INSTANCE, Collections.emptyList());
+    exchange.send(SuccessMseBlock.INSTANCE, List.of());
 
     // Then:
     ArgumentCaptor<MseBlock.Eos> captor = ArgumentCaptor.forClass(MseBlock.Eos.class);
 
-    Mockito.verify(_mailbox1).complete();
+    Mockito.verify(_mailbox1).send(SuccessMseBlock.INSTANCE, List.of());
     Mockito.verify(_mailbox1, Mockito.times(1)).send(captor.capture(), anyList());
     Assert.assertTrue(captor.getValue().isEos());
 
-    Mockito.verify(_mailbox2).complete();
+    Mockito.verify(_mailbox2).send(SuccessMseBlock.INSTANCE, List.of());
     Mockito.verify(_mailbox2, Mockito.times(1)).send(captor.capture(), anyList());
     Assert.assertTrue(captor.getValue().isEos());
   }

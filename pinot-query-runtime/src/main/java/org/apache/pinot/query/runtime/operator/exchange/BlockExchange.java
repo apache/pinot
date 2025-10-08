@@ -127,7 +127,6 @@ public abstract class BlockExchange implements AutoCloseable {
    */
   public boolean send(MseBlock.Eos eosBlock, List<DataBuffer> serializedStats)
       throws IOException, TimeoutException {
-    int numMailboxes = _sendingMailboxes.size();
     int mailboxIdToSendMetadata;
     if (!serializedStats.isEmpty()) {
       mailboxIdToSendMetadata = _statsIndexChooser.apply(_sendingMailboxes);
@@ -139,14 +138,36 @@ public abstract class BlockExchange implements AutoCloseable {
       // this may happen when the block exchange is itself used as a sending mailbox, like when using spools
       mailboxIdToSendMetadata = -1;
     }
+    Exception firstException = null;
+    int numMailboxes = _sendingMailboxes.size();
     for (int i = 0; i < numMailboxes; i++) {
-      SendingMailbox sendingMailbox = _sendingMailboxes.get(i);
-      List<DataBuffer> statsToSend = i == mailboxIdToSendMetadata ? serializedStats : Collections.emptyList();
+      try {
+        SendingMailbox sendingMailbox = _sendingMailboxes.get(i);
+        List<DataBuffer> statsToSend = i == mailboxIdToSendMetadata ? serializedStats : Collections.emptyList();
 
-      sendingMailbox.send(eosBlock, statsToSend);
-      sendingMailbox.complete();
-      if (LOGGER.isTraceEnabled()) {
-        LOGGER.trace("Block sent: {} {} to {}", eosBlock, System.identityHashCode(eosBlock), sendingMailbox);
+        sendingMailbox.send(eosBlock, statsToSend);
+        if (LOGGER.isTraceEnabled()) {
+          LOGGER.trace("Block sent: {} {} to {}", eosBlock, System.identityHashCode(eosBlock), sendingMailbox);
+        }
+      } catch (IOException | TimeoutException | RuntimeException e) {
+        // We want to try to send EOS to all mailboxes, so we catch the exception and rethrow it at the end.
+        if (firstException == null) {
+          firstException = e;
+        } else {
+          firstException.addSuppressed(e);
+        }
+      }
+    }
+    if (firstException != null) {
+      // This is ugly, but necessary to be sure we throw the right exception, which is later caught by the
+      // QueryRunner and handled properly.
+      if (firstException instanceof IOException) {
+        throw (IOException) firstException;
+      } else if (firstException instanceof TimeoutException) {
+        throw (TimeoutException) firstException;
+      } else {
+        Preconditions.checkState(firstException instanceof RuntimeException);
+        throw (RuntimeException) firstException;
       }
     }
     return false;
@@ -236,30 +257,19 @@ public abstract class BlockExchange implements AutoCloseable {
     @Override
     public void send(MseBlock.Data data)
         throws IOException, TimeoutException {
-      sendPrivate(data, Collections.emptyList());
+      if (LOGGER.isTraceEnabled()) {
+        LOGGER.trace("Exchange mailbox {} echoing data block {} {}", this, data, System.identityHashCode(data));
+      }
+      _earlyTerminated = BlockExchange.this.send(data);
     }
 
     @Override
     public void send(MseBlock.Eos block, List<DataBuffer> serializedStats)
         throws IOException, TimeoutException {
-      sendPrivate(block, serializedStats);
-    }
-
-    private void sendPrivate(MseBlock block, List<DataBuffer> serializedStats)
-        throws IOException, TimeoutException {
       if (LOGGER.isTraceEnabled()) {
-        LOGGER.trace("Exchange mailbox {} echoing {} {}", this, block, System.identityHashCode(block));
+        LOGGER.trace("Exchange mailbox {} echoing EOS block {} {}", this, block, System.identityHashCode(block));
       }
-      if (block.isData()) {
-        Preconditions.checkArgument(serializedStats.isEmpty(), "Data block cannot have stats");
-        _earlyTerminated = BlockExchange.this.send(((MseBlock.Data) block));
-      } else {
-        _earlyTerminated = BlockExchange.this.send(((MseBlock.Eos) block), serializedStats);
-      }
-    }
-
-    @Override
-    public void complete() {
+      _earlyTerminated = BlockExchange.this.send(block, serializedStats);
       _completed = true;
     }
 
