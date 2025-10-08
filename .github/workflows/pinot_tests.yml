@@ -185,6 +185,9 @@ jobs:
             --add-opens=java.base/java.lang=ALL-UNNAMED
             --add-opens=java.base/java.util=ALL-UNNAMED
             --add-opens=java.base/java.lang.reflect=ALL-UNNAMED
+            --add-opens=java.base/jdk.internal.misc=ALL-UNNAMED
+            -Dio.netty.tryReflectionSetAccessible=true
+            -Dio.grpc.netty.shaded.io.netty.tryReflectionSetAccessible=true
         run: .github/workflows/scripts/pr-tests/.pinot_tests_build.sh
       - name: Unit Test
         env:
@@ -206,6 +209,9 @@ jobs:
             --add-opens=java.base/java.lang=ALL-UNNAMED
             --add-opens=java.base/java.util=ALL-UNNAMED
             --add-opens=java.base/java.lang.reflect=ALL-UNNAMED
+            --add-opens=java.base/jdk.internal.misc=ALL-UNNAMED
+            -Dio.netty.tryReflectionSetAccessible=true
+            -Dio.grpc.netty.shaded.io.netty.tryReflectionSetAccessible=true
         run: .github/workflows/scripts/pr-tests/.pinot_tests_unit.sh
       - name: Upload coverage to Codecov
         uses: codecov/codecov-action@v5

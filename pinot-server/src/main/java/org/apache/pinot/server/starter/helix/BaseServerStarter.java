@@ -89,6 +89,7 @@ import org.apache.pinot.core.util.trace.ContinuousJfrStarter;
 import org.apache.pinot.segment.local.realtime.impl.invertedindex.RealtimeLuceneIndexRefreshManager;
 import org.apache.pinot.segment.local.realtime.impl.invertedindex.RealtimeLuceneTextIndexSearcherPool;
 import org.apache.pinot.segment.local.segment.store.TextIndexUtils;
+import org.apache.pinot.segment.local.utils.ClusterConfigForTable;
 import org.apache.pinot.segment.local.utils.SegmentAllIndexPreprocessThrottler;
 import org.apache.pinot.segment.local.utils.SegmentDownloadThrottler;
 import org.apache.pinot.segment.local.utils.SegmentMultiColTextIndexPreprocessThrottler;
@@ -265,6 +266,10 @@ public abstract class BaseServerStarter implements ServiceStartable {
     _clusterConfigChangeHandler.registerClusterConfigChangeListener(
         new TextIndexUtils.LuceneMaxClauseCountConfigChangeListener());
     LOGGER.info("Registered Lucene max clause count configuration change listener");
+    // Register cluster-level override for table configs
+    _clusterConfigChangeHandler.registerClusterConfigChangeListener(
+        new ClusterConfigForTable.ConfigChangeListener());
+    LOGGER.info("Registered ClusterConfigForTable change listener");
 
     LOGGER.info("Initializing Helix manager with zkAddress: {}, clusterName: {}, instanceId: {}", _zkAddress,
         _helixClusterName, _instanceId);

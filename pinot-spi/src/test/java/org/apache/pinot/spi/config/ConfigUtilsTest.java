@@ -79,7 +79,7 @@ public class ConfigUtilsTest {
     String streamType = "fakeStream";
     String topic = "fakeTopic";
     String tableName = "fakeTable_REALTIME";
-    String defaultConsumerFactoryClass = "org.apache.pinot.plugin.stream.kafka20.StreamConsumerFactory";
+    String defaultConsumerFactoryClass = "org.apache.pinot.plugin.stream.kafka30.StreamConsumerFactory";
     String defaultDecoderClass = "org.apache.pinot.plugin.inputformat.avro.KafkaAvroMessageDecoder";
 
     String consumerFactoryClass = "${CONSUMER_FACTORY_CLASS:" + defaultConsumerFactoryClass + "}";

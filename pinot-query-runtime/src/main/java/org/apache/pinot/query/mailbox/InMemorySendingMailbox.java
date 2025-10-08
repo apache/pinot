@@ -75,6 +75,7 @@ public class InMemorySendingMailbox implements SendingMailbox {
   public void send(MseBlock.Eos block, List<DataBuffer> serializedStats)
       throws IOException, TimeoutException {
     sendPrivate(block, serializedStats);
+    _isTerminated = true;
   }
 
   private void sendPrivate(MseBlock block, List<DataBuffer> serializedStats) {
@@ -118,11 +119,6 @@ public class InMemorySendingMailbox implements SendingMailbox {
       default:
         throw new IllegalStateException("Unsupported mailbox status: " + status);
     }
-  }
-
-  @Override
-  public void complete() {
-    _isTerminated = true;
   }
 
   @Override
