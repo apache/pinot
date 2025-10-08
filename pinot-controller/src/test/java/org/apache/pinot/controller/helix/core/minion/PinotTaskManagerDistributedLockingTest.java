@@ -872,4 +872,247 @@ public class PinotTaskManagerDistributedLockingTest extends ControllerTest {
       pinotTaskConfigs.add(new PinotTaskConfig(_taskType, configs));
     }
   }
+
+  /**
+   * Test scenario: Tests the forceReleaseLock API functionality.
+   * Verifies that when forceReleaseLock is called during task execution,
+   * the lock is released and another createTask can be started for the same table.
+   */
+  @Test
+  public void testForceReleaseLockDuringTaskExecution() throws Exception {
+    // Setup controller with distributed locking enabled
+    Map<String, Object> properties = getDefaultControllerConfiguration();
+    properties.put(ControllerConf.ControllerPeriodicTasksConf.PINOT_TASK_MANAGER_SCHEDULER_ENABLED, true);
+    properties.put(ControllerConf.ControllerPeriodicTasksConf.ENABLE_DISTRIBUTED_LOCKING, true);
+
+    startController(properties);
+    PinotTaskManager taskManager = _controllerStarter.getTaskManager();
+
+    try {
+      // Setup test environment
+      addFakeBrokerInstancesToAutoJoinHelixCluster(1, true);
+      addFakeServerInstancesToAutoJoinHelixCluster(1, true);
+      addFakeMinionInstancesToAutoJoinHelixCluster(1);
+
+      // Create and register a slow task generator that will hold the lock for a long time
+      ControllableTaskGenerator slowGenerator = new ControllableTaskGenerator(TEST_TASK_TYPE);
+      slowGenerator.setGenerationDelay(5000); // 5 second delay to simulate long-running task
+      ClusterInfoAccessor clusterInfoAccessor = Mockito.mock(ClusterInfoAccessor.class);
+      slowGenerator.init(clusterInfoAccessor);
+      taskManager.registerTaskGenerator(slowGenerator);
+
+      // Ensure task queue exists
+      _controllerStarter.getHelixTaskResourceManager().ensureTaskQueueExists(TEST_TASK_TYPE);
+
+      // Create schema and table
+      Schema schema = new Schema.SchemaBuilder().setSchemaName(RAW_TABLE_NAME_1)
+          .addSingleValueDimension("testCol", FieldSpec.DataType.STRING).build();
+      addSchema(schema);
+      createSingleTestTable(RAW_TABLE_NAME_1);
+
+      String tableNameWithType = TableNameBuilder.OFFLINE.tableNameWithType(RAW_TABLE_NAME_1);
+
+      // Wait for controller to be fully initialized
+      Thread.sleep(1000);
+
+      ExecutorService executor = Executors.newFixedThreadPool(2);
+      CountDownLatch startLatch = new CountDownLatch(1);
+      CountDownLatch firstTaskStarted = new CountDownLatch(1);
+      CountDownLatch completionLatch = new CountDownLatch(2);
+
+      AtomicInteger firstTaskCompleted = new AtomicInteger(0);
+      AtomicInteger secondTaskCompleted = new AtomicInteger(0);
+      AtomicInteger forceReleaseResult = new AtomicInteger(0);
+      AtomicInteger forceReleaseResultException = new AtomicInteger(0);
+
+      // First createTask - this will acquire the lock and run for 5 seconds
+      executor.submit(() -> {
+        try {
+          startLatch.await();
+          firstTaskStarted.countDown(); // Signal that first task has started
+          Map<String, String> result = taskManager.createTask(TEST_TASK_TYPE, RAW_TABLE_NAME_1, null, new HashMap<>());
+          if (result != null && !result.isEmpty()) {
+            firstTaskCompleted.incrementAndGet();
+          }
+        } catch (Exception ignored) {
+        } finally {
+          completionLatch.countDown();
+        }
+      });
+
+      // Second thread: Wait for first task to start, then force release lock and try another createTask
+      executor.submit(() -> {
+        try {
+          startLatch.await();
+          firstTaskStarted.await(); // Wait for first task to start
+          Thread.sleep(1000); // Let first task run for a bit to ensure it has the lock
+
+          // Force release the lock while first task is still running
+          try {
+            taskManager.forceReleaseLock(tableNameWithType);
+            forceReleaseResult.incrementAndGet();
+          } catch (Exception e) {
+            forceReleaseResultException.incrementAndGet();
+          }
+
+          // Now try to create another task for the same table - this should succeed since lock was released
+          Thread.sleep(500); // Small delay to ensure lock release is processed
+          Map<String, String> result = taskManager.createTask(TEST_TASK_TYPE, RAW_TABLE_NAME_1, null, new HashMap<>());
+          if (result != null && !result.isEmpty()) {
+            secondTaskCompleted.incrementAndGet();
+          }
+        } catch (Exception ignored) {
+        } finally {
+          completionLatch.countDown();
+        }
+      });
+
+      // Start both operations
+      startLatch.countDown();
+
+      // Wait for completion
+      assertTrue(completionLatch.await(15, TimeUnit.SECONDS), "Tasks should complete within 15 seconds");
+
+      executor.shutdownNow();
+      assertTrue(executor.awaitTermination(5, TimeUnit.SECONDS), "Executor should terminate");
+
+      // Verify results
+      assertEquals(forceReleaseResult.get(), 1, "forceReleaseLock should succeed");
+      assertEquals(forceReleaseResultException.get(), 0, "forceReleaseLock shouldn't throw exception");
+      assertEquals(firstTaskCompleted.get(), 1, "First createTask should complete successfully");
+      assertEquals(secondTaskCompleted.get(), 1, "Second createTask should succeed after lock was force released");
+
+      // Verify that both tasks were generated (first task continues even after lock release)
+      assertEquals(slowGenerator.getTaskGenerationCount(), 2, "Both createTask calls should have generated tasks");
+    } finally {
+      // Cleanup
+      try {
+        // Cancel all running tasks before dropping tables
+        Map<String, TaskState> taskStates = _controllerStarter.getHelixTaskResourceManager()
+            .getTaskStates(TEST_TASK_TYPE);
+        for (String taskName : taskStates.keySet()) {
+          try {
+            _controllerStarter.getHelixTaskResourceManager().deleteTask(taskName, true);
+          } catch (Exception e) {
+            // Ignore individual task deletion errors
+          }
+        }
+        Thread.sleep(1000); // Give time for task cancellation
+
+        dropOfflineTable(RAW_TABLE_NAME_1);
+      } catch (Exception ignored) {
+      }
+    }
+  }
+
+  /**
+   * Test scenario: Tests the forceReleaseLock API functionality to ensure it throws exception if no lock is present
+   */
+  @Test
+  public void testForceReleaseLockWhenNoLockExists() throws Exception {
+    // Setup controller with distributed locking enabled
+    Map<String, Object> properties = getDefaultControllerConfiguration();
+    properties.put(ControllerConf.ControllerPeriodicTasksConf.PINOT_TASK_MANAGER_SCHEDULER_ENABLED, true);
+    properties.put(ControllerConf.ControllerPeriodicTasksConf.ENABLE_DISTRIBUTED_LOCKING, true);
+
+    startController(properties);
+    PinotTaskManager taskManager = _controllerStarter.getTaskManager();
+
+    try {
+      // Setup test environment
+      addFakeBrokerInstancesToAutoJoinHelixCluster(1, true);
+      addFakeServerInstancesToAutoJoinHelixCluster(1, true);
+      addFakeMinionInstancesToAutoJoinHelixCluster(1);
+
+      // Create and register a slow task generator that will hold the lock for a long time
+      ControllableTaskGenerator slowGenerator = new ControllableTaskGenerator(TEST_TASK_TYPE);
+      slowGenerator.setGenerationDelay(1000); // 1 second delay to simulate long-running task
+      ClusterInfoAccessor clusterInfoAccessor = Mockito.mock(ClusterInfoAccessor.class);
+      slowGenerator.init(clusterInfoAccessor);
+      taskManager.registerTaskGenerator(slowGenerator);
+
+      // Ensure task queue exists
+      _controllerStarter.getHelixTaskResourceManager().ensureTaskQueueExists(TEST_TASK_TYPE);
+
+      // Create schema and table
+      Schema schema = new Schema.SchemaBuilder().setSchemaName(RAW_TABLE_NAME_1)
+          .addSingleValueDimension("testCol", FieldSpec.DataType.STRING).build();
+      addSchema(schema);
+      createSingleTestTable(RAW_TABLE_NAME_1);
+
+      String tableNameWithType = TableNameBuilder.OFFLINE.tableNameWithType(RAW_TABLE_NAME_1);
+
+      // Wait for controller to be fully initialized
+      Thread.sleep(1000);
+
+      ExecutorService executor = Executors.newFixedThreadPool(1);
+      CountDownLatch startLatch = new CountDownLatch(1);
+      CountDownLatch completionLatch = new CountDownLatch(1);
+
+      AtomicInteger firstTaskCompleted = new AtomicInteger(0);
+      AtomicInteger forceReleaseResult = new AtomicInteger(0);
+      AtomicInteger forceReleaseResultException = new AtomicInteger(0);
+
+      // Force release lock and try a createTask
+      executor.submit(() -> {
+        try {
+          startLatch.await();
+
+          // Force release the lock while first task is still running
+          try {
+            taskManager.forceReleaseLock(tableNameWithType);
+            forceReleaseResult.incrementAndGet();
+          } catch (Exception e) {
+            forceReleaseResultException.incrementAndGet();
+          }
+
+          // Now try to create another task for the same table - this should succeed since lock was released
+          Thread.sleep(500); // Small delay to ensure lock release is processed
+          Map<String, String> result = taskManager.createTask(TEST_TASK_TYPE, RAW_TABLE_NAME_1, null, new HashMap<>());
+          if (result != null && !result.isEmpty()) {
+            firstTaskCompleted.incrementAndGet();
+          }
+        } catch (Exception ignored) {
+        } finally {
+          completionLatch.countDown();
+        }
+      });
+
+      // Start operation
+      startLatch.countDown();
+
+      // Wait for completion
+      assertTrue(completionLatch.await(15, TimeUnit.SECONDS), "Tasks should complete within 15 seconds");
+
+      executor.shutdownNow();
+      assertTrue(executor.awaitTermination(5, TimeUnit.SECONDS), "Executor should terminate");
+
+      // Verify results
+      assertEquals(forceReleaseResult.get(), 0,
+          "forceReleaseLock should have thrown exception as no lock should be held");
+      assertEquals(forceReleaseResultException.get(), 1, "forceReleaseLock should throw an exception");
+      assertEquals(firstTaskCompleted.get(), 1, "First createTask should complete successfully");
+
+      // Verify that both tasks were generated (first task continues even after lock release)
+      assertEquals(slowGenerator.getTaskGenerationCount(), 1, "Both createTask calls should have generated tasks");
+    } finally {
+      // Cleanup
+      try {
+        // Cancel all running tasks before dropping tables
+        Map<String, TaskState> taskStates = _controllerStarter.getHelixTaskResourceManager()
+            .getTaskStates(TEST_TASK_TYPE);
+        for (String taskName : taskStates.keySet()) {
+          try {
+            _controllerStarter.getHelixTaskResourceManager().deleteTask(taskName, true);
+          } catch (Exception e) {
+            // Ignore individual task deletion errors
+          }
+        }
+        Thread.sleep(1000); // Give time for task cancellation
+
+        dropOfflineTable(RAW_TABLE_NAME_1);
+      } catch (Exception ignored) {
+      }
+    }
+  }
 }

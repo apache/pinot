@@ -150,23 +150,24 @@ public class DistributedTaskLockManager {
   /**
    * Force release the lock without checking if any tasks are in progress
    */
-  public boolean forceReleaseLock(String tableNameWithType) {
+  public void forceReleaseLock(String tableNameWithType) {
     LOGGER.info("Trying to force release the lock for table: {}", tableNameWithType);
     String lockPath = getLockPath(tableNameWithType);
 
-    boolean released = true;
     if (!_propertyStore.exists(lockPath, AccessOption.EPHEMERAL)) {
-      LOGGER.info("No lock ZNode: {} found for table: {}, nothing to force release", lockPath, tableNameWithType);
-      return released;
+      String message = "No lock ZNode: " + lockPath + " found for table: " + tableNameWithType
+          + ", nothing to force release";
+      LOGGER.warn(message);
+      throw new RuntimeException(message);
     }
 
     LOGGER.info("Lock for table: {} found at path: {}, trying to remove", tableNameWithType, lockPath);
     boolean result = _propertyStore.remove(lockPath, AccessOption.EPHEMERAL);
     if (!result) {
-      LOGGER.warn("Could not force release lock: {} for table: {}", lockPath, tableNameWithType);
-      released = false;
+      String message = "Could not force release lock: " + lockPath + " for table: " + tableNameWithType;
+      LOGGER.error(message);
+      throw new RuntimeException(message);
     }
-    return released;
   }
 
   /**

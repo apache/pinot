@@ -316,12 +316,13 @@ public class PinotTaskManager extends ControllerPeriodicTask<Void> {
     return responseMap;
   }
 
-  public boolean forceReleaseLock(String tableNameWithType) {
+  public void forceReleaseLock(String tableNameWithType) {
     if (_distributedTaskLockManager == null) {
-      LOGGER.info("Distributed task lock manager is disabled, no locks to release");
-      return true;
+      String message = "Distributed task lock manager is disabled, no locks to release";
+      LOGGER.warn(message);
+      throw new RuntimeException(message);
     }
-    return _distributedTaskLockManager.forceReleaseLock(tableNameWithType);
+    _distributedTaskLockManager.forceReleaseLock(tableNameWithType);
   }
 
   private class ZkTableConfigChangeListener implements IZkChildListener {

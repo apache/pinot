@@ -796,13 +796,14 @@ public class PinotTaskRestletResource {
   public SuccessResponse forceReleaseTaskGenerationLock(
       @ApiParam(value = "Table name (with type suffix).", required = true)
       @QueryParam("tableNameWithType") String tableNameWithType) {
-    boolean lockReleased = _pinotTaskManager.forceReleaseLock(tableNameWithType);
-    if (lockReleased) {
+    try {
+      _pinotTaskManager.forceReleaseLock(tableNameWithType);
       return new SuccessResponse("Successfully released task generation lock on table " + tableNameWithType
           + " for all task types");
-    } else {
+    } catch (Exception e) {
       throw new ControllerApplicationException(LOGGER, "Failed to release task generation lock on table: "
-          + tableNameWithType + ", try again later", Response.Status.INTERNAL_SERVER_ERROR);
+          + tableNameWithType + ", with exception: " + ExceptionUtils.getStackTrace(e),
+          Response.Status.INTERNAL_SERVER_ERROR, e);
     }
   }
 }
