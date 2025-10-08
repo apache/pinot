@@ -1,0 +1,51 @@
+{
+  "schemaName": "uuidExample",
+  "dimensionFieldSpecs": [
+    {
+      "name": "userId",
+      "dataType": "UUID"
+    },
+    {
+      "name": "sessionId",
+      "dataType": "UUID"
+    },
+    {
+      "name": "eventType",
+      "dataType": "STRING"
+    },
+    {
+      "name": "deviceType",
+      "dataType": "STRING"
+    },
+    {
+      "name": "country",
+      "dataType": "STRING"
+    }
+  ],
+  "metricFieldSpecs": [
+    {
+      "name": "duration",
+      "dataType": "LONG"
+    },
+    {
+      "name": "revenue",
+      "dataType": "DOUBLE"
+    }
+  ],
+  "dateTimeFieldSpecs": [
+    {
+      "name": "timestamp",
+      "dataType": "LONG",
+      "format": "1:MILLISECONDS:EPOCH",
+      "granularity": "1:MILLISECONDS"
+    }
+  ],
+  "primaryKeyColumns": [
+    "userId",
+    "timestamp"
+  ]
+}
+
+
+
+

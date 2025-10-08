@@ -210,6 +210,8 @@ public class MapColumnPreIndexStatsCollector extends AbstractColumnStatisticsCol
         return new BigDecimalColumnPreIndexStatsCollector(key, config);
       case STRING:
         return new StringColumnPreIndexStatsCollector(key, config);
+      case UUID:
+        return new UUIDColumnPreIndexStatsCollector(key, config);
       default:
         throw new UnsupportedOperationException(String.format("MAP column does not yet support '%s'", type));
     }

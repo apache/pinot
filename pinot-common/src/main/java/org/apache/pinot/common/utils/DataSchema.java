@@ -50,6 +50,7 @@ import org.apache.pinot.spi.utils.ByteArray;
 import org.apache.pinot.spi.utils.BytesUtils;
 import org.apache.pinot.spi.utils.CommonConstants.NullValuePlaceHolder;
 import org.apache.pinot.spi.utils.EqualityUtils;
+import org.apache.pinot.spi.utils.UUIDUtils;
 
 import static java.nio.charset.StandardCharsets.UTF_8;
 
@@ -302,6 +303,12 @@ public class DataSchema {
         return typeFactory.createSqlType(SqlTypeName.VARBINARY);
       }
     },
+    UUID(BYTES, NullValuePlaceHolder.INTERNAL_BYTES) {
+      @Override
+      public RelDataType toType(RelDataTypeFactory typeFactory) {
+        return typeFactory.createSqlType(SqlTypeName.VARBINARY);
+      }
+    },
     OBJECT(null) {
       @Override
       public RelDataType toType(RelDataTypeFactory typeFactory) {
@@ -356,6 +363,12 @@ public class DataSchema {
         return typeFactory.createArrayType(BYTES.toType(typeFactory), -1);
       }
     },
+    UUID_ARRAY(BYTES_ARRAY, NullValuePlaceHolder.BYTES_ARRAY) {
+      @Override
+      public RelDataType toType(RelDataTypeFactory typeFactory) {
+        return typeFactory.createArrayType(UUID.toType(typeFactory), -1);
+      }
+    },
     UNKNOWN(null) {
       @Override
       public RelDataType toType(RelDataTypeFactory typeFactory) {
@@ -367,7 +380,7 @@ public class DataSchema {
     private static final EnumSet<ColumnDataType> INTEGRAL_TYPES = EnumSet.of(INT, LONG);
     private static final EnumSet<ColumnDataType> ARRAY_TYPES =
         EnumSet.of(INT_ARRAY, LONG_ARRAY, FLOAT_ARRAY, DOUBLE_ARRAY, STRING_ARRAY, BOOLEAN_ARRAY, TIMESTAMP_ARRAY,
-            BYTES_ARRAY);
+            BYTES_ARRAY, UUID_ARRAY);
     private static final EnumSet<ColumnDataType> NUMERIC_ARRAY_TYPES =
         EnumSet.of(INT_ARRAY, LONG_ARRAY, FLOAT_ARRAY, DOUBLE_ARRAY);
     private static final EnumSet<ColumnDataType> INTEGRAL_ARRAY_TYPES = EnumSet.of(INT_ARRAY, LONG_ARRAY);
@@ -455,6 +468,9 @@ public class DataSchema {
         case BYTES:
         case BYTES_ARRAY:
           return DataType.BYTES;
+        case UUID:
+        case UUID_ARRAY:
+          return DataType.UUID;
         case UNKNOWN:
           return DataType.UNKNOWN;
         default:
@@ -491,6 +507,7 @@ public class DataSchema {
         case TIMESTAMP:
           return ((Timestamp) value).getTime();
         case BYTES:
+        case UUID:
           return new ByteArray((byte[]) value);
         case BOOLEAN_ARRAY:
           return fromBooleanArray((boolean[]) value);
@@ -539,6 +556,7 @@ public class DataSchema {
         case TIMESTAMP:
           return new Timestamp((long) value);
         case BYTES:
+        case UUID:
           return ((ByteArray) value).getBytes();
         case BOOLEAN_ARRAY:
           return toBooleanArray((int[]) value);
@@ -573,6 +591,7 @@ public class DataSchema {
         case JSON:
           return value.toString();
         case BYTES:
+        case UUID:
           return ((ByteArray) value).getBytes();
         case INT_ARRAY:
           return toIntArray(value);
@@ -611,6 +630,8 @@ public class DataSchema {
           return value.toString();
         case BYTES:
           return BytesUtils.toHexString((byte[]) value);
+        case UUID:
+          return UUIDUtils.toStringSafe((byte[]) value);
         case TIMESTAMP_ARRAY:
           return formatTimestampArray((Timestamp[]) value);
         case BYTES_ARRAY:
@@ -644,6 +665,8 @@ public class DataSchema {
           return value.toString();
         case BYTES:
           return ((ByteArray) value).toHexString();
+        case UUID:
+          return UUIDUtils.toStringSafe(((ByteArray) value).getBytes());
         case MAP:
           return toMap(value);
         case INT_ARRAY:
@@ -662,6 +685,8 @@ public class DataSchema {
           return formatTimestampArray((long[]) value);
         case BYTES_ARRAY:
           return (byte[][]) value;
+        case UUID_ARRAY:
+          return formatUUIDArray((byte[][]) value);
         default:
           throw new IllegalStateException(String.format("Cannot convert and format: '%s' to type: %s", value, this));
       }
@@ -820,6 +845,15 @@ public class DataSchema {
       return formattedBytesArray;
     }
 
+    private static String[] formatUUIDArray(byte[][] uuidArray) {
+      int length = uuidArray.length;
+      String[] formattedUUIDArray = new String[length];
+      for (int i = 0; i < length; i++) {
+        formattedUUIDArray[i] = UUIDUtils.toStringSafe(uuidArray[i]);
+      }
+      return formattedUUIDArray;
+    }
+
     public static ColumnDataType fromDataType(DataType dataType, boolean isSingleValue) {
       return isSingleValue ? fromDataTypeSV(dataType) : fromDataTypeMV(dataType);
     }
@@ -846,6 +880,8 @@ public class DataSchema {
           return JSON;
         case BYTES:
           return BYTES;
+        case UUID:
+          return UUID;
         case MAP:
           return MAP;
         case UNKNOWN:
@@ -873,6 +909,8 @@ public class DataSchema {
           return STRING_ARRAY;
         case BYTES:
           return BYTES_ARRAY;
+        case UUID:
+          return UUID_ARRAY;
         default:
           throw new IllegalStateException("Unsupported data type: " + dataType);
       }

@@ -1,0 +1,20 @@
+{
+  "tableName": "uuidExample",
+  "segmentsConfig": {
+    "replication": "1"
+  },
+  "tableIndexConfig": {
+    "invertedIndexColumns": [],
+    "loadMode": "MMAP"
+  },
+  "tenants": {
+    "broker": "DefaultTenant",
+    "server": "DefaultTenant"
+  },
+  "tableType": "OFFLINE",
+  "metadata": {}
+}
+
+
+
+

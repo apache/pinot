@@ -99,6 +99,9 @@ public class CastTransformFunction extends BaseTransformFunction {
         case "VARBINARY":
           _resultMetadata = sourceSV ? BYTES_SV_NO_DICTIONARY_METADATA : BYTES_MV_NO_DICTIONARY_METADATA;
           break;
+        case "UUID":
+          _resultMetadata = sourceSV ? UUID_SV_NO_DICTIONARY_METADATA : BYTES_MV_NO_DICTIONARY_METADATA;
+          break;
         case "INT_ARRAY":
         case "INTEGER_ARRAY":
           _resultMetadata = INT_MV_NO_DICTIONARY_METADATA;

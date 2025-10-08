@@ -190,6 +190,7 @@ public class ColumnMinMaxValueGenerator {
       case STRING:
         return new StringDictionary(dictionaryBuffer, length, columnMetadata.getColumnMaxLength());
       case BYTES:
+      case UUID:
         return new BytesDictionary(dictionaryBuffer, length, columnMetadata.getColumnMaxLength());
       default:
         throw new IllegalStateException("Unsupported data type: " + dataType + " for column: " + columnName);
@@ -346,7 +347,8 @@ public class ColumnMinMaxValueGenerator {
           maxValue = max;
           break;
         }
-        case BYTES: {
+        case BYTES:
+        case UUID: {
           byte[] min = null;
           byte[] max = null;
           if (isSingleValue) {

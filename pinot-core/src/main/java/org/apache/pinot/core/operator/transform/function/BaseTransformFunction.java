@@ -30,6 +30,7 @@ import org.apache.pinot.segment.spi.index.reader.Dictionary;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
 import org.apache.pinot.spi.utils.ArrayCopyUtils;
 import org.apache.pinot.spi.utils.CommonConstants.NullValuePlaceHolder;
+import org.apache.pinot.spi.utils.UUIDUtils;
 import org.roaringbitmap.RoaringBitmap;
 
 
@@ -57,6 +58,8 @@ public abstract class BaseTransformFunction implements TransformFunction {
       new TransformResultMetadata(DataType.JSON, true, false);
   protected static final TransformResultMetadata BYTES_SV_NO_DICTIONARY_METADATA =
       new TransformResultMetadata(DataType.BYTES, true, false);
+  protected static final TransformResultMetadata UUID_SV_NO_DICTIONARY_METADATA =
+      new TransformResultMetadata(DataType.UUID, true, false);
 
   protected static final TransformResultMetadata INT_MV_NO_DICTIONARY_METADATA =
       new TransformResultMetadata(DataType.INT, false, false);
@@ -385,6 +388,8 @@ public abstract class BaseTransformFunction implements TransformFunction {
           byte[][] bytesValues = transformToBytesValuesSV(valueBlock);
           ArrayCopyUtils.copy(bytesValues, _bigDecimalValuesSV, length);
           break;
+        case UUID:
+          throw new IllegalStateException("Cannot convert UUID to BIG_DECIMAL");
         case UNKNOWN:
           // Copy the values to ensure behaviour consistency with non null-handling.
           for (int i = 0; i < length; i++) {
@@ -438,6 +443,15 @@ public abstract class BaseTransformFunction implements TransformFunction {
         case BYTES:
           byte[][] bytesValues = transformToBytesValuesSV(valueBlock);
           ArrayCopyUtils.copy(bytesValues, _stringValuesSV, length);
+          break;
+        case UUID:
+          // UUID needs special handling to convert bytes to proper UUID string format
+          byte[][] uuidBytesValues = transformToBytesValuesSV(valueBlock);
+          for (int i = 0; i < length; i++) {
+            _stringValuesSV[i] = uuidBytesValues[i] != null
+                ? UUIDUtils.toStringSafe(uuidBytesValues[i])
+                : null;
+          }
           break;
         case UNKNOWN:
           // Copy the values to ensure behaviour consistency with non null-handling.

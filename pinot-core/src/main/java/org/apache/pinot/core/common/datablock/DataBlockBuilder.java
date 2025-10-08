@@ -147,6 +147,7 @@ public class DataBlockBuilder {
               fixedSize.putInt(dictId);
               break;
             case BYTES:
+            case UUID:
               setColumn(fixedSize, varSize, (ByteArray) value);
               break;
             case MAP:
@@ -352,7 +353,8 @@ public class DataBlockBuilder {
         });
         break;
       }
-      case BYTES: {
+      case BYTES:
+      case UUID: {
         ByteArray nullPlaceholder = (ByteArray) storedType.getNullPlaceholder();
         interruptableLoop(0, numRows, interruptableLoopStep, (start, end) -> {
           for (int rowId = 0; rowId < numRows; rowId++) {

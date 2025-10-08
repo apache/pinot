@@ -86,6 +86,9 @@ public class SegmentPreIndexStatsCollectorImpl implements SegmentPreIndexStatsCo
         case BYTES:
           _columnStatsCollectorMap.put(column, new BytesColumnPredIndexStatsCollector(column, _statsCollectorConfig));
           break;
+        case UUID:
+          _columnStatsCollectorMap.put(column, new UUIDColumnPreIndexStatsCollector(column, _statsCollectorConfig));
+          break;
         case MAP:
           _columnStatsCollectorMap.put(column, new MapColumnPreIndexStatsCollector(column, _statsCollectorConfig));
           break;

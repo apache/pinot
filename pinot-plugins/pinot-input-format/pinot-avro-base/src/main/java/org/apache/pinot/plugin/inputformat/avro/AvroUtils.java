@@ -55,10 +55,10 @@ public class AvroUtils {
     GENERIC_DATA.addLogicalTypeConversion(new Conversions.BigDecimalConversion());
     // Decimal with scale and precision. Deserialized as BigDecimal, serialized as bytes.
     GENERIC_DATA.addLogicalTypeConversion(new Conversions.DecimalConversion());
-    // TODO: Other interesting standard conversions we may want to add. First we need to make sure that we support
-    //  the corresponding data types in Pinot (ie can we read UUIDs or Instant?).
     // UUID is deserialized as java.util.UUID, serialized as string.
-    //GENERIC_DATA.addLogicalTypeConversion(new Conversions.UUIDConversion());
+    GENERIC_DATA.addLogicalTypeConversion(new Conversions.UUIDConversion());
+    // TODO: Other interesting standard conversions we may want to add. First we need to make sure that we support
+    //  the corresponding data types in Pinot (ie can we read Instant?).
     // Instant is deserialized as java.time.Instant, serialized as long (epoch millis).
     //GENERIC_DATA.addLogicalTypeConversion(new TimeConversions.TimestampMillisConversion());
   }

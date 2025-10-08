@@ -139,7 +139,9 @@ public class NotInPredicateEvaluatorFactory {
         }
         return new StringRawValueBasedNotInPredicateEvaluator(notInPredicate, nonMatchingValues);
       }
-      case BYTES: {
+      case BYTES:
+      case UUID: {
+        // UUID is stored as BYTES internally
         ByteArray[] bytesValues = notInPredicate.getBytesValues();
         Set<ByteArray> nonMatchingValues = new ObjectOpenHashSet<>(HashUtil.getMinHashSetSize(bytesValues.length));
         // NOTE: Add value-by-value to avoid overhead

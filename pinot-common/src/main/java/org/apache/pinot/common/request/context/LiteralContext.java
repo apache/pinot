@@ -153,6 +153,9 @@ public class LiteralContext {
       Preconditions.checkState(value.getClass().getComponentType() == byte.class, "Bytes array is not supported");
       return PinotDataType.BYTES;
     }
+    if (type == DataType.UUID) {
+      return value.getClass().isArray() ? PinotDataType.UUID_ARRAY : PinotDataType.UUID;
+    }
     boolean singleValue = !value.getClass().isArray();
     switch (type) {
       case BOOLEAN:

@@ -628,7 +628,8 @@ public class ForwardIndexHandler extends BaseIndexHandler {
         }
         break;
       }
-      case BYTES: {
+      case BYTES:
+      case UUID: {
         for (int i = 0; i < numDocs; i++) {
           if (isSVColumn) {
             byte[] val = reader.getBytes(i, readerContext);
@@ -732,7 +733,8 @@ public class ForwardIndexHandler extends BaseIndexHandler {
         }
         break;
       }
-      case BYTES: {
+      case BYTES:
+      case UUID: {
         for (int i = 0; i < numDocs; i++) {
           if (isSVColumn) {
             int dictId = reader.getDictId(i, readerContext);

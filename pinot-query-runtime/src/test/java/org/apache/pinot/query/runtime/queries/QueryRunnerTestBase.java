@@ -299,11 +299,12 @@ public abstract class QueryRunnerTestBase extends QueryTestSet {
             "Got unexpected value type: " + value.getClass() + " for STRING column, expected: String");
         return value;
       case BYTES:
+      case UUID:
         if (value instanceof byte[]) {
           return BytesUtils.toHexString((byte[]) value);
         }
         assertTrue(value instanceof String,
-            "Got unexpected value type: " + value.getClass() + " for BYTES column, expected: String or byte[]");
+            "Got unexpected value type: " + value.getClass() + " for BYTES/UUID column, expected: String or byte[]");
         return value;
       case INT_ARRAY:
         if (value instanceof JdbcArray) {

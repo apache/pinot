@@ -61,6 +61,9 @@ public class DataTypeConversionFunctions {
       case "VARCHAR":
         targetDataType = STRING;
         break;
+      case "UUID":
+        targetDataType = UUID;
+        break;
       default:
         try {
           targetDataType = PinotDataType.valueOf(transformed);

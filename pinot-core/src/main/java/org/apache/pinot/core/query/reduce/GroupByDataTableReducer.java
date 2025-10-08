@@ -471,6 +471,7 @@ public class GroupByDataTableReducer implements DataTableReducer {
       case JSON:
         return dataTable.getString(rowId, colId);
       case BYTES:
+      case UUID:
         return dataTable.getBytes(rowId, colId).getBytes();
       default:
         throw new IllegalStateException("Illegal column data type in group key: " + columnDataType);
