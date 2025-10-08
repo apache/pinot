@@ -153,7 +153,7 @@ public class HelixInstanceDataManager implements InstanceDataManager {
     _segmentReloadSemaphore = new SegmentReloadSemaphore(maxParallelRefreshThreads);
     _segmentReloadRefreshExecutor = Executors.newFixedThreadPool(maxParallelRefreshThreads,
         new ThreadFactoryBuilder().setNameFormat("segment-reload-refresh-thread-%d").build());
-    LOGGER.info("Created SegmentReloadExecutor with pool size: {}", maxParallelRefreshThreads);
+    LOGGER.info("Created SegmentReloadRefreshExecutor with pool size: {}", maxParallelRefreshThreads);
     int maxSegmentPreloadThreads = _instanceDataManagerConfig.getMaxSegmentPreloadThreads();
     if (maxSegmentPreloadThreads > 0) {
       _segmentPreloadExecutor = Executors.newFixedThreadPool(maxSegmentPreloadThreads,
