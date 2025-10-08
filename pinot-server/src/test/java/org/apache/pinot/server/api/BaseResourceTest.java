@@ -226,7 +226,7 @@ public abstract class BaseResourceTest {
     //       more checks
     TableDataManager tableDataManager = new OfflineTableDataManager();
     tableDataManager.init(instanceDataManagerConfig, helixManager, new SegmentLocks(), tableConfig, schema,
-        new SegmentReloadSemaphore(1), Executors.newSingleThreadExecutor(), null, null, null, null);
+        new SegmentReloadSemaphore(1), Executors.newSingleThreadExecutor(), null, null, null, false);
     tableDataManager.start();
     _tableDataManagerMap.put(tableNameWithType, tableDataManager);
   }

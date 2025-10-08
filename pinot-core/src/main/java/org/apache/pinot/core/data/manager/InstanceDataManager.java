@@ -172,7 +172,7 @@ public interface InstanceDataManager {
   /**
    * Returns true if background processing for SEGMENT_REFRESH is enabled, false otherwise
    */
-  boolean isEnableSegmentRefreshAsynchronousHandling();
+  boolean isAsyncSegmentRefreshEnabled();
 
   /**
    * Returns the Helix property store.

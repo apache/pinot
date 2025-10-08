@@ -129,7 +129,7 @@ public abstract class BaseTableDataManager implements TableDataManager {
   protected File _resourceTmpDir;
   protected Logger _logger;
   protected SegmentReloadSemaphore _segmentReloadSemaphore;
-  protected ExecutorService _segmentReloadExecutor;
+  protected ExecutorService _segmentReloadRefreshExecutor;
   @Nullable
   protected ExecutorService _segmentPreloadExecutor;
   protected AuthProvider _authProvider;
@@ -156,17 +156,14 @@ public abstract class BaseTableDataManager implements TableDataManager {
   protected volatile boolean _shutDown;
   protected volatile boolean _isDeleted;
 
-  // Executor service to process segment refresh if asynchronous handling is enabled
-  @Nullable
-  protected ExecutorService _segmentRefreshExecutor;
+  protected boolean _enableAsyncSegmentRefresh;
 
   @Override
   public void init(InstanceDataManagerConfig instanceDataManagerConfig, HelixManager helixManager,
       SegmentLocks segmentLocks, TableConfig tableConfig, Schema schema, SegmentReloadSemaphore segmentReloadSemaphore,
-      ExecutorService segmentReloadExecutor, @Nullable ExecutorService segmentPreloadExecutor,
-      @Nullable ExecutorService segmentRefreshExecutor,
+      ExecutorService segmentReloadRefreshExecutor, @Nullable ExecutorService segmentPreloadExecutor,
       @Nullable Cache<Pair<String, String>, SegmentErrorInfo> errorCache,
-      @Nullable SegmentOperationsThrottler segmentOperationsThrottler) {
+      @Nullable SegmentOperationsThrottler segmentOperationsThrottler, boolean enableAsyncSegmentRefresh) {
     LOGGER.info("Initializing table data manager for table: {}", tableConfig.getTableName());
 
     _instanceDataManagerConfig = instanceDataManagerConfig;
@@ -175,9 +172,9 @@ public abstract class BaseTableDataManager implements TableDataManager {
     _propertyStore = helixManager.getHelixPropertyStore();
     _segmentLocks = segmentLocks;
     _segmentReloadSemaphore = segmentReloadSemaphore;
-    _segmentReloadExecutor = segmentReloadExecutor;
+    _segmentReloadRefreshExecutor = segmentReloadRefreshExecutor;
     _segmentPreloadExecutor = segmentPreloadExecutor;
-    _segmentRefreshExecutor = segmentRefreshExecutor;
+    _enableAsyncSegmentRefresh = enableAsyncSegmentRefresh;
     _authProvider = AuthProviderUtils.extractAuthProvider(instanceDataManagerConfig.getAuthConfig(), null);
 
     _tableNameWithType = tableConfig.getTableName();
@@ -239,8 +236,7 @@ public abstract class BaseTableDataManager implements TableDataManager {
 
     _logger = LoggerFactory.getLogger(_tableNameWithType + "-" + getClass().getSimpleName());
 
-    _logger.info("Asynchronous handling for segment refresh is {}!",
-        _segmentRefreshExecutor == null ? "disabled" : "enabled");
+    _logger.info("Async segment refresh is {}!", _enableAsyncSegmentRefresh ? "enabled" : "disabled");
 
     doInit();
 
@@ -459,24 +455,32 @@ public abstract class BaseTableDataManager implements TableDataManager {
   }
 
   @Override
-  public void enqueueSegmentToReplace(String segmentName) {
-    assert _segmentRefreshExecutor != null;
+  public void replaceSegment(String segmentName)
+      throws Exception {
+    if (_enableAsyncSegmentRefresh) {
+      enqueueSegmentToReplace(segmentName);
+    } else {
+      replaceSegmentInternal(segmentName);
+    }
+  }
+
+  protected void enqueueSegmentToReplace(String segmentName) {
+    assert _enableAsyncSegmentRefresh;
     if (_shutDown) {
       _logger.warn("Shutdown in progress, skip enqueuing segment: {} to replace", segmentName);
       return;
     }
     _logger.info("Enqueuing segment: {} to be replaced", segmentName);
-    _segmentRefreshExecutor.submit(() -> {
+    _segmentReloadRefreshExecutor.submit(() -> {
       try {
-        replaceSegment(segmentName);
+        replaceSegmentInternal(segmentName);
       } catch (Exception e) {
         _serverMetrics.addMeteredTableValue(_tableNameWithType, ServerMeter.REFRESH_FAILURES, 1);
       }
     });
   }
 
-  @Override
-  public void replaceSegment(String segmentName)
+  protected void replaceSegmentInternal(String segmentName)
       throws Exception {
     Preconditions.checkState(!_shutDown,
         "Table data manager is already shut down, cannot replace segment: %s in table: %s", segmentName,
@@ -787,7 +791,7 @@ public abstract class BaseTableDataManager implements TableDataManager {
         failedSegments.add(segmentName);
         sampleException.set(t);
       }
-    }, _segmentReloadExecutor)).toArray(CompletableFuture[]::new)).get();
+    }, _segmentReloadRefreshExecutor)).toArray(CompletableFuture[]::new)).get();
     if (sampleException.get() != null) {
       throw new RuntimeException(
           String.format("Failed to reload %d/%d segments: %s in table: %s", failedSegments.size(),

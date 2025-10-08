@@ -67,9 +67,9 @@ public class DefaultTableDataManagerProvider implements TableDataManagerProvider
   @Override
   public TableDataManager getTableDataManager(TableConfig tableConfig, Schema schema,
       SegmentReloadSemaphore segmentReloadSemaphore, ExecutorService segmentReloadExecutor,
-      @Nullable ExecutorService segmentPreloadExecutor, @Nullable ExecutorService segmentRefreshExecutor,
+      @Nullable ExecutorService segmentPreloadExecutor,
       @Nullable Cache<Pair<String, String>, SegmentErrorInfo> errorCache,
-      Supplier<Boolean> isServerReadyToServeQueries) {
+      Supplier<Boolean> isServerReadyToServeQueries, boolean enableAsyncSegmentRefresh) {
     TableDataManager tableDataManager;
     switch (tableConfig.getTableType()) {
       case OFFLINE:
@@ -93,8 +93,8 @@ public class DefaultTableDataManagerProvider implements TableDataManagerProvider
         throw new IllegalStateException();
     }
     tableDataManager.init(_instanceDataManagerConfig, _helixManager, _segmentLocks, tableConfig, schema,
-        segmentReloadSemaphore, segmentReloadExecutor, segmentPreloadExecutor, segmentRefreshExecutor, errorCache,
-        _segmentOperationsThrottler);
+        segmentReloadSemaphore, segmentReloadExecutor, segmentPreloadExecutor, errorCache, _segmentOperationsThrottler,
+        enableAsyncSegmentRefresh);
     return tableDataManager;
   }
 }

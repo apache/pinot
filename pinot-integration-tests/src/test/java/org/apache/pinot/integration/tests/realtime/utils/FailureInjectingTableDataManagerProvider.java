@@ -74,9 +74,9 @@ public class FailureInjectingTableDataManagerProvider implements TableDataManage
   @Override
   public TableDataManager getTableDataManager(TableConfig tableConfig, Schema schema,
       SegmentReloadSemaphore segmentReloadSemaphore, ExecutorService segmentReloadExecutor,
-      @Nullable ExecutorService segmentPreloadExecutor, @Nullable ExecutorService segmentRefreshExecutor,
+      @Nullable ExecutorService segmentPreloadExecutor,
       @Nullable Cache<Pair<String, String>, SegmentErrorInfo> errorCache,
-      Supplier<Boolean> isServerReadyToServeQueries) {
+      Supplier<Boolean> isServerReadyToServeQueries, boolean enableAsyncSegmentRefresh) {
     TableDataManager tableDataManager;
     switch (tableConfig.getTableType()) {
       case OFFLINE:
@@ -114,8 +114,8 @@ public class FailureInjectingTableDataManagerProvider implements TableDataManage
         throw new IllegalStateException();
     }
     tableDataManager.init(_instanceDataManagerConfig, _helixManager, _segmentLocks, tableConfig, schema,
-        segmentReloadSemaphore, segmentReloadExecutor, segmentPreloadExecutor, segmentRefreshExecutor, errorCache,
-        null);
+        segmentReloadSemaphore, segmentReloadExecutor, segmentPreloadExecutor, errorCache, null,
+        enableAsyncSegmentRefresh);
     return tableDataManager;
   }
 }

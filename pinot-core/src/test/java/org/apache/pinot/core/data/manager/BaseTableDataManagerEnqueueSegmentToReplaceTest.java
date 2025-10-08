@@ -68,7 +68,7 @@ import static org.testng.Assert.assertTrue;
 
 
 /**
- * Test class for BaseTableDataManager.enqueueSegmentToReplace method with non-null _segmentRefreshExecutor
+ * Tests for async segment refresh enabled
  */
 public class BaseTableDataManagerEnqueueSegmentToReplaceTest {
   private static final File TEMP_DIR =
@@ -81,10 +81,9 @@ public class BaseTableDataManagerEnqueueSegmentToReplaceTest {
   private static final Schema SCHEMA = new Schema.SchemaBuilder().setSchemaName(RAW_TABLE_NAME).build();
 
   private OfflineTableDataManager _tableDataManager;
-  private ExecutorService _segmentRefreshExecutor;
+  private ExecutorService _segmentReloadRefreshExecutor;
   private InstanceDataManagerConfig _instanceDataManagerConfig;
   private HelixManager _helixManager;
-  private ZkHelixPropertyStore<ZNRecord> _propertyStore;
   private ServerMetrics _serverMetrics;
 
   @BeforeClass
@@ -97,7 +96,7 @@ public class BaseTableDataManagerEnqueueSegmentToReplaceTest {
     TestUtils.ensureDirectoriesExistAndEmpty(TEMP_DIR);
 
     // Create a real ExecutorService for testing
-    _segmentRefreshExecutor = Executors.newSingleThreadExecutor();
+    _segmentReloadRefreshExecutor = Executors.newSingleThreadExecutor();
 
     // Mock dependencies
     _instanceDataManagerConfig = mock(InstanceDataManagerConfig.class);
@@ -108,8 +107,7 @@ public class BaseTableDataManagerEnqueueSegmentToReplaceTest {
 
     @SuppressWarnings("unchecked")
     ZkHelixPropertyStore<ZNRecord> propertyStore = mock(ZkHelixPropertyStore.class);
-    _propertyStore = propertyStore;
-    when(_helixManager.getHelixPropertyStore()).thenReturn(_propertyStore);
+    when(_helixManager.getHelixPropertyStore()).thenReturn(propertyStore);
 
     // Mock ServerMetrics for metric validation
     _serverMetrics = mock(ServerMetrics.class);
@@ -117,8 +115,7 @@ public class BaseTableDataManagerEnqueueSegmentToReplaceTest {
     // Create table data manager with segment refresh executor
     _tableDataManager = spy(new OfflineTableDataManager());
     _tableDataManager.init(_instanceDataManagerConfig, _helixManager, new SegmentLocks(), TABLE_CONFIG,
-        SCHEMA, new SegmentReloadSemaphore(1), Executors.newSingleThreadExecutor(), null,
-        _segmentRefreshExecutor, null, null);
+        SCHEMA, new SegmentReloadSemaphore(1), _segmentReloadRefreshExecutor, null, null, null, true);
 
     // Inject the mocked ServerMetrics into the table data manager using reflection
     try {
@@ -132,9 +129,9 @@ public class BaseTableDataManagerEnqueueSegmentToReplaceTest {
 
   @AfterMethod
   public void tearDownMethod() throws Exception {
-    if (_segmentRefreshExecutor != null && !_segmentRefreshExecutor.isShutdown()) {
-      _segmentRefreshExecutor.shutdownNow();
-      _segmentRefreshExecutor.awaitTermination(5, TimeUnit.SECONDS);
+    if (_segmentReloadRefreshExecutor != null && !_segmentReloadRefreshExecutor.isShutdown()) {
+      _segmentReloadRefreshExecutor.shutdownNow();
+      _segmentReloadRefreshExecutor.awaitTermination(5, TimeUnit.SECONDS);
     }
     if (_tableDataManager != null) {
       _tableDataManager.shutDown();
@@ -180,13 +177,14 @@ public class BaseTableDataManagerEnqueueSegmentToReplaceTest {
     }).when(_tableDataManager).replaceSegmentIfCrcMismatch(any(), any(), any());
 
     // Test the method
-    _tableDataManager.enqueueSegmentToReplace(SEGMENT_NAME);
+    _tableDataManager.replaceSegment(SEGMENT_NAME);
 
     // Wait for async execution to complete
     assertTrue(latch.await(10, TimeUnit.SECONDS), "Segment replacement with CRC mismatch should be executed");
     assertTrue(replaceSegmentIfCrcMismatchCalled.get(), "replaceSegmentIfCrcMismatch should have been called");
 
     // Verify that the segment replacement was attempted
+    verify(_tableDataManager, times(1)).enqueueSegmentToReplace(SEGMENT_NAME);
     verify(_tableDataManager, times(1)).fetchZKMetadata(SEGMENT_NAME);
     verify(_tableDataManager, times(1)).fetchIndexLoadingConfig();
   }
@@ -202,16 +200,17 @@ public class BaseTableDataManagerEnqueueSegmentToReplaceTest {
     // Mock replaceSegment to track if it's called
     doAnswer(invocation -> {
       throw new AssertionError("replaceSegment should not be called when shut down");
-    }).when(_tableDataManager).replaceSegment(anyString());
+    }).when(_tableDataManager).replaceSegmentInternal(anyString());
 
     // Test the method - it should return early without enqueueing
-    _tableDataManager.enqueueSegmentToReplace(SEGMENT_NAME);
+    _tableDataManager.replaceSegment(SEGMENT_NAME);
 
     // Give some time for any potential async execution
     Thread.sleep(1000);
 
     // Verify that replaceSegment was never called
-    verify(_tableDataManager, never()).replaceSegment(SEGMENT_NAME);
+    verify(_tableDataManager, never()).replaceSegmentInternal(SEGMENT_NAME);
+    verify(_tableDataManager, never()).replaceSegmentIfCrcMismatch(any(), any(), any());
   }
 
   /**
@@ -221,14 +220,14 @@ public class BaseTableDataManagerEnqueueSegmentToReplaceTest {
   public void testEnqueueSegmentToReplaceWithException() throws Exception {
     // Setup mocks to throw exception during replacement
     RuntimeException testException = new RuntimeException("Test exception during replacement");
-    doThrow(testException).when(_tableDataManager).replaceSegment(SEGMENT_NAME);
+    doThrow(testException).when(_tableDataManager).replaceSegmentInternal(SEGMENT_NAME);
 
     // Use CountDownLatch to wait for async execution
     CountDownLatch latch = new CountDownLatch(1);
     AtomicReference<Exception> caughtException = new AtomicReference<>();
 
     // Override the executor to capture exceptions
-    ExecutorService spyExecutor = spy(_segmentRefreshExecutor);
+    ExecutorService spyExecutor = spy(_segmentReloadRefreshExecutor);
     doAnswer(invocation -> {
       Runnable task = invocation.getArgument(0);
       try {
@@ -242,16 +241,17 @@ public class BaseTableDataManagerEnqueueSegmentToReplaceTest {
     }).when(spyExecutor).submit(any(Runnable.class));
 
     // Replace the executor in the table data manager
-    _tableDataManager._segmentRefreshExecutor = spyExecutor;
+    _tableDataManager._segmentReloadRefreshExecutor = spyExecutor;
 
     // Test the method
-    _tableDataManager.enqueueSegmentToReplace(SEGMENT_NAME);
+    _tableDataManager.replaceSegment(SEGMENT_NAME);
 
     // Wait for async execution to complete
     assertTrue(latch.await(10, TimeUnit.SECONDS), "Task should complete even with exception");
 
     // Verify that replaceSegment was called and exception was handled
-    verify(_tableDataManager, times(1)).replaceSegment(SEGMENT_NAME);
+    verify(_tableDataManager, times(1)).enqueueSegmentToReplace(SEGMENT_NAME);
+    verify(_tableDataManager, times(1)).replaceSegmentInternal(SEGMENT_NAME);
 
     // Verify that the REFRESH_FAILURES metric was incremented
     verify(_serverMetrics, times(1)).addMeteredTableValue(
@@ -267,10 +267,10 @@ public class BaseTableDataManagerEnqueueSegmentToReplaceTest {
   @Test
   public void testExecutorUsage() throws Exception {
     ExecutorService mockExecutor = mock(ExecutorService.class);
-    _tableDataManager._segmentRefreshExecutor = mockExecutor;
+    _tableDataManager._segmentReloadRefreshExecutor = mockExecutor;
 
     // Test the method
-    _tableDataManager.enqueueSegmentToReplace(SEGMENT_NAME);
+    _tableDataManager.replaceSegment(SEGMENT_NAME);
 
     // Verify that the executor's submit method was called
     verify(mockExecutor, times(1)).submit(any(Runnable.class));
@@ -280,12 +280,12 @@ public class BaseTableDataManagerEnqueueSegmentToReplaceTest {
    * Test with null segment refresh executor should trigger assertion error
    */
   @Test(expectedExceptions = AssertionError.class)
-  public void testEnqueueSegmentToReplaceWithNullExecutor() {
+  public void testEnqueueSegmentToReplaceWithAsyncSegmentRefreshDisabled() {
     // Create a table data manager without segment refresh executor
     OfflineTableDataManager tableDataManagerWithoutExecutor = new OfflineTableDataManager();
     tableDataManagerWithoutExecutor.init(_instanceDataManagerConfig, _helixManager, new SegmentLocks(),
         TABLE_CONFIG, SCHEMA, new SegmentReloadSemaphore(1), Executors.newSingleThreadExecutor(),
-        null, null, null, null);
+        null, null, null, false);
 
     // This should trigger the assertion error
     tableDataManagerWithoutExecutor.enqueueSegmentToReplace(SEGMENT_NAME);
@@ -305,7 +305,7 @@ public class BaseTableDataManagerEnqueueSegmentToReplaceTest {
       Thread.sleep(50); // Simulate some work
       completionLatch.countDown();
       return null;
-    }).when(_tableDataManager).replaceSegment(anyString());
+    }).when(_tableDataManager).replaceSegmentInternal(anyString());
 
     // Start multiple threads to enqueue operations
     for (int i = 0; i < numConcurrentOperations; i++) {
@@ -313,9 +313,11 @@ public class BaseTableDataManagerEnqueueSegmentToReplaceTest {
       new Thread(() -> {
         try {
           startLatch.await();
-          _tableDataManager.enqueueSegmentToReplace(segmentName);
+          _tableDataManager.replaceSegment(segmentName);
         } catch (InterruptedException e) {
           Thread.currentThread().interrupt();
+        } catch (Exception e) {
+          throw new RuntimeException(e);
         }
       }).start();
     }
@@ -324,8 +326,7 @@ public class BaseTableDataManagerEnqueueSegmentToReplaceTest {
     startLatch.countDown();
 
     // Wait for all operations to complete
-    assertTrue(completionLatch.await(10, TimeUnit.SECONDS),
-        "All concurrent operations should complete");
+    assertTrue(completionLatch.await(10, TimeUnit.SECONDS), "All concurrent operations should complete");
 
     // Verify that replaceSegment was called for each segment
     for (int i = 0; i < numConcurrentOperations; i++) {

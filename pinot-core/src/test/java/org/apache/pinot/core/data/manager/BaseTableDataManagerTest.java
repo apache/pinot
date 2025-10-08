@@ -401,7 +401,7 @@ public class BaseTableDataManagerTest {
   }
 
   @Test
-  public void testReplaceSegmentNewDataWithRefreshExecutor()
+  public void testReplaceSegmentNewDataWithAsyncSegmentRefresh()
       throws Exception {
     SegmentZKMetadata zkMetadata = createRawSegment(SegmentVersion.v3, 5);
 
@@ -409,11 +409,11 @@ public class BaseTableDataManagerTest {
     // the one in zk, thus raw segment is downloaded and loaded.
     ImmutableSegmentDataManager segmentDataManager = createImmutableSegmentDataManager(SEGMENT_NAME, 0);
 
-    BaseTableDataManager tableDataManager = spy(createTableManagerWithSegmentRefreshExecutor());
+    BaseTableDataManager tableDataManager = spy(createTableManagerWithAsyncSegmentRefreshEnabled());
     File dataDir = tableDataManager.getSegmentDataDir(SEGMENT_NAME);
     assertFalse(dataDir.exists());
 
-    // Add the segment to the manager's internal map so enqueueSegmentToReplace can find it
+    // Add the segment to the manager's internal map so replaceSegment can find it
     tableDataManager._segmentDataManagerMap.put(SEGMENT_NAME, segmentDataManager);
 
     // Mock the methods that will be called during segment replacement
@@ -432,8 +432,8 @@ public class BaseTableDataManagerTest {
     }).when(tableDataManager).replaceSegmentIfCrcMismatch(
         any(SegmentDataManager.class), any(SegmentZKMetadata.class), any(IndexLoadingConfig.class));
 
-    // Call enqueueSegmentToReplace which will execute asynchronously
-    tableDataManager.enqueueSegmentToReplace(SEGMENT_NAME);
+    // Call replaceSegment which will execute asynchronously
+    tableDataManager.replaceSegment(SEGMENT_NAME);
 
     // Wait for async execution to complete
     assertTrue(latch.await(10, TimeUnit.SECONDS), "Segment replacement should complete");
@@ -442,7 +442,7 @@ public class BaseTableDataManagerTest {
   }
 
   @Test
-  public void testReplaceSegmentNewDataNewTierWithRefreshExecutor()
+  public void testReplaceSegmentNewDataNewTierWithAsyncSegmentRefresh()
       throws Exception {
     SegmentZKMetadata zkMetadata = createRawSegment(SegmentVersion.v3, 5);
     zkMetadata.setTier(TIER_NAME);
@@ -452,11 +452,11 @@ public class BaseTableDataManagerTest {
     ImmutableSegmentDataManager segmentDataManager = createImmutableSegmentDataManager(SEGMENT_NAME, 0);
 
     // No dataDir for coolTier, thus stay on default tier.
-    BaseTableDataManager tableDataManager = spy(createTableManagerWithSegmentRefreshExecutor());
+    BaseTableDataManager tableDataManager = spy(createTableManagerWithAsyncSegmentRefreshEnabled());
     File defaultDataDir = tableDataManager.getSegmentDataDir(SEGMENT_NAME);
     assertFalse(defaultDataDir.exists());
 
-    // Add the segment to the manager's internal map so enqueueSegmentToReplace can find it
+    // Add the segment to the manager's internal map so replaceSegment can find it
     tableDataManager._segmentDataManagerMap.put(SEGMENT_NAME, segmentDataManager);
 
     // Mock the methods that will be called during segment replacement
@@ -474,8 +474,8 @@ public class BaseTableDataManagerTest {
     }).when(tableDataManager).replaceSegmentIfCrcMismatch(
         any(SegmentDataManager.class), any(SegmentZKMetadata.class), any(IndexLoadingConfig.class));
 
-    // Call enqueueSegmentToReplace which will execute asynchronously
-    tableDataManager.enqueueSegmentToReplace(SEGMENT_NAME);
+    // Call replaceSegment which will execute asynchronously
+    tableDataManager.replaceSegment(SEGMENT_NAME);
 
     // Wait for async execution to complete
     assertTrue(latch.await(10, TimeUnit.SECONDS), "Segment replacement should complete");
@@ -483,7 +483,7 @@ public class BaseTableDataManagerTest {
     assertEquals(new SegmentMetadataImpl(defaultDataDir).getTotalDocs(), 5);
 
     // Configured dataDir for coolTier, thus move to new dir.
-    tableDataManager = spy(createTableManagerWithSegmentRefreshExecutor());
+    tableDataManager = spy(createTableManagerWithAsyncSegmentRefreshEnabled());
 
     // Add the segment to the manager's internal map
     tableDataManager._segmentDataManagerMap.put(SEGMENT_NAME, segmentDataManager);
@@ -502,7 +502,8 @@ public class BaseTableDataManagerTest {
     }).when(tableDataManager).replaceSegmentIfCrcMismatch(
         any(SegmentDataManager.class), any(SegmentZKMetadata.class), any(IndexLoadingConfig.class));
 
-    tableDataManager.enqueueSegmentToReplace(SEGMENT_NAME);
+    // Call replaceSegment which will execute asynchronously
+    tableDataManager.replaceSegment(SEGMENT_NAME);
 
     // Wait for async execution to complete
     assertTrue(latch2.await(10, TimeUnit.SECONDS), "Second segment replacement should complete");
@@ -516,7 +517,7 @@ public class BaseTableDataManagerTest {
   }
 
   @Test
-  public void testReplaceSegmentNoopWithRefreshExecutor()
+  public void testReplaceSegmentNoopWithAsyncSegmentRefresh()
       throws Exception {
     String segmentName = "seg01";
     SegmentZKMetadata zkMetadata = mock(SegmentZKMetadata.class);
@@ -525,10 +526,10 @@ public class BaseTableDataManagerTest {
 
     ImmutableSegmentDataManager segmentDataManager = createImmutableSegmentDataManager(segmentName, 1024L);
 
-    BaseTableDataManager tableDataManager = spy(createTableManagerWithSegmentRefreshExecutor());
+    BaseTableDataManager tableDataManager = spy(createTableManagerWithAsyncSegmentRefreshEnabled());
     assertFalse(tableDataManager.getSegmentDataDir(segmentName).exists());
 
-    // Add the segment to the manager's internal map so enqueueSegmentToReplace can find it
+    // Add the segment to the manager's internal map so replaceSegment can find it
     tableDataManager._segmentDataManagerMap.put(segmentName, segmentDataManager);
 
     // Mock the methods that will be called during segment replacement
@@ -545,8 +546,8 @@ public class BaseTableDataManagerTest {
     }).when(tableDataManager).replaceSegmentIfCrcMismatch(
         any(SegmentDataManager.class), any(SegmentZKMetadata.class), any(IndexLoadingConfig.class));
 
-    // Call enqueueSegmentToReplace which will execute asynchronously
-    tableDataManager.enqueueSegmentToReplace(segmentName);
+    // Call replaceSegment which will execute asynchronously
+    tableDataManager.replaceSegment(segmentName);
 
     // Wait for async execution to complete
     assertTrue(latch.await(10, TimeUnit.SECONDS), "Segment replacement should complete");
@@ -825,24 +826,24 @@ public class BaseTableDataManagerTest {
     return createTableManager(createDefaultInstanceDataManagerConfig());
   }
 
-  static OfflineTableDataManager createTableManagerWithSegmentRefreshExecutor() {
-    return createTableManagerWithSegmentRefreshExecutor(createDefaultInstanceDataManagerConfig());
+  static OfflineTableDataManager createTableManagerWithAsyncSegmentRefreshEnabled() {
+    return createTableManagerWithAsyncSegmentRefreshEnabled(createDefaultInstanceDataManagerConfig());
   }
 
   private static OfflineTableDataManager createTableManager(InstanceDataManagerConfig instanceDataManagerConfig) {
     OfflineTableDataManager tableDataManager = new OfflineTableDataManager();
     tableDataManager.init(instanceDataManagerConfig, mock(HelixManager.class), new SegmentLocks(), DEFAULT_TABLE_CONFIG,
-        SCHEMA, new SegmentReloadSemaphore(1), Executors.newSingleThreadExecutor(), null, null, null,
-        SEGMENT_OPERATIONS_THROTTLER);
+        SCHEMA, new SegmentReloadSemaphore(1), Executors.newSingleThreadExecutor(), null, null,
+        SEGMENT_OPERATIONS_THROTTLER, false);
     return tableDataManager;
   }
 
-  private static OfflineTableDataManager createTableManagerWithSegmentRefreshExecutor(
+  private static OfflineTableDataManager createTableManagerWithAsyncSegmentRefreshEnabled(
       InstanceDataManagerConfig instanceDataManagerConfig) {
     OfflineTableDataManager tableDataManager = new OfflineTableDataManager();
     tableDataManager.init(instanceDataManagerConfig, mock(HelixManager.class), new SegmentLocks(), DEFAULT_TABLE_CONFIG,
-        SCHEMA, new SegmentReloadSemaphore(1), Executors.newSingleThreadExecutor(), null,
-        Executors.newSingleThreadExecutor(), null, SEGMENT_OPERATIONS_THROTTLER);
+        SCHEMA, new SegmentReloadSemaphore(1), Executors.newSingleThreadExecutor(), null, null,
+        SEGMENT_OPERATIONS_THROTTLER, true);
     return tableDataManager;
   }
 

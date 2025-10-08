@@ -48,13 +48,13 @@ public interface TableDataManagerProvider {
 
   TableDataManager getTableDataManager(TableConfig tableConfig, Schema schema,
       SegmentReloadSemaphore segmentRefreshSemaphore, ExecutorService segmentReloadExecutor,
-      @Nullable ExecutorService segmentPreloadExecutor, @Nullable ExecutorService segmentRefreshExecutor,
+      @Nullable ExecutorService segmentPreloadExecutor,
       @Nullable Cache<Pair<String, String>, SegmentErrorInfo> errorCache,
-      Supplier<Boolean> isServerReadyToServeQueries);
+      Supplier<Boolean> isServerReadyToServeQueries, boolean enableAsyncSegmentRefresh);
 
   @VisibleForTesting
   default TableDataManager getTableDataManager(TableConfig tableConfig, Schema schema) {
     return getTableDataManager(tableConfig, schema, new SegmentReloadSemaphore(1), Executors.newSingleThreadExecutor(),
-        null, null, null, () -> true);
+        null, null, () -> true, false);
   }
 }
