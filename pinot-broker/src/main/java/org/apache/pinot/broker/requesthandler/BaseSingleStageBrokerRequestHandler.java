@@ -397,7 +397,9 @@ public abstract class BaseSingleStageBrokerRequestHandler extends BaseBrokerRequ
     String tableName = compileResult._tableName;
     String rawTableName = compileResult._rawTableName;
     PinotQuery pinotQuery = compileResult._pinotQuery;
+    _queryOptimizer.optimize(pinotQuery, schema);
     PinotQuery serverPinotQuery = compileResult._serverPinotQuery;
+    _queryOptimizer.optimize(serverPinotQuery, schema);
     LogicalTableConfig logicalTableConfig = _tableCache.getLogicalTableConfig(rawTableName);
     String database = DatabaseUtils.extractDatabaseFromFullyQualifiedTableName(tableName);
     long compilationEndTimeNs = System.nanoTime();
