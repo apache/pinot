@@ -55,6 +55,7 @@ import org.apache.pinot.segment.local.segment.index.forward.ForwardIndexPlugin;
 import org.apache.pinot.segment.local.segment.index.loader.IndexLoadingConfig;
 import org.apache.pinot.segment.local.segment.index.loader.LoaderUtils;
 import org.apache.pinot.segment.local.segment.readers.PinotSegmentColumnReader;
+import org.apache.pinot.segment.local.utils.ClusterConfigForTable;
 import org.apache.pinot.segment.spi.ColumnMetadata;
 import org.apache.pinot.segment.spi.SegmentMetadata;
 import org.apache.pinot.segment.spi.V1Constants;
@@ -672,7 +673,7 @@ public abstract class BaseDefaultColumnHandler implements DefaultColumnHandler {
       boolean createDictionary = dictionaryIndexConfig.isEnabled();
       boolean useNoDictColumnStatsCollector = false;
       if (!dictionaryIndexConfig.isEnabled()) {
-        useNoDictColumnStatsCollector = _tableConfig.getIndexingConfig().isOptimizeNoDictStatsCollection();
+        useNoDictColumnStatsCollector = ClusterConfigForTable.useOptimizedNoDictCollector(_tableConfig);
       }
       StatsCollectorConfig statsCollectorConfig = new StatsCollectorConfig(_tableConfig, _schema, null);
       ColumnIndexCreationInfo indexCreationInfo;

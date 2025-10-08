@@ -20,6 +20,7 @@ package org.apache.pinot.segment.local.segment.creator.impl.stats;
 
 import java.util.HashMap;
 import java.util.Map;
+import org.apache.pinot.segment.local.utils.ClusterConfigForTable;
 import org.apache.pinot.segment.spi.creator.ColumnStatistics;
 import org.apache.pinot.segment.spi.creator.SegmentPreIndexStatsCollector;
 import org.apache.pinot.segment.spi.creator.StatsCollectorConfig;
@@ -57,7 +58,7 @@ public class SegmentPreIndexStatsCollectorImpl implements SegmentPreIndexStatsCo
       if (!dictionaryEnabled) {
         // MAP collector is optimised for no-dictionary collection
         if (!fieldSpec.getDataType().getStoredType().equals(FieldSpec.DataType.MAP)) {
-          if (_statsCollectorConfig.getTableConfig().getIndexingConfig().isOptimizeNoDictStatsCollection()) {
+          if (ClusterConfigForTable.useOptimizedNoDictCollector(_statsCollectorConfig.getTableConfig())) {
             _columnStatsCollectorMap.put(column, new NoDictColumnStatisticsCollector(column, _statsCollectorConfig));
             continue;
           }
