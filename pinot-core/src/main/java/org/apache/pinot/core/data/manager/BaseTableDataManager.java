@@ -475,6 +475,7 @@ public abstract class BaseTableDataManager implements TableDataManager {
       try {
         replaceSegmentInternal(segmentName);
       } catch (Exception e) {
+        LOGGER.error("Caught exception while replacing segment: {}", segmentName, e);
         _serverMetrics.addMeteredTableValue(_tableNameWithType, ServerMeter.REFRESH_FAILURES, 1);
       }
     });
