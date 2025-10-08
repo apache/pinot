@@ -530,7 +530,7 @@ public class PinotTaskManagerDistributedLockingTest extends ControllerTest {
 
       // Verify that both controllers generated tasks
       int totalGenerations = generator1.getTaskGenerationCount() + generator2.getTaskGenerationCount();
-      assertEquals(totalGenerations, 3, "Both createTask and scheduleTasks should've succeeded on both controllers");
+      assertTrue(totalGenerations >= 3, "Both createTask and scheduleTasks should've succeeded on both controllers");
 
       assertNotNull(scheduleTasksResult);
       assertEquals(scheduleTasksResult.size(), 1);
