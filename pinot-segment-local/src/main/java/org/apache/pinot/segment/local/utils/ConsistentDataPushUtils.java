@@ -236,8 +236,9 @@ public class ConsistentDataPushUtils {
       List<String> offlineSegments;
       try {
         controllerURI = new URI(pinotClusterSpec.getControllerURI());
+        AuthProvider authProvider = AuthProviderUtils.makeAuthProvider(spec.getAuthToken());
         Map<String, List<String>> segments =
-            FILE_UPLOAD_DOWNLOAD_CLIENT.getSegments(controllerURI, rawTableName, TableType.OFFLINE, true);
+            FILE_UPLOAD_DOWNLOAD_CLIENT.getSegments(controllerURI, rawTableName, TableType.OFFLINE, true, authProvider);
         offlineSegments = segments.get(TableType.OFFLINE.toString());
         uriToOfflineSegments.put(controllerURI, offlineSegments);
       } catch (URISyntaxException e) {
