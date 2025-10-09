@@ -148,6 +148,9 @@ public class DictionaryBasedGroupKeyGenerator implements GroupKeyGenerator {
         cardinalityProduct = Math.min(optimizedCardinality.getRight(), cardinalityProduct);
       }
     }
+    // NOTE: We need to clean up the thread-local map before using it in case RawKeyHolder.close() is not called
+    //       for the previous segment
+    // TODO: Ensure RawKeyHolder.close()
     if (longOverflow) {
       // ArrayMapBasedHolder
       _globalGroupIdUpperBound = numGroupsLimit;
