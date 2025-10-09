@@ -1494,6 +1494,8 @@ public class CommonConstants {
     // Config keys
     public static final String CONFIG_OF_SWAGGER_USE_HTTPS = "pinot.minion.swagger.use.https";
     public static final String CONFIG_OF_METRICS_PREFIX_KEY = "pinot.minion.metrics.prefix";
+    public static final String CONFIG_OF_MAX_CONCURRENT_TASKS_PER_INSTANCE =
+        "pinot.minion.max.concurrent.tasks.per.instance";
     @Deprecated
     public static final String DEPRECATED_CONFIG_OF_METRICS_PREFIX_KEY = "metricsPrefix";
     public static final String METRICS_REGISTRY_REGISTRATION_LISTENERS_KEY = "metricsRegistryRegistrationListeners";
@@ -1504,6 +1506,8 @@ public class CommonConstants {
     public static final String DEFAULT_INSTANCE_BASE_DIR =
         System.getProperty("java.io.tmpdir") + File.separator + "PinotMinion";
     public static final String DEFAULT_INSTANCE_DATA_DIR = DEFAULT_INSTANCE_BASE_DIR + File.separator + "data";
+    // Use Helix side default if configured to be -1
+    public static final int DEFAULT_MAX_CONCURRENT_TASKS_PER_INSTANCE = -1;
 
     // Add pinot.minion prefix on those configs to be consistent with configs of controller and server.
     public static final String PREFIX_OF_CONFIG_OF_PINOT_FS_FACTORY = "pinot.minion.storage.factory";

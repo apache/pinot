@@ -367,6 +367,8 @@ public abstract class BaseMinionStarter implements ServiceStartable {
         () -> Collections.singletonList(CommonConstants.Helix.UNTAGGED_MINION_INSTANCE));
     updated |= HelixHelper.removeDisabledPartitions(instanceConfig);
     updated |= HelixHelper.updatePinotVersion(instanceConfig);
+    updated |= HelixHelper.updateMaxConcurrentTasksPerInstance(instanceConfig,
+        _config.getMaxConcurrentTasksPerInstance());
     if (updated) {
       HelixHelper.updateInstanceConfig(_helixManager, instanceConfig);
     }
