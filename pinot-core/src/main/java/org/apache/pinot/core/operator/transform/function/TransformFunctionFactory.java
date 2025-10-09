@@ -33,6 +33,7 @@ import org.apache.pinot.common.function.TransformFunctionType;
 import org.apache.pinot.common.request.context.ExpressionContext;
 import org.apache.pinot.common.request.context.FunctionContext;
 import org.apache.pinot.common.request.context.LiteralContext;
+import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.common.utils.HashUtil;
 import org.apache.pinot.core.geospatial.transform.function.GeoToH3Function;
 import org.apache.pinot.core.geospatial.transform.function.GridDiskFunction;
@@ -308,8 +309,6 @@ public class TransformFunctionFactory {
       case FUNCTION:
         FunctionContext function = expression.getFunction();
         String functionName = canonicalize(function.getFunctionName());
-        List<ExpressionContext> arguments = function.getArguments();
-        int numArguments = arguments.size();
 
         // Check if the function is ArrayValueConstructor transform function
         if (functionName.equalsIgnoreCase(ArrayLiteralTransformFunction.FUNCTION_NAME)) {
@@ -324,6 +323,15 @@ public class TransformFunctionFactory {
               GenerateArrayTransformFunction::new);
         }
 
+        List<ExpressionContext> arguments = function.getArguments();
+        int numArguments = arguments.size();
+
+        // Build child transform functions first to derive argument data types for scalar function polymorphism
+        List<TransformFunction> transformFunctionArguments = new ArrayList<>(numArguments);
+        for (ExpressionContext argument : arguments) {
+          transformFunctionArguments.add(TransformFunctionFactory.get(argument, columnContextMap, queryContext));
+        }
+
         TransformFunction transformFunction;
         Class<? extends TransformFunction> transformFunctionClass = TRANSFORM_FUNCTION_MAP.get(functionName);
         if (transformFunctionClass != null) {
@@ -336,7 +344,14 @@ public class TransformFunctionFactory {
         } else {
           // Scalar function
           String canonicalName = FunctionRegistry.canonicalize(functionName);
-          FunctionInfo functionInfo = FunctionRegistry.lookupFunctionInfo(canonicalName, numArguments);
+          // Get data types for the arguments
+          DataSchema.ColumnDataType[] argumentDataTypes = new DataSchema.ColumnDataType[numArguments];
+          for (int i = 0; i < numArguments; i++) {
+            argumentDataTypes[i] = DataSchema.ColumnDataType.fromDataType(
+                transformFunctionArguments.get(i).getResultMetadata().getDataType(),
+                transformFunctionArguments.get(i).getResultMetadata().isSingleValue());
+          }
+          FunctionInfo functionInfo = FunctionRegistry.lookupFunctionInfo(canonicalName, argumentDataTypes);
           if (functionInfo == null) {
             if (FunctionRegistry.contains(canonicalName)) {
               throw new BadQueryRequestException(
@@ -348,10 +363,6 @@ public class TransformFunctionFactory {
           transformFunction = new ScalarTransformFunctionWrapper(functionInfo);
         }
 
-        List<TransformFunction> transformFunctionArguments = new ArrayList<>(numArguments);
-        for (ExpressionContext argument : arguments) {
-          transformFunctionArguments.add(TransformFunctionFactory.get(argument, columnContextMap, queryContext));
-        }
         try {
           transformFunction.init(transformFunctionArguments, columnContextMap, queryContext.isNullHandlingEnabled());
         } catch (Exception e) {
