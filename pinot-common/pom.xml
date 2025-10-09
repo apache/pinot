@@ -24,7 +24,7 @@
   <parent>
     <artifactId>pinot</artifactId>
     <groupId>org.apache.pinot</groupId>
-    <version>1.4.0-SNAPSHOT</version>
+    <version>1.4.0</version>
   </parent>
   <artifactId>pinot-common</artifactId>
   <name>Pinot Common</name>
@@ -46,7 +46,7 @@
       <plugin>
         <groupId>org.apache.maven.plugins</groupId>
         <artifactId>maven-surefire-plugin</artifactId>
-        <configuration  combine.children="override">
+        <configuration combine.children="override">
           <forkCount>1</forkCount>
           <reuseForks>true</reuseForks>
           <properties>
@@ -408,10 +408,8 @@
                 </goals>
                 <configuration>
                   <target name="generate-code">
-                    <taskdef name="fmpp" classname="fmpp.tools.AntTask" classpathref="maven.compile.classpath"/>
-                    <fmpp configuration="src/main/codegen/config.fmpp"
-                        sourceRoot="src/main/codegen/templates"
-                        outputRoot="${project.build.directory}/generated-sources/"/>
+                    <taskdef name="fmpp" classname="fmpp.tools.AntTask" classpathref="maven.compile.classpath" />
+                    <fmpp configuration="src/main/codegen/config.fmpp" sourceRoot="src/main/codegen/templates" outputRoot="${project.build.directory}/generated-sources/" />
                   </target>
                 </configuration>
               </execution>
