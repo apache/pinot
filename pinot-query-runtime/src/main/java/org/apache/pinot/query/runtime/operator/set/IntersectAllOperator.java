@@ -30,7 +30,7 @@ import org.slf4j.LoggerFactory;
 /**
  * INTERSECT ALL operator.
  */
-public class IntersectAllOperator extends RightRowSetBasedSetOperator {
+public class IntersectAllOperator extends BinarySetOperator {
   private static final Logger LOGGER = LoggerFactory.getLogger(IntersectAllOperator.class);
   private static final String EXPLAIN_NAME = "INTERSECT_ALL";
 

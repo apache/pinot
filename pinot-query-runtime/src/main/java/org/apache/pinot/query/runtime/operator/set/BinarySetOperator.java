@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.query.runtime.operator.set;
 
+import com.google.common.base.Preconditions;
 import com.google.common.collect.HashMultiset;
 import com.google.common.collect.Multiset;
 import java.util.ArrayList;
@@ -30,17 +31,21 @@ import org.apache.pinot.query.runtime.operator.MultiStageOperator;
 import org.apache.pinot.query.runtime.plan.OpChainExecutionContext;
 
 
-/**
- * Abstract base class for set operators that process the right child operator first in order to build a set of rows
- * that are then used to filter rows from the left child operator.
- */
-public abstract class RightRowSetBasedSetOperator extends SetOperator {
-  protected final Multiset<Record> _rightRowSet;
+public abstract class BinarySetOperator extends SetOperator {
 
-  public RightRowSetBasedSetOperator(OpChainExecutionContext opChainExecutionContext,
+  protected final MultiStageOperator _leftChildOperator;
+  protected final MultiStageOperator _rightChildOperator;
+  protected final Multiset<Record> _rightRowSet;
+  private MseBlock.Eos _eos;
+  private boolean _isRightChildOperatorProcessed;
+
+  public BinarySetOperator(OpChainExecutionContext opChainExecutionContext,
       List<MultiStageOperator> inputOperators,
       DataSchema dataSchema) {
     super(opChainExecutionContext, inputOperators, dataSchema);
+    Preconditions.checkArgument(inputOperators.size() == 2, "Binary set operator should have 2 inputs");
+    _leftChildOperator = inputOperators.get(0);
+    _rightChildOperator = inputOperators.get(1);
     _rightRowSet = HashMultiset.create();
   }
 
@@ -49,7 +54,6 @@ public abstract class RightRowSetBasedSetOperator extends SetOperator {
    *
    * @return either a data block containing rows or an EoS block, never {@code null}.
    */
-  @Override
   protected MseBlock processRightOperator() {
     MseBlock block = _rightChildOperator.nextBlock();
     while (block.isData()) {
@@ -69,7 +73,6 @@ public abstract class RightRowSetBasedSetOperator extends SetOperator {
    *
    * @return block containing matched rows or EoS, never {@code null}.
    */
-  @Override
   protected MseBlock processLeftOperator() {
     // Keep reading the input blocks until we find a match row or all blocks are processed.
     // TODO: Consider batching the rows to improve performance.
@@ -89,6 +92,35 @@ public abstract class RightRowSetBasedSetOperator extends SetOperator {
       if (!rows.isEmpty()) {
         return new RowHeapDataBlock(rows, _dataSchema);
       }
+    }
+  }
+
+  @Override
+  protected MseBlock getNextBlock() {
+    if (_eos != null) {
+      return _eos;
+    }
+
+    if (!_isRightChildOperatorProcessed) {
+      MseBlock mseBlock = processRightOperator();
+
+      if (mseBlock.isData()) {
+        return mseBlock;
+      } else if (mseBlock.isError()) {
+        _eos = (MseBlock.Eos) mseBlock;
+        return _eos;
+      } else if (mseBlock.isSuccess()) {
+        // If it's a regular EOS block, we continue to process the left child operator.
+        _isRightChildOperatorProcessed = true;
+      }
+    }
+
+    MseBlock mseBlock = processLeftOperator();
+    if (mseBlock.isEos()) {
+      _eos = (MseBlock.Eos) mseBlock;
+      return _eos;
+    } else {
+      return mseBlock;
     }
   }
 
