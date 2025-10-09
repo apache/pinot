@@ -211,8 +211,6 @@ public abstract class BaseBrokerStarter implements ServiceStartable {
         Helix.PREFIX_OF_BROKER_INSTANCE, _instanceId);
 
     _brokerConf.setProperty(Broker.CONFIG_OF_BROKER_ID, _instanceId);
-
-    ContinuousJfrStarter.init(_brokerConf);
   }
 
   /// Can be overridden to apply custom configs to the broker conf.
@@ -537,6 +535,9 @@ public abstract class BaseBrokerStarter implements ServiceStartable {
     _isStarting = false;
     _brokerMetrics.addTimedValue(BrokerTimer.STARTUP_SUCCESS_DURATION_MS,
         System.currentTimeMillis() - startTimeMs, TimeUnit.MILLISECONDS);
+
+    _defaultClusterConfigChangeHandler.registerClusterConfigChangeListener(ContinuousJfrStarter.INSTANCE);
+
     LOGGER.info("Finish starting Pinot broker");
   }
 
