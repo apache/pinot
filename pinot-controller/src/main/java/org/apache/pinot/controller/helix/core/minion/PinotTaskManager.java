@@ -32,6 +32,7 @@ import java.util.Map;
 import java.util.Properties;
 import java.util.Set;
 import java.util.UUID;
+import java.util.concurrent.Callable;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.Executor;
 import java.util.stream.Collectors;
@@ -40,9 +41,12 @@ import org.apache.commons.collections4.CollectionUtils;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.hc.client5.http.impl.io.PoolingHttpClientConnectionManager;
 import org.apache.helix.AccessOption;
+import org.apache.helix.store.HelixPropertyStore;
 import org.apache.helix.task.TaskState;
+import org.apache.helix.zookeeper.datamodel.ZNRecord;
 import org.apache.helix.zookeeper.zkclient.IZkChildListener;
 import org.apache.pinot.common.exception.TableNotFoundException;
+import org.apache.pinot.common.metadata.ZKMetadataProvider;
 import org.apache.pinot.common.metrics.ControllerGauge;
 import org.apache.pinot.common.metrics.ControllerMeter;
 import org.apache.pinot.common.metrics.ControllerMetrics;
@@ -64,6 +68,7 @@ import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.TableTaskConfig;
 import org.apache.pinot.spi.utils.CommonConstants;
 import org.apache.pinot.spi.utils.builder.TableNameBuilder;
+import org.apache.zookeeper.data.Stat;
 import org.quartz.CronScheduleBuilder;
 import org.quartz.JobBuilder;
 import org.quartz.JobDataMap;
@@ -95,6 +100,8 @@ public class PinotTaskManager extends ControllerPeriodicTask<Void> {
   public final static String LEAD_CONTROLLER_MANAGER_KEY = "LeadControllerManager";
   public final static String SCHEDULE_KEY = "schedule";
   public final static String MINION_INSTANCE_TAG_CONFIG = "minionInstanceTag";
+  public final static String ACQUIRED_AT = "acquiredAt";
+  public final static int TASK_GENERATION_LOCK_TTL = 300_000;
 
   private static final String TABLE_CONFIG_PARENT_PATH = "/CONFIGS/TABLE";
   private static final String TABLE_CONFIG_PATH_PREFIX = "/CONFIGS/TABLE/";
@@ -238,8 +245,11 @@ public class PinotTaskManager extends ControllerPeriodicTask<Void> {
       // This can be used by the generator to appropriately set the subtask configs
       // Example usage in BaseTaskGenerator.getNumSubTasks()
       taskConfigs.put(MinionConstants.TRIGGERED_BY, CommonConstants.TaskTriggers.ADHOC_TRIGGER.name());
-
-      List<PinotTaskConfig> pinotTaskConfigs = taskGenerator.generateTasks(tableConfig, taskConfigs);
+      List<PinotTaskConfig> pinotTaskConfigs = new ArrayList<>();
+      generateWithLock(tableName, taskType, () -> {
+        pinotTaskConfigs.addAll(taskGenerator.generateTasks(tableConfig, taskConfigs));
+        return null;
+      });
       if (pinotTaskConfigs.isEmpty()) {
         LOGGER.warn("No ad-hoc task generated for task type: {}", taskType);
         continue;
@@ -767,8 +777,12 @@ public class PinotTaskManager extends ControllerPeriodicTask<Void> {
           tableTaskConfig.getConfigsForTaskType(taskType).put(MinionConstants.TRIGGERED_BY, triggeredBy);
         }
 
-        taskGenerator.generateTasks(List.of(tableConfig), presentTaskConfig);
+        generateWithLock(tableName, taskType, () -> {
+          taskGenerator.generateTasks(List.of(tableConfig), presentTaskConfig);
+          return null;
+        });
         int maxNumberOfSubTasks = taskGenerator.getMaxAllowedSubTasksPerTask();
+        List<PinotTaskConfig> finalTaskConfigs = presentTaskConfig;
         if (presentTaskConfig.size() > maxNumberOfSubTasks) {
           String message = String.format(
               "Number of tasks generated for task type: %s for table: %s is %d, which is greater than the "
@@ -784,12 +798,12 @@ public class PinotTaskManager extends ControllerPeriodicTask<Void> {
           }
           // For scheduled tasks, we log a warning and limit the number of tasks
           LOGGER.warn(message + "Only the first {} tasks will be scheduled", maxNumberOfSubTasks);
-          presentTaskConfig = new ArrayList<>(presentTaskConfig.subList(0, maxNumberOfSubTasks));
+          finalTaskConfigs = new ArrayList<>(presentTaskConfig.subList(0, maxNumberOfSubTasks));
           // Provide user visibility to the maximum number of subtasks that were used for the task
-          presentTaskConfig.forEach(pinotTaskConfig -> pinotTaskConfig.getConfigs()
+          finalTaskConfigs.forEach(pinotTaskConfig -> pinotTaskConfig.getConfigs()
               .put(MinionConstants.TABLE_MAX_NUM_TASKS_KEY, String.valueOf(maxNumberOfSubTasks)));
         }
-        minionInstanceTagToTaskConfigs.put(minionInstanceTag, presentTaskConfig);
+        minionInstanceTagToTaskConfigs.put(minionInstanceTag, finalTaskConfigs);
         long successRunTimestamp = System.currentTimeMillis();
         _taskManagerStatusCache.saveTaskGeneratorInfo(tableName, taskType,
             taskGeneratorMostRecentRunInfo -> taskGeneratorMostRecentRunInfo.addSuccessRunTs(successRunTimestamp));
@@ -867,6 +881,64 @@ public class PinotTaskManager extends ControllerPeriodicTask<Void> {
       }
     }
     return response.setScheduledTaskNames(submittedTaskNames);
+  }
+
+  /**
+   * Runs the task generation flow only when generation lock is successfully acquired
+   *
+   * @param tableNameWithType table for which task is being generated
+   * @param taskType task type for which task is being generated
+   * @param generate generation logic
+   * @throws Exception thrown by task generation logic or if failed to acquire lock
+   */
+  public void generateWithLock(String tableNameWithType, String taskType, Callable<Void> generate)
+      throws Exception {
+    String lockNodePath =
+        ZKMetadataProvider.constructPropertyStorePathForMinionTaskGenerationLock(tableNameWithType, taskType);
+    Stat stat = new Stat();
+    HelixPropertyStore<ZNRecord> propertyStore = _pinotHelixResourceManager.getPropertyStore();
+    ZNRecord znRecord = propertyStore.get(lockNodePath, stat, AccessOption.PERSISTENT);
+    // If lock node already exists check if it has gone beyond TTL
+    if (znRecord != null) {
+      long acquiredAt = znRecord.getLongField(ACQUIRED_AT, 0);
+      if (acquiredAt + TASK_GENERATION_LOCK_TTL > System.currentTimeMillis()) {
+        throw new RuntimeException("Unable to acquire task generation lock on table " + tableNameWithType
+            + " for task type " + taskType);
+      } else {
+        propertyStore.remove(lockNodePath, AccessOption.PERSISTENT);
+      }
+    }
+
+    // Create new lock node
+    znRecord = new ZNRecord(String.valueOf(UUID.randomUUID()));
+    znRecord.setLongField(ACQUIRED_AT, System.currentTimeMillis());
+    if (propertyStore.create(lockNodePath, znRecord, AccessOption.PERSISTENT)) {
+      LOGGER.info("Acquired task generation lock on table {} for task type {} with id {}", tableNameWithType, taskType,
+          znRecord.getId());
+      try {
+        generate.call();
+      } finally {
+        // release lock by deleting the lock node
+        propertyStore.remove(lockNodePath, AccessOption.PERSISTENT);
+      }
+    } else {
+      throw new RuntimeException("Unable to acquire task generation lock on table " + tableNameWithType
+          + " for task type " + taskType);
+    }
+  }
+
+  /**
+   * Utility to release the lock forcefully.
+   * This does not ensure the cleanup of ongoing task generation and should be used with caution.
+   * @param tableNameWithType table to release the lock from
+   * @param taskType task type to release the lock from
+   * @return true if existing lock was released, false if lock was missing.
+   */
+  public boolean forceReleaseLock(String tableNameWithType, String taskType) {
+    String lockNodePath =
+        ZKMetadataProvider.constructPropertyStorePathForMinionTaskGenerationLock(tableNameWithType, taskType);
+    // release lock by deleting the lock node
+    return _pinotHelixResourceManager.getPropertyStore().remove(lockNodePath, AccessOption.PERSISTENT);
   }
 
   @Override
