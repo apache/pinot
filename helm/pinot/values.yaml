@@ -790,7 +790,14 @@ zookeeper:
   ## Specify a Zookeeper imagePullPolicy
   ## ref: http://kubernetes.io/docs/user-guide/images/#pre-pulling-images
   image:
-    PullPolicy: "IfNotPresent"
+    registry: "docker.io"
+    repository: "bitnamilegacy/zookeeper"
+    tag: "3.9.3-debian-12-r22"
+    pullPolicy: "IfNotPresent"
+
+  global:
+    security:
+      allowInsecureImages: true
 
   ## Pod scheduling preferences (by default keep pods within a release on separate nodes).
   ## ref: https://kubernetes.io/docs/concepts/configuration/assign-pod-node/#affinity-and-anti-affinity
