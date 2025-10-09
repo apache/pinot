@@ -563,7 +563,6 @@ public abstract class BaseSingleStageBrokerRequestHandler extends BaseBrokerRequ
       attachTimeBoundary(offlinePinotQuery, timeBoundaryInfo, true);
       handleExpressionOverride(offlinePinotQuery, _tableCache.getExpressionOverrideMap(offlineTableName));
       handleTimestampIndexOverride(offlinePinotQuery, offlineTableConfig);
-      _queryOptimizer.optimize(offlinePinotQuery, offlineTableConfig, schema);
       offlineBrokerRequest = CalciteSqlCompiler.convertToBrokerRequest(offlinePinotQuery);
 
       PinotQuery realtimePinotQuery = serverPinotQuery.deepCopy();
@@ -571,7 +570,6 @@ public abstract class BaseSingleStageBrokerRequestHandler extends BaseBrokerRequ
       attachTimeBoundary(realtimePinotQuery, timeBoundaryInfo, false);
       handleExpressionOverride(realtimePinotQuery, _tableCache.getExpressionOverrideMap(realtimeTableName));
       handleTimestampIndexOverride(realtimePinotQuery, realtimeTableConfig);
-      _queryOptimizer.optimize(realtimePinotQuery, realtimeTableConfig, schema);
       realtimeBrokerRequest = CalciteSqlCompiler.convertToBrokerRequest(realtimePinotQuery);
 
       requestContext.setFanoutType(RequestContext.FanoutType.HYBRID);
@@ -582,7 +580,6 @@ public abstract class BaseSingleStageBrokerRequestHandler extends BaseBrokerRequ
       setTableName(serverBrokerRequest, offlineTableName);
       handleExpressionOverride(serverPinotQuery, _tableCache.getExpressionOverrideMap(offlineTableName));
       handleTimestampIndexOverride(serverPinotQuery, offlineTableConfig);
-      _queryOptimizer.optimize(serverPinotQuery, offlineTableConfig, schema);
       offlineBrokerRequest = serverBrokerRequest;
 
       requestContext.setFanoutType(RequestContext.FanoutType.OFFLINE);
@@ -592,7 +589,6 @@ public abstract class BaseSingleStageBrokerRequestHandler extends BaseBrokerRequ
       setTableName(serverBrokerRequest, realtimeTableName);
       handleExpressionOverride(serverPinotQuery, _tableCache.getExpressionOverrideMap(realtimeTableName));
       handleTimestampIndexOverride(serverPinotQuery, realtimeTableConfig);
-      _queryOptimizer.optimize(serverPinotQuery, realtimeTableConfig, schema);
       realtimeBrokerRequest = serverBrokerRequest;
 
       requestContext.setFanoutType(RequestContext.FanoutType.REALTIME);
@@ -1009,6 +1005,7 @@ public abstract class BaseSingleStageBrokerRequestHandler extends BaseBrokerRequ
     if (schema != null) {
       handleDistinctMultiValuedOverride(serverPinotQuery, schema);
     }
+    _queryOptimizer.optimize(serverPinotQuery, schema);
 
     return new CompileResult(pinotQuery, serverPinotQuery, schema, tableName, rawTableName);
   }
