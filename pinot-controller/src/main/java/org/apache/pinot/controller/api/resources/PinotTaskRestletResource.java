@@ -791,4 +791,25 @@ public class PinotTaskRestletResource {
     _pinotHelixTaskResourceManager.deleteTask(taskName, forceDelete);
     return new SuccessResponse("Successfully deleted task: " + taskName);
   }
+
+  @DELETE
+  @Path("/tasks/lock/forceRelease")
+  @Authorize(targetType = TargetType.TABLE, action = Actions.Table.FORCE_RELEASE_TASK_GENERATION_LOCK,
+      paramName = "tableNameWithType")
+  @Produces(MediaType.APPLICATION_JSON)
+  @Authenticate(AccessType.DELETE)
+  @ApiOperation("Force releases the task generation lock for a given table. Call this API with caution")
+  public SuccessResponse forceReleaseTaskGenerationLock(
+      @ApiParam(value = "Table name (with type suffix).", required = true)
+      @QueryParam("tableNameWithType") String tableNameWithType) {
+    try {
+      _pinotTaskManager.forceReleaseLock(tableNameWithType);
+      return new SuccessResponse("Successfully released task generation lock on table " + tableNameWithType
+          + " for all task types");
+    } catch (Exception e) {
+      throw new ControllerApplicationException(LOGGER, "Failed to release task generation lock on table: "
+          + tableNameWithType + ", with exception: " + ExceptionUtils.getStackTrace(e),
+          Response.Status.INTERNAL_SERVER_ERROR, e);
+    }
+  }
 }
