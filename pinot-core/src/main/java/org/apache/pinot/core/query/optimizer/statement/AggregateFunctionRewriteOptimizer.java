@@ -85,7 +85,7 @@ public class AggregateFunctionRewriteOptimizer implements StatementOptimizer {
         if (schema != null) {
           FieldSpec fieldSpec = schema.getFieldSpecFor(columnName);
           if (fieldSpec != null && fieldSpec.getDataType().getStoredType() == FieldSpec.DataType.STRING) {
-            String newFunctionName = functionName.equalsIgnoreCase(AggregationFunctionType.MIN.name())
+            String newFunctionName = functionName.equals(AggregationFunctionType.MIN.name())
                 ? AggregationFunctionType.MINSTRING.name() : AggregationFunctionType.MAXSTRING.name();
             function.setOperator(newFunctionName);
           }
