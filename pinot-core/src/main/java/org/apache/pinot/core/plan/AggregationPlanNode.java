@@ -57,7 +57,7 @@ public class AggregationPlanNode implements PlanNode {
 
   // DISTINCTCOUNT excluded because consuming segment metadata contains unknown cardinality when there is no dictionary
   private static final EnumSet<AggregationFunctionType> METADATA_BASED_FUNCTIONS =
-      EnumSet.of(COUNT, MIN, MINMV, MINSTRING, MAX, MAXMV, MAXSTRING, MINMAXRANGE, MINMAXRANGEMV);
+      EnumSet.of(COUNT, MIN, MINMV, MAX, MAXMV, MINMAXRANGE, MINMAXRANGEMV);
 
   private final IndexSegment _indexSegment;
   private final SegmentContext _segmentContext;

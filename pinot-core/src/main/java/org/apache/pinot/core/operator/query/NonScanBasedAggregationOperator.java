@@ -102,16 +102,16 @@ public class NonScanBasedAggregationOperator extends BaseOperator<AggregationRes
           result = getMinValueNumeric(dataSource);
           break;
         case MINSTRING:
-          result = dataSource.getDictionary() != null ? dataSource.getDictionary().getMinVal()
-              : dataSource.getDataSourceMetadata().getMinValue();
+          assert dataSource.getDictionary() != null;
+          result = dataSource.getDictionary().getMinVal();
           break;
         case MAX:
         case MAXMV:
           result = getMaxValueNumeric(dataSource);
           break;
         case MAXSTRING:
-          result = dataSource.getDictionary() != null ? dataSource.getDictionary().getMaxVal()
-              : dataSource.getDataSourceMetadata().getMaxValue();
+          assert dataSource.getDictionary() != null;
+          result = dataSource.getDictionary().getMaxVal();
           break;
         case MINMAXRANGE:
         case MINMAXRANGEMV:
