@@ -32,7 +32,6 @@ import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.TimeUnit;
-import java.util.concurrent.TimeoutException;
 import org.apache.pinot.common.datablock.DataBlock;
 import org.apache.pinot.common.datablock.DataBlockUtils;
 import org.apache.pinot.common.datablock.MetadataBlock;
@@ -90,21 +89,18 @@ public class GrpcSendingMailbox implements SendingMailbox {
   }
 
   @Override
-  public void send(MseBlock.Data data)
-      throws IOException, TimeoutException {
+  public void send(MseBlock.Data data) {
     sendInternal(data, List.of());
   }
 
   @Override
-  public void send(MseBlock.Eos block, List<DataBuffer> serializedStats)
-      throws IOException, TimeoutException {
+  public void send(MseBlock.Eos block, List<DataBuffer> serializedStats) {
     sendInternal(block, serializedStats);
     LOGGER.debug("Completing mailbox: {}", _id);
     _contentObserver.onCompleted();
   }
 
-  private void sendInternal(MseBlock block, List<DataBuffer> serializedStats)
-      throws IOException {
+  private void sendInternal(MseBlock block, List<DataBuffer> serializedStats) {
     if (isTerminated() || (isEarlyTerminated() && block.isData())) {
       LOGGER.debug("==[GRPC SEND]== terminated or early terminated mailbox. Skipping sending message {} to: {}",
           block, _id);

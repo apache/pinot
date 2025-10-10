@@ -18,9 +18,7 @@
  */
 package org.apache.pinot.query.mailbox;
 
-import java.io.IOException;
 import java.time.Duration;
-import java.time.Period;
 import java.time.temporal.ChronoUnit;
 import java.util.Collections;
 import java.util.List;
@@ -69,14 +67,12 @@ public class InMemorySendingMailbox implements SendingMailbox {
   }
 
   @Override
-  public void send(MseBlock.Data data)
-      throws IOException, TimeoutException {
+  public void send(MseBlock.Data data) {
     sendPrivate(data, Collections.emptyList());
   }
 
   @Override
-  public void send(MseBlock.Eos block, List<DataBuffer> serializedStats)
-      throws IOException, TimeoutException {
+  public void send(MseBlock.Eos block, List<DataBuffer> serializedStats) {
     sendPrivate(block, serializedStats);
     _isTerminated = true;
   }
