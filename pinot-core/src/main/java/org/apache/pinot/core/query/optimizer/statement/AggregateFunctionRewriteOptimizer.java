@@ -18,8 +18,10 @@
  */
 package org.apache.pinot.core.query.optimizer.statement;
 
+import java.util.List;
 import javax.annotation.Nullable;
 import org.apache.pinot.common.request.Expression;
+import org.apache.pinot.common.request.Function;
 import org.apache.pinot.common.request.PinotQuery;
 import org.apache.pinot.segment.spi.AggregationFunctionType;
 import org.apache.pinot.spi.data.FieldSpec;
@@ -32,49 +34,63 @@ public class AggregateFunctionRewriteOptimizer implements StatementOptimizer {
 
   @Override
   public void optimize(PinotQuery pinotQuery, @Nullable Schema schema) {
-    for (int i = 0; i < pinotQuery.getSelectListSize(); i++) {
-      Expression expression = maybeRewriteAggregateFunction(pinotQuery.getSelectList().get(i), schema);
-      pinotQuery.getSelectList().set(i, expression);
+    if (schema == null) {
+      return;
     }
-    for (int i = 0; i < pinotQuery.getGroupByListSize(); i++) {
-      Expression expression = maybeRewriteAggregateFunction(pinotQuery.getGroupByList().get(i), schema);
-      pinotQuery.getGroupByList().set(i, expression);
+
+    List<Expression> selectList = pinotQuery.getSelectList();
+    if (selectList != null) {
+      for (Expression expression : selectList) {
+        maybeRewriteAggregateFunction(expression, schema);
+      }
     }
-    for (int i = 0; i < pinotQuery.getOrderByListSize(); i++) {
-      Expression expression = maybeRewriteAggregateFunction(pinotQuery.getOrderByList().get(i), schema);
-      pinotQuery.getOrderByList().set(i, expression);
+
+    List<Expression> groupByList = pinotQuery.getGroupByList();
+    if (groupByList != null) {
+      for (Expression expression : groupByList) {
+        maybeRewriteAggregateFunction(expression, schema);
+      }
     }
-    Expression filterExpression = maybeRewriteAggregateFunction(pinotQuery.getFilterExpression(), schema);
-    pinotQuery.setFilterExpression(filterExpression);
-    Expression havingExpression = maybeRewriteAggregateFunction(pinotQuery.getHavingExpression(), schema);
-    pinotQuery.setHavingExpression(havingExpression);
+
+    List<Expression> orderByList = pinotQuery.getOrderByList();
+    if (orderByList != null) {
+      for (Expression expression : orderByList) {
+        maybeRewriteAggregateFunction(expression, schema);
+      }
+    }
+
+    maybeRewriteAggregateFunction(pinotQuery.getFilterExpression(), schema);
+    maybeRewriteAggregateFunction(pinotQuery.getHavingExpression(), schema);
   }
 
-  private Expression maybeRewriteAggregateFunction(Expression expression, Schema schema) {
-    if (expression == null || !expression.isSetFunctionCall() || !AggregationFunctionType.isAggregationFunction(
-        expression.getFunctionCall().getOperator())) {
-      return expression;
+  private void maybeRewriteAggregateFunction(@Nullable Expression expression, Schema schema) {
+    if (expression == null || !expression.isSetFunctionCall()) {
+      return;
+    }
+
+    Function function = expression.getFunctionCall();
+    String functionName = function.getOperator();
+    if (!AggregationFunctionType.isAggregationFunction(functionName)) {
+      return;
     }
 
     // Rewrite MIN(stringCol) and MAX(stringCol) to MINSTRING / MAXSTRING
-    String functionName = expression.getFunctionCall().getOperator();
     if ((functionName.equalsIgnoreCase(AggregationFunctionType.MIN.name())
         || functionName.equalsIgnoreCase(AggregationFunctionType.MAX.name()))
-        && expression.getFunctionCall().getOperandsSize() == 1) {
-      Expression operand = expression.getFunctionCall().getOperands().get(0);
+        && function.getOperandsSize() == 1) {
+      Expression operand = function.getOperands().get(0);
+      // TODO: Handle more complex expressions (e.g. MIN(trim(stringCol)) )
       if (operand.isSetIdentifier()) {
         String columnName = operand.getIdentifier().getName();
         if (schema != null) {
           FieldSpec fieldSpec = schema.getFieldSpecFor(columnName);
-          if (fieldSpec != null && fieldSpec.getDataType() == FieldSpec.DataType.STRING) {
+          if (fieldSpec != null && fieldSpec.getDataType().getStoredType() == FieldSpec.DataType.STRING) {
             String newFunctionName = functionName.equalsIgnoreCase(AggregationFunctionType.MIN.name())
                 ? AggregationFunctionType.MINSTRING.name() : AggregationFunctionType.MAXSTRING.name();
-            expression.getFunctionCall().setOperator(newFunctionName);
+            function.setOperator(newFunctionName);
           }
         }
       }
     }
-
-    return expression;
   }
 }
