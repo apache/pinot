@@ -19,6 +19,9 @@
 package org.apache.pinot.query.mailbox;
 
 import java.io.IOException;
+import java.time.Duration;
+import java.time.Period;
+import java.time.temporal.ChronoUnit;
 import java.util.Collections;
 import java.util.List;
 import java.util.concurrent.TimeoutException;
@@ -97,8 +100,8 @@ public class InMemorySendingMailbox implements SendingMailbox {
       // See https://github.com/apache/pinot/pull/16903#discussion_r2409003423
       throw new QueryException(QueryErrorCode.INTERNAL, "Interrupted while sending data to mailbox: " + _id, e);
     } catch (TimeoutException e) {
-      throw new QueryException(QueryErrorCode.EXECUTION_TIMEOUT,
-          String.format("Timed out adding block into mailbox: %s with timeout: %dms", _id, timeoutMs));
+      throw new QueryException(QueryErrorCode.EXECUTION_TIMEOUT, "Timed out adding block into mailbox: " + _id
+          + " with timeout: " + Duration.of(timeoutMs, ChronoUnit.MILLIS), e);
     }
     switch (status) {
       case SUCCESS:
@@ -110,13 +113,7 @@ public class InMemorySendingMailbox implements SendingMailbox {
         _isTerminated = true;
         break;
       case ALREADY_TERMINATED:
-        if (_isTerminated) {
-          LOGGER.debug("Local mailbox received a late message once the stream was closed. This can happen due to "
-              + "race condition between sending the last block and closing the stream on the sender side");
-        } else {
-          throw new QueryException(QueryErrorCode.INTERNAL, String.format(
-              "Mailbox: %s already errored out (received error block before)", _id));
-        }
+        LOGGER.warn("Trying to offer blocks to the already closed mailbox {}. This should not happen", _id);
         break;
       default:
         throw new IllegalStateException("Unsupported mailbox status: " + status);
