@@ -56,6 +56,8 @@ public class AggregationPlanNode implements PlanNode {
           DISTINCTCOUNTRAWULL, SEGMENTPARTITIONEDDISTINCTCOUNT, DISTINCTCOUNTSMARTHLL, DISTINCTCOUNTSMARTULL);
 
   // DISTINCTCOUNT excluded because consuming segment metadata contains unknown cardinality when there is no dictionary
+  // MINSTRING / MAXSTRING excluded because of string column metadata issues (see discussion in
+  // https://github.com/apache/pinot/pull/16983)
   private static final EnumSet<AggregationFunctionType> METADATA_BASED_FUNCTIONS =
       EnumSet.of(COUNT, MIN, MINMV, MAX, MAXMV, MINMAXRANGE, MINMAXRANGEMV);
 
