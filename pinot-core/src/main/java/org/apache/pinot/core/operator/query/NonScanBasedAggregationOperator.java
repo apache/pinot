@@ -99,15 +99,23 @@ public class NonScanBasedAggregationOperator extends BaseOperator<AggregationRes
           break;
         case MIN:
         case MINMV:
-          result = getMinValue(dataSource);
+          result = getMinValueNumeric(dataSource);
+          break;
+        case MINSTRING:
+          assert dataSource.getDictionary() != null;
+          result = dataSource.getDictionary().getMinVal();
           break;
         case MAX:
         case MAXMV:
-          result = getMaxValue(dataSource);
+          result = getMaxValueNumeric(dataSource);
+          break;
+        case MAXSTRING:
+          assert dataSource.getDictionary() != null;
+          result = dataSource.getDictionary().getMaxVal();
           break;
         case MINMAXRANGE:
         case MINMAXRANGEMV:
-          result = new MinMaxRangePair(getMinValue(dataSource), getMaxValue(dataSource));
+          result = new MinMaxRangePair(getMinValueNumeric(dataSource), getMaxValueNumeric(dataSource));
           break;
         case DISTINCTCOUNT:
         case DISTINCTSUM:
@@ -172,7 +180,7 @@ public class NonScanBasedAggregationOperator extends BaseOperator<AggregationRes
     return new AggregationResultsBlock(_aggregationFunctions, aggregationResults, _queryContext);
   }
 
-  private static Double getMinValue(DataSource dataSource) {
+  private static Double getMinValueNumeric(DataSource dataSource) {
     Dictionary dictionary = dataSource.getDictionary();
     if (dictionary != null) {
       return toDouble(dictionary.getMinVal());
@@ -180,7 +188,7 @@ public class NonScanBasedAggregationOperator extends BaseOperator<AggregationRes
     return toDouble(dataSource.getDataSourceMetadata().getMinValue());
   }
 
-  private static Double getMaxValue(DataSource dataSource) {
+  private static Double getMaxValueNumeric(DataSource dataSource) {
     Dictionary dictionary = dataSource.getDictionary();
     if (dictionary != null) {
       return toDouble(dictionary.getMaxVal());
