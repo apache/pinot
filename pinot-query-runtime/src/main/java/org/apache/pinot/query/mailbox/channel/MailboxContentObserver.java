@@ -85,7 +85,9 @@ public class MailboxContentObserver implements StreamObserver<MailboxContent> {
         closeStream();
         return;
       } catch (InterruptedException e) {
-        Thread.currentThread().interrupt();
+        // We are not restoring the interrupt status because we are already throwing an exception
+        // Code that catches this exception must finish the work fast enough to comply the interrupt contract
+        // See https://github.com/apache/pinot/pull/16903#discussion_r2409003423
         LOGGER.debug("Interrupted while processing blocks for mailbox: {}", mailboxId, e);
         closeStream();
         return;

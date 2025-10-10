@@ -92,7 +92,9 @@ public class InMemorySendingMailbox implements SendingMailbox {
     try {
       status = _receivingMailbox.offer(block, serializedStats, timeoutMs);
     } catch (InterruptedException e) {
-      Thread.currentThread().interrupt();
+      // We are not restoring the interrupt status because we are already throwing an exception
+      // Code that catches this exception must finish the work fast enough to comply the interrupt contract
+      // See https://github.com/apache/pinot/pull/16903#discussion_r2409003423
       throw new QueryException(QueryErrorCode.INTERNAL, "Interrupted while sending data to mailbox: " + _id, e);
     } catch (TimeoutException e) {
       throw new QueryException(QueryErrorCode.EXECUTION_TIMEOUT,
