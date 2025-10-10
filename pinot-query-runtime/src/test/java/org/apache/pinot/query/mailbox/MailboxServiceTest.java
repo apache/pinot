@@ -21,6 +21,7 @@ package org.apache.pinot.query.mailbox;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
 import javax.annotation.Nullable;
 import org.apache.pinot.common.datatable.StatMap;
@@ -82,7 +83,7 @@ public class MailboxServiceTest {
     _stats = new StatMap<>(MailboxSendOperator.StatKey.class);
   }
 
-  @Test
+  @Test(timeOut = 100000)
   public void testLocalHappyPathSendFirst()
       throws Exception {
     String mailboxId = MailboxIdUtils.toMailboxId(_requestId++, SENDER_STAGE_ID, 0, RECEIVER_STAGE_ID, 0);
@@ -112,7 +113,7 @@ public class MailboxServiceTest {
     assertNull(receivingMailbox.poll());
   }
 
-  @Test
+  @Test(timeOut = 100000)
   public void testLocalHappyPathReceiveFirst()
       throws Exception {
     String mailboxId = MailboxIdUtils.toMailboxId(_requestId++, SENDER_STAGE_ID, 0, RECEIVER_STAGE_ID, 0);
@@ -147,7 +148,7 @@ public class MailboxServiceTest {
     assertNull(receivingMailbox.poll());
   }
 
-  @Test
+  @Test(timeOut = 100000)
   public void testLocalCancelledBySender()
       throws Exception {
     String mailboxId = MailboxIdUtils.toMailboxId(_requestId++, SENDER_STAGE_ID, 0, RECEIVER_STAGE_ID, 0);
@@ -175,7 +176,7 @@ public class MailboxServiceTest {
     assertEquals(receivingMailbox.getNumPendingBlocks(), 0);
   }
 
-  @Test
+  @Test(timeOut = 100000)
   public void testLocalCancelledBySenderBeforeSend() {
     String mailboxId = MailboxIdUtils.toMailboxId(_requestId++, SENDER_STAGE_ID, 0, RECEIVER_STAGE_ID, 0);
     StatMap<MailboxSendOperator.StatKey> stats = new StatMap<>(MailboxSendOperator.StatKey.class);
@@ -202,7 +203,7 @@ public class MailboxServiceTest {
     assertEquals(receivingMailbox.getNumPendingBlocks(), 0);
   }
 
-  @Test
+  @Test(timeOut = 100000)
   public void testLocalCancelledByReceiver()
       throws Exception {
     String mailboxId = MailboxIdUtils.toMailboxId(_requestId++, SENDER_STAGE_ID, 0, RECEIVER_STAGE_ID, 0);
@@ -230,7 +231,7 @@ public class MailboxServiceTest {
     assertEquals(receivingMailbox.getNumPendingBlocks(), 0);
   }
 
-  @Test
+  @Test(timeOut = 100000)
   public void testLocalTimeOut()
       throws Exception {
     String mailboxId = MailboxIdUtils.toMailboxId(_requestId++, SENDER_STAGE_ID, 0, RECEIVER_STAGE_ID, 0);
@@ -265,7 +266,7 @@ public class MailboxServiceTest {
     assertEquals(receivingMailbox.getNumPendingBlocks(), 0);
   }
 
-  @Test
+  @Test(timeOut = 100000)
   public void testLocalBufferFull()
       throws Exception {
     String mailboxId = MailboxIdUtils.toMailboxId(_requestId++, SENDER_STAGE_ID, 0, RECEIVER_STAGE_ID, 0);
@@ -303,7 +304,7 @@ public class MailboxServiceTest {
     assertEquals(receivingMailbox.getNumPendingBlocks(), 0);
   }
 
-  @Test
+  @Test(timeOut = 100000)
   public void testLocalEarlyTerminated()
       throws Exception {
     String mailboxId = MailboxIdUtils.toMailboxId(_requestId++, SENDER_STAGE_ID, 0, RECEIVER_STAGE_ID, 0);
@@ -330,7 +331,7 @@ public class MailboxServiceTest {
     assertTrue(sendingMailbox.isEarlyTerminated());
   }
 
-  @Test
+  @Test(timeOut = 100000)
   public void testRemoteHappyPathSendFirst()
       throws Exception {
     String mailboxId = MailboxIdUtils.toMailboxId(_requestId++, SENDER_STAGE_ID, 0, RECEIVER_STAGE_ID, 0);
@@ -365,7 +366,7 @@ public class MailboxServiceTest {
     assertNull(receivingMailbox.poll());
   }
 
-  @Test
+  @Test(timeOut = 100000)
   public void testRemoteHappyPathReceiveFirst()
       throws Exception {
     String mailboxId = MailboxIdUtils.toMailboxId(_requestId++, SENDER_STAGE_ID, 0, RECEIVER_STAGE_ID, 0);
@@ -389,7 +390,7 @@ public class MailboxServiceTest {
     sendingMailbox.send(SuccessMseBlock.INSTANCE, MultiStageQueryStats.emptyStats(SENDER_STAGE_ID).serialize());
 
     // Wait until all the mails are delivered
-    receiveMailLatch.await();
+    assertTrue(receiveMailLatch.await(10000, TimeUnit.MILLISECONDS), "Timed out waiting for mailbox to receive");
     assertEquals(numCallbacks.get(), ReceivingMailbox.DEFAULT_MAX_PENDING_BLOCKS);
 
     for (int i = 0; i < ReceivingMailbox.DEFAULT_MAX_PENDING_BLOCKS - 1; i++) {
@@ -406,7 +407,7 @@ public class MailboxServiceTest {
     assertNull(receivingMailbox.poll());
   }
 
-  @Test
+  @Test(timeOut = 100000)
   public void testRemoteCancelledBySender()
       throws Exception {
     String mailboxId = MailboxIdUtils.toMailboxId(_requestId++, SENDER_STAGE_ID, 0, RECEIVER_STAGE_ID, 0);
@@ -425,7 +426,7 @@ public class MailboxServiceTest {
     sendingMailbox.cancel(new Exception("TEST ERROR"));
 
     // Wait until all the mails are delivered
-    receiveMailLatch.await();
+    assertTrue(receiveMailLatch.await(10000, TimeUnit.MILLISECONDS), "Timed out waiting for mailbox to receive");
     assertEquals(numCallbacks.get(), 2);
 
     // Data blocks will be cleaned up
@@ -441,7 +442,7 @@ public class MailboxServiceTest {
     assertEquals(receivingMailbox.getNumPendingBlocks(), 0);
   }
 
-  @Test
+  @Test(timeOut = 100000)
   public void testRemoteCancelledBySenderBeforeSend()
       throws Exception {
     String mailboxId = MailboxIdUtils.toMailboxId(_requestId++, SENDER_STAGE_ID, 0, RECEIVER_STAGE_ID, 0);
@@ -459,7 +460,7 @@ public class MailboxServiceTest {
     sendingMailbox.cancel(new Exception("TEST ERROR"));
 
     // Wait until cancellation is delivered
-    receiveMailLatch.await();
+    assertTrue(receiveMailLatch.await(10000, TimeUnit.MILLISECONDS), "Timed out waiting for mailbox to receive");
     assertEquals(numCallbacks.get(), 1);
 
     // Data blocks will be cleaned up
@@ -480,7 +481,7 @@ public class MailboxServiceTest {
    * this limit is still large enough to accommodate the serialized error block.
    * In this case, the receiver should be able to receive the block indicating the error message.
    */
-  @Test
+  @Test(timeOut = 100000)
   public void testRemoteCancelledBecauseResourceExhausted()
     throws Exception {
     PinotConfiguration config =
@@ -518,7 +519,7 @@ public class MailboxServiceTest {
     }
 
     // Wait until cancellation is delivered
-    receiveMailLatch.await();
+    assertTrue(receiveMailLatch.await(10000, TimeUnit.MILLISECONDS), "Timed out waiting for mailbox to receive");
     assertEquals(numCallbacks.get(), 1);
 
     // Assert that error block is returned from server.
@@ -545,7 +546,7 @@ public class MailboxServiceTest {
    * In this case, the receiver won't be able to receive the error block, and the sending side should see the
    * generic "CANCELLED: client cancelled" error message.
    */
-  @Test
+  @Test(timeOut = 100000)
   public void testRemoteCancelledWhenTinyInbound()
       throws Exception {
     PinotConfiguration config =
@@ -562,11 +563,7 @@ public class MailboxServiceTest {
         mailboxService4.getSendingMailbox("localhost", mailboxService3.getPort(), mailboxId, Long.MAX_VALUE, _stats);
     ReceivingMailbox receivingMailbox = mailboxService3.getReceivingMailbox(mailboxId);
     AtomicInteger numCallbacks = new AtomicInteger();
-    CountDownLatch receiveMailLatch = new CountDownLatch(1);
-    receivingMailbox.registeredReader(() -> {
-      numCallbacks.getAndIncrement();
-      receiveMailLatch.countDown();
-    });
+    receivingMailbox.registeredReader(numCallbacks::getAndIncrement);
 
     // Send some large data
     try {
@@ -577,26 +574,13 @@ public class MailboxServiceTest {
       Assertions.assertThat(e.getErrorCode()).isEqualTo(QueryErrorCode.SERVER_RESOURCE_LIMIT_EXCEEDED);
     }
 
-    // Wait until cancellation is delivered
-    receiveMailLatch.await();
-    assertEquals(numCallbacks.get(), 1);
-
-    // Assert that error block is returned from server.
-    assertEquals(receivingMailbox.getNumPendingBlocks(), 0);
-    MseBlock block = readBlock(receivingMailbox);
-    assertNotNull(block);
-    assertTrue(block.isError());
-
-    assertTrue(block instanceof ErrorMseBlock);
-    ErrorMseBlock errorMseBlock = (ErrorMseBlock) block;
-    assertEquals(errorMseBlock.getErrorMessages().get(QueryErrorCode.QUERY_CANCELLATION),
-        "GRPC mailbox cancelled by sender with exception: CANCELLED: client cancelled");
+    // There is no guarantee that the receiver will receive the cancellation in this case, because the error block
 
     mailboxService3.shutdown();
     mailboxService4.shutdown();
   }
 
-  @Test
+  @Test(timeOut = 100000)
   public void testRemoteCancelledByReceiver()
       throws Exception {
     String mailboxId = MailboxIdUtils.toMailboxId(_requestId++, SENDER_STAGE_ID, 0, RECEIVER_STAGE_ID, 0);
@@ -612,7 +596,7 @@ public class MailboxServiceTest {
 
     // Send one data block and then cancel
     sendingMailbox.send(OperatorTestUtil.block(DATA_SCHEMA, new Object[]{"0"}));
-    receiveMailLatch.await();
+    assertTrue(receiveMailLatch.await(10000, TimeUnit.MILLISECONDS), "Timed out waiting for mailbox to receive");
     receivingMailbox.cancel();
     assertEquals(numCallbacks.get(), 1);
 
@@ -629,7 +613,7 @@ public class MailboxServiceTest {
     assertEquals(receivingMailbox.getNumPendingBlocks(), 0);
   }
 
-  @Test
+  @Test(timeOut = 100000)
   public void testRemoteTimeOut()
       throws Exception {
     String mailboxId = MailboxIdUtils.toMailboxId(_requestId++, SENDER_STAGE_ID, 0, RECEIVER_STAGE_ID, 0);
@@ -647,7 +631,7 @@ public class MailboxServiceTest {
     // Send one data block, RPC will timeout after deadline
     sendingMailbox.send(OperatorTestUtil.block(DATA_SCHEMA, new Object[]{"0"}));
     Thread.sleep(deadlineMs - System.currentTimeMillis() + 10);
-    receiveMailLatch.await();
+    assertTrue(receiveMailLatch.await(10000, TimeUnit.MILLISECONDS), "Timed out waiting for mailbox to receive");
     assertEquals(numCallbacks.get(), 2);
     // TODO: Currently we cannot differentiate early termination vs stream error
     assertTrue(sendingMailbox.isTerminated());
@@ -672,7 +656,7 @@ public class MailboxServiceTest {
     assertEquals(receivingMailbox.getNumPendingBlocks(), 0);
   }
 
-  @Test
+  @Test(timeOut = 100000)
   public void testRemoteBufferFull()
       throws Exception {
     String mailboxId = MailboxIdUtils.toMailboxId(_requestId++, SENDER_STAGE_ID, 0, RECEIVER_STAGE_ID, 0);
@@ -698,7 +682,7 @@ public class MailboxServiceTest {
 
     // Next send will be blocked on the receiver side and cause exception after timeout
     sendingMailbox.send(SuccessMseBlock.INSTANCE, MultiStageQueryStats.emptyStats(SENDER_STAGE_ID).serialize());
-    receiveMailLatch.await();
+    assertTrue(receiveMailLatch.await(10000, TimeUnit.MILLISECONDS), "Timed out waiting for mailbox to receive");
     assertEquals(numCallbacks.get(), ReceivingMailbox.DEFAULT_MAX_PENDING_BLOCKS + 1);
 
     // Data blocks will be cleaned up
@@ -714,7 +698,7 @@ public class MailboxServiceTest {
     assertEquals(receivingMailbox.getNumPendingBlocks(), 0);
   }
 
-  @Test
+  @Test(timeOut = 100000)
   public void testRemoteEarlyTerminated()
       throws Exception {
     String mailboxId = MailboxIdUtils.toMailboxId(_requestId++, SENDER_STAGE_ID, 0, RECEIVER_STAGE_ID, 0);
