@@ -340,6 +340,7 @@ public class GrpcSendingMailbox implements SendingMailbox {
 
   private static class NonSplitSender extends Sender {
     private final int _maxChannelSize;
+    private boolean _cancelling = false;
     public NonSplitSender(GrpcSendingMailbox mailbox, int maxChannelSize) {
       super(mailbox);
       _maxChannelSize = maxChannelSize;
@@ -357,6 +358,14 @@ public class GrpcSendingMailbox implements SendingMailbox {
                 + "Try to use block splitting by enabling "
                 + CommonConstants.MultiStageQueryRunner.KEY_OF_ENABLE_DATA_BLOCK_PAYLOAD_SPLIT + " configuration, "
                 + "which requires a restart.");
+        if (_cancelling) {
+          // already cancelling, but the error cancellation error block is still too large to send.
+          // Probably the inbound message size is configured very, very small.
+          // The only thing we can do is to use the onError mechanism and hope for the best.
+          _mailbox._contentObserver.onError(exception);
+          return sizeInBytes;
+        }
+        _cancelling = true;
         _mailbox.cancel(exception);
         throw exception;
       } else {

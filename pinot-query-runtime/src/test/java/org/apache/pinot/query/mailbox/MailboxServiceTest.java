@@ -37,8 +37,10 @@ import org.apache.pinot.query.testutils.QueryTestUtils;
 import org.apache.pinot.spi.config.instance.InstanceType;
 import org.apache.pinot.spi.env.PinotConfiguration;
 import org.apache.pinot.spi.exception.QueryErrorCode;
+import org.apache.pinot.spi.exception.QueryException;
 import org.apache.pinot.spi.utils.CommonConstants.MultiStageQueryRunner;
 import org.apache.pinot.util.TestUtils;
+import org.assertj.core.api.Assertions;
 import org.testng.annotations.AfterClass;
 import org.testng.annotations.BeforeClass;
 import org.testng.annotations.BeforeTest;
@@ -473,11 +475,16 @@ public class MailboxServiceTest {
     assertEquals(receivingMailbox.getNumPendingBlocks(), 0);
   }
 
+  /**
+   * Test what happens when the sender tries to send a block that exceeds the receiver's max inbound size limit, but
+   * this limit is still large enough to accommodate the serialized error block.
+   * In this case, the receiver should be able to receive the block indicating the error message.
+   */
   @Test
   public void testRemoteCancelledBecauseResourceExhausted()
     throws Exception {
     PinotConfiguration config =
-        new PinotConfiguration(Map.of(MultiStageQueryRunner.KEY_OF_MAX_INBOUND_QUERY_DATA_BLOCK_SIZE_BYTES, 1));
+        new PinotConfiguration(Map.of(MultiStageQueryRunner.KEY_OF_MAX_INBOUND_QUERY_DATA_BLOCK_SIZE_BYTES, 1000));
     MailboxService mailboxService3 =
         new MailboxService("localhost", QueryTestUtils.getAvailablePort(), InstanceType.BROKER, config);
     mailboxService3.start();
@@ -497,7 +504,78 @@ public class MailboxServiceTest {
     });
 
     // Send some large data
-    sendingMailbox.send(OperatorTestUtil.block(DATA_SCHEMA, new Object[]{"longer-amount-of-data-than-server-expects"}));
+    try {
+      StringBuilder sb = new StringBuilder();
+      int size = 1_000;
+      for (int i = 0; i < size; i++) {
+        sb.append("longer-amount-of-data-than-server-expects" + i);
+      }
+
+      sendingMailbox.send(OperatorTestUtil.block(DATA_SCHEMA, new Object[]{sb.toString()}));
+      fail("Expect exception when sending data that exceeds server's max inbound size");
+    } catch (QueryException e) {
+      Assertions.assertThat(e.getErrorCode()).isEqualTo(QueryErrorCode.SERVER_RESOURCE_LIMIT_EXCEEDED);
+    }
+
+    // Wait until cancellation is delivered
+    receiveMailLatch.await();
+    assertEquals(numCallbacks.get(), 1);
+
+    // Assert that error block is returned from server.
+    assertEquals(receivingMailbox.getNumPendingBlocks(), 0);
+    MseBlock block = readBlock(receivingMailbox);
+    assertNotNull(block);
+    assertTrue(block.isError());
+
+    assertTrue(block instanceof ErrorMseBlock);
+    ErrorMseBlock errorMseBlock = (ErrorMseBlock) block;
+    Assertions.assertThat(errorMseBlock.getErrorMessages().get(QueryErrorCode.QUERY_CANCELLATION))
+            .matches("Cancelled by sender with exception: Block is too large to be sent using gRPC. "
+                + "Max size is 1000B but block is \\d+B. "
+                + "Try to use block splitting by enabling pinot.query.runner.enable.data.block.payload.split "
+                + "configuration, which requires a restart.");
+
+    mailboxService3.shutdown();
+    mailboxService4.shutdown();
+  }
+
+  /**
+   * Test what happens when the sender tries to send a block that exceeds the receiver's max inbound size limit, and
+   * this limit is too small to accommodate the serialized error block.
+   * In this case, the receiver won't be able to receive the error block, and the sending side should see the
+   * generic "CANCELLED: client cancelled" error message.
+   */
+  @Test
+  public void testRemoteCancelledWhenTinyInbound()
+      throws Exception {
+    PinotConfiguration config =
+        new PinotConfiguration(Map.of(MultiStageQueryRunner.KEY_OF_MAX_INBOUND_QUERY_DATA_BLOCK_SIZE_BYTES, 1));
+    MailboxService mailboxService3 =
+        new MailboxService("localhost", QueryTestUtils.getAvailablePort(), InstanceType.BROKER, config);
+    mailboxService3.start();
+    MailboxService mailboxService4 =
+        new MailboxService("localhost", QueryTestUtils.getAvailablePort(), InstanceType.SERVER, config);
+    mailboxService4.start();
+
+    String mailboxId = MailboxIdUtils.toMailboxId(_requestId++, SENDER_STAGE_ID, 0, RECEIVER_STAGE_ID, 0);
+    SendingMailbox sendingMailbox =
+        mailboxService4.getSendingMailbox("localhost", mailboxService3.getPort(), mailboxId, Long.MAX_VALUE, _stats);
+    ReceivingMailbox receivingMailbox = mailboxService3.getReceivingMailbox(mailboxId);
+    AtomicInteger numCallbacks = new AtomicInteger();
+    CountDownLatch receiveMailLatch = new CountDownLatch(1);
+    receivingMailbox.registeredReader(() -> {
+      numCallbacks.getAndIncrement();
+      receiveMailLatch.countDown();
+    });
+
+    // Send some large data
+    try {
+      sendingMailbox.send(OperatorTestUtil.block(DATA_SCHEMA,
+          new Object[]{"longer-amount-of-data-than-server-expects"}));
+      fail("Expect exception when sending data that exceeds server's max inbound size");
+    } catch (QueryException e) {
+      Assertions.assertThat(e.getErrorCode()).isEqualTo(QueryErrorCode.SERVER_RESOURCE_LIMIT_EXCEEDED);
+    }
 
     // Wait until cancellation is delivered
     receiveMailLatch.await();
@@ -512,7 +590,7 @@ public class MailboxServiceTest {
     assertTrue(block instanceof ErrorMseBlock);
     ErrorMseBlock errorMseBlock = (ErrorMseBlock) block;
     assertEquals(errorMseBlock.getErrorMessages().get(QueryErrorCode.QUERY_CANCELLATION),
-      "Cancelled by sender with exception: CANCELLED: client cancelled");
+        "GRPC mailbox cancelled by sender with exception: CANCELLED: client cancelled");
 
     mailboxService3.shutdown();
     mailboxService4.shutdown();
