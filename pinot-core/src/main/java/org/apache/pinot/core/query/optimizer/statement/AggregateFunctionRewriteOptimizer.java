@@ -75,8 +75,8 @@ public class AggregateFunctionRewriteOptimizer implements StatementOptimizer {
     }
 
     // Rewrite MIN(stringCol) and MAX(stringCol) to MINSTRING / MAXSTRING
-    if ((functionName.equalsIgnoreCase(AggregationFunctionType.MIN.name())
-        || functionName.equalsIgnoreCase(AggregationFunctionType.MAX.name()))
+    if ((functionName.equals(AggregationFunctionType.MIN.getName())
+        || functionName.equals(AggregationFunctionType.MAX.getName()))
         && function.getOperandsSize() == 1) {
       Expression operand = function.getOperands().get(0);
       // TODO: Handle more complex expressions (e.g. MIN(trim(stringCol)) )
@@ -85,8 +85,10 @@ public class AggregateFunctionRewriteOptimizer implements StatementOptimizer {
         if (schema != null) {
           FieldSpec fieldSpec = schema.getFieldSpecFor(columnName);
           if (fieldSpec != null && fieldSpec.getDataType().getStoredType() == FieldSpec.DataType.STRING) {
-            String newFunctionName = functionName.equals(AggregationFunctionType.MIN.name())
-                ? AggregationFunctionType.MINSTRING.name() : AggregationFunctionType.MAXSTRING.name();
+            String newFunctionName =
+                functionName.equals(AggregationFunctionType.MIN.getName())
+                    ? AggregationFunctionType.MINSTRING.name().toLowerCase()
+                    : AggregationFunctionType.MAXSTRING.name().toLowerCase();
             function.setOperator(newFunctionName);
           }
         }
