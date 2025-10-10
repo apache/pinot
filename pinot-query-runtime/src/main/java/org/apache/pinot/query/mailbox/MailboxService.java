@@ -70,6 +70,21 @@ public class MailboxService {
   private final ChannelManager _channelManager;
   @Nullable private final TlsConfig _tlsConfig;
   @Nullable private final QueryAccessControlFactory _accessControlFactory;
+  /**
+   * The max inbound message size for the gRPC server.
+   *
+   * If we try to send a message larger than this value, the gRPC server will throw an exception and close the
+   * connection.
+   */
+  private final int _maxInboundMessageSize;
+  /**
+   * The max size of each ByteString chunk when splitting the payload of a data block.
+   *
+   * It is only set if the data block payload split is enabled, in which case it is set to half of the max inbound
+   * message size (with a minimum of 1 byte). Otherwise, it is set to 0, which means the payload will not be split.
+   *
+   * @see CommonConstants.MultiStageQueryRunner#KEY_OF_ENABLE_DATA_BLOCK_PAYLOAD_SPLIT
+   */
   private final int _maxByteStringSize;
 
   private GrpcMailboxServer _grpcMailboxServer;
@@ -90,18 +105,18 @@ public class MailboxService {
     _instanceType = instanceType;
     _config = config;
     _tlsConfig = tlsConfig;
-    int maxInboundMessageSize = config.getProperty(
+    _maxInboundMessageSize = config.getProperty(
         CommonConstants.MultiStageQueryRunner.KEY_OF_MAX_INBOUND_QUERY_DATA_BLOCK_SIZE_BYTES,
         CommonConstants.MultiStageQueryRunner.DEFAULT_MAX_INBOUND_QUERY_DATA_BLOCK_SIZE_BYTES
     );
-    _channelManager = new ChannelManager(tlsConfig, maxInboundMessageSize, getIdleTimeout(config));
+    _channelManager = new ChannelManager(tlsConfig, _maxInboundMessageSize, getIdleTimeout(config));
     _accessControlFactory = accessControlFactory;
     boolean splitBlocks = config.getProperty(
         CommonConstants.MultiStageQueryRunner.KEY_OF_ENABLE_DATA_BLOCK_PAYLOAD_SPLIT,
         CommonConstants.MultiStageQueryRunner.DEFAULT_ENABLE_DATA_BLOCK_PAYLOAD_SPLIT);
     if (splitBlocks) {
       // so far we ensure payload is not bigger than maxBlockSize/2, we can fine tune this later
-      _maxByteStringSize = Math.max(maxInboundMessageSize / 2, 1);
+      _maxByteStringSize = Math.max(_maxInboundMessageSize / 2, 1);
     } else {
       _maxByteStringSize = 0;
     }
@@ -148,7 +163,7 @@ public class MailboxService {
       return new InMemorySendingMailbox(mailboxId, this, deadlineMs, statMap);
     } else {
       return new GrpcSendingMailbox(mailboxId, _channelManager, hostname, port, deadlineMs, statMap,
-          _maxByteStringSize);
+          _maxInboundMessageSize, _maxByteStringSize);
     }
   }
 

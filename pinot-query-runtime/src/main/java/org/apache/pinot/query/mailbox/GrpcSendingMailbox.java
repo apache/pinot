@@ -50,6 +50,8 @@ import org.apache.pinot.query.runtime.blocks.SuccessMseBlock;
 import org.apache.pinot.query.runtime.operator.MailboxSendOperator;
 import org.apache.pinot.segment.spi.memory.DataBuffer;
 import org.apache.pinot.spi.exception.QueryErrorCode;
+import org.apache.pinot.spi.exception.QueryException;
+import org.apache.pinot.spi.utils.CommonConstants;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -73,14 +75,16 @@ public class GrpcSendingMailbox implements SendingMailbox {
   private StreamObserver<MailboxContent> _contentObserver;
 
   public GrpcSendingMailbox(String id, ChannelManager channelManager, String hostname, int port, long deadlineMs,
-      StatMap<MailboxSendOperator.StatKey> statMap, int maxByteStringSize) {
+      StatMap<MailboxSendOperator.StatKey> statMap, int maxInboundMessageSize, int maxByteStringSize) {
     _id = id;
     _channelManager = channelManager;
     _hostname = hostname;
     _port = port;
     _deadlineMs = deadlineMs;
     _statMap = statMap;
-    _sender = maxByteStringSize > 0 ? new SplitSender(this, maxByteStringSize) : new NonSplitSender(this);
+    _sender = maxByteStringSize > 0
+        ? new SplitSender(this, maxByteStringSize)
+        : new NonSplitSender(this, maxInboundMessageSize);
   }
 
   @Override
@@ -335,8 +339,10 @@ public class GrpcSendingMailbox implements SendingMailbox {
   }
 
   private static class NonSplitSender extends Sender {
-    public NonSplitSender(GrpcSendingMailbox mailbox) {
+    private final int _maxChannelSize;
+    public NonSplitSender(GrpcSendingMailbox mailbox, int maxChannelSize) {
       super(mailbox);
+      _maxChannelSize = maxChannelSize;
     }
 
     @Override
@@ -344,7 +350,18 @@ public class GrpcSendingMailbox implements SendingMailbox {
         throws IOException {
       ByteString byteString = DataBlockUtils.toByteString(dataBlock);
       int sizeInBytes = byteString.size();
-      _mailbox.sendContent(byteString, false);
+      if (sizeInBytes > _maxChannelSize) {
+        QueryException exception = QueryErrorCode.SERVER_RESOURCE_LIMIT_EXCEEDED.asException(
+            "Block is too large to be sent using gRPC. "
+                + "Max size is " + _maxChannelSize + "B but block is " + sizeInBytes + "B. "
+                + "Try to use block splitting by enabling "
+                + CommonConstants.MultiStageQueryRunner.KEY_OF_ENABLE_DATA_BLOCK_PAYLOAD_SPLIT + " configuration, "
+                + "which requires a restart.");
+        _mailbox.cancel(exception);
+        throw exception;
+      } else {
+        _mailbox.sendContent(byteString, false);
+      }
       return sizeInBytes;
     }
   }
