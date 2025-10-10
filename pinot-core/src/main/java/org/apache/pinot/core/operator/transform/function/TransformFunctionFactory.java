@@ -33,7 +33,7 @@ import org.apache.pinot.common.function.TransformFunctionType;
 import org.apache.pinot.common.request.context.ExpressionContext;
 import org.apache.pinot.common.request.context.FunctionContext;
 import org.apache.pinot.common.request.context.LiteralContext;
-import org.apache.pinot.common.utils.DataSchema;
+import org.apache.pinot.common.utils.DataSchema.ColumnDataType;
 import org.apache.pinot.common.utils.HashUtil;
 import org.apache.pinot.core.geospatial.transform.function.GeoToH3Function;
 import org.apache.pinot.core.geospatial.transform.function.GridDiskFunction;
@@ -56,6 +56,7 @@ import org.apache.pinot.core.geospatial.transform.function.StPointFunction;
 import org.apache.pinot.core.geospatial.transform.function.StPolygonFunction;
 import org.apache.pinot.core.geospatial.transform.function.StWithinFunction;
 import org.apache.pinot.core.operator.ColumnContext;
+import org.apache.pinot.core.operator.transform.TransformResultMetadata;
 import org.apache.pinot.core.operator.transform.function.SingleParamMathTransformFunction.AbsTransformFunction;
 import org.apache.pinot.core.operator.transform.function.SingleParamMathTransformFunction.CeilTransformFunction;
 import org.apache.pinot.core.operator.transform.function.SingleParamMathTransformFunction.ExpTransformFunction;
@@ -345,11 +346,11 @@ public class TransformFunctionFactory {
           // Scalar function
           String canonicalName = FunctionRegistry.canonicalize(functionName);
           // Get data types for the arguments
-          DataSchema.ColumnDataType[] argumentDataTypes = new DataSchema.ColumnDataType[numArguments];
+          ColumnDataType[] argumentDataTypes = new ColumnDataType[numArguments];
           for (int i = 0; i < numArguments; i++) {
-            argumentDataTypes[i] = DataSchema.ColumnDataType.fromDataType(
-                transformFunctionArguments.get(i).getResultMetadata().getDataType(),
-                transformFunctionArguments.get(i).getResultMetadata().isSingleValue());
+            TransformResultMetadata resultMetadata = transformFunctionArguments.get(i).getResultMetadata();
+            argumentDataTypes[i] =
+                ColumnDataType.fromDataType(resultMetadata.getDataType(), resultMetadata.isSingleValue());
           }
           FunctionInfo functionInfo = FunctionRegistry.lookupFunctionInfo(canonicalName, argumentDataTypes);
           if (functionInfo == null) {
