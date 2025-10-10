@@ -326,6 +326,10 @@ public abstract class BaseClusterIntegrationTestSet extends BaseClusterIntegrati
             + "'DL' ORDER BY ArrTime DESC";
     testQuery(query, h2Query);
 
+    // Test MIN / MAX on STRING columns (automatically rewritten to MINSTRING / MAXSTRING internally)
+    query = "SELECT MIN(OriginCityName), MAX(OriginCityName) FROM mytable";
+    testQuery(query);
+
     // Test orderedPreferredPools option which will fallbacks to non preferred Pools
     // when non of preferred Pools is available
     query = "SELECT count(*) FROM mytable WHERE OriginState LIKE 'A_' option(orderedPreferredPools=0|1)";
