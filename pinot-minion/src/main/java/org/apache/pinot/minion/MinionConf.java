@@ -92,4 +92,9 @@ public class MinionConf extends PinotConfiguration {
         .orElseGet(() -> getProperty(CommonConstants.Minion.DEPRECATED_CONFIG_OF_METRICS_PREFIX_KEY,
             CommonConstants.Minion.CONFIG_OF_METRICS_PREFIX));
   }
+
+  public int getMaxConcurrentTasksPerInstance() {
+    return getProperty(CommonConstants.Minion.CONFIG_OF_MAX_CONCURRENT_TASKS_PER_INSTANCE,
+        CommonConstants.Minion.DEFAULT_MAX_CONCURRENT_TASKS_PER_INSTANCE);
+  }
 }

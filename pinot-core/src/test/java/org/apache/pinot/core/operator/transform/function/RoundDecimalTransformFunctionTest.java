@@ -98,4 +98,24 @@ public class RoundDecimalTransformFunctionTest extends BaseTransformFunctionTest
     }
     testTransformFunctionWithNull(transformFunction, expectedValues, roaringBitmap);
   }
+
+  @Test
+  public void testRoundDecimalNaNAndInfinity() {
+    ExpressionContext expression =
+        RequestContextUtils.getExpression(String.format("round_decimal(%s / 0)", INT_SV_COLUMN));
+    TransformFunction transformFunction = TransformFunctionFactory.get(expression, _dataSourceMap);
+    Assert.assertTrue(transformFunction instanceof RoundDecimalTransformFunction);
+    Assert.assertEquals(transformFunction.getName(), TransformFunctionType.ROUND_DECIMAL.getName());
+    double[] expectedValues = new double[NUM_ROWS];
+    for (int i = 0; i < NUM_ROWS; i++) {
+      if (_intSVValues[i] < 0) {
+        expectedValues[i] = Double.NEGATIVE_INFINITY;
+      } else if (_intSVValues[i] == 0) {
+        expectedValues[i] = Double.NaN;
+      } else {
+        expectedValues[i] = Double.POSITIVE_INFINITY;
+      }
+    }
+    testTransformFunction(transformFunction, expectedValues);
+  }
 }

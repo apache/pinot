@@ -172,6 +172,10 @@ public class ControllerConf extends PinotConfiguration {
     // end of the task.
     public static final String PINOT_TASK_EXPIRE_TIME_MS = "controller.task.expire.time.ms";
 
+    // Distributed lock enablement for PinotTaskManager
+    public static final String ENABLE_DISTRIBUTED_LOCKING = "controller.task.enableDistributedLocking";
+    public static final boolean DEFAULT_ENABLE_DISTRIBUTED_LOCKING = false;
+
     @Deprecated
     // RealtimeSegmentRelocator has been rebranded as SegmentRelocator
     public static final String DEPRECATED_REALTIME_SEGMENT_RELOCATOR_FREQUENCY =
@@ -1208,6 +1212,11 @@ public class ControllerConf extends PinotConfiguration {
 
   public boolean isPinotTaskManagerSchedulerEnabled() {
     return getProperty(ControllerPeriodicTasksConf.PINOT_TASK_MANAGER_SCHEDULER_ENABLED, false);
+  }
+
+  public boolean isPinotTaskManagerDistributedLockingEnabled() {
+    return getProperty(ControllerPeriodicTasksConf.ENABLE_DISTRIBUTED_LOCKING,
+        ControllerPeriodicTasksConf.DEFAULT_ENABLE_DISTRIBUTED_LOCKING);
   }
 
   public long getPinotTaskExpireTimeInMs() {

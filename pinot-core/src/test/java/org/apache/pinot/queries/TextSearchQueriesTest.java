@@ -2310,7 +2310,7 @@ public class TextSearchQueriesTest extends BaseQueriesTest {
             + ", '*CUDA*', 'parser=CLASSIC,allowLeadingWildcard=true') AND " + "TEXT_MATCH(" + SKILLS_TEXT_COL_NAME
             + ", '*Python*', 'parser=CLASSIC,allowLeadingWildcard=true') LIMIT 50000";
 
-    BrokerResponseNative brokerResponse = getBrokerResponseForOptimizedQuery(query, getTableConfig(), SCHEMA);
+    BrokerResponseNative brokerResponse = getBrokerResponseForOptimizedQuery(query, SCHEMA);
     assertTrue(brokerResponse.getNumDocsScanned() > 0, "Query should scan some documents");
   }
 
@@ -2322,7 +2322,7 @@ public class TextSearchQueriesTest extends BaseQueriesTest {
         "SELECT INT_COL, SKILLS_TEXT_COL FROM " + TABLE_NAME + " WHERE " + "TEXT_MATCH(" + SKILLS_TEXT_COL_NAME
             + ", '*CUDA*', 'parser=CLASSIC,allowLeadingWildcard=true') AND " + "TEXT_MATCH(" + SKILLS_TEXT_COL_NAME
             + ", 'Python*', 'parser=STANDARD') LIMIT 50000";
-    BrokerResponseNative responseTrailing = getBrokerResponseForOptimizedQuery(queryTrailing, getTableConfig(), SCHEMA);
+    BrokerResponseNative responseTrailing = getBrokerResponseForOptimizedQuery(queryTrailing, SCHEMA);
     assertTrue(responseTrailing.getNumDocsScanned() > 0, "Trailing wildcard should scan some documents");
 
     // This should fail: leading wildcard is NOT allowed with parser=STANDARD
@@ -2332,7 +2332,7 @@ public class TextSearchQueriesTest extends BaseQueriesTest {
             + ", '*CUDA*', 'parser=CLASSIC,allowLeadingWildcard=true') AND " + "TEXT_MATCH(" + SKILLS_TEXT_COL_NAME
             + ", '*Python*', 'parser=STANDARD') LIMIT 50000";
 
-    BrokerResponseNative responseLeading = getBrokerResponseForOptimizedQuery(queryLeading, getTableConfig(), SCHEMA);
+    BrokerResponseNative responseLeading = getBrokerResponseForOptimizedQuery(queryLeading, SCHEMA);
     List<QueryProcessingException> exceptions = responseLeading.getExceptions();
     assertFalse(exceptions.isEmpty(), "Expected error for leading wildcard with parser=STANDARD");
     String errorMsg = exceptions.toString();

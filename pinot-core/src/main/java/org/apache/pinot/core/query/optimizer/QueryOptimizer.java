@@ -34,7 +34,6 @@ import org.apache.pinot.core.query.optimizer.filter.TextMatchFilterOptimizer;
 import org.apache.pinot.core.query.optimizer.filter.TimePredicateFilterOptimizer;
 import org.apache.pinot.core.query.optimizer.statement.StatementOptimizer;
 import org.apache.pinot.core.query.optimizer.statement.StringPredicateFilterOptimizer;
-import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.data.Schema;
 
 
@@ -57,13 +56,6 @@ public class QueryOptimizer {
    * Optimizes the given query.
    */
   public void optimize(PinotQuery pinotQuery, @Nullable Schema schema) {
-    optimize(pinotQuery, null, schema);
-  }
-
-  /**
-   * Optimizes the given query.
-   */
-  public void optimize(PinotQuery pinotQuery, @Nullable TableConfig tableConfig, @Nullable Schema schema) {
     Expression filterExpression = pinotQuery.getFilterExpression();
     if (filterExpression != null) {
       for (FilterOptimizer filterOptimizer : FILTER_OPTIMIZERS) {
@@ -74,7 +66,7 @@ public class QueryOptimizer {
 
     // Run statement optimizer after filter has already been optimized.
     for (StatementOptimizer statementOptimizer : STATEMENT_OPTIMIZERS) {
-      statementOptimizer.optimize(pinotQuery, tableConfig, schema);
+      statementOptimizer.optimize(pinotQuery, schema);
     }
   }
 }
