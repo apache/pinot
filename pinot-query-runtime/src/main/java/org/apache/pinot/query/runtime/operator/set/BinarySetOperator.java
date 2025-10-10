@@ -31,6 +31,9 @@ import org.apache.pinot.query.runtime.operator.MultiStageOperator;
 import org.apache.pinot.query.runtime.plan.OpChainExecutionContext;
 
 
+/**
+ * Base class for set operators like INTERSECT and EXCEPT / MINUS that always have two children.
+ */
 public abstract class BinarySetOperator extends SetOperator {
 
   protected final MultiStageOperator _leftChildOperator;
@@ -52,7 +55,7 @@ public abstract class BinarySetOperator extends SetOperator {
   /**
    * Processes the right child operator and builds the set of rows that can be used to filter the left child.
    *
-   * @return either a data block containing rows or an EoS block, never {@code null}.
+   * @return EoS block after processing the right child completely.
    */
   protected MseBlock processRightOperator() {
     MseBlock block = _rightChildOperator.nextBlock();

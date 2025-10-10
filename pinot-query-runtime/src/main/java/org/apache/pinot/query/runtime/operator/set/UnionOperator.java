@@ -73,6 +73,7 @@ public class UnionOperator extends SetOperator {
         List<Object[]> rows = new ArrayList<>();
         for (Object[] row : ((MseBlock.Data) block).asRowHeap().getRows()) {
           Record record = new Record(row);
+          // TODO: Use a more memory efficient way to track seen rows.
           if (_seenRecords.add(record)) {
             rows.add(row);
           }
