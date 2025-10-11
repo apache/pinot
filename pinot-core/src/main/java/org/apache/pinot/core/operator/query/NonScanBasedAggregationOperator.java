@@ -21,6 +21,7 @@ package org.apache.pinot.core.operator.query;
 import com.clearspring.analytics.stream.cardinality.HyperLogLog;
 import com.clearspring.analytics.stream.cardinality.HyperLogLogPlus;
 import com.dynatrace.hash4j.distinctcount.UltraLogLog;
+import com.google.common.base.Preconditions;
 import it.unimi.dsi.fastutil.doubles.DoubleOpenHashSet;
 import it.unimi.dsi.fastutil.floats.FloatOpenHashSet;
 import it.unimi.dsi.fastutil.ints.IntOpenHashSet;
@@ -50,7 +51,7 @@ import org.apache.pinot.segment.local.customobject.MinMaxRangePair;
 import org.apache.pinot.segment.local.utils.UltraLogLogUtils;
 import org.apache.pinot.segment.spi.datasource.DataSource;
 import org.apache.pinot.segment.spi.index.reader.Dictionary;
-import org.apache.pinot.spi.data.FieldSpec;
+import org.apache.pinot.spi.data.FieldSpec.DataType;
 import org.apache.pinot.spi.utils.ByteArray;
 
 
@@ -101,6 +102,9 @@ public class NonScanBasedAggregationOperator extends BaseOperator<AggregationRes
         case MINMV:
           result = getMinValueNumeric(dataSource);
           break;
+        case MINLONG:
+          result = getMinValueLong(dataSource);
+          break;
         case MINSTRING:
           assert dataSource.getDictionary() != null;
           result = dataSource.getDictionary().getMinVal();
@@ -108,6 +112,9 @@ public class NonScanBasedAggregationOperator extends BaseOperator<AggregationRes
         case MAX:
         case MAXMV:
           result = getMaxValueNumeric(dataSource);
+          break;
+        case MAXLONG:
+          result = getMaxValueLong(dataSource);
           break;
         case MAXSTRING:
           assert dataSource.getDictionary() != null;
@@ -188,12 +195,36 @@ public class NonScanBasedAggregationOperator extends BaseOperator<AggregationRes
     return toDouble(dataSource.getDataSourceMetadata().getMinValue());
   }
 
+  private static Long getMinValueLong(DataSource dataSource) {
+    DataType dataType = dataSource.getDataSourceMetadata().getDataType().getStoredType();
+    Preconditions.checkArgument(
+        dataType == DataType.LONG || dataType == DataType.INT,
+        "MINLONG aggregation function can only be applied to columns of integer types");
+    Dictionary dictionary = dataSource.getDictionary();
+    if (dictionary != null) {
+      return ((Number) dictionary.getMinVal()).longValue();
+    }
+    return ((Number) dataSource.getDataSourceMetadata().getMinValue()).longValue();
+  }
+
   private static Double getMaxValueNumeric(DataSource dataSource) {
     Dictionary dictionary = dataSource.getDictionary();
     if (dictionary != null) {
       return toDouble(dictionary.getMaxVal());
     }
     return toDouble(dataSource.getDataSourceMetadata().getMaxValue());
+  }
+
+  private static Long getMaxValueLong(DataSource dataSource) {
+    DataType dataType = dataSource.getDataSourceMetadata().getDataType().getStoredType();
+    Preconditions.checkArgument(
+        dataType == DataType.LONG || dataType == DataType.INT,
+        "MAXLONG aggregation function can only be applied to columns of integer types");
+    Dictionary dictionary = dataSource.getDictionary();
+    if (dictionary != null) {
+      return ((Number) dictionary.getMaxVal()).longValue();
+    }
+    return ((Number) dataSource.getDataSourceMetadata().getMaxValue()).longValue();
   }
 
   private static Double toDouble(Comparable<?> value) {
@@ -280,7 +311,7 @@ public class NonScanBasedAggregationOperator extends BaseOperator<AggregationRes
 
   private static HyperLogLog getDistinctCountHLLResult(Dictionary dictionary,
       DistinctCountHLLAggregationFunction function) {
-    if (dictionary.getValueType() == FieldSpec.DataType.BYTES) {
+    if (dictionary.getValueType() == DataType.BYTES) {
       // Treat BYTES value as serialized HyperLogLog
       try {
         HyperLogLog hll = ObjectSerDeUtils.HYPER_LOG_LOG_SER_DE.deserialize(dictionary.getBytesValue(0));
@@ -299,7 +330,7 @@ public class NonScanBasedAggregationOperator extends BaseOperator<AggregationRes
 
   private static HyperLogLogPlus getDistinctCountHLLPlusResult(Dictionary dictionary,
       DistinctCountHLLPlusAggregationFunction function) {
-    if (dictionary.getValueType() == FieldSpec.DataType.BYTES) {
+    if (dictionary.getValueType() == DataType.BYTES) {
       // Treat BYTES value as serialized HyperLogLogPlus
       try {
         HyperLogLogPlus hllplus = ObjectSerDeUtils.HYPER_LOG_LOG_PLUS_SER_DE.deserialize(dictionary.getBytesValue(0));
@@ -328,7 +359,7 @@ public class NonScanBasedAggregationOperator extends BaseOperator<AggregationRes
 
   private static UltraLogLog getDistinctCountULLResult(Dictionary dictionary,
       DistinctCountULLAggregationFunction function) {
-    if (dictionary.getValueType() == FieldSpec.DataType.BYTES) {
+    if (dictionary.getValueType() == DataType.BYTES) {
       // Treat BYTES value as serialized UltraLogLog and merge
       try {
         UltraLogLog ull = ObjectSerDeUtils.ULTRA_LOG_LOG_OBJECT_SER_DE.deserialize(dictionary.getBytesValue(0));

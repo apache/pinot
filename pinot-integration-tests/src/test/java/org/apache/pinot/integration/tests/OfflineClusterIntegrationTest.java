@@ -3594,6 +3594,12 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
     testNonScanAggregationQuery(query);
     query = "SELECT MAX(AirlineID) FROM " + tableName;
     testNonScanAggregationQuery(query);
+    query = "SELECT MINLONG(AirlineID) FROM " + tableName;
+    h2Query = "SELECT MIN(AirlineID) FROM " + tableName;
+    testNonScanAggregationQuery(query, h2Query);
+    query = "SELECT MAXLONG(AirlineID) FROM " + tableName;
+    h2Query = "SELECT MAX(AirlineID) FROM " + tableName;
+    testNonScanAggregationQuery(query, h2Query);
     query = "SELECT MIN_MAX_RANGE(AirlineID) FROM " + tableName;
     h2Query = "SELECT MAX(AirlineID)-MIN(AirlineID) FROM " + tableName;
     testNonScanAggregationQuery(query, h2Query);
