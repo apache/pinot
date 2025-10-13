@@ -20,6 +20,7 @@ package org.apache.pinot.core.operator.transform.function;
 
 import com.google.common.annotations.VisibleForTesting;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Collections;
 import java.util.EnumMap;
 import java.util.HashMap;
@@ -356,7 +357,9 @@ public class TransformFunctionFactory {
           if (functionInfo == null) {
             if (FunctionRegistry.contains(canonicalName)) {
               throw new BadQueryRequestException(
-                  String.format("Unsupported function: %s with %d arguments", functionName, numArguments));
+                  numArguments > 0 ? String.format("Unsupported function: %s with arguments of type: %s", functionName,
+                      Arrays.toString(argumentDataTypes))
+                      : String.format("Unsupported function: %s with 0 arguments", functionName));
             } else {
               throw new BadQueryRequestException(String.format("Unsupported function: %s", functionName));
             }

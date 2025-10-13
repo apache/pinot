@@ -3510,6 +3510,7 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
     assertEquals(response1Json.get("rows").get(0).get(2).asText(), "Rule Execution Times\n"
         + "Rule: SortRemove -> Time:*\n"
         + "Rule: AggregateProjectMerge -> Time:*\n"
+        + "Rule: AggregateFunctionRewrite -> Time:*\n"
         + "Rule: EvaluateProjectLiteral -> Time:*\n"
         + "Rule: AggregateRemove -> Time:*\n");
 
@@ -3593,6 +3594,12 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
     testNonScanAggregationQuery(query);
     query = "SELECT MAX(AirlineID) FROM " + tableName;
     testNonScanAggregationQuery(query);
+    query = "SELECT MINLONG(AirlineID) FROM " + tableName;
+    h2Query = "SELECT MIN(AirlineID) FROM " + tableName;
+    testNonScanAggregationQuery(query, h2Query);
+    query = "SELECT MAXLONG(AirlineID) FROM " + tableName;
+    h2Query = "SELECT MAX(AirlineID) FROM " + tableName;
+    testNonScanAggregationQuery(query, h2Query);
     query = "SELECT MIN_MAX_RANGE(AirlineID) FROM " + tableName;
     h2Query = "SELECT MAX(AirlineID)-MIN(AirlineID) FROM " + tableName;
     testNonScanAggregationQuery(query, h2Query);
@@ -3631,7 +3638,13 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
     testNonScanAggregationQuery(query, h2Query);
 
     // STRING
-    // TODO: add test cases for string column when we add support for min and max on string datatype columns
+    query = "SELECT MINSTRING(Carrier) FROM " + tableName;
+    h2Query = "SELECT MIN(Carrier) FROM " + tableName;
+    testNonScanAggregationQuery(query, h2Query);
+
+    query = "SELECT MAXSTRING(Carrier) FROM " + tableName;
+    h2Query = "SELECT MAX(Carrier) FROM " + tableName;
+    testNonScanAggregationQuery(query, h2Query);
 
     // Non dictionary columns
     // INT
