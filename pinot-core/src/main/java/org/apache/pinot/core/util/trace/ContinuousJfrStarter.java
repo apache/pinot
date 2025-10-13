@@ -232,7 +232,7 @@ public class ContinuousJfrStarter implements PinotClusterConfigChangeListener {
 
       String timestamp = ZonedDateTime.ofInstant(Instant.now(), ZoneOffset.UTC)
           .format(DateTimeFormatter.ofPattern("yyyy-MM-dd_HH-mm-ss"));
-      String filename = "recording-" + _recording.getName() + timestamp + ".jfr";
+      String filename = "recording-" + _recording.getName() + "-" + timestamp + ".jfr";
       Path recordingPath = directory.resolve(filename);
       _recording.setDestination(recordingPath);
 
