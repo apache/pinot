@@ -90,7 +90,6 @@ public class TenantRebalancerTest extends ControllerTest {
     startController();
     addFakeBrokerInstancesToAutoJoinHelixCluster(1, true);
     _executorService = Executors.newFixedThreadPool(3);
-    ZkBasedTenantRebalanceObserver._defaultZkUpdateMaxRetries = 15;
   }
 
   @Test
@@ -135,7 +134,6 @@ public class TenantRebalancerTest extends ControllerTest {
       // assignment should not change, with a NO_OP status as no now server is added to test tenant
       assertEquals(rebalanceResult.getStatus(), RebalanceResult.Status.NO_OP);
       assertEquals(oldSegmentAssignment, rebalancedAssignment);
-
       // rebalance the tables on default tenant
       config.setTenantName(DEFAULT_TENANT_NAME);
       result = tenantRebalancer.rebalance(config);
@@ -143,7 +141,6 @@ public class TenantRebalancerTest extends ControllerTest {
       rebalanceResult = result.getRebalanceTableResults().get(OFFLINE_TABLE_NAME_A);
       InstancePartitions partitions = rebalanceResult.getInstanceAssignment().get(InstancePartitionsType.OFFLINE);
       assertEquals(partitions.getPartitionToInstancesMap().get("0_0").size(), 6);
-
       // ensure the ideal state and external view converges
       assertTrue(waitForCompletion(result.getJobId()));
       TenantRebalanceProgressStats progressStats = getProgress(result.getJobId());
@@ -1512,7 +1509,7 @@ public class TenantRebalancerTest extends ControllerTest {
 
     try {
       for (int i = 0; i < 3; i++) {
-        runZkBasedTenantRebalanceObserverConcurrentPoll();
+        runZkBasedTenantRebalanceObserverConcurrentPoll("concurrent-poll-job-" + i);
       }
     } finally {
       // Clean up tables
@@ -1526,12 +1523,10 @@ public class TenantRebalancerTest extends ControllerTest {
     }
   }
 
-  private void runZkBasedTenantRebalanceObserverConcurrentPoll()
+  private void runZkBasedTenantRebalanceObserverConcurrentPoll(String jobId)
       throws Exception {
     TenantRebalancer tenantRebalancer =
         new TenantRebalancer(_tableRebalanceManager, _helixResourceManager, _executorService);
-
-    String jobId = "test-concurrent-poll-job-303";
 
     // Create tenant rebalance context with multiple tables
     TenantRebalanceConfig config = new TenantRebalanceConfig();

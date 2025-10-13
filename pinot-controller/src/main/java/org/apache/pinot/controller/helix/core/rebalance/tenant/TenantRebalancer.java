@@ -159,7 +159,7 @@ public class TenantRebalancer {
     // ZK observer would likely to fail to update if the allowed retries is lower than the degree of parallelism,
     // because all threads would poll when the tenant rebalance job starts at the same time.
     int observerUpdaterMaxRetries =
-        Math.max(config.getDegreeOfParallelism(), ZkBasedTenantRebalanceObserver._defaultZkUpdateMaxRetries);
+        Math.max(config.getDegreeOfParallelism(), ZkBasedTenantRebalanceObserver.DEFAULT_ZK_UPDATE_MAX_RETRIES);
     ZkBasedTenantRebalanceObserver observer =
         new ZkBasedTenantRebalanceObserver(tenantRebalanceContext.getJobId(), config.getTenantName(),
             tables, tenantRebalanceContext, _pinotHelixResourceManager, observerUpdaterMaxRetries);
