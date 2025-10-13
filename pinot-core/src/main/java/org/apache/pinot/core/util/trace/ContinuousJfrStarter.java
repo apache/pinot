@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.core.util.trace;
 
+import com.google.common.annotations.VisibleForTesting;
 import java.io.File;
 import java.io.IOException;
 import java.io.UncheckedIOException;
@@ -26,19 +27,16 @@ import java.nio.file.Paths;
 import java.text.ParseException;
 import java.time.Duration;
 import java.time.Instant;
-import java.time.ZoneOffset;
-import java.time.ZonedDateTime;
-import java.time.format.DateTimeFormatter;
 import java.time.format.DateTimeParseException;
 import java.util.Arrays;
 import java.util.Comparator;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
+import java.util.stream.Collectors;
 import javax.annotation.concurrent.GuardedBy;
 import jdk.jfr.Configuration;
 import jdk.jfr.Recording;
-import org.apache.arrow.util.VisibleForTesting;
 import org.apache.pinot.spi.config.provider.PinotClusterConfigChangeListener;
 import org.apache.pinot.spi.env.PinotConfiguration;
 import org.apache.pinot.spi.utils.CommonConstants;
@@ -223,6 +221,12 @@ public class ContinuousJfrStarter implements PinotClusterConfigChangeListener {
     _running = true;
   }
 
+  @VisibleForTesting
+  protected static Path getRecordingPath(Path parentDir, String name, Instant timestamp) {
+    String filename = "recording-" + name + timestamp + ".jfr";
+    return parentDir.resolve(filename);
+  }
+
   private void prepareFileDumps(PinotConfiguration subset) {
     try {
       Path directory = Path.of(subset.getProperty(DIRECTORY, Paths.get(".").toString()));
@@ -230,15 +234,22 @@ public class ContinuousJfrStarter implements PinotClusterConfigChangeListener {
         throw new RuntimeException("Cannot write: " + directory);
       }
 
-      String timestamp = ZonedDateTime.ofInstant(Instant.now(), ZoneOffset.UTC)
-          .format(DateTimeFormatter.ofPattern("yyyy-MM-dd_HH-mm-ss"));
-      String filename = "recording-" + _recording.getName() + timestamp + ".jfr";
-      Path recordingPath = directory.resolve(filename);
+      Path recordingPath = getRecordingPath(directory, _recording.getName(), Instant.now());
       _recording.setDestination(recordingPath);
 
       int maxDumps = subset.getProperty(MAX_DUMPS, DEFAULT_MAX_DUMPS);
       if (maxDumps > 0) {
-        _cleanupThread = createThread(() -> cleanUpDumps(directory, maxDumps, _recording.getName()));
+        _cleanupThread = createThread(() -> {
+          while (!Thread.currentThread().isInterrupted()) {
+            cleanUpDumps(directory, maxDumps, _recording.getName());
+            try {
+              Thread.sleep(Duration.ofHours(1).toMillis());
+            } catch (InterruptedException e) {
+              Thread.currentThread().interrupt();
+              break;
+            }
+          }
+        });
         _cleanupThread.start();
       }
     } catch (IOException e) {
@@ -246,8 +257,7 @@ public class ContinuousJfrStarter implements PinotClusterConfigChangeListener {
     }
   }
 
-  @VisibleForTesting
-  protected Recording createRecording(PinotConfiguration subset) {
+  private Recording createRecording(PinotConfiguration subset) {
     String jfrConfName = subset.getProperty(CONFIGURATION, DEFAULT_CONFIGURATION);
     try {
       Configuration configuration = Configuration.getConfiguration(jfrConfName);
@@ -259,25 +269,37 @@ public class ContinuousJfrStarter implements PinotClusterConfigChangeListener {
     }
   }
 
-  @VisibleForTesting
-  protected Thread createThread(Runnable runnable) {
+  private Thread createThread(Runnable runnable) {
     Thread thread = new Thread(runnable);
     thread.setName("JFR-Dump-Cleanup");
     thread.setDaemon(true);
     return thread;
   }
 
-  private static void cleanUpDumps(Path directory, int maxDumps, String recordingName) {
+  @VisibleForTesting
+  protected static void cleanUpDumps(Path directory, int maxDumps, String recordingName) {
     if (maxDumps < 0) {
       LOGGER.debug("maxDumps is negative, no cleanup will be performed");
       return;
     }
+    LOGGER.info("Cleaning up old JFR dumps in {} to keep at most {} dumps", directory, maxDumps);
     File[] files = directory.toFile()
         .listFiles((dir, name) -> name.startsWith("recording-" + recordingName) && name.endsWith(".jfr"));
     if (files == null) {
       return;
     }
     Arrays.sort(files, Comparator.comparing(File::getName).reversed());
+    if (files.length <= maxDumps) {
+      LOGGER.info("No cleanup needed, found {} dumps", files.length);
+      return;
+    }
+    File[] filesToDelete = Arrays.copyOfRange(files, maxDumps, files.length);
+    if (LOGGER.isInfoEnabled()) {
+      String filesToDeleteName = Arrays.stream(filesToDelete)
+          .map(File::getName)
+          .collect(Collectors.joining(", "));
+      LOGGER.info("Found {} dumps, going to delete the following older dumps {}", files.length, filesToDeleteName);
+    }
     for (int i = maxDumps; i < files.length; i++) {
       boolean delete = files[i].delete();
       if (!delete) {

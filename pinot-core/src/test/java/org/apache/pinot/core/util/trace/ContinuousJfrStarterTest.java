@@ -18,9 +18,19 @@
  */
 package org.apache.pinot.core.util.trace;
 
+import java.io.File;
+import java.io.IOException;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.time.Instant;
+import java.time.ZoneOffset;
+import java.time.ZonedDateTime;
 import java.util.Map;
 import java.util.Set;
+import java.util.stream.Collectors;
+import java.util.stream.IntStream;
 import jdk.jfr.Recording;
+import org.apache.commons.io.FileUtils;
 import org.apache.pinot.spi.env.PinotConfiguration;
 import org.assertj.core.api.Assertions;
 import org.mockito.Mockito;
@@ -148,5 +158,65 @@ public class ContinuousJfrStarterTest {
         .describedAs("Recording should still be disabled")
         .isFalse();
     Mockito.verifyNoInteractions(_recording);
+  }
+
+  @Test
+  public void cleanUpThreadDeletesFiles()
+      throws IOException {
+    Path tempDirectory = Files.createTempDirectory("jfr-test-");
+    int maxDumps = 3;
+    long now = ZonedDateTime.of(2025, 10, 13, 12, 0, 0, 0, ZoneOffset.UTC).toInstant().toEpochMilli();
+    try {
+      long[] dates = IntStream.range(0, maxDumps * 2)
+          .mapToLong(i -> now - i * 3600_000L)
+          .sorted()
+          .toArray();
+      for (long creationDate : dates) {
+        Path path = ContinuousJfrStarter.getRecordingPath(tempDirectory, "test", Instant.ofEpochMilli(creationDate));
+        File file = path.toFile();
+        Assertions.assertThat(file.createNewFile())
+            .describedAs("Should be able to create a file in the temp directory")
+            .isTrue();
+        Assertions.assertThat(file.setLastModified(creationDate))
+            .describedAs("Should be able to set the last modified time")
+            .isTrue();
+      }
+
+      // Verify that we have 2 * maxDumps files
+      try (var files = Files.list(tempDirectory)) {
+        Assertions.assertThat(files.count())
+            .describedAs("Should have 2 * maxDumps files in the temp directory")
+            .isEqualTo(maxDumps * 2);
+      }
+
+      // Run the cleanup
+      ContinuousJfrStarter.cleanUpDumps(tempDirectory, maxDumps, "test");
+
+      // Verify that we have maxDumps files and only the newest ones are kept
+      try (var files = Files.list(tempDirectory)) {
+        var remainingFiles = files.collect(Collectors.toSet());
+        Assertions.assertThat(remainingFiles)
+            .describedAs("Should have maxDumps files in the temp directory")
+            .hasSize(maxDumps);
+        for (int i = 0; i < maxDumps; i++) {
+          long creationDate = dates[dates.length - 1 - i];
+          Instant timestamp = Instant.ofEpochMilli(creationDate);
+          Path expectedPath = ContinuousJfrStarter.getRecordingPath(tempDirectory, "test", timestamp);
+          Assertions.assertThat(remainingFiles)
+              .describedAs("Should contain the expected file: %s", expectedPath)
+              .contains(expectedPath);
+        }
+      }
+
+      // Clean all files
+      ContinuousJfrStarter.cleanUpDumps(tempDirectory, 0, "test");
+      try (var files = Files.list(tempDirectory)) {
+        Assertions.assertThat(files.count())
+            .describedAs("Should have no files in the temp directory")
+            .isEqualTo(0);
+      }
+    } finally {
+      FileUtils.deleteDirectory(tempDirectory.toFile());
+    }
   }
 }
