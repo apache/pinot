@@ -1360,6 +1360,10 @@ public final class TableConfigUtils {
           String column = columnPair.getColumn();
           if (!column.equals(AggregationFunctionColumnPair.STAR)) {
             referencedColumns.add(column);
+          } else if (columnPair.getFunctionType() != AggregationFunctionType.COUNT) {
+            throw new IllegalStateException("Non-COUNT function set the column as '*' in the aggregationConfig for "
+                + "function: " + aggregationConfig.getAggregationFunction()
+                + ". Please configure an actual column for the function");
           }
         }
       }
