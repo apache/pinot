@@ -257,7 +257,8 @@ public class ContinuousJfrStarter implements PinotClusterConfigChangeListener {
     }
   }
 
-  private Recording createRecording(PinotConfiguration subset) {
+  @VisibleForTesting
+  protected Recording createRecording(PinotConfiguration subset) {
     String jfrConfName = subset.getProperty(CONFIGURATION, DEFAULT_CONFIGURATION);
     try {
       Configuration configuration = Configuration.getConfiguration(jfrConfName);
