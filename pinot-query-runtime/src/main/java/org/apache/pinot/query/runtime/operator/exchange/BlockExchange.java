@@ -118,7 +118,6 @@ public abstract class BlockExchange {
    * @return true if all the mailboxes has been early terminated.
    * @throws org.apache.pinot.spi.exception.QueryException if any mailbox fails to send the block, including on timeout.
    */
-  // TODO: Remove throws, as they are never thrown
   public boolean send(MseBlock.Eos eosBlock, List<DataBuffer> serializedStats) {
     int mailboxIdToSendMetadata;
     if (!serializedStats.isEmpty()) {
