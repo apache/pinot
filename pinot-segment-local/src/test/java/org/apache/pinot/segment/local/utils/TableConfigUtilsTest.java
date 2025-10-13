@@ -1733,7 +1733,7 @@ public class TableConfigUtilsTest {
         .build();
     try {
       TableConfigUtils.validate(tableConfig, schema);
-      fail("Should fail for invalid StarTreeIndex config with aggregation config for SUM on '*' column" );
+      fail("Should fail for invalid StarTreeIndex config with aggregation config for SUM on '*' column");
     } catch (Exception e) {
       // expected
     }
