@@ -344,12 +344,14 @@ public abstract class BlockingMultiStreamConsumer<E> implements AutoCloseable {
     private final int _stageId;
     @Nullable
     private MultiStageQueryStats _stats;
+    private final int _senderStageId;
 
     public OfMseBlock(OpChainExecutionContext context,
-        List<? extends AsyncStream<ReceivingMailbox.MseBlockWithStats>> asyncProducers) {
+        List<? extends AsyncStream<ReceivingMailbox.MseBlockWithStats>> asyncProducers, int senderStageId) {
       super(context.getId(), context.getPassiveDeadlineMs(), asyncProducers);
       _stageId = context.getStageId();
       _stats = MultiStageQueryStats.emptyStats(context.getStageId());
+      _senderStageId = senderStageId;
     }
 
     @Override
@@ -393,7 +395,7 @@ public abstract class BlockingMultiStreamConsumer<E> implements AutoCloseable {
         return onException(terminateException.getErrorCode(), terminateException.getMessage());
       }
       // TODO: Add the sender stage id to the error message
-      String errMsg = "Timed out on stage " + _stageId + " waiting for data sent by a child stage";
+      String errMsg = "Timed out on stage " + _stageId + " waiting for data from child stage " + _senderStageId;
       // We log this case as debug because:
       // - The opchain will already log a stackless message once the opchain fail
       // - The trace is not useful (the log message is good enough to find where we failed)

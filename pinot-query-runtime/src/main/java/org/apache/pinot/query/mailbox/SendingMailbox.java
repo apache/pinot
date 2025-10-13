@@ -18,9 +18,7 @@
  */
 package org.apache.pinot.query.mailbox;
 
-import java.io.IOException;
 import java.util.List;
-import java.util.concurrent.TimeoutException;
 import org.apache.pinot.query.runtime.blocks.MseBlock;
 import org.apache.pinot.query.runtime.operator.exchange.BlockExchange;
 import org.apache.pinot.segment.spi.memory.DataBuffer;
@@ -54,16 +52,14 @@ public interface SendingMailbox {
    * and they should <b>not</b> acquire any resources when they are created. This method should throw if there was an
    * error sending the data, since that would allow {@link BlockExchange} to exit early.
    */
-  void send(MseBlock.Data data)
-      throws IOException, TimeoutException;
+  void send(MseBlock.Data data);
 
   /**
    * Sends an EOS block to the receiver. Note that SendingMailbox are required to acquire resources lazily in this call,
    * and they should <b>not</b> acquire any resources when they are created. This method should throw if there was an
    * error sending the data, since that would allow {@link BlockExchange} to exit early.
    */
-  void send(MseBlock.Eos block, List<DataBuffer> serializedStats)
-      throws IOException, TimeoutException;
+  void send(MseBlock.Eos block, List<DataBuffer> serializedStats);
 
   /**
    * Cancels the mailbox and notifies the receiver of the cancellation so that it can release the underlying resources.
