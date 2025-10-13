@@ -45,6 +45,8 @@ import org.apache.calcite.tools.RelBuilder;
  * Computes shared expressions once instead of duplicating computation.
  */
 public class PinotProjectFilterTransposeRule extends RelOptRule {
+  private static final String COMMON_EXPR_PREFIX = "commonExpr";
+  
   public static final PinotProjectFilterTransposeRule INSTANCE =
       new PinotProjectFilterTransposeRule("PinotProjectFilterTranspose");
 
@@ -96,7 +98,7 @@ public class PinotProjectFilterTransposeRule extends RelOptRule {
     for (RexNode commonExpr : commonExprList) {
       int index = intermediateProjects.size();
       intermediateProjects.add(commonExpr);
-      intermediateNames.add("commonExpr" + (index - neededColumns.size()));
+      intermediateNames.add(COMMON_EXPR_PREFIX + (index - neededColumns.size()));
       commonExprToIndex.put(commonExpr, index);
     }
 
