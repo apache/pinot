@@ -55,11 +55,14 @@ public class MailboxService {
       CacheBuilder.newBuilder().expireAfterAccess(DANGLING_RECEIVING_MAILBOX_EXPIRY_SECONDS, TimeUnit.SECONDS)
           .removalListener((RemovalListener<String, ReceivingMailbox>) notification -> {
             if (notification.wasEvicted()) {
-              int numPendingBlocks = notification.getValue().getNumPendingBlocks();
+              ReceivingMailbox receivingMailbox = notification.getValue();
+              int numPendingBlocks = receivingMailbox.getNumPendingBlocks();
               if (numPendingBlocks > 0) {
                 LOGGER.warn("Evicting dangling receiving mailbox: {} with {} pending blocks", notification.getKey(),
                     numPendingBlocks);
               }
+              // In case there is a leak, we should cancel the mailbox to unblock any waiters and release resources.
+              receivingMailbox.cancel();
             }
           }).build();
 

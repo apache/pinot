@@ -24,7 +24,6 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.EnumSet;
 import java.util.List;
-import java.util.concurrent.TimeoutException;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 import org.apache.calcite.rel.RelDistribution;
@@ -45,6 +44,7 @@ import org.apache.pinot.query.runtime.plan.MultiStageQueryStats;
 import org.apache.pinot.query.runtime.plan.OpChainExecutionContext;
 import org.apache.pinot.segment.spi.memory.DataBuffer;
 import org.apache.pinot.spi.exception.QueryCancelledException;
+import org.apache.pinot.spi.exception.QueryException;
 import org.apache.pinot.spi.exception.TerminationException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -213,9 +213,7 @@ public class MailboxSendOperator extends MultiStageOperator {
       if (block.isEos()) {
         sendEos((MseBlock.Eos) block);
       } else {
-        if (sendMseBlock(((MseBlock.Data) block))) {
-          earlyTerminate();
-        }
+        sendMseBlock(((MseBlock.Data) block));
       }
       checkTerminationAndSampleUsage();
       return block;
@@ -225,15 +223,14 @@ public class MailboxSendOperator extends MultiStageOperator {
     } catch (TerminationException e) {
       LOGGER.info("Query was terminated for opChain: {}", _context.getId(), e);
       return ErrorMseBlock.fromException(e);
-    } catch (TimeoutException e) {
-      LOGGER.warn("Timed out transferring data on opChain: {}", _context.getId(), e);
+    } catch (QueryException e) {
       return ErrorMseBlock.fromException(e);
-    } catch (Exception e) {
+    } catch (RuntimeException e) {
       ErrorMseBlock errorBlock = ErrorMseBlock.fromException(e);
       try {
         LOGGER.error("Exception while transferring data on opChain: {}", _context.getId(), e);
         sendEos(errorBlock);
-      } catch (Exception e2) {
+      } catch (RuntimeException e2) {
         LOGGER.error("Exception while sending error block.", e2);
       }
       return errorBlock;
@@ -246,9 +243,7 @@ public class MailboxSendOperator extends MultiStageOperator {
     return _context.getPassiveDeadlineMs();
   }
 
-  private void sendEos(MseBlock.Eos eosBlockWithoutStats)
-      throws Exception {
-
+  private void sendEos(MseBlock.Eos eosBlockWithoutStats) {
     MultiStageQueryStats stats = null;
     List<DataBuffer> serializedStats;
     if (_context.isSendStats()) {
@@ -276,22 +271,20 @@ public class MailboxSendOperator extends MultiStageOperator {
     return new StatMap<>(_statMap);
   }
 
-  private boolean sendMseBlock(MseBlock.Data block)
-      throws Exception {
-    boolean isEarlyTerminated = _exchange.send(block);
+  private void sendMseBlock(MseBlock.Data block) {
+    if (_exchange.send(block)) {
+      earlyTerminate();
+    }
     if (LOGGER.isDebugEnabled()) {
       LOGGER.debug("==[SEND]== Block " + block + " sent from: " + _context.getId());
     }
-    return isEarlyTerminated;
   }
 
-  private boolean sendMseBlock(MseBlock.Eos block, List<DataBuffer> serializedStats)
-      throws Exception {
-    boolean isEarlyTerminated = _exchange.send(block, serializedStats);
+  private void sendMseBlock(MseBlock.Eos block, List<DataBuffer> serializedStats) {
+    _exchange.send(block, serializedStats);
     if (LOGGER.isDebugEnabled()) {
       LOGGER.debug("==[SEND]== Block " + block + " sent from: " + _context.getId());
     }
-    return isEarlyTerminated;
   }
 
   @Override

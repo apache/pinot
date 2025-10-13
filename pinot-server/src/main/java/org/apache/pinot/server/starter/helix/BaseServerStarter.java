@@ -276,7 +276,7 @@ public abstract class BaseServerStarter implements ServiceStartable {
     _helixManager =
         HelixManagerFactory.getZKHelixManager(_helixClusterName, _instanceId, InstanceType.PARTICIPANT, _zkAddress);
 
-    ContinuousJfrStarter.init(_serverConf);
+    _clusterConfigChangeHandler.registerClusterConfigChangeListener(ContinuousJfrStarter.INSTANCE);
   }
 
   /// Can be overridden to apply custom configs to the server conf.
