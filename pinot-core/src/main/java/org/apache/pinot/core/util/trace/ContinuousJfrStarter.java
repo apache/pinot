@@ -223,7 +223,7 @@ public class ContinuousJfrStarter implements PinotClusterConfigChangeListener {
 
   @VisibleForTesting
   protected static Path getRecordingPath(Path parentDir, String name, Instant timestamp) {
-    String filename = "recording-" + name + timestamp + ".jfr";
+    String filename = "recording-" + name + "-" + timestamp + ".jfr";
     return parentDir.resolve(filename);
   }
 
