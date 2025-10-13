@@ -1887,7 +1887,11 @@ public class CommonConstants {
    */
   public static class MultiStageQueryRunner {
     /**
-     * Configuration for mailbox data block size
+     * Configuration for mailbox data block size.
+     *
+     * Ideally it should be in the order of a few MBs, to balance the serialization/deserialization overhead and the
+     * number of messages to transfer. Values lower tha hundreds of KBs are not recommended and may lead to excessive
+     * number of messages, overhead and even errors.
      */
     public static final String KEY_OF_MAX_INBOUND_QUERY_DATA_BLOCK_SIZE_BYTES = "pinot.query.runner.max.msg.size.bytes";
     public static final int DEFAULT_MAX_INBOUND_QUERY_DATA_BLOCK_SIZE_BYTES = 16 * 1024 * 1024;
@@ -1907,13 +1911,6 @@ public class CommonConstants {
      */
     public static final String KEY_OF_CHANNEL_IDLE_TIMEOUT_SECONDS = "pinot.query.runner.channel.idle.timeout.seconds";
     public static final long DEFAULT_CHANNEL_IDLE_TIMEOUT_SECONDS = -1;
-
-    /**
-     * Enable splitting of data block payload during mailbox transfer.
-     */
-    public static final String KEY_OF_ENABLE_DATA_BLOCK_PAYLOAD_SPLIT =
-        "pinot.query.runner.enable.data.block.payload.split";
-    public static final boolean DEFAULT_ENABLE_DATA_BLOCK_PAYLOAD_SPLIT = false;
 
     /// Configuration for server port used to receive query plans.
     public static final String KEY_OF_QUERY_SERVER_PORT = "pinot.query.server.port";

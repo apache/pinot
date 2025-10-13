@@ -75,17 +75,12 @@ public class MailboxService {
    *
    * If we try to send a message larger than this value, the gRPC server will throw an exception and close the
    * connection.
+   *
+   * The {@link GrpcSendingMailbox} will split the data block into smaller chunks to fit into this limit, but a very
+   * small limit (lower than hundred of KBs) will cause performance degradation and may even fail, given that some extra
+   * bloating is added by gRPC and protobuf.
    */
   private final int _maxInboundMessageSize;
-  /**
-   * The max size of each ByteString chunk when splitting the payload of a data block.
-   *
-   * It is only set if the data block payload split is enabled, in which case it is set to half of the max inbound
-   * message size (with a minimum of 1 byte). Otherwise, it is set to 0, which means the payload will not be split.
-   *
-   * @see CommonConstants.MultiStageQueryRunner#KEY_OF_ENABLE_DATA_BLOCK_PAYLOAD_SPLIT
-   */
-  private final int _maxByteStringSize;
 
   private GrpcMailboxServer _grpcMailboxServer;
 
@@ -111,15 +106,6 @@ public class MailboxService {
     );
     _channelManager = new ChannelManager(tlsConfig, _maxInboundMessageSize, getIdleTimeout(config));
     _accessControlFactory = accessControlFactory;
-    boolean splitBlocks = config.getProperty(
-        CommonConstants.MultiStageQueryRunner.KEY_OF_ENABLE_DATA_BLOCK_PAYLOAD_SPLIT,
-        CommonConstants.MultiStageQueryRunner.DEFAULT_ENABLE_DATA_BLOCK_PAYLOAD_SPLIT);
-    if (splitBlocks) {
-      // so far we ensure payload is not bigger than maxBlockSize/2, we can fine tune this later
-      _maxByteStringSize = Math.max(_maxInboundMessageSize / 2, 1);
-    } else {
-      _maxByteStringSize = 0;
-    }
     LOGGER.info("Initialized MailboxService with hostname: {}, port: {}", hostname, port);
   }
 
@@ -163,7 +149,7 @@ public class MailboxService {
       return new InMemorySendingMailbox(mailboxId, this, deadlineMs, statMap);
     } else {
       return new GrpcSendingMailbox(mailboxId, _channelManager, hostname, port, deadlineMs, statMap,
-          _maxInboundMessageSize, _maxByteStringSize);
+          _maxInboundMessageSize);
     }
   }
 
