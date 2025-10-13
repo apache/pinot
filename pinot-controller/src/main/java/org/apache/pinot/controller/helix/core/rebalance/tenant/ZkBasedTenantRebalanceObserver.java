@@ -56,7 +56,7 @@ public class ZkBasedTenantRebalanceObserver {
   private final String _tenantName;
   // Keep track of number of updates. Useful during debugging.
   private final AtomicInteger _numUpdatesToZk;
-  private final int _zkUpdateMaxRetries;
+  private final RetryPolicy _retryPolicy;
   private boolean _isDone;
 
   private ZkBasedTenantRebalanceObserver(String jobId, String tenantName,
@@ -65,18 +65,17 @@ public class ZkBasedTenantRebalanceObserver {
     _jobId = jobId;
     _tenantName = tenantName;
     _pinotHelixResourceManager = pinotHelixResourceManager;
-    _zkUpdateMaxRetries = zkUpdateMaxRetries;
     _numUpdatesToZk = new AtomicInteger(0);
+    _retryPolicy = RetryPolicies.randomDelayRetryPolicy(zkUpdateMaxRetries, MIN_ZK_UPDATE_RETRY_DELAY_MS,
+        MAX_ZK_UPDATE_RETRY_DELAY_MS);
   }
 
   private ZkBasedTenantRebalanceObserver(String jobId, String tenantName, TenantRebalanceProgressStats progressStats,
       TenantRebalanceContext tenantRebalanceContext, PinotHelixResourceManager pinotHelixResourceManager,
       int zkUpdateMaxRetries) {
     this(jobId, tenantName, pinotHelixResourceManager, zkUpdateMaxRetries);
-    RetryPolicy retry = RetryPolicies.randomDelayRetryPolicy(_zkUpdateMaxRetries, MIN_ZK_UPDATE_RETRY_DELAY_MS,
-        MAX_ZK_UPDATE_RETRY_DELAY_MS);
     try {
-      retry.attempt(() -> _pinotHelixResourceManager.addControllerJobToZK(_jobId,
+      _retryPolicy.attempt(() -> _pinotHelixResourceManager.addControllerJobToZK(_jobId,
           makeJobMetadata(tenantRebalanceContext, progressStats),
           ControllerJobTypes.TENANT_REBALANCE, Objects::isNull)
       );
@@ -265,9 +264,7 @@ public class ZkBasedTenantRebalanceObserver {
   private void updateTenantRebalanceJobMetadataInZk(
       BiConsumer<TenantRebalanceContext, TenantRebalanceProgressStats> updater)
       throws AttemptFailureException {
-    RetryPolicy retry = RetryPolicies.randomDelayRetryPolicy(_zkUpdateMaxRetries, MIN_ZK_UPDATE_RETRY_DELAY_MS,
-        MAX_ZK_UPDATE_RETRY_DELAY_MS);
-    retry.attempt(() -> {
+    _retryPolicy.attempt(() -> {
       Map<String, String> jobMetadata =
           _pinotHelixResourceManager.getControllerJobZKMetadata(_jobId, ControllerJobTypes.TENANT_REBALANCE);
       if (jobMetadata == null) {
