@@ -109,7 +109,7 @@ public class InMemorySendingMailbox implements SendingMailbox {
         _isTerminated = true;
         break;
       case ALREADY_TERMINATED:
-        LOGGER.warn("Trying to offer blocks to the already closed mailbox {}. This should not happen", _id);
+        LOGGER.error("Trying to offer blocks to the already closed mailbox {}. This should not happen", _id);
         break;
       default:
         throw new IllegalStateException("Unsupported mailbox status: " + status);

@@ -109,7 +109,7 @@ public class MailboxContentObserver implements StreamObserver<MailboxContent> {
           closeStream();
           break;
         case ALREADY_TERMINATED:
-          LOGGER.warn("Trying to offer blocks to the already closed mailbox {}. This should not happen", mailboxId);
+          LOGGER.error("Trying to offer blocks to the already closed mailbox {}. This should not happen", mailboxId);
           closeStream();
           break;
         default:
