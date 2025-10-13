@@ -141,14 +141,6 @@ public abstract class ErrorCodesIntegrationTest extends BaseClusterIntegrationTe
         useMultiStageQueryEngine() ? QueryErrorCode.QUERY_PLANNING : QueryErrorCode.QUERY_VALIDATION);
   }
 
-  @Test
-  public void testInvalidAggregationArg()
-      throws Exception {
-    // Cannot use numeric aggregate function for string column
-    testQueryException("SELECT MAX(OriginState) FROM mytable where ArrTime > 5",
-        QueryErrorCode.QUERY_VALIDATION);
-  }
-
   private void testQueryException(@Language("sql") String query, QueryErrorCode errorCode)
       throws Exception {
     QueryAssert queryAssert;

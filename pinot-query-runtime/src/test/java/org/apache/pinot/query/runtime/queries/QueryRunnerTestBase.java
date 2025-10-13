@@ -306,6 +306,9 @@ public abstract class QueryRunnerTestBase extends QueryTestSet {
             "Got unexpected value type: " + value.getClass() + " for BYTES column, expected: String or byte[]");
         return value;
       case INT_ARRAY:
+        if (value instanceof List) {
+          return ((List) value).stream().mapToInt(i -> (int) i).toArray();
+        }
         if (value instanceof JdbcArray) {
           try {
             Object[] array = (Object[]) ((JdbcArray) value).getArray();
