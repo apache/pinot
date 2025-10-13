@@ -459,4 +459,45 @@ public class NullHandlingIntegrationTest extends BaseClusterIntegrationTestSet
         {String.format("SELECT tan(null) FROM %s", getTableName()), "null"}
     };
   }
+
+  /// This test ensures IS_TRUE can be trimmed off on leaf stage
+  @Test(dataProvider = "useBothQueryEngines")
+  public void testFilteredAggregationNoScanInFilter(boolean useMultiStageQueryEngine)
+      throws Exception {
+    setUseMultiStageQueryEngine(useMultiStageQueryEngine);
+
+    String query = "SELECT city, COUNT(*), COUNT(*) FILTER(WHERE description = 'unknown') FROM mytable GROUP BY city";
+
+    if (useMultiStageQueryEngine) {
+      // MSE will insert IS_TRUE to the aggregate filter
+      explainLogical(query,
+          "Execution Plan\n"
+              + "PinotLogicalAggregate(group=[{0}], agg#0=[COUNT($1)], agg#1=[COUNT($2)], aggType=[FINAL])\n"
+              + "  PinotLogicalExchange(distribution=[hash[0]])\n"
+              + "    PinotLogicalAggregate(group=[{0}], agg#0=[COUNT()], agg#1=[COUNT() FILTER $1], aggType=[LEAF])\n"
+              + "      LogicalProject(city=[$5], $f1=[IS TRUE(=($7, _UTF-8'unknown'))])\n"
+              + "        PinotLogicalTableScan(table=[[default, mytable]])\n");
+      // IS_TRUE should be trimmed off, then the filter becomes always false in the server execution plan
+      explainAskingServers(query,
+          "Execution Plan\n"
+              + "PinotLogicalAggregate(group=[{0}], agg#0=[COUNT($1)], agg#1=[COUNT($2)], aggType=[FINAL])\n"
+              + "  PinotLogicalExchange(distribution=[hash[0]])\n"
+              + "    LeafStageCombineOperator(table=[mytable])\n"
+              + "      StreamingInstanceResponse\n"
+              + "        CombineGroupBy\n"
+              + "          GroupByFiltered(groupKeys=[[city]], aggregations=[[count(*), count(*)]])\n"
+              + "            Project(columns=[[city]])\n"
+              + "              DocIdSet(maxDocs=[20000])\n"
+              + "                FilterEmpty\n"
+              + "            Project(columns=[[city]])\n"
+              + "              DocIdSet(maxDocs=[20000])\n"
+              + "                FilterMatchEntireSegment(numDocs=[100])\n"
+      );
+    }
+
+    // There should be no scan in the filter since description = 'unknown' matches no value
+    JsonNode response = postQuery(query);
+    assertNoError(response);
+    assertEquals(response.get("numEntriesScannedInFilter").asLong(), 0L);
+  }
 }

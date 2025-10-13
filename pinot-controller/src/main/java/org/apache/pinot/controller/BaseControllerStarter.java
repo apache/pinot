@@ -289,7 +289,6 @@ public abstract class BaseControllerStarter implements ServiceStartable {
     TableConfigUtils.setDisableGroovy(_config.isDisableIngestionGroovy());
     TableConfigUtils.setEnforcePoolBasedAssignment(_config.isEnforcePoolBasedAssignmentEnabled());
 
-    ContinuousJfrStarter.init(_config);
     ControllerJobTypes.init(_config);
   }
 
@@ -720,6 +719,8 @@ public abstract class BaseControllerStarter implements ServiceStartable {
     });
 
     _serviceStatusCallbackList.add(generateServiceStatusCallback(_helixParticipantManager));
+
+    _clusterConfigChangeHandler.registerClusterConfigChangeListener(ContinuousJfrStarter.INSTANCE);
   }
 
   protected PinotLLCRealtimeSegmentManager createPinotLLCRealtimeSegmentManager() {

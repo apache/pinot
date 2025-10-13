@@ -384,8 +384,14 @@ public class PinotTaskRestletResource {
       @ApiParam(value = "verbosity (Prints information for the given task name."
           + "By default, only prints subtask details for running and error tasks. "
           + "Value of > 0 prints subtask details for all tasks)")
-      @DefaultValue("0") @QueryParam("verbosity") int verbosity) {
-    return _pinotHelixTaskResourceManager.getTaskDebugInfo(taskName, verbosity);
+      @DefaultValue("0") @QueryParam("verbosity") int verbosity,
+      @ApiParam(value = "Table name with type (e.g., 'myTable_OFFLINE') to filter subtasks by table. "
+          + "Only subtasks for this table will be returned.")
+      @QueryParam("tableName") @Nullable String tableNameWithType, @Context HttpHeaders httpHeaders) {
+    if (tableNameWithType != null) {
+      tableNameWithType = DatabaseUtils.translateTableName(tableNameWithType, httpHeaders);
+    }
+    return _pinotHelixTaskResourceManager.getTaskDebugInfo(taskName, tableNameWithType, verbosity);
   }
 
   @GET
@@ -784,5 +790,26 @@ public class PinotTaskRestletResource {
       @DefaultValue("false") @QueryParam("forceDelete") boolean forceDelete) {
     _pinotHelixTaskResourceManager.deleteTask(taskName, forceDelete);
     return new SuccessResponse("Successfully deleted task: " + taskName);
+  }
+
+  @DELETE
+  @Path("/tasks/lock/forceRelease")
+  @Authorize(targetType = TargetType.TABLE, action = Actions.Table.FORCE_RELEASE_TASK_GENERATION_LOCK,
+      paramName = "tableNameWithType")
+  @Produces(MediaType.APPLICATION_JSON)
+  @Authenticate(AccessType.DELETE)
+  @ApiOperation("Force releases the task generation lock for a given table. Call this API with caution")
+  public SuccessResponse forceReleaseTaskGenerationLock(
+      @ApiParam(value = "Table name (with type suffix).", required = true)
+      @QueryParam("tableNameWithType") String tableNameWithType) {
+    try {
+      _pinotTaskManager.forceReleaseLock(tableNameWithType);
+      return new SuccessResponse("Successfully released task generation lock on table " + tableNameWithType
+          + " for all task types");
+    } catch (Exception e) {
+      throw new ControllerApplicationException(LOGGER, "Failed to release task generation lock on table: "
+          + tableNameWithType + ", with exception: " + ExceptionUtils.getStackTrace(e),
+          Response.Status.INTERNAL_SERVER_ERROR, e);
+    }
   }
 }

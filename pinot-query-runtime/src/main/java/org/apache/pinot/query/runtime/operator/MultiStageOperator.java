@@ -38,6 +38,7 @@ import org.apache.pinot.core.common.Operator;
 import org.apache.pinot.core.plan.ExplainInfo;
 import org.apache.pinot.query.runtime.blocks.ErrorMseBlock;
 import org.apache.pinot.query.runtime.blocks.MseBlock;
+import org.apache.pinot.query.runtime.blocks.SuccessMseBlock;
 import org.apache.pinot.query.runtime.operator.set.SetOperator;
 import org.apache.pinot.query.runtime.plan.MultiStageQueryStats;
 import org.apache.pinot.query.runtime.plan.OpChainExecutionContext;
@@ -132,6 +133,14 @@ public abstract class MultiStageOperator implements Operator<MseBlock>, AutoClos
   protected abstract MseBlock getNextBlock()
       throws Exception;
 
+  /**
+   * Signals the operator to terminate early.
+   *
+   * After this method is called, the operator should stop processing any more input and return a
+   * {@link SuccessMseBlock} block as soon as possible.
+   * This method should be called when the consumer of the operator does not need any more data and wants to stop the
+   * execution early to save resources.
+   */
   protected void earlyTerminate() {
     _isEarlyTerminated = true;
     for (MultiStageOperator child : getChildOperators()) {

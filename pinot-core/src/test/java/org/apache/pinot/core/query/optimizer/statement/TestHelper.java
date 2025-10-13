@@ -20,7 +20,6 @@ package org.apache.pinot.core.query.optimizer.statement;
 
 import org.apache.pinot.common.request.PinotQuery;
 import org.apache.pinot.core.query.optimizer.QueryOptimizer;
-import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.sql.parsers.CalciteSqlParser;
 
@@ -38,11 +37,11 @@ class TestHelper {
    * Given two queries, this function will validate that the query obtained after rewriting the first query is the
    * same as the second query.
    */
-  static void assertEqualsQuery(String queryOriginal, String queryAfterRewrite, TableConfig config, Schema schema) {
+  static void assertEqualsQuery(String queryOriginal, String queryAfterRewrite, Schema schema) {
     PinotQuery userQuery = CalciteSqlParser.compileToPinotQuery(queryOriginal);
-    OPTIMIZER.optimize(userQuery, config, schema);
+    OPTIMIZER.optimize(userQuery, schema);
     PinotQuery rewrittenQuery = CalciteSqlParser.compileToPinotQuery(queryAfterRewrite);
-    OPTIMIZER.optimize(rewrittenQuery, config, schema);
+    OPTIMIZER.optimize(rewrittenQuery, schema);
 
     // Currently there is no way to specify Double.NEGATIVE_INFINITY in SQL, so in the test cases we specify string
     // '-Infinity' as

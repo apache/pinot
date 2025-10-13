@@ -169,6 +169,10 @@ public class ArithmeticFunctions {
   // when multiplying by Math.pow(10, scale) for rounding
   @ScalarFunction
   public static double roundDecimal(double a, int scale) {
+    if (Double.isNaN(a) || Double.isInfinite(a)) {
+      // Follow standard PostgreSQL behavior where NaN and +/- Inf are returned as is
+      return a;
+    }
     return BigDecimal.valueOf(a).setScale(scale, RoundingMode.HALF_UP).doubleValue();
   }
 
@@ -176,6 +180,12 @@ public class ArithmeticFunctions {
   // but it is not possible because of existing DateTimeFunction with same name.
   @ScalarFunction
   public static double roundDecimal(double a) {
+    if (Double.isNaN(a) || Double.isInfinite(a)) {
+      // Math.round has special handling for NaN and +/- Inf:
+      // NaN -> 0, -Inf -> Long.MIN_VALUE, +Inf -> Long.MAX_VALUE
+      // Follow standard PostgreSQL behavior where NaN and +/- Inf are returned as is
+      return a;
+    }
     return Math.round(a);
   }
 

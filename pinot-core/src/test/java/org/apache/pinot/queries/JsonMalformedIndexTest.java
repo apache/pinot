@@ -69,7 +69,7 @@ public class JsonMalformedIndexTest extends BaseQueriesTest {
   }
 
   protected void checkResult(String query, Object[][] expectedResults) {
-    BrokerResponseNative brokerResponse = getBrokerResponseForOptimizedQuery(query, TABLE_CONFIG, SCHEMA);
+    BrokerResponseNative brokerResponse = getBrokerResponseForOptimizedQuery(query, SCHEMA);
     QueriesTestUtils.testInterSegmentsResult(brokerResponse, Arrays.asList(expectedResults));
   }
 
