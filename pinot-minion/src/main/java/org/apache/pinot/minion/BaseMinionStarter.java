@@ -141,7 +141,7 @@ public abstract class BaseMinionStarter implements ServiceStartable {
         Executors.newCachedThreadPool(new ThreadFactoryBuilder().setNameFormat("async-task-thread-%d").build());
     MinionEventObservers.init(_config, _executorService);
 
-    ContinuousJfrStarter.init(_config);
+    _clusterConfigChangeHandler.registerClusterConfigChangeListener(ContinuousJfrStarter.INSTANCE);
   }
 
   /// Can be overridden to apply custom configs to the minion conf.
