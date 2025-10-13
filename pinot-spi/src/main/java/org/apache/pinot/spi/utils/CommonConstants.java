@@ -1895,7 +1895,7 @@ public class CommonConstants {
      * Configuration for mailbox data block size.
      *
      * Ideally it should be in the order of a few MBs, to balance the serialization/deserialization overhead and the
-     * number of messages to transfer. Values lower tha hundreds of KBs are not recommended and may lead to excessive
+     * number of messages to transfer. Values lower than hundreds of KBs are not recommended and may lead to excessive
      * number of messages, overhead and even errors.
      */
     public static final String KEY_OF_MAX_INBOUND_QUERY_DATA_BLOCK_SIZE_BYTES = "pinot.query.runner.max.msg.size.bytes";
