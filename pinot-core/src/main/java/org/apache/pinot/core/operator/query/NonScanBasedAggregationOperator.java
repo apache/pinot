@@ -44,6 +44,7 @@ import org.apache.pinot.core.query.aggregation.function.DistinctCountOffHeapAggr
 import org.apache.pinot.core.query.aggregation.function.DistinctCountRawHLLAggregationFunction;
 import org.apache.pinot.core.query.aggregation.function.DistinctCountRawHLLPlusAggregationFunction;
 import org.apache.pinot.core.query.aggregation.function.DistinctCountSmartHLLAggregationFunction;
+import org.apache.pinot.core.query.aggregation.function.DistinctCountSmartHLLPlusAggregationFunction;
 import org.apache.pinot.core.query.aggregation.function.DistinctCountSmartULLAggregationFunction;
 import org.apache.pinot.core.query.aggregation.function.DistinctCountULLAggregationFunction;
 import org.apache.pinot.core.query.request.context.QueryContext;
@@ -163,6 +164,10 @@ public class NonScanBasedAggregationOperator extends BaseOperator<AggregationRes
         case DISTINCTCOUNTSMARTHLL:
           result = getDistinctCountSmartHLLResult(Objects.requireNonNull(dataSource.getDictionary()),
               (DistinctCountSmartHLLAggregationFunction) aggregationFunction);
+          break;
+        case DISTINCTCOUNTSMARTHLLPLUS:
+          result = getDistinctCountSmartHLLPlusResult(Objects.requireNonNull(dataSource.getDictionary()),
+              (DistinctCountSmartHLLPlusAggregationFunction) aggregationFunction);
           break;
         case DISTINCTCOUNTULL:
           result = getDistinctCountULLResult(Objects.requireNonNull(dataSource.getDictionary()),
@@ -352,6 +357,15 @@ public class NonScanBasedAggregationOperator extends BaseOperator<AggregationRes
     if (dictionary.length() > function.getThreshold()) {
       // Store values into a HLL when the dictionary size exceeds the conversion threshold
       return getDistinctValueHLL(dictionary, function.getLog2m());
+    } else {
+      return getDistinctValueSet(dictionary);
+    }
+  }
+  private static Object getDistinctCountSmartHLLPlusResult(Dictionary dictionary,
+      DistinctCountSmartHLLPlusAggregationFunction function) {
+    if (dictionary.length() > function.getThreshold()) {
+      // Store values into a HLLPlus when the dictionary size exceeds the conversion threshold
+      return getDistinctValueHLLPlus(dictionary, function.getP(), function.getSp());
     } else {
       return getDistinctValueSet(dictionary);
     }
