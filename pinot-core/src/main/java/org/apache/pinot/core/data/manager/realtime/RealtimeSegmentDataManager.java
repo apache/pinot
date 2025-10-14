@@ -856,13 +856,21 @@ public class RealtimeSegmentDataManager extends SegmentDataManager {
                   _segmentLogger.info(
                       "CompletionMode is DOWNLOAD and download URL is available for segment: {}. URL: {}",
                       _segmentNameStr, downloadUrl);
-                  _state = State.DISCARDED;
+                  _state = State.DISCARDED; // will trigger download on ONLINE transition
                   break;
-                } else {
-                  _segmentLogger.warn(
-                      "CompletionMode is DOWNLOAD but download URL is missing for segment: {}. "
-                          + "Falling back to RETAINING mode", _segmentNameStr);
                 }
+                // No download URL yet. If peer download is enabled, prefer download path by discarding and letting
+                // ONLINE transition perform the peer download. Otherwise, fall back to retaining (local build).
+                if (_realtimeTableDataManager.getPeerDownloadScheme() != null) {
+                  _segmentLogger.warn(
+                      "CompletionMode is DOWNLOAD but URL missing for segment: {}. Peer download enabled; "
+                          + "preferring download path via ONLINE transition.", _segmentNameStr);
+                  _state = State.DISCARDED; // ONLINE transition will download from peers or deep store
+                  break;
+                }
+                _segmentLogger.warn(
+                    "CompletionMode is DOWNLOAD but download URL is missing for segment: {} and peer download "
+                        + "is disabled. Falling back to RETAINING mode", _segmentNameStr);
               }
               _state = State.RETAINING;
               // Lock the segment to avoid multiple threads touching the same segment.
@@ -1479,10 +1487,15 @@ public class RealtimeSegmentDataManager extends SegmentDataManager {
                   _state.toString(), _segmentCompletionMode, downloadUrl);
               downloadSegmentAndReplace(segmentZKMetadata);
               break;
-            } else {
-              _segmentLogger.warn("State {}. CompletionMode is DOWNLOAD but download URL is missing. "
-                  + "Falling back to building segment locally for segment: {}", _state.toString(), _segmentNameStr);
             }
+            if (_realtimeTableDataManager.getPeerDownloadScheme() != null) {
+              _segmentLogger.warn("State {}. CompletionMode is DOWNLOAD but URL missing; attempting download via peers "
+                  + "or deep store if available for segment: {}", _state.toString(), _segmentNameStr);
+              downloadSegmentAndReplace(segmentZKMetadata);
+              break;
+            }
+            _segmentLogger.warn("State {}. CompletionMode is DOWNLOAD but download URL is missing and peer download is "
+                + "disabled. Falling back to local build for segment: {}", _state.toString(), _segmentNameStr);
           }
           // Allow to catch up upto final offset, and then replace.
           if (_currentOffset.compareTo(endOffset) > 0) {

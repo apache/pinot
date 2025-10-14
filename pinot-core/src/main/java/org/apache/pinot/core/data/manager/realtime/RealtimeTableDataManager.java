@@ -581,8 +581,6 @@ public class RealtimeTableDataManager extends BaseTableDataManager {
       throws Exception {
     Status status = zkMetadata.getStatus();
     if (status.isCompleted()) {
-      // Segment is completed and ready to be downloaded either from deep storage or from a peer (if peer-to-peer
-      // download is enabled).
       return super.downloadSegment(zkMetadata);
     }
 

@@ -1656,4 +1656,12 @@ public abstract class BaseTableDataManager implements TableDataManager {
       }
     }
   }
+
+  /**
+   * Returns the configured peer download scheme if peer-to-peer download is enabled; otherwise null.
+   */
+  @Nullable
+  public String getPeerDownloadScheme() {
+    return _peerDownloadScheme;
+  }
 }
