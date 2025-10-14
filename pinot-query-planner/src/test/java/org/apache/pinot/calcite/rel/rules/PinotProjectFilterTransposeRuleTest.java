@@ -85,7 +85,9 @@ public class PinotProjectFilterTransposeRuleTest extends QueryEnvironmentTestBas
     assertTrue(explainPlan.contains("PinotLogicalTableScan"), "Should have table scan");
 
     String[] lines = explainPlan.split("\n");
-    boolean foundTopProject = false, foundFilter = false, foundBottomProject = false;
+    boolean foundTopProject = false;
+    boolean foundFilter = false;
+    boolean foundBottomProject = false;
 
     for (String line : lines) {
       if (line.contains("LogicalProject(EXPR$0=[$0])")) {

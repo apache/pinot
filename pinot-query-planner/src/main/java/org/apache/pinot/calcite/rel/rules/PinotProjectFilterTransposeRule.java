@@ -46,7 +46,6 @@ import org.apache.calcite.tools.RelBuilder;
  */
 public class PinotProjectFilterTransposeRule extends RelOptRule {
   private static final String COMMON_EXPR_PREFIX = "commonExpr";
-  
   public static final PinotProjectFilterTransposeRule INSTANCE =
       new PinotProjectFilterTransposeRule("PinotProjectFilterTranspose");
 
@@ -205,8 +204,6 @@ public class PinotProjectFilterTransposeRule extends RelOptRule {
   }
 
   private boolean areEqual(RexNode node1, RexNode node2) {
-    return RexUtil.eq(node1, node2);
-  }
+  return RexUtil.eq(node1, node2);
 }
-
-
+}
