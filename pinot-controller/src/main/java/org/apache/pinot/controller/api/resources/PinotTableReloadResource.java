@@ -9,6 +9,8 @@ import io.swagger.annotations.Api;
 import io.swagger.annotations.ApiKeyAuthDefinition;
 import io.swagger.annotations.ApiOperation;
 import io.swagger.annotations.ApiParam;
+import io.swagger.annotations.ApiResponse;
+import io.swagger.annotations.ApiResponses;
 import io.swagger.annotations.Authorization;
 import io.swagger.annotations.SecurityDefinition;
 import io.swagger.annotations.SwaggerDefinition;
@@ -68,7 +70,11 @@ import org.slf4j.LoggerFactory;
 import static org.apache.pinot.spi.utils.CommonConstants.DATABASE;
 import static org.apache.pinot.spi.utils.CommonConstants.SWAGGER_AUTHORIZATION_KEY;
 
-
+/**
+ * REST API resource for reloading table segments.
+ * Provides endpoints to reload individual segments, all segments in a table, check reload job status,
+ * and determine if segments need reloading.
+ */
 @Api(tags = Constants.SEGMENT_TAG, authorizations = {
     @Authorization(value = SWAGGER_AUTHORIZATION_KEY), @Authorization(value = DATABASE)
 })
@@ -101,13 +107,21 @@ public class PinotTableReloadResource {
   @Authorize(targetType = TargetType.TABLE, paramName = "tableName", action = Actions.Table.RELOAD_SEGMENT)
   @Authenticate(AccessType.UPDATE)
   @Produces(MediaType.APPLICATION_JSON)
-  @ApiOperation(value = "Reload a segment", notes = "Reload a segment")
+  @ApiOperation(value = "Reload a specific segment",
+      notes = "Triggers segment reload on servers. Returns job ID and message count.")
+  @ApiResponses(value = {
+      @ApiResponse(code = 200, message = "Reload job submitted successfully"),
+      @ApiResponse(code = 404, message = "Segment or table not found"),
+      @ApiResponse(code = 500, message = "Internal server error")
+  })
   public SuccessResponse reloadSegment(
-      @ApiParam(value = "Name of the table", required = true) @PathParam("tableName") String tableName,
-      @ApiParam(value = "Name of the segment", required = true) @PathParam("segmentName") @Encoded String segmentName,
-      @ApiParam(value = "Whether to force server to download segment") @QueryParam("forceDownload")
-      @DefaultValue("false") boolean forceDownload,
-      @ApiParam(value = "Name of the target instance to reload") @QueryParam("targetInstance") @Nullable
+      @ApiParam(value = "Table name with or without type suffix", required = true, example = "myTable_OFFLINE")
+      @PathParam("tableName") String tableName,
+      @ApiParam(value = "Segment name", required = true, example = "myTable_0")
+      @PathParam("segmentName") @Encoded String segmentName,
+      @ApiParam(value = "Force server to re-download segment from deep store", defaultValue = "false")
+      @QueryParam("forceDownload") @DefaultValue("false") boolean forceDownload,
+      @ApiParam(value = "Target specific server instance") @QueryParam("targetInstance") @Nullable
       String targetInstance, @Context HttpHeaders headers) {
     tableName = DatabaseUtils.translateTableName(tableName, headers);
     long startTimeMs = System.currentTimeMillis();
@@ -144,15 +158,22 @@ public class PinotTableReloadResource {
   @Authorize(targetType = TargetType.TABLE, paramName = "tableName", action = Actions.Table.RELOAD_SEGMENT)
   @Authenticate(AccessType.UPDATE)
   @Produces(MediaType.APPLICATION_JSON)
-  @ApiOperation(value = "Reload all segments", notes = "Reload all segments")
+  @ApiOperation(value = "Reload all segments in a table",
+      notes = "Reloads all segments for the specified table. Supports filtering by type, instance, or custom mapping.")
+  @ApiResponses(value = {
+      @ApiResponse(code = 200, message = "Reload jobs submitted successfully"),
+      @ApiResponse(code = 404, message = "No segments found")
+  })
   public SuccessResponse reloadAllSegments(
-      @ApiParam(value = "Name of the table", required = true) @PathParam("tableName") String tableName,
-      @ApiParam(value = "OFFLINE|REALTIME") @QueryParam("type") String tableTypeStr,
-      @ApiParam(value = "Whether to force server to download segment") @QueryParam("forceDownload")
-      @DefaultValue("false") boolean forceDownload,
-      @ApiParam(value = "Name of the target instance to reload") @QueryParam("targetInstance") @Nullable
+      @ApiParam(value = "Table name with or without type suffix", required = true, example = "myTable")
+      @PathParam("tableName") String tableName,
+      @ApiParam(value = "Table type filter", allowableValues = "OFFLINE,REALTIME") @QueryParam("type")
+      String tableTypeStr,
+      @ApiParam(value = "Force server to re-download segments from deep store", defaultValue = "false")
+      @QueryParam("forceDownload") @DefaultValue("false") boolean forceDownload,
+      @ApiParam(value = "Target specific server instance") @QueryParam("targetInstance") @Nullable
       String targetInstance,
-      @ApiParam(value = "Map from instances to segments to reload. This param takes precedence over targetInstance")
+      @ApiParam(value = "JSON map of instance to segment lists (overrides targetInstance)")
       @QueryParam("instanceToSegmentsMap") @Nullable String instanceToSegmentsMapInJson, @Context HttpHeaders headers)
       throws IOException {
     tableName = DatabaseUtils.translateTableName(tableName, headers);
@@ -278,11 +299,15 @@ public class PinotTableReloadResource {
   @Path("segments/segmentReloadStatus/{jobId}")
   @Authorize(targetType = TargetType.CLUSTER, action = Actions.Cluster.GET_SEGMENT_RELOAD_STATUS)
   @Produces(MediaType.APPLICATION_JSON)
-  @ApiOperation(value = "Get status for a submitted reload operation", notes = "Get status for a submitted reload "
-      + "operation")
+  @ApiOperation(value = "Get reload job status",
+      notes = "Returns progress and metadata for a reload job including completion stats and time estimates.")
+  @ApiResponses(value = {
+      @ApiResponse(code = 200, message = "Job status retrieved successfully"),
+      @ApiResponse(code = 404, message = "Job ID not found")
+  })
   public ServerReloadControllerJobStatusResponse getReloadJobStatus(
-      @ApiParam(value = "Reload job id", required = true) @PathParam("jobId") String reloadJobId)
-      throws Exception {
+      @ApiParam(value = "Reload job ID returned from reload endpoint", required = true) @PathParam("jobId")
+      String reloadJobId) throws Exception {
     Map<String, String> controllerJobZKMetadata =
         _pinotHelixResourceManager.getControllerJobZKMetadata(reloadJobId, ControllerJobTypes.RELOAD_SEGMENT);
     if (controllerJobZKMetadata == null) {
@@ -379,12 +404,17 @@ public class PinotTableReloadResource {
   @Path("segments/{tableNameWithType}/needReload")
   @Authorize(targetType = TargetType.TABLE, paramName = "tableNameWithType", action = Actions.Table.GET_METADATA)
   @Produces(MediaType.APPLICATION_JSON)
-  @ApiOperation(value = "Gets the metadata of reload segments check from servers hosting the table", notes = "Returns"
-      + " true if reload is needed on the table from any one of the servers")
+  @ApiOperation(value = "Check if table needs reload",
+      notes = "Queries all servers hosting the table to determine if segments need reloading.")
+  @ApiResponses(value = {
+      @ApiResponse(code = 200, message = "Reload check completed successfully"),
+      @ApiResponse(code = 400, message = "Invalid table configuration")
+  })
   public String getTableReloadMetadata(
-      @ApiParam(value = "Table name with type", required = true, example = "myTable_REALTIME")
+      @ApiParam(value = "Table name with type suffix", required = true, example = "myTable_REALTIME")
       @PathParam("tableNameWithType") String tableNameWithType,
-      @QueryParam("verbose") @DefaultValue("false") boolean verbose, @Context HttpHeaders headers) {
+      @ApiParam(value = "Include detailed server responses", defaultValue = "false") @QueryParam("verbose")
+      @DefaultValue("false") boolean verbose, @Context HttpHeaders headers) {
     tableNameWithType = DatabaseUtils.translateTableName(tableNameWithType, headers);
     LOGGER.info("Received a request to check reload for all servers hosting segments for table {}", tableNameWithType);
     try {
