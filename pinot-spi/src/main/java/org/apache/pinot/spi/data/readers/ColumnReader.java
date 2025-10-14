@@ -59,7 +59,6 @@ public interface ColumnReader extends Closeable, Serializable {
   Object next()
       throws IOException;
 
-
   /**
    * Rewind the reader to start reading from the first value again.
    *

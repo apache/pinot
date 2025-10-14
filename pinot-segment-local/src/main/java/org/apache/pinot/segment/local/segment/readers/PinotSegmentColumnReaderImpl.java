@@ -64,7 +64,8 @@ public class PinotSegmentColumnReaderImpl implements ColumnReader {
 
   @Override
   @Nullable
-  public Object next() throws IOException {
+  public Object next()
+      throws IOException {
     if (!hasNext()) {
       throw new IllegalStateException("No more values available");
     }
@@ -80,9 +81,9 @@ public class PinotSegmentColumnReaderImpl implements ColumnReader {
     return _reuseValue;
   }
 
-
   @Override
-  public void rewind() throws IOException {
+  public void rewind()
+      throws IOException {
     _currentIndex = 0;
     _reuseValue = null;
   }
@@ -92,9 +93,9 @@ public class PinotSegmentColumnReaderImpl implements ColumnReader {
     return _columnName;
   }
 
-
   @Override
-  public void close() throws IOException {
+  public void close()
+      throws IOException {
     _segmentColumnReader.close();
   }
 }

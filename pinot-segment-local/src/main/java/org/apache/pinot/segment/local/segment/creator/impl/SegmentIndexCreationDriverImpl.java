@@ -205,13 +205,12 @@ public class SegmentIndexCreationDriverImpl implements SegmentIndexCreationDrive
     Map<String, ColumnReader> columnReaders = columnReaderFactory.getAllColumnReaders();
 
     // Create columnar data source
-    ColumnarSegmentCreationDataSource columnarDataSource =
-        new ColumnarSegmentCreationDataSource(columnReaderFactory, columnReaders);
+    ColumnarSegmentCreationDataSource columnarDataSource = new ColumnarSegmentCreationDataSource(columnReaders);
 
     // Use the existing init method with columnar data source and no transform pipeline
     init(config, columnarDataSource, null, null);
 
-    LOGGER.info("Initialized SegmentIndexCreationDriverImpl for columnar building with {} columns",
+    LOGGER.info("Initialized SegmentIndexCreationDriverImpl for columnar data source building with {} columns",
         columnReaders.size());
   }
 
@@ -789,7 +788,8 @@ public class SegmentIndexCreationDriverImpl implements SegmentIndexCreationDrive
    *
    * @throws Exception if segment building fails
    */
-  public void buildColumnar() throws Exception {
+  private void buildColumnar()
+      throws Exception {
     if (!(_dataSource instanceof ColumnarSegmentCreationDataSource)) {
       throw new IllegalStateException("buildColumnar() can only be called after initColumnar()");
     }
@@ -829,7 +829,7 @@ public class SegmentIndexCreationDriverImpl implements SegmentIndexCreationDrive
 
         // Index each column independently using true column-major approach
         // This is similar to how buildByColumn works but uses ColumnReader instead of IndexSegment
-        ((SegmentColumnarIndexCreator) _indexCreator).indexColumn(columnName, columnReader);
+        _indexCreator.indexColumn(columnName, columnReader);
       }
 
       _totalIndexTimeNs = System.nanoTime() - indexStartTime;

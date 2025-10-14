@@ -47,7 +47,8 @@ public interface ColumnReaderFactory extends Closeable, Serializable {
    * @param targetSchema Target schema for the output segment
    * @throws IOException If initialization fails
    */
-  void init(Schema targetSchema) throws IOException;
+  void init(Schema targetSchema)
+      throws IOException;
 
   /**
    * Get the set of column names available in the source data.
@@ -71,7 +72,7 @@ public interface ColumnReaderFactory extends Closeable, Serializable {
    * @return ColumnReader instance for the specified column
    * @throws IOException If the column reader cannot be created
    */
-  ColumnReader createColumnReader(String columnName, FieldSpec targetFieldSpec) throws IOException;
+  ColumnReader createColumnReader(String columnName, FieldSpec targetFieldSpec);
 
   /**
    * Get all column readers for the target schema.
@@ -80,7 +81,8 @@ public interface ColumnReaderFactory extends Closeable, Serializable {
    * @return Map of column name to ColumnReader
    * @throws IOException If any column reader cannot be created
    */
-  Map<String, ColumnReader> getAllColumnReaders() throws IOException;
+  Map<String, ColumnReader> getAllColumnReaders()
+      throws IOException;
 
   /**
    * Check if the specified column exists in the source data.

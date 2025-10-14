@@ -63,11 +63,11 @@ public class ColumnarSegmentPreIndexStatsContainer implements SegmentPreIndexSta
    * @param statsCollectorConfig Configuration for statistics collection
    */
   public ColumnarSegmentPreIndexStatsContainer(Map<String, ColumnReader> columnReaders,
-                                              StatsCollectorConfig statsCollectorConfig) {
+      StatsCollectorConfig statsCollectorConfig) {
     _columnReaders = columnReaders;
     _statsCollectorConfig = statsCollectorConfig;
     _targetSchema = statsCollectorConfig.getSchema();
-    _columnStatsCollectorMap = new HashMap<>();
+    _columnStatsCollectorMap = new HashMap<>(columnReaders.size());
     _totalDocCount = -1; // indicates unset
 
     initializeStatsCollectors();
@@ -129,12 +129,7 @@ public class ColumnarSegmentPreIndexStatsContainer implements SegmentPreIndexSta
   private void collectColumnStats() {
     LOGGER.info("Collecting stats for {} columns using column-wise iteration", _columnReaders.size());
 
-    for (FieldSpec fieldSpec : _targetSchema.getAllFieldSpecs()) {
-      if (fieldSpec.isVirtualColumn()) {
-        continue;
-      }
-
-      String columnName = fieldSpec.getName();
+    for (String columnName : _columnStatsCollectorMap.keySet()) {
       AbstractColumnStatisticsCollector statsCollector = _columnStatsCollectorMap.get(columnName);
       ColumnReader columnReader = _columnReaders.get(columnName);
 
@@ -154,7 +149,7 @@ public class ColumnarSegmentPreIndexStatsContainer implements SegmentPreIndexSta
    * Collect stats from a column reader by iterating over all values using the iterator pattern.
    */
   private void collectStatsFromColumnReader(String columnName, ColumnReader columnReader,
-                                           AbstractColumnStatisticsCollector statsCollector) {
+      AbstractColumnStatisticsCollector statsCollector) {
     try {
       // Reset the column reader to start from the beginning
       columnReader.rewind();
