@@ -43,6 +43,9 @@ import org.apache.calcite.sql.SqlLiteral;
 import org.apache.calcite.sql.SqlNumericLiteral;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.commons.lang3.tuple.Pair;
+import org.apache.pinot.common.function.FunctionInfo;
+import org.apache.pinot.common.function.FunctionRegistry;
+import org.apache.pinot.common.function.FunctionUtils;
 import org.apache.pinot.common.function.TransformFunctionType;
 import org.apache.pinot.common.request.DataSource;
 import org.apache.pinot.common.request.Expression;
@@ -51,7 +54,10 @@ import org.apache.pinot.common.request.Function;
 import org.apache.pinot.common.request.Identifier;
 import org.apache.pinot.common.request.Literal;
 import org.apache.pinot.common.request.PinotQuery;
+import org.apache.pinot.common.request.context.LiteralContext;
 import org.apache.pinot.common.utils.DataSchema.ColumnDataType;
+import org.apache.pinot.spi.data.FieldSpec;
+import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.utils.BigDecimalUtils;
 import org.apache.pinot.spi.utils.BytesUtils;
 import org.apache.pinot.spi.utils.CommonConstants.Broker.Request;
@@ -663,5 +669,50 @@ public class RequestUtils {
         query.putToExpressionOverrideHints(expression, getIdentifierExpression(timeColumnWithGranularity));
       }
     }
+  }
+
+  /**
+   * Infers the expression type by recursively traversing the expression tree for function calls. The provided schema
+   * is used to resolve the types for identifier expressions. Note that for function calls, only scalar functions are
+   * supported here currently. Transform functions that don't have equivalent scalar functions, and aggregation
+   * functions aren't supported and {@link ColumnDataType#UNKNOWN} will be returned for them.
+   */
+  @Nullable
+  public static ColumnDataType inferExpressionType(@Nullable Expression expression, Schema schema) {
+    if (expression == null) {
+      return null;
+    }
+
+    if (expression.isSetIdentifier()) {
+      String columnName = expression.getIdentifier().getName();
+      FieldSpec fieldSpec = schema.getFieldSpecFor(columnName);
+      if (fieldSpec == null) {
+        return ColumnDataType.UNKNOWN;
+      }
+      return ColumnDataType.fromDataType(fieldSpec.getDataType(), fieldSpec.isSingleValueField());
+    }
+
+    if (expression.isSetLiteral()) {
+      LiteralContext literalContext = new LiteralContext(expression.getLiteral());
+      return ColumnDataType.fromDataType(literalContext.getType(), literalContext.isSingleValue());
+    }
+
+    if (expression.isSetFunctionCall()) {
+      Function fn = expression.getFunctionCall();
+      int numOperands = fn.getOperandsSize();
+      ColumnDataType[] argTypes = new ColumnDataType[numOperands];
+      for (int i = 0; i < numOperands; i++) {
+        ColumnDataType argType = inferExpressionType(fn.getOperands().get(i), schema);
+        argTypes[i] = argType != null ? argType : ColumnDataType.UNKNOWN;
+      }
+      FunctionInfo functionInfo = FunctionRegistry.lookupFunctionInfo(fn.getOperator(), argTypes);
+      if (functionInfo != null) {
+        Class<?> returnClass = functionInfo.getMethod().getReturnType();
+        ColumnDataType returnType = FunctionUtils.getColumnDataType(returnClass);
+        return returnType != null ? returnType : ColumnDataType.UNKNOWN;
+      }
+      return ColumnDataType.UNKNOWN;
+    }
+    return ColumnDataType.UNKNOWN;
   }
 }
