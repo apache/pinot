@@ -66,7 +66,8 @@ public class DefaultValueColumnReader implements ColumnReader {
 
   @Override
   @Nullable
-  public Object next() throws IOException {
+  public Object next()
+      throws IOException {
     if (!hasNext()) {
       throw new IllegalStateException("No more values available");
     }
@@ -74,9 +75,9 @@ public class DefaultValueColumnReader implements ColumnReader {
     return _defaultValue;
   }
 
-
   @Override
-  public void rewind() throws IOException {
+  public void rewind()
+      throws IOException {
     _currentIndex = 0;
   }
 
@@ -86,7 +87,8 @@ public class DefaultValueColumnReader implements ColumnReader {
   }
 
   @Override
-  public void close() throws IOException {
+  public void close()
+      throws IOException {
     // No resources to close
   }
 }

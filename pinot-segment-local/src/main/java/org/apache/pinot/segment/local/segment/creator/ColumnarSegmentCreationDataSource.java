@@ -24,7 +24,6 @@ import org.apache.pinot.segment.spi.creator.SegmentCreationDataSource;
 import org.apache.pinot.segment.spi.creator.SegmentPreIndexStatsCollector;
 import org.apache.pinot.segment.spi.creator.StatsCollectorConfig;
 import org.apache.pinot.spi.data.readers.ColumnReader;
-import org.apache.pinot.spi.data.readers.ColumnReaderFactory;
 import org.apache.pinot.spi.data.readers.RecordReader;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -45,19 +44,15 @@ import org.slf4j.LoggerFactory;
 public class ColumnarSegmentCreationDataSource implements SegmentCreationDataSource {
   private static final Logger LOGGER = LoggerFactory.getLogger(ColumnarSegmentCreationDataSource.class);
 
-  private final ColumnReaderFactory _columnReaderFactory;
   private final Map<String, ColumnReader> _columnReaders;
 
   /**
    * Create a ColumnarSegmentCreationDataSource.
    *
-   * @param columnReaderFactory Factory for creating column readers
    * @param columnReaders Map of column name to ColumnReader instances
    */
-    public ColumnarSegmentCreationDataSource(ColumnReaderFactory columnReaderFactory,
-                                          Map<String, ColumnReader> columnReaders) {
-      _columnReaderFactory = columnReaderFactory;
-      _columnReaders = columnReaders;
+  public ColumnarSegmentCreationDataSource(Map<String, ColumnReader> columnReaders) {
+    _columnReaders = columnReaders;
   }
 
   @Override
@@ -74,15 +69,6 @@ public class ColumnarSegmentCreationDataSource implements SegmentCreationDataSou
     // This method is required by the interface but should not be called in columnar mode
     throw new UnsupportedOperationException(
         "RecordReader not supported in columnar mode. Use getColumnReaders() instead.");
-  }
-
-  /**
-   * Get the column reader factory.
-   *
-   * @return ColumnReaderFactory instance
-   */
-  public ColumnReaderFactory getColumnReaderFactory() {
-    return _columnReaderFactory;
   }
 
   /**

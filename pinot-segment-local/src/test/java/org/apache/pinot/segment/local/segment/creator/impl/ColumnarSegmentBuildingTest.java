@@ -89,64 +89,67 @@ public class ColumnarSegmentBuildingTest {
   private List<GenericRow> _testData;
 
   @BeforeClass
-  public void setUp() throws IOException {
+  public void setUp()
+      throws IOException {
     _tempDir = new File(TEMP_DIR, "ColumnarSegmentBuildingTest");
     FileUtils.deleteQuietly(_tempDir);
     _tempDir.mkdirs();
 
     // Create original schema
     _originalSchema = new Schema.SchemaBuilder()
-            .addSingleValueDimension(STRING_COL_1, FieldSpec.DataType.STRING)
-            .addSingleValueDimension(STRING_COL_2, FieldSpec.DataType.STRING)
-            .addSingleValueDimension(INT_COL_1, FieldSpec.DataType.INT)
-            .addSingleValueDimension(INT_COL_2, FieldSpec.DataType.INT)
-            .addSingleValueDimension(LONG_COL, FieldSpec.DataType.LONG)
-            .addSingleValueDimension(FLOAT_COL, FieldSpec.DataType.FLOAT)
-            .addSingleValueDimension(DOUBLE_COL, FieldSpec.DataType.DOUBLE)
-            .addSingleValueDimension(BIG_DECIMAL_COL, FieldSpec.DataType.BIG_DECIMAL)
-            .addSingleValueDimension(BYTES_COL, FieldSpec.DataType.BYTES)
-            .addMultiValueDimension(MV_INT_COL, FieldSpec.DataType.INT)
-            .addMultiValueDimension(MV_STRING_COL, FieldSpec.DataType.STRING)
-            .addDateTime(TIME_COL, FieldSpec.DataType.LONG, "1:MILLISECONDS:EPOCH", "1:MILLISECONDS")
-            .build();
+        .addSingleValueDimension(STRING_COL_1, FieldSpec.DataType.STRING)
+        .addSingleValueDimension(STRING_COL_2, FieldSpec.DataType.STRING)
+        .addSingleValueDimension(INT_COL_1, FieldSpec.DataType.INT)
+        .addSingleValueDimension(INT_COL_2, FieldSpec.DataType.INT)
+        .addSingleValueDimension(LONG_COL, FieldSpec.DataType.LONG)
+        .addSingleValueDimension(FLOAT_COL, FieldSpec.DataType.FLOAT)
+        .addSingleValueDimension(DOUBLE_COL, FieldSpec.DataType.DOUBLE)
+        .addSingleValueDimension(BIG_DECIMAL_COL, FieldSpec.DataType.BIG_DECIMAL)
+        .addSingleValueDimension(BYTES_COL, FieldSpec.DataType.BYTES)
+        .addMultiValueDimension(MV_INT_COL, FieldSpec.DataType.INT)
+        .addMultiValueDimension(MV_STRING_COL, FieldSpec.DataType.STRING)
+        .addDateTime(TIME_COL, FieldSpec.DataType.LONG, "1:MILLISECONDS:EPOCH", "1:MILLISECONDS")
+        .build();
 
     // Create extended schema with additional columns
     _extendedSchema = new Schema.SchemaBuilder()
-            .addSingleValueDimension(STRING_COL_1, FieldSpec.DataType.STRING)
-            .addSingleValueDimension(STRING_COL_2, FieldSpec.DataType.STRING)
-            .addSingleValueDimension(INT_COL_1, FieldSpec.DataType.INT)
-            .addSingleValueDimension(INT_COL_2, FieldSpec.DataType.INT)
-            .addSingleValueDimension(LONG_COL, FieldSpec.DataType.LONG)
-            .addSingleValueDimension(FLOAT_COL, FieldSpec.DataType.FLOAT)
-            .addSingleValueDimension(DOUBLE_COL, FieldSpec.DataType.DOUBLE)
-            .addSingleValueDimension(BIG_DECIMAL_COL, FieldSpec.DataType.BIG_DECIMAL)
-            .addSingleValueDimension(BYTES_COL, FieldSpec.DataType.BYTES)
-            .addMultiValueDimension(MV_INT_COL, FieldSpec.DataType.INT)
-            .addMultiValueDimension(MV_STRING_COL, FieldSpec.DataType.STRING)
-            .addDateTime(TIME_COL, FieldSpec.DataType.LONG, "1:MILLISECONDS:EPOCH", "1:MILLISECONDS")
-            .addSingleValueDimension(NEW_STRING_COL, FieldSpec.DataType.STRING)
-            .addSingleValueDimension(NEW_INT_COL, FieldSpec.DataType.INT)
-            .build();
+        .addSingleValueDimension(STRING_COL_1, FieldSpec.DataType.STRING)
+        .addSingleValueDimension(STRING_COL_2, FieldSpec.DataType.STRING)
+        .addSingleValueDimension(INT_COL_1, FieldSpec.DataType.INT)
+        .addSingleValueDimension(INT_COL_2, FieldSpec.DataType.INT)
+        .addSingleValueDimension(LONG_COL, FieldSpec.DataType.LONG)
+        .addSingleValueDimension(FLOAT_COL, FieldSpec.DataType.FLOAT)
+        .addSingleValueDimension(DOUBLE_COL, FieldSpec.DataType.DOUBLE)
+        .addSingleValueDimension(BIG_DECIMAL_COL, FieldSpec.DataType.BIG_DECIMAL)
+        .addSingleValueDimension(BYTES_COL, FieldSpec.DataType.BYTES)
+        .addMultiValueDimension(MV_INT_COL, FieldSpec.DataType.INT)
+        .addMultiValueDimension(MV_STRING_COL, FieldSpec.DataType.STRING)
+        .addDateTime(TIME_COL, FieldSpec.DataType.LONG, "1:MILLISECONDS:EPOCH", "1:MILLISECONDS")
+        .addSingleValueDimension(NEW_STRING_COL, FieldSpec.DataType.STRING)
+        .addSingleValueDimension(NEW_INT_COL, FieldSpec.DataType.INT)
+        .build();
 
     // Create table config
     _tableConfig = new TableConfigBuilder(TableType.OFFLINE)
-            .setTableName(TABLE_NAME)
-            .setTimeColumnName(TIME_COL)
-            .setInvertedIndexColumns(Lists.newArrayList(STRING_COL_1, INT_COL_1))
-            .setSortedColumn(INT_COL_1)
-            .build();
+        .setTableName(TABLE_NAME)
+        .setTimeColumnName(TIME_COL)
+        .setInvertedIndexColumns(Lists.newArrayList(STRING_COL_1, INT_COL_1))
+        .setSortedColumn(INT_COL_1)
+        .build();
 
     // Generate test data
     _testData = generateTestData(100);
   }
 
   @AfterClass
-  public void tearDown() throws IOException {
+  public void tearDown()
+      throws IOException {
     FileUtils.deleteQuietly(_tempDir);
   }
 
   @Test
-  public void testBasicColumnarBuilding() throws Exception {
+  public void testBasicColumnarBuilding()
+      throws Exception {
     // First create a segment using traditional row-major approach
     File rowMajorSegmentDir = createRowMajorSegment();
 
@@ -158,7 +161,8 @@ public class ColumnarSegmentBuildingTest {
   }
 
   @Test
-  public void testColumnarBuildingWithNewColumns() throws Exception {
+  public void testColumnarBuildingWithNewColumns()
+      throws Exception {
     // Create original segment with original schema
     File originalSegmentDir = createRowMajorSegment();
 
@@ -170,7 +174,8 @@ public class ColumnarSegmentBuildingTest {
   }
 
   @Test
-  public void testColumnReaderFactory() throws Exception {
+  public void testColumnReaderFactory()
+      throws Exception {
     // Create a segment to test column reader factory with
     File segmentDir = createRowMajorSegment();
     ImmutableSegment segment = ImmutableSegmentLoader.load(segmentDir, ReadMode.mmap);
@@ -221,7 +226,8 @@ public class ColumnarSegmentBuildingTest {
   }
 
   @Test
-  public void testColumnReaderWithNewColumns() throws Exception {
+  public void testColumnReaderWithNewColumns()
+      throws Exception {
     // Create a segment to test with
     File segmentDir = createRowMajorSegment();
     ImmutableSegment segment = ImmutableSegmentLoader.load(segmentDir, ReadMode.mmap);
@@ -256,7 +262,8 @@ public class ColumnarSegmentBuildingTest {
   }
 
   @Test
-  public void testAllDataTypes() throws Exception {
+  public void testAllDataTypes()
+      throws Exception {
     // This test validates that all supported data types work correctly with columnar building
     File rowMajorSegmentDir = createRowMajorSegment();
     File columnarSegmentDir = createColumnarSegment(rowMajorSegmentDir);
@@ -285,9 +292,8 @@ public class ColumnarSegmentBuildingTest {
     }
   }
 
-
-
-  private File createRowMajorSegment() throws Exception {
+  private File createRowMajorSegment()
+      throws Exception {
     File outputDir = new File(_tempDir, "rowMajorSegment");
     FileUtils.deleteQuietly(outputDir);
     outputDir.mkdirs();
@@ -304,7 +310,8 @@ public class ColumnarSegmentBuildingTest {
     return new File(outputDir, SEGMENT_NAME + "_rowMajor");
   }
 
-  private File createColumnarSegment(File sourceSegmentDir) throws Exception {
+  private File createColumnarSegment(File sourceSegmentDir)
+      throws Exception {
     File outputDir = new File(_tempDir, "columnarSegment");
     FileUtils.deleteQuietly(outputDir);
     outputDir.mkdirs();
@@ -331,7 +338,8 @@ public class ColumnarSegmentBuildingTest {
     }
   }
 
-  private File createColumnarSegmentWithNewColumns(File sourceSegmentDir) throws Exception {
+  private File createColumnarSegmentWithNewColumns(File sourceSegmentDir)
+      throws Exception {
     File outputDir = new File(_tempDir, "columnarSegmentWithNewColumns");
     FileUtils.deleteQuietly(outputDir);
     outputDir.mkdirs();
@@ -359,7 +367,8 @@ public class ColumnarSegmentBuildingTest {
     }
   }
 
-  private void validateSegmentsIdentical(File segment1Dir, File segment2Dir) throws Exception {
+  private void validateSegmentsIdentical(File segment1Dir, File segment2Dir)
+      throws Exception {
     ImmutableSegment segment1 = ImmutableSegmentLoader.load(segment1Dir, ReadMode.mmap);
     ImmutableSegment segment2 = ImmutableSegmentLoader.load(segment2Dir, ReadMode.mmap);
 
@@ -378,7 +387,8 @@ public class ColumnarSegmentBuildingTest {
     }
   }
 
-  private void validateSegmentWithNewColumns(File segmentDir) throws Exception {
+  private void validateSegmentWithNewColumns(File segmentDir)
+      throws Exception {
     ImmutableSegment segment = ImmutableSegmentLoader.load(segmentDir, ReadMode.mmap);
 
     try {
@@ -416,7 +426,7 @@ public class ColumnarSegmentBuildingTest {
       Object value2 = row2.getValue(columnName);
 
       Assert.assertEquals(value1, value2,
-              String.format("Column %s differs at docId %d: %s vs %s", columnName, docId, value1, value2));
+          String.format("Column %s differs at docId %d: %s vs %s", columnName, docId, value1, value2));
     }
   }
 
@@ -457,7 +467,7 @@ public class ColumnarSegmentBuildingTest {
 
     @Override
     public void init(File dataFile, @Nullable Set<String> fieldsToRead,
-                     @Nullable RecordReaderConfig recordReaderConfig) {
+        @Nullable RecordReaderConfig recordReaderConfig) {
       _currentIndex = 0;
     }
 

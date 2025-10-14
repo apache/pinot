@@ -427,7 +427,8 @@ public class SegmentColumnarIndexCreator implements SegmentCreator {
    * @throws IOException if indexing fails
    */
   @Override
-  public void indexColumn(String columnName, ColumnReader columnReader) throws IOException {
+  public void indexColumn(String columnName, ColumnReader columnReader)
+      throws IOException {
     Map<IndexType<?, ?, ?>, IndexCreator> creatorsByIndex = _creatorsByColAndIndex.get(columnName);
     NullValueVectorCreator nullVec = _nullValueVectorCreatorMap.get(columnName);
     FieldSpec fieldSpec = _schema.getFieldSpecFor(columnName);
@@ -448,10 +449,14 @@ public class SegmentColumnarIndexCreator implements SegmentCreator {
         reuseColumnValueToIndex = defaultNullValue;
       }
 
-      if (fieldSpec.isSingleValueField()) {
-        indexSingleValueRow(dictionaryCreator, reuseColumnValueToIndex, creatorsByIndex);
-      } else {
-        indexMultiValueRow(dictionaryCreator, (Object[]) reuseColumnValueToIndex, creatorsByIndex);
+      try {
+        if (fieldSpec.isSingleValueField()) {
+          indexSingleValueRow(dictionaryCreator, reuseColumnValueToIndex, creatorsByIndex);
+        } else {
+          indexMultiValueRow(dictionaryCreator, (Object[]) reuseColumnValueToIndex, creatorsByIndex);
+        }
+      } catch (JsonParseException jpe) {
+        throw new ColumnJsonParserException(columnName, jpe);
       }
 
       docId++;

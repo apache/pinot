@@ -72,7 +72,8 @@ public interface SegmentCreator extends Closeable, Serializable {
   void indexColumn(String columnName, @Nullable int[] sortedDocIds, IndexSegment segment)
       throws IOException;
 
-  void indexColumn(String columnName, ColumnReader columnReader) throws IOException;
+  void indexColumn(String columnName, ColumnReader columnReader)
+      throws IOException;
 
   /**
    * Adds a column to the index.

@@ -60,7 +60,8 @@ public class PinotSegmentColumnReaderFactory implements ColumnReaderFactory {
   }
 
   @Override
-  public void init(Schema targetSchema) throws IOException {
+  public void init(Schema targetSchema)
+      throws IOException {
     _targetSchema = targetSchema;
     LOGGER.info("Initialized PinotSegmentColumnReaderFactory with target schema containing {} columns",
         targetSchema.getPhysicalColumnNames().size());
@@ -77,7 +78,7 @@ public class PinotSegmentColumnReaderFactory implements ColumnReaderFactory {
   }
 
   @Override
-  public ColumnReader createColumnReader(String columnName, FieldSpec targetFieldSpec) throws IOException {
+  public ColumnReader createColumnReader(String columnName, FieldSpec targetFieldSpec) {
     if (_targetSchema == null) {
       throw new IllegalStateException("Factory not initialized. Call init() first.");
     }
@@ -110,7 +111,8 @@ public class PinotSegmentColumnReaderFactory implements ColumnReaderFactory {
   }
 
   @Override
-  public Map<String, ColumnReader> getAllColumnReaders() throws IOException {
+  public Map<String, ColumnReader> getAllColumnReaders()
+      throws IOException {
     if (_targetSchema == null) {
       throw new IllegalStateException("Factory not initialized. Call init() first.");
     }
@@ -137,7 +139,8 @@ public class PinotSegmentColumnReaderFactory implements ColumnReaderFactory {
   }
 
   @Override
-  public void close() throws IOException {
+  public void close()
+      throws IOException {
     LOGGER.debug("Closing PinotSegmentColumnReaderFactory and {} column readers", _columnReaders.size());
 
     // Close all created column readers
