@@ -314,7 +314,6 @@ public class MinionTaskUtilsTest {
     Map<String, String> taskConfig = new HashMap<>();
     taskConfig.put(BatchConfigProperties.PUSH_MODE, BatchConfigProperties.SegmentPushType.METADATA.toString());
     ClusterInfoAccessor mockClusterInfo = getMockClusterInfo("hdfs://data/dir", "http://localhost:9000");
-    when(mockClusterInfo.getDataDir()).thenReturn("hdfs://data/dir");
     Map<String, String> pushTaskConfigs =
         MinionTaskUtils.getPushTaskConfig(_tableConfig.getTableName(), taskConfig, mockClusterInfo);
     assertEquals(pushTaskConfigs.get(BatchConfigProperties.OUTPUT_SEGMENT_DIR_URI), "hdfs://data/dir/myTable");
