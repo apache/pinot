@@ -3070,6 +3070,22 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
     }
   }
 
+  @Test(dataProvider = "useBothQueryEngines")
+  public void testMvLongAggregations(boolean useMultiStageQueryEngine)
+      throws Exception {
+    setUseMultiStageQueryEngine(useMultiStageQueryEngine);
+    String query = "SELECT sumlong(DivTotalGTimes), minlong(DivTotalGTimes), maxlong(DivTotalGTimes) FROM mytable";
+    JsonNode response = postQuery(query);
+    assertNoError(response);
+    JsonNode resultTable = response.get("resultTable");
+    JsonNode dataSchema = resultTable.get("dataSchema");
+    assertEquals(dataSchema.get("columnDataTypes").toString(), "[\"LONG\",\"LONG\",\"LONG\"]");
+    JsonNode rows = resultTable.get("rows");
+    assertEquals(rows.size(), 1);
+    JsonNode row = rows.get(0);
+    assertEquals(row.size(), 3);
+  }
+
   @AfterClass
   public void tearDown()
       throws Exception {

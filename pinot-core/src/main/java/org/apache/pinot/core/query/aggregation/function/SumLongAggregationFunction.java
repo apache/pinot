@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.core.query.aggregation.function;
 
+import com.google.common.base.Preconditions;
 import java.util.List;
 import java.util.Map;
 import org.apache.pinot.common.request.context.ExpressionContext;
@@ -79,11 +80,18 @@ public class SumLongAggregationFunction extends NullableSingleInputAggregationFu
   public void aggregate(int length, AggregationResultHolder aggregationResultHolder,
       Map<ExpressionContext, BlockValSet> blockValSetMap) {
     BlockValSet blockValSet = blockValSetMap.get(_expression);
+    Preconditions.checkArgument(blockValSet.getValueType().getStoredType() == DataType.LONG
+            || blockValSet.getValueType().getStoredType() == DataType.INT,
+        "SumLongAggregationFunction only supports integer type columns");
 
-    if (blockValSet.getValueType().getStoredType() != DataType.LONG) {
-      throw new IllegalArgumentException("SumLongAggregationFunction only supports LONG columns");
+    if (blockValSet.isSingleValue()) {
+      aggregateSv(blockValSet, length, aggregationResultHolder);
+    } else {
+      aggregateMv(blockValSet, length, aggregationResultHolder);
     }
+  }
 
+  private void aggregateSv(BlockValSet blockValSet, int length, AggregationResultHolder aggregationResultHolder) {
     long[] values = blockValSet.getLongValuesSV();
 
     // Use foldNotNull with null as initial value - this will return null if no non-null values are processed
@@ -91,6 +99,23 @@ public class SumLongAggregationFunction extends NullableSingleInputAggregationFu
       long innerSum = 0;
       for (int i = from; i < to; i++) {
         innerSum += values[i];
+      }
+      return acum == null ? innerSum : acum + innerSum;
+    });
+
+    updateAggregationResultHolder(aggregationResultHolder, sum);
+  }
+
+  private void aggregateMv(BlockValSet blockValSet, int length, AggregationResultHolder aggregationResultHolder) {
+    long[][] valuesArray = blockValSet.getLongValuesMV();
+
+    Long sum;
+    sum = foldNotNull(length, blockValSet, null, (acum, from, to) -> {
+      long innerSum = 0;
+      for (int i = from; i < to; i++) {
+        for (long value : valuesArray[i]) {
+          innerSum += value;
+        }
       }
       return acum == null ? innerSum : acum + innerSum;
     });
@@ -114,6 +139,19 @@ public class SumLongAggregationFunction extends NullableSingleInputAggregationFu
   public void aggregateGroupBySV(int length, int[] groupKeyArray, GroupByResultHolder groupByResultHolder,
       Map<ExpressionContext, BlockValSet> blockValSetMap) {
     BlockValSet blockValSet = blockValSetMap.get(_expression);
+    Preconditions.checkArgument(blockValSet.getValueType().getStoredType() == DataType.LONG
+            || blockValSet.getValueType().getStoredType() == DataType.INT,
+        "SumLongAggregationFunction only supports integer type columns");
+
+    if (blockValSet.isSingleValue()) {
+      aggregateSvGroupBySv(blockValSet, length, groupKeyArray, groupByResultHolder);
+    } else {
+      aggregateMvGroupBySv(blockValSet, length, groupKeyArray, groupByResultHolder);
+    }
+  }
+
+  private void aggregateSvGroupBySv(BlockValSet blockValSet, int length, int[] groupKeyArray,
+      GroupByResultHolder groupByResultHolder) {
     long[] values = blockValSet.getLongValuesSV();
 
     if (_nullHandlingEnabled) {
@@ -135,10 +173,54 @@ public class SumLongAggregationFunction extends NullableSingleInputAggregationFu
     }
   }
 
+  private void aggregateMvGroupBySv(BlockValSet blockValSet, int length, int[] groupKeyArray,
+      GroupByResultHolder groupByResultHolder) {
+    long[][] valuesArray = blockValSet.getLongValuesMV();
+
+    if (_nullHandlingEnabled) {
+      forEachNotNull(length, blockValSet, (from, to) -> {
+        for (int i = from; i < to; i++) {
+          int groupKey = groupKeyArray[i];
+          if (valuesArray[i].length > 0) {
+            // "i" has to be non-null here so we can use the default value as the initial value instead of null
+            long sum = DEFAULT_VALUE;
+            for (long value : valuesArray[i]) {
+              sum += value;
+            }
+            Long result = groupByResultHolder.getResult(groupKey);
+            groupByResultHolder.setValueForKey(groupKey, result == null ? sum : result + sum);
+          }
+        }
+      });
+    } else {
+      for (int i = 0; i < length; i++) {
+        int groupKey = groupKeyArray[i];
+        long sum = groupByResultHolder.getLongResult(groupKey);
+        for (long value : valuesArray[i]) {
+          sum += value;
+        }
+        groupByResultHolder.setValueForKey(groupKey, sum);
+      }
+    }
+  }
+
   @Override
   public void aggregateGroupByMV(int length, int[][] groupKeysArray, GroupByResultHolder groupByResultHolder,
       Map<ExpressionContext, BlockValSet> blockValSetMap) {
     BlockValSet blockValSet = blockValSetMap.get(_expression);
+    Preconditions.checkArgument(blockValSet.getValueType().getStoredType() == DataType.LONG
+            || blockValSet.getValueType().getStoredType() == DataType.INT,
+        "SumLongAggregationFunction only supports integer type columns");
+
+    if (blockValSet.isSingleValue()) {
+      aggregateSvGroupByMv(blockValSet, length, groupKeysArray, groupByResultHolder);
+    } else {
+      aggregateMvGroupByMv(blockValSet, length, groupKeysArray, groupByResultHolder);
+    }
+  }
+
+  private void aggregateSvGroupByMv(BlockValSet blockValSet, int length, int[][] groupKeysArray,
+      GroupByResultHolder groupByResultHolder) {
     long[] values = blockValSet.getLongValuesSV();
 
     if (_nullHandlingEnabled) {
@@ -158,6 +240,41 @@ public class SumLongAggregationFunction extends NullableSingleInputAggregationFu
         long value = values[i];
         for (int groupKey : groupKeysArray[i]) {
           groupByResultHolder.setValueForKey(groupKey, groupByResultHolder.getLongResult(groupKey) + value);
+        }
+      }
+    }
+  }
+
+  private void aggregateMvGroupByMv(BlockValSet blockValSet, int length, int[][] groupKeysArray,
+      GroupByResultHolder groupByResultHolder) {
+    long[][] valuesArray = blockValSet.getLongValuesMV();
+
+    if (_nullHandlingEnabled) {
+      forEachNotNull(length, blockValSet, (from, to) -> {
+        for (int i = from; i < to; i++) {
+          long[] values = valuesArray[i];
+          if (values.length > 0) {
+            // "i" has to be non-null here so we can use the default value as the initial value instead of null
+            long sum = DEFAULT_VALUE;
+            for (long value : values) {
+              sum += value;
+            }
+            for (int groupKey : groupKeysArray[i]) {
+              Long result = groupByResultHolder.getResult(groupKey);
+              groupByResultHolder.setValueForKey(groupKey, result == null ? sum : result + sum);
+            }
+          }
+        }
+      });
+    } else {
+      for (int i = 0; i < length; i++) {
+        long[] values = valuesArray[i];
+        for (int groupKey : groupKeysArray[i]) {
+          long sum = groupByResultHolder.getLongResult(groupKey);
+          for (long value : values) {
+            sum += value;
+          }
+          groupByResultHolder.setValueForKey(groupKey, sum);
         }
       }
     }

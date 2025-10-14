@@ -68,17 +68,37 @@ public class MinLongAggregationFunction extends NullableSingleInputAggregationFu
   public void aggregate(int length, AggregationResultHolder aggregationResultHolder,
       Map<ExpressionContext, BlockValSet> blockValSetMap) {
     BlockValSet blockValSet = blockValSetMap.get(_expression);
-    long[] values = blockValSet.getLongValuesSV();
 
-    Long min = foldNotNull(length, blockValSet, null, (acum, from, to) -> {
-      long innerMin = values[from];
-      for (int i = from; i < to; i++) {
-        innerMin = Math.min(innerMin, values[i]);
-      }
-      return acum == null ? innerMin : Math.min(acum, innerMin);
-    });
+    if (blockValSet.isSingleValue()) {
+      long[] values = blockValSet.getLongValuesSV();
 
-    updateAggregationResultHolder(aggregationResultHolder, min);
+      Long min = foldNotNull(length, blockValSet, null, (acum, from, to) -> {
+        long innerMin = values[from];
+        for (int i = from; i < to; i++) {
+          innerMin = Math.min(innerMin, values[i]);
+        }
+        return acum == null ? innerMin : Math.min(acum, innerMin);
+      });
+
+      updateAggregationResultHolder(aggregationResultHolder, min);
+    } else {
+      long[][] valuesArray = blockValSet.getLongValuesMV();
+
+      Long min = foldNotNull(length, blockValSet, null, (acum, from, to) -> {
+        long innerMin = DEFAULT_VALUE;
+        for (int i = from; i < to; i++) {
+          long[] values = valuesArray[i];
+          for (long value : values) {
+            if (value < innerMin) {
+              innerMin = value;
+            }
+          }
+        }
+        return acum == null ? innerMin : Math.min(acum, innerMin);
+      });
+
+      updateAggregationResultHolder(aggregationResultHolder, min);
+    }
   }
 
   protected void updateAggregationResultHolder(AggregationResultHolder aggregationResultHolder, Long min) {
@@ -97,8 +117,17 @@ public class MinLongAggregationFunction extends NullableSingleInputAggregationFu
   public void aggregateGroupBySV(int length, int[] groupKeyArray, GroupByResultHolder groupByResultHolder,
       Map<ExpressionContext, BlockValSet> blockValSetMap) {
     BlockValSet blockValSet = blockValSetMap.get(_expression);
-    long[] valueArray = blockValSet.getLongValuesSV();
 
+    if (blockValSet.isSingleValue()) {
+      aggregateSvGroupBySv(blockValSet, length, groupKeyArray, groupByResultHolder);
+    } else {
+      aggregateMvGroupBySv(blockValSet, length, groupKeyArray, groupByResultHolder);
+    }
+  }
+
+  private void aggregateSvGroupBySv(BlockValSet blockValSet, int length, int[] groupKeyArray,
+      GroupByResultHolder groupByResultHolder) {
+    long[] valueArray = blockValSet.getLongValuesSV();
     if (_nullHandlingEnabled) {
       forEachNotNull(length, blockValSet, (from, to) -> {
         for (int i = from; i < to; i++) {
@@ -121,10 +150,51 @@ public class MinLongAggregationFunction extends NullableSingleInputAggregationFu
     }
   }
 
+  private void aggregateMvGroupBySv(BlockValSet blockValSet, int length, int[] groupKeyArray,
+      GroupByResultHolder groupByResultHolder) {
+    long[][] valuesArray = blockValSet.getLongValuesMV();
+
+    if (_nullHandlingEnabled) {
+      forEachNotNull(length, blockValSet, (from, to) -> {
+        for (int i = from; i < to; i++) {
+          int groupKey = groupKeyArray[i];
+          Long min = groupByResultHolder.getResult(groupKey);
+          for (long value : valuesArray[i]) {
+            if (min == null || value < min) {
+              min = value;
+            }
+          }
+          groupByResultHolder.setValueForKey(groupKey, min);
+        }
+      });
+    } else {
+      for (int i = 0; i < length; i++) {
+        int groupKey = groupKeyArray[i];
+        long min = groupByResultHolder.getLongResult(groupKey);
+        for (long value : valuesArray[i]) {
+          if (value < min) {
+            min = value;
+          }
+        }
+        groupByResultHolder.setValueForKey(groupKey, min);
+      }
+    }
+  }
+
   @Override
   public void aggregateGroupByMV(int length, int[][] groupKeysArray, GroupByResultHolder groupByResultHolder,
       Map<ExpressionContext, BlockValSet> blockValSetMap) {
     BlockValSet blockValSet = blockValSetMap.get(_expression);
+
+    if (blockValSet.isSingleValue()) {
+      aggregateSvGroupByMv(blockValSet, length, groupKeysArray, groupByResultHolder);
+    } else {
+      aggregateMvGroupByMv(blockValSet, length, groupKeysArray, groupByResultHolder);
+    }
+  }
+
+  private void aggregateSvGroupByMv(BlockValSet blockValSet, int length, int[][] groupKeysArray,
+      GroupByResultHolder groupByResultHolder) {
     long[] valueArray = blockValSet.getLongValuesSV();
 
     if (_nullHandlingEnabled) {
@@ -146,6 +216,44 @@ public class MinLongAggregationFunction extends NullableSingleInputAggregationFu
           if (value < groupByResultHolder.getLongResult(groupKey)) {
             groupByResultHolder.setValueForKey(groupKey, value);
           }
+        }
+      }
+    }
+  }
+
+  private void aggregateMvGroupByMv(BlockValSet blockValSet, int length, int[][] groupKeysArray,
+      GroupByResultHolder groupByResultHolder) {
+    long[][] valuesArray = blockValSet.getLongValuesMV();
+
+    if (_nullHandlingEnabled) {
+      forEachNotNull(length, blockValSet, (from, to) -> {
+        for (int i = from; i < to; i++) {
+          Long min = null;
+          for (long value : valuesArray[i]) {
+            if (min == null || value < min) {
+              min = value;
+            }
+          }
+
+          for (int groupKey : groupKeysArray[i]) {
+            Long currentMin = groupByResultHolder.getResult(groupKey);
+            if (currentMin == null || (min != null && min < currentMin)) {
+              groupByResultHolder.setValueForKey(groupKey, min);
+            }
+          }
+        }
+      });
+    } else {
+      for (int i = 0; i < length; i++) {
+        long[] values = valuesArray[i];
+        for (int groupKey : groupKeysArray[i]) {
+          long min = groupByResultHolder.getLongResult(groupKey);
+          for (long value : values) {
+            if (value < min) {
+              min = value;
+            }
+          }
+          groupByResultHolder.setValueForKey(groupKey, min);
         }
       }
     }
