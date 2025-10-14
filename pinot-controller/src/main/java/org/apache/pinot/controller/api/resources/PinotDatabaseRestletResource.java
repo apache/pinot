@@ -29,6 +29,7 @@ import io.swagger.annotations.SwaggerDefinition;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
+import java.util.concurrent.TimeUnit;
 import javax.inject.Inject;
 import javax.ws.rs.Consumes;
 import javax.ws.rs.DELETE;
@@ -55,6 +56,7 @@ import org.apache.pinot.spi.config.DatabaseConfig;
 import org.apache.pinot.spi.config.table.QuotaConfig;
 import org.apache.pinot.spi.config.table.TableType;
 import org.apache.pinot.spi.utils.CommonConstants;
+import org.apache.pinot.spi.utils.TimeUtils;
 import org.apache.pinot.spi.utils.builder.TableNameBuilder;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -70,7 +72,8 @@ import static org.apache.pinot.spi.utils.CommonConstants.SWAGGER_AUTHORIZATION_K
     @ApiKeyAuthDefinition(name = CommonConstants.DATABASE, in = ApiKeyAuthDefinition.ApiKeyLocation.HEADER,
         key = CommonConstants.DATABASE,
         description = "Database context passed through http header. If no context is provided 'default' database "
-            + "context will be considered.")}))
+            + "context will be considered.")
+}))
 @Path("/")
 public class PinotDatabaseRestletResource {
   public static final Logger LOGGER = LoggerFactory.getLogger(PinotDatabaseRestletResource.class);
@@ -146,9 +149,48 @@ public class PinotDatabaseRestletResource {
     }
     try {
       DatabaseConfig databaseConfig = _pinotHelixResourceManager.getDatabaseConfig(databaseName);
-      QuotaConfig quotaConfig = new QuotaConfig(null, queryQuota);
+      QuotaConfig quotaConfig = new QuotaConfig(null, TimeUnit.SECONDS, 1d, Double.valueOf(queryQuota));
       if (databaseConfig == null) {
-         databaseConfig = new DatabaseConfig(databaseName, quotaConfig);
+        databaseConfig = new DatabaseConfig(databaseName, quotaConfig);
+        _pinotHelixResourceManager.addDatabaseConfig(databaseConfig);
+      } else {
+        databaseConfig.setQuotaConfig(quotaConfig);
+        _pinotHelixResourceManager.updateDatabaseConfig(databaseConfig);
+      }
+      return new SuccessResponse("Database quotas for database config " + databaseName + " successfully updated");
+    } catch (NumberFormatException e) {
+      throw e; // Re-throw NumberFormatException without wrapping
+    } catch (Exception e) {
+      throw new ControllerApplicationException(LOGGER, e.getMessage(), Response.Status.INTERNAL_SERVER_ERROR, e);
+    }
+  }
+
+  /**
+   * API to update the quota configs for database with advanced rate limiter settings
+   * If database config is not present it will be created implicitly
+   */
+  @POST
+  @Produces(MediaType.APPLICATION_JSON)
+  @Consumes(MediaType.APPLICATION_JSON)
+  @Path("/databases/{databaseName}/quotas/v2")
+  @Authorize(targetType = TargetType.CLUSTER, action = Actions.Cluster.UPDATE_DATABASE_QUOTA)
+  @ApiOperation(value = "Update database quotas (v2)", notes = "Update database quotas with rate limiter")
+  public SuccessResponse setDatabaseQuota(
+      @PathParam("databaseName") String databaseName,
+      @QueryParam("ratelimiterUnit") String ratelimiterUnit,
+      @QueryParam("ratelimiterDuration") Double ratelimiterDuration,
+      @QueryParam("maxQueriesValue") Double maxQueriesValue,
+      @Context HttpHeaders httpHeaders) {
+    if (!databaseName.equals(DatabaseUtils.extractDatabaseFromHttpHeaders(httpHeaders))) {
+      throw new ControllerApplicationException(LOGGER, "Database config name and request context does not match",
+          Response.Status.BAD_REQUEST);
+    }
+    try {
+      DatabaseConfig databaseConfig = _pinotHelixResourceManager.getDatabaseConfig(databaseName);
+      QuotaConfig quotaConfig = new QuotaConfig(null, TimeUtils.timeUnitFromString(ratelimiterUnit),
+          ratelimiterDuration, maxQueriesValue);
+      if (databaseConfig == null) {
+        databaseConfig = new DatabaseConfig(databaseName, quotaConfig);
         _pinotHelixResourceManager.addDatabaseConfig(databaseConfig);
       } else {
         databaseConfig.setQuotaConfig(quotaConfig);
@@ -180,12 +222,19 @@ public class PinotDatabaseRestletResource {
       return databaseConfig.getQuotaConfig();
     }
     HelixAdmin helixAdmin = _pinotHelixResourceManager.getHelixAdmin();
+    String clusterName = _pinotHelixResourceManager.getHelixClusterName();
+    if (helixAdmin == null || clusterName == null) {
+      return null;
+    }
     HelixConfigScope configScope = new HelixConfigScopeBuilder(HelixConfigScope.ConfigScopeProperty.CLUSTER)
-        .forCluster(_pinotHelixResourceManager.getHelixClusterName()).build();
+        .forCluster(clusterName).build();
     String defaultQueryQuota = helixAdmin.getConfig(configScope,
             Collections.singletonList(CommonConstants.Helix.DATABASE_MAX_QUERIES_PER_SECOND))
-            .getOrDefault(CommonConstants.Helix.DATABASE_MAX_QUERIES_PER_SECOND, null);
-    return new QuotaConfig(null, defaultQueryQuota);
+        .getOrDefault(CommonConstants.Helix.DATABASE_MAX_QUERIES_PER_SECOND, null);
+    if (defaultQueryQuota != null) {
+      return new QuotaConfig(null, TimeUnit.SECONDS, null, Double.valueOf(defaultQueryQuota));
+    }
+    return null;
   }
 }
 
