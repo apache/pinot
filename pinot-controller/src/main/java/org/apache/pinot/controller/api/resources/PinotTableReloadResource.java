@@ -111,8 +111,7 @@ public class PinotTableReloadResource {
       notes = "Triggers segment reload on servers. Returns job ID and message count.")
   @ApiResponses(value = {
       @ApiResponse(code = 200, message = "Reload job submitted successfully"),
-      @ApiResponse(code = 404, message = "Segment or table not found"),
-      @ApiResponse(code = 500, message = "Internal server error")
+      @ApiResponse(code = 404, message = "Segment or table not found")
   })
   public SuccessResponse reloadSegment(
       @ApiParam(value = "Table name with or without type suffix", required = true, example = "myTable_OFFLINE")
