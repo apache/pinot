@@ -23,6 +23,7 @@ import java.util.Collections;
 import java.util.HashMap;
 import java.util.Map;
 import org.apache.pinot.common.restlet.resources.ValidDocIdsType;
+import org.apache.pinot.controller.helix.core.minion.ClusterInfoAccessor;
 import org.apache.pinot.core.common.MinionConstants;
 import org.apache.pinot.core.common.MinionConstants.UpsertCompactionTask;
 import org.apache.pinot.spi.config.table.TableConfig;
@@ -31,10 +32,13 @@ import org.apache.pinot.spi.config.table.TableType;
 import org.apache.pinot.spi.config.table.UpsertConfig;
 import org.apache.pinot.spi.filesystem.LocalPinotFS;
 import org.apache.pinot.spi.filesystem.PinotFS;
+import org.apache.pinot.spi.ingestion.batch.BatchConfigProperties;
 import org.apache.pinot.spi.utils.Enablement;
 import org.apache.pinot.spi.utils.builder.TableConfigBuilder;
 import org.testng.annotations.Test;
 
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.when;
 import static org.testng.Assert.assertEquals;
 import static org.testng.Assert.assertFalse;
 import static org.testng.Assert.assertTrue;
@@ -42,6 +46,16 @@ import static org.testng.Assert.expectThrows;
 
 
 public class MinionTaskUtilsTest {
+
+  TableConfig _tableConfig =
+      new TableConfigBuilder(TableType.OFFLINE).setTableName("myTable").setTimeColumnName("dateTime").build();
+
+  public ClusterInfoAccessor getMockClusterInfo(String dataDir, String vipUrl) {
+    ClusterInfoAccessor mockClusterInfo = mock(ClusterInfoAccessor.class);
+    when(mockClusterInfo.getDataDir()).thenReturn(dataDir);
+    when(mockClusterInfo.getVipUrl()).thenReturn(vipUrl);
+    return mockClusterInfo;
+  }
 
   @Test
   public void testGetInputPinotFS()
@@ -258,5 +272,82 @@ public class MinionTaskUtilsTest {
         () -> MinionTaskUtils.getValidDocIdsType(upsertConfig4, taskConfigs4, UpsertCompactionTask.VALID_DOC_IDS_TYPE));
     assertEquals(exception4.getMessage(),
         "'snapshot' must not be 'DISABLE' with validDocIdsType: SNAPSHOT_WITH_DELETE");
+  }
+
+  @Test
+  public void testGetPushTaskConfigNoConfig() {
+    Map<String, String> taskConfig = new HashMap<>();
+    Map<String, String> pushTaskConfigs = MinionTaskUtils.getPushTaskConfig(_tableConfig.getTableName(), taskConfig,
+        getMockClusterInfo("/data/dir", "http://localhost:9000"));
+    assertEquals(pushTaskConfigs.size(), 2);
+    assertEquals(pushTaskConfigs.get(BatchConfigProperties.PUSH_MODE),
+        BatchConfigProperties.SegmentPushType.TAR.toString());
+  }
+
+  @Test
+  public void testGetPushTaskConfigURIPushMode() {
+    Map<String, String> taskConfig = new HashMap<>();
+    taskConfig.put(BatchConfigProperties.PUSH_MODE, BatchConfigProperties.SegmentPushType.URI.toString());
+    Map<String, String> pushTaskConfigs = MinionTaskUtils.getPushTaskConfig(_tableConfig.getTableName(), taskConfig,
+        getMockClusterInfo("/data/dir", "http://localhost:9000"));
+    assertEquals(pushTaskConfigs.size(), 2);
+    assertEquals(pushTaskConfigs.get(BatchConfigProperties.PUSH_MODE),
+        BatchConfigProperties.SegmentPushType.TAR.toString());
+    assertEquals(pushTaskConfigs.get(BatchConfigProperties.PUSH_CONTROLLER_URI), "http://localhost:9000");
+  }
+
+  @Test
+  public void testGetPushTaskConfigURIPushModeDeepStoreControllerInfo() {
+    Map<String, String> taskConfig = new HashMap<>();
+    taskConfig.put(BatchConfigProperties.PUSH_MODE, BatchConfigProperties.SegmentPushType.URI.toString());
+    Map<String, String> pushTaskConfigs = MinionTaskUtils.getPushTaskConfig(_tableConfig.getTableName(), taskConfig,
+        getMockClusterInfo("hdfs://data/dir", "http://localhost:9000"));
+    assertEquals(pushTaskConfigs.size(), 3);
+    assertEquals(pushTaskConfigs.get(BatchConfigProperties.PUSH_MODE),
+        BatchConfigProperties.SegmentPushType.METADATA.toString());
+    assertEquals(pushTaskConfigs.get(BatchConfigProperties.OUTPUT_SEGMENT_DIR_URI), "hdfs://data/dir/myTable");
+    assertEquals(pushTaskConfigs.get(BatchConfigProperties.PUSH_CONTROLLER_URI), "http://localhost:9000");
+  }
+
+  @Test
+  public void testGetPushTaskConfigMETADATAPushModeDeepStoreControllerInfo() {
+    Map<String, String> taskConfig = new HashMap<>();
+    taskConfig.put(BatchConfigProperties.PUSH_MODE, BatchConfigProperties.SegmentPushType.METADATA.toString());
+    ClusterInfoAccessor mockClusterInfo = getMockClusterInfo("hdfs://data/dir", "http://localhost:9000");
+    when(mockClusterInfo.getDataDir()).thenReturn("hdfs://data/dir");
+    Map<String, String> pushTaskConfigs =
+        MinionTaskUtils.getPushTaskConfig(_tableConfig.getTableName(), taskConfig, mockClusterInfo);
+    assertEquals(pushTaskConfigs.get(BatchConfigProperties.OUTPUT_SEGMENT_DIR_URI), "hdfs://data/dir/myTable");
+    assertEquals(pushTaskConfigs.get(BatchConfigProperties.PUSH_MODE),
+        BatchConfigProperties.SegmentPushType.METADATA.toString());
+    assertEquals(pushTaskConfigs.size(), 3);
+  }
+
+  @Test
+  public void testGetPushTaskConfigMETADATAPushModeDeepStoreOutputUriTaskConfig() {
+    Map<String, String> taskConfig = new HashMap<>();
+    taskConfig.put(BatchConfigProperties.PUSH_MODE, BatchConfigProperties.SegmentPushType.METADATA.toString());
+    taskConfig.put(BatchConfigProperties.OUTPUT_SEGMENT_DIR_URI, "hdfs://data/dir/myTable");
+    Map<String, String> pushTaskConfigs = MinionTaskUtils.getPushTaskConfig(_tableConfig.getTableName(), taskConfig,
+        getMockClusterInfo("/data/dir", "http://localhost:9000"));
+
+    assertEquals(pushTaskConfigs.get(BatchConfigProperties.OUTPUT_SEGMENT_DIR_URI), "hdfs://data/dir/myTable");
+    assertEquals(pushTaskConfigs.get(BatchConfigProperties.PUSH_MODE),
+        BatchConfigProperties.SegmentPushType.METADATA.toString());
+    assertEquals(pushTaskConfigs.get(BatchConfigProperties.PUSH_CONTROLLER_URI), "http://localhost:9000");
+    assertEquals(pushTaskConfigs.size(), 3);
+  }
+
+  @Test
+  public void testGetPushTaskConfigTARPushMode() {
+    Map<String, String> taskConfig = new HashMap<>();
+    taskConfig.put(BatchConfigProperties.PUSH_MODE, BatchConfigProperties.SegmentPushType.TAR.toString());
+    Map<String, String> pushTaskConfigs = MinionTaskUtils.getPushTaskConfig(_tableConfig.getTableName(), taskConfig,
+        getMockClusterInfo("/data/dir", "http://localhost:9000"));
+
+    assertEquals(pushTaskConfigs.size(), 2);
+    assertEquals(pushTaskConfigs.get(BatchConfigProperties.PUSH_MODE),
+        BatchConfigProperties.SegmentPushType.TAR.toString());
+    assertEquals(pushTaskConfigs.get(BatchConfigProperties.PUSH_CONTROLLER_URI), "http://localhost:9000");
   }
 }

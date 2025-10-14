@@ -104,35 +104,54 @@ public class MinionTaskUtils {
     return PinotFSFactory.create(fileURIScheme);
   }
 
+  public static URI getOutputSegmentDirURI(Map<String, String> taskConfigs, ClusterInfoAccessor clusterInfoAccessor,
+      String tableName) {
+    // taskConfigs has priority over clusterInfo configs for output.segment.dir.uri
+    String outputDir = taskConfigs.getOrDefault(BatchConfigProperties.OUTPUT_SEGMENT_DIR_URI,
+        normalizeDirectoryURI(clusterInfoAccessor.getDataDir()) + TableNameBuilder.extractRawTableName(tableName));
+    return URI.create(outputDir);
+  }
+
   public static Map<String, String> getPushTaskConfig(String tableName, Map<String, String> taskConfigs,
       ClusterInfoAccessor clusterInfoAccessor) {
     try {
       String pushMode = IngestionConfigUtils.getPushMode(taskConfigs);
 
       Map<String, String> singleFileGenerationTaskConfig = new HashMap<>(taskConfigs);
-      if (pushMode == null || pushMode.toUpperCase()
-          .contentEquals(BatchConfigProperties.SegmentPushType.TAR.toString())) {
+
+      // Default value for Segment Push Type is TAR.
+      BatchConfigProperties.SegmentPushType segmentPushType;
+      if (pushMode == null) {
+        segmentPushType = BatchConfigProperties.SegmentPushType.TAR;
+      } else {
+        segmentPushType = BatchConfigProperties.SegmentPushType.valueOf(pushMode.toUpperCase());
+      }
+
+      URI outputSegmentDirURI = getOutputSegmentDirURI(taskConfigs, clusterInfoAccessor, tableName);
+      if (!isLocalOutputDir(outputSegmentDirURI.getScheme())) {
+        switch (segmentPushType) {
+          case URI:
+            singleFileGenerationTaskConfig.put(BatchConfigProperties.OUTPUT_SEGMENT_DIR_URI,
+                outputSegmentDirURI.toString());
+            LOGGER.warn("URI push type is not supported in this task. Switching to METADATA push");
+            singleFileGenerationTaskConfig.put(BatchConfigProperties.PUSH_MODE,
+                BatchConfigProperties.SegmentPushType.METADATA.toString());
+            break;
+          case METADATA:
+            singleFileGenerationTaskConfig.put(BatchConfigProperties.OUTPUT_SEGMENT_DIR_URI,
+                outputSegmentDirURI.toString());
+            break;
+          default:
+            singleFileGenerationTaskConfig.put(BatchConfigProperties.PUSH_MODE,
+                BatchConfigProperties.SegmentPushType.TAR.toString());
+            break;
+        }
+      } else {
+        LOGGER.warn("Local output dir found, defaulting to TAR: {}.", outputSegmentDirURI);
         singleFileGenerationTaskConfig.put(BatchConfigProperties.PUSH_MODE,
             BatchConfigProperties.SegmentPushType.TAR.toString());
-      } else {
-        URI outputDirURI = URI.create(
-            normalizeDirectoryURI(clusterInfoAccessor.getDataDir()) + TableNameBuilder.extractRawTableName(tableName));
-        String outputDirURIScheme = outputDirURI.getScheme();
-
-        if (!isLocalOutputDir(outputDirURIScheme)) {
-          singleFileGenerationTaskConfig.put(BatchConfigProperties.OUTPUT_SEGMENT_DIR_URI, outputDirURI.toString());
-          if (pushMode.toUpperCase().contentEquals(BatchConfigProperties.SegmentPushType.URI.toString())) {
-            LOGGER.warn("URI push type is not supported in this task. Switching to METADATA push");
-            pushMode = BatchConfigProperties.SegmentPushType.METADATA.toString();
-          }
-          singleFileGenerationTaskConfig.put(BatchConfigProperties.PUSH_MODE, pushMode);
-        } else {
-          LOGGER.warn("segment upload with METADATA push is not supported with local output dir: {}."
-              + " Switching to TAR push.", outputDirURI);
-          singleFileGenerationTaskConfig.put(BatchConfigProperties.PUSH_MODE,
-              BatchConfigProperties.SegmentPushType.TAR.toString());
-        }
       }
+
       singleFileGenerationTaskConfig.put(BatchConfigProperties.PUSH_CONTROLLER_URI, clusterInfoAccessor.getVipUrl());
       return singleFileGenerationTaskConfig;
     } catch (Exception e) {
@@ -221,8 +240,8 @@ public class MinionTaskUtils {
             serverSegmentMetadataReader.getValidDocIdsBitmapFromServer(tableNameWithType, segmentName, endpoint,
                 validDocIdsType, 60_000);
       } catch (Exception e) {
-        LOGGER.warn("Unable to retrieve validDocIds bitmap for segment: " + segmentName + " from endpoint: "
-            + endpoint, e);
+        LOGGER.warn("Unable to retrieve validDocIds bitmap for segment: " + segmentName + " from endpoint: " + endpoint,
+            e);
         continue;
       }
 
@@ -236,9 +255,10 @@ public class MinionTaskUtils {
       if (!expectedCrc.equals(crcFromValidDocIdsBitmap)) {
         // In this scenario, we are hitting the other replica of the segment which did not commit to ZK or deepstore.
         // We will skip processing this bitmap to query other server to confirm if there is a valid matching CRC.
-        String message = "CRC mismatch for segment: " + segmentName + ", expected value based on task generator: "
-            + expectedCrc + ", actual crc from validDocIdsBitmapResponse from endpoint " + endpoint + ": "
-            + crcFromValidDocIdsBitmap;
+        String message =
+            "CRC mismatch for segment: " + segmentName + ", expected value based on task generator: " + expectedCrc
+                + ", actual crc from validDocIdsBitmapResponse from endpoint " + endpoint + ": "
+                + crcFromValidDocIdsBitmap;
         LOGGER.warn(message);
         continue;
       }
@@ -288,16 +308,15 @@ public class MinionTaskUtils {
     boolean isDeleteEnabled = StringUtils.isNotEmpty(upsertConfig.getDeleteRecordColumn());
     ValidDocIdsType defaultValidDocIdsType =
         isDeleteEnabled ? ValidDocIdsType.SNAPSHOT_WITH_DELETE : ValidDocIdsType.SNAPSHOT;
-    String validDocIdsTypeStr = taskConfigs.getOrDefault(validDocIdsTypeKey,
-        defaultValidDocIdsType.name()).toUpperCase();
+    String validDocIdsTypeStr =
+        taskConfigs.getOrDefault(validDocIdsTypeKey, defaultValidDocIdsType.name()).toUpperCase();
     ValidDocIdsType validDocIdsType = ValidDocIdsType.valueOf(validDocIdsTypeStr);
 
     if (isDeleteEnabled && validDocIdsType != ValidDocIdsType.SNAPSHOT_WITH_DELETE
         && validDocIdsType != ValidDocIdsType.IN_MEMORY_WITH_DELETE) {
-      LOGGER.warn(
-          "Overriding user-specified validDocIdsType '{}' to '{}' for backward compatibility because delete is "
-              + "enabled (deleteRecordColumn='{}').",
-          validDocIdsType, ValidDocIdsType.SNAPSHOT_WITH_DELETE, upsertConfig.getDeleteRecordColumn());
+      LOGGER.warn("Overriding user-specified validDocIdsType '{}' to '{}' for backward compatibility because delete is "
+              + "enabled (deleteRecordColumn='{}').", validDocIdsType, ValidDocIdsType.SNAPSHOT_WITH_DELETE,
+          upsertConfig.getDeleteRecordColumn());
       validDocIdsType = ValidDocIdsType.SNAPSHOT_WITH_DELETE;
     }
 
@@ -308,8 +327,8 @@ public class MinionTaskUtils {
 
     if (validDocIdsType == ValidDocIdsType.IN_MEMORY_WITH_DELETE
         || validDocIdsType == ValidDocIdsType.SNAPSHOT_WITH_DELETE) {
-      Preconditions.checkState(isDeleteEnabled,
-          "'deleteRecordColumn' must be provided with validDocIdsType: %s", validDocIdsType);
+      Preconditions.checkState(isDeleteEnabled, "'deleteRecordColumn' must be provided with validDocIdsType: %s",
+          validDocIdsType);
     }
     return validDocIdsType;
   }
