@@ -1331,6 +1331,9 @@ public final class TableConfigUtils {
           String column = columnPair.getColumn();
           if (!column.equals(AggregationFunctionColumnPair.STAR)) {
             referencedColumns.add(column);
+          } else if (columnPair.getFunctionType() != AggregationFunctionType.COUNT) {
+            throw new IllegalStateException("Non-COUNT function set the column as '*' in the functionColumnPair: "
+                + functionColumnPair + ". Please configure an actual column for the function");
           }
         }
       }
@@ -1357,6 +1360,10 @@ public final class TableConfigUtils {
           String column = columnPair.getColumn();
           if (!column.equals(AggregationFunctionColumnPair.STAR)) {
             referencedColumns.add(column);
+          } else if (columnPair.getFunctionType() != AggregationFunctionType.COUNT) {
+            throw new IllegalStateException("Non-COUNT function set the column as '*' in the aggregationConfig for "
+                + "function: " + aggregationConfig.getAggregationFunction()
+                + ". Please configure an actual column for the function");
           }
         }
       }
@@ -1738,9 +1745,7 @@ public final class TableConfigUtils {
   }
 
   private static void overwriteConfig(JsonNode oldCfg, JsonNode newCfg) {
-    Iterator<Map.Entry<String, JsonNode>> cfgItr = newCfg.fields();
-    while (cfgItr.hasNext()) {
-      Map.Entry<String, JsonNode> cfgEntry = cfgItr.next();
+    for (Map.Entry<String, JsonNode> cfgEntry : newCfg.properties()) {
       ((ObjectNode) oldCfg).set(cfgEntry.getKey(), cfgEntry.getValue());
     }
   }

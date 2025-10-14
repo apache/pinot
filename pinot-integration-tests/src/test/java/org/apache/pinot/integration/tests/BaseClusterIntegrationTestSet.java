@@ -211,6 +211,22 @@ public abstract class BaseClusterIntegrationTestSet extends BaseClusterIntegrati
     query = "SELECT count(*) FROM mytable WHERE (NOT DaysSinceEpoch = 16312) AND Carrier = 'DL'";
     testQuery(query);
 
+    // BETWEEN
+    query = "SELECT count(*) FROM mytable WHERE OriginState BETWEEN 'DE' AND 'PA'";
+    testQuery(query);
+
+    query = "SELECT count(*) FROM mytable WHERE OriginState BETWEEN 'PA' AND 'DE'";
+    testQuery(query);
+
+    query = "SELECT count(*) FROM mytable WHERE DaysSinceEpoch BETWEEN 16312 AND 16318";
+    testQuery(query);
+
+    query = "SELECT Carrier BETWEEN 'AA' AND 'QQ' FROM mytable";
+    testQuery(query);
+
+    query = "SELECT DaysSinceEpoch BETWEEN 16312 AND 16318 FROM mytable";
+    testQuery(query);
+
     // Post-aggregation in ORDER-BY
     query = "SELECT MAX(ArrTime) FROM mytable GROUP BY DaysSinceEpoch ORDER BY MAX(ArrTime) - MIN(ArrTime)";
     testQuery(query);
@@ -309,6 +325,10 @@ public abstract class BaseClusterIntegrationTestSet extends BaseClusterIntegrati
         "SELECT CAST(CAST(ArrTime AS VARCHAR) AS BIGINT) FROM mytable WHERE DaysSinceEpoch <> 16312 AND Carrier = "
             + "'DL' ORDER BY ArrTime DESC";
     testQuery(query, h2Query);
+
+    // Test MIN / MAX on STRING columns (automatically rewritten to MINSTRING / MAXSTRING internally)
+    query = "SELECT MIN(OriginCityName), MAX(OriginCityName) FROM mytable";
+    testQuery(query);
 
     // Test orderedPreferredPools option which will fallbacks to non preferred Pools
     // when non of preferred Pools is available

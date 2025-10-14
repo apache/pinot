@@ -59,7 +59,7 @@ public class MailboxReceiveOperator extends BaseMailboxReceiveOperator {
       block = _multiConsumer.readMseBlockBlocking();
     }
     if (block.isData()) {
-      sampleAndCheckInterruption();
+      checkTerminationAndSampleUsage();
     } else {
       onEos();
     }

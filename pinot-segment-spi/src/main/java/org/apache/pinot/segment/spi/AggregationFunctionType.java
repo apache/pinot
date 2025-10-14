@@ -53,10 +53,14 @@ public enum AggregationFunctionType {
   // TODO: min/max only supports NUMERIC in Pinot, where Calcite supports COMPARABLE_ORDERED
   MIN("min", SqlTypeName.DOUBLE, SqlTypeName.DOUBLE),
   MAX("max", SqlTypeName.DOUBLE, SqlTypeName.DOUBLE),
-  MINSTRING("minString", SqlTypeName.VARCHAR, SqlTypeName.VARCHAR),
-  MAXSTRING("maxString", SqlTypeName.VARCHAR, SqlTypeName.VARCHAR),
+  MINSTRING("minString", ReturnTypes.ARG0_NULLABLE_IF_EMPTY, OperandTypes.CHARACTER),
+  MAXSTRING("maxString", ReturnTypes.ARG0_NULLABLE_IF_EMPTY, OperandTypes.CHARACTER),
+  MINLONG("minLong", new BigintNullableIfEmpty(), OperandTypes.or(OperandTypes.INTEGER, OperandTypes.ARRAY_OF_INTEGER)),
+  MAXLONG("maxLong", new BigintNullableIfEmpty(), OperandTypes.or(OperandTypes.INTEGER, OperandTypes.ARRAY_OF_INTEGER)),
   SUM("sum", SqlTypeName.DOUBLE, SqlTypeName.DOUBLE),
   SUM0("$sum0", SqlTypeName.DOUBLE, SqlTypeName.DOUBLE),
+  SUMINT("sumInt", ReturnTypes.AGG_SUM, OperandTypes.INTEGER),
+  SUMLONG("sumLong", ReturnTypes.AGG_SUM, OperandTypes.or(OperandTypes.INTEGER, OperandTypes.ARRAY_OF_INTEGER)),
   SUMPRECISION("sumPrecision", ReturnTypes.explicit(SqlTypeName.DECIMAL), OperandTypes.ANY, SqlTypeName.OTHER),
   AVG("avg", SqlTypeName.OTHER, SqlTypeName.DOUBLE),
   MODE("mode", SqlTypeName.OTHER, SqlTypeName.DOUBLE),
@@ -394,6 +398,25 @@ public enum AggregationFunctionType {
       RelDataTypeFactory typeFactory = opBinding.getTypeFactory();
       RelDataType elementType = typeFactory.createSqlType(_sqlTypeName);
       return typeFactory.createArrayType(elementType, -1);
+    }
+  }
+
+  // Used for aggregation functions that always return BIGINT. The "IfEmpty" logic ensures that the return type is
+  // nullable for pure aggregation queries (no group-by) and filtered aggregation queries. Return values can be null
+  // if there are no matching rows (even if the operand type is not nullable).
+  private static class BigintNullableIfEmpty implements SqlReturnTypeInference {
+    @Override
+    public RelDataType inferReturnType(SqlOperatorBinding opBinding) {
+      RelDataTypeFactory typeFactory = opBinding.getTypeFactory();
+      if (opBinding.getGroupCount() == 0 || opBinding.hasFilter()) {
+        return typeFactory.createTypeWithNullability(typeFactory.createSqlType(SqlTypeName.BIGINT), true);
+      } else {
+        if (opBinding.getOperandType(0).isNullable()) {
+          return typeFactory.createTypeWithNullability(typeFactory.createSqlType(SqlTypeName.BIGINT), true);
+        } else {
+          return typeFactory.createSqlType(SqlTypeName.BIGINT);
+        }
+      }
     }
   }
 }

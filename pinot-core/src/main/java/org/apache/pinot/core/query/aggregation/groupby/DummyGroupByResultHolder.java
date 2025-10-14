@@ -32,6 +32,10 @@ public class DummyGroupByResultHolder implements GroupByResultHolder {
   }
 
   @Override
+  public void setValueForKey(int groupKey, long value) {
+  }
+
+  @Override
   public void setValueForKey(int groupKey, Object value) {
   }
 
@@ -42,6 +46,11 @@ public class DummyGroupByResultHolder implements GroupByResultHolder {
 
   @Override
   public int getIntResult(int groupKey) {
+    return 0;
+  }
+
+  @Override
+  public long getLongResult(int groupKey) {
     return 0;
   }
 

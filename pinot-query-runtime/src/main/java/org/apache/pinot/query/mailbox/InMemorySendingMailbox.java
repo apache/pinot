@@ -18,7 +18,8 @@
  */
 package org.apache.pinot.query.mailbox;
 
-import java.io.IOException;
+import java.time.Duration;
+import java.time.temporal.ChronoUnit;
 import java.util.Collections;
 import java.util.List;
 import java.util.concurrent.TimeoutException;
@@ -42,7 +43,13 @@ public class InMemorySendingMailbox implements SendingMailbox {
   private final long _deadlineMs;
 
   private ReceivingMailbox _receivingMailbox;
+
+  /// Set to true when the send operation completes calling [#complete()]
   private volatile boolean _isTerminated;
+
+  /// Set to true when the receiver waits for EOS but discards any further data blocks.
+  /// This can happen when the receiver has already early terminated, for example,
+  /// when the [org.apache.pinot.query.runtime.operator.SortOperator] limit has been reached.
   private volatile boolean _isEarlyTerminated;
   private final StatMap<MailboxSendOperator.StatKey> _statMap;
 
@@ -60,20 +67,19 @@ public class InMemorySendingMailbox implements SendingMailbox {
   }
 
   @Override
-  public void send(MseBlock.Data data)
-      throws IOException, TimeoutException {
+  public void send(MseBlock.Data data) {
     sendPrivate(data, Collections.emptyList());
   }
 
   @Override
-  public void send(MseBlock.Eos block, List<DataBuffer> serializedStats)
-      throws IOException, TimeoutException {
+  public void send(MseBlock.Eos block, List<DataBuffer> serializedStats) {
     sendPrivate(block, serializedStats);
+    _isTerminated = true;
   }
 
-  private void sendPrivate(MseBlock block, List<DataBuffer> serializedStats)
-      throws TimeoutException {
+  private void sendPrivate(MseBlock block, List<DataBuffer> serializedStats) {
     if (isTerminated() || (isEarlyTerminated() && block.isData())) {
+      LOGGER.debug("Mailbox {} already terminated, ignoring block {}", _id, block);
       return;
     }
     if (_receivingMailbox == null) {
@@ -81,30 +87,33 @@ public class InMemorySendingMailbox implements SendingMailbox {
     }
     _statMap.merge(MailboxSendOperator.StatKey.IN_MEMORY_MESSAGES, 1);
     long timeoutMs = _deadlineMs - System.currentTimeMillis();
-    ReceivingMailbox.ReceivingMailboxStatus status = _receivingMailbox.offer(block, serializedStats, timeoutMs);
-
+    ReceivingMailbox.ReceivingMailboxStatus status;
+    try {
+      status = _receivingMailbox.offer(block, serializedStats, timeoutMs);
+    } catch (InterruptedException e) {
+      // We are not restoring the interrupt status because we are already throwing an exception
+      // Code that catches this exception must finish the work fast enough to comply the interrupt contract
+      // See https://github.com/apache/pinot/pull/16903#discussion_r2409003423
+      throw new QueryException(QueryErrorCode.INTERNAL, "Interrupted while sending data to mailbox: " + _id, e);
+    } catch (TimeoutException e) {
+      throw new QueryException(QueryErrorCode.EXECUTION_TIMEOUT, "Timed out adding block into mailbox: " + _id
+          + " with timeout: " + Duration.of(timeoutMs, ChronoUnit.MILLIS), e);
+    }
     switch (status) {
       case SUCCESS:
         break;
-      case CANCELLED:
-        throw new QueryCancelledException(String.format("Mailbox: %s already cancelled from upstream", _id));
-      case ERROR:
-        throw new QueryException(QueryErrorCode.INTERNAL, String.format(
-            "Mailbox: %s already errored out (received error block before)", _id));
-      case TIMEOUT:
-        throw new QueryException(QueryErrorCode.EXECUTION_TIMEOUT,
-            String.format("Timed out adding block into mailbox: %s with timeout: %dms", _id, timeoutMs));
-      case EARLY_TERMINATED:
+      case WAITING_EOS:
         _isEarlyTerminated = true;
+        break;
+      case LAST_BLOCK:
+        _isTerminated = true;
+        break;
+      case ALREADY_TERMINATED:
+        LOGGER.error("Trying to offer blocks to the already closed mailbox {}. This should not happen", _id);
         break;
       default:
         throw new IllegalStateException("Unsupported mailbox status: " + status);
     }
-  }
-
-  @Override
-  public void complete() {
-    _isTerminated = true;
   }
 
   @Override

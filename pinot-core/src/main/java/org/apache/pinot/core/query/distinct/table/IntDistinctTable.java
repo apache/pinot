@@ -35,7 +35,7 @@ import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.common.utils.DataSchema.ColumnDataType;
 import org.apache.pinot.core.common.datatable.DataTableBuilder;
 import org.apache.pinot.core.common.datatable.DataTableBuilderFactory;
-import org.apache.pinot.spi.trace.Tracing;
+import org.apache.pinot.spi.query.QueryThreadContext;
 import org.apache.pinot.spi.utils.CommonConstants;
 import org.roaringbitmap.RoaringBitmap;
 
@@ -237,11 +237,10 @@ public class IntDistinctTable extends DistinctTable {
     int numRowsAdded = 0;
     IntIterator intIterator = _valueSet.iterator();
     while (intIterator.hasNext()) {
-      Tracing.ThreadAccountantOps.sampleAndCheckInterruptionPeriodically(numRowsAdded);
+      QueryThreadContext.checkTerminationAndSampleUsagePeriodically(numRowsAdded++, "IntDistinctTable#toDataTable");
       dataTableBuilder.startRow();
       dataTableBuilder.setColumn(0, intIterator.nextInt());
       dataTableBuilder.finishRow();
-      numRowsAdded++;
     }
     if (_hasNull) {
       RoaringBitmap nullBitmap = new RoaringBitmap();

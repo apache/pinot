@@ -209,8 +209,8 @@ export const getTasks = (tableName: string, taskType: string): Promise<AxiosResp
 export const getTaskRuntimeConfig = (taskName: string): Promise<AxiosResponse<TaskRuntimeConfig>> =>
   baseApi.get(`/tasks/task/${taskName}/runtime/config`, { headers: { ...headers, Accept: 'application/json' }});
 
-export const getTaskDebug = (taskName: string): Promise<AxiosResponse<OperationResponse>> =>
-  baseApi.get(`/tasks/task/${taskName}/debug?verbosity=1`, { headers: { ...headers, Accept: 'application/json' } });
+export const getTaskDebug = (taskName: string, tableName: string): Promise<AxiosResponse<OperationResponse>> =>
+  baseApi.get(`/tasks/task/${taskName}/debug?verbosity=1&tableName=${tableName}`, { headers: { ...headers, Accept: 'application/json' } });
 
 export const getTaskProgress = (taskName: string, subTaskName: string): Promise<AxiosResponse<TaskProgressResponse>> =>
   baseApi.get(`/tasks/subtask/${taskName}/progress`, { headers: { ...headers, Accept: 'application/json' }, params: {subtaskNames: subTaskName} });

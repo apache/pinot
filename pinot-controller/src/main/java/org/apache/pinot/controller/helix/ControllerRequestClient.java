@@ -26,7 +26,6 @@ import java.net.URISyntaxException;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
-import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import javax.annotation.Nullable;
@@ -38,6 +37,7 @@ import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.TableType;
 import org.apache.pinot.spi.config.tenant.Tenant;
 import org.apache.pinot.spi.config.tenant.TenantRole;
+import org.apache.pinot.spi.config.workload.QueryWorkloadConfig;
 import org.apache.pinot.spi.data.LogicalTableConfig;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.utils.JsonUtils;
@@ -325,9 +325,7 @@ public class ControllerRequestClient {
       }
 
       HashMap<String, List<String>> result = new HashMap<>();
-      Iterator<Map.Entry<String, JsonNode>> fields = serversMap.fields();
-      while (fields.hasNext()) {
-        Map.Entry<String, JsonNode> field = fields.next();
+      for (Map.Entry<String, JsonNode> field : serversMap.properties()) {
         List<String> segments = new ArrayList<>();
 
         ArrayNode value = (ArrayNode) field.getValue();
@@ -490,6 +488,38 @@ public class ControllerRequestClient {
     try {
       HttpClient.wrapAndThrowHttpException(_httpClient.sendDeleteRequest(
           new URI(_controllerRequestURLBuilder.forClusterConfigDelete(config)), _headers));
+    } catch (HttpErrorStatusException | URISyntaxException e) {
+      throw new IOException(e);
+    }
+  }
+
+  public void updateQueryWorkloadConfig(QueryWorkloadConfig queryWorkloadConfig)
+      throws IOException {
+    try {
+      HttpClient.wrapAndThrowHttpException(_httpClient.sendJsonPostRequest(
+          new URI(_controllerRequestURLBuilder.forQueryWorkloadConfigUpdate()),
+          JsonUtils.objectToString(queryWorkloadConfig), _headers));
+    } catch (HttpErrorStatusException | URISyntaxException e) {
+      throw new IOException(e);
+    }
+  }
+
+  public void deleteQueryWorkloadConfig(String config)
+      throws IOException {
+    try {
+      HttpClient.wrapAndThrowHttpException(_httpClient.sendDeleteRequest(
+          new URI(_controllerRequestURLBuilder.forBaseQueryWorkloadConfig(config)), _headers));
+    } catch (HttpErrorStatusException | URISyntaxException e) {
+      throw new IOException(e);
+    }
+  }
+
+  public QueryWorkloadConfig getQueryWorkloadConfig(String config)
+      throws IOException {
+    try {
+      SimpleHttpResponse response = HttpClient.wrapAndThrowHttpException(_httpClient.sendGetRequest(
+          new URI(_controllerRequestURLBuilder.forBaseQueryWorkloadConfig(config)), _headers));
+      return JsonUtils.stringToObject(response.getResponse(), QueryWorkloadConfig.class);
     } catch (HttpErrorStatusException | URISyntaxException e) {
       throw new IOException(e);
     }

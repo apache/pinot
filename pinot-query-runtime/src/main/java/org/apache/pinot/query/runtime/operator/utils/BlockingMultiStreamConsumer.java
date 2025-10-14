@@ -33,6 +33,8 @@ import org.apache.pinot.query.runtime.plan.MultiStageQueryStats;
 import org.apache.pinot.query.runtime.plan.OpChainExecutionContext;
 import org.apache.pinot.segment.spi.memory.DataBuffer;
 import org.apache.pinot.spi.exception.QueryErrorCode;
+import org.apache.pinot.spi.exception.QueryException;
+import org.apache.pinot.spi.query.QueryThreadContext;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -234,8 +236,9 @@ public abstract class BlockingMultiStreamConsumer<E> implements AutoCloseable {
           return block;
         }
       }
-    } catch (InterruptedException ex) {
-      return onException(ex);
+    } catch (Exception e) {
+      _errorBlock = onException(e);
+      return _errorBlock;
     }
   }
 
@@ -341,12 +344,14 @@ public abstract class BlockingMultiStreamConsumer<E> implements AutoCloseable {
     private final int _stageId;
     @Nullable
     private MultiStageQueryStats _stats;
+    private final int _senderStageId;
 
     public OfMseBlock(OpChainExecutionContext context,
-        List<? extends AsyncStream<ReceivingMailbox.MseBlockWithStats>> asyncProducers) {
+        List<? extends AsyncStream<ReceivingMailbox.MseBlockWithStats>> asyncProducers, int senderStageId) {
       super(context.getId(), context.getPassiveDeadlineMs(), asyncProducers);
       _stageId = context.getStageId();
       _stats = MultiStageQueryStats.emptyStats(context.getStageId());
+      _senderStageId = senderStageId;
     }
 
     @Override
@@ -384,8 +389,13 @@ public abstract class BlockingMultiStreamConsumer<E> implements AutoCloseable {
 
     @Override
     protected ReceivingMailbox.MseBlockWithStats onTimeout() {
+      // Use the terminate exception when query is explicitly terminated.
+      QueryException terminateException = QueryThreadContext.getTerminateException();
+      if (terminateException != null) {
+        return onException(terminateException.getErrorCode(), terminateException.getMessage());
+      }
       // TODO: Add the sender stage id to the error message
-      String errMsg = "Timed out on stage " + _stageId + " waiting for data sent by a child stage";
+      String errMsg = "Timed out on stage " + _stageId + " waiting for data from child stage " + _senderStageId;
       // We log this case as debug because:
       // - The opchain will already log a stackless message once the opchain fail
       // - The trace is not useful (the log message is good enough to find where we failed)
@@ -397,6 +407,11 @@ public abstract class BlockingMultiStreamConsumer<E> implements AutoCloseable {
 
     @Override
     protected ReceivingMailbox.MseBlockWithStats onException(Exception e) {
+      // Use the terminate exception when query is explicitly terminated.
+      QueryException terminateException = QueryThreadContext.getTerminateException();
+      if (terminateException != null) {
+        return onException(terminateException.getErrorCode(), terminateException.getMessage());
+      }
       // TODO: Add the sender stage id to the error message
       String errMsg = "Found an error on stage " + _stageId + " while reading from a child stage";
       // We log this case as warn because contrary to the timeout case, it should be rare to finish an execution

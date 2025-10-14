@@ -29,12 +29,16 @@ public enum ControllerTimer implements AbstractMetrics.Timer {
   TABLE_REBALANCE_EXECUTION_TIME_MS("tableRebalanceExecutionTimeMs", false),
   CRON_SCHEDULER_JOB_EXECUTION_TIME_MS("cronSchedulerJobExecutionTimeMs", false),
   IDEAL_STATE_UPDATE_TIME_MS("IdealStateUpdateTimeMs", false),
+  MINION_TASK_GENERATION_LOCK_HELD_ELAPSED_TIME_MS("minionTaskGenerationLockHeldElapsedTimeMs", false),
   // How long it took the server to start.
   STARTUP_SUCCESS_DURATION_MS("startupSuccessDurationMs", true),
   // Time taken to read the segment from deep store
   DEEP_STORE_SEGMENT_READ_TIME_MS("deepStoreSegmentReadTimeMs", true),
   // Time taken to write the segment to deep store
-  DEEP_STORE_SEGMENT_WRITE_TIME_MS("deepStoreSegmentWriteTimeMs", true);
+  DEEP_STORE_SEGMENT_WRITE_TIME_MS("deepStoreSegmentWriteTimeMs", true),
+  // Audit logging timers
+  AUDIT_REQUEST_PROCESSING_TIME("auditRequestProcessingTime", true),
+  AUDIT_RESPONSE_PROCESSING_TIME("auditResponseProcessingTime", true);
 
 
   private final String _timerName;

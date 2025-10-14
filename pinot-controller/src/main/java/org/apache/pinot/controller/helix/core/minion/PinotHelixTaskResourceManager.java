@@ -965,13 +965,27 @@ public class PinotHelixTaskResourceManager {
    * @return TaskDebugInfo contains details for subtasks in this task batch.
    */
   public synchronized TaskDebugInfo getTaskDebugInfo(String taskName, int verbosity) {
+    return getTaskDebugInfo(taskName, null, verbosity);
+  }
+
+  /**
+   * Given a taskName and table name collects status of the (sub)tasks in the taskName for the table.
+   *
+   * @param taskName          Pinot taskName
+   * @param tableNameWithType table name for which subtask status to fetch
+   * @param verbosity         By default, does not show details for completed tasks.
+   *                          If verbosity > 0, shows details for all tasks.
+   * @return TaskDebugInfo contains details for subtasks in this task batch.
+   */
+  public synchronized TaskDebugInfo getTaskDebugInfo(String taskName, @Nullable String tableNameWithType,
+      int verbosity) {
     String taskType = getTaskType(taskName);
     WorkflowContext workflowContext = _taskDriver.getWorkflowContext(getHelixJobQueueName(taskType));
     if (workflowContext == null) {
       return null;
     }
     String helixJobName = getHelixJobName(taskName);
-    return getTaskDebugInfo(workflowContext, helixJobName, null, verbosity);
+    return getTaskDebugInfo(workflowContext, helixJobName, tableNameWithType, verbosity);
   }
 
   private synchronized TaskDebugInfo getTaskDebugInfo(WorkflowContext workflowContext, String helixJobName,
@@ -1003,14 +1017,23 @@ public class PinotHelixTaskResourceManager {
       TaskCount subtaskCount = new TaskCount();
       for (int partition : partitionSet) {
         // First get the partition's state and update the subtaskCount
+        String taskIdForPartition = jobContext.getTaskIdForPartition(partition);
         TaskPartitionState partitionState = jobContext.getPartitionState(partition);
+        TaskConfig helixTaskConfig = jobConfig.getTaskConfig(taskIdForPartition);
+        PinotTaskConfig pinotTaskConfig = null;
+        if (helixTaskConfig != null) {
+          pinotTaskConfig = PinotTaskConfig.fromHelixTaskConfig(helixTaskConfig);
+          if ((tableNameWithType != null) && (!tableNameWithType.equals(pinotTaskConfig.getTableName()))) {
+            // Filter task configs that match this table name
+            continue;
+          }
+        }
         subtaskCount.addTaskState(partitionState);
         // Skip details for COMPLETED tasks
         if (!showCompleted && partitionState == TaskPartitionState.COMPLETED) {
           continue;
         }
         SubtaskDebugInfo subtaskDebugInfo = new SubtaskDebugInfo();
-        String taskIdForPartition = jobContext.getTaskIdForPartition(partition);
         subtaskDebugInfo.setTaskId(taskIdForPartition);
         subtaskDebugInfo.setState(partitionState);
         subtaskDebugInfo.setTriggeredBy(triggeredBy);
@@ -1024,15 +1047,7 @@ public class PinotHelixTaskResourceManager {
         }
         subtaskDebugInfo.setParticipant(jobContext.getAssignedParticipant(partition));
         subtaskDebugInfo.setInfo(jobContext.getPartitionInfo(partition));
-        TaskConfig helixTaskConfig = jobConfig.getTaskConfig(taskIdForPartition);
-        if (helixTaskConfig != null) {
-          PinotTaskConfig pinotTaskConfig = PinotTaskConfig.fromHelixTaskConfig(helixTaskConfig);
-          if ((tableNameWithType != null) && (!tableNameWithType.equals(pinotTaskConfig.getTableName()))) {
-            // Filter task configs that match this table name
-            continue;
-          }
-          subtaskDebugInfo.setTaskConfig(pinotTaskConfig);
-        }
+        subtaskDebugInfo.setTaskConfig(pinotTaskConfig);
         taskDebugInfo.addSubtaskInfo(subtaskDebugInfo);
       }
       taskDebugInfo.setSubtaskCount(subtaskCount);

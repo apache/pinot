@@ -111,6 +111,7 @@ public enum ServerMeter implements AbstractMetrics.Meter {
   READINESS_CHECK_OK_CALLS("readinessCheck", true),
   READINESS_CHECK_BAD_CALLS("readinessCheck", true),
   QUERIES_KILLED("query", true),
+  QUERIES_THROTTLED("query", true),
   HEAP_CRITICAL_LEVEL_EXCEEDED("count", true),
   HEAP_PANIC_LEVEL_EXCEEDED("count", true),
 
@@ -223,7 +224,9 @@ public enum ServerMeter implements AbstractMetrics.Meter {
    */
   MUTABLE_JSON_INDEX_MEMORY_USAGE("bytes", false),
   // Workload Budget exceeded counter
-  WORKLOAD_BUDGET_EXCEEDED("workloadBudgetExceeded", false, "Number of times workload budget exceeded");
+  WORKLOAD_BUDGET_EXCEEDED("workloadBudgetExceeded", false, "Number of times workload budget exceeded"),
+  INGESTION_DELAY_TRACKING_ERRORS("errors", false,
+      "Indicates the count of errors encountered while tracking ingestion delay.");
 
   private final String _meterName;
   private final String _unit;

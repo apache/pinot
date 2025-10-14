@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.spi.accounting;
 
+import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
@@ -31,6 +32,17 @@ import org.slf4j.LoggerFactory;
 
 public class WorkloadBudgetManager {
   private static final Logger LOGGER = LoggerFactory.getLogger(WorkloadBudgetManager.class);
+
+  // TODO: Pass it as a regular instance instead of a static singleton.
+  private static WorkloadBudgetManager _instance;
+
+  public static void set(WorkloadBudgetManager instance) {
+    _instance = instance;
+  }
+
+  public static WorkloadBudgetManager get() {
+    return _instance;
+  }
 
   private long _enforcementWindowMs;
   private ConcurrentHashMap<String, Budget> _workloadBudgets;
@@ -99,7 +111,6 @@ public class WorkloadBudgetManager {
     LOGGER.info("WorkloadBudgetManager has been shut down.");
   }
 
-
   /**
    * Adds or updates budget for a workload (Thread-Safe).
    */
@@ -140,7 +151,7 @@ public class WorkloadBudgetManager {
       return new BudgetStats(Long.MAX_VALUE, Long.MAX_VALUE, Long.MAX_VALUE, Long.MAX_VALUE);
     }
 
-      Budget budget = _workloadBudgets.get(workload);
+    Budget budget = _workloadBudgets.get(workload);
     if (budget == null) {
       LOGGER.warn("No budget found for workload: {}", workload);
       return new BudgetStats(Long.MAX_VALUE, Long.MAX_VALUE, Long.MAX_VALUE, Long.MAX_VALUE);
@@ -149,15 +160,14 @@ public class WorkloadBudgetManager {
   }
 
   /**
-   * Retrieves the remaining budget for a specific workload.
+   * Retrieves the initial and remaining budget for a workload.
    */
-  public BudgetStats getRemainingBudgetForWorkload(String workload) {
+  public BudgetStats getBudgetStats(String workload) {
     if (!_isEnabled) {
-      return new BudgetStats(Long.MAX_VALUE, Long.MAX_VALUE, Long.MAX_VALUE, Long.MAX_VALUE);
+      return null;
     }
-
     Budget budget = _workloadBudgets.get(workload);
-    return budget != null ? budget.getStats() : new BudgetStats(0, 0, 0, 0);
+    return budget != null ? budget.getStats() : null;
   }
 
   /**
@@ -227,6 +237,16 @@ public class WorkloadBudgetManager {
     BudgetStats stats = budget.getStats();
     return stats._cpuRemaining > 0 && stats._memoryRemaining > 0;
   }
+
+  public Map<String, BudgetStats> getAllBudgetStats() {
+    if (!_isEnabled) {
+      return null;
+    }
+    Map<String, BudgetStats> allStats = new ConcurrentHashMap<>();
+    _workloadBudgets.forEach((workload, budget) -> allStats.put(workload, budget.getStats()));
+    return allStats;
+  }
+
   /**
    * Internal class representing budget statistics.
    * It contains initial CPU and memory budgets that are configured during workload registration,
@@ -286,7 +306,7 @@ public class WorkloadBudgetManager {
     }
 
     /**
-     * Gets the current remaining budget.
+     * Gets the budget stats that provides initial and remaining CPU and memory budgets.
      */
     public BudgetStats getStats() {
       return new BudgetStats(_initialCpuBudget, _initialMemoryBudget, _cpuRemaining.get(), _memoryRemaining.get());

@@ -282,6 +282,20 @@
     <property name="file" value="${config_loc}/suppressions.xml"/>
   </module>
 
+  <!--
+  Prevent using both allowableValues and example in @ApiParam due to Swagger bug leading to UI inconsistencies
+  https://github.com/swagger-api/swagger-ui/issues/6560
+  https://github.com/swagger-api/swagger-ui/issues/5776
+   -->
+  <module name="RegexpMultiline">
+    <property name="format" value="@ApiParam\s*\([^@]*?allowableValues[^@]*?example[^@]*?\)"/>
+    <property name="message" value="Do not use both 'allowableValues' and 'example' together in @ApiParam annotations - this causes Swagger UI inconsistencies"/>
+  </module>
+  <module name="RegexpMultiline">
+    <property name="format" value="@ApiParam\s*\([^@]*?example[^@]*?allowableValues[^@]*?\)"/>
+    <property name="message" value="Do not use both 'allowableValues' and 'example' together in @ApiParam annotations - this causes Swagger UI inconsistencies"/>
+  </module>
+
   <module name="NewlineAtEndOfFile">
     <property name="lineSeparator" value="lf" />
   </module>

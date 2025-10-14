@@ -191,7 +191,7 @@ public final class DateTimeFieldSpec extends FieldSpec {
 
   @Override
   public String toString() {
-    return "< field type: DATE_TIME, field name: " + _name + ", datatype: " + _dataType + ", time column format: "
+    return "< field type: DATE_TIME, field name: " + _name + ", data type: " + _dataType + ", time column format: "
         + _format + ", time field granularity: " + _granularity + " >";
   }
 

@@ -29,10 +29,8 @@ import org.apache.pinot.common.config.GrpcConfig;
 import org.apache.pinot.common.config.NettyConfig;
 import org.apache.pinot.common.config.TlsConfig;
 import org.apache.pinot.common.function.FunctionRegistry;
-import org.apache.pinot.common.metrics.ServerGauge;
 import org.apache.pinot.common.metrics.ServerMetrics;
 import org.apache.pinot.common.utils.tls.TlsUtils;
-import org.apache.pinot.common.version.PinotVersion;
 import org.apache.pinot.core.data.manager.InstanceDataManager;
 import org.apache.pinot.core.operator.transform.function.TransformFunction;
 import org.apache.pinot.core.operator.transform.function.TransformFunctionFactory;
@@ -51,10 +49,8 @@ import org.apache.pinot.server.access.AllowAllAccessFactory;
 import org.apache.pinot.server.conf.ServerConf;
 import org.apache.pinot.server.starter.helix.SendStatsPredicate;
 import org.apache.pinot.server.worker.WorkerQueryServer;
-import org.apache.pinot.spi.accounting.ThreadResourceUsageAccountant;
+import org.apache.pinot.spi.accounting.ThreadAccountant;
 import org.apache.pinot.spi.env.PinotConfiguration;
-import org.apache.pinot.spi.metrics.PinotMetricUtils;
-import org.apache.pinot.spi.metrics.PinotMetricsRegistry;
 import org.apache.pinot.spi.plugin.PluginManager;
 import org.apache.pinot.spi.utils.CommonConstants;
 import org.slf4j.Logger;
@@ -68,7 +64,8 @@ import org.slf4j.LoggerFactory;
 public class ServerInstance {
   private static final Logger LOGGER = LoggerFactory.getLogger(ServerInstance.class);
 
-  private final ServerMetrics _serverMetrics;
+  private final HelixManager _helixManager;
+  private final ThreadAccountant _threadAccountant;
   private final InstanceDataManager _instanceDataManager;
   private final QueryExecutor _queryExecutor;
   private final LongAccumulator _latestQueryTime;
@@ -76,30 +73,21 @@ public class ServerInstance {
   private final QueryServer _nettyQueryServer;
   private final QueryServer _nettyTlsQueryServer;
   private final GrpcQueryServer _grpcQueryServer;
-  private final AccessControl _accessControl;
-  private final HelixManager _helixManager;
-
   private final WorkerQueryServer _workerQueryServer;
-  private ChannelHandler _instanceRequestHandler;
+  private final ChannelHandler _instanceRequestHandler;
+  private final ServerMetrics _serverMetrics = ServerMetrics.get();
 
   private boolean _dataManagerStarted = false;
   private boolean _queryServerStarted = false;
 
-  public ServerInstance(ServerConf serverConf, HelixManager helixManager, AccessControlFactory accessControlFactory,
-      @Nullable SegmentOperationsThrottler segmentOperationsThrottler, SendStatsPredicate sendStatsPredicate,
-      ThreadResourceUsageAccountant resourceUsageAccountant)
+  public ServerInstance(ServerConf serverConf, String instanceId, HelixManager helixManager,
+      AccessControlFactory accessControlFactory, @Nullable SegmentOperationsThrottler segmentOperationsThrottler,
+      ThreadAccountant threadAccountant, SendStatsPredicate sendStatsPredicate)
       throws Exception {
-    LOGGER.info("Initializing server instance");
+    LOGGER.info("Initializing server instance: {}", instanceId);
     _helixManager = helixManager;
+    _threadAccountant = threadAccountant;
 
-    LOGGER.info("Initializing server metrics");
-    PinotMetricsRegistry metricsRegistry = PinotMetricUtils.getPinotMetricsRegistry(serverConf.getMetricsConfig());
-    _serverMetrics =
-        new ServerMetrics(serverConf.getMetricsPrefix(), metricsRegistry, serverConf.emitTableLevelMetrics(),
-            serverConf.getAllowedTablesForEmittingMetrics());
-    _serverMetrics.initializeGlobalMeters();
-    _serverMetrics.setValueOfGlobalGauge(ServerGauge.VERSION, PinotVersion.VERSION_METRIC_NAME, 1);
-    ServerMetrics.register(_serverMetrics);
     if (segmentOperationsThrottler != null) {
       // Initialize the metrics for the throttler so it picks up the newly registered ServerMetrics object
       segmentOperationsThrottler.initializeMetrics();
@@ -124,8 +112,8 @@ public class ServerInstance {
     LOGGER.info("Initializing query scheduler");
     _latestQueryTime = new LongAccumulator(Long::max, 0);
     _queryScheduler =
-        QuerySchedulerFactory.create(serverConf.getSchedulerConfig(), _queryExecutor, _serverMetrics, _latestQueryTime,
-            resourceUsageAccountant);
+        QuerySchedulerFactory.create(serverConf.getSchedulerConfig(), instanceId, _queryExecutor, threadAccountant,
+            _latestQueryTime);
 
     TlsConfig tlsConfig =
         TlsUtils.extractTlsConfig(serverConf.getPinotConfig(), CommonConstants.Server.SERVER_TLS_PREFIX);
@@ -133,34 +121,34 @@ public class ServerInstance {
         NettyConfig.extractNettyConfig(serverConf.getPinotConfig(), CommonConstants.Server.SERVER_NETTY_PREFIX);
     accessControlFactory.init(
         serverConf.getPinotConfig().subset(CommonConstants.Server.PREFIX_OF_CONFIG_OF_ACCESS_CONTROL), helixManager);
-    _accessControl = accessControlFactory.create();
+    AccessControl accessControl = accessControlFactory.create();
 
     if (serverConf.isMultiStageServerEnabled()) {
       LOGGER.info("Initializing Multi-stage query engine");
       _workerQueryServer = new WorkerQueryServer(serverConf.getPinotConfig(), _instanceDataManager,
-          serverConf.isMultiStageEngineTlsEnabled() ? tlsConfig : null, sendStatsPredicate, resourceUsageAccountant);
+          serverConf.isMultiStageEngineTlsEnabled() ? tlsConfig : null, threadAccountant, sendStatsPredicate);
     } else {
       _workerQueryServer = null;
     }
 
+    ChannelHandler instanceRequestHandler = null;
     if (serverConf.isNettyServerEnabled()) {
       int nettyPort = serverConf.getNettyPort();
       LOGGER.info("Initializing Netty query server on port: {}", nettyPort);
-      _instanceRequestHandler =
+      instanceRequestHandler =
           ChannelHandlerFactory.getInstanceRequestHandler(helixManager.getInstanceName(), serverConf.getPinotConfig(),
-              _queryScheduler, _serverMetrics, new AllowAllAccessFactory().create());
-      _nettyQueryServer = new QueryServer(nettyPort, nettyConfig, _instanceRequestHandler);
+              _queryScheduler, new AllowAllAccessFactory().create(), threadAccountant);
+      _nettyQueryServer = new QueryServer(nettyPort, nettyConfig, instanceRequestHandler);
     } else {
       _nettyQueryServer = null;
     }
-
     if (serverConf.isNettyTlsServerEnabled()) {
       int nettySecPort = serverConf.getNettyTlsPort();
       LOGGER.info("Initializing TLS-secured Netty query server on port: {}", nettySecPort);
-      _instanceRequestHandler =
+      instanceRequestHandler =
           ChannelHandlerFactory.getInstanceRequestHandler(helixManager.getInstanceName(), serverConf.getPinotConfig(),
-              _queryScheduler, _serverMetrics, _accessControl);
-      _nettyTlsQueryServer = new QueryServer(nettySecPort, nettyConfig, tlsConfig, _instanceRequestHandler);
+              _queryScheduler, accessControl, threadAccountant);
+      _nettyTlsQueryServer = new QueryServer(nettySecPort, nettyConfig, tlsConfig, instanceRequestHandler);
     } else {
       _nettyTlsQueryServer = null;
     }
@@ -171,12 +159,13 @@ public class ServerInstance {
       TlsConfig actualTslConfig = serverConf.isGrpcTlsServerEnabled()
           ? TlsUtils.extractTlsConfig(serverConf.getPinotConfig(), CommonConstants.Server.SERVER_GRPCTLS_PREFIX)
           : null;
-      _grpcQueryServer = new GrpcQueryServer(instanceName, grpcPort,
-          GrpcConfig.buildGrpcQueryConfig(serverConf.getPinotConfig()),
-          actualTslConfig, _queryExecutor, _serverMetrics, _accessControl);
+      _grpcQueryServer =
+          new GrpcQueryServer(instanceName, grpcPort, GrpcConfig.buildGrpcQueryConfig(serverConf.getPinotConfig()),
+              actualTslConfig, _queryExecutor, accessControl, threadAccountant);
     } else {
       _grpcQueryServer = null;
     }
+    _instanceRequestHandler = instanceRequestHandler;
 
     LOGGER.info("Initializing transform functions");
     Set<Class<TransformFunction>> transformFunctionClasses = new HashSet<>();
@@ -305,6 +294,10 @@ public class ServerInstance {
 
   public HelixManager getHelixManager() {
     return _helixManager;
+  }
+
+  public ThreadAccountant getThreadAccountant() {
+    return _threadAccountant;
   }
 
   public QueryScheduler getQueryScheduler() {

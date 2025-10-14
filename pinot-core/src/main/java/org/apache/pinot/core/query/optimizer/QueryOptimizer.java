@@ -18,8 +18,6 @@
  */
 package org.apache.pinot.core.query.optimizer;
 
-import java.util.Arrays;
-import java.util.Collections;
 import java.util.List;
 import javax.annotation.Nullable;
 import org.apache.pinot.common.request.Expression;
@@ -32,9 +30,9 @@ import org.apache.pinot.core.query.optimizer.filter.MergeRangeFilterOptimizer;
 import org.apache.pinot.core.query.optimizer.filter.NumericalFilterOptimizer;
 import org.apache.pinot.core.query.optimizer.filter.TextMatchFilterOptimizer;
 import org.apache.pinot.core.query.optimizer.filter.TimePredicateFilterOptimizer;
+import org.apache.pinot.core.query.optimizer.statement.AggregateFunctionRewriteOptimizer;
 import org.apache.pinot.core.query.optimizer.statement.StatementOptimizer;
 import org.apache.pinot.core.query.optimizer.statement.StringPredicateFilterOptimizer;
-import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.data.Schema;
 
 
@@ -46,24 +44,17 @@ public class QueryOptimizer {
   // - TimePredicateFilterOptimizer and MergeRangeFilterOptimizer relies on NumericalFilterOptimizer to convert the
   //   values to the proper format so that they can be properly parsed
   private static final List<FilterOptimizer> FILTER_OPTIMIZERS =
-      Arrays.asList(new FlattenAndOrFilterOptimizer(), new IdenticalPredicateFilterOptimizer(),
+      List.of(new FlattenAndOrFilterOptimizer(), new IdenticalPredicateFilterOptimizer(),
           new MergeEqInFilterOptimizer(), new NumericalFilterOptimizer(), new TimePredicateFilterOptimizer(),
           new MergeRangeFilterOptimizer(), new TextMatchFilterOptimizer());
 
   private static final List<StatementOptimizer> STATEMENT_OPTIMIZERS =
-      Collections.singletonList(new StringPredicateFilterOptimizer());
+      List.of(new StringPredicateFilterOptimizer(), new AggregateFunctionRewriteOptimizer());
 
   /**
    * Optimizes the given query.
    */
   public void optimize(PinotQuery pinotQuery, @Nullable Schema schema) {
-    optimize(pinotQuery, null, schema);
-  }
-
-  /**
-   * Optimizes the given query.
-   */
-  public void optimize(PinotQuery pinotQuery, @Nullable TableConfig tableConfig, @Nullable Schema schema) {
     Expression filterExpression = pinotQuery.getFilterExpression();
     if (filterExpression != null) {
       for (FilterOptimizer filterOptimizer : FILTER_OPTIMIZERS) {
@@ -74,7 +65,7 @@ public class QueryOptimizer {
 
     // Run statement optimizer after filter has already been optimized.
     for (StatementOptimizer statementOptimizer : STATEMENT_OPTIMIZERS) {
-      statementOptimizer.optimize(pinotQuery, tableConfig, schema);
+      statementOptimizer.optimize(pinotQuery, schema);
     }
   }
 }

@@ -57,6 +57,9 @@ public final class AuditConfig {
   @JsonProperty("userid.jwt.claim")
   private String _useridJwtClaimName = "";
 
+  @JsonProperty("capture.response.enabled")
+  private boolean _captureResponseEnabled = false;
+
   public boolean isEnabled() {
     return _enabled;
   }
@@ -121,6 +124,14 @@ public final class AuditConfig {
     _useridJwtClaimName = useridJwtClaimName;
   }
 
+  public boolean isCaptureResponseEnabled() {
+    return _captureResponseEnabled;
+  }
+
+  public void setCaptureResponseEnabled(boolean captureResponseEnabled) {
+    _captureResponseEnabled = captureResponseEnabled;
+  }
+
   @Override
   public String toString() {
     return new StringJoiner(", ", AuditConfig.class.getSimpleName() + "[", "]").add("_enabled=" + _enabled)
@@ -131,6 +142,7 @@ public final class AuditConfig {
         .add("_urlFilterIncludePatterns='" + _urlFilterIncludePatterns + "'")
         .add("_useridHeader='" + _useridHeader + "'")
         .add("_useridJwtClaimName='" + _useridJwtClaimName + "'")
+        .add("_captureResponseEnabled=" + _captureResponseEnabled)
         .toString();
   }
 }

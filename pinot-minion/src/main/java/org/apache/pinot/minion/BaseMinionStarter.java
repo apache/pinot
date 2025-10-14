@@ -39,6 +39,7 @@ import org.apache.helix.task.TaskStateModelFactory;
 import org.apache.helix.zookeeper.constant.ZkSystemPropertyKeys;
 import org.apache.pinot.common.Utils;
 import org.apache.pinot.common.auth.AuthProviderUtils;
+import org.apache.pinot.common.config.DefaultClusterConfigChangeHandler;
 import org.apache.pinot.common.config.TlsConfig;
 import org.apache.pinot.common.metrics.MinionGauge;
 import org.apache.pinot.common.metrics.MinionMeter;
@@ -64,6 +65,7 @@ import org.apache.pinot.minion.executor.MinionTaskZkMetadataManager;
 import org.apache.pinot.minion.executor.PinotTaskExecutorFactory;
 import org.apache.pinot.minion.executor.TaskExecutorFactoryRegistry;
 import org.apache.pinot.minion.taskfactory.TaskFactoryRegistry;
+import org.apache.pinot.segment.local.utils.ClusterConfigForTable;
 import org.apache.pinot.spi.crypt.PinotCrypterFactory;
 import org.apache.pinot.spi.env.PinotConfiguration;
 import org.apache.pinot.spi.filesystem.PinotFSFactory;
@@ -99,6 +101,7 @@ public abstract class BaseMinionStarter implements ServiceStartable {
   protected MinionAdminApiApplication _minionAdminApplication;
   protected List<ListenerConfig> _listenerConfigs;
   protected ExecutorService _executorService;
+  protected DefaultClusterConfigChangeHandler _clusterConfigChangeHandler;
 
   @Override
   public void init(PinotConfiguration config)
@@ -124,6 +127,11 @@ public abstract class BaseMinionStarter implements ServiceStartable {
     }
     _listenerConfigs = ListenerConfigUtil.buildMinionConfigs(_config);
     _tlsPort = ListenerConfigUtil.findLastTlsPort(_listenerConfigs, -1);
+    _clusterConfigChangeHandler = new DefaultClusterConfigChangeHandler();
+    // Register cluster-level override for table configs
+    _clusterConfigChangeHandler.registerClusterConfigChangeListener(
+        new ClusterConfigForTable.ConfigChangeListener());
+    LOGGER.info("Registered ClusterConfigForTable change listener");
     _helixManager = new ZKHelixManager(helixClusterName, _instanceId, InstanceType.PARTICIPANT, zkAddress);
     MinionTaskZkMetadataManager minionTaskZkMetadataManager = new MinionTaskZkMetadataManager(_helixManager);
     _taskExecutorFactoryRegistry = new TaskExecutorFactoryRegistry(minionTaskZkMetadataManager, _config);
@@ -133,7 +141,7 @@ public abstract class BaseMinionStarter implements ServiceStartable {
         Executors.newCachedThreadPool(new ThreadFactoryBuilder().setNameFormat("async-task-thread-%d").build());
     MinionEventObservers.init(_config, _executorService);
 
-    ContinuousJfrStarter.init(_config);
+    _clusterConfigChangeHandler.registerClusterConfigChangeListener(ContinuousJfrStarter.INSTANCE);
   }
 
   /// Can be overridden to apply custom configs to the minion conf.
@@ -301,6 +309,12 @@ public abstract class BaseMinionStarter implements ServiceStartable {
             () -> _helixManager.isConnected() ? 1L : 0L);
     minionContext.setHelixPropertyStore(_helixManager.getHelixPropertyStore());
     minionContext.setHelixManager(_helixManager);
+    LOGGER.info("Initializing and registering the DefaultClusterConfigChangeHandler");
+    try {
+      _helixManager.addClusterfigChangeListener(_clusterConfigChangeHandler);
+    } catch (Exception e) {
+      LOGGER.error("Failed to register DefaultClusterConfigChangeHandler as the Helix ClusterConfigChangeListener", e);
+    }
     LOGGER.info("Starting minion admin application on: {}", ListenerConfigUtil.toString(_listenerConfigs));
     _minionAdminApplication = createMinionAdminApp();
     _minionAdminApplication.start(_listenerConfigs);
@@ -353,6 +367,8 @@ public abstract class BaseMinionStarter implements ServiceStartable {
         () -> Collections.singletonList(CommonConstants.Helix.UNTAGGED_MINION_INSTANCE));
     updated |= HelixHelper.removeDisabledPartitions(instanceConfig);
     updated |= HelixHelper.updatePinotVersion(instanceConfig);
+    updated |= HelixHelper.updateMaxConcurrentTasksPerInstance(instanceConfig,
+        _config.getMaxConcurrentTasksPerInstance());
     if (updated) {
       HelixHelper.updateInstanceConfig(_helixManager, instanceConfig);
     }

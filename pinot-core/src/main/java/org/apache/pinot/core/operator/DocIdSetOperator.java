@@ -28,15 +28,16 @@ import org.apache.pinot.core.operator.blocks.DocIdSetBlock;
 import org.apache.pinot.core.operator.filter.BaseFilterOperator;
 import org.apache.pinot.core.plan.DocIdSetPlanNode;
 import org.apache.pinot.segment.spi.Constants;
-import org.apache.pinot.spi.trace.Tracing;
+import org.apache.pinot.spi.query.QueryThreadContext;
 
 
 /**
- * The <code>DocIdSetOperator</code> takes a filter operator and returns blocks with set of the matched document Ids.
+ * The <code>AscendingDocIdSetOperator</code> takes a filter operator and returns blocks with set of the matched
+ * document Ids.
  * <p>Should call {@link #nextBlock()} multiple times until it returns <code>null</code> (already exhausts all the
  * matched documents) or already gathered enough documents (for selection queries).
  */
-public class DocIdSetOperator extends BaseOperator<DocIdSetBlock> {
+public class DocIdSetOperator extends BaseDocIdSetOperator {
   private static final String EXPLAIN_NAME = "DOC_ID_SET";
 
   private static final ThreadLocal<int[]> THREAD_LOCAL_DOC_IDS =
@@ -67,7 +68,7 @@ public class DocIdSetOperator extends BaseOperator<DocIdSetBlock> {
       _blockDocIdIterator = _blockDocIdSet.iterator();
     }
 
-    Tracing.ThreadAccountantOps.sample();
+    QueryThreadContext.sampleUsage();
 
     int pos = 0;
     int[] docIds = THREAD_LOCAL_DOC_IDS.get();
@@ -105,5 +106,18 @@ public class DocIdSetOperator extends BaseOperator<DocIdSetBlock> {
   public ExecutionStatistics getExecutionStatistics() {
     long numEntriesScannedInFilter = _blockDocIdSet != null ? _blockDocIdSet.getNumEntriesScannedInFilter() : 0;
     return new ExecutionStatistics(0, numEntriesScannedInFilter, 0, 0);
+  }
+
+  @Override
+  public boolean isCompatibleWith(DocIdOrder order) {
+    return order == DocIdOrder.ASC;
+  }
+
+  @Override
+  public BaseDocIdSetOperator withOrder(DocIdOrder order) {
+    if (isCompatibleWith(order)) {
+      return this;
+    }
+    return new ReverseDocIdSetOperator(_filterOperator, _maxSizeOfDocIdSet);
   }
 }

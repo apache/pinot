@@ -220,9 +220,17 @@ public class AggregationFunctionFactory {
             return new MinStringAggregationFunction(arguments, nullHandlingEnabled);
           case MAXSTRING:
             return new MaxStringAggregationFunction(arguments, nullHandlingEnabled);
+          case MINLONG:
+            return new MinLongAggregationFunction(arguments, nullHandlingEnabled);
+          case MAXLONG:
+            return new MaxLongAggregationFunction(arguments, nullHandlingEnabled);
           case SUM:
           case SUM0:
             return new SumAggregationFunction(arguments, nullHandlingEnabled);
+          case SUMINT:
+            return new SumIntAggregationFunction(arguments, nullHandlingEnabled);
+          case SUMLONG:
+            return new SumLongAggregationFunction(arguments, nullHandlingEnabled);
           case SUMPRECISION:
             return new SumPrecisionAggregationFunction(arguments, nullHandlingEnabled);
           case AVG:
