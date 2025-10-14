@@ -240,8 +240,8 @@ public class MinionTaskUtils {
             serverSegmentMetadataReader.getValidDocIdsBitmapFromServer(tableNameWithType, segmentName, endpoint,
                 validDocIdsType, 60_000);
       } catch (Exception e) {
-        LOGGER.warn("Unable to retrieve validDocIds bitmap for segment: " + segmentName + " from endpoint: " + endpoint,
-            e);
+        LOGGER.warn("Unable to retrieve validDocIds bitmap for segment: " + segmentName + " from endpoint: "
+            + endpoint, e);
         continue;
       }
 
@@ -255,10 +255,9 @@ public class MinionTaskUtils {
       if (!expectedCrc.equals(crcFromValidDocIdsBitmap)) {
         // In this scenario, we are hitting the other replica of the segment which did not commit to ZK or deepstore.
         // We will skip processing this bitmap to query other server to confirm if there is a valid matching CRC.
-        String message =
-            "CRC mismatch for segment: " + segmentName + ", expected value based on task generator: " + expectedCrc
-                + ", actual crc from validDocIdsBitmapResponse from endpoint " + endpoint + ": "
-                + crcFromValidDocIdsBitmap;
+        String message = "CRC mismatch for segment: " + segmentName + ", expected value based on task generator: "
+            + expectedCrc + ", actual crc from validDocIdsBitmapResponse from endpoint " + endpoint + ": "
+            + crcFromValidDocIdsBitmap;
         LOGGER.warn(message);
         continue;
       }
@@ -308,15 +307,16 @@ public class MinionTaskUtils {
     boolean isDeleteEnabled = StringUtils.isNotEmpty(upsertConfig.getDeleteRecordColumn());
     ValidDocIdsType defaultValidDocIdsType =
         isDeleteEnabled ? ValidDocIdsType.SNAPSHOT_WITH_DELETE : ValidDocIdsType.SNAPSHOT;
-    String validDocIdsTypeStr =
-        taskConfigs.getOrDefault(validDocIdsTypeKey, defaultValidDocIdsType.name()).toUpperCase();
+    String validDocIdsTypeStr = taskConfigs.getOrDefault(validDocIdsTypeKey,
+        defaultValidDocIdsType.name()).toUpperCase();
     ValidDocIdsType validDocIdsType = ValidDocIdsType.valueOf(validDocIdsTypeStr);
 
     if (isDeleteEnabled && validDocIdsType != ValidDocIdsType.SNAPSHOT_WITH_DELETE
         && validDocIdsType != ValidDocIdsType.IN_MEMORY_WITH_DELETE) {
-      LOGGER.warn("Overriding user-specified validDocIdsType '{}' to '{}' for backward compatibility because delete is "
-              + "enabled (deleteRecordColumn='{}').", validDocIdsType, ValidDocIdsType.SNAPSHOT_WITH_DELETE,
-          upsertConfig.getDeleteRecordColumn());
+      LOGGER.warn(
+          "Overriding user-specified validDocIdsType '{}' to '{}' for backward compatibility because delete is "
+              + "enabled (deleteRecordColumn='{}').",
+          validDocIdsType, ValidDocIdsType.SNAPSHOT_WITH_DELETE, upsertConfig.getDeleteRecordColumn());
       validDocIdsType = ValidDocIdsType.SNAPSHOT_WITH_DELETE;
     }
 
@@ -327,8 +327,8 @@ public class MinionTaskUtils {
 
     if (validDocIdsType == ValidDocIdsType.IN_MEMORY_WITH_DELETE
         || validDocIdsType == ValidDocIdsType.SNAPSHOT_WITH_DELETE) {
-      Preconditions.checkState(isDeleteEnabled, "'deleteRecordColumn' must be provided with validDocIdsType: %s",
-          validDocIdsType);
+      Preconditions.checkState(isDeleteEnabled,
+          "'deleteRecordColumn' must be provided with validDocIdsType: %s", validDocIdsType);
     }
     return validDocIdsType;
   }
