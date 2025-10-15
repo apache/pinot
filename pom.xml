@@ -306,7 +306,7 @@
     <testng.version>7.11.0</testng.version>
     <mockito-core.version>5.17.0</mockito-core.version>
     <equalsverifier.version>3.19.4</equalsverifier.version>
-    <testcontainers.version>1.21.3</testcontainers.version>
+    <testcontainers.version>2.0.0</testcontainers.version>
     <h2.version>2.4.240</h2.version>
     <jnr-posix.version>3.1.20</jnr-posix.version>
     <scalatest.version>3.2.19</scalatest.version>
