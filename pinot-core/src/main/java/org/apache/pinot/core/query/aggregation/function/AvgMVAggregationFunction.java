@@ -27,7 +27,6 @@ import org.apache.pinot.core.query.aggregation.AggregationResultHolder;
 import org.apache.pinot.core.query.aggregation.groupby.GroupByResultHolder;
 import org.apache.pinot.segment.local.customobject.AvgPair;
 import org.apache.pinot.segment.spi.AggregationFunctionType;
-import org.apache.pinot.spi.data.FieldSpec.DataType;
 
 
 public class AvgMVAggregationFunction extends AvgAggregationFunction {
@@ -46,8 +45,9 @@ public class AvgMVAggregationFunction extends AvgAggregationFunction {
       Map<ExpressionContext, BlockValSet> blockValSetMap) {
     BlockValSet blockValSet = blockValSetMap.get(_expression);
 
-    if (blockValSet.getValueType() == DataType.BYTES) {
-      // Serialized AvgPair
+    if (blockValSet.isSingleValue()) {
+      // StarTree pre-aggregated values: During StarTree creation, the multi-value column is pre-aggregated per StarTree
+      // node, resulting in a single value per node.
       byte[][] bytesValues = blockValSet.getBytesValuesSV();
       AvgPair avgPair = new AvgPair();
       forEachNotNull(length, blockValSet, (from, to) -> {
@@ -81,15 +81,9 @@ public class AvgMVAggregationFunction extends AvgAggregationFunction {
       Map<ExpressionContext, BlockValSet> blockValSetMap) {
     BlockValSet blockValSet = blockValSetMap.get(_expression);
 
-    if (blockValSet.getValueType() != DataType.BYTES) {
-      double[][] valuesArray = blockValSet.getDoubleValuesMV();
-      forEachNotNull(length, blockValSet, (from, to) -> {
-        for (int i = from; i < to; i++) {
-          aggregateOnGroupKey(groupKeyArray[i], groupByResultHolder, valuesArray[i]);
-        }
-      });
-    } else {
-      // Serialized AvgPair.
+    if (blockValSet.isSingleValue()) {
+      // StarTree pre-aggregated values: During StarTree creation, the multi-value column is pre-aggregated per StarTree
+      // node, resulting in a single value per node.
       byte[][] bytesValues = blockValSet.getBytesValuesSV();
       forEachNotNull(length, blockValSet, (from, to) -> {
         for (int i = from; i < to; i++) {
@@ -97,7 +91,15 @@ public class AvgMVAggregationFunction extends AvgAggregationFunction {
           updateGroupByResult(groupKeyArray[i], groupByResultHolder, avgPair.getSum(), avgPair.getCount());
         }
       });
+      return;
     }
+
+    double[][] valuesArray = blockValSet.getDoubleValuesMV();
+    forEachNotNull(length, blockValSet, (from, to) -> {
+      for (int i = from; i < to; i++) {
+        aggregateOnGroupKey(groupKeyArray[i], groupByResultHolder, valuesArray[i]);
+      }
+    });
   }
 
   @Override

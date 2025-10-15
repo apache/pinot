@@ -23,6 +23,7 @@ import com.fasterxml.jackson.databind.node.ObjectNode;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
 import com.google.common.collect.ImmutableSet;
+import com.google.common.collect.Iterables;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -1278,7 +1279,7 @@ public final class TableConfigUtils {
   /// - All referenced columns exist in the schema and are single-valued
   private static void validateStarTreeIndexConfigs(List<StarTreeIndexConfig> starTreeIndexConfigs,
       Map<String, FieldIndexConfigs> indexConfigsMap, Schema schema) {
-    Set<String> referencedColumns = new HashSet<>();
+    Set<String> dimensionColumns = new HashSet<>();
     for (StarTreeIndexConfig starTreeIndexConfig : starTreeIndexConfigs) {
       // Validate dimension columns are dictionary encoded
       List<String> dimensionsSplitOrder = starTreeIndexConfig.getDimensionsSplitOrder();
@@ -1289,7 +1290,7 @@ public final class TableConfigUtils {
             "Failed to find dimension column: %s specified in star-tree index config in schema", dimension);
         Preconditions.checkState(indexConfigs.getConfig(StandardIndexes.dictionary()).isEnabled(),
             "Cannot create star-tree index on dimension column: %s without dictionary", dimension);
-        referencedColumns.add(dimension);
+        dimensionColumns.add(dimension);
       }
 
       // Validate 'dimensionsSplitOrder' contains all dimensions in 'skipStarNodeCreationForDimensions'
@@ -1309,6 +1310,7 @@ public final class TableConfigUtils {
           "Either 'functionColumnPairs' or 'aggregationConfigs' must be specified, but not both");
       Set<AggregationFunctionColumnPair> functionColumnPairsSet = new HashSet<>();
       Set<AggregationFunctionColumnPair> storedTypes = new HashSet<>();
+      Set<String> aggregatedColumns = new HashSet<>();
       if (functionColumnPairs != null) {
         for (String functionColumnPair : functionColumnPairs) {
           AggregationFunctionColumnPair columnPair;
@@ -1330,7 +1332,7 @@ public final class TableConfigUtils {
           }
           String column = columnPair.getColumn();
           if (!column.equals(AggregationFunctionColumnPair.STAR)) {
-            referencedColumns.add(column);
+              aggregatedColumns.add(column);
           } else if (columnPair.getFunctionType() != AggregationFunctionType.COUNT) {
             throw new IllegalStateException("Non-COUNT function set the column as '*' in the functionColumnPair: "
                 + functionColumnPair + ". Please configure an actual column for the function");
@@ -1359,7 +1361,7 @@ public final class TableConfigUtils {
           }
           String column = columnPair.getColumn();
           if (!column.equals(AggregationFunctionColumnPair.STAR)) {
-            referencedColumns.add(column);
+              aggregatedColumns.add(column);
           } else if (columnPair.getFunctionType() != AggregationFunctionType.COUNT) {
             throw new IllegalStateException("Non-COUNT function set the column as '*' in the aggregationConfig for "
                 + "function: " + aggregationConfig.getAggregationFunction()
@@ -1368,17 +1370,18 @@ public final class TableConfigUtils {
         }
       }
 
-      Set<String> dimensionSplitOrderColumns = new HashSet<>(dimensionsSplitOrder);
-      for (String column : referencedColumns) {
+      for (String column : Iterables.concat(dimensionColumns, aggregatedColumns)) {
         FieldSpec fieldSpec = schema.getFieldSpecFor(column);
         Preconditions.checkState(fieldSpec != null,
             "Failed to find column: %s specified in star-tree index config in schema", column);
-        if (dimensionSplitOrderColumns.contains(column)) {
-          Preconditions.checkState(fieldSpec.isSingleValueField(),
-              "Star-tree dimension columns must be single-value, but found multi-value column: %s", column);
-        }
         Preconditions.checkState(fieldSpec.getDataType() != DataType.MAP,
             "Star-tree index cannot be created on MAP column: %s", column);
+      }
+
+      for (String column : dimensionColumns) {
+        FieldSpec fieldSpec = schema.getFieldSpecFor(column);
+        Preconditions.checkState(fieldSpec.isSingleValueField(),
+            "Star-tree dimension columns must be single-value, but found multi-value column: %s", column);
       }
     }
   }

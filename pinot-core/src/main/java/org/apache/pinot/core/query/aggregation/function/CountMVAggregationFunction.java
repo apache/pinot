@@ -55,6 +55,8 @@ public class CountMVAggregationFunction extends CountAggregationFunction {
     BlockValSet blockValSet = blockValSetMap.get(_expression);
 
     if (blockValSet.isSingleValue()) {
+      // StarTree pre-aggregated values: During StarTree creation, the multi-value column is pre-aggregated per StarTree
+      // node, resulting in a single value per node.
       long[] valueArray = blockValSet.getLongValuesSV();
       long count = 0;
       for (int i = 0; i < length; i++) {
@@ -82,6 +84,8 @@ public class CountMVAggregationFunction extends CountAggregationFunction {
     BlockValSet blockValSet = blockValSetMap.get(_expression);
 
     if (blockValSet.isSingleValue()) {
+      // StarTree pre-aggregated values: During StarTree creation, the multi-value column is pre-aggregated per StarTree
+      // node, resulting in a single value per node.
       long[] valueArray = blockValSet.getLongValuesSV();
       for (int i = 0; i < length; i++) {
         int groupKey = groupKeyArray[i];

@@ -44,7 +44,8 @@ public class SumMVAggregationFunction extends SumAggregationFunction {
     BlockValSet blockValSet = blockValSetMap.get(_expression);
 
     if (blockValSet.isSingleValue()) {
-      // StarTree pre-aggregated values
+      // StarTree pre-aggregated values: During StarTree creation, the multi-value column is pre-aggregated per StarTree
+      // node, resulting in a single value per node.
       double[] valueArray = blockValSet.getDoubleValuesSV();
       double sum = 0.0;
       for (int i = 0; i < length; i++) {
@@ -76,11 +77,20 @@ public class SumMVAggregationFunction extends SumAggregationFunction {
     BlockValSet blockValSet = blockValSetMap.get(_expression);
 
     if (blockValSet.isSingleValue()) {
-      // StarTree pre-aggregated values
+      // StarTree pre-aggregated values: During StarTree creation, the multi-value column is pre-aggregated per StarTree
+      // node, resulting in a single value per node.
       double[] valueArray = blockValSet.getDoubleValuesSV();
-      for (int i = 0; i < length; i++) {
-        int groupKey = groupKeyArray[i];
-        groupByResultHolder.setValueForKey(groupKey, groupByResultHolder.getDoubleResult(groupKey) + valueArray[i]);
+      if (_nullHandlingEnabled) {
+        for (int i = 0; i < length; i++) {
+          int groupKey = groupKeyArray[i];
+          Double result = groupByResultHolder.getResult(groupKey);
+          groupByResultHolder.setValueForKey(groupKey, result == null ? valueArray[i] : result + valueArray[i]);
+        }
+      } else {
+        for (int i = 0; i < length; i++) {
+          int groupKey = groupKeyArray[i];
+          groupByResultHolder.setValueForKey(groupKey, groupByResultHolder.getDoubleResult(groupKey) + valueArray[i]);
+        }
       }
       return;
     }
@@ -118,7 +128,6 @@ public class SumMVAggregationFunction extends SumAggregationFunction {
   public void aggregateGroupByMV(int length, int[][] groupKeysArray, GroupByResultHolder groupByResultHolder,
       Map<ExpressionContext, BlockValSet> blockValSetMap) {
     BlockValSet blockValSet = blockValSetMap.get(_expression);
-
     double[][] valuesArray = blockValSet.getDoubleValuesMV();
 
     if (_nullHandlingEnabled) {
