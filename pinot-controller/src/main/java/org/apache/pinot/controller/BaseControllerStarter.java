@@ -37,6 +37,7 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ThreadFactory;
 import java.util.concurrent.TimeUnit;
+import javax.inject.Singleton;
 import org.apache.commons.io.FileUtils;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.hc.client5.http.impl.io.PoolingHttpClientConnectionManager;
@@ -115,6 +116,7 @@ import org.apache.pinot.controller.helix.core.retention.RetentionManager;
 import org.apache.pinot.controller.helix.core.statemodel.LeadControllerResourceMasterSlaveStateModelFactory;
 import org.apache.pinot.controller.helix.core.util.HelixSetupUtils;
 import org.apache.pinot.controller.helix.starter.HelixConfig;
+import org.apache.pinot.controller.services.PinotTableReloadService;
 import org.apache.pinot.controller.tuner.TableConfigTunerRegistry;
 import org.apache.pinot.controller.util.BrokerServiceHelper;
 import org.apache.pinot.controller.util.TableSizeReader;
@@ -679,6 +681,8 @@ public abstract class BaseControllerStarter implements ServiceStartable {
         bind(_diskUtilizationChecker).to(DiskUtilizationChecker.class);
         bind(_resourceUtilizationManager).to(ResourceUtilizationManager.class);
         bind(controllerStartTime).named(ControllerAdminApiApplication.START_TIME);
+
+        bindAsContract(PinotTableReloadService.class).in(Singleton.class);
 
         String loggerRootDir = _config.getProperty(CommonConstants.Controller.CONFIG_OF_LOGGER_ROOT_DIR);
         if (loggerRootDir != null) {
