@@ -24,13 +24,16 @@ import java.util.Map;
 import org.apache.helix.model.ExternalView;
 import org.apache.helix.model.IdealState;
 import org.apache.pinot.broker.broker.helix.BaseBrokerStarter;
+import org.apache.pinot.core.accounting.ResourceUsageAccountantFactory;
 import org.apache.pinot.server.starter.helix.BaseServerStarter;
 import org.apache.pinot.spi.env.PinotConfiguration;
 import org.apache.pinot.spi.exception.QueryErrorCode;
+import org.apache.pinot.spi.utils.CommonConstants;
 import org.apache.pinot.spi.utils.CommonConstants.Broker;
 import org.apache.pinot.spi.utils.CommonConstants.Broker.FailureDetector;
 import org.apache.pinot.spi.utils.CommonConstants.Helix;
 import org.apache.pinot.spi.utils.CommonConstants.Helix.StateModel.BrokerResourceStateModel;
+import org.apache.pinot.spi.utils.CommonConstants.Server;
 import org.apache.pinot.util.TestUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -68,8 +71,32 @@ public class MultiNodesOfflineClusterIntegrationTest extends OfflineClusterInteg
   @Override
   protected void overrideBrokerConf(PinotConfiguration brokerConf) {
     super.overrideBrokerConf(brokerConf);
+
     brokerConf.setProperty(FailureDetector.CONFIG_OF_TYPE, FailureDetector.Type.CONNECTION.name());
     brokerConf.setProperty(Broker.CONFIG_OF_USE_LEAF_SERVER_FOR_INTERMEDIATE_STAGE, true);
+
+    // Enable thread CPU/memory tracking but not killing queries
+    brokerConf.setProperty(Broker.CONFIG_OF_ENABLE_THREAD_CPU_TIME_MEASUREMENT, true);
+    brokerConf.setProperty(Broker.CONFIG_OF_ENABLE_THREAD_ALLOCATED_BYTES_MEASUREMENT, true);
+    String prefix = CommonConstants.PINOT_QUERY_SCHEDULER_PREFIX + ".";
+    brokerConf.setProperty(prefix + CommonConstants.Accounting.CONFIG_OF_FACTORY_NAME,
+        ResourceUsageAccountantFactory.class.getName());
+    brokerConf.setProperty(prefix + CommonConstants.Accounting.CONFIG_OF_ENABLE_THREAD_CPU_SAMPLING, true);
+    brokerConf.setProperty(prefix + CommonConstants.Accounting.CONFIG_OF_ENABLE_THREAD_MEMORY_SAMPLING, true);
+  }
+
+  @Override
+  protected void overrideServerConf(PinotConfiguration serverConf) {
+    super.overrideServerConf(serverConf);
+
+    // Enable thread CPU/memory tracking but not killing queries
+    serverConf.setProperty(Server.CONFIG_OF_ENABLE_THREAD_CPU_TIME_MEASUREMENT, true);
+    serverConf.setProperty(Server.CONFIG_OF_ENABLE_THREAD_ALLOCATED_BYTES_MEASUREMENT, true);
+    String prefix = CommonConstants.PINOT_QUERY_SCHEDULER_PREFIX + ".";
+    serverConf.setProperty(prefix + CommonConstants.Accounting.CONFIG_OF_FACTORY_NAME,
+        ResourceUsageAccountantFactory.class.getName());
+    serverConf.setProperty(prefix + CommonConstants.Accounting.CONFIG_OF_ENABLE_THREAD_CPU_SAMPLING, true);
+    serverConf.setProperty(prefix + CommonConstants.Accounting.CONFIG_OF_ENABLE_THREAD_MEMORY_SAMPLING, true);
   }
 
   @Test

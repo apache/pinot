@@ -18,12 +18,13 @@
  */
 package org.apache.pinot.integration.tests;
 
-import org.testng.annotations.BeforeTest;
+import org.testng.annotations.BeforeMethod;
 
 
 public class OfflineGRPCServerMultiStageIntegrationTest extends OfflineGRPCServerIntegrationTest {
-  @BeforeTest
-  void enableMultiStage() {
+
+  @BeforeMethod
+  public void enableMultiStage() {
     setUseMultiStageQueryEngine(true);
   }
 }

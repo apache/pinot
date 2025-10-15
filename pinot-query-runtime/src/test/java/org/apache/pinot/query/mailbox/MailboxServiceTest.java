@@ -44,7 +44,10 @@ import org.testng.annotations.BeforeClass;
 import org.testng.annotations.BeforeTest;
 import org.testng.annotations.Test;
 
-import static org.testng.Assert.*;
+import static org.testng.Assert.assertEquals;
+import static org.testng.Assert.assertNotNull;
+import static org.testng.Assert.assertNull;
+import static org.testng.Assert.assertTrue;
 
 
 public class MailboxServiceTest {
@@ -245,12 +248,10 @@ public class MailboxServiceTest {
     // Send one data block, sleep until timed out, then send one more block
     sendingMailbox.send(OperatorTestUtil.block(DATA_SCHEMA, new Object[]{"0"}));
     Thread.sleep(deadlineMs - System.currentTimeMillis() + 10);
-    try {
-      sendingMailbox.send(OperatorTestUtil.block(DATA_SCHEMA, new Object[]{"1"}));
-      fail("Expect exception when sending data after timing out");
-    } catch (Exception e) {
-      // Expected
-    }
+    sendingMailbox.send(OperatorTestUtil.block(DATA_SCHEMA, new Object[]{"1"}));
+
+    // Mailbox should be terminated due to timeout
+    assertTrue(sendingMailbox.isTerminated());
 
     // Data blocks will be cleaned up
     assertEquals(numCallbacks.get(), 2);
@@ -282,14 +283,11 @@ public class MailboxServiceTest {
       sendingMailbox.send(OperatorTestUtil.block(DATA_SCHEMA, new Object[]{Integer.toString(i)}));
     }
 
-    // Next send will throw exception because buffer is full
-    try {
-      // The block sent must be a data block, as error and eos blocks are always accepted
-      sendingMailbox.send(OperatorTestUtil.block(DATA_SCHEMA, new Object[]{Integer.toString(1)}));
-      fail("Except exception when sending data after buffer is full");
-    } catch (Exception e) {
-      // Expected
-    }
+    // Next send will block until timeout because buffer is full
+    sendingMailbox.send(OperatorTestUtil.block(DATA_SCHEMA, new Object[]{Integer.toString(1)}));
+
+    // Mailbox should be terminated due to timeout
+    assertTrue(sendingMailbox.isTerminated());
 
     // Data blocks will be cleaned up
     assertEquals(numCallbacks.get(), ReceivingMailbox.DEFAULT_MAX_PENDING_BLOCKS + 1);
@@ -567,26 +565,19 @@ public class MailboxServiceTest {
       receiveMailLatch.countDown();
     });
 
-    // Send one data block, RPC will timeout after deadline
+    // Send one data block, receiver will time out after deadline
     sendingMailbox.send(OperatorTestUtil.block(DATA_SCHEMA, new Object[]{"0"}));
-    Thread.sleep(deadlineMs - System.currentTimeMillis() + 10);
     receiveMailLatch.await();
     assertEquals(numCallbacks.get(), 2);
-    // TODO: Currently we cannot differentiate early termination vs stream error
-    assertTrue(sendingMailbox.isTerminated());
-//    try {
-//      sendingMailbox.send(OperatorTestUtil.block(DATA_SCHEMA, new Object[]{1}));
-//      fail("Expect exception when sending data after timing out");
-//    } catch (Exception e) {
-//      // Expected
-//    }
-//    assertEquals(numCallbacks.get(), 2);
 
     // Data blocks will be cleaned up
     assertEquals(receivingMailbox.getNumPendingBlocks(), 0);
     MseBlock block = readBlock(receivingMailbox);
     assertNotNull(block);
     assertTrue(block.isError());
+
+    // Sender side should be terminated after receiver side times out and closes the connection
+    TestUtils.waitForCondition(aVoid -> sendingMailbox.isTerminated(), 1000L, "Failed to terminate sender");
 
     // Cancel is idempotent for both sending and receiving mailbox, so safe to call multiple times
     sendingMailbox.cancel(new Exception("TEST ERROR"));
@@ -610,18 +601,14 @@ public class MailboxServiceTest {
       receiveMailLatch.countDown();
     });
 
-    // send blocks big enough to avoid block combining in the sending side
-    // although fragile, this works because we know that outboundMax = inboundMax/2
-    String payload = new String(new char[MAX_DATA_BLOCK_SIZE / 3]).replace('\0', 'a');
-
     // Sends are non-blocking as long as channel capacity is not breached
     for (int i = 0; i < ReceivingMailbox.DEFAULT_MAX_PENDING_BLOCKS; i++) {
-      sendingMailbox.send(OperatorTestUtil.block(DATA_SCHEMA, new Object[]{payload}));
+      sendingMailbox.send(OperatorTestUtil.block(DATA_SCHEMA, new Object[]{"0"}));
     }
 
     // Next send will be blocked on the receiver side and cause exception after timeout
     // We need to send a data block, given we don't block on EOS
-    sendingMailbox.send(OperatorTestUtil.block(DATA_SCHEMA, new Object[]{payload}));
+    sendingMailbox.send(OperatorTestUtil.block(DATA_SCHEMA, new Object[]{"0"}));
     receiveMailLatch.await();
     assertEquals(numCallbacks.get(), ReceivingMailbox.DEFAULT_MAX_PENDING_BLOCKS + 1);
 
@@ -676,8 +663,7 @@ public class MailboxServiceTest {
     ReceivingMailbox.MseBlockWithStats block = receivingMailbox.poll();
     assertNotNull(block);
     assertTrue(block.getBlock().isData());
-    List<Object[]> rows = ((MseBlock.Data) block.getBlock()).asRowHeap().getRows();
-    return rows;
+    return ((MseBlock.Data) block.getBlock()).asRowHeap().getRows();
   }
 
   @Nullable
