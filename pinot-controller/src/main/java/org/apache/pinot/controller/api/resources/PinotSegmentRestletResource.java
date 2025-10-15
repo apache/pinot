@@ -119,8 +119,6 @@ import static org.apache.pinot.spi.utils.CommonConstants.SWAGGER_AUTHORIZATION_K
  *   <li>
  *     POST requests:
  *     <ul>
- *       <li>"/segments/{tableName}/{segmentName}/reload": reload a segment</li>
- *       <li>"/segments/{tableName}/reload": reload all segments</li>
  *       <li>"/segments/{tableNameWithType}/{segmentName}/reset": reset a segment</li>
  *       <li>"/segments/{tableNameWithType}/reset": reset all segments</li>
  *       <li>"/segments/{tableName}/delete": delete the segments in the payload</li>
@@ -146,7 +144,6 @@ import static org.apache.pinot.spi.utils.CommonConstants.SWAGGER_AUTHORIZATION_K
  *         <ul>
  *           <li>"GET /segments/{tableName}"</li>
  *           <li>"GET /segments/{tableName}/servers"</li>
- *           <li>"POST /segments/{tableName}/reload"</li>
  *         </ul>
  *       </li>
  *       <li>
@@ -165,10 +162,6 @@ import static org.apache.pinot.spi.utils.CommonConstants.SWAGGER_AUTHORIZATION_K
  *       <li>"GET /tables/{tableName}/segments/crc"</li>
  *       <li>"GET /tables/{tableName}/segments/{segmentName}"</li>
  *       <li>"GET /tables/{tableName}/segments/{segmentName}/metadata"</li>
- *       <li>"GET /tables/{tableName}/segments/{segmentName}/reload"</li>
- *       <li>"POST /tables/{tableName}/segments/{segmentName}/reload"</li>
- *       <li>"GET /tables/{tableName}/segments/reload"</li>
- *       <li>"POST /tables/{tableName}/segments/reload"</li>
  *     </ul>
  *   </li>
  * </ul>

@@ -90,8 +90,22 @@ import static org.apache.pinot.spi.utils.CommonConstants.SWAGGER_AUTHORIZATION_K
 
 /**
  * REST API resource for reloading table segments.
- * Provides endpoints to reload individual segments, all segments in a table, check reload job status,
- * and determine if segments need reloading.
+ * <ul>
+ *   <li>
+ *     POST requests:
+ *     <ul>
+ *       <li>"/segments/{tableName}/{segmentName}/reload": reload a specific segment</li>
+ *       <li>"/segments/{tableName}/reload": reload all segments in a table</li>
+ *     </ul>
+ *   </li>
+ *   <li>
+ *     GET requests:
+ *     <ul>
+ *       <li>"/segments/segmentReloadStatus/{jobId}": get status for a submitted reload job</li>
+ *       <li>"/segments/{tableNameWithType}/needReload": check if table segments need reloading</li>
+ *     </ul>
+ *   </li>
+ * </ul>
  */
 @Api(tags = Constants.SEGMENT_TAG, authorizations = {
     @Authorization(value = SWAGGER_AUTHORIZATION_KEY), @Authorization(value = DATABASE)
