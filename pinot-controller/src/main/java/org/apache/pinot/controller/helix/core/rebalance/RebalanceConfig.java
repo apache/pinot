@@ -18,14 +18,17 @@
  */
 package org.apache.pinot.controller.helix.core.rebalance;
 
+import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import com.google.common.base.Preconditions;
 import io.swagger.annotations.ApiModel;
 import io.swagger.annotations.ApiModelProperty;
+import java.util.Objects;
 import org.apache.pinot.controller.api.resources.ForceCommitBatchConfig;
 import org.apache.pinot.spi.utils.Enablement;
 
 
+@JsonIgnoreProperties(ignoreUnknown = true)
 @ApiModel
 public class RebalanceConfig {
   public static final int DISABLE_BATCH_SIZE_PER_SERVER = -1;
@@ -375,6 +378,40 @@ public class RebalanceConfig {
 
   public void setDiskUtilizationThreshold(double diskUtilizationThreshold) {
     _diskUtilizationThreshold = diskUtilizationThreshold;
+  }
+
+  @Override
+  public boolean equals(Object o) {
+    if (!(o instanceof RebalanceConfig)) {
+      return false;
+    }
+    RebalanceConfig that = (RebalanceConfig) o;
+    return _dryRun == that._dryRun && _preChecks == that._preChecks && _disableSummary == that._disableSummary
+        && _reassignInstances == that._reassignInstances && _includeConsuming == that._includeConsuming
+        && _bootstrap == that._bootstrap && _downtime == that._downtime
+        && _allowPeerDownloadDataLoss == that._allowPeerDownloadDataLoss
+        && _minAvailableReplicas == that._minAvailableReplicas && _lowDiskMode == that._lowDiskMode
+        && _bestEfforts == that._bestEfforts && _batchSizePerServer == that._batchSizePerServer
+        && _externalViewCheckIntervalInMs == that._externalViewCheckIntervalInMs
+        && _externalViewStabilizationTimeoutInMs == that._externalViewStabilizationTimeoutInMs
+        && _updateTargetTier == that._updateTargetTier && _heartbeatIntervalInMs == that._heartbeatIntervalInMs
+        && _heartbeatTimeoutInMs == that._heartbeatTimeoutInMs && _maxAttempts == that._maxAttempts
+        && _retryInitialDelayInMs == that._retryInitialDelayInMs
+        && Double.compare(_diskUtilizationThreshold, that._diskUtilizationThreshold) == 0
+        && _forceCommit == that._forceCommit && _forceCommitBatchSize == that._forceCommitBatchSize
+        && _forceCommitBatchStatusCheckIntervalMs == that._forceCommitBatchStatusCheckIntervalMs
+        && _forceCommitBatchStatusCheckTimeoutMs == that._forceCommitBatchStatusCheckTimeoutMs
+        && _minimizeDataMovement == that._minimizeDataMovement;
+  }
+
+  @Override
+  public int hashCode() {
+    return Objects.hash(_dryRun, _preChecks, _disableSummary, _reassignInstances, _includeConsuming, _bootstrap,
+        _downtime, _allowPeerDownloadDataLoss, _minAvailableReplicas, _lowDiskMode, _bestEfforts, _minimizeDataMovement,
+        _batchSizePerServer, _externalViewCheckIntervalInMs, _externalViewStabilizationTimeoutInMs, _updateTargetTier,
+        _heartbeatIntervalInMs, _heartbeatTimeoutInMs, _maxAttempts, _retryInitialDelayInMs, _diskUtilizationThreshold,
+        _forceCommit, _forceCommitBatchSize, _forceCommitBatchStatusCheckIntervalMs,
+        _forceCommitBatchStatusCheckTimeoutMs);
   }
 
   @Override

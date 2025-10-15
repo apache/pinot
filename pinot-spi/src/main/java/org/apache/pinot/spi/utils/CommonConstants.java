@@ -234,10 +234,16 @@ public class CommonConstants {
     public static final String CONFIG_OF_BROKER_FLAPPING_TIME_WINDOW_MS = "pinot.broker.flapping.timeWindowMs";
     public static final String CONFIG_OF_SERVER_FLAPPING_TIME_WINDOW_MS = "pinot.server.flapping.timeWindowMs";
     public static final String CONFIG_OF_MINION_FLAPPING_TIME_WINDOW_MS = "pinot.minion.flapping.timeWindowMs";
+    public static final String DEFAULT_FLAPPING_TIME_WINDOW_MS = "1";
+    // Max state transitions per-instance across all resources
     public static final String CONFIG_OF_HELIX_INSTANCE_MAX_STATE_TRANSITIONS =
         "pinot.helix.instance.state.maxStateTransitions";
     public static final String DEFAULT_HELIX_INSTANCE_MAX_STATE_TRANSITIONS = "100000";
-    public static final String DEFAULT_FLAPPING_TIME_WINDOW_MS = "1";
+    // Max state transitions per-resource per-instance. Used to provide more fairness in case a large number of state
+    // transitions come in for a single resource
+    public static final String CONFIG_OF_MAX_STATE_TRANSITIONS_PER_RESOURCE =
+        "pinot.helix.instance.state.maxStateTransitionsPerResource";
+    public static final String DEFAULT_HELIX_INSTANCE_MAX_STATE_TRANSITIONS_PER_RESOURCE = "100000";
     public static final String PINOT_SERVICE_ROLE = "pinot.service.role";
     public static final String CONFIG_OF_CLUSTER_NAME = "pinot.cluster.name";
     public static final String CONFIG_OF_ZOOKEEPER_SERVER = "pinot.zk.server";
@@ -344,6 +350,9 @@ public class CommonConstants {
         "pinot.broker.query.log.logBeforeProcessing";
     public static final boolean DEFAULT_BROKER_QUERY_LOG_BEFORE_PROCESSING = true;
     public static final String CONFIG_OF_BROKER_QUERY_ENABLE_NULL_HANDLING = "pinot.broker.query.enable.null.handling";
+    /// Provide broker level default for query option [Request.QueryOptionKey#REGEX_DICT_SIZE_THRESHOLD]
+    public static final String CONFIG_OF_BROKER_QUERY_REGEX_DICT_SIZE_THRESHOLD =
+        "pinot.broker.query.regex.dict.size.threshold";
     public static final String CONFIG_OF_BROKER_ENABLE_QUERY_CANCELLATION = "pinot.broker.enable.query.cancellation";
     public static final boolean DEFAULT_BROKER_ENABLE_QUERY_CANCELLATION = true;
     public static final double DEFAULT_BROKER_QUERY_LOG_MAX_RATE_PER_SECOND = 10_000d;
@@ -709,6 +718,12 @@ public class CommonConstants {
         public static final String IN_PREDICATE_PRE_SORTED = "inPredicatePreSorted";
         public static final String IN_PREDICATE_LOOKUP_ALGORITHM = "inPredicateLookupAlgorithm";
 
+        // When evaluating REGEXP_LIKE predicate on a dictionary encoded column:
+        // - If dictionary size is smaller than this threshold, scan the dictionary to get the matching dictionary ids
+        //   first, where inverted index can be applied if exists
+        // - Otherwise, read dictionary while scanning the forward index, cache the matching/unmatching dictionary ids
+        //   during the scan
+        public static final String REGEX_DICT_SIZE_THRESHOLD = "regexDictSizeThreshold";
 
         public static final String DROP_RESULTS = "dropResults";
 
@@ -810,6 +825,7 @@ public class CommonConstants {
 
       public static class QueryOptionValue {
         public static final int DEFAULT_MAX_STREAMING_PENDING_BLOCKS = 100;
+        public static final int DEFAULT_REGEX_DICT_SIZE_THRESHOLD = 10000;
       }
     }
 
@@ -840,6 +856,7 @@ public class CommonConstants {
       public static final String AGGREGATE_JOIN_TRANSPOSE = "AggregateJoinTranspose";
       public static final String AGGREGATE_UNION_AGGREGATE = "AggregateUnionAggregate";
       public static final String AGGREGATE_REDUCE_FUNCTIONS = "AggregateReduceFunctions";
+      public static final String AGGREGATE_FUNCTION_REWRITE = "AggregateFunctionRewrite";
       public static final String AGGREGATE_CASE_TO_FILTER = "AggregateCaseToFilter";
       public static final String PROJECT_FILTER_TRANSPOSE = "ProjectFilterTranspose";
       public static final String PROJECT_MERGE = "ProjectMerge";
@@ -1478,6 +1495,8 @@ public class CommonConstants {
     // Config keys
     public static final String CONFIG_OF_SWAGGER_USE_HTTPS = "pinot.minion.swagger.use.https";
     public static final String CONFIG_OF_METRICS_PREFIX_KEY = "pinot.minion.metrics.prefix";
+    public static final String CONFIG_OF_MAX_CONCURRENT_TASKS_PER_INSTANCE =
+        "pinot.minion.max.concurrent.tasks.per.instance";
     @Deprecated
     public static final String DEPRECATED_CONFIG_OF_METRICS_PREFIX_KEY = "metricsPrefix";
     public static final String METRICS_REGISTRY_REGISTRATION_LISTENERS_KEY = "metricsRegistryRegistrationListeners";
@@ -1488,6 +1507,8 @@ public class CommonConstants {
     public static final String DEFAULT_INSTANCE_BASE_DIR =
         System.getProperty("java.io.tmpdir") + File.separator + "PinotMinion";
     public static final String DEFAULT_INSTANCE_DATA_DIR = DEFAULT_INSTANCE_BASE_DIR + File.separator + "data";
+    // Use Helix side default if configured to be -1
+    public static final int DEFAULT_MAX_CONCURRENT_TASKS_PER_INSTANCE = -1;
 
     // Add pinot.minion prefix on those configs to be consistent with configs of controller and server.
     public static final String PREFIX_OF_CONFIG_OF_PINOT_FS_FACTORY = "pinot.minion.storage.factory";

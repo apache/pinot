@@ -92,6 +92,8 @@ public class ColocatedJoinQuickStart extends MultistageEngineQuickStart {
 
     overrides.put(CommonConstants.Broker.CONFIG_OF_ENABLE_THREAD_ALLOCATED_BYTES_MEASUREMENT, true);
     overrides.put(CommonConstants.Server.CONFIG_OF_ENABLE_THREAD_ALLOCATED_BYTES_MEASUREMENT, true);
+
+    overrides.put(CommonConstants.MultiStageQueryRunner.KEY_OF_MAX_INBOUND_QUERY_DATA_BLOCK_SIZE_BYTES, 1024);
     return overrides;
   }
 

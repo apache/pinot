@@ -168,6 +168,7 @@ public abstract class BaseControllerStarter implements ServiceStartable {
   private static final Long DATA_DIRECTORY_EXCEPTION_VALUE = 1100000L;
   private static final String METADATA_EVENT_NOTIFIER_PREFIX = "metadata.event.notifier";
   private static final String MAX_STATE_TRANSITIONS_PER_INSTANCE = "MaxStateTransitionsPerInstance";
+  private static final String MAX_STATE_TRANSITIONS_PER_RESOURCE = "MaxStateTransitionsPerResource";
 
   protected ControllerConf _config;
   protected List<ListenerConfig> _listenerConfigs;
@@ -288,7 +289,6 @@ public abstract class BaseControllerStarter implements ServiceStartable {
     TableConfigUtils.setDisableGroovy(_config.isDisableIngestionGroovy());
     TableConfigUtils.setEnforcePoolBasedAssignment(_config.isEnforcePoolBasedAssignmentEnabled());
 
-    ContinuousJfrStarter.init(_config);
     ControllerJobTypes.init(_config);
   }
 
@@ -338,6 +338,8 @@ public abstract class BaseControllerStarter implements ServiceStartable {
   }
 
   private void setupHelixClusterConstraints() {
+    // Set up the INSTANCE level state transition constraint. This provides an upper-bound on the total state transition
+    // messages that can be in the Helix messages queue for a given instance
     String maxStateTransitions = _config.getProperty(Helix.CONFIG_OF_HELIX_INSTANCE_MAX_STATE_TRANSITIONS,
         Helix.DEFAULT_HELIX_INSTANCE_MAX_STATE_TRANSITIONS);
     Map<ClusterConstraints.ConstraintAttribute, String> constraintAttributes = new HashMap<>();
@@ -349,6 +351,21 @@ public abstract class BaseControllerStarter implements ServiceStartable {
     _helixControllerManager.getClusterManagmentTool()
         .setConstraint(_helixClusterName, ClusterConstraints.ConstraintType.MESSAGE_CONSTRAINT,
             MAX_STATE_TRANSITIONS_PER_INSTANCE, constraintItem);
+
+    // Set up the RESOURCE level state transition constraint, this applies per-resource per-instance
+    String maxStateTransitionsPerResource = _config.getProperty(Helix.CONFIG_OF_MAX_STATE_TRANSITIONS_PER_RESOURCE,
+        Helix.DEFAULT_HELIX_INSTANCE_MAX_STATE_TRANSITIONS_PER_RESOURCE);
+    Map<ClusterConstraints.ConstraintAttribute, String> constraintAttributesResource = new HashMap<>();
+    constraintAttributesResource.put(ClusterConstraints.ConstraintAttribute.RESOURCE, ".*");
+    constraintAttributesResource.put(ClusterConstraints.ConstraintAttribute.INSTANCE, ".*");
+    constraintAttributesResource.put(ClusterConstraints.ConstraintAttribute.MESSAGE_TYPE,
+        Message.MessageType.STATE_TRANSITION.name());
+    ConstraintItem constraintItemResource = new ConstraintItem(constraintAttributesResource,
+        maxStateTransitionsPerResource);
+
+    _helixControllerManager.getClusterManagmentTool()
+        .setConstraint(_helixClusterName, ClusterConstraints.ConstraintType.MESSAGE_CONSTRAINT,
+            MAX_STATE_TRANSITIONS_PER_RESOURCE, constraintItemResource);
   }
 
   protected void addUtilizationChecker(UtilizationChecker utilizationChecker) {
@@ -702,6 +719,8 @@ public abstract class BaseControllerStarter implements ServiceStartable {
     });
 
     _serviceStatusCallbackList.add(generateServiceStatusCallback(_helixParticipantManager));
+
+    _clusterConfigChangeHandler.registerClusterConfigChangeListener(ContinuousJfrStarter.INSTANCE);
   }
 
   protected PinotLLCRealtimeSegmentManager createPinotLLCRealtimeSegmentManager() {

@@ -23,6 +23,7 @@ import com.google.common.collect.Sets;
 import java.io.IOException;
 import java.time.Clock;
 import java.time.Duration;
+import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
@@ -90,6 +91,28 @@ public class KafkaStreamMetadataProvider extends KafkaPartitionLevelConnectionHa
         partitionIds.add(partitionInfo.partition());
       }
       return partitionIds;
+    } catch (TimeoutException e) {
+      throw new TransientConsumerException(e);
+    }
+  }
+
+  @Override
+  public Map<Integer, StreamPartitionMsgOffset> fetchLatestStreamOffset(Set<Integer> partitionIds, long timeoutMillis) {
+    List<TopicPartition> topicPartitions = new ArrayList<>(partitionIds.size());
+    for (Integer streamPartition: partitionIds) {
+      topicPartitions.add(new TopicPartition(_topic, streamPartition));
+    }
+    try {
+      Map<TopicPartition, Long> topicPartitionToLatestOffsetMap =
+          _consumer.endOffsets(topicPartitions, Duration.ofMillis(timeoutMillis));
+
+      Map<Integer, StreamPartitionMsgOffset> partitionIdToLatestOffset =
+          new HashMap<>(topicPartitionToLatestOffsetMap.size());
+      for (Map.Entry<TopicPartition, Long> entry : topicPartitionToLatestOffsetMap.entrySet()) {
+        partitionIdToLatestOffset.put(entry.getKey().partition(), new LongMsgOffset(entry.getValue()));
+      }
+
+      return partitionIdToLatestOffset;
     } catch (TimeoutException e) {
       throw new TransientConsumerException(e);
     }
@@ -186,6 +209,11 @@ public class KafkaStreamMetadataProvider extends KafkaPartitionLevelConnectionHa
     } catch (ExecutionException | InterruptedException e) {
       throw new RuntimeException(e);
     }
+  }
+
+  @Override
+  public boolean supportsOffsetLag() {
+    return true;
   }
 
   public static class KafkaTopicMetadata implements TopicMetadata {

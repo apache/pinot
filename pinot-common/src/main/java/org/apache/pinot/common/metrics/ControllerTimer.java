@@ -29,6 +29,7 @@ public enum ControllerTimer implements AbstractMetrics.Timer {
   TABLE_REBALANCE_EXECUTION_TIME_MS("tableRebalanceExecutionTimeMs", false),
   CRON_SCHEDULER_JOB_EXECUTION_TIME_MS("cronSchedulerJobExecutionTimeMs", false),
   IDEAL_STATE_UPDATE_TIME_MS("IdealStateUpdateTimeMs", false),
+  MINION_TASK_GENERATION_LOCK_HELD_ELAPSED_TIME_MS("minionTaskGenerationLockHeldElapsedTimeMs", false),
   // How long it took the server to start.
   STARTUP_SUCCESS_DURATION_MS("startupSuccessDurationMs", true),
   // Time taken to read the segment from deep store

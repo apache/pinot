@@ -83,7 +83,7 @@ const TaskDetail = (props) => {
   const fetchData = useCallback(async () => {
     setFetching(true);
     const [debugRes, runtimeConfig] = await Promise.all([
-      PinotMethodUtils.getTaskDebugData(taskID),
+      PinotMethodUtils.getTaskDebugData(taskID, queueTableName),
       PinotMethodUtils.getTaskRuntimeConfigData(taskID)
     ]);
     const subtaskTableRecords = [];

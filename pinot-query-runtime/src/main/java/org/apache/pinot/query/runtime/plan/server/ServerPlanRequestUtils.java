@@ -234,7 +234,7 @@ public class ServerPlanRequestUtils {
     for (QueryRewriter queryRewriter : QUERY_REWRITERS) {
       pinotQuery = queryRewriter.rewrite(pinotQuery);
     }
-    QUERY_OPTIMIZER.optimize(pinotQuery, tableConfig, schema);
+    QUERY_OPTIMIZER.optimize(pinotQuery, schema);
 
     // 2. Update query options according to requestMetadataMap
     updateQueryOptions(pinotQuery, executionContext);

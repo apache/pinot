@@ -28,11 +28,14 @@ import org.slf4j.LoggerFactory;
 
 
 /**
- * Union operator for UNION ALL queries.
+ * Union operator for UNION ALL queries. Each child operator is fully drained sequentially and all rows are returned.
  */
 public class UnionAllOperator extends SetOperator {
   private static final Logger LOGGER = LoggerFactory.getLogger(UnionAllOperator.class);
   private static final String EXPLAIN_NAME = "UNION_ALL";
+
+  private MseBlock _eosBlock = null;
+  private int _currentOperatorIndex = 0;
 
   public UnionAllOperator(OpChainExecutionContext opChainExecutionContext, List<MultiStageOperator> inputOperators,
       DataSchema dataSchema) {
@@ -55,12 +58,31 @@ public class UnionAllOperator extends SetOperator {
   }
 
   @Override
-  protected MseBlock processRightOperator() {
-    return _rightChildOperator.nextBlock();
-  }
+  protected MseBlock getNextBlock()
+      throws Exception {
+    if (_eosBlock != null) {
+      return _eosBlock;
+    }
 
-  @Override
-  protected MseBlock processLeftOperator() {
-    return _leftChildOperator.nextBlock();
+    while (_currentOperatorIndex < _inputOperators.size()) {
+      MultiStageOperator currentOperator = _inputOperators.get(_currentOperatorIndex);
+      MseBlock block = currentOperator.nextBlock();
+      if (block.isError()) {
+        _eosBlock = block;
+        return block;
+      } else if (block.isSuccess()) {
+        _currentOperatorIndex++;
+        if (_currentOperatorIndex == _inputOperators.size()) {
+          _eosBlock = block;
+          return block;
+        }
+      } else if (block.isData()) {
+        return block;
+      }
+    }
+
+    // All input operators are exhausted, return EoS block.
+    assert _eosBlock != null;
+    return _eosBlock;
   }
 }

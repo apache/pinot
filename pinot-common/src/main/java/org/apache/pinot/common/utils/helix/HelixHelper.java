@@ -663,4 +663,13 @@ public class HelixHelper {
     }
     return false;
   }
+
+  public static boolean updateMaxConcurrentTasksPerInstance(InstanceConfig instanceConfig, int maxConcurrentTasks) {
+    int currentMaxConcurrentTasks = instanceConfig.getMaxConcurrentTask();
+    if (currentMaxConcurrentTasks != maxConcurrentTasks) {
+      instanceConfig.setMaxConcurrentTask(maxConcurrentTasks);
+      return true;
+    }
+    return false;
+  }
 }

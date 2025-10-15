@@ -32,6 +32,7 @@ import io.grpc.netty.shaded.io.netty.handler.ssl.ClientAuth;
 import io.grpc.netty.shaded.io.netty.handler.ssl.SslContext;
 import io.grpc.netty.shaded.io.netty.handler.ssl.SslContextBuilder;
 import io.grpc.netty.shaded.io.netty.handler.ssl.SslProvider;
+import io.grpc.netty.shaded.io.netty.util.internal.PlatformDependent;
 import io.grpc.stub.StreamObserver;
 import java.io.IOException;
 import java.util.Map;
@@ -146,6 +147,15 @@ public class GrpcQueryServer extends PinotQueryServerGrpc.PinotQueryServerImplBa
       metrics.setOrUpdateGlobalGauge(ServerGauge.GRPC_NETTY_POOLED_CACHE_SIZE_NORMAL, metric::normalCacheSize);
       metrics.setOrUpdateGlobalGauge(ServerGauge.GRPC_NETTY_POOLED_THREADLOCALCACHE, metric::numThreadLocalCaches);
       metrics.setOrUpdateGlobalGauge(ServerGauge.GRPC_NETTY_POOLED_CHUNK_SIZE, metric::chunkSize);
+
+      // Notice here we are using io.grpc.netty.shaded.io.netty.util.internal.PlatformDependent instead of
+      // io.netty.util.internal.PlatformDependent because gRPC shades Netty to avoid version conflicts.
+      // This also means it uses a different pool of direct memory and a different setting of max direct memory.
+      //
+      // Also notice these two metrics are also set by the MSE query engine. Both are set to the same value, so it
+      // doesn't matter which one _wins_ in the metrics system.
+      metrics.setOrUpdateGlobalGauge(ServerGauge.GRPC_TOTAL_MAX_DIRECT_MEMORY, PlatformDependent::maxDirectMemory);
+      metrics.setOrUpdateGlobalGauge(ServerGauge.GRPC_TOTAL_USED_DIRECT_MEMORY, PlatformDependent::usedDirectMemory);
 
       _server = builder
           .maxInboundMessageSize(config.getMaxInboundMessageSizeBytes())

@@ -47,7 +47,6 @@ import org.apache.pinot.core.transport.ServerRoutingInstance;
 import org.apache.pinot.core.util.GapfillUtils;
 import org.apache.pinot.segment.spi.IndexSegment;
 import org.apache.pinot.segment.spi.SegmentContext;
-import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.TableType;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.env.PinotConfiguration;
@@ -59,6 +58,7 @@ import org.apache.pinot.sql.parsers.CalciteSqlParser;
 import org.intellij.lang.annotations.Language;
 
 import static org.mockito.Mockito.mock;
+import static org.testng.Assert.assertEquals;
 
 
 /**
@@ -269,9 +269,9 @@ public abstract class BaseQueriesTest {
    * @see StatisticalQueriesTest for an example use case.
    */
   protected BrokerResponseNative getBrokerResponseForOptimizedQuery(@Language("sql") String query,
-      @Nullable TableConfig config, @Nullable Schema schema) {
+      @Nullable Schema schema) {
     PinotQuery pinotQuery = CalciteSqlParser.compileToPinotQuery(query);
-    OPTIMIZER.optimize(pinotQuery, config, schema);
+    OPTIMIZER.optimize(pinotQuery, schema);
     return getBrokerResponse(pinotQuery, PLAN_MAKER);
   }
 
@@ -324,5 +324,17 @@ public abstract class BaseQueriesTest {
     BrokerRequest serverBrokerRequest =
         serverPinotQuery == pinotQuery ? brokerRequest : CalciteSqlCompiler.convertToBrokerRequest(serverPinotQuery);
     return reduceOnDataTable(brokerRequest, serverBrokerRequest, dataTableMap);
+  }
+
+  protected void validateBeforeAfterQueryResults(List<Object[]> beforeResults, List<Object[]> afterResults) {
+    assertEquals(beforeResults.size(), afterResults.size());
+    for (int i = 0; i < beforeResults.size(); i++) {
+      Object[] resultRow1 = beforeResults.get(i);
+      Object[] resultRow2 = afterResults.get(i);
+      assertEquals(resultRow1.length, resultRow2.length);
+      for (int j = 0; j < resultRow1.length; j++) {
+        assertEquals(resultRow1[j], resultRow2[j]);
+      }
+    }
   }
 }
