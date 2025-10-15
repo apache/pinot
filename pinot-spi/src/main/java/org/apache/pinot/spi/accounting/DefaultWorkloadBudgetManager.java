@@ -39,17 +39,26 @@ public class DefaultWorkloadBudgetManager implements WorkloadBudgetManager {
   private final ScheduledExecutorService _resetScheduler = Executors.newSingleThreadScheduledExecutor();
   private volatile boolean _isCostCollectionEnabled;
   private volatile boolean _isCostEmissionEnabled;
+  private volatile boolean _isCostEnforcementEnabled;
 
   public DefaultWorkloadBudgetManager(PinotConfiguration config) {
     _isCostCollectionEnabled = config.getProperty(CommonConstants.Accounting.CONFIG_OF_WORKLOAD_ENABLE_COST_COLLECTION,
         CommonConstants.Accounting.DEFAULT_WORKLOAD_ENABLE_COST_COLLECTION);
+
     // Return an object even if disabled. All functionalities of this class will be noops.
     if (!_isCostCollectionEnabled) {
-      LOGGER.info("WorkloadBudgetManager is disabled. Creating a no-op instance.");
+      LOGGER.info("WorkloadBudgetManager is disabled, since cost collection is turned off. Creating a no-op instance.");
+      _isCostEmissionEnabled = false;
+      _isCostEnforcementEnabled = false;
       return;
     }
+
+    // Enforcement and emission require collection to be enabled
     _isCostEmissionEnabled = config.getProperty(CommonConstants.Accounting.CONFIG_OF_WORKLOAD_ENABLE_COST_EMISSION,
         CommonConstants.Accounting.DEFAULT_WORKLOAD_ENABLE_COST_EMISSION);
+    _isCostEnforcementEnabled = config.getProperty(
+        CommonConstants.Accounting.CONFIG_OF_WORKLOAD_ENABLE_COST_ENFORCEMENT,
+        CommonConstants.Accounting.DEFAULT_WORKLOAD_ENABLE_COST_ENFORCEMENT);
     _workloadBudgets = new ConcurrentHashMap<>();
     _enforcementWindowMs = config.getProperty(CommonConstants.Accounting.CONFIG_OF_WORKLOAD_ENFORCEMENT_WINDOW_MS,
         CommonConstants.Accounting.DEFAULT_WORKLOAD_ENFORCEMENT_WINDOW_MS);
@@ -200,8 +209,8 @@ public class DefaultWorkloadBudgetManager implements WorkloadBudgetManager {
   }
 
   public boolean canAdmitQuery(String workload) {
-    // If disabled or no budget configured, always admit
-    if (!_isCostCollectionEnabled) {
+    // If enforcement is disabled, always admit the query.
+    if (!_isCostEnforcementEnabled) {
       return true;
     }
     Budget budget = _workloadBudgets.get(workload);
