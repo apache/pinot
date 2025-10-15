@@ -571,8 +571,7 @@ public class SegmentIndexCreationDriverImpl implements SegmentIndexCreationDrive
     }
   }
 
-  private void buildStarTreeV2IfNecessary(File indexDir)
-      throws Exception {
+  private void buildStarTreeV2IfNecessary(File indexDir) {
     List<StarTreeIndexConfig> starTreeIndexConfigs = _config.getStarTreeIndexConfigs();
     boolean enableDefaultStarTree = _config.isEnableDefaultStarTree();
     if (CollectionUtils.isNotEmpty(starTreeIndexConfigs) || enableDefaultStarTree) {
@@ -582,6 +581,10 @@ public class SegmentIndexCreationDriverImpl implements SegmentIndexCreationDrive
           MultipleTreesBuilder builder = new MultipleTreesBuilder(starTreeIndexConfigs, enableDefaultStarTree, indexDir,
               buildMode)) {
         builder.build();
+      } catch (Exception e) {
+        String tableNameWithType = _config.getTableConfig().getTableName();
+        LOGGER.error("Failed to build star-tree index for table: {}, skipping", tableNameWithType, e);
+        MinionMetrics.get().addMeteredTableValue(tableNameWithType, MinionMeter.STAR_TREE_INDEX_BUILD_FAILURES, 1);
       }
     }
   }

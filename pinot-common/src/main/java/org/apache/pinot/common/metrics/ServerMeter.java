@@ -105,6 +105,7 @@ public enum ServerMeter implements AbstractMetrics.Meter {
   SEGMENT_UPLOAD_TIMEOUT("segments", false),
   NUM_RESIZES("numResizes", false),
   RESIZE_TIME_MS("resizeTimeMs", false),
+  STAR_TREE_INDEX_BUILD_FAILURES("segments", false),
   NO_TABLE_ACCESS("tables", true),
   INDEXING_FAILURES("attributeValues", true),
 
