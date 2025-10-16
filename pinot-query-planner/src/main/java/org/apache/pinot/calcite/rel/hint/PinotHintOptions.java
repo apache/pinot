@@ -87,6 +87,7 @@ public class PinotHintOptions {
     public static final String DYNAMIC_BROADCAST_JOIN_STRATEGY = "dynamic_broadcast";
     // "lookup" can be used when the right table is a dimension table replicated to all workers
     public static final String LOOKUP_JOIN_STRATEGY = "lookup";
+    public static final String SORTED_JOIN_STRATEGY = "sorted";
 
     public static final String LEFT_DISTRIBUTION_TYPE = "left_distribution_type";
     public static final String RIGHT_DISTRIBUTION_TYPE = "right_distribution_type";
@@ -126,6 +127,10 @@ public class PinotHintOptions {
     // TODO: Consider adding a Join implementation with join strategy.
     public static boolean useLookupJoinStrategy(Join join) {
       return LOOKUP_JOIN_STRATEGY.equalsIgnoreCase(getJoinStrategyHint(join));
+    }
+
+    public static boolean useSortedJoinStrategy(Join join) {
+      return SORTED_JOIN_STRATEGY.equalsIgnoreCase(getJoinStrategyHint(join));
     }
 
     @Nullable

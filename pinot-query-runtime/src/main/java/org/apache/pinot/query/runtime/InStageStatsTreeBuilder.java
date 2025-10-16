@@ -205,6 +205,9 @@ public class InStageStatsTreeBuilder implements PlanNodeVisitor<ObjectNode, InSt
   public ObjectNode visitJoin(JoinNode node, Context context) {
     if (node.getJoinStrategy() == JoinNode.JoinStrategy.HASH) {
       return recursiveCase(node, MultiStageOperator.Type.HASH_JOIN, context);
+    } else if (node.getJoinStrategy() == JoinNode.JoinStrategy.SORTED) {
+      // TODO: Create state type for SORTED_JOIN
+      return recursiveCase(node, MultiStageOperator.Type.HASH_JOIN, context);
     } else {
       assert node.getJoinStrategy() == JoinNode.JoinStrategy.LOOKUP;
       return recursiveCase(node, MultiStageOperator.Type.LOOKUP_JOIN, context);
