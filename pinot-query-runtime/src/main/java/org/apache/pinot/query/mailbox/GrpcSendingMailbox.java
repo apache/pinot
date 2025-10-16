@@ -71,7 +71,7 @@ public class GrpcSendingMailbox implements SendingMailbox {
   private final MailboxStatusObserver _statusObserver = new MailboxStatusObserver();
   private final int _maxByteStringSize;
   /// Indicates whether the sending side has attempted to close the mailbox (either via complete() or cancel()).
-  private volatile boolean _closeAttempted;
+  private volatile boolean _senderSideClosed;
 
   private StreamObserver<MailboxContent> _contentObserver;
 
@@ -102,10 +102,10 @@ public class GrpcSendingMailbox implements SendingMailbox {
   @Override
   public void send(MseBlock.Eos block, List<DataBuffer> serializedStats) {
     sendInternal(block, serializedStats);
-    if (_closeAttempted) {
+    if (!_senderSideClosed) {
       LOGGER.debug("Completing mailbox: {}", _id);
       _contentObserver.onCompleted();
-      _closeAttempted = true;
+      _senderSideClosed = true;
     } else {
       LOGGER.warn("Trying to send EOS to the already terminated mailbox: {}", _id);
     }
@@ -175,7 +175,7 @@ public class GrpcSendingMailbox implements SendingMailbox {
       LOGGER.debug("Already terminated mailbox: {}", _id);
       return;
     }
-    _closeAttempted = true;
+    _senderSideClosed = true;
     LOGGER.debug("Cancelling mailbox: {}", _id);
     if (_contentObserver == null) {
       _contentObserver = getContentObserver();
@@ -200,10 +200,10 @@ public class GrpcSendingMailbox implements SendingMailbox {
 
   @Override
   public boolean isTerminated() {
-    // _closeAttempted is set when the sending side has attempted to close the mailbox (either via complete() or
+    // _senderSideClosed is set when the sending side has attempted to close the mailbox (either via complete() or
     // cancel()). But we also need to return true the gRPC status observer has observed that the connection is closed
     // (ie due to timeout)
-    return _closeAttempted || _statusObserver.isFinished();
+    return _senderSideClosed || _statusObserver.isFinished();
   }
 
   private StreamObserver<MailboxContent> getContentObserver() {
@@ -336,7 +336,7 @@ public class GrpcSendingMailbox implements SendingMailbox {
       RuntimeException ex = new RuntimeException(errorMsg);
       ex.fillInStackTrace();
       LOGGER.error(errorMsg, ex);
-      _closeAttempted = true;
+      _senderSideClosed = true;
 
       StringWriter stringWriter = new StringWriter();
       try (PrintWriter printWriter = new PrintWriter(stringWriter)) {
