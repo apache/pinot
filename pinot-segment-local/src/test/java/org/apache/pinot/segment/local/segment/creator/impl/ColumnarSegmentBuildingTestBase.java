@@ -25,18 +25,20 @@ import java.math.BigDecimal;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
+import java.util.Random;
 import java.util.Set;
 import javax.annotation.Nullable;
 import org.apache.commons.io.FileUtils;
 import org.apache.pinot.segment.local.indexsegment.immutable.ImmutableSegmentLoader;
 import org.apache.pinot.segment.local.segment.readers.PinotSegmentColumnReaderFactory;
+import org.apache.pinot.segment.local.segment.readers.PinotSegmentRecordReader;
+import org.apache.pinot.segment.spi.ColumnMetadata;
 import org.apache.pinot.segment.spi.ImmutableSegment;
 import org.apache.pinot.segment.spi.creator.SegmentGeneratorConfig;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.TableType;
 import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.Schema;
-import org.apache.pinot.spi.data.readers.ColumnReader;
 import org.apache.pinot.spi.data.readers.GenericRow;
 import org.apache.pinot.spi.data.readers.RecordReader;
 import org.apache.pinot.spi.data.readers.RecordReaderConfig;
@@ -45,53 +47,53 @@ import org.apache.pinot.spi.utils.builder.TableConfigBuilder;
 import org.testng.Assert;
 import org.testng.annotations.AfterClass;
 import org.testng.annotations.BeforeClass;
-import org.testng.annotations.Test;
 
 
 /**
- * Tests for columnar segment building functionality.
+ * Base class for columnar segment building tests containing common setup and utility methods.
  *
- * <p>This test class validates the new columnar segment building capability including:
+ * <p>This base class provides:
  * <ul>
- *   <li>ColumnReader interface implementations</li>
- *   <li>ColumnReaderFactory for different data sources</li>
- *   <li>Columnar segment building vs row-major building equivalence</li>
- *   <li>Support for new columns with default values</li>
+ *   <li>Common test data and schema setup</li>
+ *   <li>Segment creation utility methods</li>
+ *   <li>Validation utility methods</li>
+ *   <li>Test data generation</li>
  * </ul>
  */
-public class ColumnarSegmentBuildingTest {
-  private static final String TEMP_DIR = System.getProperty("java.io.tmpdir");
-  private static final String TABLE_NAME = "testTable";
-  private static final String SEGMENT_NAME = "testSegment";
+public abstract class ColumnarSegmentBuildingTestBase {
+  protected static final String TEMP_DIR = System.getProperty("java.io.tmpdir");
+  protected static final String TABLE_NAME = "testTable";
+  protected static final String SEGMENT_NAME = "testSegment";
 
   // Test columns
-  private static final String STRING_COL_1 = "stringCol1";
-  private static final String STRING_COL_2 = "stringCol2";
-  private static final String INT_COL_1 = "intCol1";
-  private static final String INT_COL_2 = "intCol2";
-  private static final String LONG_COL = "longCol";
-  private static final String FLOAT_COL = "floatCol";
-  private static final String DOUBLE_COL = "doubleCol";
-  private static final String BIG_DECIMAL_COL = "bigDecimalCol";
-  private static final String BYTES_COL = "bytesCol";
-  private static final String TIME_COL = "timeCol";
-  private static final String MV_INT_COL = "mvIntCol";
-  private static final String MV_STRING_COL = "mvStringCol";
+  protected static final String STRING_COL_1 = "stringCol1";
+  protected static final String STRING_COL_2 = "stringCol2";
+  protected static final String INT_COL_1 = "intCol1";
+  protected static final String INT_COL_2 = "intCol2";
+  protected static final String LONG_COL = "longCol";
+  protected static final String FLOAT_COL = "floatCol";
+  protected static final String DOUBLE_COL = "doubleCol";
+  protected static final String BIG_DECIMAL_COL = "bigDecimalCol";
+  protected static final String BYTES_COL = "bytesCol";
+  protected static final String TIME_COL = "timeCol";
+  protected static final String MV_INT_COL = "mvIntCol";
+  protected static final String MV_STRING_COL = "mvStringCol";
 
   // New column for testing default value handling
-  private static final String NEW_STRING_COL = "newStringCol";
-  private static final String NEW_INT_COL = "newIntCol";
+  protected static final String NEW_STRING_COL = "newStringCol";
+  protected static final String NEW_INT_COL = "newIntCol";
+  protected static final String NEW_MV_LONG_COL = "newMvLongCol";
 
-  private File _tempDir;
-  private Schema _originalSchema;
-  private Schema _extendedSchema; // Schema with additional columns
-  private TableConfig _tableConfig;
-  private List<GenericRow> _testData;
+  protected File _tempDir;
+  protected Schema _originalSchema;
+  protected Schema _extendedSchema; // Schema with additional columns
+  protected TableConfig _tableConfig;
+  protected List<GenericRow> _testData;
 
   @BeforeClass
   public void setUp()
       throws IOException {
-    _tempDir = new File(TEMP_DIR, "ColumnarSegmentBuildingTest");
+    _tempDir = new File(TEMP_DIR, getClass().getSimpleName());
     FileUtils.deleteQuietly(_tempDir);
     _tempDir.mkdirs();
 
@@ -127,6 +129,7 @@ public class ColumnarSegmentBuildingTest {
         .addDateTime(TIME_COL, FieldSpec.DataType.LONG, "1:MILLISECONDS:EPOCH", "1:MILLISECONDS")
         .addSingleValueDimension(NEW_STRING_COL, FieldSpec.DataType.STRING)
         .addSingleValueDimension(NEW_INT_COL, FieldSpec.DataType.INT)
+        .addMultiValueDimension(NEW_MV_LONG_COL, FieldSpec.DataType.LONG)
         .build();
 
     // Create table config
@@ -147,152 +150,7 @@ public class ColumnarSegmentBuildingTest {
     FileUtils.deleteQuietly(_tempDir);
   }
 
-  @Test
-  public void testBasicColumnarBuilding()
-      throws Exception {
-    // First create a segment using traditional row-major approach
-    File rowMajorSegmentDir = createRowMajorSegment();
-
-    // Then create a segment using columnar approach from the row-major segment
-    File columnarSegmentDir = createColumnarSegment(rowMajorSegmentDir);
-
-    // Validate that both segments have identical data
-    validateSegmentsIdentical(rowMajorSegmentDir, columnarSegmentDir);
-  }
-
-  @Test
-  public void testColumnarBuildingWithNewColumns()
-      throws Exception {
-    // Create original segment with original schema
-    File originalSegmentDir = createRowMajorSegment();
-
-    // Create new segment with extended schema (has additional columns)
-    File newSegmentDir = createColumnarSegmentWithNewColumns(originalSegmentDir);
-
-    // Validate that the new segment has the additional columns with default values
-    validateSegmentWithNewColumns(newSegmentDir);
-  }
-
-  @Test
-  public void testColumnReaderFactory()
-      throws Exception {
-    // Create a segment to test column reader factory with
-    File segmentDir = createRowMajorSegment();
-    ImmutableSegment segment = ImmutableSegmentLoader.load(segmentDir, ReadMode.mmap);
-
-    try {
-      // Test PinotSegmentColumnReaderFactory
-      try (PinotSegmentColumnReaderFactory factory = new PinotSegmentColumnReaderFactory(segment)) {
-        factory.init(_originalSchema);
-
-        // Test that all expected columns are available
-        Set<String> availableColumns = factory.getAvailableColumns();
-        Assert.assertTrue(availableColumns.contains(STRING_COL_1));
-        Assert.assertTrue(availableColumns.contains(INT_COL_1));
-        Assert.assertTrue(availableColumns.contains(MV_INT_COL));
-
-        // Test creating individual column readers
-        ColumnReader stringReader = factory.createColumnReader(STRING_COL_1,
-            _originalSchema.getFieldSpecFor(STRING_COL_1));
-        Assert.assertEquals(stringReader.getColumnName(), STRING_COL_1);
-
-        ColumnReader mvReader = factory.createColumnReader(MV_INT_COL,
-            _originalSchema.getFieldSpecFor(MV_INT_COL));
-        Assert.assertEquals(mvReader.getColumnName(), MV_INT_COL);
-
-        // Test reading values using iterator pattern
-        Assert.assertTrue(stringReader.hasNext());
-        Object firstStringValue = stringReader.next();
-        Assert.assertEquals(firstStringValue, "string1_0");
-
-        // Test that we can continue reading
-        Assert.assertTrue(stringReader.hasNext());
-        Object secondStringValue = stringReader.next();
-        Assert.assertEquals(secondStringValue, "string1_1");
-
-        // Reset and test again
-        stringReader.rewind();
-        Assert.assertTrue(stringReader.hasNext());
-        firstStringValue = stringReader.next();
-        Assert.assertEquals(firstStringValue, "string1_0");
-
-        // Test creating all column readers
-        Map<String, ColumnReader> allReaders = factory.getAllColumnReaders();
-        Assert.assertEquals(allReaders.size(), _originalSchema.getPhysicalColumnNames().size());
-      }
-    } finally {
-      segment.destroy();
-    }
-  }
-
-  @Test
-  public void testColumnReaderWithNewColumns()
-      throws Exception {
-    // Create a segment to test with
-    File segmentDir = createRowMajorSegment();
-    ImmutableSegment segment = ImmutableSegmentLoader.load(segmentDir, ReadMode.mmap);
-
-    try {
-      // Test creating readers for new columns (should return default value readers)
-      try (PinotSegmentColumnReaderFactory factory = new PinotSegmentColumnReaderFactory(segment)) {
-        factory.init(_extendedSchema);
-
-        // Test creating reader for new column
-        ColumnReader newStringReader = factory.createColumnReader(NEW_STRING_COL,
-            _extendedSchema.getFieldSpecFor(NEW_STRING_COL));
-        Assert.assertEquals(newStringReader.getColumnName(), NEW_STRING_COL);
-
-        // Verify it returns default values using iterator pattern
-        Assert.assertTrue(newStringReader.hasNext());
-        Object defaultValue = newStringReader.next();
-        Assert.assertEquals(defaultValue, _extendedSchema.getFieldSpecFor(NEW_STRING_COL).getDefaultNullValue());
-
-        // Test that all values are the same (default)
-        int valueCount = 1; // We already read one value
-        while (newStringReader.hasNext()) {
-          Object value = newStringReader.next();
-          Assert.assertEquals(value, defaultValue);
-          valueCount++;
-        }
-        Assert.assertEquals(valueCount, _testData.size());
-      }
-    } finally {
-      segment.destroy();
-    }
-  }
-
-  @Test
-  public void testAllDataTypes()
-      throws Exception {
-    // This test validates that all supported data types work correctly with columnar building
-    File rowMajorSegmentDir = createRowMajorSegment();
-    File columnarSegmentDir = createColumnarSegment(rowMajorSegmentDir);
-
-    // Validate that both segments have identical data for all data types
-    validateSegmentsIdentical(rowMajorSegmentDir, columnarSegmentDir);
-
-    // Additionally validate that all expected columns and data types are present
-    ImmutableSegment segment = ImmutableSegmentLoader.load(columnarSegmentDir, ReadMode.mmap);
-    try {
-      Set<String> columnNames = segment.getPhysicalColumnNames();
-
-      // Validate all data types are present
-      Assert.assertTrue(columnNames.contains(STRING_COL_1), "STRING column missing");
-      Assert.assertTrue(columnNames.contains(INT_COL_1), "INT column missing");
-      Assert.assertTrue(columnNames.contains(LONG_COL), "LONG column missing");
-      Assert.assertTrue(columnNames.contains(FLOAT_COL), "FLOAT column missing");
-      Assert.assertTrue(columnNames.contains(DOUBLE_COL), "DOUBLE column missing");
-      Assert.assertTrue(columnNames.contains(BIG_DECIMAL_COL), "BIG_DECIMAL column missing");
-      Assert.assertTrue(columnNames.contains(BYTES_COL), "BYTES column missing");
-      Assert.assertTrue(columnNames.contains(MV_INT_COL), "Multi-value INT column missing");
-      Assert.assertTrue(columnNames.contains(MV_STRING_COL), "Multi-value STRING column missing");
-      Assert.assertTrue(columnNames.contains(TIME_COL), "TIME column missing");
-    } finally {
-      segment.destroy();
-    }
-  }
-
-  private File createRowMajorSegment()
+  protected File createRowMajorSegment()
       throws Exception {
     File outputDir = new File(_tempDir, "rowMajorSegment");
     FileUtils.deleteQuietly(outputDir);
@@ -310,7 +168,7 @@ public class ColumnarSegmentBuildingTest {
     return new File(outputDir, SEGMENT_NAME + "_rowMajor");
   }
 
-  private File createColumnarSegment(File sourceSegmentDir)
+  protected File createColumnarSegment(File sourceSegmentDir)
       throws Exception {
     File outputDir = new File(_tempDir, "columnarSegment");
     FileUtils.deleteQuietly(outputDir);
@@ -338,7 +196,7 @@ public class ColumnarSegmentBuildingTest {
     }
   }
 
-  private File createColumnarSegmentWithNewColumns(File sourceSegmentDir)
+  protected File createColumnarSegmentWithNewColumns(File sourceSegmentDir)
       throws Exception {
     File outputDir = new File(_tempDir, "columnarSegmentWithNewColumns");
     FileUtils.deleteQuietly(outputDir);
@@ -367,18 +225,41 @@ public class ColumnarSegmentBuildingTest {
     }
   }
 
-  private void validateSegmentsIdentical(File segment1Dir, File segment2Dir)
+  protected File createRowMajorSegmentWithExtendedSchema(File originalSegmentDir)
+      throws Exception {
+    File outputDir = new File(_tempDir, "rowMajorSegmentWithExtendedSchema");
+    FileUtils.deleteQuietly(outputDir);
+    outputDir.mkdirs();
+
+    SegmentGeneratorConfig config = new SegmentGeneratorConfig(_tableConfig, _extendedSchema);
+    config.setOutDir(outputDir.getAbsolutePath());
+    config.setSegmentName(SEGMENT_NAME + "_rowMajorExtended");
+
+    SegmentIndexCreationDriverImpl driver = new SegmentIndexCreationDriverImpl();
+
+    // Use PinotSegmentRecordReader to read from the original segment, similar to RefreshSegmentTaskExecutor
+    try (PinotSegmentRecordReader recordReader = new PinotSegmentRecordReader()) {
+      recordReader.init(originalSegmentDir, null, null);
+      driver.init(config, recordReader);
+      driver.build();
+    }
+
+    return new File(outputDir, SEGMENT_NAME + "_rowMajorExtended");
+  }
+
+  protected void validateSegmentsIdentical(File segment1Dir, File segment2Dir)
       throws Exception {
     ImmutableSegment segment1 = ImmutableSegmentLoader.load(segment1Dir, ReadMode.mmap);
     ImmutableSegment segment2 = ImmutableSegmentLoader.load(segment2Dir, ReadMode.mmap);
 
     try {
-      // Validate metadata
+      // Validate basic segment metadata
       Assert.assertEquals(segment1.getSegmentMetadata().getTotalDocs(), segment2.getSegmentMetadata().getTotalDocs());
       Assert.assertEquals(segment1.getSegmentMetadata().getAllColumns(), segment2.getSegmentMetadata().getAllColumns());
 
-      // Validate data for each column
+      // Validate column metadata and statistics for each column
       for (String columnName : segment1.getPhysicalColumnNames()) {
+        validateColumnMetadata(segment1, segment2, columnName);
         validateColumnData(segment1, segment2, columnName);
       }
     } finally {
@@ -387,7 +268,68 @@ public class ColumnarSegmentBuildingTest {
     }
   }
 
-  private void validateSegmentWithNewColumns(File segmentDir)
+  protected void validateColumnMetadata(ImmutableSegment segment1, ImmutableSegment segment2, String columnName) {
+    ColumnMetadata metadata1 = segment1.getSegmentMetadata().getColumnMetadataFor(columnName);
+    ColumnMetadata metadata2 = segment2.getSegmentMetadata().getColumnMetadataFor(columnName);
+
+    Assert.assertNotNull(metadata1, "Column metadata missing for " + columnName + " in segment1");
+    Assert.assertNotNull(metadata2, "Column metadata missing for " + columnName + " in segment2");
+
+    // Validate basic column properties
+    Assert.assertEquals(metadata1.getDataType(), metadata2.getDataType(),
+        "Data type mismatch for column " + columnName);
+    Assert.assertEquals(metadata1.isSingleValue(), metadata2.isSingleValue(),
+        "Single value flag mismatch for column " + columnName);
+    Assert.assertEquals(metadata1.getFieldType(), metadata2.getFieldType(),
+        "Field type mismatch for column " + columnName);
+    Assert.assertEquals(metadata1.getTotalDocs(), metadata2.getTotalDocs(),
+        "Total docs mismatch for column " + columnName);
+
+    // Validate cardinality and dictionary properties
+    Assert.assertEquals(metadata1.getCardinality(), metadata2.getCardinality(),
+        "Cardinality mismatch for column " + columnName);
+    Assert.assertEquals(metadata1.hasDictionary(), metadata2.hasDictionary(),
+        "Dictionary flag mismatch for column " + columnName);
+    Assert.assertEquals(metadata1.getColumnMaxLength(), metadata2.getColumnMaxLength(),
+        "Column max length mismatch for column " + columnName);
+
+    // Validate sorting and indexing properties
+    Assert.assertEquals(metadata1.isSorted(), metadata2.isSorted(),
+        "Sorted flag mismatch for column " + columnName);
+    Assert.assertEquals(metadata1.isAutoGenerated(), metadata2.isAutoGenerated(),
+        "Auto-generated flag mismatch for column " + columnName);
+
+    // Validate multi-value properties
+    if (!metadata1.isSingleValue()) {
+      Assert.assertEquals(metadata1.getMaxNumberOfMultiValues(), metadata2.getMaxNumberOfMultiValues(),
+          "Max number of multi-values mismatch for column " + columnName);
+      Assert.assertEquals(metadata1.getTotalNumberOfEntries(), metadata2.getTotalNumberOfEntries(),
+          "Total number of entries mismatch for column " + columnName);
+    }
+
+    // Validate min/max values if available
+    Comparable<?> minValue1 = metadata1.getMinValue();
+    Comparable<?> minValue2 = metadata2.getMinValue();
+    Comparable<?> maxValue1 = metadata1.getMaxValue();
+    Comparable<?> maxValue2 = metadata2.getMaxValue();
+
+    if (minValue1 != null && minValue2 != null) {
+      Assert.assertEquals(minValue1, minValue2,
+          "Min value mismatch for column " + columnName);
+    }
+    if (maxValue1 != null && maxValue2 != null) {
+      Assert.assertEquals(maxValue1, maxValue2,
+          "Max value mismatch for column " + columnName);
+    }
+
+    // Validate bits per element for dictionary encoded columns
+    if (metadata1.hasDictionary() && metadata2.hasDictionary()) {
+      Assert.assertEquals(metadata1.getBitsPerElement(), metadata2.getBitsPerElement(),
+          "Bits per element mismatch for column " + columnName);
+    }
+  }
+
+  protected void validateSegmentWithNewColumns(File segmentDir)
       throws Exception {
     ImmutableSegment segment = ImmutableSegmentLoader.load(segmentDir, ReadMode.mmap);
 
@@ -395,6 +337,7 @@ public class ColumnarSegmentBuildingTest {
       // Validate that new columns exist
       Assert.assertTrue(segment.getPhysicalColumnNames().contains(NEW_STRING_COL));
       Assert.assertTrue(segment.getPhysicalColumnNames().contains(NEW_INT_COL));
+      Assert.assertTrue(segment.getPhysicalColumnNames().contains(NEW_MV_LONG_COL));
 
       // Validate that new columns have default values
       GenericRow row = new GenericRow();
@@ -406,13 +349,21 @@ public class ColumnarSegmentBuildingTest {
             _extendedSchema.getFieldSpecFor(NEW_STRING_COL).getDefaultNullValue());
         Assert.assertEquals(row.getValue(NEW_INT_COL),
             _extendedSchema.getFieldSpecFor(NEW_INT_COL).getDefaultNullValue());
+
+        // For multi-value columns, the default value is wrapped in an array
+        Object mvLongValue = row.getValue(NEW_MV_LONG_COL);
+        Assert.assertTrue(mvLongValue instanceof Object[], "Multi-value column should return an array");
+        Object[] mvLongArray = (Object[]) mvLongValue;
+        Assert.assertEquals(mvLongArray.length, 1, "Default multi-value array should have one element");
+        Assert.assertEquals(mvLongArray[0],
+            _extendedSchema.getFieldSpecFor(NEW_MV_LONG_COL).getDefaultNullValue());
       }
     } finally {
       segment.destroy();
     }
   }
 
-  private void validateColumnData(ImmutableSegment segment1, ImmutableSegment segment2, String columnName) {
+  protected void validateColumnData(ImmutableSegment segment1, ImmutableSegment segment2, String columnName) {
     int numDocs = segment1.getSegmentMetadata().getTotalDocs();
 
     GenericRow row1 = new GenericRow();
@@ -430,23 +381,50 @@ public class ColumnarSegmentBuildingTest {
     }
   }
 
-  private List<GenericRow> generateTestData(int numRows) {
+  protected List<GenericRow> generateTestData(int numRows) {
     List<GenericRow> data = new ArrayList<>();
+
+    // Use a fixed seed for reproducible test results
+    Random random = new Random(42);
+
+    // Null probability - approximately 10% of values will be null for nullable columns
+    double nullProbability = 0.1;
 
     for (int i = 0; i < numRows; i++) {
       GenericRow row = new GenericRow();
-      row.putValue(STRING_COL_1, "string1_" + i);
-      row.putValue(STRING_COL_2, "string2_" + (i % 10));
-      row.putValue(INT_COL_1, i);
-      row.putValue(INT_COL_2, i * 2);
-      row.putValue(LONG_COL, (long) i * 3);
-      row.putValue(FLOAT_COL, (float) i * 1.5);
-      row.putValue(DOUBLE_COL, (double) i * 2.5);
-      row.putValue(BIG_DECIMAL_COL, new BigDecimal(i + ".123"));
-      row.putValue(BYTES_COL, ("bytes_" + i).getBytes());
-      row.putValue(TIME_COL, System.currentTimeMillis() + i);
-      row.putValue(MV_INT_COL, new Object[]{i, i + 1, i + 2});
-      row.putValue(MV_STRING_COL, new Object[]{"mv1_" + i, "mv2_" + i, "mv3_" + (i % 3)});
+
+      // STRING columns - can be null
+      row.putValue(STRING_COL_1, random.nextDouble() < nullProbability ? null : "string1_" + i);
+      row.putValue(STRING_COL_2, random.nextDouble() < nullProbability ? null : "string2_" + (i % 10));
+
+      // INT columns - can be null
+      row.putValue(INT_COL_1, random.nextDouble() < nullProbability ? null : i);
+      row.putValue(INT_COL_2, random.nextDouble() < nullProbability ? null : i * 2);
+
+      // LONG column - can be null
+      row.putValue(LONG_COL, random.nextDouble() < nullProbability ? null : (long) i * 3);
+
+      // FLOAT column - can be null
+      row.putValue(FLOAT_COL, random.nextDouble() < nullProbability ? null : (float) i * 1.5);
+
+      // DOUBLE column - can be null
+      row.putValue(DOUBLE_COL, random.nextDouble() < nullProbability ? null : (double) i * 2.5);
+
+      // BIG_DECIMAL column - can be null
+      row.putValue(BIG_DECIMAL_COL, random.nextDouble() < nullProbability ? null : new BigDecimal(i + ".123"));
+
+      // BYTES column - can be null
+      row.putValue(BYTES_COL, random.nextDouble() < nullProbability ? null : ("bytes_" + i).getBytes());
+
+      // TIME column - typically not null for time columns, but we can test it
+      // Use a deterministic timestamp based on the row index for consistent results
+      long baseTimestamp = 1700000000000L; // Fixed base timestamp
+      row.putValue(TIME_COL, random.nextDouble() < nullProbability ? null : baseTimestamp + i);
+
+      // Multi-value columns - can be null (entire array is null, not individual elements)
+      row.putValue(MV_INT_COL, random.nextDouble() < nullProbability ? null : new Object[]{i, i + 1, i + 2});
+      row.putValue(MV_STRING_COL, random.nextDouble() < nullProbability ? null
+          : new Object[]{"mv1_" + i, "mv2_" + i, "mv3_" + (i % 3)});
 
       data.add(row);
     }
@@ -457,7 +435,7 @@ public class ColumnarSegmentBuildingTest {
   /**
    * Simple test record reader for the test data.
    */
-  private static class TestRecordReader implements RecordReader {
+  protected static class TestRecordReader implements RecordReader {
     private final List<GenericRow> _data;
     private int _currentIndex = 0;
 

@@ -72,7 +72,11 @@ public class PinotSegmentColumnReaderFactory implements ColumnReaderFactory {
     return _indexSegment.getPhysicalColumnNames();
   }
 
-  @Override
+  /**
+   * Get the total number of documents/rows in the data source.
+   *
+   * @return Total number of documents
+   */
   public int getNumDocs() {
     return _indexSegment.getSegmentMetadata().getTotalDocs();
   }
@@ -111,7 +115,7 @@ public class PinotSegmentColumnReaderFactory implements ColumnReaderFactory {
   }
 
   @Override
-  public Map<String, ColumnReader> getAllColumnReaders()
+  public Map<String, ColumnReader> createAllColumnReaders()
       throws IOException {
     if (_targetSchema == null) {
       throw new IllegalStateException("Factory not initialized. Call init() first.");
@@ -133,7 +137,12 @@ public class PinotSegmentColumnReaderFactory implements ColumnReaderFactory {
     return allReaders;
   }
 
-  @Override
+  /**
+   * Check if the specified column exists in the source data.
+   *
+   * @param columnName Column name to check
+   * @return true if the column exists in source, false otherwise
+   */
   public boolean hasColumn(String columnName) {
     return _indexSegment.getPhysicalColumnNames().contains(columnName);
   }

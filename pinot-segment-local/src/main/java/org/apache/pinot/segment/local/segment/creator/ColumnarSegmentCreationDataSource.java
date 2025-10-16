@@ -18,6 +18,8 @@
  */
 package org.apache.pinot.segment.local.segment.creator;
 
+import java.io.Closeable;
+import java.io.IOException;
 import java.util.Map;
 import org.apache.pinot.segment.local.segment.creator.impl.stats.ColumnarSegmentPreIndexStatsContainer;
 import org.apache.pinot.segment.spi.creator.SegmentCreationDataSource;
@@ -41,7 +43,7 @@ import org.slf4j.LoggerFactory;
  *   <li>Data type conversions during schema evolution</li>
  * </ul>
  */
-public class ColumnarSegmentCreationDataSource implements SegmentCreationDataSource {
+public class ColumnarSegmentCreationDataSource implements SegmentCreationDataSource, Closeable {
   private static final Logger LOGGER = LoggerFactory.getLogger(ColumnarSegmentCreationDataSource.class);
 
   private final Map<String, ColumnReader> _columnReaders;
@@ -78,5 +80,13 @@ public class ColumnarSegmentCreationDataSource implements SegmentCreationDataSou
    */
   public Map<String, ColumnReader> getColumnReaders() {
     return _columnReaders;
+  }
+
+  @Override
+  public void close()
+      throws IOException {
+    for (ColumnReader columnReader : _columnReaders.values()) {
+      columnReader.close();
+    }
   }
 }
