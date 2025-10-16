@@ -144,7 +144,7 @@ public class MailboxContentObserver implements StreamObserver<MailboxContent> {
     if (_mailbox != null) {
       String msg = t != null ? t.getMessage() : "Unknown";
       String errorMessage = "GRPC mailbox cancelled by sender with exception: " + msg;
-      _mailbox.setErrorBlock(ErrorMseBlock.fromError(QueryErrorCode.QUERY_CANCELLATION, errorMessage), List.of());
+      _mailbox.setErrorBlock(ErrorMseBlock.fromError(QueryErrorCode.INTERNAL, errorMessage), List.of());
     } else {
       LOGGER.error("Got error before mailbox is set up", t);
     }
