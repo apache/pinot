@@ -24,6 +24,7 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Set;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicReference;
@@ -46,16 +47,16 @@ import org.slf4j.LoggerFactory;
 
 public class ZkBasedTenantRebalanceObserver {
   private static final Logger LOGGER = LoggerFactory.getLogger(ZkBasedTenantRebalanceObserver.class);
-  public static final int DEFAULT_ZK_UPDATE_MAX_RETRIES = 3;
   private static final int MIN_ZK_UPDATE_RETRY_DELAY_MS = 100;
   private static final int MAX_ZK_UPDATE_RETRY_DELAY_MS = 200;
+  public static final int DEFAULT_ZK_UPDATE_MAX_RETRIES = 5;
 
   private final PinotHelixResourceManager _pinotHelixResourceManager;
   private final String _jobId;
   private final String _tenantName;
   // Keep track of number of updates. Useful during debugging.
   private final AtomicInteger _numUpdatesToZk;
-  private final int _zkUpdateMaxRetries;
+  private final RetryPolicy _retryPolicy;
   private boolean _isDone;
 
   private ZkBasedTenantRebalanceObserver(String jobId, String tenantName,
@@ -64,16 +65,24 @@ public class ZkBasedTenantRebalanceObserver {
     _jobId = jobId;
     _tenantName = tenantName;
     _pinotHelixResourceManager = pinotHelixResourceManager;
-    _zkUpdateMaxRetries = zkUpdateMaxRetries;
     _numUpdatesToZk = new AtomicInteger(0);
+    _retryPolicy = RetryPolicies.randomDelayRetryPolicy(zkUpdateMaxRetries, MIN_ZK_UPDATE_RETRY_DELAY_MS,
+        MAX_ZK_UPDATE_RETRY_DELAY_MS);
   }
 
   private ZkBasedTenantRebalanceObserver(String jobId, String tenantName, TenantRebalanceProgressStats progressStats,
       TenantRebalanceContext tenantRebalanceContext, PinotHelixResourceManager pinotHelixResourceManager,
       int zkUpdateMaxRetries) {
     this(jobId, tenantName, pinotHelixResourceManager, zkUpdateMaxRetries);
-    _pinotHelixResourceManager.addControllerJobToZK(_jobId, makeJobMetadata(tenantRebalanceContext, progressStats),
-        ControllerJobTypes.TENANT_REBALANCE);
+    try {
+      _retryPolicy.attempt(() -> _pinotHelixResourceManager.addControllerJobToZK(_jobId,
+          makeJobMetadata(tenantRebalanceContext, progressStats),
+          ControllerJobTypes.TENANT_REBALANCE, Objects::isNull)
+      );
+    } catch (AttemptFailureException e) {
+      LOGGER.error("Error creating initial job metadata in ZK for jobId: {} for tenant rebalance", _jobId, e);
+      throw new RuntimeException("Error creating initial job metadata in ZK for jobId: " + _jobId, e);
+    }
     _numUpdatesToZk.incrementAndGet();
   }
 
@@ -255,12 +264,11 @@ public class ZkBasedTenantRebalanceObserver {
   private void updateTenantRebalanceJobMetadataInZk(
       BiConsumer<TenantRebalanceContext, TenantRebalanceProgressStats> updater)
       throws AttemptFailureException {
-    RetryPolicy retry = RetryPolicies.randomDelayRetryPolicy(_zkUpdateMaxRetries, MIN_ZK_UPDATE_RETRY_DELAY_MS,
-        MAX_ZK_UPDATE_RETRY_DELAY_MS);
-    retry.attempt(() -> {
+    _retryPolicy.attempt(() -> {
       Map<String, String> jobMetadata =
           _pinotHelixResourceManager.getControllerJobZKMetadata(_jobId, ControllerJobTypes.TENANT_REBALANCE);
       if (jobMetadata == null) {
+        LOGGER.warn("Skip updating ZK since job metadata is not present in ZK for jobId: {}", _jobId);
         return false;
       }
       TenantRebalanceContext originalContext = TenantRebalanceContext.fromTenantRebalanceJobMetadata(jobMetadata);
@@ -297,7 +305,7 @@ public class ZkBasedTenantRebalanceObserver {
       if (updateSuccessful) {
         return true;
       } else {
-        LOGGER.info(
+        LOGGER.warn(
             "Tenant rebalance context or progress stats is out of sync with ZK while polling, fetching the latest "
                 + "context and progress stats from ZK and retry. jobId: {}", _jobId);
         return false;

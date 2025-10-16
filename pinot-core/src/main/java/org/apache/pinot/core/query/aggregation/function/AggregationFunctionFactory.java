@@ -384,6 +384,8 @@ public class AggregationFunctionFactory {
             return new DistinctCountRawHLLAggregationFunction(arguments);
           case DISTINCTCOUNTSMARTHLL:
             return new DistinctCountSmartHLLAggregationFunction(arguments);
+          case DISTINCTCOUNTSMARTHLLPLUS:
+            return new DistinctCountSmartHLLPlusAggregationFunction(arguments);
           case DISTINCTCOUNTSMARTULL:
             return new DistinctCountSmartULLAggregationFunction(arguments);
           case FASTHLL:

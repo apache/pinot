@@ -1632,6 +1632,31 @@ public class TableConfigUtilsTest {
       fail("Should not fail for valid StarTreeIndex config column name");
     }
 
+    // Test using * as the column for the COUNT aggregation
+    starTreeIndexConfig =
+        new StarTreeIndexConfig(List.of("myCol"), List.of("myCol"), List.of("COUNT__*"), null, 1);
+    tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName(TABLE_NAME)
+        .setStarTreeIndexConfigs(List.of(starTreeIndexConfig))
+        .build();
+    try {
+      TableConfigUtils.validate(tableConfig, schema);
+    } catch (Exception e) {
+      fail("Should not fail for valid StarTreeIndex function column pair with COUNT__*");
+    }
+
+    // Test using * as the column for a non-COUNT aggregation
+    starTreeIndexConfig =
+        new StarTreeIndexConfig(List.of("myCol"), List.of("myCol"), List.of("SUM__*"), null, 1);
+    tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName(TABLE_NAME)
+        .setStarTreeIndexConfigs(List.of(starTreeIndexConfig))
+        .build();
+    try {
+      TableConfigUtils.validate(tableConfig, schema);
+      fail("Should not fail for invalid StarTreeIndex function column pair with SUM__*");
+    } catch (Exception e) {
+      // expected
+    }
+
     starTreeIndexConfig = new StarTreeIndexConfig(List.of("myCol2"), List.of("myCol"), List.of("SUM__myCol"), null, 1);
     tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName(TABLE_NAME)
         .setStarTreeIndexConfigs(List.of(starTreeIndexConfig))
@@ -1686,6 +1711,29 @@ public class TableConfigUtilsTest {
     try {
       TableConfigUtils.validate(tableConfig, schema);
       fail("Should fail for invalid StarTreeIndex config with both function column pair and aggregation config");
+    } catch (Exception e) {
+      // expected
+    }
+
+    starTreeIndexConfig = new StarTreeIndexConfig(List.of("myCol"), null, null,
+        List.of(new StarTreeAggregationConfig("*", "COUNT")), 1);
+    tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName(TABLE_NAME)
+        .setStarTreeIndexConfigs(List.of(starTreeIndexConfig))
+        .build();
+    try {
+      TableConfigUtils.validate(tableConfig, schema);
+    } catch (Exception e) {
+      fail("Should not fail for valid StarTreeIndex config with aggregation config for COUNT on '*' column");
+    }
+
+    starTreeIndexConfig = new StarTreeIndexConfig(List.of("myCol"), null, null,
+        List.of(new StarTreeAggregationConfig("*", "SUM")), 1);
+    tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName(TABLE_NAME)
+        .setStarTreeIndexConfigs(List.of(starTreeIndexConfig))
+        .build();
+    try {
+      TableConfigUtils.validate(tableConfig, schema);
+      fail("Should fail for invalid StarTreeIndex config with aggregation config for SUM on '*' column");
     } catch (Exception e) {
       // expected
     }

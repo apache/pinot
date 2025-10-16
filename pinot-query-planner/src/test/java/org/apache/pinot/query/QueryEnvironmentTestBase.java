@@ -79,7 +79,9 @@ public class QueryEnvironmentTestBase {
     TABLE_SCHEMAS.put("c_OFFLINE", getSchemaBuilder("c").build());
     TABLE_SCHEMAS.put("d", getSchemaBuilder("d").build());
     TABLE_SCHEMAS.put("e", getSchemaBuilder("e")
-        .addMultiValueDimension("mcol1", FieldSpec.DataType.STRING).build());
+        .addMultiValueDimension("mcol1", FieldSpec.DataType.STRING)
+        .addMultiValueDimension("mcol2", FieldSpec.DataType.LONG)
+        .build());
   }
 
   static Schema.SchemaBuilder getSchemaBuilder(String schemaName) {
@@ -286,7 +288,9 @@ public class QueryEnvironmentTestBase {
         // Verify type coercion in standard functions
         new Object[]{"SELECT DATEADD('DAY', 1, col7) FROM a"},
         new Object[]{"SELECT TIMESTAMPADD(DAY, 10, NOW() - 100) FROM a"},
-        new Object[]{"SELECT ts FROM a WHERE ts <= '2025-08-14 00:00:00.000000'"}
+        new Object[]{"SELECT ts FROM a WHERE ts <= '2025-08-14 00:00:00.000000'"},
+        // Aggregations on MV LONG columns
+        new Object[]{"SELECT SUMLONG(mcol2), MINLONG(mcol2), MAXLONG(mcol2) FROM e"}
     };
   }
 

@@ -33,7 +33,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.concurrent.TimeUnit;
 import org.apache.pinot.common.datablock.DataBlock;
-import org.apache.pinot.common.datablock.DataBlockUtils;
 import org.apache.pinot.common.datablock.MetadataBlock;
 import org.apache.pinot.common.datatable.StatMap;
 import org.apache.pinot.common.proto.Mailbox.MailboxContent;
@@ -68,21 +67,24 @@ public class GrpcSendingMailbox implements SendingMailbox {
   private final long _deadlineMs;
   private final StatMap<MailboxSendOperator.StatKey> _statMap;
   private final MailboxStatusObserver _statusObserver = new MailboxStatusObserver();
-  private final Sender _sender;
+  private final int _maxByteStringSize;
   /// Indicates whether the sending side has attempted to close the mailbox (either via complete() or cancel()).
   private volatile boolean _closeAttempted;
 
   private StreamObserver<MailboxContent> _contentObserver;
 
   public GrpcSendingMailbox(String id, ChannelManager channelManager, String hostname, int port, long deadlineMs,
-      StatMap<MailboxSendOperator.StatKey> statMap, int maxByteStringSize) {
+      StatMap<MailboxSendOperator.StatKey> statMap, int maxInboundMessageSize) {
     _id = id;
     _channelManager = channelManager;
     _hostname = hostname;
     _port = port;
     _deadlineMs = deadlineMs;
     _statMap = statMap;
-    _sender = maxByteStringSize > 0 ? new SplitSender(this, maxByteStringSize) : new NonSplitSender(this);
+    // TODO: tune the maxByteStringSize based on experiments. We know the maxInboundMessageSize on the receiver side,
+    //  but we want to leave some room for extra stuff for other fields like metadata, mailbox id, etc, whose size
+    //  we don't know at the time of writing into the stream as it is serialized by protobuf.
+    _maxByteStringSize = Math.max(maxInboundMessageSize / 2, 1);
   }
 
   @Override
@@ -135,7 +137,7 @@ public class GrpcSendingMailbox implements SendingMailbox {
     long start = System.currentTimeMillis();
     try {
       DataBlock dataBlock = MseBlockSerializer.toDataBlock(block, serializedStats);
-      int sizeInBytes = _sender.processAndSend(dataBlock);
+      int sizeInBytes = processAndSend(dataBlock);
       if (LOGGER.isDebugEnabled()) {
         LOGGER.debug("Serialized block: {} to {} bytes", block, sizeInBytes);
       }
@@ -143,6 +145,26 @@ public class GrpcSendingMailbox implements SendingMailbox {
     } finally {
       _statMap.merge(MailboxSendOperator.StatKey.SERIALIZATION_TIME_MS, System.currentTimeMillis() - start);
     }
+  }
+
+  /**
+   * Process the data block to split it into multiple ByteStrings that fit into the maxByteStringSize, and send them
+   * one by one.
+   */
+  protected int processAndSend(DataBlock dataBlock)
+      throws IOException {
+    List<ByteString> byteStrings = toByteStrings(dataBlock, _maxByteStringSize);
+    int sizeInBytes = 0;
+    for (ByteString byteString : byteStrings) {
+      sizeInBytes += byteString.size();
+    }
+    Iterator<ByteString> byteStringIt = byteStrings.iterator();
+    while (byteStringIt.hasNext()) {
+      ByteString byteString = byteStringIt.next();
+      boolean waitForMore = byteStringIt.hasNext();
+      sendContent(byteString, waitForMore);
+    }
+    return sizeInBytes;
   }
 
   @Override
@@ -315,58 +337,6 @@ public class GrpcSendingMailbox implements SendingMailbox {
       if (_contentObserver != null) {
         processAndSend(errorBlock, List.of());
       }
-    }
-  }
-
-  private static abstract class Sender {
-    protected final GrpcSendingMailbox _mailbox;
-
-    protected Sender(GrpcSendingMailbox mailbox) {
-      _mailbox = mailbox;
-    }
-
-    protected abstract int processAndSend(DataBlock dataBlock)
-        throws IOException;
-  }
-
-  private static class SplitSender extends Sender {
-    private final int _maxByteStringSize;
-
-    public SplitSender(GrpcSendingMailbox mailbox, int maxByteStringSize) {
-      super(mailbox);
-      _maxByteStringSize = maxByteStringSize;
-    }
-
-    @Override
-    protected int processAndSend(DataBlock dataBlock)
-        throws IOException {
-      List<ByteString> byteStrings = toByteStrings(dataBlock, _maxByteStringSize);
-      int sizeInBytes = 0;
-      for (ByteString byteString : byteStrings) {
-        sizeInBytes += byteString.size();
-      }
-      Iterator<ByteString> byteStringIt = byteStrings.iterator();
-      while (byteStringIt.hasNext()) {
-        ByteString byteString = byteStringIt.next();
-        boolean waitForMore = byteStringIt.hasNext();
-        _mailbox.sendContent(byteString, waitForMore);
-      }
-      return sizeInBytes;
-    }
-  }
-
-  private static class NonSplitSender extends Sender {
-    public NonSplitSender(GrpcSendingMailbox mailbox) {
-      super(mailbox);
-    }
-
-    @Override
-    protected int processAndSend(DataBlock dataBlock)
-        throws IOException {
-      ByteString byteString = DataBlockUtils.toByteString(dataBlock);
-      int sizeInBytes = byteString.size();
-      _mailbox.sendContent(byteString, false);
-      return sizeInBytes;
     }
   }
 }

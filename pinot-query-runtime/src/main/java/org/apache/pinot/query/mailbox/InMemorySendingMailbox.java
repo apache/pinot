@@ -18,19 +18,14 @@
  */
 package org.apache.pinot.query.mailbox;
 
-import java.time.Duration;
-import java.time.temporal.ChronoUnit;
 import java.util.Collections;
 import java.util.List;
-import java.util.concurrent.TimeoutException;
 import org.apache.pinot.common.datatable.StatMap;
 import org.apache.pinot.query.runtime.blocks.ErrorMseBlock;
 import org.apache.pinot.query.runtime.blocks.MseBlock;
 import org.apache.pinot.query.runtime.operator.MailboxSendOperator;
 import org.apache.pinot.segment.spi.memory.DataBuffer;
 import org.apache.pinot.spi.exception.QueryCancelledException;
-import org.apache.pinot.spi.exception.QueryErrorCode;
-import org.apache.pinot.spi.exception.QueryException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -87,18 +82,7 @@ public class InMemorySendingMailbox implements SendingMailbox {
     }
     _statMap.merge(MailboxSendOperator.StatKey.IN_MEMORY_MESSAGES, 1);
     long timeoutMs = _deadlineMs - System.currentTimeMillis();
-    ReceivingMailbox.ReceivingMailboxStatus status;
-    try {
-      status = _receivingMailbox.offer(block, serializedStats, timeoutMs);
-    } catch (InterruptedException e) {
-      // We are not restoring the interrupt status because we are already throwing an exception
-      // Code that catches this exception must finish the work fast enough to comply the interrupt contract
-      // See https://github.com/apache/pinot/pull/16903#discussion_r2409003423
-      throw new QueryException(QueryErrorCode.INTERNAL, "Interrupted while sending data to mailbox: " + _id, e);
-    } catch (TimeoutException e) {
-      throw new QueryException(QueryErrorCode.EXECUTION_TIMEOUT, "Timed out adding block into mailbox: " + _id
-          + " with timeout: " + Duration.of(timeoutMs, ChronoUnit.MILLIS), e);
-    }
+    ReceivingMailbox.ReceivingMailboxStatus status = _receivingMailbox.offer(block, serializedStats, timeoutMs);
     switch (status) {
       case SUCCESS:
         break;
