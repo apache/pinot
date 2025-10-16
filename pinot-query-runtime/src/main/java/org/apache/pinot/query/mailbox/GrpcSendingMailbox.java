@@ -79,6 +79,9 @@ public class GrpcSendingMailbox implements SendingMailbox {
     _port = port;
     _deadlineMs = deadlineMs;
     _statMap = statMap;
+    // TODO: tune the maxByteStringSize based on experiments. We know the maxInboundMessageSize on the receiver side,
+    //  but we want to leave some room for extra stuff for other fields like metadata, mailbox id, etc, whose size
+    //  we don't know at the time of writing into the stream as it is serialized by protobuf.
     _maxByteStringSize = Math.max(maxInboundMessageSize / 2, 1);
   }
 
