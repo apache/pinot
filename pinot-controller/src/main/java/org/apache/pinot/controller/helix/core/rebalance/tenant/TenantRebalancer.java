@@ -359,7 +359,7 @@ public class TenantRebalancer {
       TenantTableRebalanceJobContext jobContext;
       if (dryRunResult.getStatus() == RebalanceResult.Status.FAILED) {
         jobContext = new TenantTableRebalanceJobContext(table, dryRunResult.getJobId(), false);
-        LOGGER.warn("User proceeded with rebalancing table: {} despite its failed dry-run", table);
+        LOGGER.warn("Proceeding with table rebalance: {} despite its failed dry-run", table);
       } else {
         Preconditions.checkState(dryRunResult.getRebalanceSummaryResult() != null,
             "Non-failed dry-run result missing summary");
