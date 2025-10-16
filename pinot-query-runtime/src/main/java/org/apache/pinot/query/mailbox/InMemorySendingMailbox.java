@@ -134,8 +134,11 @@ public class InMemorySendingMailbox implements SendingMailbox {
   public void close() {
     if (!isTerminated()) {
       String msg = "Closing in-memory mailbox without proper EOS message";
-      LOGGER.warn(msg);
-      cancel(new RuntimeException(msg).fillInStackTrace());
+      RuntimeException exception = new RuntimeException(msg);
+      exception.fillInStackTrace();
+
+      LOGGER.error(msg, exception);
+      cancel(exception);
     }
   }
 }

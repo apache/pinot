@@ -25,6 +25,8 @@ import io.grpc.Metadata;
 import io.grpc.stub.MetadataUtils;
 import io.grpc.stub.StreamObserver;
 import java.io.IOException;
+import java.io.PrintWriter;
+import java.io.StringWriter;
 import java.nio.ByteBuffer;
 import java.util.ArrayList;
 import java.util.Collections;
@@ -331,9 +333,16 @@ public class GrpcSendingMailbox implements SendingMailbox {
       throws Exception {
     if (!isTerminated()) {
       String errorMsg = "Closing gPRC mailbox without proper EOS message";
-      LOGGER.warn(errorMsg);
+      RuntimeException ex = new RuntimeException(errorMsg);
+      ex.fillInStackTrace();
+      LOGGER.error(errorMsg, ex);
       _closeAttempted = true;
-      MseBlock errorBlock = ErrorMseBlock.fromError(QueryErrorCode.INTERNAL, errorMsg);
+
+      StringWriter stringWriter = new StringWriter();
+      try (PrintWriter printWriter = new PrintWriter(stringWriter)) {
+        ex.printStackTrace(printWriter);
+      }
+      MseBlock errorBlock = ErrorMseBlock.fromError(QueryErrorCode.INTERNAL, errorMsg + "\n" + stringWriter);
       if (_contentObserver != null) {
         processAndSend(errorBlock, List.of());
       }
