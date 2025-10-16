@@ -246,7 +246,7 @@ public class InstanceRequestHandler extends SimpleChannelInboundHandler<ByteBuf>
     if (executionContext == null) {
       return false;
     }
-    boolean cancelled = executionContext.terminate(QueryErrorCode.QUERY_CANCELLATION, "Cancelled by user");
+    boolean cancelled = executionContext.terminate(QueryErrorCode.QUERY_CANCELLATION, "Cancelled on: " + _instanceName);
     if (LOGGER.isDebugEnabled()) {
       if (cancelled) {
         LOGGER.debug("Cancelled query: {}", queryId);

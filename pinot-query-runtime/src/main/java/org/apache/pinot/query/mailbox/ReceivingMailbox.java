@@ -20,7 +20,6 @@ package org.apache.pinot.query.mailbox;
 
 import com.google.common.base.Preconditions;
 import com.google.errorprone.annotations.ThreadSafe;
-import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.util.Arrays;
 import java.util.List;
@@ -41,6 +40,8 @@ import org.apache.pinot.query.runtime.blocks.SerializedDataBlock;
 import org.apache.pinot.query.runtime.blocks.SuccessMseBlock;
 import org.apache.pinot.segment.spi.memory.DataBuffer;
 import org.apache.pinot.spi.exception.QueryErrorCode;
+import org.apache.pinot.spi.exception.TerminationException;
+import org.apache.pinot.spi.query.QueryThreadContext;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -49,16 +50,19 @@ import org.slf4j.LoggerFactory;
 /// initialized even before the corresponding OpChain is registered on the receiver, whereas the SendingMailbox is
 /// initialized when the send operator is running.
 ///
-/// There is a single ReceivingMailbox for each pair of (sender, receiver) opchains. This means that each receive
-/// operator will have multiple ReceivingMailbox instances, one for each sender. They are coordinated by a
-/// [BlockingMultiStreamConsumer].
+/// There is a single ReceivingMailbox for each pair of (sender, receiver). This means that each receive operator will
+/// have multiple ReceivingMailbox instances, one for each sender. They are coordinated by a
+/// [org.apache.pinot.query.runtime.operator.utils.BlockingMultiStreamConsumer].
 ///
 /// A ReceivingMailbox can have at most one reader and one writer at any given time. This means that different threads
 /// writing to the same mailbox must be externally synchronized.
 ///
 /// The offer methods will be called when new blocks are received from different sources. For example local workers will
-/// directly call [#offer(MseBlock, List, long)] while each remote worker opens a GPRC channel where messages
-/// are sent in raw format and [#offerRaw(List, long)] is called from them.
+/// directly call [#offer(MseBlock, List, long)] while each remote worker opens a gPRC channel where messages are sent
+/// in raw format and [#offerRaw(List, long)] is called from them.
+///
+/// All exceptions thrown from the offer methods should be handled within this class, and converted into a proper error
+/// block to be consumed by the reader.
 @ThreadSafe
 public class ReceivingMailbox {
   public static final int DEFAULT_MAX_PENDING_BLOCKS = 5;
@@ -91,53 +95,62 @@ public class ReceivingMailbox {
     return _id;
   }
 
-  ///Offers a raw block into the mailbox within the timeout specified, returns whether the block is successfully added.
-  ///
-  ///Contrary to [#offer(MseBlock, List, long)], the block may be an error block.
-  public ReceivingMailboxStatus offerRaw(List<ByteBuffer> byteBuffers, long timeoutMs)
-      throws IOException, InterruptedException, TimeoutException {
+  /// Offers a raw block into the mailbox within the timeout specified, returns the status of the mailbox.
+  public ReceivingMailboxStatus offerRaw(List<ByteBuffer> byteBuffers, long timeoutMs) {
     updateWaitCpuTime();
 
-    long startTimeMs = System.currentTimeMillis();
-    int totalBytes = 0;
-    for (ByteBuffer bb : byteBuffers) {
-      totalBytes += bb.remaining();
-    }
-    DataBlock dataBlock = DataBlockUtils.deserialize(byteBuffers);
-    _stats.merge(StatKey.DESERIALIZED_MESSAGES, 1);
-    _stats.merge(StatKey.DESERIALIZED_BYTES, totalBytes);
-    _stats.merge(StatKey.DESERIALIZATION_TIME_MS, System.currentTimeMillis() - startTimeMs);
-
     MseBlock block;
-    if (dataBlock instanceof MetadataBlock) {
-      Map<Integer, String> exceptions = dataBlock.getExceptions();
-      if (exceptions.isEmpty()) {
-        block = SuccessMseBlock.INSTANCE;
-      } else {
-        MetadataBlock metadataBlock = (MetadataBlock) dataBlock;
-        Map<QueryErrorCode, String> exceptionsByQueryError = QueryErrorCode.fromKeyMap(exceptions);
-        block = new ErrorMseBlock(metadataBlock.getStageId(), metadataBlock.getWorkerId(), metadataBlock.getServerId(),
-                exceptionsByQueryError);
+    List<DataBuffer> stats;
+    try {
+      long startTimeMs = System.currentTimeMillis();
+      int totalBytes = 0;
+      for (ByteBuffer bb : byteBuffers) {
+        totalBytes += bb.remaining();
       }
-    } else {
-      block = new SerializedDataBlock(dataBlock);
+      DataBlock dataBlock = DataBlockUtils.deserialize(byteBuffers);
+      stats = dataBlock.getStatsByStage();
+      _stats.merge(StatKey.DESERIALIZED_MESSAGES, 1);
+      _stats.merge(StatKey.DESERIALIZED_BYTES, totalBytes);
+      _stats.merge(StatKey.DESERIALIZATION_TIME_MS, System.currentTimeMillis() - startTimeMs);
+
+      if (dataBlock instanceof MetadataBlock) {
+        Map<Integer, String> exceptions = dataBlock.getExceptions();
+        if (exceptions.isEmpty()) {
+          block = SuccessMseBlock.INSTANCE;
+        } else {
+          MetadataBlock metadataBlock = (MetadataBlock) dataBlock;
+          Map<QueryErrorCode, String> exceptionsByQueryError = QueryErrorCode.fromKeyMap(exceptions);
+          block =
+              new ErrorMseBlock(metadataBlock.getStageId(), metadataBlock.getWorkerId(), metadataBlock.getServerId(),
+                  exceptionsByQueryError);
+        }
+      } else {
+        block = new SerializedDataBlock(dataBlock);
+      }
+    } catch (Exception e) {
+      // Use the terminate exception when query is explicitly terminated.
+      TerminationException terminateException = QueryThreadContext.getTerminateException();
+      if (terminateException != null) {
+        block = ErrorMseBlock.fromException(terminateException);
+      } else {
+        String errorMessage = "Caught exception while deserializing DataBlock on mailbox: " + _id;
+        LOGGER.error(errorMessage, e);
+        block = ErrorMseBlock.fromError(QueryErrorCode.INTERNAL, errorMessage + ": " + e);
+      }
+      stats = List.of();
     }
-    return offerPrivate(block, dataBlock.getStatsByStage(), timeoutMs);
+    return offerPrivate(block, stats, timeoutMs);
   }
 
-  /// Offers a non-error block into the mailbox within the timeout specified, returns whether the block is successfully
-  /// added.
-  public ReceivingMailboxStatus offer(MseBlock block, List<DataBuffer> serializedStats, long timeoutMs)
-      throws InterruptedException, TimeoutException {
+  /// Offers a block into the mailbox within the timeout specified, returns the status of the mailbox.
+  public ReceivingMailboxStatus offer(MseBlock block, List<DataBuffer> serializedStats, long timeoutMs) {
     updateWaitCpuTime();
     _stats.merge(StatKey.IN_MEMORY_MESSAGES, 1);
     return offerPrivate(block, serializedStats, timeoutMs);
   }
 
-  /// Offers a non-error block into the mailbox within the timeout specified, returns whether the block is successfully
-  /// added.
-  private ReceivingMailboxStatus offerPrivate(MseBlock block, List<DataBuffer> stats, long timeoutMs)
-      throws InterruptedException, TimeoutException {
+  /// Offers a block into the mailbox within the timeout specified, returns the status of the mailbox.
+  private ReceivingMailboxStatus offerPrivate(MseBlock block, List<DataBuffer> stats, long timeoutMs) {
     long start = System.currentTimeMillis();
     try {
       ReceivingMailboxStatus result;
@@ -161,13 +174,27 @@ public class ReceivingMailbox {
           // Nothing to do
       }
       return result;
-    } catch (TimeoutException e) {
+    } catch (Exception e) {
       _stats.merge(StatKey.OFFER_CPU_TIME_MS, System.currentTimeMillis() - start);
-      throw e;
-    } catch (InterruptedException e) {
-      String errorMessage = "Interrupted on mailbox " + _id + " while offering blocks";
-      setErrorBlock(ErrorMseBlock.fromError(QueryErrorCode.INTERNAL, errorMessage), stats);
-      throw e;
+
+      // Use the terminate exception when query is explicitly terminated.
+      TerminationException terminateException = QueryThreadContext.getTerminateException();
+      if (terminateException != null) {
+        return _blocks.offerEos(ErrorMseBlock.fromException(terminateException), stats);
+      }
+
+      // TODO: Revisit if we should log the exception.
+      if (e instanceof TimeoutException) {
+        return _blocks.offerEos(ErrorMseBlock.fromError(QueryErrorCode.EXECUTION_TIMEOUT,
+            "Timed out while waiting for receive operator to consume data from mailbox: " + _id), stats);
+      }
+      if (e instanceof InterruptedException) {
+        return _blocks.offerEos(ErrorMseBlock.fromError(QueryErrorCode.INTERNAL,
+            "Interrupted on mailbox: " + _id + " while offering blocks"), stats);
+      }
+
+      LOGGER.error("Caught unexpected exception on mailbox: {} while offering blocks", _id, e);
+      return _blocks.offerEos(ErrorMseBlock.fromException(e), stats);
     }
   }
 
@@ -515,14 +542,8 @@ public class ReceivingMailbox {
               throw new IllegalStateException("Unexpected state: " + _state);
           }
         }
-        if (nanos <= 0L) { // timed out
-          String errorMessage = "Timed out while waiting for receive operator to consume data from mailbox: " + _id;
-          ErrorMseBlock timeoutBlock = ErrorMseBlock.fromError(QueryErrorCode.EXECUTION_TIMEOUT, errorMessage);
-          changeState(State.FULL_CLOSED, "timed out while waiting to offer data block");
-          drainDataBlocks();
-          _eos = new MseBlockWithStats(timeoutBlock, List.of());
-          notifyReader();
-          throw new TimeoutException(errorMessage);
+        if (nanos <= 0L) {
+          throw new TimeoutException();
         }
         items[_putIndex] = block;
         if (++_putIndex == items.length) {

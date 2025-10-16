@@ -25,7 +25,6 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 import java.util.concurrent.TimeUnit;
-import java.util.concurrent.TimeoutException;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.pinot.common.proto.Mailbox.MailboxContent;
 import org.apache.pinot.common.proto.Mailbox.MailboxStatus;
@@ -77,21 +76,7 @@ public class MailboxContentObserver implements StreamObserver<MailboxContent> {
     }
     try {
       long timeoutMs = Context.current().getDeadline().timeRemaining(TimeUnit.MILLISECONDS);
-      ReceivingMailbox.ReceivingMailboxStatus status = null;
-      try {
-        status = _mailbox.offerRaw(_mailboxBuffers, timeoutMs);
-      } catch (TimeoutException e) {
-        LOGGER.debug("Timed out adding block into mailbox: {} with timeout: {}ms", mailboxId, timeoutMs);
-        closeStream();
-        return;
-      } catch (InterruptedException e) {
-        // We are not restoring the interrupt status because we are already throwing an exception
-        // Code that catches this exception must finish the work fast enough to comply the interrupt contract
-        // See https://github.com/apache/pinot/pull/16903#discussion_r2409003423
-        LOGGER.debug("Interrupted while processing blocks for mailbox: {}", mailboxId, e);
-        closeStream();
-        return;
-      }
+      ReceivingMailbox.ReceivingMailboxStatus status = _mailbox.offerRaw(_mailboxBuffers, timeoutMs);
       switch (status) {
         case SUCCESS:
           _responseObserver.onNext(MailboxStatus.newBuilder().setMailboxId(mailboxId)

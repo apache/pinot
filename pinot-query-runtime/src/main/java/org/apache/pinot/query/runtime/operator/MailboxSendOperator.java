@@ -45,7 +45,7 @@ import org.apache.pinot.query.runtime.plan.OpChainExecutionContext;
 import org.apache.pinot.segment.spi.memory.DataBuffer;
 import org.apache.pinot.spi.exception.QueryCancelledException;
 import org.apache.pinot.spi.exception.QueryException;
-import org.apache.pinot.spi.exception.TerminationException;
+import org.apache.pinot.spi.query.QueryThreadContext;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -168,8 +168,8 @@ public class MailboxSendOperator extends MultiStageOperator {
     List<MailboxInfo> mailboxInfos =
         context.getWorkerMetadata().getMailboxInfosMap().get(receiverStageId).getMailboxInfos();
     List<RoutingInfo> routingInfos =
-          MailboxIdUtils.toRoutingInfos(requestId, context.getStageId(), context.getWorkerId(), receiverStageId,
-              mailboxInfos);
+        MailboxIdUtils.toRoutingInfos(requestId, context.getStageId(), context.getWorkerId(), receiverStageId,
+            mailboxInfos);
     List<SendingMailbox> sendingMailboxes = routingInfos.stream()
         .map(v -> mailboxService.getSendingMailbox(v.getHostname(), v.getPort(), v.getMailboxId(), deadlineMs, statMap))
         .collect(Collectors.toList());
@@ -214,21 +214,29 @@ public class MailboxSendOperator extends MultiStageOperator {
         sendEos((MseBlock.Eos) block);
       } else {
         sendMseBlock(((MseBlock.Data) block));
+        checkTerminationAndSampleUsage();
       }
-      checkTerminationAndSampleUsage();
       return block;
-    } catch (QueryCancelledException e) {
-      LOGGER.debug("Query was cancelled for opChain: {}", _context.getId());
-      return SuccessMseBlock.INSTANCE;
-    } catch (TerminationException e) {
-      LOGGER.info("Query was terminated for opChain: {}", _context.getId(), e);
-      return ErrorMseBlock.fromException(e);
-    } catch (QueryException e) {
-      return ErrorMseBlock.fromException(e);
     } catch (RuntimeException e) {
-      ErrorMseBlock errorBlock = ErrorMseBlock.fromException(e);
-      try {
+      if (e instanceof QueryCancelledException) {
+        LOGGER.debug("Query was cancelled for opChain: {}", _context.getId());
+        // TODO: Revisit if we should return success block here.
+        return SuccessMseBlock.INSTANCE;
+      }
+      ErrorMseBlock errorBlock;
+      // First check terminate exception and use it as the results block if exists. We want to return the termination
+      // reason when query is explicitly terminated.
+      QueryException queryException = QueryThreadContext.getTerminateException();
+      if (queryException == null && e instanceof QueryException) {
+        queryException = (QueryException) e;
+      }
+      if (queryException != null) {
+        errorBlock = ErrorMseBlock.fromException(queryException);
+      } else {
         LOGGER.error("Exception while transferring data on opChain: {}", _context.getId(), e);
+        errorBlock = ErrorMseBlock.fromException(e);
+      }
+      try {
         sendEos(errorBlock);
       } catch (RuntimeException e2) {
         LOGGER.error("Exception while sending error block.", e2);

@@ -40,7 +40,6 @@ import org.apache.pinot.spi.env.PinotConfiguration;
 import org.apache.pinot.spi.exception.BadQueryRequestException;
 import org.apache.pinot.spi.exception.QueryErrorCode;
 import org.apache.pinot.spi.exception.QueryException;
-import org.apache.pinot.spi.exception.TerminationException;
 import org.apache.pinot.spi.query.QueryThreadContext;
 import org.apache.pinot.spi.utils.CommonConstants;
 import org.apache.pinot.spi.utils.builder.TableNameBuilder;
@@ -173,17 +172,16 @@ public class BrokerReduceService extends BaseReduceService {
     } catch (RuntimeException e) {
       // First check terminate exception and use it as the results block if exists. We want to return the termination
       // reason when query is explicitly terminated.
-      TerminationException terminateException = QueryThreadContext.getTerminateException();
-      if (terminateException != null) {
-        brokerResponseNative.addException(QueryProcessingException.fromQueryException(terminateException));
+      QueryException queryException = QueryThreadContext.getTerminateException();
+      if (queryException == null && e instanceof QueryException) {
+        queryException = (QueryException) e;
+      }
+      if (queryException != null) {
+        brokerResponseNative.addException(QueryProcessingException.fromQueryException(queryException));
       } else {
-        if (e instanceof QueryException) {
-          brokerResponseNative.addException(QueryProcessingException.fromQueryException((QueryException) e));
-        } else {
-          LOGGER.error("Caught exception while reducing data tables (query: {})", serverQueryContext, e);
-          brokerResponseNative.addException(new QueryProcessingException(QueryErrorCode.MERGE_RESPONSE,
-              "Caught exception while reducing data tables: " + e.getMessage()));
-        }
+        LOGGER.error("Caught exception while reducing data tables (query: {})", serverQueryContext, e);
+        brokerResponseNative.addException(new QueryProcessingException(QueryErrorCode.MERGE_RESPONSE,
+            "Caught exception while reducing data tables: " + e.getMessage()));
       }
     }
     QueryContext queryContext;
