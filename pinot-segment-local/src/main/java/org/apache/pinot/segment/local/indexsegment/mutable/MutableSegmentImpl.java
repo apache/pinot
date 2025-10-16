@@ -109,6 +109,7 @@ import org.apache.pinot.spi.data.ComplexFieldSpec;
 import org.apache.pinot.spi.data.DimensionFieldSpec;
 import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
+import org.apache.pinot.spi.data.IntermediateFieldSpec;
 import org.apache.pinot.spi.data.MetricFieldSpec;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.data.readers.GenericRow;
@@ -451,7 +452,7 @@ public class MutableSegmentImpl implements MutableSegment {
       Schema schema = config.getSchema();
       for (String column : textColumns) {
         DataType dataType = schema.getFieldSpecFor(column).getDataType();
-        if (dataType.getStoredType() != FieldSpec.DataType.STRING) {
+        if (dataType.getStoredType() != STRING) {
           throw new IllegalStateException(
               "Multi-column text index is currently only supported on STRING type columns! Found column: " + column
                   + " of type: " + dataType);
@@ -504,6 +505,16 @@ public class MutableSegmentImpl implements MutableSegment {
     assert !segmentConfig.aggregateMetrics() && CollectionUtils.isNotEmpty(aggregationConfigs);
     Map<String, ValueAggregatorInfo> columnNameToAggregatorInfo =
         Maps.newHashMapWithExpectedSize(aggregationConfigs.size());
+    List<IntermediateFieldSpec> intermediateFieldSpecs = segmentConfig.getSchema().getIntermediateFieldSpecs();
+    Map<String, DataType> intermediateColumnToDataType = null;
+
+    if (CollectionUtils.isNotEmpty(intermediateFieldSpecs)) {
+      intermediateColumnToDataType = new HashMap<>(intermediateFieldSpecs.size());
+      for (IntermediateFieldSpec intermediateFieldSpec : intermediateFieldSpecs) {
+        intermediateColumnToDataType.put(intermediateFieldSpec.getName(), intermediateFieldSpec.getDataType());
+      }
+    }
+
     for (AggregationConfig config : aggregationConfigs) {
       ExpressionContext expressionContext = RequestContextUtils.getExpression(config.getAggregationFunction());
       // validation is also done when the table is created, this is just a sanity check.
@@ -520,8 +531,12 @@ public class MutableSegmentImpl implements MutableSegment {
           ValueAggregatorFactory.getValueAggregator(functionType, arguments.subList(1, arguments.size()));
       Preconditions.checkState(valueAggregator.isAggregatedValueFixedSize(),
           "aggregator function must have fixed size aggregated value: %s", config);
+      DataType sourceDataType = null;
+      if (intermediateColumnToDataType != null) {
+        sourceDataType = intermediateColumnToDataType.get(argument.getIdentifier());
+      }
       columnNameToAggregatorInfo.put(config.getColumnName(),
-          new ValueAggregatorInfo(argument.getIdentifier(), valueAggregator, config.getSourceDataType()));
+          new ValueAggregatorInfo(argument.getIdentifier(), valueAggregator, sourceDataType));
     }
 
     return columnNameToAggregatorInfo;
@@ -547,7 +562,7 @@ public class MutableSegmentImpl implements MutableSegment {
    */
   private boolean isNoDictionaryColumn(FieldIndexConfigs indexConfigs, FieldSpec fieldSpec, String column) {
     DataType dataType = fieldSpec.getDataType();
-    if (dataType == DataType.MAP) {
+    if (dataType == MAP) {
       return true;
     }
     if (indexConfigs == null) {
@@ -1633,7 +1648,7 @@ public class MutableSegmentImpl implements MutableSegment {
     @Nullable
     final DataType _sourceDataType;
 
-    public ValueAggregatorInfo(String sourceColumn, ValueAggregator valueAggregator, DataType sourceDataType) {
+    public ValueAggregatorInfo(String sourceColumn, ValueAggregator valueAggregator, @Nullable DataType sourceDataType) {
       _valueAggregator = valueAggregator;
       _sourceColumn = sourceColumn;
       _sourceDataType = sourceDataType;

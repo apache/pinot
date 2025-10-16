@@ -35,24 +35,11 @@ public class AggregationConfig extends BaseJsonConfig {
   @JsonPropertyDescription("Aggregation function")
   private final String _aggregationFunction;
 
-  @JsonPropertyDescription("Data type of the source")
-  private final DataType _sourceDataType;
-
-  @JsonCreator
-  public AggregationConfig(@JsonProperty("columnName") String columnName,
-      @JsonProperty("aggregationFunction") String aggregationFunction,
-      @JsonProperty("sourceDataType") DataType sourceDataType) {
-    _columnName = columnName;
-    _aggregationFunction = aggregationFunction;
-    _sourceDataType = sourceDataType;
-  }
-
   @VisibleForTesting
   public AggregationConfig(@JsonProperty("columnName") String columnName,
       @JsonProperty("aggregationFunction") String aggregationFunction) {
     _columnName = columnName;
     _aggregationFunction = aggregationFunction;
-    _sourceDataType = null;
   }
 
   public String getColumnName() {
@@ -61,10 +48,5 @@ public class AggregationConfig extends BaseJsonConfig {
 
   public String getAggregationFunction() {
     return _aggregationFunction;
-  }
-
-  @Nullable
-  public DataType getSourceDataType() {
-    return _sourceDataType;
   }
 }

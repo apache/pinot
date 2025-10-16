@@ -68,7 +68,8 @@ import org.apache.pinot.spi.utils.TimestampUtils;
     @JsonSubTypes.Type(value = MetricFieldSpec.class, name = "METRIC"),
     @JsonSubTypes.Type(value = TimeFieldSpec.class, name = "TIME"),
     @JsonSubTypes.Type(value = DateTimeFieldSpec.class, name = "DATE_TIME"),
-    @JsonSubTypes.Type(value = ComplexFieldSpec.class, name = "COMPLEX")
+    @JsonSubTypes.Type(value = ComplexFieldSpec.class, name = "COMPLEX"),
+    @JsonSubTypes.Type(value = IntermediateFieldSpec.class, name = "INTERMEDIATE")
 })
 @JsonInclude(JsonInclude.Include.NON_NULL)
 public abstract class FieldSpec implements Comparable<FieldSpec>, Serializable {
@@ -391,6 +392,7 @@ public abstract class FieldSpec implements Comparable<FieldSpec>, Serializable {
         case DIMENSION:
         case TIME:
         case DATE_TIME:
+        case INTERMEDIATE:
           switch (dataType) {
             case INT:
               return DEFAULT_DIMENSION_NULL_VALUE_OF_INT;
@@ -589,7 +591,7 @@ public abstract class FieldSpec implements Comparable<FieldSpec>, Serializable {
    * segments, otherwise treated the same as <code>DIMENSION</code> field.
    */
   public enum FieldType {
-    DIMENSION, METRIC, TIME, DATE_TIME, COMPLEX
+    DIMENSION, METRIC, TIME, DATE_TIME, COMPLEX, INTERMEDIATE
   }
 
   /**
