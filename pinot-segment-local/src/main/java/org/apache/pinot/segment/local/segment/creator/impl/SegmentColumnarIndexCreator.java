@@ -444,8 +444,10 @@ public class SegmentColumnarIndexCreator implements SegmentCreator {
       reuseColumnValueToIndex = columnReader.next();
 
       // Handle null values
-      if (nullVec != null && reuseColumnValueToIndex == null) {
-        nullVec.setNull(docId);
+      if (reuseColumnValueToIndex == null) {
+        if (nullVec != null) {
+          nullVec.setNull(docId);
+        }
         reuseColumnValueToIndex = defaultNullValue;
       }
 

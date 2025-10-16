@@ -104,7 +104,7 @@ public class SegmentIndexCreationDriverImpl implements SegmentIndexCreationDrive
   private static final Logger LOGGER = LoggerFactory.getLogger(SegmentIndexCreationDriverImpl.class);
 
   private SegmentGeneratorConfig _config;
-  private RecordReader _recordReader;
+  @Nullable private RecordReader _recordReader;
   private SegmentPreIndexStatsContainer _segmentStats;
   // NOTE: Use TreeMap so that the columns are ordered alphabetically
   private TreeMap<String, ColumnIndexCreationInfo> _indexCreationInfoMap;
@@ -112,7 +112,7 @@ public class SegmentIndexCreationDriverImpl implements SegmentIndexCreationDrive
   private SegmentIndexCreationInfo _segmentIndexCreationInfo;
   private SegmentCreationDataSource _dataSource;
   private Schema _dataSchema;
-  private TransformPipeline _transformPipeline;
+  @Nullable private TransformPipeline _transformPipeline;
   private IngestionSchemaValidator _ingestionSchemaValidator;
   private int _totalDocs = 0;
   private File _tempIndexDir;
@@ -202,7 +202,7 @@ public class SegmentIndexCreationDriverImpl implements SegmentIndexCreationDrive
     columnReaderFactory.init(config.getSchema());
 
     // Create all column readers for the target schema
-    Map<String, ColumnReader> columnReaders = columnReaderFactory.getAllColumnReaders();
+    Map<String, ColumnReader> columnReaders = columnReaderFactory.createAllColumnReaders();
 
     // Create columnar data source
     ColumnarSegmentCreationDataSource columnarDataSource = new ColumnarSegmentCreationDataSource(columnReaders);
@@ -785,6 +785,11 @@ public class SegmentIndexCreationDriverImpl implements SegmentIndexCreationDrive
   /**
    * Build segment using columnar approach.
    * This method builds the segment by processing data column-wise instead of row-wise.
+   * Following is not supported:
+   * <li> recort transformation
+   * <li> sorted column change wrt to input data
+   *
+   * <p>Initialize the driver using {@link #init(SegmentGeneratorConfig, ColumnReaderFactory)}
    *
    * @throws Exception if segment building fails
    */
@@ -835,6 +840,7 @@ public class SegmentIndexCreationDriverImpl implements SegmentIndexCreationDrive
       _totalIndexTimeNs = System.nanoTime() - indexStartTime;
     } catch (Exception e) {
       _indexCreator.close();
+      columnarDataSource.close();
       throw e;
     }
 

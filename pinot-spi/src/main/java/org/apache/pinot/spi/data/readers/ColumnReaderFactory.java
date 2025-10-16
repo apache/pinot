@@ -58,13 +58,6 @@ public interface ColumnReaderFactory extends Closeable, Serializable {
   Set<String> getAvailableColumns();
 
   /**
-   * Get the total number of documents/rows in the data source.
-   *
-   * @return Total number of documents
-   */
-  int getNumDocs();
-
-  /**
    * Create a column reader for the specified column.
    *
    * @param columnName Name of the column to read
@@ -81,14 +74,6 @@ public interface ColumnReaderFactory extends Closeable, Serializable {
    * @return Map of column name to ColumnReader
    * @throws IOException If any column reader cannot be created
    */
-  Map<String, ColumnReader> getAllColumnReaders()
+  Map<String, ColumnReader> createAllColumnReaders()
       throws IOException;
-
-  /**
-   * Check if the specified column exists in the source data.
-   *
-   * @param columnName Column name to check
-   * @return true if the column exists in source, false otherwise
-   */
-  boolean hasColumn(String columnName);
 }

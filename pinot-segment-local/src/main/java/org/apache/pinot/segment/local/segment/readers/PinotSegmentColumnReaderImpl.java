@@ -70,11 +70,16 @@ public class PinotSegmentColumnReaderImpl implements ColumnReader {
       throw new IllegalStateException("No more values available");
     }
 
+    // Return null if the value is null
+    if (_segmentColumnReader.isNull(_currentIndex)) {
+      _currentIndex++;
+      return null;
+    }
     _reuseValue = _segmentColumnReader.getValue(_currentIndex);
     _currentIndex++;
 
     // Return null if the value is null
-    if (_segmentColumnReader.isNull(_currentIndex) || _reuseValue == null) {
+    if (_reuseValue == null) {
       return null;
     }
 

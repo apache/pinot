@@ -168,6 +168,7 @@ public class ColumnarSegmentPreIndexStatsContainer implements SegmentPreIndexSta
         // all columns should have same count
         LOGGER.warn("Column {} has {} documents, but expected {} documents",
             columnName, docCount, _totalDocCount);
+        throw new RuntimeException("Columns have inconsistent document counts");
       }
     } catch (IOException e) {
       LOGGER.error("Failed to collect stats for column: {}", columnName, e);
