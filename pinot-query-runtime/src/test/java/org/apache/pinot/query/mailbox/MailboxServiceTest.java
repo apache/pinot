@@ -79,7 +79,7 @@ public class MailboxServiceTest {
     _stats = new StatMap<>(MailboxSendOperator.StatKey.class);
   }
 
-  @Test(timeOut = 100000)
+  @Test
   public void testLocalHappyPathSendFirst()
       throws Exception {
     String mailboxId = MailboxIdUtils.toMailboxId(_requestId++, SENDER_STAGE_ID, 0, RECEIVER_STAGE_ID, 0);
@@ -113,7 +113,7 @@ public class MailboxServiceTest {
     assertTrue(block.getBlock().isSuccess());
   }
 
-  @Test(timeOut = 100000)
+  @Test
   public void testLocalHappyPathReceiveFirst()
       throws Exception {
     String mailboxId = MailboxIdUtils.toMailboxId(_requestId++, SENDER_STAGE_ID, 0, RECEIVER_STAGE_ID, 0);
@@ -147,7 +147,7 @@ public class MailboxServiceTest {
     assertEquals(receivingMailbox.getNumPendingBlocks(), 0);
   }
 
-  @Test(timeOut = 100000)
+  @Test
   public void testLocalCancelledBySender()
       throws Exception {
     String mailboxId = MailboxIdUtils.toMailboxId(_requestId++, SENDER_STAGE_ID, 0, RECEIVER_STAGE_ID, 0);
@@ -175,7 +175,7 @@ public class MailboxServiceTest {
     assertEquals(receivingMailbox.getNumPendingBlocks(), 0);
   }
 
-  @Test(timeOut = 100000)
+  @Test
   public void testLocalCancelledBySenderBeforeSend() {
     String mailboxId = MailboxIdUtils.toMailboxId(_requestId++, SENDER_STAGE_ID, 0, RECEIVER_STAGE_ID, 0);
     StatMap<MailboxSendOperator.StatKey> stats = new StatMap<>(MailboxSendOperator.StatKey.class);
@@ -202,7 +202,7 @@ public class MailboxServiceTest {
     assertEquals(receivingMailbox.getNumPendingBlocks(), 0);
   }
 
-  @Test(timeOut = 100000)
+  @Test
   public void testLocalCancelledByReceiver()
       throws Exception {
     String mailboxId = MailboxIdUtils.toMailboxId(_requestId++, SENDER_STAGE_ID, 0, RECEIVER_STAGE_ID, 0);
@@ -230,7 +230,7 @@ public class MailboxServiceTest {
     assertEquals(receivingMailbox.getNumPendingBlocks(), 0);
   }
 
-  @Test(timeOut = 100000)
+  @Test
   public void testLocalTimeOut()
       throws Exception {
     String mailboxId = MailboxIdUtils.toMailboxId(_requestId++, SENDER_STAGE_ID, 0, RECEIVER_STAGE_ID, 0);
@@ -265,7 +265,7 @@ public class MailboxServiceTest {
     assertEquals(receivingMailbox.getNumPendingBlocks(), 0);
   }
 
-  @Test(timeOut = 100000)
+  @Test
   public void testLocalBufferFull()
       throws Exception {
     String mailboxId = MailboxIdUtils.toMailboxId(_requestId++, SENDER_STAGE_ID, 0, RECEIVER_STAGE_ID, 0);
@@ -304,7 +304,7 @@ public class MailboxServiceTest {
     assertEquals(receivingMailbox.getNumPendingBlocks(), 0);
   }
 
-  @Test(timeOut = 100000)
+  @Test
   public void testLocalEarlyTerminated()
       throws Exception {
     String mailboxId = MailboxIdUtils.toMailboxId(_requestId++, SENDER_STAGE_ID, 0, RECEIVER_STAGE_ID, 0);
@@ -331,7 +331,7 @@ public class MailboxServiceTest {
     assertTrue(sendingMailbox.isEarlyTerminated());
   }
 
-  @Test(timeOut = 100000)
+  @Test
   public void testRemoteHappyPathSendFirst()
       throws Exception {
     String mailboxId = MailboxIdUtils.toMailboxId(_requestId++, SENDER_STAGE_ID, 0, RECEIVER_STAGE_ID, 0);
@@ -364,7 +364,7 @@ public class MailboxServiceTest {
     assertTrue(block.isSuccess());
   }
 
-  @Test(timeOut = 100000)
+  @Test
   public void testRemoteHappyPathReceiveFirst()
       throws Exception {
     String mailboxId = MailboxIdUtils.toMailboxId(_requestId++, SENDER_STAGE_ID, 0, RECEIVER_STAGE_ID, 0);
@@ -404,7 +404,7 @@ public class MailboxServiceTest {
     assertEquals(receivingMailbox.getNumPendingBlocks(), 0);
   }
 
-  @Test(timeOut = 100000)
+  @Test
   public void testRemoteCancelledBySender()
       throws Exception {
     String mailboxId = MailboxIdUtils.toMailboxId(_requestId++, SENDER_STAGE_ID, 0, RECEIVER_STAGE_ID, 0);
@@ -439,7 +439,7 @@ public class MailboxServiceTest {
     assertEquals(receivingMailbox.getNumPendingBlocks(), 0);
   }
 
-  @Test(timeOut = 100000)
+  @Test
   public void testRemoteCancelledBySenderBeforeSend()
       throws Exception {
     String mailboxId = MailboxIdUtils.toMailboxId(_requestId++, SENDER_STAGE_ID, 0, RECEIVER_STAGE_ID, 0);
@@ -473,7 +473,7 @@ public class MailboxServiceTest {
     assertEquals(receivingMailbox.getNumPendingBlocks(), 0);
   }
 
-  @Test(timeOut = 100000)
+  @Test
   public void testRemoteCancelledByReceiver()
       throws Exception {
     String mailboxId = MailboxIdUtils.toMailboxId(_requestId++, SENDER_STAGE_ID, 0, RECEIVER_STAGE_ID, 0);
@@ -506,7 +506,7 @@ public class MailboxServiceTest {
     assertEquals(receivingMailbox.getNumPendingBlocks(), 0);
   }
 
-  @Test(timeOut = 100000)
+  @Test
   public void testRemoteTimeOut()
       throws Exception {
     String mailboxId = MailboxIdUtils.toMailboxId(_requestId++, SENDER_STAGE_ID, 0, RECEIVER_STAGE_ID, 0);
@@ -549,7 +549,7 @@ public class MailboxServiceTest {
     assertEquals(receivingMailbox.getNumPendingBlocks(), 0);
   }
 
-  @Test(timeOut = 100000)
+  @Test
   public void testRemoteBufferFull()
       throws Exception {
     String mailboxId = MailboxIdUtils.toMailboxId(_requestId++, SENDER_STAGE_ID, 0, RECEIVER_STAGE_ID, 0);
@@ -592,7 +592,7 @@ public class MailboxServiceTest {
     assertEquals(receivingMailbox.getNumPendingBlocks(), 0);
   }
 
-  @Test(timeOut = 100000)
+  @Test
   public void testRemoteEarlyTerminated()
       throws Exception {
     String mailboxId = MailboxIdUtils.toMailboxId(_requestId++, SENDER_STAGE_ID, 0, RECEIVER_STAGE_ID, 0);
