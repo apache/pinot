@@ -33,7 +33,6 @@ import org.apache.pinot.controller.helix.core.assignment.segment.SegmentAssignme
 import org.apache.pinot.segment.local.utils.TableConfigUtils;
 import org.apache.pinot.spi.config.table.SegmentsValidationAndRetentionConfig;
 import org.apache.pinot.spi.config.table.TableConfig;
-import org.apache.pinot.spi.config.table.assignment.InstancePartitionsType;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -45,17 +44,15 @@ class ReplicaGroupSegmentAssignmentStrategy implements SegmentAssignmentStrategy
   private String _tableName;
   private String _partitionColumn;
   private int _replication;
-  private TableConfig _tableConfig;
 
   @Override
   public void init(HelixManager helixManager, TableConfig tableConfig) {
     _helixManager = helixManager;
-    _tableConfig = tableConfig;
     _tableName = tableConfig.getTableName();
     SegmentsValidationAndRetentionConfig validationAndRetentionConfig = tableConfig.getValidationConfig();
-    Preconditions.checkState(validationAndRetentionConfig != null, "Validation Config is null");
+    Preconditions.checkState(validationAndRetentionConfig != null, "segmentsConfig is null");
     _replication = tableConfig.getReplication();
-    _partitionColumn = TableConfigUtils.getPartitionColumn(_tableConfig);
+    _partitionColumn = TableConfigUtils.getPartitionColumn(tableConfig);
     if (_partitionColumn == null) {
       LOGGER.info("Initialized ReplicaGroupSegmentAssignmentStrategy "
           + "with replication: {} without partition column for table: {} ", _replication, _tableName);
@@ -70,7 +67,7 @@ class ReplicaGroupSegmentAssignmentStrategy implements SegmentAssignmentStrategy
    */
   @Override
   public List<String> assignSegment(String segmentName, Map<String, Map<String, String>> currentAssignment,
-      InstancePartitions instancePartitions, InstancePartitionsType instancePartitionsType) {
+      InstancePartitions instancePartitions) {
     checkReplication(instancePartitions, _replication, _tableName);
     int numPartitions = instancePartitions.getNumPartitions();
     int partitionId;
@@ -86,7 +83,7 @@ class ReplicaGroupSegmentAssignmentStrategy implements SegmentAssignmentStrategy
 
   @Override
   public Map<String, Map<String, String>> reassignSegments(Map<String, Map<String, String>> currentAssignment,
-      InstancePartitions instancePartitions, InstancePartitionsType instancePartitionsType) {
+      InstancePartitions instancePartitions) {
     Map<String, Map<String, String>> newAssignment;
     int numPartitions = instancePartitions.getNumPartitions();
 
