@@ -28,6 +28,8 @@ import javax.annotation.Nullable;
 import org.apache.commons.configuration2.PropertiesConfiguration;
 import org.apache.commons.configuration2.ex.ConfigurationException;
 import org.apache.commons.io.FileUtils;
+import org.apache.pinot.common.metrics.ServerMeter;
+import org.apache.pinot.common.metrics.ServerMetrics;
 import org.apache.pinot.segment.local.segment.index.loader.columnminmaxvalue.ColumnMinMaxValueGenerator;
 import org.apache.pinot.segment.local.segment.index.loader.columnminmaxvalue.ColumnMinMaxValueGeneratorMode;
 import org.apache.pinot.segment.local.segment.index.loader.defaultcolumn.DefaultColumnHandler;
@@ -388,6 +390,10 @@ public class SegmentPreProcessor implements AutoCloseable {
         try (MultipleTreesBuilder builder = new MultipleTreesBuilder(starTreeBuilderConfigs, indexDir,
             MultipleTreesBuilder.BuildMode.OFF_HEAP)) {
           builder.build();
+        } catch (Exception e) {
+          String tableNameWithType = _tableConfig.getTableName();
+          LOGGER.error("Failed to build star-tree index for table: {}, skipping", tableNameWithType, e);
+          ServerMetrics.get().addMeteredTableValue(tableNameWithType, ServerMeter.STAR_TREE_INDEX_BUILD_FAILURES, 1);
         }
       }
     } finally {
