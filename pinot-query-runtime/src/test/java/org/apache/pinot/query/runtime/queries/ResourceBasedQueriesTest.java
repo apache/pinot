@@ -274,9 +274,7 @@ public class ResourceBasedQueriesTest extends QueryRunnerTestBase {
     // query pinot
     runQuery(sql, expectErrorMsg, false).ifPresent(queryResult -> {
       try {
-        if (queryResult.getProcessingException() != null) {
-          Assert.fail("Expected no exception, but got: " + queryResult.getProcessingException());
-        }
+        Assert.assertNull(queryResult.getProcessingException(), "Expected no exception");
         compareRowEquals(queryResult.getResultTable(), queryH2(h2Sql), keepOutputRowOrder);
       } catch (Exception e) {
         Assert.fail(e.getMessage(), e);
