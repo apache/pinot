@@ -68,6 +68,8 @@ public class GrpcSendingMailbox implements SendingMailbox {
   private final StatMap<MailboxSendOperator.StatKey> _statMap;
   private final MailboxStatusObserver _statusObserver = new MailboxStatusObserver();
   private final int _maxByteStringSize;
+  /// Indicates whether the sending side has attempted to close the mailbox (either via complete() or cancel()).
+  private volatile boolean _senderSideClosed;
 
   private StreamObserver<MailboxContent> _contentObserver;
 
@@ -97,16 +99,21 @@ public class GrpcSendingMailbox implements SendingMailbox {
 
   @Override
   public void send(MseBlock.Eos block, List<DataBuffer> serializedStats) {
-    sendInternal(block, serializedStats);
-    LOGGER.debug("Completing mailbox: {}", _id);
-    _contentObserver.onCompleted();
+    if (sendInternal(block, serializedStats)) {
+      LOGGER.debug("Completing mailbox: {}", _id);
+      _contentObserver.onCompleted();
+      _senderSideClosed = true;
+    } else {
+      LOGGER.warn("Trying to send EOS to the already terminated mailbox: {}", _id);
+    }
   }
 
-  private void sendInternal(MseBlock block, List<DataBuffer> serializedStats) {
+  /// Tries to send the block to the receiver. Returns true if the block is sent, false otherwise.
+  private boolean sendInternal(MseBlock block, List<DataBuffer> serializedStats) {
     if (isTerminated() || (isEarlyTerminated() && block.isData())) {
       LOGGER.debug("==[GRPC SEND]== terminated or early terminated mailbox. Skipping sending message {} to: {}",
           block, _id);
-      return;
+      return false;
     }
     if (LOGGER.isDebugEnabled()) {
       LOGGER.debug("==[GRPC SEND]== sending message " + block + " to: " + _id);
@@ -122,6 +129,7 @@ public class GrpcSendingMailbox implements SendingMailbox {
     if (LOGGER.isDebugEnabled()) {
       LOGGER.debug("==[GRPC SEND]== message " + block + " sent to: " + _id);
     }
+    return true;
   }
 
   private void processAndSend(MseBlock block, List<DataBuffer> serializedStats)
@@ -166,6 +174,7 @@ public class GrpcSendingMailbox implements SendingMailbox {
       LOGGER.debug("Already terminated mailbox: {}", _id);
       return;
     }
+    _senderSideClosed = true;
     LOGGER.debug("Cancelling mailbox: {}", _id);
     if (_contentObserver == null) {
       _contentObserver = getContentObserver();
@@ -190,7 +199,10 @@ public class GrpcSendingMailbox implements SendingMailbox {
 
   @Override
   public boolean isTerminated() {
-    return _statusObserver.isFinished();
+    // _senderSideClosed is set when the sending side has attempted to close the mailbox (either via complete() or
+    // cancel()). But we also need to return true the gRPC status observer has observed that the connection is closed
+    // (ie due to timeout)
+    return _senderSideClosed || _statusObserver.isFinished();
   }
 
   private StreamObserver<MailboxContent> getContentObserver() {
@@ -313,5 +325,22 @@ public class GrpcSendingMailbox implements SendingMailbox {
     }
 
     return result;
+  }
+
+  @Override
+  public void close()
+      throws Exception {
+    if (!isTerminated()) {
+      String errorMsg = "Closing gPRC mailbox without proper EOS message";
+      RuntimeException ex = new RuntimeException(errorMsg);
+      ex.fillInStackTrace();
+      LOGGER.error(errorMsg, ex);
+      _senderSideClosed = true;
+
+      MseBlock errorBlock = ErrorMseBlock.fromError(QueryErrorCode.INTERNAL, errorMsg);
+      if (_contentObserver != null) {
+        processAndSend(errorBlock, List.of());
+      }
+    }
   }
 }

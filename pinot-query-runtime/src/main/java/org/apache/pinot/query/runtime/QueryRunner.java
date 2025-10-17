@@ -325,11 +325,9 @@ public class QueryRunner {
     long deadlineMs = executionContext.getPassiveDeadlineMs();
     for (RoutingInfo routingInfo : routingInfos) {
       String mailboxId = routingInfo.getMailboxId();
-      try {
-        StatMap<MailboxSendOperator.StatKey> statMap = new StatMap<>(MailboxSendOperator.StatKey.class);
-        SendingMailbox sendingMailbox =
-            _mailboxService.getSendingMailbox(routingInfo.getHostname(), routingInfo.getPort(),
-                mailboxId, deadlineMs, statMap);
+      StatMap<MailboxSendOperator.StatKey> statMap = new StatMap<>(MailboxSendOperator.StatKey.class);
+      try (SendingMailbox sendingMailbox = _mailboxService.getSendingMailbox(routingInfo.getHostname(),
+          routingInfo.getPort(), mailboxId, deadlineMs, statMap)) {
         // TODO: Here we are breaking the stats invariants, sending errors without including the stats of the
         //  current stage. We will need to fix this in future, but for now, we are sending the error block without
         //  the stats.
