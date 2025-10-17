@@ -268,29 +268,30 @@ public class MultipleTreesBuilder implements Closeable {
   @Override
   public void close() {
     if (_separatorTempDir != null) {
-      try {
+      if (_starTreeCreationFailed) {
         try {
-          if (_starTreeCreationFailed) {
-            LOGGER.error("Star-tree index creation failed, trying to reset the older star-tree index and metadata");
-            FileUtils.moveFileToDirectory(new File(_separatorTempDir, StarTreeV2Constants.INDEX_FILE_NAME),
-                _segmentDirectory,
-                false);
-            FileUtils.moveFileToDirectory(new File(_separatorTempDir, StarTreeV2Constants.INDEX_MAP_FILE_NAME),
-                _segmentDirectory, false);
+          LOGGER.info("Star-tree index creation failed, trying to reset the older star-tree index and metadata");
+          FileUtils.moveFileToDirectory(new File(_separatorTempDir, StarTreeV2Constants.INDEX_FILE_NAME),
+              _segmentDirectory,
+              false);
+          FileUtils.moveFileToDirectory(new File(_separatorTempDir, StarTreeV2Constants.INDEX_MAP_FILE_NAME),
+              _segmentDirectory, false);
 
-            // Copy back the older star-tree related metadata
-            Iterator<String> keys = _existingStarTreeMetadata.getKeys();
-            while (keys.hasNext()) {
-              String key = keys.next();
-              Object value = _existingStarTreeMetadata.getProperty(key);
-              _metadataProperties.addProperty(MetadataKey.STAR_TREE_PREFIX + key, value);
-            }
-            CommonsConfigurationUtils.saveToFile(_metadataProperties,
-                new File(_segmentDirectory, V1Constants.MetadataKeys.METADATA_FILE_NAME));
+          // Copy back the older star-tree related metadata
+          Iterator<String> keys = _existingStarTreeMetadata.getKeys();
+          while (keys.hasNext()) {
+            String key = keys.next();
+            Object value = _existingStarTreeMetadata.getProperty(key);
+            _metadataProperties.addProperty(MetadataKey.STAR_TREE_PREFIX + key, value);
           }
-        } catch (Exception e) {
+          CommonsConfigurationUtils.saveToFile(_metadataProperties,
+              new File(_segmentDirectory, V1Constants.MetadataKeys.METADATA_FILE_NAME));
+        } catch(Exception e) {
           LOGGER.error("Could not reset the star-tree index state to the previous one", e);
         }
+      }
+
+      try {
         FileUtils.forceDelete(_separatorTempDir);
       } catch (Exception e) {
         LOGGER.warn("Caught exception while deleting the separator tmp directory: {}",
