@@ -32,6 +32,7 @@ import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
+import org.apache.commons.configuration2.ex.ConfigurationException;
 import org.apache.commons.io.FileUtils;
 import org.apache.pinot.common.metadata.segment.SegmentZKMetadata;
 import org.apache.pinot.common.metrics.ServerMetrics;
@@ -435,7 +436,7 @@ public class RealtimeSegmentConverterTest implements PinotBuffersAfterMethodChec
 
   private void testSegment(List<GenericRow> rows, File indexDir,
       TableConfig tableConfig, SegmentMetadataImpl segmentMetadata)
-      throws IOException {
+      throws IOException, ConfigurationException {
     SegmentLocalFSDirectory segmentDir = new SegmentLocalFSDirectory(indexDir, segmentMetadata, ReadMode.mmap);
     SegmentDirectory.Reader segmentReader = segmentDir.createReader();
 

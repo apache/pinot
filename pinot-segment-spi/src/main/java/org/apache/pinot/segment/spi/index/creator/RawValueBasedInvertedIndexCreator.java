@@ -59,4 +59,13 @@ public interface RawValueBasedInvertedIndexCreator extends InvertedIndexCreator 
    * For multi-value column, adds the double values for the next document.
    */
   void add(double[] values, int length);
+
+  default void add(String value) {
+  }
+  default void add(String[] value, int length) {
+  }
+  default void add(byte[] value) {
+  }
+  default void add(byte[][] value, int length) {
+  }
 }

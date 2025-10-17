@@ -23,9 +23,12 @@ import java.io.File;
 import java.io.FileInputStream;
 import java.net.URI;
 import java.util.List;
+import java.util.Map;
 import org.apache.commons.io.FileUtils;
 import org.apache.hc.core5.http.Header;
+import org.apache.hc.core5.http.message.BasicHeader;
 import org.apache.pinot.common.auth.AuthProviderUtils;
+import org.apache.pinot.common.metadata.segment.SegmentZKMetadataCustomMapModifier;
 import org.apache.pinot.common.utils.FileUploadDownloadClient;
 import org.apache.pinot.common.utils.TarCompressionUtils;
 import org.apache.pinot.spi.auth.AuthProvider;
@@ -78,6 +81,15 @@ public class UploadSegmentCommand extends AbstractBaseAdminCommand implements Co
   @CommandLine.Option(names = {"-tableType"}, required = false,
       description = "Table type to upload. Can be OFFLINE or REALTIME")
   private TableType _tableType = TableType.OFFLINE;
+
+  @CommandLine.Option(names = {"-customMetadata"}, required = false, split = ",",
+      description = "Custom metadata to add to segment ZK metadata in key=value format (e.g. key1=value1,key2=value2)")
+  private String[] _customMetadata = null;
+
+  @CommandLine.Option(names = {"-customMetadataMode"}, required = false,
+      description = "Mode for custom metadata modification. Can be REPLACE or UPDATE. Default is UPDATE")
+  private SegmentZKMetadataCustomMapModifier.ModifyMode _customMetadataMode =
+      SegmentZKMetadataCustomMapModifier.ModifyMode.UPDATE;
 
   private AuthProvider _authProvider;
 
@@ -145,6 +157,31 @@ public class UploadSegmentCommand extends AbstractBaseAdminCommand implements Co
     _tableType = tableType;
   }
 
+  public UploadSegmentCommand setCustomMetadata(String[] customMetadata) {
+    _customMetadata = customMetadata;
+    return this;
+  }
+
+  public UploadSegmentCommand setCustomMetadataMode(SegmentZKMetadataCustomMapModifier.ModifyMode customMetadataMode) {
+    _customMetadataMode = customMetadataMode;
+    return this;
+  }
+
+  private Map<String, String> parseCustomMetadata() {
+    if (_customMetadata == null || _customMetadata.length == 0) {
+      return null;
+    }
+    Map<String, String> customMetadataMap = new java.util.HashMap<>();
+    for (String keyValue : _customMetadata) {
+      String[] parts = keyValue.split("=", 2);
+      if (parts.length != 2) {
+        throw new IllegalArgumentException("Invalid custom metadata format. Expected key=value, got: " + keyValue);
+      }
+      customMetadataMap.put(parts[0], parts[1]);
+    }
+    return customMetadataMap;
+  }
+
   @Override
   public boolean execute()
       throws Exception {
@@ -181,6 +218,16 @@ public class UploadSegmentCommand extends AbstractBaseAdminCommand implements Co
         List<Header> headerList =
             AuthProviderUtils.makeAuthHeaders(
                 AuthProviderUtils.makeAuthProvider(_authProvider, _authTokenUrl, _authToken, _user, _password));
+
+        // Add custom metadata header if provided
+        Map<String, String> customMetadataMap = parseCustomMetadata();
+        if (customMetadataMap != null && !customMetadataMap.isEmpty()) {
+          SegmentZKMetadataCustomMapModifier modifier = new SegmentZKMetadataCustomMapModifier(_customMetadataMode,
+              customMetadataMap);
+          headerList.add(new BasicHeader(FileUploadDownloadClient.CustomHeaders.SEGMENT_ZK_METADATA_CUSTOM_MAP_MODIFIER,
+              modifier.toJsonString()));
+          LOGGER.info("Added custom metadata modifier: {}", modifier.toJsonString());
+        }
 
         FileInputStream fileInputStream = new FileInputStream(segmentTarFile);
         fileUploadDownloadClient.uploadSegment(uploadSegmentHttpURI, segmentTarFile.getName(),

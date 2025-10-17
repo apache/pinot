@@ -47,6 +47,9 @@ public class TimeBasedTierSegmentSelector implements TierSegmentSelector {
 
     // get segment end time to decide if segment gets selected
     long endTimeMs = segmentZKMetadata.getEndTimeMs();
+    if (endTimeMs < 0) {
+      return System.currentTimeMillis() - segmentZKMetadata.getCreationTime() > _segmentAgeMillis;
+    }
     Preconditions.checkState(endTimeMs > 0, "Invalid endTimeMs: %s for segment: %s of table: %s", endTimeMs,
         segmentZKMetadata.getSegmentName(), tableNameWithType);
     return (System.currentTimeMillis() - endTimeMs) > _segmentAgeMillis;
