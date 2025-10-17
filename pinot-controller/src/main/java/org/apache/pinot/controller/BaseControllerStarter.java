@@ -117,6 +117,7 @@ import org.apache.pinot.controller.helix.core.statemodel.LeadControllerResourceM
 import org.apache.pinot.controller.helix.core.util.HelixSetupUtils;
 import org.apache.pinot.controller.helix.starter.HelixConfig;
 import org.apache.pinot.controller.services.PinotTableReloadService;
+import org.apache.pinot.controller.services.PinotTableReloadStatusReporter;
 import org.apache.pinot.controller.tuner.TableConfigTunerRegistry;
 import org.apache.pinot.controller.util.BrokerServiceHelper;
 import org.apache.pinot.controller.util.TableSizeReader;
@@ -683,6 +684,7 @@ public abstract class BaseControllerStarter implements ServiceStartable {
         bind(controllerStartTime).named(ControllerAdminApiApplication.START_TIME);
 
         bindAsContract(PinotTableReloadService.class).in(Singleton.class);
+        bindAsContract(PinotTableReloadStatusReporter.class).in(Singleton.class);
 
         String loggerRootDir = _config.getProperty(CommonConstants.Controller.CONFIG_OF_LOGGER_ROOT_DIR);
         if (loggerRootDir != null) {
