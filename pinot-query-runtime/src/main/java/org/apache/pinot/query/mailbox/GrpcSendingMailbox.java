@@ -99,8 +99,7 @@ public class GrpcSendingMailbox implements SendingMailbox {
 
   @Override
   public void send(MseBlock.Eos block, List<DataBuffer> serializedStats) {
-    sendInternal(block, serializedStats);
-    if (!_senderSideClosed) {
+    if (sendInternal(block, serializedStats)) {
       LOGGER.debug("Completing mailbox: {}", _id);
       _contentObserver.onCompleted();
       _senderSideClosed = true;
@@ -109,11 +108,12 @@ public class GrpcSendingMailbox implements SendingMailbox {
     }
   }
 
-  private void sendInternal(MseBlock block, List<DataBuffer> serializedStats) {
+  /// Tries to send the block to the receiver. Returns true if the block is sent, false otherwise.
+  private boolean sendInternal(MseBlock block, List<DataBuffer> serializedStats) {
     if (isTerminated() || (isEarlyTerminated() && block.isData())) {
       LOGGER.debug("==[GRPC SEND]== terminated or early terminated mailbox. Skipping sending message {} to: {}",
           block, _id);
-      return;
+      return false;
     }
     if (LOGGER.isDebugEnabled()) {
       LOGGER.debug("==[GRPC SEND]== sending message " + block + " to: " + _id);
@@ -129,6 +129,7 @@ public class GrpcSendingMailbox implements SendingMailbox {
     if (LOGGER.isDebugEnabled()) {
       LOGGER.debug("==[GRPC SEND]== message " + block + " sent to: " + _id);
     }
+    return true;
   }
 
   private void processAndSend(MseBlock block, List<DataBuffer> serializedStats)
