@@ -483,7 +483,7 @@ public class IngestionDelayTrackerTest {
     TestUtils.waitForCondition((aVoid) -> {
       try {
         verifyMetrics(partitionToMetricToValues);
-      } catch (Error e) {
+      } catch (Throwable t) {
         return false;
       }
       return true;
