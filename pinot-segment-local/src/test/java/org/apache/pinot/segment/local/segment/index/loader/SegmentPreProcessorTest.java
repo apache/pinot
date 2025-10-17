@@ -1740,7 +1740,7 @@ public class SegmentPreProcessorTest implements PinotBuffersAfterClassCheckRule 
     // Build good segment, no need for preprocess
     buildTestSegment(tableConfig, schema, stringValues, longValues);
 
-    // Test 1: Adding a new startree index with invalid functionColumnPair (SUM__*)
+    // Test 1: Adding a new star-tree index with invalid functionColumnPair (SUM__*)
     // This should fail during config creation but segment build should be fine
     IndexingConfig indexingConfig = tableConfig.getIndexingConfig();
     indexingConfig.setEnableDynamicStarTreeCreation(true);
@@ -1751,13 +1751,13 @@ public class SegmentPreProcessorTest implements PinotBuffersAfterClassCheckRule 
     try (SegmentDirectory segmentDirectory = new SegmentLocalFSDirectory(INDEX_DIR, ReadMode.mmap);
         SegmentPreProcessor processor = new SegmentPreProcessor(segmentDirectory,
             new IndexLoadingConfig(tableConfig, schema))) {
-      // Should need processing due to new startree config
+      // Should need processing due to new star-tree config
       assertTrue(processor.needProcess());
-      // Process should complete without throwing exception, but startree should not be created
+      // Process should complete without throwing exception, but star-tree should not be created
       processor.process(SEGMENT_OPERATIONS_THROTTLER);
     }
 
-    // Verify that no startree index was created due to invalid config
+    // Verify that no star-tree index was created due to invalid config
     SegmentMetadataImpl segmentMetadata = new SegmentMetadataImpl(INDEX_DIR);
     assertNull(segmentMetadata.getStarTreeV2MetadataList());
   }
@@ -1776,7 +1776,7 @@ public class SegmentPreProcessorTest implements PinotBuffersAfterClassCheckRule 
     // Build good segment, no need for preprocess
     buildTestSegment(tableConfig, schema, stringValues, longValues);
 
-    // First, create a valid startree index
+    // First, create a valid star-tree index
     IndexingConfig indexingConfig = tableConfig.getIndexingConfig();
     indexingConfig.setEnableDynamicStarTreeCreation(true);
     StarTreeIndexConfig validStarTreeIndexConfig =
@@ -1790,14 +1790,14 @@ public class SegmentPreProcessorTest implements PinotBuffersAfterClassCheckRule 
       processor.process(SEGMENT_OPERATIONS_THROTTLER);
     }
 
-    // Verify that startree index was created
+    // Verify that star-tree index was created
     SegmentMetadataImpl segmentMetadata = new SegmentMetadataImpl(INDEX_DIR);
     List<StarTreeV2Metadata> starTreeMetadataList = segmentMetadata.getStarTreeV2MetadataList();
     assertNotNull(starTreeMetadataList);
     assertFalse(starTreeMetadataList.isEmpty());
     assertEquals(starTreeMetadataList.size(), 1);
 
-    // Test 2: Try to update existing startree index with invalid functionColumnPair (SUM__*)
+    // Test 2: Try to update existing star-tree index with invalid functionColumnPair (SUM__*)
     StarTreeIndexConfig invalidStarTreeIndexConfig =
         new StarTreeIndexConfig(List.of("stringCol"), null, List.of("COUNT__*", "SUM__*"), null, 1000);
     indexingConfig.setStarTreeIndexConfigs(List.of(invalidStarTreeIndexConfig));
@@ -1805,20 +1805,20 @@ public class SegmentPreProcessorTest implements PinotBuffersAfterClassCheckRule 
     try (SegmentDirectory segmentDirectory = new SegmentLocalFSDirectory(INDEX_DIR, ReadMode.mmap);
         SegmentPreProcessor processor = new SegmentPreProcessor(segmentDirectory,
             new IndexLoadingConfig(tableConfig, schema))) {
-      // Should need processing due to changed startree config
+      // Should need processing due to changed star-tree config
       assertTrue(processor.needProcess());
-      // Process should complete without throwing exception, but startree should not be updated
+      // Process should complete without throwing exception, but star-tree should not be updated
       processor.process(SEGMENT_OPERATIONS_THROTTLER);
     }
 
-    // Verify that the original startree index still exists and hasn't changed
+    // Verify that the original star-tree index still exists and hasn't changed
     segmentMetadata = new SegmentMetadataImpl(INDEX_DIR);
     List<StarTreeV2Metadata> currentStarTreeMetadataList = segmentMetadata.getStarTreeV2MetadataList();
     assertNotNull(currentStarTreeMetadataList);
     assertFalse(currentStarTreeMetadataList.isEmpty());
     assertEquals(currentStarTreeMetadataList.size(), 1);
 
-    // Verify the metadata hasn't changed (original startree should still be there)
+    // Verify the metadata hasn't changed (original star-tree should still be there)
     assertEquals(currentStarTreeMetadataList.get(0).getDimensionsSplitOrder(),
         starTreeMetadataList.get(0).getDimensionsSplitOrder());
     assertEquals(currentStarTreeMetadataList.get(0).getFunctionColumnPairs(),
@@ -1839,7 +1839,7 @@ public class SegmentPreProcessorTest implements PinotBuffersAfterClassCheckRule 
     // Build good segment, no need for preprocess
     buildTestSegment(tableConfig, schema, stringValues, longValues);
 
-    // Test 3: Adding a new startree index with valid functionColumnPair (COUNT__*)
+    // Test 3: Adding a new star-tree index with valid functionColumnPair (COUNT__*)
     IndexingConfig indexingConfig = tableConfig.getIndexingConfig();
     indexingConfig.setEnableDynamicStarTreeCreation(true);
     StarTreeIndexConfig validStarTreeIndexConfig =
@@ -1853,7 +1853,7 @@ public class SegmentPreProcessorTest implements PinotBuffersAfterClassCheckRule 
       processor.process(SEGMENT_OPERATIONS_THROTTLER);
     }
 
-    // Verify that startree index was created successfully
+    // Verify that star-tree index was created successfully
     SegmentMetadataImpl segmentMetadata = new SegmentMetadataImpl(INDEX_DIR);
     List<StarTreeV2Metadata> starTreeMetadataList = segmentMetadata.getStarTreeV2MetadataList();
     assertNotNull(starTreeMetadataList);
@@ -1880,7 +1880,7 @@ public class SegmentPreProcessorTest implements PinotBuffersAfterClassCheckRule 
     // Build good segment, no need for preprocess
     buildTestSegment(tableConfig, schema, stringValues, longValues);
 
-    // First, create a startree index with SUM function
+    // First, create a star-tree index with SUM function
     IndexingConfig indexingConfig = tableConfig.getIndexingConfig();
     indexingConfig.setEnableDynamicStarTreeCreation(true);
     StarTreeIndexConfig originalStarTreeIndexConfig =
@@ -1894,7 +1894,7 @@ public class SegmentPreProcessorTest implements PinotBuffersAfterClassCheckRule 
       processor.process(SEGMENT_OPERATIONS_THROTTLER);
     }
 
-    // Verify that original startree index was created
+    // Verify that original star-tree index was created
     SegmentMetadataImpl segmentMetadata = new SegmentMetadataImpl(INDEX_DIR);
     List<StarTreeV2Metadata> originalStarTreeMetadataList = segmentMetadata.getStarTreeV2MetadataList();
     assertNotNull(originalStarTreeMetadataList);
@@ -1903,7 +1903,7 @@ public class SegmentPreProcessorTest implements PinotBuffersAfterClassCheckRule 
     assertEquals(originalStarTreeMetadataList.get(0).getFunctionColumnPairs().iterator().next().toColumnName(),
         "sum__longCol");
 
-    // Test 4: Update existing startree index with valid functionColumnPair (COUNT__*)
+    // Test 4: Update existing star-tree index with valid functionColumnPair (COUNT__*)
     StarTreeIndexConfig updatedStarTreeIndexConfig =
         new StarTreeIndexConfig(List.of("stringCol"), null, List.of("SUM__longCol", "COUNT__*"), null, 1000);
     indexingConfig.setStarTreeIndexConfigs(List.of(updatedStarTreeIndexConfig));
@@ -1915,7 +1915,7 @@ public class SegmentPreProcessorTest implements PinotBuffersAfterClassCheckRule 
       processor.process(SEGMENT_OPERATIONS_THROTTLER);
     }
 
-    // Verify that startree index was updated successfully
+    // Verify that star-tree index was updated successfully
     segmentMetadata = new SegmentMetadataImpl(INDEX_DIR);
     List<StarTreeV2Metadata> updatedStarTreeMetadataList = segmentMetadata.getStarTreeV2MetadataList();
     assertNotNull(updatedStarTreeMetadataList);
