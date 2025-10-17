@@ -314,6 +314,7 @@ public class ImmutableSegmentLoader {
       SegmentZKMetadata zkMetadata)
       throws Exception {
     PinotConfiguration segmentDirectoryConfigs = indexLoadingConfig.getSegmentDirectoryConfigs();
+    Map<String, String> segmentCustomConfigs = zkMetadata != null ? zkMetadata.getCustomMap() : new HashMap<>();
     SegmentDirectoryLoaderContext segmentLoaderContext =
         new SegmentDirectoryLoaderContext.Builder().setTableConfig(indexLoadingConfig.getTableConfig())
             .setSchema(indexLoadingConfig.getSchema())
@@ -321,7 +322,7 @@ public class ImmutableSegmentLoader {
             .setSegmentName(segmentName)
             .setSegmentCrc(segmentCrc)
             .setSegmentDirectoryConfigs(segmentDirectoryConfigs)
-            .setSegmentCustomConfigs(zkMetadata.getCustomMap())
+            .setSegmentCustomConfigs(segmentCustomConfigs)
             .build();
     SegmentDirectory segmentDirectory =
         SegmentDirectoryLoaderRegistry.getDefaultSegmentDirectoryLoader().load(indexDir.toURI(), segmentLoaderContext);
