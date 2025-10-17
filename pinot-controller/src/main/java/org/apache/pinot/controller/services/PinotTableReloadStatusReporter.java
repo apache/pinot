@@ -82,6 +82,14 @@ public class PinotTableReloadStatusReporter {
     return ((double) System.currentTimeMillis() - submissionTime) / (1000.0 * 60.0);
   }
 
+  private static int computeTotalSegments(Map<String, List<String>> serverToSegments) {
+    int totalSegments = 0;
+    for (Map.Entry<String, List<String>> entry : serverToSegments.entrySet()) {
+      totalSegments += entry.getValue().size();
+    }
+    return totalSegments;
+  }
+
   public ServerReloadControllerJobStatusResponse getReloadJobStatus(String reloadJobId)
       throws InvalidConfigException {
     Map<String, String> controllerJobZKMetadata =
@@ -129,16 +137,10 @@ public class PinotTableReloadStatusReporter {
     CompletionServiceHelper.CompletionServiceResponse serviceResponse =
         completionServiceHelper.doMultiGetRequest(serverUrls, null, true, 10000);
 
-    ServerReloadControllerJobStatusResponse response = new ServerReloadControllerJobStatusResponse();
-    response.setSuccessCount(0);
-
-    int totalSegments = 0;
-    for (Map.Entry<String, List<String>> entry : serverToSegments.entrySet()) {
-      totalSegments += entry.getValue().size();
-    }
-    response.setTotalSegmentCount(totalSegments);
-    response.setTotalServersQueried(serverUrls.size());
-    response.setTotalServerCallsFailed(serviceResponse._failedResponseCount);
+    ServerReloadControllerJobStatusResponse response = new ServerReloadControllerJobStatusResponse().setSuccessCount(0)
+        .setTotalSegmentCount(computeTotalSegments(serverToSegments))
+        .setTotalServersQueried(serverUrls.size())
+        .setTotalServerCallsFailed(serviceResponse._failedResponseCount);
 
     for (Map.Entry<String, String> streamResponse : serviceResponse._httpResponses.entrySet()) {
       String responseString = streamResponse.getValue();
@@ -161,8 +163,8 @@ public class PinotTableReloadStatusReporter {
     final double estimatedRemainingTimeInMinutes =
         computeEstimatedRemainingTimeInMinutes(response, timeElapsedInMinutes);
 
-    response.setTimeElapsedInMinutes(timeElapsedInMinutes);
-    response.setEstimatedTimeRemainingInMinutes(estimatedRemainingTimeInMinutes);
+    response.setTimeElapsedInMinutes(timeElapsedInMinutes)
+        .setEstimatedTimeRemainingInMinutes(estimatedRemainingTimeInMinutes);
 
     return response;
   }
