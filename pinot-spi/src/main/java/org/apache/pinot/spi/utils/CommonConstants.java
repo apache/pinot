@@ -876,6 +876,7 @@ public class CommonConstants {
       public static final String PRUNE_EMPTY_JOIN_LEFT = "PruneEmptyJoinLeft";
       public static final String PRUNE_EMPTY_JOIN_RIGHT = "PruneEmptyJoinRight";
       public static final String JOIN_TO_ENRICHED_JOIN = "JoinToEnrichedJoin";
+      public static final String PINOT_PROJECT_FILTER_TRANSPOSE = "PinotProjectFilterTranspose";
     }
 
     /**

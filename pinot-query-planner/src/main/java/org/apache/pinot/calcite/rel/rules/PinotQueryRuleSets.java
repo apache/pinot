@@ -216,6 +216,8 @@ public class PinotQueryRuleSets {
 
   // Pinot specific rules that should be run AFTER all other rules
   public static final List<RelOptRule> PINOT_POST_RULES = List.of(
+      // Common Expression evaluation for project and filter expressions
+      PinotProjectFilterTransposeRule.instanceWithDescription(PlannerRuleNames.PINOT_PROJECT_FILTER_TRANSPOSE),
       // TODO: Merge the following 2 rules into a single rule
       // add an extra exchange for sort
       PinotSortExchangeNodeInsertRule.INSTANCE,
