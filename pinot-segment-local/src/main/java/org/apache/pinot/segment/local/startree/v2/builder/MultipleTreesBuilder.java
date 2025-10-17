@@ -286,7 +286,7 @@ public class MultipleTreesBuilder implements Closeable {
           }
           CommonsConfigurationUtils.saveToFile(_metadataProperties,
               new File(_segmentDirectory, V1Constants.MetadataKeys.METADATA_FILE_NAME));
-        } catch(Exception e) {
+        } catch (Exception e) {
           LOGGER.error("Could not reset the star-tree index state to the previous one", e);
         }
       }
