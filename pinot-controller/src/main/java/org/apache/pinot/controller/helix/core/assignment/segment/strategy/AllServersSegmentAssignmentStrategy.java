@@ -58,7 +58,7 @@ public class AllServersSegmentAssignmentStrategy implements SegmentAssignmentStr
   public void init(HelixManager helixManager, TableConfig tableConfig) {
     _helixManager = helixManager;
     _tenantConfig = tableConfig.getTenantConfig();
-    LOGGER.info("Initialized AllServersSegmentAssignmentStrategy for table: {}", tableConfig);
+    LOGGER.info("Initialized AllServersSegmentAssignmentStrategy for table: {}", tableConfig.getTableName());
   }
 
   @Override
