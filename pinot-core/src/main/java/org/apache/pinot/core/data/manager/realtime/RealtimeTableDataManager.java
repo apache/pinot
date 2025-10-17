@@ -583,6 +583,21 @@ public class RealtimeTableDataManager extends BaseTableDataManager {
     if (status.isCompleted()) {
       // Segment is completed and ready to be downloaded either from deep storage or from a peer (if peer-to-peer
       // download is enabled).
+      String downloadUrl = zkMetadata.getDownloadUrl();
+      if (StringUtils.isNotEmpty(downloadUrl)) {
+        return super.downloadSegment(zkMetadata);
+      }
+      // Download URL might be missing due to race conditions or controller commit failure. If peer download
+      // is enabled, try to fetch from ONLINE peers instead of failing fast.
+      if (_peerDownloadScheme != null) {
+        try {
+          return downloadSegmentFromPeers(zkMetadata);
+        } catch (Exception e) {
+          _logger.warn("Peer download attempt failed for completed segment: {}. Falling back to deep store if possible",
+              zkMetadata.getSegmentName(), e);
+        }
+      }
+      // Fall back to the default behavior which will validate and potentially throw if URL is still missing.
       return super.downloadSegment(zkMetadata);
     }
 
