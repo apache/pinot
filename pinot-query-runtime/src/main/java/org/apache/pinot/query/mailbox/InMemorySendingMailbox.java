@@ -138,7 +138,10 @@ public class InMemorySendingMailbox implements SendingMailbox {
       exception.fillInStackTrace();
 
       LOGGER.error(msg, exception);
-      cancel(exception);
+      if (_receivingMailbox == null) {
+        _receivingMailbox = _mailboxService.getReceivingMailbox(_id);
+      }
+      _receivingMailbox.setErrorBlock(ErrorMseBlock.fromException(exception), Collections.emptyList());
     }
   }
 }
