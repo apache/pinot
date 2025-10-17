@@ -103,9 +103,11 @@ public class IngestionDelayTrackerTest {
 
     @Override
     public void createMetrics(int partitionId) {
-      if (_partitionToMetricToValues == null) {
-        _partitionToMetricToValues = new ConcurrentHashMap<>();
-        _scheduledExecutorService = Executors.newScheduledThreadPool(2);
+      synchronized (this) {
+        if (_partitionToMetricToValues == null) {
+          _partitionToMetricToValues = new ConcurrentHashMap<>();
+          _scheduledExecutorService = Executors.newScheduledThreadPool(2);
+        }
       }
       Map<String, List<Long>> metricToValues = new HashMap<>();
       _partitionToMetricToValues.put(partitionId, metricToValues);
@@ -481,7 +483,7 @@ public class IngestionDelayTrackerTest {
     TestUtils.waitForCondition((aVoid) -> {
       try {
         verifyMetrics(partitionToMetricToValues);
-      } catch (Error e) {
+      } catch (Throwable t) {
         return false;
       }
       return true;
