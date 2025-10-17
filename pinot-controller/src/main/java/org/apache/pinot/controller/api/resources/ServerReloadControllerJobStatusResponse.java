@@ -33,55 +33,64 @@ public class ServerReloadControllerJobStatusResponse {
     return _totalSegmentCount;
   }
 
-  public void setTotalSegmentCount(int totalSegmentCount) {
+  public ServerReloadControllerJobStatusResponse setTotalSegmentCount(int totalSegmentCount) {
     _totalSegmentCount = totalSegmentCount;
+    return this;
   }
 
   public int getSuccessCount() {
     return _successCount;
   }
 
-  public void setSuccessCount(int successCount) {
+  public ServerReloadControllerJobStatusResponse setSuccessCount(int successCount) {
     _successCount = successCount;
+    return this;
   }
 
   public double getEstimatedTimeRemainingInMinutes() {
     return _estimatedTimeRemainingInMinutes;
   }
 
-  public void setEstimatedTimeRemainingInMinutes(double estimatedTimeRemainingInMillis) {
-    _estimatedTimeRemainingInMinutes = estimatedTimeRemainingInMillis;
+  public ServerReloadControllerJobStatusResponse setEstimatedTimeRemainingInMinutes(
+      double estimatedTimeRemainingInMinutes) {
+    _estimatedTimeRemainingInMinutes = estimatedTimeRemainingInMinutes;
+    return this;
   }
 
   public double getTimeElapsedInMinutes() {
     return _timeElapsedInMinutes;
   }
 
-  public void setTimeElapsedInMinutes(double timeElapsedInMinutes) {
+  public ServerReloadControllerJobStatusResponse setTimeElapsedInMinutes(double timeElapsedInMinutes) {
     _timeElapsedInMinutes = timeElapsedInMinutes;
+    return this;
   }
+
 
   public int getTotalServersQueried() {
     return _totalServersQueried;
   }
 
-  public void setTotalServersQueried(int totalServersQueried) {
+  public ServerReloadControllerJobStatusResponse setTotalServersQueried(int totalServersQueried) {
     _totalServersQueried = totalServersQueried;
+    return this;
   }
 
   public int getTotalServerCallsFailed() {
     return _totalServerCallsFailed;
   }
 
-  public void setTotalServerCallsFailed(int totalServerCallsFailed) {
+  public ServerReloadControllerJobStatusResponse setTotalServerCallsFailed(int totalServerCallsFailed) {
     _totalServerCallsFailed = totalServerCallsFailed;
+    return this;
   }
 
   public Map<String, String> getMetadata() {
     return _metadata;
   }
 
-  public void setMetadata(Map<String, String> metadata) {
+  public ServerReloadControllerJobStatusResponse setMetadata(Map<String, String> metadata) {
     _metadata = metadata;
+    return this;
   }
 }
