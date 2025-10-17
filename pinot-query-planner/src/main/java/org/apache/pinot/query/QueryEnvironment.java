@@ -207,7 +207,7 @@ public class QueryEnvironment {
           workerManager.getInstanceId(), sqlNodeAndOptions.getOptions(),
           _envConfig.defaultUseLiteMode(), _envConfig.defaultRunInBroker(), _envConfig.defaultUseBrokerPruning(),
           _envConfig.defaultLiteModeLeafStageLimit(), _envConfig.defaultHashFunction(),
-          _envConfig.defaultLiteModeLeafStageFanOutAdjustedLimit());
+          _envConfig.defaultLiteModeLeafStageFanOutAdjustedLimit(), _envConfig.defaultLiteModeEnableJoins());
     }
     return new PlannerContext(_config, _catalogReader, _typeFactory, optProgram, traitProgram,
         sqlNodeAndOptions.getOptions(), _envConfig, format, physicalPlannerContext);
@@ -365,7 +365,7 @@ public class QueryEnvironment {
       Preconditions.checkNotNull(plannerContext.getPhysicalPlannerContext(), "Physical planner context is null");
       optimized = RelToPRelConverter.toPRelNode(optimized, plannerContext.getPhysicalPlannerContext(),
           _envConfig.getTableCache()).unwrap();
-      PRelNodeTreeValidator.validate((PRelNode) optimized);
+      PRelNodeTreeValidator.validate((PRelNode) optimized, plannerContext.getPhysicalPlannerContext());
     }
     return relation.withRel(optimized);
   }
@@ -794,6 +794,14 @@ public class QueryEnvironment {
     default String defaultHashFunction() {
       return CommonConstants.Broker.DEFAULT_BROKER_DEFAULT_HASH_FUNCTION;
     }
+
+      /**
+       * Whether to enable joins when using MSE Lite mode.
+       */
+      @Value.Default
+      default boolean defaultLiteModeEnableJoins() {
+        return CommonConstants.Broker.DEFAULT_LITE_MODE_ENABLE_JOINS;
+      }
 
     /**
      * Returns the worker manager.

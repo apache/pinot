@@ -571,6 +571,15 @@ public class CommonConstants {
         "pinot.broker.multistage.lite.mode.leaf.stage.fanOutAdjustedLimit";
     public static final int DEFAULT_LITE_MODE_LEAF_STAGE_FAN_OUT_ADJUSTED_LIMIT = -1;
 
+    /**
+     * Whether to enable JOIN queries when MSE Lite mode is enabled. By default joins are enabled
+     * in lite mode unless explicitly disabled. This value cannot be overridden by query option.
+     */
+    public static final String CONFIG_OF_LITE_MODE_ENABLE_JOINS =
+        "pinot.broker.multistage.lite.mode.enable.joins";
+    public static final boolean DEFAULT_LITE_MODE_ENABLE_JOINS = true;
+
+
     // Config for default hash function used in KeySelector for data shuffling
     public static final String CONFIG_OF_BROKER_DEFAULT_HASH_FUNCTION = "pinot.broker.multistage.default.hash.function";
     public static final String DEFAULT_BROKER_DEFAULT_HASH_FUNCTION = "absHashCode";
