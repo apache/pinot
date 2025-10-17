@@ -44,6 +44,7 @@ import javax.ws.rs.core.MediaType;
 import org.apache.pinot.controller.api.access.AccessType;
 import org.apache.pinot.controller.api.access.Authenticate;
 import org.apache.pinot.controller.services.PinotTableReloadService;
+import org.apache.pinot.controller.services.PinotTableReloadStatusReporter;
 import org.apache.pinot.core.auth.Actions;
 import org.apache.pinot.core.auth.Authorize;
 import org.apache.pinot.core.auth.TargetType;
@@ -87,11 +88,14 @@ import static org.apache.pinot.spi.utils.CommonConstants.SWAGGER_AUTHORIZATION_K
 public class PinotTableReloadResource {
   private static final Logger LOG = LoggerFactory.getLogger(PinotTableReloadResource.class);
 
-  private final PinotTableReloadService _pinotTableReloadService;
+  private final PinotTableReloadService _service;
+  private final PinotTableReloadStatusReporter _statusReporter;
 
   @Inject
-  public PinotTableReloadResource(PinotTableReloadService pinotTableReloadService) {
-    _pinotTableReloadService = pinotTableReloadService;
+  public PinotTableReloadResource(PinotTableReloadService service,
+      PinotTableReloadStatusReporter statusReporter) {
+    _service = service;
+    _statusReporter = statusReporter;
   }
 
   @POST
@@ -114,7 +118,7 @@ public class PinotTableReloadResource {
       @QueryParam("forceDownload") @DefaultValue("false") boolean forceDownload,
       @ApiParam(value = "Target specific server instance") @QueryParam("targetInstance") @Nullable
       String targetInstance, @Context HttpHeaders headers) {
-    return _pinotTableReloadService.reloadSegment(tableName, segmentName, forceDownload, targetInstance, headers);
+    return _service.reloadSegment(tableName, segmentName, forceDownload, targetInstance, headers);
   }
 
   @POST
@@ -140,7 +144,7 @@ public class PinotTableReloadResource {
       @ApiParam(value = "JSON map of instance to segment lists (overrides targetInstance)")
       @QueryParam("instanceToSegmentsMap") @Nullable String instanceToSegmentsMapInJson, @Context HttpHeaders headers)
       throws IOException {
-    return _pinotTableReloadService.reloadAllSegments(tableName, tableTypeStr, forceDownload, targetInstance,
+    return _service.reloadAllSegments(tableName, tableTypeStr, forceDownload, targetInstance,
         instanceToSegmentsMapInJson, headers);
   }
 
@@ -157,7 +161,7 @@ public class PinotTableReloadResource {
   public ServerReloadControllerJobStatusResponse getReloadJobStatus(
       @ApiParam(value = "Reload job ID returned from reload endpoint", required = true) @PathParam("jobId")
       String reloadJobId) throws Exception {
-    return _pinotTableReloadService.getReloadJobStatus(reloadJobId);
+    return _statusReporter.getReloadJobStatus(reloadJobId);
   }
 
   @GET
@@ -170,11 +174,11 @@ public class PinotTableReloadResource {
       @ApiResponse(code = 200, message = "Reload check completed successfully"),
       @ApiResponse(code = 400, message = "Invalid table configuration")
   })
-  public String getTableReloadMetadata(
+  public String needReload(
       @ApiParam(value = "Table name with type suffix", required = true, example = "myTable_REALTIME")
       @PathParam("tableNameWithType") String tableNameWithType,
       @ApiParam(value = "Include detailed server responses", defaultValue = "false") @QueryParam("verbose")
       @DefaultValue("false") boolean verbose, @Context HttpHeaders headers) {
-    return _pinotTableReloadService.getTableReloadMetadata(tableNameWithType, verbose, headers);
+    return _service.needReload(tableNameWithType, verbose, headers);
   }
 }
