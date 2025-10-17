@@ -21,6 +21,7 @@ package org.apache.pinot.segment.local.indexsegment.immutable;
 import com.google.common.base.Preconditions;
 import it.unimi.dsi.fastutil.objects.Object2ObjectOpenHashMap;
 import java.io.File;
+import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Map;
 import java.util.Set;
@@ -130,6 +131,7 @@ public class ImmutableSegmentLoader {
       preprocess(indexDir, indexLoadingConfig, segmentOperationsThrottler, zkMetadata);
     }
     String segmentName = segmentMetadata.getName();
+    Map<String, String> segmentCustomConfigs = zkMetadata != null ? zkMetadata.getCustomMap() : new HashMap<>();
     SegmentDirectoryLoaderContext segmentLoaderContext =
         new SegmentDirectoryLoaderContext.Builder().setTableConfig(indexLoadingConfig.getTableConfig())
             .setSchema(indexLoadingConfig.getSchema())
@@ -140,7 +142,7 @@ public class ImmutableSegmentLoader {
             .setSegmentTier(indexLoadingConfig.getSegmentTier())
             .setInstanceTierConfigs(indexLoadingConfig.getInstanceTierConfigs())
             .setSegmentDirectoryConfigs(indexLoadingConfig.getSegmentDirectoryConfigs())
-            .setSegmentCustomConfigs(zkMetadata.getCustomMap())
+            .setSegmentCustomConfigs(segmentCustomConfigs)
             .build();
     SegmentDirectoryLoader segmentLoader =
         SegmentDirectoryLoaderRegistry.getSegmentDirectoryLoader(indexLoadingConfig.getSegmentDirectoryLoader());

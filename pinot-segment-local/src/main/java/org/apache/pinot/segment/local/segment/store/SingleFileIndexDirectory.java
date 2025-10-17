@@ -372,7 +372,11 @@ class SingleFileIndexDirectory extends ColumnIndexDirectory {
         throw new RuntimeException("Buffer offset out of bounds for entry: " + entry._key);
       }
       validateMagicMarker(buffer, bufferRelativeOffset);
-      entry._buffer = buffer.view(baseOffset - fromFilePos, sliceSize);
+      
+      // Calculate the correct start and end positions for the view
+      long start = baseOffset - fromFilePos;
+      long end = start + sliceSize;
+      entry._buffer = buffer.view(start, end);
     }
   }
 
