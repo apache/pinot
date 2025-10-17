@@ -153,9 +153,6 @@ public class PinotTableReloadStatusReporter {
       }
     }
 
-    // Add ZK fields
-    response.setMetadata(controllerJobZKMetadata);
-
     // Add derived fields
     final long submissionTime =
         Long.parseLong(controllerJobZKMetadata.get(CommonConstants.ControllerJob.SUBMISSION_TIME_MS));
@@ -163,10 +160,9 @@ public class PinotTableReloadStatusReporter {
     final double estimatedRemainingTimeInMinutes =
         computeEstimatedRemainingTimeInMinutes(response, timeElapsedInMinutes);
 
-    response.setTimeElapsedInMinutes(timeElapsedInMinutes)
+    return response.setMetadata(controllerJobZKMetadata)
+        .setTimeElapsedInMinutes(timeElapsedInMinutes)
         .setEstimatedTimeRemainingInMinutes(estimatedRemainingTimeInMinutes);
-
-    return response;
   }
 
   @VisibleForTesting
