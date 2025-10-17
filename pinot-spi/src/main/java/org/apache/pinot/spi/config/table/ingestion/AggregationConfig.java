@@ -21,7 +21,10 @@ package org.apache.pinot.spi.config.table.ingestion;
 import com.fasterxml.jackson.annotation.JsonCreator;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import com.fasterxml.jackson.annotation.JsonPropertyDescription;
+import com.google.common.annotations.VisibleForTesting;
+import javax.annotation.Nullable;
 import org.apache.pinot.spi.config.BaseJsonConfig;
+import org.apache.pinot.spi.data.FieldSpec.DataType;
 
 
 public class AggregationConfig extends BaseJsonConfig {
@@ -32,7 +35,7 @@ public class AggregationConfig extends BaseJsonConfig {
   @JsonPropertyDescription("Aggregation function")
   private final String _aggregationFunction;
 
-  @JsonCreator
+  @VisibleForTesting
   public AggregationConfig(@JsonProperty("columnName") String columnName,
       @JsonProperty("aggregationFunction") String aggregationFunction) {
     _columnName = columnName;
