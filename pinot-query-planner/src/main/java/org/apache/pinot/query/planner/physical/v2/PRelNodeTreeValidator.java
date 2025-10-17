@@ -43,7 +43,6 @@ public class PRelNodeTreeValidator {
     if (context == null) {
       return;
     }
-    // TODO(mse-physical): Add more plan validations here.
     validateLiteModeJoins(rootNode, context);
   }
 

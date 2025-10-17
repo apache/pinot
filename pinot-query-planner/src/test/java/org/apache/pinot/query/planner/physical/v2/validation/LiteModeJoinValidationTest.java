@@ -37,20 +37,19 @@ public class LiteModeJoinValidationTest {
 
   private static PhysicalPlannerContext buildContext(boolean liteModeJoinsEnabled, boolean useLiteMode) {
     return new PhysicalPlannerContext(
-        /* routingManager */ null,
-        /* hostName */ "localhost",
-        /* port */ 8000,
-        /* requestId */ 1L,
-        /* instanceId */ "Broker_localhost",
-        /* queryOptions */ Map.of(),
-        /* defaultUseLiteMode */ useLiteMode,
-        /* defaultRunInBroker */ false,
-        /* defaultUseBrokerPruning */ false,
-        /* defaultLiteModeLeafStageLimit */ CommonConstants.Broker.DEFAULT_LITE_MODE_LEAF_STAGE_LIMIT,
-        /* defaultHashFunction */ KeySelector.DEFAULT_HASH_ALGORITHM,
-        /* defaultLiteModeLeafStageFanOutAdjustedLimit */
+        null,
+        "localhost",
+        8000,
+        1L,
+        "Broker_localhost",
+        Map.of(),
+        useLiteMode,
+        false,
+        false,
+        CommonConstants.Broker.DEFAULT_LITE_MODE_LEAF_STAGE_LIMIT,
+        KeySelector.DEFAULT_HASH_ALGORITHM,
         CommonConstants.Broker.DEFAULT_LITE_MODE_LEAF_STAGE_FAN_OUT_ADJUSTED_LIMIT,
-        /* defaultLiteModeEnableJoins */ liteModeJoinsEnabled);
+        liteModeJoinsEnabled);
   }
 
   private static PRelNode makeJoinPlan() {
@@ -70,8 +69,15 @@ public class LiteModeJoinValidationTest {
   }
 
   @Test
-  public void testJoinBlockedByDefaultInLiteMode() {
-    PhysicalPlannerContext ctx = buildContext(/* liteModeJoinsEnabled */ false, /* useLiteMode */ true);
+  public void testJoinEnabledByDefaultInLiteMode() {
+    PhysicalPlannerContext ctx = buildContext(CommonConstants.Broker.DEFAULT_LITE_MODE_ENABLE_JOINS, true);
+    PRelNode plan = makeJoinPlan();
+    PRelNodeTreeValidator.validate(plan, ctx);
+  }
+
+  @Test
+  public void testJoinNotAllowedWhenEnabledInLiteMode() {
+    PhysicalPlannerContext ctx = buildContext(false, true);
     PRelNode plan = makeJoinPlan();
     try {
       PRelNodeTreeValidator.validate(plan, ctx);
@@ -83,15 +89,8 @@ public class LiteModeJoinValidationTest {
   }
 
   @Test
-  public void testJoinAllowedWhenEnabledInLiteMode() {
-    PhysicalPlannerContext ctx = buildContext(/* liteModeJoinsEnabled */ true, /* useLiteMode */ true);
-    PRelNode plan = makeJoinPlan();
-    PRelNodeTreeValidator.validate(plan, ctx);
-  }
-
-  @Test
   public void testNoJoinPassesEvenWhenDisabled() {
-    PhysicalPlannerContext ctx = buildContext(/* liteModeJoinsEnabled */ false, /* useLiteMode */ true);
+    PhysicalPlannerContext ctx = buildContext(false, true);
     PRelNode plan = makeNoJoinPlan();
     PRelNodeTreeValidator.validate(plan, ctx);
   }
