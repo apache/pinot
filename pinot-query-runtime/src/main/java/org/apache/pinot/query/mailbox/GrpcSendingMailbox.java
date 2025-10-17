@@ -25,8 +25,6 @@ import io.grpc.Metadata;
 import io.grpc.stub.MetadataUtils;
 import io.grpc.stub.StreamObserver;
 import java.io.IOException;
-import java.io.PrintWriter;
-import java.io.StringWriter;
 import java.nio.ByteBuffer;
 import java.util.ArrayList;
 import java.util.Collections;
@@ -338,11 +336,7 @@ public class GrpcSendingMailbox implements SendingMailbox {
       LOGGER.error(errorMsg, ex);
       _senderSideClosed = true;
 
-      StringWriter stringWriter = new StringWriter();
-      try (PrintWriter printWriter = new PrintWriter(stringWriter)) {
-        ex.printStackTrace(printWriter);
-      }
-      MseBlock errorBlock = ErrorMseBlock.fromError(QueryErrorCode.INTERNAL, errorMsg + "\n" + stringWriter);
+      MseBlock errorBlock = ErrorMseBlock.fromError(QueryErrorCode.INTERNAL, errorMsg);
       if (_contentObserver != null) {
         processAndSend(errorBlock, List.of());
       }
