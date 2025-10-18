@@ -26,18 +26,15 @@ import org.apache.pinot.common.assignment.InstancePartitions;
 import org.apache.pinot.controller.helix.core.assignment.segment.SegmentAssignmentUtils;
 import org.apache.pinot.spi.config.table.SegmentsValidationAndRetentionConfig;
 import org.apache.pinot.spi.config.table.TableConfig;
-import org.apache.pinot.spi.config.table.assignment.InstancePartitionsType;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 
 /**
- * Balance num Segment assignment strategy class for offline segment assignment
- * <ul>
- *   <li>
- *     <p>This segment assignment strategy is used when table replication/ num_replica_groups = 1.</p>
- *   </li>
- * </ul>
+ * Balanced segment assignment strategy class where segments are distributed to instances such that each instance has
+ * approximately the same number of segments. This is the default segment assignment strategy.
+ * <p>
+ * This segment assignment strategy is used when table replication/ num_replica_groups = 1.
  */
 public class BalancedNumSegmentAssignmentStrategy implements SegmentAssignmentStrategy {
   private static final Logger LOGGER = LoggerFactory.getLogger(BalancedNumSegmentAssignmentStrategy.class);
@@ -47,7 +44,7 @@ public class BalancedNumSegmentAssignmentStrategy implements SegmentAssignmentSt
   @Override
   public void init(HelixManager helixManager, TableConfig tableConfig) {
     SegmentsValidationAndRetentionConfig validationAndRetentionConfig = tableConfig.getValidationConfig();
-    Preconditions.checkState(validationAndRetentionConfig != null, "Validation Config is null");
+    Preconditions.checkState(validationAndRetentionConfig != null, "segmentsConfig is null");
     _replication = tableConfig.getReplication();
     LOGGER.info("Initialized BalancedNumSegmentAssignmentStrategy for table: {} with replication: {}",
         tableConfig.getTableName(), _replication);
@@ -55,14 +52,14 @@ public class BalancedNumSegmentAssignmentStrategy implements SegmentAssignmentSt
 
   @Override
   public List<String> assignSegment(String segmentName, Map<String, Map<String, String>> currentAssignment,
-      InstancePartitions instancePartitions, InstancePartitionsType instancePartitionsType) {
+      InstancePartitions instancePartitions) {
     validateSegmentAssignmentStrategy(instancePartitions);
     return SegmentAssignmentUtils.assignSegmentWithoutReplicaGroup(currentAssignment, instancePartitions, _replication);
   }
 
   @Override
   public Map<String, Map<String, String>> reassignSegments(Map<String, Map<String, String>> currentAssignment,
-      InstancePartitions instancePartitions, InstancePartitionsType instancePartitionsType) {
+      InstancePartitions instancePartitions) {
     validateSegmentAssignmentStrategy(instancePartitions);
     List<String> instances =
         SegmentAssignmentUtils.getInstancesForNonReplicaGroupBasedAssignment(instancePartitions, _replication);
@@ -74,8 +71,8 @@ public class BalancedNumSegmentAssignmentStrategy implements SegmentAssignmentSt
     int numPartitions = instancePartitions.getNumPartitions();
     // Non-replica-group based assignment should have numReplicaGroups and numPartitions = 1
     Preconditions.checkState(numReplicaGroups == 1,
-        "Replica groups should be 1 in order to use BalanceNumSegmentAssignmentStrategy");
+        "Number of replica groups should be 1 in order to use BalancedNumSegmentAssignmentStrategy");
     Preconditions.checkState(numPartitions == 1,
-        "Replica groups should be 1 in order to use BalanceNumSegmentAssignmentStrategy");
+        "Number of instance partitions should be 1 in order to use BalancedNumSegmentAssignmentStrategy");
   }
 }
