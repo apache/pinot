@@ -800,23 +800,24 @@ public class SegmentIndexCreationDriverImpl implements SegmentIndexCreationDrive
     }
 
     ColumnarSegmentCreationDataSource columnarDataSource = (ColumnarSegmentCreationDataSource) _dataSource;
-    Map<String, ColumnReader> columnReaders = columnarDataSource.getColumnReaders();
-
-    LOGGER.info("Starting columnar segment building for {} columns", columnReaders.size());
-
-    // Reuse existing stats collection and index creation info logic
-    LOGGER.debug("Start building StatsCollector!");
-    collectStatsAndIndexCreationInfo();
-    LOGGER.info("Finished building StatsCollector!");
-    LOGGER.info("Collected stats for {} documents", _totalDocs);
-
-    if (_totalDocs == 0) {
-      LOGGER.warn("No documents found in data source");
-      handlePostCreation();
-      return;
-    }
 
     try {
+      Map<String, ColumnReader> columnReaders = columnarDataSource.getColumnReaders();
+
+      LOGGER.info("Starting columnar segment building for {} columns", columnReaders.size());
+
+      // Reuse existing stats collection and index creation info logic
+      LOGGER.debug("Start building StatsCollector!");
+      collectStatsAndIndexCreationInfo();
+      LOGGER.info("Finished building StatsCollector!");
+      LOGGER.info("Collected stats for {} documents", _totalDocs);
+
+      if (_totalDocs == 0) {
+        LOGGER.warn("No documents found in data source");
+        handlePostCreation();
+        return;
+      }
+
       // Initialize the index creation using the per-column statistics information
       _indexCreator.init(_config, _segmentIndexCreationInfo, _indexCreationInfoMap, _dataSchema, _tempIndexDir, null);
 
@@ -838,13 +839,25 @@ public class SegmentIndexCreationDriverImpl implements SegmentIndexCreationDrive
       }
 
       _totalIndexTimeNs = System.nanoTime() - indexStartTime;
-    } catch (Exception e) {
-      _indexCreator.close();
-      columnarDataSource.close();
-      throw e;
-    }
 
-    LOGGER.info("Finished indexing using columnar approach in IndexCreator!");
-    handlePostCreation();
+      LOGGER.info("Finished indexing using columnar approach in IndexCreator!");
+      handlePostCreation();
+    } catch (Exception e) {
+      try {
+        _indexCreator.close();
+      } catch (Exception closeException) {
+        LOGGER.error("Error closing index creator", closeException);
+        // Add the close exception as suppressed to preserve both exceptions
+        e.addSuppressed(closeException);
+      }
+      throw e;
+    } finally {
+      // Always close the columnar data source to prevent resource leaks
+      try {
+        columnarDataSource.close();
+      } catch (Exception closeException) {
+        LOGGER.error("Error closing columnar data source", closeException);
+      }
+    }
   }
 }
