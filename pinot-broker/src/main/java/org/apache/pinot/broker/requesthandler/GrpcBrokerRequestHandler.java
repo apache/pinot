@@ -37,6 +37,7 @@ import org.apache.pinot.common.response.broker.BrokerResponseNative;
 import org.apache.pinot.common.utils.grpc.ServerGrpcQueryClient;
 import org.apache.pinot.common.utils.grpc.ServerGrpcRequestBuilder;
 import org.apache.pinot.core.query.reduce.StreamingReduceService;
+import org.apache.pinot.core.routing.FederationProvider;
 import org.apache.pinot.core.routing.RoutingManager;
 import org.apache.pinot.core.routing.SegmentsToQuery;
 import org.apache.pinot.core.routing.TableRouteInfo;
@@ -66,9 +67,9 @@ public class GrpcBrokerRequestHandler extends BaseSingleStageBrokerRequestHandle
   public GrpcBrokerRequestHandler(PinotConfiguration config, String brokerId,
       BrokerRequestIdGenerator requestIdGenerator, RoutingManager routingManager,
       AccessControlFactory accessControlFactory, QueryQuotaManager queryQuotaManager, TableCache tableCache,
-      FailureDetector failureDetector, ThreadAccountant threadAccountant) {
+      FailureDetector failureDetector, ThreadAccountant threadAccountant, FederationProvider federationProvider) {
     super(config, brokerId, requestIdGenerator, routingManager, accessControlFactory, queryQuotaManager, tableCache,
-        threadAccountant);
+        threadAccountant, federationProvider);
     _streamingReduceService = new StreamingReduceService(config);
     _streamingQueryClient = new PinotServerStreamingQueryClient(GrpcConfig.buildGrpcQueryConfig(config));
     _failureDetector = failureDetector;

@@ -52,6 +52,7 @@ import org.apache.pinot.common.response.broker.QueryProcessingException;
 import org.apache.pinot.common.utils.request.RequestUtils;
 import org.apache.pinot.core.auth.Actions;
 import org.apache.pinot.core.auth.TargetType;
+import org.apache.pinot.core.routing.FederationProvider;
 import org.apache.pinot.core.routing.RoutingManager;
 import org.apache.pinot.spi.accounting.ThreadAccountant;
 import org.apache.pinot.spi.auth.AuthorizationResult;
@@ -95,6 +96,7 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
   protected final boolean _enableQueryCancellation;
   @Nullable
   protected final String _enableAutoRewriteAggregationType;
+  protected final FederationProvider _federationProvider;
 
   /**
    * Maps broker-generated query id to the query string.
@@ -108,7 +110,7 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
   public BaseBrokerRequestHandler(PinotConfiguration config, String brokerId,
       BrokerRequestIdGenerator requestIdGenerator, RoutingManager routingManager,
       AccessControlFactory accessControlFactory, QueryQuotaManager queryQuotaManager, TableCache tableCache,
-      ThreadAccountant threadAccountant) {
+      ThreadAccountant threadAccountant, FederationProvider federationProvider) {
     _config = config;
     _brokerId = brokerId;
     _requestIdGenerator = requestIdGenerator;
@@ -117,6 +119,7 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
     _queryQuotaManager = queryQuotaManager;
     _tableCache = tableCache;
     _threadAccountant = threadAccountant;
+    _federationProvider = federationProvider;
     _brokerMetrics = BrokerMetrics.get();
     _brokerQueryEventListener = BrokerQueryEventListenerFactory.getBrokerQueryEventListener();
     _trackedHeaders = BrokerQueryEventListenerFactory.getTrackedHeaders();

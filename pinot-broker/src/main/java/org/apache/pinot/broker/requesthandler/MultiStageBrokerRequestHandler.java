@@ -70,6 +70,7 @@ import org.apache.pinot.common.utils.NamedThreadFactory;
 import org.apache.pinot.common.utils.Timer;
 import org.apache.pinot.common.utils.config.QueryOptionsUtils;
 import org.apache.pinot.common.utils.tls.TlsUtils;
+import org.apache.pinot.core.routing.FederationProvider;
 import org.apache.pinot.core.routing.RoutingManager;
 import org.apache.pinot.core.transport.ServerInstance;
 import org.apache.pinot.query.ImmutableQueryEnvironment;
@@ -135,9 +136,10 @@ public class MultiStageBrokerRequestHandler extends BaseBrokerRequestHandler {
   public MultiStageBrokerRequestHandler(PinotConfiguration config, String brokerId,
       BrokerRequestIdGenerator requestIdGenerator, RoutingManager routingManager,
       AccessControlFactory accessControlFactory, QueryQuotaManager queryQuotaManager, TableCache tableCache,
-      MultiStageQueryThrottler queryThrottler, FailureDetector failureDetector, ThreadAccountant threadAccountant) {
+      MultiStageQueryThrottler queryThrottler, FailureDetector failureDetector, ThreadAccountant threadAccountant,
+      FederationProvider federationProvider) {
     super(config, brokerId, requestIdGenerator, routingManager, accessControlFactory, queryQuotaManager, tableCache,
-        threadAccountant);
+        threadAccountant, federationProvider);
     String hostname = config.getProperty(CommonConstants.MultiStageQueryRunner.KEY_OF_QUERY_RUNNER_HOSTNAME);
     int port = Integer.parseInt(config.getProperty(CommonConstants.MultiStageQueryRunner.KEY_OF_QUERY_RUNNER_PORT));
     _workerManager = new WorkerManager(_brokerId, hostname, port, _routingManager);
@@ -337,7 +339,7 @@ public class MultiStageBrokerRequestHandler extends BaseBrokerRequestHandler {
 
     try {
       ImmutableQueryEnvironment.Config queryEnvConf = getQueryEnvConf(httpHeaders, queryOptions, requestId);
-      QueryEnvironment queryEnv = new QueryEnvironment(queryEnvConf);
+      QueryEnvironment queryEnv = new QueryEnvironment(queryEnvConf, _federationProvider);
       return callAsync(requestId, query, () -> queryEnv.compile(query, sqlNodeAndOptions), queryTimer);
     } catch (WebApplicationException e) {
       throw e;

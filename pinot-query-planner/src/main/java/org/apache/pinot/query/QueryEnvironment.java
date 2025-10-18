@@ -68,6 +68,7 @@ import org.apache.pinot.calcite.sql2rel.PinotConvertletTable;
 import org.apache.pinot.common.catalog.PinotCatalogReader;
 import org.apache.pinot.common.config.provider.TableCache;
 import org.apache.pinot.common.utils.config.QueryOptionsUtils;
+import org.apache.pinot.core.routing.FederationProvider;
 import org.apache.pinot.query.catalog.PinotCatalog;
 import org.apache.pinot.query.context.PhysicalPlannerContext;
 import org.apache.pinot.query.context.PlannerContext;
@@ -143,8 +144,13 @@ public class QueryEnvironment {
   private final HepProgram _optProgram;
   private final Config _envConfig;
   private final PinotCatalog _catalog;
+  private final FederationProvider _federationProvider;
 
   public QueryEnvironment(Config config) {
+    this(config, null);
+  }
+
+  public QueryEnvironment(Config config, FederationProvider federationProvider) {
     _envConfig = config;
     String database = config.getDatabase();
     _catalog = new PinotCatalog(config.getTableCache(), database);
@@ -159,6 +165,7 @@ public class QueryEnvironment {
         rootSchema, List.of(database), _typeFactory, CONNECTION_CONFIG, config.isCaseSensitive());
     // default optProgram with no skip rule options and no use rule options
     _optProgram = getOptProgram(Set.of(), Set.of());
+    _federationProvider = federationProvider;
   }
 
   public QueryEnvironment(String database, TableCache tableCache, @Nullable WorkerManager workerManager) {
@@ -501,7 +508,7 @@ public class QueryEnvironment {
     PinotDispatchPlanner pinotDispatchPlanner =
         new PinotDispatchPlanner(plannerContext, _envConfig.getWorkerManager(), _envConfig.getRequestId(),
             _envConfig.getTableCache());
-    return pinotDispatchPlanner.createDispatchableSubPlan(plan);
+    return pinotDispatchPlanner.createDispatchableSubPlan(plan, _federationProvider);
   }
 
   // --------------------------------------------------------------------------
