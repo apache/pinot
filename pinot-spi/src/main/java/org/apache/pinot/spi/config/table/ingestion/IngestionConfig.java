@@ -76,6 +76,9 @@ public class IngestionConfig extends BaseJsonConfig {
   @JsonPropertyDescription("Configs related to check time value for segment")
   private boolean _segmentTimeValueCheck = true;
 
+  @JsonPropertyDescription("Default validation mode for transform functions: STRICT, LENIENT, or LEGACY")
+  private TransformConfig.ValidationMode _defaultTransformValidationMode;
+
   @Deprecated
   public IngestionConfig(@Nullable BatchIngestionConfig batchIngestionConfig,
       @Nullable StreamIngestionConfig streamIngestionConfig, @Nullable FilterConfig filterConfig,
@@ -199,5 +202,14 @@ public class IngestionConfig extends BaseJsonConfig {
 
   public void setSegmentTimeValueCheck(boolean segmentTimeValueCheck) {
     _segmentTimeValueCheck = segmentTimeValueCheck;
+  }
+
+  @Nullable
+  public TransformConfig.ValidationMode getDefaultTransformValidationMode() {
+    return _defaultTransformValidationMode;
+  }
+
+  public void setDefaultTransformValidationMode(@Nullable TransformConfig.ValidationMode defaultTransformValidationMode) {
+    _defaultTransformValidationMode = defaultTransformValidationMode;
   }
 }

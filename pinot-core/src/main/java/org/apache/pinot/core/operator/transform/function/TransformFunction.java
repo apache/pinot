@@ -26,6 +26,8 @@ import org.apache.pinot.core.operator.ColumnContext;
 import org.apache.pinot.core.operator.blocks.ValueBlock;
 import org.apache.pinot.core.operator.transform.TransformResultMetadata;
 import org.apache.pinot.segment.spi.index.reader.Dictionary;
+import org.apache.pinot.spi.data.FieldSpec;
+import org.apache.pinot.spi.data.Schema;
 import org.roaringbitmap.RoaringBitmap;
 
 
@@ -171,4 +173,56 @@ public interface TransformFunction {
    */
   @Nullable
   RoaringBitmap getNullBitmap(ValueBlock block);
+
+  /**
+   * Validates transform function configuration during table creation.
+   */
+  default void validateIngestionConfig(String transformFunctionExpression, 
+      org.apache.pinot.spi.data.Schema schema) {
+    // Default: no validation
+  }
+
+  /**
+   * Returns whether this function supports ingestion-time transformation.
+   */
+  default boolean supportsIngestionTransform() {
+    return true;
+  }
+
+  /**
+   * Infers output data type based on input arguments.
+   */
+  default org.apache.pinot.spi.data.FieldSpec.DataType inferOutputDataType(
+      List<String> inputArguments, org.apache.pinot.spi.data.Schema schema) {
+    return org.apache.pinot.spi.data.FieldSpec.DataType.STRING;
+  }
+
+  /**
+   * Returns expected input data types for validation.
+   */
+  default org.apache.pinot.spi.data.FieldSpec.DataType[] getExpectedInputDataTypes() {
+    return new org.apache.pinot.spi.data.FieldSpec.DataType[0];
+  }
+
+  /**
+   * Returns minimum number of arguments required.
+   */
+  default int getMinArgumentCount() {
+    return 0;
+  }
+
+  /**
+   * Returns maximum number of arguments allowed (-1 for unlimited).
+   */
+  default int getMaxArgumentCount() {
+    return -1;
+  }
+
+  /**
+   * Validates input data type compatibility.
+   */
+  default boolean isInputDataTypeSupported(org.apache.pinot.spi.data.FieldSpec.DataType inputType, 
+      int argumentIndex) {
+    return true;
+  }
 }
