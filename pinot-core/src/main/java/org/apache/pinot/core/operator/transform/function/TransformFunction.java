@@ -27,7 +27,6 @@ import org.apache.pinot.core.operator.blocks.ValueBlock;
 import org.apache.pinot.core.operator.transform.TransformResultMetadata;
 import org.apache.pinot.segment.spi.index.reader.Dictionary;
 import org.apache.pinot.spi.data.FieldSpec;
-import org.apache.pinot.spi.data.Schema;
 import org.roaringbitmap.RoaringBitmap;
 
 
@@ -177,8 +176,7 @@ public interface TransformFunction {
   /**
    * Validates transform function configuration during table creation.
    */
-  default void validateIngestionConfig(String transformFunctionExpression, 
-      org.apache.pinot.spi.data.Schema schema) {
+  default void validateIngestionConfig(String transformFunctionExpression, org.apache.pinot.spi.data.Schema schema) {
     // Default: no validation
   }
 
@@ -192,15 +190,15 @@ public interface TransformFunction {
   /**
    * Infers output data type based on input arguments.
    */
-  default org.apache.pinot.spi.data.FieldSpec.DataType inferOutputDataType(
-      List<String> inputArguments, org.apache.pinot.spi.data.Schema schema) {
-    return org.apache.pinot.spi.data.FieldSpec.DataType.STRING;
+  default org.apache.pinot.spi.data.FieldSpec.DataType inferOutputDataType(List<String> inputArguments,
+      org.apache.pinot.spi.data.Schema schema) {
+    return FieldSpec.DataType.STRING;
   }
 
   /**
    * Returns expected input data types for validation.
    */
-  default org.apache.pinot.spi.data.FieldSpec.DataType[] getExpectedInputDataTypes() {
+  default FieldSpec.DataType[] getExpectedInputDataTypes() {
     return new org.apache.pinot.spi.data.FieldSpec.DataType[0];
   }
 
@@ -221,7 +219,7 @@ public interface TransformFunction {
   /**
    * Validates input data type compatibility.
    */
-  default boolean isInputDataTypeSupported(org.apache.pinot.spi.data.FieldSpec.DataType inputType, 
+  default boolean isInputDataTypeSupported(FieldSpec.DataType inputType,
       int argumentIndex) {
     return true;
   }

@@ -209,7 +209,8 @@ public class IngestionConfig extends BaseJsonConfig {
     return _defaultTransformValidationMode;
   }
 
-  public void setDefaultTransformValidationMode(@Nullable TransformConfig.ValidationMode defaultTransformValidationMode) {
+  public void setDefaultTransformValidationMode(
+      @Nullable TransformConfig.ValidationMode defaultTransformValidationMode) {
     _defaultTransformValidationMode = defaultTransformValidationMode;
   }
 }
