@@ -29,17 +29,33 @@ import org.apache.pinot.spi.config.BaseJsonConfig;
  */
 public class TransformConfig extends BaseJsonConfig {
 
+  public enum ValidationMode {
+    STRICT,   // No automatic type conversions allowed
+    LENIENT,  // Allow safe type conversions (recommended)
+    LEGACY    // Allow all existing conversions including STRING->numeric (default)
+  }
+
   @JsonPropertyDescription("Column name")
   private final String _columnName;
 
   @JsonPropertyDescription("Transformation function string")
   private final String _transformFunction;
 
+  @JsonPropertyDescription("Validation mode for type checking: STRICT, LENIENT, or LEGACY")
+  private final ValidationMode _validationMode;
+
   @JsonCreator
   public TransformConfig(@JsonProperty("columnName") String columnName,
-      @JsonProperty("transformFunction") String transformFunction) {
+      @JsonProperty("transformFunction") String transformFunction,
+      @JsonProperty("validationMode") ValidationMode validationMode) {
     _columnName = columnName;
     _transformFunction = transformFunction;
+    _validationMode = validationMode != null ? validationMode : ValidationMode.LEGACY;
+  }
+
+  // Backward compatibility constructor
+  public TransformConfig(String columnName, String transformFunction) {
+    this(columnName, transformFunction, ValidationMode.LEGACY);
   }
 
   public String getColumnName() {
@@ -48,5 +64,9 @@ public class TransformConfig extends BaseJsonConfig {
 
   public String getTransformFunction() {
     return _transformFunction;
+  }
+
+  public ValidationMode getValidationMode() {
+    return _validationMode;
   }
 }
