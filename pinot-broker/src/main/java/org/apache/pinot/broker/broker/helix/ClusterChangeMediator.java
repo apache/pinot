@@ -63,6 +63,7 @@ public class ClusterChangeMediator
   // If no change got for 1 hour, proactively check changes
   private static final long PROACTIVE_CHANGE_CHECK_INTERVAL_MS = 3600 * 1000L;
 
+  private final String _name;
   private final Map<ChangeType, List<ClusterChangeHandler>> _changeHandlersMap;
   private final Map<ChangeType, Long> _lastChangeTimeMap = new ConcurrentHashMap<>();
   private final Map<ChangeType, Long> _lastProcessTimeMap = new HashMap<>();
@@ -71,8 +72,9 @@ public class ClusterChangeMediator
 
   private volatile boolean _running;
 
-  public ClusterChangeMediator(Map<ChangeType, List<ClusterChangeHandler>> changeHandlersMap,
+  public ClusterChangeMediator(String name, Map<ChangeType, List<ClusterChangeHandler>> changeHandlersMap,
       BrokerMetrics brokerMetrics) {
+    _name = name;
     _changeHandlersMap = changeHandlersMap;
 
     // Initialize last process time map
@@ -183,7 +185,12 @@ public class ClusterChangeMediator
     // External view list should be empty because Helix pre-fetch is disabled
     assert externalViewList.isEmpty();
 
-    enqueueChange(ChangeType.EXTERNAL_VIEW);
+    if (changeContext != null && changeContext.getPathChanged() != null
+            && changeContext.getPathChanged().contains("brokerResource")) {
+      enqueueChange(ChangeType.RESOURCE_CONFIG);
+    } else {
+      enqueueChange(ChangeType.EXTERNAL_VIEW);
+    }
   }
 
   @Override

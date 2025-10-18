@@ -671,6 +671,10 @@ public class ControllerRequestURLBuilder {
     return StringUtil.join("/", _baseUrl, "logicalTables");
   }
 
+  public String forLogicalTableCreate(String baseUrl) {
+    return StringUtil.join("/", baseUrl, "logicalTables");
+  }
+
   public String forLogicalTableUpdate(String logicalTableName) {
     return StringUtil.join("/", _baseUrl, "logicalTables", logicalTableName);
   }
