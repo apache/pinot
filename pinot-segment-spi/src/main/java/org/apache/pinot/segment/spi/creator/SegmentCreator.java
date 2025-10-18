@@ -29,6 +29,7 @@ import org.apache.pinot.segment.spi.IndexSegment;
 import org.apache.pinot.segment.spi.index.creator.SegmentIndexCreationInfo;
 import org.apache.pinot.segment.spi.index.mutable.ThreadSafeMutableRoaringBitmap;
 import org.apache.pinot.spi.data.Schema;
+import org.apache.pinot.spi.data.readers.ColumnReader;
 import org.apache.pinot.spi.data.readers.GenericRow;
 
 
@@ -69,6 +70,9 @@ public interface SegmentCreator extends Closeable, Serializable {
    * @param segment - Used to get the values of the column.
    */
   void indexColumn(String columnName, @Nullable int[] sortedDocIds, IndexSegment segment)
+      throws IOException;
+
+  void indexColumn(String columnName, ColumnReader columnReader)
       throws IOException;
 
   /**
