@@ -154,6 +154,12 @@ public class AggregationFunctionUtils {
         return dataTable.getDouble(rowId, colId);
       case STRING:
         return dataTable.getString(rowId, colId);
+      case FLOAT:
+        return dataTable.getFloat(rowId, colId);
+      case BIG_DECIMAL:
+        return dataTable.getBigDecimal(rowId, colId);
+      case BYTES:
+        return dataTable.getBytes(rowId, colId);
       case OBJECT:
         CustomObject customObject = dataTable.getCustomObject(rowId, colId);
         return customObject != null ? aggregationFunction.deserializeIntermediateResult(customObject) : null;

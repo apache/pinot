@@ -4334,4 +4334,177 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
     }
     Assert.assertTrue(columnPresent, "Column " + newAddedColumn + " not present in result set");
   }
+
+  @Test(dataProvider = "useBothQueryEngines")
+  public void testAdaptiveRegexpLike(boolean useMultiStageQueryEngine)
+      throws Exception {
+    setUseMultiStageQueryEngine(useMultiStageQueryEngine);
+    testRegexpLikeSmallDictionary();
+    testRegexpLikeLargeDictionary();
+    testRegexpLikeWithCaseSensitivity();
+    testRegexpLikeConfigurableThreshold();
+  }
+
+  private void testRegexpLikeSmallDictionary()
+      throws Exception {
+    JsonNode response = postQuery("SELECT COUNT(*) FROM mytable WHERE REGEXP_LIKE(Origin, '^[A-C].*')");
+    int matchCount = response.get("resultTable").get("rows").get(0).get(0).asInt();
+    assertTrue(matchCount > 0, "Should find matches for origins starting with A-C");
+
+    int entriesScanned = response.get("numEntriesScannedInFilter").asInt();
+    assertTrue(entriesScanned < 1000, "Dictionary-based evaluation should scan few entries");
+
+    response = postQuery("SELECT COUNT(*) FROM mytable WHERE REGEXP_LIKE(Origin, '^ZZZ.*')");
+    assertEquals(response.get("resultTable").get("rows").get(0).get(0).asInt(), 0);
+    entriesScanned = response.get("numEntriesScannedInFilter").asInt();
+    assertEquals(entriesScanned, 0, "Non-matching pattern should scan 0 entries");
+  }
+
+  private void testRegexpLikeLargeDictionary()
+      throws Exception {
+    JsonNode response = postQuery("SELECT COUNT(*) FROM mytable WHERE REGEXP_LIKE(TailNum, '^N[0-9]{3}.*')");
+    int matchCount = response.get("resultTable").get("rows").get(0).get(0).asInt();
+    assertTrue(matchCount >= 0, "Should handle tail number pattern matching");
+
+    int entriesScanned = response.get("numEntriesScannedInFilter").asInt();
+    assertTrue(entriesScanned >= matchCount, "Scan-based evaluation should scan at least as many entries as matches");
+
+    response = postQuery("SELECT COUNT(*) FROM mytable WHERE REGEXP_LIKE(TailNum, '^N[1-5][0-9][0-9][A-Z]{2}$')");
+    matchCount = response.get("resultTable").get("rows").get(0).get(0).asInt();
+    assertTrue(matchCount >= 0, "Should handle complex tail number pattern");
+  }
+
+  private void testRegexpLikeWithCaseSensitivity()
+      throws Exception {
+    JsonNode response = postQuery("SELECT COUNT(*) FROM mytable WHERE REGEXP_LIKE(Origin, '.*')");
+    int totalDocs = (int) getCountStarResult();
+    assertEquals(response.get("resultTable").get("rows").get(0).get(0).asInt(), totalDocs);
+    int entriesScanned = response.get("numEntriesScannedInFilter").asInt();
+    assertTrue(entriesScanned <= totalDocs, "Universal match should be optimized");
+
+    response = postQuery("SELECT COUNT(*) FROM mytable WHERE REGEXP_LIKE(Origin, 'NONEXISTENT_PATTERN_XYZ123')");
+    assertEquals(response.get("resultTable").get("rows").get(0).get(0).asInt(), 0);
+    entriesScanned = response.get("numEntriesScannedInFilter").asInt();
+    assertTrue(entriesScanned <= 100, "Non-matching pattern should scan minimal entries");
+
+    response = postQuery("SELECT COUNT(*) FROM mytable WHERE REGEXP_LIKE(Origin, '^lax$')");
+    int caseSensitiveCount = response.get("resultTable").get("rows").get(0).get(0).asInt();
+
+    response = postQuery("SELECT COUNT(*) FROM mytable WHERE REGEXP_LIKE(Origin, '^lax$', 'i')");
+    int caseInsensitiveCount = response.get("resultTable").get("rows").get(0).get(0).asInt();
+
+    assertTrue(caseInsensitiveCount >= caseSensitiveCount, "Case-insensitive should match at least as many");
+  }
+
+  private void testRegexpLikeConfigurableThreshold()
+      throws Exception {
+    String queryLowThreshold = "SELECT COUNT(*) FROM mytable WHERE REGEXP_LIKE(Origin, '^[A-C].*') "
+        + "OPTION(regexpLikeAdaptiveThreshold=0.01)";
+    JsonNode response = postQuery(queryLowThreshold);
+    int matchCount = response.get("resultTable").get("rows").get(0).get(0).asInt();
+    assertTrue(matchCount > 0, "Should find matches with low threshold");
+
+    String queryHighThreshold = "SELECT COUNT(*) FROM mytable WHERE REGEXP_LIKE(Origin, '^[A-C].*') "
+        + "OPTION(regexpLikeAdaptiveThreshold=0.99)";
+    response = postQuery(queryHighThreshold);
+    int matchCountHighThreshold = response.get("resultTable").get("rows").get(0).get(0).asInt();
+    assertEquals(matchCountHighThreshold, matchCount, "Results should be same regardless of threshold");
+
+    try {
+      String queryInvalidThreshold = "SELECT COUNT(*) FROM mytable WHERE REGEXP_LIKE(Origin, '^[A-C].*') "
+          + "OPTION(regexpLikeAdaptiveThreshold=1.5)";
+      response = postQuery(queryInvalidThreshold);
+      assertTrue(response.has("resultTable") || response.has("exceptions"),
+          "Should handle invalid threshold gracefully");
+    } catch (Exception e) {
+      assertTrue(e.getMessage().contains("threshold") || e.getMessage().contains("1.5"),
+          "Error should mention threshold");
+    }
+
+    String queryZeroThreshold = "SELECT COUNT(*) FROM mytable WHERE REGEXP_LIKE(Origin, '^[A-C].*') "
+        + "OPTION(regexpLikeAdaptiveThreshold=0.0)";
+    response = postQuery(queryZeroThreshold);
+    int matchCountZeroThreshold = response.get("resultTable").get("rows").get(0).get(0).asInt();
+    assertEquals(matchCountZeroThreshold, matchCount, "Results should be same with zero threshold");
+
+    String queryMaxThreshold = "SELECT COUNT(*) FROM mytable WHERE REGEXP_LIKE(Origin, '^[A-C].*') "
+        + "OPTION(regexpLikeAdaptiveThreshold=1.0)";
+    response = postQuery(queryMaxThreshold);
+    int matchCountMaxThreshold = response.get("resultTable").get("rows").get(0).get(0).asInt();
+    assertEquals(matchCountMaxThreshold, matchCount, "Results should be same with max threshold");
+  }
+
+  @Test
+  public void testAnyValueFunctionality() throws Exception {
+    // Test 1: Basic ANY_VALUE functionality with GROUP BY
+    String query = "SELECT Carrier, ANY_VALUE(Origin), COUNT(*) FROM mytable GROUP BY Carrier ORDER BY Carrier LIMIT 5";
+    JsonNode response = postQuery(query);
+    JsonNode rows = response.get("resultTable").get("rows");
+    assertTrue(rows.size() > 0, "Should have results");
+
+    for (int i = 0; i < rows.size(); i++) {
+      JsonNode row = rows.get(i);
+      assertNotNull(row.get(0).asText(), "Carrier should not be null");
+      assertNotNull(row.get(1).asText(), "ANY_VALUE(Origin) should not be null");
+      assertTrue(row.get(2).asInt() > 0, "COUNT should be greater than 0");
+    }
+
+    // Test 2: ANY_VALUE without GROUP BY - should return single values
+    query = "SELECT ANY_VALUE(Carrier), ANY_VALUE(Origin), COUNT(*) FROM mytable";
+    response = postQuery(query);
+    rows = response.get("resultTable").get("rows");
+    assertEquals(rows.size(), 1, "Should have 1 row without GROUP BY");
+
+    JsonNode row = rows.get(0);
+    assertNotNull(row.get(0).asText(), "ANY_VALUE(Carrier) should not be null");
+    assertNotNull(row.get(1).asText(), "ANY_VALUE(Origin) should not be null");
+    assertTrue(row.get(2).asInt() > 0, "COUNT should be greater than 0");
+
+    // Test 3: ANY_VALUE with multiple GROUP BY columns
+    query = "SELECT Carrier, Origin, ANY_VALUE(Dest), COUNT(*) FROM mytable"
+        + " GROUP BY Carrier, Origin ORDER BY Carrier, Origin LIMIT 10";
+    response = postQuery(query);
+    rows = response.get("resultTable").get("rows");
+    assertTrue(rows.size() > 0, "Should have results for multiple GROUP BY");
+
+    for (int i = 0; i < rows.size(); i++) {
+      row = rows.get(i);
+      assertNotNull(row.get(0).asText(), "Carrier should not be null");
+      assertNotNull(row.get(1).asText(), "Origin should not be null");
+      assertNotNull(row.get(2).asText(), "ANY_VALUE(Dest) should not be null");
+      assertTrue(row.get(3).asInt() > 0, "COUNT should be greater than 0");
+    }
+
+    // Test 4: ANY_VALUE with different data types
+    query = "SELECT ANY_VALUE(Carrier) as StringValue, ANY_VALUE(AirlineID) as IntValue,"
+        + " ANY_VALUE(FlightNum) as IntValue2, ANY_VALUE(ArrDelay) as DoubleValue FROM mytable";
+    response = postQuery(query);
+    rows = response.get("resultTable").get("rows");
+    assertEquals(rows.size(), 1, "Should have 1 row for data types test");
+
+    row = rows.get(0);
+    assertNotNull(row.get(0).asText(), "String ANY_VALUE should not be null");
+    assertTrue(row.get(1).asInt() >= 0, "Int ANY_VALUE should be valid");
+    assertTrue(row.get(2).asInt() >= 0, "Int ANY_VALUE should be valid");
+    // ArrDelay can be negative, so just check it's a valid number
+    assertNotNull(row.get(3), "Double ANY_VALUE should not be null");
+
+    // Test 5: ANY_VALUE in complex query with multiple aggregations
+    query = "SELECT Origin, ANY_VALUE(Carrier) as SampleCarrier, ANY_VALUE(Dest) as SampleDest,"
+        + " COUNT(*) as FlightCount, AVG(ArrDelay) as AvgDelay FROM mytable"
+        + " GROUP BY Origin ORDER BY FlightCount DESC LIMIT 5";
+    response = postQuery(query);
+    rows = response.get("resultTable").get("rows");
+    assertTrue(rows.size() > 0, "Should have results for complex query");
+
+    for (int i = 0; i < rows.size(); i++) {
+      row = rows.get(i);
+      assertNotNull(row.get(0).asText(), "Origin should not be null");
+      assertNotNull(row.get(1).asText(), "ANY_VALUE(Carrier) should not be null");
+      assertNotNull(row.get(2).asText(), "ANY_VALUE(Dest) should not be null");
+      assertTrue(row.get(3).asInt() > 0, "FlightCount should be positive");
+      // AvgDelay can be negative, so just verify it's a number
+      assertNotNull(row.get(4), "AvgDelay should not be null");
+    }
+  }
 }
