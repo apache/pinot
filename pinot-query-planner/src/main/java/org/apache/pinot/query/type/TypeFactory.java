@@ -24,6 +24,7 @@ import java.util.Map;
 import org.apache.calcite.jdbc.JavaTypeFactoryImpl;
 import org.apache.calcite.rel.type.RelDataType;
 import org.apache.calcite.sql.type.SqlTypeName;
+import org.apache.pinot.query.validate.Validator;
 import org.apache.pinot.spi.data.ComplexFieldSpec;
 import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.Schema;
@@ -57,6 +58,23 @@ public class TypeFactory extends JavaTypeFactoryImpl {
     boolean enableNullHandling = schema.isEnableColumnBasedNullHandling();
     for (Map.Entry<String, FieldSpec> entry : schema.getFieldSpecMap().entrySet()) {
       builder.add(entry.getKey(), toRelDataType(entry.getValue(), enableNullHandling));
+    }
+    return builder.build();
+  }
+
+  /**
+   * Creates RelDataType from Schema excluding virtual columns (columns starting with '$').
+   * This is used for NATURAL JOIN operations where virtual columns should not participate
+   * in join condition matching.
+   */
+  public RelDataType createRelDataTypeFromSchemaExcludingVirtualColumns(Schema schema) {
+    Builder builder = new Builder(this);
+    boolean enableNullHandling = schema.isEnableColumnBasedNullHandling();
+    for (Map.Entry<String, FieldSpec> entry : schema.getFieldSpecMap().entrySet()) {
+      String columnName = entry.getKey();
+      if (Validator.isVirtualColumn(columnName)) {
+        builder.add(columnName, toRelDataType(entry.getValue(), enableNullHandling));
+      }
     }
     return builder.build();
   }

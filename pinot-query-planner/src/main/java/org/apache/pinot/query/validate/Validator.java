@@ -120,7 +120,7 @@ public class Validator extends SqlValidatorImpl {
    * @param columnName column name
    * @return true if the column is a virtual column
    */
-  private static boolean isVirtualColumn(String columnName) {
+  public static boolean isVirtualColumn(String columnName) {
     return columnName.length() > 0 && columnName.charAt(0) == '$';
   }
 

@@ -36,9 +36,19 @@ import org.apache.pinot.spi.data.Schema;
  */
 public class PinotTable extends AbstractTable implements ScannableTable {
   private Schema _schema;
+  private boolean _excludeVirtualColumns = false;
 
   public PinotTable(Schema schema) {
     _schema = schema;
+  }
+
+  /**
+   * Sets whether virtual columns should be excluded from the table schema.
+   * This is typically used for NATURAL JOIN operations where virtual columns
+   * should not participate in join condition matching.
+   */
+  public void setExcludeVirtualColumns(boolean excludeVirtualColumns) {
+    _excludeVirtualColumns = excludeVirtualColumns;
   }
 
   @Override
@@ -49,7 +59,12 @@ public class PinotTable extends AbstractTable implements ScannableTable {
     } else { // this can happen when using Frameworks.withPrepare, which wraps our factory in a JavaTypeFactoryImpl
       typeFactory = TypeFactory.INSTANCE;
     }
-    return typeFactory.createRelDataTypeFromSchema(_schema);
+
+    if (shouldExcludeVirtualColumns()) {
+      return typeFactory.createRelDataTypeFromSchemaExcludingVirtualColumns(_schema);
+    } else {
+      return typeFactory.createRelDataTypeFromSchema(_schema);
+    }
   }
 
   @Override
@@ -60,5 +75,9 @@ public class PinotTable extends AbstractTable implements ScannableTable {
   @Override
   public Enumerable<Object[]> scan(DataContext dataContext) {
     return null;
+  }
+  
+  private boolean shouldExcludeVirtualColumns() {
+    return _excludeVirtualColumns;
   }
 }

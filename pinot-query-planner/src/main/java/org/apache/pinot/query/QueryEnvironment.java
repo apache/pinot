@@ -44,11 +44,15 @@ import org.apache.calcite.rel.RelNode;
 import org.apache.calcite.rel.RelRoot;
 import org.apache.calcite.rex.RexBuilder;
 import org.apache.calcite.runtime.CalciteContextException;
+import org.apache.calcite.sql.SqlCall;
 import org.apache.calcite.sql.SqlExplain;
 import org.apache.calcite.sql.SqlExplainFormat;
 import org.apache.calcite.sql.SqlExplainLevel;
+import org.apache.calcite.sql.SqlJoin;
 import org.apache.calcite.sql.SqlKind;
 import org.apache.calcite.sql.SqlNode;
+import org.apache.calcite.sql.SqlSelect;
+import org.apache.calcite.sql.util.SqlBasicVisitor;
 import org.apache.calcite.sql2rel.RelDecorrelator;
 import org.apache.calcite.sql2rel.SqlToRelConverter;
 import org.apache.calcite.tools.FrameworkConfig;
@@ -175,11 +179,64 @@ public class QueryEnvironment {
   }
 
   /**
+   * Configures virtual column exclusion for catalog tables based on query analysis.
+   * Refer: https://github.com/apache/pinot/issues/15522
+   * This method detects NATURAL JOIN operations and sets the appropriate flag on PinotTable instances.
+   */
+  private void configureVirtualColumnExclusion(SqlNodeAndOptions sqlNodeAndOptions) {
+    boolean excludeVirtualColumns = false;
+    if (containsNaturalJoin(sqlNodeAndOptions.getSqlNode())) {
+      excludeVirtualColumns = true;
+    }
+
+    if (excludeVirtualColumns) {
+      _catalog.configureVirtualColumnExclusion(true);
+    }
+  }
+
+  /**
+   * Checks if the SQL query contains a NATURAL JOIN.
+   */
+  private boolean containsNaturalJoin(SqlNode sqlNode) {
+    NaturalJoinDetector detector = new NaturalJoinDetector();
+    sqlNode.accept(detector);
+    return detector.hasNaturalJoin();
+  }
+
+  /**
+   * A simple visitor that detects NATURAL JOIN operations in the SQL AST.
+   * This leverages Calcite's built-in visitor pattern instead of manual recursion.
+   */
+  private static class NaturalJoinDetector extends SqlBasicVisitor<Void> {
+    private boolean _hasNaturalJoin = false;
+
+    @Override
+    public Void visit(SqlCall call) {
+      if (call instanceof SqlJoin) {
+        SqlJoin join = (SqlJoin) call;
+        if (join.isNatural()) {
+          _hasNaturalJoin = true;
+          return null;
+        }
+      }
+      return super.visit(call);
+    }
+
+    public boolean hasNaturalJoin() {
+      return _hasNaturalJoin;
+    }
+  }
+
+  /**
    * Returns a planner context that can be used to either parse, explain or execute a query.
    */
   private PlannerContext getPlannerContext(SqlNodeAndOptions sqlNodeAndOptions) {
     WorkerManager workerManager = getWorkerManager(sqlNodeAndOptions);
     Map<String, String> options = sqlNodeAndOptions.getOptions();
+    
+    // Detect NATURAL JOIN and configure catalog tables accordingly
+    configureVirtualColumnExclusion(sqlNodeAndOptions);
+    
     HepProgram optProgram = _optProgram;
     Set<String> useRuleSet = QueryOptionsUtils.getUsePlannerRules(options);
     if (MapUtils.isNotEmpty(options)) {

@@ -48,6 +48,7 @@ public class PinotCatalog implements Schema {
 
   private final TableCache _tableCache;
   private final String _databaseName;
+  private boolean _excludeVirtualColumns = false;
 
   /**
    * PinotCatalog needs have access to the actual {@link TableCache} object because TableCache hosts the actual
@@ -56,6 +57,15 @@ public class PinotCatalog implements Schema {
   public PinotCatalog(TableCache tableCache, String databaseName) {
     _tableCache = tableCache;
     _databaseName = databaseName;
+  }
+
+  /**
+   * Configures whether virtual columns should be excluded from table schemas.
+   * This is typically used for NATURAL JOIN operations where virtual columns
+   * should not participate in join condition matching.
+   */
+  public void configureVirtualColumnExclusion(boolean excludeVirtualColumns) {
+    _excludeVirtualColumns = excludeVirtualColumns;
   }
 
   /**
@@ -82,7 +92,9 @@ public class PinotCatalog implements Schema {
       return null;
     }
 
-    return new PinotTable(schema);
+    PinotTable table = new PinotTable(schema);
+    table.setExcludeVirtualColumns(_excludeVirtualColumns);
+    return table;
   }
 
   /**
