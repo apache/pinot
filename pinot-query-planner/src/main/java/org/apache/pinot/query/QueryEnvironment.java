@@ -95,6 +95,7 @@ import org.apache.pinot.query.validate.BytesCastVisitor;
 import org.apache.pinot.spi.exception.QueryErrorCode;
 import org.apache.pinot.spi.exception.QueryException;
 import org.apache.pinot.spi.utils.CommonConstants;
+import org.apache.pinot.spi.utils.CommonConstants.Broker.Request.QueryOptionKey;
 import org.apache.pinot.sql.parsers.CalciteSqlParser;
 import org.apache.pinot.sql.parsers.SqlNodeAndOptions;
 import org.apache.pinot.sql.parsers.parser.SqlPhysicalExplain;
@@ -178,33 +179,36 @@ public class QueryEnvironment {
   }
 
   /**
-   * Configures virtual column exclusion for catalog tables based on query analysis.
+   * Configures virtual column exclusion for catalog tables based on query options.
    * Refer: https://github.com/apache/pinot/issues/15522
-   * This method detects NATURAL JOIN operations and sets the appropriate flag on PinotTable instances.
+   * This method checks if user explicitly set the 'excludeVirtualColumns' query option.
    */
   private void configureVirtualColumnExclusion(SqlNodeAndOptions sqlNodeAndOptions) {
-    boolean excludeVirtualColumns = false;
-    if (containsNaturalJoin(sqlNodeAndOptions.getSqlNode())) {
-      excludeVirtualColumns = true;
-    }
+    Map<String, String> options = sqlNodeAndOptions.getOptions();
 
-    if (excludeVirtualColumns) {
+    // Check if user explicitly set the query option
+    String excludeVirtualColumnsOption = options.get(QueryOptionKey.EXCLUDE_VIRTUAL_COLUMNS);
+    if (Boolean.parseBoolean(excludeVirtualColumnsOption)) {
       _catalog.configureVirtualColumnExclusion(true);
     }
   }
 
-  /**
-   * Checks if the SQL query contains a NATURAL JOIN.
-   */
-  private boolean containsNaturalJoin(SqlNode sqlNode) {
+  private boolean isNaturalJoinQuery(SqlNode sqlNode) {
+    if (sqlNode == null) {
+      return false;
+    }
+
     NaturalJoinDetector detector = new NaturalJoinDetector();
-    sqlNode.accept(detector);
-    return detector.hasNaturalJoin();
+    try {
+      sqlNode.accept(detector);
+      return detector.hasNaturalJoin();
+    } catch (Exception e) {
+      return false;
+    }
   }
 
   /**
-   * A simple visitor that detects NATURAL JOIN operations in the SQL AST.
-   * This leverages Calcite's built-in visitor pattern instead of manual recursion.
+   * Visitor that detects NATURAL JOIN operations in the SQL AST.
    */
   private static class NaturalJoinDetector extends SqlBasicVisitor<Void> {
     private boolean _hasNaturalJoin = false;
@@ -224,6 +228,37 @@ public class QueryEnvironment {
     public boolean hasNaturalJoin() {
       return _hasNaturalJoin;
     }
+  }
+
+  /**
+   * Enhances validation error messages for specific scenarios like NATURAL JOIN issues.
+   * To enhance the error message: Error Code: 700 (QueryValidationError)
+   * QueryValidationError: Index 58 out of bounds for length 54
+   *
+   */
+  private String enhanceValidationErrorMessage(SqlNode sqlNode, Throwable originalError,
+      PlannerContext plannerContext) {
+    String originalMessage = originalError.getMessage();
+
+    if (originalError instanceof IndexOutOfBoundsException && isNaturalJoinQuery(sqlNode)) {
+      if (!isExcludeVirtualColumnsEnabled(plannerContext)) {
+        return String.format("NATURAL JOIN failed : %s. "
+            + "This error typically occurs when virtual columns (columns starting with '$') gets included in join "
+            + "condition matching. To resolve this issue, add OPTION(%s=true) to exclude virtual columns from the"
+            + " join. ", originalMessage, QueryOptionKey.EXCLUDE_VIRTUAL_COLUMNS);
+      }
+    }
+    return originalMessage;
+  }
+
+  /**
+   * Checks if excludeVirtualColumns option is enabled in the current query context.
+   */
+  private boolean isExcludeVirtualColumnsEnabled(PlannerContext plannerContext) {
+    // Access the query options from the planner context
+    Map<String, String> options = plannerContext.getOptions();
+    String excludeVirtualColumnsOption = options.get(QueryOptionKey.EXCLUDE_VIRTUAL_COLUMNS);
+    return Boolean.parseBoolean(excludeVirtualColumnsOption);
   }
 
   /**
@@ -452,7 +487,9 @@ public class QueryEnvironment {
     } catch (CalciteContextException e) {
       throw CalciteContextExceptionClassifier.classifyValidationException(e);
     } catch (Throwable e) {
-      throw QueryErrorCode.QUERY_VALIDATION.asException(e.getMessage(), e);
+      // Enhanced error handling for specific validation issues
+      String enhancedMessage = enhanceValidationErrorMessage(sqlNode, e, plannerContext);
+      throw QueryErrorCode.QUERY_VALIDATION.asException(enhancedMessage, e);
     }
   }
 

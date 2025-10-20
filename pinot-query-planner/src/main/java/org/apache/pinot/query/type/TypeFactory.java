@@ -21,6 +21,7 @@ package org.apache.pinot.query.type;
 import java.nio.charset.Charset;
 import java.nio.charset.StandardCharsets;
 import java.util.Map;
+import java.util.function.Predicate;
 import org.apache.calcite.jdbc.JavaTypeFactoryImpl;
 import org.apache.calcite.rel.type.RelDataType;
 import org.apache.calcite.sql.type.SqlTypeName;
@@ -54,12 +55,7 @@ public class TypeFactory extends JavaTypeFactoryImpl {
   }
 
   public RelDataType createRelDataTypeFromSchema(Schema schema) {
-    Builder builder = new Builder(this);
-    boolean enableNullHandling = schema.isEnableColumnBasedNullHandling();
-    for (Map.Entry<String, FieldSpec> entry : schema.getFieldSpecMap().entrySet()) {
-      builder.add(entry.getKey(), toRelDataType(entry.getValue(), enableNullHandling));
-    }
-    return builder.build();
+    return createRelDataTypeFromSchema(schema, column -> false);
   }
 
   /**
@@ -68,11 +64,22 @@ public class TypeFactory extends JavaTypeFactoryImpl {
    * in join condition matching.
    */
   public RelDataType createRelDataTypeFromSchemaExcludingVirtualColumns(Schema schema) {
+    return createRelDataTypeFromSchema(schema, Validator::isVirtualColumn);
+  }
+
+  /**
+   * Creates RelDataType from Schema with optional column exclusion.
+   * 
+   * @param schema the schema to create RelDataType from
+   * @param shouldExclude predicate to determine if a column should be excluded
+   * @return RelDataType representing the schema
+   */
+  private RelDataType createRelDataTypeFromSchema(Schema schema, Predicate<String> shouldExclude) {
     Builder builder = new Builder(this);
     boolean enableNullHandling = schema.isEnableColumnBasedNullHandling();
     for (Map.Entry<String, FieldSpec> entry : schema.getFieldSpecMap().entrySet()) {
       String columnName = entry.getKey();
-      if (!Validator.isVirtualColumn(columnName)) {
+      if (!shouldExclude.test(columnName)) {
         builder.add(columnName, toRelDataType(entry.getValue(), enableNullHandling));
       }
     }

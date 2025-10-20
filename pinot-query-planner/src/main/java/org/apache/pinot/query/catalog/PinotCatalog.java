@@ -92,9 +92,7 @@ public class PinotCatalog implements Schema {
       return null;
     }
 
-    PinotTable table = new PinotTable(schema);
-    table.setExcludeVirtualColumns(_excludeVirtualColumns);
-    return table;
+    return new PinotTable(schema, _excludeVirtualColumns);
   }
 
   /**
