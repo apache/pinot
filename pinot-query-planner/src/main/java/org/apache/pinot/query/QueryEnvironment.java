@@ -51,7 +51,6 @@ import org.apache.calcite.sql.SqlExplainLevel;
 import org.apache.calcite.sql.SqlJoin;
 import org.apache.calcite.sql.SqlKind;
 import org.apache.calcite.sql.SqlNode;
-import org.apache.calcite.sql.util.SqlBasicVisitor;
 import org.apache.calcite.sql2rel.RelDecorrelator;
 import org.apache.calcite.sql2rel.SqlToRelConverter;
 import org.apache.calcite.tools.FrameworkConfig;
@@ -186,7 +185,6 @@ public class QueryEnvironment {
   private void configureVirtualColumnExclusion(SqlNodeAndOptions sqlNodeAndOptions) {
     Map<String, String> options = sqlNodeAndOptions.getOptions();
 
-    // Check if user explicitly set the query option
     String excludeVirtualColumnsOption = options.get(QueryOptionKey.EXCLUDE_VIRTUAL_COLUMNS);
     if (Boolean.parseBoolean(excludeVirtualColumnsOption)) {
       _catalog.configureVirtualColumnExclusion(true);
@@ -200,13 +198,9 @@ public class QueryEnvironment {
     if (sqlNode == null) {
       return false;
     }
-    
-    // Direct check for SqlJoin
     if (sqlNode instanceof SqlJoin) {
       return ((SqlJoin) sqlNode).isNatural();
     }
-    
-    // Recursively check operands for SqlCall nodes
     if (sqlNode instanceof SqlCall) {
       SqlCall call = (SqlCall) sqlNode;
       for (SqlNode operand : call.getOperandList()) {
@@ -215,7 +209,6 @@ public class QueryEnvironment {
         }
       }
     }
-    
     return false;
   }
 
