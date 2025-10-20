@@ -76,7 +76,7 @@ public class PinotTable extends AbstractTable implements ScannableTable {
   public Enumerable<Object[]> scan(DataContext dataContext) {
     return null;
   }
-  
+
   private boolean shouldExcludeVirtualColumns() {
     return _excludeVirtualColumns;
   }

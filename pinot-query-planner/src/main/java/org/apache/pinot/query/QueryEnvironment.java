@@ -51,7 +51,6 @@ import org.apache.calcite.sql.SqlExplainLevel;
 import org.apache.calcite.sql.SqlJoin;
 import org.apache.calcite.sql.SqlKind;
 import org.apache.calcite.sql.SqlNode;
-import org.apache.calcite.sql.SqlSelect;
 import org.apache.calcite.sql.util.SqlBasicVisitor;
 import org.apache.calcite.sql2rel.RelDecorrelator;
 import org.apache.calcite.sql2rel.SqlToRelConverter;
@@ -233,10 +232,10 @@ public class QueryEnvironment {
   private PlannerContext getPlannerContext(SqlNodeAndOptions sqlNodeAndOptions) {
     WorkerManager workerManager = getWorkerManager(sqlNodeAndOptions);
     Map<String, String> options = sqlNodeAndOptions.getOptions();
-    
+
     // Detect NATURAL JOIN and configure catalog tables accordingly
     configureVirtualColumnExclusion(sqlNodeAndOptions);
-    
+
     HepProgram optProgram = _optProgram;
     Set<String> useRuleSet = QueryOptionsUtils.getUsePlannerRules(options);
     if (MapUtils.isNotEmpty(options)) {
