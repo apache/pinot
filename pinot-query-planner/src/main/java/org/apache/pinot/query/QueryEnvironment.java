@@ -184,9 +184,7 @@ public class QueryEnvironment {
    */
   private void configureVirtualColumnExclusion(SqlNodeAndOptions sqlNodeAndOptions) {
     Map<String, String> options = sqlNodeAndOptions.getOptions();
-
-    String excludeVirtualColumnsOption = options.get(QueryOptionKey.EXCLUDE_VIRTUAL_COLUMNS);
-    if (Boolean.parseBoolean(excludeVirtualColumnsOption)) {
+    if (isExcludeVirtualColumnsEnabled(options)) {
       _catalog.configureVirtualColumnExclusion(true);
     }
   }
@@ -223,10 +221,10 @@ public class QueryEnvironment {
     String originalMessage = originalError.getMessage();
 
     if (originalError instanceof IndexOutOfBoundsException && isNaturalJoinQuery(sqlNode)) {
-      if (!isExcludeVirtualColumnsEnabled(plannerContext)) {
-        return String.format("NATURAL JOIN failed : %s. "
-                + "This error typically occurs when virtual columns (columns starting with '$') gets included in join "
-                + "condition matching. To resolve this issue, add OPTION(%s=true) in the query", originalMessage,
+      if (!isExcludeVirtualColumnsEnabled(plannerContext.getOptions())) {
+        return String.format(
+            "%s. This error typically occurs when virtual columns (columns starting with '$') gets included in the "
+                + "NATURAL JOIN condition matching. To fix, add OPTION(%s=true) in the query.", originalMessage,
             QueryOptionKey.EXCLUDE_VIRTUAL_COLUMNS);
       }
     }
@@ -236,11 +234,8 @@ public class QueryEnvironment {
   /**
    * Checks if excludeVirtualColumns option is enabled in the current query context.
    */
-  private boolean isExcludeVirtualColumnsEnabled(PlannerContext plannerContext) {
-    // Access the query options from the planner context
-    Map<String, String> options = plannerContext.getOptions();
-    String excludeVirtualColumnsOption = options.get(QueryOptionKey.EXCLUDE_VIRTUAL_COLUMNS);
-    return Boolean.parseBoolean(excludeVirtualColumnsOption);
+  private boolean isExcludeVirtualColumnsEnabled(Map<String, String> options) {
+    return Boolean.parseBoolean(options.get(QueryOptionKey.EXCLUDE_VIRTUAL_COLUMNS));
   }
 
   /**
