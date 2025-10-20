@@ -72,7 +72,7 @@ public class TypeFactory extends JavaTypeFactoryImpl {
     boolean enableNullHandling = schema.isEnableColumnBasedNullHandling();
     for (Map.Entry<String, FieldSpec> entry : schema.getFieldSpecMap().entrySet()) {
       String columnName = entry.getKey();
-      if (Validator.isVirtualColumn(columnName)) {
+      if (!Validator.isVirtualColumn(columnName)) {
         builder.add(columnName, toRelDataType(entry.getValue(), enableNullHandling));
       }
     }
