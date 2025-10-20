@@ -25,6 +25,7 @@ import org.apache.calcite.rel.type.RelDataTypeFactory;
 import org.apache.calcite.schema.ScannableTable;
 import org.apache.calcite.schema.impl.AbstractTable;
 import org.apache.pinot.query.type.TypeFactory;
+import org.apache.pinot.query.validate.Validator;
 import org.apache.pinot.spi.data.Schema;
 
 
@@ -62,7 +63,7 @@ public class PinotTable extends AbstractTable implements ScannableTable {
     }
 
     if (_excludeVirtualColumns) {
-      return typeFactory.createRelDataTypeFromSchemaExcludingVirtualColumns(_schema);
+      return typeFactory.createRelDataTypeFromSchema(_schema, Validator::isVirtualColumn);
     } else {
       return typeFactory.createRelDataTypeFromSchema(_schema);
     }
