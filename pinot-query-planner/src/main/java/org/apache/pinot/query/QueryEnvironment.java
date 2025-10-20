@@ -187,7 +187,7 @@ public class QueryEnvironment {
     Map<String, String> options = sqlNodeAndOptions.getOptions();
 
     // Check if user explicitly set the query option
-    String excludeVirtualColumnsOption = options.get("excludeVirtualColumns");
+    String excludeVirtualColumnsOption = options.get(QueryOptionKey.EXCLUDE_VIRTUAL_COLUMNS);
     if (Boolean.parseBoolean(excludeVirtualColumnsOption)) {
       _catalog.configureVirtualColumnExclusion(true);
     }
@@ -234,7 +234,7 @@ public class QueryEnvironment {
         return String.format("NATURAL JOIN failed : %s. "
                 + "This error typically occurs when virtual columns (columns starting with '$') gets included in join "
                 + "condition matching. To resolve this issue, add OPTION(%s=true) in the query", originalMessage,
-            "excludeVirtualColumns");
+            QueryOptionKey.EXCLUDE_VIRTUAL_COLUMNS);
       }
     }
     return originalMessage;
@@ -246,7 +246,7 @@ public class QueryEnvironment {
   private boolean isExcludeVirtualColumnsEnabled(PlannerContext plannerContext) {
     // Access the query options from the planner context
     Map<String, String> options = plannerContext.getOptions();
-    String excludeVirtualColumnsOption = options.get("excludeVirtualColumns");
+    String excludeVirtualColumnsOption = options.get(QueryOptionKey.EXCLUDE_VIRTUAL_COLUMNS);
     return Boolean.parseBoolean(excludeVirtualColumnsOption);
   }
 
