@@ -236,16 +236,16 @@ public class QueryEnvironment {
    * QueryValidationError: Index 58 out of bounds for length 54
    *
    */
-  private String enhanceValidationErrorMessage(SqlNode sqlNode, Throwable originalError,
+  private String enhanceNaturalJoinErrorMessage(SqlNode sqlNode, Throwable originalError,
       PlannerContext plannerContext) {
     String originalMessage = originalError.getMessage();
 
     if (originalError instanceof IndexOutOfBoundsException && isNaturalJoinQuery(sqlNode)) {
       if (!isExcludeVirtualColumnsEnabled(plannerContext)) {
         return String.format("NATURAL JOIN failed : %s. "
-            + "This error typically occurs when virtual columns (columns starting with '$') gets included in join "
-            + "condition matching. To resolve this issue, add OPTION(%s=true) to exclude virtual columns from the"
-            + " join. ", originalMessage, QueryOptionKey.EXCLUDE_VIRTUAL_COLUMNS);
+                + "This error typically occurs when virtual columns (columns starting with '$') gets included in join "
+                + "condition matching. To resolve this issue, add OPTION(%s=true) in the query", originalMessage,
+            QueryOptionKey.EXCLUDE_VIRTUAL_COLUMNS);
       }
     }
     return originalMessage;
@@ -488,7 +488,7 @@ public class QueryEnvironment {
       throw CalciteContextExceptionClassifier.classifyValidationException(e);
     } catch (Throwable e) {
       // Enhanced error handling for specific validation issues
-      String enhancedMessage = enhanceValidationErrorMessage(sqlNode, e, plannerContext);
+      String enhancedMessage = enhanceNaturalJoinErrorMessage(sqlNode, e, plannerContext);
       throw QueryErrorCode.QUERY_VALIDATION.asException(enhancedMessage, e);
     }
   }

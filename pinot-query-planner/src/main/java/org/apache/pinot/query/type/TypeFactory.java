@@ -61,19 +61,12 @@ public class TypeFactory extends JavaTypeFactoryImpl {
   /**
    * Creates RelDataType from Schema excluding virtual columns (columns starting with '$').
    * This is used for NATURAL JOIN operations where virtual columns should not participate
-   * in join condition matching.
+   * in join condition matching. Reference: https://github.com/apache/pinot/issues/15522
    */
   public RelDataType createRelDataTypeFromSchemaExcludingVirtualColumns(Schema schema) {
     return createRelDataTypeFromSchema(schema, Validator::isVirtualColumn);
   }
 
-  /**
-   * Creates RelDataType from Schema with optional column exclusion.
-   * 
-   * @param schema the schema to create RelDataType from
-   * @param shouldExclude predicate to determine if a column should be excluded
-   * @return RelDataType representing the schema
-   */
   private RelDataType createRelDataTypeFromSchema(Schema schema, Predicate<String> shouldExclude) {
     Builder builder = new Builder(this);
     boolean enableNullHandling = schema.isEnableColumnBasedNullHandling();
