@@ -187,47 +187,36 @@ public class QueryEnvironment {
     Map<String, String> options = sqlNodeAndOptions.getOptions();
 
     // Check if user explicitly set the query option
-    String excludeVirtualColumnsOption = options.get(QueryOptionKey.EXCLUDE_VIRTUAL_COLUMNS);
+    String excludeVirtualColumnsOption = options.get("excludeVirtualColumns");
     if (Boolean.parseBoolean(excludeVirtualColumnsOption)) {
       _catalog.configureVirtualColumnExclusion(true);
     }
   }
 
+  /**
+   * Recursively checks if the SqlNode contains a NATURAL JOIN.
+   */
   private boolean isNaturalJoinQuery(SqlNode sqlNode) {
     if (sqlNode == null) {
       return false;
     }
-
-    NaturalJoinDetector detector = new NaturalJoinDetector();
-    try {
-      sqlNode.accept(detector);
-      return detector.hasNaturalJoin();
-    } catch (Exception e) {
-      return false;
+    
+    // Direct check for SqlJoin
+    if (sqlNode instanceof SqlJoin) {
+      return ((SqlJoin) sqlNode).isNatural();
     }
-  }
-
-  /**
-   * Visitor that detects NATURAL JOIN operations in the SQL AST.
-   */
-  private static class NaturalJoinDetector extends SqlBasicVisitor<Void> {
-    private boolean _hasNaturalJoin = false;
-
-    @Override
-    public Void visit(SqlCall call) {
-      if (call instanceof SqlJoin) {
-        SqlJoin join = (SqlJoin) call;
-        if (join.isNatural()) {
-          _hasNaturalJoin = true;
-          return null;
+    
+    // Recursively check operands for SqlCall nodes
+    if (sqlNode instanceof SqlCall) {
+      SqlCall call = (SqlCall) sqlNode;
+      for (SqlNode operand : call.getOperandList()) {
+        if (isNaturalJoinQuery(operand)) {
+          return true;
         }
       }
-      return super.visit(call);
     }
-
-    public boolean hasNaturalJoin() {
-      return _hasNaturalJoin;
-    }
+    
+    return false;
   }
 
   /**
@@ -245,7 +234,7 @@ public class QueryEnvironment {
         return String.format("NATURAL JOIN failed : %s. "
                 + "This error typically occurs when virtual columns (columns starting with '$') gets included in join "
                 + "condition matching. To resolve this issue, add OPTION(%s=true) in the query", originalMessage,
-            QueryOptionKey.EXCLUDE_VIRTUAL_COLUMNS);
+            "excludeVirtualColumns");
       }
     }
     return originalMessage;
@@ -257,7 +246,7 @@ public class QueryEnvironment {
   private boolean isExcludeVirtualColumnsEnabled(PlannerContext plannerContext) {
     // Access the query options from the planner context
     Map<String, String> options = plannerContext.getOptions();
-    String excludeVirtualColumnsOption = options.get(QueryOptionKey.EXCLUDE_VIRTUAL_COLUMNS);
+    String excludeVirtualColumnsOption = options.get("excludeVirtualColumns");
     return Boolean.parseBoolean(excludeVirtualColumnsOption);
   }
 
