@@ -36,13 +36,13 @@ import org.apache.commons.lang3.StringUtils;
 import org.apache.hc.client5.http.io.HttpClientConnectionManager;
 import org.apache.pinot.common.exception.InvalidConfigException;
 import org.apache.pinot.common.utils.URIUtils;
+import org.apache.pinot.controller.api.dto.PinotControllerJobDto;
 import org.apache.pinot.controller.api.dto.PinotTableReloadStatusResponse;
 import org.apache.pinot.controller.api.exception.ControllerApplicationException;
 import org.apache.pinot.controller.helix.core.PinotHelixResourceManager;
 import org.apache.pinot.controller.helix.core.controllerjob.ControllerJobTypes;
 import org.apache.pinot.controller.util.CompletionServiceHelper;
 import org.apache.pinot.segment.spi.creator.name.SegmentNameUtils;
-import org.apache.pinot.spi.utils.CommonConstants;
 import org.apache.pinot.spi.utils.JsonUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -92,17 +92,9 @@ public class PinotTableReloadStatusReporter {
 
   public PinotTableReloadStatusResponse getReloadJobStatus(String reloadJobId)
       throws InvalidConfigException {
-    Map<String, String> controllerJobZKMetadata =
-        _pinotHelixResourceManager.getControllerJobZKMetadata(reloadJobId, ControllerJobTypes.RELOAD_SEGMENT);
-    if (controllerJobZKMetadata == null) {
-      throw new ControllerApplicationException(LOG, "Failed to find controller job id: " + reloadJobId,
-          Response.Status.NOT_FOUND);
-    }
+    PinotControllerJobDto reloadJob = getControllerJobFromZk(reloadJobId);
 
-    String tableNameWithType = controllerJobZKMetadata.get(CommonConstants.ControllerJob.TABLE_NAME_WITH_TYPE);
-    String segmentNames = controllerJobZKMetadata.get(CommonConstants.ControllerJob.SEGMENT_RELOAD_JOB_SEGMENT_NAME);
-    String instanceName = controllerJobZKMetadata.get(CommonConstants.ControllerJob.SEGMENT_RELOAD_JOB_INSTANCE_NAME);
-    Map<String, List<String>> serverToSegments = getServerToSegments(tableNameWithType, segmentNames, instanceName);
+    Map<String, List<String>> serverToSegments = getServerToSegments(reloadJob);
 
     BiMap<String, String> serverEndPoints =
         _pinotHelixResourceManager.getDataInstanceAdminEndpoints(serverToSegments.keySet());
@@ -114,9 +106,9 @@ public class PinotTableReloadStatusReporter {
       String server = entry.getKey();
       String endpoint = entry.getValue();
       String reloadTaskStatusEndpoint =
-          endpoint + "/controllerJob/reloadStatus/" + tableNameWithType + "?reloadJobTimestamp="
-              + controllerJobZKMetadata.get(CommonConstants.ControllerJob.SUBMISSION_TIME_MS);
-      if (segmentNames != null) {
+          endpoint + "/controllerJob/reloadStatus/" + reloadJob.getTableNameWithType() + "?reloadJobTimestamp="
+              + reloadJob.getSubmissionTimeMs();
+      if (reloadJob.getSegmentName() != null) {
         List<String> segmentsForServer = serverToSegments.get(server);
         StringBuilder encodedSegmentsBuilder = new StringBuilder();
         if (!segmentsForServer.isEmpty()) {
@@ -154,15 +146,33 @@ public class PinotTableReloadStatusReporter {
     }
 
     // Add derived fields
-    final long submissionTime =
-        Long.parseLong(controllerJobZKMetadata.get(CommonConstants.ControllerJob.SUBMISSION_TIME_MS));
-    final double timeElapsedInMinutes = computeTimeElapsedInMinutes((double) submissionTime);
+    final double timeElapsedInMinutes = computeTimeElapsedInMinutes(reloadJob.getSubmissionTimeMs());
     final double estimatedRemainingTimeInMinutes =
         computeEstimatedRemainingTimeInMinutes(response, timeElapsedInMinutes);
 
-    return response.setMetadata(controllerJobZKMetadata)
+    return response.setMetadata(reloadJob)
         .setTimeElapsedInMinutes(timeElapsedInMinutes)
         .setEstimatedTimeRemainingInMinutes(estimatedRemainingTimeInMinutes);
+  }
+
+  private PinotControllerJobDto getControllerJobFromZk(String reloadJobId) {
+    Map<String, String> controllerJobZKMetadata =
+        _pinotHelixResourceManager.getControllerJobZKMetadata(reloadJobId, ControllerJobTypes.RELOAD_SEGMENT);
+    if (controllerJobZKMetadata == null) {
+      throw new ControllerApplicationException(LOG, "Failed to find controller job id: " + reloadJobId,
+          Response.Status.NOT_FOUND);
+    }
+    try {
+      return JsonUtils.jsonNodeToObject(JsonUtils.objectToJsonNode(controllerJobZKMetadata),
+          PinotControllerJobDto.class);
+    } catch (Exception e) {
+      throw new IllegalArgumentException("Failed to convert metadata to PinotControllerJobDTO", e);
+    }
+  }
+
+  @VisibleForTesting
+  Map<String, List<String>> getServerToSegments(PinotControllerJobDto job) {
+    return getServerToSegments(job.getTableNameWithType(), job.getSegmentName(), job.getInstanceName());
   }
 
   @VisibleForTesting

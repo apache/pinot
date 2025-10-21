@@ -18,8 +18,6 @@
  */
 package org.apache.pinot.controller.api.dto;
 
-import java.util.Map;
-
 public class PinotTableReloadStatusResponse {
   private double _timeElapsedInMinutes;
   private double _estimatedTimeRemainingInMinutes;
@@ -27,7 +25,7 @@ public class PinotTableReloadStatusResponse {
   private int _successCount;
   private int _totalServersQueried;
   private int _totalServerCallsFailed;
-  private Map<String, String> _metadata;
+  private PinotControllerJobDto _metadata;
 
   public int getTotalSegmentCount() {
     return _totalSegmentCount;
@@ -85,11 +83,11 @@ public class PinotTableReloadStatusResponse {
     return this;
   }
 
-  public Map<String, String> getMetadata() {
+  public PinotControllerJobDto getMetadata() {
     return _metadata;
   }
 
-  public PinotTableReloadStatusResponse setMetadata(Map<String, String> metadata) {
+  public PinotTableReloadStatusResponse setMetadata(PinotControllerJobDto metadata) {
     _metadata = metadata;
     return this;
   }
