@@ -39,22 +39,19 @@ import org.slf4j.LoggerFactory;
  * This decoder handles Arrow streaming format and converts Arrow data to Pinot's columnar format.
  */
 public class ArrowMessageDecoder implements StreamMessageDecoder<byte[]> {
-  public static final String ARROW_SCHEMA_CONFIG = "arrow.schema.config";
   public static final String ARROW_ALLOCATOR_LIMIT = "arrow.allocator.limit";
   public static final String DEFAULT_ALLOCATOR_LIMIT = "268435456"; // 256MB default
 
   private static final Logger logger = LoggerFactory.getLogger(ArrowMessageDecoder.class);
 
-  private String _kafkaTopicName;
-  private Set<String> _fieldsToRead;
+  private String _streamTopicName;
   private RootAllocator _allocator;
   private ArrowToGenericRowConverter _converter;
 
   @Override
   public void init(Map<String, String> props, Set<String> fieldsToRead, String topicName)
       throws Exception {
-    _kafkaTopicName = topicName;
-    _fieldsToRead = fieldsToRead;
+    _streamTopicName = topicName;
 
     // Initialize Arrow allocator with configurable memory limit
     long allocatorLimit =
@@ -80,7 +77,7 @@ public class ArrowMessageDecoder implements StreamMessageDecoder<byte[]> {
       // Read the Arrow schema and data
       VectorSchemaRoot root = reader.getVectorSchemaRoot();
       if (!reader.loadNextBatch()) {
-        logger.warn("No data found in Arrow message for topic: {}", _kafkaTopicName);
+        logger.warn("No data found in Arrow message for topic: {}", _streamTopicName);
         return null;
       }
 
@@ -90,8 +87,8 @@ public class ArrowMessageDecoder implements StreamMessageDecoder<byte[]> {
       return row;
     } catch (Exception e) {
       logger.error(
-          "Error decoding Arrow message for kafka topic {} : {}",
-          _kafkaTopicName,
+          "Error decoding Arrow message for stream topic {} : {}",
+          _streamTopicName,
           Arrays.toString(payload),
           e);
       return null;
@@ -102,11 +99,6 @@ public class ArrowMessageDecoder implements StreamMessageDecoder<byte[]> {
   @Override
   public GenericRow decode(byte[] payload, int offset, int length, GenericRow destination) {
     return decode(Arrays.copyOfRange(payload, offset, offset + length), destination);
-  }
-
-  private String buildEventLatencyMetricName(String kafkaTopicName) {
-    return "ServerMetrics.realtime.arrow.consumer.delay."
-        + kafkaTopicName.replace(".", "_");
   }
 
   /** Clean up resources */

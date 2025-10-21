@@ -30,13 +30,13 @@ import org.apache.arrow.vector.FieldVector;
 import org.apache.arrow.vector.ValueVector;
 import org.apache.arrow.vector.VectorSchemaRoot;
 import org.apache.arrow.vector.complex.MapVector;
-import org.apache.arrow.vector.complex.impl.UnionMapReader;
 import org.apache.arrow.vector.dictionary.DictionaryEncoder;
 import org.apache.arrow.vector.ipc.ArrowStreamReader;
 import org.apache.arrow.vector.util.Text;
 import org.apache.pinot.spi.data.readers.GenericRow;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+
 
 /**
  * Utility class for converting Apache Arrow VectorSchemaRoot to Pinot {@code GenericRow}. Processes
@@ -222,17 +222,5 @@ public class ArrowToGenericRowConverter {
     // For primitive types (Integer, Double, Boolean) and other Java standard types,
     // Arrow returns standard Java objects that are already Pinot-compatible
     return value;
-  }
-
-  private Object flattenArrowMap(MapVector fieldVector, int rowIndex) {
-    Map<String, Object> flattened = new LinkedHashMap<>();
-    UnionMapReader reader = fieldVector.getReader();
-    reader.setPosition(rowIndex);
-    while (reader.next()) {
-      flattened.put(
-          reader.key().readObject().toString(),
-          convertArrowTypeToPinotCompatible(reader.value().readObject()));
-    }
-    return flattened;
   }
 }
