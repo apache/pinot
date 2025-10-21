@@ -37,7 +37,7 @@ import org.apache.pinot.common.utils.regex.JavaUtilPattern;
 import org.apache.pinot.common.utils.regex.Matcher;
 import org.apache.pinot.common.utils.regex.Pattern;
 import org.apache.pinot.controller.ControllerConf;
-import org.apache.pinot.controller.api.resources.ServerReloadControllerJobStatusResponse;
+import org.apache.pinot.controller.api.dto.PinotTableReloadStatusResponse;
 import org.apache.pinot.controller.helix.core.controllerjob.ControllerJobTypes;
 import org.apache.pinot.controller.helix.core.rebalance.DefaultRebalancePreChecker;
 import org.apache.pinot.controller.helix.core.rebalance.RebalanceConfig;
@@ -1495,8 +1495,8 @@ public class TableRebalanceIntegrationTest extends BaseHybridClusterIntegrationT
         String requestUrl = getControllerRequestURLBuilder().forSegmentReloadStatus(reloadJobId);
         SimpleHttpResponse httpResponse =
             HttpClient.wrapAndThrowHttpException(getHttpClient().sendGetRequest(new URL(requestUrl).toURI(), null));
-        ServerReloadControllerJobStatusResponse reloadResult =
-            JsonUtils.stringToObject(httpResponse.getResponse(), ServerReloadControllerJobStatusResponse.class);
+        PinotTableReloadStatusResponse reloadResult =
+            JsonUtils.stringToObject(httpResponse.getResponse(), PinotTableReloadStatusResponse.class);
         return reloadResult.getEstimatedTimeRemainingInMinutes() == 0.0;
       } catch (Exception e) {
         return null;

@@ -36,8 +36,8 @@ import org.apache.commons.lang3.StringUtils;
 import org.apache.hc.client5.http.io.HttpClientConnectionManager;
 import org.apache.pinot.common.exception.InvalidConfigException;
 import org.apache.pinot.common.utils.URIUtils;
+import org.apache.pinot.controller.api.dto.PinotTableReloadStatusResponse;
 import org.apache.pinot.controller.api.exception.ControllerApplicationException;
-import org.apache.pinot.controller.api.resources.ServerReloadControllerJobStatusResponse;
 import org.apache.pinot.controller.helix.core.PinotHelixResourceManager;
 import org.apache.pinot.controller.helix.core.controllerjob.ControllerJobTypes;
 import org.apache.pinot.controller.util.CompletionServiceHelper;
@@ -66,7 +66,7 @@ public class PinotTableReloadStatusReporter {
     _connectionManager = connectionManager;
   }
 
-  private static double computeEstimatedRemainingTimeInMinutes(ServerReloadControllerJobStatusResponse finalResponse,
+  private static double computeEstimatedRemainingTimeInMinutes(PinotTableReloadStatusResponse finalResponse,
       double timeElapsedInMinutes) {
     int remainingSegments = finalResponse.getTotalSegmentCount() - finalResponse.getSuccessCount();
 
@@ -90,7 +90,7 @@ public class PinotTableReloadStatusReporter {
     return totalSegments;
   }
 
-  public ServerReloadControllerJobStatusResponse getReloadJobStatus(String reloadJobId)
+  public PinotTableReloadStatusResponse getReloadJobStatus(String reloadJobId)
       throws InvalidConfigException {
     Map<String, String> controllerJobZKMetadata =
         _pinotHelixResourceManager.getControllerJobZKMetadata(reloadJobId, ControllerJobTypes.RELOAD_SEGMENT);
@@ -137,7 +137,7 @@ public class PinotTableReloadStatusReporter {
     CompletionServiceHelper.CompletionServiceResponse serviceResponse =
         completionServiceHelper.doMultiGetRequest(serverUrls, null, true, 10000);
 
-    ServerReloadControllerJobStatusResponse response = new ServerReloadControllerJobStatusResponse().setSuccessCount(0)
+    PinotTableReloadStatusResponse response = new PinotTableReloadStatusResponse().setSuccessCount(0)
         .setTotalSegmentCount(computeTotalSegments(serverToSegments))
         .setTotalServersQueried(serverUrls.size())
         .setTotalServerCallsFailed(serviceResponse._failedResponseCount);
@@ -145,8 +145,8 @@ public class PinotTableReloadStatusReporter {
     for (Map.Entry<String, String> streamResponse : serviceResponse._httpResponses.entrySet()) {
       String responseString = streamResponse.getValue();
       try {
-        ServerReloadControllerJobStatusResponse r =
-            JsonUtils.stringToObject(responseString, ServerReloadControllerJobStatusResponse.class);
+        PinotTableReloadStatusResponse r =
+            JsonUtils.stringToObject(responseString, PinotTableReloadStatusResponse.class);
         response.setSuccessCount(response.getSuccessCount() + r.getSuccessCount());
       } catch (Exception e) {
         response.setTotalServerCallsFailed(response.getTotalServerCallsFailed() + 1);
@@ -166,26 +166,26 @@ public class PinotTableReloadStatusReporter {
   }
 
   @VisibleForTesting
-  Map<String, List<String>> getServerToSegments(String tableNameWithType, @Nullable String segmentNames,
+  Map<String, List<String>> getServerToSegments(String tableNameWithType, @Nullable String segmentNamesString,
       @Nullable String instanceName) {
-    if (segmentNames == null) {
+    if (segmentNamesString == null) {
       // instanceName can be null or not null, and this method below can handle both cases.
       return _pinotHelixResourceManager.getServerToSegmentsMap(tableNameWithType, instanceName, true);
     }
     // Skip servers and segments not involved in the segment reloading job.
-    List<String> segmnetNameList = new ArrayList<>();
-    Collections.addAll(segmnetNameList, StringUtils.split(segmentNames, SegmentNameUtils.SEGMENT_NAME_SEPARATOR));
+    List<String> segmentNames = new ArrayList<>();
+    Collections.addAll(segmentNames, StringUtils.split(segmentNamesString, SegmentNameUtils.SEGMENT_NAME_SEPARATOR));
     if (instanceName != null) {
-      return Map.of(instanceName, segmnetNameList);
+      return Map.of(instanceName, segmentNames);
     }
     // If instance is null, then either one or all segments are being reloaded via current segment reload restful APIs.
     // And the if-check at the beginning of this method has handled the case of reloading all segments. So here we
     // expect only one segment name.
-    checkState(segmnetNameList.size() == 1, "Only one segment is expected but got: %s", segmnetNameList);
+    checkState(segmentNames.size() == 1, "Only one segment is expected but got: %s", segmentNames);
     Map<String, List<String>> serverToSegments = new HashMap<>();
-    Set<String> servers = _pinotHelixResourceManager.getServers(tableNameWithType, segmentNames);
+    Set<String> servers = _pinotHelixResourceManager.getServers(tableNameWithType, segmentNamesString);
     for (String server : servers) {
-      serverToSegments.put(server, Collections.singletonList(segmentNames));
+      serverToSegments.put(server, Collections.singletonList(segmentNamesString));
     }
     return serverToSegments;
   }
