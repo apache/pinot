@@ -178,18 +178,6 @@ public class QueryEnvironment {
   }
 
   /**
-   * Configures virtual column exclusion for catalog tables based on query options.
-   * Refer: https://github.com/apache/pinot/issues/15522
-   * This method checks if user explicitly set the 'excludeVirtualColumns' query option.
-   */
-  private void configureVirtualColumnExclusion(SqlNodeAndOptions sqlNodeAndOptions) {
-    Map<String, String> options = sqlNodeAndOptions.getOptions();
-    if (isExcludeVirtualColumnsEnabled(options)) {
-      _catalog.configureVirtualColumnExclusion(true);
-    }
-  }
-
-  /**
    * Recursively checks if the SqlNode contains a NATURAL JOIN.
    */
   private boolean isNaturalJoinQuery(SqlNode sqlNode) {
@@ -244,9 +232,9 @@ public class QueryEnvironment {
   private PlannerContext getPlannerContext(SqlNodeAndOptions sqlNodeAndOptions) {
     WorkerManager workerManager = getWorkerManager(sqlNodeAndOptions);
     Map<String, String> options = sqlNodeAndOptions.getOptions();
-
-    // Detect NATURAL JOIN and configure catalog tables accordingly
-    configureVirtualColumnExclusion(sqlNodeAndOptions);
+    if (isExcludeVirtualColumnsEnabled(options)) {
+      _catalog.configureVirtualColumnExclusion(true);
+    }
 
     HepProgram optProgram = _optProgram;
     Set<String> useRuleSet = QueryOptionsUtils.getUsePlannerRules(options);
