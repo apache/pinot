@@ -90,46 +90,60 @@ public class PinotTableReloadStatusReporter {
     return totalSegments;
   }
 
-  public PinotTableReloadStatusResponse getReloadJobStatus(String reloadJobId)
-      throws InvalidConfigException {
-    PinotControllerJobDto reloadJob = getControllerJobFromZk(reloadJobId);
-
-    Map<String, List<String>> serverToSegments = getServerToSegments(reloadJob);
-
-    BiMap<String, String> serverEndPoints =
-        _pinotHelixResourceManager.getDataInstanceAdminEndpoints(serverToSegments.keySet());
-    CompletionServiceHelper completionServiceHelper =
-        new CompletionServiceHelper(_executor, _connectionManager, serverEndPoints);
-
+  private static List<String> getServerUrls(BiMap<String, String> serverEndPoints, PinotControllerJobDto reloadJob,
+      Map<String, List<String>> serverToSegments) {
     List<String> serverUrls = new ArrayList<>();
     for (Map.Entry<String, String> entry : serverEndPoints.entrySet()) {
-      String server = entry.getKey();
-      String endpoint = entry.getValue();
-      String reloadTaskStatusEndpoint =
-          endpoint + "/controllerJob/reloadStatus/" + reloadJob.getTableNameWithType() + "?reloadJobTimestamp="
-              + reloadJob.getSubmissionTimeMs();
-      if (reloadJob.getSegmentName() != null) {
-        List<String> segmentsForServer = serverToSegments.get(server);
-        StringBuilder encodedSegmentsBuilder = new StringBuilder();
-        if (!segmentsForServer.isEmpty()) {
-          Iterator<String> segmentIterator = segmentsForServer.iterator();
-          // Append first segment without a leading separator
-          encodedSegmentsBuilder.append(URIUtils.encode(segmentIterator.next()));
-          // Append remaining segments, each prefixed by the separator
-          while (segmentIterator.hasNext()) {
-            encodedSegmentsBuilder.append(SegmentNameUtils.SEGMENT_NAME_SEPARATOR)
-                .append(URIUtils.encode(segmentIterator.next()));
-          }
-        }
-        reloadTaskStatusEndpoint += "&segmentName=" + encodedSegmentsBuilder;
-      }
-      serverUrls.add(reloadTaskStatusEndpoint);
+      final String server = entry.getKey();
+      final String endpoint = entry.getValue();
+      serverUrls.add(constructReloadTaskStatusEndpoint(reloadJob, serverToSegments, endpoint, server));
+    }
+    return serverUrls;
+  }
+
+  private static String constructReloadTaskStatusEndpoint(PinotControllerJobDto reloadJob,
+      Map<String, List<String>> serverToSegments, String endpoint, String server) {
+    String reloadTaskStatusEndpoint = constructReloadStatusEndpoint(reloadJob, endpoint);
+    if (reloadJob.getSegmentName() == null) {
+      return reloadTaskStatusEndpoint;
     }
 
-    CompletionServiceHelper.CompletionServiceResponse serviceResponse =
+    List<String> segmentsForServer = serverToSegments.get(server);
+    StringBuilder encodedSegmentsBuilder = new StringBuilder();
+    if (!segmentsForServer.isEmpty()) {
+      Iterator<String> segmentIterator = segmentsForServer.iterator();
+      // Append first segment without a leading separator
+      encodedSegmentsBuilder.append(URIUtils.encode(segmentIterator.next()));
+      // Append remaining segments, each prefixed by the separator
+      while (segmentIterator.hasNext()) {
+        encodedSegmentsBuilder.append(SegmentNameUtils.SEGMENT_NAME_SEPARATOR)
+            .append(URIUtils.encode(segmentIterator.next()));
+      }
+    }
+    reloadTaskStatusEndpoint += "&segmentName=" + encodedSegmentsBuilder;
+    return reloadTaskStatusEndpoint;
+  }
+
+  private static String constructReloadStatusEndpoint(PinotControllerJobDto reloadJob, String endpoint) {
+    return endpoint + "/controllerJob/reloadStatus/" + reloadJob.getTableNameWithType() + "?reloadJobTimestamp="
+        + reloadJob.getSubmissionTimeMs();
+  }
+
+  public PinotTableReloadStatusResponse getReloadJobStatus(String reloadJobId)
+      throws InvalidConfigException {
+    final PinotControllerJobDto reloadJob = getControllerJobFromZk(reloadJobId);
+    final Map<String, List<String>> serverToSegments = getServerToSegments(reloadJob);
+
+    final BiMap<String, String> serverEndPoints =
+        _pinotHelixResourceManager.getDataInstanceAdminEndpoints(serverToSegments.keySet());
+    final List<String> serverUrls = getServerUrls(serverEndPoints, reloadJob, serverToSegments);
+
+    final CompletionServiceHelper completionServiceHelper =
+        new CompletionServiceHelper(_executor, _connectionManager, serverEndPoints);
+    final CompletionServiceHelper.CompletionServiceResponse serviceResponse =
         completionServiceHelper.doMultiGetRequest(serverUrls, null, true, 10000);
 
-    PinotTableReloadStatusResponse response = new PinotTableReloadStatusResponse().setSuccessCount(0)
+    final PinotTableReloadStatusResponse response = new PinotTableReloadStatusResponse().setSuccessCount(0)
         .setTotalSegmentCount(computeTotalSegments(serverToSegments))
         .setTotalServersQueried(serverUrls.size())
         .setTotalServerCallsFailed(serviceResponse._failedResponseCount);
