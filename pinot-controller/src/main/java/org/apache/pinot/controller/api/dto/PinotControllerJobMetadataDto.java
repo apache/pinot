@@ -30,7 +30,7 @@ import javax.annotation.Nullable;
  */
 @JsonIgnoreProperties(ignoreUnknown = true)
 @JsonInclude(JsonInclude.Include.NON_NULL)
-public class PinotControllerJobDto {
+public class PinotControllerJobMetadataDto {
   private String _jobId;
 
   @JsonProperty("tableName")
@@ -46,7 +46,7 @@ public class PinotControllerJobDto {
     return _jobId;
   }
 
-  public PinotControllerJobDto setJobId(String jobId) {
+  public PinotControllerJobMetadataDto setJobId(String jobId) {
     _jobId = jobId;
     return this;
   }
@@ -55,7 +55,7 @@ public class PinotControllerJobDto {
     return _tableNameWithType;
   }
 
-  public PinotControllerJobDto setTableNameWithType(String tableNameWithType) {
+  public PinotControllerJobMetadataDto setTableNameWithType(String tableNameWithType) {
     _tableNameWithType = tableNameWithType;
     return this;
   }
@@ -64,7 +64,7 @@ public class PinotControllerJobDto {
     return _jobType;
   }
 
-  public PinotControllerJobDto setJobType(String jobType) {
+  public PinotControllerJobMetadataDto setJobType(String jobType) {
     _jobType = jobType;
     return this;
   }
@@ -73,7 +73,7 @@ public class PinotControllerJobDto {
     return _submissionTimeMs;
   }
 
-  public PinotControllerJobDto setSubmissionTimeMs(long submissionTimeMs) {
+  public PinotControllerJobMetadataDto setSubmissionTimeMs(long submissionTimeMs) {
     _submissionTimeMs = submissionTimeMs;
     return this;
   }
@@ -82,7 +82,7 @@ public class PinotControllerJobDto {
     return _messageCount;
   }
 
-  public PinotControllerJobDto setMessageCount(int messageCount) {
+  public PinotControllerJobMetadataDto setMessageCount(int messageCount) {
     _messageCount = messageCount;
     return this;
   }
@@ -92,7 +92,7 @@ public class PinotControllerJobDto {
     return _segmentName;
   }
 
-  public PinotControllerJobDto setSegmentName(@Nullable String segmentName) {
+  public PinotControllerJobMetadataDto setSegmentName(@Nullable String segmentName) {
     _segmentName = segmentName;
     return this;
   }
@@ -102,7 +102,7 @@ public class PinotControllerJobDto {
     return _instanceName;
   }
 
-  public PinotControllerJobDto setInstanceName(@Nullable String instanceName) {
+  public PinotControllerJobMetadataDto setInstanceName(@Nullable String instanceName) {
     _instanceName = instanceName;
     return this;
   }

@@ -25,7 +25,7 @@ public class PinotTableReloadStatusResponse {
   private int _successCount;
   private int _totalServersQueried;
   private int _totalServerCallsFailed;
-  private PinotControllerJobDto _metadata;
+  private PinotControllerJobMetadataDto _metadata;
 
   public int getTotalSegmentCount() {
     return _totalSegmentCount;
@@ -83,11 +83,11 @@ public class PinotTableReloadStatusResponse {
     return this;
   }
 
-  public PinotControllerJobDto getMetadata() {
+  public PinotControllerJobMetadataDto getMetadata() {
     return _metadata;
   }
 
-  public PinotTableReloadStatusResponse setMetadata(PinotControllerJobDto metadata) {
+  public PinotTableReloadStatusResponse setMetadata(PinotControllerJobMetadataDto metadata) {
     _metadata = metadata;
     return this;
   }
