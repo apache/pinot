@@ -32,7 +32,6 @@ import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
-import java.util.Properties;
 import java.util.Set;
 import java.util.SortedMap;
 import java.util.TreeMap;
@@ -45,7 +44,6 @@ import org.apache.pinot.segment.spi.index.IndexType;
 import org.apache.pinot.segment.spi.index.StandardIndexes;
 import org.apache.pinot.segment.spi.index.metadata.SegmentMetadataImpl;
 import org.apache.pinot.segment.spi.loader.SegmentDirectoryLoaderContext;
-import org.apache.pinot.segment.spi.memory.EmptyIndexBuffer;
 import org.apache.pinot.segment.spi.memory.PinotDataBuffer;
 import org.apache.pinot.segment.spi.store.ColumnIndexDirectory;
 import org.apache.pinot.segment.spi.store.ColumnIndexUtils;
@@ -263,29 +261,11 @@ class SingleFileIndexDirectory extends ColumnIndexDirectory {
 
   private void mapBufferEntries()
       throws IOException {
-    // Phase 1: Prepare data structures - sort entries by start offset
-    // Use list to handle multiple entries with same start offset
-    List<IndexEntry> sortedEntries = _columnEntries.values().stream()
-        .sorted((e1, e2) -> Long.compare(e1._startOffset, e2._startOffset))
-        .collect(java.util.stream.Collectors.toList());
-
-    // Phase 2: Create buffers - handle all entries in sequential order
-    if (!sortedEntries.isEmpty()) {
-      createBuffersSequentially(sortedEntries);
-    }
-  }
-
-  /**
-   * Creates buffers for all entries in sequential order, handling both zero-size and regular entries
-   */
-  private void createBuffersSequentially(List<IndexEntry> sortedEntries)
-      throws IOException {
-    // Use the original approach with TreeMap for better memory management
     SortedMap<Long, IndexEntry> indexStartMap = new TreeMap<>();
 
-    for (IndexEntry entry : sortedEntries) {
-      long startOffset = entry._startOffset;
-      indexStartMap.put(startOffset, entry);
+    for (Map.Entry<IndexKey, IndexEntry> columnEntry : _columnEntries.entrySet()) {
+      long startOffset = columnEntry.getValue()._startOffset;
+      indexStartMap.put(startOffset, columnEntry.getValue());
     }
 
     long runningSize = 0;
@@ -295,11 +275,7 @@ class SingleFileIndexDirectory extends ColumnIndexDirectory {
       runningSize += entry._size;
 
       if (runningSize >= MAX_ALLOCATION_SIZE && !offsetAccum.isEmpty()) {
-        // Calculate the correct end offset for the previous entries
-        long lastOffset = offsetAccum.get(offsetAccum.size() - 1);
-        IndexEntry lastEntry = indexStartMap.get(lastOffset);
-        long endOffset = lastOffset + lastEntry._size;
-        mapAndSliceFile(indexStartMap, offsetAccum, endOffset);
+        mapAndSliceFile(indexStartMap, offsetAccum, offsetEntry.getKey());
         runningSize = entry._size;
         offsetAccum.clear();
       }
@@ -307,23 +283,7 @@ class SingleFileIndexDirectory extends ColumnIndexDirectory {
     }
 
     if (!offsetAccum.isEmpty()) {
-      // Calculate the correct end offset: start of last entry + size of last entry
-      long lastOffset = offsetAccum.get(offsetAccum.size() - 1);
-      IndexEntry lastEntry = indexStartMap.get(lastOffset);
-      long endOffset = lastOffset + lastEntry._size;
-      mapAndSliceFile(indexStartMap, offsetAccum, endOffset);
-    }
-    // Handle zero-size entries with empty buffer
-    for (IndexEntry entry : sortedEntries) {
-      if (entry._size == 0) {
-        Properties properties = new Properties();
-        if (_segmentDirectoryLoaderContext != null
-            && _segmentDirectoryLoaderContext.getSegmentCustomConfigs() != null) {
-          properties.putAll(_segmentDirectoryLoaderContext.getSegmentCustomConfigs());
-        }
-        entry._buffer = new EmptyIndexBuffer(properties, _segmentMetadata.getName(),
-            _segmentMetadata.getTableName());
-      }
+      mapAndSliceFile(indexStartMap, offsetAccum, offsetAccum.get(0) + runningSize);
     }
   }
 
@@ -348,31 +308,13 @@ class SingleFileIndexDirectory extends ColumnIndexDirectory {
     }
     _allocBuffers.add(buffer);
 
+    long prevSlicePoint = 0;
     for (Long fileOffset : offsetAccum) {
       IndexEntry entry = startOffsets.get(fileOffset);
-      if (entry._size == 0) {
-        continue;
-      }
-      long baseOffset = entry._startOffset + MAGIC_MARKER_SIZE_BYTES;
-      long sliceSize = entry._size - MAGIC_MARKER_SIZE_BYTES;
-      LOGGER.debug("Processing entry: key={}, startOffset={}, size={}, baseOffset={}, sliceSize={}",
-          entry._key, entry._startOffset, entry._size, baseOffset, sliceSize);
-
-      // Convert absolute file offset to buffer-relative offset
-      long bufferRelativeOffset = entry._startOffset - fromFilePos;
-      // Add bounds checking to prevent IndexOutOfBoundsException
-      if (bufferRelativeOffset < 0
-          || bufferRelativeOffset + MAGIC_MARKER_SIZE_BYTES > buffer.size()) {
-        LOGGER.error("Buffer offset out of bounds: bufferRelativeOffset={}, buffer.size()={}, "
-            + "entry._startOffset={}, fromFilePos={}",
-            bufferRelativeOffset, buffer.size(), entry._startOffset, fromFilePos);
-        throw new RuntimeException("Buffer offset out of bounds for entry: " + entry._key);
-      }
-      validateMagicMarker(buffer, bufferRelativeOffset);
-      // Calculate the correct start and end positions for the view
-      long start = baseOffset - fromFilePos;
-      long end = start + sliceSize;
-      entry._buffer = buffer.view(start, end);
+      long endSlicePoint = prevSlicePoint + entry._size;
+      validateMagicMarker(buffer, prevSlicePoint);
+      entry._buffer = buffer.view(prevSlicePoint + MAGIC_MARKER_SIZE_BYTES, endSlicePoint);
+      prevSlicePoint = endSlicePoint;
     }
   }
 
