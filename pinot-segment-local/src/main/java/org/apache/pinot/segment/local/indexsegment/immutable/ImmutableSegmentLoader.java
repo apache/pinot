@@ -99,7 +99,7 @@ public class ImmutableSegmentLoader {
    * Mostly used by UT cases to add some specific index for testing purpose.
    */
   public static ImmutableSegment load(File indexDir, IndexLoadingConfig indexLoadingConfig,
-      @Nullable SegmentOperationsThrottler segmentOperationsThrottler, SegmentZKMetadata zkMetadata)
+      @Nullable SegmentOperationsThrottler segmentOperationsThrottler, @Nullable SegmentZKMetadata zkMetadata)
       throws Exception {
     return load(indexDir, indexLoadingConfig, true, segmentOperationsThrottler, zkMetadata);
   }
