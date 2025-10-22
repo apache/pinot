@@ -25,8 +25,8 @@ import javax.annotation.Nullable;
 
 
 /**
- * Type-safe DTO for controller job ZK metadata.
- * Provides structured access to job metadata fields instead of using raw Map&lt;String, String&gt;.
+ * Type-safe DTO (Data Transfer Object) for controller job ZK metadata.
+ * Provides structured access to job metadata fields instead of using raw Map<String, String>
  */
 @JsonIgnoreProperties(ignoreUnknown = true)
 @JsonInclude(JsonInclude.Include.NON_NULL)
