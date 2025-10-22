@@ -178,48 +178,6 @@ public class QueryEnvironment {
   }
 
   /**
-   * Recursively checks if the SqlNode contains a NATURAL JOIN.
-   */
-  private boolean isNaturalJoinQuery(SqlNode sqlNode) {
-    if (sqlNode == null) {
-      return false;
-    }
-    if (sqlNode instanceof SqlJoin) {
-      return ((SqlJoin) sqlNode).isNatural();
-    }
-    if (sqlNode instanceof SqlCall) {
-      SqlCall call = (SqlCall) sqlNode;
-      for (SqlNode operand : call.getOperandList()) {
-        if (isNaturalJoinQuery(operand)) {
-          return true;
-        }
-      }
-    }
-    return false;
-  }
-
-  /**
-   * Enhances validation error messages for specific scenarios like NATURAL JOIN issues.
-   * To enhance the error message: Error Code: 700 (QueryValidationError)
-   * QueryValidationError: Index 58 out of bounds for length 54
-   *
-   */
-  private String enhanceNaturalJoinErrorMessage(SqlNode sqlNode, Throwable originalError,
-      PlannerContext plannerContext) {
-    String originalMessage = originalError.getMessage();
-
-    if (originalError instanceof IndexOutOfBoundsException && isNaturalJoinQuery(sqlNode)) {
-      if (!isExcludeVirtualColumnsEnabled(plannerContext.getOptions())) {
-        return String.format(
-            "%s. This error typically occurs when virtual columns (columns starting with '$') gets included in the "
-                + "NATURAL JOIN condition matching. To fix, add OPTION(%s=true) in the query.", originalMessage,
-            QueryOptionKey.EXCLUDE_VIRTUAL_COLUMNS);
-      }
-    }
-    return originalMessage;
-  }
-
-  /**
    * Checks if excludeVirtualColumns option is enabled in the current query context.
    */
   private boolean isExcludeVirtualColumnsEnabled(Map<String, String> options) {
@@ -452,9 +410,7 @@ public class QueryEnvironment {
     } catch (CalciteContextException e) {
       throw CalciteContextExceptionClassifier.classifyValidationException(e);
     } catch (Throwable e) {
-      // Enhanced error handling for specific validation issues
-      String enhancedMessage = enhanceNaturalJoinErrorMessage(sqlNode, e, plannerContext);
-      throw QueryErrorCode.QUERY_VALIDATION.asException(enhancedMessage, e);
+      throw QueryErrorCode.QUERY_VALIDATION.asException(e.getMessage(), e);
     }
   }
 
