@@ -38,10 +38,11 @@ public class SegmentDirectoryLoaderContext {
   private final String _segmentTier;
   private final Map<String, Map<String, String>> _instanceTierConfigs;
   private final PinotConfiguration _segmentDirectoryConfigs;
+  private final Map<String, String> _segmentCustomConfigs;
 
   private SegmentDirectoryLoaderContext(TableConfig tableConfig, Schema schema, String instanceId, String tableDataDir,
       String segmentName, String segmentCrc, String segmentTier, Map<String, Map<String, String>> instanceTierConfigs,
-      PinotConfiguration segmentDirectoryConfigs) {
+      PinotConfiguration segmentDirectoryConfigs, Map<String, String> segmentCustomConfigs) {
     _tableConfig = tableConfig;
     _schema = schema;
     _instanceId = instanceId;
@@ -51,6 +52,7 @@ public class SegmentDirectoryLoaderContext {
     _segmentTier = segmentTier;
     _instanceTierConfigs = instanceTierConfigs;
     _segmentDirectoryConfigs = segmentDirectoryConfigs;
+    _segmentCustomConfigs = segmentCustomConfigs;
   }
 
   public TableConfig getTableConfig() {
@@ -89,6 +91,10 @@ public class SegmentDirectoryLoaderContext {
     return _instanceTierConfigs;
   }
 
+  public Map<String, String> getSegmentCustomConfigs() {
+    return _segmentCustomConfigs;
+  }
+
   public static class Builder {
     private TableConfig _tableConfig;
     private Schema _schema;
@@ -99,6 +105,7 @@ public class SegmentDirectoryLoaderContext {
     private String _segmentTier;
     private Map<String, Map<String, String>> _instanceTierConfigs;
     private PinotConfiguration _segmentDirectoryConfigs;
+    private Map<String, String> _segmentCustomConfigs;
 
     public Builder setTableConfig(TableConfig tableConfig) {
       _tableConfig = tableConfig;
@@ -145,9 +152,14 @@ public class SegmentDirectoryLoaderContext {
       return this;
     }
 
+    public Builder setSegmentCustomConfigs(Map<String, String> segmentCustomConfigs) {
+      _segmentCustomConfigs = segmentCustomConfigs;
+      return this;
+    }
+
     public SegmentDirectoryLoaderContext build() {
       return new SegmentDirectoryLoaderContext(_tableConfig, _schema, _instanceId, _tableDataDir, _segmentName,
-          _segmentCrc, _segmentTier, _instanceTierConfigs, _segmentDirectoryConfigs);
+          _segmentCrc, _segmentTier, _instanceTierConfigs, _segmentDirectoryConfigs, _segmentCustomConfigs);
     }
   }
 }
