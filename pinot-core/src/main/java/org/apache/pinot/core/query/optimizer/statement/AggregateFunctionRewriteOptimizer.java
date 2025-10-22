@@ -27,9 +27,17 @@ import org.apache.pinot.segment.spi.AggregationFunctionType;
 import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.Schema;
 
-/**
- * Rewrites aggregate functions to type-specific versions in order to support polymorphic functions.
- */
+///
+/// Rewrites certain aggregation functions based on operand types to support polymorphic aggregations.
+///
+/// Currently supported rewrites:
+/// - MIN(stringType) -> MINSTRING
+/// - MAX(stringType) -> MAXSTRING
+/// - MIN(longType) -> MINLONG
+/// - MAX(longType) -> MAXLONG
+/// - SUM(longType) -> SUMLONG
+/// - SUM(intType) -> SUMINT
+///
 public class AggregateFunctionRewriteOptimizer implements StatementOptimizer {
 
   @Override
@@ -74,24 +82,48 @@ public class AggregateFunctionRewriteOptimizer implements StatementOptimizer {
       return;
     }
 
+    Expression operand = function.getOperands().get(0);
+    FieldSpec.DataType operandType;
+    // TODO: Handle more complex expressions (e.g. MIN(trim(stringCol)) )
+    if (operand.isSetIdentifier()) {
+      String columnName = operand.getIdentifier().getName();
+      FieldSpec fieldSpec = schema.getFieldSpecFor(columnName);
+      if (fieldSpec == null) {
+        return;
+      }
+      operandType = fieldSpec.getDataType().getStoredType();
+    } else {
+      return;
+    }
+
     // Rewrite MIN(stringCol) and MAX(stringCol) to MINSTRING / MAXSTRING
+    // Rewrite MIN(longCol) and MAX(longCol) to MINLONG / MAXLONG
     if ((functionName.equals(AggregationFunctionType.MIN.getName())
         || functionName.equals(AggregationFunctionType.MAX.getName()))
         && function.getOperandsSize() == 1) {
-      Expression operand = function.getOperands().get(0);
-      // TODO: Handle more complex expressions (e.g. MIN(trim(stringCol)) )
-      if (operand.isSetIdentifier()) {
-        String columnName = operand.getIdentifier().getName();
-        if (schema != null) {
-          FieldSpec fieldSpec = schema.getFieldSpecFor(columnName);
-          if (fieldSpec != null && fieldSpec.getDataType().getStoredType() == FieldSpec.DataType.STRING) {
-            String newFunctionName =
-                functionName.equals(AggregationFunctionType.MIN.getName())
-                    ? AggregationFunctionType.MINSTRING.name().toLowerCase()
-                    : AggregationFunctionType.MAXSTRING.name().toLowerCase();
-            function.setOperator(newFunctionName);
-          }
-        }
+      if (operandType == FieldSpec.DataType.STRING) {
+        String newFunctionName =
+            functionName.equals(AggregationFunctionType.MIN.getName())
+                ? AggregationFunctionType.MINSTRING.name().toLowerCase()
+                : AggregationFunctionType.MAXSTRING.name().toLowerCase();
+        function.setOperator(newFunctionName);
+      }
+      if (operandType == FieldSpec.DataType.LONG) {
+        String newFunctionName =
+            functionName.equals(AggregationFunctionType.MIN.getName())
+                ? AggregationFunctionType.MINLONG.name().toLowerCase()
+                : AggregationFunctionType.MAXLONG.name().toLowerCase();
+        function.setOperator(newFunctionName);
+      }
+    }
+
+    // Rewrite SUM(intCol) and SUM(longCol) to SUMINT / SUMLONG
+    if (functionName.equals(AggregationFunctionType.SUM.getName())) {
+      if (operandType == FieldSpec.DataType.INT) {
+        function.setOperator(AggregationFunctionType.SUMINT.name().toLowerCase());
+      }
+      if (operandType == FieldSpec.DataType.LONG) {
+        function.setOperator(AggregationFunctionType.SUMLONG.name().toLowerCase());
       }
     }
   }

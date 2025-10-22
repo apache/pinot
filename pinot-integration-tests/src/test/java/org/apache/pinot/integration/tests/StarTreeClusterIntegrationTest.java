@@ -65,7 +65,7 @@ public class StarTreeClusterIntegrationTest extends BaseClusterIntegrationTest {
   private static final String SCHEMA_FILE_NAME =
       "On_Time_On_Time_Performance_2014_100k_subset_nonulls_single_value_columns.schema";
   private static final int NUM_STAR_TREE_DIMENSIONS = 5;
-  private static final int NUM_STAR_TREE_METRICS = 5;
+  private static final int NUM_STAR_TREE_METRICS = 6;
   private static final List<AggregationFunctionType> AGGREGATION_FUNCTION_TYPES =
       Arrays.asList(AggregationFunctionType.COUNT, AggregationFunctionType.MIN, AggregationFunctionType.MAX,
           AggregationFunctionType.SUM, AggregationFunctionType.AVG, AggregationFunctionType.MINMAXRANGE,
@@ -108,7 +108,7 @@ public class StarTreeClusterIntegrationTest extends BaseClusterIntegrationTest {
     List<String> starTree1Dimensions =
         Arrays.asList("OriginCityName", "DepTimeBlk", "LongestAddGTime", "CRSDepTime", "DivArrDelay");
     List<String> starTree1Metrics =
-        Arrays.asList("CarrierDelay", "DepDelay", "LateAircraftDelay", "ArrivalDelayGroups", "ArrDel15");
+        Arrays.asList("CarrierDelay", "DepDelay", "LateAircraftDelay", "ArrivalDelayGroups", "ArrDel15", "AirlineID");
     int starTree1MaxLeafRecords = 10;
 
     // Randomly pick some dimensions and metrics for the second star-tree
@@ -186,6 +186,11 @@ public class StarTreeClusterIntegrationTest extends BaseClusterIntegrationTest {
         + "WHERE CRSDepTime BETWEEN 1137 AND 1849 AND DivArrDelay > 218 AND CRSDepTime NOT IN (35, 1633, 1457, 140) "
         + "AND LongestAddGTime NOT IN (17, 105, 20, 22) GROUP BY DepTimeBlk ORDER BY DepTimeBlk";
     testStarQuery(starQuery, !useMultiStageQueryEngine);
+
+    // Test MIN, MAX, SUM rewrite on LONG col
+    String starQuery2 =
+        "SELECT MIN(AirlineID), MAX(AirlineID), SUM(AirlineID) FROM mytable WHERE CRSDepTime BETWEEN 1137 AND 1849";
+    testStarQuery(starQuery2, !useMultiStageQueryEngine);
   }
 
   @Test(dataProvider = "useBothQueryEngines")
@@ -223,13 +228,13 @@ public class StarTreeClusterIntegrationTest extends BaseClusterIntegrationTest {
       JsonNode nullHandlingEnabledPlan = postQuery(nullHandlingEnabled + explain + starQuery);
       assertTrue(starPlan.toString().contains(FILTER_STARTREE_INDEX) || starPlan.toString().contains("FILTER_EMPTY")
               || starPlan.toString().contains("ALL_SEGMENTS_PRUNED_ON_SERVER"),
-          "StarTree query did not indicate use of StarTree index in query plan. Plan: " + starPlan);
+          "StarTree query did not indicate use of star-tree index in query plan. Plan: " + starPlan);
       assertFalse(referencePlan.toString().contains(FILTER_STARTREE_INDEX),
-          "Reference query indicated use of StarTree index in query plan. Plan: " + referencePlan);
+          "Reference query indicated use of star-tree index in query plan. Plan: " + referencePlan);
       assertTrue(
           nullHandlingEnabledPlan.toString().contains(FILTER_STARTREE_INDEX) || nullHandlingEnabledPlan.toString()
               .contains("FILTER_EMPTY") || nullHandlingEnabledPlan.toString().contains("ALL_SEGMENTS_PRUNED_ON_SERVER"),
-          "StarTree query with null handling enabled did not indicate use of StarTree index in query plan. Plan: "
+          "StarTree query with null handling enabled did not indicate use of star-tree index in query plan. Plan: "
               + nullHandlingEnabledPlan);
     }
 

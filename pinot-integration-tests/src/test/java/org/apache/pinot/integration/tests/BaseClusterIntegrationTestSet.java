@@ -330,6 +330,10 @@ public abstract class BaseClusterIntegrationTestSet extends BaseClusterIntegrati
     query = "SELECT MIN(OriginCityName), MAX(OriginCityName) FROM mytable";
     testQuery(query);
 
+    // Test MIN / MAX / SUM on LONG columns (automatically rewritten to MINLONG / MAXLONG / SUMLONG internally)
+    query = "SELECT MIN(AirlineID), MAX(AirlineID), SUM(AirlineID) FROM mytable";
+    testQuery(query);
+
     // Test orderedPreferredPools option which will fallbacks to non preferred Pools
     // when non of preferred Pools is available
     query = "SELECT count(*) FROM mytable WHERE OriginState LIKE 'A_' option(orderedPreferredPools=0|1)";

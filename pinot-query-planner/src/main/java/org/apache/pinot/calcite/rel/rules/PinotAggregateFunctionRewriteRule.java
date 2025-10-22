@@ -26,8 +26,6 @@ import org.apache.calcite.rel.RelNode;
 import org.apache.calcite.rel.core.Aggregate;
 import org.apache.calcite.rel.core.AggregateCall;
 import org.apache.calcite.rel.logical.LogicalAggregate;
-import org.apache.calcite.rel.type.RelDataType;
-import org.apache.calcite.rel.type.RelDataTypeField;
 import org.apache.calcite.sql.SqlAggFunction;
 import org.apache.calcite.sql.SqlFunctionCategory;
 import org.apache.calcite.sql.SqlKind;
@@ -37,13 +35,17 @@ import org.apache.calcite.tools.RelBuilderFactory;
 import org.apache.pinot.common.function.sql.PinotSqlAggFunction;
 
 
-/**
- * Rewrites certain aggregation functions based on operand types to support polymorphic aggregations.
- *
- * Currently supported rewrites:
- * - MIN(STRING) -> MINSTRING
- * - MAX(STRING) -> MAXSTRING
- */
+///
+/// Rewrites certain aggregation functions based on operand types to support polymorphic aggregations.
+///
+/// Currently supported rewrites:
+/// - MIN(stringType) -> MINSTRING
+/// - MAX(stringType) -> MAXSTRING
+/// - MIN(longType) -> MINLONG
+/// - MAX(longType) -> MAXLONG
+/// - SUM(longType) -> SUMLONG
+/// - SUM(intType) -> SUMINT
+///
 public class PinotAggregateFunctionRewriteRule extends RelOptRule {
   public static final PinotAggregateFunctionRewriteRule INSTANCE =
       new PinotAggregateFunctionRewriteRule(PinotRuleUtils.PINOT_REL_FACTORY, null);
@@ -65,7 +67,7 @@ public class PinotAggregateFunctionRewriteRule extends RelOptRule {
     boolean changed = false;
     List<AggregateCall> rewrittenCalls = new ArrayList<>(originalCalls.size());
     for (AggregateCall aggCall : originalCalls) {
-      AggregateCall newCall = maybeRewriteMinMaxOnString(aggCall, input, aggRel.getGroupCount());
+      AggregateCall newCall = maybeRewriteAggCall(aggCall, input, aggRel.getGroupCount());
       if (newCall != aggCall) {
         changed = true;
       }
@@ -81,34 +83,66 @@ public class PinotAggregateFunctionRewriteRule extends RelOptRule {
   }
 
   /**
-   * If the call is MIN or MAX over a STRING input, rewrite it to MINSTRING/MAXSTRING.
+   * Rewrite aggregation functions to type specific variants based on the operand type.
    */
-  private static AggregateCall maybeRewriteMinMaxOnString(AggregateCall call, RelNode input, int numGroups) {
+  private static AggregateCall maybeRewriteAggCall(AggregateCall call, RelNode input, int numGroups) {
     SqlAggFunction aggFunction = call.getAggregation();
-    SqlKind kind = aggFunction.getKind();
-    if (kind != SqlKind.MIN && kind != SqlKind.MAX) {
-      return call;
-    }
+    SqlKind aggKind = aggFunction.getKind();
 
     List<Integer> argList = call.getArgList();
     if (argList.isEmpty()) {
       return call;
     }
 
-    int argIndex = argList.get(0);
-    RelDataTypeField field = input.getRowType().getFieldList().get(argIndex);
-    RelDataType fieldType = field.getType();
-    SqlTypeName sqlTypeName = fieldType.getSqlTypeName();
-    if (!SqlTypeName.STRING_TYPES.contains(sqlTypeName)) {
-      return call;
+    SqlTypeName operandType = input.getRowType()
+        .getFieldList()
+        .get(argList.get(0))
+        .getType()
+        .getSqlTypeName();
+
+    SqlAggFunction newAgg;
+    switch (aggKind) {
+      case MIN: {
+        if (SqlTypeName.STRING_TYPES.contains(operandType)) {
+          newAgg = new PinotSqlAggFunction("MINSTRING", SqlKind.OTHER_FUNCTION, ReturnTypes.explicit(call.getType()),
+              aggFunction.getOperandTypeChecker(), SqlFunctionCategory.USER_DEFINED_FUNCTION);
+        } else if (operandType == SqlTypeName.BIGINT) {
+          newAgg = new PinotSqlAggFunction("MINLONG", SqlKind.OTHER_FUNCTION, ReturnTypes.explicit(call.getType()),
+              aggFunction.getOperandTypeChecker(), SqlFunctionCategory.USER_DEFINED_FUNCTION);
+        } else {
+          return call;
+        }
+        break;
+      }
+      case MAX: {
+        if (SqlTypeName.STRING_TYPES.contains(operandType)) {
+          newAgg = new PinotSqlAggFunction("MAXSTRING", SqlKind.OTHER_FUNCTION, ReturnTypes.explicit(call.getType()),
+              aggFunction.getOperandTypeChecker(), SqlFunctionCategory.USER_DEFINED_FUNCTION);
+        } else if (operandType == SqlTypeName.BIGINT) {
+          newAgg = new PinotSqlAggFunction("MAXLONG", SqlKind.OTHER_FUNCTION, ReturnTypes.explicit(call.getType()),
+              aggFunction.getOperandTypeChecker(), SqlFunctionCategory.USER_DEFINED_FUNCTION);
+        } else {
+          return call;
+        }
+        break;
+      }
+      case SUM: {
+        if (operandType == SqlTypeName.INTEGER) {
+          newAgg = new PinotSqlAggFunction("SUMINT", SqlKind.OTHER_FUNCTION, ReturnTypes.explicit(call.getType()),
+              aggFunction.getOperandTypeChecker(), SqlFunctionCategory.USER_DEFINED_FUNCTION);
+        } else if (operandType == SqlTypeName.BIGINT) {
+          newAgg = new PinotSqlAggFunction("SUMLONG", SqlKind.OTHER_FUNCTION, ReturnTypes.explicit(call.getType()),
+              aggFunction.getOperandTypeChecker(), SqlFunctionCategory.USER_DEFINED_FUNCTION);
+        } else {
+          return call;
+        }
+        break;
+      }
+      default:
+        return call;
     }
 
-    String targetName = (kind == SqlKind.MIN) ? "MINSTRING" : "MAXSTRING";
-    SqlAggFunction stringAgg =
-        new PinotSqlAggFunction(targetName, SqlKind.OTHER_FUNCTION, ReturnTypes.explicit(call.getType()),
-            aggFunction.getOperandTypeChecker(), SqlFunctionCategory.USER_DEFINED_FUNCTION);
-
-    return AggregateCall.create(stringAgg, call.isDistinct(), call.isApproximate(), call.ignoreNulls(), argList,
+    return AggregateCall.create(newAgg, call.isDistinct(), call.isApproximate(), call.ignoreNulls(), argList,
         call.filterArg, call.distinctKeys, call.getCollation(), numGroups, input, call.getType(), call.getName());
   }
 }
