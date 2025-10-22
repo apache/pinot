@@ -263,7 +263,7 @@
     <woodstox.version>7.1.1</woodstox.version>
     <curator.version>5.9.0</curator.version>
     <javassist.version>3.30.2-GA</javassist.version>
-    <bouncycastle.version>1.79</bouncycastle.version>
+    <bouncycastle.version>1.82</bouncycastle.version>
     <aircompressor.version>0.27</aircompressor.version>
     <jna.version>5.18.1</jna.version>
     <jnr-ffi.version>2.2.17</jnr-ffi.version>
