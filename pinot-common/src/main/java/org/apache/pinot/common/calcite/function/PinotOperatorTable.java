@@ -16,7 +16,7 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.pinot.calcite.sql.fun;
+package org.apache.pinot.common.calcite.function;
 
 import com.google.common.base.Preconditions;
 import com.google.common.base.Suppliers;
@@ -54,7 +54,9 @@ import org.apache.pinot.segment.spi.AggregationFunctionType;
 
 
 /**
- * This class defines all the {@link SqlOperator}s allowed by Pinot.
+ * This class defines all the Calcite {@link SqlOperator}s allowed by Pinot. This is primarily used by the multi-stage
+ * query engine during query parsing and validation.
+ *
  * <p>It contains the following types of operators:
  * <ul>
  *   <li>Standard operators from {@link SqlStdOperatorTable}</li>
@@ -431,6 +433,10 @@ public class PinotOperatorTable implements SqlOperatorTable {
   @Override
   public List<SqlOperator> getOperatorList() {
     return _operatorList;
+  }
+
+  public SqlOperator getOperator(String canonicalName) {
+    return _operatorMap.get(canonicalName);
   }
 
   private static class PinotLeadWindowFunction extends SqlLeadLagAggFunction {

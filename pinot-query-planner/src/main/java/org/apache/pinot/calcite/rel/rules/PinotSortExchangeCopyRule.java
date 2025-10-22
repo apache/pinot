@@ -33,8 +33,8 @@ import org.apache.calcite.rex.RexLiteral;
 import org.apache.calcite.rex.RexNode;
 import org.apache.calcite.sql.type.SqlTypeName;
 import org.apache.pinot.calcite.rel.logical.PinotLogicalSortExchange;
+import org.apache.pinot.common.calcite.type.TypeFactory;
 import org.apache.pinot.query.planner.logical.RexExpressionUtils;
-import org.apache.pinot.query.type.TypeFactory;
 
 
 public class PinotSortExchangeCopyRule extends RelRule<RelRule.Config> {

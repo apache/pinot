@@ -16,7 +16,7 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.pinot.query.type;
+package org.apache.pinot.common.calcite.type;
 
 import java.nio.charset.Charset;
 import java.nio.charset.StandardCharsets;

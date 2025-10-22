@@ -16,7 +16,7 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.pinot.common.catalog;
+package org.apache.pinot.common.calcite.catalog;
 
 import com.google.common.collect.ImmutableList;
 import java.util.List;

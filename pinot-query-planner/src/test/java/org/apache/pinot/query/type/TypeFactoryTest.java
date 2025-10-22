@@ -31,6 +31,8 @@ import org.apache.calcite.sql.SqlCollation;
 import org.apache.calcite.sql.type.ArraySqlType;
 import org.apache.calcite.sql.type.BasicSqlType;
 import org.apache.calcite.sql.type.SqlTypeName;
+import org.apache.pinot.common.calcite.type.TypeFactory;
+import org.apache.pinot.common.calcite.type.TypeSystem;
 import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.Schema;
 import org.testng.Assert;

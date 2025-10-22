@@ -18,18 +18,12 @@
  */
 package org.apache.pinot.common.utils.request;
 
-import java.math.BigDecimal;
-import java.util.List;
 import java.util.Set;
 import org.apache.calcite.sql.SqlDialect;
 import org.apache.calcite.sql.SqlLiteral;
 import org.apache.calcite.sql.parser.SqlParserPos;
-import org.apache.pinot.common.function.FunctionRegistry;
 import org.apache.pinot.common.request.Expression;
 import org.apache.pinot.common.request.ExpressionType;
-import org.apache.pinot.common.utils.DataSchema.ColumnDataType;
-import org.apache.pinot.spi.data.FieldSpec;
-import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.sql.parsers.CalciteSqlParser;
 import org.apache.pinot.sql.parsers.PinotSqlType;
 import org.apache.pinot.sql.parsers.SqlNodeAndOptions;
@@ -88,169 +82,5 @@ public class RequestUtilsTest {
     } else {
       assertEquals(tableNames, expectedSet);
     }
-  }
-
-  private static Schema buildTestSchema() {
-    return new Schema.SchemaBuilder()
-        .addSingleValueDimension("svInt", FieldSpec.DataType.INT)
-        .addSingleValueDimension("svLong", FieldSpec.DataType.LONG)
-        .addSingleValueDimension("svFloat", FieldSpec.DataType.FLOAT)
-        .addSingleValueDimension("svDouble", FieldSpec.DataType.DOUBLE)
-        .addSingleValueDimension("svBigDecimal", FieldSpec.DataType.BIG_DECIMAL)
-        .addSingleValueDimension("svString", FieldSpec.DataType.STRING)
-        .addSingleValueDimension("svBoolean", FieldSpec.DataType.BOOLEAN)
-        .addSingleValueDimension("svTimestamp", FieldSpec.DataType.TIMESTAMP)
-        .addSingleValueDimension("svBytes", FieldSpec.DataType.BYTES)
-        .addMultiValueDimension("mvInt", FieldSpec.DataType.INT)
-        .addMultiValueDimension("mvLong", FieldSpec.DataType.LONG)
-        .addMultiValueDimension("mvFloat", FieldSpec.DataType.FLOAT)
-        .addMultiValueDimension("mvDouble", FieldSpec.DataType.DOUBLE)
-        .addMultiValueDimension("mvString", FieldSpec.DataType.STRING)
-        .addMultiValueDimension("mvBoolean", FieldSpec.DataType.BOOLEAN)
-        .addMultiValueDimension("mvTimestamp", FieldSpec.DataType.TIMESTAMP)
-        .addMultiValueDimension("mvBytes", FieldSpec.DataType.BYTES)
-        .build();
-  }
-
-  @Test
-  public void testInferExpressionTypeIdentifiers() {
-    Schema schema = buildTestSchema();
-    assertEquals(RequestUtils.inferExpressionType(RequestUtils.getIdentifierExpression("svInt"), schema),
-        ColumnDataType.INT);
-    assertEquals(RequestUtils.inferExpressionType(RequestUtils.getIdentifierExpression("svLong"), schema),
-        ColumnDataType.LONG);
-    assertEquals(RequestUtils.inferExpressionType(RequestUtils.getIdentifierExpression("svFloat"), schema),
-        ColumnDataType.FLOAT);
-    assertEquals(RequestUtils.inferExpressionType(RequestUtils.getIdentifierExpression("svDouble"), schema),
-        ColumnDataType.DOUBLE);
-    assertEquals(RequestUtils.inferExpressionType(RequestUtils.getIdentifierExpression("svBigDecimal"), schema),
-        ColumnDataType.BIG_DECIMAL);
-    assertEquals(RequestUtils.inferExpressionType(RequestUtils.getIdentifierExpression("svString"), schema),
-        ColumnDataType.STRING);
-    assertEquals(RequestUtils.inferExpressionType(RequestUtils.getIdentifierExpression("svBoolean"), schema),
-        ColumnDataType.BOOLEAN);
-    assertEquals(RequestUtils.inferExpressionType(RequestUtils.getIdentifierExpression("svTimestamp"), schema),
-        ColumnDataType.TIMESTAMP);
-    assertEquals(RequestUtils.inferExpressionType(RequestUtils.getIdentifierExpression("svBytes"), schema),
-        ColumnDataType.BYTES);
-
-    assertEquals(RequestUtils.inferExpressionType(RequestUtils.getIdentifierExpression("mvInt"), schema),
-        ColumnDataType.INT_ARRAY);
-    assertEquals(RequestUtils.inferExpressionType(RequestUtils.getIdentifierExpression("mvLong"), schema),
-        ColumnDataType.LONG_ARRAY);
-    assertEquals(RequestUtils.inferExpressionType(RequestUtils.getIdentifierExpression("mvFloat"), schema),
-        ColumnDataType.FLOAT_ARRAY);
-    assertEquals(RequestUtils.inferExpressionType(RequestUtils.getIdentifierExpression("mvDouble"), schema),
-        ColumnDataType.DOUBLE_ARRAY);
-    assertEquals(RequestUtils.inferExpressionType(RequestUtils.getIdentifierExpression("mvString"), schema),
-        ColumnDataType.STRING_ARRAY);
-    assertEquals(RequestUtils.inferExpressionType(RequestUtils.getIdentifierExpression("mvBoolean"), schema),
-        ColumnDataType.BOOLEAN_ARRAY);
-    assertEquals(RequestUtils.inferExpressionType(RequestUtils.getIdentifierExpression("mvTimestamp"), schema),
-        ColumnDataType.TIMESTAMP_ARRAY);
-    assertEquals(RequestUtils.inferExpressionType(RequestUtils.getIdentifierExpression("mvBytes"), schema),
-        ColumnDataType.BYTES_ARRAY);
-
-    assertEquals(RequestUtils.inferExpressionType(RequestUtils.getIdentifierExpression("unknownCol"), schema),
-        ColumnDataType.UNKNOWN);
-  }
-
-  @Test
-  public void testInferExpressionTypeLiterals() {
-    Schema schema = buildTestSchema();
-    assertEquals(RequestUtils.inferExpressionType(RequestUtils.getLiteralExpression(true), schema),
-        ColumnDataType.BOOLEAN);
-    assertEquals(RequestUtils.inferExpressionType(RequestUtils.getLiteralExpression(1), schema),
-        ColumnDataType.INT);
-    assertEquals(RequestUtils.inferExpressionType(RequestUtils.getLiteralExpression(1L), schema),
-        ColumnDataType.LONG);
-    assertEquals(RequestUtils.inferExpressionType(RequestUtils.getLiteralExpression(1.0f), schema),
-        ColumnDataType.FLOAT);
-    assertEquals(RequestUtils.inferExpressionType(RequestUtils.getLiteralExpression(1.0d), schema),
-        ColumnDataType.DOUBLE);
-    assertEquals(RequestUtils.inferExpressionType(RequestUtils.getLiteralExpression(new BigDecimal("123.45")), schema),
-        ColumnDataType.BIG_DECIMAL);
-    assertEquals(RequestUtils.inferExpressionType(RequestUtils.getLiteralExpression("abc"), schema),
-        ColumnDataType.STRING);
-    assertEquals(RequestUtils.inferExpressionType(RequestUtils.getLiteralExpression(new byte[]{1, 2}), schema),
-        ColumnDataType.BYTES);
-
-    assertEquals(RequestUtils.inferExpressionType(RequestUtils.getLiteralExpression(new int[]{1, 2}), schema),
-        ColumnDataType.INT_ARRAY);
-    assertEquals(RequestUtils.inferExpressionType(RequestUtils.getLiteralExpression(new long[]{1L, 2L}), schema),
-        ColumnDataType.LONG_ARRAY);
-    assertEquals(RequestUtils.inferExpressionType(RequestUtils.getLiteralExpression(new float[]{1.0f, 2.0f}), schema),
-        ColumnDataType.FLOAT_ARRAY);
-    assertEquals(RequestUtils.inferExpressionType(RequestUtils.getLiteralExpression(new double[]{1.0d, 2.0d}), schema),
-        ColumnDataType.DOUBLE_ARRAY);
-    assertEquals(RequestUtils.inferExpressionType(RequestUtils.getLiteralExpression(new String[]{"a", "b"}), schema),
-        ColumnDataType.STRING_ARRAY);
-  }
-
-  @Test
-  public void testInferExpressionTypeScalarFunction() {
-    Schema schema = buildTestSchema();
-    FunctionRegistry.init();
-
-    // abs(x) -> DOUBLE
-    Expression absOnInt = RequestUtils.getFunctionExpression(
-        FunctionRegistry.canonicalize("abs"), RequestUtils.getIdentifierExpression("svInt"));
-    assertEquals(RequestUtils.inferExpressionType(absOnInt, schema), ColumnDataType.DOUBLE);
-
-    // intDiv(10.0, 3.0) -> LONG
-    Expression intDiv = RequestUtils.getFunctionExpression(
-        FunctionRegistry.canonicalize("intDiv"),
-        RequestUtils.getLiteralExpression(10.0d),
-        RequestUtils.getLiteralExpression(3.0d));
-    assertEquals(RequestUtils.inferExpressionType(intDiv, schema), ColumnDataType.LONG);
-  }
-
-  @Test
-  public void testInferExpressionTypeScalarFunctionPolymorphic() {
-    Schema schema = buildTestSchema();
-    FunctionRegistry.init();
-
-    // plus(long, long) -> LONG
-    Expression plusLongLong = RequestUtils.getFunctionExpression(
-        FunctionRegistry.canonicalize("plus"),
-        RequestUtils.getIdentifierExpression("svLong"),
-        RequestUtils.getIdentifierExpression("svLong"));
-    assertEquals(RequestUtils.inferExpressionType(plusLongLong, schema), ColumnDataType.LONG);
-
-    // plus(long, double) -> DOUBLE
-    Expression plusLongDouble = RequestUtils.getFunctionExpression(
-        FunctionRegistry.canonicalize("plus"),
-        RequestUtils.getIdentifierExpression("svLong"),
-        RequestUtils.getIdentifierExpression("svDouble"));
-    assertEquals(RequestUtils.inferExpressionType(plusLongDouble, schema), ColumnDataType.DOUBLE);
-  }
-
-  @Test
-  public void testInferExpressionTypeNestedFunctions() {
-    Schema schema = buildTestSchema();
-    FunctionRegistry.init();
-
-    // ln(abs(3.0)) -> DOUBLE
-    Expression absExpression = RequestUtils.getFunctionExpression(
-        FunctionRegistry.canonicalize("abs"), RequestUtils.getLiteralExpression(3.0d));
-    Expression lnAbs = RequestUtils.getFunctionExpression(
-        FunctionRegistry.canonicalize("ln"), absExpression);
-    assertEquals(RequestUtils.inferExpressionType(lnAbs, schema), ColumnDataType.DOUBLE);
-  }
-
-  @Test
-  public void testInferExpressionTypeUnknownAndAggregationFunctions() {
-    Schema schema = buildTestSchema();
-    FunctionRegistry.init();
-
-    // Unknown function -> UNKNOWN
-    Expression unknownFn = RequestUtils.getFunctionExpression("notafunction",
-        List.of(RequestUtils.getIdentifierExpression("svInt")));
-    assertEquals(RequestUtils.inferExpressionType(unknownFn, schema), ColumnDataType.UNKNOWN);
-
-    // Aggregation function or wrong arg count for scalar min -> UNKNOWN
-    Expression minOneArg = RequestUtils.getFunctionExpression(FunctionRegistry.canonicalize("min"),
-        List.of(RequestUtils.getIdentifierExpression("svInt")));
-    assertEquals(RequestUtils.inferExpressionType(minOneArg, schema), ColumnDataType.UNKNOWN);
   }
 }

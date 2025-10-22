@@ -20,18 +20,23 @@ package org.apache.pinot.core.query.optimizer.statement;
 
 import java.util.List;
 import javax.annotation.Nullable;
+import org.apache.pinot.common.calcite.function.SseExpressionTypeInference;
 import org.apache.pinot.common.request.Expression;
 import org.apache.pinot.common.request.Function;
 import org.apache.pinot.common.request.PinotQuery;
 import org.apache.pinot.common.utils.DataSchema.ColumnDataType;
-import org.apache.pinot.common.utils.request.RequestUtils;
 import org.apache.pinot.segment.spi.AggregationFunctionType;
 import org.apache.pinot.spi.data.Schema;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
 
 /**
  * Rewrites aggregate functions to type-specific versions in order to support polymorphic functions.
  */
 public class AggregateFunctionRewriteOptimizer implements StatementOptimizer {
+
+  public static final Logger LOGGER = LoggerFactory.getLogger(AggregateFunctionRewriteOptimizer.class);
 
   @Override
   public void optimize(PinotQuery pinotQuery, @Nullable Schema schema) {
@@ -75,14 +80,21 @@ public class AggregateFunctionRewriteOptimizer implements StatementOptimizer {
       return;
     }
 
-    // Rewrite MIN(stringCol) and MAX(stringCol) to MINSTRING / MAXSTRING
+    // Rewrite MIN(stringVal) and MAX(stringVal) to MINSTRING / MAXSTRING
     if ((functionName.equals(AggregationFunctionType.MIN.getName())
         || functionName.equals(AggregationFunctionType.MAX.getName()))
         && function.getOperandsSize() == 1) {
       Expression operand = function.getOperands().get(0);
 
-      ColumnDataType dataType = RequestUtils.inferExpressionType(operand, schema);
-      if (dataType == ColumnDataType.STRING) {
+      ColumnDataType dataType;
+      try {
+        dataType = SseExpressionTypeInference.inferReturnRelType(operand, schema);
+      } catch (Exception e) {
+        // Ignore exceptions during type inference and do not rewrite the function
+        LOGGER.warn("Exception while inferring return type for expression: {}", operand, e);
+        return;
+      }
+      if (dataType.getStoredType() == ColumnDataType.STRING) {
         String newFunctionName =
             functionName.equals(AggregationFunctionType.MIN.getName())
                 ? AggregationFunctionType.MINSTRING.name().toLowerCase()
