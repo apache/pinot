@@ -98,7 +98,7 @@ public class SegmentLocalFSDirectory extends SegmentDirectory {
 
   @VisibleForTesting
   public SegmentLocalFSDirectory(File directoryFile, SegmentMetadataImpl metadata,
-      SegmentDirectoryLoaderContext segmentDirectoryLoaderContext, ReadMode readMode) {
+      @Nullable SegmentDirectoryLoaderContext segmentDirectoryLoaderContext, ReadMode readMode) {
     _segmentDirectoryLoaderContext = segmentDirectoryLoaderContext;
 
     Preconditions.checkNotNull(directoryFile);
