@@ -141,7 +141,7 @@ public abstract class BaseSingleStageBrokerRequestHandler extends BaseBrokerRequ
   private static final Expression TRUE = RequestUtils.getLiteralExpression(true);
   private static final Expression STAR = RequestUtils.getIdentifierExpression("*");
   private static final int MAX_UNAVAILABLE_SEGMENTS_TO_PRINT_IN_QUERY_EXCEPTION = 10;
-  private static final Map<String, String> DISTINCT_MV_COL_FUNCTION_OVERRIDE_MAP =
+  private static final Map<String, String> MV_COL_AGG_FUNCTION_OVERRIDE_MAP =
       ImmutableMap.<String, String>builder().put("distinctcount", "distinctcountmv")
           .put("distinctcountbitmap", "distinctcountbitmapmv").put("distinctcounthll", "distinctcounthllmv")
           .put("distinctcountrawhll", "distinctcountrawhllmv").put("distinctsum", "distinctsummv")
@@ -1003,7 +1003,7 @@ public abstract class BaseSingleStageBrokerRequestHandler extends BaseBrokerRequ
 
     Schema schema = _tableCache.getSchema(rawTableName);
     if (schema != null) {
-      handleDistinctMultiValuedOverride(serverPinotQuery, schema);
+      handleAggFunctionMVOverride(serverPinotQuery, schema);
     }
     _queryOptimizer.optimize(serverPinotQuery, schema);
 
@@ -1298,7 +1298,6 @@ public abstract class BaseSingleStageBrokerRequestHandler extends BaseBrokerRequ
    * @return multivalued columns of the table .
    */
   private static boolean isMultiValueColumn(Schema tableSchema, String columnName) {
-
     DimensionFieldSpec dimensionFieldSpec = tableSchema.getDimensionSpec(columnName);
     return dimensionFieldSpec != null && !dimensionFieldSpec.isSingleValueField();
   }
@@ -1437,39 +1436,39 @@ public abstract class BaseSingleStageBrokerRequestHandler extends BaseBrokerRequ
   }
 
   /**
-   * Rewrites selected 'Distinct' prefixed function to 'Distinct----MV' function for the field of multivalued type.
+   * Rewrites aggregation functions to MV equivalents if the function operand is an MV column
    */
   @VisibleForTesting
-  static void handleDistinctMultiValuedOverride(PinotQuery pinotQuery, Schema tableSchema) {
+  static void handleAggFunctionMVOverride(PinotQuery pinotQuery, Schema tableSchema) {
     for (Expression expression : pinotQuery.getSelectList()) {
-      handleDistinctMultiValuedOverride(expression, tableSchema);
+      handleAggFunctionMVOverride(expression, tableSchema);
     }
     List<Expression> orderByExpressions = pinotQuery.getOrderByList();
     if (orderByExpressions != null) {
       for (Expression expression : orderByExpressions) {
         // NOTE: Order-by is always a Function with the ordering of the Expression
-        handleDistinctMultiValuedOverride(expression.getFunctionCall().getOperands().get(0), tableSchema);
+        handleAggFunctionMVOverride(expression.getFunctionCall().getOperands().get(0), tableSchema);
       }
     }
     Expression havingExpression = pinotQuery.getHavingExpression();
     if (havingExpression != null) {
-      handleDistinctMultiValuedOverride(havingExpression, tableSchema);
+      handleAggFunctionMVOverride(havingExpression, tableSchema);
     }
   }
 
   /**
-   * Rewrites selected 'Distinct' prefixed function to 'Distinct----MV' function for the field of multivalued type.
+   * Rewrites aggregation functions to MV equivalents if the function operand is an MV column
    */
-  private static void handleDistinctMultiValuedOverride(Expression expression, Schema tableSchema) {
+  private static void handleAggFunctionMVOverride(Expression expression, Schema tableSchema) {
     Function function = expression.getFunctionCall();
     if (function == null) {
       return;
     }
 
-    String overrideOperator = DISTINCT_MV_COL_FUNCTION_OVERRIDE_MAP.get(function.getOperator());
+    String overrideOperator = MV_COL_AGG_FUNCTION_OVERRIDE_MAP.get(function.getOperator());
     if (overrideOperator != null) {
       List<Expression> operands = function.getOperands();
-      if (operands.size() >= 1 && operands.get(0).isSetIdentifier() && isMultiValueColumn(tableSchema,
+      if (!operands.isEmpty() && operands.get(0).isSetIdentifier() && isMultiValueColumn(tableSchema,
           operands.get(0).getIdentifier().getName())) {
         // we are only checking the first operand that if its a MV column as all the overriding agg. fn.'s have
         // first operator is column name
@@ -1477,7 +1476,7 @@ public abstract class BaseSingleStageBrokerRequestHandler extends BaseBrokerRequ
       }
     } else {
       for (Expression operand : function.getOperands()) {
-        handleDistinctMultiValuedOverride(operand, tableSchema);
+        handleAggFunctionMVOverride(operand, tableSchema);
       }
     }
   }
