@@ -183,7 +183,7 @@
     <azure.msal4j.version>1.23.1</azure.msal4j.version>
     <joda-time.version>2.14.0</joda-time.version>
     <janino.version>3.1.12</janino.version>
-    <ayza.version>10.0.0</ayza.version>
+    <ayza.version>10.0.1</ayza.version>
     <jbcrypt.version>0.4</jbcrypt.version>
     <plexus-classworlds.version>2.9.0</plexus-classworlds.version>
     <scala-xml.version>2.4.0</scala-xml.version>
