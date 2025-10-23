@@ -134,7 +134,7 @@
         "output": [
           "Execution Plan",
           "\nPhysicalExchange(exchangeStrategy=[SINGLETON_EXCHANGE])",
-          "\n  PhysicalAggregate(group=[{0}], agg#0=[MAX($7)], aggType=[DIRECT])",
+          "\n  PhysicalAggregate(group=[{0}], agg#0=[MAXLONG($7)], aggType=[DIRECT])",
           "\n    PhysicalExchange(exchangeStrategy=[PARTITIONING_EXCHANGE], distKeys=[[0]])",
           "\n      PhysicalTableScan(table=[[default, a]])",
           "\n"

@@ -95,9 +95,9 @@ public class QueryPlannerRuleOptionsTest extends QueryEnvironmentTestBase {
     //@formatter:off
     assertEquals(explain,
       "Execution Plan\n"
-          + "PinotLogicalAggregate(group=[{}], agg#0=[SUM($0)], aggType=[FINAL])\n"
+          + "PinotLogicalAggregate(group=[{}], agg#0=[SUMINT($0)], aggType=[FINAL])\n"
           + "  PinotLogicalExchange(distribution=[hash])\n"
-          + "    PinotLogicalAggregate(group=[{}], agg#0=[SUM($0)], aggType=[LEAF])\n"
+          + "    PinotLogicalAggregate(group=[{}], agg#0=[SUMINT($0)], aggType=[LEAF])\n"
           + "      LogicalProject($f0=[CASE(=($0, _UTF-8'a'), 3, 0)])\n"
           + "        PinotLogicalTableScan(table=[[default, a]])\n");
     //@formatter:on
