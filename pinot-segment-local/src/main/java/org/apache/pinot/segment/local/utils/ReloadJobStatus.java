@@ -16,7 +16,7 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.pinot.core.data.manager;
+package org.apache.pinot.segment.local.utils;
 
 import java.util.concurrent.atomic.AtomicInteger;
 

@@ -31,6 +31,7 @@ import org.apache.pinot.common.metrics.ServerMetrics;
 import org.apache.pinot.core.data.manager.realtime.SegmentUploader;
 import org.apache.pinot.segment.local.data.manager.TableDataManager;
 import org.apache.pinot.segment.local.utils.SegmentOperationsThrottler;
+import org.apache.pinot.segment.local.utils.ServerReloadJobStatusCache;
 import org.apache.pinot.segment.spi.SegmentMetadata;
 import org.apache.pinot.spi.annotations.InterfaceAudience;
 import org.apache.pinot.spi.env.PinotConfiguration;
@@ -50,7 +51,7 @@ public interface InstanceDataManager {
    * <p>NOTE: The config is the subset of server config with prefix 'pinot.server.instance'
    */
   void init(PinotConfiguration config, HelixManager helixManager, ServerMetrics serverMetrics,
-      @Nullable SegmentOperationsThrottler segmentOperationsThrottler)
+      @Nullable SegmentOperationsThrottler segmentOperationsThrottler, ServerReloadJobStatusCache reloadJobStatusCache)
       throws Exception;
 
   /**

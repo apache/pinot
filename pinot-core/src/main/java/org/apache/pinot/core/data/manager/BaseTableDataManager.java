@@ -80,6 +80,7 @@ import org.apache.pinot.segment.local.utils.SegmentDownloadThrottler;
 import org.apache.pinot.segment.local.utils.SegmentLocks;
 import org.apache.pinot.segment.local.utils.SegmentOperationsThrottler;
 import org.apache.pinot.segment.local.utils.SegmentReloadSemaphore;
+import org.apache.pinot.segment.local.utils.ServerReloadJobStatusCache;
 import org.apache.pinot.segment.spi.ColumnMetadata;
 import org.apache.pinot.segment.spi.ImmutableSegment;
 import org.apache.pinot.segment.spi.IndexSegment;
@@ -109,6 +110,8 @@ import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.utils.CommonConstants;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+
+import static java.util.Objects.requireNonNull;
 
 
 @ThreadSafe
@@ -157,16 +160,19 @@ public abstract class BaseTableDataManager implements TableDataManager {
   protected volatile boolean _isDeleted;
 
   protected boolean _enableAsyncSegmentRefresh;
+  protected ServerReloadJobStatusCache _reloadJobStatusCache;
 
   @Override
   public void init(InstanceDataManagerConfig instanceDataManagerConfig, HelixManager helixManager,
       SegmentLocks segmentLocks, TableConfig tableConfig, Schema schema, SegmentReloadSemaphore segmentReloadSemaphore,
       ExecutorService segmentReloadRefreshExecutor, @Nullable ExecutorService segmentPreloadExecutor,
       @Nullable Cache<Pair<String, String>, SegmentErrorInfo> errorCache,
-      @Nullable SegmentOperationsThrottler segmentOperationsThrottler, boolean enableAsyncSegmentRefresh) {
+      @Nullable SegmentOperationsThrottler segmentOperationsThrottler, boolean enableAsyncSegmentRefresh,
+      ServerReloadJobStatusCache reloadJobStatusCache) {
     LOGGER.info("Initializing table data manager for table: {}", tableConfig.getTableName());
 
     _instanceDataManagerConfig = instanceDataManagerConfig;
+    _reloadJobStatusCache = requireNonNull(reloadJobStatusCache, "reloadJobStatusCache cannot be null");
     _instanceId = instanceDataManagerConfig.getInstanceId();
     _helixManager = helixManager;
     _propertyStore = helixManager.getHelixPropertyStore();
@@ -793,6 +799,7 @@ public abstract class BaseTableDataManager implements TableDataManager {
         _logger.error("Caught exception while reloading segment: {}", segmentName, t);
         failedSegments.add(segmentName);
         sampleException.set(t);
+        _reloadJobStatusCache.getOrCreate("manual-reload").incrementAndGetFailureCount();
       }
     }, _segmentReloadRefreshExecutor)).toArray(CompletableFuture[]::new)).get();
     if (sampleException.get() != null) {

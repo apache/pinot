@@ -95,6 +95,7 @@ import org.apache.pinot.segment.local.utils.SegmentDownloadThrottler;
 import org.apache.pinot.segment.local.utils.SegmentMultiColTextIndexPreprocessThrottler;
 import org.apache.pinot.segment.local.utils.SegmentOperationsThrottler;
 import org.apache.pinot.segment.local.utils.SegmentStarTreePreprocessThrottler;
+import org.apache.pinot.segment.local.utils.ServerReloadJobStatusCache;
 import org.apache.pinot.segment.spi.memory.PinotDataBuffer;
 import org.apache.pinot.segment.spi.memory.unsafe.MmapMemoryConfig;
 import org.apache.pinot.server.access.AccessControlFactory;
@@ -179,6 +180,7 @@ public abstract class BaseServerStarter implements ServiceStartable {
   protected DefaultClusterConfigChangeHandler _clusterConfigChangeHandler;
   protected volatile boolean _isServerReadyToServeQueries = false;
   protected ScheduledExecutorService _helixMessageCountScheduler;
+  protected ServerReloadJobStatusCache _reloadJobStatusCache;
 
   @Override
   public void init(PinotConfiguration serverConf)
@@ -626,6 +628,9 @@ public abstract class BaseServerStarter implements ServiceStartable {
     _serverMetrics.setValueOfGlobalGauge(ServerGauge.VERSION, PinotVersion.VERSION_METRIC_NAME, 1);
     ServerMetrics.register(_serverMetrics);
 
+    LOGGER.info("Initializing reload job status cache");
+    _reloadJobStatusCache = new ServerReloadJobStatusCache();
+
     // install default SSL context if necessary (even if not force-enabled everywhere)
     TlsConfig tlsDefaults = TlsUtils.extractTlsConfig(_serverConf, Server.SERVER_TLS_PREFIX);
     if (StringUtils.isNotBlank(tlsDefaults.getKeyStorePath()) || StringUtils.isNotBlank(
@@ -701,7 +706,7 @@ public abstract class BaseServerStarter implements ServiceStartable {
     SendStatsPredicate sendStatsPredicate = SendStatsPredicate.create(_serverConf, _helixManager);
     _serverInstance =
         new ServerInstance(serverConf, _instanceId, _helixManager, _accessControlFactory, _segmentOperationsThrottler,
-            _threadAccountant, sendStatsPredicate);
+            _threadAccountant, sendStatsPredicate, _reloadJobStatusCache);
 
     InstanceDataManager instanceDataManager = _serverInstance.getInstanceDataManager();
     instanceDataManager.setSupplierOfIsServerReadyToServeQueries(() -> _isServerReadyToServeQueries);
