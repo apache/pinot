@@ -36,7 +36,7 @@ public class EmptyIndexBuffer extends PinotDataBuffer {
   private final String _segmentPath;
 
   /**
-   * Creates a new S3EmptyIndexBuffer for a zero-size index entry
+   * Creates a new EmptyIndexBuffer for a zero-size index entry
    *
    * @param properties Properties containing S3 configuration (bucket, key, etc.)
    * @param segmentName The name of the segment
