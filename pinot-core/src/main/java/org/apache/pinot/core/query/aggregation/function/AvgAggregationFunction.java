@@ -65,19 +65,7 @@ public class AvgAggregationFunction extends NullableSingleInputAggregationFuncti
       Map<ExpressionContext, BlockValSet> blockValSetMap) {
     BlockValSet blockValSet = blockValSetMap.get(_expression);
 
-    if (blockValSet.getValueType() != DataType.BYTES) {
-      double[] doubleValues = blockValSet.getDoubleValuesSV();
-      AvgPair avgPair = new AvgPair();
-      forEachNotNull(length, blockValSet, (from, to) -> {
-        for (int i = from; i < to; i++) {
-          avgPair.apply(doubleValues[i], 1);
-        }
-      });
-      // Only set the aggregation result when there is at least one non-null input value
-      if (avgPair.getCount() != 0) {
-        updateAggregationResult(aggregationResultHolder, avgPair.getSum(), avgPair.getCount());
-      }
-    } else {
+    if (blockValSet.getValueType() == DataType.BYTES) {
       // Serialized AvgPair
       byte[][] bytesValues = blockValSet.getBytesValuesSV();
       AvgPair avgPair = new AvgPair();
@@ -91,6 +79,43 @@ public class AvgAggregationFunction extends NullableSingleInputAggregationFuncti
       if (avgPair.getCount() != 0) {
         updateAggregationResult(aggregationResultHolder, avgPair.getSum(), avgPair.getCount());
       }
+      return;
+    }
+
+    if (blockValSet.isSingleValue()) {
+      aggregateSV(length, aggregationResultHolder, blockValSet);
+    } else {
+      aggregateMV(length, aggregationResultHolder, blockValSet);
+    }
+  }
+
+  private void aggregateSV(int length, AggregationResultHolder aggregationResultHolder, BlockValSet blockValSet) {
+    double[] doubleValues = blockValSet.getDoubleValuesSV();
+    AvgPair avgPair = new AvgPair();
+    forEachNotNull(length, blockValSet, (from, to) -> {
+      for (int i = from; i < to; i++) {
+        avgPair.apply(doubleValues[i], 1);
+      }
+    });
+    // Only set the aggregation result when there is at least one non-null input value
+    if (avgPair.getCount() != 0) {
+      updateAggregationResult(aggregationResultHolder, avgPair.getSum(), avgPair.getCount());
+    }
+  }
+
+  private void aggregateMV(int length, AggregationResultHolder aggregationResultHolder, BlockValSet blockValSet) {
+    double[][] valuesArray = blockValSet.getDoubleValuesMV();
+    AvgPair avgPair = new AvgPair();
+    forEachNotNull(length, blockValSet, (from, to) -> {
+      for (int i = from; i < to; i++) {
+        for (double value : valuesArray[i]) {
+          avgPair.apply(value);
+        }
+      }
+    });
+    // Only set the aggregation result when there is at least one non-null input value
+    if (avgPair.getCount() != 0) {
+      updateAggregationResult(aggregationResultHolder, avgPair.getSum(), avgPair.getCount());
     }
   }
 
@@ -108,14 +133,7 @@ public class AvgAggregationFunction extends NullableSingleInputAggregationFuncti
       Map<ExpressionContext, BlockValSet> blockValSetMap) {
     BlockValSet blockValSet = blockValSetMap.get(_expression);
 
-    if (blockValSet.getValueType() != DataType.BYTES) {
-      double[] doubleValues = blockValSet.getDoubleValuesSV();
-      forEachNotNull(length, blockValSet, (from, to) -> {
-        for (int i = from; i < to; i++) {
-          updateGroupByResult(groupKeyArray[i], groupByResultHolder, doubleValues[i], 1L);
-        }
-      });
-    } else {
+    if (blockValSet.getValueType() == DataType.BYTES) {
       // Serialized AvgPair
       byte[][] bytesValues = blockValSet.getBytesValuesSV();
       forEachNotNull(length, blockValSet, (from, to) -> {
@@ -124,7 +142,34 @@ public class AvgAggregationFunction extends NullableSingleInputAggregationFuncti
           updateGroupByResult(groupKeyArray[i], groupByResultHolder, avgPair.getSum(), avgPair.getCount());
         }
       });
+      return;
     }
+
+    if (blockValSet.isSingleValue()) {
+      aggregateSvGroupBySv(blockValSet, length, groupKeyArray, groupByResultHolder);
+    } else {
+      aggregateMvGroupBySv(blockValSet, length, groupKeyArray, groupByResultHolder);
+    }
+  }
+
+  private void aggregateSvGroupBySv(BlockValSet blockValSet, int length, int[] groupKeyArray,
+      GroupByResultHolder groupByResultHolder) {
+    double[] doubleValues = blockValSet.getDoubleValuesSV();
+    forEachNotNull(length, blockValSet, (from, to) -> {
+      for (int i = from; i < to; i++) {
+        updateGroupByResult(groupKeyArray[i], groupByResultHolder, doubleValues[i], 1L);
+      }
+    });
+  }
+
+  private void aggregateMvGroupBySv(BlockValSet blockValSet, int length, int[] groupKeyArray,
+      GroupByResultHolder groupByResultHolder) {
+    double[][] valuesArray = blockValSet.getDoubleValuesMV();
+    forEachNotNull(length, blockValSet, (from, to) -> {
+      for (int i = from; i < to; i++) {
+        aggregateOnGroupKey(groupKeyArray[i], groupByResultHolder, valuesArray[i]);
+      }
+    });
   }
 
   @Override
@@ -132,16 +177,7 @@ public class AvgAggregationFunction extends NullableSingleInputAggregationFuncti
       Map<ExpressionContext, BlockValSet> blockValSetMap) {
     BlockValSet blockValSet = blockValSetMap.get(_expression);
 
-    if (blockValSet.getValueType() != DataType.BYTES) {
-      double[] doubleValues = blockValSet.getDoubleValuesSV();
-      forEachNotNull(length, blockValSet, (from, to) -> {
-        for (int i = from; i < to; i++) {
-          for (int groupKey : groupKeysArray[i]) {
-            updateGroupByResult(groupKey, groupByResultHolder, doubleValues[i], 1L);
-          }
-        }
-      });
-    } else {
+    if (blockValSet.getValueType() == DataType.BYTES) {
       // Serialized AvgPair
       byte[][] bytesValues = blockValSet.getBytesValuesSV();
       forEachNotNull(length, blockValSet, (from, to) -> {
@@ -152,6 +188,49 @@ public class AvgAggregationFunction extends NullableSingleInputAggregationFuncti
           }
         }
       });
+      return;
+    }
+
+    if (blockValSet.isSingleValue()) {
+      aggregateSvGroupByMv(blockValSet, length, groupKeysArray, groupByResultHolder);
+    } else {
+      aggregateMvGroupByMv(blockValSet, length, groupKeysArray, groupByResultHolder);
+    }
+  }
+
+  private void aggregateSvGroupByMv(BlockValSet blockValSet, int length, int[][] groupKeysArray,
+      GroupByResultHolder groupByResultHolder) {
+    double[] doubleValues = blockValSet.getDoubleValuesSV();
+    forEachNotNull(length, blockValSet, (from, to) -> {
+      for (int i = from; i < to; i++) {
+        for (int groupKey : groupKeysArray[i]) {
+          updateGroupByResult(groupKey, groupByResultHolder, doubleValues[i], 1L);
+        }
+      }
+    });
+  }
+
+  private void aggregateMvGroupByMv(BlockValSet blockValSet, int length, int[][] groupKeysArray,
+      GroupByResultHolder groupByResultHolder) {
+    double[][] valuesArray = blockValSet.getDoubleValuesMV();
+    forEachNotNull(length, blockValSet, (from, to) -> {
+      for (int i = from; i < to; i++) {
+        double[] values = valuesArray[i];
+        for (int groupKey : groupKeysArray[i]) {
+          aggregateOnGroupKey(groupKey, groupByResultHolder, values);
+        }
+      }
+    });
+  }
+
+  private void aggregateOnGroupKey(int groupKey, GroupByResultHolder groupByResultHolder, double[] values) {
+    double sum = 0.0;
+    for (double value : values) {
+      sum += value;
+    }
+    long count = values.length;
+    if (count != 0) {
+      updateGroupByResult(groupKey, groupByResultHolder, sum, count);
     }
   }
 

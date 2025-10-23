@@ -146,7 +146,7 @@ public abstract class BaseSingleStageBrokerRequestHandler extends BaseBrokerRequ
           .put("distinctcountbitmap", "distinctcountbitmapmv").put("distinctcounthll", "distinctcounthllmv")
           .put("distinctcountrawhll", "distinctcountrawhllmv").put("distinctsum", "distinctsummv")
           .put("distinctavg", "distinctavgmv").put("count", "countmv").put("min", "minmv").put("max", "maxmv")
-          .put("avg", "avgmv").put("sum", "summv").put("minmaxrange", "minmaxrangemv")
+          .put("sum", "summv").put("minmaxrange", "minmaxrangemv")
           .put("distinctcounthllplus", "distinctcounthllplusmv")
           .put("distinctcountrawhllplus", "distinctcountrawhllplusmv").build();
 
