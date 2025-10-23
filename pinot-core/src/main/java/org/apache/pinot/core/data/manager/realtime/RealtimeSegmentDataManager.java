@@ -237,7 +237,9 @@ public class RealtimeSegmentDataManager extends SegmentDataManager {
   private static final int MSG_COUNT_THRESHOLD_FOR_LOG = 100000;
   private static final int BUILD_TIME_LEASE_SECONDS = 30;
   private static final int MAX_CONSECUTIVE_ERROR_COUNT = 5;
-  private static final RetryPolicy CONSUMER_RECREATE_RETRY_POLICY = RetryPolicies.exponentialBackoffRetryPolicy(10, 1000L, 2.0f);
+  // 8 min max timeout for the retry policy
+  private static final RetryPolicy CONSUMER_RECREATE_RETRY_POLICY =
+      RetryPolicies.exponentialBackoffRetryPolicy(10, 1000L, 2.0f);
 
   // Interrupt consumer thread every 10 seconds in case it doesn't stop, e.g. interrupt flag getting cleared somehow
   private static final int CONSUMER_THREAD_INTERRUPT_INTERVAL_MS = 10000;

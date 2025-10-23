@@ -79,7 +79,7 @@ public abstract class KafkaPartitionLevelConnectionHandler {
     KafkaSSLUtils.initSSL(_consumerProp);
     if (retryPolicy == null) {
       _consumer = createConsumer(_consumerProp);
-    } else  {
+    } else {
       _consumer = createConsumer(_consumerProp, retryPolicy);
     }
     _topicPartition = new TopicPartition(_topic, _partition);
@@ -125,10 +125,12 @@ public abstract class KafkaPartitionLevelConnectionHandler {
           consumer.set(new KafkaConsumer<>(filterKafkaProperties(consumerProp, CONSUMER_CONFIG_NAMES)));
           return true;
         } catch (Exception e) {
+          LOGGER.warn("Caught exception while creating Kafka consumer, retrying.", e);
           return false;
         }
       });
     } catch (AttemptsExceededException | RetriableOperationException e) {
+      LOGGER.error("Caught exception while creating Kafka consumer, giving up", e);
       throw new RuntimeException(e);
     }
     return consumer.get();

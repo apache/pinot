@@ -41,8 +41,6 @@ import org.apache.kafka.common.utils.Bytes;
 import org.apache.pinot.plugin.stream.kafka.KafkaPartitionLevelStreamConfig;
 import org.apache.pinot.plugin.stream.kafka.KafkaSSLUtils;
 import org.apache.pinot.spi.stream.StreamConfig;
-import org.apache.pinot.spi.stream.StreamDataDecoderImpl;
-import org.apache.pinot.spi.stream.StreamMessageDecoder;
 import org.apache.pinot.spi.utils.retry.AttemptsExceededException;
 import org.apache.pinot.spi.utils.retry.RetriableOperationException;
 import org.apache.pinot.spi.utils.retry.RetryPolicy;
@@ -128,10 +126,12 @@ public abstract class KafkaPartitionLevelConnectionHandler {
           consumer.set(new KafkaConsumer<>(filterKafkaProperties(consumerProp, CONSUMER_CONFIG_NAMES)));
           return true;
         } catch (Exception e) {
+          LOGGER.warn("Caught exception while creating Kafka consumer, retrying.", e);
           return false;
         }
       });
     } catch (AttemptsExceededException | RetriableOperationException e) {
+      LOGGER.error("Caught exception while creating Kafka consumer, giving up", e);
       throw new RuntimeException(e);
     }
     return consumer.get();
