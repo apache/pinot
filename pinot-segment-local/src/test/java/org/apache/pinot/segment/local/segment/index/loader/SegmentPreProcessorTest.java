@@ -62,6 +62,7 @@ import org.apache.pinot.segment.spi.index.reader.ForwardIndexReader;
 import org.apache.pinot.segment.spi.store.SegmentDirectory;
 import org.apache.pinot.segment.spi.store.SegmentDirectoryPaths;
 import org.apache.pinot.segment.spi.utils.SegmentMetadataUtils;
+import org.apache.pinot.spi.config.instance.InstanceType;
 import org.apache.pinot.spi.config.table.BloomFilterConfig;
 import org.apache.pinot.spi.config.table.FieldConfig;
 import org.apache.pinot.spi.config.table.FieldConfig.CompressionCodec;
@@ -267,7 +268,7 @@ public class SegmentPreProcessorTest implements PinotBuffersAfterClassCheckRule 
     config.setOutDir(TEMP_DIR.getPath());
     config.setSegmentName(SEGMENT_NAME);
     SegmentIndexCreationDriverImpl driver = new SegmentIndexCreationDriverImpl();
-    driver.init(config);
+    driver.init(config, InstanceType.SERVER);
     driver.build();
   }
 
@@ -1740,7 +1741,7 @@ public class SegmentPreProcessorTest implements PinotBuffersAfterClassCheckRule 
     }
 
     SegmentIndexCreationDriverImpl driver = new SegmentIndexCreationDriverImpl();
-    driver.init(config, new GenericRowRecordReader(rows));
+    driver.init(config, new GenericRowRecordReader(rows), InstanceType.SERVER);
     driver.build();
   }
 
