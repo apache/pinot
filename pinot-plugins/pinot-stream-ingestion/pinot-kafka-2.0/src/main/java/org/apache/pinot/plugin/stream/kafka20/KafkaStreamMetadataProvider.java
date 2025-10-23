@@ -67,11 +67,6 @@ public class KafkaStreamMetadataProvider extends KafkaPartitionLevelConnectionHa
     super(clientId, streamConfig, partition);
   }
 
-  public KafkaStreamMetadataProvider(String clientId, StreamConfig streamConfig, int partition,
-      RetryPolicy retryPolicy) {
-    super(clientId, streamConfig, partition, retryPolicy);
-  }
-
   @Override
   public int fetchPartitionCount(long timeoutMillis) {
     try {
