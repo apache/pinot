@@ -36,6 +36,7 @@ import java.util.Properties;
 import java.util.Set;
 import java.util.SortedMap;
 import java.util.TreeMap;
+import java.util.stream.Collectors;
 import javax.annotation.Nullable;
 import org.apache.commons.configuration2.PropertiesConfiguration;
 import org.apache.commons.configuration2.ex.ConfigurationException;
@@ -267,7 +268,7 @@ class SingleFileIndexDirectory extends ColumnIndexDirectory {
     // Use list to handle multiple entries with same start offset
     List<IndexEntry> sortedEntries = _columnEntries.values().stream()
         .sorted((e1, e2) -> Long.compare(e1._startOffset, e2._startOffset))
-        .collect(java.util.stream.Collectors.toList());
+        .collect(Collectors.toList());
 
     // Phase 2: Create buffers - handle all entries in sequential order
     if (!sortedEntries.isEmpty()) {
@@ -285,7 +286,9 @@ class SingleFileIndexDirectory extends ColumnIndexDirectory {
 
     for (IndexEntry entry : sortedEntries) {
       long startOffset = entry._startOffset;
-      indexStartMap.put(startOffset, entry);
+      if (entry._size == 0) {
+        indexStartMap.put(startOffset, entry);
+      }
     }
 
     long runningSize = 0;

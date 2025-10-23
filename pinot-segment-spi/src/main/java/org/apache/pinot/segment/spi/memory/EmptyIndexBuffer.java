@@ -33,7 +33,6 @@ public class EmptyIndexBuffer extends PinotDataBuffer {
   private final Properties _properties;
   private final String _segmentName;
   private final String _tableNameWithType;
-  private final String _segmentPath;
 
   /**
    * Creates a new EmptyIndexBuffer for a zero-size index entry
@@ -47,39 +46,11 @@ public class EmptyIndexBuffer extends PinotDataBuffer {
     _properties = properties;
     _segmentName = segmentName;
     _tableNameWithType = tableNameWithType;
-    _segmentPath = constructSegmentPath();
   }
 
   /**
-   * Constructs the segment path URI from properties.
-   * <p>
-   * This may return an S3 URI (e.g., s3://bucket/key) if S3 properties are present,
-   * or a generic URI if provided via the "s3.uri" property.
-   *
-   * @return The constructed segment path URI as a string
-   */
-  private String constructSegmentPath() {
-    String bucket = _properties.getProperty("s3.bucket");
-    String key = _properties.getProperty("s3.key");
-    String region = _properties.getProperty("s3.region", "us-east-1");
-
-    if (bucket != null && key != null) {
-      return String.format("s3://%s/%s", bucket, key);
-    }
-
-    // Fallback to direct URI if available
-    String uri = _properties.getProperty("s3.uri");
-    if (uri != null) {
-      return uri;
-    }
-
-    // Default fallback
-    return String.format("s3://unknown-bucket/%s", _segmentName);
-  }
-
-  /**
-   * Gets the S3 properties containing configuration information
-   * @return The S3 properties
+   * Gets the properties containing configuration information
+   * @return The properties
    */
   public Properties getProperties() {
     return _properties;
@@ -285,7 +256,7 @@ public class EmptyIndexBuffer extends PinotDataBuffer {
   @Override
   public String toString() {
     return String.format("EmptyIndexBuffer{ segmentName=%s, tableNameWithType=%s, segmentPath=%s, size=0}",
-        _segmentName, _tableNameWithType, _segmentPath);
+        _segmentName, _tableNameWithType);
   }
 
   @Override
@@ -297,12 +268,12 @@ public class EmptyIndexBuffer extends PinotDataBuffer {
       return false;
     }
     EmptyIndexBuffer other = (EmptyIndexBuffer) obj;
-    return _segmentPath.equals(other._segmentPath) && _segmentName.equals(
+    return _segmentName.equals(
         other._segmentName) && _tableNameWithType.equals(other._tableNameWithType);
   }
 
   @Override
   public int hashCode() {
-    return java.util.Objects.hash(_segmentPath, _segmentName, _tableNameWithType);
+    return java.util.Objects.hash(_segmentName, _tableNameWithType);
   }
 }
