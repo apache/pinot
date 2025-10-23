@@ -43,6 +43,7 @@ import javax.ws.rs.core.HttpHeaders;
 import javax.ws.rs.core.MediaType;
 import org.apache.pinot.controller.api.access.AccessType;
 import org.apache.pinot.controller.api.access.Authenticate;
+import org.apache.pinot.controller.api.dto.PinotTableReloadStatusResponse;
 import org.apache.pinot.controller.services.PinotTableReloadService;
 import org.apache.pinot.controller.services.PinotTableReloadStatusReporter;
 import org.apache.pinot.core.auth.Actions;
@@ -158,7 +159,7 @@ public class PinotTableReloadResource {
       @ApiResponse(code = 200, message = "Job status retrieved successfully"),
       @ApiResponse(code = 404, message = "Job ID not found")
   })
-  public ServerReloadControllerJobStatusResponse getReloadJobStatus(
+  public PinotTableReloadStatusResponse getReloadJobStatus(
       @ApiParam(value = "Reload job ID returned from reload endpoint", required = true) @PathParam("jobId")
       String reloadJobId) throws Exception {
     return _statusReporter.getReloadJobStatus(reloadJobId);
