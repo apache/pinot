@@ -38,6 +38,7 @@ import org.apache.pinot.spi.stream.PartitionGroupConsumer;
 import org.apache.pinot.spi.stream.StreamConfig;
 import org.apache.pinot.spi.stream.StreamMessageMetadata;
 import org.apache.pinot.spi.stream.StreamPartitionMsgOffset;
+import org.apache.pinot.spi.utils.retry.RetryPolicy;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -50,6 +51,11 @@ public class KafkaPartitionLevelConsumer extends KafkaPartitionLevelConnectionHa
 
   public KafkaPartitionLevelConsumer(String clientId, StreamConfig streamConfig, int partition) {
     super(clientId, streamConfig, partition);
+  }
+
+  public KafkaPartitionLevelConsumer(String clientId, StreamConfig streamConfig, int partition,
+      RetryPolicy retryPolicy) {
+    super(clientId, streamConfig, partition, retryPolicy);
   }
 
   @Override

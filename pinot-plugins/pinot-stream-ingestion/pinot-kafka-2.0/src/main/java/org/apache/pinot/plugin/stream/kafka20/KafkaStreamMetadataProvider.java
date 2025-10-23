@@ -49,6 +49,7 @@ import org.apache.pinot.spi.stream.StreamMetadataProvider;
 import org.apache.pinot.spi.stream.StreamPartitionMsgOffset;
 import org.apache.pinot.spi.stream.TransientConsumerException;
 import org.apache.pinot.spi.utils.TimeUtils;
+import org.apache.pinot.spi.utils.retry.RetryPolicy;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -64,6 +65,11 @@ public class KafkaStreamMetadataProvider extends KafkaPartitionLevelConnectionHa
 
   public KafkaStreamMetadataProvider(String clientId, StreamConfig streamConfig, int partition) {
     super(clientId, streamConfig, partition);
+  }
+
+  public KafkaStreamMetadataProvider(String clientId, StreamConfig streamConfig, int partition,
+      RetryPolicy retryPolicy) {
+    super(clientId, streamConfig, partition, retryPolicy);
   }
 
   @Override
