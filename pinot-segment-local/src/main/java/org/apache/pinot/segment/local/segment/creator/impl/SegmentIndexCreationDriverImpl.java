@@ -123,7 +123,7 @@ public class SegmentIndexCreationDriverImpl implements SegmentIndexCreationDrive
   private int _incompleteRowsFound = 0;
   private int _skippedRowsFound = 0;
   private int _sanitizedRowsFound = 0;
-  private @Nullable InstanceType _instanceType;
+  @Nullable private InstanceType _instanceType;
 
   @Override
   public void init(SegmentGeneratorConfig config)
@@ -194,6 +194,8 @@ public class SegmentIndexCreationDriverImpl implements SegmentIndexCreationDrive
     _recordReader = dataSource.getRecordReader();
     _dataSchema = config.getSchema();
     _continueOnError = config.isContinueOnError();
+    Preconditions.checkState(instanceType == null || instanceType == InstanceType.SERVER
+        || instanceType == InstanceType.MINION, "InstanceType passed must be for minion or server or null");
     _instanceType = instanceType;
 
     if (config.isFailOnEmptySegment()) {
