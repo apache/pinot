@@ -51,8 +51,12 @@ public class EmptyIndexBuffer extends PinotDataBuffer {
   }
 
   /**
-   * Constructs the S3 segment path from properties
-   * @return The constructed S3 URI as a string
+   * Constructs the segment path URI from properties.
+   * <p>
+   * This may return an S3 URI (e.g., s3://bucket/key) if S3 properties are present,
+   * or a generic URI if provided via the "s3.uri" property.
+   *
+   * @return The constructed segment path URI as a string
    */
   private String constructSegmentPath() {
     String bucket = _properties.getProperty("s3.bucket");
