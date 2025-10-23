@@ -20,24 +20,16 @@ package org.apache.pinot.segment.local.aggregator;
 
 import javax.annotation.Nullable;
 import org.apache.pinot.segment.spi.AggregationFunctionType;
-import org.apache.pinot.spi.data.FieldSpec.DataType;
-
 
 /**
  * Value aggregator for COUNTMV aggregation function.
  * This aggregator handles multi-value columns by counting all values in all arrays.
  */
-public class CountMVValueAggregator implements ValueAggregator<Object, Long> {
-  public static final DataType AGGREGATED_VALUE_TYPE = DataType.LONG;
+public class CountMVValueAggregator extends CountValueAggregator {
 
   @Override
   public AggregationFunctionType getAggregationType() {
     return AggregationFunctionType.COUNTMV;
-  }
-
-  @Override
-  public DataType getAggregatedValueType() {
-    return AGGREGATED_VALUE_TYPE;
   }
 
   @Override
@@ -54,36 +46,6 @@ public class CountMVValueAggregator implements ValueAggregator<Object, Long> {
       return value;
     }
     return value + processMultiValueArray(rawValue);
-  }
-
-  @Override
-  public Long applyAggregatedValue(Long value, Long aggregatedValue) {
-    return value + aggregatedValue;
-  }
-
-  @Override
-  public Long cloneAggregatedValue(Long value) {
-    return value;
-  }
-
-  @Override
-  public boolean isAggregatedValueFixedSize() {
-    return true;
-  }
-
-  @Override
-  public int getMaxAggregatedValueByteSize() {
-    return Long.BYTES;
-  }
-
-  @Override
-  public byte[] serializeAggregatedValue(Long value) {
-    throw new UnsupportedOperationException();
-  }
-
-  @Override
-  public Long deserializeAggregatedValue(byte[] bytes) {
-    throw new UnsupportedOperationException();
   }
 
   /**

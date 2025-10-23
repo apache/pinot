@@ -20,24 +20,16 @@ package org.apache.pinot.segment.local.aggregator;
 
 import javax.annotation.Nullable;
 import org.apache.pinot.segment.spi.AggregationFunctionType;
-import org.apache.pinot.spi.data.FieldSpec.DataType;
-
 
 /**
  * Value aggregator for SUMMV aggregation function.
  * This aggregator handles multi-value columns by summing all values in all arrays.
  */
-public class SumMVValueAggregator implements ValueAggregator<Object, Double> {
-  public static final DataType AGGREGATED_VALUE_TYPE = DataType.DOUBLE;
+public class SumMVValueAggregator extends SumValueAggregator {
 
   @Override
   public AggregationFunctionType getAggregationType() {
     return AggregationFunctionType.SUMMV;
-  }
-
-  @Override
-  public DataType getAggregatedValueType() {
-    return AGGREGATED_VALUE_TYPE;
   }
 
   @Override
@@ -54,36 +46,6 @@ public class SumMVValueAggregator implements ValueAggregator<Object, Double> {
       return value;
     }
     return value + processMultiValueArray(rawValue);
-  }
-
-  @Override
-  public Double applyAggregatedValue(Double value, Double aggregatedValue) {
-    return value + aggregatedValue;
-  }
-
-  @Override
-  public Double cloneAggregatedValue(Double value) {
-    return value;
-  }
-
-  @Override
-  public boolean isAggregatedValueFixedSize() {
-    return true;
-  }
-
-  @Override
-  public int getMaxAggregatedValueByteSize() {
-    return Double.BYTES;
-  }
-
-  @Override
-  public byte[] serializeAggregatedValue(Double value) {
-    throw new UnsupportedOperationException();
-  }
-
-  @Override
-  public Double deserializeAggregatedValue(byte[] bytes) {
-    throw new UnsupportedOperationException();
   }
 
   /**

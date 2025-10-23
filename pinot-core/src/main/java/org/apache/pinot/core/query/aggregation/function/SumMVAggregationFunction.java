@@ -44,8 +44,8 @@ public class SumMVAggregationFunction extends SumAggregationFunction {
     BlockValSet blockValSet = blockValSetMap.get(_expression);
 
     if (blockValSet.isSingleValue()) {
-      // StarTree pre-aggregated values: During StarTree creation, the multi-value column is pre-aggregated per StarTree
-      // node, resulting in a single value per node.
+      // star-tree pre-aggregated values: During star-tree creation, the multi-value column is pre-aggregated
+      // per star-tree node, resulting in a single value per node.
       double[] valueArray = blockValSet.getDoubleValuesSV();
       double sum = 0.0;
       for (int i = 0; i < length; i++) {
@@ -77,8 +77,8 @@ public class SumMVAggregationFunction extends SumAggregationFunction {
     BlockValSet blockValSet = blockValSetMap.get(_expression);
 
     if (blockValSet.isSingleValue()) {
-      // StarTree pre-aggregated values: During StarTree creation, the multi-value column is pre-aggregated per StarTree
-      // node, resulting in a single value per node.
+      // star-tree pre-aggregated values: During star-tree creation, the multi-value column is pre-aggregated
+      // per star-tree node, resulting in a single value per node.
       double[] valueArray = blockValSet.getDoubleValuesSV();
       if (_nullHandlingEnabled) {
         for (int i = 0; i < length; i++) {
