@@ -286,7 +286,7 @@ class SingleFileIndexDirectory extends ColumnIndexDirectory {
 
     for (IndexEntry entry : sortedEntries) {
       long startOffset = entry._startOffset;
-      if (entry._size == 0) {
+      if (entry._size != 0) {
         indexStartMap.put(startOffset, entry);
       }
     }
