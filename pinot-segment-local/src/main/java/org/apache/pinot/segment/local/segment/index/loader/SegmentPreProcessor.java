@@ -394,6 +394,11 @@ public class SegmentPreProcessor implements AutoCloseable {
           String tableNameWithType = _tableConfig.getTableName();
           LOGGER.error("Failed to build star-tree index for table: {}, skipping", tableNameWithType, e);
           ServerMetrics.get().addMeteredTableValue(tableNameWithType, ServerMeter.STAR_TREE_INDEX_BUILD_FAILURES, 1);
+          if (e.getSuppressed().length > 0) {
+            LOGGER.error("Suppressed exceptions (count:{}) are present, which could be due to close failures leaving "
+                + "the star-tree index in inconsistent state, throwing exception", e.getSuppressed().length);
+            throw e;
+          }
         }
       }
     } finally {
