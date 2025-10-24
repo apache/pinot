@@ -109,7 +109,7 @@ public class SqlResultComparator {
 
     ArrayNode actualRows = (ArrayNode) actual.get(FIELD_RESULT_TABLE).get(FIELD_ROWS);
     ArrayNode expectedRows = (ArrayNode) expected.get(FIELD_RESULT_TABLE).get(FIELD_ROWS);
-    ArrayNode columnDataTypes = (ArrayNode) expected.get(FIELD_RESULT_TABLE).get(FIELD_DATA_SCHEMA).
+    ArrayNode columnDataTypes = (ArrayNode) actual.get(FIELD_RESULT_TABLE).get(FIELD_DATA_SCHEMA).
         get(FIELD_COLUMN_DATA_TYPES);
 
     convertNumbersToString(expectedRows, columnDataTypes);
@@ -497,18 +497,57 @@ public class SqlResultComparator {
      * between "columnNames" and "columnDataTypes", so we extract and append them when compare instead of compare
      * "dataSchema" directly.
      */
-    JsonNode actualColumnNames = actual.get(FIELD_RESULT_TABLE).get(FIELD_DATA_SCHEMA).get(FIELD_COLUMN_NAMES);
-    JsonNode expectedColumnNames = expected.get(FIELD_RESULT_TABLE).get(FIELD_DATA_SCHEMA).get(FIELD_COLUMN_NAMES);
-    JsonNode actualColumnDataTypes = actual.get(FIELD_RESULT_TABLE).get(FIELD_DATA_SCHEMA).get(FIELD_COLUMN_DATA_TYPES);
-    JsonNode expectedColumnDataTypes =
-        expected.get(FIELD_RESULT_TABLE).get(FIELD_DATA_SCHEMA).get(FIELD_COLUMN_DATA_TYPES);
+    ArrayNode actualColumnNames =
+        (ArrayNode) actual.get(FIELD_RESULT_TABLE).get(FIELD_DATA_SCHEMA).get(FIELD_COLUMN_NAMES);
+    ArrayNode expectedColumnNames =
+        (ArrayNode) expected.get(FIELD_RESULT_TABLE).get(FIELD_DATA_SCHEMA).get(FIELD_COLUMN_NAMES);
+    ArrayNode actualColumnDataTypes =
+        (ArrayNode) actual.get(FIELD_RESULT_TABLE).get(FIELD_DATA_SCHEMA).get(FIELD_COLUMN_DATA_TYPES);
+    ArrayNode expectedColumnDataTypes =
+        (ArrayNode) expected.get(FIELD_RESULT_TABLE).get(FIELD_DATA_SCHEMA).get(FIELD_COLUMN_DATA_TYPES);
 
-    String actualDataSchemaStr = actualColumnNames.toString() + actualColumnDataTypes.toString();
-    String expectedDataSchemaStr = expectedColumnNames.toString() + expectedColumnDataTypes.toString();
-    if (!actualDataSchemaStr.equals(expectedDataSchemaStr)) {
-      LOGGER.error("The dataSchema don't match! Actual: {}, Expected: {}", actualDataSchemaStr, expectedDataSchemaStr);
+    if (actualColumnNames.size() != expectedColumnNames.size()) {
+      LOGGER.error("Mismatch in the number of columns returned. Actual: {}, Expected: {}", actualColumnNames.size(),
+          expectedColumnNames.size());
       return false;
     }
+
+    if (actualColumnDataTypes.size() != expectedColumnDataTypes.size()) {
+      LOGGER.error("Mismatch in the number of columns returned. Actual: {}, Expected: {}", actualColumnDataTypes.size(),
+          expectedColumnDataTypes.size());
+      return false;
+    }
+
+    if (actualColumnNames.size() != actualColumnDataTypes.size()) {
+      LOGGER.error("Mismatch in data schema returned. Number in 'columnNames': {}, number in 'columnDataTypes': {}",
+          actualColumnNames.size(), expectedColumnNames.size());
+      return false;
+    }
+
+    for (int colIdx = 0; colIdx < actualColumnNames.size(); colIdx++) {
+      if (!actualColumnNames.get(colIdx).equals(expectedColumnNames.get(colIdx))) {
+        LOGGER.warn("Mismatch in column name at index: {}. Actual: {}, Expected: {}", colIdx,
+            actualColumnNames.get(colIdx), expectedColumnNames.get(colIdx));
+      }
+
+      String actualDataType = actualColumnDataTypes.get(colIdx).asText();
+      String expectedDataType = expectedColumnDataTypes.get(colIdx).asText();
+      if (expectedDataType.contains(",")) {
+        List<String> expectedTypes = List.of(expectedDataType.split(","));
+        if (!expectedTypes.contains(actualDataType)) {
+          LOGGER.error("Mismatch in column data type at index: {}. Actual: {}, Expected: {}", colIdx, actualDataType,
+              expectedDataType);
+          return false;
+        }
+      } else {
+        if (!expectedDataType.equals(actualDataType)) {
+          LOGGER.error("Mismatch in column data type at index: {}. Actual: {}, Expected: {}", colIdx, actualDataType,
+              expectedDataType);
+          return false;
+        }
+      }
+    }
+
     return true;
   }
 
@@ -528,14 +567,14 @@ public class SqlResultComparator {
         ArrayNode row = (ArrayNode) rows.get(i);
         String type = columnDataTypes.get(j).asText();
         if (type.equals(FIELD_TYPE_FLOAT) || type.equals(FIELD_TYPE_DOUBLE)) {
-          double round = Math.round(Double.valueOf(row.get(j).asText()) * 100) / 100.0;
+          double round = Math.round(Double.parseDouble(row.get(j).asText()) * 100) / 100.0;
           String str = String.valueOf(round);
           row.set(j, JsonUtils.stringToJsonNode(str));
         } else if (type.equals(FIELD_TYPE_FLOAT_ARRAY) || type.equals(FIELD_TYPE_DOUBLE_ARRAY)) {
           ArrayNode jsonArray = (ArrayNode) rows.get(i).get(j);
           List<String> arrayStr = new ArrayList<>();
           for (int k = 0; k < jsonArray.size(); k++) {
-            double round = Math.round(Double.valueOf(jsonArray.get(k).asText()) * 100) / 100;
+            double round = Math.round(Double.parseDouble(jsonArray.get(k).asText()) * 100) / 100.0;
             arrayStr.add(String.valueOf(round));
           }
           row.set(j, JsonUtils.stringToJsonNode(arrayStr.toString()));
@@ -554,7 +593,7 @@ public class SqlResultComparator {
       }
       SqlOrderBy sqlOrderBy = (SqlOrderBy) sqlNode;
       SqlNodeList orderByColumns = sqlOrderBy.orderList;
-      return orderByColumns != null && orderByColumns.size() != 0;
+      return orderByColumns != null && !orderByColumns.isEmpty();
     } catch (SqlParseException e) {
       throw new RuntimeException("Cannot parse query: " + query, e);
     }

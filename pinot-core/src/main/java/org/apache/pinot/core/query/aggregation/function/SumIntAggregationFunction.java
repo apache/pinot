@@ -30,7 +30,6 @@ import org.apache.pinot.core.query.aggregation.groupby.GroupByResultHolder;
 import org.apache.pinot.core.query.aggregation.groupby.LongGroupByResultHolder;
 import org.apache.pinot.core.query.aggregation.groupby.ObjectGroupByResultHolder;
 import org.apache.pinot.segment.spi.AggregationFunctionType;
-import org.apache.pinot.spi.data.FieldSpec.DataType;
 
 
 /**
@@ -79,11 +78,6 @@ public class SumIntAggregationFunction extends NullableSingleInputAggregationFun
   public void aggregate(int length, AggregationResultHolder aggregationResultHolder,
       Map<ExpressionContext, BlockValSet> blockValSetMap) {
     BlockValSet blockValSet = blockValSetMap.get(_expression);
-
-    if (blockValSet.getValueType().getStoredType() != DataType.INT) {
-      throw new IllegalArgumentException("SumIntAggregationFunction only supports INT columns");
-    }
-
     int[] values = blockValSet.getIntValuesSV();
 
     // Use foldNotNull with null as initial value - this will return null if no non-null values are processed
