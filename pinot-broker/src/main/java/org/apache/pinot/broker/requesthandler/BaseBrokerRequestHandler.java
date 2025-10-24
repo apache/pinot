@@ -93,6 +93,8 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
   @Nullable
   protected final String _regexDictSizeThreshold;
   protected final boolean _enableQueryCancellation;
+  @Nullable
+  protected final String _enableAutoRewriteAggregationType;
 
   /**
    * Maps broker-generated query id to the query string.
@@ -126,6 +128,8 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
     _regexDictSizeThreshold = config.getProperty(Broker.CONFIG_OF_BROKER_QUERY_REGEX_DICT_SIZE_THRESHOLD);
     _enableQueryCancellation = config.getProperty(Broker.CONFIG_OF_BROKER_ENABLE_QUERY_CANCELLATION,
         Broker.DEFAULT_BROKER_ENABLE_QUERY_CANCELLATION);
+    _enableAutoRewriteAggregationType =
+        config.getProperty(Broker.CONFIG_OF_BROKER_QUERY_ENABLE_AUTO_REWRITE_AGGREGATION_TYPE);
     if (_enableQueryCancellation) {
       _queriesById = new ConcurrentHashMap<>();
       _clientQueryIds = new ConcurrentHashMap<>();
@@ -204,6 +208,12 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
     // Add null handling option from broker config only if there is no override in the query
     if (_enableNullHandling != null) {
       sqlNodeAndOptions.getOptions().putIfAbsent(QueryOptionKey.ENABLE_NULL_HANDLING, _enableNullHandling);
+    }
+
+    // Add auto rewrite aggregation type option from broker config only if there is no override in the query
+    if (_enableAutoRewriteAggregationType != null) {
+      sqlNodeAndOptions.getOptions()
+          .putIfAbsent(QueryOptionKey.AUTO_REWRITE_AGGREGATION_TYPE, _enableAutoRewriteAggregationType);
     }
 
     if (_regexDictSizeThreshold != null) {

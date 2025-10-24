@@ -26,6 +26,8 @@ import org.apache.pinot.common.request.PinotQuery;
 import org.apache.pinot.segment.spi.AggregationFunctionType;
 import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.Schema;
+import org.apache.pinot.spi.utils.CommonConstants;
+
 
 /// Rewrites certain aggregation functions based on operand types to support polymorphic aggregations.
 ///
@@ -41,6 +43,12 @@ public class AggregateFunctionRewriteOptimizer implements StatementOptimizer {
   @Override
   public void optimize(PinotQuery pinotQuery, @Nullable Schema schema) {
     if (schema == null) {
+      return;
+    }
+
+    // Only perform auto rewrite when enabled through query option.
+    if (pinotQuery.getQueryOptions() == null || !Boolean.parseBoolean(pinotQuery.getQueryOptions().get(
+        CommonConstants.Broker.Request.QueryOptionKey.AUTO_REWRITE_AGGREGATION_TYPE))) {
       return;
     }
 

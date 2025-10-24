@@ -328,7 +328,7 @@ public abstract class BaseClusterIntegrationTestSet extends BaseClusterIntegrati
 
     // Test MIN / MAX on STRING columns (automatically rewritten to MINSTRING / MAXSTRING internally)
     query = "SELECT MIN(OriginCityName), MAX(OriginCityName) FROM mytable";
-    testQuery(query);
+    testQuery("SET autoRewriteAggregationType=true;" + query, query);
 
     // Test MIN / MAX / SUM on LONG columns (automatically rewritten to MINLONG / MAXLONG / SUMLONG internally)
     query = "SELECT MIN(AirlineID), MAX(AirlineID), SUM(AirlineID) FROM mytable";

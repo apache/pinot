@@ -3526,7 +3526,6 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
     assertEquals(response1Json.get("rows").get(0).get(2).asText(), "Rule Execution Times\n"
         + "Rule: SortRemove -> Time:*\n"
         + "Rule: AggregateProjectMerge -> Time:*\n"
-        + "Rule: AggregateFunctionRewrite -> Time:*\n"
         + "Rule: EvaluateProjectLiteral -> Time:*\n"
         + "Rule: AggregateRemove -> Time:*\n");
 

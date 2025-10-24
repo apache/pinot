@@ -23,6 +23,7 @@ import com.google.common.base.Preconditions;
 import java.io.Closeable;
 import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Properties;
@@ -92,6 +93,7 @@ import org.apache.pinot.query.validate.BytesCastVisitor;
 import org.apache.pinot.spi.exception.QueryErrorCode;
 import org.apache.pinot.spi.exception.QueryException;
 import org.apache.pinot.spi.utils.CommonConstants;
+import org.apache.pinot.spi.utils.CommonConstants.Broker.Request.QueryOptionKey;
 import org.apache.pinot.sql.parsers.CalciteSqlParser;
 import org.apache.pinot.sql.parsers.SqlNodeAndOptions;
 import org.apache.pinot.sql.parsers.parser.SqlPhysicalExplain;
@@ -181,7 +183,10 @@ public class QueryEnvironment {
     WorkerManager workerManager = getWorkerManager(sqlNodeAndOptions);
     Map<String, String> options = sqlNodeAndOptions.getOptions();
     HepProgram optProgram = _optProgram;
-    Set<String> useRuleSet = QueryOptionsUtils.getUsePlannerRules(options);
+    Set<String> useRuleSet = new HashSet<>(QueryOptionsUtils.getUsePlannerRules(options));
+    if (Boolean.parseBoolean(options.get(QueryOptionKey.AUTO_REWRITE_AGGREGATION_TYPE))) {
+      useRuleSet.add(CommonConstants.Broker.PlannerRuleNames.AGGREGATE_FUNCTION_REWRITE);
+    }
     if (MapUtils.isNotEmpty(options)) {
       Set<String> skipRuleSet = QueryOptionsUtils.getSkipPlannerRules(options);
       if (!skipRuleSet.isEmpty() || !useRuleSet.isEmpty()) {
