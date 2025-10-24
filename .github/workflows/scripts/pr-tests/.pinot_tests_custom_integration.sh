@@ -25,9 +25,13 @@ java -version
 ifconfig
 netstat -i
 
+# Ensure Maven uses tuned GC options in GitHub Actions
+export MAVEN_OPTS="${MAVEN_OPTS:-} -XX:+UseG1GC -XX:-G1UseAdaptiveIHOP -XX:InitiatingHeapOccupancyPercent=60 -XX:G1PeriodicGCInterval=2000 -XX:MaxGCPauseMillis=200"
+
 # Custom Integration Tests
 cd pinot-integration-tests || exit 1
 if [ "$RUN_TEST_SET" == "1" ]; then
   mvn test \
+      -DargLine="-XX:+UseG1GC -XX:-G1UseAdaptiveIHOP -XX:InitiatingHeapOccupancyPercent=60 -XX:G1PeriodicGCInterval=2000 -XX:MaxGCPauseMillis=200" \
       -P github-actions,codecoverage,custom-cluster-integration-test-suite || exit 1
 fi

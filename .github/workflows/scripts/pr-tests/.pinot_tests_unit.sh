@@ -25,12 +25,16 @@ java -version
 ifconfig
 netstat -i
 
+# Ensure Maven uses tuned GC options in GitHub Actions
+export MAVEN_OPTS="${MAVEN_OPTS:-} -XX:+UseG1GC -XX:-G1UseAdaptiveIHOP -XX:InitiatingHeapOccupancyPercent=60 -XX:G1PeriodicGCInterval=2000 -XX:MaxGCPauseMillis=200"
+
 # Unit Tests
 #   - TEST_SET#1 runs install and test together so the module list must ensure no additional modules were tested
 #     due to the -am flag (include dependency modules)
 #   - tests for pinot-plugins should not be ran multi-threaded
 if [ "$RUN_TEST_SET" == "1" ]; then
   mvn test \
+      -DargLine="-XX:+UseG1GC -XX:-G1UseAdaptiveIHOP -XX:InitiatingHeapOccupancyPercent=60 -XX:G1PeriodicGCInterval=2000 -XX:MaxGCPauseMillis=200" \
       -pl 'pinot-spi' \
       -pl 'pinot-segment-spi' \
       -pl 'pinot-common' \
@@ -42,6 +46,7 @@ if [ "$RUN_TEST_SET" == "1" ]; then
 fi
 if [ "$RUN_TEST_SET" == "2" ]; then
   mvn test \
+    -DargLine="-XX:+UseG1GC -XX:-G1UseAdaptiveIHOP -XX:InitiatingHeapOccupancyPercent=60 -XX:G1PeriodicGCInterval=2000 -XX:MaxGCPauseMillis=200" \
     -pl '!pinot-spi' \
     -pl '!pinot-segment-spi' \
     -pl '!pinot-common' \
