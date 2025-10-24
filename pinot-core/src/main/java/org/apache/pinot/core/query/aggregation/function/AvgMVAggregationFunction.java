@@ -50,12 +50,10 @@ public class AvgMVAggregationFunction extends AvgAggregationFunction {
       // per star-tree node, resulting in a single value per node.
       byte[][] bytesValues = blockValSet.getBytesValuesSV();
       AvgPair avgPair = new AvgPair();
-      forEachNotNull(length, blockValSet, (from, to) -> {
-        for (int i = from; i < to; i++) {
-          AvgPair value = ObjectSerDeUtils.AVG_PAIR_SER_DE.deserialize(bytesValues[i]);
-          avgPair.apply(value);
-        }
-      });
+      for (int i = 0; i < length; i++) {
+        AvgPair value = ObjectSerDeUtils.AVG_PAIR_SER_DE.deserialize(bytesValues[i]);
+        avgPair.apply(value);
+      }
       if (avgPair.getCount() != 0) {
         updateAggregationResult(aggregationResultHolder, avgPair.getSum(), avgPair.getCount());
       }
@@ -85,12 +83,10 @@ public class AvgMVAggregationFunction extends AvgAggregationFunction {
       // star-tree pre-aggregated values: During star-tree creation, the multi-value column is pre-aggregated
       // per star-tree node, resulting in a single value per node.
       byte[][] bytesValues = blockValSet.getBytesValuesSV();
-      forEachNotNull(length, blockValSet, (from, to) -> {
-        for (int i = from; i < to; i++) {
-          AvgPair avgPair = ObjectSerDeUtils.AVG_PAIR_SER_DE.deserialize(bytesValues[i]);
-          updateGroupByResult(groupKeyArray[i], groupByResultHolder, avgPair.getSum(), avgPair.getCount());
-        }
-      });
+      for (int i = 0; i < length; i++) {
+        AvgPair avgPair = ObjectSerDeUtils.AVG_PAIR_SER_DE.deserialize(bytesValues[i]);
+        updateGroupByResult(groupKeyArray[i], groupByResultHolder, avgPair.getSum(), avgPair.getCount());
+      }
       return;
     }
 
