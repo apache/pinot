@@ -35,7 +35,6 @@ import org.apache.calcite.tools.RelBuilderFactory;
 import org.apache.pinot.common.function.sql.PinotSqlAggFunction;
 
 
-///
 /// Rewrites certain aggregation functions based on operand types to support polymorphic aggregations.
 ///
 /// Currently supported rewrites:
@@ -45,7 +44,6 @@ import org.apache.pinot.common.function.sql.PinotSqlAggFunction;
 /// - MAX(longType) -> MAXLONG
 /// - SUM(longType) -> SUMLONG
 /// - SUM(intType) -> SUMINT
-///
 public class PinotAggregateFunctionRewriteRule extends RelOptRule {
   public static final PinotAggregateFunctionRewriteRule INSTANCE =
       new PinotAggregateFunctionRewriteRule(PinotRuleUtils.PINOT_REL_FACTORY, null);

@@ -27,7 +27,6 @@ import org.apache.pinot.segment.spi.AggregationFunctionType;
 import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.Schema;
 
-///
 /// Rewrites certain aggregation functions based on operand types to support polymorphic aggregations.
 ///
 /// Currently supported rewrites:
@@ -37,7 +36,6 @@ import org.apache.pinot.spi.data.Schema;
 /// - MAX(longType) -> MAXLONG
 /// - SUM(longType) -> SUMLONG
 /// - SUM(intType) -> SUMINT
-///
 public class AggregateFunctionRewriteOptimizer implements StatementOptimizer {
 
   @Override
