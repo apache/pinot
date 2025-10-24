@@ -1609,28 +1609,8 @@ public final class TableConfigUtils {
   public static void convertFromLegacyTableConfig(TableConfig tableConfig) {
     // It is possible that indexing as well as ingestion configs exist, in which case we always honor ingestion config.
     IngestionConfig ingestionConfig = tableConfig.getIngestionConfig();
-    BatchIngestionConfig batchIngestionConfig =
-        (ingestionConfig != null) ? ingestionConfig.getBatchIngestionConfig() : null;
 
-    SegmentsValidationAndRetentionConfig validationConfig = tableConfig.getValidationConfig();
-    String segmentPushType = validationConfig.getSegmentPushType();
-    String segmentPushFrequency = validationConfig.getSegmentPushFrequency();
-
-    if (batchIngestionConfig == null) {
-      // Only create the config if any of the deprecated config is not null.
-      if (segmentPushType != null || segmentPushFrequency != null) {
-        batchIngestionConfig = new BatchIngestionConfig(null, segmentPushType, segmentPushFrequency);
-      }
-    } else {
-      // This should not happen typically, but since we are in repair mode, might as well cover this corner case.
-      if (batchIngestionConfig.getSegmentIngestionType() == null) {
-        batchIngestionConfig.setSegmentIngestionType(segmentPushType);
-      }
-      if (batchIngestionConfig.getSegmentIngestionFrequency() == null) {
-        batchIngestionConfig.setSegmentIngestionFrequency(segmentPushFrequency);
-      }
-    }
-
+    // Handle stream config migration
     StreamIngestionConfig streamIngestionConfig =
         (ingestionConfig != null) ? ingestionConfig.getStreamIngestionConfig() : null;
     IndexingConfig indexingConfig = tableConfig.getIndexingConfig();
@@ -1644,13 +1624,11 @@ public final class TableConfigUtils {
     }
 
     if (ingestionConfig == null) {
-      if (batchIngestionConfig != null || streamIngestionConfig != null) {
+      if (streamIngestionConfig != null) {
         ingestionConfig = new IngestionConfig();
-        ingestionConfig.setBatchIngestionConfig(batchIngestionConfig);
         ingestionConfig.setStreamIngestionConfig(streamIngestionConfig);
       }
     } else {
-      ingestionConfig.setBatchIngestionConfig(batchIngestionConfig);
       ingestionConfig.setStreamIngestionConfig(streamIngestionConfig);
     }
 
@@ -1659,8 +1637,6 @@ public final class TableConfigUtils {
 
     // Clear the deprecated ones.
     indexingConfig.setStreamConfigs(null);
-    validationConfig.setSegmentPushFrequency(null);
-    validationConfig.setSegmentPushType(null);
   }
 
   /**

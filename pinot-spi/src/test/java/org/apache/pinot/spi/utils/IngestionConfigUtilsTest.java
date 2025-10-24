@@ -27,7 +27,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import org.apache.pinot.spi.config.table.IndexingConfig;
-import org.apache.pinot.spi.config.table.SegmentsValidationAndRetentionConfig;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.TableType;
 import org.apache.pinot.spi.config.table.ingestion.BatchIngestionConfig;
@@ -104,53 +103,34 @@ public class IngestionConfigUtilsTest {
 
   @Test
   public void testGetPushFrequency() {
-    // get from ingestion config, when not present in segmentsConfig
+    // get from ingestion config
     IngestionConfig ingestionConfig = new IngestionConfig();
     ingestionConfig.setBatchIngestionConfig(new BatchIngestionConfig(null, "APPEND", "HOURLY"));
     TableConfig tableConfig =
         new TableConfigBuilder(TableType.OFFLINE).setTableName("myTable").setIngestionConfig(ingestionConfig).build();
     Assert.assertEquals(IngestionConfigUtils.getBatchSegmentIngestionFrequency(tableConfig), "HOURLY");
 
-    // get from ingestion config, even if present in segmentsConfig
-    SegmentsValidationAndRetentionConfig segmentsValidationAndRetentionConfig =
-        new SegmentsValidationAndRetentionConfig();
-    segmentsValidationAndRetentionConfig.setSegmentPushFrequency("DAILY");
-    tableConfig.setValidationConfig(segmentsValidationAndRetentionConfig);
-    Assert.assertEquals(IngestionConfigUtils.getBatchSegmentIngestionFrequency(tableConfig), "HOURLY");
-
-    // get from segmentsConfig
-    tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName("myTable").build();
-    tableConfig.setValidationConfig(segmentsValidationAndRetentionConfig);
-    Assert.assertEquals(IngestionConfigUtils.getBatchSegmentIngestionFrequency(tableConfig), "DAILY");
-
     // present nowhere
-    segmentsValidationAndRetentionConfig.setSegmentPushFrequency(null);
+    tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName("myTable").build();
     Assert.assertNull(IngestionConfigUtils.getBatchSegmentIngestionFrequency(tableConfig));
   }
 
   @Test
   public void testGetPushType() {
-    // get from ingestion config, when not present in segmentsConfig
+    // get from ingestion config
     IngestionConfig ingestionConfig = new IngestionConfig();
     ingestionConfig.setBatchIngestionConfig(new BatchIngestionConfig(null, "APPEND", "HOURLY"));
     TableConfig tableConfig =
         new TableConfigBuilder(TableType.OFFLINE).setTableName("myTable").setIngestionConfig(ingestionConfig).build();
     Assert.assertEquals(IngestionConfigUtils.getBatchSegmentIngestionType(tableConfig), "APPEND");
 
-    // get from ingestion config, even if present in segmentsConfig
-    SegmentsValidationAndRetentionConfig segmentsValidationAndRetentionConfig =
-        new SegmentsValidationAndRetentionConfig();
-    segmentsValidationAndRetentionConfig.setSegmentPushType("REFRESH");
-    tableConfig.setValidationConfig(segmentsValidationAndRetentionConfig);
-    Assert.assertEquals(IngestionConfigUtils.getBatchSegmentIngestionType(tableConfig), "APPEND");
-
-    // get from segmentsConfig
-    tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName("myTable").build();
-    tableConfig.setValidationConfig(segmentsValidationAndRetentionConfig);
+    // test with REFRESH type
+    ingestionConfig.setBatchIngestionConfig(new BatchIngestionConfig(null, "REFRESH", "HOURLY"));
+    tableConfig.setIngestionConfig(ingestionConfig);
     Assert.assertEquals(IngestionConfigUtils.getBatchSegmentIngestionType(tableConfig), "REFRESH");
 
     // present nowhere, then should return APPEND which is the default
-    segmentsValidationAndRetentionConfig.setSegmentPushType(null);
+    tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName("myTable").build();
     Assert.assertEquals(IngestionConfigUtils.getBatchSegmentIngestionType(tableConfig), "APPEND");
   }
 
