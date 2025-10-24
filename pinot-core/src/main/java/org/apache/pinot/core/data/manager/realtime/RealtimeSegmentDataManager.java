@@ -241,6 +241,24 @@ public class RealtimeSegmentDataManager extends SegmentDataManager {
   // Interrupt consumer thread every 10 seconds in case it doesn't stop, e.g. interrupt flag getting cleared somehow
   private static final int CONSUMER_THREAD_INTERRUPT_INTERVAL_MS = 10000;
 
+  /**
+   * Auto-closeable wrapper for temporary folders to ensure cleanup
+   */
+  private static class TempFolderCloseable implements AutoCloseable {
+    private final File _folder;
+
+    public TempFolderCloseable(File folder) {
+      _folder = folder;
+    }
+
+    @Override
+    public void close() {
+      if (_folder != null) {
+        FileUtils.deleteQuietly(_folder);
+      }
+    }
+  }
+
   private final SegmentZKMetadata _segmentZKMetadata;
   private final TableConfig _tableConfig;
   private final RealtimeTableDataManager _realtimeTableDataManager;
@@ -1164,10 +1182,10 @@ public class RealtimeSegmentDataManager extends SegmentDataManager {
       final long lockAcquireTimeMillis = now();
       // Build a segment from in-memory rows.
       // If build compressed archive is true, then build the tar.compressed file as well
-      // TODO Use an auto-closeable object to delete temp resources.
+      // Create an auto-closeable object to ensure temp resources are deleted
       File tempSegmentFolder = new File(_resourceTmpDir, "tmp-" + _segmentNameStr + "-" + now());
-
-      SegmentZKPropsConfig segmentZKPropsConfig = new SegmentZKPropsConfig();
+      try (TempFolderCloseable tempFolderCloseable = new TempFolderCloseable(tempSegmentFolder)) {
+        SegmentZKPropsConfig segmentZKPropsConfig = new SegmentZKPropsConfig();
       segmentZKPropsConfig.setStartOffset(_segmentZKMetadata.getStartOffset());
       segmentZKPropsConfig.setEndOffset(_currentOffset.toString());
       // let's convert the segment now
@@ -1252,6 +1270,7 @@ public class RealtimeSegmentDataManager extends SegmentDataManager {
         return new SegmentBuildDescriptor(null, null, _currentOffset, buildTimeMillis, waitTimeMillis,
             segmentSizeBytes);
       }
+      } // End of try-with-resources for TempFolderCloseable
     } finally {
       if (_segBuildSemaphore != null) {
         _segmentLogger.info("Releasing semaphore for building segment");
