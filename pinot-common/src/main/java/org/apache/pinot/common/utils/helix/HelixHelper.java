@@ -565,6 +565,30 @@ public class HelixHelper {
   }
 
   /**
+   * Returns whether a given instance exists in Helix using a HelixManager.
+   */
+  public static boolean instanceExists(HelixManager helixManager, String instanceId) {
+    try {
+      return getInstanceConfig(helixManager, instanceId) != null;
+    } catch (Exception e) {
+      LOGGER.warn("Failed to check instance existence for {} via HelixManager", instanceId, e);
+      return false;
+    }
+  }
+
+  /**
+   * Returns whether a given instance exists in Helix using a HelixAdmin and explicit cluster name.
+   */
+  public static boolean instanceExists(HelixAdmin helixAdmin, String clusterName, String instanceId) {
+    try {
+      return helixAdmin.getInstanceConfig(clusterName, instanceId) != null;
+    } catch (Exception e) {
+      LOGGER.warn("Failed to check instance existence for {} in cluster {}", instanceId, clusterName, e);
+      return false;
+    }
+  }
+
+  /**
    * Updates instance config to the Helix property store.
    */
   public static void updateInstanceConfig(HelixManager helixManager, InstanceConfig instanceConfig) {

@@ -365,6 +365,8 @@ public class CommonConstants {
     public static final long DEFAULT_EXTRA_PASSIVE_TIMEOUT_MS = 100L;
     public static final String CONFIG_OF_BROKER_ID = "pinot.broker.instance.id";
     public static final String CONFIG_OF_BROKER_INSTANCE_TAGS = "pinot.broker.instance.tags";
+    // New key used only for first-time join initialization of tags
+    public static final String CONFIG_OF_BROKER_INSTANCE_INITIAL_TAGS = "pinot.broker.instance.initial.tags";
     public static final String CONFIG_OF_BROKER_HOSTNAME = "pinot.broker.hostname";
     public static final String CONFIG_OF_SWAGGER_USE_HTTPS = "pinot.broker.swagger.use.https";
     // Comma separated list of packages that contains javax service resources.
@@ -1040,6 +1042,8 @@ public class CommonConstants {
     public static final String INSTANCE_DATA_MANAGER_CONFIG_PREFIX = "pinot.server.instance";
     public static final String QUERY_EXECUTOR_CONFIG_PREFIX = "pinot.server.query.executor";
     public static final String METRICS_CONFIG_PREFIX = "pinot.server.metrics";
+    // Config to initialize server instance tags for first-time joiners (comma-separated)
+    public static final String CONFIG_OF_SERVER_INSTANCE_INITIAL_TAGS = "pinot.server.instance.initial.tags";
 
     public static final String CONFIG_OF_INSTANCE_DATA_MANAGER_CLASS = "pinot.server.instance.data.manager.class";
     public static final String DEFAULT_INSTANCE_DATA_MANAGER_CLASS =
@@ -1520,6 +1524,8 @@ public class CommonConstants {
     @Deprecated
     public static final String DEPRECATED_CONFIG_OF_METRICS_PREFIX_KEY = "metricsPrefix";
     public static final String METRICS_REGISTRY_REGISTRATION_LISTENERS_KEY = "metricsRegistryRegistrationListeners";
+    // Config to initialize minion instance tags for first-time joiners (comma-separated)
+    public static final String CONFIG_OF_MINION_INSTANCE_INITIAL_TAGS = "pinot.minion.instance.initial.tags";
     public static final String METRICS_CONFIG_PREFIX = "pinot.minion.metrics";
 
     // Default settings
