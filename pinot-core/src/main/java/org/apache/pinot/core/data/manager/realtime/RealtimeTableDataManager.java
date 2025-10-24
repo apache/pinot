@@ -36,7 +36,6 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 import java.util.concurrent.locks.Lock;
 import java.util.function.BooleanSupplier;
-import java.util.function.Supplier;
 import javax.annotation.Nullable;
 import javax.annotation.concurrent.ThreadSafe;
 import org.apache.commons.collections4.CollectionUtils;
@@ -135,8 +134,7 @@ public class RealtimeTableDataManager extends BaseTableDataManager {
   @Deprecated
   private static final String SEGMENT_DOWNLOAD_TIMEOUT_MINUTES = "segmentDownloadTimeoutMinutes";
 
-  // TODO: Change it to BooleanSupplier
-  private final Supplier<Boolean> _isServerReadyToServeQueries;
+  private final BooleanSupplier _isServerReadyToServeQueries;
 
   // Object to track ingestion delay for all partitions
   private IngestionDelayTracker _ingestionDelayTracker;
@@ -150,7 +148,7 @@ public class RealtimeTableDataManager extends BaseTableDataManager {
     this(segmentBuildSemaphore, () -> true);
   }
 
-  public RealtimeTableDataManager(Semaphore segmentBuildSemaphore, Supplier<Boolean> isServerReadyToServeQueries) {
+  public RealtimeTableDataManager(Semaphore segmentBuildSemaphore, BooleanSupplier isServerReadyToServeQueries) {
     _segmentBuildSemaphore = segmentBuildSemaphore;
     _isServerReadyToServeQueries = isServerReadyToServeQueries;
   }
@@ -918,7 +916,7 @@ public class RealtimeTableDataManager extends BaseTableDataManager {
     _enforceConsumptionInOrder = enforceConsumptionInOrder;
   }
 
-  public Supplier<Boolean> getIsServerReadyToServeQueries() {
+  public BooleanSupplier getIsServerReadyToServeQueries() {
     return _isServerReadyToServeQueries;
   }
 

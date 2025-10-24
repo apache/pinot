@@ -24,7 +24,7 @@ import com.google.common.cache.Cache;
 import java.util.Map;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Semaphore;
-import java.util.function.Supplier;
+import java.util.function.BooleanSupplier;
 import javax.annotation.Nullable;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.commons.lang3.tuple.Pair;
@@ -76,7 +76,7 @@ public class FailureInjectingTableDataManagerProvider implements TableDataManage
       SegmentReloadSemaphore segmentReloadSemaphore, ExecutorService segmentReloadRefreshExecutor,
       @Nullable ExecutorService segmentPreloadExecutor,
       @Nullable Cache<Pair<String, String>, SegmentErrorInfo> errorCache,
-      Supplier<Boolean> isServerReadyToServeQueries, boolean enableAsyncSegmentRefresh) {
+      BooleanSupplier isServerReadyToServeQueries, boolean enableAsyncSegmentRefresh) {
     TableDataManager tableDataManager;
     switch (tableConfig.getTableType()) {
       case OFFLINE:

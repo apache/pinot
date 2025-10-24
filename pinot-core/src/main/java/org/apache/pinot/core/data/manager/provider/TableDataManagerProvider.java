@@ -22,7 +22,7 @@ import com.google.common.annotations.VisibleForTesting;
 import com.google.common.cache.Cache;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
-import java.util.function.Supplier;
+import java.util.function.BooleanSupplier;
 import javax.annotation.Nullable;
 import org.apache.commons.lang3.tuple.Pair;
 import org.apache.helix.HelixManager;
@@ -50,7 +50,7 @@ public interface TableDataManagerProvider {
       SegmentReloadSemaphore segmentRefreshSemaphore, ExecutorService segmentReloadRefreshExecutor,
       @Nullable ExecutorService segmentPreloadExecutor,
       @Nullable Cache<Pair<String, String>, SegmentErrorInfo> errorCache,
-      Supplier<Boolean> isServerReadyToServeQueries, boolean enableAsyncSegmentRefresh);
+      BooleanSupplier isServerReadyToServeQueries, boolean enableAsyncSegmentRefresh);
 
   @VisibleForTesting
   default TableDataManager getTableDataManager(TableConfig tableConfig, Schema schema) {
