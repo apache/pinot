@@ -62,7 +62,7 @@ public enum AggregationFunctionType {
   SUMINT("sumInt", ReturnTypes.AGG_SUM, OperandTypes.INTEGER),
   SUMLONG("sumLong", ReturnTypes.AGG_SUM, OperandTypes.or(OperandTypes.INTEGER, OperandTypes.ARRAY_OF_INTEGER)),
   SUMPRECISION("sumPrecision", ReturnTypes.explicit(SqlTypeName.DECIMAL), OperandTypes.ANY, SqlTypeName.OTHER),
-  AVG("avg", SqlTypeName.OTHER, SqlTypeName.DOUBLE),
+  AVG("avg", ReturnTypes.DOUBLE, OperandTypes.or(OperandTypes.NUMERIC, OperandTypes.ARRAY), SqlTypeName.OTHER),
   MODE("mode", SqlTypeName.OTHER, SqlTypeName.DOUBLE),
   FIRSTWITHTIME("firstWithTime", ReturnTypes.ARG0,
       OperandTypes.family(SqlTypeFamily.ANY, SqlTypeFamily.ANY, SqlTypeFamily.CHARACTER), SqlTypeName.OTHER),
