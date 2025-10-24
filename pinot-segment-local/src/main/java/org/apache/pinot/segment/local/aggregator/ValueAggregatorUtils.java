@@ -18,6 +18,10 @@
  */
 package org.apache.pinot.segment.local.aggregator;
 
+import javax.annotation.Nullable;
+import org.apache.pinot.spi.data.FieldSpec;
+
+
 public class ValueAggregatorUtils {
   private ValueAggregatorUtils() {
   }
@@ -25,12 +29,29 @@ public class ValueAggregatorUtils {
   /// Tries to convert the given value to a double.
   /// We need this for [ValueAggregator] because the raw value might not be converted to the desired data type yet if it
   /// is not specified in the schema.
-  /// TODO: Provide a way to specify the desired data type for the raw value.
   public static double toDouble(Object value) {
     if (value instanceof Number) {
       return ((Number) value).doubleValue();
     } else {
       return Double.parseDouble(value.toString());
+    }
+  }
+
+  public static double toDouble(Object rawValue, @Nullable FieldSpec.DataType sourceDataType) {
+    if (sourceDataType == null) {
+      return toDouble(rawValue);
+    }
+    switch (sourceDataType) {
+      case INT:
+      case LONG:
+      case DOUBLE:
+      case FLOAT:
+        return ((Number) rawValue).doubleValue();
+      case STRING:
+        return Double.parseDouble((String) rawValue);
+      default:
+        throw new UnsupportedOperationException(
+            "Cannot convert rawValue: " + rawValue + " of type: " + sourceDataType + " to double.");
     }
   }
 }

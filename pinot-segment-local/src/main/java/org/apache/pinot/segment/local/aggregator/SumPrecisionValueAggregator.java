@@ -71,12 +71,29 @@ public class SumPrecisionValueAggregator implements ValueAggregator<Object, BigD
   }
 
   @Override
-  public BigDecimal applyRawValue(BigDecimal value, Object rawValue) {
-    value = value.add(toBigDecimal(rawValue));
+  public BigDecimal getInitialAggregatedValue(@Nullable Object rawValue, @Nullable DataType sourceDataType) {
+    if (rawValue == null) {
+      return BigDecimal.ZERO;
+    }
+    BigDecimal initialValue = toBigDecimal(rawValue, sourceDataType);
+    if (_fixedSize < 0) {
+      _maxByteSize = Math.max(_maxByteSize, BigDecimalUtils.byteSize(initialValue));
+    }
+    return initialValue;
+  }
+
+  @Override
+  public BigDecimal applyRawValue(BigDecimal value, Object rawValue, @Nullable DataType sourceDataType) {
+    value = value.add(toBigDecimal(rawValue, sourceDataType));
     if (_fixedSize < 0) {
       _maxByteSize = Math.max(_maxByteSize, BigDecimalUtils.byteSize(value));
     }
     return value;
+  }
+
+  @Override
+  public BigDecimal applyRawValue(BigDecimal value, Object rawValue) {
+    return applyRawValue(value, rawValue, null);
   }
 
   private static BigDecimal toBigDecimal(Object rawValue) {
@@ -87,6 +104,22 @@ public class SumPrecisionValueAggregator implements ValueAggregator<Object, BigD
       return BigDecimal.valueOf(((Number) rawValue).longValue());
     }
     return new BigDecimal(rawValue.toString());
+  }
+
+  private static BigDecimal toBigDecimal(Object rawValue, @Nullable DataType sourceDataType) {
+    if (sourceDataType == null) {
+      return toBigDecimal(rawValue);
+    }
+
+    switch (sourceDataType) {
+      case BYTES:
+        return BigDecimalUtils.deserialize((byte[]) rawValue);
+      case INT:
+      case LONG:
+        return BigDecimal.valueOf(((Number) rawValue).longValue());
+      default:
+        return new BigDecimal(rawValue.toString());
+    }
   }
 
   @Override
