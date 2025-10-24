@@ -48,7 +48,6 @@ import org.apache.pinot.common.function.FunctionInfo;
 import org.apache.pinot.common.function.FunctionRegistry;
 import org.apache.pinot.common.function.QueryFunctionInvoker;
 import org.apache.pinot.common.utils.DataSchema.ColumnDataType;
-import org.apache.pinot.query.planner.logical.RelToPlanNodeConverter;
 import org.apache.pinot.spi.utils.TimestampUtils;
 import org.apache.pinot.sql.parsers.SqlCompilationException;
 
@@ -174,7 +173,7 @@ public class PinotEvaluateLiteralRule {
         // Function operands cannot be evaluated, skip
         return rexCall;
       }
-      argumentTypes[i] = RelToPlanNodeConverter.convertToColumnDataType(rexLiteral.getType());
+      argumentTypes[i] = ColumnDataType.fromRelDataType(rexLiteral.getType());
       arguments[i] = getLiteralValue(rexLiteral);
     }
 
@@ -183,7 +182,7 @@ public class PinotEvaluateLiteralRule {
       // to is determined by the operator's return type. Pinot's CAST function implementation requires two arguments:
       // the value to be cast and the target type.
       argumentTypes = new ColumnDataType[]{argumentTypes[0], ColumnDataType.STRING};
-      arguments = new Object[]{arguments[0], RelToPlanNodeConverter.convertToColumnDataType(rexCall.getType()).name()};
+      arguments = new Object[]{arguments[0], ColumnDataType.fromRelDataType(rexCall.getType()).name()};
     }
     String canonicalName = FunctionRegistry.canonicalize(PinotRuleUtils.extractFunctionName(rexCall));
     FunctionInfo functionInfo = FunctionRegistry.lookupFunctionInfo(canonicalName, argumentTypes);
@@ -253,7 +252,7 @@ public class PinotEvaluateLiteralRule {
 
   private static RelDataType convertDecimalType(RelDataType relDataType, RexBuilder rexBuilder) {
     Preconditions.checkArgument(relDataType.getSqlTypeName() == SqlTypeName.DECIMAL);
-    return RelToPlanNodeConverter.convertToColumnDataType(relDataType).toType(rexBuilder.getTypeFactory());
+    return ColumnDataType.fromRelDataType(relDataType).toType(rexBuilder.getTypeFactory());
   }
 
   @Nullable

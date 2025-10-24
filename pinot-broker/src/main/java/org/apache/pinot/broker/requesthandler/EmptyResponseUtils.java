@@ -35,7 +35,6 @@ import org.apache.pinot.core.query.aggregation.function.AggregationFunction;
 import org.apache.pinot.core.query.aggregation.function.AggregationFunctionUtils;
 import org.apache.pinot.core.query.request.context.QueryContext;
 import org.apache.pinot.query.QueryEnvironment;
-import org.apache.pinot.query.planner.logical.RelToPlanNodeConverter;
 import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.Schema;
 
@@ -165,7 +164,7 @@ public class EmptyResponseUtils {
         columnNames[i] = dataTypeField.getName();
         ColumnDataType columnDataType;
         try {
-          columnDataType = RelToPlanNodeConverter.convertToColumnDataType(dataTypeField.getType());
+          columnDataType = ColumnDataType.fromRelDataType(dataTypeField.getType());
         } catch (Exception ignored) {
           columnDataType = ColumnDataType.UNKNOWN;
         }
@@ -182,7 +181,7 @@ public class EmptyResponseUtils {
       // Fill data type with the validated row type when it is available.
       for (int i = 0; i < numColumns; i++) {
         try {
-          columnDataTypes[i] = RelToPlanNodeConverter.convertToColumnDataType(dataTypeFields.get(i).getType());
+          columnDataTypes[i] = ColumnDataType.fromRelDataType(dataTypeFields.get(i).getType());
         } catch (Exception ignored) {
           // Ignore exception and keep the type from response
         }

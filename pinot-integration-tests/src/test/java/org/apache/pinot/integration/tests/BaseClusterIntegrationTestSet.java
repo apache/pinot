@@ -330,6 +330,11 @@ public abstract class BaseClusterIntegrationTestSet extends BaseClusterIntegrati
     query = "SELECT MIN(OriginCityName), MAX(OriginCityName) FROM mytable";
     testQuery(query);
 
+    // Verify that rewrite also works when input operand is a complex expression (with non-canonical function names)
+    query = "SELECT MIN(SUB_STRING(TRIM(OriginCityName), 1)), max(trim(OriginCityName)) FROM mytable";
+    h2Query = "SELECT MIN(SUBSTRING(TRIM(OriginCityName), 1)), MAX(TRIM(OriginCityName)) FROM mytable";
+    testQuery(query, h2Query);
+
     // Test orderedPreferredPools option which will fallbacks to non preferred Pools
     // when non of preferred Pools is available
     query = "SELECT count(*) FROM mytable WHERE OriginState LIKE 'A_' option(orderedPreferredPools=0|1)";

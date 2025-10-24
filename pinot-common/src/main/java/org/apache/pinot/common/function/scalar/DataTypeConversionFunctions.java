@@ -21,6 +21,7 @@ package org.apache.pinot.common.function.scalar;
 import com.google.common.base.Preconditions;
 import java.math.BigDecimal;
 import java.util.Base64;
+import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.common.utils.PinotDataType;
 import org.apache.pinot.spi.annotations.ScalarFunction;
 import org.apache.pinot.spi.utils.BigDecimalUtils;
@@ -35,6 +36,36 @@ import static org.apache.pinot.common.utils.PinotDataType.*;
  */
 public class DataTypeConversionFunctions {
   private DataTypeConversionFunctions() {
+  }
+
+  public static DataSchema.ColumnDataType getReturnType(String targetTypeLiteral) {
+    String transformed = targetTypeLiteral.toUpperCase();
+    DataSchema.ColumnDataType targetDataType;
+    switch (transformed) {
+      case "BIGINT":
+        targetDataType = DataSchema.ColumnDataType.LONG;
+        break;
+      case "DECIMAL":
+        targetDataType = DataSchema.ColumnDataType.BIG_DECIMAL;
+        break;
+      case "INT":
+        targetDataType = DataSchema.ColumnDataType.INT;
+        break;
+      case "VARBINARY":
+        targetDataType = DataSchema.ColumnDataType.BYTES;
+        break;
+      case "VARCHAR":
+        targetDataType = DataSchema.ColumnDataType.STRING;
+        break;
+      default:
+        try {
+          targetDataType = DataSchema.ColumnDataType.valueOf(transformed);
+        } catch (IllegalArgumentException e) {
+          throw new IllegalArgumentException("Unknown data type: " + targetTypeLiteral);
+        }
+        break;
+    }
+    return targetDataType;
   }
 
   @ScalarFunction

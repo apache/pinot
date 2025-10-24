@@ -21,6 +21,12 @@ package org.apache.pinot.common.utils;
 import java.math.BigDecimal;
 import java.nio.ByteBuffer;
 import java.sql.Timestamp;
+import org.apache.calcite.rel.type.RelDataTypeSystem;
+import org.apache.calcite.sql.SqlIdentifier;
+import org.apache.calcite.sql.type.ArraySqlType;
+import org.apache.calcite.sql.type.BasicSqlType;
+import org.apache.calcite.sql.type.ObjectSqlType;
+import org.apache.calcite.sql.type.SqlTypeName;
 import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.utils.BytesUtils;
 import org.testng.Assert;
@@ -188,5 +194,105 @@ public class DataSchemaTest {
     Assert.assertEquals(TIMESTAMP.format(timestampValue), timestampValue.toString());
     byte[] bytesValue = {12, 34, 56};
     Assert.assertEquals(BYTES.format(bytesValue), BytesUtils.toHexString(bytesValue));
+  }
+
+  @Test
+  public void testConvertFromRelDataTypeToColumnDataTypeForObjectTypes() {
+    Assert.assertEquals(DataSchema.ColumnDataType.fromRelDataType(
+            new ObjectSqlType(SqlTypeName.BOOLEAN, SqlIdentifier.STAR, true, null, null)),
+        DataSchema.ColumnDataType.BOOLEAN);
+    Assert.assertEquals(DataSchema.ColumnDataType.fromRelDataType(
+            new ObjectSqlType(SqlTypeName.TINYINT, SqlIdentifier.STAR, true, null, null)),
+        DataSchema.ColumnDataType.INT);
+    Assert.assertEquals(DataSchema.ColumnDataType.fromRelDataType(
+            new ObjectSqlType(SqlTypeName.SMALLINT, SqlIdentifier.STAR, true, null, null)),
+        DataSchema.ColumnDataType.INT);
+    Assert.assertEquals(DataSchema.ColumnDataType.fromRelDataType(
+            new ObjectSqlType(SqlTypeName.INTEGER, SqlIdentifier.STAR, true, null, null)),
+        DataSchema.ColumnDataType.INT);
+    Assert.assertEquals(DataSchema.ColumnDataType.fromRelDataType(
+            new ObjectSqlType(SqlTypeName.BIGINT, SqlIdentifier.STAR, true, null, null)),
+        DataSchema.ColumnDataType.LONG);
+    Assert.assertEquals(DataSchema.ColumnDataType.fromRelDataType(
+            new ObjectSqlType(SqlTypeName.FLOAT, SqlIdentifier.STAR, true, null, null)),
+        DataSchema.ColumnDataType.FLOAT);
+    Assert.assertEquals(DataSchema.ColumnDataType.fromRelDataType(
+            new ObjectSqlType(SqlTypeName.DOUBLE, SqlIdentifier.STAR, true, null, null)),
+        DataSchema.ColumnDataType.DOUBLE);
+    Assert.assertEquals(DataSchema.ColumnDataType.fromRelDataType(
+            new ObjectSqlType(SqlTypeName.TIMESTAMP, SqlIdentifier.STAR, true, null, null)),
+        DataSchema.ColumnDataType.TIMESTAMP);
+    Assert.assertEquals(DataSchema.ColumnDataType.fromRelDataType(
+            new ObjectSqlType(SqlTypeName.CHAR, SqlIdentifier.STAR, true, null, null)),
+        DataSchema.ColumnDataType.STRING);
+    Assert.assertEquals(DataSchema.ColumnDataType.fromRelDataType(
+            new ObjectSqlType(SqlTypeName.VARCHAR, SqlIdentifier.STAR, true, null, null)),
+        DataSchema.ColumnDataType.STRING);
+    Assert.assertEquals(DataSchema.ColumnDataType.fromRelDataType(
+            new ObjectSqlType(SqlTypeName.VARBINARY, SqlIdentifier.STAR, true, null, null)),
+        DataSchema.ColumnDataType.BYTES);
+    Assert.assertEquals(DataSchema.ColumnDataType.fromRelDataType(
+            new ObjectSqlType(SqlTypeName.OTHER, SqlIdentifier.STAR, true, null, null)),
+        DataSchema.ColumnDataType.OBJECT);
+  }
+
+  @Test
+  public void testBigDecimal() {
+    Assert.assertEquals(DataSchema.ColumnDataType.fromRelDataType(
+            new BasicSqlType(RelDataTypeSystem.DEFAULT, SqlTypeName.DECIMAL, 10)),
+        DataSchema.ColumnDataType.INT);
+    Assert.assertEquals(DataSchema.ColumnDataType.fromRelDataType(
+            new BasicSqlType(RelDataTypeSystem.DEFAULT, SqlTypeName.DECIMAL, 38)),
+        DataSchema.ColumnDataType.LONG);
+    Assert.assertEquals(DataSchema.ColumnDataType.fromRelDataType(
+            new BasicSqlType(RelDataTypeSystem.DEFAULT, SqlTypeName.DECIMAL, 39)),
+        DataSchema.ColumnDataType.BIG_DECIMAL);
+
+    Assert.assertEquals(DataSchema.ColumnDataType.fromRelDataType(
+            new BasicSqlType(RelDataTypeSystem.DEFAULT, SqlTypeName.DECIMAL, 14, 10)),
+        DataSchema.ColumnDataType.DOUBLE);
+    Assert.assertEquals(DataSchema.ColumnDataType.fromRelDataType(
+            new BasicSqlType(RelDataTypeSystem.DEFAULT, SqlTypeName.DECIMAL, 30, 10)),
+        DataSchema.ColumnDataType.DOUBLE);
+    Assert.assertEquals(DataSchema.ColumnDataType.fromRelDataType(
+            new BasicSqlType(RelDataTypeSystem.DEFAULT, SqlTypeName.DECIMAL, 31, 10)),
+        DataSchema.ColumnDataType.BIG_DECIMAL);
+  }
+
+  @Test
+  public void testConvertToColumnDataTypeForArray() {
+    Assert.assertEquals(DataSchema.ColumnDataType.fromRelDataType(
+            new ArraySqlType(new ObjectSqlType(SqlTypeName.BOOLEAN, SqlIdentifier.STAR, true, null, null), true)),
+        DataSchema.ColumnDataType.BOOLEAN_ARRAY);
+    Assert.assertEquals(DataSchema.ColumnDataType.fromRelDataType(
+            new ArraySqlType(new ObjectSqlType(SqlTypeName.TINYINT, SqlIdentifier.STAR, true, null, null), true)),
+        DataSchema.ColumnDataType.INT_ARRAY);
+    Assert.assertEquals(DataSchema.ColumnDataType.fromRelDataType(
+            new ArraySqlType(new ObjectSqlType(SqlTypeName.SMALLINT, SqlIdentifier.STAR, true, null, null), true)),
+        DataSchema.ColumnDataType.INT_ARRAY);
+    Assert.assertEquals(DataSchema.ColumnDataType.fromRelDataType(
+            new ArraySqlType(new ObjectSqlType(SqlTypeName.INTEGER, SqlIdentifier.STAR, true, null, null), true)),
+        DataSchema.ColumnDataType.INT_ARRAY);
+    Assert.assertEquals(DataSchema.ColumnDataType.fromRelDataType(
+            new ArraySqlType(new ObjectSqlType(SqlTypeName.BIGINT, SqlIdentifier.STAR, true, null, null), true)),
+        DataSchema.ColumnDataType.LONG_ARRAY);
+    Assert.assertEquals(DataSchema.ColumnDataType.fromRelDataType(
+            new ArraySqlType(new ObjectSqlType(SqlTypeName.FLOAT, SqlIdentifier.STAR, true, null, null), true)),
+        DataSchema.ColumnDataType.FLOAT_ARRAY);
+    Assert.assertEquals(DataSchema.ColumnDataType.fromRelDataType(
+            new ArraySqlType(new ObjectSqlType(SqlTypeName.DOUBLE, SqlIdentifier.STAR, true, null, null), true)),
+        DataSchema.ColumnDataType.DOUBLE_ARRAY);
+    Assert.assertEquals(DataSchema.ColumnDataType.fromRelDataType(
+            new ArraySqlType(new ObjectSqlType(SqlTypeName.TIMESTAMP, SqlIdentifier.STAR, true, null, null), true)),
+        DataSchema.ColumnDataType.TIMESTAMP_ARRAY);
+    Assert.assertEquals(DataSchema.ColumnDataType.fromRelDataType(
+            new ArraySqlType(new ObjectSqlType(SqlTypeName.CHAR, SqlIdentifier.STAR, true, null, null), true)),
+        DataSchema.ColumnDataType.STRING_ARRAY);
+    Assert.assertEquals(DataSchema.ColumnDataType.fromRelDataType(
+            new ArraySqlType(new ObjectSqlType(SqlTypeName.VARCHAR, SqlIdentifier.STAR, true, null, null), true)),
+        DataSchema.ColumnDataType.STRING_ARRAY);
+    Assert.assertEquals(DataSchema.ColumnDataType.fromRelDataType(
+            new ArraySqlType(new ObjectSqlType(SqlTypeName.VARBINARY, SqlIdentifier.STAR, true, null, null), true)),
+        DataSchema.ColumnDataType.BYTES_ARRAY);
   }
 }

@@ -45,7 +45,7 @@ import org.apache.calcite.sql.fun.SqlStdOperatorTable;
 import org.apache.calcite.sql.type.SqlTypeName;
 import org.apache.calcite.sql.validate.SqlValidatorUtil;
 import org.apache.pinot.calcite.rel.logical.PinotLogicalEnrichedJoin;
-import org.apache.pinot.query.type.TypeFactory;
+import org.apache.pinot.common.calcite.type.TypeFactory;
 import org.testng.annotations.BeforeMethod;
 import org.testng.annotations.Test;
 
