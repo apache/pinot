@@ -271,6 +271,13 @@ public class RealtimeSegmentDataManager extends SegmentDataManager {
   private volatile int _numRowsErrored = 0;
   private volatile long _numBytesDropped = 0;
   private volatile int _consecutiveErrorCount = 0;
+  private volatile boolean _firstDecodeErrorLogged = false;
+
+  // Configuration constants
+  private static final String STOP_ON_DECODE_ERROR_CONFIG = "stopOnDecodeError";
+
+  // Cache stopOnDecodeError configuration as class member to avoid repeated lookups
+  private final boolean _stopOnDecodeError;
   private long _startTimeMs = 0;
   private final IdleTimer _idleTimer = new IdleTimer();
   private final String _segmentNameStr;
@@ -341,7 +348,8 @@ public class RealtimeSegmentDataManager extends SegmentDataManager {
   private final boolean _trackFilteredMessageOffsets;
   private final ParallelSegmentConsumptionPolicy _parallelSegmentConsumptionPolicy;
 
-  // TODO each time this method is called, we print reason for stop. Good to print only once.
+  private volatile boolean _stopReasonPrinted = false;
+
   private boolean endCriteriaReached() {
     Preconditions.checkState(_state.shouldConsume(), "Incorrect state %s", _state);
     long now = now();
@@ -359,9 +367,12 @@ public class RealtimeSegmentDataManager extends SegmentDataManager {
             _consumeEndTime += TimeUnit.HOURS.toMillis(TIME_EXTENSION_ON_EMPTY_SEGMENT_HOURS);
             return false;
           }
-          _segmentLogger
-              .info("Stopping consumption due to time limit start={} now={} numRowsConsumed={} numRowsIndexed={}",
-                  _startTimeMs, now, _numRowsConsumed, _numRowsIndexed);
+          if (!_stopReasonPrinted) {
+            _segmentLogger
+                .info("Stopping consumption due to time limit start={} now={} numRowsConsumed={} numRowsIndexed={}",
+                    _startTimeMs, now, _numRowsConsumed, _numRowsIndexed);
+            _stopReasonPrinted = true;
+          }
           _stopReason = SegmentCompletionProtocol.REASON_TIME_LIMIT;
           return true;
         } else if (_numRowsIndexed >= _segmentMaxRowCount) {
@@ -627,13 +638,26 @@ public class RealtimeSegmentDataManager extends SegmentDataManager {
       StreamPartitionMsgOffset nextOffset = metadata.getNextOffset();
       int rowSizeInBytes = metadata.getRecordSerializedSize();
       if (decodedRow.getException() != null) {
-        // TODO: based on a config, decide whether the record should be silently dropped or stop further consumption on
-        // decode error
-        realtimeRowsDroppedMeter =
-            _serverMetrics.addMeteredTableValue(_clientId, ServerMeter.INVALID_REALTIME_ROWS_DROPPED, 1,
-                realtimeRowsDroppedMeter);
-        _numRowsErrored++;
-        _numBytesDropped += rowSizeInBytes;
+        String errorMessage = "Stopping consumption due to decode error at offset: " + offset;
+        if (_stopOnDecodeError) {
+          _segmentLogger.error(errorMessage, decodedRow.getException());
+          _realtimeTableDataManager.addSegmentError(_segmentNameStr,
+                  new SegmentErrorInfo(now(), errorMessage, decodedRow.getException()));
+          throw new RuntimeException(errorMessage, decodedRow.getException());
+        } else {
+          // Log the first decode error, then swallow all subsequent errors
+          if (!_firstDecodeErrorLogged) {
+            _segmentLogger.error("First decode error encountered at offset: {}. "
+                + "Subsequent errors will be silently dropped.", offset, decodedRow.getException());
+            _firstDecodeErrorLogged = true;
+          }
+          // Silently drop the row with error
+          realtimeRowsDroppedMeter =
+              _serverMetrics.addMeteredTableValue(_clientId, ServerMeter.INVALID_REALTIME_ROWS_DROPPED, 1,
+                  realtimeRowsDroppedMeter);
+          _numRowsErrored++;
+          _numBytesDropped += rowSizeInBytes;
+        }
       } else {
         TransformPipeline.Result result = null;
         try {
@@ -1795,6 +1819,10 @@ public class RealtimeSegmentDataManager extends SegmentDataManager {
     try {
       _startOffset = _partitionGroupConsumptionStatus.getStartOffset();
       _currentOffset = _streamPartitionMsgOffsetFactory.create(_startOffset);
+
+      // Initialize stopOnDecodeError configuration with proper validation
+      _stopOnDecodeError = parseStopOnDecodeErrorConfig(_streamConfig);
+
       makeStreamConsumer("Starting");
       createPartitionMetadataProvider("Starting");
       setPartitionParameters(realtimeSegmentConfigBuilder, indexingConfig.getSegmentPartitionConfig());
@@ -2124,5 +2152,31 @@ public class RealtimeSegmentDataManager extends SegmentDataManager {
   @VisibleForTesting
   AtomicBoolean getConsumerSemaphoreAcquired() {
     return _consumerSemaphoreAcquired;
+  }
+
+  /**
+   * Parses the stopOnDecodeError configuration with proper validation and type safety.
+   * Implements the suggested improvement from code review to add input validation.
+   *
+   * @param streamConfig The stream configuration to parse
+   * @return true if stopOnDecodeError is enabled, false otherwise
+   */
+  private boolean parseStopOnDecodeErrorConfig(StreamConfig streamConfig) {
+    String stopOnDecodeErrorConfig = streamConfig.getStreamConfigsMap().get(STOP_ON_DECODE_ERROR_CONFIG);
+    boolean stopOnDecodeError;
+    if (stopOnDecodeErrorConfig == null) {
+      // Default behavior when config is not provided: do not stop on decode error.
+      stopOnDecodeError = false;
+    } else if ("true".equalsIgnoreCase(stopOnDecodeErrorConfig)) {
+      stopOnDecodeError = true;
+    } else if ("false".equalsIgnoreCase(stopOnDecodeErrorConfig)) {
+      stopOnDecodeError = false;
+    } else {
+      // Invalid value; log and fall back to default to avoid silent misconfiguration.
+      _segmentLogger.warn("Invalid value '{}' for configuration '{}'; "
+          + "expected 'true' or 'false'. Defaulting to 'false'.", stopOnDecodeErrorConfig, STOP_ON_DECODE_ERROR_CONFIG);
+      stopOnDecodeError = false;
+    }
+    return stopOnDecodeError;
   }
 }
