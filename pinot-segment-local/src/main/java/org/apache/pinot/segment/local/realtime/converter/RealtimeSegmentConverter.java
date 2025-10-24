@@ -35,6 +35,7 @@ import org.apache.pinot.segment.local.utils.TableConfigUtils;
 import org.apache.pinot.segment.spi.creator.SegmentGeneratorConfig;
 import org.apache.pinot.segment.spi.creator.SegmentVersion;
 import org.apache.pinot.segment.spi.index.mutable.ThreadSafeMutableRoaringBitmap;
+import org.apache.pinot.spi.config.instance.InstanceType;
 import org.apache.pinot.spi.config.table.ColumnPartitionConfig;
 import org.apache.pinot.spi.config.table.SegmentPartitionConfig;
 import org.apache.pinot.spi.config.table.SegmentZKPropsConfig;
@@ -213,7 +214,8 @@ public class RealtimeSegmentConverter {
       dataSource =
           new RealtimeSegmentSegmentCreationDataSource(_realtimeSegmentImpl, (PinotSegmentRecordReader) recordReader);
     }
-    driver.init(genConfig, dataSource, TransformPipeline.getPassThroughPipeline(_tableName)); // initializes reader
+    // initializes reader
+    driver.init(genConfig, dataSource, TransformPipeline.getPassThroughPipeline(_tableName), InstanceType.SERVER);
 
     if (!_enableColumnMajor) {
       driver.build();

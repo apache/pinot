@@ -763,6 +763,9 @@ public final class TableConfigUtils {
       return;
     }
 
+    Preconditions.checkState(tableConfig.getTierConfigsList() == null || tableConfig.getTierConfigsList().isEmpty(),
+        "Tiered storage is not supported for Upsert/Dedup tables");
+
     boolean isUpsertEnabled = tableConfig.getUpsertMode() != UpsertConfig.Mode.NONE;
     boolean isDedupEnabled = tableConfig.getDedupConfig() != null && tableConfig.getDedupConfig().isDedupEnabled();
 

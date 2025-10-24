@@ -41,6 +41,7 @@ import org.apache.pinot.segment.local.segment.readers.GenericRowRecordReader;
 import org.apache.pinot.segment.spi.ColumnMetadata;
 import org.apache.pinot.segment.spi.creator.SegmentGeneratorConfig;
 import org.apache.pinot.segment.spi.index.metadata.SegmentMetadataImpl;
+import org.apache.pinot.spi.config.instance.InstanceType;
 import org.apache.pinot.spi.config.table.ColumnPartitionConfig;
 import org.apache.pinot.spi.config.table.SegmentPartitionConfig;
 import org.apache.pinot.spi.config.table.TableConfig;
@@ -152,7 +153,7 @@ public class RealtimeToOfflineSegmentsTaskExecutorTest {
       config.setTableName(TABLE_NAME);
       config.setSegmentName(segmentName);
       SegmentIndexCreationDriverImpl driver = new SegmentIndexCreationDriverImpl();
-      driver.init(config, recordReader);
+      driver.init(config, recordReader, InstanceType.MINION);
       driver.build();
       _segmentIndexDirList.add(new File(ORIGINAL_SEGMENT_DIR, segmentName));
     }
@@ -167,7 +168,7 @@ public class RealtimeToOfflineSegmentsTaskExecutorTest {
       config.setTableName(TABLE_NAME_EPOCH_HOURS);
       config.setSegmentName(segmentName);
       SegmentIndexCreationDriverImpl driver = new SegmentIndexCreationDriverImpl();
-      driver.init(config, recordReader);
+      driver.init(config, recordReader, InstanceType.MINION);
       driver.build();
       _segmentIndexDirListEpochHours.add(new File(ORIGINAL_SEGMENT_DIR, segmentName));
     }
@@ -182,7 +183,7 @@ public class RealtimeToOfflineSegmentsTaskExecutorTest {
       config.setTableName(TABLE_NAME_SDF);
       config.setSegmentName(segmentName);
       SegmentIndexCreationDriverImpl driver = new SegmentIndexCreationDriverImpl();
-      driver.init(config, recordReader);
+      driver.init(config, recordReader, InstanceType.MINION);
       driver.build();
       _segmentIndexDirListSDF.add(new File(ORIGINAL_SEGMENT_DIR, segmentName));
     }

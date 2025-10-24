@@ -33,7 +33,6 @@ import org.apache.pinot.controller.helix.core.assignment.segment.strategy.Segmen
 import org.apache.pinot.controller.helix.core.assignment.segment.strategy.SegmentAssignmentStrategyFactory;
 import org.apache.pinot.segment.local.utils.TableConfigUtils;
 import org.apache.pinot.spi.config.table.TableConfig;
-import org.apache.pinot.spi.config.table.assignment.InstancePartitionsType;
 import org.apache.pinot.spi.utils.CommonConstants.Helix.StateModel.SegmentStateModel;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -94,8 +93,7 @@ public abstract class BaseSegmentAssignment implements SegmentAssignment {
    */
   protected Pair<List<Map<String, Map<String, String>>>, Map<String, Map<String, String>>> rebalanceTiers(
       Map<String, Map<String, String>> currentAssignment, @Nullable List<Tier> sortedTiers,
-      @Nullable Map<String, InstancePartitions> tierInstancePartitionsMap, boolean bootstrap,
-      InstancePartitionsType instancePartitionsType) {
+      @Nullable Map<String, InstancePartitions> tierInstancePartitionsMap, boolean bootstrap) {
     if (sortedTiers == null) {
       return Pair.of(null, currentAssignment);
     }
@@ -129,7 +127,7 @@ public abstract class BaseSegmentAssignment implements SegmentAssignment {
       _logger.info("Rebalancing tier: {} for table: {} with bootstrap: {}, instance partitions: {}", tierName,
           _tableNameWithType, bootstrap, tierInstancePartitions);
       newTierAssignments.add(reassignSegments(tierName, tierCurrentAssignment, tierInstancePartitions, bootstrap,
-          segmentAssignmentStrategy, instancePartitionsType));
+          segmentAssignmentStrategy));
     }
 
     return Pair.of(newTierAssignments, tierSegmentAssignment.getNonTierSegmentAssignment());
@@ -140,7 +138,7 @@ public abstract class BaseSegmentAssignment implements SegmentAssignment {
    */
   protected Map<String, Map<String, String>> reassignSegments(String instancePartitionType,
       Map<String, Map<String, String>> currentAssignment, InstancePartitions instancePartitions, boolean bootstrap,
-      SegmentAssignmentStrategy segmentAssignmentStrategy, InstancePartitionsType instancePartitionsType) {
+      SegmentAssignmentStrategy segmentAssignmentStrategy) {
     Map<String, Map<String, String>> newAssignment;
     if (bootstrap) {
       _logger.info("Bootstrapping segment assignment for {} segments of table: {}", instancePartitionType,
@@ -150,14 +148,14 @@ public abstract class BaseSegmentAssignment implements SegmentAssignment {
       newAssignment = new TreeMap<>();
       for (String segment : currentAssignment.keySet()) {
         List<String> assignedInstances =
-            segmentAssignmentStrategy.assignSegment(segment, newAssignment, instancePartitions, instancePartitionsType);
+            segmentAssignmentStrategy.assignSegment(segment, newAssignment, instancePartitions);
         newAssignment
             .put(segment, SegmentAssignmentUtils.getInstanceStateMap(assignedInstances, SegmentStateModel.ONLINE));
       }
     } else {
       // Use segment assignment strategy
       newAssignment =
-          segmentAssignmentStrategy.reassignSegments(currentAssignment, instancePartitions, instancePartitionsType);
+          segmentAssignmentStrategy.reassignSegments(currentAssignment, instancePartitions);
     }
     return newAssignment;
   }

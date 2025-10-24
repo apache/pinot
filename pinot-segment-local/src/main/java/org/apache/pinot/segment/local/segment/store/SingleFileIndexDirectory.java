@@ -35,6 +35,7 @@ import java.util.Map;
 import java.util.Set;
 import java.util.SortedMap;
 import java.util.TreeMap;
+import javax.annotation.Nullable;
 import org.apache.commons.configuration2.PropertiesConfiguration;
 import org.apache.commons.configuration2.ex.ConfigurationException;
 import org.apache.commons.io.FileUtils;
@@ -42,6 +43,7 @@ import org.apache.pinot.segment.spi.V1Constants;
 import org.apache.pinot.segment.spi.index.IndexType;
 import org.apache.pinot.segment.spi.index.StandardIndexes;
 import org.apache.pinot.segment.spi.index.metadata.SegmentMetadataImpl;
+import org.apache.pinot.segment.spi.loader.SegmentDirectoryLoaderContext;
 import org.apache.pinot.segment.spi.memory.PinotDataBuffer;
 import org.apache.pinot.segment.spi.store.ColumnIndexDirectory;
 import org.apache.pinot.segment.spi.store.ColumnIndexUtils;
@@ -79,6 +81,7 @@ class SingleFileIndexDirectory extends ColumnIndexDirectory {
   private static final int MAX_ALLOCATION_SIZE = 2000 * 1024 * 1024;
 
   private final File _segmentDirectory;
+  private final SegmentDirectoryLoaderContext _segmentDirectoryLoaderContext;
   private SegmentMetadataImpl _segmentMetadata;
   private final ReadMode _readMode;
   private final File _indexFile;
@@ -92,12 +95,18 @@ class SingleFileIndexDirectory extends ColumnIndexDirectory {
   // re-arranges the content in index file to keep it compact.
   private boolean _shouldCleanupRemovedIndices;
 
+  public SingleFileIndexDirectory(File segmentDirectory, SegmentMetadataImpl segmentMetadata, ReadMode readMode)
+      throws IOException, ConfigurationException {
+    this(segmentDirectory, segmentMetadata, null, readMode);
+  }
+
   /**
    * @param segmentDirectory File pointing to segment directory
    * @param segmentMetadata segment metadata. Metadata must be fully initialized
    * @param readMode mmap vs heap mode
    */
-  public SingleFileIndexDirectory(File segmentDirectory, SegmentMetadataImpl segmentMetadata, ReadMode readMode)
+  public SingleFileIndexDirectory(File segmentDirectory, SegmentMetadataImpl segmentMetadata,
+      @Nullable SegmentDirectoryLoaderContext segmentDirectoryLoaderContext, ReadMode readMode)
       throws IOException, ConfigurationException {
     Preconditions.checkNotNull(segmentDirectory);
     Preconditions.checkNotNull(readMode);
@@ -108,6 +117,7 @@ class SingleFileIndexDirectory extends ColumnIndexDirectory {
     Preconditions.checkArgument(segmentDirectory.isDirectory(),
         "SegmentDirectory: " + segmentDirectory.toString() + " is not a directory");
 
+    _segmentDirectoryLoaderContext = segmentDirectoryLoaderContext;
     _segmentDirectory = segmentDirectory;
     _segmentMetadata = segmentMetadata;
     _readMode = readMode;

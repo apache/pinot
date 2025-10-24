@@ -21,10 +21,12 @@ package org.apache.pinot.segment.local.indexsegment.immutable;
 import com.google.common.base.Preconditions;
 import it.unimi.dsi.fastutil.objects.Object2ObjectOpenHashMap;
 import java.io.File;
+import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Map;
 import java.util.Set;
 import javax.annotation.Nullable;
+import org.apache.pinot.common.metadata.segment.SegmentZKMetadata;
 import org.apache.pinot.segment.local.segment.index.column.PhysicalColumnIndexContainer;
 import org.apache.pinot.segment.local.segment.index.converter.SegmentFormatConverterFactory;
 import org.apache.pinot.segment.local.segment.index.loader.IndexLoadingConfig;
@@ -68,7 +70,7 @@ public class ImmutableSegmentLoader {
       throws Exception {
     IndexLoadingConfig defaultIndexLoadingConfig = new IndexLoadingConfig();
     defaultIndexLoadingConfig.setReadMode(readMode);
-    return load(indexDir, defaultIndexLoadingConfig, false, null);
+    return load(indexDir, defaultIndexLoadingConfig, false, null, null);
   }
 
   /**
@@ -78,9 +80,8 @@ public class ImmutableSegmentLoader {
    */
   public static ImmutableSegment load(File indexDir, IndexLoadingConfig indexLoadingConfig)
       throws Exception {
-    return load(indexDir, indexLoadingConfig, true, null);
+    return load(indexDir, indexLoadingConfig, true, null, null);
   }
-
   /**
    * Loads the segment with specified IndexLoadingConfig.
    * This method modifies the segment like to convert segment format, add or remove indices.
@@ -89,7 +90,18 @@ public class ImmutableSegmentLoader {
   public static ImmutableSegment load(File indexDir, IndexLoadingConfig indexLoadingConfig,
       @Nullable SegmentOperationsThrottler segmentOperationsThrottler)
       throws Exception {
-    return load(indexDir, indexLoadingConfig, true, segmentOperationsThrottler);
+    return load(indexDir, indexLoadingConfig, true, segmentOperationsThrottler, null);
+  }
+
+  /**
+   * Loads the segment with specified IndexLoadingConfig.
+   * This method modifies the segment like to convert segment format, add or remove indices.
+   * Mostly used by UT cases to add some specific index for testing purpose.
+   */
+  public static ImmutableSegment load(File indexDir, IndexLoadingConfig indexLoadingConfig,
+      @Nullable SegmentOperationsThrottler segmentOperationsThrottler, @Nullable SegmentZKMetadata zkMetadata)
+      throws Exception {
+    return load(indexDir, indexLoadingConfig, true, segmentOperationsThrottler, zkMetadata);
   }
 
   /**
@@ -98,7 +110,7 @@ public class ImmutableSegmentLoader {
    */
   public static ImmutableSegment load(File indexDir, IndexLoadingConfig indexLoadingConfig, boolean needPreprocess)
       throws Exception {
-    return load(indexDir, indexLoadingConfig, needPreprocess, null);
+    return load(indexDir, indexLoadingConfig, needPreprocess, null, null);
   }
 
   /**
@@ -106,7 +118,7 @@ public class ImmutableSegmentLoader {
    * modify the segment like to convert segment format, add or remove indices.
    */
   public static ImmutableSegment load(File indexDir, IndexLoadingConfig indexLoadingConfig, boolean needPreprocess,
-      @Nullable SegmentOperationsThrottler segmentOperationsThrottler)
+      @Nullable SegmentOperationsThrottler segmentOperationsThrottler, @Nullable SegmentZKMetadata zkMetadata)
       throws Exception {
     Preconditions.checkArgument(indexDir.isDirectory(), "Index directory: %s does not exist or is not a directory",
         indexDir);
@@ -116,9 +128,10 @@ public class ImmutableSegmentLoader {
       return new EmptyIndexSegment(segmentMetadata);
     }
     if (needPreprocess) {
-      preprocess(indexDir, indexLoadingConfig, segmentOperationsThrottler);
+      preprocess(indexDir, indexLoadingConfig, segmentOperationsThrottler, zkMetadata);
     }
     String segmentName = segmentMetadata.getName();
+    Map<String, String> segmentCustomConfigs = zkMetadata != null ? zkMetadata.getCustomMap() : new HashMap<>();
     SegmentDirectoryLoaderContext segmentLoaderContext =
         new SegmentDirectoryLoaderContext.Builder().setTableConfig(indexLoadingConfig.getTableConfig())
             .setSchema(indexLoadingConfig.getSchema())
@@ -129,6 +142,7 @@ public class ImmutableSegmentLoader {
             .setSegmentTier(indexLoadingConfig.getSegmentTier())
             .setInstanceTierConfigs(indexLoadingConfig.getInstanceTierConfigs())
             .setSegmentDirectoryConfigs(indexLoadingConfig.getSegmentDirectoryConfigs())
+            .setSegmentCustomConfigs(segmentCustomConfigs)
             .build();
     SegmentDirectoryLoader segmentLoader =
         SegmentDirectoryLoaderRegistry.getSegmentDirectoryLoader(indexLoadingConfig.getSegmentDirectoryLoader());
@@ -143,7 +157,7 @@ public class ImmutableSegmentLoader {
   }
 
   public static void preprocess(File indexDir, IndexLoadingConfig indexLoadingConfig,
-      @Nullable SegmentOperationsThrottler segmentOperationsThrottler)
+      @Nullable SegmentOperationsThrottler segmentOperationsThrottler, SegmentZKMetadata zkMetadata)
       throws Exception {
     Preconditions.checkArgument(indexDir.isDirectory(), "Index directory: %s does not exist or is not a directory",
         indexDir);
@@ -158,7 +172,7 @@ public class ImmutableSegmentLoader {
         // Preprocess requires table config and schema
         if (indexLoadingConfig.getTableConfig() != null && indexLoadingConfig.getSchema() != null) {
           preprocessSegment(indexDir, segmentMetadata.getName(), segmentMetadata.getCrc(), indexLoadingConfig,
-              segmentOperationsThrottler);
+              segmentOperationsThrottler, zkMetadata);
         }
       } finally {
         if (segmentOperationsThrottler != null) {
@@ -285,20 +299,22 @@ public class ImmutableSegmentLoader {
       return;
     }
     String segmentName = indexDir.getName();
-    LOGGER.info("Segment: {} needs to be converted from version: {} to {}", segmentName, segmentVersionOnDisk,
-        segmentVersionToLoad);
+    LOGGER.info("Segment: {} needs to be converted from version: {} to {}", segmentName,
+        segmentVersionOnDisk, segmentVersionToLoad);
     SegmentFormatConverter converter =
         SegmentFormatConverterFactory.getConverter(segmentVersionOnDisk, segmentVersionToLoad);
     LOGGER.info("Using converter: {} to up-convert segment: {}", converter.getClass().getSimpleName(), segmentName);
     converter.convert(indexDir);
-    LOGGER.info("Successfully up-converted segment: {} from version: {} to {}", segmentName, segmentVersionOnDisk,
-        segmentVersionToLoad);
+    LOGGER.info("Successfully up-converted segment: {} from version: {} to {}", segmentName,
+        segmentVersionOnDisk, segmentVersionToLoad);
   }
 
   private static void preprocessSegment(File indexDir, String segmentName, String segmentCrc,
-      IndexLoadingConfig indexLoadingConfig, @Nullable SegmentOperationsThrottler segmentOperationsThrottler)
+      IndexLoadingConfig indexLoadingConfig, @Nullable SegmentOperationsThrottler segmentOperationsThrottler,
+      SegmentZKMetadata zkMetadata)
       throws Exception {
     PinotConfiguration segmentDirectoryConfigs = indexLoadingConfig.getSegmentDirectoryConfigs();
+    Map<String, String> segmentCustomConfigs = zkMetadata != null ? zkMetadata.getCustomMap() : new HashMap<>();
     SegmentDirectoryLoaderContext segmentLoaderContext =
         new SegmentDirectoryLoaderContext.Builder().setTableConfig(indexLoadingConfig.getTableConfig())
             .setSchema(indexLoadingConfig.getSchema())
@@ -306,6 +322,7 @@ public class ImmutableSegmentLoader {
             .setSegmentName(segmentName)
             .setSegmentCrc(segmentCrc)
             .setSegmentDirectoryConfigs(segmentDirectoryConfigs)
+            .setSegmentCustomConfigs(segmentCustomConfigs)
             .build();
     SegmentDirectory segmentDirectory =
         SegmentDirectoryLoaderRegistry.getDefaultSegmentDirectoryLoader().load(indexDir.toURI(), segmentLoaderContext);

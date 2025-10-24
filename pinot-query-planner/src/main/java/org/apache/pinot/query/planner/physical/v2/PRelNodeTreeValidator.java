@@ -22,6 +22,8 @@ import org.apache.calcite.rel.core.Join;
 import org.apache.calcite.rel.core.Window;
 import org.apache.pinot.common.metrics.BrokerMeter;
 import org.apache.pinot.common.metrics.BrokerMetrics;
+import org.apache.pinot.query.context.PhysicalPlannerContext;
+import org.apache.pinot.spi.exception.QueryErrorCode;
 
 
 /**
@@ -37,8 +39,36 @@ public class PRelNodeTreeValidator {
    * Validate the tree rooted at the given PRelNode. Ideally all issues with the plan should be caught even with an
    * EXPLAIN, hence this method should be called as part of query compilation itself.
    */
-  public static void validate(PRelNode rootNode) {
-    // TODO(mse-physical): Add plan validations here.
+  public static void validate(PRelNode rootNode, PhysicalPlannerContext context) {
+    if (context == null) {
+      return;
+    }
+    validateLiteModeJoins(rootNode, context);
+  }
+
+  /**
+   * Disables joins in lite mode based on broker-initialized config carried in context.
+   */
+  private static void validateLiteModeJoins(PRelNode rootNode, PhysicalPlannerContext context) {
+    if (!context.isUseLiteMode() || context.isLiteModeJoinsEnabled()) {
+      return;
+    }
+    // If joins are disabled in lite mode, we need to check if the plan contains joins
+    if (containsJoin(rootNode)) {
+      throw QueryErrorCode.QUERY_PLANNING.asException("Joins are disabled in lite mode");
+    }
+  }
+
+  private static boolean containsJoin(PRelNode node) {
+    if (node.unwrap() instanceof Join) {
+      return true;
+    }
+    for (PRelNode input : node.getPRelInputs()) {
+      if (containsJoin(input)) {
+        return true;
+      }
+    }
+    return false;
   }
 
   /**
