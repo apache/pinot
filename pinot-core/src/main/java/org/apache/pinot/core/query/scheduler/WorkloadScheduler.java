@@ -32,6 +32,7 @@ import org.apache.pinot.spi.accounting.ThreadAccountant;
 import org.apache.pinot.spi.accounting.WorkloadBudgetManager;
 import org.apache.pinot.spi.accounting.WorkloadBudgetManagerFactory;
 import org.apache.pinot.spi.env.PinotConfiguration;
+import org.apache.pinot.spi.exception.QueryErrorCode;
 import org.apache.pinot.spi.utils.CommonConstants.Accounting;
 import org.apache.pinot.spi.utils.builder.TableNameBuilder;
 import org.slf4j.Logger;
@@ -87,7 +88,7 @@ public class WorkloadScheduler extends QueryScheduler {
       _serverMetrics.addMeteredValue(workloadName, ServerMeter.WORKLOAD_BUDGET_EXCEEDED, 1L);
       _serverMetrics.addMeteredTableValue(tableName, ServerMeter.WORKLOAD_BUDGET_EXCEEDED, 1L);
       _serverMetrics.addMeteredGlobalValue(ServerMeter.WORKLOAD_BUDGET_EXCEEDED, 1L);
-      return outOfCapacity(queryRequest);
+      return immediateErrorResponse(queryRequest, QueryErrorCode.SERVER_RESOURCE_LIMIT_EXCEEDED);
     }
     queryRequest.getTimerContext().startNewPhaseTimer(ServerQueryPhase.SCHEDULER_WAIT);
     QueryExecutorService executorService = _resourceManager.getExecutorService(queryRequest, null);

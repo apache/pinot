@@ -152,7 +152,7 @@ public class DefaultWorkloadBudgetManager implements WorkloadBudgetManager {
 
     Budget budget = _workloadBudgets.get(workload);
     if (budget == null) {
-      LOGGER.warn("No budget found for workload: {}", workload);
+      LOGGER.debug("No budget found for workload: {}", workload);
       return new BudgetStats(Long.MAX_VALUE, Long.MAX_VALUE, Long.MAX_VALUE, Long.MAX_VALUE);
     }
     return budget.tryCharge(cpuUsedNs, memoryUsedBytes);
@@ -209,7 +209,7 @@ public class DefaultWorkloadBudgetManager implements WorkloadBudgetManager {
   }
 
   public boolean canAdmitQuery(String workload) {
-    // If enforcement is disabled, always admit the query.
+    // If disabled or no budget configured, always admit
     if (!_isCostEnforcementEnabled) {
       return true;
     }

@@ -23,7 +23,6 @@ import java.util.Map;
 import org.apache.pinot.spi.annotations.accounting.WorkloadBudgetManagerAnnotation;
 import org.apache.pinot.spi.env.PinotConfiguration;
 import org.apache.pinot.spi.utils.CommonConstants;
-import org.testng.annotations.AfterTest;
 import org.testng.annotations.Test;
 
 import static org.testng.Assert.assertEquals;
@@ -54,17 +53,12 @@ public class WorkloadBudgetManagerFactoryTest {
     }
   }
 
-  @AfterTest
-  public void tearDown() {
-    WorkloadBudgetManagerFactory.unregister();
-  }
-
   @Test
   public void testDefaultWorkloadBudgetManagerWhenNoCustomType() {
     // Test that default WorkloadBudgetManager is returned when no custom type is specified
     Map<String, Object> configMap = new HashMap<>();
     PinotConfiguration config = new PinotConfiguration(configMap);
-
+    WorkloadBudgetManagerFactory.unregister();
     WorkloadBudgetManagerFactory.register(config);
     WorkloadBudgetManager manager = WorkloadBudgetManagerFactory.get();
 

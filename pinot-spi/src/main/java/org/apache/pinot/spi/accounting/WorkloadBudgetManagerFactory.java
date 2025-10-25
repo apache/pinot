@@ -29,6 +29,7 @@ import org.slf4j.LoggerFactory;
 
 /**
  * Factory for {@link WorkloadBudgetManager} implementations.
+ * Maintains per-instance WorkloadBudgetManager to support multiple instances in the same JVM (e.g., integration tests).
  */
 public class WorkloadBudgetManagerFactory {
   private static final Logger LOGGER = LoggerFactory.getLogger(WorkloadBudgetManagerFactory.class);
@@ -39,14 +40,15 @@ public class WorkloadBudgetManagerFactory {
   }
 
   /**
-   * Registers WorkloadBudgetManager implementations via reflection.
+   * Registers WorkloadBudgetManager implementations via reflection for a specific instance.
    * NOTE: In order to plugin a class using reflection, the class should include ".plugin.accounting."
    * in its class path. This convention can significantly reduce the time of class scanning.
+   * @param config The configuration for this instance
    */
   public static void register(PinotConfiguration config) {
     if (_workloadBudgetManager != null) {
-      // Already registered, unregister the existing one first
-      unregister();
+      LOGGER.warn("WorkloadBudgetManager is already registered, skipping the re-registration attempt");
+      return;
     }
     long startTimeMs = System.currentTimeMillis();
     Set<Class<?>> classes = PinotReflectionUtils
@@ -76,12 +78,12 @@ public class WorkloadBudgetManagerFactory {
           typeName);
       _workloadBudgetManager = new DefaultWorkloadBudgetManager(config);
     }
-    LOGGER.info("Initialized WorkloadBudgetManagerRegistry with {} WorkloadBudgetManager implementations: {} in {}ms",
-        classes.size(), classes, System.currentTimeMillis() - startTimeMs);
+    LOGGER.info("Initialized WorkloadBudgetManager: {} in {}ms", _workloadBudgetManager.getWorkloadTypeName(),
+        System.currentTimeMillis() - startTimeMs);
   }
 
   /**
-   * Returns the WorkloadBudgetManager instance registered.
+   * Returns the registered WorkloadBudgetManager
    */
   public static WorkloadBudgetManager get() {
     return _workloadBudgetManager;

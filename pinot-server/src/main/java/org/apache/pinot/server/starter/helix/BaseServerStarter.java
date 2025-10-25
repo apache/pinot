@@ -70,6 +70,7 @@ import org.apache.pinot.common.utils.ServiceStartableUtils;
 import org.apache.pinot.common.utils.ServiceStatus;
 import org.apache.pinot.common.utils.ServiceStatus.Status;
 import org.apache.pinot.common.utils.TarCompressionUtils;
+import org.apache.pinot.common.utils.config.QueryWorkloadConfigUtils;
 import org.apache.pinot.common.utils.config.TagNameUtils;
 import org.apache.pinot.common.utils.fetcher.SegmentFetcherFactory;
 import org.apache.pinot.common.utils.helix.HelixHelper;
@@ -695,6 +696,8 @@ public abstract class BaseServerStarter implements ServiceStartable {
     WorkloadBudgetManagerFactory.register(schedulerConfig);
     _threadAccountant = ThreadAccountantUtils.createAccountant(schedulerConfig, _instanceId,
         org.apache.pinot.spi.config.instance.InstanceType.SERVER);
+    // Get all workload budgets this instance should support
+    QueryWorkloadConfigUtils.getAndUpdateWorkloadBudgets(_instanceId, _helixManager);
 
     SendStatsPredicate sendStatsPredicate = SendStatsPredicate.create(_serverConf, _helixManager);
     _serverInstance =
@@ -946,7 +949,6 @@ public abstract class BaseServerStarter implements ServiceStartable {
     LOGGER.info("Deregistering service status handler");
     ServiceStatus.removeServiceStatusCallback(_instanceId);
     _adminApiApplication.stop();
-    WorkloadBudgetManagerFactory.unregister();
     LOGGER.info("Finish shutting down Pinot server for {}", _instanceId);
   }
 
