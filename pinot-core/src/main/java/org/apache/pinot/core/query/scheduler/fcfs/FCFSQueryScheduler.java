@@ -20,11 +20,13 @@ package org.apache.pinot.core.query.scheduler.fcfs;
 
 import com.google.common.util.concurrent.ListenableFuture;
 import com.google.common.util.concurrent.ListenableFutureTask;
+import com.google.common.util.concurrent.MoreExecutors;
 import java.util.concurrent.atomic.LongAccumulator;
 import org.apache.pinot.common.metrics.ServerQueryPhase;
 import org.apache.pinot.core.query.executor.QueryExecutor;
 import org.apache.pinot.core.query.request.ServerQueryRequest;
 import org.apache.pinot.core.query.scheduler.QueryScheduler;
+import org.apache.pinot.core.query.scheduler.ThrottlingRuntime;
 import org.apache.pinot.core.query.scheduler.resources.QueryExecutorService;
 import org.apache.pinot.core.query.scheduler.resources.UnboundedResourceManager;
 import org.apache.pinot.spi.accounting.ThreadAccountant;
@@ -49,9 +51,15 @@ public class FCFSQueryScheduler extends QueryScheduler {
       return shuttingDown(queryRequest);
     }
     queryRequest.getTimerContext().startNewPhaseTimer(ServerQueryPhase.SCHEDULER_WAIT);
+    // Global runtime throttling gate
+    ThrottlingRuntime.acquireSchedulerPermit();
     QueryExecutorService executorService = _resourceManager.getExecutorService(queryRequest, null);
     ListenableFutureTask<byte[]> queryTask = createQueryFutureTask(queryRequest, executorService);
     _resourceManager.getQueryRunners().submit(queryTask);
+    queryTask.addListener(() -> {
+      // nothing else to release here (no scheduler group in FCFS), but ensure we free the global permit
+      ThrottlingRuntime.releaseSchedulerPermit();
+    }, MoreExecutors.directExecutor());
     return queryTask;
   }
 

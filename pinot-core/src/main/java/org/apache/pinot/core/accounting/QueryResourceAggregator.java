@@ -33,6 +33,7 @@ import org.apache.pinot.common.metrics.BrokerMetrics;
 import org.apache.pinot.common.metrics.ServerGauge;
 import org.apache.pinot.common.metrics.ServerMeter;
 import org.apache.pinot.common.metrics.ServerMetrics;
+import org.apache.pinot.core.query.scheduler.ThrottlingRuntime;
 import org.apache.pinot.spi.accounting.QueryResourceTracker;
 import org.apache.pinot.spi.config.instance.InstanceType;
 import org.apache.pinot.spi.exception.QueryErrorCode;
@@ -241,9 +242,19 @@ public class QueryResourceAggregator implements ResourceAggregator {
           break;
         case HeapMemoryAlarmingVerbose:
           LOGGER.debug("Heap used bytes: {} exceeds alarming level: {}", _usedBytes, config.getAlarmingLevel());
+          try {
+            ThrottlingRuntime.onLevelChange("HeapMemoryAlarmingVerbose");
+          } catch (Throwable t) {
+            // best-effort
+          }
           break;
         case Normal:
           LOGGER.info("Heap used bytes: {} drops to safe zone, entering to normal mode", _usedBytes);
+          try {
+            ThrottlingRuntime.onLevelChange("Normal");
+          } catch (Throwable t) {
+            // best-effort
+          }
           break;
         default:
           throw new IllegalStateException("Unsupported triggering level: " + _triggeringLevel);
