@@ -341,7 +341,8 @@ public class RealtimeSegmentDataManager extends SegmentDataManager {
   private final boolean _trackFilteredMessageOffsets;
   private final ParallelSegmentConsumptionPolicy _parallelSegmentConsumptionPolicy;
 
-  // TODO each time this method is called, we print reason for stop. Good to print only once.
+  private volatile boolean _stopReasonPrinted = false;
+
   private boolean endCriteriaReached() {
     Preconditions.checkState(_state.shouldConsume(), "Incorrect state %s", _state);
     long now = now();
@@ -359,9 +360,12 @@ public class RealtimeSegmentDataManager extends SegmentDataManager {
             _consumeEndTime += TimeUnit.HOURS.toMillis(TIME_EXTENSION_ON_EMPTY_SEGMENT_HOURS);
             return false;
           }
-          _segmentLogger
-              .info("Stopping consumption due to time limit start={} now={} numRowsConsumed={} numRowsIndexed={}",
-                  _startTimeMs, now, _numRowsConsumed, _numRowsIndexed);
+          if (!_stopReasonPrinted) {
+            _segmentLogger
+                .info("Stopping consumption due to time limit start={} now={} numRowsConsumed={} numRowsIndexed={}",
+                    _startTimeMs, now, _numRowsConsumed, _numRowsIndexed);
+            _stopReasonPrinted = true;
+          }
           _stopReason = SegmentCompletionProtocol.REASON_TIME_LIMIT;
           return true;
         } else if (_numRowsIndexed >= _segmentMaxRowCount) {
@@ -627,13 +631,22 @@ public class RealtimeSegmentDataManager extends SegmentDataManager {
       StreamPartitionMsgOffset nextOffset = metadata.getNextOffset();
       int rowSizeInBytes = metadata.getRecordSerializedSize();
       if (decodedRow.getException() != null) {
-        // TODO: based on a config, decide whether the record should be silently dropped or stop further consumption on
-        // decode error
-        realtimeRowsDroppedMeter =
-            _serverMetrics.addMeteredTableValue(_clientId, ServerMeter.INVALID_REALTIME_ROWS_DROPPED, 1,
-                realtimeRowsDroppedMeter);
-        _numRowsErrored++;
-        _numBytesDropped += rowSizeInBytes;
+        boolean stopOnDecodeError = _streamConfig.getStreamConfigsMap()
+            .getOrDefault("stopOnDecodeError", "false").equalsIgnoreCase("true");
+        if (stopOnDecodeError) {
+          String errorMessage = "Stopping consumption due to decode error at offset: " + offset;
+          _segmentLogger.error(errorMessage, decodedRow.getException());
+          _realtimeTableDataManager.addSegmentError(_segmentNameStr,
+                  new SegmentErrorInfo(now(), errorMessage, decodedRow.getException()));
+          throw new RuntimeException("Stopping consumption due to decode error", decodedRow.getException());
+        } else {
+          // Silently drop the row with error
+          realtimeRowsDroppedMeter =
+              _serverMetrics.addMeteredTableValue(_clientId, ServerMeter.INVALID_REALTIME_ROWS_DROPPED, 1,
+                  realtimeRowsDroppedMeter);
+          _numRowsErrored++;
+          _numBytesDropped += rowSizeInBytes;
+        }
       } else {
         TransformPipeline.Result result = null;
         try {
