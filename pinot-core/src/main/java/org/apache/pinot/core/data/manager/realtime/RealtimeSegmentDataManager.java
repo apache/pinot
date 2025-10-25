@@ -237,6 +237,9 @@ public class RealtimeSegmentDataManager extends SegmentDataManager {
   private static final int MSG_COUNT_THRESHOLD_FOR_LOG = 100000;
   private static final int BUILD_TIME_LEASE_SECONDS = 30;
   private static final int MAX_CONSECUTIVE_ERROR_COUNT = 5;
+  // 8 min max timeout for the retry policy
+  private static final RetryPolicy CONSUMER_RECREATE_RETRY_POLICY =
+      RetryPolicies.exponentialBackoffRetryPolicy(10, 1000L, 2.0f);
 
   // Interrupt consumer thread every 10 seconds in case it doesn't stop, e.g. interrupt flag getting cleared somehow
   private static final int CONSUMER_THREAD_INTERRUPT_INTERVAL_MS = 10000;
@@ -1998,7 +2001,7 @@ public class RealtimeSegmentDataManager extends SegmentDataManager {
           _streamConsumerFactory.createPartitionGroupConsumer(_clientId, _partitionGroupConsumptionStatus);
       _partitionGroupConsumer.start(_currentOffset);
     } catch (Exception e) {
-      _segmentLogger.error("Faced exception while trying to recreate stream consumer for topic partition {} reason {}",
+      _segmentLogger.error("Faced exception while trying to create stream consumer for topic partition {} reason {}",
           _clientId, reason, e);
       _serverMetrics.addMeteredTableValue(_clientId, ServerMeter.STREAM_CONSUMER_CREATE_EXCEPTIONS, 1L);
       throw e;
@@ -2015,7 +2018,8 @@ public class RealtimeSegmentDataManager extends SegmentDataManager {
     closePartitionGroupConsumer();
     try {
       _partitionGroupConsumer =
-          _streamConsumerFactory.createPartitionGroupConsumer(_clientId, _partitionGroupConsumptionStatus);
+          _streamConsumerFactory.createPartitionGroupConsumer(_clientId, _partitionGroupConsumptionStatus,
+              CONSUMER_RECREATE_RETRY_POLICY);
       _partitionGroupConsumer.start(_currentOffset);
     } catch (Exception e) {
       _segmentLogger.error("Faced exception while trying to recreate stream consumer for topic partition {}", _clientId,
