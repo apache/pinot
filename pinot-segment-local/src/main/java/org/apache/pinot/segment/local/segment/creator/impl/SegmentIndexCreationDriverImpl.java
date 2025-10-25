@@ -582,6 +582,19 @@ public class SegmentIndexCreationDriverImpl implements SegmentIndexCreationDrive
           MultipleTreesBuilder builder = new MultipleTreesBuilder(starTreeIndexConfigs, enableDefaultStarTree, indexDir,
               buildMode)) {
         builder.build();
+      } catch (Exception e) {
+        String tableNameWithType = _config.getTableConfig().getTableName();
+        LOGGER.error("Failed to build star-tree index for table: {}, skipping", tableNameWithType, e);
+        if (_instanceType == InstanceType.MINION) {
+          MinionMetrics.get().addMeteredTableValue(tableNameWithType, MinionMeter.STAR_TREE_INDEX_BUILD_FAILURES, 1);
+        } else {
+          ServerMetrics.get().addMeteredTableValue(tableNameWithType, ServerMeter.STAR_TREE_INDEX_BUILD_FAILURES, 1);
+        }
+        if (e.getSuppressed().length > 0) {
+          LOGGER.error("Suppressed exceptions (count:{}) are present, which could be due to close failures leaving "
+              + "the star-tree index in inconsistent state, throwing exception", e.getSuppressed().length);
+          throw e;
+        }
       }
     }
   }
