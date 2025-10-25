@@ -36,7 +36,6 @@ import java.util.Properties;
 import java.util.Set;
 import java.util.SortedMap;
 import java.util.TreeMap;
-import java.util.stream.Collectors;
 import javax.annotation.Nullable;
 import org.apache.commons.configuration2.PropertiesConfiguration;
 import org.apache.commons.configuration2.ex.ConfigurationException;
@@ -262,37 +261,42 @@ class SingleFileIndexDirectory extends ColumnIndexDirectory {
     }
   }
 
-  private void mapBufferEntries()
-      throws IOException {
-    // Phase 1: Prepare data structures - sort entries by start offset
-    // Use list to handle multiple entries with same start offset
-    List<IndexEntry> sortedEntries = _columnEntries.values().stream()
-        .sorted((e1, e2) -> Long.compare(e1._startOffset, e2._startOffset))
-        .collect(Collectors.toList());
+  private void mapBufferEntries() throws IOException {
+    // Split Entries which have zero size vs non-zero size
+    // Entries with size 0 represent empty indices like remote forward index
+    List<IndexEntry> pinotBufferEntries = new ArrayList<>();
+    List<IndexEntry> zeroSizeEntries = new ArrayList<>();
 
-    // Phase 2: Create buffers - handle all entries in sequential order
-    if (!sortedEntries.isEmpty()) {
-      createBuffersSequentially(sortedEntries);
+    for (IndexEntry entry : _columnEntries.values()) {
+      if (entry._size == 0) {
+        zeroSizeEntries.add(entry);
+      } else {
+        pinotBufferEntries.add(entry);
+      }
+    }
+
+    if (!pinotBufferEntries.isEmpty()) {
+      createPinotBuffers(pinotBufferEntries);
+    }
+    if (!zeroSizeEntries.isEmpty()) {
+      createRemoteBuffers(zeroSizeEntries);
     }
   }
 
   /**
-   * Creates buffers for all entries in sequential order, handling both zero-size and regular entries
+   * Creates buffers for entries with non-zero size, handling memory allocation limits
    */
-  private void createBuffersSequentially(List<IndexEntry> sortedEntries)
-      throws IOException {
-    // Use the original approach with TreeMap for better memory management
+  private void createPinotBuffers(List<IndexEntry> regularEntries) throws IOException {
+    // Use TreeMap for better memory management of regular entries
     SortedMap<Long, IndexEntry> indexStartMap = new TreeMap<>();
-
-    for (IndexEntry entry : sortedEntries) {
-      long startOffset = entry._startOffset;
-      if (entry._size != 0) {
-        indexStartMap.put(startOffset, entry);
-      }
+    for (IndexEntry entry : regularEntries) {
+      indexStartMap.put(entry._startOffset, entry);
     }
 
+    // Process regular entries in chunks to respect MAX_ALLOCATION_SIZE
     long runningSize = 0;
     List<Long> offsetAccum = new ArrayList<>();
+
     for (Map.Entry<Long, IndexEntry> offsetEntry : indexStartMap.entrySet()) {
       IndexEntry entry = offsetEntry.getValue();
       runningSize += entry._size;
@@ -310,23 +314,30 @@ class SingleFileIndexDirectory extends ColumnIndexDirectory {
     }
 
     if (!offsetAccum.isEmpty()) {
-      // Calculate the correct end offset: start of last entry + size of last entry
       long lastOffset = offsetAccum.get(offsetAccum.size() - 1);
       IndexEntry lastEntry = indexStartMap.get(lastOffset);
       long endOffset = lastOffset + lastEntry._size;
       mapAndSliceFile(indexStartMap, offsetAccum, endOffset);
     }
-    // Handle zero-size entries with empty buffer
-    for (IndexEntry entry : sortedEntries) {
-      if (entry._size == 0) {
-        Properties properties = new Properties();
-        if (_segmentDirectoryLoaderContext != null
-            && _segmentDirectoryLoaderContext.getSegmentCustomConfigs() != null) {
-          properties.putAll(_segmentDirectoryLoaderContext.getSegmentCustomConfigs());
-        }
-        entry._buffer = new EmptyIndexBuffer(properties, _segmentMetadata.getName(),
-            _segmentMetadata.getTableName());
-      }
+  }
+
+  /**
+   * Creates empty buffers for zero-size entries, using EmptyIndexBuffer
+   * Buffers created this way do not occupy space in the index file and pinot segment
+   */
+  private void createRemoteBuffers(List<IndexEntry> zeroSizeEntries) {
+    // Create properties only once for all zero-size entries
+    Properties properties = new Properties();
+    if (_segmentDirectoryLoaderContext != null
+        && _segmentDirectoryLoaderContext.getSegmentCustomConfigs() != null) {
+      properties.putAll(_segmentDirectoryLoaderContext.getSegmentCustomConfigs());
+    }
+
+    // Create empty buffers for all zero-size entries
+    for (IndexEntry entry : zeroSizeEntries) {
+      entry._buffer = new EmptyIndexBuffer(properties,
+          _segmentMetadata.getName(),
+          _segmentMetadata.getTableName());
     }
   }
 

@@ -26,7 +26,7 @@ import org.roaringbitmap.buffer.ImmutableRoaringBitmap;
 
 
 /**
- * A specialized PinotDataBuffer implementation for zero-size index entries that contains S3 segment path information.
+ * A specialized PinotDataBuffer implementation for zero-size index entries that configuration.
  * This buffer is useful for debugging and tracking purposes when dealing with empty index entries.
  */
 public class EmptyIndexBuffer extends PinotDataBuffer {
@@ -37,7 +37,7 @@ public class EmptyIndexBuffer extends PinotDataBuffer {
   /**
    * Creates a new EmptyIndexBuffer for a zero-size index entry
    *
-   * @param properties Properties containing S3 configuration (bucket, key, etc.)
+   * @param properties Properties containing configuration
    * @param segmentName The name of the segment
    * @param tableNameWithType The table name with type
    */
