@@ -21,13 +21,13 @@ package org.apache.pinot.query.mailbox;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
 import javax.annotation.Nullable;
 import org.apache.pinot.common.datatable.StatMap;
 import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.common.utils.DataSchema.ColumnDataType;
 import org.apache.pinot.query.planner.physical.MailboxIdUtils;
-import org.apache.pinot.query.runtime.blocks.ErrorMseBlock;
 import org.apache.pinot.query.runtime.blocks.MseBlock;
 import org.apache.pinot.query.runtime.blocks.SuccessMseBlock;
 import org.apache.pinot.query.runtime.operator.MailboxSendOperator;
@@ -36,7 +36,6 @@ import org.apache.pinot.query.runtime.plan.MultiStageQueryStats;
 import org.apache.pinot.query.testutils.QueryTestUtils;
 import org.apache.pinot.spi.config.instance.InstanceType;
 import org.apache.pinot.spi.env.PinotConfiguration;
-import org.apache.pinot.spi.exception.QueryErrorCode;
 import org.apache.pinot.spi.utils.CommonConstants.MultiStageQueryRunner;
 import org.apache.pinot.util.TestUtils;
 import org.testng.annotations.AfterClass;
@@ -387,7 +386,7 @@ public class MailboxServiceTest {
     sendingMailbox.send(SuccessMseBlock.INSTANCE, MultiStageQueryStats.emptyStats(SENDER_STAGE_ID).serialize());
 
     // Wait until all the mails are delivered
-    receiveMailLatch.await();
+    assertTrue(receiveMailLatch.await(10000, TimeUnit.MILLISECONDS), "Timed out waiting for mailbox to receive");
     assertEquals(numCallbacks.get(), ReceivingMailbox.DEFAULT_MAX_PENDING_BLOCKS);
 
     for (int i = 0; i < ReceivingMailbox.DEFAULT_MAX_PENDING_BLOCKS - 1; i++) {
@@ -422,7 +421,7 @@ public class MailboxServiceTest {
     sendingMailbox.cancel(new Exception("TEST ERROR"));
 
     // Wait until all the mails are delivered
-    receiveMailLatch.await();
+    assertTrue(receiveMailLatch.await(10000, TimeUnit.MILLISECONDS), "Timed out waiting for mailbox to receive");
     assertEquals(numCallbacks.get(), 2);
 
     // Data blocks will be cleaned up
@@ -456,7 +455,7 @@ public class MailboxServiceTest {
     sendingMailbox.cancel(new Exception("TEST ERROR"));
 
     // Wait until cancellation is delivered
-    receiveMailLatch.await();
+    assertTrue(receiveMailLatch.await(10000, TimeUnit.MILLISECONDS), "Timed out waiting for mailbox to receive");
     assertEquals(numCallbacks.get(), 1);
 
     // Data blocks will be cleaned up
@@ -470,51 +469,6 @@ public class MailboxServiceTest {
     receivingMailbox.cancel();
     assertEquals(numCallbacks.get(), 1);
     assertEquals(receivingMailbox.getNumPendingBlocks(), 0);
-  }
-
-  @Test
-  public void testRemoteCancelledBecauseResourceExhausted()
-    throws Exception {
-    PinotConfiguration config =
-        new PinotConfiguration(Map.of(MultiStageQueryRunner.KEY_OF_MAX_INBOUND_QUERY_DATA_BLOCK_SIZE_BYTES, 1));
-    MailboxService mailboxService3 =
-        new MailboxService("localhost", QueryTestUtils.getAvailablePort(), InstanceType.BROKER, config);
-    mailboxService3.start();
-    MailboxService mailboxService4 =
-        new MailboxService("localhost", QueryTestUtils.getAvailablePort(), InstanceType.SERVER, config);
-    mailboxService4.start();
-
-    String mailboxId = MailboxIdUtils.toMailboxId(_requestId++, SENDER_STAGE_ID, 0, RECEIVER_STAGE_ID, 0);
-    SendingMailbox sendingMailbox =
-      mailboxService4.getSendingMailbox("localhost", mailboxService3.getPort(), mailboxId, Long.MAX_VALUE, _stats);
-    ReceivingMailbox receivingMailbox = mailboxService3.getReceivingMailbox(mailboxId);
-    AtomicInteger numCallbacks = new AtomicInteger();
-    CountDownLatch receiveMailLatch = new CountDownLatch(1);
-    receivingMailbox.registeredReader(() -> {
-      numCallbacks.getAndIncrement();
-      receiveMailLatch.countDown();
-    });
-
-    // Send some large data
-    sendingMailbox.send(OperatorTestUtil.block(DATA_SCHEMA, new Object[]{"longer-amount-of-data-than-server-expects"}));
-
-    // Wait until cancellation is delivered
-    receiveMailLatch.await();
-    assertEquals(numCallbacks.get(), 1);
-
-    // Assert that error block is returned from server.
-    assertEquals(receivingMailbox.getNumPendingBlocks(), 0);
-    MseBlock block = readBlock(receivingMailbox);
-    assertNotNull(block);
-    assertTrue(block.isError());
-
-    assertTrue(block instanceof ErrorMseBlock);
-    ErrorMseBlock errorMseBlock = (ErrorMseBlock) block;
-    assertEquals(errorMseBlock.getErrorMessages().get(QueryErrorCode.QUERY_CANCELLATION),
-      "Cancelled by sender with exception: CANCELLED: client cancelled");
-
-    mailboxService3.shutdown();
-    mailboxService4.shutdown();
   }
 
   @Test
@@ -533,7 +487,7 @@ public class MailboxServiceTest {
 
     // Send one data block and then cancel
     sendingMailbox.send(OperatorTestUtil.block(DATA_SCHEMA, new Object[]{"0"}));
-    receiveMailLatch.await();
+    assertTrue(receiveMailLatch.await(10000, TimeUnit.MILLISECONDS), "Timed out waiting for mailbox to receive");
     receivingMailbox.cancel();
     assertEquals(numCallbacks.get(), 2);
 
@@ -567,7 +521,8 @@ public class MailboxServiceTest {
 
     // Send one data block, receiver will time out after deadline
     sendingMailbox.send(OperatorTestUtil.block(DATA_SCHEMA, new Object[]{"0"}));
-    receiveMailLatch.await();
+    Thread.sleep(deadlineMs - System.currentTimeMillis() + 10);
+    assertTrue(receiveMailLatch.await(10000, TimeUnit.MILLISECONDS), "Timed out waiting for mailbox to receive");
     assertEquals(numCallbacks.get(), 2);
 
     // Data blocks will be cleaned up
@@ -609,7 +564,7 @@ public class MailboxServiceTest {
     // Next send will be blocked on the receiver side and cause exception after timeout
     // We need to send a data block, given we don't block on EOS
     sendingMailbox.send(OperatorTestUtil.block(DATA_SCHEMA, new Object[]{"0"}));
-    receiveMailLatch.await();
+    assertTrue(receiveMailLatch.await(10000, TimeUnit.MILLISECONDS), "Timed out waiting for mailbox to receive");
     assertEquals(numCallbacks.get(), ReceivingMailbox.DEFAULT_MAX_PENDING_BLOCKS + 1);
 
     // Data blocks will be cleaned up

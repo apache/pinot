@@ -412,6 +412,9 @@ public class MultiStageBrokerRequestHandler extends BaseBrokerRequestHandler {
     int defaultLiteModeFanoutAdjustedLimit = _config.getProperty(
         CommonConstants.Broker.CONFIG_OF_LITE_MODE_LEAF_STAGE_FANOUT_ADJUSTED_LIMIT,
         CommonConstants.Broker.DEFAULT_LITE_MODE_LEAF_STAGE_FAN_OUT_ADJUSTED_LIMIT);
+    boolean defaultLiteModeEnableJoins = _config.getProperty(
+        CommonConstants.Broker.CONFIG_OF_LITE_MODE_ENABLE_JOINS,
+        CommonConstants.Broker.DEFAULT_LITE_MODE_ENABLE_JOINS);
     String defaultHashFunction = _config.getProperty(
         CommonConstants.Broker.CONFIG_OF_BROKER_DEFAULT_HASH_FUNCTION,
         CommonConstants.Broker.DEFAULT_BROKER_DEFAULT_HASH_FUNCTION);
@@ -437,6 +440,7 @@ public class MultiStageBrokerRequestHandler extends BaseBrokerRequestHandler {
         .defaultUseBrokerPruning(defaultUseBrokerPruning)
         .defaultLiteModeLeafStageLimit(defaultLiteModeLeafStageLimit)
         .defaultLiteModeLeafStageFanOutAdjustedLimit(defaultLiteModeFanoutAdjustedLimit)
+        .defaultLiteModeEnableJoins(defaultLiteModeEnableJoins)
         .defaultHashFunction(defaultHashFunction)
         .build();
   }

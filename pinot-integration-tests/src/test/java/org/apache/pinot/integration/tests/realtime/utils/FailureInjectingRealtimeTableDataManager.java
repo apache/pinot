@@ -21,7 +21,6 @@ package org.apache.pinot.integration.tests.realtime.utils;
 import java.util.concurrent.Semaphore;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.BooleanSupplier;
-import java.util.function.Supplier;
 import javax.annotation.Nullable;
 import org.apache.pinot.common.metadata.segment.SegmentZKMetadata;
 import org.apache.pinot.common.utils.LLCSegmentName;
@@ -46,7 +45,7 @@ public class FailureInjectingRealtimeTableDataManager extends RealtimeTableDataM
   }
 
   public FailureInjectingRealtimeTableDataManager(Semaphore segmentBuildSemaphore,
-      Supplier<Boolean> isServerReadyToServeQueries,
+      BooleanSupplier isServerReadyToServeQueries,
       @Nullable FailureInjectingTableConfig failureInjectingTableConfig) {
     super(segmentBuildSemaphore, isServerReadyToServeQueries);
     _failureInjectingTableConfig = failureInjectingTableConfig;

@@ -37,6 +37,7 @@
   </properties>
 
   <modules>
+    <module>pinot-arrow</module>
     <module>pinot-avro</module>
     <module>pinot-avro-base</module>
     <module>pinot-clp-log</module>
