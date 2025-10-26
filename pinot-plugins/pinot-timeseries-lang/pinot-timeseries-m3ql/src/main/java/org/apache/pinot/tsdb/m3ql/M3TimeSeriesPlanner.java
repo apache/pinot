@@ -22,13 +22,19 @@ import com.google.common.base.Preconditions;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+import java.util.Set;
 import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
+import org.apache.pinot.common.request.context.ExpressionContext;
+import org.apache.pinot.common.request.context.RequestContextUtils;
+import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.env.PinotConfiguration;
+import org.apache.pinot.spi.utils.builder.TableNameBuilder;
 import org.apache.pinot.tsdb.m3ql.parser.Tokenizer;
 import org.apache.pinot.tsdb.m3ql.plan.KeepLastValuePlanNode;
 import org.apache.pinot.tsdb.m3ql.plan.TransformNullPlanNode;
@@ -55,13 +61,13 @@ public class M3TimeSeriesPlanner implements TimeSeriesLogicalPlanner {
           String.format("Invalid engine id: %s. Expected: %s", request.getLanguage(), Constants.LANGUAGE));
     }
     // Step-1: Parse and create a logical plan tree.
-    BaseTimeSeriesPlanNode planNode = planQuery(request);
+    BaseTimeSeriesPlanNode planNode = planQuery(request, metadata);
     // Step-2: Compute the time-buckets.
     TimeBuckets timeBuckets = TimeBucketComputer.compute(planNode, request);
     return new TimeSeriesLogicalPlanResult(planNode, timeBuckets);
   }
 
-  public BaseTimeSeriesPlanNode planQuery(RangeTimeSeriesRequest request) {
+  public BaseTimeSeriesPlanNode planQuery(RangeTimeSeriesRequest request, TimeSeriesMetadata metadata) {
     PlanIdGenerator planIdGenerator = new PlanIdGenerator();
     Tokenizer tokenizer = new Tokenizer(request.getQuery());
     List<List<String>> commands = tokenizer.tokenize();
@@ -82,7 +88,7 @@ public class M3TimeSeriesPlanner implements TimeSeriesLogicalPlanner {
         case "fetch":
           List<String> tokens = commands.get(commandId).subList(1, commands.get(commandId).size());
           currentNode = handleFetchNode(planIdGenerator.generateId(), tokens, children, aggInfo, groupByColumns,
-              request);
+              request, metadata);
           break;
         case "sum":
         case "min":
@@ -123,7 +129,7 @@ public class M3TimeSeriesPlanner implements TimeSeriesLogicalPlanner {
 
   public BaseTimeSeriesPlanNode handleFetchNode(String planId, List<String> tokens,
       List<BaseTimeSeriesPlanNode> children, AggInfo aggInfo, List<String> groupByColumns,
-      RangeTimeSeriesRequest request) {
+      RangeTimeSeriesRequest request, TimeSeriesMetadata metadata) {
     Preconditions.checkState(tokens.size() % 2 == 0, "Mismatched args");
     String tableName = null;
     String timeColumn = null;
@@ -157,6 +163,31 @@ public class M3TimeSeriesPlanner implements TimeSeriesLogicalPlanner {
     Preconditions.checkNotNull(timeColumn, "Time column not set. Set via time_col=");
     Preconditions.checkNotNull(timeUnit, "Time unit not set. Set via time_unit=");
     Preconditions.checkNotNull(valueExpr, "Value expression not set. Set via value=");
+
+    Schema tableSchema = metadata.getSchema(TableNameBuilder.extractRawTableName(tableName));
+    Preconditions.checkState(tableSchema != null, "Failed to find schema for table: %s", tableName);
+    // validate time column
+    Preconditions.checkArgument(tableSchema.hasColumn(timeColumn),
+        "Time column '%s' not found in table '%s'.", timeColumn, tableName);
+    if (groupByColumns != null) {
+      // validate group by columns
+      for (String groupByCol : groupByColumns) {
+        Preconditions.checkArgument(tableSchema.hasColumn(groupByCol),
+            "Group-by column '%s' not found in table '%s'.", groupByCol, tableName);
+      }
+    }
+    // validate value expression columns
+    ExpressionContext expression = RequestContextUtils.getExpression(valueExpr);
+    Set<String> colsInExpr = new HashSet<>();
+    expression.getColumns(colsInExpr);
+    for (String col : colsInExpr) {
+      if (!tableSchema.hasColumn(col)) {
+        throw new IllegalArgumentException(
+            String.format("Column '%s' in value expression '%s' not found in table schema for table '%s'",
+                col, valueExpr, tableName));
+      }
+    }
+
     Map<String, String> queryOptions = new HashMap<>();
     if (request.getNumGroupsLimit() > 0) {
       queryOptions.put("numGroupsLimit", Integer.toString(request.getNumGroupsLimit()));
