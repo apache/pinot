@@ -308,6 +308,7 @@ public final class Schema implements Serializable {
       case INTERMEDIATE:
         _intermediateNames.add(columnName);
         _intermediateFieldSpecs.add((IntermediateFieldSpec) fieldSpec);
+        break;
       default:
         throw new UnsupportedOperationException("Unsupported field type: " + fieldType);
     }
