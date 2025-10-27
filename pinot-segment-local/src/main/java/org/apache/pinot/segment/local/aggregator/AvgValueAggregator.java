@@ -89,7 +89,6 @@ public class AvgValueAggregator implements ValueAggregator<Object, AvgPair> {
     if (sourceDataType == null) {
       return applyRawValue(value, rawValue);
     }
-
     switch (sourceDataType) {
       case BYTES:
         value.apply(deserializeAggregatedValue((byte[]) rawValue));
@@ -108,8 +107,6 @@ public class AvgValueAggregator implements ValueAggregator<Object, AvgPair> {
             "Cannot convert rawValue: " + rawValue + " of type: " + sourceDataType + " to double.");
     }
   }
-
-  // Two-arg overload implemented above
 
   @Override
   public AvgPair applyAggregatedValue(AvgPair value, AvgPair aggregatedValue) {

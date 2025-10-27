@@ -60,14 +60,7 @@ public class SumPrecisionValueAggregator implements ValueAggregator<Object, BigD
 
   @Override
   public BigDecimal getInitialAggregatedValue(@Nullable Object rawValue) {
-    if (rawValue == null) {
-      return BigDecimal.ZERO;
-    }
-    BigDecimal initialValue = toBigDecimal(rawValue);
-    if (_fixedSize < 0) {
-      _maxByteSize = Math.max(_maxByteSize, BigDecimalUtils.byteSize(initialValue));
-    }
-    return initialValue;
+    return getInitialAggregatedValue(rawValue, null);
   }
 
   @Override

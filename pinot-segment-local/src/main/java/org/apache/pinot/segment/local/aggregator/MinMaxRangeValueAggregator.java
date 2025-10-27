@@ -113,8 +113,6 @@ public class MinMaxRangeValueAggregator implements ValueAggregator<Object, MinMa
     }
   }
 
-  // Two-arg overload implemented above
-
   @Override
   public MinMaxRangePair applyAggregatedValue(MinMaxRangePair value, MinMaxRangePair aggregatedValue) {
     value.apply(aggregatedValue);
