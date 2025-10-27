@@ -233,6 +233,18 @@ jobs:
           token: ${{ secrets.CODECOV_TOKEN }}
           fail_ci_if_error: false
           verbose: true
+      - name: Generate Surefire Report
+        if: ${{ !cancelled() && github.ref == 'refs/heads/master' }}
+        run: mvn surefire-report:report-only -P github-actions,codecoverage,no-integration-tests || echo "Surefire report generation failed, but continuing..."
+      - name: Upload Surefire Reports
+        if: ${{ !cancelled() && github.ref == 'refs/heads/master' }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: surefire-reports-unit-test-${{ matrix.testset }}-${{matrix.distribution}}-${{matrix.java}}
+          path: |
+            **/target/surefire-reports/
+            **/target/site/surefire-report.html
+          retention-days: 30
 
   integration-test:
     if: github.repository == 'apache/pinot'
@@ -352,6 +364,18 @@ jobs:
           token: ${{ secrets.CODECOV_TOKEN }}
           fail_ci_if_error: false
           verbose: true
+      - name: Generate Surefire Report
+        if: ${{ !cancelled() && github.ref == 'refs/heads/master' }}
+        run: mvn surefire-report:report-only -P github-actions,codecoverage || echo "Surefire report generation failed, but continuing..."
+      - name: Upload Surefire Reports
+        if: ${{ !cancelled() && github.ref == 'refs/heads/master' }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: surefire-reports-integration-test-${{ matrix.testset }}-${{matrix.distribution}}-${{matrix.java}}
+          path: |
+            **/target/surefire-reports/
+            **/target/site/surefire-report.html
+          retention-days: 30
 
   compatibility-verifier:
     if: github.repository == 'apache/pinot'
