@@ -235,10 +235,6 @@ public class QueryOptionsUtils {
   public static List<Integer> getOrderedPreferredPools(Map<String, String> queryOptions) {
     String orderedPreferredPools = queryOptions.get(QueryOptionKey.ORDERED_PREFERRED_POOLS);
     if (StringUtils.isEmpty(orderedPreferredPools)) {
-      // backward compatibility
-      orderedPreferredPools = queryOptions.get(QueryOptionKey.ORDERED_PREFERRED_REPLICAS);
-    }
-    if (StringUtils.isEmpty(orderedPreferredPools)) {
       return Collections.emptyList();
     }
     // cannot use comma as the delimiter of pool list
