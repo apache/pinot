@@ -387,16 +387,20 @@ public class SegmentPreProcessor implements AutoCloseable {
         StarTreeBuilderUtils.removeStarTrees(indexDir);
       } else {
         // NOTE: Always use OFF_HEAP mode on server side.
-        try (MultipleTreesBuilder builder = new MultipleTreesBuilder(starTreeBuilderConfigs, indexDir,
-            MultipleTreesBuilder.BuildMode.OFF_HEAP)) {
+        MultipleTreesBuilder builder = new MultipleTreesBuilder(starTreeBuilderConfigs, indexDir,
+            MultipleTreesBuilder.BuildMode.OFF_HEAP);
+        try {
           builder.build();
         } catch (Exception e) {
           String tableNameWithType = _tableConfig.getTableName();
           LOGGER.error("Failed to build star-tree index for table: {}, skipping", tableNameWithType, e);
           ServerMetrics.get().addMeteredTableValue(tableNameWithType, ServerMeter.STAR_TREE_INDEX_BUILD_FAILURES, 1);
-          if (e.getSuppressed().length > 0) {
-            LOGGER.error("Suppressed exceptions (count:{}) are present, which could be due to close failures leaving "
-                + "the star-tree index in inconsistent state, throwing exception", e.getSuppressed().length);
+        } finally {
+          try {
+            builder.close();
+          } catch (Exception e) {
+            LOGGER.error("Closing builder threw an exception, potentially leaving the star-tree index in an "
+                + "inconsistent state, throwing exception", e);
             throw e;
           }
         }
