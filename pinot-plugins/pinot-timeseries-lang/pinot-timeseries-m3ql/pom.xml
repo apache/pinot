@@ -53,10 +53,6 @@
       <artifactId>testng</artifactId>
       <scope>test</scope>
     </dependency>
-    <dependency>
-      <groupId>org.apache.pinot</groupId>
-      <artifactId>pinot-common</artifactId>
-    </dependency>
   </dependencies>
 
   <profiles>
