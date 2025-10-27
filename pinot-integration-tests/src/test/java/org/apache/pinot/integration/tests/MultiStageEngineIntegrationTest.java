@@ -2101,7 +2101,7 @@ public class MultiStageEngineIntegrationTest extends BaseClusterIntegrationTestS
   }
 
   private void setupDimensionTable() throws Exception {
-    // Set up the dimension table for NATURAL JOIN tests
+    // Set up the dimension table for JOIN tests
     Schema lookupTableSchema = createSchema(DIM_TABLE_SCHEMA_PATH);
     addSchema(lookupTableSchema);
     TableConfig tableConfig = createTableConfig(DIM_TABLE_TABLE_CONFIG_PATH);
@@ -2113,17 +2113,17 @@ public class MultiStageEngineIntegrationTest extends BaseClusterIntegrationTestS
   }
 
   @Test
-  public void testNaturalJoinWithNoVirtualColumns()
+  public void testNaturalJoinWithVirtualColumns()
       throws Exception {
-    String query = "SELECT * FROM mytable a NATURAL JOIN daysOfWeek b OPTION(excludeVirtualColumns=false) LIMIT 5";
+    String query = "SET excludeVirtualColumns=false; SELECT * FROM mytable a NATURAL JOIN daysOfWeek b LIMIT 5";
     JsonNode response = postQuery(query);
     assertNotNull(response.get("exceptions").get(0).get("message"), "Should have an error message");
   }
 
   @Test
-  public void testNaturalJoinWithVirtualColumns()
+  public void testNaturalJoinWithNoVirtualColumns()
       throws Exception {
-    String query = "SELECT * FROM mytable NATURAL JOIN daysOfWeek LIMIT 5 OPTION(excludeVirtualColumns=true)";
+    String query = "SET excludeVirtualColumns=true; SELECT * FROM mytable NATURAL JOIN daysOfWeek LIMIT 5";
     JsonNode response = postQuery(query);
     assertEquals(response.get("exceptions").get(0), null);
     assertNotNull(response.get("resultTable"), "Should have result table");
