@@ -78,7 +78,6 @@ import org.testng.annotations.DataProvider;
 import org.testng.annotations.Test;
 
 import static org.apache.pinot.common.function.scalar.StringFunctions.*;
-import static org.junit.Assert.assertNull;
 import static org.testng.Assert.assertEquals;
 import static org.testng.Assert.assertFalse;
 import static org.testng.Assert.assertNotNull;
@@ -2131,7 +2130,7 @@ public class MultiStageEngineIntegrationTest extends BaseClusterIntegrationTestS
     setupDimensionTable();
     String query = "SELECT * FROM mytable NATURAL JOIN daysOfWeek LIMIT 5 OPTION(excludeVirtualColumns=true)";
     JsonNode response = postQuery(query);
-    assertNull(response.get("exceptions").get(0));
+    assertTrue(response.get("exceptions").get(0).isNull());
     assertNotNull(response.get("resultTable"), "Should have result table");
     dropOfflineTable(DIM_TABLE);
   }
