@@ -738,7 +738,7 @@ public class CommonConstants {
 
         // Exclude virtual columns (columns starting with '$') from table schema
         // This is typically used for NATURAL JOIN operations where virtual columns
-        // should not participate in join condition matching
+        // should not participate in join condition matching. Can only be used in MSE as of now
         public static final String EXCLUDE_VIRTUAL_COLUMNS = "excludeVirtualColumns";
 
         // Maximum number of pending results blocks allowed in the streaming operator

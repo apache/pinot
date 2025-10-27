@@ -78,6 +78,7 @@ import org.testng.annotations.DataProvider;
 import org.testng.annotations.Test;
 
 import static org.apache.pinot.common.function.scalar.StringFunctions.*;
+import static org.junit.Assert.assertNull;
 import static org.testng.Assert.assertEquals;
 import static org.testng.Assert.assertFalse;
 import static org.testng.Assert.assertNotNull;
@@ -94,6 +95,7 @@ public class MultiStageEngineIntegrationTest extends BaseClusterIntegrationTestS
   private static final String DIM_TABLE_SCHEMA_PATH = "dimDayOfWeek_schema.json";
   private static final String DIM_TABLE_TABLE_CONFIG_PATH = "dimDayOfWeek_config.json";
   private static final Integer DIM_NUMBER_OF_RECORDS = 7;
+  private static final String DIM_TABLE = "daysOfWeek";
 
   @Override
   protected String getSchemaFileName() {
@@ -1639,15 +1641,7 @@ public class MultiStageEngineIntegrationTest extends BaseClusterIntegrationTestS
   @Test
   public void testLookupJoin()
       throws Exception {
-
-    Schema lookupTableSchema = createSchema(DIM_TABLE_SCHEMA_PATH);
-    addSchema(lookupTableSchema);
-    TableConfig tableConfig = createTableConfig(DIM_TABLE_TABLE_CONFIG_PATH);
-    TenantConfig tenantConfig = new TenantConfig(getBrokerTenant(), getServerTenant(), null);
-    tableConfig.setTenantConfig(tenantConfig);
-    addTableConfig(tableConfig);
-    createAndUploadSegmentFromClasspath(tableConfig, lookupTableSchema, DIM_TABLE_DATA_PATH, FileFormat.CSV,
-        DIM_NUMBER_OF_RECORDS, 60_000);
+    setupDimensionTable();
 
     // Compare total rows in the primary table with number of rows in the result of the join with lookup table
     String query = "select count(*) from " + getTableName();
@@ -1672,7 +1666,7 @@ public class MultiStageEngineIntegrationTest extends BaseClusterIntegrationTestS
     assertTrue(stages.contains("LOOKUP_JOIN"), "Could not find LOOKUP_JOIN stage in the query plan");
     assertFalse(stages.contains("HASH_JOIN"), "HASH_JOIN stage should not be present in the query plan");
 
-    dropOfflineTable(tableConfig.getTableName());
+    dropOfflineTable(DIM_TABLE);
   }
 
   public void testSearchLiteralFilter()
@@ -2107,6 +2101,39 @@ public class MultiStageEngineIntegrationTest extends BaseClusterIntegrationTestS
     String query = (StringUtils.isNotBlank(database) ? "SET database='" + database + "'; " : "")
         + "select max(" + column + ") from " + tableName + ";";
     return postQuery(query, headers);
+  }
+
+  private void setupDimensionTable() throws Exception {
+    // Set up the dimension table for NATURAL JOIN tests
+    Schema lookupTableSchema = createSchema(DIM_TABLE_SCHEMA_PATH);
+    addSchema(lookupTableSchema);
+    TableConfig tableConfig = createTableConfig(DIM_TABLE_TABLE_CONFIG_PATH);
+    TenantConfig tenantConfig = new TenantConfig(getBrokerTenant(), getServerTenant(), null);
+    tableConfig.setTenantConfig(tenantConfig);
+    addTableConfig(tableConfig);
+    createAndUploadSegmentFromClasspath(tableConfig, lookupTableSchema, DIM_TABLE_DATA_PATH, FileFormat.CSV,
+        DIM_NUMBER_OF_RECORDS, 60_000);
+  }
+
+  @Test
+  public void testNaturalJoinWithVirtualColumnsError()
+      throws Exception {
+    setupDimensionTable();
+    String query = "SELECT * FROM mytable a NATURAL JOIN daysOfWeek b OPTION(excludeVirtualColumns=false) LIMIT 5";
+    JsonNode response = postQuery(query);
+    assertNotNull(response.get("exceptions").get(0).get("message"), "Should have an error message");
+    dropOfflineTable(DIM_TABLE);
+  }
+
+  @Test
+  public void testSimpleNaturalJoin()
+      throws Exception {
+    setupDimensionTable();
+    String query = "SELECT * FROM mytable NATURAL JOIN daysOfWeek LIMIT 5 OPTION(excludeVirtualColumns=true)";
+    JsonNode response = postQuery(query);
+    assertNull(response.get("exceptions").get(0));
+    assertNotNull(response.get("resultTable"), "Should have result table");
+    dropOfflineTable(DIM_TABLE);
   }
 
   @AfterClass

@@ -176,19 +176,12 @@ public class QueryEnvironment {
   }
 
   /**
-   * Checks if excludeVirtualColumns option is enabled in the current query context.
-   */
-  private boolean isExcludeVirtualColumnsEnabled(Map<String, String> options) {
-    return Boolean.parseBoolean(options.get(QueryOptionKey.EXCLUDE_VIRTUAL_COLUMNS));
-  }
-
-  /**
    * Returns a planner context that can be used to either parse, explain or execute a query.
    */
   private PlannerContext getPlannerContext(SqlNodeAndOptions sqlNodeAndOptions) {
     WorkerManager workerManager = getWorkerManager(sqlNodeAndOptions);
     Map<String, String> options = sqlNodeAndOptions.getOptions();
-    if (isExcludeVirtualColumnsEnabled(options)) {
+    if (Boolean.parseBoolean(options.get(QueryOptionKey.EXCLUDE_VIRTUAL_COLUMNS))) {
       _catalog.configureVirtualColumnExclusion(true);
     }
 
