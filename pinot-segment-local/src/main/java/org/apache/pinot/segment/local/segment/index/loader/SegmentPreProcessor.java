@@ -389,6 +389,12 @@ public class SegmentPreProcessor implements AutoCloseable {
         // NOTE: Always use OFF_HEAP mode on server side.
         MultipleTreesBuilder builder = new MultipleTreesBuilder(starTreeBuilderConfigs, indexDir,
             MultipleTreesBuilder.BuildMode.OFF_HEAP);
+        // We don't create the builder using the try-with-resources pattern because builder.close() performs
+        // some clean-up steps to roll back the star-tree index to the previous state if it exists. If this goes wrong
+        // the star-tree index can be in an inconsistent state. To prevent that, when builder.close() throws an
+        // exception we want to propagate that up instead of ignoring it. This can get clunky when using
+        // try-with-resources as in this scenario the close() exception will be added to the suppressed exception list
+        // rather than thrown as the main exception, even though the original exception thrown on build() is ignored.
         try {
           builder.build();
         } catch (Exception e) {
@@ -396,13 +402,7 @@ public class SegmentPreProcessor implements AutoCloseable {
           LOGGER.error("Failed to build star-tree index for table: {}, skipping", tableNameWithType, e);
           ServerMetrics.get().addMeteredTableValue(tableNameWithType, ServerMeter.STAR_TREE_INDEX_BUILD_FAILURES, 1);
         } finally {
-          try {
-            builder.close();
-          } catch (Exception e) {
-            LOGGER.error("Closing builder threw an exception, potentially leaving the star-tree index in an "
-                + "inconsistent state, throwing exception", e);
-            throw e;
-          }
+          builder.close();
         }
       }
     } finally {

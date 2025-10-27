@@ -67,28 +67,19 @@ public class MultipleTreesBuilderCloseTest {
   }
 
   @Test
-  public void testBuildFailureThenCloseFailureWithSuppressedException() throws Exception {
+  public void testBuildFailureThenCloseFailure() throws Exception {
     // This test verifies that when build() fails and close() also fails,
 
     // Build a test segment with star-tree
     buildTestSegment();
-
-    Exception buildException = null;
-    Exception closeException = null;
 
     // Build the star-tree index with a good configuration and ensure it passes. This will ensure that the correct
     // close clean-up path is called
     List<StarTreeV2BuilderConfig> builderConfigsValid = createBuilderConfigs();
     MultipleTreesBuilder builder = new MultipleTreesBuilder(builderConfigsValid, INDEX_DIR,
         MultipleTreesBuilder.BuildMode.OFF_HEAP);
-
-    try {
-      builder.build();
-    } catch (Exception e) {
-      fail("Building the first time with valid configs should pass", e);
-    } finally {
-      builder.close();
-    }
+    builder.build();
+    builder.close();
 
     // Create a MultipleTreesBuilder with invalid config to force build() to fail
     List<StarTreeV2BuilderConfig> builderConfigsInvalid = createInvalidBuilderConfigs();
@@ -96,30 +87,17 @@ public class MultipleTreesBuilderCloseTest {
 
     // Mock the CommonsConfigurationUtils to emulate failure during close
     try (MockedStatic<CommonsConfigurationUtils> mockedStatic = Mockito.mockStatic(CommonsConfigurationUtils.class)) {
+      assertThrows(Exception.class, builder::build);
       try {
         // This should fail due to invalid config
-        builder.build();
-        fail("Expected build() to throw an exception due to invalid config");
-      } catch (Exception e) {
-        buildException = e;
+        assertThrows(Exception.class, builder::build);
       } finally {
-        try {
-          // Mock the static method to always throw RuntimeException on any input to force a close() failure
-          mockedStatic.when(() -> CommonsConfigurationUtils.saveToFile(any(PropertiesConfiguration.class),
-              any(File.class))).thenThrow(new RuntimeException("Simulated failure"));
-          builder.close();
-          fail("Closing the builder should fail since the build should have failed");
-        } catch (Exception e) {
-          closeException = e;
-        }
+        // Mock the static method to always throw RuntimeException on any input to force a close() failure
+        mockedStatic.when(() -> CommonsConfigurationUtils.saveToFile(any(PropertiesConfiguration.class),
+            any(File.class))).thenThrow(new RuntimeException("Simulated failure"));
+        assertThrows(Exception.class, builder::close);
       }
     }
-
-    // Verify that the build exception occurred
-    assertNotNull(buildException, "Expected an exception from try-catch (build)");
-
-    // Verify that the close exception occurred
-    assertNotNull(closeException, "Expected an exception from try-catch-finally (close in finally)");
   }
 
   private void buildTestSegment() throws Exception {

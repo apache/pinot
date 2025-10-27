@@ -289,6 +289,14 @@ public class MultipleTreesBuilder implements Closeable {
               new File(_segmentDirectory, V1Constants.MetadataKeys.METADATA_FILE_NAME));
         } catch (Exception e) {
           LOGGER.error("Could not reset the star-tree index state to the previous one", e);
+          // Perform remaining clean-up if possible
+          try {
+            FileUtils.forceDelete(_separatorTempDir);
+          } catch (Exception ex) {
+            LOGGER.warn("Caught exception while deleting the separator tmp directory: {}",
+                _separatorTempDir.getAbsolutePath(), ex);
+          }
+          _segment.destroy();
           throw e;
         }
       }
@@ -297,7 +305,7 @@ public class MultipleTreesBuilder implements Closeable {
         FileUtils.forceDelete(_separatorTempDir);
       } catch (Exception e) {
         LOGGER.warn("Caught exception while deleting the separator tmp directory: {}",
-            _separatorTempDir.getAbsolutePath());
+            _separatorTempDir.getAbsolutePath(), e);
       }
     }
     _segment.destroy();
