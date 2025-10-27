@@ -31,10 +31,12 @@ import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 import org.apache.pinot.common.request.context.ExpressionContext;
+import org.apache.pinot.common.request.context.FilterContext;
 import org.apache.pinot.common.request.context.RequestContextUtils;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.env.PinotConfiguration;
 import org.apache.pinot.spi.utils.builder.TableNameBuilder;
+import org.apache.pinot.sql.parsers.CalciteSqlParser;
 import org.apache.pinot.tsdb.m3ql.parser.Tokenizer;
 import org.apache.pinot.tsdb.m3ql.plan.KeepLastValuePlanNode;
 import org.apache.pinot.tsdb.m3ql.plan.TransformNullPlanNode;
@@ -170,21 +172,23 @@ public class M3TimeSeriesPlanner implements TimeSeriesLogicalPlanner {
     Preconditions.checkArgument(tableSchema.hasColumn(timeColumn),
         "Time column '%s' not found in table '%s'.", timeColumn, tableName);
     if (groupByColumns != null) {
-      // validate group by columns
-      for (String groupByCol : groupByColumns) {
-        Preconditions.checkArgument(tableSchema.hasColumn(groupByCol),
-            "Group-by column '%s' not found in table '%s'.", groupByCol, tableName);
+      // validate group by expressions
+      for (var groupByExpr : groupByColumns) {
+        validateColumnsInExpression(groupByExpr, tableName, tableSchema);
       }
     }
     // validate value expression columns
-    ExpressionContext expression = RequestContextUtils.getExpression(valueExpr);
-    Set<String> colsInExpr = new HashSet<>();
-    expression.getColumns(colsInExpr);
-    for (String col : colsInExpr) {
+    validateColumnsInExpression(valueExpr, tableName, tableSchema);
+    // validate filter expression
+    FilterContext filterContext =
+        RequestContextUtils.getFilter(CalciteSqlParser.compileToExpression(filter));
+    Set<String> colsInFilterExpr = new HashSet<>();
+    filterContext.getColumns(colsInFilterExpr);
+    for (String col : colsInFilterExpr) {
       if (!tableSchema.hasColumn(col)) {
         throw new IllegalArgumentException(
-            String.format("Column '%s' in value expression '%s' not found in table schema for table '%s'",
-                col, valueExpr, tableName));
+            String.format("Column '%s' in filter expression '%s' not found in table schema for table '%s'",
+                col, filter, tableName));
       }
     }
 
@@ -194,5 +198,18 @@ public class M3TimeSeriesPlanner implements TimeSeriesLogicalPlanner {
     }
     return new LeafTimeSeriesPlanNode(planId, children, tableName, timeColumn, timeUnit, 0L, filter, valueExpr, aggInfo,
         groupByColumns, request.getLimit(), queryOptions);
+  }
+
+  private void validateColumnsInExpression(String exprString, String tableName, Schema tableSchema) {
+    ExpressionContext expression = RequestContextUtils.getExpression(exprString);
+    Set<String> colsInExpr = new HashSet<>();
+    expression.getColumns(colsInExpr);
+    for (String col : colsInExpr) {
+      if (!tableSchema.hasColumn(col)) {
+        throw new IllegalArgumentException(
+            String.format("Column '%s' in expression '%s' not found in table schema for table '%s'",
+                col, exprString, tableName));
+      }
+    }
   }
 }
