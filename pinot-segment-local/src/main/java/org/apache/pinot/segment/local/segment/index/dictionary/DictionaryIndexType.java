@@ -165,7 +165,7 @@ public class DictionaryIndexType
       return true;
     }
     DataType storedType = context.getFieldSpec().getDataType().getStoredType();
-    if (storedType != DataType.BYTES && storedType != DataType.BIG_DECIMAL) {
+    if (storedType != DataType.BYTES && storedType != DataType.UUID && storedType != DataType.BIG_DECIMAL) {
       return false;
     }
     return !context.isFixedLength();
@@ -181,7 +181,7 @@ public class DictionaryIndexType
   }
 
   public static boolean shouldUseVarLengthDictionary(DataType storedType, ColumnStatistics profile) {
-    if (storedType == DataType.BYTES || storedType == DataType.BIG_DECIMAL) {
+    if (storedType == DataType.BYTES || storedType == DataType.UUID || storedType == DataType.BIG_DECIMAL) {
       return !profile.isFixedLength();
     }
 
@@ -193,7 +193,8 @@ public class DictionaryIndexType
    * concerns.
    */
   public static boolean optimizeTypeShouldUseVarLengthDictionary(DataType storedType, ColumnStatistics profile) {
-    if (storedType == DataType.BYTES || storedType == DataType.BIG_DECIMAL || storedType == DataType.STRING) {
+    if (storedType == DataType.BYTES || storedType == DataType.UUID || storedType == DataType.BIG_DECIMAL
+        || storedType == DataType.STRING) {
       return !profile.isFixedLength();
     }
 

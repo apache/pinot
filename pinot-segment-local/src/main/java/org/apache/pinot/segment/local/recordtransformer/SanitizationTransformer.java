@@ -58,7 +58,8 @@ public class SanitizationTransformer implements RecordTransformer {
     for (FieldSpec fieldSpec : schema.getAllFieldSpecs()) {
       if (!fieldSpec.isVirtualColumn()) {
         DataType dataType = fieldSpec.getDataType();
-        if (dataType == DataType.STRING || dataType == DataType.JSON || dataType == DataType.BYTES) {
+        if (dataType == DataType.STRING || dataType == DataType.JSON || dataType == DataType.BYTES
+            || dataType == DataType.UUID) {
           MaxLengthExceedStrategy strategy = fieldSpec.getEffectiveMaxLengthExceedStrategy();
           if (dataType == DataType.STRING || strategy != MaxLengthExceedStrategy.NO_ACTION) {
             _columnToColumnInfoMap.put(fieldSpec.getName(),

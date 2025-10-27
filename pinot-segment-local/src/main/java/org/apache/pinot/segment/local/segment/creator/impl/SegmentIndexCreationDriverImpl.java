@@ -614,7 +614,7 @@ public class SegmentIndexCreationDriverImpl implements SegmentIndexCreationDrive
       boolean useVarLengthDictionary = dictionaryIndexConfig.getUseVarLengthDictionary()
           || DictionaryIndexType.optimizeTypeShouldUseVarLengthDictionary(storedType, columnProfile);
       Object defaultNullValue = fieldSpec.getDefaultNullValue();
-      if (storedType == DataType.BYTES) {
+      if (storedType == DataType.BYTES || storedType == DataType.UUID) {
         defaultNullValue = new ByteArray((byte[]) defaultNullValue);
       }
       _indexCreationInfoMap.put(column,

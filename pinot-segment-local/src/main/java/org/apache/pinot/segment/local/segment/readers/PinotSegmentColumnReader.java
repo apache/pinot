@@ -119,7 +119,8 @@ public class PinotSegmentColumnReader implements Closeable {
             _dictionary.readStringValues(_dictIdBuffer, numValues, values);
             return values;
           }
-          case BYTES: {
+          case BYTES:
+          case UUID: {
             byte[][] values = new byte[numValues][];
             _dictionary.readBytesValues(_dictIdBuffer, numValues, values);
             return values;
@@ -146,6 +147,7 @@ public class PinotSegmentColumnReader implements Closeable {
           case STRING:
             return _forwardIndexReader.getString(docId, _forwardIndexReaderContext);
           case BYTES:
+          case UUID:
             return _forwardIndexReader.getBytes(docId, _forwardIndexReaderContext);
           case MAP:
             return _forwardIndexReader.getMap(docId, _forwardIndexReaderContext);
@@ -165,6 +167,7 @@ public class PinotSegmentColumnReader implements Closeable {
           case STRING:
             return _forwardIndexReader.getStringMV(docId, _forwardIndexReaderContext);
           case BYTES:
+          case UUID:
             return _forwardIndexReader.getBytesMV(docId, _forwardIndexReaderContext);
           default:
             throw new IllegalStateException("Unsupported MV type: " + storedType);

@@ -178,7 +178,9 @@ public class H3IndexHandler extends BaseIndexHandler {
     // Create new H3 index for the column.
     LOGGER.info("Creating new H3 index for segment: {}, column: {}", segmentName, columnName);
     Preconditions
-        .checkState(columnMetadata.getDataType() == DataType.BYTES, "H3 index can only be applied to BYTES columns");
+        .checkState(columnMetadata.getDataType() == DataType.BYTES
+                || columnMetadata.getDataType() == DataType.UUID,
+            "H3 index can only be applied to BYTES/UUID columns");
     if (columnMetadata.hasDictionary()) {
       handleDictionaryBasedColumn(segmentWriter, columnMetadata);
     } else {

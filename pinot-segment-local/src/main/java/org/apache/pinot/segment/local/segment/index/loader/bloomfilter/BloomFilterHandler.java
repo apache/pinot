@@ -178,6 +178,7 @@ public class BloomFilterHandler extends BaseIndexHandler {
             }
             break;
           case BYTES:
+          case UUID:
             for (int i = 0; i < numDocs; i++) {
               bloomFilterCreator.add(BytesUtils.toHexString(forwardIndexReader.getBytes(i, readerContext)));
             }
@@ -236,6 +237,7 @@ public class BloomFilterHandler extends BaseIndexHandler {
             }
             break;
           case BYTES:
+          case UUID:
             for (int i = 0; i < numDocs; i++) {
               byte[][] buffer = new byte[columnMetadata.getMaxNumberOfMultiValues()][];
               int length = forwardIndexReader.getBytesMV(i, buffer, readerContext);
@@ -307,6 +309,7 @@ public class BloomFilterHandler extends BaseIndexHandler {
       case DOUBLE:
       case STRING:
       case BYTES:
+      case UUID:
         PinotDataBuffer buf = segmentWriter.getIndexFor(columnMetadata.getColumnName(), StandardIndexes.dictionary());
         return DictionaryIndexType.read(buf, columnMetadata, DictionaryIndexConfig.DEFAULT);
       default:

@@ -124,6 +124,7 @@ public class ForwardIndexCreatorFactory {
       case BIG_DECIMAL:
       case STRING:
       case BYTES:
+      case UUID:
       case MAP:
         return new SingleValueVarByteRawIndexCreator(indexDir, compressionType, column, numTotalDocs, storedType,
             lengthOfLongestEntry, deriveNumDocsPerChunk, writerVersion, targetMaxChunkSize, targetDocsPerChunk);
@@ -151,6 +152,7 @@ public class ForwardIndexCreatorFactory {
             targetDocsPerChunk);
       case STRING:
       case BYTES:
+      case UUID:
         return new MultiValueVarByteRawIndexCreator(indexDir, compressionType, column, numTotalDocs, storedType,
             writerVersion, maxRowLengthInBytes, maxNumberOfMultiValueElements, targetMaxChunkSize, targetDocsPerChunk);
       default:
