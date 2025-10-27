@@ -60,13 +60,11 @@ public class ColumnReaderInterfaceTest extends ColumnarSegmentBuildingTestBase {
         Assert.assertTrue(availableColumns.contains(INT_COL_1));
         Assert.assertTrue(availableColumns.contains(MV_INT_COL));
 
-        // Test creating individual column readers
-        ColumnReader stringReader = factory.createColumnReader(STRING_COL_1,
-            _originalSchema.getFieldSpecFor(STRING_COL_1));
+        // Test getting individual column readers
+        ColumnReader stringReader = factory.getColumnReader(STRING_COL_1);
         Assert.assertEquals(stringReader.getColumnName(), STRING_COL_1);
 
-        ColumnReader mvReader = factory.createColumnReader(MV_INT_COL,
-            _originalSchema.getFieldSpecFor(MV_INT_COL));
+        ColumnReader mvReader = factory.getColumnReader(MV_INT_COL);
         Assert.assertEquals(mvReader.getColumnName(), MV_INT_COL);
 
         // Test reading values using iterator pattern
@@ -85,8 +83,8 @@ public class ColumnReaderInterfaceTest extends ColumnarSegmentBuildingTestBase {
         firstStringValue = stringReader.next();
         Assert.assertEquals(firstStringValue, "string1_0");
 
-        // Test creating all column readers
-        Map<String, ColumnReader> allReaders = factory.createAllColumnReaders();
+        // Test getting all column readers
+        Map<String, ColumnReader> allReaders = factory.getAllColumnReaders();
         Assert.assertEquals(allReaders.size(), _originalSchema.getPhysicalColumnNames().size());
       }
     } finally {
@@ -102,13 +100,12 @@ public class ColumnReaderInterfaceTest extends ColumnarSegmentBuildingTestBase {
     ImmutableSegment segment = ImmutableSegmentLoader.load(segmentDir, ReadMode.mmap);
 
     try {
-      // Test creating readers for new columns (should return default value readers)
+      // Test getting readers for new columns (should return default value readers)
       try (PinotSegmentColumnReaderFactory factory = new PinotSegmentColumnReaderFactory(segment)) {
         factory.init(_extendedSchema);
 
-        // Test creating reader for new column
-        ColumnReader newStringReader = factory.createColumnReader(NEW_STRING_COL,
-            _extendedSchema.getFieldSpecFor(NEW_STRING_COL));
+        // Test getting reader for new column
+        ColumnReader newStringReader = factory.getColumnReader(NEW_STRING_COL);
         Assert.assertEquals(newStringReader.getColumnName(), NEW_STRING_COL);
 
         // Verify it returns default values using iterator pattern

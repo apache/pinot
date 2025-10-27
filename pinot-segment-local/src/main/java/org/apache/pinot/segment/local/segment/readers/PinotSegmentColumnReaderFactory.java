@@ -22,6 +22,7 @@ import java.io.IOException;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.Set;
+import javax.annotation.Nullable;
 import org.apache.pinot.segment.spi.IndexSegment;
 import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.Schema;
@@ -47,7 +48,7 @@ public class PinotSegmentColumnReaderFactory implements ColumnReaderFactory {
 
   private final IndexSegment _indexSegment;
   private Schema _targetSchema;
-  private final Map<String, ColumnReader> _columnReaders;
+  @Nullable private Map<String, ColumnReader> _columnReaders;
 
   /**
    * Create a PinotSegmentColumnReaderFactory.
@@ -63,6 +64,7 @@ public class PinotSegmentColumnReaderFactory implements ColumnReaderFactory {
   public void init(Schema targetSchema)
       throws IOException {
     _targetSchema = targetSchema;
+    _columnReaders = initializeAllColumnReaders();
     LOGGER.info("Initialized PinotSegmentColumnReaderFactory with target schema containing {} columns",
         targetSchema.getPhysicalColumnNames().size());
   }
@@ -82,19 +84,26 @@ public class PinotSegmentColumnReaderFactory implements ColumnReaderFactory {
   }
 
   @Override
-  public ColumnReader createColumnReader(String columnName, FieldSpec targetFieldSpec) {
+  public ColumnReader getColumnReader(String columnName)
+      throws IOException {
     if (_targetSchema == null) {
       throw new IllegalStateException("Factory not initialized. Call init() first.");
     }
 
+    ColumnReader reader = _columnReaders.get(columnName);
+    if (reader == null) {
+      throw new IOException("Column reader not found for column: " + columnName);
+    }
+    return reader;
+  }
+
+  /**
+   * Internal method to create a column reader for the specified column.
+   * This method is called during initialization to create all readers.
+   */
+  private ColumnReader createColumnReader(String columnName, FieldSpec targetFieldSpec) {
     if (targetFieldSpec.isVirtualColumn()) {
       throw new IllegalStateException("Target field spec is a virtual column.");
-    }
-
-    // Check if we already have a reader for this column
-    ColumnReader existingReader = _columnReaders.get(columnName);
-    if (existingReader != null) {
-      return existingReader;
     }
 
     ColumnReader columnReader;
@@ -109,13 +118,19 @@ public class PinotSegmentColumnReaderFactory implements ColumnReaderFactory {
       columnReader = new DefaultValueColumnReader(columnName, getNumDocs(), targetFieldSpec);
     }
 
-    // Cache the reader for reuse
-    _columnReaders.put(columnName, columnReader);
     return columnReader;
   }
 
   @Override
-  public Map<String, ColumnReader> createAllColumnReaders()
+  public Map<String, ColumnReader> getAllColumnReaders()
+      throws IOException {
+    return _columnReaders;
+  }
+
+  /**
+   * Internal method to initialize all column readers during factory initialization.
+   */
+  private Map<String, ColumnReader> initializeAllColumnReaders()
       throws IOException {
     if (_targetSchema == null) {
       throw new IllegalStateException("Factory not initialized. Call init() first.");

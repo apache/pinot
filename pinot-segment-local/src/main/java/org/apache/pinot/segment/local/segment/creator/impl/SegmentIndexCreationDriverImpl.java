@@ -201,8 +201,8 @@ public class SegmentIndexCreationDriverImpl implements SegmentIndexCreationDrive
     // Initialize the column reader factory with target schema
     columnReaderFactory.init(config.getSchema());
 
-    // Create all column readers for the target schema
-    Map<String, ColumnReader> columnReaders = columnReaderFactory.createAllColumnReaders();
+    // Get all column readers for the target schema
+    Map<String, ColumnReader> columnReaders = columnReaderFactory.getAllColumnReaders();
 
     // Create columnar data source
     ColumnarSegmentCreationDataSource columnarDataSource = new ColumnarSegmentCreationDataSource(columnReaders);

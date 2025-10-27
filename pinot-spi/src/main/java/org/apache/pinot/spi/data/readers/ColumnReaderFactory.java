@@ -23,7 +23,6 @@ import java.io.IOException;
 import java.io.Serializable;
 import java.util.Map;
 import java.util.Set;
-import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.Schema;
 
 
@@ -58,22 +57,23 @@ public interface ColumnReaderFactory extends Closeable, Serializable {
   Set<String> getAvailableColumns();
 
   /**
-   * Create a column reader for the specified column.
+   * Get a column reader for the specified column.
+   * Implementations may cache and reuse readers for efficiency.
    *
    * @param columnName Name of the column to read
-   * @param targetFieldSpec Target field specification from the output schema
-   * @return ColumnReader instance for the specified column
-   * @throws IOException If the column reader cannot be created
+   * @return ColumnReader instance for the specified column (may be cached)
+   * @throws IOException If the column reader cannot be obtained
    */
-  ColumnReader createColumnReader(String columnName, FieldSpec targetFieldSpec);
+  ColumnReader getColumnReader(String columnName)
+      throws IOException;
 
   /**
    * Get all column readers for the target schema.
-   * This is a convenience method that creates readers for all columns in the target schema.
+   * Implementations may cache and reuse instances that were created during init().
    *
-   * @return Map of column name to ColumnReader
-   * @throws IOException If any column reader cannot be created
+   * @return Map of column name to ColumnReader (cached instances)
+   * @throws IOException If any column reader cannot be obtained
    */
-  Map<String, ColumnReader> createAllColumnReaders()
+  Map<String, ColumnReader> getAllColumnReaders()
       throws IOException;
 }
