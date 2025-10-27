@@ -333,6 +333,7 @@ public class IngestionDelayTracker {
               ServerGauge.REALTIME_INGESTION_CONSUMING_OFFSET);
         }
         _serverMetrics.removePartitionGauge(_metricName, partitionId, ServerGauge.REALTIME_INGESTION_DELAY_MS);
+        _serverMetrics.removePartitionGauge(_metricName, partitionId, ServerGauge.BACKFILL_REALTIME_INGESTION_DELAY_MS);
         LOGGER.info("Successfully removed ingestion metrics for partition id: {}", partitionId);
       }
       _ingestionInfoMap.remove(partitionId);
@@ -370,7 +371,10 @@ public class IngestionDelayTracker {
   }
 
   public void createMetrics(int partitionId) {
+    List<StreamConfig> streamConfigs =
+        IngestionConfigUtils.getStreamConfigs(_realTimeTableDataManager.getCachedTableConfigAndSchema().getLeft());
     int streamConfigIndex = IngestionConfigUtils.getStreamConfigIndexFromPinotPartitionId(partitionId);
+    StreamConfig streamConfig = streamConfigs.get(streamConfigIndex);
     StreamMetadataProvider streamMetadataProvider = _streamConfigIndexToStreamMetadataProvider.get(streamConfigIndex);
 
     if (streamMetadataProvider != null && streamMetadataProvider.supportsOffsetLag()) {
@@ -383,7 +387,9 @@ public class IngestionDelayTracker {
       _serverMetrics.setOrUpdatePartitionGauge(_metricName, partitionId,
           ServerGauge.REALTIME_INGESTION_UPSTREAM_OFFSET, () -> getLatestPartitionOffset(partitionId));
     }
-    _serverMetrics.setOrUpdatePartitionGauge(_metricName, partitionId, ServerGauge.REALTIME_INGESTION_DELAY_MS,
+    _serverMetrics.setOrUpdatePartitionGauge(_metricName, partitionId,
+        streamConfig.isBackfillTopic() ? ServerGauge.BACKFILL_REALTIME_INGESTION_DELAY_MS
+            : ServerGauge.REALTIME_INGESTION_DELAY_MS,
         () -> getPartitionIngestionDelayMs(partitionId));
   }
 
