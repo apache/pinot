@@ -118,19 +118,19 @@ public interface InstanceDataManager {
    * Download happens when local segment's CRC mismatches the one of the remote segment; but can also be forced to do
    * regardless of CRC.
    */
-  void reloadSegment(String tableNameWithType, String segmentName, boolean forceDownload)
+  void reloadSegment(String tableNameWithType, String segmentName, boolean forceDownload, String reloadJobId)
       throws Exception;
 
   /**
    * Reloads all segments of a table.
    */
-  void reloadAllSegments(String tableNameWithType, boolean forceDownload)
+  void reloadAllSegments(String tableNameWithType, boolean forceDownload, String reloadJobId)
       throws Exception;
 
   /**
    * Reload a list of segments in a table.
    */
-  void reloadSegments(String tableNameWithType, List<String> segmentNames, boolean forceDownload)
+  void reloadSegments(String tableNameWithType, List<String> segmentNames, boolean forceDownload, String reloadJobId)
       throws Exception;
 
   /**

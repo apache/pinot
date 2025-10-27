@@ -199,19 +199,19 @@ public interface TableDataManager {
    * This operation is conducted within a failure handling framework and made transparent to ongoing queries, because
    * the segment is in online serving state.
    */
-  void reloadSegment(String segmentName, boolean forceDownload)
+  void reloadSegment(String segmentName, boolean forceDownload, String reloadJobId)
       throws Exception;
 
   /**
    * Reloads all segments.
    */
-  void reloadAllSegments(boolean forceDownload)
+  void reloadAllSegments(boolean forceDownload, String reloadJobId)
       throws Exception;
 
   /**
    * Reloads a list of segments.
    */
-  void reloadSegments(List<String> segmentNames, boolean forceDownload)
+  void reloadSegments(List<String> segmentNames, boolean forceDownload, String reloadJobId)
       throws Exception;
 
   /**

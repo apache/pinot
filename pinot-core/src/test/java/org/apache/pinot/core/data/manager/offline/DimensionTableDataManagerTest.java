@@ -300,7 +300,7 @@ public class DimensionTableDataManagerTest {
         SchemaSerDeUtils.toZNRecord(schemaWithExtraColumn));
     when(propertyStore.get("/SEGMENTS/dimBaseballTeams_OFFLINE/" + _segmentZKMetadata.getSegmentName(), null,
         AccessOption.PERSISTENT)).thenReturn(_segmentZKMetadata.toZNRecord());
-    tableDataManager.reloadSegment(_segmentZKMetadata.getSegmentName(), false);
+    tableDataManager.reloadSegment(_segmentZKMetadata.getSegmentName(), false, null);
 
     // Confirm the new column is available for lookup
     teamCitySpec = tableDataManager.getColumnFieldSpec("teamCity");
