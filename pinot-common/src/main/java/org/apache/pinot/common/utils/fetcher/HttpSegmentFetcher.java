@@ -21,6 +21,7 @@ package org.apache.pinot.common.utils.fetcher;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.net.InetAddresses;
 import java.io.File;
+import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.net.URI;
 import java.util.LinkedList;
@@ -191,6 +192,9 @@ public class HttpSegmentFetcher extends BaseSegmentFetcher {
           });
     } catch (AttemptsExceededException e) {
       attempts.set(e.getAttempts());
+      throw e;
+    } catch (FileNotFoundException e) {
+      attempts.set(1);
       throw e;
     } catch (RetriableOperationException e) {
       attempts.set(e.getAttempts());

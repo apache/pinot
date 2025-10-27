@@ -19,6 +19,7 @@
 package org.apache.pinot.plugin.minion.tasks.segmentgenerationandpush;
 
 import java.io.File;
+import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.net.URI;
 import java.util.ArrayList;
@@ -186,7 +187,7 @@ public class SegmentGenerationAndPushTaskExecutor extends BaseTaskExecutor {
         case TAR:
           try (PinotFS pinotFS = MinionTaskUtils.getLocalPinotFs()) {
             SegmentPushUtils.pushSegments(spec, pinotFS, Arrays.asList(outputSegmentTarURI.toString()));
-          } catch (RetriableOperationException | AttemptsExceededException e) {
+          } catch (RetriableOperationException | AttemptsExceededException | FileNotFoundException e) {
             throw new RuntimeException(e);
           }
           break;
@@ -197,7 +198,7 @@ public class SegmentGenerationAndPushTaskExecutor extends BaseTaskExecutor {
                 pushJobSpec.getSegmentUriPrefix(), pushJobSpec.getSegmentUriSuffix());
             segmentUris.add(updatedURI.toString());
             SegmentPushUtils.sendSegmentUris(spec, segmentUris);
-          } catch (RetriableOperationException | AttemptsExceededException e) {
+          } catch (RetriableOperationException | AttemptsExceededException | FileNotFoundException e) {
             throw new RuntimeException(e);
           }
           break;
@@ -207,7 +208,7 @@ public class SegmentGenerationAndPushTaskExecutor extends BaseTaskExecutor {
                 SegmentPushUtils.getSegmentUriToTarPathMap(outputSegmentDirURI, pushJobSpec,
                     new String[]{outputSegmentTarURI.toString()});
             SegmentPushUtils.sendSegmentUriAndMetadata(spec, outputFileFS, segmentUriToTarPathMap);
-          } catch (RetriableOperationException | AttemptsExceededException e) {
+          } catch (RetriableOperationException | AttemptsExceededException | FileNotFoundException e) {
             throw new RuntimeException(e);
           }
           break;
