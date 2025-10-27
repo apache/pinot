@@ -37,7 +37,7 @@ public class ValueAggregatorUtils {
     }
   }
 
-  public static double toDouble(Object rawValue, @Nullable FieldSpec.DataType sourceDataType) {
+  static double toDouble(Object rawValue, @Nullable FieldSpec.DataType sourceDataType) {
     if (sourceDataType == null) {
       return toDouble(rawValue);
     }

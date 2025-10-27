@@ -52,11 +52,11 @@ public class AvgValueAggregator implements ValueAggregator<Object, AvgPair> {
 
   @Override
   public AvgPair getInitialAggregatedValue(@Nullable Object rawValue, @Nullable DataType sourceDataType) {
-    if (rawValue == null) {
-      return new AvgPair();
-    }
     if (sourceDataType == null) {
       return getInitialAggregatedValue(rawValue);
+    }
+    if (rawValue == null) {
+      return new AvgPair();
     }
     switch (sourceDataType) {
       case BYTES:

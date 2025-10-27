@@ -42,18 +42,8 @@ public class CountValueAggregator implements ValueAggregator<Object, Long> {
   }
 
   @Override
-  public Long getInitialAggregatedValue(@Nullable Object rawValue, @Nullable DataType sourceDataType) {
-    return rawValue != null ? 1L : 0L;
-  }
-
-  @Override
-  public Long applyRawValue(Long value, Object rawValue, @Nullable DataType sourceDataType) {
-    return value + 1;
-  }
-
-  @Override
   public Long applyRawValue(Long value, Object rawValue) {
-    return applyRawValue(value, rawValue, null);
+    return value + 1;
   }
 
   @Override

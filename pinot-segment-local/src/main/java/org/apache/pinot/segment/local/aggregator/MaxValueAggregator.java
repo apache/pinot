@@ -38,10 +38,7 @@ public class MaxValueAggregator implements ValueAggregator<Object, Double> {
 
   @Override
   public Double getInitialAggregatedValue(@Nullable Object rawValue) {
-    if (rawValue == null) {
-      return Double.NEGATIVE_INFINITY;
-    }
-    return ValueAggregatorUtils.toDouble(rawValue);
+    return getInitialAggregatedValue(rawValue, null);
   }
 
   @Override

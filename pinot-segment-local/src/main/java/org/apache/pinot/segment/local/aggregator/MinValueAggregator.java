@@ -38,10 +38,7 @@ public class MinValueAggregator implements ValueAggregator<Object, Double> {
 
   @Override
   public Double getInitialAggregatedValue(@Nullable Object rawValue) {
-    if (rawValue == null) {
-      return Double.POSITIVE_INFINITY;
-    }
-    return ValueAggregatorUtils.toDouble(rawValue);
+    return getInitialAggregatedValue(rawValue, null);
   }
 
   @Override

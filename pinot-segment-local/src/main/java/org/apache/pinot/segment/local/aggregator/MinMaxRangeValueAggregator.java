@@ -53,11 +53,11 @@ public class MinMaxRangeValueAggregator implements ValueAggregator<Object, MinMa
 
   @Override
   public MinMaxRangePair getInitialAggregatedValue(@Nullable Object rawValue, @Nullable DataType sourceDataType) {
-    if (rawValue == null) {
-      return new MinMaxRangePair();
-    }
     if (sourceDataType == null) {
       return getInitialAggregatedValue(rawValue);
+    }
+    if (rawValue == null) {
+      return new MinMaxRangePair();
     }
     switch (sourceDataType) {
       case BYTES:
