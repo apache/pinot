@@ -142,6 +142,8 @@ public class RealtimeTableDataManager extends BaseTableDataManager {
   private static final String SEGMENT_DOWNLOAD_TIMEOUT_MINUTES = "segmentDownloadTimeoutMinutes";
   private static final Duration STREAM_METADATA_PROVIDER_CACHE_TTL = Duration.ofMinutes(10);
 
+  protected Cache<String, StreamMetadataProvider> _streamMetadataProviderCache;
+
   private final BooleanSupplier _isServerReadyToServeQueries;
 
   // Object to track ingestion delay for all partitions
@@ -151,7 +153,6 @@ public class RealtimeTableDataManager extends BaseTableDataManager {
   private TableUpsertMetadataManager _tableUpsertMetadataManager;
   private BooleanSupplier _isTableReadyToConsumeData;
   private boolean _enforceConsumptionInOrder = false;
-  private Cache<String, StreamMetadataProvider> _streamMetadataProviderCache;
 
   public RealtimeTableDataManager(Semaphore segmentBuildSemaphore) {
     this(segmentBuildSemaphore, () -> true);
@@ -225,20 +226,7 @@ public class RealtimeTableDataManager extends BaseTableDataManager {
     }
 
     _enforceConsumptionInOrder = isEnforceConsumptionInOrder();
-
-    _streamMetadataProviderCache = CacheBuilder.newBuilder()
-        .expireAfterAccess(STREAM_METADATA_PROVIDER_CACHE_TTL)
-        .removalListener((RemovalNotification<String, StreamMetadataProvider> notification) -> {
-          StreamMetadataProvider provider = notification.getValue();
-          if (provider != null) {
-            try {
-              provider.close();
-            } catch (Exception e) {
-              LOGGER.warn("Failed to close StreamMetadataProvider for key {}", notification.getKey(), e);
-            }
-          }
-        })
-        .build();
+    _streamMetadataProviderCache = getStreamMetadataProviderCache();
 
     // For dedup and partial-upsert, need to wait for all segments loaded before starting consuming data
     if (isDedupEnabled() || isPartialUpsertEnabled()) {
@@ -269,6 +257,23 @@ public class RealtimeTableDataManager extends BaseTableDataManager {
     } else {
       _isTableReadyToConsumeData = () -> true;
     }
+  }
+
+  @VisibleForTesting
+  protected Cache<String, StreamMetadataProvider> getStreamMetadataProviderCache() {
+    return CacheBuilder.newBuilder()
+        .expireAfterAccess(STREAM_METADATA_PROVIDER_CACHE_TTL)
+        .removalListener((RemovalNotification<String, StreamMetadataProvider> notification) -> {
+          StreamMetadataProvider provider = notification.getValue();
+          if (provider != null) {
+            try {
+              provider.close();
+            } catch (Exception e) {
+              LOGGER.warn("Failed to close StreamMetadataProvider for key {}", notification.getKey(), e);
+            }
+          }
+        })
+        .build();
   }
 
   @Override
