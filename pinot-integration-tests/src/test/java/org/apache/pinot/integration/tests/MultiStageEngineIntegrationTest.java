@@ -2115,7 +2115,7 @@ public class MultiStageEngineIntegrationTest extends BaseClusterIntegrationTestS
   }
 
   @Test
-  public void testNaturalJoinWithVirtualColumnsError()
+  public void testNaturalJoinWithNoVirtualColumns()
       throws Exception {
     setupDimensionTable();
     String query = "SELECT * FROM mytable a NATURAL JOIN daysOfWeek b OPTION(excludeVirtualColumns=false) LIMIT 5";
@@ -2125,12 +2125,12 @@ public class MultiStageEngineIntegrationTest extends BaseClusterIntegrationTestS
   }
 
   @Test
-  public void testSimpleNaturalJoin()
+  public void testNaturalJoinWithVirtualColumns()
       throws Exception {
     setupDimensionTable();
     String query = "SELECT * FROM mytable NATURAL JOIN daysOfWeek LIMIT 5 OPTION(excludeVirtualColumns=true)";
     JsonNode response = postQuery(query);
-    assertTrue(response.get("exceptions").get(0).isNull());
+    assertEquals(response.get("exceptions").get(0), null);
     assertNotNull(response.get("resultTable"), "Should have result table");
     dropOfflineTable(DIM_TABLE);
   }
