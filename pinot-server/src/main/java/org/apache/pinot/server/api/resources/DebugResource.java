@@ -54,6 +54,7 @@ import org.apache.pinot.common.restlet.resources.SegmentServerDebugInfo;
 import org.apache.pinot.common.utils.DatabaseUtils;
 import org.apache.pinot.core.data.manager.offline.ImmutableSegmentDataManager;
 import org.apache.pinot.core.data.manager.realtime.RealtimeSegmentDataManager;
+import org.apache.pinot.core.data.manager.realtime.RealtimeTableDataManager;
 import org.apache.pinot.segment.local.data.manager.SegmentDataManager;
 import org.apache.pinot.segment.local.data.manager.TableDataManager;
 import org.apache.pinot.segment.spi.ImmutableSegment;
@@ -64,6 +65,10 @@ import org.apache.pinot.spi.accounting.ThreadResourceTracker;
 import org.apache.pinot.spi.accounting.WorkloadBudgetManager;
 import org.apache.pinot.spi.config.table.TableType;
 import org.apache.pinot.spi.stream.ConsumerPartitionState;
+import org.apache.pinot.spi.stream.OffsetCriteria;
+import org.apache.pinot.spi.stream.PartitionLagState;
+import org.apache.pinot.spi.stream.StreamMetadataProvider;
+import org.apache.pinot.spi.stream.StreamPartitionMsgOffset;
 import org.apache.pinot.spi.utils.builder.TableNameBuilder;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -124,7 +129,7 @@ public class DebugResource {
     Map<String, SegmentErrorInfo> segmentErrorsMap = tableDataManager.getSegmentErrors();
     SegmentDataManager segmentDataManager = tableDataManager.acquireSegment(segmentName);
     try {
-      SegmentConsumerInfo segmentConsumerInfo = getSegmentConsumerInfo(segmentDataManager, tableType);
+      SegmentConsumerInfo segmentConsumerInfo = getSegmentConsumerInfo(tableDataManager, segmentDataManager, tableType);
       long segmentSize = getSegmentSize(segmentDataManager);
       SegmentErrorInfo segmentErrorInfo = segmentErrorsMap.get(segmentName);
       return new SegmentServerDebugInfo(segmentName, FileUtils.byteCountToDisplaySize(segmentSize), segmentConsumerInfo,
@@ -172,7 +177,8 @@ public class DebugResource {
         segmentsWithDataManagers.add(segmentName);
 
         // Get segment consumer info.
-        SegmentConsumerInfo segmentConsumerInfo = getSegmentConsumerInfo(segmentDataManager, tableType);
+        SegmentConsumerInfo segmentConsumerInfo =
+            getSegmentConsumerInfo(tableDataManager, segmentDataManager, tableType);
 
         // Get segment size.
         long segmentSize = getSegmentSize(segmentDataManager);
@@ -209,17 +215,31 @@ public class DebugResource {
         .getSegment()).getSegmentSizeBytes() : 0;
   }
 
-  private SegmentConsumerInfo getSegmentConsumerInfo(SegmentDataManager segmentDataManager, TableType tableType) {
+  private SegmentConsumerInfo getSegmentConsumerInfo(TableDataManager tableDataManager,
+      SegmentDataManager segmentDataManager, TableType tableType) {
     SegmentConsumerInfo segmentConsumerInfo = null;
     if (tableType == TableType.REALTIME) {
       RealtimeSegmentDataManager realtimeSegmentDataManager = (RealtimeSegmentDataManager) segmentDataManager;
-      Map<String, ConsumerPartitionState> partitionStateMap = realtimeSegmentDataManager.getConsumerPartitionState();
+      StreamMetadataProvider streamMetadataProvider =
+          ((RealtimeTableDataManager) (tableDataManager)).getStreamMetadataProvider(realtimeSegmentDataManager);
+      StreamPartitionMsgOffset latestMsgOffset;
+      try {
+        latestMsgOffset =
+            streamMetadataProvider.fetchStreamPartitionOffset(OffsetCriteria.LARGEST_OFFSET_CRITERIA, 5000);
+      } catch (Exception e) {
+        LOGGER.error("Failed to fetch latest stream offset.", e);
+        throw new RuntimeException(e);
+      }
+      Map<String, ConsumerPartitionState> partitionIdToStateMap =
+          realtimeSegmentDataManager.getConsumerPartitionState(latestMsgOffset);
       Map<String, String> currentOffsets = realtimeSegmentDataManager.getPartitionToCurrentOffset();
-      Map<String, String> upstreamLatest = partitionStateMap.entrySet().stream().collect(
+      Map<String, String> upstreamLatest = partitionIdToStateMap.entrySet().stream().collect(
           Collectors.toMap(Map.Entry::getKey, e -> e.getValue().getUpstreamLatestOffset().toString()));
       Map<String, String> recordsLagMap = new HashMap<>();
       Map<String, String> availabilityLagMsMap = new HashMap<>();
-      realtimeSegmentDataManager.getPartitionToLagState(partitionStateMap).forEach((k, v) -> {
+      Map<String, PartitionLagState> partitionToLagState =
+          streamMetadataProvider.getCurrentPartitionLagState(partitionIdToStateMap);
+      partitionToLagState.forEach((k, v) -> {
         recordsLagMap.put(k, v.getRecordsLag());
         availabilityLagMsMap.put(k, v.getAvailabilityLagMs());
       });

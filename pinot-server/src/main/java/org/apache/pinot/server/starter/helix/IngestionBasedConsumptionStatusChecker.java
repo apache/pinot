@@ -27,6 +27,7 @@ import java.util.Set;
 import java.util.function.Function;
 import org.apache.pinot.core.data.manager.InstanceDataManager;
 import org.apache.pinot.core.data.manager.realtime.RealtimeSegmentDataManager;
+import org.apache.pinot.core.data.manager.realtime.RealtimeTableDataManager;
 import org.apache.pinot.segment.local.data.manager.SegmentDataManager;
 import org.apache.pinot.segment.local.data.manager.TableDataManager;
 import org.apache.pinot.spi.stream.StreamPartitionMsgOffset;
@@ -93,7 +94,7 @@ public abstract class IngestionBasedConsumptionStatusChecker {
             continue;
           }
           RealtimeSegmentDataManager rtSegmentDataManager = (RealtimeSegmentDataManager) segmentDataManager;
-          if (isSegmentCaughtUp(segName, rtSegmentDataManager)) {
+          if (isSegmentCaughtUp(segName, rtSegmentDataManager, (RealtimeTableDataManager) tableDataManager)) {
             caughtUpSegments.add(segName);
           }
         } finally {
@@ -135,7 +136,8 @@ public abstract class IngestionBasedConsumptionStatusChecker {
     return numLaggingSegments;
   }
 
-  protected abstract boolean isSegmentCaughtUp(String segmentName, RealtimeSegmentDataManager rtSegmentDataManager);
+  protected abstract boolean isSegmentCaughtUp(String segmentName, RealtimeSegmentDataManager rtSegmentDataManager,
+      RealtimeTableDataManager realtimeTableDataManager);
 
   protected boolean isOffsetCaughtUp(String segmentName,
       StreamPartitionMsgOffset currentOffset, StreamPartitionMsgOffset latestOffset) {

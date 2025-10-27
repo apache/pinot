@@ -24,16 +24,21 @@ import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Map;
 import java.util.Set;
+import java.util.concurrent.TimeoutException;
 import java.util.function.Function;
 import org.apache.pinot.core.data.manager.InstanceDataManager;
 import org.apache.pinot.core.data.manager.offline.ImmutableSegmentDataManager;
 import org.apache.pinot.core.data.manager.realtime.RealtimeSegmentDataManager;
-import org.apache.pinot.segment.local.data.manager.TableDataManager;
+import org.apache.pinot.core.data.manager.realtime.RealtimeTableDataManager;
 import org.apache.pinot.segment.spi.MutableSegment;
 import org.apache.pinot.segment.spi.SegmentMetadata;
 import org.apache.pinot.spi.stream.LongMsgOffset;
+import org.apache.pinot.spi.stream.OffsetCriteria;
+import org.apache.pinot.spi.stream.StreamMetadataProvider;
 import org.testng.annotations.Test;
 
+import static org.mockito.ArgumentMatchers.anyLong;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 import static org.testng.Assert.assertEquals;
@@ -59,7 +64,8 @@ public class FreshnessBasedConsumptionStatusCheckerTest {
   }
 
   @Test
-  public void regularCaseWithOffsetCatchup() {
+  public void regularCaseWithOffsetCatchup()
+      throws TimeoutException {
     String segA0 = "tableA__0__0__123Z";
     String segA1 = "tableA__1__0__123Z";
     String segB0 = "tableB__0__0__123Z";
@@ -75,8 +81,8 @@ public class FreshnessBasedConsumptionStatusCheckerTest {
     assertEquals(statusChecker.getNumConsumingSegmentsNotReachedIngestionCriteria(), 3);
 
     // setup TableDataMangers
-    TableDataManager tableDataManagerA = mock(TableDataManager.class);
-    TableDataManager tableDataManagerB = mock(TableDataManager.class);
+    RealtimeTableDataManager tableDataManagerA = mock(RealtimeTableDataManager.class);
+    RealtimeTableDataManager tableDataManagerB = mock(RealtimeTableDataManager.class);
     when(instanceDataManager.getTableDataManager("tableA_REALTIME")).thenReturn(tableDataManagerA);
     when(instanceDataManager.getTableDataManager("tableB_REALTIME")).thenReturn(tableDataManagerB);
 
@@ -104,9 +110,21 @@ public class FreshnessBasedConsumptionStatusCheckerTest {
     when(segMngrB0.getSegment()).thenReturn(mockSegment);
     when(segMngrB0.getCurrentOffset()).thenReturn(new LongMsgOffset(1500));
 
-    when(segMngrA0.fetchLatestStreamOffset(5000)).thenReturn(new LongMsgOffset(20));
-    when(segMngrA1.fetchLatestStreamOffset(5000)).thenReturn(new LongMsgOffset(200));
-    when(segMngrB0.fetchLatestStreamOffset(5000)).thenReturn(new LongMsgOffset(2000));
+    StreamMetadataProvider segA0Provider = mock(StreamMetadataProvider.class);
+    StreamMetadataProvider segA1Provider = mock(StreamMetadataProvider.class);
+    StreamMetadataProvider segB0Provider = mock(StreamMetadataProvider.class);
+
+    when(tableDataManagerA.getStreamMetadataProvider(segMngrA0)).thenReturn(segA0Provider);
+    when(tableDataManagerA.getStreamMetadataProvider(segMngrA1)).thenReturn(segA1Provider);
+    when(tableDataManagerB.getStreamMetadataProvider(segMngrB0)).thenReturn(segB0Provider);
+
+    when(segA0Provider.fetchStreamPartitionOffset(eq(OffsetCriteria.LARGEST_OFFSET_CRITERIA), anyLong())).thenReturn(
+        new LongMsgOffset(20));
+    when(segA1Provider.fetchStreamPartitionOffset(eq(OffsetCriteria.LARGEST_OFFSET_CRITERIA), anyLong())).thenReturn(
+        new LongMsgOffset(200));
+    when(segB0Provider.fetchStreamPartitionOffset(eq(OffsetCriteria.LARGEST_OFFSET_CRITERIA), anyLong())).thenReturn(
+        new LongMsgOffset(2000));
+
     assertEquals(statusChecker.getNumConsumingSegmentsNotReachedIngestionCriteria(), 3);
 
     //              current offset          latest stream offset    current time    last ingestion time
@@ -129,7 +147,7 @@ public class FreshnessBasedConsumptionStatusCheckerTest {
 
   @Test
   public void testWithDroppedTableAndSegment()
-      throws InterruptedException {
+      throws TimeoutException {
     String segA0 = "tableA__0__0__123Z";
     String segA1 = "tableA__1__0__123Z";
     String segB0 = "tableB__0__0__123Z";
@@ -146,7 +164,7 @@ public class FreshnessBasedConsumptionStatusCheckerTest {
     assertEquals(statusChecker.getNumConsumingSegmentsNotReachedIngestionCriteria(), 3);
 
     // setup TableDataMangers
-    TableDataManager tableDataManagerA = mock(TableDataManager.class);
+    RealtimeTableDataManager tableDataManagerA = mock(RealtimeTableDataManager.class);
     when(instanceDataManager.getTableDataManager("tableA_REALTIME")).thenReturn(tableDataManagerA);
     when(instanceDataManager.getTableDataManager("tableB_REALTIME")).thenReturn(null);
 
@@ -155,7 +173,11 @@ public class FreshnessBasedConsumptionStatusCheckerTest {
     when(tableDataManagerA.acquireSegment(segA0)).thenReturn(segMngrA0);
     when(tableDataManagerA.acquireSegment(segA1)).thenReturn(null);
 
-    when(segMngrA0.fetchLatestStreamOffset(5000)).thenReturn(new LongMsgOffset(20));
+    StreamMetadataProvider segA0Provider = mock(StreamMetadataProvider.class);
+    when(tableDataManagerA.getStreamMetadataProvider(segMngrA0)).thenReturn(segA0Provider);
+    when(segA0Provider.fetchStreamPartitionOffset(eq(OffsetCriteria.LARGEST_OFFSET_CRITERIA), anyLong())).thenReturn(
+        new LongMsgOffset(20));
+
     when(segMngrA0.getCurrentOffset()).thenReturn(new LongMsgOffset(0));
     // ensure negative values are ignored
     setupLatestIngestionTimestamp(segMngrA0, Long.MIN_VALUE);
@@ -186,7 +208,8 @@ public class FreshnessBasedConsumptionStatusCheckerTest {
   }
 
   @Test
-  public void regularCaseWithFreshnessCatchup() {
+  public void regularCaseWithFreshnessCatchup()
+      throws TimeoutException {
     String segA0 = "tableA__0__0__123Z";
     String segA1 = "tableA__1__0__123Z";
     String segB0 = "tableB__0__0__123Z";
@@ -202,8 +225,8 @@ public class FreshnessBasedConsumptionStatusCheckerTest {
     assertEquals(statusChecker.getNumConsumingSegmentsNotReachedIngestionCriteria(), 3);
 
     // setup TableDataMangers
-    TableDataManager tableDataManagerA = mock(TableDataManager.class);
-    TableDataManager tableDataManagerB = mock(TableDataManager.class);
+    RealtimeTableDataManager tableDataManagerA = mock(RealtimeTableDataManager.class);
+    RealtimeTableDataManager tableDataManagerB = mock(RealtimeTableDataManager.class);
     when(instanceDataManager.getTableDataManager("tableA_REALTIME")).thenReturn(tableDataManagerA);
     when(instanceDataManager.getTableDataManager("tableB_REALTIME")).thenReturn(tableDataManagerB);
 
@@ -215,9 +238,20 @@ public class FreshnessBasedConsumptionStatusCheckerTest {
     when(tableDataManagerA.acquireSegment(segA1)).thenReturn(segMngrA1);
     when(tableDataManagerB.acquireSegment(segB0)).thenReturn(segMngrB0);
 
-    when(segMngrA0.fetchLatestStreamOffset(5000)).thenReturn(new LongMsgOffset(20));
-    when(segMngrA1.fetchLatestStreamOffset(5000)).thenReturn(new LongMsgOffset(200));
-    when(segMngrB0.fetchLatestStreamOffset(5000)).thenReturn(new LongMsgOffset(2000));
+    StreamMetadataProvider segA0Provider = mock(StreamMetadataProvider.class);
+    StreamMetadataProvider segA1Provider = mock(StreamMetadataProvider.class);
+    StreamMetadataProvider segB0Provider = mock(StreamMetadataProvider.class);
+
+    when(tableDataManagerA.getStreamMetadataProvider(segMngrA0)).thenReturn(segA0Provider);
+    when(tableDataManagerA.getStreamMetadataProvider(segMngrA1)).thenReturn(segA1Provider);
+    when(tableDataManagerB.getStreamMetadataProvider(segMngrB0)).thenReturn(segB0Provider);
+
+    when(segA0Provider.fetchStreamPartitionOffset(eq(OffsetCriteria.LARGEST_OFFSET_CRITERIA), anyLong())).thenReturn(
+        new LongMsgOffset(20));
+    when(segA1Provider.fetchStreamPartitionOffset(eq(OffsetCriteria.LARGEST_OFFSET_CRITERIA), anyLong())).thenReturn(
+        new LongMsgOffset(200));
+    when(segB0Provider.fetchStreamPartitionOffset(eq(OffsetCriteria.LARGEST_OFFSET_CRITERIA), anyLong())).thenReturn(
+        new LongMsgOffset(2000));
     when(segMngrA0.getCurrentOffset()).thenReturn(new LongMsgOffset(0));
     when(segMngrA1.getCurrentOffset()).thenReturn(new LongMsgOffset(0));
     when(segMngrB0.getCurrentOffset()).thenReturn(new LongMsgOffset(0));
@@ -251,7 +285,8 @@ public class FreshnessBasedConsumptionStatusCheckerTest {
   }
 
   @Test
-  public void regularCaseWithIdleTimeout() {
+  public void regularCaseWithIdleTimeout()
+      throws TimeoutException {
     String segA0 = "tableA__0__0__123Z";
     String segA1 = "tableA__1__0__123Z";
     String segB0 = "tableB__0__0__123Z";
@@ -268,8 +303,8 @@ public class FreshnessBasedConsumptionStatusCheckerTest {
     assertEquals(statusChecker.getNumConsumingSegmentsNotReachedIngestionCriteria(), 3);
 
     // setup TableDataMangers
-    TableDataManager tableDataManagerA = mock(TableDataManager.class);
-    TableDataManager tableDataManagerB = mock(TableDataManager.class);
+    RealtimeTableDataManager tableDataManagerA = mock(RealtimeTableDataManager.class);
+    RealtimeTableDataManager tableDataManagerB = mock(RealtimeTableDataManager.class);
     when(instanceDataManager.getTableDataManager("tableA_REALTIME")).thenReturn(tableDataManagerA);
     when(instanceDataManager.getTableDataManager("tableB_REALTIME")).thenReturn(tableDataManagerB);
 
@@ -281,9 +316,21 @@ public class FreshnessBasedConsumptionStatusCheckerTest {
     when(tableDataManagerA.acquireSegment(segA1)).thenReturn(segMngrA1);
     when(tableDataManagerB.acquireSegment(segB0)).thenReturn(segMngrB0);
 
-    when(segMngrA0.fetchLatestStreamOffset(5000)).thenReturn(new LongMsgOffset(20));
-    when(segMngrA1.fetchLatestStreamOffset(5000)).thenReturn(new LongMsgOffset(20));
-    when(segMngrB0.fetchLatestStreamOffset(5000)).thenReturn(new LongMsgOffset(20));
+    StreamMetadataProvider segA0Provider = mock(StreamMetadataProvider.class);
+    StreamMetadataProvider segA1Provider = mock(StreamMetadataProvider.class);
+    StreamMetadataProvider segB0Provider = mock(StreamMetadataProvider.class);
+
+    when(tableDataManagerA.getStreamMetadataProvider(segMngrA0)).thenReturn(segA0Provider);
+    when(tableDataManagerA.getStreamMetadataProvider(segMngrA1)).thenReturn(segA1Provider);
+    when(tableDataManagerB.getStreamMetadataProvider(segMngrB0)).thenReturn(segB0Provider);
+
+    when(segA0Provider.fetchStreamPartitionOffset(eq(OffsetCriteria.LARGEST_OFFSET_CRITERIA), anyLong())).thenReturn(
+        new LongMsgOffset(20));
+    when(segA1Provider.fetchStreamPartitionOffset(eq(OffsetCriteria.LARGEST_OFFSET_CRITERIA), anyLong())).thenReturn(
+        new LongMsgOffset(20));
+    when(segB0Provider.fetchStreamPartitionOffset(eq(OffsetCriteria.LARGEST_OFFSET_CRITERIA), anyLong())).thenReturn(
+        new LongMsgOffset(20));
+
     when(segMngrA0.getCurrentOffset()).thenReturn(new LongMsgOffset(10));
     when(segMngrA1.getCurrentOffset()).thenReturn(new LongMsgOffset(10));
     when(segMngrB0.getCurrentOffset()).thenReturn(new LongMsgOffset(10));
@@ -328,7 +375,8 @@ public class FreshnessBasedConsumptionStatusCheckerTest {
   }
 
   @Test
-  public void testSegmentsNeverHealthyWhenIdleTimeoutZeroAndNoOtherCriteriaMet() {
+  public void testSegmentsNeverHealthyWhenIdleTimeoutZeroAndNoOtherCriteriaMet()
+      throws TimeoutException {
     String segA0 = "tableA__0__0__123Z";
     String segA1 = "tableA__1__0__123Z";
     String segB0 = "tableB__0__0__123Z";
@@ -344,8 +392,8 @@ public class FreshnessBasedConsumptionStatusCheckerTest {
     assertEquals(statusChecker.getNumConsumingSegmentsNotReachedIngestionCriteria(), 3);
 
     // setup TableDataMangers
-    TableDataManager tableDataManagerA = mock(TableDataManager.class);
-    TableDataManager tableDataManagerB = mock(TableDataManager.class);
+    RealtimeTableDataManager tableDataManagerA = mock(RealtimeTableDataManager.class);
+    RealtimeTableDataManager tableDataManagerB = mock(RealtimeTableDataManager.class);
     when(instanceDataManager.getTableDataManager("tableA_REALTIME")).thenReturn(tableDataManagerA);
     when(instanceDataManager.getTableDataManager("tableB_REALTIME")).thenReturn(tableDataManagerB);
 
@@ -357,9 +405,21 @@ public class FreshnessBasedConsumptionStatusCheckerTest {
     when(tableDataManagerA.acquireSegment(segA1)).thenReturn(segMngrA1);
     when(tableDataManagerB.acquireSegment(segB0)).thenReturn(segMngrB0);
 
-    when(segMngrA0.fetchLatestStreamOffset(5000)).thenReturn(new LongMsgOffset(20));
-    when(segMngrA1.fetchLatestStreamOffset(5000)).thenReturn(new LongMsgOffset(20));
-    when(segMngrB0.fetchLatestStreamOffset(5000)).thenReturn(new LongMsgOffset(20));
+    StreamMetadataProvider segA0Provider = mock(StreamMetadataProvider.class);
+    StreamMetadataProvider segA1Provider = mock(StreamMetadataProvider.class);
+    StreamMetadataProvider segB0Provider = mock(StreamMetadataProvider.class);
+
+    when(tableDataManagerA.getStreamMetadataProvider(segMngrA0)).thenReturn(segA0Provider);
+    when(tableDataManagerA.getStreamMetadataProvider(segMngrA1)).thenReturn(segA1Provider);
+    when(tableDataManagerB.getStreamMetadataProvider(segMngrB0)).thenReturn(segB0Provider);
+
+    when(segA0Provider.fetchStreamPartitionOffset(eq(OffsetCriteria.LARGEST_OFFSET_CRITERIA), anyLong())).thenReturn(
+        new LongMsgOffset(20));
+    when(segA1Provider.fetchStreamPartitionOffset(eq(OffsetCriteria.LARGEST_OFFSET_CRITERIA), anyLong())).thenReturn(
+        new LongMsgOffset(20));
+    when(segB0Provider.fetchStreamPartitionOffset(eq(OffsetCriteria.LARGEST_OFFSET_CRITERIA), anyLong())).thenReturn(
+        new LongMsgOffset(20));
+
     when(segMngrA0.getCurrentOffset()).thenReturn(new LongMsgOffset(10));
     when(segMngrA1.getCurrentOffset()).thenReturn(new LongMsgOffset(10));
     when(segMngrB0.getCurrentOffset()).thenReturn(new LongMsgOffset(10));
@@ -380,7 +440,8 @@ public class FreshnessBasedConsumptionStatusCheckerTest {
   }
 
   @Test
-  public void segmentBeingCommitted() {
+  public void segmentBeingCommitted()
+      throws TimeoutException {
     String segA0 = "tableA__0__0__123Z";
     String segA1 = "tableA__1__0__123Z";
     String segB0 = "tableB__0__0__123Z";
@@ -396,8 +457,8 @@ public class FreshnessBasedConsumptionStatusCheckerTest {
     assertEquals(statusChecker.getNumConsumingSegmentsNotReachedIngestionCriteria(), 3);
 
     // setup TableDataMangers
-    TableDataManager tableDataManagerA = mock(TableDataManager.class);
-    TableDataManager tableDataManagerB = mock(TableDataManager.class);
+    RealtimeTableDataManager tableDataManagerA = mock(RealtimeTableDataManager.class);
+    RealtimeTableDataManager tableDataManagerB = mock(RealtimeTableDataManager.class);
     when(instanceDataManager.getTableDataManager("tableA_REALTIME")).thenReturn(tableDataManagerA);
     when(instanceDataManager.getTableDataManager("tableB_REALTIME")).thenReturn(tableDataManagerB);
 
@@ -409,9 +470,21 @@ public class FreshnessBasedConsumptionStatusCheckerTest {
     when(tableDataManagerA.acquireSegment(segA1)).thenReturn(segMngrA1);
     when(tableDataManagerB.acquireSegment(segB0)).thenReturn(segMngrB0);
 
-    when(segMngrA0.fetchLatestStreamOffset(5000)).thenReturn(new LongMsgOffset(20));
-    when(segMngrA1.fetchLatestStreamOffset(5000)).thenReturn(new LongMsgOffset(200));
-    when(segMngrB0.fetchLatestStreamOffset(5000)).thenReturn(new LongMsgOffset(2000));
+    StreamMetadataProvider segA0Provider = mock(StreamMetadataProvider.class);
+    StreamMetadataProvider segA1Provider = mock(StreamMetadataProvider.class);
+    StreamMetadataProvider segB0Provider = mock(StreamMetadataProvider.class);
+
+    when(tableDataManagerA.getStreamMetadataProvider(segMngrA0)).thenReturn(segA0Provider);
+    when(tableDataManagerA.getStreamMetadataProvider(segMngrA1)).thenReturn(segA1Provider);
+    when(tableDataManagerB.getStreamMetadataProvider(segMngrB0)).thenReturn(segB0Provider);
+
+    when(segA0Provider.fetchStreamPartitionOffset(eq(OffsetCriteria.LARGEST_OFFSET_CRITERIA), anyLong())).thenReturn(
+        new LongMsgOffset(20));
+    when(segA1Provider.fetchStreamPartitionOffset(eq(OffsetCriteria.LARGEST_OFFSET_CRITERIA), anyLong())).thenReturn(
+        new LongMsgOffset(200));
+    when(segB0Provider.fetchStreamPartitionOffset(eq(OffsetCriteria.LARGEST_OFFSET_CRITERIA), anyLong())).thenReturn(
+        new LongMsgOffset(2000));
+
     when(segMngrA0.getCurrentOffset()).thenReturn(new LongMsgOffset(0));
     when(segMngrA1.getCurrentOffset()).thenReturn(new LongMsgOffset(0));
     when(segMngrB0.getCurrentOffset()).thenReturn(new LongMsgOffset(0));
@@ -443,7 +516,8 @@ public class FreshnessBasedConsumptionStatusCheckerTest {
   }
 
   @Test
-  public void testCannotGetOffsetsOrFreshness() {
+  public void testCannotGetOffsetsOrFreshness()
+      throws TimeoutException {
     String segA0 = "tableA__0__0__123Z";
     String segA1 = "tableA__1__0__123Z";
     String segB0 = "tableB__0__0__123Z";
@@ -459,8 +533,8 @@ public class FreshnessBasedConsumptionStatusCheckerTest {
     assertEquals(statusChecker.getNumConsumingSegmentsNotReachedIngestionCriteria(), 3);
 
     // setup TableDataMangers
-    TableDataManager tableDataManagerA = mock(TableDataManager.class);
-    TableDataManager tableDataManagerB = mock(TableDataManager.class);
+    RealtimeTableDataManager tableDataManagerA = mock(RealtimeTableDataManager.class);
+    RealtimeTableDataManager tableDataManagerB = mock(RealtimeTableDataManager.class);
     when(instanceDataManager.getTableDataManager("tableA_REALTIME")).thenReturn(tableDataManagerA);
     when(instanceDataManager.getTableDataManager("tableB_REALTIME")).thenReturn(tableDataManagerB);
 
@@ -472,9 +546,21 @@ public class FreshnessBasedConsumptionStatusCheckerTest {
     when(tableDataManagerA.acquireSegment(segA1)).thenReturn(segMngrA1);
     when(tableDataManagerB.acquireSegment(segB0)).thenReturn(segMngrB0);
 
-    when(segMngrA0.fetchLatestStreamOffset(5000)).thenReturn(new LongMsgOffset(20));
-    when(segMngrA1.fetchLatestStreamOffset(5000)).thenReturn(new LongMsgOffset(200));
-    when(segMngrB0.fetchLatestStreamOffset(5000)).thenReturn(null);
+    StreamMetadataProvider segA0Provider = mock(StreamMetadataProvider.class);
+    StreamMetadataProvider segA1Provider = mock(StreamMetadataProvider.class);
+    StreamMetadataProvider segB0Provider = mock(StreamMetadataProvider.class);
+
+    when(tableDataManagerA.getStreamMetadataProvider(segMngrA0)).thenReturn(segA0Provider);
+    when(tableDataManagerA.getStreamMetadataProvider(segMngrA1)).thenReturn(segA1Provider);
+    when(tableDataManagerB.getStreamMetadataProvider(segMngrB0)).thenReturn(segB0Provider);
+
+    when(segA0Provider.fetchStreamPartitionOffset(eq(OffsetCriteria.LARGEST_OFFSET_CRITERIA), anyLong())).thenReturn(
+        new LongMsgOffset(20));
+    when(segA1Provider.fetchStreamPartitionOffset(eq(OffsetCriteria.LARGEST_OFFSET_CRITERIA), anyLong())).thenReturn(
+        new LongMsgOffset(200));
+    when(segB0Provider.fetchStreamPartitionOffset(eq(OffsetCriteria.LARGEST_OFFSET_CRITERIA), anyLong())).thenReturn(
+        null);
+
     when(segMngrA0.getCurrentOffset()).thenReturn(null);
     when(segMngrA1.getCurrentOffset()).thenReturn(new LongMsgOffset(0));
     when(segMngrB0.getCurrentOffset()).thenReturn(new LongMsgOffset(0));
@@ -495,7 +581,8 @@ public class FreshnessBasedConsumptionStatusCheckerTest {
     // segB0              0                       0                      100               0
     setupLatestIngestionTimestamp(segMngrA0, 89L);
     when(segMngrA0.getCurrentOffset()).thenReturn(new LongMsgOffset(20));
-    when(segMngrB0.fetchLatestStreamOffset(5000)).thenReturn(new LongMsgOffset(0));
+    when(segB0Provider.fetchStreamPartitionOffset(eq(OffsetCriteria.LARGEST_OFFSET_CRITERIA), anyLong())).thenReturn(
+        new LongMsgOffset(0));
     assertEquals(statusChecker.getNumConsumingSegmentsNotReachedIngestionCriteria(), 0);
   }
 }

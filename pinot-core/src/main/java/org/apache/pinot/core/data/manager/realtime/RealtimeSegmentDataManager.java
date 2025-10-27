@@ -94,7 +94,6 @@ import org.apache.pinot.spi.stream.MessageBatch;
 import org.apache.pinot.spi.stream.OffsetCriteria;
 import org.apache.pinot.spi.stream.PartitionGroupConsumer;
 import org.apache.pinot.spi.stream.PartitionGroupConsumptionStatus;
-import org.apache.pinot.spi.stream.PartitionLagState;
 import org.apache.pinot.spi.stream.PermanentConsumerException;
 import org.apache.pinot.spi.stream.StreamConfig;
 import org.apache.pinot.spi.stream.StreamConsumerFactory;
@@ -237,6 +236,9 @@ public class RealtimeSegmentDataManager extends SegmentDataManager {
   private static final int MSG_COUNT_THRESHOLD_FOR_LOG = 100000;
   private static final int BUILD_TIME_LEASE_SECONDS = 30;
   private static final int MAX_CONSECUTIVE_ERROR_COUNT = 5;
+  // 8 min max timeout for the retry policy
+  private static final RetryPolicy CONSUMER_RECREATE_RETRY_POLICY =
+      RetryPolicies.exponentialBackoffRetryPolicy(10, 1000L, 2.0f);
 
   // Interrupt consumer thread every 10 seconds in case it doesn't stop, e.g. interrupt flag getting cleared somehow
   private static final int CONSUMER_THREAD_INTERRUPT_INTERVAL_MS = 10000;
@@ -1079,21 +1081,12 @@ public class RealtimeSegmentDataManager extends SegmentDataManager {
   /**
    * Returns the {@link ConsumerPartitionState} for the partition group.
    */
-  public Map<String, ConsumerPartitionState> getConsumerPartitionState() {
+  public Map<String, ConsumerPartitionState> getConsumerPartitionState(
+      @Nullable StreamPartitionMsgOffset latestMsgOffset) {
     String partitionGroupId = String.valueOf(_partitionGroupId);
-    return Collections.singletonMap(partitionGroupId, new ConsumerPartitionState(partitionGroupId, getCurrentOffset(),
-        getLastConsumedTimestamp(), fetchLatestStreamOffset(5_000), _lastRowMetadata));
-  }
-
-  /**
-   * Returns the {@link PartitionLagState} for the partition group.
-   */
-  public Map<String, PartitionLagState> getPartitionToLagState(
-      Map<String, ConsumerPartitionState> consumerPartitionStateMap) {
-    if (_partitionMetadataProvider == null) {
-      createPartitionMetadataProvider("Get Partition Lag State");
-    }
-    return _partitionMetadataProvider.getCurrentPartitionLagState(consumerPartitionStateMap);
+    return Collections.singletonMap(partitionGroupId,
+        new ConsumerPartitionState(partitionGroupId, getCurrentOffset(), getLastConsumedTimestamp(), latestMsgOffset,
+            _lastRowMetadata));
   }
 
   /**
@@ -1114,6 +1107,14 @@ public class RealtimeSegmentDataManager extends SegmentDataManager {
 
   public StreamPartitionMsgOffset getCurrentOffset() {
     return _currentOffset;
+  }
+
+  public String getTableStreamName() {
+    return _tableStreamName;
+  }
+
+  public StreamConsumerFactory getStreamConsumerFactory() {
+    return _streamConsumerFactory;
   }
 
   @Nullable
@@ -1893,41 +1894,21 @@ public class RealtimeSegmentDataManager extends SegmentDataManager {
   }
 
   @Nullable
-  public StreamPartitionMsgOffset fetchLatestStreamOffset(long maxWaitTimeMs, boolean useDebugLog) {
-    return fetchStreamOffset(OffsetCriteria.LARGEST_OFFSET_CRITERIA, maxWaitTimeMs, useDebugLog);
+  private StreamPartitionMsgOffset fetchLatestStreamOffset(long maxWaitTimeMs) {
+    return fetchStreamOffset(OffsetCriteria.LARGEST_OFFSET_CRITERIA, maxWaitTimeMs);
   }
 
   @Nullable
-  public StreamPartitionMsgOffset fetchLatestStreamOffset(long maxWaitTimeMs) {
-    return fetchLatestStreamOffset(maxWaitTimeMs, false);
-  }
-
-  @Nullable
-  public StreamPartitionMsgOffset fetchEarliestStreamOffset(long maxWaitTimeMs, boolean useDebugLog) {
-    return fetchStreamOffset(OffsetCriteria.SMALLEST_OFFSET_CRITERIA, maxWaitTimeMs, useDebugLog);
-  }
-
-  @Nullable
-  public StreamPartitionMsgOffset fetchEarliestStreamOffset(long maxWaitTimeMs) {
-    return fetchEarliestStreamOffset(maxWaitTimeMs, false);
-  }
-
-  @Nullable
-  private StreamPartitionMsgOffset fetchStreamOffset(OffsetCriteria offsetCriteria, long maxWaitTimeMs,
-      boolean useDebugLog) {
+  private StreamPartitionMsgOffset fetchStreamOffset(OffsetCriteria offsetCriteria, long maxWaitTimeMs) {
     if (_partitionMetadataProvider == null) {
       createPartitionMetadataProvider("Fetch latest stream offset");
     }
     try {
       return _partitionMetadataProvider.fetchStreamPartitionOffset(offsetCriteria, maxWaitTimeMs);
     } catch (Exception e) {
-      String logMessage = "Cannot fetch stream offset with criteria " + offsetCriteria + " for clientId " + _clientId
-          + " and partitionGroupId " + _partitionGroupId + " with maxWaitTime " + maxWaitTimeMs;
-      if (!useDebugLog) {
-        _segmentLogger.warn(logMessage, e);
-      } else {
-        _segmentLogger.debug(logMessage, e);
-      }
+      _segmentLogger.warn(
+          "Cannot fetch stream offset with criteria {} for clientId {} and partitionGroupId {} with maxWaitTime {}",
+          offsetCriteria, _clientId, _partitionGroupId, maxWaitTimeMs, e);
     }
     return null;
   }
@@ -2015,7 +1996,8 @@ public class RealtimeSegmentDataManager extends SegmentDataManager {
     closePartitionGroupConsumer();
     try {
       _partitionGroupConsumer =
-          _streamConsumerFactory.createPartitionGroupConsumer(_clientId, _partitionGroupConsumptionStatus);
+          _streamConsumerFactory.createPartitionGroupConsumer(_clientId, _partitionGroupConsumptionStatus,
+              CONSUMER_RECREATE_RETRY_POLICY);
       _partitionGroupConsumer.start(_currentOffset);
     } catch (Exception e) {
       _segmentLogger.error("Faced exception while trying to recreate stream consumer for topic partition {}", _clientId,
