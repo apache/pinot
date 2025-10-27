@@ -145,6 +145,7 @@ public class MultiStageEngineIntegrationTest extends BaseClusterIntegrationTestS
     waitForAllDocsLoaded(600_000L);
 
     setupTableWithNonDefaultDatabase(avroFiles);
+    setupDimensionTable();
   }
 
   @Override
@@ -1640,7 +1641,6 @@ public class MultiStageEngineIntegrationTest extends BaseClusterIntegrationTestS
   @Test
   public void testLookupJoin()
       throws Exception {
-    setupDimensionTable();
 
     // Compare total rows in the primary table with number of rows in the result of the join with lookup table
     String query = "select count(*) from " + getTableName();
@@ -1664,8 +1664,6 @@ public class MultiStageEngineIntegrationTest extends BaseClusterIntegrationTestS
     }
     assertTrue(stages.contains("LOOKUP_JOIN"), "Could not find LOOKUP_JOIN stage in the query plan");
     assertFalse(stages.contains("HASH_JOIN"), "HASH_JOIN stage should not be present in the query plan");
-
-    dropOfflineTable(DIM_TABLE);
   }
 
   public void testSearchLiteralFilter()
@@ -2117,22 +2115,18 @@ public class MultiStageEngineIntegrationTest extends BaseClusterIntegrationTestS
   @Test
   public void testNaturalJoinWithNoVirtualColumns()
       throws Exception {
-    setupDimensionTable();
     String query = "SELECT * FROM mytable a NATURAL JOIN daysOfWeek b OPTION(excludeVirtualColumns=false) LIMIT 5";
     JsonNode response = postQuery(query);
     assertNotNull(response.get("exceptions").get(0).get("message"), "Should have an error message");
-    dropOfflineTable(DIM_TABLE);
   }
 
   @Test
   public void testNaturalJoinWithVirtualColumns()
       throws Exception {
-    setupDimensionTable();
     String query = "SELECT * FROM mytable NATURAL JOIN daysOfWeek LIMIT 5 OPTION(excludeVirtualColumns=true)";
     JsonNode response = postQuery(query);
     assertEquals(response.get("exceptions").get(0), null);
     assertNotNull(response.get("resultTable"), "Should have result table");
-    dropOfflineTable(DIM_TABLE);
   }
 
   @AfterClass
@@ -2140,6 +2134,7 @@ public class MultiStageEngineIntegrationTest extends BaseClusterIntegrationTestS
       throws Exception {
     dropOfflineTable(DEFAULT_TABLE_NAME);
     dropOfflineTable(TABLE_NAME_WITH_DATABASE);
+    dropOfflineTable(DIM_TABLE);
 
     stopServer();
     stopBroker();
