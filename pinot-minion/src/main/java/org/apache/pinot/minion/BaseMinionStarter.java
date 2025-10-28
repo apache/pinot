@@ -363,8 +363,28 @@ public abstract class BaseMinionStarter implements ServiceStartable {
     if (_tlsPort > 0) {
       updated |= HelixHelper.updateTlsPort(instanceConfig, _tlsPort);
     }
-    updated |= HelixHelper.addDefaultTags(instanceConfig,
-        () -> Collections.singletonList(CommonConstants.Helix.UNTAGGED_MINION_INSTANCE));
+    // Update tags for new minions (first time joining the cluster). If configured, allow initializing tags from
+    // pinot.minion.instance.tags; otherwise, fall back to untagged behavior.
+    updated |= HelixHelper.addDefaultTags(instanceConfig, () -> {
+      // Only apply initial tags for first-time joiners; skip if instance already exists in Helix
+      if (_helixManager != null && HelixHelper.instanceExists(_helixManager, _instanceId)) {
+        return Collections.emptyList();
+      }
+      String instanceTagsConfig = _config.getProperty(CommonConstants.Minion.CONFIG_OF_MINION_INSTANCE_INITIAL_TAGS);
+      if (StringUtils.isNotEmpty(instanceTagsConfig)) {
+        List<String> tags = new java.util.ArrayList<>();
+        for (String instanceTag : StringUtils.split(instanceTagsConfig, ',')) {
+          String trimmed = instanceTag.trim();
+          if (trimmed.isEmpty()) {
+            continue;
+          }
+          // Minion tags do not have a special suffix requirement; just pass them through.
+          tags.add(trimmed);
+        }
+        return tags;
+      }
+      return Collections.singletonList(CommonConstants.Helix.UNTAGGED_MINION_INSTANCE);
+    });
     updated |= HelixHelper.removeDisabledPartitions(instanceConfig);
     updated |= HelixHelper.updatePinotVersion(instanceConfig);
     updated |= HelixHelper.updateMaxConcurrentTasksPerInstance(instanceConfig,

@@ -597,14 +597,28 @@ public abstract class BaseBrokerStarter implements ServiceStartable {
     if (instanceTags.isEmpty()) {
       // This is a new broker (first time joining the cluster). We allow configuring initial broker tags regardless of
       // tenant isolation mode since it defaults to true and is relatively obscure.
-      String instanceTagsConfig = _brokerConf.getProperty(Broker.CONFIG_OF_BROKER_INSTANCE_TAGS);
+      // Prefer the new initial tags key, fallback to legacy key for backward compatibility
+      String instanceTagsConfig = _brokerConf.getProperty(Broker.CONFIG_OF_BROKER_INSTANCE_INITIAL_TAGS);
+      if (StringUtils.isEmpty(instanceTagsConfig)) {
+        instanceTagsConfig = _brokerConf.getProperty(Broker.CONFIG_OF_BROKER_INSTANCE_TAGS);
+      }
+      // Skip applying initial tags if this instance already exists in Helix
+      if (_participantHelixManager != null && HelixHelper.instanceExists(_participantHelixManager, _instanceId)) {
+        instanceTagsConfig = null;
+      }
       if (StringUtils.isNotEmpty(instanceTagsConfig)) {
         for (String instanceTag : StringUtils.split(instanceTagsConfig, ',')) {
-          Preconditions.checkArgument(TagNameUtils.isBrokerTag(instanceTag), "Illegal broker instance tag: %s",
-              instanceTag);
-          instanceConfig.addTag(instanceTag);
+          String trimmed = instanceTag.trim();
+          if (trimmed.isEmpty()) {
+            continue;
+          }
+          Preconditions.checkArgument(TagNameUtils.isBrokerTag(trimmed), "Illegal broker instance tag: %s",
+              trimmed);
+          instanceConfig.addTag(trimmed);
         }
         shouldUpdateBrokerResource = true;
+      } else if (_brokerConf.containsKey(Broker.CONFIG_OF_BROKER_INSTANCE_TAGS)) {
+        // Explicit but empty: ignore and keep current behavior
       } else if (ZKMetadataProvider.getClusterTenantIsolationEnabled(_propertyStore)) {
         instanceConfig.addTag(TagNameUtils.getBrokerTagForTenant(null));
         shouldUpdateBrokerResource = true;
