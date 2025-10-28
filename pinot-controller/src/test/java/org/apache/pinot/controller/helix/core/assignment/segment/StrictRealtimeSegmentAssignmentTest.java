@@ -18,7 +18,6 @@
  */
 package org.apache.pinot.controller.helix.core.assignment.segment;
 
-import com.google.common.collect.ImmutableMap;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
@@ -135,7 +134,7 @@ public class StrictRealtimeSegmentAssignmentTest {
   public void testAssignSegment() {
     assertTrue(_segmentAssignment instanceof StrictRealtimeSegmentAssignment);
     Map<InstancePartitionsType, InstancePartitions> onlyConsumingInstancePartitionMap =
-        ImmutableMap.of(InstancePartitionsType.CONSUMING, _instancePartitionsMap.get(InstancePartitionsType.CONSUMING));
+        Map.of(InstancePartitionsType.CONSUMING, _instancePartitionsMap.get(InstancePartitionsType.CONSUMING));
     int numInstancesPerReplicaGroup = NUM_CONSUMING_INSTANCES / NUM_REPLICAS;
     Map<String, Map<String, String>> currentAssignment = new TreeMap<>();
     // Add segments for partition 0/1/2, but add no segment for partition 3.
@@ -163,8 +162,8 @@ public class StrictRealtimeSegmentAssignmentTest {
       addToAssignment(currentAssignment, segmentId, instancesAssigned);
     }
     // Use new instancePartition to assign the new segments below.
-    ImmutableMap<InstancePartitionsType, InstancePartitions> newConsumingInstancePartitionMap =
-        ImmutableMap.of(InstancePartitionsType.CONSUMING, _newConsumingInstancePartitions);
+    Map<InstancePartitionsType, InstancePartitions> newConsumingInstancePartitionMap =
+        Map.of(InstancePartitionsType.CONSUMING, _newConsumingInstancePartitions);
 
     // No existing segments for partition 3, so use the assignment decided by new instancePartition.
     // So segment 3 (partition 3) should be assigned to instance new_0, new_3, new_6
@@ -201,7 +200,7 @@ public class StrictRealtimeSegmentAssignmentTest {
   public void testAssignSegmentWithOfflineSegment() {
     assertTrue(_segmentAssignment instanceof StrictRealtimeSegmentAssignment);
     Map<InstancePartitionsType, InstancePartitions> onlyConsumingInstancePartitionMap =
-        ImmutableMap.of(InstancePartitionsType.CONSUMING, _instancePartitionsMap.get(InstancePartitionsType.CONSUMING));
+        Map.of(InstancePartitionsType.CONSUMING, _instancePartitionsMap.get(InstancePartitionsType.CONSUMING));
     int numInstancesPerReplicaGroup = NUM_CONSUMING_INSTANCES / NUM_REPLICAS;
     Map<String, Map<String, String>> currentAssignment = new TreeMap<>();
     // Add segments for partition 0/1/2, but add no segment for partition 3.
@@ -230,8 +229,8 @@ public class StrictRealtimeSegmentAssignmentTest {
           SegmentAssignmentUtils.getInstanceStateMap(instancesAssigned, SegmentStateModel.OFFLINE));
     }
     // Use new instancePartition to assign the new segments below.
-    ImmutableMap<InstancePartitionsType, InstancePartitions> newConsumingInstancePartitionMap =
-        ImmutableMap.of(InstancePartitionsType.CONSUMING, _newConsumingInstancePartitions);
+    Map<InstancePartitionsType, InstancePartitions> newConsumingInstancePartitionMap =
+        Map.of(InstancePartitionsType.CONSUMING, _newConsumingInstancePartitions);
 
     // No existing segments for partition 3, so use the assignment decided by new instancePartition. All existing
     // segments for partition 0/1/2 are offline, thus skipped, so use the assignment decided by new instancePartition.

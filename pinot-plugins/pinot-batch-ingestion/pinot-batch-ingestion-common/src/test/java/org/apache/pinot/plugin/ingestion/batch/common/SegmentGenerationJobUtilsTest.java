@@ -19,8 +19,8 @@
 
 package org.apache.pinot.plugin.ingestion.batch.common;
 
-import com.google.common.collect.ImmutableMap;
 import java.util.HashMap;
+import java.util.Map;
 import org.apache.pinot.spi.ingestion.batch.spec.SegmentNameGeneratorSpec;
 import org.testng.Assert;
 import org.testng.annotations.Test;
@@ -35,17 +35,17 @@ public class SegmentGenerationJobUtilsTest {
     Assert.assertFalse(SegmentGenerationJobUtils.useGlobalDirectorySequenceId(spec));
     spec.setConfigs(new HashMap<>());
     Assert.assertFalse(SegmentGenerationJobUtils.useGlobalDirectorySequenceId(spec));
-    spec.setConfigs(ImmutableMap.of("use.global.directory.sequence.id", "false"));
+    spec.setConfigs(Map.of("use.global.directory.sequence.id", "false"));
     Assert.assertFalse(SegmentGenerationJobUtils.useGlobalDirectorySequenceId(spec));
-    spec.setConfigs(ImmutableMap.of("use.global.directory.sequence.id", "FALSE"));
+    spec.setConfigs(Map.of("use.global.directory.sequence.id", "FALSE"));
     Assert.assertFalse(SegmentGenerationJobUtils.useGlobalDirectorySequenceId(spec));
-    spec.setConfigs(ImmutableMap.of("use.global.directory.sequence.id", "True"));
+    spec.setConfigs(Map.of("use.global.directory.sequence.id", "True"));
     Assert.assertTrue(SegmentGenerationJobUtils.useGlobalDirectorySequenceId(spec));
-    spec.setConfigs(ImmutableMap.of("local.directory.sequence.id", "true"));
+    spec.setConfigs(Map.of("local.directory.sequence.id", "true"));
     Assert.assertFalse(SegmentGenerationJobUtils.useGlobalDirectorySequenceId(spec));
-    spec.setConfigs(ImmutableMap.of("local.directory.sequence.id", "TRUE"));
+    spec.setConfigs(Map.of("local.directory.sequence.id", "TRUE"));
     Assert.assertFalse(SegmentGenerationJobUtils.useGlobalDirectorySequenceId(spec));
-    spec.setConfigs(ImmutableMap.of("local.directory.sequence.id", "False"));
+    spec.setConfigs(Map.of("local.directory.sequence.id", "False"));
     Assert.assertTrue(SegmentGenerationJobUtils.useGlobalDirectorySequenceId(spec));
   }
 }

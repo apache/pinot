@@ -18,7 +18,6 @@
  */
 package org.apache.pinot.plugin.inputformat.avro;
 
-import com.google.common.collect.ImmutableMap;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Map;
@@ -58,9 +57,12 @@ public class AvroUtilsTest {
     org.apache.avro.Schema avroSchema =
         new org.apache.avro.Schema.Parser().parse(ClassLoader.getSystemResourceAsStream(AVRO_SCHEMA));
     Map<String, FieldSpec.FieldType> fieldSpecMap =
-        new ImmutableMap.Builder<String, FieldSpec.FieldType>().put("d1", FieldType.DIMENSION)
-            .put("d2", FieldType.DIMENSION).put("d3", FieldType.DIMENSION).put("hoursSinceEpoch", FieldType.DATE_TIME)
-            .put("m1", FieldType.METRIC).put("m2", FieldType.METRIC).build();
+        Map.of("d1", FieldType.DIMENSION,
+            "d2", FieldType.DIMENSION,
+            "d3", FieldType.DIMENSION,
+            "hoursSinceEpoch", FieldType.DATE_TIME,
+            "m1", FieldType.METRIC,
+            "m2", FieldType.METRIC);
     Schema inferredPinotSchema = AvroUtils.getPinotSchemaFromAvroSchema(avroSchema, fieldSpecMap, TimeUnit.HOURS);
     Schema expectedSchema = new Schema.SchemaBuilder().addSingleValueDimension("d1", DataType.STRING)
         .addSingleValueDimension("d2", DataType.LONG).addSingleValueDimension("d3", DataType.STRING)
@@ -76,8 +78,7 @@ public class AvroUtilsTest {
     org.apache.avro.Schema avroSchema =
         new org.apache.avro.Schema.Parser().parse(ClassLoader.getSystemResourceAsStream(AVRO_NESTED_SCHEMA));
     Map<String, FieldSpec.FieldType> fieldSpecMap =
-        new ImmutableMap.Builder<String, FieldSpec.FieldType>().put("d1", FieldType.DIMENSION)
-            .put("hoursSinceEpoch", FieldType.DATE_TIME).put("m1", FieldType.METRIC).build();
+        Map.of("d1", FieldType.DIMENSION, "hoursSinceEpoch", FieldType.DATE_TIME, "m1", FieldType.METRIC);
     Schema inferredPinotSchema =
         AvroUtils.getPinotSchemaFromAvroSchemaWithComplexTypeHandling(avroSchema, fieldSpecMap, TimeUnit.HOURS,
             new ArrayList<>(), ".", ComplexTypeConfig.CollectionNotUnnestedToJson.NON_PRIMITIVE);

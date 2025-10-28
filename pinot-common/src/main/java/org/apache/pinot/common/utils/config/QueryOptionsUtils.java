@@ -18,7 +18,6 @@
  */
 package org.apache.pinot.common.utils.config;
 
-import com.google.common.collect.ImmutableMap;
 import java.lang.reflect.Field;
 import java.lang.reflect.Modifier;
 import java.util.ArrayList;
@@ -75,7 +74,7 @@ public class QueryOptionsUtils {
       classLoadError = e;
     }
 
-    CONFIG_RESOLVER = configResolver == null ? null : ImmutableMap.copyOf(configResolver);
+    CONFIG_RESOLVER = configResolver == null ? null : Map.copyOf(configResolver);
     CLASS_LOAD_ERROR = classLoadError == null ? null
         : new RuntimeException("Failure to build case insensitive mapping.", classLoadError);
   }
