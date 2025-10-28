@@ -228,7 +228,7 @@ public class RexExpressionUtils {
       assert value instanceof Enum;
       return new RexExpression.Literal(ColumnDataType.STRING, value.toString());
     }
-    ColumnDataType dataType = RelToPlanNodeConverter.convertToColumnDataType(rexLiteral.getType());
+    ColumnDataType dataType = ColumnDataType.fromRelDataType(rexLiteral.getType());
     if (rexLiteral.isNull()) {
       return new RexExpression.Literal(dataType, null);
     } else {
@@ -288,7 +288,7 @@ public class RexExpressionUtils {
       case SEARCH:
         return handleSearch(rexCall);
       default:
-        return new RexExpression.FunctionCall(RelToPlanNodeConverter.convertToColumnDataType(rexCall.type),
+        return new RexExpression.FunctionCall(ColumnDataType.fromRelDataType(rexCall.type),
             getFunctionName(rexCall.op), fromRexNodes(rexCall.operands));
     }
   }
@@ -328,7 +328,7 @@ public class RexExpressionUtils {
     assert rexCall.operands.size() == 1;
     List<RexExpression> operands = new ArrayList<>(2);
     operands.add(fromRexNode(rexCall.operands.get(0)));
-    ColumnDataType castType = RelToPlanNodeConverter.convertToColumnDataType(rexCall.type);
+    ColumnDataType castType = ColumnDataType.fromRelDataType(rexCall.type);
     operands.add(new RexExpression.Literal(ColumnDataType.STRING, castType.name()));
     return new RexExpression.FunctionCall(castType, SqlKind.CAST.name(), operands);
   }
@@ -345,7 +345,7 @@ public class RexExpressionUtils {
     assert rexCall.operands.size() == 2;
     RexNode leftOperand = rexCall.operands.get(0);
     RexLiteral searchArgument = (RexLiteral) rexCall.operands.get(1);
-    ColumnDataType dataType = RelToPlanNodeConverter.convertToColumnDataType(searchArgument.getType());
+    ColumnDataType dataType = ColumnDataType.fromRelDataType(searchArgument.getType());
     Sarg sarg = searchArgument.getValueAs(Sarg.class);
     assert sarg != null;
     if (sarg.isPoints()) {
@@ -469,13 +469,13 @@ public class RexExpressionUtils {
   }
 
   public static RexExpression.FunctionCall fromAggregateCall(AggregateCall aggregateCall) {
-    return new RexExpression.FunctionCall(RelToPlanNodeConverter.convertToColumnDataType(aggregateCall.type),
+    return new RexExpression.FunctionCall(ColumnDataType.fromRelDataType(aggregateCall.type),
         getFunctionName(aggregateCall.getAggregation()), fromRexNodes(aggregateCall.rexList),
         aggregateCall.isDistinct(), false);
   }
 
   public static RexExpression.FunctionCall fromWindowAggregateCall(Window.RexWinAggCall winAggCall) {
-    return new RexExpression.FunctionCall(RelToPlanNodeConverter.convertToColumnDataType(winAggCall.type),
+    return new RexExpression.FunctionCall(ColumnDataType.fromRelDataType(winAggCall.type),
         getFunctionName(winAggCall.op), fromRexNodes(winAggCall.operands), winAggCall.distinct, winAggCall.ignoreNulls);
   }
 
