@@ -28,6 +28,7 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.Stack;
 import java.util.concurrent.Executor;
 import java.util.concurrent.TimeUnit;
 import javax.annotation.Nullable;
@@ -151,9 +152,7 @@ public class TimeSeriesRequestHandler extends BaseBrokerRequestHandler {
       _brokerMetrics.addMeteredGlobalValue(BrokerMeter.TIME_SERIES_GLOBAL_QUERIES_FAILED, 1);
       if (e instanceof QueryException) {
         throw (QueryException) e;
-      } else if (e instanceof IllegalArgumentException) {
-        throw (IllegalArgumentException) e;
-      }else {
+      } else {
         throw new QueryException(QueryErrorCode.UNKNOWN, "Error processing time-series query", e);
       }
     } finally {
@@ -254,13 +253,25 @@ public class TimeSeriesRequestHandler extends BaseBrokerRequestHandler {
     // check authorization for table
     tableLevelAccessControlCheck(httpHeaders, dispatchablePlan.getTableNames());
     // validate column names for all LeafTimeSeriesPlanNode in the physical plan
-    for (BaseTimeSeriesPlanNode currNode : dispatchablePlan.getServerFragments()) {
-      if (currNode instanceof LeafTimeSeriesPlanNode) {
-        validateColumnNames((LeafTimeSeriesPlanNode)currNode);
+    for (BaseTimeSeriesPlanNode serverFragmentRoot : dispatchablePlan.getServerFragments()) {
+      // traverse tree and validate all LeafTimeSeriesPlanNode
+      Stack<BaseTimeSeriesPlanNode> nodeStack = new Stack<>();
+      nodeStack.push(serverFragmentRoot);
+      while (!nodeStack.isEmpty()) {
+        BaseTimeSeriesPlanNode currNode = nodeStack.pop();
+        if (currNode instanceof LeafTimeSeriesPlanNode) {
+          String rawTableName = TableNameBuilder.extractRawTableName(((LeafTimeSeriesPlanNode) currNode).getTableName());
+          validateColumnNames((LeafTimeSeriesPlanNode) currNode, _tableCache.getSchema(rawTableName));
+        }
+        for (BaseTimeSeriesPlanNode child : currNode.getInputs()) {
+          nodeStack.push(child);
+        }
       }
     }
-    if (dispatchablePlan.getBrokerFragment() instanceof  LeafTimeSeriesPlanNode) {
-      validateColumnNames((LeafTimeSeriesPlanNode) dispatchablePlan.getBrokerFragment());
+    if (dispatchablePlan.getBrokerFragment() instanceof LeafTimeSeriesPlanNode) {
+      String rawTableName = TableNameBuilder.extractRawTableName(((LeafTimeSeriesPlanNode) dispatchablePlan.getBrokerFragment()).getTableName());
+      validateColumnNames((LeafTimeSeriesPlanNode) dispatchablePlan.getBrokerFragment(),
+          _tableCache.getSchema(rawTableName));
     }
   }
 
@@ -269,47 +280,50 @@ public class TimeSeriesRequestHandler extends BaseBrokerRequestHandler {
    * in the filter, groupBy, value etc. expressions
    * @param leafNode
    */
-  private void validateColumnNames(LeafTimeSeriesPlanNode leafNode) {
+  static void validateColumnNames(LeafTimeSeriesPlanNode leafNode, Schema tableSchema) {
     String tableName = TableNameBuilder.extractRawTableName(leafNode.getTableName());
-    Schema tableSchema = _tableCache.getSchema(tableName);
     Preconditions.checkNotNull(tableSchema, "Schema for Table " + tableName + " not found");
     String filterExpr = leafNode.getFilterExpression();
     String valueExpr = leafNode.getValueExpression();
     List<String> groupByExprs = leafNode.getGroupByExpressions();
     String timeCol = leafNode.getTimeColumn();
     // validate time column
-    Preconditions.checkArgument(tableSchema.hasColumn(timeCol),
-        "Time column '%s' not found in table '%s'.", timeCol, tableName);
+    if (!tableSchema.hasColumn(timeCol)) {
+      throw QueryErrorCode.UNKNOWN_COLUMN.asException(String.format("Time column '%s' not found in table '%s'.", timeCol, tableName));
+    }
     // validate value expression columns
-    validateColumnsInExpression(valueExpr, tableName);
+    validateColumnsInExpression(valueExpr, tableName, tableSchema);
     // validate group by Expressions
     for (var groupByExpr : groupByExprs) {
-      validateColumnsInExpression(groupByExpr, tableName);
+      validateColumnsInExpression(groupByExpr, tableName, tableSchema);
     }
-    // validate filter expression
-    FilterContext filterContext =
-        RequestContextUtils.getFilter(CalciteSqlParser.compileToExpression(filterExpr));
-    Set<String> colsInFilterExpr = new HashSet<>();
-    filterContext.getColumns(colsInFilterExpr);
-    for (String col : colsInFilterExpr) {
-      if (!tableSchema.hasColumn(col)) {
-        throw new IllegalArgumentException(
-            String.format("Column '%s' in filter expression '%s' not found in table schema for table '%s'",
-                col, filterExpr, tableName));
+    if (!StringUtils.isBlank(filterExpr)) {
+      // validate filter expression
+      FilterContext filterContext =
+          RequestContextUtils.getFilter(CalciteSqlParser.compileToExpression(filterExpr));
+      Set<String> colsInFilterExpr = new HashSet<>();
+      filterContext.getColumns(colsInFilterExpr);
+      for (String col : colsInFilterExpr) {
+        if (!tableSchema.hasColumn(col)) {
+          throw QueryErrorCode.UNKNOWN_COLUMN.asException(
+              String.format("Column '%s' in filter expression '%s' not found in table schema for table '%s'",
+                  col, filterExpr, tableName));
+        }
       }
     }
   }
 
-  private void validateColumnsInExpression(String expressionString, String tableName) {
-    Schema tableSchema = _tableCache.getSchema(tableName);
+  private static void validateColumnsInExpression(String expressionString, String tableName, Schema tableSchema) {
+    if (StringUtils.isBlank(expressionString)) {
+      return;
+    }
     ExpressionContext expression = RequestContextUtils.getExpression(expressionString);
     Set<String> colsInExpr = new HashSet<>();
     expression.getColumns(colsInExpr);
     for (String col : colsInExpr) {
       if (!tableSchema.hasColumn(col)) {
-        throw new IllegalArgumentException(
-            String.format("Column '%s' in expression '%s' not found in table schema for table '%s'",
-                col, expressionString, tableName));
+        throw QueryErrorCode.UNKNOWN_COLUMN.asException(String.format("Column '%s' in expression '%s' not found in table schema for table '%s'",
+            col, expressionString, tableName));
       }
     }
   }
