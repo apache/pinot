@@ -37,6 +37,7 @@ import org.apache.commons.lang3.StringUtils;
 import org.apache.pinot.common.utils.DatabaseUtils;
 import org.apache.pinot.segment.local.data.manager.SegmentDataManager;
 import org.apache.pinot.segment.local.data.manager.TableDataManager;
+import org.apache.pinot.segment.local.utils.ReloadJobStatus;
 import org.apache.pinot.segment.local.utils.ServerReloadJobStatusCache;
 import org.apache.pinot.segment.spi.creator.name.SegmentNameUtils;
 import org.apache.pinot.server.starter.ServerInstance;
@@ -65,7 +66,9 @@ public class ControllerJobStatusResource {
   @ApiOperation(value = "Task status", notes = "Return the status of a given reload job")
   public String reloadJobStatus(@PathParam("tableNameWithType") String tableNameWithType,
       @QueryParam("reloadJobTimestamp") long reloadJobSubmissionTimestamp,
-      @QueryParam("segmentName") String segmentName, @Context HttpHeaders headers)
+      @QueryParam("segmentName") String segmentName,
+      @QueryParam("reloadJobId") String reloadJobId,
+      @Context HttpHeaders headers)
       throws Exception {
     tableNameWithType = DatabaseUtils.translateTableName(tableNameWithType, headers);
     TableDataManager tableDataManager =
@@ -88,7 +91,17 @@ public class ControllerJobStatusResource {
           successCount++;
         }
       }
-      return JsonUtils.objectToString(new SegmentReloadStatusValue(totalSegmentCount, successCount));
+
+      // Query cache for failure count if reloadJobId is provided
+      Long failureCount = null;
+      if (reloadJobId != null) {
+        ReloadJobStatus jobStatus = _serverReloadJobStatusCache.getJobStatus(reloadJobId);
+        if (jobStatus != null) {
+          failureCount = (long) jobStatus.getFailureCount();
+        }
+      }
+
+      return JsonUtils.objectToString(new SegmentReloadStatusValue(totalSegmentCount, successCount, failureCount));
     } finally {
       for (SegmentDataManager segmentDataManager : segmentDataManagers) {
         tableDataManager.releaseSegment(segmentDataManager);
