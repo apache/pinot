@@ -33,6 +33,7 @@ import org.apache.hc.client5.http.entity.mime.MultipartEntityBuilder;
 import org.apache.hc.client5.http.impl.classic.HttpClientBuilder;
 import org.apache.hc.core5.http.HttpEntity;
 import org.apache.hc.core5.http.HttpResponse;
+import org.apache.pinot.client.admin.PinotAdminClient;
 import org.apache.pinot.controller.helix.ControllerTest;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.TableType;
@@ -89,6 +90,7 @@ public class PinotIngestionRestletResourceStatelessTest extends ControllerTest {
   public void testIngestEndpoint()
       throws Exception {
 
+    PinotAdminClient adminClient = getOrCreateAdminClient();
     List<String> segments = _helixResourceManager.getSegmentsFor(TABLE_NAME_WITH_TYPE, false);
     assertEquals(segments.size(), 0);
 
@@ -100,13 +102,14 @@ public class PinotIngestionRestletResourceStatelessTest extends ControllerTest {
     Map<String, String> batchConfigMap = new HashMap<>();
     batchConfigMap.put(BatchConfigProperties.INPUT_FORMAT, "csv");
     batchConfigMap.put(String.format("%s.delimiter", BatchConfigProperties.RECORD_READER_PROP_PREFIX), "|");
-    sendHttpPost(_controllerRequestURLBuilder.forIngestFromFile(TABLE_NAME_WITH_TYPE, batchConfigMap));
+    sendHttpPost(adminClient.getTableClient().buildIngestFromFileUrl(TABLE_NAME_WITH_TYPE, batchConfigMap));
     segments = _helixResourceManager.getSegmentsFor(TABLE_NAME_WITH_TYPE, false);
     assertEquals(segments.size(), 1);
 
     // ingest from URI
-    sendHttpPost(_controllerRequestURLBuilder.forIngestFromURI(TABLE_NAME_WITH_TYPE, batchConfigMap,
-        String.format("file://%s", _inputFile.getAbsolutePath())));
+    sendHttpPost(
+        adminClient.getTableClient().buildIngestFromUriUrl(TABLE_NAME_WITH_TYPE, batchConfigMap,
+            String.format("file://%s", _inputFile.getAbsolutePath())));
     segments = _helixResourceManager.getSegmentsFor(TABLE_NAME_WITH_TYPE, false);
     assertEquals(segments.size(), 2);
 

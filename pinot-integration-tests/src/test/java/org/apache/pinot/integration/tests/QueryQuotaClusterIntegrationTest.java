@@ -24,6 +24,7 @@ import java.io.UncheckedIOException;
 import java.net.URI;
 import java.util.Iterator;
 import java.util.List;
+import java.util.Map;
 import java.util.Properties;
 import org.apache.pinot.broker.broker.helix.BaseBrokerStarter;
 import org.apache.pinot.broker.queryquota.HelixExternalViewBasedQueryQuotaManagerTest;
@@ -65,6 +66,7 @@ public class QueryQuotaClusterIntegrationTest extends BaseClusterIntegrationTest
   public void setUp()
       throws Exception {
     TestUtils.ensureDirectoriesExistAndEmpty(_tempDir, _segmentDir, _tarDir);
+    _httpClient = getHttpClient();
 
     // Start the Pinot cluster
     startZk();
@@ -348,6 +350,7 @@ public class QueryQuotaClusterIntegrationTest extends BaseClusterIntegrationTest
   private void runQueries(int qps, boolean shouldFail) {
     runQueries(qps, shouldFail, "default");
   }
+
   private void runQueries(int qps, boolean shouldFail, String applicationName) {
     runQueries(qps, shouldFail, applicationName, getTableName());
   }
@@ -480,9 +483,9 @@ public class QueryQuotaClusterIntegrationTest extends BaseClusterIntegrationTest
 
   public void addQueryQuotaToDatabaseConfig(Integer maxQps)
       throws Exception {
-    String url = _controllerRequestURLBuilder.getBaseUrl() + "/databases/default/quotas";
+    String url = getOrCreateAdminClient().getControllerBaseUrl() + "/databases/default/quotas";
     if (maxQps != null) {
-        url += "?maxQueriesPerSecond=" + maxQps;
+      url += "?maxQueriesPerSecond=" + maxQps;
     }
     HttpClient.wrapAndThrowHttpException(_httpClient.sendPostRequest(new URI(url), null, null));
     // to allow change propagation to QueryQuotaManager
@@ -490,7 +493,7 @@ public class QueryQuotaClusterIntegrationTest extends BaseClusterIntegrationTest
 
   public void setQueryQuotaForApplication(Integer maxQps)
       throws Exception {
-    String url = _controllerRequestURLBuilder.getBaseUrl() + "/applicationQuotas/default";
+    String url = getOrCreateAdminClient().getControllerBaseUrl() + "/applicationQuotas/default";
     if (maxQps != null) {
       url += "?maxQueriesPerSecond=" + maxQps;
     }
@@ -501,13 +504,9 @@ public class QueryQuotaClusterIntegrationTest extends BaseClusterIntegrationTest
   public void addQueryQuotaToClusterConfig(Integer maxQps)
       throws Exception {
     if (maxQps == null) {
-      HttpClient.wrapAndThrowHttpException(_httpClient.sendDeleteRequest(new URI(
-        _controllerRequestURLBuilder.forClusterConfigs() + "/"
-            + CommonConstants.Helix.DATABASE_MAX_QUERIES_PER_SECOND)));
+      deleteClusterConfig(CommonConstants.Helix.DATABASE_MAX_QUERIES_PER_SECOND);
     } else {
-      String payload = "{\"" + CommonConstants.Helix.DATABASE_MAX_QUERIES_PER_SECOND + "\":\"" + maxQps + "\"}";
-      HttpClient.wrapAndThrowHttpException(
-          _httpClient.sendJsonPostRequest(new URI(_controllerRequestURLBuilder.forClusterConfigs()), payload));
+      updateClusterConfig(Map.of(CommonConstants.Helix.DATABASE_MAX_QUERIES_PER_SECOND, String.valueOf(maxQps)));
     }
     // to allow change propagation to QueryQuotaManager
   }
@@ -515,13 +514,10 @@ public class QueryQuotaClusterIntegrationTest extends BaseClusterIntegrationTest
   public void addAppQueryQuotaToClusterConfig(Integer maxQps)
       throws Exception {
     if (maxQps == null) {
-      HttpClient.wrapAndThrowHttpException(_httpClient.sendDeleteRequest(new URI(
-          _controllerRequestURLBuilder.forClusterConfigs() + "/"
-              + CommonConstants.Helix.APPLICATION_MAX_QUERIES_PER_SECOND)));
+      deleteClusterConfig(CommonConstants.Helix.APPLICATION_MAX_QUERIES_PER_SECOND);
     } else {
-      String payload = "{\"" + CommonConstants.Helix.APPLICATION_MAX_QUERIES_PER_SECOND + "\":\"" + maxQps + "\"}";
-      HttpClient.wrapAndThrowHttpException(
-          _httpClient.sendJsonPostRequest(new URI(_controllerRequestURLBuilder.forClusterConfigs()), payload));
+      updateClusterConfig(
+          Map.of(CommonConstants.Helix.APPLICATION_MAX_QUERIES_PER_SECOND, String.valueOf(maxQps)));
     }
     // to allow change propagation to QueryQuotaManager
   }

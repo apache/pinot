@@ -334,6 +334,7 @@ public class TableViews {
     if (tableView._offline == null && tableView._realtime == null) {
       throw new ControllerApplicationException(LOGGER, "Table not found", Response.Status.NOT_FOUND);
     }
+
     return tableView;
   }
 
@@ -351,10 +352,19 @@ public class TableViews {
   private TableView getTableExternalView(String tableNameOptType, @Nullable TableType tableType) {
     TableView tableView = new TableView();
     if (tableType == null || tableType == TableType.OFFLINE) {
-      tableView._offline = getExternalView(tableNameOptType, TableType.OFFLINE);
+      Map<String, Map<String, String>> external = getExternalView(tableNameOptType, TableType.OFFLINE);
+      if (external == null || external.isEmpty()) {
+        // Fallback to ideal state if external view is not yet materialized.
+        external = getIdealState(tableNameOptType, TableType.OFFLINE);
+      }
+      tableView._offline = external;
     }
     if (tableType == null || tableType == TableType.REALTIME) {
-      tableView._realtime = getExternalView(tableNameOptType, TableType.REALTIME);
+      Map<String, Map<String, String>> external = getExternalView(tableNameOptType, TableType.REALTIME);
+      if (external == null || external.isEmpty()) {
+        external = getIdealState(tableNameOptType, TableType.REALTIME);
+      }
+      tableView._realtime = external;
     }
     return tableView;
   }

@@ -208,14 +208,14 @@ public class UpsertTableSegmentPreloadIntegrationTest extends BaseClusterIntegra
       throws Exception {
     // Pause consumption and wait until all consuming segments are committed and loaded as immutable segment
     String rawTableName = getTableName();
-    sendPostRequest(_controllerRequestURLBuilder.forPauseConsumption(rawTableName));
+    getOrCreateAdminClient().getTableClient().pauseConsumption(rawTableName);
     TestUtils.waitForCondition(aVoid -> {
       ExecutionStats executionStats =
           getPinotConnection().execute("SELECT COUNT(*) FROM " + rawTableName).getExecutionStats();
       return executionStats.getNumSegmentsQueried() == 5 && executionStats.getNumConsumingSegmentsQueried() == 0;
     }, 600_000L, "Failed to pause consumption");
     // Resume consumption to trigger snapshot
-    sendPostRequest(_controllerRequestURLBuilder.forResumeConsumption(rawTableName));
+    getOrCreateAdminClient().getTableClient().resumeConsumption(rawTableName, null);
 
     // All the immutable (committed and uploaded) segments should have snapshots generated
     String realtimeTableName = TableNameBuilder.REALTIME.tableNameWithType(rawTableName);

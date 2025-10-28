@@ -19,30 +19,29 @@
 package org.apache.pinot.controller.api.resources;
 
 import com.fasterxml.jackson.core.type.TypeReference;
-import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.util.List;
 import org.apache.helix.zookeeper.datamodel.ZNRecord;
-import org.apache.pinot.common.utils.URIUtils;
+import org.apache.pinot.client.admin.PinotAdminClient;
 import org.apache.pinot.controller.helix.ControllerTest;
 import org.testng.Assert;
 import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
 
+import static org.testng.Assert.expectThrows;
 
-public class ZookeeperResourceTest {
-  private static final ControllerTest TEST_INSTANCE = ControllerTest.getInstance();
 
+public class ZookeeperResourceTest extends ControllerTest {
   @BeforeClass
   public void setUp()
       throws Exception {
-    TEST_INSTANCE.setupSharedStateAndValidate();
+    setupSharedStateAndValidate();
   }
 
   @Test
   public void testZookeeperDataEndpoints()
       throws Exception {
-    String urlPut = TEST_INSTANCE.getControllerRequestURLBuilder().forZkPut();
+    PinotAdminClient adminClient = getOrCreateAdminClient();
     String path = "/zookeeper";
     int expectedVersion = -1;
     int accessOption = 1;
@@ -53,23 +52,19 @@ public class ZookeeperResourceTest {
 
     // CASE 1: Send data in query params form using HTTP PUT
     String path1 = path + "/testCase1";
-    String params =
-        "path=" + path1 + "&data=" + URIUtils.encode(data) + "&expectedVersion=" + expectedVersion + "&accessOption="
-            + accessOption;
-    String result = ControllerTest.sendPutRequest(urlPut + "?" + params);
+    String result =
+        adminClient.getZookeeperClient().putDataWithQueryParam(path1, data, expectedVersion, accessOption);
     Assert.assertTrue(result.toLowerCase().contains("successfully updated"));
 
     // validate zk/get results in correct data
-    String urlGet = TEST_INSTANCE.getControllerRequestURLBuilder().forZkGet(path1);
-    result = ControllerTest.sendGetRequest(urlGet);
+    result = adminClient.getZookeeperClient().getData(path1);
 
     ZNRecord znRecord = ZookeeperResource.MAPPER.readValue(result.getBytes(StandardCharsets.UTF_8), ZNRecord.class);
     Assert.assertEquals(znRecord.getId(), "QuickStartCluster");
     Assert.assertEquals(znRecord.getSimpleField("key"), "value");
 
     // validate zk/getChildren in parent path
-    urlGet = TEST_INSTANCE.getControllerRequestURLBuilder().forZkGetChildren(path);
-    result = ControllerTest.sendGetRequest(urlGet);
+    result = adminClient.getZookeeperClient().getChildren(path);
 
     List<ZNRecord> recordList1 = ZookeeperResource.MAPPER.readValue(result.getBytes(StandardCharsets.UTF_8),
         new TypeReference<List<ZNRecord>>() { });
@@ -94,23 +89,15 @@ public class ZookeeperResourceTest {
 
     // CASE 2: Fail when sending large data in query params
     String path2 = path + "/testCase2";
-    try {
-      params = "path=" + path2 + "&data=" + URIUtils.encode(largeData) + "&expectedVersion=" + expectedVersion
-          + "&accessOption=" + accessOption;
-      ControllerTest.sendPutRequest(urlPut + "?" + params);
-      Assert.fail("Should not get here, large payload");
-    } catch (IOException e) {
-      // Expected
-    }
+    expectThrows(RuntimeException.class,
+        () -> adminClient.getZookeeperClient().putDataWithQueryParam(path2, largeData, expectedVersion, accessOption));
 
     // CASE 3: Send large content data should return success
-    params = "path=" + path2 + "&expectedVersion=" + expectedVersion + "&accessOption=" + accessOption;
-    result = ControllerTest.sendPutRequest(urlPut + "?" + params, largeData);
+    result = adminClient.getZookeeperClient().putData(path2, largeData, expectedVersion, accessOption);
     Assert.assertTrue(result.toLowerCase().contains("successfully updated"));
 
     // validate that zk/getChildren return 2 items.
-    urlGet = TEST_INSTANCE.getControllerRequestURLBuilder().forZkGetChildren(path);
-    result = ControllerTest.sendGetRequest(urlGet);
+    result = adminClient.getZookeeperClient().getChildren(path);
 
     List<ZNRecord> recordList3 = ZookeeperResource.MAPPER.readValue(result.getBytes(StandardCharsets.UTF_8),
         new TypeReference<List<ZNRecord>>() { });
@@ -118,16 +105,13 @@ public class ZookeeperResourceTest {
 
     // CASE 4: put all children back into a different path
     String path4 = path + "/testCase4";
-    params = "path=" + path4 + "&expectedVersion=" + expectedVersion + "&accessOption=" + accessOption;
 
     // validate that zk/putChildren will insert all correctly to another path
-    urlPut = TEST_INSTANCE.getControllerRequestURLBuilder().forZkPutChildren(path);
     String encodedChildrenData = ZookeeperResource.MAPPER.writeValueAsString(recordList3);
-    result = ControllerTest.sendPutRequest(urlPut + "?" + params, encodedChildrenData);
+    result = adminClient.getZookeeperClient().putChildren(path4, encodedChildrenData, expectedVersion, accessOption);
 
     // validate that zk/getChildren from new path should result in the same recordList
-    urlGet = TEST_INSTANCE.getControllerRequestURLBuilder().forZkGetChildren(path);
-    result = ControllerTest.sendGetRequest(urlGet);
+    result = adminClient.getZookeeperClient().getChildren(path);
 
     List<ZNRecord> recordList4 = ZookeeperResource.MAPPER.readValue(result.getBytes(StandardCharsets.UTF_8),
         new TypeReference<List<ZNRecord>>() { });
