@@ -181,7 +181,7 @@ public class StaleSegmentCheckIntegrationTest extends BaseClusterIntegrationTest
   private Map<String, TableStaleSegmentResponse> getStaleSegmentsResponse()
       throws IOException {
     return JsonUtils.stringToObject(sendGetRequest(
-            _controllerRequestURLBuilder.forStaleSegments(
+            getAdminUrlBuilder().forStaleSegments(
                 TableNameBuilder.OFFLINE.tableNameWithType(getTableName()))),
         new TypeReference<Map<String, TableStaleSegmentResponse>>() { });
   }

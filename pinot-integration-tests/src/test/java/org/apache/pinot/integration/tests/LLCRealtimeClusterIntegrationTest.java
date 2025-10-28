@@ -142,7 +142,7 @@ public class LLCRealtimeClusterIntegrationTest extends BaseRealtimeClusterIntegr
       TestUtils.waitForCondition(() -> isOffline(partition, seqNum), 5000L, timeoutMs,
           "Failed to find offline segment in partition " + partition + " seqNum ", true,
           Duration.ofMillis(timeoutMs / 10));
-      getControllerRequestClient().runPeriodicTask("RealtimeSegmentValidationManager");
+      getOrCreateAdminClient().getClusterClient().runPeriodicTask("RealtimeSegmentValidationManager");
     }
   }
 
@@ -222,7 +222,7 @@ public class LLCRealtimeClusterIntegrationTest extends BaseRealtimeClusterIntegr
     if (onlyFirstSegment) {
       numSegments = 1;
     }
-    URI uploadSegmentHttpURI = URI.create(getControllerRequestURLBuilder().forSegmentUpload());
+    URI uploadSegmentHttpURI = URI.create(getAdminUrlBuilder().forSegmentUpload());
     try (FileUploadDownloadClient fileUploadDownloadClient = new FileUploadDownloadClient()) {
       if (numSegments == 1) {
         File segmentTarFile = segmentTarFiles[0];

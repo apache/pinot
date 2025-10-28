@@ -56,6 +56,8 @@ import org.apache.pinot.client.ResultSetGroup;
 import org.apache.pinot.common.helix.ExtraInstanceConfig;
 import org.apache.pinot.common.utils.SimpleHttpResponse;
 import org.apache.pinot.common.utils.helix.HelixHelper;
+import org.apache.pinot.common.utils.http.HttpClient;
+import org.apache.pinot.common.utils.http.HttpClientConfig;
 import org.apache.pinot.common.utils.tls.TlsUtils;
 import org.apache.pinot.controller.ControllerConf;
 import org.apache.pinot.controller.helix.core.minion.TaskSchedulingContext;
@@ -95,11 +97,28 @@ public class TlsIntegrationTest extends BaseClusterIntegrationTest {
   private int _externalControllerPort;
   private int _internalBrokerPort;
   private int _externalBrokerPort;
+  private javax.net.ssl.SSLContext _sslContext;
 
   @BeforeClass
   public void setUp()
       throws Exception {
     TestUtils.ensureDirectoriesExistAndEmpty(_tempDir);
+    java.security.KeyStore keyStore = java.security.KeyStore.getInstance(PKCS_12);
+    try (java.io.InputStream ksStream =
+        new java.io.FileInputStream(new File(Objects.requireNonNull(TLS_STORE_PKCS_12).toURI()))) {
+      keyStore.load(ksStream, PASSWORD_CHAR);
+    }
+    java.security.KeyStore trustStore = java.security.KeyStore.getInstance(PKCS_12);
+    try (java.io.InputStream tsStream =
+        new java.io.FileInputStream(new File(Objects.requireNonNull(TLS_STORE_PKCS_12).toURI()))) {
+      trustStore.load(tsStream, PASSWORD_CHAR);
+    }
+    _sslContext = org.apache.hc.core5.ssl.SSLContexts.custom()
+        .loadKeyMaterial(keyStore, PASSWORD_CHAR)
+        .loadTrustMaterial(trustStore, null)
+        .build();
+    TlsUtils.setSslContext(_sslContext);
+    _httpClient = new HttpClient(HttpClientConfig.DEFAULT_HTTP_CLIENT_CONFIG, _sslContext);
 
     startZk();
     startController();
@@ -247,6 +266,11 @@ public class TlsIntegrationTest extends BaseClusterIntegrationTest {
   }
 
   @Override
+  protected javax.net.ssl.SSLContext getControllerTransportSslContext() {
+    return _sslContext;
+  }
+
+  @Override
   protected TableTaskConfig getTaskConfig() {
     Map<String, String> prop = new HashMap<>();
     prop.put("bucketTimePeriod", "30d");
@@ -258,7 +282,8 @@ public class TlsIntegrationTest extends BaseClusterIntegrationTest {
   public void addSchema(Schema schema)
       throws IOException {
     SimpleHttpResponse response =
-        sendMultipartPostRequest(_controllerRequestURLBuilder.forSchemaCreate(), schema.toSingleLineJsonString(),
+        sendMultipartPostRequest(getAdminUrlBuilder().forSchemaCreate(),
+            schema.toSingleLineJsonString(),
             AUTH_HEADER);
     Assert.assertEquals(response.getStatusCode(), 200);
   }
@@ -266,7 +291,8 @@ public class TlsIntegrationTest extends BaseClusterIntegrationTest {
   @Override
   public void addTableConfig(TableConfig tableConfig)
       throws IOException {
-    sendPostRequest(_controllerRequestURLBuilder.forTableCreate(), tableConfig.toJsonString(), AUTH_HEADER);
+    sendPostRequest(getAdminUrlBuilder().forTableCreate(),
+        tableConfig.toJsonString(), AUTH_HEADER);
   }
 
   @Override
@@ -287,7 +313,8 @@ public class TlsIntegrationTest extends BaseClusterIntegrationTest {
   public void dropRealtimeTable(String tableName)
       throws IOException {
     sendDeleteRequest(
-        _controllerRequestURLBuilder.forTableDelete(TableNameBuilder.REALTIME.tableNameWithType(tableName)),
+        getAdminUrlBuilder()
+            .forTableDelete(TableNameBuilder.REALTIME.tableNameWithType(tableName)),
         AUTH_HEADER);
   }
 
@@ -467,7 +494,8 @@ public class TlsIntegrationTest extends BaseClusterIntegrationTest {
   public void testUnauthenticatedFailure()
       throws IOException {
     sendDeleteRequest(
-        _controllerRequestURLBuilder.forTableDelete(TableNameBuilder.REALTIME.tableNameWithType("mytable")));
+        getAdminUrlBuilder()
+            .forTableDelete(TableNameBuilder.REALTIME.tableNameWithType("mytable")));
   }
 
   @Test
@@ -484,7 +512,8 @@ public class TlsIntegrationTest extends BaseClusterIntegrationTest {
     // wait for offline segments
     JsonNode offlineSegments = TestUtils.waitForResult(() -> {
       JsonNode segmentSets = JsonUtils.stringToJsonNode(
-          sendGetRequest(_controllerRequestURLBuilder.forSegmentListAPI(getTableName()), AUTH_HEADER));
+          sendGetRequest(getAdminUrlBuilder().forSegmentListAPI(getTableName()),
+              AUTH_HEADER));
       JsonNode currentOfflineSegments =
           new IntRange(0, segmentSets.size()).stream().map(segmentSets::get).filter(s -> s.has("OFFLINE"))
               .map(s -> s.get("OFFLINE")).findFirst().get();
@@ -500,7 +529,9 @@ public class TlsIntegrationTest extends BaseClusterIntegrationTest {
     for (int i = 0; i < offlineSegments.size(); i++) {
       String segment = offlineSegments.get(i).asText();
       Assert.assertTrue(
-          sendGetRequest(_controllerRequestURLBuilder.forSegmentDownload(getTableName(), segment), AUTH_HEADER).length()
+          sendGetRequest(
+              getAdminUrlBuilder().forSegmentDownload(getTableName(), segment),
+              AUTH_HEADER).length()
               > 200000); // download segment
     }
   }

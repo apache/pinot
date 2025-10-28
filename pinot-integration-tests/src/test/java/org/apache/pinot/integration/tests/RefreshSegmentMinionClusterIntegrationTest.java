@@ -332,7 +332,8 @@ public class RefreshSegmentMinionClusterIntegrationTest extends BaseClusterInteg
         List.of("DivAirportSeqIDs", "NewAddedDerivedDivAirportSeqIDs", "NewAddedDerivedDivAirportSeqIDsString",
             "NewAddedRawDerivedStringDimension", "NewAddedRawDerivedMVIntDimension", "NewAddedDerivedNullString");
     JsonNode columnIndexSizeMap = JsonUtils.stringToJsonNode(
-            sendGetRequest(_controllerRequestURLBuilder.forTableAggregateMetadata(getTableName(), columns)))
+            sendGetRequest(getAdminUrlBuilder()
+                .forTableAggregateMetadata(getTableName(), columns)))
         .get("columnIndexSizeMap");
     assertEquals(columnIndexSizeMap.size(), 6);
     JsonNode originalColumnIndexSizes = columnIndexSizeMap.get("DivAirportSeqIDs");

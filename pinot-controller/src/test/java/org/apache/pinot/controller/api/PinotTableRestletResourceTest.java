@@ -95,7 +95,7 @@ public class PinotTableRestletResourceTest extends ControllerTest {
       throws Exception {
     DEFAULT_INSTANCE.setupSharedStateAndValidate();
     registerMinionTasks();
-    _createTableUrl = DEFAULT_INSTANCE.getControllerRequestURLBuilder().forTableCreate();
+    _createTableUrl = DEFAULT_INSTANCE.getAdminUrlBuilder().forTableCreate();
   }
 
   private TableConfigBuilder getRealtimeTableBuilder(String tableName) {
@@ -289,7 +289,7 @@ public class PinotTableRestletResourceTest extends ControllerTest {
         new TableTaskConfig(Map.of(MinionConstants.SegmentGenerationAndPushTask.TASK_TYPE,
             Map.of(PinotTaskManager.SCHEDULE_KEY, "5 5 5 5 5 5 5")))).build();
     try {
-      sendPutRequest(DEFAULT_INSTANCE.getControllerRequestURLBuilder().forUpdateTableConfig(rawTableName),
+      sendPutRequest(DEFAULT_INSTANCE.getAdminUrlBuilder().forUpdateTableConfig(rawTableName),
           tableConfig.toJsonString());
       fail("Update of an OFFLINE table with an invalid cron expression does not fail");
     } catch (IOException e) {
@@ -374,7 +374,7 @@ public class PinotTableRestletResourceTest extends ControllerTest {
 
   private TableConfig getTableConfig(String tableName, String tableType)
       throws Exception {
-    String tableConfigString = sendGetRequest(DEFAULT_INSTANCE.getControllerRequestURLBuilder().forTableGet(tableName));
+    String tableConfigString = sendGetRequest(DEFAULT_INSTANCE.getAdminUrlBuilder().forTableGet(tableName));
     return JsonUtils.jsonNodeToObject(JsonUtils.stringToJsonNode(tableConfigString).get(tableType), TableConfig.class);
   }
 
@@ -394,7 +394,7 @@ public class PinotTableRestletResourceTest extends ControllerTest {
     tableConfig.getValidationConfig().setRetentionTimeValue("10");
 
     JsonNode jsonResponse = JsonUtils.stringToJsonNode(
-        sendPutRequest(DEFAULT_INSTANCE.getControllerRequestURLBuilder().forUpdateTableConfig(tableName),
+        sendPutRequest(DEFAULT_INSTANCE.getAdminUrlBuilder().forUpdateTableConfig(tableName),
             tableConfig.toJsonString()));
     assertTrue(jsonResponse.has("status"));
 
@@ -413,7 +413,7 @@ public class PinotTableRestletResourceTest extends ControllerTest {
 
     QuotaConfig quota = new QuotaConfig("10G", "100.0");
     tableConfig.setQuotaConfig(quota);
-    sendPutRequest(DEFAULT_INSTANCE.getControllerRequestURLBuilder().forUpdateTableConfig(tableName),
+    sendPutRequest(DEFAULT_INSTANCE.getAdminUrlBuilder().forUpdateTableConfig(tableName),
         tableConfig.toJsonString());
     modifiedConfig = getTableConfig(tableName, "REALTIME");
     assertNotNull(modifiedConfig.getQuotaConfig());
@@ -424,7 +424,7 @@ public class PinotTableRestletResourceTest extends ControllerTest {
       // table does not exist
       ObjectNode tableConfigJson = (ObjectNode) tableConfig.toJsonNode();
       tableConfigJson.put(TableConfig.TABLE_NAME_KEY, "noSuchTable_REALTIME");
-      sendPutRequest(DEFAULT_INSTANCE.getControllerRequestURLBuilder().forUpdateTableConfig("noSuchTable"),
+      sendPutRequest(DEFAULT_INSTANCE.getAdminUrlBuilder().forUpdateTableConfig("noSuchTable"),
           tableConfigJson.toString());
     } catch (Exception e) {
       assertTrue(e instanceof IOException);
@@ -436,7 +436,7 @@ public class PinotTableRestletResourceTest extends ControllerTest {
     List<String> tables = getTableNames(_createTableUrl + "?type=offline");
     tables.addAll(getTableNames(_createTableUrl + "?type=realtime"));
     for (String tableName : tables) {
-      sendDeleteRequest(DEFAULT_INSTANCE.getControllerRequestURLBuilder().forTableDelete(tableName));
+      sendDeleteRequest(DEFAULT_INSTANCE.getAdminUrlBuilder().forTableDelete(tableName));
     }
   }
 
@@ -494,14 +494,14 @@ public class PinotTableRestletResourceTest extends ControllerTest {
     taskTypeMap.put(MinionConstants.MergeRollupTask.TASK_TYPE, new HashMap<>());
     offlineTableConfig2.setTaskConfig(new TableTaskConfig(taskTypeMap));
     JsonUtils.stringToJsonNode(
-        sendPutRequest(DEFAULT_INSTANCE.getControllerRequestURLBuilder().forUpdateTableConfig(rawTableName2),
+        sendPutRequest(DEFAULT_INSTANCE.getAdminUrlBuilder().forUpdateTableConfig(rawTableName2),
             offlineTableConfig2.toJsonString()));
     // update for pqr_REALTIME
     taskTypeMap = new HashMap<>();
     taskTypeMap.put(MinionConstants.RealtimeToOfflineSegmentsTask.TASK_TYPE, new HashMap<>());
     realtimeTableConfig1.setTaskConfig(new TableTaskConfig(taskTypeMap));
     JsonUtils.stringToJsonNode(
-        sendPutRequest(DEFAULT_INSTANCE.getControllerRequestURLBuilder().forUpdateTableConfig(rawTableName1),
+        sendPutRequest(DEFAULT_INSTANCE.getAdminUrlBuilder().forUpdateTableConfig(rawTableName1),
             realtimeTableConfig1.toJsonString()));
 
     // list lastModified, taskType
@@ -521,7 +521,7 @@ public class PinotTableRestletResourceTest extends ControllerTest {
     taskTypeMap.put(MinionConstants.MergeRollupTask.TASK_TYPE, new HashMap<>());
     offlineTableConfig1.setTaskConfig(new TableTaskConfig(taskTypeMap));
     JsonUtils.stringToJsonNode(
-        sendPutRequest(DEFAULT_INSTANCE.getControllerRequestURLBuilder().forUpdateTableConfig(rawTableName1),
+        sendPutRequest(DEFAULT_INSTANCE.getAdminUrlBuilder().forUpdateTableConfig(rawTableName1),
             offlineTableConfig1.toJsonString()));
 
     // list lastModified, taskType
@@ -543,7 +543,7 @@ public class PinotTableRestletResourceTest extends ControllerTest {
   @Test(expectedExceptions = IOException.class)
   public void rebalanceNonExistentTable()
       throws Exception {
-    sendPostRequest(DEFAULT_INSTANCE.getControllerRequestURLBuilder().forTableRebalance(OFFLINE_TABLE_NAME, "realtime"),
+    sendPostRequest(DEFAULT_INSTANCE.getAdminUrlBuilder().forTableRebalance(OFFLINE_TABLE_NAME, "realtime"),
         null);
   }
 
@@ -555,7 +555,7 @@ public class PinotTableRestletResourceTest extends ControllerTest {
 
     // Rebalance should return status NO_OP
     RebalanceResult rebalanceResult = JsonUtils.stringToObject(sendPostRequest(
-            DEFAULT_INSTANCE.getControllerRequestURLBuilder().forTableRebalance(OFFLINE_TABLE_NAME, "offline"), null),
+            DEFAULT_INSTANCE.getAdminUrlBuilder().forTableRebalance(OFFLINE_TABLE_NAME, "offline"), null),
         RebalanceResult.class);
     assertEquals(rebalanceResult.getStatus(), RebalanceResult.Status.NO_OP);
   }
@@ -664,7 +664,7 @@ public class PinotTableRestletResourceTest extends ControllerTest {
   @Test(dataProvider = "tableTypeProvider")
   public void testDeleteTableWithLogicalTable(TableType tableType)
       throws IOException {
-    ControllerRequestURLBuilder urlBuilder = DEFAULT_INSTANCE.getControllerRequestURLBuilder();
+    ControllerRequestURLBuilder urlBuilder = DEFAULT_INSTANCE.getAdminUrlBuilder();
     String logicalTable = "logicalTable";
     String tableName = "physicalTable";
     String tableNameWithType = TableNameBuilder.forType(tableType).tableNameWithType(tableName);
@@ -820,7 +820,7 @@ public class PinotTableRestletResourceTest extends ControllerTest {
 
     // update table with unrecognizedProperties
     String updateResponse =
-        sendPutRequest(DEFAULT_INSTANCE.getControllerRequestURLBuilder().forUpdateTableConfig(tableName),
+        sendPutRequest(DEFAULT_INSTANCE.getAdminUrlBuilder().forUpdateTableConfig(tableName),
             jsonNode.toString());
     assertEquals(updateResponse,
         "{\"unrecognizedProperties\":{\"/illegalKey1\":1,\"/illegalKey2/illegalKey3\":2},\"status\":\"Table "
@@ -952,7 +952,7 @@ public class PinotTableRestletResourceTest extends ControllerTest {
     DEFAULT_INSTANCE.addDummySchema(logicalTableName);
     LogicalTableConfig logicalTableConfig = ControllerTest.getDummyLogicalTableConfig(
         logicalTableName, List.of(offlineTableConfig.getTableName()), "DefaultTenant");
-    String addLogicalTableUrl = DEFAULT_INSTANCE.getControllerRequestURLBuilder().forLogicalTableCreate();
+    String addLogicalTableUrl = DEFAULT_INSTANCE.getAdminUrlBuilder().forLogicalTableCreate();
     String logicalTableResponse = sendPostRequest(addLogicalTableUrl, logicalTableConfig.toSingleLineJsonString());
     assertEquals(logicalTableResponse,
         "{\"unrecognizedProperties\":{},\"status\":\"testTable_LOGICAL logical table successfully added.\"}");
@@ -970,20 +970,20 @@ public class PinotTableRestletResourceTest extends ControllerTest {
       throws IOException {
     // Attempt to get a non-existent table config
     String tableName = "nonExistentTable";
-    String url = DEFAULT_INSTANCE.getControllerRequestURLBuilder().forTableGet(tableName);
+    String url = DEFAULT_INSTANCE.getAdminUrlBuilder().forTableGet(tableName);
     Pair<Integer, String> respWithStatusCode = sendGetRequestWithStatusCode(url, null);
     assertEquals(Response.Status.NOT_FOUND.getStatusCode(), respWithStatusCode.getLeft());
     String msg = respWithStatusCode.getRight();
     assertTrue(msg.contains("Table nonExistentTable does not exist"), msg);
 
     // Attempt to get a non-existent table config with type
-    String offlineUrl = DEFAULT_INSTANCE.getControllerRequestURLBuilder().forTableGet(tableName, TableType.OFFLINE);
+    String offlineUrl = DEFAULT_INSTANCE.getAdminUrlBuilder().forTableGet(tableName, TableType.OFFLINE);
     respWithStatusCode = sendGetRequestWithStatusCode(offlineUrl, null);
     assertEquals(Response.Status.NOT_FOUND.getStatusCode(), respWithStatusCode.getLeft());
     msg = respWithStatusCode.getRight();
     assertTrue(msg.contains("Table nonExistentTable_OFFLINE does not exist"), msg);
 
-    String realtimeUrl = DEFAULT_INSTANCE.getControllerRequestURLBuilder().forTableGet(tableName, TableType.REALTIME);
+    String realtimeUrl = DEFAULT_INSTANCE.getAdminUrlBuilder().forTableGet(tableName, TableType.REALTIME);
     respWithStatusCode = sendGetRequestWithStatusCode(realtimeUrl, null);
     assertEquals(Response.Status.NOT_FOUND.getStatusCode(), respWithStatusCode.getLeft());
     msg = respWithStatusCode.getRight();
@@ -1077,15 +1077,15 @@ public class PinotTableRestletResourceTest extends ControllerTest {
 
     String encodedISPath =
         URLEncoder.encode("/ControllerTest/IDEALSTATES/" + tableNameWithType, Charset.defaultCharset());
-    sendDeleteRequest(DEFAULT_INSTANCE.getControllerRequestURLBuilder().forZkDelete(encodedISPath));
+    sendDeleteRequest(DEFAULT_INSTANCE.getAdminUrlBuilder().forZkDelete(encodedISPath));
     // Table deletion will throw exception but internally it should clean up all the dangling table resources
     Assert.expectThrows(IOException.class,
-        () -> sendDeleteRequest(DEFAULT_INSTANCE.getControllerRequestURLBuilder().forTableDelete(tableName)));
+        () -> sendDeleteRequest(DEFAULT_INSTANCE.getAdminUrlBuilder().forTableDelete(tableName)));
 
     String encodedTableConfigPath = URLEncoder.encode("/ControllerTest/PROPERTYSTORE/CONFIGS/TABLE/"
         + tableNameWithType, Charset.defaultCharset());
     try {
-      sendGetRequest(DEFAULT_INSTANCE.getControllerRequestURLBuilder().forZkGet(encodedTableConfigPath));
+      sendGetRequest(DEFAULT_INSTANCE.getAdminUrlBuilder().forZkGet(encodedTableConfigPath));
       fail("Table config node should be deleted so get request should fail");
     } catch (IOException e) {
       assertTrue(e.getMessage().contains(tableNameWithType + " does not exist"));
@@ -1109,7 +1109,7 @@ public class PinotTableRestletResourceTest extends ControllerTest {
         "{\"unrecognizedProperties\":{},\"status\":\"Table testTableTasksValidation_OFFLINE successfully added\"}");
 
     // Clean up
-    sendDeleteRequest(DEFAULT_INSTANCE.getControllerRequestURLBuilder().forTableDelete(tableName));
+    sendDeleteRequest(DEFAULT_INSTANCE.getAdminUrlBuilder().forTableDelete(tableName));
   }
 
   @Test
@@ -1137,7 +1137,7 @@ public class PinotTableRestletResourceTest extends ControllerTest {
     waitForTaskState(taskName, TaskState.IN_PROGRESS);
 
     // Now try to create another table with same name (simulating re-creation with dangling tasks)
-    sendDeleteRequest(DEFAULT_INSTANCE.getControllerRequestURLBuilder()
+    sendDeleteRequest(DEFAULT_INSTANCE.getAdminUrlBuilder()
         .forTableDelete(tableName + "?ignoreActiveTasks=true"));
 
     try {
@@ -1149,7 +1149,7 @@ public class PinotTableRestletResourceTest extends ControllerTest {
 
     // Clean up any remaining tasks
     try {
-      sendDeleteRequest(DEFAULT_INSTANCE.getControllerRequestURLBuilder()
+      sendDeleteRequest(DEFAULT_INSTANCE.getAdminUrlBuilder()
           .forTableDelete(tableName + "?ignoreActiveTasks=true"));
     } catch (Exception ignored) {
       // Ignore if table doesn't exist
@@ -1170,7 +1170,7 @@ public class PinotTableRestletResourceTest extends ControllerTest {
         + "\"status\":\"Table testTableTasksValidationNullConfig_OFFLINE successfully added\"}");
 
     // Clean up
-    sendDeleteRequest(DEFAULT_INSTANCE.getControllerRequestURLBuilder().forTableDelete(tableName));
+    sendDeleteRequest(DEFAULT_INSTANCE.getAdminUrlBuilder().forTableDelete(tableName));
   }
 
   @Test
@@ -1198,16 +1198,16 @@ public class PinotTableRestletResourceTest extends ControllerTest {
     waitForTaskState(taskName, TaskState.IN_PROGRESS);
 
     // stop the task queue to abort the task
-    sendPutRequest(DEFAULT_INSTANCE.getControllerRequestURLBuilder()
+    sendPutRequest(DEFAULT_INSTANCE.getAdminUrlBuilder()
         .forStopMinionTaskQueue(MinionConstants.SegmentGenerationAndPushTask.TASK_TYPE));
     waitForTaskState(taskName, TaskState.STOPPED);
     // resume the task queue again to avoid affecting other tests
-    sendPutRequest(DEFAULT_INSTANCE.getControllerRequestURLBuilder()
+    sendPutRequest(DEFAULT_INSTANCE.getAdminUrlBuilder()
         .forResumeMinionTaskQueue(MinionConstants.SegmentGenerationAndPushTask.TASK_TYPE));
 
     // Delete table - should succeed and clean up tasks
     String deleteResponse = sendDeleteRequest(
-        DEFAULT_INSTANCE.getControllerRequestURLBuilder().forTableDelete(tableName));
+        DEFAULT_INSTANCE.getAdminUrlBuilder().forTableDelete(tableName));
     assertEquals(deleteResponse, "{\"status\":\"Tables: [" + tableName + "_OFFLINE] deleted\"}");
   }
 
@@ -1215,7 +1215,7 @@ public class PinotTableRestletResourceTest extends ControllerTest {
     TestUtils.waitForCondition((aVoid) -> {
       String response;
       try {
-        response = sendGetRequest(DEFAULT_INSTANCE.getControllerRequestURLBuilder().forMinionTaskState(taskName));
+        response = sendGetRequest(DEFAULT_INSTANCE.getAdminUrlBuilder().forMinionTaskState(taskName));
       } catch (IOException e) {
         return false;
       }
@@ -1248,7 +1248,7 @@ public class PinotTableRestletResourceTest extends ControllerTest {
     waitForTaskState(taskName, TaskState.IN_PROGRESS);
     try {
       // Try to delete table without ignoring active tasks - should fail
-      sendDeleteRequest(DEFAULT_INSTANCE.getControllerRequestURLBuilder().forTableDelete(tableName));
+      sendDeleteRequest(DEFAULT_INSTANCE.getAdminUrlBuilder().forTableDelete(tableName));
       fail("Table deletion should fail when active tasks exist");
     } catch (IOException e) {
       assertTrue(e.getMessage().contains("The table has") && e.getMessage().contains("active running tasks"));
@@ -1256,11 +1256,11 @@ public class PinotTableRestletResourceTest extends ControllerTest {
 
     // Delete table with ignoreActiveTasks flag - should succeed
     String deleteResponse = sendDeleteRequest(
-        DEFAULT_INSTANCE.getControllerRequestURLBuilder().forTableDelete(tableName + "?ignoreActiveTasks=true"));
+        DEFAULT_INSTANCE.getAdminUrlBuilder().forTableDelete(tableName + "?ignoreActiveTasks=true"));
     assertEquals(deleteResponse, "{\"status\":\"Tables: [" + tableName + "_OFFLINE] deleted\"}");
 
     // delete task
-    sendDeleteRequest(DEFAULT_INSTANCE.getControllerRequestURLBuilder().forDeleteMinionTask(taskName)
+    sendDeleteRequest(DEFAULT_INSTANCE.getAdminUrlBuilder().forDeleteMinionTask(taskName)
         + "?forceDelete=true");
   }
 
@@ -1277,7 +1277,7 @@ public class PinotTableRestletResourceTest extends ControllerTest {
 
     // Delete table - should succeed even with null task config
     String deleteResponse = sendDeleteRequest(
-        DEFAULT_INSTANCE.getControllerRequestURLBuilder().forTableDelete(tableName));
+        DEFAULT_INSTANCE.getAdminUrlBuilder().forTableDelete(tableName));
     assertEquals(deleteResponse, "{\"status\":\"Tables: [" + tableName + "_OFFLINE] deleted\"}");
   }
 

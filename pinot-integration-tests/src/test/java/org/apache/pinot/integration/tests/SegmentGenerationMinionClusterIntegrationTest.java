@@ -157,7 +157,7 @@ public class SegmentGenerationMinionClusterIntegrationTest extends BaseClusterIn
     addSchema(new Schema.SchemaBuilder().setSchemaName(tableName).addSingleValueDimension("id", FieldSpec.DataType.INT)
         .addSingleValueDimension("name", FieldSpec.DataType.STRING).build());
     TableConfig tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName(tableName).build();
-    sendPostRequest(_controllerRequestURLBuilder.forTableCreate(), tableConfig.toString(),
+    sendPostRequest(getAdminUrlBuilder().forTableCreate(), tableConfig.toString(),
         BasicAuthTestUtils.AUTH_HEADER);
   }
 

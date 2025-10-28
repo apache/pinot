@@ -102,7 +102,8 @@ public class KafkaConsumingSegmentToBeMovedSummaryIntegrationTest extends BaseRe
   public void testConsumingSegmentSummary()
       throws Exception {
     String response = sendPostRequest(
-        getControllerRequestURLBuilder().forTableRebalance(getTableName(), "REALTIME", true, false, true, false, -1));
+        getAdminUrlBuilder().forTableRebalance(getTableName(), "REALTIME", true,
+            false, true, false, -1));
     RebalanceResult result = JsonUtils.stringToObject(response, RebalanceResult.class);
     Assert.assertNotNull(result);
     Assert.assertNotNull(result.getRebalanceSummaryResult());
@@ -118,7 +119,8 @@ public class KafkaConsumingSegmentToBeMovedSummaryIntegrationTest extends BaseRe
 
     startServer();
     response = sendPostRequest(
-        getControllerRequestURLBuilder().forTableRebalance(getTableName(), "REALTIME", true, false, true, false, -1));
+        getAdminUrlBuilder().forTableRebalance(getTableName(), "REALTIME", true,
+            false, true, false, -1));
     result = JsonUtils.stringToObject(response, RebalanceResult.class);
     Assert.assertNotNull(result);
     Assert.assertNotNull(result.getRebalanceSummaryResult());
@@ -144,7 +146,8 @@ public class KafkaConsumingSegmentToBeMovedSummaryIntegrationTest extends BaseRe
 
     // set includeConsuming to false
     response = sendPostRequest(
-        getControllerRequestURLBuilder().forTableRebalance(getTableName(), "REALTIME", true, false, false, false, -1));
+        getAdminUrlBuilder().forTableRebalance(getTableName(), "REALTIME", true,
+            false, false, false, -1));
     result = JsonUtils.stringToObject(response, RebalanceResult.class);
     Assert.assertNotNull(result);
     Assert.assertNotNull(result.getRebalanceSummaryResult());
@@ -159,7 +162,8 @@ public class KafkaConsumingSegmentToBeMovedSummaryIntegrationTest extends BaseRe
 
     stopKafka();
     response = sendPostRequest(
-        getControllerRequestURLBuilder().forTableRebalance(getTableName(), "REALTIME", true, false, true, false, -1));
+        getAdminUrlBuilder().forTableRebalance(getTableName(), "REALTIME", true,
+            false, true, false, -1));
     RebalanceResult resultNoInfo = JsonUtils.stringToObject(response, RebalanceResult.class);
     Assert.assertNotNull(resultNoInfo);
     Assert.assertNotNull(resultNoInfo.getRebalanceSummaryResult());

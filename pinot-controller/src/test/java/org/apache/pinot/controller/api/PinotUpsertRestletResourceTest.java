@@ -54,7 +54,7 @@ public class PinotUpsertRestletResourceTest {
     TableAndSchemaConfig tableAndSchemaConfig = new TableAndSchemaConfig(tableConfig, schema);
 
     String estimateHeapUsageUrl =
-        TEST_INSTANCE.getControllerRequestURLBuilder().forUpsertTableHeapEstimation(10000, 48, 8);
+        TEST_INSTANCE.getAdminUrlBuilder().forUpsertTableHeapEstimation(10000, 48, 8);
 
     JsonNode result = JsonUtils.stringToJsonNode(
         ControllerTest.sendPostRequest(estimateHeapUsageUrl, tableAndSchemaConfig.toJsonString()));

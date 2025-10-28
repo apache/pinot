@@ -140,7 +140,8 @@ public class SegmentUploadIntegrationTest extends BaseClusterIntegrationTest {
     jobSpec.setOutputDirURI(_tarDir.getAbsolutePath());
     TableSpec tableSpec = new TableSpec();
     tableSpec.setTableName(getTableName());
-    tableSpec.setTableConfigURI(_controllerRequestURLBuilder.forUpdateTableConfig(getTableName()));
+    tableSpec.setTableConfigURI(
+        getAdminUrlBuilder().forUpdateTableConfig(getTableName()));
     jobSpec.setTableSpec(tableSpec);
     PinotClusterSpec clusterSpec = new PinotClusterSpec();
     clusterSpec.setControllerURI(getControllerBaseApiUrl());
@@ -239,7 +240,8 @@ public class SegmentUploadIntegrationTest extends BaseClusterIntegrationTest {
     jobSpec.setOutputDirURI(_tarDir.getAbsolutePath());
     TableSpec tableSpec = new TableSpec();
     tableSpec.setTableName(getTableName() + "_OFFLINE");
-    tableSpec.setTableConfigURI(_controllerRequestURLBuilder.forUpdateTableConfig(getTableName()));
+    tableSpec.setTableConfigURI(
+        getAdminUrlBuilder().forUpdateTableConfig(getTableName()));
     jobSpec.setTableSpec(tableSpec);
     PinotClusterSpec clusterSpec = new PinotClusterSpec();
     clusterSpec.setControllerURI(getControllerBaseApiUrl());
@@ -264,7 +266,7 @@ public class SegmentUploadIntegrationTest extends BaseClusterIntegrationTest {
     JsonNode segmentsList = getSegmentsList();
     Assert.assertEquals(segmentsList.size(), 12);
     long numDocs = 0;
-    for (JsonNode segmentName: segmentsList) {
+    for (JsonNode segmentName : segmentsList) {
       numDocs += getNumDocs(segmentName.asText());
     }
     testCountStar(numDocs);
@@ -312,7 +314,8 @@ public class SegmentUploadIntegrationTest extends BaseClusterIntegrationTest {
     jobSpec.setOutputDirURI(_tarDir.getAbsolutePath());
     TableSpec tableSpec = new TableSpec();
     tableSpec.setTableName(getTableName());
-    tableSpec.setTableConfigURI(_controllerRequestURLBuilder.forUpdateTableConfig(getTableName()));
+    tableSpec.setTableConfigURI(
+        getAdminUrlBuilder().forUpdateTableConfig(getTableName()));
     jobSpec.setTableSpec(tableSpec);
     PinotClusterSpec clusterSpec = new PinotClusterSpec();
     clusterSpec.setControllerURI(getControllerBaseApiUrl());
@@ -411,14 +414,17 @@ public class SegmentUploadIntegrationTest extends BaseClusterIntegrationTest {
   private long getNumDocs(String segmentName)
       throws IOException {
     return JsonUtils.stringToJsonNode(
-            sendGetRequest(_controllerRequestURLBuilder.forSegmentMetadata(getTableName(), segmentName)))
+            sendGetRequest(
+                getAdminUrlBuilder().forSegmentMetadata(getTableName(),
+                    segmentName)))
         .get("segment.total.docs").asLong();
   }
 
   private JsonNode getSegmentsList()
       throws IOException {
     return JsonUtils.stringToJsonNode(sendGetRequest(
-            _controllerRequestURLBuilder.forSegmentListAPI(getTableName(), TableType.OFFLINE.toString())))
+            getAdminUrlBuilder()
+                .forSegmentListAPI(getTableName(), TableType.OFFLINE.toString())))
         .get(0).get("OFFLINE");
   }
 

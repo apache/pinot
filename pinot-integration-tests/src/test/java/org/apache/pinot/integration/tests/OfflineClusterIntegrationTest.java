@@ -481,7 +481,7 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
         TableNameBuilder.extractRawTableName(offlineTableName));
     parameters.add(tableNameParameter);
 
-    URI uploadSegmentHttpURI = URI.create(getControllerRequestURLBuilder().forSegmentUpload());
+    URI uploadSegmentHttpURI = URI.create(getAdminUrlBuilder().forSegmentUpload());
     try (FileUploadDownloadClient fileUploadDownloadClient = new FileUploadDownloadClient()) {
       // Refresh non-existing segment
       File segmentTarFile = segmentTarFiles[0];

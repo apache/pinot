@@ -19,10 +19,12 @@
 package org.apache.pinot.client.admin;
 
 import com.fasterxml.jackson.databind.JsonNode;
+import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.CompletableFuture;
+import javax.annotation.Nullable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -54,8 +56,8 @@ public class PinotTableAdminClient {
    * @return List of table names
    * @throws PinotAdminException If the request fails
    */
-  public List<String> listTables(String tableType, String taskType,
-      String sortType)
+  public List<String> listTables(@Nullable String tableType, @Nullable String taskType,
+      @Nullable String sortType)
       throws PinotAdminException {
     Map<String, String> queryParams = new HashMap<>();
     if (tableType != null) {
@@ -86,6 +88,24 @@ public class PinotTableAdminClient {
   }
 
   /**
+   * Gets the configuration for a specific table and type (OFFLINE/REALTIME).
+   *
+   * @param tableName Name of the table (without type suffix)
+   * @param tableType Table type string (e.g., "OFFLINE" or "REALTIME")
+   * @return Table configuration as JSON string
+   * @throws PinotAdminException If the request fails
+   */
+  public String getTableConfig(String tableName, @Nullable String tableType)
+      throws PinotAdminException {
+    Map<String, String> queryParams = new HashMap<>();
+    if (tableType != null) {
+      queryParams.put("type", tableType);
+    }
+    JsonNode response = _transport.executeGet(_controllerAddress, "/tables/" + tableName, queryParams, _headers);
+    return response.toString();
+  }
+
+  /**
    * Creates a new table with the specified configuration.
    *
    * @param tableConfig Table configuration as JSON string
@@ -93,7 +113,7 @@ public class PinotTableAdminClient {
    * @return Success response
    * @throws PinotAdminException If the request fails
    */
-  public String createTable(String tableConfig, String validationTypesToSkip)
+  public String createTable(String tableConfig, @Nullable String validationTypesToSkip)
       throws PinotAdminException {
     Map<String, String> queryParams = new HashMap<>();
     if (validationTypesToSkip != null) {
@@ -122,13 +142,38 @@ public class PinotTableAdminClient {
    * Deletes a table.
    *
    * @param tableName Name of the table to delete
+   * @param tableType Table type (realtime or offline), optional
+   * @param retentionPeriod Retention period string (e.g. 12h, 3d), optional
+   * @param ignoreActiveTasks Whether to ignore active tasks, optional
    * @return Success response
    * @throws PinotAdminException If the request fails
    */
+  public String deleteTable(String tableName, @Nullable String tableType, @Nullable String retentionPeriod,
+      @Nullable Boolean ignoreActiveTasks)
+      throws PinotAdminException {
+    Map<String, String> queryParams = new HashMap<>();
+    if (tableType != null) {
+      queryParams.put("type", tableType);
+    }
+    if (retentionPeriod != null) {
+      queryParams.put("retention", retentionPeriod);
+    }
+    if (ignoreActiveTasks != null) {
+      queryParams.put("ignoreActiveTasks", String.valueOf(ignoreActiveTasks));
+    }
+    if (queryParams.isEmpty()) {
+      queryParams = null;
+    }
+    JsonNode response = _transport.executeDelete(_controllerAddress, "/tables/" + tableName, queryParams, _headers);
+    return response.toString();
+  }
+
+  /**
+   * Deletes a table without additional options.
+   */
   public String deleteTable(String tableName)
       throws PinotAdminException {
-    JsonNode response = _transport.executeDelete(_controllerAddress, "/tables/" + tableName, null, _headers);
-    return response.toString();
+    return deleteTable(tableName, null, null, null);
   }
 
   /**
@@ -154,8 +199,8 @@ public class PinotTableAdminClient {
    * @return Rebalance result
    * @throws PinotAdminException If the request fails
    */
-  public String rebalanceTable(String tableName, boolean noDowntime, String rebalanceMode,
-      Integer minReplicasToKeepAfterRebalance)
+  public String rebalanceTable(String tableName, boolean noDowntime, @Nullable String rebalanceMode,
+      @Nullable Integer minReplicasToKeepAfterRebalance)
       throws PinotAdminException {
     Map<String, String> queryParams = new HashMap<>();
     queryParams.put("noDowntime", String.valueOf(noDowntime));
@@ -211,12 +256,16 @@ public class PinotTableAdminClient {
    * @return Success response
    * @throws PinotAdminException If the request fails
    */
-  public String setTableState(String tableName, String tableType, boolean enabled)
+  public String setTableState(String tableName, @Nullable String tableType, boolean enabled)
       throws PinotAdminException {
-    Map<String, String> queryParams = Map.of("type", tableType);
+    Map<String, String> queryParams = new HashMap<>();
+    if (tableType != null) {
+      queryParams.put("type", tableType);
+    }
+    queryParams.put("state", enabled ? "enable" : "disable");
 
     JsonNode response = _transport.executePut(_controllerAddress, "/tables/" + tableName + "/state",
-        enabled ? "enable" : "disable", queryParams, _headers);
+        null, queryParams, _headers);
     return response.toString();
   }
 
@@ -244,6 +293,37 @@ public class PinotTableAdminClient {
       throws PinotAdminException {
     JsonNode response = _transport.executeGet(_controllerAddress, "/tables/" + tableName + "/status", null, _headers);
     return response.toString();
+  }
+
+  /**
+   * Gets the size breakdown for a table.
+   *
+   * @param tableName Name of the table
+   * @return Table size response as JSON string
+   * @throws PinotAdminException If the request fails
+   */
+  public String getTableSize(String tableName)
+      throws PinotAdminException {
+    return getTableSizeDetails(tableName).toString();
+  }
+
+  /**
+   * Gets the reported table size in bytes.
+   *
+   * @param tableName Name of the table
+   * @return Reported size in bytes
+   * @throws PinotAdminException If the request fails
+   */
+  public long getReportedTableSizeInBytes(String tableName)
+      throws PinotAdminException {
+    JsonNode response = getTableSizeDetails(tableName);
+    JsonNode reportedSize = response.get("reportedSizeInBytes");
+    return reportedSize != null ? reportedSize.asLong(0L) : 0L;
+  }
+
+  private JsonNode getTableSizeDetails(String tableName)
+      throws PinotAdminException {
+    return _transport.executeGet(_controllerAddress, "/tables/" + tableName + "/size", null, _headers);
   }
 
   /**
@@ -283,6 +363,42 @@ public class PinotTableAdminClient {
   public String getTableIndexes(String tableName)
       throws PinotAdminException {
     JsonNode response = _transport.executeGet(_controllerAddress, "/tables/" + tableName + "/indexes", null, _headers);
+    return response.toString();
+  }
+
+  /**
+   * Pauses consumption for a realtime table.
+   */
+  public String pauseConsumption(String tableName)
+      throws PinotAdminException {
+    JsonNode response = _transport.executePost(_controllerAddress, "/tables/" + tableName + "/pauseConsumption",
+        null, null, _headers);
+    return response.toString();
+  }
+
+  /**
+   * Resumes consumption for a realtime table.
+   * @param tableName table name (no type suffix)
+   * @param consumeFrom optional offset criteria, e.g. "smallest", "largest", "lastConsumed"
+   */
+  public String resumeConsumption(String tableName, @Nullable String consumeFrom)
+      throws PinotAdminException {
+    Map<String, String> queryParams = new HashMap<>();
+    if (consumeFrom != null) {
+      queryParams.put("consumeFrom", consumeFrom);
+    }
+    JsonNode response = _transport.executePost(_controllerAddress, "/tables/" + tableName + "/resumeConsumption",
+        null, queryParams, _headers);
+    return response.toString();
+  }
+
+  /**
+   * Gets pause status details for a realtime table.
+   */
+  public String getPauseStatus(String tableName)
+      throws PinotAdminException {
+    JsonNode response = _transport.executeGet(_controllerAddress, "/tables/" + tableName + "/pauseStatus",
+        null, _headers);
     return response.toString();
   }
 
@@ -327,13 +443,174 @@ public class PinotTableAdminClient {
     return response.asText();
   }
 
+  /**
+   * Gets external view for a table resource.
+   */
+  public String getExternalView(String tableResourceName)
+      throws PinotAdminException {
+    JsonNode response = _transport.executeGet(_controllerAddress, "/tables/" + tableResourceName + "/externalview",
+        null, _headers);
+    return response.toString();
+  }
+
+  /**
+   * Gets ideal state for a table resource.
+   */
+  public String getIdealState(String tableResourceName)
+      throws PinotAdminException {
+    JsonNode response = _transport.executeGet(_controllerAddress, "/tables/" + tableResourceName + "/idealstate",
+        null, _headers);
+    return response.toString();
+  }
+
+  /**
+   * Gets consuming segments info for a table.
+   */
+  public String getConsumingSegmentsInfo(String tableName)
+      throws PinotAdminException {
+    JsonNode response = _transport.executeGet(_controllerAddress, "/tables/" + tableName + "/consumingSegmentsInfo",
+        null, _headers);
+    return response.toString();
+  }
+
+  /**
+   * Advanced rebalance API mirroring controller REST query params.
+   */
+  public String rebalanceTable(String tableName, String tableType, boolean dryRun, boolean reassignInstances,
+      boolean includeConsuming, boolean downtime, int minAvailableReplicas)
+      throws PinotAdminException {
+    Map<String, String> queryParams = new HashMap<>();
+    queryParams.put("type", tableType);
+    queryParams.put("dryRun", String.valueOf(dryRun));
+    queryParams.put("reassignInstances", String.valueOf(reassignInstances));
+    queryParams.put("includeConsuming", String.valueOf(includeConsuming));
+    queryParams.put("downtime", String.valueOf(downtime));
+    queryParams.put("minAvailableReplicas", String.valueOf(minAvailableReplicas));
+    JsonNode response = _transport.executePost(_controllerAddress, "/tables/" + tableName + "/rebalance", null,
+        queryParams, _headers);
+    return response.toString();
+  }
+
+  /**
+   * =========================
+   * TableConfigs APIs
+   * =========================
+   */
+
+  /**
+   * Lists all TableConfigs (raw table names) in the cluster.
+   */
+  public List<String> listTableConfigs()
+      throws PinotAdminException {
+    JsonNode response = _transport.executeGet(_controllerAddress, "/tableConfigs", null, _headers);
+    if (!response.isArray()) {
+      throw new PinotAdminException("Unexpected response for listTableConfigs: " + response);
+    }
+    List<String> result = new ArrayList<>();
+    for (JsonNode n : response) {
+      result.add(n.asText());
+    }
+    return result;
+  }
+
+  /**
+   * Gets the TableConfigs (schema + offline/real-time configs) for a raw table name.
+   */
+  public String getTableConfigs(String tableName)
+      throws PinotAdminException {
+    JsonNode response = _transport.executeGet(_controllerAddress, "/tableConfigs/" + tableName, null, _headers);
+    return response.toString();
+  }
+
+  /**
+   * Creates TableConfigs (schema + table configs). Supports skipping validations and ignoring active tasks.
+   *
+   * @param tableConfigsJson TableConfigs JSON payload
+   * @param validationTypesToSkip Optional comma-separated validation types to skip (ALL|TASK|UPSERT)
+   * @param ignoreActiveTasks Optional flag to ignore active tasks during creation
+   */
+  public String createTableConfigs(String tableConfigsJson, @Nullable String validationTypesToSkip,
+      @Nullable Boolean ignoreActiveTasks)
+      throws PinotAdminException {
+    Map<String, String> queryParams = new HashMap<>();
+    if (validationTypesToSkip != null) {
+      queryParams.put("validationTypesToSkip", validationTypesToSkip);
+    }
+    if (ignoreActiveTasks != null) {
+      queryParams.put("ignoreActiveTasks", String.valueOf(ignoreActiveTasks));
+    }
+    if (queryParams.isEmpty()) {
+      queryParams = null;
+    }
+    JsonNode response =
+        _transport.executePost(_controllerAddress, "/tableConfigs", tableConfigsJson, queryParams, _headers);
+    return response.toString();
+  }
+
+  /**
+   * Updates TableConfigs for a raw table. Supports skipping validations, reload, and forcing schema update.
+   *
+   * @param tableName Raw table name
+   * @param tableConfigsJson Updated TableConfigs JSON payload
+   * @param validationTypesToSkip Optional comma-separated validation types to skip (ALL|TASK|UPSERT)
+   * @param reload Whether to reload the table if schema change is backward compatible
+   * @param forceTableSchemaUpdate Whether to force schema update
+   */
+  public String updateTableConfigs(String tableName, String tableConfigsJson, @Nullable String validationTypesToSkip,
+      boolean reload, boolean forceTableSchemaUpdate)
+      throws PinotAdminException {
+    Map<String, String> queryParams = new HashMap<>();
+    if (validationTypesToSkip != null) {
+      queryParams.put("validationTypesToSkip", validationTypesToSkip);
+    }
+    queryParams.put("reload", String.valueOf(reload));
+    queryParams.put("forceTableSchemaUpdate", String.valueOf(forceTableSchemaUpdate));
+    JsonNode response = _transport.executePut(_controllerAddress, "/tableConfigs/" + tableName, tableConfigsJson,
+        queryParams, _headers);
+    return response.toString();
+  }
+
+  /**
+   * Deletes TableConfigs for a raw table name. Optionally ignore active tasks during cleanup.
+   */
+  public String deleteTableConfigs(String tableName, @Nullable Boolean ignoreActiveTasks)
+      throws PinotAdminException {
+    Map<String, String> queryParams = new HashMap<>();
+    if (ignoreActiveTasks != null) {
+      queryParams.put("ignoreActiveTasks", String.valueOf(ignoreActiveTasks));
+    }
+    if (queryParams.isEmpty()) {
+      queryParams = null;
+    }
+    JsonNode response =
+        _transport.executeDelete(_controllerAddress, "/tableConfigs/" + tableName, queryParams, _headers);
+    return response.toString();
+  }
+
+  /**
+   * Validates a TableConfigs payload without applying it.
+   *
+   * @param tableConfigsJson TableConfigs JSON payload
+   * @param validationTypesToSkip Optional comma-separated validation types to skip (ALL|TASK|UPSERT)
+   */
+  public String validateTableConfigs(String tableConfigsJson, @Nullable String validationTypesToSkip)
+      throws PinotAdminException {
+    Map<String, String> queryParams = new HashMap<>();
+    if (validationTypesToSkip != null) {
+      queryParams.put("validationTypesToSkip", validationTypesToSkip);
+    }
+    JsonNode response =
+        _transport.executePost(_controllerAddress, "/tableConfigs/validate", tableConfigsJson, queryParams, _headers);
+    return response.toString();
+  }
+
   // Async versions of key methods
 
   /**
    * Lists all tables in the cluster (async).
    */
-  public CompletableFuture<List<String>> listTablesAsync(String tableType, String taskType,
-      String sortType) {
+  public CompletableFuture<List<String>> listTablesAsync(@Nullable String tableType, @Nullable String taskType,
+      @Nullable String sortType) {
     Map<String, String> queryParams = new HashMap<>();
     if (tableType != null) {
       queryParams.put("type", tableType);
@@ -360,7 +637,7 @@ public class PinotTableAdminClient {
   /**
    * Creates a new table with the specified configuration (async).
    */
-  public CompletableFuture<String> createTableAsync(String tableConfig, String validationTypesToSkip) {
+  public CompletableFuture<String> createTableAsync(String tableConfig, @Nullable String validationTypesToSkip) {
     Map<String, String> queryParams = new HashMap<>();
     if (validationTypesToSkip != null) {
       queryParams.put("validationTypesToSkip", validationTypesToSkip);

@@ -47,7 +47,7 @@ public class PinotAccessControlUserRestletResourceTest {
       throws Exception {
     TEST_INSTANCE.setupSharedStateAndValidate();
 
-    _createUserUrl = TEST_INSTANCE.getControllerRequestURLBuilder().forUserCreate();
+    _createUserUrl = TEST_INSTANCE.getAdminUrlBuilder().forUserCreate();
     _userConfigBuilder.setUsername("testUser").setPassword("123456").setComponentType(ComponentType.CONTROLLER)
         .setRoleType(RoleType.USER);
   }
@@ -79,7 +79,7 @@ public class PinotAccessControlUserRestletResourceTest {
   private UserConfig getUserConfig(String username, String componentType)
       throws Exception {
     String userConfigString = ControllerTest.sendGetRequest(
-        TEST_INSTANCE.getControllerRequestURLBuilder().forUserGet(username, componentType));
+        TEST_INSTANCE.getAdminUrlBuilder().forUserGet(username, componentType));
     String usernameWithType = username + "_" + componentType;
     return JsonUtils.jsonNodeToObject(JsonUtils.stringToJsonNode(userConfigString).get(usernameWithType),
         UserConfig.class);
@@ -100,7 +100,7 @@ public class PinotAccessControlUserRestletResourceTest {
     userConfig.setPassword("654321");
 
     JsonNode jsonResponse = JsonUtils.stringToJsonNode(ControllerTest.sendPutRequest(
-        TEST_INSTANCE.getControllerRequestURLBuilder().forUpdateUserConfig(username, "CONTROLLER", true),
+        TEST_INSTANCE.getAdminUrlBuilder().forUpdateUserConfig(username, "CONTROLLER", true),
         userConfig.toString()));
     assertTrue(jsonResponse.has("status"));
 

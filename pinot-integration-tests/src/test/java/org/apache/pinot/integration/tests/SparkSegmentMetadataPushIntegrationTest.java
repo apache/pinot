@@ -153,7 +153,8 @@ public class SparkSegmentMetadataPushIntegrationTest extends BaseClusterIntegrat
 
     TableSpec tableSpec = new TableSpec();
     tableSpec.setTableName(_testTableWithType);
-    tableSpec.setTableConfigURI(_controllerRequestURLBuilder.forUpdateTableConfig(_testTableWithType));
+    tableSpec.setTableConfigURI(
+        getAdminUrlBuilder().forUpdateTableConfig(_testTableWithType));
     jobSpec.setTableSpec(tableSpec);
 
     PinotClusterSpec clusterSpec = new PinotClusterSpec();
@@ -252,7 +253,8 @@ public class SparkSegmentMetadataPushIntegrationTest extends BaseClusterIntegrat
 
     TableSpec tableSpec = new TableSpec();
     tableSpec.setTableName(_testTableWithType);
-    tableSpec.setTableConfigURI(_controllerRequestURLBuilder.forUpdateTableConfig(_testTableWithType));
+    tableSpec.setTableConfigURI(
+        getAdminUrlBuilder().forUpdateTableConfig(_testTableWithType));
     jobSpec.setTableSpec(tableSpec);
 
     PinotClusterSpec clusterSpec = new PinotClusterSpec();
@@ -358,14 +360,16 @@ public class SparkSegmentMetadataPushIntegrationTest extends BaseClusterIntegrat
   private long getNumDocs(String segmentName)
       throws IOException {
     return JsonUtils.stringToJsonNode(
-            sendGetRequest(_controllerRequestURLBuilder.forSegmentMetadata(_testTable, segmentName)))
+            sendGetRequest(
+                getAdminUrlBuilder().forSegmentMetadata(_testTable, segmentName)))
         .get("segment.total.docs").asLong();
   }
 
   private JsonNode getSegmentsList()
       throws IOException {
     return JsonUtils.stringToJsonNode(sendGetRequest(
-            _controllerRequestURLBuilder.forSegmentListAPI(_testTable, TableType.OFFLINE.toString()))).get(0)
+            getAdminUrlBuilder()
+                .forSegmentListAPI(_testTable, TableType.OFFLINE.toString()))).get(0)
         .get("OFFLINE");
   }
 

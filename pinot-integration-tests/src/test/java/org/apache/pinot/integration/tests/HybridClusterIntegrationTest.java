@@ -73,14 +73,15 @@ public class HybridClusterIntegrationTest extends BaseHybridClusterIntegrationTe
 
     // Dropping the broker should fail because it is still in the broker resource
     try {
-      sendDeleteRequest(_controllerRequestURLBuilder.forInstance(brokerId));
+      sendDeleteRequest(getAdminUrlBuilder().forInstance(brokerId));
       fail("Dropping instance should fail because it is still in the broker resource");
     } catch (Exception e) {
       // Expected
     }
 
     // Untag the broker and update the broker resource so that it is removed from the broker resource
-    sendPutRequest(_controllerRequestURLBuilder.forInstanceUpdateTags(brokerId, Collections.emptyList(), true));
+    sendPutRequest(getAdminUrlBuilder()
+        .forInstanceUpdateTags(brokerId, Collections.emptyList(), true));
 
     // Check if broker is removed from all the tables in broker resource
     brokerResourceIdealState =
@@ -100,7 +101,7 @@ public class HybridClusterIntegrationTest extends BaseHybridClusterIntegrationTe
     }, 60_000L, "Failed to remove broker from broker resource ExternalView");
 
     // Dropping the broker should success now
-    sendDeleteRequest(_controllerRequestURLBuilder.forInstance(brokerId));
+    sendDeleteRequest(getAdminUrlBuilder().forInstance(brokerId));
 
     // Check if broker is dropped from the cluster
     assertFalse(_helixAdmin.getInstancesInCluster(clusterName).contains(brokerId));
@@ -110,13 +111,15 @@ public class HybridClusterIntegrationTest extends BaseHybridClusterIntegrationTe
   public void testSegmentMetadataApi()
       throws Exception {
     {
-      String jsonOutputStr = sendGetRequest(_controllerRequestURLBuilder.forSegmentsMetadataFromServer(getTableName()));
+      String jsonOutputStr = sendGetRequest(getAdminUrlBuilder()
+          .forSegmentsMetadataFromServer(getTableName()));
       JsonNode tableSegmentsMetadata = JsonUtils.stringToJsonNode(jsonOutputStr);
       Assert.assertEquals(tableSegmentsMetadata.size(), 8);
 
       JsonNode segmentMetadataFromAllEndpoint = tableSegmentsMetadata.elements().next();
       String segmentName = segmentMetadataFromAllEndpoint.get("segmentName").asText();
-      jsonOutputStr = sendGetRequest(_controllerRequestURLBuilder.forSegmentMetadata(getTableName(), segmentName));
+      jsonOutputStr = sendGetRequest(getAdminUrlBuilder()
+          .forSegmentMetadata(getTableName(), segmentName));
       JsonNode segmentMetadataFromDirectEndpoint = JsonUtils.stringToJsonNode(jsonOutputStr);
       Assert.assertEquals(segmentMetadataFromAllEndpoint.get("totalDocs"),
           segmentMetadataFromDirectEndpoint.get("segment.total.docs"));
@@ -125,13 +128,14 @@ public class HybridClusterIntegrationTest extends BaseHybridClusterIntegrationTe
     List<String> segments = getSegmentNames(getTableName(), TableType.OFFLINE.toString());
     // with null column params
     {
-      String jsonOutputStr = sendGetRequest(_controllerRequestURLBuilder.forSegmentsMetadataFromServer(getTableName(),
-          null, segments));
+      String jsonOutputStr = sendGetRequest(getAdminUrlBuilder()
+          .forSegmentsMetadataFromServer(getTableName(), null, segments));
       JsonNode tableSegmentsMetadata = JsonUtils.stringToJsonNode(jsonOutputStr);
       Assert.assertEquals(tableSegmentsMetadata.size(), segments.size());
       JsonNode segmentMetadataFromAllEndpoint = tableSegmentsMetadata.elements().next();
       String segmentName = segmentMetadataFromAllEndpoint.get("segmentName").asText();
-      jsonOutputStr = sendGetRequest(_controllerRequestURLBuilder.forSegmentMetadata(getTableName(), segmentName));
+      jsonOutputStr = sendGetRequest(getAdminUrlBuilder()
+          .forSegmentMetadata(getTableName(), segmentName));
       JsonNode segmentMetadataFromDirectEndpoint = JsonUtils.stringToJsonNode(jsonOutputStr);
       Assert.assertEquals(segmentMetadataFromAllEndpoint.get("totalDocs"),
           segmentMetadataFromDirectEndpoint.get("segment.total.docs"));
@@ -139,13 +143,14 @@ public class HybridClusterIntegrationTest extends BaseHybridClusterIntegrationTe
     }
     // with * column param
     {
-      String jsonOutputStr = sendGetRequest(_controllerRequestURLBuilder.forSegmentsMetadataFromServer(getTableName(),
-          List.of("*"), segments));
+      String jsonOutputStr = sendGetRequest(getAdminUrlBuilder()
+          .forSegmentsMetadataFromServer(getTableName(), List.of("*"), segments));
       JsonNode tableSegmentsMetadata = JsonUtils.stringToJsonNode(jsonOutputStr);
       Assert.assertEquals(tableSegmentsMetadata.size(), segments.size());
       JsonNode segmentMetadataFromAllEndpoint = tableSegmentsMetadata.elements().next();
       String segmentName = segmentMetadataFromAllEndpoint.get("segmentName").asText();
-      jsonOutputStr = sendGetRequest(_controllerRequestURLBuilder.forSegmentMetadata(getTableName(), segmentName));
+      jsonOutputStr = sendGetRequest(getAdminUrlBuilder()
+          .forSegmentMetadata(getTableName(), segmentName));
       JsonNode segmentMetadataFromDirectEndpoint = JsonUtils.stringToJsonNode(jsonOutputStr);
       Assert.assertEquals(segmentMetadataFromAllEndpoint.get("totalDocs"),
           segmentMetadataFromDirectEndpoint.get("segment.total.docs"));
@@ -154,13 +159,14 @@ public class HybridClusterIntegrationTest extends BaseHybridClusterIntegrationTe
     // with specified column params
     {
       List<String> columns = List.of("Carrier", "FlightNum", "TailNum");
-      String jsonOutputStr = sendGetRequest(_controllerRequestURLBuilder.forSegmentsMetadataFromServer(getTableName(),
-          columns, segments));
+      String jsonOutputStr = sendGetRequest(getAdminUrlBuilder()
+          .forSegmentsMetadataFromServer(getTableName(), columns, segments));
       JsonNode tableSegmentsMetadata = JsonUtils.stringToJsonNode(jsonOutputStr);
       Assert.assertEquals(tableSegmentsMetadata.size(), segments.size());
       JsonNode segmentMetadataFromAllEndpoint = tableSegmentsMetadata.elements().next();
       String segmentName = segmentMetadataFromAllEndpoint.get("segmentName").asText();
-      jsonOutputStr = sendGetRequest(_controllerRequestURLBuilder.forSegmentMetadata(getTableName(), segmentName));
+      jsonOutputStr = sendGetRequest(getAdminUrlBuilder()
+          .forSegmentMetadata(getTableName(), segmentName));
       JsonNode segmentMetadataFromDirectEndpoint = JsonUtils.stringToJsonNode(jsonOutputStr);
       Assert.assertEquals(segmentMetadataFromAllEndpoint.get("totalDocs"),
           segmentMetadataFromDirectEndpoint.get("segment.total.docs"));
@@ -173,7 +179,8 @@ public class HybridClusterIntegrationTest extends BaseHybridClusterIntegrationTe
       throws Exception {
     {
       String jsonOutputStr =
-          sendGetRequest(_controllerRequestURLBuilder.forSegmentListAPI(getTableName(), TableType.OFFLINE.toString()));
+          sendGetRequest(getAdminUrlBuilder()
+              .forSegmentListAPI(getTableName(), TableType.OFFLINE.toString()));
       JsonNode array = JsonUtils.stringToJsonNode(jsonOutputStr);
       // There should be one element in the array
       JsonNode element = array.get(0);
@@ -182,7 +189,8 @@ public class HybridClusterIntegrationTest extends BaseHybridClusterIntegrationTe
     }
     {
       String jsonOutputStr =
-          sendGetRequest(_controllerRequestURLBuilder.forSegmentListAPI(getTableName(), TableType.REALTIME.toString()));
+          sendGetRequest(getAdminUrlBuilder()
+              .forSegmentListAPI(getTableName(), TableType.REALTIME.toString()));
       JsonNode array = JsonUtils.stringToJsonNode(jsonOutputStr);
       // There should be one element in the array
       JsonNode element = array.get(0);
@@ -190,7 +198,8 @@ public class HybridClusterIntegrationTest extends BaseHybridClusterIntegrationTe
       Assert.assertEquals(segments.size(), 24);
     }
     {
-      String jsonOutputStr = sendGetRequest(_controllerRequestURLBuilder.forSegmentListAPI(getTableName()));
+      String jsonOutputStr = sendGetRequest(getAdminUrlBuilder()
+          .forSegmentListAPI(getTableName()));
       JsonNode array = JsonUtils.stringToJsonNode(jsonOutputStr);
       JsonNode offlineSegments = array.get(0).get("OFFLINE");
       Assert.assertEquals(offlineSegments.size(), 8);

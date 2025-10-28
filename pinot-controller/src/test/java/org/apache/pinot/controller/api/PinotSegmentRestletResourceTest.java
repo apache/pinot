@@ -76,7 +76,7 @@ public class PinotSegmentRestletResourceTest {
     }
 
     // There should be no segment lineage at this point.
-    ControllerRequestURLBuilder urlBuilder = TEST_INSTANCE.getControllerRequestURLBuilder();
+    ControllerRequestURLBuilder urlBuilder = TEST_INSTANCE.getAdminUrlBuilder();
     String segmentLineageResponse =
         ControllerTest.sendGetRequest(urlBuilder.forListAllSegmentLineages(rawTableName, TableType.OFFLINE.name()));
     assertEquals(segmentLineageResponse, "");
@@ -142,13 +142,13 @@ public class PinotSegmentRestletResourceTest {
     // validate the segment metadata
     String sampleSegment = segmentMetadataTable.keySet().iterator().next();
     String resp = ControllerTest.sendGetRequest(
-        TEST_INSTANCE.getControllerRequestURLBuilder().forSegmentMetadata(rawTableName, sampleSegment));
+        TEST_INSTANCE.getAdminUrlBuilder().forSegmentMetadata(rawTableName, sampleSegment));
     Map<String, String> fetchedMetadata = JsonUtils.stringToObject(resp, Map.class);
     assertEquals(fetchedMetadata.get("segment.download.url"), "downloadUrl");
 
     // use table name with table type
     resp = ControllerTest.sendGetRequest(
-        TEST_INSTANCE.getControllerRequestURLBuilder().forSegmentMetadata(offlineTableName, sampleSegment));
+        TEST_INSTANCE.getAdminUrlBuilder().forSegmentMetadata(offlineTableName, sampleSegment));
     fetchedMetadata = JsonUtils.stringToObject(resp, Map.class);
     assertEquals(fetchedMetadata.get("segment.download.url"), "downloadUrl");
 
@@ -186,7 +186,7 @@ public class PinotSegmentRestletResourceTest {
     resourceManager.addNewSegment(offlineTableName, segmentMetadata, "downloadUrl");
 
     // Send query and verify
-    ControllerRequestURLBuilder urlBuilder = TEST_INSTANCE.getControllerRequestURLBuilder();
+    ControllerRequestURLBuilder urlBuilder = TEST_INSTANCE.getAdminUrlBuilder();
     // case 1: no overlapping
     String reply = ControllerTest.sendDeleteRequest(urlBuilder.forSegmentDeleteWithTimeWindowAPI(
         rawTableName, 0L, 10L));
@@ -225,7 +225,7 @@ public class PinotSegmentRestletResourceTest {
     resourceManager.addNewSegment(offlineTableName, segmentMetadata, "downloadUrl");
 
     // Send query and verify
-    ControllerRequestURLBuilder urlBuilder = TEST_INSTANCE.getControllerRequestURLBuilder();
+    ControllerRequestURLBuilder urlBuilder = TEST_INSTANCE.getAdminUrlBuilder();
     // case 1: send list of segments
     String reply = ControllerTest.sendDeleteRequest(urlBuilder.forDeleteMultipleSegments(
         TEST_RAW_OFFLINE_TABLE_NAME, TableType.OFFLINE.toString(), List.of("segment1")));
@@ -240,7 +240,7 @@ public class PinotSegmentRestletResourceTest {
   private void checkCrcRequest(String tableName, Map<String, SegmentMetadata> metadataTable, int expectedSize)
       throws Exception {
     String crcMapStr = ControllerTest.sendGetRequest(
-        TEST_INSTANCE.getControllerRequestURLBuilder().forListAllCrcInformationForTable(tableName));
+        TEST_INSTANCE.getAdminUrlBuilder().forListAllCrcInformationForTable(tableName));
     Map<String, String> crcMap = JsonUtils.stringToObject(crcMapStr, Map.class);
     for (String segmentName : crcMap.keySet()) {
       SegmentMetadata metadata = metadataTable.get(segmentName);

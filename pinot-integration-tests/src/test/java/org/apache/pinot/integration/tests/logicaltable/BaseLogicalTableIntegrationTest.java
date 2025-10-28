@@ -30,7 +30,6 @@ import java.util.Map;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 import org.apache.commons.io.FileUtils;
-import org.apache.pinot.controller.helix.ControllerRequestClient;
 import org.apache.pinot.controller.helix.ControllerTest;
 import org.apache.pinot.integration.tests.BaseClusterIntegrationTestSet;
 import org.apache.pinot.integration.tests.ClusterIntegrationTestUtils;
@@ -214,7 +213,8 @@ public abstract class BaseLogicalTableIntegrationTest extends BaseClusterIntegra
     long maxEndTimeMillis = Long.MIN_VALUE;
     try {
       for (String tableName : getOfflineTableNames()) {
-        String url = _controllerRequestURLBuilder.forSegmentMetadata(tableName, TableType.OFFLINE);
+        String url =
+            getAdminUrlBuilder().forSegmentMetadata(tableName, TableType.OFFLINE);
         String response = ControllerTest.sendGetRequest(url);
         JsonNode jsonNode = JsonUtils.stringToJsonNode(response);
         Iterator<String> stringIterator = jsonNode.fieldNames();
@@ -316,7 +316,7 @@ public abstract class BaseLogicalTableIntegrationTest extends BaseClusterIntegra
 
   protected void createLogicalTable()
       throws IOException {
-    String addLogicalTableUrl = _controllerRequestURLBuilder.forLogicalTableCreate();
+    String addLogicalTableUrl = getAdminUrlBuilder().forLogicalTableCreate();
     Schema logicalTableSchema = createSchema(getSchemaFileName());
     logicalTableSchema.setSchemaName(getLogicalTableName());
     addSchema(logicalTableSchema);
@@ -331,7 +331,7 @@ public abstract class BaseLogicalTableIntegrationTest extends BaseClusterIntegra
   protected LogicalTableConfig getLogicalTableConfig(String logicalTableName)
       throws IOException {
     String getLogicalTableUrl =
-        _controllerRequestURLBuilder.forLogicalTableGet(logicalTableName);
+        getAdminUrlBuilder().forLogicalTableGet(logicalTableName);
     String resp = ControllerTest.sendGetRequest(getLogicalTableUrl, getHeaders());
     return LogicalTableConfig.fromString(resp);
   }
@@ -351,7 +351,7 @@ public abstract class BaseLogicalTableIntegrationTest extends BaseClusterIntegra
 
     String logicalTableName = EMPTY_OFFLINE_TABLE_NAME + "_logical";
 
-    String addLogicalTableUrl = _controllerRequestURLBuilder.forLogicalTableCreate();
+    String addLogicalTableUrl = getAdminUrlBuilder().forLogicalTableCreate();
     Schema logicalTableSchema = createSchema(getSchemaFileName());
     logicalTableSchema.setSchemaName(logicalTableName);
     addSchema(logicalTableSchema);
@@ -381,14 +381,6 @@ public abstract class BaseLogicalTableIntegrationTest extends BaseClusterIntegra
       return _sharedClusterTestSuite.getZkUrl();
     }
     return super.getZkUrl();
-  }
-
-  @Override
-  public ControllerRequestClient getControllerRequestClient() {
-    if (_sharedClusterTestSuite != this) {
-      return _sharedClusterTestSuite.getControllerRequestClient();
-    }
-    return super.getControllerRequestClient();
   }
 
   @Override

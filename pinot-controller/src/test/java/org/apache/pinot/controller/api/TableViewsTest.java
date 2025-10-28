@@ -103,7 +103,7 @@ public class TableViewsTest extends ControllerTest {
   @Test(dataProvider = "viewProvider")
   public void testTableNotFound(String view)
       throws Exception {
-    String url = DEFAULT_INSTANCE.getControllerRequestURLBuilder().forTableView("unknownTable", view, null);
+    String url = DEFAULT_INSTANCE.getAdminUrlBuilder().forTableView("unknownTable", view, null);
     HttpURLConnection connection = (HttpURLConnection) new URL(url).openConnection();
     assertEquals(connection.getResponseCode(), 404);
   }
@@ -112,7 +112,7 @@ public class TableViewsTest extends ControllerTest {
   public void testBadRequest(String view)
       throws Exception {
     String url =
-        DEFAULT_INSTANCE.getControllerRequestURLBuilder().forTableView(OFFLINE_TABLE_NAME, view, "no_such_type");
+        DEFAULT_INSTANCE.getAdminUrlBuilder().forTableView(OFFLINE_TABLE_NAME, view, "no_such_type");
     HttpURLConnection connection = (HttpURLConnection) new URL(url).openConnection();
     assertEquals(connection.getResponseCode(), 400);
   }
@@ -167,7 +167,7 @@ public class TableViewsTest extends ControllerTest {
   private TableViews.TableView getTableView(String tableName, String view, String tableType)
       throws Exception {
     return JsonUtils.stringToObject(
-        sendGetRequest(DEFAULT_INSTANCE.getControllerRequestURLBuilder().forTableView(tableName, view, tableType)),
+        sendGetRequest(DEFAULT_INSTANCE.getAdminUrlBuilder().forTableView(tableName, view, tableType)),
         TableViews.TableView.class);
   }
 
