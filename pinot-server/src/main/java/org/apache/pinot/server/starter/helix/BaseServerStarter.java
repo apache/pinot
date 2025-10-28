@@ -65,6 +65,7 @@ import org.apache.pinot.common.metrics.ServerMeter;
 import org.apache.pinot.common.metrics.ServerMetrics;
 import org.apache.pinot.common.metrics.ServerTimer;
 import org.apache.pinot.common.restlet.resources.SystemResourceInfo;
+import org.apache.pinot.common.utils.OomProtectionUtils;
 import org.apache.pinot.common.utils.PinotAppConfigs;
 import org.apache.pinot.common.utils.ServiceStartableUtils;
 import org.apache.pinot.common.utils.ServiceStatus;
@@ -691,13 +692,25 @@ public abstract class BaseServerStarter implements ServiceStartable {
     }
 
     // Enable/disable thread CPU time measurement through instance config.
-    ThreadResourceUsageProvider.setThreadCpuTimeMeasurementEnabled(
-        _serverConf.getProperty(Server.CONFIG_OF_ENABLE_THREAD_CPU_TIME_MEASUREMENT,
-            Server.DEFAULT_ENABLE_THREAD_CPU_TIME_MEASUREMENT));
+    boolean cpuTimeMeasurementRequested = _serverConf.getProperty(Server.CONFIG_OF_ENABLE_THREAD_CPU_TIME_MEASUREMENT,
+        Server.DEFAULT_ENABLE_THREAD_CPU_TIME_MEASUREMENT);
+    ThreadResourceUsageProvider.setThreadCpuTimeMeasurementEnabled(cpuTimeMeasurementRequested);
     // Enable/disable thread memory allocation tracking through instance config
-    ThreadResourceUsageProvider.setThreadMemoryMeasurementEnabled(
+    boolean allocatedBytesMeasurementRequested =
         _serverConf.getProperty(Server.CONFIG_OF_ENABLE_THREAD_ALLOCATED_BYTES_MEASUREMENT,
-            Server.DEFAULT_THREAD_ALLOCATED_BYTES_MEASUREMENT));
+            Server.DEFAULT_THREAD_ALLOCATED_BYTES_MEASUREMENT);
+    ThreadResourceUsageProvider.setThreadMemoryMeasurementEnabled(allocatedBytesMeasurementRequested);
+    ThreadResourceUsageProvider.MeasurementStatus measurementStatus = ThreadResourceUsageProvider.selfTest();
+    if (cpuTimeMeasurementRequested && !measurementStatus.isCpuTimeUsable()) {
+      LOGGER.warn("Thread CPU time measurement requested but not available from JVM. CPU usage stats will be zero.");
+    }
+    // If JVM does not enable thread allocated bytes measurement, disable OOM protection to avoid false actions.
+    if (!measurementStatus.isAllocatedBytesUsable()) {
+      LOGGER.warn("Thread allocated bytes measurement is unavailable from JVM. Disabling OOM protection.");
+      _serverConf.setProperty(CommonConstants.Accounting.FULLY_QUALIFIED_CONFIG_OF_OOM_PROTECTION_KILLING_QUERY, false);
+    }
+    // Ensure required GC option is present; if not, disable OOM protection.
+    OomProtectionUtils.enforceIhopGcOrDisableOom(_serverConf);
     // Initialize workload budget manager and thread accountant. Workload budget manager must be initialized first
     // because it might be used by the accountant.
     PinotConfiguration schedulerConfig = _serverConf.subset(CommonConstants.PINOT_QUERY_SCHEDULER_PREFIX);
