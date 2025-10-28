@@ -19,13 +19,13 @@
 
 package org.apache.pinot.server.starter.helix;
 
+import java.util.Collections;
 import java.util.Map;
 import java.util.Set;
 import java.util.function.Function;
 import org.apache.pinot.core.data.manager.InstanceDataManager;
 import org.apache.pinot.core.data.manager.realtime.RealtimeSegmentDataManager;
 import org.apache.pinot.core.data.manager.realtime.RealtimeTableDataManager;
-import org.apache.pinot.spi.stream.OffsetCriteria;
 import org.apache.pinot.spi.stream.StreamMetadataProvider;
 import org.apache.pinot.spi.stream.StreamPartitionMsgOffset;
 
@@ -83,8 +83,11 @@ public class FreshnessBasedConsumptionStatusChecker extends IngestionBasedConsum
         realtimeTableDataManager.getStreamMetadataProvider(rtSegmentDataManager);
     StreamPartitionMsgOffset latestStreamOffset;
     try {
-      latestStreamOffset = streamMetadataProvider.fetchStreamPartitionOffset(OffsetCriteria.LARGEST_OFFSET_CRITERIA,
-          STREAM_METADATA_FETCH_TIMEOUT_MS);
+      int partitionId = rtSegmentDataManager.getPartitionGroupId();
+      Map<Integer, StreamPartitionMsgOffset> partitionMsgOffsetMap =
+          streamMetadataProvider.fetchLatestStreamOffset(Collections.singleton(partitionId),
+              STREAM_METADATA_FETCH_TIMEOUT_MS);
+      latestStreamOffset = partitionMsgOffsetMap.get(partitionId);
     } catch (Exception e) {
       _logger.error("Failed to fetch latest stream partition offset for segment: {}", segmentName, e);
       throw new RuntimeException(e);
@@ -97,28 +100,18 @@ public class FreshnessBasedConsumptionStatusChecker extends IngestionBasedConsum
       return true;
     }
 
-    StreamPartitionMsgOffset earliestStreamOffset;
-    try {
-      earliestStreamOffset = streamMetadataProvider.fetchStreamPartitionOffset(OffsetCriteria.SMALLEST_OFFSET_CRITERIA,
-          STREAM_METADATA_FETCH_TIMEOUT_MS);
-    } catch (Exception e) {
-      _logger.error("Failed to fetch earliest stream partition offset for segment: {}", segmentName, e);
-      throw new RuntimeException(e);
-    }
-
     long idleTimeMs = rtSegmentDataManager.getTimeSinceEventLastConsumedMs();
     if (segmentHasBeenIdleLongerThanThreshold(idleTimeMs)) {
       _logger.warn("Segment {} with freshness {}ms has not caught up within min freshness {}. "
-              + "But the current ingested offset {} has been idle for {}ms. At offset {}. Earliest offset {}. "
-              + "Latest offset {}.", segmentName, freshnessMs, _minFreshnessMs, currentOffset, idleTimeMs,
-          currentOffset,
-          earliestStreamOffset, latestStreamOffset);
+              + "But the current ingested offset {} has been idle for {}ms. At offset {}. " + "Latest offset {}.",
+          segmentName, freshnessMs, _minFreshnessMs, currentOffset, idleTimeMs, currentOffset, latestStreamOffset);
       return true;
     }
 
     _logger.info("Segment {} with freshness {}ms has not caught up within "
-            + "min freshness {}. At offset {}. Earliest offset {}. Latest offset {}.", segmentName, freshnessMs,
-        _minFreshnessMs, currentOffset, earliestStreamOffset, latestStreamOffset);
+            + "min freshness {}. At offset {}. Latest offset {}.", segmentName, freshnessMs, _minFreshnessMs,
+        currentOffset,
+        latestStreamOffset);
     return false;
   }
 }

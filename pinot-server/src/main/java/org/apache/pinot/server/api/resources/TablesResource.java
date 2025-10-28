@@ -35,6 +35,7 @@ import java.net.URI;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
@@ -107,7 +108,6 @@ import org.apache.pinot.spi.config.table.TableType;
 import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
 import org.apache.pinot.spi.stream.ConsumerPartitionState;
-import org.apache.pinot.spi.stream.OffsetCriteria;
 import org.apache.pinot.spi.stream.PartitionLagState;
 import org.apache.pinot.spi.stream.StreamMetadataProvider;
 import org.apache.pinot.spi.stream.StreamPartitionMsgOffset;
@@ -136,6 +136,7 @@ public class TablesResource {
   private static final Logger LOGGER = LoggerFactory.getLogger(TablesResource.class);
   private static final String PEER_SEGMENT_DOWNLOAD_DIR = "peerSegmentDownloadDir";
   private static final String SEGMENT_UPLOAD_DIR = "segmentUploadDir";
+  private static final long STREAM_METADATA_FETCH_TIMEOUT_MS = 5000;
 
   @Inject
   private ServerInstance _serverInstance;
@@ -1108,8 +1109,11 @@ public class TablesResource {
               ((RealtimeTableDataManager) (tableDataManager)).getStreamMetadataProvider(realtimeSegmentDataManager);
           StreamPartitionMsgOffset latestMsgOffset;
           try {
-            latestMsgOffset =
-                streamMetadataProvider.fetchStreamPartitionOffset(OffsetCriteria.LARGEST_OFFSET_CRITERIA, 5000);
+            int partitionId = realtimeSegmentDataManager.getPartitionGroupId();
+            Map<Integer, StreamPartitionMsgOffset> partitionMsgOffsetMap =
+                streamMetadataProvider.fetchLatestStreamOffset(Collections.singleton(partitionId),
+                    STREAM_METADATA_FETCH_TIMEOUT_MS);
+            latestMsgOffset = partitionMsgOffsetMap.get(partitionId);
           } catch (Exception e) {
             LOGGER.error("Failed to fetch latest stream offset.", e);
             throw new RuntimeException(e);

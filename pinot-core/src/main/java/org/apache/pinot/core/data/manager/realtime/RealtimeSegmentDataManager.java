@@ -1113,6 +1113,10 @@ public class RealtimeSegmentDataManager extends SegmentDataManager {
     return _tableStreamName;
   }
 
+  public int getPartitionGroupId() {
+    return _partitionGroupId;
+  }
+
   public StreamConsumerFactory getStreamConsumerFactory() {
     return _streamConsumerFactory;
   }
@@ -1432,6 +1436,10 @@ public class RealtimeSegmentDataManager extends SegmentDataManager {
       Uninterruptibles.sleepUninterruptibly(10, TimeUnit.SECONDS);
       _segmentLogger.info("Retrying after response {}", response.toJsonString());
     } while (!_shouldStop);
+  }
+
+  public StreamMetadataProvider getPartitionMetadataProvider() {
+    return _partitionMetadataProvider;
   }
 
   protected SegmentCompletionProtocol.Response postSegmentConsumedMsg() {

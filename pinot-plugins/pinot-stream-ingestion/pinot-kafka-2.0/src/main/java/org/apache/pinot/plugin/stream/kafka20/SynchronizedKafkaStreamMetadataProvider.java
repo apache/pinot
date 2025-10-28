@@ -18,7 +18,8 @@
  */
 package org.apache.pinot.plugin.stream.kafka20;
 
-import org.apache.pinot.spi.stream.OffsetCriteria;
+import java.util.Map;
+import java.util.Set;
 import org.apache.pinot.spi.stream.StreamConfig;
 import org.apache.pinot.spi.stream.StreamPartitionMsgOffset;
 
@@ -30,9 +31,9 @@ public class SynchronizedKafkaStreamMetadataProvider extends KafkaStreamMetadata
   }
 
   @Override
-  public StreamPartitionMsgOffset fetchStreamPartitionOffset(OffsetCriteria offsetCriteria, long timeoutMillis) {
+  public Map<Integer, StreamPartitionMsgOffset> fetchLatestStreamOffset(Set<Integer> partitionIds, long timeoutMillis) {
     synchronized (this) {
-      return super.fetchStreamPartitionOffset(offsetCriteria, timeoutMillis);
+      return super.fetchLatestStreamOffset(partitionIds, timeoutMillis);
     }
   }
 }

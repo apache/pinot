@@ -29,6 +29,7 @@ import io.swagger.annotations.SecurityDefinition;
 import io.swagger.annotations.SwaggerDefinition;
 import java.util.ArrayList;
 import java.util.Collection;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
@@ -65,7 +66,6 @@ import org.apache.pinot.spi.accounting.ThreadResourceTracker;
 import org.apache.pinot.spi.accounting.WorkloadBudgetManager;
 import org.apache.pinot.spi.config.table.TableType;
 import org.apache.pinot.spi.stream.ConsumerPartitionState;
-import org.apache.pinot.spi.stream.OffsetCriteria;
 import org.apache.pinot.spi.stream.PartitionLagState;
 import org.apache.pinot.spi.stream.StreamMetadataProvider;
 import org.apache.pinot.spi.stream.StreamPartitionMsgOffset;
@@ -92,6 +92,7 @@ import static org.apache.pinot.spi.utils.CommonConstants.SWAGGER_AUTHORIZATION_K
 @Path("/debug/")
 public class DebugResource {
   private static final Logger LOGGER = LoggerFactory.getLogger(DebugResource.class);
+  private static final long STREAM_METADATA_FETCH_TIMEOUT_MS = 5000;
 
   @Inject
   private ServerInstance _serverInstance;
@@ -224,8 +225,11 @@ public class DebugResource {
           ((RealtimeTableDataManager) (tableDataManager)).getStreamMetadataProvider(realtimeSegmentDataManager);
       StreamPartitionMsgOffset latestMsgOffset;
       try {
-        latestMsgOffset =
-            streamMetadataProvider.fetchStreamPartitionOffset(OffsetCriteria.LARGEST_OFFSET_CRITERIA, 5000);
+        int partitionId = realtimeSegmentDataManager.getPartitionGroupId();
+        Map<Integer, StreamPartitionMsgOffset> partitionMsgOffsetMap =
+            streamMetadataProvider.fetchLatestStreamOffset(Collections.singleton(partitionId),
+                STREAM_METADATA_FETCH_TIMEOUT_MS);
+        latestMsgOffset = partitionMsgOffsetMap.get(partitionId);
       } catch (Exception e) {
         LOGGER.error("Failed to fetch latest stream offset.", e);
         throw new RuntimeException(e);
