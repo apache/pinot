@@ -117,7 +117,7 @@ public class IdealStateGroupCommitTest {
       long idealStateUpdateSuccessCount =
           controllerMetrics.getMeteredTableValue(tableName, ControllerMeter.IDEAL_STATE_UPDATE_SUCCESS).count();
       Assert.assertTrue(idealStateUpdateSuccessCount <= NUM_UPDATES);
-      LOGGER.info("{} IdealState update are successfully commited with {} times zk updates.", NUM_UPDATES,
+      LOGGER.info("{} IdealState update are successfully committed with {} times zk updates.", NUM_UPDATES,
           idealStateUpdateSuccessCount);
     }
   }
