@@ -19,7 +19,6 @@
 package org.apache.pinot.common.function;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
-import com.google.common.collect.ImmutableList;
 import com.jayway.jsonpath.InvalidJsonException;
 import java.io.IOException;
 import java.util.ArrayList;
@@ -242,7 +241,7 @@ public class JsonFunctionsTest {
     // and "$.commits[1].sha" led to exception `Filter: [1]['sha'] can only be applied to arrays`.
     // Those failure could be reproduced by using the default JacksonJsonProvider for JsonPath.
     Map<String, Object> rawData = Map.of("commits",
-        ImmutableList.of(Map.of("sha", 123, "name", "k"), Map.of("sha", 456, "name", "j")));
+        List.of(Map.of("sha", 123, "name", "k"), Map.of("sha", 456, "name", "j")));
     assertTrue(JsonFunctions.jsonPathExists(rawData, "$.commits[*].sha"));
     assertEquals(JsonFunctions.jsonPathArray(rawData, "$.commits[*].sha"), new Integer[]{123, 456});
     assertTrue(JsonFunctions.jsonPathExists(rawData, "$.commits[1].sha"));
@@ -423,7 +422,7 @@ public class JsonFunctionsTest {
     };
     assertEquals(JsonFunctions.jsonKeyValueArrayToMap(jsonArray), expected);
 
-    List<Object> jsonList = ImmutableList.of(
+    List<Object> jsonList = List.of(
         "{\"key\": \"k1\", \"value\": \"v1\"}",
         "{\"key\": \"k2\", \"value\": \"v2\"}",
         "{\"key\": \"k3\", \"value\": \"v3\"}",
@@ -509,7 +508,7 @@ public class JsonFunctionsTest {
     System.out.println("Map result: " + mapResult);
     Assert.assertTrue(mapResult.size() > 0);
 
-    List<Object> listObj = new java.util.ArrayList<>();
+    List<Object> listObj = new ArrayList<>();
     listObj.add(Map.of("key1", "value1"));
     listObj.add(Map.of("key2", "value2"));
     List<String> listResult = JsonFunctions.jsonExtractKey(listObj, "$..**", "maxDepth=2");

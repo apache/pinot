@@ -21,6 +21,7 @@ package org.apache.pinot.segment.spi.memory;
 import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
+import java.util.List;
 import java.util.Properties;
 import org.roaringbitmap.buffer.ImmutableRoaringBitmap;
 
@@ -232,7 +233,7 @@ public class EmptyIndexBuffer extends PinotDataBuffer {
   }
 
   @Override
-  public void appendAsByteBuffers(java.util.List<ByteBuffer> appendTo) {
+  public void appendAsByteBuffers(List<ByteBuffer> appendTo) {
     // No-op for empty buffer
   }
 

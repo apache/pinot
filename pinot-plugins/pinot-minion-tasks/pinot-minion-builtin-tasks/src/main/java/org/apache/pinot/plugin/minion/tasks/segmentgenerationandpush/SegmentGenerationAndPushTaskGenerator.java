@@ -19,7 +19,6 @@
 package org.apache.pinot.plugin.minion.tasks.segmentgenerationandpush;
 
 import com.google.common.base.Preconditions;
-import com.google.common.collect.ImmutableList;
 import java.io.IOException;
 import java.net.URI;
 import java.net.URISyntaxException;
@@ -193,7 +192,7 @@ public class SegmentGenerationAndPushTaskGenerator extends BaseTaskGenerator {
       List<URI> inputFileURIs = getInputFilesFromDirectory(batchConfigMap, inputDirURI, Collections.emptySet());
       if (inputFileURIs.isEmpty()) {
         LOGGER.warn("Skip generating SegmentGenerationAndPushTask, no input files found : {}", inputDirURI);
-        return ImmutableList.of();
+        return List.of();
       }
       if (!batchConfigMap.containsKey(BatchConfigProperties.INPUT_FORMAT)) {
         batchConfigMap.put(BatchConfigProperties.INPUT_FORMAT,

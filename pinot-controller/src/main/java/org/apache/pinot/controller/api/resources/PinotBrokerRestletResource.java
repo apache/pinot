@@ -18,7 +18,6 @@
  */
 package org.apache.pinot.controller.api.resources;
 
-import com.google.common.collect.ImmutableList;
 import io.swagger.annotations.Api;
 import io.swagger.annotations.ApiKeyAuthDefinition;
 import io.swagger.annotations.ApiOperation;
@@ -195,7 +194,7 @@ public class PinotBrokerRestletResource {
             Integer.parseInt(HelixHelper.getGrpcPort(x))))
         .collect(Collectors.toSet());
     applyStateChanges(instanceInfoSet, state);
-    return ImmutableList.copyOf(instanceInfoSet);
+    return List.copyOf(instanceInfoSet);
   }
 
   @GET
@@ -233,7 +232,7 @@ public class PinotBrokerRestletResource {
               Integer.parseInt(HelixHelper.getGrpcPort(x))))
           .collect(Collectors.toSet());
       applyStateChanges(instanceInfoSet, state);
-      return ImmutableList.copyOf(instanceInfoSet);
+      return List.copyOf(instanceInfoSet);
     } catch (TableNotFoundException e) {
       throw new ControllerApplicationException(LOGGER, String.format("Table '%s' not found.", tableName),
           Response.Status.NOT_FOUND);

@@ -43,7 +43,6 @@ import org.apache.pinot.spi.utils.ReadMode;
 import org.apache.pinot.spi.utils.builder.TableConfigBuilder;
 import org.testng.annotations.Test;
 
-import static java.util.List.of;
 import static org.testng.Assert.assertNotNull;
 
 
@@ -84,13 +83,13 @@ public class PhysicalColumnIndexContainerTest {
                 .withIndexes(indexes)
                 .build())
             .addFieldConfig(new Builder(INT_COL)
-                .withIndexTypes(of(IndexType.RANGE))
+                .withIndexTypes(List.of(IndexType.RANGE))
                 .build())
             .addFieldConfig(new Builder(LONG_COL)
-                .withIndexTypes(of(IndexType.RANGE))
+                .withIndexTypes(List.of(IndexType.RANGE))
                 .build())
             .addFieldConfig(new Builder(FLOAT_COL)
-                .withIndexTypes(of(IndexType.RANGE, IndexType.SORTED))
+                .withIndexTypes(List.of(IndexType.RANGE, IndexType.SORTED))
                 .build())
             .setRangeIndexColumns(List.of(LONG_COL, FLOAT_COL))
             .build();

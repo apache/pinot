@@ -18,8 +18,8 @@
  */
 package org.apache.pinot.query.runtime.operator.exchange;
 
-import com.google.common.collect.ImmutableList;
 import com.google.common.collect.Iterators;
+import java.util.Collections;
 import java.util.List;
 import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.common.utils.DataSchema.ColumnDataType;
@@ -64,7 +64,7 @@ public class BlockExchangeTest {
   public void shouldSendEosBlockToAllDestinations()
       throws Exception {
     // Given:
-    List<SendingMailbox> destinations = ImmutableList.of(_mailbox1, _mailbox2);
+    List<SendingMailbox> destinations = List.of(_mailbox1, _mailbox2);
     BlockExchange exchange = new TestBlockExchange(destinations);
 
     // When:
@@ -86,9 +86,9 @@ public class BlockExchangeTest {
   public void shouldSendDataBlocksOnlyToTargetDestination()
       throws Exception {
     // Given:
-    List<SendingMailbox> destinations = ImmutableList.of(_mailbox1);
+    List<SendingMailbox> destinations = List.of(_mailbox1);
     BlockExchange exchange = new TestBlockExchange(destinations);
-    RowHeapDataBlock block = new RowHeapDataBlock(ImmutableList.of(new Object[]{"val"}),
+    RowHeapDataBlock block = new RowHeapDataBlock(Collections.singletonList(new Object[]{"val"}),
         new DataSchema(new String[]{"foo"}, new ColumnDataType[]{ColumnDataType.STRING}));
 
     // When:
@@ -108,9 +108,9 @@ public class BlockExchangeTest {
   public void shouldSignalEarlyTerminationProperly()
       throws Exception {
     // Given:
-    List<SendingMailbox> destinations = ImmutableList.of(_mailbox1, _mailbox2);
+    List<SendingMailbox> destinations = List.of(_mailbox1, _mailbox2);
     BlockExchange exchange = new TestBlockExchange(destinations);
-    RowHeapDataBlock block = new RowHeapDataBlock(ImmutableList.of(new Object[]{"val"}),
+    RowHeapDataBlock block = new RowHeapDataBlock(Collections.singletonList(new Object[]{"val"}),
         new DataSchema(new String[]{"foo"}, new ColumnDataType[]{ColumnDataType.STRING}));
 
     // When send normal block and some mailbox has terminated
@@ -139,18 +139,18 @@ public class BlockExchangeTest {
   public void shouldSplitBlocks()
       throws Exception {
     // Given:
-    List<SendingMailbox> destinations = ImmutableList.of(_mailbox1);
+    List<SendingMailbox> destinations = List.of(_mailbox1);
 
     DataSchema schema = new DataSchema(new String[]{"foo"}, new ColumnDataType[]{ColumnDataType.STRING});
 
     RowHeapDataBlock inBlock =
-        new RowHeapDataBlock(ImmutableList.of(new Object[]{"one"}, new Object[]{"two"}), schema);
+        new RowHeapDataBlock(List.of(new Object[]{"one"}, new Object[]{"two"}), schema);
 
-    RowHeapDataBlock outBlockOne = new RowHeapDataBlock(ImmutableList.of(new Object[]{"one"}), schema);
+    RowHeapDataBlock outBlockOne = new RowHeapDataBlock(Collections.singletonList(new Object[]{"one"}), schema);
 
-    RowHeapDataBlock outBlockTwo = new RowHeapDataBlock(ImmutableList.of(new Object[]{"two"}), schema);
+    RowHeapDataBlock outBlockTwo = new RowHeapDataBlock(Collections.singletonList(new Object[]{"two"}), schema);
 
-    BlockSplitter blockSplitter = (block, maxSize) -> ImmutableList.of(outBlockOne, outBlockTwo).iterator();
+    BlockSplitter blockSplitter = (block, maxSize) -> List.of(outBlockOne, outBlockTwo).iterator();
     BlockExchange exchange = new TestBlockExchange(destinations, blockSplitter);
 
     // When:

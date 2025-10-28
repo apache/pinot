@@ -33,7 +33,6 @@ import com.google.cloud.storage.StorageBatchResult;
 import com.google.cloud.storage.StorageException;
 import com.google.cloud.storage.StorageOptions;
 import com.google.common.base.Strings;
-import com.google.common.collect.ImmutableList;
 import java.io.File;
 import java.io.IOException;
 import java.io.InputStream;
@@ -215,7 +214,7 @@ public class GcsPinotFS extends BasePinotFS {
 
   private String[] listFilesFromGcsUri(GcsUri gcsFileUri, boolean recursive)
       throws IOException {
-    ImmutableList.Builder<String> builder = ImmutableList.builder();
+    ArrayList<String> builder = new ArrayList<>();
     String prefix = gcsFileUri.getPrefix();
     String bucketName = gcsFileUri.getBucketName();
     visitFiles(gcsFileUri, recursive, blob -> {
@@ -223,7 +222,7 @@ public class GcsPinotFS extends BasePinotFS {
         builder.add(GcsUri.createGcsUri(bucketName, blob.getName()).toString());
       }
     });
-    String[] listedFiles = builder.build().toArray(new String[0]);
+    String[] listedFiles = builder.toArray(new String[0]);
     LOGGER.info("Listed {} files from URI: {}, is recursive: {}", listedFiles.length, gcsFileUri, recursive);
     return listedFiles;
   }
@@ -231,7 +230,7 @@ public class GcsPinotFS extends BasePinotFS {
   @Override
   public List<FileMetadata> listFilesWithMetadata(URI fileUri, boolean recursive)
       throws IOException {
-    ImmutableList.Builder<FileMetadata> listBuilder = ImmutableList.builder();
+    List<FileMetadata> listBuilder = new ArrayList<>();
     GcsUri gcsFileUri = new GcsUri(fileUri);
     String prefix = gcsFileUri.getPrefix();
     String bucketName = gcsFileUri.getBucketName();
@@ -251,7 +250,7 @@ public class GcsPinotFS extends BasePinotFS {
         listBuilder.add(fileBuilder.build());
       }
     });
-    ImmutableList<FileMetadata> listedFiles = listBuilder.build();
+    List<FileMetadata> listedFiles = List.copyOf(listBuilder);
     LOGGER.info("Listed {} files from URI: {}, is recursive: {}", listedFiles.size(), gcsFileUri, recursive);
     return listedFiles;
   }

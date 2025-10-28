@@ -20,7 +20,6 @@ package org.apache.pinot.server.starter.helix;
 
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
-import com.google.common.collect.ImmutableList;
 import com.google.common.util.concurrent.ThreadFactoryBuilder;
 import java.io.File;
 import java.io.IOException;
@@ -366,8 +365,7 @@ public abstract class BaseServerStarter implements ServiceStartable {
       }
     }
 
-    ImmutableList.Builder<ServiceStatus.ServiceStatusCallback> serviceStatusCallbackListBuilder =
-        new ImmutableList.Builder<>();
+    List<ServiceStatus.ServiceStatusCallback> serviceStatusCallbackListBuilder = new ArrayList<>();
     serviceStatusCallbackListBuilder.add(
         new ServiceStatus.IdealStateAndCurrentStateMatchServiceStatusCallback(_helixManager, _helixClusterName,
             _instanceId, resourcesToMonitor, minResourcePercentForStartup));
@@ -412,7 +410,7 @@ public abstract class BaseServerStarter implements ServiceStartable {
     }
     LOGGER.info("Registering service status handler");
     ServiceStatus.setServiceStatusCallback(_instanceId,
-        new ServiceStatus.MultipleCallbackServiceStatusCallback(serviceStatusCallbackListBuilder.build()));
+        new ServiceStatus.MultipleCallbackServiceStatusCallback(List.copyOf(serviceStatusCallbackListBuilder)));
   }
 
   @Nullable

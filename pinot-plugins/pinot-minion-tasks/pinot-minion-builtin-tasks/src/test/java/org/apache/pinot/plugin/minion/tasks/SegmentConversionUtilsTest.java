@@ -18,11 +18,11 @@
  */
 package org.apache.pinot.plugin.minion.tasks;
 
-import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableSet;
 import com.sun.net.httpserver.HttpServer;
 import java.io.OutputStream;
 import java.net.InetSocketAddress;
+import java.util.List;
 import java.util.Map;
 import java.util.Random;
 import org.apache.hc.core5.http.HttpStatus;
@@ -53,8 +53,8 @@ public class SegmentConversionUtilsTest {
     _testServer = HttpServer.create(new InetSocketAddress(TEST_PORT), 0);
     _testServer.createContext("/segments/myTable", exchange -> {
       String response = JsonUtils.objectToString(
-          ImmutableList.of(
-              Map.of(TEST_TABLE_TYPE, ImmutableList.of(TEST_TABLE_SEGMENT_1, TEST_TABLE_SEGMENT_2))));
+          List.of(
+              Map.of(TEST_TABLE_TYPE, List.of(TEST_TABLE_SEGMENT_1, TEST_TABLE_SEGMENT_2))));
       exchange.sendResponseHeaders(HttpStatus.SC_OK, response.length());
       OutputStream os = exchange.getResponseBody();
       os.write(response.getBytes());
