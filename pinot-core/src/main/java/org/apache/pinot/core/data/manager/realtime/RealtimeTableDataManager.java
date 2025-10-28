@@ -162,7 +162,7 @@ public class RealtimeTableDataManager extends BaseTableDataManager {
     _ingestionDelayTracker = new IngestionDelayTracker(_serverMetrics, _tableNameWithType, this);
     File statsFile = new File(_tableDataDir, STATS_FILE_NAME);
     try {
-      _statsHistory = RealtimeSegmentStatsHistory.deserialzeFrom(statsFile);
+      _statsHistory = RealtimeSegmentStatsHistory.deserializeFrom(statsFile);
     } catch (IOException | ClassNotFoundException e) {
       _logger.error("Caught exception while reading stats history from: {}", statsFile.getAbsolutePath(), e);
       File savedFile = new File(_tableDataDir, STATS_FILE_NAME + "." + UUID.randomUUID());
@@ -175,7 +175,7 @@ public class RealtimeTableDataManager extends BaseTableDataManager {
       _logger.warn("Saved unreadable {} into {}. Creating a fresh instance", statsFile.getAbsolutePath(),
           savedFile.getAbsolutePath());
       try {
-        _statsHistory = RealtimeSegmentStatsHistory.deserialzeFrom(statsFile);
+        _statsHistory = RealtimeSegmentStatsHistory.deserializeFrom(statsFile);
       } catch (Exception e2) {
         Utils.rethrowException(e2);
       }
