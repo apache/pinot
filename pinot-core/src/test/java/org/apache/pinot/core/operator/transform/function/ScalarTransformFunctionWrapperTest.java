@@ -337,21 +337,21 @@ public class ScalarTransformFunctionWrapperTest extends BaseTransformFunctionTes
     }
     testTransformFunction(transformFunction, expectedValues);
 
-    String seperator = "::";
+    String separator = "::";
     expression = RequestContextUtils.getExpression(
-        String.format("repeat(%s, '%s', %d)", STRING_ALPHANUM_SV_COLUMN, seperator, timesToRepeat));
+        String.format("repeat(%s, '%s', %d)", STRING_ALPHANUM_SV_COLUMN, separator, timesToRepeat));
     transformFunction = TransformFunctionFactory.get(expression, _dataSourceMap);
     assertTrue(transformFunction instanceof ScalarTransformFunctionWrapper);
     assertEquals(transformFunction.getName(), "repeat");
     expectedValues = new String[NUM_ROWS];
     for (int i = 0; i < NUM_ROWS; i++) {
-      expectedValues[i] = StringUtils.repeat(_stringAlphaNumericSVValues[i], seperator, timesToRepeat);
+      expectedValues[i] = StringUtils.repeat(_stringAlphaNumericSVValues[i], separator, timesToRepeat);
     }
     testTransformFunction(transformFunction, expectedValues);
 
     timesToRepeat = -1;
     expression = RequestContextUtils.getExpression(
-        String.format("repeat(%s, '%s', %d)", STRING_ALPHANUM_SV_COLUMN, seperator, timesToRepeat));
+        String.format("repeat(%s, '%s', %d)", STRING_ALPHANUM_SV_COLUMN, separator, timesToRepeat));
     transformFunction = TransformFunctionFactory.get(expression, _dataSourceMap);
     assertTrue(transformFunction instanceof ScalarTransformFunctionWrapper);
     assertEquals(transformFunction.getName(), "repeat");
