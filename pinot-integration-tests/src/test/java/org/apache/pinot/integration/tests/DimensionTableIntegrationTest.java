@@ -33,7 +33,6 @@ import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.TableType;
 import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.Schema;
-import org.apache.pinot.spi.utils.builder.ControllerRequestURLBuilder;
 import org.apache.pinot.spi.utils.builder.TableConfigBuilder;
 import org.apache.pinot.spi.utils.builder.TableNameBuilder;
 import org.apache.pinot.util.TestUtils;
@@ -124,10 +123,6 @@ public class DimensionTableIntegrationTest extends BaseClusterIntegrationTest {
     startBroker();
     startServer();
 
-    if (_controllerRequestURLBuilder == null) {
-      _controllerRequestURLBuilder =
-          ControllerRequestURLBuilder.baseUrl("http://localhost:" + getControllerPort());
-    }
     TestUtils.ensureDirectoriesExistAndEmpty(_tempDir, _segmentDir, _tarDir);
     Schema schema = createSchema();
     addSchema(schema);

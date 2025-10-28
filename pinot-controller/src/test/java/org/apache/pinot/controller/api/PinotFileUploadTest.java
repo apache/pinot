@@ -58,8 +58,9 @@ public class PinotFileUploadTest {
   @Test
   public void testUploadBogusData()
       throws Exception {
+    String uploadUrl = TEST_INSTANCE.getAdminClient().getSegmentUploadUrl();
     try (CloseableHttpClient httpClient = HttpClients.createDefault()) {
-      HttpPost httpPost = new HttpPost(TEST_INSTANCE.getControllerRequestURLBuilder().forDataFileUpload());
+      HttpPost httpPost = new HttpPost(uploadUrl);
       HttpEntity entity = new StringEntity("blah");
       httpPost.setEntity(entity);
       try (CloseableHttpResponse response = httpClient.execute(httpPost)) {

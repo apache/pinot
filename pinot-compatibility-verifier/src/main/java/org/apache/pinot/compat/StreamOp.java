@@ -37,7 +37,7 @@ import org.apache.kafka.clients.admin.AdminClient;
 import org.apache.kafka.clients.admin.AdminClientConfig;
 import org.apache.kafka.clients.admin.KafkaAdminClient;
 import org.apache.kafka.clients.admin.NewTopic;
-import org.apache.pinot.controller.helix.ControllerTest;
+import org.apache.pinot.client.admin.PinotAdminClient;
 import org.apache.pinot.plugin.inputformat.csv.CSVRecordReaderConfig;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.data.DateTimeFormatSpec;
@@ -50,7 +50,6 @@ import org.apache.pinot.spi.exception.QueryErrorCode;
 import org.apache.pinot.spi.stream.StreamDataProducer;
 import org.apache.pinot.spi.stream.StreamDataProvider;
 import org.apache.pinot.spi.utils.JsonUtils;
-import org.apache.pinot.spi.utils.builder.ControllerRequestURLBuilder;
 import org.apache.pinot.spi.utils.builder.TableNameBuilder;
 import org.apache.pinot.tools.utils.KafkaStarterUtils;
 import org.apache.pinot.util.TestUtils;
@@ -58,6 +57,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import static java.nio.charset.StandardCharsets.UTF_8;
+
 
 /**
  * PRODUCE
@@ -181,7 +181,7 @@ public class StreamOp extends BaseOp {
   }
 
   private boolean produceData() {
-    try {
+    try (PinotAdminClient adminClient = createPinotAdminClient()) {
       // get kafka topic
       Properties streamConfigMap =
           JsonUtils.fileToObject(new File(getAbsoluteFileName(_streamConfigFileName)), Properties.class);
@@ -221,9 +221,7 @@ public class StreamOp extends BaseOp {
 
       String timeColumn = tableConfig.getValidationConfig().getTimeColumnName();
       String schemaName = TableNameBuilder.extractRawTableName(tableName);
-      String schemaString = ControllerTest
-          .sendGetRequest(ControllerRequestURLBuilder.baseUrl(ClusterDescriptor.getInstance().getControllerUrl())
-              .forSchemaGet(schemaName));
+      String schemaString = adminClient.getSchemaClient().getSchemaString(schemaName);
       Schema schema = JsonUtils.stringToObject(schemaString, Schema.class);
       DateTimeFormatSpec dateTimeFormatSpec = Objects.requireNonNull(
           schema.getSpecForTimeColumn(timeColumn)).getFormatSpec();

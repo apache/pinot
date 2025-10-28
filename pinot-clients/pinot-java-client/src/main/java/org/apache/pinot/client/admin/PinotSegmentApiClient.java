@@ -68,6 +68,20 @@ public class PinotSegmentApiClient implements Closeable {
         SEGMENT_PATH + "/" + tableNameWithType + "/" + segmentName + METADATA_PATH, null, _headers);
   }
 
+  /**
+   * Downloads a segment tarball for the given table and segment.
+   *
+   * @param tableNameWithType Table name with type suffix
+   * @param segmentName Segment name
+   * @return Segment bytes
+   * @throws PinotAdminException If the request fails
+   */
+  public byte[] downloadSegment(String tableNameWithType, String segmentName)
+      throws PinotAdminException {
+    String path = SEGMENT_PATH + "/" + tableNameWithType + "/" + segmentName + "/download";
+    return _transport.executeGetBinary(_controllerAddress, path, null, _headers);
+  }
+
   @Override
   public void close()
       throws IOException {

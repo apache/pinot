@@ -19,8 +19,6 @@
 package org.apache.pinot.controller.helix.core.minion;
 
 import java.io.IOException;
-import java.net.URI;
-import java.net.URISyntaxException;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
@@ -30,8 +28,7 @@ import java.util.Set;
 import java.util.function.Function;
 import java.util.function.Predicate;
 import org.apache.helix.task.TaskState;
-import org.apache.pinot.common.exception.HttpErrorStatusException;
-import org.apache.pinot.common.utils.http.HttpClient;
+import org.apache.pinot.client.admin.PinotAdminException;
 import org.apache.pinot.controller.ControllerConf;
 import org.apache.pinot.controller.helix.ControllerTest;
 import org.apache.pinot.controller.helix.core.minion.generator.BaseTaskGenerator;
@@ -571,28 +568,19 @@ public class PinotTaskManagerStatelessTest extends ControllerTest {
 
   private void addTableConfig(TableConfig tableConfig, String validationTypesToSkip)
       throws IOException {
-    String createTableUriStr =
-        String.format(_controllerRequestURLBuilder.forTableCreate() + "?validationTypesToSkip=%s",
-            validationTypesToSkip);
     try {
-      HttpClient.wrapAndThrowHttpException(
-          _httpClient.sendJsonPostRequest(new URI(createTableUriStr), tableConfig.toJsonString(),
-              Collections.emptyMap()));
-    } catch (HttpErrorStatusException | URISyntaxException e) {
+      getOrCreateAdminClient().getTableClient().createTable(tableConfig.toJsonString(), validationTypesToSkip);
+    } catch (PinotAdminException e) {
       throw new IOException(e);
     }
   }
 
   private void updateTableConfig(TableConfig tableConfig, String validationTypesToSkip)
       throws IOException {
-    String updateTableUriStr = String.format(
-        _controllerRequestURLBuilder.forUpdateTableConfig(tableConfig.getTableName()) + "?validationTypesToSkip=%s",
-        validationTypesToSkip);
     try {
-      HttpClient.wrapAndThrowHttpException(
-          _httpClient.sendJsonPutRequest(new URI(updateTableUriStr), tableConfig.toJsonString(),
-              Collections.emptyMap()));
-    } catch (HttpErrorStatusException | URISyntaxException e) {
+      getOrCreateAdminClient().getTableClient()
+          .updateTableConfig(tableConfig.getTableName(), tableConfig.toJsonString(), validationTypesToSkip);
+    } catch (PinotAdminException e) {
       throw new IOException(e);
     }
   }

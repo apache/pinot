@@ -18,14 +18,13 @@
  */
 package org.apache.pinot.controller.api;
 
-import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 import com.google.common.collect.Sets;
-import java.io.IOException;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import org.apache.pinot.client.admin.PinotAdminClient;
 import org.apache.pinot.controller.helix.ControllerTest;
 import org.apache.pinot.core.realtime.impl.fakestream.FakeStreamConfigUtils;
 import org.apache.pinot.spi.config.TableConfigs;
@@ -41,7 +40,6 @@ import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.stream.StreamConfig;
 import org.apache.pinot.spi.utils.CommonConstants;
 import org.apache.pinot.spi.utils.JsonUtils;
-import org.apache.pinot.spi.utils.builder.ControllerRequestURLBuilder;
 import org.apache.pinot.spi.utils.builder.TableConfigBuilder;
 import org.apache.pinot.spi.utils.builder.TableNameBuilder;
 import org.testng.Assert;
@@ -57,13 +55,10 @@ import static org.testng.Assert.fail;
  * Tests for CRUD APIs of {@link TableConfigs}
  */
 public class TableConfigsRestletResourceTest extends ControllerTest {
-  private String _createTableConfigsUrl;
-
   @BeforeClass
   public void setUp()
       throws Exception {
     DEFAULT_INSTANCE.setupSharedStateAndValidate();
-    _createTableConfigsUrl = DEFAULT_INSTANCE.getControllerRequestURLBuilder().forTableConfigsCreate();
   }
 
   private TableConfigBuilder getBaseTableConfigBuilder(String tableName, TableType tableType) {
@@ -101,8 +96,8 @@ public class TableConfigsRestletResourceTest extends ControllerTest {
 
   @Test
   public void testValidateConfig()
-      throws IOException {
-    String validateConfigUrl = DEFAULT_INSTANCE.getControllerRequestURLBuilder().forTableConfigsValidate();
+      throws Exception {
+    PinotAdminClient adminClient = getOrCreateAdminClient();
 
     String tableName = "testValidate";
     TableConfig offlineTableConfig = createOfflineTableConfig(tableName);
@@ -113,7 +108,8 @@ public class TableConfigsRestletResourceTest extends ControllerTest {
     // invalid json
     try {
       tableConfigs = new TableConfigs(tableName, schema, offlineTableConfig, realtimeTableConfig);
-      sendPostRequest(validateConfigUrl, tableConfigs.toPrettyJsonString().replace("\"offline\"", "offline\""));
+      adminClient.getTableClient()
+          .validateTableConfigs(tableConfigs.toPrettyJsonString().replace("\"offline\"", "offline\""), null);
       fail("Creation of a TableConfigs with invalid json string should have failed");
     } catch (Exception e) {
       // expected
@@ -122,7 +118,7 @@ public class TableConfigsRestletResourceTest extends ControllerTest {
     // null table configs
     try {
       tableConfigs = new TableConfigs(tableName, schema, null, null);
-      sendPostRequest(validateConfigUrl, tableConfigs.toPrettyJsonString());
+      adminClient.getTableClient().validateTableConfigs(tableConfigs.toPrettyJsonString(), null);
       fail("Creation of an TableConfigs with null table offline tableConfig and realtime tableConfig should have "
           + "failed");
     } catch (Exception e) {
@@ -132,7 +128,7 @@ public class TableConfigsRestletResourceTest extends ControllerTest {
     // null schema
     try {
       tableConfigs = new TableConfigs(tableName, null, offlineTableConfig, null);
-      sendPostRequest(validateConfigUrl, tableConfigs.toPrettyJsonString());
+      adminClient.getTableClient().validateTableConfigs(tableConfigs.toPrettyJsonString(), null);
       fail("Creation of an TableConfigs with null schema should have failed");
     } catch (Exception e) {
       // expected
@@ -141,7 +137,7 @@ public class TableConfigsRestletResourceTest extends ControllerTest {
     // empty config name
     try {
       tableConfigs = new TableConfigs("", schema, offlineTableConfig, realtimeTableConfig);
-      sendPostRequest(validateConfigUrl, tableConfigs.toPrettyJsonString());
+      adminClient.getTableClient().validateTableConfigs(tableConfigs.toPrettyJsonString(), null);
       fail("Creation of an TableConfigs with empty config name should have failed");
     } catch (Exception e) {
       // expected
@@ -151,7 +147,7 @@ public class TableConfigsRestletResourceTest extends ControllerTest {
     try {
       tableConfigs =
           new TableConfigs(tableName, createDummySchema("differentName"), offlineTableConfig, realtimeTableConfig);
-      sendPostRequest(validateConfigUrl, tableConfigs.toPrettyJsonString());
+      adminClient.getTableClient().validateTableConfigs(tableConfigs.toPrettyJsonString(), null);
       fail("Creation of an TableConfigs with schema name different than tableName should have failed");
     } catch (Exception e) {
       // expected
@@ -162,7 +158,7 @@ public class TableConfigsRestletResourceTest extends ControllerTest {
       Schema schemaWithBlankSpace = createDummySchema(tableName);
       schemaWithBlankSpace.addField(new MetricFieldSpec("blank space", FieldSpec.DataType.LONG));
       tableConfigs = new TableConfigs(tableName, schemaWithBlankSpace, offlineTableConfig, realtimeTableConfig);
-      sendPostRequest(validateConfigUrl, tableConfigs.toPrettyJsonString());
+      adminClient.getTableClient().validateTableConfigs(tableConfigs.toPrettyJsonString(), null);
       fail("Creation of an TableConfigs with blank space in column should have failed");
     } catch (Exception e) {
       // expected
@@ -171,7 +167,7 @@ public class TableConfigsRestletResourceTest extends ControllerTest {
     // offline table name doesn't match config name
     try {
       tableConfigs = new TableConfigs(tableName, schema, createOfflineTableConfig("differentName"), null);
-      sendPostRequest(validateConfigUrl, tableConfigs.toPrettyJsonString());
+      adminClient.getTableClient().validateTableConfigs(tableConfigs.toPrettyJsonString(), null);
       fail("Creation of an TableConfigs with offline table name different than tableName should have failed");
     } catch (Exception e) {
       // expected
@@ -182,7 +178,7 @@ public class TableConfigsRestletResourceTest extends ControllerTest {
       tableConfigs =
           new TableConfigs("blank space", createDummySchema("blank space"), createOfflineTableConfig("blank space"),
               null);
-      sendPostRequest(validateConfigUrl, tableConfigs.toPrettyJsonString());
+      adminClient.getTableClient().validateTableConfigs(tableConfigs.toPrettyJsonString(), null);
       fail("Creation of an TableConfigs with blank space in table name should have failed");
     } catch (Exception e) {
       // expected
@@ -193,7 +189,7 @@ public class TableConfigsRestletResourceTest extends ControllerTest {
       TableConfig invalidTableConfig = createOfflineTableConfig(tableName);
       invalidTableConfig.getIndexingConfig().setInvertedIndexColumns(Lists.newArrayList("nonExistent"));
       tableConfigs = new TableConfigs(tableName, schema, invalidTableConfig, null);
-      sendPostRequest(validateConfigUrl, tableConfigs.toPrettyJsonString());
+      adminClient.getTableClient().validateTableConfigs(tableConfigs.toPrettyJsonString(), null);
       fail("Creation of an TableConfigs with invalid table config should have failed");
     } catch (Exception e) {
       // expected
@@ -202,7 +198,7 @@ public class TableConfigsRestletResourceTest extends ControllerTest {
     // realtime table name doesn't match config name
     try {
       tableConfigs = new TableConfigs(tableName, schema, null, createRealtimeTableConfig("differentName"));
-      sendPostRequest(validateConfigUrl, tableConfigs.toPrettyJsonString());
+      adminClient.getTableClient().validateTableConfigs(tableConfigs.toPrettyJsonString(), null);
       fail("Creation of an TableConfigs with realtime table name different than tableName should have failed");
     } catch (Exception e) {
       // expected
@@ -212,7 +208,7 @@ public class TableConfigsRestletResourceTest extends ControllerTest {
     try {
       tableConfigs = new TableConfigs("blank space", createDummySchema("blank space"), null,
           createRealtimeTableConfig("blank space"));
-      sendPostRequest(validateConfigUrl, tableConfigs.toPrettyJsonString());
+      adminClient.getTableClient().validateTableConfigs(tableConfigs.toPrettyJsonString(), null);
       fail("Creation of an TableConfigs with blank space in table name should have failed");
     } catch (Exception e) {
       // expected
@@ -223,7 +219,7 @@ public class TableConfigsRestletResourceTest extends ControllerTest {
       TableConfig invalidTableConfig = createRealtimeTableConfig(tableName);
       invalidTableConfig.getIndexingConfig().setInvertedIndexColumns(Lists.newArrayList("nonExistent"));
       tableConfigs = new TableConfigs(tableName, schema, null, invalidTableConfig);
-      sendPostRequest(validateConfigUrl, tableConfigs.toPrettyJsonString());
+      adminClient.getTableClient().validateTableConfigs(tableConfigs.toPrettyJsonString(), null);
       fail("Creation of an TableConfigs with invalid table config should have failed");
     } catch (Exception e) {
       // expected
@@ -241,7 +237,7 @@ public class TableConfigsRestletResourceTest extends ControllerTest {
       TableConfig realtimeTableConfig1 = createRealtimeTableConfig(tableName);
       realtimeTableConfig1.getValidationConfig().setTimeColumnName("time2");
       tableConfigs = new TableConfigs(tableName, twoTimeColumns, offlineTableConfig1, realtimeTableConfig1);
-      sendPostRequest(validateConfigUrl, tableConfigs.toPrettyJsonString());
+      adminClient.getTableClient().validateTableConfigs(tableConfigs.toPrettyJsonString(), null);
       fail("Creation of an TableConfigs with inconsistencies across offline and realtime table config should have "
           + "failed");
     } catch (Exception e) {
@@ -254,7 +250,7 @@ public class TableConfigsRestletResourceTest extends ControllerTest {
     TableConfig realtimeTableConfig1 = createRealtimeTableConfig(tableName);
     tableConfigs = new TableConfigs(tableName, dummySchema, offlineTableConfig1, realtimeTableConfig1);
     try {
-      sendPostRequest(validateConfigUrl, tableConfigs.toPrettyJsonString());
+      adminClient.getTableClient().validateTableConfigs(tableConfigs.toPrettyJsonString(), null);
       fail("Creation of an TableConfigs without database context in header but provided in one of the configs should "
           + "fail");
     } catch (Exception e) {
@@ -264,7 +260,7 @@ public class TableConfigsRestletResourceTest extends ControllerTest {
     offlineTableConfig1.setTableName(TableNameBuilder.OFFLINE.tableNameWithType(tableName));
     dummySchema.setSchemaName("db1." + tableName);
     try {
-      sendPostRequest(validateConfigUrl, tableConfigs.toPrettyJsonString());
+      adminClient.getTableClient().validateTableConfigs(tableConfigs.toPrettyJsonString(), null);
       fail("Creation of an TableConfigs without database context in header but provided in one of the configs should "
           + "fail");
     } catch (Exception e) {
@@ -275,7 +271,7 @@ public class TableConfigsRestletResourceTest extends ControllerTest {
     // database context is not passed in header
     tableConfigs.setTableName("db1." + tableName);
     try {
-      sendPostRequest(validateConfigUrl, tableConfigs.toPrettyJsonString());
+      adminClient.getTableClient().validateTableConfigs(tableConfigs.toPrettyJsonString(), null);
       fail("Creation of an TableConfigs without database context in header but provided in all of the configs should "
           + "fail");
     } catch (Exception e) {
@@ -289,32 +285,32 @@ public class TableConfigsRestletResourceTest extends ControllerTest {
     headers.put(CommonConstants.DATABASE, "db1");
     // only schema has the database prefix
     dummySchema.setSchemaName("db1." + tableName);
-    sendPostRequest(validateConfigUrl, tableConfigs.toPrettyJsonString(), headers);
+    adminClient.executeRequest("POST", "/tableConfigs/validate", tableConfigs.toPrettyJsonString(), null, headers);
     // one of the table config has database prefix
     offlineTableConfig1.setTableName(TableNameBuilder.OFFLINE.tableNameWithType(tableName));
-    sendPostRequest(validateConfigUrl, tableConfigs.toPrettyJsonString(), headers);
+    adminClient.executeRequest("POST", "/tableConfigs/validate", tableConfigs.toPrettyJsonString(), null, headers);
 
     // successfully created with all 3 configs
     String tableName1 = "testValidate1";
     tableConfigs = new TableConfigs(tableName1, createDummySchema(tableName1), createOfflineTableConfig(tableName1),
         createRealtimeTableConfig(tableName1));
-    sendPostRequest(validateConfigUrl, tableConfigs.toPrettyJsonString());
+    adminClient.getTableClient().validateTableConfigs(tableConfigs.toPrettyJsonString(), null);
 
     // successfully create with offline config
     String tableName2 = "testValidate2";
     tableConfigs =
         new TableConfigs(tableName2, createDummySchema(tableName2), createOfflineTableConfig(tableName2), null);
-    sendPostRequest(validateConfigUrl, tableConfigs.toPrettyJsonString());
+    adminClient.getTableClient().validateTableConfigs(tableConfigs.toPrettyJsonString(), null);
 
     // successfully create with realtime config
     String tableName3 = "testValidate3";
     tableConfigs =
         new TableConfigs(tableName3, createDummySchema(tableName3), null, createRealtimeTableConfig(tableName3));
-    sendPostRequest(validateConfigUrl, tableConfigs.toPrettyJsonString());
+    adminClient.getTableClient().validateTableConfigs(tableConfigs.toPrettyJsonString(), null);
 
-    sendDeleteRequest(DEFAULT_INSTANCE.getControllerRequestURLBuilder().forTableConfigsDelete(tableName1));
-    sendDeleteRequest(DEFAULT_INSTANCE.getControllerRequestURLBuilder().forTableConfigsDelete(tableName2));
-    sendDeleteRequest(DEFAULT_INSTANCE.getControllerRequestURLBuilder().forTableConfigsDelete(tableName3));
+    adminClient.getTableClient().deleteTableConfigs(tableName1, null);
+    adminClient.getTableClient().deleteTableConfigs(tableName2, null);
+    adminClient.getTableClient().deleteTableConfigs(tableName3, null);
   }
 
   /**
@@ -322,14 +318,15 @@ public class TableConfigsRestletResourceTest extends ControllerTest {
    */
   @Test
   public void testCreateConfig()
-      throws IOException {
+      throws Exception {
+    PinotAdminClient adminClient = getOrCreateAdminClient();
     String tableName = "testCreate";
     TableConfig offlineTableConfig = createOfflineTableConfig(tableName);
     TableConfig realtimeTableConfig = createRealtimeTableConfig(tableName);
     Schema schema = createDummySchema(tableName);
     TableConfigs tableConfigs = new TableConfigs(tableName, schema, offlineTableConfig, realtimeTableConfig);
-    sendPostRequest(_createTableConfigsUrl, tableConfigs.toPrettyJsonString());
-    String response = sendGetRequest(DEFAULT_INSTANCE.getControllerRequestURLBuilder().forTableConfigsGet(tableName));
+    adminClient.getTableClient().createTableConfigs(tableConfigs.toPrettyJsonString(), null, null);
+    String response = adminClient.getTableClient().getTableConfigs(tableName);
     TableConfigs tableConfigsResponse = JsonUtils.stringToObject(response, TableConfigs.class);
     Assert.assertEquals(tableConfigsResponse.getTableName(), tableName);
     Assert.assertEquals(tableConfigsResponse.getOffline().getTableName(), offlineTableConfig.getTableName());
@@ -338,13 +335,13 @@ public class TableConfigsRestletResourceTest extends ControllerTest {
 
     // test POST of existing configs fails
     try {
-      sendPostRequest(_createTableConfigsUrl, tableConfigs.toPrettyJsonString());
+      adminClient.getTableClient().createTableConfigs(tableConfigs.toPrettyJsonString(), null, null);
       fail("Should fail for trying to add existing config");
     } catch (Exception e) {
       // expected
     }
 
-    sendDeleteRequest(DEFAULT_INSTANCE.getControllerRequestURLBuilder().forTableConfigsDelete(tableName));
+    adminClient.getTableClient().deleteTableConfigs(tableName, null);
 
     // replica check
     tableName = "testCreateReplicas";
@@ -354,28 +351,28 @@ public class TableConfigsRestletResourceTest extends ControllerTest {
     replicaTestRealtimeTableConfig.getValidationConfig().setReplication("1");
     tableConfigs = new TableConfigs(tableName, createDummySchema(tableName), replicaTestOfflineTableConfig,
         replicaTestRealtimeTableConfig);
-    sendPostRequest(_createTableConfigsUrl, tableConfigs.toPrettyJsonString());
-    response = sendGetRequest(DEFAULT_INSTANCE.getControllerRequestURLBuilder().forTableConfigsGet(tableName));
+    adminClient.getTableClient().createTableConfigs(tableConfigs.toPrettyJsonString(), null, null);
+    response = adminClient.getTableClient().getTableConfigs(tableName);
     tableConfigsResponse = JsonUtils.stringToObject(response, TableConfigs.class);
     Assert.assertEquals(tableConfigsResponse.getTableName(), tableName);
     Assert.assertEquals(tableConfigsResponse.getOffline().getReplication(),
         DEFAULT_MIN_NUM_REPLICAS);
     Assert.assertEquals(tableConfigsResponse.getRealtime().getReplication(),
         DEFAULT_MIN_NUM_REPLICAS);
-    sendDeleteRequest(DEFAULT_INSTANCE.getControllerRequestURLBuilder().forTableConfigsDelete(tableName));
+    adminClient.getTableClient().deleteTableConfigs(tableName, null);
 
     // quota check
     tableName = "testCreateQuota";
     TableConfig offlineDimTableConfig = createOfflineDimTableConfig(tableName);
     Schema dimSchema = createDummySchemaWithPrimaryKey(tableName);
     tableConfigs = new TableConfigs(tableName, dimSchema, offlineDimTableConfig, null);
-    sendPostRequest(_createTableConfigsUrl, tableConfigs.toPrettyJsonString());
-    response = sendGetRequest(DEFAULT_INSTANCE.getControllerRequestURLBuilder().forTableConfigsGet(tableName));
+    adminClient.getTableClient().createTableConfigs(tableConfigs.toPrettyJsonString(), null, null);
+    response = adminClient.getTableClient().getTableConfigs(tableName);
     tableConfigsResponse = JsonUtils.stringToObject(response, TableConfigs.class);
     Assert.assertEquals(tableName, tableConfigsResponse.getTableName());
     Assert.assertEquals(tableConfigsResponse.getOffline().getQuotaConfig().getStorage(),
         DEFAULT_INSTANCE.getControllerConfig().getDimTableMaxSize());
-    sendDeleteRequest(DEFAULT_INSTANCE.getControllerRequestURLBuilder().forTableConfigsDelete(tableName));
+    adminClient.getTableClient().deleteTableConfigs(tableName, null);
 
     // tuner config
     tableName = "testTunerConfig";
@@ -383,8 +380,8 @@ public class TableConfigsRestletResourceTest extends ControllerTest {
     TableConfig realtimeTunerTableConfig = createRealtimeTunerTableConfig(tableName);
     tableConfigs =
         new TableConfigs(tableName, createDummySchema(tableName), offlineTunerTableConfig, realtimeTunerTableConfig);
-    sendPostRequest(_createTableConfigsUrl, tableConfigs.toPrettyJsonString());
-    response = sendGetRequest(DEFAULT_INSTANCE.getControllerRequestURLBuilder().forTableConfigsGet(tableName));
+    adminClient.getTableClient().createTableConfigs(tableConfigs.toPrettyJsonString(), null, null);
+    response = adminClient.getTableClient().getTableConfigs(tableName);
     tableConfigsResponse = JsonUtils.stringToObject(response, TableConfigs.class);
     Assert.assertEquals(tableName, tableConfigsResponse.getTableName());
     Assert.assertTrue(tableConfigsResponse.getOffline().getIndexingConfig().getInvertedIndexColumns()
@@ -395,36 +392,32 @@ public class TableConfigsRestletResourceTest extends ControllerTest {
         .containsAll(schema.getDimensionNames()));
     Assert.assertTrue(tableConfigsResponse.getRealtime().getIndexingConfig().getNoDictionaryColumns()
         .containsAll(schema.getMetricNames()));
-    sendDeleteRequest(DEFAULT_INSTANCE.getControllerRequestURLBuilder().forTableConfigsDelete(tableName));
+    adminClient.getTableClient().deleteTableConfigs(tableName, null);
   }
 
   @Test
   public void testListConfigs()
-      throws IOException {
+      throws Exception {
+    PinotAdminClient adminClient = getOrCreateAdminClient();
     // create with 1 config
     String tableName1 = "testList1";
     TableConfig offlineTableConfig = createOfflineTableConfig(tableName1);
     TableConfig realtimeTableConfig = createRealtimeTableConfig(tableName1);
     Schema schema = createDummySchema(tableName1);
     TableConfigs tableConfigs = new TableConfigs(tableName1, schema, offlineTableConfig, null);
-    sendPostRequest(_createTableConfigsUrl, tableConfigs.toPrettyJsonString());
+    adminClient.getTableClient().createTableConfigs(tableConfigs.toPrettyJsonString(), null, null);
 
     // list
-    String getResponse = sendGetRequest(DEFAULT_INSTANCE.getControllerRequestURLBuilder().forTableConfigsList());
-    List<String> configs = JsonUtils.stringToObject(getResponse, new TypeReference<List<String>>() {
-    });
+    List<String> configs = adminClient.getTableClient().listTableConfigs();
     Assert.assertEquals(configs.size(), 1);
     Assert.assertTrue(configs.containsAll(Sets.newHashSet(tableName1)));
 
     // update to 2
     tableConfigs = new TableConfigs(tableName1, schema, offlineTableConfig, realtimeTableConfig);
-    sendPutRequest(DEFAULT_INSTANCE.getControllerRequestURLBuilder().forTableConfigsUpdate(tableName1),
-        tableConfigs.toPrettyJsonString());
+    adminClient.getTableClient().updateTableConfigs(tableName1, tableConfigs.toPrettyJsonString(), null, false, false);
 
     // list
-    getResponse = sendGetRequest(DEFAULT_INSTANCE.getControllerRequestURLBuilder().forTableConfigsList());
-    configs = JsonUtils.stringToObject(getResponse, new TypeReference<List<String>>() {
-    });
+    configs = adminClient.getTableClient().listTableConfigs();
     Assert.assertEquals(configs.size(), 1);
     Assert.assertTrue(configs.containsAll(Sets.newHashSet("testList1")));
 
@@ -433,31 +426,28 @@ public class TableConfigsRestletResourceTest extends ControllerTest {
     offlineTableConfig = createOfflineTableConfig(tableName2);
     schema = createDummySchema(tableName2);
     tableConfigs = new TableConfigs(tableName2, schema, offlineTableConfig, null);
-    sendPostRequest(_createTableConfigsUrl, tableConfigs.toPrettyJsonString());
+    adminClient.getTableClient().createTableConfigs(tableConfigs.toPrettyJsonString(), null, null);
 
     // list
-    getResponse = sendGetRequest(DEFAULT_INSTANCE.getControllerRequestURLBuilder().forTableConfigsList());
-    configs = JsonUtils.stringToObject(getResponse, new TypeReference<List<String>>() {
-    });
+    configs = adminClient.getTableClient().listTableConfigs();
     Assert.assertEquals(configs.size(), 2);
     Assert.assertTrue(configs.containsAll(Sets.newHashSet(tableName1, tableName2)));
 
     // delete 1
-    sendDeleteRequest(DEFAULT_INSTANCE.getControllerRequestURLBuilder().forTableConfigsDelete(tableName2));
+    adminClient.getTableClient().deleteTableConfigs(tableName2, null);
 
     // list 1
-    getResponse = sendGetRequest(DEFAULT_INSTANCE.getControllerRequestURLBuilder().forTableConfigsList());
-    configs = JsonUtils.stringToObject(getResponse, new TypeReference<List<String>>() {
-    });
+    configs = adminClient.getTableClient().listTableConfigs();
     Assert.assertEquals(configs.size(), 1);
     Assert.assertTrue(configs.containsAll(Sets.newHashSet(tableName1)));
 
-    sendDeleteRequest(DEFAULT_INSTANCE.getControllerRequestURLBuilder().forTableConfigsDelete(tableName1));
+    adminClient.getTableClient().deleteTableConfigs(tableName1, null);
   }
 
   @Test
   public void testUpdateConfig()
-      throws IOException {
+      throws Exception {
+    PinotAdminClient adminClient = getOrCreateAdminClient();
 
     // create with 1
     String tableName = "testUpdate1";
@@ -467,14 +457,14 @@ public class TableConfigsRestletResourceTest extends ControllerTest {
     TableConfigs tableConfigs = new TableConfigs(tableName, schema, offlineTableConfig, null);
     // PUT before POST should fail
     try {
-      sendPutRequest(DEFAULT_INSTANCE.getControllerRequestURLBuilder().forTableConfigsUpdate(tableName),
-          tableConfigs.toPrettyJsonString());
+      adminClient.getTableClient()
+          .updateTableConfigs(tableName, tableConfigs.toPrettyJsonString(), null, false, false);
       fail("Should fail for trying to PUT config before creating via POST");
     } catch (Exception e) {
       // expected
     }
-    sendPostRequest(_createTableConfigsUrl, tableConfigs.toPrettyJsonString());
-    String response = sendGetRequest(DEFAULT_INSTANCE.getControllerRequestURLBuilder().forTableConfigsGet(tableName));
+    adminClient.getTableClient().createTableConfigs(tableConfigs.toPrettyJsonString(), null, null);
+    String response = adminClient.getTableClient().getTableConfigs(tableName);
     TableConfigs tableConfigsResponse = JsonUtils.stringToObject(response, TableConfigs.class);
     Assert.assertEquals(tableConfigsResponse.getTableName(), tableName);
     Assert.assertEquals(tableConfigsResponse.getOffline().getTableName(), offlineTableConfig.getTableName());
@@ -482,18 +472,15 @@ public class TableConfigsRestletResourceTest extends ControllerTest {
     Assert.assertEquals(tableConfigsResponse.getSchema().getSchemaName(), schema.getSchemaName());
 
     // list
-    String getResponse = sendGetRequest(DEFAULT_INSTANCE.getControllerRequestURLBuilder().forTableConfigsList());
-    List<String> configs = JsonUtils.stringToObject(getResponse, new TypeReference<List<String>>() {
-    });
+    List<String> configs = adminClient.getTableClient().listTableConfigs();
     Assert.assertEquals(configs.size(), 1);
     Assert.assertTrue(configs.containsAll(Sets.newHashSet(tableName)));
 
     // update to 2
     tableConfigs = new TableConfigs(tableName, tableConfigsResponse.getSchema(), tableConfigsResponse.getOffline(),
         realtimeTableConfig);
-    sendPutRequest(DEFAULT_INSTANCE.getControllerRequestURLBuilder().forTableConfigsUpdate(tableName),
-        tableConfigs.toPrettyJsonString());
-    response = sendGetRequest(DEFAULT_INSTANCE.getControllerRequestURLBuilder().forTableConfigsGet(tableName));
+    adminClient.getTableClient().updateTableConfigs(tableName, tableConfigs.toPrettyJsonString(), null, false, false);
+    response = adminClient.getTableClient().getTableConfigs(tableName);
     tableConfigsResponse = JsonUtils.stringToObject(response, TableConfigs.class);
     Assert.assertEquals(tableConfigsResponse.getTableName(), tableName);
     Assert.assertEquals(tableConfigsResponse.getOffline().getTableName(), offlineTableConfig.getTableName());
@@ -501,9 +488,7 @@ public class TableConfigsRestletResourceTest extends ControllerTest {
     Assert.assertEquals(tableConfigsResponse.getSchema().getSchemaName(), schema.getSchemaName());
 
     // list
-    getResponse = sendGetRequest(DEFAULT_INSTANCE.getControllerRequestURLBuilder().forTableConfigsList());
-    configs = JsonUtils.stringToObject(getResponse, new TypeReference<List<String>>() {
-    });
+    configs = adminClient.getTableClient().listTableConfigs();
     Assert.assertEquals(configs.size(), 1);
     Assert.assertTrue(configs.containsAll(Sets.newHashSet(tableName)));
 
@@ -511,9 +496,8 @@ public class TableConfigsRestletResourceTest extends ControllerTest {
     schema.addField(new MetricFieldSpec("newMetric", FieldSpec.DataType.LONG));
     tableConfigs =
         new TableConfigs(tableName, schema, tableConfigsResponse.getOffline(), tableConfigsResponse.getRealtime());
-    sendPutRequest(DEFAULT_INSTANCE.getControllerRequestURLBuilder().forTableConfigsUpdate(tableName),
-        tableConfigs.toPrettyJsonString());
-    response = sendGetRequest(DEFAULT_INSTANCE.getControllerRequestURLBuilder().forTableConfigsGet(tableName));
+    adminClient.getTableClient().updateTableConfigs(tableName, tableConfigs.toPrettyJsonString(), null, false, false);
+    response = adminClient.getTableClient().getTableConfigs(tableName);
     tableConfigsResponse = JsonUtils.stringToObject(response, TableConfigs.class);
     Assert.assertEquals(tableConfigsResponse.getTableName(), tableName);
     Assert.assertEquals(tableConfigsResponse.getOffline().getTableName(), offlineTableConfig.getTableName());
@@ -525,27 +509,27 @@ public class TableConfigsRestletResourceTest extends ControllerTest {
     tableConfigsResponse.getRealtime().getIndexingConfig().setInvertedIndexColumns(Lists.newArrayList("dimA"));
     tableConfigs =
         new TableConfigs(tableName, schema, tableConfigsResponse.getOffline(), tableConfigsResponse.getRealtime());
-    sendPutRequest(DEFAULT_INSTANCE.getControllerRequestURLBuilder().forTableConfigsUpdate(tableName),
-        tableConfigs.toPrettyJsonString());
-    response = sendGetRequest(DEFAULT_INSTANCE.getControllerRequestURLBuilder().forTableConfigsGet(tableName));
+    adminClient.getTableClient().updateTableConfigs(tableName, tableConfigs.toPrettyJsonString(), null, false, false);
+    response = adminClient.getTableClient().getTableConfigs(tableName);
     tableConfigsResponse = JsonUtils.stringToObject(response, TableConfigs.class);
     Assert.assertTrue(tableConfigsResponse.getOffline().getIndexingConfig().getInvertedIndexColumns().contains("dimA"));
     Assert.assertTrue(
         tableConfigsResponse.getRealtime().getIndexingConfig().getInvertedIndexColumns().contains("dimA"));
 
-    sendDeleteRequest(DEFAULT_INSTANCE.getControllerRequestURLBuilder().forTableConfigsDelete(tableName));
+    adminClient.getTableClient().deleteTableConfigs(tableName, null);
   }
 
   @Test
   public void testForceUpdateTableSchemaAndConfigs()
-      throws IOException {
+      throws Exception {
+    PinotAdminClient adminClient = getOrCreateAdminClient();
     String tableName = "testUpdate1";
     TableConfig offlineTableConfig = createOfflineTableConfig(tableName);
     Schema schema = createDummySchema(tableName);
     TableConfigs tableConfigs = new TableConfigs(tableName, schema, offlineTableConfig, null);
 
-    sendPostRequest(_createTableConfigsUrl, tableConfigs.toPrettyJsonString());
-    String response = sendGetRequest(DEFAULT_INSTANCE.getControllerRequestURLBuilder().forTableConfigsGet(tableName));
+    adminClient.getTableClient().createTableConfigs(tableConfigs.toPrettyJsonString(), null, null);
+    String response = adminClient.getTableClient().getTableConfigs(tableName);
     TableConfigs tableConfigsResponse = JsonUtils.stringToObject(response, TableConfigs.class);
     Assert.assertNotNull(tableConfigs.getOffline());
 
@@ -554,46 +538,46 @@ public class TableConfigsRestletResourceTest extends ControllerTest {
     tableConfigs =
         new TableConfigs(tableName, schema, tableConfigsResponse.getOffline(), tableConfigsResponse.getRealtime());
 
-    String tableConfigUpdateUrl = DEFAULT_INSTANCE.getControllerRequestURLBuilder().forTableConfigsUpdate(tableName);
     try {
-      sendPutRequest(tableConfigUpdateUrl, tableConfigs.toPrettyJsonString());
-    } catch (IOException e) {
+      adminClient.getTableClient()
+          .updateTableConfigs(tableName, tableConfigs.toPrettyJsonString(), null, false, false);
+    } catch (RuntimeException e) {
       Assert.assertTrue(e.getMessage().contains("is not backward-compatible with the existing schema"));
     }
 
     // Skip validate table configs – Exception is still thrown
-    String newTableConfigUpdateUrl = tableConfigUpdateUrl + "?validationTypesToSkip=ALL";
     try {
-      sendPutRequest(newTableConfigUpdateUrl, tableConfigs.toPrettyJsonString());
-    } catch (IOException e) {
+      adminClient.getTableClient()
+          .updateTableConfigs(tableName, tableConfigs.toPrettyJsonString(), "ALL", false, false);
+    } catch (RuntimeException e) {
       Assert.assertTrue(e.getMessage().contains("is not backward-compatible with the existing schema"));
     }
 
     // Skip table config validation as well as force update the table schema – no exceptions are thrown
-    newTableConfigUpdateUrl = tableConfigUpdateUrl + "?validationTypesToSkip=ALL&forceTableSchemaUpdate=true";
-    response = sendPutRequest(newTableConfigUpdateUrl, tableConfigs.toPrettyJsonString());
+    response =
+        adminClient.getTableClient()
+            .updateTableConfigs(tableName, tableConfigs.toPrettyJsonString(), "ALL", false, true);
     Assert.assertTrue(response.contains("TableConfigs updated for testUpdate1"));
-    sendDeleteRequest(DEFAULT_INSTANCE.getControllerRequestURLBuilder().forTableConfigsDelete(tableName));
+    adminClient.getTableClient().deleteTableConfigs(tableName, null);
   }
 
   @Test
   public void testDeleteConfig()
       throws Exception {
+    PinotAdminClient adminClient = getOrCreateAdminClient();
     // create with 1 config
     String tableName = "testDelete1";
     TableConfig offlineTableConfig = createOfflineTableConfig(tableName);
     Schema schema = createDummySchema(tableName);
     TableConfigs tableConfigs = new TableConfigs(tableName, schema, offlineTableConfig, null);
-    sendPostRequest(_createTableConfigsUrl, tableConfigs.toPrettyJsonString());
-    String response = sendGetRequest(DEFAULT_INSTANCE.getControllerRequestURLBuilder().forTableConfigsGet(tableName));
+    adminClient.getTableClient().createTableConfigs(tableConfigs.toPrettyJsonString(), null, null);
+    String response = adminClient.getTableClient().getTableConfigs(tableName);
     TableConfigs tableConfigsResponse = JsonUtils.stringToObject(response, TableConfigs.class);
     Assert.assertEquals(tableConfigsResponse.getTableName(), tableName);
 
     // delete & check
-    sendDeleteRequest(DEFAULT_INSTANCE.getControllerRequestURLBuilder().forTableConfigsDelete(tableName));
-    String getResponse = sendGetRequest(DEFAULT_INSTANCE.getControllerRequestURLBuilder().forTableConfigsList());
-    List<String> configs = JsonUtils.stringToObject(getResponse, new TypeReference<List<String>>() {
-    });
+    adminClient.getTableClient().deleteTableConfigs(tableName, null);
+    List<String> configs = adminClient.getTableClient().listTableConfigs();
     Assert.assertEquals(configs.size(), 0);
 
     tableName = "testDelete2";
@@ -601,80 +585,77 @@ public class TableConfigsRestletResourceTest extends ControllerTest {
     TableConfig realtimeTableConfig = createRealtimeTableConfig(tableName);
     schema = createDummySchema(tableName);
     tableConfigs = new TableConfigs(tableName, schema, offlineTableConfig, realtimeTableConfig);
-    sendPostRequest(_createTableConfigsUrl, tableConfigs.toPrettyJsonString());
-    response = sendGetRequest(DEFAULT_INSTANCE.getControllerRequestURLBuilder().forTableConfigsGet(tableName));
+    adminClient.getTableClient().createTableConfigs(tableConfigs.toPrettyJsonString(), null, null);
+    response = adminClient.getTableClient().getTableConfigs(tableName);
     tableConfigsResponse = JsonUtils.stringToObject(response, TableConfigs.class);
     Assert.assertEquals(tableConfigsResponse.getTableName(), tableName);
 
     // delete & check
-    sendDeleteRequest(DEFAULT_INSTANCE.getControllerRequestURLBuilder().forTableConfigsDelete(tableName));
-    getResponse = sendGetRequest(DEFAULT_INSTANCE.getControllerRequestURLBuilder().forTableConfigsList());
-    configs = JsonUtils.stringToObject(getResponse, new TypeReference<List<String>>() {
-    });
+    adminClient.getTableClient().deleteTableConfigs(tableName, null);
+    configs = adminClient.getTableClient().listTableConfigs();
     Assert.assertEquals(configs.size(), 0);
   }
 
   @Test
   public void testDeleteTableWithLogicalTable()
-      throws IOException {
+      throws Exception {
+    PinotAdminClient adminClient = getOrCreateAdminClient();
     String logicalTableName = "testDeleteLogicalTable";
     String tableName = "physicalTable";
     TableConfig offlineTableConfig = createOfflineTableConfig(tableName);
     TableConfig realtimeTableConfig = createRealtimeTableConfig(tableName);
-    ControllerRequestURLBuilder urlBuilder = DEFAULT_INSTANCE.getControllerRequestURLBuilder();
     DEFAULT_INSTANCE.addDummySchema(logicalTableName);
     DEFAULT_INSTANCE.addDummySchema(tableName);
     DEFAULT_INSTANCE.addTableConfig(offlineTableConfig);
     DEFAULT_INSTANCE.addTableConfig(realtimeTableConfig);
 
     // Create logical table
-    String createLogicalTableUrl = urlBuilder.forLogicalTableCreate();
     LogicalTableConfig logicalTableConfig = getDummyLogicalTableConfig(logicalTableName,
         List.of(offlineTableConfig.getTableName(), realtimeTableConfig.getTableName()), "DefaultTenant");
-    String response = sendPostRequest(createLogicalTableUrl, logicalTableConfig.toJsonString());
+    String response =
+        adminClient.getLogicalTableClient().createLogicalTable(logicalTableConfig.toJsonString());
     Assert.assertTrue(response.contains("testDeleteLogicalTable logical table successfully added"), response);
 
     // Delete table should fail because it is referenced by a logical table
-    String msg = Assert.expectThrows(
-        IOException.class, () -> sendDeleteRequest(urlBuilder.forTableConfigsDelete(tableName))).getMessage();
+    String msg = Assert.expectThrows(RuntimeException.class,
+        () -> adminClient.getTableClient().deleteTableConfigs(tableName, null)).getMessage();
     Assert.assertTrue(msg.contains("Cannot delete table config: " + tableName
         + " because it is referenced in logical table: " + logicalTableName), msg);
 
     //  Delete logical table
-    String deleteLogicalTableUrl = urlBuilder.forLogicalTableDelete(logicalTableName);
-    response = sendDeleteRequest(deleteLogicalTableUrl);
+    response = adminClient.getLogicalTableClient().deleteLogicalTable(logicalTableName);
     Assert.assertTrue(response.contains("testDeleteLogicalTable logical table successfully deleted"), response);
 
     // physical table should be deleted successfully
-    response = sendDeleteRequest(urlBuilder.forTableConfigsDelete(tableName));
+    response = adminClient.getTableClient().deleteTableConfigs(tableName, null);
     Assert.assertTrue(response.contains("Deleted TableConfigs: physicalTable"), response);
   }
 
   @Test
   public void testDeleteTableConfigWithTableTypeValidation()
-      throws IOException {
-    ControllerRequestURLBuilder urlBuilder = DEFAULT_INSTANCE.getControllerRequestURLBuilder();
+      throws Exception {
+    PinotAdminClient adminClient = getOrCreateAdminClient();
     String tableName = "testDeleteWithTypeValidation";
     TableConfig offlineTableConfig = createOfflineTableConfig(tableName);
     DEFAULT_INSTANCE.addDummySchema(tableName);
     DEFAULT_INSTANCE.addTableConfig(offlineTableConfig);
 
     // Delete table should fail because it is not a raw table name
-    String msg = Assert.expectThrows(
-            IOException.class,
-            () -> sendDeleteRequest(urlBuilder.forTableConfigsDelete(offlineTableConfig.getTableName())))
+    String msg = Assert.expectThrows(RuntimeException.class,
+            () -> adminClient.getTableClient().deleteTableConfigs(offlineTableConfig.getTableName(), null))
         .getMessage();
     Assert.assertTrue(msg.contains("Invalid table name: testDeleteWithTypeValidation_OFFLINE. Use raw table name."),
         msg);
 
     // Delete table with raw table name
-    String response = sendDeleteRequest(urlBuilder.forTableConfigsDelete(tableName));
+    String response = adminClient.getTableClient().deleteTableConfigs(tableName, null);
     Assert.assertTrue(response.contains("Deleted TableConfigs: testDeleteWithTypeValidation"), response);
   }
 
   @Test
   public void testUnrecognizedProperties()
-      throws IOException {
+      throws Exception {
+    PinotAdminClient adminClient = getOrCreateAdminClient();
     String tableName = "testUnrecognized1";
     TableConfig offlineTableConfig = createOfflineTableConfig(tableName);
     Schema schema = createDummySchema(tableName);
@@ -683,25 +664,24 @@ public class TableConfigsRestletResourceTest extends ControllerTest {
     tableConfigsJson.put("illegalKey1", 1);
 
     // Validate
-    DEFAULT_INSTANCE.getControllerRequestURLBuilder().forTableConfigsValidate();
-    String response = sendPostRequest(DEFAULT_INSTANCE.getControllerRequestURLBuilder().forTableConfigsValidate(),
-        tableConfigsJson.toPrettyString());
+    String response = adminClient.getTableClient().validateTableConfigs(tableConfigsJson.toPrettyString(), null);
     JsonNode responseJson = JsonUtils.stringToJsonNode(response);
     Assert.assertTrue(responseJson.has("unrecognizedProperties"));
     Assert.assertTrue(responseJson.get("unrecognizedProperties").has("/illegalKey1"));
 
     // Create
-    response = sendPostRequest(_createTableConfigsUrl, tableConfigsJson.toPrettyString());
+    response = adminClient.getTableClient().createTableConfigs(tableConfigsJson.toPrettyString(), null, null);
     Assert.assertEquals(response, "{\"unrecognizedProperties\":{\"/illegalKey1\":1},\"status\":\"TableConfigs "
         + "testUnrecognized1 successfully added\"}");
 
     // Update
-    response = sendPutRequest(DEFAULT_INSTANCE.getControllerRequestURLBuilder().forTableConfigsUpdate(tableName),
-        tableConfigsJson.toPrettyString());
+    response =
+        adminClient.getTableClient().updateTableConfigs(tableName, tableConfigsJson.toPrettyString(), null, false,
+            false);
     Assert.assertEquals(response,
         "{\"unrecognizedProperties\":{\"/illegalKey1\":1},\"status\":\"TableConfigs updated for testUnrecognized1\"}");
     // Delete
-    sendDeleteRequest(DEFAULT_INSTANCE.getControllerRequestURLBuilder().forTableConfigsDelete(tableName));
+    adminClient.getTableClient().deleteTableConfigs(tableName, null);
   }
 
   /**
@@ -709,25 +689,25 @@ public class TableConfigsRestletResourceTest extends ControllerTest {
    */
   @Test
   public void testGetConfigCompatibility()
-      throws IOException {
+      throws Exception {
+    PinotAdminClient adminClient = getOrCreateAdminClient();
     String tableName = "table1";
     DEFAULT_INSTANCE.addDummySchema(tableName);
     TableConfig offlineTableConfig = createOfflineTableConfig(tableName);
     SegmentsValidationAndRetentionConfig validationConfig = new SegmentsValidationAndRetentionConfig();
     validationConfig.setReplication("1");
     offlineTableConfig.setValidationConfig(validationConfig);
-    sendPostRequest(DEFAULT_INSTANCE.getControllerRequestURLBuilder().forTableCreate(),
-        offlineTableConfig.toJsonString());
+    adminClient.getTableClient().createTable(offlineTableConfig.toJsonString(), null);
 
-    String response = sendGetRequest(DEFAULT_INSTANCE.getControllerRequestURLBuilder().forTableConfigsGet(tableName));
+    String response = adminClient.getTableClient().getTableConfigs(tableName);
     TableConfigs tableConfigsResponse = JsonUtils.stringToObject(response, TableConfigs.class);
     Assert.assertEquals(tableConfigsResponse.getTableName(), tableName);
     Assert.assertEquals(tableConfigsResponse.getOffline().getTableName(), offlineTableConfig.getTableName());
     Assert.assertEquals(tableConfigsResponse.getSchema().getSchemaName(), tableName);
 
     // Delete
-    sendDeleteRequest(DEFAULT_INSTANCE.getControllerRequestURLBuilder().forTableDelete(tableName));
-    sendDeleteRequest(DEFAULT_INSTANCE.getControllerRequestURLBuilder().forSchemaDelete(tableName));
+    adminClient.getTableClient().deleteTable(tableName);
+    adminClient.getSchemaClient().deleteSchema(tableName);
   }
 
   @AfterClass

@@ -157,15 +157,35 @@ public class PinotInstanceAdminClient {
    * Updates the tags of a specific instance.
    *
    * @param instanceName Name of the instance
-   * @param tagUpdateRequest Tag update request as JSON string
+   * @param tags Tags to set, as a comma-separated string
    * @return Success response
    * @throws PinotAdminException If the request fails
    */
-  public String updateInstanceTags(String instanceName, String tagUpdateRequest)
+  public String updateInstanceTags(String instanceName, String tags)
       throws PinotAdminException {
+    Map<String, String> queryParams = Map.of("tags", tags);
     JsonNode response = _transport.executePut(_controllerAddress, "/instances/" + instanceName + "/updateTags",
-        tagUpdateRequest, null, _headers);
+        null, queryParams, _headers);
     return response.toString();
+  }
+
+  /**
+   * Updates the tags of a specific instance.
+   */
+  public String updateInstanceTags(String instanceName, List<String> tags, boolean updateBrokerResource)
+      throws PinotAdminException {
+    Map<String, String> queryParams = new HashMap<>();
+    queryParams.put("tags", String.join(",", tags));
+    queryParams.put("updateBrokerResource", String.valueOf(updateBrokerResource));
+
+    JsonNode response = _transport.executePut(_controllerAddress, "/instances/" + instanceName + "/updateTags",
+        null, queryParams, _headers);
+    return response.toString();
+  }
+
+  public String updateInstanceTags(String instanceName, List<String> tags)
+      throws PinotAdminException {
+    return updateInstanceTags(instanceName, tags, false);
   }
 
   /**
@@ -215,6 +235,20 @@ public class PinotInstanceAdminClient {
 
     JsonNode response = _transport.executePost(_controllerAddress, "/instances/updateTags/validate",
         null, queryParams, _headers);
+    return response.toString();
+  }
+
+  /**
+   * Validates whether it's safe to update the tags of the given instances using a request payload.
+   *
+   * @param requestBody Validation request body
+   * @return Validation response as JSON string
+   * @throws PinotAdminException If the request fails
+   */
+  public String validateInstanceTagUpdates(String requestBody)
+      throws PinotAdminException {
+    JsonNode response =
+        _transport.executePost(_controllerAddress, "/instances/updateTags/validate", requestBody, null, _headers);
     return response.toString();
   }
 

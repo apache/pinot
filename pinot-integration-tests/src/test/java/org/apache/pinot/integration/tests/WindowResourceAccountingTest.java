@@ -42,7 +42,6 @@ import org.apache.pinot.spi.utils.CommonConstants;
 import org.apache.pinot.spi.utils.CommonConstants.Accounting;
 import org.apache.pinot.spi.utils.CommonConstants.Broker;
 import org.apache.pinot.spi.utils.CommonConstants.Server;
-import org.apache.pinot.spi.utils.builder.ControllerRequestURLBuilder;
 import org.apache.pinot.spi.utils.builder.TableConfigBuilder;
 import org.apache.pinot.util.TestUtils;
 import org.testng.annotations.AfterClass;
@@ -124,10 +123,6 @@ public class WindowResourceAccountingTest extends BaseClusterIntegrationTest {
     startBroker();
     startServer();
 
-    if (_controllerRequestURLBuilder == null) {
-      _controllerRequestURLBuilder =
-          ControllerRequestURLBuilder.baseUrl("http://localhost:" + getControllerPort());
-    }
     TestUtils.ensureDirectoriesExistAndEmpty(_tempDir, _segmentDir, _tarDir);
     // create & upload schema AND table config
     Schema schema = createSchema();

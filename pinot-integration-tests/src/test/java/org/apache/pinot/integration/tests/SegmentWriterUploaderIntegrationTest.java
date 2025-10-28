@@ -21,7 +21,6 @@ package org.apache.pinot.integration.tests;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.google.common.base.Function;
 import java.io.File;
-import java.io.IOException;
 import java.net.URI;
 import java.util.Collections;
 import java.util.HashMap;
@@ -41,7 +40,6 @@ import org.apache.pinot.spi.data.readers.GenericRow;
 import org.apache.pinot.spi.ingestion.batch.BatchConfigProperties;
 import org.apache.pinot.spi.ingestion.segment.uploader.SegmentUploader;
 import org.apache.pinot.spi.ingestion.segment.writer.SegmentWriter;
-import org.apache.pinot.spi.utils.JsonUtils;
 import org.apache.pinot.spi.utils.builder.TableNameBuilder;
 import org.apache.pinot.util.TestUtils;
 import org.slf4j.Logger;
@@ -153,11 +151,11 @@ public class SegmentWriterUploaderIntegrationTest extends BaseClusterIntegration
   }
 
   private int getNumSegments()
-      throws IOException {
-    String jsonOutputStr = sendGetRequest(_controllerRequestURLBuilder.
-        forSegmentListAPI(_tableNameWithType, TableType.OFFLINE.toString()));
-    JsonNode array = JsonUtils.stringToJsonNode(jsonOutputStr);
-    return array.get(0).get("OFFLINE").size();
+      throws Exception {
+    List<String> segments =
+        getOrCreateAdminClient().getSegmentClient().listSegments(_tableNameWithType, TableType.OFFLINE.toString(),
+            false);
+    return segments.size();
   }
 
   private int getTotalDocsFromQuery()
@@ -167,17 +165,15 @@ public class SegmentWriterUploaderIntegrationTest extends BaseClusterIntegration
   }
 
   private int getNumDocsInLatestSegment()
-      throws IOException {
-    String jsonOutputStr = sendGetRequest(_controllerRequestURLBuilder.
-        forSegmentListAPI(_tableNameWithType, TableType.OFFLINE.toString()));
-    JsonNode array = JsonUtils.stringToJsonNode(jsonOutputStr);
-    JsonNode segments = array.get(0).get("OFFLINE");
-    String segmentName = segments.get(segments.size() - 1).asText();
-
-    jsonOutputStr = sendGetRequest(_controllerRequestURLBuilder.
-        forSegmentMetadata(_tableNameWithType, segmentName));
-    JsonNode metadata = JsonUtils.stringToJsonNode(jsonOutputStr);
-    return metadata.get("segment.total.docs").asInt();
+      throws Exception {
+    List<String> segments =
+        getOrCreateAdminClient().getSegmentClient().listSegments(_tableNameWithType, TableType.OFFLINE.toString(),
+            false);
+    String segmentName = segments.get(segments.size() - 1);
+    Map<String, Object> metadata =
+        getOrCreateAdminClient().getSegmentClient().getSegmentMetadata(_tableNameWithType, segmentName, null);
+    Object totalDocs = metadata.get("segment.total.docs");
+    return totalDocs instanceof Number ? ((Number) totalDocs).intValue() : 0;
   }
 
   private void checkTotalDocsInQuery(long expectedTotalDocs) {

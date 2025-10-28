@@ -18,16 +18,10 @@
  */
 package org.apache.pinot.tools.admin.command;
 
-import java.net.URI;
-import org.apache.hc.client5.http.classic.methods.HttpGet;
-import org.apache.hc.client5.http.impl.classic.CloseableHttpClient;
-import org.apache.hc.client5.http.impl.classic.CloseableHttpResponse;
-import org.apache.hc.client5.http.impl.classic.HttpClientBuilder;
-import org.apache.hc.core5.http.HttpException;
-import org.apache.hc.core5.http.io.entity.EntityUtils;
-import org.apache.pinot.common.auth.AuthProviderUtils;
-import org.apache.pinot.spi.auth.AuthProvider;
-import org.apache.pinot.spi.utils.CommonConstants;
+import java.util.Locale;
+import org.apache.pinot.client.admin.PinotAdminClient;
+import org.apache.pinot.client.admin.PinotAdminException;
+import org.apache.pinot.spi.config.table.TableType;
 import org.apache.pinot.spi.utils.NetUtils;
 import org.apache.pinot.tools.Command;
 import org.slf4j.Logger;
@@ -36,42 +30,17 @@ import picocli.CommandLine;
 
 
 @CommandLine.Command(name = "ChangeTableState", mixinStandardHelpOptions = true)
-public class ChangeTableState extends AbstractBaseAdminCommand implements Command {
+public class ChangeTableState extends AbstractDatabaseBaseAdminCommand implements Command {
   private static final Logger LOGGER = LoggerFactory.getLogger(ChangeTableState.class);
-
-  @CommandLine.Option(names = {"-controllerHost"}, required = false, description = "host name for controller")
-  private String _controllerHost;
-
-  @CommandLine.Option(names = {"-controllerPort"}, required = false, description = "Port number for controller.")
-  private String _controllerPort = DEFAULT_CONTROLLER_PORT;
-
-  @CommandLine.Option(names = {"-controllerProtocol"}, required = false, description = "protocol for controller.")
-  private String _controllerProtocol = CommonConstants.HTTP_PROTOCOL;
 
   @CommandLine.Option(names = {"-tableName"}, required = true, description = "Table name to disable")
   private String _tableName;
 
+  @CommandLine.Option(names = {"-tableType"}, required = true, description = "Table type (OFFLINE|REALTIME)")
+  private TableType _tableType;
+
   @CommandLine.Option(names = {"-state"}, required = true, description = "Change Table State(enable|disable|drop)")
   private String _state;
-
-  @CommandLine.Option(names = {"-user"}, required = false, description = "Username for basic auth.")
-  private String _user;
-
-  @CommandLine.Option(names = {"-password"}, required = false, description = "Password for basic auth.")
-  private String _password;
-
-  @CommandLine.Option(names = {"-authToken"}, required = false, description = "Http auth token.")
-  private String _authToken;
-
-  @CommandLine.Option(names = {"-authTokenUrl"}, required = false, description = "Http auth token url.")
-  private String _authTokenUrl;
-
-  private AuthProvider _authProvider;
-
-  public ChangeTableState setAuthProvider(AuthProvider authProvider) {
-    _authProvider = authProvider;
-    return this;
-  }
 
   @Override
   public boolean execute()
@@ -80,27 +49,28 @@ public class ChangeTableState extends AbstractBaseAdminCommand implements Comman
       _controllerHost = NetUtils.getHostAddress();
     }
 
-    String stateValue = _state.toLowerCase();
+    String stateValue = _state.toLowerCase(Locale.ROOT);
     if (!stateValue.equals("enable") && !stateValue.equals("disable") && !stateValue.equals("drop")) {
       throw new IllegalArgumentException(
           "Invalid value for state: " + _state + "\n Value must be one of enable|disable|drop");
     }
-    try (CloseableHttpClient httpClient = HttpClientBuilder.create().build()) {
-      URI uri = new URI(_controllerProtocol, null, _controllerHost, Integer.parseInt(_controllerPort),
-          URI_TABLES_PATH + _tableName, "state=" + stateValue, null);
-
-      HttpGet httpGet = new HttpGet(uri);
-      AuthProviderUtils.makeAuthHeaders(
-              AuthProviderUtils.makeAuthProvider(_authProvider, _authTokenUrl, _authToken, _user, _password))
-          .forEach(header -> httpGet.addHeader(header.getName(), header.getValue()));
-
-      try (CloseableHttpResponse response = httpClient.execute(httpGet)) {
-        int status = response.getCode();
-        if (status != 200) {
-          String responseString = EntityUtils.toString(response.getEntity());
-          throw new HttpException("Failed to change table state, error: " + responseString);
-        }
+    try (PinotAdminClient adminClient = getPinotAdminClient()) {
+      switch (stateValue) {
+        case "enable":
+          adminClient.getTableClient().setTableState(_tableName, _tableType.name(), true);
+          break;
+        case "disable":
+          adminClient.getTableClient().setTableState(_tableName, _tableType.name(), false);
+          break;
+        case "drop":
+          adminClient.getTableClient().deleteTable(_tableName, _tableType.name(), null, null);
+          break;
+        default:
+          throw new IllegalArgumentException("Unsupported state: " + _state);
       }
+    } catch (PinotAdminException e) {
+      LOGGER.error("Failed to change table state for {} ({})", _tableName, _tableType, e);
+      return false;
     }
     return true;
   }
@@ -117,9 +87,8 @@ public class ChangeTableState extends AbstractBaseAdminCommand implements Comman
 
   @Override
   public String toString() {
-    return ("ChangeTableState -controllerProtocol " + _controllerProtocol + " -controllerHost " + _controllerHost
-        + " -controllerPort " + _controllerPort + " -tableName" + _tableName + " -state" + _state + " -user " + _user
-        + " -password " + "[hidden]");
+    return ("ChangeTableState -tableName " + _tableName + " -tableType " + _tableType + " -state " + _state)
+        + super.toString();
   }
 
   @Override

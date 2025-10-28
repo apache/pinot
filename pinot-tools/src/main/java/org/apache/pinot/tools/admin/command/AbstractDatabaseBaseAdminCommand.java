@@ -18,17 +18,25 @@
  */
 package org.apache.pinot.tools.admin.command;
 
+import java.net.SocketException;
+import java.net.UnknownHostException;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Properties;
 import java.util.stream.Collectors;
 import javax.net.ssl.SSLContext;
 import org.apache.hc.core5.http.Header;
 import org.apache.hc.core5.http.message.BasicHeader;
+import org.apache.pinot.client.PinotClientException;
+import org.apache.pinot.client.admin.PinotAdminClient;
+import org.apache.pinot.client.admin.PinotAdminTransport;
 import org.apache.pinot.common.auth.AuthProviderUtils;
 import org.apache.pinot.common.utils.ClientSSLContextGenerator;
 import org.apache.pinot.spi.auth.AuthProvider;
 import org.apache.pinot.spi.env.PinotConfiguration;
 import org.apache.pinot.spi.utils.CommonConstants;
+import org.apache.pinot.spi.utils.NetUtils;
 import org.apache.pinot.tools.Command;
 import picocli.CommandLine;
 
@@ -62,7 +70,7 @@ public abstract class AbstractDatabaseBaseAdminCommand extends AbstractBaseAdmin
 
   @CommandLine.Option(names = {"-skipControllerCertValidation"}, required = false, description = "Whether to skip"
       + " controller certification validation.")
-  private boolean _skipControllerCertValidation = false;
+  private boolean _skipControllerCertValidation;
 
   @CommandLine.Option(names = {"-database"}, required = false, description = "Corresponding database.")
   protected String _database;
@@ -114,16 +122,37 @@ public abstract class AbstractDatabaseBaseAdminCommand extends AbstractBaseAdmin
   protected List<Header> getHeaders() {
     List<Header> headers = AuthProviderUtils.makeAuthHeaders(
         AuthProviderUtils.makeAuthProvider(_authProvider, _authTokenUrl, _authToken, _user, _password));
-    headers.add(new BasicHeader("database", _database));
+    if (_database != null) {
+      headers.add(new BasicHeader("database", _database));
+    }
     return headers;
   }
 
   protected Map<String, String> getHeadersAsMap() {
-    return getHeaders().stream().collect(Collectors.toMap(Header::getName, Header::getValue));
+    return getHeaders().stream()
+        .filter(header -> header.getValue() != null)
+        .collect(Collectors.toMap(Header::getName, Header::getValue, (existing, replacement) -> replacement,
+            LinkedHashMap::new));
+  }
+
+  protected PinotAdminClient getPinotAdminClient()
+      throws PinotClientException, SocketException, UnknownHostException {
+    if (_controllerHost == null) {
+      _controllerHost = NetUtils.getHostAddress();
+    }
+    Properties properties = new Properties();
+    properties.setProperty(PinotAdminTransport.ADMIN_TRANSPORT_SCHEME, _controllerProtocol);
+    SSLContext sslContext = _skipControllerCertValidation ? makeTrustAllSSLContext() : null;
+    return new PinotAdminClient(_controllerHost + ":" + _controllerPort, properties, getHeadersAsMap(), sslContext);
   }
 
   public AbstractDatabaseBaseAdminCommand setExecute(boolean exec) {
     _exec = exec;
+    return this;
+  }
+
+  public AbstractDatabaseBaseAdminCommand setSkipControllerCertValidation(boolean skipControllerCertValidation) {
+    _skipControllerCertValidation = skipControllerCertValidation;
     return this;
   }
 
