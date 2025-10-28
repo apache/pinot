@@ -24,6 +24,7 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 import javax.inject.Inject;
+import javax.inject.Singleton;
 import javax.ws.rs.GET;
 import javax.ws.rs.Path;
 import javax.ws.rs.PathParam;
@@ -36,6 +37,7 @@ import org.apache.commons.lang3.StringUtils;
 import org.apache.pinot.common.utils.DatabaseUtils;
 import org.apache.pinot.segment.local.data.manager.SegmentDataManager;
 import org.apache.pinot.segment.local.data.manager.TableDataManager;
+import org.apache.pinot.segment.local.utils.ServerReloadJobStatusCache;
 import org.apache.pinot.segment.spi.creator.name.SegmentNameUtils;
 import org.apache.pinot.server.starter.ServerInstance;
 import org.apache.pinot.server.starter.helix.SegmentReloadStatusValue;
@@ -44,10 +46,18 @@ import org.apache.pinot.spi.utils.JsonUtils;
 
 @Api(tags = "Tasks")
 @Path("/")
+@Singleton
 public class ControllerJobStatusResource {
 
+  private final ServerInstance _serverInstance;
+  private final ServerReloadJobStatusCache _serverReloadJobStatusCache;
+
   @Inject
-  private ServerInstance _serverInstance;
+  public ControllerJobStatusResource(ServerInstance serverInstance,
+      ServerReloadJobStatusCache serverReloadJobStatusCache) {
+    _serverInstance = serverInstance;
+    _serverReloadJobStatusCache = serverReloadJobStatusCache;
+  }
 
   @GET
   @Path("/controllerJob/reloadStatus/{tableNameWithType}")
