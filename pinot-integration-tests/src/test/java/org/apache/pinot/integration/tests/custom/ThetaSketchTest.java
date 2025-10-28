@@ -20,7 +20,6 @@ package org.apache.pinot.integration.tests.custom;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.google.common.collect.ImmutableList;
-import com.google.common.collect.ImmutableMap;
 import java.io.File;
 import java.io.IOException;
 import java.nio.ByteBuffer;
@@ -292,8 +291,8 @@ public class ThetaSketchTest extends CustomDataQueryClusterIntegrationTest {
     {
       String query = "select dimValue, distinctCountThetaSketch(thetaSketchCol) from " + getTableName()
           + " where dimName = 'gender' group by dimValue";
-      ImmutableMap<String, Integer> expected =
-          ImmutableMap.of("Female", 50 + 60 + 70 + 110 + 120 + 130, "Male", 80 + 90 + 100 + 140 + 150 + 160);
+      Map<String, Integer> expected =
+          Map.of("Female", 50 + 60 + 70 + 110 + 120 + 130, "Male", 80 + 90 + 100 + 140 + 150 + 160);
       runAndAssert(query, expected);
     }
   }
@@ -448,8 +447,8 @@ public class ThetaSketchTest extends CustomDataQueryClusterIntegrationTest {
           + "    DISTINCT_COUNT_RAW_THETA_SKETCH(thetaSketchCol, '') FILTER (WHERE dimName = 'gender'),"
           + "    DISTINCT_COUNT_RAW_THETA_SKETCH(thetaSketchCol, '') FILTER (WHERE dimName != 'gender'))) "
           + "  FROM " + getTableName() + " GROUP BY dimValue";
-      ImmutableMap<String, Integer> expected =
-          ImmutableMap.of("Female", 0, "Male", 0, "Math", 0, "History", 0, "Biology", 0);
+      Map<String, Integer> expected =
+          Map.of("Female", 0, "Male", 0, "Math", 0, "History", 0, "Biology", 0);
       runAndAssert(query, expected);
     }
 
@@ -457,8 +456,8 @@ public class ThetaSketchTest extends CustomDataQueryClusterIntegrationTest {
     {
       String query = "select dimValue, distinctCountThetaSketch(thetaSketchCol) from " + getTableName()
           + " where dimName = 'gender' group by dimValue";
-      ImmutableMap<String, Integer> expected =
-          ImmutableMap.of("Female", 50 + 60 + 70 + 110 + 120 + 130, "Male", 80 + 90 + 100 + 140 + 150 + 160);
+      Map<String, Integer> expected =
+          Map.of("Female", 50 + 60 + 70 + 110 + 120 + 130, "Male", 80 + 90 + 100 + 140 + 150 + 160);
       runAndAssert(query, expected);
     }
 
@@ -473,8 +472,8 @@ public class ThetaSketchTest extends CustomDataQueryClusterIntegrationTest {
           + " where dimName = 'gender' and dimValue = 'Male' "
           + ") "
           + "GROUP BY dimValue";
-      ImmutableMap<String, Integer> expected =
-          ImmutableMap.of("Female", 50 + 60 + 70 + 110 + 120 + 130, "Male", 80 + 90 + 100 + 140 + 150 + 160);
+      Map<String, Integer> expected =
+          Map.of("Female", 50 + 60 + 70 + 110 + 120 + 130, "Male", 80 + 90 + 100 + 140 + 150 + 160);
       runAndAssert(query, expected);
     }
 
@@ -489,8 +488,8 @@ public class ThetaSketchTest extends CustomDataQueryClusterIntegrationTest {
           + " where dimName = 'gender' and dimValue = 'Male') b "
           + "ON a.dimName = b.dimName "
           + "GROUP BY a.dimValue";
-      ImmutableMap<String, Integer> expected =
-          ImmutableMap.of("Female", 80 + 90 + 100 + 140 + 150 + 160);
+      Map<String, Integer> expected =
+          Map.of("Female", 80 + 90 + 100 + 140 + 150 + 160);
       runAndAssert(query, expected);
     }
     {
@@ -503,8 +502,8 @@ public class ThetaSketchTest extends CustomDataQueryClusterIntegrationTest {
           + " where dimName = 'gender' and dimValue = 'Male') b "
           + "ON a.dimName = b.dimName "
           + "GROUP BY b.dimValue";
-      ImmutableMap<String, Integer> expected =
-          ImmutableMap.of("Male", 50 + 60 + 70 + 110 + 120 + 130);
+      Map<String, Integer> expected =
+          Map.of("Male", 50 + 60 + 70 + 110 + 120 + 130);
       runAndAssert(query, expected);
     }
     {

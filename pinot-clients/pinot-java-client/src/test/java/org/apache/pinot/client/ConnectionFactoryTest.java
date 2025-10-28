@@ -20,7 +20,6 @@ package org.apache.pinot.client;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.google.common.collect.ImmutableList;
-import com.google.common.collect.ImmutableMap;
 import java.lang.reflect.Method;
 import java.util.List;
 import java.util.Map;
@@ -100,7 +99,7 @@ public class ConnectionFactoryTest {
     // Create the connection
     List<String> brokers = ImmutableList.of("127.0.0.1:1234", "localhost:2345");
 
-    Map<String, String> headers = ImmutableMap.of("Caller", "curl");
+    Map<String, String> headers = Map.of("Caller", "curl");
 
     JsonAsyncHttpPinotClientTransportFactory factory = new JsonAsyncHttpPinotClientTransportFactory();
     factory.setHeaders(headers);
