@@ -58,6 +58,7 @@ public class DriverUtils {
   public static final String USER_PROPERTY = "user";
   public static final String PASSWORD_PROPERTY = "password";
   public static final String AUTH_HEADER = "Authorization";
+  public static final String AUTH_HEADER_CONFIG_KEY = "headers.Authorization";
 
   private DriverUtils() {
   }
@@ -80,6 +81,7 @@ public class DriverUtils {
       }
       String authToken = BasicAuthUtils.toBasicAuthToken(username, password);
       headers.put(AUTH_HEADER, authToken);
+      info.setProperty(AUTH_HEADER_CONFIG_KEY, authToken);
     }
     for (Object key : info.keySet()) {
       if (key.toString().equalsIgnoreCase(AUTH_HEADER)) {

@@ -18,13 +18,13 @@
  */
 package org.apache.pinot.server.api;
 
-import com.google.common.collect.ImmutableMap;
 import io.netty.channel.ChannelHandlerContext;
 import java.io.File;
 import java.io.IOException;
 import java.net.ServerSocket;
 import java.util.Arrays;
 import java.util.Collections;
+import java.util.Map;
 import javax.ws.rs.client.ClientBuilder;
 import javax.ws.rs.client.WebTarget;
 import javax.ws.rs.core.HttpHeaders;
@@ -131,14 +131,14 @@ public class AccessControlTest {
   @Test
   public void testGrpcBasicAuth() {
     testBasicAuth(new GrpcRequesterIdentity(
-        ImmutableMap.of("authorization", BasicAuthUtils.toBasicAuthToken("admin123", "verysecret"))), true);
+        Map.of("authorization", BasicAuthUtils.toBasicAuthToken("admin123", "verysecret"))), true);
     testBasicAuth(new GrpcRequesterIdentity(
-        ImmutableMap.of("authorization", BasicAuthUtils.toBasicAuthToken("user456", "kindasecret"))), false);
+        Map.of("authorization", BasicAuthUtils.toBasicAuthToken("user456", "kindasecret"))), false);
 
     testBasicAuth(new GrpcRequesterIdentity(
-        ImmutableMap.of("authorization", "Basic YWRtaW4xMjM6dmVyeXNlY3JldA")), true);
+        Map.of("authorization", "Basic YWRtaW4xMjM6dmVyeXNlY3JldA")), true);
     testBasicAuth(new GrpcRequesterIdentity(
-        ImmutableMap.of("authorization", "Basic dXNlcjQ1NjpraW5kYXNlY3JldA==")), false);
+        Map.of("authorization", "Basic dXNlcjQ1NjpraW5kYXNlY3JldA==")), false);
   }
 
   @Test
@@ -159,7 +159,7 @@ public class AccessControlTest {
 
   public void testBasicAuth(RequesterIdentity requesterIdentity, boolean isAdmin) {
     final BasicAuthAccessFactory basicAuthAccessFactory = new BasicAuthAccessFactory();
-    PinotConfiguration config = new PinotConfiguration(ImmutableMap.of("principals", "admin123,user456",
+    PinotConfiguration config = new PinotConfiguration(Map.of("principals", "admin123,user456",
         "principals.admin123.password", "verysecret", "principals.user456.password", "kindasecret",
         "principals.user456.tables", "stuff,lessImportantStuff"));
     basicAuthAccessFactory.init(config);

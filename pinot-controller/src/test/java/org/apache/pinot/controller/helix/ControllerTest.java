@@ -30,12 +30,14 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.atomic.AtomicInteger;
+import java.util.stream.Collectors;
 import javax.annotation.Nullable;
 import org.apache.commons.collections4.CollectionUtils;
 import org.apache.commons.io.FileUtils;
 import org.apache.commons.io.IOUtils;
 import org.apache.commons.lang3.tuple.Pair;
 import org.apache.hc.client5.http.entity.EntityBuilder;
+import org.apache.helix.AccessOption;
 import org.apache.helix.ConfigAccessor;
 import org.apache.helix.HelixAdmin;
 import org.apache.helix.HelixDataAccessor;
@@ -230,7 +232,7 @@ public class ControllerTest {
   public ControllerRequestClient getControllerRequestClient() {
     if (_controllerRequestClient == null) {
       _controllerRequestClient = new ControllerRequestClient(_controllerRequestURLBuilder, getHttpClient(),
-        getControllerRequestClientHeaders());
+          getControllerRequestClientHeaders());
     }
     return _controllerRequestClient;
   }
@@ -965,7 +967,7 @@ public class ControllerTest {
     LOGGER.info("Scheduled {} for table {} with id: {}", taskType, tableNameWithType, taskIds);
     assertEquals(taskIds.size(), 1,
         String.format("Task %s not scheduled as expected for table %s. Expected 1 task, but got: %s",
-        taskType, tableNameWithType, taskIds.size()));
+            taskType, tableNameWithType, taskIds.size()));
     return taskIds.get(0);
   }
 
@@ -1373,10 +1375,15 @@ public class ControllerTest {
 
     // Wait for all external views to disappear
     Set<String> tablesWithEV = new HashSet<>(tables);
-    TestUtils.waitForCondition(aVoid -> {
-      tablesWithEV.removeIf(t -> _helixResourceManager.getTableExternalView(t) == null);
-      return tablesWithEV.isEmpty();
-    }, 60_000L, "Failed to clean up all the external views");
+    try {
+      TestUtils.waitForCondition(aVoid -> {
+        tablesWithEV.removeIf(t -> _helixResourceManager.getTableExternalView(t) == null);
+        return tablesWithEV.isEmpty();
+      }, 60_000L, "Failed to clean up all the external views");
+    } catch (AssertionError e) {
+      LOGGER.warn("Remaining external views not cleaned up for tables: {}", tablesWithEV);
+      throw e;
+    }
 
     // Delete all schemas.
     List<String> schemaNames = _helixResourceManager.getAllSchemaNames();
@@ -1384,6 +1391,55 @@ public class ControllerTest {
       for (String schemaName : schemaNames) {
         getHelixResourceManager().deleteSchema(schemaName);
       }
+    }
+
+    // Ensure cluster is purely empty before returning
+    try {
+      TestUtils.waitForCondition(aVoid -> {
+        boolean noTables = CollectionUtils.isEmpty(_helixResourceManager.getAllTables());
+        boolean noLogicalTables = CollectionUtils.isEmpty(_helixResourceManager.getAllLogicalTableNames());
+        boolean noSchemas = CollectionUtils.isEmpty(_helixResourceManager.getAllSchemaNames());
+
+        // Helix: ensure no table IdealState or ExternalView remains
+        boolean noTableResourcesInIdealState = _helixDataAccessor.getChildNames(_helixDataAccessor.keyBuilder()
+            .idealStates()).stream().noneMatch(TableNameBuilder::isTableResource);
+        boolean noTableResourcesInExternalView = _helixDataAccessor.getChildNames(_helixDataAccessor.keyBuilder()
+            .externalViews()).stream().noneMatch(TableNameBuilder::isTableResource);
+
+        // Property store: ensure no segments or table-config nodes remain
+        boolean noSegmentsNodes = CollectionUtils.isEmpty(_propertyStore.getChildNames(
+            "/SEGMENTS", AccessOption.PERSISTENT));
+        boolean noTableConfigNodes = CollectionUtils.isEmpty(_propertyStore.getChildNames(
+            "/CONFIGS/TABLE", AccessOption.PERSISTENT));
+
+        return noTables && noLogicalTables && noSchemas
+            && noTableResourcesInIdealState && noTableResourcesInExternalView
+            && noSegmentsNodes && noTableConfigNodes;
+      }, 60_000L, "Failed to fully clean up cluster state");
+    } catch (AssertionError e) {
+      // Log detailed remaining resources to aid debugging
+      List<String> remainingTables = _helixResourceManager.getAllTables();
+      List<String> remainingLogicalTables = _helixResourceManager.getAllLogicalTableNames();
+      List<String> remainingSchemas = _helixResourceManager.getAllSchemaNames();
+
+      List<String> remainingIdealStateResources = _helixDataAccessor
+          .getChildNames(_helixDataAccessor.keyBuilder().idealStates())
+          .stream().filter(TableNameBuilder::isTableResource).collect(Collectors.toList());
+      List<String> remainingExternalViewResources = _helixDataAccessor
+          .getChildNames(_helixDataAccessor.keyBuilder().externalViews())
+          .stream().filter(TableNameBuilder::isTableResource).collect(Collectors.toList());
+
+      List<String> remainingSegmentNodes = _propertyStore.getChildNames(
+          "/SEGMENTS", AccessOption.PERSISTENT);
+      List<String> remainingTableConfigNodes = _propertyStore.getChildNames(
+          "/CONFIGS/TABLE", AccessOption.PERSISTENT);
+
+      LOGGER.warn(
+          "Cluster cleanup incomplete. Remaining - tables: {}, logicalTables: {}, schemas: {}, idealStateResources: "
+              + "{}, externalViewResources: {}, segmentNodes: {}, tableConfigNodes: {}",
+          remainingTables, remainingLogicalTables, remainingSchemas, remainingIdealStateResources,
+          remainingExternalViewResources, remainingSegmentNodes, remainingTableConfigNodes);
+      throw e;
     }
   }
 

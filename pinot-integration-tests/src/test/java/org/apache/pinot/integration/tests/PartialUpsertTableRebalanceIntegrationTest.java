@@ -36,9 +36,9 @@ import org.apache.pinot.common.utils.LLCSegmentName;
 import org.apache.pinot.common.utils.SimpleHttpResponse;
 import org.apache.pinot.common.utils.helix.HelixHelper;
 import org.apache.pinot.common.utils.http.HttpClient;
+import org.apache.pinot.controller.api.dto.PinotTableReloadStatusResponse;
 import org.apache.pinot.controller.api.resources.PauseStatusDetails;
 import org.apache.pinot.controller.api.resources.ServerRebalanceJobStatusResponse;
-import org.apache.pinot.controller.api.resources.ServerReloadControllerJobStatusResponse;
 import org.apache.pinot.controller.helix.core.PinotHelixResourceManager;
 import org.apache.pinot.controller.helix.core.rebalance.RebalanceConfig;
 import org.apache.pinot.controller.helix.core.rebalance.RebalanceResult;
@@ -450,8 +450,8 @@ public class PartialUpsertTableRebalanceIntegrationTest extends BaseClusterInteg
         try {
           SimpleHttpResponse httpResponse =
               HttpClient.wrapAndThrowHttpException(_httpClient.sendGetRequest(new URL(requestUrl).toURI(), null));
-          ServerReloadControllerJobStatusResponse segmentReloadStatusValue =
-              JsonUtils.stringToObject(httpResponse.getResponse(), ServerReloadControllerJobStatusResponse.class);
+          PinotTableReloadStatusResponse segmentReloadStatusValue =
+              JsonUtils.stringToObject(httpResponse.getResponse(), PinotTableReloadStatusResponse.class);
           return segmentReloadStatusValue.getSuccessCount() == segmentReloadStatusValue.getTotalSegmentCount();
         } catch (HttpErrorStatusException | URISyntaxException e) {
           throw new IOException(e);

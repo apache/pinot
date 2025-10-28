@@ -25,7 +25,6 @@ import java.util.Map;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.atomic.LongAccumulator;
 import javax.annotation.Nullable;
-import org.apache.commons.lang3.StringUtils;
 import org.apache.pinot.common.datatable.DataTable.MetadataKey;
 import org.apache.pinot.common.metrics.ServerMeter;
 import org.apache.pinot.common.metrics.ServerMetrics;
@@ -40,9 +39,7 @@ import org.apache.pinot.core.query.request.context.TimerContext;
 import org.apache.pinot.core.query.scheduler.resources.ResourceManager;
 import org.apache.pinot.spi.accounting.ThreadAccountant;
 import org.apache.pinot.spi.env.PinotConfiguration;
-import org.apache.pinot.spi.exception.EarlyTerminationException;
 import org.apache.pinot.spi.exception.QueryErrorCode;
-import org.apache.pinot.spi.exception.QueryErrorMessage;
 import org.apache.pinot.spi.exception.QueryException;
 import org.apache.pinot.spi.query.QueryExecutionContext;
 import org.apache.pinot.spi.query.QueryThreadContext;
@@ -197,34 +194,49 @@ public abstract class QueryScheduler {
     TimerContext timerContext = queryRequest.getTimerContext();
     TimerContext.Timer responseSerializationTimer =
         timerContext.startNewPhaseTimer(ServerQueryPhase.RESPONSE_SERIALIZATION);
+    long requestId = queryRequest.getRequestId();
+    String brokerId = queryRequest.getBrokerId();
 
-    byte[] responseByte = null;
+    byte[] responseBytes = null;
     try {
-      responseByte = instanceResponse.toDataTable().toBytes();
-    } catch (EarlyTerminationException e) {
-      QueryException terminateException = QueryThreadContext.getTerminateException();
-      String userMsg = "Cancelled while building data table" + (terminateException != null ? ": " + terminateException
-          : StringUtils.EMPTY);
-      LOGGER.error(userMsg);
-      QueryErrorMessage errMsg = QueryErrorMessage.safeMsg(QueryErrorCode.QUERY_CANCELLATION, userMsg);
-      Map<String, String> queryOptions = queryRequest.getQueryContext().getQueryOptions();
-      String workloadName = QueryOptionsUtils.getWorkloadName(queryOptions);
-      instanceResponse = new InstanceResponseBlock(new ExceptionResultsBlock(errMsg));
-      instanceResponse.addMetadata(MetadataKey.REQUEST_ID.getName(), Long.toString(queryRequest.getRequestId()));
-      instanceResponse.addMetadata(MetadataKey.QUERY_ID.getName(), queryRequest.getCid());
-      instanceResponse.addMetadata(MetadataKey.WORKLOAD_NAME.getName(), workloadName);
-      return serializeResponse(queryRequest, instanceResponse);
+      responseBytes = instanceResponse.toDataTable().toBytes();
     } catch (Exception e) {
-      _serverMetrics.addMeteredGlobalValue(ServerMeter.RESPONSE_SERIALIZATION_EXCEPTIONS, 1);
-      LOGGER.error("Caught exception while serializing response for requestId: {}, brokerId: {}",
-          queryRequest.getRequestId(), queryRequest.getBrokerId(), e);
+      // First check terminate exception and use it as the response if exists. We want to return the termination reason
+      // when query is explicitly terminated.
+      QueryException queryException = QueryThreadContext.getTerminateException();
+      // Do not log exception when query is explicitly terminated
+      if (queryException == null) {
+        if (e instanceof QueryException) {
+          queryException = (QueryException) e;
+          // TODO: Revisit if we should log exception here
+          LOGGER.warn("Caught QueryException while serializing response from response for requestId: {}, brokerId: {}",
+              requestId, brokerId, queryException);
+        } else {
+          _serverMetrics.addMeteredGlobalValue(ServerMeter.RESPONSE_SERIALIZATION_EXCEPTIONS, 1);
+          LOGGER.error("Caught exception while serializing response from response for requestId: {}, brokerId: {}",
+              requestId, brokerId, e);
+          queryException = QueryErrorCode.INTERNAL.asException("Error serializing response", e);
+        }
+      }
+      try {
+        InstanceResponseBlock errorResponse = new InstanceResponseBlock(new ExceptionResultsBlock(queryException));
+        errorResponse.addMetadata(MetadataKey.REQUEST_ID.getName(), Long.toString(requestId));
+        errorResponse.addMetadata(MetadataKey.QUERY_ID.getName(), queryRequest.getCid());
+        String workloadName = QueryOptionsUtils.getWorkloadName(queryRequest.getQueryContext().getQueryOptions());
+        errorResponse.addMetadata(MetadataKey.WORKLOAD_NAME.getName(), workloadName);
+        responseBytes = errorResponse.toDataTable().toBytes();
+      } catch (Exception e1) {
+        _serverMetrics.addMeteredGlobalValue(ServerMeter.RESPONSE_SERIALIZATION_EXCEPTIONS, 1);
+        LOGGER.error("Caught exception while constructing error response for requestId: {}, brokerId: {}",
+            requestId, brokerId, e1);
+      }
     }
 
     responseSerializationTimer.stopAndRecord();
     timerContext.startNewPhaseTimer(ServerQueryPhase.TOTAL_QUERY_TIME, timerContext.getQueryArrivalTimeMs())
         .stopAndRecord();
 
-    return responseByte;
+    return responseBytes;
   }
 
   /**

@@ -63,7 +63,7 @@ import static org.testng.Assert.assertTrue;
 public class StarTreeClusterIntegrationTest extends BaseClusterIntegrationTest {
   public static final String FILTER_STARTREE_INDEX = "FILTER_STARTREE_INDEX";
   private static final String SCHEMA_FILE_NAME =
-      "On_Time_On_Time_Performance_2014_100k_subset_nonulls_single_value_columns.schema";
+          "On_Time_On_Time_Performance_2014_100k_subset_nonulls_columns.schema";
   private static final int NUM_STAR_TREE_DIMENSIONS = 5;
   private static final int NUM_STAR_TREE_METRICS = 5;
   private static final List<AggregationFunctionType> AGGREGATION_FUNCTION_TYPES =
@@ -112,7 +112,9 @@ public class StarTreeClusterIntegrationTest extends BaseClusterIntegrationTest {
     int starTree1MaxLeafRecords = 10;
 
     // Randomly pick some dimensions and metrics for the second star-tree
+    // Exclude TotalAddGTime since it's a multi-value column, should not be in dimension split order.
     List<String> allDimensions = new ArrayList<>(schema.getDimensionNames());
+    allDimensions.remove("TotalAddGTime");
     Collections.shuffle(allDimensions, _random);
     List<String> starTree2Dimensions = allDimensions.subList(0, NUM_STAR_TREE_DIMENSIONS);
     List<String> allMetrics = new ArrayList<>(schema.getMetricNames());
@@ -120,10 +122,16 @@ public class StarTreeClusterIntegrationTest extends BaseClusterIntegrationTest {
     List<String> starTree2Metrics = allMetrics.subList(0, NUM_STAR_TREE_METRICS);
     int starTree2MaxLeafRecords = 100;
 
+    // Tests StarTree aggregate for multi-value column
+    List<String> starTree3Dimensions =
+        Arrays.asList("OriginCityName", "DepTimeBlk", "LongestAddGTime", "CRSDepTime", "DivArrDelay");
+    int starTree3MaxLeafRecords = 10;
+
     TableConfig tableConfig = createOfflineTableConfig();
     tableConfig.getIndexingConfig().setStarTreeIndexConfigs(
         Arrays.asList(getStarTreeIndexConfig(starTree1Dimensions, starTree1Metrics, starTree1MaxLeafRecords),
-            getStarTreeIndexConfig(starTree2Dimensions, starTree2Metrics, starTree2MaxLeafRecords)));
+            getStarTreeIndexConfig(starTree2Dimensions, starTree2Metrics, starTree2MaxLeafRecords),
+            getStarTreeIndexConfigForMVColAgg(starTree3Dimensions, starTree3MaxLeafRecords)));
     addTableConfig(tableConfig);
 
     // Unpack the Avro files
@@ -163,6 +171,14 @@ public class StarTreeClusterIntegrationTest extends BaseClusterIntegrationTest {
                 null));
       }
     }
+    return new StarTreeIndexConfig(dimensions, null, null, aggregationConfigs, maxLeafRecords);
+  }
+
+  private static StarTreeIndexConfig getStarTreeIndexConfigForMVColAgg(List<String> dimensions, int maxLeafRecords) {
+    List<StarTreeAggregationConfig> aggregationConfigs = new ArrayList<>();
+    aggregationConfigs.add(new StarTreeAggregationConfig("TotalAddGTime", "COUNTMV"));
+    aggregationConfigs.add(new StarTreeAggregationConfig("TotalAddGTime", "SUMMV"));
+    aggregationConfigs.add(new StarTreeAggregationConfig("TotalAddGTime", "AVGMV"));
     return new StarTreeIndexConfig(dimensions, null, null, aggregationConfigs, maxLeafRecords);
   }
 
@@ -206,6 +222,32 @@ public class StarTreeClusterIntegrationTest extends BaseClusterIntegrationTest {
 
     starQuery = "SELECT DepTimeBlk, COUNT(*) FILTER (WHERE CRSDepTime != 35) FROM mytable "
         + "GROUP BY DepTimeBlk ORDER BY DepTimeBlk";
+    testStarQuery(starQuery, !useMultiStageQueryEngine);
+  }
+
+  @Test(dataProvider = "useBothQueryEngines")
+  public void testMultiValueColumnAggregations(boolean useMultiStageQueryEngine)
+      throws Exception {
+    setUseMultiStageQueryEngine(useMultiStageQueryEngine);
+
+    String starQuery = "SELECT COUNTMV(TotalAddGTime), SUMMV(TotalAddGTime), AVGMV(TotalAddGTime) FROM mytable";
+    testStarQuery(starQuery, !useMultiStageQueryEngine);
+
+    starQuery = "SELECT OriginCityName, COUNTMV(TotalAddGTime), AVGMV(TotalAddGTime), SUMMV(TotalAddGTime) "
+        + "FROM mytable GROUP BY OriginCityName ORDER BY OriginCityName";
+    testStarQuery(starQuery, !useMultiStageQueryEngine);
+
+    starQuery = "SELECT DepTimeBlk, SUMMV(TotalAddGTime), AVGMV(TotalAddGTime) FROM mytable "
+        + "WHERE CRSDepTime > 1000 GROUP BY DepTimeBlk ORDER BY DepTimeBlk";
+    testStarQuery(starQuery, !useMultiStageQueryEngine);
+
+    starQuery = "SELECT OriginCityName, DepTimeBlk, SUMMV(TotalAddGTime) FROM mytable "
+        + "GROUP BY OriginCityName, DepTimeBlk ORDER BY OriginCityName, DepTimeBlk LIMIT 100";
+    testStarQuery(starQuery, !useMultiStageQueryEngine);
+
+    starQuery = "SELECT CRSDepTime, AVGMV(TotalAddGTime) FROM mytable "
+        + "WHERE CRSDepTime BETWEEN 800 AND 1200 AND DivArrDelay < 100 "
+        + "GROUP BY CRSDepTime ORDER BY CRSDepTime";
     testStarQuery(starQuery, !useMultiStageQueryEngine);
   }
 

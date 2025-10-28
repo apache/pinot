@@ -92,6 +92,7 @@ import org.apache.pinot.query.validate.BytesCastVisitor;
 import org.apache.pinot.spi.exception.QueryErrorCode;
 import org.apache.pinot.spi.exception.QueryException;
 import org.apache.pinot.spi.utils.CommonConstants;
+import org.apache.pinot.spi.utils.CommonConstants.Broker.Request.QueryOptionKey;
 import org.apache.pinot.sql.parsers.CalciteSqlParser;
 import org.apache.pinot.sql.parsers.SqlNodeAndOptions;
 import org.apache.pinot.sql.parsers.parser.SqlPhysicalExplain;
@@ -180,6 +181,10 @@ public class QueryEnvironment {
   private PlannerContext getPlannerContext(SqlNodeAndOptions sqlNodeAndOptions) {
     WorkerManager workerManager = getWorkerManager(sqlNodeAndOptions);
     Map<String, String> options = sqlNodeAndOptions.getOptions();
+    if (Boolean.parseBoolean(options.get(QueryOptionKey.EXCLUDE_VIRTUAL_COLUMNS))) {
+      _catalog.configureVirtualColumnExclusion(true);
+    }
+
     HepProgram optProgram = _optProgram;
     Set<String> useRuleSet = QueryOptionsUtils.getUsePlannerRules(options);
     if (MapUtils.isNotEmpty(options)) {
@@ -207,7 +212,7 @@ public class QueryEnvironment {
           workerManager.getInstanceId(), sqlNodeAndOptions.getOptions(),
           _envConfig.defaultUseLiteMode(), _envConfig.defaultRunInBroker(), _envConfig.defaultUseBrokerPruning(),
           _envConfig.defaultLiteModeLeafStageLimit(), _envConfig.defaultHashFunction(),
-          _envConfig.defaultLiteModeLeafStageFanOutAdjustedLimit());
+          _envConfig.defaultLiteModeLeafStageFanOutAdjustedLimit(), _envConfig.defaultLiteModeEnableJoins());
     }
     return new PlannerContext(_config, _catalogReader, _typeFactory, optProgram, traitProgram,
         sqlNodeAndOptions.getOptions(), _envConfig, format, physicalPlannerContext);
@@ -365,7 +370,7 @@ public class QueryEnvironment {
       Preconditions.checkNotNull(plannerContext.getPhysicalPlannerContext(), "Physical planner context is null");
       optimized = RelToPRelConverter.toPRelNode(optimized, plannerContext.getPhysicalPlannerContext(),
           _envConfig.getTableCache()).unwrap();
-      PRelNodeTreeValidator.validate((PRelNode) optimized);
+      PRelNodeTreeValidator.validate((PRelNode) optimized, plannerContext.getPhysicalPlannerContext());
     }
     return relation.withRel(optimized);
   }
@@ -794,6 +799,14 @@ public class QueryEnvironment {
     default String defaultHashFunction() {
       return CommonConstants.Broker.DEFAULT_BROKER_DEFAULT_HASH_FUNCTION;
     }
+
+      /**
+       * Whether to enable joins when using MSE Lite mode.
+       */
+      @Value.Default
+      default boolean defaultLiteModeEnableJoins() {
+        return CommonConstants.Broker.DEFAULT_LITE_MODE_ENABLE_JOINS;
+      }
 
     /**
      * Returns the worker manager.

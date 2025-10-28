@@ -68,17 +68,37 @@ public class MaxLongAggregationFunction extends NullableSingleInputAggregationFu
   public void aggregate(int length, AggregationResultHolder aggregationResultHolder,
       Map<ExpressionContext, BlockValSet> blockValSetMap) {
     BlockValSet blockValSet = blockValSetMap.get(_expression);
-    long[] values = blockValSet.getLongValuesSV();
 
-    Long max = foldNotNull(length, blockValSet, null, (acum, from, to) -> {
-      long innerMax = values[from];
-      for (int i = from; i < to; i++) {
-        innerMax = Math.max(innerMax, values[i]);
-      }
-      return acum == null ? innerMax : Math.max(acum, innerMax);
-    });
+    if (blockValSet.isSingleValue()) {
+      long[] values = blockValSet.getLongValuesSV();
 
-    updateAggregationResultHolder(aggregationResultHolder, max);
+      Long max = foldNotNull(length, blockValSet, null, (acum, from, to) -> {
+        long innerMax = values[from];
+        for (int i = from; i < to; i++) {
+          innerMax = Math.max(innerMax, values[i]);
+        }
+        return acum == null ? innerMax : Math.max(acum, innerMax);
+      });
+
+      updateAggregationResultHolder(aggregationResultHolder, max);
+    } else {
+      long[][] valuesArray = blockValSet.getLongValuesMV();
+
+      Long max = foldNotNull(length, blockValSet, null, (acum, from, to) -> {
+        long innerMax = DEFAULT_INITIAL_VALUE;
+        for (int i = from; i < to; i++) {
+          long[] values = valuesArray[i];
+          for (long value : values) {
+            if (value > innerMax) {
+              innerMax = value;
+            }
+          }
+        }
+        return acum == null ? innerMax : Math.max(acum, innerMax);
+      });
+
+      updateAggregationResultHolder(aggregationResultHolder, max);
+    }
   }
 
   protected void updateAggregationResultHolder(AggregationResultHolder aggregationResultHolder, Long max) {
@@ -97,6 +117,16 @@ public class MaxLongAggregationFunction extends NullableSingleInputAggregationFu
   public void aggregateGroupBySV(int length, int[] groupKeyArray, GroupByResultHolder groupByResultHolder,
       Map<ExpressionContext, BlockValSet> blockValSetMap) {
     BlockValSet blockValSet = blockValSetMap.get(_expression);
+
+    if (blockValSet.isSingleValue()) {
+      aggregateSvGroupBySV(blockValSet, length, groupKeyArray, groupByResultHolder);
+    } else {
+      aggregateMvGroupBySV(blockValSet, length, groupKeyArray, groupByResultHolder);
+    }
+  }
+
+  private void aggregateSvGroupBySV(BlockValSet blockValSet, int length, int[] groupKeyArray,
+      GroupByResultHolder groupByResultHolder) {
     long[] valueArray = blockValSet.getLongValuesSV();
 
     if (_nullHandlingEnabled) {
@@ -121,10 +151,51 @@ public class MaxLongAggregationFunction extends NullableSingleInputAggregationFu
     }
   }
 
+  private void aggregateMvGroupBySV(BlockValSet blockValSet, int length, int[] groupKeyArray,
+      GroupByResultHolder groupByResultHolder) {
+    long[][] valuesArray = blockValSet.getLongValuesMV();
+
+    if (_nullHandlingEnabled) {
+      forEachNotNull(length, blockValSet, (from, to) -> {
+        for (int i = from; i < to; i++) {
+          int groupKey = groupKeyArray[i];
+          Long max = groupByResultHolder.getResult(groupKey);
+          for (long value : valuesArray[i]) {
+            if (max == null || value > max) {
+              max = value;
+            }
+          }
+          groupByResultHolder.setValueForKey(groupKey, max);
+        }
+      });
+    } else {
+      for (int i = 0; i < length; i++) {
+        int groupKey = groupKeyArray[i];
+        long max = groupByResultHolder.getLongResult(groupKey);
+        for (long value : valuesArray[i]) {
+          if (value > max) {
+            max = value;
+          }
+        }
+        groupByResultHolder.setValueForKey(groupKey, max);
+      }
+    }
+  }
+
   @Override
   public void aggregateGroupByMV(int length, int[][] groupKeysArray, GroupByResultHolder groupByResultHolder,
       Map<ExpressionContext, BlockValSet> blockValSetMap) {
     BlockValSet blockValSet = blockValSetMap.get(_expression);
+
+    if (blockValSet.isSingleValue()) {
+      aggregateSvGroupByMV(blockValSet, length, groupKeysArray, groupByResultHolder);
+    } else {
+      aggregateMvGroupByMV(blockValSet, length, groupKeysArray, groupByResultHolder);
+    }
+  }
+
+  private void aggregateSvGroupByMV(BlockValSet blockValSet, int length, int[][] groupKeysArray,
+      GroupByResultHolder groupByResultHolder) {
     long[] valueArray = blockValSet.getLongValuesSV();
 
     if (_nullHandlingEnabled) {
@@ -146,6 +217,44 @@ public class MaxLongAggregationFunction extends NullableSingleInputAggregationFu
           if (value > groupByResultHolder.getLongResult(groupKey)) {
             groupByResultHolder.setValueForKey(groupKey, value);
           }
+        }
+      }
+    }
+  }
+
+  private void aggregateMvGroupByMV(BlockValSet blockValSet, int length, int[][] groupKeysArray,
+      GroupByResultHolder groupByResultHolder) {
+    long[][] valuesArray = blockValSet.getLongValuesMV();
+
+    if (_nullHandlingEnabled) {
+      forEachNotNull(length, blockValSet, (from, to) -> {
+        for (int i = from; i < to; i++) {
+          Long max = null;
+          for (long value : valuesArray[i]) {
+            if (max == null || value > max) {
+              max = value;
+            }
+          }
+
+          for (int groupKey : groupKeysArray[i]) {
+            Long currentMax = groupByResultHolder.getResult(groupKey);
+            if (currentMax == null || (max != null && max > currentMax)) {
+              groupByResultHolder.setValueForKey(groupKey, max);
+            }
+          }
+        }
+      });
+    } else {
+      for (int i = 0; i < length; i++) {
+        long[] values = valuesArray[i];
+        for (int groupKey : groupKeysArray[i]) {
+          long max = groupByResultHolder.getLongResult(groupKey);
+          for (long value : values) {
+            if (value > max) {
+              max = value;
+            }
+          }
+          groupByResultHolder.setValueForKey(groupKey, max);
         }
       }
     }

@@ -101,7 +101,7 @@ public class ListenerConfigUtilTest {
   }
 
   /**
-   * Asserts that controller.port can be opt-out and both http and https can be configured with seperate ports.
+   * Asserts that controller.port can be opt-out and both http and https can be configured with separate ports.
    */
   @Test
   public void testHttpAndHttpsConfigs() {

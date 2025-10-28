@@ -193,4 +193,71 @@ public class MaxLongAggregationFunctionTest extends AbstractAggregationFunctionT
         ).whenQuery("select maxlong(myField) from testTable")
         .thenResultIs("LONG", "" + (Long.MAX_VALUE - 1));
   }
+
+  @Test
+  public void aggregationMV() {
+    FluentQueryTest.withBaseDir(_baseDir)
+        .givenTable(
+            new Schema.SchemaBuilder()
+                .setSchemaName("testTable")
+                .setEnableColumnBasedNullHandling(true)
+                .addMultiValueDimension("mv", FieldSpec.DataType.LONG)
+                .build(), SINGLE_FIELD_TABLE_CONFIG)
+        .onFirstInstance(
+            new Object[]{"1;2;3"}
+        )
+        .andOnSecondInstance(
+            new Object[]{"null"}
+        )
+        .whenQuery("select maxlong(mv) from testTable")
+        .thenResultIs("LONG", "3")
+        .whenQueryWithNullHandlingEnabled("select maxlong(mv) from testTable")
+        .thenResultIs("LONG", "3");
+  }
+
+  @Test
+  public void aggregationMVGroupBySV() {
+    FluentQueryTest.withBaseDir(_baseDir)
+        .givenTable(
+            new Schema.SchemaBuilder()
+                .setSchemaName("testTable")
+                .setEnableColumnBasedNullHandling(true)
+                .addMultiValueDimension("mv", FieldSpec.DataType.LONG)
+                .addSingleValueDimension("sv", FieldSpec.DataType.STRING)
+                .build(), SINGLE_FIELD_TABLE_CONFIG)
+        .onFirstInstance(
+            new Object[]{"null", "k1"},
+            new Object[]{"1;2;3", "k2"}
+        )
+        .andOnSecondInstance(
+            new Object[]{"null", "k2"},
+            new Object[]{"1;2;3", "k1"}
+        )
+        .whenQuery("select maxlong(mv) from testTable group by sv")
+        .thenResultIs("LONG", "3", "3")
+        .whenQueryWithNullHandlingEnabled("select maxlong(mv) from testTable group by sv")
+        .thenResultIs("LONG", "3", "3");
+  }
+
+  @Test
+  public void aggregationMVGroupByMV() {
+    FluentQueryTest.withBaseDir(_baseDir)
+        .givenTable(
+            new Schema.SchemaBuilder()
+                .setSchemaName("testTable")
+                .setEnableColumnBasedNullHandling(true)
+                .addMultiValueDimension("mv1", FieldSpec.DataType.LONG)
+                .addMultiValueDimension("mv2", FieldSpec.DataType.STRING)
+                .build(), SINGLE_FIELD_TABLE_CONFIG)
+        .onFirstInstance(
+            new Object[]{"1;2", "k1;k2"}
+        )
+        .andOnSecondInstance(
+            new Object[]{"null", "k1;k2"}
+        )
+        .whenQuery("select maxlong(mv1) from testTable group by mv2")
+        .thenResultIs("LONG", "2", "2")
+        .whenQueryWithNullHandlingEnabled("select maxlong(mv1) from testTable group by mv2")
+        .thenResultIs("LONG", "2", "2");
+  }
 }

@@ -36,7 +36,6 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 import java.util.concurrent.locks.Lock;
 import java.util.function.BooleanSupplier;
-import java.util.function.Supplier;
 import javax.annotation.Nullable;
 import javax.annotation.concurrent.ThreadSafe;
 import org.apache.commons.collections4.CollectionUtils;
@@ -135,8 +134,7 @@ public class RealtimeTableDataManager extends BaseTableDataManager {
   @Deprecated
   private static final String SEGMENT_DOWNLOAD_TIMEOUT_MINUTES = "segmentDownloadTimeoutMinutes";
 
-  // TODO: Change it to BooleanSupplier
-  private final Supplier<Boolean> _isServerReadyToServeQueries;
+  private final BooleanSupplier _isServerReadyToServeQueries;
 
   // Object to track ingestion delay for all partitions
   private IngestionDelayTracker _ingestionDelayTracker;
@@ -150,7 +148,7 @@ public class RealtimeTableDataManager extends BaseTableDataManager {
     this(segmentBuildSemaphore, () -> true);
   }
 
-  public RealtimeTableDataManager(Semaphore segmentBuildSemaphore, Supplier<Boolean> isServerReadyToServeQueries) {
+  public RealtimeTableDataManager(Semaphore segmentBuildSemaphore, BooleanSupplier isServerReadyToServeQueries) {
     _segmentBuildSemaphore = segmentBuildSemaphore;
     _isServerReadyToServeQueries = isServerReadyToServeQueries;
   }
@@ -162,7 +160,7 @@ public class RealtimeTableDataManager extends BaseTableDataManager {
     _ingestionDelayTracker = new IngestionDelayTracker(_serverMetrics, _tableNameWithType, this);
     File statsFile = new File(_tableDataDir, STATS_FILE_NAME);
     try {
-      _statsHistory = RealtimeSegmentStatsHistory.deserialzeFrom(statsFile);
+      _statsHistory = RealtimeSegmentStatsHistory.deserializeFrom(statsFile);
     } catch (IOException | ClassNotFoundException e) {
       _logger.error("Caught exception while reading stats history from: {}", statsFile.getAbsolutePath(), e);
       File savedFile = new File(_tableDataDir, STATS_FILE_NAME + "." + UUID.randomUUID());
@@ -175,7 +173,7 @@ public class RealtimeTableDataManager extends BaseTableDataManager {
       _logger.warn("Saved unreadable {} into {}. Creating a fresh instance", statsFile.getAbsolutePath(),
           savedFile.getAbsolutePath());
       try {
-        _statsHistory = RealtimeSegmentStatsHistory.deserialzeFrom(statsFile);
+        _statsHistory = RealtimeSegmentStatsHistory.deserializeFrom(statsFile);
       } catch (Exception e2) {
         Utils.rethrowException(e2);
       }
@@ -581,8 +579,6 @@ public class RealtimeTableDataManager extends BaseTableDataManager {
       throws Exception {
     Status status = zkMetadata.getStatus();
     if (status.isCompleted()) {
-      // Segment is completed and ready to be downloaded either from deep storage or from a peer (if peer-to-peer
-      // download is enabled).
       return super.downloadSegment(zkMetadata);
     }
 
@@ -844,7 +840,8 @@ public class RealtimeTableDataManager extends BaseTableDataManager {
     // Get a new index loading config with latest table config and schema to load the segment
     IndexLoadingConfig indexLoadingConfig = fetchIndexLoadingConfig();
     indexLoadingConfig.setSegmentTier(zkMetadata.getTier());
-    addSegment(ImmutableSegmentLoader.load(indexDir, indexLoadingConfig, _segmentOperationsThrottler), zkMetadata);
+    addSegment(ImmutableSegmentLoader.load(indexDir, indexLoadingConfig, _segmentOperationsThrottler, zkMetadata),
+        zkMetadata);
     _ingestionDelayTracker.markPartitionForVerification(segmentName);
     _logger.info("Downloaded and replaced CONSUMING segment: {}", segmentName);
   }
@@ -869,7 +866,7 @@ public class RealtimeTableDataManager extends BaseTableDataManager {
     // Get a new index loading config with latest table config and schema to load the segment
     IndexLoadingConfig indexLoadingConfig = fetchIndexLoadingConfig();
     ImmutableSegment immutableSegment =
-        ImmutableSegmentLoader.load(indexDir, indexLoadingConfig, _segmentOperationsThrottler);
+        ImmutableSegmentLoader.load(indexDir, indexLoadingConfig, _segmentOperationsThrottler, zkMetadata);
 
     addSegment(immutableSegment, zkMetadata);
     _ingestionDelayTracker.markPartitionForVerification(segmentName);
@@ -919,7 +916,7 @@ public class RealtimeTableDataManager extends BaseTableDataManager {
     _enforceConsumptionInOrder = enforceConsumptionInOrder;
   }
 
-  public Supplier<Boolean> getIsServerReadyToServeQueries() {
+  public BooleanSupplier getIsServerReadyToServeQueries() {
     return _isServerReadyToServeQueries;
   }
 

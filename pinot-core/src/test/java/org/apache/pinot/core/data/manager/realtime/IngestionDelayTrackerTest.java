@@ -32,7 +32,7 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
-import java.util.function.Supplier;
+import java.util.function.BooleanSupplier;
 import org.apache.commons.lang3.tuple.Pair;
 import org.apache.pinot.common.metrics.ServerGauge;
 import org.apache.pinot.common.metrics.ServerMetrics;
@@ -96,16 +96,18 @@ public class IngestionDelayTrackerTest {
 
     public MockIngestionDelayTracker(ServerMetrics serverMetrics, String tableNameWithType,
         RealtimeTableDataManager realtimeTableDataManager, int timerThreadTickIntervalMs, int metricTrackingIntervalMs,
-        Supplier<Boolean> isServerReadyToServeQueries) {
+        BooleanSupplier isServerReadyToServeQueries) {
       super(serverMetrics, tableNameWithType, realtimeTableDataManager, timerThreadTickIntervalMs,
           metricTrackingIntervalMs, isServerReadyToServeQueries);
     }
 
     @Override
     public void createMetrics(int partitionId) {
-      if (_partitionToMetricToValues == null) {
-        _partitionToMetricToValues = new ConcurrentHashMap<>();
-        _scheduledExecutorService = Executors.newScheduledThreadPool(2);
+      synchronized (this) {
+        if (_partitionToMetricToValues == null) {
+          _partitionToMetricToValues = new ConcurrentHashMap<>();
+          _scheduledExecutorService = Executors.newScheduledThreadPool(2);
+        }
       }
       Map<String, List<Long>> metricToValues = new HashMap<>();
       _partitionToMetricToValues.put(partitionId, metricToValues);
@@ -481,7 +483,7 @@ public class IngestionDelayTrackerTest {
     TestUtils.waitForCondition((aVoid) -> {
       try {
         verifyMetrics(partitionToMetricToValues);
-      } catch (Error e) {
+      } catch (Throwable t) {
         return false;
       }
       return true;

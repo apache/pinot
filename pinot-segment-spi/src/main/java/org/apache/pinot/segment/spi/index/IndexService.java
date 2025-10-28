@@ -19,7 +19,6 @@
 
 package org.apache.pinot.segment.spi.index;
 
-import com.google.common.collect.ImmutableMap;
 import it.unimi.dsi.fastutil.objects.Object2ShortOpenHashMap;
 import java.util.ArrayList;
 import java.util.Collections;
@@ -31,6 +30,7 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.ServiceLoader;
 import java.util.Set;
+import java.util.stream.Collectors;
 import javax.annotation.concurrent.ThreadSafe;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -91,12 +91,10 @@ public class IndexService {
         return winner;
       });
     }
-
-    ImmutableMap.Builder<String, IndexType<?, ?, ?>> builder = ImmutableMap.builder();
-    for (Map.Entry<String, IndexPlugin<?>> entry : pluginsById.entrySet()) {
-      builder.put(entry.getKey(), entry.getValue().getIndexType());
-    }
-    _allIndexesById = builder.build();
+    _allIndexesById = Map.copyOf(
+        pluginsById.entrySet().stream()
+            .collect(Collectors.toMap(Map.Entry::getKey, e -> e.getValue().getIndexType()))
+    );
     // Sort index types so that servers can loop over and process them in a more deterministic order.
     List<String> allIndexIds = new ArrayList<>(_allIndexesById.keySet());
     Collections.sort(allIndexIds);

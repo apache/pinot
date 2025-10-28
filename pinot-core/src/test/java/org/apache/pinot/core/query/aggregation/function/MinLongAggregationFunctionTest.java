@@ -195,4 +195,78 @@ public class MinLongAggregationFunctionTest extends AbstractAggregationFunctionT
         ).whenQuery("select minlong(myField) from testTable")
         .thenResultIs("LONG", "" + (Long.MAX_VALUE - 5));
   }
+
+  @Test
+  public void aggregationMV() {
+    FluentQueryTest.withBaseDir(_baseDir)
+        .givenTable(
+            new Schema.SchemaBuilder()
+                .setSchemaName("testTable")
+                .setEnableColumnBasedNullHandling(true)
+                .addMultiValueDimension("mv", FieldSpec.DataType.LONG)
+                .build(), SINGLE_FIELD_TABLE_CONFIG)
+        .onFirstInstance(
+            new Object[]{"1;2;3"}
+        )
+        .andOnSecondInstance(
+            new Object[]{"null"}
+        )
+        .whenQuery("select minlong(mv) from testTable")
+        .thenResultIs("LONG",
+            String.valueOf(FieldSpec.getDefaultNullValue(FieldSpec.FieldType.DIMENSION, FieldSpec.DataType.LONG, null)))
+        .whenQueryWithNullHandlingEnabled("select minlong(mv) from testTable")
+        .thenResultIs("LONG", "1");
+  }
+
+  @Test
+  public void aggregationMVGroupBySV() {
+    FluentQueryTest.withBaseDir(_baseDir)
+        .givenTable(
+            new Schema.SchemaBuilder()
+                .setSchemaName("testTable")
+                .setEnableColumnBasedNullHandling(true)
+                .addMultiValueDimension("mv", FieldSpec.DataType.LONG)
+                .addSingleValueDimension("sv", FieldSpec.DataType.STRING)
+                .build(), SINGLE_FIELD_TABLE_CONFIG)
+        .onFirstInstance(
+            new Object[]{"null", "k1"},
+            new Object[]{"1;2;3", "k2"}
+        )
+        .andOnSecondInstance(
+            new Object[]{"null", "k2"},
+            new Object[]{"1;2;3", "k1"}
+        )
+        .whenQuery("select minlong(mv) from testTable group by sv")
+        .thenResultIs("LONG", String.valueOf(
+            ((Number) FieldSpec.getDefaultNullValue(FieldSpec.FieldType.DIMENSION, FieldSpec.DataType.LONG,
+                null)).longValue()), String.valueOf(
+            ((Number) FieldSpec.getDefaultNullValue(FieldSpec.FieldType.DIMENSION, FieldSpec.DataType.LONG,
+                null)).longValue()))
+        .whenQueryWithNullHandlingEnabled("select minlong(mv) from testTable group by sv")
+        .thenResultIs("LONG", "1", "1");
+  }
+
+  @Test
+  public void aggregationMVGroupByMV() {
+    FluentQueryTest.withBaseDir(_baseDir)
+        .givenTable(
+            new Schema.SchemaBuilder()
+                .setSchemaName("testTable")
+                .setEnableColumnBasedNullHandling(true)
+                .addMultiValueDimension("mv1", FieldSpec.DataType.LONG)
+                .addMultiValueDimension("mv2", FieldSpec.DataType.STRING)
+                .build(), SINGLE_FIELD_TABLE_CONFIG)
+        .onFirstInstance(
+            new Object[]{"1;2", "k1;k2"}
+        )
+        .andOnSecondInstance(
+            new Object[]{"null", "k1;k2"}
+        )
+        .whenQuery("select minlong(mv1) from testTable group by mv2")
+        .thenResultIs("LONG",
+            String.valueOf(FieldSpec.getDefaultNullValue(FieldSpec.FieldType.DIMENSION, FieldSpec.DataType.LONG, null)),
+            String.valueOf(FieldSpec.getDefaultNullValue(FieldSpec.FieldType.DIMENSION, FieldSpec.DataType.LONG, null)))
+        .whenQueryWithNullHandlingEnabled("select minlong(mv1) from testTable group by mv2")
+        .thenResultIs("LONG", "1", "1");
+  }
 }

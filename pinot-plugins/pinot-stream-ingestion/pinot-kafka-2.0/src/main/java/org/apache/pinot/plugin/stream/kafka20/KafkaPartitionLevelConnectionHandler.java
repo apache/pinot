@@ -25,7 +25,9 @@ import java.util.Collections;
 import java.util.Properties;
 import java.util.Set;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.Supplier;
+import javax.annotation.Nullable;
 import org.apache.kafka.clients.admin.AdminClient;
 import org.apache.kafka.clients.admin.AdminClientConfig;
 import org.apache.kafka.clients.consumer.Consumer;
@@ -36,9 +38,13 @@ import org.apache.kafka.common.TopicPartition;
 import org.apache.kafka.common.serialization.BytesDeserializer;
 import org.apache.kafka.common.serialization.StringDeserializer;
 import org.apache.kafka.common.utils.Bytes;
+import org.apache.pinot.plugin.stream.kafka.KafkaAdminClientManager;
 import org.apache.pinot.plugin.stream.kafka.KafkaPartitionLevelStreamConfig;
 import org.apache.pinot.plugin.stream.kafka.KafkaSSLUtils;
 import org.apache.pinot.spi.stream.StreamConfig;
+import org.apache.pinot.spi.utils.retry.AttemptsExceededException;
+import org.apache.pinot.spi.utils.retry.RetriableOperationException;
+import org.apache.pinot.spi.utils.retry.RetryPolicy;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -60,15 +66,25 @@ public abstract class KafkaPartitionLevelConnectionHandler {
   protected final Consumer<String, Bytes> _consumer;
   protected final TopicPartition _topicPartition;
   protected final Properties _consumerProp;
+  protected volatile KafkaAdminClientManager.AdminClientReference _sharedAdminClientRef;
 
   public KafkaPartitionLevelConnectionHandler(String clientId, StreamConfig streamConfig, int partition) {
+    this(clientId, streamConfig, partition, null);
+  }
+
+  public KafkaPartitionLevelConnectionHandler(String clientId, StreamConfig streamConfig, int partition,
+      @Nullable RetryPolicy retryPolicy) {
     _config = new KafkaPartitionLevelStreamConfig(streamConfig);
     _clientId = clientId;
     _partition = partition;
     _topic = _config.getKafkaTopicName();
     _consumerProp = buildProperties(streamConfig);
     KafkaSSLUtils.initSSL(_consumerProp);
-    _consumer = createConsumer(_consumerProp);
+    if (retryPolicy == null) {
+      _consumer = createConsumer(_consumerProp);
+    } else {
+      _consumer = createConsumer(_consumerProp, retryPolicy);
+    }
     _topicPartition = new TopicPartition(_topic, _partition);
     _consumer.assign(Collections.singletonList(_topicPartition));
   }
@@ -104,6 +120,25 @@ public abstract class KafkaPartitionLevelConnectionHandler {
     return filteredProps;
   }
 
+  private Consumer<String, Bytes> createConsumer(Properties consumerProp, RetryPolicy retryPolicy) {
+    AtomicReference<Consumer<String, Bytes>> consumer = new AtomicReference<>();
+    try {
+      retryPolicy.attempt(() -> {
+        try {
+          consumer.set(new KafkaConsumer<>(filterKafkaProperties(consumerProp, CONSUMER_CONFIG_NAMES)));
+          return true;
+        } catch (Exception e) {
+          LOGGER.warn("Caught exception while creating Kafka consumer, retrying.", e);
+          return false;
+        }
+      });
+    } catch (AttemptsExceededException | RetriableOperationException e) {
+      LOGGER.error("Caught exception while creating Kafka consumer, giving up", e);
+      throw new RuntimeException(e);
+    }
+    return consumer.get();
+  }
+
   @VisibleForTesting
   protected Consumer<String, Bytes> createConsumer(Properties consumerProp) {
     return retry(() -> new KafkaConsumer<>(filterKafkaProperties(consumerProp, CONSUMER_CONFIG_NAMES)), 5);
@@ -111,6 +146,53 @@ public abstract class KafkaPartitionLevelConnectionHandler {
 
   protected AdminClient createAdminClient() {
     return retry(() -> AdminClient.create(filterKafkaProperties(_consumerProp, ADMIN_CLIENT_CONFIG_NAMES)), 5);
+  }
+
+  /**
+   * Gets or creates a reusable admin client instance. The admin client is lazily initialized
+   * and reused across multiple calls to avoid the overhead of creating new connections.
+   *
+   * @return the admin client instance
+   */
+  @Deprecated
+  protected AdminClient getOrCreateAdminClient() {
+    return createAdminClient();
+  }
+
+  /**
+   * Gets or creates a shared admin client instance that can be reused across multiple
+   * connection handlers connecting to the same Kafka cluster. This provides better
+   * resource efficiency when multiple consumers/producers connect to the same bootstrap servers.
+   *
+   * @return the shared admin client instance
+   */
+  protected AdminClient getOrCreateSharedAdminClient() {
+    return getOrCreateSharedAdminClientInternal(false);
+  }
+
+  private AdminClient getOrCreateSharedAdminClientInternal(boolean isRetry) {
+    KafkaAdminClientManager.AdminClientReference ref = _sharedAdminClientRef;
+    if (ref == null) {
+      synchronized (this) {
+        ref = _sharedAdminClientRef;
+        if (ref == null) {
+          ref = KafkaAdminClientManager.getInstance().getOrCreateAdminClient(_consumerProp);
+          _sharedAdminClientRef = ref;
+        }
+      }
+    }
+    try {
+      return ref.getAdminClient();
+    } catch (IllegalStateException e) {
+      if (isRetry) {
+        throw new RuntimeException("Failed to create admin client after retry", e);
+      }
+      // Reference was closed, retry once
+      synchronized (this) {
+        _sharedAdminClientRef = null;
+      }
+      return getOrCreateSharedAdminClientInternal(true);
+    }
   }
 
   private static <T> T retry(Supplier<T> s, int nRetries) {
@@ -139,6 +221,10 @@ public abstract class KafkaPartitionLevelConnectionHandler {
   public void close()
       throws IOException {
     _consumer.close();
+    if (_sharedAdminClientRef != null) {
+      _sharedAdminClientRef.close();
+      _sharedAdminClientRef = null;
+    }
   }
 
   @VisibleForTesting

@@ -30,6 +30,7 @@ import org.apache.pinot.segment.local.segment.readers.PinotSegmentRecordReader;
 import org.apache.pinot.segment.spi.creator.SegmentGeneratorConfig;
 import org.apache.pinot.segment.spi.creator.SegmentGeneratorCustomConfigs;
 import org.apache.pinot.segment.spi.index.metadata.SegmentMetadataImpl;
+import org.apache.pinot.spi.config.instance.InstanceType;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.data.readers.GenericRow;
@@ -108,7 +109,7 @@ public class SegmentPurger {
 
       SegmentIndexCreationDriverImpl driver = new SegmentIndexCreationDriverImpl();
       purgeRecordReader.rewind();
-      driver.init(_segmentGeneratorConfig, purgeRecordReader);
+      driver.init(_segmentGeneratorConfig, purgeRecordReader, InstanceType.MINION);
       driver.build();
     }
 

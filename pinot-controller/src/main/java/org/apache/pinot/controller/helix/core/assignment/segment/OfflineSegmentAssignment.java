@@ -51,8 +51,7 @@ public class OfflineSegmentAssignment extends BaseSegmentAssignment {
     _logger.info("Assigning segment: {} with instance partitions: {} for table: {}", segmentName, instancePartitions,
         _tableNameWithType);
     List<String> instancesAssigned =
-        segmentAssignmentStrategy.assignSegment(segmentName, currentAssignment, instancePartitions,
-            InstancePartitionsType.OFFLINE);
+        segmentAssignmentStrategy.assignSegment(segmentName, currentAssignment, instancePartitions);
     _logger.info("Assigned segment: {} to instances: {} for table: {}", segmentName, instancesAssigned,
         _tableNameWithType);
     return instancesAssigned;
@@ -74,14 +73,12 @@ public class OfflineSegmentAssignment extends BaseSegmentAssignment {
     // tierPartitionMap has single tier for Dim tables and remove below check
     // See https://github.com/apache/pinot/issues/9047
     if (segmentAssignmentStrategy instanceof AllServersSegmentAssignmentStrategy) {
-      return segmentAssignmentStrategy.reassignSegments(currentAssignment, offlineInstancePartitions,
-          InstancePartitionsType.OFFLINE);
+      return segmentAssignmentStrategy.reassignSegments(currentAssignment, offlineInstancePartitions);
     }
     boolean bootstrap = config.isBootstrap();
     // Rebalance tiers first
     Pair<List<Map<String, Map<String, String>>>, Map<String, Map<String, String>>> pair =
-        rebalanceTiers(currentAssignment, sortedTiers, tierInstancePartitionsMap, bootstrap,
-            InstancePartitionsType.OFFLINE);
+        rebalanceTiers(currentAssignment, sortedTiers, tierInstancePartitionsMap, bootstrap);
     List<Map<String, Map<String, String>>> newTierAssignments = pair.getLeft();
     Map<String, Map<String, String>> nonTierAssignment = pair.getRight();
 
@@ -89,7 +86,7 @@ public class OfflineSegmentAssignment extends BaseSegmentAssignment {
         offlineInstancePartitions, bootstrap);
     Map<String, Map<String, String>> newAssignment =
         reassignSegments(InstancePartitionsType.OFFLINE.toString(), nonTierAssignment, offlineInstancePartitions,
-            bootstrap, segmentAssignmentStrategy, InstancePartitionsType.OFFLINE);
+            bootstrap, segmentAssignmentStrategy);
 
     // Add tier assignments, if available
     if (CollectionUtils.isNotEmpty(newTierAssignments)) {

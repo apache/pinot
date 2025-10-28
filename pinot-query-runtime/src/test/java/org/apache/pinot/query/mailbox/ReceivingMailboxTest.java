@@ -35,7 +35,10 @@ import org.mockito.Mockito;
 import org.testng.annotations.BeforeMethod;
 import org.testng.annotations.Test;
 
-import static org.testng.Assert.*;
+import static org.testng.Assert.assertEquals;
+import static org.testng.Assert.assertNotNull;
+import static org.testng.Assert.assertNull;
+import static org.testng.Assert.assertTrue;
 
 
 public class ReceivingMailboxTest {
@@ -51,27 +54,31 @@ public class ReceivingMailboxTest {
   }
 
   @Test
-  public void tooManyDataBlocksTheWriter()
-      throws InterruptedException, TimeoutException {
+  public void tooManyDataBlocksTheWriter() {
     int size = 2;
     ReceivingMailbox receivingMailbox = new ReceivingMailbox("id", size);
+    receivingMailbox.registeredReader(_reader);
 
     // Offer up to capacity
     for (int i = 0; i < size; i++) {
       ReceivingMailbox.ReceivingMailboxStatus status = receivingMailbox.offer(DATA_BLOCK, List.of(), 10);
       assertEquals(status, ReceivingMailbox.ReceivingMailboxStatus.SUCCESS, "Should be able to offer up to capacity");
     }
-    // Offer one more should be rejected
-    try {
-      ReceivingMailbox.ReceivingMailboxStatus status = receivingMailbox.offer(DATA_BLOCK, List.of(), 10);
-      fail("Should have thrown timeout exception, but " + status + " was returned");
-    } catch (TimeoutException e) {
-      // expected
-    }
+    // Offer one more should cause timeout
+    ReceivingMailbox.ReceivingMailboxStatus status = receivingMailbox.offer(DATA_BLOCK, List.of(), 10);
+    assertEquals(status, ReceivingMailbox.ReceivingMailboxStatus.LAST_BLOCK,
+        "Should timeout when offering over capacity");
+    ReceivingMailbox.MseBlockWithStats read = receivingMailbox.poll();
+    assertNotNull(read, "Should be able to read the timeout error block");
+    MseBlock block = read.getBlock();
+    assertTrue(block.isError(), "The block should be an error block");
+    ErrorMseBlock errorBlock = (ErrorMseBlock) block;
+    assertTrue(errorBlock.getErrorMessages().containsKey(QueryErrorCode.EXECUTION_TIMEOUT),
+        "The error block should contain timeout error");
   }
 
   @Test
-  public void offerAfterEos() throws InterruptedException, TimeoutException {
+  public void offerAfterEos() {
     ReceivingMailbox receivingMailbox = new ReceivingMailbox("id", 10);
 
     ReceivingMailbox.ReceivingMailboxStatus status = receivingMailbox.offer(DATA_BLOCK, List.of(), 10);
@@ -97,7 +104,7 @@ public class ReceivingMailboxTest {
   }
 
   @Test
-  public void shouldReadDataInOrder() throws InterruptedException, TimeoutException {
+  public void shouldReadDataInOrder() {
     ReceivingMailbox receivingMailbox = new ReceivingMailbox("id", 10);
     receivingMailbox.registeredReader(_reader);
 
@@ -121,7 +128,7 @@ public class ReceivingMailboxTest {
   }
 
   @Test
-  public void lateEosRead() throws InterruptedException, TimeoutException {
+  public void lateEosRead() {
     ReceivingMailbox receivingMailbox = new ReceivingMailbox("id", 10);
     receivingMailbox.registeredReader(_reader);
 
@@ -161,7 +168,7 @@ public class ReceivingMailboxTest {
   }
 
   @Test
-  public void bufferedDataIsKeptOnSuccess() throws InterruptedException, TimeoutException {
+  public void bufferedDataIsKeptOnSuccess() {
     ReceivingMailbox receivingMailbox = new ReceivingMailbox("id", 10);
     receivingMailbox.registeredReader(_reader);
 
@@ -189,7 +196,7 @@ public class ReceivingMailboxTest {
   }
 
   @Test
-  public void bufferedDataIsDiscardedOnError() throws InterruptedException, TimeoutException {
+  public void bufferedDataIsDiscardedOnError() {
     ReceivingMailbox receivingMailbox = new ReceivingMailbox("id", 10);
     receivingMailbox.registeredReader(_reader);
     ErrorMseBlock errorBlock = ErrorMseBlock.fromException(new RuntimeException("Test error"));
@@ -213,7 +220,7 @@ public class ReceivingMailboxTest {
   }
 
   @Test
-  public void dataAfterSuccess() throws InterruptedException, TimeoutException {
+  public void dataAfterSuccess() {
     ReceivingMailbox receivingMailbox = new ReceivingMailbox("id", 10);
     receivingMailbox.registeredReader(_reader);
 
@@ -237,7 +244,7 @@ public class ReceivingMailboxTest {
   }
 
   @Test
-  public void dataAfterError() throws InterruptedException, TimeoutException {
+  public void dataAfterError() {
     ReceivingMailbox receivingMailbox = new ReceivingMailbox("id", 10);
     receivingMailbox.registeredReader(_reader);
 
@@ -285,7 +292,7 @@ public class ReceivingMailboxTest {
 
   @Test(timeOut = 10_000)
   public void readingUnblocksWriters()
-      throws ExecutionException, InterruptedException, TimeoutException {
+      throws ExecutionException, InterruptedException {
     int maxPendingBlocks = 2;
     ReceivingMailbox mailbox = new ReceivingMailbox("id", maxPendingBlocks);
     mailbox.registeredReader(_reader);
@@ -319,15 +326,6 @@ public class ReceivingMailboxTest {
 
   CompletableFuture<ReceivingMailbox.ReceivingMailboxStatus> offer(MseBlock block, ReceivingMailbox receivingMailbox,
       ExecutorService executor) {
-    return CompletableFuture.supplyAsync(() -> {
-      try {
-        return receivingMailbox.offer(block, List.of(), 10_000);
-      } catch (InterruptedException e) {
-        Thread.currentThread().interrupt();
-        throw new RuntimeException(e);
-      } catch (TimeoutException e) {
-        throw new RuntimeException(e);
-      }
-    }, executor);
+    return CompletableFuture.supplyAsync(() -> receivingMailbox.offer(block, List.of(), 10_000), executor);
   }
 }

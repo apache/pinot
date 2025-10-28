@@ -571,6 +571,15 @@ public class CommonConstants {
         "pinot.broker.multistage.lite.mode.leaf.stage.fanOutAdjustedLimit";
     public static final int DEFAULT_LITE_MODE_LEAF_STAGE_FAN_OUT_ADJUSTED_LIMIT = -1;
 
+    /**
+     * Whether to enable JOIN queries when MSE Lite mode is enabled. By default joins are enabled
+     * in lite mode unless explicitly disabled. This value cannot be overridden by query option.
+     */
+    public static final String CONFIG_OF_LITE_MODE_ENABLE_JOINS =
+        "pinot.broker.multistage.lite.mode.enable.joins";
+    public static final boolean DEFAULT_LITE_MODE_ENABLE_JOINS = true;
+
+
     // Config for default hash function used in KeySelector for data shuffling
     public static final String CONFIG_OF_BROKER_DEFAULT_HASH_FUNCTION = "pinot.broker.multistage.default.hash.function";
     public static final String DEFAULT_BROKER_DEFAULT_HASH_FUNCTION = "absHashCode";
@@ -653,9 +662,6 @@ public class CommonConstants {
         public static final String CHUNK_SIZE_EXTRACT_FINAL_RESULT = "chunkSizeExtractFinalResult";
 
         public static final String NUM_REPLICA_GROUPS_TO_QUERY = "numReplicaGroupsToQuery";
-
-        @Deprecated
-        public static final String ORDERED_PREFERRED_REPLICAS = "orderedPreferredReplicas";
         public static final String ORDERED_PREFERRED_POOLS = "orderedPreferredPools";
         public static final String USE_FIXED_REPLICA = "useFixedReplica";
         public static final String EXPLAIN_PLAN_VERBOSE = "explainPlanVerbose";
@@ -726,6 +732,11 @@ public class CommonConstants {
         public static final String REGEX_DICT_SIZE_THRESHOLD = "regexDictSizeThreshold";
 
         public static final String DROP_RESULTS = "dropResults";
+
+        // Exclude virtual columns (columns starting with '$') from table schema
+        // This is typically used for NATURAL JOIN operations where virtual columns
+        // should not participate in join condition matching. Can only be used in MSE as of now
+        public static final String EXCLUDE_VIRTUAL_COLUMNS = "excludeVirtualColumns";
 
         // Maximum number of pending results blocks allowed in the streaming operator
         public static final String MAX_STREAMING_PENDING_BLOCKS = "maxStreamingPendingBlocks";
@@ -1118,6 +1129,17 @@ public class CommonConstants {
     public static final String CONFIG_OF_QUERY_EXECUTOR_MAX_EXECUTION_THREADS =
         QUERY_EXECUTOR_CONFIG_PREFIX + "." + MAX_EXECUTION_THREADS;
     public static final int DEFAULT_QUERY_EXECUTOR_MAX_EXECUTION_THREADS = -1;  // Use number of CPU cores
+
+    // OOM protection: heap usage throttle configuration
+    public static final String CONFIG_OF_HEAP_USAGE_THROTTLE_QUEUE_MAX_SIZE =
+        QUERY_EXECUTOR_CONFIG_PREFIX + ".heap.usage.throttle.queue.maxSize";
+    public static final int DEFAULT_HEAP_USAGE_THROTTLE_QUEUE_MAX_SIZE = 1000;
+    public static final String CONFIG_OF_HEAP_USAGE_THROTTLE_QUEUE_TIMEOUT_MS =
+        QUERY_EXECUTOR_CONFIG_PREFIX + ".heap.usage.throttle.queue.timeoutMs";
+    public static final long DEFAULT_HEAP_USAGE_THROTTLE_QUEUE_TIMEOUT_MS = 30_000L;
+    public static final String CONFIG_OF_HEAP_USAGE_THROTTLE_MONITOR_INTERVAL_MS =
+        QUERY_EXECUTOR_CONFIG_PREFIX + ".heap.usage.throttle.monitorIntervalMs";
+    public static final long DEFAULT_HEAP_USAGE_THROTTLE_MONITOR_INTERVAL_MS = 1_000L;
 
     // Group-by query related configs
     public static final String NUM_GROUPS_LIMIT = "num.groups.limit";
@@ -1892,7 +1914,11 @@ public class CommonConstants {
    */
   public static class MultiStageQueryRunner {
     /**
-     * Configuration for mailbox data block size
+     * Configuration for mailbox data block size.
+     *
+     * Ideally it should be in the order of a few MBs, to balance the serialization/deserialization overhead and the
+     * number of messages to transfer. Values lower than hundreds of KBs are not recommended and may lead to excessive
+     * number of messages, overhead and even errors.
      */
     public static final String KEY_OF_MAX_INBOUND_QUERY_DATA_BLOCK_SIZE_BYTES = "pinot.query.runner.max.msg.size.bytes";
     public static final int DEFAULT_MAX_INBOUND_QUERY_DATA_BLOCK_SIZE_BYTES = 16 * 1024 * 1024;
@@ -1912,13 +1938,6 @@ public class CommonConstants {
      */
     public static final String KEY_OF_CHANNEL_IDLE_TIMEOUT_SECONDS = "pinot.query.runner.channel.idle.timeout.seconds";
     public static final long DEFAULT_CHANNEL_IDLE_TIMEOUT_SECONDS = -1;
-
-    /**
-     * Enable splitting of data block payload during mailbox transfer.
-     */
-    public static final String KEY_OF_ENABLE_DATA_BLOCK_PAYLOAD_SPLIT =
-        "pinot.query.runner.enable.data.block.payload.split";
-    public static final boolean DEFAULT_ENABLE_DATA_BLOCK_PAYLOAD_SPLIT = false;
 
     /// Configuration for server port used to receive query plans.
     public static final String KEY_OF_QUERY_SERVER_PORT = "pinot.query.server.port";

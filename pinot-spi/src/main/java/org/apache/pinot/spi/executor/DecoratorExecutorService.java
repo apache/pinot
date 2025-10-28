@@ -46,7 +46,7 @@ import javax.annotation.Nullable;
  * TODO: Convert this class and its usages into an Executor instead of an ExecutorService
  */
 public abstract class DecoratorExecutorService implements ExecutorService {
-  private final ExecutorService _executorService;
+  protected final ExecutorService _executorService;
   private final Consumer<Future<?>> _onSubmit;
 
   public DecoratorExecutorService(ExecutorService executorService) {

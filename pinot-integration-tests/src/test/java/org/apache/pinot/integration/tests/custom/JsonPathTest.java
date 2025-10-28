@@ -20,7 +20,6 @@ package org.apache.pinot.integration.tests.custom;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.node.ArrayNode;
-import com.google.common.collect.ImmutableMap;
 import com.jayway.jsonpath.spi.cache.Cache;
 import com.jayway.jsonpath.spi.cache.CacheProvider;
 import java.io.File;
@@ -121,7 +120,7 @@ public class JsonPathTest extends CustomDataQueryClusterIntegrationTest {
         complexMap.put("k2", "value-k2-" + i);
         complexMap.put("k3", Arrays.asList("value-k3-0-" + i, "value-k3-1-" + i, "value-k3-2-" + i));
         complexMap.put("k4",
-            ImmutableMap.of("k4-k1", "value-k4-k1-" + i, "k4-k2", "value-k4-k2-" + i, "k4-k3", "value-k4-k3-" + i,
+            Map.of("k4-k1", "value-k4-k1-" + i, "k4-k2", "value-k4-k2-" + i, "k4-k3", "value-k4-k3-" + i,
                 "met", i));
         record.put(COMPLEX_MAP_STR_FIELD_NAME, JsonUtils.objectToString(complexMap));
         fileWriter.append(record);
@@ -198,16 +197,16 @@ public class JsonPathTest extends CustomDataQueryClusterIntegrationTest {
     Assert.assertFalse(rows.isEmpty());
     for (int i = 0; i < rows.size(); i++) {
       String value = rows.get(i).get(0).textValue();
-      Map results = JsonUtils.stringToObject(value, Map.class);
+      Map<?, ?> results = JsonUtils.stringToObject(value, Map.class);
       Assert.assertTrue(value.indexOf("-k1-") > 0);
       Assert.assertEquals(results.get("k1"), "value-k1-" + i);
       Assert.assertEquals(results.get("k2"), "value-k2-" + i);
-      final List k3 = (List) results.get("k3");
+      final List<?> k3 = (List<?>) results.get("k3");
       Assert.assertEquals(k3.size(), 3);
       Assert.assertEquals(k3.get(0), "value-k3-0-" + i);
       Assert.assertEquals(k3.get(1), "value-k3-1-" + i);
       Assert.assertEquals(k3.get(2), "value-k3-2-" + i);
-      final Map k4 = (Map) results.get("k4");
+      final Map<?, ?> k4 = (Map<?, ?>) results.get("k4");
       Assert.assertEquals(k4.size(), 4);
       Assert.assertEquals(k4.get("k4-k1"), "value-k4-k1-" + i);
       Assert.assertEquals(k4.get("k4-k2"), "value-k4-k2-" + i);
@@ -224,8 +223,12 @@ public class JsonPathTest extends CustomDataQueryClusterIntegrationTest {
     Assert.assertEquals(rows.size(), 1);
     for (int i = 0; i < rows.size(); i++) {
       String value = rows.get(i).get(0).textValue();
-      Assert.assertEquals(value,
-          "{\"k4-k1\":\"value-k4-k1-0\",\"k4-k2\":\"value-k4-k2-0\",\"k4-k3\":\"value-k4-k3-0\",\"met\":0}");
+      Map<?, ?> k4 = JsonUtils.stringToObject(value, Map.class);
+      Assert.assertEquals(k4.size(), 4);
+      Assert.assertEquals(k4.get("k4-k1"), "value-k4-k1-0");
+      Assert.assertEquals(k4.get("k4-k2"), "value-k4-k2-0");
+      Assert.assertEquals(k4.get("k4-k3"), "value-k4-k3-0");
+      Assert.assertEquals(Double.parseDouble(k4.get("met").toString()), 0.0);
     }
 
     //selection order by
@@ -238,15 +241,15 @@ public class JsonPathTest extends CustomDataQueryClusterIntegrationTest {
     for (int i = 0; i < rows.size(); i++) {
       String value = rows.get(i).get(0).textValue();
       Assert.assertTrue(value.indexOf("-k1-") > 0);
-      Map results = JsonUtils.stringToObject(value, Map.class);
+      Map<?, ?> results = JsonUtils.stringToObject(value, Map.class);
       String seqId = _sortedSequenceIds.get(NUM_TOTAL_DOCS - 1 - i);
       Assert.assertEquals(results.get("k1"), "value-k1-" + seqId);
       Assert.assertEquals(results.get("k2"), "value-k2-" + seqId);
-      final List k3 = (List) results.get("k3");
+      final List<?> k3 = (List<?>) results.get("k3");
       Assert.assertEquals(k3.get(0), "value-k3-0-" + seqId);
       Assert.assertEquals(k3.get(1), "value-k3-1-" + seqId);
       Assert.assertEquals(k3.get(2), "value-k3-2-" + seqId);
-      final Map k4 = (Map) results.get("k4");
+      final Map<?, ?> k4 = (Map<?, ?>) results.get("k4");
       Assert.assertEquals(k4.get("k4-k1"), "value-k4-k1-" + seqId);
       Assert.assertEquals(k4.get("k4-k2"), "value-k4-k2-" + seqId);
       Assert.assertEquals(k4.get("k4-k3"), "value-k4-k3-" + seqId);

@@ -19,7 +19,6 @@
 package org.apache.pinot.broker.routing.instanceselector;
 
 import com.google.common.collect.ImmutableList;
-import com.google.common.collect.ImmutableMap;
 import java.time.Clock;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -194,7 +193,7 @@ public class MultiStageReplicaGroupSelectorTest {
   @Test
   public void testErrorSegmentHandling() {
     // Create instance-partitions with two replica-groups and 2 partitions. Each replica-group has 2 instances.
-    Map<String, List<String>> partitionToInstances = ImmutableMap.of(
+    Map<String, List<String>> partitionToInstances = Map.of(
         "0_0", ImmutableList.of("instance-0"),
         "0_1", ImmutableList.of("instance-2"),
         "1_0", ImmutableList.of("instance-1"),
@@ -256,7 +255,7 @@ public class MultiStageReplicaGroupSelectorTest {
   }
 
   private InstancePartitions createInstancePartitions(List<String> replicaGroup0, List<String> replicaGroup1) {
-    Map<String, List<String>> partitionToInstances = ImmutableMap.of("0_0", replicaGroup0, "0_1", replicaGroup1);
+    Map<String, List<String>> partitionToInstances = Map.of("0_0", replicaGroup0, "0_1", replicaGroup1);
     InstancePartitions instancePartitions = new InstancePartitions(TABLE_NAME);
     instancePartitions.setInstances(0, 0, partitionToInstances.get("0_0"));
     instancePartitions.setInstances(0, 1, partitionToInstances.get("0_1"));

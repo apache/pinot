@@ -176,4 +176,80 @@ public class SumLongAggregationFunctionTest extends AbstractAggregationFunctionT
             "tag3    | null"
         );
   }
+
+  @Test
+  public void aggregationMV() {
+    FluentQueryTest.withBaseDir(_baseDir)
+        .givenTable(
+            new Schema.SchemaBuilder()
+                .setSchemaName("testTable")
+                .setEnableColumnBasedNullHandling(true)
+                .addMultiValueDimension("mv", FieldSpec.DataType.LONG)
+                .build(), SINGLE_FIELD_TABLE_CONFIG)
+        .onFirstInstance(
+            new Object[]{"1;2;3"}
+        )
+        .andOnSecondInstance(
+            new Object[]{"null"}
+        )
+        .whenQuery("select sumlong(mv) from testTable")
+        .thenResultIs("LONG", String.valueOf(
+            1 + 2 + 3 + (long) FieldSpec.getDefaultNullValue(FieldSpec.FieldType.DIMENSION, FieldSpec.DataType.LONG,
+                null)))
+        .whenQueryWithNullHandlingEnabled("select sumlong(mv) from testTable")
+        .thenResultIs("LONG",
+            String.valueOf(1 + 2 + 3));
+  }
+
+  @Test
+  public void aggregationMVGroupBySV() {
+    FluentQueryTest.withBaseDir(_baseDir)
+        .givenTable(
+            new Schema.SchemaBuilder()
+                .setSchemaName("testTable")
+                .setEnableColumnBasedNullHandling(true)
+                .addMultiValueDimension("mv", FieldSpec.DataType.LONG)
+                .addSingleValueDimension("sv", FieldSpec.DataType.STRING)
+                .build(), SINGLE_FIELD_TABLE_CONFIG)
+        .onFirstInstance(
+            new Object[]{"null", "k1"},
+            new Object[]{"1;2;3", "k2"}
+        )
+        .andOnSecondInstance(
+            new Object[]{"null", "k2"},
+            new Object[]{"1;2;3", "k1"}
+        )
+        .whenQuery("select sumlong(mv) from testTable group by sv")
+        .thenResultIs("LONG", String.valueOf(
+                6 + (long) FieldSpec.getDefaultNullValue(FieldSpec.FieldType.DIMENSION, FieldSpec.DataType.LONG, null)),
+            String.valueOf(
+                6 + (long) FieldSpec.getDefaultNullValue(FieldSpec.FieldType.DIMENSION, FieldSpec.DataType.LONG, null)))
+        .whenQueryWithNullHandlingEnabled("select sumlong(mv) from testTable group by sv")
+        .thenResultIs("LONG", "6", "6");
+  }
+
+  @Test
+  public void aggregationMVGroupByMV() {
+    FluentQueryTest.withBaseDir(_baseDir)
+        .givenTable(
+            new Schema.SchemaBuilder()
+                .setSchemaName("testTable")
+                .setEnableColumnBasedNullHandling(true)
+                .addMultiValueDimension("mv1", FieldSpec.DataType.LONG)
+                .addMultiValueDimension("mv2", FieldSpec.DataType.STRING)
+                .build(), SINGLE_FIELD_TABLE_CONFIG)
+        .onFirstInstance(
+            new Object[]{"1;2", "k1;k2"}
+        )
+        .andOnSecondInstance(
+            new Object[]{"null", "k1;k2"}
+        )
+        .whenQuery("select sumlong(mv1) from testTable group by mv2")
+        .thenResultIs("LONG", String.valueOf(
+                3 + (long) FieldSpec.getDefaultNullValue(FieldSpec.FieldType.DIMENSION, FieldSpec.DataType.LONG, null)),
+            String.valueOf(
+                3 + (long) FieldSpec.getDefaultNullValue(FieldSpec.FieldType.DIMENSION, FieldSpec.DataType.LONG, null)))
+        .whenQueryWithNullHandlingEnabled("select sumlong(mv1) from testTable group by mv2")
+        .thenResultIs("LONG", "3", "3");
+  }
 }

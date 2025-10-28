@@ -174,6 +174,10 @@
                 value="javax.annotation.Nonnull,
                 javax.validation.constraints.NotNull"/>
     </module>
+    <!-- Disallow importing com.google.common.collect.ImmutableMap (use java.util.Map instead) -->
+    <module name="IllegalImport">
+      <property name="illegalClasses" value="com.google.common.collect.ImmutableMap"/>
+    </module>
     <!-- Use org.testng.Assert in tests -->
     <module name="IllegalImport">
       <property name="regexp" value="true"/>
