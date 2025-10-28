@@ -69,9 +69,6 @@ public class ColumnarSegmentPreIndexStatsContainer implements SegmentPreIndexSta
     _targetSchema = statsCollectorConfig.getSchema();
     _columnStatsCollectorMap = new HashMap<>(columnReaders.size());
     _totalDocCount = -1; // indicates unset
-
-    initializeStatsCollectors();
-    collectColumnStats();
   }
 
   /**
@@ -84,42 +81,9 @@ public class ColumnarSegmentPreIndexStatsContainer implements SegmentPreIndexSta
       }
 
       String columnName = fieldSpec.getName();
-      switch (fieldSpec.getDataType().getStoredType()) {
-        case INT:
-          _columnStatsCollectorMap.put(columnName,
-              new IntColumnPreIndexStatsCollector(columnName, _statsCollectorConfig));
-          break;
-        case LONG:
-          _columnStatsCollectorMap.put(columnName,
-              new LongColumnPreIndexStatsCollector(columnName, _statsCollectorConfig));
-          break;
-        case FLOAT:
-          _columnStatsCollectorMap.put(columnName,
-              new FloatColumnPreIndexStatsCollector(columnName, _statsCollectorConfig));
-          break;
-        case DOUBLE:
-          _columnStatsCollectorMap.put(columnName,
-              new DoubleColumnPreIndexStatsCollector(columnName, _statsCollectorConfig));
-          break;
-        case BIG_DECIMAL:
-          _columnStatsCollectorMap.put(columnName,
-              new BigDecimalColumnPreIndexStatsCollector(columnName, _statsCollectorConfig));
-          break;
-        case STRING:
-          _columnStatsCollectorMap.put(columnName,
-              new StringColumnPreIndexStatsCollector(columnName, _statsCollectorConfig));
-          break;
-        case BYTES:
-          _columnStatsCollectorMap.put(columnName,
-              new BytesColumnPredIndexStatsCollector(columnName, _statsCollectorConfig));
-          break;
-        case MAP:
-          _columnStatsCollectorMap.put(columnName,
-              new MapColumnPreIndexStatsCollector(columnName, _statsCollectorConfig));
-          break;
-        default:
-          throw new IllegalStateException("Unsupported data type: " + fieldSpec.getDataType());
-      }
+      AbstractColumnStatisticsCollector collector =
+          StatsCollectorUtil.createStatsCollector(columnName, fieldSpec, _statsCollectorConfig);
+      _columnStatsCollectorMap.put(columnName, collector);
     }
   }
 
@@ -188,7 +152,8 @@ public class ColumnarSegmentPreIndexStatsContainer implements SegmentPreIndexSta
 
   @Override
   public void init() {
-    // Already initialized in constructor
+    initializeStatsCollectors();
+    collectColumnStats();
   }
 
   @Override

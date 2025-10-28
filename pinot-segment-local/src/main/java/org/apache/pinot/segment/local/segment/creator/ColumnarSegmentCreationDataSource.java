@@ -62,7 +62,10 @@ public class ColumnarSegmentCreationDataSource implements SegmentCreationDataSou
     LOGGER.info("Gathering stats using columnar approach for {} columns", _columnReaders.size());
 
     // Use columnar stats container that efficiently collects statistics column-wise
-    return new ColumnarSegmentPreIndexStatsContainer(_columnReaders, statsCollectorConfig);
+    ColumnarSegmentPreIndexStatsContainer columnarSegmentPreIndexStatsContainer =
+        new ColumnarSegmentPreIndexStatsContainer(_columnReaders, statsCollectorConfig);
+    columnarSegmentPreIndexStatsContainer.init();
+    return columnarSegmentPreIndexStatsContainer;
   }
 
   @Override
