@@ -34,7 +34,7 @@ import java.util.Properties;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.pinot.client.admin.PinotAdminClient;
 import org.apache.pinot.client.admin.PinotAdminTransport;
-import org.apache.pinot.client.admin.PinotSegmentApiClient;
+import org.apache.pinot.client.admin.PinotSegmentAdminClient;
 import org.apache.pinot.common.auth.AuthProviderUtils;
 import org.apache.pinot.common.metadata.segment.SegmentPartitionMetadata;
 import org.apache.pinot.common.restlet.resources.StartReplaceSegmentsRequest;
@@ -82,7 +82,7 @@ public class LaunchBackfillIngestionJobCommand extends LaunchDataIngestionJobCom
   @CommandLine.Option(names = {"-partitionColumnValue"}, required = false, description =
       "Segments with this partition column value " + "will only be eligible for backfill.")
   private String _partitionColumnValue;
-  private PinotSegmentApiClient _pinotSegmentApiClient;
+  private PinotSegmentAdminClient _pinotSegmentAdminClient;
 
   @Override
   public boolean execute()
@@ -102,7 +102,7 @@ public class LaunchBackfillIngestionJobCommand extends LaunchDataIngestionJobCom
       Properties transportProperties = getTransportProperties(spec);
       PinotAdminClient adminClient = new PinotAdminClient(controllerAddress, transportProperties, authHeader);
 
-      _pinotSegmentApiClient = adminClient.getSegmentApiClient();
+      _pinotSegmentAdminClient = adminClient.getSegmentClient();
       // 1. Fetch existing segments that need to be backfilled (to be replaced)
       List<String> segmentsToBackfill = fetchSegmentsToBackfill(spec);
 
@@ -175,9 +175,10 @@ public class LaunchBackfillIngestionJobCommand extends LaunchDataIngestionJobCom
     long startMs = getMillis(_backfillStartDate);
     long endMs = getMillis(_backfillEndDate);
 
-    JsonNode segmentsJson =
-        _pinotSegmentApiClient.selectSegments(spec.getTableSpec().getTableName(), OFFLINE_TABLE_TYPE,
+    String segmentsResponse =
+        _pinotSegmentAdminClient.selectSegments(spec.getTableSpec().getTableName(), OFFLINE_TABLE_TYPE,
             startMs, endMs, true);
+    JsonNode segmentsJson = JsonUtils.stringToJsonNode(segmentsResponse);
     segmentsJson.findPath(OFFLINE_TABLE_TYPE).forEach(seg -> segmentsToBackfill.add(seg.textValue()));
 
     // Partition filter
@@ -198,10 +199,11 @@ public class LaunchBackfillIngestionJobCommand extends LaunchDataIngestionJobCom
    */
   private boolean isSegmentMatchPartition(SegmentGenerationJobSpec spec, String segmentName) {
     try {
-      JsonNode response = _pinotSegmentApiClient.getSegmentMetadata(
+      Map<String, Object> metadataMap = _pinotSegmentAdminClient.getSegmentMetadata(
           TableNameBuilder.OFFLINE.tableNameWithType(spec.getTableSpec().getTableName()),
-          segmentName);
-      Map<String, String> segmentMetadata = JsonUtils.jsonNodeToStringMap(response);
+          segmentName, null);
+      Map<String, String> segmentMetadata = new HashMap<>();
+      metadataMap.forEach((k, v) -> segmentMetadata.put(k, v != null ? v.toString() : null));
 
       // Skip segments without partition metadata
       if (!segmentMetadata.containsKey(CommonConstants.Segment.PARTITION_METADATA)) {

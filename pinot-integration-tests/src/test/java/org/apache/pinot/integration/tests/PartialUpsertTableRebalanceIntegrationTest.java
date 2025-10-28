@@ -21,8 +21,6 @@ package org.apache.pinot.integration.tests;
 import com.fasterxml.jackson.core.type.TypeReference;
 import java.io.File;
 import java.io.IOException;
-import java.net.URISyntaxException;
-import java.net.URL;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
@@ -31,11 +29,8 @@ import java.util.Set;
 import org.apache.commons.io.FileUtils;
 import org.apache.helix.model.IdealState;
 import org.apache.pinot.client.ResultSetGroup;
-import org.apache.pinot.common.exception.HttpErrorStatusException;
 import org.apache.pinot.common.utils.LLCSegmentName;
-import org.apache.pinot.common.utils.SimpleHttpResponse;
 import org.apache.pinot.common.utils.helix.HelixHelper;
-import org.apache.pinot.common.utils.http.HttpClient;
 import org.apache.pinot.controller.api.dto.PinotTableReloadStatusResponse;
 import org.apache.pinot.controller.api.resources.ServerRebalanceJobStatusResponse;
 import org.apache.pinot.controller.helix.core.PinotHelixResourceManager;
@@ -425,18 +420,11 @@ public class PartialUpsertTableRebalanceIntegrationTest extends BaseClusterInteg
 
     TestUtils.waitForCondition(aVoid -> {
       try {
-        String requestUrl = getControllerRequestURLBuilder().forTableRebalanceStatus(jobId);
-        try {
-          SimpleHttpResponse httpResponse =
-              HttpClient.wrapAndThrowHttpException(getHttpClient().sendGetRequest(new URL(requestUrl).toURI(), null));
-
-          ServerRebalanceJobStatusResponse serverRebalanceJobStatusResponse =
-              JsonUtils.stringToObject(httpResponse.getResponse(), ServerRebalanceJobStatusResponse.class);
-          RebalanceResult.Status status = serverRebalanceJobStatusResponse.getTableRebalanceProgressStats().getStatus();
-          return status != RebalanceResult.Status.IN_PROGRESS;
-        } catch (HttpErrorStatusException | URISyntaxException e) {
-          throw new IOException(e);
-        }
+        String response = getOrCreateAdminClient().getClusterClient().getRebalanceStatus(jobId);
+        ServerRebalanceJobStatusResponse serverRebalanceJobStatusResponse =
+            JsonUtils.stringToObject(response, ServerRebalanceJobStatusResponse.class);
+        RebalanceResult.Status status = serverRebalanceJobStatusResponse.getTableRebalanceProgressStats().getStatus();
+        return status != RebalanceResult.Status.IN_PROGRESS;
       } catch (Exception e) {
         return null;
       }
@@ -447,16 +435,10 @@ public class PartialUpsertTableRebalanceIntegrationTest extends BaseClusterInteg
       throws Exception {
     TestUtils.waitForCondition(aVoid -> {
       try {
-        String requestUrl = getControllerRequestURLBuilder().forSegmentReloadStatus(reloadJobId);
-        try {
-          SimpleHttpResponse httpResponse =
-              HttpClient.wrapAndThrowHttpException(_httpClient.sendGetRequest(new URL(requestUrl).toURI(), null));
-          PinotTableReloadStatusResponse segmentReloadStatusValue =
-              JsonUtils.stringToObject(httpResponse.getResponse(), PinotTableReloadStatusResponse.class);
-          return segmentReloadStatusValue.getSuccessCount() == segmentReloadStatusValue.getTotalSegmentCount();
-        } catch (HttpErrorStatusException | URISyntaxException e) {
-          throw new IOException(e);
-        }
+        String response = getOrCreateAdminClient().getSegmentClient().getSegmentReloadStatus(reloadJobId);
+        PinotTableReloadStatusResponse segmentReloadStatusValue =
+            JsonUtils.stringToObject(response, PinotTableReloadStatusResponse.class);
+        return segmentReloadStatusValue.getSuccessCount() == segmentReloadStatusValue.getTotalSegmentCount();
       } catch (Exception e) {
         return null;
       }
