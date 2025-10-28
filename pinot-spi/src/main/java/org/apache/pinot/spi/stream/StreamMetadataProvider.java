@@ -92,9 +92,11 @@ public interface StreamMetadataProvider extends Closeable {
     try {
       partitionCount = fetchPartitionCount(timeoutMillis);
     } catch (Exception e) {
-      LOGGER.warn("Failed to fetch partition count for stream config: {}. Skipping stream and using"
-      + "existing partitions only. Error: {}", streamConfig.getTopicName(), e.getMessage(), e);
+      LOGGER.warn("Failed to fetch partition count for stream config: {}. Skipping stream and using existing partitions only. Error: {}", streamConfig.getTopicName(), e.getMessage(), e);
       // Return only the existing partition groups if we can't fetch partition count
+      // Add a PartitionGroupMetadata into the list, foreach partition already present in current.
+      // Setting endOffset (exclusive) as the startOffset for new partition group.
+      // If partition group is still in progress, this value will be null
       List<PartitionGroupMetadata> existingPartitionGroupMetadataList =
       new ArrayList<>(partitionGroupConsumptionStatuses.size());
       for (PartitionGroupConsumptionStatus currentPartitionGroupConsumptionStatus : partitionGroupConsumptionStatuses) {
