@@ -1786,7 +1786,7 @@ public class ExplainPlanQueriesTest extends BaseQueriesTest {
     result1.add(new Object[]{"AGGREGATE_NO_SCAN", 3, 2});
     check(query1, new ResultTable(DATA_SCHEMA, result1));
 
-    // No scan required as metadata is sufficient to answer teh query for all segments
+    // No scan required as metadata is sufficient to answer the query for all segments
     String query2 = "EXPLAIN PLAN FOR SELECT min(invertedIndexCol1) FROM testTable";
     List<Object[]> result2 = new ArrayList<>();
     result2.add(new Object[]{"BROKER_REDUCE(limit:10)", 1, 0});
@@ -1898,7 +1898,7 @@ public class ExplainPlanQueriesTest extends BaseQueriesTest {
     result1.add(new Object[]{"AGGREGATE_NO_SCAN", 3, 2});
     check(query1, new ResultTable(DATA_SCHEMA, result1));
 
-    // No scan required as metadata is sufficient to answer teh query for all segments
+    // No scan required as metadata is sufficient to answer the query for all segments
     String query2 = "SET explainPlanVerbose=true; EXPLAIN PLAN FOR SELECT min(invertedIndexCol1) FROM testTable";
     List<Object[]> result2 = new ArrayList<>();
     result2.add(new Object[]{"BROKER_REDUCE(limit:10)", 1, 0});
