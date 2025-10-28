@@ -344,7 +344,7 @@ STRING;sv;dict;json_index;false;Column: col Unrecognized token 'str': was expect
 STRING;sv;dict;native_text_index;true;
 STRING;sv;dict;text_index;true;
 STRING;sv;dict;range_index;true;
-STRING;sv;dict;startree_index;false;For input string: "str-.*"
+STRING;sv;dict;startree_index;false;
 STRING;sv;dict;vector_index;false;Cannot create vector index on single-value column: col
 STRING;sv;dict;multi_col_text_index;true;
 STRING;mv;dict;timestamp_index;false;Cannot create TIMESTAMP index on column: col of stored type other than LONG
@@ -380,7 +380,7 @@ JSON;sv;dict;json_index;true;
 JSON;sv;dict;native_text_index;false;expected [1] but found [0]
 JSON;sv;dict;text_index;false;expected [1] but found [0]
 JSON;sv;dict;range_index;true;
-JSON;sv;dict;startree_index;false;For input string: "\{"field":".*"\}"
+JSON;sv;dict;startree_index;false;
 JSON;sv;dict;vector_index;false;Cannot create vector index on single-value column: col
 JSON;sv;dict;multi_col_text_index;false;Cannot create TEXT index on column: col of stored type other than STRING
 BYTES;sv;raw;timestamp_index;false;Cannot create TIMESTAMP index on column: col of stored type other than LONG
