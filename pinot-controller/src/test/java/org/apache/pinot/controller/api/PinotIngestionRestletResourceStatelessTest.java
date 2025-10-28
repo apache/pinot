@@ -100,13 +100,15 @@ public class PinotIngestionRestletResourceStatelessTest extends ControllerTest {
     Map<String, String> batchConfigMap = new HashMap<>();
     batchConfigMap.put(BatchConfigProperties.INPUT_FORMAT, "csv");
     batchConfigMap.put(String.format("%s.delimiter", BatchConfigProperties.RECORD_READER_PROP_PREFIX), "|");
-    sendHttpPost(_controllerRequestURLBuilder.forIngestFromFile(TABLE_NAME_WITH_TYPE, batchConfigMap));
+    sendHttpPost(getOrCreateAdminClient().getControllerRequestURLBuilder()
+        .forIngestFromFile(TABLE_NAME_WITH_TYPE, batchConfigMap));
     segments = _helixResourceManager.getSegmentsFor(TABLE_NAME_WITH_TYPE, false);
     assertEquals(segments.size(), 1);
 
     // ingest from URI
-    sendHttpPost(_controllerRequestURLBuilder.forIngestFromURI(TABLE_NAME_WITH_TYPE, batchConfigMap,
-        String.format("file://%s", _inputFile.getAbsolutePath())));
+    sendHttpPost(
+        getOrCreateAdminClient().getControllerRequestURLBuilder().forIngestFromURI(TABLE_NAME_WITH_TYPE, batchConfigMap,
+            String.format("file://%s", _inputFile.getAbsolutePath())));
     segments = _helixResourceManager.getSegmentsFor(TABLE_NAME_WITH_TYPE, false);
     assertEquals(segments.size(), 2);
 

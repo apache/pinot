@@ -42,11 +42,7 @@ import org.testng.annotations.BeforeClass;
 import org.testng.annotations.DataProvider;
 import org.testng.annotations.Test;
 
-import static org.testng.Assert.assertEquals;
-import static org.testng.Assert.assertNotEquals;
-import static org.testng.Assert.assertTrue;
-import static org.testng.Assert.expectThrows;
-import static org.testng.Assert.fail;
+import static org.testng.Assert.*;
 
 
 public class PinotLogicalTableResourceTest extends ControllerTest {
@@ -64,8 +60,8 @@ public class PinotLogicalTableResourceTest extends ControllerTest {
     startController();
     addFakeBrokerInstancesToAutoJoinHelixCluster(2, false);
     addFakeServerInstancesToAutoJoinHelixCluster(1, true);
-    _controllerRequestURLBuilder = getControllerRequestURLBuilder();
-    _addLogicalTableUrl = _controllerRequestURLBuilder.forLogicalTableCreate();
+    _controllerRequestURLBuilder = getOrCreateAdminClient().getControllerRequestURLBuilder();
+    _addLogicalTableUrl = getOrCreateAdminClient().getControllerRequestURLBuilder().forLogicalTableCreate();
     createBrokerTenant(BROKER_TENANT, 1);
     createBrokerTenant(NEW_BROKER_TENANT, 1);
   }
@@ -105,9 +101,12 @@ public class PinotLogicalTableResourceTest extends ControllerTest {
 
     addDummySchema(logicalTableName);
     // verify logical table does not exist
-    String getLogicalTableUrl = _controllerRequestURLBuilder.forLogicalTableGet(logicalTableName);
-    String updateLogicalTableUrl = _controllerRequestURLBuilder.forLogicalTableUpdate(logicalTableName);
-    String deleteLogicalTableUrl = _controllerRequestURLBuilder.forLogicalTableDelete(logicalTableName);
+    String getLogicalTableUrl =
+        getOrCreateAdminClient().getControllerRequestURLBuilder().forLogicalTableGet(logicalTableName);
+    String updateLogicalTableUrl =
+        getOrCreateAdminClient().getControllerRequestURLBuilder().forLogicalTableUpdate(logicalTableName);
+    String deleteLogicalTableUrl =
+        getOrCreateAdminClient().getControllerRequestURLBuilder().forLogicalTableDelete(logicalTableName);
 
     // verify logical table does not exist
     verifyLogicalTableDoesNotExists(getLogicalTableUrl);
@@ -312,11 +311,13 @@ public class PinotLogicalTableResourceTest extends ControllerTest {
     String msg = expectThrows(IOException.class, () -> {
       addLogicalTableConfig(logicalTableConfig);
     }).getMessage();
+    System.out.println("msg: " + msg);
     assertTrue(msg.contains(
         "Reason: 'test_table_1_OFFLINE' should have the same database name as logical table: db1 != default"), msg);
 
     // Test update logical table with different database prefix
     msg = expectThrows(IOException.class, () -> updateLogicalTableConfig(logicalTableConfig)).getMessage();
+    System.out.println("expectThrows msg = " + msg);
     assertTrue(
         msg.contains(
             "Reason: 'test_table_1_OFFLINE' should have the same database name as logical table: db1 != default"),
@@ -399,7 +400,8 @@ public class PinotLogicalTableResourceTest extends ControllerTest {
     TableConfig tableConfig = createDummyTableConfig(tableName, tableType);
     addTableConfig(tableConfig);
     addDummySchema(LOGICAL_TABLE_NAME);
-    String getLogicalTableUrl = _controllerRequestURLBuilder.forLogicalTableGet(LOGICAL_TABLE_NAME);
+    String getLogicalTableUrl =
+        getOrCreateAdminClient().getControllerRequestURLBuilder().forLogicalTableGet(LOGICAL_TABLE_NAME);
     LogicalTableConfig logicalTableConfig =
         getDummyLogicalTableConfig(LOGICAL_TABLE_NAME, List.of(tableConfig.getTableName()), BROKER_TENANT);
     ControllerTest.sendPostRequest(_addLogicalTableUrl, logicalTableConfig.toSingleLineJsonString(), getHeaders());
@@ -544,7 +546,8 @@ public class PinotLogicalTableResourceTest extends ControllerTest {
   public void testGetLogicalTableNames()
       throws IOException {
     ObjectMapper objectMapper = new ObjectMapper();
-    String getLogicalTableNamesUrl = _controllerRequestURLBuilder.forLogicalTableNamesGet();
+    String getLogicalTableNamesUrl =
+        getOrCreateAdminClient().getControllerRequestURLBuilder().forLogicalTableNamesGet();
     String response = ControllerTest.sendGetRequest(getLogicalTableNamesUrl, getHeaders());
     assertEquals(response, objectMapper.writeValueAsString(List.of()));
 
@@ -619,8 +622,10 @@ public class PinotLogicalTableResourceTest extends ControllerTest {
       throws Exception {
     PinotHelixResourceManager helixResourceManager = getHelixResourceManager();
     String logicalTableName = "test_logical_table";
-    String getLogicalTableUrl = _controllerRequestURLBuilder.forLogicalTableGet(logicalTableName);
-    String updateLogicalTableUrl = _controllerRequestURLBuilder.forLogicalTableUpdate(logicalTableName);
+    String getLogicalTableUrl =
+        getOrCreateAdminClient().getControllerRequestURLBuilder().forLogicalTableGet(logicalTableName);
+    String updateLogicalTableUrl =
+        getOrCreateAdminClient().getControllerRequestURLBuilder().forLogicalTableUpdate(logicalTableName);
 
     // Create a logical table
     addDummySchema(logicalTableName);

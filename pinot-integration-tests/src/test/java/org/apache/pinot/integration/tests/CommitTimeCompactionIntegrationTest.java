@@ -1144,9 +1144,9 @@ public class CommitTimeCompactionIntegrationTest extends BaseClusterIntegrationT
 
   protected void forceCommit(String tableName1, String tableName2, String tableName3)
       throws Exception {
-    sendPostRequest(_controllerRequestURLBuilder.forTableForceCommit(tableName1));
-    sendPostRequest(_controllerRequestURLBuilder.forTableForceCommit(tableName2));
-    sendPostRequest(_controllerRequestURLBuilder.forTableForceCommit(tableName3));
+    sendPostRequest(getOrCreateAdminClient().getControllerRequestURLBuilder().forTableForceCommit(tableName1));
+    sendPostRequest(getOrCreateAdminClient().getControllerRequestURLBuilder().forTableForceCommit(tableName2));
+    sendPostRequest(getOrCreateAdminClient().getControllerRequestURLBuilder().forTableForceCommit(tableName3));
   }
 
   protected void validatePostCommitCompaction(String tableNameBaseline, String tableNameCompacted1,
