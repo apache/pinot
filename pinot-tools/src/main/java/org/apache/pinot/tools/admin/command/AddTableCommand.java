@@ -25,6 +25,7 @@ import java.io.IOException;
 import java.util.concurrent.Callable;
 import org.apache.pinot.spi.config.TableConfigs;
 import org.apache.pinot.spi.config.table.TableConfig;
+import org.apache.pinot.spi.config.table.TableConfigFactory;
 import org.apache.pinot.spi.config.table.TableType;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.utils.JsonUtils;
@@ -171,8 +172,9 @@ public class AddTableCommand extends AbstractDatabaseBaseAdminCommand {
     TableConfig offlineTableConfig = null;
     TableConfig realtimeTableConfig = null;
     if (_tableConfigFile != null) {
-      TableConfig tableConfig = attempt(() -> JsonUtils.fileToObject(new File(_tableConfigFile), TableConfig.class),
-          "Failed reading table config " + _tableConfigFile);
+      TableConfig tableConfig =
+          attempt(() -> JsonUtils.fileToObject(new File(_tableConfigFile), TableConfigFactory.getTableConfigClass()),
+              "Failed reading table config " + _tableConfigFile);
       rawTableName = TableNameBuilder.extractRawTableName(tableConfig.getTableName());
       if (tableConfig.getTableType() == TableType.OFFLINE) {
         offlineTableConfig = tableConfig;
@@ -182,12 +184,14 @@ public class AddTableCommand extends AbstractDatabaseBaseAdminCommand {
     }
 
     if (_offlineTableConfigFile != null) {
-      offlineTableConfig = attempt(() -> JsonUtils.fileToObject(new File(_offlineTableConfigFile), TableConfig.class),
+      offlineTableConfig = attempt(
+          () -> JsonUtils.fileToObject(new File(_offlineTableConfigFile), TableConfigFactory.getTableConfigClass()),
           "Failed reading offline table config " + _offlineTableConfigFile);
       rawTableName = TableNameBuilder.extractRawTableName(offlineTableConfig.getTableName());
     }
     if (_realtimeTableConfigFile != null) {
-      realtimeTableConfig = attempt(() -> JsonUtils.fileToObject(new File(_realtimeTableConfigFile), TableConfig.class),
+      realtimeTableConfig = attempt(
+          () -> JsonUtils.fileToObject(new File(_realtimeTableConfigFile), TableConfigFactory.getTableConfigClass()),
           "Failed reading realtime table config " + _realtimeTableConfigFile);
       rawTableName = TableNameBuilder.extractRawTableName(realtimeTableConfig.getTableName());
     }

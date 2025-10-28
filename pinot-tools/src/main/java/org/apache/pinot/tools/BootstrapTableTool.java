@@ -39,6 +39,7 @@ import org.apache.pinot.controller.api.resources.PinotTaskRestletResource;
 import org.apache.pinot.core.common.MinionConstants;
 import org.apache.pinot.spi.auth.AuthProvider;
 import org.apache.pinot.spi.config.table.TableConfig;
+import org.apache.pinot.spi.config.table.TableConfigFactory;
 import org.apache.pinot.spi.ingestion.batch.BatchConfigProperties;
 import org.apache.pinot.spi.ingestion.batch.IngestionJobLauncher;
 import org.apache.pinot.spi.ingestion.batch.spec.PinotClusterSpec;
@@ -154,8 +155,8 @@ public class BootstrapTableTool {
   private boolean bootstrapHybridTable(File setupTableTmpDir, String tableName, File schemaFile,
       File offlineTableConfigFile, File ingestionJobSpecFile, File realtimeTableConfig)
       throws Exception {
-    TableConfig tableConfig =
-        JsonUtils.inputStreamToObject(new FileInputStream(offlineTableConfigFile), TableConfig.class);
+    TableConfig tableConfig = JsonUtils.inputStreamToObject(new FileInputStream(offlineTableConfigFile),
+        TableConfigFactory.getTableConfigClass());
     if (tableConfig.getIngestionConfig() != null
         && tableConfig.getIngestionConfig().getBatchIngestionConfig() != null) {
       updatedTableConfig(tableConfig, setupTableTmpDir);
@@ -182,8 +183,8 @@ public class BootstrapTableTool {
   private boolean bootstrapOfflineTable(File setupTableTmpDir, String tableName, File schemaFile,
       File offlineTableConfigFile, File ingestionJobSpecFile)
       throws Exception {
-    TableConfig tableConfig =
-        JsonUtils.inputStreamToObject(new FileInputStream(offlineTableConfigFile), TableConfig.class);
+    TableConfig tableConfig = JsonUtils.inputStreamToObject(new FileInputStream(offlineTableConfigFile),
+        TableConfigFactory.getTableConfigClass());
     if (tableConfig.getIngestionConfig() != null
         && tableConfig.getIngestionConfig().getBatchIngestionConfig() != null) {
       updatedTableConfig(tableConfig, setupTableTmpDir);

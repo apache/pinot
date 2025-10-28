@@ -40,6 +40,7 @@ import org.apache.pinot.plugin.minion.tasks.MinionTaskUtils;
 import org.apache.pinot.plugin.minion.tasks.SegmentConversionResult;
 import org.apache.pinot.segment.local.utils.SegmentPushUtils;
 import org.apache.pinot.spi.config.table.TableConfig;
+import org.apache.pinot.spi.config.table.TableConfigFactory;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.filesystem.PinotFS;
 import org.apache.pinot.spi.ingestion.batch.BatchConfigProperties;
@@ -310,7 +311,8 @@ public class SegmentGenerationAndPushTaskExecutor extends BaseTaskExecutor {
       taskSpec.setSchema(schema);
       TableConfig tableConfig;
       if (taskConfigs.containsKey(BatchConfigProperties.TABLE_CONFIGS)) {
-        tableConfig = JsonUtils.stringToObject(taskConfigs.get(BatchConfigProperties.TABLE_CONFIGS), TableConfig.class);
+        tableConfig = JsonUtils.stringToObject(taskConfigs.get(BatchConfigProperties.TABLE_CONFIGS),
+            TableConfigFactory.getTableConfigClass());
       } else if (taskConfigs.containsKey(BatchConfigProperties.TABLE_CONFIGS_URI)) {
         tableConfig = SegmentGenerationUtils.getTableConfig(
             taskConfigs.get(BatchConfigProperties.TABLE_CONFIGS_URI), authToken);

@@ -44,11 +44,11 @@ import org.apache.pinot.common.utils.LogicalTableConfigUtils;
 import org.apache.pinot.common.utils.config.AccessControlUserConfigUtils;
 import org.apache.pinot.common.utils.config.QueryWorkloadConfigUtils;
 import org.apache.pinot.common.utils.config.SchemaSerDeUtils;
-import org.apache.pinot.common.utils.config.TableConfigSerDeUtils;
 import org.apache.pinot.spi.config.ConfigUtils;
 import org.apache.pinot.spi.config.DatabaseConfig;
 import org.apache.pinot.spi.config.table.QuotaConfig;
 import org.apache.pinot.spi.config.table.TableConfig;
+import org.apache.pinot.spi.config.table.TableConfigFactory;
 import org.apache.pinot.spi.config.user.UserConfig;
 import org.apache.pinot.spi.config.workload.QueryWorkloadConfig;
 import org.apache.pinot.spi.data.LogicalTableConfig;
@@ -186,7 +186,7 @@ public class ZKMetadataProvider {
     String tableConfigPath = constructPropertyStorePathForResourceConfig(tableNameWithType);
     ZNRecord tableConfigZNRecord;
     try {
-      tableConfigZNRecord = TableConfigSerDeUtils.toZNRecord(tableConfig);
+      tableConfigZNRecord = tableConfig.toZNRecord();
     } catch (Exception e) {
       LOGGER.error("Caught exception constructing ZNRecord from table config for table: {}", tableNameWithType, e);
       return false;
@@ -215,7 +215,7 @@ public class ZKMetadataProvider {
     String tableNameWithType = tableConfig.getTableName();
     ZNRecord tableConfigZNRecord;
     try {
-      tableConfigZNRecord = TableConfigSerDeUtils.toZNRecord(tableConfig);
+      tableConfigZNRecord = tableConfig.toZNRecord();
     } catch (Exception e) {
       LOGGER.error("Caught exception constructing ZNRecord from table config for table: {}", tableNameWithType, e);
       return false;
@@ -632,7 +632,7 @@ public class ZKMetadataProvider {
       return null;
     }
     try {
-      TableConfig tableConfig = TableConfigSerDeUtils.fromZNRecord(znRecord);
+      TableConfig tableConfig = TableConfigFactory.fromZNRecord(znRecord);
       TableConfig processedTableConfig = replaceVariables
           ? ConfigUtils.applyConfigWithEnvVariablesAndSystemProperties(tableConfig) : tableConfig;
       return applyDecorator ? TableConfigDecoratorRegistry.applyDecorator(processedTableConfig) : tableConfig;

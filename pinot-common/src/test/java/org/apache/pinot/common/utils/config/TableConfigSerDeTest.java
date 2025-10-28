@@ -29,6 +29,7 @@ import java.util.Map;
 import org.apache.pinot.common.tier.TierFactory;
 import org.apache.pinot.spi.config.table.CompletionConfig;
 import org.apache.pinot.spi.config.table.DedupConfig;
+import org.apache.pinot.spi.config.table.DefaultTableConfig;
 import org.apache.pinot.spi.config.table.FieldConfig;
 import org.apache.pinot.spi.config.table.HashFunction;
 import org.apache.pinot.spi.config.table.QueryConfig;
@@ -37,6 +38,7 @@ import org.apache.pinot.spi.config.table.ReplicaGroupStrategyConfig;
 import org.apache.pinot.spi.config.table.RoutingConfig;
 import org.apache.pinot.spi.config.table.SegmentsValidationAndRetentionConfig;
 import org.apache.pinot.spi.config.table.TableConfig;
+import org.apache.pinot.spi.config.table.TableConfigFactory;
 import org.apache.pinot.spi.config.table.TableType;
 import org.apache.pinot.spi.config.table.TagOverrideConfig;
 import org.apache.pinot.spi.config.table.TenantConfig;
@@ -64,7 +66,7 @@ import org.testng.annotations.Test;
 import static org.testng.Assert.*;
 
 
-public class TableConfigSerDeUtilsTest {
+public class TableConfigSerDeTest {
   private static final double NO_DICTIONARY_THRESHOLD_RATIO = 0.72;
 
   @Test
@@ -77,24 +79,24 @@ public class TableConfigSerDeUtilsTest {
       // Default table config
       TableConfig tableConfig = tableConfigBuilder.build();
 
-      checkDefaultTableConfig(tableConfig);
+      checkTableConfig(tableConfig);
 
       // Serialize then de-serialize
-      TableConfig tableConfigToCompare = JsonUtils.stringToObject(tableConfig.toJsonString(), TableConfig.class);
+      TableConfig tableConfigToCompare = JsonUtils.stringToObject(tableConfig.toJsonString(), DefaultTableConfig.class);
       assertEquals(tableConfigToCompare, tableConfig);
-      checkDefaultTableConfig(tableConfigToCompare);
+      checkTableConfig(tableConfigToCompare);
 
-      tableConfigToCompare = TableConfigSerDeUtils.fromZNRecord(TableConfigSerDeUtils.toZNRecord(tableConfig));
+      tableConfigToCompare = TableConfigFactory.fromZNRecord(tableConfig.toZNRecord());
       assertEquals(tableConfigToCompare, tableConfig);
-      checkDefaultTableConfig(tableConfigToCompare);
+      checkTableConfig(tableConfigToCompare);
 
       // Backward-compatible for raw table name and lower case table type
       ObjectNode tableConfigJson = (ObjectNode) tableConfigBuilder.build().toJsonNode();
       tableConfigJson.put(TableConfig.TABLE_NAME_KEY, "testTable");
       tableConfigJson.put(TableConfig.TABLE_TYPE_KEY, "offline");
-      tableConfigToCompare = JsonUtils.jsonNodeToObject(tableConfigJson, TableConfig.class);
+      tableConfigToCompare = JsonUtils.jsonNodeToObject(tableConfigJson, DefaultTableConfig.class);
       assertEquals(tableConfigToCompare, tableConfig);
-      checkDefaultTableConfig(tableConfigToCompare);
+      checkTableConfig(tableConfigToCompare);
     }
     {
       // With quota config
@@ -104,11 +106,11 @@ public class TableConfigSerDeUtilsTest {
       checkQuotaConfig(tableConfig);
 
       // Serialize then de-serialize
-      TableConfig tableConfigToCompare = JsonUtils.stringToObject(tableConfig.toJsonString(), TableConfig.class);
+      TableConfig tableConfigToCompare = JsonUtils.stringToObject(tableConfig.toJsonString(), DefaultTableConfig.class);
       assertEquals(tableConfigToCompare, tableConfig);
       checkQuotaConfig(tableConfigToCompare);
 
-      tableConfigToCompare = TableConfigSerDeUtils.fromZNRecord(TableConfigSerDeUtils.toZNRecord(tableConfig));
+      tableConfigToCompare = TableConfigFactory.fromZNRecord(tableConfig.toZNRecord());
       assertEquals(tableConfigToCompare, tableConfig);
       checkQuotaConfig(tableConfigToCompare);
     }
@@ -120,11 +122,11 @@ public class TableConfigSerDeUtilsTest {
       checkTenantConfigWithoutTagOverride(tableConfig);
 
       // Serialize then de-serialize
-      TableConfig tableConfigToCompare = JsonUtils.stringToObject(tableConfig.toJsonString(), TableConfig.class);
+      TableConfig tableConfigToCompare = JsonUtils.stringToObject(tableConfig.toJsonString(), DefaultTableConfig.class);
       assertEquals(tableConfigToCompare, tableConfig);
       checkTenantConfigWithoutTagOverride(tableConfigToCompare);
 
-      tableConfigToCompare = TableConfigSerDeUtils.fromZNRecord(TableConfigSerDeUtils.toZNRecord(tableConfig));
+      tableConfigToCompare = TableConfigFactory.fromZNRecord(tableConfig.toZNRecord());
       assertEquals(tableConfigToCompare, tableConfig);
       checkTenantConfigWithoutTagOverride(tableConfigToCompare);
 
@@ -135,11 +137,11 @@ public class TableConfigSerDeUtilsTest {
       checkTenantConfigWithTagOverride(tableConfig);
 
       // Serialize then de-serialize
-      tableConfigToCompare = JsonUtils.stringToObject(tableConfig.toJsonString(), TableConfig.class);
+      tableConfigToCompare = JsonUtils.stringToObject(tableConfig.toJsonString(), DefaultTableConfig.class);
       assertEquals(tableConfigToCompare, tableConfig);
       checkTenantConfigWithTagOverride(tableConfigToCompare);
 
-      tableConfigToCompare = TableConfigSerDeUtils.fromZNRecord(TableConfigSerDeUtils.toZNRecord(tableConfig));
+      tableConfigToCompare = TableConfigFactory.fromZNRecord(tableConfig.toZNRecord());
       assertEquals(tableConfigToCompare, tableConfig);
       checkTenantConfigWithTagOverride(tableConfigToCompare);
     }
@@ -153,11 +155,11 @@ public class TableConfigSerDeUtilsTest {
       checkSegmentAssignmentStrategyConfig(tableConfig);
 
       // Serialize then de-serialize
-      TableConfig tableConfigToCompare = JsonUtils.stringToObject(tableConfig.toJsonString(), TableConfig.class);
+      TableConfig tableConfigToCompare = JsonUtils.stringToObject(tableConfig.toJsonString(), DefaultTableConfig.class);
       assertEquals(tableConfigToCompare, tableConfig);
       checkSegmentAssignmentStrategyConfig(tableConfigToCompare);
 
-      tableConfigToCompare = TableConfigSerDeUtils.fromZNRecord(TableConfigSerDeUtils.toZNRecord(tableConfig));
+      tableConfigToCompare = TableConfigFactory.fromZNRecord(tableConfig.toZNRecord());
       assertEquals(tableConfigToCompare, tableConfig);
       checkSegmentAssignmentStrategyConfig(tableConfigToCompare);
     }
@@ -169,11 +171,11 @@ public class TableConfigSerDeUtilsTest {
       checkCompletionConfig(tableConfig);
 
       // Serialize then de-serialize
-      TableConfig tableConfigToCompare = JsonUtils.stringToObject(tableConfig.toJsonString(), TableConfig.class);
+      TableConfig tableConfigToCompare = JsonUtils.stringToObject(tableConfig.toJsonString(), DefaultTableConfig.class);
       assertEquals(tableConfigToCompare, tableConfig);
       checkCompletionConfig(tableConfigToCompare);
 
-      tableConfigToCompare = TableConfigSerDeUtils.fromZNRecord(TableConfigSerDeUtils.toZNRecord(tableConfig));
+      tableConfigToCompare = TableConfigFactory.fromZNRecord(tableConfig.toZNRecord());
       assertEquals(tableConfigToCompare, tableConfig);
       checkCompletionConfig(tableConfigToCompare);
     }
@@ -186,11 +188,11 @@ public class TableConfigSerDeUtilsTest {
       checkRoutingConfig(tableConfig);
 
       // Serialize then de-serialize
-      TableConfig tableConfigToCompare = JsonUtils.stringToObject(tableConfig.toJsonString(), TableConfig.class);
+      TableConfig tableConfigToCompare = JsonUtils.stringToObject(tableConfig.toJsonString(), DefaultTableConfig.class);
       assertEquals(tableConfigToCompare, tableConfig);
       checkRoutingConfig(tableConfigToCompare);
 
-      tableConfigToCompare = TableConfigSerDeUtils.fromZNRecord(TableConfigSerDeUtils.toZNRecord(tableConfig));
+      tableConfigToCompare = TableConfigFactory.fromZNRecord(tableConfig.toZNRecord());
       assertEquals(tableConfigToCompare, tableConfig);
       checkRoutingConfig(tableConfigToCompare);
     }
@@ -203,11 +205,11 @@ public class TableConfigSerDeUtilsTest {
       checkQueryConfig(tableConfig);
 
       // Serialize then de-serialize
-      TableConfig tableConfigToCompare = JsonUtils.stringToObject(tableConfig.toJsonString(), TableConfig.class);
+      TableConfig tableConfigToCompare = JsonUtils.stringToObject(tableConfig.toJsonString(), DefaultTableConfig.class);
       assertEquals(tableConfigToCompare, tableConfig);
       checkQueryConfig(tableConfigToCompare);
 
-      tableConfigToCompare = TableConfigSerDeUtils.fromZNRecord(TableConfigSerDeUtils.toZNRecord(tableConfig));
+      tableConfigToCompare = TableConfigFactory.fromZNRecord(tableConfig.toZNRecord());
       assertEquals(tableConfigToCompare, tableConfig);
       checkQueryConfig(tableConfigToCompare);
     }
@@ -223,11 +225,11 @@ public class TableConfigSerDeUtilsTest {
       checkInstanceAssignmentConfig(tableConfig);
 
       // Serialize then de-serialize
-      TableConfig tableConfigToCompare = JsonUtils.stringToObject(tableConfig.toJsonString(), TableConfig.class);
+      TableConfig tableConfigToCompare = JsonUtils.stringToObject(tableConfig.toJsonString(), DefaultTableConfig.class);
       assertEquals(tableConfigToCompare, tableConfig);
       checkInstanceAssignmentConfig(tableConfigToCompare);
 
-      tableConfigToCompare = TableConfigSerDeUtils.fromZNRecord(TableConfigSerDeUtils.toZNRecord(tableConfig));
+      tableConfigToCompare = TableConfigFactory.fromZNRecord(tableConfig.toZNRecord());
       assertEquals(tableConfigToCompare, tableConfig);
       checkInstanceAssignmentConfig(tableConfigToCompare);
     }
@@ -246,11 +248,11 @@ public class TableConfigSerDeUtilsTest {
       checkFieldConfig(tableConfig);
 
       // Serialize then de-serialize
-      TableConfig tableConfigToCompare = JsonUtils.stringToObject(tableConfig.toJsonString(), TableConfig.class);
+      TableConfig tableConfigToCompare = JsonUtils.stringToObject(tableConfig.toJsonString(), DefaultTableConfig.class);
       assertEquals(tableConfigToCompare, tableConfig);
       checkFieldConfig(tableConfigToCompare);
 
-      tableConfigToCompare = TableConfigSerDeUtils.fromZNRecord(TableConfigSerDeUtils.toZNRecord(tableConfig));
+      tableConfigToCompare = TableConfigFactory.fromZNRecord(tableConfig.toZNRecord());
       assertEquals(tableConfigToCompare, tableConfig);
       checkFieldConfig(tableConfigToCompare);
     }
@@ -259,9 +261,8 @@ public class TableConfigSerDeUtilsTest {
       TableConfig tableConfig = tableConfigBuilder.setUpsertConfig(new UpsertConfig(UpsertConfig.Mode.FULL)).build();
 
       // Serialize then de-serialize
-      checkTableConfigWithUpsertConfig(JsonUtils.stringToObject(tableConfig.toJsonString(), TableConfig.class));
-      checkTableConfigWithUpsertConfig(
-          TableConfigSerDeUtils.fromZNRecord(TableConfigSerDeUtils.toZNRecord(tableConfig)));
+      checkTableConfigWithUpsertConfig(JsonUtils.stringToObject(tableConfig.toJsonString(), DefaultTableConfig.class));
+      checkTableConfigWithUpsertConfig(TableConfigFactory.fromZNRecord(tableConfig.toZNRecord()));
     }
     {
       // with dedup config - without metadata ttl and metadata time column
@@ -270,9 +271,8 @@ public class TableConfigSerDeUtilsTest {
       TableConfig tableConfig = tableConfigBuilder.setDedupConfig(dedupConfig).build();
       // Serialize then de-serialize
       checkTableConfigWithDedupConfigWithoutTTL(
-          JsonUtils.stringToObject(tableConfig.toJsonString(), TableConfig.class));
-      checkTableConfigWithDedupConfigWithoutTTL(
-          TableConfigSerDeUtils.fromZNRecord(TableConfigSerDeUtils.toZNRecord(tableConfig)));
+          JsonUtils.stringToObject(tableConfig.toJsonString(), DefaultTableConfig.class));
+      checkTableConfigWithDedupConfigWithoutTTL(TableConfigFactory.fromZNRecord(tableConfig.toZNRecord()));
     }
     {
       // with dedup config - with metadata ttl and metadata time column
@@ -282,17 +282,16 @@ public class TableConfigSerDeUtilsTest {
       dedupConfig.setDedupTimeColumn("dedupTimeColumn");
       TableConfig tableConfig = tableConfigBuilder.setDedupConfig(dedupConfig).build();
       // Serialize then de-serialize
-      checkTableConfigWithDedupConfigWithTTL(JsonUtils.stringToObject(tableConfig.toJsonString(), TableConfig.class));
       checkTableConfigWithDedupConfigWithTTL(
-          TableConfigSerDeUtils.fromZNRecord(TableConfigSerDeUtils.toZNRecord(tableConfig)));
+          JsonUtils.stringToObject(tableConfig.toJsonString(), DefaultTableConfig.class));
+      checkTableConfigWithDedupConfigWithTTL(TableConfigFactory.fromZNRecord(tableConfig.toZNRecord()));
     }
     {
       // with SegmentsValidationAndRetentionConfig
       TableConfig tableConfig = tableConfigBuilder.setPeerSegmentDownloadScheme(CommonConstants.HTTP_PROTOCOL).build();
       checkSegmentsValidationAndRetentionConfig(
-          JsonUtils.stringToObject(tableConfig.toJsonString(), TableConfig.class));
-      checkSegmentsValidationAndRetentionConfig(
-          TableConfigSerDeUtils.fromZNRecord(TableConfigSerDeUtils.toZNRecord(tableConfig)));
+          JsonUtils.stringToObject(tableConfig.toJsonString(), DefaultTableConfig.class));
+      checkSegmentsValidationAndRetentionConfig(TableConfigFactory.fromZNRecord(tableConfig.toZNRecord()));
     }
     {
       // With ingestion config
@@ -317,11 +316,11 @@ public class TableConfigSerDeUtilsTest {
       checkIngestionConfig(tableConfig);
 
       // Serialize then de-serialize
-      TableConfig tableConfigToCompare = JsonUtils.stringToObject(tableConfig.toJsonString(), TableConfig.class);
+      TableConfig tableConfigToCompare = JsonUtils.stringToObject(tableConfig.toJsonString(), DefaultTableConfig.class);
       assertEquals(tableConfigToCompare, tableConfig);
       checkIngestionConfig(tableConfigToCompare);
 
-      tableConfigToCompare = TableConfigSerDeUtils.fromZNRecord(TableConfigSerDeUtils.toZNRecord(tableConfig));
+      tableConfigToCompare = TableConfigFactory.fromZNRecord(tableConfig.toZNRecord());
       assertEquals(tableConfigToCompare, tableConfig);
       checkIngestionConfig(tableConfigToCompare);
     }
@@ -339,11 +338,11 @@ public class TableConfigSerDeUtilsTest {
       checkTierConfigList(tableConfig);
 
       // Serialize then de-serialize
-      TableConfig tableConfigToCompare = JsonUtils.stringToObject(tableConfig.toJsonString(), TableConfig.class);
+      TableConfig tableConfigToCompare = JsonUtils.stringToObject(tableConfig.toJsonString(), DefaultTableConfig.class);
       assertEquals(tableConfigToCompare, tableConfig);
       checkTierConfigList(tableConfigToCompare);
 
-      tableConfigToCompare = TableConfigSerDeUtils.fromZNRecord(TableConfigSerDeUtils.toZNRecord(tableConfig));
+      tableConfigToCompare = TableConfigFactory.fromZNRecord(tableConfig.toZNRecord());
       assertEquals(tableConfigToCompare, tableConfig);
       checkTierConfigList(tableConfigToCompare);
     }
@@ -356,14 +355,14 @@ public class TableConfigSerDeUtilsTest {
       TableConfig tableConfig = tableConfigBuilder.setTunerConfigList(Lists.newArrayList(tunerConfig)).build();
 
       // Serialize then de-serialize
-      TableConfig tableConfigToCompare = JsonUtils.stringToObject(tableConfig.toJsonString(), TableConfig.class);
+      TableConfig tableConfigToCompare = JsonUtils.stringToObject(tableConfig.toJsonString(), DefaultTableConfig.class);
       assertEquals(tableConfigToCompare, tableConfig);
       TunerConfig tunerConfigToCompare = tableConfigToCompare.getTunerConfigsList().get(0);
 
       assertEquals(tunerConfigToCompare.getName(), name);
       assertEquals(tunerConfigToCompare.getTunerProperties(), props);
 
-      tableConfigToCompare = TableConfigSerDeUtils.fromZNRecord(TableConfigSerDeUtils.toZNRecord(tableConfig));
+      tableConfigToCompare = TableConfigFactory.fromZNRecord(tableConfig.toZNRecord());
       assertEquals(tableConfigToCompare, tableConfig);
       tunerConfigToCompare = tableConfigToCompare.getTunerConfigsList().get(0);
       assertEquals(tunerConfigToCompare.getName(), name);
@@ -376,7 +375,7 @@ public class TableConfigSerDeUtilsTest {
     assertEquals(tableConfig.getValidationConfig().getPeerSegmentDownloadScheme(), CommonConstants.HTTP_PROTOCOL);
   }
 
-  private void checkDefaultTableConfig(TableConfig tableConfig) {
+  private void checkTableConfig(TableConfig tableConfig) {
     // Check mandatory fields
     assertEquals(tableConfig.getTableName(), "testTable_OFFLINE");
     assertEquals(tableConfig.getTableType(), TableType.OFFLINE);

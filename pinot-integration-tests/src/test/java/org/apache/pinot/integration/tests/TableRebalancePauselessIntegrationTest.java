@@ -90,8 +90,8 @@ public class TableRebalancePauselessIntegrationTest extends BasePauselessRealtim
     String originalTenant = "tenantA";
     String originalTenantStrictReplicaGroup = "tenantA_strictRG";
 
-    TableConfig tableConfig = new TableConfig(getRealtimeTableConfig());
-    TableConfig tableConfigStrictReplicaGroup = new TableConfig(getRealtimeTableConfig());
+    TableConfig tableConfig = getRealtimeTableConfig().clone();
+    TableConfig tableConfigStrictReplicaGroup = getRealtimeTableConfig().clone();
     tableConfig.setTenantConfig(new TenantConfig(getBrokerTenant(), originalTenant, null));
     tableConfig.getValidationConfig().setReplication("2");
     tableConfig.getValidationConfig().setPeerSegmentDownloadScheme("http");

@@ -112,7 +112,8 @@ public class ForwardIndexHandlerReloadQueriesTest extends BaseQueriesTest {
       fieldConfigs.add(
           new FieldConfig(column, FieldConfig.EncodingType.RAW, List.of(), FieldConfig.CompressionCodec.SNAPPY, null));
     }
-    TableConfig tableConfig = createTableConfig(noDictionaryColumns, invertedIndexColumns, List.of(), fieldConfigs);
+    TableConfig
+        tableConfig = createTableConfig(noDictionaryColumns, invertedIndexColumns, List.of(), fieldConfigs);
 
     URL resource = getClass().getClassLoader().getResource(AVRO_DATA);
     assertNotNull(resource);

@@ -43,6 +43,7 @@ import org.apache.commons.io.IOUtils;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.pinot.common.utils.tls.TlsUtils;
 import org.apache.pinot.spi.config.table.TableConfig;
+import org.apache.pinot.spi.config.table.TableConfigFactory;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.filesystem.PinotFS;
 import org.apache.pinot.spi.filesystem.PinotFSFactory;
@@ -159,7 +160,7 @@ public class SegmentGenerationUtils {
       tableJsonNode = tableJsonNode.get(REALTIME);
     }
     try {
-      return JsonUtils.jsonNodeToObject(tableJsonNode, TableConfig.class);
+      return JsonUtils.jsonNodeToObject(tableJsonNode, TableConfigFactory.getTableConfigClass());
     } catch (IOException e) {
       throw new RuntimeException("Failed to decode table config from JSON - '" + tableJsonNode + "'", e);
     }

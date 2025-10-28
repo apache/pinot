@@ -56,7 +56,7 @@ public class TableConfigTest {
   @Test(dataProvider = "configs")
   public void testConfigNotRejected(byte[] config)
       throws IOException {
-    TableConfig tableConfig = JsonUtils.DEFAULT_READER.forType(TableConfig.class).readValue(config);
+    TableConfig tableConfig = JsonUtils._defaultReader.forType(DefaultTableConfig.class).readValue(config);
     assertTrue(StringUtils.isNotBlank(tableConfig.getTableName()));
   }
 
@@ -78,7 +78,7 @@ public class TableConfigTest {
   }
 
   @Test
-  public void testCopyConstructor() {
+  public void testClone() {
     IngestionConfig ingestionConfig = new IngestionConfig();
     ingestionConfig.setContinueOnError(true);
     ingestionConfig.setRetryOnSegmentBuildPrecheckFailure(true);
@@ -99,7 +99,7 @@ public class TableConfigTest {
         .setTierConfigList(List.of(new TierConfig("name", "type", null, null, "storageType", null, null, null)))
         .build();
 
-    TableConfig copy = new TableConfig(config);
+    TableConfig copy = config.clone();
 
     assertEquals(config, copy);
     assertEquals(config.toJsonString(), copy.toJsonString());

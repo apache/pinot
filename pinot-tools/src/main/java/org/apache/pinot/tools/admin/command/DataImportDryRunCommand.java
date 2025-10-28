@@ -24,6 +24,7 @@ import org.apache.pinot.plugin.inputformat.json.JSONRecordReader;
 import org.apache.pinot.segment.local.segment.creator.TransformPipeline;
 import org.apache.pinot.segment.spi.creator.StatsCollectorConfig;
 import org.apache.pinot.spi.config.table.TableConfig;
+import org.apache.pinot.spi.config.table.TableConfigFactory;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.data.readers.GenericRow;
 import org.apache.pinot.spi.utils.JsonUtils;
@@ -52,7 +53,8 @@ public class DataImportDryRunCommand extends AbstractBaseAdminCommand implements
     JSONRecordReader jsonRecordReader = new JSONRecordReader();
     jsonRecordReader.init(new File(_jsonFile), null, null);
 
-    TableConfig tableConfig = JsonUtils.fileToObject(new File(_tableConfigFile), TableConfig.class);
+    TableConfig tableConfig =
+        JsonUtils.fileToObject(new File(_tableConfigFile), TableConfigFactory.getTableConfigClass());
     StatsCollectorConfig statsCollectorConfig = new StatsCollectorConfig(tableConfig, new Schema(), null);
 
     TransformPipeline transformPipeline =

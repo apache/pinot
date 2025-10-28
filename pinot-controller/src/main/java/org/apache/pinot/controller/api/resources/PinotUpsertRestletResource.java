@@ -19,6 +19,7 @@
 package org.apache.pinot.controller.api.resources;
 
 import com.fasterxml.jackson.databind.node.ObjectNode;
+import com.google.common.base.Preconditions;
 import io.swagger.annotations.Api;
 import io.swagger.annotations.ApiKeyAuthDefinition;
 import io.swagger.annotations.ApiOperation;
@@ -42,6 +43,7 @@ import org.apache.pinot.controller.api.exception.ControllerApplicationException;
 import org.apache.pinot.core.auth.Actions;
 import org.apache.pinot.core.auth.Authorize;
 import org.apache.pinot.core.auth.TargetType;
+import org.apache.pinot.spi.config.TableConfigs;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.Schema;
@@ -99,27 +101,28 @@ public class PinotUpsertRestletResource {
   @ApiOperation(value = "Estimate memory usage for an upsert table", notes =
       "This API returns the estimated heap usage based on primary key column stats."
           + " This allows us to estimate table size before onboarding.")
-  // TODO: Switch to use TableConfigs
-  public String estimateHeapUsage(String tableSchemaConfigStr,
+  public String estimateHeapUsage(String tableConfigsStr,
       @ApiParam(value = "cardinality", required = true) @QueryParam("cardinality") long cardinality,
       @ApiParam(value = "primaryKeySize", defaultValue = "-1") @QueryParam("primaryKeySize") int primaryKeySize,
       @ApiParam(value = "numPartitions", defaultValue = "-1") @QueryParam("numPartitions") int numPartitions,
       @Context HttpHeaders headers) {
     ObjectNode resultData = JsonUtils.newObjectNode();
-    TableAndSchemaConfig tableSchemaConfig;
+    TableConfigs tableConfigs;
 
     try {
-      tableSchemaConfig = JsonUtils.stringToObject(tableSchemaConfigStr, TableAndSchemaConfig.class);
+      tableConfigs = JsonUtils.stringToObject(tableConfigsStr, TableConfigs.class);
     } catch (IOException e) {
       throw new ControllerApplicationException(LOGGER,
-          String.format("Invalid TableSchemaConfigs json string: %s. Reason: %s", tableSchemaConfigStr, e.getMessage()),
+          String.format("Invalid TableConfigs JSON string: %s. Reason: %s", tableConfigsStr, e.getMessage()),
           Response.Status.BAD_REQUEST, e);
     }
 
-    TableConfig tableConfig = tableSchemaConfig.getTableConfig();
+    // Upsert table can only be realtime
+    TableConfig tableConfig = tableConfigs.getRealtime();
+    Preconditions.checkNotNull(tableConfig);
     String tableNameWithType = DatabaseUtils.translateTableName(tableConfig.getTableName(), headers);
     tableConfig.setTableName(tableNameWithType);
-    Schema schema = tableSchemaConfig.getSchema();
+    Schema schema = tableConfigs.getSchema();
 
     resultData.put("tableName", tableNameWithType);
 

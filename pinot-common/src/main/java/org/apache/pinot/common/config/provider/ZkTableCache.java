@@ -37,12 +37,12 @@ import org.apache.helix.zookeeper.zkclient.IZkDataListener;
 import org.apache.pinot.common.request.Expression;
 import org.apache.pinot.common.utils.LogicalTableConfigUtils;
 import org.apache.pinot.common.utils.config.SchemaSerDeUtils;
-import org.apache.pinot.common.utils.config.TableConfigSerDeUtils;
 import org.apache.pinot.spi.config.provider.LogicalTableConfigChangeListener;
 import org.apache.pinot.spi.config.provider.PinotConfigProvider;
 import org.apache.pinot.spi.config.provider.SchemaChangeListener;
 import org.apache.pinot.spi.config.provider.TableConfigChangeListener;
 import org.apache.pinot.spi.config.table.TableConfig;
+import org.apache.pinot.spi.config.table.TableConfigFactory;
 import org.apache.pinot.spi.data.LogicalTableConfig;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.utils.CommonConstants.ZkPaths;
@@ -330,9 +330,8 @@ public class ZkTableCache implements TableCache {
     }
   }
 
-  private void putTableConfig(ZNRecord znRecord)
-    throws IOException {
-    TableConfig tableConfig = TableConfigSerDeUtils.fromZNRecord(znRecord);
+  private void putTableConfig(ZNRecord znRecord) {
+    TableConfig tableConfig = TableConfigFactory.fromZNRecord(znRecord);
     String tableNameWithType = tableConfig.getTableName();
     String rawTableName = TableNameBuilder.extractRawTableName(tableNameWithType);
     _tableConfigInfoMap.put(tableNameWithType, new TableConfigInfo(tableConfig));

@@ -37,6 +37,7 @@ import org.apache.pinot.segment.local.segment.creator.impl.SegmentIndexCreationD
 import org.apache.pinot.segment.spi.creator.SegmentGeneratorConfig;
 import org.apache.pinot.segment.spi.creator.SegmentIndexCreationDriver;
 import org.apache.pinot.spi.config.table.TableConfig;
+import org.apache.pinot.spi.config.table.TableConfigFactory;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.data.readers.FileFormat;
 import org.apache.pinot.spi.data.readers.RecordReaderConfig;
@@ -183,8 +184,8 @@ public class SegmentOp extends BaseOp {
    */
   private File generateSegment(File outputDir, String localReplacedInputDataFilePath)
       throws Exception {
-    TableConfig tableConfig =
-        JsonUtils.fileToObject(new File(getAbsoluteFileName(_tableConfigFileName)), TableConfig.class);
+    TableConfig tableConfig = JsonUtils.fileToObject(new File(getAbsoluteFileName(_tableConfigFileName)),
+        TableConfigFactory.getTableConfigClass());
     _tableName = tableConfig.getTableName();
     // if user does not specify segmentName, use tableName_generationNumber
     if (_segmentName == null || _segmentName.isEmpty()) {
@@ -287,8 +288,8 @@ public class SegmentOp extends BaseOp {
    */
   private boolean deleteSegment() {
     try {
-      TableConfig tableConfig =
-          JsonUtils.fileToObject(new File(getAbsoluteFileName(_tableConfigFileName)), TableConfig.class);
+      TableConfig tableConfig = JsonUtils.fileToObject(new File(getAbsoluteFileName(_tableConfigFileName)),
+          TableConfigFactory.getTableConfigClass());
       _tableName = tableConfig.getTableName();
       // if user does not specify segmentName, use tableName_generationNumber
       if (_segmentName == null || _segmentName.isEmpty()) {

@@ -50,7 +50,7 @@ import org.slf4j.LoggerFactory;
  */
 public class JsonAsyncHttpPinotClientTransport implements PinotClientTransport<ClientStats>, CursorCapable {
   private static final Logger LOGGER = LoggerFactory.getLogger(JsonAsyncHttpPinotClientTransport.class);
-  private static final ObjectReader OBJECT_READER = JsonUtils.DEFAULT_READER;
+  private static final ObjectReader OBJECT_READER = JsonUtils._defaultReader;
   private static final String DEFAULT_EXTRA_QUERY_OPTION_STRING = "groupByMode=sql;responseFormat=sql";
 
   private final Map<String, String> _headers;

@@ -42,9 +42,9 @@ import org.apache.helix.store.zk.ZkHelixPropertyStore;
 import org.apache.helix.zookeeper.datamodel.ZNRecord;
 import org.apache.helix.zookeeper.datamodel.serializer.ZNRecordSerializer;
 import org.apache.pinot.common.utils.HashUtil;
-import org.apache.pinot.common.utils.config.TableConfigSerDeUtils;
 import org.apache.pinot.common.utils.helix.HelixHelper;
 import org.apache.pinot.spi.config.table.TableConfig;
+import org.apache.pinot.spi.config.table.TableConfigFactory;
 import org.apache.pinot.spi.utils.JsonUtils;
 import org.apache.pinot.spi.utils.builder.TableNameBuilder;
 import org.apache.pinot.spi.utils.retry.RetryPolicies;
@@ -414,13 +414,12 @@ public class MoveReplicaGroup extends AbstractBaseAdminCommand implements Comman
     return getTableConfig(tableName).getTenantConfig().getServer();
   }
 
-  private TableConfig getTableConfig(String tableName)
-      throws IOException {
+  private TableConfig getTableConfig(String tableName) {
     ZNRecordSerializer serializer = new ZNRecordSerializer();
     String path = PropertyPathBuilder.propertyStore(_zkPath);
     ZkHelixPropertyStore<ZNRecord> propertyStore = new ZkHelixPropertyStore<>(_zkHost, serializer, path);
     ZNRecord tcZnRecord = propertyStore.get("/CONFIGS/TABLE/" + tableName, null, 0);
-    TableConfig tableConfig = TableConfigSerDeUtils.fromZNRecord(tcZnRecord);
+    TableConfig tableConfig = TableConfigFactory.fromZNRecord(tcZnRecord);
     LOGGER.debug("Loaded table config");
     return tableConfig;
   }

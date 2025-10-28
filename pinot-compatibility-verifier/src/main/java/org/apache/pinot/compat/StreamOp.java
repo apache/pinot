@@ -40,6 +40,7 @@ import org.apache.kafka.clients.admin.NewTopic;
 import org.apache.pinot.controller.helix.ControllerTest;
 import org.apache.pinot.plugin.inputformat.csv.CSVRecordReaderConfig;
 import org.apache.pinot.spi.config.table.TableConfig;
+import org.apache.pinot.spi.config.table.TableConfigFactory;
 import org.apache.pinot.spi.data.DateTimeFormatSpec;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.data.readers.FileFormat;
@@ -189,8 +190,8 @@ public class StreamOp extends BaseOp {
       String partitionColumn = streamConfigMap.getProperty(PARTITION_COLUMN);
 
       // get table config
-      TableConfig tableConfig =
-          JsonUtils.fileToObject(new File(getAbsoluteFileName(_tableConfigFileName)), TableConfig.class);
+      TableConfig tableConfig = JsonUtils.fileToObject(new File(getAbsoluteFileName(_tableConfigFileName)),
+          TableConfigFactory.getTableConfigClass());
       String tableName = tableConfig.getTableName();
       long existingTotalDoc = 0;
 

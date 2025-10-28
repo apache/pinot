@@ -18,6 +18,8 @@
  */
 package org.apache.pinot.controller.api;
 
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.module.SimpleModule;
 import io.swagger.jaxrs.listing.SwaggerSerializers;
 import java.io.IOException;
 import java.util.List;
@@ -27,6 +29,8 @@ import javax.servlet.http.HttpServletResponse;
 import javax.ws.rs.container.ContainerRequestContext;
 import javax.ws.rs.container.ContainerResponseContext;
 import javax.ws.rs.container.ContainerResponseFilter;
+import javax.ws.rs.ext.ContextResolver;
+import javax.ws.rs.ext.Provider;
 import org.apache.pinot.common.audit.AuditLogFilter;
 import org.apache.pinot.common.metrics.ControllerGauge;
 import org.apache.pinot.common.metrics.ControllerMetrics;
@@ -37,6 +41,8 @@ import org.apache.pinot.controller.api.access.AuthenticationFilter;
 import org.apache.pinot.core.api.ServiceAutoDiscoveryFeature;
 import org.apache.pinot.core.transport.ListenerConfig;
 import org.apache.pinot.core.util.ListenerConfigUtil;
+import org.apache.pinot.spi.config.table.TableConfig;
+import org.apache.pinot.spi.config.table.TableConfigFactory;
 import org.apache.pinot.spi.utils.CommonConstants;
 import org.apache.pinot.spi.utils.PinotReflectionUtils;
 import org.glassfish.grizzly.http.server.CLStaticHttpHandler;
@@ -83,6 +89,7 @@ public class ControllerAdminApiApplication extends ResourceConfig {
     register(new CorsFilter());
     register(AuthenticationFilter.class);
     register(AuditLogFilter.class);
+    register(ObjectMapperProvider.class);
     // property("jersey.config.server.tracing.type", "ALL");
     // property("jersey.config.server.tracing.threshold", "VERBOSE");
   }
@@ -191,6 +198,41 @@ public class ControllerAdminApiApplication extends ResourceConfig {
     /** Current number of active threads. */
     public int getActiveCount() {
       return _active.get();
+    }
+  }
+
+  /**
+   * This JAX-RS provider tells the runtime to use a custom-configured
+   * ObjectMapper for all JSON serialization and deserialization.
+   */
+  @Provider
+  private static class ObjectMapperProvider implements ContextResolver<ObjectMapper> {
+
+    private final ObjectMapper _objectMapper;
+
+    public ObjectMapperProvider() {
+      _objectMapper = createObjectMapper();
+    }
+
+    /**
+     * This is the method the JAX-RS runtime calls to get the mapper.
+     */
+    @Override
+    public ObjectMapper getContext(Class<?> type) {
+      return _objectMapper;
+    }
+
+    /**
+     * Centralized place to create and configure the ObjectMapper. Useful plugin point to configure things like
+     * concrete implementations of pluggable base classes.
+     */
+    private ObjectMapper createObjectMapper() {
+      ObjectMapper mapper = new ObjectMapper();
+      Class<? extends TableConfig> tableConfigClass = TableConfigFactory.getTableConfigClass();
+      SimpleModule module = new SimpleModule();
+      module.addAbstractTypeMapping(TableConfig.class, tableConfigClass);
+      mapper.registerModule(module);
+      return mapper;
     }
   }
 }

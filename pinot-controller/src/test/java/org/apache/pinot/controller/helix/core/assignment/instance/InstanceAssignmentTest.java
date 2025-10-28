@@ -686,7 +686,7 @@ public class InstanceAssignmentTest {
         new InstanceReplicaGroupPartitionConfig(true, 0, numReplicas, 0, numPartitions, numInstancesPerPartition, false,
             partitionColumn), null, false);
 
-    TableConfig tableConfigNotMinimized = new TableConfig(tableConfig);
+    TableConfig tableConfigNotMinimized = tableConfig.clone();
     tableConfigNotMinimized.setInstanceAssignmentConfigMap(Map.of("OFFLINE", instanceAssignmentConfigNotMinimized));
     assertFalse(InstanceAssignmentConfigUtils.getInstanceAssignmentConfig(tableConfigNotMinimized,
         InstancePartitionsType.OFFLINE).isMinimizeDataMovement());

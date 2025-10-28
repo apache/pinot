@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.minion;
 
+import com.fasterxml.jackson.databind.module.SimpleModule;
 import com.google.common.base.Preconditions;
 import com.google.common.util.concurrent.ThreadFactoryBuilder;
 import java.io.File;
@@ -66,6 +67,8 @@ import org.apache.pinot.minion.executor.PinotTaskExecutorFactory;
 import org.apache.pinot.minion.executor.TaskExecutorFactoryRegistry;
 import org.apache.pinot.minion.taskfactory.TaskFactoryRegistry;
 import org.apache.pinot.segment.local.utils.ClusterConfigForTable;
+import org.apache.pinot.spi.config.table.DefaultTableConfig;
+import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.crypt.PinotCrypterFactory;
 import org.apache.pinot.spi.env.PinotConfiguration;
 import org.apache.pinot.spi.filesystem.PinotFSFactory;
@@ -77,6 +80,7 @@ import org.apache.pinot.spi.services.ServiceStartable;
 import org.apache.pinot.spi.tasks.MinionTaskObserverStorageManager;
 import org.apache.pinot.spi.utils.CommonConstants;
 import org.apache.pinot.spi.utils.InstanceTypeUtils;
+import org.apache.pinot.spi.utils.JsonUtils;
 import org.apache.pinot.sql.parsers.rewriter.QueryRewriterFactory;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -231,6 +235,8 @@ public abstract class BaseMinionStarter implements ServiceStartable {
       FileUtils.forceMkdir(dataDir);
     }
     minionContext.setDataDir(dataDir);
+
+    initJsonMapper();
 
     // Initialize metrics
     LOGGER.info("Initializing metrics");
@@ -405,5 +411,11 @@ public abstract class BaseMinionStarter implements ServiceStartable {
 
   protected MinionAdminApiApplication createMinionAdminApp() {
     return new MinionAdminApiApplication(_instanceId, _config);
+  }
+
+  protected void initJsonMapper() {
+    SimpleModule module = new SimpleModule();
+    module.addAbstractTypeMapping(TableConfig.class, DefaultTableConfig.class);
+    JsonUtils.registerModule(module);
   }
 }

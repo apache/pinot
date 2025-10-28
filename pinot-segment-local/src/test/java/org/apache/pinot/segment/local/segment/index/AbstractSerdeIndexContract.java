@@ -28,6 +28,7 @@ import org.apache.pinot.segment.local.utils.TableConfigUtils;
 import org.apache.pinot.segment.spi.index.FieldIndexConfigs;
 import org.apache.pinot.segment.spi.index.FieldIndexConfigsUtil;
 import org.apache.pinot.segment.spi.index.IndexType;
+import org.apache.pinot.spi.config.table.DefaultTableConfig;
 import org.apache.pinot.spi.config.table.FieldConfig;
 import org.apache.pinot.spi.config.table.IndexConfig;
 import org.apache.pinot.spi.config.table.TableConfig;
@@ -82,7 +83,7 @@ public class AbstractSerdeIndexContract {
         + "  },\n"
         + "  \"tableType\":\"OFFLINE\",\n"
         + "  \"metadata\": {}\n"
-        + "}", TableConfig.class);
+        + "}", DefaultTableConfig.class);
   }
   protected final TypeReference<List<String>> _stringListTypeRef = new TypeReference<List<String>>() {
   };

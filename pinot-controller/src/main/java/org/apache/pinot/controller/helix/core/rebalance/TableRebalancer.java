@@ -1010,7 +1010,8 @@ public class TableRebalancer {
     return instanceConfig.getTags();
   }
 
-  private RebalanceSummaryResult.ConsumingSegmentToBeMovedSummary getConsumingSegmentSummary(TableConfig tableConfig,
+  private RebalanceSummaryResult.ConsumingSegmentToBeMovedSummary getConsumingSegmentSummary(
+      TableConfig tableConfig,
       Map<String, Set<String>> newServersToConsumingSegmentMap, Logger tableRebalanceLogger) {
     String tableNameWithType = tableConfig.getTableName();
     if (newServersToConsumingSegmentMap.isEmpty()) {

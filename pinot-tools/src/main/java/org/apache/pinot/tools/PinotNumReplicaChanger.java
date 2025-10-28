@@ -52,7 +52,8 @@ public class PinotNumReplicaChanger extends PinotZKChanger {
       throws Exception {
     // Get the number of replicas in the tableconfig.
     final String offlineTableName = TableNameBuilder.OFFLINE.tableNameWithType(tableName);
-    final TableConfig offlineTableConfig = ZKMetadataProvider.getOfflineTableConfig(_propertyStore, offlineTableName);
+    final TableConfig
+        offlineTableConfig = ZKMetadataProvider.getOfflineTableConfig(_propertyStore, offlineTableName);
     final int newNumReplicas = offlineTableConfig.getReplication();
 
     // Now get the idealstate, and get the number of replicas in it.

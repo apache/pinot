@@ -24,7 +24,7 @@ import org.apache.pinot.connector.spark.common.PinotDataSourceWriteOptions
 import org.apache.spark.sql.connector.write.{DataWriter, WriterCommitMessage}
 import org.apache.pinot.segment.local.segment.creator.impl.SegmentIndexCreationDriverImpl
 import org.apache.pinot.segment.spi.creator.SegmentGeneratorConfig
-import org.apache.pinot.spi.config.table.{IndexingConfig, SegmentsValidationAndRetentionConfig, TableConfig, TableCustomConfig, TenantConfig}
+import org.apache.pinot.spi.config.table.{IndexingConfig, SegmentsValidationAndRetentionConfig, DefaultTableConfig, TableCustomConfig, TenantConfig}
 import org.apache.pinot.spi.data.readers.GenericRow
 import org.apache.pinot.spi.data.Schema
 import org.apache.pinot.spi.ingestion.batch.spec.Constants
@@ -176,7 +176,7 @@ class PinotDataWriter[InternalRow](
     segmentsValidationAndRetentionConfig.setTimeColumnName(timeColumnName)
 
     // Mostly dummy tableConfig, sufficient for segment generation purposes
-    val tableConfig = new TableConfig(
+    val tableConfig = new DefaultTableConfig(
       tableName,
       "OFFLINE",
       segmentsValidationAndRetentionConfig,

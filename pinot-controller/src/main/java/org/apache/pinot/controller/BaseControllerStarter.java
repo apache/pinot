@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.controller;
 
+import com.fasterxml.jackson.databind.module.SimpleModule;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
 import com.google.common.primitives.Longs;
@@ -139,6 +140,7 @@ import org.apache.pinot.core.util.ListenerConfigUtil;
 import org.apache.pinot.core.util.trace.ContinuousJfrStarter;
 import org.apache.pinot.segment.local.function.GroovyFunctionEvaluator;
 import org.apache.pinot.segment.local.utils.TableConfigUtils;
+import org.apache.pinot.spi.config.table.DefaultTableConfig;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.crypt.PinotCrypterFactory;
 import org.apache.pinot.spi.data.Schema;
@@ -152,6 +154,7 @@ import org.apache.pinot.spi.services.ServiceStartable;
 import org.apache.pinot.spi.utils.CommonConstants;
 import org.apache.pinot.spi.utils.CommonConstants.Helix;
 import org.apache.pinot.spi.utils.InstanceTypeUtils;
+import org.apache.pinot.spi.utils.JsonUtils;
 import org.apache.pinot.spi.utils.NetUtils;
 import org.apache.pinot.sql.parsers.rewriter.QueryRewriterFactory;
 import org.glassfish.hk2.utilities.binding.AbstractBinder;
@@ -244,6 +247,8 @@ public abstract class BaseControllerStarter implements ServiceStartable {
     applyCustomConfigs(_config);
 
     PinotInsecureMode.setPinotInInsecureMode(_config.getProperty(CommonConstants.CONFIG_OF_PINOT_INSECURE_MODE, false));
+
+    initJsonMapper();
 
     setupHelixSystemProperties();
     IdealStateGroupCommit.setMinNumCharsInISToTurnOnCompression(_config.getMinNumCharsInISToTurnOnCompression());
@@ -1107,5 +1112,11 @@ public abstract class BaseControllerStarter implements ServiceStartable {
   @VisibleForTesting
   public PeriodicTaskScheduler getPeriodicTaskScheduler() {
     return _periodicTaskScheduler;
+  }
+
+  protected void initJsonMapper() {
+    SimpleModule module = new SimpleModule();
+    module.addAbstractTypeMapping(TableConfig.class, DefaultTableConfig.class);
+    JsonUtils.registerModule(module);
   }
 }

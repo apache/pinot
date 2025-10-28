@@ -35,7 +35,6 @@ import org.apache.helix.zookeeper.datamodel.ZNRecord;
 import org.apache.pinot.common.metadata.segment.SegmentZKMetadata;
 import org.apache.pinot.common.metrics.ServerMetrics;
 import org.apache.pinot.common.utils.config.SchemaSerDeUtils;
-import org.apache.pinot.common.utils.config.TableConfigSerDeUtils;
 import org.apache.pinot.segment.local.data.manager.SegmentDataManager;
 import org.apache.pinot.segment.local.indexsegment.immutable.ImmutableSegmentLoader;
 import org.apache.pinot.segment.local.segment.creator.SegmentTestUtils;
@@ -54,6 +53,7 @@ import org.apache.pinot.segment.spi.creator.SegmentGeneratorConfig;
 import org.apache.pinot.segment.spi.creator.SegmentIndexCreationDriver;
 import org.apache.pinot.segment.spi.index.metadata.SegmentMetadataImpl;
 import org.apache.pinot.spi.config.instance.InstanceDataManagerConfig;
+import org.apache.pinot.spi.config.table.DefaultTableConfig;
 import org.apache.pinot.spi.config.table.DimensionTableConfig;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.TableType;
@@ -168,7 +168,7 @@ public class DimensionTableDataManagerTest {
       throws JsonProcessingException {
     HelixManager helixManager = mock(HelixManager.class);
     when(propertyStoreMock.get("/CONFIGS/TABLE/dimBaseballTeams_OFFLINE", null, AccessOption.PERSISTENT)).thenReturn(
-        TableConfigSerDeUtils.toZNRecord(tableConfig));
+        tableConfig.toZNRecord());
     when(propertyStoreMock.get("/SCHEMAS/dimBaseballTeams", null, AccessOption.PERSISTENT)).thenReturn(
         SchemaSerDeUtils.toZNRecord(schema));
     when(helixManager.getHelixPropertyStore()).thenReturn(propertyStoreMock);
@@ -412,6 +412,6 @@ public class DimensionTableDataManagerTest {
       throws IOException {
     InputStream inputStream = new FileInputStream(tableConfigFile);
     Assert.assertNotNull(inputStream);
-    return JsonUtils.inputStreamToObject(inputStream, TableConfig.class);
+    return JsonUtils.inputStreamToObject(inputStream, DefaultTableConfig.class);
   }
 }
