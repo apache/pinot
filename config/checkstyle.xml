@@ -174,6 +174,10 @@
                 value="javax.annotation.Nonnull,
                 javax.validation.constraints.NotNull"/>
     </module>
+    <!-- Disallow importing com.google.common.collect.ImmutableMap (use java.util.Map instead) -->
+    <module name="IllegalImport">
+      <property name="illegalClasses" value="com.google.common.collect.ImmutableMap"/>
+    </module>
     <!-- Use org.testng.Assert in tests -->
     <module name="IllegalImport">
       <property name="regexp" value="true"/>
@@ -280,6 +284,20 @@
   <!-- Read checker suppressions from a file -->
   <module name="SuppressionFilter">
     <property name="file" value="${config_loc}/suppressions.xml"/>
+  </module>
+
+  <!--
+  Prevent using both allowableValues and example in @ApiParam due to Swagger bug leading to UI inconsistencies
+  https://github.com/swagger-api/swagger-ui/issues/6560
+  https://github.com/swagger-api/swagger-ui/issues/5776
+   -->
+  <module name="RegexpMultiline">
+    <property name="format" value="@ApiParam\s*\([^@]*?allowableValues[^@]*?example[^@]*?\)"/>
+    <property name="message" value="Do not use both 'allowableValues' and 'example' together in @ApiParam annotations - this causes Swagger UI inconsistencies"/>
+  </module>
+  <module name="RegexpMultiline">
+    <property name="format" value="@ApiParam\s*\([^@]*?example[^@]*?allowableValues[^@]*?\)"/>
+    <property name="message" value="Do not use both 'allowableValues' and 'example' together in @ApiParam annotations - this causes Swagger UI inconsistencies"/>
   </module>
 
   <module name="NewlineAtEndOfFile">

@@ -27,7 +27,9 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.Executors;
+import java.util.concurrent.TimeUnit;
 import org.apache.commons.io.FileUtils;
 import org.apache.helix.HelixManager;
 import org.apache.pinot.common.metadata.segment.SegmentZKMetadata;
@@ -38,6 +40,7 @@ import org.apache.pinot.common.utils.fetcher.BaseSegmentFetcher;
 import org.apache.pinot.common.utils.fetcher.SegmentFetcherFactory;
 import org.apache.pinot.core.data.manager.offline.ImmutableSegmentDataManager;
 import org.apache.pinot.core.data.manager.offline.OfflineTableDataManager;
+import org.apache.pinot.segment.local.data.manager.SegmentDataManager;
 import org.apache.pinot.segment.local.segment.creator.impl.SegmentIndexCreationDriverImpl;
 import org.apache.pinot.segment.local.segment.index.loader.IndexLoadingConfig;
 import org.apache.pinot.segment.local.segment.readers.GenericRowRecordReader;
@@ -75,7 +78,10 @@ import org.testng.annotations.BeforeClass;
 import org.testng.annotations.BeforeMethod;
 import org.testng.annotations.Test;
 
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.doAnswer;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.spy;
 import static org.mockito.Mockito.when;
 import static org.testng.Assert.*;
 
@@ -395,6 +401,162 @@ public class BaseTableDataManagerTest {
   }
 
   @Test
+  public void testReplaceSegmentNewDataWithAsyncSegmentRefresh()
+      throws Exception {
+    SegmentZKMetadata zkMetadata = createRawSegment(SegmentVersion.v3, 5);
+
+    // Mock the case where segment is loaded but its CRC is different from
+    // the one in zk, thus raw segment is downloaded and loaded.
+    ImmutableSegmentDataManager segmentDataManager = createImmutableSegmentDataManager(SEGMENT_NAME, 0);
+
+    BaseTableDataManager tableDataManager = spy(createTableManagerWithAsyncSegmentRefreshEnabled());
+    File dataDir = tableDataManager.getSegmentDataDir(SEGMENT_NAME);
+    assertFalse(dataDir.exists());
+
+    // Add the segment to the manager's internal map so replaceSegment can find it
+    tableDataManager._segmentDataManagerMap.put(SEGMENT_NAME, segmentDataManager);
+
+    // Mock the methods that will be called during segment replacement
+    doAnswer(invocation -> zkMetadata).when(tableDataManager).fetchZKMetadata(SEGMENT_NAME);
+    doAnswer(invocation -> new IndexLoadingConfig()).when(tableDataManager).fetchIndexLoadingConfig();
+
+    // Use CountDownLatch to wait for async execution
+    CountDownLatch latch = new CountDownLatch(1);
+
+    // Mock replaceSegmentIfCrcMismatch which is called by doReplaceSegment
+    doAnswer(invocation -> {
+      // Call the original replaceSegmentIfCrcMismatch method
+      invocation.callRealMethod();
+      latch.countDown();
+      return null;
+    }).when(tableDataManager).replaceSegmentIfCrcMismatch(
+        any(SegmentDataManager.class), any(SegmentZKMetadata.class), any(IndexLoadingConfig.class));
+
+    // Call replaceSegment which will execute asynchronously
+    tableDataManager.replaceSegment(SEGMENT_NAME);
+
+    // Wait for async execution to complete
+    assertTrue(latch.await(10, TimeUnit.SECONDS), "Segment replacement should complete");
+    assertTrue(dataDir.exists());
+    assertEquals(new SegmentMetadataImpl(dataDir).getTotalDocs(), 5);
+  }
+
+  @Test
+  public void testReplaceSegmentNewDataNewTierWithAsyncSegmentRefresh()
+      throws Exception {
+    SegmentZKMetadata zkMetadata = createRawSegment(SegmentVersion.v3, 5);
+    zkMetadata.setTier(TIER_NAME);
+
+    // Mock the case where segment is loaded but its CRC is different from
+    // the one in zk, thus raw segment is downloaded and loaded.
+    ImmutableSegmentDataManager segmentDataManager = createImmutableSegmentDataManager(SEGMENT_NAME, 0);
+
+    // No dataDir for coolTier, thus stay on default tier.
+    BaseTableDataManager tableDataManager = spy(createTableManagerWithAsyncSegmentRefreshEnabled());
+    File defaultDataDir = tableDataManager.getSegmentDataDir(SEGMENT_NAME);
+    assertFalse(defaultDataDir.exists());
+
+    // Add the segment to the manager's internal map so replaceSegment can find it
+    tableDataManager._segmentDataManagerMap.put(SEGMENT_NAME, segmentDataManager);
+
+    // Mock the methods that will be called during segment replacement
+    doAnswer(invocation -> zkMetadata).when(tableDataManager).fetchZKMetadata(SEGMENT_NAME);
+    doAnswer(invocation -> createTierIndexLoadingConfig(DEFAULT_TABLE_CONFIG))
+        .when(tableDataManager).fetchIndexLoadingConfig();
+
+    // Use CountDownLatch to wait for async execution
+    CountDownLatch latch = new CountDownLatch(1);
+    doAnswer(invocation -> {
+      // Call the original method
+      invocation.callRealMethod();
+      latch.countDown();
+      return null;
+    }).when(tableDataManager).replaceSegmentIfCrcMismatch(
+        any(SegmentDataManager.class), any(SegmentZKMetadata.class), any(IndexLoadingConfig.class));
+
+    // Call replaceSegment which will execute asynchronously
+    tableDataManager.replaceSegment(SEGMENT_NAME);
+
+    // Wait for async execution to complete
+    assertTrue(latch.await(10, TimeUnit.SECONDS), "Segment replacement should complete");
+    assertTrue(defaultDataDir.exists());
+    assertEquals(new SegmentMetadataImpl(defaultDataDir).getTotalDocs(), 5);
+
+    // Configured dataDir for coolTier, thus move to new dir.
+    tableDataManager = spy(createTableManagerWithAsyncSegmentRefreshEnabled());
+
+    // Add the segment to the manager's internal map
+    tableDataManager._segmentDataManagerMap.put(SEGMENT_NAME, segmentDataManager);
+
+    // Mock the methods for the second part of the test
+    doAnswer(invocation -> zkMetadata).when(tableDataManager).fetchZKMetadata(SEGMENT_NAME);
+    doAnswer(invocation -> createTierIndexLoadingConfig(TIER_TABLE_CONFIG))
+        .when(tableDataManager).fetchIndexLoadingConfig();
+
+    CountDownLatch latch2 = new CountDownLatch(1);
+    doAnswer(invocation -> {
+      // Call the original method
+      invocation.callRealMethod();
+      latch2.countDown();
+      return null;
+    }).when(tableDataManager).replaceSegmentIfCrcMismatch(
+        any(SegmentDataManager.class), any(SegmentZKMetadata.class), any(IndexLoadingConfig.class));
+
+    // Call replaceSegment which will execute asynchronously
+    tableDataManager.replaceSegment(SEGMENT_NAME);
+
+    // Wait for async execution to complete
+    assertTrue(latch2.await(10, TimeUnit.SECONDS), "Second segment replacement should complete");
+
+    File tierDataDir = tableDataManager.getSegmentDataDir(SEGMENT_NAME, TIER_NAME, TIER_TABLE_CONFIG);
+    assertTrue(tierDataDir.exists());
+    assertFalse(defaultDataDir.exists());
+    SegmentMetadata segmentMetadata = new SegmentMetadataImpl(tierDataDir);
+    assertEquals(segmentMetadata.getTotalDocs(), 5);
+    assertEquals(segmentMetadata.getIndexDir(), tierDataDir);
+  }
+
+  @Test
+  public void testReplaceSegmentNoopWithAsyncSegmentRefresh()
+      throws Exception {
+    String segmentName = "seg01";
+    SegmentZKMetadata zkMetadata = mock(SegmentZKMetadata.class);
+    when(zkMetadata.getSegmentName()).thenReturn(segmentName);
+    when(zkMetadata.getCrc()).thenReturn(1024L);
+
+    ImmutableSegmentDataManager segmentDataManager = createImmutableSegmentDataManager(segmentName, 1024L);
+
+    BaseTableDataManager tableDataManager = spy(createTableManagerWithAsyncSegmentRefreshEnabled());
+    assertFalse(tableDataManager.getSegmentDataDir(segmentName).exists());
+
+    // Add the segment to the manager's internal map so replaceSegment can find it
+    tableDataManager._segmentDataManagerMap.put(segmentName, segmentDataManager);
+
+    // Mock the methods that will be called during segment replacement
+    doAnswer(invocation -> zkMetadata).when(tableDataManager).fetchZKMetadata(segmentName);
+    doAnswer(invocation -> new IndexLoadingConfig()).when(tableDataManager).fetchIndexLoadingConfig();
+
+    // Use CountDownLatch to wait for async execution
+    CountDownLatch latch = new CountDownLatch(1);
+    doAnswer(invocation -> {
+      // Call the original method - this should be a no-op since CRCs match
+      invocation.callRealMethod();
+      latch.countDown();
+      return null;
+    }).when(tableDataManager).replaceSegmentIfCrcMismatch(
+        any(SegmentDataManager.class), any(SegmentZKMetadata.class), any(IndexLoadingConfig.class));
+
+    // Call replaceSegment which will execute asynchronously
+    tableDataManager.replaceSegment(segmentName);
+
+    // Wait for async execution to complete
+    assertTrue(latch.await(10, TimeUnit.SECONDS), "Segment replacement should complete");
+
+    // As CRC is same, the index dir is left as is, so not get created by the test.
+    assertFalse(tableDataManager.getSegmentDataDir(segmentName).exists());
+  }
+
+  @Test
   public void testAddNewSegmentUseLocalCopy()
       throws Exception {
     File indexDir = createSegment(SegmentVersion.v3, 5);
@@ -664,11 +826,24 @@ public class BaseTableDataManagerTest {
     return createTableManager(createDefaultInstanceDataManagerConfig());
   }
 
+  static OfflineTableDataManager createTableManagerWithAsyncSegmentRefreshEnabled() {
+    return createTableManagerWithAsyncSegmentRefreshEnabled(createDefaultInstanceDataManagerConfig());
+  }
+
   private static OfflineTableDataManager createTableManager(InstanceDataManagerConfig instanceDataManagerConfig) {
     OfflineTableDataManager tableDataManager = new OfflineTableDataManager();
     tableDataManager.init(instanceDataManagerConfig, mock(HelixManager.class), new SegmentLocks(), DEFAULT_TABLE_CONFIG,
         SCHEMA, new SegmentReloadSemaphore(1), Executors.newSingleThreadExecutor(), null, null,
-        SEGMENT_OPERATIONS_THROTTLER);
+        SEGMENT_OPERATIONS_THROTTLER, false);
+    return tableDataManager;
+  }
+
+  private static OfflineTableDataManager createTableManagerWithAsyncSegmentRefreshEnabled(
+      InstanceDataManagerConfig instanceDataManagerConfig) {
+    OfflineTableDataManager tableDataManager = new OfflineTableDataManager();
+    tableDataManager.init(instanceDataManagerConfig, mock(HelixManager.class), new SegmentLocks(), DEFAULT_TABLE_CONFIG,
+        SCHEMA, new SegmentReloadSemaphore(1), Executors.newSingleThreadExecutor(), null, null,
+        SEGMENT_OPERATIONS_THROTTLER, true);
     return tableDataManager;
   }
 

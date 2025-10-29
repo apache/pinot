@@ -166,7 +166,7 @@ public class TableMetadataReader {
         String segmentName = node.get("segmentName").asText();
         aggregatedNode.set(segmentName, node);
       } else {
-        node.fields().forEachRemaining(entry -> aggregatedNode.set(entry.getKey(), entry.getValue()));
+        node.properties().forEach(entry -> aggregatedNode.set(entry.getKey(), entry.getValue()));
       }
     }
     return aggregatedNode;

@@ -24,6 +24,8 @@ import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
 import org.apache.pinot.core.common.BlockDocIdIterator;
+import org.apache.pinot.core.operator.docidsets.EmptyDocIdSet;
+import org.apache.pinot.core.operator.docidsets.MatchAllDocIdSet;
 import org.apache.pinot.segment.spi.Constants;
 import org.roaringbitmap.buffer.MutableRoaringBitmap;
 import org.testng.Assert;
@@ -233,5 +235,34 @@ public class AndFilterOperatorTest {
     Assert.assertEquals(TestUtils.getDocIds(andFilterOperator.getTrues()),
         ImmutableList.of(0, 1, 2, 3, 4, 5, 6, 7, 8, 9));
     Assert.assertEquals(TestUtils.getDocIds(andFilterOperator.getFalses()), Collections.emptyList());
+  }
+
+  @Test
+  public void testAndWithEmptyFilterEarlyTermination() {
+    int numDocs = 10;
+    int[] regularDocIds = new int[]{1, 2, 3};
+    int[] emptyDocIds = new int[0];
+
+    AndFilterOperator andFilterOperator = new AndFilterOperator(
+        Arrays.asList(
+            new TestFilterOperator(regularDocIds, numDocs),
+            new TestFilterOperator(emptyDocIds, numDocs)
+        ), null, numDocs, false);
+
+    Assert.assertEquals((andFilterOperator.getTrues()).getOptimizedDocIdSet(), EmptyDocIdSet.getInstance());
+  }
+
+  @Test
+  public void testAndWithOnlyMatchAllFilterEarlyTermination() {
+    int numDocs = 10;
+    int numDocs2 = 50;
+
+    AndFilterOperator andFilterOperator = new AndFilterOperator(
+        Arrays.asList(
+            new MatchAllFilterOperator(numDocs),
+            new MatchAllFilterOperator(numDocs2)
+        ), null, numDocs, false);
+
+    Assert.assertTrue(andFilterOperator.getTrues() instanceof MatchAllDocIdSet);
   }
 }

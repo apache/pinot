@@ -42,6 +42,7 @@ public class UnionAllOperatorTest {
     MultiStageOperator leftOperator = new BlockListMultiStageOperator.Builder(schema)
         .addRow(1, "AA")
         .addRow(2, "BB")
+        .addRow(3, "aa")
         .buildWithEos();
     MultiStageOperator rightOperator = new BlockListMultiStageOperator.Builder(schema)
         .addRow(3, "aa")
@@ -58,11 +59,9 @@ public class UnionAllOperatorTest {
       resultRows.addAll(((MseBlock.Data) result).asRowHeap().getRows());
       result = unionAllOperator.nextBlock();
     }
-    // Note that UNION ALL does not guarantee the order of rows, and our implementation adds rows from the right child
-    // first
     List<Object[]> expectedRows =
-        Arrays.asList(new Object[]{3, "aa"}, new Object[]{4, "bb"}, new Object[]{5, "cc"}, new Object[]{1, "AA"},
-            new Object[]{2, "BB"});
+        Arrays.asList(new Object[]{1, "AA"}, new Object[]{2, "BB"}, new Object[]{3, "aa"}, new Object[]{3, "aa"},
+            new Object[]{4, "bb"}, new Object[]{5, "cc"});
     Assert.assertEquals(resultRows.size(), expectedRows.size());
     for (int i = 0; i < resultRows.size(); i++) {
       Assert.assertEquals(resultRows.get(i), expectedRows.get(i));

@@ -792,9 +792,10 @@ const getNodeData = (path) => {
   });
 };
 
-const putNodeData = (data) => {
-  const serializedData = Utils.serialize(data);
-  return zookeeperPutData(serializedData).then((obj)=>{
+const putNodeData = (nodeParams) => {
+  const { data, ...queryParams } = nodeParams;
+  const serializedParams = Utils.serialize(queryParams);
+  return zookeeperPutData(serializedParams, data).then((obj)=>{
     return obj;
   });
 };
@@ -942,7 +943,7 @@ const getTasksList = async (tableName, taskType) => {
     getTasks(tableName, taskType).then(async (response)=>{
       const promiseArr = [];
       const fetchInfo = async (taskID, status) => {
-        const debugData = await getTaskDebugData(taskID);
+        const debugData = await getTaskDebugData(taskID, tableName);
         const subtaskCount = get(debugData, 'data.subtaskCount', {});
         const total = get(subtaskCount, 'total', 0);
         const completed = get(subtaskCount, 'completed', 0);
@@ -979,8 +980,8 @@ const getTaskRuntimeConfigData = async (taskName: string) => {
   return response.data;
 }
 
-const getTaskDebugData = async (taskName) => {
-  const debugRes = await getTaskDebug(taskName);
+const getTaskDebugData = async (taskName, tableName) => {
+  const debugRes = await getTaskDebug(taskName, tableName);
   return debugRes;
 };
 

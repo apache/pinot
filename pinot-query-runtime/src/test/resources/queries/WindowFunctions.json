@@ -2416,6 +2416,18 @@
     },
     "queries": [
       {
+        "description": "LAG function with PARTITION BY",
+        "sql": "SELECT int_col, LAG(string_col, 1, 'defVal') OVER(PARTITION BY int_col ORDER BY double_col) as lag_col FROM {tbl} where int_col = 42 ORDER by int_col, double_col",
+        "outputs": [
+          [42, "defVal"],
+          [42, "a"],
+          [42, "d"],
+          [42, "e"],
+          [42, "e"],
+          [42, "a"]
+        ]
+      },
+      {
         "description": "Single OVER(PARTITION BY) sum",
         "sql": "SELECT SUM(int_col) OVER(PARTITION BY string_col) FROM {tbl}",
         "outputs": [

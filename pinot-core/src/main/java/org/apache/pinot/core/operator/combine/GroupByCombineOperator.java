@@ -43,7 +43,7 @@ import org.apache.pinot.core.util.GroupByUtils;
 import org.apache.pinot.spi.exception.QueryErrorCode;
 import org.apache.pinot.spi.exception.QueryErrorMessage;
 import org.apache.pinot.spi.exception.QueryException;
-import org.apache.pinot.spi.trace.Tracing;
+import org.apache.pinot.spi.query.QueryThreadContext;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -53,8 +53,6 @@ import org.slf4j.LoggerFactory;
  */
 @SuppressWarnings("rawtypes")
 public class GroupByCombineOperator extends BaseSingleBlockCombineOperator<GroupByResultsBlock> {
-  public static final int MAX_TRIM_THRESHOLD = 1_000_000_000;
-
   private static final Logger LOGGER = LoggerFactory.getLogger(GroupByCombineOperator.class);
   private static final String EXPLAIN_NAME = "COMBINE_GROUP_BY";
 
@@ -146,6 +144,7 @@ public class GroupByCombineOperator extends BaseSingleBlockCombineOperator<Group
             try {
               Iterator<GroupKeyGenerator.GroupKey> dicGroupKeyIterator = aggregationGroupByResult.getGroupKeyIterator();
               while (dicGroupKeyIterator.hasNext()) {
+                QueryThreadContext.checkTerminationAndSampleUsagePeriodically(mergedKeys++, EXPLAIN_NAME);
                 GroupKeyGenerator.GroupKey groupKey = dicGroupKeyIterator.next();
                 Object[] keys = groupKey._keys;
                 Object[] values = Arrays.copyOf(keys, _numColumns);
@@ -154,8 +153,6 @@ public class GroupByCombineOperator extends BaseSingleBlockCombineOperator<Group
                   values[_numGroupByExpressions + i] = aggregationGroupByResult.getResultForGroupId(i, groupId);
                 }
                 _indexedTable.upsert(new Key(keys), new Record(values));
-                Tracing.ThreadAccountantOps.sampleAndCheckInterruptionPeriodically(mergedKeys);
-                mergedKeys++;
               }
             } finally {
               // Release the resources used by the group key generator
@@ -164,10 +161,9 @@ public class GroupByCombineOperator extends BaseSingleBlockCombineOperator<Group
           }
         } else {
           for (IntermediateRecord intermediateResult : intermediateRecords) {
+            QueryThreadContext.checkTerminationAndSampleUsagePeriodically(mergedKeys++, EXPLAIN_NAME);
             //TODO: change upsert api so that it accepts intermediateRecord directly
             _indexedTable.upsert(intermediateResult._key, intermediateResult._record);
-            Tracing.ThreadAccountantOps.sampleAndCheckInterruptionPeriodically(mergedKeys);
-            mergedKeys++;
           }
         }
       } catch (RuntimeException e) {

@@ -19,7 +19,6 @@
 package org.apache.pinot.core.routing;
 
 import com.google.common.collect.ImmutableList;
-import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.ImmutableSet;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -60,7 +59,7 @@ import static org.testng.Assert.assertTrue;
 public class BaseTableRouteTest {
   //@formatter:off
   public static final Map<String, List<String>> SERVER1_SEGMENTS =
-      ImmutableMap.of(
+      Map.of(
           "a_REALTIME", ImmutableList.of("a1", "a2"),
           "b_REALTIME", ImmutableList.of("b1"),
           "c_OFFLINE", ImmutableList.of("c1"),
@@ -71,7 +70,7 @@ public class BaseTableRouteTest {
           "hybrid_o_disabled_REALTIME", ImmutableList.of("hor1"),
           "hybrid_r_disabled_OFFLINE", ImmutableList.of("hro1"));
   public static final Map<String, List<String>> SERVER2_SEGMENTS =
-      ImmutableMap.of(
+      Map.of(
           "a_REALTIME", ImmutableList.of("a3"),
           "b_OFFLINE", ImmutableList.of("b2"),
           "c_OFFLINE", ImmutableList.of("c2", "c3"),

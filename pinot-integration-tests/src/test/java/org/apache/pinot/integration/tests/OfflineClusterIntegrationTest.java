@@ -83,7 +83,6 @@ import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
 import org.apache.pinot.spi.data.MetricFieldSpec;
 import org.apache.pinot.spi.data.Schema;
-import org.apache.pinot.spi.env.PinotConfiguration;
 import org.apache.pinot.spi.exception.QueryErrorCode;
 import org.apache.pinot.spi.utils.CommonConstants;
 import org.apache.pinot.spi.utils.InstanceTypeUtils;
@@ -199,18 +198,6 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
         new FieldConfig("DivAirports", FieldConfig.EncodingType.DICTIONARY, List.of(), CompressionCodec.MV_ENTRY_DICT,
             null));
     return fieldConfigs;
-  }
-
-  @Override
-  protected void overrideBrokerConf(PinotConfiguration brokerConf) {
-    super.overrideBrokerConf(brokerConf);
-    brokerConf.setProperty(CommonConstants.Broker.CONFIG_OF_BROKER_ENABLE_QUERY_CANCELLATION, "true");
-  }
-
-  @Override
-  protected void overrideServerConf(PinotConfiguration serverConf) {
-    super.overrideServerConf(serverConf);
-    serverConf.setProperty(CommonConstants.Server.CONFIG_OF_ENABLE_QUERY_CANCELLATION, "true");
   }
 
   @BeforeClass
@@ -1495,18 +1482,18 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
     columnIndexSize = getColumnIndexSize(column);
     assertFalse(columnIndexSize.has(StandardIndexes.DICTIONARY_ID));
     assertTrue(columnIndexSize.has(StandardIndexes.FORWARD_ID));
-    double v2rawIndexSize = columnIndexSize.get(StandardIndexes.FORWARD_ID).asDouble();
-    assertTrue(v2rawIndexSize > forwardIndexSize);
+    double v4rawIndexSize = columnIndexSize.get(StandardIndexes.FORWARD_ID).asDouble();
+    assertTrue(v4rawIndexSize > forwardIndexSize);
 
     // NOTE: Currently Pinot doesn't support directly changing raw index version, so we need to first reset it back to
     //       dictionary encoding.
     // TODO: Support it
     resetForwardIndex(dictionarySize, forwardIndexSize);
 
-    // Convert 'DestCityName' to v4 raw index
+    // Convert 'DestCityName' to v2 raw index
     List<FieldConfig> fieldConfigs = tableConfig.getFieldConfigList();
     assertNotNull(fieldConfigs);
-    ForwardIndexConfig forwardIndexConfig = new ForwardIndexConfig.Builder().withRawIndexWriterVersion(4).build();
+    ForwardIndexConfig forwardIndexConfig = new ForwardIndexConfig.Builder().withRawIndexWriterVersion(2).build();
     ObjectNode indexes = JsonUtils.newObjectNode();
     indexes.set("forward", forwardIndexConfig.toJsonNode());
     FieldConfig fieldConfig =
@@ -1517,13 +1504,11 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
     columnIndexSize = getColumnIndexSize(column);
     assertFalse(columnIndexSize.has(StandardIndexes.DICTIONARY_ID));
     assertTrue(columnIndexSize.has(StandardIndexes.FORWARD_ID));
-    double v4RawIndexSize = columnIndexSize.get(StandardIndexes.FORWARD_ID).asDouble();
-    assertTrue(v4RawIndexSize < v2rawIndexSize && v4RawIndexSize > forwardIndexSize);
+    double v2RawIndexSize = columnIndexSize.get(StandardIndexes.FORWARD_ID).asDouble();
+    assertTrue(v2RawIndexSize > v4rawIndexSize);
 
     // Convert 'DestCityName' to SNAPPY compression
-    forwardIndexConfig =
-        new ForwardIndexConfig.Builder().withCompressionCodec(CompressionCodec.SNAPPY).withRawIndexWriterVersion(4)
-            .build();
+    forwardIndexConfig = new ForwardIndexConfig.Builder().withCompressionCodec(CompressionCodec.SNAPPY).build();
     indexes.set("forward", forwardIndexConfig.toJsonNode());
     fieldConfig =
         new FieldConfig.Builder(column).withEncodingType(FieldConfig.EncodingType.RAW).withIndexes(indexes).build();
@@ -1534,7 +1519,7 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
     assertFalse(columnIndexSize.has(StandardIndexes.DICTIONARY_ID));
     assertTrue(columnIndexSize.has(StandardIndexes.FORWARD_ID));
     double v4SnappyRawIndexSize = columnIndexSize.get(StandardIndexes.FORWARD_ID).asDouble();
-    assertTrue(v4SnappyRawIndexSize > v2rawIndexSize);
+    assertTrue(v4SnappyRawIndexSize > v4rawIndexSize);
 
     // Removing FieldConfig should be no-op because compression is not explicitly set
     fieldConfigs.remove(fieldConfigs.size() - 1);
@@ -1556,7 +1541,7 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
     columnIndexSize = getColumnIndexSize(column);
     assertFalse(columnIndexSize.has(StandardIndexes.DICTIONARY_ID));
     assertTrue(columnIndexSize.has(StandardIndexes.FORWARD_ID));
-    assertEquals(columnIndexSize.get(StandardIndexes.FORWARD_ID).asDouble(), v2rawIndexSize);
+    assertEquals(columnIndexSize.get(StandardIndexes.FORWARD_ID).asDouble(), v4rawIndexSize);
 
     resetForwardIndex(dictionarySize, forwardIndexSize);
   }
@@ -3085,6 +3070,22 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
     }
   }
 
+  @Test(dataProvider = "useBothQueryEngines")
+  public void testMvLongAggregations(boolean useMultiStageQueryEngine)
+      throws Exception {
+    setUseMultiStageQueryEngine(useMultiStageQueryEngine);
+    String query = "SELECT sumlong(DivTotalGTimes), minlong(DivTotalGTimes), maxlong(DivTotalGTimes) FROM mytable";
+    JsonNode response = postQuery(query);
+    assertNoError(response);
+    JsonNode resultTable = response.get("resultTable");
+    JsonNode dataSchema = resultTable.get("dataSchema");
+    assertEquals(dataSchema.get("columnDataTypes").toString(), "[\"LONG\",\"LONG\",\"LONG\"]");
+    JsonNode rows = resultTable.get("rows");
+    assertEquals(rows.size(), 1);
+    JsonNode row = rows.get(0);
+    assertEquals(row.size(), 3);
+  }
+
   @AfterClass
   public void tearDown()
       throws Exception {
@@ -3525,6 +3526,7 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
     assertEquals(response1Json.get("rows").get(0).get(2).asText(), "Rule Execution Times\n"
         + "Rule: SortRemove -> Time:*\n"
         + "Rule: AggregateProjectMerge -> Time:*\n"
+        + "Rule: AggregateFunctionRewrite -> Time:*\n"
         + "Rule: EvaluateProjectLiteral -> Time:*\n"
         + "Rule: AggregateRemove -> Time:*\n");
 
@@ -3608,6 +3610,12 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
     testNonScanAggregationQuery(query);
     query = "SELECT MAX(AirlineID) FROM " + tableName;
     testNonScanAggregationQuery(query);
+    query = "SELECT MINLONG(AirlineID) FROM " + tableName;
+    h2Query = "SELECT MIN(AirlineID) FROM " + tableName;
+    testNonScanAggregationQuery(query, h2Query);
+    query = "SELECT MAXLONG(AirlineID) FROM " + tableName;
+    h2Query = "SELECT MAX(AirlineID) FROM " + tableName;
+    testNonScanAggregationQuery(query, h2Query);
     query = "SELECT MIN_MAX_RANGE(AirlineID) FROM " + tableName;
     h2Query = "SELECT MAX(AirlineID)-MIN(AirlineID) FROM " + tableName;
     testNonScanAggregationQuery(query, h2Query);
@@ -3646,7 +3654,13 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
     testNonScanAggregationQuery(query, h2Query);
 
     // STRING
-    // TODO: add test cases for string column when we add support for min and max on string datatype columns
+    query = "SELECT MINSTRING(Carrier) FROM " + tableName;
+    h2Query = "SELECT MIN(Carrier) FROM " + tableName;
+    testNonScanAggregationQuery(query, h2Query);
+
+    query = "SELECT MAXSTRING(Carrier) FROM " + tableName;
+    h2Query = "SELECT MAX(Carrier) FROM " + tableName;
+    testNonScanAggregationQuery(query, h2Query);
 
     // Non dictionary columns
     // INT
@@ -3778,19 +3792,9 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
         + "/tables/mytable/metadata?columns=DivActualElapsedTime&columns=CRSElapsedTime&columns=OriginStateName"));
     validateMetadataResponse(threeSVColumnsResponse, 3, 0);
 
-    JsonNode threeSVColumnsWholeEncodedResponse = JsonUtils.stringToJsonNode(sendGetRequest(
-        getControllerBaseApiUrl() + "/tables/mytable/metadata?columns="
-            + "DivActualElapsedTime%26columns%3DCRSElapsedTime%26columns%3DOriginStateName"));
-    validateMetadataResponse(threeSVColumnsWholeEncodedResponse, 3, 0);
-
     JsonNode threeMVColumnsResponse = JsonUtils.stringToJsonNode(sendGetRequest(getControllerBaseApiUrl()
         + "/tables/mytable/metadata?columns=DivLongestGTimes&columns=DivWheelsOns&columns=DivAirports"));
     validateMetadataResponse(threeMVColumnsResponse, 3, 3);
-
-    JsonNode threeMVColumnsWholeEncodedResponse = JsonUtils.stringToJsonNode(sendGetRequest(
-        getControllerBaseApiUrl() + "/tables/mytable/metadata?columns="
-            + "DivLongestGTimes%26columns%3DDivWheelsOns%26columns%3DDivAirports"));
-    validateMetadataResponse(threeMVColumnsWholeEncodedResponse, 3, 3);
 
     JsonNode zeroColumnResponse =
         JsonUtils.stringToJsonNode(sendGetRequest(getControllerBaseApiUrl() + "/tables/mytable/metadata"));
@@ -3813,11 +3817,6 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
         getControllerBaseApiUrl() + "/tables/mytable/metadata?columns="
             + "CRSElapsedTime&columns=%2A&columns=OriginStateName"));
     validateMetadataResponse(starWithExtraEncodedColumnResponse, 83, 10);
-
-    JsonNode starWithExtraColumnWholeEncodedResponse = JsonUtils.stringToJsonNode(sendGetRequest(
-        getControllerBaseApiUrl() + "/tables/mytable/metadata?columns="
-            + "CRSElapsedTime%26columns%3D%2A%26columns%3DOriginStateName"));
-    validateMetadataResponse(starWithExtraColumnWholeEncodedResponse, 83, 10);
   }
 
   private void validateMetadataResponse(JsonNode response, int numTotalColumn, int numMVColumn) {
@@ -3970,6 +3969,43 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
     JsonNode columnDataTypes = response.get("resultTable").get("dataSchema").get("columnDataTypes");
     assertEquals(columnDataTypes.size(), 1);
     assertEquals(columnDataTypes.get(0).asText(), "DOUBLE");
+  }
+
+  @Test(dataProvider = "useBothQueryEngines")
+  public void testMinMaxString(boolean useMultiStageQueryEngine)
+      throws Exception {
+    setUseMultiStageQueryEngine(useMultiStageQueryEngine);
+
+    String sqlQuery = "SELECT MIN_STRING(DestCityName), MAX_STRING(DestCityName) FROM mytable";
+    JsonNode response = postQuery(sqlQuery);
+    assertTrue(response.get("exceptions").isEmpty());
+    JsonNode resultTable = response.get("resultTable");
+    JsonNode columnDataTypes = resultTable.get("dataSchema").get("columnDataTypes");
+    assertEquals(columnDataTypes.size(), 2);
+    assertEquals(columnDataTypes.get(0).asText(), "STRING");
+    assertEquals(columnDataTypes.get(1).asText(), "STRING");
+    JsonNode row = resultTable.get("rows").get(0);
+    assertEquals(row.size(), 2);
+    assertEquals(row.get(0).asText(), "Aberdeen, SD");
+    assertEquals(row.get(1).asText(), "Yuma, AZ");
+  }
+
+  @Test(dataProvider = "useBothQueryEngines")
+  public void testSumInt(boolean useMultiStageQueryEngine)
+      throws Exception {
+    setUseMultiStageQueryEngine(useMultiStageQueryEngine);
+
+    String sqlQuery = "SELECT SUM_INT(ArrTime), SUM(ArrTime) FROM mytable";
+    JsonNode response = postQuery(sqlQuery);
+    assertTrue(response.get("exceptions").isEmpty());
+    JsonNode resultTable = response.get("resultTable");
+    JsonNode columnDataTypes = resultTable.get("dataSchema").get("columnDataTypes");
+    assertEquals(columnDataTypes.size(), 2);
+    assertEquals(columnDataTypes.get(0).asText(), "LONG");
+    JsonNode row = resultTable.get("rows").get(0);
+    assertEquals(row.size(), 2);
+    assertTrue(row.get(0).isLong());
+    assertEquals(row.get(0).asLong(), row.get(1).asLong());
   }
 
   @Test(dataProvider = "useBothQueryEngines")
@@ -4273,7 +4309,8 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
     }, 600_000L, "Reload job did not complete in 10 minutes");
   }
 
-  private void runQueryAndAssert(String query, String newAddedColumn, FieldSpec fieldSpec) throws Exception {
+  private void runQueryAndAssert(String query, String newAddedColumn, FieldSpec fieldSpec)
+      throws Exception {
     JsonNode response = postQuery(query);
     assertNoError(response);
     JsonNode rows = response.get("resultTable").get("rows");

@@ -59,6 +59,7 @@ import org.apache.pinot.segment.spi.index.StandardIndexes;
 import org.apache.pinot.segment.spi.index.TextIndexConfig;
 import org.apache.pinot.segment.spi.index.creator.ForwardIndexCreator;
 import org.apache.pinot.segment.spi.index.creator.SegmentIndexCreationInfo;
+import org.apache.pinot.segment.spi.index.mutable.ThreadSafeMutableRoaringBitmap;
 import org.apache.pinot.segment.spi.partition.PartitionFunction;
 import org.apache.pinot.spi.config.table.IndexConfig;
 import org.apache.pinot.spi.config.table.SegmentZKPropsConfig;
@@ -355,8 +356,32 @@ public class SegmentColumnarIndexCreator implements SegmentCreator {
     _docIdCounter++;
   }
 
+  /**
+   * Indexes a column from the given segment.
+   *
+   * @param columnName The name of the column to index
+   * @param sortedDocIds If not null, provides the sorted order of documents for processing
+   * @param segment The segment containing the column data
+   */
   @Override
   public void indexColumn(String columnName, @Nullable int[] sortedDocIds, IndexSegment segment)
+      throws IOException {
+    indexColumn(columnName, sortedDocIds, segment, null);
+  }
+
+  /**
+   * Indexes a column from the given segment.
+   *
+   * @param columnName The name of the column to index
+   * @param sortedDocIds If not null, provides the sorted order of documents for processing
+   * @param segment The segment containing the column data
+   * @param validDocIds If not null, only processes documents that are marked as valid in this bitmap.
+   *                    When null, all documents in the segment are processed. This is used for
+   *                    commit-time compaction to skip invalid/deleted documents during indexing.
+   */
+  @Override
+  public void indexColumn(String columnName, @Nullable int[] sortedDocIds, IndexSegment segment,
+      @Nullable ThreadSafeMutableRoaringBitmap validDocIds)
       throws IOException {
     // Iterate over each value in the column
     int numDocs = segment.getSegmentMetadata().getTotalDocs();
@@ -371,13 +396,22 @@ public class SegmentColumnarIndexCreator implements SegmentCreator {
       if (sortedDocIds != null) {
         int onDiskDocId = 0;
         for (int docId : sortedDocIds) {
-          indexColumnValue(colReader, creatorsByIndex, columnName, fieldSpec, dictionaryCreator, docId, onDiskDocId,
-              nullVec);
-          onDiskDocId++;
+          // If validDodIds are provided, only index column if it's a valid doc
+          if (validDocIds == null || validDocIds.contains(docId)) {
+            indexColumnValue(colReader, creatorsByIndex, columnName, fieldSpec, dictionaryCreator, docId, onDiskDocId,
+                nullVec);
+            onDiskDocId++;
+          }
         }
       } else {
+        int onDiskDocId = 0;
         for (int docId = 0; docId < numDocs; docId++) {
-          indexColumnValue(colReader, creatorsByIndex, columnName, fieldSpec, dictionaryCreator, docId, docId, nullVec);
+          // If validDodIds are provided, only index column if it's a valid doc
+          if (validDocIds == null || validDocIds.contains(docId)) {
+            indexColumnValue(colReader, creatorsByIndex, columnName, fieldSpec, dictionaryCreator, docId, onDiskDocId,
+                nullVec);
+            onDiskDocId++;
+          }
         }
       }
     }
@@ -568,9 +602,16 @@ public class SegmentColumnarIndexCreator implements SegmentCreator {
             convertedStartTime = TimeUtils.getValidMinTimeMillis();
             timeUnit = TimeUnit.MILLISECONDS;
           } else {
-            timeUnit = Preconditions.checkNotNull(_config.getSegmentTimeUnit());
-            convertedEndTime = timeUnit.convert(now, TimeUnit.MILLISECONDS);
-            convertedStartTime = timeUnit.convert(TimeUtils.getValidMinTimeMillis(), TimeUnit.MILLISECONDS);
+            timeUnit = _config.getSegmentTimeUnit();
+            if (timeUnit != null) {
+              convertedEndTime = timeUnit.convert(now, TimeUnit.MILLISECONDS);
+              convertedStartTime = timeUnit.convert(TimeUtils.getValidMinTimeMillis(), TimeUnit.MILLISECONDS);
+            } else {
+              // Use millis as the time unit if not able to infer from config
+              timeUnit = TimeUnit.MILLISECONDS;
+              convertedEndTime = now;
+              convertedStartTime = TimeUtils.getValidMinTimeMillis();
+            }
           }
           LOGGER.warn(
               "Caught exception while writing time metadata for segment: {}, time column: {}, total docs: {}. "
@@ -614,10 +655,16 @@ public class SegmentColumnarIndexCreator implements SegmentCreator {
     properties.setProperty(getKeyFor(column, TOTAL_DOCS), String.valueOf(totalDocs));
     DataType dataType = fieldSpec.getDataType();
     properties.setProperty(getKeyFor(column, DATA_TYPE), String.valueOf(dataType));
+    // TODO: When the column is raw (no dictionary), we should set BITS_PER_ELEMENT to -1 (invalid). Currently we set it
+    //       regardless of whether dictionary is created or not for backward compatibility because ForwardIndexHandler
+    //       doesn't update this value when converting a raw column to dictionary encoded.
+    //       Consider changing it after releasing 1.5.0.
+    //       See https://github.com/apache/pinot/pull/16921 for details
     properties.setProperty(getKeyFor(column, BITS_PER_ELEMENT),
         String.valueOf(PinotDataBitSet.getNumBitsPerValue(cardinality - 1)));
+    FieldType fieldType = fieldSpec.getFieldType();
     properties.setProperty(getKeyFor(column, DICTIONARY_ELEMENT_SIZE), String.valueOf(dictionaryElementSize));
-    properties.setProperty(getKeyFor(column, COLUMN_TYPE), String.valueOf(fieldSpec.getFieldType()));
+    properties.setProperty(getKeyFor(column, COLUMN_TYPE), String.valueOf(fieldType));
     properties.setProperty(getKeyFor(column, IS_SORTED), String.valueOf(columnIndexCreationInfo.isSorted()));
     properties.setProperty(getKeyFor(column, HAS_DICTIONARY), String.valueOf(hasDictionary));
     properties.setProperty(getKeyFor(column, IS_SINGLE_VALUED), String.valueOf(fieldSpec.isSingleValueField()));
@@ -627,7 +674,8 @@ public class SegmentColumnarIndexCreator implements SegmentCreator {
         String.valueOf(columnIndexCreationInfo.getTotalNumberOfEntries()));
     properties.setProperty(getKeyFor(column, IS_AUTO_GENERATED),
         String.valueOf(columnIndexCreationInfo.isAutoGenerated()));
-    if (dataType.equals(DataType.STRING) || dataType.equals(DataType.BYTES) || dataType.equals(DataType.JSON)) {
+    DataType storedType = dataType.getStoredType();
+    if (storedType == DataType.STRING || storedType == DataType.BYTES) {
       properties.setProperty(getKeyFor(column, SCHEMA_MAX_LENGTH), fieldSpec.getEffectiveMaxLength());
       // TODO let's revisit writing effective maxLengthStrategy into metadata, as changing it right now may affect
       //  segment's CRC value
@@ -651,15 +699,28 @@ public class SegmentColumnarIndexCreator implements SegmentCreator {
       }
     }
 
-    // datetime field
-    if (fieldSpec.getFieldType() == FieldType.DATE_TIME) {
+    // Datetime field
+    if (fieldType == FieldType.DATE_TIME) {
       DateTimeFieldSpec dateTimeFieldSpec = (DateTimeFieldSpec) fieldSpec;
       properties.setProperty(getKeyFor(column, DATETIME_FORMAT), dateTimeFieldSpec.getFormat());
       properties.setProperty(getKeyFor(column, DATETIME_GRANULARITY), dateTimeFieldSpec.getGranularity());
     }
 
-    // complex field
-    if (fieldSpec.getFieldType() == FieldType.COMPLEX) {
+    if (fieldType != FieldType.COMPLEX) {
+      // Regular (non-complex) field
+      if (totalDocs > 0) {
+        Object min = columnIndexCreationInfo.getMin();
+        Object max = columnIndexCreationInfo.getMax();
+        // NOTE:
+        // Min/max could be null for real-time aggregate metrics. We don't directly call addColumnMinMaxValueInfo() to
+        // avoid setting MIN_MAX_VALUE_INVALID flag, which will prevent ColumnMinMaxValueGenerator from generating them
+        // when loading the segment.
+        if (min != null && max != null) {
+          addColumnMinMaxValueInfo(properties, column, min, max, storedType);
+        }
+      }
+    } else {
+      // Complex field
       ComplexFieldSpec complexFieldSpec = (ComplexFieldSpec) fieldSpec;
       properties.setProperty(getKeyFor(column, COMPLEX_CHILD_FIELD_NAMES),
           new ArrayList<>(complexFieldSpec.getChildFieldSpecs().keySet()));
@@ -668,17 +729,9 @@ public class SegmentColumnarIndexCreator implements SegmentCreator {
       }
     }
 
-    // NOTE: Min/max could be null for real-time aggregate metrics.
-    if ((fieldSpec.getFieldType() != FieldType.COMPLEX) && (totalDocs > 0)) {
-      Object min = columnIndexCreationInfo.getMin();
-      Object max = columnIndexCreationInfo.getMax();
-      if (min != null && max != null) {
-        addColumnMinMaxValueInfo(properties, column, min, max, dataType.getStoredType());
-      }
-    }
-
+    // TODO: Revisit whether we should set default null value for complex field
     String defaultNullValue = columnIndexCreationInfo.getDefaultNullValue().toString();
-    if (dataType.getStoredType() == DataType.STRING) {
+    if (storedType == DataType.STRING) {
       // NOTE: Do not limit length of default null value because we need exact value to determine whether the default
       //       null value changes
       defaultNullValue = CommonsConfigurationUtils.replaceSpecialCharacterInPropertyValue(defaultNullValue);

@@ -18,8 +18,10 @@
  */
 package org.apache.pinot.query.runtime.operator.set;
 
+import it.unimi.dsi.fastutil.objects.ObjectOpenHashSet;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Set;
 import javax.annotation.Nullable;
 import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.core.data.table.Record;
@@ -33,11 +35,15 @@ import org.slf4j.LoggerFactory;
 
 /**
  * Union operator for UNION queries. Unlike {@link UnionAllOperator}, this operator removes duplicate rows and only
- * returns distinct rows.
+ * returns distinct rows. Each child operator is fully drained sequentially and distinct rows are returned.
  */
-public class UnionOperator extends RightRowSetBasedSetOperator {
+public class UnionOperator extends SetOperator {
   private static final Logger LOGGER = LoggerFactory.getLogger(UnionOperator.class);
   private static final String EXPLAIN_NAME = "UNION";
+
+  private MseBlock _eosBlock = null;
+  private int _currentOperatorIndex = 0;
+  private final Set<Record> _seenRecords = new ObjectOpenHashSet<>();
 
   public UnionOperator(OpChainExecutionContext opChainExecutionContext,
       List<MultiStageOperator> inputOperators, DataSchema dataSchema) {
@@ -45,41 +51,42 @@ public class UnionOperator extends RightRowSetBasedSetOperator {
   }
 
   @Override
-  protected MseBlock processRightOperator() {
-    MseBlock block = _rightChildOperator.nextBlock();
-    while (block.isData()) {
-      MseBlock.Data dataBlock = (MseBlock.Data) block;
-      List<Object[]> rows = new ArrayList<>();
-      for (Object[] row : dataBlock.asRowHeap().getRows()) {
-        Record record = new Record(row);
-        if (!_rightRowSet.contains(record)) {
-          // Add a new unique row.
-          rows.add(row);
-          _rightRowSet.add(record);
+  protected MseBlock getNextBlock()
+      throws Exception {
+    if (_eosBlock != null) {
+      return _eosBlock;
+    }
+
+    while (_currentOperatorIndex < _inputOperators.size()) {
+      MultiStageOperator currentOperator = _inputOperators.get(_currentOperatorIndex);
+      MseBlock block = currentOperator.nextBlock();
+      if (block.isError()) {
+        _eosBlock = block;
+        return block;
+      } else if (block.isSuccess()) {
+        _currentOperatorIndex++;
+        if (_currentOperatorIndex == _inputOperators.size()) {
+          _eosBlock = block;
+          return block;
+        }
+      } else if (block.isData()) {
+        List<Object[]> rows = new ArrayList<>();
+        for (Object[] row : ((MseBlock.Data) block).asRowHeap().getRows()) {
+          Record record = new Record(row);
+          // TODO: Use a more memory efficient way to track seen rows.
+          if (_seenRecords.add(record)) {
+            rows.add(row);
+          }
+        }
+        if (!rows.isEmpty()) {
+          return new RowHeapDataBlock(rows, _dataSchema);
         }
       }
-      sampleAndCheckInterruption();
-      // If we have collected some rows, return them as a new block.
-      if (!rows.isEmpty()) {
-        return new RowHeapDataBlock(rows, _dataSchema);
-      } else {
-        block = _rightChildOperator.nextBlock();
-      }
     }
-    assert block.isEos();
-    return block;
-  }
 
-  @Override
-  protected boolean handleRowMatched(Object[] row) {
-    if (!_rightRowSet.contains(new Record(row))) {
-      // Row is unique, add it to the result and also to the row set to skip later duplicates.
-      _rightRowSet.add(new Record(row));
-      return true;
-    } else {
-      // Row is a duplicate, skip it.
-      return false;
-    }
+    // All input operators are exhausted, return EoS block.
+    assert _eosBlock != null;
+    return _eosBlock;
   }
 
   @Override

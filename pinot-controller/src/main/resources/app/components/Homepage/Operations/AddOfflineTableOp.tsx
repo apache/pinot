@@ -321,7 +321,6 @@ const checkFields = (tableObj,fields) => {
                 tableObj={tableObj}
                 setTableObj={setTableObj}
                 dateTimeFieldSpecs={schemaObj.dateTimeFieldSpecs}
-                disable={tableType !== ""}
               />
             </SimpleAccordion>
           </Grid>

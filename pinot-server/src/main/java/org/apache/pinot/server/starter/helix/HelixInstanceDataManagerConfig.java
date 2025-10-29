@@ -100,6 +100,11 @@ public class HelixInstanceDataManagerConfig implements InstanceDataManagerConfig
   //
   public static final String MAX_PARALLEL_REFRESH_THREADS = "max.parallel.refresh.threads";
 
+  // Whether to process SEGMENT_REFRESH in a synchronous or asynchronous manner when the messaged is received.
+  // Defaults to false, meaning SEGMENT_REFRESH will be processed in a synchronous manner.
+  public static final String ENABLE_ASYNC_SEGMENT_REFRESH = "enable.async.segment.refresh";
+  private static final boolean DEFAULT_ENABLE_ASYNC_SEGMENT_REFRESH = false;
+
   // To preload segments of table using upsert in parallel for fast upsert metadata recovery.
   private static final String MAX_SEGMENT_PRELOAD_THREADS = "max.segment.preload.threads";
 
@@ -250,6 +255,11 @@ public class HelixInstanceDataManagerConfig implements InstanceDataManagerConfig
   @Override
   public int getMaxParallelRefreshThreads() {
     return _serverConfig.getProperty(MAX_PARALLEL_REFRESH_THREADS, 1);
+  }
+
+  @Override
+  public boolean isAsyncSegmentRefreshEnabled() {
+    return _serverConfig.getProperty(ENABLE_ASYNC_SEGMENT_REFRESH, DEFAULT_ENABLE_ASYNC_SEGMENT_REFRESH);
   }
 
   @Override

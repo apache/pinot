@@ -20,8 +20,10 @@ package org.apache.pinot.controller.helix.core.minion.generator;
 
 import java.util.Collections;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 import org.apache.helix.store.zk.ZkHelixPropertyStore;
+import org.apache.helix.task.JobConfig;
 import org.apache.helix.task.TaskState;
 import org.apache.helix.zookeeper.datamodel.ZNRecord;
 import org.apache.pinot.controller.helix.core.PinotHelixResourceManager;
@@ -37,6 +39,7 @@ import org.apache.pinot.spi.utils.builder.TableConfigBuilder;
 import org.mockito.Mockito;
 import org.testng.annotations.Test;
 
+import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 import static org.testng.Assert.assertEquals;
@@ -95,7 +98,7 @@ public class TaskGeneratorUtilsTest {
 
   private static ClusterInfoAccessor createMockClusterInfoAccessor() {
     ZkHelixPropertyStore<ZNRecord> mockPropertyStore = mock(ZkHelixPropertyStore.class);
-    when(mockPropertyStore.set(Mockito.anyString(), Mockito.any(), Mockito.anyInt(), Mockito.anyInt()))
+    when(mockPropertyStore.set(Mockito.anyString(), any(), Mockito.anyInt(), Mockito.anyInt()))
         .thenReturn(true);
     PinotHelixResourceManager mockHelixResourceManager = mock(PinotHelixResourceManager.class);
     when(mockHelixResourceManager.getPropertyStore()).thenReturn(mockPropertyStore);
@@ -135,5 +138,114 @@ public class TaskGeneratorUtilsTest {
     tableTaskConfigs.put("100days.maxNumRecordsPerSegment", "15000");
     tableTaskConfigs.put("100days.maxNumRecordsPerTask", "15000");
     return tableTaskConfigs;
+  }
+
+  @Test
+  public void testGetNumConcurrentTasksPerInstanceMerged() {
+    ClusterInfoAccessor mockClusterInfoAccessor = createMockClusterInfoAccessor();
+
+    // Create test task generator
+    TestTaskGenerator taskGenerator = new TestTaskGenerator();
+    taskGenerator.init(mockClusterInfoAccessor);
+
+    // Test 1: Default behavior (no specific configs)
+    assertEquals(taskGenerator.getNumConcurrentTasksPerInstance(null),
+        JobConfig.DEFAULT_NUM_CONCURRENT_TASKS_PER_INSTANCE);
+
+    // Test 2: Task type specific config
+    String taskTypeConfigKey = "TestTask" + MinionConstants.NUM_CONCURRENT_TASKS_PER_INSTANCE_KEY_SUFFIX;
+    when(mockClusterInfoAccessor.getClusterConfig(taskTypeConfigKey)).thenReturn("3");
+    assertEquals(taskGenerator.getNumConcurrentTasksPerInstance((String) null), 3);
+
+    // Test 3: Task type + tenant specific config (should override task type config)
+    String minionTenant = "tenant1";
+    String tenantConfigKey = "TestTask." + minionTenant + MinionConstants.NUM_CONCURRENT_TASKS_PER_INSTANCE_KEY_SUFFIX;
+    when(mockClusterInfoAccessor.getClusterConfig(tenantConfigKey)).thenReturn("5");
+    assertEquals(taskGenerator.getNumConcurrentTasksPerInstance(minionTenant), 5);
+
+    // Test 4: Invalid tenant config value (should fallback to task type config)
+    when(mockClusterInfoAccessor.getClusterConfig(tenantConfigKey)).thenReturn("invalid");
+    assertEquals(taskGenerator.getNumConcurrentTasksPerInstance(minionTenant), 3);
+  }
+
+  @Test
+  public void testGetTaskTimeoutMs() {
+    ClusterInfoAccessor mockClusterInfoAccessor = createMockClusterInfoAccessor();
+
+    // Create test task generator
+    TestTaskGenerator taskGenerator = new TestTaskGenerator();
+    taskGenerator.init(mockClusterInfoAccessor);
+
+    // Test 1: Default behavior (no specific configs)
+    assertEquals(taskGenerator.getTaskTimeoutMs(any(String.class)), JobConfig.DEFAULT_TIMEOUT_PER_TASK);
+
+    // Test 2: Task type specific config
+    String taskTypeConfigKey = "TestTask" + MinionConstants.TIMEOUT_MS_KEY_SUFFIX;
+    when(mockClusterInfoAccessor.getClusterConfig(taskTypeConfigKey)).thenReturn("30000");
+    assertEquals(taskGenerator.getTaskTimeoutMs(any(String.class)), 30000L);
+
+    // Test 3: Task type + tenant specific config (should override task type config)
+    // Note: getTaskTimeoutMs doesn't take minionTag parameter, but we test the underlying utility
+    String minionTenant = "tenant1";
+    String tenantConfigKey = "TestTask." + minionTenant + MinionConstants.TIMEOUT_MS_KEY_SUFFIX;
+    when(mockClusterInfoAccessor.getClusterConfig(tenantConfigKey)).thenReturn("60000");
+    when(mockClusterInfoAccessor.getClusterConfig(taskTypeConfigKey)).thenReturn("30000");
+    // Direct test of TaskGeneratorUtils method with tenant tag
+    assertEquals(TaskGeneratorUtils.getClusterMinionConfigValue("TestTask", MinionConstants.TIMEOUT_MS_KEY_SUFFIX,
+        minionTenant, JobConfig.DEFAULT_TIMEOUT_PER_TASK, Long.class, mockClusterInfoAccessor), 60000L);
+
+    // Test 4: Invalid tenant config value (should fallback to task type config)
+    when(mockClusterInfoAccessor.getClusterConfig(tenantConfigKey)).thenReturn("invalid");
+    assertEquals(TaskGeneratorUtils.getClusterMinionConfigValue("TestTask", MinionConstants.TIMEOUT_MS_KEY_SUFFIX,
+        minionTenant, JobConfig.DEFAULT_TIMEOUT_PER_TASK, Long.class, mockClusterInfoAccessor), 30000L);
+  }
+
+  @Test
+  public void testGetMaxAttemptsPerTask() {
+    ClusterInfoAccessor mockClusterInfoAccessor = createMockClusterInfoAccessor();
+
+    // Create test task generator
+    TestTaskGenerator taskGenerator = new TestTaskGenerator();
+    taskGenerator.init(mockClusterInfoAccessor);
+
+    // Test 1: Default behavior (no specific configs)
+    assertEquals(taskGenerator.getMaxAttemptsPerTask(any(String.class)), MinionConstants.DEFAULT_MAX_ATTEMPTS_PER_TASK);
+
+    // Test 2: Task type specific config
+    String taskTypeConfigKey = "TestTask" + MinionConstants.MAX_ATTEMPTS_PER_TASK_KEY_SUFFIX;
+    when(mockClusterInfoAccessor.getClusterConfig(taskTypeConfigKey)).thenReturn("3");
+    assertEquals(taskGenerator.getMaxAttemptsPerTask(any(String.class)), 3);
+
+    // Test 3: Task type + tenant specific config (should override task type config)
+    // Note: getMaxAttemptsPerTask doesn't take minionTag parameter, but we test the underlying utility
+    String minionTenant = "tenant1";
+    String tenantConfigKey = "TestTask." + minionTenant + MinionConstants.MAX_ATTEMPTS_PER_TASK_KEY_SUFFIX;
+    when(mockClusterInfoAccessor.getClusterConfig(tenantConfigKey)).thenReturn("5");
+    when(mockClusterInfoAccessor.getClusterConfig(taskTypeConfigKey)).thenReturn("3");
+    // Direct test of TaskGeneratorUtils method with tenant tag
+    assertEquals(
+        TaskGeneratorUtils.getClusterMinionConfigValue("TestTask", MinionConstants.MAX_ATTEMPTS_PER_TASK_KEY_SUFFIX,
+            minionTenant, MinionConstants.DEFAULT_MAX_ATTEMPTS_PER_TASK, Integer.class, mockClusterInfoAccessor), 5);
+
+    // Test 4: Invalid tenant config value (should fallback to task type config)
+    when(mockClusterInfoAccessor.getClusterConfig(tenantConfigKey)).thenReturn("invalid");
+    assertEquals(
+        TaskGeneratorUtils.getClusterMinionConfigValue("TestTask", MinionConstants.MAX_ATTEMPTS_PER_TASK_KEY_SUFFIX,
+            minionTenant, MinionConstants.DEFAULT_MAX_ATTEMPTS_PER_TASK, Integer.class, mockClusterInfoAccessor), 3);
+  }
+
+  /**
+   * Test task generator that extends BaseTaskGenerator for testing purposes
+   */
+  private static class TestTaskGenerator extends BaseTaskGenerator {
+    @Override
+    public String getTaskType() {
+      return "TestTask";
+    }
+
+    @Override
+    public List<PinotTaskConfig> generateTasks(List<TableConfig> tableConfigs) {
+      return Collections.emptyList();
+    }
   }
 }

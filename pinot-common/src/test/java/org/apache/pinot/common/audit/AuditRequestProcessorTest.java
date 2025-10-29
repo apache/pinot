@@ -65,7 +65,8 @@ public class AuditRequestProcessorTest {
   @BeforeMethod
   public void setUp() {
     MockitoAnnotations.openMocks(this);
-    _processor = new AuditRequestProcessor(_configManager, mock(AuditIdentityResolver.class), _auditUrlPathFilter);
+    _processor = new AuditRequestProcessor(_configManager, mock(AuditIdentityResolver.class), _auditUrlPathFilter,
+        mock(AuditMetrics.class));
 
     _defaultConfig = new AuditConfig();
     _defaultConfig.setEnabled(true);
@@ -76,7 +77,7 @@ public class AuditRequestProcessorTest {
 
     when(_configManager.isEnabled()).thenReturn(true);
     when(_configManager.getCurrentConfig()).thenReturn(_defaultConfig);
-    when(_auditUrlPathFilter.isExcluded(any(), any())).thenReturn(false);
+    when(_auditUrlPathFilter.shouldAudit(any())).thenReturn(true);
   }
 
   private MultivaluedMap<String, String> createHeaders(String... headerPairs) {

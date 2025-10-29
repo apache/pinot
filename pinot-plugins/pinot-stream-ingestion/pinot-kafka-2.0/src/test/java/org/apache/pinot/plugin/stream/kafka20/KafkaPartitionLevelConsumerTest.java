@@ -18,13 +18,17 @@
  */
 package org.apache.pinot.plugin.stream.kafka20;
 
+import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Properties;
+import java.util.Random;
+import java.util.Set;
 import java.util.concurrent.TimeoutException;
 import java.util.stream.Collectors;
 import org.apache.kafka.clients.consumer.Consumer;
@@ -52,6 +56,7 @@ import org.apache.pinot.spi.stream.StreamMessage;
 import org.apache.pinot.spi.stream.StreamMessageMetadata;
 import org.apache.pinot.spi.stream.StreamMetadataProvider;
 import org.apache.pinot.spi.stream.StreamPartitionMsgOffset;
+import org.apache.pinot.spi.utils.retry.ExponentialBackoffRetryPolicy;
 import org.testng.Assert;
 import org.testng.annotations.AfterClass;
 import org.testng.annotations.BeforeClass;
@@ -76,6 +81,7 @@ public class KafkaPartitionLevelConsumerTest {
   private static final String TEST_TOPIC_3 = "expired";
   private static final int NUM_MSG_PRODUCED_PER_PARTITION = 1000;
   private static final long TIMESTAMP = Instant.now().toEpochMilli();
+  private static final Random RANDOM = new Random();
 
   private MiniKafkaCluster _kafkaCluster;
   private String _kafkaBrokerAddress;
@@ -144,7 +150,7 @@ public class KafkaPartitionLevelConsumerTest {
     StreamConfig streamConfig = new StreamConfig(tableNameWithType, streamConfigMap);
 
     // test default value
-    KafkaPartitionLevelConsumer kafkaSimpleStreamConsumer = new KafkaPartitionLevelConsumer(clientId, streamConfig, 0);
+    KafkaPartitionLevelConsumer kafkaSimpleStreamConsumer = createConsumer(clientId, streamConfig, 0);
     kafkaSimpleStreamConsumer.fetchMessages(new LongMsgOffset(12345L), 10000);
 
     assertEquals(KafkaStreamConfigProperties.LowLevelConsumer.KAFKA_BUFFER_SIZE_DEFAULT,
@@ -160,7 +166,7 @@ public class KafkaPartitionLevelConsumerTest {
     streamConfigMap.put("stream.kafka.buffer.size", "100");
     streamConfigMap.put("stream.kafka.socket.timeout", "1000");
     streamConfig = new StreamConfig(tableNameWithType, streamConfigMap);
-    kafkaSimpleStreamConsumer = new KafkaPartitionLevelConsumer(clientId, streamConfig, 0);
+    kafkaSimpleStreamConsumer = createConsumer(clientId, streamConfig, 0);
     kafkaSimpleStreamConsumer.fetchMessages(new LongMsgOffset(12345L), 10000);
     assertEquals(100, kafkaSimpleStreamConsumer.getKafkaPartitionLevelStreamConfig().getKafkaBufferSize());
     assertEquals(1000, kafkaSimpleStreamConsumer.getKafkaPartitionLevelStreamConfig().getKafkaSocketTimeout());
@@ -213,8 +219,7 @@ public class KafkaPartitionLevelConsumerTest {
     StreamConfig streamConfig = new StreamConfig(tableNameWithType, streamConfigMap);
 
     int partition = 0;
-    KafkaPartitionLevelConsumer kafkaSimpleStreamConsumer =
-        new KafkaPartitionLevelConsumer(clientId, streamConfig, partition);
+    KafkaPartitionLevelConsumer kafkaSimpleStreamConsumer = createConsumer(clientId, streamConfig, partition);
     kafkaSimpleStreamConsumer.fetchMessages(new LongMsgOffset(12345L), 10000);
   }
 
@@ -425,6 +430,22 @@ public class KafkaPartitionLevelConsumerTest {
   }
 
   @Test
+  public void testFetchLatestStreamOffset()
+      throws IOException {
+    StreamConfig streamConfig = getStreamConfig(TEST_TOPIC_2);
+    try (KafkaStreamMetadataProvider streamMetadataProvider = new KafkaStreamMetadataProvider("clientId",
+        streamConfig)) {
+      Set<Integer> partitions = new HashSet<>();
+      partitions.add(0);
+      partitions.add(1);
+      Map<Integer, StreamPartitionMsgOffset> partitionMsgOffsetMap =
+          streamMetadataProvider.fetchLatestStreamOffset(partitions, 1000);
+      Assert.assertEquals(((LongMsgOffset) (partitionMsgOffsetMap.get(0))).getOffset(), NUM_MSG_PRODUCED_PER_PARTITION);
+      Assert.assertEquals(((LongMsgOffset) (partitionMsgOffsetMap.get(1))).getOffset(), NUM_MSG_PRODUCED_PER_PARTITION);
+    }
+  }
+
+  @Test
   void testBatchSizeInBytesIsCalculatedCorrectly() {
     TopicPartition topicPartition = new TopicPartition("test-topic", 0);
 
@@ -457,20 +478,28 @@ public class KafkaPartitionLevelConsumerTest {
     }
 
     FakeKafkaPartitionLevelConsumer kafkaSimpleStreamConsumer =
-        new FakeKafkaPartitionLevelConsumer("clientId-test", getStreamConfig(), 0);
+        new FakeKafkaPartitionLevelConsumer("clientId-test", getStreamConfig("test-topic"), 0);
     KafkaMessageBatch kafkaMessageBatch = kafkaSimpleStreamConsumer.fetchMessages(new LongMsgOffset(12345L), 10000);
     Assert.assertEquals(kafkaMessageBatch.getSizeInBytes(), 14);
   }
 
-  private StreamConfig getStreamConfig() {
+  private KafkaPartitionLevelConsumer createConsumer(String clientId, StreamConfig streamConfig, int partition) {
+    if (RANDOM.nextDouble() < 0.5) {
+      return new KafkaPartitionLevelConsumer(clientId, streamConfig, partition);
+    } else {
+      return new KafkaPartitionLevelConsumer(clientId, streamConfig, partition,
+          new ExponentialBackoffRetryPolicy(2, 1000, 1.1));
+    }
+  }
+
+  private StreamConfig getStreamConfig(String topicName) {
     String streamType = "kafka";
-    String streamKafkaTopicName = "test-topic";
     String streamKafkaBrokerList = _kafkaBrokerAddress;
     String tableNameWithType = "tableName_REALTIME";
 
     Map<String, String> streamConfigMap = new HashMap<>();
     streamConfigMap.put("streamType", streamType);
-    streamConfigMap.put("stream.kafka.topic.name", streamKafkaTopicName);
+    streamConfigMap.put("stream.kafka.topic.name", topicName);
     streamConfigMap.put("stream.kafka.broker.list", streamKafkaBrokerList);
     streamConfigMap.put("stream.kafka.consumer.factory.class.name", getKafkaConsumerFactoryName());
     streamConfigMap.put("stream.kafka.decoder.class.name", "decoderClass");

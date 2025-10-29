@@ -46,55 +46,53 @@ public class GrpcSendingMailboxTest {
 
   @Test(dataProvider = "byteBuffersDataProvider")
   public void testByteBuffersToByteStrings(int[] byteBufferSizes, int maxByteStringSize) {
-    List<ByteBuffer> input = Arrays.stream(byteBufferSizes)
-        .mapToObj(this::randomByteBuffer).collect(Collectors.toList());
+    List<ByteBuffer> input =
+        Arrays.stream(byteBufferSizes).mapToObj(this::randomByteBuffer).collect(Collectors.toList());
     ByteBuffer expected = concatenateBuffers(input);
 
     List<ByteString> output = GrpcSendingMailbox.toByteStrings(input, maxByteStringSize);
-    for (ByteString chunk: output.subList(0, output.size() - 1)) {
+    for (ByteString chunk : output.subList(0, output.size() - 1)) {
       assertEquals(chunk.size(), maxByteStringSize);
     }
     assertTrue(output.get(output.size() - 1).size() <= maxByteStringSize);
-    ByteBuffer actual = concatenateBuffers(
-        output.stream().map(ByteString::asReadOnlyByteBuffer).collect(Collectors.toList()));
+    ByteBuffer actual =
+        concatenateBuffers(output.stream().map(ByteString::asReadOnlyByteBuffer).collect(Collectors.toList()));
 
     assertEquals(actual, expected);
   }
 
   @Test(dataProvider = "testDataBlockToByteStringsProvider")
-  public void testDataBlockToByteStrings(String name, int maxByteStringSize) throws IOException {
+  public void testDataBlockToByteStrings(String name, int maxByteStringSize)
+      throws IOException {
     DataBlock dataBlock = buildTestDataBlock();
     List<ByteString> output = GrpcSendingMailbox.toByteStrings(dataBlock, maxByteStringSize);
-    for (ByteString chunk: output) {
+    for (ByteString chunk : output) {
       assertTrue(chunk.size() <= maxByteStringSize);
     }
 
-    DataBlock actual = DataBlockUtils.deserialize(
-        output.stream().map(ByteString::asReadOnlyByteBuffer).collect(Collectors.toList()));
+    DataBlock deserialized = DataBlockUtils.deserialize(
+        output.stream().map(byteString -> byteString.asReadOnlyByteBuffer().slice()).collect(Collectors.toList()));
 
-    DataBlockEquals.checkSameContent(dataBlock, actual, "Rebuilt data block (" + name + ") does not match.");
+    DataBlockEquals.checkSameContent(dataBlock, deserialized, "Rebuilt data block (" + name + ") does not match.");
   }
 
   @Test(dataProvider = "testDataBlockToByteStringsProvider")
-  public void testToByteStringDataBuffers(String name, int maxByteStringSize) throws IOException {
+  public void testToByteStringDataBuffers(String name, int maxByteStringSize)
+      throws IOException {
     DataBlock dataBlock = buildTestDataBlock();
-    List<ByteBuffer> byteBuffers = dataBlock.serialize();
-    List<ByteString> byteStrings = GrpcSendingMailbox.toByteStrings(dataBlock, maxByteStringSize);
-    for (ByteString chunk: byteStrings) {
+    List<ByteString> output = GrpcSendingMailbox.toByteStrings(dataBlock, maxByteStringSize);
+    for (ByteString chunk : output) {
       assertTrue(chunk.size() <= maxByteStringSize);
     }
 
-    List<DataBuffer> asGrpc = byteStrings.stream()
-        .map(ByteString::asReadOnlyByteBuffer)
-        .map(bb -> PinotByteBuffer.wrap(bb.slice()))
+    List<DataBuffer> asGrpc =
+        output.stream().map(byteString -> PinotByteBuffer.wrap(byteString.asReadOnlyByteBuffer().slice()))
         .collect(Collectors.toList());
-    List<DataBuffer> directSerialize = byteBuffers.stream()
-        .map(PinotByteBuffer::wrap)
-        .collect(Collectors.toList());
+    List<DataBuffer> directSerialize =
+        dataBlock.serialize().stream().map(PinotByteBuffer::wrap).collect(Collectors.toList());
 
     try (CompoundDataBuffer grpc = new CompoundDataBuffer(asGrpc, ByteOrder.BIG_ENDIAN, false);
-        CompoundDataBuffer direct = new CompoundDataBuffer(directSerialize, ByteOrder.BIG_ENDIAN, false)
-    ) {
+        CompoundDataBuffer direct = new CompoundDataBuffer(directSerialize, ByteOrder.BIG_ENDIAN, false)) {
       assertEquals(grpc, direct);
     }
   }

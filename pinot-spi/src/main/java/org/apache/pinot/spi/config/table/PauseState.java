@@ -29,7 +29,7 @@ public class PauseState extends BaseJsonConfig {
   private String _comment;
   private String _timestamp;
   // List of inactive topic indices. Index is the index of the topic in the streamConfigMaps.
-  private List<Integer> _indexOfInactiveTopics;
+  private List<Integer> _indexOfInactiveTopics = new ArrayList<>();
 
   public PauseState() {
   }
@@ -80,7 +80,10 @@ public class PauseState extends BaseJsonConfig {
   }
 
   public void setIndexOfInactiveTopics(List<Integer> indexOfInactiveTopics) {
-    _indexOfInactiveTopics = indexOfInactiveTopics == null ? new ArrayList<>() : indexOfInactiveTopics;
+    _indexOfInactiveTopics.clear();
+    if (indexOfInactiveTopics != null) {
+      _indexOfInactiveTopics.addAll(indexOfInactiveTopics);
+    }
   }
 
   public enum ReasonCode {

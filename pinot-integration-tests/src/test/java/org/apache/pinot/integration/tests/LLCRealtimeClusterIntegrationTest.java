@@ -65,6 +65,7 @@ import org.apache.pinot.spi.utils.CommonConstants;
 import org.apache.pinot.spi.utils.JsonUtils;
 import org.apache.pinot.spi.utils.ReadMode;
 import org.apache.pinot.spi.utils.builder.TableNameBuilder;
+import org.apache.pinot.spi.utils.retry.RetryPolicy;
 import org.apache.pinot.util.TestUtils;
 import org.testng.annotations.AfterClass;
 import org.testng.annotations.BeforeClass;
@@ -549,6 +550,12 @@ public class LLCRealtimeClusterIntegrationTest extends BaseRealtimeClusterIntegr
         }
       }
       return new ExceptingKafkaConsumer(clientId, _streamConfig, partition, exceptionDuringConsume);
+    }
+
+    @Override
+    public PartitionGroupConsumer createPartitionGroupConsumer(String clientId,
+        PartitionGroupConsumptionStatus partitionGroupConsumptionStatus, RetryPolicy retryPolicy) {
+      return createPartitionGroupConsumer(clientId, partitionGroupConsumptionStatus);
     }
 
     private int getSegmentSeqNum(int partition) {

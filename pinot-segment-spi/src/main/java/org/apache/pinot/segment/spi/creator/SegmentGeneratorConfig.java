@@ -150,11 +150,10 @@ public class SegmentGeneratorConfig implements Serializable {
 
     // NOTE: SegmentGeneratorConfig#setSchema doesn't set the time column anymore. timeColumnName is expected to be
     // read from table config.
-    String timeColumnName = null;
-    if (tableConfig.getValidationConfig() != null) {
-      timeColumnName = tableConfig.getValidationConfig().getTimeColumnName();
+    String timeColumnName = tableConfig.getValidationConfig().getTimeColumnName();
+    if (timeColumnName != null) {
+      setTime(timeColumnName, schema);
     }
-    setTime(timeColumnName, schema);
 
     IndexingConfig indexingConfig = tableConfig.getIndexingConfig();
     String segmentVersion = indexingConfig.getSegmentFormatVersion();
@@ -229,14 +228,12 @@ public class SegmentGeneratorConfig implements Serializable {
   /**
    * Set time column details using the given time column
    */
-  private void setTime(@Nullable String timeColumnName, Schema schema) {
-    if (timeColumnName != null) {
-      DateTimeFieldSpec dateTimeFieldSpec = schema.getSpecForTimeColumn(timeColumnName);
-      if (dateTimeFieldSpec != null) {
-        _segmentTimeColumnDataType = dateTimeFieldSpec.getDataType();
-        setTimeColumnName(dateTimeFieldSpec.getName());
-        setDateTimeFormatSpec(dateTimeFieldSpec.getFormatSpec());
-      }
+  private void setTime(String timeColumnName, Schema schema) {
+    DateTimeFieldSpec dateTimeFieldSpec = schema.getSpecForTimeColumn(timeColumnName);
+    if (dateTimeFieldSpec != null) {
+      _segmentTimeColumnDataType = dateTimeFieldSpec.getDataType();
+      setTimeColumnName(dateTimeFieldSpec.getName());
+      setDateTimeFormatSpec(dateTimeFieldSpec.getFormatSpec());
     }
   }
 
@@ -260,6 +257,7 @@ public class SegmentGeneratorConfig implements Serializable {
     }
   }
 
+  @Nullable
   public DateTimeFormatSpec getDateTimeFormatSpec() {
     return _dateTimeFormatSpec;
   }
@@ -387,6 +385,7 @@ public class SegmentGeneratorConfig implements Serializable {
     _sequenceId = sequenceId;
   }
 
+  @Nullable
   public TimeUnit getSegmentTimeUnit() {
     return _segmentTimeUnit;
   }

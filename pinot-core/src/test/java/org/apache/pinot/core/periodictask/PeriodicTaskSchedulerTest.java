@@ -19,17 +19,17 @@
 package org.apache.pinot.core.periodictask;
 
 import java.util.ArrayList;
-import java.util.Collections;
 import java.util.List;
 import java.util.Properties;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
-import org.testng.Assert;
 import org.testng.annotations.Test;
 
 import static org.testng.Assert.assertEquals;
 import static org.testng.Assert.assertFalse;
+import static org.testng.Assert.assertTrue;
+import static org.testng.Assert.fail;
 
 
 public class PeriodicTaskSchedulerTest {
@@ -41,7 +41,7 @@ public class PeriodicTaskSchedulerTest {
     AtomicBoolean runCalled = new AtomicBoolean();
     AtomicBoolean stopCalled = new AtomicBoolean();
 
-    List<PeriodicTask> periodicTasks = Collections.singletonList(new BasePeriodicTask("TestTask", 0L/*Invalid*/, 0L) {
+    List<PeriodicTask> periodicTasks = List.of(new BasePeriodicTask("TestTask", 0L/*Invalid*/, 0L) {
       @Override
       protected void setUpTask() {
         startCalled.set(true);
@@ -60,13 +60,31 @@ public class PeriodicTaskSchedulerTest {
 
     PeriodicTaskScheduler taskScheduler = new PeriodicTaskScheduler();
     taskScheduler.init(periodicTasks);
+    assertTrue(taskScheduler.hasTask("TestTask"));
+    assertEquals(taskScheduler.getTaskNames(), List.of("TestTask"));
+
     taskScheduler.start();
     Thread.sleep(100L);
     taskScheduler.stop();
 
-    assertFalse(startCalled.get());
+    assertTrue(startCalled.get());
     assertFalse(runCalled.get());
-    assertFalse(stopCalled.get());
+    assertTrue(stopCalled.get());
+  }
+
+  @Test(expectedExceptions = IllegalStateException.class,
+      expectedExceptionsMessageRegExp = "Duplicate periodic task name: TestTask")
+  public void testTasksWithDuplicateName() {
+    List<PeriodicTask> periodicTasks = new ArrayList<>(2);
+    for (int i = 0; i < 2; i++) {
+      periodicTasks.add(new BasePeriodicTask("TestTask", 1L, 0L) {
+        @Override
+        protected void runTask(Properties periodicTaskProperties) {
+        }
+      });
+    }
+    PeriodicTaskScheduler taskScheduler = new PeriodicTaskScheduler();
+    taskScheduler.init(periodicTasks);
   }
 
   @Test
@@ -79,7 +97,7 @@ public class PeriodicTaskSchedulerTest {
 
     List<PeriodicTask> periodicTasks = new ArrayList<>(numTasks);
     for (int i = 0; i < numTasks; i++) {
-      periodicTasks.add(new BasePeriodicTask("TestTask", 1L, 0L) {
+      periodicTasks.add(new BasePeriodicTask("TestTask" + i, 1L, 0L) {
         @Override
         protected void setUpTask() {
           numTimesStartCalled.getAndIncrement();
@@ -138,7 +156,7 @@ public class PeriodicTaskSchedulerTest {
         try {
           if (_isRunning) {
             // fail since task is already running in another thread.
-            Assert.fail("More than one thread attempting to execute task at the same time.");
+            fail("More than one thread attempting to execute task at the same time.");
           }
           _isRunning = true;
           Thread.sleep(200);
@@ -185,6 +203,6 @@ public class PeriodicTaskSchedulerTest {
     taskScheduler.stop();
 
     // Confirm that all threads requested execution, even though only half the threads completed execution.
-    Assert.assertEquals(attempts.get(), numThreads);
+    assertEquals(attempts.get(), numThreads);
   }
 }

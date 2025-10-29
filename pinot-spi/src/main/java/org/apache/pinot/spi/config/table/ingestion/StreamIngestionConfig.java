@@ -59,6 +59,9 @@ public class StreamIngestionConfig extends BaseJsonConfig {
       + " completed (immutable) replica on any server in pause-less ingestion")
   private DisasterRecoveryMode _disasterRecoveryMode = DisasterRecoveryMode.DEFAULT;
 
+  @JsonPropertyDescription("Class to handle realtime offset auto reset")
+  private String _realtimeOffsetAutoResetHandlerClass;
+
   @JsonCreator
   public StreamIngestionConfig(@JsonProperty("streamConfigMaps") List<Map<String, String>> streamConfigMaps) {
     _streamConfigMaps = streamConfigMaps;
@@ -123,5 +126,14 @@ public class StreamIngestionConfig extends BaseJsonConfig {
 
   public void setDisasterRecoveryMode(DisasterRecoveryMode disasterRecoveryMode) {
     _disasterRecoveryMode = disasterRecoveryMode;
+  }
+
+  @Nullable
+  public String getRealtimeOffsetAutoResetHandlerClass() {
+    return _realtimeOffsetAutoResetHandlerClass;
+  }
+
+  public void setRealtimeOffsetAutoResetHandlerClass(String realtimeOffsetAutoResetHandlerClass) {
+    _realtimeOffsetAutoResetHandlerClass = realtimeOffsetAutoResetHandlerClass;
   }
 }

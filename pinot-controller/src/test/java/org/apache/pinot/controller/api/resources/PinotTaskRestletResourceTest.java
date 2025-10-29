@@ -20,7 +20,6 @@ package org.apache.pinot.controller.api.resources;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.google.common.collect.ImmutableList;
-import com.google.common.collect.ImmutableMap;
 import java.net.URI;
 import java.net.URISyntaxException;
 import java.util.Collections;
@@ -76,7 +75,7 @@ public class PinotTaskRestletResourceTest {
     Map<String, String> minionWorkerEndpoints
         = invokeGetSubtaskWithGivenStateProgressAndReturnCapturedMinionWorkerEndpoints(null);
     assertEquals(minionWorkerEndpoints,
-        ImmutableMap.of("minion1", "http://minion1:9514", "minion2", "http://minion2:9514"));
+        Map.of("minion1", "http://minion1:9514", "minion2", "http://minion2:9514"));
   }
 
   @Test
@@ -86,7 +85,7 @@ public class PinotTaskRestletResourceTest {
     Map<String, String> minionWorkerEndpoints
         = invokeGetSubtaskWithGivenStateProgressAndReturnCapturedMinionWorkerEndpoints(" minion1 , minion2 ");
     assertEquals(minionWorkerEndpoints,
-        ImmutableMap.of("minion1", "http://minion1:9514", "minion2", "http://minion2:9514"));
+        Map.of("minion1", "http://minion1:9514", "minion2", "http://minion2:9514"));
   }
 
   @Test
@@ -95,7 +94,7 @@ public class PinotTaskRestletResourceTest {
     Map<String, String> minionWorkerEndpoints
         = invokeGetSubtaskWithGivenStateProgressAndReturnCapturedMinionWorkerEndpoints("minion1");
     assertEquals(minionWorkerEndpoints,
-        ImmutableMap.of("minion1", "http://minion1:9514"));
+        Map.of("minion1", "http://minion1:9514"));
   }
 
   private Map<String, String> invokeGetSubtaskWithGivenStateProgressAndReturnCapturedMinionWorkerEndpoints(

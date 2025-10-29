@@ -608,6 +608,15 @@ rules:
     topic_name: "$4"
     partition: "$5"
     scope: "consumer"
+- pattern: "kafka\\.consumer<type=consumer-fetch-manager-metrics, client-id=\\\"?(([^.]+)\\.)?(?:[^,]*?\\|\\|\\|)?([^,]+)_REALTIME-([^,]+)-(\\d+)\\\"?><>(fetch-rate|fetch-latency-avg|fetch-throttle-time-avg|bytes-consumed-rate|records-consumed-rate|fetch-size-avg|fetch-size-max|records-per-request-avg)"
+  name: "kafka_consumer_$6"
+  cache: true
+  labels:
+    database: "$2"
+    table: "$3"
+    topic_name: "$4"
+    partition: "$5"
+    scope: "consumer"
 # Topic-level metrics (includes topic information from MBean)
 - pattern: "kafka\\.consumer<type=consumer-fetch-manager-metrics, client-id=(([^.]+)\\.)?([^,]+)_REALTIME-([^,]+)-(\\d+), topic=([^\"]+)><>(bytes-consumed-rate|records-consumed-rate|fetch-size-avg|fetch-size-max|records-per-request-avg)"
   name: "kafka_consumer_$7"
@@ -618,8 +627,26 @@ rules:
     topic_name: "$4"
     partition: "$5"
     scope: "topic"
+- pattern: "kafka\\.consumer<type=consumer-fetch-manager-metrics, client-id=\\\"?(([^.]+)\\.)?(?:[^,]*?\\|\\|\\|)?([^,]+)_REALTIME-([^,]+)-(\\d+)\\\"?, topic=([^\"]+)><>(bytes-consumed-rate|records-consumed-rate|fetch-size-avg|fetch-size-max|records-per-request-avg)"
+  name: "kafka_consumer_$7"
+  cache: true
+  labels:
+    database: "$2"
+    table: "$3"
+    topic_name: "$4"
+    partition: "$5"
+    scope: "topic"
 # Partition-level metrics (most granular, includes both topic and partition from MBean)
 - pattern: "kafka\\.consumer<type=consumer-fetch-manager-metrics, client-id=(([^.]+)\\.)?([^,]+)_REALTIME-([^,]+)-(\\d+), topic=([^,\"]+), partition=([^\"]+)><>(records-lag-avg|records-lag-max|records-lead-avg|records-lead-min)"
+  name: "kafka_consumer_$8"
+  cache: true
+  labels:
+    database: "$2"
+    table: "$3"
+    topic_name: "$4"
+    partition: "$5"
+    scope: "partition"
+- pattern: "kafka\\.consumer<type=consumer-fetch-manager-metrics, client-id=\\\"?(([^.]+)\\.)?(?:[^,]*?\\|\\|\\|)?([^,]+)_REALTIME-([^,]+)-(\\d+)\\\"?, topic=([^,\"]+), partition=([^\"]+)><>(records-lag-avg|records-lag-max|records-lead-avg|records-lead-min)"
   name: "kafka_consumer_$8"
   cache: true
   labels:

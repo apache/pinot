@@ -270,7 +270,7 @@ public class AggregateOperator extends MultiStageOperator {
     MseBlock block = _input.nextBlock();
     while (block.isData()) {
       _groupByExecutor.processBlock((MseBlock.Data) block);
-      sampleAndCheckInterruption();
+      checkTerminationAndSampleUsage();
       block = _input.nextBlock();
     }
     return (MseBlock.Eos) block;
@@ -286,7 +286,7 @@ public class AggregateOperator extends MultiStageOperator {
     MseBlock block = _input.nextBlock();
     while (block.isData()) {
       _aggregationExecutor.processBlock((MseBlock.Data) block);
-      sampleAndCheckInterruption();
+      checkTerminationAndSampleUsage();
       block = _input.nextBlock();
     }
     return (MseBlock.Eos) block;

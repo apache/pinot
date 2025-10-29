@@ -440,7 +440,7 @@ public class PinotLLCRealtimeSegmentManagerTest {
     when(mockMetadataProvider.fetchStreamPartitionOffset(eq(OffsetCriteria.LARGEST_OFFSET_CRITERIA),
         anyLong())).thenReturn(new LongMsgOffset(LATEST_OFFSET));
     when(mockMetadataProvider.getOffsetAtTimestamp(eq(0), anyLong(), anyLong())).thenReturn(
-        new LongMsgOffset(PARTITION_OFFSET.getOffset() + 1L));
+        new LongMsgOffset(PARTITION_OFFSET.getOffset() + NUM_DOCS + 1L));
 
     try (MockedStatic<StreamConsumerFactoryProvider> mockedStaticProvider = mockStatic(
         StreamConsumerFactoryProvider.class)) {

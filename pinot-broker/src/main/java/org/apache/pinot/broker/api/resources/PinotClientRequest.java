@@ -22,7 +22,6 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.collect.ArrayListMultimap;
-import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.Multimap;
 import io.swagger.annotations.Api;
 import io.swagger.annotations.ApiKeyAuthDefinition;
@@ -83,7 +82,6 @@ import org.apache.pinot.spi.auth.broker.RequesterIdentity;
 import org.apache.pinot.spi.env.PinotConfiguration;
 import org.apache.pinot.spi.exception.QueryErrorCode;
 import org.apache.pinot.spi.exception.QueryException;
-import org.apache.pinot.spi.query.QueryThreadContext;
 import org.apache.pinot.spi.trace.RequestContext;
 import org.apache.pinot.spi.trace.RequestScope;
 import org.apache.pinot.spi.trace.Tracing;
@@ -452,11 +450,9 @@ public class PinotClientRequest {
       @DefaultValue("3000") int timeoutMs,
       @ApiParam(value = "Return server responses for troubleshooting") @QueryParam("verbose") @DefaultValue("false")
       boolean verbose) {
-    try (QueryThreadContext.CloseableContext closeMe = QueryThreadContext.open(_instanceId)) {
+    try {
       Map<String, Integer> serverResponses = verbose ? new HashMap<>() : null;
       if (isClient) {
-        long reqId = _requestHandler.getRequestIdByClientId(id).orElse(-1L);
-        QueryThreadContext.setIds(reqId, id);
         if (_requestHandler.cancelQueryByClientId(id, timeoutMs, _executor, _httpConnMgr, serverResponses)) {
           String resp = "Cancelled client query: " + id;
           if (verbose) {
@@ -467,7 +463,6 @@ public class PinotClientRequest {
       } else {
         long reqId = Long.parseLong(id);
         if (_requestHandler.cancelQuery(reqId, timeoutMs, _executor, _httpConnMgr, serverResponses)) {
-          QueryThreadContext.setIds(reqId, id);
           String resp = "Cancelled query: " + id;
           if (verbose) {
             resp += " with responses from servers: " + serverResponses;
@@ -528,7 +523,7 @@ public class PinotClientRequest {
       return new BrokerResponseNative(QueryErrorCode.SQL_PARSING, e.getMessage());
     }
     if (forceUseMultiStage) {
-      sqlNodeAndOptions.setExtraOptions(ImmutableMap.of(Request.QueryOptionKey.USE_MULTISTAGE_ENGINE, "true"));
+      sqlNodeAndOptions.setExtraOptions(Map.of(Request.QueryOptionKey.USE_MULTISTAGE_ENGINE, "true"));
     }
     if (getCursor) {
       if (numRows == 0) {
@@ -536,7 +531,7 @@ public class PinotClientRequest {
             CommonConstants.CursorConfigs.DEFAULT_CURSOR_FETCH_ROWS);
       }
       sqlNodeAndOptions.setExtraOptions(
-          ImmutableMap.of(Request.QueryOptionKey.GET_CURSOR, "true", Request.QueryOptionKey.CURSOR_NUM_ROWS,
+          Map.of(Request.QueryOptionKey.GET_CURSOR, "true", Request.QueryOptionKey.CURSOR_NUM_ROWS,
               Integer.toString(numRows)));
       _brokerMetrics.addMeteredGlobalValue(BrokerMeter.CURSOR_QUERIES_GLOBAL, 1);
     }

@@ -19,7 +19,6 @@
 package org.apache.pinot.broker.routing.instanceselector;
 
 import com.google.common.collect.ImmutableList;
-import com.google.common.collect.ImmutableMap;
 import java.time.Clock;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -38,6 +37,8 @@ import org.apache.pinot.common.assignment.InstancePartitions;
 import org.apache.pinot.common.metrics.BrokerMetrics;
 import org.apache.pinot.common.request.BrokerRequest;
 import org.apache.pinot.common.request.PinotQuery;
+import org.apache.pinot.common.utils.LLCSegmentName;
+import org.apache.pinot.common.utils.UploadedRealtimeSegmentName;
 import org.apache.pinot.core.transport.ServerInstance;
 import org.mockito.Mock;
 import org.mockito.MockitoAnnotations;
@@ -50,11 +51,12 @@ import static org.mockito.Mockito.doReturn;
 import static org.mockito.Mockito.spy;
 import static org.mockito.Mockito.when;
 import static org.testng.Assert.assertEquals;
+import static org.testng.Assert.assertTrue;
 import static org.testng.Assert.fail;
 
 
 public class MultiStageReplicaGroupSelectorTest {
-  private static final String TABLE_NAME = "testTable_OFFLINE";
+  private static final String TABLE_NAME = "testTable_REALTIME";
   private final static List<String> SEGMENTS =
       Arrays.asList("segment0", "segment1", "segment2", "segment3", "segment4", "segment5", "segment6", "segment7",
           "segment8", "segment9", "segment10", "segment11");
@@ -71,6 +73,10 @@ public class MultiStageReplicaGroupSelectorTest {
 
   private static List<String> getSegments() {
     return SEGMENTS;
+  }
+
+  private static LLCSegmentName getLLCSegmentName(long epochMillis) {
+    return new LLCSegmentName(TABLE_NAME, 1 /* partitionGroup */, 2 /* seqNum */, epochMillis);
   }
 
   @BeforeMethod
@@ -116,6 +122,36 @@ public class MultiStageReplicaGroupSelectorTest {
     expectedSelectorResult = createExpectedAssignment(replicaGroup1, getSegments());
     selectionResult = multiStageSelector.select(_brokerRequest, getSegments(), 1);
     assertEquals(selectionResult.getSegmentToInstanceMap(), expectedSelectorResult);
+
+    // Add a new LLC segment to the list of segments but don't update segment states. The selection result should
+    // remain the same.
+    List<String> segments = new ArrayList<>(getSegments());
+    LLCSegmentName newSegmentName = getLLCSegmentName(System.currentTimeMillis());
+    segments.add(newSegmentName.getSegmentName());
+    selectionResult = multiStageSelector.select(_brokerRequest, segments, 1);
+    assertEquals(selectionResult.getSegmentToInstanceMap(), expectedSelectorResult);
+
+    // Test with an LLC segment that is older than the new segment expiration time.
+    long delta = multiStageSelector._newSegmentExpirationTimeInSeconds * 1000 + 10_000;
+    long expiredSegmentEpochMs = System.currentTimeMillis() - delta;
+    segments.set(segments.size() - 1, getLLCSegmentName(expiredSegmentEpochMs).getSegmentName());
+    try {
+      multiStageSelector.select(_brokerRequest, segments, 1);
+      fail("call should have failed");
+    } catch (Exception e) {
+      assertTrue(e.getMessage().contains(segments.get(segments.size() - 1)));
+    }
+
+    // Test with a non LLC segment, like UploadedRealtimeSegment, that has just been created. Since it is not present
+    // in segmentState, it should throw.
+    segments.set(segments.size() - 1, new UploadedRealtimeSegmentName(TABLE_NAME, 1 /* partition */,
+        System.currentTimeMillis(), "someprefix", "somesuffix").getSegmentName());
+    try {
+      multiStageSelector.select(_brokerRequest, segments, 1);
+      fail("call should have failed");
+    } catch (Exception e) {
+      assertTrue(e.getMessage().contains(segments.get(segments.size() - 1)));
+    }
   }
 
   @Test
@@ -157,7 +193,7 @@ public class MultiStageReplicaGroupSelectorTest {
   @Test
   public void testErrorSegmentHandling() {
     // Create instance-partitions with two replica-groups and 2 partitions. Each replica-group has 2 instances.
-    Map<String, List<String>> partitionToInstances = ImmutableMap.of(
+    Map<String, List<String>> partitionToInstances = Map.of(
         "0_0", ImmutableList.of("instance-0"),
         "0_1", ImmutableList.of("instance-2"),
         "1_0", ImmutableList.of("instance-1"),
@@ -219,7 +255,7 @@ public class MultiStageReplicaGroupSelectorTest {
   }
 
   private InstancePartitions createInstancePartitions(List<String> replicaGroup0, List<String> replicaGroup1) {
-    Map<String, List<String>> partitionToInstances = ImmutableMap.of("0_0", replicaGroup0, "0_1", replicaGroup1);
+    Map<String, List<String>> partitionToInstances = Map.of("0_0", replicaGroup0, "0_1", replicaGroup1);
     InstancePartitions instancePartitions = new InstancePartitions(TABLE_NAME);
     instancePartitions.setInstances(0, 0, partitionToInstances.get("0_0"));
     instancePartitions.setInstances(0, 1, partitionToInstances.get("0_1"));

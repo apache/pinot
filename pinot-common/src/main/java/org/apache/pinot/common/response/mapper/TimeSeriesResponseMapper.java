@@ -62,7 +62,7 @@ public class TimeSeriesResponseMapper {
 
   public static BrokerResponse toBrokerResponse(QueryException e) {
     BrokerResponseNativeV2 brokerResponse = new BrokerResponseNativeV2();
-    brokerResponse.addException(new QueryProcessingException(e.getErrorCode(), e.getMessage()));
+    brokerResponse.addException(QueryProcessingException.fromQueryException(e));
     return brokerResponse;
   }
 

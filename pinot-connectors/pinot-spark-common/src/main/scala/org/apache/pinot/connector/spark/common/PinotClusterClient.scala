@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.connector.spark.common
 
+import com.fasterxml.jackson.core.`type`.TypeReference
 import java.net.{URI, URLEncoder}
 import org.apache.pinot.connector.spark.common.query.ScanQuery
 import org.apache.pinot.spi.config.table.TableType
@@ -33,7 +34,7 @@ import com.fasterxml.jackson.annotation.JsonIgnoreProperties
  */
 private[pinot] object PinotClusterClient extends Logging {
   private val TABLE_SCHEMA_TEMPLATE = "%s://%s/tables/%s/schema"
-  private val TABLE_BROKER_INSTANCES_TEMPLATE = "%s://%s/v2/brokers/tables/%s"
+  private val TABLE_BROKER_INSTANCES_TEMPLATE = "%s://%s/tables/livebrokers?tables=%s"
   private val TIME_BOUNDARY_TEMPLATE = "%s://%s/debug/timeBoundary/%s"
   private val ROUTING_TABLE_TEMPLATE = "%s://%s/debug/routingTable/sql?query=%s"
   private val ROUTING_TABLE_SIMPLE_TEMPLATE = "%s://%s/debug/routingTable/%s"
@@ -71,12 +72,16 @@ private[pinot] object PinotClusterClient extends Logging {
       val uri = new URI(String.format(TABLE_BROKER_INSTANCES_TEMPLATE, scheme, targetUrl, tableName))
       val response = HttpUtils.sendGetRequest(uri, authHeader, authToken)
 
-      // Decode the JSON response into a list of BrokerEntry objects
-      val brokerEntries = decodeTo(response, classOf[Array[BrokerEntry]]).toList
+      // Decode the JSON response into a map of table name to list of LiveBrokerInfo objects
+      val typeRef = new TypeReference[Map[String, List[BrokerInstanceInfo]]] {}
+      val tableToInstancesMap = decodeTo(response, typeRef)
 
-      // Map the broker entries to "host:port" strings
-      val brokerUrls = brokerEntries.map { brokerEntry =>
-        s"${brokerEntry.host}:${brokerEntry.port}"
+      // Extract the LiveBrokerInfo list for the requested table
+      val brokerInfos = tableToInstancesMap.getOrElse(tableName, List.empty[BrokerInstanceInfo])
+
+      // Map the broker info objects to "host:port" strings
+      val brokerUrls = brokerInfos.map { brokerInfo =>
+        s"${brokerInfo.host}:${brokerInfo.port}"
       }
 
       if (brokerUrls.isEmpty) {
@@ -262,7 +267,9 @@ private[pinot] case class TimeBoundaryInfo(timeColumn: String, timeValue: String
 }
 
 @JsonIgnoreProperties(ignoreUnknown = true)
-private[pinot] case class BrokerEntry(host: String, port: Int)
+private[pinot] case class BrokerInstanceInfo(host: String,
+                                             port: Int,
+                                             instanceName: String)
 
 @JsonIgnoreProperties(ignoreUnknown = true)
 private[pinot] case class InstanceInfo(instanceName: String,

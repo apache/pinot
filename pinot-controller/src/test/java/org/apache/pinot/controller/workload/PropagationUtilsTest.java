@@ -30,6 +30,7 @@ import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.TableType;
 import org.apache.pinot.spi.config.workload.EnforcementProfile;
 import org.apache.pinot.spi.config.workload.NodeConfig;
+import org.apache.pinot.spi.config.workload.PropagationEntity;
 import org.apache.pinot.spi.config.workload.PropagationScheme;
 import org.apache.pinot.spi.config.workload.QueryWorkloadConfig;
 import org.apache.pinot.spi.utils.builder.TableConfigBuilder;
@@ -149,15 +150,22 @@ public class PropagationUtilsTest {
     @Test
     public void getQueryWorkloadConfigsForTagsTest() {
         // Create a list of query workload configurations
+        PropagationEntity entity1 = new PropagationEntity("table1", 100L, 100L, null);
+        PropagationEntity entity2 = new PropagationEntity("table2", 100L, 100L, null);
         QueryWorkloadConfig workloadConfig1 = createQueryWorkloadConfig("workload1",
-            new PropagationScheme(PropagationScheme.Type.TABLE, List.of("table1", "table2")),
-            new PropagationScheme(PropagationScheme.Type.TABLE, List.of("table1", "table2")));
+            new PropagationScheme(PropagationScheme.Type.TABLE, List.of(entity1, entity2)),
+            new PropagationScheme(PropagationScheme.Type.TABLE, List.of(entity1, entity2)));
+        PropagationEntity entity3 = new PropagationEntity("serverTag1", 100L, 100L, null);
+        PropagationEntity entity4 = new PropagationEntity("brokerTenant1_BROKER", 100L, 100L, null);
         QueryWorkloadConfig workloadConfig2 = createQueryWorkloadConfig("workload2",
-            new PropagationScheme(PropagationScheme.Type.TENANT, List.of("serverTag1")),
-            new PropagationScheme(PropagationScheme.Type.TENANT, List.of("brokerTenant1_BROKER")));
+            new PropagationScheme(PropagationScheme.Type.TENANT, List.of(entity3)),
+            new PropagationScheme(PropagationScheme.Type.TENANT, List.of(entity4)));
+        PropagationEntity entity5 = new PropagationEntity("serverTag2_REALTIME", 100L, 100L, null);
+        PropagationEntity entity6 = new PropagationEntity("brokerTenant2", 100L, 100L, null);
+        // Create a third workload config with different tags
         QueryWorkloadConfig workloadConfig3 = createQueryWorkloadConfig("workload3",
-            new PropagationScheme(PropagationScheme.Type.TENANT, List.of("serverTag2_REALTIME")),
-            new PropagationScheme(PropagationScheme.Type.TENANT, List.of("brokerTenant2")));
+            new PropagationScheme(PropagationScheme.Type.TENANT, List.of(entity5)),
+            new PropagationScheme(PropagationScheme.Type.TENANT, List.of(entity6)));
         List<QueryWorkloadConfig> queryWorkloadConfigs = List.of(workloadConfig1, workloadConfig2, workloadConfig3);
         // Create TableConfig for the workload
         List<TableConfig> tableConfigs = List.of(
@@ -183,7 +191,7 @@ public class PropagationUtilsTest {
         }
     }
 
-    private TableConfig createTableConfig(String tableName, String serverTag, String brokerTenant, TableType type) {
+    public TableConfig createTableConfig(String tableName, String serverTag, String brokerTenant, TableType type) {
         return new TableConfigBuilder(type)
             .setTableName(tableName)
             .setSegmentAssignmentStrategy("BalanceNumSegmentAssignmentStrategy")

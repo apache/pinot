@@ -150,7 +150,7 @@ public class JsonResponseEncoder implements ResponseEncoder {
 
   private Map<String, Object> extractMap(JsonNode jsonValue) {
     Map<String, Object> map = new HashMap<>();
-    jsonValue.fields().forEachRemaining(entry -> {
+    jsonValue.properties().forEach(entry -> {
       String key = entry.getKey();
       Object value = extractValue(entry.getValue());
       map.put(key, value);

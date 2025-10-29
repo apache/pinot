@@ -100,10 +100,6 @@ public class SegmentStatusChecker extends ControllerPeriodicTask<SegmentStatusCh
   }
 
   @Override
-  protected void setUpTask() {
-  }
-
-  @Override
   protected Context preprocess(Properties periodicTaskProperties) {
     Context context = new Context();
     // check if we need to log disabled tables log messages
@@ -521,10 +517,6 @@ public class SegmentStatusChecker extends ControllerPeriodicTask<SegmentStatusCh
         _controllerMetrics.removeTableTimer(tableNameWithType, metric);
       }
     }
-  }
-
-  @Override
-  public void cleanUpTask() {
   }
 
   public static final class Context {

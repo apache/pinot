@@ -60,8 +60,8 @@ public class UnionOperatorTest {
       result = unionOperator.nextBlock();
     }
     List<Object[]> expectedRows =
-        Arrays.asList(new Object[]{3, "aa"}, new Object[]{4, "bb"}, new Object[]{5, "cc"}, new Object[]{2, "BB"},
-            new Object[]{1, "AA"});
+        Arrays.asList(new Object[]{1, "AA"}, new Object[]{2, "BB"}, new Object[]{3, "aa"}, new Object[]{4, "bb"},
+            new Object[]{5, "cc"});
     Assert.assertEquals(resultRows.size(), expectedRows.size());
     for (int i = 0; i < resultRows.size(); i++) {
       Assert.assertEquals(resultRows.get(i), expectedRows.get(i));

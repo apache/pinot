@@ -23,6 +23,7 @@ import com.google.common.collect.Sets;
 import java.io.IOException;
 import java.time.Clock;
 import java.time.Duration;
+import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
@@ -35,6 +36,7 @@ import org.apache.kafka.clients.admin.AdminClient;
 import org.apache.kafka.clients.admin.ListTopicsResult;
 import org.apache.kafka.clients.consumer.OffsetAndTimestamp;
 import org.apache.kafka.common.PartitionInfo;
+import org.apache.kafka.common.TopicPartition;
 import org.apache.kafka.common.errors.TimeoutException;
 import org.apache.pinot.plugin.stream.kafka.KafkaConsumerPartitionLag;
 import org.apache.pinot.spi.stream.ConsumerPartitionState;
@@ -95,6 +97,28 @@ public class KafkaStreamMetadataProvider extends KafkaPartitionLevelConnectionHa
   }
 
   @Override
+  public Map<Integer, StreamPartitionMsgOffset> fetchLatestStreamOffset(Set<Integer> partitionIds, long timeoutMillis) {
+    List<TopicPartition> topicPartitions = new ArrayList<>(partitionIds.size());
+    for (Integer streamPartition: partitionIds) {
+      topicPartitions.add(new TopicPartition(_topic, streamPartition));
+    }
+    try {
+      Map<TopicPartition, Long> topicPartitionToLatestOffsetMap =
+          _consumer.endOffsets(topicPartitions, Duration.ofMillis(timeoutMillis));
+
+      Map<Integer, StreamPartitionMsgOffset> partitionIdToLatestOffset =
+          new HashMap<>(topicPartitionToLatestOffsetMap.size());
+      for (Map.Entry<TopicPartition, Long> entry : topicPartitionToLatestOffsetMap.entrySet()) {
+        partitionIdToLatestOffset.put(entry.getKey().partition(), new LongMsgOffset(entry.getValue()));
+      }
+
+      return partitionIdToLatestOffset;
+    } catch (TimeoutException e) {
+      throw new TransientConsumerException(e);
+    }
+  }
+
+  @Override
   public StreamPartitionMsgOffset fetchStreamPartitionOffset(OffsetCriteria offsetCriteria, long timeoutMillis) {
     Preconditions.checkNotNull(offsetCriteria);
     long offset;
@@ -144,7 +168,7 @@ public class KafkaStreamMetadataProvider extends KafkaPartitionLevelConnectionHa
   public Map<String, PartitionLagState> getCurrentPartitionLagState(
       Map<String, ConsumerPartitionState> currentPartitionStateMap) {
     Map<String, PartitionLagState> perPartitionLag = new HashMap<>();
-    for (Map.Entry<String, ConsumerPartitionState> entry: currentPartitionStateMap.entrySet()) {
+    for (Map.Entry<String, ConsumerPartitionState> entry : currentPartitionStateMap.entrySet()) {
       ConsumerPartitionState partitionState = entry.getValue();
       // Compute records-lag
       StreamPartitionMsgOffset currentOffset = partitionState.getCurrentOffset();
@@ -172,7 +196,8 @@ public class KafkaStreamMetadataProvider extends KafkaPartitionLevelConnectionHa
 
   @Override
   public List<TopicMetadata> getTopics() {
-    try (AdminClient adminClient = createAdminClient()) {
+    try {
+      AdminClient adminClient = getOrCreateSharedAdminClient();
       ListTopicsResult result = adminClient.listTopics();
       if (result == null) {
         return Collections.emptyList();
@@ -188,9 +213,55 @@ public class KafkaStreamMetadataProvider extends KafkaPartitionLevelConnectionHa
   }
 
   @Override
+  public boolean supportsOffsetLag() {
+    return true;
+  }
+
+  @Override
   public StreamPartitionMsgOffset getOffsetAtTimestamp(int partitionId, long timestampMillis, long timeoutMillis) {
-    return new LongMsgOffset(_consumer.offsetsForTimes(Map.of(_topicPartition, timestampMillis),
-            Duration.ofMillis(timeoutMillis)).get(_topicPartition).offset());
+    try {
+      OffsetAndTimestamp offsetAndTimestamp = _consumer.offsetsForTimes(Map.of(_topicPartition, timestampMillis),
+          Duration.ofMillis(timeoutMillis)).get(_topicPartition);
+      if (offsetAndTimestamp == null) {
+        return null;
+      }
+      return new LongMsgOffset(offsetAndTimestamp.offset());
+    } catch (Exception e) {
+      LOGGER.warn("Failed to get offset at timestamp {} for partition {}", timestampMillis, partitionId, e);
+      return null;
+    }
+  }
+
+  @Override
+  public Map<String, StreamPartitionMsgOffset> getStreamStartOffsets() {
+    List<PartitionInfo> partitionInfos = _consumer.partitionsFor(_topic);
+    Map<TopicPartition, Long> startOffsets = _consumer.beginningOffsets(
+        partitionInfos.stream()
+            .filter(info -> info != null)
+            .map(info -> new TopicPartition(_topic, info.partition()))
+            .collect(Collectors.toList()));
+    return startOffsets.entrySet().stream().collect(
+        Collectors.toMap(
+            entry -> String.valueOf(entry.getKey().partition()),
+            entry -> new LongMsgOffset(entry.getValue()),
+            (existingValue, newValue) -> newValue
+        ));
+  }
+
+  @Override
+  public Map<String, StreamPartitionMsgOffset> getStreamEndOffsets() {
+    List<PartitionInfo> partitionInfos = _consumer.partitionsFor(_topic);
+    Map<TopicPartition, Long> startOffsets = _consumer.endOffsets(
+        partitionInfos.stream()
+            .filter(info -> info != null)
+            .map(info -> new TopicPartition(_topic, info.partition()))
+            .collect(Collectors.toList()));
+    return startOffsets.entrySet().stream().collect(
+        Collectors.toMap(
+            entry -> String.valueOf(entry.getKey().partition()),
+            entry -> new LongMsgOffset(entry.getValue()),
+            (existingValue, newValue) -> newValue
+        ));
   }
 
   public static class KafkaTopicMetadata implements TopicMetadata {

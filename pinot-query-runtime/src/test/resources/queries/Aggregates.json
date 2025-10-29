@@ -44,7 +44,7 @@
       {
         "psql": "4.2.7",
         "description": "aggregations on string column",
-        "sql": "SELECT count(string_col), count(distinct(string_col)), count(*) FROM {tbl}"
+        "sql": "SELECT min(string_col), max(string_col), count(string_col), count(distinct(string_col)), count(*) FROM {tbl}"
       },
       {
         "psql": "4.2.7",
@@ -153,17 +153,17 @@
       {
         "psql": "4.2.7",
         "description": "aggregations on string column with filters",
-        "sql": "SELECT count(string_col), count(distinct(string_col)), count(*) FROM {tbl} WHERE string_col='b'"
+        "sql": "SELECT count(string_col), count(distinct(string_col)), count(*), min(string_col), max(string_col) FROM {tbl} WHERE string_col='b'"
       },
       {
         "psql": "4.2.7",
         "description": "aggregations on string column with filters",
-        "sql": "SELECT count(string_col), count(distinct(string_col)), count(*) FROM {tbl} WHERE int_col > 100"
+        "sql": "SELECT count(string_col), count(distinct(string_col)), count(*), min(string_col), max(string_col) FROM {tbl} WHERE int_col > 100"
       },
       {
         "psql": "4.2.7",
         "description": "aggregations on string column with filters",
-        "sql": "SELECT count(string_col), count(distinct(string_col)), count(*) FROM {tbl} WHERE int_col > 100 and double_col = 1.75"
+        "sql": "SELECT count(string_col), count(distinct(string_col)), count(*), min(string_col), max(string_col) FROM {tbl} WHERE int_col > 100 and double_col = 1.75"
       }
     ]
   },
@@ -226,12 +226,12 @@
       {
         "psql": "4.2.7",
         "description": "group by with aggregations on string column",
-        "sql": "SELECT bool_col, count(string_col), count(distinct(string_col)), count(*) FROM {tbl} GROUP BY bool_col"
+        "sql": "SELECT bool_col, count(string_col), count(distinct(string_col)), count(*), min(string_col), max(string_col) FROM {tbl} GROUP BY bool_col"
       },
       {
         "psql": "4.2.7",
         "description": "group by with aggregations on string column and order by",
-        "sql": "SELECT bool_col, count(string_col), count(distinct(string_col)), count(*) FROM {tbl} GROUP BY bool_col ORDER BY bool_col"
+        "sql": "SELECT bool_col, count(string_col), count(distinct(string_col)), count(*), min(string_col), max(string_col) FROM {tbl} GROUP BY bool_col ORDER BY bool_col"
       },
       {
         "psql": "4.2.7",
@@ -324,17 +324,17 @@
       {
         "psql": "4.2.7",
         "description": "aggregations on string column with filters",
-        "sql": "SELECT double_col, count(string_col), count(distinct(string_col)), count(*) FROM {tbl} WHERE string_col='b' GROUP BY double_col"
+        "sql": "SELECT double_col, count(string_col), count(distinct(string_col)), count(*), min(string_col), max(string_col) FROM {tbl} WHERE string_col='b' GROUP BY double_col"
       },
       {
         "psql": "4.2.7",
         "description": "aggregations on string column with filters",
-        "sql": "SELECT double_col, int_col, count(string_col), count(distinct(string_col)), count(*) FROM {tbl} WHERE int_col > 100 GROUP BY double_col, int_col"
+        "sql": "SELECT double_col, int_col, count(string_col), count(distinct(string_col)), count(*), min(string_col), max(string_col) FROM {tbl} WHERE int_col > 100 GROUP BY double_col, int_col"
       },
       {
         "psql": "4.2.7",
         "description": "aggregations on string column with filters",
-        "sql": "SELECT double_col, int_col, bool_col, count(string_col), count(distinct(string_col)), count(*) FROM {tbl} WHERE int_col > 100 and double_col = 1.75 GROUP BY double_col, int_col, bool_col"
+        "sql": "SELECT double_col, int_col, bool_col, count(string_col), count(distinct(string_col)), count(*), min(string_col), max(string_col) FROM {tbl} WHERE int_col > 100 and double_col = 1.75 GROUP BY double_col, int_col, bool_col"
       }
     ]
   },
@@ -438,7 +438,7 @@
       {
         "psql": "9.21.0",
         "description": "JOIN with simple aggregations on string columns",
-        "sql": "SELECT count(string_col), count(string_col2), count(distinct string_col), count(distinct string_col2) from {tbl1} JOIN {tbl2} ON int_col = int_col2"
+        "sql": "SELECT count(string_col), count(string_col2), count(distinct string_col), count(distinct string_col2), min(string_col), max(string_col) from {tbl1} JOIN {tbl2} ON int_col = int_col2"
       },
       {
         "psql": "9.21.0",
@@ -463,12 +463,12 @@
       {
         "psql": "9.21.0",
         "description": "JOIN with  aggregations on string columns and group by on double",
-        "sql": "SELECT double_col, count(string_col), count(string_col2), count(distinct string_col), count(distinct string_col2) from {tbl1} JOIN {tbl2} ON int_col = int_col2 GROUP BY double_col"
+        "sql": "SELECT double_col, count(string_col), count(string_col2), count(distinct string_col), count(distinct string_col2), min(string_col2), max(string_col2) from {tbl1} JOIN {tbl2} ON int_col = int_col2 GROUP BY double_col"
       },
       {
         "psql": "9.21.0",
         "description": "JOIN with  aggregations on string columns and group by on double, bool and int",
-        "sql": "SELECT double_col, bool_col, int_col, count(string_col), count(string_col2), count(distinct string_col), count(distinct string_col2) from {tbl1} JOIN {tbl2} ON int_col = int_col2 GROUP BY double_col, bool_col, int_col"
+        "sql": "SELECT double_col, bool_col, int_col, count(string_col), count(string_col2), count(distinct string_col), count(distinct string_col2), min(string_col2), max(string_col2) from {tbl1} JOIN {tbl2} ON int_col = int_col2 GROUP BY double_col, bool_col, int_col"
       },
       {
         "psql": "9.21.0",
@@ -658,13 +658,6 @@
         "comments": "parsing error:ORDER BY unexpected",
         "description": "aggregate double column followed with order by",
         "sql": "SELECT min(double_col ORDER BY int_col) FROM {tbl}"
-      },
-      {
-        "psql": "4.2.7",
-        "ignored": true,
-        "comments": "NumberFormatException: For input string: \"a\"",
-        "description": "aggregate string column",
-        "sql": "SELECT min(string_col) FROM {tbl}"
       },
       {
         "psql": "4.2.7",

@@ -28,7 +28,6 @@ import org.apache.avro.file.DataFileWriter;
 import org.apache.avro.generic.GenericData;
 import org.apache.avro.generic.GenericDatumWriter;
 import org.apache.commons.lang3.RandomStringUtils;
-import org.apache.pinot.core.util.DoubleComparisonUtil;
 import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.Schema;
 import org.testng.annotations.Test;
@@ -511,9 +510,9 @@ public class ArrayTest extends CustomDataQueryClusterIntegrationTest {
     assertEquals(entry1.size(), 4);
     assertEquals(entry1.get(0).doubleValue(), 0.0);
     // Compare double values:
-    assertEquals(DoubleComparisonUtil.defaultDoubleCompare(entry1.get(1).doubleValue(), 100.0), 0);
-    assertEquals(DoubleComparisonUtil.defaultDoubleCompare(entry1.get(2).doubleValue(), 200.0), 0);
-    assertEquals(DoubleComparisonUtil.defaultDoubleCompare(entry1.get(3).doubleValue(), 300.0), 0);
+    assertEquals(entry1.get(1).doubleValue(), 100.0, 0.000001);
+    assertEquals(entry1.get(2).doubleValue(), 200.0, 0.000001);
+    assertEquals(entry1.get(3).doubleValue(), 300.0, 0.000001);
   }
 
   @Test(dataProvider = "useBothQueryEngines")

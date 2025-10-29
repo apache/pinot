@@ -61,10 +61,10 @@ import org.apache.pinot.query.runtime.blocks.RowHeapDataBlock;
 import org.apache.pinot.query.runtime.blocks.SuccessMseBlock;
 import org.apache.pinot.query.runtime.operator.utils.TypeUtils;
 import org.apache.pinot.query.runtime.plan.OpChainExecutionContext;
-import org.apache.pinot.spi.accounting.ThreadExecutionContext;
 import org.apache.pinot.spi.exception.EarlyTerminationException;
 import org.apache.pinot.spi.exception.QueryErrorCode;
-import org.apache.pinot.spi.trace.Tracing;
+import org.apache.pinot.spi.exception.TerminationException;
+import org.apache.pinot.spi.query.QueryThreadContext;
 import org.apache.pinot.spi.utils.CommonConstants.Broker.Request.QueryOptionValue;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -172,17 +172,17 @@ public class LeafOperator extends MultiStageOperator {
           _blockingQueue.poll(_context.getPassiveDeadlineMs() - System.currentTimeMillis(), TimeUnit.MILLISECONDS);
     } catch (InterruptedException e) {
       terminateAndClearResultsBlocks();
-      return CANCELLED_BLOCK;
+      return replaceWithTerminateExceptionIfAvailable(CANCELLED_BLOCK);
     }
     if (resultsBlock == null) {
       terminateAndClearResultsBlocks();
-      return TIMEOUT_BLOCK;
+      return replaceWithTerminateExceptionIfAvailable(TIMEOUT_BLOCK);
     }
     // Terminate when there is error block
     ErrorMseBlock errorBlock = getErrorBlock();
     if (errorBlock != null) {
       terminateAndClearResultsBlocks();
-      return errorBlock;
+      return replaceWithTerminateExceptionIfAvailable(errorBlock);
     }
     if (resultsBlock == LAST_RESULTS_BLOCK) {
       _terminated = true;
@@ -191,6 +191,14 @@ public class LeafOperator extends MultiStageOperator {
       // Regular data block
       return composeMseBlock(resultsBlock);
     }
+  }
+
+  /// Check terminate exception and use it as the error block if exists. We want to return the termination reason when
+  /// query is explicitly terminated.
+  private MseBlock replaceWithTerminateExceptionIfAvailable(ErrorMseBlock errorBlock) {
+    TerminationException terminateException = QueryThreadContext.getTerminateException();
+    return terminateException != null ? ErrorMseBlock.fromError(terminateException.getErrorCode(),
+        terminateException.getMessage()) : errorBlock;
   }
 
   public ExplainedNode explain() {
@@ -210,17 +218,20 @@ public class LeafOperator extends MultiStageOperator {
             _blockingQueue.poll(_context.getPassiveDeadlineMs() - System.currentTimeMillis(), TimeUnit.MILLISECONDS);
       } catch (InterruptedException e) {
         terminateAndClearResultsBlocks();
+        checkTerminateException();
         Thread.currentThread().interrupt();
         throw new RuntimeException("Interrupted while waiting for results block", e);
       }
       if (resultsBlock == null) {
         terminateAndClearResultsBlocks();
+        checkTerminateException();
         throw new RuntimeException("Timed out waiting for results block");
       }
       // Terminate when there is error block
       ErrorMseBlock errorBlock = getErrorBlock();
       if (errorBlock != null) {
         terminateAndClearResultsBlocks();
+        checkTerminateException();
         throw new RuntimeException("Received error block: " + errorBlock.getErrorMessages());
       }
       if (resultsBlock == LAST_RESULTS_BLOCK) {
@@ -241,6 +252,13 @@ public class LeafOperator extends MultiStageOperator {
         Map.of("table", Plan.ExplainNode.AttributeValue.newBuilder().setString(_tableName).build());
     return new ExplainedNode(_context.getStageId(), _dataSchema, null, childNodes, "LeafStageCombineOperator",
         attributes);
+  }
+
+  private void checkTerminateException() {
+    TerminationException terminateException = QueryThreadContext.getTerminateException();
+    if (terminateException != null) {
+      throw terminateException;
+    }
   }
 
   @Override
@@ -266,6 +284,7 @@ public class LeafOperator extends MultiStageOperator {
 
   @VisibleForTesting
   void cancelSseTasks() {
+    terminateAndClearResultsBlocks();
     Future<?> executionFuture = _executionFuture;
     if (executionFuture != null) {
       executionFuture.cancel(true);
@@ -403,10 +422,9 @@ public class LeafOperator extends MultiStageOperator {
   }
 
   private Future<?> startExecution() {
-    ThreadExecutionContext parentContext = Tracing.getThreadAccountant().getThreadExecutionContext();
     return _executorService.submit(() -> {
       try {
-        execute(parentContext);
+        execute();
       } catch (Exception e) {
         setErrorBlock(
             ErrorMseBlock.fromError(QueryErrorCode.INTERNAL, "Caught exception while executing leaf stage: " + e));
@@ -425,20 +443,9 @@ public class LeafOperator extends MultiStageOperator {
   }
 
   @VisibleForTesting
-  void execute(@Nullable ThreadExecutionContext parentContext) {
+  void execute() {
     if (_requests.size() == 1) {
-      ServerQueryRequest request = _requests.get(0);
-      if (parentContext != null) {
-        // NOTE: Treat this as SSE runner (anchor) thread.
-        Tracing.ThreadAccountantOps.setupRunner(parentContext.getQueryId(), parentContext.getWorkloadName());
-        try {
-          executeOneRequest(request, null);
-        } finally {
-          Tracing.ThreadAccountantOps.clear();
-        }
-      } else {
-        executeOneRequest(request, null);
-      }
+      executeOneRequest(_requests.get(0), null);
     } else {
       // Hit 2 physical tables, one REALTIME and one OFFLINE
       assert _requests.size() == 2;
@@ -450,23 +457,11 @@ public class LeafOperator extends MultiStageOperator {
       for (int i = 0; i < 2; i++) {
         ServerQueryRequest request = _requests.get(i);
         futures[i] = _executorService.submit(() -> {
-          if (parentContext != null) {
-            // NOTE: Treat this as SSE runner (anchor) thread.
-            Tracing.ThreadAccountantOps.setupRunner(parentContext.getQueryId(), parentContext.getWorkloadName());
-            try {
-              // Drain the latch when receiving exception block and not wait for the other thread to finish
-              executeOneRequest(request, latch::countDown);
-            } finally {
-              Tracing.ThreadAccountantOps.clear();
-              latch.countDown();
-            }
-          } else {
-            try {
-              // Drain the latch when receiving exception block and not wait for the other thread to finish
-              executeOneRequest(request, latch::countDown);
-            } finally {
-              latch.countDown();
-            }
+          try {
+            // Drain the latch when receiving exception block and not wait for the other thread to finish
+            executeOneRequest(request, latch::countDown);
+          } finally {
+            latch.countDown();
           }
         });
       }
