@@ -222,6 +222,11 @@ public class DefaultWorkloadBudgetManager implements WorkloadBudgetManager {
     return stats._cpuRemaining > 0 && stats._memoryRemaining > 0;
   }
 
+  @Override
+  public boolean isCostCollectionEnabled() {
+    return _isCostCollectionEnabled;
+  }
+
   public Map<String, BudgetStats> getAllBudgetStats() {
     if (!_isCostCollectionEnabled) {
       return null;

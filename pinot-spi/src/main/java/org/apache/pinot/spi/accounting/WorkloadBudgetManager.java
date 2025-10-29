@@ -81,6 +81,8 @@ public interface WorkloadBudgetManager {
    */
   boolean canAdmitQuery(String workload);
 
+  boolean isCostCollectionEnabled();
+
   /**
    * Internal class representing budget statistics.
    * It contains initial CPU and memory budgets that are configured during workload registration,
