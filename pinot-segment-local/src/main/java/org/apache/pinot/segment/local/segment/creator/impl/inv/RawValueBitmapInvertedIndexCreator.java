@@ -174,6 +174,7 @@ public class RawValueBitmapInvertedIndexCreator implements RawValueBasedInverted
     }
     addValues(values, length);
   }
+  
   @Override
   public void add(Object value, int dictId)
       throws IOException {
@@ -186,12 +187,7 @@ public class RawValueBitmapInvertedIndexCreator implements RawValueBasedInverted
 
   private void addValue(Object value) {
     if (value != null) {
-      MutableRoaringBitmap bitmap = _valueToDocIds.get(value);
-      if (bitmap == null) {
-        bitmap = new MutableRoaringBitmap();
-        _valueToDocIds.put(value, bitmap);
-      }
-      bitmap.add(_nextDocId);
+      _valueToDocIds.computeIfAbsent(value, k -> new MutableRoaringBitmap()).add(_nextDocId);
     }
     _nextDocId++;
   }
@@ -199,12 +195,7 @@ public class RawValueBitmapInvertedIndexCreator implements RawValueBasedInverted
   private void addValues(Object[] values, int length) {
     for (int i = 0; i < length; i++) {
       if (values[i] != null) {
-        MutableRoaringBitmap bitmap = _valueToDocIds.get(values[i]);
-        if (bitmap == null) {
-          bitmap = new MutableRoaringBitmap();
-          _valueToDocIds.put(values[i], bitmap);
-        }
-        bitmap.add(_nextDocId);
+        _valueToDocIds.computeIfAbsent(values[i], k -> new MutableRoaringBitmap()).add(_nextDocId);
       }
     }
     _nextDocId++;
