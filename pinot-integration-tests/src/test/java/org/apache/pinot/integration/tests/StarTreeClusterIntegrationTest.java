@@ -202,6 +202,9 @@ public class StarTreeClusterIntegrationTest extends BaseClusterIntegrationTest {
         + "WHERE CRSDepTime BETWEEN 1137 AND 1849 AND DivArrDelay > 218 AND CRSDepTime NOT IN (35, 1633, 1457, 140) "
         + "AND LongestAddGTime NOT IN (17, 105, 20, 22) GROUP BY DepTimeBlk ORDER BY DepTimeBlk";
     testStarQuery(starQuery, !useMultiStageQueryEngine);
+
+    starQuery = "SET enableNullHandling=true; SELECT COUNT(DivArrDelay) FROM mytable WHERE DivArrDelay > 218";
+    testStarQuery(starQuery, false);
   }
 
   @Test(dataProvider = "useBothQueryEngines")
