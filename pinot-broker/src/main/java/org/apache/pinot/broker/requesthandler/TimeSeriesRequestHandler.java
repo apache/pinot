@@ -253,8 +253,12 @@ public class TimeSeriesRequestHandler extends BaseBrokerRequestHandler {
     // check authorization for table
     tableLevelAccessControlCheck(httpHeaders, dispatchablePlan.getTableNames());
     // validate column names for all LeafTimeSeriesPlanNode in the physical plan
+    validatePhysicalPlanColumns(dispatchablePlan);
+  }
+
+  private void validatePhysicalPlanColumns(TimeSeriesDispatchablePlan dispatchablePlan) {
     for (BaseTimeSeriesPlanNode serverFragmentRoot : dispatchablePlan.getServerFragments()) {
-      // traverse tree and validate all LeafTimeSeriesPlanNode
+      // traverse tree and validate all LeafTimeSeriesPlanNode has valid columns
       Stack<BaseTimeSeriesPlanNode> nodeStack = new Stack<>();
       nodeStack.push(serverFragmentRoot);
       while (!nodeStack.isEmpty()) {
@@ -288,9 +292,7 @@ public class TimeSeriesRequestHandler extends BaseBrokerRequestHandler {
     List<String> groupByExprs = leafNode.getGroupByExpressions();
     String timeCol = leafNode.getTimeColumn();
     // validate time column
-    if (!tableSchema.hasColumn(timeCol)) {
-      throw QueryErrorCode.UNKNOWN_COLUMN.asException(String.format("Time column '%s' not found in table '%s'.", timeCol, tableName));
-    }
+    validateColumnsInExpression(timeCol, tableName, tableSchema);
     // validate value expression columns
     validateColumnsInExpression(valueExpr, tableName, tableSchema);
     // validate group by Expressions

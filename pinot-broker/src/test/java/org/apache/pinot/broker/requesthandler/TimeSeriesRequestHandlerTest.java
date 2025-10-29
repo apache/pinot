@@ -1,3 +1,21 @@
+/**
+ * Licensed to the Apache Software Foundation (ASF) under one
+ * or more contributor license agreements.  See the NOTICE file
+ * distributed with this work for additional information
+ * regarding copyright ownership.  The ASF licenses this file
+ * to you under the Apache License, Version 2.0 (the
+ * "License"); you may not use this file except in compliance
+ * with the License.  You may obtain a copy of the License at
+ *
+ *   http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing,
+ * software distributed under the License is distributed on an
+ * "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+ * KIND, either express or implied.  See the License for the
+ * specific language governing permissions and limitations
+ * under the License.
+ */
 package org.apache.pinot.broker.requesthandler;
 
 import java.util.List;
@@ -39,8 +57,32 @@ public class TimeSeriesRequestHandlerTest {
   @Test
   void testValidateColumnNamesSuccess() {
     when(_leafNode.getTimeColumn()).thenReturn("ts");
-    when(_leafNode.getValueExpression()).thenReturn("SUM(colA)");
-    when(_leafNode.getGroupByExpressions()).thenReturn(List.of("colB", "DIMENSION(colC)"));
+    when(_leafNode.getValueExpression()).thenReturn("colA / colB");
+    when(_leafNode.getGroupByExpressions()).thenReturn(List.of(
+        "colB",
+        "DIMENSION(colC)",
+        "case when colA > 0 then 'positive' else 'non-negative' end",
+        "lower(colB)"
+        ));
+    when(_leafNode.getFilterExpression()).thenReturn("colB > 10 AND colA < 5 AND ts > 12345");
+
+    try {
+      TimeSeriesRequestHandler.validateColumnNames(_leafNode, _tableSchema);
+    } catch (Exception e) {
+      fail("Should not throw exception when all columns are valid: " + e.getMessage());
+    }
+  }
+
+  @Test
+  void testValidateColumnNamesSuccessWithTimeColumnExpression() {
+    when(_leafNode.getTimeColumn()).thenReturn("ts / 1000");
+    when(_leafNode.getValueExpression()).thenReturn("colA + 100");
+    when(_leafNode.getGroupByExpressions()).thenReturn(List.of(
+        "colB",
+        "DIMENSION(colC)",
+        "case when colA > 0 then 'positive' else 'non-negative' end",
+        "lower(colB)"
+    ));
     when(_leafNode.getFilterExpression()).thenReturn("colB > 10 AND colA < 5 AND ts > 12345");
 
     try {
@@ -60,7 +102,7 @@ public class TimeSeriesRequestHandlerTest {
       fail("Expected a QueryException to be thrown");
     } catch (QueryException e) {
       assertEquals(e.getErrorCode(), QueryErrorCode.UNKNOWN_COLUMN);
-      assertTrue(e.getMessage().contains("Time column 'invalid_ts_column' not found"));
+      assertTrue(e.getMessage().contains("Column 'invalid_ts_column' in expression 'invalid_ts_column' not found"));
     } catch (Exception e) {
       fail("Expected QueryException, but got " + e.getClass().getName(), e);
     }
@@ -137,8 +179,8 @@ public class TimeSeriesRequestHandlerTest {
 
   @Test
   public void testValidateColumnNamesWhenComplexExpressionsAllValid() {
-    when(_leafNode.getTimeColumn()).thenReturn("ts");
-    when(_leafNode.getValueExpression()).thenReturn("DIV(SUM(colA), COUNT(colB))");
+    when(_leafNode.getTimeColumn()).thenReturn("ts + 10");
+    when(_leafNode.getValueExpression()).thenReturn("colA + colB/100");
     when(_leafNode.getGroupByExpressions()).thenReturn(List.of("DATETRUNC('day', ts)", "CONCAT(colC, '-')"));
     when(_leafNode.getFilterExpression()).thenReturn("ts > 100 AND colA != 50");
 
