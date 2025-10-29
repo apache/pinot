@@ -148,8 +148,6 @@ public abstract class BaseSingleStageBrokerRequestHandler extends BaseBrokerRequ
       Map.entry("distinctsum", "distinctsummv"),
       Map.entry("distinctavg", "distinctavgmv"),
       Map.entry("count", "countmv"),
-      Map.entry("min", "minmv"),
-      Map.entry("max", "maxmv"),
       Map.entry("minmaxrange", "minmaxrangemv"),
       Map.entry("distinctcounthllplus", "distinctcounthllplusmv"),
       Map.entry("distinctcountrawhllplus", "distinctcountrawhllplusmv")

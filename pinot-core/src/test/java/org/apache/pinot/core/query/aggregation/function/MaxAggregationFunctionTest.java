@@ -181,4 +181,142 @@ public class MaxAggregationFunctionTest extends AbstractAggregationFunctionTest 
             "tag3    | null"
         );
   }
+
+  @Test
+  public void aggregationMVAllNulls() {
+    FluentQueryTest.withBaseDir(_baseDir)
+        .givenTable(
+            new Schema.SchemaBuilder()
+                .setSchemaName("testTable")
+                .setEnableColumnBasedNullHandling(true)
+                .addMultiValueDimension("mv", FieldSpec.DataType.INT)
+                .build(), SINGLE_FIELD_TABLE_CONFIG)
+        .onFirstInstance(
+            new Object[]{"null"}
+        )
+        .andOnSecondInstance(
+            new Object[]{"null"}
+        )
+        .whenQuery("select max(mv) from testTable")
+        .thenResultIs("DOUBLE",
+            String.valueOf(
+                (int) FieldSpec.getDefaultNullValue(FieldSpec.FieldType.DIMENSION, FieldSpec.DataType.INT, null))
+        )
+        .whenQueryWithNullHandlingEnabled("select max(mv) from testTable")
+        .thenResultIs("DOUBLE", "null");
+  }
+
+  @Test
+  public void aggregationMVWithNulls() {
+    FluentQueryTest.withBaseDir(_baseDir)
+        .givenTable(
+            new Schema.SchemaBuilder()
+                .setSchemaName("testTable")
+                .setEnableColumnBasedNullHandling(true)
+                .addMultiValueDimension("mv", FieldSpec.DataType.INT)
+                .build(), SINGLE_FIELD_TABLE_CONFIG)
+        .onFirstInstance(
+            new Object[]{"1;2;3"}
+        )
+        .andOnSecondInstance(
+            new Object[]{"null"}
+        )
+        .whenQuery("select max(mv) from testTable")
+        .thenResultIs("DOUBLE", "3")
+        .whenQueryWithNullHandlingEnabled("select max(mv) from testTable")
+        .thenResultIs("DOUBLE", "3");
+  }
+
+  @Test
+  public void aggregationMVGroupBySVAllNulls() {
+    FluentQueryTest.withBaseDir(_baseDir)
+        .givenTable(
+            new Schema.SchemaBuilder()
+                .setSchemaName("testTable")
+                .setEnableColumnBasedNullHandling(true)
+                .addMultiValueDimension("mv", FieldSpec.DataType.INT)
+                .addSingleValueDimension("sv", FieldSpec.DataType.STRING)
+                .build(), SINGLE_FIELD_TABLE_CONFIG)
+        .onFirstInstance(
+            new Object[]{"null", "k1"}
+        )
+        .andOnSecondInstance(
+            new Object[]{"null", "k1"}
+        )
+        .whenQuery("select max(mv) from testTable group by sv")
+        .thenResultIs("DOUBLE",
+            String.valueOf(FieldSpec.getDefaultNullValue(FieldSpec.FieldType.DIMENSION, FieldSpec.DataType.INT, null)))
+        .whenQueryWithNullHandlingEnabled("select max(mv) from testTable group by sv")
+        .thenResultIs("DOUBLE", "null");
+  }
+
+  @Test
+  public void aggregationGroupBySVWithNulls() {
+    FluentQueryTest.withBaseDir(_baseDir)
+        .givenTable(
+            new Schema.SchemaBuilder()
+                .setSchemaName("testTable")
+                .setEnableColumnBasedNullHandling(true)
+                .addMultiValueDimension("mv", FieldSpec.DataType.INT)
+                .addSingleValueDimension("sv", FieldSpec.DataType.STRING)
+                .build(), SINGLE_FIELD_TABLE_CONFIG)
+        .onFirstInstance(
+            new Object[]{"null", "k1"},
+            new Object[]{"1;2;3", "k2"}
+        )
+        .andOnSecondInstance(
+            new Object[]{"null", "k2"},
+            new Object[]{"1;2;3", "k1"}
+        )
+        .whenQuery("select max(mv) from testTable group by sv")
+        .thenResultIs("DOUBLE", "3", "3")
+        .whenQueryWithNullHandlingEnabled("select max(mv) from testTable group by sv")
+        .thenResultIs("DOUBLE", "3", "3");
+  }
+
+  @Test
+  public void aggregationMVGroupByMVAllNulls() {
+    FluentQueryTest.withBaseDir(_baseDir)
+        .givenTable(
+            new Schema.SchemaBuilder()
+                .setSchemaName("testTable")
+                .setEnableColumnBasedNullHandling(true)
+                .addMultiValueDimension("mv1", FieldSpec.DataType.INT)
+                .addMultiValueDimension("mv2", FieldSpec.DataType.STRING)
+                .build(), SINGLE_FIELD_TABLE_CONFIG)
+        .onFirstInstance(
+            new Object[]{"null", "k1;k2"}
+        )
+        .andOnSecondInstance(
+            new Object[]{"null", "k1;k2"}
+        )
+        .whenQuery("select max(mv1) from testTable group by mv2")
+        .thenResultIs("DOUBLE",
+            String.valueOf(FieldSpec.getDefaultNullValue(FieldSpec.FieldType.DIMENSION, FieldSpec.DataType.INT, null)),
+            String.valueOf(FieldSpec.getDefaultNullValue(FieldSpec.FieldType.DIMENSION, FieldSpec.DataType.INT, null)))
+        .whenQueryWithNullHandlingEnabled("select max(mv1) from testTable group by mv2")
+        .thenResultIs("DOUBLE", "null", "null");
+  }
+
+  @Test
+  public void aggregationMVGroupByMVWithNulls() {
+    FluentQueryTest.withBaseDir(_baseDir)
+        .givenTable(
+            new Schema.SchemaBuilder()
+                .setSchemaName("testTable")
+                .setEnableColumnBasedNullHandling(true)
+                .addMultiValueDimension("mv1", FieldSpec.DataType.INT)
+                .addMultiValueDimension("mv2", FieldSpec.DataType.STRING)
+                .build(), SINGLE_FIELD_TABLE_CONFIG)
+        .onFirstInstance(
+            new Object[]{"1;2", "k1;k2"}
+        )
+        .andOnSecondInstance(
+            new Object[]{"null", "k1;k2"}
+        )
+        .whenQuery("select max(mv1) from testTable group by mv2")
+        .thenResultIs("DOUBLE", "2", "2")
+        .whenQueryWithNullHandlingEnabled("select max(mv1) from testTable group by mv2")
+        .thenResultIs("DOUBLE", "2", "2");
+  }
 }

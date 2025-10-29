@@ -51,8 +51,10 @@ public enum AggregationFunctionType {
   // Aggregation functions for single-valued columns
   COUNT("count"),
   // TODO: min/max only supports NUMERIC in Pinot, where Calcite supports COMPARABLE_ORDERED
-  MIN("min", SqlTypeName.DOUBLE, SqlTypeName.DOUBLE),
-  MAX("max", SqlTypeName.DOUBLE, SqlTypeName.DOUBLE),
+  MIN("min", new PinotMinMaxReturnTypeInference(), OperandTypes.or(OperandTypes.COMPARABLE_ORDERED, OperandTypes.ARRAY),
+      SqlTypeName.DOUBLE, SqlTypeName.DOUBLE),
+  MAX("max", new PinotMinMaxReturnTypeInference(), OperandTypes.or(OperandTypes.COMPARABLE_ORDERED, OperandTypes.ARRAY),
+      SqlTypeName.DOUBLE, SqlTypeName.DOUBLE),
   MINSTRING("minString", ReturnTypes.ARG0_NULLABLE_IF_EMPTY, OperandTypes.CHARACTER),
   MAXSTRING("maxString", ReturnTypes.ARG0_NULLABLE_IF_EMPTY, OperandTypes.CHARACTER),
   MINLONG("minLong", new BigintNullableIfEmpty(), OperandTypes.or(OperandTypes.INTEGER, OperandTypes.ARRAY_OF_INTEGER)),
@@ -405,9 +407,9 @@ public enum AggregationFunctionType {
     }
   }
 
-  // Used for aggregation functions that always return BIGINT. The "IfEmpty" logic ensures that the return type is
-  // nullable for pure aggregation queries (no group-by) and filtered aggregation queries. Return values can be null
-  // if there are no matching rows (even if the operand type is not nullable).
+  /// Used for aggregation functions that always return BIGINT. The "IfEmpty" logic ensures that the return type is
+  /// nullable for pure aggregation queries (no group-by) and filtered aggregation queries. Return values can be null
+  /// if there are no matching rows (even if the operand type is not nullable).
   private static class BigintNullableIfEmpty implements SqlReturnTypeInference {
     @Override
     public RelDataType inferReturnType(SqlOperatorBinding opBinding) {
@@ -420,6 +422,25 @@ public enum AggregationFunctionType {
         } else {
           return typeFactory.createSqlType(SqlTypeName.BIGINT);
         }
+      }
+    }
+  }
+
+  /// Pinot's MIN / MAX aggregation functions can be used on SV or MV (represented as Calcite array) types.
+  private static class PinotMinMaxReturnTypeInference implements SqlReturnTypeInference {
+    @Override
+    public RelDataType inferReturnType(SqlOperatorBinding opBinding) {
+      RelDataType operandType;
+      if (opBinding.getOperandType(0).getComponentType() != null) {
+        operandType = opBinding.getOperandType(0).getComponentType();
+      } else {
+        operandType = opBinding.getOperandType(0);
+      }
+
+      if (opBinding.getGroupCount() == 0 || opBinding.hasFilter()) {
+        return opBinding.getTypeFactory().createTypeWithNullability(operandType, true);
+      } else {
+        return operandType;
       }
     }
   }
