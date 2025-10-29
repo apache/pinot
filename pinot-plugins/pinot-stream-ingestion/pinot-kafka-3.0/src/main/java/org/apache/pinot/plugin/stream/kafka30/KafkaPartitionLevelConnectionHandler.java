@@ -25,7 +25,9 @@ import java.util.Collections;
 import java.util.Properties;
 import java.util.Set;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.Supplier;
+import javax.annotation.Nullable;
 import org.apache.kafka.clients.admin.AdminClient;
 import org.apache.kafka.clients.admin.AdminClientConfig;
 import org.apache.kafka.clients.consumer.Consumer;
@@ -40,6 +42,9 @@ import org.apache.pinot.plugin.stream.kafka.KafkaAdminClientManager;
 import org.apache.pinot.plugin.stream.kafka.KafkaPartitionLevelStreamConfig;
 import org.apache.pinot.plugin.stream.kafka.KafkaSSLUtils;
 import org.apache.pinot.spi.stream.StreamConfig;
+import org.apache.pinot.spi.utils.retry.AttemptsExceededException;
+import org.apache.pinot.spi.utils.retry.RetriableOperationException;
+import org.apache.pinot.spi.utils.retry.RetryPolicy;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -64,13 +69,22 @@ public abstract class KafkaPartitionLevelConnectionHandler {
   protected volatile KafkaAdminClientManager.AdminClientReference _sharedAdminClientRef;
 
   public KafkaPartitionLevelConnectionHandler(String clientId, StreamConfig streamConfig, int partition) {
+    this(clientId, streamConfig, partition, null);
+  }
+
+  public KafkaPartitionLevelConnectionHandler(String clientId, StreamConfig streamConfig, int partition,
+      @Nullable RetryPolicy retryPolicy) {
     _config = new KafkaPartitionLevelStreamConfig(streamConfig);
     _clientId = clientId;
     _partition = partition;
     _topic = _config.getKafkaTopicName();
     _consumerProp = buildProperties(streamConfig);
     KafkaSSLUtils.initSSL(_consumerProp);
-    _consumer = createConsumer(_consumerProp);
+    if (retryPolicy == null) {
+      _consumer = createConsumer(_consumerProp);
+    } else {
+      _consumer = createConsumer(_consumerProp, retryPolicy);
+    }
     _topicPartition = new TopicPartition(_topic, _partition);
     _consumer.assign(Collections.singletonList(_topicPartition));
   }
@@ -104,6 +118,25 @@ public abstract class KafkaPartitionLevelConnectionHandler {
       }
     }
     return filteredProps;
+  }
+
+  private Consumer<String, Bytes> createConsumer(Properties consumerProp, RetryPolicy retryPolicy) {
+    AtomicReference<Consumer<String, Bytes>> consumer = new AtomicReference<>();
+    try {
+      retryPolicy.attempt(() -> {
+        try {
+          consumer.set(new KafkaConsumer<>(filterKafkaProperties(consumerProp, CONSUMER_CONFIG_NAMES)));
+          return true;
+        } catch (Exception e) {
+          LOGGER.warn("Caught exception while creating Kafka consumer, retrying.", e);
+          return false;
+        }
+      });
+    } catch (AttemptsExceededException | RetriableOperationException e) {
+      LOGGER.error("Caught exception while creating Kafka consumer, giving up", e);
+      throw new RuntimeException(e);
+    }
+    return consumer.get();
   }
 
   @VisibleForTesting

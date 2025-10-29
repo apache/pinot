@@ -177,7 +177,7 @@ public class StatelessRealtimeSegmentWriter implements Closeable {
     // Load stats history, here we are using the same stats while as the RealtimeSegmentDataManager so that we are
     // much more efficient in allocating buffers. It also works with empty file
     File statsHistoryFile = new File(tableDataDir, SEGMENT_STATS_FILE_NAME);
-    RealtimeSegmentStatsHistory statsHistory = RealtimeSegmentStatsHistory.deserialzeFrom(statsHistoryFile);
+    RealtimeSegmentStatsHistory statsHistory = RealtimeSegmentStatsHistory.deserializeFrom(statsHistoryFile);
 
     // Initialize mutable segment with configurations
     RealtimeSegmentConfig.Builder realtimeSegmentConfigBuilder = new RealtimeSegmentConfig.Builder(indexLoadingConfig)

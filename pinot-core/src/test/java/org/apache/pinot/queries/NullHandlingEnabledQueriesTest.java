@@ -18,12 +18,12 @@
  */
 package org.apache.pinot.queries;
 
-import com.google.common.collect.ImmutableMap;
 import java.io.File;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
+import java.util.Map;
 import org.apache.commons.io.FileUtils;
 import org.apache.pinot.common.response.broker.BrokerResponseNative;
 import org.apache.pinot.common.response.broker.ResultTable;
@@ -59,7 +59,7 @@ public class NullHandlingEnabledQueriesTest extends BaseQueriesTest {
   private static final String COLUMN2 = "column2";
   private static final int NUM_OF_SEGMENT_COPIES = 4;
   private final List<GenericRow> _rows = new ArrayList<>();
-  private static final ImmutableMap<String, String> QUERY_OPTIONS = ImmutableMap.of("enableNullHandling", "true");
+  private static final Map<String, String> QUERY_OPTIONS = Map.of("enableNullHandling", "true");
 
   private IndexSegment _indexSegment;
   private List<IndexSegment> _indexSegments;

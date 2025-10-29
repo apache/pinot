@@ -578,10 +578,26 @@ public class SegmentIndexCreationDriverImpl implements SegmentIndexCreationDrive
     if (CollectionUtils.isNotEmpty(starTreeIndexConfigs) || enableDefaultStarTree) {
       MultipleTreesBuilder.BuildMode buildMode =
           _config.isOnHeap() ? MultipleTreesBuilder.BuildMode.ON_HEAP : MultipleTreesBuilder.BuildMode.OFF_HEAP;
-      try (
-          MultipleTreesBuilder builder = new MultipleTreesBuilder(starTreeIndexConfigs, enableDefaultStarTree, indexDir,
-              buildMode)) {
+      MultipleTreesBuilder builder = new MultipleTreesBuilder(starTreeIndexConfigs, enableDefaultStarTree, indexDir,
+          buildMode);
+      // We don't create the builder using the try-with-resources pattern because builder.close() performs
+      // some clean-up steps to roll back the star-tree index to the previous state if it exists. If this goes wrong
+      // the star-tree index can be in an inconsistent state. To prevent that, when builder.close() throws an
+      // exception we want to propagate that up instead of ignoring it. This can get clunky when using
+      // try-with-resources as in this scenario the close() exception will be added to the suppressed exception list
+      // rather than thrown as the main exception, even though the original exception thrown on build() is ignored.
+      try {
         builder.build();
+      } catch (Exception e) {
+        String tableNameWithType = _config.getTableConfig().getTableName();
+        LOGGER.error("Failed to build star-tree index for table: {}, skipping", tableNameWithType, e);
+        if (_instanceType == InstanceType.MINION) {
+          MinionMetrics.get().addMeteredTableValue(tableNameWithType, MinionMeter.STAR_TREE_INDEX_BUILD_FAILURES, 1);
+        } else {
+          ServerMetrics.get().addMeteredTableValue(tableNameWithType, ServerMeter.STAR_TREE_INDEX_BUILD_FAILURES, 1);
+        }
+      } finally {
+        builder.close();
       }
     }
   }

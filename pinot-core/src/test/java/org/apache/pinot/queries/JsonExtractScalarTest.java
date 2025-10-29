@@ -19,8 +19,8 @@
 package org.apache.pinot.queries;
 
 import com.google.common.collect.ImmutableList;
-import com.google.common.collect.ImmutableMap;
 import java.nio.charset.StandardCharsets;
+import java.util.Map;
 import org.apache.pinot.spi.config.table.FieldConfig;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.TableType;
@@ -46,11 +46,11 @@ public class JsonExtractScalarTest extends BaseJsonQueryTest {
       .addSingleValueDimension(JSON_COLUMN_WITHOUT_INDEX, FieldSpec.DataType.JSON).build();
 
   private static final FieldConfig RAW_JSON_COLUMN_CONFIG = new FieldConfig(RAW_JSON_COLUMN,
-      FieldConfig.EncodingType.RAW, ImmutableList.of(), FieldConfig.CompressionCodec.LZ4, ImmutableMap.of());
+      FieldConfig.EncodingType.RAW, ImmutableList.of(), FieldConfig.CompressionCodec.LZ4, Map.of());
   private static final FieldConfig RAW_BYTES_COLUMN_CONFIG = new FieldConfig(RAW_BYTES_COLUMN,
-      FieldConfig.EncodingType.RAW, ImmutableList.of(), FieldConfig.CompressionCodec.LZ4, ImmutableMap.of());
+      FieldConfig.EncodingType.RAW, ImmutableList.of(), FieldConfig.CompressionCodec.LZ4, Map.of());
   private static final FieldConfig RAW_STRING_COLUMN_CONFIG = new FieldConfig(RAW_STRING_COLUMN,
-      FieldConfig.EncodingType.RAW, ImmutableList.of(), FieldConfig.CompressionCodec.LZ4, ImmutableMap.of());
+      FieldConfig.EncodingType.RAW, ImmutableList.of(), FieldConfig.CompressionCodec.LZ4, Map.of());
 
   private static final TableConfig TABLE_CONFIG =
       new TableConfigBuilder(TableType.OFFLINE).setTableName(RAW_TABLE_NAME)

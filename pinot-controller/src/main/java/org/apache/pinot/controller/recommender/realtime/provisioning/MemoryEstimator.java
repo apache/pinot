@@ -148,7 +148,7 @@ public class MemoryEstimator {
     File statsFile = new File(_workingDir, STATS_FILE_NAME);
     RealtimeSegmentStatsHistory sampleStatsHistory;
     try {
-      sampleStatsHistory = RealtimeSegmentStatsHistory.deserialzeFrom(statsFile);
+      sampleStatsHistory = RealtimeSegmentStatsHistory.deserializeFrom(statsFile);
     } catch (IOException | ClassNotFoundException e) {
       throw new RuntimeException(
           "Exception when deserializing stats history from stats file " + statsFile.getAbsolutePath(), e);
@@ -314,7 +314,7 @@ public class MemoryEstimator {
     FileUtils.copyFile(statsFile, statsFileCopy);
     RealtimeSegmentStatsHistory statsHistory;
     try {
-      statsHistory = RealtimeSegmentStatsHistory.deserialzeFrom(statsFileCopy);
+      statsHistory = RealtimeSegmentStatsHistory.deserializeFrom(statsFileCopy);
     } catch (IOException | ClassNotFoundException e) {
       throw new RuntimeException(
           "Exception when deserializing stats history from stats file " + statsFileCopy.getAbsolutePath(), e);

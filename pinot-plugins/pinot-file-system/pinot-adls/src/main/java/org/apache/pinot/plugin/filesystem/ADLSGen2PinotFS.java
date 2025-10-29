@@ -396,7 +396,7 @@ public class ADLSGen2PinotFS extends BasePinotFS {
   /**
    * Checks if the file exists at a given location
    *
-   * @param fileUri location to check the existance of the file.
+   * @param fileUri location to check the existence of the file.
    * @return true if exists else false.
    */
   @Override

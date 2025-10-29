@@ -32,7 +32,7 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
-import java.util.function.Supplier;
+import java.util.function.BooleanSupplier;
 import org.apache.commons.lang3.tuple.Pair;
 import org.apache.pinot.common.metrics.ServerGauge;
 import org.apache.pinot.common.metrics.ServerMetrics;
@@ -96,7 +96,7 @@ public class IngestionDelayTrackerTest {
 
     public MockIngestionDelayTracker(ServerMetrics serverMetrics, String tableNameWithType,
         RealtimeTableDataManager realtimeTableDataManager, int timerThreadTickIntervalMs, int metricTrackingIntervalMs,
-        Supplier<Boolean> isServerReadyToServeQueries) {
+        BooleanSupplier isServerReadyToServeQueries) {
       super(serverMetrics, tableNameWithType, realtimeTableDataManager, timerThreadTickIntervalMs,
           metricTrackingIntervalMs, isServerReadyToServeQueries);
     }

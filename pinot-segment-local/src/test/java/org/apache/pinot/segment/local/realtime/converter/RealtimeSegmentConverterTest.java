@@ -167,7 +167,7 @@ public class RealtimeSegmentConverterTest implements PinotBuffersAfterMethodChec
             .setIndex(Sets.newHashSet(STRING_COLUMN1), StandardIndexes.inverted(), IndexConfig.ENABLED)
             .setSegmentZKMetadata(getSegmentZKMetadata(segmentName)).setOffHeap(true)
             .setMemoryManager(new DirectMemoryManager(segmentName))
-            .setStatsHistory(RealtimeSegmentStatsHistory.deserialzeFrom(new File(tmpDir, "stats")))
+            .setStatsHistory(RealtimeSegmentStatsHistory.deserializeFrom(new File(tmpDir, "stats")))
             .setConsumerDir(new File(tmpDir, "consumerDir").getAbsolutePath());
 
     // create mutable segment impl
@@ -239,7 +239,7 @@ public class RealtimeSegmentConverterTest implements PinotBuffersAfterMethodChec
             .setIndex(Sets.newHashSet(STRING_COLUMN1, LONG_COLUMN1), StandardIndexes.inverted(), IndexConfig.ENABLED)
             .setSegmentZKMetadata(getSegmentZKMetadata(segmentName)).setOffHeap(true)
             .setMemoryManager(new DirectMemoryManager(segmentName))
-            .setStatsHistory(RealtimeSegmentStatsHistory.deserialzeFrom(new File(tmpDir, "stats")))
+            .setStatsHistory(RealtimeSegmentStatsHistory.deserializeFrom(new File(tmpDir, "stats")))
             .setConsumerDir(new File(tmpDir, "consumerDir").getAbsolutePath());
 
     // create mutable segment impl
@@ -319,7 +319,7 @@ public class RealtimeSegmentConverterTest implements PinotBuffersAfterMethodChec
             .setIndex(Sets.newHashSet(STRING_COLUMN1), StandardIndexes.inverted(), IndexConfig.ENABLED)
             .setSegmentZKMetadata(getSegmentZKMetadata(segmentName)).setOffHeap(true)
             .setMemoryManager(new DirectMemoryManager(segmentName))
-            .setStatsHistory(RealtimeSegmentStatsHistory.deserialzeFrom(new File(tmpDir, "stats")))
+            .setStatsHistory(RealtimeSegmentStatsHistory.deserializeFrom(new File(tmpDir, "stats")))
             .setConsumerDir(new File(tmpDir, "consumerDir").getAbsolutePath());
 
     // create mutable segment impl
@@ -391,7 +391,7 @@ public class RealtimeSegmentConverterTest implements PinotBuffersAfterMethodChec
             .setIndex(Sets.newHashSet(STRING_COLUMN1, LONG_COLUMN1), StandardIndexes.inverted(), IndexConfig.ENABLED)
             .setSegmentZKMetadata(getSegmentZKMetadata(segmentName)).setOffHeap(true)
             .setMemoryManager(new DirectMemoryManager(segmentName))
-            .setStatsHistory(RealtimeSegmentStatsHistory.deserialzeFrom(new File(tmpDir, "stats")))
+            .setStatsHistory(RealtimeSegmentStatsHistory.deserializeFrom(new File(tmpDir, "stats")))
             .setConsumerDir(new File(tmpDir, "consumerDir").getAbsolutePath());
 
     // create mutable segment impl
@@ -505,7 +505,7 @@ public class RealtimeSegmentConverterTest implements PinotBuffersAfterMethodChec
                 DictionaryIndexConfig.DEFAULT)
             .setSegmentZKMetadata(getSegmentZKMetadata(segmentName)).setOffHeap(true)
             .setMemoryManager(new DirectMemoryManager(segmentName))
-            .setStatsHistory(RealtimeSegmentStatsHistory.deserialzeFrom(new File(tmpDir, "stats")))
+            .setStatsHistory(RealtimeSegmentStatsHistory.deserializeFrom(new File(tmpDir, "stats")))
             .setConsumerDir(new File(tmpDir, "consumerDir").getAbsolutePath());
 
     // create mutable segment impl
@@ -621,7 +621,7 @@ public class RealtimeSegmentConverterTest implements PinotBuffersAfterMethodChec
             .setIndex(Sets.newHashSet(STRING_COLUMN1), StandardIndexes.dictionary(), dictionaryIndexConfig)
             .setSegmentZKMetadata(getSegmentZKMetadata(segmentName))
             .setOffHeap(true).setMemoryManager(new DirectMemoryManager(segmentName))
-            .setStatsHistory(RealtimeSegmentStatsHistory.deserialzeFrom(new File(tmpDir, "stats")))
+            .setStatsHistory(RealtimeSegmentStatsHistory.deserializeFrom(new File(tmpDir, "stats")))
             .setConsumerDir(new File(tmpDir, "consumerDir").getAbsolutePath());
 
     // create mutable segment impl

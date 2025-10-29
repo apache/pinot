@@ -41,12 +41,15 @@ public class ValueAggregatorTest {
   public static Object[][] fixedSizeAggregatedValue() {
     return new Object[][]{
         {AggregationFunctionType.COUNT, List.of(), true},
+        {AggregationFunctionType.COUNTMV, List.of(), true},
         {AggregationFunctionType.MIN, List.of(), true},
         {AggregationFunctionType.MAX, List.of(), true},
         {AggregationFunctionType.SUM, List.of(), true},
+        {AggregationFunctionType.SUMMV, List.of(), true},
         {AggregationFunctionType.SUMPRECISION, List.of(), false},
         {AggregationFunctionType.SUMPRECISION, List.of(ExpressionContext.forLiteral(Literal.intValue(20))), true},
         {AggregationFunctionType.AVG, List.of(), true},
+        {AggregationFunctionType.AVGMV, List.of(), true},
         {AggregationFunctionType.MINMAXRANGE, List.of(), true},
         {AggregationFunctionType.DISTINCTCOUNTBITMAP, List.of(), false},
         {AggregationFunctionType.DISTINCTCOUNTHLL, List.of(), true},

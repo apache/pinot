@@ -24,7 +24,6 @@ import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
 import com.google.common.base.Predicate;
 import com.google.common.base.Splitter;
-import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.ImmutableSet;
 import it.unimi.dsi.fastutil.doubles.DoubleArrayList;
 import it.unimi.dsi.fastutil.ints.IntArrayList;
@@ -529,15 +528,9 @@ public class RequestUtils {
     return StringUtils.remove(functionName, '_').toLowerCase();
   }
 
-  private static final Map<String, String> CANONICAL_NAME_TO_SPECIAL_KEY_MAP;
-
-  static {
-    ImmutableMap.Builder<String, String> builder = ImmutableMap.builder();
-    for (FilterKind filterKind : FilterKind.values()) {
-      builder.put(canonicalizeFunctionName(filterKind.name()), filterKind.name());
-    }
-    CANONICAL_NAME_TO_SPECIAL_KEY_MAP = builder.build();
-  }
+  private static final Map<String, String> CANONICAL_NAME_TO_SPECIAL_KEY_MAP =
+      Map.copyOf(Arrays.stream(FilterKind.values())
+          .collect(Collectors.toMap(f -> canonicalizeFunctionName(f.name()), Enum::name)));
 
   /**
    * Converts the function name into its canonical form, but preserving the special keys.

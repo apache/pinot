@@ -44,7 +44,7 @@ INT;mv;dict;json_index;false;Cannot create JSON index on multi-value column: col
 INT;mv;dict;native_text_index;false;Cannot create TEXT index on column: col of stored type other than STRING
 INT;mv;dict;text_index;false;Cannot create TEXT index on column: col of stored type other than STRING
 INT;mv;dict;range_index;true;
-INT;mv;dict;startree_index;false;Star-tree index can only be created on single-value columns, but found multi-value column: col
+INT;mv;dict;startree_index;false;Star-tree dimension columns must be single-value, but found multi-value column: col
 INT;mv;dict;vector_index;false;Cannot create vector index on column: col of stored type other than FLOAT
 INT;mv;dict;multi_col_text_index;false;Cannot create TEXT index on column: col of stored type other than STRING
 LONG;sv;raw;timestamp_index;true;
@@ -92,7 +92,7 @@ LONG;mv;dict;json_index;false;Cannot create JSON index on multi-value column: co
 LONG;mv;dict;native_text_index;false;Cannot create TEXT index on column: col of stored type other than STRING
 LONG;mv;dict;text_index;false;Cannot create TEXT index on column: col of stored type other than STRING
 LONG;mv;dict;range_index;true;
-LONG;mv;dict;startree_index;false;Star-tree index can only be created on single-value columns, but found multi-value column: col
+LONG;mv;dict;startree_index;false;Star-tree dimension columns must be single-value, but found multi-value column: col
 LONG;mv;dict;vector_index;false;Cannot create vector index on column: col of stored type other than FLOAT
 LONG;mv;dict;multi_col_text_index;false;Cannot create TEXT index on column: col of stored type other than STRING
 FLOAT;sv;raw;timestamp_index;false;Cannot create TIMESTAMP index on column: col of stored type other than LONG
@@ -140,7 +140,7 @@ FLOAT;mv;dict;json_index;false;Cannot create JSON index on multi-value column: c
 FLOAT;mv;dict;native_text_index;false;Cannot create TEXT index on column: col of stored type other than STRING
 FLOAT;mv;dict;text_index;false;Cannot create TEXT index on column: col of stored type other than STRING
 FLOAT;mv;dict;range_index;true;
-FLOAT;mv;dict;startree_index;false;Star-tree index can only be created on single-value columns, but found multi-value column: col
+FLOAT;mv;dict;startree_index;false;Star-tree dimension columns must be single-value, but found multi-value column: col
 FLOAT;mv;dict;vector_index;true;
 FLOAT;mv;dict;multi_col_text_index;false;Cannot create TEXT index on column: col of stored type other than STRING
 DOUBLE;sv;raw;timestamp_index;false;Cannot create TIMESTAMP index on column: col of stored type other than LONG
@@ -188,7 +188,7 @@ DOUBLE;mv;dict;json_index;false;Cannot create JSON index on multi-value column: 
 DOUBLE;mv;dict;native_text_index;false;Cannot create TEXT index on column: col of stored type other than STRING
 DOUBLE;mv;dict;text_index;false;Cannot create TEXT index on column: col of stored type other than STRING
 DOUBLE;mv;dict;range_index;true;
-DOUBLE;mv;dict;startree_index;false;Star-tree index can only be created on single-value columns, but found multi-value column: col
+DOUBLE;mv;dict;startree_index;false;Star-tree dimension columns must be single-value, but found multi-value column: col
 DOUBLE;mv;dict;vector_index;false;Cannot create vector index on column: col of stored type other than FLOAT
 DOUBLE;mv;dict;multi_col_text_index;false;Cannot create TEXT index on column: col of stored type other than STRING
 DECIMAL;sv_BIG;raw;timestamp_index;false;Cannot create TIMESTAMP index on column: col of stored type other than LONG
@@ -260,7 +260,7 @@ BOOLEAN;mv;dict;json_index;false;Cannot create JSON index on multi-value column:
 BOOLEAN;mv;dict;native_text_index;false;Cannot create TEXT index on column: col of stored type other than STRING
 BOOLEAN;mv;dict;text_index;false;Cannot create TEXT index on column: col of stored type other than STRING
 BOOLEAN;mv;dict;range_index;true;
-BOOLEAN;mv;dict;startree_index;false;Star-tree index can only be created on single-value columns, but found multi-value column: col
+BOOLEAN;mv;dict;startree_index;false;Star-tree dimension columns must be single-value, but found multi-value column: col
 BOOLEAN;mv;dict;vector_index;false;Cannot create vector index on column: col of stored type other than FLOAT
 BOOLEAN;mv;dict;multi_col_text_index;false;Cannot create TEXT index on column: col of stored type other than STRING
 TIMESTAMP;sv;raw;timestamp_index;true;
@@ -308,7 +308,7 @@ TIMESTAMP;mv;dict;json_index;false;Cannot create JSON index on multi-value colum
 TIMESTAMP;mv;dict;native_text_index;false;Cannot create TEXT index on column: col of stored type other than STRING
 TIMESTAMP;mv;dict;text_index;false;Cannot create TEXT index on column: col of stored type other than STRING
 TIMESTAMP;mv;dict;range_index;true;
-TIMESTAMP;mv;dict;startree_index;false;Star-tree index can only be created on single-value columns, but found multi-value column: col
+TIMESTAMP;mv;dict;startree_index;false;Star-tree dimension columns must be single-value, but found multi-value column: col
 TIMESTAMP;mv;dict;vector_index;false;Cannot create vector index on column: col of stored type other than FLOAT
 TIMESTAMP;mv;dict;multi_col_text_index;false;Cannot create TEXT index on column: col of stored type other than STRING
 STRING;sv;raw;timestamp_index;false;Cannot create TIMESTAMP index on column: col of stored type other than LONG
@@ -344,7 +344,7 @@ STRING;sv;dict;json_index;false;Column: col Unrecognized token 'str': was expect
 STRING;sv;dict;native_text_index;true;
 STRING;sv;dict;text_index;true;
 STRING;sv;dict;range_index;true;
-STRING;sv;dict;startree_index;false;For input string: "str-.*"
+STRING;sv;dict;startree_index;false;
 STRING;sv;dict;vector_index;false;Cannot create vector index on single-value column: col
 STRING;sv;dict;multi_col_text_index;true;
 STRING;mv;dict;timestamp_index;false;Cannot create TIMESTAMP index on column: col of stored type other than LONG
@@ -356,7 +356,7 @@ STRING;mv;dict;json_index;false;Cannot create JSON index on multi-value column: 
 STRING;mv;dict;native_text_index;true;
 STRING;mv;dict;text_index;true;
 STRING;mv;dict;range_index;true;
-STRING;mv;dict;startree_index;false;Star-tree index can only be created on single-value columns, but found multi-value column: col
+STRING;mv;dict;startree_index;false;Star-tree dimension columns must be single-value, but found multi-value column: col
 STRING;mv;dict;vector_index;false;Cannot create vector index on column: col of stored type other than FLOAT
 STRING;mv;dict;multi_col_text_index;true;
 JSON;sv;raw;timestamp_index;false;Cannot create TIMESTAMP index on column: col of stored type other than LONG
@@ -380,7 +380,7 @@ JSON;sv;dict;json_index;true;
 JSON;sv;dict;native_text_index;false;expected [1] but found [0]
 JSON;sv;dict;text_index;false;expected [1] but found [0]
 JSON;sv;dict;range_index;true;
-JSON;sv;dict;startree_index;false;For input string: "\{"field":".*"\}"
+JSON;sv;dict;startree_index;false;
 JSON;sv;dict;vector_index;false;Cannot create vector index on single-value column: col
 JSON;sv;dict;multi_col_text_index;false;Cannot create TEXT index on column: col of stored type other than STRING
 BYTES;sv;raw;timestamp_index;false;Cannot create TIMESTAMP index on column: col of stored type other than LONG
@@ -428,7 +428,7 @@ BYTES;mv;dict;json_index;false;Cannot create JSON index on multi-value column: c
 BYTES;mv;dict;native_text_index;false;Cannot create TEXT index on column: col of stored type other than STRING
 BYTES;mv;dict;text_index;false;Cannot create TEXT index on column: col of stored type other than STRING
 BYTES;mv;dict;range_index;false;Caught exception while reading data
-BYTES;mv;dict;startree_index;false;Star-tree index can only be created on single-value columns, but found multi-value column: col
+BYTES;mv;dict;startree_index;false;Star-tree dimension columns must be single-value, but found multi-value column: col
 BYTES;mv;dict;vector_index;false;Cannot create vector index on column: col of stored type other than FLOAT
 BYTES;mv;dict;multi_col_text_index;false;Caught exception while reading data
 STRING;map;raw;timestamp_index;false;Cannot create TIMESTAMP index on column: col of stored type other than LONG

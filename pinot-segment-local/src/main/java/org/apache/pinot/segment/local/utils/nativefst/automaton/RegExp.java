@@ -82,7 +82,7 @@ public class RegExp {
    * Constructs new <code>RegExp</code> from a string.
    * Same as <code>RegExp(s, ALL)</code>.
    * @param inputString regexp string
-   * @exception IllegalArgumentException if an error occured while parsing the regular expression
+   * @exception IllegalArgumentException if an error occurred while parsing the regular expression
    */
   public RegExp(String inputString)
       throws IllegalArgumentException {
@@ -93,7 +93,7 @@ public class RegExp {
    * Constructs new <code>RegExp</code> from a string.
    * @param inputString regexp string
    * @param syntaxFlags boolean 'or' of optional syntax constructs to be enabled
-   * @exception IllegalArgumentException if an error occured while parsing the regular expression
+   * @exception IllegalArgumentException if an error occurred while parsing the regular expression
    */
   public RegExp(String inputString, int syntaxFlags)
       throws IllegalArgumentException {

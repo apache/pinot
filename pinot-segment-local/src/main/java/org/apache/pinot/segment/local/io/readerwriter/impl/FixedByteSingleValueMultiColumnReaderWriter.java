@@ -186,7 +186,7 @@ public class FixedByteSingleValueMultiColumnReaderWriter implements Closeable {
 
     FixedByteSingleValueMultiColReader reader =
         new FixedByteSingleValueMultiColReader(buffer, _numRowsPerChunk, _columnSizesInBytes);
-    // ArrayList is non-threadsafe. So add to a new copy and then change teh reference (_readers is volatile).
+    // ArrayList is non-threadsafe. So add to a new copy and then change the reference (_readers is volatile).
     List<FixedByteSingleValueMultiColReader> readers = new ArrayList<>(_readers);
     readers.add(reader);
     _readers = readers;

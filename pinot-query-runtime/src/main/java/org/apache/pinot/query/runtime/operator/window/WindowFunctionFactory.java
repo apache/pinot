@@ -18,9 +18,9 @@
  */
 package org.apache.pinot.query.runtime.operator.window;
 
-import com.google.common.collect.ImmutableMap;
 import java.lang.reflect.Constructor;
 import java.lang.reflect.InvocationTargetException;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import org.apache.calcite.rel.RelFieldCollation;
@@ -38,13 +38,11 @@ public class WindowFunctionFactory {
   private WindowFunctionFactory() {
   }
 
-  //@formatter:off
   public static final Map<String, Class<? extends WindowFunction>> WINDOW_FUNCTION_MAP =
-      ImmutableMap.<String, Class<? extends WindowFunction>>builder()
-          .putAll(RankBasedWindowFunction.WINDOW_FUNCTION_MAP)
-          .putAll(ValueWindowFunction.WINDOW_FUNCTION_MAP)
-          .build();
-  //@formatter:on
+      Map.copyOf(new HashMap<>() {{
+        putAll(RankBasedWindowFunction.WINDOW_FUNCTION_MAP);
+        putAll(ValueWindowFunction.WINDOW_FUNCTION_MAP);
+      }});
 
   public static WindowFunction constructWindowFunction(RexExpression.FunctionCall aggCall, DataSchema inputSchema,
       List<RelFieldCollation> collations, WindowFrame windowFrame) {

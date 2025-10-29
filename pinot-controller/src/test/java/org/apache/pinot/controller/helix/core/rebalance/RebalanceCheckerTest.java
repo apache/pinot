@@ -19,7 +19,6 @@
 package org.apache.pinot.controller.helix.core.rebalance;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
-import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.ImmutableSet;
 import com.google.common.util.concurrent.MoreExecutors;
 import java.util.HashMap;
@@ -379,16 +378,16 @@ public class RebalanceCheckerTest {
     pinotHelixManager.start(helixZkManager, null);
 
     pinotHelixManager.addControllerJobToZK("job1",
-        ImmutableMap.of("jobId", "job1", "submissionTimeMs", "1000", "tableName", "table01"),
+        Map.of("jobId", "job1", "submissionTimeMs", "1000", "tableName", "table01"),
         ControllerJobTypes.TABLE_REBALANCE, jmd -> true);
     pinotHelixManager.addControllerJobToZK("job2",
-        ImmutableMap.of("jobId", "job2", "submissionTimeMs", "2000", "tableName", "table01"),
+        Map.of("jobId", "job2", "submissionTimeMs", "2000", "tableName", "table01"),
         ControllerJobTypes.TABLE_REBALANCE, jmd -> false);
     pinotHelixManager.addControllerJobToZK("job3",
-        ImmutableMap.of("jobId", "job3", "submissionTimeMs", "3000", "tableName", "table02"),
+        Map.of("jobId", "job3", "submissionTimeMs", "3000", "tableName", "table02"),
         ControllerJobTypes.TABLE_REBALANCE, jmd -> true);
     pinotHelixManager.addControllerJobToZK("job4",
-        ImmutableMap.of("jobId", "job4", "submissionTimeMs", "4000", "tableName", "table02"),
+        Map.of("jobId", "job4", "submissionTimeMs", "4000", "tableName", "table02"),
         ControllerJobTypes.TABLE_REBALANCE, jmd -> true);
     Map<String, Map<String, String>> jmds = jobsZnRecord.getMapFields();
     assertEquals(jmds.size(), 3);

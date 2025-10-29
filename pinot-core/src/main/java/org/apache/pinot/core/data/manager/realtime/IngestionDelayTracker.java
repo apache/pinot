@@ -33,7 +33,7 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.ThreadFactory;
 import java.util.concurrent.TimeUnit;
-import java.util.function.Supplier;
+import java.util.function.BooleanSupplier;
 import javax.annotation.Nullable;
 import org.apache.pinot.common.metrics.ServerGauge;
 import org.apache.pinot.common.metrics.ServerMeter;
@@ -128,7 +128,7 @@ public class IngestionDelayTracker {
   private final String _tableNameWithType;
   private final String _metricName;
   private final RealtimeTableDataManager _realTimeTableDataManager;
-  private final Supplier<Boolean> _isServerReadyToServeQueries;
+  private final BooleanSupplier _isServerReadyToServeQueries;
   private final Cache<String, Boolean> _segmentsToIgnore =
       CacheBuilder.newBuilder().expireAfterAccess(IGNORED_SEGMENT_CACHE_TIME_MINUTES, TimeUnit.MINUTES).build();
   // Map to describe the partitions for which the metrics are being reported.
@@ -167,7 +167,7 @@ public class IngestionDelayTracker {
   @VisibleForTesting
   public IngestionDelayTracker(ServerMetrics serverMetrics, String tableNameWithType,
       RealtimeTableDataManager realtimeTableDataManager, long metricsRemovalIntervalMs, long metricsTrackingIntervalMs,
-      Supplier<Boolean> isServerReadyToServeQueries) {
+      BooleanSupplier isServerReadyToServeQueries) {
     _serverMetrics = serverMetrics;
     _tableNameWithType = tableNameWithType;
     _metricName = tableNameWithType;
@@ -222,7 +222,7 @@ public class IngestionDelayTracker {
   private void trackIngestionDelay() {
     long startMs = System.currentTimeMillis();
     try {
-      if (!_isServerReadyToServeQueries.get() || _realTimeTableDataManager.isShutDown()) {
+      if (!_isServerReadyToServeQueries.getAsBoolean() || _realTimeTableDataManager.isShutDown()) {
         // Do not update the ingestion delay metrics during server startup period
         // or once the table data manager has been shutdown.
         return;
@@ -397,7 +397,7 @@ public class IngestionDelayTracker {
    */
   public void updateMetrics(String segmentName, int partitionId, long ingestionTimeMs,
       @Nullable StreamPartitionMsgOffset currentOffset) {
-    if (!_isServerReadyToServeQueries.get() || _realTimeTableDataManager.isShutDown()) {
+    if (!_isServerReadyToServeQueries.getAsBoolean() || _realTimeTableDataManager.isShutDown()) {
       // Do not update the ingestion delay metrics during server startup period
       // or once the table data manager has been shutdown.
       return;
@@ -469,7 +469,7 @@ public class IngestionDelayTracker {
    * This call is to be invoked by a scheduled executor thread that will periodically wake up and invoke this function.
    */
   public void timeoutInactivePartitions() {
-    if (!_isServerReadyToServeQueries.get()) {
+    if (!_isServerReadyToServeQueries.getAsBoolean()) {
       // Do not update the tracker state during server startup period
       return;
     }
@@ -502,7 +502,7 @@ public class IngestionDelayTracker {
    * the segment is still hosted by this server after some interval of time.
    */
   public void markPartitionForVerification(String segmentName) {
-    if (!_isServerReadyToServeQueries.get() || _segmentsToIgnore.getIfPresent(segmentName) != null) {
+    if (!_isServerReadyToServeQueries.getAsBoolean() || _segmentsToIgnore.getIfPresent(segmentName) != null) {
       // Do not update the tracker state during server startup period or if the segment is marked to be ignored
       return;
     }
@@ -627,7 +627,7 @@ public class IngestionDelayTracker {
         LOGGER.error("Failed to close streamMetadataProvider", e);
       }
     }
-    if (!_isServerReadyToServeQueries.get()) {
+    if (!_isServerReadyToServeQueries.getAsBoolean()) {
       // Do not update the tracker state during server startup period
       return;
     }

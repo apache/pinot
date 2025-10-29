@@ -70,8 +70,8 @@ public class ItemTransformFunction extends BaseTransformFunction {
         + "must be a string literal");
     _keyPath = new String[]{_column, _key};
 
-    // The metadata about the values that this operation will resolve to is determined by the type of teh data
-    // under they key, not by the Map column.  So we need to look up the Key's Metadata.
+    // The metadata about the values that this operation will resolve to is determined by the type of the data
+    // under the key, not by the Map column.  So we need to look up the Key's Metadata.
     DataSource dataSource = columnContextMap.get(_column).getDataSource();
 
     if (dataSource instanceof MapDataSource) {

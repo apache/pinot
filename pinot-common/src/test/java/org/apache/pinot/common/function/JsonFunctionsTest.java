@@ -20,7 +20,6 @@ package org.apache.pinot.common.function;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.google.common.collect.ImmutableList;
-import com.google.common.collect.ImmutableMap;
 import com.jayway.jsonpath.InvalidJsonException;
 import java.io.IOException;
 import java.util.ArrayList;
@@ -242,16 +241,16 @@ public class JsonFunctionsTest {
     // Object[] doesn't work with default JsonPath, where "$.commits[*].sha" would return empty,
     // and "$.commits[1].sha" led to exception `Filter: [1]['sha'] can only be applied to arrays`.
     // Those failure could be reproduced by using the default JacksonJsonProvider for JsonPath.
-    Map<String, Object> rawData = ImmutableMap.of("commits",
-        ImmutableList.of(ImmutableMap.of("sha", 123, "name", "k"), ImmutableMap.of("sha", 456, "name", "j")));
+    Map<String, Object> rawData = Map.of("commits",
+        ImmutableList.of(Map.of("sha", 123, "name", "k"), Map.of("sha", 456, "name", "j")));
     assertTrue(JsonFunctions.jsonPathExists(rawData, "$.commits[*].sha"));
     assertEquals(JsonFunctions.jsonPathArray(rawData, "$.commits[*].sha"), new Integer[]{123, 456});
     assertTrue(JsonFunctions.jsonPathExists(rawData, "$.commits[1].sha"));
     assertEquals(JsonFunctions.jsonPathArray(rawData, "$.commits[1].sha"), new Integer[]{456});
 
     // ArrayAwareJacksonJsonProvider should fix this issue.
-    rawData = ImmutableMap.of("commits",
-        new Object[]{ImmutableMap.of("sha", 123, "name", "k"), ImmutableMap.of("sha", 456, "name", "j")});
+    rawData = Map.of("commits",
+        new Object[]{Map.of("sha", 123, "name", "k"), Map.of("sha", 456, "name", "j")});
     assertEquals(JsonFunctions.jsonPathArray(rawData, "$.commits[*].sha"), new Integer[]{123, 456});
     assertEquals(JsonFunctions.jsonPathArray(rawData, "$.commits[1].sha"), new Integer[]{456});
   }
@@ -270,7 +269,7 @@ public class JsonFunctionsTest {
     // ArrayAwareJacksonJsonProvider can work with Array directly, thus no need to serialize
     // Object[] any more.
     Object[] rawDataInAry =
-        new Object[]{ImmutableMap.of("sha", 123, "name", "kk"), ImmutableMap.of("sha", 456, "name", "jj")};
+        new Object[]{Map.of("sha", 123, "name", "kk"), Map.of("sha", 456, "name", "jj")};
     assertEquals(JsonFunctions.jsonPathArray(rawDataInAry, "$.[*].sha"), new Integer[]{123, 456});
     assertEquals(JsonFunctions.jsonPathArray(rawDataInAry, "$.[1].sha"), new Integer[]{456});
   }
@@ -312,10 +311,10 @@ public class JsonFunctionsTest {
   public void testJsonFunctionOnList()
       throws JsonProcessingException {
     List<Map<String, Object>> rawData = new ArrayList<Map<String, Object>>();
-    rawData.add(ImmutableMap
-        .of("name", "maths", "grade", "A", "score", 90, "homework_grades", Arrays.asList(80, 85, 90, 95, 100)));
-    rawData.add(ImmutableMap
-        .of("name", "english", "grade", "B", "score", 50, "homework_grades", Arrays.asList(60, 65, 70, 85, 90)));
+    rawData.add(
+        Map.of("name", "maths", "grade", "A", "score", 90, "homework_grades", Arrays.asList(80, 85, 90, 95, 100)));
+    rawData.add(
+        Map.of("name", "english", "grade", "B", "score", 50, "homework_grades", Arrays.asList(60, 65, 70, 85, 90)));
     assertTrue(JsonFunctions.jsonPathExists(rawData, "$.[*].name"));
     assertEquals(JsonFunctions.jsonPathArray(rawData, "$.[*].name"), new String[]{"maths", "english"});
     assertTrue(JsonFunctions.jsonPathExists(rawData, "$.[*].grade"));
@@ -331,9 +330,9 @@ public class JsonFunctionsTest {
   public void testJsonFunctionOnObjectArray()
       throws JsonProcessingException {
     Object[] rawData = new Object[]{
-        ImmutableMap.of("name", "maths", "grade", "A", "score", 90, "homework_grades",
+        Map.of("name", "maths", "grade", "A", "score", 90, "homework_grades",
             Arrays.asList(80, 85, 90, 95, 100)),
-        ImmutableMap.of("name", "english", "grade", "B", "score", 50, "homework_grades",
+        Map.of("name", "english", "grade", "B", "score", 50, "homework_grades",
             Arrays.asList(60, 65, 70, 85, 90))
     };
     assertTrue(JsonFunctions.jsonPathExists(rawData, "$.[*].name"));
@@ -350,9 +349,9 @@ public class JsonFunctionsTest {
   @DataProvider
   public static Object[][] jsonPathStringTestCases() {
     return new Object[][]{
-        {ImmutableMap.of("foo", "x", "bar", ImmutableMap.of("foo", "y")), "$.foo", "x"},
-        {ImmutableMap.of("foo", "x", "bar", ImmutableMap.of("foo", "y")), "$.qux", null},
-        {ImmutableMap.of("foo", "x", "bar", ImmutableMap.of("foo", "y")), "$.bar", "{\"foo\":\"y\"}"},
+        {Map.of("foo", "x", "bar", Map.of("foo", "y")), "$.foo", "x"},
+        {Map.of("foo", "x", "bar", Map.of("foo", "y")), "$.qux", null},
+        {Map.of("foo", "x", "bar", Map.of("foo", "y")), "$.bar", "{\"foo\":\"y\"}"},
     };
   }
 
@@ -373,11 +372,11 @@ public class JsonFunctionsTest {
   @DataProvider
   public static Object[][] jsonPathArrayTestCases() {
     return new Object[][]{
-        {ImmutableMap.of("foo", "x", "bar", ImmutableMap.of("foo", "y")), "$.foo", new Object[]{"x"}},
-        {ImmutableMap.of("foo", "x", "bar", ImmutableMap.of("foo", "y")), "$.qux", null},
+        {Map.of("foo", "x", "bar", Map.of("foo", "y")), "$.foo", new Object[]{"x"}},
+        {Map.of("foo", "x", "bar", Map.of("foo", "y")), "$.qux", null},
         {
-            ImmutableMap.of("foo", "x", "bar", ImmutableMap.of("foo", "y")), "$.bar", new Object[]{
-            ImmutableMap.of("foo", "y")
+            Map.of("foo", "x", "bar", Map.of("foo", "y")), "$.bar", new Object[]{
+            Map.of("foo", "y")
         }
         },
     };
@@ -412,7 +411,7 @@ public class JsonFunctionsTest {
         + "{\"key\": \"k4\", \"value\": \"v4\"}, "
         + "{\"key\": \"k5\", \"value\": \"v5\"}"
         + "]";
-    Map<String, Object> expected = ImmutableMap.of("k1", "v1", "k2", "v2", "k3", "v3", "k4", "v4", "k5", "v5");
+    Map<String, Object> expected = Map.of("k1", "v1", "k2", "v2", "k3", "v3", "k4", "v4", "k5", "v5");
     assertEquals(JsonFunctions.jsonKeyValueArrayToMap(jsonString), expected);
 
     Object[] jsonArray = new Object[]{

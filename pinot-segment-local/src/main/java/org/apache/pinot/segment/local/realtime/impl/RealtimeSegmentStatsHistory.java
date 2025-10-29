@@ -57,7 +57,7 @@ public class RealtimeSegmentStatsHistory implements Serializable {
   // XXX MAX_NUM_ENTRIES should be a final variable, but we need to modify it for testing.
   private static int _maxNumEntries = 16;  // Max number of past segments for which stats are kept
 
-  // Fields to be serialzied.
+  // Fields to be serialized.
   private int _cursor = 0;
   private SegmentStats[] _entries;
   private boolean _isFull = false;
@@ -374,7 +374,7 @@ public class RealtimeSegmentStatsHistory implements Serializable {
     }
   }
 
-  public static synchronized RealtimeSegmentStatsHistory deserialzeFrom(File inFile)
+  public static synchronized RealtimeSegmentStatsHistory deserializeFrom(File inFile)
       throws IOException, ClassNotFoundException {
     if (inFile.exists()) {
       try (FileInputStream is = new FileInputStream(inFile); ObjectInputStream obis = new CustomObjectInputStream(is)) {

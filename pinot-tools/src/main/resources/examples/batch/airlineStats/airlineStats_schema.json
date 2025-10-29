@@ -188,7 +188,7 @@
       "singleValueField": false
     },
     {
-      "dataType": "INT",
+      "dataType": "LONG",
       "name": "DivTotalGTimes",
       "singleValueField": false
     },

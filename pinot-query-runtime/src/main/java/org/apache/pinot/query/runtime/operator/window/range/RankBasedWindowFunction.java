@@ -18,7 +18,6 @@
  */
 package org.apache.pinot.query.runtime.operator.window.range;
 
-import com.google.common.collect.ImmutableMap;
 import java.util.List;
 import java.util.Map;
 import org.apache.calcite.rel.RelFieldCollation;
@@ -35,13 +34,12 @@ import org.apache.pinot.query.runtime.operator.window.WindowFunction;
 public abstract class RankBasedWindowFunction extends WindowFunction {
   //@formatter:off
   public static final Map<String, Class<? extends WindowFunction>> WINDOW_FUNCTION_MAP =
-      ImmutableMap.<String, Class<? extends WindowFunction>>builder()
-          // Rank based window functions
-          .put("ROW_NUMBER", RowNumberWindowFunction.class)
-          .put("RANK", RankWindowFunction.class)
-          .put("DENSE_RANK", DenseRankWindowFunction.class)
-          .put("NTILE", NtileWindowFunction.class)
-          .build();
+      Map.of(
+          "ROW_NUMBER", RowNumberWindowFunction.class,
+          "RANK", RankWindowFunction.class,
+          "DENSE_RANK", DenseRankWindowFunction.class,
+          "NTILE", NtileWindowFunction.class
+      );
   //@formatter:on
 
   public RankBasedWindowFunction(RexExpression.FunctionCall aggCall, DataSchema inputSchema,

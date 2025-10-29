@@ -18,7 +18,6 @@
  */
 package org.apache.pinot.plugin.minion.tasks.mergerollup;
 
-import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.Lists;
 import java.util.Arrays;
 import java.util.Collections;
@@ -131,7 +130,7 @@ public class MergeRollupTaskGeneratorTest {
     validConfig.put(prefix + "c.nominalEntries", "8092");
     validConfig.put(prefix + "c.samplingProbability", "0.9");
     TableConfig offlineTableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName(RAW_TABLE_NAME)
-        .setTaskConfig(new TableTaskConfig(ImmutableMap.of(MinionConstants.MergeRollupTask.TASK_TYPE, validConfig)))
+        .setTaskConfig(new TableTaskConfig(Map.of(MinionConstants.MergeRollupTask.TASK_TYPE, validConfig)))
         .build();
     taskGenerator.validateTaskConfigs(offlineTableConfig, schema, validConfig);
   }
@@ -148,7 +147,7 @@ public class MergeRollupTaskGeneratorTest {
     invalidConfig.put(MinionConstants.MergeRollupTask.MERGE_LEVEL_KEY, mergeLevel);
     invalidConfig.put(mergeLevel + ".eraseDimensionValues", "b");
     TableConfig offlineTableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName(RAW_TABLE_NAME)
-        .setTaskConfig(new TableTaskConfig(ImmutableMap.of(MinionConstants.MergeRollupTask.TASK_TYPE, invalidConfig)))
+        .setTaskConfig(new TableTaskConfig(Map.of(MinionConstants.MergeRollupTask.TASK_TYPE, invalidConfig)))
         .build();
     assertThrows(IllegalStateException.class, () -> {
       taskGenerator.validateTaskConfigs(offlineTableConfig, schema, invalidConfig);
@@ -168,7 +167,7 @@ public class MergeRollupTaskGeneratorTest {
     invalidConfig.put(MinionConstants.MergeRollupTask.MERGE_LEVEL_KEY, mergeLevel);
     invalidConfig.put(prefix + "b.nominalEntries", "8092");
     TableConfig offlineTableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName(RAW_TABLE_NAME)
-        .setTaskConfig(new TableTaskConfig(ImmutableMap.of(MinionConstants.MergeRollupTask.TASK_TYPE, invalidConfig)))
+        .setTaskConfig(new TableTaskConfig(Map.of(MinionConstants.MergeRollupTask.TASK_TYPE, invalidConfig)))
         .build();
     assertThrows(IllegalStateException.class, () -> {
       taskGenerator.validateTaskConfigs(offlineTableConfig, schema, invalidConfig);
@@ -188,7 +187,7 @@ public class MergeRollupTaskGeneratorTest {
     invalidConfig.put(MinionConstants.MergeRollupTask.MERGE_LEVEL_KEY, mergeLevel);
     invalidConfig.put(prefix + "a.samplingProbability", "-1.01");
     TableConfig offlineTableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName(RAW_TABLE_NAME)
-        .setTaskConfig(new TableTaskConfig(ImmutableMap.of(MinionConstants.MergeRollupTask.TASK_TYPE, invalidConfig)))
+        .setTaskConfig(new TableTaskConfig(Map.of(MinionConstants.MergeRollupTask.TASK_TYPE, invalidConfig)))
         .build();
     assertThrows(IllegalStateException.class, () -> {
       taskGenerator.validateTaskConfigs(offlineTableConfig, schema, invalidConfig);
@@ -208,7 +207,7 @@ public class MergeRollupTaskGeneratorTest {
     invalidConfig.put(MinionConstants.MergeRollupTask.MERGE_LEVEL_KEY, mergeLevel);
     invalidConfig.put(prefix + "a.nominalEntries", "0");
     TableConfig offlineTableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName(RAW_TABLE_NAME)
-        .setTaskConfig(new TableTaskConfig(ImmutableMap.of(MinionConstants.MergeRollupTask.TASK_TYPE, invalidConfig)))
+        .setTaskConfig(new TableTaskConfig(Map.of(MinionConstants.MergeRollupTask.TASK_TYPE, invalidConfig)))
         .build();
     assertThrows(IllegalStateException.class, () -> {
       taskGenerator.validateTaskConfigs(offlineTableConfig, schema, invalidConfig);
@@ -228,7 +227,7 @@ public class MergeRollupTaskGeneratorTest {
     invalidConfig.put(MinionConstants.MergeRollupTask.MERGE_LEVEL_KEY, mergeLevel);
     invalidConfig.put(prefix + "a.lgK", "0");
     TableConfig offlineTableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName(RAW_TABLE_NAME)
-        .setTaskConfig(new TableTaskConfig(ImmutableMap.of(MinionConstants.MergeRollupTask.TASK_TYPE, invalidConfig)))
+        .setTaskConfig(new TableTaskConfig(Map.of(MinionConstants.MergeRollupTask.TASK_TYPE, invalidConfig)))
         .build();
     assertThrows(IllegalStateException.class, () -> {
       taskGenerator.validateTaskConfigs(offlineTableConfig, schema, invalidConfig);
@@ -590,9 +589,9 @@ public class MergeRollupTaskGeneratorTest {
 
     // Has un-merged buckets
     metadata6 = getSegmentZKMetadata(segmentName6, 432_000_000L, 432_100_000L, TimeUnit.MILLISECONDS, null);
-    metadata1.setCustomMap(ImmutableMap.of(MinionConstants.MergeRollupTask.SEGMENT_ZK_METADATA_MERGE_LEVEL_KEY, DAILY));
-    metadata2.setCustomMap(ImmutableMap.of(MinionConstants.MergeRollupTask.SEGMENT_ZK_METADATA_MERGE_LEVEL_KEY, DAILY));
-    metadata4.setCustomMap(ImmutableMap.of(MinionConstants.MergeRollupTask.SEGMENT_ZK_METADATA_MERGE_LEVEL_KEY, DAILY));
+    metadata1.setCustomMap(Map.of(MinionConstants.MergeRollupTask.SEGMENT_ZK_METADATA_MERGE_LEVEL_KEY, DAILY));
+    metadata2.setCustomMap(Map.of(MinionConstants.MergeRollupTask.SEGMENT_ZK_METADATA_MERGE_LEVEL_KEY, DAILY));
+    metadata4.setCustomMap(Map.of(MinionConstants.MergeRollupTask.SEGMENT_ZK_METADATA_MERGE_LEVEL_KEY, DAILY));
     when(mockClusterInfoProvide.getSegmentsZKMetadata(OFFLINE_TABLE_NAME)).thenReturn(
         Lists.newArrayList(metadata1, metadata2, metadata3, metadata4, metadata5, metadata6));
     when(mockClusterInfoProvide.getIdealState(OFFLINE_TABLE_NAME)).thenReturn(getIdealState(OFFLINE_TABLE_NAME,
@@ -622,8 +621,8 @@ public class MergeRollupTaskGeneratorTest {
         getSegmentZKMetadata(segmentName7, 86_400_000L, 90_000_000L, TimeUnit.MILLISECONDS, "download7");
     SegmentZKMetadata metadata8 =
         getSegmentZKMetadata(segmentName8, 2_592_000_000L, 2_600_000_000L, TimeUnit.MILLISECONDS, "download8");
-    metadata7.setCustomMap(ImmutableMap.of(MinionConstants.MergeRollupTask.SEGMENT_ZK_METADATA_MERGE_LEVEL_KEY, DAILY));
-    metadata8.setCustomMap(ImmutableMap.of(MinionConstants.MergeRollupTask.SEGMENT_ZK_METADATA_MERGE_LEVEL_KEY, DAILY));
+    metadata7.setCustomMap(Map.of(MinionConstants.MergeRollupTask.SEGMENT_ZK_METADATA_MERGE_LEVEL_KEY, DAILY));
+    metadata8.setCustomMap(Map.of(MinionConstants.MergeRollupTask.SEGMENT_ZK_METADATA_MERGE_LEVEL_KEY, DAILY));
     when(mockClusterInfoProvide.getSegmentsZKMetadata(OFFLINE_TABLE_NAME)).thenReturn(
         Lists.newArrayList(metadata7, metadata8));
     when(mockClusterInfoProvide.getIdealState(OFFLINE_TABLE_NAME)).thenReturn(
@@ -776,7 +775,7 @@ public class MergeRollupTaskGeneratorTest {
     waterMarkMap.put(DAILY, 86_400_000L);
     mockClusterInfoProvide.setMinionTaskMetadata(new MergeRollupTaskMetadata(OFFLINE_TABLE_NAME, waterMarkMap),
         MinionConstants.MergeRollupTask.TASK_TYPE, -1);
-    metadata1.setCustomMap(ImmutableMap.of(MinionConstants.MergeRollupTask.SEGMENT_ZK_METADATA_MERGE_LEVEL_KEY, DAILY));
+    metadata1.setCustomMap(Map.of(MinionConstants.MergeRollupTask.SEGMENT_ZK_METADATA_MERGE_LEVEL_KEY, DAILY));
     pinotTaskConfigs = generator.generateTasks(Lists.newArrayList(offlineTableConfig));
     assertEquals(MergeRollupTaskMetadata.fromZNRecord(
         mockClusterInfoProvide.getMinionTaskMetadataZNRecord(MinionConstants.MergeRollupTask.TASK_TYPE,
@@ -788,7 +787,7 @@ public class MergeRollupTaskGeneratorTest {
     waterMarkMap.put(DAILY, 345_600_000L);
     mockClusterInfoProvide.setMinionTaskMetadata(new MergeRollupTaskMetadata(OFFLINE_TABLE_NAME, waterMarkMap),
         MinionConstants.MergeRollupTask.TASK_TYPE, -1);
-    metadata2.setCustomMap(ImmutableMap.of(MinionConstants.MergeRollupTask.SEGMENT_ZK_METADATA_MERGE_LEVEL_KEY, DAILY));
+    metadata2.setCustomMap(Map.of(MinionConstants.MergeRollupTask.SEGMENT_ZK_METADATA_MERGE_LEVEL_KEY, DAILY));
     pinotTaskConfigs = generator.generateTasks(Lists.newArrayList(offlineTableConfig));
     assertEquals(MergeRollupTaskMetadata.fromZNRecord(
         mockClusterInfoProvide.getMinionTaskMetadataZNRecord(MinionConstants.MergeRollupTask.TASK_TYPE,
@@ -863,7 +862,7 @@ public class MergeRollupTaskGeneratorTest {
 
     // If same task and table, but COMPLETED, generate
     mergedMetadata1.setCustomMap(
-        ImmutableMap.of(MinionConstants.MergeRollupTask.SEGMENT_ZK_METADATA_MERGE_LEVEL_KEY, DAILY));
+        Map.of(MinionConstants.MergeRollupTask.SEGMENT_ZK_METADATA_MERGE_LEVEL_KEY, DAILY));
     when(mockClusterInfoProvide.getSegmentsZKMetadata(OFFLINE_TABLE_NAME)).thenReturn(
         Lists.newArrayList(metadata1, metadata2, mergedMetadata1));
     when(mockClusterInfoProvide.getIdealState(OFFLINE_TABLE_NAME)).thenReturn(
@@ -944,7 +943,7 @@ public class MergeRollupTaskGeneratorTest {
     SegmentZKMetadata metadataMergedDaily1 =
         getSegmentZKMetadata(segmentNameMergedDaily1, 86_400_000L, 110_000_000L, TimeUnit.MILLISECONDS, null);
     metadataMergedDaily1.setCustomMap(
-        ImmutableMap.of(MinionConstants.MergeRollupTask.SEGMENT_ZK_METADATA_MERGE_LEVEL_KEY, DAILY));
+        Map.of(MinionConstants.MergeRollupTask.SEGMENT_ZK_METADATA_MERGE_LEVEL_KEY, DAILY));
     when(mockClusterInfoProvide.getSegmentsZKMetadata(OFFLINE_TABLE_NAME)).thenReturn(
         Lists.newArrayList(metadata1, metadata2, metadata3, metadata4, metadata5, metadataMergedDaily1));
     when(mockClusterInfoProvide.getIdealState(OFFLINE_TABLE_NAME)).thenReturn(getIdealState(OFFLINE_TABLE_NAME,
@@ -977,12 +976,12 @@ public class MergeRollupTaskGeneratorTest {
     SegmentZKMetadata metadataMergedDaily2 =
         getSegmentZKMetadata(segmentNameMergedDaily2, 2_505_600_000L, 2_591_999_999L, TimeUnit.MILLISECONDS, null);
     metadataMergedDaily2.setCustomMap(
-        ImmutableMap.of(MinionConstants.MergeRollupTask.SEGMENT_ZK_METADATA_MERGE_LEVEL_KEY, DAILY));
+        Map.of(MinionConstants.MergeRollupTask.SEGMENT_ZK_METADATA_MERGE_LEVEL_KEY, DAILY));
     String segmentNameMergedDaily3 = "merged_testTable__4_2";
     SegmentZKMetadata metadataMergedDaily3 =
         getSegmentZKMetadata(segmentNameMergedDaily3, 2_592_000_000L, 2_592_010_000L, TimeUnit.MILLISECONDS, null);
     metadataMergedDaily3.setCustomMap(
-        ImmutableMap.of(MinionConstants.MergeRollupTask.SEGMENT_ZK_METADATA_MERGE_LEVEL_KEY, DAILY));
+        Map.of(MinionConstants.MergeRollupTask.SEGMENT_ZK_METADATA_MERGE_LEVEL_KEY, DAILY));
     when(mockClusterInfoProvide.getSegmentsZKMetadata(OFFLINE_TABLE_NAME)).thenReturn(
         Lists.newArrayList(metadata1, metadata2, metadata3, metadata4, metadata5, metadataMergedDaily1,
             metadataMergedDaily2, metadataMergedDaily3));
@@ -1021,12 +1020,12 @@ public class MergeRollupTaskGeneratorTest {
     SegmentZKMetadata metadataMergedDaily4 =
         getSegmentZKMetadata(segmentNameMergedDaily4, 2_592_000_000L, 2_592_020_000L, TimeUnit.MILLISECONDS, null);
     metadataMergedDaily4.setCustomMap(
-        ImmutableMap.of(MinionConstants.MergeRollupTask.SEGMENT_ZK_METADATA_MERGE_LEVEL_KEY, DAILY));
+        Map.of(MinionConstants.MergeRollupTask.SEGMENT_ZK_METADATA_MERGE_LEVEL_KEY, DAILY));
     String segmentNameMergedMonthly1 = "merged_testTable__1__2__3__4_1";
     SegmentZKMetadata metadataMergedMonthly1 =
         getSegmentZKMetadata(segmentNameMergedMonthly1, 86_400_000L, 2_591_999_999L, TimeUnit.MILLISECONDS, null);
     metadataMergedMonthly1.setCustomMap(
-        ImmutableMap.of(MinionConstants.MergeRollupTask.SEGMENT_ZK_METADATA_MERGE_LEVEL_KEY, MONTHLY));
+        Map.of(MinionConstants.MergeRollupTask.SEGMENT_ZK_METADATA_MERGE_LEVEL_KEY, MONTHLY));
     when(mockClusterInfoProvide.getSegmentsZKMetadata(OFFLINE_TABLE_NAME)).thenReturn(
         Lists.newArrayList(metadata1, metadata2, metadata3, metadata4, metadata5, metadataMergedDaily1,
             metadataMergedDaily2, metadataMergedDaily3, metadataMergedDaily4, metadataMergedMonthly1));

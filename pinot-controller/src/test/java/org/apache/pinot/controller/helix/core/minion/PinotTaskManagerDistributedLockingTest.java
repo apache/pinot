@@ -18,7 +18,6 @@
  */
 package org.apache.pinot.controller.helix.core.minion;
 
-import com.google.common.collect.ImmutableMap;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
@@ -783,7 +782,7 @@ public class PinotTaskManagerDistributedLockingTest extends ControllerTest {
    */
   private void createSingleTestTable(String rawTableName) throws Exception {
     Map<String, Map<String, String>> taskTypeConfigsMap = new HashMap<>();
-    taskTypeConfigsMap.put(TEST_TASK_TYPE, ImmutableMap.of("schedule", "0 */10 * ? * * *"));
+    taskTypeConfigsMap.put(TEST_TASK_TYPE, Map.of("schedule", "0 */10 * ? * * *"));
 
     TableConfig tableConfig = new TableConfigBuilder(TableType.OFFLINE)
         .setTableName(rawTableName)

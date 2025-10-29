@@ -42,6 +42,19 @@ public class SumMVAggregationFunction extends SumAggregationFunction {
   public void aggregate(int length, AggregationResultHolder aggregationResultHolder,
       Map<ExpressionContext, BlockValSet> blockValSetMap) {
     BlockValSet blockValSet = blockValSetMap.get(_expression);
+
+    if (blockValSet.isSingleValue()) {
+      // star-tree pre-aggregated values: During star-tree creation, the multi-value column is pre-aggregated
+      // per star-tree node, resulting in a single value per node.
+      double[] valueArray = blockValSet.getDoubleValuesSV();
+      double sum = 0.0;
+      for (int i = 0; i < length; i++) {
+        sum += valueArray[i];
+      }
+      updateAggregationResultHolder(aggregationResultHolder, sum);
+      return;
+    }
+
     double[][] valuesArray = blockValSet.getDoubleValuesMV();
 
     Double sum;
@@ -62,6 +75,26 @@ public class SumMVAggregationFunction extends SumAggregationFunction {
   public void aggregateGroupBySV(int length, int[] groupKeyArray, GroupByResultHolder groupByResultHolder,
       Map<ExpressionContext, BlockValSet> blockValSetMap) {
     BlockValSet blockValSet = blockValSetMap.get(_expression);
+
+    if (blockValSet.isSingleValue()) {
+      // star-tree pre-aggregated values: During star-tree creation, the multi-value column is pre-aggregated
+      // per star-tree node, resulting in a single value per node.
+      double[] valueArray = blockValSet.getDoubleValuesSV();
+      if (_nullHandlingEnabled) {
+        for (int i = 0; i < length; i++) {
+          int groupKey = groupKeyArray[i];
+          Double result = groupByResultHolder.getResult(groupKey);
+          groupByResultHolder.setValueForKey(groupKey, result == null ? valueArray[i] : result + valueArray[i]);
+        }
+      } else {
+        for (int i = 0; i < length; i++) {
+          int groupKey = groupKeyArray[i];
+          groupByResultHolder.setValueForKey(groupKey, groupByResultHolder.getDoubleResult(groupKey) + valueArray[i]);
+        }
+      }
+      return;
+    }
+
     double[][] valuesArray = blockValSet.getDoubleValuesMV();
 
     if (_nullHandlingEnabled) {

@@ -18,7 +18,6 @@
  */
 package org.apache.pinot.common.config;
 
-import com.google.common.collect.ImmutableMap;
 import java.util.Map;
 import org.apache.pinot.common.utils.tls.TlsUtils;
 import org.apache.pinot.spi.env.PinotConfiguration;
@@ -82,7 +81,7 @@ public class GrpcConfig {
   }
 
   public GrpcConfig(int maxInboundMessageSizeBytes, boolean usePlainText) {
-    this(ImmutableMap.of(CONFIG_MAX_INBOUND_MESSAGE_BYTES_SIZE, maxInboundMessageSizeBytes, CONFIG_USE_PLAIN_TEXT,
+    this(Map.of(CONFIG_MAX_INBOUND_MESSAGE_BYTES_SIZE, maxInboundMessageSizeBytes, CONFIG_USE_PLAIN_TEXT,
         usePlainText));
   }
 

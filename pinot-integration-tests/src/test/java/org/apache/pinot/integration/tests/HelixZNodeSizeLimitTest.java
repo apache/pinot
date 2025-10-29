@@ -19,7 +19,6 @@
 
 package org.apache.pinot.integration.tests;
 
-import com.google.common.collect.ImmutableMap;
 import java.util.Map;
 import org.apache.helix.zookeeper.constant.ZkSystemPropertyKeys;
 import org.apache.pinot.common.utils.helix.HelixHelper;
@@ -85,9 +84,9 @@ public class HelixZNodeSizeLimitTest extends BaseClusterIntegrationTest {
         Map<String, Map<String, String>> currentAssignment = idealState.getRecord().getMapFields();
         for (int i = 0; i < 500_000; i++) {
           currentAssignment.put("segment_" + i,
-              ImmutableMap.of("Server_with_some_reasonable_long_prefix_" + (i % 10), "ONLINE"));
+              Map.of("Server_with_some_reasonable_long_prefix_" + (i % 10), "ONLINE"));
           currentAssignment.put("segment_" + i,
-              ImmutableMap.of("Server_with_some_reasonable_long_prefix_" + (i % 9), "ONLINE"));
+              Map.of("Server_with_some_reasonable_long_prefix_" + (i % 9), "ONLINE"));
         }
         return idealState;
       });

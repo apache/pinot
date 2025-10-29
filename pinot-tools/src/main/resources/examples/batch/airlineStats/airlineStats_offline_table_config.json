@@ -66,6 +66,17 @@
           "MAX__ArrDelay"
         ],
         "maxLeafRecords": 10
+      },
+      {
+        "dimensionsSplitOrder": [
+          "AirlineID"
+        ],
+        "functionColumnPairs": [
+          "AVGMV__DivLongestGTimes",
+          "COUNTMV__DivLongestGTimes",
+          "SUMMV__DivLongestGTimes"
+        ],
+        "maxLeafRecords": 10
       }
     ],
     "enableDynamicStarTreeCreation": true,

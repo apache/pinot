@@ -18,9 +18,9 @@
  */
 package org.apache.pinot.common.datablock;
 
-import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.Lists;
 import java.util.Collections;
+import java.util.Map;
 import java.util.Random;
 import org.apache.pinot.segment.spi.memory.PinotByteBuffer;
 import org.apache.pinot.segment.spi.memory.PinotDataBuffer;
@@ -29,7 +29,8 @@ import org.testng.annotations.BeforeSuite;
 import org.testng.annotations.DataProvider;
 import org.testng.annotations.Test;
 
-import static org.testng.Assert.*;
+import static org.testng.Assert.assertEquals;
+import static org.testng.Assert.fail;
 
 
 public class ZeroCopyDataBlockSerdeTest {
@@ -58,27 +59,28 @@ public class ZeroCopyDataBlockSerdeTest {
     byte[] bytes2 = new byte[128];
     r.nextBytes(bytes2);
 
-    return new Object[][] {
+    return new Object[][]{
         {"empty error", MetadataBlock.newError(-1, -1, null, Collections.emptyMap())},
-        {"error with single message", MetadataBlock.newError(3, 1, "test2", ImmutableMap.<Integer, String>builder()
-            .put(123, "error")
-            .build())},
-        {"error with two messages", MetadataBlock.newError(3, 1, "multiple", ImmutableMap.<Integer, String>builder()
-            .put(123, "error")
-            .put(1234, "another error")
-            .build())},
+        {"error with single message", MetadataBlock.newError(3, 1, "test2", Map.of(123, "error"))},
+        {
+            "error with two messages", MetadataBlock.newError(3, 1, "multiple",
+            Map.of(123, "error", 1234, "another error"))
+        },
         {"eos empty", MetadataBlock.newEos()},
         {"eos with empty stat", new MetadataBlock(Collections.singletonList(PinotDataBuffer.empty()))},
-        {"eos with several empty stats",
-            new MetadataBlock(Lists.newArrayList(PinotDataBuffer.empty(), PinotDataBuffer.empty()))},
+        {
+            "eos with several empty stats",
+            new MetadataBlock(Lists.newArrayList(PinotDataBuffer.empty(), PinotDataBuffer.empty()))
+        },
         {"eos with one not empty stat", new MetadataBlock(Lists.newArrayList(PinotByteBuffer.wrap(bytes1)))},
-        {"eos with two not empty stat",
-            new MetadataBlock(Lists.newArrayList(PinotByteBuffer.wrap(bytes1), PinotByteBuffer.wrap(bytes2)))},
-        {"error with stats", MetadataBlock.newErrorWithStats(12, 21, "fakeId",
-            ImmutableMap.<Integer, String>builder()
-                .put(123, "error")
-                .build(),
-            Lists.newArrayList(PinotByteBuffer.wrap(bytes1)))}
+        {
+            "eos with two not empty stat",
+            new MetadataBlock(Lists.newArrayList(PinotByteBuffer.wrap(bytes1), PinotByteBuffer.wrap(bytes2)))
+        },
+        {
+            "error with stats", MetadataBlock.newErrorWithStats(12, 21, "fakeId", Map.of(123, "error"),
+            Lists.newArrayList(PinotByteBuffer.wrap(bytes1)))
+        }
     };
   }
 

@@ -18,7 +18,6 @@
  */
 package org.apache.pinot.spi.utils;
 
-import com.google.common.collect.ImmutableMap;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashMap;
@@ -156,7 +155,7 @@ public class IngestionConfigUtilsTest {
 
   @Test
   public void testGetConfigMapWithPrefix() {
-    Map<String, String> testMap = ImmutableMap.of("k1", "v1", "k1.k2", "v2", "k1.k3", "v3", "k4", "v4");
+    Map<String, String> testMap = Map.of("k1", "v1", "k1.k2", "v2", "k1.k3", "v3", "k4", "v4");
     Assert.assertEquals(2, IngestionConfigUtils.getConfigMapWithPrefix(testMap, "k1").size());
     Assert.assertEquals(2, IngestionConfigUtils.getConfigMapWithPrefix(testMap, "k1.").size());
   }

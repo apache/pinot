@@ -19,12 +19,12 @@
 
 package org.apache.pinot.queries;
 
-import com.google.common.collect.ImmutableMap;
 import java.io.File;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Iterator;
 import java.util.List;
+import java.util.Map;
 import org.apache.commons.io.FileUtils;
 import org.apache.pinot.common.request.PinotQuery;
 import org.apache.pinot.core.common.Operator;
@@ -83,7 +83,7 @@ public class BooleanAggQueriesTest extends BaseQueriesTest {
 
   @DataProvider
   public static Object[][] nullHandling() {
-    return new Object[][] {
+    return new Object[][]{
         new Object[]{true},
         new Object[]{false},
     };
@@ -106,10 +106,10 @@ public class BooleanAggQueriesTest extends BaseQueriesTest {
 
   @BeforeClass
   public void setUp()
-    throws Exception {
+      throws Exception {
     FileUtils.deleteDirectory(INDEX_DIR);
 
-    Object[][] recordContents = new Object[][] {
+    Object[][] recordContents = new Object[][]{
         new Object[]{true, "allTrue"},
         new Object[]{true, "allTrue"},
         new Object[]{true, "allTrue"},
@@ -160,9 +160,7 @@ public class BooleanAggQueriesTest extends BaseQueriesTest {
     PinotQuery pinotQuery = CalciteSqlParser.compileToPinotQuery(query);
 
     pinotQuery.setQueryOptions(
-        ImmutableMap.of(
-            CommonConstants.Broker.Request.QueryOptionKey.ENABLE_NULL_HANDLING,
-            String.valueOf(enableNullHandling)));
+        Map.of(CommonConstants.Broker.Request.QueryOptionKey.ENABLE_NULL_HANDLING, String.valueOf(enableNullHandling)));
 
     PinotQuery serverPinotQuery = GapfillUtils.stripGapfill(pinotQuery);
     QueryContext queryContext = QueryContextConverterUtils.getQueryContext(serverPinotQuery);

@@ -16,33 +16,18 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.pinot.core.util;
+package org.apache.pinot.client.admin;
 
-public class DoubleComparisonUtil {
-  private DoubleComparisonUtil() {
+/**
+ * Exception thrown when a requested resource is not found.
+ */
+public class PinotAdminNotFoundException extends PinotAdminException {
+
+  public PinotAdminNotFoundException(String message) {
+    super(message);
   }
 
-  private static final double DEFAULT_EPSILON = 0.000001;
-
-  public static int defaultDoubleCompare(double d1, double d2) {
-    return doubleCompare(d1, d2, DEFAULT_EPSILON);
-  }
-
-  public static int doubleCompare(double d1, double d2, double epsilon) {
-    if (d1 > d2) {
-      if (d1 * (1 - epsilon) > d2) {
-        return 1;
-      } else {
-        return 0;
-      }
-    }
-    if (d2 > d1) {
-      if (d2 * (1 - epsilon) > d1) {
-        return -1;
-      } else {
-        return 0;
-      }
-    }
-    return 0;
+  public PinotAdminNotFoundException(String message, Throwable cause) {
+    super(message, cause);
   }
 }
