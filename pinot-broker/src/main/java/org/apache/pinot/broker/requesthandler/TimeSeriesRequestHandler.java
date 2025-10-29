@@ -24,8 +24,11 @@ import java.net.URI;
 import java.net.URISyntaxException;
 import java.time.Duration;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
+import java.util.Stack;
 import java.util.concurrent.Executor;
 import java.util.concurrent.TimeUnit;
 import javax.annotation.Nullable;
@@ -42,6 +45,9 @@ import org.apache.pinot.broker.routing.BrokerRoutingManager;
 import org.apache.pinot.common.config.provider.TableCache;
 import org.apache.pinot.common.metrics.BrokerMeter;
 import org.apache.pinot.common.metrics.BrokerTimer;
+import org.apache.pinot.common.request.context.ExpressionContext;
+import org.apache.pinot.common.request.context.FilterContext;
+import org.apache.pinot.common.request.context.RequestContextUtils;
 import org.apache.pinot.common.response.BrokerResponse;
 import org.apache.pinot.common.utils.HumanReadableDuration;
 import org.apache.pinot.core.auth.Actions;
@@ -50,15 +56,20 @@ import org.apache.pinot.query.service.dispatch.QueryDispatcher;
 import org.apache.pinot.spi.accounting.ThreadAccountant;
 import org.apache.pinot.spi.auth.AuthorizationResult;
 import org.apache.pinot.spi.auth.broker.RequesterIdentity;
+import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.env.PinotConfiguration;
 import org.apache.pinot.spi.exception.QueryErrorCode;
 import org.apache.pinot.spi.exception.QueryException;
 import org.apache.pinot.spi.trace.RequestContext;
+import org.apache.pinot.spi.utils.builder.TableNameBuilder;
+import org.apache.pinot.sql.parsers.CalciteSqlParser;
 import org.apache.pinot.sql.parsers.SqlNodeAndOptions;
 import org.apache.pinot.tsdb.planner.TimeSeriesQueryEnvironment;
 import org.apache.pinot.tsdb.planner.physical.TimeSeriesDispatchablePlan;
 import org.apache.pinot.tsdb.spi.RangeTimeSeriesRequest;
 import org.apache.pinot.tsdb.spi.TimeSeriesLogicalPlanResult;
+import org.apache.pinot.tsdb.spi.plan.BaseTimeSeriesPlanNode;
+import org.apache.pinot.tsdb.spi.plan.LeafTimeSeriesPlanNode;
 import org.apache.pinot.tsdb.spi.series.TimeSeriesBlock;
 import org.apache.pinot.tsdb.spi.series.TimeSeriesBuilderFactoryProvider;
 import org.slf4j.Logger;
@@ -132,8 +143,8 @@ public class TimeSeriesRequestHandler extends BaseBrokerRequestHandler {
       }
       TimeSeriesDispatchablePlan dispatchablePlan =
           _queryEnvironment.buildPhysicalPlan(timeSeriesRequest, requestContext, logicalPlanResult);
+      validatePhysicalPlan(httpHeaders, dispatchablePlan);
 
-      tableLevelAccessControlCheck(httpHeaders, dispatchablePlan.getTableNames());
       timeSeriesBlock = _queryDispatcher.submitAndGet(requestContext.getRequestId(), dispatchablePlan,
           timeSeriesRequest.getTimeout().toMillis(), requestContext);
       return timeSeriesBlock;
@@ -235,6 +246,90 @@ public class TimeSeriesRequestHandler extends BaseBrokerRequestHandler {
       _brokerMetrics.addMeteredGlobalValue(BrokerMeter.REQUEST_DROPPED_DUE_TO_ACCESS_ERROR, 1);
       throw new WebApplicationException("Permission denied. " + authorizationResult.getFailureMessage(),
         Response.Status.FORBIDDEN);
+    }
+  }
+
+  private void validatePhysicalPlan(HttpHeaders httpHeaders, TimeSeriesDispatchablePlan dispatchablePlan) {
+    // check authorization for table
+    tableLevelAccessControlCheck(httpHeaders, dispatchablePlan.getTableNames());
+    // validate column names for all LeafTimeSeriesPlanNode in the physical plan
+    validatePhysicalPlanColumns(dispatchablePlan);
+  }
+
+  private void validatePhysicalPlanColumns(TimeSeriesDispatchablePlan dispatchablePlan) {
+    for (BaseTimeSeriesPlanNode serverFragmentRoot : dispatchablePlan.getServerFragments()) {
+      // traverse tree and validate all LeafTimeSeriesPlanNode has valid columns
+      Stack<BaseTimeSeriesPlanNode> nodeStack = new Stack<>();
+      nodeStack.push(serverFragmentRoot);
+      while (!nodeStack.isEmpty()) {
+        BaseTimeSeriesPlanNode currNode = nodeStack.pop();
+        if (currNode instanceof LeafTimeSeriesPlanNode) {
+          String rawTableName = TableNameBuilder.extractRawTableName(
+              ((LeafTimeSeriesPlanNode) currNode).getTableName());
+          validateColumnNames((LeafTimeSeriesPlanNode) currNode, _tableCache.getSchema(rawTableName));
+        }
+        for (BaseTimeSeriesPlanNode child : currNode.getInputs()) {
+          nodeStack.push(child);
+        }
+      }
+    }
+    if (dispatchablePlan.getBrokerFragment() instanceof LeafTimeSeriesPlanNode) {
+      String rawTableName = TableNameBuilder.extractRawTableName(
+          ((LeafTimeSeriesPlanNode) dispatchablePlan.getBrokerFragment()).getTableName());
+      validateColumnNames((LeafTimeSeriesPlanNode) dispatchablePlan.getBrokerFragment(),
+          _tableCache.getSchema(rawTableName));
+    }
+  }
+
+  /**
+   * Helper function that takes a @Code{LeafTimeSeriesPlanNode} and validates the column names used
+   * in the filter, groupBy, value etc. expressions
+   * @param leafNode
+   */
+  static void validateColumnNames(LeafTimeSeriesPlanNode leafNode, Schema tableSchema) {
+    String tableName = TableNameBuilder.extractRawTableName(leafNode.getTableName());
+    Preconditions.checkNotNull(tableSchema, "Schema for Table " + tableName + " not found");
+    String filterExpr = leafNode.getFilterExpression();
+    String valueExpr = leafNode.getValueExpression();
+    List<String> groupByExprs = leafNode.getGroupByExpressions();
+    String timeCol = leafNode.getTimeColumn();
+    // validate time column
+    validateColumnsInExpression(timeCol, tableName, tableSchema);
+    // validate value expression columns
+    validateColumnsInExpression(valueExpr, tableName, tableSchema);
+    // validate group by Expressions
+    for (var groupByExpr : groupByExprs) {
+      validateColumnsInExpression(groupByExpr, tableName, tableSchema);
+    }
+    if (!StringUtils.isBlank(filterExpr)) {
+      // validate filter expression
+      FilterContext filterContext =
+          RequestContextUtils.getFilter(CalciteSqlParser.compileToExpression(filterExpr));
+      Set<String> colsInFilterExpr = new HashSet<>();
+      filterContext.getColumns(colsInFilterExpr);
+      for (String col : colsInFilterExpr) {
+        if (!tableSchema.hasColumn(col)) {
+          throw QueryErrorCode.UNKNOWN_COLUMN.asException(
+              String.format("Column '%s' in filter expression '%s' not found in table schema for table '%s'",
+                  col, filterExpr, tableName));
+        }
+      }
+    }
+  }
+
+  private static void validateColumnsInExpression(String expressionString, String tableName, Schema tableSchema) {
+    if (StringUtils.isBlank(expressionString)) {
+      return;
+    }
+    ExpressionContext expression = RequestContextUtils.getExpression(expressionString);
+    Set<String> colsInExpr = new HashSet<>();
+    expression.getColumns(colsInExpr);
+    for (String col : colsInExpr) {
+      if (!tableSchema.hasColumn(col)) {
+        throw QueryErrorCode.UNKNOWN_COLUMN.asException(
+            String.format("Column '%s' in expression '%s' not found in table schema for table '%s'",
+            col, expressionString, tableName));
+      }
     }
   }
 
