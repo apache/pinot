@@ -24,8 +24,14 @@ import java.util.Map;
 import java.util.concurrent.Executor;
 import javax.annotation.Nullable;
 import org.apache.hc.client5.http.impl.io.PoolingHttpClientConnectionManager;
+import org.apache.helix.HelixDataAccessor;
+import org.apache.helix.HelixManager;
+import org.apache.helix.PropertyKey;
+import org.apache.helix.model.ExternalView;
 import org.apache.helix.model.HelixConfigScope;
 import org.apache.helix.model.IdealState;
+import org.apache.helix.model.InstanceConfig;
+import org.apache.helix.model.MasterSlaveSMD;
 import org.apache.helix.model.builder.HelixConfigScopeBuilder;
 import org.apache.helix.task.TaskState;
 import org.apache.helix.zookeeper.datamodel.ZNRecord;
@@ -36,12 +42,15 @@ import org.apache.pinot.common.metadata.segment.SegmentZKMetadata;
 import org.apache.pinot.common.metrics.ControllerMetrics;
 import org.apache.pinot.common.minion.BaseTaskMetadata;
 import org.apache.pinot.common.minion.MinionTaskMetadataUtils;
+import org.apache.pinot.common.utils.helix.LeadControllerUtils;
 import org.apache.pinot.controller.ControllerConf;
 import org.apache.pinot.controller.LeadControllerManager;
 import org.apache.pinot.controller.helix.core.PinotHelixResourceManager;
 import org.apache.pinot.core.minion.PinotTaskConfig;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.data.Schema;
+import org.apache.pinot.spi.utils.CommonConstants;
+import org.apache.pinot.spi.utils.builder.TableNameBuilder;
 
 
 /**
@@ -184,6 +193,79 @@ public class ClusterInfoAccessor {
    */
   public String getVipUrl() {
     return _controllerConf.generateVipUrl();
+  }
+
+  /**
+   * Get the VIP URL of the lead controller for the given table.
+   * Falls back to the current controller's VIP URL if lead controller cannot be determined for some reason
+   *
+   * @param tableNameWithType table name with type
+   * @return VIP URL of the lead controller of the table
+   */
+  public String getVipUrlForLeadController(String tableNameWithType) {
+    String rawTableName = TableNameBuilder.extractRawTableName(tableNameWithType);
+    if (_leadControllerManager.isLeaderForTable(rawTableName)) {
+      return getVipUrl();
+    }
+
+    String leadControllerInstanceId = getLeadControllerForTable(tableNameWithType);
+    if (leadControllerInstanceId == null) {
+      return getVipUrl();
+    }
+
+    // Fetch the instance config for the given controller and obtain the hostname and port
+    HelixDataAccessor dataAccessor = _pinotHelixResourceManager.getHelixZkManager().getHelixDataAccessor();
+    PropertyKey.Builder keyBuilder = dataAccessor.keyBuilder();
+    InstanceConfig instanceConfig = dataAccessor.getProperty(keyBuilder.instanceConfig(leadControllerInstanceId));
+    if (instanceConfig == null) {
+      return getVipUrl();
+    }
+
+    String host = instanceConfig.getHostName();
+    String port = instanceConfig.getPort();
+    return _controllerConf.generateVipUrl(host, port);
+  }
+
+  private String getLeadControllerForTable(String tableNameWithType) {
+    try {
+      HelixManager helixManager = _pinotHelixResourceManager.getHelixZkManager();
+
+      // Check if lead controller resource is enabled
+      boolean isLeadControllerResourceEnabled = LeadControllerUtils.isLeadControllerResourceEnabled(helixManager);
+      if (!isLeadControllerResourceEnabled) {
+        return null;
+      }
+
+      // Get external view for lead controller resource
+      ExternalView leadControllerResourceExternalView = helixManager.getClusterManagmentTool()
+          .getResourceExternalView(helixManager.getClusterName(), CommonConstants.Helix.LEAD_CONTROLLER_RESOURCE_NAME);
+
+      if (leadControllerResourceExternalView == null) {
+        return null;
+      }
+
+      // Find the partition for this table
+      String rawTableName = TableNameBuilder.extractRawTableName(tableNameWithType);
+      int partitionId = LeadControllerUtils.getPartitionIdForTable(rawTableName);
+      String partitionName = LeadControllerUtils.generatePartitionName(partitionId);
+
+      // Get the state map for this partition
+      Map<String, String> partitionStateMap = leadControllerResourceExternalView.getStateMap(partitionName);
+      if (partitionStateMap == null) {
+        return null;
+      }
+
+      // Find the controller in MASTER state
+      for (Map.Entry<String, String> entry : partitionStateMap.entrySet()) {
+        if (MasterSlaveSMD.States.MASTER.name().equals(entry.getValue())) {
+          return entry.getKey();
+        }
+      }
+
+      return null;
+    } catch (Exception e) {
+      return null;
+    }
   }
 
   /**

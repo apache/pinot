@@ -578,6 +578,10 @@ public class ControllerConf extends PinotConfiguration {
     return getControllerVipProtocol() + "://" + getControllerVipHost() + ":" + getControllerVipPort();
   }
 
+  public String generateVipUrl(String host, String port) {
+    return getControllerVipProtocol() + "://" + host + ":" + port;
+  }
+
   public String getZkStr() {
     String zkAddress = containsKey(CommonConstants.Helix.CONFIG_OF_ZOOKEEPER_SERVER) ? getProperty(
         CommonConstants.Helix.CONFIG_OF_ZOOKEEPER_SERVER) : getProperty(ZK_STR);

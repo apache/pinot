@@ -295,7 +295,8 @@ public class SegmentGenerationAndPushTaskGenerator extends BaseTaskGenerator {
     } else {
       singleFileGenerationTaskConfig.put(BatchConfigProperties.PUSH_MODE, pushMode);
     }
-    singleFileGenerationTaskConfig.put(BatchConfigProperties.PUSH_CONTROLLER_URI, _clusterInfoAccessor.getVipUrl());
+    singleFileGenerationTaskConfig.put(BatchConfigProperties.PUSH_CONTROLLER_URI,
+        _clusterInfoAccessor.getVipUrlForLeadController(tableName));
     return singleFileGenerationTaskConfig;
   }
 
