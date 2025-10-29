@@ -178,6 +178,10 @@
     <module name="IllegalImport">
       <property name="illegalClasses" value="com.google.common.collect.ImmutableMap"/>
     </module>
+    <!-- Disallow importing com.google.common.collect.ImmutableList (use java.util.List instead) -->
+    <module name="IllegalImport">
+      <property name="illegalClasses" value="com.google.common.collect.ImmutableList"/>
+    </module>
     <!-- Use org.testng.Assert in tests -->
     <module name="IllegalImport">
       <property name="regexp" value="true"/>

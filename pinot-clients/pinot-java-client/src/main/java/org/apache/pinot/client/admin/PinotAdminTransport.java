@@ -24,6 +24,7 @@ import java.io.IOException;
 import java.net.URLEncoder;
 import java.nio.charset.StandardCharsets;
 import java.time.Duration;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.Properties;
@@ -345,7 +346,7 @@ public class PinotAdminTransport implements AutoCloseable {
 
     if (arrayNode.isArray()) {
       // Handle JSON array format
-      java.util.List<String> result = new java.util.ArrayList<>();
+      List<String> result = new ArrayList<>();
       for (JsonNode element : arrayNode) {
         result.add(element.asText());
       }

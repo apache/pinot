@@ -130,7 +130,6 @@ import org.apache.calcite.util.SourceStringReader;
 import org.apache.calcite.util.Util;
 import org.apache.calcite.util.trace.CalciteTrace;
 
-import com.google.common.collect.ImmutableList;
 import org.slf4j.Logger;
 
 import java.io.Reader;
@@ -2600,7 +2599,7 @@ SqlNode RowConstructor() :
             // LOOKAHEAD in TableConstructor().  It would be so much more
             // reasonable to require parentheses.  Sigh.
             s = Span.of(value);
-            valueList = new SqlNodeList(ImmutableList.of(value),
+            valueList = new SqlNodeList(List.of(value),
                 value.getParserPosition());
         }
     )
@@ -2642,7 +2641,7 @@ SqlNodeList GroupBy() :
     list = GroupingElementList() {
         final SqlParserPos pos = s.end(this);
         final List<SqlNode> list2 = distinct
-            ? ImmutableList.of(
+            ? List.of(
                 SqlInternalOperators.GROUP_BY_DISTINCT.createCall(pos, list))
             : list;
         return new SqlNodeList(list2, pos);
@@ -4111,13 +4110,13 @@ SqlNode RowExpressionExtension() :
         (
             LOOKAHEAD(2) <LPAREN> <STAR> {
                 quantifier = null;
-                args = ImmutableList.of(SqlIdentifier.star(getPos()));
+                args = List.of(SqlIdentifier.star(getPos()));
             }
             <RPAREN>
         |
             LOOKAHEAD(2) <LPAREN> <RPAREN> {
                 quantifier = null;
-                args = ImmutableList.of();
+                args = List.of();
             }
         |
             args = FunctionParameterList(ExprContext.ACCEPT_SUB_QUERY) {
@@ -7597,12 +7596,12 @@ SqlCall NamedCall() :
     }
     (
         LOOKAHEAD(2) <LPAREN> <STAR> {
-            args = ImmutableList.of(SqlIdentifier.star(getPos()));
+            args = List.of(SqlIdentifier.star(getPos()));
         }
         <RPAREN>
     |
         LOOKAHEAD(2) <LPAREN> <RPAREN> {
-            args = ImmutableList.of();
+            args = List.of();
         }
     |
         args = FunctionParameterList(ExprContext.ACCEPT_SUB_QUERY) {

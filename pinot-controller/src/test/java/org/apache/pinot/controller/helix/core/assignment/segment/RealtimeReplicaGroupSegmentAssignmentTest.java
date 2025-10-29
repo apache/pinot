@@ -18,7 +18,6 @@
  */
 package org.apache.pinot.controller.helix.core.assignment.segment;
 
-import com.google.common.collect.ImmutableList;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashSet;
@@ -188,7 +187,7 @@ public class RealtimeReplicaGroupSegmentAssignmentTest {
     currentAssignment.put(offlineSegmentName, offlineSegmentInstanceStateMap);
 
     // Add 3 uploaded ONLINE segments to the consuming instances (i.e. no separation between consuming & completed)
-    List<String> uploadedSegmentNames = ImmutableList.of("UploadedSegment0", "UploadedSegment1", "UploadedSegment2");
+    List<String> uploadedSegmentNames = List.of("UploadedSegment0", "UploadedSegment1", "UploadedSegment2");
     onlyConsumingInstancePartitionMap =
         Map.of(InstancePartitionsType.CONSUMING, _instancePartitionsMap.get(InstancePartitionsType.CONSUMING));
     for (String uploadedSegName : uploadedSegmentNames) {
@@ -307,11 +306,11 @@ public class RealtimeReplicaGroupSegmentAssignmentTest {
     //   0_2=[instance_8, instance_9, instance_10, instance_11]
     // }
     Map<String, List<String>> segmentsToAssign = Map.of(
-        "uploadedSegment_0", ImmutableList.of(),
-        "uploadedSegment_1", ImmutableList.of(),
-        "uploadedSegment_2", ImmutableList.of(),
-        "uploadedSegment_3", ImmutableList.of(),
-        "uploadedSegment_4", ImmutableList.of()
+        "uploadedSegment_0", List.of(),
+        "uploadedSegment_1", List.of(),
+        "uploadedSegment_2", List.of(),
+        "uploadedSegment_3", List.of(),
+        "uploadedSegment_4", List.of()
     );
     int numCompletedInstancesPerReplicaGroup = NUM_COMPLETED_INSTANCES / NUM_REPLICAS;
     segmentsToAssign.forEach((segmentName, ignored) -> {

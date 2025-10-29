@@ -18,7 +18,6 @@
  */
 package org.apache.pinot.controller.helix.core.assignment.segment;
 
-import com.google.common.collect.ImmutableList;
 import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
@@ -127,7 +126,7 @@ public class RealtimeNonReplicaGroupSegmentAssignmentTest {
         Map.of(InstancePartitionsType.COMPLETED, _instancePartitionsMap.get(InstancePartitionsType.COMPLETED));
     Map<String, Map<String, String>> currentAssignment = new TreeMap<>();
 
-    List<String> uploadedSegments = ImmutableList.of("uploadedSegment_0", "uploadedSegment_1", "uploadedSegment_2",
+    List<String> uploadedSegments = List.of("uploadedSegment_0", "uploadedSegment_1", "uploadedSegment_2",
         "uploadedSegment_3");
     uploadedSegments.forEach(segmentName -> {
       List<String> actualInstances =
@@ -195,7 +194,7 @@ public class RealtimeNonReplicaGroupSegmentAssignmentTest {
     currentAssignment.put(offlineSegmentName, offlineSegmentInstanceStateMap);
 
     // Add an UPLOADED segment to the CONSUMING instances (i.e. no separation between CONSUMING & COMPLETED)
-    List<String> uploadedSegments = ImmutableList.of("UploadedSegment1", "UploadedSegment2");
+    List<String> uploadedSegments = List.of("UploadedSegment1", "UploadedSegment2");
     int numUploadedSegments = uploadedSegments.size();
     onlyConsumingInstancePartitionMap =
         Map.of(InstancePartitionsType.CONSUMING, _instancePartitionsMap.get(InstancePartitionsType.CONSUMING));
@@ -309,7 +308,7 @@ public class RealtimeNonReplicaGroupSegmentAssignmentTest {
         Map.of(InstancePartitionsType.COMPLETED, _instancePartitionsMap.get(InstancePartitionsType.COMPLETED));
     Map<String, Map<String, String>> currentAssignment = new TreeMap<>();
 
-    List<String> uploadedSegments = ImmutableList.of(
+    List<String> uploadedSegments = List.of(
         "uploadedSegment_0",
         "uploadedSegment_1",
         "uploadedSegment_2",

@@ -49,4 +49,14 @@
   <suppress checks="IllegalImport" files="Unsafer.java"/>
   <suppress checks="IllegalImport" files="UnsafePinotBuffer.java"/>
   <suppress checks="IllegalImport" files="BaseOffHeapSet.java"/>
+
+  <!-- Allow ImmutableList import where required by Calcite or tests in planner module -->
+  <suppress checks="IllegalImport"
+            files="[\\/]src[\\/]main[\\/]java[\\/]org[\\/]apache[\\/]pinot[\\/]query[\\/]planner[\\/]physical[\\/]v2[\\/]nodes[\\/]PhysicalValues\.java"/>
+  <suppress checks="IllegalImport"
+            files="[\\/]src[\\/]test[\\/]java[\\/]org[\\/]apache[\\/]pinot[\\/]query[\\/]planner[\\/]logical[\\/]RelToPlanNodeConverterTest\.java"/>
+  <suppress checks="IllegalImport"
+            files="[\\/]src[\\/]main[\\/]java[\\/]org[\\/]apache[\\/]pinot[\\/]calcite[\\/]rel[\\/]rules[\\/].*"/>
+  <suppress checks="IllegalImport"
+            files="[\\/]src[\\/]test[\\/]java[\\/]org[\\/]apache[\\/]pinot[\\/]calcite[\\/]rel[\\/]rules[\\/].*"/>
 </suppressions>

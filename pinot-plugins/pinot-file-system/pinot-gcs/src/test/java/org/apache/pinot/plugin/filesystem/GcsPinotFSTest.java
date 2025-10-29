@@ -18,7 +18,6 @@
  */
 package org.apache.pinot.plugin.filesystem;
 
-import com.google.common.collect.ImmutableList;
 import com.google.common.io.Closer;
 import java.io.BufferedWriter;
 import java.io.IOException;
@@ -243,7 +242,7 @@ public class GcsPinotFSTest {
     Set<GcsUri> expectedElementsCopy = new HashSet<>();
     String directoryName = Paths.get(gcsDirectoryUri.getPath()).getFileName().toString();
     String directoryCopyName = Paths.get(gcsDirectoryUriCopy.getPath()).getFileName().toString();
-    for (GcsUri element : ImmutableList.copyOf(expectedElements)) {
+    for (GcsUri element : List.copyOf(expectedElements)) {
       expectedElementsCopy.add(
           createGcsUri(element.getBucketName(), element.getPath().replace(directoryName, directoryCopyName)));
     }
