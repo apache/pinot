@@ -52,7 +52,7 @@ public class StringToMapFunctions {
    * @throws RuntimeException if the string is not valid JSON
    */
   @Nullable
-  @ScalarFunction(names = {"stringToMap", "string_to_map", "jsonToMap", "json_to_map"}, nullableParameters = true)
+  @ScalarFunction(names = {"stringToMap", "string_to_map"}, nullableParameters = true)
   public static Map<String, Object> stringToMap(@Nullable String jsonString) {
     if (jsonString == null || jsonString.trim().isEmpty()) {
       return null;
@@ -77,8 +77,7 @@ public class StringToMapFunctions {
    * @throws RuntimeException if the string is not valid JSON
    */
   @Nullable
-  @ScalarFunction(names = {"stringExtractValue", "string_extract_value", "stringExtractMapValue",
-      "string_extract_map_value"}, nullableParameters = true)
+  @ScalarFunction(names = {"stringExtractValue", "string_extract_value"}, nullableParameters = true)
   public static Object stringExtractValue(@Nullable String jsonString, String key) {
     Map<String, Object> map = stringToMap(jsonString);
     if (map == null) {
