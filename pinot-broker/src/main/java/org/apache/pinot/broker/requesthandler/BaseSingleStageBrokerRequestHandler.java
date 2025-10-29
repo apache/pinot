@@ -141,12 +141,9 @@ public abstract class BaseSingleStageBrokerRequestHandler extends BaseBrokerRequ
   private static final Expression STAR = RequestUtils.getIdentifierExpression("*");
   private static final int MAX_UNAVAILABLE_SEGMENTS_TO_PRINT_IN_QUERY_EXCEPTION = 10;
   private static final Map<String, String> DISTINCT_MV_COL_FUNCTION_OVERRIDE_MAP = Map.ofEntries(
-      Map.entry("distinctcount", "distinctcountmv"),
       Map.entry("distinctcountbitmap", "distinctcountbitmapmv"),
       Map.entry("distinctcounthll", "distinctcounthllmv"),
       Map.entry("distinctcountrawhll", "distinctcountrawhllmv"),
-      Map.entry("distinctsum", "distinctsummv"),
-      Map.entry("distinctavg", "distinctavgmv"),
       Map.entry("count", "countmv"),
       Map.entry("minmaxrange", "minmaxrangemv"),
       Map.entry("distinctcounthllplus", "distinctcounthllplusmv"),
