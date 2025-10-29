@@ -176,7 +176,7 @@ abstract class BaseKinesisIntegrationTest extends BaseClusterIntegrationTest {
   @Override
   public TableConfig createRealtimeTableConfig(File sampleAvroFile) {
     // Calls the super class to create the table config.
-    // Properties like stream configs are overriden in the getStreamConfigs() method.
+    // Properties like stream configs are overridden in the getStreamConfigs() method.
     return super.createRealtimeTableConfig(sampleAvroFile);
   }
 
