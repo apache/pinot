@@ -264,7 +264,8 @@ public class TimeSeriesRequestHandler extends BaseBrokerRequestHandler {
       while (!nodeStack.isEmpty()) {
         BaseTimeSeriesPlanNode currNode = nodeStack.pop();
         if (currNode instanceof LeafTimeSeriesPlanNode) {
-          String rawTableName = TableNameBuilder.extractRawTableName(((LeafTimeSeriesPlanNode) currNode).getTableName());
+          String rawTableName = TableNameBuilder.extractRawTableName(
+              ((LeafTimeSeriesPlanNode) currNode).getTableName());
           validateColumnNames((LeafTimeSeriesPlanNode) currNode, _tableCache.getSchema(rawTableName));
         }
         for (BaseTimeSeriesPlanNode child : currNode.getInputs()) {
@@ -273,7 +274,8 @@ public class TimeSeriesRequestHandler extends BaseBrokerRequestHandler {
       }
     }
     if (dispatchablePlan.getBrokerFragment() instanceof LeafTimeSeriesPlanNode) {
-      String rawTableName = TableNameBuilder.extractRawTableName(((LeafTimeSeriesPlanNode) dispatchablePlan.getBrokerFragment()).getTableName());
+      String rawTableName = TableNameBuilder.extractRawTableName(
+          ((LeafTimeSeriesPlanNode) dispatchablePlan.getBrokerFragment()).getTableName());
       validateColumnNames((LeafTimeSeriesPlanNode) dispatchablePlan.getBrokerFragment(),
           _tableCache.getSchema(rawTableName));
     }
@@ -324,7 +326,8 @@ public class TimeSeriesRequestHandler extends BaseBrokerRequestHandler {
     expression.getColumns(colsInExpr);
     for (String col : colsInExpr) {
       if (!tableSchema.hasColumn(col)) {
-        throw QueryErrorCode.UNKNOWN_COLUMN.asException(String.format("Column '%s' in expression '%s' not found in table schema for table '%s'",
+        throw QueryErrorCode.UNKNOWN_COLUMN.asException(
+            String.format("Column '%s' in expression '%s' not found in table schema for table '%s'",
             col, expressionString, tableName));
       }
     }
