@@ -31,6 +31,7 @@ import org.apache.pinot.segment.spi.creator.name.NormalizedDateSegmentNameGenera
 import org.apache.pinot.segment.spi.creator.name.SegmentNameGenerator;
 import org.apache.pinot.segment.spi.creator.name.SimpleSegmentNameGenerator;
 import org.apache.pinot.segment.spi.creator.name.UploadedRealtimeSegmentNameGenerator;
+import org.apache.pinot.spi.config.instance.InstanceType;
 import org.apache.pinot.spi.config.table.SegmentsValidationAndRetentionConfig;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.data.DateTimeFieldSpec;
@@ -112,7 +113,7 @@ public class SegmentGenerationTaskRunner implements Serializable {
 
     //build segment
     SegmentIndexCreationDriverImpl segmentIndexCreationDriver = new SegmentIndexCreationDriverImpl();
-    segmentIndexCreationDriver.init(segmentGeneratorConfig);
+    segmentIndexCreationDriver.init(segmentGeneratorConfig, InstanceType.MINION);
     segmentIndexCreationDriver.build();
     return segmentIndexCreationDriver.getSegmentName();
   }

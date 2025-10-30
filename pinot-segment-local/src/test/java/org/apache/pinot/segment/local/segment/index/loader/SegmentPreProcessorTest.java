@@ -59,9 +59,12 @@ import org.apache.pinot.segment.spi.index.IndexType;
 import org.apache.pinot.segment.spi.index.StandardIndexes;
 import org.apache.pinot.segment.spi.index.metadata.SegmentMetadataImpl;
 import org.apache.pinot.segment.spi.index.reader.ForwardIndexReader;
+import org.apache.pinot.segment.spi.index.startree.AggregationFunctionColumnPair;
+import org.apache.pinot.segment.spi.index.startree.StarTreeV2Metadata;
 import org.apache.pinot.segment.spi.store.SegmentDirectory;
 import org.apache.pinot.segment.spi.store.SegmentDirectoryPaths;
 import org.apache.pinot.segment.spi.utils.SegmentMetadataUtils;
+import org.apache.pinot.spi.config.instance.InstanceType;
 import org.apache.pinot.spi.config.table.BloomFilterConfig;
 import org.apache.pinot.spi.config.table.FieldConfig;
 import org.apache.pinot.spi.config.table.FieldConfig.CompressionCodec;
@@ -267,7 +270,7 @@ public class SegmentPreProcessorTest implements PinotBuffersAfterClassCheckRule 
     config.setOutDir(TEMP_DIR.getPath());
     config.setSegmentName(SEGMENT_NAME);
     SegmentIndexCreationDriverImpl driver = new SegmentIndexCreationDriverImpl();
-    driver.init(config);
+    driver.init(config, InstanceType.SERVER);
     driver.build();
   }
 
@@ -1723,6 +1726,214 @@ public class SegmentPreProcessorTest implements PinotBuffersAfterClassCheckRule 
     }
   }
 
+  @Test
+  public void testStarTreeCreationWithInvalidFunctionColumnPair()
+      throws Exception {
+    // Build the sample segment
+    String[] stringValues = {"A", "C", "B", "C", "D", "E", "E", "E"};
+    long[] longValues = {2, 1, 2, 3, 4, 5, 3, 2};
+    TableConfig tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName("testTable").build();
+    Schema schema = new Schema.SchemaBuilder().addSingleValueDimension("stringCol", FieldSpec.DataType.STRING)
+        .addMetric("longCol", DataType.LONG)
+        .build();
+
+    // Build good segment, no need for preprocess
+    buildTestSegment(tableConfig, schema, stringValues, longValues);
+
+    // Test 1: Adding a new star-tree index with invalid functionColumnPair (SUM__*)
+    // This should fail during config creation but segment build should be fine
+    IndexingConfig indexingConfig = tableConfig.getIndexingConfig();
+    indexingConfig.setEnableDynamicStarTreeCreation(true);
+    StarTreeIndexConfig invalidStarTreeIndexConfig =
+        new StarTreeIndexConfig(List.of("stringCol"), null, List.of("SUM__*"), null, 1000);
+    indexingConfig.setStarTreeIndexConfigs(List.of(invalidStarTreeIndexConfig));
+
+    try (SegmentDirectory segmentDirectory = new SegmentLocalFSDirectory(INDEX_DIR, ReadMode.mmap);
+        SegmentPreProcessor processor = new SegmentPreProcessor(segmentDirectory,
+            new IndexLoadingConfig(tableConfig, schema))) {
+      // Should need processing due to new star-tree config
+      assertTrue(processor.needProcess());
+      // Process should complete without throwing exception, but star-tree should not be created
+      processor.process(SEGMENT_OPERATIONS_THROTTLER);
+    }
+
+    // Verify that no star-tree index was created due to invalid config
+    SegmentMetadataImpl segmentMetadata = new SegmentMetadataImpl(INDEX_DIR);
+    assertNull(segmentMetadata.getStarTreeV2MetadataList());
+  }
+
+  @Test
+  public void testStarTreeUpdateWithInvalidFunctionColumnPair()
+      throws Exception {
+    // Build the sample segment
+    String[] stringValues = {"A", "C", "B", "C", "D", "E", "E", "E"};
+    long[] longValues = {2, 1, 2, 3, 4, 5, 3, 2};
+    TableConfig tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName("testTable").build();
+    Schema schema = new Schema.SchemaBuilder().addSingleValueDimension("stringCol", FieldSpec.DataType.STRING)
+        .addMetric("longCol", DataType.LONG)
+        .build();
+
+    // Build good segment, no need for preprocess
+    buildTestSegment(tableConfig, schema, stringValues, longValues);
+
+    // First, create a valid star-tree index
+    IndexingConfig indexingConfig = tableConfig.getIndexingConfig();
+    indexingConfig.setEnableDynamicStarTreeCreation(true);
+    StarTreeIndexConfig validStarTreeIndexConfig =
+        new StarTreeIndexConfig(List.of("stringCol"), null, List.of("COUNT__*"), null, 1000);
+    indexingConfig.setStarTreeIndexConfigs(List.of(validStarTreeIndexConfig));
+
+    try (SegmentDirectory segmentDirectory = new SegmentLocalFSDirectory(INDEX_DIR, ReadMode.mmap);
+        SegmentPreProcessor processor = new SegmentPreProcessor(segmentDirectory,
+            new IndexLoadingConfig(tableConfig, schema))) {
+      assertTrue(processor.needProcess());
+      processor.process(SEGMENT_OPERATIONS_THROTTLER);
+    }
+
+    // Verify that star-tree index was created
+    SegmentMetadataImpl segmentMetadata = new SegmentMetadataImpl(INDEX_DIR);
+    List<StarTreeV2Metadata> starTreeMetadataList = segmentMetadata.getStarTreeV2MetadataList();
+    assertNotNull(starTreeMetadataList);
+    assertFalse(starTreeMetadataList.isEmpty());
+    assertEquals(starTreeMetadataList.size(), 1);
+
+    // Test 2: Try to update existing star-tree index with invalid functionColumnPair (SUM__*)
+    StarTreeIndexConfig invalidStarTreeIndexConfig =
+        new StarTreeIndexConfig(List.of("stringCol"), null, List.of("COUNT__*", "SUM__*"), null, 1000);
+    indexingConfig.setStarTreeIndexConfigs(List.of(invalidStarTreeIndexConfig));
+
+    try (SegmentDirectory segmentDirectory = new SegmentLocalFSDirectory(INDEX_DIR, ReadMode.mmap);
+        SegmentPreProcessor processor = new SegmentPreProcessor(segmentDirectory,
+            new IndexLoadingConfig(tableConfig, schema))) {
+      // Should need processing due to changed star-tree config
+      assertTrue(processor.needProcess());
+      // Process should complete without throwing exception, but star-tree should not be updated
+      processor.process(SEGMENT_OPERATIONS_THROTTLER);
+    }
+
+    // Verify that the original star-tree index still exists and hasn't changed
+    segmentMetadata = new SegmentMetadataImpl(INDEX_DIR);
+    List<StarTreeV2Metadata> currentStarTreeMetadataList = segmentMetadata.getStarTreeV2MetadataList();
+    assertNotNull(currentStarTreeMetadataList);
+    assertFalse(currentStarTreeMetadataList.isEmpty());
+    assertEquals(currentStarTreeMetadataList.size(), 1);
+
+    // Verify the metadata hasn't changed (original star-tree should still be there)
+    assertEquals(currentStarTreeMetadataList.get(0).getDimensionsSplitOrder(),
+        starTreeMetadataList.get(0).getDimensionsSplitOrder());
+    assertEquals(currentStarTreeMetadataList.get(0).getFunctionColumnPairs(),
+        starTreeMetadataList.get(0).getFunctionColumnPairs());
+  }
+
+  @Test
+  public void testStarTreeCreationWithValidFunctionColumnPair()
+      throws Exception {
+    // Build the sample segment
+    String[] stringValues = {"A", "C", "B", "C", "D", "E", "E", "E"};
+    long[] longValues = {2, 1, 2, 3, 4, 5, 3, 2};
+    TableConfig tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName("testTable").build();
+    Schema schema = new Schema.SchemaBuilder().addSingleValueDimension("stringCol", FieldSpec.DataType.STRING)
+        .addMetric("longCol", DataType.LONG)
+        .build();
+
+    // Build good segment, no need for preprocess
+    buildTestSegment(tableConfig, schema, stringValues, longValues);
+
+    // Test 3: Adding a new star-tree index with valid functionColumnPair (COUNT__*)
+    IndexingConfig indexingConfig = tableConfig.getIndexingConfig();
+    indexingConfig.setEnableDynamicStarTreeCreation(true);
+    StarTreeIndexConfig validStarTreeIndexConfig =
+        new StarTreeIndexConfig(List.of("stringCol"), null, List.of("COUNT__*"), null, 1000);
+    indexingConfig.setStarTreeIndexConfigs(List.of(validStarTreeIndexConfig));
+
+    try (SegmentDirectory segmentDirectory = new SegmentLocalFSDirectory(INDEX_DIR, ReadMode.mmap);
+        SegmentPreProcessor processor = new SegmentPreProcessor(segmentDirectory,
+            new IndexLoadingConfig(tableConfig, schema))) {
+      assertTrue(processor.needProcess());
+      processor.process(SEGMENT_OPERATIONS_THROTTLER);
+    }
+
+    // Verify that star-tree index was created successfully
+    SegmentMetadataImpl segmentMetadata = new SegmentMetadataImpl(INDEX_DIR);
+    List<StarTreeV2Metadata> starTreeMetadataList = segmentMetadata.getStarTreeV2MetadataList();
+    assertNotNull(starTreeMetadataList);
+    assertFalse(starTreeMetadataList.isEmpty());
+    assertEquals(starTreeMetadataList.size(), 1);
+
+    StarTreeV2Metadata starTreeMetadata = starTreeMetadataList.get(0);
+    assertEquals(starTreeMetadata.getDimensionsSplitOrder(), List.of("stringCol"));
+    assertEquals(starTreeMetadata.getFunctionColumnPairs().size(), 1);
+    assertEquals(starTreeMetadata.getFunctionColumnPairs().iterator().next().toColumnName(), "count__*");
+  }
+
+  @Test
+  public void testStarTreeUpdateWithValidFunctionColumnPair()
+      throws Exception {
+    // Build the sample segment
+    String[] stringValues = {"A", "C", "B", "C", "D", "E", "E", "E"};
+    long[] longValues = {2, 1, 2, 3, 4, 5, 3, 2};
+    TableConfig tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName("testTable").build();
+    Schema schema = new Schema.SchemaBuilder().addSingleValueDimension("stringCol", FieldSpec.DataType.STRING)
+        .addMetric("longCol", DataType.LONG)
+        .build();
+
+    // Build good segment, no need for preprocess
+    buildTestSegment(tableConfig, schema, stringValues, longValues);
+
+    // First, create a star-tree index with SUM function
+    IndexingConfig indexingConfig = tableConfig.getIndexingConfig();
+    indexingConfig.setEnableDynamicStarTreeCreation(true);
+    StarTreeIndexConfig originalStarTreeIndexConfig =
+        new StarTreeIndexConfig(List.of("stringCol"), null, List.of("SUM__longCol"), null, 1000);
+    indexingConfig.setStarTreeIndexConfigs(List.of(originalStarTreeIndexConfig));
+
+    try (SegmentDirectory segmentDirectory = new SegmentLocalFSDirectory(INDEX_DIR, ReadMode.mmap);
+        SegmentPreProcessor processor = new SegmentPreProcessor(segmentDirectory,
+            new IndexLoadingConfig(tableConfig, schema))) {
+      assertTrue(processor.needProcess());
+      processor.process(SEGMENT_OPERATIONS_THROTTLER);
+    }
+
+    // Verify that original star-tree index was created
+    SegmentMetadataImpl segmentMetadata = new SegmentMetadataImpl(INDEX_DIR);
+    List<StarTreeV2Metadata> originalStarTreeMetadataList = segmentMetadata.getStarTreeV2MetadataList();
+    assertNotNull(originalStarTreeMetadataList);
+    assertFalse(originalStarTreeMetadataList.isEmpty());
+    assertEquals(originalStarTreeMetadataList.size(), 1);
+    assertEquals(originalStarTreeMetadataList.get(0).getFunctionColumnPairs().iterator().next().toColumnName(),
+        "sum__longCol");
+
+    // Test 4: Update existing star-tree index with valid functionColumnPair (COUNT__*)
+    StarTreeIndexConfig updatedStarTreeIndexConfig =
+        new StarTreeIndexConfig(List.of("stringCol"), null, List.of("SUM__longCol", "COUNT__*"), null, 1000);
+    indexingConfig.setStarTreeIndexConfigs(List.of(updatedStarTreeIndexConfig));
+
+    try (SegmentDirectory segmentDirectory = new SegmentLocalFSDirectory(INDEX_DIR, ReadMode.mmap);
+        SegmentPreProcessor processor = new SegmentPreProcessor(segmentDirectory,
+            new IndexLoadingConfig(tableConfig, schema))) {
+      assertTrue(processor.needProcess());
+      processor.process(SEGMENT_OPERATIONS_THROTTLER);
+    }
+
+    // Verify that star-tree index was updated successfully
+    segmentMetadata = new SegmentMetadataImpl(INDEX_DIR);
+    List<StarTreeV2Metadata> updatedStarTreeMetadataList = segmentMetadata.getStarTreeV2MetadataList();
+    assertNotNull(updatedStarTreeMetadataList);
+    assertFalse(updatedStarTreeMetadataList.isEmpty());
+    assertEquals(updatedStarTreeMetadataList.size(), 1);
+
+    StarTreeV2Metadata updatedStarTreeMetadata = updatedStarTreeMetadataList.get(0);
+    assertEquals(updatedStarTreeMetadata.getDimensionsSplitOrder(), List.of("stringCol"));
+    assertEquals(updatedStarTreeMetadata.getFunctionColumnPairs().size(), 2);
+    Set<String> columnNames = new HashSet<>();
+    for (AggregationFunctionColumnPair columnPair : updatedStarTreeMetadata.getFunctionColumnPairs()) {
+      columnNames.add(columnPair.toColumnName());
+    }
+    assertEquals(columnNames.size(), 2);
+    assertTrue(columnNames.contains("count__*"));
+    assertTrue(columnNames.contains("sum__longCol"));
+  }
+
   private void buildTestSegment(TableConfig tableConfig, Schema schema, String[] stringValues, long[] longValues)
       throws Exception {
     FileUtils.deleteQuietly(TEMP_DIR);
@@ -1740,7 +1951,7 @@ public class SegmentPreProcessorTest implements PinotBuffersAfterClassCheckRule 
     }
 
     SegmentIndexCreationDriverImpl driver = new SegmentIndexCreationDriverImpl();
-    driver.init(config, new GenericRowRecordReader(rows));
+    driver.init(config, new GenericRowRecordReader(rows), InstanceType.SERVER);
     driver.build();
   }
 

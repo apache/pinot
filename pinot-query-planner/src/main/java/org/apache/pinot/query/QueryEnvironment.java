@@ -182,6 +182,10 @@ public class QueryEnvironment {
   private PlannerContext getPlannerContext(SqlNodeAndOptions sqlNodeAndOptions) {
     WorkerManager workerManager = getWorkerManager(sqlNodeAndOptions);
     Map<String, String> options = sqlNodeAndOptions.getOptions();
+    if (Boolean.parseBoolean(options.get(QueryOptionKey.EXCLUDE_VIRTUAL_COLUMNS))) {
+      _catalog.configureVirtualColumnExclusion(true);
+    }
+
     HepProgram optProgram = _optProgram;
     Set<String> useRuleSet = new HashSet<>(QueryOptionsUtils.getUsePlannerRules(options));
     if (Boolean.parseBoolean(options.get(QueryOptionKey.AUTO_REWRITE_AGGREGATION_TYPE))) {

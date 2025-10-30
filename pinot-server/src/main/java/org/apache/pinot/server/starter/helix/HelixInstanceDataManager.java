@@ -36,7 +36,7 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.concurrent.locks.Lock;
-import java.util.function.Supplier;
+import java.util.function.BooleanSupplier;
 import javax.annotation.Nullable;
 import javax.annotation.concurrent.ThreadSafe;
 import org.apache.commons.io.FileUtils;
@@ -99,7 +99,7 @@ public class HelixInstanceDataManager implements InstanceDataManager {
   private HelixManager _helixManager;
   private ZkHelixPropertyStore<ZNRecord> _propertyStore;
   private SegmentUploader _segmentUploader;
-  private Supplier<Boolean> _isServerReadyToServeQueries = () -> false;
+  private BooleanSupplier _isServerReadyToServeQueries = () -> false;
 
   // Fixed size LRU cache for storing last N errors on the instance.
   // Key is TableNameWithType-SegmentName pair.
@@ -117,7 +117,7 @@ public class HelixInstanceDataManager implements InstanceDataManager {
   private ExecutorService _segmentPreloadExecutor;
 
   @Override
-  public void setSupplierOfIsServerReadyToServeQueries(Supplier<Boolean> isServingQueries) {
+  public void setSupplierOfIsServerReadyToServeQueries(BooleanSupplier isServingQueries) {
     _isServerReadyToServeQueries = isServingQueries;
   }
 

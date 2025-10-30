@@ -20,8 +20,6 @@ package org.apache.pinot.query.planner.physical.v2.opt.rules;
 
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
-import com.google.common.collect.ImmutableList;
-import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.ImmutableSet;
 import java.util.ArrayList;
 import java.util.Deque;
@@ -363,9 +361,9 @@ public class LeafStageWorkerAssignmentRule extends PRelOptRule {
         segmentsForWorker.addAll(segmentsByPartition.get(partitionNum));
       }
       workers.set(workerId, String.format("%s@%s", workerId, workers.get(workerId)));
-      workerIdToSegmentsMap.put(workerId, ImmutableMap.of(tableType, segmentsForWorker));
+      workerIdToSegmentsMap.put(workerId, Map.of(tableType, segmentsForWorker));
     }
-    HashDistributionDesc desc = new HashDistributionDesc(ImmutableList.of(keyIndex),
+    HashDistributionDesc desc = new HashDistributionDesc(List.of(keyIndex),
         DistHashFunction.valueOf(function.toUpperCase()), numPartitions);
     PinotDataDistribution dataDistribution = new PinotDataDistribution(RelDistribution.Type.HASH_DISTRIBUTED,
         workers, workers.hashCode(), ImmutableSet.of(desc), null);

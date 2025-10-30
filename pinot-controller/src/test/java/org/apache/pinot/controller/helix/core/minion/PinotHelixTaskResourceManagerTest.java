@@ -19,7 +19,6 @@
 package org.apache.pinot.controller.helix.core.minion;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
-import com.google.common.collect.ImmutableMap;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Collections;
@@ -276,7 +275,7 @@ public class PinotHelixTaskResourceManagerTest {
       // mapped to jsonized org.apache.pinot.minion.event.MinionEventObserver
       httpResp._httpResponses.put(
           String.format("%s/tasks/subtask/state/progress?subTaskState=IN_PROGRESS", workerEndpoint),
-          JsonUtils.objectToString(ImmutableMap.of(subtaskIds[2 * i], "", subtaskIds[2 * i + 1], "")));
+          JsonUtils.objectToString(Map.of(subtaskIds[2 * i], "", subtaskIds[2 * i + 1], "")));
     }
     httpResp._failedResponseCount = 1;
     ArgumentCaptor<List<String>> workerEndpointCaptor = ArgumentCaptor.forClass(List.class);

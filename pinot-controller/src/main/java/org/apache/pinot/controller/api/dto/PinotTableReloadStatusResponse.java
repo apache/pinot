@@ -16,24 +16,22 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.pinot.controller.api.resources;
+package org.apache.pinot.controller.api.dto;
 
-import java.util.Map;
-
-public class ServerReloadControllerJobStatusResponse {
+public class PinotTableReloadStatusResponse {
   private double _timeElapsedInMinutes;
   private double _estimatedTimeRemainingInMinutes;
   private int _totalSegmentCount;
   private int _successCount;
   private int _totalServersQueried;
   private int _totalServerCallsFailed;
-  private Map<String, String> _metadata;
+  private PinotControllerJobMetadataDto _metadata;
 
   public int getTotalSegmentCount() {
     return _totalSegmentCount;
   }
 
-  public ServerReloadControllerJobStatusResponse setTotalSegmentCount(int totalSegmentCount) {
+  public PinotTableReloadStatusResponse setTotalSegmentCount(int totalSegmentCount) {
     _totalSegmentCount = totalSegmentCount;
     return this;
   }
@@ -42,7 +40,7 @@ public class ServerReloadControllerJobStatusResponse {
     return _successCount;
   }
 
-  public ServerReloadControllerJobStatusResponse setSuccessCount(int successCount) {
+  public PinotTableReloadStatusResponse setSuccessCount(int successCount) {
     _successCount = successCount;
     return this;
   }
@@ -51,7 +49,7 @@ public class ServerReloadControllerJobStatusResponse {
     return _estimatedTimeRemainingInMinutes;
   }
 
-  public ServerReloadControllerJobStatusResponse setEstimatedTimeRemainingInMinutes(
+  public PinotTableReloadStatusResponse setEstimatedTimeRemainingInMinutes(
       double estimatedTimeRemainingInMinutes) {
     _estimatedTimeRemainingInMinutes = estimatedTimeRemainingInMinutes;
     return this;
@@ -61,7 +59,7 @@ public class ServerReloadControllerJobStatusResponse {
     return _timeElapsedInMinutes;
   }
 
-  public ServerReloadControllerJobStatusResponse setTimeElapsedInMinutes(double timeElapsedInMinutes) {
+  public PinotTableReloadStatusResponse setTimeElapsedInMinutes(double timeElapsedInMinutes) {
     _timeElapsedInMinutes = timeElapsedInMinutes;
     return this;
   }
@@ -71,7 +69,7 @@ public class ServerReloadControllerJobStatusResponse {
     return _totalServersQueried;
   }
 
-  public ServerReloadControllerJobStatusResponse setTotalServersQueried(int totalServersQueried) {
+  public PinotTableReloadStatusResponse setTotalServersQueried(int totalServersQueried) {
     _totalServersQueried = totalServersQueried;
     return this;
   }
@@ -80,16 +78,16 @@ public class ServerReloadControllerJobStatusResponse {
     return _totalServerCallsFailed;
   }
 
-  public ServerReloadControllerJobStatusResponse setTotalServerCallsFailed(int totalServerCallsFailed) {
+  public PinotTableReloadStatusResponse setTotalServerCallsFailed(int totalServerCallsFailed) {
     _totalServerCallsFailed = totalServerCallsFailed;
     return this;
   }
 
-  public Map<String, String> getMetadata() {
+  public PinotControllerJobMetadataDto getMetadata() {
     return _metadata;
   }
 
-  public ServerReloadControllerJobStatusResponse setMetadata(Map<String, String> metadata) {
+  public PinotTableReloadStatusResponse setMetadata(PinotControllerJobMetadataDto metadata) {
     _metadata = metadata;
     return this;
   }

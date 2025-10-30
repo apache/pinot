@@ -20,7 +20,6 @@ package org.apache.pinot.segment.local.utils;
 
 import com.fasterxml.jackson.databind.node.JsonNodeFactory;
 import com.fasterxml.jackson.databind.node.ObjectNode;
-import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.Lists;
 import java.util.Arrays;
 import java.util.Collections;
@@ -873,9 +872,9 @@ public class TableConfigUtilsTest {
         streamIngestionConfigWithoutPauselessUniqueTopics);
     TableConfig tableConfigWithoutPauselessUniqueTopics = new TableConfigBuilder(TableType.REALTIME)
         .setTableName(TABLE_NAME)
-            .setTimeColumnName("timeColumn")
-            .setIngestionConfig(ingestionConfigWithoutPauselessUniqueTopics)
-            .build();
+        .setTimeColumnName("timeColumn")
+        .setIngestionConfig(ingestionConfigWithoutPauselessUniqueTopics)
+        .build();
     try {
       TableConfigUtils.validate(tableConfigWithoutPauselessUniqueTopics, schema);
     } catch (IllegalStateException e) {
@@ -1915,6 +1914,53 @@ public class TableConfigUtilsTest {
   }
 
   @Test
+  public void testValidateUpsertWithTierConfig() {
+    Schema schema = new Schema.SchemaBuilder().setSchemaName(TABLE_NAME)
+        .addSingleValueDimension("myCol", FieldSpec.DataType.STRING)
+        .setPrimaryKeyColumns(Lists.newArrayList("myCol"))
+        .build();
+    Map<String, String> streamConfigs = getStreamConfigs();
+    UpsertConfig upsertConfig = new UpsertConfig(UpsertConfig.Mode.FULL);
+    TableConfig tableConfig = new TableConfigBuilder(TableType.REALTIME).setTableName(TABLE_NAME)
+        .setUpsertConfig(upsertConfig)
+        .setRoutingConfig(
+            new RoutingConfig(null, null, RoutingConfig.STRICT_REPLICA_GROUP_INSTANCE_SELECTOR_TYPE, false))
+        .setTimeColumnName(TIME_COLUMN)
+        .setStreamConfigs(streamConfigs)
+        .setTierConfigList(Lists.newArrayList(
+            new TierConfig("tier1", TierFactory.FIXED_SEGMENT_SELECTOR_TYPE, null, Lists.newArrayList("seg0", "seg1"),
+                TierFactory.PINOT_SERVER_STORAGE_TYPE, "tier1_tag_OFFLINE", null, null)))
+        .build();
+
+    assertThrows("Tiered storage is not supported for Upsert/Dedup tables", IllegalStateException.class,
+        () -> TableConfigUtils.validateUpsertAndDedupConfig(tableConfig, schema));
+  }
+
+  @Test
+  public void testValidateDedupWithTierConfig() {
+    Schema schema = new Schema.SchemaBuilder().setSchemaName(TABLE_NAME)
+        .addSingleValueDimension("myCol", FieldSpec.DataType.STRING)
+        .setPrimaryKeyColumns(Lists.newArrayList("myCol"))
+        .build();
+    Map<String, String> streamConfigs = getStreamConfigs();
+    DedupConfig dedupConfig = new DedupConfig();
+    dedupConfig.setMetadataTTL(10);
+    TableConfig tableConfig = new TableConfigBuilder(TableType.REALTIME).setTableName(TABLE_NAME)
+        .setDedupConfig(dedupConfig)
+        .setRoutingConfig(
+            new RoutingConfig(null, null, RoutingConfig.STRICT_REPLICA_GROUP_INSTANCE_SELECTOR_TYPE, false))
+        .setTimeColumnName(TIME_COLUMN)
+        .setStreamConfigs(streamConfigs)
+        .setTierConfigList(Lists.newArrayList(
+            new TierConfig("tier1", TierFactory.FIXED_SEGMENT_SELECTOR_TYPE, null, Lists.newArrayList("seg0", "seg1"),
+                TierFactory.PINOT_SERVER_STORAGE_TYPE, "tier1_tag_OFFLINE", null, null)))
+        .build();
+
+    assertThrows("Tiered storage is not supported for Upsert/Dedup tables", IllegalStateException.class,
+        () -> TableConfigUtils.validateUpsertAndDedupConfig(tableConfig, schema));
+  }
+
+  @Test
   public void testValidateDedupConfig() {
     Schema schema = new Schema.SchemaBuilder().setSchemaName(TABLE_NAME)
         .addSingleValueDimension("myCol", FieldSpec.DataType.STRING)
@@ -2764,16 +2810,16 @@ public class TableConfigUtilsTest {
 
     TableConfig tableConfigWithInstancePartitionsMap =
         new TableConfigBuilder(TableType.OFFLINE).setTableName(TABLE_NAME)
-            .setInstancePartitionsMap(ImmutableMap.of(InstancePartitionsType.OFFLINE, "test_OFFLINE"))
+            .setInstancePartitionsMap(Map.of(InstancePartitionsType.OFFLINE, "test_OFFLINE"))
             .build();
 
     // Call validate with a table-config with instance partitions set but not instance assignment config
     TableConfigUtils.validateInstancePartitionsTypeMapConfig(tableConfigWithInstancePartitionsMap);
 
     TableConfig invalidTableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName(TABLE_NAME)
-        .setInstancePartitionsMap(ImmutableMap.of(InstancePartitionsType.OFFLINE, "test_OFFLINE"))
+        .setInstancePartitionsMap(Map.of(InstancePartitionsType.OFFLINE, "test_OFFLINE"))
         .setInstanceAssignmentConfigMap(
-            ImmutableMap.of(InstancePartitionsType.OFFLINE.toString(), instanceAssignmentConfig))
+            Map.of(InstancePartitionsType.OFFLINE.toString(), instanceAssignmentConfig))
         .build();
     try {
       // Call validate with instance partitions and config set for the same type
@@ -2964,7 +3010,7 @@ public class TableConfigUtilsTest {
         .getReplicaGroupPartitionConfig();
 
     TableConfig invalidTableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName(TABLE_NAME)
-        .setInstanceAssignmentConfigMap(ImmutableMap.of(TableType.OFFLINE.toString(), instanceAssignmentConfig))
+        .setInstanceAssignmentConfigMap(Map.of(TableType.OFFLINE.toString(), instanceAssignmentConfig))
         .build();
     invalidTableConfig.getValidationConfig().setReplicaGroupStrategyConfig(replicaGroupStrategyConfig);
 

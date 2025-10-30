@@ -18,7 +18,6 @@
  */
 package org.apache.pinot.tsdb.spi.plan.serde;
 
-import com.google.common.collect.ImmutableMap;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.Map;
@@ -36,7 +35,7 @@ import static org.testng.Assert.assertTrue;
 
 public class TimeSeriesPlanSerdeTest {
   private static final int SERIES_LIMIT = 1000;
-  private static final Map<String, String> QUERY_OPTIONS = ImmutableMap.of("numGroupsLimit", "1000");
+  private static final Map<String, String> QUERY_OPTIONS = Map.of("numGroupsLimit", "1000");
 
   @Test
   public void testSerdeForScanFilterProjectNode() {

@@ -37,6 +37,8 @@ import org.apache.commons.collections4.CollectionUtils;
 import org.apache.commons.io.FileUtils;
 import org.apache.pinot.common.metrics.MinionMeter;
 import org.apache.pinot.common.metrics.MinionMetrics;
+import org.apache.pinot.common.metrics.ServerMeter;
+import org.apache.pinot.common.metrics.ServerMetrics;
 import org.apache.pinot.segment.local.realtime.converter.stats.RealtimeSegmentSegmentCreationDataSource;
 import org.apache.pinot.segment.local.segment.creator.RecordReaderSegmentCreationDataSource;
 import org.apache.pinot.segment.local.segment.creator.TransformPipeline;
@@ -73,6 +75,7 @@ import org.apache.pinot.segment.spi.loader.SegmentDirectoryLoaderContext;
 import org.apache.pinot.segment.spi.loader.SegmentDirectoryLoaderRegistry;
 import org.apache.pinot.segment.spi.store.SegmentDirectory;
 import org.apache.pinot.segment.spi.store.SegmentDirectoryPaths;
+import org.apache.pinot.spi.config.instance.InstanceType;
 import org.apache.pinot.spi.config.table.StarTreeIndexConfig;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.data.FieldSpec;
@@ -120,11 +123,18 @@ public class SegmentIndexCreationDriverImpl implements SegmentIndexCreationDrive
   private int _incompleteRowsFound = 0;
   private int _skippedRowsFound = 0;
   private int _sanitizedRowsFound = 0;
+  @Nullable private InstanceType _instanceType;
 
   @Override
   public void init(SegmentGeneratorConfig config)
       throws Exception {
-    init(config, getRecordReader(config));
+    init(config, getRecordReader(config), null);
+  }
+
+  @Override
+  public void init(SegmentGeneratorConfig config, @Nullable InstanceType instanceType)
+      throws Exception {
+    init(config, getRecordReader(config), instanceType);
   }
 
   private RecordReader getRecordReader(SegmentGeneratorConfig segmentGeneratorConfig)
@@ -168,16 +178,25 @@ public class SegmentIndexCreationDriverImpl implements SegmentIndexCreationDrive
   public void init(SegmentGeneratorConfig config, RecordReader recordReader)
       throws Exception {
     init(config, new RecordReaderSegmentCreationDataSource(recordReader),
-        new TransformPipeline(config.getTableConfig(), config.getSchema()));
+        new TransformPipeline(config.getTableConfig(), config.getSchema()), null);
+  }
+
+  public void init(SegmentGeneratorConfig config, RecordReader recordReader, @Nullable InstanceType instanceType)
+      throws Exception {
+    init(config, new RecordReaderSegmentCreationDataSource(recordReader),
+        new TransformPipeline(config.getTableConfig(), config.getSchema()), instanceType);
   }
 
   public void init(SegmentGeneratorConfig config, SegmentCreationDataSource dataSource,
-      TransformPipeline transformPipeline)
+      TransformPipeline transformPipeline, @Nullable InstanceType instanceType)
       throws Exception {
     _config = config;
     _recordReader = dataSource.getRecordReader();
     _dataSchema = config.getSchema();
     _continueOnError = config.isContinueOnError();
+    Preconditions.checkState(instanceType == null || instanceType == InstanceType.SERVER
+        || instanceType == InstanceType.MINION, "InstanceType passed must be for minion or server or null");
+    _instanceType = instanceType;
 
     if (config.isFailOnEmptySegment()) {
       Preconditions.checkState(_recordReader.hasNext(), "No record in data source");
@@ -329,21 +348,42 @@ public class SegmentIndexCreationDriverImpl implements SegmentIndexCreationDrive
       LOGGER.info("Sanitized {} records during transformation", _sanitizedRowsFound);
     }
 
-    MinionMetrics metrics = MinionMetrics.get();
-    String tableNameWithType = _config.getTableConfig().getTableName();
-    if (_incompleteRowsFound > 0) {
-      metrics.addMeteredTableValue(tableNameWithType, MinionMeter.TRANSFORMATION_ERROR_COUNT, _incompleteRowsFound);
-    }
-    if (_skippedRowsFound > 0) {
-      metrics.addMeteredTableValue(tableNameWithType, MinionMeter.DROPPED_RECORD_COUNT, _skippedRowsFound);
-    }
-    if (_sanitizedRowsFound > 0) {
-      metrics.addMeteredTableValue(tableNameWithType, MinionMeter.CORRUPTED_RECORD_COUNT, _sanitizedRowsFound);
-    }
+    updateMetrics(_config.getTableConfig().getTableName());
 
     LOGGER.info("Finished records indexing in IndexCreator!");
 
     handlePostCreation();
+  }
+
+  private void updateMetrics(String tableNameWithType) {
+    if (_instanceType == null) {
+      return;
+    }
+
+    // Use appropriate metrics based on instance type
+    if (_instanceType == InstanceType.MINION) {
+      MinionMetrics metrics = MinionMetrics.get();
+      if (_incompleteRowsFound > 0) {
+        metrics.addMeteredTableValue(tableNameWithType, MinionMeter.TRANSFORMATION_ERROR_COUNT, _incompleteRowsFound);
+      }
+      if (_skippedRowsFound > 0) {
+        metrics.addMeteredTableValue(tableNameWithType, MinionMeter.DROPPED_RECORD_COUNT, _skippedRowsFound);
+      }
+      if (_sanitizedRowsFound > 0) {
+        metrics.addMeteredTableValue(tableNameWithType, MinionMeter.CORRUPTED_RECORD_COUNT, _sanitizedRowsFound);
+      }
+    } else if (_instanceType == InstanceType.SERVER) {
+      ServerMetrics metrics = ServerMetrics.get();
+      if (_incompleteRowsFound > 0) {
+        metrics.addMeteredTableValue(tableNameWithType, ServerMeter.TRANSFORMATION_ERROR_COUNT, _incompleteRowsFound);
+      }
+      if (_skippedRowsFound > 0) {
+        metrics.addMeteredTableValue(tableNameWithType, ServerMeter.DROPPED_RECORD_COUNT, _skippedRowsFound);
+      }
+      if (_sanitizedRowsFound > 0) {
+        metrics.addMeteredTableValue(tableNameWithType, ServerMeter.CORRUPTED_RECORD_COUNT, _sanitizedRowsFound);
+      }
+    }
   }
 
   public void buildByColumn(IndexSegment indexSegment, ThreadSafeMutableRoaringBitmap validDocIds)
@@ -538,10 +578,26 @@ public class SegmentIndexCreationDriverImpl implements SegmentIndexCreationDrive
     if (CollectionUtils.isNotEmpty(starTreeIndexConfigs) || enableDefaultStarTree) {
       MultipleTreesBuilder.BuildMode buildMode =
           _config.isOnHeap() ? MultipleTreesBuilder.BuildMode.ON_HEAP : MultipleTreesBuilder.BuildMode.OFF_HEAP;
-      try (
-          MultipleTreesBuilder builder = new MultipleTreesBuilder(starTreeIndexConfigs, enableDefaultStarTree, indexDir,
-              buildMode)) {
+      MultipleTreesBuilder builder = new MultipleTreesBuilder(starTreeIndexConfigs, enableDefaultStarTree, indexDir,
+          buildMode);
+      // We don't create the builder using the try-with-resources pattern because builder.close() performs
+      // some clean-up steps to roll back the star-tree index to the previous state if it exists. If this goes wrong
+      // the star-tree index can be in an inconsistent state. To prevent that, when builder.close() throws an
+      // exception we want to propagate that up instead of ignoring it. This can get clunky when using
+      // try-with-resources as in this scenario the close() exception will be added to the suppressed exception list
+      // rather than thrown as the main exception, even though the original exception thrown on build() is ignored.
+      try {
         builder.build();
+      } catch (Exception e) {
+        String tableNameWithType = _config.getTableConfig().getTableName();
+        LOGGER.error("Failed to build star-tree index for table: {}, skipping", tableNameWithType, e);
+        if (_instanceType == InstanceType.MINION) {
+          MinionMetrics.get().addMeteredTableValue(tableNameWithType, MinionMeter.STAR_TREE_INDEX_BUILD_FAILURES, 1);
+        } else {
+          ServerMetrics.get().addMeteredTableValue(tableNameWithType, ServerMeter.STAR_TREE_INDEX_BUILD_FAILURES, 1);
+        }
+      } finally {
+        builder.close();
       }
     }
   }

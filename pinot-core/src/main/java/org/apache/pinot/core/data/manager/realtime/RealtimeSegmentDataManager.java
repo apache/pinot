@@ -237,6 +237,9 @@ public class RealtimeSegmentDataManager extends SegmentDataManager {
   private static final int MSG_COUNT_THRESHOLD_FOR_LOG = 100000;
   private static final int BUILD_TIME_LEASE_SECONDS = 30;
   private static final int MAX_CONSECUTIVE_ERROR_COUNT = 5;
+  // 8 min max timeout for the retry policy
+  private static final RetryPolicy CONSUMER_RECREATE_RETRY_POLICY =
+      RetryPolicies.exponentialBackoffRetryPolicy(10, 1000L, 2.0f);
 
   // Interrupt consumer thread every 10 seconds in case it doesn't stop, e.g. interrupt flag getting cleared somehow
   private static final int CONSUMER_THREAD_INTERRUPT_INTERVAL_MS = 10000;
@@ -850,8 +853,27 @@ public class RealtimeSegmentDataManager extends SegmentDataManager {
               break;
             case KEEP: {
               if (_segmentCompletionMode == CompletionMode.DOWNLOAD) {
-                _state = State.DISCARDED;
-                break;
+                // Fetch fresh metadata from ZooKeeper to check if download URL has been set by another replica
+                String downloadUrl = _realtimeTableDataManager.fetchZKMetadata(_segmentNameStr).getDownloadUrl();
+                if (StringUtils.isNotEmpty(downloadUrl)) {
+                  _segmentLogger.info(
+                      "CompletionMode is DOWNLOAD and download URL is available for segment: {}. URL: {}",
+                      _segmentNameStr, downloadUrl);
+                  _state = State.DISCARDED; // will trigger download on ONLINE transition
+                  break;
+                }
+                // No download URL yet. If peer download is enabled, prefer download path by discarding and letting
+                // ONLINE transition perform the peer download. Otherwise, fall back to retaining (local build).
+                if (_realtimeTableDataManager.getPeerDownloadScheme() != null) {
+                  _segmentLogger.warn(
+                      "CompletionMode is DOWNLOAD but URL missing for segment: {}. Peer download enabled; "
+                          + "preferring download path via ONLINE transition.", _segmentNameStr);
+                  _state = State.DISCARDED; // ONLINE transition will download from peers or deep store
+                  break;
+                }
+                _segmentLogger.warn(
+                    "CompletionMode is DOWNLOAD but download URL is missing for segment: {} and peer download "
+                        + "is disabled. Falling back to RETAINING mode", _segmentNameStr);
               }
               _state = State.RETAINING;
               // Lock the segment to avoid multiple threads touching the same segment.
@@ -1460,58 +1482,64 @@ public class RealtimeSegmentDataManager extends SegmentDataManager {
         case CATCHING_UP:
         case HOLDING:
         case INITIAL_CONSUMING:
-          switch (_segmentCompletionMode) {
-            case DOWNLOAD:
-              _segmentLogger.info("State {}. CompletionMode {}. Downloading to replace", _state.toString(),
-                  _segmentCompletionMode);
+          if (_segmentCompletionMode == CompletionMode.DOWNLOAD) {
+            // Check if download URL has been set by another replica
+            String downloadUrl = segmentZKMetadata.getDownloadUrl();
+            if (StringUtils.isNotEmpty(downloadUrl)) {
+              _segmentLogger.info("State {}. CompletionMode {}. Downloading to replace with fresh metadata. URL: {}",
+                  _state.toString(), _segmentCompletionMode, downloadUrl);
               downloadSegmentAndReplace(segmentZKMetadata);
               break;
-            case DEFAULT:
-              // Allow to catch up upto final offset, and then replace.
-              if (_currentOffset.compareTo(endOffset) > 0) {
-                // We moved ahead of the offset that is committed in ZK.
-                _segmentLogger
-                    .warn("Current offset {} ahead of the offset in zk {}. Downloading to replace", _currentOffset,
-                        endOffset);
-                downloadSegmentAndReplace(segmentZKMetadata);
-              } else if (_currentOffset.compareTo(endOffset) == 0) {
-                _segmentLogger
-                    .info("Current offset {} matches offset in zk {}. Replacing segment", _currentOffset, endOffset);
-                if (!buildSegmentAndReplace()) {
-                  _segmentLogger.warn("Failed to build the segment: {} and replace. Downloading to replace",
-                      _segmentNameStr);
-                  downloadSegmentAndReplace(segmentZKMetadata);
-                }
-              } else {
-                boolean success = false;
-                // Since online helix transition for a segment can arrive before segment's consumer acquires the
-                // semaphore, check _consumerSemaphoreAcquired before catching up.
-                // This is to avoid consuming in parallel to another segment's consumer.
-                if (_consumerSemaphoreAcquired.get()) {
-                  _segmentLogger.info("Attempting to catch up from offset {} to {} ", _currentOffset, endOffset);
-                  success = catchupToFinalOffset(endOffset,
-                      TimeUnit.MILLISECONDS.convert(MAX_TIME_FOR_CONSUMING_TO_ONLINE_IN_SECONDS, TimeUnit.SECONDS));
-                } else {
-                  _segmentLogger.warn("Consumer semaphore was not acquired, Skipping catch up from offset {} to {} ",
-                      _currentOffset, endOffset);
-                }
+            }
+            if (_realtimeTableDataManager.getPeerDownloadScheme() != null) {
+              _segmentLogger.warn("State {}. CompletionMode is DOWNLOAD but URL missing; attempting download via peers "
+                  + "or deep store if available for segment: {}", _state.toString(), _segmentNameStr);
+              downloadSegmentAndReplace(segmentZKMetadata);
+              break;
+            }
+            _segmentLogger.warn("State {}. CompletionMode is DOWNLOAD but download URL is missing and peer download is "
+                + "disabled. Falling back to local build for segment: {}", _state.toString(), _segmentNameStr);
+          }
+          // Allow to catch up upto final offset, and then replace.
+          if (_currentOffset.compareTo(endOffset) > 0) {
+            // We moved ahead of the offset that is committed in ZK.
+            _segmentLogger.warn("Current offset {} ahead of the offset in zk {}. Downloading to replace",
+                _currentOffset, endOffset);
+            downloadSegmentAndReplace(segmentZKMetadata);
+          } else if (_currentOffset.compareTo(endOffset) == 0) {
+            _segmentLogger.info("Current offset {} matches offset in zk {}. Replacing segment", _currentOffset,
+                endOffset);
+            if (!buildSegmentAndReplace()) {
+              _segmentLogger.warn("Failed to build the segment: {} and replace. Downloading to replace",
+                  _segmentNameStr);
+              downloadSegmentAndReplace(segmentZKMetadata);
+            }
+          } else {
+            boolean success = false;
+            // Since online helix transition for a segment can arrive before segment's consumer acquires the
+            // semaphore, check _consumerSemaphoreAcquired before catching up.
+            // This is to avoid consuming in parallel to another segment's consumer.
+            if (_consumerSemaphoreAcquired.get()) {
+              _segmentLogger.info("Attempting to catch up from offset {} to {} ", _currentOffset, endOffset);
+              success = catchupToFinalOffset(endOffset,
+                  TimeUnit.MILLISECONDS.convert(MAX_TIME_FOR_CONSUMING_TO_ONLINE_IN_SECONDS, TimeUnit.SECONDS));
+            } else {
+              _segmentLogger.warn("Consumer semaphore was not acquired, Skipping catch up from offset {} to {} ",
+                  _currentOffset, endOffset);
+            }
 
-                if (success) {
-                  _segmentLogger.info("Caught up to offset {}", _currentOffset);
-                  if (!buildSegmentAndReplace()) {
-                    _segmentLogger.warn("Failed to build the segment: {} after catchup. Downloading to replace",
-                        _segmentNameStr);
-                    downloadSegmentAndReplace(segmentZKMetadata);
-                  }
-                } else {
-                  _segmentLogger
-                      .info("Could not catch up to offset (current = {}). Downloading to replace", _currentOffset);
-                  downloadSegmentAndReplace(segmentZKMetadata);
-                }
+            if (success) {
+              _segmentLogger.info("Caught up to offset {}", _currentOffset);
+              if (!buildSegmentAndReplace()) {
+                _segmentLogger.warn("Failed to build the segment: {} after catchup. Downloading to replace",
+                    _segmentNameStr);
+                downloadSegmentAndReplace(segmentZKMetadata);
               }
-              break;
-            default:
-              break;
+            } else {
+              _segmentLogger
+                  .info("Could not catch up to offset (current = {}). Downloading to replace", _currentOffset);
+              downloadSegmentAndReplace(segmentZKMetadata);
+            }
           }
           break;
         default:
@@ -1788,7 +1816,7 @@ public class RealtimeSegmentDataManager extends SegmentDataManager {
           "Failed to initialize segment data manager", t));
       _segmentLogger.warn(
           "Scheduling task to call controller to mark the segment as OFFLINE in Ideal State due"
-           + " to initialization error: '{}'",
+              + " to initialization error: '{}'",
           t.getMessage());
       // Since we are going to throw exception from this thread (helix execution thread), the externalview
       // entry for this segment will be ERROR. We allow time for Helix to make this transition, and then
@@ -1973,7 +2001,7 @@ public class RealtimeSegmentDataManager extends SegmentDataManager {
           _streamConsumerFactory.createPartitionGroupConsumer(_clientId, _partitionGroupConsumptionStatus);
       _partitionGroupConsumer.start(_currentOffset);
     } catch (Exception e) {
-      _segmentLogger.error("Faced exception while trying to recreate stream consumer for topic partition {} reason {}",
+      _segmentLogger.error("Faced exception while trying to create stream consumer for topic partition {} reason {}",
           _clientId, reason, e);
       _serverMetrics.addMeteredTableValue(_clientId, ServerMeter.STREAM_CONSUMER_CREATE_EXCEPTIONS, 1L);
       throw e;
@@ -1990,7 +2018,8 @@ public class RealtimeSegmentDataManager extends SegmentDataManager {
     closePartitionGroupConsumer();
     try {
       _partitionGroupConsumer =
-          _streamConsumerFactory.createPartitionGroupConsumer(_clientId, _partitionGroupConsumptionStatus);
+          _streamConsumerFactory.createPartitionGroupConsumer(_clientId, _partitionGroupConsumptionStatus,
+              CONSUMER_RECREATE_RETRY_POLICY);
       _partitionGroupConsumer.start(_currentOffset);
     } catch (Exception e) {
       _segmentLogger.error("Faced exception while trying to recreate stream consumer for topic partition {}", _clientId,

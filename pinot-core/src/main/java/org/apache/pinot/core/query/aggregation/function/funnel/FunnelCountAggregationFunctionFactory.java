@@ -49,7 +49,7 @@ import org.roaringbitmap.RoaringBitmap;
  *  <li>'bitmap' (default): See DISTINCTCOUNTBITMAP at {@link DistinctCountBitmapAggregationFunction}
  *  <li>'theta_sketch': See DISTINCTCOUNTTHETASKETCH at {@link DistinctCountThetaSketchAggregationFunction}
  *  <li>'partitioned': See SEGMENTPARTITIONEDDISTINCTCOUNT {@link SegmentPartitionedDistinctCountAggregationFunction}
- *  <li>'sorted': sorted counts per segment then sums up. Only availabe in combination with 'partitioned'.
+ *  <li>'sorted': sorted counts per segment then sums up. Only available in combination with 'partitioned'.
  *  <li>'nominalEntries=4096': theta sketch configuration, default is 4096.
  *  </ul><p>
  */

@@ -385,9 +385,23 @@ public class StarTreeUtils {
     if (queryContext.isNullHandlingEnabled()) {
       // We can still use the star-tree index if there aren't actually any null values in this segment for all the
       // metrics being aggregated, all the dimensions being filtered on / grouped by.
-      for (AggregationFunctionColumnPair aggregationFunctionColumnPair : aggregationFunctionColumnPairs) {
+      for (int i = 0; i < aggregationFunctionColumnPairs.length; i++) {
+        AggregationFunctionColumnPair aggregationFunctionColumnPair = aggregationFunctionColumnPairs[i];
         if (aggregationFunctionColumnPair == AggregationFunctionColumnPair.COUNT_STAR) {
-          // Null handling is irrelevant for COUNT(*)
+          // COUNT aggregation function returns a non-empty input expressions list only when null handling is enabled
+          // and the input operand is a non-star identifier or function.
+          List<ExpressionContext> inputExpressions = aggregationFunctions[i].getInputExpressions();
+          if (!inputExpressions.isEmpty()) {
+            if (inputExpressions.get(0).getType() == ExpressionContext.Type.IDENTIFIER) {
+              DataSource dataSource = indexSegment.getDataSource(inputExpressions.get(0).getIdentifier());
+              if (dataSource.getNullValueVector() != null && !dataSource.getNullValueVector()
+                  .getNullBitmap()
+                  .isEmpty()) {
+                return null;
+              }
+            }
+          }
+          // Null handling is irrelevant for COUNT(*), COUNT(literal), COUNT(nonNullColumn)
           continue;
         }
 

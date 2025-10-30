@@ -105,6 +105,7 @@ public enum ServerMeter implements AbstractMetrics.Meter {
   SEGMENT_UPLOAD_TIMEOUT("segments", false),
   NUM_RESIZES("numResizes", false),
   RESIZE_TIME_MS("resizeTimeMs", false),
+  STAR_TREE_INDEX_BUILD_FAILURES("segments", false),
   NO_TABLE_ACCESS("tables", true),
   INDEXING_FAILURES("attributeValues", true),
 
@@ -236,7 +237,11 @@ public enum ServerMeter implements AbstractMetrics.Meter {
   // Workload Budget exceeded counter
   WORKLOAD_BUDGET_EXCEEDED("workloadBudgetExceeded", false, "Number of times workload budget exceeded"),
   INGESTION_DELAY_TRACKING_ERRORS("errors", false,
-      "Indicates the count of errors encountered while tracking ingestion delay.");
+      "Indicates the count of errors encountered while tracking ingestion delay."),
+
+  TRANSFORMATION_ERROR_COUNT("rows", false),
+  DROPPED_RECORD_COUNT("rows", false),
+  CORRUPTED_RECORD_COUNT("rows", false);
 
   private final String _meterName;
   private final String _unit;

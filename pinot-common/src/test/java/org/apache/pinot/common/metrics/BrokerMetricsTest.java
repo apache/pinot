@@ -52,11 +52,5 @@ public class BrokerMetricsTest {
     queryOptionWithPreferredPool.put("orderedPreferredPools", "0");
     assertEquals(BrokerMetrics.getTagForPreferredPool(queryOptionWithPreferredPool), "preferredPoolOptSet",
         "Should return preferredPoolOptSet when queryOption contains ORDERED_PREFERRED_POOLS");
-
-    // Test case 5: queryOption contains ORDERED_PREFERRED_REPLICAS
-    Map<String, String> queryOptionWithPreferredGroup = new HashMap<>();
-    queryOptionWithPreferredGroup.put("orderedPreferredReplicas", "0");
-    assertEquals(BrokerMetrics.getTagForPreferredPool(queryOptionWithPreferredGroup), "preferredPoolOptSet",
-        "Should return preferredPoolOptSet when queryOption contains ORDERED_PREFERRED_POOLS");
   }
 }

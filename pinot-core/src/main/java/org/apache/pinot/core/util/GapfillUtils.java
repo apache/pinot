@@ -33,7 +33,7 @@ import org.apache.pinot.core.query.request.context.QueryContext;
 
 
 /**
- * Util class to encapsulate all utilites required for gapfill.
+ * Util class to encapsulate all utilities required for gapfill.
  */
 public class GapfillUtils {
   private static final String GAP_FILL = "gapfill";

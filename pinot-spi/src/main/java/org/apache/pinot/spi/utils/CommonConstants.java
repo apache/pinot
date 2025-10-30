@@ -665,9 +665,6 @@ public class CommonConstants {
         public static final String CHUNK_SIZE_EXTRACT_FINAL_RESULT = "chunkSizeExtractFinalResult";
 
         public static final String NUM_REPLICA_GROUPS_TO_QUERY = "numReplicaGroupsToQuery";
-
-        @Deprecated
-        public static final String ORDERED_PREFERRED_REPLICAS = "orderedPreferredReplicas";
         public static final String ORDERED_PREFERRED_POOLS = "orderedPreferredPools";
         public static final String USE_FIXED_REPLICA = "useFixedReplica";
         public static final String EXPLAIN_PLAN_VERBOSE = "explainPlanVerbose";
@@ -738,6 +735,11 @@ public class CommonConstants {
         public static final String REGEX_DICT_SIZE_THRESHOLD = "regexDictSizeThreshold";
 
         public static final String DROP_RESULTS = "dropResults";
+
+        // Exclude virtual columns (columns starting with '$') from table schema
+        // This is typically used for NATURAL JOIN operations where virtual columns
+        // should not participate in join condition matching. Can only be used in MSE as of now
+        public static final String EXCLUDE_VIRTUAL_COLUMNS = "excludeVirtualColumns";
 
         // Maximum number of pending results blocks allowed in the streaming operator
         public static final String MAX_STREAMING_PENDING_BLOCKS = "maxStreamingPendingBlocks";

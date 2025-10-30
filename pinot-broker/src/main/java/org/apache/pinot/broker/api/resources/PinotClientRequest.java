@@ -22,7 +22,6 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.collect.ArrayListMultimap;
-import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.Multimap;
 import io.swagger.annotations.Api;
 import io.swagger.annotations.ApiKeyAuthDefinition;
@@ -524,7 +523,7 @@ public class PinotClientRequest {
       return new BrokerResponseNative(QueryErrorCode.SQL_PARSING, e.getMessage());
     }
     if (forceUseMultiStage) {
-      sqlNodeAndOptions.setExtraOptions(ImmutableMap.of(Request.QueryOptionKey.USE_MULTISTAGE_ENGINE, "true"));
+      sqlNodeAndOptions.setExtraOptions(Map.of(Request.QueryOptionKey.USE_MULTISTAGE_ENGINE, "true"));
     }
     if (getCursor) {
       if (numRows == 0) {
@@ -532,7 +531,7 @@ public class PinotClientRequest {
             CommonConstants.CursorConfigs.DEFAULT_CURSOR_FETCH_ROWS);
       }
       sqlNodeAndOptions.setExtraOptions(
-          ImmutableMap.of(Request.QueryOptionKey.GET_CURSOR, "true", Request.QueryOptionKey.CURSOR_NUM_ROWS,
+          Map.of(Request.QueryOptionKey.GET_CURSOR, "true", Request.QueryOptionKey.CURSOR_NUM_ROWS,
               Integer.toString(numRows)));
       _brokerMetrics.addMeteredGlobalValue(BrokerMeter.CURSOR_QUERIES_GLOBAL, 1);
     }
