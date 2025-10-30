@@ -32,7 +32,6 @@ import org.apache.calcite.sql.SqlKind;
 import org.apache.calcite.sql.type.ReturnTypes;
 import org.apache.calcite.sql.type.SqlTypeName;
 import org.apache.calcite.tools.RelBuilderFactory;
-import org.apache.pinot.common.function.FunctionRegistry;
 import org.apache.pinot.common.function.sql.PinotSqlAggFunction;
 
 
