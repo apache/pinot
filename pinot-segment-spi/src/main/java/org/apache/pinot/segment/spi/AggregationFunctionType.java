@@ -53,9 +53,9 @@ public enum AggregationFunctionType {
   COUNT("count"),
   // TODO: min/max only supports NUMERIC in Pinot, where Calcite supports COMPARABLE_ORDERED
   MIN("min", new PinotMinMaxReturnTypeInference(), OperandTypes.or(OperandTypes.COMPARABLE_ORDERED, OperandTypes.ARRAY),
-      SqlTypeName.DOUBLE, SqlTypeName.DOUBLE),
+      ReturnTypes.explicit(SqlTypeName.DOUBLE), ReturnTypes.explicit(SqlTypeName.DOUBLE), SqlKind.MIN),
   MAX("max", new PinotMinMaxReturnTypeInference(), OperandTypes.or(OperandTypes.COMPARABLE_ORDERED, OperandTypes.ARRAY),
-      SqlTypeName.DOUBLE, SqlTypeName.DOUBLE),
+      ReturnTypes.explicit(SqlTypeName.DOUBLE), ReturnTypes.explicit(SqlTypeName.DOUBLE), SqlKind.MAX),
   MINSTRING("minString", ReturnTypes.ARG0_NULLABLE_IF_EMPTY, OperandTypes.CHARACTER),
   MAXSTRING("maxString", ReturnTypes.ARG0_NULLABLE_IF_EMPTY, OperandTypes.CHARACTER),
   MINLONG("minLong", new BigintNullableIfEmpty(), OperandTypes.or(OperandTypes.INTEGER, OperandTypes.ARRAY_OF_INTEGER)),
