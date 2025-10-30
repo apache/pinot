@@ -34,6 +34,7 @@ import org.apache.calcite.sql.SqlKind;
 import org.apache.calcite.sql.type.ReturnTypes;
 import org.apache.calcite.sql.type.SqlTypeName;
 import org.apache.calcite.tools.RelBuilderFactory;
+import org.apache.pinot.common.function.FunctionRegistry;
 import org.apache.pinot.common.function.sql.PinotSqlAggFunction;
 
 
@@ -85,8 +86,8 @@ public class PinotAggregateFunctionRewriteRule extends RelOptRule {
    */
   private static AggregateCall maybeRewriteMinMaxOnString(AggregateCall call, RelNode input, int numGroups) {
     SqlAggFunction aggFunction = call.getAggregation();
-    SqlKind kind = aggFunction.getKind();
-    if (kind != SqlKind.MIN && kind != SqlKind.MAX) {
+    String functionName = FunctionRegistry.canonicalize(aggFunction.getName());
+    if (!functionName.equals("min") && !functionName.equals("max")) {
       return call;
     }
 
@@ -103,7 +104,7 @@ public class PinotAggregateFunctionRewriteRule extends RelOptRule {
       return call;
     }
 
-    String targetName = (kind == SqlKind.MIN) ? "MINSTRING" : "MAXSTRING";
+    String targetName = (functionName.equals("min")) ? "minstring" : "maxstring";
     SqlAggFunction stringAgg =
         new PinotSqlAggFunction(targetName, SqlKind.OTHER_FUNCTION, ReturnTypes.explicit(call.getType()),
             aggFunction.getOperandTypeChecker(), SqlFunctionCategory.USER_DEFINED_FUNCTION);
