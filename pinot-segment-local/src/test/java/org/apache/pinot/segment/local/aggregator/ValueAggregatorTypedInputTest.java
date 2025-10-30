@@ -29,7 +29,7 @@ import static org.testng.Assert.assertEquals;
 public class ValueAggregatorTypedInputTest {
 
   @Test
-  public void testSumValueAggregator_initialAndApply_withSourceType() {
+  public void testSumValueAggregatorInitialAndApplyWithSourceType() {
     SumValueAggregator agg = new SumValueAggregator();
 
     // initial
@@ -45,7 +45,7 @@ public class ValueAggregatorTypedInputTest {
   }
 
   @Test
-  public void testMinMaxAggregators_initial_withSourceType() {
+  public void testMinMaxAggregatorsInitialWithSourceType() {
     MinValueAggregator minAgg = new MinValueAggregator();
     MaxValueAggregator maxAgg = new MaxValueAggregator();
 
@@ -63,7 +63,7 @@ public class ValueAggregatorTypedInputTest {
   }
 
   @Test
-  public void testAvgValueAggregator_initialAndApply_withSourceType() {
+  public void testAvgValueAggregatorInitialAndApplyWithSourceType() {
     AvgValueAggregator agg = new AvgValueAggregator();
 
     AvgPair initial = agg.getInitialAggregatedValue("4.0", DataType.STRING);
@@ -76,7 +76,7 @@ public class ValueAggregatorTypedInputTest {
   }
 
   @Test
-  public void testMinMaxRangeValueAggregator_initialAndApply_withSourceType() {
+  public void testMinMaxRangeValueAggregatorInitialAndApplyWithSourceType() {
     MinMaxRangeValueAggregator agg = new MinMaxRangeValueAggregator();
 
     var initial = agg.getInitialAggregatedValue("5.0", DataType.STRING);
@@ -89,7 +89,7 @@ public class ValueAggregatorTypedInputTest {
   }
 
   @Test
-  public void testSumPrecisionValueAggregator_initialAndApply_withSourceType() {
+  public void testSumPrecisionValueAggregatorInitialAndApplyWithSourceType() {
     SumPrecisionValueAggregator agg = new SumPrecisionValueAggregator(java.util.List.of());
 
     BigDecimal initial = agg.getInitialAggregatedValue("12.3", DataType.STRING);
@@ -100,7 +100,7 @@ public class ValueAggregatorTypedInputTest {
   }
 
   @Test
-  public void testCountValueAggregator_initialAndApply_withSourceType() {
+  public void testCountValueAggregatorInitialAndApplyWithSourceType() {
     CountValueAggregator agg = new CountValueAggregator();
 
     // initial
@@ -115,5 +115,3 @@ public class ValueAggregatorTypedInputTest {
     assertEquals(after, 7L);
   }
 }
-
-

@@ -1648,7 +1648,8 @@ public class MutableSegmentImpl implements MutableSegment {
     @Nullable
     final DataType _sourceDataType;
 
-    public ValueAggregatorInfo(String sourceColumn, ValueAggregator valueAggregator, @Nullable DataType sourceDataType) {
+    public ValueAggregatorInfo(String sourceColumn, ValueAggregator valueAggregator,
+        @Nullable DataType sourceDataType) {
       _valueAggregator = valueAggregator;
       _sourceColumn = sourceColumn;
       _sourceDataType = sourceDataType;

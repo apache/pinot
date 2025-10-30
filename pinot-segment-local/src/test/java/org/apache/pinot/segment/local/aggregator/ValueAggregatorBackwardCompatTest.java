@@ -28,7 +28,7 @@ import static org.testng.Assert.assertEquals;
 public class ValueAggregatorBackwardCompatTest {
 
   @Test
-  public void testSum_twoArgApplyAndInitial_withoutSourceType() {
+  public void testSumTwoArgApplyAndInitialWithoutSourceType() {
     SumValueAggregator agg = new SumValueAggregator();
 
     // Legacy initial (no source type)
@@ -44,7 +44,7 @@ public class ValueAggregatorBackwardCompatTest {
   }
 
   @Test
-  public void testMinMax_twoArgApplyAndInitial_withoutSourceType() {
+  public void testMinMaxTwoArgApplyAndInitialWithoutSourceType() {
     MinValueAggregator minAgg = new MinValueAggregator();
     MaxValueAggregator maxAgg = new MaxValueAggregator();
 
@@ -60,7 +60,7 @@ public class ValueAggregatorBackwardCompatTest {
   }
 
   @Test
-  public void testAvg_twoArgApplyAndInitial_withoutSourceType() {
+  public void testAvgTwoArgApplyAndInitialWithoutSourceType() {
     AvgValueAggregator agg = new AvgValueAggregator();
 
     AvgPair initial = agg.getInitialAggregatedValue("4.0");
@@ -73,7 +73,7 @@ public class ValueAggregatorBackwardCompatTest {
   }
 
   @Test
-  public void testMinMaxRange_twoArgApplyAndInitial_withoutSourceType() {
+  public void testMinMaxRangeTwoArgApplyAndInitialWithoutSourceType() {
     MinMaxRangeValueAggregator agg = new MinMaxRangeValueAggregator();
 
     var initial = agg.getInitialAggregatedValue("5.0");
@@ -86,7 +86,7 @@ public class ValueAggregatorBackwardCompatTest {
   }
 
   @Test
-  public void testSumPrecision_twoArgApplyAndInitial_withoutSourceType() {
+  public void testSumPrecisionTwoArgApplyAndInitialWithoutSourceType() {
     SumPrecisionValueAggregator agg = new SumPrecisionValueAggregator(java.util.List.of());
 
     BigDecimal initial = agg.getInitialAggregatedValue("1.5");
@@ -97,7 +97,7 @@ public class ValueAggregatorBackwardCompatTest {
   }
 
   @Test
-  public void testCount_twoArgApplyAndInitial_withoutSourceType() {
+  public void testCountTwoArgApplyAndInitialWithoutSourceType() {
     CountValueAggregator agg = new CountValueAggregator();
 
     assertEquals(agg.getInitialAggregatedValue(null).longValue(), 0L);
@@ -107,5 +107,3 @@ public class ValueAggregatorBackwardCompatTest {
     assertEquals(after, 6L);
   }
 }
-
-
