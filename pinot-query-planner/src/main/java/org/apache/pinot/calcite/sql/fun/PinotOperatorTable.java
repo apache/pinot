@@ -182,6 +182,8 @@ public class PinotOperatorTable implements SqlOperatorTable {
       SqlStdOperatorTable.NOT,
 
       // AGGREGATE OPERATORS
+      SqlStdOperatorTable.SUM,
+      SqlStdOperatorTable.AVG,
       SqlStdOperatorTable.COUNT,
       SqlStdOperatorTable.MODE,
       SqlStdOperatorTable.STDDEV_POP,
