@@ -143,7 +143,7 @@ public class ParquetMapUDFTest {
 
     // 2. Create TableConfig with TransformConfig using stringToMap function
     List<TransformConfig> transformConfigs = new ArrayList<>();
-    transformConfigs.add(new TransformConfig("event_properties_map", "stringToMap(event_properties)"));
+    transformConfigs.add(new TransformConfig("event_properties_map", "jsonStringToMap(event_properties)"));
 
     IngestionConfig ingestionConfig = new IngestionConfig();
     ingestionConfig.setTransformConfigs(transformConfigs);
