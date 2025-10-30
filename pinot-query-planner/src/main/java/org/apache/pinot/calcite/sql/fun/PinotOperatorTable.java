@@ -372,8 +372,16 @@ public class PinotOperatorTable implements SqlOperatorTable {
     for (AggregationFunctionType functionType : AggregationFunctionType.values()) {
       if (functionType.getReturnTypeInference() != null) {
         String functionName = functionType.getName();
-        PinotSqlAggFunction function = new PinotSqlAggFunction(functionName, functionType.getReturnTypeInference(),
-            functionType.getOperandTypeChecker());
+        PinotSqlAggFunction function;
+
+        if (functionType.getSqlKind() != null) {
+          function = new PinotSqlAggFunction(functionName, functionType.getReturnTypeInference(),
+              functionType.getOperandTypeChecker(), functionType.getSqlKind());
+        } else {
+          function = new PinotSqlAggFunction(functionName, functionType.getReturnTypeInference(),
+              functionType.getOperandTypeChecker());
+        }
+
         Preconditions.checkState(operatorMap.put(FunctionRegistry.canonicalize(functionName), function) == null,
             "Aggregate function: %s is already registered", functionName);
       }

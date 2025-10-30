@@ -26,6 +26,7 @@ import java.util.stream.Stream;
 import javax.annotation.Nullable;
 import org.apache.calcite.rel.type.RelDataType;
 import org.apache.calcite.rel.type.RelDataTypeFactory;
+import org.apache.calcite.sql.SqlKind;
 import org.apache.calcite.sql.SqlOperatorBinding;
 import org.apache.calcite.sql.type.OperandTypes;
 import org.apache.calcite.sql.type.ReturnTypes;
@@ -59,14 +60,14 @@ public enum AggregationFunctionType {
   MAXSTRING("maxString", ReturnTypes.ARG0_NULLABLE_IF_EMPTY, OperandTypes.CHARACTER),
   MINLONG("minLong", new BigintNullableIfEmpty(), OperandTypes.or(OperandTypes.INTEGER, OperandTypes.ARRAY_OF_INTEGER)),
   MAXLONG("maxLong", new BigintNullableIfEmpty(), OperandTypes.or(OperandTypes.INTEGER, OperandTypes.ARRAY_OF_INTEGER)),
-  SUM("sum", ReturnTypes.AGG_SUM, OperandTypes.or(OperandTypes.NUMERIC, OperandTypes.ARRAY), SqlTypeName.DOUBLE,
-      SqlTypeName.DOUBLE),
+  SUM("sum", ReturnTypes.AGG_SUM, OperandTypes.or(OperandTypes.NUMERIC, OperandTypes.ARRAY),
+      ReturnTypes.explicit(SqlTypeName.DOUBLE), ReturnTypes.explicit(SqlTypeName.DOUBLE), SqlKind.SUM),
   SUM0("$sum0", SqlTypeName.DOUBLE, SqlTypeName.DOUBLE),
   SUMINT("sumInt", ReturnTypes.AGG_SUM, OperandTypes.INTEGER),
   SUMLONG("sumLong", ReturnTypes.AGG_SUM, OperandTypes.or(OperandTypes.INTEGER, OperandTypes.ARRAY_OF_INTEGER)),
   SUMPRECISION("sumPrecision", ReturnTypes.explicit(SqlTypeName.DECIMAL), OperandTypes.ANY, SqlTypeName.OTHER),
-  AVG("avg", ReturnTypes.AVG_AGG_FUNCTION, OperandTypes.or(OperandTypes.NUMERIC, OperandTypes.ARRAY), SqlTypeName.OTHER,
-      SqlTypeName.DOUBLE),
+  AVG("avg", ReturnTypes.AVG_AGG_FUNCTION, OperandTypes.or(OperandTypes.NUMERIC, OperandTypes.ARRAY),
+      ReturnTypes.explicit(SqlTypeName.OTHER), ReturnTypes.explicit(SqlTypeName.DOUBLE), SqlKind.AVG),
   MODE("mode", SqlTypeName.OTHER, SqlTypeName.DOUBLE),
   FIRSTWITHTIME("firstWithTime", ReturnTypes.ARG0,
       OperandTypes.family(SqlTypeFamily.ANY, SqlTypeFamily.ANY, SqlTypeFamily.CHARACTER), SqlTypeName.OTHER),
@@ -261,6 +262,7 @@ public enum AggregationFunctionType {
   private final SqlReturnTypeInference _intermediateReturnTypeInference;
   // Override final result type if it is not the same as standard return type of the function.
   private final SqlReturnTypeInference _finalReturnTypeInference;
+  private final SqlKind _sqlKind;
 
   AggregationFunctionType(String name) {
     this(name, null, null, (SqlReturnTypeInference) null, null);
@@ -294,11 +296,21 @@ public enum AggregationFunctionType {
       @Nullable SqlOperandTypeChecker operandTypeChecker,
       @Nullable SqlReturnTypeInference intermediateReturnTypeInference,
       @Nullable SqlReturnTypeInference finalReturnTypeInference) {
+    this(name, returnTypeInference, operandTypeChecker, intermediateReturnTypeInference, finalReturnTypeInference,
+        null);
+  }
+
+  AggregationFunctionType(String name, @Nullable SqlReturnTypeInference returnTypeInference,
+      @Nullable SqlOperandTypeChecker operandTypeChecker,
+      @Nullable SqlReturnTypeInference intermediateReturnTypeInference,
+      @Nullable SqlReturnTypeInference finalReturnTypeInference,
+      @Nullable SqlKind sqlKind) {
     _name = name;
     _returnTypeInference = returnTypeInference;
     _operandTypeChecker = operandTypeChecker;
     _intermediateReturnTypeInference = intermediateReturnTypeInference;
     _finalReturnTypeInference = finalReturnTypeInference;
+    _sqlKind = sqlKind;
   }
 
   public String getName() {
@@ -323,6 +335,11 @@ public enum AggregationFunctionType {
   @Nullable
   public SqlReturnTypeInference getFinalReturnTypeInference() {
     return _finalReturnTypeInference;
+  }
+
+  @Nullable
+  public SqlKind getSqlKind() {
+    return _sqlKind;
   }
 
   public static boolean isAggregationFunction(String functionName) {
