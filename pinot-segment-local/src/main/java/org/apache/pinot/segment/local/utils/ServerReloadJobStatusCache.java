@@ -70,10 +70,6 @@ public class ServerReloadJobStatusCache {
     return _cache.getIfPresent(jobId);
   }
 
-  /**
-   * Clears all entries from the cache.
-   * Useful for testing.
-   */
   public void clear() {
     _cache.invalidateAll();
     LOG.info("Cleared all entries from reload job status cache");
