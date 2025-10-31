@@ -29,6 +29,7 @@ import org.apache.pinot.common.metrics.ServerMeter;
 import org.apache.pinot.common.metrics.ServerMetrics;
 import org.apache.pinot.common.metrics.ServerQueryPhase;
 import org.apache.pinot.common.metrics.ServerTimer;
+import org.apache.pinot.common.utils.config.QueryOptionsUtils;
 import org.apache.pinot.core.operator.blocks.InstanceResponseBlock;
 import org.apache.pinot.core.query.request.ServerQueryRequest;
 import org.apache.pinot.core.query.request.context.TimerContext;
@@ -70,6 +71,7 @@ public class ServerQueryLogger {
   public void logQuery(ServerQueryRequest request, InstanceResponseBlock response, String schedulerType) {
     String tableNameWithType = request.getTableNameWithType();
     Map<String, String> responseMetadata = response.getResponseMetadata();
+    String workloadName = QueryOptionsUtils.getWorkloadName(request.getQueryContext().getQueryOptions());
 
     long numDocsScanned = getLongValue(responseMetadata, MetadataKey.NUM_DOCS_SCANNED.getName(), -1);
     addToTableMeter(tableNameWithType, ServerMeter.NUM_DOCS_SCANNED, numDocsScanned);
@@ -172,7 +174,9 @@ public class ServerQueryLogger {
 
     TimerContext timerContext = request.getTimerContext();
     long schedulerWaitMs = timerContext.getPhaseDurationMs(ServerQueryPhase.SCHEDULER_WAIT);
-
+    long totalTimeMs = timerContext.getPhaseDurationMs(ServerQueryPhase.TOTAL_QUERY_TIME);
+    _serverMetrics.addTimedValue(workloadName, ServerTimer.WORKLOAD_TOTAL_QUERY_TIME_MS, totalTimeMs,
+        TimeUnit.MILLISECONDS);
     // Please keep the format as name=value comma-separated with no spaces
     // Please add new entries at the end
     if (_queryLogRateLimiter.tryAcquire() || forceLog(schedulerWaitMs, numDocsScanned, numSegmentsPrunedInvalid)) {
@@ -182,7 +186,8 @@ public class ServerQueryLogger {
               + "schedulerWaitMs={},reqDeserMs={},totalExecMs={},resSerMs={},totalTimeMs={},"
               + "minConsumingFreshnessMs={},broker={},numDocsScanned={},scanInFilter={},scanPostFilter={},sched={},"
               + "threadCpuTimeNs(total/thread/sysActivity/resSer)={}/{}/{}/{}, "
-              + "threadMemAllocatedBytes(total/thread/resSer)={}/{}/{}",
+              + "threadMemAllocatedBytes(total/thread/resSer)={}/{}/{}, "
+              + "workloadName={}",
           request.getRequestId(),
           tableNameWithType,
           numSegmentsQueried, numSegmentsProcessed, numSegmentsMatched, numConsumingSegmentsQueried,
@@ -191,10 +196,10 @@ public class ServerQueryLogger {
           timerContext.getPhaseDurationMs(ServerQueryPhase.REQUEST_DESERIALIZATION),
           timerContext.getPhaseDurationMs(ServerQueryPhase.QUERY_PROCESSING),
           timerContext.getPhaseDurationMs(ServerQueryPhase.RESPONSE_SERIALIZATION),
-          timerContext.getPhaseDurationMs(ServerQueryPhase.TOTAL_QUERY_TIME), minConsumingFreshnessMs,
+          totalTimeMs, minConsumingFreshnessMs,
           request.getBrokerId(), numDocsScanned, numEntriesScannedInFilter, numEntriesScannedPostFilter, schedulerType,
           totalCpuTimeNs, threadCpuTimeNs, systemActivitiesCpuTimeNs, responseSerializationCpuTimeNs,
-          totalMemAllocatedBytes, threadMemAllocatedBytes, responseSerMemAllocatedBytes);
+          totalMemAllocatedBytes, threadMemAllocatedBytes, responseSerMemAllocatedBytes, workloadName);
 
       // Limit the dropping log message at most once per second.
       if (_droppedReportRateLimiter.tryAcquire()) {

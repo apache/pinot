@@ -34,7 +34,6 @@ import org.apache.pinot.spi.accounting.WorkloadBudgetManagerFactory;
 import org.apache.pinot.spi.env.PinotConfiguration;
 import org.apache.pinot.spi.exception.QueryErrorCode;
 import org.apache.pinot.spi.utils.CommonConstants.Accounting;
-import org.apache.pinot.spi.utils.builder.TableNameBuilder;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -80,9 +79,10 @@ public class WorkloadScheduler extends QueryScheduler {
     String workloadName = isSecondary
         ? _secondaryWorkloadName
         : QueryOptionsUtils.getWorkloadName(queryRequest.getQueryContext().getQueryOptions());
+    String tableName = queryRequest.getTableNameWithType();
+    _serverMetrics.addMeteredValue(workloadName, ServerMeter.WORKLOAD_QUERIES, 1L);
     if (!_workloadBudgetManager.canAdmitQuery(workloadName)) {
       // TODO: Explore queuing the query instead of rejecting it.
-      String tableName = TableNameBuilder.extractRawTableName(queryRequest.getTableNameWithType());
       LOGGER.warn("Workload budget exceeded for workload: {} query: {} table: {}", workloadName,
           queryRequest.getRequestId(), tableName);
       _serverMetrics.addMeteredValue(workloadName, ServerMeter.WORKLOAD_BUDGET_EXCEEDED, 1L);
