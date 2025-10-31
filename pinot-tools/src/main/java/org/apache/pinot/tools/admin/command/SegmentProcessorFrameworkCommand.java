@@ -29,6 +29,7 @@ import org.apache.pinot.core.segment.processing.framework.SegmentProcessorConfig
 import org.apache.pinot.core.segment.processing.framework.SegmentProcessorFramework;
 import org.apache.pinot.segment.local.segment.readers.PinotSegmentRecordReader;
 import org.apache.pinot.spi.config.table.TableConfig;
+import org.apache.pinot.spi.config.table.TableConfigFactory;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.data.readers.RecordReader;
 import org.apache.pinot.spi.plugin.PluginManager;
@@ -110,8 +111,8 @@ public class SegmentProcessorFrameworkCommand extends AbstractBaseAdminCommand i
       recordReaders.add(recordReader);
     }
 
-    TableConfig tableConfig =
-        JsonUtils.fileToObject(new File(segmentProcessorFrameworkSpec.getTableConfigFile()), TableConfig.class);
+    TableConfig tableConfig = JsonUtils.fileToObject(new File(segmentProcessorFrameworkSpec.getTableConfigFile()),
+        TableConfigFactory.getTableConfigClass());
     Schema schema = Schema.fromFile(new File(segmentProcessorFrameworkSpec.getSchemaFile()));
     SegmentProcessorConfig segmentProcessorConfig =
         new SegmentProcessorConfig.Builder().setTableConfig(tableConfig).setSchema(schema)

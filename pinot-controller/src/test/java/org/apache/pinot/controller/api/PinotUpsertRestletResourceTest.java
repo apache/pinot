@@ -21,8 +21,9 @@ package org.apache.pinot.controller.api;
 import com.fasterxml.jackson.databind.JsonNode;
 import java.io.File;
 import java.net.URL;
-import org.apache.pinot.controller.api.resources.TableAndSchemaConfig;
 import org.apache.pinot.controller.helix.ControllerTest;
+import org.apache.pinot.spi.config.TableConfigs;
+import org.apache.pinot.spi.config.table.DefaultTableConfig;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.utils.JsonUtils;
@@ -49,15 +50,14 @@ public class PinotUpsertRestletResourceTest {
     File schemaFile = readFile("memory_estimation/schema-for-upsert.json");
     File tableConfigFile = readFile("memory_estimation/table-config-for-upsert.json");
     Schema schema = JsonUtils.fileToObject(schemaFile, Schema.class);
-    TableConfig tableConfig = JsonUtils.fileToObject(tableConfigFile, TableConfig.class);
-
-    TableAndSchemaConfig tableAndSchemaConfig = new TableAndSchemaConfig(tableConfig, schema);
+    TableConfig tableConfig = JsonUtils.fileToObject(tableConfigFile, DefaultTableConfig.class);
+    TableConfigs tableConfigs = new TableConfigs("restletTable_UPSERT", schema, null, tableConfig);
 
     String estimateHeapUsageUrl =
         TEST_INSTANCE.getControllerRequestURLBuilder().forUpsertTableHeapEstimation(10000, 48, 8);
 
     JsonNode result = JsonUtils.stringToJsonNode(
-        ControllerTest.sendPostRequest(estimateHeapUsageUrl, tableAndSchemaConfig.toJsonString()));
+        ControllerTest.sendPostRequest(estimateHeapUsageUrl, tableConfigs.toJsonString()));
     assertEquals(result.get("bytesPerKey").asInt(), 48);
     assertEquals(result.get("bytesPerValue").asInt(), 60);
     assertEquals(result.get("totalKeySpace(bytes)").asLong(), 480000);

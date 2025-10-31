@@ -53,6 +53,7 @@ import org.apache.pinot.plugin.stream.kafka.KafkaStreamConfigProperties;
 import org.apache.pinot.server.starter.helix.BaseServerStarter;
 import org.apache.pinot.spi.config.table.ColumnPartitionConfig;
 import org.apache.pinot.spi.config.table.DedupConfig;
+import org.apache.pinot.spi.config.table.DefaultTableConfig;
 import org.apache.pinot.spi.config.table.FieldConfig;
 import org.apache.pinot.spi.config.table.QueryConfig;
 import org.apache.pinot.spi.config.table.ReplicaGroupStrategyConfig;
@@ -318,7 +319,7 @@ public abstract class BaseClusterIntegrationTest extends ClusterTest {
       throws IOException {
     InputStream inputStream = new FileInputStream(tableConfigFile);
     Assert.assertNotNull(inputStream);
-    return JsonUtils.inputStreamToObject(inputStream, TableConfig.class);
+    return JsonUtils.inputStreamToObject(inputStream, DefaultTableConfig.class);
   }
 
   /**

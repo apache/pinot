@@ -22,6 +22,7 @@ package org.apache.pinot.segment.local.segment.creator;
 import java.util.List;
 import java.util.Random;
 import org.apache.pinot.spi.config.table.TableConfig;
+import org.apache.pinot.spi.config.table.TableConfigFactory;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.data.readers.GenericRow;
 import org.apache.pinot.spi.utils.JsonUtils;
@@ -101,7 +102,7 @@ public class Fixtures {
   public static TableConfig createTableConfig(String consumerFactoryClass, String decoderFactoryClass)
       throws Exception {
     return JsonUtils.stringToObject(String.format(TABLE_CONFIG_JSON_TEMPLATE, consumerFactoryClass,
-        decoderFactoryClass), TableConfig.class);
+        decoderFactoryClass), TableConfigFactory.getTableConfigClass());
   }
 
   public static Schema createSchema() throws Exception {

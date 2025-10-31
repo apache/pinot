@@ -22,6 +22,7 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import org.apache.pinot.spi.config.table.DefaultTableConfig;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.data.readers.GenericRow;
@@ -129,7 +130,7 @@ public class TransformPipelineTest {
             + "    \"customConfigs\": {\n"
             + "    }\n"
             + "  }\n"
-            + "}\n", TableConfig.class);
+            + "}\n", DefaultTableConfig.class);
     Schema schema = Schema.fromString(
         "{\n"
             + "  \"dimensionFieldSpecs\": [\n"
@@ -302,7 +303,7 @@ public class TransformPipelineTest {
             + "    \"customConfigs\": {\n"
             + "    }\n"
             + "  }\n"
-            + "}\n", TableConfig.class);
+            + "}\n", DefaultTableConfig.class);
     Schema schema = Schema.fromString(
         "{\n"
             + "  \"dimensionFieldSpecs\": [\n"
@@ -469,7 +470,7 @@ public class TransformPipelineTest {
             + "    \"customConfigs\": {\n"
             + "    }\n"
             + "  }\n"
-            + "}\n", TableConfig.class);
+            + "}\n", DefaultTableConfig.class);
     Schema schema = Schema.fromString(
         "{\n"
             + "  \"dimensionFieldSpecs\": [\n"
@@ -639,7 +640,7 @@ public class TransformPipelineTest {
             + "    \"customConfigs\": {\n"
             + "    }\n"
             + "  }\n"
-            + "}\n", TableConfig.class);
+            + "}\n", DefaultTableConfig.class);
     Schema schema = Schema.fromString(
         "{\n"
             + "  \"dimensionFieldSpecs\": [\n"

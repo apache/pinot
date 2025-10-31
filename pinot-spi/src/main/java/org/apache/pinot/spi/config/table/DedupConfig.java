@@ -48,7 +48,6 @@ public class DedupConfig extends BaseJsonConfig {
   @JsonPropertyDescription("Whether to preload segments for fast dedup metadata recovery. Available values are "
       + "ENABLE, DISABLE and DEFAULT (use instance level default behavior).")
   private Enablement _preload = Enablement.DEFAULT;
-
   @JsonPropertyDescription("Whether to ignore segments from non-default tiers when constructing dedup metadata.")
   private Enablement _ignoreNonDefaultTiers = Enablement.DEFAULT;
 

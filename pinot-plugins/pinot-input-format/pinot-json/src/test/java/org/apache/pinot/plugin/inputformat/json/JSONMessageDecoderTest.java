@@ -91,7 +91,7 @@ public class JSONMessageDecoderTest {
       GenericRow row = new GenericRow();
       String line;
       while ((line = reader.readLine()) != null) {
-        JsonNode jsonNode = JsonUtils.DEFAULT_READER.readTree(line);
+        JsonNode jsonNode = JsonUtils._defaultReader.readTree(line);
         decoder.decode(line.getBytes(), row);
         for (String field : sourceFields.keySet()) {
           Object actualValue = row.getValue(field);

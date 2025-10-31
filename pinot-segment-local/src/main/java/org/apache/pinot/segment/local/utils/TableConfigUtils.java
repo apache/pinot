@@ -72,6 +72,7 @@ import org.apache.pinot.spi.config.table.SegmentsValidationAndRetentionConfig;
 import org.apache.pinot.spi.config.table.StarTreeAggregationConfig;
 import org.apache.pinot.spi.config.table.StarTreeIndexConfig;
 import org.apache.pinot.spi.config.table.TableConfig;
+import org.apache.pinot.spi.config.table.TableConfigFactory;
 import org.apache.pinot.spi.config.table.TableTaskConfig;
 import org.apache.pinot.spi.config.table.TableType;
 import org.apache.pinot.spi.config.table.TagOverrideConfig;
@@ -1577,7 +1578,7 @@ public final class TableConfigUtils {
    * </ul>
    */
   public static TableConfig createTableConfigFromOldFormat(TableConfig tableConfig, Schema schema) {
-    TableConfig clone = new TableConfig(tableConfig);
+    TableConfig clone = tableConfig.clone();
     for (IndexType<?, ?, ?> indexType : IndexService.getInstance().getAllIndexes()) {
       // get all the index data in new format
       indexType.convertToNewFormat(clone, schema);
@@ -1739,7 +1740,7 @@ public final class TableConfigUtils {
       }
       if (updated) {
         LOGGER.debug("Got overwritten table config: {} for tier: {}", tblCfgJson, tier);
-        return JsonUtils.jsonNodeToObject(tblCfgJson, TableConfig.class);
+        return JsonUtils.jsonNodeToObject(tblCfgJson, TableConfigFactory.getTableConfigClass());
       } else {
         LOGGER.debug("No table config overwrites for tier: {}", tier);
         return tableConfig;

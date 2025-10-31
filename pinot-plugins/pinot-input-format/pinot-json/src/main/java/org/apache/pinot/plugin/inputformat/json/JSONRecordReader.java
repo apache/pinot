@@ -50,7 +50,7 @@ public class JSONRecordReader implements RecordReader {
       throws IOException {
     _inputStream = RecordReaderUtils.getBufferedInputStream(_dataFile);
     try {
-      _iterator = JsonUtils.DEFAULT_READER.forType(new TypeReference<Map<String, Object>>() {
+      _iterator = JsonUtils._defaultReader.forType(new TypeReference<Map<String, Object>>() {
       }).readValues(_inputStream);
     } catch (Exception e) {
       if (_iterator != null) {

@@ -26,6 +26,7 @@ import java.util.List;
 import java.util.Map;
 import org.apache.pinot.spi.config.table.CompletionConfig;
 import org.apache.pinot.spi.config.table.DedupConfig;
+import org.apache.pinot.spi.config.table.DefaultTableConfig;
 import org.apache.pinot.spi.config.table.DimensionTableConfig;
 import org.apache.pinot.spi.config.table.FieldConfig;
 import org.apache.pinot.spi.config.table.IndexingConfig;
@@ -535,7 +536,7 @@ public class TableConfigBuilder {
       _customConfig = new TableCustomConfig(null);
     }
 
-    return new TableConfig(_tableName, _tableType.toString(), validationConfig, tenantConfig, indexingConfig,
+    return new DefaultTableConfig(_tableName, _tableType.toString(), validationConfig, tenantConfig, indexingConfig,
         _customConfig, _quotaConfig, _taskConfig, _routingConfig, _queryConfig, _instanceAssignmentConfigMap,
         _fieldConfigList, _upsertConfig, _dedupConfig, _dimensionTableConfig, _ingestionConfig, _tierConfigList,
         _isDimTable, _tunerConfigList, _instancePartitionsMap, _segmentAssignmentConfigMap);

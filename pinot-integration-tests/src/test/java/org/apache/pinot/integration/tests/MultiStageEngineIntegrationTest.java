@@ -49,6 +49,7 @@ import org.apache.commons.lang3.StringUtils;
 import org.apache.helix.model.HelixConfigScope;
 import org.apache.helix.model.builder.HelixConfigScopeBuilder;
 import org.apache.pinot.controller.api.resources.PinotQueryResource.MultiStageQueryValidationRequest;
+import org.apache.pinot.spi.config.table.DefaultTableConfig;
 import org.apache.pinot.spi.config.table.HashFunction;
 import org.apache.pinot.spi.config.table.RoutingConfig;
 import org.apache.pinot.spi.config.table.TableConfig;
@@ -1772,11 +1773,11 @@ public class MultiStageEngineIntegrationTest extends BaseClusterIntegrationTestS
     List<TableConfig> tableConfigs = new ArrayList<>();
     JsonNode offlineConfig = tableConfigsNode.get("OFFLINE");
     if (offlineConfig != null && !offlineConfig.isMissingNode() && !offlineConfig.isEmpty()) {
-      tableConfigs.add(JsonUtils.jsonNodeToObject(offlineConfig, TableConfig.class));
+      tableConfigs.add(JsonUtils.jsonNodeToObject(offlineConfig, DefaultTableConfig.class));
     }
     JsonNode realtimeConfig = tableConfigsNode.get("REALTIME");
     if (realtimeConfig != null && !realtimeConfig.isMissingNode() && !realtimeConfig.isEmpty()) {
-      tableConfigs.add(JsonUtils.jsonNodeToObject(realtimeConfig, TableConfig.class));
+      tableConfigs.add(JsonUtils.jsonNodeToObject(realtimeConfig, DefaultTableConfig.class));
     }
 
     Schema schema = JsonUtils.jsonNodeToObject(schemaNode, Schema.class);
@@ -1817,7 +1818,7 @@ public class MultiStageEngineIntegrationTest extends BaseClusterIntegrationTestS
     List<TableConfig> tableConfigs = new ArrayList<>();
     JsonNode offlineConfig = tableConfigsNode.get("OFFLINE");
     if (offlineConfig != null && !offlineConfig.isMissingNode() && !offlineConfig.isEmpty()) {
-      tableConfigs.add(JsonUtils.jsonNodeToObject(offlineConfig, TableConfig.class));
+      tableConfigs.add(JsonUtils.jsonNodeToObject(offlineConfig, DefaultTableConfig.class));
     }
 
     Schema schema = JsonUtils.jsonNodeToObject(schemaNode, Schema.class);
@@ -1862,11 +1863,11 @@ public class MultiStageEngineIntegrationTest extends BaseClusterIntegrationTestS
     List<TableConfig> tableConfigs = new ArrayList<>();
     JsonNode offlineConfig = tableConfigsNode.get("OFFLINE");
     if (offlineConfig != null && !offlineConfig.isMissingNode() && !offlineConfig.isEmpty()) {
-      tableConfigs.add(JsonUtils.jsonNodeToObject(offlineConfig, TableConfig.class));
+      tableConfigs.add(JsonUtils.jsonNodeToObject(offlineConfig, DefaultTableConfig.class));
     }
     JsonNode realtimeConfig = tableConfigsNode.get("REALTIME");
     if (realtimeConfig != null && !realtimeConfig.isMissingNode() && !realtimeConfig.isEmpty()) {
-      tableConfigs.add(JsonUtils.jsonNodeToObject(realtimeConfig, TableConfig.class));
+      tableConfigs.add(JsonUtils.jsonNodeToObject(realtimeConfig, DefaultTableConfig.class));
     }
 
     Schema schema = JsonUtils.jsonNodeToObject(schemaNode, Schema.class);
@@ -2019,11 +2020,11 @@ public class MultiStageEngineIntegrationTest extends BaseClusterIntegrationTestS
     List<TableConfig> tableConfigs = new ArrayList<>();
     JsonNode offlineConfig = tableConfigsNode.get("OFFLINE");
     if (offlineConfig != null && !offlineConfig.isMissingNode() && !offlineConfig.isEmpty()) {
-      tableConfigs.add(JsonUtils.jsonNodeToObject(offlineConfig, TableConfig.class));
+      tableConfigs.add(JsonUtils.jsonNodeToObject(offlineConfig, DefaultTableConfig.class));
     }
     JsonNode realtimeConfig = tableConfigsNode.get("REALTIME");
     if (realtimeConfig != null && !realtimeConfig.isMissingNode() && !realtimeConfig.isEmpty()) {
-      tableConfigs.add(JsonUtils.jsonNodeToObject(realtimeConfig, TableConfig.class));
+      tableConfigs.add(JsonUtils.jsonNodeToObject(realtimeConfig, DefaultTableConfig.class));
     }
     Schema schema = JsonUtils.jsonNodeToObject(schemaNode, Schema.class);
     List<Schema> schemas = Collections.singletonList(schema);

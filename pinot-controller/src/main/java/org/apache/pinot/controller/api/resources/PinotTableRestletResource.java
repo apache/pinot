@@ -213,7 +213,7 @@ public class PinotTableRestletResource {
       @Context HttpHeaders httpHeaders, @Context Request request)
       throws IOException {
     // TODO introduce a table config ctor with json string.
-    Pair<TableConfig, Map<String, Object>> tableConfigAndUnrecognizedProperties;
+    Pair<? extends TableConfig, Map<String, Object>> tableConfigAndUnrecognizedProperties;
     TableConfig tableConfig;
     String tableNameWithType;
     Schema schema;
@@ -597,7 +597,7 @@ public class PinotTableRestletResource {
       @QueryParam("validationTypesToSkip") @Nullable String typesToSkip, @Context HttpHeaders headers,
       String tableConfigString)
       throws Exception {
-    Pair<TableConfig, Map<String, Object>> tableConfigAndUnrecognizedProperties;
+    Pair<? extends TableConfig, Map<String, Object>> tableConfigAndUnrecognizedProperties;
     TableConfig tableConfig;
     String tableNameWithType;
     Schema schema;
@@ -663,7 +663,7 @@ public class PinotTableRestletResource {
       @ApiParam(value = "comma separated list of validation type(s) to skip. supported types: (ALL|TASK|UPSERT)")
       @QueryParam("validationTypesToSkip") @Nullable String typesToSkip, @Context HttpHeaders httpHeaders,
       @Context Request request) {
-    Pair<TableConfig, Map<String, Object>> tableConfigAndUnrecognizedProperties;
+    Pair<? extends TableConfig, Map<String, Object>> tableConfigAndUnrecognizedProperties;
     try {
       tableConfigAndUnrecognizedProperties =
           JsonUtils.stringToObjectAndUnrecognizedProperties(tableConfigStr, TableConfig.class);

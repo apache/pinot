@@ -166,7 +166,7 @@ public class TableRebalanceIntegrationTest extends BaseHybridClusterIntegrationT
     rebalanceConfig.setDryRun(true);
 
     TableConfig tableConfig = getRealtimeTableConfig();
-    TableConfig originalTableConfig = new TableConfig(tableConfig);
+    TableConfig originalTableConfig = tableConfig.clone();
 
     // Ensure pre-check status is null if not enabled
     String response = sendPostRequest(getTableRebalanceUrl(rebalanceConfig, TableType.REALTIME));
@@ -479,7 +479,7 @@ public class TableRebalanceIntegrationTest extends BaseHybridClusterIntegrationT
     rebalanceConfig.setDryRun(true);
 
     TableConfig tableConfig = getRealtimeTableConfig();
-    TableConfig originalTableConfig = new TableConfig(tableConfig);
+    TableConfig originalTableConfig = tableConfig.clone();
 
     // Ensure pre-check status is null if not enabled
     String response = sendPostRequest(getTableRebalanceUrl(rebalanceConfig, TableType.REALTIME));
@@ -689,7 +689,7 @@ public class TableRebalanceIntegrationTest extends BaseHybridClusterIntegrationT
     rebalanceConfig.setDryRun(true);
 
     TableConfig tableConfig = getOfflineTableConfig();
-    TableConfig originalTableConfig = new TableConfig(tableConfig);
+    TableConfig originalTableConfig = tableConfig.clone();
 
     // Ensure pre-check status is null if not enabled
     String response = sendPostRequest(getTableRebalanceUrl(rebalanceConfig, TableType.OFFLINE));
@@ -1037,7 +1037,7 @@ public class TableRebalanceIntegrationTest extends BaseHybridClusterIntegrationT
     rebalanceConfig.setDryRun(true);
 
     TableConfig tableConfig = getRealtimeTableConfig();
-    TableConfig originalTableConfig = new TableConfig(tableConfig);
+    TableConfig originalTableConfig = tableConfig.clone();
 
     // Ensure summary status is non-null always
     String response = sendPostRequest(getTableRebalanceUrl(rebalanceConfig, TableType.REALTIME));
@@ -1058,7 +1058,7 @@ public class TableRebalanceIntegrationTest extends BaseHybridClusterIntegrationT
     rebalanceConfig.setDryRun(true);
 
     TableConfig tableConfig = getOfflineTableConfig();
-    TableConfig originalTableConfig = new TableConfig(tableConfig);
+    TableConfig originalTableConfig = tableConfig.clone();
 
     // Ensure summary status is non-null always
     String response = sendPostRequest(getTableRebalanceUrl(rebalanceConfig, TableType.OFFLINE));
@@ -1367,8 +1367,8 @@ public class TableRebalanceIntegrationTest extends BaseHybridClusterIntegrationT
     String originalTenant = "tenantA";
     String originalTenantStrictReplicaGroup = "tenantA_strictRG";
 
-    TableConfig tableConfig = new TableConfig(getRealtimeTableConfig());
-    TableConfig tableConfigStrictReplicaGroup = new TableConfig(getRealtimeTableConfig());
+    TableConfig tableConfig = getRealtimeTableConfig().clone();
+    TableConfig tableConfigStrictReplicaGroup = getRealtimeTableConfig().clone();
     tableConfig.setTenantConfig(new TenantConfig(getBrokerTenant(), originalTenant, null));
     tableConfig.getValidationConfig().setReplication("2");
 

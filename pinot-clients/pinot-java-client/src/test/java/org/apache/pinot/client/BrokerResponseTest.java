@@ -26,7 +26,7 @@ import org.testng.annotations.Test;
 
 
 public class BrokerResponseTest {
-  private static final ObjectReader OBJECT_READER = JsonUtils.DEFAULT_READER;
+  private static final ObjectReader OBJECT_READER = JsonUtils._defaultReader;
 
   @Test
   public void parseResultWithRequestId()

@@ -32,6 +32,7 @@ import org.apache.pinot.segment.spi.ImmutableSegment;
 import org.apache.pinot.segment.spi.creator.SegmentGeneratorConfig;
 import org.apache.pinot.segment.spi.creator.SegmentIndexCreationDriver;
 import org.apache.pinot.spi.config.table.TableConfig;
+import org.apache.pinot.spi.config.table.TableConfigFactory;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.data.readers.FileFormat;
 import org.apache.pinot.spi.data.readers.RecordReaderConfig;
@@ -194,7 +195,7 @@ public class CreateSegmentCommand extends AbstractBaseAdminCommand implements Co
     Preconditions.checkArgument(_tableConfigFile != null, "'tableConfigFile' must be specified");
     TableConfig tableConfig;
     try {
-      tableConfig = JsonUtils.fileToObject(new File(_tableConfigFile), TableConfig.class);
+      tableConfig = JsonUtils.fileToObject(new File(_tableConfigFile), TableConfigFactory.getTableConfigClass());
     } catch (Exception e) {
       throw new IllegalStateException("Caught exception while reading table config from file: " + _tableConfigFile, e);
     }

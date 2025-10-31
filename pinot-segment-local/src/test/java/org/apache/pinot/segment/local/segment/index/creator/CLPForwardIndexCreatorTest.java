@@ -30,6 +30,7 @@ import org.apache.pinot.segment.local.segment.index.readers.forward.CLPForwardIn
 import org.apache.pinot.segment.spi.V1Constants;
 import org.apache.pinot.segment.spi.creator.StatsCollectorConfig;
 import org.apache.pinot.segment.spi.memory.PinotDataBuffer;
+import org.apache.pinot.spi.config.table.DefaultTableConfig;
 import org.apache.pinot.spi.config.table.FieldConfig;
 import org.apache.pinot.spi.config.table.IndexingConfig;
 import org.apache.pinot.spi.config.table.SegmentsValidationAndRetentionConfig;
@@ -78,7 +79,7 @@ public class CLPForwardIndexCreatorTest implements PinotBuffersAfterMethodCheckR
     Schema schema = new Schema();
     schema.addField(new DimensionFieldSpec("column1", FieldSpec.DataType.STRING, true));
     TableConfig tableConfig =
-        new TableConfig("mytable", TableType.REALTIME.name(), new SegmentsValidationAndRetentionConfig(),
+        new DefaultTableConfig("mytable", TableType.REALTIME.name(), new SegmentsValidationAndRetentionConfig(),
             new TenantConfig(null, null, null), new IndexingConfig(), new TableCustomConfig(null), null, null, null,
             null, null, null, null, null, null, null, null, false, null, null, null);
     List<FieldConfig> fieldConfigList = new ArrayList<>();

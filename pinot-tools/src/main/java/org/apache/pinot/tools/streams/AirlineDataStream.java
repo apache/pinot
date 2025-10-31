@@ -21,6 +21,7 @@ package org.apache.pinot.tools.streams;
 import java.io.File;
 import java.io.IOException;
 import java.util.Properties;
+import org.apache.pinot.spi.config.table.DefaultTableConfig;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.stream.StreamDataProducer;
@@ -62,7 +63,7 @@ public class AirlineDataStream {
   public AirlineDataStream(File baseDir)
       throws Exception {
     this(Schema.fromFile(new File(baseDir, "airlineStats_schema.json")),
-        JsonUtils.fileToObject(new File(baseDir, "airlineStats_realtime_table_config.json"), TableConfig.class),
+        JsonUtils.fileToObject(new File(baseDir, "airlineStats_realtime_table_config.json"), DefaultTableConfig.class),
         new File(baseDir, "rawdata/airlineStats_data.avro"), getDefaultKafkaProducer());
   }
 

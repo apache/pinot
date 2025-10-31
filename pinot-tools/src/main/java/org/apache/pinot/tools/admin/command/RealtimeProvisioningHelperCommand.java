@@ -30,6 +30,7 @@ import org.apache.commons.lang3.StringUtils;
 import org.apache.pinot.controller.recommender.io.metadata.SchemaWithMetaData;
 import org.apache.pinot.controller.recommender.realtime.provisioning.MemoryEstimator;
 import org.apache.pinot.spi.config.table.TableConfig;
+import org.apache.pinot.spi.config.table.TableConfigFactory;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.utils.DataSizeUtils;
 import org.apache.pinot.spi.utils.JsonUtils;
@@ -217,7 +218,7 @@ public class RealtimeProvisioningHelperCommand extends AbstractBaseAdminCommand 
     TableConfig tableConfig;
     try (FileInputStream fis = new FileInputStream(_tableConfigFile)) {
       String tableConfigString = IOUtils.toString(fis);
-      tableConfig = JsonUtils.stringToObject(tableConfigString, TableConfig.class);
+      tableConfig = JsonUtils.stringToObject(tableConfigString, TableConfigFactory.getTableConfigClass());
     } catch (IOException e) {
       throw new RuntimeException("Exception in reading table config from file " + _tableConfigFile, e);
     }

@@ -79,7 +79,7 @@ export const rebalanceServerOptions: RebalanceServerOption[] = [
         "type": "SELECT",
         "allowedValues": ["ENABLE", "DISABLE", "DEFAULT"],
         "label": "Minimize Data Movement",
-        "description": "If enabled, it reduces the segments that will be moved by trying to minimize the changes to the instance assignment. Setting this to default will fallback to the value of this flag in the TableConfig",
+        "description": "If enabled, it reduces the segments that will be moved by trying to minimize the changes to the instance assignment. Setting this to default will fallback to the value of this flag in the DefaultTableConfig",
         "isAdvancedConfig": false,
         "isStatsGatheringConfig": false,
         "markWithWarningIcon": true,

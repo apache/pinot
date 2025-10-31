@@ -28,6 +28,7 @@ import java.util.Map;
 import org.apache.commons.io.FileUtils;
 import org.apache.pinot.controller.helix.ControllerTest;
 import org.apache.pinot.spi.config.table.TableConfig;
+import org.apache.pinot.spi.config.table.TableConfigFactory;
 import org.apache.pinot.spi.utils.JsonUtils;
 import org.apache.pinot.spi.utils.builder.ControllerRequestURLBuilder;
 import org.slf4j.Logger;
@@ -138,8 +139,8 @@ public class TableOp extends BaseOp {
 
   private boolean deleteTable() {
     try {
-      TableConfig tableConfig =
-          JsonUtils.fileToObject(new File(getAbsoluteFileName(_tableConfigFileName)), TableConfig.class);
+      TableConfig tableConfig = JsonUtils.fileToObject(new File(getAbsoluteFileName(_tableConfigFileName)),
+          TableConfigFactory.getTableConfigClass());
       ControllerTest.sendDeleteRequest(
           ControllerRequestURLBuilder.baseUrl(ClusterDescriptor.getInstance().getControllerUrl())
               .forTableDelete(tableConfig.getTableName()));

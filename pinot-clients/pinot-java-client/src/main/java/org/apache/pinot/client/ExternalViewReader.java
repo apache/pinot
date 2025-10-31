@@ -46,7 +46,7 @@ import org.slf4j.LoggerFactory;
  */
 public class ExternalViewReader {
   private static final Logger LOGGER = LoggerFactory.getLogger(ExternalViewReader.class);
-  private static final ObjectReader OBJECT_READER = JsonUtils.DEFAULT_READER;
+  private static final ObjectReader OBJECT_READER = JsonUtils._defaultReader;
   public static final String BROKER_EXTERNAL_VIEW_PATH = "/EXTERNALVIEW/brokerResource";
   public static final String BROKER_INSTANCE_PATH = "/CONFIGS/PARTICIPANT";
   public static final String REALTIME_SUFFIX = "_REALTIME";

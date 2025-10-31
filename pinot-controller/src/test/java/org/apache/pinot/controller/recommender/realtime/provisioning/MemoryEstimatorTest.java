@@ -29,6 +29,7 @@ import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import org.apache.commons.io.FileUtils;
 import org.apache.pinot.controller.recommender.io.metadata.SchemaWithMetaData;
+import org.apache.pinot.spi.config.table.DefaultTableConfig;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.utils.JsonUtils;
@@ -108,7 +109,7 @@ public class MemoryEstimatorTest {
     File tableConfigFile = readFile("memory_estimation/table-config.json");
     Schema schema = JsonUtils.fileToObject(schemaFile, Schema.class);
     SchemaWithMetaData schemaWithMetadata = JsonUtils.fileToObject(schemaFile, SchemaWithMetaData.class);
-    TableConfig tableConfig = JsonUtils.fileToObject(tableConfigFile, TableConfig.class);
+    TableConfig tableConfig = JsonUtils.fileToObject(tableConfigFile, DefaultTableConfig.class);
     int numberOfRows = 100_000;
 
     // act
