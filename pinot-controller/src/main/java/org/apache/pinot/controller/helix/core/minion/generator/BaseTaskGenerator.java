@@ -22,8 +22,11 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Random;
 import java.util.Set;
+import java.util.stream.Collectors;
 import org.apache.commons.lang3.StringUtils;
+import org.apache.commons.lang3.tuple.Pair;
 import org.apache.helix.model.IdealState;
 import org.apache.helix.task.JobConfig;
 import org.apache.pinot.common.metadata.segment.SegmentZKMetadata;
@@ -216,5 +219,53 @@ public abstract class BaseTaskGenerator implements PinotTaskGenerator {
     baseConfigs.put(MinionConstants.SEGMENT_NAME_KEY, StringUtils.join(segmentNames,
         MinionConstants.SEGMENT_NAME_SEPARATOR));
     return baseConfigs;
+  }
+
+  /**
+   * Selects random items from a sorted list using reservoir sampling for efficiency.
+   * This method is useful for segment selection with randomization to avoid contention.
+   *
+   * @param sortedItems List of items paired with their priority values (e.g., invalid record count)
+   * @param maxItems Maximum number of items to select
+   * @param randomizationFactor Factor to expand candidate pool (e.g., 2.0 = select from top 2x items)
+   * @param <T> Type of items to select
+   * @return List of randomly selected items
+   */
+  public static <T> List<T> selectRandomItems(List<Pair<T, Long>> sortedItems,
+      int maxItems, double randomizationFactor) {
+    if (randomizationFactor <= 1.0 || maxItems <= 0 || sortedItems.isEmpty()) {
+      // No randomization, return top items
+      return sortedItems.stream().limit(maxItems).map(Pair::getLeft).collect(Collectors.toList());
+    }
+
+    // Calculate expanded candidate pool size
+    int candidatePoolSize = Math.min((int) Math.ceil(maxItems * randomizationFactor), sortedItems.size());
+
+    // Get top candidates based on the expanded pool size
+    List<Pair<T, Long>> candidates = sortedItems.subList(0, candidatePoolSize);
+
+    // Use reservoir sampling to efficiently select random items
+    List<Pair<T, Long>> selectedCandidates = new ArrayList<>(maxItems);
+    Random random = new Random();
+
+    for (int i = 0; i < candidates.size(); i++) {
+      if (selectedCandidates.size() < maxItems) {
+        // Fill the reservoir
+        selectedCandidates.add(candidates.get(i));
+      } else {
+        // Randomly replace elements in the reservoir
+        int randomIndex = random.nextInt(i + 1);
+        if (randomIndex < maxItems) {
+          selectedCandidates.set(randomIndex, candidates.get(i));
+        }
+      }
+    }
+
+    List<T> result = selectedCandidates.stream().map(Pair::getLeft).collect(Collectors.toList());
+
+    LOGGER.info("Applied randomization with factor {}: selected {} items from top {} candidates",
+        randomizationFactor, selectedCandidates.size(), candidatePoolSize);
+
+    return result;
   }
 }
