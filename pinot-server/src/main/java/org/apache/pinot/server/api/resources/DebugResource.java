@@ -225,7 +225,7 @@ public class DebugResource {
           ((RealtimeTableDataManager) (tableDataManager)).getStreamMetadataProvider(realtimeSegmentDataManager);
       StreamPartitionMsgOffset latestMsgOffset;
       try {
-        int partitionId = realtimeSegmentDataManager.getPartitionGroupId();
+        int partitionId = realtimeSegmentDataManager.getStreamPartitionId();
         Map<Integer, StreamPartitionMsgOffset> partitionMsgOffsetMap =
             streamMetadataProvider.fetchLatestStreamOffset(Collections.singleton(partitionId),
                 STREAM_METADATA_FETCH_TIMEOUT_MS);

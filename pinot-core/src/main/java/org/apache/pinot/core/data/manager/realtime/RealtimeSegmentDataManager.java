@@ -1113,8 +1113,8 @@ public class RealtimeSegmentDataManager extends SegmentDataManager {
     return _tableStreamName;
   }
 
-  public int getPartitionGroupId() {
-    return _partitionGroupId;
+  public int getStreamPartitionId() {
+    return _streamPartitionId;
   }
 
   public StreamConsumerFactory getStreamConsumerFactory() {

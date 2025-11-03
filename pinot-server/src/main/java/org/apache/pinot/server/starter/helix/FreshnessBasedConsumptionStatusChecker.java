@@ -83,7 +83,7 @@ public class FreshnessBasedConsumptionStatusChecker extends IngestionBasedConsum
         realtimeTableDataManager.getStreamMetadataProvider(rtSegmentDataManager);
     StreamPartitionMsgOffset latestStreamOffset;
     try {
-      int partitionId = rtSegmentDataManager.getPartitionGroupId();
+      int partitionId = rtSegmentDataManager.getStreamPartitionId();
       Map<Integer, StreamPartitionMsgOffset> partitionMsgOffsetMap =
           streamMetadataProvider.fetchLatestStreamOffset(Collections.singleton(partitionId),
               STREAM_METADATA_FETCH_TIMEOUT_MS);

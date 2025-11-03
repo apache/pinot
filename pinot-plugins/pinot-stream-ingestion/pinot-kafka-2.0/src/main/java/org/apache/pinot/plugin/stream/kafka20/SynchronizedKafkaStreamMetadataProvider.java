@@ -23,7 +23,12 @@ import java.util.Set;
 import org.apache.pinot.spi.stream.StreamConfig;
 import org.apache.pinot.spi.stream.StreamPartitionMsgOffset;
 
-
+/**
+ * A thread-safe variant of {@link KafkaStreamMetadataProvider} that synchronizes
+ * access to metadata fetch operations.
+ * This is particularly useful when a shared instance of {@link KafkaStreamMetadataProvider}
+ * is accessed concurrently by multiple threads.
+ */
 public class SynchronizedKafkaStreamMetadataProvider extends KafkaStreamMetadataProvider {
 
   public SynchronizedKafkaStreamMetadataProvider(String clientId, StreamConfig streamConfig) {

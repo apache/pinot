@@ -378,6 +378,9 @@ public class RealtimeTableDataManager extends BaseTableDataManager {
     return segmentContexts;
   }
 
+  /**
+   *  Returns thread safe StreamMetadataProvider which is shared across different callers.
+   */
   public StreamMetadataProvider getStreamMetadataProvider(RealtimeSegmentDataManager realtimeSegmentDataManager) {
     String tableStreamName = realtimeSegmentDataManager.getTableStreamName();
     StreamConsumerFactory streamConsumerFactory = realtimeSegmentDataManager.getStreamConsumerFactory();
