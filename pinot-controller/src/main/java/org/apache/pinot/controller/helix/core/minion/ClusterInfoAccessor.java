@@ -51,6 +51,8 @@ import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.utils.CommonConstants;
 import org.apache.pinot.spi.utils.builder.TableNameBuilder;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 
 /**
@@ -58,6 +60,8 @@ import org.apache.pinot.spi.utils.builder.TableNameBuilder;
  * {@link PinotHelixTaskResourceManager} which provides cluster information for PinotTaskGenerator.
  */
 public class ClusterInfoAccessor {
+  private static final Logger LOGGER = LoggerFactory.getLogger(ClusterInfoAccessor.class);
+
   private final PinotHelixResourceManager _pinotHelixResourceManager;
   private final PinotHelixTaskResourceManager _pinotHelixTaskResourceManager;
   private final ControllerConf _controllerConf;
@@ -205,11 +209,14 @@ public class ClusterInfoAccessor {
   public String getVipUrlForLeadController(String tableNameWithType) {
     String rawTableName = TableNameBuilder.extractRawTableName(tableNameWithType);
     if (_leadControllerManager.isLeaderForTable(rawTableName)) {
+      LOGGER.info("Controller is leader for table {}", tableNameWithType);
       return getVipUrl();
     }
 
     String leadControllerInstanceId = getLeadControllerForTable(tableNameWithType);
     if (leadControllerInstanceId == null) {
+      LOGGER.warn("Lead controller instance ID returned is null for table: {}, setting this controller's VIP "
+              + "URL instead", tableNameWithType);
       return getVipUrl();
     }
 
@@ -218,6 +225,8 @@ public class ClusterInfoAccessor {
     PropertyKey.Builder keyBuilder = dataAccessor.keyBuilder();
     InstanceConfig instanceConfig = dataAccessor.getProperty(keyBuilder.instanceConfig(leadControllerInstanceId));
     if (instanceConfig == null) {
+      LOGGER.warn("Instance config is null for lead controller instance: {} for table: {}, setting this controller's "
+              + "VIP URL instead", leadControllerInstanceId, tableNameWithType);
       return getVipUrl();
     }
 
@@ -233,6 +242,7 @@ public class ClusterInfoAccessor {
       // Check if lead controller resource is enabled
       boolean isLeadControllerResourceEnabled = LeadControllerUtils.isLeadControllerResourceEnabled(helixManager);
       if (!isLeadControllerResourceEnabled) {
+        LOGGER.warn("Lead controller resource is disabled, returning null");
         return null;
       }
 
@@ -241,6 +251,7 @@ public class ClusterInfoAccessor {
           .getResourceExternalView(helixManager.getClusterName(), CommonConstants.Helix.LEAD_CONTROLLER_RESOURCE_NAME);
 
       if (leadControllerResourceExternalView == null) {
+        LOGGER.warn("Lead controller resource external view is null, returning null");
         return null;
       }
 
@@ -252,6 +263,8 @@ public class ClusterInfoAccessor {
       // Get the state map for this partition
       Map<String, String> partitionStateMap = leadControllerResourceExternalView.getStateMap(partitionName);
       if (partitionStateMap == null) {
+        LOGGER.warn("Lead controller resource EV's partition state map is null for table: {}, returning null",
+            tableNameWithType);
         return null;
       }
 
@@ -262,8 +275,11 @@ public class ClusterInfoAccessor {
         }
       }
 
+      LOGGER.warn("Could not find the lead controller for table: {} in MASTER state, returning null",
+          tableNameWithType);
       return null;
     } catch (Exception e) {
+      LOGGER.warn("Caught exception while trying to fetch the lead controller for table: {}", tableNameWithType, e);
       return null;
     }
   }
