@@ -91,8 +91,6 @@ public class SSBQueryIntegrationTest extends BaseClusterIntegrationTest {
       ClusterIntegrationTestUtils.buildSegmentsFromAvro(Collections.singletonList(dataFile), tableConfig, schema, 0,
           _segmentDir, _tarDir);
       uploadSegments(tableName, _tarDir);
-      // Wait for segments to be loaded and available
-      waitForDocsLoaded(60_000L, true, tableName);
       // H2
       ClusterIntegrationTestUtils.setUpH2TableWithAvro(Collections.singletonList(dataFile), tableName, _h2Connection);
     }
