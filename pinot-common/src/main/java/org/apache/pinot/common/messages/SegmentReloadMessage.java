@@ -37,6 +37,7 @@ public class SegmentReloadMessage extends Message {
   private static final String FORCE_DOWNLOAD_KEY = "forceDownload";
   private static final String SEGMENT_NAMES = "segmentNames";
   private static final String RELOAD_JOB_ID_KEY = "reloadJobId";
+  private static final String INCLUDE_CONSUMING_SEGMENT_KEY = "includeConsumingSegment";
 
   /**
    * This msg asks server to reload all segments in the given a table.
@@ -45,7 +46,18 @@ public class SegmentReloadMessage extends Message {
    * @param forceDownload     whether to download segments from deep store when reloading.
    */
   public SegmentReloadMessage(String tableNameWithType, boolean forceDownload) {
-    this(tableNameWithType, null, forceDownload);
+    this(tableNameWithType, null, forceDownload, true);
+  }
+
+  /**
+   * This msg asks server to reload all segments in the given a table.
+   *
+   * @param tableNameWithType the table where the segments are from.
+   * @param forceDownload     whether to download segments from deep store when reloading.
+   * @param includeConsumingSegment whether to include consuming segments in the reload.
+   */
+  public SegmentReloadMessage(String tableNameWithType, boolean forceDownload, boolean includeConsumingSegment) {
+    this(tableNameWithType, null, forceDownload, includeConsumingSegment);
   }
 
   /**
@@ -56,6 +68,19 @@ public class SegmentReloadMessage extends Message {
    * @param forceDownload     whether to download segments from deep store when reloading.
    */
   public SegmentReloadMessage(String tableNameWithType, @Nullable List<String> segmentNames, boolean forceDownload) {
+    this(tableNameWithType, segmentNames, forceDownload, true);
+  }
+
+  /**
+   * This msg asks server to reload a list of specified segments in the given a table.
+   *
+   * @param tableNameWithType the table where the segments are from.
+   * @param segmentNames      a list of specified segments to reload, or null for all segments.
+   * @param forceDownload     whether to download segments from deep store when reloading.
+   * @param includeConsumingSegment whether to include consuming segments in the reload.
+   */
+  public SegmentReloadMessage(String tableNameWithType, @Nullable List<String> segmentNames, boolean forceDownload,
+      boolean includeConsumingSegment) {
     super(MessageType.USER_DEFINE_MSG, UUID.randomUUID().toString());
     setResourceName(tableNameWithType);
     setMsgSubType(RELOAD_SEGMENT_MSG_SUB_TYPE);
@@ -68,6 +93,7 @@ public class SegmentReloadMessage extends Message {
     znRecord.setSimpleField(RELOAD_JOB_ID_KEY, getMsgId());
 
     znRecord.setBooleanField(FORCE_DOWNLOAD_KEY, forceDownload);
+    znRecord.setBooleanField(INCLUDE_CONSUMING_SEGMENT_KEY, includeConsumingSegment);
     if (CollectionUtils.isNotEmpty(segmentNames)) {
       // TODO: use the new List field and deprecate the partition name in next release.
       setPartitionName(segmentNames.get(0));
@@ -84,6 +110,14 @@ public class SegmentReloadMessage extends Message {
 
   public boolean shouldForceDownload() {
     return getRecord().getBooleanField(FORCE_DOWNLOAD_KEY, false);
+  }
+
+  /**
+   * Returns whether consuming segments should be included in the reload.
+   * Defaults to true for backward compatibility with messages that don't have this field.
+   */
+  public boolean shouldIncludeConsumingSegment() {
+    return getRecord().getBooleanField(INCLUDE_CONSUMING_SEGMENT_KEY, true);
   }
 
   @Nullable

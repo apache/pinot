@@ -417,12 +417,14 @@ public class HelixInstanceDataManager implements InstanceDataManager {
   }
 
   @Override
-  public void reloadSegment(String tableNameWithType, String segmentName, boolean forceDownload, String reloadJobId)
+  public void reloadSegment(String tableNameWithType, String segmentName, boolean forceDownload,
+      boolean includeConsumingSegment, String reloadJobId)
       throws Exception {
-    LOGGER.info("Reloading segment: {} in table: {}", segmentName, tableNameWithType);
+    LOGGER.info("Reloading segment: {} in table: {} with includeConsumingSegment: {}", segmentName, tableNameWithType,
+        includeConsumingSegment);
     TableDataManager tableDataManager = _tableDataManagerMap.get(tableNameWithType);
     if (tableDataManager != null) {
-      tableDataManager.reloadSegment(segmentName, forceDownload, reloadJobId);
+      tableDataManager.reloadSegment(segmentName, forceDownload, includeConsumingSegment, reloadJobId);
     } else {
       LOGGER.warn("Failed to find data manager for table: {}, skipping reloading segment: {}", tableNameWithType,
           segmentName);
@@ -430,12 +432,14 @@ public class HelixInstanceDataManager implements InstanceDataManager {
   }
 
   @Override
-  public void reloadAllSegments(String tableNameWithType, boolean forceDownload, String reloadJobId)
+  public void reloadAllSegments(String tableNameWithType, boolean forceDownload, boolean includeConsumingSegment,
+      String reloadJobId)
       throws Exception {
-    LOGGER.info("Reloading all segments in table: {}", tableNameWithType);
+    LOGGER.info("Reloading all segments in table: {} with includeConsumingSegment: {}", tableNameWithType,
+        includeConsumingSegment);
     TableDataManager tableDataManager = _tableDataManagerMap.get(tableNameWithType);
     if (tableDataManager != null) {
-      tableDataManager.reloadAllSegments(forceDownload, reloadJobId);
+      tableDataManager.reloadAllSegments(forceDownload, includeConsumingSegment, reloadJobId);
     } else {
       LOGGER.warn("Failed to find data manager for table: {}, skipping reloading all segments", tableNameWithType);
     }
@@ -443,12 +447,13 @@ public class HelixInstanceDataManager implements InstanceDataManager {
 
   @Override
   public void reloadSegments(String tableNameWithType, List<String> segmentNames, boolean forceDownload,
-      String reloadJobId)
+      boolean includeConsumingSegment, String reloadJobId)
       throws Exception {
-    LOGGER.info("Reloading segments: {} in table: {}", segmentNames, tableNameWithType);
+    LOGGER.info("Reloading segments: {} in table: {} with includeConsumingSegment: {}", segmentNames, tableNameWithType,
+        includeConsumingSegment);
     TableDataManager tableDataManager = _tableDataManagerMap.get(tableNameWithType);
     if (tableDataManager != null) {
-      tableDataManager.reloadSegments(segmentNames, forceDownload, reloadJobId);
+      tableDataManager.reloadSegments(segmentNames, forceDownload, includeConsumingSegment, reloadJobId);
     } else {
       LOGGER.warn("Failed to find data manager for table: {}, skipping reloading segments: {}", tableNameWithType,
           segmentNames);

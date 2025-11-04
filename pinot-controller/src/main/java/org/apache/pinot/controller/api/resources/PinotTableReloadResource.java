@@ -117,9 +117,12 @@ public class PinotTableReloadResource {
       @PathParam("segmentName") @Encoded String segmentName,
       @ApiParam(value = "Force server to re-download segment from deep store", defaultValue = "false")
       @QueryParam("forceDownload") @DefaultValue("false") boolean forceDownload,
+      @ApiParam(value = "Include consuming segments in reload", defaultValue = "true")
+      @QueryParam("includeConsumingSegment") @DefaultValue("true") boolean includeConsumingSegment,
       @ApiParam(value = "Target specific server instance") @QueryParam("targetInstance") @Nullable
       String targetInstance, @Context HttpHeaders headers) {
-    return _service.reloadSegment(tableName, segmentName, forceDownload, targetInstance, headers);
+    return _service.reloadSegment(tableName, segmentName, forceDownload, includeConsumingSegment, targetInstance,
+        headers);
   }
 
   @POST

@@ -36,7 +36,10 @@ import org.apache.pinot.controller.api.access.AccessType;
 import org.apache.pinot.controller.api.exception.ControllerApplicationException;
 import org.apache.pinot.controller.helix.core.PinotHelixResourceManager;
 import org.apache.pinot.core.auth.TargetType;
+import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.TableType;
+import org.apache.pinot.spi.config.table.UpsertConfig;
+import org.apache.pinot.spi.utils.builder.TableNameBuilder;
 import org.glassfish.grizzly.http.server.Request;
 import org.slf4j.Logger;
 
@@ -164,4 +167,37 @@ public class ResourceUtils {
               segmentSizeInBytes);
       controllerMetrics.addMeteredGlobalValue(ControllerMeter.DEEP_STORE_READ_BYTES_COMPLETED, segmentSizeInBytes);
     }
+
+  /**
+   * Determines whether consuming segments should be included in reload based on table config.
+   * Returns false for REALTIME tables with partial upsert, true otherwise.
+   *
+   * @param tableNameWithType the table name with type suffix
+   * @param tableConfig the table configuration, can be null
+   * @param logger the logger for logging messages
+   * @return true if consuming segments should be included in reload, false otherwise
+   */
+  public static boolean shouldIncludeConsumingSegment(String tableNameWithType, @Nullable TableConfig tableConfig,
+      Logger logger) {
+    try {
+      // Only check for REALTIME tables
+      if (TableNameBuilder.getTableTypeFromTableName(tableNameWithType) != TableType.REALTIME) {
+        return true;
+      }
+
+      // Check if table has partial upsert configured
+      if (tableConfig != null && tableConfig.getUpsertConfig() != null
+          && tableConfig.getUpsertConfig().getMode() == UpsertConfig.Mode.PARTIAL) {
+        logger.info("Disabling consuming segment reload for table: {} as the table is Partial Upsert table",
+            tableNameWithType);
+        return false;
+      }
+
+      return true;
+    } catch (Exception e) {
+      logger.warn("Error checking table config for {}, defaulting to includeConsumingSegment=true", tableNameWithType,
+          e);
+      return true;
+    }
+  }
 }

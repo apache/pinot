@@ -105,6 +105,7 @@ import org.apache.pinot.spi.config.table.MultiColumnTextIndexConfig;
 import org.apache.pinot.spi.config.table.SegmentPartitionConfig;
 import org.apache.pinot.spi.config.table.StarTreeIndexConfig;
 import org.apache.pinot.spi.config.table.TableConfig;
+import org.apache.pinot.spi.config.table.UpsertConfig;
 import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.utils.CommonConstants;
@@ -575,18 +576,20 @@ public abstract class BaseTableDataManager implements TableDataManager {
   }
 
   @Override
-  public void reloadSegment(String segmentName, boolean forceDownload, String reloadJobId)
+  public void reloadSegment(String segmentName, boolean forceDownload, boolean includeConsumingSegment,
+      String reloadJobId)
       throws Exception {
     Preconditions.checkState(!_shutDown,
         "Table data manager is already shut down, cannot reload segment: %s in table: %s", segmentName,
         _tableNameWithType);
-    _logger.info("Reloading segment: {} with forceDownload: {}", segmentName, forceDownload);
+    _logger.info("Reloading segment: {} with forceDownload: {}, includeConsumingSegment: {}", segmentName,
+        forceDownload, includeConsumingSegment);
     SegmentDataManager segmentDataManager = _segmentDataManagerMap.get(segmentName);
     if (segmentDataManager != null) {
       IndexLoadingConfig indexLoadingConfig = fetchIndexLoadingConfig();
       _segmentReloadSemaphore.acquire(segmentName, _logger);
       try {
-        reloadSegment(segmentDataManager, indexLoadingConfig, forceDownload);
+        reloadSegment(segmentDataManager, indexLoadingConfig, forceDownload, includeConsumingSegment);
       } finally {
         _segmentReloadSemaphore.release();
       }
@@ -596,25 +599,30 @@ public abstract class BaseTableDataManager implements TableDataManager {
   }
 
   @Override
-  public void reloadAllSegments(boolean forceDownload, String reloadJobId)
+  public void reloadAllSegments(boolean forceDownload, boolean includeConsumingSegment, String reloadJobId)
       throws Exception {
     Preconditions.checkState(!_shutDown,
         "Table data manager is already shut down, cannot reload all segments in table: %s", _tableNameWithType);
-    _logger.info("Reloading all segments with forceDownload: {}", forceDownload);
+    _logger.info("Reloading all segments with forceDownload: {}, includeConsumingSegment: {}", forceDownload,
+        includeConsumingSegment);
     List<SegmentDataManager> segmentDataManagers = new ArrayList<>(_segmentDataManagerMap.values());
     if (!segmentDataManagers.isEmpty()) {
-      reloadSegments(segmentDataManagers, fetchIndexLoadingConfig(), forceDownload, reloadJobId);
+      reloadSegments(segmentDataManagers, fetchIndexLoadingConfig(), forceDownload, includeConsumingSegment,
+          reloadJobId);
     }
-    _logger.info("Reloaded all {} segments with forceDownload: {}", segmentDataManagers.size(), forceDownload);
+    _logger.info("Reloaded all {} segments with forceDownload: {}, includeConsumingSegment: {}",
+        segmentDataManagers.size(), forceDownload, includeConsumingSegment);
   }
 
   @Override
-  public void reloadSegments(List<String> segmentNames, boolean forceDownload, String reloadJobId)
+  public void reloadSegments(List<String> segmentNames, boolean forceDownload, boolean includeConsumingSegment,
+      String reloadJobId)
       throws Exception {
     Preconditions.checkState(!_shutDown,
         "Table data manager is already shut down, cannot reload segments: %s in table: %s", segmentNames,
         _tableNameWithType);
-    _logger.info("Reloading segments: {} with forceDownload: {}", segmentNames, forceDownload);
+    _logger.info("Reloading segments: {} with forceDownload: {}, includeConsumingSegment: {}", segmentNames,
+        forceDownload, includeConsumingSegment);
     List<SegmentDataManager> segmentDataManagers = new ArrayList<>(segmentNames.size());
     List<String> missingSegments = new ArrayList<>();
     for (String segmentName : segmentNames) {
@@ -626,13 +634,16 @@ public abstract class BaseTableDataManager implements TableDataManager {
       }
     }
     if (!segmentDataManagers.isEmpty()) {
-      reloadSegments(segmentDataManagers, fetchIndexLoadingConfig(), forceDownload, reloadJobId);
+      reloadSegments(segmentDataManagers, fetchIndexLoadingConfig(), forceDownload, includeConsumingSegment,
+          reloadJobId);
     }
     if (missingSegments.isEmpty()) {
-      _logger.info("Reloaded segments: {} with forceDownload: {}", segmentNames, forceDownload);
+      _logger.info("Reloaded segments: {} with forceDownload: {}, includeConsumingSegment: {}", segmentNames,
+          forceDownload, includeConsumingSegment);
     } else {
-      _logger.warn("Reloaded {}/{} segments: {} with forceDownload: {}, missing segments: {}",
-          segmentDataManagers.size(), segmentNames.size(), segmentNames, forceDownload, missingSegments);
+      _logger.warn("Reloaded {}/{} segments: {} with forceDownload: {}, includeConsumingSegment: {}, "
+          + "missing segments: {}", segmentDataManagers.size(), segmentNames.size(), segmentNames, forceDownload,
+          includeConsumingSegment, missingSegments);
     }
   }
 
@@ -782,7 +793,7 @@ public abstract class BaseTableDataManager implements TableDataManager {
   }
 
   private void reloadSegments(List<SegmentDataManager> segmentDataManagers, IndexLoadingConfig indexLoadingConfig,
-      boolean forceDownload, String reloadJobId)
+      boolean forceDownload, boolean includeConsumingSegment, String reloadJobId)
       throws Exception {
     List<String> failedSegments = new ArrayList<>();
     AtomicReference<Throwable> sampleException = new AtomicReference<>();
@@ -791,7 +802,7 @@ public abstract class BaseTableDataManager implements TableDataManager {
       try {
         _segmentReloadSemaphore.acquire(segmentName, _logger);
         try {
-          reloadSegment(segmentDataManager, indexLoadingConfig, forceDownload);
+          reloadSegment(segmentDataManager, indexLoadingConfig, forceDownload, includeConsumingSegment);
         } finally {
           _segmentReloadSemaphore.release();
         }
@@ -812,16 +823,31 @@ public abstract class BaseTableDataManager implements TableDataManager {
   }
 
   private void reloadSegment(SegmentDataManager segmentDataManager, IndexLoadingConfig indexLoadingConfig,
-      boolean forceDownload)
+      boolean forceDownload, boolean includeConsumingSegment)
       throws Exception {
     String segmentName = segmentDataManager.getSegmentName();
     if (segmentDataManager instanceof RealtimeSegmentDataManager) {
       // Use force commit to reload consuming segment
+      // Skip consuming segment reload if includeConsumingSegment is false
       if (_instanceDataManagerConfig.shouldReloadConsumingSegment()) {
-        _logger.info("Reloading (force committing) consuming segment: {}", segmentName);
-        ((RealtimeSegmentDataManager) segmentDataManager).forceCommit();
+        TableConfig tableConfig = indexLoadingConfig.getTableConfig();
+        if (includeConsumingSegment) {
+          if (tableConfig != null && tableConfig.getUpsertConfig() != null
+              && tableConfig.getUpsertConfig().getMode() == UpsertConfig.Mode.PARTIAL) {
+            _logger.warn(
+                "Reloading (force committing) consuming segment: {} for a partial upsert table. There is a chance of "
+                    + "inconsistencies between servers", segmentName);
+          } else {
+            _logger.info("Reloading (force committing) consuming segment: {}", segmentName);
+          }
+          ((RealtimeSegmentDataManager) segmentDataManager).forceCommit();
+        } else {
+          _logger.warn("Skip reloading consuming segment: {} as includeConsuming flag is disabled", segmentName);
+        }
       } else {
-        _logger.warn("Skip reloading consuming segment: {} as configured", segmentName);
+        _logger.warn(
+            "Skip reloading consuming segment: {} (includeConsumingSegment: {}, shouldReloadConsumingSegment: {})",
+            segmentName, includeConsumingSegment, _instanceDataManagerConfig.shouldReloadConsumingSegment());
       }
     } else {
       SegmentZKMetadata zkMetadata = fetchZKMetadata(segmentName);

@@ -140,6 +140,7 @@ import org.apache.pinot.controller.api.exception.UserAlreadyExistsException;
 import org.apache.pinot.controller.api.resources.InstanceInfo;
 import org.apache.pinot.controller.api.resources.OperationValidationResponse;
 import org.apache.pinot.controller.api.resources.PeriodicTaskInvocationResponse;
+import org.apache.pinot.controller.api.resources.ResourceUtils;
 import org.apache.pinot.controller.api.resources.StateType;
 import org.apache.pinot.controller.helix.core.assignment.instance.InstanceAssignmentDriver;
 import org.apache.pinot.controller.helix.core.assignment.segment.SegmentAssignment;
@@ -162,6 +163,7 @@ import org.apache.pinot.spi.config.table.TableType;
 import org.apache.pinot.spi.config.table.TagOverrideConfig;
 import org.apache.pinot.spi.config.table.TenantConfig;
 import org.apache.pinot.spi.config.table.TierConfig;
+import org.apache.pinot.spi.config.table.UpsertConfig;
 import org.apache.pinot.spi.config.table.assignment.InstancePartitionsType;
 import org.apache.pinot.spi.config.tenant.Tenant;
 import org.apache.pinot.spi.config.user.ComponentType;
@@ -1535,7 +1537,10 @@ public class PinotHelixResourceManager {
       if (reload) {
         LOGGER.info("Reloading tables with name: {}", schemaName);
         for (String tableNameWithType : tableNamesWithType) {
-          reloadAllSegments(tableNameWithType, false, null);
+          // Determine includeConsumingSegment based on table config
+          // For REALTIME tables with partial upsert, disable consuming segment reload
+          boolean includeConsumingSegment = shouldIncludeConsumingSegmentForReload(tableNameWithType);
+          reloadAllSegments(tableNameWithType, false, includeConsumingSegment, null);
         }
       } else {
         LOGGER.info("Refreshing schema for tables with name: {}", schemaName);
@@ -1550,6 +1555,15 @@ public class PinotHelixResourceManager {
       // We don't throw exception if no tables found for schema when reload is false. Since this could be valid case
       LOGGER.warn("No tables found for schema (refresh only): {}", schemaName, e);
     }
+  }
+
+  /**
+   * Determines whether consuming segments should be included in reload based on table config.
+   * Returns false for REALTIME tables with partial upsert, true otherwise.
+   */
+  private boolean shouldIncludeConsumingSegmentForReload(String tableNameWithType) {
+    TableConfig tableConfig = getTableConfig(tableNameWithType);
+    return ResourceUtils.shouldIncludeConsumingSegment(tableNameWithType, tableConfig, LOGGER);
   }
 
   /**
@@ -2761,9 +2775,10 @@ public class PinotHelixResourceManager {
   }
 
   public Map<String, Pair<Integer, String>> reloadSegments(String tableNameWithType, boolean forceDownload,
-      Map<String, List<String>> instanceToSegmentsMap) {
-    LOGGER.info("Sending reload messages for table: {} with forceDownload: {}, and instanceToSegmentsMap: {}",
-        tableNameWithType, forceDownload, instanceToSegmentsMap);
+      boolean includeConsumingSegment, Map<String, List<String>> instanceToSegmentsMap) {
+    LOGGER.info("Sending reload messages for table: {} with forceDownload: {}, includeConsumingSegment: {}, "
+        + "and instanceToSegmentsMap: {}", tableNameWithType, forceDownload, includeConsumingSegment,
+        instanceToSegmentsMap);
 
     if (forceDownload) {
       TableType tt = TableNameBuilder.getTableTypeFromTableName(tableNameWithType);
@@ -2776,7 +2791,8 @@ public class PinotHelixResourceManager {
     Map<String, Pair<Integer, String>> instanceMsgInfoMap = new HashMap<>();
     for (Map.Entry<String, List<String>> entry : instanceToSegmentsMap.entrySet()) {
       String targetInstance = entry.getKey();
-      SegmentReloadMessage message = new SegmentReloadMessage(tableNameWithType, entry.getValue(), forceDownload);
+      SegmentReloadMessage message =
+          new SegmentReloadMessage(tableNameWithType, entry.getValue(), forceDownload, includeConsumingSegment);
       int numMessagesSent =
           MessagingServiceUtils.send(messagingService, message, tableNameWithType, null, targetInstance);
       if (numMessagesSent > 0) {
@@ -2791,9 +2807,10 @@ public class PinotHelixResourceManager {
   }
 
   public Pair<Integer, String> reloadAllSegments(String tableNameWithType, boolean forceDownload,
-      @Nullable String targetInstance) {
-    LOGGER.info("Sending reload message for table: {} with forceDownload: {}, and target: {}", tableNameWithType,
-        forceDownload, targetInstance == null ? "every instance" : targetInstance);
+      boolean includeConsumingSegment, @Nullable String targetInstance) {
+    LOGGER.info("Sending reload message for table: {} with forceDownload: {}, includeConsumingSegment: {}, "
+        + "and target: {}", tableNameWithType, forceDownload, includeConsumingSegment,
+        targetInstance == null ? "every instance" : targetInstance);
 
     if (forceDownload) {
       TableType tt = TableNameBuilder.getTableTypeFromTableName(tableNameWithType);
@@ -2803,7 +2820,7 @@ public class PinotHelixResourceManager {
     }
 
     ClusterMessagingService messagingService = _helixZkManager.getMessagingService();
-    SegmentReloadMessage message = new SegmentReloadMessage(tableNameWithType, forceDownload);
+    SegmentReloadMessage message = new SegmentReloadMessage(tableNameWithType, forceDownload, includeConsumingSegment);
     int numMessagesSent =
         MessagingServiceUtils.send(messagingService, message, tableNameWithType, null, targetInstance);
     if (numMessagesSent > 0) {
@@ -2816,9 +2833,10 @@ public class PinotHelixResourceManager {
   }
 
   public Pair<Integer, String> reloadSegment(String tableNameWithType, String segmentName, boolean forceDownload,
-      @Nullable String targetInstance) {
-    LOGGER.info("Sending reload message for segment: {} in table: {} with forceDownload: {}, and target: {}",
-        segmentName, tableNameWithType, forceDownload, targetInstance == null ? "every instance" : targetInstance);
+      boolean includeConsumingSegment, @Nullable String targetInstance) {
+    LOGGER.info("Sending reload message for segment: {} in table: {} with forceDownload: {}, "
+        + "includeConsumingSegment: {}, and target: {}", segmentName, tableNameWithType, forceDownload,
+        includeConsumingSegment, targetInstance == null ? "every instance" : targetInstance);
 
     if (forceDownload) {
       TableType tt = TableNameBuilder.getTableTypeFromTableName(tableNameWithType);
@@ -2829,7 +2847,8 @@ public class PinotHelixResourceManager {
     }
 
     ClusterMessagingService messagingService = _helixZkManager.getMessagingService();
-    SegmentReloadMessage message = new SegmentReloadMessage(tableNameWithType, List.of(segmentName), forceDownload);
+    SegmentReloadMessage message =
+        new SegmentReloadMessage(tableNameWithType, List.of(segmentName), forceDownload, includeConsumingSegment);
     int numMessagesSent =
         MessagingServiceUtils.send(messagingService, message, tableNameWithType, segmentName, targetInstance);
     if (numMessagesSent > 0) {

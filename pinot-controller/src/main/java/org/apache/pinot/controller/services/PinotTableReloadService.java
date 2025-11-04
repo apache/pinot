@@ -48,6 +48,7 @@ import org.apache.pinot.controller.api.resources.SuccessResponse;
 import org.apache.pinot.controller.helix.core.PinotHelixResourceManager;
 import org.apache.pinot.controller.util.TableMetadataReader;
 import org.apache.pinot.segment.spi.creator.name.SegmentNameUtils;
+import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.TableType;
 import org.apache.pinot.spi.utils.JsonUtils;
 import org.apache.pinot.spi.utils.builder.TableNameBuilder;
@@ -74,13 +75,13 @@ public class PinotTableReloadService {
   }
 
   public SuccessResponse reloadSegment(String tableName, String segmentName, boolean forceDownload,
-      String targetInstance, HttpHeaders headers) {
+      boolean includeConsumingSegment, String targetInstance, HttpHeaders headers) {
     tableName = DatabaseUtils.translateTableName(tableName, headers);
     long startTimeMs = System.currentTimeMillis();
     segmentName = URIUtils.decode(segmentName);
     String tableNameWithType = getExistingTable(tableName, segmentName);
-    Pair<Integer, String> msgInfo =
-        _pinotHelixResourceManager.reloadSegment(tableNameWithType, segmentName, forceDownload, targetInstance);
+    Pair<Integer, String> msgInfo = _pinotHelixResourceManager.reloadSegment(tableNameWithType, segmentName,
+        forceDownload, includeConsumingSegment, targetInstance);
     boolean zkJobMetaWriteSuccess = false;
     int numReloadMsgSent = msgInfo.getLeft();
     if (numReloadMsgSent > 0) {
@@ -137,8 +138,12 @@ public class PinotTableReloadService {
     long startTimeMs = System.currentTimeMillis();
     Map<String, Map<String, String>> perTableMsgData = new LinkedHashMap<>();
     for (String tableNameWithType : tableNamesWithType) {
+      // Determine includeConsumingSegment based on table config
+      // For REALTIME tables with partial upsert, disable consuming segment reload
+      boolean includeConsumingSegment = shouldIncludeConsumingSegment(tableNameWithType);
       Pair<Integer, String> msgInfo =
-          _pinotHelixResourceManager.reloadAllSegments(tableNameWithType, forceDownload, targetInstance);
+          _pinotHelixResourceManager.reloadAllSegments(tableNameWithType, forceDownload, includeConsumingSegment,
+              targetInstance);
       int numReloadMsgSent = msgInfo.getLeft();
       if (numReloadMsgSent <= 0) {
         continue;
@@ -223,8 +228,10 @@ public class PinotTableReloadService {
     long startTimeMs = System.currentTimeMillis();
     Map<String, Map<String, Map<String, String>>> tableInstanceMsgData = new LinkedHashMap<>();
     for (String tableNameWithType : tableNamesWithType) {
-      Map<String, Pair<Integer, String>> instanceMsgInfoMap =
-          _pinotHelixResourceManager.reloadSegments(tableNameWithType, forceDownload, instanceToSegmentsMap);
+      // Determine includeConsumingSegment based on table config
+      boolean includeConsumingSegment = shouldIncludeConsumingSegment(tableNameWithType);
+      Map<String, Pair<Integer, String>> instanceMsgInfoMap = _pinotHelixResourceManager.reloadSegments(
+          tableNameWithType, forceDownload, includeConsumingSegment, instanceToSegmentsMap);
       Map<String, Map<String, String>> instanceMsgData =
           tableInstanceMsgData.computeIfAbsent(tableNameWithType, t -> new HashMap<>());
       for (Map.Entry<String, Pair<Integer, String>> instanceMsgInfo : instanceMsgInfoMap.entrySet()) {
@@ -258,5 +265,14 @@ public class PinotTableReloadService {
       }
     }
     return tableInstanceMsgData;
+  }
+
+  /**
+   * Determines whether consuming segments should be included in reload based on table config.
+   * Returns false for REALTIME tables with partial upsert, true otherwise.
+   */
+  private boolean shouldIncludeConsumingSegment(String tableNameWithType) {
+    TableConfig tableConfig = _pinotHelixResourceManager.getTableConfig(tableNameWithType);
+    return ResourceUtils.shouldIncludeConsumingSegment(tableNameWithType, tableConfig, LOG);
   }
 }

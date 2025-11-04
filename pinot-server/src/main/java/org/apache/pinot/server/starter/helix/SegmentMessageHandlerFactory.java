@@ -125,6 +125,7 @@ public class SegmentMessageHandlerFactory implements MessageHandlerFactory {
 
   private class SegmentReloadMessageHandler extends DefaultMessageHandler {
     private final boolean _forceDownload;
+    private final boolean _includeConsumingSegment;
     private final List<String> _segmentList;
     private final String _reloadJobId;
 
@@ -132,6 +133,7 @@ public class SegmentMessageHandlerFactory implements MessageHandlerFactory {
         NotificationContext context) {
       super(segmentReloadMessage, metrics, context);
       _forceDownload = segmentReloadMessage.shouldForceDownload();
+      _includeConsumingSegment = segmentReloadMessage.shouldIncludeConsumingSegment();
       _segmentList = segmentReloadMessage.getSegmentList();
       _reloadJobId = segmentReloadMessage.getReloadJobId();
     }
@@ -139,19 +141,22 @@ public class SegmentMessageHandlerFactory implements MessageHandlerFactory {
     @Override
     public HelixTaskResult handleMessage() {
       HelixTaskResult helixTaskResult = new HelixTaskResult();
-      _logger.info("Handling message: {}", _message);
+      _logger.info("Handling message: {} with includeConsumingSegment: {}", _message, _includeConsumingSegment);
       try {
         if (CollectionUtils.isNotEmpty(_segmentList)) {
-          _instanceDataManager.reloadSegments(_tableNameWithType, _segmentList, _forceDownload, _reloadJobId);
+          _instanceDataManager.reloadSegments(_tableNameWithType, _segmentList, _forceDownload, _includeConsumingSegment,
+              _reloadJobId);
         } else if (StringUtils.isNotEmpty(_segmentName)) {
           // TODO: check _segmentName to be backward compatible. Moving forward, we just need to check the list to
           //       reload one or more segments. If the list or the segment name is empty, all segments are reloaded.
-          _instanceDataManager.reloadSegment(_tableNameWithType, _segmentName, _forceDownload, _reloadJobId);
+          _instanceDataManager.reloadSegment(_tableNameWithType, _segmentName, _forceDownload, _includeConsumingSegment,
+              _reloadJobId);
         } else {
           // NOTE: the method continues if any segment reload encounters an unhandled exception,
           // and failed segments are logged out in the end. We don't acquire any permit here as they'll be acquired
           // by worked threads later.
-          _instanceDataManager.reloadAllSegments(_tableNameWithType, _forceDownload, _reloadJobId);
+          _instanceDataManager.reloadAllSegments(_tableNameWithType, _forceDownload, _includeConsumingSegment,
+              _reloadJobId);
         }
         helixTaskResult.setSuccess(true);
       } catch (Throwable e) {
