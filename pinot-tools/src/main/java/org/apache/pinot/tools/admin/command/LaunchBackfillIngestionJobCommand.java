@@ -149,7 +149,7 @@ public class LaunchBackfillIngestionJobCommand extends LaunchDataIngestionJobCom
       nameGeneratorSpec.setConfigs(configs);
       spec.setSegmentNameGeneratorSpec(nameGeneratorSpec);
     } catch (Exception e) {
-      LOGGER.error("Got exception to generate IngestionJobSpec for backill ingestion job - ", e);
+      LOGGER.error("Got exception to generate IngestionJobSpec for backfill ingestion job - ", e);
       throw e;
     }
 
@@ -212,6 +212,8 @@ public class LaunchBackfillIngestionJobCommand extends LaunchDataIngestionJobCom
           SegmentPartitionMetadata.fromJsonString(segmentMetadata.get(CommonConstants.Segment.PARTITION_METADATA));
 
       ColumnPartitionMetadata columnMetadata = partitionMetadata.getColumnPartitionMap().get(_partitionColumn);
+      // NOTE: Currently Pinot only supports at most one partition per column;
+      // multi-partition columns are not yet supported.
       if (columnMetadata == null || columnMetadata.getPartitions().size() != 1) {
         return false;
       }
@@ -298,7 +300,7 @@ public class LaunchBackfillIngestionJobCommand extends LaunchDataIngestionJobCom
     } catch (Exception e) {
       LOGGER.error("Failed to upload segments, reverting lineage entry.", e);
       Map<URI, String> uriToLineageEntryIdMap = Collections.singletonMap(controllerURI, segmentLineageEntryId);
-      ConsistentDataPushUtils.handleUploadException(spec, uriToLineageEntryIdMap, null);
+      ConsistentDataPushUtils.handleUploadException(spec, uriToLineageEntryIdMap, e);
       LOGGER.info("Reverted lineage entry [{}]. Any newly uploaded segments should have been deleted.",
           segmentLineageEntryId);
       throw e;
