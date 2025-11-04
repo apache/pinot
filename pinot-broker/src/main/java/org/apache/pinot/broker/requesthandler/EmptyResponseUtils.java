@@ -61,10 +61,15 @@ public class EmptyResponseUtils {
 
   private static ResultTable buildEmptySelectionResultTable(QueryContext queryContext) {
     List<ExpressionContext> selectExpressions = queryContext.getSelectExpressions();
+    List<String> aliases = queryContext.getAliasList();
     int numSelectExpressions = selectExpressions.size();
     String[] columnNames = new String[numSelectExpressions];
     for (int i = 0; i < numSelectExpressions; i++) {
-      columnNames[i] = selectExpressions.get(i).toString();
+      if (selectExpressions.size() == aliases.size() && aliases.get(i) != null) {
+        columnNames[i] = aliases.get(i);
+      } else {
+        columnNames[i] = selectExpressions.get(i).toString();
+      }
     }
     ColumnDataType[] columnDataTypes = new ColumnDataType[numSelectExpressions];
     // NOTE: Use STRING column data type as default for selection query
@@ -75,6 +80,7 @@ public class EmptyResponseUtils {
   private static ResultTable buildEmptyAggregationResultTable(QueryContext queryContext) {
     List<Pair<AggregationFunction, FilterContext>> filteredAggregationFunctions =
         queryContext.getFilteredAggregationFunctions();
+    List<String> aliases = queryContext.getAliasList();
     assert filteredAggregationFunctions != null;
     int numAggregations = filteredAggregationFunctions.size();
     String[] columnNames = new String[numAggregations];
@@ -83,7 +89,11 @@ public class EmptyResponseUtils {
     for (int i = 0; i < numAggregations; i++) {
       Pair<AggregationFunction, FilterContext> pair = filteredAggregationFunctions.get(i);
       AggregationFunction aggregationFunction = pair.getLeft();
-      columnNames[i] = AggregationFunctionUtils.getResultColumnName(aggregationFunction, pair.getRight());
+      if (aliases.size() == numAggregations && aliases.get(i) != null) {
+        columnNames[i] = aliases.get(i);
+      } else {
+        columnNames[i] = AggregationFunctionUtils.getResultColumnName(aggregationFunction, pair.getRight());
+      }
       columnDataTypes[i] = aggregationFunction.getFinalResultColumnType();
       Object finalResult = aggregationFunction.extractFinalResult(
           aggregationFunction.extractAggregationResult(aggregationFunction.createAggregationResultHolder()));
@@ -95,6 +105,7 @@ public class EmptyResponseUtils {
   private static ResultTable buildEmptyGroupByResultTable(QueryContext queryContext) {
     List<Pair<AggregationFunction, FilterContext>> filteredAggregationFunctions =
         queryContext.getFilteredAggregationFunctions();
+    List<String> aliases = queryContext.getAliasList();
     List<ExpressionContext> groupByExpressions = queryContext.getGroupByExpressions();
     assert filteredAggregationFunctions != null && groupByExpressions != null;
     int numColumns = groupByExpressions.size() + filteredAggregationFunctions.size();
@@ -102,14 +113,22 @@ public class EmptyResponseUtils {
     ColumnDataType[] columnDataTypes = new ColumnDataType[numColumns];
     int index = 0;
     for (ExpressionContext groupByExpression : groupByExpressions) {
-      columnNames[index] = groupByExpression.toString();
+      if (aliases.size() == numColumns && aliases.get(index) != null) {
+        columnNames[index] = aliases.get(index);
+      } else {
+        columnNames[index] = groupByExpression.toString();
+      }
       // Use STRING column data type as default for group-by expressions
       columnDataTypes[index] = ColumnDataType.STRING;
       index++;
     }
     for (Pair<AggregationFunction, FilterContext> pair : filteredAggregationFunctions) {
       AggregationFunction aggregationFunction = pair.getLeft();
-      columnNames[index] = AggregationFunctionUtils.getResultColumnName(aggregationFunction, pair.getRight());
+      if (aliases.size() == numColumns && aliases.get(index) != null) {
+        columnNames[index] = aliases.get(index);
+      } else {
+        columnNames[index] = AggregationFunctionUtils.getResultColumnName(aggregationFunction, pair.getRight());
+      }
       columnDataTypes[index] = aggregationFunction.getFinalResultColumnType();
       index++;
     }
