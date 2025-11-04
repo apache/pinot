@@ -48,6 +48,8 @@ import org.slf4j.LoggerFactory;
 public class PinotAdminTransport implements AutoCloseable {
   private static final Logger LOGGER = LoggerFactory.getLogger(PinotAdminTransport.class);
   private static final ObjectMapper OBJECT_MAPPER = new ObjectMapper();
+  public static final String ADMIN_TRANSPORT_REQUEST_TIMEOUT_MS = "pinot.admin.request.timeout.ms";
+  public static final String ADMIN_TRANSPORT_SCHEME = "pinot.admin.scheme";
 
   /**
    * Gets the ObjectMapper instance for JSON serialization/deserialization.
@@ -67,10 +69,10 @@ public class PinotAdminTransport implements AutoCloseable {
     _defaultHeaders = authHeaders != null ? authHeaders : Map.of();
 
     // Extract timeout configuration
-    _requestTimeoutMs = Integer.parseInt(properties.getProperty("pinot.admin.request.timeout.ms", "60000"));
+    _requestTimeoutMs = Integer.parseInt(properties.getProperty(ADMIN_TRANSPORT_REQUEST_TIMEOUT_MS, "60000"));
 
     // Extract scheme (http/https)
-    String scheme = properties.getProperty("pinot.admin.scheme", CommonConstants.HTTP_PROTOCOL);
+    String scheme = properties.getProperty(ADMIN_TRANSPORT_SCHEME, CommonConstants.HTTP_PROTOCOL);
     _scheme = scheme;
 
     // Build HTTP client

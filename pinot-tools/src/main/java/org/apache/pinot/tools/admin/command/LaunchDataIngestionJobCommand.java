@@ -60,7 +60,7 @@ public class LaunchDataIngestionJobCommand extends AbstractBaseAdminCommand impl
   @CommandLine.Option(names = {"-authTokenUrl"}, required = false, description = "Http auth token url.")
   protected String _authTokenUrl;
 
-  private AuthProvider _authProvider;
+  protected AuthProvider _authProvider;
 
   public String getJobSpecFile() {
     return _jobSpecFile;

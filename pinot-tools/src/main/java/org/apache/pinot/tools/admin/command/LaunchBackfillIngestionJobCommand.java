@@ -18,9 +18,7 @@
  */
 package org.apache.pinot.tools.admin.command;
 
-import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.JsonNode;
-import com.fasterxml.jackson.databind.ObjectMapper;
 import java.io.File;
 import java.io.IOException;
 import java.net.URI;
@@ -32,12 +30,14 @@ import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Properties;
 import org.apache.commons.lang3.StringUtils;
+import org.apache.pinot.client.admin.PinotAdminClient;
+import org.apache.pinot.client.admin.PinotAdminTransport;
+import org.apache.pinot.client.admin.PinotSegmentApiClient;
 import org.apache.pinot.common.auth.AuthProviderUtils;
 import org.apache.pinot.common.metadata.segment.SegmentPartitionMetadata;
 import org.apache.pinot.common.restlet.resources.StartReplaceSegmentsRequest;
-import org.apache.pinot.common.utils.SegmentApiClient;
-import org.apache.pinot.common.utils.SimpleHttpResponse;
 import org.apache.pinot.common.utils.http.HttpClient;
 import org.apache.pinot.plugin.ingestion.batch.common.SegmentGenerationTaskRunner;
 import org.apache.pinot.plugin.minion.tasks.SegmentConversionUtils;
@@ -62,6 +62,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import picocli.CommandLine;
 
+
 @CommandLine.Command(name = "LaunchBackfillIngestionJob")
 public class LaunchBackfillIngestionJobCommand extends LaunchDataIngestionJobCommand {
 
@@ -81,18 +82,29 @@ public class LaunchBackfillIngestionJobCommand extends LaunchDataIngestionJobCom
   @CommandLine.Option(names = {"-partitionColumnValue"}, required = false, description =
       "Segments with this partition column value " + "will only be eligible for backfill.")
   private String _partitionColumnValue;
+  private PinotSegmentApiClient _pinotSegmentApiClient;
 
   @Override
-  public boolean execute() throws Exception {
+  public boolean execute()
+      throws Exception {
     SegmentGenerationJobSpec spec;
     try {
       // Prepare job spec and controller client
       spec = prepareSegmentGeneratorSpec();
       URI controllerURI = URI.create(spec.getPinotClusterSpecs()[0].getControllerURI());
-      SegmentApiClient segmentApiClient = new SegmentApiClient();
+      String controllerAddress = controllerURI.getHost() + ":" + controllerURI.getPort();
 
+      if (StringUtils.isBlank(spec.getAuthToken())) {
+        spec.setAuthToken(AuthProviderUtils.makeAuthProvider(_authProvider, _authTokenUrl, _authToken, _user, _password)
+            .getTaskToken());
+      }
+      Map<String, String> authHeader = getAuthHeaders(spec);
+      Properties transportProperties = getTransportProperties(spec);
+      PinotAdminClient adminClient = new PinotAdminClient(controllerAddress, transportProperties, authHeader);
+
+      _pinotSegmentApiClient = adminClient.getSegmentApiClient();
       // 1. Fetch existing segments that need to be backfilled (to be replaced)
-      List<String> segmentsToBackfill = fetchSegmentsToBackfill(spec, segmentApiClient, controllerURI);
+      List<String> segmentsToBackfill = fetchSegmentsToBackfill(spec);
 
       // 2. Generate new segments locally
       List<String> generatedSegments = generateSegments(spec);
@@ -116,10 +128,11 @@ public class LaunchBackfillIngestionJobCommand extends LaunchDataIngestionJobCom
     return true;
   }
 
-  private SegmentGenerationJobSpec prepareSegmentGeneratorSpec() throws Exception {
+  private SegmentGenerationJobSpec prepareSegmentGeneratorSpec()
+      throws Exception {
     SegmentGenerationJobSpec spec;
     try {
-       spec = IngestionJobLauncher.getSegmentGenerationJobSpec(
+      spec = IngestionJobLauncher.getSegmentGenerationJobSpec(
           _jobSpecFile, _propertyFile, GroovyTemplateUtils.getTemplateContext(_values), System.getenv());
 
       long currentTime = System.currentTimeMillis();
@@ -143,18 +156,28 @@ public class LaunchBackfillIngestionJobCommand extends LaunchDataIngestionJobCom
     return spec;
   }
 
-  private List<String> fetchSegmentsToBackfill(SegmentGenerationJobSpec spec, SegmentApiClient segmentApiClient,
-      URI controllerURI) throws Exception {
+  public Properties getTransportProperties(SegmentGenerationJobSpec spec) {
+    Properties transportProperties = new Properties();
+    URI controllerURI = URI.create(spec.getPinotClusterSpecs()[0].getControllerURI());
+    transportProperties.setProperty(PinotAdminTransport.ADMIN_TRANSPORT_SCHEME, controllerURI.getScheme());
+    return transportProperties;
+  }
+
+  public Map<String, String> getAuthHeaders(SegmentGenerationJobSpec spec) {
+    Map<String, String> authHeaders = new HashMap<>();
+    authHeaders.put("Authorization", spec.getAuthToken());
+    return authHeaders;
+  }
+
+  private List<String> fetchSegmentsToBackfill(SegmentGenerationJobSpec spec)
+      throws Exception {
     List<String> segmentsToBackfill = new ArrayList<>();
     long startMs = getMillis(_backfillStartDate);
     long endMs = getMillis(_backfillEndDate);
 
-    String segmentsJsonStr = segmentApiClient.selectSegments(
-        SegmentApiClient.getSelectSegmentURI(controllerURI, spec.getTableSpec().getTableName(), OFFLINE_TABLE_TYPE),
-        startMs, endMs, true, SegmentApiClient.makeAuthHeader(spec.getAuthToken())
-    ).getResponse();
-
-    JsonNode segmentsJson = new ObjectMapper().readTree(segmentsJsonStr);
+    JsonNode segmentsJson =
+        _pinotSegmentApiClient.selectSegments(spec.getTableSpec().getTableName(), OFFLINE_TABLE_TYPE,
+            startMs, endMs, true);
     segmentsJson.findPath(OFFLINE_TABLE_TYPE).forEach(seg -> segmentsToBackfill.add(seg.textValue()));
 
     // Partition filter
@@ -175,20 +198,10 @@ public class LaunchBackfillIngestionJobCommand extends LaunchDataIngestionJobCom
    */
   private boolean isSegmentMatchPartition(SegmentGenerationJobSpec spec, String segmentName) {
     try {
-      URI controllerURI = URI.create(spec.getPinotClusterSpecs()[0].getControllerURI());
-
-      // Fetch segment metadata from the controller
-      SimpleHttpResponse response = new SegmentApiClient().getSegmentMetadata(
-          SegmentApiClient.getSegmentMetadataURI(controllerURI,
-              TableNameBuilder.OFFLINE.tableNameWithType(spec.getTableSpec().getTableName()),
-              segmentName),
-          SegmentApiClient.makeAuthHeader(spec.getAuthToken())
-      );
-
-      Map<String, String> segmentMetadata = JsonUtils.stringToObject(
-          response.getResponse(), new TypeReference<Map<String, String>>() {
-          }
-      );
+      JsonNode response = _pinotSegmentApiClient.getSegmentMetadata(
+          TableNameBuilder.OFFLINE.tableNameWithType(spec.getTableSpec().getTableName()),
+          segmentName);
+      Map<String, String> segmentMetadata = JsonUtils.jsonNodeToStringMap(response);
 
       // Skip segments without partition metadata
       if (!segmentMetadata.containsKey(CommonConstants.Segment.PARTITION_METADATA)) {
@@ -218,7 +231,8 @@ public class LaunchBackfillIngestionJobCommand extends LaunchDataIngestionJobCom
     }
   }
 
-  private List<String> generateSegments(SegmentGenerationJobSpec spec) throws Exception {
+  private List<String> generateSegments(SegmentGenerationJobSpec spec)
+      throws Exception {
     spec.setJobType(String.valueOf(PinotIngestionJobType.SegmentCreation));
     IngestionJobLauncher.runIngestionJob(spec);
 
@@ -259,7 +273,8 @@ public class LaunchBackfillIngestionJobCommand extends LaunchDataIngestionJobCom
 
   private String createSegmentLineageEntry(String tableNameWithType, String uploadURL,
       List<String> segmentsToBackfill, List<String> generatedSegments,
-      AuthProvider authProvider) throws Exception {
+      AuthProvider authProvider)
+      throws Exception {
     LOGGER.info("Start replacing segments by creating a lineage entry.");
     String segmentLineageEntryId = SegmentConversionUtils.startSegmentReplace(
         tableNameWithType, uploadURL, new StartReplaceSegmentsRequest(segmentsToBackfill, generatedSegments),
@@ -270,7 +285,8 @@ public class LaunchBackfillIngestionJobCommand extends LaunchDataIngestionJobCom
 
   private void pushSegmentsAndEndReplace(SegmentGenerationJobSpec spec, String tableNameWithType,
       String uploadURL, String segmentLineageEntryId,
-      AuthProvider authProvider, URI controllerURI) throws Exception {
+      AuthProvider authProvider, URI controllerURI)
+      throws Exception {
     try {
       spec.setJobType(String.valueOf(PinotIngestionJobType.SegmentTarPush));
       IngestionJobLauncher.runIngestionJob(spec);
