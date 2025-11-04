@@ -280,13 +280,13 @@ public class PinotAdminTransport implements AutoCloseable {
 
     // Add default headers
     for (Map.Entry<String, String> header : _defaultHeaders.entrySet()) {
-      requestBuilder.addHeader(header.getKey(), header.getValue());
+      requestBuilder.setHeader(header.getKey(), header.getValue());
     }
 
     // Add request-specific headers
     if (headers != null) {
       for (Map.Entry<String, String> header : headers.entrySet()) {
-        requestBuilder.addHeader(header.getKey(), header.getValue());
+        requestBuilder.setHeader(header.getKey(), header.getValue());
       }
     }
 
