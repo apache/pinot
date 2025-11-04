@@ -18,7 +18,6 @@
  */
 package org.apache.pinot.queries;
 
-import com.google.common.collect.ImmutableList;
 import java.io.File;
 import java.io.IOException;
 import java.util.ArrayList;
@@ -73,11 +72,11 @@ public class H3IndexQueriesTest extends BaseQueriesTest {
           .addSingleValueDimension(NON_H3_INDEX_GEOMETRY_COLUMN, DataType.BYTES).build();
   private static final Map<String, String> H3_INDEX_PROPERTIES = Collections.singletonMap("resolutions", "5");
   private static final TableConfig TABLE_CONFIG = new TableConfigBuilder(TableType.OFFLINE).setTableName(RAW_TABLE_NAME)
-      .setFieldConfigList(ImmutableList
-          .of(new FieldConfig(H3_INDEX_COLUMN, FieldConfig.EncodingType.DICTIONARY, FieldConfig.IndexType.H3, null,
-                  H3_INDEX_PROPERTIES),
-              new FieldConfig(H3_INDEX_GEOMETRY_COLUMN, FieldConfig.EncodingType.DICTIONARY, FieldConfig.IndexType.H3,
-                  null, H3_INDEX_PROPERTIES))).build();
+      .setFieldConfigList(List.of(
+          new FieldConfig(H3_INDEX_COLUMN, FieldConfig.EncodingType.DICTIONARY, FieldConfig.IndexType.H3, null,
+              H3_INDEX_PROPERTIES),
+          new FieldConfig(H3_INDEX_GEOMETRY_COLUMN, FieldConfig.EncodingType.DICTIONARY, FieldConfig.IndexType.H3, null,
+              H3_INDEX_PROPERTIES))).build();
 
   private IndexSegment _indexSegment;
 

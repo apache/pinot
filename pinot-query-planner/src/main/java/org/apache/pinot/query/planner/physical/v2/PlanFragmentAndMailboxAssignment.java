@@ -19,7 +19,6 @@
 package org.apache.pinot.query.planner.physical.v2;
 
 import com.google.common.base.Preconditions;
-import com.google.common.collect.ImmutableList;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.HashMap;
@@ -202,9 +201,9 @@ public class PlanFragmentAndMailboxAssignment {
           QueryServerInstance senderWorker = senderWorkers.get(workerId);
           QueryServerInstance receiverWorker = receiverWorkers.get(workerId);
           MailboxInfos mailboxInfosForSender = new SharedMailboxInfos(new MailboxInfo(receiverWorker.getHostname(),
-              receiverWorker.getQueryMailboxPort(), ImmutableList.of(workerId)));
+              receiverWorker.getQueryMailboxPort(), List.of(workerId)));
           MailboxInfos mailboxInfosForReceiver = new SharedMailboxInfos(new MailboxInfo(senderWorker.getHostname(),
-              senderWorker.getQueryMailboxPort(), ImmutableList.of(workerId)));
+              senderWorker.getQueryMailboxPort(), List.of(workerId)));
           senderMailboxMap.computeIfAbsent(workerId, (x) -> new HashMap<>()).put(receiverStageId,
               mailboxInfosForSender);
           receiverMailboxMap.computeIfAbsent(workerId, (x) -> new HashMap<>()).put(
@@ -215,7 +214,7 @@ public class PlanFragmentAndMailboxAssignment {
         Preconditions.checkState(receiverWorkers.size() == 1, "Singleton expects single instance in receiver");
         QueryServerInstance receiverWorker = receiverWorkers.get(0);
         MailboxInfos mailboxInfosForSender = new SharedMailboxInfos(
-            new MailboxInfo(receiverWorker.getHostname(), receiverWorker.getQueryMailboxPort(), ImmutableList.of(0)));
+            new MailboxInfo(receiverWorker.getHostname(), receiverWorker.getQueryMailboxPort(), List.of(0)));
         for (int workerId = 0; workerId < senderWorkers.size(); workerId++) {
           senderMailboxMap.computeIfAbsent(workerId, (x) -> new HashMap<>())
               .put(receiverStageId, mailboxInfosForSender);

@@ -21,6 +21,7 @@ package org.apache.pinot.segment.local.segment.creator.impl.stats;
 import java.math.BigDecimal;
 import java.util.Collections;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import org.apache.pinot.segment.spi.creator.StatsCollectorConfig;
@@ -46,7 +47,7 @@ public class MapColumnPreIndexStatsCollectorTest {
         .setOptimizeNoDictStatsCollection(optimiseNoDictStatsCollection)
         .setSegmentPartitionConfig(new SegmentPartitionConfig(
             Collections.singletonMap("col", new ColumnPartitionConfig("murmur", 4))))
-        .setNoDictionaryColumns(java.util.List.of("col"))
+        .setNoDictionaryColumns(List.of("col"))
         .build();
 
     Map<String, FieldSpec> children = new HashMap<>();

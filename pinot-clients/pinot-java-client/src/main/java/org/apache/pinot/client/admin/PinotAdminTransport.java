@@ -24,6 +24,7 @@ import java.io.IOException;
 import java.net.URLEncoder;
 import java.nio.charset.StandardCharsets;
 import java.time.Duration;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.Properties;
@@ -48,6 +49,8 @@ import org.slf4j.LoggerFactory;
 public class PinotAdminTransport implements AutoCloseable {
   private static final Logger LOGGER = LoggerFactory.getLogger(PinotAdminTransport.class);
   private static final ObjectMapper OBJECT_MAPPER = new ObjectMapper();
+  public static final String ADMIN_TRANSPORT_REQUEST_TIMEOUT_MS = "pinot.admin.request.timeout.ms";
+  public static final String ADMIN_TRANSPORT_SCHEME = "pinot.admin.scheme";
 
   /**
    * Gets the ObjectMapper instance for JSON serialization/deserialization.
@@ -67,10 +70,10 @@ public class PinotAdminTransport implements AutoCloseable {
     _defaultHeaders = authHeaders != null ? authHeaders : Map.of();
 
     // Extract timeout configuration
-    _requestTimeoutMs = Integer.parseInt(properties.getProperty("pinot.admin.request.timeout.ms", "60000"));
+    _requestTimeoutMs = Integer.parseInt(properties.getProperty(ADMIN_TRANSPORT_REQUEST_TIMEOUT_MS, "60000"));
 
     // Extract scheme (http/https)
-    String scheme = properties.getProperty("pinot.admin.scheme", CommonConstants.HTTP_PROTOCOL);
+    String scheme = properties.getProperty(ADMIN_TRANSPORT_SCHEME, CommonConstants.HTTP_PROTOCOL);
     _scheme = scheme;
 
     // Build HTTP client
@@ -279,13 +282,13 @@ public class PinotAdminTransport implements AutoCloseable {
 
     // Add default headers
     for (Map.Entry<String, String> header : _defaultHeaders.entrySet()) {
-      requestBuilder.addHeader(header.getKey(), header.getValue());
+      requestBuilder.setHeader(header.getKey(), header.getValue());
     }
 
     // Add request-specific headers
     if (headers != null) {
       for (Map.Entry<String, String> header : headers.entrySet()) {
-        requestBuilder.addHeader(header.getKey(), header.getValue());
+        requestBuilder.setHeader(header.getKey(), header.getValue());
       }
     }
 
@@ -345,7 +348,7 @@ public class PinotAdminTransport implements AutoCloseable {
 
     if (arrayNode.isArray()) {
       // Handle JSON array format
-      java.util.List<String> result = new java.util.ArrayList<>();
+      List<String> result = new ArrayList<>();
       for (JsonNode element : arrayNode) {
         result.add(element.asText());
       }

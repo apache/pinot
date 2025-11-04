@@ -18,8 +18,8 @@
  */
 package org.apache.pinot.controller.helix.core.minion;
 
-import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableSet;
+import java.util.List;
 import java.util.Map;
 import org.apache.helix.task.TaskPartitionState;
 import org.apache.pinot.common.metrics.ControllerMetrics;
@@ -60,7 +60,7 @@ public class TaskMetricsEmitterTest {
 
     Mockito.when(_pinotHelixTaskResourceManager.getTaskMetadataLastUpdateTimeMs()).thenReturn(Map.of());
     Mockito.when(leadControllerManager.isLeaderForTable("TaskMetricsEmitter")).thenReturn(true);
-    Mockito.when(pinotHelixResourceManager.getOnlineInstanceList()).thenReturn(ImmutableList.of());
+    Mockito.when(pinotHelixResourceManager.getOnlineInstanceList()).thenReturn(List.of());
 
     _taskMetricsEmitter = new TaskMetricsEmitter(pinotHelixResourceManager,
         _pinotHelixTaskResourceManager, leadControllerManager, new ControllerConf(), _controllerMetrics);

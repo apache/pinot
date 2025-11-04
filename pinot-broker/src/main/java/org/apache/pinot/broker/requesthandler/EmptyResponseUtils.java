@@ -85,8 +85,9 @@ public class EmptyResponseUtils {
       AggregationFunction aggregationFunction = pair.getLeft();
       columnNames[i] = AggregationFunctionUtils.getResultColumnName(aggregationFunction, pair.getRight());
       columnDataTypes[i] = aggregationFunction.getFinalResultColumnType();
-      row[i] = aggregationFunction.extractFinalResult(
+      Object finalResult = aggregationFunction.extractFinalResult(
           aggregationFunction.extractAggregationResult(aggregationFunction.createAggregationResultHolder()));
+      row[i] = finalResult != null ? columnDataTypes[i].convert(finalResult) : null;
     }
     return new ResultTable(new DataSchema(columnNames, columnDataTypes), List.<Object[]>of(row));
   }

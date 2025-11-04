@@ -19,7 +19,6 @@
 package org.apache.pinot.tsdb.planner;
 
 import com.google.common.base.Preconditions;
-import com.google.common.collect.ImmutableList;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
@@ -94,7 +93,7 @@ public class TimeSeriesPlanFragmenter {
     Context context = new Context();
     if (isSingleServerQuery) {
       final String id = rootNode.getId();
-      return ImmutableList.of(new TimeSeriesExchangeNode(id, Collections.emptyList(), null), rootNode);
+      return List.of(new TimeSeriesExchangeNode(id, Collections.emptyList(), null), rootNode);
     }
     result.add(fragmentRecursively(rootNode, context));
     result.addAll(context._fragments);

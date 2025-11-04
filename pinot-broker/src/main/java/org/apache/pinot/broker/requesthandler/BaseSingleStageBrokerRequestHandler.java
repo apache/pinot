@@ -1096,6 +1096,7 @@ public abstract class BaseSingleStageBrokerRequestHandler extends BaseBrokerRequ
       LOGGER.warn("Caught exception while building empty response for request {}: {}, {}",
           requestContext.getRequestId(), query, e.getMessage());
     }
+    brokerResponse.setTablesQueried(Set.of(TableNameBuilder.extractRawTableName(tableName)));
     brokerResponse.setTimeUsedMs(System.currentTimeMillis() - requestContext.getRequestArrivalTimeMillis());
     _queryLogger.log(new QueryLogger.QueryLogParams(requestContext, tableName, brokerResponse,
         QueryLogger.QueryLogParams.QueryEngine.SINGLE_STAGE, requesterIdentity, null));
@@ -1215,6 +1216,12 @@ public abstract class BaseSingleStageBrokerRequestHandler extends BaseBrokerRequ
       if (_enableNullHandling != null) {
         sqlNodeAndOptions.getOptions()
             .putIfAbsent(Broker.Request.QueryOptionKey.ENABLE_NULL_HANDLING, _enableNullHandling);
+      }
+
+      // Add auto rewrite aggregation type option from broker config only if there is no override in the query
+      if (_enableAutoRewriteAggregationType != null) {
+        sqlNodeAndOptions.getOptions()
+            .putIfAbsent(QueryOptionKey.AUTO_REWRITE_AGGREGATION_TYPE, _enableAutoRewriteAggregationType);
       }
 
       if (_regexDictSizeThreshold != null) {

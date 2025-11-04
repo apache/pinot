@@ -20,7 +20,6 @@ package org.apache.pinot.plugin.filesystem;
 
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
-import com.google.common.collect.ImmutableList;
 import java.io.File;
 import java.io.FileInputStream;
 import java.io.IOException;
@@ -684,7 +683,7 @@ public class S3PinotFS extends BasePinotFS {
   @Override
   public String[] listFiles(URI fileUri, boolean recursive)
       throws IOException {
-    ImmutableList.Builder<String> builder = ImmutableList.builder();
+    ArrayList<String> builder = new ArrayList<>();
     String scheme = fileUri.getScheme();
     Preconditions.checkArgument(scheme.equals(S3_SCHEME) || scheme.equals(S3A_SCHEME));
     visitFiles(fileUri, recursive, s3Object -> {
@@ -694,7 +693,7 @@ public class S3PinotFS extends BasePinotFS {
     }, commonPrefix -> {
       builder.add(scheme + SCHEME_SEPARATOR + fileUri.getHost() + DELIMITER + getNormalizedFileKey(commonPrefix));
     });
-    String[] listedFiles = builder.build().toArray(new String[0]);
+    String[] listedFiles = builder.toArray(new String[0]);
     LOGGER.info("Listed {} files from URI: {}, is recursive: {}", listedFiles.length, fileUri, recursive);
     return listedFiles;
   }
@@ -702,7 +701,7 @@ public class S3PinotFS extends BasePinotFS {
   @Override
   public List<FileMetadata> listFilesWithMetadata(URI fileUri, boolean recursive)
       throws IOException {
-    ImmutableList.Builder<FileMetadata> listBuilder = ImmutableList.builder();
+    ArrayList<FileMetadata> listBuilder = new ArrayList<>();
     String scheme = fileUri.getScheme();
     Preconditions.checkArgument(scheme.equals(S3_SCHEME) || scheme.equals(S3A_SCHEME));
     visitFiles(fileUri, recursive, s3Object -> {
@@ -719,7 +718,7 @@ public class S3PinotFS extends BasePinotFS {
           .setIsDirectory(true);
       listBuilder.add(fileBuilder.build());
     });
-    ImmutableList<FileMetadata> listedFiles = listBuilder.build();
+    List<FileMetadata> listedFiles = List.copyOf(listBuilder);
     LOGGER.info("Listed {} files from URI: {}, is recursive: {}", listedFiles.size(), fileUri, recursive);
     return listedFiles;
   }
