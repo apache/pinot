@@ -56,6 +56,7 @@ import org.apache.pinot.query.runtime.operator.NonEquiJoinOperator;
 import org.apache.pinot.query.runtime.operator.OpChain;
 import org.apache.pinot.query.runtime.operator.SortOperator;
 import org.apache.pinot.query.runtime.operator.SortedMailboxReceiveOperator;
+import org.apache.pinot.query.runtime.operator.SortedMergeJoinOperator;
 import org.apache.pinot.query.runtime.operator.TransformOperator;
 import org.apache.pinot.query.runtime.operator.WindowAggregateOperator;
 import org.apache.pinot.query.runtime.operator.set.IntersectAllOperator;
@@ -234,6 +235,8 @@ public class PlanNodeToOpChain {
             return new LookupJoinOperator(context, leftOperator, rightOperator, node);
           case ASOF:
             return new AsofJoinOperator(context, leftOperator, left.getDataSchema(), rightOperator, node);
+          case SORTED:
+            return new SortedMergeJoinOperator(context, leftOperator, rightOperator, node);
           default:
             throw new IllegalStateException("Unsupported JoinStrategy: " + joinStrategy);
         }
