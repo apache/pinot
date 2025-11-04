@@ -1509,7 +1509,7 @@ public class RealtimeSegmentDataManager extends SegmentDataManager {
             // the record location in the metadata would be left dangling considering those primary keys as first
             // rather than merging it with previous entry
             if (_realtimeTableDataManager.isPartialUpsertEnabled()) {
-              _serverMetrics.addMeteredTableValue(_clientId, ServerMeter.REALTIME_OFFSET_AHEAD_OF_ZK, 1L);
+              _serverMetrics.addMeteredTableValue(_clientId, ServerMeter.REALTIME_ROWS_AHEAD_OF_ZK, 1L);
             }
             // We moved ahead of the offset that is committed in ZK.
             _segmentLogger.warn("Current offset {} ahead of the offset in zk {}. Downloading to replace",
