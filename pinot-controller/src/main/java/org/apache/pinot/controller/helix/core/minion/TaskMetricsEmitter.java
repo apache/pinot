@@ -113,42 +113,30 @@ public class TaskMetricsEmitter extends BasePeriodicTask {
         long previousExecutionTimestamp = _previousExecutionTimestamps.computeIfAbsent(taskType,
             k -> currentExecutionTimestamp - _taskMetricsEmitterFrequencyMs);
 
-        // Get currently in-progress tasks
+        // Get currently in-progress tasks (for metrics)
         Set<String> currentInProgressTasks = _helixTaskResourceManager.getTasksInProgress(taskType);
 
         // Get tasks that were in-progress during the previous collection cycle
         Set<String> previouslyInProgressTasks =
             _previousInProgressTasks.getOrDefault(taskType, Collections.emptySet());
 
-        // Start with currently in-progress tasks
-        Set<String> tasksToReport = new HashSet<>(currentInProgressTasks);
+        // Get all tasks including those that started after the previous execution timestamp
+        // This combines in-progress tasks and short-lived tasks that started and completed between cycles
+        // in a single Helix call, avoiding duplicate getWorkflowConfig/getWorkflowContext calls
+        Set<String> tasksIncludingShortLived = _helixTaskResourceManager.getTasksInProgressAndRecent(
+            taskType, previousExecutionTimestamp);
+
+        // Start with all tasks that need reporting (in-progress + short-lived)
+        Set<String> tasksToReport = new HashSet<>(tasksIncludingShortLived);
 
         // Include tasks that were in-progress previously but are no longer in-progress
         // These tasks completed between collection cycles and need their final metrics reported
         for (String taskName : previouslyInProgressTasks) {
-          if (!currentInProgressTasks.contains(taskName)) {
+          if (!tasksIncludingShortLived.contains(taskName)) {
             LOGGER.debug("Including task {} that completed between collection cycles for taskType: {}",
                 taskName, taskType);
             tasksToReport.add(taskName);
           }
-        }
-
-        // Include tasks that started and completed between collection cycles
-        Set<String> tasksStartedAfter = _helixTaskResourceManager.getTasksStartedAfter(
-            taskType, previousExecutionTimestamp);
-
-        // Filter out tasks we already know about to avoid duplicates
-        Set<String> shortLivedTasks = new HashSet<>();
-        for (String taskName : tasksStartedAfter) {
-          if (!currentInProgressTasks.contains(taskName) && !previouslyInProgressTasks.contains(taskName)) {
-            shortLivedTasks.add(taskName);
-          }
-        }
-
-        if (!shortLivedTasks.isEmpty()) {
-          LOGGER.debug("Including {} short-lived tasks that started and completed between cycles for taskType: {}",
-              shortLivedTasks.size(), taskType);
-          tasksToReport.addAll(shortLivedTasks);
         }
 
         final int numRunningTasks = currentInProgressTasks.size();

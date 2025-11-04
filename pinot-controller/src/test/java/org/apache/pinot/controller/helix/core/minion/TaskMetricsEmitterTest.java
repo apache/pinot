@@ -82,6 +82,8 @@ public class TaskMetricsEmitterTest {
     String taskType = "taskType1";
     Mockito.when(_pinotHelixTaskResourceManager.getTaskTypes()).thenReturn(ImmutableSet.of(taskType));
     Mockito.when(_pinotHelixTaskResourceManager.getTasksInProgress(taskType)).thenReturn(ImmutableSet.of());
+    Mockito.when(_pinotHelixTaskResourceManager.getTasksInProgressAndRecent(Mockito.eq(taskType), Mockito.anyLong()))
+        .thenReturn(ImmutableSet.of());
     _taskMetricsEmitter.runTask(null);
 
     Assert.assertEquals(metricsRegistry.allMetrics().size(), 11);
@@ -126,6 +128,8 @@ public class TaskMetricsEmitterTest {
     String task11 = "task11";
     String task12 = "task12";
     Mockito.when(_pinotHelixTaskResourceManager.getTasksInProgress(taskType))
+        .thenReturn(ImmutableSet.of(task11, task12));
+    Mockito.when(_pinotHelixTaskResourceManager.getTasksInProgressAndRecent(Mockito.eq(taskType), Mockito.anyLong()))
         .thenReturn(ImmutableSet.of(task11, task12));
 
     String table1 = "table1_OFFLINE";
@@ -241,6 +245,8 @@ public class TaskMetricsEmitterTest {
   private void oneTaskTypeWithOneTable(String taskType, String taskName1, String taskName2, String tableName) {
     Mockito.when(_pinotHelixTaskResourceManager.getTaskTypes()).thenReturn(ImmutableSet.of(taskType));
     Mockito.when(_pinotHelixTaskResourceManager.getTasksInProgress(taskType))
+        .thenReturn(ImmutableSet.of(taskName1, taskName2));
+    Mockito.when(_pinotHelixTaskResourceManager.getTasksInProgressAndRecent(Mockito.eq(taskType), Mockito.anyLong()))
         .thenReturn(ImmutableSet.of(taskName1, taskName2));
 
     PinotHelixTaskResourceManager.TaskCount taskCount = new PinotHelixTaskResourceManager.TaskCount();
@@ -362,10 +368,11 @@ public class TaskMetricsEmitterTest {
     Mockito.when(_pinotHelixTaskResourceManager.getTasksInProgress(taskType))
         .thenReturn(ImmutableSet.of(taskName));
 
-    // Ensure getTasksStartedAfter returns empty for this test (not relevant for this scenario)
-    Mockito.when(_pinotHelixTaskResourceManager.getTasksStartedAfter(
+    // Ensure getTasksInProgressAndRecent returns only in-progress tasks for this test
+    // (not relevant for detecting short-lived tasks in this scenario)
+    Mockito.when(_pinotHelixTaskResourceManager.getTasksInProgressAndRecent(
         Mockito.eq(taskType), Mockito.anyLong()))
-        .thenReturn(ImmutableSet.of());
+        .thenReturn(ImmutableSet.of(taskName));
 
     PinotHelixTaskResourceManager.TaskCount taskCount = new PinotHelixTaskResourceManager.TaskCount();
     taskCount.addTaskState(TaskPartitionState.TASK_ERROR);
@@ -384,6 +391,11 @@ public class TaskMetricsEmitterTest {
     // Run 2: Task has completed and is no longer in-progress
     Mockito.when(_pinotHelixTaskResourceManager.getTasksInProgress(taskType))
         .thenReturn(ImmutableSet.of());  // Empty - task completed
+
+    // getTasksInProgressAndRecent should also return empty (task completed)
+    Mockito.when(_pinotHelixTaskResourceManager.getTasksInProgressAndRecent(
+        Mockito.eq(taskType), Mockito.anyLong()))
+        .thenReturn(ImmutableSet.of());
 
     // The emitter should detect that taskCompletedBetweenRuns was in-progress before and include it in metrics
     // This is achieved by comparing _previousInProgressTasks with currentInProgressTasks
@@ -410,9 +422,9 @@ public class TaskMetricsEmitterTest {
    * - Run 2: No tasks in-progress (taskShortLived already completed)
    *
    * Expected: Metrics for "taskShortLived" should be emitted in Run 2 by detecting it via
-   * getTasksStartedAfter() which uses WorkflowContext.getJobStartTimes() to find tasks that
-   * started after the previous execution timestamp. The emitter filters out tasks that are
-   * currently in-progress or were tracked in the previous cycle to avoid duplicates.
+   * getTasksInProgressAndRecent(taskType, timestamp) which uses WorkflowContext.getJobStartTimes() to find tasks that
+   * started after the previous execution timestamp. The emitter combines in-progress tasks and
+   * short-lived tasks in a single Helix call to avoid duplicate getWorkflowConfig/getWorkflowContext calls.
    */
   @Test
   public void testReportsTasksThatStartAndCompleteBetweenRuns() {
@@ -427,7 +439,7 @@ public class TaskMetricsEmitterTest {
         .thenReturn(ImmutableSet.of());
 
     // Run 1: No tasks started after initial timestamp (empty on first run)
-    Mockito.when(_pinotHelixTaskResourceManager.getTasksStartedAfter(
+    Mockito.when(_pinotHelixTaskResourceManager.getTasksInProgressAndRecent(
         Mockito.eq(taskType), Mockito.anyLong()))
         .thenReturn(ImmutableSet.of());
 
@@ -442,8 +454,8 @@ public class TaskMetricsEmitterTest {
 
     // Between Run 1 and Run 2: taskShortLived starts and completes with 1 error
     // This task has a job start time after Run 1's execution timestamp
-    // The implementation uses getTasksStartedAfter() which internally calls
-    // WorkflowContext.getJobStartTimes() to detect such tasks
+    // The implementation uses getTasksInProgressAndRecent(taskType, timestamp) which internally calls
+    // WorkflowContext.getJobStartTimes() to detect such tasks while avoiding duplicate Helix calls
     PinotHelixTaskResourceManager.TaskCount taskCount = new PinotHelixTaskResourceManager.TaskCount();
     taskCount.addTaskState(TaskPartitionState.TASK_ERROR);
     Mockito.when(_pinotHelixTaskResourceManager.getTableTaskCount(taskName))
@@ -453,21 +465,21 @@ public class TaskMetricsEmitterTest {
     Mockito.when(_pinotHelixTaskResourceManager.getTasksInProgress(taskType))
         .thenReturn(ImmutableSet.of());
 
-    // Mock getTasksStartedAfter to return taskShortLived (simulating it started after Run 1's timestamp)
-    // The implementation filters this to ensure it's not currently in-progress and wasn't
-    // in the previous cycle, then includes it in metrics collection
-    Mockito.when(_pinotHelixTaskResourceManager.getTasksStartedAfter(
+    // Mock getTasksInProgressAndRecent to return taskShortLived (simulating it started after Run 1's timestamp)
+    // The implementation combines in-progress tasks and tasks started after timestamp in a single call
+    // This avoids duplicate Helix calls while still capturing short-lived tasks
+    Mockito.when(_pinotHelixTaskResourceManager.getTasksInProgressAndRecent(
         Mockito.eq(taskType), Mockito.anyLong()))
         .thenReturn(ImmutableSet.of(taskName));
 
     _taskMetricsEmitter.runTask(null);
 
-    // Expected: Metrics for taskShortLived should be reported by detecting it via getTasksStartedAfter()
+    // Expected: Metrics for taskShortLived should be reported by detecting it via getTasksInProgressAndRecent()
     // The emitter:
-    // 1. Calls getTasksStartedAfter(taskType, previousExecutionTimestamp) which uses
-    //    WorkflowContext.getJobStartTimes() internally
-    // 2. Filters out tasks that are currently in-progress or were in the previous cycle
-    // 3. Includes remaining tasks (short-lived tasks) in metrics collection
+    // 1. Calls getTasksInProgressAndRecent(taskType, previousExecutionTimestamp) which combines
+    //    in-progress tasks and tasks started after timestamp in a single Helix call
+    // 2. Uses WorkflowContext.getJobStartTimes() internally to detect short-lived tasks
+    // 3. Includes tasks that were in-progress previously but completed between cycles
     Assert.assertEquals(((YammerSettableGauge<?>) metricsRegistry.allMetrics().get(
             new YammerMetricName(ControllerMetrics.class,
                 "pinot.controller.numMinionSubtasksError." + taskType))

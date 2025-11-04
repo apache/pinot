@@ -441,7 +441,23 @@ public class PinotHelixTaskResourceManager {
    * @return Set of task names
    */
   public synchronized Set<String> getTasksInProgress(String taskType) {
-    WorkflowConfig workflowConfig = _taskDriver.getWorkflowConfig(getHelixJobQueueName(taskType));
+    return getTasksInProgressAndRecent(taskType, 0);
+  }
+
+  /**
+   * Returns a set of Task names (in the form "Task_<taskType>_<uuid>_<timestamp>") that are in progress or not started
+   * yet, and optionally includes recent tasks that started after a given timestamp.
+   * NOTE: For tasks just submitted without the context created, count them as NOT_STARTED.
+   * This method combines the logic of getTasksInProgress and getTasksStartedAfter to avoid duplicate Helix calls.
+   *
+   * @param taskType Task type
+   * @param afterTimestampMs If > 0, also include tasks that started after this timestamp (in milliseconds).
+   *                         This is used to detect short-lived tasks that started and completed between cycles.
+   * @return Set of task names that are in-progress, and optionally recent tasks that started after the timestamp
+   */
+  public synchronized Set<String> getTasksInProgressAndRecent(String taskType, long afterTimestampMs) {
+    String helixJobQueueName = getHelixJobQueueName(taskType);
+    WorkflowConfig workflowConfig = _taskDriver.getWorkflowConfig(helixJobQueueName);
     if (workflowConfig == null) {
       return Collections.emptySet();
     }
@@ -449,16 +465,39 @@ public class PinotHelixTaskResourceManager {
     if (helixJobs.isEmpty()) {
       return Collections.emptySet();
     }
-    WorkflowContext workflowContext = _taskDriver.getWorkflowContext(getHelixJobQueueName(taskType));
+    WorkflowContext workflowContext = _taskDriver.getWorkflowContext(helixJobQueueName);
     if (workflowContext == null) {
-      return helixJobs.stream().map(PinotHelixTaskResourceManager::getPinotTaskName).collect(Collectors.toSet());
-    } else {
-      Map<String, TaskState> helixJobStates = workflowContext.getJobStates();
-      return helixJobs.stream().filter(helixJobName -> {
-        TaskState taskState = helixJobStates.get(helixJobName);
-        return taskState == null || taskState == TaskState.NOT_STARTED || taskState == TaskState.IN_PROGRESS;
-      }).map(PinotHelixTaskResourceManager::getPinotTaskName).collect(Collectors.toSet());
+      // If no context, return all jobs as in-progress (backward compatible behavior)
+      Set<String> result = helixJobs.stream()
+          .map(PinotHelixTaskResourceManager::getPinotTaskName)
+          .collect(Collectors.toSet());
+      // If timestamp is specified, we can't filter by start time without context, so return all
+      return result;
     }
+
+    Set<String> result = new HashSet<>();
+    Map<String, TaskState> helixJobStates = workflowContext.getJobStates();
+    Map<String, Long> jobStartTimes = afterTimestampMs > 0 ? workflowContext.getJobStartTimes() : null;
+
+    for (String helixJobName : helixJobs) {
+      String pinotTaskName = getPinotTaskName(helixJobName);
+      TaskState taskState = helixJobStates.get(helixJobName);
+
+      // Include if in-progress
+      if (taskState == null || taskState == TaskState.NOT_STARTED || taskState == TaskState.IN_PROGRESS) {
+        result.add(pinotTaskName);
+        continue;
+      }
+
+      if (afterTimestampMs > 0) {
+        // If not in-progress but timestamp is specified, check if task started after timestamp
+        Long jobStartTime = jobStartTimes.get(helixJobName);
+        if (jobStartTime != null && jobStartTime > afterTimestampMs) {
+          result.add(pinotTaskName);
+        }
+      }
+    }
+    return result;
   }
 
   /**
