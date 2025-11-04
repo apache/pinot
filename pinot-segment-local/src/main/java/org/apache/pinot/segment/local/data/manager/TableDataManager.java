@@ -35,6 +35,7 @@ import org.apache.pinot.segment.local.segment.index.loader.IndexLoadingConfig;
 import org.apache.pinot.segment.local.utils.SegmentLocks;
 import org.apache.pinot.segment.local.utils.SegmentOperationsThrottler;
 import org.apache.pinot.segment.local.utils.SegmentReloadSemaphore;
+import org.apache.pinot.segment.local.utils.ServerReloadJobStatusCache;
 import org.apache.pinot.segment.spi.ImmutableSegment;
 import org.apache.pinot.segment.spi.IndexSegment;
 import org.apache.pinot.segment.spi.SegmentContext;
@@ -52,11 +53,18 @@ public interface TableDataManager {
   /**
    * Initializes the table data manager. Should be called only once and before calling any other method.
    */
-  void init(InstanceDataManagerConfig instanceDataManagerConfig, HelixManager helixManager, SegmentLocks segmentLocks,
-      TableConfig tableConfig, Schema schema, SegmentReloadSemaphore segmentReloadSemaphore,
-      ExecutorService segmentReloadRefreshExecutor, @Nullable ExecutorService segmentPreloadExecutor,
+  void init(InstanceDataManagerConfig instanceDataManagerConfig,
+      HelixManager helixManager,
+      SegmentLocks segmentLocks,
+      TableConfig tableConfig,
+      Schema schema,
+      SegmentReloadSemaphore segmentReloadSemaphore,
+      ExecutorService segmentReloadRefreshExecutor,
+      @Nullable ExecutorService segmentPreloadExecutor,
       @Nullable Cache<Pair<String, String>, SegmentErrorInfo> errorCache,
-      @Nullable SegmentOperationsThrottler segmentOperationsThrottler, boolean enableAsyncSegmentRefresh);
+      @Nullable SegmentOperationsThrottler segmentOperationsThrottler,
+      boolean enableAsyncSegmentRefresh,
+      ServerReloadJobStatusCache reloadJobStatusCache);
 
   /**
    * Returns the instance id of the server.
@@ -191,19 +199,19 @@ public interface TableDataManager {
    * This operation is conducted within a failure handling framework and made transparent to ongoing queries, because
    * the segment is in online serving state.
    */
-  void reloadSegment(String segmentName, boolean forceDownload)
+  void reloadSegment(String segmentName, boolean forceDownload, String reloadJobId)
       throws Exception;
 
   /**
    * Reloads all segments.
    */
-  void reloadAllSegments(boolean forceDownload)
+  void reloadAllSegments(boolean forceDownload, String reloadJobId)
       throws Exception;
 
   /**
    * Reloads a list of segments.
    */
-  void reloadSegments(List<String> segmentNames, boolean forceDownload)
+  void reloadSegments(List<String> segmentNames, boolean forceDownload, String reloadJobId)
       throws Exception;
 
   /**

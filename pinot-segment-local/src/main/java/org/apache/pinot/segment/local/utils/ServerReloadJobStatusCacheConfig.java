@@ -16,33 +16,36 @@
  * specific language governing permissions and limitations
  * under the License.
  */
+package org.apache.pinot.segment.local.utils;
 
-package org.apache.pinot.server.starter.helix;
+/**
+ * Configuration for ReloadJobStatusCache.
+ */
+public class ServerReloadJobStatusCacheConfig {
 
-public class SegmentReloadStatusValue {
-  private final long _totalSegmentCount;
-  private final long _successCount;
-  private final Long _failureCount;
+  private int _maxSize = 10000;
+  private int _ttlDays = 30;
 
-  public SegmentReloadStatusValue(long totalSegmentCount, long successCount) {
-    this(totalSegmentCount, successCount, null);
+  public int getMaxSize() {
+    return _maxSize;
   }
 
-  public SegmentReloadStatusValue(long totalSegmentCount, long successCount, Long failureCount) {
-    _totalSegmentCount = totalSegmentCount;
-    _successCount = successCount;
-    _failureCount = failureCount;
+  public ServerReloadJobStatusCacheConfig setMaxSize(int maxSize) {
+    _maxSize = maxSize;
+    return this;
   }
 
-  public long getTotalSegmentCount() {
-    return _totalSegmentCount;
+  public int getTtlDays() {
+    return _ttlDays;
   }
 
-  public long getSuccessCount() {
-    return _successCount;
+  public ServerReloadJobStatusCacheConfig setTtlDays(int ttlDays) {
+    _ttlDays = ttlDays;
+    return this;
   }
 
-  public Long getFailureCount() {
-    return _failureCount;
+  @Override
+  public String toString() {
+    return "ServerReloadJobStatusCacheConfig{maxSize=" + _maxSize + ", ttlDays=" + _ttlDays + '}';
   }
 }

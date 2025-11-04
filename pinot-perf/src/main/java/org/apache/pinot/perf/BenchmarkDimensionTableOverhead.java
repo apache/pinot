@@ -48,6 +48,7 @@ import org.apache.pinot.segment.local.utils.SegmentMultiColTextIndexPreprocessTh
 import org.apache.pinot.segment.local.utils.SegmentOperationsThrottler;
 import org.apache.pinot.segment.local.utils.SegmentReloadSemaphore;
 import org.apache.pinot.segment.local.utils.SegmentStarTreePreprocessThrottler;
+import org.apache.pinot.segment.local.utils.ServerReloadJobStatusCache;
 import org.apache.pinot.segment.spi.ImmutableSegment;
 import org.apache.pinot.segment.spi.IndexSegment;
 import org.apache.pinot.segment.spi.creator.SegmentGeneratorConfig;
@@ -186,9 +187,18 @@ public class BenchmarkDimensionTableOverhead extends BaseQueriesTest {
 
     String tableName = TABLE_NAME + "_" + _iteration;
     _tableDataManager = DimensionTableDataManager.createInstanceByTableName(tableName);
-    _tableDataManager.init(instanceDataManagerConfig, helixManager, new SegmentLocks(), tableConfig, SCHEMA,
-        new SegmentReloadSemaphore(1), Executors.newSingleThreadExecutor(), null, null, SEGMENT_OPERATIONS_THROTTLER,
-        false);
+    _tableDataManager.init(instanceDataManagerConfig,
+        helixManager,
+        new SegmentLocks(),
+        tableConfig,
+        SCHEMA,
+        new SegmentReloadSemaphore(1),
+        Executors.newSingleThreadExecutor(),
+        null,
+        null,
+        SEGMENT_OPERATIONS_THROTTLER,
+        false,
+        new ServerReloadJobStatusCache());
     _tableDataManager.start();
 
     for (int i = 0; i < _indexSegments.size(); i++) {
