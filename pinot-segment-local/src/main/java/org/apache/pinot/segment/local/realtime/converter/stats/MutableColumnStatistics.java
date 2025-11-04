@@ -119,6 +119,7 @@ public class MutableColumnStatistics implements ColumnStatistics {
         }
         break;
       case BYTES:
+      case UUID:
         for (int i = 0; i < length; i++) {
           int elementLength = _dictionary.getBytesValue(i).length;
           _minElementLength = Math.min(_minElementLength, elementLength);

@@ -70,6 +70,7 @@ public class DefaultNullValueVirtualColumnProvider implements VirtualColumnProvi
       case STRING:
         return new ConstantValueStringDictionary((String) fieldSpec.getDefaultNullValue());
       case BYTES:
+      case UUID:
         return new ConstantValueBytesDictionary((byte[]) fieldSpec.getDefaultNullValue());
       default:
         throw new IllegalStateException();
@@ -122,6 +123,7 @@ public class DefaultNullValueVirtualColumnProvider implements VirtualColumnProvi
         builder.setMinValue((String) defaultNullValue).setMaxValue((String) defaultNullValue);
         break;
       case BYTES:
+      case UUID:
         builder.setMinValue(new ByteArray((byte[]) defaultNullValue))
             .setMaxValue(new ByteArray((byte[]) defaultNullValue));
         break;

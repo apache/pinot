@@ -36,6 +36,7 @@ import org.apache.pinot.spi.data.FieldSpec.DataType;
 import org.apache.pinot.spi.utils.BytesUtils;
 import org.apache.pinot.spi.utils.CommonConstants.NullValuePlaceHolder;
 import org.apache.pinot.spi.utils.TimestampUtils;
+import org.apache.pinot.spi.utils.UUIDUtils;
 import org.roaringbitmap.RoaringBitmap;
 
 
@@ -213,6 +214,13 @@ public class CaseTransformFunction extends ComputeDifferentlyWhenNullHandlingEna
           BytesUtils.toBytes(literal);
         } catch (Exception e) {
           throw new IllegalArgumentException("Invalid literal: " + literal + " for BYTES");
+        }
+        break;
+      case UUID:
+        try {
+          UUIDUtils.serializeFlexible(literal);
+        } catch (Exception e) {
+          throw new IllegalArgumentException("Invalid literal: " + literal + " for UUID");
         }
         break;
       default:

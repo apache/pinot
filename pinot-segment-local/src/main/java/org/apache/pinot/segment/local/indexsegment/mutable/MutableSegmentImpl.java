@@ -1527,7 +1527,8 @@ public class MutableSegmentImpl implements MutableSegment {
           _varByteMVMaxRowLengthInBytes = Math.max(_varByteMVMaxRowLengthInBytes, rowLength);
           break;
         }
-        case BYTES: {
+        case BYTES:
+        case UUID: {
           for (Object obj : values) {
             ByteArray value = new ByteArray((byte[]) obj);
             int length = value.length();

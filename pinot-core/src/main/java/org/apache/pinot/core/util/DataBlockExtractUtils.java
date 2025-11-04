@@ -82,6 +82,7 @@ public final class DataBlockExtractUtils {
       case STRING:
         return dataBlock.getString(rowId, colId);
       case BYTES:
+      case UUID:
         return dataBlock.getBytes(rowId, colId);
       case MAP:
         return MapUtils.deserializeMap(dataBlock.getBytes(rowId, colId).getBytes());
@@ -684,7 +685,7 @@ public final class DataBlockExtractUtils {
       Arrays.fill(values, NullValuePlaceHolder.BYTES);
       return values;
     }
-    Preconditions.checkState(storedType == DataType.BYTES,
+    Preconditions.checkState(storedType == DataType.BYTES || storedType == DataType.UUID,
         "Cannot extract byte[] values for column: %s with stored type: %s",
         dataBlock.getDataSchema().getColumnName(colId), storedType);
     if (nullBitmap == null) {
@@ -917,7 +918,7 @@ public final class DataBlockExtractUtils {
       Arrays.fill(values, NullValuePlaceHolder.BYTES);
       return values;
     }
-    Preconditions.checkState(storedType == DataType.BYTES,
+    Preconditions.checkState(storedType == DataType.BYTES || storedType == DataType.UUID,
         "Cannot extract byte[] values for column: %s with stored type: %s",
         dataBlock.getDataSchema().getColumnName(colId), storedType);
     PeekableIntIterator iterator = matchedBitmap.getIntIterator();

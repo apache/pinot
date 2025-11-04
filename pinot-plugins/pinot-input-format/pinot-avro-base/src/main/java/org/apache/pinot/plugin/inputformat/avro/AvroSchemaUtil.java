@@ -118,7 +118,8 @@ public class AvroSchemaUtil {
   public static ObjectNode toAvroSchemaJsonObject(FieldSpec fieldSpec) {
     ObjectNode jsonSchema = JsonUtils.newObjectNode();
     jsonSchema.put("name", fieldSpec.getName());
-    switch (fieldSpec.getDataType().getStoredType()) {
+    DataType dataType = fieldSpec.getDataType();
+    switch (dataType.getStoredType()) {
       case INT:
         jsonSchema.set("type", convertStringsToJsonArray("null", "int"));
         return jsonSchema;
@@ -136,7 +137,16 @@ public class AvroSchemaUtil {
         jsonSchema.set("type", convertStringsToJsonArray("null", "string"));
         return jsonSchema;
       case BYTES:
-        jsonSchema.set("type", convertStringsToJsonArray("null", "bytes"));
+        // Check if this is a UUID type
+        if (dataType == DataType.UUID) {
+          // UUID in Avro is represented as string with UUID logical type
+          ObjectNode uuidType = JsonUtils.newObjectNode();
+          uuidType.put("type", "string");
+          uuidType.put("logicalType", "uuid");
+          jsonSchema.set("type", convertToJsonArray("null", uuidType));
+        } else {
+          jsonSchema.set("type", convertStringsToJsonArray("null", "bytes"));
+        }
         return jsonSchema;
       default:
         throw new UnsupportedOperationException();
@@ -148,6 +158,13 @@ public class AvroSchemaUtil {
     for (String string : strings) {
       jsonArray.add(string);
     }
+    return jsonArray;
+  }
+
+  private static ArrayNode convertToJsonArray(String string, ObjectNode objectNode) {
+    ArrayNode jsonArray = JsonUtils.newArrayNode();
+    jsonArray.add(string);
+    jsonArray.add(objectNode);
     return jsonArray;
   }
 

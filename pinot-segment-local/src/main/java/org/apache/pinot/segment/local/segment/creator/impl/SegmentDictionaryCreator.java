@@ -325,6 +325,7 @@ public class SegmentDictionaryCreator implements IndexCreator {
       case BIG_DECIMAL:
         return _objectValueToIndexMap.getInt(value);
       case BYTES:
+      case UUID:
         return _objectValueToIndexMap.getInt(new ByteArray((byte[]) value));
       default:
         throw new UnsupportedOperationException("Unsupported data type : " + _storedType);

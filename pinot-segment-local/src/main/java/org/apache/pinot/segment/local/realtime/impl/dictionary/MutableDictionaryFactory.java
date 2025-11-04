@@ -48,6 +48,7 @@ public class MutableDictionaryFactory {
           return new StringOffHeapMutableDictionary(cardinality, maxOverflowSize, memoryManager, allocationContext,
               avgLength);
         case BYTES:
+        case UUID:
           return new BytesOffHeapMutableDictionary(cardinality, maxOverflowSize, memoryManager, allocationContext,
               avgLength);
         default:
@@ -69,6 +70,7 @@ public class MutableDictionaryFactory {
         case STRING:
           return new StringOnHeapMutableDictionary();
         case BYTES:
+        case UUID:
           return new BytesOnHeapMutableDictionary();
         default:
           throw new UnsupportedOperationException();

@@ -139,7 +139,9 @@ public class InPredicateEvaluatorFactory {
         }
         return new StringRawValueBasedInPredicateEvaluator(inPredicate, matchingValues);
       }
-      case BYTES: {
+      case BYTES:
+      case UUID: {
+        // UUID is stored as BYTES internally
         ByteArray[] bytesValues = inPredicate.getBytesValues();
         Set<ByteArray> matchingValues = new ObjectOpenHashSet<>(HashUtil.getMinHashSetSize(bytesValues.length));
         // NOTE: Add value-by-value to avoid overhead

@@ -33,6 +33,7 @@ import org.apache.pinot.spi.utils.BooleanUtils;
 import org.apache.pinot.spi.utils.BytesUtils;
 import org.apache.pinot.spi.utils.JsonUtils;
 import org.apache.pinot.spi.utils.TimestampUtils;
+import org.apache.pinot.spi.utils.UUIDUtils;
 
 
 /**
@@ -765,6 +766,61 @@ public enum PinotDataType {
     }
   },
 
+  UUID {
+    @Override
+    public int toInt(Object value) {
+      throw new UnsupportedOperationException("Cannot convert UUID to INT");
+    }
+
+    @Override
+    public long toLong(Object value) {
+      throw new UnsupportedOperationException("Cannot convert UUID to LONG");
+    }
+
+    @Override
+    public float toFloat(Object value) {
+      throw new UnsupportedOperationException("Cannot convert UUID to FLOAT");
+    }
+
+    @Override
+    public double toDouble(Object value) {
+      throw new UnsupportedOperationException("Cannot convert UUID to DOUBLE");
+    }
+
+    @Override
+    public BigDecimal toBigDecimal(Object value) {
+      throw new UnsupportedOperationException("Cannot convert UUID to BIG_DECIMAL");
+    }
+
+    @Override
+    public boolean toBoolean(Object value) {
+      throw new UnsupportedOperationException("Cannot convert UUID to BOOLEAN");
+    }
+
+    @Override
+    public Timestamp toTimestamp(Object value) {
+      throw new UnsupportedOperationException("Cannot convert UUID to TIMESTAMP");
+    }
+
+    @Override
+    public String toString(Object value) {
+      return UUIDUtils.deserializeToString((byte[]) value);
+    }
+
+    @Override
+    public byte[] toBytes(Object value) {
+      return (byte[]) value;
+    }
+
+    @Override
+    public Object convert(Object value, PinotDataType sourceType) {
+      if (sourceType == STRING) {
+        return UUIDUtils.serialize((String) value);
+      }
+      return sourceType.toBytes(value);
+    }
+  },
+
   OBJECT {
     @Override
     public int toInt(Object value) {
@@ -966,6 +1022,13 @@ public enum PinotDataType {
   },
 
   BYTES_ARRAY {
+    @Override
+    public byte[][] convert(Object value, PinotDataType sourceType) {
+      return sourceType.toBytesArray(value);
+    }
+  },
+
+  UUID_ARRAY {
     @Override
     public byte[][] convert(Object value, PinotDataType sourceType) {
       return sourceType.toBytesArray(value);
@@ -1497,6 +1560,8 @@ public enum PinotDataType {
         return fieldSpec.isSingleValueField() ? STRING : STRING_ARRAY;
       case BYTES:
         return fieldSpec.isSingleValueField() ? BYTES : BYTES_ARRAY;
+      case UUID:
+        return fieldSpec.isSingleValueField() ? UUID : UUID_ARRAY;
       case MAP:
         if (fieldSpec.isSingleValueField()) {
           return MAP;
@@ -1534,6 +1599,8 @@ public enum PinotDataType {
         return JSON;
       case BYTES:
         return BYTES;
+      case UUID:
+        return UUID;
       case OBJECT:
         return OBJECT;
       case INT_ARRAY:
@@ -1546,6 +1613,8 @@ public enum PinotDataType {
         return PRIMITIVE_DOUBLE_ARRAY;
       case STRING_ARRAY:
         return STRING_ARRAY;
+      case UUID_ARRAY:
+        return UUID_ARRAY;
       default:
         throw new IllegalStateException("Cannot convert ColumnDataType: " + columnDataType + " to PinotDataType");
     }

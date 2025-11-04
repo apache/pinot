@@ -29,6 +29,7 @@ import org.apache.pinot.spi.data.SingleValueVisitor;
 import org.apache.pinot.spi.utils.BooleanUtils;
 import org.apache.pinot.spi.utils.BytesUtils;
 import org.apache.pinot.spi.utils.TimestampUtils;
+import org.apache.pinot.spi.utils.UUIDUtils;
 
 
 /**
@@ -80,6 +81,8 @@ public class NotEqualsPredicateEvaluatorFactory {
         return new StringRawValueBasedNeqPredicateEvaluator(notEqPredicate, value);
       case BYTES:
         return new BytesRawValueBasedNeqPredicateEvaluator(notEqPredicate, BytesUtils.toBytes(value));
+      case UUID:
+        return new BytesRawValueBasedNeqPredicateEvaluator(notEqPredicate, UUIDUtils.serializeFlexible(value));
       default:
         throw new IllegalStateException("Unsupported data type: " + dataType);
     }

@@ -40,6 +40,7 @@ import org.apache.pinot.spi.utils.BytesUtils;
 import org.apache.pinot.spi.utils.EqualityUtils;
 import org.apache.pinot.spi.utils.JsonUtils;
 import org.apache.pinot.spi.utils.TimestampUtils;
+import org.apache.pinot.spi.utils.UUIDUtils;
 
 
 /**
@@ -385,6 +386,8 @@ public abstract class FieldSpec implements Comparable<FieldSpec>, Serializable {
               return DEFAULT_METRIC_NULL_VALUE_OF_STRING;
             case BYTES:
               return DEFAULT_METRIC_NULL_VALUE_OF_BYTES;
+            case UUID:
+              return DEFAULT_DIMENSION_NULL_VALUE_OF_BYTES;
             default:
               throw new IllegalStateException("Unsupported metric data type: " + dataType);
           }
@@ -409,6 +412,8 @@ public abstract class FieldSpec implements Comparable<FieldSpec>, Serializable {
             case JSON:
               return DEFAULT_DIMENSION_NULL_VALUE_OF_JSON;
             case BYTES:
+              return DEFAULT_DIMENSION_NULL_VALUE_OF_BYTES;
+            case UUID:
               return DEFAULT_DIMENSION_NULL_VALUE_OF_BYTES;
             case BIG_DECIMAL:
               return DEFAULT_DIMENSION_NULL_VALUE_OF_BIG_DECIMAL;
@@ -534,6 +539,11 @@ public abstract class FieldSpec implements Comparable<FieldSpec>, Serializable {
         case BYTES:
           jsonNode.put(key, BytesUtils.toHexString((byte[]) _defaultNullValue));
           break;
+        case UUID:
+          // For UUID, serialize to UUID string format (empty byte array becomes empty string)
+          byte[] uuidBytes = (byte[]) _defaultNullValue;
+          jsonNode.put(key, uuidBytes.length == 0 ? "" : UUIDUtils.deserializeToString(uuidBytes));
+          break;
         case MAP:
           jsonNode.put(key, JsonUtils.objectToJsonNode(_defaultNullValue));
           break;
@@ -609,6 +619,7 @@ public abstract class FieldSpec implements Comparable<FieldSpec>, Serializable {
     STRING(false, true),
     JSON(STRING, false, false),
     BYTES(false, false),
+    UUID(BYTES, false, true),
     STRUCT(false, false),
     MAP(false, false),
     LIST(false, false),
@@ -708,6 +719,8 @@ public abstract class FieldSpec implements Comparable<FieldSpec>, Serializable {
             return value;
           case BYTES:
             return BytesUtils.toBytes(value);
+          case UUID:
+            return UUIDUtils.serializeFlexible(value);
           case MAP:
             return JsonUtils.stringToObject(value, Map.class);
           case LIST:
@@ -747,6 +760,7 @@ public abstract class FieldSpec implements Comparable<FieldSpec>, Serializable {
         case JSON:
           return ((String) value1).compareTo((String) value2);
         case BYTES:
+        case UUID:
           return ByteArray.compare((byte[]) value1, (byte[]) value2);
         case MAP:
         case LIST:
@@ -765,6 +779,9 @@ public abstract class FieldSpec implements Comparable<FieldSpec>, Serializable {
       }
       if (this == BYTES) {
         return BytesUtils.toHexString((byte[]) value);
+      }
+      if (this == UUID) {
+        return UUIDUtils.deserializeToString((byte[]) value);
       }
       if (this == MAP || this == LIST) {
         try {
@@ -801,6 +818,8 @@ public abstract class FieldSpec implements Comparable<FieldSpec>, Serializable {
             return value;
           case BYTES:
             return BytesUtils.toByteArray(value);
+          case UUID:
+            return new ByteArray(UUIDUtils.serializeFlexible(value));
           case MAP:
           case LIST:
             throw new UnsupportedOperationException("Cannot convert complex data types: " + this);

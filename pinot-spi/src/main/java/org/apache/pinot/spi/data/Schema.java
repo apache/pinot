@@ -125,6 +125,7 @@ public final class Schema implements Serializable {
           case STRING:
           case JSON:
           case BYTES:
+          case UUID:
             break;
           default:
             throw new IllegalStateException(
@@ -139,6 +140,7 @@ public final class Schema implements Serializable {
           case DOUBLE:
           case BIG_DECIMAL:
           case BYTES:
+          case UUID:
             break;
           default:
             throw new IllegalStateException("Unsupported data type: " + dataType + " in METRIC field");

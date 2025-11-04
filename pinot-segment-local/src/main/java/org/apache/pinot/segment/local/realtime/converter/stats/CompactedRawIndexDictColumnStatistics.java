@@ -111,6 +111,7 @@ public class CompactedRawIndexDictColumnStatistics extends MutableColumnStatisti
       case STRING:
         return forwardIndex.getString(docId);
       case BYTES:
+      case UUID:
         return forwardIndex.getBytes(docId);
       case BIG_DECIMAL:
         return forwardIndex.getBigDecimal(docId);
@@ -132,6 +133,7 @@ public class CompactedRawIndexDictColumnStatistics extends MutableColumnStatisti
       case STRING:
         return dictionary.indexOf((String) value);
       case BYTES:
+      case UUID:
         return dictionary.indexOf(new ByteArray((byte[]) value));
       case BIG_DECIMAL:
         return dictionary.indexOf((BigDecimal) value);

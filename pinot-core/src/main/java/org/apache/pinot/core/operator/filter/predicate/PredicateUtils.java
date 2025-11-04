@@ -32,8 +32,10 @@ import org.apache.pinot.segment.spi.index.reader.Dictionary;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
 import org.apache.pinot.spi.utils.BooleanUtils;
 import org.apache.pinot.spi.utils.ByteArray;
+import org.apache.pinot.spi.utils.BytesUtils;
 import org.apache.pinot.spi.utils.CommonConstants.Broker.Request.QueryOptionKey;
 import org.apache.pinot.spi.utils.TimestampUtils;
+import org.apache.pinot.spi.utils.UUIDUtils;
 
 
 public class PredicateUtils {
@@ -53,6 +55,8 @@ public class PredicateUtils {
         return getStoredBooleanValue(value);
       case TIMESTAMP:
         return getStoredTimestampValue(value);
+      case UUID:
+        return getStoredUUIDValue(value);
       default:
         return value;
     }
@@ -70,6 +74,16 @@ public class PredicateUtils {
    */
   public static String getStoredTimestampValue(String timestampValue) {
     return Long.toString(TimestampUtils.toMillisSinceEpoch(timestampValue));
+  }
+
+  /**
+   * Converts the given UUID predicate value to hex string format for dictionary lookup.
+   */
+  public static String getStoredUUIDValue(String uuidValue) {
+    // Convert UUID to bytes (handles both UUID string and hex formats)
+    byte[] uuidBytes = UUIDUtils.serializeFlexible(uuidValue);
+    // Convert bytes to hex string for dictionary storage
+    return BytesUtils.toHexString(uuidBytes);
   }
 
   /**
@@ -177,6 +191,8 @@ public class PredicateUtils {
         }
         break;
       case BYTES:
+      case UUID:
+        // UUID is stored as BYTES internally
         ByteArray[] bytesValues = inPredicate.getBytesValues();
         for (ByteArray value : bytesValues) {
           int dictId = dictionary.indexOf(value);

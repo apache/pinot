@@ -554,6 +554,7 @@ public class InvertedIndexAndDictionaryBasedForwardIndexCreator implements AutoC
             }
             break;
           case BYTES:
+          case UUID:
             if (_singleValue) {
               for (int docId = 0; docId < _numDocs; docId++) {
                 creator.putBytes(dictionary.getBytesValue(getInt(_forwardIndexValueBuffer, docId)));

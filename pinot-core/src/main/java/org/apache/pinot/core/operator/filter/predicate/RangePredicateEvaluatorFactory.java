@@ -32,6 +32,7 @@ import org.apache.pinot.spi.utils.BooleanUtils;
 import org.apache.pinot.spi.utils.ByteArray;
 import org.apache.pinot.spi.utils.BytesUtils;
 import org.apache.pinot.spi.utils.TimestampUtils;
+import org.apache.pinot.spi.utils.UUIDUtils;
 
 
 /**
@@ -111,6 +112,10 @@ public class RangePredicateEvaluatorFactory {
         return new BytesRawValueBasedRangePredicateEvaluator(rangePredicate,
             lowerUnbounded ? null : BytesUtils.toBytes(lowerBound),
             upperUnbounded ? null : BytesUtils.toBytes(upperBound), lowerInclusive, upperInclusive);
+      case UUID:
+        return new BytesRawValueBasedRangePredicateEvaluator(rangePredicate,
+            lowerUnbounded ? null : UUIDUtils.serializeFlexible(lowerBound),
+            upperUnbounded ? null : UUIDUtils.serializeFlexible(upperBound), lowerInclusive, upperInclusive);
       default:
         throw new IllegalStateException("Unsupported data type: " + dataType);
     }
