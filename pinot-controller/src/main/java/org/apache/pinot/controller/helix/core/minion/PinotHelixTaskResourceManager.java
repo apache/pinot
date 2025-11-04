@@ -448,7 +448,7 @@ public class PinotHelixTaskResourceManager {
    * Returns a set of Task names (in the form "Task_<taskType>_<uuid>_<timestamp>") that are in progress or not started
    * yet, and optionally includes recent tasks that started after a given timestamp.
    * NOTE: For tasks just submitted without the context created, count them as NOT_STARTED.
-   * This method combines the logic of getTasksInProgress and getTasksStartedAfter to avoid duplicate Helix calls.
+   * This method combines in-progress tasks and recent tasks in a single Helix call to avoid duplicate calls.
    *
    * @param taskType Task type
    * @param afterTimestampMs If > 0, also include tasks that started after this timestamp (in milliseconds).
@@ -495,41 +495,6 @@ public class PinotHelixTaskResourceManager {
         if (jobStartTime != null && jobStartTime > afterTimestampMs) {
           result.add(pinotTaskName);
         }
-      }
-    }
-    return result;
-  }
-
-  /**
-   * Returns tasks that started after the given timestamp.
-   * This is used to detect short-lived tasks that started and completed between metric collection cycles.
-   *
-   * @param taskType Task type
-   * @param afterTimestampMs Only include tasks that started after this timestamp (in milliseconds)
-   * @return Set of task names that started after the timestamp
-   */
-  public synchronized Set<String> getTasksStartedAfter(String taskType, long afterTimestampMs) {
-    Set<String> result = new HashSet<>();
-    String helixJobQueueName = getHelixJobQueueName(taskType);
-    WorkflowConfig workflowConfig = _taskDriver.getWorkflowConfig(helixJobQueueName);
-    if (workflowConfig == null) {
-      return result;
-    }
-
-    WorkflowContext workflowContext = _taskDriver.getWorkflowContext(helixJobQueueName);
-    if (workflowContext == null) {
-      return result;
-    }
-
-    // Get all job start times in one call instead of iterating
-    Map<String, Long> jobStartTimes = workflowContext.getJobStartTimes();
-    for (Map.Entry<String, Long> entry : jobStartTimes.entrySet()) {
-      String helixJobName = entry.getKey();
-      long jobStartTime = entry.getValue();
-
-      // Include task if it started after the given timestamp
-      if (jobStartTime > afterTimestampMs) {
-        result.add(getPinotTaskName(helixJobName));
       }
     }
     return result;
