@@ -27,6 +27,7 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import javax.annotation.Nullable;
 import org.apache.helix.model.InstanceConfig;
 import org.apache.pinot.common.utils.config.TagNameUtils;
 import org.apache.pinot.controller.helix.core.PinotHelixResourceManager;
@@ -238,7 +239,7 @@ public class PropagationUtils {
             Set<String> resolvedTags = TagNameUtils.isOfflineServerTag(tenant)
                     || TagNameUtils.isRealtimeServerTag(tenant) || TagNameUtils.isBrokerTag(tenant)
                 ? Collections.singleton(tenant)
-                : new HashSet<>(getAllPossibleHelixTagsFor(tenant));
+                : new HashSet<>(getAllPossibleHelixTagsForTenant(tenant));
             if (!Collections.disjoint(resolvedTags, filterTags)) {
               matchedConfigs.add(queryWorkloadConfig);
               break;
@@ -275,11 +276,28 @@ public class PropagationUtils {
    * @param tenantName Tenant name.
    * @return A list of Helix tags for the tenant.
    */
-  private static List<String> getAllPossibleHelixTagsFor(String tenantName) {
+  public static List<String> getAllPossibleHelixTagsForTenant(String tenantName) {
     List<String> helixTags = new ArrayList<>();
     helixTags.add(TagNameUtils.getBrokerTagForTenant(tenantName));
     helixTags.add(TagNameUtils.getOfflineTagForTenant(tenantName));
     helixTags.add(TagNameUtils.getRealtimeTagForTenant(tenantName));
+    return helixTags;
+  }
+
+  public static List<String> getHelixTagsForTenant(String tenantName, @Nullable NodeConfig.Type nodeType) {
+    List<String> helixTags = new ArrayList<>();
+    if (nodeType == NodeConfig.Type.BROKER_NODE) {
+      helixTags.add(TagNameUtils.getBrokerTagForTenant(tenantName));
+    } else if (nodeType == NodeConfig.Type.SERVER_NODE) {
+      if (TagNameUtils.isOfflineServerTag(tenantName) || TagNameUtils.isRealtimeServerTag(tenantName)) {
+        helixTags.add(tenantName);
+      } else {
+        helixTags.add(TagNameUtils.getOfflineTagForTenant(tenantName));
+        helixTags.add(TagNameUtils.getRealtimeTagForTenant(tenantName));
+      }
+    } else {
+      helixTags.addAll(getAllPossibleHelixTagsForTenant(tenantName));
+    }
     return helixTags;
   }
 

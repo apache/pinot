@@ -33,6 +33,7 @@ import org.apache.helix.InstanceType;
 import org.apache.helix.model.InstanceConfig;
 import org.apache.pinot.common.messages.QueryWorkloadRefreshMessage;
 import org.apache.pinot.common.utils.config.QueryWorkloadConfigUtils;
+import org.apache.pinot.common.utils.config.TagNameUtils;
 import org.apache.pinot.controller.helix.core.PinotHelixResourceManager;
 import org.apache.pinot.controller.helix.core.util.MessagingServiceUtils;
 import org.apache.pinot.controller.workload.scheme.PropagationScheme;
@@ -214,6 +215,19 @@ public class QueryWorkloadManager {
     }
   }
 
+  public void propagateWorkloadForTables(List<String> tablesAdded, List<String> tablesRemoved) {
+    Set<String> affectedTables = new HashSet<>();
+    if (tablesAdded != null) {
+      affectedTables.addAll(tablesAdded);
+    }
+    if (tablesRemoved != null) {
+      affectedTables.addAll(tablesRemoved);
+    }
+    for (String tableName : affectedTables) {
+        propagateWorkloadForTable(tableName);
+    }
+  }
+
   /**
    * Propagates workload updates for all workloads that apply to the given table.
    *
@@ -238,50 +252,95 @@ public class QueryWorkloadManager {
    * @throws RuntimeException If propagation fails due to Helix/ZK access or message dispatch
    *                          errors.
    */
-  public void propagateWorkloadFor(String tableName) {
+  public void propagateWorkloadForTable(String tableName) {
     try {
-      List<QueryWorkloadConfig> queryWorkloadConfigs = _pinotHelixResourceManager.getAllQueryWorkloadConfigs();
-      if (queryWorkloadConfigs.isEmpty()) {
-        return;
-      }
       // Get the helixTags associated with the table
       List<String> helixTags = PropagationUtils.getHelixTagsForTable(_pinotHelixResourceManager, tableName);
-
-      // Find all workloads associated with the helix tags
-      Set<QueryWorkloadConfig> queryWorkloadConfigsForTags =
-          PropagationUtils.getQueryWorkloadConfigsForTags(_pinotHelixResourceManager, helixTags, queryWorkloadConfigs);
-
-      if (queryWorkloadConfigsForTags.isEmpty()) {
-        LOGGER.info("No workload configs match table: {}, no propagation needed", tableName);
-        return;
-      }
-
-      // Propagate the workload for each QueryWorkloadConfig
-      int successCount = 0;
-      for (QueryWorkloadConfig queryWorkloadConfig : queryWorkloadConfigsForTags) {
-        try {
-          List<String> errors = QueryWorkloadConfigUtils.validateQueryWorkloadConfig(queryWorkloadConfig);
-          if (!errors.isEmpty()) {
-            LOGGER.error("Invalid QueryWorkloadConfig: {} for table: {}, errors: {}", queryWorkloadConfig, tableName,
-                errors);
-            continue;
-          }
-          propagateWorkloadUpdateMessage(queryWorkloadConfig);
-          successCount++;
-        } catch (Exception e) {
-          LOGGER.error("Failed to propagate workload: {} for table: {}", queryWorkloadConfig.getQueryWorkloadName(),
-              tableName, e);
-          // Continue with other workloads instead of failing completely
-        }
-      }
-      LOGGER.info("Successfully propagated {} out of {} workloads for table: {}",
-          successCount, queryWorkloadConfigsForTags.size(), tableName);
+      propagateWorkloadForHelixTags(helixTags, tableName);
     } catch (Exception e) {
       // TODO: Find a way to report partial success/failure
       String errorMsg = String.format("Failed to propagate workload for table: %s", tableName);
       LOGGER.error(errorMsg, e);
       // Just log and return, we don't want to fail table operations due to workload propagation issues
     }
+  }
+
+  /**
+   * Propagates workload configurations for a specific tenant.
+   *
+   * <p>
+   * This method identifies all workload configurations that are associated with the specified
+   * tenant and propagates them to the relevant instances. The tenant name is resolved to its
+   * corresponding Helix tags (broker, offline server, and realtime server tags), and all
+   * workloads whose propagation scope matches these tags are propagated.
+   * </p>
+   *
+   * <p>
+   * The propagation process:
+   * </p>
+   * <ol>
+   *   <li>Resolves the Helix tags associated with the tenant (broker, offline, realtime).</li>
+   *   <li>Filters the workload configs to those whose scope matches the tenant's tags.</li>
+   *   <li>Invokes {@link #propagateWorkloadUpdateMessage(QueryWorkloadConfig)} for each match.</li>
+   * </ol>
+   *
+   * <p>
+   * If no workloads are configured, the method returns immediately. Any exception encountered is
+   * logged but does not cause the method to fail completely.
+   * </p>
+   *
+   * @param tenantName The tenant name (e.g., {@code DefaultTenant}).
+   */
+  public void propagateWorkloadForTenant(String tenantName) {
+    NodeConfig.Type nodeType = null;
+    if (TagNameUtils.isBrokerTag(tenantName)) {
+      nodeType = NodeConfig.Type.BROKER_NODE;
+    } else if (TagNameUtils.isServerTag(tenantName)) {
+      nodeType = NodeConfig.Type.SERVER_NODE;
+    }
+    List<String> helixTags = PropagationUtils.getHelixTagsForTenant(tenantName, nodeType);
+    propagateWorkloadForHelixTags(helixTags, tenantName);
+  }
+
+  /**
+   * Common helper method to propagate workload configurations based on Helix tags.
+   *
+   * @param helixTags List of Helix tags to filter workload configs
+   * @param entityName Name of the entity for logging
+   */
+  private void propagateWorkloadForHelixTags(List<String> helixTags, String entityName) {
+    List<QueryWorkloadConfig> queryWorkloadConfigs = _pinotHelixResourceManager.getAllQueryWorkloadConfigs();
+    if (queryWorkloadConfigs.isEmpty()) {
+      return;
+    }
+    // Find all workloads associated with the helix tags
+    Set<QueryWorkloadConfig> queryWorkloadConfigsForTags =
+        PropagationUtils.getQueryWorkloadConfigsForTags(_pinotHelixResourceManager, helixTags, queryWorkloadConfigs);
+
+    if (queryWorkloadConfigsForTags.isEmpty()) {
+      LOGGER.info("No workload configs match {}, no propagation needed", entityName);
+      return;
+    }
+
+    // Propagate the workload for each QueryWorkloadConfig
+    int successCount = 0;
+    for (QueryWorkloadConfig queryWorkloadConfig : queryWorkloadConfigsForTags) {
+      try {
+        List<String> errors = QueryWorkloadConfigUtils.validateQueryWorkloadConfig(queryWorkloadConfig);
+        if (!errors.isEmpty()) {
+          LOGGER.error("Invalid QueryWorkloadConfig: {}: {}, errors: {}", queryWorkloadConfig, entityName, errors);
+          continue;
+        }
+        propagateWorkloadUpdateMessage(queryWorkloadConfig);
+        successCount++;
+      } catch (Exception e) {
+        LOGGER.error("Failed to propagate workload: {}: {}", queryWorkloadConfig.getQueryWorkloadName(),
+            entityName, e);
+        // Continue with other workloads instead of failing completely
+      }
+    }
+    LOGGER.info("Successfully propagated {} out of {} workloads for {}", successCount,
+        queryWorkloadConfigsForTags.size(), entityName);
   }
 
   /**

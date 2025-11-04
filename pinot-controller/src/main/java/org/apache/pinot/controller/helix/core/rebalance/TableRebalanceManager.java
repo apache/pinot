@@ -218,7 +218,9 @@ public class TableRebalanceManager {
         new TableRebalancer(_resourceManager.getHelixZkManager(), zkBasedTableRebalanceObserver, _controllerMetrics,
             _rebalancePreChecker, _tableSizeReader, _resourceManager.getRealtimeSegmentManager());
 
-    return tableRebalancer.rebalance(tableConfig, rebalanceConfig, rebalanceJobId, tierToSegmentsMap);
+    RebalanceResult result = tableRebalancer.rebalance(tableConfig, rebalanceConfig, rebalanceJobId, tierToSegmentsMap);
+    _resourceManager.getQueryWorkloadManager().propagateWorkloadForTable(tableNameWithType);
+    return result;
   }
 
   /**
