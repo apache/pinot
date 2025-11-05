@@ -60,6 +60,7 @@ import org.apache.pinot.controller.ControllerConf;
 import org.apache.pinot.controller.api.exception.InvalidTableConfigException;
 import org.apache.pinot.controller.api.resources.InstanceInfo;
 import org.apache.pinot.controller.helix.ControllerTest;
+import org.apache.pinot.controller.helix.core.realtime.PartitionGroupInfo;
 import org.apache.pinot.controller.helix.core.realtime.PinotLLCRealtimeSegmentManager;
 import org.apache.pinot.controller.utils.SegmentMetadataMockUtils;
 import org.apache.pinot.core.common.MinionConstants;
@@ -80,6 +81,8 @@ import org.apache.pinot.spi.data.DateTimeFieldSpec;
 import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.stream.LongMsgOffset;
 import org.apache.pinot.spi.stream.PartitionGroupConsumptionStatus;
+import org.apache.pinot.spi.stream.PartitionGroupMetadata;
+import org.apache.pinot.spi.stream.StreamPartitionMsgOffset;
 import org.apache.pinot.spi.utils.CommonConstants.Helix;
 import org.apache.pinot.spi.utils.CommonConstants.Segment;
 import org.apache.pinot.spi.utils.CommonConstants.Server;
@@ -1673,5 +1676,50 @@ public class PinotHelixResourceManagerStatelessTest extends ControllerTest {
     stopFakeInstances();
     stopController();
     stopZk();
+  }
+
+  @Test
+  public void testAddRealtimeTableWithConsumingMetadata()
+      throws Exception {
+    final String realtimeTableName = "testTable_REALTIME";
+    TableConfig tableConfig =
+        new TableConfigBuilder(TableType.REALTIME).setTableName(RAW_TABLE_NAME).setBrokerTenant(BROKER_TENANT_NAME)
+            .setServerTenant(SERVER_TENANT_NAME)
+            .setStreamConfigs(FakeStreamConfigUtils.getDefaultLowLevelStreamConfigs().getStreamConfigsMap()).build();
+    waitForEVToDisappear(tableConfig.getTableName());
+    addDummySchema(RAW_TABLE_NAME);
+
+    List<PartitionGroupInfo> consumingMetadata = new ArrayList<>();
+    // Partition 0, sequence 5
+    PartitionGroupMetadata metadata0 = mock(PartitionGroupMetadata.class);
+    when(metadata0.getPartitionGroupId()).thenReturn(0);
+    when(metadata0.getStartOffset()).thenReturn(mock(StreamPartitionMsgOffset.class));
+    consumingMetadata.add(new PartitionGroupInfo(metadata0, 5));
+    // Partition 1, sequence 10
+    PartitionGroupMetadata metadata1 = mock(PartitionGroupMetadata.class);
+    when(metadata1.getPartitionGroupId()).thenReturn(1);
+    when(metadata1.getStartOffset()).thenReturn(mock(StreamPartitionMsgOffset.class));
+    consumingMetadata.add(new PartitionGroupInfo(metadata1, 10));
+
+    _helixResourceManager.addTable(tableConfig, consumingMetadata);
+
+    IdealState idealState = _helixResourceManager.getTableIdealState(realtimeTableName);
+    assertNotNull(idealState);
+    assertEquals(idealState.getPartitionSet().size(), 2);
+
+    for (String segmentName : idealState.getPartitionSet()) {
+      LLCSegmentName llcSegmentName = new LLCSegmentName(segmentName);
+      int partitionGroupId = llcSegmentName.getPartitionGroupId();
+      if (partitionGroupId == 0) {
+        assertEquals(llcSegmentName.getSequenceNumber(), 5);
+      } else if (partitionGroupId == 1) {
+        assertEquals(llcSegmentName.getSequenceNumber(), 10);
+      } else {
+        fail("Unexpected partition group id: " + partitionGroupId);
+      }
+    }
+
+    _helixResourceManager.deleteRealtimeTable(RAW_TABLE_NAME);
+    deleteSchema(RAW_TABLE_NAME);
   }
 }
