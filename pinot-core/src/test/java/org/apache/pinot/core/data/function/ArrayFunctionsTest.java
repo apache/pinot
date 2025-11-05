@@ -182,6 +182,22 @@ public class ArrayFunctionsTest {
         new String[]{"3", "2", "10", "6", "1", "12", "3", "2", "10", "6", "1", "12"}
     });
     inputs.add(new Object[]{
+        "array_push_back_int(intArray, 7)", Collections.singletonList("intArray"), row,
+        new int[]{3, 2, 10, 6, 1, 12, 7}
+    });
+    inputs.add(new Object[]{
+        "array_push_back_string(stringArray, 'x')", Collections.singletonList("stringArray"), row,
+        new String[]{"3", "2", "10", "6", "1", "12", "x"}
+    });
+    inputs.add(new Object[]{
+        "array_push_front_int(intArray, 7)", Collections.singletonList("intArray"), row,
+        new int[]{7, 3, 2, 10, 6, 1, 12}
+    });
+    inputs.add(new Object[]{
+        "array_push_front_string(stringArray, 'x')", Collections.singletonList("stringArray"), row,
+        new String[]{"x", "3", "2", "10", "6", "1", "12"}
+    });
+    inputs.add(new Object[]{
         "array_to_string(stringArray, '::')", Collections.singletonList("stringArray"), row,
         "3::2::10::6::1::12"
     });

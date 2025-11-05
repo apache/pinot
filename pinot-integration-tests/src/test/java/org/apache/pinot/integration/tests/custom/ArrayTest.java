@@ -579,6 +579,68 @@ public class ArrayTest extends CustomDataQueryClusterIntegrationTest {
     }
   }
 
+  @Test(dataProvider = "useBothQueryEngines")
+  public void testArrayPushBackAndFrontString(boolean useMultiStageQueryEngine)
+      throws Exception {
+    setUseMultiStageQueryEngine(useMultiStageQueryEngine);
+    for (boolean withFrom : new boolean[]{true, false}) {
+      String pushBackQuery = withFrom ? String.format(
+          "SELECT array_push_back_string(ARRAY['a'],'b') FROM %s LIMIT 1", getTableName())
+          : "SELECT array_push_back_string(ARRAY['a'],'b')";
+      JsonNode result = postQuery(pushBackQuery).get("resultTable");
+      JsonNode rows = result.get("rows");
+      assertEquals(rows.size(), 1);
+      JsonNode row = rows.get(0);
+      assertEquals(row.size(), 1);
+      assertEquals(row.get(0).size(), 2);
+      assertEquals(row.get(0).get(0).textValue(), "a");
+      assertEquals(row.get(0).get(1).textValue(), "b");
+
+      String pushFrontQuery = withFrom ? String.format(
+          "SELECT array_push_front_string(ARRAY['b'],'a') FROM %s LIMIT 1", getTableName())
+          : "SELECT array_push_front_string(ARRAY['b'],'a')";
+      result = postQuery(pushFrontQuery).get("resultTable");
+      rows = result.get("rows");
+      assertEquals(rows.size(), 1);
+      row = rows.get(0);
+      assertEquals(row.size(), 1);
+      assertEquals(row.get(0).size(), 2);
+      assertEquals(row.get(0).get(0).textValue(), "a");
+      assertEquals(row.get(0).get(1).textValue(), "b");
+    }
+  }
+
+  @Test(dataProvider = "useBothQueryEngines")
+  public void testArrayPushBackAndFrontDouble(boolean useMultiStageQueryEngine)
+      throws Exception {
+    setUseMultiStageQueryEngine(useMultiStageQueryEngine);
+    for (boolean withFrom : new boolean[]{true, false}) {
+      String pushBackQuery = withFrom ? String.format(
+          "SELECT array_push_back_double(ARRAY[CAST(0.1 AS DOUBLE)], CAST(0.2 AS DOUBLE)) FROM %s LIMIT 1",
+          getTableName()) : "SELECT array_push_back_double(ARRAY[CAST(0.1 AS DOUBLE)], CAST(0.2 AS DOUBLE))";
+      JsonNode result = postQuery(pushBackQuery).get("resultTable");
+      JsonNode rows = result.get("rows");
+      assertEquals(rows.size(), 1);
+      JsonNode row = rows.get(0);
+      assertEquals(row.size(), 1);
+      assertEquals(row.get(0).size(), 2);
+      assertEquals(row.get(0).get(0).asDouble(), 0.1);
+      assertEquals(row.get(0).get(1).asDouble(), 0.2);
+
+      String pushFrontQuery = withFrom ? String.format(
+          "SELECT array_push_front_double(ARRAY[CAST(0.2 AS DOUBLE)], CAST(0.1 AS DOUBLE)) FROM %s LIMIT 1",
+          getTableName()) : "SELECT array_push_front_double(ARRAY[CAST(0.2 AS DOUBLE)], CAST(0.1 AS DOUBLE))";
+      result = postQuery(pushFrontQuery).get("resultTable");
+      rows = result.get("rows");
+      assertEquals(rows.size(), 1);
+      row = rows.get(0);
+      assertEquals(row.size(), 1);
+      assertEquals(row.get(0).size(), 2);
+      assertEquals(row.get(0).get(0).asDouble(), 0.1);
+      assertEquals(row.get(0).get(1).asDouble(), 0.2);
+    }
+  }
+
   @Test(dataProvider = "useV1QueryEngine")
   public void testGenerateIntArray(boolean useMultiStageQueryEngine)
       throws Exception {
