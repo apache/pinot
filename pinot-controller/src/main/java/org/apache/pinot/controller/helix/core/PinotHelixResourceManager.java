@@ -149,6 +149,7 @@ import org.apache.pinot.controller.helix.core.controllerjob.ControllerJobTypes;
 import org.apache.pinot.controller.helix.core.lineage.LineageManager;
 import org.apache.pinot.controller.helix.core.lineage.LineageManagerFactory;
 import org.apache.pinot.controller.helix.core.minion.PinotTaskManager;
+import org.apache.pinot.controller.helix.core.realtime.PartitionGroupInfo;
 import org.apache.pinot.controller.helix.core.realtime.PinotLLCRealtimeSegmentManager;
 import org.apache.pinot.controller.helix.core.util.ControllerZkHelixUtils;
 import org.apache.pinot.controller.helix.core.util.MessagingServiceUtils;
@@ -1733,6 +1734,16 @@ public class PinotHelixResourceManager {
    */
   public void addTable(TableConfig tableConfig)
       throws IOException {
+    addTable(tableConfig, Collections.emptyList());
+  }
+
+  /**
+   * Performs validations of table config and adds the table to zookeeper
+   * @throws InvalidTableConfigException if validations fail
+   * @throws TableAlreadyExistsException for offline tables only if the table already exists
+   */
+  public void addTable(TableConfig tableConfig, List<PartitionGroupInfo> consumeMeta)
+      throws IOException {
     String tableNameWithType = tableConfig.getTableName();
     LOGGER.info("Adding table {}: Start", tableNameWithType);
 
@@ -1793,10 +1804,16 @@ public class PinotHelixResourceManager {
         // Add ideal state
         _helixAdmin.addResource(_helixClusterName, tableNameWithType, idealState);
         LOGGER.info("Adding table {}: Added ideal state for offline table", tableNameWithType);
-      } else {
+      } else if (consumeMeta == null || consumeMeta.isEmpty()) {
         // Add ideal state with the first CONSUMING segment
         _pinotLLCRealtimeSegmentManager.setUpNewTable(tableConfig, idealState);
         LOGGER.info("Adding table {}: Added ideal state with first consuming segment", tableNameWithType);
+      } else {
+        // Add ideal state with the first CONSUMING segment with designated partition consuming metadata
+        // Add ideal state with the first CONSUMING segment
+        _pinotLLCRealtimeSegmentManager.setUpNewTable(tableConfig, idealState, consumeMeta);
+        LOGGER.info("Adding table {}: Added consuming segments ideal state given the designated consuming metadata",
+                tableNameWithType);
       }
     } catch (Exception e) {
       LOGGER.error("Caught exception while setting up table: {}, cleaning it up", tableNameWithType, e);
