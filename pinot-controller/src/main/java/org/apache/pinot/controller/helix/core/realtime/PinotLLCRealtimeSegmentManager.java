@@ -105,6 +105,7 @@ import org.apache.pinot.controller.helix.core.util.MessagingServiceUtils;
 import org.apache.pinot.controller.validation.RealtimeSegmentValidationManager;
 import org.apache.pinot.core.data.manager.realtime.SegmentCompletionUtils;
 import org.apache.pinot.core.util.PeerServerSegmentFinder;
+import org.apache.pinot.segment.local.utils.TableConfigUtils;
 import org.apache.pinot.segment.spi.index.metadata.SegmentMetadataImpl;
 import org.apache.pinot.segment.spi.partition.metadata.ColumnPartitionMetadata;
 import org.apache.pinot.spi.config.table.ColumnPartitionConfig;
@@ -2534,8 +2535,7 @@ public class PinotLLCRealtimeSegmentManager {
     // and leading to inconsistent data.
     // TODO: Temporarily disabled until a proper fix is implemented.
     TableConfig tableConfig = _helixResourceManager.getTableConfig(tableNameWithType);
-    if (tableConfig != null && tableConfig.getReplication() > 1 && tableConfig.getUpsertConfig() != null
-        && tableConfig.getUpsertConfig().getMode() == UpsertConfig.Mode.PARTIAL) {
+    if (TableConfigUtils.checkForPartialUpsertWithReplicas(tableConfig)) {
       throw new IllegalStateException(
           "Force commit is not allowed for partial upsert tables: {} when replication > 1" + tableNameWithType);
     }

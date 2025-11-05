@@ -62,13 +62,13 @@ import org.apache.pinot.segment.local.utils.SegmentLocks;
 import org.apache.pinot.segment.local.utils.SegmentOperationsThrottler;
 import org.apache.pinot.segment.local.utils.SegmentReloadSemaphore;
 import org.apache.pinot.segment.local.utils.ServerReloadJobStatusCache;
+import org.apache.pinot.segment.local.utils.TableConfigUtils;
 import org.apache.pinot.segment.spi.SegmentMetadata;
 import org.apache.pinot.segment.spi.loader.SegmentDirectoryLoader;
 import org.apache.pinot.segment.spi.loader.SegmentDirectoryLoaderContext;
 import org.apache.pinot.segment.spi.loader.SegmentDirectoryLoaderRegistry;
 import org.apache.pinot.server.realtime.ServerSegmentCompletionProtocolHandler;
 import org.apache.pinot.spi.config.table.TableConfig;
-import org.apache.pinot.spi.config.table.UpsertConfig;
 import org.apache.pinot.spi.data.LogicalTableConfig;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.env.PinotConfiguration;
@@ -558,8 +558,7 @@ public class HelixInstanceDataManager implements InstanceDataManager {
               // and leading to inconsistent data.
               // TODO: Temporarily disabled until a proper fix is implemented.
               TableConfig tableConfig = tableDataManager.getCachedTableConfigAndSchema().getLeft();
-              if (tableConfig != null && tableConfig.getReplication() > 1 && tableConfig.getUpsertConfig() != null
-                  && tableConfig.getUpsertConfig().getMode() == UpsertConfig.Mode.PARTIAL) {
+              if (TableConfigUtils.checkForPartialUpsertWithReplicas(tableConfig)) {
                 LOGGER.warn("Force commit is not allowed on a Partial Upsert Table: {} when replication > 1",
                     tableNameWithType);
               } else {

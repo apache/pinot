@@ -81,6 +81,7 @@ import org.apache.pinot.segment.local.utils.SegmentLocks;
 import org.apache.pinot.segment.local.utils.SegmentOperationsThrottler;
 import org.apache.pinot.segment.local.utils.SegmentReloadSemaphore;
 import org.apache.pinot.segment.local.utils.ServerReloadJobStatusCache;
+import org.apache.pinot.segment.local.utils.TableConfigUtils;
 import org.apache.pinot.segment.spi.ColumnMetadata;
 import org.apache.pinot.segment.spi.ImmutableSegment;
 import org.apache.pinot.segment.spi.IndexSegment;
@@ -105,7 +106,6 @@ import org.apache.pinot.spi.config.table.MultiColumnTextIndexConfig;
 import org.apache.pinot.spi.config.table.SegmentPartitionConfig;
 import org.apache.pinot.spi.config.table.StarTreeIndexConfig;
 import org.apache.pinot.spi.config.table.TableConfig;
-import org.apache.pinot.spi.config.table.UpsertConfig;
 import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.utils.CommonConstants;
@@ -825,12 +825,9 @@ public abstract class BaseTableDataManager implements TableDataManager {
         // and leading to inconsistent data.
         // TODO: Temporarily disabled until a proper fix is implemented.
         TableConfig tableConfig = indexLoadingConfig.getTableConfig();
-        if (tableConfig != null && tableConfig.getReplication() > 1 && tableConfig.getUpsertConfig() != null
-            && tableConfig.getUpsertConfig().getMode() == UpsertConfig.Mode.PARTIAL) {
-          _logger.warn(
-              "Skipping reload (force committing) on consuming segment: {} for a Partial Upsert Table with "
-                  + "replication > 1",
-              segmentName);
+        if (TableConfigUtils.checkForPartialUpsertWithReplicas(tableConfig)) {
+          _logger.warn("Skipping reload (force committing) on consuming segment: {} for a Partial Upsert Table with "
+              + "replication > 1", segmentName);
         } else {
           _logger.info("Reloading (force committing) consuming segment: {}", segmentName);
           ((RealtimeSegmentDataManager) segmentDataManager).forceCommit();
