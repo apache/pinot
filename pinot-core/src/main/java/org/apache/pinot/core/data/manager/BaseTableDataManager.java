@@ -819,14 +819,13 @@ public abstract class BaseTableDataManager implements TableDataManager {
     if (segmentDataManager instanceof RealtimeSegmentDataManager) {
       // Use force commit to reload consuming segment
       if (_instanceDataManagerConfig.shouldReloadConsumingSegment()) {
-
-        // For a partial upsert table, force committing consuming segments is disabled.
-        // In certain scenarios, we noticed that a server with less consumed rows was chosen as winner
-        // leading to another server re consuming some rows which can lead to inconsistent and
-        // incorrect data on a server.
-        // TODO: Disabling this operation until we find a concrete fix
+        // For partial upsert tables, force-committing consuming segments is disabled.
+        // In some cases (especially when replication > 1), the server with fewer consumed rows
+        // was incorrectly chosen as the winner, causing other servers to reconsume rows
+        // and leading to inconsistent data.
+        // TODO: Temporarily disabled until a proper fix is implemented.
         TableConfig tableConfig = indexLoadingConfig.getTableConfig();
-        if (tableConfig != null && tableConfig.getUpsertConfig() != null
+        if (tableConfig != null && tableConfig.getReplication() > 1 && tableConfig.getUpsertConfig() != null
             && tableConfig.getUpsertConfig().getMode() == UpsertConfig.Mode.PARTIAL) {
           _logger.warn("Skipping reload (force committing) on consuming segment: {} as it is a Partial Upsert Table",
               segmentName);
