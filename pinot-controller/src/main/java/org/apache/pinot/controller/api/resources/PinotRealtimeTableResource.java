@@ -53,10 +53,12 @@ import javax.ws.rs.core.Response;
 import org.apache.hc.client5.http.io.HttpClientConnectionManager;
 import org.apache.helix.model.ExternalView;
 import org.apache.helix.model.IdealState;
+import org.apache.pinot.common.exception.TableNotFoundException;
 import org.apache.pinot.common.utils.DatabaseUtils;
 import org.apache.pinot.controller.ControllerConf;
 import org.apache.pinot.controller.api.exception.ControllerApplicationException;
 import org.apache.pinot.controller.helix.core.PinotHelixResourceManager;
+import org.apache.pinot.controller.helix.core.WatermarkInductionResult;
 import org.apache.pinot.controller.helix.core.controllerjob.ControllerJobTypes;
 import org.apache.pinot.controller.helix.core.realtime.PinotLLCRealtimeSegmentManager;
 import org.apache.pinot.controller.util.ConsumingSegmentInfoReader;
@@ -446,6 +448,25 @@ public class PinotRealtimeTableResource {
       throw new ControllerApplicationException(LOGGER,
           String.format("Failed to get pauseless debug info for table %s. %s", realtimeTableName, e.getMessage()),
           Response.Status.INTERNAL_SERVER_ERROR, e);
+    }
+  }
+
+
+  @GET
+  @Produces(MediaType.APPLICATION_JSON)
+  @Path("/tables/{tableName}/watermarks")
+  @Authorize(targetType = TargetType.TABLE, paramName = "tableName", action = Actions.Table.GET_IDEAL_STATE)
+  @ApiOperation(value = "Get table ideal state", notes = "Get table ideal state")
+  public WatermarkInductionResult inductConsumingWatermark(
+      @ApiParam(value = "Name of the realtime table", required = true) @PathParam("tableName") String tableName,
+      @Context HttpHeaders headers) {
+    try {
+      String table = DatabaseUtils.translateTableName(tableName, headers);
+      return _pinotHelixResourceManager.inductConsumingWatermarks(table);
+    } catch (TableNotFoundException e) {
+      throw new ControllerApplicationException(LOGGER, e.getMessage(), Response.Status.NOT_FOUND, e);
+    } catch (Exception e) {
+      throw new ControllerApplicationException(LOGGER, e.getMessage(), Response.Status.INTERNAL_SERVER_ERROR, e);
     }
   }
 
