@@ -1502,6 +1502,15 @@ public class RealtimeSegmentDataManager extends SegmentDataManager {
           }
           // Allow to catch up upto final offset, and then replace.
           if (_currentOffset.compareTo(endOffset) > 0) {
+            // For a partial upsert table, if a server consumed data ahead of committed offset(i.e w.r.t winning
+            // server) it can cause data inconsistencies and data correctness problems. For example,
+            // during reload/ force commit / pause & resume consumption operations a server with lowest consumed rows
+            // can be chosen as a winner if controller hasn't received messages from other servers. In such situations,
+            // the record location in the metadata would be left dangling considering those primary keys as first
+            // rather than merging it with previous entry
+            if (_realtimeTableDataManager.isPartialUpsertEnabled()) {
+              _serverMetrics.addMeteredTableValue(_clientId, ServerMeter.REALTIME_ROWS_AHEAD_OF_ZK, 1L);
+            }
             // We moved ahead of the offset that is committed in ZK.
             _segmentLogger.warn("Current offset {} ahead of the offset in zk {}. Downloading to replace",
                 _currentOffset, endOffset);

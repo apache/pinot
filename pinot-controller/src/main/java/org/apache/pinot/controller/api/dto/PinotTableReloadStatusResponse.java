@@ -25,6 +25,7 @@ public class PinotTableReloadStatusResponse {
   private int _successCount;
   private int _totalServersQueried;
   private int _totalServerCallsFailed;
+  private Long _failureCount;
   private PinotControllerJobMetadataDto _metadata;
 
   public int getTotalSegmentCount() {
@@ -80,6 +81,15 @@ public class PinotTableReloadStatusResponse {
 
   public PinotTableReloadStatusResponse setTotalServerCallsFailed(int totalServerCallsFailed) {
     _totalServerCallsFailed = totalServerCallsFailed;
+    return this;
+  }
+
+  public Long getFailureCount() {
+    return _failureCount;
+  }
+
+  public PinotTableReloadStatusResponse setFailureCount(Long failureCount) {
+    _failureCount = failureCount;
     return this;
   }
 
