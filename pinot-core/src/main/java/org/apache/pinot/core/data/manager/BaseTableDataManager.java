@@ -828,7 +828,7 @@ public abstract class BaseTableDataManager implements TableDataManager {
         TableConfig tableConfig = indexLoadingConfig.getTableConfig();
         if (tableConfig != null && tableConfig.getUpsertConfig() != null
             && tableConfig.getUpsertConfig().getMode() == UpsertConfig.Mode.PARTIAL) {
-          _logger.info("Skipping reload (force committing) on consuming segment: {} as it is a Partial Upsert Table",
+          _logger.warn("Skipping reload (force committing) on consuming segment: {} as it is a Partial Upsert Table",
               segmentName);
         } else {
           _logger.info("Reloading (force committing) consuming segment: {}", segmentName);
