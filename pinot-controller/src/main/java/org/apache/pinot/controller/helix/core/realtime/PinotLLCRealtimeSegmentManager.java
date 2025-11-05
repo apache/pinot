@@ -2536,7 +2536,8 @@ public class PinotLLCRealtimeSegmentManager {
     TableConfig tableConfig = _helixResourceManager.getTableConfig(tableNameWithType);
     if (tableConfig != null && tableConfig.getReplication() > 1 && tableConfig.getUpsertConfig() != null
         && tableConfig.getUpsertConfig().getMode() == UpsertConfig.Mode.PARTIAL) {
-      throw new IllegalStateException("Force commit is not allowed for partial upsert tables: " + tableNameWithType);
+      throw new IllegalStateException(
+          "Force commit is not allowed for partial upsert tables: {} when replication > 1" + tableNameWithType);
     }
 
     if (!consumingSegments.isEmpty()) {

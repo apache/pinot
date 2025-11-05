@@ -560,7 +560,8 @@ public class HelixInstanceDataManager implements InstanceDataManager {
               TableConfig tableConfig = tableDataManager.getCachedTableConfigAndSchema().getLeft();
               if (tableConfig != null && tableConfig.getReplication() > 1 && tableConfig.getUpsertConfig() != null
                   && tableConfig.getUpsertConfig().getMode() == UpsertConfig.Mode.PARTIAL) {
-                LOGGER.warn("Force commit is not allowed on a Partial Upsert Table: {}", tableNameWithType);
+                LOGGER.warn("Force commit is not allowed on a Partial Upsert Table: {} when replication > 1",
+                    tableNameWithType);
               } else {
                 ((RealtimeSegmentDataManager) segmentDataManager).forceCommit();
               }
