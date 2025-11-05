@@ -2528,6 +2528,14 @@ public class PinotLLCRealtimeSegmentManager {
   }
 
   private void sendForceCommitMessageToServers(String tableNameWithType, Set<String> consumingSegments) {
+    // Check if table is a partial upsert table and disallow force commit
+    TableConfig tableConfig = _helixResourceManager.getTableConfig(tableNameWithType);
+    if (tableConfig != null && tableConfig.getUpsertConfig() != null
+        && tableConfig.getUpsertConfig().getMode() == UpsertConfig.Mode.PARTIAL) {
+      throw new IllegalStateException(
+          "Force commit is not allowed for partial upsert tables: " + tableNameWithType);
+    }
+
     if (!consumingSegments.isEmpty()) {
       LOGGER.info("Sending force commit messages for segments: {} of table: {}", consumingSegments, tableNameWithType);
       ClusterMessagingService messagingService = _helixManager.getMessagingService();

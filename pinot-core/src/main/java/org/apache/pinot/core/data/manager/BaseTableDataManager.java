@@ -105,6 +105,7 @@ import org.apache.pinot.spi.config.table.MultiColumnTextIndexConfig;
 import org.apache.pinot.spi.config.table.SegmentPartitionConfig;
 import org.apache.pinot.spi.config.table.StarTreeIndexConfig;
 import org.apache.pinot.spi.config.table.TableConfig;
+import org.apache.pinot.spi.config.table.UpsertConfig;
 import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.utils.CommonConstants;
@@ -818,8 +819,21 @@ public abstract class BaseTableDataManager implements TableDataManager {
     if (segmentDataManager instanceof RealtimeSegmentDataManager) {
       // Use force commit to reload consuming segment
       if (_instanceDataManagerConfig.shouldReloadConsumingSegment()) {
-        _logger.info("Reloading (force committing) consuming segment: {}", segmentName);
-        ((RealtimeSegmentDataManager) segmentDataManager).forceCommit();
+
+        // For a partial upsert table, force committing consuming segments is disabled.
+        // In certain scenarios, we noticed that a server with less consumed rows was chosen as winner
+        // leading to another server re consuming some rows which can lead to inconsistent and
+        // incorrect data on a server.
+        // TODO: Disabling this operation until we find a concrete fix
+        TableConfig tableConfig = indexLoadingConfig.getTableConfig();
+        if (tableConfig != null && tableConfig.getUpsertConfig() != null
+            && tableConfig.getUpsertConfig().getMode() == UpsertConfig.Mode.PARTIAL) {
+          _logger.info("Skipping reload (force committing) on consuming segment: {} as it is a Partial Upsert Table",
+              segmentName);
+        } else {
+          _logger.info("Reloading (force committing) consuming segment: {}", segmentName);
+          ((RealtimeSegmentDataManager) segmentDataManager).forceCommit();
+        }
       } else {
         _logger.warn("Skip reloading consuming segment: {} as configured", segmentName);
       }

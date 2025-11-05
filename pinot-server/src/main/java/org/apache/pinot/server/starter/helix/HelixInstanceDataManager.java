@@ -68,6 +68,7 @@ import org.apache.pinot.segment.spi.loader.SegmentDirectoryLoaderContext;
 import org.apache.pinot.segment.spi.loader.SegmentDirectoryLoaderRegistry;
 import org.apache.pinot.server.realtime.ServerSegmentCompletionProtocolHandler;
 import org.apache.pinot.spi.config.table.TableConfig;
+import org.apache.pinot.spi.config.table.UpsertConfig;
 import org.apache.pinot.spi.data.LogicalTableConfig;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.env.PinotConfiguration;
@@ -551,7 +552,13 @@ public class HelixInstanceDataManager implements InstanceDataManager {
         if (segmentDataManager != null) {
           try {
             if (segmentDataManager instanceof RealtimeSegmentDataManager) {
-              ((RealtimeSegmentDataManager) segmentDataManager).forceCommit();
+              TableConfig tableConfig = tableDataManager.getCachedTableConfigAndSchema().getLeft();
+              if (tableConfig != null && tableConfig.getUpsertConfig() != null
+                  && tableConfig.getUpsertConfig().getMode() == UpsertConfig.Mode.PARTIAL) {
+                LOGGER.warn("Force commit is not allowed on a Partial Upsert Table: {}", tableNameWithType);
+              } else {
+                ((RealtimeSegmentDataManager) segmentDataManager).forceCommit();
+              }
             }
           } finally {
             tableDataManager.releaseSegment(segmentDataManager);
