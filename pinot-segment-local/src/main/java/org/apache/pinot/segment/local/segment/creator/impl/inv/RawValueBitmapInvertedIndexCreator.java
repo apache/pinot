@@ -174,7 +174,7 @@ public class RawValueBitmapInvertedIndexCreator implements RawValueBasedInverted
     }
     addValues(values, length);
   }
-  
+
   @Override
   public void add(Object value, int dictId)
       throws IOException {
