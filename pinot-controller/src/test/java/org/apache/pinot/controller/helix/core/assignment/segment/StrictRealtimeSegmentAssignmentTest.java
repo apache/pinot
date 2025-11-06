@@ -283,7 +283,7 @@ public class StrictRealtimeSegmentAssignmentTest {
   public void testRebalanceDedupTableWithTiers() {
     SegmentAssignment segmentAssignment = createSegmentAssignment("dedup");
     Map<InstancePartitionsType, InstancePartitions> onlyConsumingInstancePartitionMap =
-        ImmutableMap.of(InstancePartitionsType.CONSUMING, _instancePartitionsMap.get(InstancePartitionsType.CONSUMING));
+        Map.of(InstancePartitionsType.CONSUMING, _instancePartitionsMap.get(InstancePartitionsType.CONSUMING));
     Map<String, Map<String, String>> currentAssignment = new TreeMap<>();
     Set<String> segmentsOnTier = new HashSet<>();
     for (int segmentId = 0; segmentId < 6; segmentId++) {
@@ -320,7 +320,7 @@ public class StrictRealtimeSegmentAssignmentTest {
   public void testRebalanceUpsertTableWithTiers() {
     SegmentAssignment segmentAssignment = createSegmentAssignment("upsert");
     Map<InstancePartitionsType, InstancePartitions> onlyConsumingInstancePartitionMap =
-        ImmutableMap.of(InstancePartitionsType.CONSUMING, _instancePartitionsMap.get(InstancePartitionsType.CONSUMING));
+        Map.of(InstancePartitionsType.CONSUMING, _instancePartitionsMap.get(InstancePartitionsType.CONSUMING));
     Map<String, Map<String, String>> currentAssignment = new TreeMap<>();
     Set<String> segmentsOnTier = new HashSet<>();
     for (int segmentId = 0; segmentId < 6; segmentId++) {
