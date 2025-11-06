@@ -413,8 +413,7 @@ public abstract class BaseDefaultColumnHandler implements DefaultColumnHandler {
             if (!_segmentWriter.hasIndexFor(argument, StandardIndexes.forward())) {
               throw new UnsupportedOperationException(String.format("Operation not supported! Cannot create a derived "
                       + "column %s because argument: %s does not have a forward index. Enable forward index and "
-                      + "refresh/backfill the segments to create a derived column from source column %s", column,
-                  argument,
+                      + "refresh/backfill the segments to create a derived column from source column", column,
                   argument));
             }
             argumentsMetadata.add(columnMetadata);
@@ -1193,8 +1192,7 @@ public abstract class BaseDefaultColumnHandler implements DefaultColumnHandler {
               forwardIndexCreator.add(outputValue, -1);
               break;
             default:
-              throw new IllegalStateException(
-                  "Unsupported data type: " + fieldSpec.getDataType() + ", for value: " + outputValue);
+              throw new IllegalStateException("Unsupported data type: " + fieldSpec.getDataType());
           }
         }
       } else {
@@ -1220,8 +1218,7 @@ public abstract class BaseDefaultColumnHandler implements DefaultColumnHandler {
               forwardIndexCreator.putBytesMV((byte[][]) outputValue);
               break;
             default:
-              throw new IllegalStateException(
-                  "Unsupported data type: " + fieldSpec.getDataType() + ", for value: " + outputValue);
+              throw new IllegalStateException("Unsupported data type: " + fieldSpec.getDataType());
           }
         }
       }
