@@ -18,12 +18,20 @@
  */
 package org.apache.pinot.segment.local.utils;
 
+import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
+import com.fasterxml.jackson.annotation.JsonProperty;
+
 /**
  * Configuration for ReloadJobStatusCache.
+ * Uses Jackson annotations for automatic JSON mapping from ClusterConfiguration.
  */
+@JsonIgnoreProperties(ignoreUnknown = true)
 public class ServerReloadJobStatusCacheConfig {
 
+  @JsonProperty("max.size")
   private int _maxSize = 10000;
+
+  @JsonProperty("ttl.days")
   private int _ttlDays = 30;
 
   public int getMaxSize() {

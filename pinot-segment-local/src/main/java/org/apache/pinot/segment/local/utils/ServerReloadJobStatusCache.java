@@ -18,11 +18,18 @@
  */
 package org.apache.pinot.segment.local.utils;
 
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.google.common.annotations.VisibleForTesting;
 import com.google.common.cache.Cache;
 import com.google.common.cache.CacheBuilder;
+import java.util.Map;
+import java.util.Set;
 import java.util.concurrent.TimeUnit;
 import javax.annotation.Nullable;
 import javax.annotation.concurrent.ThreadSafe;
+import org.apache.commons.configuration2.MapConfiguration;
+import org.apache.pinot.spi.config.provider.PinotClusterConfigChangeListener;
+import org.apache.pinot.spi.env.PinotConfiguration;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -35,26 +42,33 @@ import static java.util.Objects.requireNonNull;
  *
  * <p>Thread-safe for concurrent access. Uses Guava Cache with LRU eviction
  * and time-based expiration.
+ *
+ * <p>Implements PinotClusterConfigChangeListener to support dynamic configuration
+ * updates from ZooKeeper cluster config. When config changes, cache is rebuilt
+ * with new settings and existing entries are migrated.
  */
 @ThreadSafe
-public class ServerReloadJobStatusCache {
+public class ServerReloadJobStatusCache implements PinotClusterConfigChangeListener {
   private static final Logger LOG = LoggerFactory.getLogger(ServerReloadJobStatusCache.class);
+  private static final String CONFIG_PREFIX = "pinot.server.table.reload.status.cache";
+  private static final ObjectMapper OBJECT_MAPPER = new ObjectMapper();
 
-  private final Cache<String, ReloadJobStatus> _cache;
+  private volatile Cache<String, ReloadJobStatus> _cache;
+  private ServerReloadJobStatusCacheConfig _currentConfig;
 
   /**
-   * Creates a cache with the given configuration.
-   *
+   * Creates a cache with default configuration.
+   * Config can be updated dynamically via cluster config changes.
    */
   public ServerReloadJobStatusCache() {
-    final ServerReloadJobStatusCacheConfig config = new ServerReloadJobStatusCacheConfig();
+    _currentConfig = new ServerReloadJobStatusCacheConfig();
     _cache = CacheBuilder.newBuilder()
-        .maximumSize(config.getMaxSize())
-        .expireAfterWrite(config.getTtlDays(), TimeUnit.DAYS)
+        .maximumSize(_currentConfig.getMaxSize())
+        .expireAfterWrite(_currentConfig.getTtlDays(), TimeUnit.DAYS)
         .recordStats()
         .build();
 
-    LOG.info("Initialized ReloadJobStatusCache with {}", config);
+    LOG.info("Initialized ReloadJobStatusCache with {}", _currentConfig);
   }
 
   /**
@@ -91,5 +105,82 @@ public class ServerReloadJobStatusCache {
       }
     }
     return status;
+  }
+
+  /**
+   * Rebuilds the cache with new configuration and migrates existing entries.
+   * This method is synchronized to prevent concurrent rebuilds.
+   *
+   * @param newConfig new cache configuration to apply
+   */
+  private synchronized void rebuildCache(ServerReloadJobStatusCacheConfig newConfig) {
+    LOG.info("Rebuilding reload status cache with new config: {}", newConfig);
+
+    // Create new cache with new configuration
+    Cache<String, ReloadJobStatus> newCache = CacheBuilder.newBuilder()
+        .maximumSize(newConfig.getMaxSize())
+        .expireAfterWrite(newConfig.getTtlDays(), TimeUnit.DAYS)
+        .recordStats()
+        .build();
+
+    // Migrate existing entries from old cache to new cache
+    Cache<String, ReloadJobStatus> oldCache = _cache;
+    if (oldCache != null) {
+      for (Map.Entry<String, ReloadJobStatus> entry : oldCache.asMap().entrySet()) {
+        newCache.put(entry.getKey(), entry.getValue());
+      }
+    }
+
+    // Atomically swap caches (volatile field ensures safe publication)
+    _cache = newCache;
+    _currentConfig = newConfig;
+
+    LOG.info("Successfully rebuilt reload status cache (size: {})", newCache.size());
+  }
+
+  /**
+   * Maps cluster configuration properties with a common prefix to a config POJO using Jackson.
+   * Uses PinotConfiguration.subset() to extract properties with the given prefix and
+   * Jackson's convertValue() for automatic object mapping.
+   *
+   * @param clusterConfigs map of all cluster configs from ZooKeeper
+   * @param configPrefix prefix to filter configs (e.g., "pinot.server.table.reload.status.cache")
+   * @return ServerReloadJobStatusCacheConfig with values from cluster config, defaults for missing values
+   */
+  @VisibleForTesting
+  static ServerReloadJobStatusCacheConfig buildFromClusterConfig(Map<String, String> clusterConfigs,
+      String configPrefix) {
+    final MapConfiguration mapConfig = new MapConfiguration(clusterConfigs);
+    final PinotConfiguration subsetConfig = new PinotConfiguration(mapConfig).subset(configPrefix);
+    return OBJECT_MAPPER.convertValue(subsetConfig.toMap(), ServerReloadJobStatusCacheConfig.class);
+  }
+
+  /**
+   * Gets the current cache configuration.
+   * Useful for testing and monitoring.
+   */
+  @VisibleForTesting
+  public synchronized ServerReloadJobStatusCacheConfig getCurrentConfig() {
+    return _currentConfig;
+  }
+
+  @Override
+  public void onChange(Set<String> changedConfigs, Map<String, String> clusterConfigs) {
+    // Check if any changed key starts with CONFIG_PREFIX (optimization to skip unnecessary rebuilds)
+    boolean hasRelevantChanges = changedConfigs.stream()
+        .anyMatch(key -> key.startsWith(CONFIG_PREFIX));
+
+    if (!hasRelevantChanges) {
+      LOG.info("No reload cache config changes detected, skipping rebuild");
+      return;
+    }
+
+    try {
+      ServerReloadJobStatusCacheConfig newConfig = buildFromClusterConfig(clusterConfigs, CONFIG_PREFIX);
+      rebuildCache(newConfig);
+      LOG.info("Successfully rebuilt cache with updated configuration");
+    } catch (Exception e) {
+      LOG.error("Failed to rebuild cache from cluster config, keeping existing cache", e);
+    }
   }
 }
