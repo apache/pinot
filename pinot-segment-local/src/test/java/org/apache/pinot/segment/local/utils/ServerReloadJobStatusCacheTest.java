@@ -52,7 +52,7 @@ public class ServerReloadJobStatusCacheTest {
   public void testOnChangeWithFullConfig() {
     // Given
     Map<String, String> properties = new HashMap<>();
-    properties.put("pinot.server.table.reload.status.cache.max.size", "5000");
+    properties.put("pinot.server.table.reload.status.cache.size.max", "5000");
     properties.put("pinot.server.table.reload.status.cache.ttl.days", "15");
     properties.put("some.other.config", "value");
 
@@ -71,7 +71,7 @@ public class ServerReloadJobStatusCacheTest {
   public void testOnChangeWithPartialConfig() {
     // Given
     Map<String, String> properties = new HashMap<>();
-    properties.put("pinot.server.table.reload.status.cache.max.size", "7500");
+    properties.put("pinot.server.table.reload.status.cache.size.max", "7500");
     properties.put("some.other.config", "value");
 
     ServerReloadJobStatusCache cache = new ServerReloadJobStatusCache();
@@ -108,7 +108,7 @@ public class ServerReloadJobStatusCacheTest {
   public void testOnChangeWithInvalidValues() {
     // Given
     Map<String, String> properties = new HashMap<>();
-    properties.put("pinot.server.table.reload.status.cache.max.size", "invalid");
+    properties.put("pinot.server.table.reload.status.cache.size.max", "invalid");
 
     ServerReloadJobStatusCache cache = new ServerReloadJobStatusCache();
     ServerReloadJobStatusCacheConfig oldConfig = cache.getCurrentConfig();
@@ -129,7 +129,7 @@ public class ServerReloadJobStatusCacheTest {
 
     // Set initial config
     Map<String, String> initialProperties = new HashMap<>();
-    initialProperties.put("pinot.server.table.reload.status.cache.max.size", "8000");
+    initialProperties.put("pinot.server.table.reload.status.cache.size.max", "8000");
     initialProperties.put("pinot.server.table.reload.status.cache.ttl.days", "20");
     cache.onChange(initialProperties.keySet(), initialProperties);
     assertThat(cache.getCurrentConfig().getMaxSize()).isEqualTo(8000);
@@ -137,7 +137,7 @@ public class ServerReloadJobStatusCacheTest {
 
     // When - Update with new config
     Map<String, String> updatedProperties = new HashMap<>();
-    updatedProperties.put("pinot.server.table.reload.status.cache.max.size", "12000");
+    updatedProperties.put("pinot.server.table.reload.status.cache.size.max", "12000");
     updatedProperties.put("pinot.server.table.reload.status.cache.ttl.days", "45");
     cache.onChange(updatedProperties.keySet(), updatedProperties);
 
@@ -153,7 +153,7 @@ public class ServerReloadJobStatusCacheTest {
 
     // Set initial custom configs
     Map<String, String> customProperties = new HashMap<>();
-    customProperties.put("pinot.server.table.reload.status.cache.max.size", "15000");
+    customProperties.put("pinot.server.table.reload.status.cache.size.max", "15000");
     customProperties.put("pinot.server.table.reload.status.cache.ttl.days", "60");
     cache.onChange(customProperties.keySet(), customProperties);
 
@@ -174,7 +174,7 @@ public class ServerReloadJobStatusCacheTest {
   public void testBuildFromClusterConfigDirectly() {
     // Given
     Map<String, String> properties = new HashMap<>();
-    properties.put("pinot.server.table.reload.status.cache.max.size", "6000");
+    properties.put("pinot.server.table.reload.status.cache.size.max", "6000");
     properties.put("pinot.server.table.reload.status.cache.ttl.days", "25");
     properties.put("some.other.config", "value");
 
@@ -205,7 +205,7 @@ public class ServerReloadJobStatusCacheTest {
 
     // When - Trigger cache rebuild with config change
     Map<String, String> properties = new HashMap<>();
-    properties.put("pinot.server.table.reload.status.cache.max.size", "5000");
+    properties.put("pinot.server.table.reload.status.cache.size.max", "5000");
     properties.put("pinot.server.table.reload.status.cache.ttl.days", "15");
     cache.onChange(properties.keySet(), properties);
 
@@ -243,7 +243,7 @@ public class ServerReloadJobStatusCacheTest {
           if (threadId == 0) {
             // One thread triggers rebuild
             Map<String, String> properties = new HashMap<>();
-            properties.put("pinot.server.table.reload.status.cache.max.size", "8000");
+            properties.put("pinot.server.table.reload.status.cache.size.max", "8000");
             cache.onChange(properties.keySet(), properties);
           } else {
             // Other threads access cache
@@ -275,7 +275,7 @@ public class ServerReloadJobStatusCacheTest {
 
     // When - Update only max size
     Map<String, String> properties = new HashMap<>();
-    properties.put("pinot.server.table.reload.status.cache.max.size", "20000");
+    properties.put("pinot.server.table.reload.status.cache.size.max", "20000");
     cache.onChange(properties.keySet(), properties);
 
     // Then - Verify new size takes effect
@@ -307,7 +307,7 @@ public class ServerReloadJobStatusCacheTest {
     ServerReloadJobStatusCache cache = new ServerReloadJobStatusCache();
 
     Map<String, String> initialProperties = new HashMap<>();
-    initialProperties.put("pinot.server.table.reload.status.cache.max.size", "8000");
+    initialProperties.put("pinot.server.table.reload.status.cache.size.max", "8000");
     initialProperties.put("pinot.server.table.reload.status.cache.ttl.days", "20");
     cache.onChange(initialProperties.keySet(), initialProperties);
 
@@ -336,7 +336,7 @@ public class ServerReloadJobStatusCacheTest {
     ServerReloadJobStatusCache cache = new ServerReloadJobStatusCache();
 
     Map<String, String> initialProperties = new HashMap<>();
-    initialProperties.put("pinot.server.table.reload.status.cache.max.size", "8000");
+    initialProperties.put("pinot.server.table.reload.status.cache.size.max", "8000");
     initialProperties.put("pinot.server.table.reload.status.cache.ttl.days", "20");
     cache.onChange(initialProperties.keySet(), initialProperties);
 
@@ -346,12 +346,12 @@ public class ServerReloadJobStatusCacheTest {
 
     // When - Update with reload cache configs changed
     Map<String, String> updatedProperties = new HashMap<>();
-    updatedProperties.put("pinot.server.table.reload.status.cache.max.size", "12000");
+    updatedProperties.put("pinot.server.table.reload.status.cache.size.max", "12000");
     updatedProperties.put("pinot.server.table.reload.status.cache.ttl.days", "40");
     updatedProperties.put("some.other.config", "value");
 
     cache.onChange(
-        Set.of("pinot.server.table.reload.status.cache.max.size", "pinot.server.table.reload.status.cache.ttl.days"),
+        Set.of("pinot.server.table.reload.status.cache.size.max", "pinot.server.table.reload.status.cache.ttl.days"),
         updatedProperties);
 
     // Then - Config should be rebuilt with new values
