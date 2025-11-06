@@ -81,6 +81,7 @@ import org.apache.pinot.segment.local.utils.SegmentLocks;
 import org.apache.pinot.segment.local.utils.SegmentOperationsThrottler;
 import org.apache.pinot.segment.local.utils.SegmentReloadSemaphore;
 import org.apache.pinot.segment.local.utils.ServerReloadJobStatusCache;
+import org.apache.pinot.segment.local.utils.TableConfigUtils;
 import org.apache.pinot.segment.spi.ColumnMetadata;
 import org.apache.pinot.segment.spi.ImmutableSegment;
 import org.apache.pinot.segment.spi.IndexSegment;
@@ -818,8 +819,19 @@ public abstract class BaseTableDataManager implements TableDataManager {
     if (segmentDataManager instanceof RealtimeSegmentDataManager) {
       // Use force commit to reload consuming segment
       if (_instanceDataManagerConfig.shouldReloadConsumingSegment()) {
-        _logger.info("Reloading (force committing) consuming segment: {}", segmentName);
-        ((RealtimeSegmentDataManager) segmentDataManager).forceCommit();
+        // For partial upsert tables, force-committing consuming segments is disabled.
+        // In some cases (especially when replication > 1), the server with fewer consumed rows
+        // was incorrectly chosen as the winner, causing other servers to reconsume rows
+        // and leading to inconsistent data.
+        // TODO: Temporarily disabled until a proper fix is implemented.
+        TableConfig tableConfig = indexLoadingConfig.getTableConfig();
+        if (TableConfigUtils.checkForPartialUpsertWithReplicas(tableConfig)) {
+          _logger.warn("Skipping reload (force committing) on consuming segment: {} for a Partial Upsert Table with "
+              + "replication > 1", segmentName);
+        } else {
+          _logger.info("Reloading (force committing) consuming segment: {}", segmentName);
+          ((RealtimeSegmentDataManager) segmentDataManager).forceCommit();
+        }
       } else {
         _logger.warn("Skip reloading consuming segment: {} as configured", segmentName);
       }

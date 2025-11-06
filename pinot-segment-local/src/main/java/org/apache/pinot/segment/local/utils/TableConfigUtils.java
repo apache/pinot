@@ -1511,6 +1511,11 @@ public final class TableConfigUtils {
     }
   }
 
+  public static boolean checkForPartialUpsertWithReplicas(TableConfig tableConfig) {
+    return tableConfig != null && tableConfig.getReplication() > 1 && tableConfig.getUpsertConfig() != null
+        && tableConfig.getUpsertConfig().getMode() == UpsertConfig.Mode.PARTIAL;
+  }
+
   // enum of all the skip-able validation types.
   public enum ValidationType {
     ALL, TASK, UPSERT

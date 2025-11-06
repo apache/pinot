@@ -62,6 +62,7 @@ import org.apache.pinot.segment.local.utils.SegmentLocks;
 import org.apache.pinot.segment.local.utils.SegmentOperationsThrottler;
 import org.apache.pinot.segment.local.utils.SegmentReloadSemaphore;
 import org.apache.pinot.segment.local.utils.ServerReloadJobStatusCache;
+import org.apache.pinot.segment.local.utils.TableConfigUtils;
 import org.apache.pinot.segment.spi.SegmentMetadata;
 import org.apache.pinot.segment.spi.loader.SegmentDirectoryLoader;
 import org.apache.pinot.segment.spi.loader.SegmentDirectoryLoaderContext;
@@ -551,7 +552,18 @@ public class HelixInstanceDataManager implements InstanceDataManager {
         if (segmentDataManager != null) {
           try {
             if (segmentDataManager instanceof RealtimeSegmentDataManager) {
-              ((RealtimeSegmentDataManager) segmentDataManager).forceCommit();
+              // For partial upsert tables, force-committing consuming segments is disabled.
+              // In some cases (especially when replication > 1), the server with fewer consumed rows
+              // was incorrectly chosen as the winner, causing other servers to reconsume rows
+              // and leading to inconsistent data.
+              // TODO: Temporarily disabled until a proper fix is implemented.
+              TableConfig tableConfig = tableDataManager.getCachedTableConfigAndSchema().getLeft();
+              if (TableConfigUtils.checkForPartialUpsertWithReplicas(tableConfig)) {
+                LOGGER.warn("Force commit is not allowed on a Partial Upsert Table: {} when replication > 1",
+                    tableNameWithType);
+              } else {
+                ((RealtimeSegmentDataManager) segmentDataManager).forceCommit();
+              }
             }
           } finally {
             tableDataManager.releaseSegment(segmentDataManager);

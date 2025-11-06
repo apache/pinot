@@ -46,6 +46,7 @@ import javax.annotation.Nullable;
 import javax.ws.rs.core.Response;
 import org.apache.commons.io.FileUtils;
 import org.apache.helix.AccessOption;
+import org.apache.helix.ClusterMessagingService;
 import org.apache.helix.HelixAdmin;
 import org.apache.helix.HelixManager;
 import org.apache.helix.model.ExternalView;
@@ -63,6 +64,7 @@ import org.apache.pinot.common.utils.FileUploadDownloadClient;
 import org.apache.pinot.common.utils.LLCSegmentName;
 import org.apache.pinot.common.utils.URIUtils;
 import org.apache.pinot.controller.ControllerConf;
+import org.apache.pinot.controller.api.resources.ForceCommitBatchConfig;
 import org.apache.pinot.controller.helix.core.PinotHelixResourceManager;
 import org.apache.pinot.controller.helix.core.assignment.segment.SegmentAssignment;
 import org.apache.pinot.controller.helix.core.realtime.segment.CommittingSegmentDescriptor;
@@ -349,9 +351,91 @@ public class PinotLLCRealtimeSegmentManagerTest {
     // Provide a segment that is not in CONSUMING state (non-existent); should be ignored without exception
     String nonConsumingSegment = "nonExistingSegment";
     Set<String> committed = segmentManager.forceCommit(REALTIME_TABLE_NAME, null, nonConsumingSegment,
-        org.apache.pinot.controller.api.resources.ForceCommitBatchConfig.of(1, 1, 5));
+        ForceCommitBatchConfig.of(1, 1, 5));
     assertTrue(committed.isEmpty(), "Expected no segments to be committed when only non-consuming segments provided");
   }
+
+  @Test
+  public void testForceCommitPartialUpsertTableWithMultipleReplicas() {
+    FakePinotLLCRealtimeSegmentManager segmentManager = new FakePinotLLCRealtimeSegmentManager();
+    segmentManager._numReplicas = 2; // RF > 1
+    Map<String, String> streamConfigs = FakeStreamConfigUtils.getDefaultLowLevelStreamConfigs().getStreamConfigsMap();
+    segmentManager._tableConfig = new TableConfigBuilder(TableType.REALTIME).setTableName(RAW_TABLE_NAME)
+        .setNumReplicas(segmentManager._numReplicas).setStreamConfigs(streamConfigs).setUpsertConfig(
+            new org.apache.pinot.spi.config.table.UpsertConfig(
+                org.apache.pinot.spi.config.table.UpsertConfig.Mode.PARTIAL)).build();
+    segmentManager._streamConfigs = IngestionConfigUtils.getStreamConfigs(segmentManager._tableConfig);
+    when(segmentManager._mockResourceManager.getTableConfig(REALTIME_TABLE_NAME)).thenReturn(
+        segmentManager._tableConfig);
+    segmentManager._numInstances = 3;
+    segmentManager.makeConsumingInstancePartitions();
+    segmentManager._numPartitions = 1;
+    segmentManager.setUpNewTable();
+    String consumingSegment = new LLCSegmentName(RAW_TABLE_NAME, 0, 0, CURRENT_TIME_MS).getSegmentName();
+    segmentManager._idealState.setPartitionState(consumingSegment, "Server_0", SegmentStateModel.CONSUMING);
+    try {
+      segmentManager.forceCommit(REALTIME_TABLE_NAME, null, consumingSegment, ForceCommitBatchConfig.of(1, 1, 5));
+      fail("Expected IllegalStateException for partial upsert table with RF > 1");
+    } catch (IllegalStateException e) {
+      assertTrue(e.getMessage().contains("Force commit is not allowed for partial upsert tables"),
+          "Exception message should mention partial upsert and replication");
+    }
+  }
+
+  @Test
+  public void testForceCommitPartialUpsertTableWithNoReplica() {
+    FakePinotLLCRealtimeSegmentManager segmentManager = new FakePinotLLCRealtimeSegmentManager();
+    segmentManager._numReplicas = 1;
+    Map<String, String> streamConfigs = FakeStreamConfigUtils.getDefaultLowLevelStreamConfigs().getStreamConfigsMap();
+    segmentManager._tableConfig = new TableConfigBuilder(TableType.REALTIME).setTableName(RAW_TABLE_NAME)
+        .setNumReplicas(segmentManager._numReplicas).setStreamConfigs(streamConfigs).setUpsertConfig(
+            new org.apache.pinot.spi.config.table.UpsertConfig(
+                org.apache.pinot.spi.config.table.UpsertConfig.Mode.PARTIAL)).build();
+    segmentManager._streamConfigs = IngestionConfigUtils.getStreamConfigs(segmentManager._tableConfig);
+    when(segmentManager._mockResourceManager.getTableConfig(REALTIME_TABLE_NAME)).thenReturn(
+        segmentManager._tableConfig);
+    segmentManager._numInstances = 2;
+    segmentManager.makeConsumingInstancePartitions();
+    segmentManager._numPartitions = 1;
+    segmentManager.setUpNewTable();
+
+    String consumingSegment = new LLCSegmentName(RAW_TABLE_NAME, 0, 0, CURRENT_TIME_MS).getSegmentName();
+    segmentManager._idealState.setPartitionState(consumingSegment, "Server_0", SegmentStateModel.CONSUMING);
+
+    // Force commit should succeed for partial upsert table with RF = 1 (no exception thrown)
+    try {
+      segmentManager.forceCommit(REALTIME_TABLE_NAME, null, consumingSegment, ForceCommitBatchConfig.of(1, 1, 5));
+      // If we reach here without exception, test passes
+    } catch (IllegalStateException e) {
+      fail("Should not throw exception for partial upsert table with RF = 1, but got: " + e.getMessage());
+    }
+  }
+
+  @Test
+  public void testForceCommitAllowsNormalTable() {
+    FakePinotLLCRealtimeSegmentManager segmentManager = new FakePinotLLCRealtimeSegmentManager();
+    segmentManager._numReplicas = 2;
+    segmentManager.makeTableConfig(); // No upsert config
+    when(segmentManager._mockResourceManager.getTableConfig(REALTIME_TABLE_NAME)).thenReturn(
+        segmentManager._tableConfig);
+    segmentManager._numInstances = 3;
+    segmentManager.makeConsumingInstancePartitions();
+    segmentManager._numPartitions = 1;
+    segmentManager.setUpNewTable();
+
+    String consumingSegment = new LLCSegmentName(RAW_TABLE_NAME, 0, 0, CURRENT_TIME_MS).getSegmentName();
+    segmentManager._idealState.setPartitionState(consumingSegment, "Server_0", SegmentStateModel.CONSUMING);
+
+    try {
+      Set<String> committed = segmentManager.forceCommit(REALTIME_TABLE_NAME, null, consumingSegment,
+          ForceCommitBatchConfig.of(1, 1, 5));
+      assertFalse(committed.isEmpty(), "Expected segments to be committed");
+      // If we reach here without exception, test passes
+    } catch (IllegalStateException e) {
+      fail("Should not throw exception for normal table, but got: " + e.getMessage());
+    }
+  }
+
 
   @Test
   public void testCommitSegmentWithOffsetAutoResetOnOffset()
@@ -1864,17 +1948,35 @@ public class PinotLLCRealtimeSegmentManagerTest {
     List<PartitionGroupMetadata> _partitionGroupMetadataList = null;
     boolean _exceededMaxSegmentCompletionTime = false;
     FileUploadDownloadClient _mockedFileUploadDownloadClient;
+    PinotHelixResourceManager _mockResourceManager;
 
     FakePinotLLCRealtimeSegmentManager() {
-      super(mock(PinotHelixResourceManager.class), CONTROLLER_CONF, mock(ControllerMetrics.class));
+      this(createMockedResourceManager());
     }
 
     FakePinotLLCRealtimeSegmentManager(PinotHelixResourceManager pinotHelixResourceManager, ControllerConf config) {
       super(pinotHelixResourceManager, config, mock(ControllerMetrics.class));
+      _mockResourceManager = pinotHelixResourceManager;
     }
 
     FakePinotLLCRealtimeSegmentManager(PinotHelixResourceManager pinotHelixResourceManager) {
       super(pinotHelixResourceManager, CONTROLLER_CONF, mock(ControllerMetrics.class));
+      _mockResourceManager = pinotHelixResourceManager;
+    }
+
+    private static PinotHelixResourceManager createMockedResourceManager() {
+      PinotHelixResourceManager mockResourceManager = mock(PinotHelixResourceManager.class);
+      HelixManager mockHelixManager = mock(HelixManager.class);
+      HelixAdmin mockHelixAdmin = mock(HelixAdmin.class);
+      ZkHelixPropertyStore mockPropertyStore = mock(ZkHelixPropertyStore.class);
+      ClusterMessagingService mockMessagingService = mock(org.apache.helix.ClusterMessagingService.class);
+      when(mockResourceManager.getHelixZkManager()).thenReturn(mockHelixManager);
+      when(mockResourceManager.getHelixAdmin()).thenReturn(mockHelixAdmin);
+      when(mockResourceManager.getPropertyStore()).thenReturn(mockPropertyStore);
+      when(mockResourceManager.getHelixClusterName()).thenReturn(CLUSTER_NAME);
+      when(mockHelixManager.getMessagingService()).thenReturn(mockMessagingService);
+      when(mockMessagingService.send(any(), any())).thenReturn(1);
+      return mockResourceManager;
     }
 
     void makeTableConfig() {
