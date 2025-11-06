@@ -46,6 +46,11 @@ public abstract class DefaultPostOrderTraversalVisitor<T, C> implements PlanNode
   }
 
   @Override
+  public T visitEnrichedJoin(EnrichedJoinNode node, C context) {
+    return visitJoin(node, context);
+  }
+
+  @Override
   public T visitMailboxReceive(MailboxReceiveNode node, C context) {
     node.getSender().visit(this, context);
     return process(node, context);

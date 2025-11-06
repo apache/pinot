@@ -108,9 +108,9 @@ public class DictionaryIndexType
     DictionaryIndexConfig dictionaryConfig = indexConfigs.getConfig(StandardIndexes.dictionary());
     if (dictionaryConfig.isEnabled() && dictionaryConfig.getUseVarLengthDictionary()) {
       DataType storedType = fieldSpec.getDataType().getStoredType();
-      Preconditions.checkState(storedType == DataType.STRING || storedType == DataType.BYTES,
-          "Cannot create var-length dictionary on column: %s of stored type other than STRING or BYTES",
-          fieldSpec.getName());
+      Preconditions.checkState(!storedType.isFixedWidth(),
+          "Cannot create var-length dictionary on column: %s of fixed-width stored type: %s", fieldSpec.getName(),
+          storedType);
     }
   }
 
@@ -357,7 +357,7 @@ public class DictionaryIndexType
 
   @Override
   public IndexHandler createIndexHandler(SegmentDirectory segmentDirectory, Map<String, FieldIndexConfigs> configsByCol,
-      @Nullable Schema schema, @Nullable TableConfig tableConfig) {
+      Schema schema, TableConfig tableConfig) {
     return IndexHandler.NoOp.INSTANCE;
   }
 

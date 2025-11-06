@@ -23,8 +23,10 @@ import com.google.common.base.Preconditions;
 import java.net.URI;
 import java.util.ArrayList;
 import java.util.Collections;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.concurrent.atomic.AtomicReference;
 import org.apache.hc.core5.http.ClassicHttpRequest;
 import org.apache.hc.core5.http.HttpHeaders;
@@ -40,6 +42,8 @@ import org.apache.pinot.common.utils.tls.TlsUtils;
 import org.apache.pinot.spi.config.workload.EnforcementProfile;
 import org.apache.pinot.spi.config.workload.InstanceCost;
 import org.apache.pinot.spi.config.workload.NodeConfig;
+import org.apache.pinot.spi.config.workload.PropagationEntity;
+import org.apache.pinot.spi.config.workload.PropagationEntityOverrides;
 import org.apache.pinot.spi.config.workload.PropagationScheme;
 import org.apache.pinot.spi.config.workload.QueryWorkloadConfig;
 import org.apache.pinot.spi.utils.JsonUtils;
@@ -211,24 +215,167 @@ public class QueryWorkloadConfigUtils {
         if (enforcementProfile == null) {
           errors.add(prefix + "enforcementProfile cannot be null");
         } else {
-           if (enforcementProfile.getCpuCostNs() < 0) {
-             errors.add(prefix + ".enforcementProfile.cpuCostNs cannot be negative");
+          long enforcementCpu = enforcementProfile.getCpuCostNs();
+          long enforcementMem = enforcementProfile.getMemoryCostBytes();
+           if (enforcementCpu <= 0) {
+             errors.add(prefix + ".enforcementProfile.cpuCostNs has to positive");
            }
-           if (enforcementProfile.getMemoryCostBytes() < 0) {
-               errors.add(prefix + ".enforcementProfile.memoryCostBytes cannot be negative");
+           if (enforcementMem <= 0) {
+             errors.add(prefix + ".enforcementProfile.memoryCostBytes has to positive");
            }
-        }
-        // Validate PropagationScheme
-        PropagationScheme propagationScheme = nodeConfig.getPropagationScheme();
-        if (propagationScheme == null) {
-          errors.add(prefix + ".propagationScheme cannot be null");
-        } else {
-          if (propagationScheme.getPropagationType() == null) {
-            errors.add(prefix + ".propagationScheme.type cannot be null");
+          // Validate PropagationScheme
+          PropagationScheme propagationScheme = nodeConfig.getPropagationScheme();
+          if (propagationScheme == null) {
+            errors.add(prefix + ".propagationScheme cannot be null");
+          } else {
+            PropagationScheme.Type propagationType = propagationScheme.getPropagationType();
+            if (propagationType == null) {
+              errors.add(prefix + ".propagationScheme.type cannot be null");
+            }
+            // Validate PropagationEntities
+            validateEntityList(propagationScheme.getPropagationEntities(),
+                prefix + ".propagationScheme.propagationEntities", errors,
+                enforcementProfile.getCpuCostNs(), enforcementProfile.getMemoryCostBytes());
           }
         }
       }
     }
     return errors;
+  }
+
+  /**
+   * Validates a list of PropagationEntity objects.
+   * <p>
+   * This method performs comprehensive validation including:
+   * <ul>
+   *   <li>Ensures the list is non-null and non-empty</li>
+   *   <li>Checks for duplicate propagationEntity IDs</li>
+   *   <li>Validates cpuCostNs and memoryCostBytes for non-null/positive values</li>
+   *   <li>Ensures consistency in cost definitions across all entities (either all or none define costs)</li>
+   *   <li>Validates that total costs do not exceed provided limits (if any)</li>
+   *   <li>Validates any overrides within each entity for the same cost rules</li>
+   *   <li>Rewrites empty costs to evenly distribute parent limits if all entities have empty costs</li>
+   * </ul>
+   *
+   */
+  private static void validateEntityList(List<PropagationEntity> entities, String prefix,
+                                         List<String> errors, Long limitCpu, Long limitMem) {
+    if (entities == null || entities.isEmpty()) {
+      errors.add(prefix + " cannot be null or empty");
+      return;
+    }
+    Set<String> seenIds = new HashSet<>();
+    // Accumulate total CPU/memory costs to ensure they don't exceed enforcementProfile limits
+    long totalCpu = 0;
+    long totalMem = 0;
+    // Track whether costs are defined or empty to ensure consistency across all entities
+    int definedCount = 0;
+    int emptyCount = 0;
+    for (int i = 0; i < entities.size(); i++) {
+      PropagationEntity entity = entities.get(i);
+      String entityPrefix = prefix + "[" + i + "]";
+      if (entity == null) {
+        errors.add(entityPrefix + " cannot be null");
+        continue;
+      }
+      validateDuplicateEntity(entity.getEntity(), entityPrefix, seenIds, errors);
+      Long currentCpu = entity.getCpuCostNs();
+      Long currentMem = entity.getMemoryCostBytes();
+      // Both costs must be defined or both null
+      // If both are defined, add to totalCpu and totalMem for limit validation
+      // If both are null, do nothing
+      if (currentCpu != null && currentMem != null) {
+        totalCpu += costOrZero(entityPrefix, "cpuCostNs", currentCpu, errors);
+        totalMem += costOrZero(entityPrefix, "memoryCostBytes", currentMem, errors);
+        definedCount++;
+      } else if (currentCpu == null && currentMem == null) {
+        emptyCount++;
+      } else {
+        errors.add(entityPrefix + " must have both cpuCostNs and memoryCostBytes defined or both null");
+        break;
+      }
+      if (definedCount > 0 && emptyCount > 0) {
+        errors.add(prefix + " must have either all or none of the propagationEntities define costs");
+        break;
+      }
+      List<PropagationEntityOverrides> overrides = entity.getOverrides();
+      if (overrides != null && !overrides.isEmpty()) {
+        validateOverrides(overrides, entityPrefix, errors, currentCpu, currentMem);
+      }
+    }
+    validateLimits(totalCpu, totalMem, limitCpu, limitMem, prefix, errors);
+    // If no errors and all entities have empty costs, rewrite to evenly distribute enforcementProfile costs
+    if (errors.isEmpty() && definedCount == 0) {
+      rewriteEmptyCosts(entities, limitCpu, limitMem);
+    }
+  }
+
+  private static void validateOverrides(List<PropagationEntityOverrides> overrides, String prefix,
+                                        List<String> errors, Long limitCpu, Long limitMem) {
+    long totalCpu = 0;
+    long totalMem = 0;
+    for (int i = 0; i < overrides.size(); i++) {
+      PropagationEntityOverrides override = overrides.get(i);
+      String overridePrefix = prefix + ".overrides[" + i + "]";
+      if (override == null) {
+        errors.add(overridePrefix + " cannot be null");
+        continue;
+      }
+      Set<String> seenIds = new HashSet<>();
+      validateDuplicateEntity(override.getEntity(), overridePrefix, seenIds, errors);
+      // For overrides, costs must be defined for each entry
+      totalCpu += costOrZero(overridePrefix, "cpuCostNs", override.getCpuCostNs(), errors);
+      totalMem += costOrZero(overridePrefix, "memoryCostBytes", override.getMemoryCostBytes(), errors);
+    }
+    validateLimits(totalCpu, totalMem, limitCpu, limitMem, prefix, errors);
+  }
+
+  private static void validateLimits(Long totalCpu, Long totalMem, Long limitCpu, Long limitMem,
+      String prefix, List<String> errors) {
+    if (limitCpu != null && totalCpu > limitCpu) {
+      errors.add(prefix + " total CPU cost (" + totalCpu + " ns) exceeds parent/limit (" + limitCpu + " ns)");
+    }
+    if (limitMem != null && totalMem > limitMem) {
+      errors.add(prefix + " total memory cost (" + totalMem + " bytes) exceeds parent/limit (" + limitMem + " bytes)");
+    }
+  }
+
+  private static void validateDuplicateEntity(String entityId, String prefix, Set<String> entityIds,
+      List<String> errors) {
+    if (entityId == null || entityId.trim().isEmpty()) {
+      errors.add(prefix + ".propagationEntity cannot be null or empty");
+    } else {
+      // Check for duplicate propagationEntity IDs
+      if (entityIds.contains(entityId)) {
+        errors.add(prefix + ".propagationEntity '" + entityId + "' is duplicated");
+      } else {
+        entityIds.add(entityId);
+      }
+    }
+  }
+
+  private static void rewriteEmptyCosts(List<PropagationEntity> entities, long totalCpu, long totalMem) {
+    int numEntities = entities.size();
+    long shareCpuCostNs = totalCpu / numEntities;
+    long shareMemoryCostBytes = totalMem / numEntities;
+    for (PropagationEntity entity : entities) {
+      if (entity.getCpuCostNs() == null && entity.getMemoryCostBytes() == null) {
+        entity.setCpuCostNs(shareCpuCostNs);
+        entity.setMemoryCostBytes(shareMemoryCostBytes);
+      }
+    }
+  }
+
+  /** Validate non-null/non-negative and return the positive value (else 0) for accumulation. */
+  private static long costOrZero(String prefix, String field, Long value, List<String> errors) {
+    if (value == null) {
+      errors.add(prefix + "." + field + " cannot be null");
+      return 0L;
+    }
+    if (value <= 0) {
+      errors.add(prefix + "." + field + " has to positive, got: " + value);
+      return 0L;
+    }
+    return value;
   }
 }

@@ -23,6 +23,7 @@ import { AppBar, Box, makeStyles, Paper } from '@material-ui/core';
 import MenuIcon from '@material-ui/icons/Menu';
 import Logo from './SvgIcons/Logo';
 import BreadcrumbsComponent from './Breadcrumbs';
+import TimezoneSelector from './TimezoneSelector';
 
 type Props = {
   highlightSidebarLink: (id: number) => void;
@@ -53,6 +54,32 @@ const useStyles = makeStyles((theme) => ({
       letterSpacing: 1,
       fontWeight: 500
     }
+  },
+  timezoneContainer: {
+    display: 'flex',
+    alignItems: 'center',
+    marginRight: theme.spacing(2),
+    '& .MuiFormControl-root': {
+      margin: 0,
+    },
+    '& .MuiInputLabel-root': {
+      color: 'rgba(255, 255, 255, 0.7)',
+    },
+    '& .MuiSelect-select': {
+      color: '#fff',
+    },
+    '& .MuiSelect-icon': {
+      color: 'rgba(255, 255, 255, 0.7)',
+    },
+    '& .MuiOutlinedInput-notchedOutline': {
+      borderColor: 'rgba(255, 255, 255, 0.3)',
+    },
+    '& .MuiOutlinedInput-root:hover .MuiOutlinedInput-notchedOutline': {
+      borderColor: 'rgba(255, 255, 255, 0.5)',
+    },
+    '& .MuiOutlinedInput-root.Mui-focused .MuiOutlinedInput-notchedOutline': {
+      borderColor: 'rgba(255, 255, 255, 0.7)',
+    },
   }
 }));
 
@@ -69,6 +96,11 @@ const Header = ({ highlightSidebarLink, showHideSideBarHandler, openSidebar, clu
             <MenuIcon onClick={() => showHideSideBarHandler()} />
           </Box>
           <BreadcrumbsComponent {...props} />
+        </Box>
+        <Box display="flex" alignItems="center" marginRight={2}>
+          <Box className={classes.timezoneContainer}>
+            <TimezoneSelector variant="outlined" size="small" showIcon={false} />
+          </Box>
         </Box>
         <Box textAlign="center" marginY="11.5px" borderLeft="1px solid rgba(255,255,255,0.5)">
           <Paper className={classes.paper}>

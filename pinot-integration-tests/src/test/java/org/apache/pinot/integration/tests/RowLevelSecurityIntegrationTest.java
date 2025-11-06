@@ -32,7 +32,6 @@ import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.env.PinotConfiguration;
 import org.apache.pinot.util.TestUtils;
-import org.junit.Assert;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.testng.annotations.AfterClass;
@@ -43,6 +42,8 @@ import static org.apache.pinot.integration.tests.BasicAuthTestUtils.AUTH_HEADER;
 import static org.apache.pinot.integration.tests.BasicAuthTestUtils.AUTH_HEADER_USER;
 import static org.apache.pinot.integration.tests.BasicAuthTestUtils.AUTH_TOKEN;
 import static org.apache.pinot.integration.tests.ClusterIntegrationTestUtils.getBrokerQueryApiUrl;
+import static org.testng.Assert.assertFalse;
+import static org.testng.Assert.assertTrue;
 
 
 public class RowLevelSecurityIntegrationTest extends BaseClusterIntegrationTest {
@@ -181,10 +182,8 @@ public class RowLevelSecurityIntegrationTest extends BaseClusterIntegrationTest 
         "select count(*)from mytable where AirlineID=19805 and DestStateName='California'";
 
     // compare admin response with that of user
-    Assert.assertTrue(
-        compareRows(queryBroker(queryWithFiltersForUser1, AUTH_HEADER), queryBroker(query, AUTH_HEADER_USER)));
-    Assert.assertTrue(
-        compareRows(queryBroker(queryWithFiltersForUser2, AUTH_HEADER), queryBroker(query, AUTH_HEADER_USER_2)));
+    assertTrue(compareRows(queryBroker(queryWithFiltersForUser1, AUTH_HEADER), queryBroker(query, AUTH_HEADER_USER)));
+    assertTrue(compareRows(queryBroker(queryWithFiltersForUser2, AUTH_HEADER), queryBroker(query, AUTH_HEADER_USER_2)));
   }
 
   @Test
@@ -214,10 +213,8 @@ public class RowLevelSecurityIntegrationTest extends BaseClusterIntegrationTest 
         + "  and DestStateName = 'California'";
 
     // compare admin response with that of user
-    Assert.assertTrue(
-        compareRows(queryBroker(queryWithFiltersForUser1, AUTH_HEADER), queryBroker(query, AUTH_HEADER_USER)));
-    Assert.assertTrue(
-        compareRows(queryBroker(queryWithFiltersForUser2, AUTH_HEADER), queryBroker(query, AUTH_HEADER_USER_2)));
+    assertTrue(compareRows(queryBroker(queryWithFiltersForUser1, AUTH_HEADER), queryBroker(query, AUTH_HEADER_USER)));
+    assertTrue(compareRows(queryBroker(queryWithFiltersForUser2, AUTH_HEADER), queryBroker(query, AUTH_HEADER_USER_2)));
   }
 
   @Test
@@ -245,10 +242,8 @@ public class RowLevelSecurityIntegrationTest extends BaseClusterIntegrationTest 
         + "    AND AirlineID='19805'";
 
     // compare admin response with that of user
-    Assert.assertTrue(
-        compareRows(queryBroker(queryWithFiltersForUser1, AUTH_HEADER), queryBroker(query, AUTH_HEADER_USER)));
-    Assert.assertTrue(
-        compareRows(queryBroker(queryWithFiltersForUser2, AUTH_HEADER), queryBroker(query, AUTH_HEADER_USER_2)));
+    assertTrue(compareRows(queryBroker(queryWithFiltersForUser1, AUTH_HEADER), queryBroker(query, AUTH_HEADER_USER)));
+    assertTrue(compareRows(queryBroker(queryWithFiltersForUser2, AUTH_HEADER), queryBroker(query, AUTH_HEADER_USER_2)));
   }
 
   @Test
@@ -266,9 +261,8 @@ public class RowLevelSecurityIntegrationTest extends BaseClusterIntegrationTest 
             + "AND "
             + "(DestStateName='Florida')";
 
-    Assert.assertTrue(
-        compareRows(queryBroker(queryWithFiltersForUser1, AUTH_HEADER),
-            queryBroker(singleStageQuery, AUTH_HEADER_USER)));
+    assertTrue(compareRows(queryBroker(queryWithFiltersForUser1, AUTH_HEADER),
+        queryBroker(singleStageQuery, AUTH_HEADER_USER)));
 
     // Test for multi-stage
     setUseMultiStageQueryEngine(true);
@@ -288,9 +282,8 @@ public class RowLevelSecurityIntegrationTest extends BaseClusterIntegrationTest 
 
     // compare admin response with that of user
 
-    Assert.assertTrue(
-        compareRows(queryBroker(queryWithFiltersForUser2, AUTH_HEADER),
-            queryBroker(multiStageQuery, AUTH_HEADER_USER_2)));
+    assertTrue(compareRows(queryBroker(queryWithFiltersForUser2, AUTH_HEADER),
+        queryBroker(multiStageQuery, AUTH_HEADER_USER_2)));
   }
 
   private JsonNode queryBroker(String query, Map<String, String> headers)
@@ -301,9 +294,14 @@ public class RowLevelSecurityIntegrationTest extends BaseClusterIntegrationTest 
     return response;
   }
 
-  private boolean compareRows(JsonNode expectedResponse, JsonNode response) {
-    JsonNode responseRow = response.get("resultTable").get("rows").get(0);
-    JsonNode expectedRow = expectedResponse.get("resultTable").get("rows").get(0);
+  private boolean compareRows(JsonNode adminQueryResponse, JsonNode userQueryResponse) {
+    // No filters should get applied for admin response
+    assertFalse(adminQueryResponse.get("rlsFiltersApplied").asBoolean());
+    // Filters are always applied in case of users
+    assertTrue(userQueryResponse.get("rlsFiltersApplied").asBoolean());
+
+    JsonNode responseRow = userQueryResponse.get("resultTable").get("rows").get(0);
+    JsonNode expectedRow = adminQueryResponse.get("resultTable").get("rows").get(0);
 
     // Compare each column
     for (int i = 0; i < responseRow.size(); i++) {

@@ -18,7 +18,6 @@
  */
 package org.apache.pinot.controller.util;
 
-import com.google.common.collect.ImmutableList;
 import java.util.List;
 import org.apache.pinot.controller.ControllerConf;
 import org.apache.pinot.core.transport.HttpServerThreadPoolConfig;
@@ -101,7 +100,7 @@ public class ListenerConfigUtilTest {
   }
 
   /**
-   * Asserts that controller.port can be opt-out and both http and https can be configured with seperate ports.
+   * Asserts that controller.port can be opt-out and both http and https can be configured with separate ports.
    */
   @Test
   public void testHttpAndHttpsConfigs() {
@@ -201,7 +200,7 @@ public class ListenerConfigUtilTest {
 
   @Test
   public void testFindLastTlsPort() {
-    List<ListenerConfig> configs = ImmutableList.of(new ListenerConfig("conf1", "host1", 9000, "http", null,
+    List<ListenerConfig> configs = List.of(new ListenerConfig("conf1", "host1", 9000, "http", null,
             HttpServerThreadPoolConfig.defaultInstance()),
         new ListenerConfig("conf2", "host2", 9001, "https", null,
             HttpServerThreadPoolConfig.defaultInstance()),
@@ -217,7 +216,7 @@ public class ListenerConfigUtilTest {
 
   @Test
   public void testFindLastTlsPortMissing() {
-    List<ListenerConfig> configs = ImmutableList.of(new ListenerConfig("conf1", "host1", 9000, "http", null,
+    List<ListenerConfig> configs = List.of(new ListenerConfig("conf1", "host1", 9000, "http", null,
             HttpServerThreadPoolConfig.defaultInstance()),
         new ListenerConfig("conf2", "host2", 9001, "http", null,
             HttpServerThreadPoolConfig.defaultInstance()),

@@ -29,7 +29,7 @@ const Alert = (props) => {
 const CustomNotification = () => {
   return (
     <NotificationContext.Consumer>
-      {context => 
+      {context =>
         <Snackbar
           anchorOrigin={{ vertical: 'top', horizontal: 'right' }}
           open={context && context.show}

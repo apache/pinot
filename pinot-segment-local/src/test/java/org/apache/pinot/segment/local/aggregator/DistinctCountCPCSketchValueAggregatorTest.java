@@ -60,6 +60,12 @@ public class DistinctCountCPCSketchValueAggregatorTest {
   }
 
   @Test
+  public void nullInitialShouldReturnEmptySketch() {
+    DistinctCountCPCSketchValueAggregator agg = new DistinctCountCPCSketchValueAggregator(Collections.emptyList());
+    assertEquals(toSketch(agg.getInitialAggregatedValue(null)).getEstimate(), 0.0);
+  }
+
+  @Test
   public void applyAggregatedValueShouldUnion() {
     CpcSketch input1 = new CpcSketch();
     IntStream.range(0, 1000).forEach(input1::update);

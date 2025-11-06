@@ -39,6 +39,7 @@ import org.testng.annotations.Test;
 import static org.apache.pinot.core.query.scheduler.TestHelper.createQueryRequest;
 import static org.testng.Assert.assertEquals;
 import static org.testng.Assert.assertTrue;
+import static org.testng.Assert.fail;
 
 
 public class MultiLevelPriorityQueueTest {
@@ -93,11 +94,10 @@ public class MultiLevelPriorityQueueTest {
     // it should throw now
     try {
       queue.put(createQueryRequest(GROUP_ONE, METRICS));
+      fail();
     } catch (OutOfCapacityException e) {
-      assertTrue(true);
-      return;
+      // expected
     }
-    assertTrue(false);
   }
 
   @Test

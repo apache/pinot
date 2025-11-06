@@ -18,8 +18,12 @@
  */
 package org.apache.pinot.core.periodictask;
 
+import com.google.common.base.Preconditions;
+import com.google.common.collect.Maps;
 import java.util.ArrayList;
+import java.util.Collection;
 import java.util.List;
+import java.util.Map;
 import java.util.Properties;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
@@ -36,33 +40,19 @@ public class PeriodicTaskScheduler {
   private static final Logger LOGGER = LoggerFactory.getLogger(PeriodicTaskScheduler.class);
 
   private ScheduledExecutorService _executorService;
-  private List<PeriodicTask> _tasksWithValidInterval;
-  private volatile int _taskCount;
+  private Map<String, PeriodicTask> _periodicTasks;
 
   /**
    * Initializes the periodic task scheduler with a list of periodic tasks.
    */
   public void init(List<PeriodicTask> periodicTasks) {
-    _tasksWithValidInterval = new ArrayList<>();
+    _periodicTasks = Maps.newHashMapWithExpectedSize(periodicTasks.size());
     for (PeriodicTask periodicTask : periodicTasks) {
-      if (periodicTask.getIntervalInSeconds() > 0) {
-        LOGGER.info("Adding periodic task: {}", periodicTask);
-        _tasksWithValidInterval.add(periodicTask);
-      } else {
-        LOGGER.info("Skipping periodic task: {}", periodicTask);
-      }
+      LOGGER.info("Adding periodic task: {}", periodicTask);
+      String periodicTaskName = periodicTask.getTaskName();
+      Preconditions.checkState(_periodicTasks.put(periodicTaskName, periodicTask) == null,
+          "Duplicate periodic task name: %s", periodicTaskName);
     }
-
-    _taskCount = _tasksWithValidInterval.size();
-  }
-
-  /**
-   * Get number of tasks scheduled. Method is thread safe since task list is not modified after it is
-   * initialized in {@link #init} method.
-   * @return
-   */
-  public int getPeriodicTaskCount() {
-    return _taskCount;
   }
 
   /**
@@ -73,17 +63,24 @@ public class PeriodicTaskScheduler {
       LOGGER.warn("Periodic task scheduler already started");
     }
 
-    if (_tasksWithValidInterval.isEmpty()) {
+    if (_periodicTasks.isEmpty()) {
       LOGGER.warn("No periodic task scheduled");
     } else {
-      LOGGER.info("Starting periodic task scheduler with tasks: {}", _tasksWithValidInterval);
-      _executorService = Executors.newScheduledThreadPool(_tasksWithValidInterval.size());
-      for (PeriodicTask periodicTask : _tasksWithValidInterval) {
+      Collection<PeriodicTask> periodicTasks = _periodicTasks.values();
+      LOGGER.info("Starting periodic task scheduler with tasks: {}", periodicTasks);
+      _executorService = Executors.newScheduledThreadPool(_periodicTasks.size());
+      for (PeriodicTask periodicTask : periodicTasks) {
         periodicTask.start();
+        String periodicTaskTaskName = periodicTask.getTaskName();
+        long intervalInSeconds = periodicTask.getIntervalInSeconds();
+        if (intervalInSeconds <= 0) {
+          LOGGER.info("Skip scheduling periodic task: {} for periodic execution (it can be manually triggered)",
+              periodicTaskTaskName);
+          continue;
+        }
         _executorService.scheduleWithFixedDelay(() -> {
           try {
-            LOGGER.info("Starting {} with running frequency of {} seconds.", periodicTask.getTaskName(),
-                periodicTask.getIntervalInSeconds());
+            LOGGER.info("Starting {} with running frequency of {} seconds.", periodicTaskTaskName, intervalInSeconds);
             periodicTask.run();
           } catch (Throwable e) {
             // catch all errors to prevent subsequent executions from being silently suppressed
@@ -91,9 +88,9 @@ public class PeriodicTaskScheduler {
             // See <a href="https://docs.oracle.com/javase/8/docs/api/java/util/concurrent/ScheduledExecutorService
             // .html#scheduleWithFixedDelay-java.lang.Runnable-long-long-java.util.concurrent.TimeUnit-">Ref</a>
             // </pre>
-            LOGGER.warn("Caught exception while running Task: {}", periodicTask.getTaskName(), e);
+            LOGGER.warn("Caught exception while running Task: {}", periodicTaskTaskName, e);
           }
-        }, periodicTask.getInitialDelayInSeconds(), periodicTask.getIntervalInSeconds(), TimeUnit.SECONDS);
+        }, periodicTask.getInitialDelayInSeconds(), intervalInSeconds, TimeUnit.SECONDS);
       }
     }
   }
@@ -108,38 +105,20 @@ public class PeriodicTaskScheduler {
       _executorService = null;
     }
 
-    if (_tasksWithValidInterval != null) {
-      LOGGER.info("Stopping all periodic tasks: {}", _tasksWithValidInterval);
-      _tasksWithValidInterval.parallelStream().forEach(PeriodicTask::stop);
+    if (_periodicTasks != null) {
+      LOGGER.info("Stopping all periodic tasks: {}", _periodicTasks);
+      _periodicTasks.values().parallelStream().forEach(PeriodicTask::stop);
     }
   }
 
-  /** @return true if task with given name exists; otherwise, false. */
+  /// Returns true if the task exists (regardless of whether it is scheduled to run periodically or not).
   public boolean hasTask(String periodicTaskName) {
-    for (PeriodicTask task : _tasksWithValidInterval) {
-      if (task.getTaskName().equals(periodicTaskName)) {
-        return true;
-      }
-    }
-    return false;
+    return _periodicTasks.containsKey(periodicTaskName);
   }
 
-  /** @return List of tasks name that will run periodically. */
+  /// Returns the list of all registered task names.
   public List<String> getTaskNames() {
-    List<String> taskNameList = new ArrayList<>();
-    for (PeriodicTask task : _tasksWithValidInterval) {
-      taskNameList.add(task.getTaskName());
-    }
-    return taskNameList;
-  }
-
-  private PeriodicTask getPeriodicTask(String periodicTaskName) {
-    for (PeriodicTask task : _tasksWithValidInterval) {
-      if (task.getTaskName().equals(periodicTaskName)) {
-        return task;
-      }
-    }
-    return null;
+    return new ArrayList<>(_periodicTasks.keySet());
   }
 
   /** Execute {@link PeriodicTask} immediately on the specified table. */
@@ -147,9 +126,9 @@ public class PeriodicTaskScheduler {
     // During controller deployment, each controller can have a slightly different list of periodic tasks if we add,
     // remove, or rename periodic task. To avoid this situation, we check again (besides the check at controller API
     // level) whether the periodic task exists.
-    PeriodicTask periodicTask = getPeriodicTask(periodicTaskName);
+    PeriodicTask periodicTask = _periodicTasks.get(periodicTaskName);
     if (periodicTask == null) {
-      LOGGER.error("Unknown Periodic Task {}", periodicTaskName);
+      LOGGER.error("Unknown periodic task: {}", periodicTaskName);
       return;
     }
 

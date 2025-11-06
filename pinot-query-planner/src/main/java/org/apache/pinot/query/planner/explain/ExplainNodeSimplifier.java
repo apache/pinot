@@ -24,6 +24,7 @@ import java.util.Collections;
 import java.util.List;
 import org.apache.pinot.core.query.reduce.ExplainPlanDataTableReducer;
 import org.apache.pinot.query.planner.plannode.AggregateNode;
+import org.apache.pinot.query.planner.plannode.EnrichedJoinNode;
 import org.apache.pinot.query.planner.plannode.ExchangeNode;
 import org.apache.pinot.query.planner.plannode.ExplainedNode;
 import org.apache.pinot.query.planner.plannode.FilterNode;
@@ -86,6 +87,11 @@ public class ExplainNodeSimplifier {
 
     @Override
     public PlanNode visitJoin(JoinNode node, Void context) {
+      return defaultNode(node);
+    }
+
+    @Override
+    public PlanNode visitEnrichedJoin(EnrichedJoinNode node, Void context) {
       return defaultNode(node);
     }
 

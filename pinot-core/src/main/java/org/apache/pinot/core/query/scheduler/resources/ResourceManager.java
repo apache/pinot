@@ -24,6 +24,7 @@ import com.google.common.util.concurrent.MoreExecutors;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ThreadFactory;
+import org.apache.pinot.core.executor.ThrottleOnCriticalHeapUsageExecutor;
 import org.apache.pinot.core.query.request.ServerQueryRequest;
 import org.apache.pinot.core.query.scheduler.SchedulerGroupAccountant;
 import org.apache.pinot.core.util.trace.TracedThreadFactory;
@@ -50,8 +51,6 @@ public abstract class ResourceManager {
   public static final String QUERY_WORKER_CONFIG_KEY = "query_worker_threads";
   public static final int DEFAULT_QUERY_RUNNER_THREADS;
   public static final int DEFAULT_QUERY_WORKER_THREADS;
-
-
 
   static {
     int numCores = Runtime.getRuntime().availableProcessors();
@@ -85,14 +84,19 @@ public abstract class ResourceManager {
     // pqr -> pinot query runner (to give short names)
     ThreadFactory queryRunnerFactory = new TracedThreadFactory(QUERY_RUNNER_THREAD_PRIORITY, false,
         CommonConstants.ExecutorService.PINOT_QUERY_RUNNER_NAME_FORMAT);
-    _queryRunners =
-        MoreExecutors.listeningDecorator(Executors.newFixedThreadPool(_numQueryRunnerThreads, queryRunnerFactory));
+
+    ExecutorService runnerService = Executors.newFixedThreadPool(_numQueryRunnerThreads, queryRunnerFactory);
+    runnerService = ThrottleOnCriticalHeapUsageExecutor.maybeWrap(
+        runnerService, config, "query runner");
+    _queryRunners = MoreExecutors.listeningDecorator(runnerService);
 
     // pqw -> pinot query workers
     ThreadFactory queryWorkersFactory = new TracedThreadFactory(Thread.NORM_PRIORITY, false,
         CommonConstants.ExecutorService.PINOT_QUERY_WORKER_NAME_FORMAT);
-    _queryWorkers =
-        MoreExecutors.listeningDecorator(Executors.newFixedThreadPool(_numQueryWorkerThreads, queryWorkersFactory));
+    ExecutorService workerService = Executors.newFixedThreadPool(_numQueryWorkerThreads, queryWorkersFactory);
+    workerService = ThrottleOnCriticalHeapUsageExecutor.maybeWrap(
+        workerService, config, "query worker");
+    _queryWorkers = MoreExecutors.listeningDecorator(workerService);
   }
 
   public void stop() {

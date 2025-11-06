@@ -127,7 +127,6 @@ public class SegmentCompletionManager {
     String realtimeTableName = TableNameBuilder.REALTIME.tableNameWithType(llcSegmentName.getTableName());
     String segmentName = llcSegmentName.getSegmentName();
     SegmentZKMetadata segmentMetadata = _segmentManager.getSegmentZKMetadata(realtimeTableName, segmentName, null);
-    Preconditions.checkState(segmentMetadata != null, "Failed to find ZK metadata for segment: %s", segmentName);
 
     TableConfig tableConfig = _segmentManager.getTableConfig(realtimeTableName);
     String factoryName = null;

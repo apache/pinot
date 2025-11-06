@@ -24,7 +24,7 @@
   <parent>
     <artifactId>pinot-plugins</artifactId>
     <groupId>org.apache.pinot</groupId>
-    <version>1.4.0-SNAPSHOT</version>
+    <version>1.5.0-SNAPSHOT</version>
   </parent>
 
   <artifactId>pinot-input-format</artifactId>
@@ -37,6 +37,7 @@
   </properties>
 
   <modules>
+    <module>pinot-arrow</module>
     <module>pinot-avro</module>
     <module>pinot-avro-base</module>
     <module>pinot-clp-log</module>

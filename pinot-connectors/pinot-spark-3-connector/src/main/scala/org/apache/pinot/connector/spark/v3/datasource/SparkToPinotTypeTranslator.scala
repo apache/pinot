@@ -58,6 +58,7 @@ object SparkToPinotTypeTranslator {
     case _: LongType => FieldSpec.DataType.LONG
     case _: FloatType => FieldSpec.DataType.FLOAT
     case _: DoubleType => FieldSpec.DataType.DOUBLE
+    case _: DecimalType => FieldSpec.DataType.BIG_DECIMAL
     case _: BooleanType => FieldSpec.DataType.BOOLEAN
     case _: BinaryType => FieldSpec.DataType.BYTES
     case _: TimestampType => FieldSpec.DataType.LONG

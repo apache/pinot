@@ -18,7 +18,6 @@
  */
 package org.apache.pinot.client;
 
-import com.google.common.collect.ImmutableList;
 import java.util.List;
 import java.util.Random;
 
@@ -33,7 +32,7 @@ public class SimpleBrokerSelector implements BrokerSelector {
   private final Random _random = new Random();
 
   public SimpleBrokerSelector(List<String> brokerList) {
-    _brokerList = ImmutableList.copyOf(brokerList);
+    _brokerList = List.copyOf(brokerList);
   }
 
   @Override
@@ -43,7 +42,7 @@ public class SimpleBrokerSelector implements BrokerSelector {
 
   @Override
   public List<String> getBrokers() {
-    return ImmutableList.copyOf(_brokerList);
+    return List.copyOf(_brokerList);
   }
 
   @Override

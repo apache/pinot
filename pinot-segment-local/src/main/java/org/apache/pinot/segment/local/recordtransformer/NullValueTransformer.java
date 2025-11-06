@@ -83,7 +83,7 @@ public class NullValueTransformer implements RecordTransformer {
   }
 
   @Override
-  public GenericRow transform(GenericRow record) {
+  public void transform(GenericRow record) {
     for (Map.Entry<String, Object> entry : _defaultNullValues.entrySet()) {
       String fieldName = entry.getKey();
       Object value = record.getValue(fieldName);
@@ -91,6 +91,5 @@ public class NullValueTransformer implements RecordTransformer {
         record.putDefaultNullValue(fieldName, entry.getValue());
       }
     }
-    return record;
   }
 }

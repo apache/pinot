@@ -21,7 +21,6 @@ package org.apache.pinot.server.predownload;
 import java.io.File;
 import java.io.IOException;
 import org.apache.commons.io.FileUtils;
-import org.testng.Assert;
 import org.testng.annotations.AfterMethod;
 import org.testng.annotations.BeforeMethod;
 import org.testng.annotations.Test;
@@ -30,9 +29,10 @@ import static org.apache.pinot.server.predownload.PredownloadTestUtil.CLUSTER_NA
 import static org.apache.pinot.server.predownload.PredownloadTestUtil.INSTANCE_ID;
 import static org.apache.pinot.server.predownload.PredownloadTestUtil.SEGMENT_NAME;
 import static org.mockito.Mockito.mock;
-import static org.testng.AssertJUnit.assertEquals;
-import static org.testng.AssertJUnit.assertNotNull;
-import static org.testng.AssertJUnit.assertTrue;
+import static org.testng.Assert.assertEquals;
+import static org.testng.Assert.assertNotNull;
+import static org.testng.Assert.assertTrue;
+import static org.testng.Assert.fail;
 
 
 public class PredownloadPredownloadStatusRecorderTest {
@@ -86,7 +86,7 @@ public class PredownloadPredownloadStatusRecorderTest {
       PredownloadStatusRecorder.predownloadComplete(PredownloadCompletionReason.NO_SEGMENT_TO_PREDOWNLOAD, CLUSTER_NAME,
           INSTANCE_ID,
           SEGMENT_NAME);
-      Assert.fail("No exception indicates we never called System.exit");
+      fail("No exception indicates we never called System.exit");
     } catch (ExitException e) {
       assertNotNull(e);
       File[] listFiles = testFolder.listFiles();
@@ -101,7 +101,7 @@ public class PredownloadPredownloadStatusRecorderTest {
       PredownloadStatusRecorder.predownloadComplete(PredownloadCompletionReason.ALL_SEGMENTS_DOWNLOADED, CLUSTER_NAME,
           INSTANCE_ID,
           SEGMENT_NAME);
-      Assert.fail("No exception indicates we never called System.exit");
+      fail("No exception indicates we never called System.exit");
     } catch (ExitException e) {
       assertNotNull(e);
       File[] listFiles = testFolder.listFiles();
@@ -117,7 +117,7 @@ public class PredownloadPredownloadStatusRecorderTest {
       PredownloadStatusRecorder.predownloadComplete(PredownloadCompletionReason.CANNOT_CONNECT_TO_DEEPSTORE,
           CLUSTER_NAME,
           INSTANCE_ID, SEGMENT_NAME);
-      Assert.fail("No exception indicates we never called System.exit");
+      fail("No exception indicates we never called System.exit");
     } catch (ExitException e) {
       assertNotNull(e);
       File[] listFiles = testFolder.listFiles();
@@ -132,11 +132,11 @@ public class PredownloadPredownloadStatusRecorderTest {
       PredownloadStatusRecorder.predownloadComplete(PredownloadCompletionReason.SOME_SEGMENTS_DOWNLOAD_FAILED,
           CLUSTER_NAME,
           INSTANCE_ID, SEGMENT_NAME);
-      Assert.fail("No exception indicates we never called System.exit");
+      fail("No exception indicates we never called System.exit");
     } catch (ExitException e) {
       assertNotNull(e);
       File[] listFiles = testFolder.listFiles();
-      assertEquals(2, listFiles.length);
+      assertEquals(listFiles.length, 2);
       assertTrue(listFiles[0].isFile());
       assertTrue(listFiles[0].getName().startsWith("FAILURE"));
       assertTrue(listFiles[1].isFile());
@@ -149,7 +149,7 @@ public class PredownloadPredownloadStatusRecorderTest {
       PredownloadStatusRecorder.predownloadComplete(PredownloadCompletionReason.INSTANCE_NON_EXISTENT, CLUSTER_NAME,
           INSTANCE_ID,
           SEGMENT_NAME);
-      Assert.fail("No exception indicates we never called System.exit");
+      fail("No exception indicates we never called System.exit");
     } catch (ExitException e) {
       assertNotNull(e);
       File[] listFiles = testFolder.listFiles();
@@ -162,7 +162,7 @@ public class PredownloadPredownloadStatusRecorderTest {
       PredownloadStatusRecorder.predownloadComplete(PredownloadCompletionReason.INSTANCE_NOT_ALIVE, CLUSTER_NAME,
           INSTANCE_ID,
           SEGMENT_NAME);
-      Assert.fail("No exception indicates we never called System.exit");
+      fail("No exception indicates we never called System.exit");
     } catch (ExitException e) {
       assertNotNull(e);
       File[] listFiles = testFolder.listFiles();

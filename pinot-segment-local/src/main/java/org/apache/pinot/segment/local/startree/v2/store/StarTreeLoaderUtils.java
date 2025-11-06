@@ -83,8 +83,8 @@ public class StarTreeLoaderUtils {
         PinotDataBuffer forwardIndexDataBuffer = indexReader.getIndexFor(metric, StandardIndexes.forward());
         DataType dataType = ValueAggregatorFactory.getAggregatedValueType(functionColumnPair.getFunctionType());
         FieldSpec fieldSpec = new MetricFieldSpec(metric, dataType);
-        ForwardIndexReader<?> forwardIndex =
-            ForwardIndexReaderFactory.createRawIndexReader(forwardIndexDataBuffer, dataType.getStoredType(), true);
+        ForwardIndexReader<?> forwardIndex = ForwardIndexReaderFactory.getInstance()
+            .createRawIndexReader(forwardIndexDataBuffer, dataType.getStoredType(), true);
         dataSourceMap.put(metric, new StarTreeDataSource(fieldSpec, numDocs, forwardIndex, null));
       }
 

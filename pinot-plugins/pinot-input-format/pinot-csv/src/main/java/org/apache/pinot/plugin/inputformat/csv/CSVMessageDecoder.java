@@ -21,10 +21,8 @@ package org.apache.pinot.plugin.inputformat.csv;
 
 import com.google.common.collect.ImmutableSet;
 import java.io.ByteArrayInputStream;
-import java.io.IOException;
 import java.io.InputStreamReader;
 import java.nio.charset.StandardCharsets;
-import java.util.Arrays;
 import java.util.Iterator;
 import java.util.Map;
 import java.util.Objects;
@@ -40,7 +38,6 @@ import org.slf4j.LoggerFactory;
 
 
 public class CSVMessageDecoder implements StreamMessageDecoder<byte[]> {
-
   private static final Logger LOGGER = LoggerFactory.getLogger(CSVMessageDecoder.class);
 
   private static final String CONFIG_FILE_FORMAT = "fileFormat";
@@ -166,24 +163,24 @@ public class CSVMessageDecoder implements StreamMessageDecoder<byte[]> {
       recordExtractorConfig.setMultiValueDelimiter(multiValueDelimiter.charAt(0));
     }
 
-    recordExtractorConfig.setColumnNames(ImmutableSet.copyOf(
-        Objects.requireNonNull(_format.getHeader())));
+    recordExtractorConfig.setColumnNames(ImmutableSet.copyOf(Objects.requireNonNull(_format.getHeader())));
     _recordExtractor.init(fieldsToRead, recordExtractorConfig);
   }
 
   @Override
   public GenericRow decode(byte[] payload, GenericRow destination) {
-    try {
-      Iterator<CSVRecord> iterator =
-          _format.parse(new InputStreamReader(new ByteArrayInputStream(payload), StandardCharsets.UTF_8)).iterator();
-      return _recordExtractor.extract(iterator.next(), destination);
-    } catch (IOException e) {
-      throw new RuntimeException("Error decoding CSV record from payload", e);
-    }
+    return decode(payload, 0, payload.length, destination);
   }
 
   @Override
   public GenericRow decode(byte[] payload, int offset, int length, GenericRow destination) {
-    return decode(Arrays.copyOfRange(payload, offset, offset + length), destination);
+    try {
+      Iterator<CSVRecord> iterator = _format.parse(
+          new InputStreamReader(new ByteArrayInputStream(payload, offset, length), StandardCharsets.UTF_8)).iterator();
+      return _recordExtractor.extract(iterator.next(), destination);
+    } catch (Exception e) {
+      throw new RuntimeException(
+          "Caught exception while decoding CSV record with payload: " + new String(payload, offset, length), e);
+    }
   }
 }

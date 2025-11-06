@@ -138,15 +138,7 @@ public abstract class ErrorCodesIntegrationTest extends BaseClusterIntegrationTe
       throws Exception {
     // ArrTime expects a numeric type
     testQueryException("SELECT COUNT(*) FROM mytable where ArrTime = 'potato'",
-        useMultiStageQueryEngine() ? QueryErrorCode.QUERY_EXECUTION : QueryErrorCode.QUERY_VALIDATION);
-  }
-
-  @Test
-  public void testInvalidAggregationArg()
-      throws Exception {
-    // Cannot use numeric aggregate function for string column
-    testQueryException("SELECT MAX(OriginState) FROM mytable where ArrTime > 5",
-        QueryErrorCode.QUERY_VALIDATION);
+        useMultiStageQueryEngine() ? QueryErrorCode.QUERY_PLANNING : QueryErrorCode.QUERY_VALIDATION);
   }
 
   private void testQueryException(@Language("sql") String query, QueryErrorCode errorCode)

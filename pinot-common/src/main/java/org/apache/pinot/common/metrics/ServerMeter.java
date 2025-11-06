@@ -54,6 +54,7 @@ public enum ServerMeter implements AbstractMetrics.Meter {
   REALTIME_OFFSET_COMMITS("commits", true),
   REALTIME_OFFSET_COMMIT_EXCEPTIONS("exceptions", false),
   STREAM_CONSUMER_CREATE_EXCEPTIONS("exceptions", false),
+  REALTIME_ROWS_AHEAD_OF_ZK("rows", false),
   // number of times partition of a record did not match the partition of the stream
   REALTIME_PARTITION_MISMATCH("mismatch", false),
   REALTIME_DEDUP_DROPPED("rows", false),
@@ -68,6 +69,7 @@ public enum ServerMeter implements AbstractMetrics.Meter {
   DELETED_TTL_KEYS_IN_MULTIPLE_SEGMENTS("rows", false),
   METADATA_TTL_PRIMARY_KEYS_REMOVED("rows", false),
   UPSERT_MISSED_VALID_DOC_ID_SNAPSHOT_COUNT("segments", false),
+  UPSERT_MISSED_QUERYABLE_DOC_ID_SNAPSHOT_COUNT("segments", false),
   UPSERT_PRELOAD_FAILURE("count", false),
   ROWS_WITH_ERRORS("rows", false),
   LLC_CONTROLLER_RESPONSE_NOT_SENT("messages", true),
@@ -92,8 +94,7 @@ public enum ServerMeter implements AbstractMetrics.Meter {
   RELOAD_FAILURES("segments", false),
   REFRESH_FAILURES("segments", false),
   UNTAR_FAILURES("segments", false),
-  SEGMENT_STREAMED_DOWNLOAD_UNTAR_FAILURES("segments", false, "Counts the number of segment "
-      + "fetch failures"),
+  SEGMENT_STREAMED_DOWNLOAD_UNTAR_FAILURES("segments", false, "Counts the number of segment " + "fetch failures"),
   SEGMENT_DIR_MOVEMENT_FAILURES("segments", false),
   SEGMENT_DOWNLOAD_FAILURES("segments", false),
   SEGMENT_DOWNLOAD_FROM_REMOTE_FAILURES("segments", false),
@@ -105,12 +106,14 @@ public enum ServerMeter implements AbstractMetrics.Meter {
   SEGMENT_UPLOAD_TIMEOUT("segments", false),
   NUM_RESIZES("numResizes", false),
   RESIZE_TIME_MS("resizeTimeMs", false),
+  STAR_TREE_INDEX_BUILD_FAILURES("segments", false),
   NO_TABLE_ACCESS("tables", true),
   INDEXING_FAILURES("attributeValues", true),
 
   READINESS_CHECK_OK_CALLS("readinessCheck", true),
   READINESS_CHECK_BAD_CALLS("readinessCheck", true),
   QUERIES_KILLED("query", true),
+  QUERIES_THROTTLED("query", true),
   HEAP_CRITICAL_LEVEL_EXCEEDED("count", true),
   HEAP_PANIC_LEVEL_EXCEEDED("count", true),
 
@@ -150,6 +153,12 @@ public enum ServerMeter implements AbstractMetrics.Meter {
    * But if a single query has 2 different join operators and each one reaches the limit, this will be increased by 2.
    */
   HASH_JOIN_TIMES_MAX_ROWS_REACHED("times", true),
+  /**
+   * Number of times group by results were trimmed.
+   * It is increased in one by each worker that reaches the limit within the stage.
+   * That means that if a stage has 10 workers and all of them reach the limit, this will be increased by 10.
+   */
+  AGGREGATE_TIMES_GROUPS_TRIMMED("times", true),
   /**
    * Number of times the max number of groups has been reached.
    * It is increased in one by each worker that reaches the limit within the stage.
@@ -203,10 +212,37 @@ public enum ServerMeter implements AbstractMetrics.Meter {
   // reingestion metrics
   SEGMENT_REINGESTION_FAILURE("segments", false),
 
+  // ThrottleOnCriticalHeapUsageExecutor meters
+  THROTTLE_EXECUTOR_QUEUED_TASKS("count", true,
+      "Number of tasks that have been queued in the throttle executor"),
+  THROTTLE_EXECUTOR_PROCESSED_TASKS("count", true,
+      "Number of tasks processed from the throttle executor queue"),
+  THROTTLE_EXECUTOR_TIMED_OUT_TASKS("count", true,
+      "Number of tasks that timed out in the throttle executor queue"),
+  THROTTLE_EXECUTOR_SHUTDOWN_CANCELED_TASKS("count", true,
+      "Number of tasks canceled during throttle executor shutdown"),
+
+  // commit-time compaction metrics
+  COMMIT_TIME_COMPACTION_ENABLED_SEGMENTS("segments", false,
+      "Number of segments processed with commit-time compaction enabled"),
+  COMMIT_TIME_COMPACTION_ROWS_PRE_COMPACTION("rows", false, "Total rows before commit-time compaction"),
+  COMMIT_TIME_COMPACTION_ROWS_POST_COMPACTION("rows", false, "Total rows after commit-time compaction"),
+  COMMIT_TIME_COMPACTION_ROWS_REMOVED("rows", false, "Number of rows removed during commit-time compaction"),
+  COMMIT_TIME_COMPACTION_BUILD_TIME_MS("milliseconds", false,
+      "Additional time spent in commit-time compaction processing"),
+
   /**
    * Approximate heap bytes used by the mutable JSON index at the time of index close.
    */
-  MUTABLE_JSON_INDEX_MEMORY_USAGE("bytes", false);
+  MUTABLE_JSON_INDEX_MEMORY_USAGE("bytes", false),
+  // Workload Budget exceeded counter
+  WORKLOAD_BUDGET_EXCEEDED("workloadBudgetExceeded", false, "Number of times workload budget exceeded"),
+  INGESTION_DELAY_TRACKING_ERRORS("errors", false,
+      "Indicates the count of errors encountered while tracking ingestion delay."),
+
+  TRANSFORMATION_ERROR_COUNT("rows", false),
+  DROPPED_RECORD_COUNT("rows", false),
+  CORRUPTED_RECORD_COUNT("rows", false);
 
   private final String _meterName;
   private final String _unit;

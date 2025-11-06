@@ -38,6 +38,7 @@ import org.apache.pinot.spi.stream.PartitionGroupConsumer;
 import org.apache.pinot.spi.stream.StreamConfig;
 import org.apache.pinot.spi.stream.StreamMessageMetadata;
 import org.apache.pinot.spi.stream.StreamPartitionMsgOffset;
+import org.apache.pinot.spi.utils.retry.RetryPolicy;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -50,6 +51,11 @@ public class KafkaPartitionLevelConsumer extends KafkaPartitionLevelConnectionHa
 
   public KafkaPartitionLevelConsumer(String clientId, StreamConfig streamConfig, int partition) {
     super(clientId, streamConfig, partition);
+  }
+
+  public KafkaPartitionLevelConsumer(String clientId, StreamConfig streamConfig, int partition,
+      RetryPolicy retryPolicy) {
+    super(clientId, streamConfig, partition, retryPolicy);
   }
 
   @Override
@@ -71,6 +77,7 @@ public class KafkaPartitionLevelConsumer extends KafkaPartitionLevelConnectionHa
     long firstOffset = -1;
     long offsetOfNextBatch = startOffset;
     StreamMessageMetadata lastMessageMetadata = null;
+    long batchSizeInBytes = 0;
     if (!records.isEmpty()) {
       firstOffset = records.get(0).offset();
       _lastFetchedOffset = records.get(records.size() - 1).offset();
@@ -82,6 +89,9 @@ public class KafkaPartitionLevelConsumer extends KafkaPartitionLevelConnectionHa
           String key = record.key();
           byte[] keyBytes = key != null ? key.getBytes(StandardCharsets.UTF_8) : null;
           filteredRecords.add(new BytesStreamMessage(keyBytes, message.get(), messageMetadata));
+          if (messageMetadata.getRecordSerializedSize() > 0) {
+            batchSizeInBytes += messageMetadata.getRecordSerializedSize();
+          }
         } else if (LOGGER.isDebugEnabled()) {
           LOGGER.debug("Tombstone message at offset: {}", record.offset());
         }
@@ -98,7 +108,7 @@ public class KafkaPartitionLevelConsumer extends KafkaPartitionLevelConnectionHa
       hasDataLoss = firstOffset > startOffset;
     }
     return new KafkaMessageBatch(filteredRecords, records.size(), offsetOfNextBatch, firstOffset, lastMessageMetadata,
-        hasDataLoss);
+        hasDataLoss, batchSizeInBytes);
   }
 
   private StreamMessageMetadata extractMessageMetadata(ConsumerRecord<String, Bytes> record) {

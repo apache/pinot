@@ -30,6 +30,7 @@ import java.util.Set;
 import org.apache.pinot.segment.local.function.FunctionEvaluator;
 import org.apache.pinot.segment.local.function.FunctionEvaluatorFactory;
 import org.apache.pinot.spi.config.table.TableConfig;
+import org.apache.pinot.spi.config.table.ingestion.IngestionConfig;
 import org.apache.pinot.spi.config.table.ingestion.TransformConfig;
 import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.Schema;
@@ -54,9 +55,9 @@ public class ExpressionTransformer implements RecordTransformer {
 
   public ExpressionTransformer(TableConfig tableConfig, Schema schema) {
     Map<String, FunctionEvaluator> expressionEvaluators = new HashMap<>();
-    _continueOnError = tableConfig.getIngestionConfig() != null && tableConfig.getIngestionConfig().isContinueOnError();
-    if (tableConfig.getIngestionConfig() != null && tableConfig.getIngestionConfig().getTransformConfigs() != null) {
-      for (TransformConfig transformConfig : tableConfig.getIngestionConfig().getTransformConfigs()) {
+    IngestionConfig ingestionConfig = tableConfig.getIngestionConfig();
+    if (ingestionConfig != null && ingestionConfig.getTransformConfigs() != null) {
+      for (TransformConfig transformConfig : ingestionConfig.getTransformConfigs()) {
         FunctionEvaluator previous = expressionEvaluators.put(transformConfig.getColumnName(),
             FunctionEvaluatorFactory.getExpressionEvaluator(transformConfig.getTransformFunction()));
         Preconditions.checkState(previous == null,
@@ -85,6 +86,8 @@ public class ExpressionTransformer implements RecordTransformer {
         topologicalSort(columnName, expressionEvaluators, discoveredNames);
       }
     }
+
+    _continueOnError = ingestionConfig != null && ingestionConfig.isContinueOnError();
   }
 
   private void topologicalSort(String column, Map<String, FunctionEvaluator> expressionEvaluators,
@@ -129,7 +132,7 @@ public class ExpressionTransformer implements RecordTransformer {
   }
 
   @Override
-  public GenericRow transform(GenericRow record) {
+  public void transform(GenericRow record) {
     for (Map.Entry<String, FunctionEvaluator> entry : _expressionEvaluators.entrySet()) {
       String column = entry.getKey();
       FunctionEvaluator transformFunctionEvaluator = entry.getValue();
@@ -144,10 +147,9 @@ public class ExpressionTransformer implements RecordTransformer {
         } catch (Exception e) {
           if (!_continueOnError) {
             throw new RuntimeException("Caught exception while evaluation transform function for column: " + column, e);
-          } else {
-            LOGGER.debug("Caught exception while evaluation transform function for column: {}", column, e);
-            record.putValue(GenericRow.INCOMPLETE_RECORD_KEY, true);
           }
+          LOGGER.debug("Caught exception while evaluation transform function for column: {}", column, e);
+          record.markIncomplete();
         }
       } else if (existingValue.getClass().isArray() || existingValue instanceof Collections
           || existingValue instanceof Map) {
@@ -163,7 +165,6 @@ public class ExpressionTransformer implements RecordTransformer {
         }
       }
     }
-    return record;
   }
 
   private boolean isTypeCompatible(Object existingValue, Object transformedValue) {

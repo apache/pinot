@@ -22,23 +22,27 @@ import it.unimi.dsi.fastutil.objects.Object2IntMap;
 import it.unimi.dsi.fastutil.objects.Object2IntOpenHashMap;
 import it.unimi.dsi.fastutil.objects.ObjectIterator;
 import java.util.Iterator;
+import java.util.function.ToIntFunction;
 
 
 public class OneObjectKeyGroupIdGenerator implements GroupIdGenerator {
   private final Object2IntOpenHashMap<Object> _groupIdMap;
   private final int _numGroupsLimit;
+  /// A function to generate the next group ID based on the current size of the map.
+  /// We use this instead of a simple lambda to avoid capturing `this` and therefore allocate on each getGroupId call
+  private final ToIntFunction<Object> _groupIdGenerator;
 
   public OneObjectKeyGroupIdGenerator(int numGroupsLimit, int initialCapacity) {
     _groupIdMap = new Object2IntOpenHashMap<>(initialCapacity);
     _groupIdMap.defaultReturnValue(INVALID_ID);
     _numGroupsLimit = numGroupsLimit;
+    _groupIdGenerator = k -> _groupIdMap.size();
   }
 
   @Override
   public int getGroupId(Object key) {
-    int numGroups = _groupIdMap.size();
-    if (numGroups < _numGroupsLimit) {
-      return _groupIdMap.computeIntIfAbsent(key, k -> numGroups);
+    if (_groupIdMap.size() < _numGroupsLimit) {
+      return _groupIdMap.computeIfAbsent(key, _groupIdGenerator);
     } else {
       return _groupIdMap.getInt(key);
     }

@@ -79,7 +79,7 @@ public class SpecialValueTransformer implements RecordTransformer {
   }
 
   @Override
-  public GenericRow transform(GenericRow record) {
+  public void transform(GenericRow record) {
     for (String column : _columnsToCheck) {
       Object value = record.getValue(column);
       if (value instanceof Object[]) {
@@ -107,7 +107,6 @@ public class SpecialValueTransformer implements RecordTransformer {
         }
       }
     }
-    return record;
   }
 
   @Nullable

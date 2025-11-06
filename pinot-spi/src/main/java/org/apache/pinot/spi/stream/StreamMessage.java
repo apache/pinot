@@ -26,7 +26,7 @@ import javax.annotation.Nullable;
  * 1. record key (optional)
  * 2. record value (required)
  * 3. length of the record value (required)
- * 4. StreamMessageMetadata (optional) - encapsulates record headers and metadata associated with a stream message
+ * 4. StreamMessageMetadata (required) - encapsulates record headers and metadata associated with a stream message
  *  (such as a message identifier, publish timestamp, user-provided headers etc)
  *
  * Similar to value decoder, each implementing stream plugin can have a key decoder and header extractor.
@@ -39,33 +39,19 @@ import javax.annotation.Nullable;
  * Additionally, the pinot table schema should refer these fields. Otherwise, even though the fields are extracted,
  * they will not materialize in the pinot table.
  */
+// TODO: Revisit if we need to support value type other than byte[]
 public class StreamMessage<T> {
   protected final byte[] _key;
   protected final T _value;
   protected final int _length;
   protected final StreamMessageMetadata _metadata;
 
-  public StreamMessage(@Nullable byte[] key, T value, int length, @Nullable StreamMessageMetadata metadata) {
+  public StreamMessage(@Nullable byte[] key, T value, int length, StreamMessageMetadata metadata) {
+    assert value != null && metadata != null;
     _key = key;
     _value = value;
     _length = length;
     _metadata = metadata;
-  }
-
-  public StreamMessage(T value, int length, @Nullable StreamMessageMetadata metadata) {
-    this(null, value, length, metadata);
-  }
-
-  public StreamMessage(T value, int length) {
-    this(value, length, null);
-  }
-
-  @Deprecated
-  public StreamMessage(@Nullable byte[] key, T value, @Nullable StreamMessageMetadata metadata, int length) {
-    _key = key;
-    _value = value;
-    _metadata = metadata;
-    _length = length;
   }
 
   /**
@@ -93,7 +79,6 @@ public class StreamMessage<T> {
   /**
    * Returns the metadata of the message.
    */
-  @Nullable
   public StreamMessageMetadata getMetadata() {
     return _metadata;
   }

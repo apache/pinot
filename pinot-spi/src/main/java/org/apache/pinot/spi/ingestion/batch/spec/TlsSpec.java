@@ -18,17 +18,22 @@
  */
 package org.apache.pinot.spi.ingestion.batch.spec;
 
+import java.io.Serializable;
+
+
 /**
  * TLS key and trust-store specification for ingestion jobs
  * (Enables access to TLS-protected controller APIs, etc.)
  */
-public class TlsSpec {
+public class TlsSpec implements Serializable {
   private String _keyStorePath;
   private String _keyStorePassword;
   private String _trustStoreType;
   private String _trustStorePath;
   private String _trustStorePassword;
   private String _keyStoreType;
+  private int _connectTimeout = 5000;
+  private int _readTimeout = 5000;
 
   public String getKeyStorePath() {
     return _keyStorePath;
@@ -76,5 +81,21 @@ public class TlsSpec {
 
   public void setKeyStoreType(String keyStoreType) {
     _keyStoreType = keyStoreType;
+  }
+
+  public int getConnectTimeout() {
+    return _connectTimeout;
+  }
+
+  public void setConnectTimeout(int connectTimeout) {
+    _connectTimeout = connectTimeout;
+  }
+
+  public int getReadTimeout() {
+    return _readTimeout;
+  }
+
+  public void setReadTimeout(int readTimeout) {
+    _readTimeout = readTimeout;
   }
 }

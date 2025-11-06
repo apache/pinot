@@ -19,11 +19,13 @@
 package org.apache.pinot.spi.stream;
 
 import java.nio.charset.StandardCharsets;
+import java.util.Map;
 import org.apache.pinot.spi.data.readers.GenericRow;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 
+@SuppressWarnings({"rawtypes", "unchecked"})
 public class StreamDataDecoderImpl implements StreamDataDecoder {
   private static final Logger LOGGER = LoggerFactory.getLogger(StreamDataDecoderImpl.class);
 
@@ -48,26 +50,26 @@ public class StreamDataDecoderImpl implements StreamDataDecoder {
 
   @Override
   public StreamDataDecoderResult decode(StreamMessage message) {
-    assert message.getValue() != null;
-
     try {
       _reuse.clear();
-      GenericRow row = _valueDecoder.decode(message.getValue(), 0, message.getLength(), _reuse);
+      Object value = message.getValue();
+      assert value != null;
+      int length = message.getLength();
+      GenericRow row = _valueDecoder.decode(value, 0, length, _reuse);
       if (row != null) {
         if (message.getKey() != null) {
           row.putValue(KEY, new String(message.getKey(), StandardCharsets.UTF_8));
         }
         StreamMessageMetadata metadata = message.getMetadata();
-        if (metadata != null) {
-          if (metadata.getHeaders() != null) {
-            metadata.getHeaders().getFieldToValueMap()
-                .forEach((key, value) -> row.putValue(HEADER_KEY_PREFIX + key, value));
-          }
-          if (metadata.getRecordMetadata() != null) {
-            metadata.getRecordMetadata().forEach((key, value) -> row.putValue(METADATA_KEY_PREFIX + key, value));
-          }
-          row.putValue(RECORD_SERIALIZED_VALUE_SIZE_KEY, message.getLength());
+        GenericRow headers = metadata.getHeaders();
+        if (headers != null) {
+          headers.getFieldToValueMap().forEach((k, v) -> row.putValue(HEADER_KEY_PREFIX + k, v));
         }
+        Map<String, String> recordMetadata = metadata.getRecordMetadata();
+        if (recordMetadata != null) {
+          recordMetadata.forEach((k, v) -> row.putValue(METADATA_KEY_PREFIX + k, v));
+        }
+        row.putValue(RECORD_SERIALIZED_VALUE_SIZE_KEY, length);
         return new StreamDataDecoderResult(row, null);
       } else {
         return new StreamDataDecoderResult(null,

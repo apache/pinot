@@ -20,9 +20,13 @@ package org.apache.pinot.segment.local.segment.creator.impl.stats;
 
 import java.util.HashMap;
 import java.util.Map;
+import org.apache.pinot.segment.local.utils.ClusterConfigForTable;
 import org.apache.pinot.segment.spi.creator.ColumnStatistics;
 import org.apache.pinot.segment.spi.creator.SegmentPreIndexStatsCollector;
 import org.apache.pinot.segment.spi.creator.StatsCollectorConfig;
+import org.apache.pinot.segment.spi.index.FieldIndexConfigs;
+import org.apache.pinot.segment.spi.index.FieldIndexConfigsUtil;
+import org.apache.pinot.segment.spi.index.StandardIndexes;
 import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.data.readers.GenericRow;
@@ -44,39 +48,25 @@ public class SegmentPreIndexStatsCollectorImpl implements SegmentPreIndexStatsCo
   @Override
   public void init() {
     _columnStatsCollectorMap = new HashMap<>();
+    Map<String, FieldIndexConfigs> indexConfigsByCol = FieldIndexConfigsUtil.createIndexConfigsByColName(
+        _statsCollectorConfig.getTableConfig(), _statsCollectorConfig.getSchema());
 
     Schema dataSchema = _statsCollectorConfig.getSchema();
     for (FieldSpec fieldSpec : dataSchema.getAllFieldSpecs()) {
       String column = fieldSpec.getName();
-      switch (fieldSpec.getDataType().getStoredType()) {
-        case INT:
-          _columnStatsCollectorMap.put(column, new IntColumnPreIndexStatsCollector(column, _statsCollectorConfig));
-          break;
-        case LONG:
-          _columnStatsCollectorMap.put(column, new LongColumnPreIndexStatsCollector(column, _statsCollectorConfig));
-          break;
-        case FLOAT:
-          _columnStatsCollectorMap.put(column, new FloatColumnPreIndexStatsCollector(column, _statsCollectorConfig));
-          break;
-        case DOUBLE:
-          _columnStatsCollectorMap.put(column, new DoubleColumnPreIndexStatsCollector(column, _statsCollectorConfig));
-          break;
-        case BIG_DECIMAL:
-          _columnStatsCollectorMap.put(column,
-              new BigDecimalColumnPreIndexStatsCollector(column, _statsCollectorConfig));
-          break;
-        case STRING:
-          _columnStatsCollectorMap.put(column, new StringColumnPreIndexStatsCollector(column, _statsCollectorConfig));
-          break;
-        case BYTES:
-          _columnStatsCollectorMap.put(column, new BytesColumnPredIndexStatsCollector(column, _statsCollectorConfig));
-          break;
-        case MAP:
-          _columnStatsCollectorMap.put(column, new MapColumnPreIndexStatsCollector(column, _statsCollectorConfig));
-          break;
-        default:
-          throw new IllegalStateException("Unsupported data type: " + fieldSpec.getDataType());
+      boolean dictionaryEnabled = indexConfigsByCol.get(column).getConfig(StandardIndexes.dictionary()).isEnabled();
+      if (!dictionaryEnabled) {
+        // MAP collector is optimised for no-dictionary collection
+        if (!fieldSpec.getDataType().getStoredType().equals(FieldSpec.DataType.MAP)) {
+          if (ClusterConfigForTable.useOptimizedNoDictCollector(_statsCollectorConfig.getTableConfig())) {
+            _columnStatsCollectorMap.put(column, new NoDictColumnStatisticsCollector(column, _statsCollectorConfig));
+            continue;
+          }
+        }
       }
+      AbstractColumnStatisticsCollector collector =
+          StatsCollectorUtil.createStatsCollector(column, fieldSpec, _statsCollectorConfig);
+      _columnStatsCollectorMap.put(column, collector);
     }
   }
 

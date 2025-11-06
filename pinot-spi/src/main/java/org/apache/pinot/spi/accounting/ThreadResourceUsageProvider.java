@@ -18,10 +18,12 @@
  */
 package org.apache.pinot.spi.accounting;
 
+import java.lang.management.GarbageCollectorMXBean;
 import java.lang.management.ManagementFactory;
 import java.lang.management.ThreadMXBean;
 import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
+import java.util.List;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -31,6 +33,9 @@ import org.slf4j.LoggerFactory;
  * and allocateBytes (JVM heap) for the current thread.
  */
 public class ThreadResourceUsageProvider {
+  private ThreadResourceUsageProvider() {
+  }
+
   private static final Logger LOGGER = LoggerFactory.getLogger(ThreadResourceUsageProvider.class);
 
   // used for getting the memory allocation function in hotspot jvm through reflection
@@ -51,14 +56,12 @@ public class ThreadResourceUsageProvider {
   private static boolean _isThreadCpuTimeMeasurementEnabled = false;
   private static boolean _isThreadMemoryMeasurementEnabled = false;
 
-  @Deprecated
-  public long getThreadTimeNs() {
-    return 0;
+  public static int getThreadCount() {
+    return MX_BEAN.getThreadCount();
   }
 
-  @Deprecated
-  public long getThreadAllocatedBytes() {
-    return 0;
+  public static long getTotalStartedThreadCount() {
+    return MX_BEAN.getTotalStartedThreadCount();
   }
 
   public static long getCurrentThreadCpuTime() {
@@ -73,6 +76,19 @@ public class ThreadResourceUsageProvider {
       LOGGER.error("Exception happened during the invocation of getting current bytes allocated", e);
       return 0;
     }
+  }
+
+  /// Returns an approximation of the total garbage collection time in milliseconds.
+  public static long getGcTime() {
+    long totalGCTime = 0;
+    List<GarbageCollectorMXBean> gcBeans = ManagementFactory.getGarbageCollectorMXBeans();
+    for (GarbageCollectorMXBean gcBean : gcBeans) {
+      long gcTime = gcBean.getCollectionTime();
+      if (gcTime > 0) {
+        totalGCTime += gcTime;
+      }
+    }
+    return totalGCTime;
   }
 
   public static boolean isThreadCpuTimeMeasurementEnabled() {

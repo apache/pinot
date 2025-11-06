@@ -20,6 +20,7 @@ package org.apache.pinot.controller.validation;
 
 import java.util.Collections;
 import org.apache.pinot.common.exception.InvalidConfigException;
+import org.apache.pinot.common.metadata.segment.SegmentZKMetadata;
 import org.apache.pinot.common.metrics.ControllerGauge;
 import org.apache.pinot.common.metrics.ControllerMetrics;
 import org.apache.pinot.common.metrics.MetricValueUtils;
@@ -32,6 +33,7 @@ import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.TableType;
 import org.apache.pinot.spi.metrics.PinotMetricUtils;
 import org.apache.pinot.spi.utils.builder.TableConfigBuilder;
+import org.apache.pinot.spi.utils.builder.TableNameBuilder;
 import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
 
@@ -178,12 +180,25 @@ public class StorageQuotaCheckerTest {
     assertEquals(
         MetricValueUtils.getTableGaugeValue(controllerMetrics, OFFLINE_TABLE_NAME,
             ControllerGauge.OFFLINE_TABLE_ESTIMATED_SIZE), 4 * 1024);
+
+    // Exceed quota but refreshing segment with equal or smaller size, should pass and update metrics
+    mockTableSizeResult(OFFLINE_TABLE_NAME, 4 * 1024, 0);
+    SegmentZKMetadata segmentZKMetadata = new SegmentZKMetadata(SEGMENT_NAME);
+    segmentZKMetadata.setSizeInBytes(SEGMENT_SIZE_IN_BYTES);
+    when(pinotHelixResourceManager.getSegmentZKMetadata(
+        TableNameBuilder.forType(tableConfig.getTableType()).tableNameWithType(tableConfig.getTableName()),
+        SEGMENT_NAME)).thenReturn(segmentZKMetadata);
+    assertTrue(isSegmentWithinQuota(tableConfig));
+    assertEquals(
+        MetricValueUtils.getTableGaugeValue(controllerMetrics, OFFLINE_TABLE_NAME,
+            ControllerGauge.OFFLINE_TABLE_ESTIMATED_SIZE), 4 * 1024);
   }
 
   private boolean isSegmentWithinQuota(TableConfig tableConfig)
       throws InvalidConfigException {
     return _storageQuotaChecker
-        .isSegmentStorageWithinQuota(tableConfig, SEGMENT_NAME, SEGMENT_SIZE_IN_BYTES)._isSegmentWithinQuota;
+        .isSegmentStorageWithinQuota(tableConfig, SEGMENT_NAME, SEGMENT_SIZE_IN_BYTES, SEGMENT_SIZE_IN_BYTES)
+        ._isSegmentWithinQuota;
   }
 
   public void mockTableSizeResult(String tableName, long tableSizeInBytes, int numMissingSegments)

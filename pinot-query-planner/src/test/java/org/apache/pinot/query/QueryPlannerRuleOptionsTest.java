@@ -50,6 +50,22 @@ public class QueryPlannerRuleOptionsTest extends QueryEnvironmentTestBase {
         .getExplainPlan();
   }
 
+  private String explainQueryWithRuleEnabled(String query, String ruleToEnable) {
+    SqlNode sqlNode = CalciteSqlParser.compileToSqlNodeAndOptions(query).getSqlNode();
+    Map<String, String> options = new HashMap<>();
+    // disable rule
+    options.put(CommonConstants.Broker.Request.QueryOptionKey.USE_PLANNER_RULES, ruleToEnable);
+    SqlNodeAndOptions sqlNodeAndOptions =
+        new SqlNodeAndOptions(
+            sqlNode,
+            PinotSqlType.DQL,
+            QueryOptionsUtils.resolveCaseInsensitiveOptions(options));
+    return _queryEnvironment
+        .compile(query, sqlNodeAndOptions)
+        .explain(RANDOM_REQUEST_ID_GEN.nextLong(), null)
+        .getExplainPlan();
+  }
+
   @Test
   public void testDisableCaseToFilter() {
     // Tests that when skipAggregateCaseToFilterRule=true,
@@ -287,5 +303,231 @@ public class QueryPlannerRuleOptionsTest extends QueryEnvironmentTestBase {
             + "      PinotLogicalExchange(distribution=[broadcast])\n"
             + "        PinotLogicalTableScan(table=[[default, b]])\n");
     //@formatter:on
+  }
+
+  @Test
+  public void testAggregateJoinTransposeExtendedDisabledByDefault() {
+    // test aggregate function pushdown is disabled by default
+    String query = "EXPLAIN PLAN FOR \n"
+        + "SELECT SUM(b.col2)\n"
+        + "FROM a INNER JOIN b\n"
+        + "ON a.col1 = b.col1\n"
+        + "GROUP BY a.col1, b.col1\n";
+
+    String explain = _queryEnvironment.explainQuery(query, RANDOM_REQUEST_ID_GEN.nextLong());
+    //@formatter:off
+    assertEquals(explain,
+        "Execution Plan\n"
+            + "LogicalProject(EXPR$0=[$2])\n"
+            + "  PinotLogicalAggregate(group=[{0, 1}], agg#0=[$SUM0($2)], aggType=[FINAL])\n"
+            + "    PinotLogicalExchange(distribution=[hash[0, 1]])\n"
+            + "      PinotLogicalAggregate(group=[{0, 1}], agg#0=[$SUM0($2)], aggType=[LEAF])\n"
+            + "        LogicalJoin(condition=[=($0, $1)], joinType=[inner])\n"
+            + "          PinotLogicalExchange(distribution=[hash[0]])\n"
+            + "            LogicalProject(col1=[$0])\n"
+            + "              PinotLogicalTableScan(table=[[default, a]])\n"
+            + "          PinotLogicalExchange(distribution=[hash[0]])\n"
+            + "            LogicalProject(col1=[$0], $f2=[CAST($1):DECIMAL(2000, 1000) NOT NULL])\n"
+            + "              PinotLogicalTableScan(table=[[default, b]])\n");
+    //@formatter:on
+  }
+
+  @Test
+  public void testEnableAggregateJoinTransposeExtended() {
+    // test aggregate function pushdown is disabled by default
+    String query = "EXPLAIN PLAN FOR \n"
+        + "SELECT SUM(b.col2)\n"
+        + "FROM a INNER JOIN b\n"
+        + "ON a.col1 = b.col1\n"
+        + "GROUP BY a.col1, b.col1\n";
+
+    String explain = explainQueryWithRuleEnabled(query, PlannerRuleNames.AGGREGATE_JOIN_TRANSPOSE_EXTENDED);
+    //@formatter:off
+    assertEquals(explain,
+        "Execution Plan\n"
+            + "LogicalProject(EXPR$0=[CAST(*($1, $3)):DECIMAL(2000, 1000) NOT NULL])\n"
+            + "  LogicalJoin(condition=[=($0, $2)], joinType=[inner])\n"
+            + "    PinotLogicalExchange(distribution=[hash[0]])\n"
+            + "      PinotLogicalAggregate(group=[{0}], agg#0=[COUNT($1)], aggType=[FINAL])\n"
+            + "        PinotLogicalExchange(distribution=[hash[0]])\n"
+            + "          PinotLogicalAggregate(group=[{0}], agg#0=[COUNT()], aggType=[LEAF])\n"
+            + "            PinotLogicalTableScan(table=[[default, a]])\n"
+            + "    PinotLogicalExchange(distribution=[hash[0]])\n"
+            + "      PinotLogicalAggregate(group=[{0}], agg#0=[$SUM0($1)], aggType=[FINAL])\n"
+            + "        PinotLogicalExchange(distribution=[hash[0]])\n"
+            + "          PinotLogicalAggregate(group=[{0}], agg#0=[$SUM0($1)], aggType=[LEAF])\n"
+            + "            LogicalProject(col1=[$0], $f2=[CAST($1):DECIMAL(2000, 1000) NOT NULL])\n"
+            + "              PinotLogicalTableScan(table=[[default, b]])\n");
+    //@formatter:on
+  }
+
+  @Test
+  public void testSortJoinTransposeDisabledByDefault() {
+    // test aggregate function pushdown is disabled by default
+    String query = "EXPLAIN PLAN FOR \n"
+        + "SELECT a.col1, b.col1\n"
+        + "FROM a LEFT JOIN b\n"
+        + "ON a.col1 = b.col1\n"
+        + "ORDER BY a.col1\n";
+
+    String explain = _queryEnvironment.explainQuery(query, RANDOM_REQUEST_ID_GEN.nextLong());
+    //@formatter:off
+    assertEquals(explain,
+        "Execution Plan\n"
+            + "LogicalSort(sort0=[$0], dir0=[ASC])\n"
+            + "  PinotLogicalSortExchange(distribution=[hash], collation=[[0]], "
+            + "isSortOnSender=[false], isSortOnReceiver=[true])\n"
+            + "    LogicalJoin(condition=[=($0, $1)], joinType=[left])\n"
+            + "      PinotLogicalExchange(distribution=[hash[0]])\n"
+            + "        LogicalProject(col1=[$0])\n"
+            + "          PinotLogicalTableScan(table=[[default, a]])\n"
+            + "      PinotLogicalExchange(distribution=[hash[0]])\n"
+            + "        LogicalProject(col1=[$0])\n"
+            + "          PinotLogicalTableScan(table=[[default, b]])\n");
+    //@formatter:on
+  }
+
+  @Test
+  public void testEnableSortJoinTranspose() {
+    // test aggregate function pushdown is disabled by default
+    String query = "EXPLAIN PLAN FOR \n"
+        + "SELECT a.col1, b.col1\n"
+        + "FROM a LEFT JOIN b\n"
+        + "ON a.col1 = b.col1\n"
+        + "ORDER BY a.col1\n";
+
+    String explain = explainQueryWithRuleEnabled(query, PlannerRuleNames.SORT_JOIN_TRANSPOSE);
+    //@formatter:off
+    assertEquals(explain,
+        "Execution Plan\n"
+            + "LogicalSort(sort0=[$0], dir0=[ASC])\n"
+            + "  PinotLogicalSortExchange(distribution=[hash], collation=[[0]], "
+            + "isSortOnSender=[false], isSortOnReceiver=[true])\n"
+            + "    LogicalJoin(condition=[=($0, $1)], joinType=[left])\n"
+            + "      PinotLogicalExchange(distribution=[hash[0]])\n"
+            + "        LogicalSort(sort0=[$0], dir0=[ASC])\n"
+            + "          PinotLogicalSortExchange(distribution=[hash], collation=[[0]], "
+            + "isSortOnSender=[false], isSortOnReceiver=[true])\n"
+            + "            LogicalProject(col1=[$0])\n"
+            + "              PinotLogicalTableScan(table=[[default, a]])\n"
+            + "      PinotLogicalExchange(distribution=[hash[0]])\n"
+            + "        LogicalProject(col1=[$0])\n"
+            + "          PinotLogicalTableScan(table=[[default, b]])\n");
+    //@formatter:on
+  }
+
+  @Test
+  public void testSortJoinCopyDisabledByDefault() {
+    // test aggregate function pushdown is disabled by default
+    String query = "EXPLAIN PLAN FOR \n"
+        + "SELECT a.col1, b.col1\n"
+        + "FROM a INNER JOIN b\n"
+        + "ON a.col1 = b.col1\n"
+        + "ORDER BY a.col1\n";
+
+    String explain = _queryEnvironment.explainQuery(query, RANDOM_REQUEST_ID_GEN.nextLong());
+    //@formatter:off
+    assertEquals(explain,
+        "Execution Plan\n"
+            + "LogicalSort(sort0=[$0], dir0=[ASC])\n"
+            + "  PinotLogicalSortExchange(distribution=[hash], collation=[[0]], "
+            + "isSortOnSender=[false], isSortOnReceiver=[true])\n"
+            + "    LogicalJoin(condition=[=($0, $1)], joinType=[inner])\n"
+            + "      PinotLogicalExchange(distribution=[hash[0]])\n"
+            + "        LogicalProject(col1=[$0])\n"
+            + "          PinotLogicalTableScan(table=[[default, a]])\n"
+            + "      PinotLogicalExchange(distribution=[hash[0]])\n"
+            + "        LogicalProject(col1=[$0])\n"
+            + "          PinotLogicalTableScan(table=[[default, b]])\n");
+    //@formatter:on
+  }
+
+  @Test
+  public void testEnableSortJoinCopy() {
+    // test aggregate function pushdown is disabled by default
+    String query = "EXPLAIN PLAN FOR \n"
+        + "SELECT a.col1, b.col1\n"
+        + "FROM a INNER JOIN b\n"
+        + "ON a.col1 = b.col1\n"
+        + "ORDER BY a.col1\n";
+
+    String explain = explainQueryWithRuleEnabled(query, PlannerRuleNames.SORT_JOIN_COPY);
+    //@formatter:off
+    assertEquals(explain,
+        "Execution Plan\n"
+            + "LogicalSort(sort0=[$0], dir0=[ASC])\n"
+            + "  PinotLogicalSortExchange(distribution=[hash], collation=[[0]], "
+            + "isSortOnSender=[false], isSortOnReceiver=[true])\n"
+            + "    LogicalJoin(condition=[=($0, $1)], joinType=[inner])\n"
+            + "      PinotLogicalExchange(distribution=[hash[0]])\n"
+            + "        LogicalSort(sort0=[$0], dir0=[ASC])\n"
+            + "          PinotLogicalSortExchange(distribution=[hash], collation=[[0]], "
+            + "isSortOnSender=[false], isSortOnReceiver=[true])\n"
+            + "            LogicalProject(col1=[$0])\n"
+            + "              PinotLogicalTableScan(table=[[default, a]])\n"
+            + "      PinotLogicalExchange(distribution=[hash[0]])\n"
+            + "        LogicalProject(col1=[$0])\n"
+            + "          PinotLogicalTableScan(table=[[default, b]])\n");
+    //@formatter:on
+  }
+
+  @Test
+  public void testAggregateUnionAggregateDisabledByDefault() {
+    // Verify that the AggregateUnionAggregateRule is disabled by default
+    //@formatter:off
+    String query = "EXPLAIN PLAN FOR "
+        + "SELECT * FROM "
+        + "(SELECT DISTINCT col1 FROM a) "
+        + "UNION "
+        + "(SELECT DISTINCT col1 FROM b)";
+    //@formatter:on
+
+    String explain = _queryEnvironment.explainQuery(query, RANDOM_REQUEST_ID_GEN.nextLong());
+
+    // The aggregates above the table scans should not be merged into the one above the UNION ALL
+    assertEquals(explain,
+        "Execution Plan\n"
+            + "PinotLogicalAggregate(group=[{0}], aggType=[FINAL])\n"
+            + "  PinotLogicalExchange(distribution=[hash[0]])\n"
+            + "    PinotLogicalAggregate(group=[{0}], aggType=[LEAF])\n"
+            + "      LogicalUnion(all=[true])\n"
+            + "        PinotLogicalExchange(distribution=[hash[0]])\n"
+            + "          PinotLogicalAggregate(group=[{0}], aggType=[FINAL])\n"
+            + "            PinotLogicalExchange(distribution=[hash[0]])\n"
+            + "              PinotLogicalAggregate(group=[{0}], aggType=[LEAF])\n"
+            + "                PinotLogicalTableScan(table=[[default, a]])\n"
+            + "        PinotLogicalExchange(distribution=[hash[0]])\n"
+            + "          PinotLogicalAggregate(group=[{0}], aggType=[FINAL])\n"
+            + "            PinotLogicalExchange(distribution=[hash[0]])\n"
+            + "              PinotLogicalAggregate(group=[{0}], aggType=[LEAF])\n"
+            + "                PinotLogicalTableScan(table=[[default, b]])\n");
+  }
+
+  @Test
+  public void testAggregateUnionAggregateEnabled() {
+    // Verify that the AggregateUnionAggregateRule is disabled by default
+    //@formatter:off
+    String query = "EXPLAIN PLAN FOR "
+        + "SELECT * FROM "
+        + "(SELECT DISTINCT col1 FROM a) "
+        + "UNION "
+        + "(SELECT DISTINCT col1 FROM b)";
+    //@formatter:on
+
+    String explain = explainQueryWithRuleEnabled(query, PlannerRuleNames.AGGREGATE_UNION_AGGREGATE);
+
+    // There shouldn't be aggregates above the table scans since they should be merged into the one above the UNION ALL
+    assertEquals(explain,
+        "Execution Plan\n"
+            + "PinotLogicalAggregate(group=[{0}], aggType=[FINAL])\n"
+            + "  PinotLogicalExchange(distribution=[hash[0]])\n"
+            + "    PinotLogicalAggregate(group=[{0}], aggType=[LEAF])\n"
+            + "      LogicalUnion(all=[true])\n"
+            + "        PinotLogicalExchange(distribution=[hash[0]])\n"
+            + "          LogicalProject(col1=[$0])\n"
+            + "            PinotLogicalTableScan(table=[[default, a]])\n"
+            + "        PinotLogicalExchange(distribution=[hash[0]])\n"
+            + "          LogicalProject(col1=[$0])\n"
+            + "            PinotLogicalTableScan(table=[[default, b]])\n");
   }
 }

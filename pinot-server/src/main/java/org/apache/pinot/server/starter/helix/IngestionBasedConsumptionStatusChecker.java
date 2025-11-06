@@ -143,8 +143,6 @@ public abstract class IngestionBasedConsumptionStatusChecker {
       // Kafka's "latest" offset is actually the next available offset. Therefore it will be 1 ahead of the
       // current offset in the case we are caught up.
       // TODO: implement a way to have this work correctly for kafka consumers
-      _logger.info("Null offset found for segment {} - current offset: {}, latest offset: {}. "
-          + "Will check consumption status later", segmentName, currentOffset, latestOffset);
       try {
         return currentOffset.compareTo(latestOffset) >= 0;
       } catch (NullPointerException e) {
@@ -154,6 +152,10 @@ public abstract class IngestionBasedConsumptionStatusChecker {
             + "Will check consumption status later", segmentName, currentOffset, latestOffset);
       }
     }
+    _logger.info(
+        "Null offset found for segment: {} - current offset: {}, latest offset: {}. Will check consumption status "
+            + "later",
+        segmentName, currentOffset, latestOffset);
     return false;
   }
 }

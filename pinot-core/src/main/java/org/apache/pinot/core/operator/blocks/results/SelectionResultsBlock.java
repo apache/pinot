@@ -21,6 +21,7 @@ package org.apache.pinot.core.operator.blocks.results;
 import java.io.IOException;
 import java.util.Comparator;
 import java.util.List;
+import java.util.Map;
 import javax.annotation.Nullable;
 import org.apache.pinot.common.datatable.DataTable;
 import org.apache.pinot.common.utils.DataSchema;
@@ -82,5 +83,17 @@ public class SelectionResultsBlock extends BaseResultsBlock {
   public DataTable getDataTable()
       throws IOException {
     return SelectionOperatorUtils.getDataTableFromRows(_rows, _dataSchema, _queryContext.isNullHandlingEnabled());
+  }
+
+  // provide sorted metadata
+  @Override
+  public Map<String, String> getResultsMetadata() {
+    Map<String, String> metadata = super.getResultsMetadata();
+    // All selection result blocks created by operators with orderBy
+    // come with non-null comparator
+    if (_comparator != null) {
+      metadata.put(DataTable.MetadataKey.SORTED.getName(), "true");
+    }
+    return metadata;
   }
 }

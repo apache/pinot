@@ -39,7 +39,7 @@ import static org.mockito.Mockito.when;
 import static org.testng.Assert.assertEquals;
 import static org.testng.Assert.assertThrows;
 import static org.testng.Assert.assertTrue;
-import static org.testng.AssertJUnit.fail;
+import static org.testng.Assert.fail;
 
 
 public class LookupTransformFunctionTest extends BaseTransformFunctionTest {

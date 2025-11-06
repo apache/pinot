@@ -345,7 +345,9 @@ public class ColumnMetadataImpl implements ColumnMetadata {
     if (defaultNullValueString != null && storedType == DataType.STRING) {
       defaultNullValueString = CommonsConfigurationUtils.recoverSpecialCharacterInPropertyValue(defaultNullValueString);
     }
-    int maxLength = config.getInt(Column.getKeyFor(column, Column.SCHEMA_MAX_LENGTH), FieldSpec.DEFAULT_MAX_LENGTH);
+    Integer maxLength = config.containsKey(Column.getKeyFor(column, Column.SCHEMA_MAX_LENGTH))
+        ? config.getInt(Column.getKeyFor(column, Column.SCHEMA_MAX_LENGTH))
+        : null;
     String maxLengthExceedStrategyString =
         config.getString(Column.getKeyFor(column, Column.SCHEMA_MAX_LENGTH_EXCEED_STRATEGY), null);
     FieldSpec.MaxLengthExceedStrategy maxLengthExceedStrategy = maxLengthExceedStrategyString != null

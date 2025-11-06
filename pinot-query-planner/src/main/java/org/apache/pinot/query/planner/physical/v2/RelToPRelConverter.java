@@ -25,6 +25,7 @@ import java.util.function.Supplier;
 import org.apache.calcite.rel.RelNode;
 import org.apache.calcite.rel.core.AsofJoin;
 import org.apache.calcite.rel.core.Filter;
+import org.apache.calcite.rel.core.Intersect;
 import org.apache.calcite.rel.core.Join;
 import org.apache.calcite.rel.core.Minus;
 import org.apache.calcite.rel.core.Project;
@@ -34,6 +35,7 @@ import org.apache.calcite.rel.core.Union;
 import org.apache.calcite.rel.core.Values;
 import org.apache.calcite.rel.core.Window;
 import org.apache.pinot.calcite.rel.logical.PinotLogicalAggregate;
+import org.apache.pinot.calcite.rel.logical.PinotLogicalEnrichedJoin;
 import org.apache.pinot.calcite.rel.rules.PinotRuleUtils;
 import org.apache.pinot.calcite.rel.traits.TraitAssignment;
 import org.apache.pinot.common.config.provider.TableCache;
@@ -41,7 +43,9 @@ import org.apache.pinot.query.context.PhysicalPlannerContext;
 import org.apache.pinot.query.planner.physical.v2.nodes.PhysicalAggregate;
 import org.apache.pinot.query.planner.physical.v2.nodes.PhysicalAsOfJoin;
 import org.apache.pinot.query.planner.physical.v2.nodes.PhysicalFilter;
+import org.apache.pinot.query.planner.physical.v2.nodes.PhysicalIntersect;
 import org.apache.pinot.query.planner.physical.v2.nodes.PhysicalJoin;
+import org.apache.pinot.query.planner.physical.v2.nodes.PhysicalMinus;
 import org.apache.pinot.query.planner.physical.v2.nodes.PhysicalProject;
 import org.apache.pinot.query.planner.physical.v2.nodes.PhysicalSort;
 import org.apache.pinot.query.planner.physical.v2.nodes.PhysicalTableScan;
@@ -108,6 +112,9 @@ public class RelToPRelConverter {
       return new PhysicalAsOfJoin(asofJoin.getCluster(), asofJoin.getTraitSet(), asofJoin.getHints(),
           asofJoin.getCondition(), asofJoin.getMatchCondition(), asofJoin.getVariablesSet(), asofJoin.getJoinType(),
           nodeIdGenerator.get(), inputs.get(0), inputs.get(1), null);
+    } else if (relNode instanceof PinotLogicalEnrichedJoin) {
+      // this should be unreachable
+      throw new IllegalStateException("EnrichedJoin is not supported in physical optimizer");
     } else if (relNode instanceof Join) {
       Preconditions.checkState(relNode.getInputs().size() == 2, "Expected exactly 2 inputs to join. Found: %s", inputs);
       Join join = (Join) relNode;
@@ -119,8 +126,12 @@ public class RelToPRelConverter {
           nodeIdGenerator.get(), null);
     } else if (relNode instanceof Minus) {
       Minus minus = (Minus) relNode;
-      return new PhysicalUnion(minus.getCluster(), minus.getTraitSet(), minus.getHints(), minus.all, inputs,
+      return new PhysicalMinus(minus.getCluster(), minus.getTraitSet(), minus.getHints(), inputs, minus.all,
           nodeIdGenerator.get(), null);
+    } else if (relNode instanceof Intersect) {
+      Intersect intersect = (Intersect) relNode;
+      return new PhysicalIntersect(intersect.getCluster(), intersect.getTraitSet(), intersect.getHints(), inputs,
+          intersect.all, nodeIdGenerator.get(), null);
     } else if (relNode instanceof Sort) {
       Preconditions.checkState(inputs.size() == 1, "Expected exactly 1 input of sort. Found: %s", inputs);
       Sort sort = (Sort) relNode;

@@ -18,7 +18,7 @@
  */
 package org.apache.pinot.sql.parsers.rewriter;
 
-import com.google.common.collect.ImmutableList;
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 import org.apache.pinot.sql.parsers.CalciteSqlParser;
@@ -38,9 +38,10 @@ public class QueryRewriterFactory {
   //   (reference) into the group-by list, but the alias should not be applied to the reference.
   //   E.g. SELECT a + 1 AS a FROM table GROUP BY 1
   public static final List<String> DEFAULT_QUERY_REWRITERS_CLASS_NAMES =
-      ImmutableList.of(CompileTimeFunctionsInvoker.class.getName(), SelectionsRewriter.class.getName(),
+      List.of(CompileTimeFunctionsInvoker.class.getName(), SelectionsRewriter.class.getName(),
           PredicateComparisonRewriter.class.getName(), AliasApplier.class.getName(), OrdinalsUpdater.class.getName(),
-          NonAggregationGroupByToDistinctQueryRewriter.class.getName(), RlsFiltersRewriter.class.getName());
+          NonAggregationGroupByToDistinctQueryRewriter.class.getName(), RlsFiltersRewriter.class.getName(),
+          CastTypeAliasRewriter.class.getName());
 
   public static void init(String queryRewritersClassNamesStr) {
     List<String> queryRewritersClassNames =
@@ -58,7 +59,7 @@ public class QueryRewriterFactory {
   }
 
   public static List<QueryRewriter> getQueryRewriters(List<String> queryRewriterClasses) {
-    final ImmutableList.Builder<QueryRewriter> builder = ImmutableList.builder();
+    final List<QueryRewriter> builder = new ArrayList<>();
     for (String queryRewriterClassName : queryRewriterClasses) {
       try {
         builder.add(getQueryRewriter(queryRewriterClassName));
@@ -66,7 +67,7 @@ public class QueryRewriterFactory {
         LOGGER.error("Failed to load QueryRewriter: {}", queryRewriterClassName, e);
       }
     }
-    return builder.build();
+    return List.copyOf(builder);
   }
 
   private static QueryRewriter getQueryRewriter(String queryRewriterClassName)

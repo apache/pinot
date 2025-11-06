@@ -100,6 +100,11 @@ public class HelixInstanceDataManagerConfig implements InstanceDataManagerConfig
   //
   public static final String MAX_PARALLEL_REFRESH_THREADS = "max.parallel.refresh.threads";
 
+  // Whether to process SEGMENT_REFRESH in a synchronous or asynchronous manner when the messaged is received.
+  // Defaults to false, meaning SEGMENT_REFRESH will be processed in a synchronous manner.
+  public static final String ENABLE_ASYNC_SEGMENT_REFRESH = "enable.async.segment.refresh";
+  private static final boolean DEFAULT_ENABLE_ASYNC_SEGMENT_REFRESH = false;
+
   // To preload segments of table using upsert in parallel for fast upsert metadata recovery.
   private static final String MAX_SEGMENT_PRELOAD_THREADS = "max.segment.preload.threads";
 
@@ -119,6 +124,9 @@ public class HelixInstanceDataManagerConfig implements InstanceDataManagerConfig
   private static final int DEFAULT_DELETED_TABLES_CACHE_TTL_MINUTES = 60;
   private static final int DEFAULT_DELETED_SEGMENTS_CACHE_SIZE = 10_000;
   private static final int DEFAULT_DELETED_SEGMENTS_CACHE_TTL_MINUTES = 2;
+  // By default, check CRC matching when loading segments.
+  private static final boolean DEFAULT_CHECK_CRC_ON_SEGMENT_LOAD = true;
+  private static final String CHECK_CRC_ON_SEGMENT_LOAD = "check.crc.on.segment.load";
 
   private final PinotConfiguration _serverConfig;
   private final PinotConfiguration _upsertConfig;
@@ -250,6 +258,11 @@ public class HelixInstanceDataManagerConfig implements InstanceDataManagerConfig
   }
 
   @Override
+  public boolean isAsyncSegmentRefreshEnabled() {
+    return _serverConfig.getProperty(ENABLE_ASYNC_SEGMENT_REFRESH, DEFAULT_ENABLE_ASYNC_SEGMENT_REFRESH);
+  }
+
+  @Override
   public int getMaxSegmentPreloadThreads() {
     return _serverConfig.getProperty(MAX_SEGMENT_PRELOAD_THREADS, 0);
   }
@@ -330,5 +343,10 @@ public class HelixInstanceDataManagerConfig implements InstanceDataManagerConfig
   @Override
   public boolean isUploadSegmentToDeepStore() {
     return _serverConfig.getProperty(UPLOAD_SEGMENT_TO_DEEP_STORE, DEFAULT_UPLOAD_SEGMENT_TO_DEEP_STORE);
+  }
+
+  @Override
+  public boolean shouldCheckCRCOnSegmentLoad() {
+    return _serverConfig.getProperty(CHECK_CRC_ON_SEGMENT_LOAD, DEFAULT_CHECK_CRC_ON_SEGMENT_LOAD);
   }
 }

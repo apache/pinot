@@ -24,6 +24,7 @@ import java.util.concurrent.BrokenBarrierException;
 import java.util.concurrent.CyclicBarrier;
 import java.util.concurrent.Executors;
 import org.apache.pinot.spi.env.PinotConfiguration;
+import org.apache.pinot.spi.query.QueryThreadExceedStrategy;
 import org.apache.pinot.spi.utils.CommonConstants;
 import org.testng.annotations.Test;
 
@@ -59,6 +60,32 @@ public class HardLimitExecutorTest {
         // as expected
         assertEquals(e.getMessage(), "Tasks limit exceeded.");
       }
+    } finally {
+      ex.shutdownNow();
+    }
+  }
+
+  @Test
+  public void testHardLimitLogExceedStrategy()
+      throws Exception {
+    HardLimitExecutor ex = new HardLimitExecutor(1, Executors.newCachedThreadPool(), QueryThreadExceedStrategy.LOG);
+    CyclicBarrier barrier = new CyclicBarrier(2);
+
+    try {
+      ex.execute(() -> {
+        try {
+          barrier.await();
+          Thread.sleep(Long.MAX_VALUE);
+        } catch (InterruptedException | BrokenBarrierException e) {
+          // do nothing
+        }
+      });
+
+      barrier.await();
+
+      ex.execute(() -> {
+        // do nothing, we just don't want it to throw an exception
+      });
     } finally {
       ex.shutdownNow();
     }

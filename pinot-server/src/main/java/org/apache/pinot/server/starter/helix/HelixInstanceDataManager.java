@@ -36,7 +36,7 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.concurrent.locks.Lock;
-import java.util.function.Supplier;
+import java.util.function.BooleanSupplier;
 import javax.annotation.Nullable;
 import javax.annotation.concurrent.ThreadSafe;
 import org.apache.commons.io.FileUtils;
@@ -61,6 +61,7 @@ import org.apache.pinot.segment.local.data.manager.TableDataManager;
 import org.apache.pinot.segment.local.utils.SegmentLocks;
 import org.apache.pinot.segment.local.utils.SegmentOperationsThrottler;
 import org.apache.pinot.segment.local.utils.SegmentReloadSemaphore;
+import org.apache.pinot.segment.local.utils.ServerReloadJobStatusCache;
 import org.apache.pinot.segment.spi.SegmentMetadata;
 import org.apache.pinot.segment.spi.loader.SegmentDirectoryLoader;
 import org.apache.pinot.segment.spi.loader.SegmentDirectoryLoaderContext;
@@ -76,6 +77,8 @@ import org.apache.pinot.spi.utils.builder.TableNameBuilder;
 import org.apache.zookeeper.data.Stat;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+
+import static java.util.Objects.requireNonNull;
 
 
 /**
@@ -96,10 +99,11 @@ public class HelixInstanceDataManager implements InstanceDataManager {
   private HelixInstanceDataManagerConfig _instanceDataManagerConfig;
   private String _instanceId;
   private TableDataManagerProvider _tableDataManagerProvider;
+  private ServerReloadJobStatusCache _reloadJobStatusCache;
   private HelixManager _helixManager;
   private ZkHelixPropertyStore<ZNRecord> _propertyStore;
   private SegmentUploader _segmentUploader;
-  private Supplier<Boolean> _isServerReadyToServeQueries = () -> false;
+  private BooleanSupplier _isServerReadyToServeQueries = () -> false;
 
   // Fixed size LRU cache for storing last N errors on the instance.
   // Key is TableNameWithType-SegmentName pair.
@@ -109,19 +113,21 @@ public class HelixInstanceDataManager implements InstanceDataManager {
   protected Cache<String, Long> _recentlyDeletedTables;
 
   private SegmentReloadSemaphore _segmentReloadSemaphore;
-  private ExecutorService _segmentReloadExecutor;
+  private ExecutorService _segmentReloadRefreshExecutor;
+
+  private boolean _enableAsyncSegmentRefresh;
 
   @Nullable
   private ExecutorService _segmentPreloadExecutor;
 
   @Override
-  public void setSupplierOfIsServerReadyToServeQueries(Supplier<Boolean> isServingQueries) {
+  public void setSupplierOfIsServerReadyToServeQueries(BooleanSupplier isServingQueries) {
     _isServerReadyToServeQueries = isServingQueries;
   }
 
   @Override
   public synchronized void init(PinotConfiguration config, HelixManager helixManager, ServerMetrics serverMetrics,
-      @Nullable SegmentOperationsThrottler segmentOperationsThrottler)
+      @Nullable SegmentOperationsThrottler segmentOperationsThrottler, ServerReloadJobStatusCache reloadJobStatusCache)
       throws Exception {
     LOGGER.info("Initializing Helix instance data manager");
 
@@ -129,10 +135,12 @@ public class HelixInstanceDataManager implements InstanceDataManager {
     LOGGER.info("HelixInstanceDataManagerConfig: {}", _instanceDataManagerConfig.getConfig());
     _instanceId = _instanceDataManagerConfig.getInstanceId();
     _helixManager = helixManager;
+    _reloadJobStatusCache = requireNonNull(reloadJobStatusCache, "reloadJobStatusCache cannot be null");
     String tableDataManagerProviderClass = _instanceDataManagerConfig.getTableDataManagerProviderClass();
     LOGGER.info("Initializing table data manager provider of class: {}", tableDataManagerProviderClass);
     _tableDataManagerProvider = PluginManager.get().createInstance(tableDataManagerProviderClass);
-    _tableDataManagerProvider.init(_instanceDataManagerConfig, helixManager, _segmentLocks, segmentOperationsThrottler);
+    _tableDataManagerProvider.init(_instanceDataManagerConfig, helixManager, _segmentLocks, segmentOperationsThrottler,
+        _reloadJobStatusCache);
     _segmentUploader = new PinotFSSegmentUploader(_instanceDataManagerConfig.getSegmentStoreUri(),
         ServerSegmentCompletionProtocolHandler.getSegmentUploadRequestTimeoutMs(), serverMetrics);
 
@@ -149,9 +157,9 @@ public class HelixInstanceDataManager implements InstanceDataManager {
     Preconditions.checkArgument(maxParallelRefreshThreads > 0,
         "'pinot.server.instance.max.parallel.refresh.threads' must be positive, got: " + maxParallelRefreshThreads);
     _segmentReloadSemaphore = new SegmentReloadSemaphore(maxParallelRefreshThreads);
-    _segmentReloadExecutor = Executors.newFixedThreadPool(maxParallelRefreshThreads,
-        new ThreadFactoryBuilder().setNameFormat("segment-reload-thread-%d").build());
-    LOGGER.info("Created SegmentReloadExecutor with pool size: {}", maxParallelRefreshThreads);
+    _segmentReloadRefreshExecutor = Executors.newFixedThreadPool(maxParallelRefreshThreads,
+        new ThreadFactoryBuilder().setNameFormat("segment-reload-refresh-thread-%d").build());
+    LOGGER.info("Created SegmentReloadRefreshExecutor with pool size: {}", maxParallelRefreshThreads);
     int maxSegmentPreloadThreads = _instanceDataManagerConfig.getMaxSegmentPreloadThreads();
     if (maxSegmentPreloadThreads > 0) {
       _segmentPreloadExecutor = Executors.newFixedThreadPool(maxSegmentPreloadThreads,
@@ -160,6 +168,8 @@ public class HelixInstanceDataManager implements InstanceDataManager {
     } else {
       LOGGER.info("SegmentPreloadExecutor was not created with pool size: {}", maxSegmentPreloadThreads);
     }
+    _enableAsyncSegmentRefresh = isAsyncSegmentRefreshEnabled();
+    LOGGER.info("Segment refresh asynchronous handling is {}", _enableAsyncSegmentRefresh ? "enabled" : "disabled");
     LOGGER.info("Initialized Helix instance data manager");
 
     // Initialize the error cache and recently deleted tables cache
@@ -241,7 +251,7 @@ public class HelixInstanceDataManager implements InstanceDataManager {
 
   @Override
   public synchronized void shutDown() {
-    _segmentReloadExecutor.shutdownNow();
+    _segmentReloadRefreshExecutor.shutdownNow();
     if (_segmentPreloadExecutor != null) {
       _segmentPreloadExecutor.shutdownNow();
     }
@@ -283,6 +293,7 @@ public class HelixInstanceDataManager implements InstanceDataManager {
       return;
     }
     LOGGER.info("Shutting down table data manager for table: {}", tableNameWithType);
+    tableDataManager.setDeleted(true);
     tableDataManager.shutDown();
     LOGGER.info("Finished shutting down table data manager for table: {}", tableNameWithType);
   }
@@ -327,7 +338,8 @@ public class HelixInstanceDataManager implements InstanceDataManager {
     TimestampIndexUtils.applyTimestampIndex(tableConfig, schema);
     TableDataManager tableDataManager =
         _tableDataManagerProvider.getTableDataManager(tableConfig, schema, _segmentReloadSemaphore,
-            _segmentReloadExecutor, _segmentPreloadExecutor, _errorCache, _isServerReadyToServeQueries);
+            _segmentReloadRefreshExecutor, _segmentPreloadExecutor, _errorCache, _isServerReadyToServeQueries,
+            _enableAsyncSegmentRefresh, _reloadJobStatusCache);
     tableDataManager.start();
     LOGGER.info("Created table data manager for table: {}", tableNameWithType);
     return tableDataManager;
@@ -405,12 +417,12 @@ public class HelixInstanceDataManager implements InstanceDataManager {
   }
 
   @Override
-  public void reloadSegment(String tableNameWithType, String segmentName, boolean forceDownload)
+  public void reloadSegment(String tableNameWithType, String segmentName, boolean forceDownload, String reloadJobId)
       throws Exception {
     LOGGER.info("Reloading segment: {} in table: {}", segmentName, tableNameWithType);
     TableDataManager tableDataManager = _tableDataManagerMap.get(tableNameWithType);
     if (tableDataManager != null) {
-      tableDataManager.reloadSegment(segmentName, forceDownload);
+      tableDataManager.reloadSegment(segmentName, forceDownload, reloadJobId);
     } else {
       LOGGER.warn("Failed to find data manager for table: {}, skipping reloading segment: {}", tableNameWithType,
           segmentName);
@@ -418,24 +430,25 @@ public class HelixInstanceDataManager implements InstanceDataManager {
   }
 
   @Override
-  public void reloadAllSegments(String tableNameWithType, boolean forceDownload)
+  public void reloadAllSegments(String tableNameWithType, boolean forceDownload, String reloadJobId)
       throws Exception {
     LOGGER.info("Reloading all segments in table: {}", tableNameWithType);
     TableDataManager tableDataManager = _tableDataManagerMap.get(tableNameWithType);
     if (tableDataManager != null) {
-      tableDataManager.reloadAllSegments(forceDownload);
+      tableDataManager.reloadAllSegments(forceDownload, reloadJobId);
     } else {
       LOGGER.warn("Failed to find data manager for table: {}, skipping reloading all segments", tableNameWithType);
     }
   }
 
   @Override
-  public void reloadSegments(String tableNameWithType, List<String> segmentNames, boolean forceDownload)
+  public void reloadSegments(String tableNameWithType, List<String> segmentNames, boolean forceDownload,
+      String reloadJobId)
       throws Exception {
     LOGGER.info("Reloading segments: {} in table: {}", segmentNames, tableNameWithType);
     TableDataManager tableDataManager = _tableDataManagerMap.get(tableNameWithType);
     if (tableDataManager != null) {
-      tableDataManager.reloadSegments(segmentNames, forceDownload);
+      tableDataManager.reloadSegments(segmentNames, forceDownload, reloadJobId);
     } else {
       LOGGER.warn("Failed to find data manager for table: {}, skipping reloading segments: {}", tableNameWithType,
           segmentNames);
@@ -509,6 +522,11 @@ public class HelixInstanceDataManager implements InstanceDataManager {
   @Override
   public int getMaxParallelRefreshThreads() {
     return _instanceDataManagerConfig.getMaxParallelRefreshThreads();
+  }
+
+  @Override
+  public boolean isAsyncSegmentRefreshEnabled() {
+    return _instanceDataManagerConfig.isAsyncSegmentRefreshEnabled();
   }
 
   @Override

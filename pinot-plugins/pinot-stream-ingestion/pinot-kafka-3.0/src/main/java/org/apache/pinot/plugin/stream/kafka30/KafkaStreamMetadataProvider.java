@@ -23,19 +23,18 @@ import com.google.common.collect.Sets;
 import java.io.IOException;
 import java.time.Clock;
 import java.time.Duration;
+import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.ExecutionException;
-import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
 import org.apache.commons.collections4.CollectionUtils;
 import org.apache.kafka.clients.admin.AdminClient;
-import org.apache.kafka.clients.admin.ListOffsetsResult;
 import org.apache.kafka.clients.admin.ListTopicsResult;
-import org.apache.kafka.clients.admin.OffsetSpec;
+import org.apache.kafka.clients.consumer.OffsetAndTimestamp;
 import org.apache.kafka.common.PartitionInfo;
 import org.apache.kafka.common.TopicPartition;
 import org.apache.kafka.common.errors.TimeoutException;
@@ -44,8 +43,8 @@ import org.apache.pinot.spi.stream.ConsumerPartitionState;
 import org.apache.pinot.spi.stream.LongMsgOffset;
 import org.apache.pinot.spi.stream.OffsetCriteria;
 import org.apache.pinot.spi.stream.PartitionLagState;
-import org.apache.pinot.spi.stream.RowMetadata;
 import org.apache.pinot.spi.stream.StreamConfig;
+import org.apache.pinot.spi.stream.StreamMessageMetadata;
 import org.apache.pinot.spi.stream.StreamMetadataProvider;
 import org.apache.pinot.spi.stream.StreamPartitionMsgOffset;
 import org.apache.pinot.spi.stream.TransientConsumerException;
@@ -98,51 +97,71 @@ public class KafkaStreamMetadataProvider extends KafkaPartitionLevelConnectionHa
   }
 
   @Override
-  public StreamPartitionMsgOffset fetchStreamPartitionOffset(OffsetCriteria offsetCriteria, long timeoutMillis) {
-    Preconditions.checkNotNull(offsetCriteria);
+  public Map<Integer, StreamPartitionMsgOffset> fetchLatestStreamOffset(Set<Integer> partitionIds, long timeoutMillis) {
+    List<TopicPartition> topicPartitions = new ArrayList<>(partitionIds.size());
+    for (Integer streamPartition: partitionIds) {
+      topicPartitions.add(new TopicPartition(_topic, streamPartition));
+    }
     try {
-      // Build the offset spec request for this partition
-      Map<TopicPartition, OffsetSpec> request = new HashMap<>();
-      if (offsetCriteria.isLargest()) {
-        request.put(_topicPartition, OffsetSpec.latest());
-      } else if (offsetCriteria.isSmallest()) {
-        request.put(_topicPartition, OffsetSpec.earliest());
-      } else if (offsetCriteria.isPeriod()) {
-        long ts = Clock.systemUTC().millis() - TimeUtils.convertPeriodToMillis(offsetCriteria.getOffsetString());
-        request.put(_topicPartition, OffsetSpec.forTimestamp(ts));
-      } else if (offsetCriteria.isTimestamp()) {
-        long ts = TimeUtils.convertTimestampToMillis(offsetCriteria.getOffsetString());
-        request.put(_topicPartition, OffsetSpec.forTimestamp(ts));
-      } else {
-        throw new IllegalArgumentException("Unknown offset criteria: " + offsetCriteria);
+      Map<TopicPartition, Long> topicPartitionToLatestOffsetMap =
+          _consumer.endOffsets(topicPartitions, Duration.ofMillis(timeoutMillis));
+
+      Map<Integer, StreamPartitionMsgOffset> partitionIdToLatestOffset =
+          new HashMap<>(topicPartitionToLatestOffsetMap.size());
+      for (Map.Entry<TopicPartition, Long> entry : topicPartitionToLatestOffsetMap.entrySet()) {
+        partitionIdToLatestOffset.put(entry.getKey().partition(), new LongMsgOffset(entry.getValue()));
       }
-      // Query via AdminClient (thread-safe)
-      ListOffsetsResult result = _adminClient.listOffsets(request);
-      Map<TopicPartition, ListOffsetsResult.ListOffsetsResultInfo> offsets =
-          result.all().get(timeoutMillis, TimeUnit.MILLISECONDS);
-      if (!isValidOffsetInfo(offsets) && (offsetCriteria.isTimestamp() || offsetCriteria.isPeriod())) {
-        // fetch endOffsets as fallback
-        request.put(_topicPartition, OffsetSpec.latest());
-        result = _adminClient.listOffsets(request);
-        offsets = result.all().get(timeoutMillis, TimeUnit.MILLISECONDS);
-        LOGGER.warn(
-            "initial offset type is {} and its value evaluates to null hence proceeding with offset {} " + "for "
-                + "topic {} partition {}", offsetCriteria, offsets.get(_topicPartition).offset(),
-            _topicPartition.topic(), _topicPartition.partition());
-      }
-      ListOffsetsResult.ListOffsetsResultInfo info = offsets.get(_topicPartition);
-      if (info == null) {
-        throw new TransientConsumerException(new RuntimeException(
-            String.format("Failed to fetch offset for topic: %s partition: %d", _topic, _topicPartition.partition())));
-      }
-      return new LongMsgOffset(info.offset());
-    } catch (InterruptedException | ExecutionException | java.util.concurrent.TimeoutException e) {
+
+      return partitionIdToLatestOffset;
+    } catch (TimeoutException e) {
       throw new TransientConsumerException(e);
     }
   }
 
-  private boolean isValidOffsetInfo(Map<TopicPartition, ListOffsetsResult.ListOffsetsResultInfo> offsets) {
-    return offsets != null && offsets.containsKey(_topicPartition) && offsets.get(_topicPartition).offset() >= 0;
+  @Override
+  public StreamPartitionMsgOffset fetchStreamPartitionOffset(OffsetCriteria offsetCriteria, long timeoutMillis) {
+    Preconditions.checkNotNull(offsetCriteria);
+    long offset;
+    try {
+      if (offsetCriteria.isLargest()) {
+        offset = _consumer.endOffsets(Collections.singletonList(_topicPartition), Duration.ofMillis(timeoutMillis))
+            .get(_topicPartition);
+      } else if (offsetCriteria.isSmallest()) {
+        offset =
+            _consumer.beginningOffsets(Collections.singletonList(_topicPartition), Duration.ofMillis(timeoutMillis))
+                .get(_topicPartition);
+      } else if (offsetCriteria.isPeriod()) {
+        OffsetAndTimestamp offsetAndTimestamp = _consumer.offsetsForTimes(Collections.singletonMap(_topicPartition,
+                Clock.systemUTC().millis() - TimeUtils.convertPeriodToMillis(offsetCriteria.getOffsetString())))
+            .get(_topicPartition);
+        if (offsetAndTimestamp == null) {
+          offset = _consumer.endOffsets(Collections.singletonList(_topicPartition), Duration.ofMillis(timeoutMillis))
+              .get(_topicPartition);
+          LOGGER.warn(
+              "initial offset type is period and its value evaluates to null hence proceeding with offset {} for "
+                  + "topic {} partition {}", offset, _topicPartition.topic(), _topicPartition.partition());
+        } else {
+          offset = offsetAndTimestamp.offset();
+        }
+      } else if (offsetCriteria.isTimestamp()) {
+        OffsetAndTimestamp offsetAndTimestamp = _consumer.offsetsForTimes(Collections.singletonMap(_topicPartition,
+            TimeUtils.convertTimestampToMillis(offsetCriteria.getOffsetString()))).get(_topicPartition);
+        if (offsetAndTimestamp == null) {
+          offset = _consumer.endOffsets(Collections.singletonList(_topicPartition), Duration.ofMillis(timeoutMillis))
+              .get(_topicPartition);
+          LOGGER.warn(
+              "initial offset type is timestamp and its value evaluates to null hence proceeding with offset {} for "
+                  + "topic {} partition {}", offset, _topicPartition.topic(), _topicPartition.partition());
+        } else {
+          offset = offsetAndTimestamp.offset();
+        }
+      } else {
+        throw new IllegalArgumentException("Unknown initial offset value " + offsetCriteria);
+      }
+      return new LongMsgOffset(offset);
+    } catch (TimeoutException e) {
+      throw new TransientConsumerException(e);
+    }
   }
 
   @Override
@@ -163,7 +182,7 @@ public class KafkaStreamMetadataProvider extends KafkaPartitionLevelConnectionHa
 
       // Compute record-availability
       String availabilityLagMs = "UNKNOWN";
-      RowMetadata lastProcessedMessageMetadata = partitionState.getLastProcessedRowMetadata();
+      StreamMessageMetadata lastProcessedMessageMetadata = partitionState.getLastProcessedRowMetadata();
       if (lastProcessedMessageMetadata != null && partitionState.getLastProcessedTimeMs() > 0) {
         long availabilityLag =
             partitionState.getLastProcessedTimeMs() - lastProcessedMessageMetadata.getRecordIngestionTimeMs();
@@ -177,7 +196,8 @@ public class KafkaStreamMetadataProvider extends KafkaPartitionLevelConnectionHa
 
   @Override
   public List<TopicMetadata> getTopics() {
-    try (AdminClient adminClient = createAdminClient()) {
+    try {
+      AdminClient adminClient = getOrCreateSharedAdminClient();
       ListTopicsResult result = adminClient.listTopics();
       if (result == null) {
         return Collections.emptyList();
@@ -192,6 +212,11 @@ public class KafkaStreamMetadataProvider extends KafkaPartitionLevelConnectionHa
     }
   }
 
+  @Override
+  public boolean supportsOffsetLag() {
+    return true;
+  }
+
   public static class KafkaTopicMetadata implements TopicMetadata {
     private String _name;
 
@@ -204,6 +229,56 @@ public class KafkaStreamMetadataProvider extends KafkaPartitionLevelConnectionHa
       return this;
     }
   }
+
+
+
+  @Override
+  public StreamPartitionMsgOffset getOffsetAtTimestamp(int partitionId, long timestampMillis, long timeoutMillis) {
+    try {
+      OffsetAndTimestamp offsetAndTimestamp = _consumer.offsetsForTimes(Map.of(_topicPartition, timestampMillis),
+          Duration.ofMillis(timeoutMillis)).get(_topicPartition);
+      if (offsetAndTimestamp == null) {
+        return null;
+      }
+      return new LongMsgOffset(offsetAndTimestamp.offset());
+    } catch (Exception e) {
+      LOGGER.warn("Failed to get offset at timestamp {} for partition {}", timestampMillis, partitionId, e);
+      return null;
+    }
+  }
+
+  @Override
+  public Map<String, StreamPartitionMsgOffset> getStreamStartOffsets() {
+    List<PartitionInfo> partitionInfos = _consumer.partitionsFor(_topic);
+    Map<TopicPartition, Long> startOffsets = _consumer.beginningOffsets(
+        partitionInfos.stream()
+            .filter(info -> info != null)
+            .map(info -> new TopicPartition(_topic, info.partition()))
+            .collect(Collectors.toList()));
+    return startOffsets.entrySet().stream().collect(
+        Collectors.toMap(
+            entry -> String.valueOf(entry.getKey().partition()),
+            entry -> new LongMsgOffset(entry.getValue()),
+            (existingValue, newValue) -> newValue
+        ));
+  }
+
+  @Override
+  public Map<String, StreamPartitionMsgOffset> getStreamEndOffsets() {
+    List<PartitionInfo> partitionInfos = _consumer.partitionsFor(_topic);
+    Map<TopicPartition, Long> startOffsets = _consumer.endOffsets(
+        partitionInfos.stream()
+            .filter(info -> info != null)
+            .map(info -> new TopicPartition(_topic, info.partition()))
+            .collect(Collectors.toList()));
+    return startOffsets.entrySet().stream().collect(
+        Collectors.toMap(
+            entry -> String.valueOf(entry.getKey().partition()),
+            entry -> new LongMsgOffset(entry.getValue()),
+            (existingValue, newValue) -> newValue
+        ));
+  }
+
   @Override
   public void close()
       throws IOException {

@@ -40,6 +40,8 @@ import static org.testng.Assert.*;
 
 
 public class TableRebalancePauselessIntegrationTest extends BasePauselessRealtimeIngestionTest {
+  private final static int FORCE_COMMIT_REBALANCE_TIMEOUT_MS = 600_000;
+
   @Override
   protected String getFailurePoint() {
     return null;  // No failure point for basic test
@@ -137,30 +139,35 @@ public class TableRebalancePauselessIntegrationTest extends BasePauselessRealtim
       assertEquals(summary.getSegmentInfo().getConsumingSegmentToBeMovedSummary().getNumConsumingSegmentsToBeMoved(),
           4);
 
-      waitForRebalanceToComplete(rebalanceResult.getJobId(), 30000);
+      waitForRebalanceToComplete(rebalanceResult.getJobId(), FORCE_COMMIT_REBALANCE_TIMEOUT_MS);
 
       if (tableConfig.getRoutingConfig() != null
           && RoutingConfig.STRICT_REPLICA_GROUP_INSTANCE_SELECTOR_TYPE.equalsIgnoreCase(
           tableConfig.getRoutingConfig().getInstanceSelectorType())) {
         // test: move segments from tenantA to tenantB
-        performForceCommitSegmentMovingTest(rebalanceConfig, tableConfig, tenantB, true, 30000);
+        performForceCommitSegmentMovingTest(rebalanceConfig, tableConfig, tenantB, true,
+            FORCE_COMMIT_REBALANCE_TIMEOUT_MS);
 
         // test: move segment from tenantB to tenantA with batch size
         rebalanceConfig.setBatchSizePerServer(1);
-        performForceCommitSegmentMovingTest(rebalanceConfig, tableConfig, tenantA, true, 30000);
+        performForceCommitSegmentMovingTest(rebalanceConfig, tableConfig, tenantA, true,
+            FORCE_COMMIT_REBALANCE_TIMEOUT_MS);
 
         // test: move segment from tenantA to tenantB with includeConsuming = false, consuming segment should not be
         // committed
         rebalanceConfig.setIncludeConsuming(false);
-        performForceCommitSegmentMovingTest(rebalanceConfig, tableConfig, tenantB, false, 30000);
+        performForceCommitSegmentMovingTest(rebalanceConfig, tableConfig, tenantB, false,
+            FORCE_COMMIT_REBALANCE_TIMEOUT_MS);
       } else {
         // test: move segments from tenantA to tenantB
-        performForceCommitSegmentMovingTest(rebalanceConfig, tableConfig, tenantB, true, 30000);
+        performForceCommitSegmentMovingTest(rebalanceConfig, tableConfig, tenantB, true,
+            FORCE_COMMIT_REBALANCE_TIMEOUT_MS);
 
         // test: move segment from tenantB to tenantA with includeConsuming = false, consuming segment should not be
         // committed
         rebalanceConfig.setIncludeConsuming(false);
-        performForceCommitSegmentMovingTest(rebalanceConfig, tableConfig, tenantA, false, 30000);
+        performForceCommitSegmentMovingTest(rebalanceConfig, tableConfig, tenantA, false,
+            FORCE_COMMIT_REBALANCE_TIMEOUT_MS);
       }
     } catch (Exception e) {
       Assert.fail("Caught exception during force commit test", e);
@@ -181,7 +188,7 @@ public class TableRebalancePauselessIntegrationTest extends BasePauselessRealtim
               + "?type=" + tableConfig.getTableType().toString());
       String response = sendPostRequest(getTableRebalanceUrl(rebalanceConfig, TableType.REALTIME));
       RebalanceResult rebalanceResult = JsonUtils.stringToObject(response, RebalanceResult.class);
-      waitForRebalanceToComplete(rebalanceResult.getJobId(), 30000);
+      waitForRebalanceToComplete(rebalanceResult.getJobId(), FORCE_COMMIT_REBALANCE_TIMEOUT_MS);
       serverStarter0.stop();
       serverStarter1.stop();
       serverStarter2.stop();

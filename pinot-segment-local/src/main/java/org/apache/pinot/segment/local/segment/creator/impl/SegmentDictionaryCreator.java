@@ -29,7 +29,6 @@ import java.io.IOException;
 import java.math.BigDecimal;
 import java.nio.ByteOrder;
 import java.util.Map;
-import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
 import org.apache.commons.io.FileUtils;
 import org.apache.pinot.segment.local.io.util.FixedByteValueReaderWriter;
@@ -87,13 +86,13 @@ public class SegmentDictionaryCreator implements IndexCreator {
   }
 
   @Override
-  public void add(@Nonnull Object value, int dictId)
+  public void add(Object value, int dictId)
       throws IOException {
     throw new UnsupportedOperationException("Dictionaries should not be built as a normal index");
   }
 
   @Override
-  public void add(@Nonnull Object[] values, @Nullable int[] dictIds)
+  public void add(Object[] values, @Nullable int[] dictIds)
       throws IOException {
     throw new UnsupportedOperationException("Dictionaries should not be built as a normal index");
   }

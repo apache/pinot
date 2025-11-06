@@ -19,6 +19,7 @@
 package org.apache.pinot.common.function;
 
 import java.lang.reflect.Method;
+import org.apache.pinot.spi.annotations.ScalarFunction;
 
 
 public class FunctionInfo {
@@ -42,5 +43,12 @@ public class FunctionInfo {
 
   public boolean hasNullableParameters() {
     return _nullableParameters;
+  }
+
+  public static FunctionInfo fromMethod(Method method) {
+    ScalarFunction annotation = method.getAnnotation(ScalarFunction.class);
+    boolean nullableParameters = annotation != null && annotation.nullableParameters();
+
+    return new FunctionInfo(method, method.getDeclaringClass(), nullableParameters);
   }
 }

@@ -216,9 +216,21 @@ public class AggregationFunctionFactory {
             return new MinAggregationFunction(arguments, nullHandlingEnabled);
           case MAX:
             return new MaxAggregationFunction(arguments, nullHandlingEnabled);
+          case MINSTRING:
+            return new MinStringAggregationFunction(arguments, nullHandlingEnabled);
+          case MAXSTRING:
+            return new MaxStringAggregationFunction(arguments, nullHandlingEnabled);
+          case MINLONG:
+            return new MinLongAggregationFunction(arguments, nullHandlingEnabled);
+          case MAXLONG:
+            return new MaxLongAggregationFunction(arguments, nullHandlingEnabled);
           case SUM:
           case SUM0:
             return new SumAggregationFunction(arguments, nullHandlingEnabled);
+          case SUMINT:
+            return new SumIntAggregationFunction(arguments, nullHandlingEnabled);
+          case SUMLONG:
+            return new SumLongAggregationFunction(arguments, nullHandlingEnabled);
           case SUMPRECISION:
             return new SumPrecisionAggregationFunction(arguments, nullHandlingEnabled);
           case AVG:
@@ -372,6 +384,10 @@ public class AggregationFunctionFactory {
             return new DistinctCountRawHLLAggregationFunction(arguments);
           case DISTINCTCOUNTSMARTHLL:
             return new DistinctCountSmartHLLAggregationFunction(arguments);
+          case DISTINCTCOUNTSMARTHLLPLUS:
+            return new DistinctCountSmartHLLPlusAggregationFunction(arguments);
+          case DISTINCTCOUNTSMARTULL:
+            return new DistinctCountSmartULLAggregationFunction(arguments);
           case FASTHLL:
             return new FastHLLAggregationFunction(arguments);
           case DISTINCTCOUNTTHETASKETCH:

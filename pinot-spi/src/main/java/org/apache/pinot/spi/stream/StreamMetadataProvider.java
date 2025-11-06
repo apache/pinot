@@ -27,6 +27,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.TimeoutException;
+import javax.annotation.Nullable;
 import org.apache.pinot.spi.annotations.InterfaceAudience;
 import org.apache.pinot.spi.annotations.InterfaceStability;
 
@@ -49,6 +50,17 @@ public interface StreamMetadataProvider extends Closeable {
    * Fetches the partition ids for a topic given the stream configs.
    */
   default Set<Integer> fetchPartitionIds(long timeoutMillis) {
+    throw new UnsupportedOperationException();
+  }
+
+  /**
+   * Fetches the latest offset for a set of given partition Ids.
+   * @param partitionIds partition Ids of the stream
+   * @param timeoutMillis fetch timeout
+   * @return latest {@link StreamPartitionMsgOffset} for each partition Id.
+   */
+  default Map<Integer, StreamPartitionMsgOffset> fetchLatestStreamOffset(Set<Integer> partitionIds,
+      long timeoutMillis) {
     throw new UnsupportedOperationException();
   }
 
@@ -127,6 +139,21 @@ public interface StreamMetadataProvider extends Closeable {
     return result;
   }
 
+  @Nullable
+  default StreamPartitionMsgOffset getOffsetAtTimestamp(int partitionId, long timestampMillis, long timeoutMillis) {
+    return null;
+  }
+
+  @Nullable
+  default Map<String, StreamPartitionMsgOffset> getStreamStartOffsets() {
+    return null;
+  }
+
+  @Nullable
+  default Map<String, StreamPartitionMsgOffset> getStreamEndOffsets() {
+    return null;
+  }
+
   /**
    * Fetches the list of available topics/streams
    *
@@ -135,6 +162,12 @@ public interface StreamMetadataProvider extends Closeable {
   default List<TopicMetadata> getTopics() {
     throw new UnsupportedOperationException();
   }
+
+  /**
+   * @return true if the stream supports computing ingestion lag by subtracting the last consumed offset from the
+   * latest offset.
+   */
+  boolean supportsOffsetLag();
 
   /**
    * Represents the metadata of a topic. This can be used to represent the topic name and other metadata in the future.

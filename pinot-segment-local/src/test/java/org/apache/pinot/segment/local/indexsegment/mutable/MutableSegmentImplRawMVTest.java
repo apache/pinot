@@ -50,6 +50,7 @@ import org.apache.pinot.spi.data.readers.RecordReader;
 import org.apache.pinot.spi.data.readers.RecordReaderFactory;
 import org.apache.pinot.spi.stream.StreamMessageMetadata;
 import org.apache.pinot.spi.utils.CommonConstants;
+import org.apache.pinot.spi.utils.CommonConstants.Segment.BuiltInVirtualColumn;
 import org.apache.pinot.spi.utils.ReadMode;
 import org.apache.pinot.spi.utils.builder.TableConfigBuilder;
 import org.testng.Assert;
@@ -57,6 +58,8 @@ import org.testng.annotations.AfterClass;
 import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
 
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.when;
 import static org.testng.Assert.assertEquals;
 import static org.testng.Assert.assertNull;
 
@@ -104,15 +107,16 @@ public class MutableSegmentImplRawMVTest implements PinotBuffersAfterClassCheckR
     _mutableSegmentImpl =
         MutableSegmentImplTestUtils.createMutableSegmentImpl(_schema, new HashSet<>(noDictionaryColumns), Set.of(),
             Set.of(), false);
-    _lastIngestionTimeMs = System.currentTimeMillis();
-    StreamMessageMetadata defaultMetadata = new StreamMessageMetadata(_lastIngestionTimeMs, new GenericRow());
-    _startTimeMs = System.currentTimeMillis();
-
+    long currentTimeMs = System.currentTimeMillis();
+    StreamMessageMetadata metadata = mock(StreamMessageMetadata.class);
+    when(metadata.getRecordIngestionTimeMs()).thenReturn(currentTimeMs);
+    _lastIngestionTimeMs = currentTimeMs;
+    _startTimeMs = currentTimeMs;
     try (RecordReader recordReader = RecordReaderFactory.getRecordReader(FileFormat.AVRO, avroFile,
         _schema.getColumnNames(), null)) {
       GenericRow reuse = new GenericRow();
       while (recordReader.hasNext()) {
-        _mutableSegmentImpl.index(recordReader.next(reuse), defaultMetadata);
+        _mutableSegmentImpl.index(recordReader.next(reuse), metadata);
         _lastIndexedTs = System.currentTimeMillis();
       }
     }
@@ -187,6 +191,13 @@ public class MutableSegmentImplRawMVTest implements PinotBuffersAfterClassCheckR
     for (FieldSpec fieldSpec : _schema.getAllFieldSpecs()) {
       if (!fieldSpec.isSingleValueField()) {
         String column = fieldSpec.getName();
+        // Skip $partitionId virtual column because this test is specifically for "raw MV" columns
+        // (MV columns with NO dictionary). $partitionId always has a dictionary
+        // (MultiValueConstantStringDictionary), so it doesn't fit the "raw MV" test pattern
+        // where getDictionary() is expected to return null.
+        if (BuiltInVirtualColumn.PARTITIONID.equals(column)) {
+          continue;
+        }
         DataSource actualDataSource = _mutableSegmentImpl.getDataSource(column);
         DataSource expectedDataSource = _immutableSegment.getDataSource(column);
 

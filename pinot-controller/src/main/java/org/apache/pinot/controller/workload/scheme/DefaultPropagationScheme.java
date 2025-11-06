@@ -20,8 +20,11 @@ package org.apache.pinot.controller.workload.scheme;
 
 import java.util.HashSet;
 import java.util.Set;
+import javax.annotation.Nullable;
 import org.apache.pinot.controller.helix.core.PinotHelixResourceManager;
 import org.apache.pinot.spi.config.workload.NodeConfig;
+import org.apache.pinot.spi.config.workload.PropagationEntity;
+import org.apache.pinot.spi.config.workload.PropagationEntityOverrides;
 
 
 public class DefaultPropagationScheme implements PropagationScheme {
@@ -33,9 +36,9 @@ public class DefaultPropagationScheme implements PropagationScheme {
   }
 
   @Override
-  public Set<String> resolveInstances(NodeConfig nodeConfig) {
+  public Set<String> resolveInstances(PropagationEntity entity, NodeConfig.Type nodeType,
+                                      @Nullable PropagationEntityOverrides override) {
     Set<String> instances;
-    NodeConfig.Type nodeType = nodeConfig.getNodeType();
     switch (nodeType) {
       case BROKER_NODE:
         instances = new HashSet<>(_pinotHelixResourceManager.getAllBrokerInstances());

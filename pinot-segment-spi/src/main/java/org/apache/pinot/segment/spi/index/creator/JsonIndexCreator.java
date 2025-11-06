@@ -20,10 +20,8 @@ package org.apache.pinot.segment.spi.index.creator;
 
 import java.io.IOException;
 import java.util.Map;
-import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
 import org.apache.pinot.segment.spi.index.IndexCreator;
-import org.apache.pinot.spi.utils.JsonUtils;
 
 
 /**
@@ -34,17 +32,17 @@ public interface JsonIndexCreator extends IndexCreator {
   char KEY_VALUE_SEPARATOR_NEXT_CHAR = KEY_VALUE_SEPARATOR + 1;
 
   @Override
-  default void add(@Nonnull Object value, int dictId)
+  default void add(Object value, int dictId)
       throws IOException {
     if (value instanceof Map) {
-      add(JsonUtils.objectToString(value));
+      add((Map) value);
     } else {
       add((String) value);
     }
   }
 
   @Override
-  default void add(@Nonnull Object[] values, @Nullable int[] dictIds) {
+  default void add(Object[] values, @Nullable int[] dictIds) {
   }
 
   /**
@@ -52,6 +50,12 @@ public interface JsonIndexCreator extends IndexCreator {
    */
   void add(String jsonString)
       throws IOException;
+
+  /**
+   * Adds the next json value for Map type
+   */
+  void add(Map jsonMap)
+    throws IOException;
 
   /**
    * Seals the index and flushes it to disk.

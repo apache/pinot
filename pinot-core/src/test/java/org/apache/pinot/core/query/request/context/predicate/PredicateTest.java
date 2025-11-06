@@ -63,6 +63,7 @@ public class PredicateTest {
 
     // RegexpLikePredicate
     assertEquals(testSerDe("ReGexP_lIKe(foo,\t\t'bar')"), "regexp_like(foo,'bar')");
+    assertEquals(testSerDe("ReGexP_lIKe(foo,\t\t'bar','i')"), "regexp_like(foo,'bar','i')");
 
     // TextMatchPredicate
     assertEquals(testSerDe("TEXT_MATCH(foo\t ,\t'bar')"), "text_match(foo,'bar')");

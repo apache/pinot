@@ -18,7 +18,6 @@
  */
 package org.apache.pinot.query;
 
-import com.google.common.collect.ImmutableList;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
@@ -305,7 +304,7 @@ public class QueryCompilationTest extends QueryEnvironmentTestBase {
     // Assert that no project of filter node for any intermediate stage because all should've been pushed down.
     for (DispatchablePlanFragment dispatchablePlanFragment : intermediateStages) {
       PlanNode roots = dispatchablePlanFragment.getPlanFragment().getFragmentRoot();
-      assertNodeTypeNotIn(roots, ImmutableList.of(ProjectNode.class, FilterNode.class));
+      assertNodeTypeNotIn(roots, List.of(ProjectNode.class, FilterNode.class));
     }
   }
 
@@ -526,6 +525,7 @@ public class QueryCompilationTest extends QueryEnvironmentTestBase {
     RuntimeException e = expectThrows(RuntimeException.class, () -> _queryEnvironment.getTableNamesForQuery(query));
     assertTrue(e.getCause().getMessage().contains("Duplicate alias in WITH: 'tmp'"));
   }
+
 
   @Test
   public void testWindowFunctions() {

@@ -21,14 +21,12 @@ package org.apache.pinot.integration.tests.custom;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.google.common.cache.Cache;
 import com.google.common.cache.CacheBuilder;
-import com.google.common.collect.ImmutableList;
 import java.io.File;
 import java.util.List;
 import org.apache.avro.file.DataFileWriter;
 import org.apache.avro.generic.GenericData;
 import org.apache.avro.generic.GenericDatumWriter;
 import org.apache.commons.lang3.RandomStringUtils;
-import org.apache.pinot.core.util.DoubleComparisonUtil;
 import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.Schema;
 import org.testng.annotations.Test;
@@ -511,9 +509,9 @@ public class ArrayTest extends CustomDataQueryClusterIntegrationTest {
     assertEquals(entry1.size(), 4);
     assertEquals(entry1.get(0).doubleValue(), 0.0);
     // Compare double values:
-    assertEquals(DoubleComparisonUtil.doubleCompare(entry1.get(1).doubleValue(), 100.0, 0.00000000001), 0);
-    assertEquals(DoubleComparisonUtil.doubleCompare(entry1.get(2).doubleValue(), 200.0, 0.00000000001), 0);
-    assertEquals(DoubleComparisonUtil.doubleCompare(entry1.get(3).doubleValue(), 300.0, 0.00000000001), 0);
+    assertEquals(entry1.get(1).doubleValue(), 100.0, 0.000001);
+    assertEquals(entry1.get(2).doubleValue(), 200.0, 0.000001);
+    assertEquals(entry1.get(3).doubleValue(), 300.0, 0.000001);
   }
 
   @Test(dataProvider = "useBothQueryEngines")
@@ -578,6 +576,68 @@ public class ArrayTest extends CustomDataQueryClusterIntegrationTest {
         assertEquals(row.get(0).get(1).textValue(), "bb");
         assertEquals(row.get(0).get(2).textValue(), "ccc");
       }
+    }
+  }
+
+  @Test(dataProvider = "useBothQueryEngines")
+  public void testArrayPushBackAndFrontString(boolean useMultiStageQueryEngine)
+      throws Exception {
+    setUseMultiStageQueryEngine(useMultiStageQueryEngine);
+    for (boolean withFrom : new boolean[]{true, false}) {
+      String pushBackQuery = withFrom ? String.format(
+          "SELECT array_push_back_string(ARRAY['a'],'b') FROM %s LIMIT 1", getTableName())
+          : "SELECT array_push_back_string(ARRAY['a'],'b')";
+      JsonNode result = postQuery(pushBackQuery).get("resultTable");
+      JsonNode rows = result.get("rows");
+      assertEquals(rows.size(), 1);
+      JsonNode row = rows.get(0);
+      assertEquals(row.size(), 1);
+      assertEquals(row.get(0).size(), 2);
+      assertEquals(row.get(0).get(0).textValue(), "a");
+      assertEquals(row.get(0).get(1).textValue(), "b");
+
+      String pushFrontQuery = withFrom ? String.format(
+          "SELECT array_push_front_string(ARRAY['b'],'a') FROM %s LIMIT 1", getTableName())
+          : "SELECT array_push_front_string(ARRAY['b'],'a')";
+      result = postQuery(pushFrontQuery).get("resultTable");
+      rows = result.get("rows");
+      assertEquals(rows.size(), 1);
+      row = rows.get(0);
+      assertEquals(row.size(), 1);
+      assertEquals(row.get(0).size(), 2);
+      assertEquals(row.get(0).get(0).textValue(), "a");
+      assertEquals(row.get(0).get(1).textValue(), "b");
+    }
+  }
+
+  @Test(dataProvider = "useBothQueryEngines")
+  public void testArrayPushBackAndFrontDouble(boolean useMultiStageQueryEngine)
+      throws Exception {
+    setUseMultiStageQueryEngine(useMultiStageQueryEngine);
+    for (boolean withFrom : new boolean[]{true, false}) {
+      String pushBackQuery = withFrom ? String.format(
+          "SELECT array_push_back_double(ARRAY[CAST(0.1 AS DOUBLE)], CAST(0.2 AS DOUBLE)) FROM %s LIMIT 1",
+          getTableName()) : "SELECT array_push_back_double(ARRAY[CAST(0.1 AS DOUBLE)], CAST(0.2 AS DOUBLE))";
+      JsonNode result = postQuery(pushBackQuery).get("resultTable");
+      JsonNode rows = result.get("rows");
+      assertEquals(rows.size(), 1);
+      JsonNode row = rows.get(0);
+      assertEquals(row.size(), 1);
+      assertEquals(row.get(0).size(), 2);
+      assertEquals(row.get(0).get(0).asDouble(), 0.1);
+      assertEquals(row.get(0).get(1).asDouble(), 0.2);
+
+      String pushFrontQuery = withFrom ? String.format(
+          "SELECT array_push_front_double(ARRAY[CAST(0.2 AS DOUBLE)], CAST(0.1 AS DOUBLE)) FROM %s LIMIT 1",
+          getTableName()) : "SELECT array_push_front_double(ARRAY[CAST(0.2 AS DOUBLE)], CAST(0.1 AS DOUBLE))";
+      result = postQuery(pushFrontQuery).get("resultTable");
+      rows = result.get("rows");
+      assertEquals(rows.size(), 1);
+      row = rows.get(0);
+      assertEquals(row.size(), 1);
+      assertEquals(row.get(0).size(), 2);
+      assertEquals(row.get(0).get(0).asDouble(), 0.1);
+      assertEquals(row.get(0).get(1).asDouble(), 0.2);
     }
   }
 
@@ -877,7 +937,7 @@ public class ArrayTest extends CustomDataQueryClusterIntegrationTest {
       throws Exception {
     // create avro schema
     org.apache.avro.Schema avroSchema = org.apache.avro.Schema.createRecord("myRecord", null, null, false);
-    avroSchema.setFields(ImmutableList.of(
+    avroSchema.setFields(List.of(
         new org.apache.avro.Schema.Field(BOOLEAN_COLUMN,
             org.apache.avro.Schema.create(org.apache.avro.Schema.Type.BOOLEAN),
             null, null),
@@ -943,11 +1003,11 @@ public class ArrayTest extends CustomDataQueryClusterIntegrationTest {
               record.put(STRING_COLUMN, RandomStringUtils.random(finalI));
               record.put(TIMESTAMP_COLUMN, finalI);
               record.put(GROUP_BY_COLUMN, String.valueOf(finalI % 10));
-              record.put(BOOLEAN_ARRAY_COLUMN, ImmutableList.of(true, true, false, false));
-              record.put(BOOLEAN_FROM_INT_ARRAY_COLUMN, ImmutableList.of(1, 1, 0, 0));
-              record.put(BOOLEAN_FROM_STRING_ARRAY_COLUMN, ImmutableList.of("true", "true", "false", "false"));
-              record.put(LONG_ARRAY_COLUMN, ImmutableList.of(0, 1, 2, 3));
-              record.put(DOUBLE_ARRAY_COLUMN, ImmutableList.of(0.0, 0.1, 0.2, 0.3));
+              record.put(BOOLEAN_ARRAY_COLUMN, List.of(true, true, false, false));
+              record.put(BOOLEAN_FROM_INT_ARRAY_COLUMN, List.of(1, 1, 0, 0));
+              record.put(BOOLEAN_FROM_STRING_ARRAY_COLUMN, List.of("true", "true", "false", "false"));
+              record.put(LONG_ARRAY_COLUMN, List.of(0, 1, 2, 3));
+              record.put(DOUBLE_ARRAY_COLUMN, List.of(0.0, 0.1, 0.2, 0.3));
               return record;
             }
         ));

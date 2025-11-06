@@ -37,6 +37,7 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ThreadFactory;
 import java.util.concurrent.TimeUnit;
+import javax.inject.Singleton;
 import org.apache.commons.io.FileUtils;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.hc.client5.http.impl.io.PoolingHttpClientConnectionManager;
@@ -59,6 +60,8 @@ import org.apache.helix.task.TaskDriver;
 import org.apache.helix.zookeeper.constant.ZkSystemPropertyKeys;
 import org.apache.helix.zookeeper.datamodel.ZNRecord;
 import org.apache.pinot.common.Utils;
+import org.apache.pinot.common.audit.AuditServiceBinder;
+import org.apache.pinot.common.config.DefaultClusterConfigChangeHandler;
 import org.apache.pinot.common.config.TlsConfig;
 import org.apache.pinot.common.function.FunctionRegistry;
 import org.apache.pinot.common.http.PoolingHttpClientConnectionManagerHelper;
@@ -98,6 +101,7 @@ import org.apache.pinot.controller.helix.core.controllerjob.ControllerJobTypes;
 import org.apache.pinot.controller.helix.core.minion.PinotHelixTaskResourceManager;
 import org.apache.pinot.controller.helix.core.minion.PinotTaskManager;
 import org.apache.pinot.controller.helix.core.minion.TaskMetricsEmitter;
+import org.apache.pinot.controller.helix.core.periodictask.ControllerPeriodicTask;
 import org.apache.pinot.controller.helix.core.realtime.PinotLLCRealtimeSegmentManager;
 import org.apache.pinot.controller.helix.core.realtime.SegmentCompletionConfig;
 import org.apache.pinot.controller.helix.core.realtime.SegmentCompletionManager;
@@ -105,19 +109,22 @@ import org.apache.pinot.controller.helix.core.rebalance.RebalanceChecker;
 import org.apache.pinot.controller.helix.core.rebalance.RebalancePreChecker;
 import org.apache.pinot.controller.helix.core.rebalance.RebalancePreCheckerFactory;
 import org.apache.pinot.controller.helix.core.rebalance.TableRebalanceManager;
-import org.apache.pinot.controller.helix.core.rebalance.tenant.DefaultTenantRebalancer;
+import org.apache.pinot.controller.helix.core.rebalance.tenant.TenantRebalanceChecker;
 import org.apache.pinot.controller.helix.core.rebalance.tenant.TenantRebalancer;
 import org.apache.pinot.controller.helix.core.relocation.SegmentRelocator;
 import org.apache.pinot.controller.helix.core.retention.RetentionManager;
 import org.apache.pinot.controller.helix.core.statemodel.LeadControllerResourceMasterSlaveStateModelFactory;
 import org.apache.pinot.controller.helix.core.util.HelixSetupUtils;
 import org.apache.pinot.controller.helix.starter.HelixConfig;
+import org.apache.pinot.controller.services.PinotTableReloadService;
+import org.apache.pinot.controller.services.PinotTableReloadStatusReporter;
 import org.apache.pinot.controller.tuner.TableConfigTunerRegistry;
 import org.apache.pinot.controller.util.BrokerServiceHelper;
 import org.apache.pinot.controller.util.TableSizeReader;
 import org.apache.pinot.controller.validation.BrokerResourceValidationManager;
 import org.apache.pinot.controller.validation.DiskUtilizationChecker;
-import org.apache.pinot.controller.validation.OfflineSegmentIntervalChecker;
+import org.apache.pinot.controller.validation.OfflineSegmentValidationManager;
+import org.apache.pinot.controller.validation.RealtimeOffsetAutoResetManager;
 import org.apache.pinot.controller.validation.RealtimeSegmentValidationManager;
 import org.apache.pinot.controller.validation.ResourceUtilizationChecker;
 import org.apache.pinot.controller.validation.ResourceUtilizationManager;
@@ -164,6 +171,7 @@ public abstract class BaseControllerStarter implements ServiceStartable {
   private static final Long DATA_DIRECTORY_EXCEPTION_VALUE = 1100000L;
   private static final String METADATA_EVENT_NOTIFIER_PREFIX = "metadata.event.notifier";
   private static final String MAX_STATE_TRANSITIONS_PER_INSTANCE = "MaxStateTransitionsPerInstance";
+  private static final String MAX_STATE_TRANSITIONS_PER_RESOURCE = "MaxStateTransitionsPerResource";
 
   protected ControllerConf _config;
   protected List<ListenerConfig> _listenerConfigs;
@@ -188,7 +196,8 @@ public abstract class BaseControllerStarter implements ServiceStartable {
   protected ValidationMetrics _validationMetrics;
   protected SqlQueryExecutor _sqlQueryExecutor;
   // Can only be constructed after resource manager getting started
-  protected OfflineSegmentIntervalChecker _offlineSegmentIntervalChecker;
+  protected OfflineSegmentValidationManager _offlineSegmentValidationManager;
+  protected RealtimeOffsetAutoResetManager _realtimeOffsetAutoResetManager;
   protected RealtimeSegmentValidationManager _realtimeSegmentValidationManager;
   protected BrokerResourceValidationManager _brokerResourceValidationManager;
   protected SegmentRelocator _segmentRelocator;
@@ -218,6 +227,7 @@ public abstract class BaseControllerStarter implements ServiceStartable {
   protected ResourceUtilizationManager _resourceUtilizationManager;
   protected RebalancePreChecker _rebalancePreChecker;
   protected TableRebalanceManager _tableRebalanceManager;
+  protected DefaultClusterConfigChangeHandler _clusterConfigChangeHandler;
 
   @Override
   public void init(PinotConfiguration pinotConfiguration)
@@ -282,7 +292,6 @@ public abstract class BaseControllerStarter implements ServiceStartable {
     TableConfigUtils.setDisableGroovy(_config.isDisableIngestionGroovy());
     TableConfigUtils.setEnforcePoolBasedAssignment(_config.isEnforcePoolBasedAssignmentEnabled());
 
-    ContinuousJfrStarter.init(_config);
     ControllerJobTypes.init(_config);
   }
 
@@ -332,6 +341,8 @@ public abstract class BaseControllerStarter implements ServiceStartable {
   }
 
   private void setupHelixClusterConstraints() {
+    // Set up the INSTANCE level state transition constraint. This provides an upper-bound on the total state transition
+    // messages that can be in the Helix messages queue for a given instance
     String maxStateTransitions = _config.getProperty(Helix.CONFIG_OF_HELIX_INSTANCE_MAX_STATE_TRANSITIONS,
         Helix.DEFAULT_HELIX_INSTANCE_MAX_STATE_TRANSITIONS);
     Map<ClusterConstraints.ConstraintAttribute, String> constraintAttributes = new HashMap<>();
@@ -343,6 +354,21 @@ public abstract class BaseControllerStarter implements ServiceStartable {
     _helixControllerManager.getClusterManagmentTool()
         .setConstraint(_helixClusterName, ClusterConstraints.ConstraintType.MESSAGE_CONSTRAINT,
             MAX_STATE_TRANSITIONS_PER_INSTANCE, constraintItem);
+
+    // Set up the RESOURCE level state transition constraint, this applies per-resource per-instance
+    String maxStateTransitionsPerResource = _config.getProperty(Helix.CONFIG_OF_MAX_STATE_TRANSITIONS_PER_RESOURCE,
+        Helix.DEFAULT_HELIX_INSTANCE_MAX_STATE_TRANSITIONS_PER_RESOURCE);
+    Map<ClusterConstraints.ConstraintAttribute, String> constraintAttributesResource = new HashMap<>();
+    constraintAttributesResource.put(ClusterConstraints.ConstraintAttribute.RESOURCE, ".*");
+    constraintAttributesResource.put(ClusterConstraints.ConstraintAttribute.INSTANCE, ".*");
+    constraintAttributesResource.put(ClusterConstraints.ConstraintAttribute.MESSAGE_TYPE,
+        Message.MessageType.STATE_TRANSITION.name());
+    ConstraintItem constraintItemResource = new ConstraintItem(constraintAttributesResource,
+        maxStateTransitionsPerResource);
+
+    _helixControllerManager.getClusterManagmentTool()
+        .setConstraint(_helixClusterName, ClusterConstraints.ConstraintType.MESSAGE_CONSTRAINT,
+            MAX_STATE_TRANSITIONS_PER_RESOURCE, constraintItemResource);
   }
 
   protected void addUtilizationChecker(UtilizationChecker utilizationChecker) {
@@ -377,12 +403,20 @@ public abstract class BaseControllerStarter implements ServiceStartable {
     return _leadControllerManager;
   }
 
-  public OfflineSegmentIntervalChecker getOfflineSegmentIntervalChecker() {
-    return _offlineSegmentIntervalChecker;
+  public OfflineSegmentValidationManager getOfflineSegmentValidationManager() {
+    return _offlineSegmentValidationManager;
+  }
+
+  public RealtimeOffsetAutoResetManager getRealtimeOffsetAutoResetManager() {
+    return _realtimeOffsetAutoResetManager;
   }
 
   public RealtimeSegmentValidationManager getRealtimeSegmentValidationManager() {
     return _realtimeSegmentValidationManager;
+  }
+
+  public RetentionManager getRetentionManager() {
+    return _retentionManager;
   }
 
   public BrokerResourceValidationManager getBrokerResourceValidationManager() {
@@ -540,6 +574,17 @@ public abstract class BaseControllerStarter implements ServiceStartable {
     // TODO: Need to put this inside HelixResourceManager when HelixControllerLeadershipManager is removed.
     _helixResourceManager.registerPinotLLCRealtimeSegmentManager(_pinotLLCRealtimeSegmentManager);
 
+    // Initialize cluster config change handler
+    LOGGER.info("Initializing cluster config change handler");
+    _clusterConfigChangeHandler = new DefaultClusterConfigChangeHandler();
+    try {
+      // Register cluster config change handler with Helix
+      _helixParticipantManager.addClusterfigChangeListener(_clusterConfigChangeHandler);
+    } catch (Exception e) {
+      throw new RuntimeException("Failed to register cluster config change handler", e);
+    }
+
+
     SegmentCompletionConfig segmentCompletionConfig = new SegmentCompletionConfig(_config);
 
     _segmentCompletionManager =
@@ -570,10 +615,20 @@ public abstract class BaseControllerStarter implements ServiceStartable {
         new TableRebalanceManager(_helixResourceManager, _controllerMetrics, _rebalancePreChecker, _tableSizeReader,
             _rebalancerExecutorService);
     _tenantRebalancer =
-        new DefaultTenantRebalancer(_tableRebalanceManager, _helixResourceManager, _rebalancerExecutorService);
+        new TenantRebalancer(_tableRebalanceManager, _helixResourceManager, _rebalancerExecutorService);
 
     // Setting up periodic tasks
     List<PeriodicTask> controllerPeriodicTasks = setupControllerPeriodicTasks();
+
+    // Register ControllerPeriodicTasks as cluster config change listeners
+    LOGGER.info("Registering ControllerPeriodicTasks as cluster config change listeners");
+    for (PeriodicTask periodicTask : controllerPeriodicTasks) {
+      if (periodicTask instanceof ControllerPeriodicTask) {
+        ControllerPeriodicTask<?> controllerPeriodicTask = (ControllerPeriodicTask<?>) periodicTask;
+        _clusterConfigChangeHandler.registerClusterConfigChangeListener(controllerPeriodicTask);
+        LOGGER.info("Registered {} as config change listener", controllerPeriodicTask.getTaskName());
+      }
+    }
     LOGGER.info("Init controller periodic tasks scheduler");
     _periodicTaskScheduler = new PeriodicTaskScheduler();
     _periodicTaskScheduler.init(controllerPeriodicTasks);
@@ -627,6 +682,10 @@ public abstract class BaseControllerStarter implements ServiceStartable {
         bind(_diskUtilizationChecker).to(DiskUtilizationChecker.class);
         bind(_resourceUtilizationManager).to(ResourceUtilizationManager.class);
         bind(controllerStartTime).named(ControllerAdminApiApplication.START_TIME);
+
+        bindAsContract(PinotTableReloadService.class).in(Singleton.class);
+        bindAsContract(PinotTableReloadStatusReporter.class).in(Singleton.class);
+
         String loggerRootDir = _config.getProperty(CommonConstants.Controller.CONFIG_OF_LOGGER_ROOT_DIR);
         if (loggerRootDir != null) {
           bind(new LocalLogFileServer(loggerRootDir)).to(LogFileServer.class);
@@ -635,6 +694,9 @@ public abstract class BaseControllerStarter implements ServiceStartable {
         }
       }
     });
+
+    // Register audit services binder
+    _adminApp.registerBinder(new AuditServiceBinder(_clusterConfigChangeHandler, getServiceRole(), _controllerMetrics));
 
     LOGGER.info("Starting controller admin application on: {}", ListenerConfigUtil.toString(_listenerConfigs));
     _adminApp.start(_listenerConfigs, _controllerMetrics);
@@ -663,6 +725,8 @@ public abstract class BaseControllerStarter implements ServiceStartable {
     });
 
     _serviceStatusCallbackList.add(generateServiceStatusCallback(_helixParticipantManager));
+
+    _clusterConfigChangeHandler.registerClusterConfigChangeListener(ContinuousJfrStarter.INSTANCE);
   }
 
   protected PinotLLCRealtimeSegmentManager createPinotLLCRealtimeSegmentManager() {
@@ -866,15 +930,16 @@ public abstract class BaseControllerStarter implements ServiceStartable {
     _taskManager = createTaskManager();
     _taskManager.init();
     periodicTasks.add(_taskManager);
+    initRealtimeOffsetAutoResetManager(periodicTasks);
     BrokerServiceHelper brokerServiceHelper =
         new BrokerServiceHelper(_helixResourceManager, _config, _executorService, _connectionManager);
     _retentionManager = new RetentionManager(_helixResourceManager, _leadControllerManager, _config, _controllerMetrics,
         brokerServiceHelper);
     periodicTasks.add(_retentionManager);
-    _offlineSegmentIntervalChecker =
-        new OfflineSegmentIntervalChecker(_config, _helixResourceManager, _leadControllerManager,
-            new ValidationMetrics(_metricsRegistry), _controllerMetrics);
-    periodicTasks.add(_offlineSegmentIntervalChecker);
+    _offlineSegmentValidationManager =
+        new OfflineSegmentValidationManager(_config, _helixResourceManager, _leadControllerManager,
+            new ValidationMetrics(_metricsRegistry), _controllerMetrics, _resourceUtilizationManager);
+    periodicTasks.add(_offlineSegmentValidationManager);
     _realtimeSegmentValidationManager =
         new RealtimeSegmentValidationManager(_config, _helixResourceManager, _leadControllerManager,
             _pinotLLCRealtimeSegmentManager, _validationMetrics, _controllerMetrics, _storageQuotaChecker,
@@ -912,8 +977,22 @@ public abstract class BaseControllerStarter implements ServiceStartable {
     PeriodicTask resourceUtilizationChecker = new ResourceUtilizationChecker(_config, _connectionManager,
         _controllerMetrics, _utilizationCheckers, _executorService, _helixResourceManager);
     periodicTasks.add(resourceUtilizationChecker);
+    PeriodicTask tenantRebalanceChecker =
+        new TenantRebalanceChecker(_config, _helixResourceManager, _tenantRebalancer);
+    periodicTasks.add(tenantRebalanceChecker);
 
     return periodicTasks;
+  }
+
+  private void initRealtimeOffsetAutoResetManager(List<PeriodicTask> periodicTasks) {
+    if (!_config.isRealtimeOffsetAutoResetBackfillEnabled()) {
+      LOGGER.info("Realtime offset auto reset is disabled, skipping initialization");
+      return;
+    }
+    _realtimeOffsetAutoResetManager =
+        new RealtimeOffsetAutoResetManager(_config, _helixResourceManager, _leadControllerManager,
+            _pinotLLCRealtimeSegmentManager, _controllerMetrics);
+    periodicTasks.add(_realtimeOffsetAutoResetManager);
   }
 
   /**
@@ -925,12 +1004,16 @@ public abstract class BaseControllerStarter implements ServiceStartable {
     LOGGER.info("Creating TaskManager with class: {}", taskManagerClass);
     try {
       return PluginManager.get().createInstance(taskManagerClass,
-          new Class[]{PinotHelixTaskResourceManager.class, PinotHelixResourceManager.class, LeadControllerManager.class,
+          new Class[]{
+              PinotHelixTaskResourceManager.class, PinotHelixResourceManager.class, LeadControllerManager.class,
               ControllerConf.class, ControllerMetrics.class, TaskManagerStatusCache.class,
-              Executor.class, PoolingHttpClientConnectionManager.class, ResourceUtilizationManager.class},
-          new Object[]{_helixTaskResourceManager, _helixResourceManager, _leadControllerManager,
+              Executor.class, PoolingHttpClientConnectionManager.class, ResourceUtilizationManager.class
+          },
+          new Object[]{
+              _helixTaskResourceManager, _helixResourceManager, _leadControllerManager,
               _config, _controllerMetrics, _taskManagerStatusCache, _executorService,
-              _connectionManager, _resourceUtilizationManager});
+              _connectionManager, _resourceUtilizationManager
+          });
     } catch (Exception e) {
       LOGGER.error("Failed to create task manager with class: {}", taskManagerClass, e);
       throw new RuntimeException("Failed to create task manager with class: " + taskManagerClass, e);

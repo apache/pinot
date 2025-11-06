@@ -106,11 +106,21 @@ public class RequestContextUtils {
    *          missing an EQUALS filter operator.
    */
   public static FilterContext getFilter(Expression thriftExpression) {
+    Function function = thriftExpression.getFunctionCall();
+    // Trim off outer IS_TRUE function as it is redundant
+    if (function != null && function.getOperator().equals("istrue")) {
+      return getFilter(function.getOperands().get(0));
+    } else {
+      return getFilterInner(thriftExpression);
+    }
+  }
+
+  private static FilterContext getFilterInner(Expression thriftExpression) {
     ExpressionType type = thriftExpression.getType();
     switch (type) {
       case FUNCTION:
         Function thriftFunction = thriftExpression.getFunctionCall();
-        return getFilter(thriftFunction);
+        return getFilterInner(thriftFunction);
       case IDENTIFIER:
         // Convert "WHERE a" to "WHERE a = true"
         return FilterContext.forPredicate(new EqPredicate(getExpression(thriftExpression), "true"));
@@ -121,7 +131,7 @@ public class RequestContextUtils {
     }
   }
 
-  public static FilterContext getFilter(Function thriftFunction) {
+  private static FilterContext getFilterInner(Function thriftFunction) {
     String functionOperator = thriftFunction.getOperator();
 
     // convert "WHERE startsWith(col, 'str')" to "WHERE startsWith(col, 'str') = true"
@@ -137,7 +147,7 @@ public class RequestContextUtils {
       case AND: {
         List<FilterContext> children = new ArrayList<>(numOperands);
         for (Expression operand : operands) {
-          FilterContext filter = getFilter(operand);
+          FilterContext filter = getFilterInner(operand);
           if (!filter.isConstant()) {
             children.add(filter);
           } else {
@@ -158,7 +168,7 @@ public class RequestContextUtils {
       case OR: {
         List<FilterContext> children = new ArrayList<>(numOperands);
         for (Expression operand : operands) {
-          FilterContext filter = getFilter(operand);
+          FilterContext filter = getFilterInner(operand);
           if (!filter.isConstant()) {
             children.add(filter);
           } else {
@@ -178,7 +188,7 @@ public class RequestContextUtils {
       }
       case NOT: {
         assert numOperands == 1;
-        FilterContext filter = getFilter(operands.get(0));
+        FilterContext filter = getFilterInner(operands.get(0));
         if (!filter.isConstant()) {
           return FilterContext.forNot(filter);
         } else {
@@ -229,11 +239,20 @@ public class RequestContextUtils {
         return FilterContext.forPredicate(
             new RangePredicate(getExpression(operands.get(0)), getStringValue(operands.get(1))));
       case REGEXP_LIKE:
-        return FilterContext.forPredicate(
-            new RegexpLikePredicate(getExpression(operands.get(0)), getStringValue(operands.get(1))));
+        if (operands.size() == 2) {
+          return FilterContext.forPredicate(
+              new RegexpLikePredicate(getExpression(operands.get(0)), getStringValue(operands.get(1))));
+        } else if (operands.size() == 3) {
+          return FilterContext.forPredicate(
+              new RegexpLikePredicate(getExpression(operands.get(0)), getStringValue(operands.get(1)),
+                  getStringValue(operands.get(2))));
+        } else {
+          throw new BadQueryRequestException("REGEXP_LIKE requires 2 or 3 arguments");
+        }
+
       case LIKE:
         return FilterContext.forPredicate(new RegexpLikePredicate(getExpression(operands.get(0)),
-            RegexpPatternConverterUtils.likeToRegexpLike(getStringValue(operands.get(1)))));
+            RegexpPatternConverterUtils.likeToRegexpLike(getStringValue(operands.get(1))), "i"));
       case TEXT_CONTAINS:
         return FilterContext.forPredicate(
             new TextContainsPredicate(getExpression(operands.get(0)), getStringValue(operands.get(1))));
@@ -278,11 +297,21 @@ public class RequestContextUtils {
    *          missing an EQUALS filter operator.
    */
   public static FilterContext getFilter(ExpressionContext filterExpression) {
+    FunctionContext function = filterExpression.getFunction();
+    // Trim off outer IS_TRUE function as it is redundant
+    if (function != null && function.getFunctionName().equals("istrue")) {
+      return getFilter(function.getArguments().get(0));
+    } else {
+      return getFilterInner(filterExpression);
+    }
+  }
+
+  private static FilterContext getFilterInner(ExpressionContext filterExpression) {
     ExpressionContext.Type type = filterExpression.getType();
     switch (type) {
       case FUNCTION:
         FunctionContext filterFunction = filterExpression.getFunction();
-        return getFilter(filterFunction);
+        return getFilterInner(filterFunction);
       case IDENTIFIER:
         return FilterContext.forPredicate(
             new EqPredicate(filterExpression, getStringValue(RequestUtils.getLiteralExpression(true))));
@@ -293,7 +322,7 @@ public class RequestContextUtils {
     }
   }
 
-  public static FilterContext getFilter(FunctionContext filterFunction) {
+  private static FilterContext getFilterInner(FunctionContext filterFunction) {
     String functionOperator = filterFunction.getFunctionName().toUpperCase();
 
     // convert "WHERE startsWith(col, 'str')" to "WHERE startsWith(col, 'str') = true"
@@ -308,7 +337,7 @@ public class RequestContextUtils {
       case AND: {
         List<FilterContext> children = new ArrayList<>(numOperands);
         for (ExpressionContext operand : operands) {
-          FilterContext filter = getFilter(operand);
+          FilterContext filter = getFilterInner(operand);
           if (!filter.isConstant()) {
             children.add(filter);
           } else {
@@ -329,7 +358,7 @@ public class RequestContextUtils {
       case OR: {
         List<FilterContext> children = new ArrayList<>(numOperands);
         for (ExpressionContext operand : operands) {
-          FilterContext filter = getFilter(operand);
+          FilterContext filter = getFilterInner(operand);
           if (!filter.isConstant()) {
             children.add(filter);
           } else {
@@ -349,7 +378,7 @@ public class RequestContextUtils {
       }
       case NOT: {
         assert numOperands == 1;
-        FilterContext filter = getFilter(operands.get(0));
+        FilterContext filter = getFilterInner(operands.get(0));
         if (!filter.isConstant()) {
           return FilterContext.forNot(filter);
         } else {
@@ -397,10 +426,19 @@ public class RequestContextUtils {
       case RANGE:
         return FilterContext.forPredicate(new RangePredicate(operands.get(0), getStringValue(operands.get(1))));
       case REGEXP_LIKE:
-        return FilterContext.forPredicate(new RegexpLikePredicate(operands.get(0), getStringValue(operands.get(1))));
+        if (operands.size() == 2) {
+          return FilterContext.forPredicate(
+              new RegexpLikePredicate(operands.get(0), getStringValue(operands.get(1))));
+        } else if (operands.size() == 3) {
+          return FilterContext.forPredicate(
+              new RegexpLikePredicate(operands.get(0), getStringValue(operands.get(1)),
+                  getStringValue(operands.get(2))));
+        } else {
+          throw new BadQueryRequestException("REGEXP_LIKE requires 2 or 3 arguments");
+        }
       case LIKE:
         return FilterContext.forPredicate(new RegexpLikePredicate(operands.get(0),
-            RegexpPatternConverterUtils.likeToRegexpLike(getStringValue(operands.get(1)))));
+            RegexpPatternConverterUtils.likeToRegexpLike(getStringValue(operands.get(1))), "i"));
       case TEXT_CONTAINS:
         return FilterContext.forPredicate(new TextContainsPredicate(operands.get(0), getStringValue(operands.get(1))));
       case TEXT_MATCH:

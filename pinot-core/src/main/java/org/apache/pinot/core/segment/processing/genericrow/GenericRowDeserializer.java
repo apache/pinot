@@ -19,12 +19,14 @@
 package org.apache.pinot.core.segment.processing.genericrow;
 
 import java.util.List;
+import java.util.Map;
 import org.apache.pinot.segment.spi.memory.PinotDataBuffer;
 import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
 import org.apache.pinot.spi.data.readers.GenericRow;
 import org.apache.pinot.spi.utils.BigDecimalUtils;
 import org.apache.pinot.spi.utils.ByteArray;
+import org.apache.pinot.spi.utils.MapUtils;
 
 import static java.nio.charset.StandardCharsets.UTF_8;
 
@@ -107,6 +109,16 @@ public class GenericRowDeserializer {
             _dataBuffer.copyTo(offset, bytes);
             offset += numBytes;
             buffer.putValue(fieldName, bytes);
+            break;
+          }
+          case MAP: {
+            int numBytes = _dataBuffer.getInt(offset);
+            offset += Integer.BYTES;
+            byte[] mapBytes = new byte[numBytes];
+            _dataBuffer.copyTo(offset, mapBytes);
+            offset += numBytes;
+            Map<String, Object> map = MapUtils.deserializeMap(mapBytes);
+            buffer.putValue(fieldName, map);
             break;
           }
           default:
@@ -259,6 +271,23 @@ public class GenericRowDeserializer {
             _dataBuffer.copyTo(offset2, bigDecimalBytes2);
             int result =
                 BigDecimalUtils.deserialize(bigDecimalBytes1).compareTo(BigDecimalUtils.deserialize(bigDecimalBytes2));
+            if (result != 0) {
+              return result;
+            }
+            offset1 += numBytes1;
+            offset2 += numBytes2;
+            break;
+          }
+          case MAP: {
+            int numBytes1 = _dataBuffer.getInt(offset1);
+            offset1 += Integer.BYTES;
+            byte[] mapBytes1 = new byte[numBytes1];
+            _dataBuffer.copyTo(offset1, mapBytes1);
+            int numBytes2 = _dataBuffer.getInt(offset2);
+            offset2 += Integer.BYTES;
+            byte[] mapBytes2 = new byte[numBytes2];
+            _dataBuffer.copyTo(offset2, mapBytes2);
+            int result = ByteArray.compare(mapBytes1, mapBytes2);
             if (result != 0) {
               return result;
             }

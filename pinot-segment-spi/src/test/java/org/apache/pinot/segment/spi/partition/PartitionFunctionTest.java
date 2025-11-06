@@ -381,7 +381,7 @@ public class PartitionFunctionTest {
     if (functionConfig == null) {
       assertTrue(functionConfigNode.isNull());
     } else {
-      functionConfigNode.fields().forEachRemaining(nodeEntry -> {
+      functionConfigNode.properties().forEach(nodeEntry -> {
         assertTrue(functionConfig.containsKey(nodeEntry.getKey()));
         assertEquals(nodeEntry.getValue().asText(), functionConfig.get(nodeEntry.getKey()));
       });

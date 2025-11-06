@@ -31,12 +31,14 @@ public class KinesisMessageBatch implements MessageBatch<byte[]> {
   private final List<BytesStreamMessage> _messages;
   private final KinesisPartitionGroupOffset _offsetOfNextBatch;
   private final boolean _endOfShard;
+  private final long _sizeInBytes;
 
   public KinesisMessageBatch(List<BytesStreamMessage> messages, KinesisPartitionGroupOffset offsetOfNextBatch,
-      boolean endOfShard) {
+      boolean endOfShard, long sizeInBytes) {
     _messages = messages;
     _offsetOfNextBatch = offsetOfNextBatch;
     _endOfShard = endOfShard;
+    _sizeInBytes = sizeInBytes;
   }
 
   @Override
@@ -57,5 +59,10 @@ public class KinesisMessageBatch implements MessageBatch<byte[]> {
   @Override
   public boolean isEndOfPartitionGroup() {
     return _endOfShard;
+  }
+
+  @Override
+  public long getSizeInBytes() {
+    return _sizeInBytes;
   }
 }

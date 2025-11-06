@@ -166,5 +166,6 @@ public class Actions {
     public static final String UPLOAD_SEGMENT = "UploadSegment";
     public static final String VALIDATE_SCHEMA = "ValidateSchema";
     public static final String VALIDATE_TABLE_CONFIGS = "ValidateTableConfigs";
+    public static final String FORCE_RELEASE_TASK_GENERATION_LOCK = "ForceReleaseTaskGenerationLock";
   }
 }

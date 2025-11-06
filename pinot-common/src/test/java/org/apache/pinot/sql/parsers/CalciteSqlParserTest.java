@@ -18,38 +18,66 @@
  */
 package org.apache.pinot.sql.parsers;
 
+import org.testng.annotations.DataProvider;
 import org.testng.annotations.Test;
 
 import static org.apache.pinot.sql.parsers.CalciteSqlParser.CALCITE_SQL_PARSER_IDENTIFIER_MAX_LENGTH;
 import static org.testng.Assert.assertThrows;
-import static org.testng.Assert.fail;
+
 
 public class CalciteSqlParserTest {
   private static final String SINGLE_CHAR = "a";
+  private static final String QUERY_TEMPLATE = "SELECT %s FROM %s";
 
   @Test
   public void testIdentifierLength() {
     String tableName = extendIdentifierToMaxLength("exampleTable");
     String columnName = extendIdentifierToMaxLength("exampleColumn");
 
-    try {
-      final String validQuery = "SELECT count(" + columnName + ") FROM " + tableName + " WHERE " + columnName
-          + " IS NOT NULL";
-      CalciteSqlParser.compileToPinotQuery(validQuery);
-    } catch (Exception ignore) {
-      // Should not reach this line
-      fail();
-    }
+    String validQuery = createQuery(tableName, columnName);
+    CalciteSqlParser.compileToPinotQuery(validQuery);
 
-    final String invalidTableNameQuery = "SELECT count(" + columnName + ") FROM " + tableName + SINGLE_CHAR + " WHERE "
-        + columnName + " IS NOT NULL";
-    final String invalidColumnNameQuery = "SELECT count(" + columnName + SINGLE_CHAR + ") FROM " + tableName + " WHERE "
-        + columnName + SINGLE_CHAR + " IS NOT NULL";
+    String invalidTableNameQuery = createQuery(columnName, tableName + SINGLE_CHAR);
     assertThrows(SqlCompilationException.class, () -> CalciteSqlParser.compileToPinotQuery(invalidTableNameQuery));
+    String invalidColumnNameQuery = createQuery(columnName + SINGLE_CHAR, tableName);
     assertThrows(SqlCompilationException.class, () -> CalciteSqlParser.compileToPinotQuery(invalidColumnNameQuery));
   }
 
   private String extendIdentifierToMaxLength(String identifier) {
     return identifier + SINGLE_CHAR.repeat(CALCITE_SQL_PARSER_IDENTIFIER_MAX_LENGTH - identifier.length());
+  }
+
+  private String createQuery(String columnName, String tableName) {
+    return String.format(QUERY_TEMPLATE, columnName, tableName);
+  }
+
+  @Test(dataProvider = "nonReservedKeywords")
+  public void testNonReservedKeywords(String keyword) {
+    CalciteSqlParser.compileToPinotQuery(createQuery(keyword, "testTable"));
+    CalciteSqlParser.compileToPinotQuery(createQuery(keyword.toUpperCase(), "testTable"));
+  }
+
+  @DataProvider
+  public static Object[][] nonReservedKeywords() {
+    return new Object[][]{
+        new Object[]{"int"},
+        new Object[]{"integer"},
+        new Object[]{"long"},
+        new Object[]{"bigint"},
+        new Object[]{"float"},
+        new Object[]{"double"},
+        new Object[]{"big_decimal"},
+        new Object[]{"decimal"},
+        new Object[]{"boolean"},
+        // TODO: Revisit if we should make "timestamp" non reserved
+//        new Object[]{"timestamp"},
+        new Object[]{"string"},
+        new Object[]{"varchar"},
+        new Object[]{"bytes"},
+        new Object[]{"binary"},
+        new Object[]{"varbinary"},
+        new Object[]{"variant"},
+        new Object[]{"uuid"}
+    };
   }
 }

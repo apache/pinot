@@ -41,19 +41,21 @@ import org.apache.pinot.segment.local.segment.creator.impl.fwd.MultiValueUnsorte
 import org.apache.pinot.segment.local.segment.creator.impl.fwd.SingleValueSortedForwardIndexCreator;
 import org.apache.pinot.segment.local.segment.creator.impl.inv.OffHeapBitmapInvertedIndexCreator;
 import org.apache.pinot.segment.local.segment.creator.impl.nullvalue.NullValueVectorCreator;
+import org.apache.pinot.segment.local.segment.creator.impl.stats.AbstractColumnStatisticsCollector;
 import org.apache.pinot.segment.local.segment.creator.impl.stats.BytesColumnPredIndexStatsCollector;
 import org.apache.pinot.segment.local.segment.creator.impl.stats.DoubleColumnPreIndexStatsCollector;
 import org.apache.pinot.segment.local.segment.creator.impl.stats.FloatColumnPreIndexStatsCollector;
 import org.apache.pinot.segment.local.segment.creator.impl.stats.IntColumnPreIndexStatsCollector;
 import org.apache.pinot.segment.local.segment.creator.impl.stats.LongColumnPreIndexStatsCollector;
+import org.apache.pinot.segment.local.segment.creator.impl.stats.NoDictColumnStatisticsCollector;
 import org.apache.pinot.segment.local.segment.creator.impl.stats.StringColumnPreIndexStatsCollector;
 import org.apache.pinot.segment.local.segment.index.dictionary.DictionaryIndexType;
 import org.apache.pinot.segment.local.segment.index.forward.ForwardIndexCreatorFactory;
 import org.apache.pinot.segment.local.segment.index.forward.ForwardIndexPlugin;
-import org.apache.pinot.segment.local.segment.index.forward.ForwardIndexType;
 import org.apache.pinot.segment.local.segment.index.loader.IndexLoadingConfig;
 import org.apache.pinot.segment.local.segment.index.loader.LoaderUtils;
 import org.apache.pinot.segment.local.segment.readers.PinotSegmentColumnReader;
+import org.apache.pinot.segment.local.utils.ClusterConfigForTable;
 import org.apache.pinot.segment.spi.ColumnMetadata;
 import org.apache.pinot.segment.spi.SegmentMetadata;
 import org.apache.pinot.segment.spi.V1Constants;
@@ -63,6 +65,8 @@ import org.apache.pinot.segment.spi.creator.StatsCollectorConfig;
 import org.apache.pinot.segment.spi.index.DictionaryIndexConfig;
 import org.apache.pinot.segment.spi.index.FieldIndexConfigs;
 import org.apache.pinot.segment.spi.index.ForwardIndexConfig;
+import org.apache.pinot.segment.spi.index.IndexReaderConstraintException;
+import org.apache.pinot.segment.spi.index.IndexReaderFactory;
 import org.apache.pinot.segment.spi.index.IndexService;
 import org.apache.pinot.segment.spi.index.IndexType;
 import org.apache.pinot.segment.spi.index.StandardIndexes;
@@ -73,6 +77,7 @@ import org.apache.pinot.segment.spi.index.reader.ForwardIndexReader;
 import org.apache.pinot.segment.spi.store.SegmentDirectory;
 import org.apache.pinot.segment.spi.utils.SegmentMetadataUtils;
 import org.apache.pinot.spi.config.table.TableConfig;
+import org.apache.pinot.spi.config.table.ingestion.IngestionConfig;
 import org.apache.pinot.spi.config.table.ingestion.TransformConfig;
 import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
@@ -129,6 +134,7 @@ public abstract class BaseDefaultColumnHandler implements DefaultColumnHandler {
   protected final File _indexDir;
   protected final SegmentMetadata _segmentMetadata;
   protected final IndexLoadingConfig _indexLoadingConfig;
+  protected final TableConfig _tableConfig;
   protected final Schema _schema;
   protected final SegmentDirectory.Writer _segmentWriter;
 
@@ -137,11 +143,14 @@ public abstract class BaseDefaultColumnHandler implements DefaultColumnHandler {
   private PropertiesConfiguration _segmentProperties;
 
   protected BaseDefaultColumnHandler(File indexDir, SegmentMetadata segmentMetadata,
-      IndexLoadingConfig indexLoadingConfig, Schema schema, SegmentDirectory.Writer segmentWriter) {
+      IndexLoadingConfig indexLoadingConfig, SegmentDirectory.Writer segmentWriter) {
     _indexDir = indexDir;
     _segmentMetadata = segmentMetadata;
     _indexLoadingConfig = indexLoadingConfig;
-    _schema = schema;
+    _tableConfig = _indexLoadingConfig.getTableConfig();
+    Preconditions.checkArgument(_tableConfig != null, "Table config must be provided");
+    _schema = _indexLoadingConfig.getSchema();
+    Preconditions.checkArgument(_schema != null, "Schema must be provided");
     _segmentWriter = segmentWriter;
   }
 
@@ -380,11 +389,10 @@ public abstract class BaseDefaultColumnHandler implements DefaultColumnHandler {
    */
   protected boolean createColumnV1Indices(String column)
       throws Exception {
-    TableConfig tableConfig = _indexLoadingConfig.getTableConfig();
     boolean errorOnFailure = _indexLoadingConfig.isErrorOnColumnBuildFailure();
-    if (tableConfig != null && tableConfig.getIngestionConfig() != null
-        && tableConfig.getIngestionConfig().getTransformConfigs() != null) {
-      List<TransformConfig> transformConfigs = tableConfig.getIngestionConfig().getTransformConfigs();
+    IngestionConfig ingestionConfig = _tableConfig.getIngestionConfig();
+    if (ingestionConfig != null && ingestionConfig.getTransformConfigs() != null) {
+      List<TransformConfig> transformConfigs = ingestionConfig.getTransformConfigs();
       for (TransformConfig transformConfig : transformConfigs) {
         if (transformConfig.getColumnName().equals(column)) {
           String transformFunction = transformConfig.getTransformFunction();
@@ -574,9 +582,7 @@ public abstract class BaseDefaultColumnHandler implements DefaultColumnHandler {
     if (_schema.isEnableColumnBasedNullHandling()) {
       return fieldSpec.isNullable();
     } else {
-      return _indexLoadingConfig.getTableConfig() != null
-          && _indexLoadingConfig.getTableConfig().getIndexingConfig() != null
-          && _indexLoadingConfig.getTableConfig().getIndexingConfig().isNullHandlingEnabled();
+      return _tableConfig.getIndexingConfig().isNullHandlingEnabled();
     }
   }
 
@@ -665,8 +671,11 @@ public abstract class BaseDefaultColumnHandler implements DefaultColumnHandler {
           fieldIndexConfigs != null ? fieldIndexConfigs.getConfig(StandardIndexes.dictionary())
               : DictionaryIndexConfig.DEFAULT;
       boolean createDictionary = dictionaryIndexConfig.isEnabled();
-      StatsCollectorConfig statsCollectorConfig =
-          new StatsCollectorConfig(_indexLoadingConfig.getTableConfig(), _schema, null);
+      boolean useNoDictColumnStatsCollector = false;
+      if (!dictionaryIndexConfig.isEnabled()) {
+        useNoDictColumnStatsCollector = ClusterConfigForTable.useOptimizedNoDictCollector(_tableConfig);
+      }
+      StatsCollectorConfig statsCollectorConfig = new StatsCollectorConfig(_tableConfig, _schema, null);
       ColumnIndexCreationInfo indexCreationInfo;
       boolean isSingleValue = fieldSpec.isSingleValueField();
       switch (fieldSpec.getDataType().getStoredType()) {
@@ -675,8 +684,9 @@ public abstract class BaseDefaultColumnHandler implements DefaultColumnHandler {
             outputValues[i] = getIntOutputValue(outputValues[i], isSingleValue, outputValueType,
                 (Integer) fieldSpec.getDefaultNullValue(), createDictionary);
           }
-          IntColumnPreIndexStatsCollector statsCollector =
-              new IntColumnPreIndexStatsCollector(column, statsCollectorConfig);
+          AbstractColumnStatisticsCollector statsCollector = !useNoDictColumnStatsCollector
+              ? new IntColumnPreIndexStatsCollector(column, statsCollectorConfig)
+              : new NoDictColumnStatisticsCollector(column, statsCollectorConfig);
           for (Object value : outputValues) {
             statsCollector.collect(value);
           }
@@ -691,8 +701,9 @@ public abstract class BaseDefaultColumnHandler implements DefaultColumnHandler {
             outputValues[i] = getLongOutputValue(outputValues[i], isSingleValue, outputValueType,
                 (Long) fieldSpec.getDefaultNullValue(), createDictionary);
           }
-          LongColumnPreIndexStatsCollector statsCollector =
-              new LongColumnPreIndexStatsCollector(column, statsCollectorConfig);
+          AbstractColumnStatisticsCollector statsCollector = !useNoDictColumnStatsCollector
+              ? new LongColumnPreIndexStatsCollector(column, statsCollectorConfig)
+              : new NoDictColumnStatisticsCollector(column, statsCollectorConfig);
           for (Object value : outputValues) {
             statsCollector.collect(value);
           }
@@ -707,8 +718,9 @@ public abstract class BaseDefaultColumnHandler implements DefaultColumnHandler {
             outputValues[i] = getFloatOutputValue(outputValues[i], isSingleValue, outputValueType,
                 (Float) fieldSpec.getDefaultNullValue(), createDictionary);
           }
-          FloatColumnPreIndexStatsCollector statsCollector =
-              new FloatColumnPreIndexStatsCollector(column, statsCollectorConfig);
+          AbstractColumnStatisticsCollector statsCollector = !useNoDictColumnStatsCollector
+              ? new FloatColumnPreIndexStatsCollector(column, statsCollectorConfig)
+              : new NoDictColumnStatisticsCollector(column, statsCollectorConfig);
           for (Object value : outputValues) {
             statsCollector.collect(value);
           }
@@ -723,8 +735,9 @@ public abstract class BaseDefaultColumnHandler implements DefaultColumnHandler {
             outputValues[i] = getDoubleOutputValue(outputValues[i], isSingleValue, outputValueType,
                 (Double) fieldSpec.getDefaultNullValue(), createDictionary);
           }
-          DoubleColumnPreIndexStatsCollector statsCollector =
-              new DoubleColumnPreIndexStatsCollector(column, statsCollectorConfig);
+          AbstractColumnStatisticsCollector statsCollector = !useNoDictColumnStatsCollector
+              ? new DoubleColumnPreIndexStatsCollector(column, statsCollectorConfig)
+              : new NoDictColumnStatisticsCollector(column, statsCollectorConfig);
           for (Object value : outputValues) {
             statsCollector.collect(value);
           }
@@ -745,8 +758,9 @@ public abstract class BaseDefaultColumnHandler implements DefaultColumnHandler {
               outputValues[i] = outputValueType.toBigDecimal(outputValues[i]);
             }
           }
-          DoubleColumnPreIndexStatsCollector statsCollector =
-              new DoubleColumnPreIndexStatsCollector(column, statsCollectorConfig);
+          AbstractColumnStatisticsCollector statsCollector = !useNoDictColumnStatsCollector
+              ? new DoubleColumnPreIndexStatsCollector(column, statsCollectorConfig)
+              : new NoDictColumnStatisticsCollector(column, statsCollectorConfig);
           for (Object value : outputValues) {
             statsCollector.collect(value);
           }
@@ -761,8 +775,9 @@ public abstract class BaseDefaultColumnHandler implements DefaultColumnHandler {
             outputValues[i] = getStringOutputValue(outputValues[i], isSingleValue, outputValueType,
                 (String) fieldSpec.getDefaultNullValue());
           }
-          StringColumnPreIndexStatsCollector statsCollector =
-              new StringColumnPreIndexStatsCollector(column, statsCollectorConfig);
+          AbstractColumnStatisticsCollector statsCollector = !useNoDictColumnStatsCollector
+              ? new StringColumnPreIndexStatsCollector(column, statsCollectorConfig)
+              : new NoDictColumnStatisticsCollector(column, statsCollectorConfig);
           for (Object value : outputValues) {
             statsCollector.collect(value);
           }
@@ -776,8 +791,9 @@ public abstract class BaseDefaultColumnHandler implements DefaultColumnHandler {
             outputValues[i] = getBytesOutputValue(outputValues[i], isSingleValue, outputValueType,
                 (byte[]) fieldSpec.getDefaultNullValue());
           }
-          BytesColumnPredIndexStatsCollector statsCollector =
-              new BytesColumnPredIndexStatsCollector(column, statsCollectorConfig);
+          AbstractColumnStatisticsCollector statsCollector = !useNoDictColumnStatsCollector
+              ? new BytesColumnPredIndexStatsCollector(column, statsCollectorConfig)
+              : new NoDictColumnStatisticsCollector(column, statsCollectorConfig);
           for (Object value : outputValues) {
             statsCollector.collect(value);
           }
@@ -1198,6 +1214,9 @@ public abstract class BaseDefaultColumnHandler implements DefaultColumnHandler {
         .withColumnIndexCreationInfo(indexCreationInfo)
         .withTotalDocs(numDocs)
         .withDictionary(hasDictionary)
+        .withTableNameWithType(_tableConfig.getTableName())
+        .withContinueOnError(_tableConfig.getIngestionConfig() != null
+            && _tableConfig.getIngestionConfig().isContinueOnError())
         .build();
 
     ForwardIndexConfig forwardIndexConfig = null;
@@ -1219,8 +1238,13 @@ public abstract class BaseDefaultColumnHandler implements DefaultColumnHandler {
     final PinotSegmentColumnReader _columnReader;
 
     ValueReader(ColumnMetadata columnMetadata)
-        throws IOException {
-      _forwardIndexReader = ForwardIndexType.read(_segmentWriter, columnMetadata);
+        throws IOException, IndexReaderConstraintException {
+
+      IndexReaderFactory<ForwardIndexReader> readerFactory = StandardIndexes.forward().getReaderFactory();
+      FieldIndexConfigs fieldIndexConfigs = new FieldIndexConfigs.Builder()
+          .add(StandardIndexes.forward(), ForwardIndexConfig.getDefault())
+          .build();
+      _forwardIndexReader = readerFactory.createIndexReader(_segmentWriter, fieldIndexConfigs, columnMetadata);
       if (columnMetadata.hasDictionary()) {
         _dictionary = DictionaryIndexType.read(_segmentWriter, columnMetadata);
       } else {
