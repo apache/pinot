@@ -2,10 +2,13 @@ package org.apache.pinot.broker.routing;
 
 import java.util.HashSet;
 import java.util.Set;
+import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
 import org.apache.helix.HelixManager;
 import org.apache.pinot.common.metadata.ZKMetadataProvider;
+import org.apache.pinot.common.metrics.BrokerMeter;
 import org.apache.pinot.common.metrics.BrokerMetrics;
+import org.apache.pinot.common.metrics.BrokerTimer;
 import org.apache.pinot.core.transport.server.routing.stats.ServerRoutingStatsManager;
 import org.apache.pinot.spi.env.PinotConfiguration;
 
@@ -23,7 +26,10 @@ public class SecondaryBrokerRoutingManager extends BrokerRoutingManager {
     super.init(helixManager);
   }
 
-  public void initAllTablesFromZk() {
+  public void determineRoutingChangeForTables() {
+    long startTimeMs = System.currentTimeMillis();
+    _brokerMetrics.addMeteredGlobalValue(BrokerMeter.SECONDARY_BROKER_ROUTING_CALCULATION_COUNT, 1L);
+
     String externalViewPath =
       _externalViewPathPrefix.substring(0, _externalViewPathPrefix.length() - 1);
 
@@ -44,6 +50,10 @@ public class SecondaryBrokerRoutingManager extends BrokerRoutingManager {
 
     toAdd.forEach(this::addRouting);
     toRemove.forEach(this::dropRouting);
+
+    long durationMs = System.currentTimeMillis() - startTimeMs;
+    _brokerMetrics.addTimedValue(BrokerTimer.SECONDARY_BROKER_ROUTING_CALCULATION_TIME_MS, durationMs,
+      TimeUnit.MILLISECONDS);
   }
 
   private boolean isPinotTableName(String table) {
@@ -75,7 +85,7 @@ public class SecondaryBrokerRoutingManager extends BrokerRoutingManager {
     System.out.println("<<<<< >>>>> Processing segment assignment change in SecondaryBrokerRoutingManager for cluster:"
       + _parentClusterName);
     super.processSegmentAssignmentChangeInternal();
-    initAllTablesFromZk();
+    determineRoutingChangeForTables();
   }
 
 //  /**

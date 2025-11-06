@@ -117,4 +117,13 @@ public interface RoutingManager {
    */
   @Nullable
   Set<String> getServingInstances(String tableNameWithType);
+
+  /**
+   * @param queryOptions
+   * @return
+   */
+  @Nullable
+  default RoutingManager getRelevantRoutingManager(Map<String, String> queryOptions) {
+    return this;
+  }
 }

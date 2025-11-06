@@ -121,7 +121,7 @@ public class BrokerRoutingManager implements RoutingManager, ClusterChangeHandle
   private static final Logger LOGGER = LoggerFactory.getLogger(BrokerRoutingManager.class);
 
   protected final String _parentClusterName;
-  private final BrokerMetrics _brokerMetrics;
+  protected final BrokerMetrics _brokerMetrics;
   protected final Map<String, RoutingEntry> _routingEntryMap = new ConcurrentHashMap<>();
   private final Map<String, ServerInstance> _enabledServerInstanceMap = new ConcurrentHashMap<>();
   // NOTE: _excludedServers doesn't need to be concurrent because it is only accessed within the _globalLock write lock

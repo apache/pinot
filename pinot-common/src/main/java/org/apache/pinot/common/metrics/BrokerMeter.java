@@ -275,6 +275,10 @@ public class BrokerMeter implements AbstractMetrics.Meter {
   public static final BrokerMeter AUDIT_REQUEST_PAYLOAD_TRUNCATED = create("AUDIT_REQUEST_PAYLOAD_TRUNCATED",
       "count", true);
 
+  // Secondary Broker related metrics
+  public static final BrokerMeter SECONDARY_BROKER_ROUTING_CALCULATION_COUNT = create(
+    "SECONDARY_BROKER_ROUTING_CALCULATION_COUNT", "count", true);
+
   private static final Map<QueryErrorCode, BrokerMeter> QUERY_ERROR_CODE_METER_MAP;
 
   // Iterate through all query error codes from QueryErrorCode.getAllValues() and create a metric for each

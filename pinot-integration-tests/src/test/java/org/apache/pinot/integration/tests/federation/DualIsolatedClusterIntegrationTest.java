@@ -30,161 +30,106 @@ import static org.testng.Assert.assertEquals;
 import static org.testng.Assert.assertNotNull;
 import static org.testng.Assert.assertTrue;
 
-/**
- * Integration test that starts two completely isolated Pinot clusters in parallel.
- * Each cluster has its own Zookeeper, Controller, Broker, and Server.
- * The clusters are aware of each other and can perform federated queries.
- */
 public class DualIsolatedClusterIntegrationTest extends BaseDualIsolatedClusterIntegrationTest {
   private static final Logger LOGGER = LoggerFactory.getLogger(DualIsolatedClusterIntegrationTest.class);
 
   @BeforeClass
   public void setUp() throws Exception {
-    LOGGER.info("Setting up dual isolated Pinot clusters in parallel");
-
-    // Initialize cluster components
     _cluster1 = new ClusterComponents();
     _cluster2 = new ClusterComponents();
-
-    // Create test directories
     setupDirectories();
-
     startZookeeper(_cluster1);
     startZookeeper(_cluster2);
-
     startControllerInit(_cluster1, CLUSTER_1_CONFIG);
     startControllerInit(_cluster2, CLUSTER_2_CONFIG);
-
-    // Start clusters with cross-references (parallel setup)
     startCluster(_cluster1, _cluster2, CLUSTER_1_CONFIG);
     startCluster(_cluster2, _cluster1, CLUSTER_2_CONFIG);
-
-    // Setup connections
     setupPinotConnections();
-
-    LOGGER.info("Dual isolated Pinot clusters setup completed");
   }
 
   @Test
   public void testClusterIsolation() throws Exception {
     setupFederationTable();
-
-    String cluster1Tables = ControllerTest.sendGetRequest(_cluster1._controllerBaseApiUrl + "/tables");
-    String cluster2Tables = ControllerTest.sendGetRequest(_cluster2._controllerBaseApiUrl + "/tables");
-
-    assertTrue(cluster1Tables.contains(FEDERATION_TABLE));
-    assertTrue(cluster2Tables.contains(FEDERATION_TABLE));
-
-    String cluster1Schemas = ControllerTest.sendGetRequest(_cluster1._controllerBaseApiUrl + "/schemas");
-    String cluster2Schemas = ControllerTest.sendGetRequest(_cluster2._controllerBaseApiUrl + "/schemas");
-
-    assertTrue(cluster1Schemas.contains(FEDERATION_TABLE));
-    assertTrue(cluster2Schemas.contains(FEDERATION_TABLE));
+    assertResourceExists("/tables", FEDERATION_TABLE);
+    assertResourceExists("/schemas", FEDERATION_TABLE);
   }
 
   @Test
   public void testIndependentOperations() throws Exception {
     setupFederationTable();
-
-    String cluster1TableInfo = ControllerTest.sendGetRequest(
+    String cluster1Info = ControllerTest.sendGetRequest(
         _cluster1._controllerBaseApiUrl + "/tables/" + FEDERATION_TABLE);
-    String cluster2TableInfo = ControllerTest.sendGetRequest(
+    String cluster2Info = ControllerTest.sendGetRequest(
         _cluster2._controllerBaseApiUrl + "/tables/" + FEDERATION_TABLE);
+    assertNotNull(cluster1Info);
+    assertNotNull(cluster2Info);
+    assertTrue(cluster1Info.contains(FEDERATION_TABLE));
+    assertTrue(cluster2Info.contains(FEDERATION_TABLE));
+  }
 
-    assertNotNull(cluster1TableInfo);
-    assertNotNull(cluster2TableInfo);
-    assertTrue(cluster1TableInfo.contains(FEDERATION_TABLE));
-    assertTrue(cluster2TableInfo.contains(FEDERATION_TABLE));
+  private void assertResourceExists(String endpoint, String resourceName) throws Exception {
+    String c1Response = ControllerTest.sendGetRequest(_cluster1._controllerBaseApiUrl + endpoint);
+    String c2Response = ControllerTest.sendGetRequest(_cluster2._controllerBaseApiUrl + endpoint);
+    assertTrue(c1Response.contains(resourceName));
+    assertTrue(c2Response.contains(resourceName));
   }
 
   @Test
   public void testLogicalFederationTwoOfflineTablesSSE() throws Exception {
-    // Clean up any logical tables from previous tests
     dropLogicalTableIfExists(LOGICAL_TABLE_NAME, _cluster1._controllerBaseApiUrl);
     dropLogicalTableIfExists(LOGICAL_TABLE_NAME, _cluster2._controllerBaseApiUrl);
     dropLogicalTableIfExists(LOGICAL_TABLE_NAME_2, _cluster1._controllerBaseApiUrl);
     dropLogicalTableIfExists(LOGICAL_TABLE_NAME_2, _cluster2._controllerBaseApiUrl);
-
     setupFirstLogicalFederatedTable();
     createLogicalTableOnBothClusters(LOGICAL_TABLE_NAME,
         LOGICAL_FEDERATION_CLUSTER_1_TABLE, LOGICAL_FEDERATION_CLUSTER_2_TABLE);
     cleanSegmentDirs();
-
-    // Generate and load data
     _cluster1AvroFiles = createAvroData(CLUSTER_1_SIZE, 1);
     _cluster2AvroFiles = createAvroData(CLUSTER_2_SIZE, 2);
-
     loadDataIntoCluster(_cluster1AvroFiles, LOGICAL_FEDERATION_CLUSTER_1_TABLE, _cluster1);
     loadDataIntoCluster(_cluster2AvroFiles, LOGICAL_FEDERATION_CLUSTER_2_TABLE, _cluster2);
-
-    // Verify counts
-    long cluster1Count = getCount(LOGICAL_TABLE_NAME, _cluster1);
-    long cluster2Count = getCount(LOGICAL_TABLE_NAME, _cluster2);
-
-    assertEquals(cluster1Count, CLUSTER_1_SIZE + CLUSTER_2_SIZE);
-    assertEquals(cluster2Count, CLUSTER_2_SIZE + CLUSTER_1_SIZE);
+    long expectedTotal = CLUSTER_1_SIZE + CLUSTER_2_SIZE;
+    assertEquals(getCount(LOGICAL_TABLE_NAME, _cluster1, true), expectedTotal);
+    assertEquals(getCount(LOGICAL_TABLE_NAME, _cluster2, true), expectedTotal);
   }
 
   @Test
   public void testLogicalFederationTwoLogicalTablesMSE() throws Exception {
-    // Clean up any logical tables from previous tests
     dropLogicalTableIfExists(LOGICAL_TABLE_NAME, _cluster1._controllerBaseApiUrl);
     dropLogicalTableIfExists(LOGICAL_TABLE_NAME, _cluster2._controllerBaseApiUrl);
     dropLogicalTableIfExists(LOGICAL_TABLE_NAME_2, _cluster1._controllerBaseApiUrl);
     dropLogicalTableIfExists(LOGICAL_TABLE_NAME_2, _cluster2._controllerBaseApiUrl);
-
     setupFirstLogicalFederatedTable();
     setupSecondLogicalFederatedTable();
-
-    // Create first logical table
     createLogicalTableOnBothClusters(LOGICAL_TABLE_NAME,
         LOGICAL_FEDERATION_CLUSTER_1_TABLE, LOGICAL_FEDERATION_CLUSTER_2_TABLE);
-
-    // Create second logical table
     createLogicalTableOnBothClusters(LOGICAL_TABLE_NAME_2,
         LOGICAL_FEDERATION_CLUSTER_1_TABLE_2, LOGICAL_FEDERATION_CLUSTER_2_TABLE_2);
-
     cleanSegmentDirs();
-
-    // Generate and load data
-    _cluster1AvroFiles = createAvroData(CLUSTER_1_SIZE, 1);
-    _cluster2AvroFiles = createAvroData(CLUSTER_2_SIZE, 2);
-
-    loadDataIntoCluster(_cluster1AvroFiles, LOGICAL_FEDERATION_CLUSTER_1_TABLE, _cluster1);
-    loadDataIntoCluster(_cluster2AvroFiles, LOGICAL_FEDERATION_CLUSTER_2_TABLE, _cluster2);
-    // Generate and load data for second logical table
-    _cluster1AvroFiles2 = createAvroDataMultipleSegments(CLUSTER_1_SIZE, 1, SEGMENTS_PER_CLUSTER);
-    _cluster2AvroFiles2 = createAvroDataMultipleSegments(CLUSTER_2_SIZE, 2, SEGMENTS_PER_CLUSTER);
-
-    loadDataIntoCluster(_cluster1AvroFiles2, LOGICAL_FEDERATION_CLUSTER_1_TABLE_2, _cluster1);
-    loadDataIntoCluster(_cluster2AvroFiles2, LOGICAL_FEDERATION_CLUSTER_2_TABLE_2, _cluster2);
-
-    // Test join query with MSE
-    String joinQuery = "SET useMultistageEngine=true; SELECT t1." + JOIN_COLUMN + ", COUNT(*) as count "
-        + "FROM " + LOGICAL_TABLE_NAME + " t1 "
+    loadDataIntoCluster(createAvroData(CLUSTER_1_SIZE, 1), LOGICAL_FEDERATION_CLUSTER_1_TABLE, _cluster1);
+    loadDataIntoCluster(createAvroData(CLUSTER_2_SIZE, 2), LOGICAL_FEDERATION_CLUSTER_2_TABLE, _cluster2);
+    loadDataIntoCluster(createAvroDataMultipleSegments(CLUSTER_1_SIZE, 1, SEGMENTS_PER_CLUSTER),
+        LOGICAL_FEDERATION_CLUSTER_1_TABLE_2, _cluster1);
+    loadDataIntoCluster(createAvroDataMultipleSegments(CLUSTER_2_SIZE, 2, SEGMENTS_PER_CLUSTER),
+        LOGICAL_FEDERATION_CLUSTER_2_TABLE_2, _cluster2);
+    String joinQuery = "SET useMultistageEngine=true; SET enableFederation=true; "
+        + "SELECT t1." + JOIN_COLUMN + ", COUNT(*) as count FROM " + LOGICAL_TABLE_NAME + " t1 "
         + "JOIN " + LOGICAL_TABLE_NAME_2 + " t2 ON t1." + JOIN_COLUMN + " = t2." + JOIN_COLUMN + " "
         + "GROUP BY t1." + JOIN_COLUMN + " LIMIT 20";
-
     String result = executeQuery(joinQuery, _cluster1);
     assertNotNull(result);
     assertTrue(result.contains("resultTable"));
-    System.out.println(result);
     assertResultRows(result);
-
-    LOGGER.info("MSE Federation Join Test completed successfully");
   }
 
   @Test
   public void testDataGeneration() throws Exception {
-    List<File> cluster1Files = createAvroData(CLUSTER_1_SIZE, 1);
-    List<File> cluster2Files = createAvroData(CLUSTER_2_SIZE, 2);
+    validateAvroFiles(createAvroData(CLUSTER_1_SIZE, 1));
+    validateAvroFiles(createAvroData(CLUSTER_2_SIZE, 2));
+  }
 
-    for (File file : cluster1Files) {
-      assertTrue(file.exists());
-      assertTrue(file.length() > 0);
-    }
-
-    for (File file : cluster2Files) {
+  private void validateAvroFiles(List<File> files) {
+    for (File file : files) {
       assertTrue(file.exists());
       assertTrue(file.length() > 0);
     }

@@ -676,6 +676,8 @@ public class CommonConstants {
         public static final String APPLICATION_NAME = "applicationName";
         public static final String USE_SPOOLS = "useSpools";
         public static final String USE_PHYSICAL_OPTIMIZER = "usePhysicalOptimizer";
+
+        public static final String ENABLE_FEDERATION = "enableFederation";
         /**
          * If set, changes the explain behavior in multi-stage engine.
          *
