@@ -28,7 +28,7 @@ import com.fasterxml.jackson.annotation.JsonProperty;
 @JsonIgnoreProperties(ignoreUnknown = true)
 public class ServerReloadJobStatusCacheConfig {
 
-  @JsonProperty("max.size")
+  @JsonProperty("size.max")
   private int _maxSize = 10000;
 
   @JsonProperty("ttl.days")
