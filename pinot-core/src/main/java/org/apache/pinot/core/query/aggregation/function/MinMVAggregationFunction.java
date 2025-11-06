@@ -41,94 +41,18 @@ public class MinMVAggregationFunction extends MinAggregationFunction {
   @Override
   public void aggregate(int length, AggregationResultHolder aggregationResultHolder,
       Map<ExpressionContext, BlockValSet> blockValSetMap) {
-    BlockValSet blockValSet = blockValSetMap.get(_expression);
-    double[][] valuesArray = blockValSet.getDoubleValuesMV();
-    Double min = foldNotNull(length, blockValSet, null, (acum, from, to) -> {
-      double innerMin = DEFAULT_VALUE;
-      for (int i = from; i < to; i++) {
-        double[] values = valuesArray[i];
-        for (double value : values) {
-          if (value < innerMin) {
-            innerMin = value;
-          }
-        }
-      }
-      return acum == null ? innerMin : Math.min(acum, innerMin);
-    });
-
-    updateAggregationResultHolder(aggregationResultHolder, min);
+    aggregateMV(blockValSetMap.get(_expression), length, aggregationResultHolder);
   }
 
   @Override
   public void aggregateGroupBySV(int length, int[] groupKeyArray, GroupByResultHolder groupByResultHolder,
       Map<ExpressionContext, BlockValSet> blockValSetMap) {
-    BlockValSet blockValSet = blockValSetMap.get(_expression);
-    double[][] valuesArray = blockValSet.getDoubleValuesMV();
-
-    if (_nullHandlingEnabled) {
-      forEachNotNull(length, blockValSet, (from, to) -> {
-        for (int i = from; i < to; i++) {
-          int groupKey = groupKeyArray[i];
-          Double min = groupByResultHolder.getResult(groupKey);
-          for (double value : valuesArray[i]) {
-            if (min == null || value < min) {
-              min = value;
-            }
-          }
-          groupByResultHolder.setValueForKey(groupKey, min);
-        }
-      });
-    } else {
-      for (int i = 0; i < length; i++) {
-        int groupKey = groupKeyArray[i];
-        double min = groupByResultHolder.getDoubleResult(groupKey);
-        for (double value : valuesArray[i]) {
-          if (value < min) {
-            min = value;
-          }
-        }
-        groupByResultHolder.setValueForKey(groupKey, min);
-      }
-    }
+    aggregateMVGroupBySV(blockValSetMap.get(_expression), length, groupKeyArray, groupByResultHolder);
   }
 
   @Override
   public void aggregateGroupByMV(int length, int[][] groupKeysArray, GroupByResultHolder groupByResultHolder,
       Map<ExpressionContext, BlockValSet> blockValSetMap) {
-    BlockValSet blockValSet = blockValSetMap.get(_expression);
-    double[][] valuesArray = blockValSet.getDoubleValuesMV();
-
-    if (_nullHandlingEnabled) {
-      forEachNotNull(length, blockValSet, (from, to) -> {
-        for (int i = from; i < to; i++) {
-          Double min = null;
-          for (double value : valuesArray[i]) {
-            if (min == null || value < min) {
-              min = value;
-            }
-          }
-
-          for (int groupKey : groupKeysArray[i]) {
-            Double currentMin = groupByResultHolder.getResult(groupKey);
-            if (currentMin == null || (min != null && min < currentMin)) {
-              groupByResultHolder.setValueForKey(groupKey, min);
-            }
-          }
-        }
-      });
-    } else {
-      for (int i = 0; i < length; i++) {
-        double[] values = valuesArray[i];
-        for (int groupKey : groupKeysArray[i]) {
-          double min = groupByResultHolder.getDoubleResult(groupKey);
-          for (double value : values) {
-            if (value < min) {
-              min = value;
-            }
-          }
-          groupByResultHolder.setValueForKey(groupKey, min);
-        }
-      }
-    }
+    aggregateMVGroupByMV(blockValSetMap.get(_expression), length, groupKeysArray, groupByResultHolder);
   }
 }

@@ -67,11 +67,11 @@ public class QueryOverrideTest {
   }
 
   @Test
-  public void testDistinctMultiValuedOverride()
+  public void testMultiValuedOverride()
       throws IOException {
-    String query1 = "SELECT DISTINCT_COUNT(col1) FROM myTable";
+    String query1 = "SELECT COUNT(col1) FROM myTable";
     PinotQuery pinotQuery1 = CalciteSqlParser.compileToPinotQuery(query1);
-    String query2 = "SELECT DISTINCT_COUNT(col2) FROM myTable";
+    String query2 = "SELECT COUNT(col2) FROM myTable";
     PinotQuery pinotQuery2 = CalciteSqlParser.compileToPinotQuery(query2);
     Schema tableSchema = Schema.fromString("{\"schemaName\":\"testSchema\","
         + "\"dimensionFieldSpecs\":[ {\"name\":\"col2\",\"dataType\":\"LONG\",\"singleValueField\":\"false\"},"
@@ -79,9 +79,9 @@ public class QueryOverrideTest {
         + "\"dateTimeFieldSpecs\":[{\"name\":\"dt1\",\"dataType\":\"INT\",\"format\":\"x:HOURS:EPOCH\","
         + "\"granularity\":\"1:HOURS\"}]}");
     BaseSingleStageBrokerRequestHandler.handleDistinctMultiValuedOverride(pinotQuery1, tableSchema);
-    assertEquals(pinotQuery1.getSelectList().get(0).getFunctionCall().getOperator(), "distinctcount");
+    assertEquals(pinotQuery1.getSelectList().get(0).getFunctionCall().getOperator(), "count");
     BaseSingleStageBrokerRequestHandler.handleDistinctMultiValuedOverride(pinotQuery2, tableSchema);
-    assertEquals(pinotQuery2.getSelectList().get(0).getFunctionCall().getOperator(), "distinctcountmv");
+    assertEquals(pinotQuery2.getSelectList().get(0).getFunctionCall().getOperator(), "countmv");
   }
 
   @Test

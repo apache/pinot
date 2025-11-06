@@ -183,11 +183,9 @@ public class PinotOperatorTable implements SqlOperatorTable {
 
       // AGGREGATE OPERATORS
       SqlStdOperatorTable.SUM,
+      SqlStdOperatorTable.AVG,
       SqlStdOperatorTable.COUNT,
       SqlStdOperatorTable.MODE,
-      SqlStdOperatorTable.MIN,
-      SqlStdOperatorTable.MAX,
-      SqlStdOperatorTable.AVG,
       SqlStdOperatorTable.STDDEV_POP,
       SqlStdOperatorTable.COVAR_POP,
       SqlStdOperatorTable.COVAR_SAMP,
@@ -376,8 +374,16 @@ public class PinotOperatorTable implements SqlOperatorTable {
     for (AggregationFunctionType functionType : AggregationFunctionType.values()) {
       if (functionType.getReturnTypeInference() != null) {
         String functionName = functionType.getName();
-        PinotSqlAggFunction function = new PinotSqlAggFunction(functionName, functionType.getReturnTypeInference(),
-            functionType.getOperandTypeChecker());
+        PinotSqlAggFunction function;
+
+        if (functionType.getSqlKind() != null) {
+          function = new PinotSqlAggFunction(functionName, functionType.getReturnTypeInference(),
+              functionType.getOperandTypeChecker(), functionType.getSqlKind());
+        } else {
+          function = new PinotSqlAggFunction(functionName, functionType.getReturnTypeInference(),
+              functionType.getOperandTypeChecker());
+        }
+
         Preconditions.checkState(operatorMap.put(FunctionRegistry.canonicalize(functionName), function) == null,
             "Aggregate function: %s is already registered", functionName);
       }

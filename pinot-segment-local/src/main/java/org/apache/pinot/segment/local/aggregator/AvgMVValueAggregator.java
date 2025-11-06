@@ -18,8 +18,6 @@
  */
 package org.apache.pinot.segment.local.aggregator;
 
-import javax.annotation.Nullable;
-import org.apache.pinot.segment.local.customobject.AvgPair;
 import org.apache.pinot.segment.spi.AggregationFunctionType;
 
 /**
@@ -31,47 +29,5 @@ public class AvgMVValueAggregator extends AvgValueAggregator {
   @Override
   public AggregationFunctionType getAggregationType() {
     return AggregationFunctionType.AVGMV;
-  }
-
-  @Override
-  public AvgPair getInitialAggregatedValue(@Nullable Object rawValue) {
-    if (rawValue == null) {
-      return new AvgPair();
-    }
-    if (rawValue instanceof byte[]) {
-      return deserializeAggregatedValue((byte[]) rawValue);
-    } else {
-      return processMultiValueArray(rawValue);
-    }
-  }
-
-  @Override
-  public AvgPair applyRawValue(AvgPair value, Object rawValue) {
-    if (rawValue instanceof byte[]) {
-      value.apply(deserializeAggregatedValue((byte[]) rawValue));
-    } else {
-      AvgPair mvResult = processMultiValueArray(rawValue);
-      value.apply(mvResult);
-    }
-    return value;
-  }
-
-  /**
-   * Processes a multi-value array and returns an AvgPair with the sum and count.
-   * The rawValue can be an Object[] array containing numeric values.
-   */
-  private AvgPair processMultiValueArray(Object rawValue) {
-    if (rawValue instanceof Object[]) {
-      Object[] values = (Object[]) rawValue;
-      AvgPair avgPair = new AvgPair();
-      for (Object value : values) {
-        if (value != null) {
-          avgPair.apply(ValueAggregatorUtils.toDouble(value));
-        }
-      }
-      return avgPair;
-    } else {
-      return new AvgPair(ValueAggregatorUtils.toDouble(rawValue), 1L);
-    }
   }
 }
