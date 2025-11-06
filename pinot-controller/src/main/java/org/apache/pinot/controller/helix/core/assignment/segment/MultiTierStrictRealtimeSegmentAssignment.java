@@ -54,8 +54,7 @@ public class MultiTierStrictRealtimeSegmentAssignment extends BaseStrictRealtime
         instancePartitions, bootstrap);
     // Rebalance tiers first. Only completed segments are moved to other tiers.
     Pair<List<Map<String, Map<String, String>>>, Map<String, Map<String, String>>> pair =
-        rebalanceTiers(currentAssignment, sortedTiers, tierInstancePartitionsMap, bootstrap,
-            InstancePartitionsType.COMPLETED);
+        rebalanceTiers(currentAssignment, sortedTiers, tierInstancePartitionsMap, bootstrap);
     List<Map<String, Map<String, String>>> newTierAssignments = pair.getLeft();
     Map<String, Map<String, String>> nonTierAssignment = pair.getRight();
     Map<String, Map<String, String>> newAssignment = new TreeMap<>();
