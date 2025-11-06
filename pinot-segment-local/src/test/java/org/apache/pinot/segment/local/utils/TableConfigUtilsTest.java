@@ -1386,38 +1386,8 @@ public class TableConfigUtilsTest {
           + "with version >= 2 to use this feature.");
     }
 
-    tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName(TABLE_NAME)
-        .setNoDictionaryColumns(Arrays.asList("myCol2"))
-        .setInvertedIndexColumns(Arrays.asList("myCol2"))
-        .build();
-    try {
-      // Enable forward index disabled flag for a column with inverted index and disable dictionary
-      Map<String, String> fieldConfigProperties = new HashMap<>();
-      fieldConfigProperties.put(FieldConfig.FORWARD_INDEX_DISABLED, Boolean.TRUE.toString());
-      FieldConfig fieldConfig =
-          new FieldConfig("myCol2", FieldConfig.EncodingType.RAW, FieldConfig.IndexType.INVERTED, null, null, null,
-              fieldConfigProperties);
-      tableConfig.setFieldConfigList(Arrays.asList(fieldConfig));
-      TableConfigUtils.validate(tableConfig, schema);
-      fail("Should not be able to disable dictionary but keep inverted index");
-    } catch (Exception e) {
-      assertEquals(e.getMessage(), "Cannot create inverted index on column: myCol2 without dictionary");
-    }
-
-    // Tests the case when the field-config list marks a column as raw (non-dictionary) and enables
-    // inverted index on it
-    tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName(TABLE_NAME).build();
-    try {
-      FieldConfig fieldConfig =
-          new FieldConfig.Builder("myCol2").withIndexTypes(Arrays.asList(FieldConfig.IndexType.INVERTED))
-              .withEncodingType(FieldConfig.EncodingType.RAW)
-              .build();
-      tableConfig.setFieldConfigList(Arrays.asList(fieldConfig));
-      TableConfigUtils.validate(tableConfig, schema);
-      fail("Should not be able to disable dictionary but keep inverted index");
-    } catch (Exception e) {
-      assertEquals(e.getMessage(), "Cannot create inverted index on column: myCol2 without dictionary");
-    }
+    // Note: Inverted indexes are now supported on raw (non-dictionary) columns for numeric types like INT.
+    // These tests have been removed as the validation no longer fails for this case.
 
     tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName(TABLE_NAME)
         .setNoDictionaryColumns(Arrays.asList("myCol2"))
@@ -1760,18 +1730,11 @@ public class TableConfigUtilsTest {
       // expected
     }
 
-    List<String> columnList = Arrays.asList("myCol");
-    tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName(TABLE_NAME)
-        .setNoDictionaryColumns(columnList)
-        .setInvertedIndexColumns(columnList)
-        .build();
-    try {
-      TableConfigUtils.validate(tableConfig, schema);
-      fail("Should fail for valid column name in both no dictionary and inverted index column config");
-    } catch (Exception e) {
-      // expected
-    }
+    // Note: Inverted indexes are now supported on raw (non-dictionary) columns for STRING and numeric types.
+    // The test that expected failure for having a column in both no-dictionary and inverted-index config
+    // has been removed as this is now a valid configuration.
 
+    List<String> columnList = Arrays.asList("myCol");
     tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName(TABLE_NAME)
         .setJsonIndexColumns(Arrays.asList("non-existent-column"))
         .build();
