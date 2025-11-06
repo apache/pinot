@@ -505,8 +505,9 @@ public abstract class BaseSingleStageBrokerRequestHandler extends BaseBrokerRequ
       routeProvider = _implicitHybridTableRouteProvider;
     }
 
+    RoutingManager routingManager = _routingManager.getRelevantRoutingManager(pinotQuery.getQueryOptions());
     // Get the tables hit by the request
-    TableRouteInfo routeInfo = routeProvider.getTableRouteInfo(tableName, _tableCache, _routingManager);
+    TableRouteInfo routeInfo = routeProvider.getTableRouteInfo(tableName, _tableCache, routingManager);
 
     if (!routeInfo.isExists()) {
       LOGGER.info("Table not found for request {}: {}", requestId, query);
@@ -630,7 +631,7 @@ public abstract class BaseSingleStageBrokerRequestHandler extends BaseBrokerRequ
     // Calculate routing table for the query
     // TODO: Modify RoutingManager interface to directly take PinotQuery
     long routingStartTimeNs = System.nanoTime();
-    routeProvider.calculateRoutes(routeInfo, _routingManager, offlineBrokerRequest, realtimeBrokerRequest,
+    routeProvider.calculateRoutes(routeInfo, routingManager, offlineBrokerRequest, realtimeBrokerRequest,
         requestId);
 
     Set<ServerInstance> offlineExecutionServers = routeInfo.getOfflineExecutionServers();

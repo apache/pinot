@@ -643,7 +643,7 @@ public abstract class BaseBrokerStarter implements ServiceStartable {
         LOGGER.info("[federation] Initializing routing tables from ZK for secondary cluster '{}'",
             secondaryClusterName);
 
-        secondaryRoutingManager.initAllTablesFromZk();
+        secondaryRoutingManager.determineRoutingChangeForTables();
         successCount++;
 
         LOGGER.info("[federation] Successfully initialized routing tables for secondary cluster '{}'",
@@ -849,7 +849,7 @@ public abstract class BaseBrokerStarter implements ServiceStartable {
         helixManager.addClusterfigChangeListener(mediator);
 
         successCount++;
-        LOGGER.info("[federation] Successfully initialized and started cluster change mediator for secondary cluster '{}'",
+        LOGGER.info("[federation] Successfully initialized, started cluster change mediator for secondary cluster {}",
             secondaryClusterName);
       } catch (Exception e) {
         failureCount++;
