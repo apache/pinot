@@ -54,7 +54,7 @@ public class ServerReloadJobStatusCache implements PinotClusterConfigChangeListe
   static final String CONFIG_PREFIX = "pinot.server.table.reload.status.cache";
 
   private volatile Cache<String, ReloadJobStatus> _cache;
-  private ServerReloadJobStatusCacheConfig _currentConfig;
+  private volatile ServerReloadJobStatusCacheConfig _currentConfig;
 
   public ServerReloadJobStatusCache() {
     _currentConfig = new ServerReloadJobStatusCacheConfig();
