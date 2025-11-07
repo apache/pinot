@@ -369,7 +369,7 @@ public class IngestionDelayTracker {
   }
 
   @VisibleForTesting
-  protected void createMetrics(int partitionId) {
+  void createMetrics(int partitionId) {
     int streamConfigIndex = IngestionConfigUtils.getStreamConfigIndexFromPinotPartitionId(partitionId);
     StreamMetadataProvider streamMetadataProvider = _streamConfigIndexToStreamMetadataProvider.get(streamConfigIndex);
 
