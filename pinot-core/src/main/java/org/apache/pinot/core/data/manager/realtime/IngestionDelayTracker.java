@@ -97,15 +97,20 @@ public class IngestionDelayTracker {
     volatile long _ingestionTimeMs;
     @Nullable
     volatile StreamPartitionMsgOffset _currentOffset;
+    volatile long _firstStreamIngestionTimeMs;
 
-    IngestionInfo(long ingestionTimeMs, @Nullable StreamPartitionMsgOffset currentOffset) {
+    IngestionInfo(long ingestionTimeMs, @Nullable StreamPartitionMsgOffset currentOffset,
+        long firstStreamIngestionTimeMs) {
       _ingestionTimeMs = ingestionTimeMs;
       _currentOffset = currentOffset;
+      _firstStreamIngestionTimeMs = firstStreamIngestionTimeMs;
     }
 
-    void update(long ingestionTimeMs, @Nullable StreamPartitionMsgOffset currentOffset) {
+    void update(long ingestionTimeMs, @Nullable StreamPartitionMsgOffset currentOffset,
+        long firstStreamIngestionTimeMs) {
       _ingestionTimeMs = ingestionTimeMs;
       _currentOffset = currentOffset;
+      _firstStreamIngestionTimeMs = firstStreamIngestionTimeMs;
     }
   }
 
@@ -150,12 +155,13 @@ public class IngestionDelayTracker {
   private Clock _clock = Clock.systemUTC();
 
   protected volatile Map<Integer, StreamPartitionMsgOffset> _partitionIdToLatestOffset;
-  protected volatile Set<Integer> _partitionsHostedByThisServer = new HashSet<>();
+  protected volatile ConcurrentHashMap<Integer, Boolean> _partitionsHostedByThisServer = new ConcurrentHashMap<>();
   // Map of StreamMetadataProvider to fetch upstream latest stream offset (Table can have multiple upstream topics)
   // This map is accessed by:
   // 1. _ingestionDelayTrackingScheduler thread.
   // 2. All threads which can removes metrics - Consumer thread, Helix Thread, Server API Thread, etc.
-  protected Map<Integer, StreamMetadataProvider> _streamConfigIndexToStreamMetadataProvider = new ConcurrentHashMap<>();
+  protected ConcurrentHashMap<Integer, StreamMetadataProvider> _streamConfigIndexToStreamMetadataProvider =
+      new ConcurrentHashMap<>();
 
   public IngestionDelayTracker(ServerMetrics serverMetrics, String tableNameWithType,
       RealtimeTableDataManager realtimeTableDataManager)
@@ -227,7 +233,7 @@ public class IngestionDelayTracker {
         // or once the table data manager has been shutdown.
         return;
       }
-      Set<Integer> partitionsHosted = _partitionsHostedByThisServer;
+      Set<Integer> partitionsHosted = new HashSet<>(_partitionsHostedByThisServer.keySet());
 
       if (_ingestionInfoMap.size() > partitionsHosted.size()) {
         // In-case new partition got assigned to the server before _partitionsHostedByThisServer was updated.
@@ -242,6 +248,11 @@ public class IngestionDelayTracker {
 
       for (Integer partitionId : partitionsHosted) {
         _partitionsTracked.computeIfAbsent(partitionId, k -> {
+          // Check below condition in-case partition was stopped being tracked. Eg: due to manual operations like -
+          // calling remove ingestion metrics API
+          if (!_partitionsHostedByThisServer.containsKey(partitionId) && !_ingestionInfoMap.containsKey(partitionId)) {
+            return null;
+          }
           createMetrics(partitionId);
           return true;
         });
@@ -320,6 +331,8 @@ public class IngestionDelayTracker {
    * @param partitionId partition ID which we should stop tracking.
    */
   private void removePartitionId(int partitionId) {
+    _partitionsHostedByThisServer.remove(partitionId);
+    _ingestionInfoMap.remove(partitionId);
     _partitionsTracked.compute(partitionId, (k, v) -> {
       if (v != null) {
         int streamConfigIndex = IngestionConfigUtils.getStreamConfigIndexFromPinotPartitionId(partitionId);
@@ -333,9 +346,10 @@ public class IngestionDelayTracker {
               ServerGauge.REALTIME_INGESTION_CONSUMING_OFFSET);
         }
         _serverMetrics.removePartitionGauge(_metricName, partitionId, ServerGauge.REALTIME_INGESTION_DELAY_MS);
+        _serverMetrics.removePartitionGauge(_metricName, partitionId,
+            ServerGauge.END_TO_END_REALTIME_INGESTION_DELAY_MS);
         LOGGER.info("Successfully removed ingestion metrics for partition id: {}", partitionId);
       }
-      _ingestionInfoMap.remove(partitionId);
       return null;
     });
 
@@ -385,18 +399,23 @@ public class IngestionDelayTracker {
     }
     _serverMetrics.setOrUpdatePartitionGauge(_metricName, partitionId, ServerGauge.REALTIME_INGESTION_DELAY_MS,
         () -> getPartitionIngestionDelayMs(partitionId));
+    _serverMetrics.setOrUpdatePartitionGauge(_metricName, partitionId,
+        ServerGauge.END_TO_END_REALTIME_INGESTION_DELAY_MS, () -> getPartitionEndToEndIngestionDelayMs(partitionId));
   }
 
   /**
    * Called by RealTimeSegmentDataManagers to update the ingestion delay metrics for a given partition.
    *
-   * @param segmentName name of the consuming segment
-   * @param partitionId partition id of the consuming segment (directly passed in to avoid parsing the segment name)
-   * @param ingestionTimeMs ingestion time of the last consumed message (from {@link StreamMessageMetadata})
-   * @param currentOffset offset of the last consumed message (from {@link StreamMessageMetadata})
+   * @param segmentName                name of the consuming segment
+   * @param partitionId                partition id of the consuming segment (directly passed in to avoid parsing the
+   *                                   segment name)
+   * @param ingestionTimeMs            ingestion time of the last consumed message (from {@link StreamMessageMetadata})
+   * @param firstStreamIngestionTimeMs ingestion time of the last consumed message in the first stream (from
+   * {@link StreamMessageMetadata})
+   * @param currentOffset              offset of the last consumed message (from {@link StreamMessageMetadata})
    */
   public void updateMetrics(String segmentName, int partitionId, long ingestionTimeMs,
-      @Nullable StreamPartitionMsgOffset currentOffset) {
+      long firstStreamIngestionTimeMs, @Nullable StreamPartitionMsgOffset currentOffset) {
     if (!_isServerReadyToServeQueries.getAsBoolean() || _realTimeTableDataManager.isShutDown()) {
       // Do not update the ingestion delay metrics during server startup period
       // or once the table data manager has been shutdown.
@@ -414,13 +433,9 @@ public class IngestionDelayTracker {
         return v;
       }
       if (v == null) {
-        _partitionsTracked.computeIfAbsent(partitionId, pid -> {
-          createMetrics(partitionId);
-          return true;
-        });
-        return new IngestionInfo(ingestionTimeMs, currentOffset);
+        return new IngestionInfo(ingestionTimeMs, currentOffset, firstStreamIngestionTimeMs);
       }
-      v.update(ingestionTimeMs, currentOffset);
+      v.update(ingestionTimeMs, currentOffset, firstStreamIngestionTimeMs);
       return v;
     });
 
@@ -494,7 +509,10 @@ public class IngestionDelayTracker {
         removePartitionId(partitionId);
       }
     }
-    _partitionsHostedByThisServer = partitionsHostedByThisServer;
+
+    ConcurrentHashMap<Integer, Boolean> newMap = new ConcurrentHashMap<>();
+    partitionsHostedByThisServer.forEach(p -> newMap.put(p, true));
+    _partitionsHostedByThisServer = newMap;
   }
 
   /**
@@ -519,6 +537,25 @@ public class IngestionDelayTracker {
   public long getPartitionIngestionTimeMs(int partitionId) {
     IngestionInfo ingestionInfo = _ingestionInfoMap.get(partitionId);
     return ingestionInfo != null ? ingestionInfo._ingestionTimeMs : Long.MIN_VALUE;
+  }
+
+  /**
+   * Method to get end to end ingestion delay for a given partition.
+   *
+   * @param partitionId partition for which we are retrieving the delay
+   *
+   * @return End to end ingestion delay in milliseconds for the given partition ID.
+   */
+  public long getPartitionEndToEndIngestionDelayMs(int partitionId) {
+    IngestionInfo ingestionInfo = _ingestionInfoMap.get(partitionId);
+    long firstStreamIngestionTimeMs = 0;
+    if ((ingestionInfo != null) && (ingestionInfo._firstStreamIngestionTimeMs > 0)) {
+      firstStreamIngestionTimeMs = ingestionInfo._firstStreamIngestionTimeMs;
+    }
+    // Compute aged delay for current partition
+    long agedIngestionDelayMs = _clock.millis() - firstStreamIngestionTimeMs;
+    // Correct to zero for any time shifts due to NTP or time reset.
+    return Math.max(agedIngestionDelayMs, 0);
   }
 
   /**
