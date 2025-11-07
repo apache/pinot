@@ -23,6 +23,7 @@ import com.google.common.collect.Sets;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Set;
+import java.util.regex.Pattern;
 import javax.annotation.Nullable;
 import org.apache.calcite.plan.RelOptTable;
 import org.apache.calcite.plan.RelOptUtil;
@@ -36,8 +37,10 @@ import org.apache.calcite.rel.core.JoinRelType;
 import org.apache.calcite.rel.core.Project;
 import org.apache.calcite.rel.core.SetOp;
 import org.apache.calcite.rel.core.TableScan;
+import org.apache.calcite.rel.core.Uncollect;
 import org.apache.calcite.rel.core.Window;
 import org.apache.calcite.rel.logical.LogicalAsofJoin;
+import org.apache.calcite.rel.logical.LogicalCorrelate;
 import org.apache.calcite.rel.logical.LogicalFilter;
 import org.apache.calcite.rel.logical.LogicalJoin;
 import org.apache.calcite.rel.logical.LogicalProject;
@@ -47,11 +50,14 @@ import org.apache.calcite.rel.logical.LogicalWindow;
 import org.apache.calcite.rel.type.RelDataType;
 import org.apache.calcite.rel.type.RelDataTypeField;
 import org.apache.calcite.rel.type.RelRecordType;
+import org.apache.calcite.rex.RexCorrelVariable;
+import org.apache.calcite.rex.RexFieldAccess;
 import org.apache.calcite.rex.RexInputRef;
 import org.apache.calcite.rex.RexLiteral;
 import org.apache.calcite.rex.RexNode;
 import org.apache.calcite.rex.RexWindowExclusion;
 import org.apache.calcite.sql.SqlLiteral;
+import org.apache.calcite.sql.SqlUnnestOperator;
 import org.apache.calcite.sql.type.SqlTypeName;
 import org.apache.pinot.calcite.rel.hint.PinotHintOptions;
 import org.apache.pinot.calcite.rel.logical.PinotLogicalAggregate;
@@ -68,6 +74,7 @@ import org.apache.pinot.common.utils.DataSchema.ColumnDataType;
 import org.apache.pinot.common.utils.DatabaseUtils;
 import org.apache.pinot.common.utils.request.RequestUtils;
 import org.apache.pinot.query.planner.plannode.AggregateNode;
+import org.apache.pinot.query.planner.plannode.BasePlanNode;
 import org.apache.pinot.query.planner.plannode.EnrichedJoinNode;
 import org.apache.pinot.query.planner.plannode.ExchangeNode;
 import org.apache.pinot.query.planner.plannode.FilterNode;
@@ -78,6 +85,7 @@ import org.apache.pinot.query.planner.plannode.ProjectNode;
 import org.apache.pinot.query.planner.plannode.SetOpNode;
 import org.apache.pinot.query.planner.plannode.SortNode;
 import org.apache.pinot.query.planner.plannode.TableScanNode;
+import org.apache.pinot.query.planner.plannode.UnnestNode;
 import org.apache.pinot.query.planner.plannode.ValueNode;
 import org.apache.pinot.query.planner.plannode.WindowNode;
 import org.codehaus.commons.nullanalysis.NotNull;
@@ -91,6 +99,8 @@ import org.slf4j.LoggerFactory;
 public final class RelToPlanNodeConverter {
   private static final Logger LOGGER = LoggerFactory.getLogger(RelToPlanNodeConverter.class);
   private static final int DEFAULT_STAGE_ID = -1;
+  private static final Pattern AUTO_GENERATED_ALIAS_PATTERN =
+      Pattern.compile("(?i)(expr\\$\\d+|item\\d+|ord\\d+|arr\\d+|unnest_col_\\d+|col\\d+)");
 
   private final BrokerMetrics _brokerMetrics = BrokerMetrics.get();
   private boolean _joinFound;
@@ -113,6 +123,10 @@ public final class RelToPlanNodeConverter {
     PlanNode result;
     if (node instanceof PinotLogicalTableScan) {
       result = convertPinotLogicalTableScan((PinotLogicalTableScan) node);
+    } else if (node instanceof Uncollect) {
+      result = convertLogicalUncollect((Uncollect) node);
+    } else if (node instanceof LogicalCorrelate) {
+      result = convertLogicalCorrelate((LogicalCorrelate) node);
     } else if (node instanceof LogicalProject) {
       result = convertLogicalProject((LogicalProject) node);
     } else if (node instanceof LogicalFilter) {
@@ -157,6 +171,506 @@ public final class RelToPlanNodeConverter {
       _tracker.trackCreation(node, result);
     }
     return result;
+  }
+
+  private UnnestNode convertLogicalUncollect(Uncollect node) {
+    // Extract array expressions (typically from a Project with one or more expressions)
+    List<RexExpression> arrayExprs = new ArrayList<>();
+    List<String> columnAliases = new ArrayList<>();
+    RelNode input = node.getInput();
+    boolean withOrdinality = node.withOrdinality;
+    String ordinalityAlias = withOrdinality ? SqlUnnestOperator.ORDINALITY_COLUMN_NAME : null;
+
+    if (input instanceof Project) {
+      Project p = (Project) input;
+      List<RelDataTypeField> outputFields = node.getRowType().getFieldList();
+      List<RelDataTypeField> projectFields = p.getRowType().getFieldList();
+      int numProjects = p.getProjects().size();
+      int numOutputFields = outputFields.size();
+
+      // Check if WITH ORDINALITY is present: output fields = project expressions + ordinality
+      if (numOutputFields > numProjects) {
+        withOrdinality = true;
+        String ordAlias = outputFields.get(numOutputFields - 1).getName();
+        // Use the alias from Uncollect's rowType if available, otherwise use default
+        ordinalityAlias = (ordAlias != null && !ordAlias.isEmpty()) ? ordAlias : "ordinality";
+      }
+
+      // Extract all array expressions from the Project
+      // Field names come from Uncollect's rowType (which has the aliases from AS clause)
+      // Fall back to Project's field names if Uncollect's field names are empty/default
+      for (int i = 0; i < numProjects; i++) {
+        arrayExprs.add(RexExpressionUtils.fromRexNode(p.getProjects().get(i)));
+        String alias = null;
+        if (i < outputFields.size()) {
+          alias = outputFields.get(i).getName();
+          // If alias is empty or null, try Project's field name
+          if ((alias == null || alias.isEmpty()) && i < projectFields.size()) {
+            alias = projectFields.get(i).getName();
+          }
+        } else if (i < projectFields.size()) {
+          alias = projectFields.get(i).getName();
+        }
+        columnAliases.add(resolveElementAlias(alias, i));
+      }
+    }
+
+    if (arrayExprs.isEmpty()) {
+      // Fallback: refer to first input ref
+      arrayExprs.add(new RexExpression.InputRef(0));
+      List<RelDataTypeField> fields = node.getRowType().getFieldList();
+      if (!fields.isEmpty()) {
+        String alias = fields.get(0).getName();
+        columnAliases.add(resolveElementAlias(alias, 0));
+        // Check for ordinality in fallback case
+        if (fields.size() > 1 && !withOrdinality) {
+          withOrdinality = true;
+          String ordAlias = fields.get(1).getName();
+          ordinalityAlias = (ordAlias != null && !ordAlias.isEmpty()) ? ordAlias : "ordinality";
+        }
+      } else {
+        columnAliases.add(resolveElementAlias(null, 0));
+      }
+    }
+
+    return new UnnestNode(DEFAULT_STAGE_ID, toDataSchema(node.getRowType()), NodeHint.EMPTY,
+        convertInputs(node.getInputs()), arrayExprs, columnAliases, withOrdinality, ordinalityAlias);
+  }
+
+  private BasePlanNode convertLogicalCorrelate(LogicalCorrelate node) {
+    // Pattern: Correlate(left, Uncollect(Project(correlatedFields...)))
+    RelNode right = node.getRight();
+    RelDataType leftRowType = node.getLeft().getRowType();
+    Project aliasProject = right instanceof Project ? (Project) right : null;
+    Project correlatedProject = findProjectUnderUncollect(right);
+    List<RexExpression> arrayExprs = new ArrayList<>();
+    List<String> columnAliases = new ArrayList<>();
+    if (correlatedProject != null) {
+      List<RelDataTypeField> outputFields = node.getRowType().getFieldList();
+      // Extract all array expressions from the Project
+      // The output fields include: left columns + array elements + (ordinality if present)
+      // We need to extract only the array element columns (skip left columns, skip ordinality if present)
+      int leftColumnCount = leftRowType.getFieldCount();
+      int numProjects = correlatedProject.getProjects().size();
+      List<RelDataTypeField> projectFields = correlatedProject.getRowType().getFieldList();
+      for (int i = 0; i < numProjects; i++) {
+        RexNode rex = correlatedProject.getProjects().get(i);
+        RexExpression arrayExpr = deriveArrayExpression(rex, correlatedProject, leftRowType);
+        if (arrayExpr == null) {
+          arrayExpr = RexExpressionUtils.fromRexNode(rex);
+        }
+        arrayExprs.add(arrayExpr);
+        // For LogicalCorrelate, aliases come from the Correlate's output row type (after left columns)
+        // This includes the aliases specified in Uncollect.create()
+        // However, if Calcite auto-generates a name (like "arr0"), prefer the Project field name
+        int aliasIndex = leftColumnCount + i;
+        String alias = null;
+        if (aliasIndex < outputFields.size()) {
+          alias = outputFields.get(aliasIndex).getName();
+          // Prefer the Project-level name when Calcite invents auto-generated aliases
+          if (alias != null && i < projectFields.size() && isLikelyAutoGeneratedAlias(alias)) {
+            String projectFieldName = projectFields.get(i).getName();
+            if (projectFieldName != null && !projectFieldName.isEmpty()
+                && !isLikelyAutoGeneratedAlias(projectFieldName)) {
+              alias = projectFieldName;
+            }
+          }
+        }
+        columnAliases.add(resolveElementAlias(alias, i));
+      }
+    }
+    if (arrayExprs.isEmpty()) {
+      // Fallback: refer to first input ref
+      arrayExprs.add(new RexExpression.InputRef(0));
+      List<RelDataTypeField> outputFields = node.getRowType().getFieldList();
+      if (!outputFields.isEmpty()) {
+        columnAliases.add(resolveElementAlias(outputFields.get(0).getName(), 0));
+      } else {
+        columnAliases.add(resolveElementAlias(null, 0));
+      }
+    }
+    LogicalFilter correlateFilter = findCorrelateFilter(right);
+    boolean wrapWithFilter = correlateFilter != null;
+    RexNode filterCondition = wrapWithFilter ? correlateFilter.getCondition() : null;
+    // Use the entire correlate output schema
+    PlanNode inputNode = toPlanNode(node.getLeft());
+    // Ensure inputs list is mutable because downstream visitors (e.g., withInputs methods) may modify the inputs list
+    List<PlanNode> inputs = new ArrayList<>();
+    inputs.add(inputNode);
+    ElementOrdinalInfo ordinalInfo = deriveElementOrdinalInfo(right, leftRowType, node.getRowType(), arrayExprs.size());
+    boolean withOrdinality = ordinalInfo.hasOrdinality();
+    String ordinalityAlias = ordinalInfo.getOrdinalityAlias();
+    if (ordinalityAlias == null || SqlUnnestOperator.ORDINALITY_COLUMN_NAME.equals(ordinalityAlias)) {
+      if (aliasProject != null) {
+        String projectOrdinalityAlias = getOrdinalityAliasFromProject(aliasProject, arrayExprs.size());
+        if (projectOrdinalityAlias != null) {
+          ordinalityAlias = projectOrdinalityAlias;
+        }
+      }
+      if (ordinalityAlias == null || SqlUnnestOperator.ORDINALITY_COLUMN_NAME.equals(ordinalityAlias)) {
+        String rightOrdinalityAlias = getOrdinalityAliasFromRelNode(right, arrayExprs.size());
+        if (rightOrdinalityAlias != null) {
+          ordinalityAlias = rightOrdinalityAlias;
+        }
+      }
+    }
+    List<Integer> elementIndexes = ordinalInfo.getElementIndexes();
+    int ordinalityIndex = ordinalInfo.getOrdinalityIndex();
+    UnnestNode unnest = new UnnestNode(DEFAULT_STAGE_ID, toDataSchema(node.getRowType()), NodeHint.EMPTY,
+        inputs, arrayExprs, columnAliases, withOrdinality, ordinalityAlias, elementIndexes, ordinalityIndex);
+    if (wrapWithFilter) {
+      // Wrap Unnest with a FilterNode; rewrite filter InputRefs to absolute output indexes
+      // For multiple arrays, we need to handle rewriting differently
+      RexExpression rewritten = rewriteInputRefsForMultipleArrays(
+          RexExpressionUtils.fromRexNode(filterCondition), elementIndexes, ordinalityIndex);
+      return new FilterNode(DEFAULT_STAGE_ID, toDataSchema(node.getRowType()), NodeHint.EMPTY,
+          new ArrayList<>(List.of(unnest)), rewritten);
+    }
+    return unnest;
+  }
+
+  private static boolean isLikelyAutoGeneratedAlias(@Nullable String alias) {
+    if (alias == null || alias.isEmpty()) {
+      return true;
+    }
+    return AUTO_GENERATED_ALIAS_PATTERN.matcher(alias).matches();
+  }
+
+  private static String resolveElementAlias(String proposedAlias, int idx) {
+    if (proposedAlias != null && !proposedAlias.isEmpty()) {
+      return proposedAlias;
+    }
+    return "unnest_col_" + idx;
+  }
+
+  @Nullable
+  private static String getOrdinalityAliasFromProject(Project project, int numArrays) {
+    List<RelDataTypeField> fields = project.getRowType().getFieldList();
+    if (fields.size() > numArrays) {
+      String alias = fields.get(numArrays).getName();
+      if (alias != null && !alias.isEmpty() && !SqlUnnestOperator.ORDINALITY_COLUMN_NAME.equals(alias)) {
+        return alias;
+      }
+    }
+    return null;
+  }
+
+  @Nullable
+  private static String getOrdinalityAliasFromRelNode(RelNode node, int numArrays) {
+    List<RelDataTypeField> fields = node.getRowType().getFieldList();
+    if (fields.size() > numArrays) {
+      String alias = fields.get(fields.size() - 1).getName();
+      if (alias != null && !alias.isEmpty() && !SqlUnnestOperator.ORDINALITY_COLUMN_NAME.equals(alias)) {
+        return alias;
+      }
+    }
+    return null;
+  }
+
+  @Nullable
+  private static Project findProjectUnderUncollect(RelNode node) {
+    RelNode current = node;
+    while (current != null) {
+      if (current instanceof Uncollect) {
+        RelNode input = ((Uncollect) current).getInput();
+        return input instanceof Project ? (Project) input : null;
+      }
+      if (current instanceof Project) {
+        current = ((Project) current).getInput();
+      } else if (current instanceof LogicalFilter) {
+        current = ((LogicalFilter) current).getInput();
+      } else {
+        return null;
+      }
+    }
+    return null;
+  }
+
+  @Nullable
+  private static Uncollect findUncollect(RelNode node) {
+    RelNode current = node;
+    while (current != null) {
+      if (current instanceof Uncollect) {
+        return (Uncollect) current;
+      }
+      if (current instanceof Project) {
+        current = ((Project) current).getInput();
+      } else if (current instanceof LogicalFilter) {
+        current = ((LogicalFilter) current).getInput();
+      } else {
+        return null;
+      }
+    }
+    return null;
+  }
+
+  @Nullable
+  private static RexExpression deriveArrayExpression(RexNode rex, Project project, RelDataType leftRowType) {
+    Integer idx = resolveInputRefFromCorrel(rex, leftRowType);
+    if (idx != null) {
+      return new RexExpression.InputRef(idx);
+    }
+    RexExpression candidate = RexExpressionUtils.fromRexNode(rex);
+    return candidate instanceof RexExpression.InputRef ? candidate : null;
+  }
+
+  @Nullable
+  private static LogicalFilter findCorrelateFilter(RelNode node) {
+    RelNode current = node;
+    while (current instanceof Project || current instanceof LogicalFilter) {
+      if (current instanceof LogicalFilter) {
+        return (LogicalFilter) current;
+      }
+      current = ((Project) current).getInput();
+    }
+    return null;
+  }
+
+  private static ElementOrdinalInfo deriveElementOrdinalInfo(RelNode right, RelDataType leftRowType,
+      RelDataType correlateOutputRowType, int numArrays) {
+    Uncollect uncollect = findUncollect(right);
+    boolean hasOrdinality = uncollect != null && uncollect.withOrdinality;
+    ElementOrdinalAccumulator accumulator =
+        new ElementOrdinalAccumulator(leftRowType.getFieldCount(), numArrays, hasOrdinality);
+    if (correlateOutputRowType != null) {
+      // Use the Correlate's output row type which includes left columns + unnested elements + ordinality
+      accumulator.populateFromCorrelateOutput(correlateOutputRowType, leftRowType.getFieldCount());
+    } else {
+      // Fallback to old logic for non-Correlate cases
+      if (right instanceof Uncollect) {
+        accumulator.populateFromRowType(right.getRowType());
+      } else if (right instanceof Project) {
+        accumulator.populateFromProject((Project) right);
+      } else if (right instanceof LogicalFilter) {
+        LogicalFilter filter = (LogicalFilter) right;
+        RelNode filterInput = filter.getInput();
+        if (filterInput instanceof Uncollect) {
+          accumulator.populateFromRowType(filter.getRowType());
+        } else if (filterInput instanceof Project) {
+          accumulator.populateFromProject((Project) filterInput);
+        }
+      }
+    }
+    if (uncollect != null) {
+      accumulator.ensureOrdinalityFromRowType(uncollect.getRowType(), uncollect.withOrdinality);
+    }
+    return accumulator.toInfo();
+  }
+
+  private static final class ElementOrdinalAccumulator {
+    private final int _base;
+    private final int _numArrays;
+    private final boolean _hasOrdinality;
+    private final List<String> _elementAliases = new ArrayList<>();
+    private String _ordinalityAlias;
+    private final List<Integer> _elementIndexes = new ArrayList<>();
+    private int _ordinalityIndex = -1;
+
+    ElementOrdinalAccumulator(int base, int numArrays, boolean hasOrdinality) {
+      _base = base;
+      _numArrays = numArrays;
+      _hasOrdinality = hasOrdinality;
+    }
+
+    void populateFromRowType(RelDataType rowType) {
+      List<RelDataTypeField> fields = rowType.getFieldList();
+      // Extract element aliases and indexes for all arrays
+      for (int i = 0; i < _numArrays && i < fields.size(); i++) {
+        _elementAliases.add(fields.get(i).getName());
+        _elementIndexes.add(_base + i);
+      }
+      // Check if ordinality is present: fields.size() should be numArrays + 1
+      if (fields.size() > _numArrays && _ordinalityIndex < 0) {
+        _ordinalityAlias = fields.get(_numArrays).getName();
+        _ordinalityIndex = _base + _numArrays;
+      }
+    }
+
+    void populateFromProject(Project project) {
+      List<RexNode> projects = project.getProjects();
+      List<RelDataTypeField> projFields = project.getRowType().getFieldList();
+      // Extract element aliases and indexes from project outputs
+      for (int j = 0; j < projects.size() && j < _numArrays; j++) {
+        String outName = projFields.get(j).getName();
+        _elementAliases.add(outName);
+        _elementIndexes.add(_base + j);
+      }
+      // Check if ordinality is present: projFields.size() should be numArrays + 1
+      if (projFields.size() > _numArrays && _ordinalityIndex < 0) {
+        _ordinalityAlias = projFields.get(_numArrays).getName();
+        _ordinalityIndex = _base + _numArrays;
+      }
+    }
+
+    void populateFromCorrelateOutput(RelDataType correlateOutputRowType, int leftColumnCount) {
+      List<RelDataTypeField> fields = correlateOutputRowType.getFieldList();
+      int rightFieldCount = Math.min(_numArrays + (_hasOrdinality ? 1 : 0), fields.size());
+      int actualLeftColumns = Math.max(0, fields.size() - rightFieldCount);
+      int missingLeftColumns = Math.max(0, leftColumnCount - actualLeftColumns);
+      int adjustedBase = Math.max(0, leftColumnCount - missingLeftColumns);
+
+      for (int i = 0; i < _numArrays; i++) {
+        int fieldIndex = adjustedBase + i;
+        if (fieldIndex < fields.size()) {
+          _elementAliases.add(fields.get(fieldIndex).getName());
+          _elementIndexes.add(fieldIndex);
+        } else {
+          _elementAliases.add(null);
+          _elementIndexes.add(_base + i);
+        }
+      }
+      int ordinalityFieldIndex = adjustedBase + _numArrays;
+      if (_hasOrdinality && ordinalityFieldIndex < fields.size() && _ordinalityIndex < 0) {
+        _ordinalityAlias = fields.get(ordinalityFieldIndex).getName();
+        _ordinalityIndex = ordinalityFieldIndex;
+      }
+    }
+
+    void ensureOrdinalityFromRowType(RelDataType rowType, boolean hasOrdinality) {
+      if (!hasOrdinality) {
+        return;
+      }
+      List<RelDataTypeField> fields = rowType.getFieldList();
+      String ordAlias = fields.size() > _numArrays ? fields.get(_numArrays).getName() : null;
+      if (_ordinalityIndex < 0) {
+        _ordinalityIndex = _base + _numArrays;
+      }
+      if (_ordinalityAlias == null || SqlUnnestOperator.ORDINALITY_COLUMN_NAME.equals(_ordinalityAlias)) {
+        _ordinalityAlias =
+            (ordAlias != null && !ordAlias.isEmpty()) ? ordAlias : SqlUnnestOperator.ORDINALITY_COLUMN_NAME;
+      }
+    }
+
+    ElementOrdinalInfo toInfo() {
+      // For backward compatibility, provide single element index if only one array
+      int singleElementIndex = _elementIndexes.isEmpty() ? -1 : _elementIndexes.get(0);
+      String singleElementAlias = _elementAliases.isEmpty() ? null : _elementAliases.get(0);
+      return new ElementOrdinalInfo(singleElementAlias, _ordinalityAlias, singleElementIndex,
+          _ordinalityIndex, _elementIndexes);
+    }
+  }
+
+  private static final class ElementOrdinalInfo {
+    private final String _elementAlias;
+    private final String _ordinalityAlias;
+    private final int _elementIndex;
+    private final int _ordinalityIndex;
+    private final List<Integer> _elementIndexes;
+
+    ElementOrdinalInfo(String elementAlias, String ordinalityAlias, int elementIndex, int ordinalityIndex) {
+      this(elementAlias, ordinalityAlias, elementIndex, ordinalityIndex,
+          elementIndex >= 0 ? List.of(elementIndex) : List.of());
+    }
+
+    ElementOrdinalInfo(String elementAlias, String ordinalityAlias, int elementIndex, int ordinalityIndex,
+        List<Integer> elementIndexes) {
+      _elementAlias = elementAlias;
+      _ordinalityAlias = ordinalityAlias;
+      _elementIndex = elementIndex;
+      _ordinalityIndex = ordinalityIndex;
+      _elementIndexes = elementIndexes;
+    }
+
+    String getElementAlias() {
+      return _elementAlias;
+    }
+
+    String getOrdinalityAlias() {
+      return _ordinalityAlias;
+    }
+
+    int getElementIndex() {
+      return _elementIndex;
+    }
+
+    List<Integer> getElementIndexes() {
+      return _elementIndexes;
+    }
+
+    int getOrdinalityIndex() {
+      return _ordinalityIndex;
+    }
+
+    boolean hasOrdinality() {
+      return _ordinalityIndex >= 0;
+    }
+  }
+
+  private static RexExpression rewriteInputRefs(RexExpression expr, int elemOutIdx, int ordOutIdx) {
+    if (expr instanceof RexExpression.InputRef) {
+      int idx = ((RexExpression.InputRef) expr).getIndex();
+      if (idx == 0 && elemOutIdx >= 0) {
+        return new RexExpression.InputRef(elemOutIdx);
+      } else if (idx == 1 && ordOutIdx >= 0) {
+        return new RexExpression.InputRef(ordOutIdx);
+      } else {
+        return expr;
+      }
+    } else if (expr instanceof RexExpression.FunctionCall) {
+      RexExpression.FunctionCall fc = (RexExpression.FunctionCall) expr;
+      List<RexExpression> ops = fc.getFunctionOperands();
+      List<RexExpression> rewritten = new ArrayList<>(ops.size());
+      for (RexExpression op : ops) {
+        rewritten.add(rewriteInputRefs(op, elemOutIdx, ordOutIdx));
+      }
+      return new RexExpression.FunctionCall(fc.getDataType(), fc.getFunctionName(), rewritten);
+    } else {
+      return expr;
+    }
+  }
+
+  private static RexExpression rewriteInputRefsForMultipleArrays(RexExpression expr, List<Integer> elemOutIdxs,
+      int ordOutIdx) {
+    if (expr instanceof RexExpression.InputRef) {
+      int idx = ((RexExpression.InputRef) expr).getIndex();
+      // Map element indexes: 0 -> first element index, 1 -> second element index, etc.
+      if (idx >= 0 && idx < elemOutIdxs.size() && elemOutIdxs.get(idx) >= 0) {
+        return new RexExpression.InputRef(elemOutIdxs.get(idx));
+      } else if (idx == elemOutIdxs.size() && ordOutIdx >= 0) {
+        // Ordinality index comes after all element indexes
+        return new RexExpression.InputRef(ordOutIdx);
+      } else {
+        return expr;
+      }
+    } else if (expr instanceof RexExpression.FunctionCall) {
+      RexExpression.FunctionCall fc = (RexExpression.FunctionCall) expr;
+      List<RexExpression> ops = fc.getFunctionOperands();
+      List<RexExpression> rewritten = new ArrayList<>(ops.size());
+      for (RexExpression op : ops) {
+        rewritten.add(rewriteInputRefsForMultipleArrays(op, elemOutIdxs, ordOutIdx));
+      }
+      return new RexExpression.FunctionCall(fc.getDataType(), fc.getFunctionName(), rewritten);
+    } else {
+      return expr;
+    }
+  }
+
+  private static Integer resolveInputRefFromCorrel(RexNode expr, RelDataType leftRowType) {
+    if (expr instanceof RexFieldAccess) {
+      RexFieldAccess fieldAccess = (RexFieldAccess) expr;
+      if (fieldAccess.getReferenceExpr() instanceof RexCorrelVariable) {
+        String fieldName = fieldAccess.getField().getName();
+        List<RelDataTypeField> fields = leftRowType.getFieldList();
+        // SQL field names are case-insensitive by default in Calcite, so we use equalsIgnoreCase for matching.
+        // NOTE: This assumes that the schema is configured with Calcite's default case-insensitivity.
+        // If the schema is case-sensitive, this approach may produce incorrect results. Update logic if needed.
+        for (int i = 0; i < fields.size(); i++) {
+          String candidateName = fields.get(i).getName();
+          if (candidateName == null) {
+            continue;
+          }
+          if (candidateName.equals(fieldName)) {
+            return i;
+          }
+          if (candidateName.equalsIgnoreCase(fieldName)) {
+            LOGGER.warn("Case-insensitive field match for correlated reference '{}' vs '{}'. "
+                + "Ensure schema case-sensitivity is configured as expected.", fieldName, candidateName);
+            return i;
+          }
+        }
+      }
+    }
+    return null;
   }
 
   private ExchangeNode convertLogicalExchange(Exchange node) {
