@@ -19,13 +19,17 @@
 package org.apache.pinot.query.planner.logical;
 
 import com.google.common.collect.ImmutableList;
+import java.math.BigDecimal;
 import java.util.Collections;
 import java.util.List;
 import org.apache.calcite.plan.RelOptCluster;
 import org.apache.calcite.plan.RelTraitSet;
 import org.apache.calcite.plan.hep.HepPlanner;
 import org.apache.calcite.plan.hep.HepProgramBuilder;
+import org.apache.calcite.rel.core.CorrelationId;
 import org.apache.calcite.rel.core.JoinRelType;
+import org.apache.calcite.rel.core.Uncollect;
+import org.apache.calcite.rel.logical.LogicalCorrelate;
 import org.apache.calcite.rel.logical.LogicalFilter;
 import org.apache.calcite.rel.logical.LogicalJoin;
 import org.apache.calcite.rel.logical.LogicalProject;
@@ -41,11 +45,14 @@ import org.apache.calcite.sql.type.ArraySqlType;
 import org.apache.calcite.sql.type.BasicSqlType;
 import org.apache.calcite.sql.type.ObjectSqlType;
 import org.apache.calcite.sql.type.SqlTypeName;
+import org.apache.calcite.util.ImmutableBitSet;
 import org.apache.pinot.calcite.rel.logical.PinotLogicalEnrichedJoin;
 import org.apache.pinot.calcite.rel.rules.PinotEnrichedJoinRule;
 import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.query.planner.plannode.EnrichedJoinNode;
+import org.apache.pinot.query.planner.plannode.FilterNode;
 import org.apache.pinot.query.planner.plannode.PlanNode;
+import org.apache.pinot.query.planner.plannode.UnnestNode;
 import org.apache.pinot.query.type.TypeFactory;
 import org.apache.pinot.spi.utils.CommonConstants;
 import org.testng.Assert;
@@ -202,5 +209,92 @@ public class RelToPlanNodeConverterTest {
 
     EnrichedJoinNode enrichedJoinNode = (EnrichedJoinNode) node;
     Assert.assertEquals(enrichedJoinNode.getFilterProjectRexes().size(), 2);
+  }
+
+  @Test
+  public void testConvertLogicalCorrelateProducesUnnestMetadata() {
+    TypeFactory typeFactory = TypeFactory.INSTANCE;
+    RelOptCluster cluster = createCluster(typeFactory);
+    RelDataType leftRowType = typeFactory.builder()
+        .add("id", SqlTypeName.INTEGER)
+        .add("arr", typeFactory.createArrayType(typeFactory.createSqlType(SqlTypeName.INTEGER), -1))
+        .build();
+    LogicalValues left = LogicalValues.create(cluster, leftRowType, ImmutableList.of());
+
+    CorrelationId correlationId = new CorrelationId(0);
+    LogicalProject project = buildCorrelatedProject(cluster, leftRowType, correlationId, "arr");
+    Uncollect uncollect = Uncollect.create(project.getTraitSet(), project, false, List.of());
+    LogicalCorrelate correlate =
+        LogicalCorrelate.create(left, uncollect, correlationId, ImmutableBitSet.of(1), JoinRelType.INNER);
+
+    RelToPlanNodeConverter converter = new RelToPlanNodeConverter(null,
+        CommonConstants.Broker.DEFAULT_BROKER_DEFAULT_HASH_FUNCTION);
+    PlanNode planNode = converter.toPlanNode(correlate);
+
+    Assert.assertTrue(planNode instanceof UnnestNode);
+    UnnestNode unnestNode = (UnnestNode) planNode;
+    Assert.assertEquals(((RexExpression.InputRef) unnestNode.getArrayExpr()).getIndex(), 1);
+    Assert.assertEquals(unnestNode.getColumnAlias(), "arr");
+    Assert.assertEquals(unnestNode.getElementIndex(), 2);
+    Assert.assertFalse(unnestNode.isWithOrdinality());
+  }
+
+  @Test
+  public void testConvertLogicalCorrelateWithFilterAndOrdinality() {
+    TypeFactory typeFactory = TypeFactory.INSTANCE;
+    RelOptCluster cluster = createCluster(typeFactory);
+    RelDataType leftRowType = typeFactory.builder()
+        .add("id", SqlTypeName.INTEGER)
+        .add("arr", typeFactory.createArrayType(typeFactory.createSqlType(SqlTypeName.INTEGER), -1))
+        .build();
+    LogicalValues left = LogicalValues.create(cluster, leftRowType, ImmutableList.of());
+
+    CorrelationId correlationId = new CorrelationId(1);
+    LogicalProject project = buildCorrelatedProject(cluster, leftRowType, correlationId, "arr");
+    Uncollect uncollect = Uncollect.create(project.getTraitSet(), project, true, List.of());
+    RexBuilder rexBuilder = cluster.getRexBuilder();
+    RexNode ordRef = rexBuilder.makeInputRef(uncollect.getRowType(), 1);
+    RexNode literal = rexBuilder.makeExactLiteral(BigDecimal.ONE, typeFactory.createSqlType(SqlTypeName.INTEGER));
+    RexNode condition = rexBuilder.makeCall(SqlStdOperatorTable.GREATER_THAN, ordRef, literal);
+    LogicalFilter filter = LogicalFilter.create(uncollect, condition);
+    LogicalCorrelate correlate =
+        LogicalCorrelate.create(left, filter, correlationId, ImmutableBitSet.of(1), JoinRelType.LEFT);
+
+    RelToPlanNodeConverter converter = new RelToPlanNodeConverter(null,
+        CommonConstants.Broker.DEFAULT_BROKER_DEFAULT_HASH_FUNCTION);
+    PlanNode planNode = converter.toPlanNode(correlate);
+
+    Assert.assertTrue(planNode instanceof FilterNode);
+    FilterNode filterNode = (FilterNode) planNode;
+    Assert.assertEquals(filterNode.getInputs().size(), 1);
+    Assert.assertTrue(filterNode.getInputs().get(0) instanceof UnnestNode);
+    UnnestNode child = (UnnestNode) filterNode.getInputs().get(0);
+    Assert.assertTrue(child.isWithOrdinality());
+    Assert.assertEquals(child.getElementIndex(), 2);
+    Assert.assertEquals(child.getOrdinalityIndex(), 3);
+
+    RexExpression.FunctionCall conditionExpr = (RexExpression.FunctionCall) filterNode.getCondition();
+    Assert.assertEquals(conditionExpr.getFunctionName(), SqlStdOperatorTable.GREATER_THAN.getKind().toString());
+    RexExpression.InputRef rewrittenOrdinal =
+        (RexExpression.InputRef) conditionExpr.getFunctionOperands().get(0);
+    Assert.assertEquals(rewrittenOrdinal.getIndex(), child.getOrdinalityIndex());
+  }
+
+  private static RelOptCluster createCluster(TypeFactory typeFactory) {
+    HepProgramBuilder hepProgramBuilder = new HepProgramBuilder();
+    HepPlanner planner = new HepPlanner(hepProgramBuilder.build());
+    RexBuilder rexBuilder = new RexBuilder(typeFactory);
+    RelOptCluster cluster = RelOptCluster.create(planner, rexBuilder);
+    cluster.setMetadataProvider(DefaultRelMetadataProvider.INSTANCE);
+    return cluster;
+  }
+
+  private static LogicalProject buildCorrelatedProject(RelOptCluster cluster, RelDataType leftRowType,
+      CorrelationId correlationId, String fieldName) {
+    RexBuilder rexBuilder = cluster.getRexBuilder();
+    RexNode fieldAccess =
+        rexBuilder.makeFieldAccess(rexBuilder.makeCorrel(leftRowType, correlationId), fieldName, true);
+    return LogicalProject.create(LogicalValues.createOneRow(cluster), Collections.emptyList(),
+        List.of(fieldAccess), List.of(fieldName));
   }
 }
