@@ -558,6 +558,92 @@ public class ArrayTest extends CustomDataQueryClusterIntegrationTest {
   }
 
   @Test(dataProvider = "useBothQueryEngines")
+  public void testArraysOverlapWithLiterals(boolean useMultiStageQueryEngine)
+      throws Exception {
+    setUseMultiStageQueryEngine(useMultiStageQueryEngine);
+
+    // INT array literals
+    JsonNode result = postQuery("SELECT ARRAYS_OVERLAP(ARRAY[1,2], ARRAY[3,2])").get("resultTable");
+    assertTrue(result.get("rows").get(0).get(0).asBoolean());
+    result = postQuery("SELECT ARRAYS_OVERLAP(ARRAY[1,2], ARRAY[3,4])").get("resultTable");
+    assertFalse(result.get("rows").get(0).get(0).asBoolean());
+
+    // LONG array literals (use large values to ensure LONG_ARRAY typing)
+    result = postQuery("SELECT ARRAYS_OVERLAP(ARRAY[2147483648,2147483649], ARRAY[2147483650,2147483649])")
+        .get("resultTable");
+    assertTrue(result.get("rows").get(0).get(0).asBoolean());
+    result = postQuery("SELECT ARRAYS_OVERLAP(ARRAY[2147483648,2147483649], ARRAY[2147483650,2147483651])")
+        .get("resultTable");
+    assertFalse(result.get("rows").get(0).get(0).asBoolean());
+
+    // DOUBLE array literals
+    result = postQuery(
+        "SELECT ARRAYS_OVERLAP(ARRAY[CAST(0.1 AS DOUBLE),CAST(0.2 AS DOUBLE)], ARRAY[CAST(0.3 AS DOUBLE),CAST(0.2 AS "
+            + "DOUBLE)])")
+        .get("resultTable");
+    assertTrue(result.get("rows").get(0).get(0).asBoolean());
+    result = postQuery(
+        "SELECT ARRAYS_OVERLAP(ARRAY[CAST(0.1 AS DOUBLE),CAST(0.2 AS DOUBLE)], ARRAY[CAST(0.3 AS DOUBLE),CAST(0.4 AS "
+            + "DOUBLE)])")
+        .get("resultTable");
+    assertFalse(result.get("rows").get(0).get(0).asBoolean());
+
+    // STRING array literals
+    result = postQuery("SELECT ARRAYS_OVERLAP(ARRAY['a','b'], ARRAY['x','b'])").get("resultTable");
+    assertTrue(result.get("rows").get(0).get(0).asBoolean());
+    result = postQuery("SELECT ARRAYS_OVERLAP(ARRAY['a','b'], ARRAY['x','y'])").get("resultTable");
+    assertFalse(result.get("rows").get(0).get(0).asBoolean());
+  }
+
+  @Test(dataProvider = "useBothQueryEngines")
+  public void testArraysOverlapWithColumns(boolean useMultiStageQueryEngine)
+      throws Exception {
+    setUseMultiStageQueryEngine(useMultiStageQueryEngine);
+
+    // LONG array column always contains [0,1,2,3] in this dataset
+    String queryTrue = String.format(
+        "SELECT COUNT(*) FROM %s WHERE ARRAYS_OVERLAP(%s, ARRAY[CAST(2 AS BIGINT), CAST(10 AS BIGINT)])",
+        getTableName(), LONG_ARRAY_COLUMN);
+    JsonNode jsonNode = postQuery(queryTrue);
+    assertEquals(jsonNode.get("resultTable").get("rows").get(0).get(0).asLong(), getCountStarResult());
+
+    String queryFalse = String.format(
+        "SELECT COUNT(*) FROM %s WHERE ARRAYS_OVERLAP(%s, ARRAY[CAST(10 AS BIGINT), CAST(11 AS BIGINT)])",
+        getTableName(), LONG_ARRAY_COLUMN);
+    jsonNode = postQuery(queryFalse);
+    assertEquals(jsonNode.get("resultTable").get("rows").get(0).get(0).asLong(), 0L);
+
+    // DOUBLE array column always contains [0.0,0.1,0.2,0.3]
+    String queryDoubleTrue = String.format(
+        "SELECT COUNT(*) FROM %s WHERE ARRAYS_OVERLAP(%s, ARRAY[CAST(0.2 AS DOUBLE), CAST(1.0 AS DOUBLE)])",
+        getTableName(), DOUBLE_ARRAY_COLUMN);
+    jsonNode = postQuery(queryDoubleTrue);
+    assertEquals(jsonNode.get("resultTable").get("rows").get(0).get(0).asLong(), getCountStarResult());
+
+    String queryDoubleFalse = String.format(
+        "SELECT COUNT(*) FROM %s WHERE ARRAYS_OVERLAP(%s, ARRAY[CAST(9.9 AS DOUBLE), CAST(8.8 AS DOUBLE)])",
+        getTableName(), DOUBLE_ARRAY_COLUMN);
+    jsonNode = postQuery(queryDoubleFalse);
+    assertEquals(jsonNode.get("resultTable").get("rows").get(0).get(0).asLong(), 0L);
+  }
+
+  @Test(dataProvider = "useBothQueryEngines")
+  public void testArraysOverlapWithSameColumn(boolean useMultiStageQueryEngine)
+      throws Exception {
+    setUseMultiStageQueryEngine(useMultiStageQueryEngine);
+    String queryLong = String.format(
+        "SELECT COUNT(*) FROM %s WHERE ARRAYS_OVERLAP(%s, %s)", getTableName(), LONG_ARRAY_COLUMN, LONG_ARRAY_COLUMN);
+    JsonNode jsonNode = postQuery(queryLong);
+    assertEquals(jsonNode.get("resultTable").get("rows").get(0).get(0).asLong(), getCountStarResult());
+
+    String queryDouble =
+        String.format("SELECT COUNT(*) FROM %s WHERE ARRAYS_OVERLAP(%s, %s)", getTableName(), DOUBLE_ARRAY_COLUMN,
+            DOUBLE_ARRAY_COLUMN);
+    jsonNode = postQuery(queryDouble);
+    assertEquals(jsonNode.get("resultTable").get("rows").get(0).get(0).asLong(), getCountStarResult());
+  }
+
+  @Test(dataProvider = "useBothQueryEngines")
   public void testStringArrayLiteral(boolean useMultiStageQueryEngine)
       throws Exception {
     setUseMultiStageQueryEngine(useMultiStageQueryEngine);
