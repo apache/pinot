@@ -34,8 +34,6 @@ import static org.assertj.core.api.Assertions.assertThat;
  */
 public class ServerReloadJobStatusCacheTest {
 
-  private static final String CONFIG_PREFIX = "pinot.server.table.reload.status.cache";
-
   @Test
   public void testDefaultConfigInitialization() {
     // Given
@@ -180,7 +178,7 @@ public class ServerReloadJobStatusCacheTest {
 
     // When
     ServerReloadJobStatusCacheConfig config =
-        ServerReloadJobStatusCache.buildFromClusterConfig(properties, CONFIG_PREFIX);
+        ServerReloadJobStatusCache.buildFromClusterConfig(properties, ServerReloadJobStatusCache.CONFIG_PREFIX);
 
     // Then
     assertThat(config.getMaxSize()).isEqualTo(6000);

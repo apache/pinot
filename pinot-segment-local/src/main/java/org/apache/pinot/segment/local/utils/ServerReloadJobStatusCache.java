@@ -50,8 +50,8 @@ import static java.util.Objects.requireNonNull;
 @ThreadSafe
 public class ServerReloadJobStatusCache implements PinotClusterConfigChangeListener {
   private static final Logger LOG = LoggerFactory.getLogger(ServerReloadJobStatusCache.class);
-  private static final String CONFIG_PREFIX = "pinot.server.table.reload.status.cache";
   private static final ObjectMapper OBJECT_MAPPER = new ObjectMapper();
+  static final String CONFIG_PREFIX = "pinot.server.table.reload.status.cache";
 
   private volatile Cache<String, ReloadJobStatus> _cache;
   private ServerReloadJobStatusCacheConfig _currentConfig;
