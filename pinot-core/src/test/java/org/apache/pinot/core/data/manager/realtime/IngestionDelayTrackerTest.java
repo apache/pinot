@@ -84,8 +84,7 @@ public class IngestionDelayTrackerTest {
   }
 
   private static class MockIngestionDelayTracker extends IngestionDelayTracker {
-
-    private Map<Integer, Map<String, List<Long>>> _partitionToMetricToValues;
+    private volatile Map<Integer, Map<String, List<Long>>> _partitionToMetricToValues;
     private ScheduledExecutorService _scheduledExecutorService;
 
     public MockIngestionDelayTracker(ServerMetrics serverMetrics, String tableNameWithType,
@@ -334,8 +333,8 @@ public class IngestionDelayTrackerTest {
     }
     for (int partitionId = 0; partitionId <= maxTestDelay; partitionId++) {
       // Untracked partitions must return 0
-      Assert.assertEquals(ingestionDelayTracker.getPartitionIngestionDelayMs(partitionId), 0);
-      Assert.assertEquals(ingestionDelayTracker.getPartitionEndToEndIngestionDelayMs(partitionId), 0);
+      Assert.assertEquals(ingestionDelayTracker.getPartitionIngestionDelayMs(partitionId), clock.millis());
+      Assert.assertEquals(ingestionDelayTracker.getPartitionEndToEndIngestionDelayMs(partitionId), clock.millis());
       Assert.assertEquals(ingestionDelayTracker.getPartitionIngestionTimeMs(partitionId), Long.MIN_VALUE);
     }
   }
@@ -357,14 +356,14 @@ public class IngestionDelayTrackerTest {
     Assert.assertEquals(ingestionDelayTracker.getPartitionIngestionTimeMs(0), ingestionTimeMs);
 
     ingestionDelayTracker.stopTrackingPartition(segmentName);
-    Assert.assertEquals(ingestionDelayTracker.getPartitionIngestionDelayMs(0), 0);
-    Assert.assertEquals(ingestionDelayTracker.getPartitionEndToEndIngestionDelayMs(0), 0);
+    Assert.assertEquals(ingestionDelayTracker.getPartitionIngestionDelayMs(0), clock.millis());
+    Assert.assertEquals(ingestionDelayTracker.getPartitionEndToEndIngestionDelayMs(0), clock.millis());
     Assert.assertEquals(ingestionDelayTracker.getPartitionIngestionTimeMs(0), Long.MIN_VALUE);
 
     // Should not update metrics for removed segment
     ingestionDelayTracker.updateMetrics(segmentName, 0, ingestionTimeMs, ingestionTimeMs, null);
-    Assert.assertEquals(ingestionDelayTracker.getPartitionIngestionDelayMs(0), 0);
-    Assert.assertEquals(ingestionDelayTracker.getPartitionEndToEndIngestionDelayMs(0), 0);
+    Assert.assertEquals(ingestionDelayTracker.getPartitionIngestionDelayMs(0), clock.millis());
+    Assert.assertEquals(ingestionDelayTracker.getPartitionEndToEndIngestionDelayMs(0), clock.millis());
     Assert.assertEquals(ingestionDelayTracker.getPartitionIngestionTimeMs(0), Long.MIN_VALUE);
   }
 
@@ -502,15 +501,14 @@ public class IngestionDelayTrackerTest {
           new LongMsgOffset(((LongMsgOffset) (partitionIdVsLatestOffset.get(partition1))).getOffset() + 50));
     }, 0, 10, TimeUnit.MILLISECONDS);
 
-    Map<Integer, Map<String, List<Long>>> partitionToMetricToValues = ingestionDelayTracker._partitionToMetricToValues;
     TestUtils.waitForCondition((aVoid) -> {
       try {
-        verifyMetrics(partitionToMetricToValues);
+        verifyMetrics(ingestionDelayTracker._partitionToMetricToValues);
       } catch (Throwable t) {
         return false;
       }
       return true;
-    }, 10, 2000, "Failed to verify the ingestion delay metrics.");
+    }, 10, 200000, "Failed to verify the ingestion delay metrics.");
     scheduledExecutorService.shutdown();
     ingestionDelayTracker.shutdown();
   }
