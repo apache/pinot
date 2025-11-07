@@ -56,10 +56,6 @@ public class ServerReloadJobStatusCache implements PinotClusterConfigChangeListe
   private volatile Cache<String, ReloadJobStatus> _cache;
   private ServerReloadJobStatusCacheConfig _currentConfig;
 
-  /**
-   * Creates a cache with default configuration.
-   * Config can be updated dynamically via cluster config changes.
-   */
   public ServerReloadJobStatusCache() {
     _currentConfig = new ServerReloadJobStatusCacheConfig();
     _cache = CacheBuilder.newBuilder()
@@ -155,10 +151,6 @@ public class ServerReloadJobStatusCache implements PinotClusterConfigChangeListe
     return OBJECT_MAPPER.convertValue(subsetConfig.toMap(), ServerReloadJobStatusCacheConfig.class);
   }
 
-  /**
-   * Gets the current cache configuration.
-   * Useful for testing and monitoring.
-   */
   @VisibleForTesting
   public synchronized ServerReloadJobStatusCacheConfig getCurrentConfig() {
     return _currentConfig;
@@ -166,7 +158,6 @@ public class ServerReloadJobStatusCache implements PinotClusterConfigChangeListe
 
   @Override
   public void onChange(Set<String> changedConfigs, Map<String, String> clusterConfigs) {
-    // Check if any changed key starts with CONFIG_PREFIX (optimization to skip unnecessary rebuilds)
     boolean hasRelevantChanges = changedConfigs.stream()
         .anyMatch(key -> key.startsWith(CONFIG_PREFIX));
 
