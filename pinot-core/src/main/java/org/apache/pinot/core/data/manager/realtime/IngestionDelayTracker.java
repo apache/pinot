@@ -140,7 +140,6 @@ public class IngestionDelayTracker {
   // This map is accessed by:
   // 1. _ingestionDelayTrackingScheduler thread.
   // 2. All threads which can removes metrics - Consumer thread, Helix Thread, Server API Thread, etc.
-  // 3. Consumer thread when it updates the ingestion info of the partition for the first time.
   private final Map<Integer, Boolean> _partitionsTracked = new ConcurrentHashMap<>();
   // Map to hold the ingestion info reported by the consumer.
   // This map is accessed by:
