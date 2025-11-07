@@ -7,7 +7,7 @@ In order to run the Apache Pinot benchmark you'll need to create the appropriate
 data segments, which are too large to be included in this github repository and
 they may need to be recreated with new Apache Pinot versions.
 
-To create the neccessary segment data for the benchmark please follow the
+To create the necessary segment data for the benchmark please follow the
 instructions below.
 
 # Creating Apache Pinot benchmark segments from TPC-H data
@@ -22,7 +22,7 @@ Registration is required.
 
 **Note:**: The instructions below for dbgen assume a Linux OS.
 
-After downloading and extracing the TPC-H tools, you'll need to build the
+After downloading and extracting the TPC-H tools, you'll need to build the
 db generator tool: ```dbgen```. To do so, extract the package that you have 
 downloaded from TPC-H's website and inside the dbgen sub directory edit the 
 ```makefile``` file.
@@ -83,7 +83,7 @@ These files are the starting point for creating our Apache Pinot segments.
 
 The first step in the process is to launch a standalone Apache Pinot Cluster on one
 single server. This cluster will serve as a host to hold the initial segments, 
-which we'll extract and copy for later re-use in the benchmark.
+which we'll extract and copy for later reuse in the benchmark.
 
 Follow the steps outlined in the Apache Pinot Manual Cluster setup to launch the
 cluster:

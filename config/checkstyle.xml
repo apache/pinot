@@ -89,7 +89,7 @@
     <module name="MissingSwitchDefault"/>
     <!-- Do not modify the 'for' loop control variable -->
     <module name="ModifiedControlVariable"/>
-    <!-- Each variable delcaration must be on a separate line -->
+    <!-- Each variable declaration must be on a separate line -->
     <module name="MultipleVariableDeclarations"/>
     <!-- Each statement (i.e. code terminated by a semicolon) must be on a separate line -->
     <module name="OneStatementPerLine"/>
@@ -182,11 +182,11 @@
     <module name="IllegalImport">
       <property name="illegalClasses" value="com.google.common.collect.ImmutableList"/>
     </module>
-    <!-- Use org.testng.Assert in tests -->
+    <!-- Use org.testing.Assert in tests -->
     <module name="IllegalImport">
       <property name="regexp" value="true"/>
       <property name="illegalClasses"
-                value="org\.testng\.AssertJUnit.*,
+                value="org\.testing\.AssertJUnit.*,
                 org\.junit\.Assert.*,
                 org\.apache\.logging\.log4j\.core\.util\.Assert.*,
                 org\.locationtech\.jts\.util\.Assert.*"/>
