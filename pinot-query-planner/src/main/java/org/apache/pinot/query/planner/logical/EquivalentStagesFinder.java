@@ -35,6 +35,7 @@ import org.apache.pinot.query.planner.plannode.ProjectNode;
 import org.apache.pinot.query.planner.plannode.SetOpNode;
 import org.apache.pinot.query.planner.plannode.SortNode;
 import org.apache.pinot.query.planner.plannode.TableScanNode;
+import org.apache.pinot.query.planner.plannode.UnnestNode;
 import org.apache.pinot.query.planner.plannode.ValueNode;
 import org.apache.pinot.query.planner.plannode.WindowNode;
 import org.slf4j.Logger;
@@ -350,6 +351,17 @@ public class EquivalentStagesFinder {
       @Override
       public Boolean visitExplained(ExplainedNode node, PlanNode context) {
         throw new UnsupportedOperationException("ExplainedNode should not be visited by NodeEquivalence");
+      }
+
+      @Override
+      public Boolean visitUnnest(UnnestNode node1, PlanNode node2) {
+        if (!(node2 instanceof UnnestNode)) {
+          return false;
+        }
+        UnnestNode that = (UnnestNode) node2;
+        return areBaseNodesEquivalent(node1, node2)
+            && Objects.equals(node1.getArrayExpr(), that.getArrayExpr())
+            && Objects.equals(node1.getColumnAlias(), that.getColumnAlias());
       }
     }
   }
