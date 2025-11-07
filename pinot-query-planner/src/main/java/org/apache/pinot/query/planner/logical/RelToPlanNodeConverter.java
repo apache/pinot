@@ -36,8 +36,10 @@ import org.apache.calcite.rel.core.JoinRelType;
 import org.apache.calcite.rel.core.Project;
 import org.apache.calcite.rel.core.SetOp;
 import org.apache.calcite.rel.core.TableScan;
+import org.apache.calcite.rel.core.Uncollect;
 import org.apache.calcite.rel.core.Window;
 import org.apache.calcite.rel.logical.LogicalAsofJoin;
+import org.apache.calcite.rel.logical.LogicalCorrelate;
 import org.apache.calcite.rel.logical.LogicalFilter;
 import org.apache.calcite.rel.logical.LogicalJoin;
 import org.apache.calcite.rel.logical.LogicalProject;
@@ -47,6 +49,8 @@ import org.apache.calcite.rel.logical.LogicalWindow;
 import org.apache.calcite.rel.type.RelDataType;
 import org.apache.calcite.rel.type.RelDataTypeField;
 import org.apache.calcite.rel.type.RelRecordType;
+import org.apache.calcite.rex.RexCorrelVariable;
+import org.apache.calcite.rex.RexFieldAccess;
 import org.apache.calcite.rex.RexInputRef;
 import org.apache.calcite.rex.RexLiteral;
 import org.apache.calcite.rex.RexNode;
@@ -68,6 +72,7 @@ import org.apache.pinot.common.utils.DataSchema.ColumnDataType;
 import org.apache.pinot.common.utils.DatabaseUtils;
 import org.apache.pinot.common.utils.request.RequestUtils;
 import org.apache.pinot.query.planner.plannode.AggregateNode;
+import org.apache.pinot.query.planner.plannode.BasePlanNode;
 import org.apache.pinot.query.planner.plannode.EnrichedJoinNode;
 import org.apache.pinot.query.planner.plannode.ExchangeNode;
 import org.apache.pinot.query.planner.plannode.FilterNode;
@@ -78,6 +83,7 @@ import org.apache.pinot.query.planner.plannode.ProjectNode;
 import org.apache.pinot.query.planner.plannode.SetOpNode;
 import org.apache.pinot.query.planner.plannode.SortNode;
 import org.apache.pinot.query.planner.plannode.TableScanNode;
+import org.apache.pinot.query.planner.plannode.UnnestNode;
 import org.apache.pinot.query.planner.plannode.ValueNode;
 import org.apache.pinot.query.planner.plannode.WindowNode;
 import org.codehaus.commons.nullanalysis.NotNull;
@@ -113,6 +119,10 @@ public final class RelToPlanNodeConverter {
     PlanNode result;
     if (node instanceof PinotLogicalTableScan) {
       result = convertPinotLogicalTableScan((PinotLogicalTableScan) node);
+    } else if (node instanceof Uncollect) {
+      result = convertLogicalUncollect((Uncollect) node);
+    } else if (node instanceof LogicalCorrelate) {
+      result = convertLogicalCorrelate((LogicalCorrelate) node);
     } else if (node instanceof LogicalProject) {
       result = convertLogicalProject((LogicalProject) node);
     } else if (node instanceof LogicalFilter) {
@@ -157,6 +167,254 @@ public final class RelToPlanNodeConverter {
       _tracker.trackCreation(node, result);
     }
     return result;
+  }
+
+  private UnnestNode convertLogicalUncollect(Uncollect node) {
+    // Expect input provides a single array expression (typically a Project with one expression)
+    RexExpression arrayExpr = null;
+    RelNode input = node.getInput();
+    if (input instanceof Project) {
+      Project p = (Project) input;
+      if (p.getProjects().size() == 1) {
+        arrayExpr = RexExpressionUtils.fromRexNode(p.getProjects().get(0));
+      }
+    }
+    if (arrayExpr == null) {
+      // Fallback: refer to first input ref
+      arrayExpr = new RexExpression.InputRef(0);
+    }
+    String columnAlias = null;
+    if (!node.getRowType().getFieldList().isEmpty()) {
+      columnAlias = node.getRowType().getFieldList().get(0).getName();
+    }
+    boolean withOrdinality = false;
+    String ordinalityAlias = null;
+    // Calcite Uncollect exposes withOrdinality via field names if present; if >1 fields and last is ordinality
+    if (node.getRowType().getFieldList().size() > 1) {
+      withOrdinality = true;
+      ordinalityAlias = node.getRowType().getFieldList().get(1).getName();
+    }
+    return new UnnestNode(DEFAULT_STAGE_ID, toDataSchema(node.getRowType()), NodeHint.EMPTY,
+        convertInputs(node.getInputs()), arrayExpr, columnAlias, withOrdinality, ordinalityAlias);
+  }
+
+  private BasePlanNode convertLogicalCorrelate(LogicalCorrelate node) {
+    // Pattern: Correlate(left, Uncollect(Project(correlatedField)))
+    RelNode right = node.getRight();
+    RelDataType leftRowType = node.getLeft().getRowType();
+    Project correlatedProject = findProjectUnderUncollect(right);
+    RexExpression arrayExpr =
+        correlatedProject != null ? deriveArrayExpression(correlatedProject, leftRowType) : null;
+    if (arrayExpr == null) {
+      arrayExpr = new RexExpression.InputRef(0);
+    }
+    LogicalFilter correlateFilter = findCorrelateFilter(right);
+    boolean wrapWithFilter = correlateFilter != null;
+    RexNode filterCondition = wrapWithFilter ? correlateFilter.getCondition() : null;
+    // Use the entire correlate output schema
+    PlanNode inputNode = toPlanNode(node.getLeft());
+    // Ensure inputs list is mutable because downstream visitors (e.g., withInputs methods) may modify the inputs list
+    List<PlanNode> inputs = new ArrayList<>(List.of(inputNode));
+    ElementOrdinalInfo ordinalInfo = deriveElementOrdinalInfo(right, leftRowType);
+    boolean withOrdinality = ordinalInfo.hasOrdinality();
+    String elementAlias = ordinalInfo.getElementAlias();
+    String ordinalityAlias = ordinalInfo.getOrdinalityAlias();
+    int elementIndex = ordinalInfo.getElementIndex();
+    int ordinalityIndex = ordinalInfo.getOrdinalityIndex();
+    UnnestNode unnest = new UnnestNode(DEFAULT_STAGE_ID, toDataSchema(node.getRowType()), NodeHint.EMPTY,
+        inputs, arrayExpr, elementAlias, withOrdinality, ordinalityAlias, elementIndex, ordinalityIndex);
+    if (wrapWithFilter) {
+      // Wrap Unnest with a FilterNode; rewrite filter InputRefs (0:elem,1:idx) to absolute output indexes
+      RexExpression rewritten =
+          rewriteInputRefs(RexExpressionUtils.fromRexNode(filterCondition), elementIndex, ordinalityIndex);
+      return new FilterNode(DEFAULT_STAGE_ID, toDataSchema(node.getRowType()), NodeHint.EMPTY,
+          new ArrayList<>(List.of(unnest)), rewritten);
+    }
+    return unnest;
+  }
+
+  @Nullable
+  private static Project findProjectUnderUncollect(RelNode node) {
+    RelNode current = node;
+    while (current != null) {
+      if (current instanceof Uncollect) {
+        RelNode input = ((Uncollect) current).getInput();
+        return input instanceof Project ? (Project) input : null;
+      }
+      if (current instanceof Project) {
+        current = ((Project) current).getInput();
+      } else if (current instanceof LogicalFilter) {
+        current = ((LogicalFilter) current).getInput();
+      } else {
+        return null;
+      }
+    }
+    return null;
+  }
+
+  @Nullable
+  private static RexExpression deriveArrayExpression(Project project, RelDataType leftRowType) {
+    if (project.getProjects().size() != 1) {
+      return null;
+    }
+    RexNode rex = project.getProjects().get(0);
+    Integer idx = resolveInputRefFromCorrel(rex, leftRowType);
+    if (idx != null) {
+      return new RexExpression.InputRef(idx);
+    }
+    RexExpression candidate = RexExpressionUtils.fromRexNode(rex);
+    return candidate instanceof RexExpression.InputRef ? candidate : new RexExpression.InputRef(0);
+  }
+
+  @Nullable
+  private static LogicalFilter findCorrelateFilter(RelNode node) {
+    RelNode current = node;
+    while (current instanceof Project || current instanceof LogicalFilter) {
+      if (current instanceof LogicalFilter) {
+        return (LogicalFilter) current;
+      }
+      current = ((Project) current).getInput();
+    }
+    return null;
+  }
+
+  private static ElementOrdinalInfo deriveElementOrdinalInfo(RelNode right, RelDataType leftRowType) {
+    ElementOrdinalAccumulator accumulator = new ElementOrdinalAccumulator(leftRowType.getFieldCount());
+    if (right instanceof Uncollect) {
+      accumulator.populateFromRowType(right.getRowType());
+    } else if (right instanceof Project) {
+      accumulator.populateFromProject((Project) right);
+    } else if (right instanceof LogicalFilter) {
+      LogicalFilter filter = (LogicalFilter) right;
+      RelNode filterInput = filter.getInput();
+      if (filterInput instanceof Uncollect) {
+        accumulator.populateFromRowType(filter.getRowType());
+      } else if (filterInput instanceof Project) {
+        accumulator.populateFromProject((Project) filterInput);
+      }
+    }
+    return accumulator.toInfo();
+  }
+
+  private static final class ElementOrdinalAccumulator {
+    private final int _base;
+    private String _elementAlias;
+    private String _ordinalityAlias;
+    private int _elementIndex = -1;
+    private int _ordinalityIndex = -1;
+
+    ElementOrdinalAccumulator(int base) {
+      _base = base;
+    }
+
+    void populateFromRowType(RelDataType rowType) {
+      List<RelDataTypeField> fields = rowType.getFieldList();
+      if (!fields.isEmpty() && _elementIndex < 0) {
+        _elementAlias = fields.get(0).getName();
+        _elementIndex = _base;
+      }
+      if (fields.size() > 1 && _ordinalityIndex < 0) {
+        _ordinalityAlias = fields.get(1).getName();
+        _ordinalityIndex = _base + 1;
+      }
+    }
+
+    void populateFromProject(Project project) {
+      List<RexNode> projects = project.getProjects();
+      List<RelDataTypeField> projFields = project.getRowType().getFieldList();
+      for (int j = 0; j < projects.size(); j++) {
+        RexNode pj = projects.get(j);
+        if (pj instanceof RexInputRef) {
+          int idx = ((RexInputRef) pj).getIndex();
+          String outName = projFields.get(j).getName();
+          if (idx == 0 && _elementIndex < 0) {
+            _elementIndex = _base + j;
+            _elementAlias = outName;
+          } else if (idx == 1 && _ordinalityIndex < 0) {
+            _ordinalityIndex = _base + j;
+            _ordinalityAlias = outName;
+          }
+        }
+      }
+    }
+
+    ElementOrdinalInfo toInfo() {
+      return new ElementOrdinalInfo(_elementAlias, _ordinalityAlias, _elementIndex, _ordinalityIndex);
+    }
+  }
+
+  private static final class ElementOrdinalInfo {
+    private final String _elementAlias;
+    private final String _ordinalityAlias;
+    private final int _elementIndex;
+    private final int _ordinalityIndex;
+
+    ElementOrdinalInfo(String elementAlias, String ordinalityAlias, int elementIndex, int ordinalityIndex) {
+      _elementAlias = elementAlias;
+      _ordinalityAlias = ordinalityAlias;
+      _elementIndex = elementIndex;
+      _ordinalityIndex = ordinalityIndex;
+    }
+
+    String getElementAlias() {
+      return _elementAlias;
+    }
+
+    String getOrdinalityAlias() {
+      return _ordinalityAlias;
+    }
+
+    int getElementIndex() {
+      return _elementIndex;
+    }
+
+    int getOrdinalityIndex() {
+      return _ordinalityIndex;
+    }
+
+    boolean hasOrdinality() {
+      return _ordinalityIndex >= 0;
+    }
+  }
+
+  private static RexExpression rewriteInputRefs(RexExpression expr, int elemOutIdx, int ordOutIdx) {
+    if (expr instanceof RexExpression.InputRef) {
+      int idx = ((RexExpression.InputRef) expr).getIndex();
+      if (idx == 0 && elemOutIdx >= 0) {
+        return new RexExpression.InputRef(elemOutIdx);
+      } else if (idx == 1 && ordOutIdx >= 0) {
+        return new RexExpression.InputRef(ordOutIdx);
+      } else {
+        return expr;
+      }
+    } else if (expr instanceof RexExpression.FunctionCall) {
+      RexExpression.FunctionCall fc = (RexExpression.FunctionCall) expr;
+      List<RexExpression> ops = fc.getFunctionOperands();
+      List<RexExpression> rewritten = new ArrayList<>(ops.size());
+      for (RexExpression op : ops) {
+        rewritten.add(rewriteInputRefs(op, elemOutIdx, ordOutIdx));
+      }
+      return new RexExpression.FunctionCall(fc.getDataType(), fc.getFunctionName(), rewritten);
+    } else {
+      return expr;
+    }
+  }
+
+  private static Integer resolveInputRefFromCorrel(RexNode expr, RelDataType leftRowType) {
+    if (expr instanceof RexFieldAccess) {
+      RexFieldAccess fieldAccess = (RexFieldAccess) expr;
+      if (fieldAccess.getReferenceExpr() instanceof RexCorrelVariable) {
+        String fieldName = fieldAccess.getField().getName();
+        List<RelDataTypeField> fields = leftRowType.getFieldList();
+        for (int i = 0; i < fields.size(); i++) {
+          // SQL field names are case-insensitive, so we must use equalsIgnoreCase for correct matching.
+          if (fields.get(i).getName().equalsIgnoreCase(fieldName)) {
+            return i;
+          }
+        }
+      }
+    }
+    return null;
   }
 
   private ExchangeNode convertLogicalExchange(Exchange node) {
