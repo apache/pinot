@@ -123,7 +123,7 @@ public interface RoutingManager {
    * @return
    */
   @Nullable
-  default RoutingManager getRelevantRoutingManager(Map<String, String> queryOptions) {
+  default RoutingManager getPrimaryRoutingManager(Map<String, String> queryOptions) {
     return this;
   }
 }

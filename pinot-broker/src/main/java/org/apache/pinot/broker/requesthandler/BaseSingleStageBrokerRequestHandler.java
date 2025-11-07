@@ -505,7 +505,7 @@ public abstract class BaseSingleStageBrokerRequestHandler extends BaseBrokerRequ
       routeProvider = _implicitHybridTableRouteProvider;
     }
 
-    RoutingManager routingManager = _routingManager.getRelevantRoutingManager(pinotQuery.getQueryOptions());
+    RoutingManager routingManager = _routingManager.getPrimaryRoutingManager(pinotQuery.getQueryOptions());
     // Get the tables hit by the request
     TableRouteInfo routeInfo = routeProvider.getTableRouteInfo(tableName, _tableCache, routingManager);
 

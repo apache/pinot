@@ -1824,20 +1824,20 @@ public class PinotHelixResourceManager {
     LOGGER.info("Adding logical table {}: Start", tableName);
 
     // TODO: Figure out table validation for cross-cluster logical tables.
-//    validateLogicalTableConfig(logicalTableConfig);
-//
-//    // Check if the logical table name is already used
-//    if (ZKMetadataProvider.isLogicalTableExists(_propertyStore, tableName)) {
-//      throw new TableAlreadyExistsException("Logical table: " + tableName + " already exists");
-//    }
-//
-//    // Check if the table name is already used by a physical table
-//    PinotHelixPropertyStoreZnRecordProvider pinotHelixPropertyStoreZnRecordProvider =
-//        PinotHelixPropertyStoreZnRecordProvider.forTable(_propertyStore);
-//    if (pinotHelixPropertyStoreZnRecordProvider.exist(TableNameBuilder.OFFLINE.tableNameWithType(tableName))
-//        || pinotHelixPropertyStoreZnRecordProvider.exist(TableNameBuilder.REALTIME.tableNameWithType(tableName))) {
-//      throw new TableAlreadyExistsException("Table name: " + tableName + " already exists");
-//    }
+    validateLogicalTableConfig(logicalTableConfig);
+
+    // Check if the logical table name is already used
+    if (ZKMetadataProvider.isLogicalTableExists(_propertyStore, tableName)) {
+      throw new TableAlreadyExistsException("Logical table: " + tableName + " already exists");
+    }
+
+    // Check if the table name is already used by a physical table
+    PinotHelixPropertyStoreZnRecordProvider pinotHelixPropertyStoreZnRecordProvider =
+        PinotHelixPropertyStoreZnRecordProvider.forTable(_propertyStore);
+    if (pinotHelixPropertyStoreZnRecordProvider.exist(TableNameBuilder.OFFLINE.tableNameWithType(tableName))
+        || pinotHelixPropertyStoreZnRecordProvider.exist(TableNameBuilder.REALTIME.tableNameWithType(tableName))) {
+      throw new TableAlreadyExistsException("Table name: " + tableName + " already exists");
+    }
 
     LOGGER.info("Adding logical table {}: Creating logical table config in the property store", tableName);
     ZKMetadataProvider.setLogicalTableConfig(_propertyStore, logicalTableConfig);

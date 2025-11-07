@@ -201,16 +201,10 @@ public class BrokerRoutingManager implements RoutingManager, ClusterChangeHandle
       processSegmentAssignmentChange();
     } else if (changeType == ChangeType.INSTANCE_CONFIG) {
       processInstanceConfigChange();
-    } else if (changeType == ChangeType.RESOURCE_CONFIG) { // temporary change to handle resource config change
-      processBrokerResourceConfigChange();
     } else {
       // NOTE: We don't track live instances change because that will be reflected through the external view change
       throw new IllegalArgumentException("Illegal change type: " + changeType);
     }
-  }
-
-  // NOOP method to handle resource config change
-  protected void processBrokerResourceConfigChange() {
   }
 
   private void processSegmentAssignmentChange() {

@@ -185,12 +185,7 @@ public class ClusterChangeMediator
     // External view list should be empty because Helix pre-fetch is disabled
     assert externalViewList.isEmpty();
 
-    if (changeContext != null && changeContext.getPathChanged() != null
-            && changeContext.getPathChanged().contains("brokerResource")) {
-      enqueueChange(ChangeType.RESOURCE_CONFIG);
-    } else {
-      enqueueChange(ChangeType.EXTERNAL_VIEW);
-    }
+    enqueueChange(ChangeType.EXTERNAL_VIEW);
   }
 
   @Override
