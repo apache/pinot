@@ -508,7 +508,7 @@ public class IngestionDelayTrackerTest {
         return false;
       }
       return true;
-    }, 10, 200000, "Failed to verify the ingestion delay metrics.");
+    }, 10, 2000, "Failed to verify the ingestion delay metrics.");
     scheduledExecutorService.shutdown();
     ingestionDelayTracker.shutdown();
   }
