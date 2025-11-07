@@ -333,23 +333,8 @@ public class IngestionDelayTracker {
   private void removePartitionId(int partitionId) {
     _partitionsHostedByThisServer.remove(partitionId);
     _ingestionInfoMap.remove(partitionId);
-    _partitionsTracked.compute(partitionId, (k, v) -> {
-      if (v != null) {
-        int streamConfigIndex = IngestionConfigUtils.getStreamConfigIndexFromPinotPartitionId(partitionId);
-        StreamMetadataProvider streamMetadataProvider =
-            _streamConfigIndexToStreamMetadataProvider.get(streamConfigIndex);
-        // Remove all metrics associated with this partition
-        if (streamMetadataProvider != null && streamMetadataProvider.supportsOffsetLag()) {
-          _serverMetrics.removePartitionGauge(_metricName, partitionId, ServerGauge.REALTIME_INGESTION_OFFSET_LAG);
-          _serverMetrics.removePartitionGauge(_metricName, partitionId, ServerGauge.REALTIME_INGESTION_UPSTREAM_OFFSET);
-          _serverMetrics.removePartitionGauge(_metricName, partitionId,
-              ServerGauge.REALTIME_INGESTION_CONSUMING_OFFSET);
-        }
-        _serverMetrics.removePartitionGauge(_metricName, partitionId, ServerGauge.REALTIME_INGESTION_DELAY_MS);
-        _serverMetrics.removePartitionGauge(_metricName, partitionId,
-            ServerGauge.END_TO_END_REALTIME_INGESTION_DELAY_MS);
-        LOGGER.info("Successfully removed ingestion metrics for partition id: {}", partitionId);
-      }
+    _partitionsTracked.computeIfPresent(partitionId, (k, v) -> {
+      removeMetrics(partitionId);
       return null;
     });
 
@@ -383,7 +368,8 @@ public class IngestionDelayTracker {
     _clock = clock;
   }
 
-  public void createMetrics(int partitionId) {
+  @VisibleForTesting
+  protected void createMetrics(int partitionId) {
     int streamConfigIndex = IngestionConfigUtils.getStreamConfigIndexFromPinotPartitionId(partitionId);
     StreamMetadataProvider streamMetadataProvider = _streamConfigIndexToStreamMetadataProvider.get(streamConfigIndex);
 
@@ -401,6 +387,26 @@ public class IngestionDelayTracker {
         () -> getPartitionIngestionDelayMs(partitionId));
     _serverMetrics.setOrUpdatePartitionGauge(_metricName, partitionId,
         ServerGauge.END_TO_END_REALTIME_INGESTION_DELAY_MS, () -> getPartitionEndToEndIngestionDelayMs(partitionId));
+
+    LOGGER.info("Successfully created ingestion metrics for partition id: {}", partitionId);
+  }
+
+  private void removeMetrics(int partitionId) {
+    int streamConfigIndex = IngestionConfigUtils.getStreamConfigIndexFromPinotPartitionId(partitionId);
+    StreamMetadataProvider streamMetadataProvider =
+        _streamConfigIndexToStreamMetadataProvider.get(streamConfigIndex);
+    // Remove all metrics associated with this partition
+    if (streamMetadataProvider != null && streamMetadataProvider.supportsOffsetLag()) {
+      _serverMetrics.removePartitionGauge(_metricName, partitionId, ServerGauge.REALTIME_INGESTION_OFFSET_LAG);
+      _serverMetrics.removePartitionGauge(_metricName, partitionId, ServerGauge.REALTIME_INGESTION_UPSTREAM_OFFSET);
+      _serverMetrics.removePartitionGauge(_metricName, partitionId,
+          ServerGauge.REALTIME_INGESTION_CONSUMING_OFFSET);
+    }
+    _serverMetrics.removePartitionGauge(_metricName, partitionId, ServerGauge.REALTIME_INGESTION_DELAY_MS);
+    _serverMetrics.removePartitionGauge(_metricName, partitionId,
+        ServerGauge.END_TO_END_REALTIME_INGESTION_DELAY_MS);
+
+    LOGGER.info("Successfully removed ingestion metrics for partition id: {}", partitionId);
   }
 
   /**
