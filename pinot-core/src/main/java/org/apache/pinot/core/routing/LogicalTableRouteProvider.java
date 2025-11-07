@@ -68,9 +68,7 @@ public class LogicalTableRouteProvider implements TableRouteProvider {
         }
       }
     }
-
-    throw new IllegalStateException(
-        "Table config not found for physical table: " + tableName + " in local or federated caches");
+    return null;
   }
 
   @Override
@@ -102,6 +100,9 @@ public class LogicalTableRouteProvider implements TableRouteProvider {
       // fillTableConfigMetadata only reads metadata from table config, and if a table exists in multiple
       // federated clusters, the table configs should be consistent.
       TableCache selectedTableCache = findTableCache(physicalTableName, physicalTableConfig, tableCache);
+      if (selectedTableCache == null) {
+        continue;
+      }
       ImplicitHybridTableRouteInfo physicalTableInfo = new ImplicitHybridTableRouteInfo();
       routeProvider.fillTableConfigMetadata(physicalTableInfo, physicalTableName, selectedTableCache);
 

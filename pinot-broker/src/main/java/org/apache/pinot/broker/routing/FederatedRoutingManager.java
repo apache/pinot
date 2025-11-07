@@ -332,7 +332,7 @@ public class FederatedRoutingManager implements RoutingManager {
     return null;
   }
 
-  public RoutingManager getRelevantRoutingManager(Map<String, String> queryOptions) {
+  public RoutingManager getPrimaryRoutingManager(Map<String, String> queryOptions) {
     boolean isFederationEnabled = QueryOptionsUtils.isEnableFederation(queryOptions, false);
     if (isFederationEnabled) {
       return this;

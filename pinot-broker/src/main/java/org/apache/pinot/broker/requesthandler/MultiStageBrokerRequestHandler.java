@@ -431,7 +431,7 @@ public class MultiStageBrokerRequestHandler extends BaseBrokerRequestHandler {
         .database(database)
         .tableCache(_tableCache)
         .workerManager(new WorkerManager(_brokerId, _hostname, _port,
-          _routingManager.getRelevantRoutingManager(queryOptions)))
+          _routingManager.getPrimaryRoutingManager(queryOptions)))
         .isCaseSensitive(caseSensitive)
         .isNullHandlingEnabled(QueryOptionsUtils.isNullHandlingEnabled(queryOptions))
         .defaultInferPartitionHint(inferPartitionHint)
