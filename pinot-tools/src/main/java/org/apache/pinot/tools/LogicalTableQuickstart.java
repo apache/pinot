@@ -21,6 +21,7 @@ package org.apache.pinot.tools;
 import com.google.common.base.Preconditions;
 import java.io.File;
 import java.io.InputStream;
+import java.net.URI;
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -128,7 +129,7 @@ public class LogicalTableQuickstart extends Quickstart {
           logicalTableUrl, logicalTableConfig.toSingleLineJsonString());
       printStatus(Color.GREEN, "***** Logical table created successfully *****");
     } catch (Exception e) {
-      printStatus(Color.YELLOW, "***** Logical table creation failed: " + e.getMessage() + " - continuing with physical tables *****");
+      printStatus(Color.YELLOW, "***** Logical table creation failed: " + e.getMessage());
     }
   }
 
@@ -153,17 +154,17 @@ public class LogicalTableQuickstart extends Quickstart {
               logicalTableSchema.getSchemaName() + ".json"))
           .build();
       HttpClient httpClient = new HttpClient();
-      String schemaUrl = "http://localhost:" + QuickstartRunner.DEFAULT_CONTROLLER_PORT + "/schemas?override=true&force=true";
-
+      String schemaUrl = "http://localhost:" + QuickstartRunner.DEFAULT_CONTROLLER_PORT + "/schemas?override=true"
+          + "&force=true";
       SimpleHttpResponse response = httpClient.sendPostRequest(
-          java.net.URI.create(schemaUrl), multipartEntity, null, null);
+          URI.create(schemaUrl), multipartEntity, null, null);
       if (response.getStatusCode() == 200) {
         printStatus(Color.GREEN, "***** Logical table schema created successfully *****");
       } else {
         printStatus(Color.YELLOW, "***** Schema creation response: " + response.getResponse() + " *****");
       }
     } catch (Exception e) {
-      printStatus(Color.YELLOW, "***** Schema creation failed: " + e.getMessage() + " - continuing anyway *****");
+      printStatus(Color.YELLOW, "***** Schema creation failed: " + e.getMessage());
     }
   }
 
@@ -177,7 +178,8 @@ public class LogicalTableQuickstart extends Quickstart {
     printStatus(Color.YELLOW, "***** Running sample queries on logical table *****");
 
     runAndPrintQuery(runner, "SELECT COUNT(*) FROM orders");
-    runAndPrintQuery(runner, "SELECT orderId, customerId, region, productId, status FROM orders WHERE region = 'us' LIMIT 10");
+    runAndPrintQuery(runner, "SELECT orderId, customerId, region, productId, status FROM orders "
+        + "WHERE region = 'us' LIMIT 10");
     runAndPrintQuery(runner, "SELECT region, COUNT(*) as orderCount FROM orders GROUP BY region ORDER BY region");
     runAndPrintQuery(runner, "SELECT status, COUNT(*) as count FROM orders GROUP BY status ORDER BY status");
 
