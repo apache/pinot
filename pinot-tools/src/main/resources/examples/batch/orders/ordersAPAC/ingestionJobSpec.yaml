@@ -70,7 +70,7 @@ tableSpec:
   # schemaURI: defines where to read the table schema, supports PinotFS or HTTP.
   schemaURI: 'http://localhost:9000/tables/ordersAPAC/schema'
 
-  # tableConfigURI: defines where to reade the table config.
+  # tableConfigURI: defines where to read the table config.
   tableConfigURI: 'http://localhost:9000/tables/ordersAPAC'
 
 # pinotClusterSpecs: defines the Pinot Cluster Access Point.
