@@ -349,6 +349,31 @@ public class CommonConstants {
     public static final String CONFIG_OF_BROKER_QUERY_LOG_BEFORE_PROCESSING =
         "pinot.broker.query.log.logBeforeProcessing";
     public static final boolean DEFAULT_BROKER_QUERY_LOG_BEFORE_PROCESSING = true;
+    public static final String CONFIG_OF_QUERY_LOG_SYSTEM_TABLE_ENABLED =
+        "pinot.broker.query.log.systemTable.enabled";
+    public static final boolean DEFAULT_QUERY_LOG_SYSTEM_TABLE_ENABLED = false;
+    public static final String CONFIG_OF_QUERY_LOG_SYSTEM_TABLE_STORAGE =
+        "pinot.broker.query.log.systemTable.storage";
+    public static final String DEFAULT_QUERY_LOG_SYSTEM_TABLE_STORAGE = "memory";
+    public static final String CONFIG_OF_QUERY_LOG_SYSTEM_TABLE_DISK_DIR =
+        "pinot.broker.query.log.systemTable.disk.dir";
+    public static final String DEFAULT_QUERY_LOG_SYSTEM_TABLE_DISK_DIR =
+        System.getProperty("java.io.tmpdir") + "/pinot-query-log";
+    public static final String CONFIG_OF_QUERY_LOG_SYSTEM_TABLE_DISK_MAX_BYTES =
+        "pinot.broker.query.log.systemTable.disk.maxBytes";
+    public static final long DEFAULT_QUERY_LOG_SYSTEM_TABLE_DISK_MAX_BYTES = 1L << 30; // 1 GiB
+    public static final String CONFIG_OF_QUERY_LOG_SYSTEM_TABLE_DISK_SEGMENT_BYTES =
+        "pinot.broker.query.log.systemTable.disk.segmentBytes";
+    public static final long DEFAULT_QUERY_LOG_SYSTEM_TABLE_DISK_SEGMENT_BYTES = 64L << 20; // 64 MiB
+    public static final String CONFIG_OF_QUERY_LOG_SYSTEM_TABLE_MAX_ENTRIES =
+        "pinot.broker.query.log.systemTable.maxEntries";
+    public static final int DEFAULT_QUERY_LOG_SYSTEM_TABLE_MAX_ENTRIES = 50_000;
+    public static final String CONFIG_OF_QUERY_LOG_SYSTEM_TABLE_RETENTION_MS =
+        "pinot.broker.query.log.systemTable.retentionMs";
+    public static final long DEFAULT_QUERY_LOG_SYSTEM_TABLE_RETENTION_MS = TimeUnit.HOURS.toMillis(6);
+    public static final String CONFIG_OF_QUERY_LOG_SYSTEM_TABLE_DEFAULT_LIMIT =
+        "pinot.broker.query.log.systemTable.defaultLimit";
+    public static final int DEFAULT_QUERY_LOG_SYSTEM_TABLE_DEFAULT_LIMIT = 100;
     public static final String CONFIG_OF_BROKER_QUERY_ENABLE_NULL_HANDLING = "pinot.broker.query.enable.null.handling";
     /// Provide broker level default for query option [Request.QueryOptionKey#REGEX_DICT_SIZE_THRESHOLD]
     public static final String CONFIG_OF_BROKER_QUERY_REGEX_DICT_SIZE_THRESHOLD =

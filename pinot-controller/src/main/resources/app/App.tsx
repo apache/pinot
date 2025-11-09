@@ -35,6 +35,7 @@ export const App = () => {
   const [role, setRole] = useState('');
   const { authUserName, authUserEmail, authenticated, authWorkflow } = useAuthProvider();
   const history = useHistory();
+  const queryRoutes = ['/query', '/query/timeseries', '/query/logs'];
 
   useEffect(() => {
     // authentication already handled by authProvider
@@ -92,12 +93,10 @@ export const App = () => {
 
   const getRouterData = () => {
     if (app_state.queryConsoleOnlyView) {
-      return RouterData.filter((routeObj) => {
-        return routeObj.path === '/query' || routeObj.path === '/query/timeseries';
-      });
+      return RouterData.filter((routeObj) => queryRoutes.includes(routeObj.path));
     }
     if (app_state.hideQueryConsoleTab) {
-      return RouterData.filter((routeObj) => routeObj.path !== '/query' && routeObj.path !== '/query/timeseries');
+      return RouterData.filter((routeObj) => !queryRoutes.includes(routeObj.path));
     }
     return RouterData;
   };

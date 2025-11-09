@@ -54,6 +54,7 @@ public class QueryLogger {
   private final Logger _logger;
   private final RateLimiter _droppedLogRateLimiter;
   private final AtomicLong _numDroppedLogs = new AtomicLong(0L);
+  private final QueryLogSystemTable _systemTable = QueryLogSystemTable.getInstance();
 
   public QueryLogger(PinotConfiguration config) {
     this(RateLimiter.create(config.getProperty(Broker.CONFIG_OF_BROKER_QUERY_LOG_MAX_RATE_PER_SECOND,
@@ -91,6 +92,13 @@ public class QueryLogger {
   public void log(QueryLogParams params) {
     _logger.debug("Broker Response: {}", params._response);
 
+    String truncatedQuery = truncateQuery(params._requestContext.getQuery());
+    String clientIp = getClientIp(params._identity);
+    if (_systemTable.isEnabled()) {
+      QueryLogRecord record = QueryLogRecord.from(params, truncatedQuery, clientIp, System.currentTimeMillis());
+      _systemTable.append(record);
+    }
+
     if (!checkRateLimiter(params)) {
       return;
     }
@@ -102,11 +110,21 @@ public class QueryLogger {
     }
 
     // always log the query last - don't add this to the QueryLogEntry enum
-    queryLogBuilder.append("query=")
-        .append(StringUtils.substring(params._requestContext.getQuery(), 0, _maxQueryLengthToLog));
+    queryLogBuilder.append("query=").append(truncatedQuery);
     _logger.info(queryLogBuilder.toString());
 
     tryLogDropped();
+  }
+
+  private String truncateQuery(String query) {
+    return StringUtils.substring(query, 0, _maxQueryLengthToLog);
+  }
+
+  private String getClientIp(@Nullable RequesterIdentity identity) {
+    if (_enableIpLogging && identity != null) {
+      return identity.getClientIp();
+    }
+    return CommonConstants.UNKNOWN;
   }
 
   private boolean checkRateLimiter(@Nullable QueryLogParams params) {
@@ -165,6 +183,32 @@ public class QueryLogger {
       _serverStats = serverStats;
     }
 
+    public RequestContext getRequestContext() {
+      return _requestContext;
+    }
+
+    public String getTable() {
+      return _table;
+    }
+
+    public BrokerResponse getResponse() {
+      return _response;
+    }
+
+    public QueryEngine getQueryEngine() {
+      return _queryEngine;
+    }
+
+    @Nullable
+    public RequesterIdentity getIdentity() {
+      return _identity;
+    }
+
+    @Nullable
+    public ServerStats getServerStats() {
+      return _serverStats;
+    }
+
     public enum QueryEngine {
       SINGLE_STAGE("singleStage"),
       MULTI_STAGE("multiStage");
@@ -175,7 +219,7 @@ public class QueryLogger {
         _name = name;
       }
 
-      private String getName() {
+      public String getName() {
         return _name;
       }
     }
@@ -306,11 +350,7 @@ public class QueryLogger {
     CLIENT_IP("clientIp") {
       @Override
       void doFormat(StringBuilder builder, QueryLogger logger, QueryLogParams params) {
-        if (logger._enableIpLogging && params._identity != null) {
-          builder.append(params._identity.getClientIp());
-        } else {
-          builder.append(CommonConstants.UNKNOWN);
-        }
+        builder.append(logger.getClientIp(params._identity));
       }
     },
     QUERY_ENGINE("queryEngine") {

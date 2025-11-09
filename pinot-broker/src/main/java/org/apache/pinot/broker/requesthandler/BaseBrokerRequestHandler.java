@@ -40,6 +40,7 @@ import org.apache.commons.lang3.StringUtils;
 import org.apache.hc.client5.http.io.HttpClientConnectionManager;
 import org.apache.pinot.broker.api.AccessControl;
 import org.apache.pinot.broker.broker.AccessControlFactory;
+import org.apache.pinot.broker.querylog.QueryLogSystemTable;
 import org.apache.pinot.broker.querylog.QueryLogger;
 import org.apache.pinot.broker.queryquota.QueryQuotaManager;
 import org.apache.pinot.common.config.provider.TableCache;
@@ -88,6 +89,7 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
   protected final long _brokerTimeoutMs;
   protected final boolean _enableRowColumnLevelAuth;
   protected final QueryLogger _queryLogger;
+  protected final QueryLogSystemTable _queryLogSystemTable;
   @Nullable
   protected final String _enableNullHandling;
   @Nullable
@@ -124,6 +126,8 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
     _enableRowColumnLevelAuth = config.getProperty(Broker.CONFIG_OF_BROKER_ENABLE_ROW_COLUMN_LEVEL_AUTH,
         Broker.DEFAULT_BROKER_ENABLE_ROW_COLUMN_LEVEL_AUTH);
     _queryLogger = new QueryLogger(config);
+    _queryLogSystemTable = QueryLogSystemTable.getInstance();
+    _queryLogSystemTable.initIfNeeded(config);
     _enableNullHandling = config.getProperty(Broker.CONFIG_OF_BROKER_QUERY_ENABLE_NULL_HANDLING);
     _regexDictSizeThreshold = config.getProperty(Broker.CONFIG_OF_BROKER_QUERY_REGEX_DICT_SIZE_THRESHOLD);
     _enableQueryCancellation = config.getProperty(Broker.CONFIG_OF_BROKER_ENABLE_QUERY_CANCELLATION,
@@ -220,9 +224,23 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
       sqlNodeAndOptions.getOptions().putIfAbsent(QueryOptionKey.REGEX_DICT_SIZE_THRESHOLD, _regexDictSizeThreshold);
     }
 
-    BrokerResponse brokerResponse =
-        handleRequest(requestId, query, sqlNodeAndOptions, request, requesterIdentity, requestContext, httpHeaders,
-            accessControl);
+    BrokerResponse systemTableResponse = null;
+    try {
+      systemTableResponse = _queryLogSystemTable.handleIfSystemTable(sqlNodeAndOptions);
+    } catch (BadQueryRequestException e) {
+      requestContext.setErrorCode(QueryErrorCode.SQL_PARSING);
+      return new BrokerResponseNative(QueryErrorCode.SQL_PARSING, e.getMessage());
+    }
+
+    BrokerResponse brokerResponse;
+    if (systemTableResponse != null) {
+      brokerResponse = systemTableResponse;
+      requestContext.setTableNames(Collections.singletonList(QueryLogSystemTable.FULL_TABLE_NAME));
+    } else {
+      brokerResponse =
+          handleRequest(requestId, query, sqlNodeAndOptions, request, requesterIdentity, requestContext, httpHeaders,
+              accessControl);
+    }
     brokerResponse.setBrokerId(_brokerId);
     brokerResponse.setRequestId(Long.toString(requestId));
     _brokerQueryEventListener.onQueryCompletion(requestContext);

@@ -236,6 +236,9 @@ export const getTableSchema = (name: string): Promise<AxiosResponse<TableSchema>
 export const getQueryResult = (params: Object): Promise<AxiosResponse<SQLResult>> =>
   transformApi.post(`/sql`, params, {headers});
 
+export const getQueryLogResult = (params: Object): Promise<AxiosResponse<SQLResult>> =>
+  transformApi.post(`/queryLog/sql`, params, {headers});
+
 export const getTimeSeriesQueryResult = (params: Object): Promise<AxiosResponse<any>> =>
   transformApi.get(`/timeseries/api/v1/query_range`, { params });
 

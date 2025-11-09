@@ -24,6 +24,7 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 import io.swagger.annotations.ApiOperation;
 import java.io.BufferedOutputStream;
+import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
@@ -66,7 +67,9 @@ import org.apache.pinot.common.config.provider.StaticTableCache;
 import org.apache.pinot.common.config.provider.TableCache;
 import org.apache.pinot.common.response.ProcessingException;
 import org.apache.pinot.common.response.broker.BrokerResponseNative;
+import org.apache.pinot.common.response.broker.QueryProcessingException;
 import org.apache.pinot.common.utils.DatabaseUtils;
+import org.apache.pinot.common.utils.QueryLogSystemTableUtils;
 import org.apache.pinot.common.utils.config.TagNameUtils;
 import org.apache.pinot.common.utils.request.RequestUtils;
 import org.apache.pinot.controller.ControllerConf;
@@ -74,6 +77,7 @@ import org.apache.pinot.controller.api.access.AccessControl;
 import org.apache.pinot.controller.api.access.AccessControlFactory;
 import org.apache.pinot.controller.api.access.AccessType;
 import org.apache.pinot.controller.helix.core.PinotHelixResourceManager;
+import org.apache.pinot.controller.util.QueryLogResponseAggregator;
 import org.apache.pinot.core.auth.Actions;
 import org.apache.pinot.core.auth.ManualAuthorization;
 import org.apache.pinot.core.query.executor.sql.SqlQueryExecutor;
@@ -143,6 +147,26 @@ public class PinotQueryResource {
       queryOptions = requestJson.get("queryOptions").asText();
     }
     return executeSqlQueryCatching(httpHeaders, sqlQuery, traceEnabled, queryOptions);
+  }
+
+  @POST
+  @Path("queryLog/sql")
+  @ManualAuthorization // performed by broker instances
+  public StreamingOutput handleQueryLogSql(String requestJsonStr, @Context HttpHeaders httpHeaders) {
+    JsonNode requestJson;
+    try {
+      requestJson = JsonUtils.stringToJsonNode(requestJsonStr);
+    } catch (Exception e) {
+      return constructQueryExceptionResponse(QueryErrorCode.JSON_PARSING, e.getMessage());
+    }
+    if (requestJson == null || !requestJson.has("sql")) {
+      return constructQueryExceptionResponse(QueryErrorCode.JSON_PARSING,
+          "JSON Payload is missing the query string field 'sql'");
+    }
+    String sqlQuery = requestJson.get("sql").asText();
+    String traceEnabled = requestJson.has("trace") ? requestJson.get("trace").toString() : "false";
+    String queryOptions = requestJson.has("queryOptions") ? requestJson.get("queryOptions").asText() : null;
+    return executeAggregatedQueryLogSqlCatching(httpHeaders, sqlQuery, traceEnabled, queryOptions);
   }
 
   @GET
@@ -348,6 +372,25 @@ public class PinotQueryResource {
     }
   }
 
+  private StreamingOutput executeAggregatedQueryLogSqlCatching(HttpHeaders httpHeaders, String sqlQuery,
+      String traceEnabled, String queryOptions) {
+    try {
+      return executeAggregatedQueryLogSql(httpHeaders, sqlQuery, traceEnabled, queryOptions);
+    } catch (ProcessingException pe) {
+      LOGGER.error("Caught exception while processing query log request {}", pe.getMessage());
+      return constructQueryExceptionResponse(QueryErrorCode.fromErrorCode(pe.getErrorCode()), pe.getMessage());
+    } catch (QueryException ex) {
+      LOGGER.warn("Caught exception while processing query log request {}", ex.getMessage());
+      return constructQueryExceptionResponse(ex.getErrorCode(), ex.getMessage());
+    } catch (WebApplicationException wae) {
+      LOGGER.error("Caught exception while processing query log request", wae);
+      throw wae;
+    } catch (Exception e) {
+      LOGGER.error("Caught unknown exception while processing query log request", e);
+      return constructQueryExceptionResponse(QueryErrorCode.INTERNAL, e.getMessage());
+    }
+  }
+
   private StreamingOutput executeSqlQuery(@Context HttpHeaders httpHeaders, String sqlQuery, String traceEnabled,
       @Nullable String queryOptions)
       throws Exception {
@@ -370,6 +413,17 @@ public class PinotQueryResource {
     }
 
     PinotSqlType sqlType = sqlNodeAndOptions.getSqlType();
+    boolean queryLogSystemTableQuery = sqlType == PinotSqlType.DQL
+        && QueryLogSystemTableUtils.isQueryLogSystemTableQuery(sqlNodeAndOptions.getSqlNode());
+
+    if (queryLogSystemTableQuery) {
+      if (isMse) {
+        throw QueryErrorCode.SQL_PARSING.asException("system.query_log queries are not supported by the multi-stage "
+            + "engine");
+      }
+      return executeAggregatedQueryLogSql(httpHeaders, sqlQuery, traceEnabled, queryOptions);
+    }
+
     switch (sqlType) {
       case DQL:
         return isMse
@@ -385,6 +439,24 @@ public class PinotQueryResource {
       default:
         throw QueryErrorCode.INTERNAL.asException("Unsupported SQL type - " + sqlType);
     }
+  }
+
+  private StreamingOutput executeAggregatedQueryLogSql(HttpHeaders httpHeaders, String sqlQuery, String traceEnabled,
+      @Nullable String queryOptions)
+      throws Exception {
+    SqlNodeAndOptions sqlNodeAndOptions = CalciteSqlParser.compileToSqlNodeAndOptions(sqlQuery);
+    if (sqlNodeAndOptions.getSqlType() != PinotSqlType.DQL
+        || !QueryLogSystemTableUtils.isQueryLogSystemTableQuery(sqlNodeAndOptions.getSqlNode())) {
+      throw QueryErrorCode.SQL_PARSING.asException("/queryLog/sql supports only SELECT queries on system.query_log");
+    }
+
+    ObjectNode requestJson = getRequestJson(sqlQuery, traceEnabled, queryOptions);
+    Map<String, String> headers = extractHeaders(httpHeaders);
+    List<InstanceConfig> brokerInstanceConfigs = _pinotHelixResourceManager.getAllBrokerInstanceConfigs();
+    if (brokerInstanceConfigs.isEmpty()) {
+      throw QueryErrorCode.BROKER_RESOURCE_MISSING.asException("Unable to find online brokers for query logs");
+    }
+    return aggregateQueryLogResponses(brokerInstanceConfigs, requestJson, headers);
   }
 
   private StreamingOutput getMultiStageQueryResponse(String query, String queryOptions, HttpHeaders httpHeaders,
@@ -576,6 +648,44 @@ public class PinotQueryResource {
     return sendRequestRaw(url, "POST", query, requestJson, headers);
   }
 
+  private StreamingOutput aggregateQueryLogResponses(List<InstanceConfig> brokerInstanceConfigs,
+      ObjectNode requestJson, Map<String, String> headers) {
+    String protocol = _controllerConf.getControllerBrokerProtocol();
+    String payload = requestJson.toString();
+    return outputStream -> {
+      long startTime = System.currentTimeMillis();
+      List<BrokerResponseNative> responses = new ArrayList<>(brokerInstanceConfigs.size());
+      List<QueryProcessingException> fetchExceptions = new ArrayList<>();
+      for (InstanceConfig brokerConfig : brokerInstanceConfigs) {
+        String hostName = getHost(brokerConfig);
+        int port = getPort(brokerConfig);
+        String url = getQueryURL(protocol, hostName, port);
+        try {
+          responses.add(fetchBrokerQueryLog(url, payload, headers));
+        } catch (Exception e) {
+          fetchExceptions.add(new QueryProcessingException(QueryErrorCode.BROKER_REQUEST_SEND,
+              String.format("Failed to fetch query log from broker %s: %s", brokerConfig.getInstanceName(),
+                  e.getMessage())));
+        }
+      }
+      BrokerResponseNative aggregated = QueryLogResponseAggregator.aggregate(responses);
+      List<QueryProcessingException> allExceptions = new ArrayList<>(aggregated.getExceptions());
+      allExceptions.addAll(fetchExceptions);
+      aggregated.setExceptions(allExceptions);
+      aggregated.setNumServersQueried(brokerInstanceConfigs.size());
+      aggregated.setTimeUsedMs(System.currentTimeMillis() - startTime);
+      aggregated.setBrokerId("controller");
+      aggregated.toOutputStream(outputStream);
+    };
+  }
+
+  private BrokerResponseNative fetchBrokerQueryLog(String url, String payload, Map<String, String> headers)
+      throws Exception {
+    ByteArrayOutputStream outputStream = new ByteArrayOutputStream();
+    sendRequestRaw(url, "POST", payload, headers, outputStream);
+    return JsonUtils.stringToObject(outputStream.toString(StandardCharsets.UTF_8), BrokerResponseNative.class);
+  }
+
   private ObjectNode getRequestJson(String query, String traceEnabled, String queryOptions) {
     ObjectNode requestJson = JsonUtils.newObjectNode();
     requestJson.put("sql", query);
@@ -736,7 +846,10 @@ public class PinotQueryResource {
     }
   }
 
-  private Map<String, String> extractHeaders(HttpHeaders httpHeaders) {
+  private Map<String, String> extractHeaders(@Nullable HttpHeaders httpHeaders) {
+    if (httpHeaders == null) {
+      return Collections.emptyMap();
+    }
     return httpHeaders.getRequestHeaders().entrySet().stream()
       .filter(entry -> !entry.getValue().isEmpty())
       .collect(Collectors.toMap(Entry::getKey, entry -> entry.getValue().get(0)));

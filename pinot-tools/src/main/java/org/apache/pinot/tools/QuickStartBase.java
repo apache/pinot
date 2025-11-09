@@ -29,6 +29,7 @@ import java.net.URL;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Paths;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Properties;
@@ -283,8 +284,11 @@ public abstract class QuickStartBase {
 
   protected Map<String, Object> getConfigOverrides() {
     try {
-      return StringUtils.isEmpty(_configFilePath) ? Map.of()
-          : PinotConfigUtils.readConfigFromFile(_configFilePath);
+      Map<String, Object> overrides = StringUtils.isEmpty(_configFilePath) ? new HashMap<>()
+          : new HashMap<>(PinotConfigUtils.readConfigFromFile(_configFilePath));
+      // Enable system.query_log for Quickstart broker by default
+      overrides.putIfAbsent("pinot.broker.query.log.systemTable.enabled", true);
+      return overrides;
     } catch (ConfigurationException e) {
       throw new RuntimeException(e);
     }

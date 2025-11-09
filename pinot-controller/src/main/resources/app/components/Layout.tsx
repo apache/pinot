@@ -22,6 +22,7 @@ import { Grid } from '@material-ui/core';
 import Sidebar from './SideBar';
 import Header from './Header';
 import QueryConsoleIcon from './SvgIcons/QueryConsoleIcon';
+import QueryLogIcon from './SvgIcons/QueryLogIcon';
 import SwaggerIcon from './SvgIcons/SwaggerIcon';
 import ClusterManagerIcon from './SvgIcons/ClusterManagerIcon';
 import ZookeeperIcon from './SvgIcons/ZookeeperIcon';
@@ -31,18 +32,27 @@ import AccountCircleOutlinedIcon from '@material-ui/icons/AccountCircleOutlined'
 let navigationItems = [
   { id: 1, name: 'Cluster Manager', link: '/', icon: <ClusterManagerIcon /> },
   { id: 2, name: 'Query Console', link: '/query', icon: <QueryConsoleIcon /> },
-  { id: 3, name: 'Zookeeper Browser', link: '/zookeeper', icon: <ZookeeperIcon /> },
-  { id: 4, name: 'Swagger REST API', link: 'help', target: '_blank', icon: <SwaggerIcon /> }
+  { id: 3, name: 'Query Logs', link: '/query/logs', icon: <QueryLogIcon /> },
+  { id: 4, name: 'Zookeeper Browser', link: '/zookeeper', icon: <ZookeeperIcon /> },
+  { id: 5, name: 'Swagger REST API', link: 'help', target: '_blank', icon: <SwaggerIcon /> }
 ];
+
+const queryNavLinks = ['/query', '/query/logs'];
 
 const Layout = (props) => {
   const role = props.role;
-  if(role === 'ADMIN'){
-    if(navigationItems.length <5){
+  if (role === 'ADMIN') {
+    const hasUserConsole = navigationItems.some((item) => item.link === '/user');
+    if (!hasUserConsole) {
       navigationItems = [
         ...navigationItems,
-        {id: 5, name: "User Console", link: '/user', icon: <AccountCircleOutlinedIcon style={{ width: 24, height: 24, verticalAlign: 'sub' }}/>}
-      ]
+        {
+          id: 6,
+          name: 'User Console',
+          link: '/user',
+          icon: <AccountCircleOutlinedIcon style={{ width: 24, height: 24, verticalAlign: 'sub' }} />,
+        },
+      ];
     }
   }
   const hash = `/${window.location.hash.split('/')[1]}`;
@@ -54,11 +64,11 @@ const Layout = (props) => {
 
   const appNavigationItems = React.useMemo(() => {
     if (app_state.queryConsoleOnlyView) {
-      return navigationItems.filter((navItem) => navItem.link === '/query');
+      return navigationItems.filter((navItem) => queryNavLinks.includes(navItem.link));
     }
     if (app_state.hideQueryConsoleTab) {
-      return navigationItems.filter((navItem) => navItem.link !== '/query');
-  }
+      return navigationItems.filter((navItem) => !queryNavLinks.includes(navItem.link));
+    }
 
     return navigationItems;
   }, [navigationItems, app_state.queryConsoleOnlyView, app_state.hideQueryConsoleTab]);
