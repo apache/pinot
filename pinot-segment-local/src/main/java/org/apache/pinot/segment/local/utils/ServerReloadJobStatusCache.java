@@ -152,7 +152,7 @@ public class ServerReloadJobStatusCache implements PinotClusterConfigChangeListe
   }
 
   @VisibleForTesting
-  public synchronized ServerReloadJobStatusCacheConfig getCurrentConfig() {
+  public ServerReloadJobStatusCacheConfig getCurrentConfig() {
     return _currentConfig;
   }
 
