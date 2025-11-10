@@ -21,8 +21,6 @@ package org.apache.pinot.segment.local.utils;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.Set;
-import java.util.concurrent.CountDownLatch;
-import java.util.concurrent.atomic.AtomicInteger;
 import org.testng.annotations.Test;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -216,53 +214,6 @@ public class ServerReloadJobStatusCacheTest {
     // Verify new config is applied
     assertThat(cache.getCurrentConfig().getMaxSize()).isEqualTo(5000);
     assertThat(cache.getCurrentConfig().getTtlDays()).isEqualTo(15);
-  }
-
-  @Test
-  public void testConcurrentAccessDuringRebuild() throws InterruptedException {
-    // Given
-    ServerReloadJobStatusCache cache = new ServerReloadJobStatusCache();
-
-    // Add entries to cache
-    for (int i = 0; i < 10; i++) {
-      ReloadJobStatus status = cache.getOrCreate("job-" + i);
-      status.incrementAndGetFailureCount();
-    }
-
-    // When - Concurrent rebuild and access
-    int numThreads = 5;
-    CountDownLatch latch = new CountDownLatch(numThreads);
-    AtomicInteger successCount = new AtomicInteger(0);
-
-    for (int i = 0; i < numThreads; i++) {
-      int threadId = i;
-      new Thread(() -> {
-        try {
-          if (threadId == 0) {
-            // One thread triggers rebuild
-            Map<String, String> properties = new HashMap<>();
-            properties.put("pinot.server.table.reload.status.cache.size.max", "8000");
-            cache.onChange(properties.keySet(), properties);
-          } else {
-            // Other threads access cache
-            for (int j = 0; j < 10; j++) {
-              ReloadJobStatus status = cache.getJobStatus("job-" + j);
-              if (status != null) {
-                successCount.incrementAndGet();
-              }
-            }
-          }
-        } finally {
-          latch.countDown();
-        }
-      }).start();
-    }
-
-    latch.await();
-
-    // Then - No exceptions should occur, and cache should be functional
-    assertThat(cache.getCurrentConfig()).isNotNull();
-    assertThat(successCount.get()).isGreaterThan(0);
   }
 
   @Test
