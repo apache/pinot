@@ -170,6 +170,11 @@ public class MinionConstants {
             DISTINCTCOUNTRAWHLLPLUS, DISTINCTCOUNTCPCSKETCH, DISTINCTCOUNTRAWCPCSKETCH, DISTINCTCOUNTULL,
             DISTINCTCOUNTRAWULL, PERCENTILEKLL, PERCENTILERAWKLL, PERCENTILETDIGEST, PERCENTILERAWTDIGEST,
             FIRSTWITHTIME, LASTWITHTIME);
+    // Adaptive segment sizing configuration (specific to MergeRollupTask)
+    public static final String DESIRED_SEGMENT_SIZE_BYTES_KEY = "desiredSegmentSizeBytes";
+    public static final String SEGMENT_SIZING_STRATEGY_KEY = "segmentSizingStrategy";
+    public static final String SIZING_PERCENTILE_KEY = "sizingPercentile";
+    public static final String SIZING_LEARNING_RATE_KEY = "sizingLearningRate";
   }
 
   /// Creates segments for the OFFLINE table, using completed segments from the corresponding REALTIME table
