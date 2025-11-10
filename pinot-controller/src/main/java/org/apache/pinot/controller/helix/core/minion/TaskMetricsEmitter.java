@@ -31,6 +31,7 @@ import org.apache.pinot.controller.ControllerConf;
 import org.apache.pinot.controller.LeadControllerManager;
 import org.apache.pinot.controller.helix.core.PinotHelixResourceManager;
 import org.apache.pinot.controller.helix.core.minion.PinotHelixTaskResourceManager.TaskCount;
+import org.apache.pinot.controller.helix.core.minion.PinotHelixTaskResourceManager.TasksByStatus;
 import org.apache.pinot.core.periodictask.BasePeriodicTask;
 import org.apache.pinot.spi.utils.InstanceTypeUtils;
 import org.slf4j.Logger;
@@ -113,21 +114,19 @@ public class TaskMetricsEmitter extends BasePeriodicTask {
         long previousExecutionTimestamp = _previousExecutionTimestamps.computeIfAbsent(taskType,
             k -> currentExecutionTimestamp - _taskMetricsEmitterFrequencyMs);
 
-        // Get currently in-progress tasks (for metrics)
-        Set<String> currentInProgressTasks = _helixTaskResourceManager.getTasksInProgress(taskType);
-
         // Get tasks that were in-progress during the previous collection cycle
         Set<String> previouslyInProgressTasks =
             _previousInProgressTasks.getOrDefault(taskType, Collections.emptySet());
 
-        // Get all tasks including those that started after the previous execution timestamp
-        // This combines in-progress tasks and short-lived tasks that started and completed between cycles
-        // in a single Helix call, avoiding duplicate getWorkflowConfig/getWorkflowContext calls
-        Set<String> tasksIncludingShortLived = _helixTaskResourceManager.getTasksInProgressAndRecent(
-            taskType, previousExecutionTimestamp);
+        // Get in-progress tasks and all tasks to report (including short-lived) in a single Helix call
+        TasksByStatus taskResult = _helixTaskResourceManager.getTasksByStatus(taskType, previousExecutionTimestamp);
+        Set<String> currentInProgressTasks = taskResult.getInProgressTasks();
+        Set<String> tasksIncludingShortLived = taskResult.getAllTasksToReport();
 
         // Start with all tasks that need reporting (in-progress + short-lived)
-        Set<String> tasksToReport = new HashSet<>(tasksIncludingShortLived);
+        Set<String> tasksToReport = new HashSet<>();
+        tasksToReport.addAll(currentInProgressTasks);
+        tasksToReport.addAll(tasksIncludingShortLived);
 
         // Include tasks that were in-progress previously but are no longer in-progress
         // These tasks completed between collection cycles and need their final metrics reported
