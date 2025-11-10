@@ -20,7 +20,10 @@ package org.apache.pinot.common.response.mapper;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
+import org.apache.pinot.common.datatable.DataTable;
 import org.apache.pinot.common.response.BrokerResponse;
+import org.apache.pinot.common.response.broker.BrokerResponseNative;
 import org.apache.pinot.common.response.broker.BrokerResponseNativeV2;
 import org.apache.pinot.common.response.broker.QueryProcessingException;
 import org.apache.pinot.common.response.broker.ResultTable;
@@ -44,7 +47,7 @@ public class TimeSeriesResponseMapper {
    * This method converts the time series data into a format compatible with the broker response.
    */
   public static BrokerResponse toBrokerResponse(TimeSeriesBlock timeSeriesBlock) {
-    BrokerResponseNativeV2 brokerResponse = new BrokerResponseNativeV2();
+    BrokerResponseNative brokerResponse = new BrokerResponseNative();
     if (timeSeriesBlock == null) {
       throw new IllegalArgumentException("timeSeriesBlock must not be null");
     }
@@ -57,6 +60,7 @@ public class TimeSeriesResponseMapper {
 
     ResultTable resultTable = new ResultTable(dataSchema, rows);
     brokerResponse.setResultTable(resultTable);
+    setStats(brokerResponse, timeSeriesBlock.getMetadata());
     return brokerResponse;
   }
 
@@ -122,5 +126,32 @@ public class TimeSeriesResponseMapper {
       }
     }
     return rows;
+  }
+
+  private static void setStats(BrokerResponseNative brokerResponse, Map<String, String> metadata) {
+    if (metadata == null || metadata.isEmpty()) {
+      return;
+    }
+    brokerResponse.setNumDocsScanned(getLongMetadataValue(metadata, DataTable.MetadataKey.NUM_DOCS_SCANNED));
+    brokerResponse.setNumEntriesScannedInFilter(
+        getLongMetadataValue(metadata, DataTable.MetadataKey.NUM_ENTRIES_SCANNED_IN_FILTER));
+    brokerResponse.setNumEntriesScannedPostFilter(
+        getLongMetadataValue(metadata, DataTable.MetadataKey.NUM_ENTRIES_SCANNED_POST_FILTER));
+    brokerResponse.setNumSegmentsQueried(getLongMetadataValue(metadata, DataTable.MetadataKey.NUM_SEGMENTS_QUERIED));
+    brokerResponse.setNumSegmentsProcessed(
+        getLongMetadataValue(metadata, DataTable.MetadataKey.NUM_SEGMENTS_PROCESSED));
+    brokerResponse.setNumSegmentsMatched(getLongMetadataValue(metadata, DataTable.MetadataKey.NUM_SEGMENTS_MATCHED));
+    brokerResponse.setNumConsumingSegmentsMatched(
+        getLongMetadataValue(metadata, DataTable.MetadataKey.NUM_CONSUMING_SEGMENTS_MATCHED));
+    brokerResponse.setNumConsumingSegmentsProcessed(
+        getLongMetadataValue(metadata, DataTable.MetadataKey.NUM_CONSUMING_SEGMENTS_PROCESSED));
+    brokerResponse.setNumConsumingSegmentsQueried(
+        getLongMetadataValue(metadata, DataTable.MetadataKey.NUM_CONSUMING_SEGMENTS_QUERIED));
+    brokerResponse.setTotalDocs(
+        getLongMetadataValue(metadata, DataTable.MetadataKey.TOTAL_DOCS));
+  }
+
+  private static long getLongMetadataValue(Map<String, String> metadata, DataTable.MetadataKey key) {
+    return Long.parseLong(metadata.getOrDefault(key.getName(), "0"));
   }
 }

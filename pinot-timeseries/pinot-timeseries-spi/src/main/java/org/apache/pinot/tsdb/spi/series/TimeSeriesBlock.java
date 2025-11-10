@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.tsdb.spi.series;
 
+import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import javax.annotation.Nullable;
@@ -37,10 +38,20 @@ public class TimeSeriesBlock {
    * {@link TimeSeries#getId()}.
    */
   private final Map<Long, List<TimeSeries>> _seriesMap;
+  /**
+   * Holds optional metadata about the block (e.g., statistics).
+   */
+  private Map<String, String> _metadata;
 
   public TimeSeriesBlock(@Nullable TimeBuckets timeBuckets, Map<Long, List<TimeSeries>> seriesMap) {
+    this(timeBuckets, seriesMap, Map.of());
+  }
+
+  public TimeSeriesBlock(@Nullable TimeBuckets timeBuckets, Map<Long, List<TimeSeries>> seriesMap,
+      Map<String, String> metadata) {
     _timeBuckets = timeBuckets;
     _seriesMap = seriesMap;
+    _metadata = Collections.unmodifiableMap(metadata);
   }
 
   @Nullable
@@ -50,5 +61,13 @@ public class TimeSeriesBlock {
 
   public Map<Long, List<TimeSeries>> getSeriesMap() {
     return _seriesMap;
+  }
+
+  public Map<String, String> getMetadata() {
+    return _metadata;
+  }
+
+  public void setMetadata(Map<String, String> metadata) {
+    _metadata = metadata;
   }
 }

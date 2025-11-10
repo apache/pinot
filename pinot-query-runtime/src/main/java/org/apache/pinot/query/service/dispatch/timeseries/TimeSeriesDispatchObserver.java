@@ -61,6 +61,7 @@ public class TimeSeriesDispatchObserver implements StreamObserver<Worker.TimeSer
     Throwable error = null;
     try {
       block = TimeSeriesBlockSerde.deserializeTimeSeriesBlock(timeSeriesResponse.getPayload().asReadOnlyByteBuffer());
+      block.setMetadata(timeSeriesResponse.getMetadataMap());
     } catch (Throwable t) {
       error = t;
     }
