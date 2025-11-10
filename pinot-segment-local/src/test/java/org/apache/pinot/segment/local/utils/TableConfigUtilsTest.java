@@ -3562,4 +3562,51 @@ public class TableConfigUtilsTest {
       assertEquals(e.getMessage(), "MetadataTTL: 50000(ms) must be smaller than the minimum segmentAge: 50000(ms)");
     }
   }
+
+  @Test
+  public void testValidateTaskConfigConflict() {
+    // Test that minNumSegmentsPerTask=1 with both UpsertCompactMergeTask and UpsertCompactionTask configured fails
+    Map<String, String> upsertCompactMergeConfig = new HashMap<>();
+    upsertCompactMergeConfig.put("bufferTimePeriod", "5d");
+    upsertCompactMergeConfig.put("minNumSegmentsPerTask", "1");
+
+    Map<String, String> upsertCompactionConfig = new HashMap<>();
+    upsertCompactionConfig.put("bufferTimePeriod", "5d");
+
+    Map<String, Map<String, String>> taskTypeConfigsMap = new HashMap<>();
+    taskTypeConfigsMap.put("UpsertCompactMergeTask", upsertCompactMergeConfig);
+    taskTypeConfigsMap.put("UpsertCompactionTask", upsertCompactionConfig);
+
+    TableConfig tableConfigWithConflict = new TableConfigBuilder(TableType.REALTIME)
+        .setTableName(TABLE_NAME)
+        .setTaskConfig(new org.apache.pinot.spi.config.table.TableTaskConfig(taskTypeConfigsMap))
+        .build();
+
+    assertThrows(IllegalStateException.class, () -> TableConfigUtils.validateTaskConfig(tableConfigWithConflict));
+
+    // Test that minNumSegmentsPerTask=2 with both tasks configured passes
+    upsertCompactMergeConfig.put("minNumSegmentsPerTask", "2");
+    taskTypeConfigsMap.put("UpsertCompactMergeTask", upsertCompactMergeConfig);
+
+    TableConfig tableConfigValid = new TableConfigBuilder(TableType.REALTIME)
+        .setTableName(TABLE_NAME)
+        .setTaskConfig(new org.apache.pinot.spi.config.table.TableTaskConfig(taskTypeConfigsMap))
+        .build();
+
+    // Should not throw
+    TableConfigUtils.validateTaskConfig(tableConfigValid);
+
+    // Test that only UpsertCompactMergeTask with minNumSegmentsPerTask=1 (without UpsertCompactionTask) passes
+    taskTypeConfigsMap.remove("UpsertCompactionTask");
+    upsertCompactMergeConfig.put("minNumSegmentsPerTask", "1");
+    taskTypeConfigsMap.put("UpsertCompactMergeTask", upsertCompactMergeConfig);
+
+    TableConfig tableConfigOnlyCompactMerge = new TableConfigBuilder(TableType.REALTIME)
+        .setTableName(TABLE_NAME)
+        .setTaskConfig(new org.apache.pinot.spi.config.table.TableTaskConfig(taskTypeConfigsMap))
+        .build();
+
+    // Should not throw
+    TableConfigUtils.validateTaskConfig(tableConfigOnlyCompactMerge);
+  }
 }

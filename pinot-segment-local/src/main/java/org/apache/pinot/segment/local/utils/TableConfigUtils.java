@@ -190,6 +190,8 @@ public final class TableConfigUtils {
       validatePartialUpsertStrategies(tableConfig, schema);
     }
 
+    validateTaskConfig(tableConfig);
+
     if (_enforcePoolBasedAssignment) {
       validateInstancePoolsNReplicaGroups(tableConfig);
     }
@@ -1137,6 +1139,37 @@ public final class TableConfigUtils {
   }
 
   /**
+   * Validates task configuration to ensure no conflicting task types are configured.
+   */
+  @VisibleForTesting
+  static void validateTaskConfig(TableConfig tableConfig) {
+    TableTaskConfig taskConfig = tableConfig.getTaskConfig();
+    if (taskConfig == null || taskConfig.getTaskTypeConfigsMap() == null) {
+      return;
+    }
+
+    Map<String, Map<String, String>> taskTypeConfigsMap = taskConfig.getTaskTypeConfigsMap();
+
+    String minNumSegmentsPerTaskKey = "minNumSegmentsPerTask";
+    if (taskTypeConfigsMap.containsKey(UPSERT_COMPACT_MERGE_TASK_TYPE)
+        && taskTypeConfigsMap.containsKey(UPSERT_COMPACTION_TASK_TYPE)) {
+
+      Map<String, String> upsertCompactMergeConfig = taskTypeConfigsMap.get(UPSERT_COMPACT_MERGE_TASK_TYPE);
+
+      if (upsertCompactMergeConfig != null) {
+        long minNumSegments = Long.parseLong(
+            upsertCompactMergeConfig.getOrDefault(minNumSegmentsPerTaskKey, String.valueOf(2)));
+
+        Preconditions.checkState(minNumSegments > 1, String.format(
+            "When %s.%s is set to 1, %s should not be configured to avoid indeterministic behavior. "
+                + "Please remove %s configuration or set %s to a value greater than 1.",
+            UPSERT_COMPACT_MERGE_TASK_TYPE, minNumSegmentsPerTaskKey, UPSERT_COMPACTION_TASK_TYPE,
+            UPSERT_COMPACTION_TASK_TYPE, minNumSegmentsPerTaskKey));
+      }
+    }
+  }
+
+  /**
    * Validates the tier configs
    * Checks for the right segmentSelectorType and its required properties
    * Checks for the right storageType and its required properties
@@ -1372,7 +1405,7 @@ public final class TableConfigUtils {
           }
           String column = columnPair.getColumn();
           if (!column.equals(AggregationFunctionColumnPair.STAR)) {
-              aggregatedColumns.add(column);
+            aggregatedColumns.add(column);
           } else if (columnPair.getFunctionType() != AggregationFunctionType.COUNT) {
             throw new IllegalStateException("Non-COUNT function set the column as '*' in the functionColumnPair: "
                 + functionColumnPair + ". Please configure an actual column for the function");
@@ -1401,7 +1434,7 @@ public final class TableConfigUtils {
           }
           String column = columnPair.getColumn();
           if (!column.equals(AggregationFunctionColumnPair.STAR)) {
-              aggregatedColumns.add(column);
+            aggregatedColumns.add(column);
           } else if (columnPair.getFunctionType() != AggregationFunctionType.COUNT) {
             throw new IllegalStateException("Non-COUNT function set the column as '*' in the aggregationConfig for "
                 + "function: " + aggregationConfig.getAggregationFunction()
