@@ -246,6 +246,40 @@ public class MultiStageReplicaGroupSelectorTest {
     }
   }
 
+  @Test
+  public void testInstancePartitionsIdealStateMismatchSegmentsDropped() {
+    // TODO: Fix this issue (described in https://github.com/apache/pinot/issues/17179) and update or remove this test.
+
+    // InstancePartitions updated to a new set of instances, while IdealState/ExternalView still reference old ones.
+    // This scenario can occur during a rebalance with instance reassignment, where the InstancePartitions in ZK are
+    // updated first, and then the IdealState is updated in batches.
+
+    // IP contains instances [instance-100..103], but IS/EV map segments to [instance-0..3].
+    List<String> newReplicaGroup0 = List.of("instance-100", "instance-101");
+    List<String> newReplicaGroup1 = List.of("instance-102", "instance-103");
+    InstancePartitions instancePartitions = createInstancePartitions(newReplicaGroup0, newReplicaGroup1);
+    MultiStageReplicaGroupSelector multiStageSelector = createMultiStageSelector(instancePartitions);
+
+    // Enabled instances and segment assignments still reference the old instances [instance-0..3]
+    List<String> enabledInstances = createEnabledInstances(4);
+    IdealState idealState = new IdealState(TABLE_NAME);
+    ExternalView externalView = new ExternalView(TABLE_NAME);
+    Set<String> onlineSegments = new HashSet<>();
+
+    setupBasicTestEnvironment(enabledInstances, idealState, externalView, onlineSegments);
+    multiStageSelector.init(new HashSet<>(enabledInstances), EMPTY_SERVER_MAP, idealState, externalView,
+        onlineSegments);
+
+    InstanceSelector.SelectionResult selectionResult = multiStageSelector.select(_brokerRequest, getSegments(), 0);
+
+    // Because instanceToPartitionMap is unaware of instances in IS/EV, segments get grouped under a null partition
+    // and are never considered in the [0..numPartitions) loop, resulting in dropped segments.
+    assertTrue(selectionResult.getSegmentToInstanceMap().isEmpty());
+    assertTrue(selectionResult.getOptionalSegmentToInstanceMap().isEmpty());
+    // Old segments are available in IS/EV, so they should not be marked as unavailable; they are effectively dropped.
+    assertTrue(selectionResult.getUnavailableSegments().isEmpty());
+  }
+
   private MultiStageReplicaGroupSelector createMultiStageSelector(InstancePartitions instancePartitions) {
     MultiStageReplicaGroupSelector multiStageSelector =
         new MultiStageReplicaGroupSelector(TABLE_NAME, _propertyStore, _brokerMetrics, null, Clock.systemUTC(),
