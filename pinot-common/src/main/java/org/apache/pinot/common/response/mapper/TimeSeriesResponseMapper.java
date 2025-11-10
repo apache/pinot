@@ -24,7 +24,6 @@ import java.util.Map;
 import org.apache.pinot.common.datatable.DataTable;
 import org.apache.pinot.common.response.BrokerResponse;
 import org.apache.pinot.common.response.broker.BrokerResponseNative;
-import org.apache.pinot.common.response.broker.BrokerResponseNativeV2;
 import org.apache.pinot.common.response.broker.QueryProcessingException;
 import org.apache.pinot.common.response.broker.ResultTable;
 import org.apache.pinot.common.utils.DataSchema;
@@ -65,7 +64,7 @@ public class TimeSeriesResponseMapper {
   }
 
   public static BrokerResponse toBrokerResponse(QueryException e) {
-    BrokerResponseNativeV2 brokerResponse = new BrokerResponseNativeV2();
+    BrokerResponseNative brokerResponse = new BrokerResponseNative();
     brokerResponse.addException(QueryProcessingException.fromQueryException(e));
     return brokerResponse;
   }
