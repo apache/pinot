@@ -162,6 +162,12 @@ public class MinionConstants {
     public static final String SEGMENT_GROUP_MANAGER_CLASS_NAME_KEY = "segment.group.manager.class.name";
 
     public static final String ERASE_DIMENSION_VALUES_KEY = "eraseDimensionValues";
+
+    // Adaptive segment sizing configuration (specific to MergeRollupTask)
+    public static final String DESIRED_SEGMENT_SIZE_BYTES_KEY = "desiredSegmentSizeBytes";
+    public static final String SEGMENT_SIZING_STRATEGY_KEY = "segmentSizingStrategy";
+    public static final String SIZING_PERCENTILE_KEY = "sizingPercentile";
+    public static final String SIZING_LEARNING_RATE_KEY = "sizingLearningRate";
   }
 
   /**
