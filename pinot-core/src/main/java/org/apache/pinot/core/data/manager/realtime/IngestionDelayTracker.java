@@ -304,6 +304,8 @@ public class IngestionDelayTracker {
             _partitionIdToLatestOffset.putAll(streamPartitionIdToLatestOffset);
           }
         } catch (Exception e) {
+          _serverMetrics.addMeteredTableValue(_realTimeTableDataManager.getTableName(),
+              ServerMeter.INGESTION_DELAY_TRACKING_ERRORS, 1);
           LOGGER.error("Failed to update latest stream offsets for partitions: {}", streamPartitionIds, e);
         }
       }
