@@ -29,10 +29,12 @@ import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
+import java.util.concurrent.atomic.AtomicReference;
 import java.util.stream.Collectors;
 import org.apache.pinot.common.assignment.InstancePartitions;
 import org.apache.pinot.common.assignment.InstancePartitionsUtils;
@@ -98,6 +100,11 @@ public class TableRebalancerClusterStatelessTest extends ControllerTest {
     addFakeBrokerInstancesToAutoJoinHelixCluster(1, true);
   }
 
+  @Override
+  protected void overrideControllerConf(Map<String, Object> properties) {
+    properties.put(ControllerConf.ENABLE_IDEAL_STATE_INSTANCE_PARTITIONS, true);
+  }
+
   /// Dropping instance from cluster requires waiting for live instance gone and removing instance related ZNodes, which
   /// are not the purpose of the test, so combine different rebalance scenarios into one test:
   /// 1. NO_OP rebalance
@@ -124,7 +131,7 @@ public class TableRebalancerClusterStatelessTest extends ControllerTest {
       DefaultRebalancePreChecker preChecker = new DefaultRebalancePreChecker();
       preChecker.init(_helixResourceManager, executorService, 1);
       TableRebalancer tableRebalancer =
-          new TableRebalancer(_helixManager, null, null, preChecker, _tableSizeReader, null);
+          new TableRebalancer(_helixManager, null, null, preChecker, _tableSizeReader, null, true);
       TableConfig tableConfig =
           new TableConfigBuilder(TableType.OFFLINE).setTableName(RAW_TABLE_NAME).setNumReplicas(NUM_REPLICAS).build();
 
@@ -704,7 +711,7 @@ public class TableRebalancerClusterStatelessTest extends ControllerTest {
       DefaultRebalancePreChecker preChecker = new DefaultRebalancePreChecker();
       preChecker.init(_helixResourceManager, executorService, 1);
       TableRebalancer tableRebalancer =
-          new TableRebalancer(_helixManager, null, null, preChecker, _tableSizeReader, null);
+          new TableRebalancer(_helixManager, null, null, preChecker, _tableSizeReader, null, true);
       TableConfig tableConfig =
           new TableConfigBuilder(TableType.REALTIME).setTableName(RAW_TABLE_NAME)
               .setNumReplicas(1)
@@ -793,7 +800,7 @@ public class TableRebalancerClusterStatelessTest extends ControllerTest {
       DefaultRebalancePreChecker preChecker = new DefaultRebalancePreChecker();
       preChecker.init(_helixResourceManager, executorService, 1);
       TableRebalancer tableRebalancer = new TableRebalancer(_helixManager, null, null, preChecker,
-          _tableSizeReader, null);
+          _tableSizeReader, null, true);
       // Set up the table with 1 replication factor and strict replica group enabled
       TableConfig tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName(RAW_TABLE_NAME)
           .setNumReplicas(1)
@@ -921,7 +928,7 @@ public class TableRebalancerClusterStatelessTest extends ControllerTest {
           (numReplicas * numPartitions * (numSegmentsPerPartition + 1)) / numServers);
     }
 
-    TableRebalancer tableRebalancer = new TableRebalancer(_helixManager, null, null, null, null, null);
+    TableRebalancer tableRebalancer = new TableRebalancer(_helixManager, null, null, null, null, null, true);
     // Rebalance should return NO_OP status since there has been no change
     RebalanceConfig rebalanceConfig = new RebalanceConfig();
     RebalanceResult rebalanceResult = tableRebalancer.rebalance(tableConfig, rebalanceConfig, null);
@@ -1074,7 +1081,7 @@ public class TableRebalancerClusterStatelessTest extends ControllerTest {
     DefaultRebalancePreChecker preChecker = new DefaultRebalancePreChecker();
     preChecker.init(_helixResourceManager, executorService, 1);
     TableRebalancer tableRebalancer =
-        new TableRebalancer(_helixManager, null, null, preChecker, _tableSizeReader, null);
+        new TableRebalancer(_helixManager, null, null, preChecker, _tableSizeReader, null, true);
     // Set up the table with 1 replication factor and strict replica group enabled
     TableConfig tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName(RAW_TABLE_NAME)
         .setNumReplicas(1)
@@ -1133,7 +1140,7 @@ public class TableRebalancerClusterStatelessTest extends ControllerTest {
     DefaultRebalancePreChecker preChecker = new DefaultRebalancePreChecker();
     preChecker.init(_helixResourceManager, executorService, 0.5);
     TableRebalancer tableRebalancer =
-        new TableRebalancer(_helixManager, null, null, preChecker, _tableSizeReader, null);
+        new TableRebalancer(_helixManager, null, null, preChecker, _tableSizeReader, null, true);
     TableConfig tableConfig =
         new TableConfigBuilder(TableType.OFFLINE).setTableName(RAW_TABLE_NAME).setNumReplicas(NUM_REPLICAS).build();
 
@@ -1229,7 +1236,7 @@ public class TableRebalancerClusterStatelessTest extends ControllerTest {
     DefaultRebalancePreChecker preChecker = new DefaultRebalancePreChecker();
     preChecker.init(_helixResourceManager, executorService, 0.5);
     TableRebalancer tableRebalancer =
-        new TableRebalancer(_helixManager, null, null, preChecker, _tableSizeReader, null);
+        new TableRebalancer(_helixManager, null, null, preChecker, _tableSizeReader, null, true);
     TableConfig tableConfig =
         new TableConfigBuilder(TableType.REALTIME).setTableName(RAW_TABLE_NAME)
             .setNumReplicas(2)
@@ -1630,7 +1637,7 @@ public class TableRebalancerClusterStatelessTest extends ControllerTest {
     ExecutorService executorService = Executors.newFixedThreadPool(10);
     preChecker.init(_helixResourceManager, executorService, 1);
     TableRebalancer tableRebalancer =
-        new TableRebalancer(_helixManager, null, null, preChecker, _tableSizeReader, null);
+        new TableRebalancer(_helixManager, null, null, preChecker, _tableSizeReader, null, true);
 
     // Try dry-run summary mode
     RebalanceConfig rebalanceConfig = new RebalanceConfig();
@@ -2171,7 +2178,7 @@ public class TableRebalancerClusterStatelessTest extends ControllerTest {
 
     ConsumingSegmentInfoReader mockConsumingSegmentInfoReader = Mockito.mock(ConsumingSegmentInfoReader.class);
     TableRebalancer tableRebalancerOriginal =
-        new TableRebalancer(_helixManager, null, null, null, _tableSizeReader, null);
+        new TableRebalancer(_helixManager, null, null, null, _tableSizeReader, null, true);
     TableConfig tableConfig =
         new TableConfigBuilder(TableType.REALTIME).setTableName(RAW_TABLE_NAME)
             .setNumReplicas(numReplica)
@@ -2282,7 +2289,7 @@ public class TableRebalancerClusterStatelessTest extends ControllerTest {
     }
 
     TableRebalancer tableRebalancerOriginal =
-        new TableRebalancer(_helixManager, null, null, null, _tableSizeReader, null);
+        new TableRebalancer(_helixManager, null, null, null, _tableSizeReader, null, true);
     TableConfig tableConfig =
         new TableConfigBuilder(TableType.REALTIME).setTableName(RAW_TABLE_NAME)
             .setNumReplicas(numReplica)
@@ -2449,6 +2456,376 @@ public class TableRebalancerClusterStatelessTest extends ControllerTest {
     assertFalse(moving.contains("segment1"));
     assertFalse(moving.contains("segment3"));
     assertFalse(moving.contains("segment4"));
+  }
+
+  @Test(timeOut = 120000)
+  public void testIdealStateInstancePartitionsDuringRebalance()
+      throws Exception {
+    // Setup: create two distinct server tenants, and a table initially using tenantOld
+    String tenantOld = "tenantOld";
+    String tenantNew = "tenantNew";
+    int numServersPerTenant = 8;
+    int numSegments = 12;
+    int numPartitions = 2;
+    int numReplicaGroups = 2;
+
+    // Create tenantOld servers (untagged at first), then tag them as tenantOld
+    for (int i = 0; i < numServersPerTenant; i++) {
+      addFakeServerInstanceToAutoJoinHelixCluster(tenantOld + "_" + SERVER_INSTANCE_ID_PREFIX + i, false);
+    }
+    _helixResourceManager.createServerTenant(
+        new Tenant(TenantRole.SERVER, tenantOld, numServersPerTenant, numServersPerTenant, 0));
+
+    // Build instance-assignment config: 2 replica groups x 2 partitions for OFFLINE
+    InstanceTagPoolConfig tagPoolOld =
+        new InstanceTagPoolConfig(TagNameUtils.getOfflineTagForTenant(tenantOld), false, 0, null);
+    InstanceReplicaGroupPartitionConfig rgpCfg =
+        new InstanceReplicaGroupPartitionConfig(true, 0, numReplicaGroups, 0, numPartitions, 0, false, null);
+    InstanceAssignmentConfig iaOld = new InstanceAssignmentConfig(tagPoolOld, null, rgpCfg, null, false);
+
+    // Create table with tenantOld and explicit instance assignment config
+    TableConfig tableConfigOld = new TableConfigBuilder(TableType.OFFLINE).setTableName(RAW_TABLE_NAME)
+        .setNumReplicas(NUM_REPLICAS)
+        .setInstanceAssignmentConfigMap(Map.of("OFFLINE", iaOld))
+        .setServerTenant(tenantOld)
+        .build();
+    addDummySchema(RAW_TABLE_NAME);
+    _helixResourceManager.addTable(tableConfigOld);
+    for (int i = 0; i < numSegments; i++) {
+      _helixResourceManager.addNewSegment(OFFLINE_TABLE_NAME,
+          SegmentMetadataMockUtils.mockSegmentMetadata(RAW_TABLE_NAME, SEGMENT_NAME_PREFIX + i), null);
+    }
+
+    // Helper to fetch the instances recorded in IdealState instance-partitions list field
+    String instancePartitionsName = InstancePartitionsUtils.getInstancePartitionsName(OFFLINE_TABLE_NAME,
+        InstancePartitionsType.OFFLINE.toString());
+    String ipListKeyPrefix = InstancePartitionsUtils.IDEAL_STATE_IP_PREFIX + instancePartitionsName
+        + InstancePartitionsUtils.IDEAL_STATE_IP_SEPARATOR;
+
+    // Verify INSTANCE_PARTITIONS persisted in ZK for initial config (2x2)
+    InstancePartitions ipZkOld =
+        InstancePartitionsUtils.fetchInstancePartitions(_propertyStore, instancePartitionsName);
+    assertNotNull(ipZkOld);
+    assertEquals(ipZkOld.getNumReplicaGroups(), numReplicaGroups);
+    assertEquals(ipZkOld.getNumPartitions(), numPartitions);
+
+    // Assert: pre-rebalance, IdealState instance partitions reflect initial (tenantOld) assignment
+    for (int partition = 0; partition < numPartitions; partition++) {
+      for (int replicaGroup = 0; replicaGroup < numReplicaGroups; replicaGroup++) {
+        List<String> initialISInstancePartitions =
+            _helixResourceManager.getTableIdealState(OFFLINE_TABLE_NAME)
+                .getRecord()
+                .getListFields()
+                .get(ipListKeyPrefix + partition + "_" + replicaGroup);
+        assertNotNull(initialISInstancePartitions, "Expected instance-partitions list field to be present at table "
+            + "creation");
+        assertEquals(new HashSet<>(initialISInstancePartitions),
+            new HashSet<>(ipZkOld.getInstances(partition, replicaGroup)),
+            "Initial IdealState instance partitions should match ZK INSTANCE_PARTITIONS");
+      }
+    }
+
+    // Add tenantNew servers and tag them
+    for (int i = 0; i < numServersPerTenant; i++) {
+      addFakeServerInstanceToAutoJoinHelixCluster(tenantNew + "_" + SERVER_INSTANCE_ID_PREFIX + i, false);
+    }
+    _helixResourceManager.createServerTenant(
+        new Tenant(TenantRole.SERVER, tenantNew, numServersPerTenant, numServersPerTenant, 0));
+
+    // Update table to use tenantNew with explicit instance assignment config (same 2x2 configuration, new tag)
+    InstanceTagPoolConfig tagPoolNew =
+        new InstanceTagPoolConfig(TagNameUtils.getOfflineTagForTenant(tenantNew), false, 0, null);
+    InstanceAssignmentConfig iaNew = new InstanceAssignmentConfig(tagPoolNew, null, rgpCfg, null, false);
+    TableConfig tableConfigNew = new TableConfigBuilder(TableType.OFFLINE).setTableName(RAW_TABLE_NAME)
+        .setNumReplicas(NUM_REPLICAS)
+        .setInstanceAssignmentConfigMap(Map.of("OFFLINE", iaNew))
+        .setServerTenant(tenantNew)
+        .build();
+    _helixResourceManager.updateTableConfig(tableConfigNew);
+
+    // Start rebalance asynchronously (with instance reassignment enabled)
+    CountDownLatch startSeen = new CountDownLatch(1);
+    CountDownLatch release = new CountDownLatch(1);
+
+    TableRebalanceObserver blockingObserver = new TableRebalanceObserver() {
+      @Override
+      public void onTrigger(Trigger trigger, Map<String, Map<String, String>> currentState,
+          Map<String, Map<String, String>> targetState, RebalanceContext rebalanceContext) {
+        if (trigger == Trigger.START_TRIGGER) {
+          startSeen.countDown();
+          try {
+            // Block to allow assertions against IdealState instance-partitions while rebalance is paused. Note that
+            // instance partitions are updated before START_TRIGGER is called so this is a good hook between instance
+            // assignment and segment assignment.
+            release.await(5, TimeUnit.SECONDS);
+          } catch (InterruptedException ignored) {
+          }
+        }
+      }
+
+      @Override
+      public void onNoop(String msg) {
+      }
+
+      @Override
+      public void onSuccess(String msg) {
+      }
+
+      @Override
+      public void onError(String errorMsg) {
+      }
+
+      @Override
+      public void onRollback() {
+      }
+
+      @Override
+      public boolean isStopped() {
+        return false;
+      }
+
+      @Override
+      public RebalanceResult.Status getStopStatus() {
+        throw new UnsupportedOperationException();
+      }
+    };
+
+    TableRebalancer tableRebalancer =
+        new TableRebalancer(_helixManager, blockingObserver, null, null, _tableSizeReader, null, true);
+    RebalanceConfig rebalanceConfig = new RebalanceConfig();
+    rebalanceConfig.setReassignInstances(true);
+    AtomicReference<RebalanceResult> resultRef = new AtomicReference<>();
+    Thread rebalanceThread =
+        new Thread(() -> resultRef.set(tableRebalancer.rebalance(tableConfigNew, rebalanceConfig, null)));
+    rebalanceThread.start();
+
+    // Wait until the rebalance has started (after new INSTANCE_PARTITIONS persisted and combined into IdealState)
+    assertTrue(startSeen.await(10, TimeUnit.SECONDS), "Rebalance did not start in time");
+    // ZK should now reflect the new instance partitions (2x2 for tenantNew)
+    InstancePartitions ipZkNew =
+        InstancePartitionsUtils.fetchInstancePartitions(_propertyStore, instancePartitionsName);
+    assertNotNull(ipZkNew);
+    assertEquals(ipZkNew.getNumReplicaGroups(), 2);
+    assertEquals(ipZkNew.getNumPartitions(), 2);
+    // IdealState should contain union (per partition/replica key) of old and new assignments
+    for (int partition = 0; partition < numPartitions; partition++) {
+      for (int replicaGroup = 0; replicaGroup < numReplicaGroups; replicaGroup++) {
+        String partitionReplica = partition + "_" + replicaGroup;
+        Set<String> expectedUnion = new HashSet<>(ipZkOld.getInstances(partitionReplica));
+        expectedUnion.addAll(ipZkNew.getInstances(partitionReplica));
+        List<String> intermediateISInstancePartitions =
+            _helixResourceManager.getTableIdealState(OFFLINE_TABLE_NAME)
+                .getRecord()
+                .getListFields()
+                .get(ipListKeyPrefix + partitionReplica);
+        assertNotNull(intermediateISInstancePartitions);
+        assertEquals(new HashSet<>(intermediateISInstancePartitions), expectedUnion,
+            "Expected IdealState instance partitions list to be union of old and new instances");
+      }
+    }
+
+    // Allow rebalance to proceed and complete
+    release.countDown();
+    rebalanceThread.join(TimeUnit.SECONDS.toMillis(60));
+    RebalanceResult rebalanceResult = resultRef.get();
+    assertNotNull(rebalanceResult, "Rebalance did not complete in time");
+    assertEquals(rebalanceResult.getStatus(), RebalanceResult.Status.DONE);
+
+    // Final assertion: IdealState instance-partitions should reflect only the new assignment (for each key)
+    // IdealState should contain union (per partition/replica key) of old and new assignments
+    for (int partition = 0; partition < numPartitions; partition++) {
+      for (int replicaGroup = 0; replicaGroup < numReplicaGroups; replicaGroup++) {
+        String partitionReplica = partition + "_" + replicaGroup;
+        List<String> finalISInstancePartitions =
+            _helixResourceManager.getTableIdealState(OFFLINE_TABLE_NAME)
+                .getRecord()
+                .getListFields()
+                .get(ipListKeyPrefix + partitionReplica);
+        assertNotNull(finalISInstancePartitions);
+        assertEquals(new HashSet<>(finalISInstancePartitions), new HashSet<>(ipZkNew.getInstances(partitionReplica)),
+            "Final IdealState instance partitions should match ZK INSTANCE_PARTITIONS");
+      }
+    }
+
+    // Cleanup
+    _helixResourceManager.deleteOfflineTable(RAW_TABLE_NAME);
+    for (int i = 0; i < numServersPerTenant; i++) {
+      stopAndDropFakeInstance(tenantOld + "_" + SERVER_INSTANCE_ID_PREFIX + i);
+      stopAndDropFakeInstance(tenantNew + "_" + SERVER_INSTANCE_ID_PREFIX + i);
+    }
+  }
+
+  @Test
+  public void testIdealStateInstancePartitionsChangeRemovesOldKeys()
+      throws Exception {
+    // Initial: 2 replica-groups x 2 partitions
+    int numServers = 8;
+    String tenant = "tenantName";
+    for (int i = 0; i < numServers; i++) {
+      addFakeServerInstanceToAutoJoinHelixCluster(tenant + "_" + SERVER_INSTANCE_ID_PREFIX + i, false);
+    }
+    _helixResourceManager.createServerTenant(new Tenant(TenantRole.SERVER, tenant, numServers, numServers, 0));
+
+    InstanceTagPoolConfig tagPool =
+        new InstanceTagPoolConfig(TagNameUtils.getOfflineTagForTenant(tenant), false, 0, null);
+    InstanceReplicaGroupPartitionConfig rgp2x2 =
+        new InstanceReplicaGroupPartitionConfig(true, 0, 2, 0, 2, 0, false, null);
+    InstanceAssignmentConfig ia2x2 = new InstanceAssignmentConfig(tagPool, null, rgp2x2, null, false);
+
+    TableConfig tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName(RAW_TABLE_NAME)
+        .setNumReplicas(NUM_REPLICAS)
+        .setInstanceAssignmentConfigMap(Map.of("OFFLINE", ia2x2))
+        .setServerTenant(tenant)
+        .build();
+    addDummySchema(RAW_TABLE_NAME);
+    _helixResourceManager.addTable(tableConfig);
+
+    // Add a few segments
+    for (int i = 0; i < 6; i++) {
+      _helixResourceManager.addNewSegment(OFFLINE_TABLE_NAME,
+          SegmentMetadataMockUtils.mockSegmentMetadata(RAW_TABLE_NAME, SEGMENT_NAME_PREFIX + i), null);
+    }
+
+    String ipName = InstancePartitionsUtils.getInstancePartitionsName(OFFLINE_TABLE_NAME,
+        InstancePartitionsType.OFFLINE.toString());
+    Map<String, List<String>> initialListFields =
+        _helixResourceManager.getTableIdealState(OFFLINE_TABLE_NAME).getRecord().getListFields();
+    // Expect keys 0_0, 0_1, 1_0, 1_1 to be present
+    assertTrue(initialListFields.containsKey(
+        InstancePartitionsUtils.IDEAL_STATE_IP_PREFIX + ipName + InstancePartitionsUtils.IDEAL_STATE_IP_SEPARATOR
+            + "0_0"));
+    assertTrue(initialListFields.containsKey(
+        InstancePartitionsUtils.IDEAL_STATE_IP_PREFIX + ipName + InstancePartitionsUtils.IDEAL_STATE_IP_SEPARATOR
+            + "0_1"));
+    assertTrue(initialListFields.containsKey(
+        InstancePartitionsUtils.IDEAL_STATE_IP_PREFIX + ipName + InstancePartitionsUtils.IDEAL_STATE_IP_SEPARATOR
+            + "1_0"));
+    assertTrue(initialListFields.containsKey(
+        InstancePartitionsUtils.IDEAL_STATE_IP_PREFIX + ipName + InstancePartitionsUtils.IDEAL_STATE_IP_SEPARATOR
+            + "1_1"));
+
+    // Change to 1 replica-group x 3 partitions (3x1)
+    InstanceReplicaGroupPartitionConfig rgp3x1 =
+        new InstanceReplicaGroupPartitionConfig(true, 0, 1, 0, 3, 0, false, null);
+    InstanceAssignmentConfig ia3x1 = new InstanceAssignmentConfig(tagPool, null, rgp3x1, null, false);
+    tableConfig.setInstanceAssignmentConfigMap(Map.of("OFFLINE", ia3x1));
+
+    // Run rebalancer with instance reassignment
+    TableRebalancer tableRebalancer = new TableRebalancer(_helixManager);
+    RebalanceConfig rebalanceConfig = new RebalanceConfig();
+    rebalanceConfig.setReassignInstances(true);
+    rebalanceConfig.setMinAvailableReplicas(0);
+    RebalanceResult result = tableRebalancer.rebalance(tableConfig, rebalanceConfig, null);
+    assertEquals(result.getStatus(), RebalanceResult.Status.DONE);
+
+    Map<String, List<String>> finalListFields =
+        _helixResourceManager.getTableIdealState(OFFLINE_TABLE_NAME).getRecord().getListFields();
+    // Old keys removed
+    assertFalse(finalListFields.containsKey(
+        InstancePartitionsUtils.IDEAL_STATE_IP_PREFIX + ipName + InstancePartitionsUtils.IDEAL_STATE_IP_SEPARATOR
+            + "0_1"));
+    assertFalse(finalListFields.containsKey(
+        InstancePartitionsUtils.IDEAL_STATE_IP_PREFIX + ipName + InstancePartitionsUtils.IDEAL_STATE_IP_SEPARATOR
+            + "1_1"));
+    // New keys present: 0_0,1_0,2_0
+    assertTrue(finalListFields.containsKey(
+        InstancePartitionsUtils.IDEAL_STATE_IP_PREFIX + ipName + InstancePartitionsUtils.IDEAL_STATE_IP_SEPARATOR
+            + "0_0"));
+    assertTrue(finalListFields.containsKey(
+        InstancePartitionsUtils.IDEAL_STATE_IP_PREFIX + ipName + InstancePartitionsUtils.IDEAL_STATE_IP_SEPARATOR
+            + "1_0"));
+    assertTrue(finalListFields.containsKey(
+        InstancePartitionsUtils.IDEAL_STATE_IP_PREFIX + ipName + InstancePartitionsUtils.IDEAL_STATE_IP_SEPARATOR
+            + "2_0"));
+
+    _helixResourceManager.deleteOfflineTable(RAW_TABLE_NAME);
+    for (int i = 0; i < numServers; i++) {
+      stopAndDropFakeInstance(tenant + "_" + SERVER_INSTANCE_ID_PREFIX + i);
+    }
+  }
+
+  @Test
+  public void testDowntimeReplaceIdealStateInstancePartitions()
+      throws Exception {
+    int numServers = 6;
+    String tenant = "downtimeTenant";
+    for (int i = 0; i < numServers; i++) {
+      addFakeServerInstanceToAutoJoinHelixCluster(tenant + "_" + SERVER_INSTANCE_ID_PREFIX + i, false);
+    }
+    _helixResourceManager.createServerTenant(new Tenant(TenantRole.SERVER, tenant, numServers, numServers, 0));
+
+    InstanceTagPoolConfig tagPool =
+        new InstanceTagPoolConfig(TagNameUtils.getOfflineTagForTenant(tenant), false, 0, null);
+    InstanceReplicaGroupPartitionConfig rgp2x2 =
+        new InstanceReplicaGroupPartitionConfig(true, 0, 2, 0, 2, 0, false, null);
+    InstanceAssignmentConfig ia2x2 = new InstanceAssignmentConfig(tagPool, null, rgp2x2, null, false);
+
+    TableConfig tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName(RAW_TABLE_NAME)
+        .setNumReplicas(NUM_REPLICAS)
+        .setInstanceAssignmentConfigMap(Map.of("OFFLINE", ia2x2))
+        .setServerTenant(tenant)
+        .build();
+    addDummySchema(RAW_TABLE_NAME);
+    _helixResourceManager.addTable(tableConfig);
+
+    String ipName = InstancePartitionsUtils.getInstancePartitionsName(OFFLINE_TABLE_NAME,
+        InstancePartitionsType.OFFLINE.toString());
+    Map<String, List<String>> initialListFields =
+        _helixResourceManager.getTableIdealState(OFFLINE_TABLE_NAME).getRecord().getListFields();
+    Set<String> ipKeys = initialListFields.keySet().stream()
+        .filter(k -> k.startsWith(
+            InstancePartitionsUtils.IDEAL_STATE_IP_PREFIX + ipName + InstancePartitionsUtils.IDEAL_STATE_IP_SEPARATOR))
+        .collect(Collectors.toSet());
+    assertEquals(ipKeys, Set.of(
+        InstancePartitionsUtils.IDEAL_STATE_IP_PREFIX + ipName + InstancePartitionsUtils.IDEAL_STATE_IP_SEPARATOR
+            + "0_0",
+        InstancePartitionsUtils.IDEAL_STATE_IP_PREFIX + ipName + InstancePartitionsUtils.IDEAL_STATE_IP_SEPARATOR
+            + "0_1",
+        InstancePartitionsUtils.IDEAL_STATE_IP_PREFIX + ipName + InstancePartitionsUtils.IDEAL_STATE_IP_SEPARATOR
+            + "1_0",
+        InstancePartitionsUtils.IDEAL_STATE_IP_PREFIX + ipName + InstancePartitionsUtils.IDEAL_STATE_IP_SEPARATOR
+            + "1_1")
+    );
+
+    // Change to 3x1 and run downtime rebalance
+    InstanceReplicaGroupPartitionConfig rgp3x1 =
+        new InstanceReplicaGroupPartitionConfig(true, 0, 1, 0, 3, 0, false, null);
+    InstanceAssignmentConfig ia3x1 = new InstanceAssignmentConfig(tagPool, null, rgp3x1, null, false);
+    tableConfig.setInstanceAssignmentConfigMap(Map.of("OFFLINE", ia3x1));
+
+    TableRebalancer tableRebalancer = new TableRebalancer(_helixManager);
+    RebalanceConfig rebalanceConfig = new RebalanceConfig();
+    rebalanceConfig.setReassignInstances(true);
+    rebalanceConfig.setDowntime(true);
+    RebalanceResult result = tableRebalancer.rebalance(tableConfig, rebalanceConfig, null);
+    assertEquals(result.getStatus(), RebalanceResult.Status.DONE);
+
+    Map<String, List<String>> finalListFields =
+        _helixResourceManager.getTableIdealState(OFFLINE_TABLE_NAME).getRecord().getListFields();
+    // Only keys for 0_0,1_0,2_0 should exist
+    ipKeys = finalListFields.keySet().stream()
+        .filter(k -> k.startsWith(
+            InstancePartitionsUtils.IDEAL_STATE_IP_PREFIX + ipName + InstancePartitionsUtils.IDEAL_STATE_IP_SEPARATOR))
+        .collect(Collectors.toSet());
+    assertEquals(ipKeys, Set.of(
+        InstancePartitionsUtils.IDEAL_STATE_IP_PREFIX + ipName + InstancePartitionsUtils.IDEAL_STATE_IP_SEPARATOR
+            + "0_0",
+        InstancePartitionsUtils.IDEAL_STATE_IP_PREFIX + ipName + InstancePartitionsUtils.IDEAL_STATE_IP_SEPARATOR
+            + "1_0",
+        InstancePartitionsUtils.IDEAL_STATE_IP_PREFIX + ipName + InstancePartitionsUtils.IDEAL_STATE_IP_SEPARATOR
+            + "2_0"));
+
+    // ZK reflects new instance partitions
+    InstancePartitions zkIp =
+        InstancePartitionsUtils.fetchInstancePartitions(_propertyStore, ipName);
+    assertNotNull(zkIp);
+    assertEquals(zkIp.getNumReplicaGroups(), 1);
+    assertEquals(zkIp.getNumPartitions(), 3);
+
+    _helixResourceManager.deleteOfflineTable(RAW_TABLE_NAME);
+    for (int i = 0; i < numServers; i++) {
+      stopAndDropFakeInstance(tenant + "_" + SERVER_INSTANCE_ID_PREFIX + i);
+    }
   }
 
   @AfterClass

@@ -20,8 +20,12 @@ package org.apache.pinot.common.assignment;
 
 import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
+import org.apache.commons.lang3.tuple.Pair;
+import org.apache.helix.model.IdealState;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.TableType;
 import org.apache.pinot.spi.config.table.assignment.InstanceAssignmentConfig;
@@ -65,6 +69,74 @@ public class InstancePartitionsUtilsTest {
 
     Assert.assertFalse(InstancePartitionsUtils.shouldFetchPreConfiguredInstancePartitions(tableConfig,
         InstancePartitionsType.OFFLINE));
+  }
+
+  @Test
+  public void testGetPartitionIdAndReplicaGroupId() {
+    Assert.assertEquals(InstancePartitionsUtils.getPartitionIdAndReplicaGroupId("0_0"), Pair.of(0, 0));
+    Assert.assertEquals(InstancePartitionsUtils.getPartitionIdAndReplicaGroupId("1_0"), Pair.of(1, 0));
+    Assert.assertEquals(InstancePartitionsUtils.getPartitionIdAndReplicaGroupId("0_1"), Pair.of(0, 1));
+  }
+
+  @Test
+  public void testCombineInstancePartitionsInIdealState() {
+    IdealState idealState = new IdealState("testTable");
+    List<InstancePartitions> instancePartitionsList = new ArrayList<>();
+    instancePartitionsList.add(
+        new InstancePartitions("testTable_CONSUMING",
+            Map.of("0_0", List.of("instance-0", "instance-1"), "0_1", List.of("instance-2", "instance-3")))
+    );
+    instancePartitionsList.add(
+        new InstancePartitions("testTable_COMPLETED", Map.of("0_0", List.of("instance-4")))
+    );
+
+    InstancePartitionsUtils.combineInstancePartitionsInIdealState(idealState, instancePartitionsList);
+    Map<String, List<String>> listFields = idealState.getRecord().getListFields();
+
+    List<String> consumingPartition0Rg0 = listFields.get(
+        InstancePartitionsUtils.IDEAL_STATE_IP_PREFIX + "testTable_CONSUMING"
+            + InstancePartitionsUtils.IDEAL_STATE_IP_SEPARATOR + "0_0");
+    Assert.assertNotNull(consumingPartition0Rg0);
+    Assert.assertEquals(new HashSet<>(consumingPartition0Rg0), Set.of("instance-0", "instance-1"));
+
+    List<String> consumingPartition0Rg1 = listFields.get(
+        InstancePartitionsUtils.IDEAL_STATE_IP_PREFIX + "testTable_CONSUMING"
+            + InstancePartitionsUtils.IDEAL_STATE_IP_SEPARATOR + "0_1");
+    Assert.assertNotNull(consumingPartition0Rg1);
+    Assert.assertEquals(new HashSet<>(consumingPartition0Rg1), Set.of("instance-2", "instance-3"));
+
+    List<String> completedPartition0Rg0 = listFields.get(
+        InstancePartitionsUtils.IDEAL_STATE_IP_PREFIX + "testTable_COMPLETED"
+            + InstancePartitionsUtils.IDEAL_STATE_IP_SEPARATOR + "0_0");
+    Assert.assertNotNull(completedPartition0Rg0);
+    Assert.assertEquals(completedPartition0Rg0, List.of("instance-4"));
+
+    // Add one more instance to 0_0 in COMPLETED, replace existing instance
+    List<InstancePartitions> updatedInstancePartitionsList = List.of(instancePartitionsList.get(0),
+        new InstancePartitions("testTable_COMPLETED", Map.of("0_0", List.of("instance-5", "instance-6"))));
+    InstancePartitionsUtils.combineInstancePartitionsInIdealState(idealState, updatedInstancePartitionsList);
+    // Verify idempotent
+    InstancePartitionsUtils.combineInstancePartitionsInIdealState(idealState, updatedInstancePartitionsList);
+
+    // Ensure that CONSUMING instance partitions aren't affected
+    consumingPartition0Rg0 = listFields.get(
+        InstancePartitionsUtils.IDEAL_STATE_IP_PREFIX + "testTable_CONSUMING"
+            + InstancePartitionsUtils.IDEAL_STATE_IP_SEPARATOR + "0_0");
+    Assert.assertNotNull(consumingPartition0Rg0);
+    Assert.assertEquals(new HashSet<>(consumingPartition0Rg0), Set.of("instance-0", "instance-1"));
+
+    consumingPartition0Rg1 = listFields.get(
+        InstancePartitionsUtils.IDEAL_STATE_IP_PREFIX + "testTable_CONSUMING"
+            + InstancePartitionsUtils.IDEAL_STATE_IP_SEPARATOR + "0_1");
+    Assert.assertNotNull(consumingPartition0Rg1);
+    Assert.assertEquals(new HashSet<>(consumingPartition0Rg1), Set.of("instance-2", "instance-3"));
+
+    // Verify that COMPLETED instance partitions 0_0 now contains both the old and new instances.
+    completedPartition0Rg0 = listFields.get(
+        InstancePartitionsUtils.IDEAL_STATE_IP_PREFIX + "testTable_COMPLETED"
+            + InstancePartitionsUtils.IDEAL_STATE_IP_SEPARATOR + "0_0");
+    Assert.assertNotNull(completedPartition0Rg0);
+    Assert.assertEquals(new HashSet<>(completedPartition0Rg0), Set.of("instance-4", "instance-5", "instance-6"));
   }
 
   private static InstanceAssignmentConfig getInstanceAssignmentConfig(InstanceAssignmentConfig.PartitionSelector

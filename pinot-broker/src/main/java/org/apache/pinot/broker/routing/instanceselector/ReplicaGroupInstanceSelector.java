@@ -39,6 +39,8 @@ import org.apache.pinot.common.utils.config.QueryOptionsUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import static org.apache.pinot.spi.utils.CommonConstants.Broker.FALLBACK_REPLICA_GROUP_ID;
+
 
 /**
  * Instance selector for replica-group routing strategy.
@@ -241,6 +243,8 @@ public class ReplicaGroupInstanceSelector extends BaseInstanceSelector {
       }
     }
 
+    Map<String, Integer> serverToReplicaGroupMap = serverToReplicaGroupMap(idealState);
+
     // Iterate over the maps and exclude the unavailable instances
     for (Map.Entry<String, Set<String>> entry : oldSegmentToOnlineInstancesMap.entrySet()) {
       String segment = entry.getKey();
@@ -251,7 +255,8 @@ public class ReplicaGroupInstanceSelector extends BaseInstanceSelector {
       List<SegmentInstanceCandidate> candidates = new ArrayList<>(onlineInstances.size());
       for (String instance : onlineInstances) {
         if (!unavailableInstances.contains(instance)) {
-          candidates.add(new SegmentInstanceCandidate(instance, true, getPool(instance)));
+          candidates.add(new SegmentInstanceCandidate(instance, true, getPool(instance),
+              serverToReplicaGroupMap.getOrDefault(instance, FALLBACK_REPLICA_GROUP_ID)));
         }
       }
       _oldSegmentCandidatesMap.put(segment, candidates);
@@ -266,7 +271,8 @@ public class ReplicaGroupInstanceSelector extends BaseInstanceSelector {
       List<SegmentInstanceCandidate> candidates = new ArrayList<>(idealStateInstanceStateMap.size());
       for (String instance : convertToSortedMap(idealStateInstanceStateMap).keySet()) {
         if (!unavailableInstances.contains(instance)) {
-          candidates.add(new SegmentInstanceCandidate(instance, onlineInstances.contains(instance), getPool(instance)));
+          candidates.add(new SegmentInstanceCandidate(instance, onlineInstances.contains(instance), getPool(instance),
+              serverToReplicaGroupMap.getOrDefault(instance, FALLBACK_REPLICA_GROUP_ID)));
         }
       }
       _newSegmentStateMap.put(segment, new NewSegmentState(newSegmentCreationTimeMap.get(segment), candidates));

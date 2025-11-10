@@ -39,6 +39,8 @@ import org.apache.helix.model.IdealState;
 import org.apache.helix.model.InstanceConfig;
 import org.apache.helix.model.MasterSlaveSMD;
 import org.apache.helix.zookeeper.datamodel.ZNRecord;
+import org.apache.pinot.common.assignment.InstancePartitions;
+import org.apache.pinot.common.assignment.InstancePartitionsUtils;
 import org.apache.pinot.common.exception.InvalidConfigException;
 import org.apache.pinot.common.exception.TableNotFoundException;
 import org.apache.pinot.common.lineage.LineageEntryState;
@@ -69,6 +71,10 @@ import org.apache.pinot.spi.config.table.TableType;
 import org.apache.pinot.spi.config.table.TagOverrideConfig;
 import org.apache.pinot.spi.config.table.TenantConfig;
 import org.apache.pinot.spi.config.table.TierConfig;
+import org.apache.pinot.spi.config.table.assignment.InstanceAssignmentConfig;
+import org.apache.pinot.spi.config.table.assignment.InstancePartitionsType;
+import org.apache.pinot.spi.config.table.assignment.InstanceReplicaGroupPartitionConfig;
+import org.apache.pinot.spi.config.table.assignment.InstanceTagPoolConfig;
 import org.apache.pinot.spi.config.table.ingestion.BatchIngestionConfig;
 import org.apache.pinot.spi.config.table.ingestion.IngestionConfig;
 import org.apache.pinot.spi.config.tenant.Tenant;
@@ -108,6 +114,7 @@ public class PinotHelixResourceManagerStatelessTest extends ControllerTest {
   @Override
   protected void overrideControllerConf(Map<String, Object> properties) {
     properties.put(ControllerConf.CLUSTER_TENANT_ISOLATION_ENABLE, false);
+    properties.put(ControllerConf.ENABLE_IDEAL_STATE_INSTANCE_PARTITIONS, true);
   }
 
   @BeforeClass
@@ -1585,6 +1592,49 @@ public class PinotHelixResourceManagerStatelessTest extends ControllerTest {
     _helixResourceManager.deleteOfflineTable(RAW_TABLE_NAME);
     segmentLineage = SegmentLineageAccessHelper.getSegmentLineage(_propertyStore, OFFLINE_TABLE_NAME);
     assertNull(segmentLineage);
+  }
+
+  @Test
+  public void testUpdateTableConfigPersistsInstancePartitionsAndIdealState()
+      throws Exception {
+    // Create table without instance assignment
+    addDummySchema(RAW_TABLE_NAME);
+    TableConfig tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName(RAW_TABLE_NAME)
+        .setBrokerTenant(BROKER_TENANT_NAME)
+        .setServerTenant(SERVER_TENANT_NAME)
+        .build();
+    waitForEVToDisappear(tableConfig.getTableName());
+    _helixResourceManager.addTable(tableConfig);
+
+    // Add explicit OFFLINE instance assignment (2 replica groups x 1 partition)
+    InstanceReplicaGroupPartitionConfig rgpCfg =
+        new InstanceReplicaGroupPartitionConfig(true, 0, 2, 0, 1, 0, false, null);
+    InstanceAssignmentConfig iaCfg =
+        new InstanceAssignmentConfig(new InstanceTagPoolConfig(TagNameUtils.getOfflineTagForTenant(SERVER_TENANT_NAME),
+            false, 0, null), null, rgpCfg, null, false);
+    tableConfig.setInstanceAssignmentConfigMap(Map.of("OFFLINE", iaCfg));
+    _helixResourceManager.updateTableConfig(tableConfig);
+
+    // ZK has instance partitions
+    String ipName =
+        InstancePartitionsType.OFFLINE.getInstancePartitionsName(RAW_TABLE_NAME);
+    InstancePartitions zkIp =
+        InstancePartitionsUtils.fetchInstancePartitions(_propertyStore, ipName);
+    assertNotNull(zkIp);
+    assertEquals(zkIp.getNumReplicaGroups(), 2);
+    assertEquals(zkIp.getNumPartitions(), 1);
+
+    // IdealState list-fields contain the instance partitions keys
+    Map<String, List<String>> listFields =
+        _helixResourceManager.getTableIdealState(OFFLINE_TABLE_NAME).getRecord().getListFields();
+    assertTrue(listFields.containsKey(
+        InstancePartitionsUtils.IDEAL_STATE_IP_PREFIX + ipName + InstancePartitionsUtils.IDEAL_STATE_IP_SEPARATOR
+            + "0_0"));
+    assertTrue(listFields.containsKey(
+        InstancePartitionsUtils.IDEAL_STATE_IP_PREFIX + ipName + InstancePartitionsUtils.IDEAL_STATE_IP_SEPARATOR
+            + "0_1"));
+
+    _helixResourceManager.deleteOfflineTable(OFFLINE_TABLE_NAME);
   }
 
   private String getDownloadURL(String controllerDataDir, String rawTableName, String segmentId) {
