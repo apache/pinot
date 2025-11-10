@@ -22,6 +22,8 @@ import com.fasterxml.jackson.core.type.TypeReference;
 import java.io.IOException;
 import java.util.Collections;
 import java.util.HashMap;
+import java.util.HashSet;
+import java.util.List;
 import java.util.Map;
 import java.util.TreeMap;
 import org.apache.pinot.common.assignment.InstancePartitions;
@@ -68,6 +70,7 @@ public class PinotInstanceAssignmentRestletResourceStatelessTest extends Control
   @Override
   protected void overrideControllerConf(Map<String, Object> properties) {
     properties.put(ControllerConf.CLUSTER_TENANT_ISOLATION_ENABLE, false);
+    properties.put(ControllerConf.ENABLE_IDEAL_STATE_INSTANCE_PARTITIONS, true);
   }
 
   @BeforeClass
@@ -127,6 +130,7 @@ public class PinotInstanceAssignmentRestletResourceStatelessTest extends Control
     _helixResourceManager.setExistingTableConfig(offlineTableConfig);
 
     // OFFLINE instance partitions should be generated
+    // Also verify IdealState list-field presence for IP key
     Map<String, InstancePartitions> instancePartitionsMap = getInstancePartitionsMap();
     assertEquals(instancePartitionsMap.size(), 1);
     InstancePartitions offlineInstancePartitions = instancePartitionsMap.get(InstancePartitionsType.OFFLINE.toString());
@@ -135,6 +139,20 @@ public class PinotInstanceAssignmentRestletResourceStatelessTest extends Control
     assertEquals(offlineInstancePartitions.getNumPartitions(), 1);
     assertEquals(offlineInstancePartitions.getInstances(0, 0).size(), 1);
     String offlineInstanceId = offlineInstancePartitions.getInstances(0, 0).get(0);
+    String ipName = InstancePartitionsType.OFFLINE.getInstancePartitionsName(RAW_TABLE_NAME);
+
+    for (int partitionId = 0; partitionId < offlineInstancePartitions.getNumPartitions(); partitionId++) {
+      for (int replica = 0; replica < offlineInstancePartitions.getNumReplicaGroups(); replica++) {
+        assertEquals(
+            new HashSet<>(
+                _helixResourceManager.getTableIdealState(TableNameBuilder.OFFLINE.tableNameWithType(RAW_TABLE_NAME))
+                    .getRecord()
+                    .getListFields()
+                    .get(InstancePartitionsUtils.IDEAL_STATE_IP_PREFIX + ipName
+                        + InstancePartitionsUtils.IDEAL_STATE_IP_SEPARATOR + partitionId + "_" + replica)),
+            new HashSet<>(offlineInstancePartitions.getInstances(partitionId, replica)));
+      }
+    }
 
     // Add CONSUMING instance assignment config to the real-time table config
     InstanceAssignmentConfig consumingInstanceAssignmentConfig = new InstanceAssignmentConfig(
@@ -349,6 +367,28 @@ public class PinotInstanceAssignmentRestletResourceStatelessTest extends Control
         Collections.singletonList(consumingInstanceId));
     assertEquals(instancePartitionsMap.get(InstancePartitionsType.COMPLETED.toString()).getInstances(0, 0),
         Collections.singletonList(consumingInstanceId));
+    // IdealState list-fields reflect each IP entry
+    String consIpName =
+        InstancePartitionsType.CONSUMING.getInstancePartitionsName(RAW_TABLE_NAME);
+    String compIpName =
+        InstancePartitionsType.COMPLETED.getInstancePartitionsName(RAW_TABLE_NAME);
+    Map<String, List<String>> listFields =
+        _helixResourceManager.getTableIdealState(TableNameBuilder.OFFLINE.tableNameWithType(RAW_TABLE_NAME))
+            .getRecord().getListFields();
+    assertTrue(listFields.keySet().stream().anyMatch(k -> k.startsWith(
+        InstancePartitionsUtils.IDEAL_STATE_IP_PREFIX + ipName + InstancePartitionsUtils.IDEAL_STATE_IP_SEPARATOR)));
+    // For REALTIME table, CONSUMING/COMPLETED keys exist after persistence
+    Map<String, List<String>> rtListFields =
+        _helixResourceManager.getTableIdealState(TableNameBuilder.REALTIME.tableNameWithType(RAW_TABLE_NAME))
+            .getRecord().getListFields();
+    assertTrue(rtListFields.keySet()
+        .stream()
+        .anyMatch(k -> k.startsWith(InstancePartitionsUtils.IDEAL_STATE_IP_PREFIX + consIpName
+            + InstancePartitionsUtils.IDEAL_STATE_IP_SEPARATOR)));
+    assertTrue(rtListFields.keySet()
+        .stream()
+        .anyMatch(k -> k.startsWith(InstancePartitionsUtils.IDEAL_STATE_IP_PREFIX + compIpName
+            + InstancePartitionsUtils.IDEAL_STATE_IP_SEPARATOR)));
 
     // Delete the offline table
     _helixResourceManager.deleteOfflineTable(RAW_TABLE_NAME);
