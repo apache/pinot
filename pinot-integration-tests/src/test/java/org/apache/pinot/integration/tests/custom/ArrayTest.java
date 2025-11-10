@@ -86,6 +86,77 @@ public class ArrayTest extends CustomDataQueryClusterIntegrationTest {
   }
 
   @Test(dataProvider = "useBothQueryEngines")
+  public void testArrayAggMvQueries(boolean useMultiStageQueryEngine)
+      throws Exception {
+    setUseMultiStageQueryEngine(useMultiStageQueryEngine);
+    String query = String.format("SELECT arrayAgg(%s, 'LONG'), arrayAgg(%s, 'DOUBLE') FROM %s LIMIT %d",
+        LONG_ARRAY_COLUMN, DOUBLE_ARRAY_COLUMN, getTableName(), getCountStarResult());
+    JsonNode result = postQuery(query).get("resultTable");
+    JsonNode rows = result.get("rows");
+    assertEquals(rows.size(), 1);
+    JsonNode row = rows.get(0);
+    assertEquals(row.size(), 2);
+    // Each row has 4 MV entries, total 1000 rows
+    assertEquals(row.get(0).size(), 4 * getCountStarResult());
+    assertEquals(row.get(1).size(), 4 * getCountStarResult());
+  }
+
+  @Test(dataProvider = "useBothQueryEngines")
+  public void testArrayAggMvDistinctQueries(boolean useMultiStageQueryEngine)
+      throws Exception {
+    setUseMultiStageQueryEngine(useMultiStageQueryEngine);
+    String query = String.format("SELECT arrayAgg(%s, 'LONG', true), arrayAgg(%s, 'DOUBLE', true) FROM %s LIMIT %d",
+        LONG_ARRAY_COLUMN, DOUBLE_ARRAY_COLUMN, getTableName(), getCountStarResult());
+    JsonNode result = postQuery(query).get("resultTable");
+    JsonNode rows = result.get("rows");
+    assertEquals(rows.size(), 1);
+    JsonNode row = rows.get(0);
+    assertEquals(row.size(), 2);
+    // Distinct values for both arrays are 4
+    assertEquals(row.get(0).size(), 4);
+    assertEquals(row.get(1).size(), 4);
+  }
+
+  @Test(dataProvider = "useBothQueryEngines")
+  public void testArrayAggMvGroupByQueries(boolean useMultiStageQueryEngine)
+      throws Exception {
+    setUseMultiStageQueryEngine(useMultiStageQueryEngine);
+    String query = String.format(
+        "SELECT arrayAgg(%s, 'LONG'), arrayAgg(%s, 'DOUBLE'), %s FROM %s GROUP BY %s LIMIT %d",
+        LONG_ARRAY_COLUMN, DOUBLE_ARRAY_COLUMN, GROUP_BY_COLUMN, getTableName(), GROUP_BY_COLUMN,
+        getCountStarResult());
+    JsonNode result = postQuery(query).get("resultTable");
+    JsonNode rows = result.get("rows");
+    assertEquals(rows.size(), 10);
+    for (int i = 0; i < 10; i++) {
+      JsonNode row = rows.get(i);
+      assertEquals(row.size(), 3);
+      // Each group has 1/10th rows
+      assertEquals(row.get(0).size(), 4 * (getCountStarResult() / 10));
+      assertEquals(row.get(1).size(), 4 * (getCountStarResult() / 10));
+    }
+  }
+
+  @Test(dataProvider = "useBothQueryEngines")
+  public void testArrayAggMvDistinctGroupByQueries(boolean useMultiStageQueryEngine)
+      throws Exception {
+    setUseMultiStageQueryEngine(useMultiStageQueryEngine);
+    String query = String.format(
+        "SELECT arrayAgg(%s, 'LONG', true), arrayAgg(%s, 'DOUBLE', true), %s FROM %s GROUP BY %s LIMIT %d",
+        LONG_ARRAY_COLUMN, DOUBLE_ARRAY_COLUMN, GROUP_BY_COLUMN, getTableName(), GROUP_BY_COLUMN,
+        getCountStarResult());
+    JsonNode result = postQuery(query).get("resultTable");
+    JsonNode rows = result.get("rows");
+    assertEquals(rows.size(), 10);
+    for (int i = 0; i < 10; i++) {
+      JsonNode row = rows.get(i);
+      assertEquals(row.size(), 3);
+      assertEquals(row.get(0).size(), 4);
+      assertEquals(row.get(1).size(), 4);
+    }
+  }
+
+  @Test(dataProvider = "useBothQueryEngines")
   public void testArrayAggQueries(boolean useMultiStageQueryEngine)
       throws Exception {
     setUseMultiStageQueryEngine(useMultiStageQueryEngine);
@@ -946,7 +1017,7 @@ public class ArrayTest extends CustomDataQueryClusterIntegrationTest {
       assertEquals(row.size(), 4);
       assertEquals(row.get(0).asInt() % 4 < 2, row.get(1).asBoolean());
       assertEquals(row.get(1).asBoolean(), row.get(2).asBoolean());
-      assertEquals(row.get(2).asBoolean(), row.get(2).asBoolean());
+      assertEquals(row.get(2).asBoolean(), row.get(3).asBoolean());
     }
   }
 
