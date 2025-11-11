@@ -12,6 +12,7 @@
     "loadMode": "HEAP",
     "invertedIndexColumns": [
       "teamID"
+      "playerID"
     ]
   },
   "metadata": {
@@ -45,4 +46,4 @@
       "encodingType": "RAW"
     }
   ]
-}
+} 
