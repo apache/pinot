@@ -23,6 +23,7 @@ import com.google.common.base.Preconditions;
 import it.unimi.dsi.fastutil.objects.Object2IntOpenHashMap;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ArrayBlockingQueue;
@@ -292,7 +293,11 @@ public class LeafOperator extends MultiStageOperator {
   }
 
   private synchronized void mergeExecutionStats(Map<String, String> executionStats) {
-    for (Map.Entry<String, String> entry : executionStats.entrySet()) {
+    Map<String, String> snapshot;
+    synchronized (executionStats) {
+      snapshot = new HashMap<>(executionStats);
+    }
+    for (Map.Entry<String, String> entry : snapshot.entrySet()) {
       String key = entry.getKey();
       DataTable.MetadataKey metadataKey = DataTable.MetadataKey.getByName(key);
       if (metadataKey == null || metadataKey == DataTable.MetadataKey.UNKNOWN) {
@@ -426,6 +431,7 @@ public class LeafOperator extends MultiStageOperator {
       try {
         execute();
       } catch (Exception e) {
+        LOGGER.error("Leaf stage failed", e);
         setErrorBlock(
             ErrorMseBlock.fromError(QueryErrorCode.INTERNAL, "Caught exception while executing leaf stage: " + e));
       } finally {

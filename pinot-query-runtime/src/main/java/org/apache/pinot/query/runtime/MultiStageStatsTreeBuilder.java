@@ -47,7 +47,7 @@ public class MultiStageStatsTreeBuilder {
     PlanNode planNode = _planNodes.get(stage);
 
     MultiStageQueryStats.StageStats stageStats = stage < _queryStats.size() ? _queryStats.get(stage) : null;
-    if (stageStats == null) {
+    if (stageStats == null || stageStats.isEmpty()) {
       // We don't have stats for this stage. This can happen when the stage is not executed. For example, when there
       // are no segments for a table.
       ObjectNode jsonNodes = JsonUtils.newObjectNode();

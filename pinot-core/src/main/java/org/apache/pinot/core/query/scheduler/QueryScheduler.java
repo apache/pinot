@@ -150,9 +150,11 @@ public abstract class QueryScheduler {
       String queryId = executionContext.getCid();
       String workloadName = executionContext.getWorkloadName();
       Map<String, String> responseMetadata = instanceResponse.getResponseMetadata();
-      responseMetadata.put(MetadataKey.REQUEST_ID.getName(), Long.toString(requestId));
-      responseMetadata.put(MetadataKey.QUERY_ID.getName(), queryId);
-      responseMetadata.put(MetadataKey.WORKLOAD_NAME.getName(), workloadName);
+      synchronized (responseMetadata) {
+        responseMetadata.put(MetadataKey.REQUEST_ID.getName(), Long.toString(requestId));
+        responseMetadata.put(MetadataKey.QUERY_ID.getName(), queryId);
+        responseMetadata.put(MetadataKey.WORKLOAD_NAME.getName(), workloadName);
+      }
       byte[] responseBytes = serializeResponse(queryRequest, instanceResponse);
 
       // Log the statistics

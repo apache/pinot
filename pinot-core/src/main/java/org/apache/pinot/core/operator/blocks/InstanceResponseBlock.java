@@ -22,6 +22,7 @@ import java.io.IOException;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
 import javax.annotation.Nullable;
 import org.apache.pinot.common.datatable.DataTable;
 import org.apache.pinot.common.utils.DataSchema;
@@ -49,7 +50,8 @@ public class InstanceResponseBlock implements Block {
         _exceptions.put(errMsg.getErrCode().getId(), errMsg.getUsrMsg());
       }
     }
-    _metadata = resultsBlock.getResultsMetadata();
+    // Copy the metadata to a concurrent hash map to avoid concurrent modification exceptions when merging stats
+    _metadata = new ConcurrentHashMap<>(resultsBlock.getResultsMetadata());
   }
 
   /**
@@ -58,13 +60,13 @@ public class InstanceResponseBlock implements Block {
   public InstanceResponseBlock() {
     _resultsBlock = null;
     _exceptions = new HashMap<>();
-    _metadata = new HashMap<>();
+    _metadata = new ConcurrentHashMap<>();
   }
 
   private InstanceResponseBlock(Map<Integer, String> exceptions, Map<String, String> metadata) {
     _resultsBlock = null;
     _exceptions = exceptions;
-    _metadata = metadata;
+    _metadata = new ConcurrentHashMap<>(metadata);
   }
 
   public InstanceResponseBlock toMetadataOnlyResponseBlock() {

@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.query.runtime.operator;
 
+import java.lang.reflect.Method;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
@@ -38,10 +39,16 @@ import org.apache.pinot.core.query.executor.QueryExecutor;
 import org.apache.pinot.core.query.request.ServerQueryRequest;
 import org.apache.pinot.core.query.request.context.QueryContext;
 import org.apache.pinot.core.query.request.context.utils.QueryContextConverterUtils;
+import org.apache.pinot.query.mailbox.MailboxService;
+import org.apache.pinot.query.routing.StageMetadata;
 import org.apache.pinot.query.routing.VirtualServerAddress;
+import org.apache.pinot.query.routing.WorkerMetadata;
+import org.apache.pinot.query.runtime.blocks.ErrorMseBlock;
 import org.apache.pinot.query.runtime.blocks.MseBlock;
 import org.apache.pinot.query.runtime.blocks.SuccessMseBlock;
 import org.apache.pinot.query.runtime.plan.OpChainExecutionContext;
+import org.apache.pinot.spi.config.instance.InstanceType;
+import org.apache.pinot.spi.env.PinotConfiguration;
 import org.apache.pinot.spi.exception.QueryErrorCode;
 import org.mockito.Mock;
 import org.mockito.MockitoAnnotations;
@@ -56,9 +63,10 @@ import static org.mockito.Mockito.spy;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 import static org.testng.Assert.assertEquals;
+import static org.testng.Assert.assertFalse;
+import static org.testng.Assert.assertNotNull;
 import static org.testng.Assert.assertSame;
 import static org.testng.Assert.assertTrue;
-
 
 // TODO: add tests for Agg / GroupBy / Distinct result blocks
 public class LeafOperatorTest {
@@ -400,5 +408,91 @@ public class LeafOperatorTest {
     assertTrue(executorService.awaitTermination(10, TimeUnit.SECONDS));
 
     operator.close();
+  }
+
+  private static OpChainExecutionContext createMinimalContext() {
+    MailboxService mailboxService =
+        new MailboxService("localhost", 0, InstanceType.SERVER, new PinotConfiguration());
+    StageMetadata stageMetadata =
+        new StageMetadata(0, Collections.emptyList(), new HashMap<>(Map.of("tableName", "t")));
+    WorkerMetadata workerMetadata = new WorkerMetadata(1, new HashMap<>());
+    return new OpChainExecutionContext(mailboxService, 1L, "cid", System.currentTimeMillis() + 60_000,
+        System.currentTimeMillis() + 60_000, "broker", Collections.emptyMap(), stageMetadata, workerMetadata, null,
+        true);
+  }
+
+  private static LeafOperator createLeafOperator() {
+    OpChainExecutionContext context = createMinimalContext();
+    List<ServerQueryRequest> requests = new ArrayList<>();
+    requests.add(mock(ServerQueryRequest.class));
+    DataSchema schema =
+        new DataSchema(new String[]{"c"}, new DataSchema.ColumnDataType[]{DataSchema.ColumnDataType.INT});
+    QueryExecutor queryExecutor = new QueryExecutor() {
+      @Override
+      public void init(PinotConfiguration config,
+          org.apache.pinot.core.data.manager.InstanceDataManager instanceDataManager,
+          org.apache.pinot.common.metrics.ServerMetrics serverMetrics) {
+      }
+
+      @Override
+      public org.apache.pinot.core.data.manager.InstanceDataManager getInstanceDataManager() {
+        return null;
+      }
+
+      @Override
+      public void start() {
+      }
+
+      @Override
+      public void shutDown() {
+      }
+
+      @Override
+      public org.apache.pinot.core.operator.blocks.InstanceResponseBlock execute(ServerQueryRequest queryRequest,
+          ExecutorService executorService, org.apache.pinot.core.query.executor.ResultsBlockStreamer streamer) {
+        return new org.apache.pinot.core.operator.blocks.InstanceResponseBlock();
+      }
+    };
+    ExecutorService executorService = Executors.newSingleThreadExecutor();
+    return new LeafOperator(context, requests, schema, queryExecutor, executorService);
+  }
+
+  @Test
+  public void mergeExecutionStatsUnderConcurrentMetadataMutation()
+      throws Exception {
+    LeafOperator leaf = createLeafOperator();
+
+    // Prepare a metadata map that will be concurrently mutated
+    Map<String, String> metadata = Collections.synchronizedMap(new HashMap<>());
+    metadata.put("numDocsScanned", "1");
+    metadata.put("numEntriesScannedInFilter", "2");
+    metadata.put("numEntriesScannedPostFilter", "3");
+
+    // Access private method via reflection
+    Method merge = LeafOperator.class.getDeclaredMethod("mergeExecutionStats", Map.class);
+    merge.setAccessible(true);
+
+    // Mutator thread that continuously changes the map
+    Thread mutator = new Thread(() -> {
+      for (int i = 0; i < 10_000; i++) {
+        metadata.put("THREAD_CPU_TIME_NS", Integer.toString(i));
+        metadata.put("THREAD_MEM_ALLOCATED_BYTES", Integer.toString(i));
+        metadata.remove("unused_" + (i - 1));
+        metadata.put("unused_" + i, "x");
+      }
+    });
+    mutator.start();
+
+    // Repeatedly call merge; should not throw ConcurrentModificationException
+    for (int i = 0; i < 1_000; i++) {
+      merge.invoke(leaf, metadata);
+    }
+
+    mutator.join(TimeUnit.SECONDS.toMillis(5));
+    assertFalse(mutator.isAlive(), "Mutator thread should finish");
+
+    // Also check that error block injection path remains functional
+    ErrorMseBlock block = ErrorMseBlock.fromError(org.apache.pinot.spi.exception.QueryErrorCode.INTERNAL, "e");
+    assertNotNull(block);
   }
 }
