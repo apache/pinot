@@ -89,8 +89,8 @@ public class SegmentCreationFinalizer {
     _instanceType = instanceType;
     _indexCreator = indexCreator;
     _timeStats = timeStats;
-    _segmentName = generateSegmentName();
     _totalDocs = totalDocs;
+    _segmentName = generateSegmentName();
   }
 
   /**
