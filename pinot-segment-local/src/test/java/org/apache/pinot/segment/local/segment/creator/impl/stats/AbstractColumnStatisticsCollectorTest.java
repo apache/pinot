@@ -19,9 +19,7 @@
 package org.apache.pinot.segment.local.segment.creator.impl.stats;
 
 import java.math.BigDecimal;
-import java.util.Arrays;
 import java.util.Collections;
-import java.util.HashSet;
 import java.util.Set;
 import org.apache.pinot.segment.spi.creator.StatsCollectorConfig;
 import org.apache.pinot.spi.config.table.ColumnPartitionConfig;
@@ -106,7 +104,7 @@ public class AbstractColumnStatisticsCollectorTest {
     assertEquals(collector.getCardinality(), expectedCardinality);
     assertEquals(collector.getTotalNumberOfEntries(), expectedTotalEntries);
     assertEquals(collector.isSorted(), expectedSorted);
-    
+
     if (expectedMin != null && expectedMax != null) {
       assertEquals(collector.getMinValue(), expectedMin);
       assertEquals(collector.getMaxValue(), expectedMax);
@@ -202,13 +200,15 @@ public class AbstractColumnStatisticsCollectorTest {
         collector.collect(5.5);  // duplicate
         collector.collect(10.5);
         break;
+      default:
+        throw new IllegalArgumentException("Unsupported data type: " + dataType);
     }
 
     collector.seal();
 
     // Verify stats
     assertBasicStats(collector, 3, 4, getMinValue(dataType), getMaxValue(dataType), true);
-    
+
     // Verify unique values set
     Object uniqueValuesSet = collector.getUniqueValuesSet();
     assertNotNull(uniqueValuesSet);
@@ -245,6 +245,8 @@ public class AbstractColumnStatisticsCollectorTest {
         collector.collect(5.5);
         collector.collect(5.5);  // duplicate
         break;
+      default:
+        throw new IllegalArgumentException("Unsupported data type: " + dataType);
     }
 
     collector.seal();
@@ -306,6 +308,8 @@ public class AbstractColumnStatisticsCollectorTest {
         collector.collect(new byte[][]{{1}, {2}});
         collector.collect(new byte[][]{{3}, {4}, {5}});
         break;
+      default:
+        throw new IllegalArgumentException("Unsupported data type: " + dataType);
     }
 
     collector.seal();
@@ -341,7 +345,7 @@ public class AbstractColumnStatisticsCollectorTest {
   @Test(dataProvider = "allDataTypes")
   public void testEmptyCollection(FieldSpec.DataType dataType) {
     AbstractColumnStatisticsCollector collector = createCollector(dataType, true, false);
-    
+
     // Seal without collecting any data
     collector.seal();
 
@@ -361,8 +365,8 @@ public class AbstractColumnStatisticsCollectorTest {
     collector.seal();
 
     // Verify stats - for BYTES, need to use ByteArray for comparison
-    Object expectedValue = dataType == FieldSpec.DataType.BYTES 
-        ? new ByteArray((byte[]) singleValue) 
+    Object expectedValue = dataType == FieldSpec.DataType.BYTES
+        ? new ByteArray((byte[]) singleValue)
         : singleValue;
     assertBasicStats(collector, 1, 1, expectedValue, expectedValue, true);
   }
@@ -379,8 +383,8 @@ public class AbstractColumnStatisticsCollectorTest {
     collector.seal();
 
     // Verify stats - for BYTES, need to use ByteArray for comparison
-    Object expectedValue = dataType == FieldSpec.DataType.BYTES 
-        ? new ByteArray((byte[]) value) 
+    Object expectedValue = dataType == FieldSpec.DataType.BYTES
+        ? new ByteArray((byte[]) value)
         : value;
     assertBasicStats(collector, 1, 10, expectedValue, expectedValue, true);
   }
@@ -388,7 +392,7 @@ public class AbstractColumnStatisticsCollectorTest {
   @Test(dataProvider = "allDataTypes", expectedExceptions = IllegalStateException.class)
   public void testUnsealedAccessThrowsException(FieldSpec.DataType dataType) {
     AbstractColumnStatisticsCollector collector = createCollector(dataType, true, false);
-    
+
     // Try to access stats before sealing - should throw
     collector.getMinValue();
   }
@@ -420,7 +424,7 @@ public class AbstractColumnStatisticsCollectorTest {
     assertNotNull(partitions);
     assertTrue(partitions.size() > 0);
     assertTrue(partitions.size() <= NUM_PARTITIONS);
-    
+
     // All partition values should be within range
     for (Integer partition : partitions) {
       assertTrue(partition >= 0 && partition < NUM_PARTITIONS);
@@ -702,4 +706,3 @@ public class AbstractColumnStatisticsCollectorTest {
     throw new IllegalArgumentException("Unsupported array type: " + array.getClass());
   }
 }
-
