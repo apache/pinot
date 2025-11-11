@@ -442,14 +442,14 @@ public class PinotHelixTaskResourceManager {
 
       // Calculate waiting time for subtasks with null state
       if (state == null && jobStartTime > 0) {
-        long waitingTimeMinutes = (currentTime - jobStartTime);
-        taskStatusSummary.getSubtaskWaitingTimes().put(taskId, waitingTimeMinutes);
+        long waitingTimeMillis = (currentTime - jobStartTime);
+        taskStatusSummary.getSubtaskWaitingTimes().put(taskId, waitingTimeMillis);
       }
 
       // Calculate running time for RUNNING subtasks
       if (state == TaskPartitionState.RUNNING && executionStartTime > 0) {
-        long runningTimeMinutes = (currentTime - executionStartTime);
-        taskStatusSummary.getSubtaskRunningTimes().put(taskId, runningTimeMinutes);
+        long runningTimeMillis = (currentTime - executionStartTime);
+        taskStatusSummary.getSubtaskRunningTimes().put(taskId, runningTimeMillis);
       }
     }
     return taskStatusSummaryMap;
@@ -1498,8 +1498,8 @@ public class PinotHelixTaskResourceManager {
 
   public static class TaskStatusSummary {
     private TaskCount _taskCount = new TaskCount();
-    private Map<String, Long> _subtaskWaitingTimes = new HashMap<>(); // subtask ID -> waiting time in minutes
-    private Map<String, Long> _subtaskRunningTimes = new HashMap<>(); // subtask ID -> running time in minutes
+    private Map<String, Long> _subtaskWaitingTimes = new HashMap<>(); // subtask ID -> waiting time in milliseconds
+    private Map<String, Long> _subtaskRunningTimes = new HashMap<>(); // subtask ID -> running time in milliseconds
 
     public TaskCount getTaskCount() {
       return _taskCount;
