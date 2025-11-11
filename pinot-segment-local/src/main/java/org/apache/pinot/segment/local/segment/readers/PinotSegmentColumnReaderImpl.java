@@ -99,6 +99,106 @@ public class PinotSegmentColumnReaderImpl implements ColumnReader {
   }
 
   @Override
+  public int getTotalDocs() {
+    return _numDocs;
+  }
+
+  @Override
+  public boolean isNull(int docId) {
+    validateDocId(docId);
+    return _segmentColumnReader.isNull(docId);
+  }
+
+  // Single-value accessors
+
+  @Override
+  public int getInt(int docId)
+      throws IOException {
+    return _segmentColumnReader.getInt(docId);
+  }
+
+  @Override
+  public long getLong(int docId)
+      throws IOException {
+    return _segmentColumnReader.getLong(docId);
+  }
+
+  @Override
+  public float getFloat(int docId)
+      throws IOException {
+    return _segmentColumnReader.getFloat(docId);
+  }
+
+  @Override
+  public double getDouble(int docId)
+      throws IOException {
+    return _segmentColumnReader.getDouble(docId);
+  }
+
+  @Override
+  public String getString(int docId)
+      throws IOException {
+    return _segmentColumnReader.getString(docId);
+  }
+
+  @Override
+  public byte[] getBytes(int docId)
+      throws IOException {
+    return _segmentColumnReader.getBytes(docId);
+  }
+
+  // Multi-value accessors
+
+  @Override
+  public int[] getIntMV(int docId)
+      throws IOException {
+    return _segmentColumnReader.getIntMV(docId);
+  }
+
+  @Override
+  public long[] getLongMV(int docId)
+      throws IOException {
+    return _segmentColumnReader.getLongMV(docId);
+  }
+
+  @Override
+  public float[] getFloatMV(int docId)
+      throws IOException {
+    return _segmentColumnReader.getFloatMV(docId);
+  }
+
+  @Override
+  public double[] getDoubleMV(int docId)
+      throws IOException {
+    return _segmentColumnReader.getDoubleMV(docId);
+  }
+
+  @Override
+  public String[] getStringMV(int docId)
+      throws IOException {
+    return _segmentColumnReader.getStringMV(docId);
+  }
+
+  @Override
+  public byte[][] getBytesMV(int docId)
+      throws IOException {
+    return _segmentColumnReader.getBytesMV(docId);
+  }
+
+  /**
+   * Validate that the document ID is within valid range.
+   *
+   * @param docId Document ID to validate
+   * @throws IndexOutOfBoundsException if docId is out of range
+   */
+  private void validateDocId(int docId) {
+    if (docId < 0 || docId >= _numDocs) {
+      throw new IndexOutOfBoundsException(
+          "docId " + docId + " is out of range. Valid range is 0 to " + (_numDocs - 1));
+    }
+  }
+
+  @Override
   public void close()
       throws IOException {
     _segmentColumnReader.close();

@@ -73,4 +73,169 @@ public interface ColumnReader extends Closeable, Serializable {
    * @return Column name
    */
   String getColumnName();
+
+  /**
+   * Get the total number of documents in this column.
+   *
+   * @return Total number of documents
+   */
+  int getTotalDocs();
+
+  /**
+   * Check if the value at the given document ID is null.
+   * <p>Document ID is 0-based. Valid values are 0 to {@link #getTotalDocs()} - 1.
+   *
+   * @param docId Document ID (0-based)
+   * @return true if the value is null, false otherwise
+   * @throws IndexOutOfBoundsException If docId is out of range
+   */
+  boolean isNull(int docId);
+
+  // Single-value accessors
+
+  /**
+   * Get int value at the given document ID for single-value columns.
+   * <p>Document ID is 0-based. Valid values are 0 to {@link #getTotalDocs()} - 1.
+   *
+   * @param docId Document ID (0-based)
+   * @return int value at the document ID
+   * @throws IndexOutOfBoundsException If docId is out of range
+   * @throws IOException If an I/O error occurs while reading
+   */
+  int getInt(int docId)
+      throws IOException;
+
+  /**
+   * Get long value at the given document ID for single-value columns.
+   * <p>Document ID is 0-based. Valid values are 0 to {@link #getTotalDocs()} - 1.
+   *
+   * @param docId Document ID (0-based)
+   * @return long value at the document ID
+   * @throws IndexOutOfBoundsException If docId is out of range
+   * @throws IOException If an I/O error occurs while reading
+   */
+  long getLong(int docId)
+      throws IOException;
+
+  /**
+   * Get float value at the given document ID for single-value columns.
+   * <p>Document ID is 0-based. Valid values are 0 to {@link #getTotalDocs()} - 1.
+   *
+   * @param docId Document ID (0-based)
+   * @return float value at the document ID
+   * @throws IndexOutOfBoundsException If docId is out of range
+   * @throws IOException If an I/O error occurs while reading
+   */
+  float getFloat(int docId)
+      throws IOException;
+
+  /**
+   * Get double value at the given document ID for single-value columns.
+   * <p>Document ID is 0-based. Valid values are 0 to {@link #getTotalDocs()} - 1.
+   *
+   * @param docId Document ID (0-based)
+   * @return double value at the document ID
+   * @throws IndexOutOfBoundsException If docId is out of range
+   * @throws IOException If an I/O error occurs while reading
+   */
+  double getDouble(int docId)
+      throws IOException;
+
+  /**
+   * Get String value at the given document ID for single-value columns.
+   * <p>Document ID is 0-based. Valid values are 0 to {@link #getTotalDocs()} - 1.
+   *
+   * @param docId Document ID (0-based)
+   * @return String value at the document ID
+   * @throws IndexOutOfBoundsException If docId is out of range
+   * @throws IOException If an I/O error occurs while reading
+   */
+  String getString(int docId)
+      throws IOException;
+
+  /**
+   * Get byte[] value at the given document ID for single-value columns.
+   * <p>Document ID is 0-based. Valid values are 0 to {@link #getTotalDocs()} - 1.
+   *
+   * @param docId Document ID (0-based)
+   * @return byte[] value at the document ID
+   * @throws IndexOutOfBoundsException If docId is out of range
+   * @throws IOException If an I/O error occurs while reading
+   */
+  byte[] getBytes(int docId)
+      throws IOException;
+
+  // Multi-value accessors
+
+  /**
+   * Get int[] values at the given document ID for multi-value columns.
+   * <p>Document ID is 0-based. Valid values are 0 to {@link #getTotalDocs()} - 1.
+   *
+   * @param docId Document ID (0-based)
+   * @return int[] values at the document ID
+   * @throws IndexOutOfBoundsException If docId is out of range
+   * @throws IOException If an I/O error occurs while reading
+   */
+  int[] getIntMV(int docId)
+      throws IOException;
+
+  /**
+   * Get long[] values at the given document ID for multi-value columns.
+   * <p>Document ID is 0-based. Valid values are 0 to {@link #getTotalDocs()} - 1.
+   *
+   * @param docId Document ID (0-based)
+   * @return long[] values at the document ID
+   * @throws IndexOutOfBoundsException If docId is out of range
+   * @throws IOException If an I/O error occurs while reading
+   */
+  long[] getLongMV(int docId)
+      throws IOException;
+
+  /**
+   * Get float[] values at the given document ID for multi-value columns.
+   * <p>Document ID is 0-based. Valid values are 0 to {@link #getTotalDocs()} - 1.
+   *
+   * @param docId Document ID (0-based)
+   * @return float[] values at the document ID
+   * @throws IndexOutOfBoundsException If docId is out of range
+   * @throws IOException If an I/O error occurs while reading
+   */
+  float[] getFloatMV(int docId)
+      throws IOException;
+
+  /**
+   * Get double[] values at the given document ID for multi-value columns.
+   * <p>Document ID is 0-based. Valid values are 0 to {@link #getTotalDocs()} - 1.
+   *
+   * @param docId Document ID (0-based)
+   * @return double[] values at the document ID
+   * @throws IndexOutOfBoundsException If docId is out of range
+   * @throws IOException If an I/O error occurs while reading
+   */
+  double[] getDoubleMV(int docId)
+      throws IOException;
+
+  /**
+   * Get String[] values at the given document ID for multi-value columns.
+   * <p>Document ID is 0-based. Valid values are 0 to {@link #getTotalDocs()} - 1.
+   *
+   * @param docId Document ID (0-based)
+   * @return String[] values at the document ID
+   * @throws IndexOutOfBoundsException If docId is out of range
+   * @throws IOException If an I/O error occurs while reading
+   */
+  String[] getStringMV(int docId)
+      throws IOException;
+
+  /**
+   * Get byte[][] values at the given document ID for multi-value columns.
+   * <p>Document ID is 0-based. Valid values are 0 to {@link #getTotalDocs()} - 1.
+   *
+   * @param docId Document ID (0-based)
+   * @return byte[][] values at the document ID
+   * @throws IndexOutOfBoundsException If docId is out of range
+   * @throws IOException If an I/O error occurs while reading
+   */
+  byte[][] getBytesMV(int docId)
+      throws IOException;
 }
