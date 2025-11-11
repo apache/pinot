@@ -186,8 +186,10 @@ public class MergeRollupTaskExecutor extends BaseMultipleSegmentsConversionExecu
       SegmentConfig segmentConfig) {
     int maxNumRecordsPerSegment = segmentConfig.getMaxNumRecordsPerSegment();
 
-    // Read adaptive sizing configuration from task config
-    String desiredSegmentSizeBytesStr = taskConfig.get(MergeRollupTask.DESIRED_SEGMENT_SIZE_BYTES_KEY);
+    // Read adaptive sizing configuration from task config with merge level prefix
+    String desiredSegmentSizeBytesKey = MergeRollupTaskUtils.buildMergeLevelKeyPrefix(
+        MergeRollupTask.DESIRED_SEGMENT_SIZE_BYTES_KEY, taskConfig);
+    String desiredSegmentSizeBytesStr = taskConfig.get(desiredSegmentSizeBytesKey);
     if (desiredSegmentSizeBytesStr == null) {
       LOGGER.info("Using DefaultSegmentNumRowProvider with maxRecordsPerSegment={}", maxNumRecordsPerSegment);
       return new DefaultSegmentNumRowProvider(maxNumRecordsPerSegment);
@@ -196,12 +198,16 @@ public class MergeRollupTaskExecutor extends BaseMultipleSegmentsConversionExecu
     long desiredSegmentSizeBytes = Long.parseLong(desiredSegmentSizeBytesStr);
 
     // Read strategy (defaults to PERCENTILE for adaptive sizing)
-    String strategyStr = taskConfig.get(MergeRollupTask.SEGMENT_SIZING_STRATEGY_KEY);
+    String segmentSizingStrategyKey = MergeRollupTaskUtils.buildMergeLevelKeyPrefix(
+        MergeRollupTask.SEGMENT_SIZING_STRATEGY_KEY, taskConfig);
+    String strategyStr = taskConfig.get(segmentSizingStrategyKey);
     String strategy = strategyStr != null ? strategyStr : "PERCENTILE";
 
     switch (strategy) {
       case "ADAPTIVE":
-        String learningRateStr = taskConfig.get(MergeRollupTask.SIZING_LEARNING_RATE_KEY);
+        String sizingLearningRateKey = MergeRollupTaskUtils.buildMergeLevelKeyPrefix(
+            MergeRollupTask.SIZING_LEARNING_RATE_KEY, taskConfig);
+        String learningRateStr = taskConfig.get(sizingLearningRateKey);
         double learningRate = learningRateStr != null ? Double.parseDouble(learningRateStr) : 0.3;
         LOGGER.info("Using AdaptiveSegmentNumRowProvider for merge rollup with desiredSegmentSize={}MB, "
                 + "maxRecordsPerSegment={}, learningRate={}",
@@ -210,7 +216,9 @@ public class MergeRollupTaskExecutor extends BaseMultipleSegmentsConversionExecu
             learningRate, 5000.0);
 
       case "PERCENTILE":
-        String percentileStr = taskConfig.get(MergeRollupTask.SIZING_PERCENTILE_KEY);
+        String sizingPercentileKey = MergeRollupTaskUtils.buildMergeLevelKeyPrefix(
+            MergeRollupTask.SIZING_PERCENTILE_KEY, taskConfig);
+        String percentileStr = taskConfig.get(sizingPercentileKey);
         int percentile = percentileStr != null ? Integer.parseInt(percentileStr) : 75;
         LOGGER.info("Using PercentileAdaptiveSegmentNumRowProvider for merge rollup with desiredSegmentSize={}MB, "
                 + "maxRecordsPerSegment={}, percentile=P{}",
