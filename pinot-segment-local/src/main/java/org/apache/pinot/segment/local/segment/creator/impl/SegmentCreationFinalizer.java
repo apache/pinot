@@ -75,6 +75,7 @@ public class SegmentCreationFinalizer {
   private final SegmentCreator _indexCreator;
   private final ColumnStatistics _timeStats;
   private final String _segmentName;
+  private final int _totalDocs;
 
   /**
    * @param config Segment generator configuration
@@ -83,12 +84,13 @@ public class SegmentCreationFinalizer {
    * @param timeStats Time column statistics (can be null)
    */
   public SegmentCreationFinalizer(SegmentGeneratorConfig config, @Nullable InstanceType instanceType,
-      SegmentCreator indexCreator, @Nullable ColumnStatistics timeStats) {
+      SegmentCreator indexCreator, @Nullable ColumnStatistics timeStats, int totalDocs) {
     _config = config;
     _instanceType = instanceType;
     _indexCreator = indexCreator;
     _timeStats = timeStats;
     _segmentName = generateSegmentName();
+    _totalDocs = totalDocs;
   }
 
   /**
@@ -140,7 +142,7 @@ public class SegmentCreationFinalizer {
     convertFormatIfNecessary(segmentOutputDir);
 
     // Build indexes if there are documents
-    if (_timeStats.getTotalNumberOfEntries() > 0) {
+    if (_totalDocs > 0) {
       buildStarTreeV2IfNecessary(segmentOutputDir);
       buildMultiColumnTextIndex(segmentOutputDir);
     }
@@ -162,7 +164,7 @@ public class SegmentCreationFinalizer {
    */
   private String generateSegmentName() {
     if (_timeStats != null) {
-      if (_timeStats.getTotalNumberOfEntries() > 0) {
+      if (_totalDocs > 0) {
         return _config.getSegmentNameGenerator()
             .generateSegmentName(_config.getSequenceId(), _timeStats.getMinValue(), _timeStats.getMaxValue());
       } else {
