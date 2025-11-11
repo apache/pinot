@@ -239,6 +239,9 @@ public enum ServerMeter implements AbstractMetrics.Meter {
   WORKLOAD_BUDGET_EXCEEDED("workloadBudgetExceeded", false, "Number of times workload budget exceeded"),
   INGESTION_DELAY_TRACKING_ERRORS("errors", false,
       "Indicates the count of errors encountered while tracking ingestion delay."),
+  INGESTION_DELAY_LATEST_OFFSET_FETCH_ERRORS("errors", false,
+      "Indicates the count of errors encountered while fetching latest stream offset for tracking ingestion offset "
+          + "lag."),
 
   TRANSFORMATION_ERROR_COUNT("rows", false),
   DROPPED_RECORD_COUNT("rows", false),

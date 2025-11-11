@@ -2052,7 +2052,7 @@ public class RealtimeSegmentDataManager extends SegmentDataManager {
     if (metadata != null) {
       try {
         _realtimeTableDataManager.updateIngestionMetrics(_segmentNameStr, _partitionGroupId,
-            metadata.getRecordIngestionTimeMs(), metadata.getOffset());
+            metadata.getRecordIngestionTimeMs(), metadata.getFirstStreamRecordIngestionTimeMs(), metadata.getOffset());
       } catch (Exception e) {
         _segmentLogger.warn("Failed to update the ingestion metrics", e);
       }
@@ -2065,7 +2065,8 @@ public class RealtimeSegmentDataManager extends SegmentDataManager {
    */
   private void setIngestionDelayToZero() {
     long currentTimeMs = System.currentTimeMillis();
-    _realtimeTableDataManager.updateIngestionMetrics(_segmentNameStr, _partitionGroupId, currentTimeMs, null);
+    _realtimeTableDataManager.updateIngestionMetrics(_segmentNameStr, _partitionGroupId, currentTimeMs, currentTimeMs,
+        null);
   }
 
   // This should be done during commit? We may not always commit when we build a segment....
