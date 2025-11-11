@@ -25,12 +25,15 @@ import java.util.List;
 import java.util.Map;
 import java.util.Properties;
 import java.util.Set;
+import java.util.concurrent.TimeUnit;
 import org.apache.pinot.common.metrics.ControllerGauge;
 import org.apache.pinot.common.metrics.ControllerMetrics;
+import org.apache.pinot.common.metrics.ControllerTimer;
 import org.apache.pinot.controller.ControllerConf;
 import org.apache.pinot.controller.LeadControllerManager;
 import org.apache.pinot.controller.helix.core.PinotHelixResourceManager;
 import org.apache.pinot.controller.helix.core.minion.PinotHelixTaskResourceManager.TaskCount;
+import org.apache.pinot.controller.helix.core.minion.PinotHelixTaskResourceManager.TaskStatusSummary;
 import org.apache.pinot.controller.helix.core.minion.PinotHelixTaskResourceManager.TasksByStatus;
 import org.apache.pinot.core.periodictask.BasePeriodicTask;
 import org.apache.pinot.spi.utils.InstanceTypeUtils;
@@ -143,14 +146,23 @@ public class TaskMetricsEmitter extends BasePeriodicTask {
         // Process all tasks that need metrics reported
         for (String task : tasksToReport) {
           try {
-            Map<String, TaskCount> tableTaskCount = _helixTaskResourceManager.getTableTaskCount(task);
-            tableTaskCount.forEach((tableNameWithType, taskCount) -> {
+            Map<String, TaskStatusSummary> tableTaskStatusSummary = _helixTaskResourceManager.getTableTaskStatusSummary(task);
+            tableTaskStatusSummary.forEach((tableNameWithType, taskStatusSummary) -> {
+              TaskCount taskCount = taskStatusSummary.getTaskCount();
               taskTypeAccumulatedCount.accumulate(taskCount);
               tableAccumulatedCount.compute(tableNameWithType, (name, count) -> {
                 if (count == null) {
                   count = new TaskCount();
                 }
                 count.accumulate(taskCount);
+                taskStatusSummary.getSubtaskWaitingTimes().values().forEach(subtaskWaitingTime -> {
+                  _controllerMetrics.addTimedTableValue(tableNameWithType, ControllerTimer.SUBTASK_WAITING_TIME,
+                      subtaskWaitingTime, TimeUnit.MILLISECONDS);
+                });
+                taskStatusSummary.getSubtaskRunningTimes().values().forEach(subtaskRunningTime -> {
+                  _controllerMetrics.addTimedTableValue(tableNameWithType, ControllerTimer.SUBTASK_RUNNING_TIME,
+                      subtaskRunningTime, TimeUnit.MILLISECONDS);
+                });
                 return count;
               });
             });

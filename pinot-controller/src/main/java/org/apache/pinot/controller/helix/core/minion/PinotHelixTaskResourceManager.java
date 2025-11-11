@@ -399,39 +399,60 @@ public class PinotHelixTaskResourceManager {
 
   /**
    * This method returns a map of table name to count of sub-tasks in various states, given the top-level task name.
+   * It also collects waiting times for subtasks with null state and running times for subtasks in RUNNING state.
    *
    * @param taskName in the form "Task_<taskType>_<uuid>_<timestamp>"
-   * @return a map of table name to {@link TaskCount}
+   * @return a map of table name to {@link TaskStatusSummary}
    */
-  public synchronized Map<String, TaskCount> getTableTaskCount(String taskName) {
+  public synchronized Map<String, TaskStatusSummary> getTableTaskStatusSummary(String taskName) {
     String helixJobName = getHelixJobName(taskName);
     JobConfig jobConfig = _taskDriver.getJobConfig(helixJobName);
     Preconditions.checkArgument(jobConfig != null, "Task: %s does not exist", taskName);
     Map<String, TaskConfig> taskConfigMap = jobConfig.getTaskConfigMap();
-    Map<String, TaskCount> taskCountMap = new HashMap<>();
+    Map<String, TaskStatusSummary> taskStatusSummaryMap = new HashMap<>();
     JobContext jobContext = _taskDriver.getJobContext(helixJobName);
     if (jobContext == null) {
+      // No job context available, only populate TaskCount without timing info
       for (TaskConfig taskConfig : taskConfigMap.values()) {
         String tableName = taskConfig.getConfigMap().getOrDefault(MinionConstants.TABLE_NAME_KEY, UNKNOWN_TABLE_NAME);
-        taskCountMap.computeIfAbsent(tableName, k -> new TaskCount()).addTaskState(null);
+        TaskStatusSummary taskStatusSummary = taskStatusSummaryMap.computeIfAbsent(tableName,
+            k -> new TaskStatusSummary());
+        taskStatusSummary.getTaskCount().addTaskState(null);
       }
-      return taskCountMap;
+      return taskStatusSummaryMap;
     }
+    long jobStartTime = jobContext.getStartTime();
+    long currentTime = System.currentTimeMillis();
     Map<String, Integer> taskIdPartitionMap = jobContext.getTaskIdPartitionMap();
     for (Map.Entry<String, TaskConfig> entry : taskConfigMap.entrySet()) {
       String taskId = entry.getKey();
       TaskPartitionState state = null;
+      long executionStartTime = 0;
       Integer partition = taskIdPartitionMap.get(taskId);
       if (partition != null) {
         state = jobContext.getPartitionState(partition);
-        long partitionStartTime = jobContext.getPartitionStartTime(partition);
-        LOGGER.info("Task Id: {}, State: {}, StartTime: {}", taskId, state, partitionStartTime);
+        executionStartTime = jobContext.getPartitionStartTime(partition);
       }
       TaskConfig taskConfig = entry.getValue();
       String tableName = taskConfig.getConfigMap().getOrDefault(MinionConstants.TABLE_NAME_KEY, UNKNOWN_TABLE_NAME);
-      taskCountMap.computeIfAbsent(tableName, k -> new TaskCount()).addTaskState(state);
+
+      TaskStatusSummary taskStatusSummary = taskStatusSummaryMap.computeIfAbsent(tableName,
+          k -> new TaskStatusSummary());
+      taskStatusSummary.getTaskCount().addTaskState(state);
+
+      // Calculate waiting time for subtasks with null state
+      if (state == null && jobStartTime > 0) {
+        long waitingTimeMinutes = (currentTime - jobStartTime);
+        taskStatusSummary.getSubtaskWaitingTimes().put(taskId, waitingTimeMinutes);
+      }
+
+      // Calculate running time for RUNNING subtasks
+      if (state == TaskPartitionState.RUNNING && executionStartTime > 0) {
+        long runningTimeMinutes = (currentTime - executionStartTime);
+        taskStatusSummary.getSubtaskRunningTimes().put(taskId, runningTimeMinutes);
+      }
     }
-    return taskCountMap;
+    return taskStatusSummaryMap;
   }
 
   /**
@@ -1472,6 +1493,36 @@ public class PinotHelixTaskResourceManager {
       _dropped += other.getDropped();
       _timedOut += other.getTimedOut();
       _aborted += other.getAborted();
+    }
+  }
+
+  public static class TaskStatusSummary {
+    private TaskCount _taskCount = new TaskCount();
+    private Map<String, Long> _subtaskWaitingTimes = new HashMap<>(); // subtask ID -> waiting time in minutes
+    private Map<String, Long> _subtaskRunningTimes = new HashMap<>(); // subtask ID -> running time in minutes
+
+    public TaskCount getTaskCount() {
+      return _taskCount;
+    }
+
+    public void setTaskCount(TaskCount taskCount) {
+      _taskCount = taskCount;
+    }
+
+    public Map<String, Long> getSubtaskWaitingTimes() {
+      return _subtaskWaitingTimes;
+    }
+
+    public void setSubtaskWaitingTimes(Map<String, Long> subtaskWaitingTimes) {
+      _subtaskWaitingTimes = subtaskWaitingTimes;
+    }
+
+    public Map<String, Long> getSubtaskRunningTimes() {
+      return _subtaskRunningTimes;
+    }
+
+    public void setSubtaskRunningTimes(Map<String, Long> subtaskRunningTimes) {
+      _subtaskRunningTimes = subtaskRunningTimes;
     }
   }
 }
