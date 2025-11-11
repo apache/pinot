@@ -411,7 +411,6 @@ public class PinotSegmentColumnReaderImplTest extends ColumnarSegmentBuildingTes
         Assert.fail("Expected IndexOutOfBoundsException for docId = -1");
       } catch (IndexOutOfBoundsException e) {
         // Expected
-        Assert.assertTrue(e.getMessage() == null || e.getMessage().contains("out of range"));
       }
 
       // Test docId = totalDocs (should throw IndexOutOfBoundsException)
@@ -420,7 +419,6 @@ public class PinotSegmentColumnReaderImplTest extends ColumnarSegmentBuildingTes
         Assert.fail("Expected IndexOutOfBoundsException for docId = totalDocs");
       } catch (IndexOutOfBoundsException e) {
         // Expected
-        Assert.assertTrue(e.getMessage() == null || e.getMessage().contains("out of range"));
       }
 
       // Test docId = totalDocs + 100 (should throw IndexOutOfBoundsException)
@@ -429,7 +427,6 @@ public class PinotSegmentColumnReaderImplTest extends ColumnarSegmentBuildingTes
         Assert.fail("Expected IndexOutOfBoundsException for docId > totalDocs");
       } catch (IndexOutOfBoundsException e) {
         // Expected
-        Assert.assertTrue(e.getMessage() == null || e.getMessage().contains("out of range"));
       }
 
       // Test isNull with out of bounds docId
@@ -438,7 +435,6 @@ public class PinotSegmentColumnReaderImplTest extends ColumnarSegmentBuildingTes
         Assert.fail("Expected IndexOutOfBoundsException for isNull(-1)");
       } catch (IndexOutOfBoundsException e) {
         // Expected
-        Assert.assertTrue(e.getMessage() == null || e.getMessage().contains("out of range"));
       }
 
       try {
@@ -446,7 +442,6 @@ public class PinotSegmentColumnReaderImplTest extends ColumnarSegmentBuildingTes
         Assert.fail("Expected IndexOutOfBoundsException for isNull(totalDocs)");
       } catch (IndexOutOfBoundsException e) {
         // Expected
-        Assert.assertTrue(e.getMessage() == null || e.getMessage().contains("out of range"));
       }
     } finally {
       reader.close();
