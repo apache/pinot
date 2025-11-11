@@ -458,7 +458,7 @@ public class SegmentIndexCreationDriverImpl implements SegmentIndexCreationDrive
     ColumnStatistics timeStats = _segmentStats.getColumnProfileFor(_config.getTimeColumnName());
     // Create finalizer and execute all post-creation operations
     SegmentCreationFinalizer finalizer = new SegmentCreationFinalizer(
-        _config, _instanceType, _indexCreator, timeStats);
+        _config, _instanceType, _indexCreator, timeStats, _totalDocs);
     _outputSegmentDir = finalizer.finalizeSegment(_tempIndexDir);
     _segmentName = finalizer.getSegmentName();
 
