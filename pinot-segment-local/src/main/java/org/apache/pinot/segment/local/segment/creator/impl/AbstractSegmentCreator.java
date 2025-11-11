@@ -95,21 +95,17 @@ public abstract class AbstractSegmentCreator implements SegmentCreator {
       NavigableMap<String, ColumnIndexCreationInfo> indexCreationInfoMap, Schema schema, File outDir,
       Map<String, ColumnIndexCreators> colIndexes, @Nullable int[] immutableToMutableIdMap)
       throws Exception {
-    _config = segmentCreationSpec;
-    _colIndexes = colIndexes;
-    _indexCreationInfoMap = indexCreationInfoMap;
-
     // Check that the output directory does not exist
     Preconditions.checkState(!outDir.exists(), "Segment output directory: %s already exists", outDir);
     Preconditions.checkState(outDir.mkdirs(), "Failed to create output directory: %s", outDir);
-    _indexDir = outDir;
 
+    _config = segmentCreationSpec;
+    _colIndexes = colIndexes;
+    _indexCreationInfoMap = indexCreationInfoMap;
+    _indexDir = outDir;
     _schema = schema;
     _totalDocs = creationInfo.getTotalDocs();
 
-    if (_totalDocs == 0) {
-      return;
-    }
     initColSegmentCreationInfo(immutableToMutableIdMap);
   }
 
@@ -117,9 +113,13 @@ public abstract class AbstractSegmentCreator implements SegmentCreator {
       throws Exception {
     Map<String, FieldIndexConfigs> indexConfigs = _config.getIndexConfigsByColName();
     for (String columnName : indexConfigs.keySet()) {
-      if (canColumnBeIndexed(columnName)) {
+      if (canColumnBeIndexed(columnName) && _totalDocs > 0) {
         ColumnIndexCreators result = createColIndexeCreators(columnName, immutableToMutableIdMap);
         _colIndexes.put(columnName, result);
+      } else {
+        FieldSpec fieldSpec = _schema.getFieldSpecFor(columnName);
+        _colIndexes.put(columnName,
+            new ColumnIndexCreators(columnName, fieldSpec, null, List.of(), null));
       }
     }
   }
