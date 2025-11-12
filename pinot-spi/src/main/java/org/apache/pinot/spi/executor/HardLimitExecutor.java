@@ -55,6 +55,14 @@ public class HardLimitExecutor extends DecoratorExecutorService {
     _currentUsageGaugeUpdater.accept(0);
   }
 
+  public HardLimitExecutor(int max, ExecutorService executorService, QueryThreadExceedStrategy exceedStrategy) {
+    this(max, executorService, exceedStrategy, max1 -> { }, current -> { }, () -> { });
+  }
+
+  public HardLimitExecutor(int max, ExecutorService executorService) {
+    this(max, executorService, QueryThreadExceedStrategy.ERROR);
+  }
+
   /**
    * Returns the hard limit of the number of threads that can be used by the multi-stage executor.
    * @param serverConf Pinot configuration
