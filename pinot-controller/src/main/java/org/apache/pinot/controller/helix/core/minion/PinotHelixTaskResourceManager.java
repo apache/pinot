@@ -1387,13 +1387,6 @@ public class PinotHelixTaskResourceManager {
     public void setRecentTasks(Set<String> recentTasks) {
       _recentTasks = recentTasks;
     }
-
-    public Set<String> getAllTasksToReport() {
-      Set<String> allTasks = new HashSet<>();
-      allTasks.addAll(_inProgressTasks);
-      allTasks.addAll(_recentTasks);
-      return allTasks;
-    }
   }
 
   @JsonPropertyOrder({"total", "completed", "running", "waiting", "error", "unknown", "dropped", "timedOut", "aborted"})

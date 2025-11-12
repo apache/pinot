@@ -124,29 +124,20 @@ public class TaskMetricsEmitter extends BasePeriodicTask {
         // Get in-progress tasks and all tasks to report (including short-lived) in a single Helix call
         TasksByStatus taskResult = _helixTaskResourceManager.getTasksByStatus(taskType, previousExecutionTimestamp);
         Set<String> currentInProgressTasks = taskResult.getInProgressTasks();
-        Set<String> tasksIncludingShortLived = taskResult.getAllTasksToReport();
+        Set<String> recentTasks = taskResult.getRecentTasks();
 
         // Start with all tasks that need reporting (in-progress + short-lived)
-        Set<String> tasksToReport = new HashSet<>();
+        Set<String> tasksToReport = new HashSet<>(previouslyInProgressTasks);
         tasksToReport.addAll(currentInProgressTasks);
-        tasksToReport.addAll(tasksIncludingShortLived);
-
-        // Include tasks that were in-progress previously but are no longer in-progress
-        // These tasks completed between collection cycles and need their final metrics reported
-        for (String taskName : previouslyInProgressTasks) {
-          if (!tasksIncludingShortLived.contains(taskName)) {
-            LOGGER.debug("Including task {} that completed between collection cycles for taskType: {}",
-                taskName, taskType);
-            tasksToReport.add(taskName);
-          }
-        }
+        tasksToReport.addAll(recentTasks);
 
         final int numRunningTasks = currentInProgressTasks.size();
 
         // Process all tasks that need metrics reported
         for (String task : tasksToReport) {
           try {
-            Map<String, TaskStatusSummary> tableTaskStatusSummary = _helixTaskResourceManager.getTableTaskStatusSummary(task);
+            Map<String, TaskStatusSummary> tableTaskStatusSummary =
+                _helixTaskResourceManager.getTableTaskStatusSummary(task);
             tableTaskStatusSummary.forEach((tableNameWithType, taskStatusSummary) -> {
               TaskCount taskCount = taskStatusSummary.getTaskCount();
               taskTypeAccumulatedCount.accumulate(taskCount);

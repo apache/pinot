@@ -39,6 +39,7 @@ import org.apache.helix.task.TaskState;
 import org.apache.helix.task.WorkflowConfig;
 import org.apache.helix.task.WorkflowContext;
 import org.apache.pinot.controller.helix.core.PinotHelixResourceManager;
+import org.apache.pinot.controller.helix.core.minion.PinotHelixTaskResourceManager.TaskStatusSummary;
 import org.apache.pinot.controller.util.CompletionServiceHelper;
 import org.apache.pinot.core.minion.PinotTaskConfig;
 import org.apache.pinot.spi.utils.JsonUtils;
@@ -332,9 +333,9 @@ public class PinotHelixTaskResourceManagerTest {
 
     PinotHelixTaskResourceManager mgr =
         new PinotHelixTaskResourceManager(mock(PinotHelixResourceManager.class), taskDriver);
-    Map<String, PinotHelixTaskResourceManager.TaskStatusSummary> tableTaskCount = mgr.getTableTaskStatusSummary(taskName);
+    Map<String, TaskStatusSummary> tableTaskCount = mgr.getTableTaskStatusSummary(taskName);
     assertEquals(tableTaskCount.size(), 2);
-    PinotHelixTaskResourceManager.TaskStatusSummary taskStatusSummary = tableTaskCount.get("table1_OFFLINE");
+    TaskStatusSummary taskStatusSummary = tableTaskCount.get("table1_OFFLINE");
     PinotHelixTaskResourceManager.TaskCount taskCount = taskStatusSummary.getTaskCount();
     assertEquals(taskCount.getTotal(), 1);
     assertEquals(taskCount.getCompleted(), 1);
@@ -387,9 +388,9 @@ public class PinotHelixTaskResourceManagerTest {
 
     PinotHelixTaskResourceManager mgr =
         new PinotHelixTaskResourceManager(mock(PinotHelixResourceManager.class), taskDriver);
-    Map<String, PinotHelixTaskResourceManager.TaskStatusSummary> tableTaskCount = mgr.getTableTaskStatusSummary(taskName);
+    Map<String, TaskStatusSummary> tableTaskCount = mgr.getTableTaskStatusSummary(taskName);
     assertEquals(tableTaskCount.size(), 1);
-    PinotHelixTaskResourceManager.TaskStatusSummary taskStatusSummary = tableTaskCount.get("table1_OFFLINE");
+    TaskStatusSummary taskStatusSummary = tableTaskCount.get("table1_OFFLINE");
     PinotHelixTaskResourceManager.TaskCount taskCount = taskStatusSummary.getTaskCount();
     assertEquals(taskCount.getTotal(), 2);
     assertEquals(taskCount.getRunning(), 1);
@@ -429,11 +430,11 @@ public class PinotHelixTaskResourceManagerTest {
 
     PinotHelixTaskResourceManager mgr =
         new PinotHelixTaskResourceManager(mock(PinotHelixResourceManager.class), taskDriver);
-    Map<String, PinotHelixTaskResourceManager.TaskStatusSummary> tableTaskCount = mgr.getTableTaskStatusSummary(taskName);
+    Map<String, TaskStatusSummary> tableTaskCount = mgr.getTableTaskStatusSummary(taskName);
     assertEquals(tableTaskCount.size(), 2);
 
     // Verify that timing maps are empty when jobContext is null
-    for (PinotHelixTaskResourceManager.TaskStatusSummary timing : tableTaskCount.values()) {
+    for (TaskStatusSummary timing : tableTaskCount.values()) {
       assertTrue(timing.getSubtaskWaitingTimes().isEmpty());
       assertTrue(timing.getSubtaskRunningTimes().isEmpty());
       assertEquals(timing.getTaskCount().getWaiting(), 1);
@@ -460,14 +461,13 @@ public class PinotHelixTaskResourceManagerTest {
 
     PinotHelixTaskResourceManager mgr =
         new PinotHelixTaskResourceManager(mock(PinotHelixResourceManager.class), taskDriver);
-    Map<String, PinotHelixTaskResourceManager.TaskStatusSummary> tableTaskCount = mgr.getTableTaskStatusSummary(taskName);
+    Map<String, TaskStatusSummary> tableTaskCount = mgr.getTableTaskStatusSummary(taskName);
 
-    PinotHelixTaskResourceManager.TaskStatusSummary taskStatusSummary = tableTaskCount.get("table1_OFFLINE");
+    TaskStatusSummary taskStatusSummary = tableTaskCount.get("table1_OFFLINE");
     // When jobStartTime is 0, waiting time should not be calculated
     assertTrue(taskStatusSummary.getSubtaskWaitingTimes().isEmpty());
     assertEquals(taskStatusSummary.getTaskCount().getWaiting(), 1);
   }
-
 
   @Test
   public void testGetTableTaskStatusSummaryWithZeroPartitionStartTime() {
@@ -491,9 +491,9 @@ public class PinotHelixTaskResourceManagerTest {
 
     PinotHelixTaskResourceManager mgr =
         new PinotHelixTaskResourceManager(mock(PinotHelixResourceManager.class), taskDriver);
-    Map<String, PinotHelixTaskResourceManager.TaskStatusSummary> tableTaskCount = mgr.getTableTaskStatusSummary(taskName);
+    Map<String, TaskStatusSummary> tableTaskCount = mgr.getTableTaskStatusSummary(taskName);
 
-    PinotHelixTaskResourceManager.TaskStatusSummary taskStatusSummary = tableTaskCount.get("table1_OFFLINE");
+    TaskStatusSummary taskStatusSummary = tableTaskCount.get("table1_OFFLINE");
     // When partitionStartTime is 0, running time should not be calculated
     assertTrue(taskStatusSummary.getSubtaskRunningTimes().isEmpty());
     assertEquals(taskStatusSummary.getTaskCount().getRunning(), 1);
@@ -526,9 +526,9 @@ public class PinotHelixTaskResourceManagerTest {
 
     PinotHelixTaskResourceManager mgr =
         new PinotHelixTaskResourceManager(mock(PinotHelixResourceManager.class), taskDriver);
-    Map<String, PinotHelixTaskResourceManager.TaskStatusSummary> tableTaskCount = mgr.getTableTaskStatusSummary(taskName);
+    Map<String, TaskStatusSummary> tableTaskCount = mgr.getTableTaskStatusSummary(taskName);
 
-    PinotHelixTaskResourceManager.TaskStatusSummary taskStatusSummary = tableTaskCount.get("table1_OFFLINE");
+    TaskStatusSummary taskStatusSummary = tableTaskCount.get("table1_OFFLINE");
     // COMPLETED and ERROR states should not have running times
     assertTrue(taskStatusSummary.getSubtaskRunningTimes().isEmpty());
     // They also should not have waiting times (only null state gets waiting time)
@@ -543,8 +543,7 @@ public class PinotHelixTaskResourceManagerTest {
     taskCount.addTaskState(TaskPartitionState.RUNNING);
 
     // Test default constructor and setters
-    PinotHelixTaskResourceManager.TaskStatusSummary timing =
-        new PinotHelixTaskResourceManager.TaskStatusSummary();
+    TaskStatusSummary timing = new TaskStatusSummary();
     timing.setTaskCount(taskCount);
     timing.setSubtaskWaitingTimes(new HashMap<>());
     timing.setSubtaskRunningTimes(new HashMap<>());
