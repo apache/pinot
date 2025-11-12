@@ -23,6 +23,7 @@ import java.util.Map;
 import java.util.concurrent.BrokenBarrierException;
 import java.util.concurrent.CyclicBarrier;
 import java.util.concurrent.Executors;
+import java.util.concurrent.atomic.AtomicInteger;
 import org.apache.pinot.spi.env.PinotConfiguration;
 import org.apache.pinot.spi.query.QueryThreadExceedStrategy;
 import org.apache.pinot.spi.utils.CommonConstants;
@@ -37,7 +38,8 @@ public class HardLimitExecutorTest {
   @Test
   public void testHardLimit()
       throws Exception {
-    HardLimitExecutor ex = new HardLimitExecutor(1, Executors.newCachedThreadPool());
+    HardLimitExecutor ex = new HardLimitExecutor(1, Executors.newCachedThreadPool(),
+        QueryThreadExceedStrategy.ERROR, max -> { }, current -> { });
     CyclicBarrier barrier = new CyclicBarrier(2);
 
     try {
@@ -68,7 +70,8 @@ public class HardLimitExecutorTest {
   @Test
   public void testHardLimitLogExceedStrategy()
       throws Exception {
-    HardLimitExecutor ex = new HardLimitExecutor(1, Executors.newCachedThreadPool(), QueryThreadExceedStrategy.LOG);
+    HardLimitExecutor ex = new HardLimitExecutor(1, Executors.newCachedThreadPool(), QueryThreadExceedStrategy.LOG,
+        max -> { }, current -> { });
     CyclicBarrier barrier = new CyclicBarrier(2);
 
     try {
@@ -126,5 +129,49 @@ public class HardLimitExecutorTest {
     Map<String, Object> configMap5 = new HashMap<>();
     PinotConfiguration config5 = new PinotConfiguration(configMap5);
     assertEquals(HardLimitExecutor.getMultiStageExecutorHardLimit(config5), -1);
+  }
+
+  @Test
+  public void testGaugeTracking()
+      throws Exception {
+    AtomicInteger maxGauge = new AtomicInteger(-1);
+    AtomicInteger currentGauge = new AtomicInteger(-1);
+
+    HardLimitExecutor ex = new HardLimitExecutor(2, Executors.newCachedThreadPool(),
+        QueryThreadExceedStrategy.ERROR,
+        max -> maxGauge.set(max),
+        current -> currentGauge.set(current));
+
+    CyclicBarrier barrier = new CyclicBarrier(3);
+
+    try {
+      assertEquals(maxGauge.get(), 2);
+      assertEquals(currentGauge.get(), 0);
+
+      ex.execute(() -> {
+        try {
+          barrier.await();
+          Thread.sleep(Long.MAX_VALUE);
+        } catch (InterruptedException | BrokenBarrierException e) {
+          // do nothing
+        }
+      });
+
+      ex.execute(() -> {
+        try {
+          barrier.await();
+          Thread.sleep(Long.MAX_VALUE);
+        } catch (InterruptedException | BrokenBarrierException e) {
+          // do nothing
+        }
+      });
+
+      barrier.await();
+
+      assertEquals(currentGauge.get(), 2);
+      assertEquals(maxGauge.get(), 2);
+    } finally {
+      ex.shutdownNow();
+    }
   }
 }

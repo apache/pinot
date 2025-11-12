@@ -38,6 +38,7 @@ import org.apache.commons.lang3.StringUtils;
 import org.apache.commons.lang3.tuple.Pair;
 import org.apache.pinot.common.config.TlsConfig;
 import org.apache.pinot.common.datatable.StatMap;
+import org.apache.pinot.common.metrics.ServerGauge;
 import org.apache.pinot.common.metrics.ServerMeter;
 import org.apache.pinot.common.metrics.ServerMetrics;
 import org.apache.pinot.common.proto.Worker;
@@ -214,7 +215,9 @@ public class QueryRunner {
         exceedStrategy = QueryThreadExceedStrategy.valueOf(Server.DEFAULT_MSE_MAX_EXECUTION_THREADS_EXCEED_STRATEGY);
       }
       LOGGER.info("Setting multi-stage executor hardLimit: {} exceedStrategy: {}", hardLimit, exceedStrategy);
-      _executorService = new HardLimitExecutor(hardLimit, _executorService, exceedStrategy);
+      _executorService = new HardLimitExecutor(hardLimit, _executorService, exceedStrategy,
+          max -> serverMetrics.setValueOfGlobalGauge(ServerGauge.MSE_THREAD_USAGE_MAX, max.longValue()),
+          current -> serverMetrics.setValueOfGlobalGauge(ServerGauge.MSE_THREAD_USAGE_CURRENT, current.longValue()));
     }
 
     _executorService = ThrottleOnCriticalHeapUsageExecutor.maybeWrap(

@@ -21,6 +21,7 @@ package org.apache.pinot.spi.executor;
 import java.util.concurrent.Callable;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.atomic.AtomicInteger;
+import java.util.function.Consumer;
 import org.apache.pinot.spi.env.PinotConfiguration;
 import org.apache.pinot.spi.query.QueryThreadExceedStrategy;
 import org.apache.pinot.spi.utils.CommonConstants;
@@ -38,12 +39,21 @@ public class HardLimitExecutor extends DecoratorExecutorService {
   private final AtomicInteger _running;
   private final int _max;
   private final QueryThreadExceedStrategy _exceedStrategy;
+  private final Consumer<Integer> _currentUsageGaugeUpdater;
 
-  public HardLimitExecutor(int max, ExecutorService executorService, QueryThreadExceedStrategy exceedStrategy) {
+  public HardLimitExecutor(int max, ExecutorService executorService, QueryThreadExceedStrategy exceedStrategy,
+      Consumer<Integer> maxUsageGaugeUpdater, Consumer<Integer> currentUsageGaugeUpdater) {
     super(executorService);
     _running = new AtomicInteger(0);
     _max = max;
     _exceedStrategy = exceedStrategy;
+    _currentUsageGaugeUpdater = currentUsageGaugeUpdater;
+    maxUsageGaugeUpdater.accept(max);
+    _currentUsageGaugeUpdater.accept(0);
+  }
+
+  public HardLimitExecutor(int max, ExecutorService executorService, QueryThreadExceedStrategy exceedStrategy) {
+    this(max, executorService, exceedStrategy, max1 -> { }, current -> { });
   }
 
   public HardLimitExecutor(int max, ExecutorService executorService) {
@@ -97,11 +107,13 @@ public class HardLimitExecutor extends DecoratorExecutorService {
     checkTaskAllowed();
     return () -> {
       checkTaskAllowed();
-      _running.getAndIncrement();
+      int currentCount = _running.getAndIncrement();
+      _currentUsageGaugeUpdater.accept(currentCount + 1);
       try {
         return task.call();
       } finally {
-        _running.decrementAndGet();
+        int newCount = _running.decrementAndGet();
+        _currentUsageGaugeUpdater.accept(newCount);
       }
     };
   }
@@ -111,11 +123,13 @@ public class HardLimitExecutor extends DecoratorExecutorService {
     checkTaskAllowed();
     return () -> {
       checkTaskAllowed();
-      _running.getAndIncrement();
+      int currentCount = _running.getAndIncrement();
+      _currentUsageGaugeUpdater.accept(currentCount + 1);
       try {
         task.run();
       } finally {
-        _running.decrementAndGet();
+        int newCount = _running.decrementAndGet();
+        _currentUsageGaugeUpdater.accept(newCount);
       }
     };
   }

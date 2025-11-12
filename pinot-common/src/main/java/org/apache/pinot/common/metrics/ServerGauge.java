@@ -153,7 +153,11 @@ public enum ServerGauge implements AbstractMetrics.Gauge {
 
   // ThrottleOnCriticalHeapUsageExecutor metrics
   THROTTLE_EXECUTOR_QUEUE_SIZE("count", true,
-      "Current number of tasks in the throttle executor queue");
+      "Current number of tasks in the throttle executor queue"),
+
+  // Multi-stage executor thread usage metrics
+  MSE_THREAD_USAGE_MAX("threads", true, "Maximum allowed threads for multi-stage executor"),
+  MSE_THREAD_USAGE_CURRENT("threads", true, "Current number of threads in use by multi-stage executor");
 
   private final String _gaugeName;
   private final String _unit;
