@@ -217,7 +217,8 @@ public class QueryRunner {
       LOGGER.info("Setting multi-stage executor hardLimit: {} exceedStrategy: {}", hardLimit, exceedStrategy);
       _executorService = new HardLimitExecutor(hardLimit, _executorService, exceedStrategy,
           max -> serverMetrics.setValueOfGlobalGauge(ServerGauge.MSE_THREAD_USAGE_MAX, max.longValue()),
-          current -> serverMetrics.setValueOfGlobalGauge(ServerGauge.MSE_THREAD_USAGE_CURRENT, current.longValue()));
+          current -> serverMetrics.setValueOfGlobalGauge(ServerGauge.MSE_THREAD_USAGE_CURRENT, current.longValue()),
+          () -> serverMetrics.addMeteredGlobalValue(ServerMeter.MSE_THREAD_LIMIT_TASK_REJECTIONS, 1L));
     }
 
     _executorService = ThrottleOnCriticalHeapUsageExecutor.maybeWrap(

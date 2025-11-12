@@ -40,20 +40,23 @@ public class HardLimitExecutor extends DecoratorExecutorService {
   private final int _max;
   private final QueryThreadExceedStrategy _exceedStrategy;
   private final Consumer<Integer> _currentUsageGaugeUpdater;
+  private final Runnable _taskRejectionCounter;
 
   public HardLimitExecutor(int max, ExecutorService executorService, QueryThreadExceedStrategy exceedStrategy,
-      Consumer<Integer> maxUsageGaugeUpdater, Consumer<Integer> currentUsageGaugeUpdater) {
+      Consumer<Integer> maxUsageGaugeUpdater, Consumer<Integer> currentUsageGaugeUpdater,
+      Runnable taskRejectionCounter) {
     super(executorService);
     _running = new AtomicInteger(0);
     _max = max;
     _exceedStrategy = exceedStrategy;
     _currentUsageGaugeUpdater = currentUsageGaugeUpdater;
+    _taskRejectionCounter = taskRejectionCounter;
     maxUsageGaugeUpdater.accept(max);
     _currentUsageGaugeUpdater.accept(0);
   }
 
   public HardLimitExecutor(int max, ExecutorService executorService, QueryThreadExceedStrategy exceedStrategy) {
-    this(max, executorService, exceedStrategy, max1 -> { }, current -> { });
+    this(max, executorService, exceedStrategy, max1 -> { }, current -> { }, () -> { });
   }
 
   public HardLimitExecutor(int max, ExecutorService executorService) {
@@ -94,6 +97,7 @@ public class HardLimitExecutor extends DecoratorExecutorService {
         LOGGER.warn("Exceed strategy LOG: Tasks limit max: {} exceeded with running: {} tasks.",
             _max, _running.get());
       } else if (_exceedStrategy == QueryThreadExceedStrategy.ERROR) {
+        _taskRejectionCounter.run();
         throw new IllegalStateException("Tasks limit exceeded.");
       } else {
         throw new IllegalStateException(String.format(

@@ -38,11 +38,14 @@ public class HardLimitExecutorTest {
   @Test
   public void testHardLimit()
       throws Exception {
+    AtomicInteger rejectionCount = new AtomicInteger(0);
     HardLimitExecutor ex = new HardLimitExecutor(1, Executors.newCachedThreadPool(),
-        QueryThreadExceedStrategy.ERROR, max -> { }, current -> { });
+        QueryThreadExceedStrategy.ERROR, max -> { }, current -> { }, rejectionCount::incrementAndGet);
     CyclicBarrier barrier = new CyclicBarrier(2);
 
     try {
+      assertEquals(rejectionCount.get(), 0);
+
       ex.execute(() -> {
         try {
           barrier.await();
@@ -62,6 +65,9 @@ public class HardLimitExecutorTest {
         // as expected
         assertEquals(e.getMessage(), "Tasks limit exceeded.");
       }
+
+      // Verify rejection counter was incremented
+      assertEquals(rejectionCount.get(), 1);
     } finally {
       ex.shutdownNow();
     }
@@ -70,8 +76,9 @@ public class HardLimitExecutorTest {
   @Test
   public void testHardLimitLogExceedStrategy()
       throws Exception {
+    AtomicInteger rejectionCount = new AtomicInteger(0);
     HardLimitExecutor ex = new HardLimitExecutor(1, Executors.newCachedThreadPool(), QueryThreadExceedStrategy.LOG,
-        max -> { }, current -> { });
+        max -> { }, current -> { }, rejectionCount::incrementAndGet);
     CyclicBarrier barrier = new CyclicBarrier(2);
 
     try {
@@ -89,6 +96,9 @@ public class HardLimitExecutorTest {
       ex.execute(() -> {
         // do nothing, we just don't want it to throw an exception
       });
+
+      // Verify rejection counter was NOT incremented (LOG mode doesn't reject tasks)
+      assertEquals(rejectionCount.get(), 0);
     } finally {
       ex.shutdownNow();
     }
@@ -136,17 +146,20 @@ public class HardLimitExecutorTest {
       throws Exception {
     AtomicInteger maxGauge = new AtomicInteger(-1);
     AtomicInteger currentGauge = new AtomicInteger(-1);
+    AtomicInteger rejectionCount = new AtomicInteger(0);
 
     HardLimitExecutor ex = new HardLimitExecutor(2, Executors.newCachedThreadPool(),
         QueryThreadExceedStrategy.ERROR,
         max -> maxGauge.set(max),
-        current -> currentGauge.set(current));
+        current -> currentGauge.set(current),
+        rejectionCount::incrementAndGet);
 
     CyclicBarrier barrier = new CyclicBarrier(3);
 
     try {
       assertEquals(maxGauge.get(), 2);
       assertEquals(currentGauge.get(), 0);
+      assertEquals(rejectionCount.get(), 0);
 
       ex.execute(() -> {
         try {
@@ -170,6 +183,20 @@ public class HardLimitExecutorTest {
 
       assertEquals(currentGauge.get(), 2);
       assertEquals(maxGauge.get(), 2);
+      assertEquals(rejectionCount.get(), 0);
+
+      // Try to submit a third task, should be rejected
+      try {
+        ex.execute(() -> {
+          // do nothing
+        });
+        fail("Should have rejected the third task");
+      } catch (IllegalStateException e) {
+        assertEquals(e.getMessage(), "Tasks limit exceeded.");
+      }
+
+      // Verify rejection counter was incremented
+      assertEquals(rejectionCount.get(), 1);
     } finally {
       ex.shutdownNow();
     }
