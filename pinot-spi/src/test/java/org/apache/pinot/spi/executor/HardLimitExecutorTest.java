@@ -142,7 +142,7 @@ public class HardLimitExecutorTest {
   }
 
   @Test
-  public void testGaugeTracking()
+  public void testMetricsTracking()
       throws Exception {
     AtomicInteger maxGauge = new AtomicInteger(-1);
     AtomicInteger currentGauge = new AtomicInteger(-1);
