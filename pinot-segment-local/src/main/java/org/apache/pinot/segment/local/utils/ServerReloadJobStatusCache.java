@@ -122,12 +122,9 @@ public class ServerReloadJobStatusCache implements PinotClusterConfigChangeListe
     // Migrate existing entries from old cache to new cache
     Cache<String, ReloadJobStatus> oldCache = _cache;
     if (oldCache != null) {
-      for (Map.Entry<String, ReloadJobStatus> entry : oldCache.asMap().entrySet()) {
-        newCache.put(entry.getKey(), entry.getValue());
-      }
+      newCache.putAll(oldCache.asMap());
     }
 
-    // Atomically swap caches (volatile field ensures safe publication)
     _cache = newCache;
     _currentConfig = newConfig;
 
