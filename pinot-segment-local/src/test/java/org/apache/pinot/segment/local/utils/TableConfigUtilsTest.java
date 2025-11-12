@@ -2004,6 +2004,24 @@ public class TableConfigUtilsTest {
     } catch (IllegalStateException e) {
       assertEquals(e.getMessage(), "A table can have either Upsert or Dedup enabled, but not both");
     }
+
+    // Valid TIMESTAMP dedupTimeColumn
+    DedupConfig dedupConfig = new DedupConfig();
+    dedupConfig.setMetadataTTL(10);
+    dedupConfig.setDedupTimeColumn(TIME_COLUMN);
+    schema = new Schema.SchemaBuilder().setSchemaName(TABLE_NAME)
+        .addSingleValueDimension("myCol", FieldSpec.DataType.STRING)
+        .addDateTime(TIME_COLUMN, FieldSpec.DataType.TIMESTAMP, "1:MILLISECONDS:EPOCH", "1:MILLISECONDS")
+        .setPrimaryKeyColumns(Lists.newArrayList("myCol"))
+        .build();
+    tableConfig = new TableConfigBuilder(TableType.REALTIME).setTableName(TABLE_NAME)
+        .setDedupConfig(dedupConfig)
+        .setRoutingConfig(
+            new RoutingConfig(null, null, RoutingConfig.STRICT_REPLICA_GROUP_INSTANCE_SELECTOR_TYPE, false))
+        .setStreamConfigs(streamConfigs)
+        .build();
+    // Should not throw an exception - TIMESTAMP is a valid type for dedupTimeColumn
+    TableConfigUtils.validateUpsertAndDedupConfig(tableConfig, schema);
   }
 
   @Test
@@ -2029,28 +2047,8 @@ public class TableConfigUtilsTest {
       TableConfigUtils.validateUpsertAndDedupConfig(tableConfig, schema);
       fail();
     } catch (IllegalStateException e) {
-      assertEquals(e.getMessage(), "MetadataTTL must have time column: timeColumn in numeric type, found: STRING");
-    }
-
-    // Invalid TIMESTAMP dedupTimeColumn
-    dedupConfig.setDedupTimeColumn(TIME_COLUMN);
-    schema = new Schema.SchemaBuilder().setSchemaName(TABLE_NAME)
-        .addSingleValueDimension("myCol", FieldSpec.DataType.STRING)
-        .addDateTime(TIME_COLUMN, FieldSpec.DataType.TIMESTAMP, "1:MILLISECONDS:EPOCH", "1:MILLISECONDS")
-        .setPrimaryKeyColumns(Lists.newArrayList("myCol"))
-        .build();
-    tableConfig = new TableConfigBuilder(TableType.REALTIME).setTableName(TABLE_NAME)
-        .setDedupConfig(dedupConfig)
-        .setRoutingConfig(
-            new RoutingConfig(null, null, RoutingConfig.STRICT_REPLICA_GROUP_INSTANCE_SELECTOR_TYPE, false))
-        .setStreamConfigs(streamConfigs)
-        .build();
-    try {
-      TableConfigUtils.validateUpsertAndDedupConfig(tableConfig, schema);
-      fail();
-    } catch (IllegalStateException e) {
       assertEquals(e.getMessage(),
-          "MetadataTTL must have dedupTimeColumn: timeColumn in numeric type, found: TIMESTAMP");
+          "MetadataTTL must have time column: timeColumn in numeric type, found: STRING");
     }
   }
 
@@ -2926,7 +2924,7 @@ public class TableConfigUtilsTest {
       // Expected
     }
 
-    // Invalid TIMESTAMP time column
+    // Valid TIMESTAMP time column
     schema = new Schema.SchemaBuilder().setSchemaName(TABLE_NAME)
         .addSingleValueDimension("myCol", FieldSpec.DataType.STRING)
         .addDateTime(TIME_COLUMN, FieldSpec.DataType.TIMESTAMP, "1:MILLISECONDS:EPOCH", "1:MILLISECONDS")
@@ -2935,16 +2933,13 @@ public class TableConfigUtilsTest {
     upsertConfig = new UpsertConfig(UpsertConfig.Mode.FULL);
     upsertConfig.setMetadataTTL(3600);
     upsertConfig.setSnapshot(Enablement.ENABLE);
-    tableConfigWithInvalidTTLConfig = new TableConfigBuilder(TableType.REALTIME).setTableName(TABLE_NAME)
+    TableConfig tableConfigWithValidTimestampTTLConfig = new TableConfigBuilder(TableType.REALTIME)
+        .setTableName(TABLE_NAME)
         .setTimeColumnName(TIME_COLUMN)
         .setUpsertConfig(upsertConfig)
         .build();
-    try {
-      TableConfigUtils.validateTTLForUpsertConfig(tableConfigWithInvalidTTLConfig, schema);
-      fail();
-    } catch (IllegalStateException e) {
-      // Expected
-    }
+    // Should not throw an exception - TIMESTAMP is a valid type for time column with TTL
+    TableConfigUtils.validateTTLForUpsertConfig(tableConfigWithValidTimestampTTLConfig, schema);
   }
 
   @Test
