@@ -31,6 +31,7 @@ import java.util.concurrent.ExecutorService;
 import java.util.function.BiConsumer;
 import java.util.function.BooleanSupplier;
 import java.util.function.Consumer;
+import java.util.function.Supplier;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 import javax.annotation.Nullable;
@@ -215,10 +216,15 @@ public class QueryRunner {
         exceedStrategy = QueryThreadExceedStrategy.valueOf(Server.DEFAULT_MSE_MAX_EXECUTION_THREADS_EXCEED_STRATEGY);
       }
       LOGGER.info("Setting multi-stage executor hardLimit: {} exceedStrategy: {}", hardLimit, exceedStrategy);
-      _executorService = new HardLimitExecutor(hardLimit, _executorService, exceedStrategy,
+      HardLimitExecutor hardLimitExecutor = new HardLimitExecutor(hardLimit, _executorService, exceedStrategy,
           max -> serverMetrics.setValueOfGlobalGauge(ServerGauge.MSE_THREAD_USAGE_MAX, max.longValue()),
-          current -> serverMetrics.setValueOfGlobalGauge(ServerGauge.MSE_THREAD_USAGE_CURRENT, current.longValue()),
           () -> serverMetrics.addMeteredGlobalValue(ServerMeter.MSE_THREAD_LIMIT_TASK_REJECTIONS, 1L));
+
+      // Register callback gauge for current thread usage
+      serverMetrics.setOrUpdateGauge(ServerGauge.MSE_THREAD_USAGE_CURRENT.getGaugeName(),
+          (Supplier<Long>) () -> (long) hardLimitExecutor.getCurrentThreadUsage());
+
+      _executorService = hardLimitExecutor;
     }
 
     _executorService = ThrottleOnCriticalHeapUsageExecutor.maybeWrap(
