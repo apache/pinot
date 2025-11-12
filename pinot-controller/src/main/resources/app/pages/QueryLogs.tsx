@@ -53,6 +53,16 @@ const DEFAULT_COLUMNS = [
 ];
 
 const DEFAULT_SELECT_LIST = DEFAULT_COLUMNS.join(', ');
+const AGGREGATE_COLUMNS = [
+  'tableName',
+  'minLatencyMs',
+  'maxLatencyMs',
+  'avgLatencyMs',
+  'p50LatencyMs',
+  'p90LatencyMs',
+  'p95LatencyMs',
+  'p99LatencyMs'
+];
 const DEFAULT_LIMIT = 200;
 const DEFAULT_LOOKBACK_MINUTES = 60;
 
@@ -123,6 +133,11 @@ const QueryLogsPage = () => {
     records: [],
     isLoading: false
   });
+  const [aggregateTable, setAggregateTable] = useState<TableData>({
+    columns: AGGREGATE_COLUMNS,
+    records: [],
+    isLoading: false
+  });
   const [exceptions, setExceptions] = useState<SqlException[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [lastUpdated, setLastUpdated] = useState<number | null>(null);
@@ -179,7 +194,7 @@ const QueryLogsPage = () => {
     return parsed;
   };
 
-  const buildSql = (activeFilters: QueryLogFilters) => {
+  const buildWhereClause = (activeFilters: QueryLogFilters) => {
     const clauses: string[] = [];
 
     if (activeFilters.tableName) {
@@ -227,9 +242,23 @@ const QueryLogsPage = () => {
     }
 
     const whereClause = clauses.length ? ` WHERE ${clauses.join(' AND ')}` : '';
+    return whereClause;
+  };
+
+  const buildSql = (activeFilters: QueryLogFilters) => {
+    const whereClause = buildWhereClause(activeFilters);
     const limitClause = ` LIMIT ${parseLimit(activeFilters.limit)}`;
 
     return `SELECT ${DEFAULT_SELECT_LIST} FROM system.query_log${whereClause} ORDER BY timestampMs DESC${limitClause}`;
+  };
+
+  const buildAggregateSql = (activeFilters: QueryLogFilters) => {
+    const whereClause = buildWhereClause(activeFilters);
+    const limitClause = ` LIMIT ${Math.min(parseLimit(activeFilters.limit), 200)}`;
+    return `SELECT tableName, MIN(timeMs) AS minLatencyMs, MAX(timeMs) AS maxLatencyMs, AVG(timeMs) AS avgLatencyMs, `
+      + `PERCENTILEEST(timeMs, 50) AS p50LatencyMs, PERCENTILEEST(timeMs, 90) AS p90LatencyMs, `
+      + `PERCENTILEEST(timeMs, 95) AS p95LatencyMs, PERCENTILEEST(timeMs, 99) AS p99LatencyMs `
+      + `FROM system.query_log${whereClause} GROUP BY tableName ORDER BY avgLatencyMs DESC${limitClause}`;
   };
 
   const sqlPreview = useMemo(() => buildSql(filters), [filters]);
@@ -250,22 +279,41 @@ const QueryLogsPage = () => {
   const runQueryLogs = async (overrideFilters?: QueryLogFilters) => {
     const activeFilters = overrideFilters || filters;
     const sql = buildSql(activeFilters);
+    const aggregateSql = buildAggregateSql(activeFilters);
     setResultTable((prev) => ({
+      ...prev,
+      isLoading: true
+    }));
+    setAggregateTable((prev) => ({
       ...prev,
       isLoading: true
     }));
     setError(null);
     try {
       const payload = { sql, trace: 'false' };
-      const response = await PinotMethodUtils.getQueryLogResults(payload);
+      const aggregatePayload = { sql: aggregateSql, trace: 'false' };
+      const [response, aggregateResponse] = await Promise.all([
+        PinotMethodUtils.getQueryLogResults(payload),
+        PinotMethodUtils.getQueryLogResults(aggregatePayload)
+      ]);
       const columns =
         response.result?.columns && response.result.columns.length
           ? response.result.columns
           : DEFAULT_COLUMNS;
       const records = response.result?.records ? formatRecords(response.result.records) : [];
+      const aggregateColumns =
+        aggregateResponse.result?.columns && aggregateResponse.result.columns.length
+          ? aggregateResponse.result.columns
+          : AGGREGATE_COLUMNS;
+      const aggregateRecords = aggregateResponse.result?.records || [];
       setResultTable({
         columns,
         records,
+        isLoading: false
+      });
+      setAggregateTable({
+        columns: aggregateColumns,
+        records: aggregateRecords,
         isLoading: false
       });
       setExceptions(response.exceptions || []);
@@ -278,6 +326,10 @@ const QueryLogsPage = () => {
       setError(message);
       setExceptions([]);
       setResultTable((prev) => ({
+        ...prev,
+        isLoading: false
+      }));
+      setAggregateTable((prev) => ({
         ...prev,
         isLoading: false
       }));
@@ -456,6 +508,17 @@ const QueryLogsPage = () => {
           </Alert>
         </Box>
       ))}
+
+      {aggregateTable.records.length > 0 || aggregateTable.isLoading ? (
+        <Box marginBottom={2}>
+          <CustomizedTables
+            title="Latency summary by table"
+            data={aggregateTable}
+            highlightBackground
+            showSearchBox={false}
+          />
+        </Box>
+      ) : null}
 
       <CustomizedTables
         title="Query log results"

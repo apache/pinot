@@ -206,6 +206,82 @@ public class QueryLogSystemTableTest {
   }
 
   @Test
+  public void testAggregationFunctions()
+      throws Exception {
+    SqlNodeAndOptions sql = CalciteSqlParser.compileToSqlNodeAndOptions(
+        "SELECT AVG(timeMs) AS avgLatency, SUM(numDocsScanned) AS totalScanned FROM system.query_log");
+    BrokerResponseNative response = (BrokerResponseNative) _systemTable.handleIfSystemTable(sql);
+    ResultTable table = response.getResultTable();
+    assertEquals(table.getRows().size(), 1);
+    Object[] row = table.getRows().get(0);
+    assertEquals(row.length, 2);
+    assertEquals(row[0], 175.0d);
+    assertEquals(row[1], 35L);
+    DataSchema schema = table.getDataSchema();
+    assertEquals(schema.getColumnDataType(0), ColumnDataType.DOUBLE);
+    assertEquals(schema.getColumnDataType(1), ColumnDataType.LONG);
+
+    SqlNodeAndOptions countSql = CalciteSqlParser.compileToSqlNodeAndOptions(
+        "SELECT COUNT(*) AS cnt FROM system.query_log");
+    BrokerResponseNative countResponse = (BrokerResponseNative) _systemTable.handleIfSystemTable(countSql);
+    ResultTable countTable = countResponse.getResultTable();
+    assertEquals(countTable.getRows().size(), 1);
+    assertEquals(countTable.getRows().get(0)[0], 3L);
+
+    SqlNodeAndOptions columnCountSql = CalciteSqlParser.compileToSqlNodeAndOptions(
+        "SELECT COUNT(timeMs) AS cnt FROM system.query_log");
+    BrokerResponseNative columnCountResponse =
+        (BrokerResponseNative) _systemTable.handleIfSystemTable(columnCountSql);
+    ResultTable columnCountTable = columnCountResponse.getResultTable();
+    assertEquals(columnCountTable.getRows().size(), 1);
+    assertEquals(columnCountTable.getRows().get(0)[0], 3L);
+  }
+
+  @Test
+  public void testAggregationWithGroupBy()
+      throws Exception {
+    SqlNodeAndOptions sql = CalciteSqlParser.compileToSqlNodeAndOptions(
+        "SELECT tableName, COUNT(*) AS cnt, MIN(timeMs) AS minLatency, MAX(timeMs) AS maxLatency "
+            + "FROM system.query_log GROUP BY tableName ORDER BY cnt DESC");
+    BrokerResponseNative response = (BrokerResponseNative) _systemTable.handleIfSystemTable(sql);
+    ResultTable table = response.getResultTable();
+    assertEquals(table.getRows().size(), 2);
+    Object[] first = table.getRows().get(0);
+    assertEquals(first[0], "foo_OFFLINE");
+    assertEquals(first[1], 2L);
+    assertEquals(first[2], 150L);
+    assertEquals(first[3], 300L);
+    Object[] second = table.getRows().get(1);
+    assertEquals(second[0], "bar_OFFLINE");
+    assertEquals(second[1], 1L);
+    assertEquals(second[2], 75L);
+    assertEquals(second[3], 75L);
+  }
+
+  @Test
+  public void testPercentileAggregationWithGroupBy()
+      throws Exception {
+    SqlNodeAndOptions sql = CalciteSqlParser.compileToSqlNodeAndOptions(
+        "SELECT tableName, PERCENTILEEST(timeMs, 50) AS p50, PERCENTILEEST(timeMs, 90) AS p90 "
+            + "FROM system.query_log GROUP BY tableName ORDER BY tableName");
+    BrokerResponseNative response = (BrokerResponseNative) _systemTable.handleIfSystemTable(sql);
+    ResultTable table = response.getResultTable();
+    assertEquals(table.getRows().size(), 2);
+    List<Object[]> rows = table.getRows();
+    Object[] barRow = rows.get(0);
+    assertEquals(barRow[0], "bar_OFFLINE");
+    assertEquals(barRow[1], 75.0);
+    assertEquals(barRow[2], 75.0);
+    Object[] fooRow = rows.get(1);
+    assertEquals(fooRow[0], "foo_OFFLINE");
+    assertEquals(fooRow[1], 225.0);
+    assertEquals(fooRow[2], 285.0);
+    DataSchema schema = table.getDataSchema();
+    assertEquals(schema.getColumnDataType(1), ColumnDataType.DOUBLE);
+    assertEquals(schema.getColumnDataType(2), ColumnDataType.DOUBLE);
+  }
+
+  @Test
   public void testDiskBackedTimeBasedRetention()
       throws Exception {
     _systemTable.reset();

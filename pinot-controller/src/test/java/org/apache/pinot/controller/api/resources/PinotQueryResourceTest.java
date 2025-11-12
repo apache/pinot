@@ -19,7 +19,6 @@
 package org.apache.pinot.controller.api.resources;
 
 import java.io.ByteArrayOutputStream;
-import java.util.Collections;
 import javax.ws.rs.core.StreamingOutput;
 import org.apache.pinot.common.config.provider.TableCache;
 import org.apache.pinot.controller.ControllerConf;
@@ -78,15 +77,6 @@ public class PinotQueryResourceTest {
     );
     Assert.assertTrue(response.contains(String.valueOf(QueryErrorCode.SQL_PARSING.getId())));
     Assert.assertFalse(response.contains("retry the query using the multi-stage query engine"));
-  }
-
-  @Test
-  public void testSystemQueryLogQueryRedirectsToAggregator() {
-    when(_resourceManager.getAllBrokerInstanceConfigs()).thenReturn(Collections.emptyList());
-    String response = streamingOutputToString(
-        _pinotQueryResource.handleGetSql("SELECT requestId FROM system.query_log", null, null, null));
-    Assert.assertTrue(response.contains(String.valueOf(QueryErrorCode.BROKER_RESOURCE_MISSING.getId())),
-        "Expected controller to route system.query_log query through aggregation path");
   }
 
   public static String streamingOutputToString(StreamingOutput streamingOutput) {

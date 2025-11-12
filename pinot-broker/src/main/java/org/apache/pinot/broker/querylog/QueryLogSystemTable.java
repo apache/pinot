@@ -31,11 +31,13 @@ import java.nio.file.Paths;
 import java.nio.file.StandardOpenOption;
 import java.util.ArrayDeque;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Collections;
 import java.util.Comparator;
 import java.util.Deque;
 import java.util.HashMap;
 import java.util.HashSet;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
@@ -191,9 +193,6 @@ public class QueryLogSystemTable {
       return null;
     }
     SqlSelect select = (SqlSelect) workingNode;
-    if (select.getGroup() != null && select.getGroup().size() > 0) {
-      throw new BadQueryRequestException("GROUP BY is not supported for system.query_log");
-    }
     if (select.getHaving() != null) {
       throw new BadQueryRequestException("HAVING is not supported for system.query_log");
     }
@@ -206,20 +205,32 @@ public class QueryLogSystemTable {
     SqlNodeList orderList = outerOrderBy != null ? outerOrderBy : select.getOrderList();
     SqlNode offset = outerOffset != null ? outerOffset : select.getOffset();
     SqlNode fetch = outerFetch != null ? outerFetch : select.getFetch();
+    SqlNodeList groupBy = select.getGroup();
 
-    return new ParsedQuery(selectList, where, orderList, offset, fetch);
+    return new ParsedQuery(selectList, where, orderList, offset, fetch, groupBy);
   }
 
   private BrokerResponse execute(ParsedQuery query)
       throws BadQueryRequestException {
     long startTimeMs = System.currentTimeMillis();
-    List<SelectedColumn> selections = resolveSelectList(query._selectList);
-    Map<String, QueryLogColumn> aliasLookup = new HashMap<>();
-    for (SelectedColumn selectedColumn : selections) {
-      aliasLookup.put(selectedColumn._outputName.toLowerCase(Locale.ROOT), selectedColumn._column);
+    AggregationQuery aggregationQuery = resolveAggregationQuery(query._selectList, query._groupBy);
+    List<SelectedColumn> selections = null;
+    Map<String, QueryLogColumn> aliasLookup;
+    if (aggregationQuery == null) {
+      aliasLookup = new HashMap<>();
+      selections = resolveSelectList(query._selectList);
+      for (SelectedColumn selectedColumn : selections) {
+        aliasLookup.put(selectedColumn._outputName.toLowerCase(Locale.ROOT), selectedColumn._column);
+      }
+    } else {
+      aliasLookup = Collections.emptyMap();
     }
 
     Predicate<QueryLogRecord> predicate = buildPredicate(query._whereClause, aliasLookup);
+    if (aggregationQuery != null) {
+      return executeAggregation(aggregationQuery, predicate, query._orderBy, query._offsetNode, query._fetchNode);
+    }
+
     List<Ordering> orderings = parseOrderings(query._orderBy, aliasLookup, selections);
     int offset = parseNonNegativeInt(query._offsetNode, "OFFSET", 0);
     int limit = parseNonNegativeInt(query._fetchNode, "LIMIT", _defaultLimit);
@@ -668,12 +679,233 @@ public class QueryLogSystemTable {
     return columns;
   }
 
+  private static List<QueryLogColumn> resolveGroupByColumns(@Nullable SqlNodeList groupBy)
+      throws BadQueryRequestException {
+    if (groupBy == null || groupBy.isEmpty()) {
+      return Collections.emptyList();
+    }
+    List<QueryLogColumn> columns = new ArrayList<>(groupBy.size());
+    Set<String> seen = new HashSet<>();
+    for (SqlNode node : groupBy) {
+      if (!(node instanceof SqlIdentifier)) {
+        throw new BadQueryRequestException("GROUP BY only supports column references, found: " + node);
+      }
+      QueryLogColumn column = QueryLogColumn.fromIdentifier((SqlIdentifier) node);
+      String key = column._columnName.toLowerCase(Locale.ROOT);
+      if (!seen.add(key)) {
+        throw new BadQueryRequestException("Duplicate column in GROUP BY: " + column._columnName);
+      }
+      columns.add(column);
+    }
+    return columns;
+  }
+
+  @Nullable
+  private static AggregationQuery resolveAggregationQuery(@Nullable SqlNodeList selectList,
+      @Nullable SqlNodeList groupBy)
+      throws BadQueryRequestException {
+    if (selectList == null || selectList.isEmpty()) {
+      return null;
+    }
+    List<QueryLogColumn> groupByColumns = resolveGroupByColumns(groupBy);
+    Map<QueryLogColumn, Integer> groupIndex = new HashMap<>();
+    for (int i = 0; i < groupByColumns.size(); i++) {
+      groupIndex.put(groupByColumns.get(i), i);
+    }
+    List<ResultProjection> projections = new ArrayList<>(selectList.size());
+    boolean seenAggregation = false;
+    for (SqlNode node : selectList) {
+      SqlNode expression = node;
+      String alias = null;
+      if (node instanceof SqlBasicCall && node.getKind() == SqlKind.AS) {
+        SqlBasicCall asCall = (SqlBasicCall) node;
+        expression = asCall.operand(0);
+        SqlNode aliasNode = asCall.operand(1);
+        if (aliasNode instanceof SqlIdentifier) {
+          alias = ((SqlIdentifier) aliasNode).getSimple();
+        } else {
+          throw new BadQueryRequestException("Alias must be an identifier: " + aliasNode);
+        }
+      }
+      AggregationSelection aggregationSelection = parseAggregationSelection(expression, alias);
+      if (aggregationSelection != null) {
+        seenAggregation = true;
+        projections.add(aggregationSelection);
+        continue;
+      }
+      if (groupByColumns.isEmpty()) {
+        if (seenAggregation) {
+          throw new BadQueryRequestException("Cannot mix aggregation functions with raw columns without GROUP BY");
+        }
+        return null;
+      }
+      if (!(expression instanceof SqlIdentifier)) {
+        throw new BadQueryRequestException(
+            "GROUP BY queries must select grouping columns or aggregations, found: " + expression);
+      }
+      QueryLogColumn column = QueryLogColumn.fromIdentifier((SqlIdentifier) expression);
+      Integer index = groupIndex.get(column);
+      if (index == null) {
+        throw new BadQueryRequestException("Column " + column._columnName + " must appear in the GROUP BY clause");
+      }
+      String outputName = alias != null ? alias : column._columnName;
+      projections.add(new GroupBySelection(column, outputName, index));
+    }
+    if (!seenAggregation && groupByColumns.isEmpty()) {
+      return null;
+    }
+    if (!groupByColumns.isEmpty() && !seenAggregation) {
+      throw new BadQueryRequestException("GROUP BY queries must include at least one aggregation");
+    }
+    return new AggregationQuery(projections, groupByColumns);
+  }
+
+  @Nullable
+  private static AggregationSelection parseAggregationSelection(SqlNode expression, @Nullable String alias)
+      throws BadQueryRequestException {
+    if (!(expression instanceof SqlBasicCall)) {
+      return null;
+    }
+    SqlBasicCall call = (SqlBasicCall) expression;
+    AggregationFunction function = AggregationFunction.fromSqlCall(call);
+    if (function == null) {
+      return null;
+    }
+    if (call.getFunctionQuantifier() != null) {
+      throw new BadQueryRequestException("DISTINCT aggregations are not supported for system.query_log");
+    }
+    QueryLogColumn column = null;
+    Double percentile = null;
+    switch (function) {
+      case COUNT:
+        if (call.getOperandList().isEmpty()) {
+          break;
+        }
+        SqlNode operand = call.operand(0);
+        if (operand instanceof SqlIdentifier && ((SqlIdentifier) operand).isStar()) {
+          break;
+        }
+        if (!(operand instanceof SqlIdentifier)) {
+          throw new BadQueryRequestException("COUNT only supports column references or *");
+        }
+        column = QueryLogColumn.fromIdentifier((SqlIdentifier) operand);
+        break;
+      case SUM:
+      case AVG:
+      case MIN:
+      case MAX:
+        if (call.operandCount() != 1 || !(call.operand(0) instanceof SqlIdentifier)) {
+          throw new BadQueryRequestException(function + " requires a single column reference");
+        }
+        column = QueryLogColumn.fromIdentifier((SqlIdentifier) call.operand(0));
+        function.validateColumn(column);
+        break;
+      case PERCENTILEEST:
+        if (call.operandCount() != 2 || !(call.operand(0) instanceof SqlIdentifier)) {
+          throw new BadQueryRequestException("PERCENTILEEST requires a column reference and percentile literal");
+        }
+        column = QueryLogColumn.fromIdentifier((SqlIdentifier) call.operand(0));
+        function.validateColumn(column);
+        SqlNode percentileNode = call.operand(1);
+        if (!(percentileNode instanceof SqlNumericLiteral)) {
+          throw new BadQueryRequestException("PERCENTILEEST percentile must be a numeric literal between 0 and 100");
+        }
+        double percentileValue = ((SqlNumericLiteral) percentileNode).bigDecimalValue().doubleValue();
+        if (percentileValue < 0d || percentileValue > 100d) {
+          throw new BadQueryRequestException("PERCENTILEEST percentile must be between 0 and 100");
+        }
+        percentile = percentileValue;
+        break;
+      default:
+        break;
+    }
+    String outputName = alias != null ? alias : expression.toString();
+    return new AggregationSelection(function, column, outputName, expression.toString().toLowerCase(Locale.ROOT),
+        percentile);
+  }
+
+  private BrokerResponse executeAggregation(AggregationQuery aggregationQuery, Predicate<QueryLogRecord> predicate,
+      @Nullable SqlNodeList orderBy, @Nullable SqlNode offsetNode, @Nullable SqlNode fetchNode)
+      throws BadQueryRequestException {
+    long startTimeMs = System.currentTimeMillis();
+    List<QueryLogRecord> rows;
+    try {
+      rows = getFilteredRecords(predicate);
+    } catch (IOException e) {
+      throw new BadQueryRequestException("Failed to read query log storage", e);
+    }
+
+    Map<GroupKey, List<QueryLogRecord>> groupedRows = groupRecords(rows, aggregationQuery._groupByColumns);
+    List<Object[]> tableRows = new ArrayList<>(groupedRows.size());
+    for (Map.Entry<GroupKey, List<QueryLogRecord>> entry : groupedRows.entrySet()) {
+      Object[] values = new Object[aggregationQuery._projections.size()];
+      for (int i = 0; i < aggregationQuery._projections.size(); i++) {
+        values[i] = aggregationQuery._projections.get(i).compute(entry.getValue(), entry.getKey()._values);
+      }
+      tableRows.add(values);
+    }
+
+    List<AggregateOrdering> aggregateOrderings = parseAggregateOrderings(orderBy, aggregationQuery);
+    if (!aggregateOrderings.isEmpty()) {
+      tableRows.sort(buildAggregateComparator(aggregateOrderings));
+    }
+
+    int offset = parseNonNegativeInt(offsetNode, "OFFSET", 0);
+    int limit = parseNonNegativeInt(fetchNode, "LIMIT", _defaultLimit);
+    int fromIndex = Math.min(offset, tableRows.size());
+    int toIndex = limit < 0 ? tableRows.size() : Math.min(tableRows.size(), fromIndex + limit);
+    List<Object[]> window = new ArrayList<>(tableRows.subList(fromIndex, toIndex));
+
+    String[] columnNames = new String[aggregationQuery._projections.size()];
+    DataSchema.ColumnDataType[] columnDataTypes = new DataSchema.ColumnDataType[aggregationQuery._projections.size()];
+    for (int i = 0; i < aggregationQuery._projections.size(); i++) {
+      ResultProjection projection = aggregationQuery._projections.get(i);
+      columnNames[i] = projection.getOutputName();
+      columnDataTypes[i] = projection.getResultType();
+    }
+    ResultTable resultTable = new ResultTable(new DataSchema(columnNames, columnDataTypes), window);
+    BrokerResponseNative response = new BrokerResponseNative();
+    response.setResultTable(resultTable);
+    response.setNumRowsResultSet(resultTable.getRows().size());
+    response.setTablesQueried(Set.of(QueryLogSystemTableUtils.FULL_TABLE_NAME));
+    response.setTimeUsedMs(System.currentTimeMillis() - startTimeMs);
+    return response;
+  }
+
   private static boolean isStar(@Nullable SqlNode node) {
     if (node instanceof SqlIdentifier) {
       SqlIdentifier identifier = (SqlIdentifier) node;
       return identifier.isStar() || (identifier.names.size() == 1 && "*".equals(identifier.getSimple()));
     }
     return false;
+  }
+
+  private static final class GroupKey {
+    private static final GroupKey EMPTY = new GroupKey(new Object[0]);
+
+    private final Object[] _values;
+    private final int _hashCode;
+
+    private GroupKey(Object[] values) {
+      _values = values;
+      _hashCode = Arrays.deepHashCode(values);
+    }
+    @Override
+    public boolean equals(Object obj) {
+      if (this == obj) {
+        return true;
+      }
+      if (!(obj instanceof GroupKey)) {
+        return false;
+      }
+      GroupKey other = (GroupKey) obj;
+      return Arrays.deepEquals(_values, other._values);
+    }
+
+    @Override
+    public int hashCode() {
+      return _hashCode;
+    }
   }
 
   private static int parseNonNegativeInt(@Nullable SqlNode node, String clause, int defaultValue)
@@ -754,6 +986,89 @@ public class QueryLogSystemTable {
       Comparator<QueryLogRecord> next = Comparator.comparing(
           record -> (Comparable) ordering._column.extractComparable(record),
           Comparator.nullsLast(Comparator.naturalOrder()));
+      if (!ordering._ascending) {
+        next = next.reversed();
+      }
+      comparator = comparator.thenComparing(next);
+    }
+    return comparator;
+  }
+
+  private Map<GroupKey, List<QueryLogRecord>> groupRecords(List<QueryLogRecord> rows,
+      List<QueryLogColumn> groupByColumns) {
+    Map<GroupKey, List<QueryLogRecord>> grouped = new LinkedHashMap<>();
+    if (groupByColumns.isEmpty()) {
+      grouped.put(GroupKey.EMPTY, rows);
+      return grouped;
+    }
+    for (QueryLogRecord record : rows) {
+      Object[] values = new Object[groupByColumns.size()];
+      for (int i = 0; i < groupByColumns.size(); i++) {
+        values[i] = groupByColumns.get(i).extract(record);
+      }
+      GroupKey key = new GroupKey(values);
+      grouped.computeIfAbsent(key, k -> new ArrayList<>()).add(record);
+    }
+    return grouped;
+  }
+
+  private static List<AggregateOrdering> parseAggregateOrderings(@Nullable SqlNodeList orderList,
+      AggregationQuery aggregationQuery)
+      throws BadQueryRequestException {
+    if (orderList == null || orderList.isEmpty()) {
+      return Collections.emptyList();
+    }
+    List<AggregateOrdering> orderings = new ArrayList<>(orderList.size());
+    for (SqlNode orderNode : orderList) {
+      boolean ascending = true;
+      SqlNode expression = orderNode;
+      if (orderNode instanceof SqlBasicCall) {
+        SqlBasicCall call = (SqlBasicCall) orderNode;
+        if (call.getKind() == SqlKind.DESCENDING) {
+          ascending = false;
+          expression = call.operand(0);
+        }
+      }
+      int columnIndex = resolveAggregateOrderIndex(expression, aggregationQuery);
+      orderings.add(new AggregateOrdering(columnIndex, ascending));
+    }
+    return orderings;
+  }
+
+  private static int resolveAggregateOrderIndex(SqlNode expression, AggregationQuery aggregationQuery)
+      throws BadQueryRequestException {
+    if (expression instanceof SqlNumericLiteral) {
+      int ordinal = parseNonNegativeInt(expression, "ORDER BY", -1);
+      if (ordinal <= 0 || ordinal > aggregationQuery._projections.size()) {
+        throw new BadQueryRequestException("ORDER BY position " + ordinal + " is out of range");
+      }
+      return ordinal - 1;
+    }
+    Integer index = aggregationQuery.getColumnIndex(expression.toString().toLowerCase(Locale.ROOT));
+    if (index != null) {
+      return index;
+    }
+    if (expression instanceof SqlIdentifier) {
+      SqlIdentifier identifier = (SqlIdentifier) expression;
+      index = aggregationQuery.getColumnIndex(identifier.getSimple().toLowerCase(Locale.ROOT));
+      if (index != null) {
+        return index;
+      }
+    }
+    throw new BadQueryRequestException("ORDER BY expression must reference the SELECT list: " + expression);
+  }
+
+  private static Comparator<Object[]> buildAggregateComparator(List<AggregateOrdering> orderings) {
+    Comparator<Object[]> comparator = Comparator.comparing(
+        row -> (Comparable) row[orderings.get(0)._columnIndex], Comparator.nullsLast(Comparator.naturalOrder()));
+    if (!orderings.get(0)._ascending) {
+      comparator = comparator.reversed();
+    }
+    for (int i = 1; i < orderings.size(); i++) {
+      AggregateOrdering ordering = orderings.get(i);
+      Comparator<Object[]> next =
+          Comparator.comparing(row -> (Comparable) row[ordering._columnIndex], Comparator.nullsLast(
+              Comparator.naturalOrder()));
       if (!ordering._ascending) {
         next = next.reversed();
       }
@@ -1037,14 +1352,16 @@ public class QueryLogSystemTable {
     private final SqlNodeList _orderBy;
     private final SqlNode _offsetNode;
     private final SqlNode _fetchNode;
+    private final SqlNodeList _groupBy;
 
     private ParsedQuery(SqlNodeList selectList, SqlNode whereClause, SqlNodeList orderBy, SqlNode offsetNode,
-        SqlNode fetchNode) {
+        SqlNode fetchNode, SqlNodeList groupBy) {
       _selectList = selectList;
       _whereClause = whereClause;
       _orderBy = orderBy;
       _offsetNode = offsetNode;
       _fetchNode = fetchNode;
+      _groupBy = groupBy;
     }
   }
 
@@ -1058,6 +1375,113 @@ public class QueryLogSystemTable {
     }
   }
 
+  private interface ResultProjection {
+    String getOutputName();
+
+    DataSchema.ColumnDataType getResultType();
+
+    Object compute(List<QueryLogRecord> records, @Nullable Object[] groupValues);
+
+    String getExpressionKey();
+  }
+
+  private static final class AggregationQuery {
+    private final List<ResultProjection> _projections;
+    private final List<QueryLogColumn> _groupByColumns;
+    private final Map<String, Integer> _nameToIndex;
+
+    private AggregationQuery(List<ResultProjection> projections, List<QueryLogColumn> groupByColumns) {
+      _projections = projections;
+      _groupByColumns = groupByColumns;
+      _nameToIndex = new HashMap<>();
+      for (int i = 0; i < projections.size(); i++) {
+        ResultProjection projection = projections.get(i);
+        _nameToIndex.put(projection.getOutputName().toLowerCase(Locale.ROOT), i);
+        String expressionKey = projection.getExpressionKey();
+        if (expressionKey != null) {
+          _nameToIndex.put(expressionKey, i);
+        }
+      }
+    }
+
+    @Nullable
+    Integer getColumnIndex(String key) {
+      return _nameToIndex.get(key.toLowerCase(Locale.ROOT));
+    }
+  }
+
+  private static final class AggregationSelection implements ResultProjection {
+    private final AggregationFunction _function;
+    private final QueryLogColumn _column;
+    private final String _outputName;
+    private final String _expressionKey;
+    private final Double _percentile;
+
+    private AggregationSelection(AggregationFunction function, @Nullable QueryLogColumn column, String outputName,
+        String expressionKey, @Nullable Double percentile) {
+      _function = function;
+      _column = column;
+      _outputName = outputName;
+      _expressionKey = expressionKey;
+      _percentile = percentile;
+    }
+
+    @Override
+    public String getOutputName() {
+      return _outputName;
+    }
+
+    @Override
+    public DataSchema.ColumnDataType getResultType() {
+      return _function.getResultType(_column);
+    }
+
+    @Override
+    public Object compute(List<QueryLogRecord> records, @Nullable Object[] groupValues) {
+      return _function.compute(records, _column, _percentile);
+    }
+
+    @Override
+    public String getExpressionKey() {
+      return _expressionKey;
+    }
+  }
+
+  private static final class GroupBySelection implements ResultProjection {
+    private final QueryLogColumn _column;
+    private final String _outputName;
+    private final int _groupIndex;
+
+    private GroupBySelection(QueryLogColumn column, String outputName, int groupIndex) {
+      _column = column;
+      _outputName = outputName;
+      _groupIndex = groupIndex;
+    }
+
+    @Override
+    public String getOutputName() {
+      return _outputName;
+    }
+
+    @Override
+    public DataSchema.ColumnDataType getResultType() {
+      return _column._dataType;
+    }
+
+    @Override
+    public Object compute(List<QueryLogRecord> records, @Nullable Object[] groupValues) {
+      if (groupValues == null || _groupIndex >= groupValues.length) {
+        return null;
+      }
+      return groupValues[_groupIndex];
+    }
+
+    @Override
+    public String getExpressionKey() {
+      return _column._columnName.toLowerCase(Locale.ROOT);
+    }
+  }
+
   private static final class Ordering {
     private final QueryLogColumn _column;
     private final boolean _ascending;
@@ -1065,6 +1489,191 @@ public class QueryLogSystemTable {
     private Ordering(QueryLogColumn column, boolean ascending) {
       _column = column;
       _ascending = ascending;
+    }
+  }
+
+  private static final class AggregateOrdering {
+    private final int _columnIndex;
+    private final boolean _ascending;
+
+    private AggregateOrdering(int columnIndex, boolean ascending) {
+      _columnIndex = columnIndex;
+      _ascending = ascending;
+    }
+  }
+
+  private enum AggregationFunction {
+    COUNT,
+    SUM,
+    AVG,
+    MIN,
+    MAX,
+    PERCENTILEEST;
+
+    static AggregationFunction fromKind(SqlKind kind) {
+      switch (kind) {
+        case COUNT:
+          return COUNT;
+        case SUM:
+          return SUM;
+        case AVG:
+          return AVG;
+        case MIN:
+          return MIN;
+        case MAX:
+          return MAX;
+        default:
+          return null;
+      }
+    }
+
+    static AggregationFunction fromSqlCall(SqlBasicCall call) {
+      AggregationFunction function = fromKind(call.getKind());
+      if (function != null) {
+        return function;
+      }
+      String operatorName = call.getOperator().getName();
+      if ("PERCENTILEEST".equalsIgnoreCase(operatorName) || "PERCENTILE".equalsIgnoreCase(operatorName)) {
+        return PERCENTILEEST;
+      }
+      switch (operatorName.toUpperCase()) {
+        case "COUNT":
+          return COUNT;
+        case "SUM":
+          return SUM;
+        case "AVG":
+          return AVG;
+        case "MIN":
+          return MIN;
+        case "MAX":
+          return MAX;
+        default:
+          return null;
+      }
+    }
+
+    void validateColumn(@Nullable QueryLogColumn column)
+        throws BadQueryRequestException {
+      switch (this) {
+        case SUM:
+        case AVG:
+        case PERCENTILEEST:
+          if (column == null || !column.isNumeric()) {
+            throw new BadQueryRequestException(this + " requires a numeric column");
+          }
+          break;
+        case MIN:
+        case MAX:
+          if (column == null || !column.isComparable()) {
+            throw new BadQueryRequestException(this + " requires a comparable column");
+          }
+          break;
+        default:
+          break;
+      }
+    }
+
+    DataSchema.ColumnDataType getResultType(@Nullable QueryLogColumn column) {
+      switch (this) {
+        case COUNT:
+        case SUM:
+          return DataSchema.ColumnDataType.LONG;
+        case AVG:
+        case PERCENTILEEST:
+          return DataSchema.ColumnDataType.DOUBLE;
+        case MIN:
+        case MAX:
+          return column != null ? column._dataType : DataSchema.ColumnDataType.UNKNOWN;
+        default:
+          return DataSchema.ColumnDataType.UNKNOWN;
+      }
+    }
+
+    Object compute(List<QueryLogRecord> records, @Nullable QueryLogColumn column, @Nullable Double percentile) {
+      switch (this) {
+        case COUNT:
+          if (column == null) {
+            return (long) records.size();
+          }
+          long count = 0;
+          for (QueryLogRecord record : records) {
+            if (column.extract(record) != null) {
+              count++;
+            }
+          }
+          return count;
+        case SUM: {
+          long sum = 0;
+          boolean hasValue = false;
+          for (QueryLogRecord record : records) {
+            Number number = column.extractNumber(record);
+            if (number != null) {
+              sum += number.longValue();
+              hasValue = true;
+            }
+          }
+          return hasValue ? sum : null;
+        }
+        case AVG: {
+          double sum = 0D;
+          long valueCount = 0;
+          for (QueryLogRecord record : records) {
+            Number number = column.extractNumber(record);
+            if (number != null) {
+              sum += number.doubleValue();
+              valueCount++;
+            }
+          }
+          return valueCount == 0 ? null : sum / valueCount;
+        }
+        case MIN: {
+          Comparable min = null;
+          for (QueryLogRecord record : records) {
+            Comparable value = column.extractComparable(record);
+            if (value != null && (min == null || value.compareTo(min) < 0)) {
+              min = value;
+            }
+          }
+          return min;
+        }
+        case MAX: {
+          Comparable max = null;
+          for (QueryLogRecord record : records) {
+            Comparable value = column.extractComparable(record);
+            if (value != null && (max == null || value.compareTo(max) > 0)) {
+              max = value;
+            }
+          }
+          return max;
+        }
+        case PERCENTILEEST: {
+          if (column == null || percentile == null) {
+            return null;
+          }
+          List<Double> values = new ArrayList<>();
+          for (QueryLogRecord record : records) {
+            Number number = column.extractNumber(record);
+            if (number != null) {
+              values.add(number.doubleValue());
+            }
+          }
+          if (values.isEmpty()) {
+            return null;
+          }
+          Collections.sort(values);
+          double normalized = percentile / 100d;
+          double rank = normalized * (values.size() - 1);
+          int lower = (int) Math.floor(rank);
+          int upper = (int) Math.ceil(rank);
+          if (lower == upper) {
+            return values.get(lower);
+          }
+          double fraction = rank - lower;
+          return values.get(lower) + (values.get(upper) - values.get(lower)) * fraction;
+        }
+        default:
+          return null;
+      }
     }
   }
 
@@ -1448,8 +2057,17 @@ public class QueryLogSystemTable {
       return value instanceof Comparable ? (Comparable) value : null;
     }
 
+    Number extractNumber(QueryLogRecord record) {
+      Object value = extract(record);
+      return value instanceof Number ? (Number) value : null;
+    }
+
     boolean isComparable() {
       return _valueType != ValueType.STRING_ARRAY && _valueType != ValueType.INT_ARRAY;
+    }
+
+    boolean isNumeric() {
+      return _valueType == ValueType.LONG || _valueType == ValueType.INT || _valueType == ValueType.TIMESTAMP;
     }
 
     Object parseLiteral(@Nullable SqlNode literal)
@@ -1494,7 +2112,7 @@ public class QueryLogSystemTable {
     static QueryLogColumn fromIdentifier(SqlIdentifier identifier)
         throws BadQueryRequestException {
       String name = identifier.names.get(identifier.names.size() - 1);
-      return fromName(name);
+      return fromName(unquoteIdentifier(name));
     }
 
     static QueryLogColumn fromName(String name)
@@ -1504,6 +2122,19 @@ public class QueryLogSystemTable {
         throw new BadQueryRequestException("Unknown column '" + name + "' for system.query_log");
       }
       return column;
+    }
+
+    private static String unquoteIdentifier(String part) {
+      if (part == null || part.length() < 2) {
+        return part;
+      }
+      char first = part.charAt(0);
+      char last = part.charAt(part.length() - 1);
+      if ((first == '`' && last == '`') || (first == '"' && last == '"') || (first == '[' && last == ']')
+          || (first == '\'' && last == '\'')) {
+        return part.substring(1, part.length() - 1);
+      }
+      return part;
     }
   }
 }

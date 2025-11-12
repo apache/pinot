@@ -55,12 +55,6 @@ const Layout = (props) => {
       ];
     }
   }
-  const hash = `/${window.location.hash.split('/')[1]}`;
-  const routeObj = navigationItems.find((obj)=>{ return obj.link === hash;});
-
-  const [selectedId, setSelectedId] = React.useState(routeObj?.id || 1);
-  const sidebarOpenState = !(localStorage.getItem('pinot_ui:sidebarState') === 'false');
-  const [openSidebar, setOpenSidebar] = React.useState(sidebarOpenState);
 
   const appNavigationItems = React.useMemo(() => {
     if (app_state.queryConsoleOnlyView) {
@@ -72,6 +66,43 @@ const Layout = (props) => {
 
     return navigationItems;
   }, [navigationItems, app_state.queryConsoleOnlyView, app_state.hideQueryConsoleTab]);
+
+  const locationPath = React.useMemo(() => {
+    if (props.location?.pathname) {
+      return props.location.pathname || '/';
+    }
+    const hash = window.location.hash || '#/';
+    const stripped = hash.startsWith('#') ? hash.substring(1) : hash;
+    return stripped || '/';
+  }, [props.location?.pathname]);
+
+  const findNavItemForPath = React.useCallback((path: string) => {
+    if (!path) {
+      return undefined;
+    }
+    const normalized = path.length > 1 && path.endsWith('/') ? path.replace(/\/+$/, '') : path;
+    return appNavigationItems.find((item) => {
+      if (normalized === item.link) {
+        return true;
+      }
+      const itemPrefix = item.link.endsWith('/') ? item.link : `${item.link}/`;
+      return normalized.startsWith(itemPrefix);
+    });
+  }, [appNavigationItems]);
+
+  const [selectedId, setSelectedId] = React.useState(() => {
+    const match = findNavItemForPath(locationPath);
+    return match?.id || appNavigationItems[0]?.id || 1;
+  });
+
+  React.useEffect(() => {
+    const match = findNavItemForPath(locationPath);
+    const resolvedId = match?.id || appNavigationItems[0]?.id || 1;
+    setSelectedId((current) => (current === resolvedId ? current : resolvedId));
+  }, [appNavigationItems, findNavItemForPath, locationPath]);
+
+  const sidebarOpenState = !(localStorage.getItem('pinot_ui:sidebarState') === 'false');
+  const [openSidebar, setOpenSidebar] = React.useState(sidebarOpenState);
 
   const highlightSidebarLink = (id: number) => {
     setSelectedId(id);

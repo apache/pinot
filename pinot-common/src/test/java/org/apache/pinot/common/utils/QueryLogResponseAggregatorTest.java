@@ -16,14 +16,13 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.pinot.controller.util;
+package org.apache.pinot.common.utils;
 
 import java.util.Collections;
 import java.util.List;
 import org.apache.pinot.common.response.broker.BrokerResponseNative;
 import org.apache.pinot.common.response.broker.QueryProcessingException;
 import org.apache.pinot.common.response.broker.ResultTable;
-import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.common.utils.DataSchema.ColumnDataType;
 import org.testng.annotations.Test;
 
@@ -36,18 +35,18 @@ public class QueryLogResponseAggregatorTest {
 
   @Test
   public void testAggregationMergesRowsAndStats() {
-    DataSchema schema = new DataSchema(new String[] {"requestId", "timeMs"},
-        new ColumnDataType[] {ColumnDataType.LONG, ColumnDataType.LONG});
+    DataSchema schema = new DataSchema(new String[]{"requestId", "timeMs"},
+        new ColumnDataType[]{ColumnDataType.LONG, ColumnDataType.LONG});
 
     BrokerResponseNative broker1 = new BrokerResponseNative();
-    broker1.setResultTable(new ResultTable(schema, Collections.singletonList(new Object[] {1L, 10L})));
+    broker1.setResultTable(new ResultTable(schema, Collections.singletonList(new Object[]{1L, 10L})));
     broker1.setNumDocsScanned(5);
     broker1.setNumEntriesScannedInFilter(1);
     broker1.setNumEntriesScannedPostFilter(2);
     broker1.setTimeUsedMs(15);
 
     BrokerResponseNative broker2 = new BrokerResponseNative();
-    broker2.setResultTable(new ResultTable(schema, Collections.singletonList(new Object[] {2L, 20L})));
+    broker2.setResultTable(new ResultTable(schema, Collections.singletonList(new Object[]{2L, 20L})));
     broker2.setNumDocsScanned(7);
     broker2.setNumEntriesScannedInFilter(3);
     broker2.setNumEntriesScannedPostFilter(4);
@@ -69,14 +68,14 @@ public class QueryLogResponseAggregatorTest {
 
   @Test
   public void testAggregationHandlesSchemaMismatch() {
-    DataSchema schema1 = new DataSchema(new String[] {"requestId"}, new ColumnDataType[] {ColumnDataType.LONG});
-    DataSchema schema2 = new DataSchema(new String[] {"requestId"}, new ColumnDataType[] {ColumnDataType.STRING});
+    DataSchema schema1 = new DataSchema(new String[]{"requestId"}, new ColumnDataType[]{ColumnDataType.LONG});
+    DataSchema schema2 = new DataSchema(new String[]{"requestId"}, new ColumnDataType[]{ColumnDataType.STRING});
 
     BrokerResponseNative broker1 = new BrokerResponseNative();
-    broker1.setResultTable(new ResultTable(schema1, Collections.singletonList(new Object[] {1L})));
+    broker1.setResultTable(new ResultTable(schema1, Collections.singletonList(new Object[]{1L})));
 
     BrokerResponseNative broker2 = new BrokerResponseNative();
-    broker2.setResultTable(new ResultTable(schema2, Collections.singletonList(new Object[] {"incompatible"})));
+    broker2.setResultTable(new ResultTable(schema2, Collections.singletonList(new Object[]{"incompatible"})));
 
     BrokerResponseNative aggregated = QueryLogResponseAggregator.aggregate(List.of(broker1, broker2));
 

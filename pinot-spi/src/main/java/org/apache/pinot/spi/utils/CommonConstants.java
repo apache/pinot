@@ -374,6 +374,12 @@ public class CommonConstants {
     public static final String CONFIG_OF_QUERY_LOG_SYSTEM_TABLE_DEFAULT_LIMIT =
         "pinot.broker.query.log.systemTable.defaultLimit";
     public static final int DEFAULT_QUERY_LOG_SYSTEM_TABLE_DEFAULT_LIMIT = 100;
+    public static final String CONFIG_OF_QUERY_LOG_SYSTEM_TABLE_FANOUT_ENABLED =
+        "pinot.broker.query.log.systemTable.fanout.enabled";
+    public static final boolean DEFAULT_QUERY_LOG_SYSTEM_TABLE_FANOUT_ENABLED = true;
+    public static final String CONFIG_OF_QUERY_LOG_SYSTEM_TABLE_FANOUT_PROTOCOL =
+        "pinot.broker.query.log.systemTable.fanout.protocol";
+    public static final String DEFAULT_QUERY_LOG_SYSTEM_TABLE_FANOUT_PROTOCOL = CommonConstants.HTTP_PROTOCOL;
     public static final String CONFIG_OF_BROKER_QUERY_ENABLE_NULL_HANDLING = "pinot.broker.query.enable.null.handling";
     /// Provide broker level default for query option [Request.QueryOptionKey#REGEX_DICT_SIZE_THRESHOLD]
     public static final String CONFIG_OF_BROKER_QUERY_REGEX_DICT_SIZE_THRESHOLD =
@@ -760,6 +766,7 @@ public class CommonConstants {
         public static final String REGEX_DICT_SIZE_THRESHOLD = "regexDictSizeThreshold";
 
         public static final String DROP_RESULTS = "dropResults";
+        public static final String QUERY_LOG_FANOUT = "queryLogFanout";
 
         // Exclude virtual columns (columns starting with '$') from table schema
         // This is typically used for NATURAL JOIN operations where virtual columns

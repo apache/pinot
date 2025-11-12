@@ -38,8 +38,10 @@ import javax.ws.rs.core.MultivaluedMap;
 import javax.ws.rs.core.Response;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.hc.client5.http.io.HttpClientConnectionManager;
+import org.apache.helix.HelixManager;
 import org.apache.pinot.broker.api.AccessControl;
 import org.apache.pinot.broker.broker.AccessControlFactory;
+import org.apache.pinot.broker.querylog.QueryLogFanoutService;
 import org.apache.pinot.broker.querylog.QueryLogSystemTable;
 import org.apache.pinot.broker.querylog.QueryLogger;
 import org.apache.pinot.broker.queryquota.QueryQuotaManager;
@@ -90,6 +92,9 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
   protected final boolean _enableRowColumnLevelAuth;
   protected final QueryLogger _queryLogger;
   protected final QueryLogSystemTable _queryLogSystemTable;
+  protected final boolean _queryLogFanoutEnabled;
+  @Nullable
+  protected final QueryLogFanoutService _queryLogFanoutService;
   @Nullable
   protected final String _enableNullHandling;
   @Nullable
@@ -110,7 +115,7 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
   public BaseBrokerRequestHandler(PinotConfiguration config, String brokerId,
       BrokerRequestIdGenerator requestIdGenerator, RoutingManager routingManager,
       AccessControlFactory accessControlFactory, QueryQuotaManager queryQuotaManager, TableCache tableCache,
-      ThreadAccountant threadAccountant) {
+      ThreadAccountant threadAccountant, @Nullable HelixManager helixManager) {
     _config = config;
     _brokerId = brokerId;
     _requestIdGenerator = requestIdGenerator;
@@ -128,6 +133,18 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
     _queryLogger = new QueryLogger(config);
     _queryLogSystemTable = QueryLogSystemTable.getInstance();
     _queryLogSystemTable.initIfNeeded(config);
+    boolean systemTableEnabled = config.getProperty(Broker.CONFIG_OF_QUERY_LOG_SYSTEM_TABLE_ENABLED,
+        Broker.DEFAULT_QUERY_LOG_SYSTEM_TABLE_ENABLED);
+    _queryLogFanoutEnabled = systemTableEnabled && config.getProperty(
+        Broker.CONFIG_OF_QUERY_LOG_SYSTEM_TABLE_FANOUT_ENABLED,
+        Broker.DEFAULT_QUERY_LOG_SYSTEM_TABLE_FANOUT_ENABLED);
+    if (_queryLogFanoutEnabled && helixManager != null) {
+      String fanoutProtocol = config.getProperty(Broker.CONFIG_OF_QUERY_LOG_SYSTEM_TABLE_FANOUT_PROTOCOL,
+          Broker.DEFAULT_QUERY_LOG_SYSTEM_TABLE_FANOUT_PROTOCOL);
+      _queryLogFanoutService = new QueryLogFanoutService(helixManager, brokerId, _brokerTimeoutMs, fanoutProtocol);
+    } else {
+      _queryLogFanoutService = null;
+    }
     _enableNullHandling = config.getProperty(Broker.CONFIG_OF_BROKER_QUERY_ENABLE_NULL_HANDLING);
     _regexDictSizeThreshold = config.getProperty(Broker.CONFIG_OF_BROKER_QUERY_REGEX_DICT_SIZE_THRESHOLD);
     _enableQueryCancellation = config.getProperty(Broker.CONFIG_OF_BROKER_ENABLE_QUERY_CANCELLATION,
@@ -234,7 +251,12 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
 
     BrokerResponse brokerResponse;
     if (systemTableResponse != null) {
-      brokerResponse = systemTableResponse;
+      BrokerResponseNative nativeResponse = (BrokerResponseNative) systemTableResponse;
+      if (_queryLogFanoutEnabled && _queryLogFanoutService != null && shouldFanoutQueryLog(sqlNodeAndOptions)) {
+        brokerResponse = _queryLogFanoutService.fanout(query, request, nativeResponse, requestContext, httpHeaders);
+      } else {
+        brokerResponse = nativeResponse;
+      }
       requestContext.setTableNames(Collections.singletonList(QueryLogSystemTable.FULL_TABLE_NAME));
     } else {
       brokerResponse =
@@ -313,6 +335,11 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
       String rawTableName = TableNameBuilder.extractRawTableName(tableName);
       _brokerMetrics.addPhaseTiming(rawTableName, phase, time);
     }
+  }
+
+  private static boolean shouldFanoutQueryLog(SqlNodeAndOptions sqlNodeAndOptions) {
+    String option = sqlNodeAndOptions.getOptions().get(QueryOptionKey.QUERY_LOG_FANOUT);
+    return option == null || !Boolean.FALSE.toString().equalsIgnoreCase(option);
   }
 
   /**
