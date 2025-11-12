@@ -217,8 +217,10 @@ public class QueryRunner {
       }
       LOGGER.info("Setting multi-stage executor hardLimit: {} exceedStrategy: {}", hardLimit, exceedStrategy);
       HardLimitExecutor hardLimitExecutor = new HardLimitExecutor(hardLimit, _executorService, exceedStrategy,
-          max -> serverMetrics.setValueOfGlobalGauge(ServerGauge.MSE_THREAD_USAGE_MAX, max.longValue()),
           () -> serverMetrics.addMeteredGlobalValue(ServerMeter.MSE_THREAD_LIMIT_TASK_REJECTIONS, 1L));
+
+      // Set max thread limit gauge (constant value)
+      serverMetrics.setValueOfGlobalGauge(ServerGauge.MSE_THREAD_USAGE_MAX, (long) hardLimit);
 
       // Register callback gauge for current thread usage
       serverMetrics.setOrUpdateGauge(ServerGauge.MSE_THREAD_USAGE_CURRENT.getGaugeName(),

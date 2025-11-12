@@ -21,7 +21,6 @@ package org.apache.pinot.spi.executor;
 import java.util.concurrent.Callable;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.atomic.AtomicInteger;
-import java.util.function.Consumer;
 import org.apache.pinot.spi.env.PinotConfiguration;
 import org.apache.pinot.spi.query.QueryThreadExceedStrategy;
 import org.apache.pinot.spi.utils.CommonConstants;
@@ -42,17 +41,16 @@ public class HardLimitExecutor extends DecoratorExecutorService {
   private final Runnable _taskRejectionCounter;
 
   public HardLimitExecutor(int max, ExecutorService executorService, QueryThreadExceedStrategy exceedStrategy,
-      Consumer<Integer> maxUsageGaugeUpdater, Runnable taskRejectionCounter) {
+      Runnable taskRejectionCounter) {
     super(executorService);
     _running = new AtomicInteger(0);
     _max = max;
     _exceedStrategy = exceedStrategy;
     _taskRejectionCounter = taskRejectionCounter;
-    maxUsageGaugeUpdater.accept(max);
   }
 
   public HardLimitExecutor(int max, ExecutorService executorService, QueryThreadExceedStrategy exceedStrategy) {
-    this(max, executorService, exceedStrategy, max1 -> { }, () -> { });
+    this(max, executorService, exceedStrategy, () -> { });
   }
 
   public HardLimitExecutor(int max, ExecutorService executorService) {

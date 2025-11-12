@@ -40,7 +40,7 @@ public class HardLimitExecutorTest {
       throws Exception {
     AtomicInteger rejectionCount = new AtomicInteger(0);
     HardLimitExecutor ex = new HardLimitExecutor(1, Executors.newCachedThreadPool(),
-        QueryThreadExceedStrategy.ERROR, max -> { }, rejectionCount::incrementAndGet);
+        QueryThreadExceedStrategy.ERROR, rejectionCount::incrementAndGet);
     CyclicBarrier barrier = new CyclicBarrier(2);
 
     try {
@@ -78,7 +78,7 @@ public class HardLimitExecutorTest {
       throws Exception {
     AtomicInteger rejectionCount = new AtomicInteger(0);
     HardLimitExecutor ex = new HardLimitExecutor(1, Executors.newCachedThreadPool(), QueryThreadExceedStrategy.LOG,
-        max -> { }, rejectionCount::incrementAndGet);
+        rejectionCount::incrementAndGet);
     CyclicBarrier barrier = new CyclicBarrier(2);
 
     try {
@@ -144,18 +144,15 @@ public class HardLimitExecutorTest {
   @Test
   public void testMetricsTracking()
       throws Exception {
-    AtomicInteger maxGauge = new AtomicInteger(-1);
     AtomicInteger rejectionCount = new AtomicInteger(0);
 
     HardLimitExecutor ex = new HardLimitExecutor(2, Executors.newCachedThreadPool(),
         QueryThreadExceedStrategy.ERROR,
-        max -> maxGauge.set(max),
         rejectionCount::incrementAndGet);
 
     CyclicBarrier barrier = new CyclicBarrier(3);
 
     try {
-      assertEquals(maxGauge.get(), 2);
       assertEquals(ex.getCurrentThreadUsage(), 0);
       assertEquals(rejectionCount.get(), 0);
 
@@ -180,7 +177,6 @@ public class HardLimitExecutorTest {
       barrier.await();
 
       assertEquals(ex.getCurrentThreadUsage(), 2);
-      assertEquals(maxGauge.get(), 2);
       assertEquals(rejectionCount.get(), 0);
 
       // Try to submit a third task, should be rejected
