@@ -884,6 +884,18 @@ public final class TableConfigUtils {
   }
 
   /**
+   * Checks if a data type is valid for time-based comparison operations (upsert/dedup).
+   * Valid types include numeric types and types with stored data as a numeric type:
+   *   e.g. TIMESTAMP which is stored as LONG internally.
+   *
+   * @param dataType the data type to check
+   * @return true if the data type can be used for time-based comparison, false otherwise
+   */
+  private static boolean isValidTimeComparisonType(DataType dataType) {
+    return dataType.isNumeric() || dataType.getStoredType().isNumeric();
+  }
+
+  /**
    * Validates the upsert config related to TTL.
    */
   @VisibleForTesting
@@ -899,15 +911,15 @@ public final class TableConfigUtils {
           "MetadataTTL / DeletedKeysTTL does not work with multiple comparison columns");
       String comparisonColumn = comparisonColumns.get(0);
       DataType comparisonColumnDataType = schema.getFieldSpecFor(comparisonColumn).getDataType();
-      Preconditions.checkState(comparisonColumnDataType.isNumeric(),
-          "MetadataTTL / DeletedKeysTTL must have comparison column: %s in numeric type, found: %s", comparisonColumn,
-          comparisonColumnDataType);
+      Preconditions.checkState(isValidTimeComparisonType(comparisonColumnDataType),
+          "MetadataTTL / DeletedKeysTTL must have comparison column: %s in numeric type, found: %s",
+          comparisonColumn, comparisonColumnDataType);
     } else {
       String comparisonColumn = tableConfig.getValidationConfig().getTimeColumnName();
       DataType comparisonColumnDataType = schema.getFieldSpecFor(comparisonColumn).getDataType();
-      Preconditions.checkState(comparisonColumnDataType.isNumeric(),
-          "MetadataTTL / DeletedKeysTTL must have time column: %s in numeric type, found: %s", comparisonColumn,
-          comparisonColumnDataType);
+      Preconditions.checkState(isValidTimeComparisonType(comparisonColumnDataType),
+          "MetadataTTL / DeletedKeysTTL must have time column: %s in numeric type, found: %s",
+          comparisonColumn, comparisonColumnDataType);
     }
 
     if (upsertConfig.getMetadataTTL() > 0) {
@@ -935,14 +947,15 @@ public final class TableConfigUtils {
     String dedupTimeColumn = dedupConfig.getDedupTimeColumn();
     if (dedupTimeColumn != null && !dedupTimeColumn.isEmpty()) {
       DataType comparisonColumnDataType = schema.getFieldSpecFor(dedupTimeColumn).getDataType();
-      Preconditions.checkState(comparisonColumnDataType.isNumeric(),
+      Preconditions.checkState(isValidTimeComparisonType(comparisonColumnDataType),
           "MetadataTTL must have dedupTimeColumn: %s in numeric type, found: %s", dedupTimeColumn,
           comparisonColumnDataType);
     } else {
       String timeColumn = tableConfig.getValidationConfig().getTimeColumnName();
       DataType timeColumnDataType = schema.getFieldSpecFor(timeColumn).getDataType();
-      Preconditions.checkState(timeColumnDataType.isNumeric(),
-          "MetadataTTL must have time column: %s in numeric type, found: %s", timeColumn, timeColumnDataType);
+      Preconditions.checkState(isValidTimeComparisonType(timeColumnDataType),
+          "MetadataTTL must have time column: %s in numeric type, found: %s", timeColumn,
+          timeColumnDataType);
     }
     if (tableConfig.getTierConfigsList() != null) {
       validateTTLAndTierConfigsForDedupTable(tableConfig, schema);
