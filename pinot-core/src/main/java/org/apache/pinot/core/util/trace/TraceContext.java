@@ -28,15 +28,16 @@ import java.util.Queue;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentLinkedQueue;
 import java.util.concurrent.atomic.AtomicInteger;
+import java.util.concurrent.atomic.AtomicLong;
 import javax.annotation.Nullable;
+import org.apache.commons.collections4.CollectionUtils;
 import org.apache.pinot.spi.utils.JsonUtils;
 
 
 /**
  * The main entry point for servers to record the trace information.
  * <p>
- * To enable tracing, the request handler thread should register the requestId by calling
- * {@link #register(long requestId)}.
+ * To enable tracing, the request handler thread should register the request by calling {@link #register()}.
  * <p>
  * To trace the {@link Runnable} or {@link java.util.concurrent.Callable} jobs the request handler creates and will be
  * executed in other threads, use {@link TraceRunnable} or {@link TraceCallable} instead.
@@ -99,37 +100,33 @@ public final class TraceContext {
    * TraceEntry is a wrapper on the trace and the request Id it belongs to.
    */
   static class TraceEntry {
-    final long _requestId;
+    final long _id;
     final Trace _trace;
 
-    TraceEntry(long requestId, Trace trace) {
-      _requestId = requestId;
+    TraceEntry(long id, Trace trace) {
+      _id = id;
       _trace = trace;
     }
   }
 
-  private static final ThreadLocal<TraceEntry> TRACE_ENTRY_THREAD_LOCAL = new ThreadLocal<TraceEntry>() {
-    @Override
-    protected TraceEntry initialValue() {
-      return null;
-    }
-  };
+  private static final ThreadLocal<TraceEntry> TRACE_ENTRY_THREAD_LOCAL = new ThreadLocal<>();
 
-  /**
-   * Map from request Id to traces associated with the request.
-   * <p>Requests may arrive simultaneously, so we need a concurrent map to manage these requests.
-   * <p>Each request may use multiple threads, so the queue should be thread-safe as well.
-   */
+  /// Map from id (unique for each request) to traces associated with the request.
+  /// Requests may arrive simultaneously, so we need a concurrent map to manage these requests.
+  /// Each request may use multiple threads, so the queue should be thread-safe as well.
   @VisibleForTesting
   static final Map<Long, Queue<Trace>> REQUEST_TO_TRACES_MAP = new ConcurrentHashMap<>();
+
+  private static final AtomicLong ID_GENERATOR = new AtomicLong(0);
 
   /**
    * Register a request to the trace.
    * <p>Should be called before logging any trace information.
    */
-  public static void register(long requestId) {
-    REQUEST_TO_TRACES_MAP.put(requestId, new ConcurrentLinkedQueue<Trace>());
-    registerThreadToRequest(new TraceEntry(requestId, null));
+  public static void register() {
+    long id = ID_GENERATOR.getAndIncrement();
+    REQUEST_TO_TRACES_MAP.put(id, new ConcurrentLinkedQueue<>());
+    registerThreadToRequest(new TraceEntry(id, null));
   }
 
   /**
@@ -137,8 +134,8 @@ public final class TraceContext {
    */
   static void registerThreadToRequest(TraceEntry parentTraceEntry) {
     Trace trace = new Trace(parentTraceEntry._trace);
-    TRACE_ENTRY_THREAD_LOCAL.set(new TraceEntry(parentTraceEntry._requestId, trace));
-    Queue<Trace> traces = REQUEST_TO_TRACES_MAP.get(parentTraceEntry._requestId);
+    TRACE_ENTRY_THREAD_LOCAL.set(new TraceEntry(parentTraceEntry._id, trace));
+    Queue<Trace> traces = REQUEST_TO_TRACES_MAP.get(parentTraceEntry._id);
     if (traces != null) {
       traces.add(trace);
     }
@@ -150,7 +147,7 @@ public final class TraceContext {
    */
   public static void unregister() {
     TraceEntry traceEntry = TRACE_ENTRY_THREAD_LOCAL.get();
-    REQUEST_TO_TRACES_MAP.remove(traceEntry._requestId);
+    REQUEST_TO_TRACES_MAP.remove(traceEntry._id);
     unregisterThreadFromRequest();
   }
 
@@ -189,8 +186,8 @@ public final class TraceContext {
    */
   public static String getTraceInfo() {
     ArrayNode jsonTraces = JsonUtils.newArrayNode();
-    Queue<Trace> traces = REQUEST_TO_TRACES_MAP.get(TRACE_ENTRY_THREAD_LOCAL.get()._requestId);
-    if (traces != null && !traces.isEmpty()) {
+    Queue<Trace> traces = REQUEST_TO_TRACES_MAP.get(TRACE_ENTRY_THREAD_LOCAL.get()._id);
+    if (CollectionUtils.isNotEmpty(traces)) {
       for (Trace trace : traces) {
         jsonTraces.add(trace.toJson());
       }
