@@ -201,6 +201,9 @@ public class UpsertCompactMergeTaskGenerator extends BaseTaskGenerator {
       // Get max number of subtasks for this table
       int maxTasks = getAndUpdateMaxNumSubTasks(taskConfigs,
           MinionConstants.DEFAULT_TABLE_MAX_NUM_TASKS, tableNameWithType);
+      long minNumSegments = Long.parseLong(
+          taskConfigs.getOrDefault(MinionConstants.UpsertCompactMergeTask.MIN_NUM_SEGMENTS_PER_TASK_KEY,
+              String.valueOf(MinionConstants.UpsertCompactMergeTask.DEFAULT_MIN_NUM_SEGMENTS_PER_TASK)));
       for (Map.Entry<Integer, List<List<SegmentMergerMetadata>>> entry
           : segmentSelectionResult.getSegmentsForCompactMergeByPartition().entrySet()) {
         if (numTasks == maxTasks) {
@@ -211,9 +214,9 @@ public class UpsertCompactMergeTaskGenerator extends BaseTaskGenerator {
         if (groups.isEmpty()) {
           continue;
         }
-        // there are no groups with more than 1 segment to merge
-        // TODO this can be later removed if we want to just do single-segment compaction from this task
-        if (groups.get(0).size() <= 1) {
+        //there are no groups with more than minNumSegmentsPerTask segment to merge. Groups are already sorted, so we
+        // just check the first entry.
+        if (groups.get(0).size() < minNumSegments) {
           continue;
         }
         // TODO see if multiple groups of same partition can be added
@@ -254,6 +257,9 @@ public class UpsertCompactMergeTaskGenerator extends BaseTaskGenerator {
     long maxNumSegments = Long.parseLong(
         taskConfigs.getOrDefault(MinionConstants.UpsertCompactMergeTask.MAX_NUM_SEGMENTS_PER_TASK_KEY,
             String.valueOf(MinionConstants.UpsertCompactMergeTask.DEFAULT_MAX_NUM_SEGMENTS_PER_TASK)));
+    long minNumSegments = Long.parseLong(
+        taskConfigs.getOrDefault(MinionConstants.UpsertCompactMergeTask.MIN_NUM_SEGMENTS_PER_TASK_KEY,
+            String.valueOf(MinionConstants.UpsertCompactMergeTask.DEFAULT_MIN_NUM_SEGMENTS_PER_TASK)));
 
     // default to Long.MAX_VALUE to avoid size-based compaction by default
     long outputSegmentMaxSizeInBytes = Long.MAX_VALUE;
@@ -381,20 +387,21 @@ public class UpsertCompactMergeTaskGenerator extends BaseTaskGenerator {
 
       // Sort groups by total invalidDocs in descending order, if invalidDocs count are same, prefer group with
       // higher number of small segments in them
-      // remove the groups having only 1 segments in them
-      // TODO this check can be later removed if we want single-segment compaction from this task itself
+      // remove the groups having less than minNumSegments segments in them
       List<List<SegmentMergerMetadata>> compactMergeGroups =
-          groups.stream().filter(x -> x.size() > 1).sorted((group1, group2) -> {
-            long invalidDocsSum1 = group1.stream().mapToLong(SegmentMergerMetadata::getInvalidDocIds).sum();
-            long invalidDocsSum2 = group2.stream().mapToLong(SegmentMergerMetadata::getInvalidDocIds).sum();
-            if (invalidDocsSum2 < invalidDocsSum1) {
-              return -1;
-            } else if (invalidDocsSum2 == invalidDocsSum1) {
-              return Long.compare(group2.size(), group1.size());
-            } else {
-              return 1;
-            }
-          }).collect(Collectors.toList());
+          groups.stream()
+              .filter(x -> x.size() >= minNumSegments)
+              .sorted((group1, group2) -> {
+                long invalidDocsSum1 = group1.stream().mapToLong(SegmentMergerMetadata::getInvalidDocIds).sum();
+                long invalidDocsSum2 = group2.stream().mapToLong(SegmentMergerMetadata::getInvalidDocIds).sum();
+                if (invalidDocsSum2 < invalidDocsSum1) {
+                  return -1;
+                } else if (invalidDocsSum2 == invalidDocsSum1) {
+                  return Long.compare(group2.size(), group1.size());
+                } else {
+                  return 1;
+                }
+              }).collect(Collectors.toList());
 
       if (!compactMergeGroups.isEmpty()) {
         groupedSegments.put(partitionID, compactMergeGroups);
