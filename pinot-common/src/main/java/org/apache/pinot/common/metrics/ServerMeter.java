@@ -204,7 +204,7 @@ public enum ServerMeter implements AbstractMetrics.Meter {
   MULTI_STAGE_SUBMISSION_COMPLETED_TASKS("tasks", true),
 
   // Multi-stage executor thread limit metrics
-  MSE_THREAD_LIMIT_TASK_REJECTIONS("tasks", true,
+  MSE_EXECUTION_THREADS_TASK_REJECTIONS("tasks", true,
       "Number of tasks rejected by multi-stage executor due to thread limit being exceeded"),
 
   // predownload metrics

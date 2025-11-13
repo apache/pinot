@@ -31,7 +31,6 @@ import java.util.concurrent.ExecutorService;
 import java.util.function.BiConsumer;
 import java.util.function.BooleanSupplier;
 import java.util.function.Consumer;
-import java.util.function.Supplier;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 import javax.annotation.Nullable;
@@ -217,14 +216,14 @@ public class QueryRunner {
       }
       LOGGER.info("Setting multi-stage executor hardLimit: {} exceedStrategy: {}", hardLimit, exceedStrategy);
       HardLimitExecutor hardLimitExecutor = new HardLimitExecutor(hardLimit, _executorService, exceedStrategy,
-          () -> serverMetrics.addMeteredGlobalValue(ServerMeter.MSE_THREAD_LIMIT_TASK_REJECTIONS, 1L));
+          () -> serverMetrics.addMeteredGlobalValue(ServerMeter.MSE_EXECUTION_THREADS_TASK_REJECTIONS, 1L));
 
       // Set max thread limit gauge (constant value)
-      serverMetrics.setValueOfGlobalGauge(ServerGauge.MSE_THREAD_USAGE_MAX, (long) hardLimit);
+      serverMetrics.setValueOfGlobalGauge(ServerGauge.MSE_EXECUTION_THREADS_MAX, (long) hardLimit);
 
       // Register callback gauge for current thread usage
-      serverMetrics.setOrUpdateGauge(ServerGauge.MSE_THREAD_USAGE_CURRENT.getGaugeName(),
-          (Supplier<Long>) () -> (long) hardLimitExecutor.getCurrentThreadUsage());
+      serverMetrics.setOrUpdateGlobalGauge(ServerGauge.MSE_EXECUTION_THREADS_CURRENT,
+          hardLimitExecutor::getCurrentThreadUsage);
 
       _executorService = hardLimitExecutor;
     }
