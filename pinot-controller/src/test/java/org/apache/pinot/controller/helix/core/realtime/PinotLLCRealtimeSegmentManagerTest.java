@@ -65,6 +65,7 @@ import org.apache.pinot.common.utils.LLCSegmentName;
 import org.apache.pinot.common.utils.URIUtils;
 import org.apache.pinot.controller.ControllerConf;
 import org.apache.pinot.controller.api.resources.ForceCommitBatchConfig;
+import org.apache.pinot.controller.api.resources.PauseStatusDetails;
 import org.apache.pinot.controller.helix.core.PinotHelixResourceManager;
 import org.apache.pinot.controller.helix.core.assignment.segment.SegmentAssignment;
 import org.apache.pinot.controller.helix.core.realtime.segment.CommittingSegmentDescriptor;
@@ -72,6 +73,7 @@ import org.apache.pinot.core.data.manager.realtime.SegmentCompletionUtils;
 import org.apache.pinot.core.realtime.impl.fakestream.FakeStreamConfigUtils;
 import org.apache.pinot.segment.spi.creator.SegmentVersion;
 import org.apache.pinot.segment.spi.index.metadata.SegmentMetadataImpl;
+import org.apache.pinot.spi.config.table.PauseState;
 import org.apache.pinot.spi.config.table.SegmentsValidationAndRetentionConfig;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.TableType;
@@ -434,6 +436,53 @@ public class PinotLLCRealtimeSegmentManagerTest {
     } catch (IllegalStateException e) {
       fail("Should not throw exception for normal table, but got: " + e.getMessage());
     }
+  }
+
+  @Test
+  public void testForceCommitWithNullBatchConfigUsesSingleBatch() {
+    FakePinotLLCRealtimeSegmentManager segmentManager = new FakePinotLLCRealtimeSegmentManager();
+    segmentManager._numReplicas = 1;
+    segmentManager.makeTableConfig();
+    segmentManager._numInstances = 2;
+    segmentManager.makeConsumingInstancePartitions();
+    segmentManager._numPartitions = 1;
+    segmentManager.setUpNewTable();
+
+    String consumingSegment = new LLCSegmentName(RAW_TABLE_NAME, 0, 0, CURRENT_TIME_MS).getSegmentName();
+    segmentManager._idealState.setPartitionState(consumingSegment, "Server_0", SegmentStateModel.CONSUMING);
+
+    Set<String> committedSegments = segmentManager.forceCommit(REALTIME_TABLE_NAME, null, null, null);
+    assertFalse(committedSegments.isEmpty(), "Expected consuming segments to be committed with null batch config");
+    assertTrue(committedSegments.contains(consumingSegment),
+        "Returned segments should include the consuming segment present in ideal state");
+  }
+
+  @Test
+  public void testPauseConsumptionPassesBatchConfigToForceCommit() {
+    FakePinotLLCRealtimeSegmentManager segmentManager = spy(new FakePinotLLCRealtimeSegmentManager());
+    String tableNameWithType = TableNameBuilder.REALTIME.tableNameWithType(RAW_TABLE_NAME);
+
+    IdealState pausedIdealState = new IdealState(tableNameWithType);
+    String consumingSegment = new LLCSegmentName(RAW_TABLE_NAME, 0, 0, CURRENT_TIME_MS).getSegmentName();
+    pausedIdealState.setPartitionState(consumingSegment, "Server_0", SegmentStateModel.CONSUMING);
+
+    doReturn(pausedIdealState).when(segmentManager).updatePauseStateInIdealState(eq(tableNameWithType), eq(true),
+        eq(PauseState.ReasonCode.ADMINISTRATIVE), any());
+
+    ForceCommitBatchConfig batchConfig = ForceCommitBatchConfig.of(2, 3, 10);
+    final ForceCommitBatchConfig[] capturedConfig = new ForceCommitBatchConfig[1];
+    doAnswer(invocation -> {
+      capturedConfig[0] = invocation.getArgument(3);
+      return Collections.singleton(consumingSegment);
+    }).when(segmentManager).forceCommit(eq(tableNameWithType), isNull(), isNull(), any());
+
+    PauseStatusDetails pauseStatusDetails =
+        segmentManager.pauseConsumption(tableNameWithType, PauseState.ReasonCode.ADMINISTRATIVE, "comment",
+            batchConfig);
+
+    assertEquals(capturedConfig[0], batchConfig, "pauseConsumption should forward the supplied batch config");
+    assertEquals(pauseStatusDetails.getConsumingSegments(), Collections.singleton(consumingSegment),
+        "pauseConsumption should include consuming segments from the updated ideal state");
   }
 
 
