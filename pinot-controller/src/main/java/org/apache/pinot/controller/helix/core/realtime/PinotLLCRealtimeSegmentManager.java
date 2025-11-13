@@ -2442,7 +2442,6 @@ public class PinotLLCRealtimeSegmentManager {
     IdealState updatedIdealState = updatePauseStateInIdealState(tableNameWithType, true, reasonCode, comment);
     Set<String> consumingSegments = findConsumingSegments(updatedIdealState);
     forceCommit(tableNameWithType, null, null, batchConfig);
-    sendForceCommitMessageToServers(tableNameWithType, consumingSegments);
     return new PauseStatusDetails(true, consumingSegments, reasonCode, comment != null ? comment
         : "Pause flag is set. Consuming segments are being committed."
             + " Use /pauseStatus endpoint in a few moments to check if all consuming segments have been committed.",
