@@ -18,7 +18,6 @@
  */
 package org.apache.pinot.segment.local.segment.readers;
 
-import java.io.IOException;
 import javax.annotation.Nullable;
 import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.readers.ColumnReader;
@@ -66,8 +65,7 @@ public class DefaultValueColumnReader implements ColumnReader {
 
   @Override
   @Nullable
-  public Object next()
-      throws IOException {
+  public Object next() {
     if (!hasNext()) {
       throw new IllegalStateException("No more values available");
     }
@@ -76,9 +74,114 @@ public class DefaultValueColumnReader implements ColumnReader {
   }
 
   @Override
-  public void rewind()
-      throws IOException {
+  public void rewind() {
     _currentIndex = 0;
+  }
+
+  @Override
+  public boolean isNextNull() {
+    if (!hasNext()) {
+      throw new IllegalStateException("No more values available");
+    }
+    return false; // Default values are never null
+  }
+
+  @Override
+  public void skipNext() {
+    if (!hasNext()) {
+      throw new IllegalStateException("No more values available");
+    }
+    _currentIndex++;
+  }
+
+  @Override
+  public int nextInt() {
+    if (!hasNext()) {
+      throw new IllegalStateException("No more values available");
+    }
+    _currentIndex++;
+    return ((Number) _defaultValue).intValue();
+  }
+
+  @Override
+  public long nextLong() {
+    if (!hasNext()) {
+      throw new IllegalStateException("No more values available");
+    }
+    _currentIndex++;
+    return ((Number) _defaultValue).longValue();
+  }
+
+  @Override
+  public float nextFloat() {
+    if (!hasNext()) {
+      throw new IllegalStateException("No more values available");
+    }
+    _currentIndex++;
+    return ((Number) _defaultValue).floatValue();
+  }
+
+  @Override
+  public double nextDouble() {
+    if (!hasNext()) {
+      throw new IllegalStateException("No more values available");
+    }
+    _currentIndex++;
+    return ((Number) _defaultValue).doubleValue();
+  }
+
+  @Override
+  public int[] nextIntMV() {
+    if (!hasNext()) {
+      throw new IllegalStateException("No more values available");
+    }
+    _currentIndex++;
+    return getIntMV(0); // Use existing getIntMV logic
+  }
+
+  @Override
+  public long[] nextLongMV() {
+    if (!hasNext()) {
+      throw new IllegalStateException("No more values available");
+    }
+    _currentIndex++;
+    return getLongMV(0);
+  }
+
+  @Override
+  public float[] nextFloatMV() {
+    if (!hasNext()) {
+      throw new IllegalStateException("No more values available");
+    }
+    _currentIndex++;
+    return getFloatMV(0);
+  }
+
+  @Override
+  public double[] nextDoubleMV() {
+    if (!hasNext()) {
+      throw new IllegalStateException("No more values available");
+    }
+    _currentIndex++;
+    return getDoubleMV(0);
+  }
+
+  @Override
+  public String[] nextStringMV() {
+    if (!hasNext()) {
+      throw new IllegalStateException("No more values available");
+    }
+    _currentIndex++;
+    return getStringMV(0);
+  }
+
+  @Override
+  public byte[][] nextBytesMV() {
+    if (!hasNext()) {
+      throw new IllegalStateException("No more values available");
+    }
+    _currentIndex++;
+    return getBytesMV(0);
   }
 
   @Override
@@ -218,8 +321,7 @@ public class DefaultValueColumnReader implements ColumnReader {
   }
 
   @Override
-  public void close()
-      throws IOException {
+  public void close() {
     // No resources to close
   }
 }

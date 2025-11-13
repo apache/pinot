@@ -48,6 +48,7 @@ public class PinotSegmentColumnReaderFactory implements ColumnReaderFactory {
 
   private final IndexSegment _indexSegment;
   private Schema _targetSchema;
+  private Set<String> _colsToRead;
   @Nullable private Map<String, ColumnReader> _columnReaders;
 
   /**
@@ -63,7 +64,14 @@ public class PinotSegmentColumnReaderFactory implements ColumnReaderFactory {
   @Override
   public void init(Schema targetSchema)
       throws IOException {
+    init(targetSchema, targetSchema.getPhysicalColumnNames());
+  }
+
+  @Override
+  public void init(Schema targetSchema, Set<String> colsToRead)
+      throws IOException {
     _targetSchema = targetSchema;
+    _colsToRead = colsToRead;
     _columnReaders = initializeAllColumnReaders();
     LOGGER.info("Initialized PinotSegmentColumnReaderFactory with target schema containing {} columns",
         targetSchema.getPhysicalColumnNames().size());
@@ -130,8 +138,7 @@ public class PinotSegmentColumnReaderFactory implements ColumnReaderFactory {
   /**
    * Internal method to initialize all column readers during factory initialization.
    */
-  private Map<String, ColumnReader> initializeAllColumnReaders()
-      throws IOException {
+  private Map<String, ColumnReader> initializeAllColumnReaders() {
     if (_targetSchema == null) {
       throw new IllegalStateException("Factory not initialized. Call init() first.");
     }
@@ -139,12 +146,11 @@ public class PinotSegmentColumnReaderFactory implements ColumnReaderFactory {
     Map<String, ColumnReader> allReaders = new HashMap<>();
 
     // Create readers for all columns in the target schema
-    for (FieldSpec fieldSpec : _targetSchema.getAllFieldSpecs()) {
+    for (String columnName : _colsToRead) {
+      FieldSpec fieldSpec = _targetSchema.getFieldSpecFor(columnName);
       if (fieldSpec.isVirtualColumn()) {
         continue;
       }
-
-      String columnName = fieldSpec.getName();
       ColumnReader reader = createColumnReader(columnName, fieldSpec);
       allReaders.put(columnName, reader);
     }
