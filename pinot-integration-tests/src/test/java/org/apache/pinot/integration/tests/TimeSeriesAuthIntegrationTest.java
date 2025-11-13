@@ -18,9 +18,7 @@
  */
 package org.apache.pinot.integration.tests;
 
-import java.util.List;
 import java.util.Map;
-import org.apache.hc.core5.http.Header;
 import org.apache.pinot.spi.env.PinotConfiguration;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -66,7 +64,7 @@ public class TimeSeriesAuthIntegrationTest extends TimeSeriesIntegrationTest {
   }
 
   @Override
-  protected List<Header> getSegmentUploadAuthHeaders() {
-    return List.of(AUTH_HEADER_BASIC);
+  protected Map<String, String> getSegmentUploadHeaders() {
+    return Map.of(AUTH_HEADER_BASIC.getName(), AUTH_HEADER_BASIC.getValue());
   }
 }

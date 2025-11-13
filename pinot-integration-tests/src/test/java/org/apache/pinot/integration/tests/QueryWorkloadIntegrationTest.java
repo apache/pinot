@@ -124,10 +124,12 @@ public class QueryWorkloadIntegrationTest extends BaseClusterIntegrationTest {
     NodeConfig nodeConfig = new NodeConfig(NodeConfig.Type.SERVER_NODE, enforcementProfile, propagationScheme);
     QueryWorkloadConfig queryWorkloadConfig = new QueryWorkloadConfig("testWorkload", List.of(nodeConfig));
     try {
-      getControllerRequestClient().updateQueryWorkloadConfig(queryWorkloadConfig);
+      getOrCreateAdminClient().getQueryWorkloadClient()
+          .updateQueryWorkloadConfig(JsonUtils.objectToString(queryWorkloadConfig));
       TestUtils.waitForCondition(aVoid -> {
         try {
-          QueryWorkloadConfig retrievedConfig = getControllerRequestClient().getQueryWorkloadConfig("testWorkload");
+          String json = getOrCreateAdminClient().getQueryWorkloadClient().getQueryWorkloadConfig("testWorkload");
+          QueryWorkloadConfig retrievedConfig = JsonUtils.stringToObject(json, QueryWorkloadConfig.class);
           return retrievedConfig != null && retrievedConfig.equals(queryWorkloadConfig);
         } catch (Exception e) {
           throw new RuntimeException(e);
@@ -143,7 +145,7 @@ public class QueryWorkloadIntegrationTest extends BaseClusterIntegrationTest {
         testServerQueryWorkloadEndpoints(serverInstance, "testWorkload", expectedCpuCostNs, expectedMemoryCostBytes);
       }
     } finally {
-      getControllerRequestClient().deleteQueryWorkloadConfig("testWorkload");
+      getOrCreateAdminClient().getQueryWorkloadClient().deleteQueryWorkloadConfig("testWorkload");
     }
   }
 
@@ -178,7 +180,7 @@ public class QueryWorkloadIntegrationTest extends BaseClusterIntegrationTest {
    */
   private Set<String> getServerInstancesForTable(String tableName) throws Exception {
     // Use the controller API to get server instances for the specific table
-    String url = _controllerRequestURLBuilder.forTableGetServerInstances(tableName);
+    String url = getOrCreateAdminClient().getControllerRequestURLBuilder().forTableGetServerInstances(tableName);
     String response = sendGetRequest(url);
 
     // Parse the JSON response to extract server instance names

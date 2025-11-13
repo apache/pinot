@@ -69,7 +69,7 @@ public class PinotUserWithAccessLogicalTableResourceTest extends ControllerTest 
     startController(configuration);
     addFakeBrokerInstancesToAutoJoinHelixCluster(1, true);
     addFakeServerInstancesToAutoJoinHelixCluster(1, true);
-    _controllerRequestURLBuilder = getControllerRequestURLBuilder();
+    _controllerRequestURLBuilder = getOrCreateAdminClient().getControllerRequestURLBuilder();
     // create schema for logical table
     addDummySchema(LOGICAL_TABLE_NAME);
   }
