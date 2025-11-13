@@ -22,6 +22,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.cache.Cache;
 import com.google.common.cache.CacheBuilder;
+import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.TimeUnit;
@@ -38,7 +39,6 @@ import static java.util.Objects.requireNonNull;
 
 /**
  * In-memory cache for tracking reload job status on server side.
- * Phase 1: Only tracks failure count per job.
  *
  * <p>Thread-safe for concurrent access. Uses Guava Cache with LRU eviction
  * and time-based expiration.
@@ -101,6 +101,40 @@ public class ServerReloadJobStatusCache implements PinotClusterConfigChangeListe
       }
     }
     return status;
+  }
+
+  /**
+   * Records a segment reload failure in the cache.
+   * Handles all business logic: counting, limit enforcement, thread safety.
+   *
+   * <p>This method ALWAYS increments the failure count, but only stores detailed
+   * failure information (segment name, exception, stack trace) for the first N failures
+   * where N is configured by maxFailureDetailsToCapture.
+   *
+   * @param jobId reload job ID (UUID)
+   * @param segmentName name of failed segment
+   * @param exception the exception that caused the failure
+   */
+  public void recordFailure(String jobId, String segmentName, Throwable exception) {
+    requireNonNull(jobId, "jobId cannot be null");
+    requireNonNull(segmentName, "segmentName cannot be null");
+    requireNonNull(exception, "exception cannot be null");
+
+    ReloadJobStatus status = getOrCreate(jobId);
+
+    // Synchronize on status object for thread-safe access to its list
+    synchronized (status) {
+      // Always increment count
+      status.incrementAndGetFailureCount();
+
+      // Only add details if under limit (check config in cache layer)
+      List<SegmentReloadStatus> details = status.getFailedSegmentDetails();
+      int maxLimit = _currentConfig.getSegmentFailureDetailsCount();
+
+      if (details.size() < maxLimit) {
+        details.add(new SegmentReloadStatus(segmentName, exception));
+      }
+    }
   }
 
   /**

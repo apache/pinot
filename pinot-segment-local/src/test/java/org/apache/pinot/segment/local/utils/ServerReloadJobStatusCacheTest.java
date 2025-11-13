@@ -18,12 +18,21 @@
  */
 package org.apache.pinot.segment.local.utils;
 
+import java.io.IOException;
+import java.util.ArrayList;
+import java.util.Collections;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.TimeUnit;
 import org.testng.annotations.Test;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 
 /**
@@ -31,6 +40,16 @@ import static org.assertj.core.api.Assertions.assertThat;
  * when onChange is called, cache rebuild logic, and entry migration.
  */
 public class ServerReloadJobStatusCacheTest {
+
+  // Helper method to get failed segment details from cache
+  private static List<SegmentReloadStatus> getFailedSegmentDetails(ServerReloadJobStatusCache cache, String jobId) {
+    ReloadJobStatus status = cache.getJobStatus(jobId);
+    if (status == null) {
+      return Collections.emptyList();
+    }
+    // Return the internal list directly for testing
+    return status.getFailedSegmentDetails();
+  }
 
   @Test
   public void testDefaultConfigInitialization() {
@@ -309,4 +328,128 @@ public class ServerReloadJobStatusCacheTest {
     assertThat(configAfter.getMaxSize()).isEqualTo(12000);
     assertThat(configAfter.getTtlDays()).isEqualTo(40);
   }
+
+  // ========== Tests for recordFailure() and getFailedSegmentDetails() ==========
+
+  @Test
+  public void testRecordFailureCreatesJobIfNotExists() {
+    // Given
+    ServerReloadJobStatusCache cache = new ServerReloadJobStatusCache();
+    String jobId = "job-new";
+    String segmentName = "segment_123";
+    Exception exception = new IOException("Test error");
+
+    // When
+    cache.recordFailure(jobId, segmentName, exception);
+
+    // Then
+    ReloadJobStatus status = cache.getJobStatus(jobId);
+    assertThat(status).isNotNull();
+    assertThat(status.getFailureCount()).isEqualTo(1);
+    assertThat(getFailedSegmentDetails(cache, jobId)).hasSize(1);
+    assertThat(getFailedSegmentDetails(cache, jobId).get(0).getSegmentName()).isEqualTo(segmentName);
+  }
+
+  @Test
+  public void testRecordFailureOverLimit() {
+    // Given
+    ServerReloadJobStatusCache cache = new ServerReloadJobStatusCache();
+    String jobId = "job-over-limit";
+    // Default limit is 5
+
+    // When - Record 10 failures (over limit)
+    for (int i = 1; i <= 10; i++) {
+      cache.recordFailure(jobId, "segment_" + i, new IOException("Error " + i));
+    }
+
+    // Then - Count should be 10, but only first 5 details stored
+    assertThat(cache.getJobStatus(jobId).getFailureCount()).isEqualTo(10);
+    List<SegmentReloadStatus> details = getFailedSegmentDetails(cache, jobId);
+    assertThat(details).hasSize(5);
+    assertThat(details.get(0).getSegmentName()).isEqualTo("segment_1");
+    assertThat(details.get(4).getSegmentName()).isEqualTo("segment_5");
+  }
+
+  @Test
+  public void testRecordFailureRespectsConfigLimit() {
+    // Given - Set custom limit of 3
+    ServerReloadJobStatusCache cache = new ServerReloadJobStatusCache();
+    Map<String, String> properties = new HashMap<>();
+    properties.put("pinot.server.table.reload.status.cache.segment.failure.details.count", "3");
+    cache.onChange(properties.keySet(), properties);
+
+    String jobId = "job-custom-limit";
+
+    // When - Record 5 failures with limit of 3
+    for (int i = 1; i <= 5; i++) {
+      cache.recordFailure(jobId, "segment_" + i, new IOException("Error " + i));
+    }
+
+    // Then - Count should be 5, but only first 3 details stored
+    assertThat(cache.getJobStatus(jobId).getFailureCount()).isEqualTo(5);
+    List<SegmentReloadStatus> details = getFailedSegmentDetails(cache, jobId);
+    assertThat(details).hasSize(3);
+    assertThat(details.get(0).getSegmentName()).isEqualTo("segment_1");
+    assertThat(details.get(2).getSegmentName()).isEqualTo("segment_3");
+  }
+
+  @Test
+  public void testRecordFailureConcurrent() throws Exception {
+    // Given
+    ServerReloadJobStatusCache cache = new ServerReloadJobStatusCache();
+    String jobId = "job-concurrent";
+    int threadCount = 10;
+    int failuresPerThread = 5;
+
+    ExecutorService executor = Executors.newFixedThreadPool(threadCount);
+    List<CompletableFuture<Void>> futures = new ArrayList<>();
+
+    // When - Record failures concurrently from multiple threads
+    for (int t = 0; t < threadCount; t++) {
+      int threadId = t;
+      CompletableFuture<Void> future = CompletableFuture.runAsync(() -> {
+        for (int i = 0; i < failuresPerThread; i++) {
+          cache.recordFailure(jobId, "segment_t" + threadId + "_" + i,
+              new IOException("Error from thread " + threadId));
+        }
+      }, executor);
+      futures.add(future);
+    }
+
+    // Wait for all threads to complete
+    CompletableFuture.allOf(futures.toArray(new CompletableFuture[0])).get(10, TimeUnit.SECONDS);
+    executor.shutdown();
+    executor.awaitTermination(5, TimeUnit.SECONDS);
+
+    // Then - All failures should be counted
+    ReloadJobStatus status = cache.getJobStatus(jobId);
+    assertThat(status.getFailureCount()).isEqualTo(threadCount * failuresPerThread);
+    // Only first 5 details stored (default limit)
+    assertThat(getFailedSegmentDetails(cache, jobId)).hasSize(5);
+  }
+
+  @Test
+  public void testConfigChangeUpdatesMaxFailureDetailsLimit() {
+    // Given
+    ServerReloadJobStatusCache cache = new ServerReloadJobStatusCache();
+    assertThat(cache.getCurrentConfig().getSegmentFailureDetailsCount()).isEqualTo(5);  // Default
+
+    // When - Update limit to 2
+    Map<String, String> properties = new HashMap<>();
+    properties.put("pinot.server.table.reload.status.cache.segment.failure.details.count", "2");
+    cache.onChange(properties.keySet(), properties);
+
+    // Then - New config should be applied
+    assertThat(cache.getCurrentConfig().getSegmentFailureDetailsCount()).isEqualTo(2);
+
+    // New jobs should use new limit
+    String jobId = "job-new-limit";
+    for (int i = 1; i <= 5; i++) {
+      cache.recordFailure(jobId, "segment_" + i, new IOException("Error " + i));
+    }
+
+    assertThat(cache.getJobStatus(jobId).getFailureCount()).isEqualTo(5);
+    assertThat(getFailedSegmentDetails(cache, jobId)).hasSize(2);  // New limit applied
+  }
+
 }

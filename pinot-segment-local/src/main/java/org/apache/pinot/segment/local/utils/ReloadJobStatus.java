@@ -18,22 +18,25 @@
  */
 package org.apache.pinot.segment.local.utils;
 
+import java.util.ArrayList;
+import java.util.List;
 import java.util.concurrent.atomic.AtomicInteger;
 
 
 /**
  * Tracks status of a reload job.
- * Phase 1: Only tracks failure count.
  */
 public class ReloadJobStatus {
   private final String _jobId;
   private final AtomicInteger _failureCount;
   private final long _createdTimeMs;
+  private final List<SegmentReloadStatus> _failedSegmentDetails;
 
   public ReloadJobStatus(String jobId) {
     _jobId = jobId;
     _failureCount = new AtomicInteger(0);
     _createdTimeMs = System.currentTimeMillis();
+    _failedSegmentDetails = new ArrayList<>();
   }
 
   public String getJobId() {
@@ -52,9 +55,14 @@ public class ReloadJobStatus {
     return _createdTimeMs;
   }
 
+  public List<SegmentReloadStatus> getFailedSegmentDetails() {
+    return _failedSegmentDetails;
+  }
+
   @Override
   public String toString() {
     return "ReloadJobStatus{jobId='" + _jobId + "', failureCount=" + _failureCount.get()
+        + ", failedSegmentDetailsCount=" + _failedSegmentDetails.size()
         + ", createdTimeMs=" + _createdTimeMs + '}';
   }
 }
