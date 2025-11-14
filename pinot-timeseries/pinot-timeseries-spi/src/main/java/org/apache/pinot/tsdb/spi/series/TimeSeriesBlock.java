@@ -66,8 +66,4 @@ public class TimeSeriesBlock {
   public Map<String, String> getMetadata() {
     return _metadata;
   }
-
-  public void setMetadata(Map<String, String> metadata) {
-    _metadata = metadata;
-  }
 }
