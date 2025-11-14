@@ -47,7 +47,7 @@ public class ClusterChangeMediatorTest {
    */
   @Test
   public void testDeadLock() {
-    ClusterChangeMediator mediator = new ClusterChangeMediator(
+    ClusterChangeMediator mediator = new ClusterChangeMediator("dummy",
         Collections.singletonMap(ChangeType.IDEAL_STATE, Collections.singletonList(new Handler())),
         mock(BrokerMetrics.class));
     mediator.start();
