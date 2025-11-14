@@ -244,6 +244,24 @@ public class RealtimeSegmentDataManager extends SegmentDataManager {
   // Interrupt consumer thread every 10 seconds in case it doesn't stop, e.g. interrupt flag getting cleared somehow
   private static final int CONSUMER_THREAD_INTERRUPT_INTERVAL_MS = 10000;
 
+  /**
+   * Auto-closeable wrapper for temporary folders to ensure cleanup
+   */
+  private static class TempFolderCloseable implements AutoCloseable {
+    private final File _folder;
+
+    public TempFolderCloseable(File folder) {
+      _folder = folder;
+    }
+
+    @Override
+    public void close() {
+      if (_folder != null) {
+        FileUtils.deleteQuietly(_folder);
+      }
+    }
+  }
+
   private final SegmentZKMetadata _segmentZKMetadata;
   private final TableConfig _tableConfig;
   private final RealtimeTableDataManager _realtimeTableDataManager;
@@ -644,8 +662,9 @@ public class RealtimeSegmentDataManager extends SegmentDataManager {
         } catch (Exception e) {
           _numRowsErrored++;
           _numBytesDropped += rowSizeInBytes;
-          String errorMessage = "Caught exception while transforming the record at offset: " + offset + " , row: "
-              + decodedRow.getResult();
+          String errorMessage =
+              "Caught exception while transforming the record at offset: " + offset + " , row: "
+                  + decodedRow.getResult();
           _segmentLogger.error(errorMessage, e);
           _realtimeTableDataManager.addSegmentError(_segmentNameStr, new SegmentErrorInfo(now(), errorMessage, e));
         }
@@ -690,8 +709,8 @@ public class RealtimeSegmentDataManager extends SegmentDataManager {
             } catch (Exception e) {
               _numRowsErrored++;
               _numBytesDropped += rowSizeInBytes;
-              String errorMessage =
-                  "Caught exception while indexing the record at offset: " + offset + " , row: " + transformedRow;
+              String errorMessage = "Caught exception while indexing the record at offset: " + offset
+                  + " , row: " + transformedRow;
               _segmentLogger.error(errorMessage, e);
               _realtimeTableDataManager.addSegmentError(_segmentNameStr, new SegmentErrorInfo(now(), errorMessage, e));
             }
@@ -1167,93 +1186,91 @@ public class RealtimeSegmentDataManager extends SegmentDataManager {
       final long lockAcquireTimeMillis = now();
       // Build a segment from in-memory rows.
       // If build compressed archive is true, then build the tar.compressed file as well
-      // TODO Use an auto-closeable object to delete temp resources.
       File tempSegmentFolder = new File(_resourceTmpDir, "tmp-" + _segmentNameStr + "-" + now());
-
-      SegmentZKPropsConfig segmentZKPropsConfig = new SegmentZKPropsConfig();
-      segmentZKPropsConfig.setStartOffset(_segmentZKMetadata.getStartOffset());
-      segmentZKPropsConfig.setEndOffset(_currentOffset.toString());
-      // let's convert the segment now
-      RealtimeSegmentConverter converter =
-          new RealtimeSegmentConverter(_realtimeSegment, segmentZKPropsConfig, tempSegmentFolder.getAbsolutePath(),
-              _schema, _tableNameWithType, _tableConfig, _segmentZKMetadata.getSegmentName(),
-              _defaultNullHandlingEnabled);
-      _segmentLogger.info("Trying to build segment");
-      try {
-        converter.build(_segmentVersion, _serverMetrics);
-      } catch (Exception e) {
-        String errorMessage = "Could not build segment";
-        FileUtils.deleteQuietly(tempSegmentFolder);
-        if (e instanceof IllegalStateException || e instanceof BufferOverflowException) {
-          // Index or forward index too large issue, the segment build would fail consistently
-          _segmentBuildFailedWithDeterministicError = true;
-        }
-        reportSegmentBuildFailure(errorMessage, e);
-        throw new SegmentBuildFailureException(errorMessage, e);
-      }
-      final long buildTimeMillis = now() - lockAcquireTimeMillis;
-      final long waitTimeMillis = lockAcquireTimeMillis - startTimeMillis;
-      _segmentLogger.info("Successfully built segment (Column Mode: {}) in {} ms, after lockWaitTime {} ms",
-          converter.isColumnMajorEnabled(), buildTimeMillis, waitTimeMillis);
-
-      File dataDir = new File(_resourceDataDir);
-      File indexDir = new File(dataDir, _segmentNameStr);
-      FileUtils.deleteQuietly(indexDir);
-
-      File[] tempFiles = tempSegmentFolder.listFiles();
-      assert tempFiles != null;
-      File tempIndexDir = tempFiles[0];
-      try {
-        FileUtils.moveDirectory(tempIndexDir, indexDir);
-      } catch (IOException e) {
-        String errorMessage = "Caught exception while moving index directory from: " + tempIndexDir + " to: "
-            + indexDir;
-        reportSegmentBuildFailure(errorMessage, e);
-        throw new SegmentBuildFailureException(errorMessage, e);
-      } finally {
-        FileUtils.deleteQuietly(tempSegmentFolder);
-      }
-
-      long segmentSizeBytes = FileUtils.sizeOfDirectory(indexDir);
-      _serverMetrics.setValueOfTableGauge(_clientId, ServerGauge.LAST_REALTIME_SEGMENT_CREATION_DURATION_SECONDS,
-          TimeUnit.MILLISECONDS.toSeconds(buildTimeMillis));
-      _serverMetrics.setValueOfTableGauge(_clientId, ServerGauge.LAST_REALTIME_SEGMENT_CREATION_WAIT_TIME_SECONDS,
-          TimeUnit.MILLISECONDS.toSeconds(waitTimeMillis));
-
-      if (forCommit) {
-        File segmentTarFile = new File(dataDir, _segmentNameStr + TarCompressionUtils.TAR_COMPRESSED_FILE_EXTENSION);
+      tempSegmentFolder.mkdirs();
+      try (TempFolderCloseable tempFolderCloseable = new TempFolderCloseable(tempSegmentFolder)) {
+        SegmentZKPropsConfig segmentZKPropsConfig = new SegmentZKPropsConfig();
+        segmentZKPropsConfig.setStartOffset(_segmentZKMetadata.getStartOffset());
+        segmentZKPropsConfig.setEndOffset(_currentOffset.toString());
+        // let's convert the segment now
+        RealtimeSegmentConverter converter =
+            new RealtimeSegmentConverter(_realtimeSegment, segmentZKPropsConfig,
+                tempSegmentFolder.getAbsolutePath(), _schema, _tableNameWithType, _tableConfig,
+                _segmentZKMetadata.getSegmentName(), _defaultNullHandlingEnabled);
+        _segmentLogger.info("Trying to build segment");
         try {
-          TarCompressionUtils.createCompressedTarFile(indexDir, segmentTarFile);
+          converter.build(_segmentVersion, _serverMetrics);
+        } catch (Exception e) {
+          String errorMessage = "Could not build segment";
+          if (e instanceof IllegalStateException || e instanceof BufferOverflowException) {
+            // Index or forward index too large issue, the segment build would fail consistently
+            _segmentBuildFailedWithDeterministicError = true;
+          }
+          reportSegmentBuildFailure(errorMessage, e);
+          throw new SegmentBuildFailureException(errorMessage, e);
+        }
+        final long buildTimeMillis = now() - lockAcquireTimeMillis;
+        final long waitTimeMillis = lockAcquireTimeMillis - startTimeMillis;
+        _segmentLogger.info("Successfully built segment (Column Mode: {}) in {} ms, after lockWaitTime {} ms",
+            converter.isColumnMajorEnabled(), buildTimeMillis, waitTimeMillis);
+
+        File dataDir = new File(_resourceDataDir);
+        File indexDir = new File(dataDir, _segmentNameStr);
+        FileUtils.deleteQuietly(indexDir);
+
+        File[] tempFiles = tempSegmentFolder.listFiles();
+        assert tempFiles != null;
+        File tempIndexDir = tempFiles[0];
+        try {
+          FileUtils.moveDirectory(tempIndexDir, indexDir);
         } catch (IOException e) {
-          String errorMessage = "Caught exception while taring index directory from: " + indexDir + " to: "
-              + segmentTarFile;
+          String errorMessage = "Caught exception while moving index directory from: " + tempIndexDir + " to: "
+              + indexDir;
           reportSegmentBuildFailure(errorMessage, e);
           throw new SegmentBuildFailureException(errorMessage, e);
         }
 
-        File metadataFile = SegmentDirectoryPaths.findMetadataFile(indexDir);
-        if (metadataFile == null) {
-          String errorMessage = "Failed to find file: " + V1Constants.MetadataKeys.METADATA_FILE_NAME
-              + " under index directory: " + indexDir;
-          reportSegmentBuildFailure(errorMessage, null);
-          throw new SegmentBuildFailureException(errorMessage);
-        }
-        File creationMetaFile = SegmentDirectoryPaths.findCreationMetaFile(indexDir);
-        if (creationMetaFile == null) {
-          String errorMessage = "Failed to find file: " + V1Constants.SEGMENT_CREATION_META + " under index directory: "
-              + indexDir;
-          reportSegmentBuildFailure(errorMessage, null);
-          throw new SegmentBuildFailureException(errorMessage);
-        }
-        Map<String, File> metadataFiles = new HashMap<>();
-        metadataFiles.put(V1Constants.MetadataKeys.METADATA_FILE_NAME, metadataFile);
-        metadataFiles.put(V1Constants.SEGMENT_CREATION_META, creationMetaFile);
+        long segmentSizeBytes = FileUtils.sizeOfDirectory(indexDir);
+        _serverMetrics.setValueOfTableGauge(_clientId, ServerGauge.LAST_REALTIME_SEGMENT_CREATION_DURATION_SECONDS,
+            TimeUnit.MILLISECONDS.toSeconds(buildTimeMillis));
+        _serverMetrics.setValueOfTableGauge(_clientId, ServerGauge.LAST_REALTIME_SEGMENT_CREATION_WAIT_TIME_SECONDS,
+            TimeUnit.MILLISECONDS.toSeconds(waitTimeMillis));
 
-        return new SegmentBuildDescriptor(segmentTarFile, metadataFiles, _currentOffset, buildTimeMillis,
-            waitTimeMillis, segmentSizeBytes);
-      } else {
-        return new SegmentBuildDescriptor(null, null, _currentOffset, buildTimeMillis, waitTimeMillis,
-            segmentSizeBytes);
+        if (forCommit) {
+          File segmentTarFile = new File(dataDir, _segmentNameStr + TarCompressionUtils.TAR_COMPRESSED_FILE_EXTENSION);
+          try {
+            TarCompressionUtils.createCompressedTarFile(indexDir, segmentTarFile);
+          } catch (IOException e) {
+            String errorMessage = "Caught exception while taring index directory from: " + indexDir + " to: "
+                + segmentTarFile;
+            reportSegmentBuildFailure(errorMessage, e);
+            throw new SegmentBuildFailureException(errorMessage, e);
+          }
+
+          File metadataFile = SegmentDirectoryPaths.findMetadataFile(indexDir);
+          if (metadataFile == null) {
+            String errorMessage = "Failed to find file: " + V1Constants.MetadataKeys.METADATA_FILE_NAME
+                + " under index directory: " + indexDir;
+            reportSegmentBuildFailure(errorMessage, null);
+            throw new SegmentBuildFailureException(errorMessage);
+          }
+          File creationMetaFile = SegmentDirectoryPaths.findCreationMetaFile(indexDir);
+          if (creationMetaFile == null) {
+            String errorMessage = "Failed to find file: " + V1Constants.SEGMENT_CREATION_META + " under index directory: "
+                + indexDir;
+            reportSegmentBuildFailure(errorMessage, null);
+            throw new SegmentBuildFailureException(errorMessage);
+          }
+          Map<String, File> metadataFiles = new HashMap<>();
+          metadataFiles.put(V1Constants.MetadataKeys.METADATA_FILE_NAME, metadataFile);
+          metadataFiles.put(V1Constants.SEGMENT_CREATION_META, creationMetaFile);
+
+          return new SegmentBuildDescriptor(segmentTarFile, metadataFiles, _currentOffset, buildTimeMillis,
+              waitTimeMillis, segmentSizeBytes);
+        } else {
+          return new SegmentBuildDescriptor(null, null, _currentOffset, buildTimeMillis, waitTimeMillis,
+              segmentSizeBytes);
+        }
       }
     } finally {
       if (_segBuildSemaphore != null) {
