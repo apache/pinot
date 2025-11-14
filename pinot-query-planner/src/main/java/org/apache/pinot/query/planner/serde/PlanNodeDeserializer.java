@@ -45,6 +45,7 @@ import org.apache.pinot.query.planner.plannode.ProjectNode;
 import org.apache.pinot.query.planner.plannode.SetOpNode;
 import org.apache.pinot.query.planner.plannode.SortNode;
 import org.apache.pinot.query.planner.plannode.TableScanNode;
+import org.apache.pinot.query.planner.plannode.UnnestNode;
 import org.apache.pinot.query.planner.plannode.ValueNode;
 import org.apache.pinot.query.planner.plannode.WindowNode;
 
@@ -81,6 +82,8 @@ public class PlanNodeDeserializer {
         return deserializeExplainedNode(protoNode);
       case ENRICHEDJOINNODE:
         return deserializeEnrichedJoinNode(protoNode);
+      case UNNESTNODE:
+        return deserializeUnnestNode(protoNode);
       default:
         throw new IllegalStateException("Unsupported PlanNode type: " + protoNode.getNodeCase());
     }
@@ -217,6 +220,23 @@ public class PlanNodeDeserializer {
     Plan.ExplainNode protoExplainNode = protoNode.getExplainNode();
     return new ExplainedNode(protoNode.getStageId(), extractDataSchema(protoNode), extractNodeHint(protoNode),
         extractInputs(protoNode), protoExplainNode.getTitle(), protoExplainNode.getAttributesMap());
+  }
+
+  private static UnnestNode deserializeUnnestNode(Plan.PlanNode protoNode) {
+    Plan.UnnestNode protoUnnestNode = protoNode.getUnnestNode();
+    String alias = protoUnnestNode.getColumnAlias();
+    if (alias != null && alias.isEmpty()) {
+      alias = null;
+    }
+    String ordAlias = protoUnnestNode.getOrdinalityAlias();
+    if (ordAlias != null && ordAlias.isEmpty()) {
+      ordAlias = null;
+    }
+    int elemIdx = protoUnnestNode.hasElementIndex() ? protoUnnestNode.getElementIndex() : -1;
+    int ordIdx = protoUnnestNode.hasOrdinalityIndex() ? protoUnnestNode.getOrdinalityIndex() : -1;
+    return new UnnestNode(protoNode.getStageId(), extractDataSchema(protoNode), extractNodeHint(protoNode),
+        extractInputs(protoNode), ProtoExpressionToRexExpression.convertExpression(protoUnnestNode.getArrayExpr()),
+        alias, protoUnnestNode.getWithOrdinality(), ordAlias, elemIdx, ordIdx);
   }
 
   private static DataSchema extractDataSchema(Plan.DataSchema protoDataSchema) {

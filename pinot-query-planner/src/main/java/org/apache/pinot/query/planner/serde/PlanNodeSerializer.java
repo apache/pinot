@@ -45,6 +45,7 @@ import org.apache.pinot.query.planner.plannode.ProjectNode;
 import org.apache.pinot.query.planner.plannode.SetOpNode;
 import org.apache.pinot.query.planner.plannode.SortNode;
 import org.apache.pinot.query.planner.plannode.TableScanNode;
+import org.apache.pinot.query.planner.plannode.UnnestNode;
 import org.apache.pinot.query.planner.plannode.ValueNode;
 import org.apache.pinot.query.planner.plannode.WindowNode;
 
@@ -276,6 +277,20 @@ public class PlanNodeSerializer {
       Plan.ExplainNode explainNode =
           Plan.ExplainNode.newBuilder().setTitle(node.getTitle()).putAllAttributes(node.getAttributes()).build();
       builder.setExplainNode(explainNode);
+      return null;
+    }
+
+    @Override
+    public Void visitUnnest(UnnestNode node, Plan.PlanNode.Builder builder) {
+      Plan.UnnestNode unnestNode = Plan.UnnestNode.newBuilder()
+          .setArrayExpr(RexExpressionToProtoExpression.convertExpression(node.getArrayExpr()))
+          .setColumnAlias(node.getColumnAlias() == null ? "" : node.getColumnAlias())
+          .setWithOrdinality(node.isWithOrdinality())
+          .setOrdinalityAlias(node.getOrdinalityAlias() == null ? "" : node.getOrdinalityAlias())
+          .setElementIndex(node.getElementIndex())
+          .setOrdinalityIndex(node.getOrdinalityIndex())
+          .build();
+      builder.setUnnestNode(unnestNode);
       return null;
     }
 

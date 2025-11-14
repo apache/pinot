@@ -44,6 +44,7 @@ import org.apache.pinot.query.planner.plannode.ProjectNode;
 import org.apache.pinot.query.planner.plannode.SetOpNode;
 import org.apache.pinot.query.planner.plannode.SortNode;
 import org.apache.pinot.query.planner.plannode.TableScanNode;
+import org.apache.pinot.query.planner.plannode.UnnestNode;
 import org.apache.pinot.query.planner.plannode.ValueNode;
 import org.apache.pinot.query.planner.plannode.WindowNode;
 
@@ -152,6 +153,26 @@ class PlanNodeMerger {
         return null;
       }
       if (node.getLimit() != otherNode.getLimit()) {
+        return null;
+      }
+      List<PlanNode> children = mergeChildren(node, context);
+      if (children == null) {
+        return null;
+      }
+      return node.withInputs(children);
+    }
+
+    @Nullable
+    @Override
+    public PlanNode visitUnnest(UnnestNode node, PlanNode context) {
+      if (context.getClass() != UnnestNode.class) {
+        return null;
+      }
+      UnnestNode otherNode = (UnnestNode) context;
+      if (!Objects.equals(node.getArrayExpr(), otherNode.getArrayExpr())) {
+        return null;
+      }
+      if (!Objects.equals(node.getColumnAlias(), otherNode.getColumnAlias())) {
         return null;
       }
       List<PlanNode> children = mergeChildren(node, context);
