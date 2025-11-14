@@ -1,0 +1,262 @@
+/**
+ * Licensed to the Apache Software Foundation (ASF) under one
+ * or more contributor license agreements.  See the NOTICE file
+ * distributed with this work for additional information
+ * regarding copyright ownership.  The ASF licenses this file
+ * to you under the Apache License, Version 2.0 (the
+ * "License"); you may not use this file except in compliance
+ * with the License.  You may obtain a copy of the License at
+ *
+ *   http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing,
+ * software distributed under the License is distributed on an
+ * "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+ * KIND, either express or implied.  See the License for the
+ * specific language governing permissions and limitations
+ * under the License.
+ */
+
+/**
+ * M3QL Parser - JavaCC Grammar for M3 Query Language
+ *
+ * Query syntax:
+ *   fetch{table="name", ts_column="col", ts_unit="SECONDS", filter="...", value="..."}
+ *   | sum{col1,col2}
+ *   | keepLastValue{}
+ *   | transformNull{0.0}
+ */
+
+options {
+    STATIC = false;
+    IGNORE_CASE = false;
+    UNICODE_INPUT = true;
+    JDK_VERSION = "1.8";
+}
+
+PARSER_BEGIN(M3qlParser)
+
+package org.apache.pinot.tsdb.m3ql.parser;
+
+import java.io.StringReader;
+import java.util.ArrayList;
+import java.util.List;
+
+/**
+ * M3QL Parser - Parses M3 Query Language syntax.
+ *
+ * This parser converts M3QL queries into a structured representation
+ * that can be used to build execution plans.
+ */
+public class M3qlParser {
+
+    /**
+     * Parse an M3QL query string.
+     *
+     * @param query the M3QL query string
+     * @return List of commands, where each command is a list of strings
+     * @throws ParseException if the query is invalid
+     */
+    public static List<List<String>> parse(String query) throws ParseException {
+        M3qlParser parser = new M3qlParser(new StringReader(query));
+        return parser.Query();
+    }
+}
+
+PARSER_END(M3qlParser)
+
+/* SKIP WHITESPACE */
+SKIP : {
+    " "
+  | "\t"
+  | "\n"
+  | "\r"
+}
+
+/* RESERVED WORDS */
+TOKEN : {
+    < FETCH: "fetch" >
+  | < SUM: "sum" >
+  | < MIN: "min" >
+  | < MAX: "max" >
+  | < KEEP_LAST_VALUE: "keepLastValue" >
+  | < TRANSFORM_NULL: "transformNull" >
+}
+
+/* OPERATORS AND SEPARATORS */
+TOKEN : {
+    < PIPE: "|" >
+  | < LBRACE: "{" >
+  | < RBRACE: "}" >
+  | < COMMA: "," >
+  | < EQUALS: "=" >
+}
+
+/* LITERALS */
+TOKEN : {
+    < QUOTED_STRING: "\"" (~["\"","\\"] | "\\" ~[])* "\"" >
+  | < NUMBER: (["-"])? (["0"-"9"])+ ("." (["0"-"9"])+)? >
+  | < IDENTIFIER: ["a"-"z","A"-"Z","_"] (["a"-"z","A"-"Z","0"-"9","_"])* >
+}
+
+/**
+ * Main query production rule.
+ * Parses: command | command | command ...
+ */
+List<List<String>> Query() :
+{
+    List<List<String>> commands = new ArrayList<List<String>>();
+    List<String> cmd;
+}
+{
+    cmd = Command()
+    { commands.add(cmd); }
+    (
+        <PIPE>
+        cmd = Command()
+        { commands.add(cmd); }
+    )*
+    <EOF>
+    { return commands; }
+}
+
+/**
+ * Command production rule.
+ * Parses: commandName{...}
+ */
+List<String> Command() :
+{
+    List<String> result;
+}
+{
+    (
+        result = FetchCommand()
+      | result = AggregationCommand()
+      | result = KeepLastValueCommand()
+      | result = TransformNullCommand()
+    )
+    { return result; }
+}
+
+/**
+ * Fetch command production rule.
+ * Parses: fetch{table="name", ts_column="col", ts_unit="SECONDS", filter="...", value="..."}
+ */
+List<String> FetchCommand() :
+{
+    List<String> result = new ArrayList<String>();
+    Token key, value;
+    String valueStr;
+}
+{
+    <FETCH>
+    { result.add("fetch"); }
+    <LBRACE>
+    (
+        key = <IDENTIFIER>
+        <EQUALS>
+        value = <QUOTED_STRING>
+        {
+            result.add(key.image);
+            // Remove quotes from the string value
+            valueStr = value.image;
+            result.add(valueStr.substring(1, valueStr.length() - 1));
+        }
+        (
+            <COMMA>
+            key = <IDENTIFIER>
+            <EQUALS>
+            value = <QUOTED_STRING>
+            {
+                result.add(key.image);
+                valueStr = value.image;
+                result.add(valueStr.substring(1, valueStr.length() - 1));
+            }
+        )*
+    )?
+    <RBRACE>
+    { return result; }
+}
+
+/**
+ * Aggregation command production rule.
+ * Parses: sum{col1,col2} or min{} or max{col1}
+ */
+List<String> AggregationCommand() :
+{
+    List<String> result = new ArrayList<String>();
+    Token cmdToken, col;
+    StringBuilder groupByCols = new StringBuilder();
+    boolean first = true;
+}
+{
+    (
+        cmdToken = <SUM>
+      | cmdToken = <MIN>
+      | cmdToken = <MAX>
+    )
+    { result.add(cmdToken.image); }
+    <LBRACE>
+    (
+        col = <IDENTIFIER>
+        {
+            if (!first) {
+                groupByCols.append(",");
+            }
+            groupByCols.append(col.image);
+            first = false;
+        }
+        (
+            <COMMA>
+            col = <IDENTIFIER>
+            {
+                groupByCols.append(",");
+                groupByCols.append(col.image);
+            }
+        )*
+    )?
+    <RBRACE>
+    {
+        if (groupByCols.length() > 0) {
+            result.add(groupByCols.toString());
+        }
+        return result;
+    }
+}
+
+/**
+ * KeepLastValue command production rule.
+ * Parses: keepLastValue{}
+ */
+List<String> KeepLastValueCommand() :
+{
+    List<String> result = new ArrayList<String>();
+}
+{
+    <KEEP_LAST_VALUE>
+    { result.add("keepLastValue"); }
+    <LBRACE>
+    <RBRACE>
+    { return result; }
+}
+
+/**
+ * TransformNull command production rule.
+ * Parses: transformNull{} or transformNull{0.0}
+ */
+List<String> TransformNullCommand() :
+{
+    List<String> result = new ArrayList<String>();
+    Token value = null;
+}
+{
+    <TRANSFORM_NULL>
+    { result.add("transformNull"); }
+    <LBRACE>
+    (
+        value = <NUMBER>
+        { result.add(value.image); }
+    )?
+    <RBRACE>
+    { return result; }
+}

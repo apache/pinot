@@ -29,7 +29,8 @@ import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 import org.apache.pinot.spi.env.PinotConfiguration;
-import org.apache.pinot.tsdb.m3ql.parser.Tokenizer;
+import org.apache.pinot.tsdb.m3ql.parser.M3qlParser;
+import org.apache.pinot.tsdb.m3ql.parser.ParseException;
 import org.apache.pinot.tsdb.m3ql.plan.KeepLastValuePlanNode;
 import org.apache.pinot.tsdb.m3ql.plan.TransformNullPlanNode;
 import org.apache.pinot.tsdb.m3ql.time.TimeBucketComputer;
@@ -63,8 +64,12 @@ public class M3TimeSeriesPlanner implements TimeSeriesLogicalPlanner {
 
   public BaseTimeSeriesPlanNode planQuery(RangeTimeSeriesRequest request) {
     PlanIdGenerator planIdGenerator = new PlanIdGenerator();
-    Tokenizer tokenizer = new Tokenizer(request.getQuery());
-    List<List<String>> commands = tokenizer.tokenize();
+    List<List<String>> commands;
+    try {
+      commands = M3qlParser.parse(request.getQuery());
+    } catch (ParseException e) {
+      throw new IllegalArgumentException("Failed to parse M3QL query: " + e.getMessage(), e);
+    }
     Preconditions.checkState(commands.size() > 1,
         "At least two commands required. " + "Query should start with a fetch followed by an aggregation.");
     BaseTimeSeriesPlanNode lastNode = null;
