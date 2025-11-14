@@ -69,6 +69,7 @@ import org.apache.pinot.common.utils.ExceptionUtils;
 import org.apache.pinot.common.utils.NamedThreadFactory;
 import org.apache.pinot.common.utils.Timer;
 import org.apache.pinot.common.utils.config.QueryOptionsUtils;
+import org.apache.pinot.common.utils.request.QueryFingerprintUtils;
 import org.apache.pinot.common.utils.tls.TlsUtils;
 import org.apache.pinot.core.routing.RoutingManager;
 import org.apache.pinot.core.transport.ServerInstance;
@@ -93,6 +94,8 @@ import org.apache.pinot.spi.exception.QueryErrorCode;
 import org.apache.pinot.spi.exception.QueryException;
 import org.apache.pinot.spi.query.QueryExecutionContext;
 import org.apache.pinot.spi.query.QueryThreadContext;
+import org.apache.pinot.spi.trace.LoggerConstants;
+import org.apache.pinot.spi.trace.QueryFingerprint;
 import org.apache.pinot.spi.trace.RequestContext;
 import org.apache.pinot.spi.utils.CommonConstants;
 import org.apache.pinot.sql.parsers.SqlNodeAndOptions;
@@ -131,6 +134,7 @@ public class MultiStageBrokerRequestHandler extends BaseBrokerRequestHandler {
   private final MultiStageQueryThrottler _queryThrottler;
   private final ExecutorService _queryCompileExecutor;
   protected final long _extraPassiveTimeoutMs;
+  protected final boolean _enableQueryFingerprinting;
 
   public MultiStageBrokerRequestHandler(PinotConfiguration config, String brokerId,
       BrokerRequestIdGenerator requestIdGenerator, RoutingManager routingManager,
@@ -169,6 +173,9 @@ public class MultiStageBrokerRequestHandler extends BaseBrokerRequestHandler {
         Executors.newFixedThreadPool(
             Math.max(1, Runtime.getRuntime().availableProcessors() / 2),
             new NamedThreadFactory("multi-stage-query-compile-executor")));
+    _enableQueryFingerprinting = _config.getProperty(
+        CommonConstants.Broker.CONFIG_OF_BROKER_ENABLE_QUERY_FINGERPRINTING,
+        CommonConstants.Broker.DEFAULT_BROKER_ENABLE_QUERY_FINGERPRINTING);
   }
 
   @Override
@@ -297,6 +304,19 @@ public class MultiStageBrokerRequestHandler extends BaseBrokerRequestHandler {
       throws QueryException, WebApplicationException {
     _queryLogger.log(requestId, query);
 
+    String queryHash = CommonConstants.Broker.DEFAULT_QUERY_HASH;
+    if (_enableQueryFingerprinting) {
+      try {
+        QueryFingerprint queryFingerprint = QueryFingerprintUtils.generateFingerprint(sqlNodeAndOptions);
+        if (queryFingerprint != null) {
+          requestContext.setQueryFingerprint(queryFingerprint);
+          LoggerConstants.QUERY_HASH_KEY.registerInMdc(queryFingerprint.getQueryHash());
+        }
+      } catch (Exception e) {
+        LOGGER.warn("Failed to generate query fingerprint for request {}: {}. {}", requestId, query, e.getMessage());
+      }
+    }
+
     String cid = extractClientRequestId(sqlNodeAndOptions);
     if (cid == null) {
       cid = Long.toString(requestId);
@@ -311,11 +331,11 @@ public class MultiStageBrokerRequestHandler extends BaseBrokerRequestHandler {
 
     QueryExecutionContext executionContext =
         new QueryExecutionContext(QueryExecutionContext.QueryType.MSE, requestId, cid, workloadName, startTimeMs,
-            activeDeadlineMs, passiveDeadlineMs, _brokerId, _brokerId);
+            activeDeadlineMs, passiveDeadlineMs, _brokerId, _brokerId, queryHash);
     QueryThreadContext.MseWorkerInfo mseWorkerInfo = new QueryThreadContext.MseWorkerInfo(0, 0);
     try (QueryThreadContext ignore = QueryThreadContext.open(executionContext, mseWorkerInfo, _threadAccountant);
-        QueryEnvironment.CompiledQuery compiledQuery = compileQuery(requestId, query, sqlNodeAndOptions, httpHeaders,
-            queryTimer)) {
+        QueryEnvironment.CompiledQuery compiledQuery = compileQuery(requestId, query, sqlNodeAndOptions, requestContext,
+            httpHeaders, queryTimer)) {
       AtomicBoolean rlsFiltersApplied = new AtomicBoolean(false);
       checkAuthorization(requesterIdentity, requestContext, httpHeaders, compiledQuery, rlsFiltersApplied);
 
@@ -332,7 +352,17 @@ public class MultiStageBrokerRequestHandler extends BaseBrokerRequestHandler {
   ///
   /// In this phase the query can be either planned or explained
   private QueryEnvironment.CompiledQuery compileQuery(long requestId, String query, SqlNodeAndOptions sqlNodeAndOptions,
-      HttpHeaders httpHeaders, Timer queryTimer) {
+      RequestContext requestContext, HttpHeaders httpHeaders, Timer queryTimer) {
+    // Add queryHash to query options so it gets passed to multi-stage workers
+    if (_enableQueryFingerprinting) {
+      QueryFingerprint queryFingerprint = requestContext.getQueryFingerprint();
+      if (queryFingerprint != null) {
+        sqlNodeAndOptions.getOptions().put(
+            CommonConstants.Broker.Request.QueryOptionKey.QUERY_HASH,
+            queryFingerprint.getQueryHash());
+      }
+    }
+
     Map<String, String> queryOptions = sqlNodeAndOptions.getOptions();
 
     try {
