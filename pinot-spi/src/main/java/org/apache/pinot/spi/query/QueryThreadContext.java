@@ -64,6 +64,10 @@ public class QueryThreadContext implements AutoCloseable {
     _accountant = accountant;
     LoggerConstants.REQUEST_ID_KEY.registerInMdc(Long.toString(executionContext.getRequestId()));
     LoggerConstants.CORRELATION_ID_KEY.registerInMdc(executionContext.getCid());
+    String queryHash = executionContext.getQueryHash();
+    if (queryHash != null) {
+      LoggerConstants.QUERY_HASH_KEY.registerInMdc(queryHash);
+    }
     if (mseWorkerInfo != null) {
       LoggerConstants.STAGE_ID_KEY.registerInMdc(Integer.toString(mseWorkerInfo.getStageId()));
       LoggerConstants.WORKER_ID_KEY.registerInMdc(Integer.toString(mseWorkerInfo.getWorkerId()));
@@ -129,6 +133,9 @@ public class QueryThreadContext implements AutoCloseable {
     THREAD_LOCAL.remove();
     LoggerConstants.REQUEST_ID_KEY.unregisterFromMdc();
     LoggerConstants.CORRELATION_ID_KEY.unregisterFromMdc();
+    if (_executionContext.getQueryHash() != null) {
+      LoggerConstants.QUERY_HASH_KEY.unregisterFromMdc();
+    }
     if (_mseWorkerInfo != null) {
       LoggerConstants.STAGE_ID_KEY.unregisterFromMdc();
       LoggerConstants.WORKER_ID_KEY.unregisterFromMdc();
