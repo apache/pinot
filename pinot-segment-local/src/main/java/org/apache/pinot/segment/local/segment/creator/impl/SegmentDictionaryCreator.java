@@ -331,6 +331,96 @@ public class SegmentDictionaryCreator implements IndexCreator {
     }
   }
 
+  /**
+   * Get dictionary index for a primitive int value without boxing.
+   */
+  public int indexOfSV(int value) {
+    return _intValueToIndexMap.get(value);
+  }
+
+  /**
+   * Get dictionary index for a primitive long value without boxing.
+   */
+  public int indexOfSV(long value) {
+    return _longValueToIndexMap.get(value);
+  }
+
+  /**
+   * Get dictionary index for a primitive float value without boxing.
+   */
+  public int indexOfSV(float value) {
+    return _floatValueToIndexMap.get(value);
+  }
+
+  /**
+   * Get dictionary index for a primitive double value without boxing.
+   */
+  public int indexOfSV(double value) {
+    return _doubleValueToIndexMap.get(value);
+  }
+
+  /**
+   * Get dictionary index for a String value.
+   */
+  public int indexOfSV(String value) {
+    return _objectValueToIndexMap.getInt(value);
+  }
+
+  /**
+   * Get dictionary index for a byte array value.
+   */
+  public int indexOfSV(byte[] value) {
+    return _objectValueToIndexMap.getInt(new ByteArray(value));
+  }
+
+  public int[] indexOfMV(int[] values) {
+    int[] indexes = new int[values.length];
+    for (int i = 0; i < values.length; i++) {
+      indexes[i] = _intValueToIndexMap.get(values[i]);
+    }
+    return indexes;
+  }
+
+  public int[] indexOfMV(long[] values) {
+    int[] indexes = new int[values.length];
+    for (int i = 0; i < values.length; i++) {
+      indexes[i] = _longValueToIndexMap.get(values[i]);
+    }
+    return indexes;
+  }
+
+  public int[] indexOfMV(float[] values) {
+    int[] indexes = new int[values.length];
+    for (int i = 0; i < values.length; i++) {
+      indexes[i] = _floatValueToIndexMap.get(values[i]);
+    }
+    return indexes;
+  }
+
+  public int[] indexOfMV(double[] values) {
+    int[] indexes = new int[values.length];
+    for (int i = 0; i < values.length; i++) {
+      indexes[i] = _doubleValueToIndexMap.get(values[i]);
+    }
+    return indexes;
+  }
+
+  public int[] indexOfMV(String[] values) {
+    int[] indexes = new int[values.length];
+    for (int i = 0; i < values.length; i++) {
+      indexes[i] = _objectValueToIndexMap.getInt(values[i]);
+    }
+    return indexes;
+  }
+
+  public int[] indexOfMV(byte[][] values) {
+    int[] indexes = new int[values.length];
+    for (int i = 0; i < values.length; i++) {
+      indexes[i] = _objectValueToIndexMap.getInt(new ByteArray(values[i]));
+    }
+    return indexes;
+  }
+
   public int[] indexOfMV(Object value) {
     Object[] multiValues = (Object[]) value;
     int[] indexes = new int[multiValues.length];

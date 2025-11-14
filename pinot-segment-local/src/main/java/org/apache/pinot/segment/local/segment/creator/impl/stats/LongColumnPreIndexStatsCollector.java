@@ -40,32 +40,38 @@ public class LongColumnPreIndexStatsCollector extends AbstractColumnStatisticsCo
 
     if (entry instanceof Object[]) {
       Object[] values = (Object[]) entry;
-      for (Object obj : values) {
-        long value = (long) obj;
-        _values.add(value);
-      }
-
-      _maxNumberOfMultiValues = Math.max(_maxNumberOfMultiValues, values.length);
-      updateTotalNumberOfEntries(values);
+      collectMultiValue(values.length, i -> (long) values[i]);
     } else if (entry instanceof long[]) {
-      long[] values = (long[]) entry;
-      for (long value : values) {
-        _values.add(value);
-      }
-
-      _maxNumberOfMultiValues = Math.max(_maxNumberOfMultiValues, values.length);
-      updateTotalNumberOfEntries(values.length);
+      collect((long[]) entry);
     } else {
-      long value = (long) entry;
-      addressSorted(value);
-      if (_values.add(value)) {
-        if (isPartitionEnabled()) {
-          updatePartition(Long.toString(value));
-        }
-      }
-
-      _totalNumberOfEntries++;
+      collect((long) entry);
     }
+  }
+
+  @Override
+  public void collect(long value) {
+    assert !_sealed;
+    addressSorted(value);
+    if (_values.add(value)) {
+      if (isPartitionEnabled()) {
+        updatePartition(Long.toString(value));
+      }
+    }
+    _totalNumberOfEntries++;
+  }
+
+  @Override
+  public void collect(long[] values) {
+    assert !_sealed;
+    collectMultiValue(values.length, i -> values[i]);
+  }
+
+  private void collectMultiValue(int length, java.util.function.IntFunction<Long> valueGetter) {
+    for (int i = 0; i < length; i++) {
+      _values.add(valueGetter.apply(i));
+    }
+    _maxNumberOfMultiValues = Math.max(_maxNumberOfMultiValues, length);
+    updateTotalNumberOfEntries(length);
   }
 
   private void addressSorted(long entry) {
