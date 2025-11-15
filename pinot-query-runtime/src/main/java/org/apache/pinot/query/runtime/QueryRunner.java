@@ -86,6 +86,7 @@ import org.apache.pinot.spi.utils.CommonConstants.Broker.Request.QueryOptionKey;
 import org.apache.pinot.spi.utils.CommonConstants.Helix;
 import org.apache.pinot.spi.utils.CommonConstants.MultiStageQueryRunner;
 import org.apache.pinot.spi.utils.CommonConstants.MultiStageQueryRunner.JoinOverFlowMode;
+import org.apache.pinot.spi.utils.CommonConstants.MultiStageQueryRunner.TimeoutOverflowMode;
 import org.apache.pinot.spi.utils.CommonConstants.MultiStageQueryRunner.WindowOverFlowMode;
 import org.apache.pinot.spi.utils.CommonConstants.Query.Request;
 import org.apache.pinot.spi.utils.CommonConstants.Query.Response;
@@ -137,6 +138,8 @@ public class QueryRunner {
   private Integer _maxRowsInWindow;
   @Nullable
   private WindowOverFlowMode _windowOverflowMode;
+  @Nullable
+  private TimeoutOverflowMode _timeoutOverflowMode;
   @Nullable
   private PhysicalTimeSeriesServerPlanVisitor _timeSeriesPhysicalPlanVisitor;
   private BooleanSupplier _sendStats;
@@ -190,6 +193,10 @@ public class QueryRunner {
 
     String windowOverflowModeStr = serverConf.getProperty(MultiStageQueryRunner.KEY_OF_WINDOW_OVERFLOW_MODE);
     _windowOverflowMode = windowOverflowModeStr != null ? WindowOverFlowMode.valueOf(windowOverflowModeStr) : null;
+
+    String timeoutOverflowModeStr = serverConf.getProperty(MultiStageQueryRunner.KEY_OF_TIMEOUT_OVERFLOW_MODE);
+    _timeoutOverflowMode =
+        timeoutOverflowModeStr != null ? TimeoutOverflowMode.valueOf(timeoutOverflowModeStr) : null;
 
     ExecutorService baseExecutorService =
         ExecutorServiceUtils.create(serverConf, Server.MULTISTAGE_EXECUTOR_CONFIG_PREFIX, "query-runner-on-" + port,
@@ -506,6 +513,14 @@ public class QueryRunner {
     }
     if (windowOverflowMode != null) {
       opChainMetadata.put(QueryOptionKey.WINDOW_OVERFLOW_MODE, windowOverflowMode.name());
+    }
+
+    TimeoutOverflowMode timeoutOverflowMode = QueryOptionsUtils.getTimeoutOverflowMode(opChainMetadata);
+    if (timeoutOverflowMode == null) {
+      timeoutOverflowMode = _timeoutOverflowMode;
+    }
+    if (timeoutOverflowMode != null) {
+      opChainMetadata.put(QueryOptionKey.TIMEOUT_OVERFLOW_MODE, timeoutOverflowMode.name());
     }
 
     return opChainMetadata;

@@ -66,6 +66,7 @@ import org.apache.pinot.spi.exception.QueryErrorCode;
 import org.apache.pinot.spi.exception.TerminationException;
 import org.apache.pinot.spi.query.QueryThreadContext;
 import org.apache.pinot.spi.utils.CommonConstants.Broker.Request.QueryOptionValue;
+import org.apache.pinot.spi.utils.CommonConstants.MultiStageQueryRunner.TimeoutOverflowMode;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -98,10 +99,12 @@ public class LeafOperator extends MultiStageOperator {
   // Use a limit-sized BlockingQueue to store the results blocks and apply back pressure to the single-stage threads
   @VisibleForTesting
   final BlockingQueue<BaseResultsBlock> _blockingQueue;
+  private final TimeoutOverflowMode _timeoutOverflowMode;
 
   @Nullable
   private volatile Future<?> _executionFuture;
   private volatile boolean _terminated;
+  private volatile boolean _timeoutOverflowTriggered;
 
   public LeafOperator(OpChainExecutionContext context, List<ServerQueryRequest> requests, DataSchema dataSchema,
       QueryExecutor queryExecutor, ExecutorService executorService) {
@@ -118,6 +121,9 @@ public class LeafOperator extends MultiStageOperator {
     Integer maxStreamingPendingBlocks = QueryOptionsUtils.getMaxStreamingPendingBlocks(context.getOpChainMetadata());
     _blockingQueue = new ArrayBlockingQueue<>(maxStreamingPendingBlocks != null ? maxStreamingPendingBlocks
         : QueryOptionValue.DEFAULT_MAX_STREAMING_PENDING_BLOCKS);
+    TimeoutOverflowMode timeoutOverflowMode =
+        QueryOptionsUtils.getTimeoutOverflowMode(context.getOpChainMetadata());
+    _timeoutOverflowMode = timeoutOverflowMode != null ? timeoutOverflowMode : TimeoutOverflowMode.THROW;
   }
 
   public List<ServerQueryRequest> getRequests() {
@@ -168,15 +174,15 @@ public class LeafOperator extends MultiStageOperator {
     BaseResultsBlock resultsBlock;
     try {
       // Here we use passive deadline because we end up waiting for the SSE operators which can timeout by their own.
-      resultsBlock =
-          _blockingQueue.poll(_context.getPassiveDeadlineMs() - System.currentTimeMillis(), TimeUnit.MILLISECONDS);
+      long deadlineMs = getWaitDeadlineMs();
+      resultsBlock = _blockingQueue.poll(Math.max(0L, deadlineMs - System.currentTimeMillis()), TimeUnit.MILLISECONDS);
     } catch (InterruptedException e) {
       terminateAndClearResultsBlocks();
       return replaceWithTerminateExceptionIfAvailable(CANCELLED_BLOCK);
     }
     if (resultsBlock == null) {
       terminateAndClearResultsBlocks();
-      return replaceWithTerminateExceptionIfAvailable(TIMEOUT_BLOCK);
+      return handleTimeoutOverflow(TIMEOUT_BLOCK, "waiting for leaf results");
     }
     // Terminate when there is error block
     ErrorMseBlock errorBlock = getErrorBlock();
@@ -201,6 +207,30 @@ public class LeafOperator extends MultiStageOperator {
         terminateException.getMessage()) : errorBlock;
   }
 
+  private MseBlock handleTimeoutOverflow(ErrorMseBlock defaultBlock, String reason) {
+    if (recordTimeoutOverflow(reason)) {
+      return SuccessMseBlock.INSTANCE;
+    }
+    return replaceWithTerminateExceptionIfAvailable(defaultBlock);
+  }
+
+  private boolean recordTimeoutOverflow(String reason) {
+    if (_timeoutOverflowMode != TimeoutOverflowMode.BREAK) {
+      return false;
+    }
+    if (!_timeoutOverflowTriggered) {
+      LOGGER.warn("Leaf operator for table '{}' returning partial results after timeout: {}", _tableName, reason);
+    }
+    _timeoutOverflowTriggered = true;
+    _statMap.merge(StatKey.TIMEOUT_OVERFLOW_REACHED, true);
+    return true;
+  }
+
+  private long getWaitDeadlineMs() {
+    return _timeoutOverflowMode == TimeoutOverflowMode.BREAK ? _context.getActiveDeadlineMs()
+        : _context.getPassiveDeadlineMs();
+  }
+
   public ExplainedNode explain() {
     if (_executionFuture == null) {
       _executionFuture = startExecution();
@@ -214,8 +244,9 @@ public class LeafOperator extends MultiStageOperator {
       BaseResultsBlock resultsBlock;
       try {
         // Here we use passive deadline because we end up waiting for the SSE operators which can timeout by their own.
-        resultsBlock =
-            _blockingQueue.poll(_context.getPassiveDeadlineMs() - System.currentTimeMillis(), TimeUnit.MILLISECONDS);
+        long deadlineMs = getWaitDeadlineMs();
+        long waitMs = Math.max(0L, deadlineMs - System.currentTimeMillis());
+        resultsBlock = _blockingQueue.poll(waitMs, TimeUnit.MILLISECONDS);
       } catch (InterruptedException e) {
         terminateAndClearResultsBlocks();
         checkTerminateException();
@@ -470,8 +501,11 @@ public class LeafOperator extends MultiStageOperator {
         });
       }
       try {
-        if (!latch.await(_context.getPassiveDeadlineMs() - System.currentTimeMillis(), TimeUnit.MILLISECONDS)) {
-          setErrorBlock(TIMEOUT_BLOCK);
+        long deadlineMs = getWaitDeadlineMs();
+        if (!latch.await(Math.max(0L, deadlineMs - System.currentTimeMillis()), TimeUnit.MILLISECONDS)) {
+          if (!recordTimeoutOverflow("waiting for hybrid leaf responses")) {
+            setErrorBlock(TIMEOUT_BLOCK);
+          }
         }
       } catch (InterruptedException e) {
         setErrorBlock(CANCELLED_BLOCK);
@@ -510,7 +544,9 @@ public class LeafOperator extends MultiStageOperator {
         } catch (InterruptedException e) {
           setErrorBlock(CANCELLED_BLOCK);
         } catch (TimeoutException e) {
-          setErrorBlock(TIMEOUT_BLOCK);
+          if (!recordTimeoutOverflow("adding results block")) {
+            setErrorBlock(TIMEOUT_BLOCK);
+          }
         } catch (Exception e) {
           if (!(e instanceof EarlyTerminationException)) {
             LOGGER.warn("Failed to add results block", e);
@@ -526,8 +562,9 @@ public class LeafOperator extends MultiStageOperator {
     if (_terminated) {
       throw new EarlyTerminationException("Query has been terminated");
     }
-    if (!_blockingQueue.offer(resultsBlock, _context.getPassiveDeadlineMs() - System.currentTimeMillis(),
-        TimeUnit.MILLISECONDS)) {
+    long deadlineMs = getWaitDeadlineMs();
+    long waitMs = Math.max(0L, deadlineMs - System.currentTimeMillis());
+    if (!_blockingQueue.offer(resultsBlock, waitMs, TimeUnit.MILLISECONDS)) {
       throw new TimeoutException("Timed out waiting to add results block");
     }
   }
@@ -704,6 +741,7 @@ public class LeafOperator extends MultiStageOperator {
     GROUPS_TRIMMED(StatMap.Type.BOOLEAN),
     NUM_GROUPS_LIMIT_REACHED(StatMap.Type.BOOLEAN),
     NUM_GROUPS_WARNING_LIMIT_REACHED(StatMap.Type.BOOLEAN),
+    TIMEOUT_OVERFLOW_REACHED(StatMap.Type.BOOLEAN, BrokerResponseNativeV2.StatKey.TIMEOUT_OVERFLOW_REACHED),
     NUM_RESIZES(StatMap.Type.INT, null),
     RESIZE_TIME_MS(StatMap.Type.LONG, null),
     THREAD_CPU_TIME_NS(StatMap.Type.LONG, null),
