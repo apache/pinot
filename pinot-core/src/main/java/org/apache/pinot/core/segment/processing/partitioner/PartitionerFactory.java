@@ -19,6 +19,7 @@
 package org.apache.pinot.core.segment.processing.partitioner;
 
 import com.google.common.base.Preconditions;
+import java.util.List;
 
 
 /**
@@ -84,5 +85,19 @@ public final class PartitionerFactory {
         break;
     }
     return partitioner;
+  }
+
+  /**
+   * Create partitioner array from configuration.
+   *
+   * @return Array of partitioners
+   */
+  public static Partitioner[] getPartitioners(List<PartitionerConfig> partitionerConfigs) {
+    int numPartitioners = partitionerConfigs.size();
+    Partitioner[] partitioners = new Partitioner[numPartitioners];
+    for (int i = 0; i < numPartitioners; i++) {
+      partitioners[i] = PartitionerFactory.getPartitioner(partitionerConfigs.get(i));
+    }
+    return partitioners;
   }
 }

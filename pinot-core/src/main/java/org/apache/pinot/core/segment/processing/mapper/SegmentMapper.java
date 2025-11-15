@@ -35,7 +35,6 @@ import org.apache.pinot.core.segment.processing.genericrow.AdaptiveSizeBasedWrit
 import org.apache.pinot.core.segment.processing.genericrow.FileWriter;
 import org.apache.pinot.core.segment.processing.genericrow.GenericRowFileManager;
 import org.apache.pinot.core.segment.processing.partitioner.Partitioner;
-import org.apache.pinot.core.segment.processing.partitioner.PartitionerConfig;
 import org.apache.pinot.core.segment.processing.partitioner.PartitionerFactory;
 import org.apache.pinot.core.segment.processing.timehandler.TimeHandler;
 import org.apache.pinot.core.segment.processing.timehandler.TimeHandlerFactory;
@@ -114,14 +113,9 @@ public class SegmentMapper {
         schema.isEnableColumnBasedNullHandling() || tableConfig.getIndexingConfig().isNullHandlingEnabled();
     _transformPipeline = transformPipeline;
     _timeHandler = TimeHandlerFactory.getTimeHandler(processorConfig);
-    List<PartitionerConfig> partitionerConfigs = processorConfig.getPartitionerConfigs();
-    int numPartitioners = partitionerConfigs.size();
-    _partitioners = new Partitioner[numPartitioners];
-    for (int i = 0; i < numPartitioners; i++) {
-      _partitioners[i] = PartitionerFactory.getPartitioner(partitionerConfigs.get(i));
-    }
+    _partitioners = PartitionerFactory.getPartitioners(processorConfig.getPartitionerConfigs());
     // Time partition + partition from partitioners
-    _partitionsBuffer = new String[numPartitioners + 1];
+    _partitionsBuffer = new String[_partitioners.length + 1];
 
     LOGGER.info("Initialized mapper with {} record readers, output dir: {}, timeHandler: {}, partitioners: {}",
         _recordReaderFileConfigs.size(), _mapperOutputDir, _timeHandler.getClass(),
