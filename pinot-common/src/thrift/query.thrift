@@ -32,6 +32,7 @@ struct PinotQuery {
   11: optional map<string, string> queryOptions;
   12: optional bool explain;
   13: optional map<Expression, Expression> expressionOverrideHints;
+  14: optional list<ArrayJoinSpec> arrayJoinList;
 }
 
 struct DataSource {
@@ -95,4 +96,19 @@ struct Identifier {
 struct Function {
   1: required string operator;
   2: optional list<Expression> operands;
+}
+
+struct ArrayJoinSpec {
+  1: required ArrayJoinType type;
+  2: required list<ArrayJoinOperand> operands;
+}
+
+struct ArrayJoinOperand {
+  1: required Expression expression;
+  2: optional string alias;
+}
+
+enum ArrayJoinType {
+  INNER,
+  LEFT
 }
