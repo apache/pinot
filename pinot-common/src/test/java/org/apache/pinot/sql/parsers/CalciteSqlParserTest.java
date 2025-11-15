@@ -19,6 +19,8 @@
 package org.apache.pinot.sql.parsers;
 
 import java.util.List;
+import org.apache.pinot.common.request.ArrayJoinSpec;
+import org.apache.pinot.common.request.ArrayJoinType;
 import org.apache.pinot.common.request.Expression;
 import org.apache.pinot.common.request.Function;
 import org.apache.pinot.common.request.PinotQuery;
@@ -83,6 +85,45 @@ public class CalciteSqlParserTest {
   public void testNonReservedKeywords(String keyword) {
     CalciteSqlParser.compileToPinotQuery(createQuery(keyword, "testTable"));
     CalciteSqlParser.compileToPinotQuery(createQuery(keyword.toUpperCase(), "testTable"));
+  }
+
+  @Test
+  public void testArrayJoinParsing() {
+    PinotQuery pinotQuery = CalciteSqlParser.compileToPinotQuery(
+        "SELECT city FROM (SELECT ['Istanbul'] AS cities) input ARRAY JOIN cities AS city");
+    assertEquals(pinotQuery.getArrayJoinListSize(), 1);
+    ArrayJoinSpec innerJoin = pinotQuery.getArrayJoinList().get(0);
+    assertEquals(innerJoin.getType(), ArrayJoinType.INNER);
+    assertEquals(innerJoin.getOperandsSize(), 1);
+    assertEquals(innerJoin.getOperands().get(0).getAlias(), "city");
+    assertEquals(innerJoin.getOperands().get(0).getExpression().getIdentifier().getName(), "cities");
+
+    PinotQuery leftPinotQuery = CalciteSqlParser.compileToPinotQuery(
+        "SELECT browser FROM (SELECT ['Chrome'] AS browsers) input LEFT ARRAY JOIN browsers AS browser");
+    assertEquals(leftPinotQuery.getArrayJoinListSize(), 1);
+    ArrayJoinSpec leftJoin = leftPinotQuery.getArrayJoinList().get(0);
+    assertEquals(leftJoin.getType(), ArrayJoinType.LEFT);
+    assertEquals(leftJoin.getOperandsSize(), 1);
+    assertEquals(leftJoin.getOperands().get(0).getAlias(), "browser");
+  }
+
+  @Test
+  public void testArrayJoinParsingOnBaseTable() {
+    PinotQuery pinotQuery =
+        CalciteSqlParser.compileToPinotQuery(
+            "SELECT RandomAirports FROM airlineStats ARRAY JOIN RandomAirports AS airport");
+    assertEquals(pinotQuery.getDataSource().getTableName(), "airlineStats");
+    assertEquals(pinotQuery.getArrayJoinListSize(), 1);
+    ArrayJoinSpec arrayJoinSpec = pinotQuery.getArrayJoinList().get(0);
+    assertEquals(arrayJoinSpec.getType(), ArrayJoinType.INNER);
+    assertEquals(arrayJoinSpec.getOperandsSize(), 1);
+    assertEquals(arrayJoinSpec.getOperands().get(0).getExpression().getIdentifier().getName(), "RandomAirports");
+    assertEquals(arrayJoinSpec.getOperands().get(0).getAlias(), "airport");
+  }
+
+  @Test
+  public void testArrayNamedTableParsing() {
+    CalciteSqlParser.compileToPinotQuery("SELECT COUNT(*) FROM ArrayTest");
   }
 
   @DataProvider

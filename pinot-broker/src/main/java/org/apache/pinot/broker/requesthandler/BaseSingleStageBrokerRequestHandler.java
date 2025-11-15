@@ -64,6 +64,8 @@ import org.apache.pinot.common.metrics.BrokerMeter;
 import org.apache.pinot.common.metrics.BrokerMetrics;
 import org.apache.pinot.common.metrics.BrokerQueryPhase;
 import org.apache.pinot.common.metrics.BrokerTimer;
+import org.apache.pinot.common.request.ArrayJoinOperand;
+import org.apache.pinot.common.request.ArrayJoinSpec;
 import org.apache.pinot.common.request.BrokerRequest;
 import org.apache.pinot.common.request.DataSource;
 import org.apache.pinot.common.request.Expression;
@@ -1843,9 +1845,10 @@ public abstract class BaseSingleStageBrokerRequestHandler extends BaseBrokerRequ
   static void updateColumnNames(String rawTableName, PinotQuery pinotQuery, boolean isCaseInsensitive,
       Map<String, String> columnNameMap) {
     if (pinotQuery != null) {
+      Set<String> arrayJoinAliases = extractArrayJoinAliases(pinotQuery, isCaseInsensitive);
       boolean hasStar = false;
       for (Expression expression : pinotQuery.getSelectList()) {
-        fixColumnName(rawTableName, expression, columnNameMap, isCaseInsensitive);
+        fixColumnName(rawTableName, expression, columnNameMap, isCaseInsensitive, arrayJoinAliases);
         //check if the select expression is '*'
         if (!hasStar && expression.equals(STAR)) {
           hasStar = true;
@@ -1857,13 +1860,12 @@ public abstract class BaseSingleStageBrokerRequestHandler extends BaseBrokerRequ
       }
       Expression filterExpression = pinotQuery.getFilterExpression();
       if (filterExpression != null) {
-        // We don't support alias in filter expression, so we don't need to pass aliasMap
-        fixColumnName(rawTableName, filterExpression, columnNameMap, isCaseInsensitive);
+        fixColumnName(rawTableName, filterExpression, columnNameMap, isCaseInsensitive, arrayJoinAliases);
       }
       List<Expression> groupByList = pinotQuery.getGroupByList();
       if (groupByList != null) {
         for (Expression expression : groupByList) {
-          fixColumnName(rawTableName, expression, columnNameMap, isCaseInsensitive);
+          fixColumnName(rawTableName, expression, columnNameMap, isCaseInsensitive, arrayJoinAliases);
         }
       }
       List<Expression> orderByList = pinotQuery.getOrderByList();
@@ -1871,12 +1873,12 @@ public abstract class BaseSingleStageBrokerRequestHandler extends BaseBrokerRequ
         for (Expression expression : orderByList) {
           // NOTE: Order-by is always a Function with the ordering of the Expression
           fixColumnName(rawTableName, expression.getFunctionCall().getOperands().get(0), columnNameMap,
-              isCaseInsensitive);
+              isCaseInsensitive, arrayJoinAliases);
         }
       }
       Expression havingExpression = pinotQuery.getHavingExpression();
       if (havingExpression != null) {
-        fixColumnName(rawTableName, havingExpression, columnNameMap, isCaseInsensitive);
+        fixColumnName(rawTableName, havingExpression, columnNameMap, isCaseInsensitive, arrayJoinAliases);
       }
     }
   }
@@ -1909,27 +1911,51 @@ public abstract class BaseSingleStageBrokerRequestHandler extends BaseBrokerRequ
    * Fixes the column names to the actual column names in the given expression.
    */
   private static void fixColumnName(String rawTableName, Expression expression, Map<String, String> columnNameMap,
-      boolean ignoreCase) {
+      boolean ignoreCase, @Nullable Set<String> arrayJoinAliases) {
     ExpressionType expressionType = expression.getType();
     if (expressionType == ExpressionType.IDENTIFIER) {
       Identifier identifier = expression.getIdentifier();
+      if (arrayJoinAliases != null) {
+        String nameToCheck = ignoreCase ? identifier.getName().toLowerCase() : identifier.getName();
+        if (arrayJoinAliases.contains(nameToCheck)) {
+          return;
+        }
+      }
       identifier.setName(getActualColumnName(rawTableName, identifier.getName(), columnNameMap, ignoreCase));
     } else if (expressionType == ExpressionType.FUNCTION) {
       final Function functionCall = expression.getFunctionCall();
       switch (functionCall.getOperator()) {
         case "as":
-          fixColumnName(rawTableName, functionCall.getOperands().get(0), columnNameMap, ignoreCase);
+          fixColumnName(rawTableName, functionCall.getOperands().get(0), columnNameMap, ignoreCase, arrayJoinAliases);
           break;
         case "lookup":
           // LOOKUP function looks up another table's schema, skip the check for now.
           break;
         default:
           for (Expression operand : functionCall.getOperands()) {
-            fixColumnName(rawTableName, operand, columnNameMap, ignoreCase);
+            fixColumnName(rawTableName, operand, columnNameMap, ignoreCase, arrayJoinAliases);
           }
           break;
       }
     }
+  }
+
+  @Nullable
+  private static Set<String> extractArrayJoinAliases(PinotQuery pinotQuery, boolean ignoreCase) {
+    List<ArrayJoinSpec> arrayJoinSpecs = pinotQuery.getArrayJoinList();
+    if (arrayJoinSpecs == null || arrayJoinSpecs.isEmpty()) {
+      return null;
+    }
+    Set<String> aliases = new HashSet<>();
+    for (ArrayJoinSpec spec : arrayJoinSpecs) {
+      for (ArrayJoinOperand operand : spec.getOperands()) {
+        String alias = operand.getAlias();
+        if (alias != null) {
+          aliases.add(ignoreCase ? alias.toLowerCase() : alias);
+        }
+      }
+    }
+    return aliases.isEmpty() ? null : aliases;
   }
 
   /**
