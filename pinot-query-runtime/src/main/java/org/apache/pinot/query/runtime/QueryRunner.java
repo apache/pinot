@@ -77,6 +77,7 @@ import org.apache.pinot.spi.utils.CommonConstants.Broker.Request.QueryOptionKey;
 import org.apache.pinot.spi.utils.CommonConstants.Helix;
 import org.apache.pinot.spi.utils.CommonConstants.MultiStageQueryRunner;
 import org.apache.pinot.spi.utils.CommonConstants.MultiStageQueryRunner.JoinOverFlowMode;
+import org.apache.pinot.spi.utils.CommonConstants.MultiStageQueryRunner.TimeoutOverflowMode;
 import org.apache.pinot.spi.utils.CommonConstants.MultiStageQueryRunner.WindowOverFlowMode;
 import org.apache.pinot.spi.utils.CommonConstants.Query.Request;
 import org.apache.pinot.spi.utils.CommonConstants.Query.Response;
@@ -96,6 +97,7 @@ import org.slf4j.LoggerFactory;
 /// [QueryRunner] accepts a [StagePlan] and runs it.
 public class QueryRunner {
   private static final Logger LOGGER = LoggerFactory.getLogger(QueryRunner.class);
+  private static final double DEFAULT_LEAF_TIMEOUT_RATIO = 0.8;
 
   private ExecutorService _executorService;
   private OpChainSchedulerService _opChainScheduler;
@@ -127,6 +129,8 @@ public class QueryRunner {
   private Integer _maxRowsInWindow;
   @Nullable
   private WindowOverFlowMode _windowOverflowMode;
+  @Nullable
+  private TimeoutOverflowMode _timeoutOverflowMode;
   @Nullable
   private PhysicalTimeSeriesServerPlanVisitor _timeSeriesPhysicalPlanVisitor;
   /// Cluster-level decision on whether to send stats over the mailbox path, driven by the `SendStatsPredicate`
@@ -187,6 +191,10 @@ public class QueryRunner {
 
     String windowOverflowModeStr = serverConf.getProperty(MultiStageQueryRunner.KEY_OF_WINDOW_OVERFLOW_MODE);
     _windowOverflowMode = windowOverflowModeStr != null ? WindowOverFlowMode.valueOf(windowOverflowModeStr) : null;
+
+    String timeoutOverflowModeStr = serverConf.getProperty(MultiStageQueryRunner.KEY_OF_TIMEOUT_OVERFLOW_MODE);
+    _timeoutOverflowMode =
+        timeoutOverflowModeStr != null ? TimeoutOverflowMode.valueOf(timeoutOverflowModeStr) : null;
 
     ExecutorService baseExecutorService =
         ExecutorServiceUtils.create(serverConf, Server.MULTISTAGE_EXECUTOR_CONFIG_PREFIX, "query-runner-on-" + port,
@@ -296,6 +304,7 @@ public class QueryRunner {
       Map<String, String> requestMetadata) {
     StageMetadata stageMetadata = stagePlan.getStageMetadata();
     Map<String, String> opChainMetadata = consolidateMetadata(stageMetadata.getCustomProperties(), requestMetadata);
+    applyLeafDeadlineOverrides(workerMetadata, opChainMetadata);
 
     // The cluster-level _sendStats decision can be overridden per-request by the SubmitWithStream RPC handler via
     // MultiStageQueryRunner.KEY_OF_STATS_REPORTING_MODE; in stream mode stats travel out-of-band
@@ -546,6 +555,14 @@ public class QueryRunner {
       opChainMetadata.put(QueryOptionKey.WINDOW_OVERFLOW_MODE, windowOverflowMode.name());
     }
 
+    TimeoutOverflowMode timeoutOverflowMode = QueryOptionsUtils.getTimeoutOverflowMode(opChainMetadata);
+    if (timeoutOverflowMode == null) {
+      timeoutOverflowMode = _timeoutOverflowMode;
+    }
+    if (timeoutOverflowMode != null) {
+      opChainMetadata.put(QueryOptionKey.TIMEOUT_OVERFLOW_MODE, timeoutOverflowMode.name());
+    }
+
     return opChainMetadata;
   }
 
@@ -590,6 +607,53 @@ public class QueryRunner {
     _opChainScheduler.unregisterCompletionListener(requestId);
   }
 
+  private void applyLeafDeadlineOverrides(WorkerMetadata workerMetadata, Map<String, String> opChainMetadata) {
+    if (!workerMetadata.isLeafStageWorker()) {
+      return;
+    }
+    Long leafTimeoutMs = QueryOptionsUtils.getLeafTimeoutMs(opChainMetadata);
+    Long leafExtraPassiveTimeoutMs = QueryOptionsUtils.getLeafExtraPassiveTimeoutMs(opChainMetadata);
+    TimeoutOverflowMode timeoutOverflowMode = _timeoutOverflowMode;
+    String timeoutOverflowModeStr = opChainMetadata.get(QueryOptionKey.TIMEOUT_OVERFLOW_MODE);
+    if (timeoutOverflowModeStr != null) {
+      try {
+        timeoutOverflowMode = TimeoutOverflowMode.valueOf(timeoutOverflowModeStr);
+      } catch (IllegalArgumentException e) {
+        LOGGER.warn("Invalid timeout overflow mode: {}", timeoutOverflowModeStr, e);
+      }
+    }
+    QueryThreadContext threadContext = QueryThreadContext.getIfAvailable();
+    if (threadContext == null) {
+      return;
+    }
+    QueryExecutionContext executionContext = threadContext.getExecutionContext();
+    long startTimeMs = executionContext.getStartTimeMs();
+    if (leafTimeoutMs == null && timeoutOverflowMode == TimeoutOverflowMode.BREAK) {
+      long globalActiveWindowMs = Math.max(1L, executionContext.getActiveDeadlineMs() - startTimeMs);
+      leafTimeoutMs = Math.max(1L, (long) Math.floor(globalActiveWindowMs * DEFAULT_LEAF_TIMEOUT_RATIO));
+    }
+    if (leafExtraPassiveTimeoutMs == null && timeoutOverflowMode == TimeoutOverflowMode.BREAK) {
+      long globalPassiveWindowMs =
+          Math.max(0L, executionContext.getPassiveDeadlineMs() - executionContext.getActiveDeadlineMs());
+      leafExtraPassiveTimeoutMs =
+          Math.max(0L, (long) Math.floor(globalPassiveWindowMs * DEFAULT_LEAF_TIMEOUT_RATIO));
+    }
+    if (leafTimeoutMs == null && leafExtraPassiveTimeoutMs == null) {
+      return;
+    }
+    long activeDeadlineMs = executionContext.getActiveDeadlineMs();
+    long passiveDeadlineMs = executionContext.getPassiveDeadlineMs();
+    if (leafTimeoutMs != null) {
+      activeDeadlineMs = Math.min(activeDeadlineMs, startTimeMs + leafTimeoutMs);
+    }
+    if (leafExtraPassiveTimeoutMs != null) {
+      passiveDeadlineMs = Math.min(passiveDeadlineMs, activeDeadlineMs + leafExtraPassiveTimeoutMs);
+    }
+    passiveDeadlineMs = Math.max(passiveDeadlineMs, activeDeadlineMs);
+    opChainMetadata.put(LeafOperator.LEAF_ACTIVE_DEADLINE_METADATA_KEY, Long.toString(activeDeadlineMs));
+    opChainMetadata.put(LeafOperator.LEAF_PASSIVE_DEADLINE_METADATA_KEY, Long.toString(passiveDeadlineMs));
+  }
+
   public StagePlan explainQuery(WorkerMetadata workerMetadata, StagePlan stagePlan,
       Map<String, String> requestMetadata) {
     if (!workerMetadata.isLeafStageWorker()) {
@@ -599,6 +663,7 @@ public class QueryRunner {
 
     StageMetadata stageMetadata = stagePlan.getStageMetadata();
     Map<String, String> opChainMetadata = consolidateMetadata(stageMetadata.getCustomProperties(), requestMetadata);
+    applyLeafDeadlineOverrides(workerMetadata, opChainMetadata);
 
     if (PipelineBreakerExecutor.hasPipelineBreakers(stagePlan)) {
       //TODO: See https://github.com/apache/pinot/pull/13733#discussion_r1752031714

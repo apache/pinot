@@ -39,9 +39,11 @@ import org.apache.pinot.query.runtime.operator.operands.TransformOperand;
 import org.apache.pinot.query.runtime.operator.operands.TransformOperandFactory;
 import org.apache.pinot.query.runtime.plan.OpChainExecutionContext;
 import org.apache.pinot.spi.exception.QueryErrorCode;
+import org.apache.pinot.spi.exception.QueryException;
 import org.apache.pinot.spi.utils.BooleanUtils;
 import org.apache.pinot.spi.utils.CommonConstants.Broker.Request.QueryOptionKey;
 import org.apache.pinot.spi.utils.CommonConstants.MultiStageQueryRunner.JoinOverFlowMode;
+import org.apache.pinot.spi.utils.CommonConstants.MultiStageQueryRunner.TimeoutOverflowMode;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -79,10 +81,12 @@ public abstract class BaseJoinOperator extends MultiStageOperator {
   ///   THROW(default): Break right table build process, and throw exception, no JOIN with left table performed.
   ///   BREAK: Break right table build process, continue to perform JOIN operation, results might be partial.
   protected final JoinOverFlowMode _joinOverflowMode;
+  protected final TimeoutOverflowMode _timeoutOverflowMode;
 
   protected boolean _isRightTableBuilt;
   @Nullable
   protected MseBlock.Eos _eos;
+  private boolean _timeoutOverflowTriggered;
 
   public BaseJoinOperator(OpChainExecutionContext context, MultiStageOperator leftInput, DataSchema leftSchema,
       MultiStageOperator rightInput, JoinNode node) {
@@ -102,6 +106,8 @@ public abstract class BaseJoinOperator extends MultiStageOperator {
     PlanNode.NodeHint nodeHint = node.getNodeHint();
     _maxRowsInJoin = getMaxRowsInJoin(metadata, nodeHint);
     _joinOverflowMode = getJoinOverflowMode(metadata, nodeHint);
+    TimeoutOverflowMode timeoutOverflowMode = QueryOptionsUtils.getTimeoutOverflowMode(metadata);
+    _timeoutOverflowMode = timeoutOverflowMode != null ? timeoutOverflowMode : TimeoutOverflowMode.THROW;
   }
 
   /// Constructor that takes the schema for NonEquiEvaluator as an argument
@@ -123,6 +129,8 @@ public abstract class BaseJoinOperator extends MultiStageOperator {
     PlanNode.NodeHint nodeHint = node.getNodeHint();
     _maxRowsInJoin = getMaxRowsInJoin(metadata, nodeHint);
     _joinOverflowMode = getJoinOverflowMode(metadata, nodeHint);
+    TimeoutOverflowMode timeoutOverflowMode = QueryOptionsUtils.getTimeoutOverflowMode(metadata);
+    _timeoutOverflowMode = timeoutOverflowMode != null ? timeoutOverflowMode : TimeoutOverflowMode.THROW;
   }
 
   protected static int getMaxRowsInJoin(Map<String, String> opChainMetadata, @Nullable PlanNode.NodeHint nodeHint) {
@@ -152,6 +160,14 @@ public abstract class BaseJoinOperator extends MultiStageOperator {
     }
     JoinOverFlowMode joinOverflowMode = QueryOptionsUtils.getJoinOverflowMode(contextMetadata);
     return joinOverflowMode != null ? joinOverflowMode : DEFAULT_JOIN_OVERFLOW_MODE;
+  }
+
+  @Override
+  protected long getDeadlineMs() {
+    if (_timeoutOverflowTriggered && _timeoutOverflowMode == TimeoutOverflowMode.BREAK) {
+      return Long.MAX_VALUE;
+    }
+    return super.getDeadlineMs();
   }
 
   @Override
@@ -282,6 +298,14 @@ public abstract class BaseJoinOperator extends MultiStageOperator {
 
   protected abstract List<Object[]> buildNonMatchRightRows();
 
+  @Override
+  protected MseBlock handleException(Exception e) {
+    if (maybeHandleTimeoutOverflow(e)) {
+      return SuccessMseBlock.INSTANCE;
+    }
+    return super.handleException(e);
+  }
+
   // TODO: Optimize this to avoid unnecessary object copy.
   protected Object[] joinRow(@Nullable Object[] leftRow, @Nullable Object[] rightRow) {
     Object[] resultRow = new Object[_resultColumnSize];
@@ -326,6 +350,29 @@ public abstract class BaseJoinOperator extends MultiStageOperator {
       leftBlock = _leftInput.nextBlock();
     }
     _eos = (MseBlock.Eos) leftBlock;
+  }
+
+  private boolean maybeHandleTimeoutOverflow(Exception e) {
+    if (_timeoutOverflowMode != TimeoutOverflowMode.BREAK) {
+      return false;
+    }
+    if (e instanceof QueryException) {
+      QueryException queryException = (QueryException) e;
+      if (queryException.getErrorCode() == QueryErrorCode.EXECUTION_TIMEOUT) {
+        if (!_timeoutOverflowTriggered) {
+          logger().warn("Join operator {} returning partial results after timeout: {}", _operatorId,
+              queryException.getMessage());
+        }
+        _timeoutOverflowTriggered = true;
+        _statMap.merge(StatKey.TIMEOUT_OVERFLOW_REACHED, true);
+        _leftInput.earlyTerminate();
+        _rightInput.earlyTerminate();
+        _eos = SuccessMseBlock.INSTANCE;
+        onEosProduced();
+        return true;
+      }
+    }
+    return false;
   }
 
   @Override
@@ -398,7 +445,8 @@ public abstract class BaseJoinOperator extends MultiStageOperator {
     /// Allocated memory in bytes for this operator or its children in the same stage.
     ALLOCATED_MEMORY_BYTES(StatMap.Type.LONG),
     /// Time spent on GC while this operator or its children in the same stage were running.
-    GC_TIME_MS(StatMap.Type.LONG);
+    GC_TIME_MS(StatMap.Type.LONG),
+    TIMEOUT_OVERFLOW_REACHED(StatMap.Type.BOOLEAN);
 
     private final StatMap.Type _type;
 

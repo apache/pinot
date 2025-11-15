@@ -46,6 +46,7 @@ import org.apache.pinot.spi.data.readers.RecordReader;
 import org.apache.pinot.spi.utils.ReadMode;
 import org.apache.pinot.spi.utils.builder.TableConfigBuilder;
 import org.apache.pinot.spi.utils.builder.TableNameBuilder;
+import org.mockito.stubbing.Answer;
 
 import static org.mockito.ArgumentMatchers.anyList;
 import static org.mockito.ArgumentMatchers.anyMap;
@@ -125,7 +126,10 @@ public class MockInstanceDataManagerFactory {
     InstanceDataManager instanceDataManager = mock(InstanceDataManager.class);
     Map<String, TableDataManager> tableDataManagers = new HashMap<>();
     for (Map.Entry<String, List<ImmutableSegment>> e : _tableSegmentMap.entrySet()) {
-      TableDataManager tableDataManager = mockTableDataManager(e.getKey(), e.getValue());
+      String tableNameWithType = e.getKey();
+      TableConfig tableConfig = createTableConfig(tableNameWithType);
+      Schema schema = _schemaMap.get(TableNameBuilder.extractRawTableName(tableNameWithType));
+      TableDataManager tableDataManager = createTableDataManager(tableNameWithType, e.getValue(), tableConfig, schema);
       tableDataManagers.put(e.getKey(), tableDataManager);
     }
     for (Map.Entry<String, TableDataManager> e : tableDataManagers.entrySet()) {
@@ -146,25 +150,30 @@ public class MockInstanceDataManagerFactory {
     return _tableSegmentNameMap;
   }
 
-  private TableDataManager mockTableDataManager(String tableNameWithType, List<ImmutableSegment> segmentList) {
+  protected TableDataManager createTableDataManager(String tableNameWithType, List<ImmutableSegment> segmentList,
+      TableConfig tableConfig, Schema schema) {
     TableDataManager tableDataManager = mock(TableDataManager.class);
     when(tableDataManager.getTableName()).thenReturn(tableNameWithType);
-    TableConfig tableConfig = createTableConfig(tableNameWithType);
-    Schema schema = _schemaMap.get(TableNameBuilder.extractRawTableName(tableNameWithType));
     when(tableDataManager.getCachedTableConfigAndSchema()).thenReturn(Pair.of(tableConfig, schema));
 
     Map<String, SegmentDataManager> segmentDataManagerMap =
         segmentList.stream().collect(Collectors.toMap(IndexSegment::getSegmentName, ImmutableSegmentDataManager::new));
     // TODO: support optional segments for multi-stage engine, but for now, it's always null.
-    when(tableDataManager.acquireSegments(anyList(), eq(null), anyList())).thenAnswer(invocation -> {
+    Answer<List<SegmentDataManager>> acquireSegmentsAnswer = invocation -> {
       List<String> segments = invocation.getArgument(0);
       return segments.stream().map(segmentDataManagerMap::get).collect(Collectors.toList());
-    });
+    };
+    when(tableDataManager.acquireSegments(anyList(), eq(null), anyList())).thenAnswer(acquireSegmentsAnswer);
     when(tableDataManager.getSegmentContexts(anyList(), anyMap())).thenAnswer(invocation -> {
       List<IndexSegment> segments = invocation.getArgument(0);
       return segments.stream().map(SegmentContext::new).collect(Collectors.toList());
     });
+    customizeTableDataManager(tableDataManager, tableNameWithType, acquireSegmentsAnswer);
     return tableDataManager;
+  }
+
+  protected void customizeTableDataManager(TableDataManager tableDataManager, String tableNameWithType,
+      Answer<List<SegmentDataManager>> acquireSegmentsAnswer) {
   }
 
   private ImmutableSegment buildSegment(String tableNameWithType, File indexDir, List<GenericRow> rows) {
