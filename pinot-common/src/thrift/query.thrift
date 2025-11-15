@@ -38,6 +38,7 @@ struct PinotQuery {
   // union of all grouping columns) is capped at 31 entries so a mask always fits in an i32 (enforced at compile
   // time by CalciteSqlParser.MAX_GROUPING_SETS_COLUMNS); plain GROUP BY queries have no such limit.
   14: optional list<i32> groupingSetMasks;
+  15: optional list<ArrayJoinSpec> arrayJoinList;
 }
 
 struct DataSource {
@@ -101,4 +102,19 @@ struct Identifier {
 struct Function {
   1: required string operator;
   2: optional list<Expression> operands;
+}
+
+struct ArrayJoinSpec {
+  1: required ArrayJoinType type;
+  2: required list<ArrayJoinOperand> operands;
+}
+
+struct ArrayJoinOperand {
+  1: required Expression expression;
+  2: optional string alias;
+}
+
+enum ArrayJoinType {
+  INNER,
+  LEFT
 }
