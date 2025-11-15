@@ -34,6 +34,7 @@ import org.apache.pinot.spi.config.table.FieldConfig;
 import org.apache.pinot.spi.utils.CommonConstants;
 import org.apache.pinot.spi.utils.CommonConstants.Broker.Request.QueryOptionKey;
 import org.apache.pinot.spi.utils.CommonConstants.MultiStageQueryRunner.JoinOverFlowMode;
+import org.apache.pinot.spi.utils.CommonConstants.MultiStageQueryRunner.TimeoutOverflowMode;
 import org.apache.pinot.spi.utils.CommonConstants.MultiStageQueryRunner.WindowOverFlowMode;
 
 
@@ -430,6 +431,24 @@ public class QueryOptionsUtils {
   public static WindowOverFlowMode getWindowOverflowMode(Map<String, String> queryOptions) {
     String windowOverflowModeStr = queryOptions.get(QueryOptionKey.WINDOW_OVERFLOW_MODE);
     return windowOverflowModeStr != null ? WindowOverFlowMode.valueOf(windowOverflowModeStr) : null;
+  }
+
+  @Nullable
+  public static TimeoutOverflowMode getTimeoutOverflowMode(Map<String, String> queryOptions) {
+    String timeoutOverflowModeStr = queryOptions.get(QueryOptionKey.TIMEOUT_OVERFLOW_MODE);
+    return timeoutOverflowModeStr != null ? TimeoutOverflowMode.valueOf(timeoutOverflowModeStr) : null;
+  }
+
+  @Nullable
+  public static Long getLeafTimeoutMs(Map<String, String> queryOptions) {
+    String leafTimeoutMs = queryOptions.get(QueryOptionKey.LEAF_TIMEOUT_MS);
+    return checkedParseLongPositive(QueryOptionKey.LEAF_TIMEOUT_MS, leafTimeoutMs);
+  }
+
+  @Nullable
+  public static Long getLeafExtraPassiveTimeoutMs(Map<String, String> queryOptions) {
+    String leafExtraPassiveTimeoutMs = queryOptions.get(QueryOptionKey.LEAF_EXTRA_PASSIVE_TIMEOUT_MS);
+    return checkedParseLong(QueryOptionKey.LEAF_EXTRA_PASSIVE_TIMEOUT_MS, leafExtraPassiveTimeoutMs, 0);
   }
 
   public static boolean isSkipUnavailableServers(Map<String, String> queryOptions) {
