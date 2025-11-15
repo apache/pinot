@@ -1957,13 +1957,14 @@ public class PinotLLCRealtimeSegmentManager {
    * Since uploading to deep store involves expensive compression step (first tar up the segment and then upload),
    * we don't want to retry the uploading. Segment without deep store copy can still be downloaded from peer servers.
    *
+   * @param forceUpload if true, bypasses checks and forces upload even if deep store copy exists
+   *
    * @see <a href="
    * https://cwiki.apache.org/confluence/display/PINOT/By-passing+deep-store+requirement+for+Realtime+segment+completion
    * "> By-passing deep-store requirement for Realtime segment completion:Failure cases and handling</a>
-   *
-   * TODO: Add an on-demand way to upload LLC segment to deep store for a specific table.
    */
-  public void uploadToDeepStoreIfMissing(TableConfig tableConfig, List<SegmentZKMetadata> segmentsZKMetadata) {
+  public void uploadToDeepStoreIfMissing(TableConfig tableConfig, List<SegmentZKMetadata> segmentsZKMetadata,
+      boolean forceUpload) {
     Preconditions.checkState(!_isStopping, "Segment manager is stopping");
 
     String realtimeTableName = tableConfig.getTableName();
@@ -1989,15 +1990,21 @@ public class PinotLLCRealtimeSegmentManager {
     //  2. Update the LLC segment ZK metadata by adding deep store download url.
     for (SegmentZKMetadata segmentZKMetadata : segmentsZKMetadata) {
       String segmentName = segmentZKMetadata.getSegmentName();
-      if (shouldSkipSegmentForDeepStoreUpload(tableConfig, segmentZKMetadata, retentionStrategy)) {
-        continue;
-      }
-      // Skip the fix if an upload is already queued for this segment
-      if (!_deepStoreUploadExecutorPendingSegments.add(segmentName)) {
-        int queueSize = _deepStoreUploadExecutorPendingSegments.size();
-        _controllerMetrics.setOrUpdateGauge(
-            ControllerGauge.LLC_SEGMENTS_DEEP_STORE_UPLOAD_RETRY_QUEUE_SIZE.getGaugeName(), queueSize);
-        continue;
+      if (!forceUpload) {
+        // Skip checks only if forceUpload is false
+        if (shouldSkipSegmentForDeepStoreUpload(tableConfig, segmentZKMetadata, retentionStrategy)) {
+          continue;
+        }
+        // Skip the fix if an upload is already queued for this segment
+        if (!_deepStoreUploadExecutorPendingSegments.add(segmentName)) {
+          int queueSize = _deepStoreUploadExecutorPendingSegments.size();
+          _controllerMetrics.setOrUpdateGauge(
+              ControllerGauge.LLC_SEGMENTS_DEEP_STORE_UPLOAD_RETRY_QUEUE_SIZE.getGaugeName(), queueSize);
+          continue;
+        }
+      } else {
+        // For force upload, still add to pending set to track
+        _deepStoreUploadExecutorPendingSegments.add(segmentName);
       }
 
       // create Runnable to perform the upload
@@ -2047,6 +2054,13 @@ public class PinotLLCRealtimeSegmentManager {
       // Submit the runnable to execute asynchronously
       _deepStoreUploadExecutor.submit(uploadRunnable);
     }
+  }
+
+  /**
+   * Overloaded method for backward compatibility. Defaults to forceUpload = false.
+   */
+  public void uploadToDeepStoreIfMissing(TableConfig tableConfig, List<SegmentZKMetadata> segmentsZKMetadata) {
+    uploadToDeepStoreIfMissing(tableConfig, segmentsZKMetadata, false);
   }
 
   private void uploadToDeepStoreWithFallback(URI uri, String segmentName, String rawTableName,
@@ -2402,9 +2416,9 @@ public class PinotLLCRealtimeSegmentManager {
       Set<String> invalidSegments = partitionedByIsConsuming.get(false);
       if (!invalidSegments.isEmpty()) {
         LOGGER.warn("Cannot commit segments that are not in CONSUMING state. All consuming segments: {}, "
-            + "provided segments to commit: {}. Ignoring all non-consuming segments, sampling 10: {}",
+                + "provided segments to commit: {}. Ignoring all non-consuming segments, sampling 10: {}",
             allConsumingSegments,
-                segmentsToCommitStr, invalidSegments.stream().limit(10).collect(Collectors.toSet()));
+            segmentsToCommitStr, invalidSegments.stream().limit(10).collect(Collectors.toSet()));
       }
       return validSegmentsToCommit;
     }
