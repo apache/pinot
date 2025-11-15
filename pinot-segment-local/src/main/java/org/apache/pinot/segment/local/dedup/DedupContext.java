@@ -39,6 +39,7 @@ public class DedupContext {
   private final double _metadataTTL;
   @Nullable
   private final String _dedupTimeColumn;
+  private final double _realtimeTTLCleanupIntervalSeconds;
   private final boolean _enablePreload;
   private final boolean _ignoreNonDefaultTiers;
   @Nullable
@@ -54,15 +55,17 @@ public class DedupContext {
   private final File _tableIndexDir;
 
   private DedupContext(TableConfig tableConfig, Schema schema, List<String> primaryKeyColumns,
-      HashFunction hashFunction, double metadataTTL, @Nullable String dedupTimeColumn, boolean enablePreload,
-      boolean ignoreNonDefaultTiers, @Nullable Map<String, String> metadataManagerConfigs,
-      boolean allowDedupConsumptionDuringCommit, @Nullable TableDataManager tableDataManager, File tableIndexDir) {
+      HashFunction hashFunction, double metadataTTL, @Nullable String dedupTimeColumn,
+      double realtimeTTLCleanupIntervalSeconds, boolean enablePreload, boolean ignoreNonDefaultTiers,
+      @Nullable Map<String, String> metadataManagerConfigs, boolean allowDedupConsumptionDuringCommit,
+      @Nullable TableDataManager tableDataManager, File tableIndexDir) {
     _tableConfig = tableConfig;
     _schema = schema;
     _primaryKeyColumns = primaryKeyColumns;
     _hashFunction = hashFunction;
     _metadataTTL = metadataTTL;
     _dedupTimeColumn = dedupTimeColumn;
+    _realtimeTTLCleanupIntervalSeconds = realtimeTTLCleanupIntervalSeconds;
     _enablePreload = enablePreload;
     _ignoreNonDefaultTiers = ignoreNonDefaultTiers;
     _metadataManagerConfigs = metadataManagerConfigs;
@@ -94,6 +97,10 @@ public class DedupContext {
   @Nullable
   public String getDedupTimeColumn() {
     return _dedupTimeColumn;
+  }
+
+  public double getRealtimeTTLCleanupIntervalSeconds() {
+    return _realtimeTTLCleanupIntervalSeconds;
   }
 
   public boolean isPreloadEnabled() {
@@ -130,6 +137,7 @@ public class DedupContext {
         .append("hashFunction", _hashFunction)
         .append("metadataTTL", _metadataTTL)
         .append("dedupTimeColumn", _dedupTimeColumn)
+        .append("realtimeTTLCleanupIntervalSeconds", _realtimeTTLCleanupIntervalSeconds)
         .append("enablePreload", _enablePreload)
         .append("ignoreNonDefaultTiers", _ignoreNonDefaultTiers)
         .append("metadataManagerConfigs", _metadataManagerConfigs)
@@ -145,6 +153,7 @@ public class DedupContext {
     private HashFunction _hashFunction = HashFunction.NONE;
     private double _metadataTTL;
     private String _dedupTimeColumn;
+    private double _realtimeTTLCleanupIntervalSeconds;
     private boolean _enablePreload;
     private boolean _ignoreNonDefaultTiers;
     private Map<String, String> _metadataManagerConfigs;
@@ -180,6 +189,11 @@ public class DedupContext {
 
     public Builder setDedupTimeColumn(String dedupTimeColumn) {
       _dedupTimeColumn = dedupTimeColumn;
+      return this;
+    }
+
+    public Builder setRealtimeTTLCleanupIntervalSeconds(double realtimeTTLCleanupIntervalSeconds) {
+      _realtimeTTLCleanupIntervalSeconds = realtimeTTLCleanupIntervalSeconds;
       return this;
     }
 
@@ -224,8 +238,8 @@ public class DedupContext {
         _tableIndexDir = _tableDataManager.getTableDataDir();
       }
       return new DedupContext(_tableConfig, _schema, _primaryKeyColumns, _hashFunction, _metadataTTL, _dedupTimeColumn,
-          _enablePreload, _ignoreNonDefaultTiers, _metadataManagerConfigs, _allowDedupConsumptionDuringCommit,
-          _tableDataManager, _tableIndexDir);
+          _realtimeTTLCleanupIntervalSeconds, _enablePreload, _ignoreNonDefaultTiers, _metadataManagerConfigs,
+          _allowDedupConsumptionDuringCommit, _tableDataManager, _tableIndexDir);
     }
   }
 }
