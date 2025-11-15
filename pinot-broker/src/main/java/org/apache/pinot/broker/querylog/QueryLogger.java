@@ -28,6 +28,7 @@ import org.apache.pinot.broker.requesthandler.BaseSingleStageBrokerRequestHandle
 import org.apache.pinot.common.response.BrokerResponse;
 import org.apache.pinot.spi.auth.broker.RequesterIdentity;
 import org.apache.pinot.spi.env.PinotConfiguration;
+import org.apache.pinot.spi.trace.QueryFingerprint;
 import org.apache.pinot.spi.trace.RequestContext;
 import org.apache.pinot.spi.utils.CommonConstants;
 import org.slf4j.Logger;
@@ -197,6 +198,14 @@ public class QueryLogger {
       @Override
       void doFormat(StringBuilder builder, QueryLogger logger, QueryLogParams params) {
         builder.append(params._table);
+      }
+    },
+    QUERY_HASH("queryHash") {
+      @Override
+      void doFormat(StringBuilder builder, QueryLogger logger, QueryLogParams params) {
+        QueryFingerprint queryFingerprint = params._requestContext.getQueryFingerprint();
+        String queryHash = queryFingerprint != null ? queryFingerprint.getQueryHash() : Broker.DEFAULT_QUERY_HASH;
+        builder.append(queryHash);
       }
     },
     TIME_MS("timeMs") {
