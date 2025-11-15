@@ -266,6 +266,9 @@ public class BrokerMeter implements AbstractMetrics.Meter {
   public static final BrokerMeter GRPC_TRANSPORT_READY = create("GRPC_TRANSPORT_READY", "grpcTransport", true);
   public static final BrokerMeter GRPC_TRANSPORT_TERMINATED = create(
       "GRPC_TRANSPORT_TERMINATED", "grpcTransport", true);
+  // Workload related metrics
+  public static final BrokerMeter WORKLOAD_QUERIES = create("WORKLOAD_QUERIES", "queries", false);
+  public static final BrokerMeter WORKLOAD_BUDGET_EXCEEDED = create("WORKLOAD_QUERY_EXCEPTIONS", "exceptions", true);
 
   public static final BrokerMeter RLS_FILTERS_APPLIED = create("RLS_FILTERS_APPLIED", "queries", false);
 
