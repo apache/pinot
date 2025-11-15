@@ -25,6 +25,8 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.TimeUnit;
 import org.apache.calcite.sql.SqlNumericLiteral;
+import org.apache.pinot.common.request.ArrayJoinSpec;
+import org.apache.pinot.common.request.ArrayJoinType;
 import org.apache.pinot.common.request.DataSource;
 import org.apache.pinot.common.request.Expression;
 import org.apache.pinot.common.request.ExpressionType;
@@ -209,6 +211,27 @@ public class CalciteSqlCompilerTest {
     Assert.assertEquals(
         secondWhen.getFunctionCall().getOperands().get(0).getFunctionCall().getOperands().get(0).getIdentifier()
             .getName(), "Quantity");
+  }
+
+  @Test
+  public void testArrayJoinCompilation() {
+    PinotQuery innerJoinQuery = compileToPinotQuery(
+        "SELECT city FROM (SELECT ['Istanbul'] AS cities) input ARRAY JOIN cities AS city");
+    Assert.assertEquals(innerJoinQuery.getArrayJoinListSize(), 1);
+    ArrayJoinSpec innerJoinSpec = innerJoinQuery.getArrayJoinList().get(0);
+    Assert.assertEquals(innerJoinSpec.getType(), ArrayJoinType.INNER);
+    Assert.assertEquals(innerJoinSpec.getOperandsSize(), 1);
+    Assert.assertEquals(innerJoinSpec.getOperands().get(0).getExpression().getIdentifier().getName(), "cities");
+    Assert.assertEquals(innerJoinSpec.getOperands().get(0).getAlias(), "city");
+
+    PinotQuery leftJoinQuery = compileToPinotQuery(
+        "SELECT browser FROM (SELECT ['Chrome'] AS browsers) input LEFT ARRAY JOIN browsers AS browser");
+    Assert.assertEquals(leftJoinQuery.getArrayJoinListSize(), 1);
+    ArrayJoinSpec leftJoinSpec = leftJoinQuery.getArrayJoinList().get(0);
+    Assert.assertEquals(leftJoinSpec.getType(), ArrayJoinType.LEFT);
+    Assert.assertEquals(leftJoinSpec.getOperandsSize(), 1);
+    Assert.assertEquals(leftJoinSpec.getOperands().get(0).getExpression().getIdentifier().getName(), "browsers");
+    Assert.assertEquals(leftJoinSpec.getOperands().get(0).getAlias(), "browser");
   }
 
   @Test
