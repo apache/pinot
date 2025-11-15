@@ -18,15 +18,27 @@
  */
 package org.apache.pinot.core.data.manager.realtime;
 
+import com.google.common.cache.Cache;
+import com.google.common.cache.CacheBuilder;
+import com.google.common.cache.RemovalNotification;
+import java.time.Duration;
+import java.util.concurrent.Semaphore;
 import org.apache.pinot.common.metadata.segment.SegmentZKMetadata;
+import org.apache.pinot.core.realtime.impl.fakestream.FakeStreamConfigUtils;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.TableType;
 import org.apache.pinot.spi.data.DateTimeFieldSpec;
 import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.Schema;
+import org.apache.pinot.spi.stream.StreamConfig;
+import org.apache.pinot.spi.stream.StreamConsumerFactoryProvider;
+import org.apache.pinot.spi.stream.StreamMetadataProvider;
 import org.apache.pinot.spi.utils.builder.TableConfigBuilder;
+import org.apache.pinot.util.TestUtils;
 import org.joda.time.DateTimeZone;
 import org.joda.time.format.DateTimeFormat;
+import org.mockito.Mockito;
+import org.testng.Assert;
 import org.testng.annotations.Test;
 
 import static org.mockito.Mockito.mock;
@@ -59,5 +71,59 @@ public class RealtimeTableDataManagerTest {
     assertNotNull(timeFieldSpec);
     assertEquals(timeFieldSpec.getDefaultNullValue(),
         Integer.parseInt(DateTimeFormat.forPattern("yyyyMMdd").withZone(DateTimeZone.UTC).print(currentTimeMs)));
+  }
+
+  @Test
+  public void testStreamMetadataProviderCache() {
+    class FakeRealtimeTableDataManager extends RealtimeTableDataManager {
+      private boolean _cacheEntryRemovalNotified;
+      public FakeRealtimeTableDataManager(Semaphore segmentBuildSemaphore) {
+        super(segmentBuildSemaphore);
+        _streamMetadataProviderCache = getStreamMetadataProviderCache();
+      }
+      public void updateCache() {
+        _streamMetadataProviderCache = CacheBuilder.newBuilder()
+            .expireAfterAccess(Duration.ofMillis(1))
+            .removalListener((RemovalNotification<String, StreamMetadataProvider> notification) -> {
+              StreamMetadataProvider provider = notification.getValue();
+              if (provider != null) {
+                try {
+                  provider.close();
+                  _cacheEntryRemovalNotified = true;
+                } catch (Exception e) {
+                  LOGGER.warn("Failed to close StreamMetadataProvider for key {}", notification.getKey(), e);
+                }
+              }
+            })
+            .build();
+      }
+      public Cache<String, StreamMetadataProvider> getCache() {
+        return _streamMetadataProviderCache;
+      }
+    }
+    FakeRealtimeTableDataManager fakeRealtimeTableDataManager = new FakeRealtimeTableDataManager(null);
+
+    RealtimeSegmentDataManager mockRealtimeSegmentDataManager = Mockito.mock(RealtimeSegmentDataManager.class);
+    when(mockRealtimeSegmentDataManager.getTableStreamName()).thenReturn("testTable-testTopic");
+    StreamConfig streamConfig = FakeStreamConfigUtils.getDefaultLowLevelStreamConfigs();
+    when(mockRealtimeSegmentDataManager.getStreamConsumerFactory()).thenReturn(
+        StreamConsumerFactoryProvider.create(streamConfig));
+
+    StreamMetadataProvider streamMetadataProvider =
+        fakeRealtimeTableDataManager.getStreamMetadataProvider(mockRealtimeSegmentDataManager);
+    Assert.assertEquals(fakeRealtimeTableDataManager.getStreamMetadataProvider(mockRealtimeSegmentDataManager),
+        streamMetadataProvider);
+
+    fakeRealtimeTableDataManager.updateCache();
+    Assert.assertEquals(fakeRealtimeTableDataManager.getCache().size(), 0);
+
+    StreamMetadataProvider streamMetadataProvider1 =
+        fakeRealtimeTableDataManager.getStreamMetadataProvider(mockRealtimeSegmentDataManager);
+    Assert.assertNotEquals(streamMetadataProvider, streamMetadataProvider1);
+
+    TestUtils.waitForCondition(
+        aVoid -> !(fakeRealtimeTableDataManager.getStreamMetadataProvider(mockRealtimeSegmentDataManager)
+            .equals(streamMetadataProvider1)), 5, 2000, "streamMetadataProvider returned from cache must be new.");
+    Assert.assertTrue(fakeRealtimeTableDataManager._cacheEntryRemovalNotified);
   }
 }

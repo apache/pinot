@@ -26,7 +26,7 @@ import java.util.Set;
 import org.apache.pinot.core.data.manager.InstanceDataManager;
 import org.apache.pinot.core.data.manager.offline.ImmutableSegmentDataManager;
 import org.apache.pinot.core.data.manager.realtime.RealtimeSegmentDataManager;
-import org.apache.pinot.segment.local.data.manager.TableDataManager;
+import org.apache.pinot.core.data.manager.realtime.RealtimeTableDataManager;
 import org.apache.pinot.spi.stream.LongMsgOffset;
 import org.testng.annotations.Test;
 
@@ -52,8 +52,8 @@ public class OffsetBasedConsumptionStatusCheckerTest {
             ConsumptionStatusCheckerTestUtils.getConsumingSegments(consumingSegments));
 
     // setup TableDataMangers
-    TableDataManager tableDataManagerA = mock(TableDataManager.class);
-    TableDataManager tableDataManagerB = mock(TableDataManager.class);
+    RealtimeTableDataManager tableDataManagerA = mock(RealtimeTableDataManager.class);
+    RealtimeTableDataManager tableDataManagerB = mock(RealtimeTableDataManager.class);
     when(instanceDataManager.getTableDataManager("tableA_REALTIME")).thenReturn(tableDataManagerA);
     when(instanceDataManager.getTableDataManager("tableB_REALTIME")).thenReturn(tableDataManagerB);
 
@@ -106,8 +106,8 @@ public class OffsetBasedConsumptionStatusCheckerTest {
     assertEquals(statusChecker.getNumConsumingSegmentsNotReachedIngestionCriteria(), 3);
 
     // setup TableDataMangers
-    TableDataManager tableDataManagerA = mock(TableDataManager.class);
-    TableDataManager tableDataManagerB = mock(TableDataManager.class);
+    RealtimeTableDataManager tableDataManagerA = mock(RealtimeTableDataManager.class);
+    RealtimeTableDataManager tableDataManagerB = mock(RealtimeTableDataManager.class);
     when(instanceDataManager.getTableDataManager("tableA_REALTIME")).thenReturn(tableDataManagerA);
     when(instanceDataManager.getTableDataManager("tableB_REALTIME")).thenReturn(tableDataManagerB);
 
@@ -166,8 +166,8 @@ public class OffsetBasedConsumptionStatusCheckerTest {
             ConsumptionStatusCheckerTestUtils.getConsumingSegments(consumingSegments));
 
     // setup TableDataMangers
-    TableDataManager tableDataManagerA = mock(TableDataManager.class);
-    TableDataManager tableDataManagerB = mock(TableDataManager.class);
+    RealtimeTableDataManager tableDataManagerA = mock(RealtimeTableDataManager.class);
+    RealtimeTableDataManager tableDataManagerB = mock(RealtimeTableDataManager.class);
     when(instanceDataManager.getTableDataManager("tableA_REALTIME")).thenReturn(tableDataManagerA);
     when(instanceDataManager.getTableDataManager("tableB_REALTIME")).thenReturn(tableDataManagerB);
 
@@ -221,8 +221,8 @@ public class OffsetBasedConsumptionStatusCheckerTest {
             ConsumptionStatusCheckerTestUtils.getConsumingSegments(consumingSegments));
 
     // setup TableDataMangers
-    TableDataManager tableDataManagerA = mock(TableDataManager.class);
-    TableDataManager tableDataManagerB = mock(TableDataManager.class);
+    RealtimeTableDataManager tableDataManagerA = mock(RealtimeTableDataManager.class);
+    RealtimeTableDataManager tableDataManagerB = mock(RealtimeTableDataManager.class);
     when(instanceDataManager.getTableDataManager("tableA_REALTIME")).thenReturn(tableDataManagerA);
     when(instanceDataManager.getTableDataManager("tableB_REALTIME")).thenReturn(tableDataManagerB);
 

@@ -55,6 +55,9 @@ public interface StreamMetadataProvider extends Closeable {
 
   /**
    * Fetches the latest offset for a set of given partition Ids.
+   * Implementations may not be thread-safe. Callers that need concurrent access
+   * should use a thread-safe wrapper.
+   *
    * @param partitionIds partition Ids of the stream
    * @param timeoutMillis fetch timeout
    * @return latest {@link StreamPartitionMsgOffset} for each partition Id.

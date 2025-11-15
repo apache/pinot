@@ -35,7 +35,7 @@ import java.net.URI;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.util.ArrayList;
-import java.util.ConcurrentModificationException;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
@@ -108,6 +108,9 @@ import org.apache.pinot.spi.config.table.TableType;
 import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
 import org.apache.pinot.spi.stream.ConsumerPartitionState;
+import org.apache.pinot.spi.stream.PartitionLagState;
+import org.apache.pinot.spi.stream.StreamMetadataProvider;
+import org.apache.pinot.spi.stream.StreamPartitionMsgOffset;
 import org.apache.pinot.spi.utils.CommonConstants;
 import org.apache.pinot.spi.utils.CommonConstants.Helix.StateModel.SegmentStateModel;
 import org.apache.pinot.spi.utils.JsonUtils;
@@ -133,6 +136,7 @@ public class TablesResource {
   private static final Logger LOGGER = LoggerFactory.getLogger(TablesResource.class);
   private static final String PEER_SEGMENT_DOWNLOAD_DIR = "peerSegmentDownloadDir";
   private static final String SEGMENT_UPLOAD_DIR = "segmentUploadDir";
+  private static final long STREAM_METADATA_FETCH_TIMEOUT_MS = 5000;
 
   @Inject
   private ServerInstance _serverInstance;
@@ -1101,11 +1105,26 @@ public class TablesResource {
       for (SegmentDataManager segmentDataManager : segmentDataManagers) {
         if (segmentDataManager instanceof RealtimeSegmentDataManager) {
           RealtimeSegmentDataManager realtimeSegmentDataManager = (RealtimeSegmentDataManager) segmentDataManager;
-          Map<String, ConsumerPartitionState> partitionStateMap =
-              realtimeSegmentDataManager.getConsumerPartitionState();
+          StreamMetadataProvider streamMetadataProvider =
+              ((RealtimeTableDataManager) (tableDataManager)).getStreamMetadataProvider(realtimeSegmentDataManager);
+          StreamPartitionMsgOffset latestMsgOffset;
+          try {
+            int partitionId = realtimeSegmentDataManager.getStreamPartitionId();
+            Map<Integer, StreamPartitionMsgOffset> partitionMsgOffsetMap =
+                streamMetadataProvider.fetchLatestStreamOffset(Collections.singleton(partitionId),
+                    STREAM_METADATA_FETCH_TIMEOUT_MS);
+            latestMsgOffset = partitionMsgOffsetMap.get(partitionId);
+          } catch (Exception e) {
+            LOGGER.error("Failed to fetch latest stream offset.", e);
+            throw new RuntimeException(e);
+          }
+          Map<String, ConsumerPartitionState> partitionIdToStateMap =
+              realtimeSegmentDataManager.getConsumerPartitionState(latestMsgOffset);
           Map<String, String> recordsLagMap = new HashMap<>();
           Map<String, String> availabilityLagMsMap = new HashMap<>();
-          realtimeSegmentDataManager.getPartitionToLagState(partitionStateMap).forEach((k, v) -> {
+          Map<String, PartitionLagState> partitionToLagState =
+              streamMetadataProvider.getCurrentPartitionLagState(partitionIdToStateMap);
+          partitionToLagState.forEach((k, v) -> {
             recordsLagMap.put(k, v.getRecordsLag());
             availabilityLagMsMap.put(k, v.getAvailabilityLagMs());
           });
@@ -1114,15 +1133,12 @@ public class TablesResource {
           segmentConsumerInfoList.add(new SegmentConsumerInfo(segmentDataManager.getSegmentName(),
               realtimeSegmentDataManager.getConsumerState().toString(),
               realtimeSegmentDataManager.getLastConsumedTimestamp(), partitiionToOffsetMap,
-              new SegmentConsumerInfo.PartitionOffsetInfo(partitiionToOffsetMap, partitionStateMap.entrySet().stream()
+              new SegmentConsumerInfo.PartitionOffsetInfo(partitiionToOffsetMap, partitionIdToStateMap.entrySet()
+                  .stream()
                   .collect(Collectors.toMap(Map.Entry::getKey, e -> e.getValue().getUpstreamLatestOffset().toString())),
                   recordsLagMap, availabilityLagMsMap)));
         }
       }
-    } catch (ConcurrentModificationException e) {
-      LOGGER.warn("Multi-threaded access is unsafe for KafkaConsumer, caught exception when fetching stream offset",
-          e);
-      return segmentConsumerInfoList;
     } catch (Exception e) {
       throw new WebApplicationException("Caught exception when getting consumer info for table: " + realtimeTableName);
     } finally {
