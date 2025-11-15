@@ -18,9 +18,11 @@
  */
 package org.apache.pinot.core.plan;
 
+import java.util.ArrayList;
 import java.util.Collection;
 import java.util.HashMap;
 import java.util.HashSet;
+import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import org.apache.pinot.common.request.context.ExpressionContext;
@@ -30,7 +32,9 @@ import org.apache.pinot.core.operator.DocIdSetOperator;
 import org.apache.pinot.core.operator.ProjectionOperator;
 import org.apache.pinot.core.operator.ProjectionOperatorUtils;
 import org.apache.pinot.core.operator.filter.BaseFilterOperator;
+import org.apache.pinot.core.operator.transform.ArrayJoinOperator;
 import org.apache.pinot.core.operator.transform.TransformOperator;
+import org.apache.pinot.core.query.request.context.ArrayJoinContext;
 import org.apache.pinot.core.query.request.context.QueryContext;
 import org.apache.pinot.segment.spi.IndexSegment;
 import org.apache.pinot.segment.spi.SegmentContext;
@@ -66,9 +70,27 @@ public class ProjectPlanNode implements PlanNode {
 
   @Override
   public BaseProjectOperator<?> run() {
+    Set<ExpressionContext> expressionSet = new HashSet<>();
+    List<ExpressionContext> projectionExpressions = new ArrayList<>(_expressions.size());
+    for (ExpressionContext expression : _expressions) {
+      if (expressionSet.add(expression)) {
+        projectionExpressions.add(expression);
+      }
+    }
+    if (!_queryContext.getArrayJoinContexts().isEmpty()) {
+      for (ArrayJoinContext arrayJoinContext : _queryContext.getArrayJoinContexts()) {
+        for (ArrayJoinContext.Operand operand : arrayJoinContext.getOperands()) {
+          ExpressionContext expression = operand.getExpression();
+          if (expressionSet.add(expression)) {
+            projectionExpressions.add(expression);
+          }
+        }
+      }
+    }
+
     Set<String> projectionColumns = new HashSet<>();
     boolean hasNonIdentifierExpression = false;
-    for (ExpressionContext expression : _expressions) {
+    for (ExpressionContext expression : projectionExpressions) {
       expression.getColumns(projectionColumns);
       if (expression.getType() != ExpressionContext.Type.IDENTIFIER) {
         hasNonIdentifierExpression = true;
@@ -85,7 +107,12 @@ public class ProjectPlanNode implements PlanNode {
     // TODO: figure out a way to close this operator, as it may hold reader context
     ProjectionOperator projectionOperator =
         ProjectionOperatorUtils.getProjectionOperator(dataSourceMap, docIdSetOperator, _queryContext);
-    return hasNonIdentifierExpression ? new TransformOperator(_queryContext, projectionOperator, _expressions)
-        : projectionOperator;
+    BaseProjectOperator<?> baseOperator =
+        hasNonIdentifierExpression ? new TransformOperator(_queryContext, projectionOperator, projectionExpressions)
+            : projectionOperator;
+    if (!_queryContext.getArrayJoinContexts().isEmpty()) {
+      baseOperator = new ArrayJoinOperator(_queryContext, baseOperator);
+    }
+    return baseOperator;
   }
 }

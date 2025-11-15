@@ -349,14 +349,28 @@ public class ExplainPlanQueriesTest extends BaseQueriesTest {
   }
 
   private void check(String query, ResultTable expected, boolean checkPrefetchEnabled) {
-    checkWithQueryExecutor(query, expected, _queryExecutor);
+    BrokerRequest brokerRequest = CalciteSqlCompiler.compileToBrokerRequest(query);
+    check(brokerRequest, expected, checkPrefetchEnabled);
+  }
+
+  private void check(BrokerRequest brokerRequest, ResultTable expected) {
+    check(brokerRequest, expected, false);
+  }
+
+  private void check(BrokerRequest brokerRequest, ResultTable expected, boolean checkPrefetchEnabled) {
+    checkWithQueryExecutor(brokerRequest.deepCopy(), expected, _queryExecutor);
     if (checkPrefetchEnabled) {
-      checkWithQueryExecutor(query, getPrefetchEnabledResulTable(expected), _queryExecutorWithPrefetchEnabled);
+      checkWithQueryExecutor(brokerRequest.deepCopy(), getPrefetchEnabledResulTable(expected),
+          _queryExecutorWithPrefetchEnabled);
     }
   }
 
   private void checkWithQueryExecutor(String query, ResultTable expected, QueryExecutor queryExecutor) {
     BrokerRequest brokerRequest = CalciteSqlCompiler.compileToBrokerRequest(query);
+    checkWithQueryExecutor(brokerRequest, expected, queryExecutor);
+  }
+
+  private void checkWithQueryExecutor(BrokerRequest brokerRequest, ResultTable expected, QueryExecutor queryExecutor) {
 
     int segmentsForServer1 = _segmentNames.size() / 2;
     List<String> indexSegmentsForServer1 = new ArrayList<>();
@@ -479,6 +493,27 @@ public class ExplainPlanQueriesTest extends BaseQueriesTest {
     result4.add(new Object[]{"DOC_ID_SET", 5, 4});
     result4.add(new Object[]{"FILTER_MATCH_ENTIRE_SEGMENT(docs:3)", 6, 5});
     check(query4, new ResultTable(DATA_SCHEMA, result4), true);
+  }
+
+  @Test
+  public void testArrayJoinSelectionPlan() {
+    BrokerRequest brokerRequest = CalciteSqlCompiler.compileToBrokerRequest(
+        // Add a comment between the base table and ARRAY JOIN clause to bypass the parser rewrite that
+        // wraps the table in parentheses (which Calcite does not accept for EXPLAIN PLAN queries yet).
+        "SELECT mvRawCol1 FROM testTable /*ARRAY_JOIN*/ ARRAY JOIN mvRawCol1 AS mvValue");
+    brokerRequest.getPinotQuery().setExplain(true);
+    List<Object[]> result = new ArrayList<>();
+    result.add(new Object[]{"BROKER_REDUCE(limit:10)", 1, 0});
+    result.add(new Object[]{"COMBINE_SELECT", 2, 1});
+    result.add(new Object[]{
+        "PLAN_START(numSegmentsForThisPlan:4)", ExplainPlanRows.PLAN_START_IDS, ExplainPlanRows.PLAN_START_IDS
+    });
+    result.add(new Object[]{"SELECT(selectList:mvRawCol1)", 3, 2});
+    result.add(new Object[]{"ARRAY_JOIN", 4, 3});
+    result.add(new Object[]{"PROJECT(mvRawCol1)", 5, 4});
+    result.add(new Object[]{"DOC_ID_SET", 6, 5});
+    result.add(new Object[]{"FILTER_MATCH_ENTIRE_SEGMENT(docs:3)", 7, 6});
+    check(brokerRequest, new ResultTable(DATA_SCHEMA, result), true);
   }
 
   @Test
