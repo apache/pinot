@@ -18,10 +18,13 @@
  */
 package org.apache.pinot.common.response.broker;
 
+import com.fasterxml.jackson.databind.JsonNode;
+import java.io.IOException;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Set;
 import org.apache.pinot.common.datatable.StatMap;
+import org.apache.pinot.spi.utils.JsonUtils;
 import org.testng.annotations.Test;
 
 import static org.testng.Assert.assertEquals;
@@ -45,6 +48,23 @@ public class BrokerResponseNativeV2Test {
     assertEquals(brokerResponse.getEarlyTerminationReasons(),
         List.of("DISTINCT_MAX_ROWS", "DISTINCT_MAX_ROWS_WITHOUT_CHANGE", "DISTINCT_MAX_EXECUTION_TIME"));
     assertTrue(brokerResponse.isPartialResult());
+  }
+
+  @Test
+  public void testTimeoutOverflowFlagSerialized()
+      throws IOException {
+    BrokerResponseNativeV2 response = new BrokerResponseNativeV2();
+    assertFalse(response.isTimeoutOverflowReached());
+    assertFalse(response.isPartialResult());
+
+    response.mergeTimeoutOverflowReached(true);
+
+    assertTrue(response.isTimeoutOverflowReached());
+    assertTrue(response.isPartialResult());
+
+    JsonNode json = JsonUtils.objectToJsonNode(response);
+    assertTrue(json.get("timeoutOverflowReached").asBoolean());
+    assertTrue(json.get("partialResult").asBoolean());
   }
 
   private static Set<String> stringSet(String... values) {

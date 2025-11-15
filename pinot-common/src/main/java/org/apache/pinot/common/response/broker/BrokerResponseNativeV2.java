@@ -88,6 +88,7 @@ public class BrokerResponseNativeV2 implements BrokerResponse {
   private String _requestId;
   private String _clientRequestId;
   private String _brokerId;
+  private boolean _timeoutOverflowReached;
   private int _numServersQueried;
   private int _numServersResponded;
   private long _brokerReduceTimeMs;
@@ -126,7 +127,7 @@ public class BrokerResponseNativeV2 implements BrokerResponse {
   @Override
   public boolean isPartialResult() {
     return getExceptionsSize() > 0 || isNumGroupsLimitReached() || !getEarlyTerminationReasons().isEmpty()
-        || isMaxRowsInJoinReached() || isMseLiteLeafStageLimitReached();
+        || isMaxRowsInJoinReached() || isMseLiteLeafStageLimitReached() || isTimeoutOverflowReached();
   }
 
   @Override
@@ -209,6 +210,18 @@ public class BrokerResponseNativeV2 implements BrokerResponse {
   @JsonInclude(JsonInclude.Include.NON_EMPTY)
   public List<String> getEarlyTerminationReasons() {
     return List.copyOf(_brokerStats.getStringSet(StatKey.EARLY_TERMINATION_REASONS));
+  }
+
+  @JsonProperty("timeoutOverflowReached")
+  public boolean isTimeoutOverflowReached() {
+    return _timeoutOverflowReached;
+  }
+
+  public void mergeTimeoutOverflowReached(boolean timeoutOverflowReached) {
+    if (timeoutOverflowReached) {
+      _timeoutOverflowReached = true;
+    }
+    _brokerStats.merge(StatKey.TIMEOUT_OVERFLOW_REACHED, timeoutOverflowReached);
   }
 
   @Override
@@ -515,6 +528,9 @@ public class BrokerResponseNativeV2 implements BrokerResponse {
 
   public void addBrokerStats(StatMap<StatKey> brokerStats) {
     _brokerStats.merge(brokerStats);
+    if (brokerStats.getBoolean(StatKey.TIMEOUT_OVERFLOW_REACHED)) {
+      _timeoutOverflowReached = true;
+    }
   }
 
   // NOTE: The following keys should match the keys in the leaf-stage operator.
@@ -550,7 +566,8 @@ public class BrokerResponseNativeV2 implements BrokerResponse {
       }
     },
     EARLY_TERMINATION_REASONS(StatMap.Type.STRING_SET),
-    LITE_MODE_LEAF_STAGE_LIMIT_REACHED(StatMap.Type.BOOLEAN);
+    LITE_MODE_LEAF_STAGE_LIMIT_REACHED(StatMap.Type.BOOLEAN),
+    TIMEOUT_OVERFLOW_REACHED(StatMap.Type.BOOLEAN);
 
     private final StatMap.Type _type;
 
