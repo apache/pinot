@@ -109,7 +109,8 @@ public class BrokerResponseNativeV2 implements BrokerResponse {
   @JsonProperty(access = JsonProperty.Access.READ_ONLY)
   @Override
   public boolean isPartialResult() {
-    return getExceptionsSize() > 0 || isNumGroupsLimitReached() || isMaxRowsInJoinReached();
+    return getExceptionsSize() > 0 || isNumGroupsLimitReached() || isMaxRowsInJoinReached()
+        || isTimeoutOverflowReached();
   }
 
   @Override
@@ -150,6 +151,14 @@ public class BrokerResponseNativeV2 implements BrokerResponse {
 
   public void mergeNumGroupsWarningLimitReached(boolean numGroupsWarningLimitReached) {
     _brokerStats.merge(StatKey.NUM_GROUPS_WARNING_LIMIT_REACHED, numGroupsWarningLimitReached);
+  }
+
+  public boolean isTimeoutOverflowReached() {
+    return _brokerStats.getBoolean(StatKey.TIMEOUT_OVERFLOW_REACHED);
+  }
+
+  public void mergeTimeoutOverflowReached(boolean timeoutOverflowReached) {
+    _brokerStats.merge(StatKey.TIMEOUT_OVERFLOW_REACHED, timeoutOverflowReached);
   }
 
   @Override
@@ -453,7 +462,8 @@ public class BrokerResponseNativeV2 implements BrokerResponse {
     NUM_SEGMENTS_PRUNED_BY_VALUE(StatMap.Type.INT),
     GROUPS_TRIMMED(StatMap.Type.BOOLEAN),
     NUM_GROUPS_LIMIT_REACHED(StatMap.Type.BOOLEAN),
-    NUM_GROUPS_WARNING_LIMIT_REACHED(StatMap.Type.BOOLEAN);
+    NUM_GROUPS_WARNING_LIMIT_REACHED(StatMap.Type.BOOLEAN),
+    TIMEOUT_OVERFLOW_REACHED(StatMap.Type.BOOLEAN);
 
     private final StatMap.Type _type;
 
