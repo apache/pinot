@@ -47,6 +47,10 @@ public class IndexingConfig extends BaseJsonConfig {
   private List<String> _sortedColumn;
   private List<String> _bloomFilterColumns;
   private Map<String, BloomFilterConfig> _bloomFilterConfigs;
+  // Map index configs - kept for backward compatibility with Pinot 1.3
+  // Map indexes are now handled through the FieldConfig/indexes system
+  @Deprecated
+  private Map<String, IndexConfig> _mapIndexConfigs;
   private String _loadMode;
   @Deprecated // Moved to {@link IngestionConfig#getStreamIngestionConfig}
   private Map<String, String> _streamConfigs;
@@ -196,6 +200,31 @@ public class IndexingConfig extends BaseJsonConfig {
 
   public void setBloomFilterConfigs(Map<String, BloomFilterConfig> bloomFilterConfigs) {
     _bloomFilterConfigs = bloomFilterConfigs;
+  }
+
+  /**
+   * Returns map index configurations.
+   * 
+   * @deprecated Map indexes are now configured through the FieldConfig/indexes system.
+   * This method is kept for backward compatibility with Pinot 1.3.
+   * @return map of column names to map index configurations, or null if not set
+   */
+  @Deprecated
+  @Nullable
+  public Map<String, IndexConfig> getMapIndexConfigs() {
+    return _mapIndexConfigs;
+  }
+
+  /**
+   * Sets map index configurations.
+   * 
+   * @deprecated Map indexes are now configured through the FieldConfig/indexes system.
+   * This method is kept for backward compatibility with Pinot 1.3.
+   * @param mapIndexConfigs map of column names to map index configurations
+   */
+  @Deprecated
+  public void setMapIndexConfigs(Map<String, IndexConfig> mapIndexConfigs) {
+    _mapIndexConfigs = mapIndexConfigs;
   }
 
   @Nullable
@@ -448,6 +477,9 @@ public class IndexingConfig extends BaseJsonConfig {
     }
     if (_bloomFilterConfigs != null) {
       allColumns.addAll(_bloomFilterConfigs.keySet());
+    }
+    if (_mapIndexConfigs != null) {
+      allColumns.addAll(_mapIndexConfigs.keySet());
     }
     if (_noDictionaryColumns != null) {
       allColumns.addAll(_noDictionaryColumns);
