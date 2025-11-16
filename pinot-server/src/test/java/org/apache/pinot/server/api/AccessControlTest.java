@@ -36,6 +36,7 @@ import org.apache.pinot.common.config.TlsConfig;
 import org.apache.pinot.common.metrics.ServerMetrics;
 import org.apache.pinot.core.transport.HttpServerThreadPoolConfig;
 import org.apache.pinot.core.transport.ListenerConfig;
+import org.apache.pinot.segment.local.utils.ServerReloadJobStatusCache;
 import org.apache.pinot.server.access.AccessControl;
 import org.apache.pinot.server.access.AccessControlFactory;
 import org.apache.pinot.server.access.BasicAuthAccessFactory;
@@ -84,7 +85,9 @@ public class AccessControlTest {
         CommonConstants.Helix.DEFAULT_SERVER_NETTY_PORT);
     serverConf.setProperty(CommonConstants.Server.CONFIG_OF_INSTANCE_ID,
         CommonConstants.Helix.PREFIX_OF_SERVER_INSTANCE + hostname + "_" + port);
-    _adminApiApplication = new AdminApiApplication(serverInstance, new DenyAllAccessFactory(), serverConf);
+    _adminApiApplication = new AdminApiApplication(serverInstance, new DenyAllAccessFactory(),
+        mock(ServerReloadJobStatusCache.class),
+        serverConf);
 
     int adminApiApplicationPort = getAvailablePort();
     _adminApiApplication.start(Collections.singletonList(

@@ -39,6 +39,7 @@ import org.apache.pinot.segment.local.data.manager.SegmentDataManager;
 import org.apache.pinot.segment.local.segment.index.loader.IndexLoadingConfig;
 import org.apache.pinot.segment.local.utils.SegmentLocks;
 import org.apache.pinot.segment.local.utils.SegmentReloadSemaphore;
+import org.apache.pinot.segment.local.utils.ServerReloadJobStatusCache;
 import org.apache.pinot.segment.spi.ImmutableSegment;
 import org.apache.pinot.segment.spi.SegmentMetadata;
 import org.apache.pinot.spi.config.instance.InstanceDataManagerConfig;
@@ -55,14 +56,7 @@ import org.testng.annotations.Test;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
-import static org.mockito.Mockito.doAnswer;
-import static org.mockito.Mockito.doThrow;
-import static org.mockito.Mockito.mock;
-import static org.mockito.Mockito.never;
-import static org.mockito.Mockito.spy;
-import static org.mockito.Mockito.times;
-import static org.mockito.Mockito.verify;
-import static org.mockito.Mockito.when;
+import static org.mockito.Mockito.*;
 import static org.testng.Assert.assertNull;
 import static org.testng.Assert.assertTrue;
 
@@ -115,7 +109,8 @@ public class BaseTableDataManagerEnqueueSegmentToReplaceTest {
     // Create table data manager with segment refresh executor
     _tableDataManager = spy(new OfflineTableDataManager());
     _tableDataManager.init(_instanceDataManagerConfig, _helixManager, new SegmentLocks(), TABLE_CONFIG,
-        SCHEMA, new SegmentReloadSemaphore(1), _segmentReloadRefreshExecutor, null, null, null, true);
+        SCHEMA, new SegmentReloadSemaphore(1), _segmentReloadRefreshExecutor, null, null, null, true,
+        mock(ServerReloadJobStatusCache.class));
 
     // Inject the mocked ServerMetrics into the table data manager using reflection
     try {
@@ -285,7 +280,7 @@ public class BaseTableDataManagerEnqueueSegmentToReplaceTest {
     OfflineTableDataManager tableDataManagerWithoutExecutor = new OfflineTableDataManager();
     tableDataManagerWithoutExecutor.init(_instanceDataManagerConfig, _helixManager, new SegmentLocks(),
         TABLE_CONFIG, SCHEMA, new SegmentReloadSemaphore(1), Executors.newSingleThreadExecutor(),
-        null, null, null, false);
+        null, null, null, false, mock(ServerReloadJobStatusCache.class));
 
     // This should trigger the assertion error
     tableDataManagerWithoutExecutor.enqueueSegmentToReplace(SEGMENT_NAME);

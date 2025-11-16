@@ -86,6 +86,61 @@ public class EmptyResponseUtilsTest {
   }
 
   @Test
+  public void testBuildEmptyResultTableWithAliases() {
+    // Selection
+    QueryContext queryContext =
+        QueryContextConverterUtils.getQueryContext("SELECT a AS col_a, b AS col_B, c FROM testTable WHERE foo = 'bar'");
+    ResultTable resultTable = EmptyResponseUtils.buildEmptyResultTable(queryContext);
+    DataSchema dataSchema = resultTable.getDataSchema();
+    assertEquals(dataSchema.getColumnNames(), new String[]{"col_a", "col_B", "c"});
+    assertEquals(dataSchema.getColumnDataTypes(), new ColumnDataType[]{
+        ColumnDataType.STRING, ColumnDataType.STRING, ColumnDataType.STRING
+    });
+    assertTrue(resultTable.getRows().isEmpty());
+
+    // Distinct
+    queryContext = QueryContextConverterUtils.getQueryContext(
+          "SELECT DISTINCT a, b AS col_B FROM testTable WHERE foo = 'bar'");
+    resultTable = EmptyResponseUtils.buildEmptyResultTable(queryContext);
+    dataSchema = resultTable.getDataSchema();
+    assertEquals(dataSchema.getColumnNames(), new String[]{"a", "col_B"});
+    assertEquals(dataSchema.getColumnDataTypes(), new ColumnDataType[]{
+        ColumnDataType.STRING, ColumnDataType.STRING
+    });
+    assertTrue(resultTable.getRows().isEmpty());
+
+    // Aggregation
+    queryContext =
+        QueryContextConverterUtils.getQueryContext(
+            "SELECT COUNT(*) AS num_test, SUM(a) AS Total, MAX(b) AS largest, MIN(b) FROM testTable WHERE foo = 'bar'");
+    resultTable = EmptyResponseUtils.buildEmptyResultTable(queryContext);
+    dataSchema = resultTable.getDataSchema();
+    assertEquals(dataSchema.getColumnNames(), new String[]{"num_test", "Total", "largest", "min(b)"});
+    assertEquals(dataSchema.getColumnDataTypes(), new ColumnDataType[]{
+        ColumnDataType.LONG, ColumnDataType.DOUBLE, ColumnDataType.DOUBLE, ColumnDataType.DOUBLE
+    });
+    List<Object[]> rows = resultTable.getRows();
+    assertEquals(rows.size(), 1);
+    Object[] row = rows.get(0);
+    assertEquals(row[0], 0L);
+    assertEquals(row[1], 0.0);
+    assertEquals(row[2], Double.NEGATIVE_INFINITY);
+
+    // Group-by
+    queryContext = QueryContextConverterUtils.getQueryContext(
+        "SELECT c, d AS col_d, COUNT(*) AS num_test, SUM(a) AS Total, MAX(b) AS largest, MIN(b) "
+            + "FROM testTable WHERE foo = 'bar' GROUP BY c, d");
+    resultTable = EmptyResponseUtils.buildEmptyResultTable(queryContext);
+    dataSchema = resultTable.getDataSchema();
+    assertEquals(dataSchema.getColumnNames(), new String[]{"c", "col_d", "num_test", "Total", "largest", "min(b)"});
+    assertEquals(dataSchema.getColumnDataTypes(), new ColumnDataType[]{
+        ColumnDataType.STRING, ColumnDataType.STRING, ColumnDataType.LONG,
+        ColumnDataType.DOUBLE, ColumnDataType.DOUBLE, ColumnDataType.DOUBLE
+    });
+    assertTrue(resultTable.getRows().isEmpty());
+  }
+
+  @Test
   public void testBuildEmptyResultTableWithDistinctCountRawHLL() {
     // Test DISTINCTCOUNTRAWHLL aggregation with empty results
     // This should not throw a Jackson serialization error

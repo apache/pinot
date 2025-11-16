@@ -72,6 +72,11 @@
       <artifactId>hadoop-mapreduce-client-core</artifactId>
       <scope>${hadoop.dependencies.scope}</scope>
     </dependency>
+    <dependency>
+      <groupId>org.apache.pinot</groupId>
+      <artifactId>pinot-segment-local</artifactId>
+      <scope>test</scope>
+    </dependency>
   </dependencies>
 
   <profiles>

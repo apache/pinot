@@ -1096,6 +1096,7 @@ public abstract class BaseSingleStageBrokerRequestHandler extends BaseBrokerRequ
       LOGGER.warn("Caught exception while building empty response for request {}: {}, {}",
           requestContext.getRequestId(), query, e.getMessage());
     }
+    brokerResponse.setTablesQueried(Set.of(TableNameBuilder.extractRawTableName(tableName)));
     brokerResponse.setTimeUsedMs(System.currentTimeMillis() - requestContext.getRequestArrivalTimeMillis());
     _queryLogger.log(new QueryLogger.QueryLogParams(requestContext, tableName, brokerResponse,
         QueryLogger.QueryLogParams.QueryEngine.SINGLE_STAGE, requesterIdentity, null));

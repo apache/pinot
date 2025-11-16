@@ -42,4 +42,30 @@ public interface TimeHandler {
    */
   @Nullable
   String handleTime(GenericRow row);
+
+  /**
+   * Returns the time column name, or null if no time column is configured.
+   * This enables efficient columnar processing by reading only the time column.
+   */
+  @Nullable
+  String getTimeColumn();
+
+  /**
+   * Handles time value from a column and returns the time partition, or {@code null} if the value is filtered out.
+   *
+   * @param columnValue The time column value
+   * @return The time partition string, or null if the row is filtered based on time
+   */
+  @Nullable
+  String handleTimeColumn(Object columnValue);
+
+  /**
+   * Returns the modified time value (eg: rounding) from the original column value.
+   * It assumes that the column value has already passed the filtering criteria.
+   *
+   * @param columnValue The original time column value
+   * @return The modified time value
+   */
+  @Nullable
+  Object getModifiedTimeValue(Object columnValue);
 }

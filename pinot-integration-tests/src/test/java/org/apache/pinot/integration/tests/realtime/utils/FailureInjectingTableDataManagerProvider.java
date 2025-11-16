@@ -37,6 +37,7 @@ import org.apache.pinot.segment.local.data.manager.TableDataManager;
 import org.apache.pinot.segment.local.utils.SegmentLocks;
 import org.apache.pinot.segment.local.utils.SegmentOperationsThrottler;
 import org.apache.pinot.segment.local.utils.SegmentReloadSemaphore;
+import org.apache.pinot.segment.local.utils.ServerReloadJobStatusCache;
 import org.apache.pinot.spi.config.instance.InstanceDataManagerConfig;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.data.Schema;
@@ -61,8 +62,11 @@ public class FailureInjectingTableDataManagerProvider implements TableDataManage
   private PinotConfiguration _pinotConfiguration;
 
   @Override
-  public void init(InstanceDataManagerConfig instanceDataManagerConfig, HelixManager helixManager,
-      SegmentLocks segmentLocks, @Nullable SegmentOperationsThrottler segmentOperationsThrottler) {
+  public void init(InstanceDataManagerConfig instanceDataManagerConfig,
+      HelixManager helixManager,
+      SegmentLocks segmentLocks,
+      @Nullable SegmentOperationsThrottler segmentOperationsThrottler,
+      ServerReloadJobStatusCache reloadJobStatusCache) {
     _instanceDataManagerConfig = instanceDataManagerConfig;
     _helixManager = helixManager;
     _segmentLocks = segmentLocks;
@@ -72,11 +76,15 @@ public class FailureInjectingTableDataManagerProvider implements TableDataManage
   }
 
   @Override
-  public TableDataManager getTableDataManager(TableConfig tableConfig, Schema schema,
-      SegmentReloadSemaphore segmentReloadSemaphore, ExecutorService segmentReloadRefreshExecutor,
+  public TableDataManager getTableDataManager(TableConfig tableConfig,
+      Schema schema,
+      SegmentReloadSemaphore segmentReloadSemaphore,
+      ExecutorService segmentReloadRefreshExecutor,
       @Nullable ExecutorService segmentPreloadExecutor,
       @Nullable Cache<Pair<String, String>, SegmentErrorInfo> errorCache,
-      BooleanSupplier isServerReadyToServeQueries, boolean enableAsyncSegmentRefresh) {
+      BooleanSupplier isServerReadyToServeQueries,
+      boolean enableAsyncSegmentRefresh,
+      ServerReloadJobStatusCache reloadJobStatusCache) {
     TableDataManager tableDataManager;
     switch (tableConfig.getTableType()) {
       case OFFLINE:
@@ -113,9 +121,18 @@ public class FailureInjectingTableDataManagerProvider implements TableDataManage
       default:
         throw new IllegalStateException();
     }
-    tableDataManager.init(_instanceDataManagerConfig, _helixManager, _segmentLocks, tableConfig, schema,
-        segmentReloadSemaphore, segmentReloadRefreshExecutor, segmentPreloadExecutor, errorCache, null,
-        enableAsyncSegmentRefresh);
+    tableDataManager.init(_instanceDataManagerConfig,
+        _helixManager,
+        _segmentLocks,
+        tableConfig,
+        schema,
+        segmentReloadSemaphore,
+        segmentReloadRefreshExecutor,
+        segmentPreloadExecutor,
+        errorCache,
+        null,
+        enableAsyncSegmentRefresh,
+        reloadJobStatusCache);
     return tableDataManager;
   }
 }

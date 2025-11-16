@@ -32,6 +32,7 @@ import org.apache.pinot.spi.utils.BigDecimalUtils;
 import org.apache.pinot.spi.utils.BooleanUtils;
 import org.apache.pinot.spi.utils.BytesUtils;
 import org.apache.pinot.spi.utils.JsonUtils;
+import org.apache.pinot.spi.utils.MapUtils;
 import org.apache.pinot.spi.utils.TimestampUtils;
 
 
@@ -827,6 +828,8 @@ public enum PinotDataType {
           } catch (Exception e) {
             throw new RuntimeException("Unable to convert String to Map. Input value: " + value, e);
           }
+        case BYTES:
+          return MapUtils.deserializeMap((byte[]) value);
         case OBJECT:
         case MAP:
           if (value instanceof Map) {
@@ -839,6 +842,16 @@ public enum PinotDataType {
           throw new UnsupportedOperationException(String.format("Cannot convert '%s' (Class of value: '%s') to MAP",
               sourceType, value.getClass()));
       }
+    }
+
+    @SuppressWarnings("unchecked")
+    @Override
+    public byte[] toBytes(Object value) {
+      if (!(value instanceof Map)) {
+        throw new UnsupportedOperationException("Cannot convert non-Map value to BYTES for MAP type: "
+            + (value == null ? "null" : value.getClass()));
+      }
+      return MapUtils.serializeMap((Map<String, Object>) value);
     }
   },
 

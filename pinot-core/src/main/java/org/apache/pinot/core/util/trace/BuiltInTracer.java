@@ -62,8 +62,8 @@ public class BuiltInTracer implements Tracer {
   }
 
   @Override
-  public void register(long requestId) {
-    TraceContext.register(requestId);
+  public void register() {
+    TraceContext.register();
   }
 
   @Override

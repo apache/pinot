@@ -288,16 +288,16 @@ public class QueryRunner {
     OpChainExecutionContext executionContext =
         OpChainExecutionContext.fromQueryContext(_mailboxService, opChainMetadata, stageMetadata, workerMetadata,
             pipelineBreakerResult, _sendStats.getAsBoolean());
-    OpChain opChain;
-    if (workerMetadata.isLeafStageWorker()) {
-      Map<String, String> rlsFilters = RlsUtils.extractRlsFilters(requestMetadata);
-      opChain =
-          ServerPlanRequestUtils.compileLeafStage(executionContext, stagePlan, _leafQueryExecutor, _executorService,
-              rlsFilters);
-    } else {
-      opChain = PlanNodeToOpChain.convert(stagePlan.getRootNode(), executionContext);
-    }
     try {
+      OpChain opChain;
+      if (workerMetadata.isLeafStageWorker()) {
+        Map<String, String> rlsFilters = RlsUtils.extractRlsFilters(requestMetadata);
+        opChain =
+            ServerPlanRequestUtils.compileLeafStage(executionContext, stagePlan, _leafQueryExecutor, _executorService,
+                rlsFilters);
+      } else {
+        opChain = PlanNodeToOpChain.convert(stagePlan.getRootNode(), executionContext);
+      }
       // This can fail if the executor rejects the task.
       _opChainScheduler.register(opChain);
     } catch (RuntimeException e) {

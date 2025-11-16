@@ -1543,6 +1543,26 @@ public class MultiStageEngineIntegrationTest extends BaseClusterIntegrationTestS
     assertEquals(tablesQueried.get(0).asText(), "mytable");
   }
 
+  @Test(dataProvider = "useBothQueryEngines")
+  public void testTablesQueriedFieldWithPrunedSegments(boolean useMultiStageQueryEngine)
+      throws Exception {
+    setUseMultiStageQueryEngine(useMultiStageQueryEngine);
+    // Query with a filter that is always false, causing all segments to be pruned at the broker
+    String query = "select sum(ActualElapsedTime) from mytable WHERE 1=0;";
+    JsonNode jsonNode = postQuery(query);
+    JsonNode tablesQueried = jsonNode.get("tablesQueried");
+    assertNotNull(tablesQueried, "tablesQueried should not be null even when all segments are pruned");
+    assertTrue(tablesQueried.isArray());
+    if (useMultiStageQueryEngine) {
+      // TODO: Multi-stage engine will optimize the query before getting. Once this is fixed,
+      // we can update the test to expect "mytable" here.
+      assertEquals(tablesQueried.size(), 0);
+    } else {
+      assertEquals(tablesQueried.size(), 1);
+      assertEquals(tablesQueried.get(0).asText(), "mytable");
+    }
+  }
+
   @Test
   public void testTablesQueriedWithJoin()
       throws Exception {

@@ -47,11 +47,10 @@ import org.apache.pinot.segment.local.segment.creator.impl.stats.DoubleColumnPre
 import org.apache.pinot.segment.local.segment.creator.impl.stats.FloatColumnPreIndexStatsCollector;
 import org.apache.pinot.segment.local.segment.creator.impl.stats.IntColumnPreIndexStatsCollector;
 import org.apache.pinot.segment.local.segment.creator.impl.stats.LongColumnPreIndexStatsCollector;
+import org.apache.pinot.segment.local.segment.creator.impl.stats.MapColumnPreIndexStatsCollector;
 import org.apache.pinot.segment.local.segment.creator.impl.stats.NoDictColumnStatisticsCollector;
 import org.apache.pinot.segment.local.segment.creator.impl.stats.StringColumnPreIndexStatsCollector;
 import org.apache.pinot.segment.local.segment.index.dictionary.DictionaryIndexType;
-import org.apache.pinot.segment.local.segment.index.forward.ForwardIndexCreatorFactory;
-import org.apache.pinot.segment.local.segment.index.forward.ForwardIndexPlugin;
 import org.apache.pinot.segment.local.segment.index.loader.IndexLoadingConfig;
 import org.apache.pinot.segment.local.segment.index.loader.LoaderUtils;
 import org.apache.pinot.segment.local.segment.readers.PinotSegmentColumnReader;
@@ -414,8 +413,7 @@ public abstract class BaseDefaultColumnHandler implements DefaultColumnHandler {
             if (!_segmentWriter.hasIndexFor(argument, StandardIndexes.forward())) {
               throw new UnsupportedOperationException(String.format("Operation not supported! Cannot create a derived "
                       + "column %s because argument: %s does not have a forward index. Enable forward index and "
-                      + "refresh/backfill the segments to create a derived column from source column %s", column,
-                  argument,
+                      + "refresh/backfill the segments to create a derived column from source column", column,
                   argument));
             }
             argumentsMetadata.add(columnMetadata);
@@ -809,6 +807,30 @@ public abstract class BaseDefaultColumnHandler implements DefaultColumnHandler {
                   new ByteArray((byte[]) fieldSpec.getDefaultNullValue()));
           break;
         }
+        case MAP: {
+          // Ensure each value is non-null; default for MAP is an empty map
+          for (int i = 0; i < numDocs; i++) {
+            if (outputValues[i] == null) {
+              outputValues[i] = fieldSpec.getDefaultNullValue();
+            }
+          }
+
+          // Use MapColumnPreIndexStatsCollector for collecting MAP stats
+          AbstractColumnStatisticsCollector statsCollector =
+              new MapColumnPreIndexStatsCollector(column, statsCollectorConfig);
+          for (Object value : outputValues) {
+            statsCollector.collect(value);
+          }
+          statsCollector.seal();
+
+          // MAP does not use dictionary encoding
+          createDictionary = false;
+          indexCreationInfo =
+              new ColumnIndexCreationInfo(statsCollector, /* createDictionary */ false, false, true,
+                  fieldSpec.getDefaultNullValue());
+          break;
+        }
+
         default:
           throw new IllegalStateException();
       }
@@ -1166,8 +1188,11 @@ public abstract class BaseDefaultColumnHandler implements DefaultColumnHandler {
             case BYTES:
               forwardIndexCreator.putBytes((byte[]) outputValue);
               break;
+            case MAP:
+              forwardIndexCreator.add(outputValue, -1);
+              break;
             default:
-              throw new IllegalStateException();
+              throw new IllegalStateException("Unsupported data type: " + fieldSpec.getDataType());
           }
         }
       } else {
@@ -1193,10 +1218,11 @@ public abstract class BaseDefaultColumnHandler implements DefaultColumnHandler {
               forwardIndexCreator.putBytesMV((byte[][]) outputValue);
               break;
             default:
-              throw new IllegalStateException();
+              throw new IllegalStateException("Unsupported data type: " + fieldSpec.getDataType());
           }
         }
       }
+      forwardIndexCreator.seal();
     }
 
     // Add the column metadata
@@ -1222,13 +1248,12 @@ public abstract class BaseDefaultColumnHandler implements DefaultColumnHandler {
     ForwardIndexConfig forwardIndexConfig = null;
     FieldIndexConfigs fieldIndexConfig = _indexLoadingConfig.getFieldIndexConfig(column);
     if (fieldIndexConfig != null) {
-      forwardIndexConfig = fieldIndexConfig.getConfig(new ForwardIndexPlugin().getIndexType());
+      forwardIndexConfig = fieldIndexConfig.getConfig(StandardIndexes.forward());
     }
     if (forwardIndexConfig == null) {
       forwardIndexConfig = new ForwardIndexConfig(false, null, null, null, null, null, null);
     }
-
-    return ForwardIndexCreatorFactory.createIndexCreator(indexCreationContext, forwardIndexConfig);
+    return StandardIndexes.forward().createIndexCreator(indexCreationContext, forwardIndexConfig);
   }
 
   @SuppressWarnings("rawtypes")

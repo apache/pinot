@@ -230,6 +230,9 @@ export const getClusterConfig = (): Promise<AxiosResponse<ClusterConfig>> =>
 export const getQueryTables = (type?: string): Promise<AxiosResponse<QueryTables>> =>
   baseApi.get(`/tables${type ? `?type=${type}`: ''}`);
 
+export const getLogicalTables = (): Promise<AxiosResponse<string[]>> =>
+  baseApi.get(`/logicalTables`);
+
 export const getTableSchema = (name: string): Promise<AxiosResponse<TableSchema>> =>
   baseApi.get(`/tables/${name}/schema`);
 

@@ -105,6 +105,7 @@ import org.apache.pinot.controller.helix.core.util.MessagingServiceUtils;
 import org.apache.pinot.controller.validation.RealtimeSegmentValidationManager;
 import org.apache.pinot.core.data.manager.realtime.SegmentCompletionUtils;
 import org.apache.pinot.core.util.PeerServerSegmentFinder;
+import org.apache.pinot.segment.local.utils.TableConfigUtils;
 import org.apache.pinot.segment.spi.index.metadata.SegmentMetadataImpl;
 import org.apache.pinot.segment.spi.partition.metadata.ColumnPartitionMetadata;
 import org.apache.pinot.spi.config.table.ColumnPartitionConfig;
@@ -2528,6 +2529,17 @@ public class PinotLLCRealtimeSegmentManager {
   }
 
   private void sendForceCommitMessageToServers(String tableNameWithType, Set<String> consumingSegments) {
+    // For partial upsert tables, force-committing consuming segments is disabled.
+    // In some cases (especially when replication > 1), the server with fewer consumed rows
+    // was incorrectly chosen as the winner, causing other servers to reconsume rows
+    // and leading to inconsistent data.
+    // TODO: Temporarily disabled until a proper fix is implemented.
+    TableConfig tableConfig = _helixResourceManager.getTableConfig(tableNameWithType);
+    if (TableConfigUtils.checkForPartialUpsertWithReplicas(tableConfig)) {
+      throw new IllegalStateException(
+          "Force commit is not allowed for partial upsert tables: {} when replication > 1" + tableNameWithType);
+    }
+
     if (!consumingSegments.isEmpty()) {
       LOGGER.info("Sending force commit messages for segments: {} of table: {}", consumingSegments, tableNameWithType);
       ClusterMessagingService messagingService = _helixManager.getMessagingService();

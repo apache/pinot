@@ -142,7 +142,8 @@ public class PurgeTaskGenerator extends BaseTaskGenerator {
           break;
         }
         configs.put(MinionConstants.DOWNLOAD_URL_KEY, segmentZKMetadata.getDownloadUrl());
-        configs.put(MinionConstants.UPLOAD_URL_KEY, _clusterInfoAccessor.getVipUrl() + "/segments");
+        configs.put(MinionConstants.UPLOAD_URL_KEY,
+            _clusterInfoAccessor.getVipUrlForLeadController(tableName) + "/segments");
         configs.put(MinionConstants.ORIGINAL_SEGMENT_CRC_KEY, String.valueOf(segmentZKMetadata.getCrc()));
         pinotTaskConfigs.add(new PinotTaskConfig(taskType, configs));
         tableNumTasks++;

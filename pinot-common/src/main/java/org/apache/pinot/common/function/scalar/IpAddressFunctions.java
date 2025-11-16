@@ -77,4 +77,56 @@ public class IpAddressFunctions {
     }
     return prefix.contains(ip);
   }
+
+  /**
+   * Returns the IP prefix for the given IP address with the specified prefix length.
+   *
+   * @param ipAddress IP address string (e.g., "192.168.1.100")
+   * @param prefixBits Prefix length in bits (e.g., 24 for /24 subnet)
+   * @return IP prefix string in CIDR notation (e.g., "192.168.1.0/24")
+   * @throws IllegalArgumentException if the IP address is already prefixed or if prefix length is invalid
+   */
+  @ScalarFunction
+  public static String ipPrefix(String ipAddress, int prefixBits) {
+    IPAddress ip = getAddress(ipAddress);
+    if (ip.isPrefixed()) {
+      throw new IllegalArgumentException("IP Address " + ipAddress + " should not be prefixed.");
+    }
+    if (prefixBits < 0 || prefixBits > ip.getBitCount()) {
+      throw new IllegalArgumentException(
+          "Invalid prefix length " + prefixBits + " for IP address " + ipAddress
+          + ". Must be between 0 and " + ip.getBitCount());
+    }
+    try {
+      return ip.setPrefixLength(prefixBits).toPrefixBlock().toString();
+    } catch (PrefixLenException e) {
+      throw new IllegalArgumentException("Invalid prefix length: " + prefixBits, e);
+    }
+  }
+
+  /**
+   * Returns the minimum (first) IP address in the given subnet.
+   *
+   * @param ipPrefix IP prefix string in CIDR notation (e.g., "192.168.1.0/24")
+   * @return Minimum IP address in the subnet (e.g., "192.168.1.0")
+   * @throws IllegalArgumentException if the IP address is not a valid prefix
+   */
+  @ScalarFunction
+  public static String ipSubnetMin(String ipPrefix) {
+    IPAddress prefix = getPrefix(ipPrefix);
+    return prefix.getLower().withoutPrefixLength().toCanonicalString();
+  }
+
+  /**
+   * Returns the maximum (last) IP address in the given subnet.
+   *
+   * @param ipPrefix IP prefix string in CIDR notation (e.g., "192.168.1.0/24")
+   * @return Maximum IP address in the subnet (e.g., "192.168.1.255")
+   * @throws IllegalArgumentException if the IP address is not a valid prefix
+   */
+  @ScalarFunction
+  public static String ipSubnetMax(String ipPrefix) {
+    IPAddress prefix = getPrefix(ipPrefix);
+    return prefix.getUpper().withoutPrefixLength().toCanonicalString();
+  }
 }

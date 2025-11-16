@@ -20,8 +20,10 @@ package org.apache.pinot.controller.helix.core.retention.strategy;
 
 import java.util.concurrent.TimeUnit;
 import org.apache.pinot.common.metadata.segment.SegmentZKMetadata;
+import org.apache.pinot.spi.utils.CommonConstants.Segment.Realtime.Status;
 import org.testng.annotations.Test;
 
+import static org.testng.Assert.assertEquals;
 import static org.testng.Assert.assertFalse;
 import static org.testng.Assert.assertTrue;
 
@@ -63,5 +65,74 @@ public class TimeRetentionStrategyTest {
     // Set end time to 200 years in the future (not purgeable due to bogus timestamp)
     segmentZKMetadata.setEndTime(today + (365 * 200));
     assertFalse(retentionStrategy.isPurgeable(tableNameWithType, segmentZKMetadata));
+  }
+
+  @Test
+  public void testIncompleteSegmentRetention() {
+    String tableNameWithType = "myTable_REALTIME";
+    TimeRetentionStrategy retentionStrategy = new TimeRetentionStrategy(TimeUnit.DAYS, 30L);
+
+    // Test IN_PROGRESS segment (consuming segment)
+    SegmentZKMetadata consumingSegmentMetadata = new SegmentZKMetadata("myConsumingSegment");
+    consumingSegmentMetadata.setStatus(Status.IN_PROGRESS);
+
+    // Consuming segments have end time of -1, which would normally trigger the warning log
+    // But with our fix, consuming segments should not be purgeable regardless of end time
+    assertFalse(retentionStrategy.isPurgeable(tableNameWithType, consumingSegmentMetadata));
+
+    // Test COMMITTING segment (pauseless ingestion)
+    SegmentZKMetadata committingSegmentMetadata = new SegmentZKMetadata("myCommittingSegment");
+    committingSegmentMetadata.setStatus(Status.COMMITTING);
+
+    // Committing segments also have end time of -1 until they are fully committed
+    // They should not be purgeable either
+    assertFalse(retentionStrategy.isPurgeable(tableNameWithType, committingSegmentMetadata));
+
+    // Test with completed statuses to ensure they still follow normal retention logic
+    SegmentZKMetadata doneSegmentMetadata = new SegmentZKMetadata("myDoneSegment");
+    doneSegmentMetadata.setStatus(Status.DONE);
+    doneSegmentMetadata.setTimeUnit(TimeUnit.DAYS);
+
+    // Set end time to two months ago (should be purgeable for completed segments)
+    long today = TimeUnit.MILLISECONDS.toDays(System.currentTimeMillis());
+    doneSegmentMetadata.setEndTime(today - 60);
+    assertTrue(retentionStrategy.isPurgeable(tableNameWithType, doneSegmentMetadata));
+
+    // Test UPLOADED status as well
+    SegmentZKMetadata uploadedSegmentMetadata = new SegmentZKMetadata("myUploadedSegment");
+    uploadedSegmentMetadata.setStatus(Status.UPLOADED);
+    uploadedSegmentMetadata.setTimeUnit(TimeUnit.DAYS);
+    uploadedSegmentMetadata.setEndTime(today - 60);
+    assertTrue(retentionStrategy.isPurgeable(tableNameWithType, uploadedSegmentMetadata));
+  }
+
+  @Test
+  public void testOfflineTableRetention() {
+    String tableNameWithType = "myTable_OFFLINE";
+    TimeRetentionStrategy retentionStrategy = new TimeRetentionStrategy(TimeUnit.DAYS, 30L);
+
+    // Test offline segment - these don't have status field set, so getStatus() returns default UPLOADED
+    // But we need to ensure they follow normal retention logic for offline tables
+    SegmentZKMetadata offlineSegmentMetadata = new SegmentZKMetadata("myOfflineSegment");
+    // Note: We don't set status for offline segments - it defaults to UPLOADED
+    offlineSegmentMetadata.setTimeUnit(TimeUnit.DAYS);
+
+    // Verify that offline segments have default status of UPLOADED
+    assertEquals(Status.UPLOADED, offlineSegmentMetadata.getStatus());
+    assertTrue(offlineSegmentMetadata.getStatus().isCompleted());
+
+    long today = TimeUnit.MILLISECONDS.toDays(System.currentTimeMillis());
+
+    // Set end time to two weeks ago (should not be purgeable - within retention period)
+    offlineSegmentMetadata.setEndTime(today - 14);
+    assertFalse(retentionStrategy.isPurgeable(tableNameWithType, offlineSegmentMetadata));
+
+    // Set end time to two months ago (should be purgeable - beyond retention period)
+    offlineSegmentMetadata.setEndTime(today - 60);
+    assertTrue(retentionStrategy.isPurgeable(tableNameWithType, offlineSegmentMetadata));
+
+    // Test offline segment with invalid end time (should not be purgeable)
+    offlineSegmentMetadata.setEndTime(-1);
+    assertFalse(retentionStrategy.isPurgeable(tableNameWithType, offlineSegmentMetadata));
   }
 }

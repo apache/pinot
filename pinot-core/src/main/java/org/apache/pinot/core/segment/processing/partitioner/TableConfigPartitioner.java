@@ -37,11 +37,25 @@ public class TableConfigPartitioner implements Partitioner {
     _column = columnName;
     _partitionFunction = PartitionFunctionFactory
         .getPartitionFunction(columnPartitionConfig.getFunctionName(), columnPartitionConfig.getNumPartitions(),
-                columnPartitionConfig.getFunctionConfig());
+            columnPartitionConfig.getFunctionConfig());
   }
 
   @Override
   public String getPartition(GenericRow genericRow) {
     return String.valueOf(_partitionFunction.getPartition(FieldSpec.getStringValue(genericRow.getValue(_column))));
+  }
+
+  @Override
+  public String[] getPartitionColumns() {
+    return new String[]{_column};
+  }
+
+  @Override
+  public String getPartitionFromColumns(Object[] columnValues) {
+    if (columnValues.length != 1) {
+      throw new IllegalArgumentException(
+          "TableConfigPartitioner expects exactly 1 column value, got " + columnValues.length);
+    }
+    return String.valueOf(_partitionFunction.getPartition(FieldSpec.getStringValue(columnValues[0])));
   }
 }

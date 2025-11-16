@@ -43,6 +43,7 @@ import org.apache.pinot.tools.admin.command.GenerateDataCommand;
 import org.apache.pinot.tools.admin.command.GitHubEventsQuickStartCommand;
 import org.apache.pinot.tools.admin.command.ImportDataCommand;
 import org.apache.pinot.tools.admin.command.JsonToPinotSchema;
+import org.apache.pinot.tools.admin.command.LaunchBackfillIngestionJobCommand;
 import org.apache.pinot.tools.admin.command.LaunchDataIngestionJobCommand;
 import org.apache.pinot.tools.admin.command.LaunchSparkDataIngestionJobCommand;
 import org.apache.pinot.tools.admin.command.MoveReplicaGroup;
@@ -100,6 +101,7 @@ public class PinotAdministrator {
     SUBCOMMAND_MAP.put("OperateClusterConfig", new OperateClusterConfigCommand());
     SUBCOMMAND_MAP.put("GenerateData", new GenerateDataCommand());
     SUBCOMMAND_MAP.put("LaunchDataIngestionJob", new LaunchDataIngestionJobCommand());
+    SUBCOMMAND_MAP.put("LaunchBackfillIngestionJob", new LaunchBackfillIngestionJobCommand());
     SUBCOMMAND_MAP.put("LaunchSparkDataIngestionJob", new LaunchSparkDataIngestionJobCommand());
     SUBCOMMAND_MAP.put("CreateSegment", new CreateSegmentCommand());
     SUBCOMMAND_MAP.put("ImportData", new ImportDataCommand());

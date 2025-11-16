@@ -21,6 +21,8 @@ package org.apache.pinot.segment.local.segment.creator.impl.stats;
 import com.clearspring.analytics.stream.cardinality.HyperLogLogPlus;
 import java.math.BigDecimal;
 import java.nio.charset.StandardCharsets;
+import java.util.HashSet;
+import java.util.Set;
 import org.apache.commons.lang3.NotImplementedException;
 import org.apache.pinot.segment.spi.creator.StatsCollectorConfig;
 import org.apache.pinot.spi.utils.BigDecimalUtils;
@@ -52,6 +54,10 @@ public class NoDictColumnStatisticsCollector extends AbstractColumnStatisticsCol
   private boolean _sealed = false;
   // HLL Plus generally returns approximate cardinality >= actual cardinality which is desired
   private final HyperLogLogPlus _hllPlus;
+  // Track exact uniques up to a threshold to avoid small-N underestimation and test flakiness
+  private static final int EXACT_UNIQUE_TRACKING_THRESHOLD = 2048;
+  // Single-threaded: simple Set is sufficient; set to null once threshold exceeded to cap memory
+  private Set<Object> _exactUniques = new HashSet<>();
 
   public NoDictColumnStatisticsCollector(String column, StatsCollectorConfig statsCollectorConfig) {
     super(column, statsCollectorConfig);
@@ -75,6 +81,7 @@ public class NoDictColumnStatisticsCollector extends AbstractColumnStatisticsCol
         }
         updateMinMax(value);
         updateHllPlus(value);
+        trackExactUnique(value);
         int len = getValueLength(value);
         _minLength = Math.min(_minLength, len);
         _maxLength = Math.max(_maxLength, len);
@@ -92,6 +99,7 @@ public class NoDictColumnStatisticsCollector extends AbstractColumnStatisticsCol
         for (int value : values) {
           updateMinMax(value);
           updateHllPlus(value);
+          trackExactUnique(value);
         }
         length = values.length;
       } else if (entry instanceof long[]) {
@@ -99,6 +107,7 @@ public class NoDictColumnStatisticsCollector extends AbstractColumnStatisticsCol
         for (long value : values) {
           updateMinMax(value);
           updateHllPlus(value);
+          trackExactUnique(value);
         }
         length = values.length;
       } else if (entry instanceof float[]) {
@@ -106,6 +115,7 @@ public class NoDictColumnStatisticsCollector extends AbstractColumnStatisticsCol
         for (float value : values) {
           updateMinMax(value);
           updateHllPlus(value);
+          trackExactUnique(value);
         }
         length = values.length;
       } else {
@@ -113,6 +123,7 @@ public class NoDictColumnStatisticsCollector extends AbstractColumnStatisticsCol
         for (double value : values) {
           updateMinMax(value);
           updateHllPlus(value);
+          trackExactUnique(value);
         }
         length = values.length;
       }
@@ -123,6 +134,7 @@ public class NoDictColumnStatisticsCollector extends AbstractColumnStatisticsCol
       addressSorted(value);
       updateMinMax(entry);
       updateHllPlus(entry);
+      trackExactUnique(entry);
       int len = getValueLength(entry);
       _minLength = Math.min(_minLength, len);
       _maxLength = Math.max(_maxLength, len);
@@ -208,8 +220,11 @@ public class NoDictColumnStatisticsCollector extends AbstractColumnStatisticsCol
 
   @Override
   public int getCardinality() {
-    // Get approximate distinct count estimate using HLL++
-    // Increase by 10% to increase probability of not returning lower than actual cardinality
+    // If we are still tracking exact uniques, return exact cardinality
+    if (_exactUniques != null) {
+      return _exactUniques.size();
+    }
+    // Get approximate distinct count estimate using HLL++ with a 10% upward buffer
     long estimate = Math.round(_hllPlus.cardinality() * 1.1);
     // There are cases where approximation can overshoot the actual number of entries.
     // Returning a cardinality greater than total entries can break assumptions.
@@ -223,10 +238,34 @@ public class NoDictColumnStatisticsCollector extends AbstractColumnStatisticsCol
 
   private void updateHllPlus(Object value) {
     if (value instanceof BigDecimal) {
-      // Canonicalize BigDecimal as string to avoid scale-related equality issues
+      // Canonicalize BigDecimal as string to avoid scale-related equality issues:
+      // BigDecimals with different scales (e.g., 1.0 vs 1.00) are not equal by default,
+      // but their string representations normalize the value for cardinality tracking.
       _hllPlus.offer(((BigDecimal) value).toString());
     } else {
       _hllPlus.offer(value);
+    }
+  }
+
+  private void trackExactUnique(Object value) {
+    if (_exactUniques == null) {
+      return;
+    }
+    Object key;
+    if (value instanceof byte[]) {
+      key = new ByteArray((byte[]) value);
+    } else if (value instanceof BigDecimal) {
+      // Use string representation to avoid scale-related equality issues:
+      // BigDecimals with different scales (e.g., 1.0 vs 1.00) are not equal by default,
+      // but their string representations normalize the value for cardinality tracking.
+      key = ((BigDecimal) value).toString();
+    } else {
+      key = value;
+    }
+    _exactUniques.add(key);
+    if (_exactUniques.size() > EXACT_UNIQUE_TRACKING_THRESHOLD) {
+      // Drop exact tracking once the threshold is exceeded to avoid unbounded memory.
+      _exactUniques = null;
     }
   }
 }

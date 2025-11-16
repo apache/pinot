@@ -3,7 +3,7 @@ INT;sv;raw;timestamp_index;false;Cannot create TIMESTAMP index on column: col of
 INT;sv;raw;bloom_filter;true;
 INT;sv;raw;fst_index;false;Cannot create FST index on column: col without dictionary
 INT;sv;raw;h3_index;false;Cannot create H3 index on column: col of stored type other than BYTES
-INT;sv;raw;inverted_index;false;Cannot create inverted index on column: col without dictionary
+INT;sv;raw;inverted_index;false;Cannot create inverted index for raw index column: col
 INT;sv;raw;json_index;false;Cannot create JSON index on column: col of stored type other than STRING or MAP
 INT;sv;raw;native_text_index;false;Cannot create TEXT index on column: col of stored type other than STRING
 INT;sv;raw;text_index;false;Cannot create TEXT index on column: col of stored type other than STRING
@@ -15,7 +15,7 @@ INT;mv;raw;timestamp_index;false;Cannot create TIMESTAMP index on column: col of
 INT;mv;raw;bloom_filter;true;
 INT;mv;raw;fst_index;false;Cannot create FST index on column: col without dictionary
 INT;mv;raw;h3_index;false;Cannot create H3 index on multi-value column: col
-INT;mv;raw;inverted_index;false;Cannot create inverted index on column: col without dictionary
+INT;mv;raw;inverted_index;false;Cannot create inverted index for raw index column: col
 INT;mv;raw;json_index;false;Cannot create JSON index on multi-value column: col
 INT;mv;raw;native_text_index;false;Cannot create TEXT index on column: col of stored type other than STRING
 INT;mv;raw;text_index;false;Cannot create TEXT index on column: col of stored type other than STRING
@@ -51,7 +51,7 @@ LONG;sv;raw;timestamp_index;true;
 LONG;sv;raw;bloom_filter;true;
 LONG;sv;raw;fst_index;false;Cannot create FST index on column: col without dictionary
 LONG;sv;raw;h3_index;false;Cannot create H3 index on column: col of stored type other than BYTES
-LONG;sv;raw;inverted_index;false;Cannot create inverted index on column: col without dictionary
+LONG;sv;raw;inverted_index;false;Cannot create inverted index for raw index column: col
 LONG;sv;raw;json_index;false;Cannot create JSON index on column: col of stored type other than STRING or MAP
 LONG;sv;raw;native_text_index;false;Cannot create TEXT index on column: col of stored type other than STRING
 LONG;sv;raw;text_index;false;Cannot create TEXT index on column: col of stored type other than STRING
@@ -63,7 +63,7 @@ LONG;mv;raw;timestamp_index;false;Cannot create TIMESTAMP index on multi-value c
 LONG;mv;raw;bloom_filter;true;
 LONG;mv;raw;fst_index;false;Cannot create FST index on column: col without dictionary
 LONG;mv;raw;h3_index;false;Cannot create H3 index on multi-value column: col
-LONG;mv;raw;inverted_index;false;Cannot create inverted index on column: col without dictionary
+LONG;mv;raw;inverted_index;false;Cannot create inverted index for raw index column: col
 LONG;mv;raw;json_index;false;Cannot create JSON index on multi-value column: col
 LONG;mv;raw;native_text_index;false;Cannot create TEXT index on column: col of stored type other than STRING
 LONG;mv;raw;text_index;false;Cannot create TEXT index on column: col of stored type other than STRING
@@ -99,7 +99,7 @@ FLOAT;sv;raw;timestamp_index;false;Cannot create TIMESTAMP index on column: col 
 FLOAT;sv;raw;bloom_filter;true;
 FLOAT;sv;raw;fst_index;false;Cannot create FST index on column: col without dictionary
 FLOAT;sv;raw;h3_index;false;Cannot create H3 index on column: col of stored type other than BYTES
-FLOAT;sv;raw;inverted_index;false;Cannot create inverted index on column: col without dictionary
+FLOAT;sv;raw;inverted_index;false;Cannot create inverted index for raw index column: col
 FLOAT;sv;raw;json_index;false;Cannot create JSON index on column: col of stored type other than STRING or MAP
 FLOAT;sv;raw;native_text_index;false;Cannot create TEXT index on column: col of stored type other than STRING
 FLOAT;sv;raw;text_index;false;Cannot create TEXT index on column: col of stored type other than STRING
@@ -111,7 +111,7 @@ FLOAT;mv;raw;timestamp_index;false;Cannot create TIMESTAMP index on column: col 
 FLOAT;mv;raw;bloom_filter;true;
 FLOAT;mv;raw;fst_index;false;Cannot create FST index on column: col without dictionary
 FLOAT;mv;raw;h3_index;false;Cannot create H3 index on multi-value column: col
-FLOAT;mv;raw;inverted_index;false;Cannot create inverted index on column: col without dictionary
+FLOAT;mv;raw;inverted_index;false;Cannot create inverted index for raw index column: col
 FLOAT;mv;raw;json_index;false;Cannot create JSON index on multi-value column: col
 FLOAT;mv;raw;native_text_index;false;Cannot create TEXT index on column: col of stored type other than STRING
 FLOAT;mv;raw;text_index;false;Cannot create TEXT index on column: col of stored type other than STRING
@@ -147,7 +147,7 @@ DOUBLE;sv;raw;timestamp_index;false;Cannot create TIMESTAMP index on column: col
 DOUBLE;sv;raw;bloom_filter;true;
 DOUBLE;sv;raw;fst_index;false;Cannot create FST index on column: col without dictionary
 DOUBLE;sv;raw;h3_index;false;Cannot create H3 index on column: col of stored type other than BYTES
-DOUBLE;sv;raw;inverted_index;false;Cannot create inverted index on column: col without dictionary
+DOUBLE;sv;raw;inverted_index;false;Cannot create inverted index for raw index column: col
 DOUBLE;sv;raw;json_index;false;Cannot create JSON index on column: col of stored type other than STRING or MAP
 DOUBLE;sv;raw;native_text_index;false;Cannot create TEXT index on column: col of stored type other than STRING
 DOUBLE;sv;raw;text_index;false;Cannot create TEXT index on column: col of stored type other than STRING
@@ -159,7 +159,7 @@ DOUBLE;mv;raw;timestamp_index;false;Cannot create TIMESTAMP index on column: col
 DOUBLE;mv;raw;bloom_filter;true;
 DOUBLE;mv;raw;fst_index;false;Cannot create FST index on column: col without dictionary
 DOUBLE;mv;raw;h3_index;false;Cannot create H3 index on multi-value column: col
-DOUBLE;mv;raw;inverted_index;false;Cannot create inverted index on column: col without dictionary
+DOUBLE;mv;raw;inverted_index;false;Cannot create inverted index for raw index column: col
 DOUBLE;mv;raw;json_index;false;Cannot create JSON index on multi-value column: col
 DOUBLE;mv;raw;native_text_index;false;Cannot create TEXT index on column: col of stored type other than STRING
 DOUBLE;mv;raw;text_index;false;Cannot create TEXT index on column: col of stored type other than STRING
@@ -195,7 +195,7 @@ DECIMAL;sv_BIG;raw;timestamp_index;false;Cannot create TIMESTAMP index on column
 DECIMAL;sv_BIG;raw;bloom_filter;true;
 DECIMAL;sv_BIG;raw;fst_index;false;Cannot create FST index on column: col without dictionary
 DECIMAL;sv_BIG;raw;h3_index;false;Cannot create H3 index on column: col of stored type other than BYTES
-DECIMAL;sv_BIG;raw;inverted_index;false;Cannot create inverted index on column: col without dictionary
+DECIMAL;sv_BIG;raw;inverted_index;false;Cannot create inverted index for raw index column: col
 DECIMAL;sv_BIG;raw;json_index;false;Cannot create JSON index on column: col of stored type other than STRING or MAP
 DECIMAL;sv_BIG;raw;native_text_index;false;Cannot create TEXT index on column: col of stored type other than STRING
 DECIMAL;sv_BIG;raw;text_index;false;Cannot create TEXT index on column: col of stored type other than STRING
@@ -219,7 +219,7 @@ BOOLEAN;sv;raw;timestamp_index;false;Cannot create TIMESTAMP index on column: co
 BOOLEAN;sv;raw;bloom_filter;false;Cannot create bloom filter on BOOLEAN column: col
 BOOLEAN;sv;raw;fst_index;false;Cannot create FST index on column: col without dictionary
 BOOLEAN;sv;raw;h3_index;false;Cannot create H3 index on column: col of stored type other than BYTES
-BOOLEAN;sv;raw;inverted_index;false;Cannot create inverted index on column: col without dictionary
+BOOLEAN;sv;raw;inverted_index;false;Cannot create inverted index for raw index column: col
 BOOLEAN;sv;raw;json_index;false;Cannot create JSON index on column: col of stored type other than STRING or MAP
 BOOLEAN;sv;raw;native_text_index;false;Cannot create TEXT index on column: col of stored type other than STRING
 BOOLEAN;sv;raw;text_index;false;Cannot create TEXT index on column: col of stored type other than STRING
@@ -231,7 +231,7 @@ BOOLEAN;mv;raw;timestamp_index;false;Cannot create TIMESTAMP index on column: co
 BOOLEAN;mv;raw;bloom_filter;false;Cannot create bloom filter on BOOLEAN column: col
 BOOLEAN;mv;raw;fst_index;false;Cannot create FST index on column: col without dictionary
 BOOLEAN;mv;raw;h3_index;false;Cannot create H3 index on multi-value column: col
-BOOLEAN;mv;raw;inverted_index;false;Cannot create inverted index on column: col without dictionary
+BOOLEAN;mv;raw;inverted_index;false;Cannot create inverted index for raw index column: col
 BOOLEAN;mv;raw;json_index;false;Cannot create JSON index on multi-value column: col
 BOOLEAN;mv;raw;native_text_index;false;Cannot create TEXT index on column: col of stored type other than STRING
 BOOLEAN;mv;raw;text_index;false;Cannot create TEXT index on column: col of stored type other than STRING
@@ -267,7 +267,7 @@ TIMESTAMP;sv;raw;timestamp_index;true;
 TIMESTAMP;sv;raw;bloom_filter;true;
 TIMESTAMP;sv;raw;fst_index;false;Cannot create FST index on column: col without dictionary
 TIMESTAMP;sv;raw;h3_index;false;Cannot create H3 index on column: col of stored type other than BYTES
-TIMESTAMP;sv;raw;inverted_index;false;Cannot create inverted index on column: col without dictionary
+TIMESTAMP;sv;raw;inverted_index;false;Cannot create inverted index for raw index column: col
 TIMESTAMP;sv;raw;json_index;false;Cannot create JSON index on column: col of stored type other than STRING or MAP
 TIMESTAMP;sv;raw;native_text_index;false;Cannot create TEXT index on column: col of stored type other than STRING
 TIMESTAMP;sv;raw;text_index;false;Cannot create TEXT index on column: col of stored type other than STRING
@@ -279,7 +279,7 @@ TIMESTAMP;mv;raw;timestamp_index;false;Cannot create TIMESTAMP index on multi-va
 TIMESTAMP;mv;raw;bloom_filter;true;
 TIMESTAMP;mv;raw;fst_index;false;Cannot create FST index on column: col without dictionary
 TIMESTAMP;mv;raw;h3_index;false;Cannot create H3 index on multi-value column: col
-TIMESTAMP;mv;raw;inverted_index;false;Cannot create inverted index on column: col without dictionary
+TIMESTAMP;mv;raw;inverted_index;false;Cannot create inverted index for raw index column: col
 TIMESTAMP;mv;raw;json_index;false;Cannot create JSON index on multi-value column: col
 TIMESTAMP;mv;raw;native_text_index;false;Cannot create TEXT index on column: col of stored type other than STRING
 TIMESTAMP;mv;raw;text_index;false;Cannot create TEXT index on column: col of stored type other than STRING
@@ -315,7 +315,7 @@ STRING;sv;raw;timestamp_index;false;Cannot create TIMESTAMP index on column: col
 STRING;sv;raw;bloom_filter;true;
 STRING;sv;raw;fst_index;false;Cannot create FST index on column: col without dictionary
 STRING;sv;raw;h3_index;false;Cannot create H3 index on column: col of stored type other than BYTES
-STRING;sv;raw;inverted_index;false;Cannot create inverted index on column: col without dictionary
+STRING;sv;raw;inverted_index;false;Cannot create inverted index for raw index column: col
 STRING;sv;raw;json_index;false;Column: col Unrecognized token 'str': was expecting (JSON String, Number, Array, Object or token 'null', 'true' or 'false')  at [Source: REDACTED (`StreamReadFeature.INCLUDE_SOURCE_IN_LOCATION` disabled); line: 1, column: 15]
 STRING;sv;raw;native_text_index;true;
 STRING;sv;raw;text_index;true;
@@ -327,7 +327,7 @@ STRING;mv;raw;timestamp_index;false;Cannot create TIMESTAMP index on column: col
 STRING;mv;raw;bloom_filter;true;
 STRING;mv;raw;fst_index;false;Cannot create FST index on column: col without dictionary
 STRING;mv;raw;h3_index;false;Cannot create H3 index on multi-value column: col
-STRING;mv;raw;inverted_index;false;Cannot create inverted index on column: col without dictionary
+STRING;mv;raw;inverted_index;false;Cannot create inverted index for raw index column: col
 STRING;mv;raw;json_index;false;Cannot create JSON index on multi-value column: col
 STRING;mv;raw;native_text_index;true;
 STRING;mv;raw;text_index;true;
@@ -363,7 +363,7 @@ JSON;sv;raw;timestamp_index;false;Cannot create TIMESTAMP index on column: col o
 JSON;sv;raw;bloom_filter;true;
 JSON;sv;raw;fst_index;false;Cannot create FST index on column: col without dictionary
 JSON;sv;raw;h3_index;false;Cannot create H3 index on column: col of stored type other than BYTES
-JSON;sv;raw;inverted_index;false;Cannot create inverted index on column: col without dictionary
+JSON;sv;raw;inverted_index;false;Cannot create inverted index for raw index column: col
 JSON;sv;raw;json_index;true;
 JSON;sv;raw;native_text_index;false;expected [1] but found [0]
 JSON;sv;raw;text_index;false;expected [1] but found [0]
@@ -387,7 +387,7 @@ BYTES;sv;raw;timestamp_index;false;Cannot create TIMESTAMP index on column: col 
 BYTES;sv;raw;bloom_filter;false;Caught exception while reading data
 BYTES;sv;raw;fst_index;false;Cannot create FST index on column: col without dictionary
 BYTES;sv;raw;h3_index;false;Caught exception while reading data
-BYTES;sv;raw;inverted_index;false;Cannot create inverted index on column: col without dictionary
+BYTES;sv;raw;inverted_index;false;Caught exception while reading data
 BYTES;sv;raw;json_index;false;Cannot create JSON index on column: col of stored type other than STRING or MAP
 BYTES;sv;raw;native_text_index;false;Cannot create TEXT index on column: col of stored type other than STRING
 BYTES;sv;raw;text_index;false;Cannot create TEXT index on column: col of stored type other than STRING
@@ -399,7 +399,7 @@ BYTES;mv;raw;timestamp_index;false;Cannot create TIMESTAMP index on column: col 
 BYTES;mv;raw;bloom_filter;false;Caught exception while reading data
 BYTES;mv;raw;fst_index;false;Cannot create FST index on column: col without dictionary
 BYTES;mv;raw;h3_index;false;Cannot create H3 index on multi-value column: col
-BYTES;mv;raw;inverted_index;false;Cannot create inverted index on column: col without dictionary
+BYTES;mv;raw;inverted_index;false;Caught exception while reading data
 BYTES;mv;raw;json_index;false;Cannot create JSON index on multi-value column: col
 BYTES;mv;raw;native_text_index;false;Cannot create TEXT index on column: col of stored type other than STRING
 BYTES;mv;raw;text_index;false;Cannot create TEXT index on column: col of stored type other than STRING
@@ -435,7 +435,7 @@ STRING;map;raw;timestamp_index;false;Cannot create TIMESTAMP index on column: co
 STRING;map;raw;bloom_filter;false;Cannot create bloom filter on MAP column: col
 STRING;map;raw;fst_index;false;Cannot create FST index on column: col without dictionary
 STRING;map;raw;h3_index;false;Cannot create H3 index on column: col of stored type other than BYTES
-STRING;map;raw;inverted_index;false;Cannot create inverted index on column: col without dictionary
+STRING;map;raw;inverted_index;false;Cannot create inverted index on MAP column: col
 STRING;map;raw;json_index;true;
 STRING;map;raw;native_text_index;false;Cannot create TEXT index on column: col of stored type other than STRING
 STRING;map;raw;text_index;false;Cannot create TEXT index on column: col of stored type other than STRING
@@ -459,7 +459,7 @@ INT;map;raw;timestamp_index;false;Cannot create TIMESTAMP index on column: col o
 INT;map;raw;bloom_filter;false;Cannot create bloom filter on MAP column: col
 INT;map;raw;fst_index;false;Cannot create FST index on column: col without dictionary
 INT;map;raw;h3_index;false;Cannot create H3 index on column: col of stored type other than BYTES
-INT;map;raw;inverted_index;false;Cannot create inverted index on column: col without dictionary
+INT;map;raw;inverted_index;false;Cannot create inverted index on MAP column: col
 INT;map;raw;json_index;true;
 INT;map;raw;native_text_index;false;Cannot create TEXT index on column: col of stored type other than STRING
 INT;map;raw;text_index;false;Cannot create TEXT index on column: col of stored type other than STRING
@@ -483,7 +483,7 @@ LONG;map;raw;timestamp_index;false;Cannot create TIMESTAMP index on column: col 
 LONG;map;raw;bloom_filter;false;Cannot create bloom filter on MAP column: col
 LONG;map;raw;fst_index;false;Cannot create FST index on column: col without dictionary
 LONG;map;raw;h3_index;false;Cannot create H3 index on column: col of stored type other than BYTES
-LONG;map;raw;inverted_index;false;Cannot create inverted index on column: col without dictionary
+LONG;map;raw;inverted_index;false;Cannot create inverted index on MAP column: col
 LONG;map;raw;json_index;true;
 LONG;map;raw;native_text_index;false;Cannot create TEXT index on column: col of stored type other than STRING
 LONG;map;raw;text_index;false;Cannot create TEXT index on column: col of stored type other than STRING
@@ -507,7 +507,7 @@ FLOAT;map;raw;timestamp_index;false;Cannot create TIMESTAMP index on column: col
 FLOAT;map;raw;bloom_filter;false;Cannot create bloom filter on MAP column: col
 FLOAT;map;raw;fst_index;false;Cannot create FST index on column: col without dictionary
 FLOAT;map;raw;h3_index;false;Cannot create H3 index on column: col of stored type other than BYTES
-FLOAT;map;raw;inverted_index;false;Cannot create inverted index on column: col without dictionary
+FLOAT;map;raw;inverted_index;false;Cannot create inverted index on MAP column: col
 FLOAT;map;raw;json_index;true;
 FLOAT;map;raw;native_text_index;false;Cannot create TEXT index on column: col of stored type other than STRING
 FLOAT;map;raw;text_index;false;Cannot create TEXT index on column: col of stored type other than STRING
@@ -531,7 +531,7 @@ DOUBLE;map;raw;timestamp_index;false;Cannot create TIMESTAMP index on column: co
 DOUBLE;map;raw;bloom_filter;false;Cannot create bloom filter on MAP column: col
 DOUBLE;map;raw;fst_index;false;Cannot create FST index on column: col without dictionary
 DOUBLE;map;raw;h3_index;false;Cannot create H3 index on column: col of stored type other than BYTES
-DOUBLE;map;raw;inverted_index;false;Cannot create inverted index on column: col without dictionary
+DOUBLE;map;raw;inverted_index;false;Cannot create inverted index on MAP column: col
 DOUBLE;map;raw;json_index;true;
 DOUBLE;map;raw;native_text_index;false;Cannot create TEXT index on column: col of stored type other than STRING
 DOUBLE;map;raw;text_index;false;Cannot create TEXT index on column: col of stored type other than STRING

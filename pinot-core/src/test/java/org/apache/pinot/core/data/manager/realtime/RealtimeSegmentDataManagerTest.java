@@ -49,6 +49,7 @@ import org.apache.pinot.segment.local.realtime.impl.RealtimeSegmentStatsHistory;
 import org.apache.pinot.segment.local.segment.creator.Fixtures;
 import org.apache.pinot.segment.local.segment.index.loader.IndexLoadingConfig;
 import org.apache.pinot.segment.local.utils.SegmentLocks;
+import org.apache.pinot.segment.local.utils.ServerReloadJobStatusCache;
 import org.apache.pinot.spi.config.instance.InstanceDataManagerConfig;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.ingestion.IngestionConfig;
@@ -768,7 +769,11 @@ public class RealtimeSegmentDataManagerTest {
     when(instanceDataManagerConfig.getUpsertConfig()).thenReturn(new PinotConfiguration());
     when(instanceDataManagerConfig.getDedupConfig()).thenReturn(new PinotConfiguration());
     TableDataManagerProvider tableDataManagerProvider = new DefaultTableDataManagerProvider();
-    tableDataManagerProvider.init(instanceDataManagerConfig, mock(HelixManager.class), new SegmentLocks(), null);
+    tableDataManagerProvider.init(instanceDataManagerConfig,
+        mock(HelixManager.class),
+        new SegmentLocks(),
+        null,
+        mock(ServerReloadJobStatusCache.class));
     TableConfig tableConfig = createTableConfig();
     Schema schema = Fixtures.createSchema();
     TableDataManager tableDataManager = tableDataManagerProvider.getTableDataManager(tableConfig, schema);

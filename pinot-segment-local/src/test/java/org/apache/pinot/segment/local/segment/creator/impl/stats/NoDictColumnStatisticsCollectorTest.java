@@ -781,9 +781,11 @@ public class NoDictColumnStatisticsCollectorTest {
     String context = String.format("Iteration %d, DataType: %s, SingleValue: %s, Data: %s",
         iteration, dataType, isSingleValue, Arrays.deepToString(testData));
 
-    assertTrue(noDictCollector.getCardinality() >= expectedCollector.getCardinality(),
-        "Approx Cardinality " + noDictCollector.getCardinality() + " is lower than actual cardinality "
-            + expectedCollector.getCardinality() + " for " + context);
+    int approx = noDictCollector.getCardinality();
+    int exact = expectedCollector.getCardinality();
+    assertTrue(approx >= exact,
+        "Approx Cardinality " + approx + " is lower than actual cardinality "
+            + exact + " for " + context);
     assertEquals(noDictCollector.getMinValue(), expectedCollector.getMinValue(),
         "MinValue mismatch - " + context);
     assertEquals(noDictCollector.getMaxValue(), expectedCollector.getMaxValue(),

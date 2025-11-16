@@ -133,7 +133,8 @@ public class MinionTaskUtils {
               BatchConfigProperties.SegmentPushType.TAR.toString());
         }
       }
-      singleFileGenerationTaskConfig.put(BatchConfigProperties.PUSH_CONTROLLER_URI, clusterInfoAccessor.getVipUrl());
+      singleFileGenerationTaskConfig.put(BatchConfigProperties.PUSH_CONTROLLER_URI,
+          clusterInfoAccessor.getVipUrlForLeadController(tableName));
       return singleFileGenerationTaskConfig;
     } catch (Exception e) {
       return taskConfigs;

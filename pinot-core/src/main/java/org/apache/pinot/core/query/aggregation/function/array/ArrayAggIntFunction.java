@@ -38,15 +38,26 @@ public class ArrayAggIntFunction extends BaseArrayAggIntFunction<IntArrayList> {
   public void aggregate(int length, AggregationResultHolder aggregationResultHolder,
       Map<ExpressionContext, BlockValSet> blockValSetMap) {
     BlockValSet blockValSet = blockValSetMap.get(_expression);
-    int[] value = blockValSet.getIntValuesSV();
     IntArrayList valueArray =
         aggregationResultHolder.getResult() != null ? aggregationResultHolder.getResult() : new IntArrayList(length);
-
-    forEachNotNull(length, blockValSet, (from, to) -> {
-      for (int i = from; i < to; i++) {
-        valueArray.add(value[i]);
-      }
-    });
+    if (blockValSet.isSingleValue()) {
+      int[] values = blockValSet.getIntValuesSV();
+      forEachNotNull(length, blockValSet, (from, to) -> {
+        for (int i = from; i < to; i++) {
+          valueArray.add(values[i]);
+        }
+      });
+    } else {
+      int[][] valuesArray = blockValSet.getIntValuesMV();
+      forEachNotNull(length, blockValSet, (from, to) -> {
+        for (int i = from; i < to; i++) {
+          int[] values = valuesArray[i];
+          for (int v : values) {
+            valueArray.add(v);
+          }
+        }
+      });
+    }
     aggregationResultHolder.setValue(valueArray);
   }
 

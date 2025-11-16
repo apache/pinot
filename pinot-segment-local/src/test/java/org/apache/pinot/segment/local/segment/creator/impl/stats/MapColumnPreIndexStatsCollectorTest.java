@@ -24,6 +24,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.TreeMap;
 import org.apache.pinot.segment.spi.creator.StatsCollectorConfig;
 import org.apache.pinot.segment.spi.partition.PartitionFunction;
 import org.apache.pinot.spi.config.table.ColumnPartitionConfig;
@@ -248,5 +249,143 @@ public class MapColumnPreIndexStatsCollectorTest {
           "max MV mismatch for key " + key);
       assertEquals(keyNoDict.isSorted(), keyDict.isSorted(), "sorted mismatch for key " + key);
     }
+  }
+
+  @Test
+  public void testFrequenciesUniqueKeysAndLengths() {
+    Map<String, Object> r1 = new HashMap<>();
+    r1.put("kStr", "alpha");
+    r1.put("kInt", 3);
+    r1.put("kLong", 7L);
+    r1.put("kFloat", 1.5f);
+    r1.put("kDouble", 2.25d);
+    r1.put("kBigDec", new java.math.BigDecimal("10.01"));
+    r1.put("kNull", null); // ignored
+
+    Map<String, Object> r2 = new HashMap<>();
+    r2.put("kStr", "beta");
+    r2.put("kInt", 3);
+    r2.put("kLong", 2L);
+    r2.put("kFloat", 1.5f);
+    r2.put("kDouble", 0.75d);
+    r2.put("kBigDec", new java.math.BigDecimal("10.01"));
+
+    Map<String, Object> r3 = new HashMap<>();
+    r3.put("kStr", "alpha");
+    r3.put("kInt", 3);
+    r3.put("kFloat", 3.5f);
+    r3.put("kBigDec", new java.math.BigDecimal("5.25"));
+
+    StatsCollectorConfig cfg = newConfig(false);
+    MapColumnPreIndexStatsCollector col = new MapColumnPreIndexStatsCollector("col", cfg);
+    col.collect(r1);
+    col.collect(r2);
+    col.collect(r3);
+    col.seal();
+
+    // Frequencies per key
+    Map<String, Integer> freqs = col.getAllKeyFrequencies();
+    assertEquals(freqs.get("kStr").intValue(), 3);
+    assertEquals(freqs.get("kInt").intValue(), 3);
+    assertEquals(freqs.get("kLong").intValue(), 2);
+    assertEquals(freqs.get("kFloat").intValue(), 3);
+    assertEquals(freqs.get("kDouble").intValue(), 2);
+    assertEquals(freqs.get("kBigDec").intValue(), 3);
+    assertFalse(freqs.containsKey("kNull"));
+
+    // Unique key set is sorted
+    String[] keys = col.getUniqueValuesSet();
+    assertEquals(keys, new String[]{"kBigDec", "kDouble", "kFloat", "kInt", "kLong", "kStr"});
+
+    // Row length metrics
+    int l1 = org.apache.pinot.spi.utils.MapUtils.serializeMap(r1).length;
+    int l2 = org.apache.pinot.spi.utils.MapUtils.serializeMap(r2).length;
+    int l3 = org.apache.pinot.spi.utils.MapUtils.serializeMap(r3).length;
+    int expectedMin = Math.min(l1, Math.min(l2, l3));
+    int expectedMax = Math.max(l1, Math.max(l2, l3));
+    assertEquals(col.getLengthOfShortestElement(), expectedMin);
+    assertEquals(col.getLengthOfLargestElement(), expectedMax);
+    assertEquals(col.getMaxRowLengthInBytes(), expectedMax);
+  }
+
+  @Test
+  public void testTypeConversionAndJsonSerialization() {
+    // Create collectors based on first-seen types, then feed convertible values
+    Map<String, Object> r1 = new HashMap<>();
+    r1.put("kInt2", 5); // int collector
+    r1.put("kObj",
+        new TreeMap<>(Map.of("k1", "v1", "k2", "v2"))); // will serialize to a JSON object: {"k1":"v1","k2":"v2"}
+    r1.put("kBigDec2", new BigDecimal("1.23")); // big decimal collector
+
+    Map<String, Object> r2 = new HashMap<>();
+    r2.put("kInt2", "6"); // string convertible to int
+    r2.put("kObj", List.of(2, 3)); // will serialize to "[2,3]"
+    r2.put("kBigDec2", "4.56"); // string convertible to big decimal
+
+    StatsCollectorConfig cfg = newConfig(false);
+    MapColumnPreIndexStatsCollector col = new MapColumnPreIndexStatsCollector("col", cfg);
+    col.collect(r1);
+    col.collect(r2);
+    col.seal();
+
+    // Int conversion branch
+    AbstractColumnStatisticsCollector sInt = col.getKeyStatistics("kInt2");
+    assertNotNull(sInt);
+    assertTrue(sInt instanceof IntColumnPreIndexStatsCollector);
+    assertEquals(sInt.getMaxValue(), 6);
+    assertEquals(sInt.getMinValue(), 5);
+    assertEquals(sInt.getCardinality(), 2); // {5,6}
+
+    // BigDecimal conversion branch
+    AbstractColumnStatisticsCollector sDec = col.getKeyStatistics("kBigDec2");
+    assertNotNull(sDec);
+    assertTrue(sDec instanceof BigDecimalColumnPreIndexStatsCollector);
+    assertEquals(sDec.getMaxValue(), new java.math.BigDecimal("4.56"));
+    assertEquals(sDec.getMinValue(), new java.math.BigDecimal("1.23"));
+
+    // JSON serialization branch for String collector
+    AbstractColumnStatisticsCollector sObj = col.getKeyStatistics("kObj");
+    assertNotNull(sObj);
+    assertTrue(sObj instanceof StringColumnPreIndexStatsCollector);
+    assertEquals(sObj.getMinValue(), "[2,3]");
+    assertEquals(sObj.getMaxValue(), "{\"k1\":\"v1\",\"k2\":\"v2\"}");
+  }
+
+  @Test(expectedExceptions = UnsupportedOperationException.class)
+  public void testUnsupportedEntryTypeThrows() {
+    StatsCollectorConfig cfg = newConfig(false);
+    MapColumnPreIndexStatsCollector col = new MapColumnPreIndexStatsCollector("col", cfg);
+    col.collect("not a map");
+  }
+
+  @Test
+  public void testSealIsIdempotent() {
+    StatsCollectorConfig cfg = newConfig(false);
+    MapColumnPreIndexStatsCollector col = new MapColumnPreIndexStatsCollector("col", cfg);
+
+    Map<String, Object> r1 = new HashMap<>();
+    r1.put("a", 1);
+    col.collect(r1);
+
+    col.seal();
+    String[] keys1 = col.getUniqueValuesSet();
+    col.seal(); // no-op
+    String[] keys2 = col.getUniqueValuesSet();
+    assertEquals(keys1, keys2);
+  }
+
+  @Test
+  public void testNoDictCreatesNoDictChildCollectors() {
+    StatsCollectorConfig cfgNoDict = newConfig(true);
+    MapColumnPreIndexStatsCollector col = new MapColumnPreIndexStatsCollector("col", cfgNoDict);
+
+    Map<String, Object> r1 = new HashMap<>();
+    r1.put("kInt", 1);
+    r1.put("kStr", "x");
+    col.collect(r1);
+    col.seal();
+
+    assertTrue(col.getKeyStatistics("kInt") instanceof NoDictColumnStatisticsCollector);
+    assertTrue(col.getKeyStatistics("kStr") instanceof NoDictColumnStatisticsCollector);
   }
 }

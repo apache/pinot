@@ -180,9 +180,7 @@ public enum AggregationFunctionType {
       ReturnTypes.ARG1, OperandTypes.VARIADIC, SqlTypeName.OTHER, SqlTypeName.BIGINT),
 
   // Array aggregate functions
-  ARRAYAGG("arrayAgg", ReturnTypes.TO_ARRAY,
-      OperandTypes.family(List.of(SqlTypeFamily.ANY, SqlTypeFamily.CHARACTER, SqlTypeFamily.BOOLEAN), i -> i == 2),
-      SqlTypeName.OTHER),
+  ARRAYAGG("arrayAgg", new ArrayOfComponentReturnTypeInference(), OperandTypes.VARIADIC, SqlTypeName.OTHER),
   LISTAGG("listAgg", SqlTypeName.OTHER, SqlTypeName.VARCHAR),
 
   SUMARRAYLONG("sumArrayLong", new ArrayReturnTypeInference(SqlTypeName.BIGINT), OperandTypes.ARRAY, SqlTypeName.OTHER),
@@ -400,6 +398,23 @@ public enum AggregationFunctionType {
       RelDataTypeFactory typeFactory = opBinding.getTypeFactory();
       RelDataType elementType = typeFactory.createSqlType(_sqlTypeName);
       return typeFactory.createArrayType(elementType, -1);
+    }
+  }
+
+  /**
+   * Returns ARRAY of the component type of the first operand when the first operand is an ARRAY.
+   * Falls back to ARRAY of the operand type if the component type is unavailable.
+   */
+  private static class ArrayOfComponentReturnTypeInference implements SqlReturnTypeInference {
+    @Override
+    public RelDataType inferReturnType(SqlOperatorBinding opBinding) {
+      RelDataTypeFactory typeFactory = opBinding.getTypeFactory();
+      RelDataType operandType = opBinding.getOperandType(0);
+      RelDataType componentType = operandType.getComponentType();
+      if (componentType != null) {
+        return typeFactory.createArrayType(componentType, -1);
+      }
+      return typeFactory.createArrayType(operandType, -1);
     }
   }
 

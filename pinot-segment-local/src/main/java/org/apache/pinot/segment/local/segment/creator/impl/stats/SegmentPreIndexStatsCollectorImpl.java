@@ -64,35 +64,9 @@ public class SegmentPreIndexStatsCollectorImpl implements SegmentPreIndexStatsCo
           }
         }
       }
-      switch (fieldSpec.getDataType().getStoredType()) {
-        case INT:
-          _columnStatsCollectorMap.put(column, new IntColumnPreIndexStatsCollector(column, _statsCollectorConfig));
-          break;
-        case LONG:
-          _columnStatsCollectorMap.put(column, new LongColumnPreIndexStatsCollector(column, _statsCollectorConfig));
-          break;
-        case FLOAT:
-          _columnStatsCollectorMap.put(column, new FloatColumnPreIndexStatsCollector(column, _statsCollectorConfig));
-          break;
-        case DOUBLE:
-          _columnStatsCollectorMap.put(column, new DoubleColumnPreIndexStatsCollector(column, _statsCollectorConfig));
-          break;
-        case BIG_DECIMAL:
-          _columnStatsCollectorMap.put(column,
-              new BigDecimalColumnPreIndexStatsCollector(column, _statsCollectorConfig));
-          break;
-        case STRING:
-          _columnStatsCollectorMap.put(column, new StringColumnPreIndexStatsCollector(column, _statsCollectorConfig));
-          break;
-        case BYTES:
-          _columnStatsCollectorMap.put(column, new BytesColumnPredIndexStatsCollector(column, _statsCollectorConfig));
-          break;
-        case MAP:
-          _columnStatsCollectorMap.put(column, new MapColumnPreIndexStatsCollector(column, _statsCollectorConfig));
-          break;
-        default:
-          throw new IllegalStateException("Unsupported data type: " + fieldSpec.getDataType());
-      }
+      AbstractColumnStatisticsCollector collector =
+          StatsCollectorUtil.createStatsCollector(column, fieldSpec, _statsCollectorConfig);
+      _columnStatsCollectorMap.put(column, collector);
     }
   }
 

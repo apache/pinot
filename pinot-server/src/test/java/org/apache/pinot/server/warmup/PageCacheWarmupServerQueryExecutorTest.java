@@ -90,6 +90,8 @@ public class PageCacheWarmupServerQueryExecutorTest {
     PageCacheWarmupConfig warm = mock(PageCacheWarmupConfig.class);
     when(warm.enableOnRestart()).thenReturn(true);
     when(warm.enableOnRefresh()).thenReturn(true);
+    when(warm.getQpsLimitOnRestart()).thenReturn(null);
+    when(warm.getQpsLimitOnRefresh()).thenReturn(null);
     when(cfg.getPageCacheWarmupConfig()).thenReturn(warm);
 
     when(_tableMgr.getCachedTableConfigAndSchema()).thenReturn(Pair.of(cfg, null));

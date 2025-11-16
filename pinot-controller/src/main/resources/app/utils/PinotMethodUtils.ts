@@ -114,7 +114,8 @@ import {
   pauseConsumption,
   resumeConsumption,
   getPauseStatus,
-  getVersions
+  getVersions,
+  getLogicalTables
 } from '../requests';
 import { baseApi } from './axios-config';
 import Utils from './Utils';
@@ -272,6 +273,22 @@ const getQueryTablesList = ({bothType = false}) => {
       result.data.tables.map((table)=>{
         responseObj.records.push([table]);
       });
+    });
+    return responseObj;
+  });
+};
+
+// This method is used to display logical table listing on query page
+// API: /logicalTables
+// Expected Output: {columns: [], records: []}
+const getQueryLogicalTablesList = () => {
+  return getLogicalTables().then(({ data }) => {
+    const responseObj = {
+      columns: ['Logical Tables'],
+      records: []
+    };
+    data.map((logicalTable) => {
+      responseObj.records.push([logicalTable]);
     });
     return responseObj;
   });
@@ -1377,6 +1394,7 @@ export default {
   getClusterConfigData,
   getClusterConfigJSON,
   getQueryTablesList,
+  getQueryLogicalTablesList,
   getTableSchemaData,
   getQueryResults,
   getTenantTableData,
