@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.query.mailbox.channel;
 
+import io.grpc.StatusRuntimeException;
 import io.grpc.stub.StreamObserver;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
@@ -67,7 +68,27 @@ public class MailboxStatusObserver implements StreamObserver<MailboxStatus> {
 
   @Override
   public void onError(Throwable t) {
-    LOGGER.warn("Error on sender side", t);
+    boolean skipLog = false;
+    if (t instanceof StatusRuntimeException) {
+      switch (((StatusRuntimeException) t).getStatus().getCode()) {
+        case CANCELLED:
+          // If the receiver cancelled the stream, we should not treat it as an error.
+          LOGGER.trace("Sending mailbox stream cancelled by receiving side");
+          skipLog = true;
+          break;
+        case DEADLINE_EXCEEDED:
+          // If the request timeout, we should not treat it as an error.
+          LOGGER.trace("Sending mailbox stream deadline exceeded");
+          skipLog = true;
+          break;
+        default:
+          // Other gRPC errors are treated as errors
+          break;
+      }
+    }
+    if (!skipLog) {
+      LOGGER.warn("Sending mailbox received an error from receiving side", t);
+    }
     _finished.set(true);
   }
 

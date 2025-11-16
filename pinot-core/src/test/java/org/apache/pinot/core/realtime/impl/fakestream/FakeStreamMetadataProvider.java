@@ -19,9 +19,12 @@
 package org.apache.pinot.core.realtime.impl.fakestream;
 
 import java.io.IOException;
+import java.util.HashMap;
+import java.util.Map;
 import java.util.Set;
 import java.util.stream.Collectors;
 import java.util.stream.IntStream;
+import org.apache.pinot.spi.stream.LongMsgOffset;
 import org.apache.pinot.spi.stream.OffsetCriteria;
 import org.apache.pinot.spi.stream.StreamConfig;
 import org.apache.pinot.spi.stream.StreamMetadataProvider;
@@ -58,7 +61,22 @@ public class FakeStreamMetadataProvider implements StreamMetadataProvider {
   }
 
   @Override
+  public boolean supportsOffsetLag() {
+    return true;
+  }
+
+  @Override
   public void close()
       throws IOException {
+  }
+
+  @Override
+  public Map<Integer, StreamPartitionMsgOffset> fetchLatestStreamOffset(Set<Integer> partitionIds,
+      long timeoutMillis) {
+    Map<Integer, StreamPartitionMsgOffset> partitionIdToLatestOffset = new HashMap<>();
+    for (Integer partitionId: partitionIds) {
+      partitionIdToLatestOffset.put(partitionId, new LongMsgOffset(Integer.MAX_VALUE));
+    }
+    return partitionIdToLatestOffset;
   }
 }

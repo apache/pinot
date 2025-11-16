@@ -24,12 +24,14 @@ import java.time.Instant;
 import java.time.ZoneOffset;
 import java.util.Arrays;
 import java.util.Optional;
+import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.TimeUnit;
 import org.apache.pinot.common.metrics.ServerMetrics;
 import org.apache.pinot.spi.env.PinotConfiguration;
 import org.apache.pinot.spi.stream.StreamConfig;
 import org.apache.pinot.spi.utils.CommonConstants;
+import org.apache.pinot.util.TestUtils;
 import org.testng.annotations.Test;
 
 import static org.apache.pinot.core.data.manager.realtime.RealtimeConsumptionRateManager.*;
@@ -70,7 +72,15 @@ public class RealtimeConsumptionRateManagerTest {
 
     when(SERVER_CONFIG_1.getProperty(CommonConstants.Server.CONFIG_OF_SERVER_CONSUMPTION_RATE_LIMIT,
         CommonConstants.Server.DEFAULT_SERVER_CONSUMPTION_RATE_LIMIT)).thenReturn(5.0);
-    when(SERVER_CONFIG_2.getProperty(CommonConstants.Server.CONFIG_OF_SERVER_CONSUMPTION_RATE_LIMIT,
+    if (Math.random() < 0.5) {
+      when(SERVER_CONFIG_1.getProperty(CommonConstants.Server.CONFIG_OF_SERVER_CONSUMPTION_RATE_LIMIT_BYTES,
+          CommonConstants.Server.DEFAULT_SERVER_CONSUMPTION_RATE_LIMIT)).thenReturn(5.0);
+    }
+    if (Math.random() < 0.5) {
+      when(SERVER_CONFIG_2.getProperty(CommonConstants.Server.CONFIG_OF_SERVER_CONSUMPTION_RATE_LIMIT,
+          CommonConstants.Server.DEFAULT_SERVER_CONSUMPTION_RATE_LIMIT)).thenReturn(2.5);
+    }
+    when(SERVER_CONFIG_2.getProperty(CommonConstants.Server.CONFIG_OF_SERVER_CONSUMPTION_RATE_LIMIT_BYTES,
         CommonConstants.Server.DEFAULT_SERVER_CONSUMPTION_RATE_LIMIT)).thenReturn(2.5);
     when(SERVER_CONFIG_3.getProperty(CommonConstants.Server.CONFIG_OF_SERVER_CONSUMPTION_RATE_LIMIT,
         CommonConstants.Server.DEFAULT_SERVER_CONSUMPTION_RATE_LIMIT)).thenReturn(0.0);
@@ -82,11 +92,11 @@ public class RealtimeConsumptionRateManagerTest {
   public void testCreateRateLimiter() {
     // topic A
     ConsumptionRateLimiter rateLimiter = _consumptionRateManager.createRateLimiter(STREAM_CONFIG_A, TABLE_NAME);
-    assertEquals(5.0, ((RateLimiterImpl) rateLimiter).getRate(), DELTA);
+    assertEquals(5.0, ((PartitionRateLimiter) rateLimiter).getRate(), DELTA);
 
     // topic B
     rateLimiter = _consumptionRateManager.createRateLimiter(STREAM_CONFIG_B, TABLE_NAME);
-    assertEquals(2.5, ((RateLimiterImpl) rateLimiter).getRate(), DELTA);
+    assertEquals(2.5, ((PartitionRateLimiter) rateLimiter).getRate(), DELTA);
 
     // topic C
     rateLimiter = _consumptionRateManager.createRateLimiter(STREAM_CONFIG_C, TABLE_NAME);
@@ -97,11 +107,22 @@ public class RealtimeConsumptionRateManagerTest {
   public void testCreateServerRateLimiter() {
     // Server config 1
     ConsumptionRateLimiter rateLimiter = _consumptionRateManager.createServerRateLimiter(SERVER_CONFIG_1, null);
-    assertEquals(5.0, ((RateLimiterImpl) rateLimiter).getRate(), DELTA);
+    ServerRateLimiter serverRateLimiter = (ServerRateLimiter) rateLimiter;
+    try {
+      assertEquals(serverRateLimiter.getRate(), 5.0, DELTA);
+      assertEquals(serverRateLimiter.getMetricEmitter().getRate(), 5.0, DELTA);
+    } finally {
+      serverRateLimiter.close();
+    }
 
     // Server config 2
-    rateLimiter = _consumptionRateManager.createServerRateLimiter(SERVER_CONFIG_2, null);
-    assertEquals(2.5, ((RateLimiterImpl) rateLimiter).getRate(), DELTA);
+    serverRateLimiter = (ServerRateLimiter) _consumptionRateManager.createServerRateLimiter(SERVER_CONFIG_2, null);
+    try {
+      assertEquals(((ServerRateLimiter) rateLimiter).getRate(), 2.5, DELTA);
+      assertEquals(serverRateLimiter.getRate(), 2.5, DELTA);
+    } finally {
+      serverRateLimiter.close();
+    }
 
     // Server config 3
     rateLimiter = _consumptionRateManager.createServerRateLimiter(SERVER_CONFIG_3, null);
@@ -110,6 +131,20 @@ public class RealtimeConsumptionRateManagerTest {
     // Server config 4
     rateLimiter = _consumptionRateManager.createServerRateLimiter(SERVER_CONFIG_4, null);
     assertEquals(rateLimiter, NOOP_RATE_LIMITER);
+
+    ServerRateLimitConfig serverRateLimitConfig = new ServerRateLimitConfig(1, MessageCountThrottlingStrategy.INSTANCE);
+    _consumptionRateManager.updateServerRateLimiter(serverRateLimitConfig, null);
+    serverRateLimiter = (ServerRateLimiter) _consumptionRateManager.getServerRateLimiter();
+    try {
+      assertEquals(serverRateLimiter.getRate(), 1);
+      assertEquals(serverRateLimiter.getMetricEmitter().getRate(), 1);
+
+      serverRateLimiter.updateRateLimit(12_000, ByteCountThrottlingStrategy.INSTANCE);
+      assertEquals(serverRateLimiter.getRate(), 12_000);
+      assertEquals(serverRateLimiter.getMetricEmitter().getRate(), 12_000);
+    } finally {
+      serverRateLimiter.close();
+    }
   }
 
   @Test
@@ -164,48 +199,84 @@ public class RealtimeConsumptionRateManagerTest {
     double rateLimit = 2; // unit: msgs/sec
     double rateLimitInMinutes = rateLimit * 60;
     ServerMetrics serverMetrics = mock(ServerMetrics.class);
-    MetricEmitter metricEmitter = new MetricEmitter(serverMetrics, "tableA-topicB-partition5");
+    QuotaUtilizationTracker quotaUtilizationTracker =
+        new QuotaUtilizationTracker(serverMetrics, "tableA-topicB-partition5");
 
     // 1st minute: no metrics should be emitted in the first minute
     int[] numMsgs = {10, 20, 5, 25};
     Instant now = Clock.fixed(Instant.parse("2022-08-10T12:00:02Z"), ZoneOffset.UTC).instant();
-    assertEquals(metricEmitter.emitMetric(numMsgs[0], rateLimit, now), 0);
+    assertEquals(quotaUtilizationTracker.update(numMsgs[0], rateLimit, now), 0);
     now = Clock.fixed(Instant.parse("2022-08-10T12:00:10Z"), ZoneOffset.UTC).instant();
-    assertEquals(metricEmitter.emitMetric(numMsgs[1], rateLimit, now), 0);
+    assertEquals(quotaUtilizationTracker.update(numMsgs[1], rateLimit, now), 0);
     now = Clock.fixed(Instant.parse("2022-08-10T12:00:30Z"), ZoneOffset.UTC).instant();
-    assertEquals(metricEmitter.emitMetric(numMsgs[2], rateLimit, now), 0);
+    assertEquals(quotaUtilizationTracker.update(numMsgs[2], rateLimit, now), 0);
     now = Clock.fixed(Instant.parse("2022-08-10T12:00:55Z"), ZoneOffset.UTC).instant();
-    assertEquals(metricEmitter.emitMetric(numMsgs[3], rateLimit, now), 0);
+    assertEquals(quotaUtilizationTracker.update(numMsgs[3], rateLimit, now), 0);
 
     // 2nd minute: metric should be emitted
     now = Clock.fixed(Instant.parse("2022-08-10T12:01:05Z"), ZoneOffset.UTC).instant();
     int sumOfMsgsInPrevMinute = sum(numMsgs);
     int expectedRatio = calcExpectedRatio(rateLimitInMinutes, sumOfMsgsInPrevMinute);
     numMsgs = new int[]{35};
-    assertEquals(metricEmitter.emitMetric(numMsgs[0], rateLimit, now), expectedRatio);
+    assertEquals(quotaUtilizationTracker.update(numMsgs[0], rateLimit, now), expectedRatio);
 
     // 3rd minute
     now = Clock.fixed(Instant.parse("2022-08-10T12:02:25Z"), ZoneOffset.UTC).instant();
     sumOfMsgsInPrevMinute = sum(numMsgs);
     expectedRatio = calcExpectedRatio(rateLimitInMinutes, sumOfMsgsInPrevMinute);
     numMsgs = new int[]{0};
-    assertEquals(metricEmitter.emitMetric(numMsgs[0], rateLimit, now), expectedRatio);
+    assertEquals(quotaUtilizationTracker.update(numMsgs[0], rateLimit, now), expectedRatio);
 
     // 4th minute
     now = Clock.fixed(Instant.parse("2022-08-10T12:03:15Z"), ZoneOffset.UTC).instant();
     sumOfMsgsInPrevMinute = sum(numMsgs);
     expectedRatio = calcExpectedRatio(rateLimitInMinutes, sumOfMsgsInPrevMinute);
     numMsgs = new int[]{10, 20};
-    assertEquals(metricEmitter.emitMetric(numMsgs[0], rateLimit, now), expectedRatio);
+    assertEquals(quotaUtilizationTracker.update(numMsgs[0], rateLimit, now), expectedRatio);
     now = Clock.fixed(Instant.parse("2022-08-10T12:03:20Z"), ZoneOffset.UTC).instant();
-    assertEquals(metricEmitter.emitMetric(numMsgs[1], rateLimit, now), expectedRatio);
+    assertEquals(quotaUtilizationTracker.update(numMsgs[1], rateLimit, now), expectedRatio);
 
     // 5th minute
     now = Clock.fixed(Instant.parse("2022-08-10T12:04:30Z"), ZoneOffset.UTC).instant();
     sumOfMsgsInPrevMinute = sum(numMsgs);
     expectedRatio = calcExpectedRatio(rateLimitInMinutes, sumOfMsgsInPrevMinute);
     numMsgs = new int[]{5};
-    assertEquals(metricEmitter.emitMetric(numMsgs[0], rateLimit, now), expectedRatio);
+    assertEquals(quotaUtilizationTracker.update(numMsgs[0], rateLimit, now), expectedRatio);
+  }
+
+  @Test
+  public void testAsyncMetricEmitter()
+      throws InterruptedException {
+    AsyncMetricEmitter emitter = new AsyncMetricEmitter(mock(ServerMetrics.class), "testMetric", 10.0);
+    try {
+      emitter.start(0, 1);
+      Thread.sleep(1500); // Let emitter run at-least once
+      for (int i = 0; i < 20; i++) {
+        CompletableFuture.runAsync(() -> emitter.record(1));
+      }
+      TestUtils.waitForCondition(
+          aVoid -> (emitter.getMessageCount().intValue() == 0) && (emitter.getTracker().getAggregateUnits() > 0),
+          5000,
+          "Expected messageCount to be zero because messageCount is always reset before emitter calls "
+              + "quotaUtilisationTracker");
+    } finally {
+      emitter.close();
+    }
+
+    AsyncMetricEmitter emitter1 = new AsyncMetricEmitter(mock(ServerMetrics.class), "testMetric", 10.0);
+    try {
+      emitter1.start(10, 10);
+      for (int i = 0; i < 20; i++) {
+        CompletableFuture.runAsync(() -> emitter1.record(1));
+      }
+      TestUtils.waitForCondition(
+          aVoid -> ((emitter1.getMessageCount().intValue() > 0) && (emitter1.getTracker().getAggregateUnits()
+              == 0)), 5000,
+          "Expected messageCount to be greater than zero because messageCount will reset post initial delay (first "
+              + "run).");
+    } finally {
+      emitter.close();
+    }
   }
 
   private int calcExpectedRatio(double rateLimitInMinutes, int sumOfMsgsInPrevMinute) {

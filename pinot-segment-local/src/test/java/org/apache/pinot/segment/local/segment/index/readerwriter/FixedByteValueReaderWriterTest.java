@@ -74,4 +74,40 @@ public class FixedByteValueReaderWriterTest implements PinotBuffersAfterMethodCh
       }
     }
   }
+
+  @Test(dataProvider = "params")
+  public void testFixedByteValueReaderWriterNonAscii(int maxStringLength, int configuredMaxLength, ByteOrder byteOrder)
+      throws IOException {
+    byte[] bytes = new byte[configuredMaxLength];
+    // Use a multi-byte UTF-8 character (é = 0xC3 0xA9)
+    byte[] nonAsciiChar = "é".getBytes(StandardCharsets.UTF_8);
+
+    try (PinotDataBuffer buffer = PinotDataBuffer.allocateDirect(configuredMaxLength * 1000L, byteOrder,
+        "testFixedByteValueReaderWriterNonAscii")) {
+      FixedByteValueReaderWriter readerWriter = new FixedByteValueReaderWriter(buffer);
+      List<String> inputs = new ArrayList<>(1000);
+
+      for (int i = 0; i < 1000; i++) {
+        // number of *characters* to write
+        int charCount = ThreadLocalRandom.current().nextInt(maxStringLength);
+        int byteCount = charCount * nonAsciiChar.length;
+        if (byteCount > configuredMaxLength) {
+          byteCount = configuredMaxLength - (configuredMaxLength % nonAsciiChar.length); // fit whole chars
+          charCount = byteCount / nonAsciiChar.length;
+        }
+
+        Arrays.fill(bytes, (byte) 0);
+        for (int pos = 0; pos < byteCount; pos += nonAsciiChar.length) {
+          System.arraycopy(nonAsciiChar, 0, bytes, pos, nonAsciiChar.length);
+        }
+
+        readerWriter.writeBytes(i, configuredMaxLength, bytes);
+        inputs.add("é".repeat(charCount));
+      }
+
+      for (int i = 0; i < 1000; i++) {
+        assertEquals(readerWriter.getUnpaddedString(i, configuredMaxLength, bytes), inputs.get(i));
+      }
+    }
+  }
 }

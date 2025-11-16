@@ -39,7 +39,6 @@ import org.apache.commons.io.FileUtils;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.pinot.segment.local.segment.creator.impl.SegmentIndexCreationDriverImpl;
 import org.apache.pinot.segment.local.segment.index.dictionary.DictionaryIndexType;
-import org.apache.pinot.segment.local.segment.index.forward.ForwardIndexType;
 import org.apache.pinot.segment.local.segment.index.loader.invertedindex.RangeIndexHandler;
 import org.apache.pinot.segment.local.segment.readers.GenericRowRecordReader;
 import org.apache.pinot.segment.local.segment.readers.PinotSegmentColumnReader;
@@ -49,7 +48,11 @@ import org.apache.pinot.segment.spi.V1Constants;
 import org.apache.pinot.segment.spi.compression.ChunkCompressionType;
 import org.apache.pinot.segment.spi.compression.DictIdCompressionType;
 import org.apache.pinot.segment.spi.creator.SegmentGeneratorConfig;
+import org.apache.pinot.segment.spi.index.DictionaryIndexConfig;
+import org.apache.pinot.segment.spi.index.FieldIndexConfigs;
 import org.apache.pinot.segment.spi.index.ForwardIndexConfig;
+import org.apache.pinot.segment.spi.index.IndexReaderConstraintException;
+import org.apache.pinot.segment.spi.index.IndexReaderFactory;
 import org.apache.pinot.segment.spi.index.IndexType;
 import org.apache.pinot.segment.spi.index.StandardIndexes;
 import org.apache.pinot.segment.spi.index.metadata.SegmentMetadataImpl;
@@ -295,6 +298,8 @@ public class ForwardIndexHandlerTest {
   //@formatter:on
 
   private static final Random RANDOM = new Random();
+  private static int _cardinalityOfSvEntries;
+  private static int _cardinalityOfMvEntries;
 
   private static final List<GenericRow> TEST_DATA;
 
@@ -323,21 +328,23 @@ public class ForwardIndexHandlerTest {
     Long[][] tempMVLongRowsForwardIndexDisabled = new Long[numRows][maxNumberOfMVEntries];
     byte[][][] tempMVByteRowsForwardIndexDisabled = new byte[numRows][maxNumberOfMVEntries][];
 
+    _cardinalityOfSvEntries = 1; // Start with 1 to account for static "testRow" entry
+    _cardinalityOfMvEntries = maxNumberOfMVEntries + 1; // Add 1 to account for static "testRow" entry
     for (int i = 0; i < numRows; i++) {
       // Adding a fixed value to check for filter queries
       if (i % 10 == 0) {
         String str = "testRow";
         tempStringRows[i] = str;
-        tempIntRows[i] = 1001;
-        tempLongRows[i] = 1001L;
+        tempIntRows[i] = numRows + 1;
+        tempLongRows[i] = (long) (numRows + 1);
         tempBytesRows[i] = str.getBytes();
-        tempBigDecimalRows[i] = BigDecimal.valueOf(1001);
+        tempBigDecimalRows[i] = BigDecimal.valueOf(numRows + 1);
 
         // Avoid creating empty arrays.
         int numMVElements = RANDOM.nextInt(maxNumberOfMVEntries) + 1;
         for (int j = 0; j < numMVElements; j++) {
-          tempMVIntRows[i][j] = 1001;
-          tempMVLongRows[i][j] = 1001L;
+          tempMVIntRows[i][j] = numRows + 1;
+          tempMVLongRows[i][j] = (long) (numRows + 1);
           tempMVStringRows[i][j] = str;
           tempMVByteRows[i][j] = str.getBytes();
         }
@@ -348,9 +355,11 @@ public class ForwardIndexHandlerTest {
         tempLongRows[i] = (long) i;
         tempBytesRows[i] = str.getBytes();
         tempBigDecimalRows[i] = BigDecimal.valueOf(i);
+        _cardinalityOfSvEntries += 1;
 
         // Avoid creating empty arrays.
-        int numMVElements = RANDOM.nextInt(maxNumberOfMVEntries) + 1;
+        // To test total cardinality, for atleast 1 row, have the number of MV entries = maxNumberOfMVEntries
+        int numMVElements = (i == 1) ? maxNumberOfMVEntries : (RANDOM.nextInt(maxNumberOfMVEntries) + 1);
         for (int j = 0; j < numMVElements; j++) {
           tempMVIntRows[i][j] = j;
           tempMVLongRows[i][j] = (long) j;
@@ -361,7 +370,7 @@ public class ForwardIndexHandlerTest {
 
       // Populate data for the MV columns with forward index disabled to have unique entries per row.
       // Avoid creating empty arrays.
-      int numMVElements = RANDOM.nextInt(maxNumberOfMVEntries) + 1;
+      int numMVElements = (i == 1) ? maxNumberOfMVEntries : (RANDOM.nextInt(maxNumberOfMVEntries) + 1);
       for (int j = 0; j < numMVElements; j++) {
         String str = "n" + i + j;
         tempMVIntRowsForwardIndexDisabled[i][j] = j;
@@ -567,6 +576,7 @@ public class ForwardIndexHandlerTest {
         .setNoDictionaryColumns(new ArrayList<>(noDictionaryColumns))
         .setInvertedIndexColumns(new ArrayList<>(invertedIndexColumns))
         .setCreateInvertedIndexDuringSegmentGeneration(true).setRangeIndexColumns(new ArrayList<>(rangeIndexColumns))
+        .setOptimizeNoDictStatsCollection(true)
         .setFieldConfigList(new ArrayList<>(fieldConfigMap.values())).build();
   }
 
@@ -1120,8 +1130,11 @@ public class ForwardIndexHandlerTest {
 
       try (SegmentDirectory segmentDirectory = new SegmentLocalFSDirectory(INDEX_DIR, ReadMode.mmap);
           SegmentDirectory.Reader reader = segmentDirectory.createReader()) {
-        ForwardIndexReader<?> forwardIndexReader =
-            ForwardIndexType.read(reader, segmentDirectory.getSegmentMetadata().getColumnMetadataFor(column));
+        IndexReaderFactory<ForwardIndexReader> readerFactory = StandardIndexes.forward().getReaderFactory();
+        ColumnMetadata columnMetadata = segmentDirectory.getSegmentMetadata().getColumnMetadataFor(column);
+        FieldIndexConfigs fieldIndexConfigs = createFieldIndexConfigsFromMetadata(columnMetadata);
+        ForwardIndexReader forwardIndexReader =
+            readerFactory.createIndexReader(reader, fieldIndexConfigs, columnMetadata);
         assertTrue(forwardIndexReader.isDictionaryEncoded());
         assertFalse(forwardIndexReader.isSingleValue());
         assertEquals(forwardIndexReader.getDictIdCompressionType(), DictIdCompressionType.MV_ENTRY_DICT);
@@ -1147,8 +1160,11 @@ public class ForwardIndexHandlerTest {
 
       try (SegmentDirectory segmentDirectory = new SegmentLocalFSDirectory(INDEX_DIR, ReadMode.mmap);
           SegmentDirectory.Reader reader = segmentDirectory.createReader()) {
-        ForwardIndexReader<?> forwardIndexReader =
-            ForwardIndexType.read(reader, segmentDirectory.getSegmentMetadata().getColumnMetadataFor(column));
+        IndexReaderFactory<ForwardIndexReader> readerFactory = StandardIndexes.forward().getReaderFactory();
+        ColumnMetadata columnMetadata = segmentDirectory.getSegmentMetadata().getColumnMetadataFor(column);
+        FieldIndexConfigs fieldIndexConfigs = createFieldIndexConfigsFromMetadata(columnMetadata);
+        ForwardIndexReader forwardIndexReader =
+            readerFactory.createIndexReader(reader, fieldIndexConfigs, columnMetadata);
         assertTrue(forwardIndexReader.isDictionaryEncoded());
         assertFalse(forwardIndexReader.isSingleValue());
         assertNull(forwardIndexReader.getDictIdCompressionType());
@@ -1232,7 +1248,11 @@ public class ForwardIndexHandlerTest {
       } else if (dataType == DataType.BIG_DECIMAL) {
         dictionaryElementSize = 4;
       }
-      validateMetadataProperties(column, true, dictionaryElementSize, metadata.getCardinality(),
+      int expectedCardinality = column.equals(DIM_MV_PASS_THROUGH_INTEGER) || column.equals(DIM_MV_PASS_THROUGH_LONG)
+          ? _cardinalityOfMvEntries : _cardinalityOfSvEntries;
+      // DIM_RAW_SORTED_INTEGER has all unique values
+      expectedCardinality = column.equals(DIM_RAW_SORTED_INTEGER) ? TEST_DATA.size() : expectedCardinality;
+      validateMetadataProperties(column, true, dictionaryElementSize, expectedCardinality,
           metadata.getTotalDocs(), dataType, metadata.getFieldType(), metadata.isSorted(), metadata.isSingleValue(),
           metadata.getMaxNumberOfMultiValues(), metadata.getTotalNumberOfEntries(), metadata.isAutoGenerated(),
           metadata.getMinValue(), metadata.getMaxValue(), false);
@@ -1274,7 +1294,11 @@ public class ForwardIndexHandlerTest {
     } else if (dataType == DataType.BIG_DECIMAL) {
       dictionaryElementSize = 4;
     }
-    validateMetadataProperties(column1, true, dictionaryElementSize, metadata.getCardinality(), metadata.getTotalDocs(),
+    int expectedCardinality = column1.equals(DIM_MV_PASS_THROUGH_INTEGER) || column1.equals(DIM_MV_PASS_THROUGH_LONG)
+        ? _cardinalityOfMvEntries : _cardinalityOfSvEntries;
+    // DIM_RAW_SORTED_INTEGER has all unique values
+    expectedCardinality = column1.equals(DIM_RAW_SORTED_INTEGER) ? TEST_DATA.size() : expectedCardinality;
+    validateMetadataProperties(column1, true, dictionaryElementSize, expectedCardinality, metadata.getTotalDocs(),
         dataType, metadata.getFieldType(), metadata.isSorted(), metadata.isSingleValue(),
         metadata.getMaxNumberOfMultiValues(), metadata.getTotalNumberOfEntries(), metadata.isAutoGenerated(),
         metadata.getMinValue(), metadata.getMaxValue(), false);
@@ -1294,7 +1318,11 @@ public class ForwardIndexHandlerTest {
     } else if (dataType == DataType.BIG_DECIMAL) {
       dictionaryElementSize = 4;
     }
-    validateMetadataProperties(column2, true, dictionaryElementSize, metadata.getCardinality(), metadata.getTotalDocs(),
+    expectedCardinality = column2.equals(DIM_MV_PASS_THROUGH_INTEGER) || column2.equals(DIM_MV_PASS_THROUGH_LONG)
+        ? _cardinalityOfMvEntries : _cardinalityOfSvEntries;
+    // DIM_RAW_SORTED_INTEGER has all unique values
+    expectedCardinality = column2.equals(DIM_RAW_SORTED_INTEGER) ? TEST_DATA.size() : expectedCardinality;
+    validateMetadataProperties(column2, true, dictionaryElementSize, expectedCardinality, metadata.getTotalDocs(),
         dataType, metadata.getFieldType(), metadata.isSorted(), metadata.isSingleValue(),
         metadata.getMaxNumberOfMultiValues(), metadata.getTotalNumberOfEntries(), metadata.isAutoGenerated(),
         metadata.getMinValue(), metadata.getMaxValue(), false);
@@ -1489,7 +1517,9 @@ public class ForwardIndexHandlerTest {
       } else if (dataType == DataType.BIG_DECIMAL) {
         dictionaryElementSize = 4;
       }
-      validateMetadataProperties(column, true, dictionaryElementSize, metadata.getCardinality(),
+      int expectedCardinality = column.equals(DIM_MV_PASS_THROUGH_INTEGER) || column.equals(DIM_MV_PASS_THROUGH_LONG)
+          ? _cardinalityOfMvEntries : _cardinalityOfSvEntries;
+      validateMetadataProperties(column, true, dictionaryElementSize, expectedCardinality,
           metadata.getTotalDocs(), dataType, metadata.getFieldType(), metadata.isSorted(), metadata.isSingleValue(),
           metadata.getMaxNumberOfMultiValues(), metadata.getTotalNumberOfEntries(), metadata.isAutoGenerated(),
           metadata.getMinValue(), metadata.getMaxValue(), false);
@@ -1535,7 +1565,9 @@ public class ForwardIndexHandlerTest {
     } else if (dataType == DataType.BIG_DECIMAL) {
       dictionaryElementSize = 4;
     }
-    validateMetadataProperties(column1, true, dictionaryElementSize, metadata.getCardinality(), metadata.getTotalDocs(),
+    int expectedCardinality = column1.equals(DIM_MV_PASS_THROUGH_INTEGER) || column1.equals(DIM_MV_PASS_THROUGH_LONG)
+        ? _cardinalityOfMvEntries : _cardinalityOfSvEntries;
+    validateMetadataProperties(column1, true, dictionaryElementSize, expectedCardinality, metadata.getTotalDocs(),
         dataType, metadata.getFieldType(), metadata.isSorted(), metadata.isSingleValue(),
         metadata.getMaxNumberOfMultiValues(), metadata.getTotalNumberOfEntries(), metadata.isAutoGenerated(),
         metadata.getMinValue(), metadata.getMaxValue(), false);
@@ -1553,7 +1585,9 @@ public class ForwardIndexHandlerTest {
     } else if (dataType == DataType.BIG_DECIMAL) {
       dictionaryElementSize = 4;
     }
-    validateMetadataProperties(column2, true, dictionaryElementSize, metadata.getCardinality(), metadata.getTotalDocs(),
+    expectedCardinality = column2.equals(DIM_MV_PASS_THROUGH_INTEGER) || column2.equals(DIM_MV_PASS_THROUGH_LONG)
+        ? _cardinalityOfMvEntries : _cardinalityOfSvEntries;
+    validateMetadataProperties(column2, true, dictionaryElementSize, expectedCardinality, metadata.getTotalDocs(),
         dataType, metadata.getFieldType(), metadata.isSorted(), metadata.isSingleValue(),
         metadata.getMaxNumberOfMultiValues(), metadata.getTotalNumberOfEntries(), metadata.isAutoGenerated(),
         metadata.getMinValue(), metadata.getMaxValue(), false);
@@ -1628,7 +1662,9 @@ public class ForwardIndexHandlerTest {
       } else if (dataType == DataType.BIG_DECIMAL) {
         dictionaryElementSize = 4;
       }
-      validateMetadataProperties(column, true, dictionaryElementSize, metadata.getCardinality(),
+      int expectedCardinality = column.equals(DIM_MV_PASS_THROUGH_INTEGER) || column.equals(DIM_MV_PASS_THROUGH_LONG)
+          ? _cardinalityOfMvEntries : _cardinalityOfSvEntries;
+      validateMetadataProperties(column, true, dictionaryElementSize, expectedCardinality,
           metadata.getTotalDocs(), dataType, metadata.getFieldType(), metadata.isSorted(), metadata.isSingleValue(),
           metadata.getMaxNumberOfMultiValues(), metadata.getTotalNumberOfEntries(), metadata.isAutoGenerated(),
           metadata.getMinValue(), metadata.getMaxValue(), false);
@@ -2019,12 +2055,14 @@ public class ForwardIndexHandlerTest {
     try (SegmentDirectory segmentDirectory = new SegmentLocalFSDirectory(INDEX_DIR, ReadMode.mmap);
         SegmentDirectory.Reader reader = segmentDirectory.createReader()) {
       validateForwardIndex(segmentDirectory, reader, columnName, expectedCompressionType, isSorted);
+    } catch (IndexReaderConstraintException e) {
+      throw new RuntimeException(e);
     }
   }
 
   private void validateForwardIndex(SegmentDirectory segmentDirectory, SegmentDirectory.Reader reader,
       String columnName, @Nullable CompressionCodec expectedCompressionType, boolean isSorted)
-      throws IOException {
+      throws IOException, IndexReaderConstraintException {
     ColumnMetadata columnMetadata = segmentDirectory.getSegmentMetadata().getColumnMetadataFor(columnName);
     boolean isSingleValue = columnMetadata.isSingleValue();
 
@@ -2036,7 +2074,9 @@ public class ForwardIndexHandlerTest {
     assertTrue(reader.hasIndexFor(columnName, StandardIndexes.forward()));
 
     // Check Compression type in header
-    ForwardIndexReader<?> fwdIndexReader = ForwardIndexType.read(reader, columnMetadata);
+    IndexReaderFactory<ForwardIndexReader> readerFactory = StandardIndexes.forward().getReaderFactory();
+    FieldIndexConfigs fieldIndexConfigs = createFieldIndexConfigsFromMetadata(columnMetadata);
+    ForwardIndexReader<?> fwdIndexReader = readerFactory.createIndexReader(reader, fieldIndexConfigs, columnMetadata);
     ChunkCompressionType fwdIndexCompressionType = fwdIndexReader.getCompressionType();
     if (expectedCompressionType != null) {
       assertNotNull(fwdIndexCompressionType);
@@ -2044,8 +2084,9 @@ public class ForwardIndexHandlerTest {
     } else {
       assertNull(fwdIndexCompressionType);
     }
-
-    try (ForwardIndexReader<?> forwardIndexReader = ForwardIndexType.read(reader, columnMetadata)) {
+    fieldIndexConfigs = createFieldIndexConfigsFromMetadata(columnMetadata);
+    try (ForwardIndexReader<?> forwardIndexReader = readerFactory.createIndexReader(reader, fieldIndexConfigs,
+        columnMetadata)) {
       Dictionary dictionary = null;
       if (columnMetadata.hasDictionary()) {
         dictionary = DictionaryIndexType.read(reader, columnMetadata);
@@ -2256,5 +2297,21 @@ public class ForwardIndexHandlerTest {
     assertEquals(columnMetadata.isAutoGenerated(), isAutoGenerated);
     assertEquals(columnMetadata.getMinValue(), minValue);
     assertEquals(columnMetadata.getMaxValue(), maxValue);
+  }
+
+  private FieldIndexConfigs createFieldIndexConfigsFromMetadata(ColumnMetadata columnMetadata) {
+    FieldIndexConfigs.Builder builder = new FieldIndexConfigs.Builder();
+
+    // Add forward index config
+    ForwardIndexConfig forwardIndexConfig = ForwardIndexConfig.getDefault();
+    builder.add(StandardIndexes.forward(), forwardIndexConfig);
+
+    // Add dictionary config if the column has dictionary
+    if (columnMetadata.hasDictionary()) {
+      DictionaryIndexConfig dictionaryConfig = DictionaryIndexConfig.DEFAULT;
+      builder.add(StandardIndexes.dictionary(), dictionaryConfig);
+    }
+
+    return builder.build();
   }
 }

@@ -38,6 +38,10 @@ public class PageCacheWarmupConfig extends BaseJsonConfig {
   // This is used to define a strategy for how queries should be selected for warmup
   @Nullable
   private final String _policy;
+  // Warmup QPS limit, defaults to the table QPS limit per replica if not set
+  private final Integer _qpsLimitOnRestart;
+  // Warmup QPS limit, defaults to the table QPS limit per replica if not set
+  private final Integer _qpsLimitOnRefresh;
 
   private static final int DEFAULT_WARMUP_DURATION_SECONDS = 180;
 
@@ -45,13 +49,17 @@ public class PageCacheWarmupConfig extends BaseJsonConfig {
   public PageCacheWarmupConfig(@JsonProperty("enableOnRestart") boolean enableOnRestart,
                                @JsonProperty("enableOnRefresh") boolean enableOnRefresh,
                                @JsonProperty("maxWarmupDurationSeconds") @Nullable Integer maxWarmupDurationSeconds,
-                               @Nullable @JsonProperty("policy") String policy) {
+                               @Nullable @JsonProperty("policy") String policy,
+                               @Nullable @JsonProperty("qpsLimitOnRestart") Integer qpsLimitOnRestart,
+                               @Nullable @JsonProperty("qpsLimitOnRestart") Integer qpsLimitOnRefresh) {
     _enableOnRestart = enableOnRestart;
     _enableOnRefresh = enableOnRefresh;
     _maxWarmupDurationSeconds = (maxWarmupDurationSeconds != null)
         ? maxWarmupDurationSeconds
         : DEFAULT_WARMUP_DURATION_SECONDS;
     _policy = policy;
+    _qpsLimitOnRestart = qpsLimitOnRestart;
+    _qpsLimitOnRefresh = qpsLimitOnRefresh;
   }
 
   // Getters
@@ -74,5 +82,17 @@ public class PageCacheWarmupConfig extends BaseJsonConfig {
   @JsonProperty("policy")
   public String getPolicy() {
     return _policy;
+  }
+
+  @Nullable
+  @JsonProperty("qpsLimitOnRestart")
+  public Integer getQpsLimitOnRestart() {
+    return _qpsLimitOnRestart;
+  }
+
+  @Nullable
+  @JsonProperty("qpsLimitOnRefresh")
+  public Integer getQpsLimitOnRefresh() {
+    return _qpsLimitOnRefresh;
   }
 }

@@ -20,7 +20,6 @@ package org.apache.pinot.segment.local.utils;
 
 import com.fasterxml.jackson.databind.node.JsonNodeFactory;
 import com.fasterxml.jackson.databind.node.ObjectNode;
-import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.Lists;
 import java.util.Arrays;
 import java.util.Collections;
@@ -29,6 +28,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.function.BiConsumer;
+import javax.annotation.Nullable;
 import org.apache.pinot.common.tier.TierFactory;
 import org.apache.pinot.segment.spi.AggregationFunctionType;
 import org.apache.pinot.segment.spi.Constants;
@@ -81,6 +81,7 @@ import org.apache.pinot.spi.utils.Enablement;
 import org.apache.pinot.spi.utils.JsonUtils;
 import org.apache.pinot.spi.utils.builder.TableConfigBuilder;
 import org.mockito.Mockito;
+import org.testng.annotations.DataProvider;
 import org.testng.annotations.Test;
 
 import static org.mockito.Mockito.when;
@@ -814,6 +815,71 @@ public class TableConfigUtilsTest {
     // Legacy behavior: allow size based threshold to be explicitly set to 0
     streamConfigs.put(StreamConfigProperties.SEGMENT_FLUSH_THRESHOLD_ROWS, "0");
     TableConfigUtils.validateStreamConfig(new StreamConfig("test", streamConfigs));
+
+    // Test for multiple stream configs with pauseless consumption enabled - should fail
+    StreamIngestionConfig streamIngestionConfigWithPauseless =
+        new StreamIngestionConfig(Arrays.asList(streamConfigs, streamConfigs));
+    streamIngestionConfigWithPauseless.setPauselessConsumptionEnabled(true);
+
+    IngestionConfig ingestionConfigWithPauseless = new IngestionConfig();
+    ingestionConfigWithPauseless.setStreamIngestionConfig(streamIngestionConfigWithPauseless);
+
+    TableConfig tableConfigWithPauseless = new TableConfigBuilder(TableType.REALTIME).setTableName(TABLE_NAME)
+        .setTimeColumnName("timeColumn")
+        .setIngestionConfig(ingestionConfigWithPauseless)
+        .build();
+
+    try {
+      TableConfigUtils.validate(tableConfigWithPauseless, schema);
+      fail("Should fail when pauseless consumption is enabled with multiple stream configs");
+    } catch (IllegalStateException e) {
+      // Expected - should fail with specific error message
+      assertTrue(
+          e.getMessage().contains("Multiple stream configs are not supported with pauseless consumption enabled"));
+    }
+
+    // Test for multiple stream configs with pauseless consumption disabled - should pass
+    StreamIngestionConfig streamIngestionConfigWithoutPauseless =
+        new StreamIngestionConfig(Arrays.asList(streamConfigs, streamConfigs));
+    streamIngestionConfigWithoutPauseless.setPauselessConsumptionEnabled(false);
+
+    IngestionConfig ingestionConfigWithoutPauseless = new IngestionConfig();
+    ingestionConfigWithoutPauseless.setStreamIngestionConfig(streamIngestionConfigWithoutPauseless);
+
+    TableConfig tableConfigWithoutPauseless = new TableConfigBuilder(TableType.REALTIME).setTableName(TABLE_NAME)
+        .setTimeColumnName("timeColumn")
+        .setIngestionConfig(ingestionConfigWithoutPauseless)
+        .build();
+
+    try {
+      TableConfigUtils.validate(tableConfigWithoutPauseless, schema);
+      fail("Should fail when duplicate topic names are present in multiple stream configs");
+    } catch (IllegalStateException e) {
+      // Expected - should fail with specific error message
+      assertTrue(
+          e.getMessage().contains("Duplicate topic names found in streamConfigs:"));
+    }
+
+    // Test for multiple stream configs with pauseless consumption disabled and unique topic names - should pass
+    Map<String, String> anotherStreamConfig = new HashMap<>(streamConfigs);
+    anotherStreamConfig.put("stream.kafka.topic.name", "myTopic2");
+    StreamIngestionConfig streamIngestionConfigWithoutPauselessUniqueTopics =
+        new StreamIngestionConfig(Arrays.asList(streamConfigs, anotherStreamConfig));
+    streamIngestionConfigWithoutPauselessUniqueTopics.setPauselessConsumptionEnabled(false);
+
+    IngestionConfig ingestionConfigWithoutPauselessUniqueTopics = new IngestionConfig();
+    ingestionConfigWithoutPauselessUniqueTopics.setStreamIngestionConfig(
+        streamIngestionConfigWithoutPauselessUniqueTopics);
+    TableConfig tableConfigWithoutPauselessUniqueTopics = new TableConfigBuilder(TableType.REALTIME)
+        .setTableName(TABLE_NAME)
+        .setTimeColumnName("timeColumn")
+        .setIngestionConfig(ingestionConfigWithoutPauselessUniqueTopics)
+        .build();
+    try {
+      TableConfigUtils.validate(tableConfigWithoutPauselessUniqueTopics, schema);
+    } catch (IllegalStateException e) {
+      fail("Should not fail when pauseless consumption is disabled with multiple stream configs with unique topics");
+    }
   }
 
   @Test
@@ -1440,6 +1506,7 @@ public class TableConfigUtilsTest {
         .addSingleValueDimension("myCol", FieldSpec.DataType.STRING)
         .addSingleValueDimension("bytesCol", FieldSpec.DataType.BYTES)
         .addSingleValueDimension("intCol", FieldSpec.DataType.INT)
+        .addSingleValueDimension("bigDecimalCol", FieldSpec.DataType.BIG_DECIMAL)
         .addMultiValueDimension("multiValCol", FieldSpec.DataType.STRING)
         .build();
     TableConfig tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName(TABLE_NAME)
@@ -1564,6 +1631,31 @@ public class TableConfigUtilsTest {
       fail("Should not fail for valid StarTreeIndex config column name");
     }
 
+    // Test using * as the column for the COUNT aggregation
+    starTreeIndexConfig =
+        new StarTreeIndexConfig(List.of("myCol"), List.of("myCol"), List.of("COUNT__*"), null, 1);
+    tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName(TABLE_NAME)
+        .setStarTreeIndexConfigs(List.of(starTreeIndexConfig))
+        .build();
+    try {
+      TableConfigUtils.validate(tableConfig, schema);
+    } catch (Exception e) {
+      fail("Should not fail for valid StarTreeIndex function column pair with COUNT__*");
+    }
+
+    // Test using * as the column for a non-COUNT aggregation
+    starTreeIndexConfig =
+        new StarTreeIndexConfig(List.of("myCol"), List.of("myCol"), List.of("SUM__*"), null, 1);
+    tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName(TABLE_NAME)
+        .setStarTreeIndexConfigs(List.of(starTreeIndexConfig))
+        .build();
+    try {
+      TableConfigUtils.validate(tableConfig, schema);
+      fail("Should not fail for invalid StarTreeIndex function column pair with SUM__*");
+    } catch (Exception e) {
+      // expected
+    }
+
     starTreeIndexConfig = new StarTreeIndexConfig(List.of("myCol2"), List.of("myCol"), List.of("SUM__myCol"), null, 1);
     tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName(TABLE_NAME)
         .setStarTreeIndexConfigs(List.of(starTreeIndexConfig))
@@ -1618,6 +1710,29 @@ public class TableConfigUtilsTest {
     try {
       TableConfigUtils.validate(tableConfig, schema);
       fail("Should fail for invalid StarTreeIndex config with both function column pair and aggregation config");
+    } catch (Exception e) {
+      // expected
+    }
+
+    starTreeIndexConfig = new StarTreeIndexConfig(List.of("myCol"), null, null,
+        List.of(new StarTreeAggregationConfig("*", "COUNT")), 1);
+    tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName(TABLE_NAME)
+        .setStarTreeIndexConfigs(List.of(starTreeIndexConfig))
+        .build();
+    try {
+      TableConfigUtils.validate(tableConfig, schema);
+    } catch (Exception e) {
+      fail("Should not fail for valid StarTreeIndex config with aggregation config for COUNT on '*' column");
+    }
+
+    starTreeIndexConfig = new StarTreeIndexConfig(List.of("myCol"), null, null,
+        List.of(new StarTreeAggregationConfig("*", "SUM")), 1);
+    tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName(TABLE_NAME)
+        .setStarTreeIndexConfigs(List.of(starTreeIndexConfig))
+        .build();
+    try {
+      TableConfigUtils.validate(tableConfig, schema);
+      fail("Should fail for invalid StarTreeIndex config with aggregation config for SUM on '*' column");
     } catch (Exception e) {
       // expected
     }
@@ -1707,11 +1822,16 @@ public class TableConfigUtilsTest {
     }
 
     tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName(TABLE_NAME)
+        .setVarLengthDictionaryColumns(Arrays.asList("myCol", "bytesCol", "bigDecimalCol", "multiValCol"))
+        .build();
+    TableConfigUtils.validate(tableConfig, schema);
+
+    tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName(TABLE_NAME)
         .setVarLengthDictionaryColumns(Arrays.asList("intCol"))
         .build();
     try {
       TableConfigUtils.validate(tableConfig, schema);
-      fail("Should fail for Var length dictionary defined for non string/bytes column");
+      fail("Should fail for Var length dictionary defined for fixed-width column");
     } catch (Exception e) {
       // expected
     }
@@ -1791,6 +1911,53 @@ public class TableConfigUtilsTest {
     } catch (Exception e) {
       // expected
     }
+  }
+
+  @Test
+  public void testValidateUpsertWithTierConfig() {
+    Schema schema = new Schema.SchemaBuilder().setSchemaName(TABLE_NAME)
+        .addSingleValueDimension("myCol", FieldSpec.DataType.STRING)
+        .setPrimaryKeyColumns(Lists.newArrayList("myCol"))
+        .build();
+    Map<String, String> streamConfigs = getStreamConfigs();
+    UpsertConfig upsertConfig = new UpsertConfig(UpsertConfig.Mode.FULL);
+    TableConfig tableConfig = new TableConfigBuilder(TableType.REALTIME).setTableName(TABLE_NAME)
+        .setUpsertConfig(upsertConfig)
+        .setRoutingConfig(
+            new RoutingConfig(null, null, RoutingConfig.STRICT_REPLICA_GROUP_INSTANCE_SELECTOR_TYPE, false))
+        .setTimeColumnName(TIME_COLUMN)
+        .setStreamConfigs(streamConfigs)
+        .setTierConfigList(Lists.newArrayList(
+            new TierConfig("tier1", TierFactory.FIXED_SEGMENT_SELECTOR_TYPE, null, Lists.newArrayList("seg0", "seg1"),
+                TierFactory.PINOT_SERVER_STORAGE_TYPE, "tier1_tag_OFFLINE", null, null)))
+        .build();
+
+    assertThrows("Tiered storage is not supported for Upsert/Dedup tables", IllegalStateException.class,
+        () -> TableConfigUtils.validateUpsertAndDedupConfig(tableConfig, schema));
+  }
+
+  @Test
+  public void testValidateDedupWithTierConfig() {
+    Schema schema = new Schema.SchemaBuilder().setSchemaName(TABLE_NAME)
+        .addSingleValueDimension("myCol", FieldSpec.DataType.STRING)
+        .setPrimaryKeyColumns(Lists.newArrayList("myCol"))
+        .build();
+    Map<String, String> streamConfigs = getStreamConfigs();
+    DedupConfig dedupConfig = new DedupConfig();
+    dedupConfig.setMetadataTTL(10);
+    TableConfig tableConfig = new TableConfigBuilder(TableType.REALTIME).setTableName(TABLE_NAME)
+        .setDedupConfig(dedupConfig)
+        .setRoutingConfig(
+            new RoutingConfig(null, null, RoutingConfig.STRICT_REPLICA_GROUP_INSTANCE_SELECTOR_TYPE, false))
+        .setTimeColumnName(TIME_COLUMN)
+        .setStreamConfigs(streamConfigs)
+        .setTierConfigList(Lists.newArrayList(
+            new TierConfig("tier1", TierFactory.FIXED_SEGMENT_SELECTOR_TYPE, null, Lists.newArrayList("seg0", "seg1"),
+                TierFactory.PINOT_SERVER_STORAGE_TYPE, "tier1_tag_OFFLINE", null, null)))
+        .build();
+
+    assertThrows("Tiered storage is not supported for Upsert/Dedup tables", IllegalStateException.class,
+        () -> TableConfigUtils.validateUpsertAndDedupConfig(tableConfig, schema));
   }
 
   @Test
@@ -1999,6 +2166,37 @@ public class TableConfigUtilsTest {
       fail("Tag override must not be allowed with upsert");
     } catch (IllegalStateException e) {
       assertEquals(e.getMessage(), "Invalid tenant tag override used for Upsert/Dedup table");
+    }
+
+    // Instance assignment config with just CONSUMING instance partitions configured should be allowed
+    InstanceAssignmentConfig instanceAssignmentConfig = Mockito.mock(InstanceAssignmentConfig.class);
+    tableConfig = new TableConfigBuilder(TableType.REALTIME).setTableName(TABLE_NAME)
+        .setTimeColumnName(TIME_COLUMN)
+        .setUpsertConfig(new UpsertConfig(UpsertConfig.Mode.FULL))
+        .setStreamConfigs(getStreamConfigs())
+        .setRoutingConfig(
+            new RoutingConfig(null, null, RoutingConfig.STRICT_REPLICA_GROUP_INSTANCE_SELECTOR_TYPE, false))
+        .setInstanceAssignmentConfigMap(Map.of(InstancePartitionsType.CONSUMING.name(), instanceAssignmentConfig))
+        .build();
+
+    TableConfigUtils.validateUpsertAndDedupConfig(tableConfig, schema);
+
+    // Instance assignment config with CONSUMING and COMPLETED instance partitions configured should not be allowed
+    tableConfig = new TableConfigBuilder(TableType.REALTIME).setTableName(TABLE_NAME)
+        .setTimeColumnName(TIME_COLUMN)
+        .setUpsertConfig(new UpsertConfig(UpsertConfig.Mode.FULL))
+        .setStreamConfigs(getStreamConfigs())
+        .setRoutingConfig(
+            new RoutingConfig(null, null, RoutingConfig.STRICT_REPLICA_GROUP_INSTANCE_SELECTOR_TYPE, false))
+        .setInstanceAssignmentConfigMap(Map.of(InstancePartitionsType.CONSUMING.name(), instanceAssignmentConfig,
+            InstancePartitionsType.COMPLETED.name(), instanceAssignmentConfig))
+        .build();
+
+    try {
+      TableConfigUtils.validateUpsertAndDedupConfig(tableConfig, schema);
+      fail("Instance assignment config with COMPLETED instance partitions must not be allowed with upsert");
+    } catch (IllegalStateException e) {
+      assertEquals(e.getMessage(), "COMPLETED instance partitions can't be configured for upsert / dedup tables");
     }
 
     // empty tag override with upsert should pass
@@ -2612,16 +2810,16 @@ public class TableConfigUtilsTest {
 
     TableConfig tableConfigWithInstancePartitionsMap =
         new TableConfigBuilder(TableType.OFFLINE).setTableName(TABLE_NAME)
-            .setInstancePartitionsMap(ImmutableMap.of(InstancePartitionsType.OFFLINE, "test_OFFLINE"))
+            .setInstancePartitionsMap(Map.of(InstancePartitionsType.OFFLINE, "test_OFFLINE"))
             .build();
 
     // Call validate with a table-config with instance partitions set but not instance assignment config
     TableConfigUtils.validateInstancePartitionsTypeMapConfig(tableConfigWithInstancePartitionsMap);
 
     TableConfig invalidTableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName(TABLE_NAME)
-        .setInstancePartitionsMap(ImmutableMap.of(InstancePartitionsType.OFFLINE, "test_OFFLINE"))
+        .setInstancePartitionsMap(Map.of(InstancePartitionsType.OFFLINE, "test_OFFLINE"))
         .setInstanceAssignmentConfigMap(
-            ImmutableMap.of(InstancePartitionsType.OFFLINE.toString(), instanceAssignmentConfig))
+            Map.of(InstancePartitionsType.OFFLINE.toString(), instanceAssignmentConfig))
         .build();
     try {
       // Call validate with instance partitions and config set for the same type
@@ -2812,7 +3010,7 @@ public class TableConfigUtilsTest {
         .getReplicaGroupPartitionConfig();
 
     TableConfig invalidTableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName(TABLE_NAME)
-        .setInstanceAssignmentConfigMap(ImmutableMap.of(TableType.OFFLINE.toString(), instanceAssignmentConfig))
+        .setInstanceAssignmentConfigMap(Map.of(TableType.OFFLINE.toString(), instanceAssignmentConfig))
         .build();
     invalidTableConfig.getValidationConfig().setReplicaGroupStrategyConfig(replicaGroupStrategyConfig);
 
@@ -3099,11 +3297,13 @@ public class TableConfigUtilsTest {
     public void init(Map<String, String> props, Set<String> fieldsToRead, String topicName) {
     }
 
+    @Nullable
     @Override
     public GenericRow decode(byte[] payload, GenericRow destination) {
       return null;
     }
 
+    @Nullable
     @Override
     public GenericRow decode(byte[] payload, int offset, int length, GenericRow destination) {
       return null;
@@ -3201,5 +3401,81 @@ public class TableConfigUtilsTest {
     tableConfig.setValidationConfig(validationConfig);
 
     assertEquals(TableConfigUtils.getPartitionColumn(tableConfig), PARTITION_COLUMN);
+  }
+
+  @DataProvider(name = "tableTypeTestDataProvider")
+  public Object[][] tableTypeTestDataProvider() {
+    return new Object[][]{
+        {TableType.OFFLINE},
+        {TableType.REALTIME}
+    };
+  }
+
+  @Test(dataProvider = "tableTypeTestDataProvider")
+  public void testIsRelevantToTenant(TableType tableType) {
+    // Test 1: Basic server tenant relevance
+    TableConfig tableConfig = new TableConfigBuilder(tableType)
+        .setTableName(TABLE_NAME)
+        .setServerTenant("serverTenant")
+        .setBrokerTenant("brokerTenant")
+        .build();
+
+    assertTrue(TableConfigUtils.isRelevantToTenant(tableConfig, "serverTenant"));
+    assertFalse(TableConfigUtils.isRelevantToTenant(tableConfig, "otherTenant"));
+    assertFalse(TableConfigUtils.isRelevantToTenant(tableConfig,
+        "brokerTenant")); // broker tenant not relevant for server operations
+
+    // Test 2: Tag override configs
+    TagOverrideConfig tagOverrideConfig = new TagOverrideConfig("customConsuming_REALTIME", "customCompleted_OFFLINE");
+    tableConfig = new TableConfigBuilder(tableType)
+        .setTableName(TABLE_NAME)
+        .setTagOverrideConfig(tagOverrideConfig)
+        .setServerTenant("serverTenant")
+        .setBrokerTenant("brokerTenant")
+        .build();
+
+    assertTrue(TableConfigUtils.isRelevantToTenant(tableConfig, "serverTenant"));
+    assertTrue(TableConfigUtils.isRelevantToTenant(tableConfig, "customConsuming"));
+    assertTrue(TableConfigUtils.isRelevantToTenant(tableConfig, "customCompleted"));
+    assertFalse(TableConfigUtils.isRelevantToTenant(tableConfig, "otherTenant"));
+
+    // Test 3: Instance assignment configs
+    String tagSuffix = tableType == TableType.OFFLINE ? "_OFFLINE" : "_REALTIME";
+    InstanceTagPoolConfig tagPoolConfig = new InstanceTagPoolConfig("tag" + tagSuffix, false, 0, null);
+    InstanceReplicaGroupPartitionConfig replicaGroupPartitionConfig =
+        new InstanceReplicaGroupPartitionConfig(false, 0, 0, 0, 0, 0, false, null);
+    InstanceAssignmentConfig instanceAssignmentConfig =
+        new InstanceAssignmentConfig(tagPoolConfig, null, replicaGroupPartitionConfig, null, false);
+
+    Map<String, InstanceAssignmentConfig> instanceAssignmentConfigMap = new HashMap<>();
+    instanceAssignmentConfigMap.put(tableType.name(), instanceAssignmentConfig);
+
+    tableConfig = new TableConfigBuilder(tableType)
+        .setTableName(TABLE_NAME)
+        .setServerTenant("serverTenant")
+        .setBrokerTenant("brokerTenant")
+        .setInstanceAssignmentConfigMap(instanceAssignmentConfigMap)
+        .build();
+
+    assertTrue(TableConfigUtils.isRelevantToTenant(tableConfig, "serverTenant"));
+    assertTrue(TableConfigUtils.isRelevantToTenant(tableConfig, "tag"));
+    assertFalse(TableConfigUtils.isRelevantToTenant(tableConfig, "otherTenant"));
+
+    // Test 4: Tier configs
+    TierConfig tierConfig =
+        new TierConfig("tier", TierFactory.TIME_SEGMENT_SELECTOR_TYPE.toLowerCase(), "40d", null,
+            TierFactory.PINOT_SERVER_STORAGE_TYPE, "tierTag" + tagSuffix, null, null);
+    List<TierConfig> tierConfigs = Collections.singletonList(tierConfig);
+
+    tableConfig = new TableConfigBuilder(tableType)
+        .setTableName(TABLE_NAME)
+        .setServerTenant("serverTenant")
+        .setBrokerTenant("brokerTenant")
+        .setTierConfigList(tierConfigs)
+        .build();
+
+    assertTrue(TableConfigUtils.isRelevantToTenant(tableConfig, "serverTenant"));
+    assertTrue(TableConfigUtils.isRelevantToTenant(tableConfig, "tierTag"));
+    assertFalse(TableConfigUtils.isRelevantToTenant(tableConfig, "otherTenant"));
   }
 }

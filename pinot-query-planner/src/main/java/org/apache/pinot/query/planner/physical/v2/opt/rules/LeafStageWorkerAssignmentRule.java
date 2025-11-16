@@ -20,8 +20,6 @@ package org.apache.pinot.query.planner.physical.v2.opt.rules;
 
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
-import com.google.common.collect.ImmutableList;
-import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.ImmutableSet;
 import java.util.ArrayList;
 import java.util.Deque;
@@ -51,9 +49,9 @@ import org.apache.pinot.common.utils.UploadedRealtimeSegmentName;
 import org.apache.pinot.common.utils.config.QueryOptionsUtils;
 import org.apache.pinot.core.routing.RoutingManager;
 import org.apache.pinot.core.routing.RoutingTable;
-import org.apache.pinot.core.routing.ServerRouteInfo;
+import org.apache.pinot.core.routing.SegmentsToQuery;
 import org.apache.pinot.core.routing.TablePartitionInfo;
-import org.apache.pinot.core.routing.TimeBoundaryInfo;
+import org.apache.pinot.core.routing.timeboundary.TimeBoundaryInfo;
 import org.apache.pinot.core.transport.ServerInstance;
 import org.apache.pinot.query.context.PhysicalPlannerContext;
 import org.apache.pinot.query.planner.logical.LeafStageToPinotQuery;
@@ -158,8 +156,8 @@ public class LeafStageWorkerAssignmentRule extends PRelOptRule {
       String tableType = routingEntry.getKey();
       RoutingTable routingTable = routingEntry.getValue();
       Map<String, List<String>> currentSegmentsMap = new HashMap<>();
-      Map<ServerInstance, ServerRouteInfo> tmp = routingTable.getServerInstanceToSegmentsMap();
-      for (Map.Entry<ServerInstance, ServerRouteInfo> serverEntry : tmp.entrySet()) {
+      Map<ServerInstance, SegmentsToQuery> tmp = routingTable.getServerInstanceToSegmentsMap();
+      for (Map.Entry<ServerInstance, SegmentsToQuery> serverEntry : tmp.entrySet()) {
         // TODO: Optional segments are not supported yet by the MSE.
         String instanceId = serverEntry.getKey().getInstanceId();
         Preconditions.checkState(currentSegmentsMap.put(instanceId, serverEntry.getValue().getSegments()) == null,
@@ -174,7 +172,7 @@ public class LeafStageWorkerAssignmentRule extends PRelOptRule {
       }
       if (!routingTable.getUnavailableSegments().isEmpty()) {
         // Set unavailable segments in context, keyed by PRelNode ID.
-        segmentUnavailableMap.put(TableNameBuilder.forType(TableType.valueOf(tableName)).tableNameWithType(tableName),
+        segmentUnavailableMap.put(TableNameBuilder.forType(TableType.valueOf(tableType)).tableNameWithType(tableName),
             new HashSet<>(routingTable.getUnavailableSegments()));
       }
     }
@@ -363,9 +361,9 @@ public class LeafStageWorkerAssignmentRule extends PRelOptRule {
         segmentsForWorker.addAll(segmentsByPartition.get(partitionNum));
       }
       workers.set(workerId, String.format("%s@%s", workerId, workers.get(workerId)));
-      workerIdToSegmentsMap.put(workerId, ImmutableMap.of(tableType, segmentsForWorker));
+      workerIdToSegmentsMap.put(workerId, Map.of(tableType, segmentsForWorker));
     }
-    HashDistributionDesc desc = new HashDistributionDesc(ImmutableList.of(keyIndex),
+    HashDistributionDesc desc = new HashDistributionDesc(List.of(keyIndex),
         DistHashFunction.valueOf(function.toUpperCase()), numPartitions);
     PinotDataDistribution dataDistribution = new PinotDataDistribution(RelDistribution.Type.HASH_DISTRIBUTED,
         workers, workers.hashCode(), ImmutableSet.of(desc), null);

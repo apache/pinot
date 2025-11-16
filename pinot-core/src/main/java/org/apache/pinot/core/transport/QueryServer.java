@@ -36,6 +36,7 @@ import io.netty.channel.nio.NioEventLoopGroup;
 import io.netty.channel.socket.ServerSocketChannel;
 import io.netty.channel.socket.SocketChannel;
 import io.netty.channel.socket.nio.NioServerSocketChannel;
+import io.netty.util.internal.PlatformDependent;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.TimeUnit;
 import org.apache.pinot.common.config.NettyConfig;
@@ -130,6 +131,9 @@ public class QueryServer {
       metrics.setOrUpdateGlobalGauge(ServerGauge.NETTY_POOLED_CACHE_SIZE_NORMAL, metric::normalCacheSize);
       metrics.setOrUpdateGlobalGauge(ServerGauge.NETTY_POOLED_THREADLOCALCACHE, metric::numThreadLocalCaches);
       metrics.setOrUpdateGlobalGauge(ServerGauge.NETTY_POOLED_CHUNK_SIZE, metric::chunkSize);
+      metrics.setOrUpdateGlobalGauge(ServerGauge.NETTY_TOTAL_MAX_DIRECT_MEMORY, PlatformDependent::maxDirectMemory);
+      metrics.setOrUpdateGlobalGauge(ServerGauge.NETTY_TOTAL_USED_DIRECT_MEMORY, PlatformDependent::usedDirectMemory);
+
       _channel = (ServerSocketChannel) serverBootstrap.group(_bossGroup, _workerGroup).channel(_channelClass)
           .option(ChannelOption.SO_BACKLOG, 128)
           .childOption(ChannelOption.SO_KEEPALIVE, true)

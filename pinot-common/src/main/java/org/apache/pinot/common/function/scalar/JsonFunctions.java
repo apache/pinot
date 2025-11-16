@@ -20,8 +20,8 @@ package org.apache.pinot.common.function.scalar;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.JsonNode;
-import com.fasterxml.jackson.databind.ObjectMapper;
 import com.google.common.annotations.VisibleForTesting;
+import com.google.common.base.Preconditions;
 import com.jayway.jsonpath.Configuration;
 import com.jayway.jsonpath.JsonPath;
 import com.jayway.jsonpath.Option;
@@ -30,10 +30,13 @@ import com.jayway.jsonpath.Predicate;
 import com.jayway.jsonpath.spi.cache.CacheProvider;
 import com.jayway.jsonpath.spi.json.JacksonJsonProvider;
 import com.jayway.jsonpath.spi.mapper.JacksonMappingProvider;
+import java.io.IOException;
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
 import javax.annotation.Nullable;
+import org.apache.commons.lang3.StringUtils;
 import org.apache.pinot.common.function.JsonPathCache;
 import org.apache.pinot.spi.annotations.ScalarFunction;
 import org.apache.pinot.spi.utils.JsonUtils;
@@ -59,6 +62,12 @@ public class JsonFunctions {
   private static final ParseContext PARSE_CONTEXT = JsonPath.using(
       new Configuration.ConfigurationBuilder().jsonProvider(new ArrayAwareJacksonJsonProvider())
           .mappingProvider(new JacksonMappingProvider()).options(Option.SUPPRESS_EXCEPTIONS)
+          .build());
+
+  // JsonPath context for extracting keys (paths)
+  private static final ParseContext KEY_PARSE_CONTEXT = JsonPath.using(
+      new Configuration.ConfigurationBuilder().jsonProvider(new JacksonJsonProvider())
+          .mappingProvider(new JacksonMappingProvider()).options(Option.AS_PATH_LIST, Option.SUPPRESS_EXCEPTIONS)
           .build());
 
   static {
@@ -252,11 +261,10 @@ public class JsonFunctions {
         setValuesToMap(keyColumnName, valueColumnName, obj, result);
       }
     } else {
-      ObjectMapper mapper = new ObjectMapper();
       JsonNode arrayNode;
       try {
-        arrayNode = mapper.readTree(keyValueArray.toString());
-      } catch (JsonProcessingException e) {
+        arrayNode = JsonUtils.stringToJsonNode(keyValueArray.toString());
+      } catch (IOException e) {
         throw new RuntimeException(e);
       }
       for (int i = 0; i < arrayNode.size(); i++) {
@@ -321,15 +329,229 @@ public class JsonFunctions {
       Map<String, String> objMap = (Map) obj;
       result.put(objMap.get(keyColumnName), objMap.get(valueColumnName));
     } else {
-      ObjectMapper mapper = new ObjectMapper();
       JsonNode mapNode;
       try {
-        mapNode = mapper.readTree(obj.toString());
-      } catch (JsonProcessingException e) {
+        mapNode = JsonUtils.stringToJsonNode(obj.toString());
+      } catch (IOException e) {
         throw new RuntimeException(e);
       }
       result.put(mapNode.get(keyColumnName).asText(), mapNode.get(valueColumnName).asText());
     }
+  }
+
+  /**
+   * Extract keys from JSON object using JsonPath.
+   * <p>
+   * Examples:
+   * - jsonExtractKey('{"a": 1, "b": {"c": 2}}', '$.*') returns ["$['a']", "$['b']"]
+   * - jsonExtractKey('{"a": 1, "b": {"c": 2}}', '$.*') returns ["$['a']", "$['b']"]
+   * - jsonExtractKey('{"a": 1, "b": {"c": 2}}', '$..**') returns ["$['a']", "$['b']", "$['b']['c']"]
+   * - jsonExtractKey('{"a": [1, 2]}', '$.*') returns ["$['a']"]
+   *
+   * @param jsonObj  JSON object or string
+   * @param jsonPath JsonPath expression to extract keys
+   * @return List of key paths matching the JsonPath, empty list if input is null or invalid
+   */
+  @ScalarFunction
+  public static List<String> jsonExtractKey(Object jsonObj, String jsonPath) {
+    // treat empty string as extracting all
+    if ("".equals(jsonPath)) {
+      jsonPath = "$..**";
+    }
+    return jsonExtractKeyInternal(jsonObj, JsonPathCache.INSTANCE.getOrCompute(jsonPath));
+  }
+
+  public static List<String> jsonExtractKeyInternal(Object jsonObj, JsonPath jsonPath) {
+    if (jsonObj instanceof String) {
+      return KEY_PARSE_CONTEXT.parse((String) jsonObj).read(jsonPath);
+    }
+    return KEY_PARSE_CONTEXT.parse(jsonObj).read(jsonPath);
+  }
+
+  @ScalarFunction
+  public static List<String> jsonExtractKey(Object jsonObj, String jsonPath, String paramString)
+      throws IOException {
+    JsonExtractFunctionParameters params = new JsonExtractFunctionParameters(paramString);
+
+    if (params._maxDepth == 0) {
+      return java.util.Collections.emptyList();
+    }
+    // Special handling for empty string, '$.**' and '$..' recursive key extraction
+    if ("".equals(jsonPath) || "$..**".equals(jsonPath) || "$..".equals(jsonPath)) {
+      return jsonExtractAllKeysInternal(jsonObj, params._maxDepth, params._dotNotation);
+    }
+    return jsonExtractKeyInternal(jsonObj, JsonPathCache.INSTANCE.getOrCompute(jsonPath), params._maxDepth,
+        params._dotNotation);
+  }
+
+  public static boolean isExtractAllKeys(String jsonPath) {
+    return "".equals(jsonPath) || "$..**".equals(jsonPath) || "$..".equals(jsonPath);
+  }
+
+  public static List<String> jsonExtractKeyInternal(Object jsonObj, JsonPath jsonPath, int maxDepth,
+      boolean dotNotation)
+      throws IOException {
+    // For other expressions, try to get keys using AS_PATH_LIST
+    List<String> keys = jsonObj instanceof String ? KEY_PARSE_CONTEXT.parse((String) jsonObj).read(jsonPath)
+        : KEY_PARSE_CONTEXT.parse(jsonObj).read(jsonPath);
+    if (dotNotation) {
+      List<String> finalKeys = new ArrayList<>();
+      for (String key : keys) {
+        if (getKeyDepth(key) <= maxDepth) {
+          finalKeys.add(convertToDotNotation(key));
+        }
+      }
+      return finalKeys;
+    }
+    keys.removeIf(s -> getKeyDepth(s) > maxDepth);
+    return keys;
+  }
+
+  /**
+   * Extract all keys recursively from a JSON object up to maxDepth with output format option
+   */
+  public static List<String> jsonExtractAllKeysInternal(Object jsonObj, int maxDepth, boolean dotNotation) {
+    List<String> allKeys = new ArrayList<>();
+    try {
+      JsonNode node;
+      if (jsonObj instanceof String) {
+        node = JsonUtils.stringToJsonNode((String) jsonObj);
+      } else {
+        node = JsonUtils.stringToJsonNode(JsonUtils.objectToString(jsonObj));
+      }
+
+      extractKeysFromNode(node, dotNotation ? "" : "$", allKeys, maxDepth, 1, dotNotation);
+    } catch (Exception e) {
+      // Return empty list on error
+    }
+    return allKeys;
+  }
+
+  /**
+   * Recursively extract keys from a JsonNode with output format option
+   */
+  private static void extractKeysFromNode(JsonNode node, String currentPath, List<String> keys,
+      int maxDepth, int currentDepth, boolean dotNotation) {
+    if (currentDepth > maxDepth) {
+      return;
+    }
+
+    if (node.isObject()) {
+      node.fieldNames().forEachRemaining(fieldName -> {
+        String newPath = dotNotation ? (currentPath.isEmpty() ? fieldName : currentPath + "." + fieldName)
+            : currentPath + "['" + fieldName + "']";
+        keys.add(newPath);
+
+        JsonNode childNode = node.get(fieldName);
+        if (currentDepth < maxDepth && (childNode.isObject() || childNode.isArray())) {
+          extractKeysFromNode(childNode, newPath, keys, maxDepth, currentDepth + 1, dotNotation);
+        }
+      });
+    } else if (node.isArray()) {
+      for (int i = 0; i < node.size(); i++) {
+        String newPath = dotNotation ? (currentPath.isEmpty() ? String.valueOf(i) : currentPath + "." + i)
+            : currentPath + "[" + i + "]";
+        keys.add(newPath);
+
+        JsonNode childNode = node.get(i);
+        if (currentDepth < maxDepth && (childNode.isObject() || childNode.isArray())) {
+          extractKeysFromNode(childNode, newPath, keys, maxDepth, currentDepth + 1, dotNotation);
+        }
+      }
+    }
+  }
+
+  /**
+   * Convert JsonPath format to dot notation
+   * Example: $['a']['b']['c'] -> a.b.c
+   * $[0]['name'] -> 0.name
+   */
+  static String convertToDotNotation(String jsonPath) {
+    if (jsonPath == null || jsonPath.isEmpty() || "$".equals(jsonPath)) {
+      return "";
+    }
+
+    String result = jsonPath.substring(1); // Remove $
+
+    StringBuilder sb = new StringBuilder();
+    int i = 0;
+
+    while (i < result.length()) {
+      if (i + 1 < result.length() && result.charAt(i) == '[' && result.charAt(i + 1) == '\'') {
+        // Handle ['key'] pattern
+        int closingQuoteIndex = result.indexOf('\'', i + 2);
+        if (closingQuoteIndex != -1 && closingQuoteIndex + 1 < result.length()
+            && result.charAt(closingQuoteIndex + 1) == ']') {
+          sb.append('.');
+          sb.append(result, i + 2, closingQuoteIndex);
+          i = closingQuoteIndex + 2; // Skip past the closing ']'
+        } else {
+          sb.append(result.charAt(i));
+          i++;
+        }
+      } else if (result.charAt(i) == '[') {
+        // Handle [index] pattern
+        int closingBracketIndex = result.indexOf(']', i);
+        if (closingBracketIndex != -1) {
+          String possibleIndex = result.substring(i + 1, closingBracketIndex);
+          boolean isNumeric = true;
+          for (int j = 0; j < possibleIndex.length(); j++) {
+            if (!Character.isDigit(possibleIndex.charAt(j))) {
+              isNumeric = false;
+              break;
+            }
+          }
+
+          if (isNumeric) {
+            sb.append('.');
+            sb.append(possibleIndex);
+            i = closingBracketIndex + 1; // Skip past the closing ']'
+          } else {
+            sb.append(result.charAt(i));
+            i++;
+          }
+        } else {
+          sb.append(result.charAt(i));
+          i++;
+        }
+      } else {
+        sb.append(result.charAt(i));
+        i++;
+      }
+    }
+
+    result = sb.toString();
+
+    // Remove leading dot if present
+    if (result.startsWith(".")) {
+      result = result.substring(1);
+    }
+
+    return result;
+  }
+
+  /**
+   * Calculate the depth of a key path.
+   * For JsonPath keys like "$['a']" or "$['a']['b']", count the number of levels.
+   * For dot notation keys like "a.b.c", count the number of dots + 1.
+   */
+  static int getKeyDepth(String key) {
+    if (key == null || key.isEmpty()) {
+      return 0;
+    }
+
+    // Handle JsonPath format like "$['a']" or "$['a']['b']"
+    if (key.startsWith("$[")) {
+      return (int) key.chars().filter(ch -> ch == '[').count();
+    }
+
+    // Handle dot notation format like "a.b.c"
+    if (key.contains(".")) {
+      return key.split("\\.").length;
+    }
+
+    // Single key
+    return 1;
   }
 
   @VisibleForTesting
@@ -361,6 +583,53 @@ public class JsonFunctions {
         return Arrays.asList((Object[]) obj);
       }
       return super.toIterable(obj);
+    }
+  }
+
+  public static class JsonExtractFunctionParameters {
+    static final char PARAMETER_DELIMITER = ';';
+    static final char PARAMETER_KEY_VALUE_SEPARATOR = '=';
+
+    static final String MAX_DEPTH_KEY = "MAXDEPTH";
+    static final String DOT_NOTATION_KEY = "DOTNOTATION";
+
+    int _maxDepth = Integer.MAX_VALUE;
+    boolean _dotNotation;
+
+    public JsonExtractFunctionParameters(String parametersString) {
+      String[] keyValuePairs = StringUtils.split(parametersString, PARAMETER_DELIMITER);
+      for (String keyValuePairRaw : keyValuePairs) {
+        String keyValuePair = keyValuePairRaw.trim();
+        if (keyValuePair.isEmpty()) {
+          continue;
+        }
+        String[] keyAndValue = StringUtils.split(keyValuePair, PARAMETER_KEY_VALUE_SEPARATOR);
+        Preconditions.checkArgument(keyAndValue.length == 2, "Invalid parameter: %s", keyValuePair);
+        String key = keyAndValue[0];
+        String value = keyAndValue[1].trim();
+        switch (key.trim().toUpperCase()) {
+          case MAX_DEPTH_KEY:
+            _maxDepth = Integer.parseInt(value);
+            // Treat the non-positive threshold as unlimited
+            if (_maxDepth < 0) {
+              _maxDepth = Integer.MAX_VALUE;
+            }
+            break;
+          case DOT_NOTATION_KEY:
+            _dotNotation = Boolean.parseBoolean(value);
+            break;
+          default:
+            throw new IllegalArgumentException("Invalid parameter key: " + key);
+        }
+      }
+    }
+
+    public int getMaxDepth() {
+      return _maxDepth;
+    }
+
+    public boolean isDotNotation() {
+      return _dotNotation;
     }
   }
 }

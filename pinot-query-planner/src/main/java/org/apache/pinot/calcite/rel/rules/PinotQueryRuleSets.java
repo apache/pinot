@@ -116,8 +116,8 @@ public class PinotQueryRuleSets {
       // join and semi-join rules
       SemiJoinRule.ProjectToSemiJoinRule.ProjectToSemiJoinRuleConfig.DEFAULT
           .withDescription(PlannerRuleNames.PROJECT_TO_SEMI_JOIN).toRule(),
-      PinotSeminJoinDistinctProjectRule
-          .instanceWithDescription(PlannerRuleNames.SEMIN_JOIN_DISTINCT_PROJECT),
+      PinotSemiJoinDistinctProjectRule
+          .instanceWithDescription(PlannerRuleNames.SEMI_JOIN_DISTINCT_PROJECT),
 
       // Consider semijoin optimizations first before push transitive predicate
       // Pinot version doesn't push predicates to the right in case of lookup join
@@ -146,6 +146,9 @@ public class PinotQueryRuleSets {
       //    `plannerRule_skipAggregateReduceFunctions=true` in query option
       PinotAggregateReduceFunctionsRule
           .instanceWithDescription(PlannerRuleNames.AGGREGATE_REDUCE_FUNCTIONS),
+
+      PinotAggregateFunctionRewriteRule
+          .instanceWithDescription(PlannerRuleNames.AGGREGATE_FUNCTION_REWRITE),
 
       // convert CASE-style filtered aggregates into true filtered aggregates
       // put it after AGGREGATE_REDUCE_FUNCTIONS where SUM is converted to SUM0
@@ -183,6 +186,8 @@ public class PinotQueryRuleSets {
           .withDescription(PlannerRuleNames.AGGREGATE_PROJECT_MERGE).toRule(),
       ProjectMergeRule.Config.DEFAULT
           .withDescription(PlannerRuleNames.PROJECT_MERGE).toRule(),
+      ProjectRemoveRule.Config.DEFAULT
+          .withDescription(PlannerRuleNames.PROJECT_REMOVE).toRule(),
       FilterMergeRule.Config.DEFAULT
           .withDescription(PlannerRuleNames.FILTER_MERGE).toRule(),
       AggregateRemoveRule.Config.DEFAULT

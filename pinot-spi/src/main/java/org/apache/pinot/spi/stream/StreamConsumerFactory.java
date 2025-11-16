@@ -20,6 +20,7 @@ package org.apache.pinot.spi.stream;
 
 import java.util.Set;
 import java.util.concurrent.atomic.AtomicInteger;
+import org.apache.pinot.spi.utils.retry.RetryPolicy;
 
 
 /**
@@ -63,6 +64,11 @@ public abstract class StreamConsumerFactory {
   public PartitionGroupConsumer createPartitionGroupConsumer(String clientId,
       PartitionGroupConsumptionStatus partitionGroupConsumptionStatus) {
     return createPartitionLevelConsumer(clientId, partitionGroupConsumptionStatus.getStreamPartitionGroupId());
+  }
+
+  public PartitionGroupConsumer createPartitionGroupConsumer(String clientId,
+      PartitionGroupConsumptionStatus partitionGroupConsumptionStatus, RetryPolicy retryPolicy) {
+    return createPartitionGroupConsumer(clientId, partitionGroupConsumptionStatus);
   }
 
   @Deprecated

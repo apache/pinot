@@ -58,16 +58,22 @@ public class BrokerMeter implements AbstractMetrics.Meter {
    */
   public static final BrokerMeter POOL_QUERIES = create("POOL_QUERIES", "routing", false);
   /**
-   * Number of segment selected per pool during query execution.
+   * Number of segments selected per pool during query execution.
    * <p>
    * This metric is not global and is attached to a particular pool.
-   * Currently this counter include single stage queries only.
+   * Currently, this counter includes single-stage queries only.
    * <p>
-   * Let's say the query option orderedReferredPools is set and a few nodes in the preferred pool are down.
-   * The other metric {@link #POOL_QUERIES} shows the traffic are relatively equal over pool.
-   * This metric is still going to show that most of segments are still selected from the preferred pool.
+   * Let's say the query option orderedPreferredPools is set and a few nodes in the preferred pool are down.
+   * The other metric {@link #POOL_QUERIES} shows the traffic is relatively equal over pool.
+   * This metric is still going to show that most of the segments are still selected from the preferred pool.
    */
   public static final BrokerMeter POOL_SEG_QUERIES = create("POOL_SEG_QUERIES", "routing", false);
+  /**
+   * Number of segments whose replicas are not distributed into multiple pools in ideal state.
+   * <p>
+   * This metric is not global and is attached to a particular table
+   */
+  public static final BrokerMeter SINGLE_POOL_SEGMENTS = create("SINGLE_POOL_SEGMENTS", "segments", false);
   /**
    * Number of multi-stage queries that have been started.
    * <p>
@@ -112,6 +118,7 @@ public class BrokerMeter implements AbstractMetrics.Meter {
   public static final BrokerMeter UNKNOWN_COLUMN_EXCEPTIONS = create("UNKNOWN_COLUMN_EXCEPTIONS", "exceptions", false);
   // Queries preempted by accountant
   public static final BrokerMeter QUERIES_KILLED = create("QUERIES_KILLED", "query", true);
+  public static final BrokerMeter QUERIES_THROTTLED = create("QUERIES_THROTTLED", "query", true);
   // Scatter phase.
   public static final BrokerMeter NO_SERVER_FOUND_EXCEPTIONS = create(
       "NO_SERVER_FOUND_EXCEPTIONS", "exceptions", false);
@@ -261,6 +268,12 @@ public class BrokerMeter implements AbstractMetrics.Meter {
       "GRPC_TRANSPORT_TERMINATED", "grpcTransport", true);
 
   public static final BrokerMeter RLS_FILTERS_APPLIED = create("RLS_FILTERS_APPLIED", "queries", false);
+
+  // Audit logging metrics
+  public static final BrokerMeter AUDIT_REQUEST_FAILURES = create("AUDIT_REQUEST_FAILURES", "failures", true);
+  public static final BrokerMeter AUDIT_RESPONSE_FAILURES = create("AUDIT_RESPONSE_FAILURES", "failures", true);
+  public static final BrokerMeter AUDIT_REQUEST_PAYLOAD_TRUNCATED = create("AUDIT_REQUEST_PAYLOAD_TRUNCATED",
+      "count", true);
 
   private static final Map<QueryErrorCode, BrokerMeter> QUERY_ERROR_CODE_METER_MAP;
 

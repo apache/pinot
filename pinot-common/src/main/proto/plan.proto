@@ -40,6 +40,7 @@ message PlanNode {
     ValueNode valueNode = 14;
     WindowNode windowNode = 15;
     ExplainNode explainNode = 16;
+    EnrichedJoinNode enrichedJoinNode = 17;
   }
 }
 
@@ -101,6 +102,35 @@ message JoinNode {
   repeated Expression nonEquiConditions = 4;
   JoinStrategy joinStrategy = 5;
   Expression matchCondition = 6;
+}
+
+enum FilterProjectRexType {
+  FILTER = 0;
+  PROJECT = 1;
+}
+
+message ProjectAndResultSchema {
+  repeated Expression project = 1;
+  DataSchema schema = 2;
+}
+
+message FilterProjectRex {
+  FilterProjectRexType type = 1;
+  optional Expression filter = 2;
+  optional ProjectAndResultSchema projectAndResultSchema = 3;
+}
+
+message EnrichedJoinNode {
+  JoinType joinType = 1;
+  repeated int32 leftKeys = 2;
+  repeated int32 rightKeys = 3;
+  repeated Expression nonEquiConditions = 4;
+  JoinStrategy joinStrategy = 5;
+  Expression matchCondition = 6;
+  repeated FilterProjectRex filterProjectRex = 7;
+  DataSchema joinResultDataSchema = 8;
+  int32 fetch = 9;
+  int32 offset = 10;
 }
 
 enum ExchangeType {

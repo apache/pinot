@@ -18,7 +18,6 @@
  */
 package org.apache.pinot.segment.local.recordtransformer;
 
-import com.google.common.collect.ImmutableMap;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.HashMap;
@@ -131,7 +130,9 @@ public class ComplexTypeTransformerTest {
     transformedRows = transformer.transform(List.of(genericRow));
     assertEquals(transformedRows.size(), 2);
     assertEquals(transformedRows.get(0).getValue("array.a"), "v1");
+    assertEquals(transformedRows.get(0).getValue("array"), array);
     assertEquals(transformedRows.get(1).getValue("array.a"), "v2");
+    assertEquals(transformedRows.get(1).getValue("array"), array);
 
     // unnest sibling collections
     //    {
@@ -180,12 +181,20 @@ public class ComplexTypeTransformerTest {
     assertEquals(transformedRows.size(), 4);
     assertEquals(transformedRows.get(0).getValue("array.a"), "v1");
     assertEquals(transformedRows.get(0).getValue("array2.b"), "v3");
+    assertEquals(transformedRows.get(0).getValue("array"), array);
+    assertEquals(transformedRows.get(0).getValue("array2"), array2);
     assertEquals(transformedRows.get(1).getValue("array.a"), "v1");
     assertEquals(transformedRows.get(1).getValue("array2.b"), "v4");
+    assertEquals(transformedRows.get(1).getValue("array"), array);
+    assertEquals(transformedRows.get(1).getValue("array2"), array2);
     assertEquals(transformedRows.get(2).getValue("array.a"), "v2");
     assertEquals(transformedRows.get(2).getValue("array2.b"), "v3");
+    assertEquals(transformedRows.get(2).getValue("array"), array);
+    assertEquals(transformedRows.get(2).getValue("array2"), array2);
     assertEquals(transformedRows.get(3).getValue("array.a"), "v2");
     assertEquals(transformedRows.get(3).getValue("array2.b"), "v4");
+    assertEquals(transformedRows.get(3).getValue("array"), array);
+    assertEquals(transformedRows.get(3).getValue("array2"), array2);
 
     // unnest nested collection
     // {
@@ -242,6 +251,41 @@ public class ComplexTypeTransformerTest {
     assertEquals(transformedRows.get(0).getValue("array.a"), "v1");
     assertEquals(transformedRows.get(0).getValue("array.array2"), "[{\"b\":\"v3\"},{\"b\":\"v4\"}]");
     assertEquals(transformedRows.get(1).getValue("array.a"), "v2");
+
+    // unnest root level collection with simple non-primitive values
+    //    {
+    //      "a": "value",
+    //      "b": "another",
+    //      "array":["x", "y"]
+    //    }
+    //  ->
+    //    [{
+    //      "a": "value",
+    //      "b": "another",
+    //      "array":"x"
+    //    },
+    //    {
+    //      "a": "value",
+    //      "b": "another",
+    //      "array":"y"
+    //    }]
+    genericRow = new GenericRow();
+    genericRow.putValue("a", "value");
+    genericRow.putValue("b", "another");
+    array = new Object[2];
+    array[0] = "x";
+    array[1] = "y";
+    genericRow.putValue("array", array);
+    transformer =
+        new ComplexTypeTransformer.Builder().setFieldsToUnnest(List.of("array")).build();
+    transformedRows = transformer.transform(List.of(genericRow));
+    assertEquals(transformedRows.size(), 2);
+    assertEquals(transformedRows.get(0).getValue("a"), "value");
+    assertEquals(transformedRows.get(0).getValue("b"), "another");
+    assertEquals(transformedRows.get(0).getValue("array"), "x");
+    assertEquals(transformedRows.get(1).getValue("a"), "value");
+    assertEquals(transformedRows.get(1).getValue("b"), "another");
+    assertEquals(transformedRows.get(1).getValue("array"), "y");
   }
 
   @Test
@@ -316,7 +360,7 @@ public class ComplexTypeTransformerTest {
     GenericRow genericRow = new GenericRow();
     Map<String, Object> map = new HashMap<>();
     Object[] array1 = new Object[1];
-    array1[0] = ImmutableMap.of("b", "v1");
+    array1[0] = Map.of("b", "v1");
     map.put("array1", array1);
     Object[] array = new Object[1];
     array[0] = map;
@@ -395,7 +439,7 @@ public class ComplexTypeTransformerTest {
     genericRow = new GenericRow();
     map = new HashMap<>();
     array1 = new Object[1];
-    array1[0] = ImmutableMap.of("b", "v1");
+    array1[0] = Map.of("b", "v1");
     map.put("array1", array1);
     genericRow.putValue("t", map);
     transformer =

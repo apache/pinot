@@ -55,16 +55,15 @@ import org.apache.pinot.core.auth.Authorize;
 import org.apache.pinot.core.auth.ManualAuthorization;
 import org.apache.pinot.core.auth.TargetType;
 import org.apache.pinot.core.routing.RoutingTable;
-import org.apache.pinot.core.routing.ServerRouteInfo;
-import org.apache.pinot.core.routing.TimeBoundaryInfo;
+import org.apache.pinot.core.routing.SegmentsToQuery;
+import org.apache.pinot.core.routing.timeboundary.TimeBoundaryInfo;
 import org.apache.pinot.core.transport.ServerInstance;
 import org.apache.pinot.core.transport.server.routing.stats.ServerRoutingStatsEntry;
 import org.apache.pinot.core.transport.server.routing.stats.ServerRoutingStatsManager;
 import org.apache.pinot.spi.accounting.QueryResourceTracker;
+import org.apache.pinot.spi.accounting.ThreadAccountant;
 import org.apache.pinot.spi.accounting.ThreadResourceTracker;
-import org.apache.pinot.spi.accounting.ThreadResourceUsageAccountant;
 import org.apache.pinot.spi.config.table.TableType;
-import org.apache.pinot.spi.trace.Tracing;
 import org.apache.pinot.spi.utils.builder.TableNameBuilder;
 import org.apache.pinot.sql.parsers.CalciteSqlCompiler;
 
@@ -99,6 +98,9 @@ public class PinotBrokerDebug {
 
   @Inject
   AccessControlFactory _accessControlFactory;
+
+  @Inject
+  ThreadAccountant _threadAccountant;
 
   @GET
   @Produces(MediaType.APPLICATION_JSON)
@@ -158,11 +160,11 @@ public class PinotBrokerDebug {
       @ApiResponse(code = 404, message = "Routing not found"),
       @ApiResponse(code = 500, message = "Internal server error")
   })
-  public Map<String, Map<ServerInstance, ServerRouteInfo>> getRoutingTableWithOptionalSegments(
+  public Map<String, Map<ServerInstance, SegmentsToQuery>> getRoutingTableWithOptionalSegments(
       @ApiParam(value = "Name of the table") @PathParam("tableName") String tableName,
       @Context HttpHeaders headers) {
     tableName = DatabaseUtils.translateTableName(tableName, headers);
-    Map<String, Map<ServerInstance, ServerRouteInfo>> result = new TreeMap<>();
+    Map<String, Map<ServerInstance, SegmentsToQuery>> result = new TreeMap<>();
     getRoutingTable(tableName, (tableNameWithType, routingTable) -> result.put(tableNameWithType,
         routingTable.getServerInstanceToSegmentsMap()));
     if (!result.isEmpty()) {
@@ -193,7 +195,7 @@ public class PinotBrokerDebug {
   }
 
   private static Map<ServerInstance, List<String>> removeOptionalSegments(
-      Map<ServerInstance, ServerRouteInfo> serverInstanceToSegmentsMap) {
+      Map<ServerInstance, SegmentsToQuery> serverInstanceToSegmentsMap) {
     Map<ServerInstance, List<String>> ret = new HashMap<>();
     serverInstanceToSegmentsMap.forEach((k, v) -> ret.put(k, v.getSegments()));
     return ret;
@@ -232,7 +234,7 @@ public class PinotBrokerDebug {
       @ApiResponse(code = 404, message = "Routing not found"),
       @ApiResponse(code = 500, message = "Internal server error")
   })
-  public Map<ServerInstance, ServerRouteInfo> getRoutingTableForQueryWithOptionalSegments(
+  public Map<ServerInstance, SegmentsToQuery> getRoutingTableForQueryWithOptionalSegments(
       @ApiParam(value = "SQL query (table name should have type suffix)") @QueryParam("query") String query,
       @Context HttpHeaders httpHeaders) {
     BrokerRequest brokerRequest = CalciteSqlCompiler.compileToBrokerRequest(query);
@@ -290,8 +292,7 @@ public class PinotBrokerDebug {
   @Authorize(targetType = TargetType.CLUSTER, action = Actions.Cluster.DEBUG_RESOURCE_USAGE)
   @ApiOperation(value = "Get resource usage of threads")
   public Collection<? extends ThreadResourceTracker> getThreadResourceUsage() {
-    ThreadResourceUsageAccountant threadAccountant = Tracing.getThreadAccountant();
-    return threadAccountant.getThreadResources();
+    return _threadAccountant.getThreadResources();
   }
 
   @GET
@@ -301,8 +302,7 @@ public class PinotBrokerDebug {
   @ApiOperation(value = "Get current resource usage of queries in this service", notes = "This is a debug endpoint, "
       + "and won't maintain backward compatibility")
   public Collection<? extends QueryResourceTracker> getQueryUsage() {
-    ThreadResourceUsageAccountant threadAccountant = Tracing.getThreadAccountant();
-    return threadAccountant.getQueryResources().values();
+    return _threadAccountant.getQueryResources().values();
   }
 
   @GET

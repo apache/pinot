@@ -65,7 +65,6 @@ import org.slf4j.LoggerFactory;
  * QPS, we fault in the hottest pages before real traffic arrives, smoothing the
  * cold‑start curve.
  *
- * <h2>Main entry points</h2>
  * <ul>
  *   <li>{@link #startWarmupOnRestart()} – Invoked at server startup.  Iterates over every table
  *       hosted by the instance and kicks off warm‑up if the table’s
@@ -75,11 +74,11 @@ import org.slf4j.LoggerFactory;
  *       of freshly‑downloaded segments to target.</li>
  * </ul>
  *
- * <h2>Key behaviours</h2>
  * <ul>
- *   <li><b>Per‑table QPS budgeting</b>:  QPS is derived from the table’s quota
- *       ({@link QuotaConfig#getMaxQPS()}) and replication factor, then optionally scaled by
- *       {@code pinot.server.max.pagecache.refresh.warmup.qps.rate} for refresh warm‑ups.</li>
+ *   <li><b>Per‑table QPS budgeting</b>:  QPS defaults to the table’s configured max QPS
+ *   ({@link QuotaConfig#getMaxQPS()}) divided by replication factor, if not provided in the
+ *   {@link PageCacheWarmupConfig} and replication factor.
+ *   </li>
  *   <li><b>Segment selection</b>:  By default all resident segments are warmed up, but the refresh
  *       path allows a <i>segment filter</i> so we don’t thrash the cache with untargeted reads.</li>
  *   <li><b>Time‑bounded execution</b>:  Both the instance‑level warm‑up window and table‑level
@@ -127,7 +126,9 @@ public class PageCacheWarmupServerQueryExecutor {
         if (warmupConfig == null || !warmupConfig.enableOnRestart()) {
           continue;
         }
-        double warmupQps = Math.max(getQpsPerReplica(tableConfig), 1);
+        double warmupQps = warmupConfig.getQpsLimitOnRestart() != null
+          ? warmupConfig.getQpsLimitOnRestart()
+          : Math.max(getQpsPerReplica(tableConfig), 1);
         warmupTable(tableNameWithType, warmupConfig, null, null, warmupQps);
       } catch (Exception e) {
         String errorMessage = String.format("PageCache warmup failed on restart for table: %s", tableNameWithType);
@@ -147,7 +148,10 @@ public class PageCacheWarmupServerQueryExecutor {
       if (warmupConfig == null || !warmupConfig.enableOnRefresh()) {
         return;
       }
-      double warmupQps = Math.max(getQpsPerReplica(tableConfig) * _refreshWarmupQpsRateLimit, 1);
+      double warmupQps = warmupConfig.getQpsLimitOnRefresh() != null
+          ? warmupConfig.getQpsLimitOnRefresh()
+          // Apply rate limit over the qpsLimit to avoid overwhelming the server since it is handling live traffic
+          : Math.max(getQpsPerReplica(tableConfig) * _refreshWarmupQpsRateLimit, 1);;
       warmupTable(tableNameWithType, warmupConfig, warmupQueries, segmentFilter, warmupQps);
     } catch (Exception e) {
       String errorMessage = String.format("PageCache warmup failed on refresh for table: %s", tableNameWithType);

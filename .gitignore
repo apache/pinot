@@ -58,3 +58,6 @@ kubernetes/helm/**/Chart.lock
 #Develocity
 .mvn/.gradle-enterprise/
 .mvn/.develocity/
+
+pinot-integration-tests/src/test/resources/udf-test-results/*.md
+!/pinot-integration-tests/src/test/resources/udf-test-results/README.md

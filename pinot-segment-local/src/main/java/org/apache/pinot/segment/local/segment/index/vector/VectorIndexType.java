@@ -18,7 +18,7 @@
  */
 package org.apache.pinot.segment.local.segment.index.vector;
 
-import com.clearspring.analytics.util.Preconditions;
+import com.google.common.base.Preconditions;
 import java.io.File;
 import java.io.IOException;
 import java.util.List;

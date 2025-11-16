@@ -113,9 +113,9 @@ public class ResourceUtils {
     controllerMetrics.setValueOfGlobalGauge(ControllerGauge.DEEP_STORE_WRITE_OPS_IN_PROGRESS, writeCount);
 
     long segmentBytesUploading = _deepStoreWriteBytesInProgress.addAndGet(-segmentSizeInBytes);
-    controllerMetrics.setOrUpdateTableGauge(rawTableName, ControllerGauge.DEEP_STORE_WRITE_OPS_IN_PROGRESS,
+    controllerMetrics.setOrUpdateTableGauge(rawTableName, ControllerGauge.DEEP_STORE_WRITE_BYTES_IN_PROGRESS,
             segmentBytesUploading);
-    controllerMetrics.setValueOfGlobalGauge(ControllerGauge.DEEP_STORE_WRITE_OPS_IN_PROGRESS, segmentBytesUploading);
+    controllerMetrics.setValueOfGlobalGauge(ControllerGauge.DEEP_STORE_WRITE_BYTES_IN_PROGRESS, segmentBytesUploading);
 
     long durationMs = System.currentTimeMillis() - startTimeMs;
     controllerMetrics.addTimedTableValue(rawTableName, ControllerTimer.DEEP_STORE_SEGMENT_WRITE_TIME_MS, durationMs,

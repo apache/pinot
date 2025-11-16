@@ -55,6 +55,8 @@ import org.apache.pinot.spi.data.readers.FileFormat;
 import org.apache.pinot.spi.env.CommonsConfigurationUtils;
 import org.apache.pinot.spi.env.PinotConfiguration;
 import org.apache.pinot.spi.exception.QueryErrorCode;
+import org.apache.pinot.spi.query.QueryThreadContext;
+import org.apache.pinot.spi.utils.CommonConstants;
 import org.apache.pinot.spi.utils.ReadMode;
 import org.apache.pinot.spi.utils.builder.TableConfigBuilder;
 import org.apache.pinot.spi.utils.builder.TableNameBuilder;
@@ -80,7 +82,8 @@ public class QueryExecutorExceptionsTest {
   private static final String OFFLINE_TABLE_NAME = TableNameBuilder.OFFLINE.tableNameWithType(RAW_TABLE_NAME);
   private static final int NUM_SEGMENTS_TO_GENERATE = 2;
   private static final int NUM_EMPTY_SEGMENTS_TO_GENERATE = 2;
-  private static final ExecutorService QUERY_RUNNERS = Executors.newFixedThreadPool(20);
+  private static final ExecutorService QUERY_RUNNERS =
+      QueryThreadContext.contextAwareExecutorService(Executors.newFixedThreadPool(2));
 
   private final List<ImmutableSegment> _indexSegments = new ArrayList<>(NUM_SEGMENTS_TO_GENERATE);
   private final List<String> _segmentNames = new ArrayList<>(NUM_SEGMENTS_TO_GENERATE);
@@ -145,8 +148,7 @@ public class QueryExecutorExceptionsTest {
     // Set up the query executor
     resourceUrl = getClass().getClassLoader().getResource(QUERY_EXECUTOR_CONFIG_PATH);
     assertNotNull(resourceUrl);
-    PropertiesConfiguration queryExecutorConfig =
-        CommonsConfigurationUtils.fromFile(new File(resourceUrl.getFile()));
+    PropertiesConfiguration queryExecutorConfig = CommonsConfigurationUtils.fromFile(new File(resourceUrl.getFile()));
     _queryExecutor = new ServerQueryExecutorV1Impl();
     _queryExecutor.init(new PinotConfiguration(queryExecutorConfig), instanceDataManager, ServerMetrics.get());
   }
@@ -160,8 +162,8 @@ public class QueryExecutorExceptionsTest {
     String query = "SELECT COUNT(*) FROM " + OFFLINE_TABLE_NAME;
     InstanceRequest instanceRequest = new InstanceRequest(0L, CalciteSqlCompiler.compileToBrokerRequest(query));
     instanceRequest.setSearchSegments(_segmentNames);
-    InstanceResponseBlock instanceResponse = _queryExecutor.execute(getQueryRequest(instanceRequest), QUERY_RUNNERS);
-    Map<Integer, String> exceptions = instanceResponse.getExceptions();
+    InstanceResponseBlock response = execute(instanceRequest);
+    Map<Integer, String> exceptions = response.getExceptions();
     assertTrue(exceptions.containsKey(QueryErrorCode.SERVER_SEGMENT_MISSING.getId()));
 
     String errorMessage = exceptions.get(QueryErrorCode.SERVER_SEGMENT_MISSING.getId());
@@ -171,15 +173,43 @@ public class QueryExecutorExceptionsTest {
     assertEqualsNoOrder(actualMissingSegments, expectedMissingSegments);
   }
 
+  /**
+   * When ignoreMissingSegments is set in queryOptions, the server should not populate SERVER_SEGMENT_MISSING exception.
+   */
+  @Test
+  public void testServerSegmentMissingExceptionIgnoredByOption() {
+    String query = "SELECT COUNT(*) FROM " + OFFLINE_TABLE_NAME;
+    // 1) Without the option -> we should see SERVER_SEGMENT_MISSING
+    InstanceRequest instanceRequestNoOpt = new InstanceRequest(0L, CalciteSqlCompiler.compileToBrokerRequest(query));
+    instanceRequestNoOpt.setSearchSegments(_segmentNames);
+    InstanceResponseBlock responseNoOpt = execute(instanceRequestNoOpt);
+    Map<Integer, String> exceptionsNoOpt = responseNoOpt.getExceptions();
+    assertTrue(exceptionsNoOpt.containsKey(QueryErrorCode.SERVER_SEGMENT_MISSING.getId()));
+
+    // 2) With ignoreMissingSegments=true -> we should NOT see SERVER_SEGMENT_MISSING
+    InstanceRequest instanceRequestOpt = new InstanceRequest(0L, CalciteSqlCompiler.compileToBrokerRequest(query));
+    instanceRequestOpt.getQuery()
+        .getPinotQuery()
+        .putToQueryOptions(CommonConstants.Broker.Request.QueryOptionKey.IGNORE_MISSING_SEGMENTS, "true");
+    instanceRequestOpt.setSearchSegments(_segmentNames);
+    InstanceResponseBlock responseOpt = execute(instanceRequestOpt);
+    Map<Integer, String> exceptionsOpt = responseOpt.getExceptions();
+    assertFalse(exceptionsOpt.containsKey(QueryErrorCode.SERVER_SEGMENT_MISSING.getId()));
+  }
+
+  private InstanceResponseBlock execute(InstanceRequest instanceRequest) {
+    ServerQueryRequest queryRequest =
+        new ServerQueryRequest(instanceRequest, ServerMetrics.get(), System.currentTimeMillis());
+    try (QueryThreadContext ignore = QueryThreadContext.openForSseTest()) {
+      return _queryExecutor.execute(queryRequest, QUERY_RUNNERS);
+    }
+  }
+
   @AfterClass
   public void tearDown() {
     for (IndexSegment segment : _indexSegments) {
       segment.destroy();
     }
     FileUtils.deleteQuietly(INDEX_DIR);
-  }
-
-  private ServerQueryRequest getQueryRequest(InstanceRequest instanceRequest) {
-    return new ServerQueryRequest(instanceRequest, ServerMetrics.get(), System.currentTimeMillis());
   }
 }

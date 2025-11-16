@@ -557,7 +557,7 @@ const TenantPageDetails = ({ match }: RouteComponentProps<Props>) => {
     const result = await PinotMethodUtils.rebalanceBrokersForTableOp(tableName);
     syncResponse(result);
   };
-  
+
   const handleRepairTable = () => {
     setDialogDetails({
       title: 'Repair Table',

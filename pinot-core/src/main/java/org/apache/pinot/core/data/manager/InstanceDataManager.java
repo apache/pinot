@@ -21,7 +21,7 @@ package org.apache.pinot.core.data.manager;
 import java.io.File;
 import java.util.List;
 import java.util.Set;
-import java.util.function.Supplier;
+import java.util.function.BooleanSupplier;
 import javax.annotation.Nullable;
 import javax.annotation.concurrent.ThreadSafe;
 import org.apache.helix.HelixManager;
@@ -170,6 +170,11 @@ public interface InstanceDataManager {
   int getMaxParallelRefreshThreads();
 
   /**
+   * Returns true if background processing for SEGMENT_REFRESH is enabled, false otherwise
+   */
+  boolean isAsyncSegmentRefreshEnabled();
+
+  /**
    * Returns the Helix property store.
    */
   ZkHelixPropertyStore<ZNRecord> getPropertyStore();
@@ -190,7 +195,7 @@ public interface InstanceDataManager {
    *
    * @param isServerReadyToServeQueries supplier to retrieve state of server.
    */
-  void setSupplierOfIsServerReadyToServeQueries(Supplier<Boolean> isServerReadyToServeQueries);
+  void setSupplierOfIsServerReadyToServeQueries(BooleanSupplier isServerReadyToServeQueries);
 
   /**
    * Returns consumer directory paths on the instance

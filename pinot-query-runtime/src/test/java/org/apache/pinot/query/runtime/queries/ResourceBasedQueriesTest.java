@@ -52,16 +52,17 @@ import org.apache.pinot.query.service.dispatch.QueryDispatcher;
 import org.apache.pinot.query.testutils.MockInstanceDataManagerFactory;
 import org.apache.pinot.query.testutils.QueryTestUtils;
 import org.apache.pinot.segment.spi.ImmutableSegment;
+import org.apache.pinot.spi.config.instance.InstanceType;
 import org.apache.pinot.spi.config.table.TableType;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.data.readers.GenericRow;
 import org.apache.pinot.spi.env.PinotConfiguration;
-import org.apache.pinot.spi.utils.CommonConstants;
+import org.apache.pinot.spi.utils.CommonConstants.MultiStageQueryRunner;
 import org.apache.pinot.spi.utils.JsonUtils;
 import org.apache.pinot.spi.utils.builder.TableNameBuilder;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
+import org.assertj.core.api.Assertions;
 import org.testng.Assert;
+import org.testng.SkipException;
 import org.testng.annotations.AfterClass;
 import org.testng.annotations.BeforeClass;
 import org.testng.annotations.DataProvider;
@@ -69,7 +70,6 @@ import org.testng.annotations.Test;
 
 
 public class ResourceBasedQueriesTest extends QueryRunnerTestBase {
-  private static final Logger LOGGER = LoggerFactory.getLogger(ResourceBasedQueriesTest.class);
   private static final ObjectMapper MAPPER = new ObjectMapper();
   private static final Pattern TABLE_NAME_REPLACE_PATTERN = Pattern.compile("\\{([\\w\\d]+)\\}");
   private static final String QUERY_TEST_RESOURCE_FOLDER = "queries";
@@ -212,9 +212,10 @@ public class ResourceBasedQueriesTest extends QueryRunnerTestBase {
     _reducerHostname = "localhost";
     _reducerPort = QueryTestUtils.getAvailablePort();
     Map<String, Object> reducerConfig = new HashMap<>();
-    reducerConfig.put(CommonConstants.MultiStageQueryRunner.KEY_OF_QUERY_RUNNER_HOSTNAME, _reducerHostname);
-    reducerConfig.put(CommonConstants.MultiStageQueryRunner.KEY_OF_QUERY_RUNNER_PORT, _reducerPort);
-    _mailboxService = new MailboxService(_reducerHostname, _reducerPort, new PinotConfiguration(reducerConfig));
+    reducerConfig.put(MultiStageQueryRunner.KEY_OF_QUERY_RUNNER_HOSTNAME, _reducerHostname);
+    reducerConfig.put(MultiStageQueryRunner.KEY_OF_QUERY_RUNNER_PORT, _reducerPort);
+    _mailboxService =
+        new MailboxService(_reducerHostname, _reducerPort, InstanceType.BROKER, new PinotConfiguration(reducerConfig));
     _mailboxService.start();
 
     QueryServerEnclosure server1 = new QueryServerEnclosure(factory1);
@@ -267,12 +268,13 @@ public class ResourceBasedQueriesTest extends QueryRunnerTestBase {
 
   // TODO: name the test using testCaseName for testng reports
   @Test(dataProvider = "testResourceQueryTestCaseProviderInputOnly")
-  public void testQueryTestCasesWithH2(String testCaseName, boolean isIgnored, String sql, String h2Sql, String expect,
-      boolean keepOutputRowOrder, boolean ignoreV2Optimizer)
+  public void testQueryTestCasesWithH2(String testCaseName, boolean isIgnored, String sql, String h2Sql,
+      @Nullable String expectErrorMsg, boolean keepOutputRowOrder, boolean ignoreV2Optimizer)
       throws Exception {
     // query pinot
-    runQuery(sql, expect, false).ifPresent(queryResult -> {
+    runQuery(sql, expectErrorMsg, false).ifPresent(queryResult -> {
       try {
+        Assert.assertNull(queryResult.getProcessingException(), "Expected no exception");
         compareRowEquals(queryResult.getResultTable(), queryH2(h2Sql), keepOutputRowOrder);
       } catch (Exception e) {
         Assert.fail(e.getMessage(), e);
@@ -287,8 +289,8 @@ public class ResourceBasedQueriesTest extends QueryRunnerTestBase {
       throws Exception {
     // query pinot
     if (ignoreV2Optimizer) {
-      LOGGER.warn("Ignoring query for test-case ({}): with v2 optimizer: {}", testCaseName, sql);
-      return;
+      throw new SkipException(
+          "Ignoring query for test-case with v2 optimizer, testCase: " + testCaseName + ", SQL: " + sql);
     }
     sql = String.format("SET usePhysicalOptimizer=true; %s", sql);
     runQuery(sql, expect, false).ifPresent(queryResult -> {
@@ -302,7 +304,7 @@ public class ResourceBasedQueriesTest extends QueryRunnerTestBase {
 
   @Test(dataProvider = "testResourceQueryTestCaseProviderBoth")
   public void testQueryTestCasesWithOutput(String testCaseName, boolean isIgnored, String sql, String h2Sql,
-      List<Object[]> expectedRows, String expect, boolean keepOutputRowOrder)
+      List<Object[]> expectedRows, String expect, boolean keepOutputRowOrder, boolean ignoreV2Optimizer)
       throws Exception {
     runQuery(sql, expect, false).ifPresent(
         queryResult -> compareRowEquals(queryResult.getResultTable(), expectedRows, keepOutputRowOrder));
@@ -310,8 +312,12 @@ public class ResourceBasedQueriesTest extends QueryRunnerTestBase {
 
   @Test(dataProvider = "testResourceQueryTestCaseProviderBoth")
   public void testQueryTestCasesWithNewOptimizerWithOutput(String testCaseName, boolean isIgnored, String sql,
-      String h2Sql, List<Object[]> expectedRows, String expect, boolean keepOutputRowOrder)
+      String h2Sql, List<Object[]> expectedRows, String expect, boolean keepOutputRowOrder, boolean ignoreV2Optimizer)
       throws Exception {
+    if (ignoreV2Optimizer) {
+      throw new SkipException(
+          "Ignoring query for test-case with v2 optimizer, testCase: " + testCaseName + ", SQL: " + sql);
+    }
     final String finalSql = String.format("SET usePhysicalOptimizer=true; %s", sql);
     runQuery(finalSql, expect, false).ifPresent(
         queryResult -> compareRowEquals(queryResult.getResultTable(), expectedRows, keepOutputRowOrder));
@@ -319,8 +325,12 @@ public class ResourceBasedQueriesTest extends QueryRunnerTestBase {
 
   @Test(dataProvider = "testResourceQueryTestCaseProviderBoth")
   public void testQueryTestCasesWithLiteModeWithOutput(String testCaseName, boolean isIgnored, String sql,
-      String h2Sql, List<Object[]> expectedRows, String expect, boolean keepOutputRowOrder)
+      String h2Sql, List<Object[]> expectedRows, String expect, boolean keepOutputRowOrder, boolean ignoreV2Optimizer)
       throws Exception {
+    if (ignoreV2Optimizer) {
+      throw new SkipException(
+          "Ignoring query for test-case with v2 optimizer, testCase: " + testCaseName + ", SQL: " + sql);
+    }
     final String finalSql = String.format("SET usePhysicalOptimizer=true; SET useLiteMode=true; %s", sql);
     runQuery(finalSql, expect, false).ifPresent(
         queryResult -> compareRowEquals(queryResult.getResultTable(), expectedRows, keepOutputRowOrder));
@@ -385,22 +395,34 @@ public class ResourceBasedQueriesTest extends QueryRunnerTestBase {
     });
   }
 
-  private Optional<QueryDispatcher.QueryResult> runQuery(String sql, final String except, boolean trace)
+  private Optional<QueryDispatcher.QueryResult> runQuery(String sql, @Nullable String expectedErrorMsg, boolean trace)
       throws Exception {
     try {
       // query pinot
       QueryDispatcher.QueryResult queryResult = queryRunner(sql, trace);
-      Assert.assertNull(except, "Expected error with message '" + except + "'. But instead rows were returned: "
-          + JsonUtils.objectToPrettyString(queryResult.getResultTable()));
+      if (expectedErrorMsg == null) {
+        Assert.assertTrue(queryResult.getProcessingException() == null,
+            "Unexpected exception: " + JsonUtils.objectToPrettyString(queryResult.getProcessingException()));
+      } else {
+        Assert.assertTrue(queryResult.getProcessingException() != null,
+            "Expected error with message '" + expectedErrorMsg + "'. But instead no error was thrown.");
+        Pattern pattern = Pattern.compile(expectedErrorMsg, Pattern.DOTALL);
+        Assertions.assertThat(queryResult.getProcessingException().getMessage()).matches(pattern);
+        return Optional.empty();
+      }
+      Assert.assertNull(expectedErrorMsg, "Expected error with message '" + expectedErrorMsg
+          + "'. But instead rows were returned: " + JsonUtils.objectToPrettyString(queryResult.getResultTable()));
+      Assert.assertNotNull(queryResult.getResultTable(),
+          "Result table is null: " + JsonUtils.objectToPrettyString(queryResult));
       return Optional.of(queryResult);
     } catch (Exception e) {
-      if (except == null) {
+      if (expectedErrorMsg == null) {
         throw e;
       } else {
-        Pattern pattern = Pattern.compile(except, Pattern.DOTALL);
+        Pattern pattern = Pattern.compile(expectedErrorMsg, Pattern.DOTALL);
         Assert.assertTrue(pattern.matcher(e.getMessage()).matches(),
             String.format("Caught exception '%s', but it did not match the expected pattern '%s'.", e.getMessage(),
-                except));
+                expectedErrorMsg));
       }
     }
 
@@ -435,7 +457,7 @@ public class ResourceBasedQueriesTest extends QueryRunnerTestBase {
           }
           Object[] testEntry = new Object[]{
               testCaseName, queryCase._ignored, sql, h2Sql, expectedRows, queryCase._expectedException,
-              queryCase._keepOutputRowOrder
+              queryCase._keepOutputRowOrder, queryCase._ignoreV2Optimizer
           };
           providerContent.add(testEntry);
         }
@@ -570,12 +592,5 @@ public class ResourceBasedQueriesTest extends QueryRunnerTestBase {
       }
     }
     return testCaseMap;
-  }
-
-  private static Object extractExtraProps(Map<String, Object> extraProps, String propKey) {
-    if (extraProps == null) {
-      return null;
-    }
-    return extraProps.getOrDefault(propKey, null);
   }
 }

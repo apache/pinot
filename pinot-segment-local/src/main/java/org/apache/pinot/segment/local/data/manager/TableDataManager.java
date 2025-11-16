@@ -54,9 +54,9 @@ public interface TableDataManager {
    */
   void init(InstanceDataManagerConfig instanceDataManagerConfig, HelixManager helixManager, SegmentLocks segmentLocks,
       TableConfig tableConfig, Schema schema, SegmentReloadSemaphore segmentReloadSemaphore,
-      ExecutorService segmentReloadExecutor, @Nullable ExecutorService segmentPreloadExecutor,
+      ExecutorService segmentReloadRefreshExecutor, @Nullable ExecutorService segmentPreloadExecutor,
       @Nullable Cache<Pair<String, String>, SegmentErrorInfo> errorCache,
-      @Nullable SegmentOperationsThrottler segmentOperationsThrottler);
+      @Nullable SegmentOperationsThrottler segmentOperationsThrottler, boolean enableAsyncSegmentRefresh);
 
   /**
    * Returns the instance id of the server.
@@ -216,6 +216,10 @@ public interface TableDataManager {
    */
   boolean isSegmentDeletedRecently(String segmentName);
 
+  boolean isDeleted();
+
+  void setDeleted(boolean deleted);
+
   /**
    * Acquires all segments of the table.
    * <p>It is the caller's responsibility to return the segments by calling {@link #releaseSegment(SegmentDataManager)}.
@@ -330,6 +334,14 @@ public interface TableDataManager {
    * @param segmentNameStr name of segment for which the state change is being handled
    */
   default void onConsumingToDropped(String segmentNameStr) {
+  }
+
+  /**
+   * Interface to handle segment state transitions from CONSUMING to OFFLINE
+   *
+   * @param segmentNameStr name of segment for which the state change is being handled
+   */
+  default void onConsumingToOffline(String segmentNameStr) {
   }
 
   /**

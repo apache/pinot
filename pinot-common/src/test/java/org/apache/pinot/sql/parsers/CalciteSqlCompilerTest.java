@@ -348,6 +348,15 @@ public class CalciteSqlCompilerTest {
     }
 
     {
+      PinotQuery pinotQuery = compileToPinotQuery("select * from vegetables where regexp_like(E, '^u.*', 'i')");
+      Function func = pinotQuery.getFilterExpression().getFunctionCall();
+      Assert.assertEquals(func.getOperator(), "REGEXP_LIKE");
+      Assert.assertEquals(func.getOperands().get(0).getIdentifier().getName(), "E");
+      Assert.assertEquals(func.getOperands().get(1).getLiteral().getStringValue(), "^u.*");
+      Assert.assertEquals(func.getOperands().get(2).getLiteral().getStringValue(), "i");
+    }
+
+    {
       PinotQuery pinotQuery = compileToPinotQuery("select * from vegetables where g IN (12, 13, 15.2, 17)");
       Function func = pinotQuery.getFilterExpression().getFunctionCall();
       Assert.assertEquals(func.getOperator(), FilterKind.IN.name());
@@ -467,6 +476,15 @@ public class CalciteSqlCompilerTest {
       Assert.assertEquals(rhs.size(), 2);
       Assert.assertEquals(rhs.get(0).getFunctionCall().getOperator(), "issubnetof");
       Assert.assertEquals(rhs.get(1).getLiteral(), Literal.boolValue(true));
+    }
+
+    {
+      PinotQuery pinotQuery = compileToPinotQuery("select * from vegetables where regexp_like(E, '^u.*', 'i')");
+      Function func = pinotQuery.getFilterExpression().getFunctionCall();
+      Assert.assertEquals(func.getOperator(), "REGEXP_LIKE");
+      Assert.assertEquals(func.getOperands().get(0).getIdentifier().getName(), "E");
+      Assert.assertEquals(func.getOperands().get(1).getLiteral().getStringValue(), "^u.*");
+      Assert.assertEquals(func.getOperands().get(2).getLiteral().getStringValue(), "i");
     }
   }
 
@@ -1776,7 +1794,7 @@ public class CalciteSqlCompilerTest {
         pinotQuery.getSelectList().get(0).getFunctionCall().getOperands().get(0).getIdentifier().getName(), "column1");
     Assert.assertEquals(
         pinotQuery.getSelectList().get(0).getFunctionCall().getOperands().get(1).getLiteral().getStringValue(),
-        "VARCHAR");
+        "STRING");
 
     pinotQuery = compileToPinotQuery("SELECT CAST(column1 AS varchar) from myTable");
     Assert.assertEquals(pinotQuery.getSelectListSize(), 1);
@@ -1785,7 +1803,7 @@ public class CalciteSqlCompilerTest {
         pinotQuery.getSelectList().get(0).getFunctionCall().getOperands().get(0).getIdentifier().getName(), "column1");
     Assert.assertEquals(
         pinotQuery.getSelectList().get(0).getFunctionCall().getOperands().get(1).getLiteral().getStringValue(),
-        "VARCHAR");
+        "STRING");
 
     pinotQuery = compileToPinotQuery(
         "SELECT SUM(CAST(CAST(ArrTime AS STRING) AS LONG)) FROM mytable WHERE DaysSinceEpoch <> 16312 AND Carrier = "

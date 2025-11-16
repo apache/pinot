@@ -1,4 +1,33 @@
 {
+  "physical_opt_lite_mode_limit_options": {
+    "queries": [
+      {
+        "description": "Verify that override for lite mode leaf stage limit works.",
+        "sql": "SET usePhysicalOptimizer=true; SET useLiteMode=true; SET liteModeLeafStageLimit=1000; EXPLAIN PLAN FOR SELECT COUNT(*) FROM a WHERE col1 = 'foo'",
+        "output": [
+          "Execution Plan",
+          "\nPhysicalAggregate(group=[{}], agg#0=[COUNT($0)], aggType=[FINAL])",
+          "\n  PhysicalExchange(exchangeStrategy=[SINGLETON_EXCHANGE])",
+          "\n    PhysicalAggregate(group=[{}], agg#0=[COUNT()], aggType=[LEAF], limit=[1000])",
+          "\n      PhysicalFilter(condition=[=($0, _UTF-8'foo')])",
+          "\n        PhysicalTableScan(table=[[default, a]])",
+          "\n"
+        ]
+      },{
+        "description": "Verify that override for lite mode leaf stage fan-out adjusted limit works.",
+        "sql": "SET usePhysicalOptimizer=true; SET useLiteMode=true; SET liteModeLeafStageFanOutAdjustedLimit=1000; EXPLAIN PLAN FOR SELECT COUNT(*) FROM a WHERE col1 = 'foo'",
+        "output": [
+          "Execution Plan",
+          "\nPhysicalAggregate(group=[{}], agg#0=[COUNT($0)], aggType=[FINAL])",
+          "\n  PhysicalExchange(exchangeStrategy=[SINGLETON_EXCHANGE])",
+          "\n    PhysicalAggregate(group=[{}], agg#0=[COUNT()], aggType=[LEAF], limit=[500])",
+          "\n      PhysicalFilter(condition=[=($0, _UTF-8'foo')])",
+          "\n        PhysicalTableScan(table=[[default, a]])",
+          "\n"
+        ]
+      }
+    ]
+  },
   "physical_opt_constant_queries": {
     "queries": [
       {
@@ -23,7 +52,7 @@
       },
       {
         "description": "Query that gets optimized to a Values node",
-        "sql": "SET usePhysicalOptimizer=true; EXPLAIN PLAN FOR SELECT * FROM a WHERE col1 IS NULL LIMIT 1",
+        "sql": "SET usePhysicalOptimizer=true; EXPLAIN PLAN FOR SELECT * FROM a WHERE col1 <> col1 LIMIT 1",
         "output": [
           "Execution Plan",
           "\nPhysicalSort(fetch=[1])",
@@ -466,7 +495,7 @@
     "queries": [
       {
         "description": "Self semi-joins",
-        "sql": "SET usePhysicalOptimizer=true; EXPLAIN PLAN FOR SELECT col1, col2 FROM a WHERE col2 IN (SELECT col2 FROM a WHERE col3 = 'foo') AND col2 IN (SELECT col2 FROM a WHERE col3 = 'bar')",
+        "sql": "SET usePhysicalOptimizer=true; EXPLAIN PLAN FOR SELECT col1, col2 FROM a WHERE col2 IN (SELECT col2 FROM a WHERE col3 = '1') AND col2 IN (SELECT col2 FROM a WHERE col3 = '2')",
         "output": [
           "Execution Plan",
           "\nPhysicalExchange(exchangeStrategy=[SINGLETON_EXCHANGE])",
@@ -477,18 +506,18 @@
           "\n          PhysicalTableScan(table=[[default, a]])",
           "\n      PhysicalExchange(exchangeStrategy=[IDENTITY_EXCHANGE])",
           "\n        PhysicalProject(col2=[$1])",
-          "\n          PhysicalFilter(condition=[=($2, CAST(_UTF-8'foo'):INTEGER NOT NULL)])",
+          "\n          PhysicalFilter(condition=[=($2, 1)])",
           "\n            PhysicalTableScan(table=[[default, a]])",
           "\n    PhysicalExchange(exchangeStrategy=[IDENTITY_EXCHANGE])",
           "\n      PhysicalProject(col2=[$1])",
-          "\n        PhysicalFilter(condition=[=($2, CAST(_UTF-8'bar'):INTEGER NOT NULL)])",
+          "\n        PhysicalFilter(condition=[=($2, 2)])",
           "\n          PhysicalTableScan(table=[[default, a]])",
           "\n"
         ]
       },
       {
         "description": "Self semi and anti semi-joins",
-        "sql": "SET usePhysicalOptimizer=true; EXPLAIN PLAN FOR SELECT col1, col2 FROM a WHERE col2 IN (SELECT col2 FROM a WHERE col3 = 'foo') AND col2 NOT IN (SELECT col2 FROM a WHERE col3 = 'bar') AND col2 IN (SELECT col2 FROM a WHERE col3 = 'lorem')",
+        "sql": "SET usePhysicalOptimizer=true; EXPLAIN PLAN FOR SELECT col1, col2 FROM a WHERE col2 IN (SELECT col2 FROM a WHERE col3 = '1') AND col2 NOT IN (SELECT col2 FROM a WHERE col3 = '2') AND col2 IN (SELECT col2 FROM a WHERE col3 = '3')",
         "output": [
           "Execution Plan",
           "\nPhysicalExchange(exchangeStrategy=[SINGLETON_EXCHANGE])",
@@ -503,23 +532,23 @@
           "\n                  PhysicalTableScan(table=[[default, a]])",
           "\n              PhysicalExchange(exchangeStrategy=[IDENTITY_EXCHANGE])",
           "\n                PhysicalProject(col2=[$1])",
-          "\n                  PhysicalFilter(condition=[=($2, CAST(_UTF-8'foo'):INTEGER NOT NULL)])",
+          "\n                  PhysicalFilter(condition=[=($2, 1)])",
           "\n                    PhysicalTableScan(table=[[default, a]])",
           "\n          PhysicalExchange(exchangeStrategy=[IDENTITY_EXCHANGE])",
           "\n            PhysicalAggregate(group=[{0}], agg#0=[MIN($1)], aggType=[DIRECT])",
           "\n              PhysicalProject(col2=[$1], $f1=[true])",
-          "\n                PhysicalFilter(condition=[=($2, CAST(_UTF-8'bar'):INTEGER NOT NULL)])",
+          "\n                PhysicalFilter(condition=[=($2, 2)])",
           "\n                  PhysicalTableScan(table=[[default, a]])",
           "\n    PhysicalExchange(exchangeStrategy=[IDENTITY_EXCHANGE])",
           "\n      PhysicalProject(col2=[$1])",
-          "\n        PhysicalFilter(condition=[=($2, CAST(_UTF-8'lorem'):INTEGER NOT NULL)])",
+          "\n        PhysicalFilter(condition=[=($2, 3)])",
           "\n          PhysicalTableScan(table=[[default, a]])",
           "\n"
         ]
       },
       {
         "description": "Self semi and anti semi-joins with aggregation in the end",
-        "sql": "SET usePhysicalOptimizer=true; EXPLAIN PLAN FOR SELECT col1, COUNT(*) FROM a WHERE col2 IN (SELECT col2 FROM a WHERE col3 = 'foo') AND col2 NOT IN (SELECT col2 FROM a WHERE col3 = 'bar') AND col2 IN (SELECT col2 FROM a WHERE col3 = 'lorem') GROUP BY col1",
+        "sql": "SET usePhysicalOptimizer=true; EXPLAIN PLAN FOR SELECT col1, COUNT(*) FROM a WHERE col2 IN (SELECT col2 FROM a WHERE col3 = '1') AND col2 NOT IN (SELECT col2 FROM a WHERE col3 = '2') AND col2 IN (SELECT col2 FROM a WHERE col3 = '3') GROUP BY col1",
         "output": [
           "Execution Plan",
           "\nPhysicalExchange(exchangeStrategy=[SINGLETON_EXCHANGE])",
@@ -537,16 +566,16 @@
           "\n                        PhysicalTableScan(table=[[default, a]])",
           "\n                    PhysicalExchange(exchangeStrategy=[IDENTITY_EXCHANGE])",
           "\n                      PhysicalProject(col2=[$1])",
-          "\n                        PhysicalFilter(condition=[=($2, CAST(_UTF-8'foo'):INTEGER NOT NULL)])",
+          "\n                        PhysicalFilter(condition=[=($2, 1)])",
           "\n                          PhysicalTableScan(table=[[default, a]])",
           "\n                PhysicalExchange(exchangeStrategy=[IDENTITY_EXCHANGE])",
           "\n                  PhysicalAggregate(group=[{0}], agg#0=[MIN($1)], aggType=[DIRECT])",
           "\n                    PhysicalProject(col2=[$1], $f1=[true])",
-          "\n                      PhysicalFilter(condition=[=($2, CAST(_UTF-8'bar'):INTEGER NOT NULL)])",
+          "\n                      PhysicalFilter(condition=[=($2, 2)])",
           "\n                        PhysicalTableScan(table=[[default, a]])",
           "\n          PhysicalExchange(exchangeStrategy=[IDENTITY_EXCHANGE])",
           "\n            PhysicalProject(col2=[$1])",
-          "\n              PhysicalFilter(condition=[=($2, CAST(_UTF-8'lorem'):INTEGER NOT NULL)])",
+          "\n              PhysicalFilter(condition=[=($2, 3)])",
           "\n                PhysicalTableScan(table=[[default, a]])",
           "\n"
         ]
@@ -613,7 +642,7 @@
     "queries": [
       {
         "description": "Union, distinct, etc. but still maximally identity exchange",
-        "sql": "SET usePhysicalOptimizer=true; EXPLAIN PLAN FOR WITH tmp AS (SELECT col2 FROM a WHERE col1 = 'foo' UNION ALL SELECT col2 FROM a WHERE col3 = 'bar'), tmp2 AS (SELECT DISTINCT col2 FROM tmp) SELECT COUNT(*), col3 FROM a WHERE col2 IN (SELECT col2 FROM tmp2) GROUP BY col3",
+        "sql": "SET usePhysicalOptimizer=true; EXPLAIN PLAN FOR WITH tmp AS (SELECT col2 FROM a WHERE col1 = 'foo' UNION ALL SELECT col2 FROM a WHERE col3 = '1'), tmp2 AS (SELECT DISTINCT col2 FROM tmp) SELECT COUNT(*), col3 FROM a WHERE col2 IN (SELECT col2 FROM tmp2) GROUP BY col3",
         "output": [
           "Execution Plan",
           "\nPhysicalExchange(exchangeStrategy=[SINGLETON_EXCHANGE])",
@@ -633,7 +662,7 @@
           "\n                      PhysicalTableScan(table=[[default, a]])",
           "\n                PhysicalExchange(exchangeStrategy=[IDENTITY_EXCHANGE])",
           "\n                  PhysicalProject(col2=[$1])",
-          "\n                    PhysicalFilter(condition=[=($2, CAST(_UTF-8'bar'):INTEGER NOT NULL)])",
+          "\n                    PhysicalFilter(condition=[=($2, 1)])",
           "\n                      PhysicalTableScan(table=[[default, a]])",
           "\n"
         ]
@@ -803,6 +832,21 @@
           "\n            PhysicalExchange(exchangeStrategy=[SINGLETON_EXCHANGE])",
           "\n              PhysicalAggregate(group=[{0, 1, 7}], aggType=[LEAF], limit=[100])",
           "\n                PhysicalTableScan(table=[[default, a]])",
+          "\n"
+        ]
+      },
+      {
+        "description": "Tests collation push down for Lite Mode. Collation from the exchange above should get pushed down to the sort below.",
+        "sql": "SET usePhysicalOptimizer=true; SET useLiteMode=true; EXPLAIN PLAN FOR WITH tmp AS (SELECT col1, ROW_NUMBER() OVER (ORDER BY ts DESC) as row_num FROM a) SELECT COUNT(*) FROM tmp WHERE row_num <= 100",
+        "output": [
+          "Execution Plan",
+          "\nPhysicalAggregate(group=[{}], agg#0=[COUNT()], aggType=[DIRECT])",
+          "\n  PhysicalFilter(condition=[<=($1, 100)])",
+          "\n    PhysicalWindow(window#0=[window(order by [0 DESC] rows between UNBOUNDED PRECEDING and CURRENT ROW aggs [ROW_NUMBER()])])",
+          "\n      PhysicalExchange(exchangeStrategy=[SINGLETON_EXCHANGE], collation=[[0 DESC]])",
+          "\n        PhysicalSort(sort0=[$0], dir0=[DESC], fetch=[100000])",
+          "\n          PhysicalProject(ts=[$7])",
+          "\n            PhysicalTableScan(table=[[default, a]])",
           "\n"
         ]
       }

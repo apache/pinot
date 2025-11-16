@@ -64,14 +64,6 @@ import static org.apache.pinot.spi.utils.CommonConstants.SWAGGER_AUTHORIZATION_K
  * files stored under {@code controllerConf.pageCacheWarmupDataDir}. Pinot servers
  * read these files on startup to pre‑warm the OS page cache.</p>
  *
- * <h2>Endpoints</h2>
- * <table border="1">
- *   <tr><th>Method</th><th>Path</th><th>Description</th></tr>
- *   <tr><td>GET</td><td>/pagecache/queries/{tableName}</td><td>Return warm‑up queries</td></tr>
- *   <tr><td>POST</td><td>/pagecache/queries/{tableName}</td><td>Store or overwrite queries</td></tr>
- *   <tr><td>DELETE</td><td>/pagecache/queries/{tableName}</td><td>Remove stored queries</td></tr>
- * </table>
- *
  */
 @Api(tags = Constants.PAGE_CACHE_WARMUP_TAG, authorizations = {@Authorization(value = SWAGGER_AUTHORIZATION_KEY),
     @Authorization(value = DATABASE)})
@@ -127,7 +119,6 @@ public class PageCacheWarmupRestletResource {
         ? DEFAULT_QUERY_FILE_NAME
         : queryFileNameParam;
       validateInput(tableName, tableType, queryFileNameParam);
-
       LOGGER.info("Fetching warmup queries for tableName: {}, tableType: {}", tableName, tableType);
       File tableDir = new File(_pageCacheWarmupDataDir, tableName + "_" + tableType);
       File queryFile = new File(tableDir, queryFileName);
@@ -205,14 +196,12 @@ public class PageCacheWarmupRestletResource {
         ? DEFAULT_QUERY_FILE_NAME
         : queryFileNameParam;
       validateInput(tableName, tableType, queryFileName);
-
       List<String> queries = JsonUtils.stringToObject(requestString, new TypeReference<>() { });
       if (queries == null || queries.isEmpty()) {
         throw new ControllerApplicationException(LOGGER, "Queries list cannot be empty", 400);
       }
       LOGGER.info("Storing {} queries for {}_{}", queries.size(), tableName, tableType);
       storeQueriesInPageCacheWarmupDataDir(tableName + "_" + tableType, queryFileName, queries);
-
       String responseString = String.format("Successfully stored %d queries for table: %s_%s (file: %s)",
           queries.size(), tableName, tableType, queryFileName);
       return Response.ok(responseString).build();

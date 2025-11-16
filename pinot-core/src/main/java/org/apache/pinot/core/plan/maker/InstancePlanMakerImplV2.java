@@ -285,6 +285,10 @@ public class InstancePlanMakerImplV2 implements PlanMaker {
       } else {
         queryContext.setGroupTrimThreshold(_groupByTrimThreshold);
       }
+      // Set optimizeMaxInitialResultHolderCapacity
+      boolean optimizeMaxInitialResultHolderCapacity =
+          QueryOptionsUtils.optimizeMaxInitialResultHolderCapacityEnabled(queryOptions);
+      queryContext.setOptimizeMaxInitialResultHolderCapacity(optimizeMaxInitialResultHolderCapacity);
       // Set numThreadsExtractFinalResult
       Integer numThreadsExtractFinalResult = QueryOptionsUtils.getNumThreadsExtractFinalResult(queryOptions);
       if (numThreadsExtractFinalResult != null) {

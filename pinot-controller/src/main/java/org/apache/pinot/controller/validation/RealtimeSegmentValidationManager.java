@@ -66,7 +66,6 @@ public class RealtimeSegmentValidationManager extends ControllerPeriodicTask<Rea
   private final boolean _segmentAutoResetOnErrorAtValidation;
 
   public static final String OFFSET_CRITERIA = "offsetCriteria";
-  public static final String RUN_SEGMENT_LEVEL_VALIDATION = "runSegmentLevelValidation";
   public static final String REPAIR_ERROR_SEGMENTS_FOR_PARTIAL_UPSERT_OR_DEDUP =
       "repairErrorSegmentsForPartialUpsertOrDedup";
 
@@ -134,7 +133,7 @@ public class RealtimeSegmentValidationManager extends ControllerPeriodicTask<Rea
     if (isPauselessConsumptionEnabled) {
       // For pauseless tables without dedup or partial upsert, repair segments in error state
       _llcRealtimeSegmentManager.repairSegmentsInErrorStateForPauselessConsumption(tableConfig,
-          context._repairErrorSegmentsForPartialUpsertOrDedup);
+          context._repairErrorSegmentsForPartialUpsertOrDedup, _segmentAutoResetOnErrorAtValidation);
     } else if (_segmentAutoResetOnErrorAtValidation) {
       // Reset for pauseless tables is already handled in repairSegmentsInErrorStateForPauselessConsumption method with
       // additional checks for pauseless consumption

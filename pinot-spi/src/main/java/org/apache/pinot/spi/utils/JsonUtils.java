@@ -44,7 +44,6 @@ import java.util.AbstractMap;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
-import java.util.Iterator;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -79,7 +78,7 @@ public class JsonUtils {
   public static final String ARRAY_INDEX_KEY = ".$index";
   public static final String SKIPPED_VALUE_REPLACEMENT = "$SKIPPED$";
   public static final int MAX_COMBINATIONS = 100_000;
-  private static final List<Map<String, String>> SKIPPED_FLATTENED_RECORD =
+  public static final List<Map<String, String>> SKIPPED_FLATTENED_RECORD =
       Collections.singletonList(Collections.singletonMap(VALUE_KEY, SKIPPED_VALUE_REPLACEMENT));
 
   // For querying
@@ -158,6 +157,11 @@ public class JsonUtils {
     return DEFAULT_READER.readTree(jsonString);
   }
 
+  public static Map<String, String> jsonNodeToStringMap(JsonNode jsonNode)
+      throws IOException {
+    return DEFAULT_READER.forType(MAP_TYPE_REFERENCE).readValue(jsonNode);
+  }
+
   public static JsonNode stringToJsonNodeWithBigDecimal(String jsonString)
       throws IOException {
     return READER_WITH_BIG_DECIMAL.readTree(jsonString);
@@ -221,6 +225,11 @@ public class JsonUtils {
   public static JsonNode bytesToJsonNode(byte[] jsonBytes)
       throws IOException {
     return DEFAULT_READER.readTree(new ByteArrayInputStream(jsonBytes));
+  }
+
+  public static JsonNode bytesToJsonNode(byte[] jsonBytes, int offset, int length)
+      throws IOException {
+    return DEFAULT_READER.readTree(new ByteArrayInputStream(jsonBytes, offset, length));
   }
 
   public static <T> T jsonNodeToObject(JsonNode jsonNode, Class<T> valueType)
@@ -446,9 +455,7 @@ public class JsonUtils {
     // Put all nested results (from array) into a list to be processed later
     List<List<Map<String, String>>> nestedResultsList = new ArrayList<>();
 
-    Iterator<Map.Entry<String, JsonNode>> fieldIterator = node.fields();
-    while (fieldIterator.hasNext()) {
-      Map.Entry<String, JsonNode> fieldEntry = fieldIterator.next();
+    for (Map.Entry<String, JsonNode> fieldEntry : node.properties()) {
       String field = fieldEntry.getKey();
       Set<String> excludeFields = jsonIndexConfig.getExcludeFields();
       if (excludeFields != null && excludeFields.contains(field)) {
@@ -613,9 +620,7 @@ public class JsonUtils {
       @Nullable Map<String, FieldSpec.FieldType> fieldTypeMap, @Nullable TimeUnit timeUnit, List<String> fieldsToUnnest,
       String delimiter, ComplexTypeConfig.CollectionNotUnnestedToJson collectionNotUnnestedToJson) {
     Schema pinotSchema = new Schema();
-    Iterator<Map.Entry<String, JsonNode>> fieldIterator = jsonNode.fields();
-    while (fieldIterator.hasNext()) {
-      Map.Entry<String, JsonNode> fieldEntry = fieldIterator.next();
+    for (Map.Entry<String, JsonNode> fieldEntry : jsonNode.properties()) {
       JsonNode childNode = fieldEntry.getValue();
       inferPinotSchemaFromJsonNode(childNode, pinotSchema, fieldEntry.getKey(), fieldTypeMap, timeUnit, fieldsToUnnest,
           delimiter, collectionNotUnnestedToJson);
@@ -651,9 +656,7 @@ public class JsonUtils {
       }
       // do not include the node for other cases
     } else if (jsonNode.isObject()) {
-      Iterator<Map.Entry<String, JsonNode>> fieldIterator = jsonNode.fields();
-      while (fieldIterator.hasNext()) {
-        Map.Entry<String, JsonNode> fieldEntry = fieldIterator.next();
+      for (Map.Entry<String, JsonNode> fieldEntry : jsonNode.properties()) {
         JsonNode childNode = fieldEntry.getValue();
         inferPinotSchemaFromJsonNode(childNode, pinotSchema, String.join(delimiter, path, fieldEntry.getKey()),
             fieldTypeMap, timeUnit, fieldsToUnnest, delimiter, collectionNotUnnestedToJson);
@@ -736,14 +739,14 @@ public class JsonUtils {
     JsonNode jsonNode;
     try {
       jsonNode = JsonUtils.stringToJsonNode(jsonString);
-    } catch (JsonProcessingException e) {
+      return JsonUtils.flatten(jsonNode, jsonIndexConfig);
+    } catch (Exception e) {
       if (jsonIndexConfig.getSkipInvalidJson()) {
         return SKIPPED_FLATTENED_RECORD;
       } else {
         throw e;
       }
     }
-    return JsonUtils.flatten(jsonNode, jsonIndexConfig);
   }
 
   /**

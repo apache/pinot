@@ -73,7 +73,7 @@ public class VarByteChunkForwardIndexReaderV4
     _chunkCompressionType = ChunkCompressionType.valueOf(dataBuffer.getInt(8));
     _chunkDecompressor = ChunkCompressorFactory.getDecompressor(_chunkCompressionType);
     int chunksOffset = dataBuffer.getInt(12);
-    // the file has a BE header for compatability reasons (version selection) but the content is LE
+    // the file has a BE header for compatibility reasons (version selection) but the content is LE
     _metadata = dataBuffer.view(16, chunksOffset, ByteOrder.LITTLE_ENDIAN);
     _chunksStartOffset = chunksOffset;
     _chunks = dataBuffer.view(chunksOffset, dataBuffer.size(), ByteOrder.LITTLE_ENDIAN);

@@ -19,7 +19,6 @@
 package org.apache.pinot.tools;
 
 import com.google.common.base.Preconditions;
-import com.google.common.collect.ImmutableMap;
 import java.io.File;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -101,7 +100,7 @@ public class HybridQuickstart extends Quickstart {
 
   @Override
   protected Map<String, String> getDefaultStreamTableDirectories() {
-    return ImmutableMap.of("airlineStats", "examples/stream/airlineStats");
+    return Map.of("airlineStats", "examples/stream/airlineStats");
   }
 
   public void execute()

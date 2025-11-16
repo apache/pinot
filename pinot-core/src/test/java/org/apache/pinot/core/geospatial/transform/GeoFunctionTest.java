@@ -36,6 +36,7 @@ import org.apache.pinot.core.operator.filter.MatchAllFilterOperator;
 import org.apache.pinot.core.operator.transform.function.TransformFunction;
 import org.apache.pinot.core.operator.transform.function.TransformFunctionFactory;
 import org.apache.pinot.core.plan.DocIdSetPlanNode;
+import org.apache.pinot.core.query.request.context.QueryContext;
 import org.apache.pinot.segment.local.indexsegment.immutable.ImmutableSegmentLoader;
 import org.apache.pinot.segment.local.segment.creator.impl.SegmentIndexCreationDriverImpl;
 import org.apache.pinot.segment.local.segment.readers.GenericRowRecordReader;
@@ -165,7 +166,8 @@ public abstract class GeoFunctionTest {
     }
 
     ProjectionBlock projectionBlock = new ProjectionOperator(dataSourceMap,
-        new DocIdSetOperator(new MatchAllFilterOperator(length), DocIdSetPlanNode.MAX_DOC_PER_CALL)).nextBlock();
+        new DocIdSetOperator(new MatchAllFilterOperator(length), DocIdSetPlanNode.MAX_DOC_PER_CALL),
+        new QueryContext.Builder().build()).nextBlock();
 
     ExpressionContext expression = RequestContextUtils.getExpression(function);
     TransformFunction transformFunction = TransformFunctionFactory.get(expression, dataSourceMap);

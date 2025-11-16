@@ -18,7 +18,6 @@
  */
 package org.apache.pinot.common.function.scalar;
 
-import org.apache.pinot.common.function.scalar.string.NgramFunctions;
 import org.testng.annotations.DataProvider;
 import org.testng.annotations.Test;
 
@@ -95,24 +94,6 @@ public class StringFunctionsTest {
     };
   }
 
-  @DataProvider(name = "ngramTestCases")
-  public static Object[][] ngramTestCases() {
-    return new Object[][]{
-        {"abcd", 0, 3, new String[]{"abc", "bcd"}, new String[]{"a", "b", "c", "d", "ab", "bc", "cd", "abc", "bcd"}},
-        {"abcd", 2, 2, new String[]{"ab", "bc", "cd"}, new String[]{"ab", "bc", "cd"}},
-        {"abcd", 3, 0, new String[]{}, new String[]{}},
-        {"abc", 0, 3, new String[]{"abc"}, new String[]{"a", "b", "c", "ab", "bc", "abc"}},
-        {"abc", 3, 0, new String[]{}, new String[]{}},
-        {"abc", 3, 3, new String[]{"abc"}, new String[]{"abc"}},
-        {"a", 0, 3, new String[]{}, new String[]{"a"}},
-        {"a", 2, 3, new String[]{}, new String[]{}},
-        {"a", 3, 3, new String[]{}, new String[]{}},
-        {"", 3, 0, new String[]{}, new String[]{}},
-        {"", 3, 3, new String[]{}, new String[]{}},
-        {"", 0, 3, new String[]{}, new String[]{}}
-    };
-  }
-
   @Test(dataProvider = "isJson")
   public void testIsJson(String input, boolean expectedValue) {
     assertEquals(StringFunctions.isJson(input), expectedValue);
@@ -132,12 +113,6 @@ public class StringFunctionsTest {
     assertEquals(StringFunctions.suffixes(input, length), expectedSuffix);
     assertEquals(StringFunctions.prefixesWithPrefix(input, length, "^"), expectedPrefixWithRegexChar);
     assertEquals(StringFunctions.suffixesWithSuffix(input, length, "$"), expectedSuffixWithRegexChar);
-  }
-
-  @Test(dataProvider = "ngramTestCases")
-  public void testNGram(String input, int minGram, int maxGram, String[] expectedExactNGram, String[] expectedNGram) {
-    assertEquals(new NgramFunctions().uniqueNgrams(input, maxGram), expectedExactNGram);
-    assertEquals(new NgramFunctions().uniqueNgrams(input, minGram, maxGram), expectedNGram);
   }
 
   @Test

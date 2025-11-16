@@ -20,17 +20,21 @@ package org.apache.pinot.controller.helix.core.assignment.segment;
 
 import com.google.common.base.Preconditions;
 import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.TreeMap;
 import javax.annotation.Nullable;
 import org.apache.commons.collections4.CollectionUtils;
 import org.apache.commons.lang3.tuple.Pair;
 import org.apache.pinot.common.assignment.InstancePartitions;
 import org.apache.pinot.common.tier.Tier;
+import org.apache.pinot.common.utils.PauselessConsumptionUtils;
 import org.apache.pinot.common.utils.SegmentUtils;
 import org.apache.pinot.controller.helix.core.assignment.segment.strategy.SegmentAssignmentStrategy;
 import org.apache.pinot.controller.helix.core.assignment.segment.strategy.SegmentAssignmentStrategyFactory;
+import org.apache.pinot.controller.helix.core.realtime.PinotLLCRealtimeSegmentManager;
 import org.apache.pinot.controller.helix.core.rebalance.RebalanceConfig;
 import org.apache.pinot.spi.config.table.assignment.InstancePartitionsType;
 import org.apache.pinot.spi.utils.CommonConstants.Helix.StateModel.SegmentStateModel;
@@ -92,8 +96,7 @@ public class RealtimeSegmentAssignment extends BaseSegmentAssignment {
       SegmentAssignmentStrategy segmentAssignmentStrategy =
           SegmentAssignmentStrategyFactory.getSegmentAssignmentStrategy(_helixManager, _tableConfig,
               instancePartitionsType.toString(), instancePartitions);
-      instancesAssigned = segmentAssignmentStrategy.assignSegment(segmentName, currentAssignment, instancePartitions,
-          InstancePartitionsType.COMPLETED);
+      instancesAssigned = segmentAssignmentStrategy.assignSegment(segmentName, currentAssignment, instancePartitions);
     } else {
       instancesAssigned = assignConsumingSegment(segmentName, instancePartitions);
     }
@@ -182,8 +185,7 @@ public class RealtimeSegmentAssignment extends BaseSegmentAssignment {
     boolean bootstrap = config.isBootstrap();
     // Rebalance tiers first
     Pair<List<Map<String, Map<String, String>>>, Map<String, Map<String, String>>> pair =
-        rebalanceTiers(currentAssignment, sortedTiers, tierInstancePartitionsMap, bootstrap,
-            InstancePartitionsType.COMPLETED);
+        rebalanceTiers(currentAssignment, sortedTiers, tierInstancePartitionsMap, bootstrap);
 
     List<Map<String, Map<String, String>>> newTierAssignments = pair.getLeft();
     Map<String, Map<String, String>> nonTierAssignment = pair.getRight();
@@ -192,8 +194,16 @@ public class RealtimeSegmentAssignment extends BaseSegmentAssignment {
             + "includeConsuming: {}, bootstrap: {}", _tableNameWithType, completedInstancePartitions,
         consumingInstancePartitions, includeConsuming, bootstrap);
 
+    Set<String> committingSegments = null;
+    if (PauselessConsumptionUtils.isPauselessEnabled(_tableConfig)) {
+      List<String> committingSegmentList = PinotLLCRealtimeSegmentManager.getCommittingSegments(_tableNameWithType,
+          _helixManager.getHelixPropertyStore());
+      if (!committingSegmentList.isEmpty()) {
+        committingSegments = new HashSet<>(committingSegmentList);
+      }
+    }
     SegmentAssignmentUtils.CompletedConsumingOfflineSegmentAssignment completedConsumingOfflineSegmentAssignment =
-        new SegmentAssignmentUtils.CompletedConsumingOfflineSegmentAssignment(nonTierAssignment);
+        new SegmentAssignmentUtils.CompletedConsumingOfflineSegmentAssignment(nonTierAssignment, committingSegments);
     Map<String, Map<String, String>> newAssignment;
 
     // Reassign COMPLETED segments first
@@ -208,7 +218,7 @@ public class RealtimeSegmentAssignment extends BaseSegmentAssignment {
       _logger.info("Reassigning COMPLETED segments with COMPLETED instance partitions for table: {}",
           _tableNameWithType);
       newAssignment = reassignSegments(InstancePartitionsType.COMPLETED.toString(), completedSegmentAssignment,
-          completedInstancePartitions, bootstrap, segmentAssignmentStrategy, InstancePartitionsType.COMPLETED);
+          completedInstancePartitions, bootstrap, segmentAssignmentStrategy);
     } else {
       // When COMPLETED instance partitions are not provided, reassign COMPLETED segments the same way as CONSUMING
       // segments with CONSUMING instance partitions (ensure COMPLETED segments are served by the correct instances when
@@ -233,10 +243,18 @@ public class RealtimeSegmentAssignment extends BaseSegmentAssignment {
       _logger.info("Reassigning CONSUMING segments with CONSUMING instance partitions for table: {}",
           _tableNameWithType);
 
-      for (String segmentName : consumingSegmentAssignment.keySet()) {
+      for (Map.Entry<String, Map<String, String>> entry : consumingSegmentAssignment.entrySet()) {
+        String segmentName = entry.getKey();
+        Map<String, String> originalInstanceStateMap = entry.getValue();
+        // The consumingSegmentAssignment can contain two types of segments:
+        //   1. Segments in CONSUMING state (for both pauseless and non-pauseless tables)
+        //   2. Segments in ONLINE state with segment status in COMMITTING state for pauseless tables
+        // The target state should be determined based on the current state in the original instanceStateMap
+        String targetState = originalInstanceStateMap.containsValue(SegmentStateModel.ONLINE)
+            ? SegmentStateModel.ONLINE : SegmentStateModel.CONSUMING;
         List<String> instancesAssigned = assignConsumingSegment(segmentName, consumingInstancePartitions);
         Map<String, String> instanceStateMap =
-            SegmentAssignmentUtils.getInstanceStateMap(instancesAssigned, SegmentStateModel.CONSUMING);
+            SegmentAssignmentUtils.getInstanceStateMap(instancesAssigned, targetState);
         newAssignment.put(segmentName, instanceStateMap);
       }
     } else {

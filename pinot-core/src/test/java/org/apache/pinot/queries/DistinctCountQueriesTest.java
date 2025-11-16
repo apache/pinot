@@ -19,6 +19,7 @@
 package org.apache.pinot.queries;
 
 import com.clearspring.analytics.stream.cardinality.HyperLogLog;
+import com.clearspring.analytics.stream.cardinality.HyperLogLogPlus;
 import java.io.File;
 import java.io.IOException;
 import java.util.ArrayList;
@@ -519,6 +520,136 @@ public class DistinctCountQueriesTest extends BaseQueriesTest {
         (DistinctCountSmartHLLAggregationFunction) queryContext.getAggregationFunctions()[0];
     assertEquals(function.getThreshold(), 10);
     assertEquals(function.getLog2m(), 8);
+  }
+
+  @Test
+  public void testSmartHLLPlus() {
+    // Dictionary based
+    String query = "SELECT DISTINCTCOUNTSMARTHLLPLUS(intColumn, 'threshold=10'), "
+            + "DISTINCTCOUNTSMARTHLLPLUS(longColumn, 'threshold=10'), "
+            + "DISTINCTCOUNTSMARTHLLPLUS(floatColumn, 'threshold=10'), "
+            + "DISTINCTCOUNTSMARTHLLPLUS(doubleColumn, 'threshold=10'), "
+            + "DISTINCTCOUNTSMARTHLLPLUS(stringColumn, 'threshold=10'), "
+            + "DISTINCTCOUNTSMARTHLLPLUS(bytesColumn, 'threshold=10') FROM testTable";
+
+    // Inner segment
+    Object[] interSegmentsExpectedResults = new Object[6];
+    for (Object operator : Arrays.asList(getOperator(query), getOperatorWithFilter(query))) {
+      assertTrue(operator instanceof NonScanBasedAggregationOperator);
+      AggregationResultsBlock resultsBlock = ((NonScanBasedAggregationOperator) operator).nextBlock();
+      QueriesTestUtils.testInnerSegmentExecutionStatistics(((Operator) operator).getExecutionStatistics(), NUM_RECORDS,
+              0, 0, NUM_RECORDS);
+      List<Object> aggregationResult = resultsBlock.getResults();
+      assertNotNull(aggregationResult);
+      assertEquals(aggregationResult.size(), 6);
+      for (int i = 0; i < 6; i++) {
+        assertTrue(aggregationResult.get(i) instanceof HyperLogLogPlus);
+        HyperLogLogPlus hll = (HyperLogLogPlus) aggregationResult.get(i);
+
+        // Check precision is 14
+        assertEquals(hll.sizeof(), 10924);
+
+        int actualResult = (int) hll.cardinality();
+        int expectedResult = _values.size();
+        // The standard deviation of the error for p 14 is 0.81%, allow 2% error
+        assertEquals(actualResult, expectedResult, expectedResult * 0.02);
+
+        interSegmentsExpectedResults[i] = actualResult;
+      }
+    }
+
+    // Inter segments
+    for (BrokerResponseNative brokerResponse : Arrays.asList(getBrokerResponse(query),
+            getBrokerResponseWithFilter(query))) {
+      QueriesTestUtils.testInterSegmentsResult(brokerResponse, 4 * NUM_RECORDS, 0, 0, 4 * NUM_RECORDS,
+              interSegmentsExpectedResults);
+    }
+
+    // Regular aggregation
+    query = query + " WHERE intColumn >= 500";
+
+    // Inner segment
+    int expectedResult = 0;
+    for (Integer value : _values) {
+      if (value >= 500) {
+        expectedResult++;
+      }
+    }
+    AggregationOperator aggregationOperator = getOperator(query);
+    List<Object> aggregationResult = aggregationOperator.nextBlock().getResults();
+    assertNotNull(aggregationResult);
+    assertEquals(aggregationResult.size(), 6);
+    for (int i = 0; i < 6; i++) {
+      assertTrue(aggregationResult.get(i) instanceof HyperLogLogPlus);
+      HyperLogLogPlus hll = (HyperLogLogPlus) aggregationResult.get(i);
+
+      // Check precision is 14
+      assertEquals(hll.sizeof(), 10924);
+
+      int actualResult = (int) hll.cardinality();
+      // The standard deviation of the error for p 14 is 0.81%, allow 2% error
+      assertEquals(actualResult, expectedResult, expectedResult * 0.02);
+
+      interSegmentsExpectedResults[i] = actualResult;
+    }
+
+    // Inter segments
+    QueriesTestUtils.testInterSegmentsResult(getBrokerResponse(query), interSegmentsExpectedResults);
+
+    // Change precision
+    query = "SELECT DISTINCTCOUNTSMARTHLLPLUS(intColumn, 'threshold=10;p=12') FROM testTable";
+    NonScanBasedAggregationOperator nonScanOperator = getOperator(query);
+    aggregationResult = nonScanOperator.nextBlock().getResults();
+    assertNotNull(aggregationResult);
+    assertEquals(aggregationResult.size(), 1);
+    assertTrue(aggregationResult.get(0) instanceof HyperLogLogPlus);
+    HyperLogLogPlus hll = (HyperLogLogPlus) aggregationResult.get(0);
+    // Check precision is 12
+    assertEquals(hll.sizeof(), 2732);
+  }
+
+  @Test
+  public void testSmartULL() {
+    String query = "SELECT DISTINCTCOUNTSMARTULL(intColumn, 'threshold=10'), "
+        + "DISTINCTCOUNTSMARTULL(longColumn, 'threshold=10'), DISTINCTCOUNTSMARTULL(floatColumn, 'threshold=10'), "
+        + "DISTINCTCOUNTSMARTULL(doubleColumn, 'threshold=10'), DISTINCTCOUNTSMARTULL(stringColumn, 'threshold=10') "
+        + "FROM testTable";
+
+    Object[] interSegmentsExpectedResults = new Object[5];
+    for (Object operator : Arrays.asList(getOperator(query), getOperatorWithFilter(query))) {
+      assertTrue(operator instanceof NonScanBasedAggregationOperator);
+      AggregationResultsBlock resultsBlock = ((NonScanBasedAggregationOperator) operator).nextBlock();
+      QueriesTestUtils.testInnerSegmentExecutionStatistics(((Operator) operator).getExecutionStatistics(), NUM_RECORDS,
+          0, 0, NUM_RECORDS);
+      List<Object> aggregationResult = resultsBlock.getResults();
+      assertNotNull(aggregationResult);
+      assertEquals(aggregationResult.size(), 5);
+      for (int i = 0; i < 5; i++) {
+        // After threshold promotion, result should be ULL object
+        assertTrue(aggregationResult.get(i) instanceof com.dynatrace.hash4j.distinctcount.UltraLogLog);
+        com.dynatrace.hash4j.distinctcount.UltraLogLog ull =
+            (com.dynatrace.hash4j.distinctcount.UltraLogLog) aggregationResult.get(i);
+        int actual = (int) Math.round(ull.getDistinctCountEstimate());
+        int expected = _values.size();
+        // ULL with default p provides high accuracy; allow 5% error similar to HLL(log2m=12)
+        assertEquals(actual, expected, expected * 0.05);
+        interSegmentsExpectedResults[i] = actual;
+      }
+    }
+
+    for (BrokerResponseNative brokerResponse : Arrays.asList(getBrokerResponse(query),
+        getBrokerResponseWithFilter(query))) {
+      QueriesTestUtils.testInterSegmentsResult(brokerResponse, 4 * NUM_RECORDS, 0, 0, 4 * NUM_RECORDS,
+          interSegmentsExpectedResults);
+    }
+
+    // Change p via parameters
+    query = "SELECT DISTINCTCOUNTSMARTULL(intColumn, 'threshold=10;p=16') FROM testTable";
+    NonScanBasedAggregationOperator nonScanOperator = getOperator(query);
+    List<Object> aggregationResult = nonScanOperator.nextBlock().getResults();
+    assertNotNull(aggregationResult);
+    assertEquals(aggregationResult.size(), 1);
+    assertTrue(aggregationResult.get(0) instanceof com.dynatrace.hash4j.distinctcount.UltraLogLog);
   }
 
   @AfterClass

@@ -18,7 +18,6 @@
  */
 package org.apache.pinot.core.query.scheduler;
 
-import com.google.common.base.Preconditions;
 import com.google.common.util.concurrent.Futures;
 import com.google.common.util.concurrent.ListenableFuture;
 import com.google.common.util.concurrent.ListenableFutureTask;
@@ -26,7 +25,6 @@ import java.util.Map;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.atomic.LongAccumulator;
 import javax.annotation.Nullable;
-import org.apache.commons.lang3.StringUtils;
 import org.apache.pinot.common.datatable.DataTable.MetadataKey;
 import org.apache.pinot.common.metrics.ServerMeter;
 import org.apache.pinot.common.metrics.ServerMetrics;
@@ -39,12 +37,12 @@ import org.apache.pinot.core.query.logger.ServerQueryLogger;
 import org.apache.pinot.core.query.request.ServerQueryRequest;
 import org.apache.pinot.core.query.request.context.TimerContext;
 import org.apache.pinot.core.query.scheduler.resources.ResourceManager;
+import org.apache.pinot.spi.accounting.ThreadAccountant;
 import org.apache.pinot.spi.env.PinotConfiguration;
-import org.apache.pinot.spi.exception.EarlyTerminationException;
 import org.apache.pinot.spi.exception.QueryErrorCode;
-import org.apache.pinot.spi.exception.QueryErrorMessage;
+import org.apache.pinot.spi.exception.QueryException;
+import org.apache.pinot.spi.query.QueryExecutionContext;
 import org.apache.pinot.spi.query.QueryThreadContext;
-import org.apache.pinot.spi.trace.Tracing;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -56,10 +54,13 @@ import org.slf4j.LoggerFactory;
 public abstract class QueryScheduler {
   private static final Logger LOGGER = LoggerFactory.getLogger(QueryScheduler.class);
 
-  protected final ServerMetrics _serverMetrics;
+  protected final PinotConfiguration _config;
+  protected final String _instanceId;
   protected final QueryExecutor _queryExecutor;
-  protected final ResourceManager _resourceManager;
+  protected final ThreadAccountant _threadAccountant;
   protected final LongAccumulator _latestQueryTime;
+  protected final ResourceManager _resourceManager;
+  protected final ServerMetrics _serverMetrics = ServerMetrics.get();
   protected final ServerQueryLogger _queryLogger = ServerQueryLogger.getInstance();
 
   protected volatile boolean _isRunning = false;
@@ -68,20 +69,15 @@ public abstract class QueryScheduler {
    * Constructor to initialize QueryScheduler
    * @param queryExecutor QueryExecutor engine to use
    * @param resourceManager for managing server thread resources
-   * @param serverMetrics server metrics collector
    */
-  public QueryScheduler(PinotConfiguration config, QueryExecutor queryExecutor, ResourceManager resourceManager,
-      ServerMetrics serverMetrics, LongAccumulator latestQueryTime) {
-    Preconditions.checkNotNull(config);
-    Preconditions.checkNotNull(queryExecutor);
-    Preconditions.checkNotNull(resourceManager);
-    Preconditions.checkNotNull(serverMetrics);
-    Preconditions.checkNotNull(latestQueryTime);
-
-    _serverMetrics = serverMetrics;
-    _resourceManager = resourceManager;
+  public QueryScheduler(PinotConfiguration config, String instanceId, QueryExecutor queryExecutor,
+      ThreadAccountant threadAccountant, LongAccumulator latestQueryTime, ResourceManager resourceManager) {
+    _config = config;
+    _instanceId = instanceId;
     _queryExecutor = queryExecutor;
+    _threadAccountant = threadAccountant;
     _latestQueryTime = latestQueryTime;
+    _resourceManager = resourceManager;
   }
 
   /**
@@ -123,13 +119,7 @@ public abstract class QueryScheduler {
    */
   protected ListenableFutureTask<byte[]> createQueryFutureTask(ServerQueryRequest queryRequest,
       ExecutorService executorService) {
-    @Nullable
-    QueryThreadContext.Memento memento = QueryThreadContext.isInitialized() ? QueryThreadContext.createMemento() : null;
-    return ListenableFutureTask.create(() -> {
-      try (QueryThreadContext.CloseableContext closeme = QueryThreadContext.open(memento)) {
-        return processQueryAndSerialize(queryRequest, executorService);
-      }
-    });
+    return ListenableFutureTask.create(() -> processQueryAndSerialize(queryRequest, executorService));
   }
 
   /**
@@ -140,17 +130,13 @@ public abstract class QueryScheduler {
    */
   @Nullable
   protected byte[] processQueryAndSerialize(ServerQueryRequest queryRequest, ExecutorService executorService) {
-    Map<String, String> queryOptions = queryRequest.getQueryContext().getQueryOptions();
-    String workloadName = QueryOptionsUtils.getWorkloadName(queryOptions);
-
-    //Start instrumentation context. This must not be moved further below interspersed into the code.
-    Tracing.ThreadAccountantOps.setupRunner(queryRequest.getQueryId(), workloadName);
-
-    try {
-      _latestQueryTime.accumulate(System.currentTimeMillis());
+    QueryExecutionContext executionContext = queryRequest.toExecutionContext(_instanceId);
+    _latestQueryTime.accumulate(executionContext.getStartTimeMs());
+    try (QueryThreadContext ignore = QueryThreadContext.open(executionContext, _threadAccountant)) {
       InstanceResponseBlock instanceResponse;
       try {
-        instanceResponse = _queryExecutor.execute(queryRequest, executorService);
+        instanceResponse =
+            _queryExecutor.execute(queryRequest, QueryThreadContext.contextAwareExecutorService(executorService));
       } catch (Exception e) {
         LOGGER.error("Encountered exception while processing requestId {} from broker {}", queryRequest.getRequestId(),
             queryRequest.getBrokerId(), e);
@@ -160,9 +146,12 @@ public abstract class QueryScheduler {
         instanceResponse.addException(QueryErrorCode.INTERNAL, e.getMessage());
       }
 
-      long requestId = queryRequest.getRequestId();
+      long requestId = executionContext.getRequestId();
+      String queryId = executionContext.getCid();
+      String workloadName = executionContext.getWorkloadName();
       Map<String, String> responseMetadata = instanceResponse.getResponseMetadata();
       responseMetadata.put(MetadataKey.REQUEST_ID.getName(), Long.toString(requestId));
+      responseMetadata.put(MetadataKey.QUERY_ID.getName(), queryId);
       responseMetadata.put(MetadataKey.WORKLOAD_NAME.getName(), workloadName);
       byte[] responseBytes = serializeResponse(queryRequest, instanceResponse);
 
@@ -172,11 +161,12 @@ public abstract class QueryScheduler {
       }
 
       // TODO: Perform this check sooner during the serialization of DataTable.
+      Map<String, String> queryOptions = queryRequest.getQueryContext().getQueryOptions();
       Long maxResponseSizeBytes = QueryOptionsUtils.getMaxServerResponseSizeBytes(queryOptions);
       if (maxResponseSizeBytes != null && responseBytes != null && responseBytes.length > maxResponseSizeBytes) {
-        String errMsg = "Serialized query response size " + responseBytes.length + " exceeds threshold "
-            + maxResponseSizeBytes + " for requestId " + queryRequest.getRequestId() + " from broker "
-            + queryRequest.getBrokerId();
+        String errMsg =
+            "Serialized query response size " + responseBytes.length + " exceeds threshold " + maxResponseSizeBytes
+                + " for requestId " + requestId + " from broker " + queryRequest.getBrokerId();
         LOGGER.error(errMsg);
         _serverMetrics.addMeteredTableValue(queryRequest.getTableNameWithType(),
             ServerMeter.LARGE_QUERY_RESPONSE_SIZE_EXCEPTIONS, 1);
@@ -184,35 +174,13 @@ public abstract class QueryScheduler {
         instanceResponse = new InstanceResponseBlock();
         instanceResponse.addException(QueryErrorCode.QUERY_CANCELLATION, errMsg);
         instanceResponse.addMetadata(MetadataKey.REQUEST_ID.getName(), Long.toString(requestId));
-        responseMetadata.put(MetadataKey.WORKLOAD_NAME.getName(), workloadName);
+        instanceResponse.addMetadata(MetadataKey.QUERY_ID.getName(), queryId);
+        instanceResponse.addMetadata(MetadataKey.WORKLOAD_NAME.getName(), workloadName);
         responseBytes = serializeResponse(queryRequest, instanceResponse);
       }
 
       return responseBytes;
-    } finally {
-      Tracing.ThreadAccountantOps.clear();
     }
-  }
-
-  /**
-   * Helper function to decide whether to force the log
-   *
-   * TODO: come up with other criteria for forcing a log and come up with better numbers
-   *
-   */
-  private boolean forceLog(long schedulerWaitMs, long numDocsScanned, long numSegmentsPrunedInvalid) {
-    // If scheduler wait time is larger than 100ms, force the log
-    if (schedulerWaitMs > 100L) {
-      return true;
-    }
-
-    // If there are invalid segments, force the log
-    if (numSegmentsPrunedInvalid > 0) {
-      return true;
-    }
-
-    // If the number of document scanned is larger than 1 million rows, force the log
-    return numDocsScanned > 1_000_000L;
   }
 
   /**
@@ -226,45 +194,61 @@ public abstract class QueryScheduler {
     TimerContext timerContext = queryRequest.getTimerContext();
     TimerContext.Timer responseSerializationTimer =
         timerContext.startNewPhaseTimer(ServerQueryPhase.RESPONSE_SERIALIZATION);
+    long requestId = queryRequest.getRequestId();
+    String brokerId = queryRequest.getBrokerId();
 
-    byte[] responseByte = null;
+    byte[] responseBytes = null;
     try {
-      responseByte = instanceResponse.toDataTable().toBytes();
-    } catch (EarlyTerminationException e) {
-      Exception killedErrorMsg = Tracing.getThreadAccountant().getErrorStatus();
-      String userMsg =
-          "Cancelled while building data table" + (killedErrorMsg == null ? StringUtils.EMPTY : " " + killedErrorMsg);
-      LOGGER.error(userMsg);
-      QueryErrorMessage errMsg = QueryErrorMessage.safeMsg(QueryErrorCode.QUERY_CANCELLATION, userMsg);
-      Map<String, String> queryOptions = queryRequest.getQueryContext().getQueryOptions();
-      String workloadName = QueryOptionsUtils.getWorkloadName(queryOptions);
-      instanceResponse = new InstanceResponseBlock(new ExceptionResultsBlock(errMsg));
-      instanceResponse.addMetadata(MetadataKey.REQUEST_ID.getName(), Long.toString(queryRequest.getRequestId()));
-      instanceResponse.addMetadata(MetadataKey.WORKLOAD_NAME.getName(), workloadName);
-      return serializeResponse(queryRequest, instanceResponse);
+      responseBytes = instanceResponse.toDataTable().toBytes();
     } catch (Exception e) {
-      _serverMetrics.addMeteredGlobalValue(ServerMeter.RESPONSE_SERIALIZATION_EXCEPTIONS, 1);
-      LOGGER.error("Caught exception while serializing response for requestId: {}, brokerId: {}",
-          queryRequest.getRequestId(), queryRequest.getBrokerId(), e);
+      // First check terminate exception and use it as the response if exists. We want to return the termination reason
+      // when query is explicitly terminated.
+      QueryException queryException = QueryThreadContext.getTerminateException();
+      // Do not log exception when query is explicitly terminated
+      if (queryException == null) {
+        if (e instanceof QueryException) {
+          queryException = (QueryException) e;
+          // TODO: Revisit if we should log exception here
+          LOGGER.warn("Caught QueryException while serializing response from response for requestId: {}, brokerId: {}",
+              requestId, brokerId, queryException);
+        } else {
+          _serverMetrics.addMeteredGlobalValue(ServerMeter.RESPONSE_SERIALIZATION_EXCEPTIONS, 1);
+          LOGGER.error("Caught exception while serializing response from response for requestId: {}, brokerId: {}",
+              requestId, brokerId, e);
+          queryException = QueryErrorCode.INTERNAL.asException("Error serializing response", e);
+        }
+      }
+      try {
+        InstanceResponseBlock errorResponse = new InstanceResponseBlock(new ExceptionResultsBlock(queryException));
+        errorResponse.addMetadata(MetadataKey.REQUEST_ID.getName(), Long.toString(requestId));
+        errorResponse.addMetadata(MetadataKey.QUERY_ID.getName(), queryRequest.getCid());
+        String workloadName = QueryOptionsUtils.getWorkloadName(queryRequest.getQueryContext().getQueryOptions());
+        errorResponse.addMetadata(MetadataKey.WORKLOAD_NAME.getName(), workloadName);
+        responseBytes = errorResponse.toDataTable().toBytes();
+      } catch (Exception e1) {
+        _serverMetrics.addMeteredGlobalValue(ServerMeter.RESPONSE_SERIALIZATION_EXCEPTIONS, 1);
+        LOGGER.error("Caught exception while constructing error response for requestId: {}, brokerId: {}",
+            requestId, brokerId, e1);
+      }
     }
 
     responseSerializationTimer.stopAndRecord();
     timerContext.startNewPhaseTimer(ServerQueryPhase.TOTAL_QUERY_TIME, timerContext.getQueryArrivalTimeMs())
         .stopAndRecord();
 
-    return responseByte;
+    return responseBytes;
   }
 
   /**
    * Error response future in case of internal error where query response is not available. This can happen if the
    * query can not be executed.
    */
-  protected ListenableFuture<byte[]> immediateErrorResponse(ServerQueryRequest queryRequest,
-      QueryErrorCode errorCode) {
+  protected ListenableFuture<byte[]> immediateErrorResponse(ServerQueryRequest queryRequest, QueryErrorCode errorCode) {
     Map<String, String> queryOptions = queryRequest.getQueryContext().getQueryOptions();
     String workloadName = QueryOptionsUtils.getWorkloadName(queryOptions);
     InstanceResponseBlock instanceResponse = new InstanceResponseBlock();
     instanceResponse.addMetadata(MetadataKey.REQUEST_ID.getName(), Long.toString(queryRequest.getRequestId()));
+    instanceResponse.addMetadata(MetadataKey.QUERY_ID.getName(), queryRequest.getCid());
     instanceResponse.addMetadata(MetadataKey.WORKLOAD_NAME.getName(), workloadName);
     instanceResponse.addException(errorCode, errorCode.getDefaultMessage());
     return Futures.immediateFuture(serializeResponse(queryRequest, instanceResponse));

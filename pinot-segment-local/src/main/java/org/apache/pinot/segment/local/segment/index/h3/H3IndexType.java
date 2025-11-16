@@ -109,9 +109,9 @@ public class H3IndexType extends AbstractIndexType<H3IndexConfig, H3IndexReader,
     H3IndexResolution resolution = Objects.requireNonNull(indexConfig).getResolution();
     return context.isOnHeap()
         ? new OnHeapH3IndexCreator(context.getIndexDir(), context.getFieldSpec().getName(),
-        context.getTableNameWithType(), resolution)
+        context.getTableNameWithType(), context.isContinueOnError(), resolution)
         : new OffHeapH3IndexCreator(context.getIndexDir(), context.getFieldSpec().getName(),
-            context.getTableNameWithType(), resolution);
+            context.getTableNameWithType(), context.isContinueOnError(), resolution);
   }
 
   @Override

@@ -21,6 +21,7 @@ package org.apache.pinot.core.query.aggregation.function;
 import org.apache.pinot.common.CustomObject;
 import org.apache.pinot.common.request.context.ExpressionContext;
 import org.apache.pinot.common.utils.DataSchema.ColumnDataType;
+import org.apache.pinot.common.utils.RoaringBitmapUtils;
 import org.apache.pinot.core.common.BlockValSet;
 import org.apache.pinot.core.common.ObjectSerDeUtils;
 import org.apache.pinot.core.query.aggregation.groupby.GroupByResultHolder;
@@ -69,7 +70,7 @@ public class LastDoubleValueWithTimeAggregationFunction extends LastWithTimeAggr
     long[] timeValues = timeValSet.getLongValuesSV();
 
     IntIterator nullIdxIterator = orNullIterator(blockValSet, timeValSet);
-    forEachNotNull(length, nullIdxIterator, (from, to) -> {
+    RoaringBitmapUtils.forEachUnset(length, nullIdxIterator, (from, to) -> {
       for (int i = from; i < to; i++) {
         double data = doubleValues[i];
         long time = timeValues[i];
@@ -85,7 +86,7 @@ public class LastDoubleValueWithTimeAggregationFunction extends LastWithTimeAggr
     long[] timeValues = timeValSet.getLongValuesSV();
 
     IntIterator nullIdxIterator = orNullIterator(blockValSet, timeValSet);
-    forEachNotNull(length, nullIdxIterator, (from, to) -> {
+    RoaringBitmapUtils.forEachUnset(length, nullIdxIterator, (from, to) -> {
       for (int i = from; i < to; i++) {
         double value = doubleValues[i];
         long time = timeValues[i];

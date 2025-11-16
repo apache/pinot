@@ -35,6 +35,7 @@ import org.apache.calcite.rel.core.Union;
 import org.apache.calcite.rel.core.Values;
 import org.apache.calcite.rel.core.Window;
 import org.apache.pinot.calcite.rel.logical.PinotLogicalAggregate;
+import org.apache.pinot.calcite.rel.logical.PinotLogicalEnrichedJoin;
 import org.apache.pinot.calcite.rel.rules.PinotRuleUtils;
 import org.apache.pinot.calcite.rel.traits.TraitAssignment;
 import org.apache.pinot.common.config.provider.TableCache;
@@ -111,6 +112,9 @@ public class RelToPRelConverter {
       return new PhysicalAsOfJoin(asofJoin.getCluster(), asofJoin.getTraitSet(), asofJoin.getHints(),
           asofJoin.getCondition(), asofJoin.getMatchCondition(), asofJoin.getVariablesSet(), asofJoin.getJoinType(),
           nodeIdGenerator.get(), inputs.get(0), inputs.get(1), null);
+    } else if (relNode instanceof PinotLogicalEnrichedJoin) {
+      // this should be unreachable
+      throw new IllegalStateException("EnrichedJoin is not supported in physical optimizer");
     } else if (relNode instanceof Join) {
       Preconditions.checkState(relNode.getInputs().size() == 2, "Expected exactly 2 inputs to join. Found: %s", inputs);
       Join join = (Join) relNode;

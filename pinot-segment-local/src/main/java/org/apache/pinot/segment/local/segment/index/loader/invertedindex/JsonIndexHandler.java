@@ -25,7 +25,6 @@ import java.util.Map;
 import java.util.Set;
 import org.apache.commons.io.FileUtils;
 import org.apache.pinot.segment.local.segment.index.dictionary.DictionaryIndexType;
-import org.apache.pinot.segment.local.segment.index.forward.ForwardIndexType;
 import org.apache.pinot.segment.local.segment.index.loader.BaseIndexHandler;
 import org.apache.pinot.segment.local.segment.index.loader.LoaderUtils;
 import org.apache.pinot.segment.spi.ColumnMetadata;
@@ -34,6 +33,7 @@ import org.apache.pinot.segment.spi.creator.IndexCreationContext;
 import org.apache.pinot.segment.spi.creator.SegmentVersion;
 import org.apache.pinot.segment.spi.index.FieldIndexConfigs;
 import org.apache.pinot.segment.spi.index.FieldIndexConfigsUtil;
+import org.apache.pinot.segment.spi.index.IndexReaderFactory;
 import org.apache.pinot.segment.spi.index.StandardIndexes;
 import org.apache.pinot.segment.spi.index.creator.JsonIndexCreator;
 import org.apache.pinot.segment.spi.index.reader.Dictionary;
@@ -134,8 +134,8 @@ public class JsonIndexHandler extends BaseIndexHandler {
     // Create new json index for the column.
     LOGGER.info("Creating new json index for segment: {}, column: {}", segmentName, columnName);
     Preconditions.checkState(columnMetadata.isSingleValue() && (columnMetadata.getDataType() == DataType.STRING
-            || columnMetadata.getDataType() == DataType.JSON),
-        "Json index can only be applied to single-value STRING or JSON columns");
+            || columnMetadata.getDataType() == DataType.JSON || columnMetadata.getDataType() == DataType.MAP),
+        "Json index can only be applied to single-value STRING, JSON, or MAP columns");
     if (columnMetadata.hasDictionary()) {
       handleDictionaryBasedColumn(segmentWriter, columnMetadata);
     } else {
@@ -165,7 +165,9 @@ public class JsonIndexHandler extends BaseIndexHandler {
             && _tableConfig.getIngestionConfig().isContinueOnError())
         .build();
     JsonIndexConfig config = _jsonIndexConfigs.get(columnName);
-    try (ForwardIndexReader forwardIndexReader = ForwardIndexType.read(segmentWriter, columnMetadata);
+    IndexReaderFactory<ForwardIndexReader> readerFactory = StandardIndexes.forward().getReaderFactory();
+    try (ForwardIndexReader forwardIndexReader = readerFactory.createIndexReader(segmentWriter,
+        _fieldIndexConfigs.get(columnMetadata.getColumnName()), columnMetadata);
         ForwardIndexReaderContext readerContext = forwardIndexReader.createContext();
         Dictionary dictionary = DictionaryIndexType.read(segmentWriter, columnMetadata);
         JsonIndexCreator jsonIndexCreator = StandardIndexes.json().createIndexCreator(context, config)) {
@@ -190,7 +192,9 @@ public class JsonIndexHandler extends BaseIndexHandler {
             && _tableConfig.getIngestionConfig().isContinueOnError())
         .build();
     JsonIndexConfig config = _jsonIndexConfigs.get(columnName);
-    try (ForwardIndexReader forwardIndexReader = ForwardIndexType.read(segmentWriter, columnMetadata);
+    IndexReaderFactory<ForwardIndexReader> readerFactory = StandardIndexes.forward().getReaderFactory();
+    try (ForwardIndexReader forwardIndexReader = readerFactory.createIndexReader(segmentWriter,
+        _fieldIndexConfigs.get(columnMetadata.getColumnName()), columnMetadata);
         ForwardIndexReaderContext readerContext = forwardIndexReader.createContext();
         JsonIndexCreator jsonIndexCreator = StandardIndexes.json().createIndexCreator(context, config)) {
       int numDocs = columnMetadata.getTotalDocs();

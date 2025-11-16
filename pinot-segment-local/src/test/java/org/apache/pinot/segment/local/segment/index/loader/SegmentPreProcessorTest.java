@@ -39,7 +39,6 @@ import org.apache.pinot.segment.local.PinotBuffersAfterClassCheckRule;
 import org.apache.pinot.segment.local.segment.creator.SegmentTestUtils;
 import org.apache.pinot.segment.local.segment.creator.impl.SegmentIndexCreationDriverImpl;
 import org.apache.pinot.segment.local.segment.index.converter.SegmentV1V2ToV3FormatConverter;
-import org.apache.pinot.segment.local.segment.index.forward.ForwardIndexType;
 import org.apache.pinot.segment.local.segment.index.loader.columnminmaxvalue.ColumnMinMaxValueGeneratorMode;
 import org.apache.pinot.segment.local.segment.readers.GenericRowRecordReader;
 import org.apache.pinot.segment.local.segment.store.SegmentLocalFSDirectory;
@@ -53,13 +52,19 @@ import org.apache.pinot.segment.spi.V1Constants;
 import org.apache.pinot.segment.spi.compression.ChunkCompressionType;
 import org.apache.pinot.segment.spi.creator.SegmentGeneratorConfig;
 import org.apache.pinot.segment.spi.creator.SegmentVersion;
+import org.apache.pinot.segment.spi.index.FieldIndexConfigs;
+import org.apache.pinot.segment.spi.index.ForwardIndexConfig;
+import org.apache.pinot.segment.spi.index.IndexReaderFactory;
 import org.apache.pinot.segment.spi.index.IndexType;
 import org.apache.pinot.segment.spi.index.StandardIndexes;
 import org.apache.pinot.segment.spi.index.metadata.SegmentMetadataImpl;
 import org.apache.pinot.segment.spi.index.reader.ForwardIndexReader;
+import org.apache.pinot.segment.spi.index.startree.AggregationFunctionColumnPair;
+import org.apache.pinot.segment.spi.index.startree.StarTreeV2Metadata;
 import org.apache.pinot.segment.spi.store.SegmentDirectory;
 import org.apache.pinot.segment.spi.store.SegmentDirectoryPaths;
 import org.apache.pinot.segment.spi.utils.SegmentMetadataUtils;
+import org.apache.pinot.spi.config.instance.InstanceType;
 import org.apache.pinot.spi.config.table.BloomFilterConfig;
 import org.apache.pinot.spi.config.table.FieldConfig;
 import org.apache.pinot.spi.config.table.FieldConfig.CompressionCodec;
@@ -265,7 +270,7 @@ public class SegmentPreProcessorTest implements PinotBuffersAfterClassCheckRule 
     config.setOutDir(TEMP_DIR.getPath());
     config.setSegmentName(SEGMENT_NAME);
     SegmentIndexCreationDriverImpl driver = new SegmentIndexCreationDriverImpl();
-    driver.init(config);
+    driver.init(config, InstanceType.SERVER);
     driver.build();
   }
 
@@ -289,6 +294,7 @@ public class SegmentPreProcessorTest implements PinotBuffersAfterClassCheckRule 
         .setRangeIndexColumns(new ArrayList<>(_rangeIndexColumns))
         .setFieldConfigList(new ArrayList<>(_fieldConfigMap.values()))
         .setNullHandlingEnabled(true)
+        .setOptimizeNoDictStatsCollection(true)
         .setIngestionConfig(_ingestionConfig)
         .build();
     IndexingConfig indexingConfig = tableConfig.getIndexingConfig();
@@ -384,12 +390,16 @@ public class SegmentPreProcessorTest implements PinotBuffersAfterClassCheckRule 
   @Test
   public void testSimpleEnableDictionarySV()
       throws Exception {
+    int approxCardinality = 46934; // derived via NoDictColumnStatisticsCollector
+    int approxCardinalityStr = 6; // derived via NoDictColumnStatisticsCollector
     // TEST 1. Check running forwardIndexHandler on a V1 segment. No-op for all existing raw columns.
     buildV1Segment();
-    checkForwardIndexCreation(EXISTING_STRING_COL_RAW, 5, 3, _schema, false, false, false, 0, ChunkCompressionType.LZ4,
+    checkForwardIndexCreation(EXISTING_STRING_COL_RAW, approxCardinalityStr, 3, _schema, false,
+        false, false, 0, ChunkCompressionType.LZ4,
         true, 0, DataType.STRING, 100000);
-    validateIndex(StandardIndexes.forward(), EXISTING_INT_COL_RAW, 42242, 16, false, false, false, 0, true, 0,
-        ChunkCompressionType.LZ4, false, DataType.INT, 100000);
+    // since dictionary is disabled, the cardinality will be approximate cardinality.
+    validateIndex(StandardIndexes.forward(), EXISTING_INT_COL_RAW, approxCardinality, 16, false, false, false, 0,
+        true, 0, ChunkCompressionType.LZ4, false, DataType.INT, 100000);
 
     // Convert the segment to V3.
     convertV1SegmentToV3();
@@ -408,9 +418,11 @@ public class SegmentPreProcessorTest implements PinotBuffersAfterClassCheckRule 
   @Test
   public void testSimpleEnableDictionaryMV()
       throws Exception {
+    int approxCardinality = 20516; // derived via NoDictColumnStatisticsCollector
     // TEST 1. Check running forwardIndexHandler on a V1 segment. No-op for all existing raw columns.
     buildV1Segment();
-    checkForwardIndexCreation(EXISTING_INT_COL_RAW_MV, 18499, 15, _schema, false, false, false, 0,
+    // since dictionary is disabled, the cardinality will be approximate cardinality.
+    checkForwardIndexCreation(EXISTING_INT_COL_RAW_MV, approxCardinality, 15, _schema, false, false, false, 0,
         ChunkCompressionType.LZ4, false, 13, DataType.INT, 106688);
 
     // Convert the segment to V3.
@@ -425,6 +437,8 @@ public class SegmentPreProcessorTest implements PinotBuffersAfterClassCheckRule 
   @Test
   public void testEnableDictAndOtherIndexesSV()
       throws Exception {
+    int approxCardinality = 46934; // derived via NoDictColumnStatisticsCollector
+
     // TEST 1: EXISTING_STRING_COL_RAW. Enable dictionary. Also add inverted index and text index. Reload code path
     // will create dictionary, inverted index and text index.
     buildV3Segment();
@@ -442,11 +456,13 @@ public class SegmentPreProcessorTest implements PinotBuffersAfterClassCheckRule 
 
     // TEST 2: EXISTING_STRING_COL_RAW. Enable dictionary on a raw column that already has text index.
     resetIndexConfigs();
+    int approxCardinalityStr = 6; // derived via NoDictColumnStatisticsCollector
     _fieldConfigMap.put(EXISTING_STRING_COL_RAW,
         new FieldConfig(EXISTING_STRING_COL_RAW, FieldConfig.EncodingType.RAW, List.of(FieldConfig.IndexType.TEXT),
             null, null));
     buildV3Segment();
-    validateIndex(StandardIndexes.text(), EXISTING_STRING_COL_RAW, 5, 3, false, false, false, 0, true, 0, null, false,
+    validateIndex(StandardIndexes.text(), EXISTING_STRING_COL_RAW, approxCardinalityStr, 3, false, false,
+        false, 0, true, 0, null, false,
         DataType.STRING, 100000);
 
     // At this point, the segment has text index. Now, the reload path should create a dictionary.
@@ -463,7 +479,8 @@ public class SegmentPreProcessorTest implements PinotBuffersAfterClassCheckRule 
     resetIndexConfigs();
     _rangeIndexColumns.add(EXISTING_INT_COL_RAW);
     buildV3Segment();
-    validateIndex(StandardIndexes.range(), EXISTING_INT_COL_RAW, 42242, 16, false, false, false, 0, true, 0,
+    // Since dictionary is disabled, the cardinality will be approximate cardinality.
+    validateIndex(StandardIndexes.range(), EXISTING_INT_COL_RAW, approxCardinality, 16, false, false, false, 0, true, 0,
         ChunkCompressionType.LZ4, false, DataType.INT, 100000);
     long oldRangeIndexSize = new SegmentMetadataImpl(INDEX_DIR).getColumnMetadataFor(EXISTING_INT_COL_RAW)
         .getIndexSizeFor(StandardIndexes.range());
@@ -482,6 +499,8 @@ public class SegmentPreProcessorTest implements PinotBuffersAfterClassCheckRule 
   @Test
   public void testEnableDictAndOtherIndexesMV()
       throws Exception {
+    int approxCardinality = 20516; // derived via NoDictColumnStatisticsCollector
+
     // TEST 1: EXISTING_INT_COL_RAW_MV. Enable dictionary for an MV column. Also enable inverted index and range index.
     buildV3Segment();
     _noDictionaryColumns.remove(EXISTING_INT_COL_RAW_MV);
@@ -498,10 +517,11 @@ public class SegmentPreProcessorTest implements PinotBuffersAfterClassCheckRule 
     resetIndexConfigs();
     _rangeIndexColumns.add(EXISTING_INT_COL_RAW_MV);
     buildV3Segment();
-    validateIndex(StandardIndexes.forward(), EXISTING_INT_COL_RAW_MV, 18499, 15, false, false, false, 0, false, 13,
-        ChunkCompressionType.LZ4, false, DataType.INT, 106688);
-    validateIndex(StandardIndexes.range(), EXISTING_INT_COL_RAW_MV, 18499, 15, false, false, false, 0, false, 13,
-        ChunkCompressionType.LZ4, false, DataType.INT, 106688);
+    // Since dictionary is disabled, the cardinality will be approximate cardinality.
+    validateIndex(StandardIndexes.forward(), EXISTING_INT_COL_RAW_MV, approxCardinality, 15, false, false, false, 0,
+        false, 13, ChunkCompressionType.LZ4, false, DataType.INT, 106688);
+    validateIndex(StandardIndexes.range(), EXISTING_INT_COL_RAW_MV, approxCardinality, 15, false, false, false, 0,
+        false, 13, ChunkCompressionType.LZ4, false, DataType.INT, 106688);
 
     // Enable dictionary.
     _noDictionaryColumns.remove(EXISTING_INT_COL_RAW_MV);
@@ -621,27 +641,34 @@ public class SegmentPreProcessorTest implements PinotBuffersAfterClassCheckRule 
   @Test
   public void testForwardIndexHandlerChangeCompression()
       throws Exception {
+    int approximateCardinality = 20516; // derived via NoDictColumnStatisticsCollector
+    int approxCardinalityStr = 6; // derived via NoDictColumnStatisticsCollector
+
     // Test1: Rewriting forward index will be a no-op for v1 segments. Default LZ4 compressionType will be retained.
     buildV1Segment();
     _fieldConfigMap.put(EXISTING_STRING_COL_RAW,
         new FieldConfig(EXISTING_STRING_COL_RAW, FieldConfig.EncodingType.RAW, List.of(), CompressionCodec.ZSTANDARD,
             null));
-    checkForwardIndexCreation(EXISTING_STRING_COL_RAW, 5, 3, _schema, false, false, false, 0, ChunkCompressionType.LZ4,
+    checkForwardIndexCreation(EXISTING_STRING_COL_RAW, approxCardinalityStr, 3, _schema, false,
+        false, false, 0, ChunkCompressionType.LZ4,
         true, 0, DataType.STRING, 100000);
 
     // Convert the segment to V3.
     convertV1SegmentToV3();
 
     // Test2: Now forward index will be rewritten with ZSTANDARD compressionType.
-    checkForwardIndexCreation(EXISTING_STRING_COL_RAW, 5, 3, _schema, false, false, false, 0,
+    checkForwardIndexCreation(EXISTING_STRING_COL_RAW, approxCardinalityStr, 3, _schema, false,
+        false, false, 0,
         ChunkCompressionType.ZSTANDARD, true, 0, DataType.STRING, 100000);
 
     // Test3: Change compression on existing raw index column. Also add text index on same column. Check correctness.
     _fieldConfigMap.put(EXISTING_STRING_COL_RAW,
         new FieldConfig(EXISTING_STRING_COL_RAW, FieldConfig.EncodingType.RAW, List.of(FieldConfig.IndexType.TEXT),
             CompressionCodec.SNAPPY, null));
-    checkTextIndexCreation(EXISTING_STRING_COL_RAW, 5, 3, _schema, false, false, false, 0);
-    validateIndex(StandardIndexes.forward(), EXISTING_STRING_COL_RAW, 5, 3, false, false, false, 0, true, 0,
+    checkTextIndexCreation(EXISTING_STRING_COL_RAW, approxCardinalityStr, 3, _schema, false,
+        false, false, 0);
+    validateIndex(StandardIndexes.forward(), EXISTING_STRING_COL_RAW, approxCardinalityStr, 3, false,
+        false, false, 0, true, 0,
         ChunkCompressionType.SNAPPY, false, DataType.STRING, 100000);
 
     // Test4: Change compression on RAW index column. Change another index on another column. Check correctness.
@@ -656,14 +683,16 @@ public class SegmentPreProcessorTest implements PinotBuffersAfterClassCheckRule 
     // Check FST index
     checkFSTIndexCreation(EXISTING_STRING_COL_DICT, 9, 4, _newColumnsSchemaWithFST, false, false, 26);
     // Check forward index.
-    validateIndex(StandardIndexes.forward(), EXISTING_STRING_COL_RAW, 5, 3, false, false, false, 0, true, 0,
+    validateIndex(StandardIndexes.forward(), EXISTING_STRING_COL_RAW, approxCardinalityStr, 3, false,
+        false, false, 0, true, 0,
         ChunkCompressionType.ZSTANDARD, false, DataType.STRING, 100000);
 
     // Test5: Change compressionType for an MV column
     _fieldConfigMap.put(EXISTING_INT_COL_RAW_MV,
         new FieldConfig(EXISTING_INT_COL_RAW_MV, FieldConfig.EncodingType.RAW, List.of(), CompressionCodec.ZSTANDARD,
             null));
-    checkForwardIndexCreation(EXISTING_INT_COL_RAW_MV, 18499, 15, _schema, false, false, false, 0,
+    // Since dictionary is disabled, the cardinality will be approximate cardinality.
+    checkForwardIndexCreation(EXISTING_INT_COL_RAW_MV, approximateCardinality, 15, _schema, false, false, false, 0,
         ChunkCompressionType.ZSTANDARD, false, 13, DataType.INT, 106688);
   }
 
@@ -698,11 +727,13 @@ public class SegmentPreProcessorTest implements PinotBuffersAfterClassCheckRule 
   @Test(dataProvider = "bothV1AndV3")
   public void testEnableTextIndexOnExistingRawColumn(SegmentVersion segmentVersion)
       throws Exception {
+    int approxCardinalityStr = 6; // derived via NoDictColumnStatisticsCollector
     buildSegment(segmentVersion);
     _fieldConfigMap.put(EXISTING_STRING_COL_RAW,
         new FieldConfig(EXISTING_STRING_COL_RAW, FieldConfig.EncodingType.RAW, List.of(FieldConfig.IndexType.TEXT),
             null, null));
-    checkTextIndexCreation(EXISTING_STRING_COL_RAW, 5, 3, _schema, false, false, false, 0);
+    checkTextIndexCreation(EXISTING_STRING_COL_RAW, approxCardinalityStr, 3, _schema, false,
+        false, false, 0);
   }
 
   /**
@@ -805,8 +836,12 @@ public class SegmentPreProcessorTest implements PinotBuffersAfterClassCheckRule 
       // Check if the raw forward index compressionType is correct.
       if (expectedCompressionType != null) {
         assertFalse(hasDictionary);
-
-        try (ForwardIndexReader<?> fwdIndexReader = ForwardIndexType.read(reader, columnMetadata)) {
+        IndexReaderFactory<ForwardIndexReader> readerFactory = StandardIndexes.forward().getReaderFactory();
+        FieldIndexConfigs fieldIndexConfigs = new FieldIndexConfigs.Builder()
+            .add(StandardIndexes.forward(), ForwardIndexConfig.getDefault())
+            .build();
+        try (ForwardIndexReader fwdIndexReader = readerFactory.createIndexReader(reader, fieldIndexConfigs,
+            columnMetadata)) {
           ChunkCompressionType compressionType = fwdIndexReader.getCompressionType();
           assertEquals(compressionType, expectedCompressionType);
         }
@@ -1095,7 +1130,7 @@ public class SegmentPreProcessorTest implements PinotBuffersAfterClassCheckRule 
     assertEquals(columnMetadata.getFieldSpec(), spec);
     assertTrue(columnMetadata.isAutoGenerated());
     originalColumnMetadata = segmentMetadata.getColumnMetadataFor("column3");
-    assertEquals(columnMetadata.getCardinality(), originalColumnMetadata.getCardinality());
+    assertEquals(columnMetadata.getCardinality(), 6); // cardinality derived via NoDictColumnStatisticsCollector
     assertEquals(columnMetadata.getBitsPerElement(), originalColumnMetadata.getBitsPerElement());
     assertEquals(columnMetadata.getTotalNumberOfEntries(), originalColumnMetadata.getTotalNumberOfEntries());
 
@@ -1500,6 +1535,32 @@ public class SegmentPreProcessorTest implements PinotBuffersAfterClassCheckRule 
     });
   }
 
+  @Test(dataProvider = "bothV1AndV3")
+  public void testH3IndexResolutionUpdate(SegmentVersion segmentVersion)
+      throws Exception {
+    buildSegment(segmentVersion);
+
+    // Create H3 index with resolution 5.
+    _fieldConfigMap.put("newH3Col",
+        new FieldConfig("newH3Col", FieldConfig.EncodingType.DICTIONARY, List.of(FieldConfig.IndexType.H3), null,
+            Map.of("resolutions", "5")));
+    runPreProcessor(_newColumnsSchemaWithH3Json);
+
+    verifyProcessNotNeeded();
+
+    // Update H3 index resolution to 4
+    _fieldConfigMap.put("newH3Col",
+        new FieldConfig("newH3Col", FieldConfig.EncodingType.DICTIONARY, List.of(FieldConfig.IndexType.H3), null,
+            Map.of("resolutions", "4")));
+
+    // Verify that preprocessing is needed, update the index, and verify again that no more processing is needed
+    verifyProcessNeeded();
+
+    // Remove new indexes
+    resetIndexConfigs();
+    runPreProcessor(_newColumnsSchemaWithH3Json);
+  }
+
   private void verifyProcessNeeded()
       throws Exception {
     try (SegmentDirectory segmentDirectory = new SegmentLocalFSDirectory(INDEX_DIR, ReadMode.mmap);
@@ -1665,6 +1726,214 @@ public class SegmentPreProcessorTest implements PinotBuffersAfterClassCheckRule 
     }
   }
 
+  @Test
+  public void testStarTreeCreationWithInvalidFunctionColumnPair()
+      throws Exception {
+    // Build the sample segment
+    String[] stringValues = {"A", "C", "B", "C", "D", "E", "E", "E"};
+    long[] longValues = {2, 1, 2, 3, 4, 5, 3, 2};
+    TableConfig tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName("testTable").build();
+    Schema schema = new Schema.SchemaBuilder().addSingleValueDimension("stringCol", FieldSpec.DataType.STRING)
+        .addMetric("longCol", DataType.LONG)
+        .build();
+
+    // Build good segment, no need for preprocess
+    buildTestSegment(tableConfig, schema, stringValues, longValues);
+
+    // Test 1: Adding a new star-tree index with invalid functionColumnPair (SUM__*)
+    // This should fail during config creation but segment build should be fine
+    IndexingConfig indexingConfig = tableConfig.getIndexingConfig();
+    indexingConfig.setEnableDynamicStarTreeCreation(true);
+    StarTreeIndexConfig invalidStarTreeIndexConfig =
+        new StarTreeIndexConfig(List.of("stringCol"), null, List.of("SUM__*"), null, 1000);
+    indexingConfig.setStarTreeIndexConfigs(List.of(invalidStarTreeIndexConfig));
+
+    try (SegmentDirectory segmentDirectory = new SegmentLocalFSDirectory(INDEX_DIR, ReadMode.mmap);
+        SegmentPreProcessor processor = new SegmentPreProcessor(segmentDirectory,
+            new IndexLoadingConfig(tableConfig, schema))) {
+      // Should need processing due to new star-tree config
+      assertTrue(processor.needProcess());
+      // Process should complete without throwing exception, but star-tree should not be created
+      processor.process(SEGMENT_OPERATIONS_THROTTLER);
+    }
+
+    // Verify that no star-tree index was created due to invalid config
+    SegmentMetadataImpl segmentMetadata = new SegmentMetadataImpl(INDEX_DIR);
+    assertNull(segmentMetadata.getStarTreeV2MetadataList());
+  }
+
+  @Test
+  public void testStarTreeUpdateWithInvalidFunctionColumnPair()
+      throws Exception {
+    // Build the sample segment
+    String[] stringValues = {"A", "C", "B", "C", "D", "E", "E", "E"};
+    long[] longValues = {2, 1, 2, 3, 4, 5, 3, 2};
+    TableConfig tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName("testTable").build();
+    Schema schema = new Schema.SchemaBuilder().addSingleValueDimension("stringCol", FieldSpec.DataType.STRING)
+        .addMetric("longCol", DataType.LONG)
+        .build();
+
+    // Build good segment, no need for preprocess
+    buildTestSegment(tableConfig, schema, stringValues, longValues);
+
+    // First, create a valid star-tree index
+    IndexingConfig indexingConfig = tableConfig.getIndexingConfig();
+    indexingConfig.setEnableDynamicStarTreeCreation(true);
+    StarTreeIndexConfig validStarTreeIndexConfig =
+        new StarTreeIndexConfig(List.of("stringCol"), null, List.of("COUNT__*"), null, 1000);
+    indexingConfig.setStarTreeIndexConfigs(List.of(validStarTreeIndexConfig));
+
+    try (SegmentDirectory segmentDirectory = new SegmentLocalFSDirectory(INDEX_DIR, ReadMode.mmap);
+        SegmentPreProcessor processor = new SegmentPreProcessor(segmentDirectory,
+            new IndexLoadingConfig(tableConfig, schema))) {
+      assertTrue(processor.needProcess());
+      processor.process(SEGMENT_OPERATIONS_THROTTLER);
+    }
+
+    // Verify that star-tree index was created
+    SegmentMetadataImpl segmentMetadata = new SegmentMetadataImpl(INDEX_DIR);
+    List<StarTreeV2Metadata> starTreeMetadataList = segmentMetadata.getStarTreeV2MetadataList();
+    assertNotNull(starTreeMetadataList);
+    assertFalse(starTreeMetadataList.isEmpty());
+    assertEquals(starTreeMetadataList.size(), 1);
+
+    // Test 2: Try to update existing star-tree index with invalid functionColumnPair (SUM__*)
+    StarTreeIndexConfig invalidStarTreeIndexConfig =
+        new StarTreeIndexConfig(List.of("stringCol"), null, List.of("COUNT__*", "SUM__*"), null, 1000);
+    indexingConfig.setStarTreeIndexConfigs(List.of(invalidStarTreeIndexConfig));
+
+    try (SegmentDirectory segmentDirectory = new SegmentLocalFSDirectory(INDEX_DIR, ReadMode.mmap);
+        SegmentPreProcessor processor = new SegmentPreProcessor(segmentDirectory,
+            new IndexLoadingConfig(tableConfig, schema))) {
+      // Should need processing due to changed star-tree config
+      assertTrue(processor.needProcess());
+      // Process should complete without throwing exception, but star-tree should not be updated
+      processor.process(SEGMENT_OPERATIONS_THROTTLER);
+    }
+
+    // Verify that the original star-tree index still exists and hasn't changed
+    segmentMetadata = new SegmentMetadataImpl(INDEX_DIR);
+    List<StarTreeV2Metadata> currentStarTreeMetadataList = segmentMetadata.getStarTreeV2MetadataList();
+    assertNotNull(currentStarTreeMetadataList);
+    assertFalse(currentStarTreeMetadataList.isEmpty());
+    assertEquals(currentStarTreeMetadataList.size(), 1);
+
+    // Verify the metadata hasn't changed (original star-tree should still be there)
+    assertEquals(currentStarTreeMetadataList.get(0).getDimensionsSplitOrder(),
+        starTreeMetadataList.get(0).getDimensionsSplitOrder());
+    assertEquals(currentStarTreeMetadataList.get(0).getFunctionColumnPairs(),
+        starTreeMetadataList.get(0).getFunctionColumnPairs());
+  }
+
+  @Test
+  public void testStarTreeCreationWithValidFunctionColumnPair()
+      throws Exception {
+    // Build the sample segment
+    String[] stringValues = {"A", "C", "B", "C", "D", "E", "E", "E"};
+    long[] longValues = {2, 1, 2, 3, 4, 5, 3, 2};
+    TableConfig tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName("testTable").build();
+    Schema schema = new Schema.SchemaBuilder().addSingleValueDimension("stringCol", FieldSpec.DataType.STRING)
+        .addMetric("longCol", DataType.LONG)
+        .build();
+
+    // Build good segment, no need for preprocess
+    buildTestSegment(tableConfig, schema, stringValues, longValues);
+
+    // Test 3: Adding a new star-tree index with valid functionColumnPair (COUNT__*)
+    IndexingConfig indexingConfig = tableConfig.getIndexingConfig();
+    indexingConfig.setEnableDynamicStarTreeCreation(true);
+    StarTreeIndexConfig validStarTreeIndexConfig =
+        new StarTreeIndexConfig(List.of("stringCol"), null, List.of("COUNT__*"), null, 1000);
+    indexingConfig.setStarTreeIndexConfigs(List.of(validStarTreeIndexConfig));
+
+    try (SegmentDirectory segmentDirectory = new SegmentLocalFSDirectory(INDEX_DIR, ReadMode.mmap);
+        SegmentPreProcessor processor = new SegmentPreProcessor(segmentDirectory,
+            new IndexLoadingConfig(tableConfig, schema))) {
+      assertTrue(processor.needProcess());
+      processor.process(SEGMENT_OPERATIONS_THROTTLER);
+    }
+
+    // Verify that star-tree index was created successfully
+    SegmentMetadataImpl segmentMetadata = new SegmentMetadataImpl(INDEX_DIR);
+    List<StarTreeV2Metadata> starTreeMetadataList = segmentMetadata.getStarTreeV2MetadataList();
+    assertNotNull(starTreeMetadataList);
+    assertFalse(starTreeMetadataList.isEmpty());
+    assertEquals(starTreeMetadataList.size(), 1);
+
+    StarTreeV2Metadata starTreeMetadata = starTreeMetadataList.get(0);
+    assertEquals(starTreeMetadata.getDimensionsSplitOrder(), List.of("stringCol"));
+    assertEquals(starTreeMetadata.getFunctionColumnPairs().size(), 1);
+    assertEquals(starTreeMetadata.getFunctionColumnPairs().iterator().next().toColumnName(), "count__*");
+  }
+
+  @Test
+  public void testStarTreeUpdateWithValidFunctionColumnPair()
+      throws Exception {
+    // Build the sample segment
+    String[] stringValues = {"A", "C", "B", "C", "D", "E", "E", "E"};
+    long[] longValues = {2, 1, 2, 3, 4, 5, 3, 2};
+    TableConfig tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName("testTable").build();
+    Schema schema = new Schema.SchemaBuilder().addSingleValueDimension("stringCol", FieldSpec.DataType.STRING)
+        .addMetric("longCol", DataType.LONG)
+        .build();
+
+    // Build good segment, no need for preprocess
+    buildTestSegment(tableConfig, schema, stringValues, longValues);
+
+    // First, create a star-tree index with SUM function
+    IndexingConfig indexingConfig = tableConfig.getIndexingConfig();
+    indexingConfig.setEnableDynamicStarTreeCreation(true);
+    StarTreeIndexConfig originalStarTreeIndexConfig =
+        new StarTreeIndexConfig(List.of("stringCol"), null, List.of("SUM__longCol"), null, 1000);
+    indexingConfig.setStarTreeIndexConfigs(List.of(originalStarTreeIndexConfig));
+
+    try (SegmentDirectory segmentDirectory = new SegmentLocalFSDirectory(INDEX_DIR, ReadMode.mmap);
+        SegmentPreProcessor processor = new SegmentPreProcessor(segmentDirectory,
+            new IndexLoadingConfig(tableConfig, schema))) {
+      assertTrue(processor.needProcess());
+      processor.process(SEGMENT_OPERATIONS_THROTTLER);
+    }
+
+    // Verify that original star-tree index was created
+    SegmentMetadataImpl segmentMetadata = new SegmentMetadataImpl(INDEX_DIR);
+    List<StarTreeV2Metadata> originalStarTreeMetadataList = segmentMetadata.getStarTreeV2MetadataList();
+    assertNotNull(originalStarTreeMetadataList);
+    assertFalse(originalStarTreeMetadataList.isEmpty());
+    assertEquals(originalStarTreeMetadataList.size(), 1);
+    assertEquals(originalStarTreeMetadataList.get(0).getFunctionColumnPairs().iterator().next().toColumnName(),
+        "sum__longCol");
+
+    // Test 4: Update existing star-tree index with valid functionColumnPair (COUNT__*)
+    StarTreeIndexConfig updatedStarTreeIndexConfig =
+        new StarTreeIndexConfig(List.of("stringCol"), null, List.of("SUM__longCol", "COUNT__*"), null, 1000);
+    indexingConfig.setStarTreeIndexConfigs(List.of(updatedStarTreeIndexConfig));
+
+    try (SegmentDirectory segmentDirectory = new SegmentLocalFSDirectory(INDEX_DIR, ReadMode.mmap);
+        SegmentPreProcessor processor = new SegmentPreProcessor(segmentDirectory,
+            new IndexLoadingConfig(tableConfig, schema))) {
+      assertTrue(processor.needProcess());
+      processor.process(SEGMENT_OPERATIONS_THROTTLER);
+    }
+
+    // Verify that star-tree index was updated successfully
+    segmentMetadata = new SegmentMetadataImpl(INDEX_DIR);
+    List<StarTreeV2Metadata> updatedStarTreeMetadataList = segmentMetadata.getStarTreeV2MetadataList();
+    assertNotNull(updatedStarTreeMetadataList);
+    assertFalse(updatedStarTreeMetadataList.isEmpty());
+    assertEquals(updatedStarTreeMetadataList.size(), 1);
+
+    StarTreeV2Metadata updatedStarTreeMetadata = updatedStarTreeMetadataList.get(0);
+    assertEquals(updatedStarTreeMetadata.getDimensionsSplitOrder(), List.of("stringCol"));
+    assertEquals(updatedStarTreeMetadata.getFunctionColumnPairs().size(), 2);
+    Set<String> columnNames = new HashSet<>();
+    for (AggregationFunctionColumnPair columnPair : updatedStarTreeMetadata.getFunctionColumnPairs()) {
+      columnNames.add(columnPair.toColumnName());
+    }
+    assertEquals(columnNames.size(), 2);
+    assertTrue(columnNames.contains("count__*"));
+    assertTrue(columnNames.contains("sum__longCol"));
+  }
+
   private void buildTestSegment(TableConfig tableConfig, Schema schema, String[] stringValues, long[] longValues)
       throws Exception {
     FileUtils.deleteQuietly(TEMP_DIR);
@@ -1682,7 +1951,7 @@ public class SegmentPreProcessorTest implements PinotBuffersAfterClassCheckRule 
     }
 
     SegmentIndexCreationDriverImpl driver = new SegmentIndexCreationDriverImpl();
-    driver.init(config, new GenericRowRecordReader(rows));
+    driver.init(config, new GenericRowRecordReader(rows), InstanceType.SERVER);
     driver.build();
   }
 
