@@ -22,10 +22,16 @@ package org.apache.pinot.server.starter.helix;
 public class SegmentReloadStatusValue {
   private final long _totalSegmentCount;
   private final long _successCount;
+  private final Long _failureCount;
 
   public SegmentReloadStatusValue(long totalSegmentCount, long successCount) {
+    this(totalSegmentCount, successCount, null);
+  }
+
+  public SegmentReloadStatusValue(long totalSegmentCount, long successCount, Long failureCount) {
     _totalSegmentCount = totalSegmentCount;
     _successCount = successCount;
+    _failureCount = failureCount;
   }
 
   public long getTotalSegmentCount() {
@@ -34,5 +40,9 @@ public class SegmentReloadStatusValue {
 
   public long getSuccessCount() {
     return _successCount;
+  }
+
+  public Long getFailureCount() {
+    return _failureCount;
   }
 }

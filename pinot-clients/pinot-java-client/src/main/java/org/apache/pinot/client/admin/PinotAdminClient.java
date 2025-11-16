@@ -44,6 +44,7 @@ public class PinotAdminClient implements AutoCloseable {
   private PinotSegmentAdminClient _segmentClient;
   private PinotTenantAdminClient _tenantClient;
   private PinotTaskAdminClient _taskClient;
+  private PinotSegmentApiClient _segmentApiClient;
 
   /**
    * Creates a PinotAdminClient with the specified controller address.
@@ -122,6 +123,18 @@ public class PinotAdminClient implements AutoCloseable {
       _tableClient = new PinotTableAdminClient(_transport, _controllerAddress, _headers);
     }
     return _tableClient;
+  }
+
+  /**
+   * Gets the segment api client.
+   *
+   * @return Segment administration operations
+   */
+  public PinotSegmentApiClient getSegmentApiClient() {
+    if (_segmentApiClient == null) {
+      _segmentApiClient = new PinotSegmentApiClient(_transport, _controllerAddress, _headers);
+    }
+    return _segmentApiClient;
   }
 
   /**

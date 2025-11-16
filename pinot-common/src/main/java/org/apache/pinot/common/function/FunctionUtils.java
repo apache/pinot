@@ -149,6 +149,9 @@ public class FunctionUtils {
     if (Collection.class.isAssignableFrom(clazz)) {
       return PinotDataType.COLLECTION;
     }
+    if (Map.class.isAssignableFrom(clazz)) {
+      return PinotDataType.MAP;
+    }
     return ARGUMENT_TYPE_MAP.get(clazz);
   }
 

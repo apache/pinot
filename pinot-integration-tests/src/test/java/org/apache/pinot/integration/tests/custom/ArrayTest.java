@@ -86,6 +86,77 @@ public class ArrayTest extends CustomDataQueryClusterIntegrationTest {
   }
 
   @Test(dataProvider = "useBothQueryEngines")
+  public void testArrayAggMvQueries(boolean useMultiStageQueryEngine)
+      throws Exception {
+    setUseMultiStageQueryEngine(useMultiStageQueryEngine);
+    String query = String.format("SELECT arrayAgg(%s, 'LONG'), arrayAgg(%s, 'DOUBLE') FROM %s LIMIT %d",
+        LONG_ARRAY_COLUMN, DOUBLE_ARRAY_COLUMN, getTableName(), getCountStarResult());
+    JsonNode result = postQuery(query).get("resultTable");
+    JsonNode rows = result.get("rows");
+    assertEquals(rows.size(), 1);
+    JsonNode row = rows.get(0);
+    assertEquals(row.size(), 2);
+    // Each row has 4 MV entries, total 1000 rows
+    assertEquals(row.get(0).size(), 4 * getCountStarResult());
+    assertEquals(row.get(1).size(), 4 * getCountStarResult());
+  }
+
+  @Test(dataProvider = "useBothQueryEngines")
+  public void testArrayAggMvDistinctQueries(boolean useMultiStageQueryEngine)
+      throws Exception {
+    setUseMultiStageQueryEngine(useMultiStageQueryEngine);
+    String query = String.format("SELECT arrayAgg(%s, 'LONG', true), arrayAgg(%s, 'DOUBLE', true) FROM %s LIMIT %d",
+        LONG_ARRAY_COLUMN, DOUBLE_ARRAY_COLUMN, getTableName(), getCountStarResult());
+    JsonNode result = postQuery(query).get("resultTable");
+    JsonNode rows = result.get("rows");
+    assertEquals(rows.size(), 1);
+    JsonNode row = rows.get(0);
+    assertEquals(row.size(), 2);
+    // Distinct values for both arrays are 4
+    assertEquals(row.get(0).size(), 4);
+    assertEquals(row.get(1).size(), 4);
+  }
+
+  @Test(dataProvider = "useBothQueryEngines")
+  public void testArrayAggMvGroupByQueries(boolean useMultiStageQueryEngine)
+      throws Exception {
+    setUseMultiStageQueryEngine(useMultiStageQueryEngine);
+    String query = String.format(
+        "SELECT arrayAgg(%s, 'LONG'), arrayAgg(%s, 'DOUBLE'), %s FROM %s GROUP BY %s LIMIT %d",
+        LONG_ARRAY_COLUMN, DOUBLE_ARRAY_COLUMN, GROUP_BY_COLUMN, getTableName(), GROUP_BY_COLUMN,
+        getCountStarResult());
+    JsonNode result = postQuery(query).get("resultTable");
+    JsonNode rows = result.get("rows");
+    assertEquals(rows.size(), 10);
+    for (int i = 0; i < 10; i++) {
+      JsonNode row = rows.get(i);
+      assertEquals(row.size(), 3);
+      // Each group has 1/10th rows
+      assertEquals(row.get(0).size(), 4 * (getCountStarResult() / 10));
+      assertEquals(row.get(1).size(), 4 * (getCountStarResult() / 10));
+    }
+  }
+
+  @Test(dataProvider = "useBothQueryEngines")
+  public void testArrayAggMvDistinctGroupByQueries(boolean useMultiStageQueryEngine)
+      throws Exception {
+    setUseMultiStageQueryEngine(useMultiStageQueryEngine);
+    String query = String.format(
+        "SELECT arrayAgg(%s, 'LONG', true), arrayAgg(%s, 'DOUBLE', true), %s FROM %s GROUP BY %s LIMIT %d",
+        LONG_ARRAY_COLUMN, DOUBLE_ARRAY_COLUMN, GROUP_BY_COLUMN, getTableName(), GROUP_BY_COLUMN,
+        getCountStarResult());
+    JsonNode result = postQuery(query).get("resultTable");
+    JsonNode rows = result.get("rows");
+    assertEquals(rows.size(), 10);
+    for (int i = 0; i < 10; i++) {
+      JsonNode row = rows.get(i);
+      assertEquals(row.size(), 3);
+      assertEquals(row.get(0).size(), 4);
+      assertEquals(row.get(1).size(), 4);
+    }
+  }
+
+  @Test(dataProvider = "useBothQueryEngines")
   public void testArrayAggQueries(boolean useMultiStageQueryEngine)
       throws Exception {
     setUseMultiStageQueryEngine(useMultiStageQueryEngine);
@@ -558,6 +629,92 @@ public class ArrayTest extends CustomDataQueryClusterIntegrationTest {
   }
 
   @Test(dataProvider = "useBothQueryEngines")
+  public void testArraysOverlapWithLiterals(boolean useMultiStageQueryEngine)
+      throws Exception {
+    setUseMultiStageQueryEngine(useMultiStageQueryEngine);
+
+    // INT array literals
+    JsonNode result = postQuery("SELECT ARRAYS_OVERLAP(ARRAY[1,2], ARRAY[3,2])").get("resultTable");
+    assertTrue(result.get("rows").get(0).get(0).asBoolean());
+    result = postQuery("SELECT ARRAYS_OVERLAP(ARRAY[1,2], ARRAY[3,4])").get("resultTable");
+    assertFalse(result.get("rows").get(0).get(0).asBoolean());
+
+    // LONG array literals (use large values to ensure LONG_ARRAY typing)
+    result = postQuery("SELECT ARRAYS_OVERLAP(ARRAY[2147483648,2147483649], ARRAY[2147483650,2147483649])")
+        .get("resultTable");
+    assertTrue(result.get("rows").get(0).get(0).asBoolean());
+    result = postQuery("SELECT ARRAYS_OVERLAP(ARRAY[2147483648,2147483649], ARRAY[2147483650,2147483651])")
+        .get("resultTable");
+    assertFalse(result.get("rows").get(0).get(0).asBoolean());
+
+    // DOUBLE array literals
+    result = postQuery(
+        "SELECT ARRAYS_OVERLAP(ARRAY[CAST(0.1 AS DOUBLE),CAST(0.2 AS DOUBLE)], ARRAY[CAST(0.3 AS DOUBLE),CAST(0.2 AS "
+            + "DOUBLE)])")
+        .get("resultTable");
+    assertTrue(result.get("rows").get(0).get(0).asBoolean());
+    result = postQuery(
+        "SELECT ARRAYS_OVERLAP(ARRAY[CAST(0.1 AS DOUBLE),CAST(0.2 AS DOUBLE)], ARRAY[CAST(0.3 AS DOUBLE),CAST(0.4 AS "
+            + "DOUBLE)])")
+        .get("resultTable");
+    assertFalse(result.get("rows").get(0).get(0).asBoolean());
+
+    // STRING array literals
+    result = postQuery("SELECT ARRAYS_OVERLAP(ARRAY['a','b'], ARRAY['x','b'])").get("resultTable");
+    assertTrue(result.get("rows").get(0).get(0).asBoolean());
+    result = postQuery("SELECT ARRAYS_OVERLAP(ARRAY['a','b'], ARRAY['x','y'])").get("resultTable");
+    assertFalse(result.get("rows").get(0).get(0).asBoolean());
+  }
+
+  @Test(dataProvider = "useBothQueryEngines")
+  public void testArraysOverlapWithColumns(boolean useMultiStageQueryEngine)
+      throws Exception {
+    setUseMultiStageQueryEngine(useMultiStageQueryEngine);
+
+    // LONG array column always contains [0,1,2,3] in this dataset
+    String queryTrue = String.format(
+        "SELECT COUNT(*) FROM %s WHERE ARRAYS_OVERLAP(%s, ARRAY[CAST(2 AS BIGINT), CAST(10 AS BIGINT)])",
+        getTableName(), LONG_ARRAY_COLUMN);
+    JsonNode jsonNode = postQuery(queryTrue);
+    assertEquals(jsonNode.get("resultTable").get("rows").get(0).get(0).asLong(), getCountStarResult());
+
+    String queryFalse = String.format(
+        "SELECT COUNT(*) FROM %s WHERE ARRAYS_OVERLAP(%s, ARRAY[CAST(10 AS BIGINT), CAST(11 AS BIGINT)])",
+        getTableName(), LONG_ARRAY_COLUMN);
+    jsonNode = postQuery(queryFalse);
+    assertEquals(jsonNode.get("resultTable").get("rows").get(0).get(0).asLong(), 0L);
+
+    // DOUBLE array column always contains [0.0,0.1,0.2,0.3]
+    String queryDoubleTrue = String.format(
+        "SELECT COUNT(*) FROM %s WHERE ARRAYS_OVERLAP(%s, ARRAY[CAST(0.2 AS DOUBLE), CAST(1.0 AS DOUBLE)])",
+        getTableName(), DOUBLE_ARRAY_COLUMN);
+    jsonNode = postQuery(queryDoubleTrue);
+    assertEquals(jsonNode.get("resultTable").get("rows").get(0).get(0).asLong(), getCountStarResult());
+
+    String queryDoubleFalse = String.format(
+        "SELECT COUNT(*) FROM %s WHERE ARRAYS_OVERLAP(%s, ARRAY[CAST(9.9 AS DOUBLE), CAST(8.8 AS DOUBLE)])",
+        getTableName(), DOUBLE_ARRAY_COLUMN);
+    jsonNode = postQuery(queryDoubleFalse);
+    assertEquals(jsonNode.get("resultTable").get("rows").get(0).get(0).asLong(), 0L);
+  }
+
+  @Test(dataProvider = "useBothQueryEngines")
+  public void testArraysOverlapWithSameColumn(boolean useMultiStageQueryEngine)
+      throws Exception {
+    setUseMultiStageQueryEngine(useMultiStageQueryEngine);
+    String queryLong = String.format(
+        "SELECT COUNT(*) FROM %s WHERE ARRAYS_OVERLAP(%s, %s)", getTableName(), LONG_ARRAY_COLUMN, LONG_ARRAY_COLUMN);
+    JsonNode jsonNode = postQuery(queryLong);
+    assertEquals(jsonNode.get("resultTable").get("rows").get(0).get(0).asLong(), getCountStarResult());
+
+    String queryDouble =
+        String.format("SELECT COUNT(*) FROM %s WHERE ARRAYS_OVERLAP(%s, %s)", getTableName(), DOUBLE_ARRAY_COLUMN,
+            DOUBLE_ARRAY_COLUMN);
+    jsonNode = postQuery(queryDouble);
+    assertEquals(jsonNode.get("resultTable").get("rows").get(0).get(0).asLong(), getCountStarResult());
+  }
+
+  @Test(dataProvider = "useBothQueryEngines")
   public void testStringArrayLiteral(boolean useMultiStageQueryEngine)
       throws Exception {
     setUseMultiStageQueryEngine(useMultiStageQueryEngine);
@@ -576,6 +733,68 @@ public class ArrayTest extends CustomDataQueryClusterIntegrationTest {
         assertEquals(row.get(0).get(1).textValue(), "bb");
         assertEquals(row.get(0).get(2).textValue(), "ccc");
       }
+    }
+  }
+
+  @Test(dataProvider = "useBothQueryEngines")
+  public void testArrayPushBackAndFrontString(boolean useMultiStageQueryEngine)
+      throws Exception {
+    setUseMultiStageQueryEngine(useMultiStageQueryEngine);
+    for (boolean withFrom : new boolean[]{true, false}) {
+      String pushBackQuery = withFrom ? String.format(
+          "SELECT array_push_back_string(ARRAY['a'],'b') FROM %s LIMIT 1", getTableName())
+          : "SELECT array_push_back_string(ARRAY['a'],'b')";
+      JsonNode result = postQuery(pushBackQuery).get("resultTable");
+      JsonNode rows = result.get("rows");
+      assertEquals(rows.size(), 1);
+      JsonNode row = rows.get(0);
+      assertEquals(row.size(), 1);
+      assertEquals(row.get(0).size(), 2);
+      assertEquals(row.get(0).get(0).textValue(), "a");
+      assertEquals(row.get(0).get(1).textValue(), "b");
+
+      String pushFrontQuery = withFrom ? String.format(
+          "SELECT array_push_front_string(ARRAY['b'],'a') FROM %s LIMIT 1", getTableName())
+          : "SELECT array_push_front_string(ARRAY['b'],'a')";
+      result = postQuery(pushFrontQuery).get("resultTable");
+      rows = result.get("rows");
+      assertEquals(rows.size(), 1);
+      row = rows.get(0);
+      assertEquals(row.size(), 1);
+      assertEquals(row.get(0).size(), 2);
+      assertEquals(row.get(0).get(0).textValue(), "a");
+      assertEquals(row.get(0).get(1).textValue(), "b");
+    }
+  }
+
+  @Test(dataProvider = "useBothQueryEngines")
+  public void testArrayPushBackAndFrontDouble(boolean useMultiStageQueryEngine)
+      throws Exception {
+    setUseMultiStageQueryEngine(useMultiStageQueryEngine);
+    for (boolean withFrom : new boolean[]{true, false}) {
+      String pushBackQuery = withFrom ? String.format(
+          "SELECT array_push_back_double(ARRAY[CAST(0.1 AS DOUBLE)], CAST(0.2 AS DOUBLE)) FROM %s LIMIT 1",
+          getTableName()) : "SELECT array_push_back_double(ARRAY[CAST(0.1 AS DOUBLE)], CAST(0.2 AS DOUBLE))";
+      JsonNode result = postQuery(pushBackQuery).get("resultTable");
+      JsonNode rows = result.get("rows");
+      assertEquals(rows.size(), 1);
+      JsonNode row = rows.get(0);
+      assertEquals(row.size(), 1);
+      assertEquals(row.get(0).size(), 2);
+      assertEquals(row.get(0).get(0).asDouble(), 0.1);
+      assertEquals(row.get(0).get(1).asDouble(), 0.2);
+
+      String pushFrontQuery = withFrom ? String.format(
+          "SELECT array_push_front_double(ARRAY[CAST(0.2 AS DOUBLE)], CAST(0.1 AS DOUBLE)) FROM %s LIMIT 1",
+          getTableName()) : "SELECT array_push_front_double(ARRAY[CAST(0.2 AS DOUBLE)], CAST(0.1 AS DOUBLE))";
+      result = postQuery(pushFrontQuery).get("resultTable");
+      rows = result.get("rows");
+      assertEquals(rows.size(), 1);
+      row = rows.get(0);
+      assertEquals(row.size(), 1);
+      assertEquals(row.get(0).size(), 2);
+      assertEquals(row.get(0).get(0).asDouble(), 0.1);
+      assertEquals(row.get(0).get(1).asDouble(), 0.2);
     }
   }
 
@@ -798,7 +1017,7 @@ public class ArrayTest extends CustomDataQueryClusterIntegrationTest {
       assertEquals(row.size(), 4);
       assertEquals(row.get(0).asInt() % 4 < 2, row.get(1).asBoolean());
       assertEquals(row.get(1).asBoolean(), row.get(2).asBoolean());
-      assertEquals(row.get(2).asBoolean(), row.get(2).asBoolean());
+      assertEquals(row.get(2).asBoolean(), row.get(3).asBoolean());
     }
   }
 

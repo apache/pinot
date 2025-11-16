@@ -51,7 +51,7 @@ public class PageCacheWarmupConfig extends BaseJsonConfig {
                                @JsonProperty("maxWarmupDurationSeconds") @Nullable Integer maxWarmupDurationSeconds,
                                @Nullable @JsonProperty("policy") String policy,
                                @Nullable @JsonProperty("qpsLimitOnRestart") Integer qpsLimitOnRestart,
-                               @Nullable @JsonProperty("qpsLimitOnRestart") Integer qpsLimitOnRefresh) {
+                               @Nullable @JsonProperty("qpsLimitOnRefresh") Integer qpsLimitOnRefresh) {
     _enableOnRestart = enableOnRestart;
     _enableOnRefresh = enableOnRefresh;
     _maxWarmupDurationSeconds = (maxWarmupDurationSeconds != null)
