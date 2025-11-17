@@ -114,10 +114,9 @@ public class MinionTaskUtils {
 
   public static Map<String, String> getPushTaskConfig(String tableName, Map<String, String> taskConfigs,
       ClusterInfoAccessor clusterInfoAccessor) {
+    Map<String, String> singleFileGenerationTaskConfig = new HashMap<>(taskConfigs);
     try {
       String pushMode = IngestionConfigUtils.getPushMode(taskConfigs);
-
-      Map<String, String> singleFileGenerationTaskConfig = new HashMap<>(taskConfigs);
 
       // Default value for Segment Push Type is TAR.
       BatchConfigProperties.SegmentPushType segmentPushType;
@@ -155,7 +154,9 @@ public class MinionTaskUtils {
       singleFileGenerationTaskConfig.put(BatchConfigProperties.PUSH_CONTROLLER_URI, clusterInfoAccessor.getVipUrl());
       return singleFileGenerationTaskConfig;
     } catch (Exception e) {
-      return taskConfigs;
+      singleFileGenerationTaskConfig.put(BatchConfigProperties.PUSH_MODE,
+            BatchConfigProperties.SegmentPushType.TAR.toString());
+      return singleFileGenerationTaskConfig;
     }
   }
 
