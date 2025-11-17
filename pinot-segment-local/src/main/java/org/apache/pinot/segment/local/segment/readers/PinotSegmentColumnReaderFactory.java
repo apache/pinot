@@ -22,7 +22,6 @@ import java.io.IOException;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.Set;
-import javax.annotation.Nullable;
 import org.apache.pinot.segment.spi.IndexSegment;
 import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.Schema;
@@ -49,7 +48,7 @@ public class PinotSegmentColumnReaderFactory implements ColumnReaderFactory {
   private final IndexSegment _indexSegment;
   private Schema _targetSchema;
   private Set<String> _colsToRead;
-  @Nullable private Map<String, ColumnReader> _columnReaders;
+  private Map<String, ColumnReader> _columnReaders;
 
   /**
    * Create a PinotSegmentColumnReaderFactory.

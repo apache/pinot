@@ -32,14 +32,13 @@ import javax.annotation.Nullable;
  * <p>This interface provides 3 patterns optimised for different use cases
  * (Some implementations may not support all patterns):
  * <ul>
- *   <li>Sequential iteration over all values in a column using hasNext() and next() and rewind()</li>
- *   <li>Sequential iteration with type-specific methods (nextInt(), nextLong(), etc.)
- *        and null handling (isNextNull(), skipNext())</li>
+ *   <li>Sequential iteration over all values in a column using hasNext(), next() and rewind()</li>
+ *   <li>Sequential iteration with type-specific methods (isInt(), isLong(), nextInt(), nextLong(), etc.)
+ *        and null handling (isNextNull(), skipNext()) and supports hasNext() and rewind()</li>
  *   <li>Random access by document ID using getInt(docId), getLong(docId), etc. and isNull(docId) for null checks</li>
  * </ul>
  *
- * <p>Implementations should handle data type conversions, default values for new columns,
- * and efficient column-wise data access patterns.
+ * <p>Implementations should handle data type conversions and efficient column-wise data access patterns.
  *
  * <h2>Usage Patterns</h2>
  *
@@ -52,7 +51,13 @@ import javax.annotation.Nullable;
  * <pre>{@code
  * // Read all values in the column
  * while (columnReader.hasNext()) {
- *   Object value = columnReader.next();
+ *   Object value;
+ *   try {
+ *    value = columnReader.next();
+ *   } catch (Exception e) {
+ *    // Handle exception / log
+ *    continue;
+*    }
  *   if (value != null) {
  *     // Process non-null value
  *     processValue(value);
@@ -78,33 +83,26 @@ import javax.annotation.Nullable;
  * <p>This pattern uses {@link #isNextNull()} to check for nulls before calling type-specific methods
  * like {@link #nextInt()}, {@link #nextLong()}, etc. Use {@link #skipNext()} to advance past null values.
  * This is the preferred pattern when you know the column data type and want to avoid boxing overhead.
- *
+ * Before using this pattern, check the column data type using methods like {@link #isInt()}, {@link #isLong()}, etc.
+ * If the data type does not match, fall back to Pattern 1 with {@link #next()}.
  * <pre>{@code
  * // Read all int values in the column, handling nulls
- * while (columnReader.hasNext()) {
- *   if (columnReader.isNextNull()) {
- *     // Skip the null value
- *     columnReader.skipNext();
- *     handleNullValue();
- *   } else {
- *     // Read the primitive int value (no boxing)
- *     int value = columnReader.nextInt();
- *     processIntValue(value);
- *   }
+ * if (columnReader.isInt()) {
+ *  while (columnReader.hasNext()) {
+ *     if (columnReader.isNextNull()) {
+ *       // Skip the null value
+ *      columnReader.skipNext();
+ *      handleNullValue();
+ *     } else {
+ *      // Read the primitive int value (no boxing)
+ *      int value = columnReader.nextInt();
+ *      processIntValue(value);
+ *    }
+ *  }
+ * } else {
+ *  // Fallback to Pattern 1 if not INT type
  * }
  *
- * // Rewind to read the column again
- * columnReader.rewind();
- *
- * // Second pass - maybe with different logic
- * while (columnReader.hasNext()) {
- *   if (!columnReader.isNextNull()) {
- *     int value = columnReader.nextInt();
- *     processIntValueAgain(value);
- *   } else {
- *     columnReader.skipNext();
- *   }
- * }
  * }</pre>
  *
  * <h3>Pattern 3: Random Access by Document ID</h3>
@@ -172,102 +170,60 @@ public interface ColumnReader extends Closeable, Serializable {
   boolean isNextNull() throws IOException;
 
   /**
-   * Move the reader to skip the next value in the column.
-   * This is typically called if isNextNull() returns true to skip the null value before calling nextInt(), etc
-   *  which can't handle null values.
+   * Move the reader to skip the next value in the column and advance to the following value.
+   * This method is typically used because type specific methods like {@link #nextInt()}, {@link #nextLong()}, etc.
+   * cannot return null values
+   * Thus, if {@link #isNextNull()} returns true, clients should call this method to skip the null value.
    *
-   * @throws IOException If an I/O error occurs while reading
+   * <p><b>Example</b>
+   * <pre>{@code
+   * if (columnReader.isNextNull()) {
+   *   columnReader.skipNext();  // Skip null and move to next value
+   * } else {
+   *   int value = columnReader.nextInt();
+   * }
+   * }</pre>
+   *
+   * @throws IOException If an I/O error occurs while skipping
    */
   void skipNext() throws IOException;
 
   /**
-   * Get the next int value in the column.
-   * Should be called only if the column data type is INT and isNextNull() returns false.
-   *
-   * @return Next int value
+   * Check if the column data type from the actual reader can be returned as the expected type directly.
+   * For multi-value columns, this indicates if the multi-value type specific methods can be called directly.
+   * If true, the type specific methods like nextInt() can be called directly.
+   * Otherwise, clients should use next() and cast the result.
+   */
+  boolean isInt();
+  boolean isLong();
+  boolean isFloat();
+  boolean isDouble();
+  boolean isString();
+  boolean isBytes();
+
+  /**
+   * Get the next int / long / float / double / string / byte[] value for single-value columns.
+   * Should be called only if isNextNull() returns false.
    * @throws IOException If an I/O error occurs while reading
    */
   int nextInt() throws IOException;
-
-  /**
-   * Get the next long value in the column.
-   * Should be called only if the column data type is LONG and isNextNull() returns false.
-   *
-   * @return Next long value
-   * @throws IOException If an I/O error occurs while reading
-   */
   long nextLong() throws IOException;
-
-  /**
-   * Get the next float value in the column.
-   * Should be called only if the column data type is FLOAT and isNextNull() returns false.
-   *
-   * @return Next float value
-   * @throws IOException If an I/O error occurs while reading
-   */
   float nextFloat() throws IOException;
-
-  /**
-   * Get the next double value in the column.
-   * Should be called only if the column data type is DOUBLE and isNextNull() returns false.
-   *
-   * @return Next double value
-   * @throws IOException If an I/O error occurs while reading
-   */
   double nextDouble() throws IOException;
+  String nextString() throws IOException;
+  byte[] nextBytes() throws IOException;
 
   /**
-   * Get the next int[] values in the column for multi-value columns.
-   * Should be called only if the column is multi-value INT and isNextNull() returns false.
+   * Get the next int[] / long[] / float[] / double[] / string[] / bytes[][] values for multi-value columns.
+   * Should be called only if isNextNull() returns false.
    *
-   * @return Next int[] values
    * @throws IOException If an I/O error occurs while reading
    */
   int[] nextIntMV() throws IOException;
-
-  /**
-   * Get the next long[] values in the column for multi-value columns.
-   * Should be called only if the column is multi-value LONG and isNextNull() returns false.
-   *
-   * @return Next long[] values
-   * @throws IOException If an I/O error occurs while reading
-   */
   long[] nextLongMV() throws IOException;
-
-  /**
-   * Get the next float[] values in the column for multi-value columns.
-   * Should be called only if the column is multi-value FLOAT and isNextNull() returns false.
-   *
-   * @return Next float[] values
-   * @throws IOException If an I/O error occurs while reading
-   */
   float[] nextFloatMV() throws IOException;
-
-  /**
-   * Get the next double[] values in the column for multi-value columns.
-   * Should be called only if the column is multi-value DOUBLE and isNextNull() returns false.
-   *
-   * @return Next double[] values
-   * @throws IOException If an I/O error occurs while reading
-   */
   double[] nextDoubleMV() throws IOException;
-
-  /**
-   * Get the next String[] values in the column for multi-value columns.
-   * Should be called only if the column is multi-value STRING and isNextNull() returns false.
-   *
-   * @return Next String[] values
-   * @throws IOException If an I/O error occurs while reading
-   */
   String[] nextStringMV() throws IOException;
-
-  /**
-   * Get the next byte[][] values in the column for multi-value columns.
-   * Should be called only if the column is multi-value BYTES and isNextNull() returns false.
-   *
-   * @return Next byte[][] values
-   * @throws IOException If an I/O error occurs while reading
-   */
   byte[][] nextBytesMV() throws IOException;
 
   /**
@@ -275,8 +231,7 @@ public interface ColumnReader extends Closeable, Serializable {
    *
    * @throws IOException If an I/O error occurs while rewinding
    */
-  void rewind()
-      throws IOException;
+  void rewind() throws IOException;
 
   /**
    * Get the name of the column.
@@ -300,153 +255,41 @@ public interface ColumnReader extends Closeable, Serializable {
    * @return true if the value is null, false otherwise
    * @throws IndexOutOfBoundsException If docId is out of range
    */
-  boolean isNull(int docId);
+  boolean isNull(int docId) throws IOException;
 
   // Single-value accessors
 
   /**
-   * Get int value at the given document ID for single-value columns.
+   * Get int / long / float / double / string / byte[] value at the given document ID for single-value columns.
+   * Should be called only if isNull(docId) returns false.
    * <p>Document ID is 0-based. Valid values are 0 to {@link #getTotalDocs()} - 1.
    *
    * @param docId Document ID (0-based)
-   * @return int value at the document ID
    * @throws IndexOutOfBoundsException If docId is out of range
    * @throws IOException If an I/O error occurs while reading
    */
-  int getInt(int docId)
-      throws IOException;
-
-  /**
-   * Get long value at the given document ID for single-value columns.
-   * <p>Document ID is 0-based. Valid values are 0 to {@link #getTotalDocs()} - 1.
-   *
-   * @param docId Document ID (0-based)
-   * @return long value at the document ID
-   * @throws IndexOutOfBoundsException If docId is out of range
-   * @throws IOException If an I/O error occurs while reading
-   */
-  long getLong(int docId)
-      throws IOException;
-
-  /**
-   * Get float value at the given document ID for single-value columns.
-   * <p>Document ID is 0-based. Valid values are 0 to {@link #getTotalDocs()} - 1.
-   *
-   * @param docId Document ID (0-based)
-   * @return float value at the document ID
-   * @throws IndexOutOfBoundsException If docId is out of range
-   * @throws IOException If an I/O error occurs while reading
-   */
-  float getFloat(int docId)
-      throws IOException;
-
-  /**
-   * Get double value at the given document ID for single-value columns.
-   * <p>Document ID is 0-based. Valid values are 0 to {@link #getTotalDocs()} - 1.
-   *
-   * @param docId Document ID (0-based)
-   * @return double value at the document ID
-   * @throws IndexOutOfBoundsException If docId is out of range
-   * @throws IOException If an I/O error occurs while reading
-   */
-  double getDouble(int docId)
-      throws IOException;
-
-  /**
-   * Get String value at the given document ID for single-value columns.
-   * <p>Document ID is 0-based. Valid values are 0 to {@link #getTotalDocs()} - 1.
-   *
-   * @param docId Document ID (0-based)
-   * @return String value at the document ID
-   * @throws IndexOutOfBoundsException If docId is out of range
-   * @throws IOException If an I/O error occurs while reading
-   */
-  String getString(int docId)
-      throws IOException;
-
-  /**
-   * Get byte[] value at the given document ID for single-value columns.
-   * <p>Document ID is 0-based. Valid values are 0 to {@link #getTotalDocs()} - 1.
-   *
-   * @param docId Document ID (0-based)
-   * @return byte[] value at the document ID
-   * @throws IndexOutOfBoundsException If docId is out of range
-   * @throws IOException If an I/O error occurs while reading
-   */
-  byte[] getBytes(int docId)
-      throws IOException;
+  int getInt(int docId) throws IOException;
+  long getLong(int docId) throws IOException;
+  float getFloat(int docId) throws IOException;
+  double getDouble(int docId) throws IOException;
+  String getString(int docId) throws IOException;
+  byte[] getBytes(int docId) throws IOException;
 
   // Multi-value accessors
 
   /**
-   * Get int[] values at the given document ID for multi-value columns.
+   * Get int[] / long[] / float[] / double[] / string[] / bytes[][] values at the given doc ID for multi-value columns.
+   * Should be called only if isNull(docId) returns false.
    * <p>Document ID is 0-based. Valid values are 0 to {@link #getTotalDocs()} - 1.
    *
    * @param docId Document ID (0-based)
-   * @return int[] values at the document ID
    * @throws IndexOutOfBoundsException If docId is out of range
    * @throws IOException If an I/O error occurs while reading
    */
-  int[] getIntMV(int docId)
-      throws IOException;
-
-  /**
-   * Get long[] values at the given document ID for multi-value columns.
-   * <p>Document ID is 0-based. Valid values are 0 to {@link #getTotalDocs()} - 1.
-   *
-   * @param docId Document ID (0-based)
-   * @return long[] values at the document ID
-   * @throws IndexOutOfBoundsException If docId is out of range
-   * @throws IOException If an I/O error occurs while reading
-   */
-  long[] getLongMV(int docId)
-      throws IOException;
-
-  /**
-   * Get float[] values at the given document ID for multi-value columns.
-   * <p>Document ID is 0-based. Valid values are 0 to {@link #getTotalDocs()} - 1.
-   *
-   * @param docId Document ID (0-based)
-   * @return float[] values at the document ID
-   * @throws IndexOutOfBoundsException If docId is out of range
-   * @throws IOException If an I/O error occurs while reading
-   */
-  float[] getFloatMV(int docId)
-      throws IOException;
-
-  /**
-   * Get double[] values at the given document ID for multi-value columns.
-   * <p>Document ID is 0-based. Valid values are 0 to {@link #getTotalDocs()} - 1.
-   *
-   * @param docId Document ID (0-based)
-   * @return double[] values at the document ID
-   * @throws IndexOutOfBoundsException If docId is out of range
-   * @throws IOException If an I/O error occurs while reading
-   */
-  double[] getDoubleMV(int docId)
-      throws IOException;
-
-  /**
-   * Get String[] values at the given document ID for multi-value columns.
-   * <p>Document ID is 0-based. Valid values are 0 to {@link #getTotalDocs()} - 1.
-   *
-   * @param docId Document ID (0-based)
-   * @return String[] values at the document ID
-   * @throws IndexOutOfBoundsException If docId is out of range
-   * @throws IOException If an I/O error occurs while reading
-   */
-  String[] getStringMV(int docId)
-      throws IOException;
-
-  /**
-   * Get byte[][] values at the given document ID for multi-value columns.
-   * <p>Document ID is 0-based. Valid values are 0 to {@link #getTotalDocs()} - 1.
-   *
-   * @param docId Document ID (0-based)
-   * @return byte[][] values at the document ID
-   * @throws IndexOutOfBoundsException If docId is out of range
-   * @throws IOException If an I/O error occurs while reading
-   */
-  byte[][] getBytesMV(int docId)
-      throws IOException;
+  int[] getIntMV(int docId) throws IOException;
+  long[] getLongMV(int docId) throws IOException;
+  float[] getFloatMV(int docId) throws IOException;
+  double[] getDoubleMV(int docId) throws IOException;
+  String[] getStringMV(int docId) throws IOException;
+  byte[][] getBytesMV(int docId) throws IOException;
 }

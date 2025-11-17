@@ -21,6 +21,7 @@ package org.apache.pinot.segment.local.segment.readers;
 import java.io.IOException;
 import javax.annotation.Nullable;
 import org.apache.pinot.segment.spi.IndexSegment;
+import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.readers.ColumnReader;
 
 
@@ -38,6 +39,7 @@ public class PinotSegmentColumnReaderImpl implements ColumnReader {
   private final PinotSegmentColumnReader _segmentColumnReader;
   private final String _columnName;
   private final int _numDocs;
+  private final FieldSpec.DataType _dataType;
 
   private int _currentIndex;
 
@@ -55,6 +57,11 @@ public class PinotSegmentColumnReaderImpl implements ColumnReader {
     _columnName = columnName;
     _numDocs = indexSegment.getSegmentMetadata().getTotalDocs();
     _currentIndex = 0;
+
+    // Get the data type from the schema
+    FieldSpec fieldSpec = indexSegment.getSegmentMetadata().getSchema().getFieldSpecFor(columnName);
+    assert fieldSpec != null : "FieldSpec should not be null for column: " + columnName;
+    _dataType = fieldSpec.getDataType();
   }
 
   @Override
@@ -103,6 +110,36 @@ public class PinotSegmentColumnReaderImpl implements ColumnReader {
   }
 
   @Override
+  public boolean isInt() {
+    return _dataType == FieldSpec.DataType.INT;
+  }
+
+  @Override
+  public boolean isLong() {
+    return _dataType == FieldSpec.DataType.LONG;
+  }
+
+  @Override
+  public boolean isFloat() {
+    return _dataType == FieldSpec.DataType.FLOAT;
+  }
+
+  @Override
+  public boolean isDouble() {
+    return _dataType == FieldSpec.DataType.DOUBLE;
+  }
+
+  @Override
+  public boolean isString() {
+    return _dataType == FieldSpec.DataType.STRING;
+  }
+
+  @Override
+  public boolean isBytes() {
+    return _dataType == FieldSpec.DataType.BYTES;
+  }
+
+  @Override
   public int nextInt() {
     if (!hasNext()) {
       throw new IllegalStateException("No more values available");
@@ -138,6 +175,26 @@ public class PinotSegmentColumnReaderImpl implements ColumnReader {
       throw new IllegalStateException("No more values available");
     }
     double value = _segmentColumnReader.getDouble(_currentIndex);
+    _currentIndex++;
+    return value;
+  }
+
+  @Override
+  public String nextString() {
+    if (!hasNext()) {
+      throw new IllegalStateException("No more values available");
+    }
+    String value = _segmentColumnReader.getString(_currentIndex);
+    _currentIndex++;
+    return value;
+  }
+
+  @Override
+  public byte[] nextBytes() {
+    if (!hasNext()) {
+      throw new IllegalStateException("No more values available");
+    }
+    byte[] value = _segmentColumnReader.getBytes(_currentIndex);
     _currentIndex++;
     return value;
   }

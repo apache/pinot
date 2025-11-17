@@ -34,6 +34,15 @@ public class DefaultValueColumnReader implements ColumnReader {
   private final String _columnName;
   private final int _numDocs;
   private final Object _defaultValue;
+  private final FieldSpec.DataType _dataType;
+
+  // Pre-computed multi-value arrays for reuse
+  private int[] _defaultIntMV;
+  private long[] _defaultLongMV;
+  private float[] _defaultFloatMV;
+  private double[] _defaultDoubleMV;
+  private String[] _defaultStringMV;
+  private byte[][] _defaultBytesMV;
 
   private int _currentIndex;
 
@@ -48,6 +57,7 @@ public class DefaultValueColumnReader implements ColumnReader {
     _columnName = columnName;
     _numDocs = numDocs;
     _currentIndex = 0;
+    _dataType = fieldSpec.getDataType();
 
     // For multi-value fields, wrap the default value in an array
     Object defaultNullValue = fieldSpec.getDefaultNullValue();
@@ -55,6 +65,48 @@ public class DefaultValueColumnReader implements ColumnReader {
       _defaultValue = defaultNullValue;
     } else {
       _defaultValue = new Object[]{defaultNullValue};
+      // Pre-compute typed arrays for multi-value fields to avoid repeated allocations
+      Object[] defaultArray = (Object[]) _defaultValue;
+      switch (_dataType) {
+        case INT:
+          _defaultIntMV = new int[defaultArray.length];
+          for (int i = 0; i < defaultArray.length; i++) {
+            _defaultIntMV[i] = ((Number) defaultArray[i]).intValue();
+          }
+          break;
+        case LONG:
+          _defaultLongMV = new long[defaultArray.length];
+          for (int i = 0; i < defaultArray.length; i++) {
+            _defaultLongMV[i] = ((Number) defaultArray[i]).longValue();
+          }
+          break;
+        case FLOAT:
+          _defaultFloatMV = new float[defaultArray.length];
+          for (int i = 0; i < defaultArray.length; i++) {
+            _defaultFloatMV[i] = ((Number) defaultArray[i]).floatValue();
+          }
+          break;
+        case DOUBLE:
+          _defaultDoubleMV = new double[defaultArray.length];
+          for (int i = 0; i < defaultArray.length; i++) {
+            _defaultDoubleMV[i] = ((Number) defaultArray[i]).doubleValue();
+          }
+          break;
+        case STRING:
+          _defaultStringMV = new String[defaultArray.length];
+          for (int i = 0; i < defaultArray.length; i++) {
+            _defaultStringMV[i] = (String) defaultArray[i];
+          }
+          break;
+        case BYTES:
+          _defaultBytesMV = new byte[defaultArray.length][];
+          for (int i = 0; i < defaultArray.length; i++) {
+            _defaultBytesMV[i] = (byte[]) defaultArray[i];
+          }
+          break;
+        default:
+          break;
+      }
     }
   }
 
@@ -83,7 +135,7 @@ public class DefaultValueColumnReader implements ColumnReader {
     if (!hasNext()) {
       throw new IllegalStateException("No more values available");
     }
-    return false; // Default values are never null
+    return _defaultValue == null;
   }
 
   @Override
@@ -92,6 +144,36 @@ public class DefaultValueColumnReader implements ColumnReader {
       throw new IllegalStateException("No more values available");
     }
     _currentIndex++;
+  }
+
+  @Override
+  public boolean isInt() {
+    return _dataType == FieldSpec.DataType.INT;
+  }
+
+  @Override
+  public boolean isLong() {
+    return _dataType == FieldSpec.DataType.LONG;
+  }
+
+  @Override
+  public boolean isFloat() {
+    return _dataType == FieldSpec.DataType.FLOAT;
+  }
+
+  @Override
+  public boolean isDouble() {
+    return _dataType == FieldSpec.DataType.DOUBLE;
+  }
+
+  @Override
+  public boolean isString() {
+    return _dataType == FieldSpec.DataType.STRING;
+  }
+
+  @Override
+  public boolean isBytes() {
+    return _dataType == FieldSpec.DataType.BYTES;
   }
 
   @Override
@@ -131,12 +213,30 @@ public class DefaultValueColumnReader implements ColumnReader {
   }
 
   @Override
+  public String nextString() {
+    if (!hasNext()) {
+      throw new IllegalStateException("No more values available");
+    }
+    _currentIndex++;
+    return (String) _defaultValue;
+  }
+
+  @Override
+  public byte[] nextBytes() {
+    if (!hasNext()) {
+      throw new IllegalStateException("No more values available");
+    }
+    _currentIndex++;
+    return (byte[]) _defaultValue;
+  }
+
+  @Override
   public int[] nextIntMV() {
     if (!hasNext()) {
       throw new IllegalStateException("No more values available");
     }
     _currentIndex++;
-    return getIntMV(0); // Use existing getIntMV logic
+    return _defaultIntMV;
   }
 
   @Override
@@ -145,7 +245,7 @@ public class DefaultValueColumnReader implements ColumnReader {
       throw new IllegalStateException("No more values available");
     }
     _currentIndex++;
-    return getLongMV(0);
+    return _defaultLongMV;
   }
 
   @Override
@@ -154,7 +254,7 @@ public class DefaultValueColumnReader implements ColumnReader {
       throw new IllegalStateException("No more values available");
     }
     _currentIndex++;
-    return getFloatMV(0);
+    return _defaultFloatMV;
   }
 
   @Override
@@ -163,7 +263,7 @@ public class DefaultValueColumnReader implements ColumnReader {
       throw new IllegalStateException("No more values available");
     }
     _currentIndex++;
-    return getDoubleMV(0);
+    return _defaultDoubleMV;
   }
 
   @Override
@@ -172,7 +272,7 @@ public class DefaultValueColumnReader implements ColumnReader {
       throw new IllegalStateException("No more values available");
     }
     _currentIndex++;
-    return getStringMV(0);
+    return _defaultStringMV;
   }
 
   @Override
@@ -181,7 +281,7 @@ public class DefaultValueColumnReader implements ColumnReader {
       throw new IllegalStateException("No more values available");
     }
     _currentIndex++;
-    return getBytesMV(0);
+    return _defaultBytesMV;
   }
 
   @Override
@@ -197,8 +297,7 @@ public class DefaultValueColumnReader implements ColumnReader {
   @Override
   public boolean isNull(int docId) {
     validateDocId(docId);
-    // Default values are never null
-    return false;
+    return _defaultValue == null;
   }
 
   // Single-value accessors
@@ -244,67 +343,37 @@ public class DefaultValueColumnReader implements ColumnReader {
   @Override
   public int[] getIntMV(int docId) {
     validateDocId(docId);
-    Object[] defaultArray = (Object[]) _defaultValue;
-    int[] result = new int[defaultArray.length];
-    for (int i = 0; i < defaultArray.length; i++) {
-      result[i] = ((Number) defaultArray[i]).intValue();
-    }
-    return result;
+    return _defaultIntMV;
   }
 
   @Override
   public long[] getLongMV(int docId) {
     validateDocId(docId);
-    Object[] defaultArray = (Object[]) _defaultValue;
-    long[] result = new long[defaultArray.length];
-    for (int i = 0; i < defaultArray.length; i++) {
-      result[i] = ((Number) defaultArray[i]).longValue();
-    }
-    return result;
+    return _defaultLongMV;
   }
 
   @Override
   public float[] getFloatMV(int docId) {
     validateDocId(docId);
-    Object[] defaultArray = (Object[]) _defaultValue;
-    float[] result = new float[defaultArray.length];
-    for (int i = 0; i < defaultArray.length; i++) {
-      result[i] = ((Number) defaultArray[i]).floatValue();
-    }
-    return result;
+    return _defaultFloatMV;
   }
 
   @Override
   public double[] getDoubleMV(int docId) {
     validateDocId(docId);
-    Object[] defaultArray = (Object[]) _defaultValue;
-    double[] result = new double[defaultArray.length];
-    for (int i = 0; i < defaultArray.length; i++) {
-      result[i] = ((Number) defaultArray[i]).doubleValue();
-    }
-    return result;
+    return _defaultDoubleMV;
   }
 
   @Override
   public String[] getStringMV(int docId) {
     validateDocId(docId);
-    Object[] defaultArray = (Object[]) _defaultValue;
-    String[] result = new String[defaultArray.length];
-    for (int i = 0; i < defaultArray.length; i++) {
-      result[i] = (String) defaultArray[i];
-    }
-    return result;
+    return _defaultStringMV;
   }
 
   @Override
   public byte[][] getBytesMV(int docId) {
     validateDocId(docId);
-    Object[] defaultArray = (Object[]) _defaultValue;
-    byte[][] result = new byte[defaultArray.length][];
-    for (int i = 0; i < defaultArray.length; i++) {
-      result[i] = (byte[]) defaultArray[i];
-    }
-    return result;
+    return _defaultBytesMV;
   }
 
   /**

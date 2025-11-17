@@ -201,8 +201,10 @@ public class PinotSegmentColumnReaderImplTest extends ColumnarSegmentBuildingTes
             (Function<Object, Object>) val -> val instanceof Double ? ((Double) val).floatValue() : val},
         {DOUBLE_COL, (SingleValueGetter) PinotSegmentColumnReaderImpl::getDouble,
             (SingleValueSequentialGetter) PinotSegmentColumnReaderImpl::nextDouble, null},
-        {STRING_COL_1, (SingleValueGetter) PinotSegmentColumnReaderImpl::getString, null, null},
-        {BYTES_COL, (SingleValueGetter) PinotSegmentColumnReaderImpl::getBytes, null, null}
+        {STRING_COL_1, (SingleValueGetter) PinotSegmentColumnReaderImpl::getString,
+            (SingleValueSequentialGetter) PinotSegmentColumnReaderImpl::nextString, null},
+        {BYTES_COL, (SingleValueGetter) PinotSegmentColumnReaderImpl::getBytes,
+            (SingleValueSequentialGetter) PinotSegmentColumnReaderImpl::nextBytes, null},
     };
 
     // Create test cases for all index types
@@ -229,8 +231,24 @@ public class PinotSegmentColumnReaderImplTest extends ColumnarSegmentBuildingTes
       int totalDocs = reader.getTotalDocs();
       Assert.assertEquals(totalDocs, _testData.size());
 
-      // Get default value for the column type
-      Object defaultValue = schema.getFieldSpecFor(columnName).getDefaultNullValue();
+      // Get field spec and data type for the column
+      FieldSpec fieldSpec = schema.getFieldSpecFor(columnName);
+      Object defaultValue = fieldSpec.getDefaultNullValue();
+      FieldSpec.DataType dataType = fieldSpec.getDataType();
+
+      // Test type indicator methods
+      Assert.assertEquals(reader.isInt(), dataType == FieldSpec.DataType.INT,
+          "isInt() should return " + (dataType == FieldSpec.DataType.INT) + " for " + columnName);
+      Assert.assertEquals(reader.isLong(), dataType == FieldSpec.DataType.LONG,
+          "isLong() should return " + (dataType == FieldSpec.DataType.LONG) + " for " + columnName);
+      Assert.assertEquals(reader.isFloat(), dataType == FieldSpec.DataType.FLOAT,
+          "isFloat() should return " + (dataType == FieldSpec.DataType.FLOAT) + " for " + columnName);
+      Assert.assertEquals(reader.isDouble(), dataType == FieldSpec.DataType.DOUBLE,
+          "isDouble() should return " + (dataType == FieldSpec.DataType.DOUBLE) + " for " + columnName);
+      Assert.assertEquals(reader.isString(), dataType == FieldSpec.DataType.STRING,
+          "isString() should return " + (dataType == FieldSpec.DataType.STRING) + " for " + columnName);
+      Assert.assertEquals(reader.isBytes(), dataType == FieldSpec.DataType.BYTES,
+          "isBytes() should return " + (dataType == FieldSpec.DataType.BYTES) + " for " + columnName);
 
       // Test reading all documents using random access (Pattern 3)
       for (int docId = 0; docId < totalDocs; docId++) {
@@ -389,7 +407,22 @@ public class PinotSegmentColumnReaderImplTest extends ColumnarSegmentBuildingTes
       // Get default value for MV type (wrapped in array)
       FieldSpec fieldSpec = schema.getFieldSpecFor(columnName);
       Object defaultNullValue = fieldSpec.getDefaultNullValue();
+      FieldSpec.DataType dataType = fieldSpec.getDataType();
       Object defaultValue;
+
+      // Test type indicator methods
+      Assert.assertEquals(reader.isInt(), dataType == FieldSpec.DataType.INT,
+          "isInt() should return " + (dataType == FieldSpec.DataType.INT) + " for " + columnName);
+      Assert.assertEquals(reader.isLong(), dataType == FieldSpec.DataType.LONG,
+          "isLong() should return " + (dataType == FieldSpec.DataType.LONG) + " for " + columnName);
+      Assert.assertEquals(reader.isFloat(), dataType == FieldSpec.DataType.FLOAT,
+          "isFloat() should return " + (dataType == FieldSpec.DataType.FLOAT) + " for " + columnName);
+      Assert.assertEquals(reader.isDouble(), dataType == FieldSpec.DataType.DOUBLE,
+          "isDouble() should return " + (dataType == FieldSpec.DataType.DOUBLE) + " for " + columnName);
+      Assert.assertEquals(reader.isString(), dataType == FieldSpec.DataType.STRING,
+          "isString() should return " + (dataType == FieldSpec.DataType.STRING) + " for " + columnName);
+      Assert.assertEquals(reader.isBytes(), dataType == FieldSpec.DataType.BYTES,
+          "isBytes() should return " + (dataType == FieldSpec.DataType.BYTES) + " for " + columnName);
 
       // Create default array based on type
       switch (fieldSpec.getDataType()) {
