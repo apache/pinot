@@ -85,6 +85,7 @@ public class FilterTransformer implements RecordTransformer {
           LOGGER.debug("Caught exception while executing filter function: {} for record: {}", _filterFunction,
               record.toString(), e);
           record.markIncomplete();
+          filteredRecords.add(record);
         }
       }
     }
