@@ -168,6 +168,7 @@ public class QueryDispatcher {
       submit(requestId, dispatchableSubPlan, timeoutMs, servers, queryOptions);
       QueryResult result = runReducer(dispatchableSubPlan, queryOptions, _mailboxService);
       if (result.getProcessingException() != null) {
+        LOGGER.warn("Query result includes processing exceptions. Trying to cancel the other opchains");
         MultiStageQueryStats statsFromCancel = cancelWithStats(requestId, servers);
         cancelled = true;
         return result.withStats(statsFromCancel);
@@ -207,6 +208,7 @@ public class QueryDispatcher {
     }
     // in case of known exceptions (timeout or query exception), we need can build here the erroneous QueryResult
     // that include the stats.
+    LOGGER.warn("Query failed with a known exception. Trying to cancel the other opchains");
     MultiStageQueryStats stats = cancelWithStats(requestId, servers);
     if (stats == null) {
       throw ex;

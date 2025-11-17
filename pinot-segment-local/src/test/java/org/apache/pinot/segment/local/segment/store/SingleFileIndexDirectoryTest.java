@@ -18,7 +18,6 @@
  */
 package org.apache.pinot.segment.local.segment.store;
 
-import com.google.common.collect.ImmutableMap;
 import java.io.ByteArrayOutputStream;
 import java.io.File;
 import java.io.IOException;
@@ -28,6 +27,7 @@ import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Map;
 import java.util.TreeMap;
 import java.util.TreeSet;
 import java.util.UUID;
@@ -311,17 +311,17 @@ public class SingleFileIndexDirectoryTest implements PinotBuffersAfterMethodChec
       FileUtils.touch(srcTmp);
     }
     File dstTmp = new File(TEMP_DIR, UUID.randomUUID().toString());
-    TreeMap<IndexKey, IndexEntry> indicesToCopy = new TreeMap<>(ImmutableMap
-        .of(new IndexKey("foo", StandardIndexes.inverted()),
-            new IndexEntry(new IndexKey("foo", StandardIndexes.inverted()), 0, 0),
-            new IndexKey("foo", StandardIndexes.forward()),
-            new IndexEntry(new IndexKey("foo", StandardIndexes.forward()), 0, 0),
-            new IndexKey("bar", StandardIndexes.forward()),
-            new IndexEntry(new IndexKey("bar", StandardIndexes.forward()), 0, 0),
-            new IndexKey("bar", StandardIndexes.dictionary()),
-            new IndexEntry(new IndexKey("bar", StandardIndexes.dictionary()), 0, 0),
-            new IndexKey("bar", StandardIndexes.json()),
-            new IndexEntry(new IndexKey("bar", StandardIndexes.json()), 0, 0)));
+    TreeMap<IndexKey, IndexEntry> indicesToCopy = new TreeMap<>(Map.of(
+        new IndexKey("foo", StandardIndexes.inverted()),
+        new IndexEntry(new IndexKey("foo", StandardIndexes.inverted()), 0, 0),
+        new IndexKey("foo", StandardIndexes.forward()),
+        new IndexEntry(new IndexKey("foo", StandardIndexes.forward()), 0, 0),
+        new IndexKey("bar", StandardIndexes.forward()),
+        new IndexEntry(new IndexKey("bar", StandardIndexes.forward()), 0, 0),
+        new IndexKey("bar", StandardIndexes.dictionary()),
+        new IndexEntry(new IndexKey("bar", StandardIndexes.dictionary()), 0, 0),
+        new IndexKey("bar", StandardIndexes.json()),
+        new IndexEntry(new IndexKey("bar", StandardIndexes.json()), 0, 0)));
     List<IndexEntry> retained = SingleFileIndexDirectory.copyIndices(srcTmp, dstTmp, indicesToCopy);
     List<IndexKey> retainedKeys = retained.stream().map(e -> e._key).collect(Collectors.toList());
     // The returned entries are sorted.

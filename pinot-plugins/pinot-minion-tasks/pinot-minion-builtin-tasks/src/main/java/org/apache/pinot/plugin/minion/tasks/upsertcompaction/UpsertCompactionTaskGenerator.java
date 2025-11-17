@@ -188,7 +188,8 @@ public class UpsertCompactionTaskGenerator extends BaseTaskGenerator {
         }
         Map<String, String> configs = new HashMap<>(getBaseTaskConfigs(tableConfig, List.of(segment.getSegmentName())));
         configs.put(MinionConstants.DOWNLOAD_URL_KEY, segment.getDownloadUrl());
-        configs.put(MinionConstants.UPLOAD_URL_KEY, _clusterInfoAccessor.getVipUrl() + "/segments");
+        configs.put(MinionConstants.UPLOAD_URL_KEY,
+            _clusterInfoAccessor.getVipUrlForLeadController(tableNameWithType) + "/segments");
         configs.put(MinionConstants.ORIGINAL_SEGMENT_CRC_KEY, String.valueOf(segment.getCrc()));
         configs.put(UpsertCompactionTask.VALID_DOC_IDS_TYPE, validDocIdsType.toString());
         configs.put(UpsertCompactionTask.IGNORE_CRC_MISMATCH_KEY,

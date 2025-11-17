@@ -22,7 +22,6 @@ import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Function;
 import com.google.common.base.Objects;
 import com.google.common.base.Ticker;
-import com.google.common.collect.ImmutableList;
 import com.google.common.collect.Iterators;
 import com.google.common.collect.Multimap;
 import com.google.common.collect.Multimaps;
@@ -188,7 +187,7 @@ public class QuantileDigest {
       checkArgument(quantile >= 0 && quantile <= 1, "quantile must be between [0,1]");
     }
 
-    final ImmutableList.Builder<Long> builder = ImmutableList.builder();
+    final List<Long> builder = new ArrayList<>();
     final PeekingIterator<Double> iterator = Iterators.peekingIterator(quantiles.iterator());
 
     postOrderTraversal(_root, new Callback() {
@@ -219,14 +218,14 @@ public class QuantileDigest {
       iterator.next();
     }
 
-    return builder.build();
+    return List.copyOf(builder);
   }
 
   /**
    * Gets the value at the specified quantile +/- maxError. The quantile must be in the range [0, 1]
    */
   public long getQuantile(double quantile) {
-    return getQuantiles(ImmutableList.of(quantile)).get(0);
+    return getQuantiles(List.of(quantile)).get(0);
   }
 
   /**
@@ -247,7 +246,7 @@ public class QuantileDigest {
   public List<Bucket> getHistogram(List<Long> bucketUpperBounds) {
     checkArgument(Ordering.natural().isOrdered(bucketUpperBounds), "buckets must be sorted in increasing order");
 
-    final ImmutableList.Builder<Bucket> builder = ImmutableList.builder();
+    final ArrayList<Bucket> builder = new ArrayList<>();
     final PeekingIterator<Long> iterator = Iterators.peekingIterator(bucketUpperBounds.iterator());
 
     final AtomicDouble sum = new AtomicDouble();
@@ -288,7 +287,7 @@ public class QuantileDigest {
       iterator.next();
     }
 
-    return builder.build();
+    return List.copyOf(builder);
   }
 
   public long getMin() {

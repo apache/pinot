@@ -33,7 +33,7 @@ import org.apache.pinot.query.runtime.plan.MultiStageQueryStats;
 import org.apache.pinot.query.runtime.plan.OpChainExecutionContext;
 import org.apache.pinot.segment.spi.memory.DataBuffer;
 import org.apache.pinot.spi.exception.QueryErrorCode;
-import org.apache.pinot.spi.exception.QueryException;
+import org.apache.pinot.spi.exception.TerminationException;
 import org.apache.pinot.spi.query.QueryThreadContext;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -390,7 +390,7 @@ public abstract class BlockingMultiStreamConsumer<E> implements AutoCloseable {
     @Override
     protected ReceivingMailbox.MseBlockWithStats onTimeout() {
       // Use the terminate exception when query is explicitly terminated.
-      QueryException terminateException = QueryThreadContext.getTerminateException();
+      TerminationException terminateException = QueryThreadContext.getTerminateException();
       if (terminateException != null) {
         return onException(terminateException.getErrorCode(), terminateException.getMessage());
       }
@@ -408,7 +408,7 @@ public abstract class BlockingMultiStreamConsumer<E> implements AutoCloseable {
     @Override
     protected ReceivingMailbox.MseBlockWithStats onException(Exception e) {
       // Use the terminate exception when query is explicitly terminated.
-      QueryException terminateException = QueryThreadContext.getTerminateException();
+      TerminationException terminateException = QueryThreadContext.getTerminateException();
       if (terminateException != null) {
         return onException(terminateException.getErrorCode(), terminateException.getMessage());
       }

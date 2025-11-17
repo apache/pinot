@@ -20,12 +20,12 @@
 package org.apache.pinot.plugin.filesystem;
 
 import com.google.common.base.Strings;
-import com.google.common.collect.ImmutableList;
 import java.io.File;
 import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.io.InputStream;
 import java.net.URI;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.function.Consumer;
 import org.apache.hadoop.conf.Configuration;
@@ -142,9 +142,9 @@ public class HadoopPinotFS extends BasePinotFS {
   @Override
   public String[] listFiles(URI fileUri, boolean recursive)
       throws IOException {
-    ImmutableList.Builder<String> builder = ImmutableList.builder();
+    ArrayList<String> builder = new ArrayList<>();
     visitFiles(fileUri, recursive, f -> builder.add(f.getPath().toString()));
-    String[] listedFiles = builder.build().toArray(new String[0]);
+    String[] listedFiles = builder.toArray(new String[0]);
     LOGGER.debug("Listed {} files from URI: {}, is recursive: {}", listedFiles.length, fileUri, recursive);
     return listedFiles;
   }
@@ -152,14 +152,14 @@ public class HadoopPinotFS extends BasePinotFS {
   @Override
   public List<FileMetadata> listFilesWithMetadata(URI fileUri, boolean recursive)
       throws IOException {
-    ImmutableList.Builder<FileMetadata> listBuilder = ImmutableList.builder();
+    ArrayList<FileMetadata> listBuilder = new ArrayList<>();
     visitFiles(fileUri, recursive, f -> {
       FileMetadata.Builder fileBuilder =
           new FileMetadata.Builder().setFilePath(f.getPath().toString()).setLastModifiedTime(f.getModificationTime())
               .setLength(f.getLen()).setIsDirectory(f.isDirectory());
       listBuilder.add(fileBuilder.build());
     });
-    ImmutableList<FileMetadata> listedFiles = listBuilder.build();
+    List<FileMetadata> listedFiles = List.copyOf(listBuilder);
     LOGGER.debug("Listed {} files from URI: {}, is recursive: {}", listedFiles.size(), fileUri, recursive);
     return listedFiles;
   }

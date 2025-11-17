@@ -20,7 +20,6 @@ package org.apache.pinot.segment.local.utils;
 
 import com.fasterxml.jackson.databind.node.JsonNodeFactory;
 import com.fasterxml.jackson.databind.node.ObjectNode;
-import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.Lists;
 import java.util.Arrays;
 import java.util.Collections;
@@ -873,9 +872,9 @@ public class TableConfigUtilsTest {
         streamIngestionConfigWithoutPauselessUniqueTopics);
     TableConfig tableConfigWithoutPauselessUniqueTopics = new TableConfigBuilder(TableType.REALTIME)
         .setTableName(TABLE_NAME)
-            .setTimeColumnName("timeColumn")
-            .setIngestionConfig(ingestionConfigWithoutPauselessUniqueTopics)
-            .build();
+        .setTimeColumnName("timeColumn")
+        .setIngestionConfig(ingestionConfigWithoutPauselessUniqueTopics)
+        .build();
     try {
       TableConfigUtils.validate(tableConfigWithoutPauselessUniqueTopics, schema);
     } catch (IllegalStateException e) {
@@ -1387,38 +1386,8 @@ public class TableConfigUtilsTest {
           + "with version >= 2 to use this feature.");
     }
 
-    tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName(TABLE_NAME)
-        .setNoDictionaryColumns(Arrays.asList("myCol2"))
-        .setInvertedIndexColumns(Arrays.asList("myCol2"))
-        .build();
-    try {
-      // Enable forward index disabled flag for a column with inverted index and disable dictionary
-      Map<String, String> fieldConfigProperties = new HashMap<>();
-      fieldConfigProperties.put(FieldConfig.FORWARD_INDEX_DISABLED, Boolean.TRUE.toString());
-      FieldConfig fieldConfig =
-          new FieldConfig("myCol2", FieldConfig.EncodingType.RAW, FieldConfig.IndexType.INVERTED, null, null, null,
-              fieldConfigProperties);
-      tableConfig.setFieldConfigList(Arrays.asList(fieldConfig));
-      TableConfigUtils.validate(tableConfig, schema);
-      fail("Should not be able to disable dictionary but keep inverted index");
-    } catch (Exception e) {
-      assertEquals(e.getMessage(), "Cannot create inverted index on column: myCol2 without dictionary");
-    }
-
-    // Tests the case when the field-config list marks a column as raw (non-dictionary) and enables
-    // inverted index on it
-    tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName(TABLE_NAME).build();
-    try {
-      FieldConfig fieldConfig =
-          new FieldConfig.Builder("myCol2").withIndexTypes(Arrays.asList(FieldConfig.IndexType.INVERTED))
-              .withEncodingType(FieldConfig.EncodingType.RAW)
-              .build();
-      tableConfig.setFieldConfigList(Arrays.asList(fieldConfig));
-      TableConfigUtils.validate(tableConfig, schema);
-      fail("Should not be able to disable dictionary but keep inverted index");
-    } catch (Exception e) {
-      assertEquals(e.getMessage(), "Cannot create inverted index on column: myCol2 without dictionary");
-    }
+    // Note: Inverted indexes are now supported on raw (non-dictionary) columns for numeric types like INT.
+    // These tests have been removed as the validation no longer fails for this case.
 
     tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName(TABLE_NAME)
         .setNoDictionaryColumns(Arrays.asList("myCol2"))
@@ -1761,18 +1730,11 @@ public class TableConfigUtilsTest {
       // expected
     }
 
-    List<String> columnList = Arrays.asList("myCol");
-    tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName(TABLE_NAME)
-        .setNoDictionaryColumns(columnList)
-        .setInvertedIndexColumns(columnList)
-        .build();
-    try {
-      TableConfigUtils.validate(tableConfig, schema);
-      fail("Should fail for valid column name in both no dictionary and inverted index column config");
-    } catch (Exception e) {
-      // expected
-    }
+    // Note: Inverted indexes are now supported on raw (non-dictionary) columns for STRING and numeric types.
+    // The test that expected failure for having a column in both no-dictionary and inverted-index config
+    // has been removed as this is now a valid configuration.
 
+    List<String> columnList = Arrays.asList("myCol");
     tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName(TABLE_NAME)
         .setJsonIndexColumns(Arrays.asList("non-existent-column"))
         .build();
@@ -1912,6 +1874,53 @@ public class TableConfigUtilsTest {
     } catch (Exception e) {
       // expected
     }
+  }
+
+  @Test
+  public void testValidateUpsertWithTierConfig() {
+    Schema schema = new Schema.SchemaBuilder().setSchemaName(TABLE_NAME)
+        .addSingleValueDimension("myCol", FieldSpec.DataType.STRING)
+        .setPrimaryKeyColumns(Lists.newArrayList("myCol"))
+        .build();
+    Map<String, String> streamConfigs = getStreamConfigs();
+    UpsertConfig upsertConfig = new UpsertConfig(UpsertConfig.Mode.FULL);
+    TableConfig tableConfig = new TableConfigBuilder(TableType.REALTIME).setTableName(TABLE_NAME)
+        .setUpsertConfig(upsertConfig)
+        .setRoutingConfig(
+            new RoutingConfig(null, null, RoutingConfig.STRICT_REPLICA_GROUP_INSTANCE_SELECTOR_TYPE, false))
+        .setTimeColumnName(TIME_COLUMN)
+        .setStreamConfigs(streamConfigs)
+        .setTierConfigList(Lists.newArrayList(
+            new TierConfig("tier1", TierFactory.FIXED_SEGMENT_SELECTOR_TYPE, null, Lists.newArrayList("seg0", "seg1"),
+                TierFactory.PINOT_SERVER_STORAGE_TYPE, "tier1_tag_OFFLINE", null, null)))
+        .build();
+
+    assertThrows("Tiered storage is not supported for Upsert/Dedup tables", IllegalStateException.class,
+        () -> TableConfigUtils.validateUpsertAndDedupConfig(tableConfig, schema));
+  }
+
+  @Test
+  public void testValidateDedupWithTierConfig() {
+    Schema schema = new Schema.SchemaBuilder().setSchemaName(TABLE_NAME)
+        .addSingleValueDimension("myCol", FieldSpec.DataType.STRING)
+        .setPrimaryKeyColumns(Lists.newArrayList("myCol"))
+        .build();
+    Map<String, String> streamConfigs = getStreamConfigs();
+    DedupConfig dedupConfig = new DedupConfig();
+    dedupConfig.setMetadataTTL(10);
+    TableConfig tableConfig = new TableConfigBuilder(TableType.REALTIME).setTableName(TABLE_NAME)
+        .setDedupConfig(dedupConfig)
+        .setRoutingConfig(
+            new RoutingConfig(null, null, RoutingConfig.STRICT_REPLICA_GROUP_INSTANCE_SELECTOR_TYPE, false))
+        .setTimeColumnName(TIME_COLUMN)
+        .setStreamConfigs(streamConfigs)
+        .setTierConfigList(Lists.newArrayList(
+            new TierConfig("tier1", TierFactory.FIXED_SEGMENT_SELECTOR_TYPE, null, Lists.newArrayList("seg0", "seg1"),
+                TierFactory.PINOT_SERVER_STORAGE_TYPE, "tier1_tag_OFFLINE", null, null)))
+        .build();
+
+    assertThrows("Tiered storage is not supported for Upsert/Dedup tables", IllegalStateException.class,
+        () -> TableConfigUtils.validateUpsertAndDedupConfig(tableConfig, schema));
   }
 
   @Test
@@ -2764,16 +2773,16 @@ public class TableConfigUtilsTest {
 
     TableConfig tableConfigWithInstancePartitionsMap =
         new TableConfigBuilder(TableType.OFFLINE).setTableName(TABLE_NAME)
-            .setInstancePartitionsMap(ImmutableMap.of(InstancePartitionsType.OFFLINE, "test_OFFLINE"))
+            .setInstancePartitionsMap(Map.of(InstancePartitionsType.OFFLINE, "test_OFFLINE"))
             .build();
 
     // Call validate with a table-config with instance partitions set but not instance assignment config
     TableConfigUtils.validateInstancePartitionsTypeMapConfig(tableConfigWithInstancePartitionsMap);
 
     TableConfig invalidTableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName(TABLE_NAME)
-        .setInstancePartitionsMap(ImmutableMap.of(InstancePartitionsType.OFFLINE, "test_OFFLINE"))
+        .setInstancePartitionsMap(Map.of(InstancePartitionsType.OFFLINE, "test_OFFLINE"))
         .setInstanceAssignmentConfigMap(
-            ImmutableMap.of(InstancePartitionsType.OFFLINE.toString(), instanceAssignmentConfig))
+            Map.of(InstancePartitionsType.OFFLINE.toString(), instanceAssignmentConfig))
         .build();
     try {
       // Call validate with instance partitions and config set for the same type
@@ -2964,7 +2973,7 @@ public class TableConfigUtilsTest {
         .getReplicaGroupPartitionConfig();
 
     TableConfig invalidTableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName(TABLE_NAME)
-        .setInstanceAssignmentConfigMap(ImmutableMap.of(TableType.OFFLINE.toString(), instanceAssignmentConfig))
+        .setInstanceAssignmentConfigMap(Map.of(TableType.OFFLINE.toString(), instanceAssignmentConfig))
         .build();
     invalidTableConfig.getValidationConfig().setReplicaGroupStrategyConfig(replicaGroupStrategyConfig);
 
@@ -3431,5 +3440,136 @@ public class TableConfigUtilsTest {
     assertTrue(TableConfigUtils.isRelevantToTenant(tableConfig, "serverTenant"));
     assertTrue(TableConfigUtils.isRelevantToTenant(tableConfig, "tierTag"));
     assertFalse(TableConfigUtils.isRelevantToTenant(tableConfig, "otherTenant"));
+  }
+
+  @Test
+  public void testValidateTierConfigsForDedupTable() {
+    Schema schema = new Schema.SchemaBuilder().setSchemaName(TABLE_NAME)
+        .addSingleValueDimension("myCol", FieldSpec.DataType.STRING)
+        .addDateTime(TIME_COLUMN, FieldSpec.DataType.LONG, "1:MILLISECONDS:EPOCH", "1:MILLISECONDS")
+        .build();
+    // Validate that table's timeColumn must be used as dedupTimeColumn.
+    DedupConfig dedupConfig = new DedupConfig();
+    dedupConfig.setDedupTimeColumn("foo");
+    TableConfig tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName(TABLE_NAME)
+        .setTimeColumnName(TIME_COLUMN)
+        .setDedupConfig(dedupConfig)
+        .build();
+    try {
+      TableConfigUtils.validateTTLAndTierConfigsForDedupTable(tableConfig, schema);
+      fail();
+    } catch (IllegalStateException e) {
+      assertEquals(e.getMessage(), "DedupTimeColumn: foo is different from table's timeColumn: timeColumn");
+    }
+    // Validate that time based segment selector must be used by tiers.
+    dedupConfig = new DedupConfig();
+    dedupConfig.setMetadataTTL(100);
+    tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName(TABLE_NAME)
+        .setTimeColumnName(TIME_COLUMN)
+        .setDedupConfig(dedupConfig)
+        .setTierConfigList(Lists.newArrayList(new TierConfig("tier1", TierFactory.FIXED_SEGMENT_SELECTOR_TYPE, "", null,
+            TierFactory.PINOT_SERVER_STORAGE_TYPE.toLowerCase(), "tier1_tag_OFFLINE", null, null)))
+        .build();
+    try {
+      TableConfigUtils.validateTTLAndTierConfigsForDedupTable(tableConfig, schema);
+      fail();
+    } catch (IllegalStateException e) {
+      assertEquals(e.getMessage(), "Time based segment selector is required but tier: tier1 uses selector: fixed");
+    }
+    // Validate that TTL must be smaller than min of segment ages of all segment selectors.
+    // Changing timeColumn time units to make sure TTL is converted to millisecond properly.
+    dedupConfig = new DedupConfig();
+    dedupConfig.setMetadataTTL(100);
+    tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName(TABLE_NAME)
+        .setTimeColumnName(TIME_COLUMN)
+        .setDedupConfig(dedupConfig)
+        .setTierConfigList(Lists.newArrayList(
+            new TierConfig("tier1", TierFactory.TIME_SEGMENT_SELECTOR_TYPE, "50s", null,
+                TierFactory.PINOT_SERVER_STORAGE_TYPE.toLowerCase(), "tier1_tag_OFFLINE", null, null),
+            new TierConfig("tier2", TierFactory.TIME_SEGMENT_SELECTOR_TYPE.toLowerCase(), "100s", null,
+                TierFactory.PINOT_SERVER_STORAGE_TYPE, "tier2_tag_OFFLINE", null, null)))
+        .build();
+    // Got TTL=100ms vs. minAge=50s, testing with timeColumn of ms/epoch
+    TableConfigUtils.validateTTLAndTierConfigsForDedupTable(tableConfig, schema);
+    // Got TTL=100s vs. minAge=50s, testing with timeColumn of sec/epoch
+    schema = new Schema.SchemaBuilder().setSchemaName(TABLE_NAME)
+        .addSingleValueDimension("myCol", FieldSpec.DataType.STRING)
+        .addDateTime(TIME_COLUMN, FieldSpec.DataType.LONG, "1:SECONDS:EPOCH", "1:SECONDS")
+        .build();
+    try {
+      TableConfigUtils.validateTTLAndTierConfigsForDedupTable(tableConfig, schema);
+      fail();
+    } catch (IllegalStateException e) {
+      assertEquals(e.getMessage(), "MetadataTTL: 100000(ms) must be smaller than the minimum segmentAge: 50000(ms)");
+    }
+    // Got TTL=50000ms vs. minAge=50000ms, testing with timeColumn of timestamp type
+    dedupConfig = new DedupConfig();
+    dedupConfig.setMetadataTTL(50000);
+    tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName(TABLE_NAME)
+        .setTimeColumnName(TIME_COLUMN)
+        .setDedupConfig(dedupConfig)
+        .setTierConfigList(Lists.newArrayList(
+            new TierConfig("tier1", TierFactory.TIME_SEGMENT_SELECTOR_TYPE, "50s", null,
+                TierFactory.PINOT_SERVER_STORAGE_TYPE.toLowerCase(), "tier1_tag_OFFLINE", null, null),
+            new TierConfig("tier2", TierFactory.TIME_SEGMENT_SELECTOR_TYPE.toLowerCase(), "100s", null,
+                TierFactory.PINOT_SERVER_STORAGE_TYPE, "tier2_tag_OFFLINE", null, null)))
+        .build();
+    schema = new Schema.SchemaBuilder().setSchemaName(TABLE_NAME)
+        .addSingleValueDimension("myCol", FieldSpec.DataType.STRING)
+        .addDateTime(TIME_COLUMN, FieldSpec.DataType.TIMESTAMP, "1:MILLISECONDS:EPOCH", "1:MILLISECONDS")
+        .build();
+    try {
+      TableConfigUtils.validateTTLAndTierConfigsForDedupTable(tableConfig, schema);
+      fail();
+    } catch (IllegalStateException e) {
+      assertEquals(e.getMessage(), "MetadataTTL: 50000(ms) must be smaller than the minimum segmentAge: 50000(ms)");
+    }
+  }
+
+  @Test
+  public void testValidateTaskConfigConflict() {
+    // Test that minNumSegmentsPerTask=1 with both UpsertCompactMergeTask and UpsertCompactionTask configured fails
+    Map<String, String> upsertCompactMergeConfig = new HashMap<>();
+    upsertCompactMergeConfig.put("bufferTimePeriod", "5d");
+    upsertCompactMergeConfig.put("minNumSegmentsPerTask", "1");
+
+    Map<String, String> upsertCompactionConfig = new HashMap<>();
+    upsertCompactionConfig.put("bufferTimePeriod", "5d");
+
+    Map<String, Map<String, String>> taskTypeConfigsMap = new HashMap<>();
+    taskTypeConfigsMap.put("UpsertCompactMergeTask", upsertCompactMergeConfig);
+    taskTypeConfigsMap.put("UpsertCompactionTask", upsertCompactionConfig);
+
+    TableConfig tableConfigWithConflict = new TableConfigBuilder(TableType.REALTIME)
+        .setTableName(TABLE_NAME)
+        .setTaskConfig(new org.apache.pinot.spi.config.table.TableTaskConfig(taskTypeConfigsMap))
+        .build();
+
+    assertThrows(IllegalStateException.class, () -> TableConfigUtils.validateTaskConfig(tableConfigWithConflict));
+
+    // Test that minNumSegmentsPerTask=2 with both tasks configured passes
+    upsertCompactMergeConfig.put("minNumSegmentsPerTask", "2");
+    taskTypeConfigsMap.put("UpsertCompactMergeTask", upsertCompactMergeConfig);
+
+    TableConfig tableConfigValid = new TableConfigBuilder(TableType.REALTIME)
+        .setTableName(TABLE_NAME)
+        .setTaskConfig(new org.apache.pinot.spi.config.table.TableTaskConfig(taskTypeConfigsMap))
+        .build();
+
+    // Should not throw
+    TableConfigUtils.validateTaskConfig(tableConfigValid);
+
+    // Test that only UpsertCompactMergeTask with minNumSegmentsPerTask=1 (without UpsertCompactionTask) passes
+    taskTypeConfigsMap.remove("UpsertCompactionTask");
+    upsertCompactMergeConfig.put("minNumSegmentsPerTask", "1");
+    taskTypeConfigsMap.put("UpsertCompactMergeTask", upsertCompactMergeConfig);
+
+    TableConfig tableConfigOnlyCompactMerge = new TableConfigBuilder(TableType.REALTIME)
+        .setTableName(TABLE_NAME)
+        .setTaskConfig(new org.apache.pinot.spi.config.table.TableTaskConfig(taskTypeConfigsMap))
+        .build();
+
+    // Should not throw
+    TableConfigUtils.validateTaskConfig(tableConfigOnlyCompactMerge);
   }
 }

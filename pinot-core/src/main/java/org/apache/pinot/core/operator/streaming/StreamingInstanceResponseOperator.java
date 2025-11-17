@@ -32,7 +32,6 @@ import org.apache.pinot.segment.spi.SegmentContext;
 import org.apache.pinot.spi.exception.QueryErrorCode;
 import org.apache.pinot.spi.exception.QueryErrorMessage;
 import org.apache.pinot.spi.exception.QueryException;
-import org.apache.pinot.spi.exception.TerminationException;
 import org.apache.pinot.spi.query.QueryThreadContext;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -91,11 +90,14 @@ public class StreamingInstanceResponseOperator extends InstanceResponseOperator 
         return buildInstanceResponseBlock(resultsBlock).toMetadataOnlyResponseBlock();
       }
     } catch (Throwable t) {
-      TerminationException terminateException = QueryThreadContext.getTerminateException();
-      if (terminateException != null) {
-        return new InstanceResponseBlock(new ExceptionResultsBlock(terminateException));
-      } else if (t instanceof QueryException) {
-        return new InstanceResponseBlock(new ExceptionResultsBlock((QueryException) t));
+      // First check terminate exception and use it as the results block if exists. We want to return the termination
+      // reason when query is explicitly terminated.
+      QueryException queryException = QueryThreadContext.getTerminateException();
+      if (queryException == null && t instanceof QueryException) {
+        queryException = (QueryException) t;
+      }
+      if (queryException != null) {
+        return new InstanceResponseBlock(new ExceptionResultsBlock(queryException));
       } else {
         LOGGER.error("Caught exception while streaming results (query: {})", _queryContext, t);
         return new InstanceResponseBlock(new ExceptionResultsBlock(QueryErrorMessage.safeMsg(QueryErrorCode.INTERNAL,

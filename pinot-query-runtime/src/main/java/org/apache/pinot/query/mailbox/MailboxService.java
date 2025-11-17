@@ -73,7 +73,17 @@ public class MailboxService {
   private final ChannelManager _channelManager;
   @Nullable private final TlsConfig _tlsConfig;
   @Nullable private final QueryAccessControlFactory _accessControlFactory;
-  private final int _maxByteStringSize;
+  /**
+   * The max inbound message size for the gRPC server.
+   *
+   * If we try to send a message larger than this value, the gRPC server will throw an exception and close the
+   * connection.
+   *
+   * The {@link GrpcSendingMailbox} will split the data block into smaller chunks to fit into this limit, but a very
+   * small limit (lower than hundred of KBs) will cause performance degradation and may even fail, given that some extra
+   * bloating is added by gRPC and protobuf.
+   */
+  private final int _maxInboundMessageSize;
 
   private GrpcMailboxServer _grpcMailboxServer;
 
@@ -93,21 +103,12 @@ public class MailboxService {
     _instanceType = instanceType;
     _config = config;
     _tlsConfig = tlsConfig;
-    int maxInboundMessageSize = config.getProperty(
+    _maxInboundMessageSize = config.getProperty(
         CommonConstants.MultiStageQueryRunner.KEY_OF_MAX_INBOUND_QUERY_DATA_BLOCK_SIZE_BYTES,
         CommonConstants.MultiStageQueryRunner.DEFAULT_MAX_INBOUND_QUERY_DATA_BLOCK_SIZE_BYTES
     );
-    _channelManager = new ChannelManager(tlsConfig, maxInboundMessageSize, getIdleTimeout(config));
+    _channelManager = new ChannelManager(tlsConfig, _maxInboundMessageSize, getIdleTimeout(config));
     _accessControlFactory = accessControlFactory;
-    boolean splitBlocks = config.getProperty(
-        CommonConstants.MultiStageQueryRunner.KEY_OF_ENABLE_DATA_BLOCK_PAYLOAD_SPLIT,
-        CommonConstants.MultiStageQueryRunner.DEFAULT_ENABLE_DATA_BLOCK_PAYLOAD_SPLIT);
-    if (splitBlocks) {
-      // so far we ensure payload is not bigger than maxBlockSize/2, we can fine tune this later
-      _maxByteStringSize = Math.max(maxInboundMessageSize / 2, 1);
-    } else {
-      _maxByteStringSize = 0;
-    }
     LOGGER.info("Initialized MailboxService with hostname: {}, port: {}", hostname, port);
   }
 
@@ -151,7 +152,7 @@ public class MailboxService {
       return new InMemorySendingMailbox(mailboxId, this, deadlineMs, statMap);
     } else {
       return new GrpcSendingMailbox(mailboxId, _channelManager, hostname, port, deadlineMs, statMap,
-          _maxByteStringSize);
+          _maxInboundMessageSize);
     }
   }
 

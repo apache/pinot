@@ -44,16 +44,22 @@ public class ValueAggregatorFactory {
     switch (aggregationType) {
       case COUNT:
         return new CountValueAggregator();
+      case COUNTMV:
+        return new CountMVValueAggregator();
       case MIN:
         return new MinValueAggregator();
       case MAX:
         return new MaxValueAggregator();
       case SUM:
         return new SumValueAggregator();
+      case SUMMV:
+        return new SumMVValueAggregator();
       case SUMPRECISION:
         return new SumPrecisionValueAggregator(arguments);
       case AVG:
         return new AvgValueAggregator();
+      case AVGMV:
+        return new AvgMVValueAggregator();
       case MINMAXRANGE:
         return new MinMaxRangeValueAggregator();
       case DISTINCTCOUNTBITMAP:
@@ -99,16 +105,22 @@ public class ValueAggregatorFactory {
     switch (aggregationType) {
       case COUNT:
         return CountValueAggregator.AGGREGATED_VALUE_TYPE;
+      case COUNTMV:
+        return CountMVValueAggregator.AGGREGATED_VALUE_TYPE;
       case MIN:
         return MinValueAggregator.AGGREGATED_VALUE_TYPE;
       case MAX:
         return MaxValueAggregator.AGGREGATED_VALUE_TYPE;
       case SUM:
         return SumValueAggregator.AGGREGATED_VALUE_TYPE;
+      case SUMMV:
+        return SumMVValueAggregator.AGGREGATED_VALUE_TYPE;
       case SUMPRECISION:
         return SumPrecisionValueAggregator.AGGREGATED_VALUE_TYPE;
       case AVG:
         return AvgValueAggregator.AGGREGATED_VALUE_TYPE;
+      case AVGMV:
+        return AvgMVValueAggregator.AGGREGATED_VALUE_TYPE;
       case MINMAXRANGE:
         return MinMaxRangeValueAggregator.AGGREGATED_VALUE_TYPE;
       case DISTINCTCOUNTBITMAP:

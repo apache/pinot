@@ -89,7 +89,7 @@ public class SegmentAssignmentUtilsTest {
     Map<String, Map<String, String>> newAssignment =
         SegmentAssignmentUtils.rebalanceNonReplicaGroupBasedTable(currentAssignment, newInstances, NUM_REPLICAS);
     // There should be 100 segments assigned
-    assertEquals(currentAssignment.size(), numSegments);
+    assertEquals(newAssignment.size(), numSegments);
     // Each segment should have 3 replicas
     for (Map<String, String> instanceStateMap : newAssignment.values()) {
       assertEquals(instanceStateMap.size(), NUM_REPLICAS);
@@ -205,6 +205,74 @@ public class SegmentAssignmentUtilsTest {
       assertEquals(numSegmentsToMovePerInstance.get(newInstanceNamePrefix + i), IntIntPair.of(30, 0));
       assertEquals(numSegmentsToMovePerInstance.get(INSTANCE_NAME_PREFIX + i), IntIntPair.of(0, 30));
     }
+  }
+
+
+  @Test
+  public void testRebalanceTableWithHelixAutoRebalanceStrategyEdgeCase() {
+    int numSegments = 90;
+    List<String> segments = SegmentAssignmentTestUtils.getNameList(SEGMENT_NAME_PREFIX, numSegments);
+    // testing when numInstances == numReplicas
+    int numInstances = NUM_REPLICAS;
+    List<String> instances = SegmentAssignmentTestUtils.getNameList(INSTANCE_NAME_PREFIX, numInstances);
+
+    // Uniformly spray segments to the instances (i0 represents instance_0, s0 represents segment_0)
+    // [    i0,    i1,    i2]
+    //  s0(r0) s0(r1) s0(r2)
+    //  s1(r0) s1(r1) s1(r2)
+    //  s2(r0) s2(r1) s2(r2)
+    //  ...
+    Map<String, Map<String, String>> currentAssignment = new TreeMap<>();
+    int assignedInstanceId = 0;
+    for (String segmentName : segments) {
+      List<String> instancesAssigned = new ArrayList<>(NUM_REPLICAS);
+      for (int replicaId = 0; replicaId < NUM_REPLICAS; replicaId++) {
+        instancesAssigned.add(instances.get(assignedInstanceId));
+        assignedInstanceId = (assignedInstanceId + 1) % numInstances;
+      }
+      currentAssignment.put(segmentName,
+          SegmentAssignmentUtils.getInstanceStateMap(instancesAssigned, SegmentStateModel.ONLINE));
+    }
+
+    // There should be 90 segments assigned
+    assertEquals(currentAssignment.size(), numSegments);
+    // Each segment should have 3 replicas
+    for (Map<String, String> instanceStateMap : currentAssignment.values()) {
+      assertEquals(instanceStateMap.size(), NUM_REPLICAS);
+    }
+    // Each instance should have 90 segments assigned
+    int[] numSegmentsAssignedPerInstance =
+        SegmentAssignmentUtils.getNumSegmentsAssignedPerInstance(currentAssignment, instances);
+    int[] expectedNumSegmentsAssignedPerInstance = new int[numInstances];
+    int numSegmentsPerInstance = numSegments * NUM_REPLICAS / numInstances;
+    Arrays.fill(expectedNumSegmentsAssignedPerInstance, numSegmentsPerInstance);
+    assertEquals(numSegmentsAssignedPerInstance, expectedNumSegmentsAssignedPerInstance);
+    // Current assignment should already be balanced
+    assertEquals(SegmentAssignmentUtils.rebalanceNonReplicaGroupBasedTable(currentAssignment, instances, NUM_REPLICAS),
+        currentAssignment);
+
+    // Reduce replicas from 3 to 2
+    int newReplicas = 2;
+
+    Map<String, Map<String, String>> newAssignment =
+        SegmentAssignmentUtils.rebalanceNonReplicaGroupBasedTable(currentAssignment, instances, newReplicas);
+    // There should be 90 segments assigned
+    assertEquals(newAssignment.size(), numSegments);
+    // Each segment should have 2 replicas now
+    for (Map<String, String> instanceStateMap : newAssignment.values()) {
+      assertEquals(instanceStateMap.size(), newReplicas);
+    }
+    numSegmentsAssignedPerInstance =
+        SegmentAssignmentUtils.getNumSegmentsAssignedPerInstance(newAssignment, instances);
+    assertEquals(numSegmentsAssignedPerInstance[0], 60);
+    assertEquals(numSegmentsAssignedPerInstance[1], 60);
+    assertEquals(numSegmentsAssignedPerInstance[2], 60);
+    Map<String, IntIntPair> numSegmentsToMovePerInstance =
+        SegmentAssignmentUtils.getNumSegmentsToMovePerInstance(currentAssignment, newAssignment);
+    assertEquals(numSegmentsToMovePerInstance.size(), numInstances);
+    assertEquals(numSegmentsToMovePerInstance.get(INSTANCE_NAME_PREFIX + 0), IntIntPair.of(0, 30));
+    assertEquals(numSegmentsToMovePerInstance.get(INSTANCE_NAME_PREFIX + 1), IntIntPair.of(0, 30));
+    assertEquals(numSegmentsToMovePerInstance.get(INSTANCE_NAME_PREFIX + 2), IntIntPair.of(0, 30));
   }
 
   @Test

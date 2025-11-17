@@ -24,6 +24,7 @@ import org.apache.pinot.spi.stream.PartitionGroupConsumptionStatus;
 import org.apache.pinot.spi.stream.StreamConfig;
 import org.apache.pinot.spi.stream.StreamConsumerFactory;
 import org.apache.pinot.spi.stream.StreamMetadataProvider;
+import org.apache.pinot.spi.utils.retry.RetryPolicy;
 
 
 public class KafkaConsumerFactory extends StreamConsumerFactory {
@@ -45,9 +46,25 @@ public class KafkaConsumerFactory extends StreamConsumerFactory {
   }
 
   @Override
+  public StreamMetadataProvider createStreamMetadataProvider(String clientId, boolean concurrentAccessExpected) {
+    if (concurrentAccessExpected) {
+      return new SynchronizedKafkaStreamMetadataProvider(clientId, _streamConfig);
+    } else {
+      return createStreamMetadataProvider(clientId);
+    }
+  }
+
+  @Override
   public PartitionGroupConsumer createPartitionGroupConsumer(String clientId,
       PartitionGroupConsumptionStatus partitionGroupConsumptionStatus) {
     return new KafkaPartitionLevelConsumer(clientId, _streamConfig,
         partitionGroupConsumptionStatus.getStreamPartitionGroupId());
+  }
+
+  @Override
+  public PartitionGroupConsumer createPartitionGroupConsumer(String clientId,
+      PartitionGroupConsumptionStatus partitionGroupConsumptionStatus, RetryPolicy retryPolicy) {
+    return new KafkaPartitionLevelConsumer(clientId, _streamConfig,
+        partitionGroupConsumptionStatus.getStreamPartitionGroupId(), retryPolicy);
   }
 }

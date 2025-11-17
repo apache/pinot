@@ -18,7 +18,6 @@
  */
 package org.apache.pinot.common.config;
 
-import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.ImmutableSet;
 import java.util.Map;
 import java.util.Set;
@@ -37,11 +36,11 @@ import org.slf4j.LoggerFactory;
 public class DefaultClusterConfigChangeHandler implements ClusterConfigChangeListener, PinotClusterConfigProvider {
   private static final Logger LOGGER = LoggerFactory.getLogger(DefaultClusterConfigChangeHandler.class);
 
-  private volatile ImmutableMap<String, String> _properties;
+  private volatile Map<String, String> _properties;
   private final CopyOnWriteArrayList<PinotClusterConfigChangeListener> _clusterConfigChangeListeners;
 
   public DefaultClusterConfigChangeHandler() {
-    _properties = ImmutableMap.of();
+    _properties = Map.of();
     _clusterConfigChangeListeners = new CopyOnWriteArrayList<>();
   }
 
@@ -54,14 +53,14 @@ public class DefaultClusterConfigChangeHandler implements ClusterConfigChangeLis
 
   private synchronized void process(Map<String, String> properties) {
     Set<String> changedProperties = ImmutableSet.copyOf(getChangedProperties(_properties, properties));
-    _properties = ImmutableMap.copyOf(properties);
+    _properties = Map.copyOf(properties);
     for (PinotClusterConfigChangeListener listener : _clusterConfigChangeListeners) {
       listener.onChange(changedProperties, _properties);
     }
   }
 
   @Override
-  public ImmutableMap<String, String> getClusterConfigs() {
+  public Map<String, String> getClusterConfigs() {
     return _properties;
   }
 
