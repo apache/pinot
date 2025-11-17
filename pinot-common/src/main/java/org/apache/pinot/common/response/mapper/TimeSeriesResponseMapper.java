@@ -22,8 +22,9 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import org.apache.pinot.common.datatable.DataTable;
+import org.apache.pinot.common.datatable.StatMap;
 import org.apache.pinot.common.response.BrokerResponse;
-import org.apache.pinot.common.response.broker.BrokerResponseNative;
+import org.apache.pinot.common.response.broker.BrokerResponseNativeV2;
 import org.apache.pinot.common.response.broker.QueryProcessingException;
 import org.apache.pinot.common.response.broker.ResultTable;
 import org.apache.pinot.common.utils.DataSchema;
@@ -46,7 +47,7 @@ public class TimeSeriesResponseMapper {
    * This method converts the time series data into a format compatible with the broker response.
    */
   public static BrokerResponse toBrokerResponse(TimeSeriesBlock timeSeriesBlock) {
-    BrokerResponseNative brokerResponse = new BrokerResponseNative();
+    BrokerResponseNativeV2 brokerResponse = new BrokerResponseNativeV2();
     if (timeSeriesBlock == null) {
       throw new IllegalArgumentException("timeSeriesBlock must not be null");
     }
@@ -64,7 +65,7 @@ public class TimeSeriesResponseMapper {
   }
 
   public static BrokerResponse toBrokerResponse(QueryException e) {
-    BrokerResponseNative brokerResponse = new BrokerResponseNative();
+    BrokerResponseNativeV2 brokerResponse = new BrokerResponseNativeV2();
     brokerResponse.addException(QueryProcessingException.fromQueryException(e));
     return brokerResponse;
   }
@@ -127,30 +128,40 @@ public class TimeSeriesResponseMapper {
     return rows;
   }
 
-  private static void setStats(BrokerResponseNative brokerResponse, Map<String, String> metadata) {
+  private static void setStats(BrokerResponseNativeV2 brokerResponse, Map<String, String> metadata) {
     if (metadata == null || metadata.isEmpty()) {
       return;
     }
-    brokerResponse.setNumDocsScanned(getLongMetadataValue(metadata, DataTable.MetadataKey.NUM_DOCS_SCANNED));
-    brokerResponse.setNumEntriesScannedInFilter(
+
+    StatMap<BrokerResponseNativeV2.StatKey> map = new StatMap<>(BrokerResponseNativeV2.StatKey.class);
+    map.merge(BrokerResponseNativeV2.StatKey.NUM_DOCS_SCANNED, getLongMetadataValue(metadata,
+        DataTable.MetadataKey.NUM_DOCS_SCANNED));
+    map.merge(BrokerResponseNativeV2.StatKey.NUM_ENTRIES_SCANNED_IN_FILTER,
         getLongMetadataValue(metadata, DataTable.MetadataKey.NUM_ENTRIES_SCANNED_IN_FILTER));
-    brokerResponse.setNumEntriesScannedPostFilter(
+    map.merge(BrokerResponseNativeV2.StatKey.NUM_ENTRIES_SCANNED_POST_FILTER,
         getLongMetadataValue(metadata, DataTable.MetadataKey.NUM_ENTRIES_SCANNED_POST_FILTER));
-    brokerResponse.setNumSegmentsQueried(getLongMetadataValue(metadata, DataTable.MetadataKey.NUM_SEGMENTS_QUERIED));
-    brokerResponse.setNumSegmentsProcessed(
-        getLongMetadataValue(metadata, DataTable.MetadataKey.NUM_SEGMENTS_PROCESSED));
-    brokerResponse.setNumSegmentsMatched(getLongMetadataValue(metadata, DataTable.MetadataKey.NUM_SEGMENTS_MATCHED));
-    brokerResponse.setNumConsumingSegmentsMatched(
-        getLongMetadataValue(metadata, DataTable.MetadataKey.NUM_CONSUMING_SEGMENTS_MATCHED));
-    brokerResponse.setNumConsumingSegmentsProcessed(
-        getLongMetadataValue(metadata, DataTable.MetadataKey.NUM_CONSUMING_SEGMENTS_PROCESSED));
-    brokerResponse.setNumConsumingSegmentsQueried(
-        getLongMetadataValue(metadata, DataTable.MetadataKey.NUM_CONSUMING_SEGMENTS_QUERIED));
-    brokerResponse.setTotalDocs(
+    map.merge(BrokerResponseNativeV2.StatKey.NUM_SEGMENTS_QUERIED,
+        getIntMetadataValue(metadata, DataTable.MetadataKey.NUM_SEGMENTS_QUERIED));
+    map.merge(BrokerResponseNativeV2.StatKey.NUM_SEGMENTS_PROCESSED,
+        getIntMetadataValue(metadata, DataTable.MetadataKey.NUM_SEGMENTS_PROCESSED));
+    map.merge(BrokerResponseNativeV2.StatKey.NUM_SEGMENTS_MATCHED,
+        getIntMetadataValue(metadata, DataTable.MetadataKey.NUM_SEGMENTS_MATCHED));
+    map.merge(BrokerResponseNativeV2.StatKey.NUM_CONSUMING_SEGMENTS_MATCHED,
+        getIntMetadataValue(metadata, DataTable.MetadataKey.NUM_CONSUMING_SEGMENTS_MATCHED));
+    map.merge(BrokerResponseNativeV2.StatKey.NUM_CONSUMING_SEGMENTS_PROCESSED,
+        getIntMetadataValue(metadata, DataTable.MetadataKey.NUM_CONSUMING_SEGMENTS_PROCESSED));
+    map.merge(BrokerResponseNativeV2.StatKey.NUM_CONSUMING_SEGMENTS_QUERIED,
+        getIntMetadataValue(metadata, DataTable.MetadataKey.NUM_CONSUMING_SEGMENTS_QUERIED));
+    map.merge(BrokerResponseNativeV2.StatKey.TOTAL_DOCS,
         getLongMetadataValue(metadata, DataTable.MetadataKey.TOTAL_DOCS));
+    brokerResponse.addBrokerStats(map);
   }
 
   private static long getLongMetadataValue(Map<String, String> metadata, DataTable.MetadataKey key) {
     return Long.parseLong(metadata.getOrDefault(key.getName(), "0"));
+  }
+
+  private static int getIntMetadataValue(Map<String, String> metadata, DataTable.MetadataKey key) {
+    return Integer.parseInt(metadata.getOrDefault(key.getName(), "0"));
   }
 }

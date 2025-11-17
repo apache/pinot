@@ -23,7 +23,7 @@ import java.util.Collections;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
-import org.apache.pinot.common.response.broker.BrokerResponseNative;
+import org.apache.pinot.common.response.broker.BrokerResponseNativeV2;
 import org.apache.pinot.common.response.broker.QueryProcessingException;
 import org.apache.pinot.common.response.broker.ResultTable;
 import org.apache.pinot.common.utils.DataSchema;
@@ -64,8 +64,8 @@ public class TimeSeriesResponseMapperTest {
 
   @Test
   public void toBrokerResponseWithException() {
-    BrokerResponseNative resp = (BrokerResponseNative) TimeSeriesResponseMapper.toBrokerResponse(
-      new QueryException(QueryErrorCode.INTERNAL, "time series exception"));
+    BrokerResponseNativeV2 resp = (BrokerResponseNativeV2) TimeSeriesResponseMapper.toBrokerResponse(
+        new QueryException(QueryErrorCode.INTERNAL, "time series exception"));
     List<QueryProcessingException> exceptions = resp.getExceptions();
     assertEquals(exceptions.size(), 1);
     assertEquals(exceptions.get(0).getErrorCode(), QueryErrorCode.INTERNAL.getId());
@@ -77,7 +77,7 @@ public class TimeSeriesResponseMapperTest {
     when(_timeBuckets.getTimeBuckets()).thenReturn(new Long[]{100L, 200L, 300L});
     when(_block.getTimeBuckets()).thenReturn(_timeBuckets);
 
-    BrokerResponseNative resp = (BrokerResponseNative) TimeSeriesResponseMapper.toBrokerResponse(_block);
+    BrokerResponseNativeV2 resp = (BrokerResponseNativeV2) TimeSeriesResponseMapper.toBrokerResponse(_block);
     ResultTable table = resp.getResultTable();
     assertNotNull(table);
 
@@ -118,7 +118,7 @@ public class TimeSeriesResponseMapperTest {
     seriesMap.put(123456789L, Arrays.asList(s1, s2));
     when(_block.getSeriesMap()).thenReturn(seriesMap);
 
-    BrokerResponseNative resp = (BrokerResponseNative) TimeSeriesResponseMapper.toBrokerResponse(_block);
+    BrokerResponseNativeV2 resp = (BrokerResponseNativeV2) TimeSeriesResponseMapper.toBrokerResponse(_block);
     ResultTable table = resp.getResultTable();
     DataSchema schema = table.getDataSchema();
 

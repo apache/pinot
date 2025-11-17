@@ -36,8 +36,6 @@ import org.apache.pinot.tsdb.spi.series.BaseTimeSeriesBuilder;
 import org.apache.pinot.tsdb.spi.series.TimeSeries;
 import org.apache.pinot.tsdb.spi.series.TimeSeriesBlock;
 import org.apache.pinot.tsdb.spi.series.TimeSeriesBuilderFactory;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 
 /**
@@ -53,8 +51,6 @@ import org.slf4j.LoggerFactory;
  * different servers, we will simply append them to the list, creating a union.
  */
 public class TimeSeriesExchangeReceiveOperator extends BaseTimeSeriesOperator {
-
-  private static final Logger LOGGER = LoggerFactory.getLogger(TimeSeriesExchangeReceiveOperator.class);
 
   private static final List<DataTable.MetadataKey> ADDITIVE_STATS_KEYS = List.of(
     DataTable.MetadataKey.NUM_DOCS_SCANNED,
@@ -178,17 +174,15 @@ public class TimeSeriesExchangeReceiveOperator extends BaseTimeSeriesOperator {
   private void mergeStats(Map<String, String> aggregatedStats, Map<String, String> metadata) {
     for (DataTable.MetadataKey statKey : ADDITIVE_STATS_KEYS) {
       String key = statKey.getName();
-      String existingValue = aggregatedStats.get(key);
+      String existingValue = aggregatedStats.getOrDefault(key, "0");
       String newValue = metadata.get(key);
       if (newValue != null) {
         try {
           long newLong = Long.parseLong(newValue);
-          long existingLong = existingValue != null ? Long.parseLong(existingValue) : 0L;
+          long existingLong = Long.parseLong(existingValue);
           aggregatedStats.put(key, Long.toString(existingLong + newLong));
         } catch (NumberFormatException e) {
           // Ignore malformed stats
-          LOGGER.warn("Failed to parse metadata key: {} with value: {}. Ignoring it in stats aggregation",
-              key, newValue);
         }
       }
     }
