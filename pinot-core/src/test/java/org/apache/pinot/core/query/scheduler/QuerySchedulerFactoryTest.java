@@ -20,16 +20,15 @@ package org.apache.pinot.core.query.scheduler;
 
 import com.google.common.util.concurrent.ListenableFuture;
 import java.util.concurrent.atomic.LongAccumulator;
-import org.apache.pinot.common.metrics.ServerMetrics;
 import org.apache.pinot.core.query.executor.QueryExecutor;
 import org.apache.pinot.core.query.request.ServerQueryRequest;
 import org.apache.pinot.core.query.scheduler.fcfs.BoundedFCFSScheduler;
 import org.apache.pinot.core.query.scheduler.fcfs.FCFSQueryScheduler;
 import org.apache.pinot.core.query.scheduler.resources.UnboundedResourceManager;
 import org.apache.pinot.core.query.scheduler.tokenbucket.TokenPriorityScheduler;
-import org.apache.pinot.spi.accounting.ThreadResourceUsageAccountant;
+import org.apache.pinot.spi.accounting.ThreadAccountant;
+import org.apache.pinot.spi.accounting.ThreadAccountantUtils;
 import org.apache.pinot.spi.env.PinotConfiguration;
-import org.apache.pinot.spi.trace.Tracing;
 import org.testng.annotations.Test;
 
 import static org.mockito.Mockito.mock;
@@ -40,47 +39,45 @@ public class QuerySchedulerFactoryTest {
 
   @Test
   public void testQuerySchedulerFactory() {
+    PinotConfiguration config = new PinotConfiguration();
+    String instanceId = "serverId";
     QueryExecutor queryExecutor = mock(QueryExecutor.class);
-    ServerMetrics serverMetrics = mock(ServerMetrics.class);
+    ThreadAccountant threadAccountant = ThreadAccountantUtils.getNoOpAccountant();
     LongAccumulator latestQueryTime = mock(LongAccumulator.class);
 
-    PinotConfiguration config = new PinotConfiguration();
-    ThreadResourceUsageAccountant accountant = new Tracing.DefaultThreadResourceUsageAccountant();
     config.setProperty(QuerySchedulerFactory.ALGORITHM_NAME_CONFIG_KEY, QuerySchedulerFactory.FCFS_ALGORITHM);
     QueryScheduler queryScheduler =
-        QuerySchedulerFactory.create(config, queryExecutor, serverMetrics, latestQueryTime, accountant);
+        QuerySchedulerFactory.create(config, instanceId, queryExecutor, threadAccountant, latestQueryTime);
     assertTrue(queryScheduler instanceof FCFSQueryScheduler);
 
     config.setProperty(QuerySchedulerFactory.ALGORITHM_NAME_CONFIG_KEY, QuerySchedulerFactory.TOKEN_BUCKET_ALGORITHM);
-    queryScheduler = QuerySchedulerFactory.create(config, queryExecutor, serverMetrics, latestQueryTime, accountant);
+    queryScheduler = QuerySchedulerFactory.create(config, instanceId, queryExecutor, threadAccountant, latestQueryTime);
     assertTrue(queryScheduler instanceof TokenPriorityScheduler);
 
     config.setProperty(QuerySchedulerFactory.ALGORITHM_NAME_CONFIG_KEY, QuerySchedulerFactory.BOUNDED_FCFS_ALGORITHM);
-    queryScheduler = QuerySchedulerFactory.create(config, queryExecutor, serverMetrics, latestQueryTime, accountant);
+    queryScheduler = QuerySchedulerFactory.create(config, instanceId, queryExecutor, threadAccountant, latestQueryTime);
     assertTrue(queryScheduler instanceof BoundedFCFSScheduler);
 
     config.setProperty(QuerySchedulerFactory.ALGORITHM_NAME_CONFIG_KEY,
         QuerySchedulerFactory.BINARY_WORKLOAD_ALGORITHM);
-    queryScheduler = QuerySchedulerFactory.create(config, queryExecutor, serverMetrics, latestQueryTime, accountant);
+    queryScheduler = QuerySchedulerFactory.create(config, instanceId, queryExecutor, threadAccountant, latestQueryTime);
     assertTrue(queryScheduler instanceof BinaryWorkloadScheduler);
 
     config.setProperty(QuerySchedulerFactory.ALGORITHM_NAME_CONFIG_KEY, TestQueryScheduler.class.getName());
-    queryScheduler = QuerySchedulerFactory.create(config, queryExecutor, serverMetrics, latestQueryTime, accountant);
+    queryScheduler = QuerySchedulerFactory.create(config, instanceId, queryExecutor, threadAccountant, latestQueryTime);
     assertTrue(queryScheduler instanceof TestQueryScheduler);
 
     config.setProperty(QuerySchedulerFactory.ALGORITHM_NAME_CONFIG_KEY,
         QuerySchedulerFactory.WORKLOAD_SCHEDULER_ALGORITHM);
-    queryScheduler = QuerySchedulerFactory.create(config, queryExecutor, serverMetrics, latestQueryTime, accountant);
+    queryScheduler = QuerySchedulerFactory.create(config, instanceId, queryExecutor, threadAccountant, latestQueryTime);
     assertTrue(queryScheduler instanceof WorkloadScheduler);
   }
 
   public static final class TestQueryScheduler extends QueryScheduler {
 
-    public TestQueryScheduler(PinotConfiguration config, QueryExecutor queryExecutor, ServerMetrics serverMetrics,
-        LongAccumulator latestQueryTime, ThreadResourceUsageAccountant resourceUsageAccountant) {
-      super(config, queryExecutor,
-          new UnboundedResourceManager(config, resourceUsageAccountant), serverMetrics,
-          latestQueryTime);
+    public TestQueryScheduler(PinotConfiguration config, String instanceId, QueryExecutor queryExecutor,
+        ThreadAccountant threadAccountant, LongAccumulator latestQueryTime) {
+      super(config, instanceId, queryExecutor, threadAccountant, latestQueryTime, new UnboundedResourceManager(config));
     }
 
     @Override

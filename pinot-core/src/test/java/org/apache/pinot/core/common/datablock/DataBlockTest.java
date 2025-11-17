@@ -18,7 +18,6 @@
  */
 package org.apache.pinot.core.common.datablock;
 
-import com.google.common.collect.ImmutableList;
 import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.util.ArrayList;
@@ -39,7 +38,7 @@ import org.testng.annotations.Test;
 
 public class DataBlockTest {
   private static final List<ColumnDataType> EXCLUDE_DATA_TYPES =
-      ImmutableList.of(ColumnDataType.OBJECT, ColumnDataType.JSON, ColumnDataType.BYTES, ColumnDataType.BYTES_ARRAY);
+      List.of(ColumnDataType.OBJECT, ColumnDataType.JSON, ColumnDataType.BYTES, ColumnDataType.BYTES_ARRAY);
   private static final int TEST_ROW_COUNT = 5;
 
   @Test

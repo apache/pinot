@@ -228,6 +228,10 @@ const QueryPage = () => {
     columns: [],
     records: [],
   });
+  const [logicalTableList, setLogicalTableList] = useState<TableData>({
+    columns: [],
+    records: [],
+  });
   const [showErrorType, setShowErrorType] = useState<ErrorViewType>(ErrorViewType.EXCEPTION);
 
   const [tableSchema, setTableSchema] = useState<TableData>({
@@ -451,6 +455,8 @@ const QueryPage = () => {
   const fetchData = async () => {
     const result = await PinotMethodUtils.getQueryTablesList({bothType: false});
     setTableList(result);
+    const logicalTablesResult = await PinotMethodUtils.getQueryLogicalTablesList();
+    setLogicalTableList(logicalTablesResult);
     setFetching(false);
   };
 
@@ -526,6 +532,7 @@ const QueryPage = () => {
       <Grid item>
         <QuerySideBar
           tableList={tableList}
+          logicalTableList={logicalTableList}
           fetchSQLData={fetchSQLData}
           tableSchema={tableSchema}
           selectedTable={selectedTable}

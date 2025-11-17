@@ -19,7 +19,6 @@
 package org.apache.pinot.controller.helix.core.minion;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
-import com.google.common.collect.ImmutableMap;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Collections;
@@ -276,7 +275,7 @@ public class PinotHelixTaskResourceManagerTest {
       // mapped to jsonized org.apache.pinot.minion.event.MinionEventObserver
       httpResp._httpResponses.put(
           String.format("%s/tasks/subtask/state/progress?subTaskState=IN_PROGRESS", workerEndpoint),
-          JsonUtils.objectToString(ImmutableMap.of(subtaskIds[2 * i], "", subtaskIds[2 * i + 1], "")));
+          JsonUtils.objectToString(Map.of(subtaskIds[2 * i], "", subtaskIds[2 * i + 1], "")));
     }
     httpResp._failedResponseCount = 1;
     ArgumentCaptor<List<String>> workerEndpointCaptor = ArgumentCaptor.forClass(List.class);
@@ -414,20 +413,23 @@ public class PinotHelixTaskResourceManagerTest {
 
     // Test filtering by table
     Map<String, PinotHelixTaskResourceManager.TaskDebugInfo> result =
-        mgr.getTasksDebugInfoByTable(taskType, tableNameWithType, 0);
-
-    // Verify that only tasks for the target table are returned
+        mgr.getTasksDebugInfoByTable(taskType, tableNameWithType, 1);
     assertEquals(result.size(), 1);
     assertTrue(result.containsKey(taskName));
+    verifyResultFilteredByTable(result.get(taskName), "task1", TaskPartitionState.RUNNING, tableNameWithType);
 
-    PinotHelixTaskResourceManager.TaskDebugInfo taskDebugInfo = result.get(taskName);
-    assertEquals(taskDebugInfo.getTaskState(), TaskState.IN_PROGRESS);
+    PinotHelixTaskResourceManager.TaskDebugInfo result2 =
+        mgr.getTaskDebugInfo(taskName, otherTableNameWithType, 1);
+    verifyResultFilteredByTable(result2, "task2", TaskPartitionState.COMPLETED, otherTableNameWithType);
+  }
 
+  private static void verifyResultFilteredByTable(PinotHelixTaskResourceManager.TaskDebugInfo taskDebugInfo,
+      String taskId, TaskPartitionState state, String tableNameWithType) {
     // Verify that only subtasks for the target table are included
     List<PinotHelixTaskResourceManager.SubtaskDebugInfo> subtaskInfos = taskDebugInfo.getSubtaskInfos();
     assertEquals(subtaskInfos.size(), 1);
-    assertEquals(subtaskInfos.get(0).getTaskId(), "task1");
-    assertEquals(subtaskInfos.get(0).getState(), TaskPartitionState.RUNNING);
+    assertEquals(subtaskInfos.get(0).getTaskId(), taskId);
+    assertEquals(subtaskInfos.get(0).getState(), state);
 
     // Verify the task config belongs to the target table
     PinotTaskConfig taskConfig = subtaskInfos.get(0).getTaskConfig();
@@ -555,12 +557,12 @@ public class PinotHelixTaskResourceManagerTest {
     PinotHelixTaskResourceManager mgr = new PinotHelixTaskResourceManager(helixResourceManager, taskDriver);
 
     // Test getTaskDebugInfo with table filtering (should not filter when tableNameWithType is null)
-    PinotHelixTaskResourceManager.TaskDebugInfo result = mgr.getTaskDebugInfo(taskName, 0);
+    PinotHelixTaskResourceManager.TaskDebugInfo result = mgr.getTaskDebugInfo(taskName, null, 1);
 
     // Verify that all subtasks are included when no table filtering is applied
     assertEquals(result.getTaskState(), TaskState.IN_PROGRESS);
     List<PinotHelixTaskResourceManager.SubtaskDebugInfo> subtaskInfos = result.getSubtaskInfos();
-    assertEquals(subtaskInfos.size(), 1); // Only running tasks are shown with verbosity = 0
+    assertEquals(subtaskInfos.size(), 2);
 
     // Verify the subtask is included
     assertEquals(subtaskInfos.get(0).getTaskId(), "task1");
@@ -589,7 +591,7 @@ public class PinotHelixTaskResourceManagerTest {
     PinotHelixTaskResourceManager mgr = new PinotHelixTaskResourceManager(helixResourceManager, taskDriver);
 
     // Test getTaskDebugInfo with null job context
-    PinotHelixTaskResourceManager.TaskDebugInfo result = mgr.getTaskDebugInfo(taskName, 0);
+    PinotHelixTaskResourceManager.TaskDebugInfo result = mgr.getTaskDebugInfo(taskName, null, 0);
 
     // Verify that basic task info is still returned even with null job context
     assertEquals(result.getTaskState(), TaskState.IN_PROGRESS);

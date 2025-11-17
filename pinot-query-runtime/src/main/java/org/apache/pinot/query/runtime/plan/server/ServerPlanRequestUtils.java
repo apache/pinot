@@ -19,7 +19,6 @@
 package org.apache.pinot.query.runtime.plan.server;
 
 import com.google.common.base.Preconditions;
-import com.google.common.collect.ImmutableList;
 import java.math.BigDecimal;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -59,7 +58,6 @@ import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.TableType;
 import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.Schema;
-import org.apache.pinot.spi.query.QueryThreadContext;
 import org.apache.pinot.spi.utils.ByteArray;
 import org.apache.pinot.spi.utils.CommonConstants;
 import org.apache.pinot.spi.utils.builder.TableNameBuilder;
@@ -77,7 +75,7 @@ public class ServerPlanRequestUtils {
 
   private static final int DEFAULT_LEAF_NODE_LIMIT = Integer.MAX_VALUE;
   private static final List<String> QUERY_REWRITERS_CLASS_NAMES =
-      ImmutableList.of(PredicateComparisonRewriter.class.getName(),
+      List.of(PredicateComparisonRewriter.class.getName(),
           NonAggregationGroupByToDistinctQueryRewriter.class.getName(), RlsFiltersRewriter.class.getName());
   private static final List<QueryRewriter> QUERY_REWRITERS =
       new ArrayList<>(QueryRewriterFactory.getQueryRewriters(QUERY_REWRITERS_CLASS_NAMES));
@@ -227,9 +225,6 @@ public class ServerPlanRequestUtils {
     Preconditions.checkArgument(segmentList == null || tableRouteInfoList == null,
         "Either segmentList OR tableRouteInfoList should be set");
 
-    // Making a unique requestId for leaf stages otherwise it causes problem on stats/metrics/tracing.
-    long requestId = (executionContext.getRequestId() << 16) + ((long) executionContext.getStageId() << 8) + (
-        tableType == TableType.REALTIME ? 1 : 0);
     // 1. Modify the PinotQuery
     pinotQuery.getDataSource().setTableName(tableNameWithType);
     if (timeBoundaryInfo != null) {
@@ -238,7 +233,7 @@ public class ServerPlanRequestUtils {
     for (QueryRewriter queryRewriter : QUERY_REWRITERS) {
       pinotQuery = queryRewriter.rewrite(pinotQuery);
     }
-    QUERY_OPTIMIZER.optimize(pinotQuery, tableConfig, schema);
+    QUERY_OPTIMIZER.optimize(pinotQuery, schema);
 
     // 2. Update query options according to requestMetadataMap
     updateQueryOptions(pinotQuery, executionContext);
@@ -252,9 +247,13 @@ public class ServerPlanRequestUtils {
 
     // 4. Create InstanceRequest with segmentList
     InstanceRequest instanceRequest = new InstanceRequest();
+    // Making a unique requestId for leaf stages otherwise it causes problem on stats/metrics/tracing.
+    // TODO: Revisit if this is still necessary
+    long requestId = (executionContext.getRequestId() << 16) + ((long) executionContext.getStageId() << 8) + (
+        tableType == TableType.REALTIME ? 1 : 0);
     instanceRequest.setRequestId(requestId);
-    instanceRequest.setCid(QueryThreadContext.getCid());
-    instanceRequest.setBrokerId("unknown");
+    instanceRequest.setCid(executionContext.getCid());
+    instanceRequest.setBrokerId(executionContext.getBrokerId());
     instanceRequest.setEnableTrace(executionContext.isTraceEnabled());
     /*
      * If segmentList is not null, it means that the query is for a single table and we can directly set the segments.
@@ -429,7 +428,7 @@ public class ServerPlanRequestUtils {
     LogicalTableContext logicalTableContext = instanceDataManager.getLogicalTableContext(logicalTableName);
     Preconditions.checkNotNull(logicalTableContext,
         String.format("LogicalTableContext not found for logical table name: %s, query context id: %s",
-            logicalTableName, QueryThreadContext.getCid()));
+            logicalTableName, executionContext.getCid()));
 
     Map<String, List<String>> logicalTableSegmentsMap =
         executionContext.getWorkerMetadata().getLogicalTableSegmentsMap();

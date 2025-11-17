@@ -147,6 +147,9 @@ public class PinotQueryRuleSets {
       PinotAggregateReduceFunctionsRule
           .instanceWithDescription(PlannerRuleNames.AGGREGATE_REDUCE_FUNCTIONS),
 
+      PinotAggregateFunctionRewriteRule
+          .instanceWithDescription(PlannerRuleNames.AGGREGATE_FUNCTION_REWRITE),
+
       // convert CASE-style filtered aggregates into true filtered aggregates
       // put it after AGGREGATE_REDUCE_FUNCTIONS where SUM is converted to SUM0
       AggregateCaseToFilterRule.Config.DEFAULT

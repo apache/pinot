@@ -19,9 +19,7 @@
 package org.apache.pinot.query.runtime.operator.exchange;
 
 import com.google.common.base.Preconditions;
-import java.io.IOException;
 import java.util.List;
-import java.util.concurrent.TimeoutException;
 import java.util.function.Function;
 import org.apache.pinot.query.mailbox.SendingMailbox;
 import org.apache.pinot.query.runtime.blocks.BlockSplitter;
@@ -45,8 +43,7 @@ class SingletonExchange extends BlockExchange {
   }
 
   @Override
-  protected void route(List<SendingMailbox> sendingMailboxes, MseBlock.Data block)
-      throws IOException, TimeoutException {
+  protected void route(List<SendingMailbox> sendingMailboxes, MseBlock.Data block) {
     sendBlock(sendingMailboxes.get(0), block);
   }
 }

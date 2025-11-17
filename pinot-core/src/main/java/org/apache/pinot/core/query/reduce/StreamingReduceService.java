@@ -57,6 +57,7 @@ public class StreamingReduceService extends BaseReduceService {
     super(config);
   }
 
+  /// [org.apache.pinot.spi.query.QueryThreadContext] must already be set up before calling this method.
   public BrokerResponseNative reduceOnStreamResponse(BrokerRequest brokerRequest,
       Map<ServerRoutingInstance, Iterator<Server.ServerResponse>> serverResponseMap, long reduceTimeOutMs,
       BrokerMetrics brokerMetrics)

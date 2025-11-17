@@ -391,4 +391,8 @@ public class SegmentDictionaryCreator implements IndexCreator {
   @Override
   public void close() {
   }
+
+  public File getDictionaryFile() {
+    return _dictionaryFile;
+  }
 }

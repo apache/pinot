@@ -220,9 +220,17 @@ public class AggregationFunctionFactory {
             return new MinStringAggregationFunction(arguments, nullHandlingEnabled);
           case MAXSTRING:
             return new MaxStringAggregationFunction(arguments, nullHandlingEnabled);
+          case MINLONG:
+            return new MinLongAggregationFunction(arguments, nullHandlingEnabled);
+          case MAXLONG:
+            return new MaxLongAggregationFunction(arguments, nullHandlingEnabled);
           case SUM:
           case SUM0:
             return new SumAggregationFunction(arguments, nullHandlingEnabled);
+          case SUMINT:
+            return new SumIntAggregationFunction(arguments, nullHandlingEnabled);
+          case SUMLONG:
+            return new SumLongAggregationFunction(arguments, nullHandlingEnabled);
           case SUMPRECISION:
             return new SumPrecisionAggregationFunction(arguments, nullHandlingEnabled);
           case AVG:
@@ -260,16 +268,19 @@ public class AggregationFunctionFactory {
           }
           case LISTAGG: {
             Preconditions.checkArgument(numArguments == 2 || numArguments == 3,
-                "LISTAGG expects 2 arguments, got: %s. The function can be used as "
-                    + "listAgg([distinct] expression, 'separator')", numArguments);
+                "LISTAGG expects 2 or 3 arguments, got: %s. The function can be used as "
+                    + "listAgg(expression, 'separator'[, true|false])", numArguments);
             ExpressionContext separatorExpression = arguments.get(1);
             Preconditions.checkArgument(separatorExpression.getType() == ExpressionContext.Type.LITERAL,
                 "LISTAGG expects the 2nd argument to be literal, got: %s. The function can be used as "
-                    + "listAgg([distinct] expression, 'separator')", separatorExpression.getType());
+                    + "listAgg(expression, 'separator'[, true|false])", separatorExpression.getType());
             String separator = separatorExpression.getLiteral().getStringValue();
             boolean isDistinct = false;
             if (numArguments == 3) {
               ExpressionContext isDistinctListAggExp = arguments.get(2);
+              Preconditions.checkArgument(isDistinctListAggExp.getType() == ExpressionContext.Type.LITERAL,
+                  "LISTAGG expects the 3rd argument to be a boolean literal (true/false), got: %s. The function can "
+                      + "be used as listAgg(expression, 'separator'[, true|false])", isDistinctListAggExp.getType());
               isDistinct = isDistinctListAggExp.getLiteral().getBooleanValue();
             }
             if (isDistinct) {
@@ -376,6 +387,8 @@ public class AggregationFunctionFactory {
             return new DistinctCountRawHLLAggregationFunction(arguments);
           case DISTINCTCOUNTSMARTHLL:
             return new DistinctCountSmartHLLAggregationFunction(arguments);
+          case DISTINCTCOUNTSMARTHLLPLUS:
+            return new DistinctCountSmartHLLPlusAggregationFunction(arguments);
           case DISTINCTCOUNTSMARTULL:
             return new DistinctCountSmartULLAggregationFunction(arguments);
           case FASTHLL:

@@ -18,8 +18,6 @@
  */
 package org.apache.pinot.core.routing;
 
-import com.google.common.collect.ImmutableList;
-import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.ImmutableSet;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -60,28 +58,28 @@ import static org.testng.Assert.assertTrue;
 public class BaseTableRouteTest {
   //@formatter:off
   public static final Map<String, List<String>> SERVER1_SEGMENTS =
-      ImmutableMap.of(
-          "a_REALTIME", ImmutableList.of("a1", "a2"),
-          "b_REALTIME", ImmutableList.of("b1"),
-          "c_OFFLINE", ImmutableList.of("c1"),
-          "d_OFFLINE", ImmutableList.of("d1"),
-          "e_OFFLINE", ImmutableList.of("e1"),
-          "hybrid_o_disabled_OFFLINE", ImmutableList.of("hod1"),
-          "hybrid_r_disabled_REALTIME", ImmutableList.of("hrd1"),
-          "hybrid_o_disabled_REALTIME", ImmutableList.of("hor1"),
-          "hybrid_r_disabled_OFFLINE", ImmutableList.of("hro1"));
+      Map.of(
+          "a_REALTIME", List.of("a1", "a2"),
+          "b_REALTIME", List.of("b1"),
+          "c_OFFLINE", List.of("c1"),
+          "d_OFFLINE", List.of("d1"),
+          "e_OFFLINE", List.of("e1"),
+          "hybrid_o_disabled_OFFLINE", List.of("hod1"),
+          "hybrid_r_disabled_REALTIME", List.of("hrd1"),
+          "hybrid_o_disabled_REALTIME", List.of("hor1"),
+          "hybrid_r_disabled_OFFLINE", List.of("hro1"));
   public static final Map<String, List<String>> SERVER2_SEGMENTS =
-      ImmutableMap.of(
-          "a_REALTIME", ImmutableList.of("a3"),
-          "b_OFFLINE", ImmutableList.of("b2"),
-          "c_OFFLINE", ImmutableList.of("c2", "c3"),
-          "d_OFFLINE", ImmutableList.of("d3"),
-          "e_REALTIME", ImmutableList.of("e2"),
-          "e_OFFLINE", ImmutableList.of("e3"),
-          "hybrid_o_disabled_OFFLINE", ImmutableList.of("hod2"),
-          "hybrid_r_disabled_REALTIME", ImmutableList.of("hrd2"),
-          "hybrid_o_disabled_REALTIME", ImmutableList.of("hor2"),
-          "hybrid_r_disabled_OFFLINE", ImmutableList.of("hro2"));
+      Map.of(
+          "a_REALTIME", List.of("a3"),
+          "b_OFFLINE", List.of("b2"),
+          "c_OFFLINE", List.of("c2", "c3"),
+          "d_OFFLINE", List.of("d3"),
+          "e_REALTIME", List.of("e2"),
+          "e_OFFLINE", List.of("e3"),
+          "hybrid_o_disabled_OFFLINE", List.of("hod2"),
+          "hybrid_r_disabled_REALTIME", List.of("hrd2"),
+          "hybrid_o_disabled_REALTIME", List.of("hor2"),
+          "hybrid_r_disabled_OFFLINE", List.of("hro2"));
   //@formatter:on
 
   public static final Map<String, Schema> TABLE_SCHEMAS = new HashMap<>();

@@ -54,7 +54,7 @@ import org.apache.pinot.segment.spi.index.reader.JsonIndexReader;
 import org.apache.pinot.segment.spi.memory.PinotDataBuffer;
 import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.exception.BadQueryRequestException;
-import org.apache.pinot.spi.trace.Tracing;
+import org.apache.pinot.spi.query.QueryThreadContext;
 import org.apache.pinot.spi.utils.JsonUtils;
 import org.apache.pinot.sql.parsers.CalciteSqlParser;
 import org.roaringbitmap.IntConsumer;
@@ -541,8 +541,9 @@ public class ImmutableJsonIndexReader implements JsonIndexReader {
       }
 
       if (!docIds.isEmpty()) {
+        QueryThreadContext.checkTerminationAndSampleUsagePeriodically(result.size(),
+            "ImmutableJsonIndexReader.getMatchingFlattenedDocsMap");
         result.put(key.substring(jsonPathKey.length() + 1), docIds);
-        Tracing.ThreadAccountantOps.sampleAndCheckInterruptionPeriodically(result.size());
       }
     }
 

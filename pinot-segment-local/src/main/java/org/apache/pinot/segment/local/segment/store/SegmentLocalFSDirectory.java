@@ -34,6 +34,7 @@ import org.apache.pinot.segment.spi.creator.SegmentVersion;
 import org.apache.pinot.segment.spi.index.IndexType;
 import org.apache.pinot.segment.spi.index.metadata.SegmentMetadataImpl;
 import org.apache.pinot.segment.spi.index.multicolumntext.MultiColumnTextIndexConstants;
+import org.apache.pinot.segment.spi.loader.SegmentDirectoryLoaderContext;
 import org.apache.pinot.segment.spi.memory.PinotDataBuffer;
 import org.apache.pinot.segment.spi.store.ColumnIndexDirectory;
 import org.apache.pinot.segment.spi.store.SegmentDirectory;
@@ -62,6 +63,7 @@ public class SegmentLocalFSDirectory extends SegmentDirectory {
   private final File _segmentDirectory;
   private final SegmentLock _segmentLock;
   private final ReadMode _readMode;
+  private final SegmentDirectoryLoaderContext _segmentDirectoryLoaderContext;
   private SegmentMetadataImpl _segmentMetadata;
   private ColumnIndexDirectory _columnIndexDirectory;
   private StarTreeIndexReader _starTreeIndexReader;
@@ -75,15 +77,29 @@ public class SegmentLocalFSDirectory extends SegmentDirectory {
     _segmentDirectory = null;
     _segmentLock = new SegmentLock();
     _readMode = null;
+    _segmentDirectoryLoaderContext = null;
   }
 
   public SegmentLocalFSDirectory(File directory, ReadMode readMode)
       throws IOException, ConfigurationException {
-    this(directory, new SegmentMetadataImpl(directory), readMode);
+    this(directory, new SegmentMetadataImpl(directory), null, readMode);
+  }
+
+  public SegmentLocalFSDirectory(File directory, @Nullable SegmentDirectoryLoaderContext segmentDirectoryLoaderContext,
+      ReadMode readMode)
+      throws IOException, ConfigurationException {
+    this(directory, new SegmentMetadataImpl(directory), segmentDirectoryLoaderContext, readMode);
+  }
+
+  public SegmentLocalFSDirectory(File directory, SegmentMetadataImpl metadata, ReadMode readMode)
+      throws IOException, ConfigurationException {
+    this(directory, metadata, null, readMode);
   }
 
   @VisibleForTesting
-  public SegmentLocalFSDirectory(File directoryFile, SegmentMetadataImpl metadata, ReadMode readMode) {
+  public SegmentLocalFSDirectory(File directoryFile, SegmentMetadataImpl metadata,
+      @Nullable SegmentDirectoryLoaderContext segmentDirectoryLoaderContext, ReadMode readMode) {
+    _segmentDirectoryLoaderContext = segmentDirectoryLoaderContext;
 
     Preconditions.checkNotNull(directoryFile);
     Preconditions.checkNotNull(metadata);
@@ -260,7 +276,8 @@ public class SegmentLocalFSDirectory extends SegmentDirectory {
         break;
       case v3:
         try {
-          _columnIndexDirectory = new SingleFileIndexDirectory(_segmentDirectory, _segmentMetadata, _readMode);
+          _columnIndexDirectory = new SingleFileIndexDirectory(_segmentDirectory, _segmentMetadata,
+              _segmentDirectoryLoaderContext, _readMode);
         } catch (ConfigurationException e) {
           LOGGER.error("Failed to create columnar index directory", e);
           throw new RuntimeException(e);

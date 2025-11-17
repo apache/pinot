@@ -28,8 +28,8 @@ import org.apache.pinot.core.operator.BaseOperator;
 import org.apache.pinot.core.operator.ExecutionStatistics;
 import org.apache.pinot.core.operator.blocks.results.SelectionResultsBlock;
 import org.apache.pinot.core.operator.query.EmptySelectionOperator;
-import org.apache.pinot.core.operator.query.SelectionPartiallyOrderedByAscOperator;
 import org.apache.pinot.core.operator.query.SelectionPartiallyOrderedByDescOperation;
+import org.apache.pinot.core.operator.query.SelectionPartiallyOrderedByLinearOperator;
 import org.apache.pinot.spi.accounting.ThreadResourceUsageProvider;
 import org.testng.annotations.Test;
 
@@ -264,11 +264,10 @@ public class InnerSegmentSelectionSingleValueQueriesTest extends BaseSingleValue
   }
 
   @Test
-  public void testSelectionOrderBySortedColumn() {
-    // Test query order by single sorted column in ascending order
+  public void testSelectionOrderBySingleSortedColumnAsc() {
     String orderBy = " ORDER BY column5";
     BaseOperator<SelectionResultsBlock> selectionOrderByOperator = getOperator(SELECTION_QUERY + orderBy);
-    assertTrue(selectionOrderByOperator instanceof SelectionPartiallyOrderedByAscOperator);
+    assertTrue(selectionOrderByOperator instanceof SelectionPartiallyOrderedByLinearOperator);
     SelectionResultsBlock resultsBlock = selectionOrderByOperator.nextBlock();
     ExecutionStatistics executionStatistics = selectionOrderByOperator.getExecutionStatistics();
     assertEquals(executionStatistics.getNumDocsScanned(), 10L);
@@ -285,137 +284,231 @@ public class InnerSegmentSelectionSingleValueQueriesTest extends BaseSingleValue
     Object[] lastRow = selectionResult.get(9);
     assertEquals(lastRow.length, 3);
     assertEquals(lastRow[0], "gFuH");
+  }
 
-    // Test query order by single sorted column in descending order
-    orderBy = " ORDER BY column5 DESC";
-    selectionOrderByOperator = getOperator(SELECTION_QUERY + orderBy);
-    assertTrue(selectionOrderByOperator instanceof SelectionPartiallyOrderedByDescOperation);
-    resultsBlock = selectionOrderByOperator.nextBlock();
-    executionStatistics = selectionOrderByOperator.getExecutionStatistics();
+  @Test
+  public void testSelectionOrderBySingleSortedColumnDescDidOrder() {
+    String orderBy = " ORDER BY column5 DESC";
+    BaseOperator<SelectionResultsBlock> selectionOrderByOperator = getOperator(
+        "SET allowReverseOrder = false; " + SELECTION_QUERY + orderBy);
+    assertTrue(selectionOrderByOperator instanceof SelectionPartiallyOrderedByDescOperation, "Expected: "
+        + SelectionPartiallyOrderedByLinearOperator.class + ", found: " + selectionOrderByOperator.getClass());
+    SelectionResultsBlock resultsBlock = selectionOrderByOperator.nextBlock();
+    ExecutionStatistics executionStatistics = selectionOrderByOperator.getExecutionStatistics();
     assertEquals(executionStatistics.getNumDocsScanned(), 30000L);
     assertEquals(executionStatistics.getNumEntriesScannedInFilter(), 0L);
     // 30000 * (3 columns)
     assertEquals(executionStatistics.getNumEntriesScannedPostFilter(), 90000L);
     assertEquals(executionStatistics.getNumTotalDocs(), 30000L);
-    dataSchema = resultsBlock.getDataSchema();
+    DataSchema dataSchema = resultsBlock.getDataSchema();
     assertEquals(dataSchema.getColumnNames(), new String[]{"column5", "column1", "column11"});
     assertEquals(dataSchema.getColumnDataTypes(),
         new ColumnDataType[]{ColumnDataType.STRING, ColumnDataType.INT, ColumnDataType.STRING});
-    selectionResult = resultsBlock.getRows();
+    List<Object[]> selectionResult = resultsBlock.getRows();
     assertEquals(selectionResult.size(), 10);
-    lastRow = selectionResult.get(9);
+    Object[] lastRow = selectionResult.get(9);
     assertEquals(lastRow.length, 3);
     assertEquals(lastRow[0], "gFuH");
+  }
 
-    // Test query order by all sorted columns in ascending order
+  @Test
+  public void testSelectionOrderBySingleSortedColumnDescReverseOrder() {
+    String orderBy = " ORDER BY column5 DESC";
+    BaseOperator<SelectionResultsBlock> selectionOrderByOperator = getOperator(
+        "SET allowReverseOrder = true; " + SELECTION_QUERY + orderBy);
+    assertTrue(selectionOrderByOperator instanceof SelectionPartiallyOrderedByLinearOperator, "Expected: "
+        + SelectionPartiallyOrderedByLinearOperator.class + ", found: " + selectionOrderByOperator.getClass());
+    SelectionResultsBlock resultsBlock = selectionOrderByOperator.nextBlock();
+    ExecutionStatistics executionStatistics = selectionOrderByOperator.getExecutionStatistics();
+    assertEquals(executionStatistics.getNumDocsScanned(), 10L);
+    assertEquals(executionStatistics.getNumEntriesScannedInFilter(), 0L);
+    // 10 * (3 columns)
+    assertEquals(executionStatistics.getNumEntriesScannedPostFilter(), 30L);
+    assertEquals(executionStatistics.getNumTotalDocs(), 30000L);
+    DataSchema dataSchema = resultsBlock.getDataSchema();
+    assertEquals(dataSchema.getColumnNames(), new String[]{"column5", "column1", "column11"});
+    assertEquals(dataSchema.getColumnDataTypes(),
+        new ColumnDataType[]{ColumnDataType.STRING, ColumnDataType.INT, ColumnDataType.STRING});
+    List<Object[]> selectionResult = resultsBlock.getRows();
+    assertEquals(selectionResult.size(), 10);
+    Object[] lastRow = selectionResult.get(9);
+    assertEquals(lastRow.length, 3);
+    assertEquals(lastRow[0], "gFuH");
+  }
+
+  @Test
+  public void testSelectionOrderByAllSortedColumnsAsc() {
     String query = "SELECT column5, daysSinceEpoch FROM testTable ORDER BY column5, daysSinceEpoch";
-    selectionOrderByOperator = getOperator(query);
-    assertTrue(selectionOrderByOperator instanceof SelectionPartiallyOrderedByAscOperator);
-    resultsBlock = selectionOrderByOperator.nextBlock();
-    executionStatistics = selectionOrderByOperator.getExecutionStatistics();
+    BaseOperator<SelectionResultsBlock> selectionOrderByOperator = getOperator(query);
+    assertTrue(selectionOrderByOperator instanceof SelectionPartiallyOrderedByLinearOperator);
+    SelectionResultsBlock resultsBlock = selectionOrderByOperator.nextBlock();
+    ExecutionStatistics executionStatistics = selectionOrderByOperator.getExecutionStatistics();
     assertEquals(executionStatistics.getNumDocsScanned(), 10L);
     assertEquals(executionStatistics.getNumEntriesScannedInFilter(), 0L);
     // 10 * (2 columns)
     assertEquals(executionStatistics.getNumEntriesScannedPostFilter(), 20L);
     assertEquals(executionStatistics.getNumTotalDocs(), 30000L);
-    dataSchema = resultsBlock.getDataSchema();
+    DataSchema dataSchema = resultsBlock.getDataSchema();
     assertEquals(dataSchema.getColumnNames(), new String[]{"column5", "daysSinceEpoch"});
     assertEquals(dataSchema.getColumnDataTypes(), new ColumnDataType[]{ColumnDataType.STRING, ColumnDataType.INT});
-    selectionResult = resultsBlock.getRows();
+    List<Object[]> selectionResult = resultsBlock.getRows();
     assertEquals(selectionResult.size(), 10);
-    lastRow = selectionResult.get(9);
+    Object[] lastRow = selectionResult.get(9);
     assertEquals(lastRow.length, 2);
     assertEquals(lastRow[0], "gFuH");
     assertEquals(lastRow[1], 126164076);
+  }
 
-    // Test query order by all sorted columns in descending order
-    query = "SELECT column5 FROM testTable ORDER BY column5 DESC, daysSinceEpoch DESC";
-    selectionOrderByOperator = getOperator(query);
+  @Test
+  public void testSelectionOrderByAllSortedColumnsDescDidOrder() {
+    String query = "SET allowReverseOrder = false;"
+        + "SELECT column5 "
+        + "FROM testTable "
+        + "ORDER BY column5 DESC, daysSinceEpoch DESC";
+    BaseOperator<SelectionResultsBlock> selectionOrderByOperator = getOperator(query);
     assertTrue(selectionOrderByOperator instanceof SelectionPartiallyOrderedByDescOperation);
-    resultsBlock = selectionOrderByOperator.nextBlock();
-    executionStatistics = selectionOrderByOperator.getExecutionStatistics();
+    SelectionResultsBlock resultsBlock = selectionOrderByOperator.nextBlock();
+    ExecutionStatistics executionStatistics = selectionOrderByOperator.getExecutionStatistics();
     assertEquals(executionStatistics.getNumDocsScanned(), 30000L);
     assertEquals(executionStatistics.getNumEntriesScannedInFilter(), 0L);
     // 30000 * (2 columns)
     assertEquals(executionStatistics.getNumEntriesScannedPostFilter(), 60000L);
     assertEquals(executionStatistics.getNumTotalDocs(), 30000L);
-    dataSchema = resultsBlock.getDataSchema();
+    DataSchema dataSchema = resultsBlock.getDataSchema();
     assertEquals(dataSchema.getColumnNames(), new String[]{"column5", "daysSinceEpoch"});
     assertEquals(dataSchema.getColumnDataTypes(), new ColumnDataType[]{ColumnDataType.STRING, ColumnDataType.INT});
-    selectionResult = resultsBlock.getRows();
+    List<Object[]> selectionResult = resultsBlock.getRows();
     assertEquals(selectionResult.size(), 10);
-    lastRow = selectionResult.get(9);
+    Object[] lastRow = selectionResult.get(9);
     assertEquals(lastRow.length, 2);
     assertEquals(lastRow[0], "gFuH");
     assertEquals(lastRow[1], 167572854);
+  }
 
-    // Test query order by one sorted column in ascending order, the other sorted column in descending order
-    query = "SELECT daysSinceEpoch FROM testTable ORDER BY column5, daysSinceEpoch DESC";
-    selectionOrderByOperator = getOperator(query);
-    assertTrue(selectionOrderByOperator instanceof SelectionPartiallyOrderedByAscOperator);
-    resultsBlock = selectionOrderByOperator.nextBlock();
-    executionStatistics = selectionOrderByOperator.getExecutionStatistics();
+  @Test
+  public void testSelectionOrderByAllSortedColumnsDescReverseOrder() {
+    String query = "SET allowReverseOrder = true;"
+        + "SELECT column5 "
+        + "FROM testTable "
+        + "ORDER BY column5 DESC, daysSinceEpoch DESC";
+    BaseOperator<SelectionResultsBlock> selectionOrderByOperator = getOperator(query);
+    assertTrue(selectionOrderByOperator instanceof SelectionPartiallyOrderedByLinearOperator);
+    SelectionResultsBlock resultsBlock = selectionOrderByOperator.nextBlock();
+    ExecutionStatistics executionStatistics = selectionOrderByOperator.getExecutionStatistics();
+    assertEquals(executionStatistics.getNumDocsScanned(), 10L);
+    assertEquals(executionStatistics.getNumEntriesScannedInFilter(), 0L);
+    // 10 * (2 columns)
+    assertEquals(executionStatistics.getNumEntriesScannedPostFilter(), 20L);
+    assertEquals(executionStatistics.getNumTotalDocs(), 30000L);
+    DataSchema dataSchema = resultsBlock.getDataSchema();
+    assertEquals(dataSchema.getColumnNames(), new String[]{"column5", "daysSinceEpoch"});
+    assertEquals(dataSchema.getColumnDataTypes(), new ColumnDataType[]{ColumnDataType.STRING, ColumnDataType.INT});
+    List<Object[]> selectionResult = resultsBlock.getRows();
+    assertEquals(selectionResult.size(), 10);
+    Object[] lastRow = selectionResult.get(9);
+    assertEquals(lastRow.length, 2);
+    assertEquals(lastRow[0], "gFuH");
+    assertEquals(lastRow[1], 167572854);
+  }
+
+  @Test
+  public void testSelectionOrderByMixedSortedColumns() {
+    String query = "SELECT daysSinceEpoch FROM testTable ORDER BY column5, daysSinceEpoch DESC";
+    BaseOperator<SelectionResultsBlock> selectionOrderByOperator = getOperator(query);
+    assertTrue(selectionOrderByOperator instanceof SelectionPartiallyOrderedByLinearOperator);
+    SelectionResultsBlock resultsBlock = selectionOrderByOperator.nextBlock();
+    ExecutionStatistics executionStatistics = selectionOrderByOperator.getExecutionStatistics();
     assertEquals(executionStatistics.getNumDocsScanned(), 30000L);
     assertEquals(executionStatistics.getNumEntriesScannedInFilter(), 0L);
     // 30000 * (2 columns)
     assertEquals(executionStatistics.getNumEntriesScannedPostFilter(), 60000L);
     assertEquals(executionStatistics.getNumTotalDocs(), 30000L);
-    dataSchema = resultsBlock.getDataSchema();
+    DataSchema dataSchema = resultsBlock.getDataSchema();
     assertEquals(dataSchema.getColumnNames(), new String[]{"column5", "daysSinceEpoch"});
     assertEquals(dataSchema.getColumnDataTypes(), new ColumnDataType[]{ColumnDataType.STRING, ColumnDataType.INT});
-    selectionResult = resultsBlock.getRows();
+    List<Object[]> selectionResult = resultsBlock.getRows();
     assertEquals(selectionResult.size(), 10);
-    lastRow = selectionResult.get(9);
+    Object[] lastRow = selectionResult.get(9);
     assertEquals(lastRow.length, 2);
     assertEquals(lastRow[0], "gFuH");
     assertEquals(lastRow[1], 167572854);
+  }
 
-    // Test query order by one sorted column in ascending order, and some unsorted columns
-    query = "SELECT column1 FROM testTable ORDER BY column5, column6, column1";
-    selectionOrderByOperator = getOperator(query);
-    assertTrue(selectionOrderByOperator instanceof SelectionPartiallyOrderedByAscOperator);
-    resultsBlock = selectionOrderByOperator.nextBlock();
-    executionStatistics = selectionOrderByOperator.getExecutionStatistics();
+  @Test
+  public void testSelectionOrderBySortedAndUnsortedColumnsAsc() {
+    String query = "SELECT column1 FROM testTable ORDER BY column5, column6, column1";
+    BaseOperator<SelectionResultsBlock> selectionOrderByOperator = getOperator(query);
+    assertTrue(selectionOrderByOperator instanceof SelectionPartiallyOrderedByLinearOperator);
+    SelectionResultsBlock resultsBlock = selectionOrderByOperator.nextBlock();
+    ExecutionStatistics executionStatistics = selectionOrderByOperator.getExecutionStatistics();
     assertEquals(executionStatistics.getNumDocsScanned(), 30000L);
     assertEquals(executionStatistics.getNumEntriesScannedInFilter(), 0L);
     // 30000 * (3 columns)
     assertEquals(executionStatistics.getNumEntriesScannedPostFilter(), 90000L);
     assertEquals(executionStatistics.getNumTotalDocs(), 30000L);
-    dataSchema = resultsBlock.getDataSchema();
+    DataSchema dataSchema = resultsBlock.getDataSchema();
     assertEquals(dataSchema.getColumnNames(), new String[]{"column5", "column6", "column1"});
     assertEquals(dataSchema.getColumnDataTypes(),
         new ColumnDataType[]{ColumnDataType.STRING, ColumnDataType.INT, ColumnDataType.INT});
-    selectionResult = resultsBlock.getRows();
+    List<Object[]> selectionResult = resultsBlock.getRows();
     assertEquals(selectionResult.size(), 10);
-    lastRow = selectionResult.get(9);
+    Object[] lastRow = selectionResult.get(9);
     assertEquals(lastRow.length, 3);
     assertEquals(lastRow[0], "gFuH");
-    // Unsorted column values should be the same as ordering by their own
     assertEquals(lastRow[1], 6043515);
     assertEquals(lastRow[2], 10542595);
+  }
 
-    // Test query order by one sorted column in descending order, and some unsorted columns
-    query = "SELECT column6 FROM testTable ORDER BY column5 DESC, column6, column1";
-    selectionOrderByOperator = getOperator(query);
+  @Test
+  public void testSelectionOrderBySortedAndUnsortedColumnsDescDidOrder() {
+    String query = "SET allowReverseOrder = false; "
+        + "SELECT  column6 FROM testTable ORDER BY column5 DESC, column6, column1";
+    BaseOperator<SelectionResultsBlock> selectionOrderByOperator = getOperator(query);
     assertTrue(selectionOrderByOperator instanceof SelectionPartiallyOrderedByDescOperation);
-    resultsBlock = selectionOrderByOperator.nextBlock();
-    executionStatistics = selectionOrderByOperator.getExecutionStatistics();
+    SelectionResultsBlock resultsBlock = selectionOrderByOperator.nextBlock();
+    ExecutionStatistics executionStatistics = selectionOrderByOperator.getExecutionStatistics();
     assertEquals(executionStatistics.getNumDocsScanned(), 30000L);
     assertEquals(executionStatistics.getNumEntriesScannedInFilter(), 0L);
     // 30000 * (3 columns)
     assertEquals(executionStatistics.getNumEntriesScannedPostFilter(), 90000L);
     assertEquals(executionStatistics.getNumTotalDocs(), 30000L);
-    dataSchema = resultsBlock.getDataSchema();
+    DataSchema dataSchema = resultsBlock.getDataSchema();
     assertEquals(dataSchema.getColumnNames(), new String[]{"column5", "column6", "column1"});
     assertEquals(dataSchema.getColumnDataTypes(),
         new ColumnDataType[]{ColumnDataType.STRING, ColumnDataType.INT, ColumnDataType.INT});
-    selectionResult = resultsBlock.getRows();
+    List<Object[]> selectionResult = resultsBlock.getRows();
     assertEquals(selectionResult.size(), 10);
-    lastRow = selectionResult.get(9);
+    Object[] lastRow = selectionResult.get(9);
     assertEquals(lastRow.length, 3);
     assertEquals(lastRow[0], "gFuH");
-    // Unsorted column values should be the same as ordering by their own
     assertEquals(lastRow[1], 6043515);
+    // Unsorted column values should be the same as ordering by their own
+    assertEquals(lastRow[2], 10542595);
+  }
+
+  @Test
+  public void testSelectionOrderBySortedAndUnsortedColumnsDescReverseOrder() {
+    String query = "SET allowReverseOrder = true; "
+        + "SELECT column6 FROM testTable ORDER BY column5 DESC, column6, column1";
+    BaseOperator<SelectionResultsBlock> selectionOrderByOperator = getOperator(query);
+    assertTrue(selectionOrderByOperator instanceof SelectionPartiallyOrderedByLinearOperator);
+    SelectionResultsBlock resultsBlock = selectionOrderByOperator.nextBlock();
+    ExecutionStatistics executionStatistics = selectionOrderByOperator.getExecutionStatistics();
+    assertEquals(executionStatistics.getNumDocsScanned(), 30000L);
+    assertEquals(executionStatistics.getNumEntriesScannedInFilter(), 0L);
+    assertEquals(executionStatistics.getNumEntriesScannedPostFilter(), 90000L);
+    assertEquals(executionStatistics.getNumTotalDocs(), 30000L);
+    DataSchema dataSchema = resultsBlock.getDataSchema();
+    assertEquals(dataSchema.getColumnNames(), new String[]{"column5", "column6", "column1"});
+    assertEquals(dataSchema.getColumnDataTypes(),
+        new ColumnDataType[]{ColumnDataType.STRING, ColumnDataType.INT, ColumnDataType.INT});
+    List<Object[]> selectionResult = resultsBlock.getRows();
+    assertEquals(selectionResult.size(), 10);
+    Object[] lastRow = selectionResult.get(9);
+    assertEquals(lastRow.length, 3);
+    assertEquals(lastRow[0], "gFuH");
+    assertEquals(lastRow[1], 6043515);
+    // Unsorted column values should be the same as ordering by their own
     assertEquals(lastRow[2], 10542595);
   }
 

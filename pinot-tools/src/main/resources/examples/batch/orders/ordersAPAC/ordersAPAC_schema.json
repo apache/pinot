@@ -1,0 +1,27 @@
+{
+  "metricFieldSpecs": [
+  ],
+  "dimensionFieldSpecs": [
+    {
+      "dataType": "STRING",
+      "name": "orderId"
+    },
+    {
+      "dataType": "STRING",
+      "name": "customerId"
+    },
+    {
+      "dataType": "STRING",
+      "name": "region"
+    },
+    {
+      "dataType": "STRING",
+      "name": "productId"
+    },
+    {
+      "dataType": "STRING",
+      "name": "status"
+    }
+  ],
+  "schemaName": "ordersAPAC"
+}

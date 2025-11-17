@@ -23,6 +23,7 @@ import java.io.IOException;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.HashSet;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -85,7 +86,9 @@ public class DefaultRebalancePreChecker implements RebalancePreChecker {
 
     tableRebalanceLogger.info("Start pre-checks");
 
-    Map<String, RebalancePreCheckerResult> preCheckResult = new HashMap<>();
+    // Right now pre-check items are done sequentially. If pre-check items are to be done in parallel, we should not
+    // use linked hash map but to sort the result in the end
+    Map<String, RebalancePreCheckerResult> preCheckResult = new LinkedHashMap<>();
     // Check for reload status
     preCheckResult.put(NEEDS_RELOAD_STATUS, checkReloadNeededOnServers(tableNameWithType, tableRebalanceLogger));
     // Check whether minimizeDataMovement is set in TableConfig

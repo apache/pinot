@@ -100,7 +100,7 @@ public class PinotTableInstances {
   })
   public String getTableInstances(
       @ApiParam(value = "Table name without type", required = true) @PathParam("tableName") String tableName,
-      @ApiParam(value = "Instance type", example = "broker", allowableValues = "BROKER, SERVER") @DefaultValue("")
+      @ApiParam(value = "Instance type", allowableValues = "BROKER, SERVER") @DefaultValue("")
       @QueryParam("type") String type, @Context HttpHeaders headers) {
     tableName = DatabaseUtils.translateTableName(tableName, headers);
     ObjectNode ret = JsonUtils.newObjectNode();

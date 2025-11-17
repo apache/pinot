@@ -31,7 +31,6 @@ import org.apache.pinot.common.proto.PinotQueryWorkerGrpc;
 import org.apache.pinot.common.proto.Worker;
 import org.apache.pinot.common.utils.grpc.ServerGrpcQueryClient;
 import org.apache.pinot.query.routing.QueryServerInstance;
-import org.apache.pinot.spi.query.QueryThreadContext;
 
 
 /**
@@ -48,13 +47,9 @@ class DispatchClient {
 
   public DispatchClient(String host, int port, @Nullable TlsConfig tlsConfig) {
     if (tlsConfig == null) {
-      _channel = ManagedChannelBuilder
-          .forAddress(host, port)
-          .usePlaintext()
-          .build();
+      _channel = ManagedChannelBuilder.forAddress(host, port).usePlaintext().build();
     } else {
-      _channel = NettyChannelBuilder
-          .forAddress(host, port)
+      _channel = NettyChannelBuilder.forAddress(host, port)
           .sslContext(ServerGrpcQueryClient.buildSslContext(tlsConfig))
           .build();
     }
@@ -71,25 +66,13 @@ class DispatchClient {
   }
 
   public void cancelAsync(long requestId) {
-    String cid = QueryThreadContext.isInitialized() && QueryThreadContext.getCid() != null
-        ? QueryThreadContext.getCid()
-        : Long.toString(requestId);
-    Worker.CancelRequest cancelRequest = Worker.CancelRequest.newBuilder()
-        .setRequestId(requestId)
-        .setCid(cid)
-        .build();
+    Worker.CancelRequest cancelRequest = Worker.CancelRequest.newBuilder().setRequestId(requestId).build();
     _dispatchStub.cancel(cancelRequest, NO_OP_CANCEL_STREAM_OBSERVER);
   }
 
   public void cancel(long requestId, QueryServerInstance virtualServer, Deadline deadline,
       Consumer<AsyncResponse<Worker.CancelResponse>> callback) {
-    String cid = QueryThreadContext.isInitialized() && QueryThreadContext.getCid() != null
-        ? QueryThreadContext.getCid()
-        : Long.toString(requestId);
-    Worker.CancelRequest cancelRequest = Worker.CancelRequest.newBuilder()
-        .setRequestId(requestId)
-        .setCid(cid)
-        .build();
+    Worker.CancelRequest cancelRequest = Worker.CancelRequest.newBuilder().setRequestId(requestId).build();
     StreamObserver<Worker.CancelResponse> observer = new LastValueDispatchObserver<>(virtualServer, callback);
     _dispatchStub.withDeadline(deadline).cancel(cancelRequest, observer);
   }

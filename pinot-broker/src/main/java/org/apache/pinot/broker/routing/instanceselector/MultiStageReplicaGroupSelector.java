@@ -28,6 +28,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import javax.annotation.Nullable;
+import org.apache.commons.collections4.CollectionUtils;
 import org.apache.commons.lang3.tuple.Pair;
 import org.apache.helix.model.ExternalView;
 import org.apache.helix.model.IdealState;
@@ -38,6 +39,7 @@ import org.apache.pinot.broker.routing.adaptiveserverselector.ServerSelectionCon
 import org.apache.pinot.common.assignment.InstancePartitions;
 import org.apache.pinot.common.assignment.InstancePartitionsUtils;
 import org.apache.pinot.common.metrics.BrokerMetrics;
+import org.apache.pinot.common.utils.LLCSegmentName;
 import org.apache.pinot.core.transport.ServerInstance;
 import org.apache.pinot.spi.config.table.TableType;
 import org.apache.pinot.spi.config.table.assignment.InstancePartitionsType;
@@ -132,8 +134,14 @@ public class MultiStageReplicaGroupSelector extends BaseInstanceSelector {
     // instanceToSegmentsMap stores the mapping from instance to the active segments it can serve.
     for (String segment : segments) {
       List<SegmentInstanceCandidate> candidates = segmentStates.getCandidates(segment);
-      Preconditions.checkState(candidates != null && !candidates.isEmpty(),
-        "Failed to find servers for segment: %s", segment);
+      if (CollectionUtils.isEmpty(candidates)) {
+        if (isNewLLCSegment(segment)) {
+          // New segments might not be tracked in segmentStates yet.
+          continue;
+        } else {
+          throw new IllegalStateException(String.format("Failed to find servers for segment: %s", segment));
+        }
+      }
       for (SegmentInstanceCandidate candidate : candidates) {
         instanceToSegmentsMap
           .computeIfAbsent(candidate.getInstance(), k -> new HashSet<>())
@@ -164,6 +172,15 @@ public class MultiStageReplicaGroupSelector extends BaseInstanceSelector {
     }
 
     return computeOptionalSegments(segmentToSelectedInstanceMap, segmentStates);
+  }
+
+  private boolean isNewLLCSegment(String segmentName) {
+    LLCSegmentName llcSegmentName = LLCSegmentName.of(segmentName);
+    if (llcSegmentName == null) {
+      return false;
+    }
+    return InstanceSelector.isNewSegment(llcSegmentName.getCreationTimeMs(), System.currentTimeMillis(),
+        _newSegmentExpirationTimeInSeconds * 1000);
   }
 
   /**

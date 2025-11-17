@@ -23,9 +23,9 @@ import java.util.List;
 import java.util.Properties;
 import java.util.concurrent.CompletableFuture;
 import javax.annotation.Nullable;
+import org.apache.pinot.sql.parsers.parser.TableNameExtractor;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-
 
 /**
  * A connection to Pinot, normally created through calls to the {@link ConnectionFactory}.
@@ -204,5 +204,75 @@ public class Connection {
    */
   public PinotClientTransport<?> getTransport() {
     return _transport;
+  }
+
+  /**
+   * Opens a cursor for the given query, enabling pagination through large result sets.
+   * The returned cursor starts with the first page already loaded.
+   *
+   * @param query the query to execute
+   * @param pageSize the number of rows per page
+   * @return ResultCursor with the first page loaded and ready for navigation
+   * @throws PinotClientException If an exception occurs while processing the query
+   */
+  public ResultCursor openCursor(String query, int pageSize) throws PinotClientException {
+    try {
+      return openCursorAsync(query, pageSize).get();
+    } catch (Exception e) {
+      if (e.getCause() instanceof PinotClientException) {
+        throw (PinotClientException) e.getCause();
+      } else if (e.getCause() instanceof UnsupportedOperationException) {
+        throw (UnsupportedOperationException) e.getCause();
+      } else {
+        throw new PinotClientException("Failed to open cursor", e);
+      }
+    }
+  }
+
+  /**
+   * Opens a cursor for the given query asynchronously, enabling pagination through large result sets.
+   * The returned cursor starts with the first page already loaded.
+   *
+   * @param query the query to execute
+   * @param pageSize the number of rows per page
+   * @return CompletableFuture containing ResultCursor with the first page loaded and ready for navigation
+   */
+  public CompletableFuture<ResultCursor> openCursorAsync(String query, int pageSize) {
+    return validateCursorSupport()
+        .thenCompose(unused -> selectBrokerForCursor(query))
+        .thenCompose(brokerHostPort -> executeInitialCursorQuery(brokerHostPort, query, pageSize));
+  }
+
+  private CompletableFuture<Void> validateCursorSupport() {
+    if (!(_transport instanceof CursorCapable)) {
+      return CompletableFuture.failedFuture(
+          new UnsupportedOperationException("Cursor operations not supported by this connection type"));
+    }
+    return CompletableFuture.completedFuture(null);
+  }
+
+  private CompletableFuture<String> selectBrokerForCursor(String query) {
+    String[] tableNames = resolveTableName(query);
+    String brokerHostPort = _brokerSelector.selectBroker(tableNames);
+    if (brokerHostPort == null) {
+      return CompletableFuture.failedFuture(
+          new PinotClientException("Could not find broker to execute cursor query"));
+    }
+    return CompletableFuture.completedFuture(brokerHostPort);
+  }
+
+  private CompletableFuture<ResultCursor> executeInitialCursorQuery(String brokerHostPort, String query, int pageSize) {
+    try {
+      CursorCapable cursorTransport = (CursorCapable) _transport;
+      return cursorTransport.executeQueryWithCursorAsync(brokerHostPort, query, pageSize)
+          .thenApply(initialResponse -> {
+            if (initialResponse.hasExceptions() && _failOnExceptions) {
+              throw new PinotClientException("Query had processing exceptions: \n" + initialResponse.getExceptions());
+            }
+            return (ResultCursor) new ResultCursorImpl(_transport, brokerHostPort, initialResponse, _failOnExceptions);
+          });
+    } catch (Exception e) {
+      return CompletableFuture.failedFuture(new PinotClientException("Failed to open cursor", e));
+    }
   }
 }

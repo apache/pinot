@@ -282,9 +282,9 @@ public class SelectionOrderByOperator extends BaseOperator<SelectionResultsBlock
       dataSourceMap.put(column, _indexSegment.getDataSource(column, _queryContext.getSchema()));
     }
 
+    BitmapDocIdSetOperator docIdOperator = BitmapDocIdSetOperator.ascending(docIds, numRows);
     try (ProjectionOperator projectionOperator =
-        ProjectionOperatorUtils.getProjectionOperator(dataSourceMap, new BitmapDocIdSetOperator(docIds, numRows),
-            _queryContext)) {
+        ProjectionOperatorUtils.getProjectionOperator(dataSourceMap, docIdOperator, _queryContext)) {
       TransformOperator transformOperator =
           new TransformOperator(_queryContext, projectionOperator, nonOrderByExpressions);
 

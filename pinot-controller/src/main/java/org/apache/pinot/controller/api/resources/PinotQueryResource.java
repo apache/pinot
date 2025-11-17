@@ -32,6 +32,7 @@ import java.net.URL;
 import java.nio.charset.StandardCharsets;
 import java.time.Duration;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
@@ -43,13 +44,16 @@ import java.util.stream.Collectors;
 import java.util.stream.Stream;
 import javax.annotation.Nullable;
 import javax.inject.Inject;
+import javax.ws.rs.Consumes;
 import javax.ws.rs.GET;
 import javax.ws.rs.POST;
 import javax.ws.rs.Path;
+import javax.ws.rs.Produces;
 import javax.ws.rs.QueryParam;
 import javax.ws.rs.WebApplicationException;
 import javax.ws.rs.core.Context;
 import javax.ws.rs.core.HttpHeaders;
+import javax.ws.rs.core.MediaType;
 import javax.ws.rs.core.Response;
 import javax.ws.rs.core.StreamingOutput;
 import org.apache.calcite.sql.SqlNode;
@@ -89,6 +93,7 @@ import org.apache.pinot.sql.parsers.CalciteSqlCompiler;
 import org.apache.pinot.sql.parsers.CalciteSqlParser;
 import org.apache.pinot.sql.parsers.PinotSqlType;
 import org.apache.pinot.sql.parsers.SqlNodeAndOptions;
+import org.apache.pinot.sql.parsers.parser.TableNameExtractor;
 import org.apache.pinot.tsdb.planner.TimeSeriesQueryEnvironment;
 import org.apache.pinot.tsdb.planner.TimeSeriesTableMetadataProvider;
 import org.apache.pinot.tsdb.spi.RangeTimeSeriesRequest;
@@ -210,6 +215,33 @@ public class PinotQueryResource {
       }
     }
     return multiStageQueryValidationResponses;
+  }
+
+  @POST
+  @Path("query/tableNames")
+  @Consumes(MediaType.APPLICATION_JSON)
+  @Produces(MediaType.APPLICATION_JSON)
+  @ApiOperation(value = "Extract table names from SQL queries")
+  public Set<String> extractTableNames(List<String> sqlQueries, @Context HttpHeaders httpHeaders) {
+
+    Set<String> allTableNames = new HashSet<>();
+
+    if ((sqlQueries == null || sqlQueries.isEmpty())) {
+      return allTableNames;
+    }
+
+    for (String sqlQuery : sqlQueries) {
+      try {
+        String[] tableNamesArray = TableNameExtractor.resolveTableName(sqlQuery);
+        if (tableNamesArray != null) {
+          Collections.addAll(allTableNames, tableNamesArray);
+        }
+      } catch (Exception e) {
+        LOGGER.error("Failed to extract table names from query: {}", sqlQuery, e);
+        throw e;
+      }
+    }
+    return allTableNames;
   }
 
   public static class MultiStageQueryValidationResponse {

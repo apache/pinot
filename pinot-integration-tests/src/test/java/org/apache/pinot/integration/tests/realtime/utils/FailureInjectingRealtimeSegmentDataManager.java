@@ -50,13 +50,15 @@ public class FailureInjectingRealtimeSegmentDataManager extends RealtimeSegmentD
       RealtimeTableDataManager realtimeTableDataManager, String resourceDataDir, IndexLoadingConfig indexLoadingConfig,
       Schema schema, LLCSegmentName llcSegmentName, ConsumerCoordinator consumerCoordinator,
       ServerMetrics serverMetrics, boolean failCommit, PartitionDedupMetadataManager partitionDedupMetadataManager,
-      BooleanSupplier isTableReadyToConsumeData)
+      BooleanSupplier isTableReadyToConsumeData, boolean failConsumingTransition)
       throws AttemptsExceededException, RetriableOperationException {
     // Pass through to the real parent constructor
     super(segmentZKMetadata, tableConfig, realtimeTableDataManager, resourceDataDir, indexLoadingConfig, schema,
         llcSegmentName, consumerCoordinator, serverMetrics, null /* no PartitionUpsertMetadataManager */,
         partitionDedupMetadataManager, isTableReadyToConsumeData);
-
+    if (failConsumingTransition) {
+      throw new RuntimeException("Forced to fail the consuming transition");
+    }
     _failCommit = failCommit;
   }
 

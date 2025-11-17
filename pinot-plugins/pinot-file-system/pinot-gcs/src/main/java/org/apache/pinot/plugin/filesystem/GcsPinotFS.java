@@ -19,6 +19,7 @@
 package org.apache.pinot.plugin.filesystem;
 
 import com.google.api.gax.paging.Page;
+import com.google.api.gax.rpc.FixedHeaderProvider;
 import com.google.auth.Credentials;
 import com.google.auth.oauth2.GoogleCredentials;
 import com.google.cloud.storage.Blob;
@@ -32,7 +33,6 @@ import com.google.cloud.storage.StorageBatchResult;
 import com.google.cloud.storage.StorageException;
 import com.google.cloud.storage.StorageOptions;
 import com.google.common.base.Strings;
-import com.google.common.collect.ImmutableList;
 import java.io.File;
 import java.io.IOException;
 import java.io.InputStream;
@@ -46,6 +46,7 @@ import java.util.ArrayList;
 import java.util.Base64;
 import java.util.Iterator;
 import java.util.List;
+import java.util.Map;
 import java.util.function.Consumer;
 import org.apache.commons.io.FileUtils;
 import org.apache.commons.io.IOUtils;
@@ -70,9 +71,15 @@ public class GcsPinotFS extends BasePinotFS {
 
   @Override
   public void init(PinotConfiguration config) {
+    String version = GcsPinotFS.class.getPackage().getImplementationVersion();
+    if (version == null) {
+      version = "unknown";
+    }
+    String userAgent = "apache-pinot/" + version + " (GPN:apache-pinot)";
     Credentials credentials = null;
     try {
-      StorageOptions.Builder storageBuilder = StorageOptions.newBuilder();
+      StorageOptions.Builder storageBuilder = StorageOptions.newBuilder()
+          .setHeaderProvider(FixedHeaderProvider.create(Map.of("User-Agent", userAgent)));
       if (!Strings.isNullOrEmpty(config.getProperty(PROJECT_ID))) {
         LOGGER.info("Configs are: {}, {}", PROJECT_ID, config.getProperty(PROJECT_ID));
         String projectId = config.getProperty(PROJECT_ID);
@@ -207,7 +214,7 @@ public class GcsPinotFS extends BasePinotFS {
 
   private String[] listFilesFromGcsUri(GcsUri gcsFileUri, boolean recursive)
       throws IOException {
-    ImmutableList.Builder<String> builder = ImmutableList.builder();
+    ArrayList<String> builder = new ArrayList<>();
     String prefix = gcsFileUri.getPrefix();
     String bucketName = gcsFileUri.getBucketName();
     visitFiles(gcsFileUri, recursive, blob -> {
@@ -215,7 +222,7 @@ public class GcsPinotFS extends BasePinotFS {
         builder.add(GcsUri.createGcsUri(bucketName, blob.getName()).toString());
       }
     });
-    String[] listedFiles = builder.build().toArray(new String[0]);
+    String[] listedFiles = builder.toArray(new String[0]);
     LOGGER.info("Listed {} files from URI: {}, is recursive: {}", listedFiles.length, gcsFileUri, recursive);
     return listedFiles;
   }
@@ -223,7 +230,7 @@ public class GcsPinotFS extends BasePinotFS {
   @Override
   public List<FileMetadata> listFilesWithMetadata(URI fileUri, boolean recursive)
       throws IOException {
-    ImmutableList.Builder<FileMetadata> listBuilder = ImmutableList.builder();
+    List<FileMetadata> listBuilder = new ArrayList<>();
     GcsUri gcsFileUri = new GcsUri(fileUri);
     String prefix = gcsFileUri.getPrefix();
     String bucketName = gcsFileUri.getBucketName();
@@ -243,7 +250,7 @@ public class GcsPinotFS extends BasePinotFS {
         listBuilder.add(fileBuilder.build());
       }
     });
-    ImmutableList<FileMetadata> listedFiles = listBuilder.build();
+    List<FileMetadata> listedFiles = List.copyOf(listBuilder);
     LOGGER.info("Listed {} files from URI: {}, is recursive: {}", listedFiles.size(), gcsFileUri, recursive);
     return listedFiles;
   }

@@ -18,11 +18,13 @@
  */
 package org.apache.pinot.query.mailbox.channel;
 
+import com.google.common.base.Preconditions;
 import io.grpc.Server;
 import io.grpc.netty.shaded.io.grpc.netty.NettyServerBuilder;
 import io.grpc.netty.shaded.io.netty.buffer.PooledByteBufAllocator;
 import io.grpc.netty.shaded.io.netty.buffer.PooledByteBufAllocatorMetric;
 import io.grpc.netty.shaded.io.netty.channel.ChannelOption;
+import io.grpc.netty.shaded.io.netty.util.internal.PlatformDependent;
 import io.grpc.stub.StreamObserver;
 import java.io.IOException;
 import java.util.concurrent.TimeUnit;
@@ -38,6 +40,7 @@ import org.apache.pinot.core.transport.grpc.GrpcQueryServer;
 import org.apache.pinot.query.access.AuthorizationInterceptor;
 import org.apache.pinot.query.access.QueryAccessControlFactory;
 import org.apache.pinot.query.mailbox.MailboxService;
+import org.apache.pinot.spi.config.instance.InstanceType;
 import org.apache.pinot.spi.env.PinotConfiguration;
 import org.apache.pinot.spi.utils.CommonConstants;
 
@@ -65,19 +68,10 @@ public class GrpcMailboxServer extends PinotMailboxGrpc.PinotMailboxImplBase {
     PooledByteBufAllocator bufAllocator = new PooledByteBufAllocator(true);
     PooledByteBufAllocatorMetric metric = bufAllocator.metric();
 
-    // Register memory metrics - use ServerMetrics if available, otherwise use BrokerMetrics
-    ServerMetrics serverMetrics = ServerMetrics.get();
-    BrokerMetrics brokerMetrics = BrokerMetrics.get();
-    if (serverMetrics != null) {
-      serverMetrics.setOrUpdateGlobalGauge(ServerGauge.MAILBOX_SERVER_USED_DIRECT_MEMORY, metric::usedDirectMemory);
-      serverMetrics.setOrUpdateGlobalGauge(ServerGauge.MAILBOX_SERVER_USED_HEAP_MEMORY, metric::usedHeapMemory);
-      serverMetrics.setOrUpdateGlobalGauge(ServerGauge.MAILBOX_SERVER_ARENAS_DIRECT, metric::numDirectArenas);
-      serverMetrics.setOrUpdateGlobalGauge(ServerGauge.MAILBOX_SERVER_ARENAS_HEAP, metric::numHeapArenas);
-      serverMetrics.setOrUpdateGlobalGauge(ServerGauge.MAILBOX_SERVER_CACHE_SIZE_SMALL, metric::smallCacheSize);
-      serverMetrics.setOrUpdateGlobalGauge(ServerGauge.MAILBOX_SERVER_CACHE_SIZE_NORMAL, metric::normalCacheSize);
-      serverMetrics.setOrUpdateGlobalGauge(ServerGauge.MAILBOX_SERVER_THREADLOCALCACHE, metric::numThreadLocalCaches);
-      serverMetrics.setOrUpdateGlobalGauge(ServerGauge.MAILBOX_SERVER_CHUNK_SIZE, metric::chunkSize);
-    } else if (brokerMetrics != null) {
+    // Register memory metrics based on instance type
+    InstanceType instanceType = mailboxService.getInstanceType();
+    if (instanceType == InstanceType.BROKER) {
+      BrokerMetrics brokerMetrics = BrokerMetrics.get();
       brokerMetrics.setOrUpdateGlobalGauge(BrokerGauge.MAILBOX_SERVER_USED_DIRECT_MEMORY, metric::usedDirectMemory);
       brokerMetrics.setOrUpdateGlobalGauge(BrokerGauge.MAILBOX_SERVER_USED_HEAP_MEMORY, metric::usedHeapMemory);
       brokerMetrics.setOrUpdateGlobalGauge(BrokerGauge.MAILBOX_SERVER_ARENAS_DIRECT, metric::numDirectArenas);
@@ -86,6 +80,39 @@ public class GrpcMailboxServer extends PinotMailboxGrpc.PinotMailboxImplBase {
       brokerMetrics.setOrUpdateGlobalGauge(BrokerGauge.MAILBOX_SERVER_CACHE_SIZE_NORMAL, metric::normalCacheSize);
       brokerMetrics.setOrUpdateGlobalGauge(BrokerGauge.MAILBOX_SERVER_THREADLOCALCACHE, metric::numThreadLocalCaches);
       brokerMetrics.setOrUpdateGlobalGauge(BrokerGauge.MAILBOX_SERVER_CHUNK_SIZE, metric::chunkSize);
+
+      // Notice here we are using io.grpc.netty.shaded.io.netty.util.internal.PlatformDependent instead of
+      // io.netty.util.internal.PlatformDependent because gRPC shades Netty to avoid version conflicts.
+      // This also means it uses a different pool of direct memory and a different setting of max direct memory.
+      //
+      // Also notice these two metrics are also set by GrpcQueryService. Both are set to the same value, so it
+      // doesn't matter which one _wins_ in the metrics system.
+      brokerMetrics.setOrUpdateGlobalGauge(BrokerGauge.GRPC_TOTAL_MAX_DIRECT_MEMORY,
+          PlatformDependent::maxDirectMemory);
+      brokerMetrics.setOrUpdateGlobalGauge(BrokerGauge.GRPC_TOTAL_USED_DIRECT_MEMORY,
+          PlatformDependent::usedDirectMemory);
+    } else {
+      Preconditions.checkState(instanceType == InstanceType.SERVER, "Unexpected instance type: %s", instanceType);
+      ServerMetrics serverMetrics = ServerMetrics.get();
+      serverMetrics.setOrUpdateGlobalGauge(ServerGauge.MAILBOX_SERVER_USED_DIRECT_MEMORY, metric::usedDirectMemory);
+      serverMetrics.setOrUpdateGlobalGauge(ServerGauge.MAILBOX_SERVER_USED_HEAP_MEMORY, metric::usedHeapMemory);
+      serverMetrics.setOrUpdateGlobalGauge(ServerGauge.MAILBOX_SERVER_ARENAS_DIRECT, metric::numDirectArenas);
+      serverMetrics.setOrUpdateGlobalGauge(ServerGauge.MAILBOX_SERVER_ARENAS_HEAP, metric::numHeapArenas);
+      serverMetrics.setOrUpdateGlobalGauge(ServerGauge.MAILBOX_SERVER_CACHE_SIZE_SMALL, metric::smallCacheSize);
+      serverMetrics.setOrUpdateGlobalGauge(ServerGauge.MAILBOX_SERVER_CACHE_SIZE_NORMAL, metric::normalCacheSize);
+      serverMetrics.setOrUpdateGlobalGauge(ServerGauge.MAILBOX_SERVER_THREADLOCALCACHE, metric::numThreadLocalCaches);
+      serverMetrics.setOrUpdateGlobalGauge(ServerGauge.MAILBOX_SERVER_CHUNK_SIZE, metric::chunkSize);
+
+      // Notice here we are using io.grpc.netty.shaded.io.netty.util.internal.PlatformDependent instead of
+      // io.netty.util.internal.PlatformDependent because gRPC shades Netty to avoid version conflicts.
+      // This also means it uses a different pool of direct memory and a different setting of max direct memory.
+      //
+      // Also notice these two metrics are also set by GrpcQueryService. Both are set to the same value, so it
+      // doesn't matter which one _wins_ in the metrics system.
+      serverMetrics.setOrUpdateGlobalGauge(ServerGauge.GRPC_TOTAL_MAX_DIRECT_MEMORY,
+          PlatformDependent::maxDirectMemory);
+      serverMetrics.setOrUpdateGlobalGauge(ServerGauge.GRPC_TOTAL_USED_DIRECT_MEMORY,
+          PlatformDependent::usedDirectMemory);
     }
 
     NettyServerBuilder builder = NettyServerBuilder

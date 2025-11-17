@@ -42,9 +42,22 @@ public class DoubleAggregationResultHolder implements AggregationResultHolder {
     _value = value;
   }
 
+  /**
+   * {@inheritDoc}
+   * @param value
+   */
   @Override
   public void setValue(int value) {
     throw new RuntimeException("Method 'setValue' (with int value) not supported in DoubleAggregationResultHolder");
+  }
+
+  /**
+   * {@inheritDoc}
+   * @param value
+   */
+  @Override
+  public void setValue(long value) {
+    throw new RuntimeException("Method 'setValue' (with long value) not supported in DoubleAggregationResultHolder");
   }
 
   /**
@@ -74,6 +87,16 @@ public class DoubleAggregationResultHolder implements AggregationResultHolder {
   @Override
   public int getIntResult() {
     throw new RuntimeException("Method 'getIntResult' not supported in DoubleAggregationResultHolder");
+  }
+
+  /**
+   * {@inheritDoc}
+   *
+   * @return
+   */
+  @Override
+  public long getLongResult() {
+    throw new RuntimeException("Method 'getLongResult' not supported in DoubleAggregationResultHolder");
   }
 
   /**

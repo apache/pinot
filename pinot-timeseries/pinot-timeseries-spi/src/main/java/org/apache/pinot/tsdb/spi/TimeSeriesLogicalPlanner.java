@@ -40,7 +40,7 @@ public interface TimeSeriesLogicalPlanner {
   /**
    * Returns the name of the table from the logical plan result by traversing the plan tree and extracting the
    * table name from the first encountered {@link LeafTimeSeriesPlanNode}
-   * This method is recommended to be overriden by implementations for more efficient table name extraction.
+   * This method is recommended to be overridden by implementations for more efficient table name extraction.
    */
   default String getTableName(TimeSeriesLogicalPlanResult result) {
     BaseTimeSeriesPlanNode node = result.getPlanNode();

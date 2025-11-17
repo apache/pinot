@@ -98,7 +98,7 @@ abstract class BaseStarTreeV2Test<R, A> {
   private static final String DIMENSION1 = "d1__COLUMN_NAME";
   private static final String DIMENSION2 = "DISTINCTCOUNTRAWHLL__d2";
   private static final int DIMENSION_CARDINALITY = 100;
-  private static final String METRIC = "m";
+  private static final String AGG_COL = "m";
 
   // Supported filters
   private static final String QUERY_FILTER_AND = String.format(" WHERE %1$s = 0 AND %2$s < 10", DIMENSION1, DIMENSION2);
@@ -151,7 +151,8 @@ abstract class BaseStarTreeV2Test<R, A> {
     DataType rawValueType = getRawValueType();
     // Raw value type will be null for COUNT aggregation function
     if (rawValueType != null) {
-      schemaBuilder.addMetric(METRIC, rawValueType);
+      schemaBuilder.addDimensionField(AGG_COL, rawValueType,
+              dimensionFieldSpec -> dimensionFieldSpec.setSingleValueField(isAggColSingleValueField()));
     }
     Schema schema = schemaBuilder.build();
     TableConfig tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName(TABLE_NAME).build();
@@ -162,7 +163,7 @@ abstract class BaseStarTreeV2Test<R, A> {
       segmentRecord.putValue(DIMENSION1, RANDOM.nextInt(DIMENSION_CARDINALITY));
       segmentRecord.putValue(DIMENSION2, RANDOM.nextInt(DIMENSION_CARDINALITY));
       if (rawValueType != null) {
-        segmentRecord.putValue(METRIC, getRandomRawValue(RANDOM));
+        segmentRecord.putValue(AGG_COL, getRandomRawValue(RANDOM));
       }
       segmentRecords.add(segmentRecord);
     }
@@ -175,8 +176,9 @@ abstract class BaseStarTreeV2Test<R, A> {
     driver.build();
 
     StarTreeIndexConfig starTreeIndexConfig = new StarTreeIndexConfig(Arrays.asList(DIMENSION1, DIMENSION2), null, null,
-        Collections.singletonList(new StarTreeAggregationConfig(METRIC, _valueAggregator.getAggregationType().getName(),
-            null, getCompressionCodec(), true, getIndexVersion(), null, null)), MAX_LEAF_RECORDS);
+        Collections.singletonList(new StarTreeAggregationConfig(AGG_COL,
+                _valueAggregator.getAggregationType().getName(), null, getCompressionCodec(),
+                true, getIndexVersion(), null, null)), MAX_LEAF_RECORDS);
     File indexDir = new File(TEMP_DIR, SEGMENT_NAME);
     // Randomly build star-tree using on-heap or off-heap mode
     MultipleTreesBuilder.BuildMode buildMode =
@@ -196,9 +198,9 @@ abstract class BaseStarTreeV2Test<R, A> {
     } else if (aggregationType == AggregationFunctionType.PERCENTILEEST
         || aggregationType == AggregationFunctionType.PERCENTILETDIGEST) {
       // Append a percentile number for percentile functions
-      return String.format("%s(%s, 50)", aggregationType.getName(), METRIC);
+      return String.format("%s(%s, 50)", aggregationType.getName(), AGG_COL);
     } else {
-      return String.format("%s(%s)", aggregationType.getName(), METRIC);
+      return String.format("%s(%s)", aggregationType.getName(), AGG_COL);
     }
   }
 
@@ -476,7 +478,16 @@ abstract class BaseStarTreeV2Test<R, A> {
 
   private Object getNextRawValue(int docId, ForwardIndexReader reader, ForwardIndexReaderContext readerContext,
       Dictionary dictionary) {
-    return dictionary.get(reader.getDictId(docId, readerContext));
+    if (isAggColSingleValueField()) {
+      return dictionary.get(reader.getDictId(docId, readerContext));
+    } else {
+      int[] dictIds = reader.getDictIdMV(docId, readerContext);
+        Object[] rawValue = new Object[dictIds.length];
+        for (int i = 0; i < dictIds.length; i++) {
+          rawValue[i] = dictionary.get(dictIds[i]);
+        }
+        return rawValue;
+    }
   }
 
   /**
@@ -497,6 +508,10 @@ abstract class BaseStarTreeV2Test<R, A> {
     // Allow 2, 3, 4 or null
     int version = 1 + RANDOM.nextInt(4);
     return version > 1 ? version : null;
+  }
+
+  protected boolean isAggColSingleValueField() {
+    return true;
   }
 
   abstract ValueAggregator<R, A> getValueAggregator();

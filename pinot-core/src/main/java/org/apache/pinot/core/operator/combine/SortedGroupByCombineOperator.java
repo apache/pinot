@@ -41,7 +41,6 @@ import org.apache.pinot.core.util.GroupByUtils;
 import org.apache.pinot.spi.exception.QueryErrorCode;
 import org.apache.pinot.spi.exception.QueryErrorMessage;
 import org.apache.pinot.spi.exception.QueryException;
-import org.apache.pinot.spi.trace.Tracing;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -66,8 +65,8 @@ import org.slf4j.LoggerFactory;
  */
 @SuppressWarnings({"rawtypes", "unchecked"})
 public class SortedGroupByCombineOperator extends BaseSingleBlockCombineOperator<GroupByResultsBlock> {
-
   private static final Logger LOGGER = LoggerFactory.getLogger(SortedGroupByCombineOperator.class);
+  // TODO: Consider changing it to "COMBINE_GROUP_BY_SORTED" to distinguish from GroupByCombineOperator
   private static final String EXPLAIN_NAME = "COMBINE_GROUP_BY";
 
   // We use a CountDownLatch to track if all Futures are finished by the query timeout, and cancel the unfinished
@@ -162,7 +161,7 @@ public class SortedGroupByCombineOperator extends BaseSingleBlockCombineOperator
         } else {
           records = mergeRecords(records, (SortedRecords) waitingObject);
         }
-        Tracing.ThreadAccountantOps.sampleAndCheckInterruption();
+        checkTerminationAndSampleUsage();
 
         while (true) {
           SortedRecords finalRecords = records;
@@ -176,7 +175,7 @@ public class SortedGroupByCombineOperator extends BaseSingleBlockCombineOperator
           } else {
             records = mergeRecords(records, (SortedRecords) waitingObject);
           }
-          Tracing.ThreadAccountantOps.sampleAndCheckInterruption();
+          checkTerminationAndSampleUsage();
         }
       } catch (RuntimeException e) {
         throw wrapOperatorException(operator, e);
@@ -237,10 +236,7 @@ public class SortedGroupByCombineOperator extends BaseSingleBlockCombineOperator
   }
 
   private GroupByResultsBlock finishSortedRecords(SortedRecords records) {
-    SortedRecordTable table =
-        new SortedRecordTable(records, _dataSchema, _queryContext, _executorService);
-
-    // finish
+    SortedRecordTable table = new SortedRecordTable(records, _dataSchema, _queryContext, _executorService);
     if (_queryContext.isServerReturnFinalResult()) {
       table.finish(true, true);
     } else if (_queryContext.isServerReturnFinalResultKeyUnpartitioned()) {

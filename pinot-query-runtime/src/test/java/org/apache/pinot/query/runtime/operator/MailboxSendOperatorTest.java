@@ -20,7 +20,6 @@ package org.apache.pinot.query.runtime.operator;
 
 import java.util.List;
 import java.util.Map;
-import java.util.concurrent.TimeoutException;
 import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.common.utils.DataSchema.ColumnDataType;
 import org.apache.pinot.query.mailbox.MailboxService;
@@ -32,6 +31,7 @@ import org.apache.pinot.query.runtime.blocks.SuccessMseBlock;
 import org.apache.pinot.query.runtime.operator.exchange.BlockExchange;
 import org.apache.pinot.query.runtime.plan.MultiStageQueryStats;
 import org.apache.pinot.query.runtime.plan.OpChainExecutionContext;
+import org.apache.pinot.spi.query.QueryExecutionContext;
 import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.testng.annotations.AfterMethod;
@@ -101,26 +101,6 @@ public class MailboxSendOperatorTest {
     ArgumentCaptor<MseBlock.Eos> captor = ArgumentCaptor.forClass(MseBlock.Eos.class);
     verify(_exchange).send(captor.capture(), anyList());
     assertTrue(captor.getValue().isError(), "expected to send error block to exchange");
-  }
-
-  @Test
-  public void shouldNotSendErrorBlockWhenTimedOut()
-      throws Exception {
-    // Given:
-    MseBlock.Data dataBlock = getDummyDataBlock();
-    when(_input.nextBlock()).thenReturn(dataBlock);
-    doThrow(new TimeoutException()).when(_exchange).send(any());
-
-    // When:
-    MseBlock block = getOperator().nextBlock();
-
-    // Then:
-    assertTrue(block.isError(), "expected error block to propagate");
-    ArgumentCaptor<MseBlock.Data> captor = ArgumentCaptor.forClass(MseBlock.Data.class);
-    verify(_exchange).send(captor.capture());
-    assertSame(captor.getValue(), dataBlock, "expected to send data block to exchange");
-
-    verify(_exchange, never()).send(any(), anyList());
   }
 
   @Test
@@ -195,8 +175,8 @@ public class MailboxSendOperatorTest {
     WorkerMetadata workerMetadata = new WorkerMetadata(0, Map.of(), Map.of());
     StageMetadata stageMetadata = new StageMetadata(SENDER_STAGE_ID, List.of(workerMetadata), Map.of());
     OpChainExecutionContext context =
-        new OpChainExecutionContext(_mailboxService, 123L, Long.MAX_VALUE, Long.MAX_VALUE, Map.of(), stageMetadata,
-            workerMetadata, null, null, true);
+        OpChainExecutionContext.fromQueryContext(_mailboxService, Map.of(), stageMetadata, workerMetadata, null, true,
+            QueryExecutionContext.forMseTest());
     return new MailboxSendOperator(context, _input, statMap -> _exchange);
   }
 

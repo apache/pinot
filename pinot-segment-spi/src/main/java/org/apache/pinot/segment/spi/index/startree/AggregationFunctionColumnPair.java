@@ -104,6 +104,15 @@ public class AggregationFunctionColumnPair implements Comparable<AggregationFunc
         return AggregationFunctionType.DISTINCTCOUNTCPCSKETCH;
       case DISTINCTCOUNTRAWULL:
         return AggregationFunctionType.DISTINCTCOUNTULL;
+      // TODO: Add type specific value aggregators for MIN / MAX / SUM and use those automatically for star-tree indexes
+      //       based on the column type. For now, fall back to the default double-based star-tree index if one exists.
+      case MINLONG:
+        return AggregationFunctionType.MIN;
+      case MAXLONG:
+        return AggregationFunctionType.MAX;
+      case SUMLONG:
+      case SUMINT:
+        return AggregationFunctionType.SUM;
       default:
         return aggregationType;
     }

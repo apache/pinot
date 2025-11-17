@@ -166,6 +166,15 @@
           [4],
           [2]
         ]
+      },
+      {
+        "description": "UNION with three children",
+        "sql": "WITH data AS (SELECT a FROM (VALUES(array [1, 2]), (array [3, 4]), (array [5, 6])) \"data\" (\"a\")) SELECT * FROM data",
+        "outputs": [
+          [[1, 2]],
+          [[3, 4]],
+          [[5, 6]]
+        ]
       }
     ]
   }

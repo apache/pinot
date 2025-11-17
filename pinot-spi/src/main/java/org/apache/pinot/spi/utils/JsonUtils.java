@@ -44,7 +44,6 @@ import java.util.AbstractMap;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
-import java.util.Iterator;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -456,9 +455,7 @@ public class JsonUtils {
     // Put all nested results (from array) into a list to be processed later
     List<List<Map<String, String>>> nestedResultsList = new ArrayList<>();
 
-    Iterator<Map.Entry<String, JsonNode>> fieldIterator = node.fields();
-    while (fieldIterator.hasNext()) {
-      Map.Entry<String, JsonNode> fieldEntry = fieldIterator.next();
+    for (Map.Entry<String, JsonNode> fieldEntry : node.properties()) {
       String field = fieldEntry.getKey();
       Set<String> excludeFields = jsonIndexConfig.getExcludeFields();
       if (excludeFields != null && excludeFields.contains(field)) {
@@ -623,9 +620,7 @@ public class JsonUtils {
       @Nullable Map<String, FieldSpec.FieldType> fieldTypeMap, @Nullable TimeUnit timeUnit, List<String> fieldsToUnnest,
       String delimiter, ComplexTypeConfig.CollectionNotUnnestedToJson collectionNotUnnestedToJson) {
     Schema pinotSchema = new Schema();
-    Iterator<Map.Entry<String, JsonNode>> fieldIterator = jsonNode.fields();
-    while (fieldIterator.hasNext()) {
-      Map.Entry<String, JsonNode> fieldEntry = fieldIterator.next();
+    for (Map.Entry<String, JsonNode> fieldEntry : jsonNode.properties()) {
       JsonNode childNode = fieldEntry.getValue();
       inferPinotSchemaFromJsonNode(childNode, pinotSchema, fieldEntry.getKey(), fieldTypeMap, timeUnit, fieldsToUnnest,
           delimiter, collectionNotUnnestedToJson);
@@ -661,9 +656,7 @@ public class JsonUtils {
       }
       // do not include the node for other cases
     } else if (jsonNode.isObject()) {
-      Iterator<Map.Entry<String, JsonNode>> fieldIterator = jsonNode.fields();
-      while (fieldIterator.hasNext()) {
-        Map.Entry<String, JsonNode> fieldEntry = fieldIterator.next();
+      for (Map.Entry<String, JsonNode> fieldEntry : jsonNode.properties()) {
         JsonNode childNode = fieldEntry.getValue();
         inferPinotSchemaFromJsonNode(childNode, pinotSchema, String.join(delimiter, path, fieldEntry.getKey()),
             fieldTypeMap, timeUnit, fieldsToUnnest, delimiter, collectionNotUnnestedToJson);
@@ -729,9 +722,7 @@ public class JsonUtils {
         case DATE_TIME:
           Preconditions.checkState(isSingleValueField, "Time field: %s cannot be multi-valued", name);
           Preconditions.checkNotNull(timeUnit, "Time unit cannot be null");
-          // TODO: Switch to new format after releasing 0.11.0
-          //       "EPOCH|" + timeUnit.name()
-          String format = "1:" + timeUnit.name() + ":EPOCH";
+          String format = "EPOCH|" + timeUnit.name();
           String granularity = "1:" + timeUnit.name();
           pinotSchema.addField(new DateTimeFieldSpec(name, dataType, format, granularity));
           break;

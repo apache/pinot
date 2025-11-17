@@ -71,10 +71,10 @@ import org.apache.pinot.common.utils.SegmentUtils;
 import org.apache.pinot.common.utils.config.TierConfigUtils;
 import org.apache.pinot.controller.api.resources.ForceCommitBatchConfig;
 import org.apache.pinot.controller.helix.core.assignment.instance.InstanceAssignmentDriver;
+import org.apache.pinot.controller.helix.core.assignment.segment.BaseStrictRealtimeSegmentAssignment;
 import org.apache.pinot.controller.helix.core.assignment.segment.SegmentAssignment;
 import org.apache.pinot.controller.helix.core.assignment.segment.SegmentAssignmentFactory;
 import org.apache.pinot.controller.helix.core.assignment.segment.SegmentAssignmentUtils;
-import org.apache.pinot.controller.helix.core.assignment.segment.StrictRealtimeSegmentAssignment;
 import org.apache.pinot.controller.helix.core.realtime.PinotLLCRealtimeSegmentManager;
 import org.apache.pinot.controller.util.TableSizeReader;
 import org.apache.pinot.segment.local.utils.TableConfigUtils;
@@ -558,7 +558,7 @@ public class TableRebalancer {
     // StrictReplicaGroupAssignment::rebalanceTable() and similar limitations apply here as well
     Object2IntOpenHashMap<String> segmentPartitionIdMap = new Object2IntOpenHashMap<>();
 
-    boolean isStrictRealtimeSegmentAssignment = (segmentAssignment instanceof StrictRealtimeSegmentAssignment);
+    boolean isStrictRealtimeSegmentAssignment = (segmentAssignment instanceof BaseStrictRealtimeSegmentAssignment);
     PartitionIdFetcher partitionIdFetcher =
         new PartitionIdFetcherImpl(tableNameWithType, TableConfigUtils.getPartitionColumn(tableConfig), _helixManager,
             isStrictRealtimeSegmentAssignment);
@@ -622,7 +622,7 @@ public class TableRebalancer {
           // If all the segments to be moved remain unchanged (same instance state map) in the new ideal state, apply
           // the same target instance state map for these segments to the new ideal state as the target assignment
           boolean segmentsToMoveChanged = false;
-          if (segmentAssignment instanceof StrictRealtimeSegmentAssignment) {
+          if (segmentAssignment instanceof BaseStrictRealtimeSegmentAssignment) {
             // For StrictRealtimeSegmentAssignment, we need to recompute the target assignment because the assignment
             // for new added segments is based on the existing assignment
             segmentsToMoveChanged = true;
@@ -1977,7 +1977,7 @@ public class TableRebalancer {
       //       best to return that there is a risk of data loss for pauseless enabled tables for segments in COMMITTING
       //       state
       if (_isPauselessEnabled && segmentZKMetadata.getStatus() == CommonConstants.Segment.Realtime.Status.COMMITTING
-          && !_pinotLLCRealtimeSegmentManager.allowRepairOfErrorSegments(false, _tableConfig)) {
+          && !_pinotLLCRealtimeSegmentManager.allowRepairOfCommittingSegments(false, _tableConfig)) {
         return Pair.of(true, generateDataLossRiskMessage(segmentName, false));
       }
       return NO_DATA_LOSS_RISK_RESULT;

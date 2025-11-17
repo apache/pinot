@@ -36,7 +36,6 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 import java.util.concurrent.locks.Lock;
 import java.util.function.BooleanSupplier;
-import java.util.function.Supplier;
 import javax.annotation.Nullable;
 import javax.annotation.concurrent.ThreadSafe;
 import org.apache.commons.collections4.CollectionUtils;
@@ -84,7 +83,6 @@ import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.stream.StreamConfigProperties;
 import org.apache.pinot.spi.stream.StreamMessageMetadata;
-import org.apache.pinot.spi.stream.StreamMetadataProvider;
 import org.apache.pinot.spi.stream.StreamPartitionMsgOffset;
 import org.apache.pinot.spi.utils.CommonConstants;
 import org.apache.pinot.spi.utils.CommonConstants.Segment.Realtime.Status;
@@ -136,8 +134,7 @@ public class RealtimeTableDataManager extends BaseTableDataManager {
   @Deprecated
   private static final String SEGMENT_DOWNLOAD_TIMEOUT_MINUTES = "segmentDownloadTimeoutMinutes";
 
-  // TODO: Change it to BooleanSupplier
-  private final Supplier<Boolean> _isServerReadyToServeQueries;
+  private final BooleanSupplier _isServerReadyToServeQueries;
 
   // Object to track ingestion delay for all partitions
   private IngestionDelayTracker _ingestionDelayTracker;
@@ -151,7 +148,7 @@ public class RealtimeTableDataManager extends BaseTableDataManager {
     this(segmentBuildSemaphore, () -> true);
   }
 
-  public RealtimeTableDataManager(Semaphore segmentBuildSemaphore, Supplier<Boolean> isServerReadyToServeQueries) {
+  public RealtimeTableDataManager(Semaphore segmentBuildSemaphore, BooleanSupplier isServerReadyToServeQueries) {
     _segmentBuildSemaphore = segmentBuildSemaphore;
     _isServerReadyToServeQueries = isServerReadyToServeQueries;
   }
@@ -160,11 +157,10 @@ public class RealtimeTableDataManager extends BaseTableDataManager {
   protected void doInit() {
     _leaseExtender = SegmentBuildTimeLeaseExtender.getOrCreate(_instanceId, _serverMetrics, _tableNameWithType);
     // Tracks ingestion delay of all partitions being served for this table
-    _ingestionDelayTracker =
-        new IngestionDelayTracker(_serverMetrics, _tableNameWithType, this, _isServerReadyToServeQueries);
+    _ingestionDelayTracker = new IngestionDelayTracker(_serverMetrics, _tableNameWithType, this);
     File statsFile = new File(_tableDataDir, STATS_FILE_NAME);
     try {
-      _statsHistory = RealtimeSegmentStatsHistory.deserialzeFrom(statsFile);
+      _statsHistory = RealtimeSegmentStatsHistory.deserializeFrom(statsFile);
     } catch (IOException | ClassNotFoundException e) {
       _logger.error("Caught exception while reading stats history from: {}", statsFile.getAbsolutePath(), e);
       File savedFile = new File(_tableDataDir, STATS_FILE_NAME + "." + UUID.randomUUID());
@@ -177,7 +173,7 @@ public class RealtimeTableDataManager extends BaseTableDataManager {
       _logger.warn("Saved unreadable {} into {}. Creating a fresh instance", statsFile.getAbsolutePath(),
           savedFile.getAbsolutePath());
       try {
-        _statsHistory = RealtimeSegmentStatsHistory.deserialzeFrom(statsFile);
+        _statsHistory = RealtimeSegmentStatsHistory.deserializeFrom(statsFile);
       } catch (Exception e2) {
         Utils.rethrowException(e2);
       }
@@ -291,19 +287,19 @@ public class RealtimeTableDataManager extends BaseTableDataManager {
   /**
    * Updates the ingestion metrics for the given partition.
    *
-   * @param segmentName name of the consuming segment
-   * @param partitionId partition id of the consuming segment (directly passed in to avoid parsing the segment name)
-   * @param ingestionTimeMs ingestion time of the last consumed message (from {@link StreamMessageMetadata})
+   * @param segmentName                      name of the consuming segment
+   * @param partitionId                      partition id of the consuming segment (directly passed in to avoid parsing
+   *                                         the segment name)
+   * @param ingestionTimeMs                  ingestion time of the last consumed message (from
+   *                                         {@link StreamMessageMetadata})
    * @param firstStreamIngestionTimeMs ingestion time of the last consumed message in the first stream (from
-   *                                   {@link StreamMessageMetadata})
-   * @param currentOffset offset of the last consumed message (from {@link StreamMessageMetadata})
-   * @param latestOffset offset of the latest message in the partition (from {@link StreamMetadataProvider})
+   * {@link StreamMessageMetadata})
+   * @param currentOffset                    offset of the last consumed message (from {@link StreamMessageMetadata})
    */
   public void updateIngestionMetrics(String segmentName, int partitionId, long ingestionTimeMs,
-      long firstStreamIngestionTimeMs, @Nullable StreamPartitionMsgOffset currentOffset,
-      @Nullable StreamPartitionMsgOffset latestOffset) {
-    _ingestionDelayTracker.updateIngestionMetrics(segmentName, partitionId, ingestionTimeMs, firstStreamIngestionTimeMs,
-        currentOffset, latestOffset);
+      long firstStreamIngestionTimeMs, @Nullable StreamPartitionMsgOffset currentOffset) {
+    _ingestionDelayTracker.updateMetrics(segmentName, partitionId, ingestionTimeMs, firstStreamIngestionTimeMs,
+        currentOffset);
   }
 
   /**
@@ -320,7 +316,7 @@ public class RealtimeTableDataManager extends BaseTableDataManager {
    * still be consuming, e.g. when the new consuming segment is created on a different server.
    */
   public void removeIngestionMetrics(String segmentName) {
-    _ingestionDelayTracker.stopTrackingPartitionIngestionDelay(segmentName);
+    _ingestionDelayTracker.stopTrackingPartition(segmentName);
   }
 
   /**
@@ -332,7 +328,7 @@ public class RealtimeTableDataManager extends BaseTableDataManager {
   @Override
   public void onConsumingToDropped(String segmentName) {
     // NOTE: No need to mark segment ignored here because it should have already been dropped.
-    _ingestionDelayTracker.stopTrackingPartitionIngestionDelay(new LLCSegmentName(segmentName).getPartitionGroupId());
+    _ingestionDelayTracker.stopTrackingPartition(new LLCSegmentName(segmentName).getPartitionGroupId());
   }
 
   /**
@@ -345,7 +341,7 @@ public class RealtimeTableDataManager extends BaseTableDataManager {
    */
   @Override
   public void onConsumingToOffline(String segmentName) {
-    _ingestionDelayTracker.stopTrackingPartitionIngestionDelay(segmentName);
+    _ingestionDelayTracker.stopTrackingPartition(segmentName);
   }
 
   @Override
@@ -511,10 +507,10 @@ public class RealtimeTableDataManager extends BaseTableDataManager {
 
   public Set<Integer> stopTrackingPartitionIngestionDelay(@Nullable Set<Integer> partitionIds) {
     if (CollectionUtils.isEmpty(partitionIds)) {
-      return _ingestionDelayTracker.stopTrackingIngestionDelayForAllPartitions();
+      return _ingestionDelayTracker.stopTrackingAllPartitions();
     }
     for (Integer partitionId: partitionIds) {
-      _ingestionDelayTracker.stopTrackingPartitionIngestionDelay(partitionId);
+      _ingestionDelayTracker.stopTrackingPartition(partitionId);
     }
     return partitionIds;
   }
@@ -588,8 +584,6 @@ public class RealtimeTableDataManager extends BaseTableDataManager {
       throws Exception {
     Status status = zkMetadata.getStatus();
     if (status.isCompleted()) {
-      // Segment is completed and ready to be downloaded either from deep storage or from a peer (if peer-to-peer
-      // download is enabled).
       return super.downloadSegment(zkMetadata);
     }
 
@@ -851,7 +845,8 @@ public class RealtimeTableDataManager extends BaseTableDataManager {
     // Get a new index loading config with latest table config and schema to load the segment
     IndexLoadingConfig indexLoadingConfig = fetchIndexLoadingConfig();
     indexLoadingConfig.setSegmentTier(zkMetadata.getTier());
-    addSegment(ImmutableSegmentLoader.load(indexDir, indexLoadingConfig, _segmentOperationsThrottler), zkMetadata);
+    addSegment(ImmutableSegmentLoader.load(indexDir, indexLoadingConfig, _segmentOperationsThrottler, zkMetadata),
+        zkMetadata);
     _ingestionDelayTracker.markPartitionForVerification(segmentName);
     _logger.info("Downloaded and replaced CONSUMING segment: {}", segmentName);
   }
@@ -876,7 +871,7 @@ public class RealtimeTableDataManager extends BaseTableDataManager {
     // Get a new index loading config with latest table config and schema to load the segment
     IndexLoadingConfig indexLoadingConfig = fetchIndexLoadingConfig();
     ImmutableSegment immutableSegment =
-        ImmutableSegmentLoader.load(indexDir, indexLoadingConfig, _segmentOperationsThrottler);
+        ImmutableSegmentLoader.load(indexDir, indexLoadingConfig, _segmentOperationsThrottler, zkMetadata);
 
     addSegment(immutableSegment, zkMetadata);
     _ingestionDelayTracker.markPartitionForVerification(segmentName);
@@ -924,6 +919,10 @@ public class RealtimeTableDataManager extends BaseTableDataManager {
   @VisibleForTesting
   void setEnforceConsumptionInOrder(boolean enforceConsumptionInOrder) {
     _enforceConsumptionInOrder = enforceConsumptionInOrder;
+  }
+
+  public BooleanSupplier getIsServerReadyToServeQueries() {
+    return _isServerReadyToServeQueries;
   }
 
   /**

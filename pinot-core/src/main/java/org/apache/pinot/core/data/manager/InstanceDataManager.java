@@ -21,7 +21,7 @@ package org.apache.pinot.core.data.manager;
 import java.io.File;
 import java.util.List;
 import java.util.Set;
-import java.util.function.Supplier;
+import java.util.function.BooleanSupplier;
 import javax.annotation.Nullable;
 import javax.annotation.concurrent.ThreadSafe;
 import org.apache.helix.HelixManager;
@@ -31,6 +31,7 @@ import org.apache.pinot.common.metrics.ServerMetrics;
 import org.apache.pinot.core.data.manager.realtime.SegmentUploader;
 import org.apache.pinot.segment.local.data.manager.TableDataManager;
 import org.apache.pinot.segment.local.utils.SegmentOperationsThrottler;
+import org.apache.pinot.segment.local.utils.ServerReloadJobStatusCache;
 import org.apache.pinot.segment.spi.SegmentMetadata;
 import org.apache.pinot.spi.annotations.InterfaceAudience;
 import org.apache.pinot.spi.env.PinotConfiguration;
@@ -50,7 +51,7 @@ public interface InstanceDataManager {
    * <p>NOTE: The config is the subset of server config with prefix 'pinot.server.instance'
    */
   void init(PinotConfiguration config, HelixManager helixManager, ServerMetrics serverMetrics,
-      @Nullable SegmentOperationsThrottler segmentOperationsThrottler)
+      @Nullable SegmentOperationsThrottler segmentOperationsThrottler, ServerReloadJobStatusCache reloadJobStatusCache)
       throws Exception;
 
   /**
@@ -117,19 +118,19 @@ public interface InstanceDataManager {
    * Download happens when local segment's CRC mismatches the one of the remote segment; but can also be forced to do
    * regardless of CRC.
    */
-  void reloadSegment(String tableNameWithType, String segmentName, boolean forceDownload)
+  void reloadSegment(String tableNameWithType, String segmentName, boolean forceDownload, String reloadJobId)
       throws Exception;
 
   /**
    * Reloads all segments of a table.
    */
-  void reloadAllSegments(String tableNameWithType, boolean forceDownload)
+  void reloadAllSegments(String tableNameWithType, boolean forceDownload, String reloadJobId)
       throws Exception;
 
   /**
    * Reload a list of segments in a table.
    */
-  void reloadSegments(String tableNameWithType, List<String> segmentNames, boolean forceDownload)
+  void reloadSegments(String tableNameWithType, List<String> segmentNames, boolean forceDownload, String reloadJobId)
       throws Exception;
 
   /**
@@ -170,6 +171,11 @@ public interface InstanceDataManager {
   int getMaxParallelRefreshThreads();
 
   /**
+   * Returns true if background processing for SEGMENT_REFRESH is enabled, false otherwise
+   */
+  boolean isAsyncSegmentRefreshEnabled();
+
+  /**
    * Returns the Helix property store.
    */
   ZkHelixPropertyStore<ZNRecord> getPropertyStore();
@@ -190,7 +196,7 @@ public interface InstanceDataManager {
    *
    * @param isServerReadyToServeQueries supplier to retrieve state of server.
    */
-  void setSupplierOfIsServerReadyToServeQueries(Supplier<Boolean> isServerReadyToServeQueries);
+  void setSupplierOfIsServerReadyToServeQueries(BooleanSupplier isServerReadyToServeQueries);
 
   /**
    * Returns consumer directory paths on the instance

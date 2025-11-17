@@ -19,9 +19,6 @@
 package org.apache.pinot.integration.tests;
 
 import com.fasterxml.jackson.databind.JsonNode;
-import java.net.URLEncoder;
-import java.nio.charset.StandardCharsets;
-import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 import java.util.Map;
@@ -125,12 +122,7 @@ public class HybridClusterIntegrationTest extends BaseHybridClusterIntegrationTe
           segmentMetadataFromDirectEndpoint.get("segment.total.docs"));
     }
     // get list of segment names to pass in query params for following tests
-    List<String> segmentNames = getSegmentNames(getTableName(), TableType.OFFLINE.toString());
-    List<String> segments = new ArrayList<>();
-    for (String segment : segmentNames) {
-      String encodedSegmentName = URLEncoder.encode(segment, StandardCharsets.UTF_8.toString());
-      segments.add(encodedSegmentName);
-    }
+    List<String> segments = getSegmentNames(getTableName(), TableType.OFFLINE.toString());
     // with null column params
     {
       String jsonOutputStr = sendGetRequest(_controllerRequestURLBuilder.forSegmentsMetadataFromServer(getTableName(),
@@ -143,7 +135,7 @@ public class HybridClusterIntegrationTest extends BaseHybridClusterIntegrationTe
       JsonNode segmentMetadataFromDirectEndpoint = JsonUtils.stringToJsonNode(jsonOutputStr);
       Assert.assertEquals(segmentMetadataFromAllEndpoint.get("totalDocs"),
           segmentMetadataFromDirectEndpoint.get("segment.total.docs"));
-      Assert.assertEquals(tableSegmentsMetadata.get(segmentNames.get(0)).get("columns").size(), 0);
+      Assert.assertEquals(tableSegmentsMetadata.get(segments.get(0)).get("columns").size(), 0);
     }
     // with * column param
     {
@@ -157,7 +149,7 @@ public class HybridClusterIntegrationTest extends BaseHybridClusterIntegrationTe
       JsonNode segmentMetadataFromDirectEndpoint = JsonUtils.stringToJsonNode(jsonOutputStr);
       Assert.assertEquals(segmentMetadataFromAllEndpoint.get("totalDocs"),
           segmentMetadataFromDirectEndpoint.get("segment.total.docs"));
-      Assert.assertEquals(tableSegmentsMetadata.get(segmentNames.get(0)).get("columns").size(), 79);
+      Assert.assertEquals(tableSegmentsMetadata.get(segments.get(0)).get("columns").size(), 79);
     }
     // with specified column params
     {
@@ -172,7 +164,7 @@ public class HybridClusterIntegrationTest extends BaseHybridClusterIntegrationTe
       JsonNode segmentMetadataFromDirectEndpoint = JsonUtils.stringToJsonNode(jsonOutputStr);
       Assert.assertEquals(segmentMetadataFromAllEndpoint.get("totalDocs"),
           segmentMetadataFromDirectEndpoint.get("segment.total.docs"));
-      Assert.assertEquals(tableSegmentsMetadata.get(segmentNames.get(0)).get("columns").size(), columns.size());
+      Assert.assertEquals(tableSegmentsMetadata.get(segments.get(0)).get("columns").size(), columns.size());
     }
   }
 

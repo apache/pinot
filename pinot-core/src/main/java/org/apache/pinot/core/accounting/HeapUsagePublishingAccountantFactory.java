@@ -18,43 +18,66 @@
  */
 package org.apache.pinot.core.accounting;
 
+import java.util.Collection;
+import java.util.List;
+import java.util.Map;
 import java.util.Timer;
 import java.util.TimerTask;
 import org.apache.pinot.common.metrics.ServerGauge;
 import org.apache.pinot.common.metrics.ServerMetrics;
+import org.apache.pinot.spi.accounting.QueryResourceTracker;
+import org.apache.pinot.spi.accounting.ThreadAccountant;
 import org.apache.pinot.spi.accounting.ThreadAccountantFactory;
-import org.apache.pinot.spi.accounting.ThreadResourceUsageAccountant;
+import org.apache.pinot.spi.accounting.ThreadResourceTracker;
+import org.apache.pinot.spi.accounting.TrackingScope;
 import org.apache.pinot.spi.config.instance.InstanceType;
 import org.apache.pinot.spi.env.PinotConfiguration;
-import org.apache.pinot.spi.trace.Tracing;
+import org.apache.pinot.spi.query.QueryThreadContext;
 import org.apache.pinot.spi.utils.CommonConstants;
 import org.apache.pinot.spi.utils.ResourceUsageUtils;
 
 
 /**
- * Accountant task that is used to publish heap usage metrics in addition to
- * the functionality of DefaultThreadAccountant
+ * Accountant task that is used to publish heap usage metrics.
  */
 public class HeapUsagePublishingAccountantFactory implements ThreadAccountantFactory {
 
   @Override
-  public ThreadResourceUsageAccountant init(PinotConfiguration config, String instanceId, InstanceType instanceType) {
+  public ThreadAccountant init(PinotConfiguration config, String instanceId, InstanceType instanceType) {
     int period = config.getProperty(CommonConstants.Accounting.CONFIG_OF_HEAP_USAGE_PUBLISHING_PERIOD_MS,
         CommonConstants.Accounting.DEFAULT_HEAP_USAGE_PUBLISH_PERIOD);
-    return new HeapUsagePublishingResourceUsageAccountant(period);
+    return new HeapUsagePublishingAccountant(period);
   }
 
-  public static class HeapUsagePublishingResourceUsageAccountant extends Tracing.DefaultThreadResourceUsageAccountant {
-    private final Timer _timer;
+  public static class HeapUsagePublishingAccountant implements ThreadAccountant {
     private final int _period;
+    private final Timer _timer;
+    private final ServerMetrics _serverMetrics = ServerMetrics.get();
 
-    public HeapUsagePublishingResourceUsageAccountant(int period) {
+    public HeapUsagePublishingAccountant(int period) {
       _period = period;
       _timer = new Timer("HeapUsagePublishingAccountant", true);
     }
 
     public void publishHeapUsageMetrics() {
-      ServerMetrics.get().setValueOfGlobalGauge(ServerGauge.JVM_HEAP_USED_BYTES, ResourceUsageUtils.getUsedHeapSize());
+      _serverMetrics.setValueOfGlobalGauge(ServerGauge.JVM_HEAP_USED_BYTES, ResourceUsageUtils.getUsedHeapSize());
+    }
+
+    @Override
+    public void setupTask(QueryThreadContext threadContext) {
+    }
+
+    @Override
+    public void sampleUsage() {
+    }
+
+    @Override
+    public void clear() {
+    }
+
+    @Override
+    public void updateUntrackedResourceUsage(String identifier, long cpuTimeNs, long allocatedBytes,
+        TrackingScope trackingScope) {
     }
 
     @Override
@@ -65,6 +88,21 @@ public class HeapUsagePublishingAccountantFactory implements ThreadAccountantFac
           publishHeapUsageMetrics();
         }
       }, _period, _period);
+    }
+
+    @Override
+    public void stopWatcherTask() {
+      _timer.cancel();
+    }
+
+    @Override
+    public Collection<? extends ThreadResourceTracker> getThreadResources() {
+      return List.of();
+    }
+
+    @Override
+    public Map<String, ? extends QueryResourceTracker> getQueryResources() {
+      return Map.of();
     }
   }
 }

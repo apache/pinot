@@ -67,8 +67,10 @@ public class PhysicalPlannerContext {
   private final boolean _useLiteMode;
   private final boolean _runInBroker;
   private final boolean _useBrokerPruning;
-  private final int _liteModeServerStageLimit;
+  private final int _liteModeLeafStageLimit;
+  private final int _liteModeLeafStageFanOutAdjustedLimit;
   private final DistHashFunction _defaultHashFunction;
+  private final boolean _liteModeJoinsEnabled;
 
   /**
    * Used by controller when it needs to extract table names from the query.
@@ -84,8 +86,10 @@ public class PhysicalPlannerContext {
     _useLiteMode = CommonConstants.Broker.DEFAULT_USE_LITE_MODE;
     _runInBroker = CommonConstants.Broker.DEFAULT_RUN_IN_BROKER;
     _useBrokerPruning = CommonConstants.Broker.DEFAULT_USE_BROKER_PRUNING;
-    _liteModeServerStageLimit = CommonConstants.Broker.DEFAULT_LITE_MODE_LEAF_STAGE_LIMIT;
+    _liteModeLeafStageLimit = CommonConstants.Broker.DEFAULT_LITE_MODE_LEAF_STAGE_LIMIT;
+    _liteModeLeafStageFanOutAdjustedLimit = CommonConstants.Broker.DEFAULT_LITE_MODE_LEAF_STAGE_FAN_OUT_ADJUSTED_LIMIT;
     _defaultHashFunction = DistHashFunction.valueOf(KeySelector.DEFAULT_HASH_ALGORITHM.toUpperCase());
+    _liteModeJoinsEnabled = CommonConstants.Broker.DEFAULT_LITE_MODE_ENABLE_JOINS;
   }
 
   public PhysicalPlannerContext(RoutingManager routingManager, String hostName, int port, long requestId,
@@ -93,12 +97,14 @@ public class PhysicalPlannerContext {
     this(routingManager, hostName, port, requestId, instanceId, queryOptions,
         CommonConstants.Broker.DEFAULT_USE_LITE_MODE, CommonConstants.Broker.DEFAULT_RUN_IN_BROKER,
         CommonConstants.Broker.DEFAULT_USE_BROKER_PRUNING, CommonConstants.Broker.DEFAULT_LITE_MODE_LEAF_STAGE_LIMIT,
-        KeySelector.DEFAULT_HASH_ALGORITHM);
+        KeySelector.DEFAULT_HASH_ALGORITHM, CommonConstants.Broker.DEFAULT_LITE_MODE_LEAF_STAGE_FAN_OUT_ADJUSTED_LIMIT,
+        CommonConstants.Broker.DEFAULT_LITE_MODE_ENABLE_JOINS);
   }
 
   public PhysicalPlannerContext(RoutingManager routingManager, String hostName, int port, long requestId,
       String instanceId, Map<String, String> queryOptions, boolean defaultUseLiteMode, boolean defaultRunInBroker,
-      boolean defaultUseBrokerPruning, int defaultLiteModeLeafStageLimit, String defaultHashFunction) {
+      boolean defaultUseBrokerPruning, int defaultLiteModeLeafStageLimit, String defaultHashFunction,
+      int defaultLiteModeLeafStageFanOutAdjustedLimit, boolean defaultLiteModeEnableJoins) {
     _routingManager = routingManager;
     _hostName = hostName;
     _port = port;
@@ -108,10 +114,13 @@ public class PhysicalPlannerContext {
     _useLiteMode = QueryOptionsUtils.isUseLiteMode(_queryOptions, defaultUseLiteMode);
     _runInBroker = QueryOptionsUtils.isRunInBroker(_queryOptions, defaultRunInBroker);
     _useBrokerPruning = QueryOptionsUtils.isUseBrokerPruning(_queryOptions, defaultUseBrokerPruning);
-    _liteModeServerStageLimit = QueryOptionsUtils.getLiteModeServerStageLimit(_queryOptions,
+    _liteModeLeafStageLimit = QueryOptionsUtils.getLiteModeLeafStageLimit(_queryOptions,
         defaultLiteModeLeafStageLimit);
+    _liteModeLeafStageFanOutAdjustedLimit = QueryOptionsUtils.getLiteModeLeafStageFanOutAdjustedLimit(_queryOptions,
+        defaultLiteModeLeafStageFanOutAdjustedLimit);
     _defaultHashFunction = DistHashFunction.valueOf(defaultHashFunction.toUpperCase());
     _instanceIdToQueryServerInstance.put(instanceId, getBrokerQueryServerInstance());
+    _liteModeJoinsEnabled = defaultLiteModeEnableJoins;
   }
 
   public Supplier<Integer> getNodeIdGenerator() {
@@ -151,6 +160,10 @@ public class PhysicalPlannerContext {
     return _useLiteMode;
   }
 
+  public boolean isLiteModeJoinsEnabled() {
+    return _liteModeJoinsEnabled;
+  }
+
   public boolean isRunInBroker() {
     return _runInBroker;
   }
@@ -159,8 +172,12 @@ public class PhysicalPlannerContext {
     return _useBrokerPruning;
   }
 
-  public int getLiteModeServerStageLimit() {
-    return _liteModeServerStageLimit;
+  public int getLiteModeLeafStageLimit() {
+    return _liteModeLeafStageLimit;
+  }
+
+  public int getLiteModeLeafStageFanOutAdjustedLimit() {
+    return _liteModeLeafStageFanOutAdjustedLimit;
   }
 
   /**

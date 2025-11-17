@@ -197,7 +197,7 @@ public class TableConfigsRestletResource {
       String tableConfigsStr,
       @ApiParam(value = "comma separated list of validation type(s) to skip. supported types: (ALL|TASK|UPSERT)")
       @QueryParam("validationTypesToSkip") @Nullable String typesToSkip,
-      @ApiParam(defaultValue = "false") @QueryParam("ignoreActiveTasks") boolean ignoreActiveTasks,
+      @DefaultValue("false") @QueryParam("ignoreActiveTasks") boolean ignoreActiveTasks,
       @Context HttpHeaders httpHeaders, @Context Request request)
       throws Exception {
     Pair<TableConfigs, Map<String, Object>> tableConfigsAndUnrecognizedProps;
@@ -210,16 +210,16 @@ public class TableConfigsRestletResource {
     }
     TableConfigs tableConfigs = tableConfigsAndUnrecognizedProps.getLeft();
     String databaseName = DatabaseUtils.extractDatabaseFromHttpHeaders(httpHeaders);
-    validateConfig(tableConfigs, databaseName, typesToSkip);
     String rawTableName = DatabaseUtils.translateTableName(tableConfigs.getTableName(), databaseName);
-    tableConfigs.setTableName(rawTableName);
-
     if (_pinotHelixResourceManager.hasOfflineTable(rawTableName) || _pinotHelixResourceManager.hasRealtimeTable(
         rawTableName) || _pinotHelixResourceManager.getSchema(rawTableName) != null) {
       throw new ControllerApplicationException(LOGGER,
           String.format("TableConfigs: %s already exists. Use PUT to update existing config", rawTableName),
           Response.Status.BAD_REQUEST);
     }
+
+    validateConfig(tableConfigs, databaseName, typesToSkip);
+    tableConfigs.setTableName(rawTableName);
 
     TableConfig offlineTableConfig = tableConfigs.getOffline();
     TableConfig realtimeTableConfig = tableConfigs.getRealtime();
@@ -298,7 +298,7 @@ public class TableConfigsRestletResource {
   public SuccessResponse deleteConfig(
       @ApiParam(value = "TableConfigs name i.e. raw table name", required = true) @PathParam("tableName")
       String tableName,
-      @ApiParam(defaultValue = "false") @QueryParam("ignoreActiveTasks") boolean ignoreActiveTasks,
+      @DefaultValue("false") @QueryParam("ignoreActiveTasks") boolean ignoreActiveTasks,
       @Context HttpHeaders headers) {
     try {
       if (TableNameBuilder.isOfflineTableResource(tableName) || TableNameBuilder.isRealtimeTableResource(tableName)) {

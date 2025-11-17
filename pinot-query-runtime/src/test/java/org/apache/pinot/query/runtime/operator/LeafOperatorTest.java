@@ -42,7 +42,6 @@ import org.apache.pinot.query.routing.VirtualServerAddress;
 import org.apache.pinot.query.runtime.blocks.MseBlock;
 import org.apache.pinot.query.runtime.blocks.SuccessMseBlock;
 import org.apache.pinot.query.runtime.plan.OpChainExecutionContext;
-import org.apache.pinot.spi.accounting.ThreadExecutionContext;
 import org.apache.pinot.spi.exception.QueryErrorCode;
 import org.mockito.Mock;
 import org.mockito.MockitoAnnotations;
@@ -57,7 +56,6 @@ import static org.mockito.Mockito.spy;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 import static org.testng.Assert.assertEquals;
-import static org.testng.Assert.assertNotSame;
 import static org.testng.Assert.assertSame;
 import static org.testng.Assert.assertTrue;
 
@@ -365,10 +363,11 @@ public class LeafOperatorTest {
     OpChainExecutionContext context = OperatorTestUtil.getContext(opChainMetadata);
     CountDownLatch resultsBlockAdded = new CountDownLatch(1);
 
+    ExecutorService executorService = Executors.newSingleThreadExecutor();
     LeafOperator operator =
-        new LeafOperator(context, mockQueryRequests(1), schema, mock(QueryExecutor.class), _executorService) {
+        new LeafOperator(context, mockQueryRequests(1), schema, mock(QueryExecutor.class), executorService) {
           @Override
-          void execute(ThreadExecutionContext parentContext) {
+          void execute() {
             try {
               // Fill queue and block on second add
               SelectionResultsBlock dataBlock =
@@ -392,16 +391,13 @@ public class LeafOperatorTest {
     // Wait for blocking queue to fill up
     resultsBlockAdded.await();
 
-    // Early terminate the operator, which will also interrupt the child
+    // Early terminate the operator, which will also clear the queue and interrupt the child
     operator.earlyTerminate();
-
-    // Child should still block on adding LAST_RESULTS_BLOCK
-    Thread.sleep(100);
-    assertNotSame(operator._blockingQueue.peek(), LeafOperator.LAST_RESULTS_BLOCK);
-
-    // Main thread read the next block, which should return SUCCESS_MSE_BLOCK and also unblock the child
     assertSame(operator.getNextBlock(), SuccessMseBlock.INSTANCE);
-    assertSame(operator._blockingQueue.poll(10, TimeUnit.SECONDS), LeafOperator.LAST_RESULTS_BLOCK);
+
+    // Child thread should exit
+    executorService.shutdown();
+    assertTrue(executorService.awaitTermination(10, TimeUnit.SECONDS));
 
     operator.close();
   }

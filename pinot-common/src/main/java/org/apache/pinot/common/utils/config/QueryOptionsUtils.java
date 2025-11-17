@@ -18,7 +18,6 @@
  */
 package org.apache.pinot.common.utils.config;
 
-import com.google.common.collect.ImmutableMap;
 import java.lang.reflect.Field;
 import java.lang.reflect.Modifier;
 import java.util.ArrayList;
@@ -75,7 +74,7 @@ public class QueryOptionsUtils {
       classLoadError = e;
     }
 
-    CONFIG_RESOLVER = configResolver == null ? null : ImmutableMap.copyOf(configResolver);
+    CONFIG_RESOLVER = configResolver == null ? null : Map.copyOf(configResolver);
     CLASS_LOAD_ERROR = classLoadError == null ? null
         : new RuntimeException("Failure to build case insensitive mapping.", classLoadError);
   }
@@ -113,9 +112,9 @@ public class QueryOptionsUtils {
   }
 
   @Nullable
-  public static Long getPassiveTimeoutMs(Map<String, String> queryOptions) {
-    String passiveTimeoutMsString = queryOptions.get(QueryOptionKey.EXTRA_PASSIVE_TIMEOUT_MS);
-    return checkedParseLong(QueryOptionKey.EXTRA_PASSIVE_TIMEOUT_MS, passiveTimeoutMsString, 0);
+  public static Long getExtraPassiveTimeoutMs(Map<String, String> queryOptions) {
+    String extraPassiveTimeoutMsString = queryOptions.get(QueryOptionKey.EXTRA_PASSIVE_TIMEOUT_MS);
+    return checkedParseLong(QueryOptionKey.EXTRA_PASSIVE_TIMEOUT_MS, extraPassiveTimeoutMsString, 0);
   }
 
   @Nullable
@@ -198,26 +197,26 @@ public class QueryOptionsUtils {
 
   public static Set<String> getSkipPlannerRules(Map<String, String> queryOptions) {
     // Example config:  skipPlannerRules='FilterIntoJoin,FilterAggregateTranspose'
-    String skipIndexesStr = queryOptions.get(QueryOptionKey.SKIP_PLANNER_RULES);
-    if (skipIndexesStr == null) {
+    String skipPlannerRulesStr = queryOptions.get(QueryOptionKey.SKIP_PLANNER_RULES);
+    if (skipPlannerRulesStr == null) {
       return Set.of();
     }
 
-    String[] skippedRules = StringUtils.split(skipIndexesStr, ',');
+    String[] skippedRules = StringUtils.split(skipPlannerRulesStr, ',');
 
     return new HashSet<>(List.of(skippedRules));
   }
 
   public static Set<String> getUsePlannerRules(Map<String, String> queryOptions) {
     // Example config:  usePlannerRules='SortJoinTranspose, AggregateJoinTransposeExtended'
-    String usedIndexesStr = queryOptions.get(QueryOptionKey.USE_PLANNER_RULES);
-    if (usedIndexesStr == null) {
+    String usePlannerRulesStr = queryOptions.get(QueryOptionKey.USE_PLANNER_RULES);
+    if (usePlannerRulesStr == null) {
       return Set.of();
     }
 
-    String[] usedRules = StringUtils.split(usedIndexesStr, ',');
+    String[] useRules = StringUtils.split(usePlannerRulesStr, ',');
 
-    return new HashSet<>(List.of(usedRules));
+    return new HashSet<>(List.of(useRules));
   }
 
   @Nullable
@@ -234,10 +233,6 @@ public class QueryOptionsUtils {
 
   public static List<Integer> getOrderedPreferredPools(Map<String, String> queryOptions) {
     String orderedPreferredPools = queryOptions.get(QueryOptionKey.ORDERED_PREFERRED_POOLS);
-    if (StringUtils.isEmpty(orderedPreferredPools)) {
-      // backward compatibility
-      orderedPreferredPools = queryOptions.get(QueryOptionKey.ORDERED_PREFERRED_REPLICAS);
-    }
     if (StringUtils.isEmpty(orderedPreferredPools)) {
       return Collections.emptyList();
     }
@@ -344,11 +339,6 @@ public class QueryOptionsUtils {
 
   public static boolean isFilteredAggregationsSkipEmptyGroups(Map<String, String> queryOptions) {
     return Boolean.parseBoolean(queryOptions.get(QueryOptionKey.FILTERED_AGGREGATIONS_SKIP_EMPTY_GROUPS));
-  }
-
-  @Nullable
-  public static String getOrderByAlgorithm(Map<String, String> queryOptions) {
-    return queryOptions.get(QueryOptionKey.ORDER_BY_ALGORITHM);
   }
 
   @Nullable
@@ -496,9 +486,15 @@ public class QueryOptionsUtils {
     return option != null ? Boolean.parseBoolean(option) : defaultValue;
   }
 
-  public static int getLiteModeServerStageLimit(Map<String, String> queryOptions, int defaultValue) {
-    String option = queryOptions.get(QueryOptionKey.LITE_MODE_SERVER_STAGE_LIMIT);
-    return option != null ? checkedParseIntPositive(QueryOptionKey.LITE_MODE_SERVER_STAGE_LIMIT, option) : defaultValue;
+  public static Integer getLiteModeLeafStageLimit(Map<String, String> queryOptions, int defaultValue) {
+    String option = queryOptions.get(QueryOptionKey.LITE_MODE_LEAF_STAGE_LIMIT);
+    return option != null ? checkedParseIntPositive(QueryOptionKey.LITE_MODE_LEAF_STAGE_LIMIT, option) : defaultValue;
+  }
+
+  public static Integer getLiteModeLeafStageFanOutAdjustedLimit(Map<String, String> queryOptions, int defaultValue) {
+    String option = queryOptions.get(QueryOptionKey.LITE_MODE_LEAF_STAGE_FANOUT_ADJUSTED_LIMIT);
+    return option != null ? checkedParseIntPositive(QueryOptionKey.LITE_MODE_LEAF_STAGE_FANOUT_ADJUSTED_LIMIT, option)
+        : defaultValue;
   }
 
   @Nullable
@@ -575,5 +571,24 @@ public class QueryOptionsUtils {
 
   public static String getWorkloadName(Map<String, String> queryOptions) {
     return queryOptions.getOrDefault(QueryOptionKey.WORKLOAD_NAME, CommonConstants.Accounting.DEFAULT_WORKLOAD_NAME);
+  }
+
+  public static boolean isReverseOrderAllowed(Map<String, String> queryOptions) {
+    String value = queryOptions.get(QueryOptionKey.ALLOW_REVERSE_ORDER);
+    if (value == null) {
+      return QueryOptionKey.DEFAULT_ALLOW_REVERSE_ORDER;
+    }
+    return Boolean.parseBoolean(value);
+  }
+
+  /// When evaluating REGEXP_LIKE predicate on a dictionary encoded column:
+  /// - If dictionary size is smaller than this threshold, scan the dictionary to get the matching dictionary ids
+  ///   first, where inverted index can be applied if exists
+  /// - Otherwise, read dictionary while scanning the forward index, cache the matching/unmatching dictionary ids
+  ///   during the scan
+  @Nullable
+  public static Integer getRegexDictSizeThreshold(Map<String, String> queryOptions) {
+    String regexDictSizeThreshold = queryOptions.get(QueryOptionKey.REGEX_DICT_SIZE_THRESHOLD);
+    return uncheckedParseInt(QueryOptionKey.REGEX_DICT_SIZE_THRESHOLD, regexDictSizeThreshold);
   }
 }

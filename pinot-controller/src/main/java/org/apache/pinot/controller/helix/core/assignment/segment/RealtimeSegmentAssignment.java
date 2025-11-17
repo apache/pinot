@@ -96,8 +96,7 @@ public class RealtimeSegmentAssignment extends BaseSegmentAssignment {
       SegmentAssignmentStrategy segmentAssignmentStrategy =
           SegmentAssignmentStrategyFactory.getSegmentAssignmentStrategy(_helixManager, _tableConfig,
               instancePartitionsType.toString(), instancePartitions);
-      instancesAssigned = segmentAssignmentStrategy.assignSegment(segmentName, currentAssignment, instancePartitions,
-          InstancePartitionsType.COMPLETED);
+      instancesAssigned = segmentAssignmentStrategy.assignSegment(segmentName, currentAssignment, instancePartitions);
     } else {
       instancesAssigned = assignConsumingSegment(segmentName, instancePartitions);
     }
@@ -184,17 +183,15 @@ public class RealtimeSegmentAssignment extends BaseSegmentAssignment {
         "Failed to find CONSUMING instance partitions for table: %s", _tableNameWithType);
     boolean includeConsuming = config.isIncludeConsuming();
     boolean bootstrap = config.isBootstrap();
-    // Rebalance tiers first
-    Pair<List<Map<String, Map<String, String>>>, Map<String, Map<String, String>>> pair =
-        rebalanceTiers(currentAssignment, sortedTiers, tierInstancePartitionsMap, bootstrap,
-            InstancePartitionsType.COMPLETED);
-
-    List<Map<String, Map<String, String>>> newTierAssignments = pair.getLeft();
-    Map<String, Map<String, String>> nonTierAssignment = pair.getRight();
-
     _logger.info("Rebalancing table: {} with COMPLETED instance partitions: {}, CONSUMING instance partitions: {}, "
             + "includeConsuming: {}, bootstrap: {}", _tableNameWithType, completedInstancePartitions,
         consumingInstancePartitions, includeConsuming, bootstrap);
+    // Rebalance tiers first
+    Pair<List<Map<String, Map<String, String>>>, Map<String, Map<String, String>>> pair =
+        rebalanceTiers(currentAssignment, sortedTiers, tierInstancePartitionsMap, bootstrap);
+
+    List<Map<String, Map<String, String>>> newTierAssignments = pair.getLeft();
+    Map<String, Map<String, String>> nonTierAssignment = pair.getRight();
 
     Set<String> committingSegments = null;
     if (PauselessConsumptionUtils.isPauselessEnabled(_tableConfig)) {
@@ -220,7 +217,7 @@ public class RealtimeSegmentAssignment extends BaseSegmentAssignment {
       _logger.info("Reassigning COMPLETED segments with COMPLETED instance partitions for table: {}",
           _tableNameWithType);
       newAssignment = reassignSegments(InstancePartitionsType.COMPLETED.toString(), completedSegmentAssignment,
-          completedInstancePartitions, bootstrap, segmentAssignmentStrategy, InstancePartitionsType.COMPLETED);
+          completedInstancePartitions, bootstrap, segmentAssignmentStrategy);
     } else {
       // When COMPLETED instance partitions are not provided, reassign COMPLETED segments the same way as CONSUMING
       // segments with CONSUMING instance partitions (ensure COMPLETED segments are served by the correct instances when

@@ -38,15 +38,26 @@ public class ArrayAggDistinctFloatFunction extends BaseArrayAggFloatFunction<Flo
   public void aggregate(int length, AggregationResultHolder aggregationResultHolder,
       Map<ExpressionContext, BlockValSet> blockValSetMap) {
     BlockValSet blockValSet = blockValSetMap.get(_expression);
-    float[] value = blockValSet.getFloatValuesSV();
     FloatOpenHashSet valueSet = aggregationResultHolder.getResult() != null ? aggregationResultHolder.getResult()
         : new FloatOpenHashSet(length);
-
-    forEachNotNull(length, blockValSet, (from, to) -> {
-      for (int i = from; i < to; i++) {
-        valueSet.add(value[i]);
-      }
-    });
+    if (blockValSet.isSingleValue()) {
+      float[] values = blockValSet.getFloatValuesSV();
+      forEachNotNull(length, blockValSet, (from, to) -> {
+        for (int i = from; i < to; i++) {
+          valueSet.add(values[i]);
+        }
+      });
+    } else {
+      float[][] valuesArray = blockValSet.getFloatValuesMV();
+      forEachNotNull(length, blockValSet, (from, to) -> {
+        for (int i = from; i < to; i++) {
+          float[] values = valuesArray[i];
+          for (float v : values) {
+            valueSet.add(v);
+          }
+        }
+      });
+    }
     aggregationResultHolder.setValue(valueSet);
   }
 

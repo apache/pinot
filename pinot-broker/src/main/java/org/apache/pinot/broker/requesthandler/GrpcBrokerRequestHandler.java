@@ -42,7 +42,7 @@ import org.apache.pinot.core.routing.SegmentsToQuery;
 import org.apache.pinot.core.routing.TableRouteInfo;
 import org.apache.pinot.core.transport.ServerInstance;
 import org.apache.pinot.core.transport.ServerRoutingInstance;
-import org.apache.pinot.spi.accounting.ThreadResourceUsageAccountant;
+import org.apache.pinot.spi.accounting.ThreadAccountant;
 import org.apache.pinot.spi.config.table.TableType;
 import org.apache.pinot.spi.env.PinotConfiguration;
 import org.apache.pinot.spi.query.QueryThreadContext;
@@ -66,9 +66,9 @@ public class GrpcBrokerRequestHandler extends BaseSingleStageBrokerRequestHandle
   public GrpcBrokerRequestHandler(PinotConfiguration config, String brokerId,
       BrokerRequestIdGenerator requestIdGenerator, RoutingManager routingManager,
       AccessControlFactory accessControlFactory, QueryQuotaManager queryQuotaManager, TableCache tableCache,
-      FailureDetector failureDetector, ThreadResourceUsageAccountant accountant) {
+      FailureDetector failureDetector, ThreadAccountant threadAccountant) {
     super(config, brokerId, requestIdGenerator, routingManager, accessControlFactory, queryQuotaManager, tableCache,
-        accountant);
+        threadAccountant);
     _streamingReduceService = new StreamingReduceService(config);
     _streamingQueryClient = new PinotServerStreamingQueryClient(GrpcConfig.buildGrpcQueryConfig(config));
     _failureDetector = failureDetector;
@@ -131,7 +131,7 @@ public class GrpcBrokerRequestHandler extends BaseSingleStageBrokerRequestHandle
       List<String> segments = routingEntry.getValue().getSegments();
       // TODO: enable throttling on per host bases.
       try {
-        String cid = QueryThreadContext.getCid() == null ? QueryThreadContext.getCid() : Long.toString(requestId);
+        String cid = QueryThreadContext.get().getExecutionContext().getCid();
         Iterator<Server.ServerResponse> streamingResponse = _streamingQueryClient.submit(serverInstance,
             new ServerGrpcRequestBuilder()
                 .setRequestId(requestId)

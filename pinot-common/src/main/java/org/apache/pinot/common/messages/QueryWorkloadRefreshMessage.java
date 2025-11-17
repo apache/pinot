@@ -45,7 +45,10 @@ public class QueryWorkloadRefreshMessage extends Message {
     setMsgSubType(messageSubType);
     // Give it infinite time to process the message, as long as session is alive
     setExecutionTimeout(-1);
-    QueryWorkloadConfigUtils.updateZNRecordWithInstanceCost(getRecord(), queryWorkloadName, instanceCost);
+    // We don't expect the instance cost for non-refresh message
+    if (messageSubType.equals(REFRESH_QUERY_WORKLOAD_MSG_SUB_TYPE)) {
+      QueryWorkloadConfigUtils.updateZNRecordWithInstanceCost(getRecord(), queryWorkloadName, instanceCost);
+    }
   }
 
   /**

@@ -34,6 +34,20 @@ public class RoundRobinPartitioner implements Partitioner {
 
   @Override
   public String getPartition(GenericRow genericRow) {
+    return getPartition();
+  }
+
+  @Override
+  public String[] getPartitionColumns() {
+    return new String[0]; // No columns needed
+  }
+
+  @Override
+  public String getPartitionFromColumns(Object[] columnValues) {
+    return getPartition();
+  }
+
+  private String getPartition() {
     int currentPartition = _nextPartition;
     _nextPartition = (_nextPartition + 1) % _numPartitions;
     return String.valueOf(currentPartition);

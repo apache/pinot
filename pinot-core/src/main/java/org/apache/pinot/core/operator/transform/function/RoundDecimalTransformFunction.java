@@ -88,9 +88,14 @@ public class RoundDecimalTransformFunction extends BaseTransformFunction {
     int length = valueBlock.getNumDocs();
     initDoubleValuesSV(length);
     double[] leftValues = _leftTransformFunction.transformToDoubleValuesSV(valueBlock);
+    // Follow standard PostgreSQL behavior where NaN and +/- Inf are returned as is
     if (_fixedScale) {
       for (int i = 0; i < length; i++) {
         double value = leftValues[i];
+        if (Double.isNaN(value) || Double.isInfinite(value)) {
+          _doubleValuesSV[i] = value;
+          continue;
+        }
         try {
           _doubleValuesSV[i] = BigDecimal.valueOf(value).setScale(_scale, RoundingMode.HALF_UP).doubleValue();
         } catch (Exception e) {
@@ -101,6 +106,10 @@ public class RoundDecimalTransformFunction extends BaseTransformFunction {
       int[] rightValues = _rightTransformFunction.transformToIntValuesSV(valueBlock);
       for (int i = 0; i < length; i++) {
         double value = leftValues[i];
+        if (Double.isNaN(value) || Double.isInfinite(value)) {
+          _doubleValuesSV[i] = value;
+          continue;
+        }
         int scale = rightValues[i];
         try {
           _doubleValuesSV[i] = BigDecimal.valueOf(value).setScale(scale, RoundingMode.HALF_UP).doubleValue();
@@ -111,11 +120,11 @@ public class RoundDecimalTransformFunction extends BaseTransformFunction {
     } else {
       for (int i = 0; i < length; i++) {
         double value = leftValues[i];
-        if (value == Double.NEGATIVE_INFINITY || value == Double.POSITIVE_INFINITY || Double.isNaN(value)) {
+        if (Double.isNaN(value) || Double.isInfinite(value)) {
           _doubleValuesSV[i] = value;
-        } else {
-          _doubleValuesSV[i] = Math.round(value);
+          continue;
         }
+        _doubleValuesSV[i] = Math.round(value);
       }
     }
     return _doubleValuesSV;
