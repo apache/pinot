@@ -204,7 +204,7 @@ public class ArithmeticFunctions {
     return Math.signum(a) * Math.floor(Math.abs(a));
   }
 
-  @ScalarFunction
+  @ScalarFunction(isDeterministic = false)
   public static double rand() {
     return ThreadLocalRandom.current().nextDouble();
   }
