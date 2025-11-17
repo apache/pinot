@@ -37,6 +37,7 @@ import org.apache.pinot.spi.utils.Enablement;
 import org.apache.pinot.spi.utils.builder.TableConfigBuilder;
 import org.testng.annotations.Test;
 
+import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 import static org.testng.Assert.assertEquals;
@@ -53,7 +54,7 @@ public class MinionTaskUtilsTest {
   public ClusterInfoAccessor getMockClusterInfo(String dataDir, String vipUrl) {
     ClusterInfoAccessor mockClusterInfo = mock(ClusterInfoAccessor.class);
     when(mockClusterInfo.getDataDir()).thenReturn(dataDir);
-    when(mockClusterInfo.getVipUrl()).thenReturn(vipUrl);
+    when(mockClusterInfo.getVipUrlForLeadController(any())).thenReturn(vipUrl);
     return mockClusterInfo;
   }
 
