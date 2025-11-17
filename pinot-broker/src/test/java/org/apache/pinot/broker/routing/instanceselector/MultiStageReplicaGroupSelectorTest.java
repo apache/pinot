@@ -18,8 +18,6 @@
  */
 package org.apache.pinot.broker.routing.instanceselector;
 
-import com.google.common.collect.ImmutableList;
-import com.google.common.collect.ImmutableMap;
 import java.time.Clock;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -95,8 +93,8 @@ public class MultiStageReplicaGroupSelectorTest {
   @Test
   public void testBasicReplicaGroupSelection() {
     // Create instance-partitions with two replica-groups and 1 partition. Each replica-group has 2 instances.
-    List<String> replicaGroup0 = ImmutableList.of("instance-0", "instance-1");
-    List<String> replicaGroup1 = ImmutableList.of("instance-2", "instance-3");
+    List<String> replicaGroup0 = List.of("instance-0", "instance-1");
+    List<String> replicaGroup1 = List.of("instance-2", "instance-3");
     InstancePartitions instancePartitions = createInstancePartitions(replicaGroup0, replicaGroup1);
     MultiStageReplicaGroupSelector multiStageSelector = createMultiStageSelector(instancePartitions);
 
@@ -158,8 +156,8 @@ public class MultiStageReplicaGroupSelectorTest {
   @Test
   public void testInstanceFailureHandling() {
     // Create instance-partitions with two replica-groups and 1 partition. Each replica-group has 2 instances.
-    List<String> replicaGroup0 = ImmutableList.of("instance-0", "instance-1");
-    List<String> replicaGroup1 = ImmutableList.of("instance-2", "instance-3");
+    List<String> replicaGroup0 = List.of("instance-0", "instance-1");
+    List<String> replicaGroup1 = List.of("instance-2", "instance-3");
     InstancePartitions instancePartitions = createInstancePartitions(replicaGroup0, replicaGroup1);
     MultiStageReplicaGroupSelector multiStageSelector = createMultiStageSelector(instancePartitions);
 
@@ -194,11 +192,11 @@ public class MultiStageReplicaGroupSelectorTest {
   @Test
   public void testErrorSegmentHandling() {
     // Create instance-partitions with two replica-groups and 2 partitions. Each replica-group has 2 instances.
-    Map<String, List<String>> partitionToInstances = ImmutableMap.of(
-        "0_0", ImmutableList.of("instance-0"),
-        "0_1", ImmutableList.of("instance-2"),
-        "1_0", ImmutableList.of("instance-1"),
-        "1_1", ImmutableList.of("instance-3"));
+    Map<String, List<String>> partitionToInstances = Map.of(
+        "0_0", List.of("instance-0"),
+        "0_1", List.of("instance-2"),
+        "1_0", List.of("instance-1"),
+        "1_1", List.of("instance-3"));
     InstancePartitions instancePartitions = new InstancePartitions(TABLE_NAME);
     instancePartitions.setInstances(0, 0, partitionToInstances.get("0_0"));
     instancePartitions.setInstances(0, 1, partitionToInstances.get("0_1"));
@@ -246,6 +244,40 @@ public class MultiStageReplicaGroupSelectorTest {
     }
   }
 
+  @Test
+  public void testInstancePartitionsIdealStateMismatchSegmentsDropped() {
+    // TODO: Fix this issue (described in https://github.com/apache/pinot/issues/17179) and update or remove this test.
+
+    // InstancePartitions updated to a new set of instances, while IdealState/ExternalView still reference old ones.
+    // This scenario can occur during a rebalance with instance reassignment, where the InstancePartitions in ZK are
+    // updated first, and then the IdealState is updated in batches.
+
+    // IP contains instances [instance-100..103], but IS/EV map segments to [instance-0..3].
+    List<String> newReplicaGroup0 = List.of("instance-100", "instance-101");
+    List<String> newReplicaGroup1 = List.of("instance-102", "instance-103");
+    InstancePartitions instancePartitions = createInstancePartitions(newReplicaGroup0, newReplicaGroup1);
+    MultiStageReplicaGroupSelector multiStageSelector = createMultiStageSelector(instancePartitions);
+
+    // Enabled instances and segment assignments still reference the old instances [instance-0..3]
+    List<String> enabledInstances = createEnabledInstances(4);
+    IdealState idealState = new IdealState(TABLE_NAME);
+    ExternalView externalView = new ExternalView(TABLE_NAME);
+    Set<String> onlineSegments = new HashSet<>();
+
+    setupBasicTestEnvironment(enabledInstances, idealState, externalView, onlineSegments);
+    multiStageSelector.init(new HashSet<>(enabledInstances), EMPTY_SERVER_MAP, idealState, externalView,
+        onlineSegments);
+
+    InstanceSelector.SelectionResult selectionResult = multiStageSelector.select(_brokerRequest, getSegments(), 0);
+
+    // Because instanceToPartitionMap is unaware of instances in IS/EV, segments get grouped under a null partition
+    // and are never considered in the [0..numPartitions) loop, resulting in dropped segments.
+    assertTrue(selectionResult.getSegmentToInstanceMap().isEmpty());
+    assertTrue(selectionResult.getOptionalSegmentToInstanceMap().isEmpty());
+    // Old segments are available in IS/EV, so they should not be marked as unavailable; they are effectively dropped.
+    assertTrue(selectionResult.getUnavailableSegments().isEmpty());
+  }
+
   private MultiStageReplicaGroupSelector createMultiStageSelector(InstancePartitions instancePartitions) {
     MultiStageReplicaGroupSelector multiStageSelector =
         new MultiStageReplicaGroupSelector(TABLE_NAME, _propertyStore, _brokerMetrics, null, Clock.systemUTC(),
@@ -256,7 +288,7 @@ public class MultiStageReplicaGroupSelectorTest {
   }
 
   private InstancePartitions createInstancePartitions(List<String> replicaGroup0, List<String> replicaGroup1) {
-    Map<String, List<String>> partitionToInstances = ImmutableMap.of("0_0", replicaGroup0, "0_1", replicaGroup1);
+    Map<String, List<String>> partitionToInstances = Map.of("0_0", replicaGroup0, "0_1", replicaGroup1);
     InstancePartitions instancePartitions = new InstancePartitions(TABLE_NAME);
     instancePartitions.setInstances(0, 0, partitionToInstances.get("0_0"));
     instancePartitions.setInstances(0, 1, partitionToInstances.get("0_1"));

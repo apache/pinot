@@ -125,9 +125,13 @@ public class PinotTableReloadStatusReporter {
     return reloadTaskStatusEndpoint;
   }
 
-  private static String constructReloadStatusEndpoint(PinotControllerJobMetadataDto reloadJob, String endpoint) {
-    return endpoint + "/controllerJob/reloadStatus/" + reloadJob.getTableNameWithType() + "?reloadJobTimestamp="
-        + reloadJob.getSubmissionTimeMs();
+  private static String constructReloadStatusEndpoint(PinotControllerJobMetadataDto jobMetadata, String endpoint) {
+    String url = endpoint + "/controllerJob/reloadStatus/" + jobMetadata.getTableNameWithType()
+        + "?reloadJobTimestamp=" + jobMetadata.getSubmissionTimeMs();
+    if (jobMetadata.getJobId() != null) {
+      url += "&reloadJobId=" + jobMetadata.getJobId();
+    }
+    return url;
   }
 
   public PinotTableReloadStatusResponse getReloadJobStatus(String reloadJobId)
@@ -149,15 +153,29 @@ public class PinotTableReloadStatusReporter {
         .setTotalServersQueried(serverUrls.size())
         .setTotalServerCallsFailed(serviceResponse._failedResponseCount);
 
+    long totalFailureCount = 0;
+    boolean hasFailureCountData = false;
+
     for (Map.Entry<String, String> streamResponse : serviceResponse._httpResponses.entrySet()) {
       String responseString = streamResponse.getValue();
       try {
         PinotTableReloadStatusResponse r =
             JsonUtils.stringToObject(responseString, PinotTableReloadStatusResponse.class);
         response.setSuccessCount(response.getSuccessCount() + r.getSuccessCount());
+
+        // Aggregate failure counts if available
+        if (r.getFailureCount() != null) {
+          totalFailureCount += r.getFailureCount();
+          hasFailureCountData = true;
+        }
       } catch (Exception e) {
         response.setTotalServerCallsFailed(response.getTotalServerCallsFailed() + 1);
       }
+    }
+
+    // Only set failure count if at least one server provided data
+    if (hasFailureCountData) {
+      response.setFailureCount(totalFailureCount);
     }
 
     // Add derived fields

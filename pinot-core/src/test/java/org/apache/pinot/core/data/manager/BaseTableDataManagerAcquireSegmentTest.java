@@ -18,7 +18,6 @@
  */
 package org.apache.pinot.core.data.manager;
 
-import com.google.common.collect.ImmutableList;
 import java.io.File;
 import java.lang.reflect.Field;
 import java.util.ArrayList;
@@ -43,6 +42,7 @@ import org.apache.pinot.segment.local.utils.SegmentMultiColTextIndexPreprocessTh
 import org.apache.pinot.segment.local.utils.SegmentOperationsThrottler;
 import org.apache.pinot.segment.local.utils.SegmentReloadSemaphore;
 import org.apache.pinot.segment.local.utils.SegmentStarTreePreprocessThrottler;
+import org.apache.pinot.segment.local.utils.ServerReloadJobStatusCache;
 import org.apache.pinot.segment.spi.ImmutableSegment;
 import org.apache.pinot.segment.spi.SegmentMetadata;
 import org.apache.pinot.spi.config.instance.InstanceDataManagerConfig;
@@ -135,7 +135,7 @@ public class BaseTableDataManagerAcquireSegmentTest {
     TableDataManager tableDataManager = new OfflineTableDataManager();
     tableDataManager.init(instanceDataManagerConfig, mock(HelixManager.class), new SegmentLocks(), tableConfig, schema,
         new SegmentReloadSemaphore(1), Executors.newSingleThreadExecutor(), null, null, segmentOperationsThrottler,
-        false);
+        false, mock(ServerReloadJobStatusCache.class));
     tableDataManager.start();
     Field segsMapField = BaseTableDataManager.class.getDeclaredField("_segmentDataManagerMap");
     segsMapField.setAccessible(true);
@@ -188,7 +188,7 @@ public class BaseTableDataManagerAcquireSegmentTest {
     // If a caller tries to acquire the deleted segment using acquireSegments, it will be returned in
     // notAcquiredSegments. The isSegmentDeletedRecently method should return true.
     List<String> notAcquiredSegments = new ArrayList<>();
-    tableDataManager.acquireSegments(ImmutableList.of(segmentName), notAcquiredSegments);
+    tableDataManager.acquireSegments(List.of(segmentName), notAcquiredSegments);
     Assert.assertEquals(notAcquiredSegments.size(), 1);
     Assert.assertTrue(tableDataManager.isSegmentDeletedRecently(segmentName));
 

@@ -21,7 +21,6 @@ package org.apache.pinot.broker.requesthandler;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
-import com.google.common.collect.ImmutableMap;
 import java.net.URI;
 import java.util.ArrayList;
 import java.util.Collections;
@@ -141,14 +140,22 @@ public abstract class BaseSingleStageBrokerRequestHandler extends BaseBrokerRequ
   private static final Expression TRUE = RequestUtils.getLiteralExpression(true);
   private static final Expression STAR = RequestUtils.getIdentifierExpression("*");
   private static final int MAX_UNAVAILABLE_SEGMENTS_TO_PRINT_IN_QUERY_EXCEPTION = 10;
-  private static final Map<String, String> DISTINCT_MV_COL_FUNCTION_OVERRIDE_MAP =
-      ImmutableMap.<String, String>builder().put("distinctcount", "distinctcountmv")
-          .put("distinctcountbitmap", "distinctcountbitmapmv").put("distinctcounthll", "distinctcounthllmv")
-          .put("distinctcountrawhll", "distinctcountrawhllmv").put("distinctsum", "distinctsummv")
-          .put("distinctavg", "distinctavgmv").put("count", "countmv").put("min", "minmv").put("max", "maxmv")
-          .put("avg", "avgmv").put("sum", "summv").put("minmaxrange", "minmaxrangemv")
-          .put("distinctcounthllplus", "distinctcounthllplusmv")
-          .put("distinctcountrawhllplus", "distinctcountrawhllplusmv").build();
+  private static final Map<String, String> DISTINCT_MV_COL_FUNCTION_OVERRIDE_MAP = Map.ofEntries(
+      Map.entry("distinctcount", "distinctcountmv"),
+      Map.entry("distinctcountbitmap", "distinctcountbitmapmv"),
+      Map.entry("distinctcounthll", "distinctcounthllmv"),
+      Map.entry("distinctcountrawhll", "distinctcountrawhllmv"),
+      Map.entry("distinctsum", "distinctsummv"),
+      Map.entry("distinctavg", "distinctavgmv"),
+      Map.entry("count", "countmv"),
+      Map.entry("min", "minmv"),
+      Map.entry("max", "maxmv"),
+      Map.entry("avg", "avgmv"),
+      Map.entry("sum", "summv"),
+      Map.entry("minmaxrange", "minmaxrangemv"),
+      Map.entry("distinctcounthllplus", "distinctcounthllplusmv"),
+      Map.entry("distinctcountrawhllplus", "distinctcountrawhllplusmv")
+  );
 
   protected final QueryOptimizer _queryOptimizer = new QueryOptimizer();
   protected final boolean _disableGroovy;
@@ -1089,6 +1096,7 @@ public abstract class BaseSingleStageBrokerRequestHandler extends BaseBrokerRequ
       LOGGER.warn("Caught exception while building empty response for request {}: {}, {}",
           requestContext.getRequestId(), query, e.getMessage());
     }
+    brokerResponse.setTablesQueried(Set.of(TableNameBuilder.extractRawTableName(tableName)));
     brokerResponse.setTimeUsedMs(System.currentTimeMillis() - requestContext.getRequestArrivalTimeMillis());
     _queryLogger.log(new QueryLogger.QueryLogParams(requestContext, tableName, brokerResponse,
         QueryLogger.QueryLogParams.QueryEngine.SINGLE_STAGE, requesterIdentity, null));
@@ -1208,6 +1216,12 @@ public abstract class BaseSingleStageBrokerRequestHandler extends BaseBrokerRequ
       if (_enableNullHandling != null) {
         sqlNodeAndOptions.getOptions()
             .putIfAbsent(Broker.Request.QueryOptionKey.ENABLE_NULL_HANDLING, _enableNullHandling);
+      }
+
+      // Add auto rewrite aggregation type option from broker config only if there is no override in the query
+      if (_enableAutoRewriteAggregationType != null) {
+        sqlNodeAndOptions.getOptions()
+            .putIfAbsent(QueryOptionKey.AUTO_REWRITE_AGGREGATION_TYPE, _enableAutoRewriteAggregationType);
       }
 
       if (_regexDictSizeThreshold != null) {

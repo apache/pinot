@@ -65,10 +65,21 @@ public class ListAggFunction extends NullableSingleInputAggregationFunction<Obje
       Map<ExpressionContext, BlockValSet> blockValSetMap) {
     ObjectCollection<String> valueSet = getObjectCollection(aggregationResultHolder);
     BlockValSet blockValSet = blockValSetMap.get(_expression);
-    String[] values = blockValSet.getStringValuesSV();
-    forEachNotNull(length, blockValSet, (from, to) -> {
-      valueSet.addAll(Arrays.asList(values).subList(from, to));
-    });
+    if (blockValSet.isSingleValue()) {
+      String[] values = blockValSet.getStringValuesSV();
+      forEachNotNull(length, blockValSet, (from, to) -> {
+        valueSet.addAll(Arrays.asList(values).subList(from, to));
+      });
+    } else {
+      String[][] valuesArray = blockValSet.getStringValuesMV();
+      forEachNotNull(length, blockValSet, (from, to) -> {
+        for (int i = from; i < to; i++) {
+          for (String v : valuesArray[i]) {
+            valueSet.add(v);
+          }
+        }
+      });
+    }
   }
 
   protected ObjectCollection<String> getObjectCollection(AggregationResultHolder aggregationResultHolder) {
@@ -94,28 +105,55 @@ public class ListAggFunction extends NullableSingleInputAggregationFunction<Obje
   public void aggregateGroupBySV(int length, int[] groupKeyArray, GroupByResultHolder groupByResultHolder,
       Map<ExpressionContext, BlockValSet> blockValSetMap) {
     BlockValSet blockValSet = blockValSetMap.get(_expression);
-    String[] values = blockValSet.getStringValuesSV();
-    forEachNotNull(length, blockValSet, (from, to) -> {
-      for (int i = from; i < to; i++) {
-        ObjectCollection<String> groupValueList = getObjectCollection(groupByResultHolder, groupKeyArray[i]);
-        groupValueList.add(values[i]);
-      }
-    });
+    if (blockValSet.isSingleValue()) {
+      String[] values = blockValSet.getStringValuesSV();
+      forEachNotNull(length, blockValSet, (from, to) -> {
+        for (int i = from; i < to; i++) {
+          ObjectCollection<String> groupValueList = getObjectCollection(groupByResultHolder, groupKeyArray[i]);
+          groupValueList.add(values[i]);
+        }
+      });
+    } else {
+      String[][] valuesArray = blockValSet.getStringValuesMV();
+      forEachNotNull(length, blockValSet, (from, to) -> {
+        for (int i = from; i < to; i++) {
+          ObjectCollection<String> groupValueList = getObjectCollection(groupByResultHolder, groupKeyArray[i]);
+          for (String v : valuesArray[i]) {
+            groupValueList.add(v);
+          }
+        }
+      });
+    }
   }
 
   @Override
   public void aggregateGroupByMV(int length, int[][] groupKeysArray, GroupByResultHolder groupByResultHolder,
       Map<ExpressionContext, BlockValSet> blockValSetMap) {
     BlockValSet blockValSet = blockValSetMap.get(_expression);
-    String[] values = blockValSet.getStringValuesSV();
-    forEachNotNull(length, blockValSet, (from, to) -> {
-      for (int i = from; i < to; i++) {
-        for (int groupKey : groupKeysArray[i]) {
-          ObjectCollection<String> groupValueList = getObjectCollection(groupByResultHolder, groupKey);
-          groupValueList.add(values[i]);
+    if (blockValSet.isSingleValue()) {
+      String[] values = blockValSet.getStringValuesSV();
+      forEachNotNull(length, blockValSet, (from, to) -> {
+        for (int i = from; i < to; i++) {
+          for (int groupKey : groupKeysArray[i]) {
+            ObjectCollection<String> groupValueList = getObjectCollection(groupByResultHolder, groupKey);
+            groupValueList.add(values[i]);
+          }
         }
-      }
-    });
+      });
+    } else {
+      String[][] valuesArray = blockValSet.getStringValuesMV();
+      forEachNotNull(length, blockValSet, (from, to) -> {
+        for (int i = from; i < to; i++) {
+          int[] groupKeys = groupKeysArray[i];
+          for (int groupKey : groupKeys) {
+            ObjectCollection<String> groupValueList = getObjectCollection(groupByResultHolder, groupKey);
+            for (String v : valuesArray[i]) {
+              groupValueList.add(v);
+            }
+          }
+        }
+      });
+    }
   }
 
   @Override

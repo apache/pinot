@@ -1096,7 +1096,7 @@ public class RealtimeSegmentDataManager extends SegmentDataManager {
    */
   private void reportDataLoss(MessageBatch messageBatch) {
     if (messageBatch.hasDataLoss()) {
-      _serverMetrics.setValueOfTableGauge(_tableStreamName, ServerGauge.STREAM_DATA_LOSS, 1L);
+      _serverMetrics.setValueOfTableGauge(_clientId, ServerGauge.STREAM_DATA_LOSS, 1L);
       String message = "Message loss detected in stream partition: " + _partitionGroupId + " for table: "
           + _tableNameWithType + " startOffset: " + _currentOffset + " batchFirstOffset: "
           + messageBatch.getFirstMessageOffset();
@@ -1508,6 +1508,15 @@ public class RealtimeSegmentDataManager extends SegmentDataManager {
           }
           // Allow to catch up upto final offset, and then replace.
           if (_currentOffset.compareTo(endOffset) > 0) {
+            // For a partial upsert table, if a server consumed data ahead of committed offset(i.e w.r.t winning
+            // server) it can cause data inconsistencies and data correctness problems. For example,
+            // during reload/ force commit / pause & resume consumption operations a server with lowest consumed rows
+            // can be chosen as a winner if controller hasn't received messages from other servers. In such situations,
+            // the record location in the metadata would be left dangling considering those primary keys as first
+            // rather than merging it with previous entry
+            if (_realtimeTableDataManager.isPartialUpsertEnabled()) {
+              _serverMetrics.addMeteredTableValue(_clientId, ServerMeter.REALTIME_ROWS_AHEAD_OF_ZK, 1L);
+            }
             // We moved ahead of the offset that is committed in ZK.
             _segmentLogger.warn("Current offset {} ahead of the offset in zk {}. Downloading to replace",
                 _currentOffset, endOffset);
@@ -2029,7 +2038,7 @@ public class RealtimeSegmentDataManager extends SegmentDataManager {
     if (metadata != null) {
       try {
         _realtimeTableDataManager.updateIngestionMetrics(_segmentNameStr, _partitionGroupId,
-            metadata.getRecordIngestionTimeMs(), metadata.getOffset());
+            metadata.getRecordIngestionTimeMs(), metadata.getFirstStreamRecordIngestionTimeMs(), metadata.getOffset());
       } catch (Exception e) {
         _segmentLogger.warn("Failed to update the ingestion metrics", e);
       }
@@ -2042,7 +2051,8 @@ public class RealtimeSegmentDataManager extends SegmentDataManager {
    */
   private void setIngestionDelayToZero() {
     long currentTimeMs = System.currentTimeMillis();
-    _realtimeTableDataManager.updateIngestionMetrics(_segmentNameStr, _partitionGroupId, currentTimeMs, null);
+    _realtimeTableDataManager.updateIngestionMetrics(_segmentNameStr, _partitionGroupId, currentTimeMs, currentTimeMs,
+        null);
   }
 
   // This should be done during commit? We may not always commit when we build a segment....

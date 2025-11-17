@@ -80,6 +80,8 @@ import org.apache.pinot.segment.local.utils.SegmentDownloadThrottler;
 import org.apache.pinot.segment.local.utils.SegmentLocks;
 import org.apache.pinot.segment.local.utils.SegmentOperationsThrottler;
 import org.apache.pinot.segment.local.utils.SegmentReloadSemaphore;
+import org.apache.pinot.segment.local.utils.ServerReloadJobStatusCache;
+import org.apache.pinot.segment.local.utils.TableConfigUtils;
 import org.apache.pinot.segment.spi.ColumnMetadata;
 import org.apache.pinot.segment.spi.ImmutableSegment;
 import org.apache.pinot.segment.spi.IndexSegment;
@@ -109,6 +111,8 @@ import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.utils.CommonConstants;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+
+import static java.util.Objects.requireNonNull;
 
 
 @ThreadSafe
@@ -157,16 +161,19 @@ public abstract class BaseTableDataManager implements TableDataManager {
   protected volatile boolean _isDeleted;
 
   protected boolean _enableAsyncSegmentRefresh;
+  protected ServerReloadJobStatusCache _reloadJobStatusCache;
 
   @Override
   public void init(InstanceDataManagerConfig instanceDataManagerConfig, HelixManager helixManager,
       SegmentLocks segmentLocks, TableConfig tableConfig, Schema schema, SegmentReloadSemaphore segmentReloadSemaphore,
       ExecutorService segmentReloadRefreshExecutor, @Nullable ExecutorService segmentPreloadExecutor,
       @Nullable Cache<Pair<String, String>, SegmentErrorInfo> errorCache,
-      @Nullable SegmentOperationsThrottler segmentOperationsThrottler, boolean enableAsyncSegmentRefresh) {
+      @Nullable SegmentOperationsThrottler segmentOperationsThrottler, boolean enableAsyncSegmentRefresh,
+      ServerReloadJobStatusCache reloadJobStatusCache) {
     LOGGER.info("Initializing table data manager for table: {}", tableConfig.getTableName());
 
     _instanceDataManagerConfig = instanceDataManagerConfig;
+    _reloadJobStatusCache = requireNonNull(reloadJobStatusCache, "reloadJobStatusCache cannot be null");
     _instanceId = instanceDataManagerConfig.getInstanceId();
     _helixManager = helixManager;
     _propertyStore = helixManager.getHelixPropertyStore();
@@ -569,7 +576,7 @@ public abstract class BaseTableDataManager implements TableDataManager {
   }
 
   @Override
-  public void reloadSegment(String segmentName, boolean forceDownload)
+  public void reloadSegment(String segmentName, boolean forceDownload, String reloadJobId)
       throws Exception {
     Preconditions.checkState(!_shutDown,
         "Table data manager is already shut down, cannot reload segment: %s in table: %s", segmentName,
@@ -590,20 +597,20 @@ public abstract class BaseTableDataManager implements TableDataManager {
   }
 
   @Override
-  public void reloadAllSegments(boolean forceDownload)
+  public void reloadAllSegments(boolean forceDownload, String reloadJobId)
       throws Exception {
     Preconditions.checkState(!_shutDown,
         "Table data manager is already shut down, cannot reload all segments in table: %s", _tableNameWithType);
     _logger.info("Reloading all segments with forceDownload: {}", forceDownload);
     List<SegmentDataManager> segmentDataManagers = new ArrayList<>(_segmentDataManagerMap.values());
     if (!segmentDataManagers.isEmpty()) {
-      reloadSegments(segmentDataManagers, fetchIndexLoadingConfig(), forceDownload);
+      reloadSegments(segmentDataManagers, fetchIndexLoadingConfig(), forceDownload, reloadJobId);
     }
     _logger.info("Reloaded all {} segments with forceDownload: {}", segmentDataManagers.size(), forceDownload);
   }
 
   @Override
-  public void reloadSegments(List<String> segmentNames, boolean forceDownload)
+  public void reloadSegments(List<String> segmentNames, boolean forceDownload, String reloadJobId)
       throws Exception {
     Preconditions.checkState(!_shutDown,
         "Table data manager is already shut down, cannot reload segments: %s in table: %s", segmentNames,
@@ -620,7 +627,7 @@ public abstract class BaseTableDataManager implements TableDataManager {
       }
     }
     if (!segmentDataManagers.isEmpty()) {
-      reloadSegments(segmentDataManagers, fetchIndexLoadingConfig(), forceDownload);
+      reloadSegments(segmentDataManagers, fetchIndexLoadingConfig(), forceDownload, reloadJobId);
     }
     if (missingSegments.isEmpty()) {
       _logger.info("Reloaded segments: {} with forceDownload: {}", segmentNames, forceDownload);
@@ -776,7 +783,7 @@ public abstract class BaseTableDataManager implements TableDataManager {
   }
 
   private void reloadSegments(List<SegmentDataManager> segmentDataManagers, IndexLoadingConfig indexLoadingConfig,
-      boolean forceDownload)
+      boolean forceDownload, String reloadJobId)
       throws Exception {
     List<String> failedSegments = new ArrayList<>();
     AtomicReference<Throwable> sampleException = new AtomicReference<>();
@@ -793,6 +800,9 @@ public abstract class BaseTableDataManager implements TableDataManager {
         _logger.error("Caught exception while reloading segment: {}", segmentName, t);
         failedSegments.add(segmentName);
         sampleException.set(t);
+        if (reloadJobId != null) {
+          _reloadJobStatusCache.getOrCreate(reloadJobId).incrementAndGetFailureCount();
+        }
       }
     }, _segmentReloadRefreshExecutor)).toArray(CompletableFuture[]::new)).get();
     if (sampleException.get() != null) {
@@ -809,8 +819,19 @@ public abstract class BaseTableDataManager implements TableDataManager {
     if (segmentDataManager instanceof RealtimeSegmentDataManager) {
       // Use force commit to reload consuming segment
       if (_instanceDataManagerConfig.shouldReloadConsumingSegment()) {
-        _logger.info("Reloading (force committing) consuming segment: {}", segmentName);
-        ((RealtimeSegmentDataManager) segmentDataManager).forceCommit();
+        // For partial upsert tables, force-committing consuming segments is disabled.
+        // In some cases (especially when replication > 1), the server with fewer consumed rows
+        // was incorrectly chosen as the winner, causing other servers to reconsume rows
+        // and leading to inconsistent data.
+        // TODO: Temporarily disabled until a proper fix is implemented.
+        TableConfig tableConfig = indexLoadingConfig.getTableConfig();
+        if (TableConfigUtils.checkForPartialUpsertWithReplicas(tableConfig)) {
+          _logger.warn("Skipping reload (force committing) on consuming segment: {} for a Partial Upsert Table with "
+              + "replication > 1", segmentName);
+        } else {
+          _logger.info("Reloading (force committing) consuming segment: {}", segmentName);
+          ((RealtimeSegmentDataManager) segmentDataManager).forceCommit();
+        }
       } else {
         _logger.warn("Skip reloading consuming segment: {} as configured", segmentName);
       }

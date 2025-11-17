@@ -596,6 +596,9 @@ public class CommonConstants {
     @Deprecated
     public static final int FALLBACK_REPLICA_GROUP_ID = -1;
 
+    public static final String CONFIG_OF_BROKER_QUERY_ENABLE_AUTO_REWRITE_AGGREGATION_TYPE =
+        "pinot.broker.query.enable.auto.rewrite.aggregation.type";
+
     public static class Request {
       public static final String SQL = "sql";
       public static final String SQL_V1 = "sqlV1";
@@ -733,6 +736,11 @@ public class CommonConstants {
 
         public static final String DROP_RESULTS = "dropResults";
 
+        // Exclude virtual columns (columns starting with '$') from table schema
+        // This is typically used for NATURAL JOIN operations where virtual columns
+        // should not participate in join condition matching. Can only be used in MSE as of now
+        public static final String EXCLUDE_VIRTUAL_COLUMNS = "excludeVirtualColumns";
+
         // Maximum number of pending results blocks allowed in the streaming operator
         public static final String MAX_STREAMING_PENDING_BLOCKS = "maxStreamingPendingBlocks";
 
@@ -827,6 +835,14 @@ public class CommonConstants {
         // Option denoting the workloadName to which the query belongs. This is used to enforce resource budgets for
         // each workload if "Query Workload Isolation" feature enabled.
         public static final String WORKLOAD_NAME = "workloadName";
+
+        // Option to enable auto rewrite of certain aggregations based on input operand type. This can be enabled to
+        // improve performance and also avoid precision loss from default double based aggregations. This will be turned
+        // on by default in a future release. Examples of rewrites:
+        // MIN(longCol) -> MINLONG(longCol)
+        // MAX(stringCol) -> MAXSTRING(stringCol)
+        // SUM(intCol) -> SUMINT(intCol)
+        public static final String AUTO_REWRITE_AGGREGATION_TYPE = "autoRewriteAggregationType";
       }
 
       public static class QueryOptionValue {
@@ -897,7 +913,8 @@ public class CommonConstants {
         PlannerRuleNames.SORT_JOIN_TRANSPOSE,
         PlannerRuleNames.SORT_JOIN_COPY,
         PlannerRuleNames.AGGREGATE_UNION_AGGREGATE,
-        PlannerRuleNames.JOIN_TO_ENRICHED_JOIN
+        PlannerRuleNames.JOIN_TO_ENRICHED_JOIN,
+        PlannerRuleNames.AGGREGATE_FUNCTION_REWRITE
     );
 
     public static class FailureDetector {

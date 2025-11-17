@@ -88,7 +88,7 @@ public class Tracing {
     static final FallbackTracer INSTANCE = new FallbackTracer();
 
     @Override
-    public void register(long requestId) {
+    public void register() {
     }
 
     @Override
