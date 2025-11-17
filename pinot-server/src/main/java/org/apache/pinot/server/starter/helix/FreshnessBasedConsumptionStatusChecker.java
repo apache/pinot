@@ -19,12 +19,12 @@
 
 package org.apache.pinot.server.starter.helix;
 
-import java.util.Collections;
 import java.util.Map;
 import java.util.Set;
 import java.util.function.Function;
 import org.apache.pinot.core.data.manager.InstanceDataManager;
 import org.apache.pinot.core.data.manager.realtime.RealtimeSegmentDataManager;
+import org.apache.pinot.core.data.manager.realtime.RealtimeSegmentMetadataUtils;
 import org.apache.pinot.core.data.manager.realtime.RealtimeTableDataManager;
 import org.apache.pinot.spi.stream.StreamMetadataProvider;
 import org.apache.pinot.spi.stream.StreamPartitionMsgOffset;
@@ -39,7 +39,6 @@ import org.apache.pinot.spi.stream.StreamPartitionMsgOffset;
  *   - the last ingested message is within {@link #_minFreshnessMs} of the current system time
  */
 public class FreshnessBasedConsumptionStatusChecker extends IngestionBasedConsumptionStatusChecker {
-  private static final long STREAM_METADATA_FETCH_TIMEOUT_MS = 5000;
   private final long _minFreshnessMs;
   private final long _idleTimeoutMs;
 
@@ -81,17 +80,8 @@ public class FreshnessBasedConsumptionStatusChecker extends IngestionBasedConsum
 
     StreamMetadataProvider streamMetadataProvider =
         realtimeTableDataManager.getStreamMetadataProvider(rtSegmentDataManager);
-    StreamPartitionMsgOffset latestStreamOffset;
-    try {
-      int partitionId = rtSegmentDataManager.getStreamPartitionId();
-      Map<Integer, StreamPartitionMsgOffset> partitionMsgOffsetMap =
-          streamMetadataProvider.fetchLatestStreamOffset(Collections.singleton(partitionId),
-              STREAM_METADATA_FETCH_TIMEOUT_MS);
-      latestStreamOffset = partitionMsgOffsetMap.get(partitionId);
-    } catch (Exception e) {
-      _logger.error("Failed to fetch latest stream partition offset for segment: {}", segmentName, e);
-      throw new RuntimeException(e);
-    }
+    StreamPartitionMsgOffset latestStreamOffset =
+        RealtimeSegmentMetadataUtils.fetchLatestStreamOffset(rtSegmentDataManager, streamMetadataProvider);
 
     if (isOffsetCaughtUp(segmentName, currentOffset, latestStreamOffset)) {
       _logger.info("Segment {} with freshness {}ms has not caught up within min freshness {}. "
