@@ -102,10 +102,10 @@ public class MinMaxRangeValueAggregator implements ValueAggregator<Object, MinMa
       case LONG:
       case DOUBLE:
       case FLOAT:
-        value.apply(((Number) rawValue).doubleValue(), 1L);
+        value.apply(((Number) rawValue).doubleValue());
         return value;
       case STRING:
-        value.apply(Double.parseDouble((String) rawValue), 1L);
+        value.apply(Double.parseDouble((String) rawValue));
         return value;
       default:
         throw new UnsupportedOperationException(
