@@ -30,7 +30,7 @@ import javax.annotation.Nullable;
 import javax.annotation.concurrent.ThreadSafe;
 import org.apache.commons.configuration2.MapConfiguration;
 import org.apache.commons.lang3.exception.ExceptionUtils;
-import org.apache.pinot.common.response.server.SegmentReloadFailureResponse;
+import org.apache.pinot.common.response.server.SegmentReloadFailure;
 import org.apache.pinot.spi.config.provider.PinotClusterConfigChangeListener;
 import org.apache.pinot.spi.env.PinotConfiguration;
 import org.slf4j.Logger;
@@ -132,17 +132,16 @@ public class ServerReloadJobStatusCache implements PinotClusterConfigChangeListe
       status.incrementAndGetFailureCount();
 
       // Only add details if under limit (check config in cache layer)
-      List<SegmentReloadFailureResponse> details = status.getFailedSegmentDetails();
+      List<SegmentReloadFailure> details = status.getFailedSegmentDetails();
       int maxLimit = _currentConfig.getSegmentFailureDetailsCount();
 
       if (details.size() < maxLimit) {
-        SegmentReloadFailureResponse failureDto = new SegmentReloadFailureResponse()
+        details.add(new SegmentReloadFailure()
             .setSegmentName(segmentName)
             .setServerName(_instanceId)
             .setErrorMessage(exception.getMessage())
             .setStackTrace(ExceptionUtils.getStackTrace(exception))
-            .setFailedAtMs(System.currentTimeMillis());
-        details.add(failureDto);
+            .setFailedAtMs(System.currentTimeMillis()));
       }
     }
   }

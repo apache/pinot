@@ -29,7 +29,7 @@ import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
-import org.apache.pinot.common.response.server.SegmentReloadFailureResponse;
+import org.apache.pinot.common.response.server.SegmentReloadFailure;
 import org.testng.annotations.Test;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -42,7 +42,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 public class ServerReloadJobStatusCacheTest {
 
   // Helper method to get failed segment details from cache
-  private static List<SegmentReloadFailureResponse> getFailedSegmentDetails(ServerReloadJobStatusCache cache,
+  private static List<SegmentReloadFailure> getFailedSegmentDetails(ServerReloadJobStatusCache cache,
       String jobId) {
     ReloadJobStatus status = cache.getJobStatus(jobId);
     if (status == null) {
@@ -365,7 +365,7 @@ public class ServerReloadJobStatusCacheTest {
 
     // Then - Count should be 10, but only first 5 details stored
     assertThat(cache.getJobStatus(jobId).getFailureCount()).isEqualTo(10);
-    List<SegmentReloadFailureResponse> details = getFailedSegmentDetails(cache, jobId);
+    List<SegmentReloadFailure> details = getFailedSegmentDetails(cache, jobId);
     assertThat(details).hasSize(5);
     assertThat(details.get(0).getSegmentName()).isEqualTo("segment_1");
     assertThat(details.get(4).getSegmentName()).isEqualTo("segment_5");
@@ -388,7 +388,7 @@ public class ServerReloadJobStatusCacheTest {
 
     // Then - Count should be 5, but only first 3 details stored
     assertThat(cache.getJobStatus(jobId).getFailureCount()).isEqualTo(5);
-    List<SegmentReloadFailureResponse> details = getFailedSegmentDetails(cache, jobId);
+    List<SegmentReloadFailure> details = getFailedSegmentDetails(cache, jobId);
     assertThat(details).hasSize(3);
     assertThat(details.get(0).getSegmentName()).isEqualTo("segment_1");
     assertThat(details.get(2).getSegmentName()).isEqualTo("segment_3");

@@ -27,7 +27,7 @@ public class ServerReloadStatusResponse {
   private long _totalSegmentCount;
   private long _successCount;
   private Long _failureCount;
-  private List<SegmentReloadFailureResponse> _failedSegments;
+  private List<SegmentReloadFailure> _sampleSegmentReloadFailures;
 
   public long getTotalSegmentCount() {
     return _totalSegmentCount;
@@ -58,12 +58,13 @@ public class ServerReloadStatusResponse {
   }
 
   @Nullable
-  public List<SegmentReloadFailureResponse> getFailedSegments() {
-    return _failedSegments;
+  public List<SegmentReloadFailure> getSampleSegmentReloadFailures() {
+    return _sampleSegmentReloadFailures;
   }
 
-  public ServerReloadStatusResponse setFailedSegments(List<SegmentReloadFailureResponse> failedSegments) {
-    _failedSegments = failedSegments;
+  public ServerReloadStatusResponse setSampleSegmentReloadFailures(
+      List<SegmentReloadFailure> sampleSegmentReloadFailures) {
+    _sampleSegmentReloadFailures = sampleSegmentReloadFailures;
     return this;
   }
 }

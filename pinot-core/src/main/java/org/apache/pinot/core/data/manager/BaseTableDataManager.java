@@ -816,9 +816,6 @@ public abstract class BaseTableDataManager implements TableDataManager {
       boolean forceDownload)
       throws Exception {
     String segmentName = segmentDataManager.getSegmentName();
-    if (true) {
-      throw new RuntimeException("UNFORTUNATE KABOOM");
-    }
     if (segmentDataManager instanceof RealtimeSegmentDataManager) {
       // Use force commit to reload consuming segment
       if (_instanceDataManagerConfig.shouldReloadConsumingSegment()) {

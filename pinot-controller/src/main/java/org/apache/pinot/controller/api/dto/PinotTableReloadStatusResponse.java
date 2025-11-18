@@ -20,7 +20,7 @@ package org.apache.pinot.controller.api.dto;
 
 import java.util.List;
 import javax.annotation.Nullable;
-import org.apache.pinot.common.response.server.SegmentReloadFailureResponse;
+import org.apache.pinot.common.response.server.SegmentReloadFailure;
 
 
 public class PinotTableReloadStatusResponse {
@@ -32,7 +32,7 @@ public class PinotTableReloadStatusResponse {
   private int _totalServerCallsFailed;
   private Long _failureCount;
   private PinotControllerJobMetadataDto _metadata;
-  private List<SegmentReloadFailureResponse> _failedSegments;
+  private List<SegmentReloadFailure> _sampleSegmentReloadFailures;
 
   public int getTotalSegmentCount() {
     return _totalSegmentCount;
@@ -109,12 +109,13 @@ public class PinotTableReloadStatusResponse {
   }
 
   @Nullable
-  public List<SegmentReloadFailureResponse> getFailedSegments() {
-    return _failedSegments;
+  public List<SegmentReloadFailure> getSampleSegmentReloadFailures() {
+    return _sampleSegmentReloadFailures;
   }
 
-  public PinotTableReloadStatusResponse setFailedSegments(List<SegmentReloadFailureResponse> failedSegments) {
-    _failedSegments = failedSegments;
+  public PinotTableReloadStatusResponse setSampleSegmentReloadFailures(
+      List<SegmentReloadFailure> sampleSegmentReloadFailures) {
+    _sampleSegmentReloadFailures = sampleSegmentReloadFailures;
     return this;
   }
 }

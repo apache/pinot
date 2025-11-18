@@ -35,7 +35,7 @@ import javax.ws.rs.core.Response;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.hc.client5.http.io.HttpClientConnectionManager;
 import org.apache.pinot.common.exception.InvalidConfigException;
-import org.apache.pinot.common.response.server.SegmentReloadFailureResponse;
+import org.apache.pinot.common.response.server.SegmentReloadFailure;
 import org.apache.pinot.common.response.server.ServerReloadStatusResponse;
 import org.apache.pinot.common.utils.URIUtils;
 import org.apache.pinot.controller.api.dto.PinotControllerJobMetadataDto;
@@ -180,14 +180,15 @@ public class PinotTableReloadStatusReporter {
       response.setFailureCount(totalFailureCount);
     }
 
-    List<SegmentReloadFailureResponse> allFailedSegments = new ArrayList<>();
+    List<SegmentReloadFailure> allFailedSegments = new ArrayList<>();
     for (Map.Entry<String, String> streamResponse : serviceResponse._httpResponses.entrySet()) {
       String responseString = streamResponse.getValue();
       try {
         ServerReloadStatusResponse serverResponse =
             JsonUtils.stringToObject(responseString, ServerReloadStatusResponse.class);
-        if (serverResponse.getFailedSegments() != null && !serverResponse.getFailedSegments().isEmpty()) {
-          allFailedSegments.addAll(serverResponse.getFailedSegments());
+        if (serverResponse.getSampleSegmentReloadFailures() != null
+            && !serverResponse.getSampleSegmentReloadFailures().isEmpty()) {
+          allFailedSegments.addAll(serverResponse.getSampleSegmentReloadFailures());
         }
       } catch (Exception e) {
         // Already handled in existing code above
@@ -204,7 +205,7 @@ public class PinotTableReloadStatusReporter {
             allFailedSegments.size(), maxFailuresInResponse, reloadJobId);
         allFailedSegments = allFailedSegments.subList(0, maxFailuresInResponse);
       }
-      response.setFailedSegments(allFailedSegments);
+      response.setSampleSegmentReloadFailures(allFailedSegments);
     }
 
     // Add derived fields
