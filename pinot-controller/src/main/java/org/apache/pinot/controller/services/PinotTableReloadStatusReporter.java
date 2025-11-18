@@ -200,7 +200,7 @@ public class PinotTableReloadStatusReporter {
             allFailedSegments.size(), maxFailuresInResponse, reloadJobId);
         allFailedSegments = allFailedSegments.subList(0, maxFailuresInResponse);
       }
-      response.setSampleSegmentReloadFailures(allFailedSegments);
+      response.setSegmentReloadFailures(allFailedSegments);
     }
 
     // Add derived fields

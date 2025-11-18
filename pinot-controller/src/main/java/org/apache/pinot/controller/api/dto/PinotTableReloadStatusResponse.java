@@ -19,7 +19,6 @@
 package org.apache.pinot.controller.api.dto;
 
 import java.util.List;
-import javax.annotation.Nullable;
 import org.apache.pinot.common.response.server.SegmentReloadFailureResponse;
 import org.apache.pinot.spi.annotations.InterfaceStability;
 
@@ -110,14 +109,13 @@ public class PinotTableReloadStatusResponse {
     return this;
   }
 
-  @Nullable
-  public List<SegmentReloadFailureResponse> getSampleSegmentReloadFailures() {
+  public List<SegmentReloadFailureResponse> getSegmentReloadFailures() {
     return _segmentReloadFailures;
   }
 
-  public PinotTableReloadStatusResponse setSampleSegmentReloadFailures(
-      List<SegmentReloadFailureResponse> sampleSegmentReloadFailureResponses) {
-    _segmentReloadFailures = sampleSegmentReloadFailureResponses;
+  public PinotTableReloadStatusResponse setSegmentReloadFailures(
+      List<SegmentReloadFailureResponse> segmentReloadFailures) {
+    _segmentReloadFailures = segmentReloadFailures;
     return this;
   }
 }
