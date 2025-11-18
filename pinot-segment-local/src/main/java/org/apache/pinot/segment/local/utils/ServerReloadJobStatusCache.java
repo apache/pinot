@@ -55,10 +55,12 @@ public class ServerReloadJobStatusCache implements PinotClusterConfigChangeListe
   private static final ObjectMapper OBJECT_MAPPER = new ObjectMapper();
   static final String CONFIG_PREFIX = "pinot.server.table.reload.status.cache";
 
+  private final String _instanceId;
   private volatile Cache<String, ReloadJobStatus> _cache;
   private volatile ServerReloadJobStatusCacheConfig _currentConfig;
 
-  public ServerReloadJobStatusCache() {
+  public ServerReloadJobStatusCache(String instanceId) {
+    _instanceId = requireNonNull(instanceId, "instanceId cannot be null");
     _currentConfig = new ServerReloadJobStatusCacheConfig();
     _cache = CacheBuilder.newBuilder()
         .maximumSize(_currentConfig.getMaxSize())
@@ -66,7 +68,7 @@ public class ServerReloadJobStatusCache implements PinotClusterConfigChangeListe
         .recordStats()
         .build();
 
-    LOG.info("Initialized ReloadJobStatusCache with {}", _currentConfig);
+    LOG.info("Initialized ReloadJobStatusCache for instance {} with {}", _instanceId, _currentConfig);
   }
 
   /**
@@ -136,6 +138,7 @@ public class ServerReloadJobStatusCache implements PinotClusterConfigChangeListe
       if (details.size() < maxLimit) {
         SegmentReloadFailureResponse failureDto = new SegmentReloadFailureResponse()
             .setSegmentName(segmentName)
+            .setServerName(_instanceId)
             .setErrorMessage(exception.getMessage())
             .setStackTrace(ExceptionUtils.getStackTrace(exception))
             .setFailedAtMs(System.currentTimeMillis());

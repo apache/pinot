@@ -55,7 +55,7 @@ public class ServerReloadJobStatusCacheTest {
   @Test
   public void testDefaultConfigInitialization() {
     // Given
-    ServerReloadJobStatusCache cache = new ServerReloadJobStatusCache();
+    ServerReloadJobStatusCache cache = new ServerReloadJobStatusCache("testServer");
 
     // Then
     ServerReloadJobStatusCacheConfig config = cache.getCurrentConfig();
@@ -72,7 +72,7 @@ public class ServerReloadJobStatusCacheTest {
     properties.put("pinot.server.table.reload.status.cache.ttl.days", "15");
     properties.put("some.other.config", "value");
 
-    ServerReloadJobStatusCache cache = new ServerReloadJobStatusCache();
+    ServerReloadJobStatusCache cache = new ServerReloadJobStatusCache("testServer");
 
     // When
     cache.onChange(properties.keySet(), properties);
@@ -90,7 +90,7 @@ public class ServerReloadJobStatusCacheTest {
     properties.put("pinot.server.table.reload.status.cache.size.max", "7500");
     properties.put("some.other.config", "value");
 
-    ServerReloadJobStatusCache cache = new ServerReloadJobStatusCache();
+    ServerReloadJobStatusCache cache = new ServerReloadJobStatusCache("testServer");
 
     // When
     cache.onChange(properties.keySet(), properties);
@@ -109,7 +109,7 @@ public class ServerReloadJobStatusCacheTest {
     properties.put("some.other.config", "value");
     properties.put("another.config", "123");
 
-    ServerReloadJobStatusCache cache = new ServerReloadJobStatusCache();
+    ServerReloadJobStatusCache cache = new ServerReloadJobStatusCache("testServer");
 
     // When
     cache.onChange(properties.keySet(), properties);
@@ -126,7 +126,7 @@ public class ServerReloadJobStatusCacheTest {
     Map<String, String> properties = new HashMap<>();
     properties.put("pinot.server.table.reload.status.cache.size.max", "invalid");
 
-    ServerReloadJobStatusCache cache = new ServerReloadJobStatusCache();
+    ServerReloadJobStatusCache cache = new ServerReloadJobStatusCache("testServer");
     ServerReloadJobStatusCacheConfig oldConfig = cache.getCurrentConfig();
 
     // When - Invalid config should keep old cache
@@ -141,7 +141,7 @@ public class ServerReloadJobStatusCacheTest {
   @Test
   public void testConfigUpdateOverwritesPrevious() {
     // Given
-    ServerReloadJobStatusCache cache = new ServerReloadJobStatusCache();
+    ServerReloadJobStatusCache cache = new ServerReloadJobStatusCache("testServer");
 
     // Set initial config
     Map<String, String> initialProperties = new HashMap<>();
@@ -165,7 +165,7 @@ public class ServerReloadJobStatusCacheTest {
   @Test
   public void testZookeeperConfigDeletionRevertsToDefaults() {
     // Given
-    ServerReloadJobStatusCache cache = new ServerReloadJobStatusCache();
+    ServerReloadJobStatusCache cache = new ServerReloadJobStatusCache("testServer");
 
     // Set initial custom configs
     Map<String, String> customProperties = new HashMap<>();
@@ -206,7 +206,7 @@ public class ServerReloadJobStatusCacheTest {
   @Test
   public void testCacheEntryMigrationOnRebuild() {
     // Given
-    ServerReloadJobStatusCache cache = new ServerReloadJobStatusCache();
+    ServerReloadJobStatusCache cache = new ServerReloadJobStatusCache("testServer");
 
     // Add some entries to cache
     ReloadJobStatus status1 = cache.getOrCreate("job-1");
@@ -239,7 +239,7 @@ public class ServerReloadJobStatusCacheTest {
   @Test
   public void testCacheRebuildWithDifferentSize() {
     // Given
-    ServerReloadJobStatusCache cache = new ServerReloadJobStatusCache();
+    ServerReloadJobStatusCache cache = new ServerReloadJobStatusCache("testServer");
     assertThat(cache.getCurrentConfig().getMaxSize()).isEqualTo(10000);
 
     // When - Update only max size
@@ -256,7 +256,7 @@ public class ServerReloadJobStatusCacheTest {
   @Test
   public void testCacheRebuildWithDifferentTTL() {
     // Given
-    ServerReloadJobStatusCache cache = new ServerReloadJobStatusCache();
+    ServerReloadJobStatusCache cache = new ServerReloadJobStatusCache("testServer");
     assertThat(cache.getCurrentConfig().getTtlDays()).isEqualTo(30);
 
     // When - Update only TTL
@@ -273,7 +273,7 @@ public class ServerReloadJobStatusCacheTest {
   @Test
   public void testOnChangeSkipsRebuildWhenNoRelevantConfigsChanged() {
     // Given
-    ServerReloadJobStatusCache cache = new ServerReloadJobStatusCache();
+    ServerReloadJobStatusCache cache = new ServerReloadJobStatusCache("testServer");
 
     Map<String, String> initialProperties = new HashMap<>();
     initialProperties.put("pinot.server.table.reload.status.cache.size.max", "8000");
@@ -302,7 +302,7 @@ public class ServerReloadJobStatusCacheTest {
   @Test
   public void testOnChangeRebuildsWhenRelevantConfigsChanged() {
     // Given
-    ServerReloadJobStatusCache cache = new ServerReloadJobStatusCache();
+    ServerReloadJobStatusCache cache = new ServerReloadJobStatusCache("testServer");
 
     Map<String, String> initialProperties = new HashMap<>();
     initialProperties.put("pinot.server.table.reload.status.cache.size.max", "8000");
@@ -335,7 +335,7 @@ public class ServerReloadJobStatusCacheTest {
   @Test
   public void testRecordFailureCreatesJobIfNotExists() {
     // Given
-    ServerReloadJobStatusCache cache = new ServerReloadJobStatusCache();
+    ServerReloadJobStatusCache cache = new ServerReloadJobStatusCache("testServer");
     String jobId = "job-new";
     String segmentName = "segment_123";
     Exception exception = new IOException("Test error");
@@ -354,7 +354,7 @@ public class ServerReloadJobStatusCacheTest {
   @Test
   public void testRecordFailureOverLimit() {
     // Given
-    ServerReloadJobStatusCache cache = new ServerReloadJobStatusCache();
+    ServerReloadJobStatusCache cache = new ServerReloadJobStatusCache("testServer");
     String jobId = "job-over-limit";
     // Default limit is 5
 
@@ -374,7 +374,7 @@ public class ServerReloadJobStatusCacheTest {
   @Test
   public void testRecordFailureRespectsConfigLimit() {
     // Given - Set custom limit of 3
-    ServerReloadJobStatusCache cache = new ServerReloadJobStatusCache();
+    ServerReloadJobStatusCache cache = new ServerReloadJobStatusCache("testServer");
     Map<String, String> properties = new HashMap<>();
     properties.put("pinot.server.table.reload.status.cache.segment.failure.details.count", "3");
     cache.onChange(properties.keySet(), properties);
@@ -397,7 +397,7 @@ public class ServerReloadJobStatusCacheTest {
   @Test
   public void testRecordFailureConcurrent() throws Exception {
     // Given
-    ServerReloadJobStatusCache cache = new ServerReloadJobStatusCache();
+    ServerReloadJobStatusCache cache = new ServerReloadJobStatusCache("testServer");
     String jobId = "job-concurrent";
     int threadCount = 10;
     int failuresPerThread = 5;
@@ -432,7 +432,7 @@ public class ServerReloadJobStatusCacheTest {
   @Test
   public void testConfigChangeUpdatesMaxFailureDetailsLimit() {
     // Given
-    ServerReloadJobStatusCache cache = new ServerReloadJobStatusCache();
+    ServerReloadJobStatusCache cache = new ServerReloadJobStatusCache("testServer");
     assertThat(cache.getCurrentConfig().getSegmentFailureDetailsCount()).isEqualTo(5);  // Default
 
     // When - Update limit to 2

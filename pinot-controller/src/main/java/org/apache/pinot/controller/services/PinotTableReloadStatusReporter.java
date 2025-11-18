@@ -180,20 +180,13 @@ public class PinotTableReloadStatusReporter {
       response.setFailureCount(totalFailureCount);
     }
 
-    // Collect ALL failed segment details from all servers (NO deduplication)
-    // Server context is critical for debugging - same segment may fail on one server but succeed on another
     List<SegmentReloadFailureResponse> allFailedSegments = new ArrayList<>();
     for (Map.Entry<String, String> streamResponse : serviceResponse._httpResponses.entrySet()) {
-      String serverName = streamResponse.getKey();
       String responseString = streamResponse.getValue();
       try {
         ServerReloadStatusResponse serverResponse =
             JsonUtils.stringToObject(responseString, ServerReloadStatusResponse.class);
         if (serverResponse.getFailedSegments() != null && !serverResponse.getFailedSegments().isEmpty()) {
-          // Populate serverName for each failure (server doesn't populate this)
-          for (SegmentReloadFailureResponse failure : serverResponse.getFailedSegments()) {
-            failure.setServerName(serverName);
-          }
           allFailedSegments.addAll(serverResponse.getFailedSegments());
         }
       } catch (Exception e) {
