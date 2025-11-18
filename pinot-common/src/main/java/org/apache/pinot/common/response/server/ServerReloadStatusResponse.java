@@ -25,7 +25,7 @@ import javax.annotation.Nullable;
 
 public class ServerReloadStatusResponse {
   private long _totalSegmentCount;
-  private long _successCount;
+  private int _successCount;
   private Long _failureCount;
   private List<SegmentReloadFailure> _sampleSegmentReloadFailures;
 
@@ -38,11 +38,11 @@ public class ServerReloadStatusResponse {
     return this;
   }
 
-  public long getSuccessCount() {
+  public int getSuccessCount() {
     return _successCount;
   }
 
-  public ServerReloadStatusResponse setSuccessCount(long successCount) {
+  public ServerReloadStatusResponse setSuccessCount(int successCount) {
     _successCount = successCount;
     return this;
   }

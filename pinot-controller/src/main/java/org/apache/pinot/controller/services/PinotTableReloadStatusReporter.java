@@ -157,18 +157,28 @@ public class PinotTableReloadStatusReporter {
 
     long totalFailureCount = 0;
     boolean hasFailureCountData = false;
+    List<SegmentReloadFailure> allFailedSegments = new ArrayList<>();
 
+    // Single iteration to aggregate counts and collect failed segments
     for (Map.Entry<String, String> streamResponse : serviceResponse._httpResponses.entrySet()) {
       String responseString = streamResponse.getValue();
       try {
-        PinotTableReloadStatusResponse r =
-            JsonUtils.stringToObject(responseString, PinotTableReloadStatusResponse.class);
-        response.setSuccessCount(response.getSuccessCount() + r.getSuccessCount());
+        ServerReloadStatusResponse serverResponse =
+            JsonUtils.stringToObject(responseString, ServerReloadStatusResponse.class);
+
+        // Aggregate success count
+        response.setSuccessCount(response.getSuccessCount() + serverResponse.getSuccessCount());
 
         // Aggregate failure counts if available
-        if (r.getFailureCount() != null) {
-          totalFailureCount += r.getFailureCount();
+        if (serverResponse.getFailureCount() != null) {
+          totalFailureCount += serverResponse.getFailureCount();
           hasFailureCountData = true;
+        }
+
+        // Collect failed segments
+        if (serverResponse.getSampleSegmentReloadFailures() != null
+            && !serverResponse.getSampleSegmentReloadFailures().isEmpty()) {
+          allFailedSegments.addAll(serverResponse.getSampleSegmentReloadFailures());
         }
       } catch (Exception e) {
         response.setTotalServerCallsFailed(response.getTotalServerCallsFailed() + 1);
@@ -178,21 +188,6 @@ public class PinotTableReloadStatusReporter {
     // Only set failure count if at least one server provided data
     if (hasFailureCountData) {
       response.setFailureCount(totalFailureCount);
-    }
-
-    List<SegmentReloadFailure> allFailedSegments = new ArrayList<>();
-    for (Map.Entry<String, String> streamResponse : serviceResponse._httpResponses.entrySet()) {
-      String responseString = streamResponse.getValue();
-      try {
-        ServerReloadStatusResponse serverResponse =
-            JsonUtils.stringToObject(responseString, ServerReloadStatusResponse.class);
-        if (serverResponse.getSampleSegmentReloadFailures() != null
-            && !serverResponse.getSampleSegmentReloadFailures().isEmpty()) {
-          allFailedSegments.addAll(serverResponse.getSampleSegmentReloadFailures());
-        }
-      } catch (Exception e) {
-        // Already handled in existing code above
-      }
     }
 
     // Set failed segments in response if any were collected

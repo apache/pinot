@@ -86,7 +86,7 @@ public class ControllerJobStatusResource {
       totalSegmentCount = targetSegments.size();
     }
     try {
-      long successCount = 0;
+      int successCount = 0;
       for (SegmentDataManager segmentDataManager : segmentDataManagers) {
         if (segmentDataManager.getLoadTimeMs() >= reloadJobSubmissionTimestamp) {
           successCount++;
