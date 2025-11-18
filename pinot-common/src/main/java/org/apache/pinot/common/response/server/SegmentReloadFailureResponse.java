@@ -18,12 +18,14 @@
  */
 package org.apache.pinot.common.response.server;
 
+import org.apache.pinot.spi.annotations.InterfaceStability;
 
 
 /**
  * DTO representing a single segment reload failure.
  */
-public class SegmentReloadFailure {
+@InterfaceStability.Unstable
+public class SegmentReloadFailureResponse {
   private String _segmentName;
   private String _serverName;
   private String _errorMessage;
@@ -31,14 +33,14 @@ public class SegmentReloadFailure {
   private long _failedAtMs;
 
   // Default constructor for JSON deserialization
-  public SegmentReloadFailure() {
+  public SegmentReloadFailureResponse() {
   }
 
   public String getSegmentName() {
     return _segmentName;
   }
 
-  public SegmentReloadFailure setSegmentName(String segmentName) {
+  public SegmentReloadFailureResponse setSegmentName(String segmentName) {
     _segmentName = segmentName;
     return this;
   }
@@ -47,7 +49,7 @@ public class SegmentReloadFailure {
     return _serverName;
   }
 
-  public SegmentReloadFailure setServerName(String serverName) {
+  public SegmentReloadFailureResponse setServerName(String serverName) {
     _serverName = serverName;
     return this;
   }
@@ -56,7 +58,7 @@ public class SegmentReloadFailure {
     return _errorMessage;
   }
 
-  public SegmentReloadFailure setErrorMessage(String errorMessage) {
+  public SegmentReloadFailureResponse setErrorMessage(String errorMessage) {
     _errorMessage = errorMessage;
     return this;
   }
@@ -65,7 +67,7 @@ public class SegmentReloadFailure {
     return _stackTrace;
   }
 
-  public SegmentReloadFailure setStackTrace(String stackTrace) {
+  public SegmentReloadFailureResponse setStackTrace(String stackTrace) {
     _stackTrace = stackTrace;
     return this;
   }
@@ -74,7 +76,7 @@ public class SegmentReloadFailure {
     return _failedAtMs;
   }
 
-  public SegmentReloadFailure setFailedAtMs(long failedAtMs) {
+  public SegmentReloadFailureResponse setFailedAtMs(long failedAtMs) {
     _failedAtMs = failedAtMs;
     return this;
   }

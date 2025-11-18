@@ -21,7 +21,7 @@ package org.apache.pinot.segment.local.utils;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.atomic.AtomicInteger;
-import org.apache.pinot.common.response.server.SegmentReloadFailure;
+import org.apache.pinot.common.response.server.SegmentReloadFailureResponse;
 
 
 /**
@@ -31,7 +31,7 @@ public class ReloadJobStatus {
   private final String _jobId;
   private final AtomicInteger _failureCount;
   private final long _createdTimeMs;
-  private final List<SegmentReloadFailure> _failedSegmentDetails;
+  private final List<SegmentReloadFailureResponse> _failedSegmentDetails;
 
   public ReloadJobStatus(String jobId) {
     _jobId = jobId;
@@ -56,7 +56,7 @@ public class ReloadJobStatus {
     return _createdTimeMs;
   }
 
-  public List<SegmentReloadFailure> getFailedSegmentDetails() {
+  public List<SegmentReloadFailureResponse> getFailedSegmentDetails() {
     return _failedSegmentDetails;
   }
 

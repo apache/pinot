@@ -35,7 +35,7 @@ import javax.ws.rs.core.Response;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.hc.client5.http.io.HttpClientConnectionManager;
 import org.apache.pinot.common.exception.InvalidConfigException;
-import org.apache.pinot.common.response.server.SegmentReloadFailure;
+import org.apache.pinot.common.response.server.SegmentReloadFailureResponse;
 import org.apache.pinot.common.response.server.ServerReloadStatusResponse;
 import org.apache.pinot.common.utils.URIUtils;
 import org.apache.pinot.controller.api.dto.PinotControllerJobMetadataDto;
@@ -157,7 +157,7 @@ public class PinotTableReloadStatusReporter {
 
     long totalFailureCount = 0;
     boolean hasFailureCountData = false;
-    List<SegmentReloadFailure> allFailedSegments = new ArrayList<>();
+    List<SegmentReloadFailureResponse> allFailedSegments = new ArrayList<>();
 
     // Single iteration to aggregate counts and collect failed segments
     for (Map.Entry<String, String> streamResponse : serviceResponse._httpResponses.entrySet()) {

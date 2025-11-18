@@ -21,13 +21,15 @@ package org.apache.pinot.common.response.server;
 
 import java.util.List;
 import javax.annotation.Nullable;
+import org.apache.pinot.spi.annotations.InterfaceStability;
 
 
+@InterfaceStability.Unstable
 public class ServerReloadStatusResponse {
   private long _totalSegmentCount;
   private int _successCount;
   private Long _failureCount;
-  private List<SegmentReloadFailure> _sampleSegmentReloadFailures;
+  private List<SegmentReloadFailureResponse> _segmentReloadFailures;
 
   public long getTotalSegmentCount() {
     return _totalSegmentCount;
@@ -58,13 +60,13 @@ public class ServerReloadStatusResponse {
   }
 
   @Nullable
-  public List<SegmentReloadFailure> getSampleSegmentReloadFailures() {
-    return _sampleSegmentReloadFailures;
+  public List<SegmentReloadFailureResponse> getSampleSegmentReloadFailures() {
+    return _segmentReloadFailures;
   }
 
   public ServerReloadStatusResponse setSampleSegmentReloadFailures(
-      List<SegmentReloadFailure> sampleSegmentReloadFailures) {
-    _sampleSegmentReloadFailures = sampleSegmentReloadFailures;
+      List<SegmentReloadFailureResponse> sampleSegmentReloadFailureResponses) {
+    _segmentReloadFailures = sampleSegmentReloadFailureResponses;
     return this;
   }
 }

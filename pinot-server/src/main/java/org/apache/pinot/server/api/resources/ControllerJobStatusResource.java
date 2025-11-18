@@ -34,7 +34,7 @@ import javax.ws.rs.core.Context;
 import javax.ws.rs.core.HttpHeaders;
 import javax.ws.rs.core.MediaType;
 import org.apache.commons.lang3.StringUtils;
-import org.apache.pinot.common.response.server.SegmentReloadFailure;
+import org.apache.pinot.common.response.server.SegmentReloadFailureResponse;
 import org.apache.pinot.common.response.server.ServerReloadStatusResponse;
 import org.apache.pinot.common.utils.DatabaseUtils;
 import org.apache.pinot.segment.local.data.manager.SegmentDataManager;
@@ -106,7 +106,7 @@ public class ControllerJobStatusResource {
 
           // Get defensive copy of failed segment details
           synchronized (jobStatus) {
-            List<SegmentReloadFailure> details = jobStatus.getFailedSegmentDetails();
+            List<SegmentReloadFailureResponse> details = jobStatus.getFailedSegmentDetails();
             if (!details.isEmpty()) {
               response.setSampleSegmentReloadFailures(new ArrayList<>(details));
             }
