@@ -72,14 +72,13 @@
           "\n        PhysicalJoin(condition=[=($0, $1)], joinType=[semi])",
           "\n          PhysicalExchange(exchangeStrategy=[PARTITIONING_EXCHANGE], distKeys=[[0]])",
           "\n            PhysicalProject(col1=[$0])",
-          "\n              PhysicalFilter(condition=[=($0, _UTF-8'foo')])",
-          "\n                PhysicalTableScan(table=[[default, a]])",
+          "\n              PhysicalTableScan(table=[[default, a]])",
           "\n          PhysicalExchange(exchangeStrategy=[PARTITIONING_EXCHANGE], distKeys=[[0]])",
           "\n            PhysicalProject(name=[$1])",
           "\n              PhysicalJoin(condition=[=($0, $2)], joinType=[inner])",
-          "\n                PhysicalValues(tuples=[[]])",
+          "\n                PhysicalValues(tuples=[[{ 1, _UTF-8'foo' }]])",
           "\n                PhysicalProject(EXPR$0=[$0])",
-          "\n                  PhysicalValues(tuples=[[]])",
+          "\n                  PhysicalValues(tuples=[[{ 2, _UTF-8'bar' }]])",
           "\n"
         ]
       }
