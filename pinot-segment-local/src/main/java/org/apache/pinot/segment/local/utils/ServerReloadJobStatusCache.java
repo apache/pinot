@@ -116,13 +116,11 @@ public class ServerReloadJobStatusCache implements PinotClusterConfigChangeListe
    * @param jobId reload job ID (UUID)
    * @param segmentName name of failed segment
    * @param exception the exception that caused the failure
-   * @param serverName name of the server reporting the failure
    */
-  public void recordFailure(String jobId, String segmentName, Throwable exception, String serverName) {
+  public void recordFailure(String jobId, String segmentName, Throwable exception) {
     requireNonNull(jobId, "jobId cannot be null");
     requireNonNull(segmentName, "segmentName cannot be null");
     requireNonNull(exception, "exception cannot be null");
-    requireNonNull(serverName, "serverName cannot be null");
 
     ReloadJobStatus status = getOrCreate(jobId);
 
@@ -136,10 +134,8 @@ public class ServerReloadJobStatusCache implements PinotClusterConfigChangeListe
       int maxLimit = _currentConfig.getSegmentFailureDetailsCount();
 
       if (details.size() < maxLimit) {
-        // Create DTO with fluent setters
         SegmentReloadFailureResponse failureDto = new SegmentReloadFailureResponse()
             .setSegmentName(segmentName)
-            .setServerName(serverName)
             .setErrorMessage(exception.getMessage())
             .setStackTrace(ExceptionUtils.getStackTrace(exception))
             .setFailedAtMs(System.currentTimeMillis());

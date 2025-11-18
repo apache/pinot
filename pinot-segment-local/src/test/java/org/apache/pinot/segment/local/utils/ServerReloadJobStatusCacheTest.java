@@ -341,7 +341,7 @@ public class ServerReloadJobStatusCacheTest {
     Exception exception = new IOException("Test error");
 
     // When
-    cache.recordFailure(jobId, segmentName, exception, "server-name");
+    cache.recordFailure(jobId, segmentName, exception);
 
     // Then
     ReloadJobStatus status = cache.getJobStatus(jobId);
@@ -360,7 +360,7 @@ public class ServerReloadJobStatusCacheTest {
 
     // When - Record 10 failures (over limit)
     for (int i = 1; i <= 10; i++) {
-      cache.recordFailure(jobId, "segment_" + i, new IOException("Error " + i), "server-name");
+      cache.recordFailure(jobId, "segment_" + i, new IOException("Error " + i));
     }
 
     // Then - Count should be 10, but only first 5 details stored
@@ -383,7 +383,7 @@ public class ServerReloadJobStatusCacheTest {
 
     // When - Record 5 failures with limit of 3
     for (int i = 1; i <= 5; i++) {
-      cache.recordFailure(jobId, "segment_" + i, new IOException("Error " + i), "server-name");
+      cache.recordFailure(jobId, "segment_" + i, new IOException("Error " + i));
     }
 
     // Then - Count should be 5, but only first 3 details stored
@@ -411,7 +411,7 @@ public class ServerReloadJobStatusCacheTest {
       CompletableFuture<Void> future = CompletableFuture.runAsync(() -> {
         for (int i = 0; i < failuresPerThread; i++) {
           cache.recordFailure(jobId, "segment_t" + threadId + "_" + i,
-              new IOException("Error from thread " + threadId), "server-name");
+              new IOException("Error from thread " + threadId));
         }
       }, executor);
       futures.add(future);
@@ -446,7 +446,7 @@ public class ServerReloadJobStatusCacheTest {
     // New jobs should use new limit
     String jobId = "job-new-limit";
     for (int i = 1; i <= 5; i++) {
-      cache.recordFailure(jobId, "segment_" + i, new IOException("Error " + i), "server-name");
+      cache.recordFailure(jobId, "segment_" + i, new IOException("Error " + i));
     }
 
     assertThat(cache.getJobStatus(jobId).getFailureCount()).isEqualTo(5);
