@@ -1559,6 +1559,40 @@ public class SegmentPreProcessorTest implements PinotBuffersAfterClassCheckRule 
     runPreProcessor(_newColumnsSchemaWithH3Json);
   }
 
+  @Test(dataProvider = "bothV1AndV3")
+  public void testBloomFilterFPPUpdate(SegmentVersion segmentVersion)
+      throws Exception {
+    buildSegment(segmentVersion);
+
+    // Create bloom filter with FPP 0.05. Calculated FPP is 0.9992553024063195
+    _bloomFilterConfigs = Map.of("column1", new BloomFilterConfig(0.05, 10, true));
+    runPreProcessor(_newColumnsSchemaWithH3Json);
+
+    verifyProcessNotNeeded();
+
+    // No change in bloom filter FPP. Calculated FPP is 0.9992553024063195
+    _bloomFilterConfigs = Map.of("column1", new BloomFilterConfig(0.05, 10, true));
+
+    // Verify that preprocessing is not needed
+    verifyProcessNotNeeded();
+
+    // Update bloom filter maxSizeInBytes to 1024, Calculated FPP is 0.9265516921226757
+    _bloomFilterConfigs = Map.of("column1", new BloomFilterConfig(0.05, 1024, true));
+
+    // Verify that preprocessing is needed
+    verifyProcessNeeded();
+
+    // Update bloom filter FPP to 0.9, Calculated FPP is 0.99
+    _bloomFilterConfigs = Map.of("column1", new BloomFilterConfig(0.99, 1024, true));
+
+    // Verify that preprocessing is needed
+    verifyProcessNeeded();
+
+    // Remove bloom filter
+    resetIndexConfigs();
+    runPreProcessor(_newColumnsSchemaWithH3Json);
+  }
+
   private void verifyProcessNeeded()
       throws Exception {
     try (SegmentDirectory segmentDirectory = new SegmentLocalFSDirectory(INDEX_DIR, ReadMode.mmap);

@@ -117,7 +117,7 @@ public class BenchmarkBloomFilter {
     List<String> words =
         IntStream.generate(r::nextInt).limit(_cardinality).mapToObj(Integer::toString).collect(Collectors.toList());
 
-    double fpp = Math.max(0.01d, GuavaBloomFilterReaderUtils.computeFPP(_maxSizeInBytes, _cardinality));
+    double fpp = GuavaBloomFilterReaderUtils.computeFPP(0.01d, _maxSizeInBytes, _cardinality);
     BloomFilter<CharSequence> bloomFilter = BloomFilter.create(
         Funnels.stringFunnel(StandardCharsets.UTF_8), _cardinality, fpp);
     words.forEach(bloomFilter::put);
