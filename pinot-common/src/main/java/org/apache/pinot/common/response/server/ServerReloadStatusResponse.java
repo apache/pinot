@@ -17,32 +17,53 @@
  * under the License.
  */
 
-package org.apache.pinot.server.starter.helix;
+package org.apache.pinot.common.response.server;
 
-public class SegmentReloadStatusValue {
-  private final long _totalSegmentCount;
-  private final long _successCount;
-  private final Long _failureCount;
+import java.util.List;
+import javax.annotation.Nullable;
 
-  public SegmentReloadStatusValue(long totalSegmentCount, long successCount) {
-    this(totalSegmentCount, successCount, null);
-  }
 
-  public SegmentReloadStatusValue(long totalSegmentCount, long successCount, Long failureCount) {
-    _totalSegmentCount = totalSegmentCount;
-    _successCount = successCount;
-    _failureCount = failureCount;
-  }
+public class ServerReloadStatusResponse {
+  private long _totalSegmentCount;
+  private long _successCount;
+  private Long _failureCount;
+  private List<SegmentReloadFailureResponse> _failedSegments;
 
   public long getTotalSegmentCount() {
     return _totalSegmentCount;
+  }
+
+  public ServerReloadStatusResponse setTotalSegmentCount(long totalSegmentCount) {
+    _totalSegmentCount = totalSegmentCount;
+    return this;
   }
 
   public long getSuccessCount() {
     return _successCount;
   }
 
+  public ServerReloadStatusResponse setSuccessCount(long successCount) {
+    _successCount = successCount;
+    return this;
+  }
+
+  @Nullable
   public Long getFailureCount() {
     return _failureCount;
+  }
+
+  public ServerReloadStatusResponse setFailureCount(Long failureCount) {
+    _failureCount = failureCount;
+    return this;
+  }
+
+  @Nullable
+  public List<SegmentReloadFailureResponse> getFailedSegments() {
+    return _failedSegments;
+  }
+
+  public ServerReloadStatusResponse setFailedSegments(List<SegmentReloadFailureResponse> failedSegments) {
+    _failedSegments = failedSegments;
+    return this;
   }
 }

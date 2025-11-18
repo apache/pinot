@@ -29,10 +29,10 @@ import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
+import org.apache.pinot.common.response.server.SegmentReloadFailureResponse;
 import org.testng.annotations.Test;
 
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 
 /**
@@ -42,7 +42,8 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 public class ServerReloadJobStatusCacheTest {
 
   // Helper method to get failed segment details from cache
-  private static List<SegmentReloadStatus> getFailedSegmentDetails(ServerReloadJobStatusCache cache, String jobId) {
+  private static List<SegmentReloadFailureResponse> getFailedSegmentDetails(ServerReloadJobStatusCache cache,
+      String jobId) {
     ReloadJobStatus status = cache.getJobStatus(jobId);
     if (status == null) {
       return Collections.emptyList();
@@ -340,7 +341,7 @@ public class ServerReloadJobStatusCacheTest {
     Exception exception = new IOException("Test error");
 
     // When
-    cache.recordFailure(jobId, segmentName, exception);
+    cache.recordFailure(jobId, segmentName, exception, "server-name");
 
     // Then
     ReloadJobStatus status = cache.getJobStatus(jobId);
@@ -359,12 +360,12 @@ public class ServerReloadJobStatusCacheTest {
 
     // When - Record 10 failures (over limit)
     for (int i = 1; i <= 10; i++) {
-      cache.recordFailure(jobId, "segment_" + i, new IOException("Error " + i));
+      cache.recordFailure(jobId, "segment_" + i, new IOException("Error " + i), "server-name");
     }
 
     // Then - Count should be 10, but only first 5 details stored
     assertThat(cache.getJobStatus(jobId).getFailureCount()).isEqualTo(10);
-    List<SegmentReloadStatus> details = getFailedSegmentDetails(cache, jobId);
+    List<SegmentReloadFailureResponse> details = getFailedSegmentDetails(cache, jobId);
     assertThat(details).hasSize(5);
     assertThat(details.get(0).getSegmentName()).isEqualTo("segment_1");
     assertThat(details.get(4).getSegmentName()).isEqualTo("segment_5");
@@ -382,12 +383,12 @@ public class ServerReloadJobStatusCacheTest {
 
     // When - Record 5 failures with limit of 3
     for (int i = 1; i <= 5; i++) {
-      cache.recordFailure(jobId, "segment_" + i, new IOException("Error " + i));
+      cache.recordFailure(jobId, "segment_" + i, new IOException("Error " + i), "server-name");
     }
 
     // Then - Count should be 5, but only first 3 details stored
     assertThat(cache.getJobStatus(jobId).getFailureCount()).isEqualTo(5);
-    List<SegmentReloadStatus> details = getFailedSegmentDetails(cache, jobId);
+    List<SegmentReloadFailureResponse> details = getFailedSegmentDetails(cache, jobId);
     assertThat(details).hasSize(3);
     assertThat(details.get(0).getSegmentName()).isEqualTo("segment_1");
     assertThat(details.get(2).getSegmentName()).isEqualTo("segment_3");
@@ -410,7 +411,7 @@ public class ServerReloadJobStatusCacheTest {
       CompletableFuture<Void> future = CompletableFuture.runAsync(() -> {
         for (int i = 0; i < failuresPerThread; i++) {
           cache.recordFailure(jobId, "segment_t" + threadId + "_" + i,
-              new IOException("Error from thread " + threadId));
+              new IOException("Error from thread " + threadId), "server-name");
         }
       }, executor);
       futures.add(future);
@@ -445,11 +446,10 @@ public class ServerReloadJobStatusCacheTest {
     // New jobs should use new limit
     String jobId = "job-new-limit";
     for (int i = 1; i <= 5; i++) {
-      cache.recordFailure(jobId, "segment_" + i, new IOException("Error " + i));
+      cache.recordFailure(jobId, "segment_" + i, new IOException("Error " + i), "server-name");
     }
 
     assertThat(cache.getJobStatus(jobId).getFailureCount()).isEqualTo(5);
     assertThat(getFailedSegmentDetails(cache, jobId)).hasSize(2);  // New limit applied
   }
-
 }

@@ -29,6 +29,8 @@ import java.util.concurrent.TimeUnit;
 import javax.annotation.Nullable;
 import javax.annotation.concurrent.ThreadSafe;
 import org.apache.commons.configuration2.MapConfiguration;
+import org.apache.commons.lang3.exception.ExceptionUtils;
+import org.apache.pinot.common.response.server.SegmentReloadFailureResponse;
 import org.apache.pinot.spi.config.provider.PinotClusterConfigChangeListener;
 import org.apache.pinot.spi.env.PinotConfiguration;
 import org.slf4j.Logger;
@@ -114,11 +116,13 @@ public class ServerReloadJobStatusCache implements PinotClusterConfigChangeListe
    * @param jobId reload job ID (UUID)
    * @param segmentName name of failed segment
    * @param exception the exception that caused the failure
+   * @param serverName name of the server reporting the failure
    */
-  public void recordFailure(String jobId, String segmentName, Throwable exception) {
+  public void recordFailure(String jobId, String segmentName, Throwable exception, String serverName) {
     requireNonNull(jobId, "jobId cannot be null");
     requireNonNull(segmentName, "segmentName cannot be null");
     requireNonNull(exception, "exception cannot be null");
+    requireNonNull(serverName, "serverName cannot be null");
 
     ReloadJobStatus status = getOrCreate(jobId);
 
@@ -128,11 +132,18 @@ public class ServerReloadJobStatusCache implements PinotClusterConfigChangeListe
       status.incrementAndGetFailureCount();
 
       // Only add details if under limit (check config in cache layer)
-      List<SegmentReloadStatus> details = status.getFailedSegmentDetails();
+      List<SegmentReloadFailureResponse> details = status.getFailedSegmentDetails();
       int maxLimit = _currentConfig.getSegmentFailureDetailsCount();
 
       if (details.size() < maxLimit) {
-        details.add(new SegmentReloadStatus(segmentName, exception));
+        // Create DTO with fluent setters
+        SegmentReloadFailureResponse failureDto = new SegmentReloadFailureResponse()
+            .setSegmentName(segmentName)
+            .setServerName(serverName)
+            .setErrorMessage(exception.getMessage())
+            .setStackTrace(ExceptionUtils.getStackTrace(exception))
+            .setFailedAtMs(System.currentTimeMillis());
+        details.add(failureDto);
       }
     }
   }

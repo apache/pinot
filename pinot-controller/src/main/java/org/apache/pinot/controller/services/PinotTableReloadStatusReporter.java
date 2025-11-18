@@ -35,6 +35,8 @@ import javax.ws.rs.core.Response;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.hc.client5.http.io.HttpClientConnectionManager;
 import org.apache.pinot.common.exception.InvalidConfigException;
+import org.apache.pinot.common.response.server.SegmentReloadFailureResponse;
+import org.apache.pinot.common.response.server.ServerReloadStatusResponse;
 import org.apache.pinot.common.utils.URIUtils;
 import org.apache.pinot.controller.api.dto.PinotControllerJobMetadataDto;
 import org.apache.pinot.controller.api.dto.PinotTableReloadStatusResponse;
@@ -176,6 +178,35 @@ public class PinotTableReloadStatusReporter {
     // Only set failure count if at least one server provided data
     if (hasFailureCountData) {
       response.setFailureCount(totalFailureCount);
+    }
+
+    // Collect ALL failed segment details from all servers (NO deduplication)
+    // Server context is critical for debugging - same segment may fail on one server but succeed on another
+    List<SegmentReloadFailureResponse> allFailedSegments = new ArrayList<>();
+    for (Map.Entry<String, String> streamResponse : serviceResponse._httpResponses.entrySet()) {
+      String responseString = streamResponse.getValue();
+      try {
+        ServerReloadStatusResponse serverResponse =
+            JsonUtils.stringToObject(responseString, ServerReloadStatusResponse.class);
+        if (serverResponse.getFailedSegments() != null && !serverResponse.getFailedSegments().isEmpty()) {
+          allFailedSegments.addAll(serverResponse.getFailedSegments());
+        }
+      } catch (Exception e) {
+        // Already handled in existing code above
+      }
+    }
+
+    // Set failed segments in response if any were collected
+    if (!allFailedSegments.isEmpty()) {
+      // Limit to prevent huge responses (e.g., max 500 failures across all servers)
+      // This limit is higher than per-server limit since we're aggregating
+      int maxFailuresInResponse = 500;
+      if (allFailedSegments.size() > maxFailuresInResponse) {
+        LOG.warn("Truncating failed segments list from {} to {} for job {}",
+            allFailedSegments.size(), maxFailuresInResponse, reloadJobId);
+        allFailedSegments = allFailedSegments.subList(0, maxFailuresInResponse);
+      }
+      response.setFailedSegments(allFailedSegments);
     }
 
     // Add derived fields

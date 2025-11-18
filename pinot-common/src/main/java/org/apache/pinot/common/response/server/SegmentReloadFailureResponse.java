@@ -16,56 +16,74 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.pinot.segment.local.utils;
+package org.apache.pinot.common.response.server;
 
-import org.apache.commons.lang3.exception.ExceptionUtils;
-
-import static java.util.Objects.requireNonNull;
 
 
 /**
- * Used by ServerReloadJobStatusCache to track failed segments with error details.
+ * DTO representing a single segment reload failure.
  */
-public class SegmentReloadStatus {
-  private final String _segmentName;
-  private final String _errorMessage;
-  private final String _stackTrace;
-  private final long _failedAtMs;
+public class SegmentReloadFailureResponse {
+  private String _segmentName;
+  private String _serverName;
+  private String _errorMessage;
+  private String _stackTrace;
+  private long _failedAtMs;
 
-  /**
-   * Creates a new segment reload status capturing failure details.
-   *
-   * @param segmentName name of the failed segment
-   * @param exception the exception that caused the failure
-   */
-  public SegmentReloadStatus(String segmentName, Throwable exception) {
-    _segmentName = requireNonNull(segmentName, "segmentName cannot be null");
-    requireNonNull(exception, "exception cannot be null");
-    _errorMessage = exception.getMessage();
-    _stackTrace = ExceptionUtils.getStackTrace(exception);
-    _failedAtMs = System.currentTimeMillis();
+  // Default constructor for JSON deserialization
+  public SegmentReloadFailureResponse() {
   }
 
   public String getSegmentName() {
     return _segmentName;
   }
 
+  public SegmentReloadFailureResponse setSegmentName(String segmentName) {
+    _segmentName = segmentName;
+    return this;
+  }
+
+  public String getServerName() {
+    return _serverName;
+  }
+
+  public SegmentReloadFailureResponse setServerName(String serverName) {
+    _serverName = serverName;
+    return this;
+  }
+
   public String getErrorMessage() {
     return _errorMessage;
+  }
+
+  public SegmentReloadFailureResponse setErrorMessage(String errorMessage) {
+    _errorMessage = errorMessage;
+    return this;
   }
 
   public String getStackTrace() {
     return _stackTrace;
   }
 
+  public SegmentReloadFailureResponse setStackTrace(String stackTrace) {
+    _stackTrace = stackTrace;
+    return this;
+  }
+
   public long getFailedAtMs() {
     return _failedAtMs;
   }
 
+  public SegmentReloadFailureResponse setFailedAtMs(long failedAtMs) {
+    _failedAtMs = failedAtMs;
+    return this;
+  }
+
   @Override
   public String toString() {
-    return "SegmentReloadStatus{"
+    return "SegmentReloadFailureDto{"
         + "segmentName='" + _segmentName + '\''
+        + ", serverName='" + _serverName + '\''
         + ", errorMessage='" + _errorMessage + '\''
         + ", failedAtMs=" + _failedAtMs
         + '}';

@@ -801,7 +801,7 @@ public abstract class BaseTableDataManager implements TableDataManager {
         failedSegments.add(segmentName);
         sampleException.set(t);
         if (reloadJobId != null) {
-          _reloadJobStatusCache.recordFailure(reloadJobId, segmentName, t);
+          _reloadJobStatusCache.recordFailure(reloadJobId, segmentName, t, _instanceId);
         }
       }
     }, _segmentReloadRefreshExecutor)).toArray(CompletableFuture[]::new)).get();

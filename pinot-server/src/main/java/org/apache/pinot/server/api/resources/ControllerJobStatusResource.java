@@ -34,6 +34,8 @@ import javax.ws.rs.core.Context;
 import javax.ws.rs.core.HttpHeaders;
 import javax.ws.rs.core.MediaType;
 import org.apache.commons.lang3.StringUtils;
+import org.apache.pinot.common.response.server.SegmentReloadFailureResponse;
+import org.apache.pinot.common.response.server.ServerReloadStatusResponse;
 import org.apache.pinot.common.utils.DatabaseUtils;
 import org.apache.pinot.segment.local.data.manager.SegmentDataManager;
 import org.apache.pinot.segment.local.data.manager.TableDataManager;
@@ -41,7 +43,6 @@ import org.apache.pinot.segment.local.utils.ReloadJobStatus;
 import org.apache.pinot.segment.local.utils.ServerReloadJobStatusCache;
 import org.apache.pinot.segment.spi.creator.name.SegmentNameUtils;
 import org.apache.pinot.server.starter.ServerInstance;
-import org.apache.pinot.server.starter.helix.SegmentReloadStatusValue;
 import org.apache.pinot.spi.utils.JsonUtils;
 
 
@@ -92,16 +93,28 @@ public class ControllerJobStatusResource {
         }
       }
 
-      // Query cache for failure count if reloadJobId is provided
-      Long failureCount = null;
+      // Build response with fluent setters
+      ServerReloadStatusResponse response = new ServerReloadStatusResponse()
+          .setTotalSegmentCount(totalSegmentCount)
+          .setSuccessCount(successCount);
+
+      // Query cache for failure count and details if reloadJobId is provided
       if (reloadJobId != null) {
         ReloadJobStatus jobStatus = _serverReloadJobStatusCache.getJobStatus(reloadJobId);
         if (jobStatus != null) {
-          failureCount = (long) jobStatus.getFailureCount();
+          response.setFailureCount((long) jobStatus.getFailureCount());
+
+          // Get defensive copy of failed segment details
+          synchronized (jobStatus) {
+            List<SegmentReloadFailureResponse> details = jobStatus.getFailedSegmentDetails();
+            if (!details.isEmpty()) {
+              response.setFailedSegments(new ArrayList<>(details));
+            }
+          }
         }
       }
 
-      return JsonUtils.objectToString(new SegmentReloadStatusValue(totalSegmentCount, successCount, failureCount));
+      return JsonUtils.objectToString(response);
     } finally {
       for (SegmentDataManager segmentDataManager : segmentDataManagers) {
         tableDataManager.releaseSegment(segmentDataManager);
