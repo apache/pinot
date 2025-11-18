@@ -30,6 +30,7 @@ import javax.annotation.Nullable;
 import javax.annotation.concurrent.ThreadSafe;
 import org.apache.commons.configuration2.MapConfiguration;
 import org.apache.commons.lang3.exception.ExceptionUtils;
+import org.apache.pinot.common.response.server.ApiErrorResponse;
 import org.apache.pinot.common.response.server.SegmentReloadFailureResponse;
 import org.apache.pinot.spi.config.provider.PinotClusterConfigChangeListener;
 import org.apache.pinot.spi.env.PinotConfiguration;
@@ -139,8 +140,9 @@ public class ServerReloadJobStatusCache implements PinotClusterConfigChangeListe
         details.add(new SegmentReloadFailureResponse()
             .setSegmentName(segmentName)
             .setServerName(_instanceId)
-            .setErrorMessage(exception.getMessage())
-            .setStackTrace(ExceptionUtils.getStackTrace(exception))
+            .setError(new ApiErrorResponse()
+                .setErrorMsg(exception.getMessage())
+                .setStacktrace(ExceptionUtils.getStackTrace(exception)))
             .setFailedAtMs(System.currentTimeMillis()));
       }
     }

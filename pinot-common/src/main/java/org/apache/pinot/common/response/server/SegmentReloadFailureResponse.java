@@ -28,13 +28,8 @@ import org.apache.pinot.spi.annotations.InterfaceStability;
 public class SegmentReloadFailureResponse {
   private String _segmentName;
   private String _serverName;
-  private String _errorMessage;
-  private String _stackTrace;
+  private ApiErrorResponse _error;
   private long _failedAtMs;
-
-  // Default constructor for JSON deserialization
-  public SegmentReloadFailureResponse() {
-  }
 
   public String getSegmentName() {
     return _segmentName;
@@ -54,21 +49,12 @@ public class SegmentReloadFailureResponse {
     return this;
   }
 
-  public String getErrorMessage() {
-    return _errorMessage;
+  public ApiErrorResponse getError() {
+    return _error;
   }
 
-  public SegmentReloadFailureResponse setErrorMessage(String errorMessage) {
-    _errorMessage = errorMessage;
-    return this;
-  }
-
-  public String getStackTrace() {
-    return _stackTrace;
-  }
-
-  public SegmentReloadFailureResponse setStackTrace(String stackTrace) {
-    _stackTrace = stackTrace;
+  public SegmentReloadFailureResponse setError(ApiErrorResponse error) {
+    _error = error;
     return this;
   }
 
@@ -79,15 +65,5 @@ public class SegmentReloadFailureResponse {
   public SegmentReloadFailureResponse setFailedAtMs(long failedAtMs) {
     _failedAtMs = failedAtMs;
     return this;
-  }
-
-  @Override
-  public String toString() {
-    return "SegmentReloadFailureDto{"
-        + "segmentName='" + _segmentName + '\''
-        + ", serverName='" + _serverName + '\''
-        + ", errorMessage='" + _errorMessage + '\''
-        + ", failedAtMs=" + _failedAtMs
-        + '}';
   }
 }
