@@ -611,6 +611,8 @@ public class CommonConstants {
       public static class QueryOptionKey {
         public static final String TIMEOUT_MS = "timeoutMs";
         public static final String EXTRA_PASSIVE_TIMEOUT_MS = "extraPassiveTimeoutMs";
+        public static final String LEAF_TIMEOUT_MS = "leafTimeoutMs";
+        public static final String LEAF_EXTRA_PASSIVE_TIMEOUT_MS = "leafExtraPassiveTimeoutMs";
         public static final String SKIP_UPSERT = "skipUpsert";
         public static final String SKIP_UPSERT_VIEW = "skipUpsertView";
         public static final String UPSERT_VIEW_FRESHNESS_MS = "upsertViewFreshnessMs";
@@ -751,6 +753,7 @@ public class CommonConstants {
         // Handle WINDOW Overflow
         public static final String MAX_ROWS_IN_WINDOW = "maxRowsInWindow";
         public static final String WINDOW_OVERFLOW_MODE = "windowOverflowMode";
+        public static final String TIMEOUT_OVERFLOW_MODE = "timeoutOverflowMode";
 
         // Indicates the maximum length of the serialized response per server for a query.
         public static final String MAX_SERVER_RESPONSE_SIZE_BYTES = "maxServerResponseSizeBytes";
@@ -1965,6 +1968,7 @@ public class CommonConstants {
      */
     public static final String KEY_OF_MAX_ROWS_IN_JOIN = "pinot.query.join.max.rows";
     public static final String KEY_OF_JOIN_OVERFLOW_MODE = "pinot.query.join.overflow.mode";
+    public static final String KEY_OF_TIMEOUT_OVERFLOW_MODE = "pinot.query.timeout.overflow.mode";
 
     /// Specifies the send stats mode used in MSE.
     ///
@@ -1992,6 +1996,9 @@ public class CommonConstants {
     public static final String KEY_OF_LOG_STATS = "logStats";
 
     public enum JoinOverFlowMode {
+      THROW, BREAK
+    }
+    public enum TimeoutOverflowMode {
       THROW, BREAK
     }
 
