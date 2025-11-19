@@ -24,6 +24,7 @@ import org.apache.pinot.common.request.context.ExpressionContext;
 import org.apache.pinot.common.request.context.FilterContext;
 import org.apache.pinot.common.request.context.FunctionContext;
 import org.apache.pinot.common.request.context.OrderByExpressionContext;
+import org.apache.pinot.common.utils.config.QueryOptionsUtils;
 import org.apache.pinot.core.query.request.context.QueryContext;
 
 
@@ -59,6 +60,21 @@ public class QueryContextUtils {
    */
   public static boolean isDistinctQuery(QueryContext query) {
     return query.isDistinct();
+  }
+
+  /**
+   * Returns {@code true} if the given distinct query can stop scanning segments early, {@code false} otherwise.
+   */
+  public static boolean isDistinctEarlyTerminationEnabled(QueryContext query) {
+    if (!isDistinctQuery(query)) {
+      return false;
+    }
+    if (query.getOrderByExpressions() == null && query.getLimit() > 0 && query.getLimit() < Integer.MAX_VALUE) {
+      return true;
+    }
+    return QueryOptionsUtils.getMaxRowsInDistinct(query.getQueryOptions()) != null
+        || QueryOptionsUtils.getNumRowsWithoutChangeInDistinct(query.getQueryOptions()) != null
+        || QueryOptionsUtils.getMaxExecutionTimeMsInDistinct(query.getQueryOptions()) != null;
   }
 
   /** Collect aggregation functions (except for the ones in filter). */

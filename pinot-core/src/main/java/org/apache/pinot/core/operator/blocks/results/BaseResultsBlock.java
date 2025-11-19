@@ -37,6 +37,13 @@ import org.apache.pinot.spi.exception.QueryErrorMessage;
  * The {@code BaseResultsBlock} class is the holder of the server side results.
  */
 public abstract class BaseResultsBlock implements Block {
+  public enum EarlyTerminationReason {
+    NONE,
+    DISTINCT_MAX_ROWS,
+    DISTINCT_NO_NEW_VALUES,
+    DISTINCT_TIME_LIMIT
+  }
+
   private List<QueryErrorMessage> _processingExceptions;
   private long _numTotalDocs;
   private long _numDocsScanned;
@@ -49,6 +56,7 @@ public abstract class BaseResultsBlock implements Block {
   private long _executionThreadCpuTimeNs;
   private long _executionThreadMemAllocatedBytes;
   private int _numServerThreads;
+  private EarlyTerminationReason _earlyTerminationReason = EarlyTerminationReason.NONE;
 
   @Nullable
   public List<QueryErrorMessage> getErrorMessages() {
@@ -163,6 +171,14 @@ public abstract class BaseResultsBlock implements Block {
     _numServerThreads = numServerThreads;
   }
 
+  public EarlyTerminationReason getEarlyTerminationReason() {
+    return _earlyTerminationReason;
+  }
+
+  public void setEarlyTerminationReason(EarlyTerminationReason earlyTerminationReason) {
+    _earlyTerminationReason = earlyTerminationReason;
+  }
+
   /**
    * Returns the total size (number of rows) in this result block, without having to materialize the rows.
    *
@@ -208,6 +224,9 @@ public abstract class BaseResultsBlock implements Block {
     metadata.put(MetadataKey.NUM_CONSUMING_SEGMENTS_PROCESSED.getName(),
         Integer.toString(_numConsumingSegmentsProcessed));
     metadata.put(MetadataKey.NUM_CONSUMING_SEGMENTS_MATCHED.getName(), Integer.toString(_numConsumingSegmentsMatched));
+    if (_earlyTerminationReason != EarlyTerminationReason.NONE) {
+      metadata.put(MetadataKey.EARLY_TERMINATION_REASON.getName(), _earlyTerminationReason.name());
+    }
     return metadata;
   }
 }
