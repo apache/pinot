@@ -146,6 +146,11 @@ public class ServerPlanRequestUtils {
       Map<String, String> requestMetadata) {
     StagePlan stagePlan = serverContext.getStagePlan();
     PinotQuery pinotQuery = serverContext.getPinotQuery();
+    if (requestMetadata != null) {
+      // Preserve query options (case-insensitive) so server-side execution can honor limits such as
+      // maxRowsInDistinct/numRowsWithoutChangeInDistinct.
+      pinotQuery.setQueryOptions(QueryOptionsUtils.resolveCaseInsensitiveOptions(requestMetadata));
+    }
     // attach leaf node limit it not set
     Integer leafNodeLimit = QueryOptionsUtils.getMultiStageLeafLimit(requestMetadata);
     pinotQuery.setLimit(leafNodeLimit != null ? leafNodeLimit : DEFAULT_LEAF_NODE_LIMIT);

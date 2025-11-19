@@ -25,6 +25,7 @@ import java.time.Duration;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
+import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Locale;
@@ -590,7 +591,7 @@ public class MultiStageBrokerRequestHandler extends BaseBrokerRequestHandler {
       QueryDispatcher.QueryResult queryResults;
       try {
         queryResults = _queryDispatcher.submitAndReduce(requestContext, dispatchableSubPlan, timer.getRemainingTimeMs(),
-            query.getOptions());
+            mergeQueryOptions(query));
       } catch (QueryException e) {
         throw e;
       } catch (Throwable t) {
@@ -684,6 +685,16 @@ public class MultiStageBrokerRequestHandler extends BaseBrokerRequestHandler {
       _brokerMetrics.setValueOfGlobalGauge(BrokerGauge.ESTIMATED_MSE_SERVER_THREADS,
           _queryThrottler.currentQueryServerThreads());
     }
+  }
+
+  /**
+    * Uses both the parsed SQL options and the (potentially mutated) compiled query options to ensure we
+    * propagate everything (including queryOptions from the client) to the servers.
+    */
+  private static Map<String, String> mergeQueryOptions(QueryEnvironment.CompiledQuery query) {
+    Map<String, String> merged = new HashMap<>(query.getSqlNodeAndOptions().getOptions());
+    merged.putAll(query.getOptions());
+    return merged;
   }
 
   private static void throwTableAccessError(TableAuthorizationResult tableAuthorizationResult) {

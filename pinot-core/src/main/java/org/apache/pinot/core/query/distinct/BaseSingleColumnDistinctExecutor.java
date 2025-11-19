@@ -18,11 +18,11 @@
  */
 package org.apache.pinot.core.query.distinct;
 
+import java.util.function.LongSupplier;
 import org.apache.pinot.common.request.context.ExpressionContext;
 import org.apache.pinot.core.common.BlockValSet;
 import org.apache.pinot.core.operator.blocks.ValueBlock;
 import org.apache.pinot.core.query.distinct.table.DistinctTable;
-import org.roaringbitmap.PeekableIntIterator;
 import org.roaringbitmap.RoaringBitmap;
 
 
@@ -32,6 +32,7 @@ import org.roaringbitmap.RoaringBitmap;
 public abstract class BaseSingleColumnDistinctExecutor<T extends DistinctTable, S, M> implements DistinctExecutor {
   protected final ExpressionContext _expression;
   protected final T _distinctTable;
+  private final DistinctEarlyTerminationContext _earlyTerminationContext = new DistinctEarlyTerminationContext();
 
   public BaseSingleColumnDistinctExecutor(ExpressionContext expression, T distinctTable) {
     _expression = expression;
@@ -39,47 +40,93 @@ public abstract class BaseSingleColumnDistinctExecutor<T extends DistinctTable, 
   }
 
   @Override
+  public void setMaxRowsToProcess(int maxRows) {
+    _earlyTerminationContext.setMaxRowsToProcess(maxRows);
+  }
+
+  @Override
+  public void setNumRowsWithoutChangeInDistinct(int numRowsWithoutChangeInDistinct) {
+    _earlyTerminationContext.setNumRowsWithoutChangeInDistinct(numRowsWithoutChangeInDistinct);
+  }
+
+  @Override
+  public void setTimeSupplier(LongSupplier timeSupplier) {
+    _earlyTerminationContext.setTimeSupplier(timeSupplier);
+  }
+
+  @Override
+  public void setRemainingTimeNanos(long remainingTimeNanos) {
+    _earlyTerminationContext.setRemainingTimeNanos(remainingTimeNanos);
+  }
+
+  @Override
+  public boolean isNumRowsWithoutChangeLimitReached() {
+    return _earlyTerminationContext.isNumRowsWithoutChangeLimitReached();
+  }
+
+  @Override
+  public int getNumRowsProcessed() {
+    return _earlyTerminationContext.getNumRowsProcessed();
+  }
+
+  @Override
   public boolean process(ValueBlock valueBlock) {
+    if (shouldStopProcessing()) {
+      return true;
+    }
     BlockValSet blockValueSet = valueBlock.getBlockValueSet(_expression);
-    int numDocs = valueBlock.getNumDocs();
+    int numDocs = clampToRemaining(valueBlock.getNumDocs());
+    if (numDocs <= 0) {
+      return true;
+    }
+    boolean limitReached = false;
     if (_distinctTable.isNullHandlingEnabled() && blockValueSet.isSingleValue()) {
       RoaringBitmap nullBitmap = blockValueSet.getNullBitmap();
-      if (nullBitmap != null && !nullBitmap.isEmpty()) {
-        return processWithNull(blockValueSet, numDocs, nullBitmap);
-      } else {
-        return processWithoutNull(blockValueSet, numDocs);
-      }
-    } else {
-      return processWithoutNull(blockValueSet, numDocs);
-    }
-  }
-
-  private boolean processWithNull(BlockValSet blockValueSet, int numDocs, RoaringBitmap nullBitmap) {
-    _distinctTable.addNull();
-    S values = getValuesSV(blockValueSet);
-    PeekableIntIterator nullIterator = nullBitmap.getIntIterator();
-    int prev = 0;
-    while (nullIterator.hasNext()) {
-      int nextNull = nullIterator.next();
-      if (nextNull > prev) {
-        if (processSV(values, prev, nextNull)) {
-          return true;
+      S values = getValuesSV(blockValueSet);
+      for (int docId = 0; docId < numDocs; docId++) {
+        if (shouldStopProcessing()) {
+          break;
+        }
+        boolean isNull = nullBitmap != null && nullBitmap.contains(docId);
+        int sizeBefore = _distinctTable.size();
+        if (isNull) {
+          _distinctTable.addNull();
+        } else {
+          limitReached = processSV(values, docId, docId + 1);
+        }
+        recordRowProcessed(_distinctTable.size() > sizeBefore);
+        if (limitReached) {
+          break;
         }
       }
-      prev = nextNull + 1;
-    }
-    if (prev < numDocs) {
-      return processSV(values, prev, numDocs);
-    }
-    return false;
-  }
-
-  private boolean processWithoutNull(BlockValSet blockValueSet, int numDocs) {
-    if (blockValueSet.isSingleValue()) {
-      return processSV(getValuesSV(blockValueSet), 0, numDocs);
+    } else if (blockValueSet.isSingleValue()) {
+      S values = getValuesSV(blockValueSet);
+      for (int docId = 0; docId < numDocs; docId++) {
+        if (shouldStopProcessing()) {
+          break;
+        }
+        int sizeBefore = _distinctTable.size();
+        limitReached = processSV(values, docId, docId + 1);
+        recordRowProcessed(_distinctTable.size() > sizeBefore);
+        if (limitReached) {
+          break;
+        }
+      }
     } else {
-      return processMV(getValuesMV(blockValueSet), 0, numDocs);
+      M values = getValuesMV(blockValueSet);
+      for (int docId = 0; docId < numDocs; docId++) {
+        if (shouldStopProcessing()) {
+          break;
+        }
+        int sizeBefore = _distinctTable.size();
+        limitReached = processMV(values, docId, docId + 1);
+        recordRowProcessed(_distinctTable.size() > sizeBefore);
+        if (limitReached) {
+          break;
+        }
+      }
     }
+    return limitReached || shouldStopProcessing();
   }
 
   /**
@@ -105,5 +152,27 @@ public abstract class BaseSingleColumnDistinctExecutor<T extends DistinctTable, 
   @Override
   public DistinctTable getResult() {
     return _distinctTable;
+  }
+
+  @Override
+  public int getNumDistinctRowsCollected() {
+    return _distinctTable.size();
+  }
+
+  @Override
+  public int getRemainingRowsToProcess() {
+    return _earlyTerminationContext.getRemainingRowsToProcess();
+  }
+
+  private int clampToRemaining(int numDocs) {
+    return _earlyTerminationContext.clampToRemaining(numDocs);
+  }
+
+  private void recordRowProcessed(boolean distinctChanged) {
+    _earlyTerminationContext.recordRowProcessed(distinctChanged);
+  }
+
+  private boolean shouldStopProcessing() {
+    return _earlyTerminationContext.shouldStopProcessing();
   }
 }
