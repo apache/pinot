@@ -339,6 +339,16 @@ public class LeafOperator extends MultiStageOperator {
         case NUM_GROUPS_WARNING_LIMIT_REACHED:
           _statMap.merge(StatKey.NUM_GROUPS_WARNING_LIMIT_REACHED, Boolean.parseBoolean(entry.getValue()));
           break;
+        case EARLY_TERMINATION_REASON:
+          String reason = entry.getValue();
+          if (BaseResultsBlock.EarlyTerminationReason.DISTINCT_MAX_ROWS.name().equals(reason)) {
+            _statMap.merge(StatKey.MAX_ROWS_IN_DISTINCT_REACHED, true);
+          } else if (BaseResultsBlock.EarlyTerminationReason.DISTINCT_NO_NEW_VALUES.name().equals(reason)) {
+            _statMap.merge(StatKey.NUM_ROWS_WITHOUT_CHANGE_IN_DISTINCT_REACHED, true);
+          } else {
+            LOGGER.warn("Unknown distinct early termination reason: {}", reason);
+          }
+          break;
         case TIME_USED_MS:
           _statMap.merge(StatKey.EXECUTION_TIME_MS, Long.parseLong(entry.getValue()));
           break;
@@ -704,6 +714,8 @@ public class LeafOperator extends MultiStageOperator {
     GROUPS_TRIMMED(StatMap.Type.BOOLEAN),
     NUM_GROUPS_LIMIT_REACHED(StatMap.Type.BOOLEAN),
     NUM_GROUPS_WARNING_LIMIT_REACHED(StatMap.Type.BOOLEAN),
+    MAX_ROWS_IN_DISTINCT_REACHED(StatMap.Type.BOOLEAN),
+    NUM_ROWS_WITHOUT_CHANGE_IN_DISTINCT_REACHED(StatMap.Type.BOOLEAN),
     NUM_RESIZES(StatMap.Type.INT, null),
     RESIZE_TIME_MS(StatMap.Type.LONG, null),
     THREAD_CPU_TIME_NS(StatMap.Type.LONG, null),
