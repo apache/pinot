@@ -131,7 +131,7 @@ public class PinotThrottledLogger {
     if (state._rateLimiter.tryAcquire()) {
       long droppedCount = state._droppedCount;
       if (droppedCount > 0) {
-        consumer.accept(String.format("... Suppressed %d occurrences of %s ...",
+        consumer.accept(String.format("Dropped %d occurrences of %s",
             droppedCount,
             exceptionClass.getSimpleName()), null);
         state._droppedCount = 0;
