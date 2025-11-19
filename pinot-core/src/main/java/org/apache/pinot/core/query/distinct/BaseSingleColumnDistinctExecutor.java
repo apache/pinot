@@ -30,8 +30,11 @@ import org.roaringbitmap.RoaringBitmap;
  * Base implementation of {@link DistinctExecutor} for single column.
  */
 public abstract class BaseSingleColumnDistinctExecutor<T extends DistinctTable, S, M> implements DistinctExecutor {
+  private static final int UNLIMITED_ROWS = Integer.MAX_VALUE;
+
   protected final ExpressionContext _expression;
   protected final T _distinctTable;
+  private int _rowsRemaining = UNLIMITED_ROWS;
 
   public BaseSingleColumnDistinctExecutor(ExpressionContext expression, T distinctTable) {
     _expression = expression;
@@ -39,7 +42,15 @@ public abstract class BaseSingleColumnDistinctExecutor<T extends DistinctTable, 
   }
 
   @Override
+  public void setMaxRowsToProcess(int maxRows) {
+    _rowsRemaining = maxRows;
+  }
+
+  @Override
   public boolean process(ValueBlock valueBlock) {
+    if (_rowsRemaining <= 0) {
+      return true;
+    }
     BlockValSet blockValueSet = valueBlock.getBlockValueSet(_expression);
     int numDocs = valueBlock.getNumDocs();
     if (_distinctTable.isNullHandlingEnabled() && blockValueSet.isSingleValue()) {
@@ -55,30 +66,66 @@ public abstract class BaseSingleColumnDistinctExecutor<T extends DistinctTable, 
   }
 
   private boolean processWithNull(BlockValSet blockValueSet, int numDocs, RoaringBitmap nullBitmap) {
+    int limitedNumDocs = clampToRemaining(0, numDocs);
+    if (limitedNumDocs <= 0) {
+      return true;
+    }
     _distinctTable.addNull();
     S values = getValuesSV(blockValueSet);
     PeekableIntIterator nullIterator = nullBitmap.getIntIterator();
     int prev = 0;
-    while (nullIterator.hasNext()) {
+    while (nullIterator.hasNext() && prev < limitedNumDocs) {
       int nextNull = nullIterator.next();
       if (nextNull > prev) {
-        if (processSV(values, prev, nextNull)) {
+        int rangeEnd = Math.min(nextNull, limitedNumDocs);
+        if (processSVRange(values, prev, rangeEnd)) {
           return true;
         }
       }
       prev = nextNull + 1;
     }
-    if (prev < numDocs) {
-      return processSV(values, prev, numDocs);
+    if (prev < limitedNumDocs) {
+      return processSVRange(values, prev, limitedNumDocs);
     }
     return false;
   }
 
+  /**
+   * Processes a range of single-value values, respecting the row budget.
+   * @param values the single-value values
+   * @param from the start index (inclusive)
+   * @param to the end index (exclusive)
+   * @return true if processing should stop early, false otherwise
+   */
+  private boolean processSVRange(S values, int from, int to) {
+    int limitedTo = clampToRemaining(from, to);
+    if (limitedTo <= from) {
+      return true;
+    }
+    if (processSV(values, from, limitedTo)) {
+      return true;
+    }
+    consumeRows(limitedTo - from);
+    return _rowsRemaining <= 0;
+  }
+
   private boolean processWithoutNull(BlockValSet blockValueSet, int numDocs) {
     if (blockValueSet.isSingleValue()) {
-      return processSV(getValuesSV(blockValueSet), 0, numDocs);
+      int limitedTo = clampToRemaining(0, numDocs);
+      if (limitedTo <= 0) {
+        return true;
+      }
+      boolean satisfied = processSV(getValuesSV(blockValueSet), 0, limitedTo);
+      consumeRows(limitedTo);
+      return satisfied || _rowsRemaining <= 0;
     } else {
-      return processMV(getValuesMV(blockValueSet), 0, numDocs);
+      int limitedTo = clampToRemaining(0, numDocs);
+      if (limitedTo <= 0) {
+        return true;
+      }
+      boolean satisfied = processMV(getValuesMV(blockValueSet), 0, limitedTo);
+      consumeRows(limitedTo);
+      return satisfied || _rowsRemaining <= 0;
     }
   }
 
@@ -105,5 +152,31 @@ public abstract class BaseSingleColumnDistinctExecutor<T extends DistinctTable, 
   @Override
   public DistinctTable getResult() {
     return _distinctTable;
+  }
+
+  @Override
+  public int getNumDistinctRowsCollected() {
+    return _distinctTable.size();
+  }
+
+  @Override
+  public int getRemainingRowsToProcess() {
+    return _rowsRemaining;
+  }
+
+  private int clampToRemaining(int from, int to) {
+    if (_rowsRemaining == UNLIMITED_ROWS) {
+      return to;
+    }
+    if (_rowsRemaining <= 0) {
+      return from;
+    }
+    return Math.min(to, from + _rowsRemaining);
+  }
+
+  private void consumeRows(int count) {
+    if (_rowsRemaining != UNLIMITED_ROWS) {
+      _rowsRemaining -= count;
+    }
   }
 }
