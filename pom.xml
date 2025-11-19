@@ -249,7 +249,7 @@
 
     <!-- Configuration for Scala -->
     <scala.version>2.12.20</scala.version>
-    <scala-2.13.version>2.13.16</scala-2.13.version>
+    <scala-2.13.version>2.13.18</scala-2.13.version>
     <scala.compat.version>2.12</scala.compat.version>
 
     <!-- Solve conflicts and vulnerabilities -->
