@@ -49,12 +49,12 @@ import org.slf4j.Logger;
  * <p><b>Example Usage:</b>
  * <pre>
  * Logger logger = LoggerFactory.getLogger(MyClass.class);
- * PinotThrottledLogger throttled = new PinotThrottledLogger(logger, ingestionConfig);
+ * PinotThrottledLogger throttled = new PinotThrottledLogger(logger, ingestionConfig, tableName);
  *
  * try {
  *   // some operation
  * } catch (Exception e) {
- *   throttled.warn("Operation failed for record: {}", record, e);
+ *   throttled.warn("Operation failed for record: " + record, e);
  * }
  * </pre>
  *
