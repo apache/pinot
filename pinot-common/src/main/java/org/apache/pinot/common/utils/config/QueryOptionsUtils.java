@@ -97,6 +97,26 @@ public class QueryOptionsUtils {
     return resolved;
   }
 
+  public static Map<String, String> mergeQueryOptions(@Nullable Map<String, String> baseOptions,
+      @Nullable Map<String, String> overridingOptions) {
+    Map<String, String> merged = new HashMap<>();
+    if (baseOptions != null) {
+      merged.putAll(baseOptions);
+    }
+    if (overridingOptions != null && !overridingOptions.isEmpty()) {
+      merged.putAll(resolveCaseInsensitiveOptions(overridingOptions));
+    }
+    return merged;
+  }
+
+  public static void mergeQueryOptionsIfAbsent(@Nullable Map<String, String> targetOptions,
+      @Nullable Map<String, String> extraOptions) {
+    if (targetOptions == null || extraOptions == null || extraOptions.isEmpty()) {
+      return;
+    }
+    resolveCaseInsensitiveOptions(extraOptions).forEach(targetOptions::putIfAbsent);
+  }
+
   @Nullable
   public static String resolveCaseInsensitiveKey(Object property) {
     if (property instanceof String) {
@@ -115,6 +135,12 @@ public class QueryOptionsUtils {
   public static Long getExtraPassiveTimeoutMs(Map<String, String> queryOptions) {
     String extraPassiveTimeoutMsString = queryOptions.get(QueryOptionKey.EXTRA_PASSIVE_TIMEOUT_MS);
     return checkedParseLong(QueryOptionKey.EXTRA_PASSIVE_TIMEOUT_MS, extraPassiveTimeoutMsString, 0);
+  }
+
+  @Nullable
+  public static Long getMaxExecutionTimeMsInDistinct(Map<String, String> queryOptions) {
+    String maxExecutionTimeMs = queryOptions.get(QueryOptionKey.MAX_EXECUTION_TIME_MS_IN_DISTINCT);
+    return checkedParseLong(QueryOptionKey.MAX_EXECUTION_TIME_MS_IN_DISTINCT, maxExecutionTimeMs, 0);
   }
 
   @Nullable
@@ -416,6 +442,19 @@ public class QueryOptionsUtils {
   public static Integer getMaxRowsInJoin(Map<String, String> queryOptions) {
     String maxRowsInJoin = queryOptions.get(QueryOptionKey.MAX_ROWS_IN_JOIN);
     return checkedParseIntPositive(QueryOptionKey.MAX_ROWS_IN_JOIN, maxRowsInJoin);
+  }
+
+  @Nullable
+  public static Integer getMaxRowsInDistinct(Map<String, String> queryOptions) {
+    String maxRowsInDistinct = queryOptions.get(QueryOptionKey.MAX_ROWS_IN_DISTINCT);
+    return checkedParseIntPositive(QueryOptionKey.MAX_ROWS_IN_DISTINCT, maxRowsInDistinct);
+  }
+
+  @Nullable
+  public static Integer getNumRowsWithoutChangeInDistinct(Map<String, String> queryOptions) {
+    String numRowsWithoutChange =
+        queryOptions.get(QueryOptionKey.NUM_ROWS_WITHOUT_CHANGE_IN_DISTINCT);
+    return checkedParseIntPositive(QueryOptionKey.NUM_ROWS_WITHOUT_CHANGE_IN_DISTINCT, numRowsWithoutChange);
   }
 
   @Nullable

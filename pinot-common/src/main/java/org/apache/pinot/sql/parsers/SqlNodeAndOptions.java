@@ -58,8 +58,6 @@ public class SqlNodeAndOptions {
   }
 
   public void setExtraOptions(Map<String, String> extractOptionsMap) {
-    for (Map.Entry<String, String> e : QueryOptionsUtils.resolveCaseInsensitiveOptions(extractOptionsMap).entrySet()) {
-      _options.putIfAbsent(e.getKey(), e.getValue());
-    }
+    QueryOptionsUtils.mergeQueryOptionsIfAbsent(_options, extractOptionsMap);
   }
 }
