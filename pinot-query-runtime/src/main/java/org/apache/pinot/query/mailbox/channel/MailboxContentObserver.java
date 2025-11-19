@@ -94,7 +94,7 @@ public class MailboxContentObserver implements StreamObserver<MailboxContent> {
           closeStream();
           break;
         case ALREADY_TERMINATED:
-          // this can happen when the mailbox is cancelled by the receiver. No more messages are going to be accepted.
+          LOGGER.debug("Dropping blocks for already closed mailbox {} (likely early terminated)", mailboxId);
           closeStream();
           break;
         default:

@@ -696,6 +696,19 @@ public abstract class ClusterTest extends ControllerTest {
   }
 
   private static JsonNode sanitizeResponse(JsonNode responseJsonNode) {
+    // Ensure early-termination flags are present even if the broker omits them when false.
+    if (responseJsonNode.isObject()) {
+      if (!responseJsonNode.has("maxRowsInDistinctReached")) {
+        ((com.fasterxml.jackson.databind.node.ObjectNode) responseJsonNode).put("maxRowsInDistinctReached", false);
+      }
+      if (!responseJsonNode.has("numRowsWithoutChangeInDistinctReached")) {
+        ((com.fasterxml.jackson.databind.node.ObjectNode) responseJsonNode).put("numRowsWithoutChangeInDistinctReached",
+            false);
+      }
+      if (!responseJsonNode.has("timeLimitInDistinctReached")) {
+        ((com.fasterxml.jackson.databind.node.ObjectNode) responseJsonNode).put("timeLimitInDistinctReached", false);
+      }
+    }
     JsonNode resultTable = responseJsonNode.get("resultTable");
     if (resultTable == null) {
       return responseJsonNode;

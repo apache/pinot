@@ -20,13 +20,16 @@ package org.apache.pinot.core.operator.query;
 
 import java.util.Collections;
 import java.util.List;
+import java.util.concurrent.TimeUnit;
 import javax.annotation.Nullable;
 import org.apache.pinot.common.request.context.OrderByExpressionContext;
 import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.common.utils.DataSchema.ColumnDataType;
+import org.apache.pinot.common.utils.config.QueryOptionsUtils;
 import org.apache.pinot.core.common.Operator;
 import org.apache.pinot.core.operator.BaseOperator;
 import org.apache.pinot.core.operator.ExecutionStatistics;
+import org.apache.pinot.core.operator.blocks.results.BaseResultsBlock;
 import org.apache.pinot.core.operator.blocks.results.DistinctResultsBlock;
 import org.apache.pinot.core.query.distinct.table.BigDecimalDistinctTable;
 import org.apache.pinot.core.query.distinct.table.BytesDistinctTable;
@@ -48,19 +51,29 @@ import org.apache.pinot.spi.query.QueryThreadContext;
  */
 public class DictionaryBasedDistinctOperator extends BaseOperator<DistinctResultsBlock> {
   private static final String EXPLAIN_NAME = "DISTINCT_DICTIONARY";
+  private static final int TIME_CHECK_INTERVAL = 1024;
+  private static final int TIME_CHECK_MASK = TIME_CHECK_INTERVAL - 1;
 
   private final DataSource _dataSource;
   private final QueryContext _queryContext;
+  private final long _maxExecutionTimeNs;
 
   private int _numDocsScanned;
+  private long _startTimeNs;
+  private boolean _hitTimeLimit;
 
   public DictionaryBasedDistinctOperator(DataSource dataSource, QueryContext queryContext) {
     _dataSource = dataSource;
     _queryContext = queryContext;
+    Long maxExecutionTimeMs = QueryOptionsUtils.getMaxExecutionTimeMsInDistinct(queryContext.getQueryOptions());
+    _maxExecutionTimeNs =
+        maxExecutionTimeMs != null ? TimeUnit.MILLISECONDS.toNanos(maxExecutionTimeMs) : Long.MAX_VALUE;
   }
 
   @Override
   protected DistinctResultsBlock getNextBlock() {
+    _startTimeNs = System.nanoTime();
+    _hitTimeLimit = false;
     String column = _queryContext.getSelectExpressions().get(0).getIdentifier();
     Dictionary dictionary = _dataSource.getDictionary();
     assert dictionary != null;
@@ -98,7 +111,12 @@ public class DictionaryBasedDistinctOperator extends BaseOperator<DistinctResult
       default:
         throw new IllegalStateException("Unsupported data type: " + dictionary.getValueType());
     }
-    return new DistinctResultsBlock(distinctTable, _queryContext);
+    DistinctResultsBlock resultsBlock = new DistinctResultsBlock(distinctTable, _queryContext);
+    resultsBlock.setNumDocsScanned(_numDocsScanned);
+    if (_hitTimeLimit) {
+      resultsBlock.setEarlyTerminationReason(BaseResultsBlock.EarlyTerminationReason.DISTINCT_TIME_LIMIT);
+    }
+    return resultsBlock;
   }
 
   private IntDistinctTable createIntDistinctTable(DataSchema dataSchema, Dictionary dictionary,
@@ -108,35 +126,49 @@ public class DictionaryBasedDistinctOperator extends BaseOperator<DistinctResult
     int numValuesToKeep = Math.min(limit, dictLength);
     IntDistinctTable distinctTable =
         new IntDistinctTable(dataSchema, limit, _queryContext.isNullHandlingEnabled(), orderByExpression);
+    int rowsProcessed = 0;
     if (orderByExpression == null) {
       for (int i = 0; i < numValuesToKeep; i++) {
+        if ((i & TIME_CHECK_MASK) == 0 && hasExceededTimeLimit()) {
+          break;
+        }
         QueryThreadContext.checkTerminationAndSampleUsagePeriodically(i, EXPLAIN_NAME);
         distinctTable.addUnbounded(dictionary.getIntValue(i));
+        rowsProcessed++;
       }
-      _numDocsScanned = numValuesToKeep;
     } else {
       if (dictionary.isSorted()) {
         if (orderByExpression.isAsc()) {
           for (int i = 0; i < numValuesToKeep; i++) {
+            if ((i & TIME_CHECK_MASK) == 0 && hasExceededTimeLimit()) {
+              break;
+            }
             QueryThreadContext.checkTerminationAndSampleUsagePeriodically(i, EXPLAIN_NAME);
             distinctTable.addUnbounded(dictionary.getIntValue(i));
+            rowsProcessed++;
           }
-          _numDocsScanned = numValuesToKeep;
         } else {
           for (int i = 0; i < numValuesToKeep; i++) {
+            if ((i & TIME_CHECK_MASK) == 0 && hasExceededTimeLimit()) {
+              break;
+            }
             QueryThreadContext.checkTerminationAndSampleUsagePeriodically(i, EXPLAIN_NAME);
             distinctTable.addUnbounded(dictionary.getIntValue(dictLength - 1 - i));
+            rowsProcessed++;
           }
-          _numDocsScanned = numValuesToKeep;
         }
       } else {
         for (int i = 0; i < dictLength; i++) {
+          if ((i & TIME_CHECK_MASK) == 0 && hasExceededTimeLimit()) {
+            break;
+          }
           QueryThreadContext.checkTerminationAndSampleUsagePeriodically(i, EXPLAIN_NAME);
           distinctTable.addWithOrderBy(dictionary.getIntValue(i));
+          rowsProcessed++;
         }
-        _numDocsScanned = dictLength;
       }
     }
+    _numDocsScanned = rowsProcessed;
     return distinctTable;
   }
 
@@ -147,35 +179,49 @@ public class DictionaryBasedDistinctOperator extends BaseOperator<DistinctResult
     int numValuesToKeep = Math.min(limit, dictLength);
     LongDistinctTable distinctTable =
         new LongDistinctTable(dataSchema, limit, _queryContext.isNullHandlingEnabled(), orderByExpression);
+    int rowsProcessed = 0;
     if (orderByExpression == null) {
       for (int i = 0; i < numValuesToKeep; i++) {
+        if ((i & TIME_CHECK_MASK) == 0 && hasExceededTimeLimit()) {
+          break;
+        }
         QueryThreadContext.checkTerminationAndSampleUsagePeriodically(i, EXPLAIN_NAME);
         distinctTable.addUnbounded(dictionary.getLongValue(i));
+        rowsProcessed++;
       }
-      _numDocsScanned = numValuesToKeep;
     } else {
       if (dictionary.isSorted()) {
         if (orderByExpression.isAsc()) {
           for (int i = 0; i < numValuesToKeep; i++) {
+            if ((i & TIME_CHECK_MASK) == 0 && hasExceededTimeLimit()) {
+              break;
+            }
             QueryThreadContext.checkTerminationAndSampleUsagePeriodically(i, EXPLAIN_NAME);
             distinctTable.addUnbounded(dictionary.getLongValue(i));
+            rowsProcessed++;
           }
-          _numDocsScanned = numValuesToKeep;
         } else {
           for (int i = 0; i < numValuesToKeep; i++) {
+            if ((i & TIME_CHECK_MASK) == 0 && hasExceededTimeLimit()) {
+              break;
+            }
             QueryThreadContext.checkTerminationAndSampleUsagePeriodically(i, EXPLAIN_NAME);
             distinctTable.addUnbounded(dictionary.getLongValue(dictLength - 1 - i));
+            rowsProcessed++;
           }
-          _numDocsScanned = numValuesToKeep;
         }
       } else {
         for (int i = 0; i < dictLength; i++) {
+          if ((i & TIME_CHECK_MASK) == 0 && hasExceededTimeLimit()) {
+            break;
+          }
           QueryThreadContext.checkTerminationAndSampleUsagePeriodically(i, EXPLAIN_NAME);
           distinctTable.addWithOrderBy(dictionary.getLongValue(i));
+          rowsProcessed++;
         }
-        _numDocsScanned = dictLength;
       }
     }
+    _numDocsScanned = rowsProcessed;
     return distinctTable;
   }
 
@@ -186,35 +232,49 @@ public class DictionaryBasedDistinctOperator extends BaseOperator<DistinctResult
     int numValuesToKeep = Math.min(limit, dictLength);
     FloatDistinctTable distinctTable =
         new FloatDistinctTable(dataSchema, limit, _queryContext.isNullHandlingEnabled(), orderByExpression);
+    int rowsProcessed = 0;
     if (orderByExpression == null) {
       for (int i = 0; i < numValuesToKeep; i++) {
+        if ((i & TIME_CHECK_MASK) == 0 && hasExceededTimeLimit()) {
+          break;
+        }
         QueryThreadContext.checkTerminationAndSampleUsagePeriodically(i, EXPLAIN_NAME);
         distinctTable.addUnbounded(dictionary.getFloatValue(i));
+        rowsProcessed++;
       }
-      _numDocsScanned = numValuesToKeep;
     } else {
       if (dictionary.isSorted()) {
         if (orderByExpression.isAsc()) {
           for (int i = 0; i < numValuesToKeep; i++) {
+            if ((i & TIME_CHECK_MASK) == 0 && hasExceededTimeLimit()) {
+              break;
+            }
             QueryThreadContext.checkTerminationAndSampleUsagePeriodically(i, EXPLAIN_NAME);
             distinctTable.addUnbounded(dictionary.getFloatValue(i));
+            rowsProcessed++;
           }
-          _numDocsScanned = numValuesToKeep;
         } else {
           for (int i = 0; i < numValuesToKeep; i++) {
+            if ((i & TIME_CHECK_MASK) == 0 && hasExceededTimeLimit()) {
+              break;
+            }
             QueryThreadContext.checkTerminationAndSampleUsagePeriodically(i, EXPLAIN_NAME);
             distinctTable.addUnbounded(dictionary.getFloatValue(dictLength - 1 - i));
+            rowsProcessed++;
           }
-          _numDocsScanned = numValuesToKeep;
         }
       } else {
         for (int i = 0; i < dictLength; i++) {
+          if ((i & TIME_CHECK_MASK) == 0 && hasExceededTimeLimit()) {
+            break;
+          }
           QueryThreadContext.checkTerminationAndSampleUsagePeriodically(i, EXPLAIN_NAME);
           distinctTable.addWithOrderBy(dictionary.getFloatValue(i));
+          rowsProcessed++;
         }
-        _numDocsScanned = dictLength;
       }
     }
+    _numDocsScanned = rowsProcessed;
     return distinctTable;
   }
 
@@ -225,35 +285,49 @@ public class DictionaryBasedDistinctOperator extends BaseOperator<DistinctResult
     int numValuesToKeep = Math.min(limit, dictLength);
     DoubleDistinctTable distinctTable =
         new DoubleDistinctTable(dataSchema, limit, _queryContext.isNullHandlingEnabled(), orderByExpression);
+    int rowsProcessed = 0;
     if (orderByExpression == null) {
       for (int i = 0; i < numValuesToKeep; i++) {
+        if ((i & TIME_CHECK_MASK) == 0 && hasExceededTimeLimit()) {
+          break;
+        }
         QueryThreadContext.checkTerminationAndSampleUsagePeriodically(i, EXPLAIN_NAME);
         distinctTable.addUnbounded(dictionary.getDoubleValue(i));
+        rowsProcessed++;
       }
-      _numDocsScanned = numValuesToKeep;
     } else {
       if (dictionary.isSorted()) {
         if (orderByExpression.isAsc()) {
           for (int i = 0; i < numValuesToKeep; i++) {
+            if ((i & TIME_CHECK_MASK) == 0 && hasExceededTimeLimit()) {
+              break;
+            }
             QueryThreadContext.checkTerminationAndSampleUsagePeriodically(i, EXPLAIN_NAME);
             distinctTable.addUnbounded(dictionary.getDoubleValue(i));
+            rowsProcessed++;
           }
-          _numDocsScanned = numValuesToKeep;
         } else {
           for (int i = 0; i < numValuesToKeep; i++) {
+            if ((i & TIME_CHECK_MASK) == 0 && hasExceededTimeLimit()) {
+              break;
+            }
             QueryThreadContext.checkTerminationAndSampleUsagePeriodically(i, EXPLAIN_NAME);
             distinctTable.addUnbounded(dictionary.getDoubleValue(dictLength - 1 - i));
+            rowsProcessed++;
           }
-          _numDocsScanned = numValuesToKeep;
         }
       } else {
         for (int i = 0; i < dictLength; i++) {
+          if ((i & TIME_CHECK_MASK) == 0 && hasExceededTimeLimit()) {
+            break;
+          }
           QueryThreadContext.checkTerminationAndSampleUsagePeriodically(i, EXPLAIN_NAME);
           distinctTable.addWithOrderBy(dictionary.getDoubleValue(i));
+          rowsProcessed++;
         }
-        _numDocsScanned = dictLength;
       }
     }
+    _numDocsScanned = rowsProcessed;
     return distinctTable;
   }
 
@@ -264,35 +338,49 @@ public class DictionaryBasedDistinctOperator extends BaseOperator<DistinctResult
     int numValuesToKeep = Math.min(limit, dictLength);
     BigDecimalDistinctTable distinctTable =
         new BigDecimalDistinctTable(dataSchema, limit, _queryContext.isNullHandlingEnabled(), orderByExpression);
+    int rowsProcessed = 0;
     if (orderByExpression == null) {
       for (int i = 0; i < numValuesToKeep; i++) {
+        if ((i & TIME_CHECK_MASK) == 0 && hasExceededTimeLimit()) {
+          break;
+        }
         QueryThreadContext.checkTerminationAndSampleUsagePeriodically(i, EXPLAIN_NAME);
         distinctTable.addUnbounded(dictionary.getBigDecimalValue(i));
+        rowsProcessed++;
       }
-      _numDocsScanned = numValuesToKeep;
     } else {
       if (dictionary.isSorted()) {
         if (orderByExpression.isAsc()) {
           for (int i = 0; i < numValuesToKeep; i++) {
+            if ((i & TIME_CHECK_MASK) == 0 && hasExceededTimeLimit()) {
+              break;
+            }
             QueryThreadContext.checkTerminationAndSampleUsagePeriodically(i, EXPLAIN_NAME);
             distinctTable.addUnbounded(dictionary.getBigDecimalValue(i));
+            rowsProcessed++;
           }
-          _numDocsScanned = numValuesToKeep;
         } else {
           for (int i = 0; i < numValuesToKeep; i++) {
+            if ((i & TIME_CHECK_MASK) == 0 && hasExceededTimeLimit()) {
+              break;
+            }
             QueryThreadContext.checkTerminationAndSampleUsagePeriodically(i, EXPLAIN_NAME);
             distinctTable.addUnbounded(dictionary.getBigDecimalValue(dictLength - 1 - i));
+            rowsProcessed++;
           }
-          _numDocsScanned = numValuesToKeep;
         }
       } else {
         for (int i = 0; i < dictLength; i++) {
+          if ((i & TIME_CHECK_MASK) == 0 && hasExceededTimeLimit()) {
+            break;
+          }
           QueryThreadContext.checkTerminationAndSampleUsagePeriodically(i, EXPLAIN_NAME);
           distinctTable.addWithOrderBy(dictionary.getBigDecimalValue(i));
+          rowsProcessed++;
         }
-        _numDocsScanned = dictLength;
       }
     }
+    _numDocsScanned = rowsProcessed;
     return distinctTable;
   }
 
@@ -303,35 +391,49 @@ public class DictionaryBasedDistinctOperator extends BaseOperator<DistinctResult
     int numValuesToKeep = Math.min(limit, dictLength);
     StringDistinctTable distinctTable =
         new StringDistinctTable(dataSchema, limit, _queryContext.isNullHandlingEnabled(), orderByExpression);
+    int rowsProcessed = 0;
     if (orderByExpression == null) {
       for (int i = 0; i < numValuesToKeep; i++) {
+        if ((i & TIME_CHECK_MASK) == 0 && hasExceededTimeLimit()) {
+          break;
+        }
         QueryThreadContext.checkTerminationAndSampleUsagePeriodically(i, EXPLAIN_NAME);
         distinctTable.addUnbounded(dictionary.getStringValue(i));
+        rowsProcessed++;
       }
-      _numDocsScanned = numValuesToKeep;
     } else {
       if (dictionary.isSorted()) {
         if (orderByExpression.isAsc()) {
           for (int i = 0; i < numValuesToKeep; i++) {
+            if ((i & TIME_CHECK_MASK) == 0 && hasExceededTimeLimit()) {
+              break;
+            }
             QueryThreadContext.checkTerminationAndSampleUsagePeriodically(i, EXPLAIN_NAME);
             distinctTable.addUnbounded(dictionary.getStringValue(i));
+            rowsProcessed++;
           }
-          _numDocsScanned = numValuesToKeep;
         } else {
           for (int i = 0; i < numValuesToKeep; i++) {
+            if ((i & TIME_CHECK_MASK) == 0 && hasExceededTimeLimit()) {
+              break;
+            }
             QueryThreadContext.checkTerminationAndSampleUsagePeriodically(i, EXPLAIN_NAME);
             distinctTable.addUnbounded(dictionary.getStringValue(dictLength - 1 - i));
+            rowsProcessed++;
           }
-          _numDocsScanned = numValuesToKeep;
         }
       } else {
         for (int i = 0; i < dictLength; i++) {
+          if ((i & TIME_CHECK_MASK) == 0 && hasExceededTimeLimit()) {
+            break;
+          }
           QueryThreadContext.checkTerminationAndSampleUsagePeriodically(i, EXPLAIN_NAME);
           distinctTable.addWithOrderBy(dictionary.getStringValue(i));
+          rowsProcessed++;
         }
-        _numDocsScanned = dictLength;
       }
     }
+    _numDocsScanned = rowsProcessed;
     return distinctTable;
   }
 
@@ -342,36 +444,61 @@ public class DictionaryBasedDistinctOperator extends BaseOperator<DistinctResult
     int numValuesToKeep = Math.min(limit, dictLength);
     BytesDistinctTable distinctTable =
         new BytesDistinctTable(dataSchema, limit, _queryContext.isNullHandlingEnabled(), orderByExpression);
+    int rowsProcessed = 0;
     if (orderByExpression == null) {
       for (int i = 0; i < numValuesToKeep; i++) {
+        if ((i & TIME_CHECK_MASK) == 0 && hasExceededTimeLimit()) {
+          break;
+        }
         QueryThreadContext.checkTerminationAndSampleUsagePeriodically(i, EXPLAIN_NAME);
         distinctTable.addUnbounded(dictionary.getByteArrayValue(i));
+        rowsProcessed++;
       }
-      _numDocsScanned = numValuesToKeep;
     } else {
       if (dictionary.isSorted()) {
         if (orderByExpression.isAsc()) {
           for (int i = 0; i < numValuesToKeep; i++) {
+            if ((i & TIME_CHECK_MASK) == 0 && hasExceededTimeLimit()) {
+              break;
+            }
             QueryThreadContext.checkTerminationAndSampleUsagePeriodically(i, EXPLAIN_NAME);
             distinctTable.addUnbounded(dictionary.getByteArrayValue(i));
+            rowsProcessed++;
           }
-          _numDocsScanned = numValuesToKeep;
         } else {
           for (int i = 0; i < numValuesToKeep; i++) {
+            if ((i & TIME_CHECK_MASK) == 0 && hasExceededTimeLimit()) {
+              break;
+            }
             QueryThreadContext.checkTerminationAndSampleUsagePeriodically(i, EXPLAIN_NAME);
             distinctTable.addUnbounded(dictionary.getByteArrayValue(dictLength - 1 - i));
+            rowsProcessed++;
           }
-          _numDocsScanned = numValuesToKeep;
         }
       } else {
         for (int i = 0; i < dictLength; i++) {
+          if ((i & TIME_CHECK_MASK) == 0 && hasExceededTimeLimit()) {
+            break;
+          }
           QueryThreadContext.checkTerminationAndSampleUsagePeriodically(i, EXPLAIN_NAME);
           distinctTable.addWithOrderBy(dictionary.getByteArrayValue(i));
+          rowsProcessed++;
         }
-        _numDocsScanned = dictLength;
       }
     }
+    _numDocsScanned = rowsProcessed;
     return distinctTable;
+  }
+
+  private boolean hasExceededTimeLimit() {
+    if (_maxExecutionTimeNs == Long.MAX_VALUE) {
+      return false;
+    }
+    if (System.nanoTime() - _startTimeNs >= _maxExecutionTimeNs) {
+      _hitTimeLimit = true;
+      return true;
+    }
+    return false;
   }
 
   @Override
