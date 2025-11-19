@@ -19,10 +19,6 @@
 package org.apache.pinot.common.utils;
 
 import java.io.IOException;
-import java.util.concurrent.CountDownLatch;
-import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Executors;
-import java.util.concurrent.TimeUnit;
 import org.apache.pinot.spi.config.table.ingestion.IngestionConfig;
 import org.slf4j.Logger;
 import org.testng.annotations.Test;
@@ -87,32 +83,4 @@ public class PinotThrottledLoggerTest {
     verify(mockLogger, times(100)).debug(eq("Error"), any(NumberFormatException.class));
   }
 
-  @Test
-  public void testThreadSafety() throws InterruptedException {
-    Logger mockLogger = mock(Logger.class);
-    PinotThrottledLogger throttledLogger = new PinotThrottledLogger(mockLogger, 10.0 / 60.0);
-
-    int numThreads = 10;
-    int exceptionsPerThread = 100;
-    ExecutorService executor = Executors.newFixedThreadPool(numThreads);
-    CountDownLatch latch = new CountDownLatch(numThreads);
-
-    for (int i = 0; i < numThreads; i++) {
-      executor.submit(() -> {
-        try {
-          for (int j = 0; j < exceptionsPerThread; j++) {
-            throttledLogger.warn("Error", new NumberFormatException("Invalid number"));
-          }
-        } finally {
-          latch.countDown();
-        }
-      });
-    }
-
-    latch.await(10, TimeUnit.SECONDS);
-    executor.shutdown();
-    executor.awaitTermination(10, TimeUnit.SECONDS);
-
-    verify(mockLogger, atMost(11)).warn(eq("Error"), any(NumberFormatException.class));
-  }
 }

@@ -19,9 +19,9 @@
 package org.apache.pinot.common.utils;
 
 import com.google.common.util.concurrent.RateLimiter;
+import java.util.HashMap;
+import java.util.Map;
 import java.util.Optional;
-import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.atomic.AtomicLong;
 import java.util.function.BiConsumer;
 import javax.annotation.Nullable;
 import org.apache.pinot.common.metrics.ServerMeter;
@@ -41,10 +41,10 @@ import org.slf4j.Logger;
  * <ul>
  *   <li>Class-based fingerprinting: Each exception class gets its own rate limiter</li>
  *   <li>Suppression tracking: Reports count of dropped logs when rate limit is lifted</li>
- *   <li>Non-blocking: Uses atomic operations, no locks in hot path</li>
- *   <li>Thread-safe: ConcurrentHashMap ensures safe concurrent access</li>
  *   <li>Bounded memory: Exception classes are finite (~10-50 typical)</li>
  * </ul>
+ *
+ * <p><b>Note:</b> This class is designed for single-threaded access per instance (one TransformPipeline per thread).
  *
  * <p><b>Example Usage:</b>
  * <pre>
@@ -58,8 +58,13 @@ import org.slf4j.Logger;
  * }
  * </pre>
  *
- * <p><b>Backward Compatibility:</b>
- * When rate limit is 0 (default), falls back to DEBUG level logging to maintain backward compatible behavior.
+ * <p><b>Logging Behavior:</b>
+ * <ul>
+ *   <li><b>Rate limit disabled (≤ 0):</b> All exceptions logged at DEBUG level (backward compatible default)</li>
+ *   <li><b>Within rate limit (> 0, quota available):</b> Logs at WARN/ERROR level with suppression counts</li>
+ *   <li><b>Rate limit exceeded (> 0, quota exhausted):</b> Logs at DEBUG level while tracking suppression counts</li>
+ * </ul>
+ * This ensures no exception information is lost - all exceptions are logged at either WARN/ERROR or DEBUG level.
  *
  * <p><b>Example Output:</b>
  * <pre>
@@ -83,8 +88,7 @@ import org.slf4j.Logger;
 public class PinotThrottledLogger {
   private final Logger _delegate;
 
-  private final ConcurrentHashMap<Class<?>, RateLimiter> _rateLimiterMap = new ConcurrentHashMap<>();
-  private final ConcurrentHashMap<Class<?>, AtomicLong> _droppedCountMap = new ConcurrentHashMap<>();
+  private final Map<Class<?>, ExceptionState> _stateMap = new HashMap<>();
   private final double _permitsPerSecond;
   private final String _tableName;
 
@@ -121,24 +125,34 @@ public class PinotThrottledLogger {
       return;
     }
 
-    Class<?> exceptionClass = t.getClass();
+    final Class<?> exceptionClass = t.getClass();
+    final ExceptionState state = _stateMap.computeIfAbsent(exceptionClass, k -> new ExceptionState(_permitsPerSecond));
 
-    RateLimiter limiter = _rateLimiterMap.computeIfAbsent(exceptionClass, k -> RateLimiter.create(_permitsPerSecond));
-    AtomicLong droppedCount = _droppedCountMap.computeIfAbsent(exceptionClass, k -> new AtomicLong(0));
-
-    if (limiter.tryAcquire()) {
-      long suppressed = droppedCount.getAndSet(0);
-      if (suppressed > 0) {
-        String suppressionMsg =
-            String.format("... Suppressed %d occurrences of %s ...", suppressed, exceptionClass.getSimpleName());
-        consumer.accept(suppressionMsg, null);
+    if (state._rateLimiter.tryAcquire()) {
+      long droppedCount = state._droppedCount;
+      if (droppedCount > 0) {
+        consumer.accept(String.format("... Suppressed %d occurrences of %s ...",
+            droppedCount,
+            exceptionClass.getSimpleName()), null);
+        state._droppedCount = 0;
       }
       consumer.accept(msg, t);
     } else {
-      droppedCount.incrementAndGet();
+      state._droppedCount++;
+      _delegate.debug(msg, t);
       if (_tableName != null) {
         ServerMetrics.get().addMeteredTableValue(_tableName, ServerMeter.LOGS_DROPPED_BY_THROTTLED_LOGGER, 1L);
       }
+    }
+  }
+
+  private static class ExceptionState {
+    final RateLimiter _rateLimiter;
+    long _droppedCount;
+
+    ExceptionState(double permitsPerSecond) {
+      _rateLimiter = RateLimiter.create(permitsPerSecond);
+      _droppedCount = 0;
     }
   }
 }
