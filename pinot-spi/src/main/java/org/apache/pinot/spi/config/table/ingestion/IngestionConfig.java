@@ -76,6 +76,9 @@ public class IngestionConfig extends BaseJsonConfig {
   @JsonPropertyDescription("Configs related to check time value for segment")
   private boolean _segmentTimeValueCheck = true;
 
+  @JsonPropertyDescription("Max exception logs per minute per exception class (0 to disable)")
+  private int _ingestionExceptionLogRateLimitPerMin = 0;
+
   @Deprecated
   public IngestionConfig(@Nullable BatchIngestionConfig batchIngestionConfig,
       @Nullable StreamIngestionConfig streamIngestionConfig, @Nullable FilterConfig filterConfig,
@@ -152,6 +155,10 @@ public class IngestionConfig extends BaseJsonConfig {
     return _segmentTimeValueCheck;
   }
 
+  public int getIngestionExceptionLogRateLimitPerMin() {
+    return _ingestionExceptionLogRateLimitPerMin;
+  }
+
   public void setBatchIngestionConfig(BatchIngestionConfig batchIngestionConfig) {
     _batchIngestionConfig = batchIngestionConfig;
   }
@@ -199,5 +206,9 @@ public class IngestionConfig extends BaseJsonConfig {
 
   public void setSegmentTimeValueCheck(boolean segmentTimeValueCheck) {
     _segmentTimeValueCheck = segmentTimeValueCheck;
+  }
+
+  public void setIngestionExceptionLogRateLimitPerMin(int ingestionExceptionLogRateLimitPerMin) {
+    _ingestionExceptionLogRateLimitPerMin = ingestionExceptionLogRateLimitPerMin;
   }
 }
