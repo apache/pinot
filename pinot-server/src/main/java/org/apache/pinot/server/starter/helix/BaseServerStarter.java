@@ -629,6 +629,10 @@ public abstract class BaseServerStarter implements ServiceStartable {
     LOGGER.info("Initializing reload job status cache");
     _reloadJobStatusCache = new ServerReloadJobStatusCache();
 
+    // Register cache as cluster config listener for dynamic config updates
+    _clusterConfigChangeHandler.registerClusterConfigChangeListener(_reloadJobStatusCache);
+    LOGGER.info("Registered ServerReloadJobStatusCache as cluster config listener");
+
     // install default SSL context if necessary (even if not force-enabled everywhere)
     TlsConfig tlsDefaults = TlsUtils.extractTlsConfig(_serverConf, Server.SERVER_TLS_PREFIX);
     if (StringUtils.isNotBlank(tlsDefaults.getKeyStorePath()) || StringUtils.isNotBlank(
