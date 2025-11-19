@@ -44,13 +44,15 @@ import org.apache.pinot.spi.utils.JsonUtils;
  */
 @JsonPropertyOrder({
     "resultTable", "numRowsResultSet", "partialResult", "exceptions", "numGroupsLimitReached",
-    "numGroupsWarningLimitReached", "timeUsedMs", "requestId", "clientRequestId", "brokerId", "numDocsScanned",
-    "totalDocs", "numEntriesScannedInFilter", "numEntriesScannedPostFilter", "numServersQueried", "numServersResponded",
-    "numSegmentsQueried", "numSegmentsProcessed", "numSegmentsMatched", "numConsumingSegmentsQueried",
-    "numConsumingSegmentsProcessed", "numConsumingSegmentsMatched", "minConsumingFreshnessTimeMs",
-    "numSegmentsPrunedByBroker", "numSegmentsPrunedByServer", "numSegmentsPrunedInvalid", "numSegmentsPrunedByLimit",
-    "numSegmentsPrunedByValue", "brokerReduceTimeMs", "offlineThreadCpuTimeNs", "realtimeThreadCpuTimeNs",
-    "offlineSystemActivitiesCpuTimeNs", "realtimeSystemActivitiesCpuTimeNs", "offlineResponseSerializationCpuTimeNs",
+    "numGroupsWarningLimitReached", "maxRowsInDistinctReached", "maxRowsWithoutChangeInDistinctReached",
+    "maxExecutionTimeInDistinctReached", "timeUsedMs",
+    "requestId", "clientRequestId", "brokerId", "numDocsScanned", "totalDocs", "numEntriesScannedInFilter",
+    "numEntriesScannedPostFilter", "numServersQueried", "numServersResponded", "numSegmentsQueried",
+    "numSegmentsProcessed", "numSegmentsMatched", "numConsumingSegmentsQueried", "numConsumingSegmentsProcessed",
+    "numConsumingSegmentsMatched", "minConsumingFreshnessTimeMs", "numSegmentsPrunedByBroker",
+    "numSegmentsPrunedByServer", "numSegmentsPrunedInvalid", "numSegmentsPrunedByLimit", "numSegmentsPrunedByValue",
+    "brokerReduceTimeMs", "offlineThreadCpuTimeNs", "realtimeThreadCpuTimeNs", "offlineSystemActivitiesCpuTimeNs",
+    "realtimeSystemActivitiesCpuTimeNs", "offlineResponseSerializationCpuTimeNs",
     "realtimeResponseSerializationCpuTimeNs", "offlineTotalCpuTimeNs", "realtimeTotalCpuTimeNs",
     "explainPlanNumEmptyFilterSegments", "explainPlanNumMatchAllFilterSegments", "traceInfo", "tablesQueried",
     "offlineThreadMemAllocatedBytes", "realtimeThreadMemAllocatedBytes", "offlineResponseSerMemAllocatedBytes",
@@ -74,6 +76,9 @@ public class BrokerResponseNative implements BrokerResponse {
   private boolean _groupsTrimmed = false;
   private boolean _numGroupsLimitReached = false;
   private boolean _numGroupsWarningLimitReached = false;
+  private boolean _maxRowsInDistinctReached = false;
+  private boolean _maxRowsWithoutChangeInDistinctReached = false;
+  private boolean _maxExecutionTimeInDistinctReached = false;
   private long _timeUsedMs = 0L;
   private String _requestId;
   private String _clientRequestId;
@@ -189,7 +194,8 @@ public class BrokerResponseNative implements BrokerResponse {
   @JsonProperty(access = JsonProperty.Access.READ_ONLY)
   @Override
   public boolean isPartialResult() {
-    return getExceptionsSize() > 0 || isNumGroupsLimitReached();
+    return getExceptionsSize() > 0 || isNumGroupsLimitReached() || isMaxRowsInDistinctReached()
+        || isMaxRowsWithoutChangeInDistinctReached() || isMaxExecutionTimeInDistinctReached();
   }
 
   @Override
@@ -230,6 +236,30 @@ public class BrokerResponseNative implements BrokerResponse {
 
   public void setNumGroupsWarningLimitReached(boolean numGroupsWarningLimitReached) {
     _numGroupsWarningLimitReached = numGroupsWarningLimitReached;
+  }
+
+  public boolean isMaxRowsInDistinctReached() {
+    return _maxRowsInDistinctReached;
+  }
+
+  public void setMaxRowsInDistinctReached(boolean maxRowsInDistinctReached) {
+    _maxRowsInDistinctReached = maxRowsInDistinctReached;
+  }
+
+  public boolean isMaxRowsWithoutChangeInDistinctReached() {
+    return _maxRowsWithoutChangeInDistinctReached;
+  }
+
+  public void setMaxRowsWithoutChangeInDistinctReached(boolean numRowsWithoutChangeInDistinctReached) {
+    _maxRowsWithoutChangeInDistinctReached = numRowsWithoutChangeInDistinctReached;
+  }
+
+  public boolean isMaxExecutionTimeInDistinctReached() {
+    return _maxExecutionTimeInDistinctReached;
+  }
+
+  public void setMaxExecutionTimeInDistinctReached(boolean timeLimitInDistinctReached) {
+    _maxExecutionTimeInDistinctReached = timeLimitInDistinctReached;
   }
 
   @JsonIgnore
