@@ -415,6 +415,19 @@ public class QueryOptionsUtils {
   }
 
   @Nullable
+  public static Integer getMaxRowsInDistinct(Map<String, String> queryOptions) {
+    String maxRowsInDistinct = queryOptions.get(QueryOptionKey.MAX_ROWS_IN_DISTINCT);
+    return checkedParseIntPositive(QueryOptionKey.MAX_ROWS_IN_DISTINCT, maxRowsInDistinct);
+  }
+
+  @Nullable
+  public static Integer getNumRowsWithoutChangeInDistinct(Map<String, String> queryOptions) {
+    String numRowsWithoutChange =
+        queryOptions.get(QueryOptionKey.NUM_ROWS_WITHOUT_CHANGE_IN_DISTINCT);
+    return checkedParseIntPositive(QueryOptionKey.NUM_ROWS_WITHOUT_CHANGE_IN_DISTINCT, numRowsWithoutChange);
+  }
+
+  @Nullable
   public static JoinOverFlowMode getJoinOverflowMode(Map<String, String> queryOptions) {
     String joinOverflowModeStr = queryOptions.get(QueryOptionKey.JOIN_OVERFLOW_MODE);
     return joinOverflowModeStr != null ? JoinOverFlowMode.valueOf(joinOverflowModeStr) : null;

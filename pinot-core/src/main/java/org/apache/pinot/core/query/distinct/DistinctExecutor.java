@@ -30,6 +30,21 @@ public interface DistinctExecutor {
   int MAX_INITIAL_CAPACITY = 10000;
 
   /**
+   * Sets the maximum number of rows to process across all blocks. Implementations should respect this limit and avoid
+   * reading more rows once exhausted. Default implementation is a no-op for executors that do not support it.
+   */
+  default void setMaxRowsToProcess(int maxRows) {
+  }
+
+  /**
+   * Returns the remaining number of rows that can be processed. Implementations that do not support early termination
+   * should return {@link Integer#MAX_VALUE}.
+   */
+  default int getRemainingRowsToProcess() {
+    return Integer.MAX_VALUE;
+  }
+
+  /**
    * Processes the given value block, returns {@code true} if the query is already satisfied, {@code false}
    * otherwise. No more calls should be made after it returns {@code true}.
    */
@@ -40,4 +55,9 @@ public interface DistinctExecutor {
    * used to merge other records or tables, but can only be merged into the main DistinctTable.
    */
   DistinctTable getResult();
+
+  /**
+   * Returns the number of distinct rows collected so far.
+   */
+  int getNumDistinctRowsCollected();
 }
