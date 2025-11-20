@@ -33,6 +33,8 @@ public class HashUtilsTest {
         "5eb63bbbe01eeed093cb22bb8f5acdc3");
     assertEquals(BytesUtils.toHexString(HashUtils.hashMurmur3("hello world".getBytes())),
         "0e617feb46603f53b163eb607d4697ab");
+    assertEquals(BytesUtils.toHexString(HashUtils.hashXXHash("hello world".getBytes())),
+        "45ab6734b21e6968");
   }
 
   @Test
