@@ -2777,7 +2777,9 @@ public class PinotLLCRealtimeSegmentManager {
         != null)) {
       DisasterRecoveryMode disasterRecoveryMode =
           tableConfig.getIngestionConfig().getStreamIngestionConfig().getDisasterRecoveryMode();
-      return shouldRepairErrorSegmentsForPartialUpsertOrDedup(disasterRecoveryMode);
+      if (shouldRepairErrorSegmentsForPartialUpsertOrDedup(disasterRecoveryMode)) {
+        return true;
+      }
     }
 
     boolean isPartialUpsertEnabled = (tableConfig.getUpsertConfig() != null) && (tableConfig.getUpsertConfig().getMode()
