@@ -1206,7 +1206,7 @@ public class PinotLLCRealtimeSegmentManagerTest {
     controllerConfig.setDataDir(TEMP_DIR.toString());
     FakePinotLLCRealtimeSegmentManager segmentManager =
         new FakePinotLLCRealtimeSegmentManager(pinotHelixResourceManager, controllerConfig);
-    Assert.assertTrue(segmentManager.isDeepStoreLLCSegmentUploadRetryEnabled());
+    Assert.assertTrue(segmentManager.isDeepStoreLLCSegmentUploadRetryEnabled(false));
 
     // Set up a new table with 2 replicas, 5 instances, 5 partition.
     setUpNewTable(segmentManager, 2, 5, 5);
@@ -1333,7 +1333,7 @@ public class PinotLLCRealtimeSegmentManagerTest {
     controllerConfig.setDataDir(TEMP_DIR.toString());
     FakePinotLLCRealtimeSegmentManager segmentManager =
         new FakePinotLLCRealtimeSegmentManager(pinotHelixResourceManager, controllerConfig);
-    Assert.assertTrue(segmentManager.isDeepStoreLLCSegmentUploadRetryEnabled());
+    Assert.assertTrue(segmentManager.isDeepStoreLLCSegmentUploadRetryEnabled(false));
 
     // Set up a new table with 2 replicas, 5 instances, 5 partition.
     setUpNewTable(segmentManager, 2, 5, 5);
@@ -1461,7 +1461,7 @@ public class PinotLLCRealtimeSegmentManagerTest {
     controllerConfig.setDataDir(TEMP_DIR.toString());
     FakePinotLLCRealtimeSegmentManager segmentManager =
         new FakePinotLLCRealtimeSegmentManager(pinotHelixResourceManager, controllerConfig);
-    Assert.assertTrue(segmentManager.isDeepStoreLLCSegmentUploadRetryEnabled());
+    Assert.assertTrue(segmentManager.isDeepStoreLLCSegmentUploadRetryEnabled(false));
 
     // Set up a new table with 2 replicas, 5 instances, 5 partition.
     setUpNewTable(segmentManager, 2, 5, 5);

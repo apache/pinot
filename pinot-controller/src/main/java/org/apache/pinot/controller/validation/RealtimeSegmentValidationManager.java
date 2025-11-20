@@ -232,12 +232,13 @@ public class RealtimeSegmentValidationManager extends ControllerPeriodicTask<Rea
 
     // Ensures all segments in COMMITTING state are properly tracked in ZooKeeper.
     // Acts as a recovery mechanism for segments that may have failed to register during start of commit protocol.
-    if (PauselessConsumptionUtils.isPauselessEnabled(tableConfig)) {
+    boolean pauselessEnabled = PauselessConsumptionUtils.isPauselessEnabled(tableConfig);
+    if (pauselessEnabled) {
       syncCommittingSegmentsFromMetadata(realtimeTableName, segmentsZKMetadata);
     }
 
     // Check missing segments and upload them to the deep store
-    if (_llcRealtimeSegmentManager.isDeepStoreLLCSegmentUploadRetryEnabled()) {
+    if (_llcRealtimeSegmentManager.isDeepStoreLLCSegmentUploadRetryEnabled(pauselessEnabled)) {
       _llcRealtimeSegmentManager.uploadToDeepStoreIfMissing(tableConfig, segmentsZKMetadata);
     }
   }

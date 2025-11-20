@@ -209,13 +209,13 @@ public class PinotLLCRealtimeSegmentManager {
   private final ControllerMetrics _controllerMetrics;
   private final MetadataEventNotifierFactory _metadataEventNotifierFactory;
   private final FlushThresholdUpdateManager _flushThresholdUpdateManager;
-  private final boolean _isDeepStoreLLCSegmentUploadRetryEnabled;
+  private Boolean _isDeepStoreLLCSegmentUploadRetryEnabled;
   private final boolean _isTmpSegmentAsyncDeletionEnabled;
   private final int _deepstoreUploadRetryTimeoutMs;
-  private final FileUploadDownloadClient _fileUploadDownloadClient;
+  private FileUploadDownloadClient _fileUploadDownloadClient;
   private final AtomicInteger _numCompletingSegments = new AtomicInteger(0);
-  private final ExecutorService _deepStoreUploadExecutor;
-  private final Set<String> _deepStoreUploadExecutorPendingSegments;
+  private ExecutorService _deepStoreUploadExecutor;
+  private Set<String> _deepStoreUploadExecutorPendingSegments;
 
   private volatile boolean _isStopping = false;
 
@@ -233,17 +233,26 @@ public class PinotLLCRealtimeSegmentManager {
             helixResourceManager);
     _flushThresholdUpdateManager = new FlushThresholdUpdateManager();
     _isDeepStoreLLCSegmentUploadRetryEnabled = controllerConf.isDeepStoreRetryUploadLLCSegmentEnabled();
+    if (_isDeepStoreLLCSegmentUploadRetryEnabled != null && _isDeepStoreLLCSegmentUploadRetryEnabled) {
+      enableDeepStoreSegmentUploadRetry(controllerConf.getDeepStoreRetryUploadParallelism());
+    }
     _isTmpSegmentAsyncDeletionEnabled = controllerConf.isTmpSegmentAsyncDeletionEnabled();
     _deepstoreUploadRetryTimeoutMs = controllerConf.getDeepStoreRetryUploadTimeoutMs();
-    _fileUploadDownloadClient = _isDeepStoreLLCSegmentUploadRetryEnabled ? initFileUploadDownloadClient() : null;
-    _deepStoreUploadExecutor = _isDeepStoreLLCSegmentUploadRetryEnabled ? Executors.newFixedThreadPool(
-        controllerConf.getDeepStoreRetryUploadParallelism()) : null;
-    _deepStoreUploadExecutorPendingSegments =
-        _isDeepStoreLLCSegmentUploadRetryEnabled ? ConcurrentHashMap.newKeySet() : null;
   }
 
-  public boolean isDeepStoreLLCSegmentUploadRetryEnabled() {
-    return _isDeepStoreLLCSegmentUploadRetryEnabled;
+  private void enableDeepStoreSegmentUploadRetry(int deepStoreRetryUploadParallelism) {
+    _fileUploadDownloadClient = initFileUploadDownloadClient();
+    _deepStoreUploadExecutor = Executors.newFixedThreadPool(deepStoreRetryUploadParallelism);
+    _deepStoreUploadExecutorPendingSegments = ConcurrentHashMap.newKeySet();
+  }
+
+  public boolean isDeepStoreLLCSegmentUploadRetryEnabled(boolean pauselessEnabled) {
+    if (_isDeepStoreLLCSegmentUploadRetryEnabled == null && pauselessEnabled) {
+      _isDeepStoreLLCSegmentUploadRetryEnabled = true;
+      enableDeepStoreSegmentUploadRetry(
+          ControllerConf.ControllerPeriodicTasksConf.DEFAULT_DEEP_STORE_RETRY_UPLOAD_PARALLELISM);
+    }
+    return _isDeepStoreLLCSegmentUploadRetryEnabled != null && _isDeepStoreLLCSegmentUploadRetryEnabled;
   }
 
   public boolean isTmpSegmentAsyncDeletionEnabled() {
