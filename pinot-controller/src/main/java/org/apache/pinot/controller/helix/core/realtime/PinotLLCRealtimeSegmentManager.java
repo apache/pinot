@@ -2533,15 +2533,18 @@ public class PinotLLCRealtimeSegmentManager {
   }
 
   private void sendForceCommitMessageToServers(String tableNameWithType, Set<String> consumingSegments) {
-    // For partial upsert tables, force-committing consuming segments is disabled.
-    // In some cases (especially when replication > 1), the server with fewer consumed rows
-    // was incorrectly chosen as the winner, causing other servers to reconsume rows
-    // and leading to inconsistent data.
+    // For partial-upsert tables or upserts with out-of-order events enabled, force-committing
+    // consuming segments is disabled. In some cases (especially when replication > 1), the
+    // server that consumed fewer rows was incorrectly selected as the winner, causing other
+    // servers to reconsume rows and resulting in inconsistent data when previous state must
+    // be referenced for add/update operations.
     // TODO: Temporarily disabled until a proper fix is implemented.
     TableConfig tableConfig = _helixResourceManager.getTableConfig(tableNameWithType);
-    if (TableConfigUtils.checkForPartialUpsertWithReplicas(tableConfig)) {
+    if (TableConfigUtils.checkForInconsistentStateConfigs(tableConfig)) {
       throw new IllegalStateException(
-          "Force commit is not allowed for partial upsert tables: {} when replication > 1" + tableNameWithType);
+          "Force commit is not allowed when replication > 1 for partial-upsert tables, or for upsert tables"
+              + " when dropOutOfOrder is enabled with consistency mode: " + UpsertConfig.ConsistencyMode.NONE
+              + " for the table: " + tableNameWithType);
     }
 
     if (!consumingSegments.isEmpty()) {
