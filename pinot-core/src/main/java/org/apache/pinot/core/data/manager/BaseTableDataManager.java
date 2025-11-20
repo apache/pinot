@@ -162,6 +162,8 @@ public abstract class BaseTableDataManager implements TableDataManager {
 
   protected boolean _enableAsyncSegmentRefresh;
   protected ServerReloadJobStatusCache _reloadJobStatusCache;
+  // Table-level skip flag: when true, CRC checks are skipped for this specific table regardless of instance default.
+  private boolean _skipCrcCheckForThisTable;
 
   @Override
   public void init(InstanceDataManagerConfig instanceDataManagerConfig, HelixManager helixManager,
@@ -185,6 +187,8 @@ public abstract class BaseTableDataManager implements TableDataManager {
     _authProvider = AuthProviderUtils.extractAuthProvider(instanceDataManagerConfig.getAuthConfig(), null);
 
     _tableNameWithType = tableConfig.getTableName();
+    _skipCrcCheckForThisTable =
+        tableConfig.getValidationConfig() != null && tableConfig.getValidationConfig().isSkipCrcCheckOnLoad();
     _tableDataDir = instanceDataManagerConfig.getInstanceDataDir() + File.separator + _tableNameWithType;
     _indexDir = new File(_tableDataDir);
     if (!_indexDir.exists()) {
@@ -438,10 +442,10 @@ public abstract class BaseTableDataManager implements TableDataManager {
       _logger.info("Segment: {} has CRC: {} same as before, not replacing it", segmentName, localMetadata.getCrc());
       return;
     }
-    if (!_instanceDataManagerConfig.shouldCheckCRCOnSegmentLoad()) {
+    if (!_instanceDataManagerConfig.shouldCheckCRCOnSegmentLoad() || _skipCrcCheckForThisTable) {
       _logger.info("Skipping replacing segment: {} even though its CRC has changed from: {} to: {} because "
-          + "instance.check.crc.on.segment.load is set to false", segmentName, localMetadata.getCrc(),
-          zkMetadata.getCrc());
+          + "instance.check.crc.on.segment.load is set to false or skipCrcCheckOnLoad is enabled", segmentName,
+          localMetadata.getCrc(), zkMetadata.getCrc());
       return;
     }
     _logger.info("Replacing segment: {} because its CRC has changed from: {} to: {}", segmentName,
@@ -866,9 +870,9 @@ public abstract class BaseTableDataManager implements TableDataManager {
       - Copy the backup directory back to the original index directory.
       - Continue loading the segment from the index directory.
       */
+      boolean checkCrc = _instanceDataManagerConfig.shouldCheckCRCOnSegmentLoad() && !_skipCrcCheckForThisTable;
       boolean shouldDownload =
-          forceDownload || (isSegmentStatusCompleted(zkMetadata) && !hasSameCRC(zkMetadata, localMetadata)
-              && _instanceDataManagerConfig.shouldCheckCRCOnSegmentLoad());
+          forceDownload || (isSegmentStatusCompleted(zkMetadata) && !hasSameCRC(zkMetadata, localMetadata) && checkCrc);
       if (shouldDownload) {
         // Create backup directory to handle failure of segment reloading.
         createBackup(indexDir);
@@ -1281,7 +1285,7 @@ public abstract class BaseTableDataManager implements TableDataManager {
     if (isSegmentStatusCompleted(zkMetadata) && !hasSameCRC(zkMetadata, segmentMetadata)) {
       _logger.warn("Segment: {} has CRC changed from: {} to: {}", segmentName, segmentMetadata.getCrc(),
           zkMetadata.getCrc());
-      if (_instanceDataManagerConfig.shouldCheckCRCOnSegmentLoad()) {
+      if (_instanceDataManagerConfig.shouldCheckCRCOnSegmentLoad() && !_skipCrcCheckForThisTable) {
         closeSegmentDirectoryQuietly(segmentDirectory);
         return false;
       }
