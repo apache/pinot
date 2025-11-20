@@ -1175,6 +1175,26 @@ public class TableConfigUtilsTest {
 
     try {
       FieldConfig fieldConfig =
+          new FieldConfig("myCol1", FieldConfig.EncodingType.RAW, null, null, CompressionCodec.DELTADELTA, null, null);
+      tableConfig.setFieldConfigList(Arrays.asList(fieldConfig));
+      TableConfigUtils.validate(tableConfig, schema);
+    } catch (Exception e) {
+      assertEquals(e.getMessage(),
+          "Compression codec DELTADELTA can only be used on INT/LONG data types, found STRING for column: myCol1");
+    }
+
+    try {
+      FieldConfig fieldConfig =
+          new FieldConfig("myCol2", FieldConfig.EncodingType.RAW, null, null, CompressionCodec.DELTADELTA, null, null);
+      tableConfig.setFieldConfigList(Arrays.asList(fieldConfig));
+      TableConfigUtils.validate(tableConfig, schema);
+    } catch (Exception e) {
+      assertEquals(e.getMessage(),
+          "Compression codec DELTADELTA can only be used on single-value columns, found multi-value column: myCol2");
+    }
+
+    try {
+      FieldConfig fieldConfig =
           new FieldConfig("myCol1", FieldConfig.EncodingType.DICTIONARY, FieldConfig.IndexType.FST, null, null);
       tableConfig.setFieldConfigList(Arrays.asList(fieldConfig));
       TableConfigUtils.validate(tableConfig, schema);

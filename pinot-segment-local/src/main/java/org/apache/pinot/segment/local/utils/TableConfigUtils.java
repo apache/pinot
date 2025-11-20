@@ -1235,6 +1235,9 @@ public final class TableConfigUtils {
       for (FieldConfig fieldConfig : fieldConfigs) {
         String column = fieldConfig.getName();
         Preconditions.checkState(schema.hasColumn(column), "Failed to find column: %s in schema", column);
+
+        // Validate DELTA / DELTADELTA compression codecs compatibility
+        validateGorillaCompressionCodecIfPresent(fieldConfig, schema.getFieldSpecFor(column));
       }
       validateIndexingConfigAndFieldConfigListCompatibility(indexingConfig, fieldConfigs);
     }
@@ -1906,5 +1909,25 @@ public final class TableConfigUtils {
     Set<String> relevantTenants =
         getRelevantTags(tableConfig).stream().map(TagNameUtils::getTenantFromTag).collect(Collectors.toSet());
     return relevantTenants.contains(tenantName);
+  }
+
+  private static void validateGorillaCompressionCodecIfPresent(FieldConfig fieldConfig, FieldSpec fieldSpec) {
+    if (fieldConfig.getCompressionCodec() == null) {
+      return;
+    }
+    switch (fieldConfig.getCompressionCodec()) {
+      case DELTA:
+      case DELTADELTA:
+        Preconditions.checkState(fieldSpec.isSingleValueField(),
+            "Compression codec %s can only be used on single-value columns, found multi-value column: %s",
+            fieldConfig.getCompressionCodec(), fieldConfig.getName());
+        DataType storedType = fieldSpec.getDataType().getStoredType();
+        Preconditions.checkState(storedType == DataType.INT || storedType == DataType.LONG,
+            "Compression codec %s can only be used on INT/LONG data types, found %s for column: %s",
+            fieldConfig.getCompressionCodec(), storedType, fieldConfig.getName());
+        break;
+      default:
+        // no-op for other codecs
+    }
   }
 }
