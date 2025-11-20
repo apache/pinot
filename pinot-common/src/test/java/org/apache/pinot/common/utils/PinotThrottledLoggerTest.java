@@ -26,11 +26,7 @@ import org.testng.annotations.Test;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
-import static org.mockito.Mockito.atMost;
-import static org.mockito.Mockito.mock;
-import static org.mockito.Mockito.never;
-import static org.mockito.Mockito.times;
-import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.*;
 
 
 public class PinotThrottledLoggerTest {
@@ -82,5 +78,4 @@ public class PinotThrottledLoggerTest {
     verify(mockLogger, never()).warn(anyString(), any(Throwable.class));
     verify(mockLogger, times(100)).debug(eq("Error"), any(NumberFormatException.class));
   }
-
 }
