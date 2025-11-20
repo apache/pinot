@@ -77,7 +77,11 @@ public abstract class ColumnarSegmentBuildingTestBase {
   protected static final String BYTES_COL = "bytesCol";
   protected static final String TIME_COL = "timeCol";
   protected static final String MV_INT_COL = "mvIntCol";
+  protected static final String MV_LONG_COL = "mvLongCol";
+  protected static final String MV_FLOAT_COL = "mvFloatCol";
+  protected static final String MV_DOUBLE_COL = "mvDoubleCol";
   protected static final String MV_STRING_COL = "mvStringCol";
+  protected static final String MV_BYTES_COL = "mvBytesCol";
 
   // New column for testing default value handling
   protected static final String NEW_STRING_COL = "newStringCol";
@@ -109,7 +113,11 @@ public abstract class ColumnarSegmentBuildingTestBase {
         .addSingleValueDimension(BIG_DECIMAL_COL, FieldSpec.DataType.BIG_DECIMAL)
         .addSingleValueDimension(BYTES_COL, FieldSpec.DataType.BYTES)
         .addMultiValueDimension(MV_INT_COL, FieldSpec.DataType.INT)
+        .addMultiValueDimension(MV_LONG_COL, FieldSpec.DataType.LONG)
+        .addMultiValueDimension(MV_FLOAT_COL, FieldSpec.DataType.FLOAT)
+        .addMultiValueDimension(MV_DOUBLE_COL, FieldSpec.DataType.DOUBLE)
         .addMultiValueDimension(MV_STRING_COL, FieldSpec.DataType.STRING)
+        .addMultiValueDimension(MV_BYTES_COL, FieldSpec.DataType.BYTES)
         .addDateTime(TIME_COL, FieldSpec.DataType.LONG, "1:MILLISECONDS:EPOCH", "1:MILLISECONDS")
         .build();
 
@@ -125,7 +133,11 @@ public abstract class ColumnarSegmentBuildingTestBase {
         .addSingleValueDimension(BIG_DECIMAL_COL, FieldSpec.DataType.BIG_DECIMAL)
         .addSingleValueDimension(BYTES_COL, FieldSpec.DataType.BYTES)
         .addMultiValueDimension(MV_INT_COL, FieldSpec.DataType.INT)
+        .addMultiValueDimension(MV_LONG_COL, FieldSpec.DataType.LONG)
+        .addMultiValueDimension(MV_FLOAT_COL, FieldSpec.DataType.FLOAT)
+        .addMultiValueDimension(MV_DOUBLE_COL, FieldSpec.DataType.DOUBLE)
         .addMultiValueDimension(MV_STRING_COL, FieldSpec.DataType.STRING)
+        .addMultiValueDimension(MV_BYTES_COL, FieldSpec.DataType.BYTES)
         .addDateTime(TIME_COL, FieldSpec.DataType.LONG, "1:MILLISECONDS:EPOCH", "1:MILLISECONDS")
         .addSingleValueDimension(NEW_STRING_COL, FieldSpec.DataType.STRING)
         .addSingleValueDimension(NEW_INT_COL, FieldSpec.DataType.INT)
@@ -152,20 +164,90 @@ public abstract class ColumnarSegmentBuildingTestBase {
 
   protected File createRowMajorSegment()
       throws Exception {
-    File outputDir = new File(_tempDir, "rowMajorSegment");
+    return createRowMajorSegmentWithConfig(_tableConfig, _originalSchema, "rowMajorSegment");
+  }
+
+  protected File createRowMajorSegmentWithConfig(TableConfig tableConfig, Schema schema, String dirName)
+      throws Exception {
+    File outputDir = new File(_tempDir, dirName);
     FileUtils.deleteQuietly(outputDir);
     outputDir.mkdirs();
 
-    SegmentGeneratorConfig config = new SegmentGeneratorConfig(_tableConfig, _originalSchema);
+    SegmentGeneratorConfig config = new SegmentGeneratorConfig(tableConfig, schema);
     config.setOutDir(outputDir.getAbsolutePath());
-    config.setSegmentName(SEGMENT_NAME + "_rowMajor");
+    config.setSegmentName(SEGMENT_NAME + "_" + dirName);
 
     SegmentIndexCreationDriverImpl driver = new SegmentIndexCreationDriverImpl();
     TestRecordReader recordReader = new TestRecordReader(_testData);
     driver.init(config, recordReader);
     driver.build();
 
-    return new File(outputDir, SEGMENT_NAME + "_rowMajor");
+    return new File(outputDir, SEGMENT_NAME + "_" + dirName);
+  }
+
+  protected TableConfig createTableConfigWithNoDictionary() {
+    List<String> allColumns = new ArrayList<>();
+    allColumns.add(STRING_COL_1);
+    allColumns.add(STRING_COL_2);
+    allColumns.add(INT_COL_1);
+    allColumns.add(INT_COL_2);
+    allColumns.add(LONG_COL);
+    allColumns.add(FLOAT_COL);
+    allColumns.add(DOUBLE_COL);
+    allColumns.add(BIG_DECIMAL_COL);
+    allColumns.add(BYTES_COL);
+    allColumns.add(MV_INT_COL);
+    allColumns.add(MV_LONG_COL);
+    allColumns.add(MV_FLOAT_COL);
+    allColumns.add(MV_DOUBLE_COL);
+    allColumns.add(MV_STRING_COL);
+    allColumns.add(MV_BYTES_COL);
+
+    return new TableConfigBuilder(TableType.OFFLINE)
+        .setTableName(TABLE_NAME)
+        .setTimeColumnName(TIME_COL)
+        .setNoDictionaryColumns(allColumns)
+        .build();
+  }
+
+  protected Schema createNullableSchema() {
+    return new Schema.SchemaBuilder()
+        .setEnableColumnBasedNullHandling(true)
+        .addDimensionField(STRING_COL_1, FieldSpec.DataType.STRING, spec -> spec.setNullable(true))
+        .addDimensionField(STRING_COL_2, FieldSpec.DataType.STRING, spec -> spec.setNullable(true))
+        .addDimensionField(INT_COL_1, FieldSpec.DataType.INT, spec -> spec.setNullable(true))
+        .addDimensionField(INT_COL_2, FieldSpec.DataType.INT, spec -> spec.setNullable(true))
+        .addDimensionField(LONG_COL, FieldSpec.DataType.LONG, spec -> spec.setNullable(true))
+        .addDimensionField(FLOAT_COL, FieldSpec.DataType.FLOAT, spec -> spec.setNullable(true))
+        .addDimensionField(DOUBLE_COL, FieldSpec.DataType.DOUBLE, spec -> spec.setNullable(true))
+        .addDimensionField(BIG_DECIMAL_COL, FieldSpec.DataType.BIG_DECIMAL, spec -> spec.setNullable(true))
+        .addDimensionField(BYTES_COL, FieldSpec.DataType.BYTES, spec -> spec.setNullable(true))
+        .addDimensionField(MV_INT_COL, FieldSpec.DataType.INT, spec -> {
+          spec.setSingleValueField(false);
+          spec.setNullable(true);
+        })
+        .addDimensionField(MV_LONG_COL, FieldSpec.DataType.LONG, spec -> {
+          spec.setSingleValueField(false);
+          spec.setNullable(true);
+        })
+        .addDimensionField(MV_FLOAT_COL, FieldSpec.DataType.FLOAT, spec -> {
+          spec.setSingleValueField(false);
+          spec.setNullable(true);
+        })
+        .addDimensionField(MV_DOUBLE_COL, FieldSpec.DataType.DOUBLE, spec -> {
+          spec.setSingleValueField(false);
+          spec.setNullable(true);
+        })
+        .addDimensionField(MV_STRING_COL, FieldSpec.DataType.STRING, spec -> {
+          spec.setSingleValueField(false);
+          spec.setNullable(true);
+        })
+        .addDimensionField(MV_BYTES_COL, FieldSpec.DataType.BYTES, spec -> {
+          spec.setSingleValueField(false);
+          spec.setNullable(true);
+        })
+        .addDateTime(TIME_COL, FieldSpec.DataType.LONG, "1:MILLISECONDS:EPOCH", "1:MILLISECONDS")
+        .build();
   }
 
   protected File createColumnarSegment(File sourceSegmentDir)
@@ -423,8 +505,16 @@ public abstract class ColumnarSegmentBuildingTestBase {
 
       // Multi-value columns - can be null (entire array is null, not individual elements)
       row.putValue(MV_INT_COL, random.nextDouble() < nullProbability ? null : new Object[]{i, i + 1, i + 2});
+      row.putValue(MV_LONG_COL, random.nextDouble() < nullProbability ? null
+          : new Object[]{(long) i * 10, (long) (i + 1) * 10, (long) (i + 2) * 10});
+      row.putValue(MV_FLOAT_COL, random.nextDouble() < nullProbability ? null
+          : new Object[]{(float) i * 1.1f, (float) (i + 1) * 1.1f, (float) (i + 2) * 1.1f});
+      row.putValue(MV_DOUBLE_COL, random.nextDouble() < nullProbability ? null
+          : new Object[]{(double) i * 2.2, (double) (i + 1) * 2.2, (double) (i + 2) * 2.2});
       row.putValue(MV_STRING_COL, random.nextDouble() < nullProbability ? null
           : new Object[]{"mv1_" + i, "mv2_" + i, "mv3_" + (i % 3)});
+      row.putValue(MV_BYTES_COL, random.nextDouble() < nullProbability ? null
+          : new Object[]{("mvbytes1_" + i).getBytes(), ("mvbytes2_" + i).getBytes()});
 
       data.add(row);
     }

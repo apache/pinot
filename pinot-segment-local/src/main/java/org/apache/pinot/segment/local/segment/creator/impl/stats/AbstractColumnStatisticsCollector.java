@@ -99,6 +99,40 @@ public abstract class AbstractColumnStatisticsCollector implements ColumnStatist
    */
   public abstract void collect(Object entry);
 
+  // Collects statistics for primitive values
+  // Default implementation boxes the value for backward compatibility.
+  public void collect(int value) {
+    collect((Object) value);
+  }
+
+  public void collect(long value) {
+    collect((Object) value);
+  }
+
+  public void collect(float value) {
+    collect((Object) value);
+  }
+
+  public void collect(double value) {
+    collect((Object) value);
+  }
+
+  public void collect(int[] values) {
+    collect((Object) values);
+  }
+
+  public void collect(long[] values) {
+    collect((Object) values);
+  }
+
+  public void collect(float[] values) {
+    collect((Object) values);
+  }
+
+  public void collect(double[] values) {
+    collect((Object) values);
+  }
+
   public int getLengthOfShortestElement() {
     return -1;
   }

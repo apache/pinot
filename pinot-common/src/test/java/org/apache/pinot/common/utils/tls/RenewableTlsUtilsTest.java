@@ -54,6 +54,7 @@ import nl.altindag.ssl.trustmanager.HotSwappableX509ExtendedTrustManager;
 import nl.altindag.ssl.trustmanager.UnsafeX509ExtendedTrustManager;
 import org.apache.commons.io.FileUtils;
 import org.apache.pinot.common.config.TlsConfig;
+import org.apache.pinot.common.utils.NamedThreadFactory;
 import org.testng.annotations.AfterMethod;
 import org.testng.annotations.BeforeMethod;
 import org.testng.annotations.Test;
@@ -84,6 +85,7 @@ public class RenewableTlsUtilsTest {
 
   private static final String TLS_KEYSTORE_FILE_PATH = DEFAULT_TEST_TLS_DIR + "/" + TLS_KEYSTORE_FILE;
   private static final String TLS_TRUSTSTORE_FILE_PATH = DEFAULT_TEST_TLS_DIR + "/" + TLS_TRUSTSTORE_FILE;
+  private static final String SSL_RELOAD_THREAD_PREFIX = "ssl-reload-test";
 
   @BeforeMethod
   public void setUp()
@@ -183,7 +185,8 @@ public class RenewableTlsUtilsTest {
 
     // Start a new thread to reload the ssl factory when the tls files change
     // Avoid early finalization by not using Executors.newSingleThreadExecutor (java <= 20, JDK-8145304)
-    ExecutorService executorService = Executors.newFixedThreadPool(1);
+    ExecutorService executorService = Executors.newFixedThreadPool(1,
+            new NamedThreadFactory(SSL_RELOAD_THREAD_PREFIX, true));
     executorService.execute(
         () -> {
           try {

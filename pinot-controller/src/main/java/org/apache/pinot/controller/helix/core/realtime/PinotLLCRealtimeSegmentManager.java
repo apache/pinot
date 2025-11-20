@@ -1061,9 +1061,13 @@ public class PinotLLCRealtimeSegmentManager {
                 + "Please update the table config accordingly.", numPartitionGroups,
             columnPartitionConfig.getNumPartitions());
       }
+      // For multi-stream tables, convert Pinot partition ID (which includes padding offset) to stream partition ID.
+      // This ensures the partition metadata stored in ZK matches what the broker's partition function computes
+      // during query pruning. For example, stream 1 partition 5 has Pinot partition ID 10005, but should store 5.
+      int streamPartitionId = IngestionConfigUtils.getStreamPartitionIdFromPinotPartitionId(partitionId);
       ColumnPartitionMetadata columnPartitionMetadata =
           new ColumnPartitionMetadata(columnPartitionConfig.getFunctionName(), numPartitionGroups,
-              Collections.singleton(partitionId), columnPartitionConfig.getFunctionConfig());
+              Collections.singleton(streamPartitionId), columnPartitionConfig.getFunctionConfig());
       return new SegmentPartitionMetadata(Collections.singletonMap(entry.getKey(), columnPartitionMetadata));
     } else {
       LOGGER.warn(
@@ -2402,9 +2406,9 @@ public class PinotLLCRealtimeSegmentManager {
       Set<String> invalidSegments = partitionedByIsConsuming.get(false);
       if (!invalidSegments.isEmpty()) {
         LOGGER.warn("Cannot commit segments that are not in CONSUMING state. All consuming segments: {}, "
-            + "provided segments to commit: {}. Ignoring all non-consuming segments, sampling 10: {}",
+                + "provided segments to commit: {}. Ignoring all non-consuming segments, sampling 10: {}",
             allConsumingSegments,
-                segmentsToCommitStr, invalidSegments.stream().limit(10).collect(Collectors.toSet()));
+            segmentsToCommitStr, invalidSegments.stream().limit(10).collect(Collectors.toSet()));
       }
       return validSegmentsToCommit;
     }

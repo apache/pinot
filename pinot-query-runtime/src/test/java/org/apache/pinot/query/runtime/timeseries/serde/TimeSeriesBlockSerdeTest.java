@@ -51,7 +51,8 @@ public class TimeSeriesBlockSerdeTest {
       // Serialize, deserialize and serialize again
       ByteString byteString1 = TimeSeriesBlockSerde.serializeTimeSeriesBlock(block1);
       String serializedBlockString1 = byteString1.toStringUtf8();
-      TimeSeriesBlock block2 = TimeSeriesBlockSerde.deserializeTimeSeriesBlock(byteString1.asReadOnlyByteBuffer());
+      TimeSeriesBlock block2 = TimeSeriesBlockSerde.deserializeTimeSeriesBlock(byteString1.asReadOnlyByteBuffer(),
+          Collections.emptyMap());
       String serializedBlockString2 = TimeSeriesBlockSerde.serializeTimeSeriesBlock(block2).toStringUtf8();
       // Serialized blocks in both cases should be the same since serialization is deterministic.
       assertEquals(serializedBlockString1, serializedBlockString2);
