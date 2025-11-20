@@ -41,15 +41,69 @@ class DeltaDeltaDecompressor implements ChunkDecompressor {
   @Override
   public int decompress(ByteBuffer compressedInput, ByteBuffer decompressedOutput)
       throws IOException {
-    // Read and validate type flag (only LONG supported), TODO: support INT
+    // Read and validate type flag
     byte flag = compressedInput.get();
     if (flag != LONG_FLAG) {
-      throw new IOException("Invalid input: only LONG flag supported, got " + flag);
+      return decompressForInt(compressedInput, decompressedOutput);
     }
     return decompressForLong(compressedInput, decompressedOutput);
   }
 
-  public int decompressForLong(ByteBuffer compressedInput, ByteBuffer decompressedOutput) {
+  private int decompressForInt(ByteBuffer compressedInput, ByteBuffer decompressedOutput) {
+    // Get number of integers
+    int numIntegers = compressedInput.getInt();
+    if (numIntegers == 0) {
+      decompressedOutput.flip();
+      return 0;
+    }
+
+    // Get first value
+    int prevValue = compressedInput.getInt();
+    decompressedOutput.putInt(prevValue);
+
+    if (numIntegers == 1) {
+      decompressedOutput.flip();
+      return Integer.BYTES;
+    }
+
+    // Get size of compressed delta values
+    int compressedSize = compressedInput.getInt();
+
+    // Create temporary buffer for decompressed deltas
+    ByteBuffer deltaBuffer = ByteBuffer.allocate((numIntegers - 1) * Integer.BYTES);
+
+    // Get compressed delta values position
+    ByteBuffer compressedDeltas = compressedInput.slice();
+    compressedDeltas.limit(compressedSize);
+
+    // Decompress delta values using LZ4
+    LZ4_FACTORY.safeDecompressor().decompress(compressedDeltas, deltaBuffer);
+    deltaBuffer.flip();
+
+    // Get first delta
+    int prevDelta = deltaBuffer.getInt();
+    int currentValue = prevValue + prevDelta;
+    decompressedOutput.putInt(currentValue);
+    prevValue = currentValue;
+
+    // Decompress remaining values
+    for (int i = 2; i < numIntegers; i++) {
+      int deltaOfDelta = deltaBuffer.getInt();
+      int currentDelta = prevDelta + deltaOfDelta;
+      currentValue = prevValue + currentDelta;
+
+      decompressedOutput.putInt(currentValue);
+
+      prevValue = currentValue;
+      prevDelta = currentDelta;
+    }
+
+    // Make buffer ready for reading
+    decompressedOutput.flip();
+    return numIntegers * Integer.BYTES;
+  }
+
+  private int decompressForLong(ByteBuffer compressedInput, ByteBuffer decompressedOutput) {
     // Get number of integers
     int numLongs = compressedInput.getInt();
     if (numLongs == 0) {
@@ -105,12 +159,11 @@ class DeltaDeltaDecompressor implements ChunkDecompressor {
 
   @Override
   public int decompressedLength(ByteBuffer compressedInput) {
-    // Expect LONG flag only
     byte flag = compressedInput.get(compressedInput.position());
-    if (flag != LONG_FLAG) {
-      throw new IllegalStateException("Invalid input: only LONG flag supported, got " + flag);
-    }
     int numValues = compressedInput.getInt(compressedInput.position() + 1);
+    if (flag != LONG_FLAG) {
+      return numValues * Integer.BYTES;
+    }
     return numValues * Long.BYTES;
   }
 }

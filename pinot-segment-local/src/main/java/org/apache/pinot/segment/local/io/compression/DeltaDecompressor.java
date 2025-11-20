@@ -44,9 +44,54 @@ class DeltaDecompressor implements ChunkDecompressor {
     // Read and validate type flag (only LONG supported), TODO: support INT
     byte flag = compressedInput.get();
     if (flag != LONG_FLAG) {
-      throw new IOException("Invalid input: only LONG flag supported, got " + flag);
+      return decompressForInt(compressedInput, decompressedOutput);
     }
     return decompressForLong(compressedInput, decompressedOutput);
+  }
+
+  private int decompressForInt(ByteBuffer compressedInput, ByteBuffer decompressedOutput)
+      throws IOException {
+    // Get number of longs
+    int numIntegers = compressedInput.getInt();
+    if (numIntegers == 0) {
+      decompressedOutput.flip();
+      return 0;
+    }
+
+    // Get first value
+    int prevValue = compressedInput.getInt();
+    decompressedOutput.putInt(prevValue);
+
+    if (numIntegers == 1) {
+      decompressedOutput.flip();
+      return Integer.BYTES;
+    }
+
+    // Get size of compressed delta values
+    int compressedSize = compressedInput.getInt();
+
+    // Create temporary buffer for decompressed deltas
+    ByteBuffer deltaBuffer = ByteBuffer.allocate((numIntegers - 1) * Integer.BYTES);
+
+    // Get compressed delta values position
+    ByteBuffer compressedDeltas = compressedInput.slice();
+    compressedDeltas.limit(compressedSize);
+
+    // Decompress delta values using LZ4
+    LZ4_FACTORY.safeDecompressor().decompress(compressedDeltas, deltaBuffer);
+    deltaBuffer.flip();
+
+    // Reconstruct remaining values
+    for (int i = 1; i < numIntegers; i++) {
+      int delta = deltaBuffer.getInt();
+      int currentValue = prevValue + delta;
+      decompressedOutput.putInt(currentValue);
+      prevValue = currentValue;
+    }
+
+    // Make buffer ready for reading
+    decompressedOutput.flip();
+    return numIntegers * Integer.BYTES;
   }
 
   private int decompressForLong(ByteBuffer compressedInput, ByteBuffer decompressedOutput)
@@ -96,12 +141,11 @@ class DeltaDecompressor implements ChunkDecompressor {
 
   @Override
   public int decompressedLength(ByteBuffer compressedInput) {
-    // Expect LONG flag only
     byte flag = compressedInput.get(compressedInput.position());
-    if (flag != LONG_FLAG) {
-      throw new IllegalStateException("Invalid input: only LONG flag supported, got " + flag);
-    }
     int numValues = compressedInput.getInt(compressedInput.position() + 1);
+    if (flag != LONG_FLAG) {
+      return numValues * Integer.BYTES;
+    }
     return numValues * Long.BYTES;
   }
 }
