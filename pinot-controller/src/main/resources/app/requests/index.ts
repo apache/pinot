@@ -334,7 +334,7 @@ export const getInfo = (): Promise<AxiosResponse<OperationResponse>> =>
   baseApi.get(`/auth/info`);
 
 export const authenticateUser = (authToken): Promise<AxiosResponse<OperationResponse>> =>
-  baseApi.get(`/auth/verify`, {headers:{"Authorization": authToken}});
+  baseApi.get(`/auth/verify/v2`, {headers:{"Authorization": authToken}});
 
 export const getSegmentDebugInfo = (tableName: string, tableType: string): Promise<AxiosResponse<OperationResponse>> =>
   baseApi.get(`debug/tables/${tableName}?type=${tableType}&verbosity=10`);

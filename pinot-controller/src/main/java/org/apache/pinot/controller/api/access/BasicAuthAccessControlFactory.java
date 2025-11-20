@@ -28,6 +28,7 @@ import javax.ws.rs.NotAuthorizedException;
 import javax.ws.rs.core.HttpHeaders;
 import org.apache.pinot.core.auth.BasicAuthPrincipal;
 import org.apache.pinot.core.auth.BasicAuthUtils;
+import org.apache.pinot.core.auth.TargetType;
 import org.apache.pinot.spi.env.PinotConfiguration;
 
 
@@ -88,6 +89,11 @@ public class BasicAuthAccessControlFactory implements AccessControlFactory {
         throw new NotAuthorizedException("Basic");
       }
       return true;
+    }
+
+    @Override
+    public boolean hasAccess(HttpHeaders httpHeaders, TargetType targetType) {
+      return getPrincipal(httpHeaders).isPresent();
     }
 
     private Optional<BasicAuthPrincipal> getPrincipal(HttpHeaders headers) {
