@@ -2751,6 +2751,13 @@ public class PinotLLCRealtimeSegmentManager {
         ControllerGauge.PAUSELESS_SEGMENTS_IN_UNRECOVERABLE_ERROR_COUNT, segmentsInUnRecoverableState);
   }
 
+  public boolean shouldRepairErrorSegmentsForPartialUpsertOrDedup(@Nullable DisasterRecoveryMode disasterRecoveryMode) {
+    if (disasterRecoveryMode == null) {
+      return false;
+    }
+    return disasterRecoveryMode == DisasterRecoveryMode.ALWAYS;
+  }
+
   /**
    * Whether to allow repairing the ERROR segments with ZK status: COMMITTING
    * This method is only useful for pauseless ingestion with features like dedup enabled (Since repairing committing
@@ -2770,9 +2777,7 @@ public class PinotLLCRealtimeSegmentManager {
         != null)) {
       DisasterRecoveryMode disasterRecoveryMode =
           tableConfig.getIngestionConfig().getStreamIngestionConfig().getDisasterRecoveryMode();
-      if (disasterRecoveryMode == DisasterRecoveryMode.ALWAYS) {
-        return true;
-      }
+      return shouldRepairErrorSegmentsForPartialUpsertOrDedup(disasterRecoveryMode);
     }
 
     boolean isPartialUpsertEnabled = (tableConfig.getUpsertConfig() != null) && (tableConfig.getUpsertConfig().getMode()
