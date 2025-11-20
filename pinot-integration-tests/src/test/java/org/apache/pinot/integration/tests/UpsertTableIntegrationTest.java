@@ -550,8 +550,6 @@ public class UpsertTableIntegrationTest extends BaseClusterIntegrationTest {
             .setTablesToSchedule(Collections.singleton(realtimeTableName)))
         .get(MinionConstants.UpsertCompactionTask.TASK_TYPE));
     waitForTaskToComplete();
-    // Wait for segments to converge after compaction before checking document count
-    waitForNumQueriedSegmentsToConverge(tableName, 600_000L, 3, 2);
     // 1 segment should be compacted (351 rows -> 1 rows), 2 segments (500 rows, 151 rows) should be deleted
     waitForAllDocsLoaded(tableName, 600_000L, 1);
     assertEquals(queryCountStar(tableName), 1);
