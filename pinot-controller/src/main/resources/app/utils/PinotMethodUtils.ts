@@ -182,24 +182,87 @@ const getAllInstances = () => {
   });
 };
 
+// This method is used to check the health endpoint of an instance
+// API: http://{hostname}:{port}/health
+// Expected Output: 'OK' or error
+const checkInstanceHealth = async (hostname, port) => {
+  try {
+    const response = await baseApi.get(`http://${hostname}:${port}/health`, {
+      timeout: 5000 // 5 second timeout
+    });
+    return response.data === 'OK' || response.status === 200;
+  } catch (error) {
+    return false;
+  }
+};
+
 // This method is used to display instance data on cluster manager home page
 // API: /instances/:instanceName
 // Expected Output: {columns: [], records: []}
 const getInstanceData = (instances, liveInstanceArr) => {
   const promiseArr = [...instances.map((inst) => getInstance(inst))];
 
-  return Promise.all(promiseArr).then((result) => {
+  return Promise.all(promiseArr).then(async (result) => {
+    // First, get all instance configs
+    const instanceRecords = result.map(({ data }) => {
+      const isAlive = liveInstanceArr.indexOf(data.instanceName) > -1;
+      const isEnabled = data.enabled;
+      const queriesDisabled = data.queriesDisabled === 'true' || data.queriesDisabled === true;
+      const shutdownInProgress = data.shutdownInProgress === true;
+      
+      return {
+        instanceName: data.instanceName,
+        enabled: data.enabled,
+        hostName: data.hostName,
+        port: data.port,
+        adminPort: data.adminPort,
+        isAlive,
+        isEnabled,
+        queriesDisabled,
+        shutdownInProgress
+      };
+    });
+
+    // Then check health endpoints for alive instances
+    const healthCheckPromises = instanceRecords.map(async (record) => {
+      if (!record.isAlive) {
+        return { ...record, healthStatus: 'Dead' };
+      }
+
+      // Determine which port to use for health check
+      // For brokers and servers, use adminPort if available, otherwise use main port
+      const healthPort = record.adminPort && record.adminPort > 0 ? record.adminPort : record.port;
+      const isHealthy = await checkInstanceHealth(record.hostName, healthPort);
+
+      let status = 'Dead';
+      if (record.isAlive) {
+        if (record.shutdownInProgress) {
+          status = 'Shutting Down';
+        } else if (!record.isEnabled) {
+          status = 'Disabled';
+        } else if (record.queriesDisabled) {
+          status = 'Queries Disabled';
+        } else if (isHealthy) {
+          status = 'Healthy';
+        } else {
+          status = 'Unhealthy';
+        }
+      }
+
+      return { ...record, healthStatus: status };
+    });
+
+    const recordsWithHealth = await Promise.all(healthCheckPromises);
+
     return {
       columns: ['Instance Name', 'Enabled', 'Hostname', 'Port', 'Status'],
-      records: [
-        ...result.map(({ data }) => [
-          data.instanceName,
-          data.enabled,
-          data.hostName,
-          data.port,
-          liveInstanceArr.indexOf(data.instanceName) > -1 ? 'Alive' : 'Dead'
-        ]),
-      ],
+      records: recordsWithHealth.map(record => [
+        record.instanceName,
+        record.enabled,
+        record.hostName,
+        record.port,
+        record.healthStatus
+      ])
     };
   });
 };
