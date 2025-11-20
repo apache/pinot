@@ -253,7 +253,7 @@
     <scala.compat.version>2.12</scala.compat.version>
 
     <!-- Solve conflicts and vulnerabilities -->
-    <kerby.version>2.1.0</kerby.version>
+    <kerby.version>2.1.1</kerby.version>
     <jline.version>3.30.6</jline.version>
     <wildfly.version>2.0.1</wildfly.version>
     <jettison.version>1.5.4</jettison.version>
