@@ -374,6 +374,10 @@ public class PinotLLCRealtimeSegmentManager {
         LOGGER.error("Failed to close fileUploadDownloadClient.");
       }
     }
+
+    if (_deepStoreUploadExecutor != null) {
+      _deepStoreUploadExecutor.shutdown();
+    }
   }
 
   /**

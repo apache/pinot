@@ -1201,12 +1201,18 @@ public class PinotLLCRealtimeSegmentManagerTest {
 
     // init fake PinotLLCRealtimeSegmentManager
     ControllerConf controllerConfig = new ControllerConf();
-    controllerConfig.setProperty(ControllerConf.ControllerPeriodicTasksConf.ENABLE_DEEP_STORE_RETRY_UPLOAD_LLC_SEGMENT,
-        true);
+    boolean pauselessEnabled = false;
+    if (new Random().nextDouble() > 0.5) {
+      controllerConfig.setProperty(
+          ControllerConf.ControllerPeriodicTasksConf.ENABLE_DEEP_STORE_RETRY_UPLOAD_LLC_SEGMENT,
+          true);
+    } else {
+      pauselessEnabled = true;
+    }
     controllerConfig.setDataDir(TEMP_DIR.toString());
     FakePinotLLCRealtimeSegmentManager segmentManager =
         new FakePinotLLCRealtimeSegmentManager(pinotHelixResourceManager, controllerConfig);
-    Assert.assertTrue(segmentManager.isDeepStoreLLCSegmentUploadRetryEnabled(false));
+    Assert.assertTrue(segmentManager.isDeepStoreLLCSegmentUploadRetryEnabled(pauselessEnabled));
 
     // Set up a new table with 2 replicas, 5 instances, 5 partition.
     setUpNewTable(segmentManager, 2, 5, 5);
