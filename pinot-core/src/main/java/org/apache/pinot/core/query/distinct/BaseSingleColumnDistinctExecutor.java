@@ -32,6 +32,7 @@ import org.roaringbitmap.RoaringBitmap;
 public abstract class BaseSingleColumnDistinctExecutor<T extends DistinctTable, S, M> implements DistinctExecutor {
   protected final ExpressionContext _expression;
   protected final T _distinctTable;
+  private int _rowsRemaining = Integer.MAX_VALUE;
 
   public BaseSingleColumnDistinctExecutor(ExpressionContext expression, T distinctTable) {
     _expression = expression;
@@ -39,7 +40,15 @@ public abstract class BaseSingleColumnDistinctExecutor<T extends DistinctTable, 
   }
 
   @Override
+  public void setMaxRowsToProcess(int maxRows) {
+    _rowsRemaining = maxRows;
+  }
+
+  @Override
   public boolean process(ValueBlock valueBlock) {
+    if (_rowsRemaining <= 0) {
+      return true;
+    }
     BlockValSet blockValueSet = valueBlock.getBlockValueSet(_expression);
     int numDocs = valueBlock.getNumDocs();
     if (_distinctTable.isNullHandlingEnabled() && blockValueSet.isSingleValue()) {
@@ -62,23 +71,54 @@ public abstract class BaseSingleColumnDistinctExecutor<T extends DistinctTable, 
     while (nullIterator.hasNext()) {
       int nextNull = nullIterator.next();
       if (nextNull > prev) {
-        if (processSV(values, prev, nextNull)) {
+        if (processSVRange(values, prev, nextNull)) {
           return true;
         }
       }
       prev = nextNull + 1;
     }
     if (prev < numDocs) {
-      return processSV(values, prev, numDocs);
+      return processSVRange(values, prev, numDocs);
     }
     return false;
   }
 
+  /**
+   * Processes a range of single-value values, respecting the row budget.
+   * @param values the single-value values
+   * @param from the start index (inclusive)
+   * @param to the end index (exclusive)
+   * @return true if processing should stop early, false otherwise
+   */
+  private boolean processSVRange(S values, int from, int to) {
+    int limitedTo = clampToRemaining(from, to);
+    if (limitedTo <= from) {
+      return true;
+    }
+    if (processSV(values, from, limitedTo)) {
+      return true;
+    }
+    consumeRows(limitedTo - from);
+    return _rowsRemaining <= 0;
+  }
+
   private boolean processWithoutNull(BlockValSet blockValueSet, int numDocs) {
     if (blockValueSet.isSingleValue()) {
-      return processSV(getValuesSV(blockValueSet), 0, numDocs);
+      int limitedTo = clampToRemaining(0, numDocs);
+      if (limitedTo <= 0) {
+        return true;
+      }
+      boolean satisfied = processSV(getValuesSV(blockValueSet), 0, limitedTo);
+      consumeRows(limitedTo);
+      return satisfied || _rowsRemaining <= 0;
     } else {
-      return processMV(getValuesMV(blockValueSet), 0, numDocs);
+      int limitedTo = clampToRemaining(0, numDocs);
+      if (limitedTo <= 0) {
+        return true;
+      }
+      boolean satisfied = processMV(getValuesMV(blockValueSet), 0, limitedTo);
+      consumeRows(limitedTo);
+      return satisfied || _rowsRemaining <= 0;
     }
   }
 
@@ -105,5 +145,31 @@ public abstract class BaseSingleColumnDistinctExecutor<T extends DistinctTable, 
   @Override
   public DistinctTable getResult() {
     return _distinctTable;
+  }
+
+  @Override
+  public int getNumDistinctRowsCollected() {
+    return _distinctTable.size();
+  }
+
+  @Override
+  public int getRemainingRowsToProcess() {
+    return _rowsRemaining;
+  }
+
+  private int clampToRemaining(int from, int to) {
+    if (_rowsRemaining == Integer.MAX_VALUE) {
+      return to;
+    }
+    if (_rowsRemaining <= 0) {
+      return from;
+    }
+    return Math.min(to, from + _rowsRemaining);
+  }
+
+  private void consumeRows(int count) {
+    if (_rowsRemaining != Integer.MAX_VALUE) {
+      _rowsRemaining -= count;
+    }
   }
 }
