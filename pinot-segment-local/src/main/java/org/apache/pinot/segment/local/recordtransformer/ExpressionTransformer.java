@@ -27,6 +27,7 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import org.apache.pinot.common.utils.PinotThrottledLogger;
 import org.apache.pinot.segment.local.function.FunctionEvaluator;
 import org.apache.pinot.segment.local.function.FunctionEvaluatorFactory;
 import org.apache.pinot.spi.config.table.TableConfig;
@@ -52,6 +53,7 @@ public class ExpressionTransformer implements RecordTransformer {
   @VisibleForTesting
   final LinkedHashMap<String, FunctionEvaluator> _expressionEvaluators = new LinkedHashMap<>();
   private final boolean _continueOnError;
+  private final PinotThrottledLogger _throttledLogger;
 
   public ExpressionTransformer(TableConfig tableConfig, Schema schema) {
     Map<String, FunctionEvaluator> expressionEvaluators = new HashMap<>();
@@ -88,6 +90,7 @@ public class ExpressionTransformer implements RecordTransformer {
     }
 
     _continueOnError = ingestionConfig != null && ingestionConfig.isContinueOnError();
+    _throttledLogger = new PinotThrottledLogger(LOGGER, ingestionConfig, tableConfig.getTableName());
   }
 
   private void topologicalSort(String column, Map<String, FunctionEvaluator> expressionEvaluators,
@@ -148,7 +151,7 @@ public class ExpressionTransformer implements RecordTransformer {
           if (!_continueOnError) {
             throw new RuntimeException("Caught exception while evaluation transform function for column: " + column, e);
           }
-          LOGGER.debug("Caught exception while evaluation transform function for column: {}", column, e);
+          _throttledLogger.warn("Caught exception while evaluation transform function for column: " + column, e);
           record.markIncomplete();
         }
       } else if (existingValue.getClass().isArray() || existingValue instanceof Collections

@@ -29,6 +29,7 @@ import java.util.Map;
 import java.util.Set;
 import javax.annotation.Nullable;
 import org.apache.pinot.common.utils.PinotDataType;
+import org.apache.pinot.common.utils.PinotThrottledLogger;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.ingestion.IngestionConfig;
 import org.apache.pinot.spi.data.FieldSpec;
@@ -50,6 +51,7 @@ public class DataTypeTransformer implements RecordTransformer {
 
   private final Map<String, PinotDataType> _dataTypes = new HashMap<>();
   private final boolean _continueOnError;
+  private final PinotThrottledLogger _throttledLogger;
 
   public DataTypeTransformer(TableConfig tableConfig, Schema schema) {
     for (FieldSpec fieldSpec : schema.getAllFieldSpecs()) {
@@ -59,6 +61,7 @@ public class DataTypeTransformer implements RecordTransformer {
     }
     IngestionConfig ingestionConfig = tableConfig.getIngestionConfig();
     _continueOnError = ingestionConfig != null && ingestionConfig.isContinueOnError();
+    _throttledLogger = new PinotThrottledLogger(LOGGER, ingestionConfig, tableConfig.getTableName());
   }
 
   @Override
@@ -121,7 +124,7 @@ public class DataTypeTransformer implements RecordTransformer {
         if (!_continueOnError) {
           throw new RuntimeException("Caught exception while transforming data type for column: " + column, e);
         }
-        LOGGER.debug("Caught exception while transforming data type for column: {}", column, e);
+        _throttledLogger.warn("Caught exception while transforming data type for column: " + column, e);
         record.putValue(column, null);
         record.markIncomplete();
       }

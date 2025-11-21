@@ -29,6 +29,7 @@ import java.util.Objects;
 import java.util.Set;
 import javax.annotation.Nullable;
 import org.apache.pinot.common.function.scalar.JsonFunctions;
+import org.apache.pinot.common.utils.PinotThrottledLogger;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.ingestion.ComplexTypeConfig;
 import org.apache.pinot.spi.config.table.ingestion.ComplexTypeConfig.CollectionNotUnnestedToJson;
@@ -98,6 +99,7 @@ public class ComplexTypeTransformer implements RecordTransformer {
   private final CollectionNotUnnestedToJson _collectionNotUnnestedToJson;
   private final Map<String, String> _prefixesToRename;
   private final boolean _continueOnError;
+  private final PinotThrottledLogger _throttledLogger;
   private final List<String> _fieldsToUnnestAndKeepOriginalValue;
 
   private ComplexTypeTransformer(TableConfig tableConfig) {
@@ -122,6 +124,7 @@ public class ComplexTypeTransformer implements RecordTransformer {
         Objects.requireNonNullElse(complexTypeConfig.getCollectionNotUnnestedToJson(), DEFAULT_COLLECTION_TO_JSON_MODE);
     _prefixesToRename = Objects.requireNonNullElse(complexTypeConfig.getPrefixesToRename(), Map.of());
     _continueOnError = ingestionConfig.isContinueOnError();
+    _throttledLogger = new PinotThrottledLogger(LOGGER, ingestionConfig, tableConfig.getTableName());
   }
 
   /// Returns a [ComplexTypeTransformer] if it is defined in the table config, `null` otherwise.
@@ -143,6 +146,7 @@ public class ComplexTypeTransformer implements RecordTransformer {
     _collectionNotUnnestedToJson = collectionNotUnnestedToJson;
     _prefixesToRename = prefixesToRename;
     _continueOnError = continueOnError;
+    _throttledLogger = new PinotThrottledLogger(LOGGER, 0.0);
   }
 
   @VisibleForTesting
@@ -233,7 +237,8 @@ public class ComplexTypeTransformer implements RecordTransformer {
         if (!_continueOnError) {
           throw new RuntimeException("Caught exception while transforming complex types", e);
         }
-        LOGGER.debug("Caught exception while transforming complex types for record: {}", record.toString(), e);
+        _throttledLogger.warn(
+            String.format("Caught exception while transforming complex types for record: %s", record.toString()), e);
         record.markIncomplete();
       }
     }
@@ -245,7 +250,8 @@ public class ComplexTypeTransformer implements RecordTransformer {
           if (!_continueOnError) {
             throw new RuntimeException("Caught exception while renaming prefixes", e);
           }
-          LOGGER.debug("Caught exception while renaming prefixes for record: {}", record.toString(), e);
+          _throttledLogger.warn(
+              String.format("Caught exception while renaming prefixes for record: %s", record.toString()), e);
           record.markIncomplete();
         }
       }

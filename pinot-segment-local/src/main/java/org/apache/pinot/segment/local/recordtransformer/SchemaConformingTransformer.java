@@ -34,6 +34,7 @@ import javax.annotation.Nullable;
 import org.apache.pinot.common.metrics.ServerGauge;
 import org.apache.pinot.common.metrics.ServerMeter;
 import org.apache.pinot.common.metrics.ServerMetrics;
+import org.apache.pinot.common.utils.PinotThrottledLogger;
 import org.apache.pinot.segment.local.utils.Base64Utils;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.ingestion.IngestionConfig;
@@ -114,6 +115,7 @@ public class SchemaConformingTransformer implements RecordTransformer {
   private final int _jsonKeyValueSeparatorByteCount;
   private final boolean _continueOnError;
   private final ServerMetrics _serverMetrics;
+  private final PinotThrottledLogger _throttledLogger;
 
   private final GenericRow _reusedOutputRecord = new GenericRow();
   private final Map<String, Object> _reusedMergedTextIndexMap = new HashMap<>();
@@ -143,6 +145,7 @@ public class SchemaConformingTransformer implements RecordTransformer {
         _transformerConfig.getJsonKeyValueSeparator().getBytes(StandardCharsets.UTF_8).length;
     _continueOnError = ingestionConfig.isContinueOnError();
     _serverMetrics = ServerMetrics.get();
+    _throttledLogger = new PinotThrottledLogger(_logger, ingestionConfig, tableConfig.getTableName());
   }
 
   /// Returns a [ComplexTypeTransformer] if it is defined in the table config, `null` otherwise.
@@ -377,7 +380,7 @@ public class SchemaConformingTransformer implements RecordTransformer {
       if (!_continueOnError) {
         throw e;
       }
-      _logger.debug("Couldn't transform record: {}", record.toString(), e);
+      _throttledLogger.warn("Couldn't transform record: " + record.toString(), e);
       outputRecord.markIncomplete();
     }
   }

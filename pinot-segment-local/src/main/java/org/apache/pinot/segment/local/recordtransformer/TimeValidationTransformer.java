@@ -19,6 +19,7 @@
 package org.apache.pinot.segment.local.recordtransformer;
 
 import com.google.common.base.Preconditions;
+import org.apache.pinot.common.utils.PinotThrottledLogger;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.ingestion.IngestionConfig;
 import org.apache.pinot.spi.data.DateTimeFieldSpec;
@@ -46,6 +47,7 @@ public class TimeValidationTransformer implements RecordTransformer {
   private final DateTimeFormatSpec _timeFormatSpec;
   private final boolean _enableTimeValueCheck;
   private final boolean _continueOnError;
+  private final PinotThrottledLogger _throttledLogger;
 
   public TimeValidationTransformer(TableConfig tableConfig, Schema schema) {
     _timeColumnName = tableConfig.getValidationConfig().getTimeColumnName();
@@ -61,6 +63,7 @@ public class TimeValidationTransformer implements RecordTransformer {
       _timeFormatSpec = null;
       _continueOnError = false;
     }
+    _throttledLogger = new PinotThrottledLogger(LOGGER, ingestionConfig, tableConfig.getTableName());
   }
 
   @Override
@@ -83,7 +86,7 @@ public class TimeValidationTransformer implements RecordTransformer {
       if (!_continueOnError) {
         throw new IllegalStateException(errorMessage, e);
       }
-      LOGGER.debug(errorMessage, e);
+      _throttledLogger.warn(errorMessage, e);
       record.putValue(_timeColumnName, null);
       record.markIncomplete();
       return;
@@ -95,7 +98,7 @@ public class TimeValidationTransformer implements RecordTransformer {
       if (!_continueOnError) {
         throw new IllegalStateException(errorMessage);
       }
-      LOGGER.debug(errorMessage);
+      _throttledLogger.warn(errorMessage, new IllegalStateException(errorMessage));
       record.putValue(_timeColumnName, null);
       record.markIncomplete();
     }
