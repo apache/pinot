@@ -25,12 +25,16 @@ import java.util.List;
 import java.util.Map;
 import java.util.Properties;
 import java.util.Set;
+import java.util.concurrent.TimeUnit;
 import org.apache.pinot.common.metrics.ControllerGauge;
 import org.apache.pinot.common.metrics.ControllerMetrics;
+import org.apache.pinot.common.metrics.ControllerTimer;
 import org.apache.pinot.controller.ControllerConf;
 import org.apache.pinot.controller.LeadControllerManager;
 import org.apache.pinot.controller.helix.core.PinotHelixResourceManager;
 import org.apache.pinot.controller.helix.core.minion.PinotHelixTaskResourceManager.TaskCount;
+import org.apache.pinot.controller.helix.core.minion.PinotHelixTaskResourceManager.TaskStatusSummary;
+import org.apache.pinot.controller.helix.core.minion.PinotHelixTaskResourceManager.TasksByStatus;
 import org.apache.pinot.core.periodictask.BasePeriodicTask;
 import org.apache.pinot.spi.utils.InstanceTypeUtils;
 import org.slf4j.Logger;
@@ -113,45 +117,43 @@ public class TaskMetricsEmitter extends BasePeriodicTask {
         long previousExecutionTimestamp = _previousExecutionTimestamps.computeIfAbsent(taskType,
             k -> currentExecutionTimestamp - _taskMetricsEmitterFrequencyMs);
 
-        // Get currently in-progress tasks (for metrics)
-        Set<String> currentInProgressTasks = _helixTaskResourceManager.getTasksInProgress(taskType);
-
         // Get tasks that were in-progress during the previous collection cycle
         Set<String> previouslyInProgressTasks =
             _previousInProgressTasks.getOrDefault(taskType, Collections.emptySet());
 
-        // Get all tasks including those that started after the previous execution timestamp
-        // This combines in-progress tasks and short-lived tasks that started and completed between cycles
-        // in a single Helix call, avoiding duplicate getWorkflowConfig/getWorkflowContext calls
-        Set<String> tasksIncludingShortLived = _helixTaskResourceManager.getTasksInProgressAndRecent(
-            taskType, previousExecutionTimestamp);
+        // Get in-progress tasks and all tasks to report (including short-lived) in a single Helix call
+        TasksByStatus taskResult = _helixTaskResourceManager.getTasksByStatus(taskType, previousExecutionTimestamp);
+        Set<String> currentInProgressTasks = taskResult.getInProgressTasks();
+        Set<String> recentTasks = taskResult.getRecentTasks();
 
         // Start with all tasks that need reporting (in-progress + short-lived)
-        Set<String> tasksToReport = new HashSet<>(tasksIncludingShortLived);
-
-        // Include tasks that were in-progress previously but are no longer in-progress
-        // These tasks completed between collection cycles and need their final metrics reported
-        for (String taskName : previouslyInProgressTasks) {
-          if (!tasksIncludingShortLived.contains(taskName)) {
-            LOGGER.debug("Including task {} that completed between collection cycles for taskType: {}",
-                taskName, taskType);
-            tasksToReport.add(taskName);
-          }
-        }
+        Set<String> tasksToReport = new HashSet<>(previouslyInProgressTasks);
+        tasksToReport.addAll(currentInProgressTasks);
+        tasksToReport.addAll(recentTasks);
 
         final int numRunningTasks = currentInProgressTasks.size();
 
         // Process all tasks that need metrics reported
         for (String task : tasksToReport) {
           try {
-            Map<String, TaskCount> tableTaskCount = _helixTaskResourceManager.getTableTaskCount(task);
-            tableTaskCount.forEach((tableNameWithType, taskCount) -> {
+            Map<String, TaskStatusSummary> tableTaskStatusSummary =
+                _helixTaskResourceManager.getTableTaskStatusSummary(task);
+            tableTaskStatusSummary.forEach((tableNameWithType, taskStatusSummary) -> {
+              TaskCount taskCount = taskStatusSummary.getTaskCount();
               taskTypeAccumulatedCount.accumulate(taskCount);
               tableAccumulatedCount.compute(tableNameWithType, (name, count) -> {
                 if (count == null) {
                   count = new TaskCount();
                 }
                 count.accumulate(taskCount);
+                taskStatusSummary.getSubtaskWaitingTimes().values().forEach(subtaskWaitingTime -> {
+                  _controllerMetrics.addTimedTableValue(tableNameWithType, ControllerTimer.SUBTASK_WAITING_TIME,
+                      subtaskWaitingTime, TimeUnit.MILLISECONDS);
+                });
+                taskStatusSummary.getSubtaskRunningTimes().values().forEach(subtaskRunningTime -> {
+                  _controllerMetrics.addTimedTableValue(tableNameWithType, ControllerTimer.SUBTASK_RUNNING_TIME,
+                      subtaskRunningTime, TimeUnit.MILLISECONDS);
+                });
                 return count;
               });
             });
