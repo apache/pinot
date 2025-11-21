@@ -908,7 +908,7 @@ public class CommonConstants {
      * If a rule is enabled and disabled at the same time,
      * it will be disabled
      */
-    public static final Set<String> DEFAULT_DISABLED_RULES = Set.of(
+    public static final List<String> DEFAULT_DISABLED_RULES = List.of(
         PlannerRuleNames.AGGREGATE_JOIN_TRANSPOSE_EXTENDED,
         PlannerRuleNames.SORT_JOIN_TRANSPOSE,
         PlannerRuleNames.SORT_JOIN_COPY,
@@ -917,6 +917,8 @@ public class CommonConstants {
         PlannerRuleNames.AGGREGATE_FUNCTION_REWRITE,
         PlannerRuleNames.JOIN_PUSH_TRANSITIVE_PREDICATES
     );
+
+    public static final String CONFIG_OF_BROKER_MSE_PLANNER_DISABLED_RULES = "pinot.broker.mse.planner.disabled.rules";
 
     public static class FailureDetector {
       public enum Type {
