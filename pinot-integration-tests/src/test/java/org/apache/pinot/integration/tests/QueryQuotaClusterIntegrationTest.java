@@ -348,6 +348,7 @@ public class QueryQuotaClusterIntegrationTest extends BaseClusterIntegrationTest
   private void runQueries(int qps, boolean shouldFail) {
     runQueries(qps, shouldFail, "default");
   }
+
   private void runQueries(int qps, boolean shouldFail, String applicationName) {
     runQueries(qps, shouldFail, applicationName, getTableName());
   }
@@ -480,9 +481,9 @@ public class QueryQuotaClusterIntegrationTest extends BaseClusterIntegrationTest
 
   public void addQueryQuotaToDatabaseConfig(Integer maxQps)
       throws Exception {
-    String url = _controllerRequestURLBuilder.getBaseUrl() + "/databases/default/quotas";
+    String url = getOrCreateAdminClient().getControllerBaseUrl() + "/databases/default/quotas";
     if (maxQps != null) {
-        url += "?maxQueriesPerSecond=" + maxQps;
+      url += "?maxQueriesPerSecond=" + maxQps;
     }
     HttpClient.wrapAndThrowHttpException(_httpClient.sendPostRequest(new URI(url), null, null));
     // to allow change propagation to QueryQuotaManager
@@ -490,7 +491,7 @@ public class QueryQuotaClusterIntegrationTest extends BaseClusterIntegrationTest
 
   public void setQueryQuotaForApplication(Integer maxQps)
       throws Exception {
-    String url = _controllerRequestURLBuilder.getBaseUrl() + "/applicationQuotas/default";
+    String url = getOrCreateAdminClient().getControllerBaseUrl() + "/applicationQuotas/default";
     if (maxQps != null) {
       url += "?maxQueriesPerSecond=" + maxQps;
     }
@@ -502,12 +503,13 @@ public class QueryQuotaClusterIntegrationTest extends BaseClusterIntegrationTest
       throws Exception {
     if (maxQps == null) {
       HttpClient.wrapAndThrowHttpException(_httpClient.sendDeleteRequest(new URI(
-        _controllerRequestURLBuilder.forClusterConfigs() + "/"
-            + CommonConstants.Helix.DATABASE_MAX_QUERIES_PER_SECOND)));
+          getOrCreateAdminClient().getControllerRequestURLBuilder().forClusterConfigs() + "/"
+              + CommonConstants.Helix.DATABASE_MAX_QUERIES_PER_SECOND)));
     } else {
       String payload = "{\"" + CommonConstants.Helix.DATABASE_MAX_QUERIES_PER_SECOND + "\":\"" + maxQps + "\"}";
       HttpClient.wrapAndThrowHttpException(
-          _httpClient.sendJsonPostRequest(new URI(_controllerRequestURLBuilder.forClusterConfigs()), payload));
+          _httpClient.sendJsonPostRequest(
+              new URI(getOrCreateAdminClient().getControllerRequestURLBuilder().forClusterConfigs()), payload));
     }
     // to allow change propagation to QueryQuotaManager
   }
@@ -516,12 +518,13 @@ public class QueryQuotaClusterIntegrationTest extends BaseClusterIntegrationTest
       throws Exception {
     if (maxQps == null) {
       HttpClient.wrapAndThrowHttpException(_httpClient.sendDeleteRequest(new URI(
-          _controllerRequestURLBuilder.forClusterConfigs() + "/"
+          getOrCreateAdminClient().getControllerRequestURLBuilder().forClusterConfigs() + "/"
               + CommonConstants.Helix.APPLICATION_MAX_QUERIES_PER_SECOND)));
     } else {
       String payload = "{\"" + CommonConstants.Helix.APPLICATION_MAX_QUERIES_PER_SECOND + "\":\"" + maxQps + "\"}";
       HttpClient.wrapAndThrowHttpException(
-          _httpClient.sendJsonPostRequest(new URI(_controllerRequestURLBuilder.forClusterConfigs()), payload));
+          _httpClient.sendJsonPostRequest(
+              new URI(getOrCreateAdminClient().getControllerRequestURLBuilder().forClusterConfigs()), payload));
     }
     // to allow change propagation to QueryQuotaManager
   }

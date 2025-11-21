@@ -258,7 +258,8 @@ public class TlsIntegrationTest extends BaseClusterIntegrationTest {
   public void addSchema(Schema schema)
       throws IOException {
     SimpleHttpResponse response =
-        sendMultipartPostRequest(_controllerRequestURLBuilder.forSchemaCreate(), schema.toSingleLineJsonString(),
+        sendMultipartPostRequest(getOrCreateAdminClient().getControllerRequestURLBuilder().forSchemaCreate(),
+            schema.toSingleLineJsonString(),
             AUTH_HEADER);
     Assert.assertEquals(response.getStatusCode(), 200);
   }
@@ -266,7 +267,8 @@ public class TlsIntegrationTest extends BaseClusterIntegrationTest {
   @Override
   public void addTableConfig(TableConfig tableConfig)
       throws IOException {
-    sendPostRequest(_controllerRequestURLBuilder.forTableCreate(), tableConfig.toJsonString(), AUTH_HEADER);
+    sendPostRequest(getOrCreateAdminClient().getControllerRequestURLBuilder().forTableCreate(),
+        tableConfig.toJsonString(), AUTH_HEADER);
   }
 
   @Override
@@ -287,7 +289,8 @@ public class TlsIntegrationTest extends BaseClusterIntegrationTest {
   public void dropRealtimeTable(String tableName)
       throws IOException {
     sendDeleteRequest(
-        _controllerRequestURLBuilder.forTableDelete(TableNameBuilder.REALTIME.tableNameWithType(tableName)),
+        getOrCreateAdminClient().getControllerRequestURLBuilder()
+            .forTableDelete(TableNameBuilder.REALTIME.tableNameWithType(tableName)),
         AUTH_HEADER);
   }
 
@@ -467,7 +470,8 @@ public class TlsIntegrationTest extends BaseClusterIntegrationTest {
   public void testUnauthenticatedFailure()
       throws IOException {
     sendDeleteRequest(
-        _controllerRequestURLBuilder.forTableDelete(TableNameBuilder.REALTIME.tableNameWithType("mytable")));
+        getOrCreateAdminClient().getControllerRequestURLBuilder()
+            .forTableDelete(TableNameBuilder.REALTIME.tableNameWithType("mytable")));
   }
 
   @Test
@@ -484,7 +488,8 @@ public class TlsIntegrationTest extends BaseClusterIntegrationTest {
     // wait for offline segments
     JsonNode offlineSegments = TestUtils.waitForResult(() -> {
       JsonNode segmentSets = JsonUtils.stringToJsonNode(
-          sendGetRequest(_controllerRequestURLBuilder.forSegmentListAPI(getTableName()), AUTH_HEADER));
+          sendGetRequest(getOrCreateAdminClient().getControllerRequestURLBuilder().forSegmentListAPI(getTableName()),
+              AUTH_HEADER));
       JsonNode currentOfflineSegments =
           new IntRange(0, segmentSets.size()).stream().map(segmentSets::get).filter(s -> s.has("OFFLINE"))
               .map(s -> s.get("OFFLINE")).findFirst().get();
@@ -500,7 +505,9 @@ public class TlsIntegrationTest extends BaseClusterIntegrationTest {
     for (int i = 0; i < offlineSegments.size(); i++) {
       String segment = offlineSegments.get(i).asText();
       Assert.assertTrue(
-          sendGetRequest(_controllerRequestURLBuilder.forSegmentDownload(getTableName(), segment), AUTH_HEADER).length()
+          sendGetRequest(
+              getOrCreateAdminClient().getControllerRequestURLBuilder().forSegmentDownload(getTableName(), segment),
+              AUTH_HEADER).length()
               > 200000); // download segment
     }
   }

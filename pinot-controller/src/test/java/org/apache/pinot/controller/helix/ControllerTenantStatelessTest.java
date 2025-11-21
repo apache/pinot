@@ -70,14 +70,17 @@ public class ControllerTenantStatelessTest extends ControllerTest {
     }
 
     // Get broker tenants
-    JsonNode response = JsonUtils.stringToJsonNode(sendGetRequest(_controllerRequestURLBuilder.forTenantGet()));
+    JsonNode response = JsonUtils.stringToJsonNode(
+        sendGetRequest(getOrCreateAdminClient().getControllerRequestURLBuilder().forTenantGet()));
     Assert.assertEquals(response.get("BROKER_TENANTS").size(), NUM_BROKER_TAGS);
     for (int i = 1; i <= NUM_BROKER_TAGS; i++) {
       String brokerTag = BROKER_TAG_PREFIX + i;
-      response = JsonUtils.stringToJsonNode(sendGetRequest(_controllerRequestURLBuilder.forBrokerTenantGet(brokerTag)));
+      response = JsonUtils.stringToJsonNode(
+          sendGetRequest(getOrCreateAdminClient().getControllerRequestURLBuilder().forBrokerTenantGet(brokerTag)));
       Assert.assertEquals(response.get("BrokerInstances").size(), NUM_BROKERS_PER_TAG);
       Assert.assertEquals(response.get("tenantName").asText(), brokerTag);
-      response = JsonUtils.stringToJsonNode(sendGetRequest(_controllerRequestURLBuilder.forTenantGet(brokerTag)));
+      response = JsonUtils.stringToJsonNode(
+          sendGetRequest(getOrCreateAdminClient().getControllerRequestURLBuilder().forTenantGet(brokerTag)));
       Assert.assertEquals(response.get("BrokerInstances").size(), NUM_BROKERS_PER_TAG);
       Assert.assertEquals(response.get("ServerInstances").size(), 0);
       Assert.assertEquals(response.get("tenantName").asText(), brokerTag);
@@ -100,7 +103,7 @@ public class ControllerTenantStatelessTest extends ControllerTest {
     // Delete broker tenants
     for (int i = 1; i <= NUM_BROKER_TAGS; i++) {
       String brokerTenant = BROKER_TAG_PREFIX + i;
-      sendDeleteRequest(_controllerRequestURLBuilder.forBrokerTenantDelete(brokerTenant));
+      sendDeleteRequest(getOrCreateAdminClient().getControllerRequestURLBuilder().forBrokerTenantDelete(brokerTenant));
       Assert.assertEquals(_helixAdmin
               .getInstancesInClusterWithTag(getHelixClusterName(), TagNameUtils.getBrokerTagForTenant(brokerTenant))
               .size(),
@@ -115,7 +118,7 @@ public class ControllerTenantStatelessTest extends ControllerTest {
   @Test
   public void testEmptyServerTenant() {
     try {
-      sendGetRequest(_controllerRequestURLBuilder.forServerTenantGet("doesn't_exist"));
+      sendGetRequest(getOrCreateAdminClient().getControllerRequestURLBuilder().forServerTenantGet("doesn't_exist"));
       Assert.fail();
     } catch (Exception e) {
     }
@@ -141,14 +144,17 @@ public class ControllerTenantStatelessTest extends ControllerTest {
     }
 
     // Get server tenants
-    JsonNode response = JsonUtils.stringToJsonNode(sendGetRequest(_controllerRequestURLBuilder.forTenantGet()));
+    JsonNode response = JsonUtils.stringToJsonNode(
+        sendGetRequest(getOrCreateAdminClient().getControllerRequestURLBuilder().forTenantGet()));
     Assert.assertEquals(response.get("SERVER_TENANTS").size(), NUM_SERVER_TAGS);
     for (int i = 1; i <= NUM_SERVER_TAGS; i++) {
       String serverTag = SERVER_TAG_PREFIX + i;
-      response = JsonUtils.stringToJsonNode(sendGetRequest(_controllerRequestURLBuilder.forServerTenantGet(serverTag)));
+      response = JsonUtils.stringToJsonNode(
+          sendGetRequest(getOrCreateAdminClient().getControllerRequestURLBuilder().forServerTenantGet(serverTag)));
       Assert.assertEquals(response.get("ServerInstances").size(), NUM_SERVERS_PER_TAG);
       Assert.assertEquals(response.get("tenantName").asText(), serverTag);
-      response = JsonUtils.stringToJsonNode(sendGetRequest(_controllerRequestURLBuilder.forTenantGet(serverTag)));
+      response = JsonUtils.stringToJsonNode(
+          sendGetRequest(getOrCreateAdminClient().getControllerRequestURLBuilder().forTenantGet(serverTag)));
       Assert.assertEquals(response.get("BrokerInstances").size(), 0);
       Assert.assertEquals(response.get("ServerInstances").size(), NUM_SERVERS_PER_TAG);
       Assert.assertEquals(response.get("tenantName").asText(), serverTag);
@@ -174,7 +180,7 @@ public class ControllerTenantStatelessTest extends ControllerTest {
     // Delete server tenants
     for (int i = 1; i < NUM_SERVER_TAGS; i++) {
       String serverTenant = SERVER_TAG_PREFIX + i;
-      sendDeleteRequest(_controllerRequestURLBuilder.forServerTenantDelete(serverTenant));
+      sendDeleteRequest(getOrCreateAdminClient().getControllerRequestURLBuilder().forServerTenantDelete(serverTenant));
       Assert.assertEquals(_helixAdmin
           .getInstancesInClusterWithTag(getHelixClusterName(), TagNameUtils.getOfflineTagForTenant(serverTenant))
           .size(), 0);
