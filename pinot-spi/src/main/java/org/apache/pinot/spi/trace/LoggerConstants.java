@@ -28,6 +28,8 @@ public enum LoggerConstants {
   REQUEST_ID_KEY("pinot.query.id"),
   /// The correlation or query id of the query.
   CORRELATION_ID_KEY("pinot.query.cid"),
+  /// The fingerprint hash of the query.
+  QUERY_HASH_KEY("pinot.query.hash"),
   /// The MSE worker id of the query.
   WORKER_ID_KEY("pinot.mse.workerId"),
   /// The MSE stage id of the query.
