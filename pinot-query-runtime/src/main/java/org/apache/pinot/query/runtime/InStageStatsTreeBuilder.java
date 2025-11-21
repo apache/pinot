@@ -41,6 +41,7 @@ import org.apache.pinot.query.planner.plannode.ProjectNode;
 import org.apache.pinot.query.planner.plannode.SetOpNode;
 import org.apache.pinot.query.planner.plannode.SortNode;
 import org.apache.pinot.query.planner.plannode.TableScanNode;
+import org.apache.pinot.query.planner.plannode.UnnestNode;
 import org.apache.pinot.query.planner.plannode.ValueNode;
 import org.apache.pinot.query.planner.plannode.WindowNode;
 import org.apache.pinot.query.runtime.operator.MailboxSendOperator;
@@ -289,6 +290,11 @@ public class InStageStatsTreeBuilder implements PlanNodeVisitor<ObjectNode, InSt
   @Override
   public ObjectNode visitExplained(ExplainedNode node, Context context) {
     throw new UnsupportedOperationException("ExplainedNode should not be visited");
+  }
+
+  @Override
+  public ObjectNode visitUnnest(UnnestNode node, Context context) {
+    return recursiveCase(node, MultiStageOperator.Type.UNNEST, context);
   }
 
   public static class Context {
