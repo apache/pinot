@@ -1133,8 +1133,7 @@ public class ControllerConf extends PinotConfiguration {
   }
 
   public DisasterRecoveryMode getDisasterRecoveryMode() {
-    String disasterRecoveryModeString = getProperty(ControllerPeriodicTasksConf.DISASTER_RECOVERY_MODE_CONFIG_KEY);
-    return getDisasterRecoveryMode(disasterRecoveryModeString);
+    return getDisasterRecoveryMode(getProperty(ControllerPeriodicTasksConf.DISASTER_RECOVERY_MODE_CONFIG_KEY));
   }
 
   public static DisasterRecoveryMode getDisasterRecoveryMode(@Nullable String disasterRecoveryModeString) {
