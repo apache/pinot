@@ -126,18 +126,12 @@ public class ServerReloadJobStatusCache implements PinotClusterConfigChangeListe
     requireNonNull(exception, "exception cannot be null");
 
     ReloadJobStatus status = getOrCreate(jobId);
+    status.incrementAndGetFailureCount();
 
-    // Synchronize on status object for thread-safe access to its list
     synchronized (status) {
-      // Always increment count
-      status.incrementAndGetFailureCount();
-
-      // Only add details if under limit (check config in cache layer)
-      List<SegmentReloadFailureResponse> details = status.getFailedSegmentDetails();
       int maxLimit = _currentConfig.getSegmentFailureDetailsCount();
-
-      if (details.size() < maxLimit) {
-        details.add(new SegmentReloadFailureResponse()
+      if (status.getFailedSegmentDetails().size() < maxLimit) {
+        status.addFailureDetail(new SegmentReloadFailureResponse()
             .setSegmentName(segmentName)
             .setServerName(_instanceId)
             .setError(new ApiErrorResponse()

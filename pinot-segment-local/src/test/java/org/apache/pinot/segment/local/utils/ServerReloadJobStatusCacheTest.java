@@ -41,17 +41,6 @@ import static org.assertj.core.api.Assertions.assertThat;
  */
 public class ServerReloadJobStatusCacheTest {
 
-  // Helper method to get failed segment details from cache
-  private static List<SegmentReloadFailureResponse> getFailedSegmentDetails(ServerReloadJobStatusCache cache,
-      String jobId) {
-    ReloadJobStatus status = cache.getJobStatus(jobId);
-    if (status == null) {
-      return Collections.emptyList();
-    }
-    // Return the internal list directly for testing
-    return status.getFailedSegmentDetails();
-  }
-
   @Test
   public void testDefaultConfigInitialization() {
     // Given
@@ -139,30 +128,6 @@ public class ServerReloadJobStatusCacheTest {
   }
 
   @Test
-  public void testConfigUpdateOverwritesPrevious() {
-    // Given
-    ServerReloadJobStatusCache cache = new ServerReloadJobStatusCache("testServer");
-
-    // Set initial config
-    Map<String, String> initialProperties = new HashMap<>();
-    initialProperties.put("pinot.server.table.reload.status.cache.size.max", "8000");
-    initialProperties.put("pinot.server.table.reload.status.cache.ttl.days", "20");
-    cache.onChange(initialProperties.keySet(), initialProperties);
-    assertThat(cache.getCurrentConfig().getMaxSize()).isEqualTo(8000);
-    assertThat(cache.getCurrentConfig().getTtlDays()).isEqualTo(20);
-
-    // When - Update with new config
-    Map<String, String> updatedProperties = new HashMap<>();
-    updatedProperties.put("pinot.server.table.reload.status.cache.size.max", "12000");
-    updatedProperties.put("pinot.server.table.reload.status.cache.ttl.days", "45");
-    cache.onChange(updatedProperties.keySet(), updatedProperties);
-
-    // Then
-    assertThat(cache.getCurrentConfig().getMaxSize()).isEqualTo(12000);
-    assertThat(cache.getCurrentConfig().getTtlDays()).isEqualTo(45);
-  }
-
-  @Test
   public void testZookeeperConfigDeletionRevertsToDefaults() {
     // Given
     ServerReloadJobStatusCache cache = new ServerReloadJobStatusCache("testServer");
@@ -234,40 +199,6 @@ public class ServerReloadJobStatusCacheTest {
     // Verify new config is applied
     assertThat(cache.getCurrentConfig().getMaxSize()).isEqualTo(5000);
     assertThat(cache.getCurrentConfig().getTtlDays()).isEqualTo(15);
-  }
-
-  @Test
-  public void testCacheRebuildWithDifferentSize() {
-    // Given
-    ServerReloadJobStatusCache cache = new ServerReloadJobStatusCache("testServer");
-    assertThat(cache.getCurrentConfig().getMaxSize()).isEqualTo(10000);
-
-    // When - Update only max size
-    Map<String, String> properties = new HashMap<>();
-    properties.put("pinot.server.table.reload.status.cache.size.max", "20000");
-    cache.onChange(properties.keySet(), properties);
-
-    // Then - Verify new size takes effect
-    assertThat(cache.getCurrentConfig().getMaxSize()).isEqualTo(20000);
-    // TTL should remain default
-    assertThat(cache.getCurrentConfig().getTtlDays()).isEqualTo(30);
-  }
-
-  @Test
-  public void testCacheRebuildWithDifferentTTL() {
-    // Given
-    ServerReloadJobStatusCache cache = new ServerReloadJobStatusCache("testServer");
-    assertThat(cache.getCurrentConfig().getTtlDays()).isEqualTo(30);
-
-    // When - Update only TTL
-    Map<String, String> properties = new HashMap<>();
-    properties.put("pinot.server.table.reload.status.cache.ttl.days", "45");
-    cache.onChange(properties.keySet(), properties);
-
-    // Then - Verify new TTL takes effect
-    assertThat(cache.getCurrentConfig().getTtlDays()).isEqualTo(45);
-    // Max size should remain default
-    assertThat(cache.getCurrentConfig().getMaxSize()).isEqualTo(10000);
   }
 
   @Test
@@ -347,51 +278,42 @@ public class ServerReloadJobStatusCacheTest {
     ReloadJobStatus status = cache.getJobStatus(jobId);
     assertThat(status).isNotNull();
     assertThat(status.getFailureCount()).isEqualTo(1);
-    assertThat(getFailedSegmentDetails(cache, jobId)).hasSize(1);
-    assertThat(getFailedSegmentDetails(cache, jobId).get(0).getSegmentName()).isEqualTo(segmentName);
+    assertThat(status.getFailedSegmentDetails()).hasSize(1);
+    assertThat(status.getFailedSegmentDetails().get(0).getSegmentName()).isEqualTo(segmentName);
   }
 
-  @Test
-  public void testRecordFailureOverLimit() {
+  @org.testng.annotations.DataProvider(name = "failureLimits")
+  public Object[][] failureLimitsProvider() {
+    return new Object[][] {
+        {5, 10, "default limit (5)"},
+        {3, 5, "custom limit (3)"},
+        {1, 3, "limit of 1"}
+    };
+  }
+
+  @Test(dataProvider = "failureLimits")
+  public void testRecordFailureRespectsLimit(int limit, int totalFailures, String description) {
     // Given
     ServerReloadJobStatusCache cache = new ServerReloadJobStatusCache("testServer");
-    String jobId = "job-over-limit";
-    // Default limit is 5
+    if (limit != 5) {
+      Map<String, String> properties = new HashMap<>();
+      properties.put("pinot.server.table.reload.status.cache.segment.failure.details.count", String.valueOf(limit));
+      cache.onChange(properties.keySet(), properties);
+    }
 
-    // When - Record 10 failures (over limit)
-    for (int i = 1; i <= 10; i++) {
+    String jobId = "job-limit-" + limit;
+
+    // When - Record failures
+    for (int i = 1; i <= totalFailures; i++) {
       cache.recordFailure(jobId, "segment_" + i, new IOException("Error " + i));
     }
 
-    // Then - Count should be 10, but only first 5 details stored
-    assertThat(cache.getJobStatus(jobId).getFailureCount()).isEqualTo(10);
-    List<SegmentReloadFailureResponse> details = getFailedSegmentDetails(cache, jobId);
-    assertThat(details).hasSize(5);
-    assertThat(details.get(0).getSegmentName()).isEqualTo("segment_1");
-    assertThat(details.get(4).getSegmentName()).isEqualTo("segment_5");
-  }
-
-  @Test
-  public void testRecordFailureRespectsConfigLimit() {
-    // Given - Set custom limit of 3
-    ServerReloadJobStatusCache cache = new ServerReloadJobStatusCache("testServer");
-    Map<String, String> properties = new HashMap<>();
-    properties.put("pinot.server.table.reload.status.cache.segment.failure.details.count", "3");
-    cache.onChange(properties.keySet(), properties);
-
-    String jobId = "job-custom-limit";
-
-    // When - Record 5 failures with limit of 3
-    for (int i = 1; i <= 5; i++) {
-      cache.recordFailure(jobId, "segment_" + i, new IOException("Error " + i));
-    }
-
-    // Then - Count should be 5, but only first 3 details stored
-    assertThat(cache.getJobStatus(jobId).getFailureCount()).isEqualTo(5);
-    List<SegmentReloadFailureResponse> details = getFailedSegmentDetails(cache, jobId);
-    assertThat(details).hasSize(3);
-    assertThat(details.get(0).getSegmentName()).isEqualTo("segment_1");
-    assertThat(details.get(2).getSegmentName()).isEqualTo("segment_3");
+    // Then - Count should equal totalFailures, but only first 'limit' details stored
+    ReloadJobStatus status = cache.getJobStatus(jobId);
+    assertThat(status.getFailureCount()).isEqualTo(totalFailures);
+    assertThat(status.getFailedSegmentDetails()).hasSize(limit);
+    assertThat(status.getFailedSegmentDetails().get(0).getSegmentName()).isEqualTo("segment_1");
+    assertThat(status.getFailedSegmentDetails().get(limit - 1).getSegmentName()).isEqualTo("segment_" + limit);
   }
 
   @Test
@@ -426,7 +348,7 @@ public class ServerReloadJobStatusCacheTest {
     ReloadJobStatus status = cache.getJobStatus(jobId);
     assertThat(status.getFailureCount()).isEqualTo(threadCount * failuresPerThread);
     // Only first 5 details stored (default limit)
-    assertThat(getFailedSegmentDetails(cache, jobId)).hasSize(5);
+    assertThat(status.getFailedSegmentDetails()).hasSize(5);
   }
 
   @Test
@@ -449,7 +371,94 @@ public class ServerReloadJobStatusCacheTest {
       cache.recordFailure(jobId, "segment_" + i, new IOException("Error " + i));
     }
 
-    assertThat(cache.getJobStatus(jobId).getFailureCount()).isEqualTo(5);
-    assertThat(getFailedSegmentDetails(cache, jobId)).hasSize(2);  // New limit applied
+    ReloadJobStatus newJobStatus = cache.getJobStatus(jobId);
+    assertThat(newJobStatus.getFailureCount()).isEqualTo(5);
+    assertThat(newJobStatus.getFailedSegmentDetails()).hasSize(2);  // New limit applied
+  }
+
+  @Test
+  public void testGetOrCreateConcurrent() throws Exception {
+    // Given
+    ServerReloadJobStatusCache cache = new ServerReloadJobStatusCache("testServer");
+    String jobId = "concurrent-job";
+    int threadCount = 20;
+    ExecutorService executor = Executors.newFixedThreadPool(threadCount);
+    List<CompletableFuture<ReloadJobStatus>> futures = new ArrayList<>();
+
+    // When - Multiple threads try to create the same job
+    for (int t = 0; t < threadCount; t++) {
+      CompletableFuture<ReloadJobStatus> future = CompletableFuture.supplyAsync(() -> {
+        return cache.getOrCreate(jobId);
+      }, executor);
+      futures.add(future);
+    }
+
+    // Wait for all threads to complete
+    List<ReloadJobStatus> results = new ArrayList<>();
+    for (CompletableFuture<ReloadJobStatus> future : futures) {
+      results.add(future.get(10, TimeUnit.SECONDS));
+    }
+    executor.shutdown();
+    executor.awaitTermination(5, TimeUnit.SECONDS);
+
+    // Then - All threads should get the exact same instance
+    ReloadJobStatus firstStatus = results.get(0);
+    for (ReloadJobStatus status : results) {
+      assertThat(status).isSameAs(firstStatus);
+    }
+    assertThat(cache.getJobStatus(jobId)).isSameAs(firstStatus);
+  }
+
+  @Test(expectedExceptions = UnsupportedOperationException.class)
+  public void testGetFailedSegmentDetailsReturnsUnmodifiableList() {
+    // Given
+    ServerReloadJobStatusCache cache = new ServerReloadJobStatusCache("testServer");
+    String jobId = "test-job";
+    cache.recordFailure(jobId, "segment_1", new IOException("Error"));
+
+    // When - Try to modify the returned list
+    ReloadJobStatus status = cache.getJobStatus(jobId);
+    List<SegmentReloadFailureResponse> details = status.getFailedSegmentDetails();
+
+    // Then - Should throw UnsupportedOperationException
+    details.add(new SegmentReloadFailureResponse());
+  }
+
+  @Test(expectedExceptions = NullPointerException.class)
+  public void testRecordFailureWithNullJobId() {
+    ServerReloadJobStatusCache cache = new ServerReloadJobStatusCache("testServer");
+    cache.recordFailure(null, "segment", new IOException("Error"));
+  }
+
+  @Test(expectedExceptions = NullPointerException.class)
+  public void testRecordFailureWithNullSegmentName() {
+    ServerReloadJobStatusCache cache = new ServerReloadJobStatusCache("testServer");
+    cache.recordFailure("job-1", null, new IOException("Error"));
+  }
+
+  @Test(expectedExceptions = NullPointerException.class)
+  public void testRecordFailureWithNullException() {
+    ServerReloadJobStatusCache cache = new ServerReloadJobStatusCache("testServer");
+    cache.recordFailure("job-1", "segment", null);
+  }
+
+  @Test
+  public void testEdgeCaseZeroLimit() {
+    // Given
+    ServerReloadJobStatusCache cache = new ServerReloadJobStatusCache("testServer");
+    Map<String, String> properties = new HashMap<>();
+    properties.put("pinot.server.table.reload.status.cache.segment.failure.details.count", "0");
+    cache.onChange(properties.keySet(), properties);
+
+    String jobId = "job-zero-limit";
+
+    // When - Record failures with zero limit
+    cache.recordFailure(jobId, "segment_1", new IOException("Error"));
+    cache.recordFailure(jobId, "segment_2", new IOException("Error"));
+
+    // Then - Count should be 2, but no details stored
+    ReloadJobStatus zeroLimitStatus = cache.getJobStatus(jobId);
+    assertThat(zeroLimitStatus.getFailureCount()).isEqualTo(2);
+    assertThat(zeroLimitStatus.getFailedSegmentDetails()).isEmpty();
   }
 }

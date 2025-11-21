@@ -19,6 +19,7 @@
 package org.apache.pinot.segment.local.utils;
 
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
 import java.util.concurrent.atomic.AtomicInteger;
 import org.apache.pinot.common.response.server.SegmentReloadFailureResponse;
@@ -26,18 +27,17 @@ import org.apache.pinot.common.response.server.SegmentReloadFailureResponse;
 
 /**
  * Tracks status of a reload job.
+ * Thread-safe for concurrent access.
  */
 public class ReloadJobStatus {
   private final String _jobId;
-  private final AtomicInteger _failureCount;
+  private final AtomicInteger _failureCount = new AtomicInteger(0);
   private final long _createdTimeMs;
-  private final List<SegmentReloadFailureResponse> _failedSegmentDetails;
+  private final List<SegmentReloadFailureResponse> _failedSegmentDetails = new ArrayList<>();
 
   public ReloadJobStatus(String jobId) {
     _jobId = jobId;
-    _failureCount = new AtomicInteger(0);
     _createdTimeMs = System.currentTimeMillis();
-    _failedSegmentDetails = new ArrayList<>();
   }
 
   public String getJobId() {
@@ -56,8 +56,12 @@ public class ReloadJobStatus {
     return _createdTimeMs;
   }
 
-  public List<SegmentReloadFailureResponse> getFailedSegmentDetails() {
-    return _failedSegmentDetails;
+  public synchronized List<SegmentReloadFailureResponse> getFailedSegmentDetails() {
+    return Collections.unmodifiableList(_failedSegmentDetails);
+  }
+
+  synchronized void addFailureDetail(SegmentReloadFailureResponse failureResponse) {
+    _failedSegmentDetails.add(failureResponse);
   }
 
   @Override

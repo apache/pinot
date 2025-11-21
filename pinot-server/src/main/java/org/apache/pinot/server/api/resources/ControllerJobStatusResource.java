@@ -23,6 +23,7 @@ import io.swagger.annotations.ApiOperation;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
+import java.util.Optional;
 import javax.inject.Inject;
 import javax.inject.Singleton;
 import javax.ws.rs.GET;
@@ -93,26 +94,15 @@ public class ControllerJobStatusResource {
         }
       }
 
-      // Build response with fluent setters
       ServerReloadStatusResponse response = new ServerReloadStatusResponse()
           .setTotalSegmentCount(totalSegmentCount)
           .setSuccessCount(successCount);
 
-      // Query cache for failure count and details if reloadJobId is provided
-      if (reloadJobId != null) {
-        ReloadJobStatus jobStatus = _serverReloadJobStatusCache.getJobStatus(reloadJobId);
-        if (jobStatus != null) {
-          response.setFailureCount((long) jobStatus.getFailureCount());
-
-          // Get defensive copy of failed segment details
-          synchronized (jobStatus) {
-            List<SegmentReloadFailureResponse> details = jobStatus.getFailedSegmentDetails();
-            if (!details.isEmpty()) {
-              response.setSampleSegmentReloadFailures(new ArrayList<>(details));
-            }
-          }
-        }
-      }
+      Optional.ofNullable(reloadJobId)
+          .map(_serverReloadJobStatusCache::getJobStatus)
+          .ifPresent(jobStatus -> response
+              .setFailureCount((long) jobStatus.getFailureCount())
+              .setSampleSegmentReloadFailures(jobStatus.getFailedSegmentDetails()));
 
       return JsonUtils.objectToString(response);
     } finally {
