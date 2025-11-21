@@ -19,12 +19,12 @@
 package org.apache.pinot.segment.local.utils;
 
 import com.dynatrace.hash4j.hashing.HashValue128;
+import com.dynatrace.hash4j.hashing.Hasher128;
 import com.google.common.hash.Hashing;
 import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
 import java.util.UUID;
 import net.jpountz.xxhash.XXHashFactory;
-import com.dynatrace.hash4j.hashing.Hasher128;
 import org.apache.pinot.spi.config.table.HashFunction;
 import org.apache.pinot.spi.data.readers.PrimaryKey;
 import org.apache.pinot.spi.utils.ByteArray;
