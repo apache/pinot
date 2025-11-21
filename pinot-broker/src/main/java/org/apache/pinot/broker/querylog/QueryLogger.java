@@ -153,9 +153,11 @@ public class QueryLogger {
     private final RequesterIdentity _identity;
     @Nullable
     private final ServerStats _serverStats;
+    public final String _workloadName;
 
     public QueryLogParams(RequestContext requestContext, String table, BrokerResponse response,
-        QueryEngine queryEngine, @Nullable RequesterIdentity identity, @Nullable ServerStats serverStats) {
+        QueryEngine queryEngine, @Nullable RequesterIdentity identity, @Nullable ServerStats serverStats,
+        String workloadName) {
       _requestContext = requestContext;
       // NOTE: Passing table name separately because table name within request context is always raw table name.
       _table = table;
@@ -163,6 +165,7 @@ public class QueryLogger {
       _queryEngine = queryEngine;
       _identity = identity;
       _serverStats = serverStats;
+      _workloadName = workloadName;
     }
 
     public enum QueryEngine {
@@ -345,6 +348,12 @@ public class QueryLogger {
       @Override
       void doFormat(StringBuilder builder, QueryLogger logger, QueryLogParams params) {
         builder.append(params._response.getRLSFiltersApplied());
+      }
+    },
+    WORKLOAD_NAME("workloadName") {
+      @Override
+      void doFormat(StringBuilder builder, QueryLogger logger, QueryLogParams params) {
+        builder.append(params._workloadName);
       }
     };
 

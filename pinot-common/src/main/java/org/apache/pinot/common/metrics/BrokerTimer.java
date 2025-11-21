@@ -61,7 +61,9 @@ public enum BrokerTimer implements AbstractMetrics.Timer {
   GRPC_QUERY_EXECUTION_MS(true),
   // Audit logging timers
   AUDIT_REQUEST_PROCESSING_TIME(true),
-  AUDIT_RESPONSE_PROCESSING_TIME(true);
+  AUDIT_RESPONSE_PROCESSING_TIME(true),
+  // The total time spent in processing the workload queries
+  WORKLOAD_TOTAL_QUERY_TIME_MS(false);
 
   private final String _timerName;
   private final boolean _global;
