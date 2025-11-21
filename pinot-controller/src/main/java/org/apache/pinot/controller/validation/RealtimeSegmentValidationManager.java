@@ -326,6 +326,11 @@ public class RealtimeSegmentValidationManager extends ControllerPeriodicTask<Rea
     }
   }
 
+  @VisibleForTesting
+  DisasterRecoveryMode getDisasterRecoveryMode() {
+    return _disasterRecoveryMode;
+  }
+
   public static final class Context {
     private boolean _runSegmentLevelValidation;
     private boolean _repairErrorSegmentsForPartialUpsertOrDedup;
