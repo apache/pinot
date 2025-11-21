@@ -422,6 +422,10 @@ public class MultiStageBrokerRequestHandler extends BaseBrokerRequestHandler {
         CommonConstants.Helix.ENABLE_CASE_INSENSITIVE_KEY,
         CommonConstants.Helix.DEFAULT_ENABLE_CASE_INSENSITIVE
     );
+    List<String> defaultDisabledRules = _config.getProperty(
+        CommonConstants.Broker.CONFIG_OF_BROKER_MSE_PLANNER_DISABLED_RULES,
+        CommonConstants.Broker.DEFAULT_DISABLED_RULES
+    );
     return QueryEnvironment.configBuilder()
         .requestId(requestId)
         .database(database)
@@ -442,6 +446,7 @@ public class MultiStageBrokerRequestHandler extends BaseBrokerRequestHandler {
         .defaultLiteModeLeafStageFanOutAdjustedLimit(defaultLiteModeFanoutAdjustedLimit)
         .defaultLiteModeEnableJoins(defaultLiteModeEnableJoins)
         .defaultHashFunction(defaultHashFunction)
+        .defaultDisabledMseRules(defaultDisabledRules)
         .build();
   }
 
