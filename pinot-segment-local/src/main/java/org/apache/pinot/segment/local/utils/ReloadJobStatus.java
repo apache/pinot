@@ -19,6 +19,7 @@
 package org.apache.pinot.segment.local.utils;
 
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
 import java.util.concurrent.atomic.AtomicInteger;
 import org.apache.pinot.common.response.server.SegmentReloadFailureResponse;
@@ -57,7 +58,7 @@ public class ReloadJobStatus {
   }
 
   public List<SegmentReloadFailureResponse> getFailedSegmentDetails() {
-    return _failedSegmentDetails;
+    return Collections.unmodifiableList(_failedSegmentDetails);
   }
 
   @Override
