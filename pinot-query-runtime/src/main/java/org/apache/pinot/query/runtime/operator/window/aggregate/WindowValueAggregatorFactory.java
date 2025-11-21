@@ -46,6 +46,8 @@ public class WindowValueAggregatorFactory {
       case "SUM0":
       case "$SUM0":
         return new SumWindowValueAggregator();
+      case "AVG":
+        return new AvgWindowValueAggregator();
       case "MIN":
         return new MinWindowValueAggregator(supportRemoval);
       case "MAX":

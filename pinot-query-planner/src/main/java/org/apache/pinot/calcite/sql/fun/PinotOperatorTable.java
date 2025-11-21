@@ -25,6 +25,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.function.Supplier;
 import javax.annotation.Nullable;
+import org.apache.calcite.sql.SqlAggFunction;
 import org.apache.calcite.sql.SqlBinaryOperator;
 import org.apache.calcite.sql.SqlFunction;
 import org.apache.calcite.sql.SqlFunctionCategory;
@@ -33,6 +34,7 @@ import org.apache.calcite.sql.SqlKind;
 import org.apache.calcite.sql.SqlOperator;
 import org.apache.calcite.sql.SqlOperatorTable;
 import org.apache.calcite.sql.SqlPostfixOperator;
+import org.apache.calcite.sql.SqlSplittableAggFunction;
 import org.apache.calcite.sql.SqlSyntax;
 import org.apache.calcite.sql.fun.SqlLeadLagAggFunction;
 import org.apache.calcite.sql.fun.SqlMonotonicBinaryOperator;
@@ -182,18 +184,15 @@ public class PinotOperatorTable implements SqlOperatorTable {
       SqlStdOperatorTable.NOT,
 
       // AGGREGATE OPERATORS
-      SqlStdOperatorTable.SUM,
       SqlStdOperatorTable.COUNT,
       SqlStdOperatorTable.MODE,
-      SqlStdOperatorTable.MIN,
-      SqlStdOperatorTable.MAX,
-      SqlStdOperatorTable.AVG,
       SqlStdOperatorTable.STDDEV_POP,
       SqlStdOperatorTable.COVAR_POP,
       SqlStdOperatorTable.COVAR_SAMP,
       SqlStdOperatorTable.STDDEV_SAMP,
       SqlStdOperatorTable.VAR_POP,
       SqlStdOperatorTable.VAR_SAMP,
+      PinotSumFunction.INSTANCE,
       SqlStdOperatorTable.SUM0,
 
       // WINDOW Rank Functions
@@ -376,8 +375,16 @@ public class PinotOperatorTable implements SqlOperatorTable {
     for (AggregationFunctionType functionType : AggregationFunctionType.values()) {
       if (functionType.getReturnTypeInference() != null) {
         String functionName = functionType.getName();
-        PinotSqlAggFunction function = new PinotSqlAggFunction(functionName, functionType.getReturnTypeInference(),
-            functionType.getOperandTypeChecker());
+        PinotSqlAggFunction function;
+
+        if (functionType.getSqlKind() != null) {
+          function = new PinotSqlAggFunction(functionName, functionType.getReturnTypeInference(),
+              functionType.getOperandTypeChecker(), functionType.getSqlKind());
+        } else {
+          function = new PinotSqlAggFunction(functionName, functionType.getReturnTypeInference(),
+              functionType.getOperandTypeChecker());
+        }
+
         Preconditions.checkState(operatorMap.put(FunctionRegistry.canonicalize(functionName), function) == null,
             "Aggregate function: %s is already registered", functionName);
       }
@@ -465,6 +472,28 @@ public class PinotOperatorTable implements SqlOperatorTable {
     @Override
     public boolean allowsFraming() {
       return false;
+    }
+  }
+
+  /// Pinot's custom SUM aggregation function that can aggregate on SV or MV numeric inputs.
+  private static final class PinotSumFunction extends PinotSqlAggFunction {
+    static final SqlOperator INSTANCE = new PinotSumFunction();
+
+    public PinotSumFunction() {
+      super("SUM", ReturnTypes.AGG_SUM, OperandTypes.or(OperandTypes.NUMERIC, OperandTypes.ARRAY), SqlKind.SUM);
+    }
+
+    @Override
+    public <T> @Nullable T unwrap(Class<T> clazz) {
+      if (clazz.isInstance(SqlSplittableAggFunction.SumSplitter.INSTANCE)) {
+        return clazz.cast(SqlSplittableAggFunction.SumSplitter.INSTANCE);
+      }
+      return super.unwrap(clazz);
+    }
+
+    @Override
+    public SqlAggFunction getRollup() {
+      return this;
     }
   }
 }

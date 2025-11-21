@@ -16,18 +16,47 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.pinot.segment.local.aggregator;
+package org.apache.pinot.query.runtime.operator.window.aggregate;
 
-import org.apache.pinot.segment.spi.AggregationFunctionType;
+import javax.annotation.Nullable;
+
 
 /**
- * Value aggregator for AVGMV aggregation function.
- * This aggregator handles multi-value columns by computing the average across all values in all arrays.
+ * Window value aggregator for AVG window function.
  */
-public class AvgMVValueAggregator extends AvgValueAggregator {
+public class AvgWindowValueAggregator implements WindowValueAggregator<Object> {
+  private double _sum = 0.0;
+  private int _count = 0;
 
   @Override
-  public AggregationFunctionType getAggregationType() {
-    return AggregationFunctionType.AVGMV;
+  public void addValue(@Nullable Object value) {
+    if (value != null) {
+      _count++;
+      _sum += ((Number) value).doubleValue();
+    }
+  }
+
+  @Override
+  public void removeValue(@Nullable Object value) {
+    if (value != null) {
+      _count--;
+      _sum -= ((Number) value).doubleValue();
+    }
+  }
+
+  @Override
+  @Nullable
+  public Object getCurrentAggregatedValue() {
+    if (_count == 0) {
+      return null;
+    } else {
+      return _sum / _count;
+    }
+  }
+
+  @Override
+  public void clear() {
+    _sum = 0.0;
+    _count = 0;
   }
 }
