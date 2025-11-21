@@ -35,6 +35,8 @@ public class HashUtilsTest {
         "0e617feb46603f53b163eb607d4697ab");
     assertEquals(BytesUtils.toHexString(HashUtils.hashXXHash("hello world".getBytes())),
         "45ab6734b21e6968");
+    assertEquals(BytesUtils.toHexString(HashUtils.hashXXH128("hello world".getBytes())),
+        "df8d09e93f874900a99b8775cc15b6c7");
   }
 
   @Test
