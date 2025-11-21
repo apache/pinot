@@ -380,7 +380,7 @@ public class PinotLLCRealtimeSegmentManagerTest {
       segmentManager.forceCommit(REALTIME_TABLE_NAME, null, consumingSegment, ForceCommitBatchConfig.of(1, 1, 5));
       fail("Expected IllegalStateException for partial upsert table with RF > 1");
     } catch (IllegalStateException e) {
-      assertTrue(e.getMessage().contains("Force commit is not allowed for partial upsert tables"),
+      assertTrue(e.getMessage().contains("Force commit is not allowed when replication > 1 for partial-upsert tables"),
           "Exception message should mention partial upsert and replication");
     }
   }
@@ -407,7 +407,9 @@ public class PinotLLCRealtimeSegmentManagerTest {
       segmentManager.forceCommit(REALTIME_TABLE_NAME, null, consumingSegment, ForceCommitBatchConfig.of(1, 1, 5));
       fail("Expected IllegalStateException for partial upsert table with RF > 1");
     } catch (IllegalStateException e) {
-      assertTrue(e.getMessage().contains("Force commit is not allowed for partial upsert tables"),
+      assertTrue(e.getMessage().contains(
+              "Force commit is not allowed when replication > 1 for partial-upsert tables, or for upsert tables when "
+                  + "dropOutOfOrder is enabled with consistency mode: NONE for the table: testTable_REALTIME"),
           "Exception message should mention partial upsert and replication");
     }
   }
