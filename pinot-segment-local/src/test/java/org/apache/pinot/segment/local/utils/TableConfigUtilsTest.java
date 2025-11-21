@@ -3089,7 +3089,7 @@ public class TableConfigUtilsTest {
         new TableConfig("table", TableType.OFFLINE.name(), new SegmentsValidationAndRetentionConfig(),
             new TenantConfig("DefaultTenant", "DefaultTenant", null), new IndexingConfig(), new TableCustomConfig(null),
             null, null, null, null, Map.of("OFFLINE", config), null, null, null, null, null, null, false, null, null,
-            null);
+            null, null);
 
     assertTrue(TableConfigUtils.isTableUsingInstancePoolAndReplicaGroup(tableConfig));
   }
@@ -3104,7 +3104,7 @@ public class TableConfigUtilsTest {
         new TableConfig("table", TableType.REALTIME.name(), new SegmentsValidationAndRetentionConfig(),
             new TenantConfig("DefaultTenant", "DefaultTenant", null), new IndexingConfig(), new TableCustomConfig(null),
             null, null, null, null, Map.of("CONSUMING", config), null, null, null, null, null, null, false, null, null,
-            null);
+            null, null);
 
     assertTrue(TableConfigUtils.isTableUsingInstancePoolAndReplicaGroup(tableConfig));
   }
@@ -3114,7 +3114,7 @@ public class TableConfigUtilsTest {
     TableConfig tableConfig =
         new TableConfig("table", TableType.OFFLINE.name(), new SegmentsValidationAndRetentionConfig(),
             new TenantConfig("DefaultTenant", "DefaultTenant", null), new IndexingConfig(), new TableCustomConfig(null),
-            null, null, null, null, null, null, null, null, null, null, null, false, null, null, null);
+            null, null, null, null, null, null, null, null, null, null, null, false, null, null, null, null);
 
     assertFalse(TableConfigUtils.isTableUsingInstancePoolAndReplicaGroup(tableConfig));
   }
@@ -3124,7 +3124,7 @@ public class TableConfigUtilsTest {
     TableConfig tableConfig =
         new TableConfig("table", TableType.REALTIME.name(), new SegmentsValidationAndRetentionConfig(),
             new TenantConfig("DefaultTenant", "DefaultTenant", null), new IndexingConfig(), new TableCustomConfig(null),
-            null, null, null, null, null, null, null, null, null, null, null, false, null, null, null);
+            null, null, null, null, null, null, null, null, null, null, null, false, null, null, null, null);
 
     assertFalse(TableConfigUtils.isTableUsingInstancePoolAndReplicaGroup(tableConfig));
   }
@@ -3139,7 +3139,7 @@ public class TableConfigUtilsTest {
         new TableConfig("table", TableType.OFFLINE.name(), new SegmentsValidationAndRetentionConfig(),
             new TenantConfig("DefaultTenant", "DefaultTenant", null), new IndexingConfig(), new TableCustomConfig(null),
             null, null, null, null, Map.of("OFFLINE", config), null, null, null, null, null, null, false, null, null,
-            null);
+            null, null);
 
     assertFalse(TableConfigUtils.isTableUsingInstancePoolAndReplicaGroup(tableConfig));
   }
@@ -3154,7 +3154,7 @@ public class TableConfigUtilsTest {
         new TableConfig("table", TableType.REALTIME.name(), new SegmentsValidationAndRetentionConfig(),
             new TenantConfig("DefaultTenant", "DefaultTenant", null), new IndexingConfig(), new TableCustomConfig(null),
             null, null, null, null, Map.of("CONSUMING", config), null, null, null, null, null, null, false, null, null,
-            null);
+            null, null);
 
     assertFalse(TableConfigUtils.isTableUsingInstancePoolAndReplicaGroup(tableConfig));
   }
@@ -3169,7 +3169,7 @@ public class TableConfigUtilsTest {
         new TableConfig("table", TableType.OFFLINE.name(), new SegmentsValidationAndRetentionConfig(),
             new TenantConfig("DefaultTenant", "DefaultTenant", null), new IndexingConfig(), new TableCustomConfig(null),
             null, null, null, null, Map.of("OFFLINE", config), null, null, null, null, null, null, false, null, null,
-            null);
+            null, null);
 
     assertFalse(TableConfigUtils.isTableUsingInstancePoolAndReplicaGroup(tableConfig));
   }
@@ -3184,7 +3184,7 @@ public class TableConfigUtilsTest {
         new TableConfig("table", TableType.REALTIME.name(), new SegmentsValidationAndRetentionConfig(),
             new TenantConfig("DefaultTenant", "DefaultTenant", null), new IndexingConfig(), new TableCustomConfig(null),
             null, null, null, null, Map.of("CONSUMING", config), null, null, null, null, null, null, false, null, null,
-            null);
+            null, null);
 
     assertFalse(TableConfigUtils.isTableUsingInstancePoolAndReplicaGroup(tableConfig));
   }

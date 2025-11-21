@@ -152,6 +152,7 @@ import org.apache.pinot.controller.helix.core.minion.PinotTaskManager;
 import org.apache.pinot.controller.helix.core.realtime.PinotLLCRealtimeSegmentManager;
 import org.apache.pinot.controller.helix.core.util.ControllerZkHelixUtils;
 import org.apache.pinot.controller.helix.core.util.MessagingServiceUtils;
+import org.apache.pinot.controller.util.PageCacheWarmupControllerExecutor;
 import org.apache.pinot.controller.workload.QueryWorkloadManager;
 import org.apache.pinot.segment.spi.SegmentMetadata;
 import org.apache.pinot.spi.config.DatabaseConfig;
@@ -232,10 +233,11 @@ public class PinotHelixResourceManager {
   private TableCache _tableCache;
   private final LineageManager _lineageManager;
   private final QueryWorkloadManager _queryWorkloadManager;
+  private final PageCacheWarmupControllerExecutor _pageCacheWarmupControllerExecutor;
 
   public PinotHelixResourceManager(String helixClusterName, @Nullable String dataDir,
       boolean isSingleTenantCluster, boolean enableBatchMessageMode, int deletedSegmentsRetentionInDays,
-      boolean enableTieredSegmentAssignment, LineageManager lineageManager) {
+      boolean enableTieredSegmentAssignment, LineageManager lineageManager, String pageCacheWarmupQueriesDataDir) {
     _helixClusterName = helixClusterName;
     _dataDir = dataDir;
     _isSingleTenantCluster = isSingleTenantCluster;
@@ -258,13 +260,15 @@ public class PinotHelixResourceManager {
     }
     _lineageManager = lineageManager;
     _queryWorkloadManager = new QueryWorkloadManager(this);
+    _pageCacheWarmupControllerExecutor = new PageCacheWarmupControllerExecutor(this,
+        pageCacheWarmupQueriesDataDir);
   }
 
   public PinotHelixResourceManager(ControllerConf controllerConf) {
     this(controllerConf.getHelixClusterName(), controllerConf.getDataDir(),
         controllerConf.tenantIsolationEnabled(), controllerConf.getEnableBatchMessageMode(),
         controllerConf.getDeletedSegmentsRetentionInDays(), controllerConf.tieredSegmentAssignmentEnabled(),
-        LineageManagerFactory.create(controllerConf));
+        LineageManagerFactory.create(controllerConf), controllerConf.getPageCacheWarmupQueriesDataDir());
   }
 
   /**
@@ -4247,7 +4251,7 @@ public class PinotHelixResourceManager {
    */
   protected void preSegmentReplaceUpdateRouting(String tableNameWithType, List<String> segmentsTo,
       List<String> segmentsFrom) {
-    // No-op by default
+    _pageCacheWarmupControllerExecutor.triggerPageCacheWarmup(tableNameWithType, segmentsTo);
   }
 
   /**

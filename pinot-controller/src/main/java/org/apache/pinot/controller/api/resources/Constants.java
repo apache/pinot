@@ -54,6 +54,7 @@ public class Constants {
   public static final String PERIODIC_TASK_TAG = "PeriodicTask";
   public static final String UPSERT_RESOURCE_TAG = "Upsert";
   public static final String QUERY_WORKLOAD_TAG = "QueryWorkload";
+  public static final String PAGE_CACHE_WARMUP_TAG = "PageCacheWarmup";
   public static final String RESET_OFFSET_FROM = "ResetOffsetFrom";
   public static final String RESET_OFFSET_TO = "ResetOffsetTo";
   public static final String RESET_OFFSET_TOPIC_NAME = "ResetOffsetTopicName";

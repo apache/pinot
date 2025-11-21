@@ -58,6 +58,7 @@ public class TableConfig extends BaseJsonConfig {
   public static final String TIER_CONFIGS_LIST_KEY = "tierConfigs";
   public static final String TUNER_CONFIG_LIST_KEY = "tunerConfigs";
   public static final String TIER_OVERWRITES_KEY = "tierOverwrites";
+  public static final String PAGE_CACHE_WARMUP_CONFIG_KEY = "pageCacheWarmupConfig";
 
   // Double underscore is reserved for real-time segment name delimiter
   public static final String TABLE_NAME_FORBIDDEN_SUBSTRING = "__";
@@ -113,6 +114,9 @@ public class TableConfig extends BaseJsonConfig {
   @JsonPropertyDescription(value = "Configs for Table config tuner")
   private List<TunerConfig> _tunerConfigList;
 
+  @JsonPropertyDescription(value = "Page cache warmup configuration")
+  private PageCacheWarmupConfig _pageCacheWarmupConfig;
+
   @JsonCreator
   public TableConfig(@JsonProperty(value = TABLE_NAME_KEY, required = true) String tableName,
       @JsonProperty(value = TABLE_TYPE_KEY, required = true) String tableType,
@@ -138,7 +142,8 @@ public class TableConfig extends BaseJsonConfig {
       @JsonProperty(INSTANCE_PARTITIONS_MAP_CONFIG_KEY) @Nullable
       Map<InstancePartitionsType, String> instancePartitionsMap,
       @JsonProperty(SEGMENT_ASSIGNMENT_CONFIG_MAP_KEY) @Nullable
-      Map<String, SegmentAssignmentConfig> segmentAssignmentConfigMap) {
+      Map<String, SegmentAssignmentConfig> segmentAssignmentConfigMap,
+      @JsonProperty(PAGE_CACHE_WARMUP_CONFIG_KEY) @Nullable PageCacheWarmupConfig pageCacheWarmupConfig) {
     Preconditions.checkArgument(tableName != null, "'tableName' must be configured");
     Preconditions.checkArgument(!tableName.contains(TABLE_NAME_FORBIDDEN_SUBSTRING),
         "'tableName' cannot contain double underscore ('__')");
@@ -169,6 +174,7 @@ public class TableConfig extends BaseJsonConfig {
     _tunerConfigList = tunerConfigList;
     _instancePartitionsMap = instancePartitionsMap;
     _segmentAssignmentConfigMap = segmentAssignmentConfigMap;
+    _pageCacheWarmupConfig = pageCacheWarmupConfig;
   }
 
   public TableConfig(TableConfig tableConfig) {
@@ -193,6 +199,7 @@ public class TableConfig extends BaseJsonConfig {
     _tunerConfigList = tableConfig.getTunerConfigsList();
     _instancePartitionsMap = tableConfig.getInstancePartitionsMap();
     _segmentAssignmentConfigMap = tableConfig.getSegmentAssignmentConfigMap();
+    _pageCacheWarmupConfig = tableConfig.getPageCacheWarmupConfig();
   }
 
   @JsonProperty(TABLE_NAME_KEY)
@@ -415,5 +422,15 @@ public class TableConfig extends BaseJsonConfig {
       }
     }
     return Integer.parseInt(_validationConfig.getReplication());
+  }
+
+  @JsonProperty(PAGE_CACHE_WARMUP_CONFIG_KEY)
+  @Nullable
+  public PageCacheWarmupConfig getPageCacheWarmupConfig() {
+    return _pageCacheWarmupConfig;
+  }
+
+  public void setPageCacheWarmupConfig(PageCacheWarmupConfig pageCacheWarmupConfig) {
+    _pageCacheWarmupConfig = pageCacheWarmupConfig;
   }
 }
