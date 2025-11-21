@@ -26,6 +26,7 @@ import java.util.stream.Stream;
 import javax.annotation.Nullable;
 import org.apache.calcite.rel.type.RelDataType;
 import org.apache.calcite.rel.type.RelDataTypeFactory;
+import org.apache.calcite.sql.SqlKind;
 import org.apache.calcite.sql.SqlOperatorBinding;
 import org.apache.calcite.sql.type.OperandTypes;
 import org.apache.calcite.sql.type.ReturnTypes;
@@ -51,8 +52,10 @@ public enum AggregationFunctionType {
   // Aggregation functions for single-valued columns
   COUNT("count"),
   // TODO: min/max only supports NUMERIC in Pinot, where Calcite supports COMPARABLE_ORDERED
-  MIN("min", SqlTypeName.DOUBLE, SqlTypeName.DOUBLE),
-  MAX("max", SqlTypeName.DOUBLE, SqlTypeName.DOUBLE),
+  MIN("min", new PinotMinMaxReturnTypeInference(), OperandTypes.or(OperandTypes.COMPARABLE_ORDERED, OperandTypes.ARRAY),
+      ReturnTypes.explicit(SqlTypeName.DOUBLE), ReturnTypes.explicit(SqlTypeName.DOUBLE), SqlKind.MIN),
+  MAX("max", new PinotMinMaxReturnTypeInference(), OperandTypes.or(OperandTypes.COMPARABLE_ORDERED, OperandTypes.ARRAY),
+      ReturnTypes.explicit(SqlTypeName.DOUBLE), ReturnTypes.explicit(SqlTypeName.DOUBLE), SqlKind.MAX),
   MINSTRING("minString", ReturnTypes.ARG0_NULLABLE_IF_EMPTY, OperandTypes.CHARACTER),
   MAXSTRING("maxString", ReturnTypes.ARG0_NULLABLE_IF_EMPTY, OperandTypes.CHARACTER),
   MINLONG("minLong", new BigintNullableIfEmpty(), OperandTypes.or(OperandTypes.INTEGER, OperandTypes.ARRAY_OF_INTEGER)),
@@ -62,7 +65,8 @@ public enum AggregationFunctionType {
   SUMINT("sumInt", ReturnTypes.AGG_SUM, OperandTypes.INTEGER),
   SUMLONG("sumLong", ReturnTypes.AGG_SUM, OperandTypes.or(OperandTypes.INTEGER, OperandTypes.ARRAY_OF_INTEGER)),
   SUMPRECISION("sumPrecision", ReturnTypes.explicit(SqlTypeName.DECIMAL), OperandTypes.ANY, SqlTypeName.OTHER),
-  AVG("avg", SqlTypeName.OTHER, SqlTypeName.DOUBLE),
+  AVG("avg", ReturnTypes.AVG_AGG_FUNCTION, OperandTypes.or(OperandTypes.NUMERIC, OperandTypes.ARRAY),
+      ReturnTypes.explicit(SqlTypeName.OTHER), ReturnTypes.explicit(SqlTypeName.DOUBLE), SqlKind.AVG),
   MODE("mode", SqlTypeName.OTHER, SqlTypeName.DOUBLE),
   FIRSTWITHTIME("firstWithTime", ReturnTypes.ARG0,
       OperandTypes.family(SqlTypeFamily.ANY, SqlTypeFamily.ANY, SqlTypeFamily.CHARACTER), SqlTypeName.OTHER),
@@ -79,8 +83,10 @@ public enum AggregationFunctionType {
   DISTINCTCOUNTOFFHEAP("distinctCountOffHeap", ReturnTypes.BIGINT,
       OperandTypes.family(List.of(SqlTypeFamily.ANY, SqlTypeFamily.CHARACTER), i -> i == 1), SqlTypeName.OTHER,
       SqlTypeName.INTEGER),
-  DISTINCTSUM("distinctSum", ReturnTypes.AGG_SUM, OperandTypes.NUMERIC, SqlTypeName.OTHER, SqlTypeName.DOUBLE),
-  DISTINCTAVG("distinctAvg", ReturnTypes.DOUBLE, OperandTypes.NUMERIC, SqlTypeName.OTHER),
+  DISTINCTSUM("distinctSum", ReturnTypes.AGG_SUM, OperandTypes.or(OperandTypes.NUMERIC, OperandTypes.ARRAY),
+      SqlTypeName.OTHER, SqlTypeName.DOUBLE),
+  DISTINCTAVG("distinctAvg", ReturnTypes.DOUBLE, OperandTypes.or(OperandTypes.NUMERIC, OperandTypes.ARRAY),
+      SqlTypeName.OTHER),
   DISTINCTCOUNTBITMAP("distinctCountBitmap", ReturnTypes.BIGINT, OperandTypes.ANY, SqlTypeName.OTHER,
       SqlTypeName.INTEGER),
   SEGMENTPARTITIONEDDISTINCTCOUNT("segmentPartitionedDistinctCount", ReturnTypes.BIGINT, OperandTypes.ANY),
@@ -253,6 +259,7 @@ public enum AggregationFunctionType {
   private final SqlReturnTypeInference _intermediateReturnTypeInference;
   // Override final result type if it is not the same as standard return type of the function.
   private final SqlReturnTypeInference _finalReturnTypeInference;
+  private final SqlKind _sqlKind;
 
   AggregationFunctionType(String name) {
     this(name, null, null, (SqlReturnTypeInference) null, null);
@@ -286,11 +293,21 @@ public enum AggregationFunctionType {
       @Nullable SqlOperandTypeChecker operandTypeChecker,
       @Nullable SqlReturnTypeInference intermediateReturnTypeInference,
       @Nullable SqlReturnTypeInference finalReturnTypeInference) {
+    this(name, returnTypeInference, operandTypeChecker, intermediateReturnTypeInference, finalReturnTypeInference,
+        null);
+  }
+
+  AggregationFunctionType(String name, @Nullable SqlReturnTypeInference returnTypeInference,
+      @Nullable SqlOperandTypeChecker operandTypeChecker,
+      @Nullable SqlReturnTypeInference intermediateReturnTypeInference,
+      @Nullable SqlReturnTypeInference finalReturnTypeInference,
+      @Nullable SqlKind sqlKind) {
     _name = name;
     _returnTypeInference = returnTypeInference;
     _operandTypeChecker = operandTypeChecker;
     _intermediateReturnTypeInference = intermediateReturnTypeInference;
     _finalReturnTypeInference = finalReturnTypeInference;
+    _sqlKind = sqlKind;
   }
 
   public String getName() {
@@ -315,6 +332,11 @@ public enum AggregationFunctionType {
   @Nullable
   public SqlReturnTypeInference getFinalReturnTypeInference() {
     return _finalReturnTypeInference;
+  }
+
+  @Nullable
+  public SqlKind getSqlKind() {
+    return _sqlKind;
   }
 
   public static boolean isAggregationFunction(String functionName) {
@@ -418,9 +440,9 @@ public enum AggregationFunctionType {
     }
   }
 
-  // Used for aggregation functions that always return BIGINT. The "IfEmpty" logic ensures that the return type is
-  // nullable for pure aggregation queries (no group-by) and filtered aggregation queries. Return values can be null
-  // if there are no matching rows (even if the operand type is not nullable).
+  /// Used for aggregation functions that always return BIGINT. The "IfEmpty" logic ensures that the return type is
+  /// nullable for pure aggregation queries (no group-by) and filtered aggregation queries. Return values can be null
+  /// if there are no matching rows (even if the operand type is not nullable).
   private static class BigintNullableIfEmpty implements SqlReturnTypeInference {
     @Override
     public RelDataType inferReturnType(SqlOperatorBinding opBinding) {
@@ -433,6 +455,25 @@ public enum AggregationFunctionType {
         } else {
           return typeFactory.createSqlType(SqlTypeName.BIGINT);
         }
+      }
+    }
+  }
+
+  /// Pinot's MIN / MAX aggregation functions can be used on SV or MV (represented as Calcite array) types.
+  private static class PinotMinMaxReturnTypeInference implements SqlReturnTypeInference {
+    @Override
+    public RelDataType inferReturnType(SqlOperatorBinding opBinding) {
+      RelDataType operandType;
+      if (opBinding.getOperandType(0).getComponentType() != null) {
+        operandType = opBinding.getOperandType(0).getComponentType();
+      } else {
+        operandType = opBinding.getOperandType(0);
+      }
+
+      if (opBinding.getGroupCount() == 0 || opBinding.hasFilter()) {
+        return opBinding.getTypeFactory().createTypeWithNullability(operandType, true);
+      } else {
+        return operandType;
       }
     }
   }
