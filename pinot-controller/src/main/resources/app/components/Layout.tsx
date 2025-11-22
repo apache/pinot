@@ -31,7 +31,6 @@ import AccountCircleOutlinedIcon from '@material-ui/icons/AccountCircleOutlined'
 let navigationItems = [
   { id: 1, name: 'Cluster Manager', link: '/', icon: <ClusterManagerIcon /> },
   { id: 2, name: 'Query Console', link: '/query', icon: <QueryConsoleIcon /> },
-  { id: 3, name: 'Zookeeper Browser', link: '/zookeeper', icon: <ZookeeperIcon /> },
   { id: 4, name: 'Swagger REST API', link: 'help', target: '_blank', icon: <SwaggerIcon /> }
 ];
 
@@ -41,6 +40,7 @@ const Layout = (props) => {
     if(navigationItems.length <5){
       navigationItems = [
         ...navigationItems,
+        {id: 3, name: 'Zookeeper Browser', link: '/zookeeper', icon: <ZookeeperIcon /> },
         {id: 5, name: "User Console", link: '/user', icon: <AccountCircleOutlinedIcon style={{ width: 24, height: 24, verticalAlign: 'sub' }}/>}
       ]
     }
