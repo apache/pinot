@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.spi.utils.retry;
 
+import java.io.FileNotFoundException;
 import java.util.concurrent.Callable;
 
 
@@ -32,9 +33,10 @@ public interface RetryPolicy {
    *
    * @param operation The operation to attempt, which returns true on success and false on failure.
    * @throws AttemptsExceededException
+   * @throws FileNotFoundException
    * @throws RetriableOperationException
    * @return the number of attempts used for the operation. 0 means the first try was successful.
    */
   int attempt(Callable<Boolean> operation)
-      throws AttemptsExceededException, RetriableOperationException;
+      throws AttemptsExceededException, FileNotFoundException, RetriableOperationException;
 }
