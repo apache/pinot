@@ -1782,7 +1782,7 @@ public class PinotHelixResourceManager {
       Preconditions.checkState(tableConfig != null, "Failed to read table config for table: %s", tableNameWithType);
 
       // Assign instances
-      assignInstances(tableConfig, true);
+      assignInstances(tableConfig, idealState, true);
       LOGGER.info("Adding table {}: Assigned instances", tableNameWithType);
 
       if (tableType == TableType.OFFLINE) {
@@ -1995,7 +1995,11 @@ public class PinotHelixResourceManager {
     _pinotLLCRealtimeSegmentManager = pinotLLCRealtimeSegmentManager;
   }
 
-  private void assignInstances(TableConfig tableConfig, boolean override) {
+  /**
+   * Returns true if instances were (re)assigned and the ideal state updated with the new instance replica group
+   * information, false otherwise.
+   */
+  private boolean assignInstances(TableConfig tableConfig, IdealState idealState, boolean override) {
     String tableNameWithType = tableConfig.getTableName();
     String rawTableName = TableNameBuilder.extractRawTableName(tableNameWithType);
 
@@ -2009,6 +2013,7 @@ public class PinotHelixResourceManager {
       }
     }
 
+    List<InstancePartitions> assignedInstancePartitions = new ArrayList<>();
     InstanceAssignmentDriver instanceAssignmentDriver = new InstanceAssignmentDriver(tableConfig);
     List<InstanceConfig> instanceConfigs = getAllHelixInstanceConfigs();
     if (!instancePartitionsTypesToAssign.isEmpty()) {
@@ -2039,6 +2044,7 @@ public class PinotHelixResourceManager {
                 referenceInstancePartitionsName);
           }
         }
+        assignedInstancePartitions.add(instancePartitions);
         InstancePartitionsUtils.persistInstancePartitions(_propertyStore, instancePartitions);
       }
     }
@@ -2057,11 +2063,18 @@ public class PinotHelixResourceManager {
                 instanceAssignmentDriver.assignInstances(tierConfig.getName(), instanceConfigs, null,
                     tableConfig.getInstanceAssignmentConfigMap().get(tierConfig.getName()));
             LOGGER.info("Persisting instance partitions: {}", instancePartitions);
+            assignedInstancePartitions.add(instancePartitions);
             InstancePartitionsUtils.persistInstancePartitions(_propertyStore, instancePartitions);
           }
         }
       }
     }
+
+    if (!assignedInstancePartitions.isEmpty()) {
+      InstancePartitionsUtils.combineInstancePartitionsInIdealState(idealState, assignedInstancePartitions);
+      return true;
+    }
+    return false;
   }
 
   public void updateUserConfig(UserConfig userConfig)
@@ -2172,7 +2185,13 @@ public class PinotHelixResourceManager {
     }
 
     // Assign instances
-    assignInstances(tableConfig, false);
+    if (assignInstances(tableConfig, idealState, false)) {
+      HelixHelper.updateIdealState(_helixZkManager, tableNameWithType, is -> {
+        assert is != null;
+        is.getRecord().setListFields(idealState.getRecord().getListFields());
+        return is;
+      }, RetryPolicies.exponentialBackoffRetryPolicy(5, 1000L, 1.2f));
+    }
 
     // Send update query quota message if quota is specified
     sendTableConfigRefreshMessage(tableNameWithType);
@@ -4735,6 +4754,21 @@ public class PinotHelixResourceManager {
 
   public QueryWorkloadManager getQueryWorkloadManager() {
     return _queryWorkloadManager;
+  }
+
+  public void combineInstancePartitionsInIdealState(String tableNameWithType,
+      List<InstancePartitions> instancePartitions) {
+    IdealState currentIdealState = getTableIdealState(tableNameWithType);
+    if (currentIdealState == null) {
+      throw new RuntimeException("Failed to retrieve IdealState for table: " + tableNameWithType);
+    }
+
+    InstancePartitionsUtils.combineInstancePartitionsInIdealState(currentIdealState, instancePartitions);
+    HelixHelper.updateIdealState(_helixZkManager, tableNameWithType, idealState -> {
+      assert idealState != null;
+      idealState.getRecord().setListFields(currentIdealState.getRecord().getListFields());
+      return idealState;
+    }, DEFAULT_RETRY_POLICY);
   }
 
   /*
