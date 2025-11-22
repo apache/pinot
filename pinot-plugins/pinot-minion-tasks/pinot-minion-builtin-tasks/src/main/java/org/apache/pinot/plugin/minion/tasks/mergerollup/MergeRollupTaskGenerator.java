@@ -722,7 +722,20 @@ public class MergeRollupTaskGenerator extends BaseTaskGenerator {
         .getSegmentGroups(tableConfig, _clusterInfoAccessor, selectedSegments);
     List<PinotTaskConfig> pinotTaskConfigs = new ArrayList<>();
 
+    // Check if size-based grouping is configured
+    long maxSegmentSizeBytesPerTask = getMaxSegmentSizeBytesPerTask(mergeConfigs);
+    boolean useSizeBasedGrouping = maxSegmentSizeBytesPerTask > 0;
+
+    if (useSizeBasedGrouping) {
+      LOGGER.info("Using size-based grouping for table {}, mergeLevel {}: maxSegmentSizeBytesPerTask={} bytes ({} MB)",
+          tableNameWithType, mergeLevel, maxSegmentSizeBytesPerTask, maxSegmentSizeBytesPerTask / (1024 * 1024));
+    } else {
+      LOGGER.info("Using row-based grouping for table {}, mergeLevel {}: maxNumRecordsPerTask={}",
+          tableNameWithType, mergeLevel, maxNumRecordsPerTask);
+    }
+
     for (List<SegmentZKMetadata> segments : segmentGroups) {
+      long currentTaskSizeBytes = 0;
       int numRecordsPerTask = 0;
       List<List<String>> segmentNamesList = new ArrayList<>();
       List<List<String>> downloadURLsList = new ArrayList<>();
@@ -733,10 +746,37 @@ public class MergeRollupTaskGenerator extends BaseTaskGenerator {
         SegmentZKMetadata targetSegment = segments.get(i);
         segmentNames.add(targetSegment.getSegmentName());
         downloadURLs.add(targetSegment.getDownloadUrl());
-        numRecordsPerTask += targetSegment.getTotalDocs();
-        if (numRecordsPerTask >= maxNumRecordsPerTask || i == segments.size() - 1) {
+
+        boolean shouldCreateTask = false;
+
+        if (useSizeBasedGrouping) {
+          // Size-based grouping: accumulate segment sizes
+          long segmentSizeBytes = targetSegment.getSizeInBytes();
+          currentTaskSizeBytes += segmentSizeBytes;
+          shouldCreateTask = (currentTaskSizeBytes >= maxSegmentSizeBytesPerTask) || (i == segments.size() - 1);
+
+          if (shouldCreateTask) {
+            LOGGER.info("Creating task for table {}, mergeLevel {}: {} segments, {} bytes ({} MB), {} records",
+                tableNameWithType, mergeLevel, segmentNames.size(), currentTaskSizeBytes,
+                currentTaskSizeBytes / (1024 * 1024),
+                segments.subList(i - segmentNames.size() + 1, i + 1).stream()
+                    .mapToLong(SegmentZKMetadata::getTotalDocs).sum());
+          }
+        } else {
+          // Row-based grouping: accumulate record counts
+          numRecordsPerTask += targetSegment.getTotalDocs();
+          shouldCreateTask = (numRecordsPerTask >= maxNumRecordsPerTask) || (i == segments.size() - 1);
+
+          if (shouldCreateTask) {
+            LOGGER.info("Creating task for table {}, mergeLevel {}: {} segments, {} records",
+                tableNameWithType, mergeLevel, segmentNames.size(), numRecordsPerTask);
+          }
+        }
+
+        if (shouldCreateTask) {
           segmentNamesList.add(segmentNames);
           downloadURLsList.add(downloadURLs);
+          currentTaskSizeBytes = 0;
           numRecordsPerTask = 0;
           segmentNames = new ArrayList<>();
           downloadURLs = new ArrayList<>();
@@ -788,6 +828,25 @@ public class MergeRollupTaskGenerator extends BaseTaskGenerator {
     }
 
     return pinotTaskConfigs;
+  }
+
+  /**
+   * Get maxSegmentSizeBytesPerTask from merge configs.
+   * Returns 0 if not configured (indicating row-based grouping should be used).
+   */
+  private long getMaxSegmentSizeBytesPerTask(Map<String, String> mergeConfigs) {
+    String value = mergeConfigs.get(MergeTask.MAX_SEGMENT_SIZE_BYTES_PER_TASK_KEY);
+    if (value != null) {
+      try {
+        long bytes = Long.parseLong(value);
+        if (bytes > 0) {
+          return bytes;
+        }
+      } catch (NumberFormatException e) {
+        LOGGER.warn("Invalid maxSegmentSizeBytesPerTask value: {}", value, e);
+      }
+    }
+    return 0;  // Not configured, use row-based grouping
   }
 
   private long getMergeRollupTaskDelayInNumTimeBuckets(long watermarkMs, @Nullable Long maxEndTimeMsOfCurrentLevel,
