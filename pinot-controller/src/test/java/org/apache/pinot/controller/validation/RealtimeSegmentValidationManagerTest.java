@@ -18,11 +18,17 @@
  */
 package org.apache.pinot.controller.validation;
 
+import java.util.HashMap;
+import java.util.HashSet;
+import java.util.List;
+import java.util.Map;
+import java.util.Set;
 import org.apache.pinot.common.metrics.ControllerMetrics;
 import org.apache.pinot.controller.ControllerConf;
 import org.apache.pinot.controller.api.resources.PauseStatusDetails;
 import org.apache.pinot.controller.helix.core.PinotHelixResourceManager;
 import org.apache.pinot.controller.helix.core.realtime.PinotLLCRealtimeSegmentManager;
+import org.apache.pinot.spi.config.table.DisasterRecoveryMode;
 import org.apache.pinot.spi.config.table.PauseState;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.mockito.Mock;
@@ -33,7 +39,8 @@ import org.testng.annotations.BeforeMethod;
 import org.testng.annotations.DataProvider;
 import org.testng.annotations.Test;
 
-import static org.mockito.Mockito.*;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.when;
 
 
 public class RealtimeSegmentValidationManagerTest {
@@ -123,5 +130,16 @@ public class RealtimeSegmentValidationManagerTest {
     boolean result = _realtimeSegmentValidationManager.shouldEnsureConsuming(tableName);
 
     Assert.assertEquals(result, expectedResult);
+  }
+
+  @Test
+  public void testConfigChange() {
+    Assert.assertNull(_realtimeSegmentValidationManager.getDisasterRecoveryMode());
+    Map<String, String> newConfig = new HashMap<>();
+    newConfig.put(ControllerConf.ControllerPeriodicTasksConf.DISASTER_RECOVERY_MODE_CONFIG_KEY, "ALWAYS");
+    Set<String> changedConfigSet =
+        new HashSet<>(List.of(ControllerConf.ControllerPeriodicTasksConf.DISASTER_RECOVERY_MODE_CONFIG_KEY));
+    _realtimeSegmentValidationManager.onChange(changedConfigSet, newConfig);
+    Assert.assertEquals(_realtimeSegmentValidationManager.getDisasterRecoveryMode(), DisasterRecoveryMode.ALWAYS);
   }
 }
