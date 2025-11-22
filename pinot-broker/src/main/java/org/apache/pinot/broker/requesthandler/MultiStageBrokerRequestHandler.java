@@ -70,6 +70,7 @@ import org.apache.pinot.common.utils.NamedThreadFactory;
 import org.apache.pinot.common.utils.Timer;
 import org.apache.pinot.common.utils.config.QueryOptionsUtils;
 import org.apache.pinot.common.utils.tls.TlsUtils;
+import org.apache.pinot.core.routing.FederationProvider;
 import org.apache.pinot.core.routing.RoutingManager;
 import org.apache.pinot.core.transport.ServerInstance;
 import org.apache.pinot.query.ImmutableQueryEnvironment;
@@ -125,22 +126,25 @@ public class MultiStageBrokerRequestHandler extends BaseBrokerRequestHandler {
 
   private static final int NUM_UNAVAILABLE_SEGMENTS_TO_LOG = 10;
 
-  private final WorkerManager _workerManager;
+  private final String _hostname;
+  private final int _port;
   private final QueryDispatcher _queryDispatcher;
   private final boolean _explainAskingServerDefault;
   private final MultiStageQueryThrottler _queryThrottler;
   private final ExecutorService _queryCompileExecutor;
   protected final long _extraPassiveTimeoutMs;
 
+  private WorkerManager _workerManager;
+
   public MultiStageBrokerRequestHandler(PinotConfiguration config, String brokerId,
       BrokerRequestIdGenerator requestIdGenerator, RoutingManager routingManager,
       AccessControlFactory accessControlFactory, QueryQuotaManager queryQuotaManager, TableCache tableCache,
-      MultiStageQueryThrottler queryThrottler, FailureDetector failureDetector, ThreadAccountant threadAccountant) {
+      MultiStageQueryThrottler queryThrottler, FailureDetector failureDetector, ThreadAccountant threadAccountant,
+      FederationProvider federationProvider) {
     super(config, brokerId, requestIdGenerator, routingManager, accessControlFactory, queryQuotaManager, tableCache,
-        threadAccountant);
-    String hostname = config.getProperty(CommonConstants.MultiStageQueryRunner.KEY_OF_QUERY_RUNNER_HOSTNAME);
-    int port = Integer.parseInt(config.getProperty(CommonConstants.MultiStageQueryRunner.KEY_OF_QUERY_RUNNER_PORT));
-    _workerManager = new WorkerManager(_brokerId, hostname, port, _routingManager);
+        threadAccountant, federationProvider);
+    _hostname = config.getProperty(CommonConstants.MultiStageQueryRunner.KEY_OF_QUERY_RUNNER_HOSTNAME);
+    _port = Integer.parseInt(config.getProperty(CommonConstants.MultiStageQueryRunner.KEY_OF_QUERY_RUNNER_PORT));
     TlsConfig tlsConfig = config.getProperty(CommonConstants.Helix.CONFIG_OF_MULTI_STAGE_ENGINE_TLS_ENABLED,
         CommonConstants.Helix.DEFAULT_MULTI_STAGE_ENGINE_TLS_ENABLED) ? TlsUtils.extractTlsConfig(config,
         CommonConstants.Broker.BROKER_TLS_PREFIX) : null;
@@ -155,10 +159,10 @@ public class MultiStageBrokerRequestHandler extends BaseBrokerRequestHandler {
         CommonConstants.MultiStageQueryRunner.DEFAULT_OF_CANCEL_TIMEOUT_MS);
     Duration cancelTimeout = Duration.ofMillis(cancelMillis);
     _queryDispatcher =
-        new QueryDispatcher(new MailboxService(hostname, port, InstanceType.BROKER, config, tlsConfig), failureDetector,
-            tlsConfig, isQueryCancellationEnabled(), cancelTimeout);
+        new QueryDispatcher(new MailboxService(_hostname, _port, InstanceType.BROKER, config, tlsConfig),
+          failureDetector, tlsConfig, isQueryCancellationEnabled(), cancelTimeout);
     LOGGER.info("Initialized MultiStageBrokerRequestHandler on host: {}, port: {} with broker id: {}, timeout: {}ms, "
-            + "query log max length: {}, query log max rate: {}, query cancellation enabled: {}", hostname, port,
+            + "query log max length: {}, query log max rate: {}, query cancellation enabled: {}", _hostname, _port,
         _brokerId, _brokerTimeoutMs, _queryLogger.getMaxQueryLengthToLog(), _queryLogger.getLogRateLimit(),
         this.isQueryCancellationEnabled());
     _explainAskingServerDefault = _config.getProperty(
@@ -337,7 +341,7 @@ public class MultiStageBrokerRequestHandler extends BaseBrokerRequestHandler {
 
     try {
       ImmutableQueryEnvironment.Config queryEnvConf = getQueryEnvConf(httpHeaders, queryOptions, requestId);
-      QueryEnvironment queryEnv = new QueryEnvironment(queryEnvConf);
+      QueryEnvironment queryEnv = new QueryEnvironment(queryEnvConf, _federationProvider);
       return callAsync(requestId, query, () -> queryEnv.compile(query, sqlNodeAndOptions), queryTimer);
     } catch (WebApplicationException e) {
       throw e;
@@ -426,7 +430,8 @@ public class MultiStageBrokerRequestHandler extends BaseBrokerRequestHandler {
         .requestId(requestId)
         .database(database)
         .tableCache(_tableCache)
-        .workerManager(_workerManager)
+        .workerManager(new WorkerManager(_brokerId, _hostname, _port,
+          _routingManager.getPrimaryRoutingManager(queryOptions)))
         .isCaseSensitive(caseSensitive)
         .isNullHandlingEnabled(QueryOptionsUtils.isNullHandlingEnabled(queryOptions))
         .defaultInferPartitionHint(inferPartitionHint)

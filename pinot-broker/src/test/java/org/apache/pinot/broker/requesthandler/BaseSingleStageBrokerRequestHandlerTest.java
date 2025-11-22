@@ -166,6 +166,7 @@ public class BaseSingleStageBrokerRequestHandlerTest {
     BrokerRoutingManager routingManager = mock(BrokerRoutingManager.class);
     when(routingManager.routingExists(tableName)).thenReturn(true);
     when(routingManager.getQueryTimeoutMs(tableName)).thenReturn(10000L);
+    when(routingManager.getPrimaryRoutingManager(any())).thenReturn(routingManager);
     RoutingTable rt = mock(RoutingTable.class);
     when(rt.getServerInstanceToSegmentsMap()).thenReturn(Map.of(new ServerInstance(new InstanceConfig("server01_9000")),
         new SegmentsToQuery(List.of("segment01"), List.of())));
@@ -182,7 +183,7 @@ public class BaseSingleStageBrokerRequestHandlerTest {
     BaseSingleStageBrokerRequestHandler requestHandler =
         new BaseSingleStageBrokerRequestHandler(config, "testBrokerId", new BrokerRequestIdGenerator(), routingManager,
             new AllowAllAccessControlFactory(), queryQuotaManager, tableCache,
-            ThreadAccountantUtils.getNoOpAccountant()) {
+            ThreadAccountantUtils.getNoOpAccountant(), null) {
           @Override
           public void start() {
           }

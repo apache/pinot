@@ -471,6 +471,11 @@ public class QueryOptionsUtils {
     return option != null ? Boolean.parseBoolean(option) : defaultValue;
   }
 
+  public static boolean isEnableFederation(Map<String, String> queryOptions, boolean defaultValue) {
+    String option = queryOptions.get(QueryOptionKey.ENABLE_FEDERATION);
+    return option != null ? Boolean.parseBoolean(option) : defaultValue;
+  }
+
   public static boolean isUseLiteMode(Map<String, String> queryOptions, boolean defaultValue) {
     String option = queryOptions.get(QueryOptionKey.USE_LITE_MODE);
     return option != null ? Boolean.parseBoolean(option) : defaultValue;
