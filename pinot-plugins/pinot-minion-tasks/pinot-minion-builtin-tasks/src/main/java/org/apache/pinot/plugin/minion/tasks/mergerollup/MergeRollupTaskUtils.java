@@ -45,6 +45,7 @@ public class MergeRollupTaskUtils {
       MergeTask.MERGE_TYPE_KEY,
       MergeTask.MAX_NUM_RECORDS_PER_SEGMENT_KEY,
       MergeTask.MAX_NUM_RECORDS_PER_TASK_KEY,
+      MergeTask.MAX_SEGMENT_SIZE_BYTES_PER_TASK_KEY,
       MergeTask.MAX_NUM_PARALLEL_BUCKETS,
       MinionConstants.MergeRollupTask.ERASE_DIMENSION_VALUES_KEY,
       MinionConstants.MergeRollupTask.DESIRED_SEGMENT_SIZE_BYTES_KEY,

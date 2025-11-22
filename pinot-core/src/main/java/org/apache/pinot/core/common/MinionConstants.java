@@ -132,6 +132,13 @@ public class MinionConstants {
     // Segment config
     public static final String MAX_NUM_RECORDS_PER_TASK_KEY = "maxNumRecordsPerTask";
     public static final String MAX_NUM_RECORDS_PER_SEGMENT_KEY = "maxNumRecordsPerSegment";
+    /**
+     * maximum total size in bytes of input segments to process in a single task.
+     * When set, this takes precedence over MAX_NUM_RECORDS_PER_TASK_KEY for grouping segments into tasks.
+     * This provides more predictable memory usage and output sizes, especially for tables with variable
+     * row sizes (e.g., tables with theta sketches, HLL, or other large column types).
+     */
+    public static final String MAX_SEGMENT_SIZE_BYTES_PER_TASK_KEY = "maxSegmentSizeBytesPerTask";
 
     // See AdaptiveSizeBasedWriter for documentation of these configs
     public static final String SEGMENT_MAPPER_FILE_SIZE_IN_BYTES = "segmentMapperFileSizeThresholdInBytes";

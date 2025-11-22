@@ -513,6 +513,112 @@ public class MergeRollupTaskGeneratorTest {
   }
 
   /**
+   * Test max segment size bytes per task
+   */
+  @Test
+  public void testMaxSegmentSizeBytesPerTask() {
+    Map<String, Map<String, String>> taskConfigsMap = new HashMap<>();
+    Map<String, String> tableTaskConfigs = new HashMap<>();
+    tableTaskConfigs.put(DAILY + ".mergeType", "concat");
+    tableTaskConfigs.put(DAILY + ".bufferTimePeriod", "2d");
+    tableTaskConfigs.put(DAILY + ".bucketTimePeriod", "1d");
+    tableTaskConfigs.put(DAILY + ".maxNumRecordsPerSegment", "1000000");
+    tableTaskConfigs.put(DAILY + ".maxSegmentSizeBytesPerTask", "104857600"); // 100MB
+    taskConfigsMap.put(MinionConstants.MergeRollupTask.TASK_TYPE, tableTaskConfigs);
+    TableConfig offlineTableConfig = getTableConfig(TableType.OFFLINE, taskConfigsMap);
+    ClusterInfoAccessor mockClusterInfoProvide = mock(ClusterInfoAccessor.class);
+
+    String segmentName1 = "testTable__1";
+    String segmentName2 = "testTable__2";
+    SegmentZKMetadata metadata1 =
+        getSegmentZKMetadata(segmentName1, 86_400_000L, 90_000_000L, TimeUnit.MILLISECONDS, "download1");
+    metadata1.setTotalDocs(2000000L);
+    metadata1.setSizeInBytes(52428800L); // 50MB
+    SegmentZKMetadata metadata2 =
+        getSegmentZKMetadata(segmentName2, 86_400_000L, 100_000_000L, TimeUnit.MILLISECONDS, "download2");
+    metadata2.setTotalDocs(4000000L);
+    metadata2.setSizeInBytes(62914560L); // 60MB
+    when(mockClusterInfoProvide.getSegmentsZKMetadata(OFFLINE_TABLE_NAME)).thenReturn(
+        Lists.newArrayList(metadata1, metadata2));
+    when(mockClusterInfoProvide.getIdealState(OFFLINE_TABLE_NAME)).thenReturn(
+        getIdealState(OFFLINE_TABLE_NAME, Lists.newArrayList(segmentName1, segmentName2)));
+
+    // Single task (both segments fit under 100MB limit)
+    MergeRollupTaskGenerator generator = new MergeRollupTaskGenerator();
+    generator.init(mockClusterInfoProvide);
+    List<PinotTaskConfig> pinotTaskConfigs = generator.generateTasks(Lists.newArrayList(offlineTableConfig));
+    assertEquals(pinotTaskConfigs.size(), 1);
+    checkPinotTaskConfig(pinotTaskConfigs.get(0).getConfigs(), segmentName1 + "," + segmentName2, DAILY, "concat", "1d",
+        null, "1000000");
+    assertEquals(pinotTaskConfigs.get(0).getConfigs().get(MinionConstants.DOWNLOAD_URL_KEY), "download1,download2");
+
+    // Multiple tasks when segments exceed size limit
+    String segmentName3 = "testTable__3";
+    String segmentName4 = "testTable__4";
+    SegmentZKMetadata metadata3 =
+        getSegmentZKMetadata(segmentName3, 86_400_000L, 110_000_000L, TimeUnit.MILLISECONDS, null);
+    metadata3.setTotalDocs(3000000L);
+    metadata3.setSizeInBytes(52428800L); // 50MB
+    SegmentZKMetadata metadata4 =
+        getSegmentZKMetadata(segmentName4, 86_400_000L, 120_000_000L, TimeUnit.MILLISECONDS, null);
+    metadata4.setTotalDocs(4000000L);
+    metadata4.setSizeInBytes(62914560L); // 60MB
+    when(mockClusterInfoProvide.getSegmentsZKMetadata(OFFLINE_TABLE_NAME)).thenReturn(
+        Lists.newArrayList(metadata1, metadata2, metadata3, metadata4));
+    when(mockClusterInfoProvide.getIdealState(OFFLINE_TABLE_NAME)).thenReturn(
+        getIdealState(OFFLINE_TABLE_NAME, Lists.newArrayList(segmentName1, segmentName2, segmentName3, segmentName4)));
+
+    // With 4 segments @ 50+60+50+60 MB, should create: task1=(seg1+seg2=110MB), task2=(seg3+seg4=110MB)
+    pinotTaskConfigs = generator.generateTasks(Lists.newArrayList(offlineTableConfig));
+    assertEquals(pinotTaskConfigs.size(), 2);
+    checkPinotTaskConfig(pinotTaskConfigs.get(0).getConfigs(), segmentName1 + "," + segmentName2, DAILY, "concat", "1d",
+        null, "1000000");
+    checkPinotTaskConfig(pinotTaskConfigs.get(1).getConfigs(), segmentName3 + "," + segmentName4, DAILY, "concat", "1d",
+        null, "1000000");
+  }
+
+  /**
+   * Test backwards compatibility: when maxSegmentSizeBytesPerTask is not set, fall back to row-based grouping
+   */
+  @Test
+  public void testBackwardsCompatibilityWithRowBasedGrouping() {
+    Map<String, Map<String, String>> taskConfigsMap = new HashMap<>();
+    Map<String, String> tableTaskConfigs = new HashMap<>();
+    tableTaskConfigs.put(DAILY + ".mergeType", "concat");
+    tableTaskConfigs.put(DAILY + ".bufferTimePeriod", "2d");
+    tableTaskConfigs.put(DAILY + ".bucketTimePeriod", "1d");
+    tableTaskConfigs.put(DAILY + ".maxNumRecordsPerSegment", "1000000");
+    tableTaskConfigs.put(DAILY + ".maxNumRecordsPerTask", "5000000");
+    // Note: maxSegmentSizeBytesPerTask NOT set
+    taskConfigsMap.put(MinionConstants.MergeRollupTask.TASK_TYPE, tableTaskConfigs);
+    TableConfig offlineTableConfig = getTableConfig(TableType.OFFLINE, taskConfigsMap);
+    ClusterInfoAccessor mockClusterInfoProvide = mock(ClusterInfoAccessor.class);
+
+    String segmentName1 = "testTable__1";
+    String segmentName2 = "testTable__2";
+    SegmentZKMetadata metadata1 =
+        getSegmentZKMetadata(segmentName1, 86_400_000L, 90_000_000L, TimeUnit.MILLISECONDS, "download1");
+    metadata1.setTotalDocs(2000000L);
+    metadata1.setSizeInBytes(52428800L); // 50MB
+    SegmentZKMetadata metadata2 =
+        getSegmentZKMetadata(segmentName2, 86_400_000L, 100_000_000L, TimeUnit.MILLISECONDS, "download2");
+    metadata2.setTotalDocs(4000000L);
+    metadata2.setSizeInBytes(62914560L); // 60MB
+    when(mockClusterInfoProvide.getSegmentsZKMetadata(OFFLINE_TABLE_NAME)).thenReturn(
+        Lists.newArrayList(metadata1, metadata2));
+    when(mockClusterInfoProvide.getIdealState(OFFLINE_TABLE_NAME)).thenReturn(
+        getIdealState(OFFLINE_TABLE_NAME, Lists.newArrayList(segmentName1, segmentName2)));
+
+    // Should use row-based grouping (both segments have 6M total rows, under 5M limit per task)
+    MergeRollupTaskGenerator generator = new MergeRollupTaskGenerator();
+    generator.init(mockClusterInfoProvide);
+    List<PinotTaskConfig> pinotTaskConfigs = generator.generateTasks(Lists.newArrayList(offlineTableConfig));
+    assertEquals(pinotTaskConfigs.size(), 1);
+    checkPinotTaskConfig(pinotTaskConfigs.get(0).getConfigs(), segmentName1 + "," + segmentName2, DAILY, "concat", "1d",
+        null, "1000000");
+  }
+
+  /**
    * Test num parallel buckets
    */
   @Test
