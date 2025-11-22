@@ -627,7 +627,7 @@ public abstract class BaseServerStarter implements ServiceStartable {
     ServerMetrics.register(_serverMetrics);
 
     LOGGER.info("Initializing reload job status cache");
-    _reloadJobStatusCache = new ServerReloadJobStatusCache();
+    _reloadJobStatusCache = new ServerReloadJobStatusCache(_instanceId);
 
     // Register cache as cluster config listener for dynamic config updates
     _clusterConfigChangeHandler.registerClusterConfigChangeListener(_reloadJobStatusCache);

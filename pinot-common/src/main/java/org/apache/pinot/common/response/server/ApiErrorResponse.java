@@ -16,33 +16,32 @@
  * specific language governing permissions and limitations
  * under the License.
  */
+package org.apache.pinot.common.response.server;
 
-package org.apache.pinot.server.starter.helix;
+import org.apache.pinot.spi.annotations.InterfaceStability;
 
-public class SegmentReloadStatusValue {
-  private final long _totalSegmentCount;
-  private final long _successCount;
-  private final Long _failureCount;
 
-  public SegmentReloadStatusValue(long totalSegmentCount, long successCount) {
-    this(totalSegmentCount, successCount, null);
+@InterfaceStability.Unstable
+public class ApiErrorResponse {
+
+  private String _errorMsg;
+  private String _stacktrace;
+
+  public String getErrorMsg() {
+    return _errorMsg;
   }
 
-  public SegmentReloadStatusValue(long totalSegmentCount, long successCount, Long failureCount) {
-    _totalSegmentCount = totalSegmentCount;
-    _successCount = successCount;
-    _failureCount = failureCount;
+  public ApiErrorResponse setErrorMsg(String errorMsg) {
+    _errorMsg = errorMsg;
+    return this;
   }
 
-  public long getTotalSegmentCount() {
-    return _totalSegmentCount;
+  public String getStacktrace() {
+    return _stacktrace;
   }
 
-  public long getSuccessCount() {
-    return _successCount;
-  }
-
-  public Long getFailureCount() {
-    return _failureCount;
+  public ApiErrorResponse setStacktrace(String stacktrace) {
+    _stacktrace = stacktrace;
+    return this;
   }
 }
