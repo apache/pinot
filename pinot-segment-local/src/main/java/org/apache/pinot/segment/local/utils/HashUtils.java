@@ -18,10 +18,13 @@
  */
 package org.apache.pinot.segment.local.utils;
 
+import com.dynatrace.hash4j.hashing.HashValue128;
+import com.dynatrace.hash4j.hashing.Hasher128;
 import com.google.common.hash.Hashing;
 import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
 import java.util.UUID;
+import net.jpountz.xxhash.XXHashFactory;
 import org.apache.pinot.spi.config.table.HashFunction;
 import org.apache.pinot.spi.data.readers.PrimaryKey;
 import org.apache.pinot.spi.utils.ByteArray;
@@ -63,6 +66,29 @@ public class HashUtils {
     return result;
   }
 
+  /** Compute 64-bit xxHash (XXH64) with seed=0, returned as big-endian 8-byte array. */
+  public static byte[] hashXXHash(byte[] bytes) {
+    XXHashFactory xxhFactory = XXHashFactory.fastestInstance();
+    long hash64 = xxhFactory.hash64().hash(bytes, 0, bytes.length, 0L);
+    ByteBuffer buf = ByteBuffer.allocate(8).order(ByteOrder.BIG_ENDIAN);
+    buf.putLong(hash64);
+    return buf.array();
+  }
+
+  /**
+   * Compute xxh128 using hash4j (XXH3-128). Returns a 16-byte array (big-endian order for each 64-bit half).
+   */
+  public static byte[] hashXXH128(byte[] bytes) {
+    Hasher128 hasher = com.dynatrace.hash4j.hashing.Hashing.xxh3_128();
+    HashValue128 hashValue128 = hasher.hashBytesTo128Bits(bytes);
+
+    // Encode as big-endian 16 bytes
+    ByteBuffer buf = ByteBuffer.allocate(16).order(ByteOrder.BIG_ENDIAN);
+    buf.putLong(hashValue128.getMostSignificantBits());
+    buf.putLong(hashValue128.getLeastSignificantBits());
+    return buf.array();
+  }
+
   public static Object hashPrimaryKey(PrimaryKey primaryKey, HashFunction hashFunction) {
     switch (hashFunction) {
       case NONE:
@@ -73,6 +99,10 @@ public class HashUtils {
         return new ByteArray(HashUtils.hashMurmur3(primaryKey.asBytes()));
       case UUID:
         return new ByteArray(HashUtils.hashUUID(primaryKey));
+      case XXHASH:
+        return new ByteArray(HashUtils.hashXXHash(primaryKey.asBytes()));
+      case XXH128:
+        return new ByteArray(HashUtils.hashXXH128(primaryKey.asBytes()));
       default:
         throw new IllegalArgumentException(String.format("Unrecognized hash function %s", hashFunction));
     }
