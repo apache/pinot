@@ -133,7 +133,7 @@ public class InvertedIndexAndDictionaryBasedForwardIndexCreator implements AutoC
     _totalNumberOfEntries = _columnMetadata.getTotalNumberOfEntries();
     _maxNumberOfMultiValues = _columnMetadata.getMaxNumberOfMultiValues();
     _storedType = _columnMetadata.getFieldSpec().getDataType().getStoredType();
-    _dictionaryEnabled = dictionaryEnabled;
+    _dictionaryEnabled = dictionaryEnabled && !fwdConf.isRawEncoding();
     int numValues = _singleValue ? _numDocs : _totalNumberOfEntries;
     _useMMapBuffer = numValues > NUM_VALUES_THRESHOLD_FOR_MMAP_BUFFER;
 
