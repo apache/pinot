@@ -753,7 +753,10 @@ public class MergeRollupTaskGenerator extends BaseTaskGenerator {
           // Size-based grouping: accumulate segment sizes
           long segmentSizeBytes = targetSegment.getSizeInBytes();
           currentTaskSizeBytes += segmentSizeBytes;
-          shouldCreateTask = (currentTaskSizeBytes >= maxSegmentSizeBytesPerTask) || (i == segments.size() - 1);
+          // Check if adding this segment would exceed the limit (and we already have segments in the task)
+          boolean wouldExceedLimit = (currentTaskSizeBytes > maxSegmentSizeBytesPerTask) && (segmentNames.size() > 1);
+          boolean isLastSegment = (i == segments.size() - 1);
+          shouldCreateTask = wouldExceedLimit || isLastSegment;
 
           if (shouldCreateTask) {
             LOGGER.info("Creating task for table {}, mergeLevel {}: {} segments, {} bytes ({} MB), {} records",
