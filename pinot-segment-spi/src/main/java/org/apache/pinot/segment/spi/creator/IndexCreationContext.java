@@ -35,6 +35,17 @@ import org.apache.pinot.spi.data.FieldSpec;
  */
 public interface IndexCreationContext {
 
+  /**
+   * Forward index encoding for the current column.
+   *
+   * This is intentionally separate from dictionary presence because a column may need a dictionary for secondary
+   * indexes while still using a raw forward index.
+   */
+  enum ForwardIndexEncoding {
+    RAW,
+    DICTIONARY
+  }
+
   FieldSpec getFieldSpec();
 
   File getIndexDir();
@@ -56,6 +67,8 @@ public interface IndexCreationContext {
   int getTotalDocs();
 
   boolean hasDictionary();
+
+  ForwardIndexEncoding getForwardIndexEncoding();
 
   Comparable<?> getMinValue();
 
@@ -128,6 +141,7 @@ public interface IndexCreationContext {
     private int _totalNumberOfEntries;
     private int _totalDocs;
     private boolean _hasDictionary = true;
+    private ForwardIndexEncoding _forwardIndexEncoding = ForwardIndexEncoding.RAW;
     private Comparable<?> _minValue;
     private Comparable<?> _maxValue;
     private boolean _forwardIndexDisabled;
@@ -177,6 +191,7 @@ public interface IndexCreationContext {
           .withTotalNumberOfEntries(columnMetadata.getTotalNumberOfEntries())
           .withTotalDocs(columnMetadata.getTotalDocs())
           .withDictionary(columnMetadata.hasDictionary())
+          .withForwardIndexEncoding(columnMetadata.getForwardIndexEncoding())
           .withMinValue(columnMetadata.getMinValue())
           .withMaxValue(columnMetadata.getMaxValue())
           .withMaxNumberOfMultiValueElements(columnMetadata.getMaxNumberOfMultiValues());
@@ -237,6 +252,11 @@ public interface IndexCreationContext {
       return this;
     }
 
+    public Builder withForwardIndexEncoding(ForwardIndexEncoding forwardIndexEncoding) {
+      _forwardIndexEncoding = Objects.requireNonNull(forwardIndexEncoding);
+      return this;
+    }
+
     public Builder withMinValue(Comparable<?> minValue) {
       _minValue = minValue;
       return this;
@@ -285,7 +305,8 @@ public interface IndexCreationContext {
     public Common build() {
       return new Common(Objects.requireNonNull(_indexDir), _lengthOfLongestEntry, _maxNumberOfMultiValueElements,
           _maxRowLengthInBytes, _onHeap, Objects.requireNonNull(_fieldSpec), _sorted, _cardinality,
-          _totalNumberOfEntries, _totalDocs, _hasDictionary, _minValue, _maxValue, _forwardIndexDisabled,
+          _totalNumberOfEntries, _totalDocs, _hasDictionary, _forwardIndexEncoding, _minValue, _maxValue,
+          _forwardIndexDisabled,
           _sortedUniqueElementsArray, _optimizedDictionary, _fixedLength, _textCommitOnClose, _columnStatistics,
           _realtimeConversion, _consumerDir, _immutableToMutableIdMap, _tableNameWithType, _continueOnError);
     }
@@ -313,6 +334,7 @@ public interface IndexCreationContext {
     private final int _totalNumberOfEntries;
     private final int _totalDocs;
     private final boolean _hasDictionary;
+    private final ForwardIndexEncoding _forwardIndexEncoding;
     private final Comparable<?> _minValue;
     private final Comparable<?> _maxValue;
     private final boolean _forwardIndexDisabled;
@@ -330,7 +352,8 @@ public interface IndexCreationContext {
     private Common(File indexDir, int lengthOfLongestEntry,
         int maxNumberOfMultiValueElements, int maxRowLengthInBytes, boolean onHeap,
         FieldSpec fieldSpec, boolean sorted, int cardinality, int totalNumberOfEntries,
-        int totalDocs, boolean hasDictionary, Comparable<?> minValue, Comparable<?> maxValue,
+        int totalDocs, boolean hasDictionary, ForwardIndexEncoding forwardIndexEncoding, Comparable<?> minValue,
+        Comparable<?> maxValue,
         boolean forwardIndexDisabled, Object sortedUniqueElementsArray, boolean optimizeDictionary, boolean fixedLength,
         boolean textCommitOnClose, ColumnStatistics columnStatistics, boolean realtimeConversion, File consumerDir,
         int[] immutableToMutableIdMap, String tableNameWithType, boolean continueOnError) {
@@ -345,6 +368,7 @@ public interface IndexCreationContext {
       _totalNumberOfEntries = totalNumberOfEntries;
       _totalDocs = totalDocs;
       _hasDictionary = hasDictionary;
+      _forwardIndexEncoding = forwardIndexEncoding;
       _minValue = minValue;
       _maxValue = maxValue;
       _forwardIndexDisabled = forwardIndexDisabled;
@@ -402,6 +426,11 @@ public interface IndexCreationContext {
 
     public boolean hasDictionary() {
       return _hasDictionary;
+    }
+
+    @Override
+    public ForwardIndexEncoding getForwardIndexEncoding() {
+      return _forwardIndexEncoding;
     }
 
     @Override

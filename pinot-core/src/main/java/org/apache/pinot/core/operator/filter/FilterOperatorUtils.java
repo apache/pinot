@@ -26,6 +26,7 @@ import org.apache.pinot.common.request.context.predicate.Predicate;
 import org.apache.pinot.core.operator.filter.predicate.BaseDictIdBasedRegexpLikePredicateEvaluator;
 import org.apache.pinot.core.operator.filter.predicate.PredicateEvaluator;
 import org.apache.pinot.core.query.request.context.QueryContext;
+import org.apache.pinot.segment.local.segment.index.readers.RawValueBitmapInvertedIndexReader;
 import org.apache.pinot.segment.spi.datasource.DataSource;
 import org.apache.pinot.segment.spi.index.reader.NullValueVectorReader;
 import org.apache.pinot.spi.config.table.FieldConfig;
@@ -124,9 +125,11 @@ public class FilterOperatorUtils {
         }
         if (dataSource.getInvertedIndex() != null
             && queryContext.isIndexUseAllowed(dataSource, FieldConfig.IndexType.INVERTED)) {
-          // Use raw value inverted index filter operator for raw encoded columns
-          if (!predicateEvaluator.isDictionaryBased()) {
+          if (dataSource.getInvertedIndex() instanceof RawValueBitmapInvertedIndexReader) {
             return new RawValueInvertedIndexFilterOperator(queryContext, predicateEvaluator, dataSource, numDocs);
+          }
+          if (!predicateEvaluator.isDictionaryBased()) {
+            return new ScanBasedFilterOperator(queryContext, predicateEvaluator, dataSource, numDocs);
           }
           return new InvertedIndexFilterOperator(queryContext, predicateEvaluator, dataSource, numDocs);
         }

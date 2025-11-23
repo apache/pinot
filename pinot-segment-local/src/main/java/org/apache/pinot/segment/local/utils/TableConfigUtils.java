@@ -1506,6 +1506,7 @@ public final class TableConfigUtils {
         indexType.validate(indexConfigs, fieldSpec, tableConfig);
       }
     }
+    validateExplicitDictionaryForRawForwardIndex(tableConfig, schema, indexConfigsMap);
 
     validateMultiColumnTextIndex(indexingConfig.getMultiColumnTextIndexConfig());
 
@@ -1584,6 +1585,11 @@ public final class TableConfigUtils {
         }
       }
     }
+  }
+
+  private static void validateExplicitDictionaryForRawForwardIndex(TableConfig tableConfig, Schema schema,
+      Map<String, FieldIndexConfigs> indexConfigsMap) {
+    // Dictionary-required secondary indexes infer dictionary presence even when the forward index remains raw.
   }
 
   /// Validates compatibility across [IndexingConfig] and [FieldConfig]s, ensures that:

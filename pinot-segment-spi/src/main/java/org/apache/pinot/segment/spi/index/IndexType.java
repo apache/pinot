@@ -120,6 +120,14 @@ public interface IndexType<C extends IndexConfig, IR extends IndexReader, IC ext
       Schema schema, TableConfig tableConfig);
 
   /**
+   * Indicates whether this index requires a dictionary to function for the provided column.
+   * FieldIndexConfigs is provided so index types can consult related per-column index settings when deciding.
+   */
+  default boolean requiresDictionary(FieldSpec fieldSpec, FieldIndexConfigs fieldIndexConfigs) {
+    return false;
+  }
+
+  /**
    * This method is used to perform in place conversion of provided {@link TableConfig} to newer format
    * related to the IndexType that implements it.
    *

@@ -113,6 +113,7 @@ public class V1Constants {
       public static final String COLUMN_TYPE = "columnType";
       public static final String IS_SORTED = "isSorted";
       public static final String HAS_DICTIONARY = "hasDictionary";
+      public static final String FORWARD_INDEX_ENCODING = "forwardIndexEncoding";
       public static final String IS_SINGLE_VALUED = "isSingleValues";
       public static final String MAX_MULTI_VALUE_ELEMENTS = "maxNumberOfMultiValues";
       public static final String TOTAL_NUMBER_OF_ENTRIES = "totalNumberOfEntries";

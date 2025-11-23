@@ -314,12 +314,13 @@ public class MutableSegmentImpl implements MutableSegment {
 
       FieldIndexConfigs indexConfigs =
           Optional.ofNullable(config.getIndexConfigByCol().get(column)).orElse(FieldIndexConfigs.EMPTY);
-      boolean isDictionary = !isNoDictionaryColumn(indexConfigs, fieldSpec, column);
+      boolean hasDictionary = !isNoDictionaryColumn(indexConfigs, fieldSpec, column);
       MutableIndexContext context =
           MutableIndexContext.builder()
               .withFieldSpec(fieldSpec)
               .withMemoryManager(_memoryManager)
-              .withDictionary(isDictionary)
+              .withDictionary(hasDictionary)
+              .withForwardIndexEncoding(indexConfigs.getConfig(StandardIndexes.forward()).getForwardIndexEncoding())
               .withCapacity(_capacity)
               .offHeap(_offHeap)
               .withSegmentName(_segmentName)
@@ -351,7 +352,7 @@ public class MutableSegmentImpl implements MutableSegment {
 
       // Dictionary-encoded column
       MutableDictionary dictionary;
-      if (isDictionary) {
+      if (hasDictionary) {
         DictionaryIndexConfig dictionaryIndexConfig = indexConfigs.getConfig(StandardIndexes.dictionary());
         if (dictionaryIndexConfig.isDisabled()) {
           // Even if dictionary is disabled in the config, isNoDictionaryColumn(...) returned false, so

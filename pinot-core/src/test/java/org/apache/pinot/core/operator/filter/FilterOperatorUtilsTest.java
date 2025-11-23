@@ -19,22 +19,38 @@
 package org.apache.pinot.core.operator.filter;
 
 import com.google.common.collect.Lists;
+import java.io.File;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
 import java.util.OptionalInt;
+import java.nio.ByteOrder;
+import java.nio.file.Files;
+import org.apache.commons.io.FileUtils;
 import org.apache.pinot.common.request.context.ExpressionContext;
+import org.apache.pinot.common.request.context.predicate.Predicate;
 import org.apache.pinot.common.request.context.predicate.TextMatchPredicate;
 import org.apache.pinot.core.common.Operator;
 import org.apache.pinot.core.operator.blocks.FilterBlock;
 import org.apache.pinot.core.query.request.context.QueryContext;
+import org.apache.pinot.segment.local.segment.creator.impl.inv.RawValueBitmapInvertedIndexCreator;
+import org.apache.pinot.segment.local.segment.index.readers.RawValueBitmapInvertedIndexReader;
+import org.apache.pinot.core.operator.filter.predicate.PredicateEvaluator;
+import org.apache.pinot.segment.spi.datasource.DataSource;
+import org.apache.pinot.segment.spi.datasource.DataSourceMetadata;
+import org.apache.pinot.segment.spi.index.reader.InvertedIndexReader;
 import org.apache.pinot.segment.spi.index.reader.TextIndexReader;
+import org.apache.pinot.segment.spi.memory.PinotDataBuffer;
+import org.apache.pinot.spi.config.table.FieldConfig;
+import org.apache.pinot.spi.data.FieldSpec.DataType;
 import org.roaringbitmap.buffer.ImmutableRoaringBitmap;
 import org.roaringbitmap.buffer.MutableRoaringBitmap;
 import org.testng.annotations.DataProvider;
 import org.testng.annotations.Test;
 
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 import static org.testng.Assert.assertEquals;
@@ -118,6 +134,62 @@ public class FilterOperatorUtilsTest {
     assertTrue(filterOperator instanceof MatchAllFilterOperator);
   }
 
+  @Test
+  public void testLeafFilterOperatorUsesRawValueBitmapInvertedIndexFallback()
+      throws Exception {
+    QueryContext queryContext = mock(QueryContext.class);
+    when(queryContext.isNullHandlingEnabled()).thenReturn(false);
+    when(queryContext.isIndexUseAllowed(any(DataSource.class), eq(FieldConfig.IndexType.INVERTED))).thenReturn(true);
+
+    DataSource dataSource = mock(DataSource.class);
+    DataSourceMetadata dataSourceMetadata = mock(DataSourceMetadata.class);
+    when(dataSourceMetadata.isSorted()).thenReturn(false);
+    when(dataSourceMetadata.getDataType()).thenReturn(DataType.INT);
+    when(dataSourceMetadata.isSingleValue()).thenReturn(true);
+    when(dataSource.getDataSourceMetadata()).thenReturn(dataSourceMetadata);
+
+    PredicateEvaluator predicateEvaluator = mock(PredicateEvaluator.class);
+    when(predicateEvaluator.isAlwaysFalse()).thenReturn(false);
+    when(predicateEvaluator.isAlwaysTrue()).thenReturn(false);
+    when(predicateEvaluator.getPredicateType()).thenReturn(Predicate.Type.EQ);
+    when(predicateEvaluator.isDictionaryBased()).thenReturn(false);
+    when(predicateEvaluator.isExclusive()).thenReturn(false);
+
+    try (RawValueInvertedIndexFixture fixture = createRawValueBitmapInvertedIndexReader()) {
+      when(dataSource.getInvertedIndex()).thenReturn((InvertedIndexReader) fixture._reader);
+      BaseFilterOperator filterOperator =
+          FilterOperatorUtils.getLeafFilterOperator(queryContext, predicateEvaluator, dataSource, NUM_DOCS);
+      assertTrue(filterOperator instanceof RawValueInvertedIndexFilterOperator);
+    }
+  }
+
+  @Test
+  public void testLeafFilterOperatorUsesStandardInvertedIndexWhenDictionaryBased()
+      throws Exception {
+    QueryContext queryContext = mock(QueryContext.class);
+    when(queryContext.isNullHandlingEnabled()).thenReturn(false);
+    when(queryContext.isIndexUseAllowed(any(DataSource.class), eq(FieldConfig.IndexType.INVERTED))).thenReturn(true);
+
+    DataSource dataSource = mock(DataSource.class);
+    DataSourceMetadata dataSourceMetadata = mock(DataSourceMetadata.class);
+    when(dataSourceMetadata.isSorted()).thenReturn(false);
+    when(dataSourceMetadata.getDataType()).thenReturn(DataType.INT);
+    when(dataSourceMetadata.isSingleValue()).thenReturn(true);
+    when(dataSource.getDataSourceMetadata()).thenReturn(dataSourceMetadata);
+    when(dataSource.getInvertedIndex()).thenReturn(mock(InvertedIndexReader.class));
+
+    PredicateEvaluator predicateEvaluator = mock(PredicateEvaluator.class);
+    when(predicateEvaluator.isAlwaysFalse()).thenReturn(false);
+    when(predicateEvaluator.isAlwaysTrue()).thenReturn(false);
+    when(predicateEvaluator.getPredicateType()).thenReturn(Predicate.Type.EQ);
+    when(predicateEvaluator.isDictionaryBased()).thenReturn(true);
+    when(predicateEvaluator.isExclusive()).thenReturn(false);
+
+    BaseFilterOperator filterOperator =
+        FilterOperatorUtils.getLeafFilterOperator(queryContext, predicateEvaluator, dataSource, NUM_DOCS);
+    assertTrue(filterOperator instanceof InvertedIndexFilterOperator);
+  }
+
   @DataProvider
   public static Object[][] priorities() {
     SortedIndexBasedFilterOperator sorted = mock(SortedIndexBasedFilterOperator.class);
@@ -188,6 +260,44 @@ public class FilterOperatorUtilsTest {
     List<Operator> actualChildOperators = ((AndFilterOperator) filterOperator).getChildOperators();
     assertEquals(actualChildOperators, Lists.newArrayList(first, second), "Filter " + first + " should have "
         + "more priority than filter " + second);
+  }
+
+  private RawValueInvertedIndexFixture createRawValueBitmapInvertedIndexReader()
+      throws Exception {
+    File indexDir = Files.createTempDirectory("filter-raw-inverted-index").toFile();
+    File indexFile = new File(indexDir,
+        "col" + org.apache.pinot.segment.spi.V1Constants.Indexes.BITMAP_INVERTED_INDEX_FILE_EXTENSION);
+    try (RawValueBitmapInvertedIndexCreator creator = new RawValueBitmapInvertedIndexCreator(DataType.INT, "col",
+        indexDir)) {
+      creator.add(11);
+      creator.add(22);
+      creator.add(11);
+    }
+    PinotDataBuffer dataBuffer = PinotDataBuffer.mapFile(indexFile, true, 0, indexFile.length(), ByteOrder.BIG_ENDIAN,
+        "filter-raw-inverted-index");
+    return new RawValueInvertedIndexFixture(indexDir, dataBuffer, new RawValueBitmapInvertedIndexReader(dataBuffer,
+        DataType.INT));
+  }
+
+  private static final class RawValueInvertedIndexFixture implements AutoCloseable {
+    private final File _indexDir;
+    private final PinotDataBuffer _dataBuffer;
+    private final RawValueBitmapInvertedIndexReader _reader;
+
+    private RawValueInvertedIndexFixture(File indexDir, PinotDataBuffer dataBuffer,
+        RawValueBitmapInvertedIndexReader reader) {
+      _indexDir = indexDir;
+      _dataBuffer = dataBuffer;
+      _reader = reader;
+    }
+
+    @Override
+    public void close()
+        throws Exception {
+      _reader.close();
+      _dataBuffer.close();
+      FileUtils.deleteQuietly(_indexDir);
+    }
   }
 
   // --- TextMatchFilterOperator searchable doc fence tests ---

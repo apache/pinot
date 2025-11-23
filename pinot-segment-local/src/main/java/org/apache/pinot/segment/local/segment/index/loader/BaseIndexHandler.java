@@ -112,10 +112,14 @@ public abstract class BaseIndexHandler implements IndexHandler {
     FieldIndexConfigs fieldIndexConfig = _fieldIndexConfigs.get(columnName);
     boolean dictionaryEnabled = fieldIndexConfig.getConfig(StandardIndexes.dictionary()).isEnabled();
     ForwardIndexConfig forwardIndexConfig = fieldIndexConfig.getConfig(StandardIndexes.forward());
+    boolean dictionaryBasedForwardIndex =
+        forwardIndexConfig.getForwardIndexEncoding() == org.apache.pinot.segment.spi.creator.IndexCreationContext
+            .ForwardIndexEncoding.DICTIONARY;
 
     InvertedIndexAndDictionaryBasedForwardIndexCreator creator =
         new InvertedIndexAndDictionaryBasedForwardIndexCreator(columnName, _segmentDirectory, dictionaryEnabled,
-            forwardIndexConfig, segmentWriter, isTemporaryForwardIndex, _tableConfig.getTableName(),
+            dictionaryBasedForwardIndex, forwardIndexConfig, segmentWriter, isTemporaryForwardIndex,
+            _tableConfig.getTableName(),
             _tableConfig.getIngestionConfig() != null && _tableConfig.getIngestionConfig().isContinueOnError());
     creator.regenerateForwardIndex();
     // Validate that the forward index is created.

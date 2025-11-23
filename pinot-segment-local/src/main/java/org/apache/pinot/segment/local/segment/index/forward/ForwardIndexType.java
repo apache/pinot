@@ -22,7 +22,6 @@ package org.apache.pinot.segment.local.segment.index.forward;
 import com.google.common.base.Preconditions;
 import com.google.common.collect.Maps;
 import java.util.Collection;
-import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import javax.annotation.Nullable;
@@ -41,6 +40,7 @@ import org.apache.pinot.segment.spi.index.ColumnConfigDeserializer;
 import org.apache.pinot.segment.spi.index.DictionaryIndexConfig;
 import org.apache.pinot.segment.spi.index.FieldIndexConfigs;
 import org.apache.pinot.segment.spi.index.ForwardIndexConfig;
+import org.apache.pinot.segment.spi.index.IndexConfigDeserializer;
 import org.apache.pinot.segment.spi.index.IndexHandler;
 import org.apache.pinot.segment.spi.index.IndexReaderFactory;
 import org.apache.pinot.segment.spi.index.IndexUtil;
@@ -110,7 +110,9 @@ public class ForwardIndexType extends AbstractIndexType<ForwardIndexConfig, Forw
     String column = fieldSpec.getName();
     CompressionCodec compressionCodec = forwardIndexConfig.getCompressionCodec();
     DictionaryIndexConfig dictionaryConfig = indexConfigs.getConfig(StandardIndexes.dictionary());
-    if (dictionaryConfig.isEnabled()) {
+    if (forwardIndexConfig.getForwardIndexEncoding() == IndexCreationContext.ForwardIndexEncoding.DICTIONARY) {
+      Preconditions.checkState(dictionaryConfig.isEnabled(),
+          "Dictionary-encoded forward index requires dictionary for column: %s", column);
       Preconditions.checkState(compressionCodec == null || compressionCodec.isApplicableToDictEncodedIndex(),
           "Compression codec: %s is not applicable to dictionary encoded column: %s", compressionCodec, column);
     } else {
@@ -167,6 +169,16 @@ public class ForwardIndexType extends AbstractIndexType<ForwardIndexConfig, Forw
   }
 
   @Override
+  protected ColumnConfigDeserializer<ForwardIndexConfig> createDeserializer() {
+    // Forward index configs can be specified via indexes.* or legacy field config properties; allow fallback so both
+    // styles can coexist across columns without treating them as mutually exclusive.
+    ColumnConfigDeserializer<ForwardIndexConfig> fromIndexes =
+        IndexConfigDeserializer.fromIndexes(getPrettyName(), getIndexConfigClass());
+    ColumnConfigDeserializer<ForwardIndexConfig> legacy = createDeserializerForLegacyConfigs();
+    return legacy != null ? fromIndexes.withFallbackAlternative(legacy) : fromIndexes;
+  }
+
+  @Override
   protected ColumnConfigDeserializer<ForwardIndexConfig> createDeserializerForLegacyConfigs() {
     // reads tableConfig.fieldConfigList and decides what to create using the FieldConfig properties and encoding
     return (tableConfig, schema) -> {
@@ -203,6 +215,9 @@ public class ForwardIndexType extends AbstractIndexType<ForwardIndexConfig, Forw
   private ForwardIndexConfig createConfigFromFieldConfig(FieldConfig fieldConfig) {
     ForwardIndexConfig.Builder builder = new ForwardIndexConfig.Builder();
     builder.withCompressionCodec(fieldConfig.getCompressionCodec());
+    builder.withForwardIndexEncoding(fieldConfig.getEncodingType() == FieldConfig.EncodingType.RAW
+        ? IndexCreationContext.ForwardIndexEncoding.RAW
+        : IndexCreationContext.ForwardIndexEncoding.DICTIONARY);
     Map<String, String> properties = fieldConfig.getProperties();
     if (properties != null) {
       builder.withLegacyProperties(properties);
@@ -235,20 +250,21 @@ public class ForwardIndexType extends AbstractIndexType<ForwardIndexConfig, Forw
     return ForwardIndexReaderFactory.getInstance();
   }
 
-  public String getFileExtension(ColumnMetadata columnMetadata) {
-    if (columnMetadata.isSingleValue()) {
-      if (!columnMetadata.hasDictionary()) {
-        return V1Constants.Indexes.RAW_SV_FORWARD_INDEX_FILE_EXTENSION;
-      } else if (columnMetadata.isSorted()) {
-        return V1Constants.Indexes.SORTED_SV_FORWARD_INDEX_FILE_EXTENSION;
-      } else {
-        return V1Constants.Indexes.UNSORTED_SV_FORWARD_INDEX_FILE_EXTENSION;
+  /**
+   * Returns forward index file extensions applicable to the column.
+   */
+  public List<String> getFileExtension(ColumnMetadata columnMetadata) {
+    if (columnMetadata.isForwardIndexDictionaryEncoded()) {
+      if (columnMetadata.isSingleValue()) {
+        return List.of(columnMetadata.isSorted() ? V1Constants.Indexes.SORTED_SV_FORWARD_INDEX_FILE_EXTENSION
+            : V1Constants.Indexes.UNSORTED_SV_FORWARD_INDEX_FILE_EXTENSION);
       }
-    } else if (!columnMetadata.hasDictionary()) {
-      return V1Constants.Indexes.RAW_MV_FORWARD_INDEX_FILE_EXTENSION;
-    } else {
-      return V1Constants.Indexes.UNSORTED_MV_FORWARD_INDEX_FILE_EXTENSION;
+      return List.of(V1Constants.Indexes.UNSORTED_MV_FORWARD_INDEX_FILE_EXTENSION);
     }
+    if (columnMetadata.isSingleValue()) {
+      return List.of(V1Constants.Indexes.RAW_SV_FORWARD_INDEX_FILE_EXTENSION);
+    }
+    return List.of(V1Constants.Indexes.RAW_MV_FORWARD_INDEX_FILE_EXTENSION);
   }
 
   @Override
@@ -256,7 +272,7 @@ public class ForwardIndexType extends AbstractIndexType<ForwardIndexConfig, Forw
     if (columnMetadata == null) {
       return EXTENSIONS;
     }
-    return Collections.singletonList(getFileExtension(columnMetadata));
+    return getFileExtension(columnMetadata);
   }
 
   @Nullable
@@ -270,7 +286,7 @@ public class ForwardIndexType extends AbstractIndexType<ForwardIndexConfig, Forw
     FieldSpec.DataType storedType = context.getFieldSpec().getDataType().getStoredType();
     int fixedLengthBytes = context.getFixedLengthBytes();
     boolean isSingleValue = context.getFieldSpec().isSingleValueField();
-    if (!context.hasDictionary()) {
+    if (context.getForwardIndexEncoding() == IndexCreationContext.ForwardIndexEncoding.RAW) {
       if (isSingleValue) {
         String allocationContext =
             IndexUtil.buildAllocationContext(context.getSegmentName(), context.getFieldSpec().getName(),
@@ -314,6 +330,8 @@ public class ForwardIndexType extends AbstractIndexType<ForwardIndexConfig, Forw
             context.getCapacity(), storedType.size(), context.getMemoryManager(), allocationContext, false, storedType);
       }
     } else {
+      Preconditions.checkState(context.hasDictionary(),
+          "Dictionary-encoded mutable forward index requires dictionary for column: %s", column);
       if (isSingleValue) {
         String allocationContext = IndexUtil.buildAllocationContext(segmentName, column,
             V1Constants.Indexes.UNSORTED_SV_FORWARD_INDEX_FILE_EXTENSION);

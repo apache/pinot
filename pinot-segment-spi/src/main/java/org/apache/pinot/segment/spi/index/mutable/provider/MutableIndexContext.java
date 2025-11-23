@@ -20,6 +20,7 @@ package org.apache.pinot.segment.spi.index.mutable.provider;
 
 import java.io.File;
 import java.util.Objects;
+import org.apache.pinot.segment.spi.creator.IndexCreationContext;
 import org.apache.pinot.segment.spi.memory.PinotDataBufferMemoryManager;
 import org.apache.pinot.spi.data.FieldSpec;
 
@@ -29,6 +30,7 @@ public class MutableIndexContext {
   private final FieldSpec _fieldSpec;
   private final int _fixedLengthBytes;
   private final boolean _hasDictionary;
+  private final IndexCreationContext.ForwardIndexEncoding _forwardIndexEncoding;
   private final boolean _offHeap;
   private final int _estimatedColSize;
   private final int _estimatedCardinality;
@@ -37,12 +39,14 @@ public class MutableIndexContext {
   private final PinotDataBufferMemoryManager _memoryManager;
   private final File _consumerDir;
 
-  public MutableIndexContext(FieldSpec fieldSpec, int fixedLengthBytes, boolean hasDictionary, String segmentName,
+  public MutableIndexContext(FieldSpec fieldSpec, int fixedLengthBytes, boolean hasDictionary,
+      IndexCreationContext.ForwardIndexEncoding forwardIndexEncoding, String segmentName,
       PinotDataBufferMemoryManager memoryManager, int capacity, boolean offHeap, int estimatedColSize,
       int estimatedCardinality, int avgNumMultiValues, File consumerDir) {
     _fieldSpec = fieldSpec;
     _fixedLengthBytes = fixedLengthBytes;
     _hasDictionary = hasDictionary;
+    _forwardIndexEncoding = forwardIndexEncoding;
     _segmentName = segmentName;
     _memoryManager = memoryManager;
     _capacity = capacity;
@@ -71,6 +75,10 @@ public class MutableIndexContext {
 
   public boolean hasDictionary() {
     return _hasDictionary;
+  }
+
+  public IndexCreationContext.ForwardIndexEncoding getForwardIndexEncoding() {
+    return _forwardIndexEncoding;
   }
 
   public int getCapacity() {
@@ -106,6 +114,8 @@ public class MutableIndexContext {
     private int _fixedLengthBytes;
     private String _segmentName;
     private boolean _hasDictionary = true;
+    private IndexCreationContext.ForwardIndexEncoding _forwardIndexEncoding =
+        IndexCreationContext.ForwardIndexEncoding.RAW;
     private boolean _offHeap = true;
     private int _capacity;
     private PinotDataBufferMemoryManager _memoryManager;
@@ -131,6 +141,11 @@ public class MutableIndexContext {
 
     public Builder withDictionary(boolean hasDictionary) {
       _hasDictionary = hasDictionary;
+      return this;
+    }
+
+    public Builder withForwardIndexEncoding(IndexCreationContext.ForwardIndexEncoding forwardIndexEncoding) {
+      _forwardIndexEncoding = forwardIndexEncoding;
       return this;
     }
 
@@ -171,8 +186,8 @@ public class MutableIndexContext {
 
     public MutableIndexContext build() {
       return new MutableIndexContext(Objects.requireNonNull(_fieldSpec), _fixedLengthBytes, _hasDictionary,
-          Objects.requireNonNull(_segmentName), Objects.requireNonNull(_memoryManager), _capacity, _offHeap,
-          _estimatedColSize, _estimatedCardinality, _avgNumMultiValues, _consumerDir);
+          _forwardIndexEncoding, Objects.requireNonNull(_segmentName), Objects.requireNonNull(_memoryManager),
+          _capacity, _offHeap, _estimatedColSize, _estimatedCardinality, _avgNumMultiValues, _consumerDir);
     }
   }
 }
