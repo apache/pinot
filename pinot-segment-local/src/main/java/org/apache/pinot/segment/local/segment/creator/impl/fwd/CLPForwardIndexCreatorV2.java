@@ -476,6 +476,11 @@ public class CLPForwardIndexCreatorV2 implements ForwardIndexCreator {
   }
 
   @Override
+  public void add(Object cellValue, int dictId) {
+    putString((String) cellValue);
+  }
+
+  @Override
   public boolean isSingleValue() {
     return true;
   }
