@@ -11,6 +11,17 @@
   "tableIndexConfig": {
     "loadMode": "MMAP"
   },
+  "fieldConfigList": [
+    {
+      "name": "commits_url",
+      "encodingType": "RAW",
+      "indexes": {
+        "inverted": {
+          "enabled": "true"
+        }
+      }
+    }
+  ],
   "ingestionConfig": {
     "transformConfigs": [
       {

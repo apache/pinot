@@ -31,6 +31,7 @@ import org.apache.pinot.segment.spi.index.ForwardIndexConfig;
 import org.apache.pinot.segment.spi.index.creator.ForwardIndexCreator;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
 
+
 /**
  * Raw (non-dictionary-encoded) forward index creator for single-value column of variable length data type (BIG_DECIMAL,
  * STRING, BYTES).
@@ -100,6 +101,11 @@ public class SingleValueVarByteRawIndexCreator implements ForwardIndexCreator {
   @Override
   public boolean isDictionaryEncoded() {
     return false;
+  }
+
+  @Override
+  public void add(Object cellValue, int dictId) {
+    addRaw(cellValue);
   }
 
   @Override

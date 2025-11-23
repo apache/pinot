@@ -18,11 +18,21 @@
  */
 package org.apache.pinot.segment.spi.creator;
 
+import java.util.Set;
 import java.util.concurrent.TimeUnit;
 import org.apache.pinot.segment.spi.creator.name.FixedSegmentNameGenerator;
 import org.apache.pinot.segment.spi.creator.name.NormalizedDateSegmentNameGenerator;
 import org.apache.pinot.segment.spi.creator.name.SimpleSegmentNameGenerator;
 import org.apache.pinot.segment.spi.creator.name.UploadedRealtimeSegmentNameGenerator;
+import org.apache.pinot.segment.spi.index.AbstractIndexType;
+import org.apache.pinot.segment.spi.index.FieldIndexConfigs;
+import org.apache.pinot.segment.spi.index.IndexCreator;
+import org.apache.pinot.segment.spi.index.IndexPlugin;
+import org.apache.pinot.segment.spi.index.IndexReader;
+import org.apache.pinot.segment.spi.index.IndexReaderFactory;
+import org.apache.pinot.segment.spi.index.IndexService;
+import org.apache.pinot.segment.spi.index.IndexType;
+import org.apache.pinot.segment.spi.index.StandardIndexes;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.TableType;
 import org.apache.pinot.spi.data.FieldSpec;
@@ -30,6 +40,8 @@ import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.data.TimeGranularitySpec;
 import org.apache.pinot.spi.utils.builder.TableConfigBuilder;
 import org.testng.Assert;
+import org.testng.annotations.AfterClass;
+import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
 
 import static org.testng.Assert.assertEquals;
@@ -39,6 +51,21 @@ import static org.testng.Assert.assertNull;
 
 // TODO: add more tests here.
 public class SegmentGeneratorConfigTest {
+  private IndexService _originalIndexService;
+
+  @BeforeClass
+  public void setUpIndexService() {
+    _originalIndexService = IndexService.getInstance();
+    IndexType<?, ?, ?> dictionaryIndex = new DummyDictionaryIndexType(StandardIndexes.DICTIONARY_ID);
+    IndexType<?, ?, ?> forwardIndex = new DummyForwardIndexType(StandardIndexes.FORWARD_ID);
+    IndexService.setInstance(
+        new IndexService(Set.of(new DummyIndexPlugin(dictionaryIndex), new DummyIndexPlugin(forwardIndex))));
+  }
+
+  @AfterClass
+  public void tearDownIndexService() {
+    IndexService.setInstance(_originalIndexService);
+  }
 
   @Test
   public void testEpochTime() {
@@ -162,5 +189,98 @@ public class SegmentGeneratorConfigTest {
     segmentGeneratorConfig = new SegmentGeneratorConfig(tableConfig, schema);
 
     Assert.assertTrue(segmentGeneratorConfig.getSegmentNameGenerator() instanceof SimpleSegmentNameGenerator);
+  }
+
+  private static class DummyIndexPlugin implements IndexPlugin<IndexType<?, ?, ?>> {
+    private final IndexType<?, ?, ?> _indexType;
+
+    DummyIndexPlugin(IndexType<?, ?, ?> indexType) {
+      _indexType = indexType;
+    }
+
+    @Override
+    public IndexType<?, ?, ?> getIndexType() {
+      return _indexType;
+    }
+  }
+
+  private static class DummyDictionaryIndexType extends
+      AbstractIndexType<org.apache.pinot.segment.spi.index.DictionaryIndexConfig, IndexReader, IndexCreator> {
+    DummyDictionaryIndexType(String id) {
+      super(id);
+    }
+
+    @Override
+    public Class<org.apache.pinot.segment.spi.index.DictionaryIndexConfig> getIndexConfigClass() {
+      return org.apache.pinot.segment.spi.index.DictionaryIndexConfig.class;
+    }
+
+    @Override
+    public org.apache.pinot.segment.spi.index.DictionaryIndexConfig getDefaultConfig() {
+      return org.apache.pinot.segment.spi.index.DictionaryIndexConfig.DEFAULT;
+    }
+
+    @Override
+    public IndexCreator createIndexCreator(org.apache.pinot.segment.spi.creator.IndexCreationContext context,
+        org.apache.pinot.segment.spi.index.DictionaryIndexConfig indexConfig) {
+      return null;
+    }
+
+    @Override
+    protected IndexReaderFactory<IndexReader> createReaderFactory() {
+      return (segmentReader, fieldIndexConfigs, metadata) -> null;
+    }
+
+    @Override
+    public java.util.List<String> getFileExtensions(org.apache.pinot.segment.spi.ColumnMetadata columnMetadata) {
+      return java.util.List.of();
+    }
+
+    @Override
+    public org.apache.pinot.segment.spi.index.IndexHandler createIndexHandler(
+        org.apache.pinot.segment.spi.store.SegmentDirectory segmentDirectory,
+        java.util.Map<String, FieldIndexConfigs> configsByCol, Schema schema, TableConfig tableConfig) {
+      return null;
+    }
+  }
+
+  private static class DummyForwardIndexType extends
+      AbstractIndexType<org.apache.pinot.segment.spi.index.ForwardIndexConfig, IndexReader, IndexCreator> {
+    DummyForwardIndexType(String id) {
+      super(id);
+    }
+
+    @Override
+    public Class<org.apache.pinot.segment.spi.index.ForwardIndexConfig> getIndexConfigClass() {
+      return org.apache.pinot.segment.spi.index.ForwardIndexConfig.class;
+    }
+
+    @Override
+    public org.apache.pinot.segment.spi.index.ForwardIndexConfig getDefaultConfig() {
+      return org.apache.pinot.segment.spi.index.ForwardIndexConfig.getDefault();
+    }
+
+    @Override
+    public IndexCreator createIndexCreator(org.apache.pinot.segment.spi.creator.IndexCreationContext context,
+        org.apache.pinot.segment.spi.index.ForwardIndexConfig indexConfig) {
+      return null;
+    }
+
+    @Override
+    protected IndexReaderFactory<IndexReader> createReaderFactory() {
+      return (segmentReader, fieldIndexConfigs, metadata) -> null;
+    }
+
+    @Override
+    public java.util.List<String> getFileExtensions(org.apache.pinot.segment.spi.ColumnMetadata columnMetadata) {
+      return java.util.List.of();
+    }
+
+    @Override
+    public org.apache.pinot.segment.spi.index.IndexHandler createIndexHandler(
+        org.apache.pinot.segment.spi.store.SegmentDirectory segmentDirectory,
+        java.util.Map<String, FieldIndexConfigs> configsByCol, Schema schema, TableConfig tableConfig) {
+      return null;
+    }
   }
 }

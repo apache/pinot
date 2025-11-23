@@ -22,10 +22,13 @@ package org.apache.pinot.segment.spi.index;
 import com.fasterxml.jackson.annotation.JsonCreator;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import com.google.common.base.Preconditions;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Objects;
 import javax.annotation.Nullable;
 import org.apache.pinot.spi.config.table.IndexConfig;
 import org.apache.pinot.spi.config.table.Intern;
+import org.apache.pinot.spi.data.FieldSpec;
 
 
 public class DictionaryIndexConfig extends IndexConfig {
@@ -113,5 +116,45 @@ public class DictionaryIndexConfig extends IndexConfig {
     } else {
       return "DictionaryIndexConfig{" + "\"disabled\": true}";
     }
+  }
+
+  /**
+   * Returns {@code true} if a dictionary must be created for the given column based on the configured indexes.
+   */
+  public static boolean isDictionaryRequired(FieldSpec fieldSpec, FieldIndexConfigs fieldIndexConfigs) {
+    IndexConfig dictionaryConfig = fieldIndexConfigs.getConfig(StandardIndexes.dictionary());
+    if (dictionaryConfig != null && dictionaryConfig.isEnabled()) {
+      return true;
+    }
+    for (IndexType<?, ?, ?> indexType : IndexService.getInstance().getAllIndexes()) {
+      if (indexType == StandardIndexes.dictionary()) {
+        continue;
+      }
+      IndexConfig indexConfig = fieldIndexConfigs.getConfig(indexType);
+      if (indexConfig != null && indexConfig.isEnabled()
+          && indexType.requiresDictionary(fieldSpec, fieldIndexConfigs)) {
+        return true;
+      }
+    }
+    return false;
+  }
+
+  /**
+   * Returns {@code true} if a dictionary must be created for the given column based on the configured indexes.
+   */
+  public static List<IndexType> getIndexTypesWithDictionaryRequired(FieldSpec fieldSpec,
+      FieldIndexConfigs fieldIndexConfigs) {
+    List<IndexType> indexTypes = new ArrayList<>();
+    for (IndexType<?, ?, ?> indexType : IndexService.getInstance().getAllIndexes()) {
+      if (indexType == StandardIndexes.dictionary()) {
+        continue;
+      }
+      IndexConfig indexConfig = fieldIndexConfigs.getConfig(indexType);
+      if (indexConfig != null && indexConfig.isEnabled()
+          && indexType.requiresDictionary(fieldSpec, fieldIndexConfigs)) {
+        indexTypes.add(indexType);
+      }
+    }
+    return indexTypes;
   }
 }

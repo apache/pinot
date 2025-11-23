@@ -42,44 +42,48 @@ public interface ForwardIndexCreator extends IndexCreator {
     if (dictId >= 0) {
       putDictId(dictId);
     } else {
-      switch (getValueType()) {
-        case INT:
-          putInt((int) cellValue);
-          break;
-        case LONG:
-          putLong((long) cellValue);
-          break;
-        case FLOAT:
-          putFloat((float) cellValue);
-          break;
-        case DOUBLE:
-          putDouble((double) cellValue);
-          break;
-        case BIG_DECIMAL:
-          putBigDecimal((BigDecimal) cellValue);
-          break;
-        case STRING:
+      addRaw(cellValue);
+    }
+  }
+
+  default void addRaw(Object cellValue) {
+    switch (getValueType()) {
+      case INT:
+        putInt((int) cellValue);
+        break;
+      case LONG:
+        putLong((long) cellValue);
+        break;
+      case FLOAT:
+        putFloat((float) cellValue);
+        break;
+      case DOUBLE:
+        putDouble((double) cellValue);
+        break;
+      case BIG_DECIMAL:
+        putBigDecimal((BigDecimal) cellValue);
+        break;
+      case STRING:
+        putString((String) cellValue);
+        break;
+      case BYTES:
+        putBytes((byte[]) cellValue);
+        break;
+      case JSON:
+      case MAP:
+        if (cellValue instanceof String) {
           putString((String) cellValue);
-          break;
-        case BYTES:
+        } else if (cellValue instanceof byte[]) {
           putBytes((byte[]) cellValue);
-          break;
-        case JSON:
-        case MAP:
-          if (cellValue instanceof String) {
-            putString((String) cellValue);
-          } else if (cellValue instanceof byte[]) {
-            putBytes((byte[]) cellValue);
-          } else if (cellValue instanceof Map) {
-            putBytes(MapUtils.serializeMap((Map<String, Object>) cellValue));
-          } else {
-            throw new IllegalStateException(
-                "Unsupported value type: " + getValueType() + ", cellValue type is: " + cellValue.getClass());
-          }
-          break;
-        default:
-          throw new IllegalStateException();
-      }
+        } else if (cellValue instanceof Map) {
+          putBytes(MapUtils.serializeMap((Map<String, Object>) cellValue));
+        } else {
+          throw new IllegalStateException(
+              "Unsupported value type: " + getValueType() + ", cellValue type is: " + cellValue.getClass());
+        }
+        break;
+      default:
+        throw new IllegalStateException();
     }
   }
 

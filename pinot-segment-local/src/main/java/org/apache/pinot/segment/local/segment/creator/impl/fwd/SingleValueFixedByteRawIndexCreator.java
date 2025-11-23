@@ -80,6 +80,11 @@ public class SingleValueFixedByteRawIndexCreator implements ForwardIndexCreator 
   }
 
   @Override
+  public void add(Object cellValue, int dictId) {
+    addRaw(cellValue);
+  }
+
+  @Override
   public boolean isSingleValue() {
     return true;
   }

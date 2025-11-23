@@ -36,6 +36,8 @@ import org.apache.pinot.segment.local.segment.index.readers.LongDictionary;
 import org.apache.pinot.segment.local.segment.index.readers.StringDictionary;
 import org.apache.pinot.segment.spi.ColumnMetadata;
 import org.apache.pinot.segment.spi.SegmentMetadata;
+import org.apache.pinot.segment.spi.index.ForwardIndexConfig;
+import org.apache.pinot.segment.spi.index.IndexReaderConstraintException;
 import org.apache.pinot.segment.spi.index.StandardIndexes;
 import org.apache.pinot.segment.spi.index.reader.Dictionary;
 import org.apache.pinot.segment.spi.index.reader.ForwardIndexReader;
@@ -198,14 +200,14 @@ public class ColumnMinMaxValueGenerator {
 
   @SuppressWarnings({"rawtypes", "unchecked"})
   private void addColumnMinMaxValueWithoutDictionary(ColumnMetadata columnMetadata)
-      throws IOException {
+      throws IOException, IndexReaderConstraintException {
     String columnName = columnMetadata.getColumnName();
     DataType dataType = columnMetadata.getDataType();
     DataType storedType = dataType.getStoredType();
     boolean isSingleValue = columnMetadata.isSingleValue();
     PinotDataBuffer rawIndexBuffer = _segmentWriter.getIndexFor(columnName, StandardIndexes.forward());
     try (ForwardIndexReader rawIndexReader = ForwardIndexReaderFactory.getInstance()
-        .createIndexReader(rawIndexBuffer, columnMetadata);
+        .createIndexReader(rawIndexBuffer, columnMetadata, ForwardIndexConfig.getDefault());
         ForwardIndexReaderContext readerContext = rawIndexReader.createContext()) {
       int numDocs = columnMetadata.getTotalDocs();
       Object minValue;
