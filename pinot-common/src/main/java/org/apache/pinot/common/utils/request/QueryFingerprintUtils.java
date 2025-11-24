@@ -35,38 +35,33 @@ public class QueryFingerprintUtils {
   }
 
   @Nullable
-  public static QueryFingerprint generateFingerprint(SqlNodeAndOptions sqlNodeAndOptions) {
+  public static QueryFingerprint generateFingerprint(SqlNodeAndOptions sqlNodeAndOptions) throws Exception {
     if (sqlNodeAndOptions == null) {
       return null;
     }
 
-    try {
-      SqlNode sqlNode = sqlNodeAndOptions.getSqlNode();
-      if (sqlNode == null) {
-        return null;
-      }
-
-      QueryFingerprintVisitor visitor = new QueryFingerprintVisitor();
-      SqlNode queryFingerprintNode = sqlNode.accept(visitor);
-
-      if (queryFingerprintNode == null) {
-        return null;
-      }
-
-      String fingerprint = queryFingerprintNode.toSqlString(c -> c.withDialect(AnsiSqlDialect.DEFAULT)).getSql();
-
-      if (fingerprint == null) {
-        return null;
-      }
-
-      // Normalize whitespace: replace newlines with spaces, collapse multiple spaces into one, and trim
-      fingerprint = fingerprint.replace("\n", " ").replaceAll("\\s+", " ").trim();
-
-      return new QueryFingerprint(hashString(fingerprint), fingerprint);
-    } catch (Exception e) {
-      LOGGER.warn("Failed to generate query fingerprint from SqlNode", e);
+    SqlNode sqlNode = sqlNodeAndOptions.getSqlNode();
+    if (sqlNode == null) {
       return null;
     }
+
+    QueryFingerprintVisitor visitor = new QueryFingerprintVisitor();
+    SqlNode queryFingerprintNode = sqlNode.accept(visitor);
+
+    if (queryFingerprintNode == null) {
+      return null;
+    }
+
+    String fingerprint = queryFingerprintNode.toSqlString(c -> c.withDialect(AnsiSqlDialect.DEFAULT)).getSql();
+
+    if (fingerprint == null) {
+      return null;
+    }
+
+    // Normalize whitespace: replace newlines with spaces, collapse multiple spaces into one, and trim
+    fingerprint = fingerprint.replace("\n", " ").replaceAll("\\s+", " ").trim();
+
+    return new QueryFingerprint(hashString(fingerprint), fingerprint);
   }
 
   private static String hashString(String input) {
