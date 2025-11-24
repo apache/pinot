@@ -282,6 +282,12 @@ public class PinotSegmentColumnReaderImpl implements ColumnReader {
     return _segmentColumnReader.isNull(docId);
   }
 
+  @Override
+  public Object getValue(int docId)
+      throws IOException {
+    return _segmentColumnReader.getValue(docId);
+  }
+
   // Single-value accessors
 
   @Override

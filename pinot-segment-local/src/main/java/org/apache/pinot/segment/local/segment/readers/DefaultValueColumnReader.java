@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.segment.local.segment.readers;
 
+import java.io.IOException;
 import javax.annotation.Nullable;
 import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.readers.ColumnReader;
@@ -298,6 +299,13 @@ public class DefaultValueColumnReader implements ColumnReader {
   public boolean isNull(int docId) {
     validateDocId(docId);
     return _defaultValue == null;
+  }
+
+  @Override
+  public Object getValue(int docId)
+      throws IOException {
+    validateDocId(docId);
+    return _defaultValue;
   }
 
   // Single-value accessors

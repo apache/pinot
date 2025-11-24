@@ -113,7 +113,7 @@ public abstract class AbstractSegmentCreator implements SegmentCreator {
       throws Exception {
     Map<String, FieldIndexConfigs> indexConfigs = _config.getIndexConfigsByColName();
     for (String columnName : indexConfigs.keySet()) {
-      if (canColumnBeIndexed(columnName) && _totalDocs > 0) {
+      if (canColumnBeIndexed(columnName) && _totalDocs > 0 && _indexCreationInfoMap.containsKey(columnName)) {
         ColumnIndexCreators result = createColIndexeCreators(columnName, immutableToMutableIdMap);
         _colIndexes.put(columnName, result);
       } else {

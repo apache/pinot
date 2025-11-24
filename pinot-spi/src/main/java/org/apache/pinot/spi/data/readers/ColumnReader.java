@@ -257,6 +257,12 @@ public interface ColumnReader extends Closeable, Serializable {
    */
   boolean isNull(int docId) throws IOException;
 
+  /**
+   * Get the value at the given document ID.
+   * <p>Document ID is 0-based. Valid values are 0 to {@link #getTotalDocs()} - 1.
+   */
+  Object getValue(int docId) throws IOException;
+
   // Single-value accessors
 
   /**
