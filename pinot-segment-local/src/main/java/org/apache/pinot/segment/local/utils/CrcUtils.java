@@ -124,7 +124,7 @@ public class CrcUtils {
       }
     }
     long crc = checksum.getValue();
-    LOGGER.info("Computed crc = {}, based on files {}", crc, filesToComputeCrc);
+    LOGGER.info("Computed crc = {}, with dataOnly = {}  based on files {}", crc, dataOnly, filesToComputeCrc);
     return crc;
   }
 }

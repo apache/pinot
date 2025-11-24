@@ -210,6 +210,7 @@ public class SegmentZKMetadataTest {
     offlineSegmentMetadata.setTimeUnit(TimeUnit.HOURS);
     offlineSegmentMetadata.setTotalDocs(50000);
     offlineSegmentMetadata.setCrc(54321);
+    offlineSegmentMetadata.setDataCrc(-1);
     offlineSegmentMetadata.setCreationTime(1000);
     offlineSegmentMetadata.setDownloadUrl("http://localhost:8000/testTable_O_3000_4000");
     offlineSegmentMetadata.setPushTime(4000);
