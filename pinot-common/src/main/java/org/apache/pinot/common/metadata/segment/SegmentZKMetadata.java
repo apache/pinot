@@ -170,8 +170,16 @@ public class SegmentZKMetadata implements ZKMetadata {
     return _znRecord.getLongField(Segment.CRC, -1);
   }
 
+  public long getDataCrc() {
+    return _znRecord.getLongField(Segment.DATA_CRC, -1);
+  }
+
   public void setCrc(long crc) {
     setNonNegativeValue(Segment.CRC, crc);
+  }
+
+  public void setDataCrc(long dataCrc) {
+    setNonNegativeValue(Segment.DATA_CRC, dataCrc);
   }
 
   public String getTier() {

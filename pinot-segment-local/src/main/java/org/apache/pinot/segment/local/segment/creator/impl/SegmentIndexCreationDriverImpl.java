@@ -522,6 +522,8 @@ public class SegmentIndexCreationDriverImpl implements SegmentIndexCreationDrive
     // Delete the temporary directory
     FileUtils.deleteQuietly(_tempIndexDir);
 
+    // Compute data crc before segment format conversion applies since v3 puts all index files into a single one
+    long dataCrc = CrcUtils.forAllFilesInFolder(segmentOutputDir).computeCrc(true);
     convertFormatIfNecessary(segmentOutputDir);
 
     if (_totalDocs > 0) {
@@ -531,7 +533,7 @@ public class SegmentIndexCreationDriverImpl implements SegmentIndexCreationDrive
     updatePostSegmentCreationIndexes(segmentOutputDir);
 
     // Compute CRC and creation time
-    long crc = CrcUtils.forAllFilesInFolder(segmentOutputDir).computeCrc();
+    long crc = CrcUtils.forAllFilesInFolder(segmentOutputDir).computeCrc(false);
     long creationTime;
     String creationTimeInConfig = _config.getCreationTime();
     if (creationTimeInConfig != null) {
@@ -546,7 +548,7 @@ public class SegmentIndexCreationDriverImpl implements SegmentIndexCreationDrive
     }
 
     // Persist creation metadata to disk
-    persistCreationMeta(segmentOutputDir, crc, creationTime);
+    persistCreationMeta(segmentOutputDir, crc, dataCrc, creationTime);
 
     LOGGER.info("Driver, record read time (in ms) : {}", TimeUnit.NANOSECONDS.toMillis(_totalRecordReadTimeNs));
     LOGGER.info("Driver, stats collector time (in ms) : {}", TimeUnit.NANOSECONDS.toMillis(_totalStatsCollectorTimeNs));
@@ -681,13 +683,14 @@ public class SegmentIndexCreationDriverImpl implements SegmentIndexCreationDrive
     return _segmentStats.getColumnProfileFor(columnName);
   }
 
-  public static void persistCreationMeta(File indexDir, long crc, long creationTime)
+  public static void persistCreationMeta(File indexDir, long crc, long dataOnlyCrc, long creationTime)
       throws IOException {
     File segmentDir = SegmentDirectoryPaths.findSegmentDirectory(indexDir);
     File creationMetaFile = new File(segmentDir, V1Constants.SEGMENT_CREATION_META);
     try (DataOutputStream output = new DataOutputStream(new FileOutputStream(creationMetaFile))) {
       output.writeLong(crc);
       output.writeLong(creationTime);
+      output.writeLong(dataOnlyCrc);
     }
   }
 

@@ -139,6 +139,7 @@ public class SegmentZKMetadataTest {
     record.setSimpleField(CommonConstants.Segment.TIME_UNIT, TimeUnit.HOURS.toString());
     record.setLongField(CommonConstants.Segment.TOTAL_DOCS, 10000);
     record.setLongField(CommonConstants.Segment.CRC, 1234);
+    record.setLongField(CommonConstants.Segment.DATA_CRC, 4567);
     record.setLongField(CommonConstants.Segment.CREATION_TIME, 3000);
     record.setIntField(CommonConstants.Segment.Realtime.FLUSH_THRESHOLD_SIZE, 1234);
     return record;
@@ -153,6 +154,7 @@ public class SegmentZKMetadataTest {
     realtimeSegmentMetadata.setStatus(Status.DONE);
     realtimeSegmentMetadata.setTotalDocs(10000);
     realtimeSegmentMetadata.setCrc(1234);
+    realtimeSegmentMetadata.setDataCrc(4567);
     realtimeSegmentMetadata.setCreationTime(3000);
     realtimeSegmentMetadata.setSizeThresholdToFlushSegment(1234);
     return realtimeSegmentMetadata;

@@ -24,6 +24,7 @@ import java.io.FileInputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
 import java.util.zip.Adler32;
@@ -38,47 +39,80 @@ public class CrcUtils {
   private static final Logger LOGGER = LoggerFactory.getLogger(CrcUtils.class);
   private static final int BUFFER_SIZE = 65536;
   private static final String CRC_FILE_EXTENSTION = ".crc";
+  private static final List<String> DATA_FILE_EXTENSIONS = Arrays.asList(".fwd", ".dict", ".inv");
+  private static final String METADATA_FILE = "metadata.properties";
 
   private final List<File> _files;
+  private final List<File> _dataFiles;
 
-  private CrcUtils(List<File> files) {
+  private CrcUtils(List<File> files, List<File> dataFiles) {
     _files = files;
+    _dataFiles = dataFiles;
   }
 
   public static CrcUtils forAllFilesInFolder(File dir) {
-    List<File> normalFiles = new ArrayList<>();
-    getAllNormalFiles(dir, normalFiles);
-    Collections.sort(normalFiles);
-    return new CrcUtils(normalFiles);
+    List<File> allNormalFiles = new ArrayList<>();
+    List<File> dataFiles = new ArrayList<>();
+    collectFiles(dir, allNormalFiles, dataFiles);
+    Collections.sort(allNormalFiles);
+    Collections.sort(dataFiles);
+    return new CrcUtils(allNormalFiles, dataFiles);
   }
 
   /**
-   * Helper method to get all normal (non-directory) files under a directory recursively.
+   * Helper method to get all files (normal and data files) in the directory to later compute CRC for them.
    * <p>NOTE: do not include the segment creation meta file.
    */
-  private static void getAllNormalFiles(File dir, List<File> normalFiles) {
+  private static void collectFiles(File dir, List<File> normalFiles, List<File> dataFiles) {
     File[] files = dir.listFiles();
     Preconditions.checkNotNull(files);
     for (File file : files) {
       if (file.isFile()) {
+        String fileName = file.getName();
         // Certain file systems, e.g. HDFS will create .crc files when perform data copy.
         // We should ignore both SEGMENT_CREATION_META and generated '.crc' files.
-        if (!file.getName().equals(V1Constants.SEGMENT_CREATION_META) && !file.getName()
+        if (!fileName.equals(V1Constants.SEGMENT_CREATION_META) && !fileName
             .endsWith(CRC_FILE_EXTENSTION)) {
+          // add all files to normal files
           normalFiles.add(file);
+          //include data extension files and metadata file to dataFiles
+          // Conditionally add to the data-only list
+          if (isDataFile(fileName)) {
+            dataFiles.add(file);
+          }
         }
       } else {
-        getAllNormalFiles(file, normalFiles);
+        collectFiles(file, normalFiles, dataFiles);
       }
     }
   }
 
-  public long computeCrc()
+  /**
+   * Determines if a file is considered a "Data File" (Metadata or one of ".fwd", ".dict", ".inv" file types).
+   */
+  private static boolean isDataFile(String fileName) {
+    if (fileName.equals(METADATA_FILE)) {
+      return true;
+    }
+    for (String ext : DATA_FILE_EXTENSIONS) {
+      if (fileName.endsWith(ext)) {
+        return true;
+      }
+    }
+    return false;
+  }
+
+  public long computeCrc(boolean dataOnly)
       throws IOException {
+    List<File> filesToComputeCrc = _files;
+    if (dataOnly) {
+      filesToComputeCrc = _dataFiles;
+    }
+
     byte[] buffer = new byte[BUFFER_SIZE];
     Checksum checksum = new Adler32();
 
-    for (File file : _files) {
+    for (File file : filesToComputeCrc) {
       try (InputStream input = new FileInputStream(file)) {
         int len;
         while ((len = input.read(buffer)) > 0) {
@@ -90,7 +124,7 @@ public class CrcUtils {
       }
     }
     long crc = checksum.getValue();
-    LOGGER.info("Computed crc = {}, based on files {}", crc, _files);
+    LOGGER.info("Computed crc = {}, based on files {}", crc, filesToComputeCrc);
     return crc;
   }
 }
