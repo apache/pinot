@@ -28,7 +28,7 @@ import org.testng.annotations.Test;
 public class QueryFingerprintUtilsTest {
 
   @Test
-  public void testNullQuery() {
+  public void testNullQuery() throws Exception {
     QueryFingerprint fingerprint = QueryFingerprintUtils.generateFingerprint(null);
     Assert.assertNull(fingerprint, "Null query should return null fingerprint");
   }
@@ -224,7 +224,7 @@ public class QueryFingerprintUtilsTest {
   }
 
   @Test
-  public void testQueryShapeNormalization() {
+  public void testQueryShapeNormalization() throws Exception {
     // Queries with different literals should produce the same fingerprint
     String[] queries = {
         "SELECT * FROM table1 WHERE col1 = 100",
@@ -248,7 +248,7 @@ public class QueryFingerprintUtilsTest {
   }
 
   @Test
-  public void testFingerprintTrimsWhitespace() {
+  public void testFingerprintTrimsWhitespace() throws Exception {
     SqlNodeAndOptions sqlNodeAndOptions1 = CalciteSqlParser.compileToSqlNodeAndOptions("SELECT col1 FROM table1");
     SqlNodeAndOptions sqlNodeAndOptions2 = CalciteSqlParser.compileToSqlNodeAndOptions("SELECT col1 FROM table1 ");
     QueryFingerprint queryFingerprint1 = QueryFingerprintUtils.generateFingerprint(sqlNodeAndOptions1);
@@ -261,7 +261,7 @@ public class QueryFingerprintUtilsTest {
   }
 
   @Test
-  public void testMultilineFormatNormalization() {
+  public void testMultilineFormatNormalization() throws Exception {
     // Queries with newlines should produce the same fingerprint as single-line queries
     String query1 = "SELECT col1\nFROM table1\nWHERE col2 = 100";
     String query2 = "SELECT col1 FROM table1 WHERE col2 = 100";
@@ -283,7 +283,7 @@ public class QueryFingerprintUtilsTest {
   }
 
   @Test
-  public void testComplexMultiStageQuery() {
+  public void testComplexMultiStageQuery() throws Exception {
     // Test a complex multi-stage query with JOINs, subqueries, and aggregations
     String query = "SELECT t1.col1, COUNT(*), AVG(t2.col2) "
         + "FROM table1 t1 "
