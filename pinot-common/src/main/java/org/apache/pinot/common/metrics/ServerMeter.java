@@ -245,9 +245,7 @@ public enum ServerMeter implements AbstractMetrics.Meter {
 
   TRANSFORMATION_ERROR_COUNT("rows", false),
   DROPPED_RECORD_COUNT("rows", false),
-  CORRUPTED_RECORD_COUNT("rows", false),
-  LOGS_DROPPED_BY_THROTTLED_LOGGER("logs", false,
-      "Count of suppressed exception logs during ingestion by throttled logger");
+  CORRUPTED_RECORD_COUNT("rows", false);
 
   private final String _meterName;
   private final String _unit;

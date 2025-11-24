@@ -27,7 +27,7 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
-import org.apache.pinot.common.utils.PinotThrottledLogger;
+import org.apache.pinot.common.utils.ThrottledLogger;
 import org.apache.pinot.segment.local.function.FunctionEvaluator;
 import org.apache.pinot.segment.local.function.FunctionEvaluatorFactory;
 import org.apache.pinot.spi.config.table.TableConfig;
@@ -53,7 +53,7 @@ public class ExpressionTransformer implements RecordTransformer {
   @VisibleForTesting
   final LinkedHashMap<String, FunctionEvaluator> _expressionEvaluators = new LinkedHashMap<>();
   private final boolean _continueOnError;
-  private final PinotThrottledLogger _throttledLogger;
+  private final ThrottledLogger _throttledLogger;
 
   public ExpressionTransformer(TableConfig tableConfig, Schema schema) {
     Map<String, FunctionEvaluator> expressionEvaluators = new HashMap<>();
@@ -90,7 +90,7 @@ public class ExpressionTransformer implements RecordTransformer {
     }
 
     _continueOnError = ingestionConfig != null && ingestionConfig.isContinueOnError();
-    _throttledLogger = new PinotThrottledLogger(LOGGER, ingestionConfig, tableConfig.getTableName());
+    _throttledLogger = new ThrottledLogger(LOGGER, ingestionConfig);
   }
 
   private void topologicalSort(String column, Map<String, FunctionEvaluator> expressionEvaluators,

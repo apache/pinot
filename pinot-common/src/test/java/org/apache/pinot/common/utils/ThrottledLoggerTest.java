@@ -29,12 +29,12 @@ import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.*;
 
 
-public class PinotThrottledLoggerTest {
+public class ThrottledLoggerTest {
 
   @Test
   public void testIndependentRateLimitingPerExceptionClass() {
     Logger mockLogger = mock(Logger.class);
-    PinotThrottledLogger throttledLogger = new PinotThrottledLogger(mockLogger, 2.0 / 60.0);
+    ThrottledLogger throttledLogger = new ThrottledLogger(mockLogger, 2.0 / 60.0);
 
     for (int i = 0; i < 100; i++) {
       throttledLogger.warn("Error", new NumberFormatException("Invalid number"));
@@ -54,7 +54,7 @@ public class PinotThrottledLoggerTest {
   @Test
   public void testDefaultIngestionConfigDisablesThrottling() {
     Logger mockLogger = mock(Logger.class);
-    PinotThrottledLogger throttledLogger = new PinotThrottledLogger(mockLogger, null, null);
+    ThrottledLogger throttledLogger = new ThrottledLogger(mockLogger, null);
 
     for (int i = 0; i < 100; i++) {
       throttledLogger.warn("Error", new NumberFormatException("Invalid number"));
@@ -69,7 +69,7 @@ public class PinotThrottledLoggerTest {
     Logger mockLogger = mock(Logger.class);
     IngestionConfig config = new IngestionConfig();
     config.setIngestionExceptionLogRateLimitPerMin(0);
-    PinotThrottledLogger throttledLogger = new PinotThrottledLogger(mockLogger, config, null);
+    ThrottledLogger throttledLogger = new ThrottledLogger(mockLogger, config);
 
     for (int i = 0; i < 100; i++) {
       throttledLogger.warn("Error", new NumberFormatException("Invalid number"));

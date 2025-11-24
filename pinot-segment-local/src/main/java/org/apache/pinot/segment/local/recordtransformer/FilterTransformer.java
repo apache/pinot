@@ -20,7 +20,7 @@ package org.apache.pinot.segment.local.recordtransformer;
 
 import java.util.ArrayList;
 import java.util.List;
-import org.apache.pinot.common.utils.PinotThrottledLogger;
+import org.apache.pinot.common.utils.ThrottledLogger;
 import org.apache.pinot.segment.local.function.FunctionEvaluator;
 import org.apache.pinot.segment.local.function.FunctionEvaluatorFactory;
 import org.apache.pinot.spi.config.table.TableConfig;
@@ -41,7 +41,7 @@ public class FilterTransformer implements RecordTransformer {
   private final String _filterFunction;
   private final FunctionEvaluator _evaluator;
   private final boolean _continueOnError;
-  private final PinotThrottledLogger _throttledLogger;
+  private final ThrottledLogger _throttledLogger;
 
   private long _numRecordsFiltered;
 
@@ -54,7 +54,7 @@ public class FilterTransformer implements RecordTransformer {
     }
     _evaluator = _filterFunction != null ? FunctionEvaluatorFactory.getExpressionEvaluator(_filterFunction) : null;
     _continueOnError = ingestionConfig != null && ingestionConfig.isContinueOnError();
-    _throttledLogger = new PinotThrottledLogger(LOGGER, ingestionConfig, tableConfig.getTableName());
+    _throttledLogger = new ThrottledLogger(LOGGER, ingestionConfig);
   }
 
   @Override

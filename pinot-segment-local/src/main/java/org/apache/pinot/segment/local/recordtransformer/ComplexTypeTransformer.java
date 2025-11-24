@@ -29,7 +29,7 @@ import java.util.Objects;
 import java.util.Set;
 import javax.annotation.Nullable;
 import org.apache.pinot.common.function.scalar.JsonFunctions;
-import org.apache.pinot.common.utils.PinotThrottledLogger;
+import org.apache.pinot.common.utils.ThrottledLogger;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.ingestion.ComplexTypeConfig;
 import org.apache.pinot.spi.config.table.ingestion.ComplexTypeConfig.CollectionNotUnnestedToJson;
@@ -99,7 +99,7 @@ public class ComplexTypeTransformer implements RecordTransformer {
   private final CollectionNotUnnestedToJson _collectionNotUnnestedToJson;
   private final Map<String, String> _prefixesToRename;
   private final boolean _continueOnError;
-  private final PinotThrottledLogger _throttledLogger;
+  private final ThrottledLogger _throttledLogger;
   private final List<String> _fieldsToUnnestAndKeepOriginalValue;
 
   private ComplexTypeTransformer(TableConfig tableConfig) {
@@ -124,7 +124,7 @@ public class ComplexTypeTransformer implements RecordTransformer {
         Objects.requireNonNullElse(complexTypeConfig.getCollectionNotUnnestedToJson(), DEFAULT_COLLECTION_TO_JSON_MODE);
     _prefixesToRename = Objects.requireNonNullElse(complexTypeConfig.getPrefixesToRename(), Map.of());
     _continueOnError = ingestionConfig.isContinueOnError();
-    _throttledLogger = new PinotThrottledLogger(LOGGER, ingestionConfig, tableConfig.getTableName());
+    _throttledLogger = new ThrottledLogger(LOGGER, ingestionConfig);
   }
 
   /// Returns a [ComplexTypeTransformer] if it is defined in the table config, `null` otherwise.
@@ -146,7 +146,7 @@ public class ComplexTypeTransformer implements RecordTransformer {
     _collectionNotUnnestedToJson = collectionNotUnnestedToJson;
     _prefixesToRename = prefixesToRename;
     _continueOnError = continueOnError;
-    _throttledLogger = new PinotThrottledLogger(LOGGER, 0.0);
+    _throttledLogger = new ThrottledLogger(LOGGER, 0.0);
   }
 
   @VisibleForTesting
