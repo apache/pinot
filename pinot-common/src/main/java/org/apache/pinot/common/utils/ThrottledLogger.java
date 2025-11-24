@@ -24,7 +24,6 @@ import java.util.function.BiConsumer;
 import javax.annotation.Nullable;
 import javax.annotation.concurrent.NotThreadSafe;
 import org.apache.pinot.spi.config.table.ingestion.IngestionConfig;
-import org.apache.pinot.spi.utils.CommonConstants;
 import org.slf4j.Logger;
 
 
@@ -57,7 +56,7 @@ public class ThrottledLogger {
 
   private static double getRateLimitPerMin(@Nullable IngestionConfig ingestionConfig) {
     if (ingestionConfig == null) {
-      return CommonConstants.IngestionConfigs.DEFAULT_INGESTION_EXCEPTION_LOG_RATE_LIMIT_PER_MIN;
+      return 0;
     }
     return ingestionConfig.getIngestionExceptionLogRateLimitPerMin();
   }
@@ -93,68 +92,6 @@ public class ThrottledLogger {
       // If acquire failed, the limiter has already incremented its internal dropped counter.
       // We still debug log so the data isn't completely lost.
       _delegate.debug(msg, t);
-    }
-  }
-
-  /**
-   * A highly performant, non-thread-safe Token Bucket implementation.
-   * It tracks its own dropped count to avoid wrapper object allocations.
-   */
-  @NotThreadSafe
-  private static class RateLimiter {
-    private final double _capacity;
-    private final double _tokensPerNano;
-
-    private double _tokens;
-    private long _lastRefillNano;
-    private long _droppedCount;
-
-    RateLimiter(double rateLimitPerMin) {
-      _capacity = rateLimitPerMin;
-      _tokens = rateLimitPerMin;
-      _tokensPerNano = rateLimitPerMin / 60_000_000_000.0;
-      _lastRefillNano = System.nanoTime();
-      _droppedCount = 0;
-    }
-
-    /**
-     * Attempts to consume a token.
-     * Refills tokens based on elapsed time.
-     * @return true if token acquired, false if limit exceeded (and increments dropped count)
-     */
-    boolean tryAcquire() {
-      long now = System.nanoTime();
-
-      // 1. Refill
-      long delta = now - _lastRefillNano;
-      if (delta > 0) {
-        double newTokens = delta * _tokensPerNano;
-        _tokens = Math.min(_capacity, _tokens + newTokens);
-        _lastRefillNano = now;
-      }
-
-      // 2. Acquire
-      if (_tokens >= 1.0) {
-        _tokens -= 1.0;
-        return true;
-      }
-
-      // 3. Reject & Track
-      _droppedCount++;
-      return false;
-    }
-
-    /**
-     * Returns the number of logs dropped since the last successful acquire,
-     * and resets the counter to zero.
-     */
-    long getAndResetDroppedCount() {
-      if (_droppedCount == 0) {
-        return 0;
-      }
-      long count = _droppedCount;
-      _droppedCount = 0;
-      return count;
     }
   }
 }
