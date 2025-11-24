@@ -52,10 +52,8 @@ public enum AggregationFunctionType {
   // Aggregation functions for single-valued columns
   COUNT("count"),
   // TODO: min/max only supports NUMERIC in Pinot, where Calcite supports COMPARABLE_ORDERED
-  MIN("min", new PinotMinMaxReturnTypeInference(), OperandTypes.or(OperandTypes.COMPARABLE_ORDERED, OperandTypes.ARRAY),
-      ReturnTypes.explicit(SqlTypeName.DOUBLE), ReturnTypes.explicit(SqlTypeName.DOUBLE), SqlKind.MIN),
-  MAX("max", new PinotMinMaxReturnTypeInference(), OperandTypes.or(OperandTypes.COMPARABLE_ORDERED, OperandTypes.ARRAY),
-      ReturnTypes.explicit(SqlTypeName.DOUBLE), ReturnTypes.explicit(SqlTypeName.DOUBLE), SqlKind.MAX),
+  MIN("min", SqlTypeName.DOUBLE, SqlTypeName.DOUBLE),
+  MAX("max", SqlTypeName.DOUBLE, SqlTypeName.DOUBLE),
   MINSTRING("minString", ReturnTypes.ARG0_NULLABLE_IF_EMPTY, OperandTypes.CHARACTER),
   MAXSTRING("maxString", ReturnTypes.ARG0_NULLABLE_IF_EMPTY, OperandTypes.CHARACTER),
   MINLONG("minLong", new BigintNullableIfEmpty(), OperandTypes.or(OperandTypes.INTEGER, OperandTypes.ARRAY_OF_INTEGER)),
@@ -65,8 +63,8 @@ public enum AggregationFunctionType {
   SUMINT("sumInt", ReturnTypes.AGG_SUM, OperandTypes.INTEGER),
   SUMLONG("sumLong", ReturnTypes.AGG_SUM, OperandTypes.or(OperandTypes.INTEGER, OperandTypes.ARRAY_OF_INTEGER)),
   SUMPRECISION("sumPrecision", ReturnTypes.explicit(SqlTypeName.DECIMAL), OperandTypes.ANY, SqlTypeName.OTHER),
-  AVG("avg", ReturnTypes.AVG_AGG_FUNCTION, OperandTypes.or(OperandTypes.NUMERIC, OperandTypes.ARRAY),
-      ReturnTypes.explicit(SqlTypeName.OTHER), ReturnTypes.explicit(SqlTypeName.DOUBLE), SqlKind.AVG),
+  // TODO: Support MV types after next release (see https://github.com/apache/pinot/pull/17109)
+  AVG("avg", SqlTypeName.OTHER, SqlTypeName.DOUBLE),
   MODE("mode", SqlTypeName.OTHER, SqlTypeName.DOUBLE),
   FIRSTWITHTIME("firstWithTime", ReturnTypes.ARG0,
       OperandTypes.family(SqlTypeFamily.ANY, SqlTypeFamily.ANY, SqlTypeFamily.CHARACTER), SqlTypeName.OTHER),
@@ -455,25 +453,6 @@ public enum AggregationFunctionType {
         } else {
           return typeFactory.createSqlType(SqlTypeName.BIGINT);
         }
-      }
-    }
-  }
-
-  /// Pinot's MIN / MAX aggregation functions can be used on SV or MV (represented as Calcite array) types.
-  private static class PinotMinMaxReturnTypeInference implements SqlReturnTypeInference {
-    @Override
-    public RelDataType inferReturnType(SqlOperatorBinding opBinding) {
-      RelDataType operandType;
-      if (opBinding.getOperandType(0).getComponentType() != null) {
-        operandType = opBinding.getOperandType(0).getComponentType();
-      } else {
-        operandType = opBinding.getOperandType(0);
-      }
-
-      if (opBinding.getGroupCount() == 0 || opBinding.hasFilter()) {
-        return opBinding.getTypeFactory().createTypeWithNullability(operandType, true);
-      } else {
-        return operandType;
       }
     }
   }
