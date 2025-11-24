@@ -45,6 +45,7 @@ public class SegmentMetadataMockUtils {
     Mockito.when(segmentMetadata.getName()).thenReturn(segmentName);
     Mockito.when(segmentMetadata.getTotalDocs()).thenReturn(numTotalDocs);
     Mockito.when(segmentMetadata.getCrc()).thenReturn(crc);
+    Mockito.when(segmentMetadata.getDataCrc()).thenReturn(String.valueOf(Long.parseLong(crc) + 100));
     Mockito.when(segmentMetadata.getStartTime()).thenReturn(startTime);
     Mockito.when(segmentMetadata.getEndTime()).thenReturn(endTime);
     Mockito.when(segmentMetadata.getTimeInterval()).thenReturn(
@@ -97,6 +98,7 @@ public class SegmentMetadataMockUtils {
     when(segmentMetadata.getTableName()).thenReturn(rawTableName);
     when(segmentMetadata.getName()).thenReturn(segmentName);
     when(segmentMetadata.getCrc()).thenReturn("0");
+    when(segmentMetadata.getDataCrc()).thenReturn("1");
 
     TreeMap<String, ColumnMetadata> columnMetadataMap = new TreeMap<>();
     columnMetadataMap.put(columnName, columnMetadata);
@@ -110,6 +112,7 @@ public class SegmentMetadataMockUtils {
     Mockito.when(segmentMetadata.getName()).thenReturn(segmentName);
     Mockito.when(segmentMetadata.getTotalDocs()).thenReturn(10);
     Mockito.when(segmentMetadata.getCrc()).thenReturn(Long.toString(System.nanoTime()));
+    Mockito.when(segmentMetadata.getDataCrc()).thenReturn(Long.toString(System.nanoTime()));
     Mockito.when(segmentMetadata.getStartTime()).thenReturn(endTime - 10);
     Mockito.when(segmentMetadata.getEndTime()).thenReturn(endTime);
     Mockito.when(segmentMetadata.getTimeInterval()).thenReturn(
