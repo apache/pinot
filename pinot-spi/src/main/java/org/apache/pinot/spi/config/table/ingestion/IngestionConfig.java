@@ -23,6 +23,7 @@ import com.fasterxml.jackson.annotation.JsonPropertyDescription;
 import java.util.List;
 import javax.annotation.Nullable;
 import org.apache.pinot.spi.config.BaseJsonConfig;
+import org.apache.pinot.spi.utils.CommonConstants;
 
 
 /**
@@ -75,6 +76,10 @@ public class IngestionConfig extends BaseJsonConfig {
 
   @JsonPropertyDescription("Configs related to check time value for segment")
   private boolean _segmentTimeValueCheck = true;
+
+  @JsonPropertyDescription("Max exception logs per minute per exception class (0 to disable)")
+  private int _ingestionExceptionLogRateLimitPerMin =
+      CommonConstants.IngestionConfigs.DEFAULT_INGESTION_EXCEPTION_LOG_RATE_LIMIT_PER_MIN;
 
   @Deprecated
   public IngestionConfig(@Nullable BatchIngestionConfig batchIngestionConfig,
@@ -152,6 +157,10 @@ public class IngestionConfig extends BaseJsonConfig {
     return _segmentTimeValueCheck;
   }
 
+  public int getIngestionExceptionLogRateLimitPerMin() {
+    return _ingestionExceptionLogRateLimitPerMin;
+  }
+
   public void setBatchIngestionConfig(BatchIngestionConfig batchIngestionConfig) {
     _batchIngestionConfig = batchIngestionConfig;
   }
@@ -199,5 +208,9 @@ public class IngestionConfig extends BaseJsonConfig {
 
   public void setSegmentTimeValueCheck(boolean segmentTimeValueCheck) {
     _segmentTimeValueCheck = segmentTimeValueCheck;
+  }
+
+  public void setIngestionExceptionLogRateLimitPerMin(int ingestionExceptionLogRateLimitPerMin) {
+    _ingestionExceptionLogRateLimitPerMin = ingestionExceptionLogRateLimitPerMin;
   }
 }

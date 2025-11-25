@@ -2091,6 +2091,10 @@ public class CommonConstants {
         "pinot.field.spec.default.json.max.length";
   }
 
+  public static class IngestionConfigs {
+    public static final int DEFAULT_INGESTION_EXCEPTION_LOG_RATE_LIMIT_PER_MIN = 5;
+  }
+
   /**
    * Configuration for setting up groovy static analyzer.
    * User can config different configuration for query and ingestion (table creation and update) static analyzer.
