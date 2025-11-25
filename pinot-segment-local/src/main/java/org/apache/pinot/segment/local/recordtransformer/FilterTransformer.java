@@ -82,12 +82,10 @@ public class FilterTransformer implements RecordTransformer {
       } catch (Exception e) {
         if (!_continueOnError) {
           throw new RuntimeException(
-              String.format("Caught exception while executing filter function: %s for record: %s", _filterFunction,
-                  record.toString()), e);
+              String.format("Caught exception while executing filter function: %s", _filterFunction), e);
         } else {
           _throttledLogger.warn(
-              String.format("Caught exception while executing filter function: %s for record: %s", _filterFunction,
-                  record.toString()), e);
+              String.format("Caught exception while executing filter function: %s", _filterFunction), e);
           record.markIncomplete();
         }
       }

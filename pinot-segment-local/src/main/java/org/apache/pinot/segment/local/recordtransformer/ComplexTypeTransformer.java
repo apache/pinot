@@ -237,8 +237,7 @@ public class ComplexTypeTransformer implements RecordTransformer {
         if (!_continueOnError) {
           throw new RuntimeException("Caught exception while transforming complex types", e);
         }
-        _throttledLogger.warn(
-            String.format("Caught exception while transforming complex types for record: %s", record.toString()), e);
+        _throttledLogger.warn("Caught exception while transforming complex types", e);
         record.markIncomplete();
       }
     }
@@ -250,8 +249,7 @@ public class ComplexTypeTransformer implements RecordTransformer {
           if (!_continueOnError) {
             throw new RuntimeException("Caught exception while renaming prefixes", e);
           }
-          _throttledLogger.warn(
-              String.format("Caught exception while renaming prefixes for record: %s", record.toString()), e);
+          _throttledLogger.warn("Caught exception while renaming prefixes", e);
           record.markIncomplete();
         }
       }
