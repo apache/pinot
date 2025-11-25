@@ -54,8 +54,6 @@ public class WindowValueAggregatorFactory {
         return new MaxWindowValueAggregator(supportRemoval);
       case "COUNT":
         return new CountWindowValueAggregator();
-      case "AVG":
-        return new AvgWindowValueAggregator();
       case "BOOLAND":
         return new BoolAndValueAggregator();
       case "BOOLOR":
