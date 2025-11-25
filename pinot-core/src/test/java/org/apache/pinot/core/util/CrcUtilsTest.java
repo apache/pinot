@@ -349,7 +349,9 @@ public class CrcUtilsTest {
       long firstRunCrc = crcs.get(0);
       for (int i = 1; i < crcs.size(); i++) {
         Assert.assertEquals(crcs.get(i).longValue(), firstRunCrc,
-            String.format("CRC Determinism failed for %s with Forward Index Disabled! Run 1 vs Run %d", version, i + 1));
+            String.format("CRC Determinism failed for %s with Forward Index Disabled! Run 1 vs Run %d",
+                version,
+                i + 1));
       }
     }
   }
