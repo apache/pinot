@@ -26,6 +26,7 @@ import java.io.InputStream;
 import java.net.URL;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 import org.apache.commons.io.FileUtils;
 import org.apache.pinot.plugin.inputformat.csv.CSVRecordReaderConfig;
 import org.apache.pinot.segment.local.segment.creator.SegmentTestUtils;
@@ -40,6 +41,8 @@ import org.apache.pinot.spi.config.table.FSTType;
 import org.apache.pinot.spi.config.table.FieldConfig;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.TableType;
+import org.apache.pinot.spi.config.table.ingestion.IngestionConfig;
+import org.apache.pinot.spi.config.table.ingestion.TransformConfig;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.data.readers.FileFormat;
@@ -262,7 +265,91 @@ public class CrcUtilsTest {
       long firstRunCrc = crcs.get(0);
       for (int i = 1; i < crcs.size(); i++) {
         Assert.assertEquals(crcs.get(i).longValue(), firstRunCrc,
-            String.format("Determinism test Failed for %s! Run 1 vs Run %d", version, i + 1));
+            String.format("CRC Determinism test Failed for %s! Run 1 vs Run %d", version, i + 1));
+      }
+    }
+  }
+
+  @Test
+  public void testCrcConsistencyWithAllForwardIndexDisabledAndTransformsForAllSegmentVers()
+      throws Exception {
+    int numRuns = 5;
+
+    URL resource = getClass().getClassLoader().getResource(AVRO_DATA);
+    assertNotNull(resource);
+    File avroFile = new File(TestUtils.getFileFromResourceUrl(resource));
+
+    // Define Schema with an extra column for Transformation
+    // We add "transformedCol" which will be generated during ingestion
+    Schema schema = new Schema.SchemaBuilder().setSchemaName(RAW_TABLE_NAME)
+        .addSingleValueDimension("column1", DataType.INT)
+        .addSingleValueDimension("column5", DataType.STRING)
+        .addMultiValueDimension("column6", DataType.INT)
+        .addSingleValueDimension("transformedCol", DataType.INT)
+        .addMetric("count", DataType.INT)
+        .addDateTime("daysSinceEpoch", DataType.INT, "EPOCH|DAYS", "1:DAYS")
+        .build();
+
+    // Define Field Configs to DISABLE Forward Index for ALL columns
+    List<FieldConfig> fieldConfigs = new ArrayList<>();
+    List<String> columns = List.of("column1", "column5", "column6", "transformedCol", "count", "daysSinceEpoch");
+
+    for (String col : columns) {
+      Map<String, String> properties = Map.of("forwardIndexDisabled", "true");
+      FieldConfig config = new FieldConfig(col, FieldConfig.EncodingType.DICTIONARY,
+          List.of(FieldConfig.IndexType.INVERTED), null, properties);
+      fieldConfigs.add(config);
+    }
+
+    List<TransformConfig> transformConfigs = new ArrayList<>();
+    transformConfigs.add(new TransformConfig("transformedCol", "plus(column1, 100)"));
+
+    IngestionConfig ingestionConfig = SegmentTestUtils.getSkipTimeCheckIngestionConfig();
+    ingestionConfig.setTransformConfigs(transformConfigs);
+
+    TableConfig tableConfig = new TableConfigBuilder(TableType.OFFLINE)
+        .setTableName(RAW_TABLE_NAME)
+        .setTimeColumnName("daysSinceEpoch")
+        .setFieldConfigList(fieldConfigs) // Apply No-Forward-Index configs
+        .setIngestionConfig(ingestionConfig) // Apply Transformations
+        .build();
+
+    SegmentVersion[] versionsToTest = new SegmentVersion[]{
+        SegmentVersion.v1,
+        SegmentVersion.v2,
+        SegmentVersion.v3
+    };
+
+    for (SegmentVersion version : versionsToTest) {
+      List<Long> crcs = new ArrayList<>();
+
+      for (int i = 0; i < numRuns; i++) {
+        FileUtils.deleteDirectory(INDEX_DIR);
+        INDEX_DIR.mkdirs();
+
+        SegmentGeneratorConfig config = new SegmentGeneratorConfig(tableConfig, schema);
+        config.setInputFilePath(avroFile.getAbsolutePath());
+        config.setSegmentVersion(version);
+        config.setOutDir(INDEX_DIR.getAbsolutePath());
+        config.setSegmentName("testCrcNoForwardIndex");
+
+        SegmentIndexCreationDriver driver = new SegmentIndexCreationDriverImpl();
+        driver.init(config);
+        driver.build();
+
+        File indexDir = driver.getOutputDirectory();
+
+        long currentDataCrc = readDataOnlyCrcFromMeta(indexDir);
+        crcs.add(currentDataCrc);
+
+        System.out.println(String.format("  [%s] Run %d Data CRC: %d", version, i + 1, currentDataCrc));
+      }
+
+      Assert.assertFalse(crcs.isEmpty());
+      long firstRunCrc = crcs.get(0);
+      for (int i = 1; i < crcs.size(); i++) {
+        Assert.assertEquals(crcs.get(i).longValue(), firstRunCrc,
+            String.format("CRC Determinism failed for %s with Forward Index Disabled! Run 1 vs Run %d", version, i + 1));
       }
     }
   }
