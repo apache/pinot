@@ -380,7 +380,7 @@ public class SchemaConformingTransformer implements RecordTransformer {
       if (!_continueOnError) {
         throw e;
       }
-      _throttledLogger.warn("Couldn't transform record: " + record.toString(), e);
+      _throttledLogger.warn("Couldn't transform record", e);
       outputRecord.markIncomplete();
     }
   }
