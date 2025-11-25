@@ -189,6 +189,9 @@ public class PinotOperatorTable implements SqlOperatorTable {
 
       // AGGREGATE OPERATORS
       SqlStdOperatorTable.COUNT,
+      SqlStdOperatorTable.SUM,
+      PinotMinMaxFunction.MIN,
+      PinotMinMaxFunction.MAX,
       SqlStdOperatorTable.AVG,
       SqlStdOperatorTable.MODE,
       SqlStdOperatorTable.STDDEV_POP,
@@ -197,9 +200,6 @@ public class PinotOperatorTable implements SqlOperatorTable {
       SqlStdOperatorTable.STDDEV_SAMP,
       SqlStdOperatorTable.VAR_POP,
       SqlStdOperatorTable.VAR_SAMP,
-      PinotSumFunction.INSTANCE,
-      PinotMinMaxFunction.MIN,
-      PinotMinMaxFunction.MAX,
       SqlStdOperatorTable.SUM0,
 
       // WINDOW Rank Functions
@@ -486,6 +486,8 @@ public class PinotOperatorTable implements SqlOperatorTable {
   /// the return type inference and operand type checker in {@link AggregationFunctionType} like we do for other
   /// functions because {@link org.apache.calcite.sql.fun.SqlSumAggFunction} has some customizations that we need to
   /// retain here to ensure that rules like {@link org.apache.calcite.rel.rules.AggregateRemoveRule} work as expected.
+  /// TODO: Replace {@link SqlStdOperatorTable#SUM} with this instance after the next release (there's a dependency
+  /// on AVG window function, see https://github.com/apache/pinot/pull/17109).
   private static final class PinotSumFunction extends PinotSqlAggFunction {
     static final SqlOperator INSTANCE = new PinotSumFunction();
 
