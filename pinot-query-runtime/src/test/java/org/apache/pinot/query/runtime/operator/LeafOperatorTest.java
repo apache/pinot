@@ -38,11 +38,17 @@ import org.apache.pinot.core.query.executor.QueryExecutor;
 import org.apache.pinot.core.query.request.ServerQueryRequest;
 import org.apache.pinot.core.query.request.context.QueryContext;
 import org.apache.pinot.core.query.request.context.utils.QueryContextConverterUtils;
+import org.apache.pinot.query.mailbox.MailboxService;
+import org.apache.pinot.query.planner.physical.DispatchablePlanFragment;
+import org.apache.pinot.query.routing.StageMetadata;
 import org.apache.pinot.query.routing.VirtualServerAddress;
+import org.apache.pinot.query.routing.WorkerMetadata;
 import org.apache.pinot.query.runtime.blocks.MseBlock;
 import org.apache.pinot.query.runtime.blocks.SuccessMseBlock;
+import org.apache.pinot.query.runtime.plan.MultiStageQueryStats;
 import org.apache.pinot.query.runtime.plan.OpChainExecutionContext;
 import org.apache.pinot.spi.exception.QueryErrorCode;
+import org.apache.pinot.spi.utils.CommonConstants.Broker.Request.QueryOptionKey;
 import org.mockito.Mock;
 import org.mockito.MockitoAnnotations;
 import org.testng.annotations.AfterClass;
@@ -107,6 +113,39 @@ public class LeafOperatorTest {
       queryRequests.add(queryRequest);
     }
     return queryRequests;
+  }
+
+  private LeafOperator createLeafOperatorWithTimeoutMode(String timeoutOverflowMode, long timeoutMs,
+      QueryExecutor queryExecutor, DataSchema schema) {
+    Map<String, String> metadata = new HashMap<>();
+    metadata.put(QueryOptionKey.TIMEOUT_OVERFLOW_MODE, timeoutOverflowMode);
+    return new LeafOperator(createExecutionContext(metadata, timeoutMs), mockQueryRequests(1), schema, queryExecutor,
+        _executorService);
+  }
+
+  private OpChainExecutionContext createExecutionContext(Map<String, String> metadata, long timeoutMs) {
+    long deadline = System.currentTimeMillis() + timeoutMs;
+    MailboxService mailboxService = mock(MailboxService.class);
+    when(mailboxService.getHostname()).thenReturn("localhost");
+    when(mailboxService.getPort()).thenReturn(1234);
+    WorkerMetadata workerMetadata = new WorkerMetadata(0, Map.of(), Map.of());
+    StageMetadata stageMetadata =
+        new StageMetadata(0, List.of(workerMetadata), Map.of(DispatchablePlanFragment.TABLE_NAME_KEY, "testTable"));
+    return new OpChainExecutionContext(mailboxService, 0L, "cid", deadline, deadline, "brokerId", metadata,
+        stageMetadata, workerMetadata, null, true);
+  }
+
+  private QueryExecutor slowQueryExecutor(long sleepMs) {
+    QueryExecutor queryExecutor = mock(QueryExecutor.class);
+    when(queryExecutor.execute(any(), any(), any())).thenAnswer(invocation -> {
+      try {
+        Thread.sleep(sleepMs);
+      } catch (InterruptedException e) {
+        Thread.currentThread().interrupt();
+      }
+      return new InstanceResponseBlock(new MetadataResultsBlock());
+    });
+    return queryExecutor;
   }
 
   @Test
@@ -197,6 +236,65 @@ public class LeafOperatorTest {
     assertEquals(rows2.get(0), new Object[]{"bar", 3});
     assertEquals(rows2.get(1), new Object[]{"foo", 4});
     assertTrue(resultBlock3.isEos(), "Expected EOS after reading 2 blocks");
+
+    operator.close();
+  }
+
+  @Test
+  public void shouldBreakOnTimeoutOverflowMode()
+      throws Exception {
+    DataSchema schema = new DataSchema(new String[]{"strCol"},
+        new DataSchema.ColumnDataType[]{DataSchema.ColumnDataType.STRING});
+    LeafOperator operator =
+        createLeafOperatorWithTimeoutMode("BREAK", 20, slowQueryExecutor(50), schema);
+    _operatorRef.set(operator);
+
+    MseBlock block = operator.nextBlock();
+    assertSame(block, SuccessMseBlock.INSTANCE);
+    MultiStageQueryStats stats = operator.calculateStats();
+    assertTrue(OperatorTestUtil.getStatMap(LeafOperator.StatKey.class, stats)
+        .getBoolean(LeafOperator.StatKey.TIMEOUT_OVERFLOW_REACHED));
+
+    operator.close();
+  }
+
+  @Test
+  public void shouldEmitPartialResultsWhenTimeoutErrorBlockReceived()
+      throws Exception {
+    QueryContext queryContext = QueryContextConverterUtils.getQueryContext("SELECT strCol FROM tbl");
+    DataSchema schema = new DataSchema(new String[]{"strCol"},
+        new DataSchema.ColumnDataType[]{DataSchema.ColumnDataType.STRING});
+    List<BaseResultsBlock> dataBlocks = Collections.singletonList(
+        new SelectionResultsBlock(schema, Arrays.asList(new Object[]{"foo"}, new Object[]{"bar"}), queryContext));
+    InstanceResponseBlock metadataBlock = new InstanceResponseBlock(new MetadataResultsBlock());
+    metadataBlock.addException(QueryErrorCode.EXECUTION_TIMEOUT, "Timing out on: LEAF");
+    QueryExecutor queryExecutor = mockQueryExecutor(dataBlocks, metadataBlock);
+    LeafOperator operator = createLeafOperatorWithTimeoutMode("BREAK", 1_000, queryExecutor, schema);
+    _operatorRef.set(operator);
+
+    MseBlock dataBlock = operator.nextBlock();
+    List<Object[]> rows = ((MseBlock.Data) dataBlock).asRowHeap().getRows();
+    assertEquals(rows.get(0), new Object[]{"foo"});
+    assertEquals(rows.get(1), new Object[]{"bar"});
+    assertSame(operator.nextBlock(), SuccessMseBlock.INSTANCE);
+    MultiStageQueryStats stats = operator.calculateStats();
+    assertTrue(OperatorTestUtil.getStatMap(LeafOperator.StatKey.class, stats)
+        .getBoolean(LeafOperator.StatKey.TIMEOUT_OVERFLOW_REACHED));
+
+    operator.close();
+  }
+
+  @Test
+  public void shouldThrowOnTimeoutOverflowMode()
+      throws Exception {
+    DataSchema schema = new DataSchema(new String[]{"strCol"},
+        new DataSchema.ColumnDataType[]{DataSchema.ColumnDataType.STRING});
+    LeafOperator operator =
+        createLeafOperatorWithTimeoutMode("THROW", 20, slowQueryExecutor(50), schema);
+    _operatorRef.set(operator);
+
+    MseBlock block = operator.nextBlock();
+    assertTrue(block.isError());
 
     operator.close();
   }
