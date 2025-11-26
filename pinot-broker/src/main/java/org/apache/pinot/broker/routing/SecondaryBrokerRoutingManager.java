@@ -25,13 +25,13 @@ import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.stream.Collectors;
-import org.apache.helix.HelixManager;
 import org.apache.pinot.common.metadata.ZKMetadataProvider;
 import org.apache.pinot.common.metrics.BrokerMeter;
 import org.apache.pinot.common.metrics.BrokerMetrics;
 import org.apache.pinot.common.metrics.BrokerTimer;
 import org.apache.pinot.core.transport.server.routing.stats.ServerRoutingStatsManager;
 import org.apache.pinot.spi.env.PinotConfiguration;
+import org.apache.pinot.spi.utils.builder.TableNameBuilder;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -41,62 +41,48 @@ public class SecondaryBrokerRoutingManager extends BrokerRoutingManager {
   private static final long ROUTING_CHANGE_DETECTION_INTERVAL_MS = 10_000L;
 
   private final AtomicBoolean _processChangeInRouting = new AtomicBoolean(false);
+  private final ScheduledExecutorService _routingChangeExecutor;
 
   public SecondaryBrokerRoutingManager(BrokerMetrics brokerMetrics,
-      ServerRoutingStatsManager serverRoutingStatsManager,
-      PinotConfiguration pinotConfig) {
+      ServerRoutingStatsManager serverRoutingStatsManager, PinotConfiguration pinotConfig) {
     super(brokerMetrics, serverRoutingStatsManager, pinotConfig);
-
-    ScheduledExecutorService executorService = Executors.newSingleThreadScheduledExecutor();
-    executorService.scheduleAtFixedRate(this::determineRoutingChangeForTables, 0,
-      ROUTING_CHANGE_DETECTION_INTERVAL_MS, TimeUnit.MILLISECONDS);
+    _routingChangeExecutor = Executors.newSingleThreadScheduledExecutor();
+    _routingChangeExecutor.scheduleAtFixedRate(this::determineRoutingChangeForTables, 0,
+        ROUTING_CHANGE_DETECTION_INTERVAL_MS, TimeUnit.MILLISECONDS);
   }
 
-  @Override
-  public void init(HelixManager helixManager) {
-    super.init(helixManager);
+  public void shutdown() {
+    _routingChangeExecutor.shutdownNow();
   }
 
   public void determineRoutingChangeForTables() {
-    LOGGER.info("Determining routing changes for tables in SecondaryBrokerRoutingManager for cluster: {}",
-      _parentClusterName);
     if (!_processChangeInRouting.getAndSet(false)) {
       return;
     }
+    LOGGER.info("Processing routing changes for cluster: {}", _parentClusterName);
     long startTimeMs = System.currentTimeMillis();
     _brokerMetrics.addMeteredGlobalValue(BrokerMeter.SECONDARY_BROKER_ROUTING_CALCULATION_COUNT, 1L);
-    String externalViewPath =
-      _externalViewPathPrefix.substring(0, _externalViewPathPrefix.length() - 1);
 
-    // Tables currently visible in ZK
+    String externalViewPath = _externalViewPathPrefix.substring(0, _externalViewPathPrefix.length() - 1);
     Set<String> currentTables = _zkDataAccessor.getChildNames(externalViewPath, 0).stream()
-      .filter(this::isPinotTableName)
-      .collect(Collectors.toSet());
-
-    // Tables we currently have routing for
+        .filter(t -> TableNameBuilder.getTableTypeFromTableName(t) != null)
+        .collect(Collectors.toSet());
     Set<String> knownTables = new HashSet<>(_routingEntryMap.keySet());
 
-    // Diff: what to add / what to remove
     Set<String> toAdd = new HashSet<>(currentTables);
     toAdd.removeAll(knownTables);
-
     Set<String> toRemove = new HashSet<>(knownTables);
     toRemove.removeAll(currentTables);
 
     toAdd.forEach(this::addRouting);
     toRemove.forEach(this::dropRouting);
 
-    long durationMs = System.currentTimeMillis() - startTimeMs;
-    _brokerMetrics.addTimedValue(BrokerTimer.SECONDARY_BROKER_ROUTING_CALCULATION_TIME_MS, durationMs,
-      TimeUnit.MILLISECONDS);
-  }
-
-  private boolean isPinotTableName(String table) {
-    return table.endsWith("_OFFLINE") || table.endsWith("_REALTIME");
+    _brokerMetrics.addTimedValue(BrokerTimer.SECONDARY_BROKER_ROUTING_CALCULATION_TIME_MS,
+        System.currentTimeMillis() - startTimeMs, TimeUnit.MILLISECONDS);
   }
 
   private void addRouting(String table) {
-    LOGGER.info("Adding routing in SecondaryBrokerRoutingManager for table: {} in {}", table, _parentClusterName);
+    LOGGER.info("Adding routing for table: {} in cluster: {}", table, _parentClusterName);
     if (ZKMetadataProvider.isLogicalTableExists(_propertyStore, table)) {
       buildRoutingForLogicalTable(table);
     } else {
@@ -105,7 +91,7 @@ public class SecondaryBrokerRoutingManager extends BrokerRoutingManager {
   }
 
   private void dropRouting(String table) {
-    LOGGER.info("Dropping routing in SecondaryBrokerRoutingManager for table: {} in {}", table, _parentClusterName);
+    LOGGER.info("Dropping routing for table: {} in cluster: {}", table, _parentClusterName);
     if (ZKMetadataProvider.isLogicalTableExists(_propertyStore, table)) {
       removeRoutingForLogicalTable(table);
     } else {

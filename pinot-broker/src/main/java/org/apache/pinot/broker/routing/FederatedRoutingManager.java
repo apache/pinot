@@ -19,13 +19,13 @@
 package org.apache.pinot.broker.routing;
 
 import java.util.ArrayList;
-import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
-import java.util.concurrent.ConcurrentHashMap;
+import java.util.function.Function;
+import java.util.function.Predicate;
 import javax.annotation.Nullable;
 import org.apache.pinot.common.request.BrokerRequest;
 import org.apache.pinot.core.routing.RoutingManager;
@@ -47,15 +47,8 @@ import org.slf4j.LoggerFactory;
 public class FederatedRoutingManager implements RoutingManager {
   private static final Logger LOGGER = LoggerFactory.getLogger(FederatedRoutingManager.class);
 
-  // Primary routing manager (connected to primary ZooKeeper cluster)
   private final BrokerRoutingManager _primaryRoutingManager;
-
-  // Secondary routing managers (connected to secondary ZooKeeper clusters)
   private final List<BrokerRoutingManager> _secondaryRoutingManagers;
-
-  // Combined routing information
-  private final Map<String, ServerInstance> _combinedServerInstanceMap = new ConcurrentHashMap<>();
-  private final Map<String, RoutingTable> _combinedRoutingTableCache = new ConcurrentHashMap<>();
 
   public FederatedRoutingManager(BrokerRoutingManager primaryRoutingManager,
       List<BrokerRoutingManager> secondaryRoutingManagers) {
@@ -63,271 +56,151 @@ public class FederatedRoutingManager implements RoutingManager {
     _secondaryRoutingManagers = secondaryRoutingManagers;
   }
 
-  private void updateCombinedServerInstances() {
-    _combinedServerInstanceMap.clear();
-
-    // Add server instances from primary routing manager
-    Map<String, ServerInstance> primaryServerInstances = _primaryRoutingManager.getEnabledServerInstanceMap();
-    _combinedServerInstanceMap.putAll(primaryServerInstances);
-
-    // Add server instances from secondary routing managers
-    for (BrokerRoutingManager secondaryRoutingManager : _secondaryRoutingManagers) {
-      Map<String, ServerInstance> secondaryServerInstances = secondaryRoutingManager.getEnabledServerInstanceMap();
-      _combinedServerInstanceMap.putAll(secondaryServerInstances);
+  @Nullable
+  private <T> T findFirst(Function<BrokerRoutingManager, T> getter, String tableNameForLog) {
+    T result = getter.apply(_primaryRoutingManager);
+    if (result != null) {
+      return result;
     }
+    for (BrokerRoutingManager secondary : _secondaryRoutingManagers) {
+      try {
+        result = getter.apply(secondary);
+        if (result != null) {
+          return result;
+        }
+      } catch (Exception e) {
+        LOGGER.error("Error querying secondary routing manager for table {}", tableNameForLog, e);
+      }
+    }
+    return null;
+  }
 
-    LOGGER.info("Updated combined server instances. Total: {}", _combinedServerInstanceMap.size());
+  private boolean anyMatch(Predicate<BrokerRoutingManager> predicate) {
+    if (predicate.test(_primaryRoutingManager)) {
+      return true;
+    }
+    for (BrokerRoutingManager secondary : _secondaryRoutingManagers) {
+      if (predicate.test(secondary)) {
+        return true;
+      }
+    }
+    return false;
   }
 
   @Override
   public boolean routingExists(String tableNameWithType) {
-    // Check if routing exists in primary routing manager
-    if (_primaryRoutingManager.routingExists(tableNameWithType)) {
-      return true;
-    }
-
-    // Check if routing exists in any secondary routing manager
-    for (BrokerRoutingManager secondaryRoutingManager : _secondaryRoutingManagers) {
-      if (secondaryRoutingManager.routingExists(tableNameWithType)) {
-        return true;
-      }
-    }
-
-    return false;
+    return anyMatch(mgr -> mgr.routingExists(tableNameWithType));
   }
 
   @Override
   public boolean isTableDisabled(String tableNameWithType) {
-    // Check if table is disabled in primary routing manager
-    if (_primaryRoutingManager.isTableDisabled(tableNameWithType)) {
-      return true;
-    }
-
-    // Check if table is disabled in any secondary routing manager
-    for (BrokerRoutingManager secondaryRoutingManager : _secondaryRoutingManagers) {
-      if (secondaryRoutingManager.isTableDisabled(tableNameWithType)) {
-        return true;
-      }
-    }
-
-    return false;
+    return anyMatch(mgr -> mgr.isTableDisabled(tableNameWithType));
   }
 
   @Nullable
   @Override
   public RoutingTable getRoutingTable(BrokerRequest brokerRequest, long requestId) {
-    String tableNameWithType = brokerRequest.getQuerySource().getTableName();
-    return getRoutingTable(brokerRequest, tableNameWithType, requestId);
+    return getRoutingTable(brokerRequest, brokerRequest.getQuerySource().getTableName(), requestId);
   }
 
   @Nullable
   @Override
   public RoutingTable getRoutingTable(BrokerRequest brokerRequest, String tableNameWithType, long requestId) {
-    // Check cache first
-    String cacheKey = tableNameWithType + "_" + requestId;
-    RoutingTable cachedRoutingTable = _combinedRoutingTableCache.get(cacheKey);
-    if (cachedRoutingTable != null) {
-      return cachedRoutingTable;
-    }
-
-    // Get routing table from primary routing manager
-    RoutingTable primaryRoutingTable = _primaryRoutingManager.getRoutingTable(brokerRequest,
-        tableNameWithType, requestId);
-
-    // Combine with routing tables from secondary routing managers
-    RoutingTable combinedRoutingTable = combineRoutingTables(primaryRoutingTable, tableNameWithType,
-        brokerRequest, requestId);
-
-    // Cache the result
-    if (combinedRoutingTable != null) {
-      _combinedRoutingTableCache.put(cacheKey, combinedRoutingTable);
-    }
-
-    return combinedRoutingTable;
+    RoutingTable primaryTable = _primaryRoutingManager.getRoutingTable(brokerRequest, tableNameWithType, requestId);
+    return combineRoutingTables(primaryTable, tableNameWithType, brokerRequest, requestId);
   }
 
-  private RoutingTable combineRoutingTables(RoutingTable primaryRoutingTable, String tableNameWithType,
+  private RoutingTable combineRoutingTables(@Nullable RoutingTable primaryTable, String tableNameWithType,
       BrokerRequest brokerRequest, long requestId) {
-    if (primaryRoutingTable == null) {
-      // If primary routing table is null, try to get routing table from secondary managers
-      for (BrokerRoutingManager secondaryRoutingManager : _secondaryRoutingManagers) {
-        RoutingTable secondaryRoutingTable = secondaryRoutingManager.getRoutingTable(brokerRequest,
-            tableNameWithType, requestId);
-        if (secondaryRoutingTable != null) {
-          return secondaryRoutingTable;
-        }
-      }
-      return null;
-    }
+    Map<ServerInstance, SegmentsToQuery> combinedMap = primaryTable != null
+        ? new HashMap<>(primaryTable.getServerInstanceToSegmentsMap()) : new HashMap<>();
+    List<String> unavailableSegments = primaryTable != null
+        ? new ArrayList<>(primaryTable.getUnavailableSegments()) : new ArrayList<>();
+    int prunedCount = primaryTable != null ? primaryTable.getNumPrunedSegments() : 0;
 
-    // Start with primary routing table
-    Map<ServerInstance, SegmentsToQuery> combinedServerInstanceToSegmentsMap =
-        new HashMap<>(primaryRoutingTable.getServerInstanceToSegmentsMap());
-    List<String> combinedUnavailableSegments = new ArrayList<>(primaryRoutingTable.getUnavailableSegments());
-    int combinedNumPrunedSegments = primaryRoutingTable.getNumPrunedSegments();
-
-    // Add routing information from secondary routing managers
-    for (BrokerRoutingManager secondaryRoutingManager : _secondaryRoutingManagers) {
+    for (BrokerRoutingManager secondary : _secondaryRoutingManagers) {
       try {
-        RoutingTable secondaryRoutingTable = secondaryRoutingManager.getRoutingTable(brokerRequest,
-            tableNameWithType, requestId);
-        if (secondaryRoutingTable != null) {
-          // Combine server instance to segments map
-          for (Map.Entry<ServerInstance, SegmentsToQuery> entry
-              : secondaryRoutingTable.getServerInstanceToSegmentsMap().entrySet()) {
-            ServerInstance serverInstance = entry.getKey();
-            SegmentsToQuery secondaryRouteInfo = entry.getValue();
-
-            SegmentsToQuery existingRouteInfo = combinedServerInstanceToSegmentsMap.get(serverInstance);
-            if (existingRouteInfo != null) {
-              // Merge segments
-              existingRouteInfo.getSegments().addAll(secondaryRouteInfo.getSegments());
-              existingRouteInfo.getOptionalSegments().addAll(secondaryRouteInfo.getOptionalSegments());
-            } else {
-              // Add new server instance
-              combinedServerInstanceToSegmentsMap.put(serverInstance, secondaryRouteInfo);
-            }
-          }
-
-          // Combine unavailable segments
-          combinedUnavailableSegments.addAll(secondaryRoutingTable.getUnavailableSegments());
-
-          // Add pruned segments count
-          combinedNumPrunedSegments += secondaryRoutingTable.getNumPrunedSegments();
+        RoutingTable secondaryTable = secondary.getRoutingTable(brokerRequest, tableNameWithType, requestId);
+        if (secondaryTable != null) {
+          mergeRoutingTable(combinedMap, secondaryTable);
+          unavailableSegments.addAll(secondaryTable.getUnavailableSegments());
+          prunedCount += secondaryTable.getNumPrunedSegments();
         }
       } catch (Exception e) {
-        LOGGER.error("Error combining routing table from secondary routing manager for table {}",
-            tableNameWithType, e);
+        LOGGER.error("Error combining routing table for table {}", tableNameWithType, e);
       }
     }
+    return combinedMap.isEmpty() && unavailableSegments.isEmpty() ? null
+        : new RoutingTable(combinedMap, unavailableSegments, prunedCount);
+  }
 
-    return new RoutingTable(combinedServerInstanceToSegmentsMap,
-        combinedUnavailableSegments, combinedNumPrunedSegments);
+  private void mergeRoutingTable(Map<ServerInstance, SegmentsToQuery> target, RoutingTable source) {
+    for (Map.Entry<ServerInstance, SegmentsToQuery> entry : source.getServerInstanceToSegmentsMap().entrySet()) {
+      SegmentsToQuery existing = target.get(entry.getKey());
+      if (existing != null) {
+        existing.getSegments().addAll(entry.getValue().getSegments());
+        existing.getOptionalSegments().addAll(entry.getValue().getOptionalSegments());
+      } else {
+        target.put(entry.getKey(), entry.getValue());
+      }
+    }
   }
 
   @Nullable
   @Override
   public TimeBoundaryInfo getTimeBoundaryInfo(String tableNameWithType) {
-    // Try to get time boundary info from primary routing manager first
-    TimeBoundaryInfo primaryTimeBoundaryInfo = _primaryRoutingManager.getTimeBoundaryInfo(tableNameWithType);
-    if (primaryTimeBoundaryInfo != null) {
-      return primaryTimeBoundaryInfo;
-    }
-
-    // Try to get time boundary info from secondary routing managers
-    for (BrokerRoutingManager secondaryRoutingManager : _secondaryRoutingManagers) {
-      try {
-        TimeBoundaryInfo secondaryTimeBoundaryInfo = secondaryRoutingManager.getTimeBoundaryInfo(tableNameWithType);
-        if (secondaryTimeBoundaryInfo != null) {
-          return secondaryTimeBoundaryInfo;
-        }
-      } catch (Exception e) {
-        LOGGER.error("Error getting time boundary info from secondary routing manager for table {}",
-            tableNameWithType, e);
-      }
-    }
-
-    return null;
+    return findFirst(mgr -> mgr.getTimeBoundaryInfo(tableNameWithType), tableNameWithType);
   }
 
   @Override
   public Map<String, ServerInstance> getEnabledServerInstanceMap() {
-    updateCombinedServerInstances();
-    return _combinedServerInstanceMap;
+    Map<String, ServerInstance> combined = new HashMap<>(_primaryRoutingManager.getEnabledServerInstanceMap());
+    for (BrokerRoutingManager secondary : _secondaryRoutingManagers) {
+      combined.putAll(secondary.getEnabledServerInstanceMap());
+    }
+    return combined;
   }
 
   @Override
   public TablePartitionInfo getTablePartitionInfo(String tableNameWithType) {
-    // Try to get table partition info from primary routing manager first
-    TablePartitionInfo primaryTablePartitionInfo = _primaryRoutingManager.getTablePartitionInfo(tableNameWithType);
-    if (primaryTablePartitionInfo != null) {
-      return primaryTablePartitionInfo;
-    }
-
-    // Try to get table partition info from secondary routing managers
-    for (BrokerRoutingManager secondaryRoutingManager : _secondaryRoutingManagers) {
-      try {
-        TablePartitionInfo secondaryTablePartitionInfo =
-            secondaryRoutingManager.getTablePartitionInfo(tableNameWithType);
-        if (secondaryTablePartitionInfo != null) {
-          return secondaryTablePartitionInfo;
-        }
-      } catch (Exception e) {
-        LOGGER.error("Error getting table partition info from secondary routing manager for table {}",
-            tableNameWithType, e);
-      }
-    }
-
-    return null;
+    return findFirst(mgr -> mgr.getTablePartitionInfo(tableNameWithType), tableNameWithType);
   }
 
   @Override
   public Set<String> getServingInstances(String tableNameWithType) {
-    // Get serving instances from primary routing manager
-    Set<String> primaryServingInstances = _primaryRoutingManager.getServingInstances(tableNameWithType);
-    if (primaryServingInstances == null) {
-      primaryServingInstances = Collections.emptySet();
+    Set<String> combined = new HashSet<>();
+    Set<String> primary = _primaryRoutingManager.getServingInstances(tableNameWithType);
+    if (primary != null) {
+      combined.addAll(primary);
     }
-    // Combine with serving instances from secondary routing managers
-    Set<String> combinedServingInstances = new HashSet<>(primaryServingInstances);
-    for (BrokerRoutingManager secondaryRoutingManager : _secondaryRoutingManagers) {
+    for (BrokerRoutingManager secondary : _secondaryRoutingManagers) {
       try {
-        Set<String> secondaryServingInstances = secondaryRoutingManager.getServingInstances(tableNameWithType);
-        if (secondaryServingInstances != null) {
-          combinedServingInstances.addAll(secondaryServingInstances);
+        Set<String> instances = secondary.getServingInstances(tableNameWithType);
+        if (instances != null) {
+          combined.addAll(instances);
         }
       } catch (Exception e) {
-        LOGGER.error("Error getting serving instances from secondary routing manager for table {}",
-            tableNameWithType, e);
+        LOGGER.error("Error getting serving instances for table {}", tableNameWithType, e);
       }
     }
-
-    return combinedServingInstances.isEmpty() ? null : combinedServingInstances;
+    return combined.isEmpty() ? null : combined;
   }
 
   @Override
   public List<String> getSegments(BrokerRequest brokerRequest) {
-    // Get segments from primary routing manager
-    List<String> primarySegments = _primaryRoutingManager.getSegments(brokerRequest);
-
-    // Combine with segments from secondary routing managers
-    List<String> combinedSegments = new ArrayList<>(primarySegments);
-    for (BrokerRoutingManager secondaryRoutingManager : _secondaryRoutingManagers) {
+    List<String> combined = new ArrayList<>(_primaryRoutingManager.getSegments(brokerRequest));
+    for (BrokerRoutingManager secondary : _secondaryRoutingManagers) {
       try {
-        List<String> secondarySegments = secondaryRoutingManager.getSegments(brokerRequest);
-        combinedSegments.addAll(secondarySegments);
+        combined.addAll(secondary.getSegments(brokerRequest));
       } catch (Exception e) {
         LOGGER.error("Error getting segments from secondary routing manager", e);
       }
     }
-
-    return combinedSegments;
+    return combined;
   }
 
   @Override
   public TablePartitionReplicatedServersInfo getTablePartitionReplicatedServersInfo(String tableNameWithType) {
-    // Try to get table partition replicated servers info from primary routing manager first
-    TablePartitionReplicatedServersInfo primaryInfo =
-        _primaryRoutingManager.getTablePartitionReplicatedServersInfo(tableNameWithType);
-    if (primaryInfo != null) {
-      return primaryInfo;
-    }
-
-    // Try to get table partition replicated servers info from secondary routing managers
-    for (BrokerRoutingManager secondaryRoutingManager : _secondaryRoutingManagers) {
-      try {
-        TablePartitionReplicatedServersInfo secondaryInfo =
-            secondaryRoutingManager.getTablePartitionReplicatedServersInfo(tableNameWithType);
-        if (secondaryInfo != null) {
-          return secondaryInfo;
-        }
-      } catch (Exception e) {
-        LOGGER.error(
-            "Error getting table partition replicated servers info from secondary routing manager for table {}",
-            tableNameWithType, e);
-      }
-    }
-
-    return null;
+    return findFirst(mgr -> mgr.getTablePartitionReplicatedServersInfo(tableNameWithType), tableNameWithType);
   }
 }

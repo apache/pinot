@@ -155,13 +155,11 @@ public abstract class BaseBrokerStarter implements ServiceStartable {
   protected Map<String, HelixManager> _secondarySpectatorHelixManager;
   protected HelixAdmin _helixAdmin;
   protected ZkHelixPropertyStore<ZNRecord> _propertyStore;
-  protected ZkHelixPropertyStore<ZNRecord> _secondaryPropertyStore;
   protected HelixDataAccessor _helixDataAccessor;
   protected PinotMetricsRegistry _metricsRegistry;
   protected BrokerMetrics _brokerMetrics;
   protected BrokerRoutingManager _routingManager;
   protected Map<String, SecondaryBrokerRoutingManager> _secondaryRoutingManagers;
-  protected BrokerRoutingManager _secondaryRoutingManager;
   protected FederatedRoutingManager _federatedRoutingManager;
   protected CrossClusterFederationProvider _crossClusterFederationProvider;
   protected AccessControlFactory _accessControlFactory;
@@ -240,39 +238,31 @@ public abstract class BaseBrokerStarter implements ServiceStartable {
       return;
     }
 
-    secondaryClusterNames = secondaryClusterNames.replaceAll("\\s+", "");
-    _secondaryClusterNames = Arrays.asList(secondaryClusterNames.split(","));
-    LOGGER.info("[federation] Configured secondary cluster names: {}", _secondaryClusterNames);
-
+    _secondaryClusterNames = Arrays.asList(secondaryClusterNames.replaceAll("\\s+", "").split(","));
     if (_secondaryClusterNames.isEmpty()) {
       LOGGER.warn("[federation] Secondary cluster names list is empty after parsing");
       return;
     }
+    LOGGER.info("[federation] Configured secondary cluster names: {}", _secondaryClusterNames);
 
     _secondaryZkServers = new HashMap<>();
     for (String name : _secondaryClusterNames) {
-      String secondaryZkServers = brokerConf.getProperty(
-          String.format(Helix.CONFIG_OF_SECONDARY_ZOOKEEPER_SERVER, name));
+      String zkConfig = String.format(Helix.CONFIG_OF_SECONDARY_ZOOKEEPER_SERVER, name);
+      String zkServers = brokerConf.getProperty(zkConfig);
 
-      if (secondaryZkServers == null || secondaryZkServers.trim().isEmpty()) {
-        LOGGER.error("[federation] Missing ZooKeeper configuration for secondary cluster: {}. "
-            + "Expected config key: {}", name,
-            String.format(Helix.CONFIG_OF_SECONDARY_ZOOKEEPER_SERVER, name));
+      if (zkServers == null || zkServers.trim().isEmpty()) {
+        LOGGER.error("[federation] Missing ZooKeeper configuration for cluster '{}', expected: {}", name, zkConfig);
         continue;
       }
-
-      secondaryZkServers = secondaryZkServers.replaceAll("\\s+", "");
-      _secondaryZkServers.put(name, secondaryZkServers);
-      LOGGER.info("[federation] Registered ZooKeeper servers for cluster '{}': {}", name, secondaryZkServers);
+      _secondaryZkServers.put(name, zkServers.replaceAll("\\s+", ""));
     }
 
     if (_secondaryZkServers.isEmpty()) {
-      LOGGER.error("[federation] No valid ZooKeeper configurations found for any secondary clusters. "
-          + "Federation will not be functional.");
+      LOGGER.error("[federation] No valid ZooKeeper configurations found - federation will not be functional");
       _secondaryClusterNames = null;
     } else {
-      LOGGER.info("[federation] Successfully initialized {} secondary cluster(s): {}",
-          _secondaryZkServers.size(), _secondaryZkServers.keySet());
+      LOGGER.info("[federation] Initialized {} secondary cluster(s): {}", _secondaryZkServers.size(),
+          _secondaryZkServers.keySet());
     }
   }
 
@@ -622,47 +612,29 @@ public abstract class BaseBrokerStarter implements ServiceStartable {
   }
 
   private void initSecondaryClusterRouting() {
-    LOGGER.info("[federation] Initializing secondary cluster routing tables");
-
     if (_secondaryRoutingManagers == null || _secondaryRoutingManagers.isEmpty()) {
-      LOGGER.info("[federation] No secondary routing managers available - skipping secondary cluster "
-          + "routing initialization");
+      LOGGER.info("[federation] No secondary routing managers - skipping routing table initialization");
       return;
     }
 
-    int successCount = 0;
-    int failureCount = 0;
+    LOGGER.info("[federation] Initializing routing tables for {} secondary clusters", _secondaryRoutingManagers.size());
+    int initialized = 0;
 
     for (Map.Entry<String, SecondaryBrokerRoutingManager> entry : _secondaryRoutingManagers.entrySet()) {
-      String secondaryClusterName = entry.getKey();
-      SecondaryBrokerRoutingManager secondaryRoutingManager = entry.getValue();
-
       try {
-        LOGGER.info("[federation] Initializing routing tables from ZK for secondary cluster '{}'",
-            secondaryClusterName);
-
-        secondaryRoutingManager.determineRoutingChangeForTables();
-        successCount++;
-
-        LOGGER.info("[federation] Successfully initialized routing tables for secondary cluster '{}'",
-            secondaryClusterName);
+        entry.getValue().determineRoutingChangeForTables();
+        initialized++;
       } catch (Exception e) {
-        failureCount++;
-        LOGGER.error("[federation] Failed to initialize routing tables for secondary cluster '{}'. Error: {}",
-            secondaryClusterName, e.getMessage(), e);
+        LOGGER.error("[federation] Failed to initialize routing tables for cluster '{}'", entry.getKey(), e);
       }
     }
 
-    LOGGER.info("[federation] Completed secondary cluster routing initialization. "
-        + "Success: {}, Failure: {}, Total clusters: {}",
-        successCount, failureCount, _secondaryRoutingManagers.size());
+    LOGGER.info("[federation] Initialized routing tables for {}/{} secondary clusters",
+        initialized, _secondaryRoutingManagers.size());
   }
 
   private void initSecondaryClusterFederationProvider(TableCache tableCache, boolean caseInsensitive,
       RoutingManager primaryRoutingManager, RoutingManager federatedRoutingManager) {
-    LOGGER.info("[federation] Initializing federation provider");
-
-    // Only create FederationProvider if federation is actually enabled (i.e., we have a federated routing manager)
     if (federatedRoutingManager == null) {
       LOGGER.info("[federation] Federation is not enabled - FederationProvider will be null");
       _crossClusterFederationProvider = null;
@@ -671,143 +643,99 @@ public abstract class BaseBrokerStarter implements ServiceStartable {
 
     Map<String, TableCache> tableCacheMap = new HashMap<>();
     tableCacheMap.put(_clusterName, tableCache);
-    LOGGER.info("[federation] Added primary cluster '{}' to federation provider", _clusterName);
 
     if (_secondarySpectatorHelixManager == null || _secondarySpectatorHelixManager.isEmpty()) {
-      LOGGER.info("[federation] No secondary spectator Helix managers available - "
-          + "creating federation provider with primary cluster only");
+      LOGGER.info("[federation] No secondary spectator Helix managers - creating provider with primary cluster only");
       _crossClusterFederationProvider = null;
       return;
     }
 
-    int successCount = 0;
-    int failureCount = 0;
+    LOGGER.info("[federation] Initializing federation provider with {} secondary clusters",
+        _secondarySpectatorHelixManager.size());
 
     for (Map.Entry<String, HelixManager> entry : _secondarySpectatorHelixManager.entrySet()) {
-      String secondaryClusterName = entry.getKey();
-      HelixManager helixManager = entry.getValue();
-
+      String clusterName = entry.getKey();
       try {
-        LOGGER.info("[federation] Creating table cache for secondary cluster '{}'", secondaryClusterName);
-        TableCache secondaryTableCache = new ZkTableCache(helixManager.getHelixPropertyStore(), caseInsensitive);
-        tableCacheMap.put(secondaryClusterName, secondaryTableCache);
-        successCount++;
-        LOGGER.info("[federation] Successfully added secondary cluster '{}' to federation provider",
-            secondaryClusterName);
+        TableCache secondaryCache = new ZkTableCache(entry.getValue().getHelixPropertyStore(), caseInsensitive);
+        tableCacheMap.put(clusterName, secondaryCache);
       } catch (Exception e) {
-        failureCount++;
-        LOGGER.error("[federation] Failed to create table cache for secondary cluster '{}'. Error: {}",
-            secondaryClusterName, e.getMessage(), e);
+        LOGGER.error("[federation] Failed to create table cache for cluster '{}'", clusterName, e);
       }
     }
 
     _crossClusterFederationProvider = new CrossClusterFederationProvider(tableCacheMap, primaryRoutingManager,
-      federatedRoutingManager);
-    LOGGER.info("[federation] Created federation provider with {} total cluster(s) (1 primary + {} secondary). "
-        + "Success: {}, Failure: {}",
-        tableCacheMap.size(), tableCacheMap.size() - 1, successCount, failureCount);
+        federatedRoutingManager);
+    LOGGER.info("[federation] Created federation provider with {}/{} clusters (1 primary + {} secondary)",
+        tableCacheMap.size(), _secondarySpectatorHelixManager.size() + 1, tableCacheMap.size() - 1);
   }
 
   private void initSecondaryClusterFederatedRoutingManager() {
-    LOGGER.info("[federation] Initializing federated routing manager");
-
     if (_secondarySpectatorHelixManager == null || _secondarySpectatorHelixManager.isEmpty()) {
-      LOGGER.info("[federation] No secondary spectator Helix managers available - skipping federated routing manager "
-          + "initialization");
+      LOGGER.info("[federation] No secondary spectator Helix managers - skipping federated routing manager init");
       return;
     }
 
+    LOGGER.info("[federation] Initializing federated routing manager for {} clusters",
+        _secondarySpectatorHelixManager.size());
     _secondaryRoutingManagers = new HashMap<>();
-    int successCount = 0;
-    int failureCount = 0;
 
     for (Map.Entry<String, HelixManager> entry : _secondarySpectatorHelixManager.entrySet()) {
-      String secondaryClusterName = entry.getKey();
-      HelixManager secondarySpectatorHelixManager = entry.getValue();
-
+      String clusterName = entry.getKey();
       try {
-        LOGGER.info("[federation] Initializing routing manager for secondary cluster '{}'", secondaryClusterName);
-
-        SecondaryBrokerRoutingManager secondaryRoutingManager =
+        SecondaryBrokerRoutingManager routingManager =
             new SecondaryBrokerRoutingManager(_brokerMetrics, _serverRoutingStatsManager, _brokerConf);
-        secondaryRoutingManager.init(secondarySpectatorHelixManager);
-
-        _secondaryRoutingManagers.put(secondaryClusterName, secondaryRoutingManager);
-        successCount++;
-
-        LOGGER.info("[federation] Successfully initialized routing manager for secondary cluster '{}'",
-            secondaryClusterName);
+        routingManager.init(entry.getValue());
+        _secondaryRoutingManagers.put(clusterName, routingManager);
       } catch (Exception e) {
-        failureCount++;
-        LOGGER.error("[federation] Failed to initialize routing manager for secondary cluster '{}'. Error: {}",
-            secondaryClusterName, e.getMessage(), e);
+        LOGGER.error("[federation] Failed to initialize routing manager for cluster '{}'", clusterName, e);
       }
     }
 
-    if (!_secondaryRoutingManagers.isEmpty()) {
+    if (_secondaryRoutingManagers.isEmpty()) {
+      LOGGER.error("[federation] Failed to initialize any routing managers - federated routing unavailable");
+    } else {
       _federatedRoutingManager = new FederatedRoutingManager(_routingManager,
           new ArrayList<>(_secondaryRoutingManagers.values()));
-      LOGGER.info("[federation] Created federated routing manager with {} secondary cluster(s). "
-          + "Success: {}, Failure: {}",
-          _secondaryRoutingManagers.size(), successCount, failureCount);
-    } else {
-      LOGGER.error("[federation] Failed to initialize any secondary routing managers. "
-          + "Federated routing will not be available.");
+      LOGGER.info("[federation] Created federated routing manager with {}/{} secondary clusters",
+          _secondaryRoutingManagers.size(), _secondarySpectatorHelixManager.size());
     }
   }
 
   private void initSecondaryClusterSpectatorHelixManagers() throws Exception {
-    LOGGER.info("[federation] Initializing secondary cluster spectator Helix managers");
-
     if (_secondaryZkServers == null || _secondaryZkServers.isEmpty()) {
-      LOGGER.info("[federation] No secondary ZooKeeper servers configured - skipping spectator Helix manager "
-          + "initialization");
+      LOGGER.info("[federation] No secondary ZK servers configured - skipping spectator Helix manager init");
       return;
     }
 
+    LOGGER.info("[federation] Initializing spectator Helix managers for {} secondary clusters",
+        _secondaryZkServers.size());
     _secondarySpectatorHelixManager = new HashMap<>();
-    int successCount = 0;
-    int failureCount = 0;
 
     for (Map.Entry<String, String> entry : _secondaryZkServers.entrySet()) {
-      String secondaryClusterName = entry.getKey();
-      String secondaryZkServers = entry.getValue();
-
+      String clusterName = entry.getKey();
+      String zkServers = entry.getValue();
       try {
-        LOGGER.info("[federation] Connecting to secondary cluster '{}' at ZK: {}",
-            secondaryClusterName, secondaryZkServers);
-
-        HelixManager secondarySpectatorHelixManager = HelixManagerFactory.getZKHelixManager(
-            secondaryClusterName, _instanceId, InstanceType.SPECTATOR, secondaryZkServers);
-        secondarySpectatorHelixManager.connect();
-
-        _secondarySpectatorHelixManager.put(secondaryClusterName, secondarySpectatorHelixManager);
-        successCount++;
-
-        LOGGER.info("[federation] Successfully connected to secondary cluster '{}' at ZK: {}",
-            secondaryClusterName, secondaryZkServers);
+        HelixManager helixManager = HelixManagerFactory.getZKHelixManager(
+            clusterName, _instanceId, InstanceType.SPECTATOR, zkServers);
+        helixManager.connect();
+        _secondarySpectatorHelixManager.put(clusterName, helixManager);
+        LOGGER.info("[federation] Connected to secondary cluster '{}' at ZK: {}", clusterName, zkServers);
       } catch (Exception e) {
-        failureCount++;
-        LOGGER.error("[federation] Failed to connect to secondary cluster '{}' at ZK: {}. Error: {}",
-            secondaryClusterName, secondaryZkServers, e.getMessage(), e);
+        LOGGER.error("[federation] Failed to connect to cluster '{}' at ZK: {}", clusterName, zkServers, e);
       }
     }
 
-    LOGGER.info("[federation] Completed secondary cluster spectator Helix manager initialization. "
-        + "Success: {}, Failure: {}, Total clusters: {}",
-        successCount, failureCount, _secondarySpectatorHelixManager.keySet());
-
     if (_secondarySpectatorHelixManager.isEmpty()) {
-      LOGGER.error("[federation] Failed to connect to any secondary clusters. Federation will not be functional.");
+      LOGGER.error("[federation] Failed to connect to any secondary clusters - federation will not be functional");
+    } else {
+      LOGGER.info("[federation] Connected to {}/{} secondary clusters: {}", _secondarySpectatorHelixManager.size(),
+          _secondaryZkServers.size(), _secondarySpectatorHelixManager.keySet());
     }
   }
 
   public void initSecondaryClusterChangeMediator() throws Exception {
-    LOGGER.info("[federation] Initializing secondary cluster change mediators");
-
     if (_secondarySpectatorHelixManager == null || _secondarySpectatorHelixManager.isEmpty()) {
-      LOGGER.info("[federation] No secondary spectator Helix managers available - skipping cluster change mediator "
-          + "initialization");
+      LOGGER.info("[federation] No secondary spectator Helix managers - skipping cluster change mediator init");
       return;
     }
 
@@ -816,58 +744,41 @@ public abstract class BaseBrokerStarter implements ServiceStartable {
       return;
     }
 
+    LOGGER.info("[federation] Initializing cluster change mediators for {} secondary clusters",
+        _secondarySpectatorHelixManager.size());
     _secondaryClusterChangeMediator = new HashMap<>();
-    int successCount = 0;
-    int failureCount = 0;
 
-    for (String secondaryClusterName : _secondarySpectatorHelixManager.keySet()) {
+    for (String clusterName : _secondarySpectatorHelixManager.keySet()) {
+      BrokerRoutingManager routingManager = _secondaryRoutingManagers.get(clusterName);
+      if (routingManager == null) {
+        LOGGER.error("[federation] Routing manager not found for cluster '{}' - skipping mediator setup", clusterName);
+        continue;
+      }
+
       try {
-        LOGGER.info("[federation] Initializing cluster change mediator for secondary cluster '{}'",
-            secondaryClusterName);
+        Map<ChangeType, List<ClusterChangeHandler>> handlers = new HashMap<>();
+        handlers.put(ChangeType.CLUSTER_CONFIG, new ArrayList<>());
+        handlers.put(ChangeType.IDEAL_STATE, Collections.singletonList(routingManager));
+        handlers.put(ChangeType.EXTERNAL_VIEW, Collections.singletonList(routingManager));
+        handlers.put(ChangeType.INSTANCE_CONFIG, Collections.singletonList(routingManager));
+        handlers.put(ChangeType.RESOURCE_CONFIG, Collections.singletonList(routingManager));
 
-        BrokerRoutingManager secondaryRoutingManager = _secondaryRoutingManagers.get(secondaryClusterName);
-        if (secondaryRoutingManager == null) {
-          LOGGER.error("[federation] Secondary routing manager not found for cluster '{}' - "
-              + "skipping cluster change mediator setup", secondaryClusterName);
-          failureCount++;
-          continue;
-        }
-
-        // Create change handlers map
-        Map<ChangeType, List<ClusterChangeHandler>> clusterChangeHandlersMap = new HashMap<>();
-        clusterChangeHandlersMap.put(ChangeType.CLUSTER_CONFIG, new ArrayList<>());
-        clusterChangeHandlersMap.put(ChangeType.IDEAL_STATE, Collections.singletonList(secondaryRoutingManager));
-        clusterChangeHandlersMap.put(ChangeType.EXTERNAL_VIEW, Collections.singletonList(secondaryRoutingManager));
-        clusterChangeHandlersMap.put(ChangeType.INSTANCE_CONFIG, Collections.singletonList(secondaryRoutingManager));
-        clusterChangeHandlersMap.put(ChangeType.RESOURCE_CONFIG, Collections.singletonList(secondaryRoutingManager));
-
-        ClusterChangeMediator mediator = new ClusterChangeMediator(_secondaryInstanceId, clusterChangeHandlersMap,
-            _brokerMetrics);
-
-        LOGGER.info("[federation] Starting cluster change mediator for secondary cluster '{}'", secondaryClusterName);
+        ClusterChangeMediator mediator = new ClusterChangeMediator(_secondaryInstanceId, handlers, _brokerMetrics);
         mediator.start();
-        _secondaryClusterChangeMediator.put(secondaryClusterName, mediator);
+        _secondaryClusterChangeMediator.put(clusterName, mediator);
 
-        // Add listeners to Helix manager
-        HelixManager helixManager = _secondarySpectatorHelixManager.get(secondaryClusterName);
+        HelixManager helixManager = _secondarySpectatorHelixManager.get(clusterName);
         helixManager.addIdealStateChangeListener(mediator);
         helixManager.addExternalViewChangeListener(mediator);
         helixManager.addInstanceConfigChangeListener(mediator);
         helixManager.addClusterfigChangeListener(mediator);
-
-        successCount++;
-        LOGGER.info("[federation] Successfully initialized, started cluster change mediator for secondary cluster {}",
-            secondaryClusterName);
       } catch (Exception e) {
-        failureCount++;
-        LOGGER.error("[federation] Failed to initialize cluster change mediator for secondary cluster '{}'. Error: {}",
-            secondaryClusterName, e.getMessage(), e);
+        LOGGER.error("[federation] Failed to initialize cluster change mediator for cluster '{}'", clusterName, e);
       }
     }
 
-    LOGGER.info("[federation] Completed secondary cluster change mediator initialization. "
-        + "Success: {}, Failure: {}, Total mediators: {}",
-        successCount, failureCount, _secondaryClusterChangeMediator.size());
+    LOGGER.info("[federation] Initialized {}/{} cluster change mediators", _secondaryClusterChangeMediator.size(),
+        _secondarySpectatorHelixManager.size());
   }
 
   /**
@@ -1028,10 +939,10 @@ public abstract class BaseBrokerStarter implements ServiceStartable {
     LOGGER.info("Stopping cluster change mediator");
     _clusterChangeMediator.stop();
     if (_secondaryClusterChangeMediator != null) {
-      for (ClusterChangeMediator mediator : _secondaryClusterChangeMediator.values()) {
-        LOGGER.info("Stopping secondary cluster change mediator");
-        mediator.stop();
-      }
+      _secondaryClusterChangeMediator.values().forEach(ClusterChangeMediator::stop);
+    }
+    if (_secondaryRoutingManagers != null) {
+      _secondaryRoutingManagers.values().forEach(SecondaryBrokerRoutingManager::shutdown);
     }
 
     _failureDetector.stop();
@@ -1071,10 +982,7 @@ public abstract class BaseBrokerStarter implements ServiceStartable {
     LOGGER.info("Disconnecting spectator Helix manager");
     _spectatorHelixManager.disconnect();
     if (_secondarySpectatorHelixManager != null) {
-      for (HelixManager helixManager : _secondarySpectatorHelixManager.values()) {
-        LOGGER.info("Disconnecting secondary spectator Helix manager");
-        helixManager.disconnect();
-      }
+      _secondarySpectatorHelixManager.values().forEach(HelixManager::disconnect);
     }
 
     LOGGER.info("Deregistering service status handler");

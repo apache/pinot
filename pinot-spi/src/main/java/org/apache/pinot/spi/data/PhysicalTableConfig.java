@@ -28,38 +28,20 @@ import org.apache.pinot.spi.config.BaseJsonConfig;
  */
 public class PhysicalTableConfig extends BaseJsonConfig {
   @JsonProperty("isFederated")
-  boolean _isFederated;
+  private boolean _isFederated;
 
-  /**
-   * Default constructor that creates a non-federated physical table config.
-   */
   public PhysicalTableConfig() {
     this(false);
   }
 
-  /**
-   * Constructor that creates a physical table config with the specified federation status.
-   *
-   * @param isFederated true if this physical table is federated across clusters, false otherwise
-   */
   public PhysicalTableConfig(boolean isFederated) {
     _isFederated = isFederated;
   }
 
-  /**
-   * Returns whether this physical table is federated across clusters.
-   *
-   * @return true if the physical table is federated, false otherwise
-   */
   public boolean isFederated() {
     return _isFederated;
   }
 
-  /**
-   * Sets whether this physical table is federated across clusters.
-   *
-   * @param isFederated true if the physical table is federated, false otherwise
-   */
   public void setFederated(boolean isFederated) {
     _isFederated = isFederated;
   }
