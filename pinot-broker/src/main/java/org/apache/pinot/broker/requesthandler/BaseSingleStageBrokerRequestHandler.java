@@ -88,7 +88,7 @@ import org.apache.pinot.core.query.reduce.BaseGapfillProcessor;
 import org.apache.pinot.core.query.reduce.GapfillProcessorFactory;
 import org.apache.pinot.core.query.request.context.QueryContext;
 import org.apache.pinot.core.query.request.context.utils.QueryContextConverterUtils;
-import org.apache.pinot.core.routing.FederationProvider;
+import org.apache.pinot.core.routing.CrossClusterFederationProvider;
 import org.apache.pinot.core.routing.ImplicitHybridTableRouteProvider;
 import org.apache.pinot.core.routing.LogicalTableRouteProvider;
 import org.apache.pinot.core.routing.RoutingManager;
@@ -179,9 +179,9 @@ public abstract class BaseSingleStageBrokerRequestHandler extends BaseBrokerRequ
   public BaseSingleStageBrokerRequestHandler(PinotConfiguration config, String brokerId,
       BrokerRequestIdGenerator requestIdGenerator, RoutingManager routingManager,
       AccessControlFactory accessControlFactory, QueryQuotaManager queryQuotaManager, TableCache tableCache,
-      ThreadAccountant threadAccountant, FederationProvider federationProvider) {
+      ThreadAccountant threadAccountant, CrossClusterFederationProvider crossClusterFederationProvider) {
     super(config, brokerId, requestIdGenerator, routingManager, accessControlFactory, queryQuotaManager, tableCache,
-        threadAccountant, federationProvider);
+        threadAccountant, crossClusterFederationProvider);
     _disableGroovy = _config.getProperty(Broker.DISABLE_GROOVY, Broker.DEFAULT_DISABLE_GROOVY);
     _useApproximateFunction = _config.getProperty(Broker.USE_APPROXIMATE_FUNCTION, false);
     _defaultHllLog2m = _config.getProperty(CommonConstants.Helix.DEFAULT_HYPERLOGLOG_LOG2M_KEY,
@@ -210,7 +210,7 @@ public abstract class BaseSingleStageBrokerRequestHandler extends BaseBrokerRequ
         Broker.DEFAULT_USE_MSE_TO_FILL_EMPTY_RESPONSE_SCHEMA);
 
     _implicitHybridTableRouteProvider = new ImplicitHybridTableRouteProvider();
-    _logicalTableRouteProvider = new LogicalTableRouteProvider(federationProvider);
+    _logicalTableRouteProvider = new LogicalTableRouteProvider(crossClusterFederationProvider);
 
     LOGGER.info("Initialized {} with broker id: {}, timeout: {}ms, query response limit: {}, "
             + "default query limit {}, query log max length: {}, query log max rate: {}, query cancellation "
@@ -505,7 +505,11 @@ public abstract class BaseSingleStageBrokerRequestHandler extends BaseBrokerRequ
       routeProvider = _implicitHybridTableRouteProvider;
     }
 
-    RoutingManager routingManager = _routingManager.getPrimaryRoutingManager(pinotQuery.getQueryOptions());
+    // Get the appropriate routing manager based on query options
+    // If FederationProvider is null (federation not enabled), use the routing manager directly
+    RoutingManager routingManager = _crossClusterFederationProvider != null
+        ? _crossClusterFederationProvider.getRoutingManager(pinotQuery.getQueryOptions())
+        : _routingManager;
     // Get the tables hit by the request
     TableRouteInfo routeInfo = routeProvider.getTableRouteInfo(tableName, _tableCache, routingManager);
 

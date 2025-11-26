@@ -52,7 +52,7 @@ import org.apache.pinot.common.response.BrokerResponse;
 import org.apache.pinot.common.utils.HumanReadableDuration;
 import org.apache.pinot.core.auth.Actions;
 import org.apache.pinot.core.auth.TargetType;
-import org.apache.pinot.core.routing.FederationProvider;
+import org.apache.pinot.core.routing.CrossClusterFederationProvider;
 import org.apache.pinot.query.service.dispatch.QueryDispatcher;
 import org.apache.pinot.spi.accounting.ThreadAccountant;
 import org.apache.pinot.spi.auth.AuthorizationResult;
@@ -86,9 +86,10 @@ public class TimeSeriesRequestHandler extends BaseBrokerRequestHandler {
   public TimeSeriesRequestHandler(PinotConfiguration config, String brokerId,
       BrokerRequestIdGenerator requestIdGenerator, BrokerRoutingManager routingManager,
       AccessControlFactory accessControlFactory, QueryQuotaManager queryQuotaManager, TableCache tableCache,
-      QueryDispatcher queryDispatcher, ThreadAccountant threadAccountant, FederationProvider federationProvider) {
+      QueryDispatcher queryDispatcher, ThreadAccountant threadAccountant,
+      CrossClusterFederationProvider crossClusterFederationProvider) {
     super(config, brokerId, requestIdGenerator, routingManager, accessControlFactory, queryQuotaManager, tableCache,
-        threadAccountant, federationProvider);
+        threadAccountant, crossClusterFederationProvider);
     _queryEnvironment = new TimeSeriesQueryEnvironment(config, routingManager, tableCache);
     _queryEnvironment.init(config);
     _queryDispatcher = queryDispatcher;

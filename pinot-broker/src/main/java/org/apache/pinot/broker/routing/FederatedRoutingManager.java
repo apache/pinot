@@ -28,7 +28,6 @@ import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import javax.annotation.Nullable;
 import org.apache.pinot.common.request.BrokerRequest;
-import org.apache.pinot.common.utils.config.QueryOptionsUtils;
 import org.apache.pinot.core.routing.RoutingManager;
 import org.apache.pinot.core.routing.RoutingTable;
 import org.apache.pinot.core.routing.SegmentsToQuery;
@@ -330,14 +329,5 @@ public class FederatedRoutingManager implements RoutingManager {
     }
 
     return null;
-  }
-
-  public RoutingManager getPrimaryRoutingManager(Map<String, String> queryOptions) {
-    boolean isFederationEnabled = QueryOptionsUtils.isEnableFederation(queryOptions, false);
-    if (isFederationEnabled) {
-      return this;
-    } else {
-      return _primaryRoutingManager;
-    }
   }
 }

@@ -166,11 +166,13 @@ public class BaseSingleStageBrokerRequestHandlerTest {
     BrokerRoutingManager routingManager = mock(BrokerRoutingManager.class);
     when(routingManager.routingExists(tableName)).thenReturn(true);
     when(routingManager.getQueryTimeoutMs(tableName)).thenReturn(10000L);
-    when(routingManager.getPrimaryRoutingManager(any())).thenReturn(routingManager);
     RoutingTable rt = mock(RoutingTable.class);
     when(rt.getServerInstanceToSegmentsMap()).thenReturn(Map.of(new ServerInstance(new InstanceConfig("server01_9000")),
         new SegmentsToQuery(List.of("segment01"), List.of())));
     when(routingManager.getRoutingTable(any(), Mockito.anyLong())).thenReturn(rt);
+
+    // FederationProvider is null when federation is not enabled (which is the case in this test)
+
     QueryQuotaManager queryQuotaManager = mock(QueryQuotaManager.class);
     when(queryQuotaManager.acquire(anyString())).thenReturn(true);
     when(queryQuotaManager.acquireDatabase(anyString())).thenReturn(true);

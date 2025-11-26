@@ -84,7 +84,7 @@ import org.apache.pinot.common.utils.tls.TlsUtils;
 import org.apache.pinot.common.version.PinotVersion;
 import org.apache.pinot.core.query.executor.sql.SqlQueryExecutor;
 import org.apache.pinot.core.query.utils.rewriter.ResultRewriterFactory;
-import org.apache.pinot.core.routing.FederationProvider;
+import org.apache.pinot.core.routing.CrossClusterFederationProvider;
 import org.apache.pinot.core.routing.RoutingManager;
 import org.apache.pinot.core.transport.ListenerConfig;
 import org.apache.pinot.core.transport.server.routing.stats.ServerRoutingStatsManager;
@@ -163,7 +163,7 @@ public abstract class BaseBrokerStarter implements ServiceStartable {
   protected Map<String, SecondaryBrokerRoutingManager> _secondaryRoutingManagers;
   protected BrokerRoutingManager _secondaryRoutingManager;
   protected FederatedRoutingManager _federatedRoutingManager;
-  protected FederationProvider _federationProvider;
+  protected CrossClusterFederationProvider _crossClusterFederationProvider;
   protected AccessControlFactory _accessControlFactory;
   protected BrokerRequestHandler _brokerRequestHandler;
   protected SqlQueryExecutor _sqlQueryExecutor;
@@ -415,7 +415,7 @@ public abstract class BaseBrokerStarter implements ServiceStartable {
         _brokerConf.getProperty(Helix.ENABLE_CASE_INSENSITIVE_KEY, Helix.DEFAULT_ENABLE_CASE_INSENSITIVE);
 
     TableCache tableCache = new ZkTableCache(_propertyStore, caseInsensitive);
-    initSecondaryClusterFederationProvider(tableCache, caseInsensitive);
+    initSecondaryClusterFederationProvider(tableCache, caseInsensitive, _routingManager, _federatedRoutingManager);
 
 
     LOGGER.info("Initializing Broker Event Listener Factory");
@@ -451,13 +451,11 @@ public abstract class BaseBrokerStarter implements ServiceStartable {
     String brokerRequestHandlerType =
         _brokerConf.getProperty(Broker.BROKER_REQUEST_HANDLER_TYPE, Broker.DEFAULT_BROKER_REQUEST_HANDLER_TYPE);
     BaseSingleStageBrokerRequestHandler singleStageBrokerRequestHandler;
-    RoutingManager routingManager = (_federatedRoutingManager != null)
-        ? _federatedRoutingManager : _routingManager;
     if (brokerRequestHandlerType.equalsIgnoreCase(Broker.GRPC_BROKER_REQUEST_HANDLER_TYPE)) {
       singleStageBrokerRequestHandler =
-          new GrpcBrokerRequestHandler(_brokerConf, brokerId, requestIdGenerator, routingManager,
+          new GrpcBrokerRequestHandler(_brokerConf, brokerId, requestIdGenerator, _routingManager,
               _accessControlFactory, _queryQuotaManager, tableCache, _failureDetector, _threadAccountant,
-              _federationProvider);
+            _crossClusterFederationProvider);
     } else {
       // Default request handler type, i.e. netty
       NettyConfig nettyDefaults = NettyConfig.extractNettyConfig(_brokerConf, Broker.BROKER_NETTY_PREFIX);
@@ -467,9 +465,9 @@ public abstract class BaseBrokerStarter implements ServiceStartable {
         tlsDefaults = TlsUtils.extractTlsConfig(_brokerConf, Broker.BROKER_TLS_PREFIX);
       }
       singleStageBrokerRequestHandler =
-          new SingleConnectionBrokerRequestHandler(_brokerConf, brokerId, requestIdGenerator, routingManager,
+          new SingleConnectionBrokerRequestHandler(_brokerConf, brokerId, requestIdGenerator, _routingManager,
               _accessControlFactory, _queryQuotaManager, tableCache, nettyDefaults, tlsDefaults,
-              _serverRoutingStatsManager, _failureDetector, _threadAccountant, _federationProvider);
+              _serverRoutingStatsManager, _failureDetector, _threadAccountant, _crossClusterFederationProvider);
     }
     MultiStageBrokerRequestHandler multiStageBrokerRequestHandler = null;
     QueryDispatcher queryDispatcher = null;
@@ -481,9 +479,9 @@ public abstract class BaseBrokerStarter implements ServiceStartable {
       // TODO: decouple protocol and engine selection.
       queryDispatcher = createQueryDispatcher(_brokerConf);
       multiStageBrokerRequestHandler =
-          new MultiStageBrokerRequestHandler(_brokerConf, brokerId, requestIdGenerator, routingManager,
+          new MultiStageBrokerRequestHandler(_brokerConf, brokerId, requestIdGenerator, _routingManager,
               _accessControlFactory, _queryQuotaManager, tableCache, _multiStageQueryThrottler, _failureDetector,
-              _threadAccountant, _federationProvider);
+              _threadAccountant, _crossClusterFederationProvider);
     }
     TimeSeriesRequestHandler timeSeriesRequestHandler = null;
     if (StringUtils.isNotBlank(_brokerConf.getProperty(PinotTimeSeriesConfiguration.getEnabledLanguagesConfigKey()))) {
@@ -491,7 +489,7 @@ public abstract class BaseBrokerStarter implements ServiceStartable {
       timeSeriesRequestHandler =
           new TimeSeriesRequestHandler(_brokerConf, brokerId, requestIdGenerator, _routingManager,
               _accessControlFactory, _queryQuotaManager, tableCache, queryDispatcher, _threadAccountant,
-              _federationProvider);
+            _crossClusterFederationProvider);
     }
 
     LOGGER.info("Initializing PinotFSFactory");
@@ -660,8 +658,16 @@ public abstract class BaseBrokerStarter implements ServiceStartable {
         successCount, failureCount, _secondaryRoutingManagers.size());
   }
 
-  private void initSecondaryClusterFederationProvider(TableCache tableCache, boolean caseInsensitive) {
+  private void initSecondaryClusterFederationProvider(TableCache tableCache, boolean caseInsensitive,
+      RoutingManager primaryRoutingManager, RoutingManager federatedRoutingManager) {
     LOGGER.info("[federation] Initializing federation provider");
+
+    // Only create FederationProvider if federation is actually enabled (i.e., we have a federated routing manager)
+    if (federatedRoutingManager == null) {
+      LOGGER.info("[federation] Federation is not enabled - FederationProvider will be null");
+      _crossClusterFederationProvider = null;
+      return;
+    }
 
     Map<String, TableCache> tableCacheMap = new HashMap<>();
     tableCacheMap.put(_clusterName, tableCache);
@@ -670,7 +676,7 @@ public abstract class BaseBrokerStarter implements ServiceStartable {
     if (_secondarySpectatorHelixManager == null || _secondarySpectatorHelixManager.isEmpty()) {
       LOGGER.info("[federation] No secondary spectator Helix managers available - "
           + "creating federation provider with primary cluster only");
-      _federationProvider = new FederationProvider(tableCacheMap);
+      _crossClusterFederationProvider = null;
       return;
     }
 
@@ -695,7 +701,8 @@ public abstract class BaseBrokerStarter implements ServiceStartable {
       }
     }
 
-    _federationProvider = new FederationProvider(tableCacheMap);
+    _crossClusterFederationProvider = new CrossClusterFederationProvider(tableCacheMap, primaryRoutingManager,
+      federatedRoutingManager);
     LOGGER.info("[federation] Created federation provider with {} total cluster(s) (1 primary + {} secondary). "
         + "Success: {}, Failure: {}",
         tableCacheMap.size(), tableCacheMap.size() - 1, successCount, failureCount);

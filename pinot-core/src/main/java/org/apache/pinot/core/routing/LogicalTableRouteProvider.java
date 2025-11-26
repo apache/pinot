@@ -37,14 +37,14 @@ import org.slf4j.LoggerFactory;
 
 public class LogicalTableRouteProvider implements TableRouteProvider {
   private static final Logger LOGGER = LoggerFactory.getLogger(LogicalTableRouteProvider.class);
-  private final FederationProvider _federationProvider;
+  private final CrossClusterFederationProvider _crossClusterFederationProvider;
 
   public LogicalTableRouteProvider() {
     this(null);
   }
 
-  public LogicalTableRouteProvider(FederationProvider federationProvider) {
-    _federationProvider = federationProvider;
+  public LogicalTableRouteProvider(CrossClusterFederationProvider crossClusterFederationProvider) {
+    _crossClusterFederationProvider = crossClusterFederationProvider;
   }
 
   /**
@@ -60,8 +60,8 @@ public class LogicalTableRouteProvider implements TableRouteProvider {
     }
 
     // If not found locally and federation is enabled, search federated caches
-    if (_federationProvider != null) {
-      for (TableCache federatedCache : _federationProvider.getTableCacheMap().values()) {
+    if (_crossClusterFederationProvider != null) {
+      for (TableCache federatedCache : _crossClusterFederationProvider.getTableCacheMap().values()) {
         tableConfig = federatedCache.getTableConfig(tableName);
         if (tableConfig != null) {
           return federatedCache;
