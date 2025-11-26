@@ -143,6 +143,7 @@ public class QueryEnvironment {
   private final HepProgram _optProgram;
   private final Config _envConfig;
   private final PinotCatalog _catalog;
+  private final Set<String> _defaultDisabledPlannerRules;
 
   public QueryEnvironment(Config config) {
     _envConfig = config;
@@ -157,8 +158,9 @@ public class QueryEnvironment {
         .build();
     _catalogReader = new PinotCatalogReader(
         rootSchema, List.of(database), _typeFactory, CONNECTION_CONFIG, config.isCaseSensitive());
+    _defaultDisabledPlannerRules = _envConfig.defaultDisabledPlannerRules();
     // default optProgram with no skip rule options and no use rule options
-    _optProgram = getOptProgram(Set.of(), Set.of(), new HashSet<>(_envConfig.defaultDisabledMseRules()));
+    _optProgram = getOptProgram(Set.of(), Set.of(), _defaultDisabledPlannerRules);
   }
 
   public QueryEnvironment(String database, TableCache tableCache, @Nullable WorkerManager workerManager) {
@@ -195,7 +197,7 @@ public class QueryEnvironment {
       Set<String> skipRuleSet = QueryOptionsUtils.getSkipPlannerRules(options);
       if (!skipRuleSet.isEmpty() || !useRuleSet.isEmpty()) {
         // dynamically create optProgram according to rule options
-        optProgram = getOptProgram(skipRuleSet, useRuleSet, new HashSet<>(_envConfig.defaultDisabledMseRules()));
+        optProgram = getOptProgram(skipRuleSet, useRuleSet, _defaultDisabledPlannerRules);
       }
     }
     boolean usePhysicalOptimizer = QueryOptionsUtils.isUsePhysicalOptimizer(sqlNodeAndOptions.getOptions(),
@@ -625,7 +627,7 @@ public class QueryEnvironment {
         }
       }
       if (!isRuleSkipped(CommonConstants.Broker.PlannerRuleNames.JOIN_TO_ENRICHED_JOIN, Set.of(), useRuleSet,
-          new HashSet<>(config.defaultDisabledMseRules()))) {
+          config.defaultDisabledPlannerRules())) {
         // push filter and project above join to enrichedJoin, does not work with physical optimizer
         hepProgramBuilder.addRuleCollection(PinotEnrichedJoinRule.PINOT_ENRICHED_JOIN_RULES);
       }
@@ -828,7 +830,7 @@ public class QueryEnvironment {
      * Returns the list of planner rules that are disabled by default.
      */
     @Value.Default
-    default List<String> defaultDisabledMseRules() {
+    default Set<String> defaultDisabledPlannerRules() {
       return CommonConstants.Broker.DEFAULT_DISABLED_RULES;
     }
 
