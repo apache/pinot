@@ -38,6 +38,9 @@ public class SumValueAggregator implements ValueAggregator<Object, Double> {
 
   @Override
   public Double getInitialAggregatedValue(@Nullable Object rawValue) {
+    if (rawValue == null) {
+      return 0.0;
+    }
     return processRawValue(rawValue);
   }
 
@@ -80,9 +83,6 @@ public class SumValueAggregator implements ValueAggregator<Object, Double> {
    * Processes a raw value (single number or multi-value array) and returns the sum.
    */
   protected Double processRawValue(@Nullable Object rawValue) {
-    if (rawValue == null) {
-      return 0.0;
-    }
     if (rawValue instanceof Object[]) {
       Object[] values = (Object[]) rawValue;
       double sum = 0.0;

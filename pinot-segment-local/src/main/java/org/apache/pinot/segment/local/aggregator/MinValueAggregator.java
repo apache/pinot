@@ -38,6 +38,9 @@ public class MinValueAggregator implements ValueAggregator<Object, Double> {
 
   @Override
   public Double getInitialAggregatedValue(@Nullable Object rawValue) {
+    if (rawValue == null) {
+      return Double.POSITIVE_INFINITY;
+    }
     return processRawValue(rawValue);
   }
 
@@ -76,10 +79,7 @@ public class MinValueAggregator implements ValueAggregator<Object, Double> {
     throw new UnsupportedOperationException();
   }
 
-  protected Double processRawValue(@Nullable Object rawValue) {
-    if (rawValue == null) {
-      return Double.POSITIVE_INFINITY;
-    }
+  protected Double processRawValue(Object rawValue) {
     if (rawValue instanceof Object[]) {
       Object[] values = (Object[]) rawValue;
       double min = Double.POSITIVE_INFINITY;

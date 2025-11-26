@@ -38,6 +38,9 @@ public class MaxValueAggregator implements ValueAggregator<Object, Double> {
 
   @Override
   public Double getInitialAggregatedValue(@Nullable Object rawValue) {
+    if (rawValue == null) {
+      return Double.NEGATIVE_INFINITY;
+    }
     return processRawValue(rawValue);
   }
 
@@ -76,10 +79,7 @@ public class MaxValueAggregator implements ValueAggregator<Object, Double> {
     throw new UnsupportedOperationException();
   }
 
-  protected Double processRawValue(@Nullable Object rawValue) {
-    if (rawValue == null) {
-      return Double.NEGATIVE_INFINITY;
-    }
+  protected Double processRawValue(Object rawValue) {
     if (rawValue instanceof Object[]) {
       Object[] values = (Object[]) rawValue;
       double max = Double.NEGATIVE_INFINITY;

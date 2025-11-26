@@ -40,6 +40,9 @@ public class AvgValueAggregator implements ValueAggregator<Object, AvgPair> {
 
   @Override
   public AvgPair getInitialAggregatedValue(@Nullable Object rawValue) {
+    if (rawValue == null) {
+      return new AvgPair();
+    }
     return processRawValue(rawValue);
   }
 
@@ -84,11 +87,7 @@ public class AvgValueAggregator implements ValueAggregator<Object, AvgPair> {
   /**
    * Processes a raw value (either multi-value array or single number) and returns an AvgPair with the sum and count.
    */
-  protected AvgPair processRawValue(@Nullable Object rawValue) {
-    if (rawValue == null) {
-      return new AvgPair();
-    }
-
+  protected AvgPair processRawValue(Object rawValue) {
     if (rawValue instanceof byte[]) {
       return deserializeAggregatedValue((byte[]) rawValue);
     }

@@ -40,6 +40,9 @@ public class MinMaxRangeValueAggregator implements ValueAggregator<Object, MinMa
 
   @Override
   public MinMaxRangePair getInitialAggregatedValue(@Nullable Object rawValue) {
+    if (rawValue == null) {
+      return new MinMaxRangePair();
+    }
     return processRawValue(rawValue);
   }
 
@@ -80,10 +83,7 @@ public class MinMaxRangeValueAggregator implements ValueAggregator<Object, MinMa
     return CustomSerDeUtils.MIN_MAX_RANGE_PAIR_SER_DE.deserialize(bytes);
   }
 
-  protected MinMaxRangePair processRawValue(@Nullable Object rawValue) {
-    if (rawValue == null) {
-      return new MinMaxRangePair();
-    }
+  protected MinMaxRangePair processRawValue(Object rawValue) {
     if (rawValue instanceof byte[]) {
       return deserializeAggregatedValue((byte[]) rawValue);
     } else if (rawValue instanceof Object[]) {
