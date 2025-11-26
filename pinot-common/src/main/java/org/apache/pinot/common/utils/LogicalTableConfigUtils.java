@@ -147,19 +147,22 @@ public class LogicalTableConfigUtils {
       String physicalTableName = entry.getKey();
       PhysicalTableConfig physicalTableConfig = entry.getValue();
 
-      // validate database name matches
-      String physicalTableDatabaseName = DatabaseUtils.extractDatabaseFromFullyQualifiedTableName(physicalTableName);
-      if (!StringUtils.equalsIgnoreCase(databaseName, physicalTableDatabaseName)) {
-        throw new IllegalArgumentException(
+      // only validate non-federated physical tables.
+      if (!physicalTableConfig.isFederated()) {
+        // validate database name matches
+        String physicalTableDatabaseName = DatabaseUtils.extractDatabaseFromFullyQualifiedTableName(physicalTableName);
+        if (!StringUtils.equalsIgnoreCase(databaseName, physicalTableDatabaseName)) {
+          throw new IllegalArgumentException(
             "Invalid logical table. Reason: '" + physicalTableName
-                + "' should have the same database name as logical table: " + databaseName + " != "
-                + physicalTableDatabaseName);
-      }
+              + "' should have the same database name as logical table: " + databaseName + " != "
+              + physicalTableDatabaseName);
+        }
 
-      // validate physical table exists
-      if (!physicalTableExistsPredicate.test(physicalTableName)) {
-        throw new IllegalArgumentException(
+        // validate physical table exists
+        if (!physicalTableExistsPredicate.test(physicalTableName)) {
+          throw new IllegalArgumentException(
             "Invalid logical table. Reason: '" + physicalTableName + "' should be one of the existing tables");
+        }
       }
       // validate physical table config is not null
       if (physicalTableConfig == null) {

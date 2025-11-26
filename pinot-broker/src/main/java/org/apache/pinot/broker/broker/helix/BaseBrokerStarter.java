@@ -22,6 +22,7 @@ import com.google.common.base.Preconditions;
 import java.io.IOException;
 import java.net.InetAddress;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
@@ -55,6 +56,8 @@ import org.apache.pinot.broker.requesthandler.MultiStageQueryThrottler;
 import org.apache.pinot.broker.requesthandler.SingleConnectionBrokerRequestHandler;
 import org.apache.pinot.broker.requesthandler.TimeSeriesRequestHandler;
 import org.apache.pinot.broker.routing.BrokerRoutingManager;
+import org.apache.pinot.broker.routing.FederatedRoutingManager;
+import org.apache.pinot.broker.routing.SecondaryBrokerRoutingManager;
 import org.apache.pinot.common.Utils;
 import org.apache.pinot.common.audit.AuditServiceBinder;
 import org.apache.pinot.common.config.DefaultClusterConfigChangeHandler;
@@ -81,6 +84,8 @@ import org.apache.pinot.common.utils.tls.TlsUtils;
 import org.apache.pinot.common.version.PinotVersion;
 import org.apache.pinot.core.query.executor.sql.SqlQueryExecutor;
 import org.apache.pinot.core.query.utils.rewriter.ResultRewriterFactory;
+import org.apache.pinot.core.routing.CrossClusterFederationProvider;
+import org.apache.pinot.core.routing.RoutingManager;
 import org.apache.pinot.core.transport.ListenerConfig;
 import org.apache.pinot.core.transport.server.routing.stats.ServerRoutingStatsManager;
 import org.apache.pinot.core.util.ListenerConfigUtil;
@@ -122,12 +127,15 @@ public abstract class BaseBrokerStarter implements ServiceStartable {
   protected PinotConfiguration _brokerConf;
   protected List<ListenerConfig> _listenerConfigs;
   protected String _clusterName;
+  protected List<String> _secondaryClusterNames;
   protected String _zkServers;
+  protected Map<String, String> _secondaryZkServers;
   protected String _hostname;
   protected int _port;
   protected int _tlsPort;
   protected int _grpcPort;
   protected String _instanceId;
+  protected String _secondaryInstanceId;
   private volatile boolean _isStarting = false;
   private volatile boolean _isShuttingDown = false;
 
@@ -144,17 +152,22 @@ public abstract class BaseBrokerStarter implements ServiceStartable {
   protected final List<ClusterChangeHandler> _liveInstanceChangeHandlers = new ArrayList<>();
   // Spectator Helix manager handles the custom change listeners, properties read/write
   protected HelixManager _spectatorHelixManager;
+  protected Map<String, HelixManager> _secondarySpectatorHelixManager;
   protected HelixAdmin _helixAdmin;
   protected ZkHelixPropertyStore<ZNRecord> _propertyStore;
   protected HelixDataAccessor _helixDataAccessor;
   protected PinotMetricsRegistry _metricsRegistry;
   protected BrokerMetrics _brokerMetrics;
   protected BrokerRoutingManager _routingManager;
+  protected Map<String, SecondaryBrokerRoutingManager> _secondaryRoutingManagers;
+  protected FederatedRoutingManager _federatedRoutingManager;
+  protected CrossClusterFederationProvider _crossClusterFederationProvider;
   protected AccessControlFactory _accessControlFactory;
   protected BrokerRequestHandler _brokerRequestHandler;
   protected SqlQueryExecutor _sqlQueryExecutor;
   protected BrokerAdminApiApplication _brokerAdminApplication;
   protected ClusterChangeMediator _clusterChangeMediator;
+  protected Map<String, ClusterChangeMediator> _secondaryClusterChangeMediator;
   // Participant Helix manager handles Helix functionality such as state transitions and messages
   protected HelixManager _participantHelixManager;
   // Handles the server routing stats.
@@ -173,6 +186,8 @@ public abstract class BaseBrokerStarter implements ServiceStartable {
     // Remove all white-spaces from the list of zkServers (if any).
     _zkServers = brokerConf.getProperty(Helix.CONFIG_OF_ZOOKEEPER_SERVER).replaceAll("\\s+", "");
     _clusterName = brokerConf.getProperty(Helix.CONFIG_OF_CLUSTER_NAME);
+    initSecondaryClusterNamesAndZk(brokerConf);
+
     ServiceStartableUtils.applyClusterConfig(_brokerConf, _zkServers, _clusterName, ServiceRole.BROKER);
     applyCustomConfigs(brokerConf);
 
@@ -206,11 +221,49 @@ public abstract class BaseBrokerStarter implements ServiceStartable {
     if (_instanceId == null) {
       _instanceId = Helix.PREFIX_OF_BROKER_INSTANCE + _hostname + "_" + _port;
     }
+    _secondaryInstanceId = _instanceId + "_secondary";
     // NOTE: Force all instances to have the same prefix in order to derive the instance type based on the instance id
     Preconditions.checkState(InstanceTypeUtils.isBroker(_instanceId), "Instance id must have prefix '%s', got '%s'",
         Helix.PREFIX_OF_BROKER_INSTANCE, _instanceId);
 
     _brokerConf.setProperty(Broker.CONFIG_OF_BROKER_ID, _instanceId);
+  }
+
+  private void initSecondaryClusterNamesAndZk(PinotConfiguration brokerConf) {
+    LOGGER.info("[federation] Initializing secondary cluster configuration");
+    String secondaryClusterNames = brokerConf.getProperty(Helix.CONFIG_OF_SECONDARY_CLUSTER_NAME);
+
+    if (secondaryClusterNames == null || secondaryClusterNames.trim().isEmpty()) {
+      LOGGER.info("[federation] No secondary cluster configured - federation is disabled");
+      return;
+    }
+
+    _secondaryClusterNames = Arrays.asList(secondaryClusterNames.replaceAll("\\s+", "").split(","));
+    if (_secondaryClusterNames.isEmpty()) {
+      LOGGER.warn("[federation] Secondary cluster names list is empty after parsing");
+      return;
+    }
+    LOGGER.info("[federation] Configured secondary cluster names: {}", _secondaryClusterNames);
+
+    _secondaryZkServers = new HashMap<>();
+    for (String name : _secondaryClusterNames) {
+      String zkConfig = String.format(Helix.CONFIG_OF_SECONDARY_ZOOKEEPER_SERVER, name);
+      String zkServers = brokerConf.getProperty(zkConfig);
+
+      if (zkServers == null || zkServers.trim().isEmpty()) {
+        LOGGER.error("[federation] Missing ZooKeeper configuration for cluster '{}', expected: {}", name, zkConfig);
+        continue;
+      }
+      _secondaryZkServers.put(name, zkServers.replaceAll("\\s+", ""));
+    }
+
+    if (_secondaryZkServers.isEmpty()) {
+      LOGGER.error("[federation] No valid ZooKeeper configurations found - federation will not be functional");
+      _secondaryClusterNames = null;
+    } else {
+      LOGGER.info("[federation] Initialized {} secondary cluster(s): {}", _secondaryZkServers.size(),
+          _secondaryZkServers.keySet());
+    }
   }
 
   /// Can be overridden to apply custom configs to the broker conf.
@@ -302,6 +355,10 @@ public abstract class BaseBrokerStarter implements ServiceStartable {
     _spectatorHelixManager =
         HelixManagerFactory.getZKHelixManager(_clusterName, _instanceId, InstanceType.SPECTATOR, _zkServers);
     _spectatorHelixManager.connect();
+
+    LOGGER.info("Connecting secondary spectator Helix managers");
+    initSecondaryClusterSpectatorHelixManagers();
+
     _helixAdmin = _spectatorHelixManager.getClusterManagmentTool();
     _propertyStore = _spectatorHelixManager.getHelixPropertyStore();
     _helixDataAccessor = _spectatorHelixManager.getHelixDataAccessor();
@@ -327,9 +384,13 @@ public abstract class BaseBrokerStarter implements ServiceStartable {
     _serverRoutingStatsManager.init();
     _routingManager = new BrokerRoutingManager(_brokerMetrics, _serverRoutingStatsManager, _brokerConf);
     _routingManager.init(_spectatorHelixManager);
+
+    initSecondaryClusterFederatedRoutingManager();
+
     final PinotConfiguration factoryConf = _brokerConf.subset(Broker.ACCESS_CONTROL_CONFIG_PREFIX);
     // Adding cluster name to the config so that it can be used by the AccessControlFactory
-    factoryConf.setProperty(Helix.CONFIG_OF_CLUSTER_NAME, _brokerConf.getProperty(Helix.CONFIG_OF_CLUSTER_NAME));
+    factoryConf.setProperty(Helix.CONFIG_OF_CLUSTER_NAME,
+        _brokerConf.getProperty(Helix.CONFIG_OF_CLUSTER_NAME));
     _accessControlFactory = AccessControlFactory.loadFactory(factoryConf, _propertyStore);
     _queryQuotaManager = new HelixExternalViewBasedQueryQuotaManager(_brokerMetrics, _instanceId);
     _queryQuotaManager.init(_spectatorHelixManager);
@@ -342,7 +403,10 @@ public abstract class BaseBrokerStarter implements ServiceStartable {
     FunctionRegistry.init();
     boolean caseInsensitive =
         _brokerConf.getProperty(Helix.ENABLE_CASE_INSENSITIVE_KEY, Helix.DEFAULT_ENABLE_CASE_INSENSITIVE);
+
     TableCache tableCache = new ZkTableCache(_propertyStore, caseInsensitive);
+    initSecondaryClusterFederationProvider(tableCache, caseInsensitive, _routingManager, _federatedRoutingManager);
+
 
     LOGGER.info("Initializing Broker Event Listener Factory");
     BrokerQueryEventListenerFactory.init(_brokerConf.subset(Broker.EVENT_LISTENER_CONFIG_PREFIX));
@@ -380,7 +444,8 @@ public abstract class BaseBrokerStarter implements ServiceStartable {
     if (brokerRequestHandlerType.equalsIgnoreCase(Broker.GRPC_BROKER_REQUEST_HANDLER_TYPE)) {
       singleStageBrokerRequestHandler =
           new GrpcBrokerRequestHandler(_brokerConf, brokerId, requestIdGenerator, _routingManager,
-              _accessControlFactory, _queryQuotaManager, tableCache, _failureDetector, _threadAccountant);
+              _accessControlFactory, _queryQuotaManager, tableCache, _failureDetector, _threadAccountant,
+            _crossClusterFederationProvider);
     } else {
       // Default request handler type, i.e. netty
       NettyConfig nettyDefaults = NettyConfig.extractNettyConfig(_brokerConf, Broker.BROKER_NETTY_PREFIX);
@@ -392,7 +457,7 @@ public abstract class BaseBrokerStarter implements ServiceStartable {
       singleStageBrokerRequestHandler =
           new SingleConnectionBrokerRequestHandler(_brokerConf, brokerId, requestIdGenerator, _routingManager,
               _accessControlFactory, _queryQuotaManager, tableCache, nettyDefaults, tlsDefaults,
-              _serverRoutingStatsManager, _failureDetector, _threadAccountant);
+              _serverRoutingStatsManager, _failureDetector, _threadAccountant, _crossClusterFederationProvider);
     }
     MultiStageBrokerRequestHandler multiStageBrokerRequestHandler = null;
     QueryDispatcher queryDispatcher = null;
@@ -406,14 +471,15 @@ public abstract class BaseBrokerStarter implements ServiceStartable {
       multiStageBrokerRequestHandler =
           new MultiStageBrokerRequestHandler(_brokerConf, brokerId, requestIdGenerator, _routingManager,
               _accessControlFactory, _queryQuotaManager, tableCache, _multiStageQueryThrottler, _failureDetector,
-              _threadAccountant);
+              _threadAccountant, _crossClusterFederationProvider);
     }
     TimeSeriesRequestHandler timeSeriesRequestHandler = null;
     if (StringUtils.isNotBlank(_brokerConf.getProperty(PinotTimeSeriesConfiguration.getEnabledLanguagesConfigKey()))) {
       Preconditions.checkNotNull(queryDispatcher, "Multistage Engine should be enabled to use time-series engine");
       timeSeriesRequestHandler =
           new TimeSeriesRequestHandler(_brokerConf, brokerId, requestIdGenerator, _routingManager,
-              _accessControlFactory, _queryQuotaManager, tableCache, queryDispatcher, _threadAccountant);
+              _accessControlFactory, _queryQuotaManager, tableCache, queryDispatcher, _threadAccountant,
+            _crossClusterFederationProvider);
     }
 
     LOGGER.info("Initializing PinotFSFactory");
@@ -495,7 +561,7 @@ public abstract class BaseBrokerStarter implements ServiceStartable {
     if (!_liveInstanceChangeHandlers.isEmpty()) {
       clusterChangeHandlersMap.put(ChangeType.LIVE_INSTANCE, _liveInstanceChangeHandlers);
     }
-    _clusterChangeMediator = new ClusterChangeMediator(clusterChangeHandlersMap, _brokerMetrics);
+    _clusterChangeMediator = new ClusterChangeMediator(_instanceId, clusterChangeHandlersMap, _brokerMetrics);
     _clusterChangeMediator.start();
     _spectatorHelixManager.addIdealStateChangeListener(_clusterChangeMediator);
     _spectatorHelixManager.addExternalViewChangeListener(_clusterChangeMediator);
@@ -504,6 +570,8 @@ public abstract class BaseBrokerStarter implements ServiceStartable {
     if (!_liveInstanceChangeHandlers.isEmpty()) {
       _spectatorHelixManager.addLiveInstanceChangeListener(_clusterChangeMediator);
     }
+
+    initSecondaryClusterChangeMediator();
 
     LOGGER.info("Connecting participant Helix manager");
     _participantHelixManager =
@@ -518,7 +586,9 @@ public abstract class BaseBrokerStarter implements ServiceStartable {
         .registerMessageHandlerFactory(Message.MessageType.USER_DEFINE_MSG.toString(),
             new BrokerUserDefinedMessageHandlerFactory(_routingManager, _queryQuotaManager));
     _participantHelixManager.connect();
+
     updateInstanceConfigAndBrokerResourceIfNeeded();
+    initSecondaryClusterRouting();
     _brokerMetrics.addCallbackGauge(Helix.INSTANCE_CONNECTED_METRIC_NAME,
         () -> _participantHelixManager.isConnected() ? 1L : 0L);
     _participantHelixManager.addPreConnectCallback(
@@ -539,6 +609,176 @@ public abstract class BaseBrokerStarter implements ServiceStartable {
     _defaultClusterConfigChangeHandler.registerClusterConfigChangeListener(ContinuousJfrStarter.INSTANCE);
 
     LOGGER.info("Finish starting Pinot broker");
+  }
+
+  private void initSecondaryClusterRouting() {
+    if (_secondaryRoutingManagers == null || _secondaryRoutingManagers.isEmpty()) {
+      LOGGER.info("[federation] No secondary routing managers - skipping routing table initialization");
+      return;
+    }
+
+    LOGGER.info("[federation] Initializing routing tables for {} secondary clusters", _secondaryRoutingManagers.size());
+    int initialized = 0;
+
+    for (Map.Entry<String, SecondaryBrokerRoutingManager> entry : _secondaryRoutingManagers.entrySet()) {
+      try {
+        entry.getValue().determineRoutingChangeForTables();
+        initialized++;
+      } catch (Exception e) {
+        LOGGER.error("[federation] Failed to initialize routing tables for cluster '{}'", entry.getKey(), e);
+      }
+    }
+
+    LOGGER.info("[federation] Initialized routing tables for {}/{} secondary clusters",
+        initialized, _secondaryRoutingManagers.size());
+  }
+
+  private void initSecondaryClusterFederationProvider(TableCache tableCache, boolean caseInsensitive,
+      RoutingManager primaryRoutingManager, RoutingManager federatedRoutingManager) {
+    if (federatedRoutingManager == null) {
+      LOGGER.info("[federation] Federation is not enabled - FederationProvider will be null");
+      _crossClusterFederationProvider = null;
+      return;
+    }
+
+    Map<String, TableCache> tableCacheMap = new HashMap<>();
+    tableCacheMap.put(_clusterName, tableCache);
+
+    if (_secondarySpectatorHelixManager == null || _secondarySpectatorHelixManager.isEmpty()) {
+      LOGGER.info("[federation] No secondary spectator Helix managers - creating provider with primary cluster only");
+      _crossClusterFederationProvider = null;
+      return;
+    }
+
+    LOGGER.info("[federation] Initializing federation provider with {} secondary clusters",
+        _secondarySpectatorHelixManager.size());
+
+    for (Map.Entry<String, HelixManager> entry : _secondarySpectatorHelixManager.entrySet()) {
+      String clusterName = entry.getKey();
+      try {
+        TableCache secondaryCache = new ZkTableCache(entry.getValue().getHelixPropertyStore(), caseInsensitive);
+        tableCacheMap.put(clusterName, secondaryCache);
+      } catch (Exception e) {
+        LOGGER.error("[federation] Failed to create table cache for cluster '{}'", clusterName, e);
+      }
+    }
+
+    _crossClusterFederationProvider = new CrossClusterFederationProvider(tableCacheMap, primaryRoutingManager,
+        federatedRoutingManager);
+    LOGGER.info("[federation] Created federation provider with {}/{} clusters (1 primary + {} secondary)",
+        tableCacheMap.size(), _secondarySpectatorHelixManager.size() + 1, tableCacheMap.size() - 1);
+  }
+
+  private void initSecondaryClusterFederatedRoutingManager() {
+    if (_secondarySpectatorHelixManager == null || _secondarySpectatorHelixManager.isEmpty()) {
+      LOGGER.info("[federation] No secondary spectator Helix managers - skipping federated routing manager init");
+      return;
+    }
+
+    LOGGER.info("[federation] Initializing federated routing manager for {} clusters",
+        _secondarySpectatorHelixManager.size());
+    _secondaryRoutingManagers = new HashMap<>();
+
+    for (Map.Entry<String, HelixManager> entry : _secondarySpectatorHelixManager.entrySet()) {
+      String clusterName = entry.getKey();
+      try {
+        SecondaryBrokerRoutingManager routingManager =
+            new SecondaryBrokerRoutingManager(_brokerMetrics, _serverRoutingStatsManager, _brokerConf);
+        routingManager.init(entry.getValue());
+        _secondaryRoutingManagers.put(clusterName, routingManager);
+      } catch (Exception e) {
+        LOGGER.error("[federation] Failed to initialize routing manager for cluster '{}'", clusterName, e);
+      }
+    }
+
+    if (_secondaryRoutingManagers.isEmpty()) {
+      LOGGER.error("[federation] Failed to initialize any routing managers - federated routing unavailable");
+    } else {
+      _federatedRoutingManager = new FederatedRoutingManager(_routingManager,
+          new ArrayList<>(_secondaryRoutingManagers.values()));
+      LOGGER.info("[federation] Created federated routing manager with {}/{} secondary clusters",
+          _secondaryRoutingManagers.size(), _secondarySpectatorHelixManager.size());
+    }
+  }
+
+  private void initSecondaryClusterSpectatorHelixManagers() throws Exception {
+    if (_secondaryZkServers == null || _secondaryZkServers.isEmpty()) {
+      LOGGER.info("[federation] No secondary ZK servers configured - skipping spectator Helix manager init");
+      return;
+    }
+
+    LOGGER.info("[federation] Initializing spectator Helix managers for {} secondary clusters",
+        _secondaryZkServers.size());
+    _secondarySpectatorHelixManager = new HashMap<>();
+
+    for (Map.Entry<String, String> entry : _secondaryZkServers.entrySet()) {
+      String clusterName = entry.getKey();
+      String zkServers = entry.getValue();
+      try {
+        HelixManager helixManager = HelixManagerFactory.getZKHelixManager(
+            clusterName, _instanceId, InstanceType.SPECTATOR, zkServers);
+        helixManager.connect();
+        _secondarySpectatorHelixManager.put(clusterName, helixManager);
+        LOGGER.info("[federation] Connected to secondary cluster '{}' at ZK: {}", clusterName, zkServers);
+      } catch (Exception e) {
+        LOGGER.error("[federation] Failed to connect to cluster '{}' at ZK: {}", clusterName, zkServers, e);
+      }
+    }
+
+    if (_secondarySpectatorHelixManager.isEmpty()) {
+      LOGGER.error("[federation] Failed to connect to any secondary clusters - federation will not be functional");
+    } else {
+      LOGGER.info("[federation] Connected to {}/{} secondary clusters: {}", _secondarySpectatorHelixManager.size(),
+          _secondaryZkServers.size(), _secondarySpectatorHelixManager.keySet());
+    }
+  }
+
+  public void initSecondaryClusterChangeMediator() throws Exception {
+    if (_secondarySpectatorHelixManager == null || _secondarySpectatorHelixManager.isEmpty()) {
+      LOGGER.info("[federation] No secondary spectator Helix managers - skipping cluster change mediator init");
+      return;
+    }
+
+    if (_secondaryRoutingManagers == null || _secondaryRoutingManagers.isEmpty()) {
+      LOGGER.error("[federation] Secondary routing managers not initialized - cannot create cluster change mediators");
+      return;
+    }
+
+    LOGGER.info("[federation] Initializing cluster change mediators for {} secondary clusters",
+        _secondarySpectatorHelixManager.size());
+    _secondaryClusterChangeMediator = new HashMap<>();
+
+    for (String clusterName : _secondarySpectatorHelixManager.keySet()) {
+      BrokerRoutingManager routingManager = _secondaryRoutingManagers.get(clusterName);
+      if (routingManager == null) {
+        LOGGER.error("[federation] Routing manager not found for cluster '{}' - skipping mediator setup", clusterName);
+        continue;
+      }
+
+      try {
+        Map<ChangeType, List<ClusterChangeHandler>> handlers = new HashMap<>();
+        handlers.put(ChangeType.CLUSTER_CONFIG, new ArrayList<>());
+        handlers.put(ChangeType.IDEAL_STATE, Collections.singletonList(routingManager));
+        handlers.put(ChangeType.EXTERNAL_VIEW, Collections.singletonList(routingManager));
+        handlers.put(ChangeType.INSTANCE_CONFIG, Collections.singletonList(routingManager));
+        handlers.put(ChangeType.RESOURCE_CONFIG, Collections.singletonList(routingManager));
+
+        ClusterChangeMediator mediator = new ClusterChangeMediator(_secondaryInstanceId, handlers, _brokerMetrics);
+        mediator.start();
+        _secondaryClusterChangeMediator.put(clusterName, mediator);
+
+        HelixManager helixManager = _secondarySpectatorHelixManager.get(clusterName);
+        helixManager.addIdealStateChangeListener(mediator);
+        helixManager.addExternalViewChangeListener(mediator);
+        helixManager.addInstanceConfigChangeListener(mediator);
+        helixManager.addClusterfigChangeListener(mediator);
+      } catch (Exception e) {
+        LOGGER.error("[federation] Failed to initialize cluster change mediator for cluster '{}'", clusterName, e);
+      }
+    }
+
+    LOGGER.info("[federation] Initialized {}/{} cluster change mediators", _secondaryClusterChangeMediator.size(),
+        _secondarySpectatorHelixManager.size());
   }
 
   /**
@@ -618,6 +858,7 @@ public abstract class BaseBrokerStarter implements ServiceStartable {
     if (updated) {
       HelixHelper.updateInstanceConfig(_participantHelixManager, instanceConfig);
     }
+
     if (shouldUpdateBrokerResource) {
       // Update broker resource to include the new broker
       long startTimeMs = System.currentTimeMillis();
@@ -697,6 +938,12 @@ public abstract class BaseBrokerStarter implements ServiceStartable {
 
     LOGGER.info("Stopping cluster change mediator");
     _clusterChangeMediator.stop();
+    if (_secondaryClusterChangeMediator != null) {
+      _secondaryClusterChangeMediator.values().forEach(ClusterChangeMediator::stop);
+    }
+    if (_secondaryRoutingManagers != null) {
+      _secondaryRoutingManagers.values().forEach(SecondaryBrokerRoutingManager::shutdown);
+    }
 
     _failureDetector.stop();
 
@@ -734,6 +981,9 @@ public abstract class BaseBrokerStarter implements ServiceStartable {
 
     LOGGER.info("Disconnecting spectator Helix manager");
     _spectatorHelixManager.disconnect();
+    if (_secondarySpectatorHelixManager != null) {
+      _secondarySpectatorHelixManager.values().forEach(HelixManager::disconnect);
+    }
 
     LOGGER.info("Deregistering service status handler");
     ServiceStatus.removeServiceStatusCallback(_instanceId);

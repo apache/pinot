@@ -246,7 +246,9 @@ public class CommonConstants {
     public static final String DEFAULT_HELIX_INSTANCE_MAX_STATE_TRANSITIONS_PER_RESOURCE = "100000";
     public static final String PINOT_SERVICE_ROLE = "pinot.service.role";
     public static final String CONFIG_OF_CLUSTER_NAME = "pinot.cluster.name";
+    public static final String CONFIG_OF_SECONDARY_CLUSTER_NAME = "pinot.secondary.cluster.names";
     public static final String CONFIG_OF_ZOOKEEPER_SERVER = "pinot.zk.server";
+    public static final String CONFIG_OF_SECONDARY_ZOOKEEPER_SERVER = "pinot.zk.server.secondary.%s";
     @Deprecated(since = "1.5.0", forRemoval = true)
     public static final String CONFIG_OF_ZOOKEEPR_SERVER = "pinot.zk.server";
 
@@ -674,6 +676,8 @@ public class CommonConstants {
         public static final String APPLICATION_NAME = "applicationName";
         public static final String USE_SPOOLS = "useSpools";
         public static final String USE_PHYSICAL_OPTIMIZER = "usePhysicalOptimizer";
+
+        public static final String ENABLE_FEDERATION = "enableFederation";
         /**
          * If set, changes the explain behavior in multi-stage engine.
          *

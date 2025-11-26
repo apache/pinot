@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.spi.data;
 
+import com.fasterxml.jackson.annotation.JsonProperty;
 import org.apache.pinot.spi.config.BaseJsonConfig;
 
 
@@ -26,4 +27,22 @@ import org.apache.pinot.spi.config.BaseJsonConfig;
  * This is empty by design and more docs would be added as features are added.
  */
 public class PhysicalTableConfig extends BaseJsonConfig {
+  @JsonProperty("isFederated")
+  private boolean _isFederated;
+
+  public PhysicalTableConfig() {
+    this(false);
+  }
+
+  public PhysicalTableConfig(boolean isFederated) {
+    _isFederated = isFederated;
+  }
+
+  public boolean isFederated() {
+    return _isFederated;
+  }
+
+  public void setFederated(boolean isFederated) {
+    _isFederated = isFederated;
+  }
 }

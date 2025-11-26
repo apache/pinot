@@ -120,8 +120,9 @@ import org.slf4j.LoggerFactory;
 public class BrokerRoutingManager implements RoutingManager, ClusterChangeHandler {
   private static final Logger LOGGER = LoggerFactory.getLogger(BrokerRoutingManager.class);
 
-  private final BrokerMetrics _brokerMetrics;
-  private final Map<String, RoutingEntry> _routingEntryMap = new ConcurrentHashMap<>();
+  protected final String _parentClusterName;
+  protected final BrokerMetrics _brokerMetrics;
+  protected final Map<String, RoutingEntry> _routingEntryMap = new ConcurrentHashMap<>();
   private final Map<String, ServerInstance> _enabledServerInstanceMap = new ConcurrentHashMap<>();
   // NOTE: _excludedServers doesn't need to be concurrent because it is only accessed within the _globalLock write lock
   private final Set<String> _excludedServers = new HashSet<>();
@@ -143,11 +144,11 @@ public class BrokerRoutingManager implements RoutingManager, ClusterChangeHandle
   // Per-table build start time in millis. Any request before this time should be ignored
   private final Map<String, Long> _routingTableBuildStartTimeMs = new ConcurrentHashMap<>();
 
-  private BaseDataAccessor<ZNRecord> _zkDataAccessor;
-  private String _externalViewPathPrefix;
-  private String _idealStatePathPrefix;
+  protected BaseDataAccessor<ZNRecord> _zkDataAccessor;
+  protected String _externalViewPathPrefix;
+  protected String _idealStatePathPrefix;
   private String _instanceConfigsPath;
-  private ZkHelixPropertyStore<ZNRecord> _propertyStore;
+  protected ZkHelixPropertyStore<ZNRecord> _propertyStore;
 
   private Set<String> _routableServers;
 
@@ -160,6 +161,7 @@ public class BrokerRoutingManager implements RoutingManager, ClusterChangeHandle
     _brokerMetrics = brokerMetrics;
     _serverRoutingStatsManager = serverRoutingStatsManager;
     _pinotConfig = pinotConfig;
+    _parentClusterName = _pinotConfig.getProperty("pinot.cluster.name");
     _enablePartitionMetadataManager =
         pinotConfig.getProperty(CommonConstants.Broker.CONFIG_OF_ENABLE_PARTITION_METADATA_MANAGER,
             CommonConstants.Broker.DEFAULT_ENABLE_PARTITION_METADATA_MANAGER);
@@ -214,7 +216,7 @@ public class BrokerRoutingManager implements RoutingManager, ClusterChangeHandle
     }
   }
 
-  private void processSegmentAssignmentChangeInternal() {
+  protected void processSegmentAssignmentChangeInternal() {
     LOGGER.info("Processing segment assignment change");
     long startTimeMs = System.currentTimeMillis();
 

@@ -1823,6 +1823,7 @@ public class PinotHelixResourceManager {
     String tableName = logicalTableConfig.getTableName();
     LOGGER.info("Adding logical table {}: Start", tableName);
 
+    // TODO: Figure out table validation for cross-cluster logical tables.
     validateLogicalTableConfig(logicalTableConfig);
 
     // Check if the logical table name is already used
