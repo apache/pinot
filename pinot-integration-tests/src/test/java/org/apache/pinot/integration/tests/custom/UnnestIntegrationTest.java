@@ -19,13 +19,10 @@
 package org.apache.pinot.integration.tests.custom;
 
 import com.fasterxml.jackson.databind.JsonNode;
-import com.google.common.cache.Cache;
-import com.google.common.cache.CacheBuilder;
 import java.io.File;
 import java.util.List;
 import org.apache.avro.file.DataFileWriter;
 import org.apache.avro.generic.GenericData;
-import org.apache.avro.generic.GenericDatumWriter;
 import org.apache.commons.lang3.RandomStringUtils;
 import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.Schema;
@@ -366,32 +363,25 @@ public class UnnestIntegrationTest extends CustomDataQueryClusterIntegrationTest
             null, null)
     ));
 
-    // create avro file
-    File avroFile = new File(_tempDir, "data.avro");
-    Cache<Integer, GenericData.Record> recordCache = CacheBuilder.newBuilder().build();
-    try (DataFileWriter<GenericData.Record> fileWriter = new DataFileWriter<>(new GenericDatumWriter<>(avroSchema))) {
-      fileWriter.create(avroSchema, avroFile);
+    try (AvroFilesAndWriters avroFilesAndWriters = createAvroFilesAndWriters(avroSchema)) {
+      List<DataFileWriter<GenericData.Record>> writers = avroFilesAndWriters.getWriters();
       for (int i = 0; i < getCountStarResult(); i++) {
+        // create avro record
+        GenericData.Record record = new GenericData.Record(avroSchema);
+        record.put(INT_COLUMN, i);
+        record.put(LONG_COLUMN, i);
+        record.put(FLOAT_COLUMN, i + RANDOM.nextFloat());
+        record.put(DOUBLE_COLUMN, i + RANDOM.nextDouble());
+        record.put(STRING_COLUMN, RandomStringUtils.insecure().next(i));
+        record.put(TIMESTAMP_COLUMN, i);
+        record.put(GROUP_BY_COLUMN, String.valueOf(i % 10));
+        record.put(LONG_ARRAY_COLUMN, List.of(0, 1, 2, 3));
+        record.put(DOUBLE_ARRAY_COLUMN, List.of(0.0, 0.1, 0.2, 0.3));
+        record.put(STRING_ARRAY_COLUMN, List.of("a", "b", "c"));
         // add avro record to file
-        int finalI = i;
-        fileWriter.append(recordCache.get(i, () -> {
-              // create avro record
-              GenericData.Record record = new GenericData.Record(avroSchema);
-              record.put(INT_COLUMN, finalI);
-              record.put(LONG_COLUMN, finalI);
-              record.put(FLOAT_COLUMN, finalI + RANDOM.nextFloat());
-              record.put(DOUBLE_COLUMN, finalI + RANDOM.nextDouble());
-              record.put(STRING_COLUMN, RandomStringUtils.insecure().next(finalI));
-              record.put(TIMESTAMP_COLUMN, finalI);
-              record.put(GROUP_BY_COLUMN, String.valueOf(finalI % 10));
-              record.put(LONG_ARRAY_COLUMN, List.of(0, 1, 2, 3));
-              record.put(DOUBLE_ARRAY_COLUMN, List.of(0.0, 0.1, 0.2, 0.3));
-              record.put(STRING_ARRAY_COLUMN, List.of("a", "b", "c"));
-              return record;
-            }
-        ));
+        writers.get(i % getNumAvroFiles()).append(record);
       }
+      return avroFilesAndWriters.getAvroFiles();
     }
-    return List.of(avroFile);
   }
 }
