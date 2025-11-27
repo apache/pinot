@@ -902,7 +902,7 @@ public class TablesResource {
   @Produces(MediaType.APPLICATION_JSON)
   @ApiOperation(value = "Upload a low level consumer segment to segment store and return the segment download url,"
       + "crc and other segment metadata",
-      notes = "Upload a low level consumer segment to segment store and return the segment download url, crc "
+      notes = "Upload a low level consumer segment to segment store and return the segment download url, crc, data crc "
           + "and other segment metadata")
   @ApiResponses(value = {
       @ApiResponse(code = 200, message = "Success"),

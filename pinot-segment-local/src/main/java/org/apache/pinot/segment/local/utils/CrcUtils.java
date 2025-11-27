@@ -40,7 +40,6 @@ public class CrcUtils {
   private static final int BUFFER_SIZE = 65536;
   private static final String CRC_FILE_EXTENSTION = ".crc";
   private static final List<String> DATA_FILE_EXTENSIONS = Arrays.asList(".fwd", ".dict", ".inv");
-  private static final String METADATA_FILE = "metadata.properties";
 
   private final List<File> _files;
   private final List<File> _dataFiles;
@@ -75,7 +74,7 @@ public class CrcUtils {
             .endsWith(CRC_FILE_EXTENSTION)) {
           // add all files to normal files
           normalFiles.add(file);
-          //include data extension files and metadata file to dataFiles
+          //include data extension files to dataFiles
           // Conditionally add to the data-only list
           if (isDataFile(fileName)) {
             dataFiles.add(file);
