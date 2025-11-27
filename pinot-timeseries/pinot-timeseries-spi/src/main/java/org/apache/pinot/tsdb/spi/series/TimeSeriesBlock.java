@@ -18,10 +18,12 @@
  */
 package org.apache.pinot.tsdb.spi.series;
 
+import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import javax.annotation.Nullable;
+import org.apache.pinot.spi.exception.QueryException;
 import org.apache.pinot.tsdb.spi.TimeBuckets;
 
 
@@ -41,7 +43,11 @@ public class TimeSeriesBlock {
   /**
    * Holds optional metadata about the block (e.g., statistics).
    */
-  private Map<String, String> _metadata;
+  private final Map<String, String> _metadata;
+  /**
+   * Holds exceptions encountered during processing of the block.
+   */
+  private final List<QueryException> _exceptions;
 
   public TimeSeriesBlock(@Nullable TimeBuckets timeBuckets, Map<Long, List<TimeSeries>> seriesMap) {
     this(timeBuckets, seriesMap, Map.of());
@@ -52,6 +58,7 @@ public class TimeSeriesBlock {
     _timeBuckets = timeBuckets;
     _seriesMap = seriesMap;
     _metadata = Collections.unmodifiableMap(metadata);
+    _exceptions = new ArrayList<>();
   }
 
   @Nullable
@@ -65,5 +72,13 @@ public class TimeSeriesBlock {
 
   public Map<String, String> getMetadata() {
     return _metadata;
+  }
+
+  public List<QueryException> getExceptions() {
+    return _exceptions;
+  }
+
+  public void addToExceptions(QueryException exception) {
+    _exceptions.add(exception);
   }
 }

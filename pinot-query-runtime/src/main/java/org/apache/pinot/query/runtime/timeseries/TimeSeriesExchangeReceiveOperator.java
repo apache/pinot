@@ -29,6 +29,8 @@ import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.TimeUnit;
 import javax.annotation.Nullable;
 import org.apache.pinot.common.datatable.DataTable;
+import org.apache.pinot.spi.exception.QueryErrorCode;
+import org.apache.pinot.spi.exception.QueryException;
 import org.apache.pinot.tsdb.spi.AggInfo;
 import org.apache.pinot.tsdb.spi.TimeBuckets;
 import org.apache.pinot.tsdb.spi.operator.BaseTimeSeriesOperator;
@@ -116,13 +118,22 @@ public class TimeSeriesExchangeReceiveOperator extends BaseTimeSeriesOperator {
     TimeBuckets timeBuckets = null;
     Map<Long, BaseTimeSeriesBuilder> seriesBuilderMap = new HashMap<>();
     Map<String, String> aggregatedStats = new HashMap<>();
+    QueryException timeoutException = null;
+
     for (int index = 0; index < _numServersQueried; index++) {
       // Step-1: Poll, and ensure we received a TimeSeriesBlock.
       long remainingTimeMs = _deadlineMs - System.currentTimeMillis();
-      Preconditions.checkState(remainingTimeMs > 0,
-          "Timed out before polling all servers. Successfully Polled: %s of %s", index, _numServersQueried);
+      if (remainingTimeMs <= 0) {
+        timeoutException = new QueryException(QueryErrorCode.SERVER_NOT_RESPONDING,
+            String.format("Timed out before polling all servers. Successfully Polled: %s of %s", index, _numServersQueried));
+        break;
+      }
       Object result = poll(remainingTimeMs);
-      Preconditions.checkNotNull(result, "Timed out waiting for response. Waited: %s ms", remainingTimeMs);
+      if (result == null) {
+        timeoutException = new QueryException(QueryErrorCode.SERVER_NOT_RESPONDING,
+            String.format("Timed out waiting for response. Waited: %s ms", remainingTimeMs));
+        break;
+      }
       if (result instanceof Throwable) {
         throw (Throwable) result;
       }
@@ -164,7 +175,11 @@ public class TimeSeriesExchangeReceiveOperator extends BaseTimeSeriesOperator {
       timeSeriesList.add(entry.getValue().build());
       seriesMap.put(seriesHash, timeSeriesList);
     }
-    return new TimeSeriesBlock(timeBuckets, seriesMap, aggregatedStats);
+    TimeSeriesBlock resultBlock = new TimeSeriesBlock(timeBuckets, seriesMap, aggregatedStats);
+    if (timeoutException != null) {
+      resultBlock.addToExceptions(timeoutException);
+    }
+    return resultBlock;
   }
 
   /**
@@ -193,11 +208,20 @@ public class TimeSeriesExchangeReceiveOperator extends BaseTimeSeriesOperator {
     Map<Long, List<TimeSeries>> timeSeriesMap = new HashMap<>();
     TimeBuckets timeBuckets = null;
     Map<String, String> aggregatedStats = new HashMap<>();
+    QueryException timeoutException = null;
     for (int index = 0; index < _numServersQueried; index++) {
       long remainingTimeMs = _deadlineMs - System.currentTimeMillis();
-      Preconditions.checkState(remainingTimeMs > 0, "Timed out before polling exchange receive");
+      if (remainingTimeMs <= 0) {
+        timeoutException = new QueryException(QueryErrorCode.SERVER_NOT_RESPONDING,
+            String.format("Timed out before polling all servers. Successfully Polled: %s of %s", index, _numServersQueried));
+        break;
+      }
       Object result = _receiver.poll(remainingTimeMs, TimeUnit.MILLISECONDS);
-      Preconditions.checkNotNull(result, "Timed out waiting for response. Waited: %s ms", remainingTimeMs);
+      if (result == null) {
+        timeoutException = new QueryException(QueryErrorCode.SERVER_NOT_RESPONDING,
+            String.format("Timed out waiting for response. Waited: %s ms", remainingTimeMs));
+        break;
+      }
       if (result instanceof Throwable) {
         throw ((Throwable) result);
       }
@@ -218,6 +242,10 @@ public class TimeSeriesExchangeReceiveOperator extends BaseTimeSeriesOperator {
       mergeStats(aggregatedStats, blockToMerge.getMetadata());
     }
     Preconditions.checkNotNull(timeBuckets, "Time buckets is null in exchange receive operator");
-    return new TimeSeriesBlock(timeBuckets, timeSeriesMap, aggregatedStats);
+    TimeSeriesBlock resultBlock = new TimeSeriesBlock(timeBuckets, timeSeriesMap, aggregatedStats);
+    if (timeoutException != null) {
+      resultBlock.addToExceptions(timeoutException);
+    }
+    return resultBlock;
   }
 }
