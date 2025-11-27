@@ -138,7 +138,7 @@ public class SumArrayDoubleAggregationFunction
 
   @Override
   public DataSchema.ColumnDataType getIntermediateResultColumnType() {
-    return DataSchema.ColumnDataType.DOUBLE_ARRAY;
+    return DataSchema.ColumnDataType.OBJECT;
   }
 
   @Override

@@ -43,6 +43,8 @@ import org.roaringbitmap.RoaringBitmap;
 
 public class DistinctCountULLAggregationFunction extends BaseSingleInputAggregationFunction<UltraLogLog, Comparable> {
   protected final int _p;
+  // Here we support aggregate on raw value or ULL bytes
+  private boolean _aggregateOnRawValues;
 
   public DistinctCountULLAggregationFunction(List<ExpressionContext> arguments) {
     super(arguments.get(0));
@@ -102,6 +104,7 @@ public class DistinctCountULLAggregationFunction extends BaseSingleInputAggregat
       return;
     }
 
+    _aggregateOnRawValues = true;
     // For dictionary-encoded expression, store dictionary ids into the bitmap
     Dictionary dictionary = blockValSet.getDictionary();
     if (dictionary != null) {
@@ -175,6 +178,7 @@ public class DistinctCountULLAggregationFunction extends BaseSingleInputAggregat
       return;
     }
 
+    _aggregateOnRawValues = true;
     // For dictionary-encoded expression, store dictionary ids into the bitmap
     Dictionary dictionary = blockValSet.getDictionary();
     if (dictionary != null) {
@@ -257,6 +261,7 @@ public class DistinctCountULLAggregationFunction extends BaseSingleInputAggregat
       return;
     }
 
+    _aggregateOnRawValues = true;
     // For dictionary-encoded expression, store dictionary ids into the bitmap
     Dictionary dictionary = blockValSet.getDictionary();
     if (dictionary != null) {
@@ -309,7 +314,12 @@ public class DistinctCountULLAggregationFunction extends BaseSingleInputAggregat
   public UltraLogLog extractAggregationResult(AggregationResultHolder aggregationResultHolder) {
     Object result = aggregationResultHolder.getResult();
     if (result == null) {
-      return UltraLogLog.create(_p);
+      if (_aggregateOnRawValues) {
+        return UltraLogLog.create(_p);
+      }
+      // Here we cannot directly return a default UltraLogLog object, as if the input is ULL bytes, which may use a
+      // different _p, then the ULL object merge will fail.
+      return null;
     }
 
     if (result instanceof DictIdsWrapper) {
@@ -325,7 +335,12 @@ public class DistinctCountULLAggregationFunction extends BaseSingleInputAggregat
   public UltraLogLog extractGroupByResult(GroupByResultHolder groupByResultHolder, int groupKey) {
     Object result = groupByResultHolder.getResult(groupKey);
     if (result == null) {
-      return UltraLogLog.create(_p);
+      if (_aggregateOnRawValues) {
+        return UltraLogLog.create(_p);
+      }
+      // Here we cannot directly return a default UltraLogLog object, as if the input is ULL bytes, which may use a
+      // different _p, then the ULL object merge will fail.
+      return null;
     }
 
     if (result instanceof DictIdsWrapper) {
