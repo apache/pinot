@@ -949,8 +949,11 @@ public class TablesResource {
     try {
       segmentTarFile = createSegmentTarFile(tableDataManager, segmentName);
       String downloadUrl = uploadSegment(segmentTarFile, realtimeTableNameWithType, segmentName, timeoutMs);
-      return new TableLLCSegmentUploadResponse(segmentName,
-          Long.parseLong(segmentDataManager.getSegment().getSegmentMetadata().getCrc()), downloadUrl);
+      return new TableLLCSegmentUploadResponse(
+          segmentName,
+          Long.parseLong(segmentDataManager.getSegment().getSegmentMetadata().getCrc()),
+          Long.parseLong(segmentDataManager.getSegment().getSegmentMetadata().getDataCrc()),
+          downloadUrl);
     } finally {
       FileUtils.deleteQuietly(segmentTarFile);
       tableDataManager.releaseSegment(segmentDataManager);

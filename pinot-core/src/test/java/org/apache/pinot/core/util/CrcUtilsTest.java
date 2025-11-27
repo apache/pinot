@@ -107,10 +107,10 @@ public class CrcUtilsTest {
     driver.build();
 
     File indexDir = driver.getOutputDirectory();
-    assertEquals(CrcUtils.forAllFilesInFolder(indexDir).computeCrc(false), 2102337593L);
+    assertEquals(CrcUtils.forAllFilesInFolder(indexDir).computeCrc(), 2102337593L);
 
     new SegmentV1V2ToV3FormatConverter().convert(indexDir);
-    assertEquals(CrcUtils.forAllFilesInFolder(indexDir).computeCrc(false), 3362640853L);
+    assertEquals(CrcUtils.forAllFilesInFolder(indexDir).computeCrc(), 3362640853L);
   }
 
   @Test
@@ -137,10 +137,10 @@ public class CrcUtilsTest {
     driver.build();
 
     File indexDir = driver.getOutputDirectory();
-    assertEquals(CrcUtils.forAllFilesInFolder(indexDir).computeCrc(false), 289171778L);
+    assertEquals(CrcUtils.forAllFilesInFolder(indexDir).computeCrc(), 289171778L);
 
     new SegmentV1V2ToV3FormatConverter().convert(indexDir);
-    assertEquals(CrcUtils.forAllFilesInFolder(indexDir).computeCrc(false), 3409394291L);
+    assertEquals(CrcUtils.forAllFilesInFolder(indexDir).computeCrc(), 3409394291L);
   }
 
   @Test
@@ -166,10 +166,10 @@ public class CrcUtilsTest {
     driver.build();
 
     File indexDir = driver.getOutputDirectory();
-    assertEquals(CrcUtils.forAllFilesInFolder(indexDir).computeCrc(false), 2627227852L);
+    assertEquals(CrcUtils.forAllFilesInFolder(indexDir).computeCrc(), 2627227852L);
 
     new SegmentV1V2ToV3FormatConverter().convert(indexDir);
-    assertEquals(CrcUtils.forAllFilesInFolder(indexDir).computeCrc(false), 1229791705L);
+    assertEquals(CrcUtils.forAllFilesInFolder(indexDir).computeCrc(), 1229791705L);
   }
 
   @Test
@@ -198,14 +198,14 @@ public class CrcUtilsTest {
     // When using text index in RealTime table, different crc values can cause servers to have to download segments
     // from deep store to make segment replicas in sync.
     File indexDir = driver.getOutputDirectory();
-    System.out.println(CrcUtils.forAllFilesInFolder(indexDir).computeCrc(false));
+    System.out.println(CrcUtils.forAllFilesInFolder(indexDir).computeCrc());
 
     new SegmentV1V2ToV3FormatConverter().convert(indexDir);
-    System.out.println(CrcUtils.forAllFilesInFolder(indexDir).computeCrc(false));
+    System.out.println(CrcUtils.forAllFilesInFolder(indexDir).computeCrc());
   }
 
   @Test
-  public void testCrcConsistencyWithExternalIndexesForAllSegmentVers()
+  public void testDataCrcConsistencyWithExternalIndexesForAllSegmentVers()
       throws Exception {
     int numRuns = 5;
 
@@ -271,7 +271,7 @@ public class CrcUtilsTest {
   }
 
   @Test
-  public void testCrcConsistencyWithAllForwardIndexDisabledAndTransformsForAllSegmentVers()
+  public void testDataCrcConsistencyWithAllForwardIndexDisabledAndTransformsForAllSegmentVers()
       throws Exception {
     int numRuns = 5;
 

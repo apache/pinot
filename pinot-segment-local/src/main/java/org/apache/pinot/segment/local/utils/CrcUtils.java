@@ -88,12 +88,9 @@ public class CrcUtils {
   }
 
   /**
-   * Determines if a file is considered a "Data File" (Metadata or one of ".fwd", ".dict", ".inv" file types).
+   * Determines if a file is considered a "Data File" (one of ".fwd", ".dict", ".inv" file types).
    */
   private static boolean isDataFile(String fileName) {
-    if (fileName.equals(METADATA_FILE)) {
-      return true;
-    }
     for (String ext : DATA_FILE_EXTENSIONS) {
       if (fileName.endsWith(ext)) {
         return true;
@@ -102,13 +99,15 @@ public class CrcUtils {
     return false;
   }
 
-  public long computeCrc(boolean dataOnly)
-      throws IOException {
-    List<File> filesToComputeCrc = _files;
-    if (dataOnly) {
-      filesToComputeCrc = _dataFiles;
-    }
+  public long computeCrc() throws IOException {
+    return crcForFiles(_files);
+  }
 
+  public long computeDataCrc() throws IOException {
+    return crcForFiles(_dataFiles);
+  }
+
+  private long crcForFiles(List<File> filesToComputeCrc) throws IOException {
     byte[] buffer = new byte[BUFFER_SIZE];
     Checksum checksum = new Adler32();
 
@@ -124,7 +123,7 @@ public class CrcUtils {
       }
     }
     long crc = checksum.getValue();
-    LOGGER.info("Computed crc = {}, with dataOnly = {}  based on files {}", crc, dataOnly, filesToComputeCrc);
+    LOGGER.info("Computed crc = {}, based on files {}", crc, filesToComputeCrc);
     return crc;
   }
 }

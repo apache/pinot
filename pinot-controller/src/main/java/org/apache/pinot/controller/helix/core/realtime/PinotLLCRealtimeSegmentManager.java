@@ -2138,11 +2138,15 @@ public class PinotLLCRealtimeSegmentManager {
       TableLLCSegmentUploadResponse response, PinotFS pinotFS)
       throws Exception {
     long currentCrc = currentMetadata.getCrc();
-
     long newCrc = response.getCrc();
+    long newDataCrc = response.getDataCrc();
     if (currentCrc != newCrc) {
-      LOGGER.info("Updating CRC in ZK metadata for segment: {} from: {} to: {}", segmentName, currentCrc, newCrc);
+      LOGGER.info("Updating CRC and data CRC in ZK metadata for segment: {} "
+              + "[oldCRC: {} newCRC: {}][oldDataCRC: {} newDataCRC: {}]",
+          segmentName, currentCrc, newCrc, currentMetadata.getDataCrc(), newDataCrc);
       currentMetadata.setCrc(newCrc);
+      // since data CRC is a subset of CRC, we update data CRC too when CRC changes
+      currentMetadata.setDataCrc(newDataCrc);
     }
     moveSegmentAndSetDownloadUrl(rawTableName, segmentName, response.getDownloadUrl(), pinotFS, currentMetadata);
   }

@@ -196,7 +196,7 @@ public class SegmentMetadataImpl implements SegmentMetadata {
       try {
         _dataCrc = ds.readLong();
       } catch (IOException e) {
-        LOGGER.warn("Could not find data crc, falling back to default LONG_MIN value");
+        LOGGER.debug("Could not find data crc, falling back to default LONG_MIN value");
       } finally {
         ds.close();
       }
@@ -212,7 +212,7 @@ public class SegmentMetadataImpl implements SegmentMetadata {
       try {
         _dataCrc = ds.readLong();
       } catch (IOException e) {
-        LOGGER.warn("Could not find data crc, falling back to default LONG_MIN value");
+        LOGGER.debug("Could not find data crc, falling back to default LONG_MIN value");
       }
     }
   }
@@ -485,7 +485,9 @@ public class SegmentMetadataImpl implements SegmentMetadata {
     segmentMetadata.put("segmentName", _segmentName);
     segmentMetadata.put("schemaName", _schema != null ? _schema.getSchemaName() : null);
     segmentMetadata.put("crc", _crc);
-    segmentMetadata.put("dataCrc", _dataCrc);
+    if (_dataCrc != Long.MIN_VALUE) {
+      segmentMetadata.put("dataCrc", _dataCrc);
+    }
     segmentMetadata.put("creationTimeMillis", _creationTime);
     TimeZone timeZone = TimeZone.getTimeZone("UTC");
     DateFormat dateFormat = new SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss:SSS' UTC'");

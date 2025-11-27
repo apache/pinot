@@ -523,7 +523,7 @@ public class SegmentIndexCreationDriverImpl implements SegmentIndexCreationDrive
     FileUtils.deleteQuietly(_tempIndexDir);
 
     // Compute data crc before segment format conversion applies since v3 puts all index files into a single one
-    long dataCrc = CrcUtils.forAllFilesInFolder(segmentOutputDir).computeCrc(true);
+    long dataCrc = CrcUtils.forAllFilesInFolder(segmentOutputDir).computeDataCrc();
     convertFormatIfNecessary(segmentOutputDir);
 
     if (_totalDocs > 0) {
@@ -533,7 +533,7 @@ public class SegmentIndexCreationDriverImpl implements SegmentIndexCreationDrive
     updatePostSegmentCreationIndexes(segmentOutputDir);
 
     // Compute CRC and creation time
-    long crc = CrcUtils.forAllFilesInFolder(segmentOutputDir).computeCrc(false);
+    long crc = CrcUtils.forAllFilesInFolder(segmentOutputDir).computeCrc();
     long creationTime;
     String creationTimeInConfig = _config.getCreationTime();
     if (creationTimeInConfig != null) {
@@ -683,14 +683,14 @@ public class SegmentIndexCreationDriverImpl implements SegmentIndexCreationDrive
     return _segmentStats.getColumnProfileFor(columnName);
   }
 
-  public static void persistCreationMeta(File indexDir, long crc, long dataOnlyCrc, long creationTime)
+  public static void persistCreationMeta(File indexDir, long crc, long dataCrc, long creationTime)
       throws IOException {
     File segmentDir = SegmentDirectoryPaths.findSegmentDirectory(indexDir);
     File creationMetaFile = new File(segmentDir, V1Constants.SEGMENT_CREATION_META);
     try (DataOutputStream output = new DataOutputStream(new FileOutputStream(creationMetaFile))) {
       output.writeLong(crc);
       output.writeLong(creationTime);
-      output.writeLong(dataOnlyCrc);
+      output.writeLong(dataCrc);
     }
   }
 
