@@ -125,7 +125,8 @@ public class TimeSeriesExchangeReceiveOperator extends BaseTimeSeriesOperator {
       long remainingTimeMs = _deadlineMs - System.currentTimeMillis();
       if (remainingTimeMs <= 0) {
         timeoutException = new QueryException(QueryErrorCode.SERVER_NOT_RESPONDING,
-            String.format("Timed out before polling all servers. Successfully Polled: %s of %s", index, _numServersQueried));
+            String.format("Timed out before polling all servers. Successfully Polled: %s of %s", index,
+                _numServersQueried));
         break;
       }
       Object result = poll(remainingTimeMs);
@@ -213,7 +214,8 @@ public class TimeSeriesExchangeReceiveOperator extends BaseTimeSeriesOperator {
       long remainingTimeMs = _deadlineMs - System.currentTimeMillis();
       if (remainingTimeMs <= 0) {
         timeoutException = new QueryException(QueryErrorCode.SERVER_NOT_RESPONDING,
-            String.format("Timed out before polling all servers. Successfully Polled: %s of %s", index, _numServersQueried));
+            String.format("Timed out before polling all servers. Successfully Polled: %s of %s", index,
+                _numServersQueried));
         break;
       }
       Object result = _receiver.poll(remainingTimeMs, TimeUnit.MILLISECONDS);
