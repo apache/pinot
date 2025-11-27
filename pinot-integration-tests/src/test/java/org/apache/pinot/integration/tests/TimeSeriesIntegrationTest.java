@@ -50,6 +50,8 @@ import org.testng.annotations.Test;
 
 import static org.testng.Assert.assertEquals;
 import static org.testng.Assert.assertNotNull;
+import static org.testng.Assert.assertTrue;
+
 
 public class TimeSeriesIntegrationTest extends BaseClusterIntegrationTest {
 
@@ -276,6 +278,11 @@ public class TimeSeriesIntegrationTest extends BaseClusterIntegrationTest {
         validator.validate(tsArray.get(i).asLong(), valArray.get(i).asLong(), metric);
       }
     }
+
+    // Validate query stats
+    assertTrue(Long.parseLong(result.path("totalDocs").asText()) > 0);
+    assertTrue(Long.parseLong(result.path("numDocsScanned").asText()) > 0);
+    assertTrue(Long.parseLong(result.path("numSegmentsQueried").asText()) > 0);
   }
 
   private List<String> extractStrings(JsonNode arrayNode) {

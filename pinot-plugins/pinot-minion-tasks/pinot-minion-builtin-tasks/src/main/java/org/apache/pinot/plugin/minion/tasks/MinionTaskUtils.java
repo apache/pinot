@@ -104,40 +104,60 @@ public class MinionTaskUtils {
     return PinotFSFactory.create(fileURIScheme);
   }
 
+  public static URI getOutputSegmentDirURI(Map<String, String> taskConfigs, ClusterInfoAccessor clusterInfoAccessor,
+      String tableName) {
+    // taskConfigs has priority over clusterInfo configs for output.segment.dir.uri
+    String outputDir = taskConfigs.getOrDefault(BatchConfigProperties.OUTPUT_SEGMENT_DIR_URI,
+        normalizeDirectoryURI(clusterInfoAccessor.getDataDir()) + TableNameBuilder.extractRawTableName(tableName));
+    return URI.create(outputDir);
+  }
+
   public static Map<String, String> getPushTaskConfig(String tableName, Map<String, String> taskConfigs,
       ClusterInfoAccessor clusterInfoAccessor) {
+    Map<String, String> singleFileGenerationTaskConfig = new HashMap<>(taskConfigs);
     try {
       String pushMode = IngestionConfigUtils.getPushMode(taskConfigs);
 
-      Map<String, String> singleFileGenerationTaskConfig = new HashMap<>(taskConfigs);
-      if (pushMode == null || pushMode.toUpperCase()
-          .contentEquals(BatchConfigProperties.SegmentPushType.TAR.toString())) {
+      // Default value for Segment Push Type is TAR.
+      BatchConfigProperties.SegmentPushType segmentPushType;
+      if (pushMode == null) {
+        segmentPushType = BatchConfigProperties.SegmentPushType.TAR;
+      } else {
+        segmentPushType = BatchConfigProperties.SegmentPushType.valueOf(pushMode.toUpperCase());
+      }
+
+      URI outputSegmentDirURI = getOutputSegmentDirURI(taskConfigs, clusterInfoAccessor, tableName);
+      if (!isLocalOutputDir(outputSegmentDirURI.getScheme())) {
+        switch (segmentPushType) {
+          case URI:
+            singleFileGenerationTaskConfig.put(BatchConfigProperties.OUTPUT_SEGMENT_DIR_URI,
+                outputSegmentDirURI.toString());
+            LOGGER.warn("URI push type is not supported in this task. Switching to METADATA push");
+            singleFileGenerationTaskConfig.put(BatchConfigProperties.PUSH_MODE,
+                BatchConfigProperties.SegmentPushType.METADATA.toString());
+            break;
+          case METADATA:
+            singleFileGenerationTaskConfig.put(BatchConfigProperties.OUTPUT_SEGMENT_DIR_URI,
+                outputSegmentDirURI.toString());
+            break;
+          default:
+            singleFileGenerationTaskConfig.put(BatchConfigProperties.PUSH_MODE,
+                BatchConfigProperties.SegmentPushType.TAR.toString());
+            break;
+        }
+      } else {
+        LOGGER.warn("Local output dir found, defaulting to TAR: {}.", outputSegmentDirURI);
         singleFileGenerationTaskConfig.put(BatchConfigProperties.PUSH_MODE,
             BatchConfigProperties.SegmentPushType.TAR.toString());
-      } else {
-        URI outputDirURI = URI.create(
-            normalizeDirectoryURI(clusterInfoAccessor.getDataDir()) + TableNameBuilder.extractRawTableName(tableName));
-        String outputDirURIScheme = outputDirURI.getScheme();
-
-        if (!isLocalOutputDir(outputDirURIScheme)) {
-          singleFileGenerationTaskConfig.put(BatchConfigProperties.OUTPUT_SEGMENT_DIR_URI, outputDirURI.toString());
-          if (pushMode.toUpperCase().contentEquals(BatchConfigProperties.SegmentPushType.URI.toString())) {
-            LOGGER.warn("URI push type is not supported in this task. Switching to METADATA push");
-            pushMode = BatchConfigProperties.SegmentPushType.METADATA.toString();
-          }
-          singleFileGenerationTaskConfig.put(BatchConfigProperties.PUSH_MODE, pushMode);
-        } else {
-          LOGGER.warn("segment upload with METADATA push is not supported with local output dir: {}."
-              + " Switching to TAR push.", outputDirURI);
-          singleFileGenerationTaskConfig.put(BatchConfigProperties.PUSH_MODE,
-              BatchConfigProperties.SegmentPushType.TAR.toString());
-        }
       }
+
       singleFileGenerationTaskConfig.put(BatchConfigProperties.PUSH_CONTROLLER_URI,
           clusterInfoAccessor.getVipUrlForLeadController(tableName));
       return singleFileGenerationTaskConfig;
     } catch (Exception e) {
-      return taskConfigs;
+      singleFileGenerationTaskConfig.put(BatchConfigProperties.PUSH_MODE,
+            BatchConfigProperties.SegmentPushType.TAR.toString());
+      return singleFileGenerationTaskConfig;
     }
   }
 

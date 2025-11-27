@@ -75,6 +75,7 @@ import org.apache.pinot.segment.spi.index.metadata.SegmentMetadataImpl;
 import org.apache.pinot.spi.config.table.SegmentsValidationAndRetentionConfig;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.TableType;
+import org.apache.pinot.spi.config.table.UpsertConfig;
 import org.apache.pinot.spi.config.table.assignment.InstancePartitionsType;
 import org.apache.pinot.spi.env.PinotConfiguration;
 import org.apache.pinot.spi.filesystem.PinotFSFactory;
@@ -356,14 +357,16 @@ public class PinotLLCRealtimeSegmentManagerTest {
   }
 
   @Test
-  public void testForceCommitPartialUpsertTableWithMultipleReplicas() {
+  public void testForceCommitUpsertWithOutOfOrderTable() {
     FakePinotLLCRealtimeSegmentManager segmentManager = new FakePinotLLCRealtimeSegmentManager();
     segmentManager._numReplicas = 2; // RF > 1
     Map<String, String> streamConfigs = FakeStreamConfigUtils.getDefaultLowLevelStreamConfigs().getStreamConfigsMap();
+    UpsertConfig upsertConfig = new UpsertConfig(UpsertConfig.Mode.FULL);
+    upsertConfig.setDropOutOfOrderRecord(true);
+    upsertConfig.setConsistencyMode(UpsertConfig.ConsistencyMode.NONE);
     segmentManager._tableConfig = new TableConfigBuilder(TableType.REALTIME).setTableName(RAW_TABLE_NAME)
-        .setNumReplicas(segmentManager._numReplicas).setStreamConfigs(streamConfigs).setUpsertConfig(
-            new org.apache.pinot.spi.config.table.UpsertConfig(
-                org.apache.pinot.spi.config.table.UpsertConfig.Mode.PARTIAL)).build();
+        .setNumReplicas(segmentManager._numReplicas).setStreamConfigs(streamConfigs).setUpsertConfig(upsertConfig)
+        .build();
     segmentManager._streamConfigs = IngestionConfigUtils.getStreamConfigs(segmentManager._tableConfig);
     when(segmentManager._mockResourceManager.getTableConfig(REALTIME_TABLE_NAME)).thenReturn(
         segmentManager._tableConfig);
@@ -377,7 +380,36 @@ public class PinotLLCRealtimeSegmentManagerTest {
       segmentManager.forceCommit(REALTIME_TABLE_NAME, null, consumingSegment, ForceCommitBatchConfig.of(1, 1, 5));
       fail("Expected IllegalStateException for partial upsert table with RF > 1");
     } catch (IllegalStateException e) {
-      assertTrue(e.getMessage().contains("Force commit is not allowed for partial upsert tables"),
+      assertTrue(e.getMessage().contains("Force commit is not allowed when replication > 1 for partial-upsert tables"),
+          "Exception message should mention partial upsert and replication");
+    }
+  }
+
+  @Test
+  public void testForceCommitPartialUpsertTableWithMultipleReplicas() {
+    FakePinotLLCRealtimeSegmentManager segmentManager = new FakePinotLLCRealtimeSegmentManager();
+    segmentManager._numReplicas = 2; // RF > 1
+    Map<String, String> streamConfigs = FakeStreamConfigUtils.getDefaultLowLevelStreamConfigs().getStreamConfigsMap();
+    segmentManager._tableConfig = new TableConfigBuilder(TableType.REALTIME).setTableName(RAW_TABLE_NAME)
+        .setNumReplicas(segmentManager._numReplicas).setStreamConfigs(streamConfigs).setUpsertConfig(
+            new UpsertConfig(
+                UpsertConfig.Mode.PARTIAL)).build();
+    segmentManager._streamConfigs = IngestionConfigUtils.getStreamConfigs(segmentManager._tableConfig);
+    when(segmentManager._mockResourceManager.getTableConfig(REALTIME_TABLE_NAME)).thenReturn(
+        segmentManager._tableConfig);
+    segmentManager._numInstances = 3;
+    segmentManager.makeConsumingInstancePartitions();
+    segmentManager._numPartitions = 1;
+    segmentManager.setUpNewTable();
+    String consumingSegment = new LLCSegmentName(RAW_TABLE_NAME, 0, 0, CURRENT_TIME_MS).getSegmentName();
+    segmentManager._idealState.setPartitionState(consumingSegment, "Server_0", SegmentStateModel.CONSUMING);
+    try {
+      segmentManager.forceCommit(REALTIME_TABLE_NAME, null, consumingSegment, ForceCommitBatchConfig.of(1, 1, 5));
+      fail("Expected IllegalStateException for partial upsert table with RF > 1");
+    } catch (IllegalStateException e) {
+      assertTrue(e.getMessage().contains(
+              "Force commit is not allowed when replication > 1 for partial-upsert tables, or for upsert tables when "
+                  + "dropOutOfOrder is enabled with consistency mode: NONE for the table: testTable_REALTIME"),
           "Exception message should mention partial upsert and replication");
     }
   }
@@ -389,8 +421,8 @@ public class PinotLLCRealtimeSegmentManagerTest {
     Map<String, String> streamConfigs = FakeStreamConfigUtils.getDefaultLowLevelStreamConfigs().getStreamConfigsMap();
     segmentManager._tableConfig = new TableConfigBuilder(TableType.REALTIME).setTableName(RAW_TABLE_NAME)
         .setNumReplicas(segmentManager._numReplicas).setStreamConfigs(streamConfigs).setUpsertConfig(
-            new org.apache.pinot.spi.config.table.UpsertConfig(
-                org.apache.pinot.spi.config.table.UpsertConfig.Mode.PARTIAL)).build();
+            new UpsertConfig(
+                UpsertConfig.Mode.PARTIAL)).build();
     segmentManager._streamConfigs = IngestionConfigUtils.getStreamConfigs(segmentManager._tableConfig);
     when(segmentManager._mockResourceManager.getTableConfig(REALTIME_TABLE_NAME)).thenReturn(
         segmentManager._tableConfig);

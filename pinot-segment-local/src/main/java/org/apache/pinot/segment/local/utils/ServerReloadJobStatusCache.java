@@ -28,6 +28,9 @@ import java.util.concurrent.TimeUnit;
 import javax.annotation.Nullable;
 import javax.annotation.concurrent.ThreadSafe;
 import org.apache.commons.configuration2.MapConfiguration;
+import org.apache.commons.lang3.exception.ExceptionUtils;
+import org.apache.pinot.common.response.server.ApiErrorResponse;
+import org.apache.pinot.common.response.server.SegmentReloadFailureResponse;
 import org.apache.pinot.spi.config.provider.PinotClusterConfigChangeListener;
 import org.apache.pinot.spi.env.PinotConfiguration;
 import org.slf4j.Logger;
@@ -38,7 +41,6 @@ import static java.util.Objects.requireNonNull;
 
 /**
  * In-memory cache for tracking reload job status on server side.
- * Phase 1: Only tracks failure count per job.
  *
  * <p>Thread-safe for concurrent access. Uses Guava Cache with LRU eviction
  * and time-based expiration.
@@ -53,10 +55,12 @@ public class ServerReloadJobStatusCache implements PinotClusterConfigChangeListe
   private static final ObjectMapper OBJECT_MAPPER = new ObjectMapper();
   static final String CONFIG_PREFIX = "pinot.server.table.reload.status.cache";
 
+  private final String _instanceId;
   private volatile Cache<String, ReloadJobStatus> _cache;
   private volatile ServerReloadJobStatusCacheConfig _currentConfig;
 
-  public ServerReloadJobStatusCache() {
+  public ServerReloadJobStatusCache(String instanceId) {
+    _instanceId = requireNonNull(instanceId, "instanceId cannot be null");
     _currentConfig = new ServerReloadJobStatusCacheConfig();
     _cache = CacheBuilder.newBuilder()
         .maximumSize(_currentConfig.getMaxSize())
@@ -64,7 +68,7 @@ public class ServerReloadJobStatusCache implements PinotClusterConfigChangeListe
         .recordStats()
         .build();
 
-    LOG.info("Initialized ReloadJobStatusCache with {}", _currentConfig);
+    LOG.info("Initialized ReloadJobStatusCache for instance {} with {}", _instanceId, _currentConfig);
   }
 
   /**
@@ -101,6 +105,40 @@ public class ServerReloadJobStatusCache implements PinotClusterConfigChangeListe
       }
     }
     return status;
+  }
+
+  /**
+   * Records a segment reload failure in the cache.
+   * Handles all business logic: counting, limit enforcement, thread safety.
+   *
+   * <p>This method ALWAYS increments the failure count, but only stores detailed
+   * failure information (segment name, exception, stack trace) for the first N failures
+   * where N is configured by maxFailureDetailsToCapture.
+   *
+   * @param jobId reload job ID (UUID)
+   * @param segmentName name of failed segment
+   * @param exception the exception that caused the failure
+   */
+  public void recordFailure(String jobId, String segmentName, Throwable exception) {
+    requireNonNull(jobId, "jobId cannot be null");
+    requireNonNull(segmentName, "segmentName cannot be null");
+    requireNonNull(exception, "exception cannot be null");
+
+    ReloadJobStatus status = getOrCreate(jobId);
+    status.incrementAndGetFailureCount();
+
+    synchronized (status) {
+      int maxLimit = _currentConfig.getSegmentFailureDetailsCount();
+      if (status.getFailedSegmentDetails().size() < maxLimit) {
+        status.addFailureDetail(new SegmentReloadFailureResponse()
+            .setSegmentName(segmentName)
+            .setServerName(_instanceId)
+            .setError(new ApiErrorResponse()
+                .setErrorMsg(exception.getMessage())
+                .setStacktrace(ExceptionUtils.getStackTrace(exception)))
+            .setFailedAtMs(System.currentTimeMillis()));
+      }
+    }
   }
 
   /**

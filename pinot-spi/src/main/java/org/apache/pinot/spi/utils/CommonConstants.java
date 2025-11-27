@@ -914,7 +914,8 @@ public class CommonConstants {
         PlannerRuleNames.SORT_JOIN_COPY,
         PlannerRuleNames.AGGREGATE_UNION_AGGREGATE,
         PlannerRuleNames.JOIN_TO_ENRICHED_JOIN,
-        PlannerRuleNames.AGGREGATE_FUNCTION_REWRITE
+        PlannerRuleNames.AGGREGATE_FUNCTION_REWRITE,
+        PlannerRuleNames.JOIN_PUSH_TRANSITIVE_PREDICATES
     );
 
     public static class FailureDetector {
@@ -2088,6 +2089,10 @@ public class CommonConstants {
         "pinot.field.spec.default.json.max.length.exceed.strategy";
     public static final String CONFIG_OF_DEFAULT_JSON_MAX_LENGTH =
         "pinot.field.spec.default.json.max.length";
+  }
+
+  public static class IngestionConfigs {
+    public static final int DEFAULT_INGESTION_EXCEPTION_LOG_RATE_LIMIT_PER_MIN = 5;
   }
 
   /**

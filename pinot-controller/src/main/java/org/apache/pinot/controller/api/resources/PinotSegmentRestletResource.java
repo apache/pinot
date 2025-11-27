@@ -466,6 +466,89 @@ public class PinotSegmentRestletResource {
     }
   }
 
+  @POST
+  @Path("segments/{tableNameWithType}/uploadFromServerToDeepstore")
+  @Authorize(targetType = TargetType.TABLE, paramName = "tableNameWithType", action = Actions.Table.UPLOAD_SEGMENT)
+  @Authenticate(AccessType.UPDATE)
+  @Produces(MediaType.APPLICATION_JSON)
+  @ApiOperation(value = "Upload realtime segments from server to deep store",
+      notes = "Uploads realtime segments from servers (with online replicas) to deep store. "
+          + "When forceMode=false (default), only uploads segments missing from deep store. "
+          + "When forceMode=true, bypasses all checks and reuploads segments even if they already exist.")
+  @ApiResponses(value = {
+      @ApiResponse(code = 200, message = "Success"),
+      @ApiResponse(code = 400, message = "Bad request - table must be a realtime table"),
+      @ApiResponse(code = 404, message = "Table not found"),
+      @ApiResponse(code = 500, message = "Internal server error")
+  })
+  public SuccessResponse uploadFromServerToDeepstore(
+      @ApiParam(value = "Name of the realtime table with type", required = true, example = "myTable_REALTIME")
+      @PathParam("tableNameWithType") String tableNameWithType,
+      @ApiParam(value = "List of segment names to upload. If not provided, uploads all segments.",
+          allowMultiple = true) @QueryParam("segmentNames") @Nullable List<String> segmentNames,
+      @ApiParam(value = "Force mode: when true, bypasses checks and reuploads even if segments exist in deep store",
+          defaultValue = "false") @QueryParam("forceMode") @DefaultValue("false") boolean forceMode,
+      @Context HttpHeaders headers) {
+    tableNameWithType = DatabaseUtils.translateTableName(tableNameWithType, headers);
+
+    // Validate this is a realtime table
+    TableType tableType = TableNameBuilder.getTableTypeFromTableName(tableNameWithType);
+    if (tableType != TableType.REALTIME) {
+      throw new ControllerApplicationException(LOGGER,
+          "Upload from server to deep store is only supported for REALTIME tables. Provided: " + tableNameWithType,
+          Status.BAD_REQUEST);
+    }
+
+    // Get table config
+    TableConfig tableConfig = _pinotHelixResourceManager.getTableConfig(tableNameWithType);
+    if (tableConfig == null) {
+      throw new ControllerApplicationException(LOGGER,
+          "Table config not found for table: " + tableNameWithType, Status.NOT_FOUND);
+    }
+
+    // Get segments to upload
+    List<SegmentZKMetadata> segmentsToUpload;
+    if (segmentNames == null || segmentNames.isEmpty()) {
+      LOGGER.info("Empty/null segment list provided for table: {}. Not uploading anything.", tableNameWithType);
+      return new SuccessResponse("No segments to upload for table: "
+          + tableNameWithType);
+    } else {
+      // Upload specific segments
+      segmentsToUpload = new ArrayList<>();
+      for (String segmentName : segmentNames) {
+        SegmentZKMetadata segmentZKMetadata =
+            _pinotHelixResourceManager.getSegmentZKMetadata(tableNameWithType, segmentName);
+        if (segmentZKMetadata == null) {
+          LOGGER.warn("Segment not found: {} in table: {} while reuploading to deepstore",
+              segmentName, tableNameWithType);
+          continue;
+        }
+        segmentsToUpload.add(segmentZKMetadata);
+      }
+    }
+
+    if (segmentsToUpload.isEmpty()) {
+      return new SuccessResponse("No segments found to upload for table: " + tableNameWithType);
+    }
+
+    LOGGER.info("Uploading {} segments from server to deep store for table: {} (forceMode: {})",
+        segmentsToUpload.size(), tableNameWithType, forceMode);
+
+    // Trigger upload (with or without force mode)
+    try {
+      _pinotHelixResourceManager.getRealtimeSegmentManager()
+          .uploadToDeepStoreIfMissing(tableConfig, segmentsToUpload, forceMode);
+      String mode = forceMode ? "force upload" : "upload";
+      return new SuccessResponse(
+          String.format("Successfully queued %d segment(s) for %s to deep store for table: %s",
+              segmentsToUpload.size(), mode, tableNameWithType));
+    } catch (Exception e) {
+      throw new ControllerApplicationException(LOGGER,
+          String.format("Failed to upload segments to deep store for table: %s. Error: %s",
+              tableNameWithType, e.getMessage()), Status.INTERNAL_SERVER_ERROR, e);
+    }
+  }
+
   @DELETE
   @Produces(MediaType.APPLICATION_JSON)
   @Path("/segments/{tableName}/{segmentName}")
