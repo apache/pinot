@@ -31,7 +31,6 @@ import java.util.List;
 import java.util.Map;
 import org.apache.avro.file.DataFileWriter;
 import org.apache.avro.generic.GenericData;
-import org.apache.avro.generic.GenericDatumWriter;
 import org.apache.pinot.common.function.JsonPathCache;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.TableType;
@@ -51,18 +50,18 @@ public class JsonPathTest extends CustomDataQueryClusterIntegrationTest {
 
   protected static final String DEFAULT_TABLE_NAME = "JsonPathTest";
 
-  protected static final int NUM_TOTAL_DOCS = 1000;
+  protected static final int NUM_DOCS_PER_SEGMENT = 1000;
   private static final String MY_MAP_STR_FIELD_NAME = "myMapStr";
   private static final String MY_MAP_STR_K1_FIELD_NAME = "myMapStr_k1";
   private static final String MY_MAP_STR_K2_FIELD_NAME = "myMapStr_k2";
   private static final String COMPLEX_MAP_STR_FIELD_NAME = "complexMapStr";
   private static final String COMPLEX_MAP_STR_K3_FIELD_NAME = "complexMapStr_k3";
 
-  protected final List<String> _sortedSequenceIds = new ArrayList<>(NUM_TOTAL_DOCS);
+  protected final List<String> _sortedSequenceIds = new ArrayList<>(NUM_DOCS_PER_SEGMENT);
 
   @Override
   protected long getCountStarResult() {
-    return NUM_TOTAL_DOCS;
+    return (long) NUM_DOCS_PER_SEGMENT * getNumAvroFiles();
   }
 
   @Override
@@ -105,10 +104,8 @@ public class JsonPathTest extends CustomDataQueryClusterIntegrationTest {
                 org.apache.avro.Schema.Type.STRING), null, null));
     avroSchema.setFields(fields);
 
-    File avroFile = new File(_tempDir, "data.avro");
-    try (DataFileWriter<GenericData.Record> fileWriter = new DataFileWriter<>(new GenericDatumWriter<>(avroSchema))) {
-      fileWriter.create(avroSchema, avroFile);
-      for (int i = 0; i < NUM_TOTAL_DOCS; i++) {
+    try (AvroFilesAndWriters avroFilesAndWriters = createAvroFilesAndWriters(avroSchema)) {
+      for (int i = 0; i < NUM_DOCS_PER_SEGMENT; i++) {
         Map<String, String> map = new HashMap<>();
         map.put("k1", "value-k1-" + i);
         map.put("k2", "value-k2-" + i);
@@ -123,13 +120,14 @@ public class JsonPathTest extends CustomDataQueryClusterIntegrationTest {
             Map.of("k4-k1", "value-k4-k1-" + i, "k4-k2", "value-k4-k2-" + i, "k4-k3", "value-k4-k3-" + i,
                 "met", i));
         record.put(COMPLEX_MAP_STR_FIELD_NAME, JsonUtils.objectToString(complexMap));
-        fileWriter.append(record);
+        for (DataFileWriter<GenericData.Record> writer : avroFilesAndWriters.getWriters()) {
+          writer.append(record);
+        }
         _sortedSequenceIds.add(String.valueOf(i));
       }
+      Collections.sort(_sortedSequenceIds);
+      return avroFilesAndWriters.getAvroFiles();
     }
-    Collections.sort(_sortedSequenceIds);
-
-    return List.of(avroFile);
   }
 
   @Test(dataProvider = "useBothQueryEngines")
@@ -199,19 +197,19 @@ public class JsonPathTest extends CustomDataQueryClusterIntegrationTest {
       String value = rows.get(i).get(0).textValue();
       Map<?, ?> results = JsonUtils.stringToObject(value, Map.class);
       Assert.assertTrue(value.indexOf("-k1-") > 0);
-      Assert.assertEquals(results.get("k1"), "value-k1-" + i);
-      Assert.assertEquals(results.get("k2"), "value-k2-" + i);
+      Assert.assertEquals(results.get("k1"), "value-k1-" + i % NUM_DOCS_PER_SEGMENT);
+      Assert.assertEquals(results.get("k2"), "value-k2-" + i % NUM_DOCS_PER_SEGMENT);
       final List<?> k3 = (List<?>) results.get("k3");
       Assert.assertEquals(k3.size(), 3);
-      Assert.assertEquals(k3.get(0), "value-k3-0-" + i);
-      Assert.assertEquals(k3.get(1), "value-k3-1-" + i);
-      Assert.assertEquals(k3.get(2), "value-k3-2-" + i);
+      Assert.assertEquals(k3.get(0), "value-k3-0-" + i % NUM_DOCS_PER_SEGMENT);
+      Assert.assertEquals(k3.get(1), "value-k3-1-" + i % NUM_DOCS_PER_SEGMENT);
+      Assert.assertEquals(k3.get(2), "value-k3-2-" + i % NUM_DOCS_PER_SEGMENT);
       final Map<?, ?> k4 = (Map<?, ?>) results.get("k4");
       Assert.assertEquals(k4.size(), 4);
-      Assert.assertEquals(k4.get("k4-k1"), "value-k4-k1-" + i);
-      Assert.assertEquals(k4.get("k4-k2"), "value-k4-k2-" + i);
-      Assert.assertEquals(k4.get("k4-k3"), "value-k4-k3-" + i);
-      Assert.assertEquals(Double.parseDouble(k4.get("met").toString()), i);
+      Assert.assertEquals(k4.get("k4-k1"), "value-k4-k1-" + i % NUM_DOCS_PER_SEGMENT);
+      Assert.assertEquals(k4.get("k4-k2"), "value-k4-k2-" + i % NUM_DOCS_PER_SEGMENT);
+      Assert.assertEquals(k4.get("k4-k3"), "value-k4-k3-" + i % NUM_DOCS_PER_SEGMENT);
+      Assert.assertEquals(Double.parseDouble(k4.get("met").toString()), i % NUM_DOCS_PER_SEGMENT);
     }
 
     //Filter Query
@@ -220,7 +218,7 @@ public class JsonPathTest extends CustomDataQueryClusterIntegrationTest {
     pinotResponse = postQuery(query);
     rows = (ArrayNode) pinotResponse.get("resultTable").get("rows");
     Assert.assertNotNull(rows);
-    Assert.assertEquals(rows.size(), 1);
+    Assert.assertEquals(rows.size(), getNumAvroFiles());
     for (int i = 0; i < rows.size(); i++) {
       String value = rows.get(i).get(0).textValue();
       Map<?, ?> k4 = JsonUtils.stringToObject(value, Map.class);
@@ -233,7 +231,7 @@ public class JsonPathTest extends CustomDataQueryClusterIntegrationTest {
 
     //selection order by
     query = "Select complexMapStr from " + getTableName()
-        + " order by jsonExtractScalar(complexMapStr,'$.k4.k4-k1','STRING') DESC LIMIT " + NUM_TOTAL_DOCS;
+        + " order by jsonExtractScalar(complexMapStr,'$.k4.k4-k1','STRING') DESC LIMIT " + NUM_DOCS_PER_SEGMENT;
     pinotResponse = postQuery(query);
     rows = (ArrayNode) pinotResponse.get("resultTable").get("rows");
     Assert.assertNotNull(rows);
@@ -242,7 +240,7 @@ public class JsonPathTest extends CustomDataQueryClusterIntegrationTest {
       String value = rows.get(i).get(0).textValue();
       Assert.assertTrue(value.indexOf("-k1-") > 0);
       Map<?, ?> results = JsonUtils.stringToObject(value, Map.class);
-      String seqId = _sortedSequenceIds.get(NUM_TOTAL_DOCS - 1 - i);
+      String seqId = _sortedSequenceIds.get(NUM_DOCS_PER_SEGMENT - 1 - i / getNumAvroFiles());
       Assert.assertEquals(results.get("k1"), "value-k1-" + seqId);
       Assert.assertEquals(results.get("k2"), "value-k2-" + seqId);
       final List<?> k3 = (List<?>) results.get("k3");
@@ -271,10 +269,10 @@ public class JsonPathTest extends CustomDataQueryClusterIntegrationTest {
     Assert.assertNotNull(pinotResponse.get("resultTable").get("rows"));
     ArrayNode rows = (ArrayNode) pinotResponse.get("resultTable").get("rows");
     for (int i = 0; i < rows.size(); i++) {
-      String seqId = _sortedSequenceIds.get(NUM_TOTAL_DOCS - 1 - i);
+      String seqId = _sortedSequenceIds.get(NUM_DOCS_PER_SEGMENT - 1 - i);
       final JsonNode row = rows.get(i);
       Assert.assertEquals(row.get(0).asText(), "value-k1-" + seqId);
-      Assert.assertEquals(row.get(1).asDouble(), Double.parseDouble(seqId));
+      Assert.assertEquals(row.get(1).asDouble(), Double.parseDouble(seqId) * getNumAvroFiles());
     }
   }
 
@@ -291,10 +289,10 @@ public class JsonPathTest extends CustomDataQueryClusterIntegrationTest {
     Assert.assertNotNull(pinotResponse.get("resultTable").get("rows"));
     ArrayNode rows = (ArrayNode) pinotResponse.get("resultTable").get("rows");
     for (int i = 0; i < rows.size(); i++) {
-      String seqId = String.valueOf(NUM_TOTAL_DOCS - 1 - i);
+      String seqId = String.valueOf(NUM_DOCS_PER_SEGMENT - 1 - i);
       final JsonNode row = rows.get(i);
       Assert.assertEquals(row.get(0).asText(), "value-k1-" + seqId);
-      Assert.assertEquals(row.get(1).asDouble(), Double.parseDouble(seqId));
+      Assert.assertEquals(row.get(1).asDouble(), Double.parseDouble(seqId) * getNumAvroFiles());
     }
   }
 
@@ -313,7 +311,7 @@ public class JsonPathTest extends CustomDataQueryClusterIntegrationTest {
     Assert.assertEquals(rows.size(), 1);
     final JsonNode row = rows.get(0);
     Assert.assertEquals(row.get(0).asText(), "defaultKey");
-    Assert.assertEquals(row.get(1).asDouble(), 1000.0);
+    Assert.assertEquals(row.get(1).asDouble(), 1000.0 * getNumAvroFiles());
   }
 
   @Test(dataProvider = "useBothQueryEngines")
@@ -331,7 +329,7 @@ public class JsonPathTest extends CustomDataQueryClusterIntegrationTest {
     Assert.assertEquals(rows.size(), 1);
     final JsonNode row = rows.get(0);
     Assert.assertEquals(row.get(0).asText(), "defaultKey");
-    Assert.assertTrue(Math.abs(row.get(1).asDouble() - 100.0) < 1e-10);
+    Assert.assertTrue(Math.abs(row.get(1).asDouble() - 100.0 * getNumAvroFiles()) < 1e-10);
   }
 
   @Test(dataProvider = "useBothQueryEngines")
