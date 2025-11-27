@@ -53,6 +53,19 @@ public class CountMVAggregationFunction extends CountAggregationFunction {
   public void aggregate(int length, AggregationResultHolder aggregationResultHolder,
       Map<ExpressionContext, BlockValSet> blockValSetMap) {
     BlockValSet blockValSet = blockValSetMap.get(_expression);
+
+    if (blockValSet.isSingleValue()) {
+      // star-tree pre-aggregated values: During star-tree creation, the multi-value column is pre-aggregated
+      // per star-tree node, resulting in a single value per node.
+      long[] valueArray = blockValSet.getLongValuesSV();
+      long count = 0;
+      for (int i = 0; i < length; i++) {
+        count += valueArray[i];
+      }
+      aggregationResultHolder.setValue(aggregationResultHolder.getDoubleResult() + count);
+      return;
+    }
+
     int[] valueArray = blockValSet.getNumMVEntries();
     // Hack to make count effectively final for use in the lambda (we know that there aren't concurrent access issues
     // with forEachNotNull)
@@ -69,6 +82,18 @@ public class CountMVAggregationFunction extends CountAggregationFunction {
   public void aggregateGroupBySV(int length, int[] groupKeyArray, GroupByResultHolder groupByResultHolder,
       Map<ExpressionContext, BlockValSet> blockValSetMap) {
     BlockValSet blockValSet = blockValSetMap.get(_expression);
+
+    if (blockValSet.isSingleValue()) {
+      // star-tree pre-aggregated values: During star-tree creation, the multi-value column is pre-aggregated
+      // per star-tree node, resulting in a single value per node.
+      long[] valueArray = blockValSet.getLongValuesSV();
+      for (int i = 0; i < length; i++) {
+        int groupKey = groupKeyArray[i];
+        groupByResultHolder.setValueForKey(groupKey, groupByResultHolder.getDoubleResult(groupKey) + valueArray[i]);
+      }
+      return;
+    }
+
     int[] valueArray = blockValSet.getNumMVEntries();
     forEachNotNull(length, blockValSet, (from, to) -> {
       for (int i = from; i < to; i++) {

@@ -59,6 +59,9 @@ public class MultiColumnTextMetadata {
       FieldConfig.TEXT_INDEX_LUCENE_NRT_CACHING_DIRECTORY_BUFFER_SIZE,
       FieldConfig.TEXT_INDEX_LUCENE_USE_LBS_MERGE_POLICY,
       FieldConfig.TEXT_INDEX_LUCENE_DOC_ID_TRANSLATOR_MODE
+      // The following aren't handled at the moment.
+      //FieldConfig.TEXT_INDEX_NO_RAW_DATA
+      //FieldConfig.TEXT_INDEX_RAW_VALUE
   );
 
   // keys allowed in per-column properties
@@ -110,26 +113,6 @@ public class MultiColumnTextMetadata {
           LOGGER.debug("Ignoring unknown shared setting from multi-column text index configuration: " + key);
         }
       }
-
-      //setProperty(sharedProps, FieldConfig.TEXT_FST_TYPE);
-      //uncomment when multi col index handles these flags
-      //setProperty(sharedProps, FieldConfig.TEXT_INDEX_NO_RAW_DATA);
-      //setProperty(sharedProps, FieldConfig.TEXT_INDEX_RAW_VALUE);
-      /*setProperty(sharedProps, FieldConfig.TEXT_INDEX_ENABLE_QUERY_CACHE);
-      setProperty(sharedProps, FieldConfig.TEXT_INDEX_USE_AND_FOR_MULTI_TERM_QUERIES);
-      setArrayProperty(sharedProps, FieldConfig.TEXT_INDEX_STOP_WORD_INCLUDE_KEY);
-      setArrayProperty(sharedProps, FieldConfig.TEXT_INDEX_STOP_WORD_EXCLUDE_KEY);
-      setProperty(sharedProps, FieldConfig.TEXT_INDEX_LUCENE_USE_COMPOUND_FILE);
-      setProperty(sharedProps, FieldConfig.TEXT_INDEX_LUCENE_MAX_BUFFER_SIZE_MB);
-      setProperty(sharedProps, FieldConfig.TEXT_INDEX_LUCENE_ANALYZER_CLASS);
-      setProperty(sharedProps, FieldConfig.TEXT_INDEX_LUCENE_ANALYZER_CLASS_ARGS);
-      setProperty(sharedProps, FieldConfig.TEXT_INDEX_LUCENE_ANALYZER_CLASS_ARG_TYPES);
-      setProperty(sharedProps, FieldConfig.TEXT_INDEX_LUCENE_QUERY_PARSER_CLASS);
-      setProperty(sharedProps, FieldConfig.TEXT_INDEX_ENABLE_PREFIX_SUFFIX_PHRASE_QUERIES);
-      setProperty(sharedProps, FieldConfig.TEXT_INDEX_LUCENE_REUSE_MUTABLE_INDEX);
-      setProperty(sharedProps, FieldConfig.TEXT_INDEX_LUCENE_NRT_CACHING_DIRECTORY_BUFFER_SIZE);
-      setProperty(sharedProps, FieldConfig.TEXT_INDEX_LUCENE_USE_LBS_MERGE_POLICY);
-      setProperty(sharedProps, FieldConfig.TEXT_INDEX_LUCENE_DOC_ID_TRANSLATOR_MODE);*/
     } else {
       _sharedProperties = Collections.emptyMap();
     }
@@ -210,9 +193,6 @@ public class MultiColumnTextMetadata {
     target.setProperty(MetadataKey.ROOT_PREFIX + MetadataKey.COLUMNS, columns);
 
     if (textProps != null) {
-      //uncomment when multi col index handles these flags
-      //setProperty(target, FieldConfig.TEXT_INDEX_NO_RAW_DATA, textProps);
-      //setProperty(target, FieldConfig.TEXT_INDEX_RAW_VALUE, textProps);
       setProperty(target, FieldConfig.TEXT_INDEX_ENABLE_QUERY_CACHE, textProps);
       setProperty(target, FieldConfig.TEXT_INDEX_USE_AND_FOR_MULTI_TERM_QUERIES, textProps);
       setProperty(target, FieldConfig.TEXT_INDEX_STOP_WORD_INCLUDE_KEY, textProps);
@@ -233,7 +213,7 @@ public class MultiColumnTextMetadata {
     if (perColumnProperties != null) {
       for (Map.Entry<String, Map<String, String>> entry : perColumnProperties.entrySet()) {
         String column = entry.getKey();
-        if (column == null || column.length() == 0 || !columns.contains(column)) {
+        if (column == null || column.isEmpty() || !columns.contains(column)) {
           continue;
         }
 
@@ -335,5 +315,13 @@ public class MultiColumnTextMetadata {
 
   public List<String> getColumns() {
     return _columns;
+  }
+
+  public static boolean isValidSharedProperty(String key) {
+    return SHARED_PROPERTIES.contains(key);
+  }
+
+  public static boolean isValidPerColumnProperty(String key) {
+    return PER_COLUMN_PROPERTIES.contains(key);
   }
 }

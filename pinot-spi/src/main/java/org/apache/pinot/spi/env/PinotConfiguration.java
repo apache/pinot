@@ -123,7 +123,7 @@ public class PinotConfiguration {
    *
    * @param baseProperties to provide programmatically through a {@link Map}.
    */
-  public PinotConfiguration(Map<String, Object> baseProperties) {
+  public PinotConfiguration(Map<String, ? extends Object> baseProperties) {
     this(baseProperties, new SystemEnvironment().getEnvironmentVariables());
   }
 
@@ -135,7 +135,7 @@ public class PinotConfiguration {
    * @param baseProperties with highest precedences (e.g. CLI arguments)
    * @param environmentVariables as a {@link Map}.
    */
-  public PinotConfiguration(Map<String, Object> baseProperties, Map<String, String> environmentVariables) {
+  public PinotConfiguration(Map<String, ? extends Object> baseProperties, Map<String, String> environmentVariables) {
     _configuration = new CompositeConfiguration(
         applyDynamicEnvConfig(computeConfigurationsFromSources(baseProperties, environmentVariables),
             environmentVariables));
@@ -190,7 +190,7 @@ public class PinotConfiguration {
     }).collect(Collectors.toList());
   }
 
-  private static List<Configuration> computeConfigurationsFromSources(Map<String, Object> baseProperties,
+  private static List<Configuration> computeConfigurationsFromSources(Map<String, ? extends Object> baseProperties,
       Map<String, String> environmentVariables) {
     Map<String, Object> relaxedBaseProperties = relaxProperties(baseProperties);
     // Env is only used to check for config paths to load.
@@ -262,12 +262,12 @@ public class PinotConfiguration {
     return envVarEntry.getKey().replace("_", ".").toLowerCase();
   }
 
-  private static Map<String, Object> relaxProperties(Map<String, Object> properties) {
+  private static Map<String, Object> relaxProperties(Map<String, ? extends Object> properties) {
     return properties.entrySet().stream()
         .collect(Collectors.toMap(PinotConfiguration::relaxPropertyName, Entry::getValue));
   }
 
-  private static String relaxPropertyName(Entry<String, Object> propertyEntry) {
+  private static String relaxPropertyName(Entry<String, ? extends Object> propertyEntry) {
     return relaxPropertyName(propertyEntry.getKey());
   }
 

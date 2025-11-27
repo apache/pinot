@@ -21,6 +21,7 @@ package org.apache.pinot.query.runtime.operator.groupby;
 import it.unimi.dsi.fastutil.objects.Object2IntOpenHashMap;
 import it.unimi.dsi.fastutil.objects.ObjectIterator;
 import java.util.Iterator;
+import java.util.function.ToIntFunction;
 import org.apache.pinot.common.utils.DataSchema.ColumnDataType;
 import org.apache.pinot.core.query.aggregation.groupby.utils.ValueToIdMap;
 import org.apache.pinot.core.query.aggregation.groupby.utils.ValueToIdMapFactory;
@@ -29,6 +30,9 @@ import org.apache.pinot.spi.utils.FixedIntArray;
 
 public class MultiKeysGroupIdGenerator implements GroupIdGenerator {
   private final Object2IntOpenHashMap<FixedIntArray> _groupIdMap;
+  /// A function to generate the next group ID based on the current size of the map.
+  /// We use this instead of a simple lambda to avoid capturing `this` and therefore allocate on each getGroupId call
+  private final ToIntFunction<FixedIntArray> _groupIdGenerator;
   private final ValueToIdMap[] _keyToIdMaps;
   private final int _numGroupsLimit;
 
@@ -36,6 +40,8 @@ public class MultiKeysGroupIdGenerator implements GroupIdGenerator {
       int numGroupsLimit, int initialCapacity) {
     _groupIdMap = new Object2IntOpenHashMap<>(initialCapacity);
     _groupIdMap.defaultReturnValue(INVALID_ID);
+    _groupIdGenerator = k -> _groupIdMap.size();
+
     _keyToIdMaps = new ValueToIdMap[numKeyColumns];
     for (int i = 0; i < numKeyColumns; i++) {
       _keyToIdMaps[i] = ValueToIdMapFactory.get(keyTypes[i].toDataType());
@@ -48,13 +54,12 @@ public class MultiKeysGroupIdGenerator implements GroupIdGenerator {
     Object[] keyValues = (Object[]) key;
     int numKeyColumns = keyValues.length;
     int[] keyIds = new int[numKeyColumns];
-    int numGroups = _groupIdMap.size();
-    if (numGroups < _numGroupsLimit) {
+    if (_groupIdMap.size() < _numGroupsLimit) {
       for (int i = 0; i < numKeyColumns; i++) {
         Object keyValue = keyValues[i];
         keyIds[i] = keyValue != null ? _keyToIdMaps[i].put(keyValue) : NULL_ID;
       }
-      return _groupIdMap.computeIntIfAbsent(new FixedIntArray(keyIds), k -> numGroups);
+      return _groupIdMap.computeIfAbsent(new FixedIntArray(keyIds), _groupIdGenerator);
     } else {
       for (int i = 0; i < numKeyColumns; i++) {
         Object keyValue = keyValues[i];

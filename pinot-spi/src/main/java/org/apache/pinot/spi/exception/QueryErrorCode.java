@@ -32,6 +32,7 @@ public enum QueryErrorCode {
   JSON_PARSING(100, "JsonParsingError"),
   /// Error detected at parsing time. For example, syntax error.
   SQL_PARSING(150, "SQLParsingError"),
+  TIMESERIES_PARSING(155, "TimeseriesParsingError"),
   SQL_RUNTIME(160, "SQLRuntimeError"),
   ACCESS_DENIED(180, "AccessDenied"),
   TABLE_DOES_NOT_EXIST(190, "TableDoesNotExistError"),
@@ -52,6 +53,7 @@ public enum QueryErrorCode {
   BROKER_REQUEST_SEND(425, "BrokerRequestSend"),
   SERVER_NOT_RESPONDING(427, "ServerNotResponding"),
   TOO_MANY_REQUESTS(429, "TooManyRequests"),
+  WORKLOAD_BUDGET_EXCEEDED(429, "WorkloadBudgetExceededError"),
   INTERNAL(450, "InternalError"),
   MERGE_RESPONSE(500, "MergeResponseError"),
   QUERY_CANCELLATION(503, "QueryCancellationError"),

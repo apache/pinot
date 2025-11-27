@@ -29,6 +29,7 @@ import java.util.concurrent.locks.Lock;
 import java.util.concurrent.locks.ReentrantLock;
 import org.apache.helix.model.IdealState;
 import org.apache.pinot.common.metadata.segment.SegmentZKMetadata;
+import org.apache.pinot.common.metrics.ServerGauge;
 import org.apache.pinot.common.metrics.ServerMetrics;
 import org.apache.pinot.common.metrics.ServerTimer;
 import org.apache.pinot.common.utils.LLCSegmentName;
@@ -94,10 +95,18 @@ public class ConsumerCoordinator {
     }
 
     long startTimeMs = System.currentTimeMillis();
-    while (!_semaphore.tryAcquire(WAIT_INTERVAL_MS, TimeUnit.MILLISECONDS)) {
-      LOGGER.warn("Failed to acquire consumer semaphore for segment: {} in: {}ms. Retrying.", segmentName,
-          System.currentTimeMillis() - startTimeMs);
-      checkSegmentStatus(segmentName);
+    try {
+      while (!_semaphore.tryAcquire(WAIT_INTERVAL_MS, TimeUnit.MILLISECONDS)) {
+        checkSegmentStatus(segmentName);
+        long waitTimeMs = System.currentTimeMillis() - startTimeMs;
+        LOGGER.warn("Failed to acquire consumer semaphore for segment: {} in: {}ms. Retrying.", segmentName,
+            waitTimeMs);
+        _serverMetrics.setValueOfPartitionGauge(_realtimeTableDataManager.getTableName(),
+            llcSegmentName.getPartitionGroupId(), ServerGauge.CONSUMER_LOCK_WAIT_TIME_MS, waitTimeMs);
+      }
+    } finally {
+      _serverMetrics.setValueOfPartitionGauge(_realtimeTableDataManager.getTableName(),
+          llcSegmentName.getPartitionGroupId(), ServerGauge.CONSUMER_LOCK_WAIT_TIME_MS, 0);
     }
   }
 

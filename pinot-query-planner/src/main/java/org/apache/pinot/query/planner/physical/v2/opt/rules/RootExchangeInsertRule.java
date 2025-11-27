@@ -53,7 +53,8 @@ public class RootExchangeInsertRule implements PRelNodeTransformer {
     PinotDataDistribution pinotDataDistribution = new PinotDataDistribution(RelDistribution.Type.SINGLETON,
         workers, workers.hashCode(), null, inferCollation(currentNode));
     return new PhysicalExchange(nodeId(), currentNode, pinotDataDistribution, List.of(),
-        ExchangeStrategy.SINGLETON_EXCHANGE, null, PinotExecStrategyTrait.getDefaultExecStrategy());
+        ExchangeStrategy.SINGLETON_EXCHANGE, null, PinotExecStrategyTrait.getDefaultExecStrategy(),
+        _context.getDefaultHashFunction());
   }
 
   private String brokerWorkerId() {

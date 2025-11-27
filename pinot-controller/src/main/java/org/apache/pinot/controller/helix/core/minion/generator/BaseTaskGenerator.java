@@ -29,6 +29,7 @@ import org.apache.helix.task.JobConfig;
 import org.apache.pinot.common.metadata.segment.SegmentZKMetadata;
 import org.apache.pinot.controller.api.exception.UnknownTaskTypeException;
 import org.apache.pinot.controller.helix.core.minion.ClusterInfoAccessor;
+import org.apache.pinot.controller.helix.core.minion.TaskSchedulingContext;
 import org.apache.pinot.core.common.MinionConstants;
 import org.apache.pinot.core.minion.PinotTaskConfig;
 import org.apache.pinot.spi.config.table.TableConfig;
@@ -52,24 +53,21 @@ public abstract class BaseTaskGenerator implements PinotTaskGenerator {
   }
 
   @Override
-  public long getTaskTimeoutMs() {
-    String taskType = getTaskType();
-    String configKey = taskType + MinionConstants.TIMEOUT_MS_KEY_SUFFIX;
-    String configValue = _clusterInfoAccessor.getClusterConfig(configKey);
-    if (configValue != null) {
-      try {
-        return Long.parseLong(configValue);
-      } catch (Exception e) {
-        LOGGER.error("Invalid cluster config {}: '{}'", configKey, configValue, e);
-      }
-    }
-    return JobConfig.DEFAULT_TIMEOUT_PER_TASK;
+  public long getTaskTimeoutMs(String minionTag) {
+    return TaskGeneratorUtils.getClusterMinionConfigValue(getTaskType(), MinionConstants.TIMEOUT_MS_KEY_SUFFIX,
+        minionTag, JobConfig.DEFAULT_TIMEOUT_PER_TASK, Long.class, _clusterInfoAccessor);
   }
 
   @Override
-  public int getNumConcurrentTasksPerInstance() {
-    String taskType = getTaskType();
-    String configKey = taskType + MinionConstants.NUM_CONCURRENT_TASKS_PER_INSTANCE_KEY_SUFFIX;
+  public int getNumConcurrentTasksPerInstance(String minionTag) {
+    return TaskGeneratorUtils.getClusterMinionConfigValue(getTaskType(),
+        MinionConstants.NUM_CONCURRENT_TASKS_PER_INSTANCE_KEY_SUFFIX,
+        minionTag, JobConfig.DEFAULT_NUM_CONCURRENT_TASKS_PER_INSTANCE, Integer.class, _clusterInfoAccessor);
+  }
+
+  @Override
+  public int getMaxAllowedSubTasksPerTask() {
+    String configKey = MinionConstants.MAX_ALLOWED_SUB_TASKS_KEY;
     String configValue = _clusterInfoAccessor.getClusterConfig(configKey);
     if (configValue != null) {
       try {
@@ -78,22 +76,79 @@ public abstract class BaseTaskGenerator implements PinotTaskGenerator {
         LOGGER.error("Invalid config {}: '{}'", configKey, configValue, e);
       }
     }
-    return JobConfig.DEFAULT_NUM_CONCURRENT_TASKS_PER_INSTANCE;
+    return MinionConstants.DEFAULT_MINION_MAX_NUM_OF_SUBTASKS_LIMIT;
+  }
+
+  /**
+   * Updates the max num tasks parameter with the actual maximum number of subtasks based on
+   * 1. configured value for the table subtask
+   * 2. default value for the task type
+   * 3. if the task is triggered manually or adhoc
+   * 4. any cluster default(s)
+   * This is required to provide user visibility to the maximum number of subtasks that were used for the task
+   * @param defaultNumSubTasks - the default number of subtasks for the task type
+   */
+  public int getAndUpdateMaxNumSubTasks(Map<String, String> taskConfigs, int defaultNumSubTasks, String tableName) {
+    int maxNumSubTasks = getNumSubTasks(taskConfigs, defaultNumSubTasks, tableName);
+    taskConfigs.put(MinionConstants.TABLE_MAX_NUM_TASKS_KEY, String.valueOf(maxNumSubTasks));
+    return maxNumSubTasks;
+  }
+
+  /**
+   * Gets the final maximum number of subtasks for the given table based on the
+   * 1. configured value for the table subtask
+   * 2. default value for the task type
+   * 3. if the task is triggered manually or adhoc
+   * 4. any cluster default(s)
+   * @param defaultNumSubTasks - the default number of subtasks for the task type
+   */
+  public int getNumSubTasks(Map<String, String> taskConfigs, int defaultNumSubTasks, String tableName) {
+    int tableMaxNumTasks = defaultNumSubTasks;
+    String tableMaxNumTasksConfig = taskConfigs.get(MinionConstants.TABLE_MAX_NUM_TASKS_KEY);
+    if (tableMaxNumTasksConfig != null) {
+      try {
+        tableMaxNumTasks = Integer.parseInt(tableMaxNumTasksConfig);
+      } catch (Exception e) {
+        LOGGER.warn("MaxNumTasks {} have been wrongly set for table : {}, and task {}",
+            tableMaxNumTasksConfig, tableName, getTaskType());
+      }
+    }
+
+    // For manual / adhoc triggers, the user expects the task to run upto configured (or task's default) value
+    // Based on system constraints, we may not be able to run the task with that many subtasks
+    // To identify such cases, we return the configured / default value in this method
+    // And the API that calls this method can fail the task generation if the generated tasks exceed the limit
+    if (taskConfigs.containsKey(MinionConstants.TRIGGERED_BY)) {
+      String triggeredBy = taskConfigs.get(MinionConstants.TRIGGERED_BY);
+      if (TaskSchedulingContext.isUserTriggeredTask(triggeredBy)) {
+        if (tableMaxNumTasks <= 0) {
+          // A negative value for maxNumTasks is generally used to indicate that the intention
+          // is to not have a limit on the number of subtasks.
+          tableMaxNumTasks = Integer.MAX_VALUE;
+        }
+        return tableMaxNumTasks;
+      }
+    }
+
+    // A negative value for maxNumTasks is generally used to indicate that the intention
+    // is to not have a limit on the number of subtasks.
+    // Thus, rather than throwing an error, or setting it to the default value,
+    // we set it to the max allowed subtasks.
+    if (tableMaxNumTasks > getMaxAllowedSubTasksPerTask() || tableMaxNumTasks <= 0) {
+      LOGGER.warn(
+          "MaxNumTasks for table {} for tasktype {} is {} which is greater than the max allowed subtasks {}"
+              + ". Setting it to the max allowed subtasks",
+          tableName, getTaskType(), tableMaxNumTasks, getMaxAllowedSubTasksPerTask());
+      tableMaxNumTasks = getMaxAllowedSubTasksPerTask();
+    }
+    return tableMaxNumTasks;
   }
 
   @Override
-  public int getMaxAttemptsPerTask() {
-    String taskType = getTaskType();
-    String configKey = taskType + MinionConstants.MAX_ATTEMPTS_PER_TASK_KEY_SUFFIX;
-    String configValue = _clusterInfoAccessor.getClusterConfig(configKey);
-    if (configValue != null) {
-      try {
-        return Integer.parseInt(configValue);
-      } catch (Exception e) {
-        LOGGER.error("Invalid config {}: '{}'", configKey, configValue, e);
-      }
-    }
-    return MinionConstants.DEFAULT_MAX_ATTEMPTS_PER_TASK;
+  public int getMaxAttemptsPerTask(String minionTag) {
+    return TaskGeneratorUtils.getClusterMinionConfigValue(getTaskType(),
+        MinionConstants.MAX_ATTEMPTS_PER_TASK_KEY_SUFFIX, minionTag, MinionConstants.DEFAULT_MAX_ATTEMPTS_PER_TASK,
+        Integer.class, _clusterInfoAccessor);
   }
 
   /**
@@ -159,7 +214,7 @@ public abstract class BaseTaskGenerator implements PinotTaskGenerator {
     Map<String, String> baseConfigs = new HashMap<>();
     baseConfigs.put(MinionConstants.TABLE_NAME_KEY, tableConfig.getTableName());
     baseConfigs.put(MinionConstants.SEGMENT_NAME_KEY, StringUtils.join(segmentNames,
-          MinionConstants.SEGMENT_NAME_SEPARATOR));
+        MinionConstants.SEGMENT_NAME_SEPARATOR));
     return baseConfigs;
   }
 }

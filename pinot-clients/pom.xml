@@ -24,7 +24,7 @@
   <parent>
     <artifactId>pinot</artifactId>
     <groupId>org.apache.pinot</groupId>
-    <version>1.4.0-SNAPSHOT</version>
+    <version>1.5.0-SNAPSHOT</version>
   </parent>
   <artifactId>pinot-clients</artifactId>
   <packaging>pom</packaging>
@@ -35,6 +35,7 @@
   </properties>
 
   <modules>
+    <module>pinot-cli</module>
     <module>pinot-java-client</module>
     <module>pinot-jdbc-client</module>
   </modules>

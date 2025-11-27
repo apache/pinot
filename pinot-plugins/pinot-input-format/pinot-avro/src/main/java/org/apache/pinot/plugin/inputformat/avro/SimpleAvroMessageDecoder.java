@@ -19,7 +19,6 @@
 package org.apache.pinot.plugin.inputformat.avro;
 
 import com.google.common.base.Preconditions;
-import java.io.IOException;
 import java.util.Map;
 import java.util.Set;
 import javax.annotation.concurrent.NotThreadSafe;
@@ -33,8 +32,6 @@ import org.apache.pinot.spi.data.readers.RecordExtractor;
 import org.apache.pinot.spi.data.readers.RecordExtractorConfig;
 import org.apache.pinot.spi.plugin.PluginManager;
 import org.apache.pinot.spi.stream.StreamMessageDecoder;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 
 /**
@@ -43,15 +40,15 @@ import org.slf4j.LoggerFactory;
  */
 @NotThreadSafe
 public class SimpleAvroMessageDecoder implements StreamMessageDecoder<byte[]> {
-  private static final Logger LOGGER = LoggerFactory.getLogger(SimpleAvroMessageDecoder.class);
-
   private static final String SCHEMA = "schema";
+  private static final String LEADING_BYTES_TO_STRIP = "leading.bytes.to.strip";
 
   private org.apache.avro.Schema _avroSchema;
   private DatumReader<GenericData.Record> _datumReader;
   private RecordExtractor<GenericData.Record> _avroRecordExtractor;
   private BinaryDecoder _binaryDecoderToReuse;
   private GenericData.Record _avroRecordToReuse;
+  private int _leadingBytesToStrip = 0;
 
   @Override
   public void init(Map<String, String> props, Set<String> fieldsToRead, String topicName)
@@ -59,6 +56,18 @@ public class SimpleAvroMessageDecoder implements StreamMessageDecoder<byte[]> {
     Preconditions.checkState(props.containsKey(SCHEMA), "Avro schema must be provided");
     _avroSchema = new org.apache.avro.Schema.Parser().parse(props.get(SCHEMA));
     _datumReader = new GenericDatumReader<>(_avroSchema);
+
+    // Optional: Strip leading header bytes before decoding (e.g., magic byte + schema id)
+    String leadingBytes = props.get(LEADING_BYTES_TO_STRIP);
+    if (leadingBytes != null && !leadingBytes.isEmpty()) {
+      try {
+        _leadingBytesToStrip = Integer.parseInt(leadingBytes);
+        Preconditions.checkState(_leadingBytesToStrip >= 0, "'%s' must be non-negative", LEADING_BYTES_TO_STRIP);
+      } catch (NumberFormatException e) {
+        throw new IllegalArgumentException("Invalid integer for '" + LEADING_BYTES_TO_STRIP + "': " + leadingBytes,
+            e);
+      }
+    }
     String recordExtractorClass = props.get(RECORD_EXTRACTOR_CONFIG_KEY);
     String recordExtractorConfigClass = props.get(RECORD_EXTRACTOR_CONFIG_CONFIG_KEY);
     // Backward compatibility to support Avro by default
@@ -92,12 +101,18 @@ public class SimpleAvroMessageDecoder implements StreamMessageDecoder<byte[]> {
    */
   @Override
   public GenericRow decode(byte[] payload, int offset, int length, GenericRow destination) {
-    _binaryDecoderToReuse = DecoderFactory.get().binaryDecoder(payload, offset, length, _binaryDecoderToReuse);
+    int effectiveOffset = offset + _leadingBytesToStrip;
+    int effectiveLength = length - _leadingBytesToStrip;
+    if (effectiveLength < 0) {
+      throw new IllegalArgumentException("Configured '" + LEADING_BYTES_TO_STRIP + "' (" + _leadingBytesToStrip
+          + ") exceeds available payload length (" + length + ")");
+    }
+    _binaryDecoderToReuse = DecoderFactory.get().binaryDecoder(payload, effectiveOffset, effectiveLength,
+        _binaryDecoderToReuse);
     try {
       _avroRecordToReuse = _datumReader.read(_avroRecordToReuse, _binaryDecoderToReuse);
-    } catch (IOException e) {
-      LOGGER.error("Caught exception while reading message using schema: {}", _avroSchema, e);
-      return null;
+    } catch (Exception e) {
+      throw new RuntimeException("Caught exception while reading message using schema: " + _avroSchema, e);
     }
     return _avroRecordExtractor.extract(_avroRecordToReuse, destination);
   }

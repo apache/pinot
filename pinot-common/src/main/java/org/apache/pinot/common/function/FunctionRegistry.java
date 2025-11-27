@@ -22,10 +22,13 @@ import com.google.common.base.Preconditions;
 import java.lang.reflect.Method;
 import java.lang.reflect.Modifier;
 import java.util.Arrays;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
+import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.stream.Collectors;
 import javax.annotation.Nullable;
 import org.apache.calcite.rel.type.RelDataType;
 import org.apache.calcite.rel.type.RelDataTypeFactory;
@@ -76,10 +79,12 @@ public class FunctionRegistry {
   // Key is canonical name
   public static final Map<String, PinotScalarFunction> FUNCTION_MAP;
 
-  private static final int VAR_ARG_KEY = -1;
+  public static final int VAR_ARG_KEY = -1;
 
   static {
     long startTimeMs = System.currentTimeMillis();
+
+    // TODO: Register functions for UDFs
 
     // Register ScalarFunction classes
     Map<String, PinotScalarFunction> functionMap = new HashMap<>();
@@ -124,7 +129,8 @@ public class FunctionRegistry {
       ScalarFunction scalarFunction = method.getAnnotation(ScalarFunction.class);
       if (scalarFunction.enabled()) {
         FunctionInfo functionInfo =
-            new FunctionInfo(method, method.getDeclaringClass(), scalarFunction.nullableParameters());
+            new FunctionInfo(method, method.getDeclaringClass(), scalarFunction.nullableParameters(),
+                scalarFunction.isDeterministic());
         int numArguments = scalarFunction.isVarArg() ? VAR_ARG_KEY : method.getParameterCount();
         String[] names = scalarFunction.names();
         if (names.length == 0) {
@@ -184,6 +190,10 @@ public class FunctionRegistry {
         numArguments == VAR_ARG_KEY ? "variable" : numArguments);
   }
 
+  public static Map<String, PinotScalarFunction> getFunctions() {
+    return Collections.unmodifiableMap(FUNCTION_MAP);
+  }
+
   /**
    * Returns {@code true} if the given canonical name is registered, {@code false} otherwise.
    *
@@ -241,29 +251,43 @@ public class FunctionRegistry {
   }
 
   public static class ArgumentCountBasedScalarFunction implements PinotScalarFunction {
-    private final String _name;
+    private final String _mainName;
+    private final Set<String> _names;
     private final Map<Integer, FunctionInfo> _functionInfoMap;
 
-    private ArgumentCountBasedScalarFunction(String name, Map<Integer, FunctionInfo> functionInfoMap) {
-      _name = name;
+    public ArgumentCountBasedScalarFunction(String name, Map<Integer, FunctionInfo> functionInfoMap) {
+      this(List.of(name), functionInfoMap);
+    }
+
+    public ArgumentCountBasedScalarFunction(List<String> names, Map<Integer, FunctionInfo> functionInfoMap) {
+      Preconditions.checkArgument(!names.isEmpty(), "At least one name is required");
+      _mainName = FunctionRegistry.canonicalize(names.get(0));
+      _names = names.stream()
+          .map(FunctionRegistry::canonicalize)
+          .collect(Collectors.toSet());
       _functionInfoMap = functionInfoMap;
     }
 
     @Override
     public String getName() {
-      return _name;
+      return _mainName;
+    }
+
+    @Override
+    public Set<String> getNames() {
+      return _names;
     }
 
     @Override
     public PinotSqlFunction toPinotSqlFunction() {
-      return new PinotSqlFunction(_name, getReturnTypeInference(), getOperandTypeChecker());
+      return new PinotSqlFunction(_mainName, getReturnTypeInference(), getOperandTypeChecker(), isDeterministic());
     }
 
     private SqlReturnTypeInference getReturnTypeInference() {
       return opBinding -> {
         int numArguments = opBinding.getOperandCount();
         FunctionInfo functionInfo = getFunctionInfo(numArguments);
-        Preconditions.checkState(functionInfo != null, "Failed to find function: %s with %s arguments", _name,
+        Preconditions.checkState(functionInfo != null, "Failed to find function: %s with %s arguments", _mainName,
             numArguments);
         RelDataTypeFactory typeFactory = opBinding.getTypeFactory();
         Method method = functionInfo.getMethod();
@@ -324,6 +348,32 @@ public class FunctionRegistry {
     public FunctionInfo getFunctionInfo(int numArguments) {
       FunctionInfo functionInfo = _functionInfoMap.get(numArguments);
       return functionInfo != null ? functionInfo : _functionInfoMap.get(VAR_ARG_KEY);
+    }
+
+    private boolean isDeterministic() {
+      for (FunctionInfo functionInfo : _functionInfoMap.values()) {
+        if (!functionInfo.isDeterministic()) {
+          return false;
+        }
+      }
+      return true;
+    }
+
+    @Override
+    public String getScalarFunctionId() {
+      if (_functionInfoMap.size() == 1) {
+        String singleFunInfo = printFunctionInfo(_functionInfoMap.values().iterator().next());
+        return "ArgumentCountBasedScalarFunction{" + singleFunInfo + "}";
+      }
+      String mapDescription = _functionInfoMap.entrySet().stream()
+          .map(pair -> pair.getKey() + ": " + printFunctionInfo(pair.getValue()))
+          .collect(Collectors.joining(", ", "[", "]"));
+      return "ArgumentCountBasedScalarFunction{" + mapDescription + "}";
+    }
+
+    private String printFunctionInfo(FunctionInfo functionInfo) {
+      Method method = functionInfo.getMethod();
+      return method.getDeclaringClass().getTypeName() + '.' + method.getName();
     }
   }
 }

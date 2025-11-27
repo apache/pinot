@@ -21,12 +21,14 @@ package org.apache.pinot.query.runtime;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.node.ArrayNode;
 import com.fasterxml.jackson.databind.node.ObjectNode;
+import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
 import java.util.function.IntFunction;
 import org.apache.pinot.common.datatable.StatMap;
 import org.apache.pinot.query.planner.plannode.AggregateNode;
 import org.apache.pinot.query.planner.plannode.BasePlanNode;
+import org.apache.pinot.query.planner.plannode.EnrichedJoinNode;
 import org.apache.pinot.query.planner.plannode.ExchangeNode;
 import org.apache.pinot.query.planner.plannode.ExplainedNode;
 import org.apache.pinot.query.planner.plannode.FilterNode;
@@ -64,9 +66,13 @@ public class InStageStatsTreeBuilder implements PlanNodeVisitor<ObjectNode, InSt
   }
 
   private ObjectNode selfNode(MultiStageOperator.Type type, Context context) {
+    return selfNode(type, context, _index, new JsonNode[0]);
+  }
+
+  private ObjectNode selfNode(MultiStageOperator.Type type, Context context, int index, JsonNode[] childrenArr) {
     ObjectNode json = JsonUtils.newObjectNode();
     json.put("type", type.toString());
-    for (Map.Entry<String, JsonNode> entry : _stageStats.getOperatorStats(_index).asJson().properties()) {
+    for (Map.Entry<String, JsonNode> entry : _stageStats.getOperatorStats(index).asJson().properties()) {
       json.set(entry.getKey(), entry.getValue());
     }
 
@@ -74,11 +80,62 @@ public class InStageStatsTreeBuilder implements PlanNodeVisitor<ObjectNode, InSt
       json.put("parallelism", context._parallelism);
     }
 
-    JsonNode executionTimeMs = json.get("executionTimeMs");
-    long cpuTimeMs = executionTimeMs == null ? 0 : executionTimeMs.asLong(0);
-    json.put("clockTimeMs", cpuTimeMs / context._parallelism);
+    addClockTimeMs(type, json, childrenArr, context);
+    addSelfAllocatedBytes(type, json, childrenArr, context);
+    addSelfGcTime(type, json, childrenArr, context);
+
+    if (childrenArr.length > 0) {
+      json.set(CHILDREN_KEY, JsonUtils.objectToJsonNode(childrenArr));
+    }
 
     return json;
+  }
+
+  private void addClockTimeMs(MultiStageOperator.Type type, ObjectNode selfNode, JsonNode[] children, Context context) {
+    JsonNode executionTimeMs = selfNode.get("executionTimeMs");
+    long cpuTimeMs = executionTimeMs == null ? 0 : executionTimeMs.asLong(0);
+
+    selfNode.put("clockTimeMs", cpuTimeMs / context._parallelism);
+
+    long childrenStat = getChildrenStat(type, children, "executionTimeMs");
+    long selfExecutionTimeMs = cpuTimeMs - childrenStat;
+    if (selfExecutionTimeMs != 0) {
+      selfNode.put("selfExecutionTimeMs", selfExecutionTimeMs);
+      selfNode.put("selfClockTimeMs", selfExecutionTimeMs / context._parallelism);
+    }
+  }
+
+  private void addSelfAllocatedBytes(
+      MultiStageOperator.Type type, ObjectNode selfNode, JsonNode[] children, Context context) {
+    JsonNode allocatedBytes = selfNode.get("allocatedMemoryBytes");
+    long totalAllocatedBytes = allocatedBytes == null ? 0 : allocatedBytes.asLong(0);
+
+    long selfAllocatedBytes = totalAllocatedBytes - getChildrenStat(type, children, "allocatedMemoryBytes");
+    if (selfAllocatedBytes != 0) {
+      selfNode.put("selfAllocatedMB", selfAllocatedBytes / (1024 * 1024));
+    }
+  }
+
+  private void addSelfGcTime(MultiStageOperator.Type type, ObjectNode selfNode, JsonNode[] children, Context context) {
+    JsonNode gcTimeMs = selfNode.get("gcTimeMs");
+    long totalGcTimeMs = gcTimeMs == null ? 0 : gcTimeMs.asLong(0);
+
+    long selfGcTimeMs = totalGcTimeMs - getChildrenStat(type, children, "gcTimeMs");
+    if (selfGcTimeMs != 0) {
+      selfNode.put("selfGcTimeMs", selfGcTimeMs);
+    }
+  }
+
+  private long getChildrenStat(MultiStageOperator.Type type, JsonNode[] children, String key) {
+    if (children == null) {
+      return 0;
+    }
+    return Arrays.stream(children)
+            .mapToLong(child -> {
+              JsonNode statNode = child.get(key);
+              return statNode == null ? 0 : statNode.asLong(0);
+            })
+            .sum();
   }
 
   private ObjectNode recursiveCase(BasePlanNode node, MultiStageOperator.Type expectedType, Context context) {
@@ -114,14 +171,13 @@ public class InStageStatsTreeBuilder implements PlanNodeVisitor<ObjectNode, InSt
           return json;
       }
     }
-    ObjectNode json = selfNode(type, context);
+    int selfIndex = _index;
     List<PlanNode> inputs = node.getInputs();
     int size = inputs.size();
     JsonNode[] childrenArr = new JsonNode[size];
     if (size > _index) {
-      LOGGER.warn("Operator {} has {} inputs but only {} stats are left", type, size,
-          _index);
-      return json;
+      LOGGER.warn("Operator {} has {} inputs but only {} stats are left", type, size, _index);
+      return selfNode(type, context);
     }
     for (int i = size - 1; i >= 0; i--) {
       PlanNode planNode = inputs.get(i);
@@ -130,7 +186,8 @@ public class InStageStatsTreeBuilder implements PlanNodeVisitor<ObjectNode, InSt
 
       childrenArr[i] = child;
     }
-    json.set(CHILDREN_KEY, JsonUtils.objectToJsonNode(childrenArr));
+
+    ObjectNode json = selfNode(type, context, selfIndex, childrenArr);
     return json;
   }
 
@@ -152,6 +209,11 @@ public class InStageStatsTreeBuilder implements PlanNodeVisitor<ObjectNode, InSt
       assert node.getJoinStrategy() == JoinNode.JoinStrategy.LOOKUP;
       return recursiveCase(node, MultiStageOperator.Type.LOOKUP_JOIN, context);
     }
+  }
+
+  @Override
+  public ObjectNode visitEnrichedJoin(EnrichedJoinNode node, Context context) {
+    return visitJoin(node, context);
   }
 
   @Override

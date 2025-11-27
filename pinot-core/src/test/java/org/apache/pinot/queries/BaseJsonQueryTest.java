@@ -179,7 +179,7 @@ public abstract class BaseJsonQueryTest extends BaseQueriesTest {
   }
 
   protected void checkResult(String query, Object[][] expectedResults) {
-    BrokerResponseNative brokerResponse = getBrokerResponseForOptimizedQuery(query, tableConfig(), schema());
+    BrokerResponseNative brokerResponse = getBrokerResponseForOptimizedQuery(query, schema());
     QueriesTestUtils.testInterSegmentsResult(brokerResponse, Arrays.asList(expectedResults));
   }
 

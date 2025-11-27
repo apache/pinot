@@ -21,6 +21,7 @@ package org.apache.pinot.broker.routing.adaptiveserverselector;
 import java.util.Collections;
 import java.util.List;
 import java.util.Map;
+import org.apache.pinot.broker.routing.instanceselector.InstanceSelectorConfig;
 import org.apache.pinot.common.utils.config.QueryOptionsUtils;
 
 
@@ -29,6 +30,7 @@ import org.apache.pinot.common.utils.config.QueryOptionsUtils;
  * servers are selected for query execution.
  */
 public class ServerSelectionContext {
+  private final InstanceSelectorConfig _config;
   /**
    * Map of query options that can influence server selection behavior.
    * These options are passed into the context class to avoid endless constructor argument changes
@@ -44,6 +46,7 @@ public class ServerSelectionContext {
   private final Map<String, String> _queryOptions;
   // If some query options need further processing, store the parsing result below to avoid duplicate parsing.
   private final List<Integer> _orderedPreferredPools;
+  private final boolean _isUseFixedReplica;
 
   /**
    * Creates a new server selection context with the given query options.
@@ -52,13 +55,20 @@ public class ServerSelectionContext {
    *
    * @param queryOptions map of query options that may contain server selection preferences
    */
-  public ServerSelectionContext(Map<String, String> queryOptions) {
+  public ServerSelectionContext(Map<String, String> queryOptions, InstanceSelectorConfig instanceSelectorConfig) {
     _queryOptions = queryOptions == null ? Collections.emptyMap() : queryOptions;
+    _config = instanceSelectorConfig;
     _orderedPreferredPools = QueryOptionsUtils.getOrderedPreferredPools(_queryOptions);
+    Boolean isUseFixedReplica = QueryOptionsUtils.isUseFixedReplica(_queryOptions);
+    _isUseFixedReplica = isUseFixedReplica != null ? isUseFixedReplica : instanceSelectorConfig.isUseFixedReplica();
   }
 
   public Map<String, String> getQueryOptions() {
     return _queryOptions;
+  }
+
+  public boolean isUseFixedReplica() {
+    return _isUseFixedReplica;
   }
 
   public List<Integer> getOrderedPreferredPools() {

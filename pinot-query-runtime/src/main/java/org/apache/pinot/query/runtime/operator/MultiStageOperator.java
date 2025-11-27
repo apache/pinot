@@ -33,31 +33,33 @@ import org.apache.pinot.common.metrics.ServerMetrics;
 import org.apache.pinot.common.metrics.ServerTimer;
 import org.apache.pinot.common.proto.Plan;
 import org.apache.pinot.common.response.broker.BrokerResponseNativeV2;
+import org.apache.pinot.common.utils.config.QueryOptionsUtils;
 import org.apache.pinot.core.common.Operator;
 import org.apache.pinot.core.plan.ExplainInfo;
 import org.apache.pinot.query.runtime.blocks.ErrorMseBlock;
 import org.apache.pinot.query.runtime.blocks.MseBlock;
+import org.apache.pinot.query.runtime.blocks.SuccessMseBlock;
+import org.apache.pinot.query.runtime.operator.set.SetOperator;
 import org.apache.pinot.query.runtime.plan.MultiStageQueryStats;
 import org.apache.pinot.query.runtime.plan.OpChainExecutionContext;
 import org.apache.pinot.query.runtime.plan.pipeline.PipelineBreakerOperator;
-import org.apache.pinot.spi.exception.EarlyTerminationException;
-import org.apache.pinot.spi.exception.QueryErrorCode;
+import org.apache.pinot.spi.accounting.ThreadResourceSnapshot;
+import org.apache.pinot.spi.accounting.ThreadResourceUsageProvider;
+import org.apache.pinot.spi.query.QueryThreadContext;
 import org.apache.pinot.spi.trace.InvocationScope;
 import org.apache.pinot.spi.trace.Tracing;
 import org.slf4j.Logger;
 
 
-public abstract class MultiStageOperator
-    implements Operator<MseBlock>, AutoCloseable {
-
+public abstract class MultiStageOperator implements Operator<MseBlock>, AutoCloseable {
   protected final OpChainExecutionContext _context;
   protected final String _operatorId;
+
   protected boolean _isEarlyTerminated;
 
   public MultiStageOperator(OpChainExecutionContext context) {
     _context = context;
     _operatorId = Joiner.on("_").join(getClass().getSimpleName(), _context.getStageId(), _context.getServer());
-    _isEarlyTerminated = false;
   }
 
   /**
@@ -71,17 +73,25 @@ public abstract class MultiStageOperator
 
   public abstract Type getOperatorType();
 
-  public abstract void registerExecution(long time, int numRows);
+  public abstract void registerExecution(long time, int numRows, long memoryUsedBytes, long gcTimeMs);
 
-  // Samples resource usage of the operator. The operator should call this function for every block of data or
-  // assuming the block holds 10000 rows or more.
-  protected void sampleAndCheckInterruption() {
-    Tracing.ThreadAccountantOps.sampleMSE();
-    if (Tracing.ThreadAccountantOps.isInterrupted()) {
-      earlyTerminate();
-      throw QueryErrorCode.SERVER_RESOURCE_LIMIT_EXCEEDED.asException("Resource limit exceeded for operator: "
-          + getExplainName());
-    }
+  /// By default, it uses the active deadline, which is the one that should be used for most operators, but if the
+  /// operator does not actively process data (ie both mailbox operators), it should override this method to use the
+  /// passive deadline instead.
+  protected long getDeadlineMs() {
+    return _context.getActiveDeadlineMs();
+  }
+
+  protected void checkTermination() {
+    QueryThreadContext.checkTermination(this::getExplainName, getDeadlineMs());
+  }
+
+  protected void checkTerminationAndSampleUsage() {
+    QueryThreadContext.checkTerminationAndSampleUsage(this::getExplainName, getDeadlineMs());
+  }
+
+  protected void checkTerminationAndSampleUsagePeriodically(int numRecordsProcessed, String scope) {
+    QueryThreadContext.checkTerminationAndSampleUsagePeriodically(numRecordsProcessed, scope, getDeadlineMs());
   }
 
   /**
@@ -91,22 +101,26 @@ public abstract class MultiStageOperator
    */
   @Override
   public MseBlock nextBlock() {
-    if (Tracing.ThreadAccountantOps.isInterrupted()) {
-      throw new EarlyTerminationException("Interrupted while processing next block");
-    }
     if (logger().isDebugEnabled()) {
       logger().debug("Operator {}: Reading next block", _operatorId);
     }
+
+    ThreadResourceSnapshot resourceSnapshot = new ThreadResourceSnapshot();
+    long preBlockGcTime = getGcTimeMillis();
     try (InvocationScope ignored = Tracing.getTracer().createScope(getClass())) {
       MseBlock nextBlock;
       Stopwatch executeStopwatch = Stopwatch.createStarted();
       try {
+        checkTermination();
         nextBlock = getNextBlock();
       } catch (Exception e) {
+        logger().warn("Operator {}: Exception while processing next block", _operatorId, e);
         nextBlock = ErrorMseBlock.fromException(e);
       }
       int numRows = nextBlock instanceof MseBlock.Data ? ((MseBlock.Data) nextBlock).getNumRows() : 0;
-      registerExecution(executeStopwatch.elapsed(TimeUnit.MILLISECONDS), numRows);
+      long memoryUsedBytes = resourceSnapshot.getAllocatedBytes();
+      long gcTimeMs = getGcTimeMillis() - preBlockGcTime;
+      registerExecution(executeStopwatch.elapsed(TimeUnit.MILLISECONDS), numRows, memoryUsedBytes, gcTimeMs);
 
       if (logger().isDebugEnabled()) {
         logger().debug("Operator {}. Block {} ready to send", _operatorId, nextBlock);
@@ -119,6 +133,14 @@ public abstract class MultiStageOperator
   protected abstract MseBlock getNextBlock()
       throws Exception;
 
+  /**
+   * Signals the operator to terminate early.
+   *
+   * After this method is called, the operator should stop processing any more input and return a
+   * {@link SuccessMseBlock} block as soon as possible.
+   * This method should be called when the consumer of the operator does not need any more data and wants to stop the
+   * execution early to save resources.
+   */
   protected void earlyTerminate() {
     _isEarlyTerminated = true;
     for (MultiStageOperator child : getChildOperators()) {
@@ -202,6 +224,13 @@ public abstract class MultiStageOperator
     return Collections.emptyMap();
   }
 
+  private long getGcTimeMillis() {
+    if (!QueryOptionsUtils.isCollectGcStats(_context.getOpChainMetadata())) {
+      return -1;
+    }
+    return ThreadResourceUsageProvider.getGcTime();
+  }
+
   /**
    * This enum is used to identify the operation type.
    * <p>
@@ -215,6 +244,7 @@ public abstract class MultiStageOperator
       public void mergeInto(BrokerResponseNativeV2 response, StatMap<?> map) {
         @SuppressWarnings("unchecked")
         StatMap<AggregateOperator.StatKey> stats = (StatMap<AggregateOperator.StatKey>) map;
+        response.mergeGroupsTrimmed(stats.getBoolean(AggregateOperator.StatKey.GROUPS_TRIMMED));
         response.mergeNumGroupsLimitReached(stats.getBoolean(AggregateOperator.StatKey.NUM_GROUPS_LIMIT_REACHED));
         response.mergeNumGroupsWarningLimitReached(
             stats.getBoolean(AggregateOperator.StatKey.NUM_GROUPS_WARNING_LIMIT_REACHED));

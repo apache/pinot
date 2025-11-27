@@ -46,6 +46,7 @@ import static org.testng.Assert.*;
 
 public class LeafStageWorkerAssignmentRuleTest {
   private static final String TABLE_NAME = "testTable";
+  private static final String TABLE_NAME_RT = "testTable_REALTIME";
   private static final String INVALID_SEGMENT_PARTITION = "testTable__1__35__20250509T1444Z";
   private static final List<String> FIELDS_IN_SCAN = List.of("userId", "orderId", "orderAmount", "cityId", "cityName");
   private static final String PARTITION_COLUMN = "userId";
@@ -119,7 +120,7 @@ public class LeafStageWorkerAssignmentRuleTest {
     HashDistributionDesc desc = result._pinotDataDistribution.getHashDistributionDesc().iterator().next();
     assertEquals(desc.getNumPartitions(), OFFLINE_NUM_PARTITIONS);
     assertEquals(desc.getKeys(), List.of(FIELDS_IN_SCAN.indexOf(PARTITION_COLUMN)));
-    assertEquals(desc.getHashFunction(), PARTITION_FUNCTION);
+    assertEquals(desc.getHashFunction().name(), PARTITION_FUNCTION.toUpperCase());
     validateTableScanAssignment(result, OFFLINE_INSTANCE_ID_TO_SEGMENTS._offlineTableSegmentsMap, "OFFLINE");
   }
 
@@ -135,7 +136,7 @@ public class LeafStageWorkerAssignmentRuleTest {
     HashDistributionDesc desc = result._pinotDataDistribution.getHashDistributionDesc().iterator().next();
     assertEquals(desc.getNumPartitions(), REALTIME_NUM_PARTITIONS);
     assertEquals(desc.getKeys(), List.of(FIELDS_IN_SCAN.indexOf(PARTITION_COLUMN)));
-    assertEquals(desc.getHashFunction(), PARTITION_FUNCTION);
+    assertEquals(desc.getHashFunction().name(), PARTITION_FUNCTION.toUpperCase());
     validateTableScanAssignment(result, REALTIME_INSTANCE_ID_TO_SEGMENTS._realtimeTableSegmentsMap, "REALTIME");
   }
 
@@ -157,7 +158,7 @@ public class LeafStageWorkerAssignmentRuleTest {
       HashDistributionDesc desc = result._pinotDataDistribution.getHashDistributionDesc().iterator().next();
       assertEquals(desc.getNumPartitions(), REALTIME_NUM_PARTITIONS);
       assertEquals(desc.getKeys(), List.of(FIELDS_IN_SCAN.indexOf(PARTITION_COLUMN)));
-      assertEquals(desc.getHashFunction(), PARTITION_FUNCTION);
+      assertEquals(desc.getHashFunction().name(), PARTITION_FUNCTION.toUpperCase());
       validateTableScanAssignment(result,
           REALTIME_INSTANCE_ID_TO_SEGMENTS_WITH_INVALID_PARTITIONS._realtimeTableSegmentsMap, "REALTIME");
     }
@@ -268,6 +269,20 @@ public class LeafStageWorkerAssignmentRuleTest {
     assertEquals(Map.of(1, List.of("foobar__9__35__20250509T1444Z")),
         LeafStageWorkerAssignmentRule.getInvalidSegmentsByInferredPartition(List.of("foobar__9__35__20250509T1444Z"),
             inferPartitions, tableNameWithType, 8));
+  }
+
+  @Test
+  public void testAttemptPartitionedDistributionWhenInvalidHashFunction() {
+    TablePartitionInfo tablePartitionInfo = createRealtimeTablePartitionInfo();
+    // Test with this tablePartitionInfo to confirm partitioned distribution is generated.
+    assertNotNull(LeafStageWorkerAssignmentRule.attemptPartitionedDistribution(TABLE_NAME_RT, FIELDS_IN_SCAN, Map.of(),
+        tablePartitionInfo, false, false));
+    // Change TPI to set an invalid function name.
+    tablePartitionInfo = new TablePartitionInfo(tablePartitionInfo.getTableNameWithType(),
+        tablePartitionInfo.getPartitionColumn(), "foobar", tablePartitionInfo.getNumPartitions(),
+        tablePartitionInfo.getSegmentsByPartition(), tablePartitionInfo.getSegmentsWithInvalidPartition());
+    assertNull(LeafStageWorkerAssignmentRule.attemptPartitionedDistribution(TABLE_NAME_RT, FIELDS_IN_SCAN, Map.of(),
+        tablePartitionInfo, false, false));
   }
 
   @Test

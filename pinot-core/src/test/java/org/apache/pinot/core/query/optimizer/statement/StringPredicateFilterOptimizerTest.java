@@ -37,34 +37,32 @@ public class StringPredicateFilterOptimizerTest {
   public void testReplaceMinusWithCompare() {
     // 'WHERE strColumn1=strColumn2' gets replaced with 'strcmp(strColumn1, strColumn2) = 0'
     TestHelper.assertEqualsQuery("SELECT * FROM testTable WHERE strColumn1=strColumn2",
-        "SELECT * FROM testTable WHERE strcmp(strColumn1,strColumn2) = 0", TABLE_CONFIG_WITHOUT_INDEX, SCHEMA);
+        "SELECT * FROM testTable WHERE strcmp(strColumn1,strColumn2) = 0", SCHEMA);
 
     // 'WHERE trim(strColumn1)=strColumn2' gets replaced with 'strcmp(trim(strColumn1), strColumn2) = 0'
     TestHelper.assertEqualsQuery("SELECT * FROM testTable WHERE trim(strColumn1)=strColumn2",
-        "SELECT * FROM testTable WHERE strcmp(trim(strColumn1),strColumn2) = 0", TABLE_CONFIG_WITHOUT_INDEX, SCHEMA);
+        "SELECT * FROM testTable WHERE strcmp(trim(strColumn1),strColumn2) = 0", SCHEMA);
 
     // 'WHERE strColumn1=trim(strColumn2)' gets replaced with 'strcmp(strColumn1, trim(strColumn2)) = 0'
     TestHelper.assertEqualsQuery("SELECT * FROM testTable WHERE strColumn1=trim(strColumn2)",
-        "SELECT * FROM testTable WHERE strcmp(strColumn1,trim(strColumn2)) = 0", TABLE_CONFIG_WITHOUT_INDEX, SCHEMA);
+        "SELECT * FROM testTable WHERE strcmp(strColumn1,trim(strColumn2)) = 0", SCHEMA);
 
     // 'WHERE strColumn1>strColumn2' gets replaced with 'strcmp(strColumn1, strColumn2) > 0'
     TestHelper.assertEqualsQuery("SELECT * FROM testTable WHERE strColumn1>strColumn2",
-        "SELECT * FROM testTable WHERE strcmp(strColumn1,strColumn2) > 0", TABLE_CONFIG_WITHOUT_INDEX, SCHEMA);
+        "SELECT * FROM testTable WHERE strcmp(strColumn1,strColumn2) > 0", SCHEMA);
 
     // 'HAVING strColumn1=strColumn2' gets replaced with 'strcmp(strColumn1, strColumn2) = 0'
     TestHelper.assertEqualsQuery("SELECT strColumn1, strColumn2 FROM testTable HAVING strColumn1=strColumn2",
-        "SELECT strColumn1, strColumn2 FROM testTable HAVING strcmp(strColumn1,strColumn2)=0",
-        TABLE_CONFIG_WITHOUT_INDEX, SCHEMA);
+        "SELECT strColumn1, strColumn2 FROM testTable HAVING strcmp(strColumn1,strColumn2)=0", SCHEMA);
 
     // 'HAVING strColumn1=strColumn2' gets replaced with 'strcmp(strColumn1, strColumn2) < 0'
     TestHelper.assertEqualsQuery("SELECT strColumn1, strColumn2 FROM testTable HAVING strColumn1<strColumn2",
-        "SELECT strColumn1, strColumn2 FROM testTable HAVING strcmp(strColumn1,strColumn2)<0",
-        TABLE_CONFIG_WITHOUT_INDEX, SCHEMA);
+        "SELECT strColumn1, strColumn2 FROM testTable HAVING strcmp(strColumn1,strColumn2)<0", SCHEMA);
 
     // 'WHERE strColumn1=strColumn2 AND strColumn1=strColumn3' gets replaced with 'strcmp(strColumn1, strColumn2) = 0
     // AND strcmp(strColumn1, strColumn3) = 0'
     TestHelper.assertEqualsQuery("SELECT * FROM testTable WHERE strColumn1=strColumn2 OR strColumn1=strColumn3",
         "SELECT * FROM testTable WHERE strcmp(strColumn1,strColumn2) = 0 OR strcmp(strColumn1,strColumn3) = 0",
-        TABLE_CONFIG_WITHOUT_INDEX, SCHEMA);
+        SCHEMA);
   }
 }

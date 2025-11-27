@@ -19,6 +19,7 @@
 package org.apache.pinot.segment.local.segment.index.datasource;
 
 import javax.annotation.Nullable;
+import org.apache.pinot.segment.local.segment.index.column.PhysicalColumnIndexContainer;
 import org.apache.pinot.segment.spi.datasource.DataSource;
 import org.apache.pinot.segment.spi.datasource.DataSourceMetadata;
 import org.apache.pinot.segment.spi.index.IndexReader;
@@ -31,6 +32,7 @@ import org.apache.pinot.segment.spi.index.reader.ForwardIndexReader;
 import org.apache.pinot.segment.spi.index.reader.H3IndexReader;
 import org.apache.pinot.segment.spi.index.reader.InvertedIndexReader;
 import org.apache.pinot.segment.spi.index.reader.JsonIndexReader;
+import org.apache.pinot.segment.spi.index.reader.MultiColumnTextIndexReader;
 import org.apache.pinot.segment.spi.index.reader.NullValueVectorReader;
 import org.apache.pinot.segment.spi.index.reader.RangeIndexReader;
 import org.apache.pinot.segment.spi.index.reader.TextIndexReader;
@@ -92,8 +94,26 @@ public abstract class BaseDataSource implements DataSource {
 
   @Nullable
   @Override
+  public MultiColumnTextIndexReader getMultiColumnTextIndex() {
+    if (_indexContainer instanceof PhysicalColumnIndexContainer) {
+      return ((PhysicalColumnIndexContainer) _indexContainer).getMultiColumnTextIndex();
+    } else if (_indexContainer instanceof ColumnIndexContainer.FromMap) {
+      return ((ColumnIndexContainer.FromMap) _indexContainer).getMultiColumnTextIndex();
+    }
+
+    return null;
+  }
+
+  @Nullable
+  @Override
   public TextIndexReader getFSTIndex() {
     return getIndex(StandardIndexes.fst());
+  }
+
+  @Nullable
+  @Override
+  public TextIndexReader getIFSTIndex() {
+    return getIndex(StandardIndexes.ifst());
   }
 
   @Nullable

@@ -30,6 +30,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import org.apache.pinot.spi.annotations.InterfaceStability;
+import org.apache.pinot.spi.exception.QueryException;
 import org.apache.pinot.tsdb.spi.series.TimeSeries;
 import org.apache.pinot.tsdb.spi.series.TimeSeriesBlock;
 
@@ -56,7 +57,7 @@ public class PinotBrokerTimeSeriesResponse {
   private String _error;
 
   static {
-    OBJECT_MAPPER.setSerializationInclusion(JsonInclude.Include.NON_NULL);
+    OBJECT_MAPPER.setDefaultPropertyInclusion(JsonInclude.Include.NON_NULL);
   }
 
   @JsonCreator
@@ -106,6 +107,14 @@ public class PinotBrokerTimeSeriesResponse {
       throw new UnsupportedOperationException("Non-bucketed series block not supported yet");
     }
     return convertBucketedSeriesBlock(seriesBlock);
+  }
+
+  public static PinotBrokerTimeSeriesResponse fromException(Exception e) {
+    if (e instanceof QueryException) {
+      QueryException qe = (QueryException) e;
+      return newErrorResponse(qe.getErrorCode().getDefaultMessage(), e.getMessage());
+    }
+    return newErrorResponse(e.getClass().getSimpleName(), e.getMessage());
   }
 
   private static PinotBrokerTimeSeriesResponse convertBucketedSeriesBlock(TimeSeriesBlock seriesBlock) {

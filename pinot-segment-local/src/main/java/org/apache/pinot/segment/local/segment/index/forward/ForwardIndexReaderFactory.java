@@ -71,7 +71,7 @@ public class ForwardIndexReaderFactory extends IndexReaderFactory.Default<Forwar
     return createIndexReader(dataBuffer, metadata);
   }
 
-  public static ForwardIndexReader createIndexReader(PinotDataBuffer dataBuffer, ColumnMetadata metadata) {
+  public ForwardIndexReader createIndexReader(PinotDataBuffer dataBuffer, ColumnMetadata metadata) {
     if (metadata.hasDictionary()) {
       if (metadata.isSingleValue()) {
         if (metadata.isSorted()) {
@@ -108,7 +108,7 @@ public class ForwardIndexReaderFactory extends IndexReaderFactory.Default<Forwar
     }
   }
 
-  public static ForwardIndexReader createRawIndexReader(PinotDataBuffer dataBuffer, DataType storedType,
+  public ForwardIndexReader createRawIndexReader(PinotDataBuffer dataBuffer, DataType storedType,
       boolean isSingleValue) {
     int version = dataBuffer.getInt(0);
     if (isSingleValue && storedType.isFixedWidth()) {
@@ -128,7 +128,7 @@ public class ForwardIndexReaderFactory extends IndexReaderFactory.Default<Forwar
     }
   }
 
-  private static ForwardIndexReader createNonV4RawIndexReader(PinotDataBuffer dataBuffer, DataType storedType,
+  private ForwardIndexReader createNonV4RawIndexReader(PinotDataBuffer dataBuffer, DataType storedType,
       boolean isSingleValue) {
     // Only reach here if SV + raw + var byte + non v4 or MV + non v4
     if (isSingleValue) {

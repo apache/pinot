@@ -29,6 +29,9 @@ import java.util.Map;
 import java.util.PriorityQueue;
 import java.util.Set;
 import java.util.TreeMap;
+import java.util.stream.Collectors;
+import javax.annotation.Nullable;
+import org.apache.commons.collections4.CollectionUtils;
 import org.apache.helix.HelixManager;
 import org.apache.helix.store.zk.ZkHelixPropertyStore;
 import org.apache.helix.zookeeper.datamodel.ZNRecord;
@@ -37,6 +40,7 @@ import org.apache.pinot.common.metadata.ZKMetadataProvider;
 import org.apache.pinot.common.metadata.segment.SegmentZKMetadata;
 import org.apache.pinot.common.tier.Tier;
 import org.apache.pinot.spi.utils.CommonConstants.Helix.StateModel.SegmentStateModel;
+import org.apache.pinot.spi.utils.CommonConstants.Segment.Realtime.Status;
 import org.apache.pinot.spi.utils.Pairs;
 
 
@@ -161,10 +165,15 @@ public class SegmentAssignmentUtils {
     for (Map.Entry<String, Map<String, String>> entry : currentAssignment.entrySet()) {
       String segment = entry.getKey();
       Set<String> currentServers = entry.getValue().keySet();
+      List<String> sortedCandidateServers = currentServers.stream().filter(serverIds::containsKey).sorted((s1, s2) -> {
+        Integer serverId1 = serverIds.get(s1);
+        Integer serverId2 = serverIds.get(s2);
+        return Integer.compare(numSegmentsAssignedPerServer[serverId1], numSegmentsAssignedPerServer[serverId2]);
+      }).collect(Collectors.toList());
       int remainingReplicas = replication;
-      for (String server : currentServers) {
+      for (String server : sortedCandidateServers) {
         Integer serverId = serverIds.get(server);
-        if (serverId != null && numSegmentsAssignedPerServer[serverId] < targetNumSegmentsPerServer) {
+        if (numSegmentsAssignedPerServer[serverId] < targetNumSegmentsPerServer) {
           newAssignment.computeIfAbsent(segment, k -> new TreeMap<>()).put(server, SegmentStateModel.ONLINE);
           numSegmentsAssignedPerServer[serverId]++;
           remainingReplicas--;
@@ -387,19 +396,38 @@ public class SegmentAssignmentUtils {
     private final Map<String, Map<String, String>> _offlineSegmentAssignment = new TreeMap<>();
 
     // NOTE: split the segments based on the following criteria:
-    //       1. At least one instance ONLINE -> COMPLETED segment
-    //       2. At least one instance CONSUMING -> CONSUMING segment
+    //       1. At least one instance ONLINE && segment is not COMMITTING -> COMPLETED segment
+    //       2. At least one instance CONSUMING || segment is COMMITTING -> CONSUMING segment
     //       3. All instances OFFLINE (all instances encountered error while consuming) -> OFFLINE segment
-    CompletedConsumingOfflineSegmentAssignment(Map<String, Map<String, String>> segmentAssignment) {
-      for (Map.Entry<String, Map<String, String>> entry : segmentAssignment.entrySet()) {
-        String segmentName = entry.getKey();
-        Map<String, String> instanceStateMap = entry.getValue();
-        if (instanceStateMap.containsValue(SegmentStateModel.ONLINE)) {
-          _completedSegmentAssignment.put(segmentName, instanceStateMap);
-        } else if (instanceStateMap.containsValue(SegmentStateModel.CONSUMING)) {
-          _consumingSegmentAssignment.put(segmentName, instanceStateMap);
-        } else {
-          _offlineSegmentAssignment.put(segmentName, instanceStateMap);
+    CompletedConsumingOfflineSegmentAssignment(Map<String, Map<String, String>> segmentAssignment,
+        @Nullable Set<String> committingSegments) {
+      if (CollectionUtils.isEmpty(committingSegments)) {
+        for (Map.Entry<String, Map<String, String>> entry : segmentAssignment.entrySet()) {
+          String segmentName = entry.getKey();
+          Map<String, String> instanceStateMap = entry.getValue();
+          if (instanceStateMap.containsValue(SegmentStateModel.ONLINE)) {
+            _completedSegmentAssignment.put(segmentName, instanceStateMap);
+          } else if (instanceStateMap.containsValue(SegmentStateModel.CONSUMING)) {
+            _consumingSegmentAssignment.put(segmentName, instanceStateMap);
+          } else {
+            _offlineSegmentAssignment.put(segmentName, instanceStateMap);
+          }
+        }
+      } else {
+        for (Map.Entry<String, Map<String, String>> entry : segmentAssignment.entrySet()) {
+          String segmentName = entry.getKey();
+          Map<String, String> instanceStateMap = entry.getValue();
+          if (instanceStateMap.containsValue(SegmentStateModel.ONLINE)) {
+            if (committingSegments.contains(segmentName)) {
+              _consumingSegmentAssignment.put(segmentName, instanceStateMap);
+            } else {
+              _completedSegmentAssignment.put(segmentName, instanceStateMap);
+            }
+          } else if (instanceStateMap.containsValue(SegmentStateModel.CONSUMING)) {
+            _consumingSegmentAssignment.put(segmentName, instanceStateMap);
+          } else {
+            _offlineSegmentAssignment.put(segmentName, instanceStateMap);
+          }
         }
       }
     }
@@ -452,7 +480,8 @@ public class SegmentAssignmentUtils {
           // find an eligible tier for the segment, from the ordered list of tiers
           SegmentZKMetadata segmentZKMetadata =
               ZKMetadataProvider.getSegmentZKMetadata(propertyStore, tableNameWithType, segmentName);
-          if (segmentZKMetadata != null) {
+          // Skip COMMITTING segments
+          if (segmentZKMetadata != null && segmentZKMetadata.getStatus() != Status.COMMITTING) {
             for (Tier tier : sortedTiers) {
               if (tier.getSegmentSelector().selectSegment(tableNameWithType, segmentZKMetadata)) {
                 _tierNameToSegmentAssignmentMap.get(tier.getName()).put(segmentName, instanceStateMap);

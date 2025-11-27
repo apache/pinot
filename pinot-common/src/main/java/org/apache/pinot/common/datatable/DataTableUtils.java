@@ -64,6 +64,17 @@ public class DataTableUtils {
     return rowSizeInBytes;
   }
 
+  // return boolean as a byte to be sent over Bytebuffer
+  public static byte[] encodeBoolean(boolean b) {
+    return new byte[]{(byte) (b ? 1 : 0)};
+  }
+
+  public static boolean decodeBoolean(ByteBuffer buffer)
+      throws IOException {
+    byte b = buffer.get();
+    return (int) b == 1;
+  }
+
   /**
    * Helper method to decode string.
    */

@@ -21,7 +21,6 @@ package org.apache.pinot.segment.spi.index.creator;
 import java.io.IOException;
 import java.math.BigDecimal;
 import java.util.Map;
-import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
 import org.apache.pinot.segment.spi.index.IndexCreator;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
@@ -39,7 +38,7 @@ public interface ForwardIndexCreator extends IndexCreator {
   }
 
   @Override
-  default void add(@Nonnull Object cellValue, int dictId) {
+  default void add(Object cellValue, int dictId) {
     if (dictId >= 0) {
       putDictId(dictId);
     } else {
@@ -85,7 +84,7 @@ public interface ForwardIndexCreator extends IndexCreator {
   }
 
   @Override
-  default void add(@Nonnull Object[] cellValues, @Nullable int[] dictIds)
+  default void add(Object[] cellValues, @Nullable int[] dictIds)
       throws IOException {
     if (dictIds != null) {
       putDictIdMV(dictIds);
@@ -148,6 +147,132 @@ public interface ForwardIndexCreator extends IndexCreator {
         default:
           throw new IllegalStateException();
       }
+    }
+  }
+
+  /**
+   * Primitive type additions for columnar processing optimization.
+   * These methods avoid boxing overhead when iterating over columnar data.
+   * Default implementations delegate to putDictId or put* methods based on dictId.
+   */
+
+  @Override
+  default void addInt(int value, int dictId)
+      throws IOException {
+    if (dictId >= 0) {
+      putDictId(dictId);
+    } else {
+      putInt(value);
+    }
+  }
+
+  @Override
+  default void addLong(long value, int dictId)
+      throws IOException {
+    if (dictId >= 0) {
+      putDictId(dictId);
+    } else {
+      putLong(value);
+    }
+  }
+
+  @Override
+  default void addFloat(float value, int dictId)
+      throws IOException {
+    if (dictId >= 0) {
+      putDictId(dictId);
+    } else {
+      putFloat(value);
+    }
+  }
+
+  @Override
+  default void addDouble(double value, int dictId)
+      throws IOException {
+    if (dictId >= 0) {
+      putDictId(dictId);
+    } else {
+      putDouble(value);
+    }
+  }
+
+  @Override
+  default void addString(String value, int dictId)
+      throws IOException {
+    if (dictId >= 0) {
+      putDictId(dictId);
+    } else {
+      putString(value);
+    }
+  }
+
+  @Override
+  default void addBytes(byte[] value, int dictId)
+      throws IOException {
+    if (dictId >= 0) {
+      putDictId(dictId);
+    } else {
+      putBytes(value);
+    }
+  }
+
+  @Override
+  default void addIntMV(int[] values, @Nullable int[] dictIds)
+      throws IOException {
+    if (dictIds != null) {
+      putDictIdMV(dictIds);
+    } else {
+      putIntMV(values);
+    }
+  }
+
+  @Override
+  default void addLongMV(long[] values, @Nullable int[] dictIds)
+      throws IOException {
+    if (dictIds != null) {
+      putDictIdMV(dictIds);
+    } else {
+      putLongMV(values);
+    }
+  }
+
+  @Override
+  default void addFloatMV(float[] values, @Nullable int[] dictIds)
+      throws IOException {
+    if (dictIds != null) {
+      putDictIdMV(dictIds);
+    } else {
+      putFloatMV(values);
+    }
+  }
+
+  @Override
+  default void addDoubleMV(double[] values, @Nullable int[] dictIds)
+      throws IOException {
+    if (dictIds != null) {
+      putDictIdMV(dictIds);
+    } else {
+      putDoubleMV(values);
+    }
+  }
+
+  @Override
+  default void addStringMV(String[] values, @Nullable int[] dictIds)
+      throws IOException {
+    if (dictIds != null) {
+      putDictIdMV(dictIds);
+    } else {
+      putStringMV(values);
+    }
+  }
+
+  @Override
+  default void addBytesMV(byte[][] values, @Nullable int[] dictIds)
+      throws IOException {
+    if (dictIds != null) {
+      putDictIdMV(dictIds);
+    } else {
+      putBytesMV(values);
     }
   }
 

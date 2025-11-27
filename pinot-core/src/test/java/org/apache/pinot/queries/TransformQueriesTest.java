@@ -19,10 +19,10 @@
 
 package org.apache.pinot.queries;
 
-import com.google.common.collect.ImmutableList;
 import java.io.File;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Iterator;
 import java.util.List;
 import java.util.concurrent.TimeUnit;
 import org.apache.commons.io.FileUtils;
@@ -56,6 +56,7 @@ import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
 
 import static org.testng.Assert.assertEquals;
+import static org.testng.Assert.assertFalse;
 import static org.testng.Assert.assertNotNull;
 
 
@@ -234,7 +235,9 @@ public class TransformQueriesTest extends BaseQueriesTest {
     GroupByOperator groupByOperator = getOperator(query);
     AggregationGroupByResult aggregationGroupByResult = groupByOperator.nextBlock().getAggregationGroupByResult();
     assertNotNull(aggregationGroupByResult);
-    List<GroupKeyGenerator.GroupKey> groupKeys = ImmutableList.copyOf(aggregationGroupByResult.getGroupKeyIterator());
+    Iterator<GroupKeyGenerator.GroupKey> groupKeyIterator = aggregationGroupByResult.getGroupKeyIterator();
+    List<GroupKeyGenerator.GroupKey> groupKeys = List.of(groupKeyIterator.next());
+    assertFalse(groupKeyIterator.hasNext());
     assertEquals(groupKeys.size(), 1);
     assertEquals(groupKeys.get(0)._keys, expectedGroupKey);
     Object resultForKey = aggregationGroupByResult.getResultForGroupId(groupKeys.get(0)._groupId, 0);

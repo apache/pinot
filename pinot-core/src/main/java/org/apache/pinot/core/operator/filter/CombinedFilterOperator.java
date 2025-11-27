@@ -23,6 +23,7 @@ import java.util.List;
 import java.util.Map;
 import org.apache.pinot.core.common.BlockDocIdSet;
 import org.apache.pinot.core.operator.docidsets.AndDocIdSet;
+import org.apache.pinot.core.operator.docidsets.EmptyDocIdSet;
 import org.apache.pinot.spi.trace.Tracing;
 
 
@@ -62,7 +63,11 @@ public class CombinedFilterOperator extends BaseFilterOperator {
   protected BlockDocIdSet getTrues() {
     Tracing.activeRecording().setNumChildren(2);
     BlockDocIdSet mainFilterDocIdSet = _mainFilterOperator.nextBlock().getNonScanFilterBLockDocIdSet();
+    BlockDocIdSet optimizedMainFilterDocIdSet = mainFilterDocIdSet.getOptimizedDocIdSet();
+    if (optimizedMainFilterDocIdSet instanceof EmptyDocIdSet) {
+      return EmptyDocIdSet.getInstance();
+    }
     BlockDocIdSet subFilterDocIdSet = _subFilterOperator.nextBlock().getBlockDocIdSet();
-    return new AndDocIdSet(Arrays.asList(mainFilterDocIdSet, subFilterDocIdSet), _queryOptions);
+    return new AndDocIdSet(Arrays.asList(optimizedMainFilterDocIdSet, subFilterDocIdSet), _queryOptions);
   }
 }

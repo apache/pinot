@@ -25,13 +25,12 @@ import java.util.Arrays;
 import java.util.List;
 import java.util.concurrent.TimeUnit;
 import org.apache.commons.io.FileUtils;
+import org.apache.pinot.core.data.table.IntermediateRecord;
 import org.apache.pinot.core.operator.ExecutionStatistics;
 import org.apache.pinot.core.operator.blocks.results.AggregationResultsBlock;
 import org.apache.pinot.core.operator.blocks.results.GroupByResultsBlock;
 import org.apache.pinot.core.operator.query.AggregationOperator;
 import org.apache.pinot.core.operator.query.GroupByOperator;
-import org.apache.pinot.core.query.aggregation.groupby.AggregationGroupByResult;
-import org.apache.pinot.core.query.aggregation.groupby.GroupKeyGenerator;
 import org.apache.pinot.segment.local.indexsegment.immutable.ImmutableSegmentLoader;
 import org.apache.pinot.segment.local.segment.creator.impl.SegmentIndexCreationDriverImpl;
 import org.apache.pinot.segment.spi.ImmutableSegment;
@@ -130,12 +129,11 @@ public class FastHllQueriesTest extends BaseQueriesTest {
     GroupByResultsBlock groupByResultsBlock = groupByOperator.nextBlock();
     executionStatistics = groupByOperator.getExecutionStatistics();
     QueriesTestUtils.testInnerSegmentExecutionStatistics(executionStatistics, 30000L, 0L, 90000L, 30000L);
-    AggregationGroupByResult aggregationGroupByResult = groupByResultsBlock.getAggregationGroupByResult();
-    GroupKeyGenerator.GroupKey firstGroupKey = aggregationGroupByResult.getGroupKeyIterator().next();
-    assertEquals(firstGroupKey._keys[0], "");
-    assertEquals(((HyperLogLog) aggregationGroupByResult.getResultForGroupId(0, firstGroupKey._groupId)).cardinality(),
+    IntermediateRecord firstRecord = groupByResultsBlock.getIntermediateRecords().get(0);
+    assertEquals(firstRecord._key.getValues()[0], "");
+    assertEquals(((HyperLogLog) firstRecord._record.getValues()[1]).cardinality(),
         21L);
-    assertEquals(((HyperLogLog) aggregationGroupByResult.getResultForGroupId(1, firstGroupKey._groupId)).cardinality(),
+    assertEquals(((HyperLogLog) firstRecord._record.getValues()[2]).cardinality(),
         691L);
 
     // Test inter segments base query

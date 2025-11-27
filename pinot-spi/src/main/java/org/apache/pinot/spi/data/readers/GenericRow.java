@@ -22,11 +22,11 @@ import com.fasterxml.jackson.core.JsonProcessingException;
 import java.io.Serializable;
 import java.util.ArrayList;
 import java.util.Collection;
-import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Set;
 import javax.annotation.Nullable;
 import org.apache.pinot.spi.utils.ByteArray;
@@ -52,38 +52,22 @@ import org.apache.pinot.spi.utils.JsonUtils;
  */
 public class GenericRow implements Serializable {
 
-  /**
-   * This key is used by a Decoder/RecordReader to handle 1 record to many records flattening.
-   * If a Decoder/RecordReader produces multiple GenericRows from the given record, they must be put into the
-   * destination GenericRow as a List<GenericRow> with this key.
-   * The segment generation drivers handle this key as a special case and process the multiple records.
-   */
+  /// This key is used by [org.apache.pinot.spi.stream.StreamMessageDecoder] to handle the case of single stream message
+  /// being decoded into multiple records. If a decoder produces multiple records from a single stream message, they
+  /// must be put into the destination [GenericRow] as a [List<GenericRow>] with this key.
+  /// TODO: Remove this special key and change decoder interface to return a list of records instead of a single record.
   public static final String MULTIPLE_RECORDS_KEY = "$MULTIPLE_RECORDS_KEY$";
-  /**
-   * This key is used by the FilterTransformer to skip records during ingestion
-   * The FilterTransformer puts this key into the GenericRow with value true, if the record matches the filtering
-   * criteria, based on
-   * FilterConfig
-   */
+
+  /// This key is used by [org.apache.pinot.spi.stream.StreamMessageDecoder] to handle the case of a stream message
+  /// being decoded into zero record. If a decoder produces no record from a stream message, it can either return `null`
+  /// or put `true` for this key into the destination [GenericRow].
+  /// TODO: Remove this special key and change decoder interface to return a list of records instead of a single record.
   public static final String SKIP_RECORD_KEY = "$SKIP_RECORD_KEY$";
-
-  /**
-   * This key is used by transformers to indicate some error might have occurred while doing transform on a column
-   * and a default/null value has been put in place of actual value. Only used when continueOnError is set to true
-   */
-  public static final String INCOMPLETE_RECORD_KEY = "$INCOMPLETE_RECORD_KEY$";
-
-  public static final String SANITIZED_RECORD_KEY = "$SANITIZED_RECORD_KEY$";
 
   private final Map<String, Object> _fieldToValueMap = new HashMap<>();
   private final Set<String> _nullValueFields = new HashSet<>();
-
-  /**
-   * @return Whether the given key is one of the special types of keys ($SKIP_RECORD_KEY$, etc.)
-   */
-  public static boolean isSpecialKeyType(String key) {
-    return key.equals(SKIP_RECORD_KEY) || key.equals(INCOMPLETE_RECORD_KEY) || key.equals(MULTIPLE_RECORDS_KEY);
-  }
+  private boolean _incomplete;
+  private boolean _sanitized;
 
   /**
    * Initializes the generic row from the given generic row (shallow copy). The row should be new created or cleared
@@ -92,6 +76,8 @@ public class GenericRow implements Serializable {
   public void init(GenericRow row) {
     _fieldToValueMap.putAll(row._fieldToValueMap);
     _nullValueFields.addAll(row._nullValueFields);
+    _incomplete = row._incomplete;
+    _sanitized = row._sanitized;
   }
 
   /**
@@ -100,7 +86,7 @@ public class GenericRow implements Serializable {
    * the value for the field can be {@code null}.
    */
   public Map<String, Object> getFieldToValueMap() {
-    return Collections.unmodifiableMap(_fieldToValueMap);
+    return _fieldToValueMap;
   }
 
   /**
@@ -109,7 +95,7 @@ public class GenericRow implements Serializable {
    * {@link #putDefaultNullValue(String, Object)}.
    */
   public Set<String> getNullValueFields() {
-    return Collections.unmodifiableSet(_nullValueFields);
+    return _nullValueFields;
   }
 
   /**
@@ -149,6 +135,18 @@ public class GenericRow implements Serializable {
    */
   public boolean hasNullValues() {
     return !_nullValueFields.isEmpty();
+  }
+
+  /// Returns `true` if the row has been marked as incomplete.
+  /// A row is marked as incomplete when errors occurred during record transform, and default/null value has been put in
+  /// place of original value.
+  public boolean isIncomplete() {
+    return _incomplete;
+  }
+
+  /// Returns `true` if the row has been sanitized by SanitizationTransformer.
+  public boolean isSanitized() {
+    return _sanitized;
   }
 
   /**
@@ -247,17 +245,29 @@ public class GenericRow implements Serializable {
     return _nullValueFields.remove(fieldName);
   }
 
+  /// Marks the row as incomplete.
+  public void markIncomplete() {
+    _incomplete = true;
+  }
+
+  /// Marks the row as sanitized.
+  public void markSanitized() {
+    _sanitized = true;
+  }
+
   /**
    * Removes all the fields from the row.
    */
   public void clear() {
     _fieldToValueMap.clear();
     _nullValueFields.clear();
+    _incomplete = false;
+    _sanitized = false;
   }
 
   @Override
   public int hashCode() {
-    return EqualityUtils.hashCodeOf(_fieldToValueMap.hashCode(), _nullValueFields.hashCode());
+    return Objects.hash(_fieldToValueMap, _nullValueFields, _incomplete, _sanitized);
   }
 
   @Override
@@ -267,8 +277,8 @@ public class GenericRow implements Serializable {
     }
     if (obj instanceof GenericRow) {
       GenericRow that = (GenericRow) obj;
-      return _nullValueFields.equals(that._nullValueFields) && EqualityUtils
-          .isEqual(_fieldToValueMap, that._fieldToValueMap);
+      return _incomplete == that._incomplete && _sanitized == that._sanitized && _nullValueFields.equals(
+          that._nullValueFields) && EqualityUtils.isEqual(_fieldToValueMap, that._fieldToValueMap);
     }
     return false;
   }

@@ -25,7 +25,6 @@ import java.util.Objects;
 import org.apache.pinot.spi.stream.BytesStreamMessage;
 import org.apache.pinot.spi.stream.PartitionGroupConsumer;
 import org.apache.pinot.spi.stream.StreamConfig;
-import org.apache.pinot.spi.stream.StreamMessageMetadata;
 import org.apache.pinot.spi.stream.StreamPartitionMsgOffset;
 import org.apache.pulsar.client.api.MessageId;
 import org.apache.pulsar.client.api.PulsarClientException;
@@ -74,10 +73,13 @@ public class PulsarPartitionLevelConsumer extends PulsarPartitionLevelConnection
       }
     }
 
+    long batchSizeInBytes = 0;
     // Read messages until all available messages are read, or we run out of time
     try {
       while (_reader.hasMessageAvailable() && System.currentTimeMillis() < endTimeMs) {
-        messages.add(PulsarUtils.buildPulsarStreamMessage(_reader.readNext(), _config));
+        BytesStreamMessage bytesStreamMessage = PulsarUtils.buildPulsarStreamMessage(_reader.readNext(), _config);
+        batchSizeInBytes += bytesStreamMessage.getMetadata().getRecordSerializedSize();
+        messages.add(bytesStreamMessage);
       }
     } catch (PulsarClientException e) {
       throw new RuntimeException("Caught exception while fetching messages from Pulsar", e);
@@ -87,13 +89,10 @@ public class PulsarPartitionLevelConsumer extends PulsarPartitionLevelConnection
     if (messages.isEmpty()) {
       offsetOfNextBatch = (MessageIdStreamOffset) startOffset;
     } else {
-      StreamMessageMetadata lastMessageMetadata = messages.get(messages.size() - 1).getMetadata();
-      assert lastMessageMetadata != null;
-      offsetOfNextBatch = (MessageIdStreamOffset) lastMessageMetadata.getNextOffset();
+      offsetOfNextBatch = (MessageIdStreamOffset) messages.get(messages.size() - 1).getMetadata().getNextOffset();
     }
-    assert offsetOfNextBatch != null;
     _nextMessageId = offsetOfNextBatch.getMessageId();
-    return new PulsarMessageBatch(messages, offsetOfNextBatch, _reader.hasReachedEndOfTopic());
+    return new PulsarMessageBatch(messages, offsetOfNextBatch, _reader.hasReachedEndOfTopic(), batchSizeInBytes);
   }
 
   @Override

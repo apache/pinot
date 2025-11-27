@@ -19,7 +19,6 @@
 package org.apache.pinot.calcite.rel.rules;
 
 import com.google.common.base.Preconditions;
-import com.google.common.collect.ImmutableList;
 import java.util.ArrayList;
 import java.util.EnumSet;
 import java.util.List;
@@ -140,9 +139,9 @@ public class PinotRuleUtils {
     // Supported window functions
     // OTHER_FUNCTION supported are: BOOL_AND, BOOL_OR
     private static final EnumSet<SqlKind> SUPPORTED_WINDOW_FUNCTION_KIND =
-        EnumSet.of(SqlKind.SUM, SqlKind.SUM0, SqlKind.MIN, SqlKind.MAX, SqlKind.COUNT, SqlKind.ROW_NUMBER, SqlKind.RANK,
-            SqlKind.DENSE_RANK, SqlKind.NTILE, SqlKind.LAG, SqlKind.LEAD, SqlKind.FIRST_VALUE, SqlKind.LAST_VALUE,
-            SqlKind.OTHER_FUNCTION);
+        EnumSet.of(SqlKind.SUM, SqlKind.SUM0, SqlKind.MIN, SqlKind.MAX, SqlKind.COUNT, SqlKind.AVG, SqlKind.ROW_NUMBER,
+            SqlKind.RANK, SqlKind.DENSE_RANK, SqlKind.NTILE, SqlKind.LAG, SqlKind.LEAD, SqlKind.FIRST_VALUE,
+            SqlKind.LAST_VALUE, SqlKind.OTHER_FUNCTION);
 
     public static void validateWindows(Window window) {
       int numGroups = window.groups.size();
@@ -242,7 +241,7 @@ public class PinotRuleUtils {
     }
 
     @Nullable
-    private static RexLiteral getLiteral(RexNode rexNode, int numInputFields, ImmutableList<RexLiteral> constants,
+    private static RexLiteral getLiteral(RexNode rexNode, int numInputFields, List<RexLiteral> constants,
         @Nullable List<RexNode> projects) {
       if (!(rexNode instanceof RexInputRef)) {
         return null;

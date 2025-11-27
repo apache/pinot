@@ -42,7 +42,7 @@ public class KinesisMessageBatchTest {
     }
     KinesisMessageBatch batch =
         new KinesisMessageBatch(messages, new KinesisPartitionGroupOffset(SHARD_ID, Integer.toString(numMessages - 1)),
-            false);
+            false, 0);
 
     for (int i = 0; i < numMessages; i++) {
       BytesStreamMessage streamMessage = batch.getStreamMessage(i);
@@ -52,7 +52,6 @@ public class KinesisMessageBatchTest {
       byte[] value = streamMessage.getValue();
       assertEquals(new String(value, StandardCharsets.UTF_8), "value-" + i);
       StreamMessageMetadata metadata = streamMessage.getMetadata();
-      assertNotNull(metadata);
       assertEquals(metadata.getRecordIngestionTimeMs(), baseTimeMs + i);
       StreamPartitionMsgOffset offset = metadata.getOffset();
       assertTrue(offset instanceof KinesisPartitionGroupOffset);

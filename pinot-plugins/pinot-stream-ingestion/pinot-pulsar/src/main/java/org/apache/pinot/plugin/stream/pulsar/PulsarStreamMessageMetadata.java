@@ -20,19 +20,15 @@
 package org.apache.pinot.plugin.stream.pulsar;
 
 import java.util.EnumSet;
-import java.util.Map;
-import javax.annotation.Nullable;
-import org.apache.pinot.spi.data.readers.GenericRow;
-import org.apache.pinot.spi.stream.StreamMessageMetadata;
 
 
 /**
- * Pulsar specific implementation of {@link StreamMessageMetadata}
  * Pulsar makes many metadata values available for each message. Please see the pulsar documentation for more details.
  * @see <a href="https://pulsar.apache.org/docs/en/concepts-messaging/#message-properties">Pulsar Message Properties</a>
  */
-// TODO: Make it a util class
-public class PulsarStreamMessageMetadata extends StreamMessageMetadata {
+public class PulsarStreamMessageMetadata {
+  private PulsarStreamMessageMetadata() {
+  }
 
   public enum PulsarMessageMetadataValue {
     PUBLISH_TIME("publishTime"),
@@ -64,16 +60,5 @@ public class PulsarStreamMessageMetadata extends StreamMessageMetadata {
       EnumSet<PulsarMessageMetadataValue> values = EnumSet.allOf(PulsarMessageMetadataValue.class);
       return values.stream().filter(value -> value.getKey().equals(key)).findFirst().orElse(null);
     }
-  }
-
-  @Deprecated
-  public PulsarStreamMessageMetadata(long recordIngestionTimeMs, @Nullable GenericRow headers) {
-    super(recordIngestionTimeMs, headers);
-  }
-
-  @Deprecated
-  public PulsarStreamMessageMetadata(long recordIngestionTimeMs, @Nullable GenericRow headers,
-      Map<String, String> metadata) {
-    super(recordIngestionTimeMs, headers, metadata);
   }
 }

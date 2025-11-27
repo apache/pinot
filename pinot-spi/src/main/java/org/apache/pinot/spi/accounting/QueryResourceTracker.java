@@ -19,28 +19,16 @@
 package org.apache.pinot.spi.accounting;
 
 import com.fasterxml.jackson.databind.annotation.JsonSerialize;
+import org.apache.pinot.spi.query.QueryExecutionContext;
 
 
-/**
- * Tracks allocated bytes and CPU time for a query in a server or a broker.
- */
+/// Tracks CPU time and allocated bytes for a query.
 @JsonSerialize
 public interface QueryResourceTracker {
-  /**
-   * QueryId tracked by the implementation.
-   * @return a string containing the query id.
-   */
-  String getQueryId();
 
-  /**
-   * Allocated bytes for a query in a server or broker
-   * @return A long containing the number of bytes allocated to execute the query.
-   */
-  long getAllocatedBytes();
+  QueryExecutionContext getExecutionContext();
 
-  /**
-   * Total execution CPU Time(nanoseconds) of a query in a server or broker.
-   * @return A long containing the nanoseconds.
-   */
   long getCpuTimeNs();
+
+  long getAllocatedBytes();
 }

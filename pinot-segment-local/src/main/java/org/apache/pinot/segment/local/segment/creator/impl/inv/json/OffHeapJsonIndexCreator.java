@@ -70,9 +70,10 @@ public class OffHeapJsonIndexCreator extends BaseJsonIndexCreator {
   private int _numPostingListsInLastChunk;
   private int _numPostingLists;
 
-  public OffHeapJsonIndexCreator(File indexDir, String columnName, JsonIndexConfig jsonIndexConfig)
+  public OffHeapJsonIndexCreator(File indexDir, String columnName, String tableNameWithType, boolean continueOnError,
+      JsonIndexConfig jsonIndexConfig)
       throws IOException {
-    super(indexDir, columnName, jsonIndexConfig);
+    super(indexDir, columnName, tableNameWithType, continueOnError, jsonIndexConfig);
     _postingListFile = new File(_tempDir, POSTING_LIST_FILE_NAME);
     _postingListOutputStream = new DataOutputStream(new BufferedOutputStream(new FileOutputStream(_postingListFile)));
   }

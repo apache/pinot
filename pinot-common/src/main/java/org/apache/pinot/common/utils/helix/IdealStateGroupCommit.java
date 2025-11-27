@@ -114,6 +114,7 @@ public class IdealStateGroupCommit {
     Entry entry = new Entry(resourceName, updater);
 
     queue._pending.add(entry);
+    LOGGER.debug("The queue size for resource {} is {}", resourceName, queue._pending.size());
     while (!entry._sent.get()) {
       if (queue._running.compareAndSet(null, Thread.currentThread())) {
         ArrayList<Entry> processed = new ArrayList<>();

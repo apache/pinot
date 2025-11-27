@@ -57,7 +57,6 @@ import org.slf4j.LoggerFactory;
  * See https://github.com/linkedin/pinot/wiki/Low-level-kafka-consumers
  */
 public class BlockingSegmentCompletionFSM implements SegmentCompletionFSM {
-  public static final Logger LOGGER = LoggerFactory.getLogger(BlockingSegmentCompletionFSM.class);
 
   public enum BlockingSegmentCompletionFSMState {
     PARTIAL_CONSUMING,  // Indicates that at least one replica has reported that it has stopped consuming.
@@ -130,7 +129,7 @@ public class BlockingSegmentCompletionFSM implements SegmentCompletionFSM {
     if (savedCommitTime != null && savedCommitTime > initialCommitTimeMs) {
       initialCommitTimeMs = savedCommitTime;
     }
-    _logger = LoggerFactory.getLogger("SegmentCompletionFSM_" + segmentName.getSegmentName());
+    _logger = LoggerFactory.getLogger(this.getClass().getSimpleName() + "_" + segmentName.getSegmentName());
     int maxCommitTimeForAllSegmentsSeconds = SegmentCompletionManager.getMaxCommitTimeForAllSegmentsSeconds();
     if (initialCommitTimeMs > maxCommitTimeForAllSegmentsSeconds * 1000L) {
       // The table has a really high value configured for max commit time. Set it to a higher value than default
@@ -144,7 +143,9 @@ public class BlockingSegmentCompletionFSM implements SegmentCompletionFSM {
     _maxTimeAllowedToCommitMs = _startTimeMs + _initialCommitTimeMs;
     _controllerVipUrl = segmentCompletionManager.getControllerVipUrl();
 
-    if (segmentMetadata.getStatus() != CommonConstants.Segment.Realtime.Status.IN_PROGRESS) {
+    // NOTE: If segment ZK status is COMMITTING, The current behaviour expects the segment protocol calls to fail and
+    // abort leaving it to realtime segment validation job to fix it.
+    if (segmentMetadata.getStatus().isCompleted()) {
       _state = BlockingSegmentCompletionFSMState.COMMITTED;
       StreamPartitionMsgOffsetFactory factory =
           _segmentCompletionManager.getStreamPartitionMsgOffsetFactory(_segmentName);
@@ -771,7 +772,7 @@ public class BlockingSegmentCompletionFSM implements SegmentCompletionFSM {
       // The winner is coming back to report its offset. Take a decision based on the offset reported, and whether we
       // already notified them
       // Winner is supposedly already in the commit call. Something wrong.
-      LOGGER.warn(
+      _logger.warn(
           "{}:Aborting FSM because winner is reporting a segment while it is also committing instance={} offset={} "
               + "now={}", _state, instanceId, offset, now);
       // Ask them to hold, just in case the committer fails for some reason..

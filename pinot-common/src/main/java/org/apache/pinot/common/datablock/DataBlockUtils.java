@@ -32,7 +32,6 @@ import java.util.EnumMap;
 import java.util.List;
 import java.util.function.LongConsumer;
 import java.util.regex.Pattern;
-import java.util.stream.Collectors;
 import javax.annotation.Nullable;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.pinot.common.utils.DataSchema;
@@ -229,12 +228,9 @@ public final class DataBlockUtils {
    */
   public static DataBlock deserialize(List<ByteBuffer> buffers)
       throws IOException {
-    List<DataBuffer> dataBuffers = buffers.stream()
-        .map(PinotByteBuffer::slice)
-        .collect(Collectors.toList());
-    try (CompoundDataBuffer compoundBuffer = new CompoundDataBuffer(dataBuffers, ByteOrder.BIG_ENDIAN, false)) {
-      return deserialize(compoundBuffer);
-    }
+    DataBuffer dataBuffer = buffers.size() == 1 ? PinotByteBuffer.wrap(buffers.get(0))
+        : CompoundDataBuffer.fromByteBuffers(buffers, ByteOrder.BIG_ENDIAN, false);
+    return deserialize(dataBuffer);
   }
 
   /**
@@ -243,9 +239,9 @@ public final class DataBlockUtils {
    */
   public static DataBlock deserialize(ByteBuffer[] buffers)
       throws IOException {
-    try (CompoundDataBuffer compoundBuffer = new CompoundDataBuffer(buffers, ByteOrder.BIG_ENDIAN, false)) {
-      return deserialize(compoundBuffer);
-    }
+    DataBuffer dataBuffer = buffers.length == 1 ? PinotByteBuffer.wrap(buffers[0])
+        : CompoundDataBuffer.fromByteBuffers(buffers, ByteOrder.BIG_ENDIAN, false);
+    return deserialize(dataBuffer);
   }
 
   /**

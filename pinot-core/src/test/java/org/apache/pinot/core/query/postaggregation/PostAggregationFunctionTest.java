@@ -26,8 +26,8 @@ import org.testng.annotations.Test;
 
 import static org.testng.Assert.assertEquals;
 import static org.testng.Assert.assertFalse;
+import static org.testng.Assert.assertNull;
 import static org.testng.Assert.assertTrue;
-import static org.testng.AssertJUnit.assertNull;
 
 
 public class PostAggregationFunctionTest {
@@ -128,5 +128,10 @@ public class PostAggregationFunctionTest {
     assertEquals(function.getResultType(), ColumnDataType.OBJECT);
     assertNull(function.invoke(new Object[]{null, null, null, null, null, null, null, null, null, null}));
     assertEquals(function.invoke(new Object[]{null, null, null, null, null, null, null, null, null, 10}), 10);
+
+    // Test null handling
+    function = new PostAggregationFunction("plus", new ColumnDataType[]{ColumnDataType.INT, ColumnDataType.INT});
+    // The function returns null if any argument is null
+    assertNull(function.invoke(new Object[]{null, 1}));
   }
 }

@@ -37,7 +37,7 @@ import org.apache.pinot.common.utils.regex.JavaUtilPattern;
 import org.apache.pinot.common.utils.regex.Matcher;
 import org.apache.pinot.common.utils.regex.Pattern;
 import org.apache.pinot.controller.ControllerConf;
-import org.apache.pinot.controller.api.resources.ServerReloadControllerJobStatusResponse;
+import org.apache.pinot.controller.api.dto.PinotTableReloadStatusResponse;
 import org.apache.pinot.controller.helix.core.controllerjob.ControllerJobTypes;
 import org.apache.pinot.controller.helix.core.rebalance.DefaultRebalancePreChecker;
 import org.apache.pinot.controller.helix.core.rebalance.RebalanceConfig;
@@ -77,6 +77,7 @@ import static org.testng.Assert.*;
 
 
 public class TableRebalanceIntegrationTest extends BaseHybridClusterIntegrationTest {
+  private final static int FORCE_COMMIT_REBALANCE_TIMEOUT_MS = 600_000;
 
   @Override
   protected void overrideControllerConf(Map<String, Object> properties) {
@@ -1414,36 +1415,42 @@ public class TableRebalanceIntegrationTest extends BaseHybridClusterIntegrationT
       assertEquals(summary.getSegmentInfo().getConsumingSegmentToBeMovedSummary().getNumConsumingSegmentsToBeMoved(),
           4);
 
-      waitForRebalanceToComplete(rebalanceResult.getJobId(), 30000);
+      waitForRebalanceToComplete(rebalanceResult.getJobId(), FORCE_COMMIT_REBALANCE_TIMEOUT_MS);
 
       if (tableConfig.getRoutingConfig() != null
           && RoutingConfig.STRICT_REPLICA_GROUP_INSTANCE_SELECTOR_TYPE.equalsIgnoreCase(
           tableConfig.getRoutingConfig().getInstanceSelectorType())) {
         // test: move segments from tenantA to tenantB
-        performForceCommitSegmentMovingTest(rebalanceConfig, tableConfig, tenantB, true, 30000);
+        performForceCommitSegmentMovingTest(rebalanceConfig, tableConfig, tenantB, true,
+            FORCE_COMMIT_REBALANCE_TIMEOUT_MS);
 
         // test: move segment from tenantB to tenantA with batch size
         rebalanceConfig.setBatchSizePerServer(1);
-        performForceCommitSegmentMovingTest(rebalanceConfig, tableConfig, tenantA, true, 30000);
+        performForceCommitSegmentMovingTest(rebalanceConfig, tableConfig, tenantA, true,
+            FORCE_COMMIT_REBALANCE_TIMEOUT_MS);
 
         // test: move segment from tenantA to tenantB with includeConsuming = false, consuming segment should not be
         // committed
         rebalanceConfig.setDowntime(false);
         rebalanceConfig.setIncludeConsuming(false);
-        performForceCommitSegmentMovingTest(rebalanceConfig, tableConfig, tenantB, false, 30000);
+        performForceCommitSegmentMovingTest(rebalanceConfig, tableConfig, tenantB, false,
+            FORCE_COMMIT_REBALANCE_TIMEOUT_MS);
       } else {
         // test: move segments from tenantA to tenantB
-        performForceCommitSegmentMovingTest(rebalanceConfig, tableConfig, tenantB, true, 30000);
+        performForceCommitSegmentMovingTest(rebalanceConfig, tableConfig, tenantB, true,
+            FORCE_COMMIT_REBALANCE_TIMEOUT_MS);
 
         // test: move segment from tenantB to tenantA with downtime
         rebalanceConfig.setDowntime(true);
-        performForceCommitSegmentMovingTestWithEVISConverge(rebalanceConfig, tableConfig, tenantA, true, 30000);
+        performForceCommitSegmentMovingTestWithEVISConverge(rebalanceConfig, tableConfig, tenantA, true,
+            FORCE_COMMIT_REBALANCE_TIMEOUT_MS);
 
         // test: move segment from tenantA to tenantB with includeConsuming = false, consuming segment should not be
         // committed
         rebalanceConfig.setDowntime(false);
         rebalanceConfig.setIncludeConsuming(false);
-        performForceCommitSegmentMovingTest(rebalanceConfig, tableConfig, tenantB, false, 30000);
+        performForceCommitSegmentMovingTest(rebalanceConfig, tableConfig, tenantB, false,
+            FORCE_COMMIT_REBALANCE_TIMEOUT_MS);
       }
     } catch (Exception e) {
       Assert.fail("Caught exception during force commit test", e);
@@ -1463,7 +1470,7 @@ public class TableRebalanceIntegrationTest extends BaseHybridClusterIntegrationT
               + "?type=" + tableConfig.getTableType().toString());
       String response = sendPostRequest(getTableRebalanceUrl(rebalanceConfig, TableType.REALTIME));
       RebalanceResult rebalanceResult = JsonUtils.stringToObject(response, RebalanceResult.class);
-      waitForRebalanceToComplete(rebalanceResult.getJobId(), 30000);
+      waitForRebalanceToComplete(rebalanceResult.getJobId(), FORCE_COMMIT_REBALANCE_TIMEOUT_MS);
 
       serverStarter0.stop();
       serverStarter1.stop();
@@ -1488,8 +1495,8 @@ public class TableRebalanceIntegrationTest extends BaseHybridClusterIntegrationT
         String requestUrl = getControllerRequestURLBuilder().forSegmentReloadStatus(reloadJobId);
         SimpleHttpResponse httpResponse =
             HttpClient.wrapAndThrowHttpException(getHttpClient().sendGetRequest(new URL(requestUrl).toURI(), null));
-        ServerReloadControllerJobStatusResponse reloadResult =
-            JsonUtils.stringToObject(httpResponse.getResponse(), ServerReloadControllerJobStatusResponse.class);
+        PinotTableReloadStatusResponse reloadResult =
+            JsonUtils.stringToObject(httpResponse.getResponse(), PinotTableReloadStatusResponse.class);
         return reloadResult.getEstimatedTimeRemainingInMinutes() == 0.0;
       } catch (Exception e) {
         return null;

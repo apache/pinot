@@ -25,6 +25,7 @@ import org.apache.calcite.rel.type.RelDataTypeFactory;
 import org.apache.calcite.schema.ScannableTable;
 import org.apache.calcite.schema.impl.AbstractTable;
 import org.apache.pinot.query.type.TypeFactory;
+import org.apache.pinot.query.validate.Validator;
 import org.apache.pinot.spi.data.Schema;
 
 
@@ -36,9 +37,20 @@ import org.apache.pinot.spi.data.Schema;
  */
 public class PinotTable extends AbstractTable implements ScannableTable {
   private Schema _schema;
+  private boolean _excludeVirtualColumns = false;
 
   public PinotTable(Schema schema) {
+    this(schema, false);
+  }
+
+  /**
+   * Constructor with option to exclude virtual columns.
+   * This is typically used for NATURAL JOIN operations where virtual columns
+   * should not participate in join condition matching.
+   */
+  public PinotTable(Schema schema, boolean excludeVirtualColumns) {
     _schema = schema;
+    _excludeVirtualColumns = excludeVirtualColumns;
   }
 
   @Override
@@ -49,7 +61,12 @@ public class PinotTable extends AbstractTable implements ScannableTable {
     } else { // this can happen when using Frameworks.withPrepare, which wraps our factory in a JavaTypeFactoryImpl
       typeFactory = TypeFactory.INSTANCE;
     }
-    return typeFactory.createRelDataTypeFromSchema(_schema);
+
+    if (_excludeVirtualColumns) {
+      return typeFactory.createRelDataTypeFromSchema(_schema, Validator::isVirtualColumn);
+    } else {
+      return typeFactory.createRelDataTypeFromSchema(_schema);
+    }
   }
 
   @Override

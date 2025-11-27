@@ -18,12 +18,13 @@
  */
 package org.apache.pinot.core.operator.filter;
 
-import com.google.common.collect.ImmutableList;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
 import org.apache.pinot.core.common.BlockDocIdIterator;
+import org.apache.pinot.core.operator.docidsets.EmptyDocIdSet;
+import org.apache.pinot.core.operator.docidsets.MatchAllDocIdSet;
 import org.apache.pinot.segment.spi.Constants;
 import org.roaringbitmap.buffer.MutableRoaringBitmap;
 import org.testng.Assert;
@@ -174,8 +175,8 @@ public class AndFilterOperatorTest {
         Arrays.asList(new TestFilterOperator(docIds1, nullDocIds1, numDocs),
             new TestFilterOperator(docIds2, nullDocIds2, numDocs)), null, numDocs, true);
 
-    Assert.assertEquals(TestUtils.getDocIds(andFilterOperator.getTrues()), ImmutableList.of(1, 2));
-    Assert.assertEquals(TestUtils.getDocIds(andFilterOperator.getFalses()), ImmutableList.of(0, 7, 8, 9));
+    Assert.assertEquals(TestUtils.getDocIds(andFilterOperator.getTrues()), List.of(1, 2));
+    Assert.assertEquals(TestUtils.getDocIds(andFilterOperator.getFalses()), List.of(0, 7, 8, 9));
   }
 
   @Test
@@ -190,8 +191,8 @@ public class AndFilterOperatorTest {
         Arrays.asList(new TestFilterOperator(docIds1, nullDocIds1, numDocs),
             new TestFilterOperator(docIds2, nullDocIds2, numDocs)), null, numDocs, false);
 
-    Assert.assertEquals(TestUtils.getDocIds(andFilterOperator.getTrues()), ImmutableList.of(0));
-    Assert.assertEquals(TestUtils.getDocIds(andFilterOperator.getFalses()), ImmutableList.of(1, 2, 3));
+    Assert.assertEquals(TestUtils.getDocIds(andFilterOperator.getTrues()), List.of(0));
+    Assert.assertEquals(TestUtils.getDocIds(andFilterOperator.getFalses()), List.of(1, 2, 3));
   }
 
   @Test
@@ -206,7 +207,7 @@ public class AndFilterOperatorTest {
 
     Assert.assertEquals(TestUtils.getDocIds(andFilterOperator.getTrues()), Collections.emptyList());
     Assert.assertEquals(TestUtils.getDocIds(andFilterOperator.getFalses()),
-        ImmutableList.of(0, 1, 2, 3, 4, 5, 6, 7, 8, 9));
+        List.of(0, 1, 2, 3, 4, 5, 6, 7, 8, 9));
   }
 
   @Test
@@ -219,8 +220,8 @@ public class AndFilterOperatorTest {
         Arrays.asList(new TestFilterOperator(docIds1, nullDocIds1, numDocs), new MatchAllFilterOperator(numDocs)), null,
         numDocs, true);
 
-    Assert.assertEquals(TestUtils.getDocIds(andFilterOperator.getTrues()), ImmutableList.of(1, 2, 3));
-    Assert.assertEquals(TestUtils.getDocIds(andFilterOperator.getFalses()), ImmutableList.of(0, 7, 8, 9));
+    Assert.assertEquals(TestUtils.getDocIds(andFilterOperator.getTrues()), List.of(1, 2, 3));
+    Assert.assertEquals(TestUtils.getDocIds(andFilterOperator.getFalses()), List.of(0, 7, 8, 9));
   }
 
   @Test
@@ -231,7 +232,36 @@ public class AndFilterOperatorTest {
             null, numDocs, true);
 
     Assert.assertEquals(TestUtils.getDocIds(andFilterOperator.getTrues()),
-        ImmutableList.of(0, 1, 2, 3, 4, 5, 6, 7, 8, 9));
+        List.of(0, 1, 2, 3, 4, 5, 6, 7, 8, 9));
     Assert.assertEquals(TestUtils.getDocIds(andFilterOperator.getFalses()), Collections.emptyList());
+  }
+
+  @Test
+  public void testAndWithEmptyFilterEarlyTermination() {
+    int numDocs = 10;
+    int[] regularDocIds = new int[]{1, 2, 3};
+    int[] emptyDocIds = new int[0];
+
+    AndFilterOperator andFilterOperator = new AndFilterOperator(
+        Arrays.asList(
+            new TestFilterOperator(regularDocIds, numDocs),
+            new TestFilterOperator(emptyDocIds, numDocs)
+        ), null, numDocs, false);
+
+    Assert.assertEquals((andFilterOperator.getTrues()).getOptimizedDocIdSet(), EmptyDocIdSet.getInstance());
+  }
+
+  @Test
+  public void testAndWithOnlyMatchAllFilterEarlyTermination() {
+    int numDocs = 10;
+    int numDocs2 = 50;
+
+    AndFilterOperator andFilterOperator = new AndFilterOperator(
+        Arrays.asList(
+            new MatchAllFilterOperator(numDocs),
+            new MatchAllFilterOperator(numDocs2)
+        ), null, numDocs, false);
+
+    Assert.assertTrue(andFilterOperator.getTrues() instanceof MatchAllDocIdSet);
   }
 }

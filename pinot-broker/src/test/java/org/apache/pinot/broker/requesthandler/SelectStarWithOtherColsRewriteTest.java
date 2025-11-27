@@ -19,7 +19,6 @@
 
 package org.apache.pinot.broker.requesthandler;
 
-import com.google.common.collect.ImmutableMap;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
@@ -34,21 +33,16 @@ import org.testng.annotations.Test;
 
 public class SelectStarWithOtherColsRewriteTest {
 
-  private static final Map<String, String> COL_MAP;
-
-  static {
-    //build table schema
-    ImmutableMap.Builder<String, String> builder = ImmutableMap.builder();
-    builder.put("playerID", "playerID");
-    builder.put("homeRuns", "homeRuns");
-    builder.put("playerStint", "playerStint");
-    builder.put("groundedIntoDoublePlays", "groundedIntoDoublePlays");
-    builder.put("G_old", "G_old");
-    builder.put("$segmentName", "$segmentName");
-    builder.put("$docId", "$docId");
-    builder.put("$hostName", "$hostName");
-    COL_MAP = builder.build();
-  }
+  private static final Map<String, String> COL_MAP = Map.of(
+      "playerID", "playerID",
+      "homeRuns", "homeRuns",
+      "playerStint", "playerStint",
+      "groundedIntoDoublePlays", "groundedIntoDoublePlays",
+      "G_old", "G_old",
+      "$segmentName", "$segmentName",
+      "$docId", "$docId",
+      "$hostName", "$hostName"
+  );
 
   /**
    * When the query contains only '*', it should be expanded into columns.

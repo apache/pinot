@@ -22,6 +22,7 @@ import java.util.Collections;
 import java.util.Set;
 import java.util.function.Consumer;
 import java.util.function.Function;
+import javax.annotation.Nullable;
 import javax.annotation.concurrent.ThreadSafe;
 import org.apache.pinot.common.metrics.BrokerMetrics;
 import org.apache.pinot.spi.env.PinotConfiguration;
@@ -51,11 +52,11 @@ public class NoOpFailureDetector implements FailureDetector {
   }
 
   @Override
-  public void markServerHealthy(String instanceId) {
+  public void markServerHealthy(String instanceId, @Nullable String hostName) {
   }
 
   @Override
-  public void markServerUnhealthy(String instanceId) {
+  public void markServerUnhealthy(String instanceId, @Nullable String hostName) {
   }
 
   @Override

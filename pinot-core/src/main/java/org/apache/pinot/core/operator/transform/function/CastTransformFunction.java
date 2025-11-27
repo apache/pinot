@@ -22,11 +22,14 @@ import com.google.common.base.Preconditions;
 import java.math.BigDecimal;
 import java.util.List;
 import java.util.Map;
+import org.apache.pinot.common.utils.RoaringBitmapUtils;
 import org.apache.pinot.core.operator.ColumnContext;
 import org.apache.pinot.core.operator.blocks.ValueBlock;
 import org.apache.pinot.core.operator.transform.TransformResultMetadata;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
 import org.apache.pinot.spi.utils.ArrayCopyUtils;
+import org.apache.pinot.spi.utils.TimestampUtils;
+import org.roaringbitmap.RoaringBitmap;
 
 
 public class CastTransformFunction extends BaseTransformFunction {
@@ -57,10 +60,6 @@ public class CastTransformFunction extends BaseTransformFunction {
     if (castFormatTransformFunction instanceof LiteralTransformFunction) {
       String targetType = ((LiteralTransformFunction) castFormatTransformFunction).getStringLiteral().toUpperCase();
       switch (targetType) {
-        case "BYTES":
-        case "VARBINARY":
-          _resultMetadata = sourceSV ? BYTES_SV_NO_DICTIONARY_METADATA : BYTES_MV_NO_DICTIONARY_METADATA;
-          break;
         case "INT":
         case "INTEGER":
           _resultMetadata = sourceSV ? INT_SV_NO_DICTIONARY_METADATA : INT_MV_NO_DICTIONARY_METADATA;
@@ -93,6 +92,13 @@ public class CastTransformFunction extends BaseTransformFunction {
         case "VARCHAR":
           _resultMetadata = sourceSV ? STRING_SV_NO_DICTIONARY_METADATA : STRING_MV_NO_DICTIONARY_METADATA;
           break;
+        case "JSON":
+          _resultMetadata = sourceSV ? JSON_SV_NO_DICTIONARY_METADATA : JSON_MV_NO_DICTIONARY_METADATA;
+          break;
+        case "BYTES":
+        case "VARBINARY":
+          _resultMetadata = sourceSV ? BYTES_SV_NO_DICTIONARY_METADATA : BYTES_MV_NO_DICTIONARY_METADATA;
+          break;
         case "INT_ARRAY":
         case "INTEGER_ARRAY":
           _resultMetadata = INT_MV_NO_DICTIONARY_METADATA;
@@ -109,9 +115,6 @@ public class CastTransformFunction extends BaseTransformFunction {
         case "STRING_ARRAY":
         case "VARCHAR_ARRAY":
           _resultMetadata = STRING_MV_NO_DICTIONARY_METADATA;
-          break;
-        case "JSON":
-          _resultMetadata = sourceSV ? JSON_SV_NO_DICTIONARY_METADATA : JSON_MV_NO_DICTIONARY_METADATA;
           break;
         default:
           throw new IllegalArgumentException("Unable to cast expression to type - " + targetType);
@@ -191,7 +194,19 @@ public class CastTransformFunction extends BaseTransformFunction {
       int length = valueBlock.getNumDocs();
       initLongValuesSV(length);
       String[] stringValues = _transformFunction.transformToStringValuesSV(valueBlock);
-      ArrayCopyUtils.copyToTimestamp(stringValues, _longValuesSV, length);
+      RoaringBitmap nullBitmap = _transformFunction.getNullBitmap(valueBlock);
+      if (_nullHandlingEnabled && nullBitmap != null && !nullBitmap.isEmpty()) {
+        // Null string values can't be converted to valid timestamps, so we skip over those values.
+        // Avoid using RoaringBitmap::contains API in a loop due to poor performance.
+        // Avoid cloning + flipping the null bitmap to reduce allocation.
+        RoaringBitmapUtils.forEachUnset(length, nullBitmap.getIntIterator(), (from, to) -> {
+          for (int i = from; i < to; i++) {
+            _longValuesSV[i] = TimestampUtils.toMillisSinceEpoch(stringValues[i]);
+          }
+        });
+      } else {
+        ArrayCopyUtils.copyToTimestamp(stringValues, _longValuesSV, length);
+      }
       return _longValuesSV;
     } else {
       return _transformFunction.transformToLongValuesSV(valueBlock);
@@ -230,18 +245,20 @@ public class CastTransformFunction extends BaseTransformFunction {
     DataType resultDataType = _resultMetadata.getDataType();
     if (resultDataType.getStoredType() == DataType.STRING) {
       switch (_sourceDataType) {
-        case BOOLEAN:
+        case BOOLEAN: {
           int length = valueBlock.getNumDocs();
           initStringValuesSV(length);
           int[] intValues = _transformFunction.transformToIntValuesSV(valueBlock);
           ArrayCopyUtils.copyFromBoolean(intValues, _stringValuesSV, length);
           return _stringValuesSV;
-        case TIMESTAMP:
-          length = valueBlock.getNumDocs();
+        }
+        case TIMESTAMP: {
+          int length = valueBlock.getNumDocs();
           initStringValuesSV(length);
           long[] longValues = _transformFunction.transformToLongValuesSV(valueBlock);
           ArrayCopyUtils.copyFromTimestamp(longValues, _stringValuesSV, length);
           return _stringValuesSV;
+        }
         default:
           return _transformFunction.transformToStringValuesSV(valueBlock);
       }

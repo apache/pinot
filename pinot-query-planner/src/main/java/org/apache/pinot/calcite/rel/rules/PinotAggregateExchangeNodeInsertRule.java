@@ -18,11 +18,11 @@
  */
 package org.apache.pinot.calcite.rel.rules;
 
-import com.google.common.collect.ImmutableList;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 import java.util.Map;
+import java.util.stream.Collectors;
 import javax.annotation.Nullable;
 import org.apache.calcite.plan.Context;
 import org.apache.calcite.plan.RelOptRule;
@@ -61,6 +61,7 @@ import org.apache.calcite.util.mapping.Mappings;
 import org.apache.pinot.calcite.rel.hint.PinotHintOptions;
 import org.apache.pinot.calcite.rel.hint.PinotHintStrategyTable;
 import org.apache.pinot.calcite.rel.logical.PinotLogicalAggregate;
+import org.apache.pinot.calcite.rel.logical.PinotLogicalEnrichedJoin;
 import org.apache.pinot.calcite.rel.logical.PinotLogicalExchange;
 import org.apache.pinot.calcite.rel.logical.PinotLogicalSortExchange;
 import org.apache.pinot.common.function.sql.PinotSqlAggFunction;
@@ -341,11 +342,11 @@ public class PinotAggregateExchangeNodeInsertRule {
     final List<ImmutableBitSet> newGroupSets = aggregate.getGroupSets()
         .stream()
         .map(bitSet -> Mappings.apply(mapping, bitSet))
-        .collect(ImmutableList.toImmutableList());
+        .collect(Collectors.toUnmodifiableList());
     final List<RelBuilder.AggCall> newAggCallList = aggregate.getAggCallList()
         .stream()
         .map(aggCall -> relBuilder.aggregateCall(aggCall, mapping))
-        .collect(ImmutableList.toImmutableList());
+        .collect(Collectors.toUnmodifiableList());
 
     final RelBuilder.GroupKey groupKey = relBuilder.groupKey(newGroupSet, newGroupSets);
     relBuilder.aggregate(groupKey, newAggCallList);
@@ -372,7 +373,7 @@ public class PinotAggregateExchangeNodeInsertRule {
       int numArguments = argList.size();
       List<RexNode> rexList;
       if (numArguments <= 1) {
-        rexList = ImmutableList.of(inputRef);
+        rexList = List.of(inputRef);
       } else {
         rexList = new ArrayList<>(numArguments);
         rexList.add(inputRef);
@@ -404,9 +405,9 @@ public class PinotAggregateExchangeNodeInsertRule {
       int numArguments = argList.size();
       List<RexNode> rexList;
       if (numArguments == 0) {
-        rexList = ImmutableList.of();
+        rexList = List.of();
       } else if (numArguments == 1) {
-        rexList = ImmutableList.of(RexInputRef.of(argList.get(0), input.getRowType()));
+        rexList = List.of(RexInputRef.of(argList.get(0), input.getRowType()));
       } else {
         rexList = new ArrayList<>(numArguments);
         rexList.add(RexInputRef.of(argList.get(0), input.getRowType()));
@@ -461,7 +462,7 @@ public class PinotAggregateExchangeNodeInsertRule {
     SqlAggFunction sqlAggFunction =
         new PinotSqlAggFunction(functionName, kind, returnTypeInference, operandTypeChecker, functionCategory);
     return AggregateCall.create(sqlAggFunction, false, orgAggCall.isApproximate(), orgAggCall.ignoreNulls(), rexList,
-        ImmutableList.of(), aggType.isInputIntermediateFormat() ? -1 : orgAggCall.filterArg, orgAggCall.distinctKeys,
+        List.of(), aggType.isInputIntermediateFormat() ? -1 : orgAggCall.filterArg, orgAggCall.distinctKeys,
         orgAggCall.collation, numGroups, input, returnType, null);
   }
 
@@ -472,6 +473,8 @@ public class PinotAggregateExchangeNodeInsertRule {
       return ((Project) relNode).getProjects();
     } else if (relNode instanceof Union) {
       return findImmediateProjects(relNode.getInput(0));
+    } else if (relNode instanceof PinotLogicalEnrichedJoin) {
+      return ((PinotLogicalEnrichedJoin) relNode).getProjects();
     }
     return null;
   }

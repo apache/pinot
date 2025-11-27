@@ -2028,7 +2028,11 @@ public class TextSearchQueriesTest extends BaseQueriesTest {
     });
 
     String query = "SELECT INT_COL, SKILLS_TEXT_COL FROM " + TABLE_NAME + " WHERE TEXT_MATCH(" + SKILLS_TEXT_COL_NAME
-        + ", '*ealtime streaming system*', 'parser=CLASSIC,allowLeadingWildcard=true,defaultOperator=AND') LIMIT 50000";
+        + ", 'realtime streaming system', 'parser=MATCHPHRASE') LIMIT 50000";
+    testTextSearchSelectQueryHelper(query, 0, false, expected);
+
+    query = "SELECT INT_COL, SKILLS_TEXT_COL FROM " + TABLE_NAME + " WHERE TEXT_MATCH(" + SKILLS_TEXT_COL_NAME
+        + ", 'realtime streaming system', 'parser=MATCHPHRASE,enablePrefixMatch=true') LIMIT 50000";
     testTextSearchSelectQueryHelper(query, expected.size(), false, expected);
 
     List<Object[]> expected1 = new ArrayList<>();
@@ -2080,6 +2084,54 @@ public class TextSearchQueriesTest extends BaseQueriesTest {
         + ", '*ealtime streaming system*', 'parser=STANDARD,allowLeadingWildcard=true,defaultOperator=AND') LIMIT "
         + "50000";
     testTextSearchSelectQueryHelper(query8, expected.size(), false, expected);
+  }
+
+  @Test
+  public void testMatchPhraseQueryParser()
+      throws Exception {
+    // Test case 1: "Tensor flow" - should match 3 documents
+    List<Object[]> expectedTensorFlow = new ArrayList<>();
+    expectedTensorFlow.add(new Object[]{
+        1004, "Machine learning, Tensor flow, Java, Stanford university,"
+    });
+    expectedTensorFlow.add(new Object[]{
+        1007, "C++, Python, Tensor flow, database kernel, storage, indexing and transaction processing, building "
+        + "large scale systems, Machine learning"
+    });
+    expectedTensorFlow.add(new Object[]{
+        1016, "CUDA, GPU processing, Tensor flow, Pandas, Python, Jupyter notebook, spark, Machine learning, building"
+        + " high performance scalable systems"
+    });
+
+    // Test exact phrase "Tensor flow" with default settings (slop=0, inOrder=true)
+    String queryExactPhrase =
+        "SELECT INT_COL, SKILLS_TEXT_COL FROM " + TABLE_NAME + " WHERE TEXT_MATCH(" + SKILLS_TEXT_COL_NAME
+            + ", 'Tensor flow', 'parser=MATCHPHRASE,enablePrefixMatch=true') LIMIT 50000";
+    testTextSearchSelectQueryHelper(queryExactPhrase, 3, false, expectedTensorFlow);
+
+    // Test "Tensor database" with slop=1 (should allow one position gap)
+    List<Object[]> expectedTensorDatabase = new ArrayList<>();
+    expectedTensorDatabase.add(new Object[]{
+        1007, "C++, Python, Tensor flow, database kernel, storage, indexing and transaction processing, building "
+        + "large scale systems, Machine learning"
+    });
+
+    String querySlop1 =
+        "SELECT INT_COL, SKILLS_TEXT_COL FROM " + TABLE_NAME + " WHERE TEXT_MATCH(" + SKILLS_TEXT_COL_NAME
+            + ", 'Tensor database', 'parser=MATCHPHRASE,enablePrefixMatch=true,slop=1') LIMIT 50000";
+    testTextSearchSelectQueryHelper(querySlop1, 1, false, expectedTensorDatabase);
+
+    // Test "Tensor flow" with inOrder=false (should allow any order)
+    String queryInOrderFalse =
+        "SELECT INT_COL, SKILLS_TEXT_COL FROM " + TABLE_NAME + " WHERE TEXT_MATCH(" + SKILLS_TEXT_COL_NAME
+            + ", 'Tensor flow', 'parser=MATCHPHRASE,enablePrefixMatch=true,inOrder=false') LIMIT 50000";
+    testTextSearchSelectQueryHelper(queryInOrderFalse, 3, false, expectedTensorFlow);
+
+    // Test "Tensor flow" with both slop=1 and inOrder=false
+    String querySlopAndInOrder =
+        "SELECT INT_COL, SKILLS_TEXT_COL FROM " + TABLE_NAME + " WHERE TEXT_MATCH(" + SKILLS_TEXT_COL_NAME
+            + ", 'flow Tensor', 'parser=MATCHPHRASE,enablePrefixMatch=true,inOrder=false') LIMIT 50000";
+    testTextSearchSelectQueryHelper(querySlopAndInOrder, 3, false, expectedTensorFlow);
   }
 
   // ===== TEST CASES FOR AND/OR FILTER OPERATORS =====
@@ -2258,7 +2310,7 @@ public class TextSearchQueriesTest extends BaseQueriesTest {
             + ", '*CUDA*', 'parser=CLASSIC,allowLeadingWildcard=true') AND " + "TEXT_MATCH(" + SKILLS_TEXT_COL_NAME
             + ", '*Python*', 'parser=CLASSIC,allowLeadingWildcard=true') LIMIT 50000";
 
-    BrokerResponseNative brokerResponse = getBrokerResponseForOptimizedQuery(query, getTableConfig(), SCHEMA);
+    BrokerResponseNative brokerResponse = getBrokerResponseForOptimizedQuery(query, SCHEMA);
     assertTrue(brokerResponse.getNumDocsScanned() > 0, "Query should scan some documents");
   }
 
@@ -2270,7 +2322,7 @@ public class TextSearchQueriesTest extends BaseQueriesTest {
         "SELECT INT_COL, SKILLS_TEXT_COL FROM " + TABLE_NAME + " WHERE " + "TEXT_MATCH(" + SKILLS_TEXT_COL_NAME
             + ", '*CUDA*', 'parser=CLASSIC,allowLeadingWildcard=true') AND " + "TEXT_MATCH(" + SKILLS_TEXT_COL_NAME
             + ", 'Python*', 'parser=STANDARD') LIMIT 50000";
-    BrokerResponseNative responseTrailing = getBrokerResponseForOptimizedQuery(queryTrailing, getTableConfig(), SCHEMA);
+    BrokerResponseNative responseTrailing = getBrokerResponseForOptimizedQuery(queryTrailing, SCHEMA);
     assertTrue(responseTrailing.getNumDocsScanned() > 0, "Trailing wildcard should scan some documents");
 
     // This should fail: leading wildcard is NOT allowed with parser=STANDARD
@@ -2280,12 +2332,77 @@ public class TextSearchQueriesTest extends BaseQueriesTest {
             + ", '*CUDA*', 'parser=CLASSIC,allowLeadingWildcard=true') AND " + "TEXT_MATCH(" + SKILLS_TEXT_COL_NAME
             + ", '*Python*', 'parser=STANDARD') LIMIT 50000";
 
-    BrokerResponseNative responseLeading = getBrokerResponseForOptimizedQuery(queryLeading, getTableConfig(), SCHEMA);
+    BrokerResponseNative responseLeading = getBrokerResponseForOptimizedQuery(queryLeading, SCHEMA);
     List<QueryProcessingException> exceptions = responseLeading.getExceptions();
     assertFalse(exceptions.isEmpty(), "Expected error for leading wildcard with parser=STANDARD");
     String errorMsg = exceptions.toString();
     assertTrue(errorMsg.contains("Leading wildcard is not allowed") || errorMsg.contains(
             "Failed while searching the text index"),
         "Expected error related to leading wildcard or text search failure, got: " + errorMsg);
+  }
+
+  @Test
+  public void testTextSearchWithMinimumShouldMatchParser()
+      throws Exception {
+    // Test 1: Require at least 2 out of 3 terms (minimumShouldMatch=2) - AWS hadoop big
+    List<Object[]> expectedMin2Of3 = new ArrayList<>();
+    expectedMin2Of3.add(new Object[]{
+        1008, "Amazon EC2, AWS, hadoop, big data, spark, building high performance scalable systems, building and "
+        + "deploying large scale production systems, concurrency, multi-threading, Java, C++, CPU processing"
+    });
+
+    String queryMin2Of3 =
+        "SELECT INT_COL, SKILLS_TEXT_COL FROM " + TABLE_NAME + " WHERE TEXT_MATCH(" + SKILLS_TEXT_COL_NAME
+            + ", 'AWS hadoop big', 'parser=MATCH,minimumShouldMatch=2') LIMIT 50000";
+    testTextSearchSelectQueryHelper(queryMin2Of3, expectedMin2Of3.size(), false, expectedMin2Of3);
+
+    // Test 2: Percentage minimum_should_match - require at least 60% (2 out of 3 terms)
+    String queryMin80Percent =
+        "SELECT INT_COL, SKILLS_TEXT_COL FROM " + TABLE_NAME + " WHERE TEXT_MATCH(" + SKILLS_TEXT_COL_NAME
+            + ", 'AWS hadoop big', 'parser=MATCH,minimumShouldMatch=80%') LIMIT 50000";
+    testTextSearchSelectQueryHelper(queryMin80Percent, expectedMin2Of3.size(), false, expectedMin2Of3);
+
+    // Test 3: Require at least 1 out of 2 terms (minimumShouldMatch=1) - Stanford Tensor
+    List<Object[]> expectedMin1Of2 = new ArrayList<>();
+    expectedMin1Of2.add(new Object[]{
+        1004, "Machine learning, Tensor flow, Java, Stanford university,"
+    });
+    expectedMin1Of2.add(new Object[]{
+        1007, "C++, Python, Tensor flow, database kernel, storage, indexing and transaction processing, building "
+        + "large scale systems, Machine learning"
+    });
+    expectedMin1Of2.add(new Object[]{
+        1016, "CUDA, GPU processing, Tensor flow, Pandas, Python, Jupyter notebook, spark, Machine learning, building"
+        + " high performance scalable systems"
+    });
+
+    String queryMin1Of2 =
+        "SELECT INT_COL, SKILLS_TEXT_COL FROM " + TABLE_NAME + " WHERE TEXT_MATCH(" + SKILLS_TEXT_COL_NAME
+            + ", 'Stanford Tensor', 'parser=MATCH,minimumShouldMatch=1') LIMIT 50000";
+    testTextSearchSelectQueryHelper(queryMin1Of2, expectedMin1Of2.size(), false, expectedMin1Of2);
+
+    // Test 4: Require at least 3 out of 4 terms (minimumShouldMatch=3) - Apache Kafka publish subscribe
+    List<Object[]> expectedMin3Of4 = new ArrayList<>();
+    expectedMin3Of4.add(new Object[]{
+        1017, "Distributed systems, Apache Kafka, publish-subscribe, building and deploying large scale production "
+        + "systems, concurrency, multi-threading, C++, CPU processing, Java"
+    });
+
+    String queryMin3Of4 =
+        "SELECT INT_COL, SKILLS_TEXT_COL FROM " + TABLE_NAME + " WHERE TEXT_MATCH(" + SKILLS_TEXT_COL_NAME
+            + ", 'Apache Kafka publish subscribe', 'parser=MATCH,minimumShouldMatch=3') LIMIT 50000";
+    testTextSearchSelectQueryHelper(queryMin3Of4, expectedMin3Of4.size(), false, expectedMin3Of4);
+
+    // Test 5: Require all 3 terms (minimumShouldMatch=3) - AWS hadoop spark
+    List<Object[]> expectedMin3Of3 = new ArrayList<>();
+    expectedMin3Of3.add(new Object[]{
+        1008, "Amazon EC2, AWS, hadoop, big data, spark, building high performance scalable systems, building and "
+        + "deploying large scale production systems, concurrency, multi-threading, Java, C++, CPU processing"
+    });
+
+    String queryMin3Of3 =
+        "SELECT INT_COL, SKILLS_TEXT_COL FROM " + TABLE_NAME + " WHERE TEXT_MATCH(" + SKILLS_TEXT_COL_NAME
+            + ", 'AWS hadoop spark', 'parser=MATCH,minimumShouldMatch=3') LIMIT 50000";
+    testTextSearchSelectQueryHelper(queryMin3Of3, expectedMin3Of3.size(), false, expectedMin3Of3);
   }
 }

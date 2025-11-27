@@ -22,7 +22,6 @@ import com.google.auto.service.AutoService;
 import java.util.Collection;
 import java.util.HashMap;
 import java.util.Map;
-import javax.validation.constraints.NotNull;
 import org.apache.pinot.common.cursors.AbstractResponseStore;
 import org.apache.pinot.common.metrics.BrokerMetrics;
 import org.apache.pinot.common.response.CursorResponse;
@@ -81,8 +80,8 @@ public class MemoryResponseStore extends AbstractResponseStore {
   }
 
   @Override
-  public void init(@NotNull PinotConfiguration config, @NotNull String brokerHost, int brokerPort, String brokerId,
-      @NotNull BrokerMetrics brokerMetrics, String expirationTime)
+  public void init(PinotConfiguration config, String brokerHost, int brokerPort, String brokerId,
+      BrokerMetrics brokerMetrics, String expirationTime)
       throws Exception {
     init(brokerHost, brokerPort, brokerId, brokerMetrics, expirationTime);
   }

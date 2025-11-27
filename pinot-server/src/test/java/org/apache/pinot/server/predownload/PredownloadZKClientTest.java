@@ -35,7 +35,6 @@ import org.apache.pinot.spi.config.instance.InstanceDataManagerConfig;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.env.PinotConfiguration;
 import org.mockito.MockedStatic;
-import org.testng.Assert;
 import org.testng.annotations.AfterClass;
 import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
@@ -46,8 +45,7 @@ import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.mockStatic;
 import static org.mockito.Mockito.spy;
 import static org.mockito.Mockito.when;
-import static org.testng.Assert.assertThrows;
-import static org.testng.AssertJUnit.*;
+import static org.testng.Assert.*;
 
 
 public class PredownloadZKClientTest {
@@ -85,7 +83,7 @@ public class PredownloadZKClientTest {
     try {
       _predownloadZkClient.getDataAccessor();
     } catch (Exception e) {
-      Assert.fail("Expected no exception, but got: " + e.getMessage());
+      fail("Expected no exception, but got: " + e.getMessage());
     }
   }
 
@@ -101,7 +99,7 @@ public class PredownloadZKClientTest {
     try {
       _predownloadZkClient.getInstanceConfig(dataAccessor);
     } catch (Exception e) {
-      Assert.fail("Expected no exception, but got: " + e.getMessage());
+      fail("Expected no exception, but got: " + e.getMessage());
     }
   }
 
@@ -116,12 +114,12 @@ public class PredownloadZKClientTest {
     try (MockedStatic<PredownloadStatusRecorder> statusRecorderMockedStatic = mockStatic(
         PredownloadStatusRecorder.class)) {
       when(_helixZkClient.exists(any())).thenReturn(true);
-      assertEquals(0, _predownloadZkClient.getSegmentsOfInstance(dataAccessor).size());
+      assertTrue(_predownloadZkClient.getSegmentsOfInstance(dataAccessor).isEmpty());
     }
     try (MockedStatic<PredownloadStatusRecorder> statusRecorderMockedStatic = mockStatic(
         PredownloadStatusRecorder.class)) {
       when(_helixZkClient.exists(any())).thenReturn(false);
-      assertEquals(0, _predownloadZkClient.getSegmentsOfInstance(dataAccessor).size());
+      assertTrue(_predownloadZkClient.getSegmentsOfInstance(dataAccessor).isEmpty());
     }
 
     // live instance not null
@@ -131,7 +129,7 @@ public class PredownloadZKClientTest {
 
     // no segments
     when(dataAccessor.getChildValues(any(PropertyKey.class))).thenReturn(null);
-    assertEquals(0, _predownloadZkClient.getSegmentsOfInstance(dataAccessor).size());
+    assertTrue(_predownloadZkClient.getSegmentsOfInstance(dataAccessor).isEmpty());
     // with segments
     CurrentState currentState = spy(new CurrentState(TABLE_NAME));
     currentState.setState(SEGMENT_NAME, "ONLINE");
@@ -139,7 +137,7 @@ public class PredownloadZKClientTest {
     currentState.setState(THIRD_SEGMENT_NAME, "OFFLINE");
     when(dataAccessor.getChildValues(any(PropertyKey.class), anyBoolean())).thenReturn(List.of(currentState));
     List<PredownloadSegmentInfo> predownloadSegmentInfoList = _predownloadZkClient.getSegmentsOfInstance(dataAccessor);
-    assertEquals(2, predownloadSegmentInfoList.size());
+    assertEquals(predownloadSegmentInfoList.size(), 2);
     assertTrue(
         Arrays.asList(SEGMENT_NAME, SECOND_SEGMENT_NAME).contains(predownloadSegmentInfoList.get(0).getSegmentName()));
     assertTrue(

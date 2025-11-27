@@ -18,7 +18,7 @@
  */
 package org.apache.pinot.core.query.utils.rewriter;
 
-import com.google.common.collect.ImmutableList;
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 import java.util.concurrent.atomic.AtomicReference;
@@ -33,7 +33,7 @@ public class ResultRewriterFactory {
 
   private static final Logger LOGGER = LoggerFactory.getLogger(ResultRewriterFactory.class);
   // left blank intentionally to not load any result rewriter by default
-  static final List<String> DEFAULT_RESULT_REWRITERS_CLASS_NAMES = ImmutableList.of();
+  static final List<String> DEFAULT_RESULT_REWRITERS_CLASS_NAMES = List.of();
 
   static AtomicReference<List<ResultRewriter>> _resultRewriters
       = new AtomicReference<>(getResultRewriter(DEFAULT_RESULT_REWRITERS_CLASS_NAMES));
@@ -50,7 +50,7 @@ public class ResultRewriterFactory {
   }
 
   private static List<ResultRewriter> getResultRewriter(List<String> resultRewriterClasses) {
-    final ImmutableList.Builder<ResultRewriter> builder = ImmutableList.builder();
+    final List<ResultRewriter> builder = new ArrayList<>();
     for (String resultRewriterClassName : resultRewriterClasses) {
       try {
         builder.add(getResultRewriter(resultRewriterClassName));
@@ -58,7 +58,7 @@ public class ResultRewriterFactory {
         LOGGER.error("Failed to load resultRewriter: {}", resultRewriterClassName, e);
       }
     }
-    return builder.build();
+    return List.copyOf(builder);
   }
 
   private static ResultRewriter getResultRewriter(String resultRewriterClassName)

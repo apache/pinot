@@ -69,7 +69,6 @@ import org.apache.pinot.spi.utils.JsonUtils;
 import org.apache.pinot.spi.utils.builder.TableConfigBuilder;
 import org.apache.pinot.spi.utils.builder.TableNameBuilder;
 import org.apache.pinot.util.TestUtils;
-import org.jetbrains.annotations.NotNull;
 import org.testng.Assert;
 import org.testng.annotations.AfterClass;
 import org.testng.annotations.BeforeClass;
@@ -255,11 +254,11 @@ public class TableIndexingTest {
 
   @Test(dataProvider = "fieldsAndIndexTypes")
   public void testAddIndex(TestCase testCase) {
+    String indexType = testCase._indexType;
     try {
       // create schema copy to avoid side effects between test cases
       // e.g. timestamp index creates additional virtual columns
       Schema schema = Schema.fromString(_schemas.get(testCase._schemaIndex).toPrettyJsonString());
-      String indexType = testCase._indexType;
       String schemaName = schema.getSchemaName();
 
       FieldSpec field = schema.getFieldSpecFor(COLUMN_NAME);
@@ -511,7 +510,12 @@ public class TableIndexingTest {
           expectedType = indexType;
         }
 
-        Assert.assertEquals(indexStats.get(COLUMN_NAME).get(expectedType), 1);
+        if ("startree_index".equals(indexType) && !testCase._expectedSuccess) {
+          // It is possible that we successfully create the segment, but without the star-tree index
+          Assert.assertEquals(indexStats.get(COLUMN_NAME).get(expectedType), 0);
+        } else {
+          Assert.assertEquals(indexStats.get(COLUMN_NAME).get(expectedType), 1);
+        }
       }
     } catch (Throwable t) {
       testCase._error = t;
@@ -524,7 +528,13 @@ public class TableIndexingTest {
       Assert.fail("No expected status found for test case: " + testCase);
     } else if (testCase._expectedSuccess && testCase._error != null) {
       Assert.fail("Expected success for test case: " + testCase + " but got error: " + testCase._error);
-    } else if (!testCase._expectedSuccess && !testCase.getErrorMessage().equals(testCase._expectedMessage)) {
+    } else if ("startree_index".equals(indexType) && !testCase._expectedSuccess && testCase._expectedMessage.isEmpty()
+        && (testCase.getErrorMessage() != null && !testCase.getErrorMessage().isEmpty())) {
+      Assert.fail("Expected no error message for test case " + testCase + " as star-tree index creation should be "
+          + "skipped for such cases");
+    } else if (!testCase._expectedSuccess && !testCase._expectedMessage.isEmpty()
+        && (testCase.getErrorMessage() == null || (!testCase.getErrorMessage().equals(testCase._expectedMessage)
+        && !testCase.getErrorMessage().matches(testCase._expectedMessage)))) {
       Assert.fail("Expected error: \"" + testCase._expectedMessage + "\" for test case: " + testCase + " but got: \""
           + testCase.getErrorMessage() + "\"");
     }
@@ -538,7 +548,7 @@ public class TableIndexingTest {
     }
   }
 
-  private @NotNull StringBuilder generateSummary() {
+  private StringBuilder generateSummary() {
     StringBuilder summary = new StringBuilder();
     summary.append("data_type;cardinality;encoding;index_type;success;error\n");
     for (TestCase test : _allResults) {
@@ -565,7 +575,7 @@ public class TableIndexingTest {
     return summary;
   }
 
-  private @NotNull List<String> readExpectedFromFile()
+  private List<String> readExpectedFromFile()
       throws IOException {
     URL resource = getClass().getClassLoader().getResource("TableIndexingTest.csv");
     File expectedFile = new File(TestUtils.getFileFromResourceUrl(resource));

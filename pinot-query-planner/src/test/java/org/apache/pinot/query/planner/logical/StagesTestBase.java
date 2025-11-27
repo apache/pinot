@@ -20,7 +20,6 @@ package org.apache.pinot.query.planner.logical;
 
 import com.google.common.base.Function;
 import com.google.common.base.Preconditions;
-import com.google.common.collect.ImmutableMap;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.IdentityHashMap;
@@ -34,6 +33,7 @@ import org.apache.calcite.rel.RelFieldCollation;
 import org.apache.calcite.rel.core.JoinRelType;
 import org.apache.pinot.calcite.rel.logical.PinotRelExchangeType;
 import org.apache.pinot.common.utils.DataSchema;
+import org.apache.pinot.query.planner.partitioning.KeySelector;
 import org.apache.pinot.query.planner.plannode.JoinNode;
 import org.apache.pinot.query.planner.plannode.MailboxReceiveNode;
 import org.apache.pinot.query.planner.plannode.MailboxSendNode;
@@ -134,7 +134,8 @@ public class StagesTestBase {
           boolean prePartitioned, List<RelFieldCollation> collations, boolean sort, boolean sortedOnSender) {
         PlanNode input = childBuilder.build(nextStageId);
         MailboxSendNode mailboxSendNode = new MailboxSendNode(nextStageId, input.getDataSchema(), List.of(input),
-            stageId, exchangeType, distribution, keys, prePartitioned, collations, sort);
+            stageId, exchangeType, distribution, keys, prePartitioned, collations, sort,
+            KeySelector.DEFAULT_HASH_ALGORITHM);
         MailboxSendNode old = _stageRoots.put(nextStageId, mailboxSendNode);
         Preconditions.checkState(old == null, "Mailbox already exists for stageId: %s", nextStageId);
         return new MailboxReceiveNode(stageId, input.getDataSchema(), nextStageId, exchangeType, distribution, keys,
@@ -191,7 +192,7 @@ public class StagesTestBase {
     return (stageId, mySchema, myHints) -> {
       PlanNode input = childBuilder.build(stageId);
       MailboxSendNode mailboxSendNode = new MailboxSendNode(newStageId, mySchema, List.of(input), stageId, null,
-          null, null, false, null, false);
+          null, null, false, null, false, KeySelector.DEFAULT_HASH_ALGORITHM);
       MailboxSendNode old = _stageRoots.put(stageId, mailboxSendNode);
       Preconditions.checkState(old == null, "Mailbox already exists for stageId: %s", stageId);
       return mailboxSendNode;
@@ -239,7 +240,7 @@ public class StagesTestBase {
     default SimpleChildBuilder<P> withHints(String key, Map<String, String> values) {
       return (stageId, dataSchema, hints1) -> {
         PlanNode.NodeHint myHints = hints1 == null
-            ? new PlanNode.NodeHint(ImmutableMap.of(key, values))
+            ? new PlanNode.NodeHint(Map.of(key, values))
             : hints1.with(key, values);
         return build(stageId, dataSchema, myHints);
       };
@@ -380,8 +381,8 @@ public class StagesTestBase {
 
       PlanNode input = _childBuilder.build(_senderStageId);
       DataSchema mySchema = input.getDataSchema();
-      _sender = new MailboxSendNode(_senderStageId, mySchema, List.of(input), null,
-          null, null, false, null, false);
+      _sender = new MailboxSendNode(_senderStageId, mySchema, List.of(input), 0, null,
+          null, null, false, null, false, KeySelector.DEFAULT_HASH_ALGORITHM);
     }
 
     /**

@@ -245,6 +245,12 @@ public class QueryLogger {
             .append(params._response.getNumServersQueried());
       }
     },
+    GROUPS_TRIMMED("groupsTrimmed") {
+      @Override
+      void doFormat(StringBuilder builder, QueryLogger logger, QueryLogParams params) {
+        builder.append(params._response.isGroupsTrimmed());
+      }
+    },
     GROUP_LIMIT_REACHED("groupLimitReached") {
       @Override
       void doFormat(StringBuilder builder, QueryLogger logger, QueryLogParams params) {
@@ -333,6 +339,12 @@ public class QueryLogger {
       @Override
       void doFormat(StringBuilder builder, QueryLogger logger, QueryLogParams params) {
           builder.append(params._response.getPools());
+      }
+    },
+    RLS_FILTERS_APPLIED("rlsFiltersApplied") {
+      @Override
+      void doFormat(StringBuilder builder, QueryLogger logger, QueryLogParams params) {
+        builder.append(params._response.getRLSFiltersApplied());
       }
     };
 

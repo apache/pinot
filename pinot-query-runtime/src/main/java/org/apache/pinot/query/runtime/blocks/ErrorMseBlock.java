@@ -27,7 +27,6 @@ import java.util.Map;
 import javax.annotation.Nullable;
 import org.apache.pinot.common.response.ProcessingException;
 import org.apache.pinot.common.utils.ExceptionUtils;
-import org.apache.pinot.query.MseWorkerThreadContext;
 import org.apache.pinot.spi.exception.QueryErrorCode;
 import org.apache.pinot.spi.exception.QueryException;
 import org.apache.pinot.spi.query.QueryThreadContext;
@@ -59,17 +58,18 @@ public class ErrorMseBlock implements MseBlock.Eos {
   }
 
   public static ErrorMseBlock fromMap(Map<QueryErrorCode, String> errorMessages) {
-    int stage;
-    int worker;
-    String server = QueryThreadContext.isInitialized() ? QueryThreadContext.getInstanceId() : "unknown";
-    if (MseWorkerThreadContext.isInitialized()) {
-      stage = MseWorkerThreadContext.getStageId();
-      worker = MseWorkerThreadContext.getWorkerId();
-    } else {
-      stage = -1; // Default value when not initialized
-      worker = -1; // Default value when not initialized
+    QueryThreadContext threadContext = QueryThreadContext.getIfAvailable();
+    if (threadContext == null) {
+      return new ErrorMseBlock(-1, -1, "unknown", errorMessages);
     }
-    return new ErrorMseBlock(stage, worker, server, errorMessages);
+    int stageId = -1;
+    int workerId = -1;
+    QueryThreadContext.MseWorkerInfo mseWorkerInfo = threadContext.getMseWorkerInfo();
+    if (mseWorkerInfo != null) {
+      stageId = mseWorkerInfo.getStageId();
+      workerId = mseWorkerInfo.getWorkerId();
+    }
+    return new ErrorMseBlock(stageId, workerId, threadContext.getExecutionContext().getInstanceId(), errorMessages);
   }
 
   public static ErrorMseBlock fromException(Exception e) {

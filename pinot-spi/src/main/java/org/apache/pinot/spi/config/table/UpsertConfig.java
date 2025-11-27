@@ -102,6 +102,9 @@ public class UpsertConfig extends BaseJsonConfig {
   @JsonPropertyDescription("If we are using deletionKeysTTL + compaction we need to enable this for data consistency")
   private boolean _enableDeletedKeysCompactionConsistency;
 
+  @JsonPropertyDescription("Whether to enable compaction during segment commit time to remove invalid records")
+  private boolean _enableCommitTimeCompaction;
+
   @JsonPropertyDescription("Configure the way to provide consistent view for upsert table")
   private ConsistencyMode _consistencyMode = ConsistencyMode.NONE;
 
@@ -274,6 +277,14 @@ public class UpsertConfig extends BaseJsonConfig {
 
   public void setEnableDeletedKeysCompactionConsistency(boolean enableDeletedKeysCompactionConsistency) {
     _enableDeletedKeysCompactionConsistency = enableDeletedKeysCompactionConsistency;
+  }
+
+  public boolean isEnableCommitTimeCompaction() {
+    return _enableCommitTimeCompaction;
+  }
+
+  public void setEnableCommitTimeCompaction(boolean enableCommitTimeCompaction) {
+    _enableCommitTimeCompaction = enableCommitTimeCompaction;
   }
 
   public ConsistencyMode getConsistencyMode() {

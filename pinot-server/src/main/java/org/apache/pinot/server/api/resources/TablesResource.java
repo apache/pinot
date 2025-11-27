@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.server.api.resources;
 
+import com.fasterxml.jackson.databind.JsonNode;
 import com.google.common.base.Preconditions;
 import io.swagger.annotations.Api;
 import io.swagger.annotations.ApiKeyAuthDefinition;
@@ -86,6 +87,7 @@ import org.apache.pinot.common.utils.helix.HelixHelper;
 import org.apache.pinot.core.data.manager.InstanceDataManager;
 import org.apache.pinot.core.data.manager.offline.ImmutableSegmentDataManager;
 import org.apache.pinot.core.data.manager.realtime.RealtimeSegmentDataManager;
+import org.apache.pinot.core.data.manager.realtime.RealtimeSegmentMetadataUtils;
 import org.apache.pinot.core.data.manager.realtime.RealtimeTableDataManager;
 import org.apache.pinot.core.data.manager.realtime.SegmentUploader;
 import org.apache.pinot.segment.local.data.manager.SegmentDataManager;
@@ -95,6 +97,7 @@ import org.apache.pinot.segment.local.indexsegment.immutable.ImmutableSegmentImp
 import org.apache.pinot.segment.spi.ColumnMetadata;
 import org.apache.pinot.segment.spi.ImmutableSegment;
 import org.apache.pinot.segment.spi.IndexSegment;
+import org.apache.pinot.segment.spi.V1Constants;
 import org.apache.pinot.segment.spi.datasource.DataSource;
 import org.apache.pinot.segment.spi.index.IndexService;
 import org.apache.pinot.segment.spi.index.metadata.SegmentMetadataImpl;
@@ -105,6 +108,9 @@ import org.apache.pinot.spi.config.table.TableType;
 import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
 import org.apache.pinot.spi.stream.ConsumerPartitionState;
+import org.apache.pinot.spi.stream.PartitionLagState;
+import org.apache.pinot.spi.stream.StreamMetadataProvider;
+import org.apache.pinot.spi.stream.StreamPartitionMsgOffset;
 import org.apache.pinot.spi.utils.CommonConstants;
 import org.apache.pinot.spi.utils.CommonConstants.Helix.StateModel.SegmentStateModel;
 import org.apache.pinot.spi.utils.JsonUtils;
@@ -184,7 +190,6 @@ public class TablesResource {
   }
 
   @GET
-  @Encoded
   @Produces(MediaType.APPLICATION_JSON)
   @Path("/tables/{tableName}/metadata")
   @ApiOperation(value = "List metadata for all segments of a given table", notes = "List segments metadata of table "
@@ -196,8 +201,8 @@ public class TablesResource {
   })
   public String getSegmentMetadata(
       @ApiParam(value = "Table Name with type", required = true) @PathParam("tableName") String tableName,
-      @ApiParam(value = "Column name", allowMultiple = true) @QueryParam("columns") @DefaultValue("")
-      List<String> columns, @Context HttpHeaders headers)
+      @ApiParam(value = "Column name", allowMultiple = true) @QueryParam("columns") List<String> columns,
+      @Context HttpHeaders headers)
       throws WebApplicationException {
     tableName = DatabaseUtils.translateTableName(tableName, headers);
     InstanceDataManager instanceDataManager = _serverInstance.getInstanceDataManager();
@@ -211,21 +216,7 @@ public class TablesResource {
       throw new WebApplicationException("Table: " + tableName + " is not found", Response.Status.NOT_FOUND);
     }
 
-    List<String> decodedColumns = new ArrayList<>(columns.size());
-    for (String column : columns) {
-      decodedColumns.add(URIUtils.decode(column));
-    }
-
-    boolean allColumns = false;
-    // For robustness, loop over all columns, if any of the columns is "*", return metadata for all columns.
-    for (String column : decodedColumns) {
-      if (column.equals("*")) {
-        allColumns = true;
-        break;
-      }
-    }
-    Set<String> columnSet = allColumns ? null : new HashSet<>(decodedColumns);
-
+    Set<String> columnSet = columns.contains("*") ? null : new HashSet<>(columns);
     List<SegmentDataManager> segmentDataManagers = tableDataManager.acquireAllSegments();
     long totalSegmentSizeBytes = 0;
     long totalNumRows = 0;
@@ -323,14 +314,13 @@ public class TablesResource {
   }
 
   @GET
-  @Encoded
   @Path("/tables/{tableName}/indexes")
   @Produces(MediaType.APPLICATION_JSON)
   @ApiOperation(value = "Provide index metadata", notes = "Provide index details for the table")
   @ApiResponses(value = {
-      @ApiResponse(code = 200, message = "Success"), @ApiResponse(code = 500, message = "Internal server error",
-      response = ErrorInfo.class), @ApiResponse(code = 404, message = "Table or segment not found", response =
-      ErrorInfo.class)
+      @ApiResponse(code = 200, message = "Success"),
+      @ApiResponse(code = 500, message = "Internal server error", response = ErrorInfo.class),
+      @ApiResponse(code = 404, message = "Table or segment not found", response = ErrorInfo.class)
   })
   public String getTableIndexes(
       @ApiParam(value = "Table name including type", required = true, example = "myTable_OFFLINE")
@@ -369,7 +359,6 @@ public class TablesResource {
   }
 
   @GET
-  @Encoded
   @Path("/tables/{tableName}/segments/{segmentName}/metadata")
   @Produces(MediaType.APPLICATION_JSON)
   @ApiOperation(value = "Provide segment metadata", notes = "Provide segments metadata for the segment on server")
@@ -381,16 +370,13 @@ public class TablesResource {
   public String getSegmentMetadata(
       @ApiParam(value = "Table name including type", required = true, example = "myTable_OFFLINE")
       @PathParam("tableName") String tableName,
-      @ApiParam(value = "Segment name", required = true) @PathParam("segmentName") String segmentName,
-      @ApiParam(value = "Column name", allowMultiple = true) @QueryParam("columns") @DefaultValue("")
-      List<String> columns, @Context HttpHeaders headers) {
+      @ApiParam(value = "Segment name", required = true) @PathParam("segmentName") @Encoded String segmentName,
+      @ApiParam(value = "Column name", allowMultiple = true) @QueryParam("columns") List<String> columns,
+      @Context HttpHeaders headers) {
     tableName = DatabaseUtils.translateTableName(tableName, headers);
-    for (int i = 0; i < columns.size(); i++) {
-      columns.set(i, URIUtils.decode(columns.get(i)));
-    }
+    segmentName = URIUtils.decode(segmentName);
 
     TableDataManager tableDataManager = ServerResourceUtils.checkGetTableDataManager(_serverInstance, tableName);
-    segmentName = URIUtils.decode(segmentName);
     SegmentDataManager segmentDataManager = tableDataManager.acquireSegment(segmentName);
     if (segmentDataManager == null) {
       throw new WebApplicationException(String.format("Table %s segments %s does not exist", tableName, segmentName),
@@ -406,6 +392,52 @@ public class TablesResource {
     } finally {
       tableDataManager.releaseSegment(segmentDataManager);
     }
+  }
+
+  @GET
+  @Path("/tables/{tableName}/segments/metadata")
+  @Produces(MediaType.APPLICATION_JSON)
+  @ApiOperation(value = "Provide segments metadata", notes = "Provide segments metadata for the segments on server")
+  @ApiResponses(value = {
+      @ApiResponse(code = 200, message = "Success"),
+      @ApiResponse(code = 500, message = "Internal server error", response = ErrorInfo.class),
+      @ApiResponse(code = 404, message = "Table or segment not found", response = ErrorInfo.class)
+  })
+  public String getSegmentsMetadata(
+      @ApiParam(value = "Table name including type", required = true, example = "myTable_OFFLINE")
+      @PathParam("tableName") String tableName,
+      @ApiParam(value = "Segments to include (all if not specified)", allowMultiple = true) @QueryParam("segments")
+      List<String> segments,
+      @ApiParam(value = "Columns to include (use '*' to include all)", allowMultiple = true) @QueryParam("columns")
+      List<String> columns,
+      @Context HttpHeaders headers) {
+    tableName = DatabaseUtils.translateTableName(tableName, headers);
+    TableDataManager tableDataManager = ServerResourceUtils.checkGetTableDataManager(_serverInstance, tableName);
+    List<SegmentDataManager> segmentDataManagers;
+    if (!segments.isEmpty()) {
+      segmentDataManagers = tableDataManager.acquireSegments(segments, new ArrayList<>());
+    } else {
+      segmentDataManagers = tableDataManager.acquireAllSegments();
+    }
+    // get metadata for every segment in the list
+    Map<String, JsonNode> response = new HashMap<>();
+    try {
+      for (SegmentDataManager segmentDataManager: segmentDataManagers) {
+        String segmentName = segmentDataManager.getSegmentName();
+        String segmentMetadata = SegmentMetadataFetcher.getSegmentMetadata(segmentDataManager, columns);
+        JsonNode segmentMetadataJson = JsonUtils.stringToJsonNode(segmentMetadata);
+        response.put(segmentName, segmentMetadataJson);
+      }
+    } catch (Exception e) {
+      LOGGER.error("Failed to convert table {} segments to json", tableName);
+      throw new WebApplicationException("Failed to convert segment metadata to json",
+          Response.Status.INTERNAL_SERVER_ERROR);
+    } finally {
+      for (SegmentDataManager segmentDataManager : segmentDataManagers) {
+        tableDataManager.releaseSegment(segmentDataManager);
+      }
+    }
+    return ResourceUtils.convertToJsonString(response);
   }
 
   @GET
@@ -452,6 +484,7 @@ public class TablesResource {
       @Context HttpHeaders httpHeaders)
       throws Exception {
     tableNameWithType = DatabaseUtils.translateTableName(tableNameWithType, httpHeaders);
+    segmentName = URIUtils.decode(segmentName);
     LOGGER.info("Received a request to download segment {} for table {}", segmentName, tableNameWithType);
     // Validate data access
     ServerResourceUtils.validateDataAccess(_accessControlFactory, tableNameWithType, httpHeaders);
@@ -566,8 +599,8 @@ public class TablesResource {
       @ApiParam(value = "Name of the table with type REALTIME", required = true, example = "myTable_REALTIME")
       @PathParam("tableNameWithType") String tableNameWithType,
       @ApiParam(value = "Name of the segment", required = true) @PathParam("segmentName") @Encoded String segmentName,
-      @ApiParam(value = "Valid doc ids type")
-      @QueryParam("validDocIdsType") String validDocIdsType, @Context HttpHeaders httpHeaders) {
+      @ApiParam(value = "Valid doc ids type") @QueryParam("validDocIdsType") @Nullable String validDocIdsType,
+      @Context HttpHeaders httpHeaders) {
     tableNameWithType = DatabaseUtils.translateTableName(tableNameWithType, httpHeaders);
     segmentName = URIUtils.decode(segmentName);
     LOGGER.info("Received a request to download validDocIds for segment {} table {}", segmentName, tableNameWithType);
@@ -618,18 +651,16 @@ public class TablesResource {
   @Produces(MediaType.APPLICATION_JSON)
   @ApiOperation(value = "Provides segment validDocId metadata", notes = "Provides segment validDocId metadata")
   @ApiResponses(value = {
-      @ApiResponse(code = 200, message = "Success"), @ApiResponse(code = 500, message = "Internal server error",
-      response = ErrorInfo.class), @ApiResponse(code = 404, message = "Table or segment not found", response =
-      ErrorInfo.class)
+      @ApiResponse(code = 200, message = "Success"),
+      @ApiResponse(code = 500, message = "Internal server error", response = ErrorInfo.class),
+      @ApiResponse(code = 404, message = "Table or segment not found", response = ErrorInfo.class)
   })
   public String getValidDocIdsMetadata(
       @ApiParam(value = "Table name including type", required = true, example = "myTable_REALTIME")
       @PathParam("tableNameWithType") String tableNameWithType,
-      @ApiParam(value = "Valid doc ids type")
-      @QueryParam("validDocIdsType") String validDocIdsType,
+      @ApiParam(value = "Valid doc ids type") @QueryParam("validDocIdsType") String validDocIdsType,
       @ApiParam(value = "Segment name", allowMultiple = true) @QueryParam("segmentNames") List<String> segmentNames,
-      @Context HttpHeaders headers)
-      throws Exception {
+      @Context HttpHeaders headers) {
     tableNameWithType = DatabaseUtils.translateTableName(tableNameWithType, headers);
     return ResourceUtils.convertToJsonString(
         processValidDocIdsMetadata(tableNameWithType, segmentNames, validDocIdsType));
@@ -640,9 +671,9 @@ public class TablesResource {
   @Produces(MediaType.APPLICATION_JSON)
   @ApiOperation(value = "Provides segment validDocIds metadata", notes = "Provides segment validDocIds metadata")
   @ApiResponses(value = {
-      @ApiResponse(code = 200, message = "Success"), @ApiResponse(code = 500, message = "Internal server error",
-      response = ErrorInfo.class), @ApiResponse(code = 404, message = "Table or segment not found", response =
-      ErrorInfo.class)
+      @ApiResponse(code = 200, message = "Success"),
+      @ApiResponse(code = 500, message = "Internal server error", response = ErrorInfo.class),
+      @ApiResponse(code = 404, message = "Table or segment not found", response = ErrorInfo.class)
   })
   public String getValidDocIdsMetadata(
       @ApiParam(value = "Table name including type", required = true, example = "myTable_REALTIME")
@@ -752,12 +783,18 @@ public class TablesResource {
       String validDocIdsTypeStr) {
     if (validDocIdsTypeStr == null) {
       // By default, we read the valid doc ids from snapshot.
-      return Pair.of(ValidDocIdsType.SNAPSHOT, ((ImmutableSegmentImpl) indexSegment).loadValidDocIdsFromSnapshot());
+      return Pair.of(ValidDocIdsType.SNAPSHOT,
+          ((ImmutableSegmentImpl) indexSegment).loadDocIdsFromSnapshot(V1Constants.VALID_DOC_IDS_SNAPSHOT_FILE_NAME));
     }
     ValidDocIdsType validDocIdsType = ValidDocIdsType.valueOf(validDocIdsTypeStr.toUpperCase());
     switch (validDocIdsType) {
       case SNAPSHOT:
-        return Pair.of(validDocIdsType, ((ImmutableSegmentImpl) indexSegment).loadValidDocIdsFromSnapshot());
+        return Pair.of(validDocIdsType,
+            ((ImmutableSegmentImpl) indexSegment).loadDocIdsFromSnapshot(V1Constants.VALID_DOC_IDS_SNAPSHOT_FILE_NAME));
+      case SNAPSHOT_WITH_DELETE:
+        return Pair.of(validDocIdsType,
+            ((ImmutableSegmentImpl) indexSegment).loadDocIdsFromSnapshot(
+                V1Constants.QUERYABLE_DOC_IDS_SNAPSHOT_FILE_NAME));
       case IN_MEMORY:
         return Pair.of(validDocIdsType, indexSegment.getValidDocIds().getMutableRoaringBitmap());
       case IN_MEMORY_WITH_DELETE:
@@ -766,7 +803,8 @@ public class TablesResource {
         // By default, we read the valid doc ids from snapshot.
         LOGGER.warn("Invalid validDocIdsType: {}. Using default validDocIdsType: {}", validDocIdsType,
             ValidDocIdsType.SNAPSHOT);
-        return Pair.of(ValidDocIdsType.SNAPSHOT, ((ImmutableSegmentImpl) indexSegment).loadValidDocIdsFromSnapshot());
+        return Pair.of(ValidDocIdsType.SNAPSHOT,
+            ((ImmutableSegmentImpl) indexSegment).loadDocIdsFromSnapshot(V1Constants.VALID_DOC_IDS_SNAPSHOT_FILE_NAME));
     }
   }
 
@@ -800,11 +838,12 @@ public class TablesResource {
   public String uploadLLCSegment(
       @ApiParam(value = "Name of the REALTIME table", required = true) @PathParam("realtimeTableName")
       String realtimeTableName,
-      @ApiParam(value = "Name of the segment", required = true) @PathParam("segmentName") String segmentName,
+      @ApiParam(value = "Name of the segment", required = true) @PathParam("segmentName") @Encoded String segmentName,
       @QueryParam("uploadTimeoutMs") @DefaultValue("-1") int timeoutMs,
       @Context HttpHeaders headers)
       throws Exception {
     realtimeTableName = DatabaseUtils.translateTableName(realtimeTableName, headers);
+    segmentName = URIUtils.decode(segmentName);
     LOGGER.info("Received a request to upload low level consumer segment {} for table {}", segmentName,
         realtimeTableName);
 
@@ -874,11 +913,12 @@ public class TablesResource {
   public TableLLCSegmentUploadResponse uploadLLCSegmentV2(
       @ApiParam(value = "Name of the REALTIME table", required = true) @PathParam("realtimeTableNameWithType")
       String realtimeTableNameWithType,
-      @ApiParam(value = "Name of the segment", required = true) @PathParam("segmentName") String segmentName,
+      @ApiParam(value = "Name of the segment", required = true) @PathParam("segmentName") @Encoded String segmentName,
       @QueryParam("uploadTimeoutMs") @DefaultValue("-1") int timeoutMs,
       @Context HttpHeaders headers)
       throws Exception {
     realtimeTableNameWithType = DatabaseUtils.translateTableName(realtimeTableNameWithType, headers);
+    segmentName = URIUtils.decode(segmentName);
     LOGGER.info("Received a request to upload low level consumer segment {} for table {}", segmentName,
         realtimeTableNameWithType);
 
@@ -945,10 +985,11 @@ public class TablesResource {
   public String uploadCommittedSegment(
       @ApiParam(value = "Name of the real-time table", required = true) @PathParam("realtimeTableName")
       String realtimeTableName,
-      @ApiParam(value = "Name of the segment", required = true) @PathParam("segmentName") String segmentName,
+      @ApiParam(value = "Name of the segment", required = true) @PathParam("segmentName") @Encoded String segmentName,
       @QueryParam("uploadTimeoutMs") @DefaultValue("-1") int timeoutMs, @Context HttpHeaders headers)
       throws Exception {
     realtimeTableName = DatabaseUtils.translateTableName(realtimeTableName, headers);
+    segmentName = URIUtils.decode(segmentName);
     LOGGER.info("Received a request to upload committed segment: {} for table: {}", segmentName, realtimeTableName);
 
     // Check it's real-time table
@@ -1063,11 +1104,17 @@ public class TablesResource {
       for (SegmentDataManager segmentDataManager : segmentDataManagers) {
         if (segmentDataManager instanceof RealtimeSegmentDataManager) {
           RealtimeSegmentDataManager realtimeSegmentDataManager = (RealtimeSegmentDataManager) segmentDataManager;
-          Map<String, ConsumerPartitionState> partitionStateMap =
-              realtimeSegmentDataManager.getConsumerPartitionState();
+          StreamMetadataProvider streamMetadataProvider =
+              ((RealtimeTableDataManager) (tableDataManager)).getStreamMetadataProvider(realtimeSegmentDataManager);
+          StreamPartitionMsgOffset latestMsgOffset =
+              RealtimeSegmentMetadataUtils.fetchLatestStreamOffset(realtimeSegmentDataManager, streamMetadataProvider);
+          Map<String, ConsumerPartitionState> partitionIdToStateMap =
+              realtimeSegmentDataManager.getConsumerPartitionState(latestMsgOffset);
           Map<String, String> recordsLagMap = new HashMap<>();
           Map<String, String> availabilityLagMsMap = new HashMap<>();
-          realtimeSegmentDataManager.getPartitionToLagState(partitionStateMap).forEach((k, v) -> {
+          Map<String, PartitionLagState> partitionToLagState =
+              streamMetadataProvider.getCurrentPartitionLagState(partitionIdToStateMap);
+          partitionToLagState.forEach((k, v) -> {
             recordsLagMap.put(k, v.getRecordsLag());
             availabilityLagMsMap.put(k, v.getAvailabilityLagMs());
           });
@@ -1076,7 +1123,8 @@ public class TablesResource {
           segmentConsumerInfoList.add(new SegmentConsumerInfo(segmentDataManager.getSegmentName(),
               realtimeSegmentDataManager.getConsumerState().toString(),
               realtimeSegmentDataManager.getLastConsumedTimestamp(), partitiionToOffsetMap,
-              new SegmentConsumerInfo.PartitionOffsetInfo(partitiionToOffsetMap, partitionStateMap.entrySet().stream()
+              new SegmentConsumerInfo.PartitionOffsetInfo(partitiionToOffsetMap, partitionIdToStateMap.entrySet()
+                  .stream()
                   .collect(Collectors.toMap(Map.Entry::getKey, e -> e.getValue().getUpstreamLatestOffset().toString())),
                   recordsLagMap, availabilityLagMsMap)));
         }

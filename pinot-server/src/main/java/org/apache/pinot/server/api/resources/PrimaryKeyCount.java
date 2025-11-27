@@ -21,7 +21,6 @@ package org.apache.pinot.server.api.resources;
 import java.util.HashSet;
 import java.util.Map;
 import java.util.Set;
-import javax.validation.constraints.NotNull;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.pinot.common.restlet.resources.PrimaryKeyCountInfo;
 import org.apache.pinot.core.data.manager.InstanceDataManager;
@@ -78,7 +77,7 @@ public class PrimaryKeyCount {
     return new PrimaryKeyCountInfo(instanceId, totalPrimaryKeyCount, tablesWithPrimaryKeys, System.currentTimeMillis());
   }
 
-  private static Map<Integer, Long> getPartitionToPrimaryKeyCount(@NotNull RealtimeTableDataManager tableDataManager) {
+  private static Map<Integer, Long> getPartitionToPrimaryKeyCount(RealtimeTableDataManager tableDataManager) {
     // Fetch the primary key count per partition if either upsert or dedup is enabled
     if (tableDataManager.isUpsertEnabled()) {
       return tableDataManager.getTableUpsertMetadataManager().getPartitionToPrimaryKeyCount();

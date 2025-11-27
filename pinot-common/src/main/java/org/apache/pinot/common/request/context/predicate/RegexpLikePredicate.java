@@ -20,19 +20,28 @@ package org.apache.pinot.common.request.context.predicate;
 
 import java.util.Objects;
 import org.apache.pinot.common.request.context.ExpressionContext;
+import org.apache.pinot.common.utils.RegexpPatternConverterUtils;
 import org.apache.pinot.common.utils.regex.Pattern;
 import org.apache.pinot.common.utils.regex.PatternFactory;
 
 /**
- * Predicate for REGEXP_LIKE.
+ * Predicate for REGEXP_LIKE with optional match parameters
  */
 public class RegexpLikePredicate extends BasePredicate {
   private final String _value;
+  private final boolean _caseInsensitive;
   private Pattern _pattern = null;
 
   public RegexpLikePredicate(ExpressionContext lhs, String value) {
     super(lhs);
     _value = value;
+    _caseInsensitive = false;
+  }
+
+  public RegexpLikePredicate(ExpressionContext lhs, String value, String matchParameter) {
+    super(lhs);
+    _value = value;
+    _caseInsensitive = RegexpPatternConverterUtils.isCaseInsensitive(matchParameter);
   }
 
   @Override
@@ -44,9 +53,13 @@ public class RegexpLikePredicate extends BasePredicate {
     return _value;
   }
 
+  public boolean isCaseInsensitive() {
+    return _caseInsensitive;
+  }
+
   public Pattern getPattern() {
     if (_pattern == null) {
-      _pattern = PatternFactory.compile(_value);
+      _pattern = PatternFactory.compile(_value, _caseInsensitive);
     }
     return _pattern;
   }
@@ -60,16 +73,20 @@ public class RegexpLikePredicate extends BasePredicate {
       return false;
     }
     RegexpLikePredicate that = (RegexpLikePredicate) o;
-    return Objects.equals(_lhs, that._lhs) && Objects.equals(_value, that._value);
+    return Objects.equals(_lhs, that._lhs) && Objects.equals(_value, that._value) && Objects.equals(_caseInsensitive, that._caseInsensitive);
   }
 
   @Override
   public int hashCode() {
-    return Objects.hash(_lhs, _value);
+    return Objects.hash(_lhs, _value, _caseInsensitive);
   }
 
   @Override
   public String toString() {
-    return "regexp_like(" + _lhs + ",'" + _value + "')";
+    if (_caseInsensitive) {
+      return "regexp_like(" + _lhs + ",'" + _value + "','i')";
+    } else {
+      return "regexp_like(" + _lhs + ",'" + _value + "')";
+    }
   }
 }

@@ -20,6 +20,7 @@ package org.apache.pinot.core.data.table;
 
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
 import java.util.Collections;
@@ -324,8 +325,28 @@ public class TableResizer {
    * Trims the aggregation results using a heap and returns the top records.
    * This method is to be called from individual segment if the intermediate results need to be trimmed.
    */
-  public List<IntermediateRecord> trimInSegmentResults(GroupKeyGenerator groupKeyGenerator,
+  public List<IntermediateRecord> sortInSegmentResults(GroupKeyGenerator groupKeyGenerator,
       GroupByResultHolder[] groupByResultHolders, int size) {
+    // getNumKeys() does not count nulls
+    assert groupKeyGenerator.getNumKeys() <= size;
+    Iterator<GroupKeyGenerator.GroupKey> groupKeyIterator = groupKeyGenerator.getGroupKeys();
+
+    // Initialize a heap with the first 'size' groups
+    List<IntermediateRecord> arr = new ArrayList<>(size);
+    while (groupKeyIterator.hasNext()) {
+      arr.add(getIntermediateRecord(groupKeyIterator.next(), groupByResultHolders));
+    }
+
+    arr.sort(_intermediateRecordComparator);
+    return arr;
+  }
+
+  /**
+   * Trims the aggregation results using a heap and returns the top records.
+   * This method is to be called from individual segment if the intermediate results need to be trimmed.
+   */
+  public List<IntermediateRecord> trimInSegmentResults(GroupKeyGenerator groupKeyGenerator,
+      GroupByResultHolder[] groupByResultHolders, int size, boolean sortOutput) {
     // Should not reach here when numGroups <= heap size because there is no need to create a heap
     assert groupKeyGenerator.getNumKeys() > size;
     Iterator<GroupKeyGenerator.GroupKey> groupKeyIterator = groupKeyGenerator.getGroupKeys();
@@ -347,7 +368,20 @@ public class TableResizer {
       }
     }
 
-    return Arrays.asList(heap);
+    if (!sortOutput) {
+      return Arrays.asList(heap);
+    }
+
+    for (int i = heap.length; i > 0; i--) {
+      downHeap(heap, i, 0, comparator);
+      // swap root with last
+      IntermediateRecord tmp = heap[0];
+      heap[0] = heap[i - 1];
+      heap[i - 1] = tmp;
+    }
+
+    List<IntermediateRecord> result = Arrays.asList(heap);
+    return result;
   }
 
   /**

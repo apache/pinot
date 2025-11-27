@@ -48,6 +48,8 @@ public class LuceneTextIndexUtils {
   public static final String PARSER_CLASSIC = "CLASSIC";
   public static final String PARSER_STANDARD = "STANDARD";
   public static final String PARSER_COMPLEX = "COMPLEX";
+  public static final String PARSER_MATCHPHRASE = "MATCHPHRASE";
+  public static final String PARSER_MATCH = "MATCH";
 
   // Default operator constants
   public static final String DEFAULT_OPERATOR_AND = "AND";
@@ -76,6 +78,10 @@ public class LuceneTextIndexUtils {
     public static final String TIME_ZONE = "timeZone";
     public static final String PHRASE_SLOP = "phraseSlop";
     public static final String MAX_DETERMINIZED_STATES = "maxDeterminizedStates";
+    public static final String SLOP = "slop";
+    public static final String IN_ORDER = "inOrder";
+    public static final String ENABLE_PREFIX_MATCH = "enablePrefixMatch";
+    public static final String MINIMUM_SHOULD_MATCH = "minimumShouldMatch";
   }
 
   // Parser class names
@@ -84,6 +90,10 @@ public class LuceneTextIndexUtils {
   public static final String COMPLEX_PHRASE_QUERY_PARSER_CLASS =
       "org.apache.lucene.queryparser.complexPhrase.ComplexPhraseQueryParser";
   public static final String CLASSIC_QUERY_PARSER = "org.apache.lucene.queryparser.classic.QueryParser";
+  public static final String MATCHPHRASE_QUERY_PARSER_CLASS =
+      "org.apache.pinot.segment.local.segment.index.text.lucene.parsers.PrefixPhraseQueryParser";
+  public static final String MATCH_QUERY_PARSER_CLASS =
+      "org.apache.pinot.segment.local.segment.index.text.lucene.parsers.MatchQueryParser";
 
   private LuceneTextIndexUtils() {
   }
@@ -146,6 +156,12 @@ public class LuceneTextIndexUtils {
         break;
       case PARSER_COMPLEX:
         parserClassName = COMPLEX_PHRASE_QUERY_PARSER_CLASS;
+        break;
+      case PARSER_MATCHPHRASE:
+        parserClassName = MATCHPHRASE_QUERY_PARSER_CLASS;
+        break;
+      case PARSER_MATCH:
+        parserClassName = MATCH_QUERY_PARSER_CLASS;
         break;
       default:
         parserClassName = CLASSIC_QUERY_PARSER;
@@ -224,7 +240,7 @@ public class LuceneTextIndexUtils {
         Method parseMethod = parser.getClass().getMethod("parse", String.class, String.class);
         query = (Query) parseMethod.invoke(parser, actualQuery, column);
       } else {
-        // Other parsers use parse(String)
+        // Other parsers (CLASSIC, COMPLEX, MATCHPHRASE) use parse(String)
         Method parseMethod = parser.getClass().getMethod("parse", String.class);
         query = (Query) parseMethod.invoke(parser, actualQuery);
       }
@@ -331,6 +347,22 @@ public class LuceneTextIndexUtils {
 
     public int getMaxDeterminizedStates() {
       return Integer.parseInt(_options.getOrDefault(OptionKey.MAX_DETERMINIZED_STATES, "10000"));
+    }
+
+    public int getSlop() {
+      return Integer.parseInt(_options.getOrDefault(OptionKey.SLOP, "0"));
+    }
+
+    public boolean isInOrder() {
+      return Boolean.parseBoolean(_options.getOrDefault(OptionKey.IN_ORDER, "true"));
+    }
+
+    public boolean isEnablePrefixMatch() {
+      return Boolean.parseBoolean(_options.getOrDefault(OptionKey.ENABLE_PREFIX_MATCH, "false"));
+    }
+
+    public String getMinimumShouldMatch() {
+      return _options.getOrDefault(OptionKey.MINIMUM_SHOULD_MATCH, null);
     }
   }
 

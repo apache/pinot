@@ -31,6 +31,7 @@ import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.PriorityQueue;
+import javax.annotation.Nullable;
 import org.apache.pinot.segment.spi.index.reader.H3IndexResolution;
 import org.apache.pinot.segment.spi.memory.PinotDataBuffer;
 import org.locationtech.jts.geom.Geometry;
@@ -60,15 +61,16 @@ public class OffHeapH3IndexCreator extends BaseH3IndexCreator {
 
   private long _postingListChunkOffset;
 
-  public OffHeapH3IndexCreator(File indexDir, String columnName, H3IndexResolution resolution)
+  public OffHeapH3IndexCreator(File indexDir, String columnName, String tableNameWithType, boolean continueOnError,
+      H3IndexResolution resolution)
       throws IOException {
-    super(indexDir, columnName, resolution);
+    super(indexDir, columnName, tableNameWithType, continueOnError, resolution);
     _postingListFile = new File(_tempDir, POSTING_LIST_FILE_NAME);
     _postingListOutputStream = new DataOutputStream(new BufferedOutputStream(new FileOutputStream(_postingListFile)));
   }
 
   @Override
-  public void add(Geometry geometry)
+  public void add(@Nullable Geometry geometry)
       throws IOException {
     super.add(geometry);
     if (_postingListMap.size() % FLUSH_THRESHOLD == 0) {

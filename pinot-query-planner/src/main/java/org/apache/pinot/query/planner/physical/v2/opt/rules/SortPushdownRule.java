@@ -78,7 +78,8 @@ public class SortPushdownRule extends PRelOptRule {
     PhysicalSort n2 = new PhysicalSort(sort.getCluster(), RelTraitSet.createEmpty(), List.of(), sort.collation,
         null /* offset */, newSortFetch, o2, nodeId(), o2.getPinotDataDistributionOrThrow(), o2.isLeafStage());
     PhysicalExchange n1 = new PhysicalExchange(nodeId(), n2, o1.getPinotDataDistributionOrThrow(),
-        o1.getDistributionKeys(), o1.getExchangeStrategy(), o1.getRelCollation(), o1.getExecStrategy());
+        o1.getDistributionKeys(), o1.getExchangeStrategy(), o1.getRelCollation(), o1.getExecStrategy(),
+        o1.getHashFunction());
     return new PhysicalSort(sort.getCluster(), sort.getTraitSet(), sort.getHints(), sort.getCollation(),
         sort.offset, sort.fetch, n1, sort.getNodeId(), sort.getPinotDataDistributionOrThrow(), false);
   }

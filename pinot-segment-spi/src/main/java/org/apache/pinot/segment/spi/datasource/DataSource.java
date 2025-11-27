@@ -28,6 +28,7 @@ import org.apache.pinot.segment.spi.index.reader.ForwardIndexReader;
 import org.apache.pinot.segment.spi.index.reader.H3IndexReader;
 import org.apache.pinot.segment.spi.index.reader.InvertedIndexReader;
 import org.apache.pinot.segment.spi.index.reader.JsonIndexReader;
+import org.apache.pinot.segment.spi.index.reader.MultiColumnTextIndexReader;
 import org.apache.pinot.segment.spi.index.reader.NullValueVectorReader;
 import org.apache.pinot.segment.spi.index.reader.RangeIndexReader;
 import org.apache.pinot.segment.spi.index.reader.TextIndexReader;
@@ -89,10 +90,24 @@ public interface DataSource {
   TextIndexReader getTextIndex();
 
   /**
+   * Returns the text index for the column if exists, or {@code null} if not.
+   */
+  @Nullable
+  default MultiColumnTextIndexReader getMultiColumnTextIndex() {
+    return null;
+  }
+
+  /**
    * Returns the FST index for the column if exists, or {@code null} if not.
    */
   @Nullable
   TextIndexReader getFSTIndex();
+
+  /**
+   * Returns the IFST index for the column if exists, or {@code null} if not.
+   */
+  @Nullable
+  TextIndexReader getIFSTIndex();
 
   /**
    * Returns the json index for the column if exists, or {@code null} if not.
