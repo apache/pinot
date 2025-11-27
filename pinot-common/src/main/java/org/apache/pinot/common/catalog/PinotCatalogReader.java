@@ -18,7 +18,6 @@
  */
 package org.apache.pinot.common.catalog;
 
-import com.google.common.collect.ImmutableList;
 import java.util.List;
 import org.apache.calcite.config.CalciteConnectionConfig;
 import org.apache.calcite.jdbc.CalciteSchema;
@@ -39,6 +38,6 @@ public class PinotCatalogReader extends CalciteCatalogReader {
   public PinotCatalogReader(CalciteSchema rootSchema, List<String> defaultSchema,
       RelDataTypeFactory typeFactory, CalciteConnectionConfig config, boolean caseSensitive) {
     super(rootSchema, new PinotNameMatcher(caseSensitive),
-        ImmutableList.of(ImmutableList.copyOf(defaultSchema), ImmutableList.of()), typeFactory, config);
+        List.of(List.copyOf(defaultSchema), List.of()), typeFactory, config);
   }
 }

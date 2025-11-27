@@ -115,8 +115,9 @@ public class JsonIndexType extends AbstractIndexType<JsonIndexConfig, JsonIndexR
     Preconditions.checkState(storedType == DataType.STRING || storedType == DataType.MAP,
         "Json index is currently only supported on STRING columns");
     return context.isOnHeap() ? new OnHeapJsonIndexCreator(context.getIndexDir(), context.getFieldSpec().getName(),
-        indexConfig)
-        : new OffHeapJsonIndexCreator(context.getIndexDir(), context.getFieldSpec().getName(), indexConfig);
+        context.getTableNameWithType(), context.isContinueOnError(), indexConfig)
+        : new OffHeapJsonIndexCreator(context.getIndexDir(), context.getFieldSpec().getName(),
+            context.getTableNameWithType(), context.isContinueOnError(), indexConfig);
   }
 
   @Override
@@ -136,8 +137,8 @@ public class JsonIndexType extends AbstractIndexType<JsonIndexConfig, JsonIndexR
 
   @Override
   public IndexHandler createIndexHandler(SegmentDirectory segmentDirectory, Map<String, FieldIndexConfigs> configsByCol,
-      @Nullable Schema schema, @Nullable TableConfig tableConfig) {
-    return new JsonIndexHandler(segmentDirectory, configsByCol, tableConfig);
+      Schema schema, TableConfig tableConfig) {
+    return new JsonIndexHandler(segmentDirectory, configsByCol, tableConfig, schema);
   }
 
   private static class ReaderFactory extends IndexReaderFactory.Default<JsonIndexConfig, JsonIndexReader> {

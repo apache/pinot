@@ -25,6 +25,7 @@ import org.apache.pinot.common.utils.PinotDataType;
 import org.apache.pinot.spi.annotations.ScalarFunction;
 import org.apache.pinot.spi.utils.BigDecimalUtils;
 import org.apache.pinot.spi.utils.BytesUtils;
+import org.apache.pinot.spi.utils.TimestampUtils;
 
 import static org.apache.pinot.common.utils.PinotDataType.*;
 
@@ -38,43 +39,56 @@ public class DataTypeConversionFunctions {
 
   @ScalarFunction
   public static Object cast(Object value, String targetTypeLiteral) {
-    try {
-      Class<?> clazz = value.getClass();
-      // TODO: Support cast for MV
-      Preconditions.checkArgument(!clazz.isArray() | clazz == byte[].class, "%s must not be an array type", clazz);
-      PinotDataType sourceType = PinotDataType.getSingleValueType(clazz);
-      String transformed = targetTypeLiteral.toUpperCase();
-      PinotDataType targetDataType;
-      switch (transformed) {
-        case "BIGINT":
-          targetDataType = LONG;
-          break;
-        case "DECIMAL":
-          targetDataType = BIG_DECIMAL;
-          break;
-        case "INT":
-          targetDataType = INTEGER;
-          break;
-        case "VARBINARY":
-          targetDataType = BYTES;
-          break;
-        case "VARCHAR":
-          targetDataType = STRING;
-          break;
-        default:
+    Class<?> clazz = value.getClass();
+    // TODO: Support cast for MV
+    Preconditions.checkArgument(!clazz.isArray() | clazz == byte[].class, "%s must not be an array type", clazz);
+    PinotDataType sourceType = PinotDataType.getSingleValueType(clazz);
+    String transformed = targetTypeLiteral.toUpperCase();
+    PinotDataType targetDataType;
+    switch (transformed) {
+      case "BIGINT":
+        targetDataType = LONG;
+        break;
+      case "DECIMAL":
+        targetDataType = BIG_DECIMAL;
+        break;
+      case "INT":
+        targetDataType = INTEGER;
+        break;
+      case "VARBINARY":
+        targetDataType = BYTES;
+        break;
+      case "VARCHAR":
+        targetDataType = STRING;
+        break;
+      default:
+        try {
           targetDataType = PinotDataType.valueOf(transformed);
-          break;
-      }
-      if (sourceType == STRING && (targetDataType == INTEGER || targetDataType == LONG)) {
-        if (String.valueOf(value).contains(".")) {
-          // convert integers via double to avoid parse errors
-          return targetDataType.convert(DOUBLE.convert(value, sourceType), DOUBLE);
+        } catch (IllegalArgumentException e) {
+          throw new IllegalArgumentException("Unknown data type: " + targetTypeLiteral);
+        }
+        break;
+    }
+    if (sourceType == STRING && (targetDataType == INTEGER || targetDataType == LONG)) {
+      String stringValue = value.toString().trim();
+      if (targetDataType == INTEGER) {
+        try {
+          return Integer.parseInt(stringValue);
+        } catch (NumberFormatException e) {
+          // If the value is not parseable as an integer, try to parse it as a double.
+          return (int) Double.parseDouble(stringValue);
+        }
+      } else {
+        try {
+          // This step will try to parse the string as a timestamp or a long.
+          return TimestampUtils.toMillisSinceEpoch(stringValue);
+        } catch (Exception e) {
+          // If the value is not parseable as a timestamp or a long, try to parse it as a double.
+          return (long) Double.parseDouble(stringValue);
         }
       }
-      return targetDataType.convert(value, sourceType);
-    } catch (IllegalArgumentException e) {
-      throw new IllegalArgumentException("Unknown data type: " + targetTypeLiteral);
     }
+    return targetDataType.convert(value, sourceType);
   }
 
   /**

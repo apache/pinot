@@ -32,7 +32,7 @@ import org.apache.pinot.segment.local.data.manager.TableDataManager;
 import org.apache.pinot.segment.local.dedup.PartitionDedupMetadataManager;
 import org.apache.pinot.segment.local.dedup.TableDedupMetadataManager;
 import org.apache.pinot.segment.local.dedup.TableDedupMetadataManagerFactory;
-import org.apache.pinot.segment.local.recordtransformer.CompositeTransformer;
+import org.apache.pinot.segment.local.segment.creator.TransformPipeline;
 import org.apache.pinot.spi.config.table.DedupConfig;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.TableType;
@@ -74,7 +74,7 @@ public class MutableSegmentDedupTest implements PinotBuffersAfterMethodCheckRule
         .setTimeColumnName(TIME_COLUMN)
         .setDedupConfig(dedupConfig)
         .build();
-    CompositeTransformer recordTransformer = CompositeTransformer.getDefaultTransformer(tableConfig, schema);
+    TransformPipeline transformPipeline = new TransformPipeline(tableConfig, schema);
     File jsonFile = new File(dataResourceUrl.getFile());
     PartitionDedupMetadataManager partitionDedupMetadataManager =
         (dedupEnabled) ? getTableDedupMetadataManager(schema, dedupConfig).getOrCreatePartitionManager(0) : null;
@@ -86,8 +86,10 @@ public class MutableSegmentDedupTest implements PinotBuffersAfterMethodCheckRule
           schema.getColumnNames(), null)) {
         while (recordReader.hasNext()) {
           recordReader.next(reuse);
-          GenericRow transformedRow = recordTransformer.transform(reuse);
-          _mutableSegmentImpl.index(transformedRow, null);
+          TransformPipeline.Result result = transformPipeline.processRow(reuse);
+          for (GenericRow transformedRow : result.getTransformedRows()) {
+            _mutableSegmentImpl.index(transformedRow, null);
+          }
           if (dedupEnabled) {
             partitionDedupMetadataManager.removeExpiredPrimaryKeys();
           }

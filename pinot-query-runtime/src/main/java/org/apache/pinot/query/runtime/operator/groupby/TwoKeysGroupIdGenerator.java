@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.query.runtime.operator.groupby;
 
+import it.unimi.dsi.fastutil.longs.Long2IntFunction;
 import it.unimi.dsi.fastutil.longs.Long2IntMap;
 import it.unimi.dsi.fastutil.longs.Long2IntOpenHashMap;
 import it.unimi.dsi.fastutil.objects.ObjectIterator;
@@ -32,6 +33,9 @@ public class TwoKeysGroupIdGenerator implements GroupIdGenerator {
   private final ValueToIdMap _firstKeyToIdMap;
   private final ValueToIdMap _secondKeyToIdMap;
   private final int _numGroupsLimit;
+  /// A function to generate the next group ID based on the current size of the map.
+  /// We use this instead of a simple lambda to avoid capturing `this` and therefore allocate on each getGroupId call
+  private final Long2IntFunction _groupIdGenerator;
 
   public TwoKeysGroupIdGenerator(ColumnDataType firstKeyType,
       ColumnDataType secondKeyType, int numGroupsLimit, int initialCapacity) {
@@ -40,6 +44,7 @@ public class TwoKeysGroupIdGenerator implements GroupIdGenerator {
     _firstKeyToIdMap = ValueToIdMapFactory.get(firstKeyType.toDataType());
     _secondKeyToIdMap = ValueToIdMapFactory.get(secondKeyType.toDataType());
     _numGroupsLimit = numGroupsLimit;
+    _groupIdGenerator = k -> _groupIdMap.size();
   }
 
   @Override
@@ -47,12 +52,11 @@ public class TwoKeysGroupIdGenerator implements GroupIdGenerator {
     Object[] keyValues = (Object[]) key;
     Object firstKey = keyValues[0];
     Object secondKey = keyValues[1];
-    int numGroups = _groupIdMap.size();
-    if (numGroups < _numGroupsLimit) {
+    if (_groupIdMap.size() < _numGroupsLimit) {
       int firstKeyId = firstKey != null ? _firstKeyToIdMap.put(firstKey) : NULL_ID;
       int secondKeyId = secondKey != null ? _secondKeyToIdMap.put(secondKey) : NULL_ID;
       long longKey = ((long) firstKeyId << 32) | (secondKeyId & 0xFFFFFFFFL);
-      return _groupIdMap.computeIfAbsent(longKey, k -> numGroups);
+      return _groupIdMap.computeIfAbsent(longKey, _groupIdGenerator);
     } else {
       int firstKeyId;
       if (firstKey != null) {

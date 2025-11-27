@@ -43,7 +43,7 @@ public final class MetricFieldSpec extends FieldSpec {
     super(name, dataType, true, defaultNullValue);
   }
 
-  public MetricFieldSpec(String name, DataType dataType, @Nullable Object defaultNullValue, int maxLength,
+  public MetricFieldSpec(String name, DataType dataType, @Nullable Object defaultNullValue, @Nullable Integer maxLength,
       @Nullable MaxLengthExceedStrategy maxLengthExceedStrategy) {
     super(name, dataType, true, maxLength, defaultNullValue, maxLengthExceedStrategy);
   }

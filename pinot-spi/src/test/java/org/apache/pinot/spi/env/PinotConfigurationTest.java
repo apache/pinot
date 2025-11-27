@@ -107,16 +107,16 @@ public class PinotConfigurationTest {
   @Test
   public void assertPropertyOverride() {
     PinotConfiguration pinotConfiguration = new PinotConfiguration();
-    pinotConfiguration.setProperty("property.override", "overriden-value");
+    pinotConfiguration.setProperty("property.override", "overridden-value");
 
     pinotConfiguration.containsKey("property.override");
-    Assert.assertEquals(pinotConfiguration.getProperty("property.override"), "overriden-value");
+    Assert.assertEquals(pinotConfiguration.getProperty("property.override"), "overridden-value");
 
     pinotConfiguration = new PinotConfiguration(pinotConfiguration.toMap()).clone().subset("property");
 
-    pinotConfiguration.addProperty("override", "overriden-value-2");
+    pinotConfiguration.addProperty("override", "overridden-value-2");
 
-    Assert.assertEquals(pinotConfiguration.getProperty("override"), "overriden-value,overriden-value-2");
+    Assert.assertEquals(pinotConfiguration.getProperty("override"), "overridden-value,overridden-value-2");
 
     Object object = new Object();
     pinotConfiguration.setProperty("raw-property", object);

@@ -114,8 +114,7 @@ public enum Distribution {
     }
 
     @Override
-    protected Object clone()
-    throws CloneNotSupportedException {
+    protected DataSupplier clone() {
       return new DataSupplier(clone(_random), _generator);
     }
 

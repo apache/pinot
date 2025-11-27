@@ -27,7 +27,6 @@ import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
 import java.util.stream.Collectors;
-import javax.validation.constraints.NotNull;
 import javax.ws.rs.NotAuthorizedException;
 import org.apache.pinot.broker.api.AccessControl;
 import org.apache.pinot.common.request.BrokerRequest;
@@ -137,7 +136,7 @@ public class BasicAuthAccessControlFactory extends AccessControlFactory {
     }
 
     @Override
-    public TableRowColAccessResult getRowColFilters(RequesterIdentity requesterIdentity, @NotNull String table) {
+    public TableRowColAccessResult getRowColFilters(RequesterIdentity requesterIdentity, String table) {
       Optional<BasicAuthPrincipal> principalOpt = getPrincipalOpt(requesterIdentity);
 
       Preconditions.checkState(principalOpt.isPresent(), "Principal is not authorized");

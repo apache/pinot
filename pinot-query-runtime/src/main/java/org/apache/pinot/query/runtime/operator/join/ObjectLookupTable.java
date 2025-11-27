@@ -71,4 +71,9 @@ public class ObjectLookupTable extends LookupTable {
   public Set<Map.Entry<Object, Object>> entrySet() {
     return _lookupTable.entrySet();
   }
+
+  @Override
+  public int size() {
+    return _lookupTable.size();
+  }
 }

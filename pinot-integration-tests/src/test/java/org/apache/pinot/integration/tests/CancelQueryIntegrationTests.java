@@ -19,21 +19,17 @@
 package org.apache.pinot.integration.tests;
 
 import com.fasterxml.jackson.databind.JsonNode;
-import com.google.common.collect.ImmutableList;
 import java.io.File;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Timer;
 import java.util.UUID;
 import org.apache.commons.io.FileUtils;
-import org.apache.helix.model.HelixConfigScope;
 import org.apache.helix.model.IdealState;
-import org.apache.helix.model.builder.HelixConfigScopeBuilder;
 import org.apache.pinot.common.utils.ServiceStatus;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.TableType;
 import org.apache.pinot.spi.data.Schema;
-import org.apache.pinot.spi.env.PinotConfiguration;
 import org.apache.pinot.spi.utils.CommonConstants;
 import org.apache.pinot.spi.utils.InstanceTypeUtils;
 import org.apache.pinot.spi.utils.builder.TableNameBuilder;
@@ -61,18 +57,6 @@ public class CancelQueryIntegrationTests extends BaseClusterIntegrationTestSet {
     return NUM_SERVERS;
   }
 
-  @Override
-  protected void overrideBrokerConf(PinotConfiguration brokerConf) {
-    super.overrideBrokerConf(brokerConf);
-    brokerConf.setProperty(CommonConstants.Broker.CONFIG_OF_BROKER_ENABLE_QUERY_CANCELLATION, "true");
-  }
-
-  @Override
-  protected void overrideServerConf(PinotConfiguration serverConf) {
-    super.overrideServerConf(serverConf);
-    serverConf.setProperty(CommonConstants.Server.CONFIG_OF_ENABLE_QUERY_CANCELLATION, "true");
-  }
-
   @BeforeClass
   public void setUp()
       throws Exception {
@@ -81,12 +65,6 @@ public class CancelQueryIntegrationTests extends BaseClusterIntegrationTestSet {
     // Start the Pinot cluster
     startZk();
     startController();
-    // Set hyperloglog log2m value to 12.
-    HelixConfigScope scope =
-        new HelixConfigScopeBuilder(HelixConfigScope.ConfigScopeProperty.CLUSTER).forCluster(getHelixClusterName())
-            .build();
-    _helixManager.getConfigAccessor()
-        .set(scope, CommonConstants.Helix.DEFAULT_HYPERLOGLOG_LOG2M_KEY, Integer.toString(12));
     startBrokers(getNumBrokers());
     startServers(getNumServers());
 
@@ -157,7 +135,7 @@ public class CancelQueryIntegrationTests extends BaseClusterIntegrationTestSet {
           }
         }
       }
-      _serviceStatusCallbacks.add(new ServiceStatus.MultipleCallbackServiceStatusCallback(ImmutableList.of(
+      _serviceStatusCallbacks.add(new ServiceStatus.MultipleCallbackServiceStatusCallback(List.of(
           new ServiceStatus.IdealStateAndCurrentStateMatchServiceStatusCallback(_helixManager, getHelixClusterName(),
               instance, resourcesToMonitor, 100.0),
           new ServiceStatus.IdealStateAndExternalViewMatchServiceStatusCallback(_helixManager, getHelixClusterName(),

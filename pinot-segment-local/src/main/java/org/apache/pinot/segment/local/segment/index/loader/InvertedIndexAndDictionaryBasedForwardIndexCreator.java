@@ -82,6 +82,8 @@ public class InvertedIndexAndDictionaryBasedForwardIndexCreator implements AutoC
   private final ForwardIndexConfig _forwardIndexConfig;
   private final SegmentDirectory.Writer _segmentWriter;
   private final boolean _isTemporaryForwardIndex;
+  private final String _tableNameWithType;
+  private final boolean _continueOnError;
 
   // Metadata
   private final SegmentDirectory _segmentDirectory;
@@ -114,13 +116,15 @@ public class InvertedIndexAndDictionaryBasedForwardIndexCreator implements AutoC
 
   public InvertedIndexAndDictionaryBasedForwardIndexCreator(String columnName, SegmentDirectory segmentDirectory,
       boolean dictionaryEnabled, ForwardIndexConfig fwdConf, SegmentDirectory.Writer segmentWriter,
-      boolean isTemporaryForwardIndex)
+      boolean isTemporaryForwardIndex, String tableNameWithType, boolean continueOnError)
       throws IOException {
     _columnName = columnName;
     _segmentDirectory = segmentDirectory;
     _segmentMetadata = segmentDirectory.getSegmentMetadata();
     _segmentWriter = segmentWriter;
     _isTemporaryForwardIndex = isTemporaryForwardIndex;
+    _tableNameWithType = tableNameWithType;
+    _continueOnError = continueOnError;
 
     _columnMetadata = _segmentMetadata.getColumnMetadataFor(columnName);
     _singleValue = _columnMetadata.isSingleValue();
@@ -212,9 +216,11 @@ public class InvertedIndexAndDictionaryBasedForwardIndexCreator implements AutoC
       // MV columns, in addition to dictionary related metadata, MAX_MULTI_VALUE_ELEMENTS and TOTAL_NUMBER_OF_ENTRIES
       // may be modified which can be left behind in the modified state even on forward index deletion.
       LOGGER.info("Created forward index from inverted index and dictionary. Updating metadata properties for "
-          + "segment: {}, column: {}, property list: {}, is temporary: {}", segmentName, _columnName,
+              + "segment: {}, column: {}, property list: {}, is temporary: {}", segmentName, _columnName,
           metadataProperties, _isTemporaryForwardIndex);
-      _segmentMetadata = SegmentMetadataUtils.updateMetadataProperties(_segmentDirectory, metadataProperties);
+      if (!metadataProperties.isEmpty()) {
+        _segmentMetadata = SegmentMetadataUtils.updateMetadataProperties(_segmentDirectory, metadataProperties);
+      }
     } catch (Exception e) {
       throw new IOException(
           String.format("Failed to update metadata properties for segment: %s, column: %s", segmentName, _columnName),
@@ -268,17 +274,24 @@ public class InvertedIndexAndDictionaryBasedForwardIndexCreator implements AutoC
           .withForwardIndexDisabled(false)
           .withDictionary(_dictionaryEnabled)
           .withLengthOfLongestEntry(lengthOfLongestEntry)
+          .withTableNameWithType(_tableNameWithType)
+          .withContinueOnError(_continueOnError)
           .build();
 
       // note: this method closes buffers and removes files
       writeToForwardIndex(dictionary, context);
 
       // Setup and return the metadata properties to update
-      Map<String, String> metadataProperties = new HashMap<>();
-      metadataProperties.put(getKeyFor(_columnName, HAS_DICTIONARY), String.valueOf(_dictionaryEnabled));
-      metadataProperties.put(getKeyFor(_columnName, DICTIONARY_ELEMENT_SIZE),
-          String.valueOf(_dictionaryEnabled ? _columnMetadata.getColumnMaxLength() : 0));
-      return metadataProperties;
+      if (_dictionaryEnabled) {
+        return Map.of();
+      } else {
+        return Map.of(
+            getKeyFor(_columnName, HAS_DICTIONARY), String.valueOf(false),
+            getKeyFor(_columnName, DICTIONARY_ELEMENT_SIZE), String.valueOf(0)
+            // TODO: See https://github.com/apache/pinot/pull/16921 for details
+            // getKeyFor(_columnName, BITS_PER_ELEMENT), String.valueOf(-1)
+        );
+      }
     }
   }
 
@@ -354,19 +367,23 @@ public class InvertedIndexAndDictionaryBasedForwardIndexCreator implements AutoC
           .withMaxNumberOfMultiValueElements(maxNumberOfMultiValues[0])
           .withMaxRowLengthInBytes(maxRowLengthInBytes[0])
           .withLengthOfLongestEntry(lengthOfLongestEntry)
+          .withTableNameWithType(_tableNameWithType)
+          .withContinueOnError(_continueOnError)
           .build();
 
       writeToForwardIndex(dictionary, context);
 
       // Setup and return the metadata properties to update
       Map<String, String> metadataProperties = new HashMap<>();
-      metadataProperties.put(getKeyFor(_columnName, HAS_DICTIONARY), String.valueOf(_dictionaryEnabled));
-      metadataProperties.put(getKeyFor(_columnName, DICTIONARY_ELEMENT_SIZE),
-          String.valueOf(_dictionaryEnabled ? _columnMetadata.getColumnMaxLength() : 0));
       metadataProperties.put(getKeyFor(_columnName, MAX_MULTI_VALUE_ELEMENTS),
           String.valueOf(maxNumberOfMultiValues[0]));
-      metadataProperties.put(getKeyFor(_columnName, TOTAL_NUMBER_OF_ENTRIES),
-          String.valueOf(_nextValueId));
+      metadataProperties.put(getKeyFor(_columnName, TOTAL_NUMBER_OF_ENTRIES), String.valueOf(_nextValueId));
+      if (!_dictionaryEnabled) {
+        metadataProperties.put(getKeyFor(_columnName, HAS_DICTIONARY), String.valueOf(false));
+        metadataProperties.put(getKeyFor(_columnName, DICTIONARY_ELEMENT_SIZE), String.valueOf(0));
+        // TODO: See https://github.com/apache/pinot/pull/16921 for details
+        // metadataProperties.put(getKeyFor(_columnName, BITS_PER_ELEMENT), String.valueOf(-1));
+      }
       return metadataProperties;
     }
   }

@@ -18,9 +18,11 @@
  */
 package org.apache.pinot.plugin.minion.tasks.mergerollup;
 
+import com.google.common.annotations.VisibleForTesting;
 import java.util.Arrays;
 import java.util.HashMap;
 import java.util.HashSet;
+import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.TreeMap;
@@ -62,6 +64,11 @@ public class MergeRollupTaskUtils {
       String key = entry.getKey();
       for (String configKey : VALID_CONFIG_KEYS) {
         if (key.endsWith(configKey)) {
+          if (key.length() - configKey.length() < 2) {
+            throw new IllegalStateException(
+                "Configuration key: " + key + " should be prefixed by merge level, e.g. '1day.'");
+          }
+
           String level = key.substring(0, key.length() - configKey.length() - 1);
           levelToConfigMap.computeIfAbsent(level, k -> new TreeMap<>()).put(configKey, entry.getValue());
         } else {
@@ -133,5 +140,10 @@ public class MergeRollupTaskUtils {
       }
     }
     return aggregationFunctionParameters;
+  }
+
+  @VisibleForTesting
+  public static List<String> getValidConfigKeys() {
+    return Arrays.asList(VALID_CONFIG_KEYS);
   }
 }

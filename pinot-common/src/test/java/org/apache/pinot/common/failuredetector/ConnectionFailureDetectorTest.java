@@ -39,6 +39,7 @@ import static org.testng.Assert.assertTrue;
 
 public class ConnectionFailureDetectorTest {
   private static final String INSTANCE_ID = "Server_localhost_1234";
+  private static final String HOST_NAME = "localhost";
 
   private BrokerMetrics _brokerMetrics;
   private FailureDetector _failureDetector;
@@ -67,15 +68,15 @@ public class ConnectionFailureDetectorTest {
     // No unhealthy servers initially
     verify(Collections.emptySet(), 0, 0);
 
-    _failureDetector.markServerUnhealthy(INSTANCE_ID);
+    _failureDetector.markServerUnhealthy(INSTANCE_ID, HOST_NAME);
     verify(Collections.singleton(INSTANCE_ID), 1, 0);
 
     // Mark server unhealthy again should have no effect
-    _failureDetector.markServerUnhealthy(INSTANCE_ID);
+    _failureDetector.markServerUnhealthy(INSTANCE_ID, HOST_NAME);
     verify(Collections.singleton(INSTANCE_ID), 1, 0);
 
     // Mark server healthy should remove it from the unhealthy servers and trigger a callback
-    _failureDetector.markServerHealthy(INSTANCE_ID);
+    _failureDetector.markServerHealthy(INSTANCE_ID, HOST_NAME);
     verify(Collections.emptySet(), 1, 1);
   }
 
@@ -84,7 +85,7 @@ public class ConnectionFailureDetectorTest {
     _unhealthyServerRetrier = new UnhealthyServerRetrier(10);
     _failureDetector.registerUnhealthyServerRetrier(_unhealthyServerRetrier);
 
-    _failureDetector.markServerUnhealthy(INSTANCE_ID);
+    _failureDetector.markServerUnhealthy(INSTANCE_ID, HOST_NAME);
     verify(Collections.singleton(INSTANCE_ID), 1, 0);
 
     // Should get 10 retries in 1s, then remove the failed server from the unhealthy servers.
@@ -111,7 +112,7 @@ public class ConnectionFailureDetectorTest {
     _unhealthyServerRetrier = new UnhealthyServerRetrier(6);
     _failureDetector.registerUnhealthyServerRetrier(_unhealthyServerRetrier);
 
-    _failureDetector.markServerUnhealthy(INSTANCE_ID);
+    _failureDetector.markServerUnhealthy(INSTANCE_ID, HOST_NAME);
     verify(Collections.singleton(INSTANCE_ID), 1, 0);
 
     TestUtils.waitForCondition(aVoid -> {
@@ -150,7 +151,7 @@ public class ConnectionFailureDetectorTest {
     // Register a retrier that isn't aware of the failing server. This should not affect the retry process.
     _failureDetector.registerUnhealthyServerRetrier(instanceId -> FailureDetector.ServerState.UNKNOWN);
 
-    _failureDetector.markServerUnhealthy(INSTANCE_ID);
+    _failureDetector.markServerUnhealthy(INSTANCE_ID, HOST_NAME);
     verify(Collections.singleton(INSTANCE_ID), 1, 0);
 
     // Should retry until both unhealthy server retriers return that the server is healthy

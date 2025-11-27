@@ -124,7 +124,7 @@ public class ExecutorServiceUtils {
   public static void close(ExecutorService executorService, long terminationMillis) {
     executorService.shutdown();
     try {
-      if (!executorService.awaitTermination(terminationMillis, TimeUnit.SECONDS)) {
+      if (!executorService.awaitTermination(terminationMillis, TimeUnit.MILLISECONDS)) {
         List<Runnable> runnables = executorService.shutdownNow();
         LOGGER.warn("Around {} didn't finish in time after a shutdown", runnables.size());
       }

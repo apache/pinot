@@ -23,11 +23,11 @@ import com.fasterxml.jackson.databind.node.ObjectNode;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
 import com.google.common.collect.ImmutableSet;
+import com.google.common.collect.Iterables;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
-import java.util.EnumSet;
 import java.util.HashSet;
 import java.util.Iterator;
 import java.util.List;
@@ -44,6 +44,8 @@ import org.apache.pinot.common.request.context.FunctionContext;
 import org.apache.pinot.common.request.context.RequestContextUtils;
 import org.apache.pinot.common.tier.TierFactory;
 import org.apache.pinot.common.utils.config.TagNameUtils;
+import org.apache.pinot.segment.local.aggregator.ValueAggregator;
+import org.apache.pinot.segment.local.aggregator.ValueAggregatorFactory;
 import org.apache.pinot.segment.local.function.FunctionEvaluator;
 import org.apache.pinot.segment.local.function.FunctionEvaluatorFactory;
 import org.apache.pinot.segment.local.recordtransformer.SchemaConformingTransformer;
@@ -54,12 +56,14 @@ import org.apache.pinot.segment.spi.index.FieldIndexConfigsUtil;
 import org.apache.pinot.segment.spi.index.IndexService;
 import org.apache.pinot.segment.spi.index.IndexType;
 import org.apache.pinot.segment.spi.index.StandardIndexes;
+import org.apache.pinot.segment.spi.index.multicolumntext.MultiColumnTextMetadata;
 import org.apache.pinot.segment.spi.index.startree.AggregationFunctionColumnPair;
 import org.apache.pinot.spi.config.table.ColumnPartitionConfig;
 import org.apache.pinot.spi.config.table.DedupConfig;
 import org.apache.pinot.spi.config.table.FieldConfig;
 import org.apache.pinot.spi.config.table.FieldConfig.EncodingType;
 import org.apache.pinot.spi.config.table.IndexingConfig;
+import org.apache.pinot.spi.config.table.MultiColumnTextIndexConfig;
 import org.apache.pinot.spi.config.table.QuotaConfig;
 import org.apache.pinot.spi.config.table.ReplicaGroupStrategyConfig;
 import org.apache.pinot.spi.config.table.RoutingConfig;
@@ -86,6 +90,7 @@ import org.apache.pinot.spi.config.table.ingestion.IngestionConfig;
 import org.apache.pinot.spi.config.table.ingestion.SchemaConformingTransformerConfig;
 import org.apache.pinot.spi.config.table.ingestion.StreamIngestionConfig;
 import org.apache.pinot.spi.config.table.ingestion.TransformConfig;
+import org.apache.pinot.spi.data.DateTimeFieldSpec;
 import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
 import org.apache.pinot.spi.data.Schema;
@@ -103,7 +108,9 @@ import org.apache.pinot.spi.utils.TimeUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import static org.apache.pinot.segment.spi.AggregationFunctionType.*;
+import static org.apache.pinot.segment.spi.AggregationFunctionType.DISTINCTCOUNTHLL;
+import static org.apache.pinot.segment.spi.AggregationFunctionType.DISTINCTCOUNTHLLPLUS;
+import static org.apache.pinot.segment.spi.AggregationFunctionType.SUMPRECISION;
 
 
 /**
@@ -122,8 +129,6 @@ public final class TableConfigUtils {
   // this is duplicate with KinesisConfig.STREAM_TYPE, while instead of use KinesisConfig.STREAM_TYPE directly, we
   // hardcode the value here to avoid pulling the entire pinot-kinesis module as dependency.
   private static final String KINESIS_STREAM_TYPE = "kinesis";
-  private static final EnumSet<AggregationFunctionType> SUPPORTED_INGESTION_AGGREGATIONS =
-      EnumSet.of(SUM, MIN, MAX, COUNT, DISTINCTCOUNTHLL, SUMPRECISION, DISTINCTCOUNTHLLPLUS);
 
   private static final Set<String> UPSERT_DEDUP_ALLOWED_ROUTING_STRATEGIES =
       ImmutableSet.of(RoutingConfig.STRICT_REPLICA_GROUP_INSTANCE_SELECTOR_TYPE,
@@ -185,8 +190,10 @@ public final class TableConfigUtils {
       validatePartialUpsertStrategies(tableConfig, schema);
     }
 
+    validateTaskConfig(tableConfig);
+
     if (_enforcePoolBasedAssignment) {
-      validateInstancePoolsNReplicaGroups(tableConfig);
+      validateInstancePoolsAndReplicaGroups(tableConfig);
     }
   }
 
@@ -214,7 +221,17 @@ public final class TableConfigUtils {
     return status;
   }
 
-  public static void validateInstancePoolsNReplicaGroups(TableConfig tableConfig) {
+  public static void validateInstancePoolsAndReplicaGroups(TableConfig tableConfig) {
+    // Instance pools / replica groups aren't relevant for dimension tables
+    if (tableConfig.isDimTable()) {
+      return;
+    }
+    // If the table is set up to point to a pre-existing instance partitions (like that of a reference table to support
+    // colocated joins), we don't need to validate instance pools and replica groups since that check should be done on
+    // the reference source.
+    if (tableConfig.getInstancePartitionsMap() != null) {
+      return;
+    }
     Preconditions.checkState(isTableUsingInstancePoolAndReplicaGroup(tableConfig),
         "Instance pool and replica group configurations must be enabled");
   }
@@ -266,14 +283,56 @@ public final class TableConfigUtils {
     }
 
     // Retention may not be specified. Ignore validation in that case.
-    String timeUnitString = segmentsConfig.getRetentionTimeUnit();
-    if (timeUnitString == null || timeUnitString.isEmpty()) {
-      return;
+    String retentionTimeUnitString = segmentsConfig.getRetentionTimeUnit();
+    if (retentionTimeUnitString != null && !retentionTimeUnitString.isEmpty()) {
+      try {
+        TimeUnit.valueOf(retentionTimeUnitString.toUpperCase());
+      } catch (Exception e) {
+        throw new IllegalStateException(
+            String.format("Table: %s, invalid retention time unit: %s", tableName, retentionTimeUnitString));
+      }
     }
-    try {
-      TimeUnit.valueOf(timeUnitString.toUpperCase());
-    } catch (Exception e) {
-      throw new IllegalStateException(String.format("Table: %s, invalid time unit: %s", tableName, timeUnitString));
+
+    // Untracked segments retention may not be specified. Ignore validation in that case.
+    String untrackedSegmentsRetentionTimeUnitString = segmentsConfig.getUntrackedSegmentsRetentionTimeUnit();
+    String untrackedSegmentsRetentionTimeValueString = segmentsConfig.getUntrackedSegmentsRetentionTimeValue();
+
+    boolean hasUntrackedTimeUnit =
+        untrackedSegmentsRetentionTimeUnitString != null && !untrackedSegmentsRetentionTimeUnitString.isEmpty();
+    boolean hasUntrackedTimeValue =
+        untrackedSegmentsRetentionTimeValueString != null && !untrackedSegmentsRetentionTimeValueString.isEmpty();
+
+    if (hasUntrackedTimeUnit && !hasUntrackedTimeValue) {
+      throw new IllegalStateException(String.format(
+          "Table: %s, untracked retention time value must be specified when untracked retention time unit is provided",
+          tableName));
+    }
+    if (hasUntrackedTimeValue && !hasUntrackedTimeUnit) {
+      throw new IllegalStateException(String.format(
+          "Table: %s, untracked retention time unit must be specified when untracked retention time value is provided",
+          tableName));
+    }
+
+    if (hasUntrackedTimeUnit) {
+      try {
+        TimeUnit.valueOf(untrackedSegmentsRetentionTimeUnitString.toUpperCase());
+      } catch (Exception e) {
+        throw new IllegalStateException(String.format("Table: %s, invalid untracked retention time unit: %s", tableName,
+            untrackedSegmentsRetentionTimeUnitString));
+      }
+
+      try {
+        long timeValue = Long.parseLong(untrackedSegmentsRetentionTimeValueString);
+        if (timeValue <= 0) {
+          throw new IllegalStateException(
+              String.format("Table: %s, untracked retention time value must be positive: %s", tableName,
+                  untrackedSegmentsRetentionTimeValueString));
+        }
+      } catch (Exception e) {
+        throw new IllegalStateException(
+            String.format("Table: %s, invalid untracked retention time value: %s", tableName,
+                untrackedSegmentsRetentionTimeValueString));
+      }
     }
   }
 
@@ -416,7 +475,7 @@ public final class TableConfigUtils {
       // Aggregation configs
       List<AggregationConfig> aggregationConfigs = ingestionConfig.getAggregationConfigs();
       Set<String> aggregationSourceColumns = new HashSet<>();
-      if (!CollectionUtils.isEmpty(aggregationConfigs)) {
+      if (CollectionUtils.isNotEmpty(aggregationConfigs)) {
         Preconditions.checkState(!tableConfig.getIndexingConfig().isAggregateMetrics(),
             "aggregateMetrics cannot be set with AggregationConfig");
         Set<String> aggregationColumns = new HashSet<>();
@@ -451,8 +510,6 @@ public final class TableConfigUtils {
           FunctionContext functionContext = expressionContext.getFunction();
           AggregationFunctionType functionType =
               AggregationFunctionType.getAggregationFunctionType(functionContext.getFunctionName());
-          validateIngestionAggregation(functionType);
-
           List<ExpressionContext> arguments = functionContext.getArguments();
           int numArguments = arguments.size();
           if (functionType == DISTINCTCOUNTHLL) {
@@ -508,6 +565,18 @@ public final class TableConfigUtils {
           Preconditions.checkState(firstArgument.getType() == ExpressionContext.Type.IDENTIFIER,
               "First argument of aggregation function: %s must be identifier, got: %s", functionType,
               firstArgument.getType());
+          // Create a ValueAggregator for the aggregation function and check if it is supported for ingestion (fixed
+          // size aggregated value).
+          ValueAggregator<?, ?> valueAggregator;
+          try {
+            valueAggregator =
+                ValueAggregatorFactory.getValueAggregator(functionType, arguments.subList(1, numArguments));
+          } catch (Exception e) {
+            throw new IllegalStateException(
+                "Caught exception while creating ValueAggregator for aggregation function: " + aggregationFunction, e);
+          }
+          Preconditions.checkState(valueAggregator.isAggregatedValueFixedSize(),
+              "Aggregation function: %s must have fixed size aggregated value", aggregationFunction);
 
           aggregationSourceColumns.add(firstArgument.getIdentifier());
         }
@@ -563,8 +632,8 @@ public final class TableConfigUtils {
             expressionEvaluator = FunctionEvaluatorFactory.getExpressionEvaluator(transformFunction);
           } catch (Exception e) {
             throw new IllegalStateException(
-                "Invalid transform function '" + transformFunction + "' for column '" + columnName
-                    + "', exception: " + e.getMessage(), e);
+                "Invalid transform function '" + transformFunction + "' for column '" + columnName + "', exception: "
+                    + e.getMessage(), e);
           }
           List<String> arguments = expressionEvaluator.getArguments();
           if (arguments.contains(columnName)) {
@@ -599,11 +668,6 @@ public final class TableConfigUtils {
     }
   }
 
-  public static void validateIngestionAggregation(AggregationFunctionType functionType) {
-    Preconditions.checkState(SUPPORTED_INGESTION_AGGREGATIONS.contains(functionType),
-        "Aggregation function: %s must be one of: %s", functionType, SUPPORTED_INGESTION_AGGREGATIONS);
-  }
-
   private static void validateStreamConfigMaps(TableConfig tableConfig) {
     List<Map<String, String>> streamConfigMaps = IngestionConfigUtils.getStreamConfigMaps(tableConfig);
     int numStreamConfigs = streamConfigMaps.size();
@@ -620,6 +684,12 @@ public final class TableConfigUtils {
       streamConfigs.add(streamConfig);
     }
     if (numStreamConfigs > 1) {
+      IngestionConfig ingestionConfig = tableConfig.getIngestionConfig();
+      if (ingestionConfig != null && ingestionConfig.getStreamIngestionConfig() != null) {
+        Preconditions.checkState(
+            !tableConfig.getIngestionConfig().getStreamIngestionConfig().isPauselessConsumptionEnabled(),
+            "Multiple stream configs are not supported with pauseless consumption enabled");
+      }
       Preconditions.checkState(!tableConfig.isUpsertEnabled(),
           "Multiple stream configs are not supported for upsert table");
 
@@ -628,14 +698,17 @@ public final class TableConfigUtils {
       // 2. Ensure segment flush parameters consistent across all streamConfigs. We need this because Pinot is
       // predefining the values before fetching stream partition info from stream. At the construction time, we don't
       // know the value extracted from a streamConfig would be applied to which segment.
+      // 3. There should not be duplicate topic names across streamConfigs.
       // TODO: Remove these limitations
       StreamConfig firstStreamConfig = streamConfigs.get(0);
+      Set<String> topicNames = new HashSet<>();
       String streamType = firstStreamConfig.getType();
       int flushThresholdRows = firstStreamConfig.getFlushThresholdRows();
       long flushThresholdTimeMillis = firstStreamConfig.getFlushThresholdTimeMillis();
       double flushThresholdVarianceFraction = firstStreamConfig.getFlushThresholdVarianceFraction();
       long flushThresholdSegmentSizeBytes = firstStreamConfig.getFlushThresholdSegmentSizeBytes();
       int flushThresholdSegmentRows = firstStreamConfig.getFlushThresholdSegmentRows();
+      topicNames.add(firstStreamConfig.getTopicName());
       for (int i = 1; i < numStreamConfigs; i++) {
         StreamConfig streamConfig = streamConfigs.get(i);
         Preconditions.checkState(streamConfig.getType().equals(streamType),
@@ -646,6 +719,8 @@ public final class TableConfigUtils {
                 && streamConfig.getFlushThresholdSegmentSizeBytes() == flushThresholdSegmentSizeBytes
                 && streamConfig.getFlushThresholdSegmentRows() == flushThresholdSegmentRows,
             "Segment flush parameters must be consistent across all streamConfigs");
+        Preconditions.checkState(topicNames.add(streamConfig.getTopicName()),
+            "Duplicate topic names found in streamConfigs: %s", streamConfig.getTopicName());
       }
     }
   }
@@ -701,6 +776,9 @@ public final class TableConfigUtils {
       return;
     }
 
+    Preconditions.checkState(tableConfig.getTierConfigsList() == null || tableConfig.getTierConfigsList().isEmpty(),
+        "Tiered storage is not supported for Upsert/Dedup tables");
+
     boolean isUpsertEnabled = tableConfig.getUpsertMode() != UpsertConfig.Mode.NONE;
     boolean isDedupEnabled = tableConfig.getDedupConfig() != null && tableConfig.getDedupConfig().isDedupEnabled();
 
@@ -733,6 +811,8 @@ public final class TableConfigUtils {
     // specifically for upsert
     UpsertConfig upsertConfig = tableConfig.getUpsertConfig();
     if (upsertConfig != null) {
+      // Currently, only one tier is allowed for upsert table, as the committed segments can't be moved to other tiers.
+      Preconditions.checkState(tableConfig.getTierConfigsList() == null, "The upsert table cannot have multi-tiers");
       // no startree index
       Preconditions.checkState(CollectionUtils.isEmpty(tableConfig.getIndexingConfig().getStarTreeIndexConfigs())
               && !tableConfig.getIndexingConfig().isEnableDefaultStarTree(),
@@ -790,8 +870,8 @@ public final class TableConfigUtils {
 
         // enableDeletedKeysCompactionConsistency should exist with UpsertCompactionTask / UpsertCompactMergeTask
         TableTaskConfig taskConfig = tableConfig.getTaskConfig();
-        Preconditions.checkState(taskConfig != null
-                && (taskConfig.getTaskTypeConfigsMap().containsKey(UPSERT_COMPACTION_TASK_TYPE)
+        Preconditions.checkState(
+            taskConfig != null && (taskConfig.getTaskTypeConfigsMap().containsKey(UPSERT_COMPACTION_TASK_TYPE)
                 || taskConfig.getTaskTypeConfigsMap().containsKey(UPSERT_COMPACT_MERGE_TASK_TYPE)),
             "enableDeletedKeysCompactionConsistency should exist with UpsertCompactionTask"
                 + " / UpsertCompactMergeTask for upsert table");
@@ -806,11 +886,23 @@ public final class TableConfigUtils {
 
     Preconditions.checkState(
         tableConfig.getInstanceAssignmentConfigMap() == null || !tableConfig.getInstanceAssignmentConfigMap()
-            .containsKey(InstancePartitionsType.COMPLETED),
-        "InstanceAssignmentConfig for COMPLETED is not allowed for upsert tables");
+            .containsKey(InstancePartitionsType.COMPLETED.name()),
+        "COMPLETED instance partitions can't be configured for upsert / dedup tables");
     validateAggregateMetricsForUpsertConfig(tableConfig);
     validateTTLForUpsertConfig(tableConfig, schema);
     validateTTLForDedupConfig(tableConfig, schema);
+  }
+
+  /**
+   * Checks if a data type is valid for time-based comparison operations (upsert/dedup).
+   * Valid types include numeric types and types with stored data as a numeric type:
+   *   e.g. TIMESTAMP which is stored as LONG internally.
+   *
+   * @param dataType the data type to check
+   * @return true if the data type can be used for time-based comparison, false otherwise
+   */
+  private static boolean isValidTimeComparisonType(DataType dataType) {
+    return dataType.isNumeric() || dataType.getStoredType().isNumeric();
   }
 
   /**
@@ -829,15 +921,15 @@ public final class TableConfigUtils {
           "MetadataTTL / DeletedKeysTTL does not work with multiple comparison columns");
       String comparisonColumn = comparisonColumns.get(0);
       DataType comparisonColumnDataType = schema.getFieldSpecFor(comparisonColumn).getDataType();
-      Preconditions.checkState(comparisonColumnDataType.isNumeric(),
-          "MetadataTTL / DeletedKeysTTL must have comparison column: %s in numeric type, found: %s", comparisonColumn,
-          comparisonColumnDataType);
+      Preconditions.checkState(isValidTimeComparisonType(comparisonColumnDataType),
+          "MetadataTTL / DeletedKeysTTL must have comparison column: %s in numeric type, found: %s",
+          comparisonColumn, comparisonColumnDataType);
     } else {
       String comparisonColumn = tableConfig.getValidationConfig().getTimeColumnName();
       DataType comparisonColumnDataType = schema.getFieldSpecFor(comparisonColumn).getDataType();
-      Preconditions.checkState(comparisonColumnDataType.isNumeric(),
-          "MetadataTTL / DeletedKeysTTL must have time column: %s in numeric type, found: %s", comparisonColumn,
-          comparisonColumnDataType);
+      Preconditions.checkState(isValidTimeComparisonType(comparisonColumnDataType),
+          "MetadataTTL / DeletedKeysTTL must have time column: %s in numeric type, found: %s",
+          comparisonColumn, comparisonColumnDataType);
     }
 
     if (upsertConfig.getMetadataTTL() > 0) {
@@ -865,15 +957,50 @@ public final class TableConfigUtils {
     String dedupTimeColumn = dedupConfig.getDedupTimeColumn();
     if (dedupTimeColumn != null && !dedupTimeColumn.isEmpty()) {
       DataType comparisonColumnDataType = schema.getFieldSpecFor(dedupTimeColumn).getDataType();
-      Preconditions.checkState(comparisonColumnDataType.isNumeric(),
+      Preconditions.checkState(isValidTimeComparisonType(comparisonColumnDataType),
           "MetadataTTL must have dedupTimeColumn: %s in numeric type, found: %s", dedupTimeColumn,
           comparisonColumnDataType);
     } else {
       String timeColumn = tableConfig.getValidationConfig().getTimeColumnName();
       DataType timeColumnDataType = schema.getFieldSpecFor(timeColumn).getDataType();
-      Preconditions.checkState(timeColumnDataType.isNumeric(),
-          "MetadataTTL must have time column: %s in numeric type, found: %s", timeColumn, timeColumnDataType);
+      Preconditions.checkState(isValidTimeComparisonType(timeColumnDataType),
+          "MetadataTTL must have time column: %s in numeric type, found: %s", timeColumn,
+          timeColumnDataType);
     }
+    if (tableConfig.getTierConfigsList() != null) {
+      validateTTLAndTierConfigsForDedupTable(tableConfig, schema);
+    }
+  }
+
+  @VisibleForTesting
+  static void validateTTLAndTierConfigsForDedupTable(TableConfig tableConfig, Schema schema) {
+    DedupConfig dedupConfig = tableConfig.getDedupConfig();
+    // Tiers are required to use segmentAge selector, and the min of them should be >= TTL, so that only segments
+    // out of TTL are moved to other tiers. Also, TTL must be defined on timeColumn to compare with segmentAges.
+    String timeColumn = tableConfig.getValidationConfig().getTimeColumnName();
+    String dedupTimeColumn = dedupConfig.getDedupTimeColumn();
+    if (dedupTimeColumn != null && !dedupTimeColumn.isEmpty()) {
+      Preconditions.checkState(timeColumn.equalsIgnoreCase(dedupTimeColumn),
+          "DedupTimeColumn: %s is different from table's timeColumn: %s", dedupTimeColumn, timeColumn);
+    }
+    long minSegmentAgeInMs = Long.MAX_VALUE;
+    for (TierConfig tierConfig : tableConfig.getTierConfigsList()) {
+      String tierName = tierConfig.getName();
+      String segmentSelectorType = tierConfig.getSegmentSelectorType();
+      Preconditions.checkState(segmentSelectorType.equalsIgnoreCase(TierFactory.TIME_SEGMENT_SELECTOR_TYPE),
+          "Time based segment selector is required but tier: %s uses selector: %s", tierName, segmentSelectorType);
+      String segmentAge = tierConfig.getSegmentAge();
+      minSegmentAgeInMs = Math.min(minSegmentAgeInMs, TimeUtils.convertPeriodToMillis(segmentAge));
+    }
+    // Convert TTL value to millisecond based on timeColumn fieldSpec in order to compare with segment ages.
+    DateTimeFieldSpec dateTimeSpec = schema.getSpecForTimeColumn(timeColumn);
+    long ttl = (long) dedupConfig.getMetadataTTL();
+    long ttlInMs = dateTimeSpec.getFormatSpec().fromFormatToMillis(ttl);
+    LOGGER.debug(
+        "Converting MetadataTTL: {} to {}ms with DateTimeFieldSpec: {} and to compare with minSegmentAge: {}ms", ttl,
+        ttlInMs, dateTimeSpec, minSegmentAgeInMs);
+    Preconditions.checkState(ttlInMs < minSegmentAgeInMs,
+        "MetadataTTL: %s(ms) must be smaller than the minimum segmentAge: %s(ms)", ttlInMs, minSegmentAgeInMs);
   }
 
   /**
@@ -930,7 +1057,8 @@ public final class TableConfigUtils {
       return;
     }
     for (Map.Entry<String, InstanceAssignmentConfig> instanceAssignmentConfigMapEntry
-        : tableConfig.getInstanceAssignmentConfigMap().entrySet()) {
+        : tableConfig.getInstanceAssignmentConfigMap()
+        .entrySet()) {
       String instancePartitionsType = instanceAssignmentConfigMapEntry.getKey();
       InstanceAssignmentConfig instanceAssignmentConfig = instanceAssignmentConfigMapEntry.getValue();
       if (instanceAssignmentConfig.getPartitionSelector()
@@ -1034,6 +1162,37 @@ public final class TableConfigUtils {
   }
 
   /**
+   * Validates task configuration to ensure no conflicting task types are configured.
+   */
+  @VisibleForTesting
+  static void validateTaskConfig(TableConfig tableConfig) {
+    TableTaskConfig taskConfig = tableConfig.getTaskConfig();
+    if (taskConfig == null || taskConfig.getTaskTypeConfigsMap() == null) {
+      return;
+    }
+
+    Map<String, Map<String, String>> taskTypeConfigsMap = taskConfig.getTaskTypeConfigsMap();
+
+    String minNumSegmentsPerTaskKey = "minNumSegmentsPerTask";
+    if (taskTypeConfigsMap.containsKey(UPSERT_COMPACT_MERGE_TASK_TYPE)
+        && taskTypeConfigsMap.containsKey(UPSERT_COMPACTION_TASK_TYPE)) {
+
+      Map<String, String> upsertCompactMergeConfig = taskTypeConfigsMap.get(UPSERT_COMPACT_MERGE_TASK_TYPE);
+
+      if (upsertCompactMergeConfig != null) {
+        long minNumSegments = Long.parseLong(
+            upsertCompactMergeConfig.getOrDefault(minNumSegmentsPerTaskKey, String.valueOf(2)));
+
+        Preconditions.checkState(minNumSegments > 1, String.format(
+            "When %s.%s is set to 1, %s should not be configured to avoid indeterministic behavior. "
+                + "Please remove %s configuration or set %s to a value greater than 1.",
+            UPSERT_COMPACT_MERGE_TASK_TYPE, minNumSegmentsPerTaskKey, UPSERT_COMPACTION_TASK_TYPE,
+            UPSERT_COMPACTION_TASK_TYPE, minNumSegmentsPerTaskKey));
+      }
+    }
+  }
+
+  /**
    * Validates the tier configs
    * Checks for the right segmentSelectorType and its required properties
    * Checks for the right storageType and its required properties
@@ -1050,8 +1209,8 @@ public final class TableConfigUtils {
       Preconditions.checkState(tierNames.add(tierName), "Tier name: %s already exists in tier configs", tierName);
 
       String segmentSelectorType = tierConfig.getSegmentSelectorType();
-      String segmentAge = tierConfig.getSegmentAge();
       if (segmentSelectorType.equalsIgnoreCase(TierFactory.TIME_SEGMENT_SELECTOR_TYPE)) {
+        String segmentAge = tierConfig.getSegmentAge();
         Preconditions.checkState(segmentAge != null,
             "Must provide 'segmentAge' for segmentSelectorType: %s in tier: %s", segmentSelectorType, tierName);
         Preconditions.checkState(TimeUtils.isPeriodValid(segmentAge),
@@ -1107,6 +1266,8 @@ public final class TableConfigUtils {
       }
     }
 
+    validateMultiColumnTextIndex(indexingConfig.getMultiColumnTextIndexConfig());
+
     // Star-tree index config is not managed by FieldIndexConfigs, and we need to validate it separately.
     List<StarTreeIndexConfig> starTreeIndexConfigs = indexingConfig.getStarTreeIndexConfigs();
     if (CollectionUtils.isNotEmpty(starTreeIndexConfigs)) {
@@ -1154,6 +1315,36 @@ public final class TableConfigUtils {
     }
   }
 
+  private static void validateMultiColumnTextIndex(MultiColumnTextIndexConfig multiColTextIndex) {
+    if (multiColTextIndex == null) {
+      return;
+    }
+
+    Preconditions.checkState(multiColTextIndex.getColumns() != null && !multiColTextIndex.getColumns().isEmpty(),
+        "Multi-column text index's list of columns can't be empty");
+
+    checkForDuplicates(multiColTextIndex.getColumns());
+
+    if (multiColTextIndex.getProperties() != null) {
+      for (String key : multiColTextIndex.getProperties().keySet()) {
+        Preconditions.checkState(MultiColumnTextMetadata.isValidSharedProperty(key),
+            "Multi-column text index doesn't allow: %s as shared property", key);
+      }
+    }
+
+    if (multiColTextIndex.getPerColumnProperties() != null) {
+      for (String column : multiColTextIndex.getPerColumnProperties().keySet()) {
+        Preconditions.checkState(multiColTextIndex.getColumns().contains(column),
+            "Multi-column text index per-column property refers to unknown column: %s", column);
+
+        for (String key : multiColTextIndex.getPerColumnProperties().get(column).keySet()) {
+          Preconditions.checkState(MultiColumnTextMetadata.isValidPerColumnProperty(key),
+              "Multi-column text index doesn't allow: %s as property for column: %s", key, column);
+        }
+      }
+    }
+  }
+
   /// Validates compatibility across [IndexingConfig] and [FieldConfig]s, ensures that:
   /// - Columns with DICTIONARY encoding type in [FieldConfig]s are not defined as no-dictionary in [IndexingConfig]
   private static void validateIndexingConfigAndFieldConfigListCompatibility(IndexingConfig indexingConfig,
@@ -1184,7 +1375,7 @@ public final class TableConfigUtils {
   /// - All referenced columns exist in the schema and are single-valued
   private static void validateStarTreeIndexConfigs(List<StarTreeIndexConfig> starTreeIndexConfigs,
       Map<String, FieldIndexConfigs> indexConfigsMap, Schema schema) {
-    Set<String> referencedColumns = new HashSet<>();
+    Set<String> dimensionColumns = new HashSet<>();
     for (StarTreeIndexConfig starTreeIndexConfig : starTreeIndexConfigs) {
       // Validate dimension columns are dictionary encoded
       List<String> dimensionsSplitOrder = starTreeIndexConfig.getDimensionsSplitOrder();
@@ -1195,7 +1386,7 @@ public final class TableConfigUtils {
             "Failed to find dimension column: %s specified in star-tree index config in schema", dimension);
         Preconditions.checkState(indexConfigs.getConfig(StandardIndexes.dictionary()).isEnabled(),
             "Cannot create star-tree index on dimension column: %s without dictionary", dimension);
-        referencedColumns.add(dimension);
+        dimensionColumns.add(dimension);
       }
 
       // Validate 'dimensionsSplitOrder' contains all dimensions in 'skipStarNodeCreationForDimensions'
@@ -1215,6 +1406,7 @@ public final class TableConfigUtils {
           "Either 'functionColumnPairs' or 'aggregationConfigs' must be specified, but not both");
       Set<AggregationFunctionColumnPair> functionColumnPairsSet = new HashSet<>();
       Set<AggregationFunctionColumnPair> storedTypes = new HashSet<>();
+      Set<String> aggregatedColumns = new HashSet<>();
       if (functionColumnPairs != null) {
         for (String functionColumnPair : functionColumnPairs) {
           AggregationFunctionColumnPair columnPair;
@@ -1236,7 +1428,10 @@ public final class TableConfigUtils {
           }
           String column = columnPair.getColumn();
           if (!column.equals(AggregationFunctionColumnPair.STAR)) {
-            referencedColumns.add(column);
+            aggregatedColumns.add(column);
+          } else if (columnPair.getFunctionType() != AggregationFunctionType.COUNT) {
+            throw new IllegalStateException("Non-COUNT function set the column as '*' in the functionColumnPair: "
+                + functionColumnPair + ". Please configure an actual column for the function");
           }
         }
       }
@@ -1262,20 +1457,27 @@ public final class TableConfigUtils {
           }
           String column = columnPair.getColumn();
           if (!column.equals(AggregationFunctionColumnPair.STAR)) {
-            referencedColumns.add(column);
+            aggregatedColumns.add(column);
+          } else if (columnPair.getFunctionType() != AggregationFunctionType.COUNT) {
+            throw new IllegalStateException("Non-COUNT function set the column as '*' in the aggregationConfig for "
+                + "function: " + aggregationConfig.getAggregationFunction()
+                + ". Please configure an actual column for the function");
           }
         }
       }
 
-      // Validate all referenced columns exist in the schema and are single-valued
-      for (String column : referencedColumns) {
+      for (String column : Iterables.concat(dimensionColumns, aggregatedColumns)) {
         FieldSpec fieldSpec = schema.getFieldSpecFor(column);
         Preconditions.checkState(fieldSpec != null,
             "Failed to find column: %s specified in star-tree index config in schema", column);
-        Preconditions.checkState(fieldSpec.isSingleValueField(),
-            "Star-tree index can only be created on single-value columns, but found multi-value column: %s", column);
         Preconditions.checkState(fieldSpec.getDataType() != DataType.MAP,
             "Star-tree index cannot be created on MAP column: %s", column);
+      }
+
+      for (String column : dimensionColumns) {
+        FieldSpec fieldSpec = schema.getFieldSpecFor(column);
+        Preconditions.checkState(fieldSpec.isSingleValueField(),
+            "Star-tree dimension columns must be single-value, but found multi-value column: %s", column);
       }
     }
   }
@@ -1387,6 +1589,28 @@ public final class TableConfigUtils {
     }
   }
 
+  public static void checkForDuplicates(List<String> columns) {
+    Set<String> seen = new HashSet<>(columns.size());
+    Set<String> duplicates = new HashSet<>(columns.size());
+
+    for (String item : columns) {
+      if (!seen.add(item)) {
+        duplicates.add(item);
+      }
+    }
+
+    if (!duplicates.isEmpty()) {
+      throw new IllegalStateException("Cannot create TEXT index on duplicate columns: " + duplicates);
+    }
+  }
+
+  public static boolean checkForInconsistentStateConfigs(TableConfig tableConfig) {
+    return tableConfig != null && tableConfig.getUpsertConfig() != null && tableConfig.getReplication() > 1 && (
+        tableConfig.getUpsertConfig().getMode() == UpsertConfig.Mode.PARTIAL || (
+            tableConfig.getUpsertConfig().isDropOutOfOrderRecord()
+                && tableConfig.getUpsertConfig().getConsistencyMode() == UpsertConfig.ConsistencyMode.NONE));
+  }
+
   // enum of all the skip-able validation types.
   public enum ValidationType {
     ALL, TASK, UPSERT
@@ -1462,12 +1686,19 @@ public final class TableConfigUtils {
     if (clone.getFieldConfigList() != null) {
       List<FieldConfig> cleanFieldConfigList = new ArrayList<>();
       for (FieldConfig fieldConfig : clone.getFieldConfigList()) {
-        cleanFieldConfigList.add(new FieldConfig.Builder(fieldConfig)
-            .withIndexTypes(null).withProperties(null).build());
+        cleanFieldConfigList.add(
+            new FieldConfig.Builder(fieldConfig).withIndexTypes(null).withProperties(null).build());
       }
       clone.setFieldConfigList(cleanFieldConfigList);
     }
     return clone;
+  }
+
+  public static boolean isCommitTimeCompactionEnabled(TableConfig tableConfig) {
+    if (tableConfig.getUpsertConfig() == null) {
+      return false;
+    }
+    return tableConfig.getUpsertConfig().isEnableCommitTimeCompaction();
   }
 
   /**
@@ -1620,9 +1851,7 @@ public final class TableConfigUtils {
   }
 
   private static void overwriteConfig(JsonNode oldCfg, JsonNode newCfg) {
-    Iterator<Map.Entry<String, JsonNode>> cfgItr = newCfg.fields();
-    while (cfgItr.hasNext()) {
-      Map.Entry<String, JsonNode> cfgEntry = cfgItr.next();
+    for (Map.Entry<String, JsonNode> cfgEntry : newCfg.properties()) {
       ((ObjectNode) oldCfg).set(cfgEntry.getKey(), cfgEntry.getValue());
     }
   }
@@ -1655,8 +1884,7 @@ public final class TableConfigUtils {
     Set<String> relevantTags = new HashSet<>();
     String serverTenantName = tableConfig.getTenantConfig().getServer();
     if (serverTenantName != null) {
-      String serverTenantTag =
-          TagNameUtils.getServerTagForTenant(serverTenantName, tableConfig.getTableType());
+      String serverTenantTag = TagNameUtils.getServerTagForTenant(serverTenantName, tableConfig.getTableType());
       relevantTags.add(serverTenantTag);
     }
     TagOverrideConfig tagOverrideConfig = tableConfig.getTenantConfig().getTagOverrideConfig();
@@ -1684,5 +1912,11 @@ public final class TableConfigUtils {
       });
     }
     return relevantTags;
+  }
+
+  public static boolean isRelevantToTenant(TableConfig tableConfig, String tenantName) {
+    Set<String> relevantTenants =
+        getRelevantTags(tableConfig).stream().map(TagNameUtils::getTenantFromTag).collect(Collectors.toSet());
+    return relevantTenants.contains(tenantName);
   }
 }

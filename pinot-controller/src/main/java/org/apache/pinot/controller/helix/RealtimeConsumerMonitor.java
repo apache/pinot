@@ -64,11 +64,6 @@ public class RealtimeConsumerMonitor extends ControllerPeriodicTask<RealtimeCons
   }
 
   @Override
-  protected void setUpTask() {
-    LOGGER.info("Setting up RealtimeConsumerMonitor task");
-  }
-
-  @Override
   protected void processTable(String tableNameWithType) {
     if (!TableType.REALTIME.equals(TableNameBuilder.getTableTypeFromTableName(tableNameWithType))) {
       return;

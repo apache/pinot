@@ -77,12 +77,12 @@ public abstract class BaseMailboxReceiveOperator extends MultiStageOperator {
         asyncStreams.add(asyncStream);
         _receivingStats.add(asyncStream._mailbox.getStatMap());
       }
-      _multiConsumer = new BlockingMultiStreamConsumer.OfMseBlock(context, asyncStreams);
+      _multiConsumer = new BlockingMultiStreamConsumer.OfMseBlock(context, asyncStreams, senderStageId);
     } else {
       // TODO: Revisit if we should throw exception here.
       _mailboxIds = List.of();
       _receivingStats = List.of();
-      _multiConsumer = new BlockingMultiStreamConsumer.OfMseBlock(context, List.of());
+      _multiConsumer = new BlockingMultiStreamConsumer.OfMseBlock(context, List.of(), senderStageId);
     }
     _statMap.merge(StatKey.FAN_IN, _mailboxIds.size());
   }
@@ -132,9 +132,20 @@ public abstract class BaseMailboxReceiveOperator extends MultiStageOperator {
   }
 
   @Override
-  public void registerExecution(long time, int numRows) {
+  protected long getDeadlineMs() {
+    // mailbox receive operator uses passive deadline instead of the active one because it is not an active operator
+    // as it just waits for data from the mailbox.
+    // This way if timeout is reached, it will be less probable to hit the timeout here, on the stage waiting for data,
+    // than in the operator that is actively processing the data, which will produce a more meaningful error message.
+    return _context.getPassiveDeadlineMs();
+  }
+
+  @Override
+  public void registerExecution(long time, int numRows, long memoryUsedBytes, long gcTimeMs) {
     _statMap.merge(StatKey.EXECUTION_TIME_MS, time);
     _statMap.merge(StatKey.EMITTED_ROWS, numRows);
+    _statMap.merge(StatKey.ALLOCATED_MEMORY_BYTES, memoryUsedBytes);
+    _statMap.merge(StatKey.GC_TIME_MS, gcTimeMs);
   }
 
   private void addReceivingStats(StatMap<ReceivingMailbox.StatKey> from) {
@@ -193,7 +204,6 @@ public abstract class BaseMailboxReceiveOperator extends MultiStageOperator {
   }
 
   public enum StatKey implements StatMap.Key {
-    //@formatter:off
     EXECUTION_TIME_MS(StatMap.Type.LONG) {
       @Override
       public boolean includeDefaultInJson() {
@@ -246,8 +256,15 @@ public abstract class BaseMailboxReceiveOperator extends MultiStageOperator {
     /**
      * How long (in CPU time) it took to wait for the messages to be offered to downstream operator.
      */
-    UPSTREAM_WAIT_MS(StatMap.Type.LONG);
-    //@formatter:on
+    UPSTREAM_WAIT_MS(StatMap.Type.LONG),
+    /**
+     * Allocated memory in bytes for this operator or its children in the same stage.
+     */
+    ALLOCATED_MEMORY_BYTES(StatMap.Type.LONG),
+    /**
+     * Time spent on GC while this operator or its children in the same stage were running.
+     */
+    GC_TIME_MS(StatMap.Type.LONG);
 
     private final StatMap.Type _type;
 

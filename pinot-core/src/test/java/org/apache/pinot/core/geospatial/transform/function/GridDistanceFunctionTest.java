@@ -21,6 +21,7 @@ package org.apache.pinot.core.geospatial.transform.function;
 import com.uber.h3core.H3CoreV3;
 import java.io.IOException;
 import java.util.Arrays;
+import java.util.List;
 import org.apache.pinot.common.request.context.ExpressionContext;
 import org.apache.pinot.common.request.context.FunctionContext;
 import org.apache.pinot.core.operator.transform.function.BaseTransformFunctionTest;
@@ -50,7 +51,7 @@ public class GridDistanceFunctionTest extends BaseTransformFunctionTest {
     // Calculate expected grid distance
     long expectedDistance = 0;
     for (int k = 1; k <= 100; k++) {
-      java.util.List<java.util.List<Long>> ringsWithDistances = h3CoreV3.kRingDistances(h3Index1, k);
+      List<List<Long>> ringsWithDistances = h3CoreV3.kRingDistances(h3Index1, k);
       boolean found = false;
       for (int distance = 0; distance < ringsWithDistances.size(); distance++) {
         if (ringsWithDistances.get(distance).contains(h3Index2)) {

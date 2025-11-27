@@ -29,6 +29,7 @@ import java.util.Arrays;
 import java.util.HashMap;
 import java.util.Iterator;
 import java.util.Map;
+import java.util.function.ToIntFunction;
 import javax.annotation.Nullable;
 import org.apache.commons.lang3.tuple.Pair;
 import org.apache.pinot.common.request.context.ExpressionContext;
@@ -140,34 +141,28 @@ public class DictionaryBasedGroupKeyGenerator implements GroupKeyGenerator {
       _isSingleValueColumn[i] = columnContext.isSingleValue();
     }
     if (groupByExpressionSizesFromPredicates != null) {
-       Pair<Boolean, Long> optimizedCardinality = getOptimizedGroupByCardinality(groupByExpressionSizesFromPredicates,
-           cardinalityMap);
-       if (optimizedCardinality.getLeft() && optimizedCardinality.getRight() != null) {
-         longOverflow = false;
-         cardinalityProduct = Math.min(optimizedCardinality.getRight(), cardinalityProduct);
-       }
+      Pair<Boolean, Long> optimizedCardinality = getOptimizedGroupByCardinality(groupByExpressionSizesFromPredicates,
+          cardinalityMap);
+      if (optimizedCardinality.getLeft() && optimizedCardinality.getRight() != null) {
+        longOverflow = false;
+        cardinalityProduct = Math.min(optimizedCardinality.getRight(), cardinalityProduct);
+      }
     }
-    // TODO: Clear the holder after processing the query instead of before
+    // NOTE: We need to clean up the thread-local map before using it in case RawKeyHolder.close() is not called
+    //       for the previous segment
+    // TODO: Ensure RawKeyHolder.close()
     if (longOverflow) {
       // ArrayMapBasedHolder
       _globalGroupIdUpperBound = numGroupsLimit;
       Object2IntOpenHashMap<IntArray> groupIdMap = THREAD_LOCAL_INT_ARRAY_MAP.get();
-      int size = groupIdMap.size();
-      groupIdMap.clear();
-      if (size > MAX_CACHING_MAP_SIZE) {
-        groupIdMap.trim();
-      }
+      clearAndTrim(groupIdMap);
       _rawKeyHolder = new ArrayMapBasedHolder(groupIdMap);
     } else {
       if (cardinalityProduct > Integer.MAX_VALUE) {
         // LongMapBasedHolder
         _globalGroupIdUpperBound = numGroupsLimit;
         Long2IntOpenHashMap groupIdMap = THREAD_LOCAL_LONG_MAP.get();
-        int size = groupIdMap.size();
-        groupIdMap.clear();
-        if (size > MAX_CACHING_MAP_SIZE) {
-          groupIdMap.trim();
-        }
+        clearAndTrim(groupIdMap);
         _rawKeyHolder = new LongMapBasedHolder(groupIdMap);
       } else {
         _globalGroupIdUpperBound = Math.min((int) cardinalityProduct, numGroupsLimit);
@@ -199,6 +194,26 @@ public class DictionaryBasedGroupKeyGenerator implements GroupKeyGenerator {
       }
     }
     return Pair.of(true, maxInitialResultHolderCapacity);
+  }
+
+  private static void clearAndTrim(Long2IntOpenHashMap map) {
+    int size = map.size();
+    if (size > 0) {
+      map.clear();
+      if (size > MAX_CACHING_MAP_SIZE) {
+        map.trim();
+      }
+    }
+  }
+
+  private static void clearAndTrim(Object2IntOpenHashMap<IntArray> map) {
+    int size = map.size();
+    if (size > 0) {
+      map.clear();
+      if (size > MAX_CACHING_MAP_SIZE) {
+        map.trim();
+      }
+    }
   }
 
   @Override
@@ -245,7 +260,13 @@ public class DictionaryBasedGroupKeyGenerator implements GroupKeyGenerator {
     return _rawKeyHolder.getNumKeys();
   }
 
-  private interface RawKeyHolder {
+  /// Clear and trim thread-local map of _rawKeyHolder
+  @Override
+  public void close() {
+    _rawKeyHolder.close();
+  }
+
+  private interface RawKeyHolder extends AutoCloseable {
 
     /**
      * Process a block of documents for all single-valued group-by columns case.
@@ -279,6 +300,9 @@ public class DictionaryBasedGroupKeyGenerator implements GroupKeyGenerator {
      * Returns current number of unique keys
      */
     int getNumKeys();
+
+    @Override
+    void close();
   }
 
   // This holder works only if it can fit all results, otherwise it fails on AIOOBE or produces too many group keys
@@ -374,7 +398,7 @@ public class DictionaryBasedGroupKeyGenerator implements GroupKeyGenerator {
 
     @Override
     public Iterator<GroupKey> getGroupKeys() {
-      return new Iterator<GroupKey>() {
+      return new Iterator<>() {
         private int _currentGroupId;
         private final GroupKey _groupKey = new GroupKey();
 
@@ -410,6 +434,10 @@ public class DictionaryBasedGroupKeyGenerator implements GroupKeyGenerator {
     @Override
     public int getNumKeys() {
       return _numKeys;
+    }
+
+    @Override
+    public void close() {
     }
   }
 
@@ -464,7 +492,7 @@ public class DictionaryBasedGroupKeyGenerator implements GroupKeyGenerator {
 
     @Override
     public Iterator<GroupKey> getGroupKeys() {
-      return new Iterator<GroupKey>() {
+      return new Iterator<>() {
         private final Iterator<IntGroupIdMap.Entry> _iterator = _groupIdMap.iterator();
         private final GroupKey _groupKey = new GroupKey();
 
@@ -491,6 +519,11 @@ public class DictionaryBasedGroupKeyGenerator implements GroupKeyGenerator {
     @Override
     public int getNumKeys() {
       return _groupIdMap.size();
+    }
+
+    @Override
+    public void close() {
+      _groupIdMap.clearAndTrim();
     }
   }
 
@@ -605,27 +638,6 @@ public class DictionaryBasedGroupKeyGenerator implements GroupKeyGenerator {
     return rawValue;
   }
 
-  /**
-   * Helper method to get the string key from the raw key.
-   */
-  private String getStringKey(int rawKey) {
-    // Specialize single group-by column case
-    if (_numGroupByExpressions == 1) {
-      return _dictionaries[0].getStringValue(rawKey);
-    } else {
-      int cardinality = _cardinalities[0];
-      StringBuilder groupKeyBuilder = new StringBuilder(_dictionaries[0].getStringValue(rawKey % cardinality));
-      rawKey /= cardinality;
-      for (int i = 1; i < _numGroupByExpressions; i++) {
-        groupKeyBuilder.append(GroupKeyGenerator.DELIMITER);
-        cardinality = _cardinalities[i];
-        groupKeyBuilder.append(_dictionaries[i].getStringValue(rawKey % cardinality));
-        rawKey /= cardinality;
-      }
-      return groupKeyBuilder.toString();
-    }
-  }
-
   private class LongMapBasedHolder implements RawKeyHolder {
     private final Long2IntOpenHashMap _groupIdMap;
 
@@ -674,7 +686,7 @@ public class DictionaryBasedGroupKeyGenerator implements GroupKeyGenerator {
 
     @Override
     public Iterator<GroupKey> getGroupKeys() {
-      return new Iterator<GroupKey>() {
+      return new Iterator<>() {
         private final ObjectIterator<Long2IntMap.Entry> _iterator = _groupIdMap.long2IntEntrySet().fastIterator();
         private final GroupKey _groupKey = new GroupKey();
 
@@ -701,6 +713,11 @@ public class DictionaryBasedGroupKeyGenerator implements GroupKeyGenerator {
     @Override
     public int getNumKeys() {
       return _groupIdMap.size();
+    }
+
+    @Override
+    public void close() {
+      clearAndTrim(_groupIdMap);
     }
   }
 
@@ -790,22 +807,6 @@ public class DictionaryBasedGroupKeyGenerator implements GroupKeyGenerator {
     return groupKeys;
   }
 
-  /**
-   * Helper method to get the string key from the raw key.
-   */
-  private String getStringKey(long rawKey) {
-    int cardinality = _cardinalities[0];
-    StringBuilder groupKeyBuilder = new StringBuilder(_dictionaries[0].getStringValue((int) (rawKey % cardinality)));
-    rawKey /= cardinality;
-    for (int i = 1; i < _numGroupByExpressions; i++) {
-      groupKeyBuilder.append(GroupKeyGenerator.DELIMITER);
-      cardinality = _cardinalities[i];
-      groupKeyBuilder.append(_dictionaries[i].getStringValue((int) (rawKey % cardinality)));
-      rawKey /= cardinality;
-    }
-    return groupKeyBuilder.toString();
-  }
-
   private class ArrayMapBasedHolder implements RawKeyHolder {
     private final Object2IntOpenHashMap<IntArray> _groupIdMap;
 
@@ -840,7 +841,7 @@ public class DictionaryBasedGroupKeyGenerator implements GroupKeyGenerator {
     private int getGroupId(IntArray rawKey) {
       int numGroups = _groupIdMap.size();
       if (numGroups < _globalGroupIdUpperBound) {
-        return _groupIdMap.computeIntIfAbsent(rawKey, k -> numGroups);
+        return _groupIdMap.computeIfAbsent(rawKey, (ToIntFunction<? super IntArray>) k -> numGroups);
       } else {
         return _groupIdMap.getInt(rawKey);
       }
@@ -853,7 +854,7 @@ public class DictionaryBasedGroupKeyGenerator implements GroupKeyGenerator {
 
     @Override
     public Iterator<GroupKey> getGroupKeys() {
-      return new Iterator<GroupKey>() {
+      return new Iterator<>() {
         private final ObjectIterator<Object2IntMap.Entry<IntArray>> _iterator =
             _groupIdMap.object2IntEntrySet().fastIterator();
         private final GroupKey _groupKey = new GroupKey();
@@ -881,6 +882,11 @@ public class DictionaryBasedGroupKeyGenerator implements GroupKeyGenerator {
     @Override
     public int getNumKeys() {
       return _groupIdMap.size();
+    }
+
+    @Override
+    public void close() {
+      clearAndTrim(_groupIdMap);
     }
   }
 
@@ -970,18 +976,6 @@ public class DictionaryBasedGroupKeyGenerator implements GroupKeyGenerator {
       groupKeys[i] = getRawValue(i, rawKey._elements[i]);
     }
     return groupKeys;
-  }
-
-  /**
-   * Helper method to get the string key from the raw key.
-   */
-  private String getStringKey(IntArray rawKey) {
-    StringBuilder groupKeyBuilder = new StringBuilder(_dictionaries[0].getStringValue(rawKey._elements[0]));
-    for (int i = 1; i < _numGroupByExpressions; i++) {
-      groupKeyBuilder.append(GroupKeyGenerator.DELIMITER);
-      groupKeyBuilder.append(_dictionaries[i].getStringValue(rawKey._elements[i]));
-    }
-    return groupKeyBuilder.toString();
   }
 
   /**
@@ -1084,7 +1078,7 @@ public class DictionaryBasedGroupKeyGenerator implements GroupKeyGenerator {
     }
 
     public Iterator<Entry> iterator() {
-      return new Iterator<Entry>() {
+      return new Iterator<>() {
         private final Entry _entry = new Entry();
         private int _index;
         private int _numRemainingEntries = _size;

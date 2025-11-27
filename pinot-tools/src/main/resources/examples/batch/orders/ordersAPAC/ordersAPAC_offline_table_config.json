@@ -1,0 +1,22 @@
+{
+  "tableName": "ordersAPAC",
+  "tableType": "OFFLINE",
+  "segmentsConfig": {
+    "segmentPushType": "APPEND",
+    "segmentAssignmentStrategy": "BalanceNumSegmentAssignmentStrategy",
+    "replication": "1"
+  },
+  "tenants": {
+  },
+  "tableIndexConfig": {
+    "loadMode": "MMAP",
+    "invertedIndexColumns": [
+      "region",
+      "status"
+    ]
+  },
+  "metadata": {
+    "customConfigs": {
+    }
+  }
+}

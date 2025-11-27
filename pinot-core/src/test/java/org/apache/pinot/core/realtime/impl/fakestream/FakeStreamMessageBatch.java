@@ -58,4 +58,11 @@ class FakeStreamMessageBatch implements MessageBatch<byte[]> {
   public StreamPartitionMsgOffset getOffsetOfNextBatch() {
     return new LongMsgOffset(_offsetOfNextBatch);
   }
+
+  @Override
+  public long getSizeInBytes() {
+    return _values.stream()
+        .mapToInt(byteArray -> byteArray.length)
+        .sum();
+  }
 }

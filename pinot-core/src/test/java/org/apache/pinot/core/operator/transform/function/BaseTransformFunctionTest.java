@@ -41,6 +41,7 @@ import org.apache.pinot.core.operator.ProjectionOperator;
 import org.apache.pinot.core.operator.blocks.ProjectionBlock;
 import org.apache.pinot.core.operator.filter.MatchAllFilterOperator;
 import org.apache.pinot.core.plan.DocIdSetPlanNode;
+import org.apache.pinot.core.query.request.context.QueryContext;
 import org.apache.pinot.segment.local.indexsegment.immutable.ImmutableSegmentLoader;
 import org.apache.pinot.segment.local.segment.creator.impl.SegmentIndexCreationDriverImpl;
 import org.apache.pinot.segment.local.segment.readers.GenericRowRecordReader;
@@ -328,7 +329,8 @@ public abstract class BaseTransformFunctionTest {
     }
 
     _projectionBlock = new ProjectionOperator(_dataSourceMap,
-        new DocIdSetOperator(new MatchAllFilterOperator(NUM_ROWS), DocIdSetPlanNode.MAX_DOC_PER_CALL)).nextBlock();
+        new DocIdSetOperator(new MatchAllFilterOperator(NUM_ROWS), DocIdSetPlanNode.MAX_DOC_PER_CALL),
+        new QueryContext.Builder().build()).nextBlock();
   }
 
   // overridden in startree json index tests

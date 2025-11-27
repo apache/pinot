@@ -46,6 +46,7 @@ import org.apache.pinot.segment.local.segment.creator.SegmentTestUtils;
 import org.apache.pinot.segment.local.segment.creator.impl.SegmentIndexCreationDriverImpl;
 import org.apache.pinot.segment.local.utils.SegmentLocks;
 import org.apache.pinot.segment.local.utils.SegmentReloadSemaphore;
+import org.apache.pinot.segment.local.utils.ServerReloadJobStatusCache;
 import org.apache.pinot.segment.spi.ImmutableSegment;
 import org.apache.pinot.segment.spi.creator.SegmentGeneratorConfig;
 import org.apache.pinot.segment.spi.creator.SegmentIndexCreationDriver;
@@ -75,7 +76,10 @@ import static org.testng.Assert.assertTrue;
 
 
 public abstract class BaseResourceTest {
-  private static final String AVRO_DATA_PATH = "data/test_data-mv.avro";
+  protected String getAvroFileName() {
+    return "data/test_data-mv.avro";
+  }
+
   private static final File TEMP_DIR = new File(FileUtils.getTempDirectory(), "BaseResourceTest");
   protected static final String TABLE_NAME = "testTable";
   protected static final String LLC_SEGMENT_NAME_FOR_UPLOAD_SUCCESS =
@@ -104,7 +108,7 @@ public abstract class BaseResourceTest {
 
     FileUtils.deleteQuietly(TEMP_DIR);
     assertTrue(TEMP_DIR.mkdirs());
-    URL resourceUrl = getClass().getClassLoader().getResource(AVRO_DATA_PATH);
+    URL resourceUrl = getClass().getClassLoader().getResource(getAvroFileName());
     assertNotNull(resourceUrl);
     _avroFile = new File(resourceUrl.getFile());
 
@@ -154,7 +158,9 @@ public abstract class BaseResourceTest {
         CommonConstants.Helix.DEFAULT_SERVER_NETTY_PORT);
     _instanceId = CommonConstants.Helix.PREFIX_OF_SERVER_INSTANCE + hostname + "_" + port;
     serverConf.setProperty(CommonConstants.Server.CONFIG_OF_INSTANCE_ID, _instanceId);
-    _adminApiApplication = new AdminApiApplication(_serverInstance, new AllowAllAccessFactory(), serverConf);
+    _adminApiApplication = new AdminApiApplication(_serverInstance, new AllowAllAccessFactory(),
+        mock(ServerReloadJobStatusCache.class),
+        serverConf);
     _adminApiApplication.start(Collections.singletonList(
         new ListenerConfig(CommonConstants.HTTP_PROTOCOL, "0.0.0.0", CommonConstants.Server.DEFAULT_ADMIN_API_PORT,
             CommonConstants.HTTP_PROTOCOL, new TlsConfig(), HttpServerThreadPoolConfig.defaultInstance())));
@@ -222,8 +228,18 @@ public abstract class BaseResourceTest {
     // NOTE: Use OfflineTableDataManager for both OFFLINE and REALTIME table because RealtimeTableDataManager performs
     //       more checks
     TableDataManager tableDataManager = new OfflineTableDataManager();
-    tableDataManager.init(instanceDataManagerConfig, helixManager, new SegmentLocks(), tableConfig, schema,
-        new SegmentReloadSemaphore(1), Executors.newSingleThreadExecutor(), null, null, null);
+    tableDataManager.init(instanceDataManagerConfig,
+        helixManager,
+        new SegmentLocks(),
+        tableConfig,
+        schema,
+        new SegmentReloadSemaphore(1),
+        Executors.newSingleThreadExecutor(),
+        null,
+        null,
+        null,
+        false,
+        mock(ServerReloadJobStatusCache.class));
     tableDataManager.start();
     _tableDataManagerMap.put(tableNameWithType, tableDataManager);
   }

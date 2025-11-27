@@ -23,6 +23,7 @@ import com.fasterxml.jackson.annotation.JsonProperty;
 import com.fasterxml.jackson.annotation.JsonPropertyDescription;
 import com.fasterxml.jackson.annotation.JsonValue;
 import java.util.List;
+import javax.annotation.Nullable;
 import org.apache.pinot.spi.config.BaseJsonConfig;
 
 /**
@@ -33,6 +34,40 @@ import org.apache.pinot.spi.config.BaseJsonConfig;
  * of resource and query limits across different instances.
  * </p>
  *
+ * <p>
+ * Please note that for the propagation type and the corresponding propagationEntity should be consistent.
+ * For example, if the propagation type is TABLE, then the propagationEntity should contain table names, the table name
+ * can be with or without type suffix, e.g. "myTable_OFFLINE" or "myTable". If the table name is without type suffix,
+ * then the cost will be split to both OFFLINE and REALTIME tables.
+ *
+ * Similarly, if the propagation type is TENANT, then the propagationEntity should contain tenant names.
+ * </p>
+ *
+ * <p>
+ * In the below example, the propagation type is set to TABLE, indicating that
+ * the settings will be applied at the individual table level. The costSplits
+ * define specific CPU and memory costs allocated to each table.
+ * </p>
+ *
+ * Example configurations:
+ * <pre>
+ *   {
+ *   "propagationType": "TABLE",
+ *   "costSplits":
+ *    [
+ *      {
+ *      "propagationEntity": "table1_OFFLINE",
+ *      "cpuCostNs" : 100,
+ *      "memoryCostBytes" : 100
+ *      },
+ *      {
+ *      "propagationEntity": "table2_OFFLINE",
+ *      "cpuCostNs" : 200,
+ *      "memoryCostBytes" : 200
+ *      }
+ *    ]
+ *   }
+ * </pre>
  * @see QueryWorkloadConfig
  * @see NodeConfig
  */
@@ -93,7 +128,7 @@ public class PropagationScheme extends BaseJsonConfig {
   }
 
   private static final String PROPAGATION_TYPE = "propagationType";
-  private static final String VALUES = "values";
+  private static final String PROPAGATION_ENTITIES = "propagationEntities";
 
   /**
    * The type of propagation to apply (per-table or per-tenant).
@@ -101,23 +136,20 @@ public class PropagationScheme extends BaseJsonConfig {
   @JsonPropertyDescription("Describes the type of propagation scheme")
   private Type _propagationType;
 
-  /**
-   * The specific identifiers (table names or tenant names) to which settings apply.
-   */
-  @JsonPropertyDescription("Describes the values of the propagation scheme")
-  private List<String> _values;
+  @JsonPropertyDescription("Describes the cost splits for the propagation scheme")
+  private List<PropagationEntity> _propagationEntities;
 
   /**
    * Constructs a PropagationScheme with the given type and target values.
    *
    * @param propagationType the Type of propagation (TABLE or TENANT)
-   * @param values the list of identifiers (tables or tenants) for propagation
+   *  @param propagationEntities the list of CostSplit defining specific allocations
    */
   @JsonCreator
   public PropagationScheme(@JsonProperty(PROPAGATION_TYPE) Type propagationType,
-      @JsonProperty(VALUES) List<String> values) {
+      @Nullable @JsonProperty(PROPAGATION_ENTITIES) List<PropagationEntity> propagationEntities) {
     _propagationType = propagationType;
-    _values = values;
+    _propagationEntities = propagationEntities;
   }
 
   /**
@@ -130,12 +162,12 @@ public class PropagationScheme extends BaseJsonConfig {
   }
 
   /**
-   * Returns the list of target identifiers for propagation.
+   * Returns the cost splits for the propagation scheme.
    *
-   * @return list of table names or tenant names
+   * @return list of cost splits with their propagation entities
    */
-  public List<String> getValues() {
-    return _values;
+  public List<PropagationEntity> getPropagationEntities() {
+    return _propagationEntities;
   }
 
   /**
@@ -148,11 +180,11 @@ public class PropagationScheme extends BaseJsonConfig {
   }
 
   /**
-   * Sets the target identifiers for propagation.
+   * Sets the cost splits for the propagation entities.
    *
-   * @param values list of table or tenant names to apply settings to
+   * @param propagationEntities list of cost splits to apply
    */
-  public void setValues(List<String> values) {
-    _values = values;
+  public void setPropagationEntities(List<PropagationEntity> propagationEntities) {
+    _propagationEntities = propagationEntities;
   }
 }

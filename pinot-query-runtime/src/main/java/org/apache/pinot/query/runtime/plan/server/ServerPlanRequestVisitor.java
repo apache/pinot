@@ -33,6 +33,7 @@ import org.apache.pinot.common.utils.request.RequestUtils;
 import org.apache.pinot.core.plan.maker.InstancePlanMakerImplV2;
 import org.apache.pinot.query.parser.CalciteRexExpressionParser;
 import org.apache.pinot.query.planner.plannode.AggregateNode;
+import org.apache.pinot.query.planner.plannode.EnrichedJoinNode;
 import org.apache.pinot.query.planner.plannode.ExchangeNode;
 import org.apache.pinot.query.planner.plannode.ExplainedNode;
 import org.apache.pinot.query.planner.plannode.FilterNode;
@@ -168,6 +169,71 @@ public class ServerPlanRequestVisitor implements PlanNodeVisitor<Void, ServerPla
         // TODO: we should keep query stats here as well
         ServerPlanRequestUtils.attachDynamicFilter(context.getPinotQuery(), node.getLeftKeys(), node.getRightKeys(),
             resultDataContainer, dataSchema);
+      }
+    } else {
+      // For lookup join, visit the right child and set it as the leaf boundary.
+      Preconditions.checkState(node.getJoinStrategy() == JoinNode.JoinStrategy.LOOKUP,
+          "Leaf stage should not visit regular JoinNode");
+      if (visit(right, context)) {
+        context.setLeafStageBoundaryNode(right);
+      }
+    }
+
+    return null;
+  }
+
+  @Override
+  public Void visitEnrichedJoin(EnrichedJoinNode node, ServerPlanRequestContext context) {
+    // We can reach here for dynamic broadcast SEMI join and lookup join.
+    List<PlanNode> inputs = node.getInputs();
+    PlanNode left = inputs.get(0);
+    PlanNode right = inputs.get(1);
+
+    if (right instanceof MailboxReceiveNode
+        && ((MailboxReceiveNode) right).getExchangeType() == PinotRelExchangeType.PIPELINE_BREAKER) {
+      // For dynamic broadcast SEMI join, right child should be a PIPELINE_BREAKER exchange. Visit the left child and
+      // attach the dynamic filter to the query.
+      if (visit(left, context)) {
+        // semi join to dynamic filter logic
+        PipelineBreakerResult pipelineBreakerResult = context.getPipelineBreakerResult();
+        int resultMapId = pipelineBreakerResult.getNodeIdMap().get(right);
+        List<MseBlock> blocks = pipelineBreakerResult.getResultMap().getOrDefault(resultMapId, Collections.emptyList());
+        List<Object[]> resultDataContainer = new ArrayList<>();
+        DataSchema dataSchema = right.getDataSchema();
+        for (MseBlock block : blocks) {
+          if (block.isData()) {
+            resultDataContainer.addAll(((MseBlock.Data) block).asRowHeap().getRows());
+          }
+        }
+        // TODO: we should keep query stats here as well
+        ServerPlanRequestUtils.attachDynamicFilter(context.getPinotQuery(), node.getLeftKeys(), node.getRightKeys(),
+            resultDataContainer, dataSchema);
+
+        PinotQuery pinotQuery = context.getPinotQuery();
+        for (EnrichedJoinNode.FilterProjectRex rex : node.getFilterProjectRexes()) {
+          if (rex.getType() == EnrichedJoinNode.FilterProjectRexType.FILTER) {
+            // filter logic here
+            if (pinotQuery.getFilterExpression() == null) {
+              Expression expression = CalciteRexExpressionParser.toExpression(rex.getFilter(),
+                  pinotQuery.getSelectList());
+              applyTimestampIndex(expression, pinotQuery);
+              pinotQuery.setFilterExpression(expression);
+            } else {
+              // if filter is already applied then it cannot have another one on leaf.
+              context.setLeafStageBoundaryNode(node.getInputs().get(0));
+            }
+          } else {
+            // project logic here
+            List<Expression> selectList =
+                CalciteRexExpressionParser.convertRexNodes(
+                    rex.getProjectAndResultSchema().getProject(),
+                    pinotQuery.getSelectList());
+            for (Expression expression : selectList) {
+              applyTimestampIndex(expression, pinotQuery);
+            }
+            pinotQuery.setSelectList(selectList);
+          }
+        }
       }
     } else {
       // For lookup join, visit the right child and set it as the leaf boundary.

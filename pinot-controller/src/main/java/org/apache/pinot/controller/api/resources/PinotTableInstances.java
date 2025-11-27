@@ -50,7 +50,7 @@ import javax.ws.rs.core.Context;
 import javax.ws.rs.core.HttpHeaders;
 import javax.ws.rs.core.MediaType;
 import javax.ws.rs.core.Response;
-import org.apache.commons.collections.CollectionUtils;
+import org.apache.commons.collections4.CollectionUtils;
 import org.apache.pinot.common.exception.TableNotFoundException;
 import org.apache.pinot.common.utils.DatabaseUtils;
 import org.apache.pinot.common.utils.SimpleHttpResponse;
@@ -100,7 +100,7 @@ public class PinotTableInstances {
   })
   public String getTableInstances(
       @ApiParam(value = "Table name without type", required = true) @PathParam("tableName") String tableName,
-      @ApiParam(value = "Instance type", example = "broker", allowableValues = "BROKER, SERVER") @DefaultValue("")
+      @ApiParam(value = "Instance type", allowableValues = "BROKER, SERVER") @DefaultValue("")
       @QueryParam("type") String type, @Context HttpHeaders headers) {
     tableName = DatabaseUtils.translateTableName(tableName, headers);
     ObjectNode ret = JsonUtils.newObjectNode();

@@ -18,8 +18,8 @@
  */
 package org.apache.pinot.common.function.scalar.regexp;
 
-import java.util.regex.Pattern;
 import org.apache.pinot.common.utils.RegexpPatternConverterUtils;
+import org.apache.pinot.common.utils.regex.PatternFactory;
 import org.apache.pinot.spi.annotations.ScalarFunction;
 
 
@@ -33,13 +33,18 @@ public class RegexpLikeVarFunctions {
 
   @ScalarFunction
   public static boolean regexpLikeVar(String inputStr, String regexPatternStr) {
-    Pattern pattern = Pattern.compile(regexPatternStr, Pattern.UNICODE_CASE | Pattern.CASE_INSENSITIVE);
-    return pattern.matcher(inputStr).find();
+    return PatternFactory.compile(regexPatternStr).matcher(inputStr).find();
+  }
+
+  @ScalarFunction
+  public static boolean regexpLikeVar(String inputStr, String regexPatternStr, String matchParameter) {
+    boolean caseInsensitive = RegexpPatternConverterUtils.isCaseInsensitive(matchParameter);
+    return PatternFactory.compile(regexPatternStr, caseInsensitive).matcher(inputStr).find();
   }
 
   @ScalarFunction
   public static boolean likeVar(String inputStr, String likePatternStr) {
     String regexPatternStr = RegexpPatternConverterUtils.likeToRegexpLike(likePatternStr);
-    return regexpLikeVar(inputStr, regexPatternStr);
+    return PatternFactory.compile(regexPatternStr, true).matcher(inputStr).find(); // Case insensitive by default
   }
 }

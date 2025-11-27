@@ -68,11 +68,11 @@ const InstanceListingPage = () => {
     <AppLoader />
   ) : (
     <Grid item xs className={classes.gridContainer}>
-      <Instances 
-        liveInstanceNames={liveInstanceNames} 
-        instances={instances} 
-        clusterName={clusterName} 
-        instanceType={instanceType} 
+      <Instances
+        liveInstanceNames={liveInstanceNames}
+        instances={instances}
+        clusterName={clusterName}
+        instanceType={instanceType}
       />
     </Grid>
   );

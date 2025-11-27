@@ -104,4 +104,9 @@ public abstract class LookupTable {
    */
   @SuppressWarnings("rawtypes")
   public abstract Set<Map.Entry<Object, Object>> entrySet();
+
+  /**
+   * Returns the number of entries in the lookup table.
+   */
+  public abstract int size();
 }

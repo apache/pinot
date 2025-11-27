@@ -60,6 +60,7 @@ public class MultistageGroupByExecutor {
   private final AggType _aggType;
   private final boolean _leafReturnFinalResult;
   private final DataSchema _resultSchema;
+  private int _rowsProcessed;
   private final int _numGroupsLimit;
   private final int _numGroupsWarningLimit;
   private final boolean _filteredAggregationsSkipEmptyGroups;
@@ -206,12 +207,14 @@ public class MultistageGroupByExecutor {
         _groupIdGenerator.getGroupKeyIterator(numKeys + numFunctions);
 
     int idx = 0;
-    while (idx++ < numGroups && groupKeyIterator.hasNext()) {
+    while (idx < numGroups && groupKeyIterator.hasNext()) {
       Object[] row = getRow(groupKeyIterator, numKeys, numFunctions, resultStoredTypes);
       sortedRows.add(row);
+      idx++;
     }
 
     while (groupKeyIterator.hasNext()) {
+      idx++;
       // TODO: allocate new array row only if row enters set
       Object[] row = getRow(groupKeyIterator, numKeys, numFunctions, resultStoredTypes);
       if (comparator.compare(sortedRows.peek(), row) < 0) {
@@ -219,6 +222,8 @@ public class MultistageGroupByExecutor {
         sortedRows.offer(row);
       }
     }
+
+    _rowsProcessed = idx;
 
     int resultSize = sortedRows.size();
     ArrayList<Object[]> result = new ArrayList<>(sortedRows.size());
@@ -245,9 +250,13 @@ public class MultistageGroupByExecutor {
         _groupIdGenerator.getGroupKeyIterator(numKeys + numFunctions);
 
     int idx = 0;
-    while (groupKeyIterator.hasNext() && idx++ < numGroups) {
+    while (groupKeyIterator.hasNext() && idx < numGroups) {
       Object[] row = getRow(groupKeyIterator, numKeys, numFunctions, resultStoredTypes);
       rows.add(row);
+      idx++;
+    }
+    if (groupKeyIterator.hasNext()) {
+      _rowsProcessed = idx + 1;
     }
     return rows;
   }
@@ -290,6 +299,10 @@ public class MultistageGroupByExecutor {
 
   public int getNumGroups() {
     return _groupIdGenerator.getNumGroups();
+  }
+
+  public int getRowsProcessed() {
+    return _rowsProcessed;
   }
 
   public boolean isNumGroupsLimitReached() {

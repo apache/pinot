@@ -137,7 +137,8 @@ public class RebalanceChecker extends ControllerPeriodicTask<Void> {
     // 3) If configured, we can abort the other rebalance jobs for the table by setting their status to FAILED.
 
     if (hasStuckInProgressJobs(tableNameWithType, allJobMetadata)) {
-      abortExistingJobs(tableNameWithType, _pinotHelixResourceManager);
+      TableRebalanceManager.cancelRebalance(tableNameWithType, _pinotHelixResourceManager,
+          RebalanceResult.Status.ABORTED);
     }
 
     Map<String/*original jobId*/, Set<Pair<TableRebalanceContext/*job attempts*/, Long
@@ -212,29 +213,6 @@ public class RebalanceChecker extends ControllerPeriodicTask<Void> {
       return ThreadLocalRandom.current().nextLong((long) minDelayMs, (long) maxDelayMs);
     }
     return (long) minDelayMs;
-  }
-
-  private static void abortExistingJobs(String tableNameWithType, PinotHelixResourceManager pinotHelixResourceManager) {
-    boolean updated =
-        pinotHelixResourceManager.updateJobsForTable(tableNameWithType, ControllerJobTypes.TABLE_REBALANCE,
-        jobMetadata -> {
-          String jobId = jobMetadata.get(CommonConstants.ControllerJob.JOB_ID);
-          try {
-            String jobStatsInStr = jobMetadata.get(RebalanceJobConstants.JOB_METADATA_KEY_REBALANCE_PROGRESS_STATS);
-            TableRebalanceProgressStats jobStats =
-                JsonUtils.stringToObject(jobStatsInStr, TableRebalanceProgressStats.class);
-            if (jobStats.getStatus() != RebalanceResult.Status.IN_PROGRESS) {
-              return;
-            }
-            LOGGER.info("Abort rebalance job: {} for table: {}", jobId, tableNameWithType);
-            jobStats.setStatus(RebalanceResult.Status.ABORTED);
-            jobMetadata.put(RebalanceJobConstants.JOB_METADATA_KEY_REBALANCE_PROGRESS_STATS,
-                JsonUtils.objectToString(jobStats));
-          } catch (Exception e) {
-            LOGGER.error("Failed to abort rebalance job: {} for table: {}", jobId, tableNameWithType, e);
-          }
-        });
-    LOGGER.info("Tried to abort existing jobs at best effort and done: {}", updated);
   }
 
   @VisibleForTesting

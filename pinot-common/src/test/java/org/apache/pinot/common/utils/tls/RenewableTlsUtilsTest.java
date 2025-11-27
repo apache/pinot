@@ -18,7 +18,6 @@
  */
 package org.apache.pinot.common.utils.tls;
 
-import com.google.common.collect.ImmutableMap;
 import java.io.File;
 import java.io.IOException;
 import java.io.InputStream;
@@ -55,6 +54,7 @@ import nl.altindag.ssl.trustmanager.HotSwappableX509ExtendedTrustManager;
 import nl.altindag.ssl.trustmanager.UnsafeX509ExtendedTrustManager;
 import org.apache.commons.io.FileUtils;
 import org.apache.pinot.common.config.TlsConfig;
+import org.apache.pinot.common.utils.NamedThreadFactory;
 import org.testng.annotations.AfterMethod;
 import org.testng.annotations.BeforeMethod;
 import org.testng.annotations.Test;
@@ -85,12 +85,13 @@ public class RenewableTlsUtilsTest {
 
   private static final String TLS_KEYSTORE_FILE_PATH = DEFAULT_TEST_TLS_DIR + "/" + TLS_KEYSTORE_FILE;
   private static final String TLS_TRUSTSTORE_FILE_PATH = DEFAULT_TEST_TLS_DIR + "/" + TLS_TRUSTSTORE_FILE;
+  private static final String SSL_RELOAD_THREAD_PREFIX = "ssl-reload-test";
 
   @BeforeMethod
   public void setUp()
       throws IOException, URISyntaxException {
     copyResourceFilesToTempFolder(
-        ImmutableMap.of(TLS_KEYSTORE_FILE, TLS_KEYSTORE_FILE, TLS_TRUSTSTORE_FILE, TLS_TRUSTSTORE_FILE));
+        Map.of(TLS_KEYSTORE_FILE, TLS_KEYSTORE_FILE, TLS_TRUSTSTORE_FILE, TLS_TRUSTSTORE_FILE));
   }
 
   private static void copyResourceFilesToTempFolder(Map<String, String> srcAndDestFileMap)
@@ -184,7 +185,8 @@ public class RenewableTlsUtilsTest {
 
     // Start a new thread to reload the ssl factory when the tls files change
     // Avoid early finalization by not using Executors.newSingleThreadExecutor (java <= 20, JDK-8145304)
-    ExecutorService executorService = Executors.newFixedThreadPool(1);
+    ExecutorService executorService = Executors.newFixedThreadPool(1,
+            new NamedThreadFactory(SSL_RELOAD_THREAD_PREFIX, true));
     executorService.execute(
         () -> {
           try {
@@ -356,7 +358,7 @@ public class RenewableTlsUtilsTest {
 
     // update tls files
     copyResourceFilesToTempFolder(
-        ImmutableMap.of(TLS_KEYSTORE_UPDATED_FILE, TLS_KEYSTORE_FILE, TLS_TRUSTSTORE_UPDATED_FILE,
+        Map.of(TLS_KEYSTORE_UPDATED_FILE, TLS_KEYSTORE_FILE, TLS_TRUSTSTORE_UPDATED_FILE,
             TLS_TRUSTSTORE_FILE));
 
     // wait for the file change event to be detected

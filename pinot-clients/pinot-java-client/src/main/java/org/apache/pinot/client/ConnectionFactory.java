@@ -278,4 +278,9 @@ public class ConnectionFactory {
   private static PinotClientTransport getDefault() {
     return getDefault(new Properties());
   }
+
+  @VisibleForTesting
+  static void resetDefaultTransport() {
+    _defaultTransport = null;
+  }
 }

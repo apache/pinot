@@ -171,19 +171,25 @@ public class ClusterIntegrationTestUtils {
           int h2Index = 1;
           for (int avroIndex = 0; avroIndex < numFields; avroIndex++) {
             Object value = record.get(avroIndex);
-            if (value instanceof GenericData.Array) {
-              GenericData.Array array = (GenericData.Array) value;
+            if (value instanceof Collection) {
+              Collection<?> collection = (Collection<?>) value;
               Object[] arrayValue = new Object[MAX_NUM_ELEMENTS_IN_MULTI_VALUE_TO_COMPARE];
-              for (int i = 0; i < MAX_NUM_ELEMENTS_IN_MULTI_VALUE_TO_COMPARE; i++) {
-                if (i < array.size()) {
-                  arrayValue[i] = array.get(i);
-                  if (arrayValue[i] instanceof Utf8) {
-                    arrayValue[i] =
-                        StringUtil.sanitizeStringValue(arrayValue[i].toString(), FieldSpec.DEFAULT_MAX_LENGTH);
+              int index = 0;
+              for (Object element : collection) {
+                if (index < MAX_NUM_ELEMENTS_IN_MULTI_VALUE_TO_COMPARE) {
+                  arrayValue[index] = element;
+                  if (arrayValue[index] instanceof Utf8) {
+                    arrayValue[index] =
+                        StringUtil.sanitizeStringValue(arrayValue[index].toString(), FieldSpec.DEFAULT_MAX_LENGTH);
                   }
+                  index++;
                 } else {
-                  arrayValue[i] = null;
+                  break;
                 }
+              }
+              // Fill remaining slots with null
+              for (int i = index; i < MAX_NUM_ELEMENTS_IN_MULTI_VALUE_TO_COMPARE; i++) {
+                arrayValue[i] = null;
               }
               h2Statement.setObject(h2Index++, arrayValue);
             } else {

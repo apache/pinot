@@ -471,10 +471,6 @@ public class MultiStageQueryStats {
       return _operatorTypes.get(index);
     }
 
-    public MultiStageOperator.Type getLastType() {
-      return _operatorTypes.get(_operatorTypes.size() - 1);
-    }
-
     public StatMap<?> getLastOperatorStats() {
       return _operatorStats.get(_operatorStats.size() - 1);
     }

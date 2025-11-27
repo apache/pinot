@@ -41,6 +41,8 @@ public class DistinctCountBitmapValueAggregator implements ValueAggregator<Objec
 
   @Override
   public RoaringBitmap getInitialAggregatedValue(Object rawValue) {
+    // NOTE: rawValue cannot be null because this aggregator can only be used for star-tree index.
+    assert rawValue != null;
     RoaringBitmap initialValue;
     if (rawValue instanceof byte[]) {
       byte[] bytes = (byte[]) rawValue;
@@ -75,6 +77,11 @@ public class DistinctCountBitmapValueAggregator implements ValueAggregator<Objec
   @Override
   public RoaringBitmap cloneAggregatedValue(RoaringBitmap value) {
     return value.clone();
+  }
+
+  @Override
+  public boolean isAggregatedValueFixedSize() {
+    return false;
   }
 
   @Override

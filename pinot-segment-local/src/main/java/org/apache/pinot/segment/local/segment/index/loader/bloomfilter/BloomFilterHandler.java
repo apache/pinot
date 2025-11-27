@@ -23,10 +23,8 @@ import java.io.IOException;
 import java.util.HashSet;
 import java.util.Map;
 import java.util.Set;
-import javax.annotation.Nullable;
 import org.apache.commons.io.FileUtils;
 import org.apache.pinot.segment.local.segment.index.dictionary.DictionaryIndexType;
-import org.apache.pinot.segment.local.segment.index.forward.ForwardIndexType;
 import org.apache.pinot.segment.local.segment.index.loader.BaseIndexHandler;
 import org.apache.pinot.segment.local.segment.index.loader.LoaderUtils;
 import org.apache.pinot.segment.spi.ColumnMetadata;
@@ -36,6 +34,7 @@ import org.apache.pinot.segment.spi.creator.SegmentVersion;
 import org.apache.pinot.segment.spi.index.DictionaryIndexConfig;
 import org.apache.pinot.segment.spi.index.FieldIndexConfigs;
 import org.apache.pinot.segment.spi.index.FieldIndexConfigsUtil;
+import org.apache.pinot.segment.spi.index.IndexReaderFactory;
 import org.apache.pinot.segment.spi.index.StandardIndexes;
 import org.apache.pinot.segment.spi.index.creator.BloomFilterCreator;
 import org.apache.pinot.segment.spi.index.reader.Dictionary;
@@ -46,6 +45,7 @@ import org.apache.pinot.segment.spi.store.SegmentDirectory;
 import org.apache.pinot.spi.config.table.BloomFilterConfig;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
+import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.utils.BytesUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -57,8 +57,8 @@ public class BloomFilterHandler extends BaseIndexHandler {
   private final Map<String, BloomFilterConfig> _bloomFilterConfigs;
 
   public BloomFilterHandler(SegmentDirectory segmentDirectory, Map<String, FieldIndexConfigs> fieldIndexConfigs,
-      @Nullable TableConfig tableConfig) {
-    super(segmentDirectory, fieldIndexConfigs, tableConfig);
+      TableConfig tableConfig, Schema schema) {
+    super(segmentDirectory, fieldIndexConfigs, tableConfig, schema);
     _bloomFilterConfigs = FieldIndexConfigsUtil.enableConfigByColumn(StandardIndexes.bloomFilter(), fieldIndexConfigs);
   }
 
@@ -117,6 +117,9 @@ public class BloomFilterHandler extends BaseIndexHandler {
     IndexCreationContext context = IndexCreationContext.builder()
         .withIndexDir(indexDir)
         .withColumnMetadata(columnMetadata)
+        .withTableNameWithType(_tableConfig.getTableName())
+        .withContinueOnError(_tableConfig.getIngestionConfig() != null
+            && _tableConfig.getIngestionConfig().isContinueOnError())
         .build();
     try (BloomFilterCreator bloomFilterCreator =
         StandardIndexes.bloomFilter().createIndexCreator(context, bloomFilterConfig);
@@ -136,10 +139,15 @@ public class BloomFilterHandler extends BaseIndexHandler {
     IndexCreationContext context = IndexCreationContext.builder()
         .withIndexDir(indexDir)
         .withColumnMetadata(columnMetadata)
+        .withTableNameWithType(_tableConfig.getTableName())
+        .withContinueOnError(_tableConfig.getIngestionConfig() != null
+            && _tableConfig.getIngestionConfig().isContinueOnError())
         .build();
+    IndexReaderFactory<ForwardIndexReader> readerFactory = StandardIndexes.forward().getReaderFactory();
     try (BloomFilterCreator bloomFilterCreator = StandardIndexes.bloomFilter()
         .createIndexCreator(context, bloomFilterConfig);
-        ForwardIndexReader forwardIndexReader = ForwardIndexType.read(segmentWriter, columnMetadata);
+        ForwardIndexReader forwardIndexReader = readerFactory.createIndexReader(segmentWriter,
+            _fieldIndexConfigs.get(columnMetadata.getColumnName()), columnMetadata);
         ForwardIndexReaderContext readerContext = forwardIndexReader.createContext()) {
       if (columnMetadata.isSingleValue()) {
         // SV
