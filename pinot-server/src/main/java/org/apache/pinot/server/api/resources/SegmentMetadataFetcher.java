@@ -75,13 +75,7 @@ public class SegmentMetadataFetcher {
       throws JsonProcessingException {
     IndexSegment segment = segmentDataManager.getSegment();
     SegmentMetadata segmentMetadata = segment.getSegmentMetadata();
-    Set<String> columnSet;
-    if (columns.size() == 1 && columns.get(0).equals("*")) {
-      // Making code consistent and returning metadata and indexes only for non-virtual columns.
-      columnSet = segment.getPhysicalColumnNames();
-    } else {
-      columnSet = new HashSet<>(columns);
-    }
+    Set<String> columnSet = columns.contains("*") ? segment.getPhysicalColumnNames() : new HashSet<>(columns);
     ObjectNode segmentMetadataJson = (ObjectNode) segmentMetadata.toJson(columnSet);
     segmentMetadataJson.set(COLUMN_INDEX_KEY,
         JsonUtils.objectToJsonNode(getIndexesForSegmentColumns(segmentDataManager, columnSet)));

@@ -29,7 +29,6 @@ import java.io.IOException;
 import java.math.BigDecimal;
 import java.nio.ByteOrder;
 import java.util.Map;
-import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
 import org.apache.commons.io.FileUtils;
 import org.apache.pinot.segment.local.io.util.FixedByteValueReaderWriter;
@@ -87,13 +86,13 @@ public class SegmentDictionaryCreator implements IndexCreator {
   }
 
   @Override
-  public void add(@Nonnull Object value, int dictId)
+  public void add(Object value, int dictId)
       throws IOException {
     throw new UnsupportedOperationException("Dictionaries should not be built as a normal index");
   }
 
   @Override
-  public void add(@Nonnull Object[] values, @Nullable int[] dictIds)
+  public void add(Object[] values, @Nullable int[] dictIds)
       throws IOException {
     throw new UnsupportedOperationException("Dictionaries should not be built as a normal index");
   }
@@ -332,6 +331,96 @@ public class SegmentDictionaryCreator implements IndexCreator {
     }
   }
 
+  /**
+   * Get dictionary index for a primitive int value without boxing.
+   */
+  public int indexOfSV(int value) {
+    return _intValueToIndexMap.get(value);
+  }
+
+  /**
+   * Get dictionary index for a primitive long value without boxing.
+   */
+  public int indexOfSV(long value) {
+    return _longValueToIndexMap.get(value);
+  }
+
+  /**
+   * Get dictionary index for a primitive float value without boxing.
+   */
+  public int indexOfSV(float value) {
+    return _floatValueToIndexMap.get(value);
+  }
+
+  /**
+   * Get dictionary index for a primitive double value without boxing.
+   */
+  public int indexOfSV(double value) {
+    return _doubleValueToIndexMap.get(value);
+  }
+
+  /**
+   * Get dictionary index for a String value.
+   */
+  public int indexOfSV(String value) {
+    return _objectValueToIndexMap.getInt(value);
+  }
+
+  /**
+   * Get dictionary index for a byte array value.
+   */
+  public int indexOfSV(byte[] value) {
+    return _objectValueToIndexMap.getInt(new ByteArray(value));
+  }
+
+  public int[] indexOfMV(int[] values) {
+    int[] indexes = new int[values.length];
+    for (int i = 0; i < values.length; i++) {
+      indexes[i] = _intValueToIndexMap.get(values[i]);
+    }
+    return indexes;
+  }
+
+  public int[] indexOfMV(long[] values) {
+    int[] indexes = new int[values.length];
+    for (int i = 0; i < values.length; i++) {
+      indexes[i] = _longValueToIndexMap.get(values[i]);
+    }
+    return indexes;
+  }
+
+  public int[] indexOfMV(float[] values) {
+    int[] indexes = new int[values.length];
+    for (int i = 0; i < values.length; i++) {
+      indexes[i] = _floatValueToIndexMap.get(values[i]);
+    }
+    return indexes;
+  }
+
+  public int[] indexOfMV(double[] values) {
+    int[] indexes = new int[values.length];
+    for (int i = 0; i < values.length; i++) {
+      indexes[i] = _doubleValueToIndexMap.get(values[i]);
+    }
+    return indexes;
+  }
+
+  public int[] indexOfMV(String[] values) {
+    int[] indexes = new int[values.length];
+    for (int i = 0; i < values.length; i++) {
+      indexes[i] = _objectValueToIndexMap.getInt(values[i]);
+    }
+    return indexes;
+  }
+
+  public int[] indexOfMV(byte[][] values) {
+    int[] indexes = new int[values.length];
+    for (int i = 0; i < values.length; i++) {
+      indexes[i] = _objectValueToIndexMap.getInt(new ByteArray(values[i]));
+    }
+    return indexes;
+  }
+
   public int[] indexOfMV(Object value) {
     Object[] multiValues = (Object[]) value;
     int[] indexes = new int[multiValues.length];
@@ -391,5 +480,9 @@ public class SegmentDictionaryCreator implements IndexCreator {
 
   @Override
   public void close() {
+  }
+
+  public File getDictionaryFile() {
+    return _dictionaryFile;
   }
 }

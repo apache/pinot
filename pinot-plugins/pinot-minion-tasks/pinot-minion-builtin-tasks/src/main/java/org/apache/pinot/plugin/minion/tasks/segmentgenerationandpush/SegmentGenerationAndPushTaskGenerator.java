@@ -19,7 +19,6 @@
 package org.apache.pinot.plugin.minion.tasks.segmentgenerationandpush;
 
 import com.google.common.base.Preconditions;
-import com.google.common.collect.ImmutableList;
 import java.io.IOException;
 import java.net.URI;
 import java.net.URISyntaxException;
@@ -112,18 +111,8 @@ public class SegmentGenerationAndPushTaskGenerator extends BaseTaskGenerator {
           tableTaskConfig.getConfigsForTaskType(MinionConstants.SegmentGenerationAndPushTask.TASK_TYPE);
       Preconditions.checkNotNull(taskConfigs, "Task config shouldn't be null for Table: %s", tableNameWithType);
 
-      // Get max number of tasks for this table
-      int tableMaxNumTasks;
-      String tableMaxNumTasksConfig = taskConfigs.get(MinionConstants.TABLE_MAX_NUM_TASKS_KEY);
-      if (tableMaxNumTasksConfig != null) {
-        try {
-          tableMaxNumTasks = Integer.parseInt(tableMaxNumTasksConfig);
-        } catch (NumberFormatException e) {
-          tableMaxNumTasks = Integer.MAX_VALUE;
-        }
-      } else {
-        tableMaxNumTasks = Integer.MAX_VALUE;
-      }
+      // Get max number of subtasks for this table
+      int tableMaxNumTasks = getAndUpdateMaxNumSubTasks(taskConfigs, Integer.MAX_VALUE, tableNameWithType);
 
       // Generate tasks
       int tableNumTasks = 0;
@@ -203,7 +192,7 @@ public class SegmentGenerationAndPushTaskGenerator extends BaseTaskGenerator {
       List<URI> inputFileURIs = getInputFilesFromDirectory(batchConfigMap, inputDirURI, Collections.emptySet());
       if (inputFileURIs.isEmpty()) {
         LOGGER.warn("Skip generating SegmentGenerationAndPushTask, no input files found : {}", inputDirURI);
-        return ImmutableList.of();
+        return List.of();
       }
       if (!batchConfigMap.containsKey(BatchConfigProperties.INPUT_FORMAT)) {
         batchConfigMap.put(BatchConfigProperties.INPUT_FORMAT,
@@ -306,7 +295,8 @@ public class SegmentGenerationAndPushTaskGenerator extends BaseTaskGenerator {
     } else {
       singleFileGenerationTaskConfig.put(BatchConfigProperties.PUSH_MODE, pushMode);
     }
-    singleFileGenerationTaskConfig.put(BatchConfigProperties.PUSH_CONTROLLER_URI, _clusterInfoAccessor.getVipUrl());
+    singleFileGenerationTaskConfig.put(BatchConfigProperties.PUSH_CONTROLLER_URI,
+        _clusterInfoAccessor.getVipUrlForLeadController(tableName));
     return singleFileGenerationTaskConfig;
   }
 

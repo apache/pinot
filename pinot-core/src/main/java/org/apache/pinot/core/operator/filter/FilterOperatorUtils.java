@@ -23,6 +23,7 @@ import java.util.Comparator;
 import java.util.List;
 import java.util.OptionalInt;
 import org.apache.pinot.common.request.context.predicate.Predicate;
+import org.apache.pinot.core.operator.filter.predicate.BaseDictIdBasedRegexpLikePredicateEvaluator;
 import org.apache.pinot.core.operator.filter.predicate.PredicateEvaluator;
 import org.apache.pinot.core.query.request.context.QueryContext;
 import org.apache.pinot.segment.spi.datasource.DataSource;
@@ -53,20 +54,19 @@ public class FilterOperatorUtils {
     /**
      * Returns the AND filter operator or equivalent filter operator.
      */
-    BaseFilterOperator getAndFilterOperator(QueryContext queryContext,
-        List<BaseFilterOperator> filterOperators, int numDocs);
+    BaseFilterOperator getAndFilterOperator(QueryContext queryContext, List<BaseFilterOperator> filterOperators,
+        int numDocs);
 
     /**
      * Returns the OR filter operator or equivalent filter operator.
      */
-    BaseFilterOperator getOrFilterOperator(QueryContext queryContext,
-        List<BaseFilterOperator> filterOperators, int numDocs);
+    BaseFilterOperator getOrFilterOperator(QueryContext queryContext, List<BaseFilterOperator> filterOperators,
+        int numDocs);
 
     /**
      * Returns the NOT filter operator or equivalent filter operator.
      */
-    BaseFilterOperator getNotFilterOperator(QueryContext queryContext, BaseFilterOperator filterOperator,
-        int numDocs);
+    BaseFilterOperator getNotFilterOperator(QueryContext queryContext, BaseFilterOperator filterOperator, int numDocs);
   }
 
   public static class DefaultImplementation implements Implementation {
@@ -106,13 +106,15 @@ public class FilterOperatorUtils {
         }
         return new ScanBasedFilterOperator(queryContext, predicateEvaluator, dataSource, numDocs);
       } else if (predicateType == Predicate.Type.REGEXP_LIKE) {
-        if (dataSource.getFSTIndex() != null && dataSource.getDataSourceMetadata().isSorted()
-            && queryContext.isIndexUseAllowed(dataSource, FieldConfig.IndexType.SORTED)) {
-          return new SortedIndexBasedFilterOperator(queryContext, predicateEvaluator, dataSource, numDocs);
-        }
-        if (dataSource.getFSTIndex() != null && dataSource.getInvertedIndex() != null
-            && queryContext.isIndexUseAllowed(dataSource, FieldConfig.IndexType.INVERTED)) {
-          return new InvertedIndexFilterOperator(queryContext, predicateEvaluator, dataSource, numDocs);
+        if (predicateEvaluator instanceof BaseDictIdBasedRegexpLikePredicateEvaluator) {
+          if (dataSource.getDataSourceMetadata().isSorted()
+              && queryContext.isIndexUseAllowed(dataSource, FieldConfig.IndexType.SORTED)) {
+            return new SortedIndexBasedFilterOperator(queryContext, predicateEvaluator, dataSource, numDocs);
+          }
+          if (dataSource.getInvertedIndex() != null
+              && queryContext.isIndexUseAllowed(dataSource, FieldConfig.IndexType.INVERTED)) {
+            return new InvertedIndexFilterOperator(queryContext, predicateEvaluator, dataSource, numDocs);
+          }
         }
         return new ScanBasedFilterOperator(queryContext, predicateEvaluator, dataSource, numDocs);
       } else {
@@ -122,6 +124,10 @@ public class FilterOperatorUtils {
         }
         if (dataSource.getInvertedIndex() != null
             && queryContext.isIndexUseAllowed(dataSource, FieldConfig.IndexType.INVERTED)) {
+          // Use raw value inverted index filter operator for raw encoded columns
+          if (!predicateEvaluator.isDictionaryBased()) {
+            return new RawValueInvertedIndexFilterOperator(queryContext, predicateEvaluator, dataSource, numDocs);
+          }
           return new InvertedIndexFilterOperator(queryContext, predicateEvaluator, dataSource, numDocs);
         }
         if (RangeIndexBasedFilterOperator.canEvaluate(predicateEvaluator, dataSource)
@@ -159,8 +165,8 @@ public class FilterOperatorUtils {
     }
 
     @Override
-    public BaseFilterOperator getOrFilterOperator(QueryContext queryContext,
-        List<BaseFilterOperator> filterOperators, int numDocs) {
+    public BaseFilterOperator getOrFilterOperator(QueryContext queryContext, List<BaseFilterOperator> filterOperators,
+        int numDocs) {
       List<BaseFilterOperator> childFilterOperators = new ArrayList<>(filterOperators.size());
       for (BaseFilterOperator filterOperator : filterOperators) {
         if (filterOperator.isResultMatchingAll()) {
@@ -195,7 +201,6 @@ public class FilterOperatorUtils {
       return new NotFilterOperator(filterOperator, numDocs, queryContext.isNullHandlingEnabled());
     }
 
-
     /**
      * For AND filter operator, reorders its child filter operators based on their cost and puts the ones with
      * inverted index first in order to reduce the number of documents to be processed.
@@ -220,7 +225,8 @@ public class FilterOperatorUtils {
             return PrioritizedFilterOperator.HIGH_PRIORITY;
           }
           if (filterOperator instanceof BitmapBasedFilterOperator
-              || filterOperator instanceof InvertedIndexFilterOperator) {
+              || filterOperator instanceof InvertedIndexFilterOperator
+              || filterOperator instanceof RawValueInvertedIndexFilterOperator) {
             return PrioritizedFilterOperator.MEDIUM_PRIORITY;
           }
           if (filterOperator instanceof RangeIndexBasedFilterOperator

@@ -87,7 +87,8 @@ public class TimeSeriesBlockSerde {
   private TimeSeriesBlockSerde() {
   }
 
-  public static TimeSeriesBlock deserializeTimeSeriesBlock(ByteBuffer readOnlyByteBuffer)
+  public static TimeSeriesBlock deserializeTimeSeriesBlock(ByteBuffer readOnlyByteBuffer,
+      Map<String, String> metadataMap)
       throws IOException {
     DataBlock dataBlock = DataBlockUtils.readFrom(readOnlyByteBuffer);
     SerializedDataBlock mseBlock = new SerializedDataBlock(dataBlock);
@@ -103,7 +104,7 @@ public class TimeSeriesBlockSerde {
       long seriesId = Long.parseLong(timeSeries.getId());
       seriesMap.computeIfAbsent(seriesId, x -> new ArrayList<>()).add(timeSeries);
     }
-    return new TimeSeriesBlock(timeBuckets, seriesMap);
+    return new TimeSeriesBlock(timeBuckets, seriesMap, metadataMap);
   }
 
   public static ByteString serializeTimeSeriesBlock(TimeSeriesBlock timeSeriesBlock)

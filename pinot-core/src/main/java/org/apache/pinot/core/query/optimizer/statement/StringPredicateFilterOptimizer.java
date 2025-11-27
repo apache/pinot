@@ -26,7 +26,6 @@ import org.apache.pinot.common.request.Expression;
 import org.apache.pinot.common.request.ExpressionType;
 import org.apache.pinot.common.request.Function;
 import org.apache.pinot.common.request.PinotQuery;
-import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.sql.FilterKind;
@@ -48,7 +47,7 @@ public class StringPredicateFilterOptimizer implements StatementOptimizer {
   private static final String STRCMP_OPERATOR_NAME = "strcmp";
 
   @Override
-  public void optimize(PinotQuery query, @Nullable TableConfig tableConfig, @Nullable Schema schema) {
+  public void optimize(PinotQuery query, @Nullable Schema schema) {
     if (schema == null) {
       return;
     }

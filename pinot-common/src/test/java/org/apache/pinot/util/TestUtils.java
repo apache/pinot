@@ -24,7 +24,6 @@ import java.io.IOException;
 import java.net.URL;
 import java.time.Duration;
 import java.time.Instant;
-import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
 import net.openhft.chronicle.core.Jvm;
 import org.apache.commons.io.FileUtils;
@@ -44,7 +43,7 @@ public class TestUtils {
 
   private static final Logger LOGGER = LoggerFactory.getLogger(TestUtils.class);
 
-  public static String getFileFromResourceUrl(@Nonnull URL resourceUrl) {
+  public static String getFileFromResourceUrl(URL resourceUrl) {
     // For maven cross package use case, we need to extract the resource from jar to a temporary directory.
     String resourceUrlStr = resourceUrl.toString();
     if (resourceUrlStr.contains("jar!")) {
@@ -69,7 +68,7 @@ public class TestUtils {
    * @param dirs Directories to be cleared
    * @throws IOException
    */
-  public static void ensureDirectoriesExistAndEmpty(@Nonnull File... dirs)
+  public static void ensureDirectoriesExistAndEmpty(File... dirs)
       throws IOException {
     for (File dir : dirs) {
       FileUtils.deleteDirectory(dir);

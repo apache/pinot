@@ -33,6 +33,7 @@ import org.apache.pinot.spi.stream.StreamConfigProperties;
 import org.apache.pinot.spi.stream.StreamPartitionMsgOffset;
 import org.apache.pinot.spi.utils.CommonConstants;
 import org.apache.pinot.spi.utils.builder.TableNameBuilder;
+import org.apache.pinot.spi.utils.retry.RetryPolicy;
 
 import static org.testng.Assert.assertTrue;
 
@@ -93,6 +94,12 @@ public class LLCRealtimeKafka3ClusterIntegrationTest extends LLCRealtimeClusterI
         }
       }
       return new ExceptingKafka3Consumer(clientId, _streamConfig, partition, exceptionDuringConsume);
+    }
+
+    @Override
+    public PartitionGroupConsumer createPartitionGroupConsumer(String clientId,
+        PartitionGroupConsumptionStatus partitionGroupConsumptionStatus, RetryPolicy retryPolicy) {
+      return createPartitionGroupConsumer(clientId, partitionGroupConsumptionStatus);
     }
 
     private int getSegmentSeqNum(int partition) {

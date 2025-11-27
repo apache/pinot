@@ -305,6 +305,7 @@ public class TableConfig extends BaseJsonConfig {
   }
 
   @JsonProperty(INSTANCE_PARTITIONS_MAP_CONFIG_KEY)
+  @Nullable
   public Map<InstancePartitionsType, String> getInstancePartitionsMap() {
     return _instancePartitionsMap;
   }

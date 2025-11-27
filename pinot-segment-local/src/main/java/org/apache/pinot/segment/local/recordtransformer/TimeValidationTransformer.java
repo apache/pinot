@@ -19,6 +19,7 @@
 package org.apache.pinot.segment.local.recordtransformer;
 
 import com.google.common.base.Preconditions;
+import org.apache.pinot.common.utils.ThrottledLogger;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.ingestion.IngestionConfig;
 import org.apache.pinot.spi.data.DateTimeFieldSpec;
@@ -46,27 +47,23 @@ public class TimeValidationTransformer implements RecordTransformer {
   private final DateTimeFormatSpec _timeFormatSpec;
   private final boolean _enableTimeValueCheck;
   private final boolean _continueOnError;
+  private final ThrottledLogger _throttledLogger;
 
   public TimeValidationTransformer(TableConfig tableConfig, Schema schema) {
     _timeColumnName = tableConfig.getValidationConfig().getTimeColumnName();
-    if (_timeColumnName != null) {
+    IngestionConfig ingestionConfig = tableConfig.getIngestionConfig();
+    _enableTimeValueCheck = _timeColumnName != null && ingestionConfig != null && ingestionConfig.isRowTimeValueCheck();
+    if (_enableTimeValueCheck) {
       DateTimeFieldSpec dateTimeFieldSpec = schema.getSpecForTimeColumn(_timeColumnName);
       Preconditions.checkState(dateTimeFieldSpec != null, "Failed to find spec for time column: %s from schema: %s",
           _timeColumnName, schema.getSchemaName());
       _timeFormatSpec = dateTimeFieldSpec.getFormatSpec();
-      IngestionConfig ingestionConfig = tableConfig.getIngestionConfig();
-      if (ingestionConfig != null) {
-        _enableTimeValueCheck = ingestionConfig.isRowTimeValueCheck();
-        _continueOnError = ingestionConfig.isContinueOnError();
-      } else {
-        _enableTimeValueCheck = false;
-        _continueOnError = false;
-      }
+      _continueOnError = ingestionConfig.isContinueOnError();
     } else {
       _timeFormatSpec = null;
-      _enableTimeValueCheck = false;
       _continueOnError = false;
     }
+    _throttledLogger = new ThrottledLogger(LOGGER, ingestionConfig);
   }
 
   @Override
@@ -75,13 +72,10 @@ public class TimeValidationTransformer implements RecordTransformer {
   }
 
   @Override
-  public GenericRow transform(GenericRow record) {
-    if (!_enableTimeValueCheck) {
-      return record;
-    }
+  public void transform(GenericRow record) {
     Object timeValue = record.getValue(_timeColumnName);
     if (timeValue == null) {
-      return record;
+      return;
     }
     long timeValueMs;
     try {
@@ -89,27 +83,24 @@ public class TimeValidationTransformer implements RecordTransformer {
     } catch (Exception e) {
       String errorMessage =
           String.format("Caught exception while parsing time value: %s with format: %s", timeValue, _timeFormatSpec);
-      if (_continueOnError) {
-        LOGGER.debug(errorMessage);
-        record.putValue(_timeColumnName, null);
-        return record;
-      } else {
-        throw new IllegalStateException(errorMessage);
+      if (!_continueOnError) {
+        throw new IllegalStateException(errorMessage, e);
       }
+      _throttledLogger.warn(errorMessage, e);
+      record.putValue(_timeColumnName, null);
+      record.markIncomplete();
+      return;
     }
     if (!TimeUtils.timeValueInValidRange(timeValueMs)) {
       String errorMessage =
           String.format("Time value: %s is not in valid range: %s", new DateTime(timeValueMs, DateTimeZone.UTC),
               TimeUtils.VALID_TIME_INTERVAL);
-      if (_continueOnError) {
-        LOGGER.debug(errorMessage);
-        record.putValue(_timeColumnName, null);
-        record.putValue(GenericRow.INCOMPLETE_RECORD_KEY, true);
-        return record;
-      } else {
+      if (!_continueOnError) {
         throw new IllegalStateException(errorMessage);
       }
+      _throttledLogger.warn(errorMessage, new IllegalStateException(errorMessage));
+      record.putValue(_timeColumnName, null);
+      record.markIncomplete();
     }
-    return record;
   }
 }

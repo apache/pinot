@@ -96,6 +96,31 @@ public class MultiStageQueryThrottlerTest {
   }
 
   @Test
+  public void testAcquireReleaseLogExceedStrategy()
+      throws Exception {
+    when(_helixAdmin.getConfig(any(),
+        eq(Collections.singletonList(CommonConstants.Helix.CONFIG_OF_MULTI_STAGE_ENGINE_MAX_SERVER_QUERY_THREADS)))
+    ).thenReturn(Map.of(CommonConstants.Helix.CONFIG_OF_MULTI_STAGE_ENGINE_MAX_SERVER_QUERY_THREADS, "2"));
+    Map<String, Object> configMap = new HashMap<>();
+    configMap.put(CommonConstants.Broker.CONFIG_OF_MSE_MAX_SERVER_QUERY_THREADS_EXCEED_STRATEGY, "LOG");
+    PinotConfiguration config = new PinotConfiguration(configMap);
+    _multiStageQueryThrottler = new MultiStageQueryThrottler(config);
+
+    Assert.assertTrue(_multiStageQueryThrottler.tryAcquire(1, 100, TimeUnit.MILLISECONDS));
+    Assert.assertTrue(_multiStageQueryThrottler.tryAcquire(1, 100, TimeUnit.MILLISECONDS));
+    // over limit but should acquire since log-only is enabled
+    Assert.assertTrue(_multiStageQueryThrottler.tryAcquire(1, 100, TimeUnit.MILLISECONDS));
+    Assert.assertTrue(_multiStageQueryThrottler.tryAcquire(1, 100, TimeUnit.MILLISECONDS));
+
+    Assert.assertEquals(_multiStageQueryThrottler.currentQueryServerThreads(), 4);
+
+    _multiStageQueryThrottler.release(2);
+    Assert.assertEquals(_multiStageQueryThrottler.currentQueryServerThreads(), 2);
+    _multiStageQueryThrottler.release(2);
+    Assert.assertEquals(_multiStageQueryThrottler.currentQueryServerThreads(), 0);
+  }
+
+  @Test
   public void testDisabledThrottling()
       throws Exception {
     when(_helixAdmin.getConfig(any(),

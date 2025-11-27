@@ -444,4 +444,61 @@ public class FieldSpecTest {
 
     Assert.assertEquals(deserialized, fieldSpec, "Changes detected while checking serialize/deserialize idempotency");
   }
+
+
+  /**
+   * Test to ensure only expected fields are serialized and @JsonIgnore methods are excluded.
+   * This test verifies that getEffectiveMaxLength and getEffectiveMaxLengthExceedStrategy
+   * (which are annotated with @JsonIgnore) do not appear in the JSON output.
+   */
+  @Test
+  public void testJsonSerializationExcludesIgnoredFields() throws Exception {
+    // Test DimensionFieldSpec with some null and some non-null values
+    DimensionFieldSpec dimensionFieldSpec = new DimensionFieldSpec("testDimension", STRING, true, 100, "defaultValue");
+    dimensionFieldSpec.setMaxLengthExceedStrategy(FieldSpec.MaxLengthExceedStrategy.TRIM_LENGTH);
+
+    String json = JsonUtils.objectToString(dimensionFieldSpec);
+
+    // Verify @JsonIgnore methods are not in JSON
+    Assert.assertFalse(json.contains("effectiveMaxLength"),
+        "JSON should not contain effectiveMaxLength (marked with @JsonIgnore): " + json);
+    Assert.assertFalse(json.contains("effectiveMaxLengthExceedStrategy"),
+        "JSON should not contain effectiveMaxLengthExceedStrategy (marked with @JsonIgnore): " + json);
+    Assert.assertFalse(json.contains("nullable"),
+        "JSON should not contain nullable (marked with @JsonIgnore): " + json);
+
+    // Verify expected fields are present
+    Assert.assertTrue(json.contains("\"name\":\"testDimension\""),
+        "JSON should contain name field: " + json);
+    Assert.assertTrue(json.contains("\"dataType\":\"STRING\""),
+        "JSON should contain dataType field: " + json);
+
+    // Test MetricFieldSpec with null values to ensure they're not serialized
+    MetricFieldSpec metricFieldSpec = new MetricFieldSpec("testMetric", INT);
+    // maxLength, maxLengthExceedStrategy, and transformFunction should be null
+
+    String metricJson = JsonUtils.objectToString(metricFieldSpec);
+
+    // Verify @JsonIgnore methods are not in JSON
+    Assert.assertFalse(metricJson.contains("effectiveMaxLength"),
+        "JSON should not contain effectiveMaxLength (marked with @JsonIgnore): " + metricJson);
+    Assert.assertFalse(metricJson.contains("effectiveMaxLengthExceedStrategy"),
+        "JSON should not contain effectiveMaxLengthExceedStrategy (marked with @JsonIgnore): " + metricJson);
+
+    // Verify null fields are not present (these should be null for a basic MetricFieldSpec)
+    Assert.assertFalse(metricJson.contains("maxLength"),
+        "JSON should not contain maxLength when it's null: " + metricJson);
+    Assert.assertFalse(metricJson.contains("maxLengthExceedStrategy"),
+        "JSON should not contain maxLengthExceedStrategy when it's null: " + metricJson);
+    Assert.assertFalse(metricJson.contains("transformFunction"),
+        "JSON should not contain transformFunction when it's null: " + metricJson);
+
+    // Verify expected fields are present
+    Assert.assertTrue(metricJson.contains("\"name\":\"testMetric\""),
+        "JSON should contain name field: " + metricJson);
+    Assert.assertTrue(metricJson.contains("\"dataType\":\"INT\""),
+        "JSON should contain dataType field: " + metricJson);
+    Assert.assertTrue(metricJson.contains("\"singleValueField\":true"),
+        "JSON should contain singleValueField field: " + metricJson);
+  }
 }

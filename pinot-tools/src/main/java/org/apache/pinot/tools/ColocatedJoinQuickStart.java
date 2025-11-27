@@ -89,6 +89,11 @@ public class ColocatedJoinQuickStart extends MultistageEngineQuickStart {
     Map<String, Object> overrides = new HashMap<>(super.getConfigOverrides());
     // This is actually not required anymore, but we are keeping it as reference
     overrides.put(CommonConstants.Broker.CONFIG_OF_ENABLE_PARTITION_METADATA_MANAGER, "true");
+
+    overrides.put(CommonConstants.Broker.CONFIG_OF_ENABLE_THREAD_ALLOCATED_BYTES_MEASUREMENT, true);
+    overrides.put(CommonConstants.Server.CONFIG_OF_ENABLE_THREAD_ALLOCATED_BYTES_MEASUREMENT, true);
+
+    overrides.put(CommonConstants.MultiStageQueryRunner.KEY_OF_MAX_INBOUND_QUERY_DATA_BLOCK_SIZE_BYTES, 1024);
     return overrides;
   }
 

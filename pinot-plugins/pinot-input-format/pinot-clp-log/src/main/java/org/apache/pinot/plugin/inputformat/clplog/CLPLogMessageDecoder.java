@@ -19,9 +19,9 @@
 package org.apache.pinot.plugin.inputformat.clplog;
 
 import com.fasterxml.jackson.databind.JsonNode;
-import java.util.Arrays;
 import java.util.Map;
 import java.util.Set;
+import javax.annotation.Nullable;
 import org.apache.pinot.common.metrics.ServerMetrics;
 import org.apache.pinot.spi.data.readers.GenericRow;
 import org.apache.pinot.spi.data.readers.RecordExtractor;
@@ -89,27 +89,28 @@ public class CLPLogMessageDecoder implements StreamMessageDecoder<byte[]> {
     }
   }
 
+  @Nullable
   @Override
   public GenericRow decode(byte[] payload, GenericRow destination) {
+    return decode(payload, 0, payload.length, destination);
+  }
+
+  @Nullable
+  @Override
+  public GenericRow decode(byte[] payload, int offset, int length, GenericRow destination) {
     try {
-      JsonNode message = JsonUtils.bytesToJsonNode(payload);
-      Map<String, Object> from = JsonUtils.jsonNodeToMap(message);
-      _recordExtractor.extract(from, destination);
-      return destination;
+      JsonNode jsonNode = JsonUtils.bytesToJsonNode(payload, offset, length);
+      return _recordExtractor.extract(JsonUtils.jsonNodeToMap(jsonNode), destination);
     } catch (Exception e) {
-      if (0 != _errorSamplingPeriod) {
+      if (_errorSamplingPeriod != 0) {
         _numErrorsUntilNextPrint--;
-        if (0 == _numErrorsUntilNextPrint) {
-          LOGGER.error("Caught exception while decoding row, discarding row. Payload is {}", new String(payload), e);
+        if (_numErrorsUntilNextPrint == 0) {
+          LOGGER.error("Caught exception while decoding row, discarding row. Payload is {}",
+              new String(payload, offset, length), e);
           _numErrorsUntilNextPrint = _errorSamplingPeriod;
         }
       }
       return null;
     }
-  }
-
-  @Override
-  public GenericRow decode(byte[] payload, int offset, int length, GenericRow destination) {
-    return decode(Arrays.copyOfRange(payload, offset, offset + length), destination);
   }
 }

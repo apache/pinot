@@ -27,29 +27,35 @@ import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.atomic.AtomicReference;
 import org.apache.pinot.core.common.Operator;
 import org.apache.pinot.core.operator.BaseOperator;
+import org.apache.pinot.core.operator.ExecutionStatistics;
 import org.apache.pinot.core.operator.blocks.results.BaseResultsBlock;
 import org.apache.pinot.core.operator.blocks.results.ExceptionResultsBlock;
 import org.apache.pinot.core.operator.combine.merger.ResultsBlockMerger;
 import org.apache.pinot.core.query.request.context.QueryContext;
+import org.apache.pinot.core.query.scheduler.resources.ResourceManager;
 import org.apache.pinot.core.util.QueryMultiThreadingUtils;
 import org.apache.pinot.core.util.trace.TraceRunnable;
-import org.apache.pinot.spi.accounting.ThreadExecutionContext;
+import org.apache.pinot.segment.spi.MutableSegment;
 import org.apache.pinot.spi.accounting.ThreadResourceSnapshot;
 import org.apache.pinot.spi.exception.EarlyTerminationException;
 import org.apache.pinot.spi.exception.QueryErrorCode;
 import org.apache.pinot.spi.exception.QueryErrorMessage;
 import org.apache.pinot.spi.exception.QueryException;
+import org.apache.pinot.spi.exception.TerminationException;
+import org.apache.pinot.spi.query.QueryThreadContext;
 import org.apache.pinot.spi.trace.Tracing;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 
-/**
- * Base implementation of the combine operator.
- * <p>Combine operator uses multiple worker threads to process segments in parallel, and uses the main thread to merge
- * the results blocks from the processed segments. It can early-terminate the query to save the system resources if it
- * detects that the merged results can already satisfy the query, or the query is already errored out or timed out.
- */
+/// Base implementation of the combine operator.
+///
+/// Combine operator uses multiple worker threads to process segments in parallel, and uses the main thread to merge
+/// the results blocks from the processed segments. It can early-terminate the query to save the system resources if it
+/// detects that the merged results can already satisfy the query, or the query is already errored out or timed out.
+///
+/// Different from other operators, [#nextBlock()] should never throw exception, but always return a results block.
+/// Exceptions should be wrapped into an [ExceptionResultsBlock].
 @SuppressWarnings({"rawtypes"})
 public abstract class BaseCombineOperator<T extends BaseResultsBlock> extends BaseOperator<BaseResultsBlock> {
   private static final Logger LOGGER = LoggerFactory.getLogger(BaseCombineOperator.class);
@@ -92,26 +98,120 @@ public abstract class BaseCombineOperator<T extends BaseResultsBlock> extends Ba
     _futures = new Future[_numTasks];
   }
 
+  @Override
+  public List<Operator> getChildOperators() {
+    return _operators;
+  }
+
+  /// Do not check termination in combine operator to ensure [#nextBlock()] returns a results block instead of
+  /// throwing exception.
+  @Override
+  protected void checkTermination() {
+  }
+
+  /// Replaces the error block with the terminate exception if exists, and attaches the execution statistics to the
+  /// results block.
+  protected BaseResultsBlock checkTerminateExceptionAndAttachExecutionStats(BaseResultsBlock resultsBlock) {
+    // For exception results block, check terminate exception and use it as the results block if exists. We want to
+    // return the termination reason when query is explicitly terminated.
+    if (resultsBlock instanceof ExceptionResultsBlock) {
+      TerminationException terminateException = QueryThreadContext.getTerminateException();
+      if (terminateException != null) {
+        resultsBlock = new ExceptionResultsBlock(terminateException);
+      }
+    }
+    return attachExecutionStats(resultsBlock);
+  }
+
+  /// Creates an exception results block from the given throwable, and attaches the execution statistics to it.
+  protected BaseResultsBlock createExceptionResultsBlockAndAttachExecutionStats(Exception e, String context) {
+    // First check terminate exception and use it as the results block if exists. We want to return the termination
+    // reason when query is explicitly terminated.
+    ExceptionResultsBlock resultsBlock;
+    TerminationException terminateException = QueryThreadContext.getTerminateException();
+    if (terminateException != null) {
+      resultsBlock = new ExceptionResultsBlock(terminateException);
+    } else if (e instanceof QueryException) {
+      resultsBlock = new ExceptionResultsBlock((QueryException) e);
+    } else if (e instanceof InterruptedException) {
+      resultsBlock = new ExceptionResultsBlock(new EarlyTerminationException("Interrupted while " + context, e));
+    } else {
+      LOGGER.error("Caught exception while {} (query: {})", context, _queryContext, e);
+      resultsBlock = new ExceptionResultsBlock(
+          QueryErrorCode.INTERNAL.asException("Caught exception while " + context + ": " + e.getMessage(), e));
+    }
+    return attachExecutionStats(resultsBlock);
+  }
+
+  /// Attaches the execution statistics to the results block.
+  protected BaseResultsBlock attachExecutionStats(BaseResultsBlock resultsBlock) {
+    int numSegmentsProcessed = _operators.size();
+    int numSegmentsMatched = 0;
+    int numConsumingSegmentsProcessed = 0;
+    int numConsumingSegmentsMatched = 0;
+    long numDocsScanned = 0;
+    long numEntriesScannedInFilter = 0;
+    long numEntriesScannedPostFilter = 0;
+    long numTotalDocs = 0;
+    for (Operator operator : _operators) {
+      ExecutionStatistics executionStatistics = operator.getExecutionStatistics();
+      if (executionStatistics.getNumDocsScanned() > 0) {
+        numSegmentsMatched++;
+      }
+
+      // TODO: Check all operators and properly implement the getIndexSegment.
+      if (operator.getIndexSegment() instanceof MutableSegment) {
+        numConsumingSegmentsProcessed += 1;
+        if (executionStatistics.getNumDocsScanned() > 0) {
+          numConsumingSegmentsMatched++;
+        }
+      }
+
+      numDocsScanned += executionStatistics.getNumDocsScanned();
+      numEntriesScannedInFilter += executionStatistics.getNumEntriesScannedInFilter();
+      numEntriesScannedPostFilter += executionStatistics.getNumEntriesScannedPostFilter();
+      numTotalDocs += executionStatistics.getNumTotalDocs();
+    }
+    resultsBlock.setNumSegmentsProcessed(numSegmentsProcessed);
+    resultsBlock.setNumSegmentsMatched(numSegmentsMatched);
+    resultsBlock.setNumConsumingSegmentsProcessed(numConsumingSegmentsProcessed);
+    resultsBlock.setNumConsumingSegmentsMatched(numConsumingSegmentsMatched);
+    resultsBlock.setNumDocsScanned(numDocsScanned);
+    resultsBlock.setNumEntriesScannedInFilter(numEntriesScannedInFilter);
+    resultsBlock.setNumEntriesScannedPostFilter(numEntriesScannedPostFilter);
+    resultsBlock.setNumTotalDocs(numTotalDocs);
+    resultsBlock.setExecutionThreadCpuTimeNs(_totalWorkerThreadCpuTimeNs.get());
+    resultsBlock.setExecutionThreadMemAllocatedBytes(_totalWorkerThreadMemAllocatedBytes.get());
+    resultsBlock.setNumServerThreads(getNumWorkerThreads());
+    return resultsBlock;
+  }
+
+  /// Returns the number of worker threads used to process segments.
+  protected int getNumWorkerThreads() {
+    // _numTasks are number of async tasks submitted to the _executorService, but it does not mean Pinot server
+    // use those number of threads to concurrently process segments. Instead, if _executorService thread pool has
+    // less number of threads than _numTasks, the number of threads that used to concurrently process segments equals
+    // to the pool size.
+    // TODO: Get the actual number of query worker threads instead of using the default value.
+    return Math.min(_numTasks, ResourceManager.DEFAULT_QUERY_WORKER_THREADS);
+  }
+
   /**
    * Start the combine operator process. This will spin up multiple threads to process data segments in parallel.
    */
   protected void startProcess() {
     Tracing.activeRecording().setNumTasks(_numTasks);
-    ThreadExecutionContext parentContext = Tracing.getThreadAccountant().getThreadExecutionContext();
     for (int i = 0; i < _numTasks; i++) {
-      int taskId = i;
       _futures[i] = _executorService.submit(new TraceRunnable() {
         @Override
         public void runJob() {
           ThreadResourceSnapshot resourceSnapshot = new ThreadResourceSnapshot();
-          Tracing.ThreadAccountantOps.setupWorker(taskId, parentContext);
 
           // Register the task to the phaser
           // NOTE: If the phaser is terminated (returning negative value) when trying to register the task, that means
           //       the query execution has finished, and the main thread has deregistered itself and returned the
           //       result. Directly return as no execution result will be taken.
           if (_phaser.register() < 0) {
-            Tracing.ThreadAccountantOps.clear();
             return;
           }
           try {
@@ -124,7 +224,10 @@ public abstract class BaseCombineOperator<T extends BaseResultsBlock> extends Ba
             //       exception into the query response, and the main thread might wait infinitely (until timeout) or
             //       throw unexpected exceptions (such as NPE).
             if (t instanceof Exception) {
-              LOGGER.error("Caught exception while processing query: {}", _queryContext, t);
+              // Do not log exception when query is explicitly terminated
+              if (QueryThreadContext.getTerminateException() == null) {
+                LOGGER.error("Caught exception while processing query: {}", _queryContext, t);
+              }
             } else {
               LOGGER.error("Caught serious error while processing query: {}", _queryContext, t);
             }
@@ -132,7 +235,6 @@ public abstract class BaseCombineOperator<T extends BaseResultsBlock> extends Ba
           } finally {
             onProcessSegmentsFinish();
             _phaser.arriveAndDeregister();
-            Tracing.ThreadAccountantOps.clear();
           }
 
           _totalWorkerThreadCpuTimeNs.getAndAdd(resourceSnapshot.getCpuTimeNs());
@@ -163,11 +265,6 @@ public abstract class BaseCombineOperator<T extends BaseResultsBlock> extends Ba
     QueryErrorCode errCode = QueryErrorCode.EXECUTION_TIMEOUT;
     QueryErrorMessage errMsg = new QueryErrorMessage(errCode, "Timed out while polling results block", logMsg);
     return new ExceptionResultsBlock(errMsg);
-  }
-
-  @Override
-  public List<Operator> getChildOperators() {
-    return _operators;
   }
 
   /**

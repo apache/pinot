@@ -29,12 +29,15 @@ import io.swagger.annotations.ApiResponses;
 import io.swagger.annotations.Authorization;
 import io.swagger.annotations.SecurityDefinition;
 import io.swagger.annotations.SwaggerDefinition;
+import java.util.Arrays;
 import java.util.HashMap;
 import java.util.HashSet;
+import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.Executor;
+import java.util.stream.Collectors;
 import javax.inject.Inject;
 import javax.ws.rs.DefaultValue;
 import javax.ws.rs.GET;
@@ -124,6 +127,38 @@ public class PinotRealtimeTableResource {
   }
 
   @POST
+  @Path("/tables/{tableName}/pauseTopicConsumption")
+  @Authorize(targetType = TargetType.TABLE, paramName = "tableName", action = Actions.Table.PAUSE_CONSUMPTION)
+  @Produces(MediaType.APPLICATION_JSON)
+  @ApiOperation(value = "Pause consumption of some topics of a realtime table", notes = "Pause the consumption of "
+      + "some topics of a realtime table.")
+  public Response pauseTopicConsumption(
+      @ApiParam(value = "Name of the table", required = true) @PathParam("tableName") String tableName,
+      @ApiParam(value = "Comma separated list of index of the topics", required = true) @QueryParam("topicIndices")
+      String topicIndices,
+      @Context HttpHeaders headers) {
+    tableName = DatabaseUtils.translateTableName(tableName, headers);
+    String tableNameWithType = TableNameBuilder.REALTIME.tableNameWithType(tableName);
+    validateTable(tableNameWithType);
+    List<Integer> topicIndexList;
+    try {
+      topicIndexList = Arrays.stream(topicIndices.split(","))
+          .map(String::trim)
+          .map(idx -> Integer.parseInt(idx))
+          .collect(Collectors.toList());
+    } catch (NumberFormatException nfe) {
+      throw new ControllerApplicationException(LOGGER, "topicIndices should be a comma separated list of integers",
+          Response.Status.BAD_REQUEST, nfe);
+    }
+    try {
+      return Response.ok(_pinotLLCRealtimeSegmentManager.pauseTopicsConsumption(tableNameWithType, topicIndexList))
+          .build();
+    } catch (Exception e) {
+      throw new ControllerApplicationException(LOGGER, e.getMessage(), Response.Status.INTERNAL_SERVER_ERROR, e);
+    }
+  }
+
+  @POST
   @Path("/tables/{tableName}/resumeConsumption")
   @Authorize(targetType = TargetType.TABLE, paramName = "tableName", action = Actions.Table.RESUME_CONSUMPTION)
   @Produces(MediaType.APPLICATION_JSON)
@@ -155,6 +190,39 @@ public class PinotRealtimeTableResource {
     try {
       return Response.ok(_pinotLLCRealtimeSegmentManager.resumeConsumption(tableNameWithType, consumeFrom,
           PauseState.ReasonCode.ADMINISTRATIVE, comment)).build();
+    } catch (Exception e) {
+      throw new ControllerApplicationException(LOGGER, e.getMessage(), Response.Status.INTERNAL_SERVER_ERROR, e);
+    }
+  }
+
+  @POST
+  @Path("/tables/{tableName}/resumeTopicConsumption")
+  @Authorize(targetType = TargetType.TABLE, paramName = "tableName", action = Actions.Table.RESUME_CONSUMPTION)
+  @Produces(MediaType.APPLICATION_JSON)
+  @ApiOperation(value = "Resume consumption of some topics of a realtime table", notes =
+      "Resume the consumption for some topics of a realtime table. There are two independent pause mechanism, "
+          + "table pause and topic pause. The topics is resumed only if both table and topics are resumed.")
+  public Response resumeTopicConsumption(
+      @ApiParam(value = "Name of the table", required = true) @PathParam("tableName") String tableName,
+      @ApiParam(value = "Comma separated list of index of the topics", required = true) @QueryParam("topicIndices")
+      String topicIndices,
+      @Context HttpHeaders headers) {
+    tableName = DatabaseUtils.translateTableName(tableName, headers);
+    String tableNameWithType = TableNameBuilder.REALTIME.tableNameWithType(tableName);
+    validateTable(tableNameWithType);
+    List<Integer> topicIndexList;
+    try {
+      topicIndexList = Arrays.stream(topicIndices.split(","))
+          .map(String::trim)
+          .map(idx -> Integer.parseInt(idx))
+          .collect(Collectors.toList());
+    } catch (NumberFormatException nfe) {
+      throw new ControllerApplicationException(LOGGER, "topicIndices should be a comma separated list of integers",
+          Response.Status.BAD_REQUEST, nfe);
+    }
+    try {
+      return Response.ok(_pinotLLCRealtimeSegmentManager.resumeTopicsConsumption(
+          tableNameWithType, topicIndexList)).build();
     } catch (Exception e) {
       throw new ControllerApplicationException(LOGGER, e.getMessage(), Response.Status.INTERNAL_SERVER_ERROR, e);
     }

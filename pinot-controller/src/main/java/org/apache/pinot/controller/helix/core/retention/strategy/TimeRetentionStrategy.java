@@ -39,6 +39,13 @@ public class TimeRetentionStrategy implements RetentionStrategy {
 
   @Override
   public boolean isPurgeable(String tableNameWithType, SegmentZKMetadata segmentZKMetadata) {
+
+    // For realtime tables, only completed segments(DONE or UPLOADED) are eligible for purging.
+    //For offline tables, status defaults to UPLOADED which is completed, so they proceed to normal retention
+    if (!segmentZKMetadata.getStatus().isCompleted()) {
+      return false; // Incomplete segments don't have final end time and should not be purged
+    }
+
     return isPurgeable(tableNameWithType, segmentZKMetadata.getSegmentName(), segmentZKMetadata.getEndTimeMs());
   }
 

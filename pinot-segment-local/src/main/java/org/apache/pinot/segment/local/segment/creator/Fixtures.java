@@ -19,7 +19,7 @@
 
 package org.apache.pinot.segment.local.segment.creator;
 
-import com.google.common.collect.ImmutableList;
+import java.util.List;
 import java.util.Random;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.data.Schema;
@@ -136,7 +136,7 @@ public class Fixtures {
     GenericRow secondRow = createSingleRow(rand.nextInt(Integer.MAX_VALUE));
     GenericRow thirdRow = createSingleRow(rand.nextInt(Integer.MAX_VALUE));
     GenericRow retVal = new GenericRow();
-    retVal.putValue(GenericRow.MULTIPLE_RECORDS_KEY, ImmutableList.of(firstRow, secondRow, thirdRow));
+    retVal.putValue(GenericRow.MULTIPLE_RECORDS_KEY, List.of(firstRow, secondRow, thirdRow));
     return retVal;
   }
 
@@ -146,7 +146,7 @@ public class Fixtures {
     GenericRow secondRow = createInvalidSingleRow(rand.nextInt(Integer.MAX_VALUE));
     GenericRow thirdRow = createSingleRow(rand.nextInt(Integer.MAX_VALUE));
     GenericRow retVal = new GenericRow();
-    retVal.putValue(GenericRow.MULTIPLE_RECORDS_KEY, ImmutableList.of(firstRow, secondRow, thirdRow));
+    retVal.putValue(GenericRow.MULTIPLE_RECORDS_KEY, List.of(firstRow, secondRow, thirdRow));
     return retVal;
   }
 }

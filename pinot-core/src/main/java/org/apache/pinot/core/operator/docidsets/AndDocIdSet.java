@@ -196,4 +196,9 @@ public final class AndDocIdSet implements BlockDocIdSet {
     }
     return _numEntriesScannedInFilter + numEntriesScannedForScanBasedDocIdSets;
   }
+
+  @Override
+  public BlockDocIdSet getOptimizedDocIdSet() {
+    return this;
+  }
 }

@@ -34,6 +34,9 @@ import org.apache.pinot.segment.local.indexsegment.immutable.ImmutableSegmentLoa
 import org.apache.pinot.segment.local.segment.index.forward.ForwardIndexCreatorFactory;
 import org.apache.pinot.segment.spi.IndexSegment;
 import org.apache.pinot.segment.spi.V1Constants;
+import org.apache.pinot.segment.spi.V1Constants.MetadataKeys;
+import org.apache.pinot.segment.spi.V1Constants.MetadataKeys.Column;
+import org.apache.pinot.segment.spi.V1Constants.MetadataKeys.Segment;
 import org.apache.pinot.segment.spi.compression.ChunkCompressionType;
 import org.apache.pinot.segment.spi.datasource.DataSource;
 import org.apache.pinot.segment.spi.datasource.DataSourceMetadata;
@@ -252,20 +255,19 @@ public class DictionaryToRawIndexConverter {
    */
   private void updateMetadata(File segmentDir, String[] columns, String tableName)
       throws ConfigurationException {
-    File metadataFile = new File(segmentDir, V1Constants.MetadataKeys.METADATA_FILE_NAME);
+    File metadataFile = new File(segmentDir, MetadataKeys.METADATA_FILE_NAME);
     PropertiesConfiguration properties = CommonsConfigurationUtils.fromFile(metadataFile);
 
     if (tableName != null) {
-      properties
-          .setProperty(V1Constants.MetadataKeys.Segment.TABLE_NAME, TableNameBuilder.extractRawTableName(tableName));
+      properties.setProperty(Segment.TABLE_NAME, TableNameBuilder.extractRawTableName(tableName));
     }
 
     for (String column : columns) {
-      properties.setProperty(
-          V1Constants.MetadataKeys.Column.getKeyFor(column, V1Constants.MetadataKeys.Column.HAS_DICTIONARY), false);
-      properties.setProperty(
-          V1Constants.MetadataKeys.Column.getKeyFor(column, V1Constants.MetadataKeys.Column.BITS_PER_ELEMENT), -1);
+      properties.setProperty(Column.getKeyFor(column, Column.HAS_DICTIONARY), false);
+      properties.setProperty(Column.getKeyFor(column, Column.DICTIONARY_ELEMENT_SIZE), 0);
+      properties.setProperty(Column.getKeyFor(column, Column.BITS_PER_ELEMENT), -1);
     }
+
     CommonsConfigurationUtils.saveToFile(properties, metadataFile);
   }
 

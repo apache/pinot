@@ -94,8 +94,6 @@ public class TypeSystem extends RelDataTypeSystemImpl {
 
   @Override
   public RelDataType deriveAvgAggType(RelDataTypeFactory typeFactory, RelDataType argumentType) {
-    assert SqlTypeUtil.isNumeric(argumentType);
-
     switch (argumentType.getSqlTypeName()) {
       case DECIMAL: {
         // For BIG_DECIMAL, set the return type to BIG_DECIMAL. Check OSS issue #10318 for more details.
@@ -109,6 +107,11 @@ public class TypeSystem extends RelDataTypeSystemImpl {
 
   @Override
   public RelDataType deriveSumType(RelDataTypeFactory typeFactory, RelDataType argumentType) {
+    if (argumentType.getComponentType() != null) {
+      // For MV columns, the return type for SUM is the same as the return type for SUM on the individual element type.
+      return deriveSumType(typeFactory, argumentType.getComponentType());
+    }
+
     assert SqlTypeUtil.isNumeric(argumentType);
     switch (argumentType.getSqlTypeName()) {
       case TINYINT:

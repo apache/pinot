@@ -20,6 +20,7 @@ package org.apache.pinot.common.function.scalar.array;
 
 import java.util.EnumMap;
 import java.util.Map;
+import java.util.Set;
 import javax.annotation.Nullable;
 import org.apache.pinot.common.function.FunctionInfo;
 import org.apache.pinot.common.function.PinotScalarFunction;
@@ -59,6 +60,11 @@ public class ArrayLengthScalarFunction implements PinotScalarFunction {
   @Override
   public String getName() {
     return "ARRAYLENGTH";
+  }
+
+  @Override
+  public Set<String> getNames() {
+    return Set.of("ARRAYLENGTH", "CARDINALITY");
   }
 
   @Nullable

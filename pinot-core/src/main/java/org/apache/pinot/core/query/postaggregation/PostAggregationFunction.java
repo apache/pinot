@@ -89,15 +89,7 @@ public class PostAggregationFunction {
     if (_functionInvoker.getMethod().isVarArgs()) {
       result = _functionInvoker.invoke(new Object[]{arguments});
     } else {
-      int numArguments = arguments.length;
-      PinotDataType[] parameterTypes = _functionInvoker.getParameterTypes();
-      for (int i = 0; i < numArguments; i++) {
-        PinotDataType parameterType = parameterTypes[i];
-        PinotDataType argumentType = _argumentTypes[i];
-        if (parameterType != argumentType) {
-          arguments[i] = parameterType.convert(arguments[i], argumentType);
-        }
-      }
+      _functionInvoker.convertTypes(arguments);
       result = _functionInvoker.invoke(arguments);
     }
 

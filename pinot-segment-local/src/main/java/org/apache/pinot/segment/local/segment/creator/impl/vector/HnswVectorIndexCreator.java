@@ -20,7 +20,6 @@ package org.apache.pinot.segment.local.segment.creator.impl.vector;
 
 import java.io.File;
 import java.io.IOException;
-import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
 import org.apache.lucene.document.Document;
 import org.apache.lucene.document.StoredField;
@@ -74,7 +73,7 @@ public class HnswVectorIndexCreator implements VectorIndexCreator {
   }
 
   @Override
-  public void add(@Nonnull Object[] values, @Nullable int[] dictIds) {
+  public void add(Object[] values, @Nullable int[] dictIds) {
     float[] floatValues = new float[_vectorDimension];
     for (int i = 0; i < values.length; i++) {
       floatValues[i] = (Float) values[i];

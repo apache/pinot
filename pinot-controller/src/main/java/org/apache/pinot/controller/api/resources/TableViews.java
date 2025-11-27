@@ -38,7 +38,6 @@ import java.util.Set;
 import java.util.SortedSet;
 import java.util.TreeSet;
 import java.util.stream.Collectors;
-import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
 import javax.inject.Inject;
 import javax.ws.rs.DefaultValue;
@@ -349,7 +348,7 @@ public class TableViews {
     return tableView;
   }
 
-  private TableView getTableExternalView(@Nonnull String tableNameOptType, @Nullable TableType tableType) {
+  private TableView getTableExternalView(String tableNameOptType, @Nullable TableType tableType) {
     TableView tableView = new TableView();
     if (tableType == null || tableType == TableType.OFFLINE) {
       tableView._offline = getExternalView(tableNameOptType, TableType.OFFLINE);
@@ -373,8 +372,7 @@ public class TableViews {
   }
 
   @Nullable
-  public Map<String, Map<String, String>> getIdealState(@Nonnull String tableNameOptType,
-      @Nullable TableType tableType) {
+  public Map<String, Map<String, String>> getIdealState(String tableNameOptType, @Nullable TableType tableType) {
     String tableNameWithType = getTableNameWithType(tableNameOptType, tableType);
     IdealState resourceIdealState = _pinotHelixResourceManager.getHelixAdmin()
         .getResourceIdealState(_pinotHelixResourceManager.getHelixClusterName(), tableNameWithType);
@@ -382,14 +380,14 @@ public class TableViews {
   }
 
   @Nullable
-  public Map<String, Map<String, String>> getExternalView(@Nonnull String tableNameOptType, TableType tableType) {
+  public Map<String, Map<String, String>> getExternalView(String tableNameOptType, @Nullable TableType tableType) {
     String tableNameWithType = getTableNameWithType(tableNameOptType, tableType);
     ExternalView resourceEV = _pinotHelixResourceManager.getHelixAdmin()
         .getResourceExternalView(_pinotHelixResourceManager.getHelixClusterName(), tableNameWithType);
     return resourceEV == null ? null : resourceEV.getRecord().getMapFields();
   }
 
-  private String getTableNameWithType(@Nonnull String tableNameOptType, @Nullable TableType tableType) {
+  private String getTableNameWithType(String tableNameOptType, @Nullable TableType tableType) {
     if (tableType != null) {
       if (tableType == TableType.OFFLINE) {
         return TableNameBuilder.OFFLINE.tableNameWithType(tableNameOptType);

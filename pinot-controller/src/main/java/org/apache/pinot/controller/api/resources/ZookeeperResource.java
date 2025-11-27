@@ -24,6 +24,7 @@ import com.fasterxml.jackson.databind.DeserializationFeature;
 import com.fasterxml.jackson.databind.MapperFeature;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.SerializationFeature;
+import com.fasterxml.jackson.databind.json.JsonMapper;
 import com.google.common.annotations.VisibleForTesting;
 import io.swagger.annotations.Api;
 import io.swagger.annotations.ApiKeyAuthDefinition;
@@ -81,17 +82,14 @@ public class ZookeeperResource {
 
   // Helix uses codehaus.jackson.map.ObjectMapper, hence we can't use pinot JsonUtils here.
   @VisibleForTesting
-  static final ObjectMapper MAPPER = (new ObjectMapper()).setAnnotationIntrospector(new CodehausJacksonIntrospector());
-
-  static {
-    // Configuration should be identical to org.apache.helix.zookeeper.datamodel.serializer.ZNRecordSerializer.
-
-    MAPPER.enable(SerializationFeature.INDENT_OUTPUT);
-    MAPPER.enable(new MapperFeature[]{MapperFeature.AUTO_DETECT_FIELDS});
-    MAPPER.enable(new MapperFeature[]{MapperFeature.CAN_OVERRIDE_ACCESS_MODIFIERS});
-    MAPPER.enable(new MapperFeature[]{MapperFeature.AUTO_DETECT_SETTERS});
-    MAPPER.enable(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES);
-  }
+  static final ObjectMapper MAPPER = JsonMapper.builder()
+      .enable(MapperFeature.AUTO_DETECT_FIELDS)
+      .enable(MapperFeature.AUTO_DETECT_FIELDS)
+      .enable(MapperFeature.CAN_OVERRIDE_ACCESS_MODIFIERS)
+      .enable(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES)
+      .enable(SerializationFeature.INDENT_OUTPUT)
+      .build()
+      .setAnnotationIntrospector(new CodehausJacksonIntrospector());
 
   @Inject
   PinotHelixResourceManager _pinotHelixResourceManager;

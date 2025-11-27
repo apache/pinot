@@ -20,7 +20,6 @@
 package org.apache.pinot.broker.requesthandler;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
-import com.google.common.collect.ImmutableMap;
 import java.util.Map;
 import org.apache.pinot.common.request.PinotQuery;
 import org.apache.pinot.segment.local.function.GroovyFunctionEvaluator;
@@ -44,58 +43,58 @@ public class QueryValidationTest {
   @Test
   public void testNonExistingColumns() {
     String query = "SELECT DISTINCT(col1, col2) FROM foo";
-    testNonExistingColumns("foo", false, ImmutableMap.of("col1", "col1"), query,
+    testNonExistingColumns("foo", false, Map.of("col1", "col1"), query,
         "Unknown columnName 'col2' found in the query");
-    testNonExistingColumns("foo", false, ImmutableMap.of("col2", "col2"), query,
+    testNonExistingColumns("foo", false, Map.of("col2", "col2"), query,
         "Unknown columnName 'col1' found in the query");
-    testExistingColumns("foo", false, ImmutableMap.of("col2", "col2", "col1", "col1"), query);
+    testExistingColumns("foo", false, Map.of("col2", "col2", "col1", "col1"), query);
     query = "SELECT sum(Col1) FROM foo";
-    testNonExistingColumns("foo", false, ImmutableMap.of("col1", "col1"), query,
+    testNonExistingColumns("foo", false, Map.of("col1", "col1"), query,
         "Unknown columnName 'Col1' found in the query");
-    testExistingColumns("foo", false, ImmutableMap.of("Col1", "Col1"), query);
-    testExistingColumns("foo", true, ImmutableMap.of("col1", "col1"), query);
-    testExistingColumns("foo", true, ImmutableMap.of("col1", "Col1"), query);
+    testExistingColumns("foo", false, Map.of("Col1", "Col1"), query);
+    testExistingColumns("foo", true, Map.of("col1", "col1"), query);
+    testExistingColumns("foo", true, Map.of("col1", "Col1"), query);
     query = "SELECT sum(Col1) AS sum_col1 FROM foo";
-    testNonExistingColumns("foo", false, ImmutableMap.of("col1", "col1"), query,
+    testNonExistingColumns("foo", false, Map.of("col1", "col1"), query,
         "Unknown columnName 'Col1' found in the query");
-    testExistingColumns("foo", false, ImmutableMap.of("Col1", "Col1"), query);
-    testExistingColumns("foo", true, ImmutableMap.of("col1", "col1"), query);
-    testExistingColumns("foo", true, ImmutableMap.of("col1", "Col1"), query);
+    testExistingColumns("foo", false, Map.of("Col1", "Col1"), query);
+    testExistingColumns("foo", true, Map.of("col1", "col1"), query);
+    testExistingColumns("foo", true, Map.of("col1", "Col1"), query);
     query = "SELECT sum(Col1) AS sum_col1 FROM foo HAVING sum_col1 > 10";
-    testNonExistingColumns("foo", false, ImmutableMap.of("col1", "col1"), query,
+    testNonExistingColumns("foo", false, Map.of("col1", "col1"), query,
         "Unknown columnName 'Col1' found in the query");
-    testNonExistingColumns("foo", false, ImmutableMap.of("col1", "cOL1"), query,
+    testNonExistingColumns("foo", false, Map.of("col1", "cOL1"), query,
         "Unknown columnName 'Col1' found in the query");
-    testExistingColumns("foo", false, ImmutableMap.of("Col1", "Col1"), query);
-    testExistingColumns("foo", true, ImmutableMap.of("col1", "col1"), query);
-    testExistingColumns("foo", true, ImmutableMap.of("col1", "Col1"), query);
-    testExistingColumns("foo", true, ImmutableMap.of("col1", "cOL1"), query);
+    testExistingColumns("foo", false, Map.of("Col1", "Col1"), query);
+    testExistingColumns("foo", true, Map.of("col1", "col1"), query);
+    testExistingColumns("foo", true, Map.of("col1", "Col1"), query);
+    testExistingColumns("foo", true, Map.of("col1", "cOL1"), query);
     query = "SELECT sum(Col1) AS sum_col1, b AS B, c as D FROM foo GROUP BY B, D";
-    testNonExistingColumns("foo", false, ImmutableMap.of("col1", "col1", "b", "b", "c", "c"), query,
+    testNonExistingColumns("foo", false, Map.of("col1", "col1", "b", "b", "c", "c"), query,
         "Unknown columnName 'Col1' found in the query");
-    testNonExistingColumns("foo", false, ImmutableMap.of("Col1", "Col1", "B", "B", "c", "c"), query,
+    testNonExistingColumns("foo", false, Map.of("Col1", "Col1", "B", "B", "c", "c"), query,
         "Unknown columnName 'b' found in the query");
-    testNonExistingColumns("foo", false, ImmutableMap.of("Col1", "Col1", "c", "c"), query,
+    testNonExistingColumns("foo", false, Map.of("Col1", "Col1", "c", "c"), query,
         "Unknown columnName 'b' found in the query");
-    testNonExistingColumns("foo", false, ImmutableMap.of("Col1", "Col1", "b", "b", "C", "C"), query,
+    testNonExistingColumns("foo", false, Map.of("Col1", "Col1", "b", "b", "C", "C"), query,
         "Unknown columnName 'c' found in the query");
-    testExistingColumns("foo", false, ImmutableMap.of("Col1", "Col1", "b", "b", "c", "c"), query);
-    testExistingColumns("foo", true, ImmutableMap.of("col1", "col1", "b", "b", "c", "c"), query);
-    testExistingColumns("foo", true, ImmutableMap.of("col1", "COL1", "b", "B", "c", "C"), query);
+    testExistingColumns("foo", false, Map.of("Col1", "Col1", "b", "b", "c", "c"), query);
+    testExistingColumns("foo", true, Map.of("col1", "col1", "b", "b", "c", "c"), query);
+    testExistingColumns("foo", true, Map.of("col1", "COL1", "b", "B", "c", "C"), query);
     query = "SELECT sum(Col1) AS sum_col1, b AS B, c as D FROM foo GROUP BY 2, 3";
-    testNonExistingColumns("foo", false, ImmutableMap.of("col1", "col1", "B", "B", "c", "c", "D", "D"), query,
+    testNonExistingColumns("foo", false, Map.of("col1", "col1", "B", "B", "c", "c", "D", "D"), query,
         "Unknown columnName 'Col1' found in the query");
-    testNonExistingColumns("foo", false, ImmutableMap.of("col1", "col1", "b", "b", "c", "c"), query,
+    testNonExistingColumns("foo", false, Map.of("col1", "col1", "b", "b", "c", "c"), query,
         "Unknown columnName 'Col1' found in the query");
-    testNonExistingColumns("foo", false, ImmutableMap.of("Col1", "Col1", "B", "B", "c", "c"), query,
+    testNonExistingColumns("foo", false, Map.of("Col1", "Col1", "B", "B", "c", "c"), query,
         "Unknown columnName 'b' found in the query");
-    testNonExistingColumns("foo", false, ImmutableMap.of("Col1", "Col1", "c", "c"), query,
+    testNonExistingColumns("foo", false, Map.of("Col1", "Col1", "c", "c"), query,
         "Unknown columnName 'b' found in the query");
-    testNonExistingColumns("foo", false, ImmutableMap.of("Col1", "Col1", "b", "b", "C", "C"), query,
+    testNonExistingColumns("foo", false, Map.of("Col1", "Col1", "b", "b", "C", "C"), query,
         "Unknown columnName 'c' found in the query");
-    testExistingColumns("foo", false, ImmutableMap.of("Col1", "Col1", "b", "b", "c", "c", "D", "D"), query);
-    testExistingColumns("foo", true, ImmutableMap.of("col1", "col1", "b", "b", "c", "c", "d", "d"), query);
-    testExistingColumns("foo", true, ImmutableMap.of("col1", "COL1", "b", "B", "c", "C"), query);
+    testExistingColumns("foo", false, Map.of("Col1", "Col1", "b", "b", "c", "c", "D", "D"), query);
+    testExistingColumns("foo", true, Map.of("col1", "col1", "b", "b", "c", "c", "d", "d"), query);
+    testExistingColumns("foo", true, Map.of("col1", "COL1", "b", "B", "c", "C"), query);
   }
 
   @Test

@@ -23,6 +23,7 @@ import java.util.Map;
 import java.util.Set;
 import javax.annotation.Nullable;
 import org.apache.commons.lang3.ArrayUtils;
+import org.apache.commons.lang3.NotImplementedException;
 import org.apache.pinot.segment.spi.Constants;
 import org.apache.pinot.segment.spi.partition.PartitionFunction;
 
@@ -64,11 +65,23 @@ public class ColumnIndexCreationInfo implements Serializable {
   }
 
   public Object getSortedUniqueElementsArray() {
-    return _columnStatistics.getUniqueValuesSet();
+    try {
+      return _columnStatistics.getUniqueValuesSet();
+    } catch (NotImplementedException e) {
+      return null;
+    }
   }
 
   public int getDistinctValueCount() {
-    Object uniqueValArray = _columnStatistics.getUniqueValuesSet();
+    Object uniqueValArray;
+    try {
+      uniqueValArray = _columnStatistics.getUniqueValuesSet();
+    } catch (NotImplementedException e) {
+      // For no-dictionary columns, we don't retain unique values in collectors to save memory.
+      // Fall back to the collectors' cardinality (tracked as total entries) so downstream components retain
+      // a non-negative effective cardinality for optimizations like scan-based AND reordering.
+      return _columnStatistics.getCardinality();
+    }
     if (uniqueValArray == null) {
       return Constants.UNKNOWN_CARDINALITY;
     }

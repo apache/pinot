@@ -37,7 +37,6 @@ import org.apache.pinot.spi.data.DateTimeFieldSpec;
 import org.apache.pinot.spi.data.DateTimeFormatPatternSpec;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
 import org.apache.pinot.spi.exception.BadQueryRequestException;
-import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 import org.joda.time.DateTimeZone;
 import org.joda.time.MutableDateTime;
@@ -800,7 +799,7 @@ public class DateTimeConversionTransformFunctionTest extends BaseTransformFuncti
     assertStrInLongOut(input, expected, function);
   }
 
-  private @NotNull DateTimeConversionTransformFunction prepareFunction(String inputFormat,
+  private DateTimeConversionTransformFunction prepareFunction(String inputFormat,
       String outputFormat, String bucketGranularity, String bucketingTimeZone) {
 
     DateTimeConversionTransformFunction function = new DateTimeConversionTransformFunction();

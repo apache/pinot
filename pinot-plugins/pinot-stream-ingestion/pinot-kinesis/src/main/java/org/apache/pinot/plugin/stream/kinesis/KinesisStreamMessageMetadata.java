@@ -18,25 +18,10 @@
  */
 package org.apache.pinot.plugin.stream.kinesis;
 
-import java.util.Map;
-import javax.annotation.Nullable;
-import org.apache.pinot.spi.data.readers.GenericRow;
-import org.apache.pinot.spi.stream.StreamMessageMetadata;
+public class KinesisStreamMessageMetadata {
+  private KinesisStreamMessageMetadata() {
+  }
 
-
-// TODO: Make it a util class
-public class KinesisStreamMessageMetadata extends StreamMessageMetadata {
   public static final String APPRX_ARRIVAL_TIMESTAMP_KEY = "apprxArrivalTimestamp";
   public static final String SEQUENCE_NUMBER_KEY = "sequenceNumber";
-
-  @Deprecated
-  public KinesisStreamMessageMetadata(long recordIngestionTimeMs, @Nullable GenericRow headers) {
-    super(recordIngestionTimeMs, headers);
-  }
-
-  @Deprecated
-  public KinesisStreamMessageMetadata(long recordIngestionTimeMs, @Nullable GenericRow headers,
-      Map<String, String> metadata) {
-    super(recordIngestionTimeMs, headers, metadata);
-  }
 }

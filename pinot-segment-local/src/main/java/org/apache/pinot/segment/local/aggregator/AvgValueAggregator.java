@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.segment.local.aggregator;
 
+import javax.annotation.Nullable;
 import org.apache.pinot.segment.local.customobject.AvgPair;
 import org.apache.pinot.segment.local.utils.CustomSerDeUtils;
 import org.apache.pinot.segment.spi.AggregationFunctionType;
@@ -38,21 +39,17 @@ public class AvgValueAggregator implements ValueAggregator<Object, AvgPair> {
   }
 
   @Override
-  public AvgPair getInitialAggregatedValue(Object rawValue) {
-    if (rawValue instanceof byte[]) {
-      return deserializeAggregatedValue((byte[]) rawValue);
-    } else {
-      return new AvgPair(((Number) rawValue).doubleValue(), 1L);
+  public AvgPair getInitialAggregatedValue(@Nullable Object rawValue) {
+    if (rawValue == null) {
+      return new AvgPair();
     }
+    return processRawValue(rawValue);
   }
 
   @Override
   public AvgPair applyRawValue(AvgPair value, Object rawValue) {
-    if (rawValue instanceof byte[]) {
-      value.apply(deserializeAggregatedValue((byte[]) rawValue));
-    } else {
-      value.apply(((Number) rawValue).doubleValue(), 1L);
-    }
+    AvgPair processedValue = processRawValue(rawValue);
+    value.apply(processedValue);
     return value;
   }
 
@@ -68,6 +65,11 @@ public class AvgValueAggregator implements ValueAggregator<Object, AvgPair> {
   }
 
   @Override
+  public boolean isAggregatedValueFixedSize() {
+    return true;
+  }
+
+  @Override
   public int getMaxAggregatedValueByteSize() {
     return Double.BYTES + Long.BYTES;
   }
@@ -80,5 +82,27 @@ public class AvgValueAggregator implements ValueAggregator<Object, AvgPair> {
   @Override
   public AvgPair deserializeAggregatedValue(byte[] bytes) {
     return CustomSerDeUtils.AVG_PAIR_SER_DE.deserialize(bytes);
+  }
+
+  /**
+   * Processes a raw value (either multi-value array or single number) and returns an AvgPair with the sum and count.
+   */
+  protected AvgPair processRawValue(Object rawValue) {
+    if (rawValue instanceof byte[]) {
+      return deserializeAggregatedValue((byte[]) rawValue);
+    }
+
+    if (rawValue instanceof Object[]) {
+      Object[] values = (Object[]) rawValue;
+      AvgPair avgPair = new AvgPair();
+      for (Object value : values) {
+        if (value != null) {
+          avgPair.apply(ValueAggregatorUtils.toDouble(value));
+        }
+      }
+      return avgPair;
+    }
+
+    return new AvgPair(ValueAggregatorUtils.toDouble(rawValue), 1L);
   }
 }

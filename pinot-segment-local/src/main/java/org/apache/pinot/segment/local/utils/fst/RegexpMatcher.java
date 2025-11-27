@@ -40,21 +40,17 @@ import org.apache.lucene.util.fst.Util;
  *   match(input) Function builds the automaton and matches given input.
  */
 public class RegexpMatcher {
-
-  private final String _regexQuery;
   private final FST<Long> _fst;
   private final Automaton _automaton;
 
   public RegexpMatcher(String regexQuery, FST<Long> fst) {
-    _regexQuery = regexQuery;
     _fst = fst;
-    _automaton = (new RegExp(_regexQuery)).toAutomaton();
+    _automaton = (new RegExp(regexQuery)).toAutomaton();
   }
 
   public static List<Long> regexMatch(String regexQuery, FST<Long> fst)
       throws IOException {
-    RegexpMatcher matcher = new RegexpMatcher(regexQuery, fst);
-    return matcher.regexMatchOnFST();
+    return new RegexpMatcher(regexQuery, fst).regexMatchOnFST();
   }
 
   // Matches "input" string with _regexQuery Automaton.

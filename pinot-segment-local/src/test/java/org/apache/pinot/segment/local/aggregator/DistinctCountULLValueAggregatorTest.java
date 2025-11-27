@@ -81,6 +81,12 @@ public class DistinctCountULLValueAggregatorTest {
   }
 
   @Test
+  public void nullInitialShouldReturnEmptyULL() {
+    DistinctCountULLValueAggregator agg = new DistinctCountULLValueAggregator(Collections.emptyList());
+    assertEquals(agg.getInitialAggregatedValue(null).getDistinctCountEstimate(), 0.0);
+  }
+
+  @Test
   public void applyAggregatedValueShouldUnion() {
     UltraLogLog input1 = UltraLogLog.create(12);
     IntStream.range(0, 1000).mapToObj(UltraLogLogUtils::hashObject).forEach(h -> h.ifPresent(input1::add));

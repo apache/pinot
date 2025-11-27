@@ -595,7 +595,7 @@ public class StringFunctions {
    * @see StringUtils#repeat(String, String, int)
    * @param input
    * @param times
-   * @return concatenate the string to itself specified number of times with specified seperator
+   * @return concatenate the string to itself specified number of times with specified separator
    */
   @ScalarFunction
   public static String repeat(String input, String sep, int times) {

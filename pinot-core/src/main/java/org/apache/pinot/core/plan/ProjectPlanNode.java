@@ -23,7 +23,6 @@ import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Map;
 import java.util.Set;
-import javax.annotation.Nullable;
 import org.apache.pinot.common.request.context.ExpressionContext;
 import org.apache.pinot.common.utils.HashUtil;
 import org.apache.pinot.core.operator.BaseProjectOperator;
@@ -50,7 +49,7 @@ public class ProjectPlanNode implements PlanNode {
   private final BaseFilterOperator _filterOperator;
 
   public ProjectPlanNode(SegmentContext segmentContext, QueryContext queryContext,
-      Collection<ExpressionContext> expressions, int maxDocsPerCall, @Nullable BaseFilterOperator filterOperator) {
+      Collection<ExpressionContext> expressions, int maxDocsPerCall, BaseFilterOperator filterOperator) {
     _indexSegment = segmentContext.getIndexSegment();
     _segmentContext = segmentContext;
     _queryContext = queryContext;
@@ -61,7 +60,8 @@ public class ProjectPlanNode implements PlanNode {
 
   public ProjectPlanNode(SegmentContext segmentContext, QueryContext queryContext,
       Collection<ExpressionContext> expressions, int maxDocsPerCall) {
-    this(segmentContext, queryContext, expressions, maxDocsPerCall, null);
+    this(segmentContext, queryContext, expressions, maxDocsPerCall,
+        new FilterPlanNode(segmentContext, queryContext).run());
   }
 
   @Override
@@ -78,13 +78,13 @@ public class ProjectPlanNode implements PlanNode {
     projectionColumns.forEach(
         column -> dataSourceMap.put(column, _indexSegment.getDataSource(column, _queryContext.getSchema())));
     // NOTE: Skip creating DocIdSetOperator when maxDocsPerCall is 0 (for selection query with LIMIT 0)
-    DocIdSetOperator docIdSetOperator =
-        _maxDocsPerCall > 0 ? new DocIdSetPlanNode(_segmentContext, _queryContext, _maxDocsPerCall,
-            _filterOperator).run() : null;
+    DocIdSetOperator docIdSetOperator = _maxDocsPerCall > 0
+        ? new DocIdSetPlanNode(_segmentContext, _queryContext, _maxDocsPerCall, _filterOperator).run()
+        : null;
 
     // TODO: figure out a way to close this operator, as it may hold reader context
     ProjectionOperator projectionOperator =
-        ProjectionOperatorUtils.getProjectionOperator(dataSourceMap, docIdSetOperator);
+        ProjectionOperatorUtils.getProjectionOperator(dataSourceMap, docIdSetOperator, _queryContext);
     return hasNonIdentifierExpression ? new TransformOperator(_queryContext, projectionOperator, _expressions)
         : projectionOperator;
   }

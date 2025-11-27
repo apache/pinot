@@ -24,7 +24,6 @@ import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
-import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
 
 
@@ -164,7 +163,7 @@ public class EqualityUtils {
     return false;
   }
 
-  public static boolean isNullOrNotSameClass(@Nonnull Object left, @Nullable Object right) {
+  public static boolean isNullOrNotSameClass(Object left, @Nullable Object right) {
     return right == null || left.getClass() != right.getClass();
   }
 

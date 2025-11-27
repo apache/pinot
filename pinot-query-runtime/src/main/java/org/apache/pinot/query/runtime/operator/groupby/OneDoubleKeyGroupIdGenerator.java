@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.query.runtime.operator.groupby;
 
+import it.unimi.dsi.fastutil.doubles.Double2IntFunction;
 import it.unimi.dsi.fastutil.doubles.Double2IntMap;
 import it.unimi.dsi.fastutil.doubles.Double2IntOpenHashMap;
 import it.unimi.dsi.fastutil.objects.ObjectIterator;
@@ -29,6 +30,9 @@ public class OneDoubleKeyGroupIdGenerator implements GroupIdGenerator {
   private final int _numGroupsLimit;
 
   private int _numGroups = 0;
+  /// A function to generate the next group ID based on the current size of the map.
+  /// We use this instead of a simple lambda to avoid capturing `this` and therefore allocate on each getGroupId call
+  private final Double2IntFunction _groupIdGenerator = k -> _numGroups;
   private int _nullGroupId = INVALID_ID;
 
   public OneDoubleKeyGroupIdGenerator(int numGroupsLimit, int initialCapacity) {
@@ -46,7 +50,7 @@ public class OneDoubleKeyGroupIdGenerator implements GroupIdGenerator {
         }
         return _nullGroupId;
       }
-      int groupId = _groupIdMap.computeIfAbsent((double) key, k -> _numGroups);
+      int groupId = _groupIdMap.computeIfAbsent((double) key, _groupIdGenerator);
       if (groupId == _numGroups) {
         _numGroups++;
       }

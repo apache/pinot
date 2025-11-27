@@ -20,10 +20,12 @@ package org.apache.pinot.spi.utils;
 
 import com.google.common.base.Preconditions;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.stream.Collectors;
-import org.apache.commons.collections.CollectionUtils;
+import org.apache.commons.collections4.CollectionUtils;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.pinot.spi.config.table.IndexingConfig;
 import org.apache.pinot.spi.config.table.TableConfig;
@@ -34,6 +36,7 @@ import org.apache.pinot.spi.config.table.ingestion.IngestionConfig;
 import org.apache.pinot.spi.env.PinotConfiguration;
 import org.apache.pinot.spi.ingestion.batch.BatchConfigProperties;
 import org.apache.pinot.spi.stream.StreamConfig;
+import org.apache.pinot.spi.stream.StreamConsumerFactory;
 
 
 /**
@@ -99,6 +102,11 @@ public final class IngestionConfigUtils {
     return new StreamConfig(tableConfig.getTableName(), getFirstStreamConfigMap(tableConfig));
   }
 
+  /// Returns `true` if the table contains multiple streams.
+  public static boolean hasMultipleStreams(TableConfig tableConfig) {
+    return getStreamConfigMaps(tableConfig).size() > 1;
+  }
+
   /**
    * Getting the Pinot segment level partition id from the stream partition id.
    * @param partitionId the partition id from the stream
@@ -108,18 +116,27 @@ public final class IngestionConfigUtils {
     return index * PARTITION_PADDING_OFFSET + partitionId;
   }
 
-  /**
-   * Getting the Stream partition id from the Pinot segment partition id.
-   * @param partitionId the segment partition id on Pinot
-   */
+  /// Returns the stream partition id from the Pinot segment partition id.
+  public static int getStreamPartitionIdFromPinotPartitionId(TableConfig tableConfig, int partitionId) {
+    return hasMultipleStreams(tableConfig) ? getStreamPartitionIdFromPinotPartitionId(partitionId) : partitionId;
+  }
+
+  /// Returns the stream partition id from the Pinot segment partition id.
+  /// NOTE: First verify if there are multiple stream configs before invoking this method. User might plug in a stream
+  ///       that generates large partition id.
   public static int getStreamPartitionIdFromPinotPartitionId(int partitionId) {
     return partitionId % PARTITION_PADDING_OFFSET;
   }
 
-  /**
-   * Getting the StreamConfig index of StreamConfigs list from the Pinot segment partition id.
-   * @param partitionId the segment partition id on Pinot
-   */
+  /// Returns the StreamConfig for the given Pinot segment partition id.
+  public static StreamConfig getStreamConfigFromPinotPartitionId(List<StreamConfig> streamConfigs, int partitionId) {
+    return streamConfigs.size() > 1 ? streamConfigs.get(getStreamConfigIndexFromPinotPartitionId(partitionId))
+        : streamConfigs.get(0);
+  }
+
+  /// Returns the index of the StreamConfigs from the Pinot segment partition id.
+  /// NOTE: First verify if there are multiple stream configs before invoking this method. User might plug in a stream
+  ///       that generates large partition id.
   public static int getStreamConfigIndexFromPinotPartitionId(int partitionId) {
     return partitionId / PARTITION_PADDING_OFFSET;
   }
@@ -312,5 +329,26 @@ public final class IngestionConfigUtils {
       return Long.parseLong(pushRetryIntervalMillis);
     }
     return DEFAULT_PUSH_RETRY_INTERVAL_MILLIS;
+  }
+
+  /**
+   * Returns a unique client id which can be used for Stream providers
+   */
+  public static String getTableTopicUniqueClientId(String className, StreamConfig streamConfig) {
+    return StreamConsumerFactory.getUniqueClientId(
+        className + "-" + streamConfig.getTableNameWithType() + "-" + streamConfig.getTopicName());
+  }
+
+  /**
+   * Returns a Map of stream config index to Set of stream partition Ids.
+   * @param pinotPartitionIds Set of pinot partition ids.
+   */
+  public static Map<Integer, Set<Integer>> getStreamConfigIndexToStreamPartitions(Set<Integer> pinotPartitionIds) {
+    Map<Integer, Set<Integer>> streamIndexToPartitions = new HashMap<>();
+    for (Integer partition : pinotPartitionIds) {
+      streamIndexToPartitions.computeIfAbsent(getStreamConfigIndexFromPinotPartitionId(partition),
+          k -> new HashSet<>()).add(getStreamPartitionIdFromPinotPartitionId(partition));
+    }
+    return streamIndexToPartitions;
   }
 }

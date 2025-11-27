@@ -35,6 +35,7 @@ import org.apache.pinot.segment.spi.datasource.DataSourceMetadata;
 import org.apache.pinot.segment.spi.index.reader.Dictionary;
 import org.apache.pinot.segment.spi.index.reader.ForwardIndexReader;
 import org.apache.pinot.segment.spi.index.reader.ForwardIndexReaderContext;
+import org.apache.pinot.spi.config.instance.InstanceType;
 import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.data.readers.FileFormat;
@@ -49,6 +50,8 @@ import org.testng.annotations.AfterClass;
 import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
 
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.when;
 import static org.testng.Assert.assertEquals;
 
 
@@ -76,22 +79,23 @@ public class MutableSegmentImplTest {
     SegmentGeneratorConfig config =
         SegmentTestUtils.getSegmentGeneratorConfigWithoutTimeColumn(avroFile, TEMP_DIR, "testTable");
     SegmentIndexCreationDriver driver = new SegmentIndexCreationDriverImpl();
-    driver.init(config);
+    driver.init(config, InstanceType.SERVER);
     driver.build();
     _immutableSegment = ImmutableSegmentLoader.load(new File(TEMP_DIR, driver.getSegmentName()), ReadMode.mmap);
 
     _schema = config.getSchema();
     VirtualColumnProviderFactory.addBuiltInVirtualColumnsToSegmentSchema(_schema, "testSegment");
     _mutableSegmentImpl = MutableSegmentImplTestUtils.createMutableSegmentImpl(_schema);
-    _lastIngestionTimeMs = System.currentTimeMillis();
-    StreamMessageMetadata defaultMetadata = new StreamMessageMetadata(_lastIngestionTimeMs, new GenericRow());
-    _startTimeMs = System.currentTimeMillis();
-
-    try (RecordReader recordReader = RecordReaderFactory
-        .getRecordReader(FileFormat.AVRO, avroFile, _schema.getColumnNames(), null)) {
+    long currentTimeMs = System.currentTimeMillis();
+    StreamMessageMetadata metadata = mock(StreamMessageMetadata.class);
+    when(metadata.getRecordIngestionTimeMs()).thenReturn(currentTimeMs);
+    _lastIngestionTimeMs = currentTimeMs;
+    _startTimeMs = currentTimeMs;
+    try (RecordReader recordReader = RecordReaderFactory.getRecordReader(FileFormat.AVRO, avroFile,
+        _schema.getColumnNames(), null)) {
       GenericRow reuse = new GenericRow();
       while (recordReader.hasNext()) {
-        _mutableSegmentImpl.index(recordReader.next(reuse), defaultMetadata);
+        _mutableSegmentImpl.index(recordReader.next(reuse), metadata);
         _lastIndexedTs = System.currentTimeMillis();
       }
     }

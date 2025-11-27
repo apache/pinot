@@ -91,12 +91,29 @@ public class CompoundDataBuffer implements DataBuffer {
     this(buffers.toArray(new DataBuffer[0]), order, owner);
   }
 
+  public static CompoundDataBuffer fromByteBuffers(ByteBuffer[] buffers, ByteOrder order, boolean owner) {
+    return new CompoundDataBuffer(asDataBufferArray(buffers), order, owner);
+  }
+
+  public static CompoundDataBuffer fromByteBuffers(List<ByteBuffer> buffers, ByteOrder order, boolean owner) {
+    return new CompoundDataBuffer(asDataBufferArray(buffers), order, owner);
+  }
+
   private static DataBuffer[] asDataBufferArray(ByteBuffer[] buffers) {
     DataBuffer[] result = new DataBuffer[buffers.length];
     for (int i = 0; i < buffers.length; i++) {
       result[i] = PinotByteBuffer.wrap(buffers[i]);
     }
     return result;
+  }
+
+  private static DataBuffer[] asDataBufferArray(List<ByteBuffer> buffers) {
+    int numBuffers = buffers.size();
+    DataBuffer[] dataBuffers = new DataBuffer[numBuffers];
+    for (int i = 0; i < numBuffers; i++) {
+      dataBuffers[i] = PinotByteBuffer.wrap(buffers.get(i));
+    }
+    return dataBuffers;
   }
 
   private int getBufferIndex(long offset) {

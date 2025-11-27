@@ -29,6 +29,7 @@ import io.swagger.annotations.SecurityDefinition;
 import io.swagger.annotations.SwaggerDefinition;
 import javax.inject.Inject;
 import javax.ws.rs.DELETE;
+import javax.ws.rs.Encoded;
 import javax.ws.rs.PUT;
 import javax.ws.rs.Path;
 import javax.ws.rs.PathParam;
@@ -40,6 +41,7 @@ import org.apache.helix.HelixManager;
 import org.apache.pinot.broker.routing.BrokerRoutingManager;
 import org.apache.pinot.common.metadata.ZKMetadataProvider;
 import org.apache.pinot.common.utils.DatabaseUtils;
+import org.apache.pinot.common.utils.URIUtils;
 import org.apache.pinot.core.auth.Actions;
 import org.apache.pinot.core.auth.Authorize;
 import org.apache.pinot.core.auth.TargetType;
@@ -97,9 +99,10 @@ public class PinotBrokerRouting {
   })
   public String refreshRouting(
       @ApiParam(value = "Table name (with type)") @PathParam("tableName") String tableNameWithType,
-      @ApiParam(value = "Segment name") @PathParam("segmentName") String segmentName,
+      @ApiParam(value = "Segment name") @PathParam("segmentName") @Encoded String segmentName,
       @Context HttpHeaders headers) {
-    _routingManager.refreshSegment(DatabaseUtils.translateTableName(tableNameWithType, headers), segmentName);
+    _routingManager.refreshSegment(DatabaseUtils.translateTableName(tableNameWithType, headers),
+        URIUtils.decode(segmentName));
     return "Success";
   }
 

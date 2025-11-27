@@ -19,7 +19,6 @@
 package org.apache.pinot.segment.local.customobject;
 
 import java.util.Comparator;
-import javax.annotation.Nonnull;
 import org.apache.datasketches.theta.SetOperationBuilder;
 import org.apache.datasketches.theta.Sketch;
 import org.apache.datasketches.theta.Union;
@@ -54,7 +53,6 @@ public class ThetaSketchAccumulator extends CustomObjectAccumulator<Sketch> {
     _setOperationBuilder = setOperationBuilder;
   }
 
-  @Nonnull
   @Override
   public Sketch getResult() {
     return unionAll();

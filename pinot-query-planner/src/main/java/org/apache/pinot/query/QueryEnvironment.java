@@ -23,6 +23,7 @@ import com.google.common.base.Preconditions;
 import java.io.Closeable;
 import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Properties;
@@ -54,9 +55,9 @@ import org.apache.calcite.sql2rel.SqlToRelConverter;
 import org.apache.calcite.tools.FrameworkConfig;
 import org.apache.calcite.tools.Frameworks;
 import org.apache.calcite.tools.RelBuilder;
-import org.apache.commons.collections.CollectionUtils;
-import org.apache.commons.collections.MapUtils;
+import org.apache.commons.collections4.MapUtils;
 import org.apache.commons.lang3.tuple.Pair;
+import org.apache.pinot.calcite.rel.rules.PinotEnrichedJoinRule;
 import org.apache.pinot.calcite.rel.rules.PinotImplicitTableHintRule;
 import org.apache.pinot.calcite.rel.rules.PinotJoinToDynamicBroadcastRule;
 import org.apache.pinot.calcite.rel.rules.PinotQueryRuleSets;
@@ -92,6 +93,7 @@ import org.apache.pinot.query.validate.BytesCastVisitor;
 import org.apache.pinot.spi.exception.QueryErrorCode;
 import org.apache.pinot.spi.exception.QueryException;
 import org.apache.pinot.spi.utils.CommonConstants;
+import org.apache.pinot.spi.utils.CommonConstants.Broker.Request.QueryOptionKey;
 import org.apache.pinot.sql.parsers.CalciteSqlParser;
 import org.apache.pinot.sql.parsers.SqlNodeAndOptions;
 import org.apache.pinot.sql.parsers.parser.SqlPhysicalExplain;
@@ -141,26 +143,38 @@ public class QueryEnvironment {
   private final HepProgram _optProgram;
   private final Config _envConfig;
   private final PinotCatalog _catalog;
+  private final Set<String> _defaultDisabledPlannerRules;
 
   public QueryEnvironment(Config config) {
     _envConfig = config;
     String database = config.getDatabase();
     _catalog = new PinotCatalog(config.getTableCache(), database);
     CalciteSchema rootSchema = CalciteSchema.createRootSchema(false, false, database, _catalog);
-    _config = Frameworks.newConfigBuilder().traitDefs().operatorTable(PinotOperatorTable.instance())
-        .defaultSchema(rootSchema.plus()).sqlToRelConverterConfig(PinotRuleUtils.PINOT_SQL_TO_REL_CONFIG).build();
+    _config = Frameworks.newConfigBuilder()
+        .traitDefs()
+        .operatorTable(PinotOperatorTable.instance(config.isNullHandlingEnabled()))
+        .defaultSchema(rootSchema.plus())
+        .sqlToRelConverterConfig(PinotRuleUtils.PINOT_SQL_TO_REL_CONFIG)
+        .build();
     _catalogReader = new PinotCatalogReader(
         rootSchema, List.of(database), _typeFactory, CONNECTION_CONFIG, config.isCaseSensitive());
-    // default optProgram with no skip rule options
-    _optProgram = getOptProgram(null);
+    _defaultDisabledPlannerRules = _envConfig.defaultDisabledPlannerRules();
+    // default optProgram with no skip rule options and no use rule options
+    _optProgram = getOptProgram(Set.of(), Set.of(), _defaultDisabledPlannerRules);
   }
 
   public QueryEnvironment(String database, TableCache tableCache, @Nullable WorkerManager workerManager) {
+    this(database, tableCache, workerManager, true);
+  }
+
+  public QueryEnvironment(String database, TableCache tableCache, @Nullable WorkerManager workerManager,
+      boolean nullHandlingEnabled) {
     this(configBuilder()
         .requestId(-1L)
         .database(database)
         .tableCache(tableCache)
         .workerManager(workerManager)
+        .isNullHandlingEnabled(nullHandlingEnabled)
         .build());
   }
 
@@ -170,16 +184,25 @@ public class QueryEnvironment {
   private PlannerContext getPlannerContext(SqlNodeAndOptions sqlNodeAndOptions) {
     WorkerManager workerManager = getWorkerManager(sqlNodeAndOptions);
     Map<String, String> options = sqlNodeAndOptions.getOptions();
+    if (Boolean.parseBoolean(options.get(QueryOptionKey.EXCLUDE_VIRTUAL_COLUMNS))) {
+      _catalog.configureVirtualColumnExclusion(true);
+    }
+
     HepProgram optProgram = _optProgram;
+    Set<String> useRuleSet = new HashSet<>(QueryOptionsUtils.getUsePlannerRules(options));
+    if (Boolean.parseBoolean(options.get(QueryOptionKey.AUTO_REWRITE_AGGREGATION_TYPE))) {
+      useRuleSet.add(CommonConstants.Broker.PlannerRuleNames.AGGREGATE_FUNCTION_REWRITE);
+    }
     if (MapUtils.isNotEmpty(options)) {
       Set<String> skipRuleSet = QueryOptionsUtils.getSkipPlannerRules(options);
-      if (CollectionUtils.isNotEmpty(skipRuleSet)) {
+      if (!skipRuleSet.isEmpty() || !useRuleSet.isEmpty()) {
         // dynamically create optProgram according to rule options
-        optProgram = getOptProgram(skipRuleSet);
+        optProgram = getOptProgram(skipRuleSet, useRuleSet, _defaultDisabledPlannerRules);
       }
     }
-    boolean usePhysicalOptimizer = QueryOptionsUtils.isUsePhysicalOptimizer(sqlNodeAndOptions.getOptions());
-    HepProgram traitProgram = getTraitProgram(workerManager, _envConfig, usePhysicalOptimizer);
+    boolean usePhysicalOptimizer = QueryOptionsUtils.isUsePhysicalOptimizer(sqlNodeAndOptions.getOptions(),
+        _envConfig.defaultUsePhysicalOptimizer());
+    HepProgram traitProgram = getTraitProgram(workerManager, _envConfig, usePhysicalOptimizer, useRuleSet);
     SqlExplainFormat format = SqlExplainFormat.DOT;
     if (sqlNodeAndOptions.getSqlNode().getKind().equals(SqlKind.EXPLAIN)) {
       SqlExplain explain = (SqlExplain) sqlNodeAndOptions.getSqlNode();
@@ -192,7 +215,10 @@ public class QueryEnvironment {
       workerManager = _envConfig.getWorkerManager();
       physicalPlannerContext = new PhysicalPlannerContext(workerManager.getRoutingManager(),
           workerManager.getHostName(), workerManager.getPort(), _envConfig.getRequestId(),
-          workerManager.getInstanceId(), sqlNodeAndOptions.getOptions());
+          workerManager.getInstanceId(), sqlNodeAndOptions.getOptions(),
+          _envConfig.defaultUseLiteMode(), _envConfig.defaultRunInBroker(), _envConfig.defaultUseBrokerPruning(),
+          _envConfig.defaultLiteModeLeafStageLimit(), _envConfig.defaultHashFunction(),
+          _envConfig.defaultLiteModeLeafStageFanOutAdjustedLimit(), _envConfig.defaultLiteModeEnableJoins());
     }
     return new PlannerContext(_config, _catalogReader, _typeFactory, optProgram, traitProgram,
         sqlNodeAndOptions.getOptions(), _envConfig, format, physicalPlannerContext);
@@ -350,7 +376,7 @@ public class QueryEnvironment {
       Preconditions.checkNotNull(plannerContext.getPhysicalPlannerContext(), "Physical planner context is null");
       optimized = RelToPRelConverter.toPRelNode(optimized, plannerContext.getPhysicalPlannerContext(),
           _envConfig.getTableCache()).unwrap();
-      PRelNodeTreeValidator.validate((PRelNode) optimized);
+      PRelNodeTreeValidator.validate((PRelNode) optimized, plannerContext.getPhysicalPlannerContext());
     }
     return relation.withRel(optimized);
   }
@@ -472,7 +498,8 @@ public class QueryEnvironment {
           _envConfig.getWorkerManager(), requestId, _envConfig.getTableCache());
       return pinotDispatchPlanner.createDispatchableSubPlanV2(plan.getLeft(), plan.getRight());
     }
-    SubPlan plan = PinotLogicalQueryPlanner.makePlan(relRoot, tracker, useSpools(plannerContext.getOptions()));
+    SubPlan plan = PinotLogicalQueryPlanner.makePlan(relRoot, tracker, useSpools(plannerContext.getOptions()),
+        _envConfig.defaultHashFunction());
     PinotDispatchPlanner pinotDispatchPlanner =
         new PinotDispatchPlanner(plannerContext, _envConfig.getWorkerManager(), _envConfig.getRequestId(),
             _envConfig.getTableCache());
@@ -491,9 +518,12 @@ public class QueryEnvironment {
    * - In the third phase, the logical plan is prune with PRUNE_RULES.
    *
    * @param skipRuleSet parsed skipped rule name set from query options
+   * @param useRuleSet parsed use rule set from query options
+   * @param defaultDisabledRuleSet parsed default disabled rule set from broker config
    * @return HepProgram that performs logical transformations
    */
-  private static HepProgram getOptProgram(@Nullable Set<String> skipRuleSet) {
+  private static HepProgram getOptProgram(Set<String> skipRuleSet, Set<String> useRuleSet,
+      Set<String> defaultDisabledRuleSet) {
     HepProgramBuilder hepProgramBuilder = new HepProgramBuilder();
     // Set the match order as DEPTH_FIRST. The default is arbitrary which works the same as DEPTH_FIRST, but it's
     // best to be explicit.
@@ -502,27 +532,19 @@ public class QueryEnvironment {
     // ----
     // Rules are disabled if its corresponding value is set to false in ruleFlags
     // construct filtered BASIC_RULES, FILTER_PUSHDOWN_RULES, PROJECT_PUSHDOWN_RULES, PRUNE_RULES
-    List<RelOptRule> basicRules;
-    List<RelOptRule> filterPushdownRules;
-    List<RelOptRule> projectPushdownRules;
-    List<RelOptRule> pruneRules;
-    if (skipRuleSet == null) {
-      basicRules = PinotQueryRuleSets.BASIC_RULES;
-      filterPushdownRules = PinotQueryRuleSets.FILTER_PUSHDOWN_RULES;
-      projectPushdownRules = PinotQueryRuleSets.PROJECT_PUSHDOWN_RULES;
-      pruneRules = PinotQueryRuleSets.PRUNE_RULES;
-    } else {
-      basicRules = filterRuleList(PinotQueryRuleSets.BASIC_RULES, skipRuleSet);
-      filterPushdownRules = filterRuleList(PinotQueryRuleSets.FILTER_PUSHDOWN_RULES, skipRuleSet);
-      projectPushdownRules = filterRuleList(PinotQueryRuleSets.PROJECT_PUSHDOWN_RULES, skipRuleSet);
-      pruneRules = filterRuleList(PinotQueryRuleSets.PRUNE_RULES, skipRuleSet);
-    }
-
+    List<RelOptRule> basicRules =
+        filterRuleList(PinotQueryRuleSets.BASIC_RULES, skipRuleSet, useRuleSet, defaultDisabledRuleSet);
+    List<RelOptRule> filterPushdownRules =
+        filterRuleList(PinotQueryRuleSets.FILTER_PUSHDOWN_RULES, skipRuleSet, useRuleSet, defaultDisabledRuleSet);
+    List<RelOptRule> projectPushdownRules =
+        filterRuleList(PinotQueryRuleSets.PROJECT_PUSHDOWN_RULES, skipRuleSet, useRuleSet, defaultDisabledRuleSet);
+    List<RelOptRule> pruneRules =
+        filterRuleList(PinotQueryRuleSets.PRUNE_RULES, skipRuleSet, useRuleSet, defaultDisabledRuleSet);
 
     // Run the Calcite CORE rules using 1 HepInstruction per rule. We use 1 HepInstruction per rule for simplicity:
     // the rules used here can rest assured that they are the only ones evaluated in a dedicated graph-traversal.
     for (RelOptRule relOptRule : basicRules) {
-        hepProgramBuilder.addRuleInstance(relOptRule);
+      hepProgramBuilder.addRuleInstance(relOptRule);
     }
 
     // ----
@@ -539,12 +561,8 @@ public class QueryEnvironment {
     // Prune duplicate/unnecessary nodes using a single HepInstruction.
     // TODO: We can consider using HepMatchOrder.TOP_DOWN if we find cases where it would help.
     hepProgramBuilder.addRuleCollection(pruneRules);
-    return hepProgramBuilder.build();
-  }
 
-  // util func to check no rules are skipped
-  private static boolean noRulesSkipped(Set<String> set) {
-    return set.isEmpty();
+    return hepProgramBuilder.build();
   }
 
   /**
@@ -554,13 +572,16 @@ public class QueryEnvironment {
    *
    * @param rules static list of rules
    * @param skipRuleSet skip rule set from options
+   * @param useRuleSet use rule set from options
+   * @param defaultDisabledRuleSet default disabled rule set from config
    * @return filtered list of rules
    */
-  private static List<RelOptRule> filterRuleList(List<RelOptRule> rules, Set<String> skipRuleSet) {
+  private static List<RelOptRule> filterRuleList(List<RelOptRule> rules, Set<String> skipRuleSet,
+      Set<String> useRuleSet, Set<String> defaultDisabledRuleSet) {
     List<RelOptRule> filteredRules = new ArrayList<>();
     for (RelOptRule relOptRule : rules) {
       String ruleName = relOptRule.toString();
-      if (isRuleSkipped(ruleName, skipRuleSet)) {
+      if (isRuleSkipped(ruleName, skipRuleSet, useRuleSet, defaultDisabledRuleSet)) {
         continue;
       }
       filteredRules.add(relOptRule);
@@ -569,18 +590,29 @@ public class QueryEnvironment {
   }
 
   /**
-   * Whether a rule is skipped, rules not skipped by default
+   * Returns whether a rule should be skipped.
+   * A rule is disabled if it is in both skipRuleSet and useRuleSet.
+   *
    * @param ruleName description of the rule
-   * @param skipRuleSet query skipSet
-   * @return false if corresponding key is not in skipMap or the value is "false", else true
+   * @param skipRuleSet rules to be skipped, this takes precedence over {@code useRuleSet}.
+   * @param useRuleSet rules to be used.
+   * @param defaultDisabledRuleSet rules disabled by default. Any rule in this set will still be applied if it's also
+   *                              present in {@code useRuleSet}.
+   * @return true if rule should be skipped
    */
-  private static boolean isRuleSkipped(String ruleName, Set<String> skipRuleSet) {
-    // can put rule-specific default behavior here
-    return skipRuleSet.contains(ruleName);
+  private static boolean isRuleSkipped(String ruleName, Set<String> skipRuleSet, Set<String> useRuleSet,
+      Set<String> defaultDisabledRuleSet) {
+    if (skipRuleSet.contains(ruleName)) {
+      return true;
+    }
+    if (defaultDisabledRuleSet.contains(ruleName)) {
+      return !useRuleSet.contains(ruleName);
+    }
+    return false;
   }
 
   private static HepProgram getTraitProgram(@Nullable WorkerManager workerManager, Config config,
-      boolean usePhysicalOptimizer) {
+      boolean usePhysicalOptimizer, Set<String> useRuleSet) {
     HepProgramBuilder hepProgramBuilder = new HepProgramBuilder();
 
     // Set the match order as BOTTOM_UP.
@@ -593,6 +625,11 @@ public class QueryEnvironment {
         if (isEligibleQueryPostRule(relOptRule, config)) {
           hepProgramBuilder.addRuleInstance(relOptRule);
         }
+      }
+      if (!isRuleSkipped(CommonConstants.Broker.PlannerRuleNames.JOIN_TO_ENRICHED_JOIN, Set.of(), useRuleSet,
+          config.defaultDisabledPlannerRules())) {
+        // push filter and project above join to enrichedJoin, does not work with physical optimizer
+        hepProgramBuilder.addRuleCollection(PinotEnrichedJoinRule.PINOT_ENRICHED_JOIN_RULES);
       }
     } else {
       for (RelOptRule relOptRule : PinotQueryRuleSets.PINOT_POST_RULES_V2) {
@@ -644,6 +681,11 @@ public class QueryEnvironment {
     @Nullable
     TableCache getTableCache();
 
+    @Value.Default
+    default boolean isNullHandlingEnabled() {
+      return false;
+    }
+
     /**
      * Whether the schema should be considered case-insensitive.
      */
@@ -683,7 +725,6 @@ public class QueryEnvironment {
       return CommonConstants.Broker.DEFAULT_USE_LEAF_SERVER_FOR_INTERMEDIATE_STAGE;
     }
 
-
     @Value.Default
     default boolean defaultEnableGroupTrim() {
       return CommonConstants.Broker.DEFAULT_MSE_ENABLE_GROUP_TRIM;
@@ -692,6 +733,105 @@ public class QueryEnvironment {
     @Value.Default
     default boolean defaultEnableDynamicFilteringSemiJoin() {
       return CommonConstants.Broker.DEFAULT_ENABLE_DYNAMIC_FILTERING_SEMI_JOIN;
+    }
+
+    /**
+     * Whether to use physical optimizer by default.
+     *
+     * This is treated as the default value for the broker and it is expected to be obtained from a Pinot configuration.
+     * This default value can be always overridden at query level by the query option
+     * {@link CommonConstants.Broker.Request.QueryOptionKey#USE_PHYSICAL_OPTIMIZER}.
+     */
+    @Value.Default
+    default boolean defaultUsePhysicalOptimizer() {
+      return CommonConstants.Broker.DEFAULT_USE_PHYSICAL_OPTIMIZER;
+    }
+
+    /**
+     * Whether to use lite mode by default.
+     *
+     * This is treated as the default value for the broker and it is expected to be obtained from a Pinot configuration.
+     * This default value can be always overridden at query level by the query option
+     * {@link CommonConstants.Broker.Request.QueryOptionKey#USE_LITE_MODE}.
+     */
+    @Value.Default
+    default boolean defaultUseLiteMode() {
+      return CommonConstants.Broker.DEFAULT_USE_LITE_MODE;
+    }
+
+    /**
+     * Whether to run in broker by default.
+     *
+     * This is treated as the default value for the broker and it is expected to be obtained from a Pinot configuration.
+     * This default value can be always overridden at query level by the query option
+     * {@link CommonConstants.Broker.Request.QueryOptionKey#RUN_IN_BROKER}.
+     */
+    @Value.Default
+    default boolean defaultRunInBroker() {
+      return CommonConstants.Broker.DEFAULT_RUN_IN_BROKER;
+    }
+
+    /**
+     * Whether to use broker pruning by default.
+     *
+     * This is treated as the default value for the broker and it is expected to be obtained from a Pinot configuration.
+     * This default value can be always overridden at query level by the query option
+     * {@link CommonConstants.Broker.Request.QueryOptionKey#USE_BROKER_PRUNING}.
+     */
+    @Value.Default
+    default boolean defaultUseBrokerPruning() {
+      return CommonConstants.Broker.DEFAULT_USE_BROKER_PRUNING;
+    }
+
+    /**
+     * Default server stage limit for lite mode queries.
+     *
+     * This is treated as the default value for the broker and it is expected to be obtained from a Pinot configuration.
+     * This default value can be always overridden at query level by the query option
+     * {@link CommonConstants.Broker.Request.QueryOptionKey#LITE_MODE_LEAF_STAGE_LIMIT}.
+     */
+    @Value.Default
+    default int defaultLiteModeLeafStageLimit() {
+      return CommonConstants.Broker.DEFAULT_LITE_MODE_LEAF_STAGE_LIMIT;
+    }
+
+    /**
+     * Default server stage limit for lite mode queries.
+     *
+     * This is treated as the default value for the broker and it is expected to be obtained from a Pinot configuration.
+     * This default value can be always overridden at query level by the query option
+     * {@link CommonConstants.Broker.Request.QueryOptionKey#LITE_MODE_LEAF_STAGE_LIMIT}.
+     */
+    @Value.Default
+    default int defaultLiteModeLeafStageFanOutAdjustedLimit() {
+      return CommonConstants.Broker.DEFAULT_LITE_MODE_LEAF_STAGE_FAN_OUT_ADJUSTED_LIMIT;
+    }
+
+    /**
+     * Default hash function to use for KeySelector data shuffling.
+     *
+     * This is treated as the default value for the broker and it is expected to be obtained from a Pinot configuration.
+     * This default value can be always overridden at query level by the query option.
+     */
+    @Value.Default
+    default String defaultHashFunction() {
+      return CommonConstants.Broker.DEFAULT_BROKER_DEFAULT_HASH_FUNCTION;
+    }
+
+    /**
+     * Whether to enable joins when using MSE Lite mode.
+     */
+    @Value.Default
+    default boolean defaultLiteModeEnableJoins() {
+      return CommonConstants.Broker.DEFAULT_LITE_MODE_ENABLE_JOINS;
+    }
+
+    /**
+     * Returns the list of planner rules that are disabled by default.
+     */
+    @Value.Default
+    default Set<String> defaultDisabledPlannerRules() {
+      return CommonConstants.Broker.DEFAULT_DISABLED_RULES;
     }
 
     /**

@@ -113,7 +113,7 @@ public class NullValueIndexType extends AbstractIndexType<IndexConfig, NullValue
 
   @Override
   public IndexHandler createIndexHandler(SegmentDirectory segmentDirectory, Map<String, FieldIndexConfigs> configsByCol,
-      @Nullable Schema schema, @Nullable TableConfig tableConfig) {
+      Schema schema, TableConfig tableConfig) {
     return IndexHandler.NoOp.INSTANCE;
   }
 

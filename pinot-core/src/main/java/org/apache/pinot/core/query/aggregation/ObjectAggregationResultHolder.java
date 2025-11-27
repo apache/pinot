@@ -48,6 +48,11 @@ public class ObjectAggregationResultHolder implements AggregationResultHolder {
     _value = value;
   }
 
+  @Override
+  public void setValue(long value) {
+    _value = value;
+  }
+
   /**
    * {@inheritDoc}
    * @return
@@ -65,6 +70,16 @@ public class ObjectAggregationResultHolder implements AggregationResultHolder {
   @Override
   public int getIntResult() {
     throw new RuntimeException("Method 'getIntResult' not supported in ObjectAggregationResultHolder");
+  }
+
+  /**
+   * {@inheritDoc}
+   *
+   * @return
+   */
+  @Override
+  public long getLongResult() {
+    throw new RuntimeException("Method 'getLongResult' not supported in ObjectAggregationResultHolder");
   }
 
   /**

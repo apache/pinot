@@ -49,6 +49,7 @@ import org.apache.pinot.core.operator.filter.TextContainsFilterOperator;
 import org.apache.pinot.core.operator.filter.TextMatchFilterOperator;
 import org.apache.pinot.core.operator.filter.VectorSimilarityFilterOperator;
 import org.apache.pinot.core.operator.filter.predicate.FSTBasedRegexpPredicateEvaluatorFactory;
+import org.apache.pinot.core.operator.filter.predicate.IFSTBasedRegexpPredicateEvaluatorFactory;
 import org.apache.pinot.core.operator.filter.predicate.PredicateEvaluator;
 import org.apache.pinot.core.operator.filter.predicate.PredicateEvaluatorProvider;
 import org.apache.pinot.core.operator.transform.function.ItemTransformFunction;
@@ -213,10 +214,12 @@ public class FilterPlanNode implements PlanNode {
    * Helper method to build the operator tree from the filter.
    */
   private BaseFilterOperator constructPhysicalOperator(FilterContext filter, int numDocs) {
+    List<FilterContext> childFilters;
+    List<BaseFilterOperator> childFilterOperators;
     switch (filter.getType()) {
       case AND:
-        List<FilterContext> childFilters = filter.getChildren();
-        List<BaseFilterOperator> childFilterOperators = new ArrayList<>(childFilters.size());
+        childFilters = filter.getChildren();
+        childFilterOperators = new ArrayList<>(childFilters.size());
         for (FilterContext childFilter : childFilters) {
           BaseFilterOperator childFilterOperator = constructPhysicalOperator(childFilter, numDocs);
           if (childFilterOperator.isResultEmpty()) {
@@ -265,9 +268,10 @@ public class FilterPlanNode implements PlanNode {
           String column = lhs.getIdentifier();
           DataSource dataSource = _indexSegment.getDataSource(column, _queryContext.getSchema());
           PredicateEvaluator predicateEvaluator;
+          TextIndexReader textIndexReader;
           switch (predicate.getType()) {
             case TEXT_CONTAINS:
-              TextIndexReader textIndexReader = dataSource.getTextIndex();
+              textIndexReader = dataSource.getTextIndex();
               if (!(textIndexReader instanceof NativeTextIndexReader)
                   && !(textIndexReader instanceof NativeMutableTextIndex)) {
                 throw new UnsupportedOperationException("TEXT_CONTAINS is supported only on native text index");
@@ -296,22 +300,28 @@ public class FilterPlanNode implements PlanNode {
                 return new TextMatchFilterOperator(textIndexReader, (TextMatchPredicate) predicate, numDocs);
               }
             case REGEXP_LIKE:
-              // FST Index is available only for rolled out segments. So, we use different evaluator for rolled out and
-              // consuming segments.
-              //
-              // Rolled out segments (immutable): FST Index reader is available use FSTBasedEvaluator
-              // else use regular flow of getting predicate evaluator.
-              //
-              // Consuming segments: When FST is enabled, use AutomatonBasedEvaluator so that regexp matching logic is
-              // similar to that of FSTBasedEvaluator, else use regular flow of getting predicate evaluator.
-              if (dataSource.getFSTIndex() != null) {
-                predicateEvaluator =
-                    FSTBasedRegexpPredicateEvaluatorFactory.newFSTBasedEvaluator((RegexpLikePredicate) predicate,
-                        dataSource.getFSTIndex(), dataSource.getDictionary());
+              // Check if case-insensitive flag is present
+              RegexpLikePredicate regexpLikePredicate = (RegexpLikePredicate) predicate;
+              boolean caseInsensitive = regexpLikePredicate.isCaseInsensitive();
+              if (caseInsensitive) {
+                if (dataSource.getIFSTIndex() != null) {
+                  predicateEvaluator =
+                      IFSTBasedRegexpPredicateEvaluatorFactory.newIFSTBasedEvaluator(regexpLikePredicate,
+                          dataSource.getIFSTIndex(), dataSource.getDictionary());
+                } else {
+                  predicateEvaluator =
+                      PredicateEvaluatorProvider.getPredicateEvaluator(predicate, dataSource.getDictionary(),
+                          dataSource.getDataSourceMetadata().getDataType(), _queryContext);
+                }
               } else {
-                predicateEvaluator =
-                    PredicateEvaluatorProvider.getPredicateEvaluator(predicate, dataSource.getDictionary(),
-                        dataSource.getDataSourceMetadata().getDataType());
+                if (dataSource.getFSTIndex() != null) {
+                  predicateEvaluator = FSTBasedRegexpPredicateEvaluatorFactory.newFSTBasedEvaluator(regexpLikePredicate,
+                      dataSource.getFSTIndex(), dataSource.getDictionary());
+                } else {
+                  predicateEvaluator =
+                      PredicateEvaluatorProvider.getPredicateEvaluator(predicate, dataSource.getDictionary(),
+                          dataSource.getDataSourceMetadata().getDataType(), _queryContext);
+                }
               }
               _predicateEvaluators.add(Pair.of(predicate, predicateEvaluator));
               return FilterOperatorUtils.getLeafFilterOperator(_queryContext, predicateEvaluator, dataSource, numDocs);
@@ -333,20 +343,22 @@ public class FilterPlanNode implements PlanNode {
               Preconditions.checkState(vectorIndex != null,
                   "Cannot apply VECTOR_SIMILARITY on column: %s without vector index", column);
               return new VectorSimilarityFilterOperator(vectorIndex, (VectorSimilarityPredicate) predicate, numDocs);
-            case IS_NULL:
+            case IS_NULL: {
               NullValueVectorReader nullValueVector = dataSource.getNullValueVector();
               if (nullValueVector != null) {
                 return new BitmapBasedFilterOperator(nullValueVector.getNullBitmap(), false, numDocs);
               } else {
                 return EmptyFilterOperator.getInstance();
               }
-            case IS_NOT_NULL:
-              nullValueVector = dataSource.getNullValueVector();
+            }
+            case IS_NOT_NULL: {
+              NullValueVectorReader nullValueVector = dataSource.getNullValueVector();
               if (nullValueVector != null) {
                 return new BitmapBasedFilterOperator(nullValueVector.getNullBitmap(), true, numDocs);
               } else {
                 return new MatchAllFilterOperator(numDocs);
               }
+            }
             default:
               predicateEvaluator =
                   PredicateEvaluatorProvider.getPredicateEvaluator(predicate, dataSource, _queryContext);

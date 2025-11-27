@@ -23,6 +23,7 @@ import java.util.Map;
 import java.util.Set;
 import org.apache.pinot.core.common.MinionConstants;
 import org.apache.pinot.core.common.MinionConstants.MergeTask;
+import org.testng.Assert;
 import org.testng.annotations.Test;
 
 import static org.testng.Assert.assertEquals;
@@ -31,6 +32,27 @@ import static org.testng.Assert.assertTrue;
 
 
 public class MergeRollupTaskUtilsTest {
+
+  @Test
+  public void testGetLevelToConfigMapKeyError() {
+    for (String config : MergeRollupTaskUtils.getValidConfigKeys()) {
+      try {
+        MergeRollupTaskUtils.getLevelToConfigMap(Map.of(config, "XXX"));
+        Assert.fail();
+      } catch (Exception e) {
+        assertEquals(e.getMessage(),
+            "Configuration key: " + config + " should be prefixed by merge level, e.g. '1day.'");
+      }
+
+      try {
+        MergeRollupTaskUtils.getLevelToConfigMap(Map.of("." + config, "XXX"));
+        Assert.fail();
+      } catch (Exception e) {
+        assertEquals(e.getMessage(),
+            "Configuration key: ." + config + " should be prefixed by merge level, e.g. '1day.'");
+      }
+    }
+  }
 
   @Test
   public void testGetLevelToConfigMap() {

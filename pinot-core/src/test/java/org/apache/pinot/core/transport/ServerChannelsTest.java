@@ -21,9 +21,9 @@ package org.apache.pinot.core.transport;
 import com.sun.net.httpserver.HttpServer;
 import java.net.InetSocketAddress;
 import org.apache.pinot.common.config.NettyConfig;
-import org.apache.pinot.common.metrics.BrokerMetrics;
 import org.apache.pinot.common.request.BrokerRequest;
 import org.apache.pinot.common.request.InstanceRequest;
+import org.apache.pinot.spi.accounting.ThreadAccountantUtils;
 import org.apache.pinot.spi.config.table.TableType;
 import org.testng.annotations.AfterClass;
 import org.testng.annotations.BeforeClass;
@@ -62,14 +62,14 @@ public class ServerChannelsTest {
   @Test(dataProvider = "parameters")
   public void testConnect(boolean nativeTransportEnabled)
       throws Exception {
-    BrokerMetrics brokerMetrics = mock(BrokerMetrics.class);
     NettyConfig nettyConfig = new NettyConfig();
     nettyConfig.setNativeTransportsEnabled(nativeTransportEnabled);
     QueryRouter queryRouter = mock(QueryRouter.class);
 
     ServerRoutingInstance serverRoutingInstance =
         new ServerRoutingInstance("localhost", _dummyServer.getAddress().getPort(), TableType.REALTIME);
-    ServerChannels serverChannels = new ServerChannels(queryRouter, brokerMetrics, nettyConfig, null);
+    ServerChannels serverChannels =
+        new ServerChannels(queryRouter, nettyConfig, null, ThreadAccountantUtils.getNoOpAccountant());
     serverChannels.connect(serverRoutingInstance);
 
     final long requestId = System.currentTimeMillis();

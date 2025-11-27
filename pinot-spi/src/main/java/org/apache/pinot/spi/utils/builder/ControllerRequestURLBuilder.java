@@ -24,7 +24,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
 import javax.annotation.Nullable;
-import org.apache.commons.collections.CollectionUtils;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.pinot.spi.config.table.TableType;
 import org.apache.pinot.spi.config.table.assignment.InstancePartitionsType;
@@ -116,6 +115,22 @@ public class ControllerRequestURLBuilder {
   public String forPeriodTaskRun(String taskName, String tableName, TableType tableType) {
     return StringUtil.join("/", _baseUrl, "periodictask", "run?taskname=" + taskName + "&tableName=" + tableName
         + "&type=" + tableType);
+  }
+
+  public String forMinionTaskState(String taskName) {
+    return StringUtil.join("/", _baseUrl, "tasks", "task", taskName, "state");
+  }
+
+  public String forDeleteMinionTask(String taskName) {
+    return StringUtil.join("/", _baseUrl, "tasks", "task", taskName);
+  }
+
+  public String forStopMinionTaskQueue(String taskType) {
+    return StringUtil.join("/", _baseUrl, "tasks", taskType, "stop");
+  }
+
+  public String forResumeMinionTaskQueue(String taskType) {
+    return StringUtil.join("/", _baseUrl, "tasks", taskType, "resume");
   }
 
   public String forUpdateUserConfig(String username, String componentTypeStr, boolean passwordChanged) {
@@ -325,24 +340,9 @@ public class ControllerRequestURLBuilder {
   }
 
   public String forTableAggregateMetadata(String tableName, @Nullable List<String> columns) {
-    return StringUtil.join("/", _baseUrl, "tables", tableName, "metadata") + constructColumnsParameter(columns);
-  }
-
-  private String constructColumnsParameter(@Nullable List<String> columns) {
-    if (!CollectionUtils.isEmpty(columns)) {
-      StringBuilder parameter = new StringBuilder();
-      parameter.append("?columns=");
-      parameter.append(columns.get(0));
-      int numColumns = columns.size();
-      if (numColumns > 1) {
-        for (int i = 1; i < numColumns; i++) {
-          parameter.append("&columns=").append(columns.get(i));
-        }
-      }
-      return parameter.toString();
-    } else {
-      return "";
-    }
+    String columnsParam = UrlBuilderUtils.generateColumnsParam(columns);
+    String url = StringUtil.join("/", _baseUrl, "tables", tableName, "metadata");
+    return columnsParam != null ? url + "?" + columnsParam : url;
   }
 
   public String forSchemaValidate() {
@@ -429,7 +429,15 @@ public class ControllerRequestURLBuilder {
   }
 
   public String forSegmentsMetadataFromServer(String tableName, @Nullable List<String> columns) {
-    return StringUtil.join("/", _baseUrl, "segments", tableName, "metadata") + constructColumnsParameter(columns);
+    return forSegmentsMetadataFromServer(tableName, columns, null);
+  }
+
+  public String forSegmentsMetadataFromServer(String tableName, @Nullable List<String> columns,
+      @Nullable List<String> segments) {
+    tableName = encode(tableName);
+    String columnsAndSegmentsParam = UrlBuilderUtils.generateColumnsAndSegmentsParam(columns, segments);
+    String url = StringUtil.join("/", _baseUrl, "segments", tableName, "metadata");
+    return columnsAndSegmentsParam != null ? url + "?" + columnsAndSegmentsParam : url;
   }
 
   public String forSegmentMetadata(String tableName, String segmentName) {
@@ -601,6 +609,10 @@ public class ControllerRequestURLBuilder {
     return StringUtil.join("/", _baseUrl, "zk/delete");
   }
 
+  public String forZkDelete(String path) {
+    return StringUtil.join("/", _baseUrl, "zk/delete", "?path=" + path);
+  }
+
   public String forZkGet(String path) {
     return StringUtil.join("/", _baseUrl, "zk/get", "?path=" + path);
   }
@@ -624,6 +636,11 @@ public class ControllerRequestURLBuilder {
 
   public String forPauseStatus(String tableName) {
     return StringUtil.join("/", _baseUrl, "tables", tableName, "pauseStatus");
+  }
+
+  public String forValidDocIdsMetadata(String tableName, String validDocIdsType) {
+    return StringUtil.join("/", _baseUrl, "tables", tableName,
+        "validDocIdsMetadata?validDocIdsType=" + validDocIdsType);
   }
 
   public String forUpdateTagsValidation() {
@@ -672,5 +689,21 @@ public class ControllerRequestURLBuilder {
 
   public String forTableTimeBoundary(String tableName) {
     return StringUtil.join("/", _baseUrl, "tables", tableName, "timeBoundary");
+  }
+
+  public String forClusterConfigUpdate() {
+    return StringUtil.join("/", _baseUrl, "cluster", "configs");
+  }
+
+  public String forClusterConfigDelete(String config) {
+    return StringUtil.join("/", _baseUrl, "cluster", "configs", config);
+  }
+
+  public String forQueryWorkloadConfigUpdate() {
+    return StringUtil.join("/", _baseUrl, "queryWorkloadConfigs");
+  }
+
+  public String forBaseQueryWorkloadConfig(String config) {
+    return StringUtil.join("/", _baseUrl, "queryWorkloadConfigs", config);
   }
 }

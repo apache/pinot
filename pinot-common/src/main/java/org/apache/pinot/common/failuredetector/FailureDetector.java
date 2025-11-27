@@ -21,6 +21,7 @@ package org.apache.pinot.common.failuredetector;
 import java.util.Set;
 import java.util.function.Consumer;
 import java.util.function.Function;
+import javax.annotation.Nullable;
 import javax.annotation.concurrent.ThreadSafe;
 import org.apache.pinot.common.metrics.BrokerMetrics;
 import org.apache.pinot.spi.annotations.InterfaceAudience;
@@ -69,12 +70,28 @@ public interface FailureDetector {
   /**
    * Marks a server as healthy.
    */
-  void markServerHealthy(String instanceId);
+  @Deprecated
+  default void markServerHealthy(String instanceId) {
+    markServerHealthy(instanceId, null);
+  };
+
+  /**
+   * Marks a server as healthy.
+   */
+  void markServerHealthy(String instanceId, @Nullable String hostName);
 
   /**
    * Marks a server as unhealthy.
    */
-  void markServerUnhealthy(String instanceId);
+  @Deprecated
+  default void markServerUnhealthy(String instanceId) {
+    markServerUnhealthy(instanceId, null);
+  };
+
+  /**
+   * Marks a server as unhealthy.
+   */
+  void markServerUnhealthy(String instanceId, @Nullable String hostName);
 
   /**
    * Returns all the unhealthy servers.

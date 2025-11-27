@@ -19,22 +19,19 @@
 package org.apache.pinot.core.query.scheduler;
 
 import com.google.common.annotations.VisibleForTesting;
-import com.google.common.base.Preconditions;
 import com.google.common.util.concurrent.ListenableFuture;
 import com.google.common.util.concurrent.ListenableFutureTask;
 import com.google.common.util.concurrent.MoreExecutors;
 import java.util.List;
-import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Semaphore;
 import java.util.concurrent.atomic.LongAccumulator;
-import org.apache.pinot.common.metrics.ServerMetrics;
 import org.apache.pinot.common.metrics.ServerQueryPhase;
 import org.apache.pinot.core.query.executor.QueryExecutor;
 import org.apache.pinot.core.query.request.ServerQueryRequest;
 import org.apache.pinot.core.query.scheduler.resources.QueryExecutorService;
 import org.apache.pinot.core.query.scheduler.resources.ResourceManager;
+import org.apache.pinot.spi.accounting.ThreadAccountant;
 import org.apache.pinot.spi.env.PinotConfiguration;
-import org.apache.pinot.spi.query.QueryThreadContext;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -53,10 +50,10 @@ public abstract class PriorityScheduler extends QueryScheduler {
   @VisibleForTesting
   Thread _scheduler;
 
-  public PriorityScheduler(PinotConfiguration config, ResourceManager resourceManager, QueryExecutor queryExecutor,
-      SchedulerPriorityQueue queue, ServerMetrics metrics, LongAccumulator latestQueryTime) {
-    super(config, queryExecutor, resourceManager, metrics, latestQueryTime);
-    Preconditions.checkNotNull(queue);
+  public PriorityScheduler(PinotConfiguration config, String instanceId, QueryExecutor queryExecutor,
+      ThreadAccountant threadAccountant, LongAccumulator latestQueryTime, ResourceManager resourceManager,
+      SchedulerPriorityQueue queue) {
+    super(config, instanceId, queryExecutor, threadAccountant, latestQueryTime, resourceManager);
     _queryQueue = queue;
     _numRunners = resourceManager.getNumQueryRunnerThreads();
     _runningQueriesSemaphore = new Semaphore(_numRunners);
@@ -96,20 +93,19 @@ public abstract class PriorityScheduler extends QueryScheduler {
             break;
           }
           try {
-            final SchedulerQueryContext request = _queryQueue.take();
+            SchedulerQueryContext request = _queryQueue.take();
             if (request == null) {
               continue;
             }
             ServerQueryRequest queryRequest = request.getQueryRequest();
-            final QueryExecutorService executor =
-                _resourceManager.getExecutorService(queryRequest, request.getSchedulerGroup());
-            ExecutorService innerExecutor = QueryThreadContext.contextAwareExecutorService(executor);
-            final ListenableFutureTask<byte[]> queryFutureTask = createQueryFutureTask(queryRequest, innerExecutor);
+            SchedulerGroup schedulerGroup = request.getSchedulerGroup();
+            QueryExecutorService executorService = _resourceManager.getExecutorService(queryRequest, schedulerGroup);
+            ListenableFutureTask<byte[]> queryFutureTask = createQueryFutureTask(queryRequest, executorService);
             queryFutureTask.addListener(new Runnable() {
               @Override
               public void run() {
-                executor.releaseWorkers();
-                request.getSchedulerGroup().endQuery();
+                executorService.releaseWorkers();
+                schedulerGroup.endQuery();
                 _runningQueriesSemaphore.release();
                 checkStopResourceManager();
                 if (!_isRunning && _runningQueriesSemaphore.availablePermits() == _numRunners) {
@@ -118,7 +114,7 @@ public abstract class PriorityScheduler extends QueryScheduler {
               }
             }, MoreExecutors.directExecutor());
             request.setResultFuture(queryFutureTask);
-            request.getSchedulerGroup().startQuery();
+            schedulerGroup.startQuery();
             queryRequest.getTimerContext().getPhaseTimer(ServerQueryPhase.SCHEDULER_WAIT).stopAndRecord();
             _resourceManager.getQueryRunners().submit(queryFutureTask);
           } catch (Throwable t) {
