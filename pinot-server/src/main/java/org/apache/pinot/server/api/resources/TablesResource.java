@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.server.api.resources;
 
+import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.google.common.base.Preconditions;
 import io.swagger.annotations.Api;
@@ -45,6 +46,8 @@ import java.util.stream.Collectors;
 import javax.annotation.Nullable;
 import javax.inject.Inject;
 import javax.inject.Named;
+import javax.ws.rs.BadRequestException;
+import javax.ws.rs.Consumes;
 import javax.ws.rs.DELETE;
 import javax.ws.rs.DefaultValue;
 import javax.ws.rs.Encoded;
@@ -104,6 +107,7 @@ import org.apache.pinot.segment.spi.index.metadata.SegmentMetadataImpl;
 import org.apache.pinot.server.access.AccessControlFactory;
 import org.apache.pinot.server.api.AdminApiApplication;
 import org.apache.pinot.server.starter.ServerInstance;
+import org.apache.pinot.spi.config.table.PageCacheWarmupRequest;
 import org.apache.pinot.spi.config.table.TableType;
 import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
@@ -146,6 +150,8 @@ public class TablesResource {
   @Inject
   @Named(AdminApiApplication.SERVER_INSTANCE_ID)
   private String _instanceId;
+
+  private final Set<String> _tablesWithWarmupInProgress = new HashSet<>();
 
   @GET
   @Path("/tables")
@@ -1287,6 +1293,78 @@ public class TablesResource {
       }
     } catch (Exception e) {
       throw new WebApplicationException(e.getMessage(), Response.Status.INTERNAL_SERVER_ERROR);
+    }
+  }
+
+  /**
+   * Initiates an on‑demand page‑cache warm‑up for the given table.
+   *
+   * <p><b>Request body</b> — JSON object containing:</p>
+   * <pre>{@code
+   * {
+   *   "queries":  ["SELECT COUNT(*) FROM myTable", "SELECT SUM(col) FROM myTable"],
+   *   "segments": ["myTable_0_99_OFFLINE", "myTable_100_199_OFFLINE"]
+   * }
+   * }</pre>
+   *
+   * <ul>
+   *   <li><code>queries</code> – List of queries execute. Each is prefixed with
+   *       <code>SET isSecondaryWorkload=true;</code> on the server so it runs on the secondary
+   *       workload queue, if that is configured</li>
+   *   <li><code>segments</code> – List of segment names to warm up. An empty list means all segments.</li>
+   * </ul>
+   *
+   * <h4>Concurrency</h4>
+   * Only <em>one</em> warm‑up per table can run at a time. If another warm‑up is already in progress,
+   * the endpoint returns <strong>409 CONFLICT</strong>.
+   *
+   * @param tableNameWithType Fully‑qualified table name (e.g. {@code myTable_OFFLINE})
+   * @param requestString     Raw JSON payload described above
+   * @return {@link Response} – 200 OK on success; 400 BAD REQUEST for malformed payload; 409 CONFLICT if
+   *         a warm‑up is already running; 500 INTERNAL_SERVER_ERROR for unexpected failures.
+   */
+  @POST
+  @Path("/tables/{tableNameWithType}/triggerWarmup")
+  @Consumes(MediaType.APPLICATION_JSON)
+  @Produces(MediaType.APPLICATION_JSON)
+  @ApiOperation(value = "Trigger page cache warmup",
+      notes = "Initiates page cache warmup process for provided table and segments by executing the provided queries.")
+  public Response triggerPageCacheWarmup(
+      @ApiParam(required = true) @PathParam("tableNameWithType") String tableNameWithType, String requestString
+  ) {
+    try {
+      LOGGER.info("Received request to initiate page cache warmup with request: {}", requestString);
+      // Prevent concurrent warmup requests
+      if (_tablesWithWarmupInProgress.contains(tableNameWithType)) {
+        String message = String.format("Page cache warmup is already in progress for table: %s. ", tableNameWithType);
+        LOGGER.warn(message);
+        return Response.status(Response.Status.CONFLICT).entity(message).build();
+      }
+      PageCacheWarmupRequest warmupRequest = JsonUtils.stringToObject(requestString, PageCacheWarmupRequest.class);
+      // Validate the parsed request
+      if (warmupRequest.getQueries() == null || warmupRequest.getQueries().isEmpty()) {
+        throw new BadRequestException("Queries cannot be null or empty.");
+      } else if (warmupRequest.getSegments() == null || warmupRequest.getSegments().isEmpty()) {
+        throw new BadRequestException("Segments cannot be null or empty.");
+      }
+      // Trigger the warmup
+      _tablesWithWarmupInProgress.add(tableNameWithType);
+      _serverInstance.getPageCacheWarmupServerQueryExecutor().startWarmupOnRefresh(tableNameWithType,
+          warmupRequest.getQueries(), warmupRequest.getSegments());
+      String responseString = String.format("Successfully triggered page cache warmup for table: %s",
+          tableNameWithType);
+      LOGGER.info(responseString);
+      return Response.ok(responseString).build();
+    } catch (BadRequestException | JsonProcessingException e) {
+      String errorMessage = String.format("Invalid request: %s, error: %s", requestString, e.getMessage());
+      LOGGER.error(errorMessage, e);
+      return Response.status(Response.Status.BAD_REQUEST).entity(errorMessage).build();
+    } catch (Exception e) {
+      String errorMessage = String.format("Failed to trigger page cache error on refresh: %s", e);
+      LOGGER.error(errorMessage, e);
+      return Response.serverError().entity(errorMessage).build();
+    } finally {
+      _tablesWithWarmupInProgress.remove(tableNameWithType);
     }
   }
 }
