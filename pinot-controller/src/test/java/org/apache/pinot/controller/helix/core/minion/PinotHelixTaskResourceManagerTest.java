@@ -39,6 +39,7 @@ import org.apache.helix.task.TaskState;
 import org.apache.helix.task.WorkflowConfig;
 import org.apache.helix.task.WorkflowContext;
 import org.apache.pinot.controller.helix.core.PinotHelixResourceManager;
+import org.apache.pinot.controller.helix.core.minion.PinotHelixTaskResourceManager.TaskStatusSummary;
 import org.apache.pinot.controller.util.CompletionServiceHelper;
 import org.apache.pinot.core.minion.PinotTaskConfig;
 import org.apache.pinot.spi.utils.JsonUtils;
@@ -303,7 +304,7 @@ public class PinotHelixTaskResourceManagerTest {
   }
 
   @Test
-  public void testGetTableTaskCount() {
+  public void testGetTableTaskStatusSummary() {
     String taskName = "Task_TestTask_12345";
     String helixJobName = PinotHelixTaskResourceManager.getHelixJobName(taskName);
     TaskDriver taskDriver = mock(TaskDriver.class);
@@ -324,25 +325,234 @@ public class PinotHelixTaskResourceManagerTest {
     when(jobContext.getTaskIdForPartition(1)).thenReturn("taskId1");
     when(jobContext.getPartitionState(0)).thenReturn(TaskPartitionState.RUNNING);
     when(jobContext.getPartitionState(1)).thenReturn(TaskPartitionState.COMPLETED);
+    long partitionStartTime0 = System.currentTimeMillis() - 120000; // 2 minutes ago
+    when(jobContext.getPartitionStartTime(0)).thenReturn(partitionStartTime0);
+    when(jobContext.getPartitionStartTime(1)).thenReturn(System.currentTimeMillis() - 60000); // 1 minute ago
+    long jobStartTime = System.currentTimeMillis() - 300000; // 5 minutes ago
+    when(jobContext.getStartTime()).thenReturn(jobStartTime);
 
     PinotHelixTaskResourceManager mgr =
         new PinotHelixTaskResourceManager(mock(PinotHelixResourceManager.class), taskDriver);
-    Map<String, PinotHelixTaskResourceManager.TaskCount> tableTaskCount = mgr.getTableTaskCount(taskName);
+    Map<String, TaskStatusSummary> tableTaskCount = mgr.getTableTaskStatusSummary(taskName);
     assertEquals(tableTaskCount.size(), 2);
-    PinotHelixTaskResourceManager.TaskCount taskCount = tableTaskCount.get("table1_OFFLINE");
+    TaskStatusSummary taskStatusSummary = tableTaskCount.get("table1_OFFLINE");
+    PinotHelixTaskResourceManager.TaskCount taskCount = taskStatusSummary.getTaskCount();
     assertEquals(taskCount.getTotal(), 1);
     assertEquals(taskCount.getCompleted(), 1);
     assertEquals(taskCount.getRunning(), 0);
     assertEquals(taskCount.getWaiting(), 0);
     assertEquals(taskCount.getError(), 0);
     assertEquals(taskCount.getUnknown(), 0);
-    taskCount = tableTaskCount.get("unknown");
+    taskStatusSummary = tableTaskCount.get("unknown");
+    taskCount = taskStatusSummary.getTaskCount();
     assertEquals(taskCount.getTotal(), 1);
     assertEquals(taskCount.getCompleted(), 0);
     assertEquals(taskCount.getRunning(), 1);
     assertEquals(taskCount.getWaiting(), 0);
     assertEquals(taskCount.getError(), 0);
     assertEquals(taskCount.getUnknown(), 0);
+
+    // Verify running time is calculated for RUNNING subtask (taskId0) - in milliseconds
+    Map<String, Long> runningTimes = taskStatusSummary.getSubtaskRunningTimes();
+    assertEquals(runningTimes.size(), 1);
+    assertTrue(runningTimes.containsKey("taskId0"));
+    // Running time should be approximately 120000 ms (2 minutes)
+    long runningTime = runningTimes.get("taskId0");
+    assertTrue(runningTime >= 115000 && runningTime <= 125000);
+  }
+
+  @Test
+  public void testGetTableTaskStatusSummaryWithTiming() {
+    String taskName = "Task_TestTask_67890";
+    String helixJobName = PinotHelixTaskResourceManager.getHelixJobName(taskName);
+    TaskDriver taskDriver = mock(TaskDriver.class);
+    JobConfig jobConfig = mock(JobConfig.class);
+    when(taskDriver.getJobConfig(anyString())).thenReturn(jobConfig);
+    Map<String, TaskConfig> taskConfigMap = new HashMap<>();
+    taskConfigMap.put("taskId0", new TaskConfig("",
+        new HashMap<>(Collections.singletonMap("tableName", "table1_OFFLINE"))));
+    taskConfigMap.put("taskId1", new TaskConfig("",
+        new HashMap<>(Collections.singletonMap("tableName", "table1_OFFLINE"))));
+    when(jobConfig.getTaskConfigMap()).thenReturn(taskConfigMap);
+    JobContext jobContext = mock(JobContext.class);
+    when(taskDriver.getJobContext(helixJobName)).thenReturn(jobContext);
+    Map<String, Integer> taskIdPartitionMap = new HashMap<>();
+    taskIdPartitionMap.put("taskId0", 0);
+    // taskId1 has no partition (null state - waiting)
+    when(jobContext.getTaskIdPartitionMap()).thenReturn(taskIdPartitionMap);
+    when(jobContext.getPartitionState(0)).thenReturn(TaskPartitionState.RUNNING);
+    long partitionStartTime = System.currentTimeMillis() - 180000; // 3 minutes ago
+    when(jobContext.getPartitionStartTime(0)).thenReturn(partitionStartTime);
+    long jobStartTime = System.currentTimeMillis() - 600000; // 10 minutes ago
+    when(jobContext.getStartTime()).thenReturn(jobStartTime);
+
+    PinotHelixTaskResourceManager mgr =
+        new PinotHelixTaskResourceManager(mock(PinotHelixResourceManager.class), taskDriver);
+    Map<String, TaskStatusSummary> tableTaskCount = mgr.getTableTaskStatusSummary(taskName);
+    assertEquals(tableTaskCount.size(), 1);
+    TaskStatusSummary taskStatusSummary = tableTaskCount.get("table1_OFFLINE");
+    PinotHelixTaskResourceManager.TaskCount taskCount = taskStatusSummary.getTaskCount();
+    assertEquals(taskCount.getTotal(), 2);
+    assertEquals(taskCount.getRunning(), 1);
+    assertEquals(taskCount.getWaiting(), 1);
+
+    // Verify running time for RUNNING subtask (taskId0) - in milliseconds
+    Map<String, Long> runningTimes = taskStatusSummary.getSubtaskRunningTimes();
+    assertEquals(runningTimes.size(), 1);
+    assertTrue(runningTimes.containsKey("taskId0"));
+    // Running time should be approximately 180000 ms (3 minutes)
+    long runningTime = runningTimes.get("taskId0");
+    assertTrue(runningTime >= 175000 && runningTime <= 185000);
+
+    // Verify waiting time for null state subtask (taskId1) - in milliseconds
+    Map<String, Long> waitingTimes = taskStatusSummary.getSubtaskWaitingTimes();
+    assertEquals(waitingTimes.size(), 1);
+    assertTrue(waitingTimes.containsKey("taskId1"));
+    // Waiting time should be approximately 600000 ms (10 minutes)
+    long waitingTime = waitingTimes.get("taskId1");
+    assertTrue(waitingTime >= 595000 && waitingTime <= 605000);
+  }
+
+  @Test
+  public void testGetTableTaskStatusSummaryWithNullJobContext() {
+    String taskName = "Task_TestTask_NullContext";
+    String helixJobName = PinotHelixTaskResourceManager.getHelixJobName(taskName);
+    TaskDriver taskDriver = mock(TaskDriver.class);
+    JobConfig jobConfig = mock(JobConfig.class);
+    when(taskDriver.getJobConfig(anyString())).thenReturn(jobConfig);
+    Map<String, TaskConfig> taskConfigMap = new HashMap<>();
+    taskConfigMap.put("taskId0", new TaskConfig("",
+        new HashMap<>(Collections.singletonMap("tableName", "table1_OFFLINE"))));
+    taskConfigMap.put("taskId1", new TaskConfig("",
+        new HashMap<>(Collections.singletonMap("tableName", "table2_OFFLINE"))));
+    when(jobConfig.getTaskConfigMap()).thenReturn(taskConfigMap);
+    when(taskDriver.getJobContext(helixJobName)).thenReturn(null);
+
+    PinotHelixTaskResourceManager mgr =
+        new PinotHelixTaskResourceManager(mock(PinotHelixResourceManager.class), taskDriver);
+    Map<String, TaskStatusSummary> tableTaskCount = mgr.getTableTaskStatusSummary(taskName);
+    assertEquals(tableTaskCount.size(), 2);
+
+    // Verify that timing maps are empty when jobContext is null
+    for (TaskStatusSummary timing : tableTaskCount.values()) {
+      assertTrue(timing.getSubtaskWaitingTimes().isEmpty());
+      assertTrue(timing.getSubtaskRunningTimes().isEmpty());
+      assertEquals(timing.getTaskCount().getWaiting(), 1);
+    }
+  }
+
+  @Test
+  public void testGetTableTaskStatusSummaryWithZeroJobStartTime() {
+    String taskName = "Task_TestTask_ZeroStart";
+    String helixJobName = PinotHelixTaskResourceManager.getHelixJobName(taskName);
+    TaskDriver taskDriver = mock(TaskDriver.class);
+    JobConfig jobConfig = mock(JobConfig.class);
+    when(taskDriver.getJobConfig(anyString())).thenReturn(jobConfig);
+    Map<String, TaskConfig> taskConfigMap = new HashMap<>();
+    taskConfigMap.put("taskId0", new TaskConfig("",
+        new HashMap<>(Collections.singletonMap("tableName", "table1_OFFLINE"))));
+    when(jobConfig.getTaskConfigMap()).thenReturn(taskConfigMap);
+    JobContext jobContext = mock(JobContext.class);
+    when(taskDriver.getJobContext(helixJobName)).thenReturn(jobContext);
+    Map<String, Integer> taskIdPartitionMap = new HashMap<>();
+    // taskId0 has no partition (null state - waiting)
+    when(jobContext.getTaskIdPartitionMap()).thenReturn(taskIdPartitionMap);
+    when(jobContext.getStartTime()).thenReturn(0L); // Zero job start time
+
+    PinotHelixTaskResourceManager mgr =
+        new PinotHelixTaskResourceManager(mock(PinotHelixResourceManager.class), taskDriver);
+    Map<String, TaskStatusSummary> tableTaskCount = mgr.getTableTaskStatusSummary(taskName);
+
+    TaskStatusSummary taskStatusSummary = tableTaskCount.get("table1_OFFLINE");
+    // When jobStartTime is 0, waiting time should not be calculated
+    assertTrue(taskStatusSummary.getSubtaskWaitingTimes().isEmpty());
+    assertEquals(taskStatusSummary.getTaskCount().getWaiting(), 1);
+  }
+
+  @Test
+  public void testGetTableTaskStatusSummaryWithZeroPartitionStartTime() {
+    String taskName = "Task_TestTask_ZeroPartition";
+    String helixJobName = PinotHelixTaskResourceManager.getHelixJobName(taskName);
+    TaskDriver taskDriver = mock(TaskDriver.class);
+    JobConfig jobConfig = mock(JobConfig.class);
+    when(taskDriver.getJobConfig(anyString())).thenReturn(jobConfig);
+    Map<String, TaskConfig> taskConfigMap = new HashMap<>();
+    taskConfigMap.put("taskId0", new TaskConfig("",
+        new HashMap<>(Collections.singletonMap("tableName", "table1_OFFLINE"))));
+    when(jobConfig.getTaskConfigMap()).thenReturn(taskConfigMap);
+    JobContext jobContext = mock(JobContext.class);
+    when(taskDriver.getJobContext(helixJobName)).thenReturn(jobContext);
+    Map<String, Integer> taskIdPartitionMap = new HashMap<>();
+    taskIdPartitionMap.put("taskId0", 0);
+    when(jobContext.getTaskIdPartitionMap()).thenReturn(taskIdPartitionMap);
+    when(jobContext.getPartitionState(0)).thenReturn(TaskPartitionState.RUNNING);
+    when(jobContext.getPartitionStartTime(0)).thenReturn(0L); // Zero partition start time
+    when(jobContext.getStartTime()).thenReturn(System.currentTimeMillis() - 300000);
+
+    PinotHelixTaskResourceManager mgr =
+        new PinotHelixTaskResourceManager(mock(PinotHelixResourceManager.class), taskDriver);
+    Map<String, TaskStatusSummary> tableTaskCount = mgr.getTableTaskStatusSummary(taskName);
+
+    TaskStatusSummary taskStatusSummary = tableTaskCount.get("table1_OFFLINE");
+    // When partitionStartTime is 0, running time should not be calculated
+    assertTrue(taskStatusSummary.getSubtaskRunningTimes().isEmpty());
+    assertEquals(taskStatusSummary.getTaskCount().getRunning(), 1);
+  }
+
+  @Test
+  public void testGetTableTaskStatusSummaryWithNonRunningStates() {
+    String taskName = "Task_TestTask_NonRunning";
+    String helixJobName = PinotHelixTaskResourceManager.getHelixJobName(taskName);
+    TaskDriver taskDriver = mock(TaskDriver.class);
+    JobConfig jobConfig = mock(JobConfig.class);
+    when(taskDriver.getJobConfig(anyString())).thenReturn(jobConfig);
+    Map<String, TaskConfig> taskConfigMap = new HashMap<>();
+    taskConfigMap.put("taskId0", new TaskConfig("",
+        new HashMap<>(Collections.singletonMap("tableName", "table1_OFFLINE"))));
+    taskConfigMap.put("taskId1", new TaskConfig("",
+        new HashMap<>(Collections.singletonMap("tableName", "table1_OFFLINE"))));
+    when(jobConfig.getTaskConfigMap()).thenReturn(taskConfigMap);
+    JobContext jobContext = mock(JobContext.class);
+    when(taskDriver.getJobContext(helixJobName)).thenReturn(jobContext);
+    Map<String, Integer> taskIdPartitionMap = new HashMap<>();
+    taskIdPartitionMap.put("taskId0", 0);
+    taskIdPartitionMap.put("taskId1", 1);
+    when(jobContext.getTaskIdPartitionMap()).thenReturn(taskIdPartitionMap);
+    when(jobContext.getPartitionState(0)).thenReturn(TaskPartitionState.COMPLETED);
+    when(jobContext.getPartitionState(1)).thenReturn(TaskPartitionState.TASK_ERROR);
+    when(jobContext.getPartitionStartTime(0)).thenReturn(System.currentTimeMillis() - 60000);
+    when(jobContext.getPartitionStartTime(1)).thenReturn(System.currentTimeMillis() - 120000);
+    when(jobContext.getStartTime()).thenReturn(System.currentTimeMillis() - 300000);
+
+    PinotHelixTaskResourceManager mgr =
+        new PinotHelixTaskResourceManager(mock(PinotHelixResourceManager.class), taskDriver);
+    Map<String, TaskStatusSummary> tableTaskCount = mgr.getTableTaskStatusSummary(taskName);
+
+    TaskStatusSummary taskStatusSummary = tableTaskCount.get("table1_OFFLINE");
+    // COMPLETED and ERROR states should not have running times
+    assertTrue(taskStatusSummary.getSubtaskRunningTimes().isEmpty());
+    // They also should not have waiting times (only null state gets waiting time)
+    assertTrue(taskStatusSummary.getSubtaskWaitingTimes().isEmpty());
+    assertEquals(taskStatusSummary.getTaskCount().getCompleted(), 1);
+    assertEquals(taskStatusSummary.getTaskCount().getError(), 1);
+  }
+
+  @Test
+  public void testTaskCountWithTimingConstructorWithNullMaps() {
+    PinotHelixTaskResourceManager.TaskCount taskCount = new PinotHelixTaskResourceManager.TaskCount();
+    taskCount.addTaskState(TaskPartitionState.RUNNING);
+
+    // Test default constructor and setters
+    TaskStatusSummary timing = new TaskStatusSummary();
+    timing.setTaskCount(taskCount);
+    timing.setSubtaskWaitingTimes(new HashMap<>());
+    timing.setSubtaskRunningTimes(new HashMap<>());
+
+    assertNotNull(timing.getSubtaskWaitingTimes());
+    assertNotNull(timing.getSubtaskRunningTimes());
+    assertTrue(timing.getSubtaskWaitingTimes().isEmpty());
+    assertTrue(timing.getSubtaskRunningTimes().isEmpty());
+    assertEquals(timing.getTaskCount().getRunning(), 1);
   }
 
   @Test

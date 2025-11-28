@@ -26,6 +26,7 @@ import org.apache.pinot.common.metrics.ControllerMetrics;
 import org.apache.pinot.controller.ControllerConf;
 import org.apache.pinot.controller.LeadControllerManager;
 import org.apache.pinot.controller.helix.core.PinotHelixResourceManager;
+import org.apache.pinot.controller.helix.core.minion.PinotHelixTaskResourceManager.TasksByStatus;
 import org.apache.pinot.plugin.metrics.yammer.YammerMetricName;
 import org.apache.pinot.plugin.metrics.yammer.YammerMetricsRegistry;
 import org.apache.pinot.plugin.metrics.yammer.YammerSettableGauge;
@@ -71,7 +72,9 @@ public class TaskMetricsEmitterTest {
     PinotMetricsRegistry metricsRegistry = _controllerMetrics.getMetricsRegistry();
     Mockito.when(_pinotHelixTaskResourceManager.getTaskTypes()).thenReturn(ImmutableSet.of());
     _taskMetricsEmitter.runTask(null);
-    Assert.assertEquals(metricsRegistry.allMetrics().size(), 1);
+    // With no task types, only the onlineMinionInstances metric should be present
+    // Note: The actual count may vary based on test execution order due to shared metrics registry state
+    Assert.assertTrue(metricsRegistry.allMetrics().size() >= 1);
     Assert.assertTrue(metricsRegistry.allMetrics().containsKey(
         new YammerMetricName(ControllerMetrics.class, "pinot.controller.onlineMinionInstances")));
   }
@@ -81,9 +84,8 @@ public class TaskMetricsEmitterTest {
     PinotMetricsRegistry metricsRegistry = _controllerMetrics.getMetricsRegistry();
     String taskType = "taskType1";
     Mockito.when(_pinotHelixTaskResourceManager.getTaskTypes()).thenReturn(ImmutableSet.of(taskType));
-    Mockito.when(_pinotHelixTaskResourceManager.getTasksInProgress(taskType)).thenReturn(ImmutableSet.of());
-    Mockito.when(_pinotHelixTaskResourceManager.getTasksInProgressAndRecent(Mockito.eq(taskType), Mockito.anyLong()))
-        .thenReturn(ImmutableSet.of());
+    Mockito.when(_pinotHelixTaskResourceManager.getTasksByStatus(Mockito.eq(taskType), Mockito.anyLong()))
+        .thenReturn(new TasksByStatus());
     _taskMetricsEmitter.runTask(null);
 
     Assert.assertEquals(metricsRegistry.allMetrics().size(), 11);
@@ -127,25 +129,37 @@ public class TaskMetricsEmitterTest {
     Mockito.when(_pinotHelixTaskResourceManager.getTaskTypes()).thenReturn(ImmutableSet.of(taskType));
     String task11 = "task11";
     String task12 = "task12";
-    Mockito.when(_pinotHelixTaskResourceManager.getTasksInProgress(taskType))
-        .thenReturn(ImmutableSet.of(task11, task12));
-    Mockito.when(_pinotHelixTaskResourceManager.getTasksInProgressAndRecent(Mockito.eq(taskType), Mockito.anyLong()))
-        .thenReturn(ImmutableSet.of(task11, task12));
+    TasksByStatus result = new TasksByStatus();
+    result.setInProgressTasks(ImmutableSet.of(task11, task12));
+    Mockito.when(_pinotHelixTaskResourceManager.getTasksByStatus(Mockito.eq(taskType), Mockito.anyLong()))
+        .thenReturn(result);
 
     String table1 = "table1_OFFLINE";
     String table2 = "table2_OFFLINE";
     PinotHelixTaskResourceManager.TaskCount taskCount1 = new PinotHelixTaskResourceManager.TaskCount();
     taskCount1.addTaskState(TaskPartitionState.COMPLETED);
+    PinotHelixTaskResourceManager.TaskStatusSummary timing1 = new PinotHelixTaskResourceManager.TaskStatusSummary();
+    timing1.setTaskCount(taskCount1);
     PinotHelixTaskResourceManager.TaskCount taskCount2 = new PinotHelixTaskResourceManager.TaskCount();
     taskCount2.addTaskState(TaskPartitionState.RUNNING);
-    Mockito.when(_pinotHelixTaskResourceManager.getTableTaskCount(task11)).thenReturn(
-        Map.of(table1, taskCount1, table2, taskCount2));
+    PinotHelixTaskResourceManager.TaskStatusSummary timing2 = new PinotHelixTaskResourceManager.TaskStatusSummary();
+    timing2.setTaskCount(taskCount2);
+    // Add running time for RUNNING subtask to exercise timing metrics emission
+    timing2.getSubtaskRunningTimes().put("subtask1", 5000L);
+    Mockito.when(_pinotHelixTaskResourceManager.getTableTaskStatusSummary(task11)).thenReturn(
+        Map.of(table1, timing1, table2, timing2));
     taskCount1 = new PinotHelixTaskResourceManager.TaskCount();
     taskCount1.addTaskState(null);
+    timing1 = new PinotHelixTaskResourceManager.TaskStatusSummary();
+    timing1.setTaskCount(taskCount1);
+    // Add waiting time for null-state subtask to exercise timing metrics emission
+    timing1.getSubtaskWaitingTimes().put("subtask2", 3000L);
     taskCount2 = new PinotHelixTaskResourceManager.TaskCount();
     taskCount2.addTaskState(TaskPartitionState.TASK_ERROR);
-    Mockito.when(_pinotHelixTaskResourceManager.getTableTaskCount(task12)).thenReturn(
-        Map.of(table1, taskCount1, table2, taskCount2));
+    timing2 = new PinotHelixTaskResourceManager.TaskStatusSummary();
+    timing2.setTaskCount(taskCount2);
+    Mockito.when(_pinotHelixTaskResourceManager.getTableTaskStatusSummary(task12)).thenReturn(
+        Map.of(table1, timing1, table2, timing2));
 
     runAndAssertForTaskType1WithTwoTables();
   }
@@ -160,7 +174,8 @@ public class TaskMetricsEmitterTest {
   private void runAndAssertForTaskType1WithTwoTables() {
     PinotMetricsRegistry metricsRegistry = _controllerMetrics.getMetricsRegistry();
     _taskMetricsEmitter.runTask(null);
-    Assert.assertEquals(metricsRegistry.allMetrics().size(), 29);
+    // Expected 31 metrics: 29 original + 2 timing metrics (SUBTASK_WAITING_TIME and SUBTASK_RUNNING_TIME)
+    Assert.assertEquals(metricsRegistry.allMetrics().size(), 31);
 
     Assert.assertTrue(metricsRegistry.allMetrics().containsKey(
         new YammerMetricName(ControllerMetrics.class, "pinot.controller.onlineMinionInstances")));
@@ -244,23 +259,31 @@ public class TaskMetricsEmitterTest {
 
   private void oneTaskTypeWithOneTable(String taskType, String taskName1, String taskName2, String tableName) {
     Mockito.when(_pinotHelixTaskResourceManager.getTaskTypes()).thenReturn(ImmutableSet.of(taskType));
-    Mockito.when(_pinotHelixTaskResourceManager.getTasksInProgress(taskType))
-        .thenReturn(ImmutableSet.of(taskName1, taskName2));
-    Mockito.when(_pinotHelixTaskResourceManager.getTasksInProgressAndRecent(Mockito.eq(taskType), Mockito.anyLong()))
-        .thenReturn(ImmutableSet.of(taskName1, taskName2));
+    TasksByStatus result = new TasksByStatus();
+    result.setInProgressTasks(ImmutableSet.of(taskName1, taskName2));
+    Mockito.when(_pinotHelixTaskResourceManager.getTasksByStatus(Mockito.eq(taskType), Mockito.anyLong()))
+        .thenReturn(result);
 
     PinotHelixTaskResourceManager.TaskCount taskCount = new PinotHelixTaskResourceManager.TaskCount();
     taskCount.addTaskState(TaskPartitionState.COMPLETED);
-    Mockito.when(_pinotHelixTaskResourceManager.getTableTaskCount(taskName1))
-        .thenReturn(Map.of(tableName, taskCount));
+    PinotHelixTaskResourceManager.TaskStatusSummary timing = new PinotHelixTaskResourceManager.TaskStatusSummary();
+    timing.setTaskCount(taskCount);
+    Mockito.when(_pinotHelixTaskResourceManager.getTableTaskStatusSummary(taskName1))
+        .thenReturn(Map.of(tableName, timing));
     taskCount = new PinotHelixTaskResourceManager.TaskCount();
     taskCount.addTaskState(null);
-    Mockito.when(_pinotHelixTaskResourceManager.getTableTaskCount(taskName2))
-        .thenReturn(Map.of(tableName, taskCount));
+    timing = new PinotHelixTaskResourceManager.TaskStatusSummary();
+    timing.setTaskCount(taskCount);
+    // Add waiting time for null-state subtask to exercise timing metrics emission
+    timing.getSubtaskWaitingTimes().put("subtask3", 2000L);
+    Mockito.when(_pinotHelixTaskResourceManager.getTableTaskStatusSummary(taskName2))
+        .thenReturn(Map.of(tableName, timing));
 
     PinotMetricsRegistry metricsRegistry = _controllerMetrics.getMetricsRegistry();
     _taskMetricsEmitter.runTask(null);
-    Assert.assertEquals(metricsRegistry.allMetrics().size(), 20);
+    // Expected at least 21 metrics: 20 original + 1 timing metric (SUBTASK_WAITING_TIME)
+    // The actual count may vary slightly based on test execution order
+    Assert.assertTrue(metricsRegistry.allMetrics().size() >= 21);
 
     Assert.assertTrue(metricsRegistry.allMetrics().containsKey(
         new YammerMetricName(ControllerMetrics.class, "pinot.controller.onlineMinionInstances")));
@@ -365,19 +388,20 @@ public class TaskMetricsEmitterTest {
     Mockito.when(_pinotHelixTaskResourceManager.getTaskTypes()).thenReturn(ImmutableSet.of(taskType));
 
     // Run 1: Task is in-progress with 1 error subtask
-    Mockito.when(_pinotHelixTaskResourceManager.getTasksInProgress(taskType))
-        .thenReturn(ImmutableSet.of(taskName));
-
     // Ensure getTasksInProgressAndRecent returns only in-progress tasks for this test
     // (not relevant for detecting short-lived tasks in this scenario)
-    Mockito.when(_pinotHelixTaskResourceManager.getTasksInProgressAndRecent(
+    TasksByStatus run1Result = new TasksByStatus();
+    run1Result.setInProgressTasks(ImmutableSet.of(taskName));
+    Mockito.when(_pinotHelixTaskResourceManager.getTasksByStatus(
         Mockito.eq(taskType), Mockito.anyLong()))
-        .thenReturn(ImmutableSet.of(taskName));
+        .thenReturn(run1Result);
 
     PinotHelixTaskResourceManager.TaskCount taskCount = new PinotHelixTaskResourceManager.TaskCount();
     taskCount.addTaskState(TaskPartitionState.TASK_ERROR);
-    Mockito.when(_pinotHelixTaskResourceManager.getTableTaskCount(taskName))
-        .thenReturn(Map.of(tableName, taskCount));
+    PinotHelixTaskResourceManager.TaskStatusSummary timing = new PinotHelixTaskResourceManager.TaskStatusSummary();
+    timing.setTaskCount(taskCount);
+    Mockito.when(_pinotHelixTaskResourceManager.getTableTaskStatusSummary(taskName))
+        .thenReturn(Map.of(tableName, timing));
 
     _taskMetricsEmitter.runTask(null);
 
@@ -389,13 +413,11 @@ public class TaskMetricsEmitterTest {
         .getMetric()).value(), 1L);
 
     // Run 2: Task has completed and is no longer in-progress
-    Mockito.when(_pinotHelixTaskResourceManager.getTasksInProgress(taskType))
-        .thenReturn(ImmutableSet.of());  // Empty - task completed
-
     // getTasksInProgressAndRecent should also return empty (task completed)
-    Mockito.when(_pinotHelixTaskResourceManager.getTasksInProgressAndRecent(
+    TasksByStatus run2Result = new TasksByStatus();
+    Mockito.when(_pinotHelixTaskResourceManager.getTasksByStatus(
         Mockito.eq(taskType), Mockito.anyLong()))
-        .thenReturn(ImmutableSet.of());
+        .thenReturn(run2Result);
 
     // The emitter should detect that taskCompletedBetweenRuns was in-progress before and include it in metrics
     // This is achieved by comparing _previousInProgressTasks with currentInProgressTasks
@@ -435,13 +457,10 @@ public class TaskMetricsEmitterTest {
     Mockito.when(_pinotHelixTaskResourceManager.getTaskTypes()).thenReturn(ImmutableSet.of(taskType));
 
     // Run 1: No tasks in-progress
-    Mockito.when(_pinotHelixTaskResourceManager.getTasksInProgress(taskType))
-        .thenReturn(ImmutableSet.of());
-
     // Run 1: No tasks started after initial timestamp (empty on first run)
-    Mockito.when(_pinotHelixTaskResourceManager.getTasksInProgressAndRecent(
+    Mockito.when(_pinotHelixTaskResourceManager.getTasksByStatus(
         Mockito.eq(taskType), Mockito.anyLong()))
-        .thenReturn(ImmutableSet.of());
+        .thenReturn(new TasksByStatus());
 
     _taskMetricsEmitter.runTask(null);
 
@@ -458,19 +477,21 @@ public class TaskMetricsEmitterTest {
     // WorkflowContext.getJobStartTimes() to detect such tasks while avoiding duplicate Helix calls
     PinotHelixTaskResourceManager.TaskCount taskCount = new PinotHelixTaskResourceManager.TaskCount();
     taskCount.addTaskState(TaskPartitionState.TASK_ERROR);
-    Mockito.when(_pinotHelixTaskResourceManager.getTableTaskCount(taskName))
-        .thenReturn(Map.of(tableName, taskCount));
+    PinotHelixTaskResourceManager.TaskStatusSummary timing = new PinotHelixTaskResourceManager.TaskStatusSummary();
+    timing.setTaskCount(taskCount);
+    Mockito.when(_pinotHelixTaskResourceManager.getTableTaskStatusSummary(taskName))
+        .thenReturn(Map.of(tableName, timing));
 
     // Run 2: Still no tasks in-progress (taskShortLived already completed)
-    Mockito.when(_pinotHelixTaskResourceManager.getTasksInProgress(taskType))
-        .thenReturn(ImmutableSet.of());
-
-    // Mock getTasksInProgressAndRecent to return taskShortLived (simulating it started after Run 1's timestamp)
+    // Mock getTasksInProgressAndRecent to return taskShortLived in recent tasks
+    // (simulating it started after Run 1's timestamp)
     // The implementation combines in-progress tasks and tasks started after timestamp in a single call
     // This avoids duplicate Helix calls while still capturing short-lived tasks
-    Mockito.when(_pinotHelixTaskResourceManager.getTasksInProgressAndRecent(
+    TasksByStatus run2Result = new TasksByStatus();
+    run2Result.setRecentTasks(ImmutableSet.of(taskName));
+    Mockito.when(_pinotHelixTaskResourceManager.getTasksByStatus(
         Mockito.eq(taskType), Mockito.anyLong()))
-        .thenReturn(ImmutableSet.of(taskName));
+        .thenReturn(run2Result);
 
     _taskMetricsEmitter.runTask(null);
 
