@@ -38,6 +38,7 @@ import org.apache.pinot.query.planner.plannode.ProjectNode;
 import org.apache.pinot.query.planner.plannode.SetOpNode;
 import org.apache.pinot.query.planner.plannode.SortNode;
 import org.apache.pinot.query.planner.plannode.TableScanNode;
+import org.apache.pinot.query.planner.plannode.UnnestNode;
 import org.apache.pinot.query.planner.plannode.ValueNode;
 import org.apache.pinot.query.planner.plannode.WindowNode;
 
@@ -153,6 +154,11 @@ public class PlanNodeSorter {
         return node;
       }
       return node.withInputs(simplifiedChildren);
+    }
+
+    @Override
+    public PlanNode visitUnnest(UnnestNode node, Comparator<PlanNode> comparator) {
+      return defaultNode(node, comparator);
     }
 
     private List<PlanNode> applyToChildren(List<PlanNode> children, Comparator<PlanNode> comparator) {
