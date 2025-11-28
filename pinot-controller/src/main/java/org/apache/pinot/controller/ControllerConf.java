@@ -29,6 +29,7 @@ import java.util.Random;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
+import javax.annotation.Nullable;
 import org.apache.commons.configuration2.Configuration;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.helix.controller.rebalancer.strategy.AutoRebalanceStrategy;
@@ -273,6 +274,7 @@ public class ControllerConf extends PinotConfiguration {
     public static final int MIN_INITIAL_DELAY_IN_SECONDS = 120;
     public static final int MAX_INITIAL_DELAY_IN_SECONDS = 300;
     public static final int DEFAULT_SPLIT_COMMIT_TMP_SEGMENT_LIFETIME_SECOND = 60 * 60; // 1 Hour.
+    public static final int DEFAULT_DEEP_STORE_RETRY_UPLOAD_PARALLELISM = 1;
 
     public static final Random RANDOM = new Random();
 
@@ -1167,8 +1169,9 @@ public class ControllerConf extends PinotConfiguration {
         getPeriodicTaskInitialDelayInSeconds());
   }
 
-  public boolean isDeepStoreRetryUploadLLCSegmentEnabled() {
-    return getProperty(ControllerPeriodicTasksConf.ENABLE_DEEP_STORE_RETRY_UPLOAD_LLC_SEGMENT, false);
+  @Nullable
+  public Boolean isDeepStoreRetryUploadLLCSegmentEnabled() {
+    return getProperty(ControllerPeriodicTasksConf.ENABLE_DEEP_STORE_RETRY_UPLOAD_LLC_SEGMENT, Boolean.class);
   }
 
   public boolean isTmpSegmentAsyncDeletionEnabled() {
@@ -1180,7 +1183,8 @@ public class ControllerConf extends PinotConfiguration {
   }
 
   public int getDeepStoreRetryUploadParallelism() {
-    return getProperty(ControllerPeriodicTasksConf.DEEP_STORE_RETRY_UPLOAD_PARALLELISM, 1);
+    return getProperty(ControllerPeriodicTasksConf.DEEP_STORE_RETRY_UPLOAD_PARALLELISM,
+        ControllerPeriodicTasksConf.DEFAULT_DEEP_STORE_RETRY_UPLOAD_PARALLELISM);
   }
 
   public int getTmpSegmentRetentionInSeconds() {
