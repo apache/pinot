@@ -23,6 +23,7 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
 import java.util.stream.Collectors;
+import org.apache.commons.lang3.StringUtils;
 
 
 /**
@@ -61,7 +62,7 @@ public class BasicAuthPrincipal {
   }
 
   public boolean hasTable(String tableName) {
-    return isTableIncluded(tableName) && isTableNotExcluded(tableName);
+    return StringUtils.isEmpty(tableName) || (isTableIncluded(tableName) && isTableNotExcluded(tableName));
   }
 
   private boolean isTableIncluded(String tableName) {
