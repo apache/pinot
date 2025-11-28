@@ -37,7 +37,6 @@ import org.apache.avro.Schema.Field;
 import org.apache.avro.Schema.Type;
 import org.apache.avro.file.DataFileWriter;
 import org.apache.avro.generic.GenericData;
-import org.apache.avro.generic.GenericDatumWriter;
 import org.apache.pinot.segment.spi.index.ForwardIndexConfig;
 import org.apache.pinot.spi.config.table.FieldConfig;
 import org.apache.pinot.spi.config.table.MultiColumnTextIndexConfig;
@@ -230,7 +229,6 @@ public class MultiColumnTextIndicesTest extends CustomDataQueryClusterIntegratio
     }
     assertEquals(skills.size(), NUM_SKILLS);
 
-    File avroFile = new File(_tempDir, "data.avro");
     org.apache.avro.Schema avroSchema = org.apache.avro.Schema.createRecord("myRecord", null, null, false);
     avroSchema.setFields(Arrays.asList(
         new Field(NULLABLE_TEXT_COL, createUnion(create(Type.NULL), create(Type.STRING)), null, null),
@@ -248,8 +246,8 @@ public class MultiColumnTextIndicesTest extends CustomDataQueryClusterIntegratio
 
     List<String> valueList = List.of("value");
 
-    try (DataFileWriter<GenericData.Record> fileWriter = new DataFileWriter<>(new GenericDatumWriter<>(avroSchema))) {
-      fileWriter.create(avroSchema, avroFile);
+    try (AvroFilesAndWriters avroFilesAndWriters = createAvroFilesAndWriters(avroSchema)) {
+      List<DataFileWriter<GenericData.Record>> writers = avroFilesAndWriters.getWriters();
       for (int i = 0; i < NUM_RECORDS; i++) {
         GenericData.Record record = new GenericData.Record(avroSchema);
         record.put(NULLABLE_TEXT_COL, (i & 1) == 1 ? null : "value");
@@ -264,10 +262,10 @@ public class MultiColumnTextIndicesTest extends CustomDataQueryClusterIntegratio
         record.put(DICT_TEXT_COL_CASE_SENSITIVE_MV, List.of(skills.get(i % NUM_SKILLS), "" + i));
         record.put(TEXT_COL_NATIVE, skills.get(i % NUM_SKILLS));
         record.put(TIME_COL, System.currentTimeMillis());
-        fileWriter.append(record);
+        writers.get(i % getNumAvroFiles()).append(record);
       }
+      return avroFilesAndWriters.getAvroFiles();
     }
-    return List.of(avroFile);
   }
 
   @Override

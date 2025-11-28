@@ -34,6 +34,8 @@ import org.apache.pinot.segment.local.utils.GeometryUtils;
 import org.apache.pinot.segment.spi.AggregationFunctionType;
 import org.apache.pinot.spi.utils.ByteArray;
 import org.locationtech.jts.geom.Geometry;
+import org.locationtech.jts.geom.util.GeometryCombiner;
+import org.locationtech.jts.operation.union.UnaryUnionOp;
 
 
 public class StUnionAggregationFunction extends BaseSingleInputAggregationFunction<Geometry, ByteArray> {
@@ -63,8 +65,7 @@ public class StUnionAggregationFunction extends BaseSingleInputAggregationFuncti
     byte[][] bytesArray = blockValSetMap.get(_expression).getBytesValuesSV();
     Geometry geometry = aggregationResultHolder.getResult();
     for (int i = 0; i < length; i++) {
-      Geometry value = GeometrySerializer.deserialize(bytesArray[i]);
-      geometry = geometry == null ? value : geometry.union(value);
+      geometry = union(geometry, GeometrySerializer.deserialize(bytesArray[i]));
     }
     aggregationResultHolder.setValue(geometry);
   }
@@ -77,7 +78,7 @@ public class StUnionAggregationFunction extends BaseSingleInputAggregationFuncti
       int groupKey = groupKeyArray[i];
       Geometry value = GeometrySerializer.deserialize(bytesArray[i]);
       Geometry geometry = groupByResultHolder.getResult(groupKey);
-      groupByResultHolder.setValueForKey(groupKey, geometry == null ? value : geometry.union(value));
+      groupByResultHolder.setValueForKey(groupKey, union(geometry, value));
     }
   }
 
@@ -89,7 +90,7 @@ public class StUnionAggregationFunction extends BaseSingleInputAggregationFuncti
       Geometry value = GeometrySerializer.deserialize(bytesArray[i]);
       for (int groupKey : groupKeysArray[i]) {
         Geometry geometry = groupByResultHolder.getResult(groupKey);
-        groupByResultHolder.setValueForKey(groupKey, geometry == null ? value : geometry.union(value));
+        groupByResultHolder.setValueForKey(groupKey, union(geometry, value));
       }
     }
   }
@@ -108,7 +109,7 @@ public class StUnionAggregationFunction extends BaseSingleInputAggregationFuncti
 
   @Override
   public Geometry merge(Geometry intermediateResult1, Geometry intermediateResult2) {
-    return intermediateResult1.union(intermediateResult2);
+    return union(intermediateResult1, intermediateResult2);
   }
 
   @Override
@@ -135,5 +136,19 @@ public class StUnionAggregationFunction extends BaseSingleInputAggregationFuncti
   @Override
   public ByteArray extractFinalResult(Geometry geometry) {
     return new ByteArray(GeometrySerializer.serialize(geometry));
+  }
+
+  private static Geometry union(Geometry left, Geometry right) {
+    if (left == null) {
+      return right;
+    }
+    if (right == null) {
+      return left;
+    }
+    if (Geometry.TYPENAME_GEOMETRYCOLLECTION.equals(left.getGeometryType())
+        || Geometry.TYPENAME_GEOMETRYCOLLECTION.equals(right.getGeometryType())) {
+      return UnaryUnionOp.union(GeometryCombiner.combine(left, right));
+    }
+    return left.union(right);
   }
 }

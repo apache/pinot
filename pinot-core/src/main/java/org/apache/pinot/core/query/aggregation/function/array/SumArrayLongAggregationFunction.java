@@ -148,7 +148,7 @@ public class SumArrayLongAggregationFunction extends BaseSingleInputAggregationF
 
   @Override
   public DataSchema.ColumnDataType getIntermediateResultColumnType() {
-    return DataSchema.ColumnDataType.LONG_ARRAY;
+    return DataSchema.ColumnDataType.OBJECT;
   }
 
   @Override

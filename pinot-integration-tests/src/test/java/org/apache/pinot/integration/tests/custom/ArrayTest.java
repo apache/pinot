@@ -25,7 +25,6 @@ import java.io.File;
 import java.util.List;
 import org.apache.avro.file.DataFileWriter;
 import org.apache.avro.generic.GenericData;
-import org.apache.avro.generic.GenericDatumWriter;
 import org.apache.commons.lang3.RandomStringUtils;
 import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.Schema;
@@ -234,32 +233,40 @@ public class ArrayTest extends CustomDataQueryClusterIntegrationTest {
 
     query =
         String.format("SELECT "
-            + "listAgg(stringCol, ' | ') WITHIN GROUP (ORDER BY stringCol) "
-            + "FROM %s LIMIT %d", getTableName(), getCountStarResult());
+            + "listAgg(stringCol, ' | ') WITHIN GROUP (ORDER BY stringCol), intCol "
+            + "FROM %s GROUP BY intCol LIMIT %d", getTableName(), getCountStarResult());
     jsonNode = postQuery(query);
     rows = jsonNode.get("resultTable").get("rows");
-    assertEquals(rows.size(), 1);
-    row = rows.get(0);
-    assertEquals(row.size(), 1);
-    String[] splits = row.get(0).asText().split(" \\| ");
-    assertEquals(splits.length, getCountStarResult());
-    for (int i = 1; i < splits.length; i++) {
-      assertTrue(splits[i].compareTo(splits[i - 1]) >= 0);
+    assertEquals(rows.size(), getCountStarResult() / 10);
+    for (int rowId = 0; rowId < getCountStarResult() / 10; rowId++) {
+      row = rows.get(rowId);
+      assertEquals(row.size(), 2);
+      String[] splits = row.get(0).asText().split(" \\| ");
+      if (splits.length > 0) {
+        assertEquals(splits.length, 10);
+        for (int i = 1; i < splits.length; i++) {
+          assertTrue(splits[i].compareTo(splits[i - 1]) >= 0);
+        }
+      }
     }
 
     query =
         String.format("SELECT "
-            + "listAgg(cast(doubleCol AS VARCHAR), ' | ') WITHIN GROUP (ORDER BY doubleCol) "
-            + "FROM %s LIMIT %d", getTableName(), getCountStarResult());
+            + "listAgg(cast(doubleCol AS VARCHAR), ' | ') WITHIN GROUP (ORDER BY doubleCol), stringCol "
+            + "FROM %s GROUP BY stringCol LIMIT %d", getTableName(), getCountStarResult());
     jsonNode = postQuery(query);
     rows = jsonNode.get("resultTable").get("rows");
-    assertEquals(rows.size(), 1);
-    row = rows.get(0);
-    assertEquals(row.size(), 1);
-    splits = row.get(0).asText().split(" \\| ");
-    assertEquals(splits.length, getCountStarResult());
-    for (int i = 1; i < splits.length; i++) {
-      assertTrue(Double.parseDouble(splits[i]) >= Double.parseDouble(splits[i - 1]));
+    assertEquals(rows.size(), getCountStarResult() / 10);
+    for (int rowId = 0; rowId < getCountStarResult() / 10; rowId++) {
+      row = rows.get(rowId);
+      assertEquals(row.size(), 2);
+      String[] splits = row.get(0).asText().split(" \\| ");
+      if (splits.length > 0) {
+        assertEquals(splits.length, 10);
+        for (int i = 1; i < splits.length; i++) {
+          assertTrue(splits[i].compareTo(splits[i - 1]) >= 0);
+        }
+      }
     }
   }
 
@@ -341,32 +348,38 @@ public class ArrayTest extends CustomDataQueryClusterIntegrationTest {
 
     query =
         String.format("SELECT "
-            + "listAgg(DISTINCT stringCol, ' | ') WITHIN GROUP (ORDER BY stringCol) "
-            + "FROM %s LIMIT %d", getTableName(), getCountStarResult());
+            + "listAgg(DISTINCT stringCol, ' | ') WITHIN GROUP (ORDER BY stringCol), intCol "
+            + "FROM %s GROUP BY intCol LIMIT %d", getTableName(), getCountStarResult());
     jsonNode = postQuery(query);
     rows = jsonNode.get("resultTable").get("rows");
-    assertEquals(rows.size(), 1);
-    row = rows.get(0);
-    assertEquals(row.size(), 1);
-    String[] splits = row.get(0).asText().split(" \\| ");
-    assertEquals(splits.length, getCountStarResult() / 10);
-    for (int j = 1; j < splits.length; j++) {
-      assertTrue(splits[j].compareTo(splits[j - 1]) > 0);
+    assertEquals(rows.size(), getCountStarResult() / 10);
+    for (int rowId = 0; rowId < getCountStarResult() / 10; rowId++) {
+      row = rows.get(rowId);
+      assertEquals(row.size(), 2);
+      String[] splits = row.get(0).asText().split(" \\| ");
+      if (splits.length > 1) {
+        assertEquals(splits.length, getCountStarResult());
+        for (int i = 1; i < splits.length; i++) {
+          assertTrue(splits[i].compareTo(splits[i - 1]) >= 0);
+        }
+      }
     }
 
     query =
         String.format("SELECT "
-            + "listAgg(DISTINCT cast(doubleCol AS VARCHAR), ' | ') WITHIN GROUP (ORDER BY doubleCol) "
-            + "FROM %s LIMIT %d", getTableName(), getCountStarResult());
+            + "listAgg(DISTINCT cast(doubleCol AS VARCHAR), ' | ') WITHIN GROUP (ORDER BY doubleCol), stringCol "
+            + "FROM %s GROUP BY stringCol LIMIT %d", getTableName(), getCountStarResult());
     jsonNode = postQuery(query);
     rows = jsonNode.get("resultTable").get("rows");
-    assertEquals(rows.size(), 1);
-    row = rows.get(0);
-    assertEquals(row.size(), 1);
-    splits = row.get(0).asText().split(" \\| ");
-    assertEquals(splits.length, getCountStarResult() / 10);
-    for (int j = 1; j < splits.length; j++) {
-      assertTrue(Double.parseDouble(splits[j]) > Double.parseDouble(splits[j - 1]));
+    assertEquals(rows.size(), getCountStarResult() / 10);
+    for (int rowId = 0; rowId < getCountStarResult() / 10; rowId++) {
+      row = rows.get(rowId);
+      assertEquals(row.size(), 2);
+      String[] splits = row.get(0).asText().split(" \\| ");
+      assertEquals(splits.length, 1);
+      for (int j = 1; j < splits.length; j++) {
+        assertTrue(Double.parseDouble(splits[j]) > Double.parseDouble(splits[j - 1]));
+      }
     }
   }
 
@@ -845,7 +858,7 @@ public class ArrayTest extends CustomDataQueryClusterIntegrationTest {
             + "GENERATE_ARRAY(1, 3, -1) "
             + "FROM %s LIMIT 1", getTableName());
     JsonNode jsonNode = postQuery(query);
-    assertEquals(jsonNode.get("exceptions").size(), 1);
+    assertEquals(jsonNode.get("exceptions").size(), getNumAvroFiles());
   }
 
   @Test(dataProvider = "useV1QueryEngine")
@@ -894,7 +907,7 @@ public class ArrayTest extends CustomDataQueryClusterIntegrationTest {
             + "GENERATE_ARRAY(2147483648, 2147483650, -1) "
             + "FROM %s LIMIT 1", getTableName());
     JsonNode jsonNode = postQuery(query);
-    assertEquals(jsonNode.get("exceptions").size(), 1);
+    assertEquals(jsonNode.get("exceptions").size(), getNumAvroFiles());
   }
 
   @Test(dataProvider = "useV1QueryEngine")
@@ -944,7 +957,7 @@ public class ArrayTest extends CustomDataQueryClusterIntegrationTest {
             + "GENERATE_ARRAY(0.3, 0.1, 1.1) "
             + "FROM %s LIMIT 1", getTableName());
     JsonNode jsonNode = postQuery(query);
-    assertEquals(jsonNode.get("exceptions").size(), 1);
+    assertEquals(jsonNode.get("exceptions").size(), getNumAvroFiles());
   }
 
   @Test(dataProvider = "useV1QueryEngine")
@@ -994,7 +1007,7 @@ public class ArrayTest extends CustomDataQueryClusterIntegrationTest {
             + "GENERATE_ARRAY(CAST(0.3 AS DOUBLE), CAST(0.1 AS DOUBLE), CAST(1.1 AS DOUBLE)) "
             + "FROM %s LIMIT 1", getTableName());
     JsonNode jsonNode = postQuery(query);
-    assertEquals(jsonNode.get("exceptions").size(), 1);
+    assertEquals(jsonNode.get("exceptions").size(), getNumAvroFiles());
   }
 
   @Test(dataProvider = "useBothQueryEngines")
@@ -1139,37 +1152,36 @@ public class ArrayTest extends CustomDataQueryClusterIntegrationTest {
             null, null)
     ));
 
-    // create avro file
-    File avroFile = new File(_tempDir, "data.avro");
     Cache<Integer, GenericData.Record> recordCache = CacheBuilder.newBuilder().build();
-    try (DataFileWriter<GenericData.Record> fileWriter = new DataFileWriter<>(new GenericDatumWriter<>(avroSchema))) {
-      fileWriter.create(avroSchema, avroFile);
+    try (AvroFilesAndWriters avroFilesAndWriters = createAvroFilesAndWriters(avroSchema)) {
+      List<DataFileWriter<GenericData.Record>> writers = avroFilesAndWriters.getWriters();
       for (int i = 0; i < getCountStarResult(); i++) {
         // add avro record to file
         int finalI = i;
-        fileWriter.append(recordCache.get((int) (i % (getCountStarResult() / 10)), () -> {
-              // create avro record
-              GenericData.Record record = new GenericData.Record(avroSchema);
-              record.put(BOOLEAN_COLUMN, finalI % 4 == 0 || finalI % 4 == 1);
-              record.put(BOOLEAN_FROM_INT_COLUMN, finalI % 4 == 0 || finalI % 4 == 1 ? 1 : 0);
-              record.put(BOOLEAN_FROM_STRING_COLUMN, finalI % 4 == 0 || finalI % 4 == 1 ? "true" : "false");
-              record.put(INT_COLUMN, finalI);
-              record.put(LONG_COLUMN, finalI);
-              record.put(FLOAT_COLUMN, finalI + RANDOM.nextFloat());
-              record.put(DOUBLE_COLUMN, finalI + RANDOM.nextDouble());
-              record.put(STRING_COLUMN, RandomStringUtils.random(finalI));
-              record.put(TIMESTAMP_COLUMN, finalI);
-              record.put(GROUP_BY_COLUMN, String.valueOf(finalI % 10));
-              record.put(BOOLEAN_ARRAY_COLUMN, List.of(true, true, false, false));
-              record.put(BOOLEAN_FROM_INT_ARRAY_COLUMN, List.of(1, 1, 0, 0));
-              record.put(BOOLEAN_FROM_STRING_ARRAY_COLUMN, List.of("true", "true", "false", "false"));
-              record.put(LONG_ARRAY_COLUMN, List.of(0, 1, 2, 3));
-              record.put(DOUBLE_ARRAY_COLUMN, List.of(0.0, 0.1, 0.2, 0.3));
-              return record;
-            }
-        ));
+        writers.get(i % getNumAvroFiles())
+            .append(recordCache.get((int) (i % (getCountStarResult() / 10)), () -> {
+                  // create avro record
+                  GenericData.Record record = new GenericData.Record(avroSchema);
+                  record.put(BOOLEAN_COLUMN, finalI % 4 == 0 || finalI % 4 == 1);
+                  record.put(BOOLEAN_FROM_INT_COLUMN, finalI % 4 == 0 || finalI % 4 == 1 ? 1 : 0);
+                  record.put(BOOLEAN_FROM_STRING_COLUMN, finalI % 4 == 0 || finalI % 4 == 1 ? "true" : "false");
+                  record.put(INT_COLUMN, finalI);
+                  record.put(LONG_COLUMN, finalI);
+                  record.put(FLOAT_COLUMN, finalI + RANDOM.nextFloat());
+                  record.put(DOUBLE_COLUMN, finalI + RANDOM.nextDouble());
+                  record.put(STRING_COLUMN, RandomStringUtils.random(finalI));
+                  record.put(TIMESTAMP_COLUMN, finalI);
+                  record.put(GROUP_BY_COLUMN, String.valueOf(finalI % 10));
+                  record.put(BOOLEAN_ARRAY_COLUMN, List.of(true, true, false, false));
+                  record.put(BOOLEAN_FROM_INT_ARRAY_COLUMN, List.of(1, 1, 0, 0));
+                  record.put(BOOLEAN_FROM_STRING_ARRAY_COLUMN, List.of("true", "true", "false", "false"));
+                  record.put(LONG_ARRAY_COLUMN, List.of(0, 1, 2, 3));
+                  record.put(DOUBLE_ARRAY_COLUMN, List.of(0.0, 0.1, 0.2, 0.3));
+                  return record;
+                }
+            ));
       }
+      return avroFilesAndWriters.getAvroFiles();
     }
-    return List.of(avroFile);
   }
 }
