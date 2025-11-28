@@ -2120,6 +2120,7 @@ public class PinotLLCRealtimeSegmentManager {
       LOGGER.info("Updating CRC in ZK metadata for segment: {} from: {} to: {}", segmentName, currentMetadata.getCrc(),
           uploadedMetadata.getCrc());
       currentMetadata.setCrc(uploadedMetadata.getCrc());
+      currentMetadata.setDataCrc(uploadedMetadata.getDataCrc());
     }
     moveSegmentAndSetDownloadUrl(rawTableName, segmentName, uploadedMetadata.getDownloadUrl(), pinotFS,
         currentMetadata);
@@ -2138,9 +2139,14 @@ public class PinotLLCRealtimeSegmentManager {
       throws Exception {
     long currentCrc = currentMetadata.getCrc();
     long newCrc = response.getCrc();
+    long newDataCrc = response.getDataCrc();
     if (currentCrc != newCrc) {
-      LOGGER.info("Updating CRC in ZK metadata for segment: {} from: {} to: {}", segmentName, currentCrc, newCrc);
+      LOGGER.info("Updating CRC and data CRC in ZK metadata for segment: {} "
+              + "[oldCRC: {} newCRC: {}][oldDataCRC: {} newDataCRC: {}]",
+          segmentName, currentCrc, newCrc, currentMetadata.getDataCrc(), newDataCrc);
       currentMetadata.setCrc(newCrc);
+      // since data CRC is a subset of CRC, we update data CRC too when CRC changes
+      currentMetadata.setDataCrc(newDataCrc);
     }
     moveSegmentAndSetDownloadUrl(rawTableName, segmentName, response.getDownloadUrl(), pinotFS, currentMetadata);
   }

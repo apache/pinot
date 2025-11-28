@@ -408,6 +408,7 @@ public class MemoryEstimator {
     segmentZKMetadata.setCreationTime(segmentMetadata.getIndexCreationTime());
     segmentZKMetadata.setTotalDocs(totalDocs);
     segmentZKMetadata.setCrc(Long.parseLong(segmentMetadata.getCrc()));
+    segmentZKMetadata.setDataCrc(Long.parseLong(segmentMetadata.getDataCrc()));
     return segmentZKMetadata;
   }
 

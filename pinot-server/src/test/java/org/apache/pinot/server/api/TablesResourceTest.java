@@ -395,7 +395,7 @@ public class TablesResourceTest extends BaseResourceTest {
     Assert.assertEquals(validDocIdsMetadata.get("totalInvalidDocs").asInt(), 199992);
     Assert.assertEquals(validDocIdsMetadata.get("segmentCrc").asText(), "187068486");
     Assert.assertEquals(validDocIdsMetadata.get("validDocIdsType").asText(), "SNAPSHOT");
-    Assert.assertEquals(validDocIdsMetadata.get("segmentSizeInBytes").asLong(), 4514723);
+    Assert.assertEquals(validDocIdsMetadata.get("segmentSizeInBytes").asLong(), 4514731);
     Assert.assertTrue(validDocIdsMetadata.has("segmentCreationTimeMillis"));
     Assert.assertTrue(validDocIdsMetadata.get("segmentCreationTimeMillis").asLong() > 0);
 
@@ -434,7 +434,7 @@ public class TablesResourceTest extends BaseResourceTest {
     Assert.assertEquals(validDocIdsMetadata.get("totalInvalidDocs").asInt(), 199992);
     Assert.assertEquals(validDocIdsMetadata.get("segmentCrc").asText(), "187068486");
     Assert.assertEquals(validDocIdsMetadata.get("validDocIdsType").asText(), "SNAPSHOT_WITH_DELETE");
-    Assert.assertEquals(validDocIdsMetadata.get("segmentSizeInBytes").asLong(), 4514723);
+    Assert.assertEquals(validDocIdsMetadata.get("segmentSizeInBytes").asLong(), 4514731);
     Assert.assertTrue(validDocIdsMetadata.has("segmentCreationTimeMillis"));
     Assert.assertTrue(validDocIdsMetadata.get("segmentCreationTimeMillis").asLong() > 0);
 
