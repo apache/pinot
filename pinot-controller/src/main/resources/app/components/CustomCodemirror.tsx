@@ -35,7 +35,7 @@ declare global {
   }
 }
 
-window.jsonlint = require('jsonlint');
+window.jsonlint = require('@prantlf/jsonlint');
 
 type Props = {
   data: Object,
