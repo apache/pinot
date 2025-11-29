@@ -114,13 +114,29 @@ public class PinotRealtimeTableResource {
   public Response pauseConsumption(
       @ApiParam(value = "Name of the table", required = true) @PathParam("tableName") String tableName,
       @ApiParam(value = "Comment on pausing the consumption") @QueryParam("comment") String comment,
+      @ApiParam(value = "Max number of consuming segments to commit at once")
+      @QueryParam("batchSize") @DefaultValue(ForceCommitBatchConfig.DEFAULT_BATCH_SIZE + "") int batchSize,
+      @ApiParam(value = "How often to check whether the current batch of segments have been successfully committed or"
+          + " not")
+      @QueryParam("batchStatusCheckIntervalSec")
+      @DefaultValue(ForceCommitBatchConfig.DEFAULT_STATUS_CHECK_INTERVAL_SEC + "") int batchStatusCheckIntervalSec,
+      @ApiParam(value = "Timeout based on which the controller will stop checking the forceCommit status of the batch"
+          + " of segments and throw an exception")
+      @QueryParam("batchStatusCheckTimeoutSec")
+      @DefaultValue(ForceCommitBatchConfig.DEFAULT_STATUS_CHECK_TIMEOUT_SEC + "") int batchStatusCheckTimeoutSec,
       @Context HttpHeaders headers) {
     tableName = DatabaseUtils.translateTableName(tableName, headers);
     String tableNameWithType = TableNameBuilder.REALTIME.tableNameWithType(tableName);
     validateTable(tableNameWithType);
+    ForceCommitBatchConfig batchConfig;
+    try {
+      batchConfig = ForceCommitBatchConfig.of(batchSize, batchStatusCheckIntervalSec, batchStatusCheckTimeoutSec);
+    } catch (Exception e) {
+      throw new ControllerApplicationException(LOGGER, "Invalid batch config", Response.Status.BAD_REQUEST, e);
+    }
     try {
       return Response.ok(_pinotLLCRealtimeSegmentManager.pauseConsumption(tableNameWithType,
-          PauseState.ReasonCode.ADMINISTRATIVE, comment)).build();
+          PauseState.ReasonCode.ADMINISTRATIVE, comment, batchConfig)).build();
     } catch (Exception e) {
       throw new ControllerApplicationException(LOGGER, e.getMessage(), Response.Status.INTERNAL_SERVER_ERROR, e);
     }
