@@ -67,6 +67,12 @@ public class DatabaseUtils {
       case 2:
         Preconditions.checkArgument(!tableSplit[1].isEmpty(), "Invalid table name '%s'", tableName);
         String databasePrefix = tableSplit[0];
+        // Allow system tables to bypass database prefix validation so they can be queried regardless of header.
+        // System tables are globally accessible and not subject to database-level access controls, so skip validation.
+        // Ensure system tables do not expose sensitive information because this bypass is intentional.
+        if ("system".equalsIgnoreCase(databasePrefix)) {
+          return tableName;
+        }
         if (!StringUtils.isEmpty(databaseName) && (ignoreCase || !databaseName.equals(databasePrefix))
             && (!ignoreCase || !databaseName.equalsIgnoreCase(databasePrefix))) {
           throw new DatabaseConflictException("Database name '" + databasePrefix

@@ -27,6 +27,7 @@ import org.apache.pinot.common.failuredetector.FailureDetector;
 import org.apache.pinot.common.metrics.BrokerMetrics;
 import org.apache.pinot.common.response.BrokerResponse;
 import org.apache.pinot.common.response.broker.ResultTable;
+import org.apache.pinot.common.systemtable.SystemTableRegistry;
 import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.core.transport.server.routing.stats.ServerRoutingStatsManager;
 import org.apache.pinot.spi.accounting.ThreadAccountantUtils;
@@ -172,8 +173,8 @@ public class LiteralOnlyBrokerRequestTest {
       throws Exception {
     SingleConnectionBrokerRequestHandler requestHandler =
         new SingleConnectionBrokerRequestHandler(new PinotConfiguration(), "testBrokerId",
-            new BrokerRequestIdGenerator(), null, ACCESS_CONTROL_FACTORY, null, null, null, null,
-            mock(ServerRoutingStatsManager.class), mock(FailureDetector.class),
+            new BrokerRequestIdGenerator(), null, ACCESS_CONTROL_FACTORY, null, null, new SystemTableRegistry(), null,
+            null, mock(ServerRoutingStatsManager.class), mock(FailureDetector.class),
             ThreadAccountantUtils.getNoOpAccountant());
 
     long randNum = RANDOM.nextLong();
@@ -198,8 +199,8 @@ public class LiteralOnlyBrokerRequestTest {
       throws Exception {
     SingleConnectionBrokerRequestHandler requestHandler =
         new SingleConnectionBrokerRequestHandler(new PinotConfiguration(), "testBrokerId",
-            new BrokerRequestIdGenerator(), null, ACCESS_CONTROL_FACTORY, null, null, null, null,
-            mock(ServerRoutingStatsManager.class), mock(FailureDetector.class),
+            new BrokerRequestIdGenerator(), null, ACCESS_CONTROL_FACTORY, null, null, new SystemTableRegistry(), null,
+            null, mock(ServerRoutingStatsManager.class), mock(FailureDetector.class),
             ThreadAccountantUtils.getNoOpAccountant());
     long currentTsMin = System.currentTimeMillis();
     BrokerResponse brokerResponse = requestHandler.handleRequest(
@@ -354,8 +355,8 @@ public class LiteralOnlyBrokerRequestTest {
       throws Exception {
     SingleConnectionBrokerRequestHandler requestHandler =
         new SingleConnectionBrokerRequestHandler(new PinotConfiguration(), "testBrokerId",
-            new BrokerRequestIdGenerator(), null, ACCESS_CONTROL_FACTORY, null, null, null, null,
-            mock(ServerRoutingStatsManager.class), mock(FailureDetector.class),
+            new BrokerRequestIdGenerator(), null, ACCESS_CONTROL_FACTORY, null, null, new SystemTableRegistry(), null,
+            null, mock(ServerRoutingStatsManager.class), mock(FailureDetector.class),
             ThreadAccountantUtils.getNoOpAccountant());
 
     // Test 1: select constant
