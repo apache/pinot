@@ -20,6 +20,8 @@ package org.apache.pinot.client.admin;
 
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.JsonNode;
+import java.net.URLEncoder;
+import java.nio.charset.StandardCharsets;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -35,6 +37,10 @@ public class PinotSegmentAdminClient {
   private final PinotAdminTransport _transport;
   private final String _controllerAddress;
   private final Map<String, String> _headers;
+
+  private static String encodePathSegment(String segment) {
+    return URLEncoder.encode(segment, StandardCharsets.UTF_8).replace("+", "%20");
+  }
 
   public PinotSegmentAdminClient(PinotAdminTransport transport, String controllerAddress,
       Map<String, String> headers) {
@@ -55,7 +61,8 @@ public class PinotSegmentAdminClient {
       throws PinotAdminException {
     Map<String, String> queryParams = Map.of("excludeReplacedSegments", String.valueOf(excludeReplacedSegments));
 
-    JsonNode response = _transport.executeGet(_controllerAddress, "/segments/" + tableName, queryParams, _headers);
+    JsonNode response =
+        _transport.executeGet(_controllerAddress, "/segments/" + encodePathSegment(tableName), queryParams, _headers);
     return _transport.parseStringArray(response, "segments");
   }
 
@@ -81,7 +88,8 @@ public class PinotSegmentAdminClient {
   public String getServerToSegmentsMap(String tableName)
       throws PinotAdminException {
     JsonNode response =
-        _transport.executeGet(_controllerAddress, "/segments/" + tableName + "/servers", null, _headers);
+        _transport.executeGet(_controllerAddress, "/segments/" + encodePathSegment(tableName) + "/servers", null,
+            _headers);
     return response.toString();
   }
 
@@ -95,7 +103,8 @@ public class PinotSegmentAdminClient {
   public String listSegmentLineage(String tableName)
       throws PinotAdminException {
     JsonNode response =
-        _transport.executeGet(_controllerAddress, "/segments/" + tableName + "/lineage", null, _headers);
+        _transport.executeGet(_controllerAddress, "/segments/" + encodePathSegment(tableName) + "/lineage", null,
+            _headers);
     return response.toString();
   }
 
@@ -108,7 +117,8 @@ public class PinotSegmentAdminClient {
    */
   public Map<String, String> getSegmentToCrcMap(String tableName)
       throws PinotAdminException {
-    JsonNode response = _transport.executeGet(_controllerAddress, "/segments/" + tableName + "/crc", null, _headers);
+    JsonNode response =
+        _transport.executeGet(_controllerAddress, "/segments/" + encodePathSegment(tableName) + "/crc", null, _headers);
     return PinotAdminTransport.getObjectMapper().convertValue(response.get("segmentCrcMap"),
         new TypeReference<Map<String, String>>() {
         });
@@ -132,7 +142,8 @@ public class PinotSegmentAdminClient {
     }
 
     JsonNode response =
-        _transport.executeGet(_controllerAddress, "/segments/" + tableName + "/" + segmentName + "/metadata",
+        _transport.executeGet(_controllerAddress, "/segments/" + encodePathSegment(tableName) + "/"
+                + encodePathSegment(segmentName) + "/metadata",
             queryParams, _headers);
     return PinotAdminTransport.getObjectMapper().convertValue(response,
         new TypeReference<Map<String, Object>>() {
@@ -156,7 +167,8 @@ public class PinotSegmentAdminClient {
     }
 
     JsonNode response =
-        _transport.executePost(_controllerAddress, "/segments/" + tableNameWithType + "/" + segmentName + "/reset",
+        _transport.executePost(_controllerAddress, "/segments/" + encodePathSegment(tableNameWithType) + "/"
+                + encodePathSegment(segmentName) + "/reset",
             null, queryParams, _headers);
     return response.toString();
   }
@@ -173,8 +185,9 @@ public class PinotSegmentAdminClient {
       throws PinotAdminException {
     Map<String, String> queryParams = Map.of("errorSegmentsOnly", String.valueOf(errorSegmentsOnly));
 
-    JsonNode response = _transport.executePost(_controllerAddress, "/segments/" + tableNameWithType + "/reset",
-        null, queryParams, _headers);
+    JsonNode response =
+        _transport.executePost(_controllerAddress, "/segments/" + encodePathSegment(tableNameWithType) + "/reset",
+            null, queryParams, _headers);
     return response.toString();
   }
 
@@ -194,8 +207,8 @@ public class PinotSegmentAdminClient {
       queryParams.put("retention", retentionPeriod);
     }
 
-    JsonNode response = _transport.executeDelete(_controllerAddress, "/segments/" + tableName + "/" + segmentName,
-        queryParams, _headers);
+    JsonNode response = _transport.executeDelete(_controllerAddress,
+        "/segments/" + encodePathSegment(tableName) + "/" + encodePathSegment(segmentName), queryParams, _headers);
     return response.toString();
   }
 
@@ -219,7 +232,7 @@ public class PinotSegmentAdminClient {
       queryParams.put("retention", retentionPeriod);
     }
 
-    JsonNode response = _transport.executeDelete(_controllerAddress, "/segments/" + tableName,
+    JsonNode response = _transport.executeDelete(_controllerAddress, "/segments/" + encodePathSegment(tableName),
         queryParams, _headers);
     return response.toString();
   }
@@ -234,7 +247,8 @@ public class PinotSegmentAdminClient {
    */
   public String deleteSegments(String tableName, String segmentDeleteRequest)
       throws PinotAdminException {
-    JsonNode response = _transport.executePost(_controllerAddress, "/segments/" + tableName + "/delete",
+    JsonNode response = _transport.executePost(_controllerAddress, "/segments/" + encodePathSegment(tableName)
+            + "/delete",
         segmentDeleteRequest, null, _headers);
     return response.toString();
   }
