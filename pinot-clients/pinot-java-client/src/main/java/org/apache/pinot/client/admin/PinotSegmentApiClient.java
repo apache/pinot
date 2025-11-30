@@ -59,13 +59,15 @@ public class PinotSegmentApiClient implements Closeable {
     queryParams.put(QueryParameters.END_TIMESTAMP, String.valueOf(endTimestamp));
     queryParams.put(QueryParameters.EXCLUDE_OVERLAPPING, String.valueOf(excludeOverlapping));
     queryParams.put(QueryParameters.TYPE, tableType);
-    return _transport.executeGet(_controllerAddress, SEGMENT_PATH + "/" + rawTableName + SELECT_PATH,
-        queryParams, _headers);
+    return _transport.executeGet(_controllerAddress,
+        SEGMENT_PATH + "/" + PinotAdminPathUtils.encodePathSegment(rawTableName) + SELECT_PATH, queryParams, _headers);
   }
 
   public JsonNode getSegmentMetadata(String tableNameWithType, String segmentName) throws PinotAdminException {
     return _transport.executeGet(_controllerAddress,
-        SEGMENT_PATH + "/" + tableNameWithType + "/" + segmentName + METADATA_PATH, null, _headers);
+        SEGMENT_PATH + "/" + PinotAdminPathUtils.encodePathSegment(tableNameWithType) + "/"
+            + PinotAdminPathUtils.encodePathSegment(segmentName) + METADATA_PATH,
+        null, _headers);
   }
 
   @Override

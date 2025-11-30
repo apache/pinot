@@ -60,6 +60,15 @@ public class DatabaseUtilsTest {
     error(DEFAULT_DATABASE_NAME + "." + FULLY_QUALIFIED_TABLE_NAME, DEFAULT_DATABASE_NAME);
   }
 
+  @Test
+  public void systemTableDatabaseBypassTest() {
+    assertEquals(DatabaseUtils.translateTableName("system.tables", DATABASE_NAME), "system.tables");
+    assertEquals(DatabaseUtils.translateTableName("system.tables", DEFAULT_DATABASE_NAME), "system.tables");
+    assertEquals(DatabaseUtils.translateTableName("system.tables", (String) null), "system.tables");
+    assertEquals(DatabaseUtils.translateTableName("system.tables", DATABASE_NAME, true), "system.tables");
+    assertEquals(DatabaseUtils.translateTableName("SYSTEM.tables", DATABASE_NAME, true), "SYSTEM.tables");
+  }
+
   private void check(String tableName, String databaseName, String fqn) {
     check(tableName, databaseName, fqn, false);
   }
