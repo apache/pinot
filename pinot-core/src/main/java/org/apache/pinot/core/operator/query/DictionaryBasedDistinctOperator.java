@@ -63,9 +63,10 @@ public class DictionaryBasedDistinctOperator extends BaseOperator<DistinctResult
     _queryContext = queryContext;
     if (queryContext.getQueryOptions() != null) {
       Integer maxRows = QueryOptionsUtils.getMaxRowsInDistinct(queryContext.getQueryOptions());
-      _maxRowsInDistinct = maxRows != null ? maxRows : Integer.MAX_VALUE;
+      int limit = queryContext.getLimit();
+      _maxRowsInDistinct = maxRows != null ? Math.min(limit, maxRows) : limit;
     } else {
-      _maxRowsInDistinct = Integer.MAX_VALUE;
+      _maxRowsInDistinct = queryContext.getLimit();
     }
   }
 

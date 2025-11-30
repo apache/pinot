@@ -23,6 +23,7 @@ import java.io.File;
 import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 import java.util.stream.Collectors;
 import java.util.stream.IntStream;
@@ -30,6 +31,7 @@ import org.apache.avro.SchemaBuilder;
 import org.apache.avro.file.DataFileWriter;
 import org.apache.avro.generic.GenericData;
 import org.apache.avro.generic.GenericDatumWriter;
+import org.apache.pinot.integration.tests.ClusterIntegrationTestUtils;
 import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.utils.CommonConstants.Broker.Request.QueryOptionKey;
@@ -50,7 +52,8 @@ public class DistinctQueriesTest extends CustomDataQueryClusterIntegrationTest {
   private static final String MV_INT_COL = "intArrayCol";
   private static final String MV_STRING_COL = "stringArrayCol";
 
-  private static final int NUM_ROWS = 24_000;
+  // Keep the dataset modest to avoid slowing down the suite while still exercising early termination.
+  private static final int NUM_ROWS_PER_SEGMENT = 50_000;
   private static final int NUM_INT_VALUES = 5;
   private static final int NUM_LONG_VALUES = 5;
   private static final int NUM_DOUBLE_VALUES = 3;
@@ -62,7 +65,7 @@ public class DistinctQueriesTest extends CustomDataQueryClusterIntegrationTest {
 
   @Override
   protected long getCountStarResult() {
-    return NUM_ROWS;
+    return NUM_ROWS_PER_SEGMENT * 2;
   }
 
   @Override
@@ -98,7 +101,7 @@ public class DistinctQueriesTest extends CustomDataQueryClusterIntegrationTest {
     File avroFile = new File(_tempDir, "distinct-data.avro");
     try (DataFileWriter<GenericData.Record> writer = new DataFileWriter<>(new GenericDatumWriter<>(avroSchema))) {
       writer.create(avroSchema, avroFile);
-      for (int i = 0; i < NUM_ROWS; i++) {
+      for (int i = 0; i < NUM_ROWS_PER_SEGMENT; i++) {
         GenericData.Record record = new GenericData.Record(avroSchema);
         record.put(INT_COL, getIntValue(i));
         record.put(LONG_COL, getLongValue(i));
@@ -109,7 +112,21 @@ public class DistinctQueriesTest extends CustomDataQueryClusterIntegrationTest {
         writer.append(record);
       }
     }
-    return List.of(avroFile);
+    File avroFile1 = new File(_tempDir, "distinct-data-1.avro");
+    try (DataFileWriter<GenericData.Record> writer = new DataFileWriter<>(new GenericDatumWriter<>(avroSchema))) {
+      writer.create(avroSchema, avroFile1);
+      for (int i = 0; i < NUM_ROWS_PER_SEGMENT; i++) {
+        GenericData.Record record = new GenericData.Record(avroSchema);
+        record.put(INT_COL, getIntValue(i));
+        record.put(LONG_COL, getLongValue(i));
+        record.put(DOUBLE_COL, getDoubleValue(i));
+        record.put(STRING_COL, getStringValue(i));
+        record.put(MV_INT_COL, List.of(getMultiValueBase(i), getMultiValueBase(i) + MV_OFFSET));
+        record.put(MV_STRING_COL, List.of(getStringValue(i), getStringValue(i + MV_OFFSET)));
+        writer.append(record);
+      }
+    }
+    return List.of(avroFile, avroFile1);
   }
 
   @Override
@@ -181,24 +198,36 @@ public class DistinctQueriesTest extends CustomDataQueryClusterIntegrationTest {
   public void testMaxRowsInDistinctEarlyTermination(boolean useMultiStageQueryEngine)
       throws Exception {
     setUseMultiStageQueryEngine(useMultiStageQueryEngine);
-    String sql = String.format("SET \"%s\" = 3; SELECT DISTINCT %s FROM %s WHERE rand() < 1.0 LIMIT 100",
-        QueryOptionKey.MAX_ROWS_IN_DISTINCT, STRING_COL, getTableName());
-    JsonNode response = postQuery(sql);
-    assertTrue(response.get("maxRowsInDistinctReached").asBoolean(), "expected maxRowsInDistinctReached flag");
-    assertTrue(response.get("partialResult").asBoolean(), "partialResult should be true");
-    assertTrue(response.get("resultTable").get("rows").size() <= 3, "row count should honor threshold");
+    String sql = String.format("SELECT DISTINCT %s FROM %s WHERE rand() < 1.0 LIMIT 100", STRING_COL, getTableName());
+    JsonNode response =
+        postQueryWithOptions(sql, useMultiStageQueryEngine, Map.of(QueryOptionKey.MAX_ROWS_IN_DISTINCT, "3"));
+    assertTrue(response.path("maxRowsInDistinctReached").asBoolean(false),
+        "expected maxRowsInDistinctReached flag. Response: " + response);
+    assertTrue(response.path("partialResult").asBoolean(false), "partialResult should be true. Response: " + response);
+    assertEquals(response.get("resultTable").get("rows").size(), 3, "row count should honor threshold");
+    assertEquals(response.path("numDocsScanned").asLong() % 3, 0,
+        "expected 3 or 6 rows scanned when budget is exhausted. Response: " + response);
   }
 
   @Test(dataProvider = "useBothQueryEngines")
   public void testNoChangeEarlyTermination(boolean useMultiStageQueryEngine)
       throws Exception {
     setUseMultiStageQueryEngine(useMultiStageQueryEngine);
-    String sql = String.format("SET \"%s\" = 5000; SELECT DISTINCT %s FROM %s WHERE rand() < 1.0 LIMIT 100",
-        QueryOptionKey.NUM_ROWS_WITHOUT_CHANGE_IN_DISTINCT, INT_COL, getTableName());
-    JsonNode response = postQuery(sql);
-    assertTrue(response.get("numRowsWithoutChangeInDistinctReached").asBoolean(),
-        "expected no-change flag to be set");
-    assertTrue(response.get("partialResult").asBoolean(), "partialResult should be true");
+    String sql = String.format("SELECT DISTINCT %s FROM %s WHERE rand() < 1.0 LIMIT 100", INT_COL, getTableName());
+    JsonNode response = postQueryWithOptions(sql, useMultiStageQueryEngine,
+        Map.of(QueryOptionKey.NUM_ROWS_WITHOUT_CHANGE_IN_DISTINCT, "1000"));
+    assertTrue(response.path("numRowsWithoutChangeInDistinctReached").asBoolean(false),
+        "expected no-change flag to be set. Response: " + response);
+    assertTrue(response.path("partialResult").asBoolean(false), "partialResult should be true. Response: " + response);
+  }
+
+  private JsonNode postQueryWithOptions(String sql, boolean useMultiStageQueryEngine, Map<String, String> queryOptions)
+      throws Exception {
+    String optionsString =
+        queryOptions.entrySet().stream().map(e -> e.getKey() + "=" + e.getValue()).collect(Collectors.joining(";"));
+    return postQuery(sql,
+        ClusterIntegrationTestUtils.getBrokerQueryApiUrl(getBrokerBaseApiUrl(), useMultiStageQueryEngine), null,
+        Map.of("queryOptions", optionsString));
   }
 
   private <T> void assertDistinctColumnValues(String column, List<T> expected,

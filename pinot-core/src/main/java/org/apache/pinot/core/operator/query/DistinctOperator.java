@@ -90,12 +90,8 @@ public class DistinctOperator extends BaseOperator<DistinctResultsBlock> {
       int distinctCountBeforeBlock = enforceNoChangeLimit ? executor.getNumDistinctRowsCollected() : -1;
       boolean satisfied = executor.process(valueBlock);
       int rowsRemainingAfter = executor.getRemainingRowsToProcess();
-      int docsProcessedForLimit;
-      if (enforceRowLimit && rowsRemainingBefore != UNLIMITED_ROWS && rowsRemainingAfter != UNLIMITED_ROWS) {
-        docsProcessedForLimit = Math.max(0, rowsRemainingBefore - rowsRemainingAfter);
-      } else {
-        docsProcessedForLimit = valueBlock.getNumDocs();
-      }
+      int docsProcessedForLimit =
+          enforceRowLimit ? Math.max(0, rowsRemainingBefore - rowsRemainingAfter) : valueBlock.getNumDocs();
       _numDocsScanned += docsProcessedForLimit;
       if (enforceRowLimit && _numDocsScanned >= _maxRowsInDistinct) {
         _hitMaxRowsLimit = true;

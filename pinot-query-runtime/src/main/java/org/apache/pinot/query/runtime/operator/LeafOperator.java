@@ -340,21 +340,13 @@ public class LeafOperator extends MultiStageOperator {
           _statMap.merge(StatKey.NUM_GROUPS_WARNING_LIMIT_REACHED, Boolean.parseBoolean(entry.getValue()));
           break;
         case EARLY_TERMINATION_REASON:
-          try {
-            BaseResultsBlock.EarlyTerminationReason reason =
-                BaseResultsBlock.EarlyTerminationReason.valueOf(entry.getValue());
-            switch (reason) {
-              case DISTINCT_MAX_ROWS:
-                _statMap.merge(StatKey.MAX_ROWS_IN_DISTINCT_REACHED, true);
-                break;
-              case DISTINCT_NO_NEW_VALUES:
-                _statMap.merge(StatKey.NUM_ROWS_WITHOUT_CHANGE_IN_DISTINCT_REACHED, true);
-                break;
-              default:
-                break;
-            }
-          } catch (IllegalArgumentException e) {
-            LOGGER.warn("Unknown distinct early termination reason: {}", entry.getValue());
+          String reason = entry.getValue();
+          if (BaseResultsBlock.EarlyTerminationReason.DISTINCT_MAX_ROWS.name().equals(reason)) {
+            _statMap.merge(StatKey.MAX_ROWS_IN_DISTINCT_REACHED, true);
+          } else if (BaseResultsBlock.EarlyTerminationReason.DISTINCT_NO_NEW_VALUES.name().equals(reason)) {
+            _statMap.merge(StatKey.NUM_ROWS_WITHOUT_CHANGE_IN_DISTINCT_REACHED, true);
+          } else {
+            LOGGER.warn("Unknown distinct early termination reason: {}", reason);
           }
           break;
         case TIME_USED_MS:

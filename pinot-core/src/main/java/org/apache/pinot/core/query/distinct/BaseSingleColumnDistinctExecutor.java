@@ -30,9 +30,11 @@ import org.roaringbitmap.RoaringBitmap;
  * Base implementation of {@link DistinctExecutor} for single column.
  */
 public abstract class BaseSingleColumnDistinctExecutor<T extends DistinctTable, S, M> implements DistinctExecutor {
+  private static final int UNLIMITED_ROWS = Integer.MAX_VALUE;
+
   protected final ExpressionContext _expression;
   protected final T _distinctTable;
-  private int _rowsRemaining = Integer.MAX_VALUE;
+  private int _rowsRemaining = UNLIMITED_ROWS;
 
   public BaseSingleColumnDistinctExecutor(ExpressionContext expression, T distinctTable) {
     _expression = expression;
@@ -64,21 +66,26 @@ public abstract class BaseSingleColumnDistinctExecutor<T extends DistinctTable, 
   }
 
   private boolean processWithNull(BlockValSet blockValueSet, int numDocs, RoaringBitmap nullBitmap) {
+    int limitedNumDocs = clampToRemaining(0, numDocs);
+    if (limitedNumDocs <= 0) {
+      return true;
+    }
     _distinctTable.addNull();
     S values = getValuesSV(blockValueSet);
     PeekableIntIterator nullIterator = nullBitmap.getIntIterator();
     int prev = 0;
-    while (nullIterator.hasNext()) {
+    while (nullIterator.hasNext() && prev < limitedNumDocs) {
       int nextNull = nullIterator.next();
       if (nextNull > prev) {
-        if (processSVRange(values, prev, nextNull)) {
+        int rangeEnd = Math.min(nextNull, limitedNumDocs);
+        if (processSVRange(values, prev, rangeEnd)) {
           return true;
         }
       }
       prev = nextNull + 1;
     }
-    if (prev < numDocs) {
-      return processSVRange(values, prev, numDocs);
+    if (prev < limitedNumDocs) {
+      return processSVRange(values, prev, limitedNumDocs);
     }
     return false;
   }
@@ -158,7 +165,7 @@ public abstract class BaseSingleColumnDistinctExecutor<T extends DistinctTable, 
   }
 
   private int clampToRemaining(int from, int to) {
-    if (_rowsRemaining == Integer.MAX_VALUE) {
+    if (_rowsRemaining == UNLIMITED_ROWS) {
       return to;
     }
     if (_rowsRemaining <= 0) {
@@ -168,7 +175,7 @@ public abstract class BaseSingleColumnDistinctExecutor<T extends DistinctTable, 
   }
 
   private void consumeRows(int count) {
-    if (_rowsRemaining != Integer.MAX_VALUE) {
+    if (_rowsRemaining != UNLIMITED_ROWS) {
       _rowsRemaining -= count;
     }
   }
