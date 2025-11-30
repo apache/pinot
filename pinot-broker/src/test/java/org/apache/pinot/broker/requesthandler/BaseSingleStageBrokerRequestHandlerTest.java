@@ -34,6 +34,7 @@ import org.apache.pinot.common.request.BrokerRequest;
 import org.apache.pinot.common.request.Expression;
 import org.apache.pinot.common.request.PinotQuery;
 import org.apache.pinot.common.response.broker.BrokerResponseNative;
+import org.apache.pinot.common.systemtable.SystemTableRegistry;
 import org.apache.pinot.core.routing.RoutingTable;
 import org.apache.pinot.core.routing.SegmentsToQuery;
 import org.apache.pinot.core.routing.TableRouteInfo;
@@ -181,7 +182,7 @@ public class BaseSingleStageBrokerRequestHandlerTest {
     BrokerQueryEventListenerFactory.init(config);
     BaseSingleStageBrokerRequestHandler requestHandler =
         new BaseSingleStageBrokerRequestHandler(config, "testBrokerId", new BrokerRequestIdGenerator(), routingManager,
-            new AllowAllAccessControlFactory(), queryQuotaManager, tableCache,
+            new AllowAllAccessControlFactory(), queryQuotaManager, tableCache, new SystemTableRegistry(),
             ThreadAccountantUtils.getNoOpAccountant()) {
           @Override
           public void start() {
