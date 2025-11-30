@@ -192,24 +192,24 @@ public class BaseSingleStageBrokerRequestHandlerTest {
         new BaseSingleStageBrokerRequestHandler(config, "testBrokerId", new BrokerRequestIdGenerator(), routingManager,
             new AllowAllAccessControlFactory(), queryQuotaManager, tableCache,
             ThreadAccountantUtils.getNoOpAccountant()) {
-          @Override
-          public void start() {
-          }
+              @Override
+              public void start() {
+              }
 
-          @Override
-          public void shutDown() {
-          }
+              @Override
+              public void shutDown() {
+              }
 
-          @Override
-          protected BrokerResponseNative processBrokerRequest(long requestId, BrokerRequest originalBrokerRequest,
-              BrokerRequest serverBrokerRequest, TableRouteInfo route, long timeoutMs, ServerStats serverStats,
-              RequestContext requestContext)
-              throws Exception {
-            testRequestId[0] = requestId;
-            latch.await();
-            return null;
-          }
-        };
+              @Override
+              protected BrokerResponseNative processBrokerRequest(long requestId, BrokerRequest originalBrokerRequest,
+                  BrokerRequest serverBrokerRequest, TableRouteInfo route, long timeoutMs, ServerStats serverStats,
+                  RequestContext requestContext)
+                  throws Exception {
+                testRequestId[0] = requestId;
+                latch.await();
+                return null;
+              }
+            };
     CompletableFuture.runAsync(() -> {
       try {
         requestHandler.handleRequest(String.format("select * from %s limit 10", tableName));

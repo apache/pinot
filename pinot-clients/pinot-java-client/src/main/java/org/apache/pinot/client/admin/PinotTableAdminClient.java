@@ -186,6 +186,23 @@ public class PinotTableAdminClient {
   }
 
   /**
+   * Fetches the table size details.
+   *
+   * @param tableName Table name (raw or with type)
+   * @param verbose Whether to include per-segment details
+   * @param includeReplacedSegments Whether to include replaced segments
+   * @return Table size response as JsonNode
+   * @throws PinotAdminException If the request fails
+   */
+  public JsonNode getTableSize(String tableName, boolean verbose, boolean includeReplacedSegments)
+      throws PinotAdminException {
+    Map<String, String> queryParams = new HashMap<>();
+    queryParams.put("verbose", String.valueOf(verbose));
+    queryParams.put("includeReplacedSegments", String.valueOf(includeReplacedSegments));
+    return _transport.executeGet(_controllerAddress, "/tables/" + tableName + "/size", queryParams, _headers);
+  }
+
+  /**
    * Gets the current state of a table.
    *
    * @param tableName Name of the table

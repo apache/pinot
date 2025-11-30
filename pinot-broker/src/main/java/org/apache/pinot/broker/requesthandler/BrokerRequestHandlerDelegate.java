@@ -22,6 +22,7 @@ import com.fasterxml.jackson.databind.JsonNode;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.OptionalLong;
+import java.util.Set;
 import java.util.concurrent.Executor;
 import javax.annotation.Nullable;
 import javax.ws.rs.core.HttpHeaders;
@@ -37,6 +38,7 @@ import org.apache.pinot.spi.exception.QueryErrorCode;
 import org.apache.pinot.spi.exception.QueryException;
 import org.apache.pinot.spi.trace.RequestContext;
 import org.apache.pinot.spi.utils.CommonConstants.Broker.Request;
+import org.apache.pinot.sql.parsers.CalciteSqlParser;
 import org.apache.pinot.sql.parsers.SqlNodeAndOptions;
 import org.apache.pinot.tsdb.spi.series.TimeSeriesBlock;
 
@@ -49,14 +51,17 @@ import org.apache.pinot.tsdb.spi.series.TimeSeriesBlock;
  */
 public class BrokerRequestHandlerDelegate implements BrokerRequestHandler {
   private final BaseSingleStageBrokerRequestHandler _singleStageBrokerRequestHandler;
+  private final SystemTableBrokerRequestHandler _systemTableBrokerRequestHandler;
   private final MultiStageBrokerRequestHandler _multiStageBrokerRequestHandler;
   private final TimeSeriesRequestHandler _timeSeriesRequestHandler;
   private final AbstractResponseStore _responseStore;
 
   public BrokerRequestHandlerDelegate(BaseSingleStageBrokerRequestHandler singleStageBrokerRequestHandler,
+      SystemTableBrokerRequestHandler systemTableBrokerRequestHandler,
       @Nullable MultiStageBrokerRequestHandler multiStageBrokerRequestHandler,
       @Nullable TimeSeriesRequestHandler timeSeriesRequestHandler, AbstractResponseStore responseStore) {
     _singleStageBrokerRequestHandler = singleStageBrokerRequestHandler;
+    _systemTableBrokerRequestHandler = systemTableBrokerRequestHandler;
     _multiStageBrokerRequestHandler = multiStageBrokerRequestHandler;
     _timeSeriesRequestHandler = timeSeriesRequestHandler;
     _responseStore = responseStore;
@@ -64,6 +69,7 @@ public class BrokerRequestHandlerDelegate implements BrokerRequestHandler {
 
   @Override
   public void start() {
+    _systemTableBrokerRequestHandler.start();
     _singleStageBrokerRequestHandler.start();
     if (_multiStageBrokerRequestHandler != null) {
       _multiStageBrokerRequestHandler.start();
@@ -75,6 +81,7 @@ public class BrokerRequestHandlerDelegate implements BrokerRequestHandler {
 
   @Override
   public void shutDown() {
+    _systemTableBrokerRequestHandler.shutDown();
     _singleStageBrokerRequestHandler.shutDown();
     if (_multiStageBrokerRequestHandler != null) {
       _multiStageBrokerRequestHandler.shutDown();
@@ -106,7 +113,25 @@ public class BrokerRequestHandlerDelegate implements BrokerRequestHandler {
       }
     }
 
+    Set<String> tableNames = null;
+    if (_systemTableBrokerRequestHandler != null) {
+      try {
+        // NOTE: compileToPinotQuery(SqlNodeAndOptions) mutates the SqlNode (e.g. SqlOrderBy -> SqlSelect).
+        // Re-parse from raw SQL so the SqlNodeAndOptions passed to the handler is unchanged (important for MSE).
+        JsonNode sql = request.get(Request.SQL);
+        String sqlQuery =
+            (sql != null && sql.isTextual()) ? sql.asText() : sqlNodeAndOptions.getSqlNode().toString();
+        tableNames = RequestUtils.getTableNames(CalciteSqlParser.compileToPinotQuery(sqlQuery));
+      } catch (Exception e) {
+        // Ignore compilation exceptions here; the selected request handler will surface them appropriately.
+      }
+    }
     BaseBrokerRequestHandler requestHandler = _singleStageBrokerRequestHandler;
+    if (tableNames != null && tableNames.size() == 1
+        && _systemTableBrokerRequestHandler != null
+        && _systemTableBrokerRequestHandler.canHandle(tableNames.iterator().next())) {
+      requestHandler = _systemTableBrokerRequestHandler;
+    }
     if (QueryOptionsUtils.isUseMultistageEngine(sqlNodeAndOptions.getOptions())) {
       if (_multiStageBrokerRequestHandler != null) {
         requestHandler = _multiStageBrokerRequestHandler;
