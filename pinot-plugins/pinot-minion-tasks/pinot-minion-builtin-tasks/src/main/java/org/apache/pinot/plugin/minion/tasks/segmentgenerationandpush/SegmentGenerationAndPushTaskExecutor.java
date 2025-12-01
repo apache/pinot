@@ -169,9 +169,24 @@ public class SegmentGenerationAndPushTaskExecutor extends BaseTaskExecutor {
     LOGGER.info("Trying to push Pinot segment with push mode {} from {}", pushMode, outputSegmentTarURI);
 
     PushJobSpec pushJobSpec = new PushJobSpec();
-    pushJobSpec.setPushAttempts(DEFUALT_PUSH_ATTEMPTS);
-    pushJobSpec.setPushParallelism(DEFAULT_PUSH_PARALLELISM);
-    pushJobSpec.setPushRetryIntervalMillis(DEFAULT_PUSH_RETRY_INTERVAL_MILLIS);
+    // Read push attempts from task config, default to 5 if not specified
+    int pushAttempts = DEFUALT_PUSH_ATTEMPTS;
+    if (taskConfigs.containsKey(BatchConfigProperties.PUSH_ATTEMPTS)) {
+      pushAttempts = Integer.parseInt(taskConfigs.get(BatchConfigProperties.PUSH_ATTEMPTS));
+    }
+    pushJobSpec.setPushAttempts(pushAttempts);
+    // Read push parallelism from task config, default to 1 if not specified
+    int pushParallelism = DEFAULT_PUSH_PARALLELISM;
+    if (taskConfigs.containsKey(BatchConfigProperties.PUSH_PARALLELISM)) {
+      pushParallelism = Integer.parseInt(taskConfigs.get(BatchConfigProperties.PUSH_PARALLELISM));
+    }
+    pushJobSpec.setPushParallelism(pushParallelism);
+    // Read push retry interval from task config, default to 1000ms if not specified
+    long pushRetryIntervalMillis = DEFAULT_PUSH_RETRY_INTERVAL_MILLIS;
+    if (taskConfigs.containsKey(BatchConfigProperties.PUSH_RETRY_INTERVAL_MILLIS)) {
+      pushRetryIntervalMillis = Long.parseLong(taskConfigs.get(BatchConfigProperties.PUSH_RETRY_INTERVAL_MILLIS));
+    }
+    pushJobSpec.setPushRetryIntervalMillis(pushRetryIntervalMillis);
     pushJobSpec.setSegmentUriPrefix(taskConfigs.get(BatchConfigProperties.PUSH_SEGMENT_URI_PREFIX));
     pushJobSpec.setSegmentUriSuffix(taskConfigs.get(BatchConfigProperties.PUSH_SEGMENT_URI_SUFFIX));
 

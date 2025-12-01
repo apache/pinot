@@ -197,8 +197,8 @@ public class SegmentPushUtils implements Serializable {
             return true;
           } catch (HttpErrorStatusException e) {
             int statusCode = e.getStatusCode();
-            if (statusCode >= 500) {
-              // Temporary exception
+            if (statusCode >= 400) {
+              // Temporary exception - retry on both 4xx and 5xx errors
               LOGGER.warn("Caught temporary exception while pushing table: {} segment: {} to {}, will retry", tableName,
                   segmentName, controllerURI, e);
               return false;
@@ -254,8 +254,8 @@ public class SegmentPushUtils implements Serializable {
             return true;
           } catch (HttpErrorStatusException e) {
             int statusCode = e.getStatusCode();
-            if (statusCode >= 500) {
-              // Temporary exception
+            if (statusCode >= 400) {
+              // Temporary exception - retry on both 4xx and 5xx errors
               LOGGER.warn("Caught temporary exception while pushing table: {} segment uri: {} to {}, will retry",
                   tableName, segmentUri, controllerURI, e);
               return false;
@@ -355,8 +355,8 @@ public class SegmentPushUtils implements Serializable {
               return true;
             } catch (HttpErrorStatusException e) {
               int statusCode = e.getStatusCode();
-              if (statusCode >= 500) {
-                // Temporary exception
+              if (statusCode >= 400) {
+                // Temporary exception - retry on both 4xx and 5xx errors
                 LOGGER.warn("Caught temporary exception while pushing table: {} segment: {} to {}, will retry",
                     tableName, segmentName, controllerURI, e);
                 return false;
@@ -426,8 +426,8 @@ public class SegmentPushUtils implements Serializable {
             return true;
           } catch (HttpErrorStatusException e) {
             int statusCode = e.getStatusCode();
-            if (statusCode >= 500) {
-              // Temporary exception
+            if (statusCode >= 400) {
+              // Temporary exception - retry on both 4xx and 5xx errors
               LOGGER.warn("Caught temporary exception while pushing table: {} segments: {} to {}, will retry",
                   tableName, segmentMetadataFileMap.keySet(), controllerURI, e);
               return false;
