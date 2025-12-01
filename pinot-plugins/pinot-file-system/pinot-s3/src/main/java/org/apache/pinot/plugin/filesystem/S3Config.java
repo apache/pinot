@@ -88,7 +88,7 @@ public class S3Config {
   public static final String RESPONSE_CHECKSUM_VALIDATION = "responseChecksumValidation";
   public static final String USE_LEGACY_MD5_PLUGIN = "useLegacyMd5Plugin";
   public static final String DISABLE_MULTIPART_UPLOAD = "disableMultipartUpload";
-  private static final boolean DEFAULT_DISABLE_MULTIPART_UPLOAD = false;
+  private static final boolean DEFAULT_DISABLE_MULTIPART_UPLOAD = true;
 
 
   private final String _accessKey;
