@@ -113,6 +113,7 @@ public class S3PinotFS extends BasePinotFS {
   private String _ssekmsEncryptionContext;
   private long _minObjectSizeToUploadInParts;
   private long _multiPartUploadPartSize;
+  private boolean _disableMultipartUpload;
   private @Nullable StorageClass _storageClass;
   private StsClient _stsClient;
   private StsAssumeRoleCredentialsProvider _stsCredentialsProvider;
@@ -214,7 +215,9 @@ public class S3PinotFS extends BasePinotFS {
         throw new RuntimeException("Could not initialize S3PinotFS", e);
       }
 
-      // Close old resources after new client is live (order: provider → STS client → S3 client)
+      _disableMultipartUpload = _s3Config.isMultipartUploadDisabled();
+
+      // Close old resources after new client is live (order: provider -> STS client -> S3 client)
       closeQuietly(oldStsCredentialsProvider, "oldStsCredentialsProvider");
       closeQuietly(oldStsClient, "oldStsClient");
       closeQuietly(oldS3Client, "oldS3Client");
@@ -320,6 +323,7 @@ public class S3PinotFS extends BasePinotFS {
     setServerSideEncryption(serverSideEncryption, s3Config);
     setMultiPartUploadConfigs(s3Config);
     setDisableAcl(s3Config);
+    _disableMultipartUpload = s3Config.isMultipartUploadDisabled();
   }
 
   @VisibleForTesting
@@ -884,7 +888,7 @@ public class S3PinotFS extends BasePinotFS {
   @Override
   public void copyFromLocalFile(File srcFile, URI dstUri)
       throws Exception {
-    if (_minObjectSizeToUploadInParts > 0 && srcFile.length() > _minObjectSizeToUploadInParts) {
+    if (!_disableMultipartUpload && _minObjectSizeToUploadInParts > 0 && srcFile.length() > _minObjectSizeToUploadInParts) {
       LOGGER.info("Copy {} from local to {} in parts", srcFile.getAbsolutePath(), dstUri);
       uploadFileInParts(srcFile, dstUri);
     } else {
@@ -959,6 +963,11 @@ public class S3PinotFS extends BasePinotFS {
   void setMultiPartUploadConfigs(long minObjectSizeToUploadInParts, long multiPartUploadPartSize) {
     _minObjectSizeToUploadInParts = minObjectSizeToUploadInParts;
     _multiPartUploadPartSize = multiPartUploadPartSize;
+  }
+
+  @VisibleForTesting
+  void setDisableMultipartUpload(boolean disableMultipartUpload) {
+    _disableMultipartUpload = disableMultipartUpload;
   }
 
   @Override
