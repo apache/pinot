@@ -89,6 +89,83 @@ public class HadoopPinotFS extends BasePinotFS {
   }
 
   @Override
+  public boolean deleteBatch(List<URI> segmentUris, boolean forceDelete)
+      throws IOException {
+    if (segmentUris == null || segmentUris.isEmpty()) {
+      return true;
+    }
+
+    boolean result = true;
+    List<Path> pathsToDelete = new ArrayList<>();
+
+    LOGGER.info("Deleting batch of {} URIs, forceDelete: {}", segmentUris.size(), forceDelete);
+
+    for (URI segmentUri : segmentUris) {
+      try {
+        Path path = new Path(segmentUri);
+
+        // Check if path exists before attempting deletion
+        if (!_hadoopFS.exists(path)) {
+          LOGGER.debug("Path {} does not exist, skipping deletion", segmentUri);
+          continue;
+        }
+
+        if (isDirectory(segmentUri)) {
+          if (!forceDelete) {
+            // Check if directory is empty
+            if (listFiles(segmentUri, false).length > 0) {
+              LOGGER.warn("Directory {} is not empty and forceDelete is false, skipping", segmentUri);
+              result = false;
+              continue;
+            }
+          }
+          // For directories, recursively collect all files
+          collectFilesRecursively(path, pathsToDelete);
+        } else {
+          pathsToDelete.add(path);
+        }
+      } catch (IOException e) {
+        LOGGER.warn("Error processing path {} for batch deletion", segmentUri, e);
+        result = false;
+      }
+    }
+
+    // Perform batch deletion
+    if (!pathsToDelete.isEmpty()) {
+      LOGGER.info("Deleting {} paths in batch", pathsToDelete.size());
+      for (Path path : pathsToDelete) {
+        try {
+          if (!_hadoopFS.delete(path, true)) {
+            LOGGER.warn("Failed to delete path: {}", path);
+            result = false;
+          }
+        } catch (IOException e) {
+          LOGGER.warn("Error deleting path: {}", path, e);
+          result = false;
+        }
+      }
+    }
+
+    return result;
+  }
+
+  /**
+   * Recursively collects all file paths from a directory for batch deletion.
+   */
+  private void collectFilesRecursively(Path dirPath, List<Path> pathsToDelete)
+      throws IOException {
+    FileStatus[] files = _hadoopFS.listStatus(dirPath);
+    for (FileStatus file : files) {
+      if (file.isDirectory()) {
+        collectFilesRecursively(file.getPath(), pathsToDelete);
+      }
+      pathsToDelete.add(file.getPath());
+    }
+    // Add the directory itself to be deleted after its contents
+    pathsToDelete.add(dirPath);
+  }
+
+  @Override
   public boolean doMove(URI srcUri, URI dstUri)
       throws IOException {
     return _hadoopFS.rename(new Path(srcUri), new Path(dstUri));
@@ -198,7 +275,7 @@ public class HadoopPinotFS extends BasePinotFS {
         throw new RuntimeException("_hadoopFS client is not initialized when trying to copy files");
       }
       if (_hadoopFS.isDirectory(remoteFile)) {
-        throw new IllegalArgumentException(srcUri.toString() + " is a direactory");
+        throw new IllegalArgumentException(srcUri.toString() + " is a directory");
       }
       long startMs = System.currentTimeMillis();
       _hadoopFS.copyToLocalFile(remoteFile, localFile);
