@@ -19,6 +19,8 @@
 package org.apache.pinot.common.utils.config;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.core.type.TypeReference;
+import java.io.IOException;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -26,6 +28,9 @@ import java.util.stream.Collectors;
 import org.apache.helix.zookeeper.datamodel.ZNRecord;
 import org.apache.pinot.spi.config.user.AccessType;
 import org.apache.pinot.spi.config.user.UserConfig;
+import org.apache.pinot.spi.utils.JsonUtils;
+import org.slf4j.Logger;
+
 
 /**
  * UserConfigUtils is responsible for two things:
@@ -35,6 +40,9 @@ import org.apache.pinot.spi.config.user.UserConfig;
 public class AccessControlUserConfigUtils {
     private AccessControlUserConfigUtils() {
     }
+
+    private static final Logger LOGGER = org.slf4j.LoggerFactory.getLogger(
+        AccessControlUserConfigUtils.class);
 
     public static UserConfig fromZNRecord(ZNRecord znRecord) {
         Map<String, String> simpleFields = znRecord.getSimpleFields();
@@ -48,13 +56,32 @@ public class AccessControlUserConfigUtils {
         List<String> tableList = znRecord.getListField(UserConfig.TABLES_KEY);
         List<String> excludeTableList = znRecord.getListField(UserConfig.EXCLUDE_TABLES_KEY);
 
-        List<String> permissionListFromZNRecord = znRecord.getListField(UserConfig.PERMISSIONS_KEY);
+        List<String> permissionListFromZNRecord = znRecord.getListField(
+            UserConfig.PERMISSIONS_KEY);
         List<AccessType> permissionList = null;
         if (permissionListFromZNRecord != null) {
             permissionList = permissionListFromZNRecord.stream()
-                .map(x -> AccessType.valueOf(x)).collect(Collectors.toList());
+                .map(x -> AccessType.valueOf(x))
+                .collect(Collectors.toList());
         }
-        return new UserConfig(username, password, component, role, tableList, excludeTableList, permissionList);
+
+        // Extract RLS filters from simple fields (stored as JSON)
+        Map<String, List<String>> rlsFilters = null;
+        String rlsFiltersJson = simpleFields.get(UserConfig.RLS_FILTERS_KEY);
+        if (rlsFiltersJson != null && !rlsFiltersJson.isEmpty()) {
+            try {
+                rlsFilters = JsonUtils.stringToObject(
+                    rlsFiltersJson, new TypeReference<Map<String, List<String>>>() {
+                    }
+                );
+            } catch (IOException e) {
+                // Log error but continue - RLS filters are optional
+                LOGGER.error("Failed to deserialize RLS filters for user: {}", username, e);
+            }
+        }
+
+        return new UserConfig(username, password, component, role, tableList,
+            excludeTableList, permissionList, rlsFilters);
     }
 
     public static ZNRecord toZNRecord(UserConfig userConfig)
@@ -83,6 +110,12 @@ public class AccessControlUserConfigUtils {
         if (permissionList != null) {
             listFields.put(UserConfig.PERMISSIONS_KEY, userConfig.getPermissios().stream()
                 .map(e -> e.toString()).collect(Collectors.toList()));
+        }
+
+        // Serialize RLS filters as JSON and store in simple fields
+        Map<String, List<String>> rlsFilters = userConfig.getRlsFilters();
+        if (rlsFilters != null && !rlsFilters.isEmpty()) {
+            simpleFields.put(UserConfig.RLS_FILTERS_KEY, JsonUtils.objectToString(rlsFilters));
         }
 
         ZNRecord znRecord = new ZNRecord(userConfig.getUserName());

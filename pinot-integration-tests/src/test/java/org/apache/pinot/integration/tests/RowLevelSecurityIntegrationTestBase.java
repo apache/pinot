@@ -30,7 +30,6 @@ import org.apache.pinot.client.JsonAsyncHttpPinotClientTransportFactory;
 import org.apache.pinot.controller.helix.ControllerRequestClient;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.data.Schema;
-import org.apache.pinot.spi.env.PinotConfiguration;
 import org.apache.pinot.util.TestUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -38,77 +37,31 @@ import org.testng.annotations.AfterClass;
 import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
 
-import static org.apache.pinot.integration.tests.BasicAuthTestUtils.AUTH_HEADER;
-import static org.apache.pinot.integration.tests.BasicAuthTestUtils.AUTH_HEADER_USER;
-import static org.apache.pinot.integration.tests.BasicAuthTestUtils.AUTH_TOKEN;
 import static org.apache.pinot.integration.tests.ClusterIntegrationTestUtils.getBrokerQueryApiUrl;
 import static org.testng.Assert.assertFalse;
 import static org.testng.Assert.assertTrue;
 
 
-public class RowLevelSecurityIntegrationTest extends BaseClusterIntegrationTest {
-  private static final String AUTH_TOKEN_USER_2 = "Basic dXNlcjI6bm90U29TZWNyZXQ";
+/**
+ * Base class for Row Level Security integration tests.
+ * Contains all test logic that is shared between BasicAuth and ZkAuth implementations.
+ */
+public abstract class RowLevelSecurityIntegrationTestBase extends BaseClusterIntegrationTest {
+  public static final String ADMIN_USER = "admin";
+  public static final String ADMIN_PASSWORD = "verysecret";
+  public static final String AUTH_TOKEN = "Basic YWRtaW46dmVyeXNlY3JldA==";
+  public static final Map<String, String> AUTH_HEADER = Map.of("Authorization", AUTH_TOKEN);
+
+  public static final String AUTH_TOKEN_USER = "Basic dXNlcjpzZWNyZXQ=";
+  public static final Map<String, String> AUTH_HEADER_USER = Map.of("Authorization", AUTH_TOKEN_USER);
+
+  private static final String AUTH_TOKEN_USER_2 = "Basic dXNlcjI6bm90U29TZWNyZXQ=";
   public static final Map<String, String> AUTH_HEADER_USER_2 = Map.of("Authorization", AUTH_TOKEN_USER_2);
+
   private static final String DEFAULT_TABLE_NAME_2 = "mytable2";
   private static final String DEFAULT_TABLE_NAME_3 = "mytable3";
-
+  private static final Logger LOGGER = LoggerFactory.getLogger(RowLevelSecurityIntegrationTestBase.class);
   protected List<File> _avroFiles;
-  private static final Logger LOGGER = LoggerFactory.getLogger(RowLevelSecurityIntegrationTest.class);
-
-  @Override
-  protected void overrideControllerConf(Map<String, Object> properties) {
-    properties.put("controller.segment.fetcher.auth.token", AUTH_TOKEN);
-    properties.put("controller.admin.access.control.factory.class",
-        "org.apache.pinot.controller.api.access.BasicAuthAccessControlFactory");
-    properties.put("controller.admin.access.control.principals", "admin, user, user2");
-    properties.put("controller.admin.access.control.principals.admin.password", "verysecret");
-    properties.put("controller.admin.access.control.principals.user.password", "secret");
-    properties.put("controller.admin.access.control.principals.user2.password", "notSoSecret");
-    properties.put("controller.admin.access.control.principals.user.tables", "mytable, mytable2, mytable3");
-    properties.put("controller.admin.access.control.principals.user.permissions", "read");
-    properties.put("controller.admin.access.control.principals.user2.tables", "mytable, mytable2, mytable3");
-    properties.put("controller.admin.access.control.principals.user2.permissions", "read");
-  }
-
-  @Override
-  protected void overrideBrokerConf(PinotConfiguration brokerConf) {
-    brokerConf.setProperty("pinot.broker.enable.row.column.level.auth", "true");
-    brokerConf.setProperty("pinot.broker.access.control.class",
-        "org.apache.pinot.broker.broker.BasicAuthAccessControlFactory");
-    brokerConf.setProperty("pinot.broker.access.control.principals", "admin, user, user2");
-    brokerConf.setProperty("pinot.broker.access.control.principals.admin.password", "verysecret");
-    brokerConf.setProperty("pinot.broker.access.control.principals.user.password", "secret");
-    brokerConf.setProperty("pinot.broker.access.control.principals.user2.password", "notSoSecret");
-    brokerConf.setProperty("pinot.broker.access.control.principals.user.tables", "mytable, mytable2, mytable3");
-    brokerConf.setProperty("pinot.broker.access.control.principals.user.permissions", "read");
-    brokerConf.setProperty("pinot.broker.access.control.principals.user.mytable.rls", "AirlineID='19805'");
-    brokerConf.setProperty("pinot.broker.access.control.principals.user.mytable3.rls",
-        "AirlineID='20409' OR AirTime>'300', DestStateName='Florida'");
-    brokerConf.setProperty("pinot.broker.access.control.principals.user2.tables", "mytable, mytable2, mytable3");
-    brokerConf.setProperty("pinot.broker.access.control.principals.user2.permissions", "read");
-    brokerConf.setProperty("pinot.broker.access.control.principals.user2.mytable.rls",
-        "AirlineID='19805', DestStateName='California'");
-    brokerConf.setProperty("pinot.broker.access.control.principals.user2.mytable2.rls",
-        "AirlineID='20409', DestStateName='Florida'");
-    brokerConf.setProperty("pinot.broker.access.control.principals.user2.mytable3.rls",
-        "AirlineID='20409' OR DestStateName='California', DestStateName='Florida'");
-  }
-
-  @Override
-  protected void overrideServerConf(PinotConfiguration serverConf) {
-    serverConf.setProperty("pinot.server.segment.fetcher.auth.token", AUTH_TOKEN);
-    serverConf.setProperty("pinot.server.segment.uploader.auth.token", AUTH_TOKEN);
-    serverConf.setProperty("pinot.server.instance.auth.token", AUTH_TOKEN);
-  }
-
-  @Override
-  public ControllerRequestClient getControllerRequestClient() {
-    if (_controllerRequestClient == null) {
-      _controllerRequestClient =
-          new ControllerRequestClient(_controllerRequestURLBuilder, getHttpClient(), AUTH_HEADER);
-    }
-    return _controllerRequestClient;
-  }
 
   @Override
   protected Connection getPinotConnection() {
@@ -122,6 +75,15 @@ public class RowLevelSecurityIntegrationTest extends BaseClusterIntegrationTest 
     return _pinotConnection;
   }
 
+  @Override
+  public ControllerRequestClient getControllerRequestClient() {
+    if (_controllerRequestClient == null) {
+      _controllerRequestClient =
+          new ControllerRequestClient(_controllerRequestURLBuilder, getHttpClient(), AUTH_HEADER);
+    }
+    return _controllerRequestClient;
+  }
+
   @BeforeClass
   public void setUp()
       throws Exception {
@@ -130,6 +92,9 @@ public class RowLevelSecurityIntegrationTest extends BaseClusterIntegrationTest 
     startController();
     startBroker();
     startServer();
+
+    // Allow subclasses to initialize users (for ZkAuth)
+    initializeUsers();
 
     startKafka();
     _avroFiles = unpackAvroData(_tempDir);
@@ -141,6 +106,16 @@ public class RowLevelSecurityIntegrationTest extends BaseClusterIntegrationTest 
     setupTable(DEFAULT_TABLE_NAME_3);
 
     waitForAllDocsLoaded(600_000L);
+  }
+
+  /**
+   * Hook for subclasses to initialize users.
+   * BasicAuth: no-op (users configured via properties)
+   * ZkAuth: create users via REST API
+   */
+  protected void initializeUsers()
+      throws Exception {
+    // Default implementation does nothing
   }
 
   private void setupTable(String tableName)

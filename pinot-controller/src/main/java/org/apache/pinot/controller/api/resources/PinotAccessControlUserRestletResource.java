@@ -81,7 +81,11 @@ public class PinotAccessControlUserRestletResource {
      *         "component": "BROKER",
      *         "role" : "ADMIN",
      *         "tables": ["table1", "table2"],
-     *         "permissions": ["READ"]
+     *         "permissions": ["READ"],
+     *         "rlsFilters": {
+     *           "table1": ["column1='value1'"],
+     *           "table2": ["column2='value2' AND column3='value3'"]
+     *         }
      *        }
      *  </pre>
      *
