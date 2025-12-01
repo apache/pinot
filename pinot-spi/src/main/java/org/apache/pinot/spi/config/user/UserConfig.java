@@ -74,7 +74,18 @@ public class UserConfig extends BaseJsonConfig {
         @JsonProperty(value = PERMISSIONS_KEY) @Nullable List<AccessType> permissionList,
         @JsonProperty(value = RLS_FILTERS_KEY) @Nullable Map<String, List<String>> rlsFilters
     ) {
-        this(username, password, component, role, tableList, excludeTableList, permissionList, rlsFilters, true);
+        Preconditions.checkArgument(username != null, "'username' must be configured");
+        Preconditions.checkArgument(password != null, "'password' must be configured");
+
+        // NOTE: Handle lower case table type and raw table name for backward-compatibility
+        _username = username;
+        _password = password;
+        _componentType = ComponentType.valueOf(component.toUpperCase());
+        _roleType = RoleType.valueOf(role.toUpperCase());
+        _tables = tableList;
+        _excludeTables = excludeTableList;
+        _permissions = permissionList;
+        _rlsFilters = rlsFilters;
     }
 
     /**
@@ -83,50 +94,7 @@ public class UserConfig extends BaseJsonConfig {
      */
     public UserConfig(String username, String password, String component, String role,
         List<String> tableList, List<String> excludeTableList, List<AccessType> permissionList) {
-        this(username, password, component, role, tableList, excludeTableList, permissionList, null, true);
-    }
-
-    private UserConfig(String username, String password, String component, String role,
-        List<String> tableList, List<String> excludeTableList, List<AccessType> permissionList,
-        Map<String, List<String>> rlsFilters, boolean validate) {
-        if (validate) {
-            Preconditions.checkArgument(username != null, "'username' must be configured");
-            Preconditions.checkArgument(!username.isEmpty(), "'username' must not be empty");
-            Preconditions.checkArgument(password != null, "'password' must be configured");
-            Preconditions.checkArgument(!password.isEmpty(), "'password' must not be empty");
-        }
-
-        // NOTE: Handle lower case table type and raw table name for backward-compatibility
-        _username = username;
-        _password = password;
-        _componentType = ComponentType.valueOf(component.toUpperCase());
-        _roleType = RoleType.valueOf(role.toUpperCase());
-
-        if (tableList != null) {
-            Preconditions.checkArgument(tableList.stream().allMatch(table -> table != null && !table.isEmpty()),
-                "'tables' must not contain empty or null table names");
-        }
-        _tables = tableList;
-        if (excludeTableList != null) {
-            Preconditions.checkArgument(excludeTableList.stream().allMatch(table -> table != null && !table.isEmpty()),
-                "'excludeTables' must not contain empty or null table names");
-        }
-        _excludeTables = excludeTableList;
-
-        // Null elements in the permission list are not allowed
-        if (permissionList != null) {
-            Preconditions.checkArgument(permissionList.stream().allMatch(Objects::nonNull),
-                "'permissions' must not contain null elements");
-        }
-        _permissions = permissionList;
-
-        // Validate RLS filters if provided
-        if (rlsFilters != null) {
-            Preconditions.checkArgument(
-                rlsFilters.values().stream().allMatch(filters -> filters != null && !filters.isEmpty()),
-                "'rlsFilters' must not contain null or empty filter lists");
-        }
-        _rlsFilters = rlsFilters;
+      this(username, password, component, role, tableList, excludeTableList, permissionList, null);
     }
 
     @JsonProperty(USERNAME_KEY)
