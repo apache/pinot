@@ -41,94 +41,18 @@ public class MaxMVAggregationFunction extends MaxAggregationFunction {
   @Override
   public void aggregate(int length, AggregationResultHolder aggregationResultHolder,
       Map<ExpressionContext, BlockValSet> blockValSetMap) {
-    BlockValSet blockValSet = blockValSetMap.get(_expression);
-    double[][] valuesArray = blockValSet.getDoubleValuesMV();
-    Double max = foldNotNull(length, blockValSet, null, (acum, from, to) -> {
-      double innerMax = DEFAULT_INITIAL_VALUE;
-      for (int i = from; i < to; i++) {
-        double[] values = valuesArray[i];
-        for (double value : values) {
-          if (value > innerMax) {
-            innerMax = value;
-          }
-        }
-      }
-      return acum == null ? innerMax : Math.max(acum, innerMax);
-    });
-
-    updateAggregationResultHolder(aggregationResultHolder, max);
+    aggregateMV(blockValSetMap.get(_expression), length, aggregationResultHolder);
   }
 
   @Override
   public void aggregateGroupBySV(int length, int[] groupKeyArray, GroupByResultHolder groupByResultHolder,
       Map<ExpressionContext, BlockValSet> blockValSetMap) {
-    BlockValSet blockValSet = blockValSetMap.get(_expression);
-    double[][] valuesArray = blockValSet.getDoubleValuesMV();
-
-    if (_nullHandlingEnabled) {
-      forEachNotNull(length, blockValSet, (from, to) -> {
-        for (int i = from; i < to; i++) {
-          int groupKey = groupKeyArray[i];
-          Double max = groupByResultHolder.getResult(groupKey);
-          for (double value : valuesArray[i]) {
-            if (max == null || value > max) {
-              max = value;
-            }
-          }
-          groupByResultHolder.setValueForKey(groupKey, max);
-        }
-      });
-    } else {
-      for (int i = 0; i < length; i++) {
-        int groupKey = groupKeyArray[i];
-        double max = groupByResultHolder.getDoubleResult(groupKey);
-        for (double value : valuesArray[i]) {
-          if (value > max) {
-            max = value;
-          }
-        }
-        groupByResultHolder.setValueForKey(groupKey, max);
-      }
-    }
+    aggregateMVGroupBySV(blockValSetMap.get(_expression), length, groupKeyArray, groupByResultHolder);
   }
 
   @Override
   public void aggregateGroupByMV(int length, int[][] groupKeysArray, GroupByResultHolder groupByResultHolder,
       Map<ExpressionContext, BlockValSet> blockValSetMap) {
-    BlockValSet blockValSet = blockValSetMap.get(_expression);
-    double[][] valuesArray = blockValSet.getDoubleValuesMV();
-
-    if (_nullHandlingEnabled) {
-      forEachNotNull(length, blockValSet, (from, to) -> {
-        for (int i = from; i < to; i++) {
-          Double max = null;
-          for (double value : valuesArray[i]) {
-            if (max == null || value > max) {
-              max = value;
-            }
-          }
-
-          for (int groupKey : groupKeysArray[i]) {
-            Double currentMax = groupByResultHolder.getResult(groupKey);
-            if (currentMax == null || (max != null && max > currentMax)) {
-              groupByResultHolder.setValueForKey(groupKey, max);
-            }
-          }
-        }
-      });
-    } else {
-      for (int i = 0; i < length; i++) {
-        double[] values = valuesArray[i];
-        for (int groupKey : groupKeysArray[i]) {
-          double max = groupByResultHolder.getDoubleResult(groupKey);
-          for (double value : values) {
-            if (value > max) {
-              max = value;
-            }
-          }
-          groupByResultHolder.setValueForKey(groupKey, max);
-        }
-      }
-    }
+    aggregateMVGroupByMV(blockValSetMap.get(_expression), length, groupKeysArray, groupByResultHolder);
   }
 }

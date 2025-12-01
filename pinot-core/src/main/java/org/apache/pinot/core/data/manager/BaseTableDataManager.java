@@ -801,7 +801,7 @@ public abstract class BaseTableDataManager implements TableDataManager {
         failedSegments.add(segmentName);
         sampleException.set(t);
         if (reloadJobId != null) {
-          _reloadJobStatusCache.getOrCreate(reloadJobId).incrementAndGetFailureCount();
+          _reloadJobStatusCache.recordFailure(reloadJobId, segmentName, t);
         }
       }
     }, _segmentReloadRefreshExecutor)).toArray(CompletableFuture[]::new)).get();
@@ -819,15 +819,18 @@ public abstract class BaseTableDataManager implements TableDataManager {
     if (segmentDataManager instanceof RealtimeSegmentDataManager) {
       // Use force commit to reload consuming segment
       if (_instanceDataManagerConfig.shouldReloadConsumingSegment()) {
-        // For partial upsert tables, force-committing consuming segments is disabled.
-        // In some cases (especially when replication > 1), the server with fewer consumed rows
-        // was incorrectly chosen as the winner, causing other servers to reconsume rows
-        // and leading to inconsistent data.
+        // For partial-upsert tables or upserts with out-of-order events enabled, force-committing
+        // consuming segments is disabled. In some cases (especially when replication > 1), the
+        // server that consumed fewer rows was incorrectly selected as the winner, causing other
+        // servers to reconsume rows and resulting in inconsistent data when previous state must
+        // be referenced for add/update operations.
         // TODO: Temporarily disabled until a proper fix is implemented.
         TableConfig tableConfig = indexLoadingConfig.getTableConfig();
-        if (TableConfigUtils.checkForPartialUpsertWithReplicas(tableConfig)) {
-          _logger.warn("Skipping reload (force committing) on consuming segment: {} for a Partial Upsert Table with "
-              + "replication > 1", segmentName);
+        if (TableConfigUtils.checkForInconsistentStateConfigs(tableConfig)) {
+          _logger.warn(
+              "Skipping reload (force committing) on consuming segment: {} for a Partial Upsert Table/ upsert tables "
+                  + "when dropOutOfOrder is enabled with no consistency mode",
+              segmentName);
         } else {
           _logger.info("Reloading (force committing) consuming segment: {}", segmentName);
           ((RealtimeSegmentDataManager) segmentDataManager).forceCommit();

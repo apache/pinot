@@ -918,6 +918,8 @@ public class CommonConstants {
         PlannerRuleNames.JOIN_PUSH_TRANSITIVE_PREDICATES
     );
 
+    public static final String CONFIG_OF_BROKER_MSE_PLANNER_DISABLED_RULES = "pinot.broker.mse.planner.disabled.rules";
+
     public static class FailureDetector {
       public enum Type {
         // Do not detect any failure
@@ -2089,6 +2091,10 @@ public class CommonConstants {
         "pinot.field.spec.default.json.max.length.exceed.strategy";
     public static final String CONFIG_OF_DEFAULT_JSON_MAX_LENGTH =
         "pinot.field.spec.default.json.max.length";
+  }
+
+  public static class IngestionConfigs {
+    public static final int DEFAULT_INGESTION_EXCEPTION_LOG_RATE_LIMIT_PER_MIN = 5;
   }
 
   /**

@@ -16,33 +16,47 @@
  * specific language governing permissions and limitations
  * under the License.
  */
+package org.apache.pinot.query.runtime.operator.window.aggregate;
 
-package org.apache.pinot.server.starter.helix;
+import javax.annotation.Nullable;
 
-public class SegmentReloadStatusValue {
-  private final long _totalSegmentCount;
-  private final long _successCount;
-  private final Long _failureCount;
 
-  public SegmentReloadStatusValue(long totalSegmentCount, long successCount) {
-    this(totalSegmentCount, successCount, null);
+/**
+ * Window value aggregator for AVG window function.
+ */
+public class AvgWindowValueAggregator implements WindowValueAggregator<Object> {
+  private double _sum = 0.0;
+  private int _count = 0;
+
+  @Override
+  public void addValue(@Nullable Object value) {
+    if (value != null) {
+      _count++;
+      _sum += ((Number) value).doubleValue();
+    }
   }
 
-  public SegmentReloadStatusValue(long totalSegmentCount, long successCount, Long failureCount) {
-    _totalSegmentCount = totalSegmentCount;
-    _successCount = successCount;
-    _failureCount = failureCount;
+  @Override
+  public void removeValue(@Nullable Object value) {
+    if (value != null) {
+      _count--;
+      _sum -= ((Number) value).doubleValue();
+    }
   }
 
-  public long getTotalSegmentCount() {
-    return _totalSegmentCount;
+  @Override
+  @Nullable
+  public Object getCurrentAggregatedValue() {
+    if (_count == 0) {
+      return null;
+    } else {
+      return _sum / _count;
+    }
   }
 
-  public long getSuccessCount() {
-    return _successCount;
-  }
-
-  public Long getFailureCount() {
-    return _failureCount;
+  @Override
+  public void clear() {
+    _sum = 0.0;
+    _count = 0;
   }
 }

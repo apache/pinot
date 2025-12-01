@@ -26,6 +26,7 @@ import java.util.stream.Stream;
 import javax.annotation.Nullable;
 import org.apache.calcite.rel.type.RelDataType;
 import org.apache.calcite.rel.type.RelDataTypeFactory;
+import org.apache.calcite.sql.SqlKind;
 import org.apache.calcite.sql.SqlOperatorBinding;
 import org.apache.calcite.sql.type.OperandTypes;
 import org.apache.calcite.sql.type.ReturnTypes;
@@ -62,6 +63,7 @@ public enum AggregationFunctionType {
   SUMINT("sumInt", ReturnTypes.AGG_SUM, OperandTypes.INTEGER),
   SUMLONG("sumLong", ReturnTypes.AGG_SUM, OperandTypes.or(OperandTypes.INTEGER, OperandTypes.ARRAY_OF_INTEGER)),
   SUMPRECISION("sumPrecision", ReturnTypes.explicit(SqlTypeName.DECIMAL), OperandTypes.ANY, SqlTypeName.OTHER),
+  // TODO: Support MV types after next release (see https://github.com/apache/pinot/pull/17109)
   AVG("avg", SqlTypeName.OTHER, SqlTypeName.DOUBLE),
   MODE("mode", SqlTypeName.OTHER, SqlTypeName.DOUBLE),
   FIRSTWITHTIME("firstWithTime", ReturnTypes.ARG0,
@@ -79,8 +81,10 @@ public enum AggregationFunctionType {
   DISTINCTCOUNTOFFHEAP("distinctCountOffHeap", ReturnTypes.BIGINT,
       OperandTypes.family(List.of(SqlTypeFamily.ANY, SqlTypeFamily.CHARACTER), i -> i == 1), SqlTypeName.OTHER,
       SqlTypeName.INTEGER),
-  DISTINCTSUM("distinctSum", ReturnTypes.AGG_SUM, OperandTypes.NUMERIC, SqlTypeName.OTHER, SqlTypeName.DOUBLE),
-  DISTINCTAVG("distinctAvg", ReturnTypes.DOUBLE, OperandTypes.NUMERIC, SqlTypeName.OTHER),
+  DISTINCTSUM("distinctSum", ReturnTypes.AGG_SUM, OperandTypes.or(OperandTypes.NUMERIC, OperandTypes.ARRAY),
+      SqlTypeName.OTHER, SqlTypeName.DOUBLE),
+  DISTINCTAVG("distinctAvg", ReturnTypes.DOUBLE, OperandTypes.or(OperandTypes.NUMERIC, OperandTypes.ARRAY),
+      SqlTypeName.OTHER),
   DISTINCTCOUNTBITMAP("distinctCountBitmap", ReturnTypes.BIGINT, OperandTypes.ANY, SqlTypeName.OTHER,
       SqlTypeName.INTEGER),
   SEGMENTPARTITIONEDDISTINCTCOUNT("segmentPartitionedDistinctCount", ReturnTypes.BIGINT, OperandTypes.ANY),
@@ -253,6 +257,7 @@ public enum AggregationFunctionType {
   private final SqlReturnTypeInference _intermediateReturnTypeInference;
   // Override final result type if it is not the same as standard return type of the function.
   private final SqlReturnTypeInference _finalReturnTypeInference;
+  private final SqlKind _sqlKind;
 
   AggregationFunctionType(String name) {
     this(name, null, null, (SqlReturnTypeInference) null, null);
@@ -286,11 +291,21 @@ public enum AggregationFunctionType {
       @Nullable SqlOperandTypeChecker operandTypeChecker,
       @Nullable SqlReturnTypeInference intermediateReturnTypeInference,
       @Nullable SqlReturnTypeInference finalReturnTypeInference) {
+    this(name, returnTypeInference, operandTypeChecker, intermediateReturnTypeInference, finalReturnTypeInference,
+        null);
+  }
+
+  AggregationFunctionType(String name, @Nullable SqlReturnTypeInference returnTypeInference,
+      @Nullable SqlOperandTypeChecker operandTypeChecker,
+      @Nullable SqlReturnTypeInference intermediateReturnTypeInference,
+      @Nullable SqlReturnTypeInference finalReturnTypeInference,
+      @Nullable SqlKind sqlKind) {
     _name = name;
     _returnTypeInference = returnTypeInference;
     _operandTypeChecker = operandTypeChecker;
     _intermediateReturnTypeInference = intermediateReturnTypeInference;
     _finalReturnTypeInference = finalReturnTypeInference;
+    _sqlKind = sqlKind;
   }
 
   public String getName() {
@@ -315,6 +330,11 @@ public enum AggregationFunctionType {
   @Nullable
   public SqlReturnTypeInference getFinalReturnTypeInference() {
     return _finalReturnTypeInference;
+  }
+
+  @Nullable
+  public SqlKind getSqlKind() {
+    return _sqlKind;
   }
 
   public static boolean isAggregationFunction(String functionName) {
@@ -418,9 +438,9 @@ public enum AggregationFunctionType {
     }
   }
 
-  // Used for aggregation functions that always return BIGINT. The "IfEmpty" logic ensures that the return type is
-  // nullable for pure aggregation queries (no group-by) and filtered aggregation queries. Return values can be null
-  // if there are no matching rows (even if the operand type is not nullable).
+  /// Used for aggregation functions that always return BIGINT. The "IfEmpty" logic ensures that the return type is
+  /// nullable for pure aggregation queries (no group-by) and filtered aggregation queries. Return values can be null
+  /// if there are no matching rows (even if the operand type is not nullable).
   private static class BigintNullableIfEmpty implements SqlReturnTypeInference {
     @Override
     public RelDataType inferReturnType(SqlOperatorBinding opBinding) {
