@@ -135,7 +135,15 @@ public class DefaultValueColumnReader implements ColumnReader {
     if (!hasNext()) {
       throw new IllegalStateException("No more values available");
     }
-    return _defaultValue == null;
+    // This is required because clients need to know if the next value is null (to add null vector etc)
+    // Since next() will return the default value, this is an appropriate way to indicate nullability
+    // Ideally
+    // 1. DefaultValueColumnReader should return null for all methods
+    // 2. PinotSegmentColumnReaderFactory shouldn't create DefaultValueColumnReader.
+    //    Clients should handle this based on need (eg: adding default value to the segment vs using null vector)
+    // 3. For any null data (in new or old columns), clients should call NullValueTransformer to get default values
+    // Until above is done, we return true here so that clients can take appropriate action
+    return true;
   }
 
   @Override
@@ -297,7 +305,8 @@ public class DefaultValueColumnReader implements ColumnReader {
   @Override
   public boolean isNull(int docId) {
     validateDocId(docId);
-    return _defaultValue == null;
+    // check comment in isNextNull() for explanation
+    return true;
   }
 
   // Single-value accessors
