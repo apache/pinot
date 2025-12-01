@@ -616,7 +616,7 @@ public abstract class BaseSegmentProcessorFrameworkTest {
       GenericRow row = new GenericRow();
       Object[] rawRow = data.get(i);
       row.putValue("campaign", rawRow[0]);
-      
+
       // Set invalid value for specified rows and column
       if (invalidRowIndices.contains(i) && invalidColumn.equals("clicks")) {
         row.putValue("clicks", "INVALID");
@@ -626,7 +626,7 @@ public abstract class BaseSegmentProcessorFrameworkTest {
         row.putValue("clicks", rawRow[1]);
         row.putValue("time", rawRow[2]);
       }
-      
+
       inputRows.add(row);
     }
 
@@ -699,31 +699,63 @@ public abstract class BaseSegmentProcessorFrameworkTest {
 
     // Segment 1: 100 docs
     List<Object[]> segment1Data = new ArrayList<>();
-    for (int i = 0; i < 30; i++) segment1Data.add(new Object[]{"abc", 1000 + i, day1 + i * 1000});
-    for (int i = 0; i < 25; i++) segment1Data.add(new Object[]{"xyz", 2000 + i, day1 + i * 1000});
-    for (int i = 0; i < 20; i++) segment1Data.add(new Object[]{"abc", 3000 + i, day2 + i * 1000});
-    for (int i = 0; i < 15; i++) segment1Data.add(new Object[]{null, 4000 + i, day2 + i * 1000});
-    for (int i = 0; i < 10; i++) segment1Data.add(new Object[]{"pqr", null, day3 + i * 1000});
+    for (int i = 0; i < 30; i++) {
+      segment1Data.add(new Object[]{"abc", 1000 + i, day1 + i * 1000});
+    }
+    for (int i = 0; i < 25; i++) {
+      segment1Data.add(new Object[]{"xyz", 2000 + i, day1 + i * 1000});
+    }
+    for (int i = 0; i < 20; i++) {
+      segment1Data.add(new Object[]{"abc", 3000 + i, day2 + i * 1000});
+    }
+    for (int i = 0; i < 15; i++) {
+      segment1Data.add(new Object[]{null, 4000 + i, day2 + i * 1000});
+    }
+    for (int i = 0; i < 10; i++) {
+      segment1Data.add(new Object[]{"pqr", null, day3 + i * 1000});
+    }
     // Shuffle to mix data
     Collections.shuffle(segment1Data, new Random());
 
     // Segment 2: 50 docs
     List<Object[]> segment2Data = new ArrayList<>();
-    for (int i = 0; i < 15; i++) segment2Data.add(new Object[]{"abc", 5000 + i, day1 + i * 1000});
-    for (int i = 0; i < 10; i++) segment2Data.add(new Object[]{"xyz", 6000 + i, day2 + i * 1000});
-    for (int i = 0; i < 12; i++) segment2Data.add(new Object[]{"pqr", 7000 + i, day2 + i * 1000});
-    for (int i = 0; i < 8; i++) segment2Data.add(new Object[]{null, null, day1 + i * 1000});
-    for (int i = 0; i < 5; i++) segment2Data.add(new Object[]{"abc", 8000 + i, day3 + i * 1000});
+    for (int i = 0; i < 15; i++) {
+      segment2Data.add(new Object[]{"abc", 5000 + i, day1 + i * 1000});
+    }
+    for (int i = 0; i < 10; i++) {
+      segment2Data.add(new Object[]{"xyz", 6000 + i, day2 + i * 1000});
+    }
+    for (int i = 0; i < 12; i++) {
+      segment2Data.add(new Object[]{"pqr", 7000 + i, day2 + i * 1000});
+    }
+    for (int i = 0; i < 8; i++) {
+      segment2Data.add(new Object[]{null, null, day1 + i * 1000});
+    }
+    for (int i = 0; i < 5; i++) {
+      segment2Data.add(new Object[]{"abc", 8000 + i, day3 + i * 1000});
+    }
     Collections.shuffle(segment2Data, new Random());
 
     // Segment 3: 200 docs
     List<Object[]> segment3Data = new ArrayList<>();
-    for (int i = 0; i < 50; i++) segment3Data.add(new Object[]{"abc", 9000 + i, day1 + i * 1000});
-    for (int i = 0; i < 40; i++) segment3Data.add(new Object[]{"xyz", 10000 + i, day1 + i * 1000});
-    for (int i = 0; i < 35; i++) segment3Data.add(new Object[]{"pqr", 11000 + i, day1 + i * 1000});
-    for (int i = 0; i < 30; i++) segment3Data.add(new Object[]{"abc", null, day2 + i * 1000});
-    for (int i = 0; i < 25; i++) segment3Data.add(new Object[]{null, 12000 + i, day3 + i * 1000});
-    for (int i = 0; i < 20; i++) segment3Data.add(new Object[]{"xyz", 13000 + i, day3 + i * 1000});
+    for (int i = 0; i < 50; i++) {
+      segment3Data.add(new Object[]{"abc", 9000 + i, day1 + i * 1000});
+    }
+    for (int i = 0; i < 40; i++) {
+      segment3Data.add(new Object[]{"xyz", 10000 + i, day1 + i * 1000});
+    }
+    for (int i = 0; i < 35; i++) {
+      segment3Data.add(new Object[]{"pqr", 11000 + i, day1 + i * 1000});
+    }
+    for (int i = 0; i < 30; i++) {
+      segment3Data.add(new Object[]{"abc", null, day2 + i * 1000});
+    }
+    for (int i = 0; i < 25; i++) {
+      segment3Data.add(new Object[]{null, 12000 + i, day3 + i * 1000});
+    }
+    for (int i = 0; i < 20; i++) {
+      segment3Data.add(new Object[]{"xyz", 13000 + i, day3 + i * 1000});
+    }
     Collections.shuffle(segment3Data, new Random());
 
     segmentDataLists.add(segment1Data);
@@ -803,7 +835,7 @@ public abstract class BaseSegmentProcessorFrameworkTest {
 
     // Verify exactly 4 segments created (30+30+30+10)
     assertEquals(outputSegments.size(), 4, "Should create exactly 4 segments");
-    
+
     outputSegments.sort(null);
     SegmentMetadata seg0 = new SegmentMetadataImpl(outputSegments.get(0));
     SegmentMetadata seg1 = new SegmentMetadataImpl(outputSegments.get(1));
@@ -992,7 +1024,7 @@ public abstract class BaseSegmentProcessorFrameworkTest {
 
     // Verify processing completes with all 10 docs
     assertEquals(outputSegments.size(), 1, "Should create 1 output segment");
-    
+
     ImmutableSegment segment = ImmutableSegmentLoader.load(outputSegments.get(0), ReadMode.mmap);
     SegmentMetadata metadata = segment.getSegmentMetadata();
     assertEquals(metadata.getTotalDocs(), 10, "Should have all 10 docs");
@@ -1113,7 +1145,7 @@ public abstract class BaseSegmentProcessorFrameworkTest {
     // clicks: different ranges to test partitioning
     List<Object[]> testData = new ArrayList<>();
     long baseTime = 1597719600000L;
-    
+
     // Add data for abc campaign with 1000 clicks
     for (int i = 0; i < 20; i++) {
       testData.add(new Object[]{"abc", 1000, baseTime + i * 1000});
@@ -1171,13 +1203,13 @@ public abstract class BaseSegmentProcessorFrameworkTest {
     for (File segmentDir : outputSegments) {
       SegmentMetadata metadata = new SegmentMetadataImpl(segmentDir);
       totalDocs += metadata.getTotalDocs();
-      
+
       // Each segment should have only one campaign value (cardinality = 1)
       ColumnMetadata campaignMetadata = metadata.getColumnMetadataFor("campaign");
       assertNotNull(campaignMetadata, "Campaign column metadata should not be null");
-      assertEquals(campaignMetadata.getCardinality(), 1, 
+      assertEquals(campaignMetadata.getCardinality(), 1,
           "Each segment should have exactly 1 campaign value");
-      
+
       // Each segment should have clicks values from a specific partition
       ColumnMetadata clicksMetadata = metadata.getColumnMetadataFor("clicks");
       assertEquals(clicksMetadata.getCardinality(), 1,

@@ -221,8 +221,8 @@ public class SegmentProcessorFrameworkTest extends BaseSegmentProcessorFramework
         new RecordReaderFileConfig(FileFormat.CSV, new File(resource.toURI()), null, null, null);
     TableConfig tableConfig =
         new TableConfigBuilder(TableType.OFFLINE).setTableName("myTable").setTimeColumnName("time").build();
-    Schema schema =
-        new Schema.SchemaBuilder().setSchemaName("mySchema").addSingleValueDimension("teamId", FieldSpec.DataType.STRING, "")
+    Schema schema = new Schema.SchemaBuilder().setSchemaName("mySchema")
+            .addSingleValueDimension("teamId", FieldSpec.DataType.STRING, "")
             .addSingleValueDimension("teamName", FieldSpec.DataType.STRING, "")
             .addDateTime("time", FieldSpec.DataType.LONG, "1:MILLISECONDS:EPOCH", "1:MILLISECONDS").build();
 
@@ -422,5 +422,4 @@ public class SegmentProcessorFrameworkTest extends BaseSegmentProcessorFramework
     segment.destroy();
     FileUtils.cleanDirectory(workingDir);
   }
-
 }
