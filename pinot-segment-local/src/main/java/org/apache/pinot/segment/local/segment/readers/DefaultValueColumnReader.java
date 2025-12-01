@@ -18,7 +18,6 @@
  */
 package org.apache.pinot.segment.local.segment.readers;
 
-import java.io.IOException;
 import javax.annotation.Nullable;
 import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.readers.ColumnReader;
