@@ -74,8 +74,8 @@ import static org.apache.pinot.segment.spi.V1Constants.MetadataKeys.Segment.*;
 /**
  * Abstract base class for segment creators containing common functionality and metadata handling.
  */
-public abstract class AbstractSegmentCreator implements SegmentCreator {
-  private static final Logger LOGGER = LoggerFactory.getLogger(AbstractSegmentCreator.class);
+public abstract class BaseSegmentCreator implements SegmentCreator {
+  private static final Logger LOGGER = LoggerFactory.getLogger(BaseSegmentCreator.class);
   // Allow at most 512 characters for the metadata property
   private static final int METADATA_PROPERTY_LENGTH_LIMIT = 512;
 

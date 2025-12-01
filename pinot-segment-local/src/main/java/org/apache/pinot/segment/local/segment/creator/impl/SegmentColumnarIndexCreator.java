@@ -48,7 +48,7 @@ import org.apache.pinot.spi.data.readers.GenericRow;
  * Segment creator which writes data in a columnar form.
  */
 // TODO: check resource leaks
-public class SegmentColumnarIndexCreator extends AbstractSegmentCreator {
+public class SegmentColumnarIndexCreator extends BaseSegmentCreator {
   private int _docIdCounter;
 
   @Override
