@@ -23,6 +23,7 @@ import java.io.IOException;
 import java.io.Serializable;
 import java.util.Map;
 import java.util.Set;
+import javax.annotation.Nullable;
 import org.apache.pinot.spi.data.Schema;
 
 
@@ -71,10 +72,8 @@ public interface ColumnReaderFactory extends Closeable, Serializable {
    *
    * @param columnName Name of the column to read
    * @return ColumnReader instance for the specified column (may be cached)
-   * @throws IOException If the column reader cannot be obtained
    */
-  ColumnReader getColumnReader(String columnName)
-      throws IOException;
+  @Nullable ColumnReader getColumnReader(String columnName);
 
   /**
    * Get all column readers for the target schema.

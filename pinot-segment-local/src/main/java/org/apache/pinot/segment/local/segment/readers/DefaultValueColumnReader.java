@@ -338,6 +338,12 @@ public class DefaultValueColumnReader implements ColumnReader {
     return (byte[]) _defaultValue;
   }
 
+  @Override
+  public Object getValue(int docId) {
+    validateDocId(docId);
+    return _defaultValue;
+  }
+
   // Multi-value accessors
 
   @Override

@@ -314,6 +314,12 @@ public class PinotSegmentColumnReaderImpl implements ColumnReader {
     return _segmentColumnReader.getBytes(docId);
   }
 
+  @Override
+  public Object getValue(int docId)
+      throws IOException {
+    return _segmentColumnReader.getValue(docId);
+  }
+
   // Multi-value accessors
 
   @Override
