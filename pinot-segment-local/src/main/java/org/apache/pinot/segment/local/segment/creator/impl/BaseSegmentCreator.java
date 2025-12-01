@@ -391,6 +391,7 @@ public abstract class BaseSegmentCreator implements SegmentCreator {
 
     properties.setProperty(SEGMENT_CREATOR_VERSION, _config.getCreatorVersion());
     properties.setProperty(SEGMENT_PADDING_CHARACTER, String.valueOf(V1Constants.Str.DEFAULT_STRING_PAD_CHAR));
+    properties.setProperty(SEGMENT_NAME, _segmentName);
     properties.setProperty(TABLE_NAME, _config.getTableName());
     properties.setProperty(DIMENSIONS, _config.getDimensions());
     properties.setProperty(METRICS, _config.getMetrics());
@@ -515,8 +516,6 @@ public abstract class BaseSegmentCreator implements SegmentCreator {
       properties.setProperty(Realtime.START_OFFSET, segmentZKPropsConfig.getStartOffset());
       properties.setProperty(Realtime.END_OFFSET, segmentZKPropsConfig.getEndOffset());
     }
-    properties.setProperty(SEGMENT_NAME, _segmentName);
-
     CommonsConfigurationUtils.saveToFile(properties, metadataFile);
   }
 
