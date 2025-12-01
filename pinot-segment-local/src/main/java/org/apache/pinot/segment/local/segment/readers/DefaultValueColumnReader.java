@@ -301,13 +301,6 @@ public class DefaultValueColumnReader implements ColumnReader {
     return _defaultValue == null;
   }
 
-  @Override
-  public Object getValue(int docId)
-      throws IOException {
-    validateDocId(docId);
-    return _defaultValue;
-  }
-
   // Single-value accessors
 
   @Override
