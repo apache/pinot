@@ -33,16 +33,7 @@ public class DefaultValueColumnReader implements ColumnReader {
 
   private final String _columnName;
   private final int _numDocs;
-  private final Object _defaultValue;
   private final FieldSpec.DataType _dataType;
-
-  // Pre-computed multi-value arrays for reuse
-  private int[] _defaultIntMV;
-  private long[] _defaultLongMV;
-  private float[] _defaultFloatMV;
-  private double[] _defaultDoubleMV;
-  private String[] _defaultStringMV;
-  private byte[][] _defaultBytesMV;
 
   private int _currentIndex;
 
@@ -58,56 +49,6 @@ public class DefaultValueColumnReader implements ColumnReader {
     _numDocs = numDocs;
     _currentIndex = 0;
     _dataType = fieldSpec.getDataType();
-
-    // For multi-value fields, wrap the default value in an array
-    Object defaultNullValue = fieldSpec.getDefaultNullValue();
-    if (fieldSpec.isSingleValueField()) {
-      _defaultValue = defaultNullValue;
-    } else {
-      _defaultValue = new Object[]{defaultNullValue};
-      // Pre-compute typed arrays for multi-value fields to avoid repeated allocations
-      Object[] defaultArray = (Object[]) _defaultValue;
-      switch (_dataType) {
-        case INT:
-          _defaultIntMV = new int[defaultArray.length];
-          for (int i = 0; i < defaultArray.length; i++) {
-            _defaultIntMV[i] = ((Number) defaultArray[i]).intValue();
-          }
-          break;
-        case LONG:
-          _defaultLongMV = new long[defaultArray.length];
-          for (int i = 0; i < defaultArray.length; i++) {
-            _defaultLongMV[i] = ((Number) defaultArray[i]).longValue();
-          }
-          break;
-        case FLOAT:
-          _defaultFloatMV = new float[defaultArray.length];
-          for (int i = 0; i < defaultArray.length; i++) {
-            _defaultFloatMV[i] = ((Number) defaultArray[i]).floatValue();
-          }
-          break;
-        case DOUBLE:
-          _defaultDoubleMV = new double[defaultArray.length];
-          for (int i = 0; i < defaultArray.length; i++) {
-            _defaultDoubleMV[i] = ((Number) defaultArray[i]).doubleValue();
-          }
-          break;
-        case STRING:
-          _defaultStringMV = new String[defaultArray.length];
-          for (int i = 0; i < defaultArray.length; i++) {
-            _defaultStringMV[i] = (String) defaultArray[i];
-          }
-          break;
-        case BYTES:
-          _defaultBytesMV = new byte[defaultArray.length][];
-          for (int i = 0; i < defaultArray.length; i++) {
-            _defaultBytesMV[i] = (byte[]) defaultArray[i];
-          }
-          break;
-        default:
-          break;
-      }
-    }
   }
 
   @Override
@@ -122,7 +63,7 @@ public class DefaultValueColumnReader implements ColumnReader {
       throw new IllegalStateException("No more values available");
     }
     _currentIndex++;
-    return _defaultValue;
+    return null;
   }
 
   @Override
@@ -135,7 +76,7 @@ public class DefaultValueColumnReader implements ColumnReader {
     if (!hasNext()) {
       throw new IllegalStateException("No more values available");
     }
-    return _defaultValue == null;
+    return true;
   }
 
   @Override
@@ -178,38 +119,26 @@ public class DefaultValueColumnReader implements ColumnReader {
 
   @Override
   public int nextInt() {
-    if (!hasNext()) {
-      throw new IllegalStateException("No more values available");
-    }
-    _currentIndex++;
-    return ((Number) _defaultValue).intValue();
+    throw new UnsupportedOperationException(
+        "Cannot read primitive int from default value column reader - use next() or getValue() instead");
   }
 
   @Override
   public long nextLong() {
-    if (!hasNext()) {
-      throw new IllegalStateException("No more values available");
-    }
-    _currentIndex++;
-    return ((Number) _defaultValue).longValue();
+    throw new UnsupportedOperationException(
+        "Cannot read primitive long from default value column reader - use next() or getValue() instead");
   }
 
   @Override
   public float nextFloat() {
-    if (!hasNext()) {
-      throw new IllegalStateException("No more values available");
-    }
-    _currentIndex++;
-    return ((Number) _defaultValue).floatValue();
+    throw new UnsupportedOperationException(
+        "Cannot read primitive float from default value column reader - use next() or getValue() instead");
   }
 
   @Override
   public double nextDouble() {
-    if (!hasNext()) {
-      throw new IllegalStateException("No more values available");
-    }
-    _currentIndex++;
-    return ((Number) _defaultValue).doubleValue();
+    throw new UnsupportedOperationException(
+        "Cannot read primitive double from default value column reader - use next() or getValue() instead");
   }
 
   @Override
@@ -218,7 +147,7 @@ public class DefaultValueColumnReader implements ColumnReader {
       throw new IllegalStateException("No more values available");
     }
     _currentIndex++;
-    return (String) _defaultValue;
+    return null;
   }
 
   @Override
@@ -227,7 +156,7 @@ public class DefaultValueColumnReader implements ColumnReader {
       throw new IllegalStateException("No more values available");
     }
     _currentIndex++;
-    return (byte[]) _defaultValue;
+    return null;
   }
 
   @Override
@@ -236,7 +165,7 @@ public class DefaultValueColumnReader implements ColumnReader {
       throw new IllegalStateException("No more values available");
     }
     _currentIndex++;
-    return _defaultIntMV;
+    return null;
   }
 
   @Override
@@ -245,7 +174,7 @@ public class DefaultValueColumnReader implements ColumnReader {
       throw new IllegalStateException("No more values available");
     }
     _currentIndex++;
-    return _defaultLongMV;
+    return null;
   }
 
   @Override
@@ -254,7 +183,7 @@ public class DefaultValueColumnReader implements ColumnReader {
       throw new IllegalStateException("No more values available");
     }
     _currentIndex++;
-    return _defaultFloatMV;
+    return null;
   }
 
   @Override
@@ -263,7 +192,7 @@ public class DefaultValueColumnReader implements ColumnReader {
       throw new IllegalStateException("No more values available");
     }
     _currentIndex++;
-    return _defaultDoubleMV;
+    return null;
   }
 
   @Override
@@ -272,7 +201,7 @@ public class DefaultValueColumnReader implements ColumnReader {
       throw new IllegalStateException("No more values available");
     }
     _currentIndex++;
-    return _defaultStringMV;
+    return null;
   }
 
   @Override
@@ -281,7 +210,7 @@ public class DefaultValueColumnReader implements ColumnReader {
       throw new IllegalStateException("No more values available");
     }
     _currentIndex++;
-    return _defaultBytesMV;
+    return null;
   }
 
   @Override
@@ -297,45 +226,45 @@ public class DefaultValueColumnReader implements ColumnReader {
   @Override
   public boolean isNull(int docId) {
     validateDocId(docId);
-    return _defaultValue == null;
+    return true;
   }
 
   // Single-value accessors
 
   @Override
   public int getInt(int docId) {
-    validateDocId(docId);
-    return ((Number) _defaultValue).intValue();
+    throw new UnsupportedOperationException(
+        "Cannot read primitive int from default value column reader - use getValue() instead");
   }
 
   @Override
   public long getLong(int docId) {
-    validateDocId(docId);
-    return ((Number) _defaultValue).longValue();
+    throw new UnsupportedOperationException(
+        "Cannot read primitive long from default value column reader - use getValue() instead");
   }
 
   @Override
   public float getFloat(int docId) {
-    validateDocId(docId);
-    return ((Number) _defaultValue).floatValue();
+    throw new UnsupportedOperationException(
+        "Cannot read primitive float from default value column reader - use getValue() instead");
   }
 
   @Override
   public double getDouble(int docId) {
-    validateDocId(docId);
-    return ((Number) _defaultValue).doubleValue();
+    throw new UnsupportedOperationException(
+        "Cannot read primitive double from default value column reader - use getValue() instead");
   }
 
   @Override
   public String getString(int docId) {
     validateDocId(docId);
-    return (String) _defaultValue;
+    return null;
   }
 
   @Override
   public byte[] getBytes(int docId) {
     validateDocId(docId);
-    return (byte[]) _defaultValue;
+    return null;
   }
 
   // Multi-value accessors
@@ -343,37 +272,37 @@ public class DefaultValueColumnReader implements ColumnReader {
   @Override
   public int[] getIntMV(int docId) {
     validateDocId(docId);
-    return _defaultIntMV;
+    return null;
   }
 
   @Override
   public long[] getLongMV(int docId) {
     validateDocId(docId);
-    return _defaultLongMV;
+    return null;
   }
 
   @Override
   public float[] getFloatMV(int docId) {
     validateDocId(docId);
-    return _defaultFloatMV;
+    return null;
   }
 
   @Override
   public double[] getDoubleMV(int docId) {
     validateDocId(docId);
-    return _defaultDoubleMV;
+    return null;
   }
 
   @Override
   public String[] getStringMV(int docId) {
     validateDocId(docId);
-    return _defaultStringMV;
+    return null;
   }
 
   @Override
   public byte[][] getBytesMV(int docId) {
     validateDocId(docId);
-    return _defaultBytesMV;
+    return null;
   }
 
   /**
