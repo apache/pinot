@@ -93,7 +93,8 @@ public class InMemorySendingMailbox implements SendingMailbox {
         _isTerminated = true;
         break;
       case ALREADY_TERMINATED:
-        LOGGER.error("Trying to offer blocks to the already closed mailbox {}. This should not happen", _id);
+        // this can happen when the mailbox is cancelled by the receiver. No more messages are going to be accepted.
+        _isTerminated = true;
         break;
       default:
         throw new IllegalStateException("Unsupported mailbox status: " + status);
