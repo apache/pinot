@@ -110,6 +110,11 @@ public class PinotSegmentColumnReaderImpl implements ColumnReader {
   }
 
   @Override
+  public boolean isSingleValue() {
+    return _segmentColumnReader.isSingleValue();
+  }
+
+  @Override
   public boolean isInt() {
     return _dataType == FieldSpec.DataType.INT;
   }

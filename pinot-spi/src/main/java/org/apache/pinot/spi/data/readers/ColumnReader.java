@@ -189,6 +189,11 @@ public interface ColumnReader extends Closeable, Serializable {
   void skipNext() throws IOException;
 
   /**
+   * Check if the column data is single-value or multi-value.
+   */
+  boolean isSingleValue();
+
+  /**
    * Check if the column data type from the actual reader can be returned as the expected type directly.
    * For multi-value columns, this indicates if the multi-value type specific methods can be called directly.
    * If true, the type specific methods like nextInt() can be called directly.
