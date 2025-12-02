@@ -23,6 +23,7 @@ import com.fasterxml.jackson.databind.node.ObjectNode;
 import com.google.common.base.Preconditions;
 import java.util.Collections;
 import java.util.EnumMap;
+import java.util.Iterator;
 import java.util.Map;
 import javax.annotation.Nullable;
 import org.apache.pinot.common.response.ProcessingException;
@@ -136,5 +137,17 @@ public class ErrorMseBlock implements MseBlock.Eos {
     } catch (JsonProcessingException e) {
       return "{\"type\": \"error\", \"errorMessages\": \"not serializable\"}";
     }
+  }
+
+  /// Returns the main error code of the block.
+  ///
+  /// Right now this just returns the first error code in the map or UNKNOWN if the map is empty,
+  /// but in the future we might want to have a more sophisticated
+  public QueryErrorCode getMainErrorCode() {
+    Iterator<QueryErrorCode> iterator = _errorMessages.keySet().iterator();
+    if (!iterator.hasNext()) {
+      return QueryErrorCode.UNKNOWN;
+    }
+    return iterator.next();
   }
 }
