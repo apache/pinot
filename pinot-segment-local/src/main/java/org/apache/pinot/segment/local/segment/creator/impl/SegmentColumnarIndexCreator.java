@@ -132,7 +132,7 @@ public class SegmentColumnarIndexCreator implements SegmentCreator {
 
     Map<String, FieldIndexConfigs> indexConfigs = segmentCreationSpec.getIndexConfigsByColName();
 
-    _creatorsByColAndIndex = Maps.newHashMapWithExpectedSize(indexConfigs.keySet().size());
+    _creatorsByColAndIndex = Maps.newHashMapWithExpectedSize(indexConfigs.size());
 
     for (String columnName : indexConfigs.keySet()) {
       FieldSpec fieldSpec = schema.getFieldSpecFor(columnName);
@@ -303,7 +303,13 @@ public class SegmentColumnarIndexCreator implements SegmentCreator {
 
     String column = spec.getName();
     FieldIndexConfigs fieldIndexConfigs = config.getIndexConfigsByColName().get(column);
+    // Infer dictionary existence based on index
+    boolean dictionaryRequired = DictionaryIndexConfig.isDictionaryRequired(spec, fieldIndexConfigs);
     if (fieldIndexConfigs.getConfig(StandardIndexes.dictionary()).isDisabled()) {
+      if (dictionaryRequired) {
+        LOGGER.warn("Found indexes {} require dictionary, but dictionary is disabled explicitly.",
+            DictionaryIndexConfig.getIndexTypesWithDictionaryRequired(spec, fieldIndexConfigs));
+      }
       return false;
     }
 

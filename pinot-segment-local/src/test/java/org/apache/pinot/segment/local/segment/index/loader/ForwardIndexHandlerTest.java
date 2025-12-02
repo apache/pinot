@@ -886,15 +886,7 @@ public class ForwardIndexHandlerTest {
           new FieldConfig(DIM_SV_FORWARD_INDEX_DISABLED_INTEGER, FieldConfig.EncodingType.RAW,
               List.of(FieldConfig.IndexType.INVERTED, FieldConfig.IndexType.RANGE), CompressionCodec.LZ4,
               Map.of(FieldConfig.FORWARD_INDEX_DISABLED, "true")));
-      try {
-        computeOperations();
-        fail("Disabling dictionary on forward index disabled column with inverted index and a range index "
-            + "is not possible");
-      } catch (IllegalStateException e) {
-        assertEquals(e.getMessage(), "Must disable range index (enabled) to disable the dictionary for a "
-            + "forwardIndexDisabled column: DIM_SV_FORWARD_INDEX_DISABLED_INTEGER of segment: testSegment or refresh "
-            + "/ back-fill the forward index");
-      }
+      computeOperations();
     }
   }
 

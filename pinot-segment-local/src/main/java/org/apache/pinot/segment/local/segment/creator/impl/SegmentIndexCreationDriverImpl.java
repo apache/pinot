@@ -714,7 +714,7 @@ public class SegmentIndexCreationDriverImpl implements SegmentIndexCreationDrive
       DataType storedType = fieldSpec.getDataType().getStoredType();
       ColumnStatistics columnProfile = _segmentStats.getColumnProfileFor(column);
       DictionaryIndexConfig dictionaryIndexConfig = indexConfigsMap.get(column).getConfig(StandardIndexes.dictionary());
-      boolean createDictionary = dictionaryIndexConfig.isDisabled();
+      boolean createDictionary = dictionaryIndexConfig.isEnabled();
       boolean useVarLengthDictionary = dictionaryIndexConfig.getUseVarLengthDictionary()
           || DictionaryIndexType.optimizeTypeShouldUseVarLengthDictionary(storedType, columnProfile);
       Object defaultNullValue = fieldSpec.getDefaultNullValue();
