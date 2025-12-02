@@ -523,7 +523,12 @@ public class SegmentIndexCreationDriverImpl implements SegmentIndexCreationDrive
     FileUtils.deleteQuietly(_tempIndexDir);
 
     // Compute data crc before segment format conversion applies since v3 puts all index files into a single one
-    long dataCrc = CrcUtils.forAllFilesInFolder(segmentOutputDir).computeDataCrc();
+    // Compute data crc only if no column has fwd index disabled
+    boolean hasForwardIndexDisabledCols = hasAnyColumnWithForwardIndexDisabled();
+    long dataCrc = Long.MIN_VALUE;
+    if (!hasForwardIndexDisabledCols) {
+      dataCrc = CrcUtils.forAllFilesInFolder(segmentOutputDir).computeDataCrc();
+    }
     convertFormatIfNecessary(segmentOutputDir);
 
     if (_totalDocs > 0) {
@@ -677,6 +682,26 @@ public class SegmentIndexCreationDriverImpl implements SegmentIndexCreationDrive
     converter.convert(segmentDirectory);
   }
 
+  private boolean hasAnyColumnWithForwardIndexDisabled() {
+    Map<String, FieldIndexConfigs> indexConfigsMap = _config.getIndexConfigsByColName();
+    for (FieldSpec fieldSpec : _dataSchema.getAllFieldSpecs()) {
+      // Ignore virtual columns
+      if (fieldSpec.isVirtualColumn()) {
+        continue;
+      }
+      String column = fieldSpec.getName();
+      boolean isFwdIndexEnabled = indexConfigsMap
+          .get(column)
+          .getConfig(StandardIndexes.forward())
+          .isEnabled();
+
+      if (!isFwdIndexEnabled) {
+        return true;
+      }
+    }
+    return false;
+  }
+
   @Override
   public ColumnStatistics getColumnStatisticsCollector(final String columnName)
       throws Exception {
@@ -690,7 +715,11 @@ public class SegmentIndexCreationDriverImpl implements SegmentIndexCreationDrive
     try (DataOutputStream output = new DataOutputStream(new FileOutputStream(creationMetaFile))) {
       output.writeLong(crc);
       output.writeLong(creationTime);
-      output.writeLong(dataCrc);
+      // might be negative if the data CRC could not be computed for the segment. eg. in case a column has fwd index
+      // disabled
+      if (dataCrc >= 0) {
+        output.writeLong(dataCrc);
+      }
     }
   }
 

@@ -46,7 +46,7 @@ import org.apache.pinot.tools.utils.PinotConfigUtils;
  *
  */
 public class AbstractBaseAdminCommand extends AbstractBaseCommand {
-  static final String DEFAULT_CONTROLLER_PORT = "9000";
+  static final String DEFAULT_CONTROLLER_PORT = "9001";
   static final String URI_TABLES_PATH = "/tables/";
 
   public AbstractBaseAdminCommand(boolean addShutdownHook) {
