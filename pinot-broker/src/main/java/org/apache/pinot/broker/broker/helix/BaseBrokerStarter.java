@@ -150,6 +150,7 @@ public abstract class BaseBrokerStarter implements ServiceStartable {
   protected HelixAdmin _helixAdmin;
   protected ZkHelixPropertyStore<ZNRecord> _propertyStore;
   protected HelixDataAccessor _helixDataAccessor;
+  protected TableCache _tableCache;
   protected PinotMetricsRegistry _metricsRegistry;
   protected BrokerMetrics _brokerMetrics;
   protected BrokerRoutingManager _routingManager;
@@ -353,7 +354,7 @@ public abstract class BaseBrokerStarter implements ServiceStartable {
     FunctionRegistry.init();
     boolean caseInsensitive =
         _brokerConf.getProperty(Helix.ENABLE_CASE_INSENSITIVE_KEY, Helix.DEFAULT_ENABLE_CASE_INSENSITIVE);
-    TableCache tableCache = new ZkTableCache(_propertyStore, caseInsensitive);
+    _tableCache = new ZkTableCache(_propertyStore, caseInsensitive);
 
     LOGGER.info("Initializing Broker Event Listener Factory");
     BrokerQueryEventListenerFactory.init(_brokerConf.subset(Broker.EVENT_LISTENER_CONFIG_PREFIX));
@@ -391,7 +392,7 @@ public abstract class BaseBrokerStarter implements ServiceStartable {
     if (brokerRequestHandlerType.equalsIgnoreCase(Broker.GRPC_BROKER_REQUEST_HANDLER_TYPE)) {
       singleStageBrokerRequestHandler =
           new GrpcBrokerRequestHandler(_brokerConf, brokerId, requestIdGenerator, _routingManager,
-              _accessControlFactory, _queryQuotaManager, tableCache, _failureDetector, _threadAccountant);
+              _accessControlFactory, _queryQuotaManager, _tableCache, _failureDetector, _threadAccountant);
     } else {
       // Default request handler type, i.e. netty
       NettyConfig nettyDefaults = NettyConfig.extractNettyConfig(_brokerConf, Broker.BROKER_NETTY_PREFIX);
@@ -402,7 +403,7 @@ public abstract class BaseBrokerStarter implements ServiceStartable {
       }
       singleStageBrokerRequestHandler =
           new SingleConnectionBrokerRequestHandler(_brokerConf, brokerId, requestIdGenerator, _routingManager,
-              _accessControlFactory, _queryQuotaManager, tableCache, nettyDefaults, tlsDefaults,
+              _accessControlFactory, _queryQuotaManager, _tableCache, nettyDefaults, tlsDefaults,
               _serverRoutingStatsManager, _failureDetector, _threadAccountant);
     }
     MultiStageBrokerRequestHandler multiStageBrokerRequestHandler = null;
@@ -416,7 +417,7 @@ public abstract class BaseBrokerStarter implements ServiceStartable {
       queryDispatcher = createQueryDispatcher(_brokerConf);
       multiStageBrokerRequestHandler =
           new MultiStageBrokerRequestHandler(_brokerConf, brokerId, requestIdGenerator, _routingManager,
-              _accessControlFactory, _queryQuotaManager, tableCache, _multiStageQueryThrottler, _failureDetector,
+              _accessControlFactory, _queryQuotaManager, _tableCache, _multiStageQueryThrottler, _failureDetector,
               _threadAccountant);
     }
     TimeSeriesRequestHandler timeSeriesRequestHandler = null;
@@ -424,7 +425,7 @@ public abstract class BaseBrokerStarter implements ServiceStartable {
       Preconditions.checkNotNull(queryDispatcher, "Multistage Engine should be enabled to use time-series engine");
       timeSeriesRequestHandler =
           new TimeSeriesRequestHandler(_brokerConf, brokerId, requestIdGenerator, _routingManager,
-              _accessControlFactory, _queryQuotaManager, tableCache, queryDispatcher, _threadAccountant);
+              _accessControlFactory, _queryQuotaManager, _tableCache, queryDispatcher, _threadAccountant);
     }
 
     LOGGER.info("Initializing PinotFSFactory");
