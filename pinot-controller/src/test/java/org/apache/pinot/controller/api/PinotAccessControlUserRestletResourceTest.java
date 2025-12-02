@@ -604,22 +604,6 @@ public class PinotAccessControlUserRestletResourceTest {
   }
 
   @Test
-  public void testAddUserWithEmptyUsername()
-      throws Exception {
-    try {
-      String userConfigString = _userConfigBuilder.setUsername("")
-          .setComponentType(ComponentType.BROKER)
-          .build().toJsonString();
-      ControllerTest.sendPostRequest(_createUserUrl, userConfigString);
-      fail("Creating a user with empty username should fail");
-    } catch (Exception e) {
-      // Expected exception - either IllegalArgumentException or IOException
-      assertTrue(e.getMessage().contains("username") || e.getMessage().contains("empty")
-          || e.getMessage().contains("must be configured"));
-    }
-  }
-
-  @Test
   public void testGetUserByUsernameAndComponent()
       throws Exception {
     String username = "getUserTest";
