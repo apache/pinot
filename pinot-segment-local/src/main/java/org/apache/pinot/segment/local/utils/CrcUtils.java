@@ -39,7 +39,7 @@ public class CrcUtils {
   private static final Logger LOGGER = LoggerFactory.getLogger(CrcUtils.class);
   private static final int BUFFER_SIZE = 65536;
   private static final String CRC_FILE_EXTENSTION = ".crc";
-  private static final List<String> DATA_FILE_EXTENSIONS = Arrays.asList(".fwd", ".dict", ".inv");
+  private static final List<String> DATA_FILE_EXTENSIONS = Arrays.asList(".fwd", ".dict");
 
   private final List<File> _files;
   private final List<File> _dataFiles;
@@ -87,7 +87,7 @@ public class CrcUtils {
   }
 
   /**
-   * Determines if a file is considered a "Data File" (one of ".fwd", ".dict", ".inv" file types).
+   * Determines if a file is considered a "Data File" (one of ".fwd", ".dict" file types).
    */
   private static boolean isDataFile(String fileName) {
     for (String ext : DATA_FILE_EXTENSIONS) {
