@@ -28,23 +28,23 @@ import javax.annotation.Nullable;
 @JsonIgnoreProperties(ignoreUnknown = true)
 public class CopyTablePayload {
 
-  String _sourceClusterUri;
-  Map<String, String> _headers;
+  private String _sourceClusterUri;
+  private Map<String, String> _headers;
   /**
    * Broker tenant for the new table.
    * MUST NOT contain the tenant type suffix, i.e. _BROKER.
    */
-  String _brokerTenant;
+  private String _brokerTenant;
   /**
    * Server tenant for the new table.
    * MUST NOT contain the tenant type suffix, i.e. _REALTIME or _OFFLINE.
    */
-  String _serverTenant;
+  private String _serverTenant;
 
-  Map<String, String> _tagPoolReplacementMap;
+  private Map<String, String> _tagPoolReplacementMap;
 
   @JsonCreator
-  public CopyTablePayload(@JsonProperty(value = "tableName", required = true) String tableName,
+  public CopyTablePayload(
       @JsonProperty(value = "sourceClusterUri", required = true) String sourceClusterUri,
       @JsonProperty("sourceClusterHeaders") Map<String, String> headers,
       @JsonProperty(value = "brokerTenant", required = true) String brokerTenant,

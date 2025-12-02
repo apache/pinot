@@ -300,8 +300,8 @@ public class PinotTableRestletResource {
     try {
       tableName = DatabaseUtils.translateTableName(tableName, headers);
       CopyTablePayload copyTablePayload = JsonUtils.stringToObject(payload, CopyTablePayload.class);
-      String sourceControllerUri = copyTablePayload._sourceClusterUri;
-      Map<String, String> requestHeaders = copyTablePayload._headers;
+      String sourceControllerUri = copyTablePayload.getSourceClusterUri();
+      Map<String, String> requestHeaders = copyTablePayload.getHeaders();
       String brokerTenant = copyTablePayload.getBrokerTenant();
       String serverTenant = copyTablePayload.getServerTenant();
       Map<String, String> tagReplacementMap = copyTablePayload.getTagPoolReplacementMap();
@@ -326,7 +326,7 @@ public class PinotTableRestletResource {
         tweakRealtimeTableConfig(realtimeTableConfigNode, brokerTenant, serverTenant, tagReplacementMap);
         TableConfig realtimeTableConfig = JsonUtils.jsonNodeToObject(realtimeTableConfigNode, TableConfig.class);
 
-        URI watermarkUri = new URI(sourceControllerUri + "/tables/" + tableName + "/watermarks");
+        URI watermarkUri = new URI(sourceControllerUri + "/tables/" + tableName + "/consumerWatermarks");
         SimpleHttpResponse watermarkResponse = HttpClient.wrapAndThrowHttpException(
             HttpClient.getInstance().sendGetRequest(watermarkUri, requestHeaders));
         String watermarkJson = watermarkResponse.getResponse();

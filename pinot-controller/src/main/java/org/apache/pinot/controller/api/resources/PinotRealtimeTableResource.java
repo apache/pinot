@@ -454,7 +454,7 @@ public class PinotRealtimeTableResource {
 
   @GET
   @Produces(MediaType.APPLICATION_JSON)
-  @Path("/tables/{tableName}/watermarks")
+  @Path("/tables/{tableName}/consumerWatermarks")
   @Authorize(targetType = TargetType.TABLE, paramName = "tableName", action = Actions.Table.GET_IDEAL_STATE)
   @ApiOperation(value = "Get table ideal state", notes = "Get table ideal state")
   public WatermarkInductionResult inductConsumingWatermark(
