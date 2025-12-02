@@ -19,6 +19,7 @@
 package org.apache.pinot.core.util;
 
 import java.io.DataInputStream;
+import java.io.EOFException;
 import java.io.File;
 import java.io.FileInputStream;
 import java.io.IOException;
@@ -41,8 +42,6 @@ import org.apache.pinot.spi.config.table.FSTType;
 import org.apache.pinot.spi.config.table.FieldConfig;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.TableType;
-import org.apache.pinot.spi.config.table.ingestion.IngestionConfig;
-import org.apache.pinot.spi.config.table.ingestion.TransformConfig;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.data.readers.FileFormat;
@@ -253,7 +252,9 @@ public class CrcUtilsTest {
 
         File indexDir = driver.getOutputDirectory();
 
-        long currentDataCrc = readDataOnlyCrcFromMeta(indexDir);
+        Long currentDataCrc = readDataOnlyCrcFromMetaIfPresent(indexDir);
+
+        Assert.assertNotNull(currentDataCrc);
 
         crcs.add(currentDataCrc);
         System.out.println(String.format("  [%s] Run %d Data CRC got from meta file: %d",
@@ -271,96 +272,74 @@ public class CrcUtilsTest {
   }
 
   @Test
-  public void testDataCrcConsistencyWithAllForwardIndexDisabledAndTransformsForAllSegmentVers()
-      throws Exception {
-    int numRuns = 5;
+  public void testDataCrcNotGeneratedIfForwardIndexDisabled() throws Exception {
+    URL schemaResource = getClass().getClassLoader().getResource(COMPLEX_SCHEMA_NAME);
+    URL tableConfigResource = getClass().getClassLoader().getResource(COMPLEX_TABLE_CONFIG_NAME);
+    URL dataResource = getClass().getClassLoader().getResource(COMPLEX_DATA_NAME);
 
-    URL resource = getClass().getClassLoader().getResource(AVRO_DATA);
-    assertNotNull(resource);
-    File avroFile = new File(TestUtils.getFileFromResourceUrl(resource));
+    assertNotNull(schemaResource, "Schema file not found: " + COMPLEX_SCHEMA_NAME);
+    assertNotNull(tableConfigResource, "Table config file not found: " + COMPLEX_TABLE_CONFIG_NAME);
+    assertNotNull(dataResource, "Data file not found: " + COMPLEX_DATA_NAME);
 
-    // Define Schema with an extra column for Transformation
-    // We add "transformedCol" which will be generated during ingestion
-    Schema schema = new Schema.SchemaBuilder().setSchemaName(RAW_TABLE_NAME)
-        .addSingleValueDimension("column1", DataType.INT)
-        .addSingleValueDimension("column5", DataType.STRING)
-        .addMultiValueDimension("column6", DataType.INT)
-        .addSingleValueDimension("transformedCol", DataType.INT)
-        .addMetric("count", DataType.INT)
-        .addDateTime("daysSinceEpoch", DataType.INT, "EPOCH|DAYS", "1:DAYS")
-        .build();
+    Schema schema = Schema.fromFile(new File(TestUtils.getFileFromResourceUrl(schemaResource)));
+    TableConfig tableConfig = createTableConfig(new File(tableConfigResource.getFile()));
+    File dataFile = new File(TestUtils.getFileFromResourceUrl(dataResource));
 
-    // Define Field Configs to DISABLE Forward Index for ALL columns
-    List<FieldConfig> fieldConfigs = new ArrayList<>();
-    List<String> columns = List.of("column1", "column5", "column6", "transformedCol", "count", "daysSinceEpoch");
+    // Modify table config to disable forward index for cityName column
+    FieldConfig disableFwdIndexfieldConfig = new FieldConfig("associatedInts",
+        FieldConfig.EncodingType.DICTIONARY,
+        List.of(FieldConfig.IndexType.INVERTED),
+        null,
+        Map.of(FieldConfig.FORWARD_INDEX_DISABLED, "true"));
 
-    for (String col : columns) {
-      Map<String, String> properties = Map.of("forwardIndexDisabled", "true");
-      FieldConfig config = new FieldConfig(col, FieldConfig.EncodingType.DICTIONARY,
-          List.of(FieldConfig.IndexType.INVERTED), null, properties);
-      fieldConfigs.add(config);
+    List<FieldConfig> fieldConfigList = new ArrayList<>();
+    if (tableConfig.getFieldConfigList() != null) {
+      fieldConfigList.addAll(tableConfig.getFieldConfigList());
     }
-
-    List<TransformConfig> transformConfigs = new ArrayList<>();
-    transformConfigs.add(new TransformConfig("transformedCol", "plus(column1, 100)"));
-
-    IngestionConfig ingestionConfig = SegmentTestUtils.getSkipTimeCheckIngestionConfig();
-    ingestionConfig.setTransformConfigs(transformConfigs);
-
-    TableConfig tableConfig = new TableConfigBuilder(TableType.OFFLINE)
-        .setTableName(RAW_TABLE_NAME)
-        .setTimeColumnName("daysSinceEpoch")
-        .setFieldConfigList(fieldConfigs) // Apply No-Forward-Index configs
-        .setIngestionConfig(ingestionConfig) // Apply Transformations
-        .build();
+    fieldConfigList.add(disableFwdIndexfieldConfig);
+    tableConfig.setFieldConfigList(fieldConfigList);
 
     SegmentVersion[] versionsToTest = new SegmentVersion[]{
         SegmentVersion.v1,
-        SegmentVersion.v2,
         SegmentVersion.v3
     };
 
     for (SegmentVersion version : versionsToTest) {
-      List<Long> crcs = new ArrayList<>();
+      FileUtils.deleteDirectory(INDEX_DIR);
+      INDEX_DIR.mkdirs();
 
-      for (int i = 0; i < numRuns; i++) {
-        FileUtils.deleteDirectory(INDEX_DIR);
-        INDEX_DIR.mkdirs();
+      SegmentGeneratorConfig config = new SegmentGeneratorConfig(tableConfig, schema);
+      config.setInputFilePath(dataFile.getAbsolutePath());
+      config.setSegmentVersion(version);
+      config.setOutDir(INDEX_DIR.getAbsolutePath());
+      config.setFormat(FileFormat.CSV);
+      config.setSegmentName("testCrcSegmentWithForwardIndexDisabled");
 
-        SegmentGeneratorConfig config = new SegmentGeneratorConfig(tableConfig, schema);
-        config.setInputFilePath(avroFile.getAbsolutePath());
-        config.setSegmentVersion(version);
-        config.setOutDir(INDEX_DIR.getAbsolutePath());
-        config.setSegmentName("testCrcNoForwardIndex");
+      CSVRecordReaderConfig csvReaderConfig = new CSVRecordReaderConfig();
+      csvReaderConfig.setMultiValueDelimiter('|');
+      csvReaderConfig.setSkipHeader(false);
 
-        SegmentIndexCreationDriver driver = new SegmentIndexCreationDriverImpl();
-        driver.init(config);
-        driver.build();
+      config.setReaderConfig(csvReaderConfig);
+      SegmentIndexCreationDriver driver = new SegmentIndexCreationDriverImpl();
+      driver.init(config);
+      driver.build();
 
-        File indexDir = driver.getOutputDirectory();
+      File indexDir = driver.getOutputDirectory();
 
-        long currentDataCrc = readDataOnlyCrcFromMeta(indexDir);
-        crcs.add(currentDataCrc);
+      // Verify that data CRC is not generated, should be null
+      Long dataCrc = readDataOnlyCrcFromMetaIfPresent(indexDir);
 
-        System.out.println(String.format("  [%s] Run %d Data CRC: %d", version, i + 1, currentDataCrc));
-      }
-
-      Assert.assertFalse(crcs.isEmpty());
-      long firstRunCrc = crcs.get(0);
-      for (int i = 1; i < crcs.size(); i++) {
-        Assert.assertEquals(crcs.get(i).longValue(), firstRunCrc,
-            String.format("CRC Determinism failed for %s with Forward Index Disabled! Run 1 vs Run %d",
-                version,
-                i + 1));
-      }
+      Assert.assertNull(dataCrc,
+          String.format("Data CRC should not be written for segment version %s when forward index is disabled",
+              version));
     }
   }
 
   /**
-   * Helper method to read the 'dataOnlyCrc' from the creation.meta file.
-   * Logic corresponds to: output.writeLong(crc); output.writeLong(creationTime); output.writeLong(dataOnlyCrc);
+   * Helper method to read the 'dataOnlyCrc' from the creation.meta file if it exists.
+   * Returns null if data CRC was not written to the file.
    */
-  private long readDataOnlyCrcFromMeta(File indexDir) throws IOException {
+  private Long readDataOnlyCrcFromMetaIfPresent(File indexDir) throws IOException {
     File metaFile = new File(indexDir, V1Constants.SEGMENT_CREATION_META);
 
     if (!metaFile.exists()) {
@@ -382,9 +361,14 @@ public class CrcUtilsTest {
     try (DataInputStream input = new DataInputStream(new FileInputStream(metaFile))) {
       long crc = input.readLong();           // 1st: Standard CRC (Skip)
       long creationTime = input.readLong();  // 2nd: Creation Time (Skip)
-      return input.readLong();               // 3rd: Data Only CRC (Return this)
+      try {
+        return input.readLong();             // 3rd: Data Only CRC (Return this if present)
+      } catch (EOFException e) {
+        return null;                         // Data CRC not written
+      }
     }
   }
+
   private static TableConfig createTableConfig(File tableConfigFile)
       throws IOException {
     InputStream inputStream = new FileInputStream(tableConfigFile);

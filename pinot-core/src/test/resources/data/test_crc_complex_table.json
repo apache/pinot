@@ -46,10 +46,7 @@
           "aggregationFunction": "SUM"
         }
       ]
-    }],
-    "forwardIndexDisabledColumns": [
-      "cityName"
-    ]
+    }]
   },
   "metadata": {},
   "fieldConfigList": [
