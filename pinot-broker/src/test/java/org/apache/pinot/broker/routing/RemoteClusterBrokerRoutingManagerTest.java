@@ -18,164 +18,382 @@
  */
 package org.apache.pinot.broker.routing;
 
-import java.lang.reflect.Field;
-import java.util.concurrent.ScheduledExecutorService;
-import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicReference;
+import org.apache.helix.model.ExternalView;
+import org.apache.helix.model.IdealState;
+import org.apache.helix.model.InstanceConfig;
+import org.apache.pinot.common.metadata.ZKMetadataProvider;
+import org.apache.pinot.common.metadata.segment.SegmentZKMetadata;
 import org.apache.pinot.common.metrics.BrokerMetrics;
+import org.apache.pinot.controller.helix.ControllerTest;
 import org.apache.pinot.core.transport.server.routing.stats.ServerRoutingStatsManager;
+import org.apache.pinot.spi.config.table.TableConfig;
+import org.apache.pinot.spi.config.table.TableType;
+import org.apache.pinot.spi.data.DateTimeFieldSpec;
+import org.apache.pinot.spi.data.FieldSpec;
+import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.env.PinotConfiguration;
-import org.mockito.Mock;
-import org.mockito.MockitoAnnotations;
-import org.testng.annotations.AfterMethod;
-import org.testng.annotations.BeforeMethod;
+import org.apache.pinot.spi.utils.CommonConstants;
+import org.apache.pinot.spi.utils.builder.TableConfigBuilder;
+import org.apache.pinot.spi.utils.builder.TableNameBuilder;
+import org.mockito.Mockito;
+import org.testng.Assert;
+import org.testng.annotations.AfterClass;
+import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
 
 import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.ArgumentMatchers.anyString;
-import static org.mockito.Mockito.when;
-import static org.testng.Assert.assertFalse;
-import static org.testng.Assert.assertNotNull;
-import static org.testng.Assert.assertTrue;
 
 /**
- * Unit tests for {@link RemoteClusterBrokerRoutingManager}.
- * Tests focus on lifecycle management, executor behavior, and routing change processing.
+ * Test class for {@link RemoteClusterBrokerRoutingManager}.
+ * Tests the remote cluster routing manager with real ZooKeeper to validate table discovery,
+ * routing updates, concurrent operations, and lifecycle management.
  */
-public class RemoteClusterBrokerRoutingManagerTest {
-  private static final String REMOTE_CLUSTER_NAME = "testRemoteCluster";
-  private static final String PROCESS_CHANGE_FIELD_NAME = "_processChangeInRouting";
-  private static final String ROUTING_EXECUTOR_FIELD_NAME = "_routingChangeExecutor";
-  private static final int EXECUTOR_STARTUP_WAIT_MS = 100;
+public class RemoteClusterBrokerRoutingManagerTest extends ControllerTest {
+  private static final String REMOTE_CLUSTER_NAME = "remoteCluster";
+  private static final String RAW_TABLE_NAME = "remoteTable";
+  private static final String OFFLINE_TABLE = TableNameBuilder.OFFLINE.tableNameWithType(RAW_TABLE_NAME);
+  private static final String SERVER_INSTANCE_1 = "Server_remote_host1_9000";
+  private static final String SERVER_INSTANCE_2 = "Server_remote_host2_9000";
 
-  @Mock
   private BrokerMetrics _brokerMetrics;
-
-  @Mock
   private ServerRoutingStatsManager _serverRoutingStatsManager;
-
-  @Mock
   private PinotConfiguration _pinotConfig;
-
   private RemoteClusterBrokerRoutingManager _routingManager;
 
-  @BeforeMethod
-  public void setUp() {
-    MockitoAnnotations.openMocks(this);
+  @BeforeClass
+  public void setUp() throws Exception {
+    startZk();
+    startController();
 
-    // Setup mock configuration
-    when(_pinotConfig.getProperty(anyString(), anyString()))
+    _brokerMetrics = Mockito.mock(BrokerMetrics.class);
+    _serverRoutingStatsManager = Mockito.mock(ServerRoutingStatsManager.class);
+    _pinotConfig = Mockito.mock(PinotConfiguration.class);
+
+    Mockito.when(_pinotConfig.getProperty(Mockito.eq("pinot.broker.adaptive.server.selector.type")))
+        .thenReturn("UNIFORM_RANDOM");
+    Mockito.when(_pinotConfig.getProperty(
+        Mockito.eq(CommonConstants.Broker.CONFIG_OF_ROUTING_ASSIGNMENT_CHANGE_PROCESS_PARALLELISM), anyInt()))
+        .thenReturn(10);
+    Mockito.when(_pinotConfig.getProperty(anyString(), anyString()))
         .thenAnswer(invocation -> invocation.getArgument(1));
-    when(_pinotConfig.getProperty(anyString(), anyInt()))
+    Mockito.when(_pinotConfig.getProperty(anyString(), anyInt()))
         .thenAnswer(invocation -> invocation.getArgument(1));
 
-    // Create the routing manager
     _routingManager = new RemoteClusterBrokerRoutingManager(
         REMOTE_CLUSTER_NAME, _brokerMetrics, _serverRoutingStatsManager, _pinotConfig);
+    _routingManager.init(_helixManager);
+
+    addServerInstances();
+    triggerInstanceConfigProcessing();
   }
 
-  @AfterMethod
+  private void triggerInstanceConfigProcessing() {
+    try {
+      _routingManager.processClusterChange(org.apache.helix.HelixConstants.ChangeType.INSTANCE_CONFIG);
+    } catch (Exception e) {
+      Assert.fail("Failed to process instance config", e);
+    }
+  }
+
+  @AfterClass
   public void tearDown() {
     if (_routingManager != null) {
       _routingManager.shutdown();
     }
+    stopController();
+    stopZk();
   }
 
-  @Test
-  public void testConstructor() {
-    assertNotNull(_routingManager);
-  }
+  private void addServerInstances() {
+    String clusterName = getHelixClusterName();
 
-  @Test
-  public void testProcessSegmentAssignmentChangeSetsFlag() throws Exception {
-    AtomicBoolean changeFlag = getProcessChangeFlag();
-    assertFalse(changeFlag.get(), "Initial flag should be false");
-
-    _routingManager.processSegmentAssignmentChangeInternal();
-
-    assertTrue(changeFlag.get(), "Flag should be set to true after processing change");
-  }
-
-  @Test
-  public void testShutdownStopsExecutor() throws Exception {
-    _routingManager.shutdown();
-
-    ScheduledExecutorService executor = getRoutingChangeExecutor();
-    assertTrue(executor.isShutdown() || executor.isTerminated(),
-        "Executor should be shutdown or terminated");
-  }
-
-  @Test
-  public void testExecutorIsScheduledOnInitialization() throws Exception {
-    RemoteClusterBrokerRoutingManager manager = new RemoteClusterBrokerRoutingManager(
-        REMOTE_CLUSTER_NAME, _brokerMetrics, _serverRoutingStatsManager, _pinotConfig);
-
-    try {
-      ScheduledExecutorService executor = getRoutingChangeExecutor(manager);
-
-      assertNotNull(executor, "Executor should be initialized");
-      assertFalse(executor.isShutdown(), "Executor should not be shutdown initially");
-
-      Thread.sleep(EXECUTOR_STARTUP_WAIT_MS);
-
-      assertFalse(executor.isShutdown(), "Executor should still be running after startup");
-    } finally {
-      manager.shutdown();
+    for (String serverInstanceId : new String[]{SERVER_INSTANCE_1, SERVER_INSTANCE_2}) {
+      if (!_helixAdmin.getInstancesInCluster(clusterName).contains(serverInstanceId)) {
+        InstanceConfig instanceConfig = new InstanceConfig(serverInstanceId);
+        instanceConfig.setHostName(serverInstanceId.split("_")[1]);
+        instanceConfig.setPort("9000");
+        instanceConfig.setInstanceEnabled(true);
+        _helixAdmin.addInstance(clusterName, instanceConfig);
+        _helixAdmin.enableInstance(clusterName, serverInstanceId, true);
+      }
     }
   }
 
   @Test
-  public void testMultipleShutdownCallsAreSafe() {
-    _routingManager.shutdown();
-    _routingManager.shutdown();
-    _routingManager.shutdown();
-  }
+  public void testTableDiscoveryAddsNewTable() throws Exception {
+    Assert.assertFalse(_routingManager.routingExists(OFFLINE_TABLE), "Table should not exist initially");
 
-  @Test
-  public void testDetermineRoutingChangeWithoutFlagIsNoOp() {
+    createTableInZooKeeper(OFFLINE_TABLE, TableType.OFFLINE);
+
+    _routingManager.processSegmentAssignmentChangeInternal();
+    Assert.assertTrue(_routingManager.hasRoutingChangeScheduled(), "Flag should be set after change");
+
     _routingManager.determineRoutingChangeForTables();
+
+    Assert.assertTrue(_routingManager.routingExists(OFFLINE_TABLE), "Table should be discovered and added");
+    Assert.assertFalse(_routingManager.hasRoutingChangeScheduled(), "Flag should be consumed");
   }
 
   @Test
-  public void testProcessSegmentAssignmentChangeIdempotent() throws Exception {
-    AtomicBoolean changeFlag = getProcessChangeFlag();
+  public void testTableRemovalDeletesRouting() throws Exception {
+    String tableToRemove = "tableToRemove_OFFLINE";
+    createTableInZooKeeper(tableToRemove, TableType.OFFLINE);
 
     _routingManager.processSegmentAssignmentChangeInternal();
+    _routingManager.determineRoutingChangeForTables();
+    Assert.assertTrue(_routingManager.routingExists(tableToRemove), "Table should exist after discovery");
+
+    deleteTableFromZooKeeper(tableToRemove);
+
     _routingManager.processSegmentAssignmentChangeInternal();
+    _routingManager.determineRoutingChangeForTables();
+
+    Assert.assertFalse(_routingManager.routingExists(tableToRemove), "Table should be removed from routing");
+  }
+
+  @Test
+  public void testConcurrentTableDiscoveryAndQueries() throws Exception {
+    String table1 = "concurrentTable1_OFFLINE";
+    String table2 = "concurrentTable2_OFFLINE";
+
+    createTableInZooKeeper(table1, TableType.OFFLINE);
     _routingManager.processSegmentAssignmentChangeInternal();
+    _routingManager.determineRoutingChangeForTables();
+    Assert.assertTrue(_routingManager.routingExists(table1));
 
-    assertTrue(changeFlag.get(), "Flag should remain true after multiple calls");
+    ExecutorService executor = Executors.newFixedThreadPool(3);
+    CountDownLatch startLatch = new CountDownLatch(1);
+    CountDownLatch finishLatch = new CountDownLatch(3);
+
+    AtomicReference<Exception> discoveryException = new AtomicReference<>();
+    AtomicReference<Exception> query1Exception = new AtomicReference<>();
+    AtomicReference<Exception> query2Exception = new AtomicReference<>();
+
+    try {
+      // Thread 1: Discover new table
+      Future<?> discoveryTask = executor.submit(() -> {
+        try {
+          startLatch.await();
+          createTableInZooKeeper(table2, TableType.OFFLINE);
+          _routingManager.processSegmentAssignmentChangeInternal();
+          _routingManager.determineRoutingChangeForTables();
+        } catch (Exception e) {
+          discoveryException.set(e);
+        } finally {
+          finishLatch.countDown();
+        }
+      });
+
+      // Thread 2: Query existing table
+      Future<?> query1Task = executor.submit(() -> {
+        try {
+          startLatch.await();
+          for (int i = 0; i < 10; i++) {
+            boolean exists = _routingManager.routingExists(table1);
+            Assert.assertTrue(exists, "Existing table should remain queryable during discovery");
+            Thread.sleep(5);
+          }
+        } catch (Exception e) {
+          query1Exception.set(e);
+        } finally {
+          finishLatch.countDown();
+        }
+      });
+
+      // Thread 3: Query both tables
+      Future<?> query2Task = executor.submit(() -> {
+        try {
+          startLatch.await();
+          Thread.sleep(20); // Let discovery happen first
+          for (int i = 0; i < 5; i++) {
+            _routingManager.routingExists(table1);
+            _routingManager.routingExists(table2);
+            Thread.sleep(10);
+          }
+        } catch (Exception e) {
+          query2Exception.set(e);
+        } finally {
+          finishLatch.countDown();
+        }
+      });
+
+      startLatch.countDown();
+      Assert.assertTrue(finishLatch.await(10, TimeUnit.SECONDS), "Tasks should complete");
+
+      if (discoveryException.get() != null) {
+        Assert.fail("Discovery failed", discoveryException.get());
+      }
+      if (query1Exception.get() != null) {
+        Assert.fail("Query 1 failed", query1Exception.get());
+      }
+      if (query2Exception.get() != null) {
+        Assert.fail("Query 2 failed", query2Exception.get());
+      }
+
+      Assert.assertTrue(_routingManager.routingExists(table1), "Table 1 should exist");
+      Assert.assertTrue(_routingManager.routingExists(table2), "Table 2 should be discovered");
+    } finally {
+      executor.shutdown();
+      Assert.assertTrue(executor.awaitTermination(5, TimeUnit.SECONDS));
+    }
   }
 
-  /**
-   * Helper method to access the private process change flag using reflection.
-   */
-  private AtomicBoolean getProcessChangeFlag() throws Exception {
-    return getProcessChangeFlag(_routingManager);
+  @Test
+  public void testMultipleTableDiscoveryInParallel() throws Exception {
+    String[] tables = {
+        "parallelTable1_OFFLINE",
+        "parallelTable2_OFFLINE",
+        "parallelTable3_OFFLINE"
+    };
+
+    ExecutorService executor = Executors.newFixedThreadPool(3);
+    CountDownLatch startLatch = new CountDownLatch(1);
+    CountDownLatch finishLatch = new CountDownLatch(3);
+
+    AtomicReference<Exception> exception = new AtomicReference<>();
+
+    try {
+      for (int i = 0; i < tables.length; i++) {
+        final String tableName = tables[i];
+        executor.submit(() -> {
+          try {
+            startLatch.await();
+            createTableInZooKeeper(tableName, TableType.OFFLINE);
+          } catch (Exception e) {
+            exception.set(e);
+          } finally {
+            finishLatch.countDown();
+          }
+        });
+      }
+
+      startLatch.countDown();
+      Assert.assertTrue(finishLatch.await(10, TimeUnit.SECONDS), "Table creation should complete");
+
+      if (exception.get() != null) {
+        Assert.fail("Table creation failed", exception.get());
+      }
+
+      _routingManager.processSegmentAssignmentChangeInternal();
+      _routingManager.determineRoutingChangeForTables();
+
+      for (String tableName : tables) {
+        Assert.assertTrue(_routingManager.routingExists(tableName),
+            "Table " + tableName + " should be discovered");
+      }
+    } finally {
+      executor.shutdown();
+      Assert.assertTrue(executor.awaitTermination(5, TimeUnit.SECONDS));
+    }
   }
 
-  /**
-   * Helper method to access the private process change flag for a specific manager.
-   */
-  private AtomicBoolean getProcessChangeFlag(RemoteClusterBrokerRoutingManager manager) throws Exception {
-    Field field = RemoteClusterBrokerRoutingManager.class.getDeclaredField(PROCESS_CHANGE_FIELD_NAME);
-    field.setAccessible(true);
-    return (AtomicBoolean) field.get(manager);
+  @Test
+  public void testRepeatedDiscoveryCalls() throws Exception {
+    String testTable = "repeatedTable_OFFLINE";
+    createTableInZooKeeper(testTable, TableType.OFFLINE);
+
+    for (int i = 0; i < 5; i++) {
+      _routingManager.processSegmentAssignmentChangeInternal();
+      _routingManager.determineRoutingChangeForTables();
+    }
+
+    Assert.assertTrue(_routingManager.routingExists(testTable),
+        "Table should be discovered after repeated calls");
   }
 
-  /**
-   * Helper method to access the private routing change executor using reflection.
-   */
-  private ScheduledExecutorService getRoutingChangeExecutor() throws Exception {
-    return getRoutingChangeExecutor(_routingManager);
+  @Test
+  public void testShutdownDuringDiscovery() throws Exception {
+    String testTable = "shutdownTable_OFFLINE";
+    createTableInZooKeeper(testTable, TableType.OFFLINE);
+
+    ExecutorService executor = Executors.newFixedThreadPool(2);
+    CountDownLatch startLatch = new CountDownLatch(1);
+    CountDownLatch finishLatch = new CountDownLatch(2);
+
+    AtomicReference<Exception> discoveryException = new AtomicReference<>();
+    AtomicReference<Exception> shutdownException = new AtomicReference<>();
+
+    try {
+      // Thread 1: Start discovery
+      Future<?> discoveryTask = executor.submit(() -> {
+        try {
+          startLatch.await();
+          _routingManager.processSegmentAssignmentChangeInternal();
+          _routingManager.determineRoutingChangeForTables();
+        } catch (Exception e) {
+          discoveryException.set(e);
+        } finally {
+          finishLatch.countDown();
+        }
+      });
+
+      // Thread 2: Shutdown
+      Future<?> shutdownTask = executor.submit(() -> {
+        try {
+          startLatch.await();
+          Thread.sleep(10);
+          _routingManager.shutdown();
+        } catch (Exception e) {
+          shutdownException.set(e);
+        } finally {
+          finishLatch.countDown();
+        }
+      });
+
+      startLatch.countDown();
+      Assert.assertTrue(finishLatch.await(10, TimeUnit.SECONDS), "Tasks should complete");
+
+      if (shutdownException.get() != null) {
+        Assert.fail("Shutdown failed", shutdownException.get());
+      }
+
+      Assert.assertTrue(_routingManager.isExecutorShutdown(), "Executor should be shutdown");
+    } finally {
+      executor.shutdown();
+      Assert.assertTrue(executor.awaitTermination(5, TimeUnit.SECONDS));
+    }
   }
 
-  /**
-   * Helper method to access the private routing change executor for a specific manager.
-   */
-  private ScheduledExecutorService getRoutingChangeExecutor(RemoteClusterBrokerRoutingManager manager)
-      throws Exception {
-    Field field = RemoteClusterBrokerRoutingManager.class.getDeclaredField(ROUTING_EXECUTOR_FIELD_NAME);
-    field.setAccessible(true);
-    return (ScheduledExecutorService) field.get(manager);
+  private void createTableInZooKeeper(String tableNameWithType, TableType tableType) {
+    TableConfig tableConfig = new TableConfigBuilder(tableType)
+        .setTableName(TableNameBuilder.extractRawTableName(tableNameWithType))
+        .setTimeColumnName("timestamp")
+        .build();
+    ZKMetadataProvider.setTableConfig(_propertyStore, tableConfig);
+
+    Schema schema = new Schema();
+    schema.setSchemaName(TableNameBuilder.extractRawTableName(tableNameWithType));
+    schema.addField(new DateTimeFieldSpec("timestamp", FieldSpec.DataType.LONG, "1:MILLISECONDS:EPOCH", "1:DAYS"));
+    ZKMetadataProvider.setSchema(_propertyStore, schema);
+
+    IdealState idealState = new IdealState(tableNameWithType);
+    idealState.setStateModelDefRef("OnlineOffline");
+    idealState.setRebalanceMode(IdealState.RebalanceMode.CUSTOMIZED);
+    idealState.setNumPartitions(1);
+    idealState.setPartitionState("segment_0", SERVER_INSTANCE_1, "ONLINE");
+
+    ExternalView externalView = new ExternalView(tableNameWithType);
+    externalView.setState("segment_0", SERVER_INSTANCE_1, "ONLINE");
+
+    _helixDataAccessor.setProperty(_helixDataAccessor.keyBuilder().idealStates(tableNameWithType), idealState);
+    _helixDataAccessor.setProperty(_helixDataAccessor.keyBuilder().externalView(tableNameWithType), externalView);
+
+    SegmentZKMetadata segmentMetadata = new SegmentZKMetadata("segment_0");
+    segmentMetadata.setEndTime(System.currentTimeMillis());
+    segmentMetadata.setTimeUnit(TimeUnit.MILLISECONDS);
+    segmentMetadata.setTotalDocs(1000);
+    ZKMetadataProvider.setSegmentZKMetadata(_propertyStore, tableNameWithType, segmentMetadata);
+  }
+
+  private void deleteTableFromZooKeeper(String tableNameWithType) {
+    _helixDataAccessor.removeProperty(_helixDataAccessor.keyBuilder().idealStates(tableNameWithType));
+    _helixDataAccessor.removeProperty(_helixDataAccessor.keyBuilder().externalView(tableNameWithType));
   }
 }

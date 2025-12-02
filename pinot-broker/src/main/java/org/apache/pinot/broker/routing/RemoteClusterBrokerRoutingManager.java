@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.broker.routing;
 
+import com.google.common.annotations.VisibleForTesting;
 import java.util.HashSet;
 import java.util.Set;
 import java.util.concurrent.Executors;
@@ -108,5 +109,15 @@ public class RemoteClusterBrokerRoutingManager extends BrokerRoutingManager {
   protected void processSegmentAssignmentChangeInternal() {
     super.processSegmentAssignmentChangeInternal();
     _processChangeInRouting.set(true);
+  }
+
+  @VisibleForTesting
+  boolean hasRoutingChangeScheduled() {
+    return _processChangeInRouting.get();
+  }
+
+  @VisibleForTesting
+  boolean isExecutorShutdown() {
+    return _routingChangeExecutor.isShutdown() || _routingChangeExecutor.isTerminated();
   }
 }
