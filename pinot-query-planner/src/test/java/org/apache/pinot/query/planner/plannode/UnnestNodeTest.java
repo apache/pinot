@@ -172,6 +172,8 @@ public class UnnestNodeTest {
     Assert.assertEquals(node2.getInputs().get(0), input);
     Assert.assertEquals(node2.getArrayExprs(), node1.getArrayExprs());
     Assert.assertEquals(node2.getColumnAliases(), node1.getColumnAliases());
+    Assert.assertNotSame(node2.getTableFunctionContext(), node1.getTableFunctionContext());
+    Assert.assertEquals(node2.getTableFunctionContext(), node1.getTableFunctionContext());
   }
 
   @Test

@@ -88,6 +88,7 @@ import org.apache.pinot.query.planner.plannode.TableScanNode;
 import org.apache.pinot.query.planner.plannode.UnnestNode;
 import org.apache.pinot.query.planner.plannode.ValueNode;
 import org.apache.pinot.query.planner.plannode.WindowNode;
+import org.apache.pinot.spi.utils.CommonConstants;
 import org.codehaus.commons.nullanalysis.NotNull;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -99,6 +100,11 @@ import org.slf4j.LoggerFactory;
 public final class RelToPlanNodeConverter {
   private static final Logger LOGGER = LoggerFactory.getLogger(RelToPlanNodeConverter.class);
   private static final int DEFAULT_STAGE_ID = -1;
+  /**
+   * Pattern used to detect Calcite/Pinot auto-generated aliases such as expr$0, item0, ord0, arr0, unnest_col_0, col0.
+   * The matcher is case-insensitive because connectors may emit the aliases in different cases (e.g., EXPR$0 vs
+   * expr$0).
+   */
   private static final Pattern AUTO_GENERATED_ALIAS_PATTERN =
       Pattern.compile("(?i)(expr\\$\\d+|item\\d+|ord\\d+|arr\\d+|unnest_col_\\d+|col\\d+)");
 
@@ -108,11 +114,18 @@ public final class RelToPlanNodeConverter {
   @Nullable
   private final TransformationTracker.Builder<PlanNode, RelNode> _tracker;
   private final String _hashFunction;
+  private final boolean _caseSensitive;
 
   public RelToPlanNodeConverter(@Nullable TransformationTracker.Builder<PlanNode, RelNode> tracker,
       String hashFunction) {
+    this(tracker, hashFunction, !CommonConstants.Helix.DEFAULT_ENABLE_CASE_INSENSITIVE);
+  }
+
+  public RelToPlanNodeConverter(@Nullable TransformationTracker.Builder<PlanNode, RelNode> tracker,
+      String hashFunction, boolean caseSensitive) {
     _tracker = tracker;
     _hashFunction = hashFunction;
+    _caseSensitive = caseSensitive;
   }
 
   /**
@@ -233,8 +246,15 @@ public final class RelToPlanNodeConverter {
       }
     }
 
+    List<Integer> elementIndexes = new ArrayList<>();
+    for (int i = 0; i < arrayExprs.size(); i++) {
+      elementIndexes.add(UnnestNode.UNSPECIFIED_INDEX);
+    }
+    UnnestNode.TableFunctionContext tableFunctionContext =
+        new UnnestNode.TableFunctionContext(columnAliases, withOrdinality, ordinalityAlias, elementIndexes,
+            UnnestNode.UNSPECIFIED_INDEX);
     return new UnnestNode(DEFAULT_STAGE_ID, toDataSchema(node.getRowType()), NodeHint.EMPTY,
-        convertInputs(node.getInputs()), arrayExprs, columnAliases, withOrdinality, ordinalityAlias);
+        convertInputs(node.getInputs()), arrayExprs, tableFunctionContext);
   }
 
   private BasePlanNode convertLogicalCorrelate(LogicalCorrelate node) {
@@ -316,8 +336,11 @@ public final class RelToPlanNodeConverter {
     }
     List<Integer> elementIndexes = ordinalInfo.getElementIndexes();
     int ordinalityIndex = ordinalInfo.getOrdinalityIndex();
+    UnnestNode.TableFunctionContext tableFunctionContext =
+        new UnnestNode.TableFunctionContext(columnAliases, withOrdinality, ordinalityAlias, elementIndexes,
+            ordinalityIndex);
     UnnestNode unnest = new UnnestNode(DEFAULT_STAGE_ID, toDataSchema(node.getRowType()), NodeHint.EMPTY,
-        inputs, arrayExprs, columnAliases, withOrdinality, ordinalityAlias, elementIndexes, ordinalityIndex);
+        inputs, arrayExprs, tableFunctionContext);
     if (wrapWithFilter) {
       // Wrap Unnest with a FilterNode; rewrite filter InputRefs to absolute output indexes
       // For multiple arrays, we need to handle rewriting differently
@@ -405,7 +428,7 @@ public final class RelToPlanNodeConverter {
   }
 
   @Nullable
-  private static RexExpression deriveArrayExpression(RexNode rex, Project project, RelDataType leftRowType) {
+  private RexExpression deriveArrayExpression(RexNode rex, Project project, RelDataType leftRowType) {
     Integer idx = resolveInputRefFromCorrel(rex, leftRowType);
     if (idx != null) {
       return new RexExpression.InputRef(idx);
@@ -645,7 +668,7 @@ public final class RelToPlanNodeConverter {
     }
   }
 
-  private static Integer resolveInputRefFromCorrel(RexNode expr, RelDataType leftRowType) {
+  private Integer resolveInputRefFromCorrel(RexNode expr, RelDataType leftRowType) {
     if (expr instanceof RexFieldAccess) {
       RexFieldAccess fieldAccess = (RexFieldAccess) expr;
       if (fieldAccess.getReferenceExpr() instanceof RexCorrelVariable) {
@@ -663,9 +686,14 @@ public final class RelToPlanNodeConverter {
             return i;
           }
           if (candidateName.equalsIgnoreCase(fieldName)) {
-            LOGGER.warn("Case-insensitive field match for correlated reference '{}' vs '{}'. "
-                + "Ensure schema case-sensitivity is configured as expected.", fieldName, candidateName);
-            return i;
+            if (_caseSensitive) {
+              LOGGER.warn("Skipping correlated reference '{}' vs '{}' because schema is case-sensitive. "
+                  + "Adjust query or enable case-insensitive matching.", fieldName, candidateName);
+            } else {
+              LOGGER.warn("Case-insensitive field match for correlated reference '{}' vs '{}'. "
+                  + "Ensure schema case-sensitivity is configured as expected.", fieldName, candidateName);
+              return i;
+            }
           }
         }
       }

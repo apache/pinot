@@ -37,39 +37,28 @@ public class UnnestNode extends BasePlanNode {
   public static final int UNSPECIFIED_INDEX = -1;
 
   private final List<RexExpression> _arrayExprs;
-  private final List<String> _columnAliases;
-  private final boolean _withOrdinality;
-  @Nullable
-  private final String _ordinalityAlias;
-  // Absolute output indexes in the stage schema; -1 means unspecified
-  private final List<Integer> _elementIndexes;
-  private final int _ordinalityIndex;
+  private final TableFunctionContext _tableFunctionContext;
 
   public UnnestNode(int stageId, DataSchema dataSchema, NodeHint nodeHint, List<PlanNode> inputs,
       List<RexExpression> arrayExprs, List<String> columnAliases, boolean withOrdinality,
       @Nullable String ordinalityAlias) {
-    super(stageId, dataSchema, nodeHint, inputs);
-    _arrayExprs = arrayExprs;
-    _columnAliases = columnAliases;
-    _withOrdinality = withOrdinality;
-    _ordinalityAlias = ordinalityAlias;
-    _elementIndexes = new ArrayList<>();
-    for (int i = 0; i < arrayExprs.size(); i++) {
-      _elementIndexes.add(UNSPECIFIED_INDEX);
-    }
-    _ordinalityIndex = UNSPECIFIED_INDEX;
+    this(stageId, dataSchema, nodeHint, inputs, arrayExprs,
+        new TableFunctionContext(columnAliases, withOrdinality, ordinalityAlias,
+            defaultElementIndexes(arrayExprs.size()), UNSPECIFIED_INDEX));
   }
 
   public UnnestNode(int stageId, DataSchema dataSchema, NodeHint nodeHint, List<PlanNode> inputs,
       List<RexExpression> arrayExprs, List<String> columnAliases, boolean withOrdinality,
       @Nullable String ordinalityAlias, List<Integer> elementIndexes, int ordinalityIndex) {
+    this(stageId, dataSchema, nodeHint, inputs, arrayExprs,
+        new TableFunctionContext(columnAliases, withOrdinality, ordinalityAlias, elementIndexes, ordinalityIndex));
+  }
+
+  public UnnestNode(int stageId, DataSchema dataSchema, NodeHint nodeHint, List<PlanNode> inputs,
+      List<RexExpression> arrayExprs, TableFunctionContext tableFunctionContext) {
     super(stageId, dataSchema, nodeHint, inputs);
     _arrayExprs = arrayExprs;
-    _columnAliases = columnAliases;
-    _withOrdinality = withOrdinality;
-    _ordinalityAlias = ordinalityAlias;
-    _elementIndexes = elementIndexes;
-    _ordinalityIndex = ordinalityIndex;
+    _tableFunctionContext = tableFunctionContext;
   }
 
   // Backward compatibility constructor for single array
@@ -97,36 +86,40 @@ public class UnnestNode extends BasePlanNode {
     return _arrayExprs.isEmpty() ? null : _arrayExprs.get(0);
   }
 
+  public TableFunctionContext getTableFunctionContext() {
+    return _tableFunctionContext;
+  }
+
   public List<String> getColumnAliases() {
-    return _columnAliases;
+    return _tableFunctionContext.getColumnAliases();
   }
 
   // Backward compatibility method
   @Nullable
   public String getColumnAlias() {
-    return _columnAliases.isEmpty() ? null : _columnAliases.get(0);
+    return getColumnAliases().isEmpty() ? null : getColumnAliases().get(0);
   }
 
   public boolean isWithOrdinality() {
-    return _withOrdinality;
+    return _tableFunctionContext.isWithOrdinality();
   }
 
   @Nullable
   public String getOrdinalityAlias() {
-    return _ordinalityAlias;
+    return _tableFunctionContext.getOrdinalityAlias();
   }
 
   public List<Integer> getElementIndexes() {
-    return _elementIndexes;
+    return _tableFunctionContext.getElementIndexes();
   }
 
   // Backward compatibility method
   public int getElementIndex() {
-    return _elementIndexes.isEmpty() ? UNSPECIFIED_INDEX : _elementIndexes.get(0);
+    return getElementIndexes().isEmpty() ? UNSPECIFIED_INDEX : getElementIndexes().get(0);
   }
 
   public int getOrdinalityIndex() {
-    return _ordinalityIndex;
+    return _tableFunctionContext.getOrdinalityIndex();
   }
 
   @Override
@@ -141,8 +134,7 @@ public class UnnestNode extends BasePlanNode {
 
   @Override
   public PlanNode withInputs(List<PlanNode> inputs) {
-    return new UnnestNode(_stageId, _dataSchema, _nodeHint, inputs, _arrayExprs, _columnAliases, _withOrdinality,
-        _ordinalityAlias, _elementIndexes, _ordinalityIndex);
+    return new UnnestNode(_stageId, _dataSchema, _nodeHint, inputs, _arrayExprs, _tableFunctionContext.copy());
   }
 
   @Override
@@ -157,14 +149,87 @@ public class UnnestNode extends BasePlanNode {
       return false;
     }
     UnnestNode that = (UnnestNode) o;
-    return Objects.equals(_arrayExprs, that._arrayExprs) && Objects.equals(_columnAliases, that._columnAliases)
-        && _withOrdinality == that._withOrdinality && Objects.equals(_ordinalityAlias, that._ordinalityAlias)
-        && Objects.equals(_elementIndexes, that._elementIndexes) && _ordinalityIndex == that._ordinalityIndex;
+    return Objects.equals(_arrayExprs, that._arrayExprs)
+        && Objects.equals(_tableFunctionContext, that._tableFunctionContext);
   }
 
   @Override
   public int hashCode() {
-    return Objects.hash(super.hashCode(), _arrayExprs, _columnAliases, _withOrdinality, _ordinalityAlias,
-        _elementIndexes, _ordinalityIndex);
+    return Objects.hash(super.hashCode(), _arrayExprs, _tableFunctionContext);
+  }
+
+  private static List<Integer> defaultElementIndexes(int count) {
+    List<Integer> indexes = new ArrayList<>(count);
+    for (int i = 0; i < count; i++) {
+      indexes.add(UNSPECIFIED_INDEX);
+    }
+    return indexes;
+  }
+
+  /**
+   * Encapsulates standard SQL table function metadata (column aliases, ordinality) for UNNEST.
+   */
+  public static final class TableFunctionContext {
+    private final List<String> _columnAliases;
+    private final boolean _withOrdinality;
+    @Nullable
+    private final String _ordinalityAlias;
+    private final List<Integer> _elementIndexes;
+    private final int _ordinalityIndex;
+
+    public TableFunctionContext(List<String> columnAliases, boolean withOrdinality, @Nullable String ordinalityAlias,
+        List<Integer> elementIndexes, int ordinalityIndex) {
+      _columnAliases = List.copyOf(columnAliases);
+      _withOrdinality = withOrdinality;
+      _ordinalityAlias = ordinalityAlias;
+      _elementIndexes = List.copyOf(elementIndexes);
+      _ordinalityIndex = ordinalityIndex;
+    }
+
+    public List<String> getColumnAliases() {
+      return _columnAliases;
+    }
+
+    public boolean isWithOrdinality() {
+      return _withOrdinality;
+    }
+
+    @Nullable
+    public String getOrdinalityAlias() {
+      return _ordinalityAlias;
+    }
+
+    public List<Integer> getElementIndexes() {
+      return _elementIndexes;
+    }
+
+    public int getOrdinalityIndex() {
+      return _ordinalityIndex;
+    }
+
+    public TableFunctionContext copy() {
+      return new TableFunctionContext(_columnAliases, _withOrdinality, _ordinalityAlias, _elementIndexes,
+          _ordinalityIndex);
+    }
+
+    @Override
+    public boolean equals(Object o) {
+      if (this == o) {
+        return true;
+      }
+      if (!(o instanceof TableFunctionContext)) {
+        return false;
+      }
+      TableFunctionContext that = (TableFunctionContext) o;
+      return _withOrdinality == that._withOrdinality && _ordinalityIndex == that._ordinalityIndex
+          && Objects.equals(_columnAliases, that._columnAliases)
+          && Objects.equals(_ordinalityAlias, that._ordinalityAlias)
+          && Objects.equals(_elementIndexes, that._elementIndexes);
+    }
+
+    @Override
+    public int hashCode() {
+      return Objects.hash(_columnAliases, _withOrdinality, _ordinalityAlias, _elementIndexes, _ordinalityIndex);
+    }
   }
 }

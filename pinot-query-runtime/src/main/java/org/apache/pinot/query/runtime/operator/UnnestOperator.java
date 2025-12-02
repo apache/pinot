@@ -51,6 +51,7 @@ public class UnnestOperator extends MultiStageOperator {
   private final List<Integer> _elementIndexes;
   private final int _ordinalityIndex;
   private final StatMap<StatKey> _statMap = new StatMap<>(StatKey.class);
+  private boolean _loggedElementOverflow;
 
   public UnnestOperator(OpChainExecutionContext context, MultiStageOperator input, DataSchema inputSchema,
       UnnestNode node) {
@@ -95,6 +96,11 @@ public class UnnestOperator extends MultiStageOperator {
     return EXPLAIN_NAME;
   }
 
+  /**
+   * Produces zipped rows across the configured array expressions for each input row.
+   * If an expression evaluates to a scalar instead of an array/list, we intentionally treat it as a single-element
+   * array so the row still participates in UNNEST output instead of being dropped.
+   */
   @Override
   protected MseBlock getNextBlock() {
     MseBlock block = _input.nextBlock();
@@ -143,6 +149,11 @@ public class UnnestOperator extends MultiStageOperator {
         for (double v : arr) {
           elements.add(v);
         }
+      } else if (value instanceof float[]) {
+        float[] arr = (float[]) value;
+        for (float v : arr) {
+          elements.add(v);
+        }
       } else if (value instanceof boolean[]) {
         boolean[] arr = (boolean[]) value;
         for (boolean v : arr) {
@@ -170,6 +181,7 @@ public class UnnestOperator extends MultiStageOperator {
         Object[] arr = (Object[]) value;
         Collections.addAll(elements, arr);
       } else {
+        // Last-resort fallback for uncommon array types; use reflection only in this slow path.
         int length = java.lang.reflect.Array.getLength(value);
         for (int i = 0; i < length; i++) {
           elements.add(java.lang.reflect.Array.get(value, i));
@@ -194,21 +206,6 @@ public class UnnestOperator extends MultiStageOperator {
       return;
     }
 
-    // Get default null values for each element column from the result schema
-    int base = inputRow.length;
-    List<Object> defaultNullValues = new ArrayList<>();
-    for (int i = 0; i < arrays.size(); i++) {
-      int elemPos;
-      if (i < _elementIndexes.size() && _elementIndexes.get(i) >= 0
-          && _elementIndexes.get(i) < _resultSchema.size()) {
-        elemPos = _elementIndexes.get(i);
-      } else {
-        elemPos = base + i;
-      }
-      DataSchema.ColumnDataType columnDataType = _resultSchema.getColumnDataType(elemPos);
-      defaultNullValues.add(columnDataType.getNullPlaceholder());
-    }
-
     // Align arrays by index: for each position, take element from each array or use null
     int ordinality = 1;
     for (int idx = 0; idx < maxLength; idx++) {
@@ -218,8 +215,8 @@ public class UnnestOperator extends MultiStageOperator {
         if (idx < array.size()) {
           alignedElements.add(array.get(idx));
         } else {
-          // Use default null value for shorter arrays
-          alignedElements.add(defaultNullValues.get(arrIdx));
+          // Padding shorter array with null
+          alignedElements.add(null);
         }
       }
       outRows.add(appendElements(inputRow, alignedElements, ordinality++));
@@ -245,6 +242,14 @@ public class UnnestOperator extends MultiStageOperator {
       if (elemPos < 0) {
         if (nextFreePos >= outSize) {
           // No room to write this element; skip because downstream schema does not include it.
+          if (!_loggedElementOverflow) {
+            LOGGER.warn(
+                "UnnestOperator: Skipping element at index {} due to insufficient output capacity (outSize={}, "
+                    + "elementsSize={}, inputRowLength={}, elementIndexCount={}). "
+                    + "This may indicate a schema mismatch between planner and runtime. Further warnings suppressed.",
+                i, outSize, elements.size(), inputRow.length, _elementIndexes.size());
+            _loggedElementOverflow = true;
+          }
           continue;
         }
         elemPos = nextFreePos++;

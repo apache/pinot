@@ -122,7 +122,7 @@ public class UnnestIntegrationTest extends CustomDataQueryClusterIntegrationTest
           break;
         case 3:
           assertEquals(row.get(1).asLong(), 3L);
-          assertEquals(row.get(2).asText(), "");
+          assertEquals(row.get(2).asText(), "null");
           break;
         default:
           break;
@@ -233,8 +233,8 @@ public class UnnestIntegrationTest extends CustomDataQueryClusterIntegrationTest
           break;
         case 4:
           assertEquals(row.get(1).asLong(), 3L);
-          assertTrue(row.get(2).isNull() || row.get(2).asText().isEmpty(),
-              "Shorter stringArrayCol should yield null/empty padding for ordinality 4");
+          assertTrue(row.get(2).isNull(),
+              "Shorter stringArrayCol should yield null padding for ordinality 4");
           break;
         default:
           throw new AssertionError("Unexpected ordinality " + ordinality);
