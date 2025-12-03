@@ -62,5 +62,10 @@ public @interface ScalarFunction {
    */
   boolean isVarArg() default false;
 
+  /**
+   * Whether the scalar function should be treated as deterministic (eligible for compile-time evaluation).
+   */
+  boolean isDeterministic() default true;
+
   @Deprecated boolean isPlaceholder() default false;
 }

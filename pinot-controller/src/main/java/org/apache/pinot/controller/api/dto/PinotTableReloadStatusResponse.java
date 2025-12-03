@@ -18,6 +18,12 @@
  */
 package org.apache.pinot.controller.api.dto;
 
+import java.util.List;
+import org.apache.pinot.common.response.server.SegmentReloadFailureResponse;
+import org.apache.pinot.spi.annotations.InterfaceStability;
+
+
+@InterfaceStability.Evolving
 public class PinotTableReloadStatusResponse {
   private double _timeElapsedInMinutes;
   private double _estimatedTimeRemainingInMinutes;
@@ -27,6 +33,7 @@ public class PinotTableReloadStatusResponse {
   private int _totalServerCallsFailed;
   private Long _failureCount;
   private PinotControllerJobMetadataDto _metadata;
+  private List<SegmentReloadFailureResponse> _segmentReloadFailures;
 
   public int getTotalSegmentCount() {
     return _totalSegmentCount;
@@ -99,6 +106,16 @@ public class PinotTableReloadStatusResponse {
 
   public PinotTableReloadStatusResponse setMetadata(PinotControllerJobMetadataDto metadata) {
     _metadata = metadata;
+    return this;
+  }
+
+  public List<SegmentReloadFailureResponse> getSegmentReloadFailures() {
+    return _segmentReloadFailures;
+  }
+
+  public PinotTableReloadStatusResponse setSegmentReloadFailures(
+      List<SegmentReloadFailureResponse> segmentReloadFailures) {
+    _segmentReloadFailures = segmentReloadFailures;
     return this;
   }
 }

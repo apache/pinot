@@ -25,14 +25,18 @@ import java.util.List;
 import java.util.Map;
 import java.util.function.Supplier;
 import javax.annotation.Nullable;
+import org.apache.calcite.rel.type.RelDataType;
+import org.apache.calcite.sql.SqlAggFunction;
 import org.apache.calcite.sql.SqlBinaryOperator;
 import org.apache.calcite.sql.SqlFunction;
 import org.apache.calcite.sql.SqlFunctionCategory;
 import org.apache.calcite.sql.SqlIdentifier;
 import org.apache.calcite.sql.SqlKind;
 import org.apache.calcite.sql.SqlOperator;
+import org.apache.calcite.sql.SqlOperatorBinding;
 import org.apache.calcite.sql.SqlOperatorTable;
 import org.apache.calcite.sql.SqlPostfixOperator;
+import org.apache.calcite.sql.SqlSplittableAggFunction;
 import org.apache.calcite.sql.SqlSyntax;
 import org.apache.calcite.sql.fun.SqlLeadLagAggFunction;
 import org.apache.calcite.sql.fun.SqlMonotonicBinaryOperator;
@@ -41,9 +45,11 @@ import org.apache.calcite.sql.fun.SqlStdOperatorTable;
 import org.apache.calcite.sql.type.InferTypes;
 import org.apache.calcite.sql.type.OperandTypes;
 import org.apache.calcite.sql.type.ReturnTypes;
+import org.apache.calcite.sql.type.SqlReturnTypeInference;
 import org.apache.calcite.sql.type.SqlTypeFamily;
 import org.apache.calcite.sql.type.SqlTypeTransforms;
 import org.apache.calcite.sql.validate.SqlNameMatcher;
+import org.apache.calcite.util.Optionality;
 import org.apache.commons.lang3.tuple.Pair;
 import org.apache.pinot.common.function.FunctionRegistry;
 import org.apache.pinot.common.function.PinotScalarFunction;
@@ -182,12 +188,12 @@ public class PinotOperatorTable implements SqlOperatorTable {
       SqlStdOperatorTable.NOT,
 
       // AGGREGATE OPERATORS
-      SqlStdOperatorTable.SUM,
       SqlStdOperatorTable.COUNT,
-      SqlStdOperatorTable.MODE,
-      SqlStdOperatorTable.MIN,
-      SqlStdOperatorTable.MAX,
+      SqlStdOperatorTable.SUM,
+      PinotMinMaxFunction.MIN,
+      PinotMinMaxFunction.MAX,
       SqlStdOperatorTable.AVG,
+      SqlStdOperatorTable.MODE,
       SqlStdOperatorTable.STDDEV_POP,
       SqlStdOperatorTable.COVAR_POP,
       SqlStdOperatorTable.COVAR_SAMP,
@@ -376,8 +382,16 @@ public class PinotOperatorTable implements SqlOperatorTable {
     for (AggregationFunctionType functionType : AggregationFunctionType.values()) {
       if (functionType.getReturnTypeInference() != null) {
         String functionName = functionType.getName();
-        PinotSqlAggFunction function = new PinotSqlAggFunction(functionName, functionType.getReturnTypeInference(),
-            functionType.getOperandTypeChecker());
+        PinotSqlAggFunction function;
+
+        if (functionType.getSqlKind() != null) {
+          function = new PinotSqlAggFunction(functionName, functionType.getReturnTypeInference(),
+              functionType.getOperandTypeChecker(), functionType.getSqlKind());
+        } else {
+          function = new PinotSqlAggFunction(functionName, functionType.getReturnTypeInference(),
+              functionType.getOperandTypeChecker());
+        }
+
         Preconditions.checkState(operatorMap.put(FunctionRegistry.canonicalize(functionName), function) == null,
             "Aggregate function: %s is already registered", functionName);
       }
@@ -465,6 +479,85 @@ public class PinotOperatorTable implements SqlOperatorTable {
     @Override
     public boolean allowsFraming() {
       return false;
+    }
+  }
+
+  /// Pinot's custom SUM aggregation function that can aggregate on SV or MV numeric inputs. We can't simply override
+  /// the return type inference and operand type checker in {@link AggregationFunctionType} like we do for other
+  /// functions because {@link org.apache.calcite.sql.fun.SqlSumAggFunction} has some customizations that we need to
+  /// retain here to ensure that rules like {@link org.apache.calcite.rel.rules.AggregateRemoveRule} work as expected.
+  /// TODO: Replace {@link SqlStdOperatorTable#SUM} with this instance after the next release (there's a dependency
+  /// on AVG window function, see https://github.com/apache/pinot/pull/17109).
+  private static final class PinotSumFunction extends PinotSqlAggFunction {
+    static final SqlOperator INSTANCE = new PinotSumFunction();
+
+    public PinotSumFunction() {
+      super("SUM", ReturnTypes.AGG_SUM, OperandTypes.or(OperandTypes.NUMERIC, OperandTypes.ARRAY), SqlKind.SUM);
+    }
+
+    @Override
+    public <T> @Nullable T unwrap(Class<T> clazz) {
+      if (clazz.isInstance(SqlSplittableAggFunction.SumSplitter.INSTANCE)) {
+        return clazz.cast(SqlSplittableAggFunction.SumSplitter.INSTANCE);
+      }
+      return super.unwrap(clazz);
+    }
+
+    @Override
+    public SqlAggFunction getRollup() {
+      return this;
+    }
+  }
+
+  /// Pinot's custom MIN / MAX aggregation function that can aggregate on SV or MV comparable inputs. We can't simply
+  /// override the return type inference and operand type checker in {@link AggregationFunctionType} like we do for
+  /// other functions because {@link org.apache.calcite.sql.fun.SqlMinMaxAggFunction} has some customizations that we
+  /// need to retain here to ensure that rules like {@link org.apache.calcite.rel.rules.AggregateRemoveRule} work as
+  /// expected.
+  private static final class PinotMinMaxFunction extends PinotSqlAggFunction {
+    static final SqlOperator MIN = new PinotMinMaxFunction(SqlKind.MIN);
+    static final SqlOperator MAX = new PinotMinMaxFunction(SqlKind.MAX);
+
+    public PinotMinMaxFunction(SqlKind kind) {
+      super(kind.name(), new PinotMinMaxReturnTypeInference(),
+          OperandTypes.or(OperandTypes.COMPARABLE_ORDERED, OperandTypes.ARRAY), kind);
+    }
+
+    @Override
+    public Optionality getDistinctOptionality() {
+      return Optionality.IGNORED;
+    }
+
+    @Override
+    public <T> @Nullable T unwrap(Class<T> clazz) {
+      if (clazz.isInstance(SqlSplittableAggFunction.SelfSplitter.INSTANCE)) {
+        return clazz.cast(SqlSplittableAggFunction.SelfSplitter.INSTANCE);
+      }
+      return super.unwrap(clazz);
+    }
+
+    @Override
+    public SqlAggFunction getRollup() {
+      return this;
+    }
+  }
+
+  /// Pinot's MIN / MAX aggregation functions can be used on SV or MV (represented as Calcite array) types.
+  private static class PinotMinMaxReturnTypeInference implements SqlReturnTypeInference {
+    @Override
+    public RelDataType inferReturnType(SqlOperatorBinding opBinding) {
+      RelDataType operandType;
+      if (opBinding.getOperandType(0).getComponentType() != null) {
+        operandType = opBinding.getOperandType(0).getComponentType();
+      } else {
+        operandType = opBinding.getOperandType(0);
+      }
+
+      if (opBinding.getGroupCount() == 0 || opBinding.hasFilter()) {
+        return opBinding.getTypeFactory().createTypeWithNullability(operandType, true);
+      } else {
+        return operandType;
+      }
     }
   }
 }

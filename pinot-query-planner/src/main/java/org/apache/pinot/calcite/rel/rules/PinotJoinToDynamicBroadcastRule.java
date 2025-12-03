@@ -21,7 +21,6 @@ package org.apache.pinot.calcite.rel.rules;
 import org.apache.calcite.plan.RelOptRule;
 import org.apache.calcite.plan.RelOptRuleCall;
 import org.apache.calcite.plan.hep.HepRelVertex;
-import org.apache.calcite.rel.RelDistribution;
 import org.apache.calcite.rel.RelDistributions;
 import org.apache.calcite.rel.RelNode;
 import org.apache.calcite.rel.core.Exchange;
@@ -149,16 +148,21 @@ public class PinotJoinToDynamicBroadcastRule extends RelOptRule {
     Exchange left = (Exchange) ((HepRelVertex) join.getLeft()).getCurrentRel();
     Exchange right = (Exchange) ((HepRelVertex) join.getRight()).getCurrentRel();
 
-    // when colocated join hint is given, dynamic broadcast exchange can be hash-distributed b/c
-    //    1. currently, dynamic broadcast only works against main table off leaf-stage; (e.g. receive node on leaf)
-    //    2. when hash key are the same but hash functions are different, it can be done via normal hash shuffle.
+    RelNode rightInput = right.getInput();
+    PinotLogicalExchange newRight;
+    // TODO: Automatically figure out table colocation. In order to do that, distribution trait must be propagated
+    //       before applying this rule.
     boolean colocatedByJoinKeys = Boolean.TRUE.equals(PinotHintOptions.JoinHintOptions.isColocatedByJoinKeys(join));
-    RelDistribution relDistribution = colocatedByJoinKeys ? RelDistributions.hash(join.analyzeCondition().rightKeys)
-        : RelDistributions.BROADCAST_DISTRIBUTED;
-    PinotLogicalExchange dynamicBroadcastExchange =
-        PinotLogicalExchange.create(right.getInput(), relDistribution, PinotRelExchangeType.PIPELINE_BREAKER);
+    if (colocatedByJoinKeys) {
+      newRight =
+          PinotLogicalExchange.create(rightInput, RelDistributions.SINGLETON, PinotRelExchangeType.PIPELINE_BREAKER,
+              true);
+    } else {
+      newRight = PinotLogicalExchange.create(rightInput, RelDistributions.BROADCAST_DISTRIBUTED,
+          PinotRelExchangeType.PIPELINE_BREAKER, false);
+    }
 
-    call.transformTo(join.copy(join.getTraitSet(), join.getCondition(), left.getInput(), dynamicBroadcastExchange,
-        join.getJoinType(), join.isSemiJoinDone()));
+    call.transformTo(join.copy(join.getTraitSet(), join.getCondition(), left.getInput(), newRight, join.getJoinType(),
+        join.isSemiJoinDone()));
   }
 }

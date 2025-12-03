@@ -156,7 +156,7 @@ public class QueryCompilationTest extends QueryEnvironmentTestBase {
   public void testJoinPushTransitivePredicate() {
     // queries involving extra predicate on join keys
     // should be optimized to push the predicate to both sides of the join if applicable
-    String query = "EXPLAIN PLAN FOR\n"
+    String query = "SET usePlannerRules='JoinPushTransitivePredicates'; EXPLAIN PLAN FOR\n"
         + "SELECT * FROM a\n"
         + "JOIN b\n"
         + "ON a.col1 = b.col1\n"
