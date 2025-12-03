@@ -1928,10 +1928,9 @@ public class PinotLLCRealtimeSegmentManagerTest {
   @Test
   public void testShouldRepairErrorSegmentsForPartialUpsertOrDedup() {
     PinotLLCRealtimeSegmentManager pinotLLCRealtimeSegmentManager = new FakePinotLLCRealtimeSegmentManager();
-    Assert.assertFalse(pinotLLCRealtimeSegmentManager.shouldRepairErrorSegmentsForPartialUpsertOrDedup(null));
     Assert.assertFalse(
         pinotLLCRealtimeSegmentManager.shouldRepairErrorSegmentsForPartialUpsertOrDedup(DisasterRecoveryMode.DEFAULT));
-    Assert.assertFalse(
+    Assert.assertTrue(
         pinotLLCRealtimeSegmentManager.shouldRepairErrorSegmentsForPartialUpsertOrDedup(DisasterRecoveryMode.ALWAYS));
   }
 

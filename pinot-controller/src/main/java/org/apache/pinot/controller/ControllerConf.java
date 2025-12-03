@@ -1138,7 +1138,7 @@ public class ControllerConf extends PinotConfiguration {
 
   public static DisasterRecoveryMode getDisasterRecoveryMode(@Nullable String disasterRecoveryModeString) {
     if (disasterRecoveryModeString == null) {
-      return null;
+      return DisasterRecoveryMode.DEFAULT;
     }
     return DisasterRecoveryMode.valueOf(disasterRecoveryModeString);
   }

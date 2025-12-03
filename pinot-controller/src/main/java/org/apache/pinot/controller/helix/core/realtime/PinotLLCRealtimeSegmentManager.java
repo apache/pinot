@@ -2751,10 +2751,7 @@ public class PinotLLCRealtimeSegmentManager {
         ControllerGauge.PAUSELESS_SEGMENTS_IN_UNRECOVERABLE_ERROR_COUNT, segmentsInUnRecoverableState);
   }
 
-  public boolean shouldRepairErrorSegmentsForPartialUpsertOrDedup(@Nullable DisasterRecoveryMode disasterRecoveryMode) {
-    if (disasterRecoveryMode == null) {
-      return false;
-    }
+  public boolean shouldRepairErrorSegmentsForPartialUpsertOrDedup(DisasterRecoveryMode disasterRecoveryMode) {
     return disasterRecoveryMode == DisasterRecoveryMode.ALWAYS;
   }
 
