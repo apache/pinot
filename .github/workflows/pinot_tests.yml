@@ -132,7 +132,7 @@ jobs:
           retry_wait_seconds: 20
           timeout_minutes: 120
           command: |
-            cd master-head
+            cd master-head || exit 1
             for mod in pinot-spi pinot-segment-spi; do
               mvn clean package -T1C -pl $mod -am -DskipTests -Dproject.build.finalName="$mod"
             done
@@ -265,12 +265,13 @@ jobs:
           verbose: true
       - name: Generate Surefire Report
         if: ${{ !cancelled() && github.ref == 'refs/heads/master' }}
+        continue-on-error: true
         uses: nick-fields/retry@v3
         with:
           max_attempts: 3
           retry_wait_seconds: 20
           timeout_minutes: 120
-          command: mvn surefire-report:report-only -P github-actions,codecoverage,no-integration-tests || echo "Surefire report generation failed, but continuing..."
+          command: mvn surefire-report:report-only -P github-actions,codecoverage,no-integration-tests
       - name: Upload Surefire Reports
         if: ${{ !cancelled() && github.ref == 'refs/heads/master' }}
         uses: actions/upload-artifact@v4
@@ -416,12 +417,13 @@ jobs:
           verbose: true
       - name: Generate Surefire Report
         if: ${{ !cancelled() && github.ref == 'refs/heads/master' }}
+        continue-on-error: true
         uses: nick-fields/retry@v3
         with:
           max_attempts: 3
           retry_wait_seconds: 20
           timeout_minutes: 120
-          command: mvn surefire-report:report-only -P github-actions,codecoverage || echo "Surefire report generation failed, but continuing..."
+          command: mvn surefire-report:report-only -P github-actions,codecoverage
       - name: Upload Surefire Reports
         if: ${{ !cancelled() && github.ref == 'refs/heads/master' }}
         uses: actions/upload-artifact@v4
