@@ -753,8 +753,6 @@ public abstract class BaseServerStarter implements ServiceStartable {
     WorkloadBudgetManagerFactory.register(schedulerConfig);
     _threadAccountant = ThreadAccountantUtils.createAccountant(schedulerConfig, _instanceId,
         org.apache.pinot.spi.config.instance.InstanceType.SERVER);
-    // Get all workload budgets this instance should support
-    QueryWorkloadConfigUtils.getAndUpdateWorkloadBudgets(_instanceId, _helixManager);
 
     SendStatsPredicate sendStatsPredicate = SendStatsPredicate.create(_serverConf, _helixManager);
     KeepPipelineBreakerStatsPredicate keepPipelineBreakerStatsPredicate =
@@ -786,6 +784,9 @@ public abstract class BaseServerStarter implements ServiceStartable {
     _helixManager.connect();
     _helixAdmin = _helixManager.getClusterManagmentTool();
     updateInstanceConfigIfNeeded(serverConf);
+
+    // Get all workload budgets this instance should support (must be done after HelixManager is connected)
+    QueryWorkloadConfigUtils.getAndUpdateWorkloadBudgets(_instanceId, _helixManager);
 
     // Start a background task to monitor Helix message count
     int refreshIntervalSeconds = _serverConf.getProperty(Server.CONFIG_OF_MESSAGES_COUNT_REFRESH_INTERVAL_SECONDS,
