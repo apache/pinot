@@ -41,7 +41,6 @@ import org.apache.calcite.rex.RexBuilder;
 import org.apache.calcite.rex.RexInputRef;
 import org.apache.calcite.rex.RexNode;
 import org.apache.calcite.sql.SqlIdentifier;
-import org.apache.calcite.sql.SqlUnnestOperator;
 import org.apache.calcite.sql.fun.SqlStdOperatorTable;
 import org.apache.calcite.sql.type.ArraySqlType;
 import org.apache.calcite.sql.type.BasicSqlType;
@@ -236,7 +235,6 @@ public class RelToPlanNodeConverterTest {
     Assert.assertTrue(planNode instanceof UnnestNode);
     UnnestNode unnestNode = (UnnestNode) planNode;
     Assert.assertEquals(((RexExpression.InputRef) unnestNode.getArrayExpr()).getIndex(), 1);
-    Assert.assertEquals(unnestNode.getColumnAlias(), "arr");
     Assert.assertEquals(unnestNode.getElementIndex(), 2);
     Assert.assertFalse(unnestNode.isWithOrdinality());
   }
@@ -311,12 +309,8 @@ public class RelToPlanNodeConverterTest {
     // Check multiple arrays support
     Assert.assertEquals(unnestNode.getArrayExprs().size(), 1);
     Assert.assertEquals(((RexExpression.InputRef) unnestNode.getArrayExprs().get(0)).getIndex(), 0);
-    // Check aliases - Calcite might generate different aliases, so we check that they're not null
-    Assert.assertEquals(unnestNode.getColumnAliases().size(), 1);
-    Assert.assertNotNull(unnestNode.getColumnAliases().get(0));
     // Check WITH ORDINALITY
     Assert.assertTrue(unnestNode.isWithOrdinality());
-    Assert.assertNotNull(unnestNode.getOrdinalityAlias());
   }
 
   @Test
@@ -349,9 +343,6 @@ public class RelToPlanNodeConverterTest {
     Assert.assertEquals(((RexExpression.InputRef) unnestNode.getArrayExprs().get(0)).getIndex(), 0);
     Assert.assertEquals(((RexExpression.InputRef) unnestNode.getArrayExprs().get(1)).getIndex(), 1);
     // Check aliases
-    Assert.assertEquals(unnestNode.getColumnAliases().size(), 2);
-    Assert.assertEquals(unnestNode.getColumnAliases().get(0), "longValue");
-    Assert.assertEquals(unnestNode.getColumnAliases().get(1), "stringValue");
     // Check no ordinality
     Assert.assertFalse(unnestNode.isWithOrdinality());
   }
@@ -386,12 +377,8 @@ public class RelToPlanNodeConverterTest {
     Assert.assertEquals(((RexExpression.InputRef) unnestNode.getArrayExprs().get(0)).getIndex(), 0);
     Assert.assertEquals(((RexExpression.InputRef) unnestNode.getArrayExprs().get(1)).getIndex(), 1);
     // Check aliases
-    Assert.assertEquals(unnestNode.getColumnAliases().size(), 2);
-    Assert.assertEquals(unnestNode.getColumnAliases().get(0), "longVal");
-    Assert.assertEquals(unnestNode.getColumnAliases().get(1), "strVal");
     // Check WITH ORDINALITY
     Assert.assertTrue(unnestNode.isWithOrdinality());
-    Assert.assertEquals(unnestNode.getOrdinalityAlias(), SqlUnnestOperator.ORDINALITY_COLUMN_NAME);
   }
 
   @Test
@@ -429,9 +416,6 @@ public class RelToPlanNodeConverterTest {
     Assert.assertEquals(((RexExpression.InputRef) unnestNode.getArrayExprs().get(0)).getIndex(), 1);
     Assert.assertEquals(((RexExpression.InputRef) unnestNode.getArrayExprs().get(1)).getIndex(), 2);
     // Check aliases
-    Assert.assertEquals(unnestNode.getColumnAliases().size(), 2);
-    Assert.assertEquals(unnestNode.getColumnAliases().get(0), "longValue");
-    Assert.assertEquals(unnestNode.getColumnAliases().get(1), "stringValue");
     // Check element indexes
     Assert.assertEquals(unnestNode.getElementIndexes().size(), 2);
     Assert.assertEquals(unnestNode.getElementIndexes().get(0).intValue(),
@@ -475,12 +459,8 @@ public class RelToPlanNodeConverterTest {
     Assert.assertEquals(((RexExpression.InputRef) unnestNode.getArrayExprs().get(0)).getIndex(), 1);
     Assert.assertEquals(((RexExpression.InputRef) unnestNode.getArrayExprs().get(1)).getIndex(), 2);
     // Check aliases
-    Assert.assertEquals(unnestNode.getColumnAliases().size(), 2);
-    Assert.assertEquals(unnestNode.getColumnAliases().get(0), "longValue");
-    Assert.assertEquals(unnestNode.getColumnAliases().get(1), "stringValue");
     // Check WITH ORDINALITY
     Assert.assertTrue(unnestNode.isWithOrdinality());
-    Assert.assertEquals(unnestNode.getOrdinalityAlias(), SqlUnnestOperator.ORDINALITY_COLUMN_NAME);
     // Check element indexes
     Assert.assertEquals(unnestNode.getElementIndexes().size(), 2);
     Assert.assertEquals(unnestNode.getElementIndexes().get(0).intValue(), 3); // base (left columns) = 3

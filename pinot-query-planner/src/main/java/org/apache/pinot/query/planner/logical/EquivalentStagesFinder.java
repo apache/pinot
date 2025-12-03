@@ -360,8 +360,10 @@ public class EquivalentStagesFinder {
         }
         UnnestNode that = (UnnestNode) node2;
         return areBaseNodesEquivalent(node1, node2)
-            && Objects.equals(node1.getArrayExpr(), that.getArrayExpr())
-            && Objects.equals(node1.getColumnAlias(), that.getColumnAlias());
+            && Objects.equals(node1.getArrayExprs(), that.getArrayExprs())
+            && node1.isWithOrdinality() == that.isWithOrdinality()
+            && Objects.equals(node1.getElementIndexes(), that.getElementIndexes())
+            && node1.getOrdinalityIndex() == that.getOrdinalityIndex();
       }
     }
   }

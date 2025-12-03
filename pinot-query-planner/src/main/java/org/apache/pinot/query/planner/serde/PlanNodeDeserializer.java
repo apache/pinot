@@ -231,35 +231,17 @@ public class PlanNodeDeserializer {
       arrayExprs.add(ProtoExpressionToRexExpression.convertExpression(expr));
     }
 
-    Plan.TableFunctionSpec tableFunctionSpec = protoUnnestNode.getTableFunctionSpec();
-
-    // Convert column aliases
-    List<String> columnAliases = new ArrayList<>();
-    for (String alias : tableFunctionSpec.getColumnAliasesList()) {
-      if (alias != null && !alias.isEmpty()) {
-        columnAliases.add(alias);
-      } else {
-        columnAliases.add(null);
-      }
-    }
-
-    String ordAlias = tableFunctionSpec.getOrdinalityAlias();
-    if (ordAlias != null && ordAlias.isEmpty()) {
-      ordAlias = null;
-    }
-
     // Convert element indexes
     List<Integer> elementIndexes = new ArrayList<>();
-    for (int idx : tableFunctionSpec.getElementIndexesList()) {
+    for (int idx : protoUnnestNode.getElementIndexesList()) {
       elementIndexes.add(idx);
     }
 
-    int ordIdx = tableFunctionSpec.hasOrdinalityIndex() ? tableFunctionSpec.getOrdinalityIndex()
+    int ordIdx = protoUnnestNode.hasOrdinalityIndex() ? protoUnnestNode.getOrdinalityIndex()
         : UnnestNode.UNSPECIFIED_INDEX;
 
     UnnestNode.TableFunctionContext context =
-        new UnnestNode.TableFunctionContext(columnAliases, tableFunctionSpec.getWithOrdinality(), ordAlias,
-            elementIndexes, ordIdx);
+        new UnnestNode.TableFunctionContext(protoUnnestNode.getWithOrdinality(), elementIndexes, ordIdx);
 
     return new UnnestNode(protoNode.getStageId(), extractDataSchema(protoNode), extractNodeHint(protoNode),
         extractInputs(protoNode), arrayExprs, context);

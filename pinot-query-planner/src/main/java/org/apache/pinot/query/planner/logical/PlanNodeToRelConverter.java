@@ -24,7 +24,6 @@ import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.Set;
 import java.util.stream.Collectors;
 import org.apache.calcite.plan.RelOptCluster;
 import org.apache.calcite.plan.RelTraitSet;
@@ -33,21 +32,16 @@ import org.apache.calcite.rel.RelCollations;
 import org.apache.calcite.rel.RelDistribution;
 import org.apache.calcite.rel.RelDistributions;
 import org.apache.calcite.rel.RelNode;
-import org.apache.calcite.rel.core.CorrelationId;
 import org.apache.calcite.rel.core.JoinRelType;
 import org.apache.calcite.rel.core.SetOp;
 import org.apache.calcite.rel.core.Uncollect;
 import org.apache.calcite.rel.core.Window;
-import org.apache.calcite.rel.logical.LogicalCorrelate;
 import org.apache.calcite.rel.logical.LogicalIntersect;
 import org.apache.calcite.rel.logical.LogicalMinus;
-import org.apache.calcite.rel.logical.LogicalProject;
 import org.apache.calcite.rel.logical.LogicalSort;
 import org.apache.calcite.rel.logical.LogicalUnion;
-import org.apache.calcite.rel.logical.LogicalValues;
 import org.apache.calcite.rel.logical.LogicalWindow;
 import org.apache.calcite.rel.type.RelDataType;
-import org.apache.calcite.rex.RexBuilder;
 import org.apache.calcite.rex.RexLiteral;
 import org.apache.calcite.rex.RexNode;
 import org.apache.calcite.rex.RexWindowBound;
@@ -465,35 +459,25 @@ public final class PlanNodeToRelConverter {
     public Void visitUnnest(UnnestNode node, Void context) {
       List<RelNode> inputs = inputsAsList(node);
       try {
-        RelNode left = inputs.get(0);
-        RelOptCluster cluster = _builder.getCluster();
-        RexBuilder rexBuilder = cluster.getRexBuilder();
-        String elemAlias = node.getColumnAlias() != null ? node.getColumnAlias() : "unnest_col";
-        String ordAlias = node.getOrdinalityAlias() != null ? node.getOrdinalityAlias() : "ordinality";
-        boolean withOrd = node.isWithOrdinality();
+        Preconditions.checkArgument(inputs.size() == 1, "Unnest node should have exactly one input");
+        RelNode input = inputs.get(0);
 
-        // Build right side: Project(corrVar.field or expression over corrVar)
-        // For now, support InputRef only; fallback to first field when not InputRef.
-        CorrelationId corrId = new CorrelationId(0);
-        RexNode corrRef = rexBuilder.makeCorrel(left.getRowType(), corrId);
-        RexNode arrayExprOverCorr;
-        if (node.getArrayExpr() instanceof RexExpression.InputRef) {
-          int idx = ((RexExpression.InputRef) node.getArrayExpr()).getIndex();
-          arrayExprOverCorr = rexBuilder.makeFieldAccess(corrRef, idx);
-        } else {
-          // Best-effort: map to first field
-          arrayExprOverCorr = rexBuilder.makeFieldAccess(corrRef, 0);
+        // Build a Project to compute the array expressions that will be unnested.
+        _builder.push(input);
+        List<RexNode> arrayProjects = new ArrayList<>(node.getArrayExprs().size());
+        for (RexExpression arrayExpr : node.getArrayExprs()) {
+          arrayProjects.add(RexExpressionUtils.toRexNode(_builder, arrayExpr));
         }
-        LogicalProject project = LogicalProject.create(LogicalValues.createOneRow(cluster),
-            List.of(), List.of(arrayExprOverCorr), List.of(elemAlias), Set.of());
-        Uncollect uncollect = Uncollect.create(RelTraitSet.createEmpty(), project, withOrd,
-            withOrd ? List.of(elemAlias, ordAlias) : List.of(elemAlias));
+        if (arrayProjects.isEmpty()) {
+          arrayProjects.add(_builder.field(0));
+        }
+        _builder.project(arrayProjects);
+        RelNode project = _builder.build();
 
-        // Correlate left with uncollect (CROSS JOIN)
-        ImmutableBitSet requiredCols = ImmutableBitSet.range(left.getRowType().getFieldCount());
-        LogicalCorrelate correlate =
-            LogicalCorrelate.create(left, uncollect, List.of(), corrId, requiredCols, JoinRelType.INNER);
-        _builder.push(correlate);
+        // Use Uncollect to model UNNEST with optional ordinality.
+        Uncollect uncollect =
+            Uncollect.create(project.getTraitSet(), project, node.isWithOrdinality(), Collections.emptyList());
+        _builder.push(uncollect);
       } catch (RuntimeException e) {
         LOGGER.warn("Failed to convert unnest node: {}", node, e);
         _builder.push(new PinotExplainedRelNode(_builder.getCluster(), "UnknownUnnest", Collections.emptyMap(),

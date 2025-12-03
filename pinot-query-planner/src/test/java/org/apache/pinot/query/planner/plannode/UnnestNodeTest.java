@@ -39,14 +39,11 @@ public class UnnestNodeTest {
 
     // Test backward compatibility methods
     Assert.assertEquals(node.getArrayExpr(), arrayExpr);
-    Assert.assertEquals(node.getColumnAlias(), "elem");
     Assert.assertEquals(node.getElementIndex(), UnnestNode.UNSPECIFIED_INDEX);
 
     // Test new methods
     Assert.assertEquals(node.getArrayExprs().size(), 1);
     Assert.assertEquals(node.getArrayExprs().get(0), arrayExpr);
-    Assert.assertEquals(node.getColumnAliases().size(), 1);
-    Assert.assertEquals(node.getColumnAliases().get(0), "elem");
     Assert.assertEquals(node.getElementIndexes().size(), 1);
     Assert.assertEquals(node.getElementIndexes().get(0).intValue(), UnnestNode.UNSPECIFIED_INDEX);
     Assert.assertFalse(node.isWithOrdinality());
@@ -67,18 +64,14 @@ public class UnnestNodeTest {
 
     // Test backward compatibility methods
     Assert.assertEquals(node.getArrayExpr(), arrayExpr);
-    Assert.assertEquals(node.getColumnAlias(), "elem");
     Assert.assertEquals(node.getElementIndex(), 1);
     Assert.assertEquals(node.getOrdinalityIndex(), 2);
 
     // Test new methods
     Assert.assertEquals(node.getArrayExprs().size(), 1);
-    Assert.assertEquals(node.getColumnAliases().size(), 1);
-    Assert.assertEquals(node.getColumnAliases().get(0), "elem");
     Assert.assertEquals(node.getElementIndexes().size(), 1);
     Assert.assertEquals(node.getElementIndexes().get(0).intValue(), 1);
     Assert.assertTrue(node.isWithOrdinality());
-    Assert.assertEquals(node.getOrdinalityAlias(), "ord");
   }
 
   @Test
@@ -101,9 +94,6 @@ public class UnnestNodeTest {
     Assert.assertEquals(node.getArrayExprs().size(), 2);
     Assert.assertEquals(node.getArrayExprs().get(0), longArrayExpr);
     Assert.assertEquals(node.getArrayExprs().get(1), stringArrayExpr);
-    Assert.assertEquals(node.getColumnAliases().size(), 2);
-    Assert.assertEquals(node.getColumnAliases().get(0), "longVal");
-    Assert.assertEquals(node.getColumnAliases().get(1), "strVal");
     Assert.assertEquals(node.getElementIndexes().size(), 2);
     Assert.assertEquals(node.getElementIndexes().get(0).intValue(), UnnestNode.UNSPECIFIED_INDEX);
     Assert.assertEquals(node.getElementIndexes().get(1).intValue(), UnnestNode.UNSPECIFIED_INDEX);
@@ -111,7 +101,6 @@ public class UnnestNodeTest {
 
     // Test backward compatibility methods (should return first element)
     Assert.assertEquals(node.getArrayExpr(), longArrayExpr);
-    Assert.assertEquals(node.getColumnAlias(), "longVal");
     Assert.assertEquals(node.getElementIndex(), UnnestNode.UNSPECIFIED_INDEX);
   }
 
@@ -137,19 +126,14 @@ public class UnnestNodeTest {
     Assert.assertEquals(node.getArrayExprs().size(), 2);
     Assert.assertEquals(node.getArrayExprs().get(0), longArrayExpr);
     Assert.assertEquals(node.getArrayExprs().get(1), stringArrayExpr);
-    Assert.assertEquals(node.getColumnAliases().size(), 2);
-    Assert.assertEquals(node.getColumnAliases().get(0), "longVal");
-    Assert.assertEquals(node.getColumnAliases().get(1), "strVal");
     Assert.assertEquals(node.getElementIndexes().size(), 2);
     Assert.assertEquals(node.getElementIndexes().get(0).intValue(), 1);
     Assert.assertEquals(node.getElementIndexes().get(1).intValue(), 2);
     Assert.assertTrue(node.isWithOrdinality());
-    Assert.assertEquals(node.getOrdinalityAlias(), "ord");
     Assert.assertEquals(node.getOrdinalityIndex(), 3);
 
     // Test backward compatibility methods (should return first element)
     Assert.assertEquals(node.getArrayExpr(), longArrayExpr);
-    Assert.assertEquals(node.getColumnAlias(), "longVal");
     Assert.assertEquals(node.getElementIndex(), 1);
   }
 
@@ -171,7 +155,7 @@ public class UnnestNodeTest {
     Assert.assertEquals(node2.getInputs().size(), 1);
     Assert.assertEquals(node2.getInputs().get(0), input);
     Assert.assertEquals(node2.getArrayExprs(), node1.getArrayExprs());
-    Assert.assertEquals(node2.getColumnAliases(), node1.getColumnAliases());
+    Assert.assertEquals(node2.getElementIndexes(), node1.getElementIndexes());
     Assert.assertNotSame(node2.getTableFunctionContext(), node1.getTableFunctionContext());
     Assert.assertEquals(node2.getTableFunctionContext(), node1.getTableFunctionContext());
   }
