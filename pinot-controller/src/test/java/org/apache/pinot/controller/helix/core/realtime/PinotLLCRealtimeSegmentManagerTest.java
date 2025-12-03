@@ -72,6 +72,7 @@ import org.apache.pinot.core.data.manager.realtime.SegmentCompletionUtils;
 import org.apache.pinot.core.realtime.impl.fakestream.FakeStreamConfigUtils;
 import org.apache.pinot.segment.spi.creator.SegmentVersion;
 import org.apache.pinot.segment.spi.index.metadata.SegmentMetadataImpl;
+import org.apache.pinot.spi.config.table.DisasterRecoveryMode;
 import org.apache.pinot.spi.config.table.SegmentsValidationAndRetentionConfig;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.TableType;
@@ -1954,6 +1955,15 @@ public class PinotLLCRealtimeSegmentManagerTest {
     when(zkHelixPropertyStore.set(eq(committingSegmentsListPath), any(), anyInt(), eq(AccessOption.PERSISTENT)))
         .thenThrow(new RuntimeException("ZooKeeper operation failed"));
     assertFalse(segmentManager.syncCommittingSegments(realtimeTableName, newSegments));
+  }
+
+  @Test
+  public void testShouldRepairErrorSegmentsForPartialUpsertOrDedup() {
+    PinotLLCRealtimeSegmentManager pinotLLCRealtimeSegmentManager = new FakePinotLLCRealtimeSegmentManager();
+    Assert.assertFalse(
+        pinotLLCRealtimeSegmentManager.shouldRepairErrorSegmentsForPartialUpsertOrDedup(DisasterRecoveryMode.DEFAULT));
+    Assert.assertTrue(
+        pinotLLCRealtimeSegmentManager.shouldRepairErrorSegmentsForPartialUpsertOrDedup(DisasterRecoveryMode.ALWAYS));
   }
 
   //////////////////////////////////////////////////////////////////////////////////
