@@ -134,7 +134,7 @@ public class RealtimeSegmentValidationManagerTest {
 
   @Test
   public void testConfigChange() {
-    Assert.assertNull(_realtimeSegmentValidationManager.getDisasterRecoveryMode());
+    Assert.assertEquals(_realtimeSegmentValidationManager.getDisasterRecoveryMode(), DisasterRecoveryMode.DEFAULT);
     Map<String, String> newConfig = new HashMap<>();
     newConfig.put(ControllerConf.ControllerPeriodicTasksConf.DISASTER_RECOVERY_MODE_CONFIG_KEY, "ALWAYS");
     Set<String> changedConfigSet =

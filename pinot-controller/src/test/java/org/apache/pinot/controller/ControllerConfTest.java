@@ -205,7 +205,7 @@ public class ControllerConfTest {
   public void testGetDisasterRecoveryMode() {
     Map<String, Object> controllerConfig = new HashMap<>();
     ControllerConf conf = new ControllerConf(controllerConfig);
-    Assert.assertNull(conf.getDisasterRecoveryMode());
+    Assert.assertEquals(conf.getDisasterRecoveryMode(), DisasterRecoveryMode.DEFAULT);
 
     controllerConfig = new HashMap<>();
     controllerConfig.put(DISASTER_RECOVERY_MODE_CONFIG_KEY, "ALWAYS");
