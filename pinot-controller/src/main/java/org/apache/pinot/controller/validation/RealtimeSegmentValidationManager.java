@@ -238,7 +238,9 @@ public class RealtimeSegmentValidationManager extends ControllerPeriodicTask<Rea
     }
 
     // Check missing segments and upload them to the deep store
-    if (_llcRealtimeSegmentManager.isDeepStoreLLCSegmentUploadRetryEnabled(pauselessEnabled)) {
+    // If pauseless consumption is enabled, always run uploadToDeepStoreIfMissing step because in pauseless
+    // consumption, the segment commit can be marked completed even if segment was not uploaded to the deep store.
+    if (pauselessEnabled || _llcRealtimeSegmentManager.isDeepStoreLLCSegmentUploadRetryEnabled()) {
       _llcRealtimeSegmentManager.uploadToDeepStoreIfMissing(tableConfig, segmentsZKMetadata);
     }
   }
