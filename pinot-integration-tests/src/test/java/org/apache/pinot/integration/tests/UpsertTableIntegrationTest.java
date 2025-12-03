@@ -45,8 +45,11 @@ import org.apache.pinot.spi.config.table.TableTaskConfig;
 import org.apache.pinot.spi.config.table.TableType;
 import org.apache.pinot.spi.config.table.TenantConfig;
 import org.apache.pinot.spi.config.table.UpsertConfig;
+import org.apache.pinot.spi.config.table.ingestion.TransformConfig;
+import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.env.PinotConfiguration;
+import org.apache.pinot.spi.stream.StreamConfigProperties;
 import org.apache.pinot.spi.utils.CommonConstants.Server;
 import org.apache.pinot.spi.utils.Enablement;
 import org.apache.pinot.spi.utils.builder.TableNameBuilder;
@@ -310,6 +313,52 @@ public class UpsertTableIntegrationTest extends BaseClusterIntegrationTest {
     upsertConfig.setDeleteRecordColumn(DELETE_COL);
     testDeleteWithPartialUpsert(getKafkaTopic() + "-partial-upsert-with-deletes", "gameScoresPartialUpsertWithDelete",
         upsertConfig);
+  }
+
+  @Test
+  public void testPartialUpsertPostUpdateTransforms()
+      throws Exception {
+    String tableName = "partialUpsertPostTransforms";
+    String kafkaTopicName = getKafkaTopic() + "-post-transforms";
+    createKafkaTopic(kafkaTopicName);
+
+    Schema schema = new Schema.SchemaBuilder().setSchemaName(tableName)
+        .addSingleValueDimension("id", FieldSpec.DataType.INT)
+        .addMetric("score", FieldSpec.DataType.FLOAT)
+        .addMetric("bonus", FieldSpec.DataType.FLOAT)
+        .addMetric("total", FieldSpec.DataType.FLOAT)
+        .addDateTime(TIME_COL_NAME, FieldSpec.DataType.LONG, "1:MILLISECONDS:EPOCH", "1:MILLISECONDS")
+        .setPrimaryKeyColumns(List.of("id"))
+        .build();
+    addSchema(schema);
+
+    UpsertConfig upsertConfig = new UpsertConfig(UpsertConfig.Mode.PARTIAL);
+    upsertConfig.setComparisonColumn(TIME_COL_NAME);
+    upsertConfig.setPartialUpsertPostUpdateTransformConfigs(
+        List.of(new TransformConfig("total", "plus(score,bonus)")));
+
+    Map<String, String> csvDecoderProperties =
+        getCSVDecoderProperties(CSV_DELIMITER, "id,score,bonus,total," + TIME_COL_NAME);
+    csvDecoderProperties.put(
+        StreamConfigProperties.constructStreamProperty("kafka", "decoder.prop.nullStringValue"), "NULL");
+    TableConfig tableConfig =
+        createCSVUpsertTableConfig(tableName, kafkaTopicName, getNumKafkaPartitions(), csvDecoderProperties,
+            upsertConfig, "id");
+    addTableConfig(tableConfig);
+
+    // First record sets score, second sets bonus. Post-upsert transform should compute total from the merged row.
+    List<String> records = List.of("1,5,NULL,NULL,1000", "1,NULL,10,NULL,2000");
+    pushCsvIntoKafka(records, kafkaTopicName, 0);
+    waitForAllDocsLoaded(tableName, 600_000L, records.size());
+
+    ResultSet resultSet =
+        getPinotConnection().execute("SELECT score, bonus, total FROM " + tableName + " WHERE id = 1")
+            .getResultSet(0);
+    assertEquals(resultSet.getRowCount(), 1);
+    assertEquals(resultSet.getDouble(0, 0), 5.0, 0.01);
+    assertEquals(resultSet.getDouble(0, 1), 10.0, 0.01);
+    assertEquals(resultSet.getDouble(0, 2), 15.0, 0.01);
+    dropRealtimeTable(TableNameBuilder.REALTIME.tableNameWithType(tableName));
   }
 
   protected void testDeleteWithPartialUpsert(String kafkaTopicName, String tableName, UpsertConfig upsertConfig)
