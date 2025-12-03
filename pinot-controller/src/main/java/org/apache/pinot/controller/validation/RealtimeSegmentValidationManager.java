@@ -288,6 +288,8 @@ public class RealtimeSegmentValidationManager extends ControllerPeriodicTask<Rea
     try {
       return Boolean.parseBoolean(property);
     } catch (Exception e) {
+      LOGGER.warn("Failed to parse property '{}' for '{}'. Returning false.", property,
+          REPAIR_ERROR_SEGMENTS_FOR_PARTIAL_UPSERT_OR_DEDUP, e);
       return false;
     }
   }
