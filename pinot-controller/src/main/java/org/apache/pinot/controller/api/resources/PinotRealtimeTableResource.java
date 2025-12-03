@@ -131,7 +131,7 @@ public class PinotRealtimeTableResource {
     ForceCommitBatchConfig batchConfig;
     try {
       batchConfig = ForceCommitBatchConfig.of(batchSize, batchStatusCheckIntervalSec, batchStatusCheckTimeoutSec);
-    } catch (Exception e) {
+    } catch (IllegalArgumentException e) {
       throw new ControllerApplicationException(LOGGER, "Invalid batch config", Response.Status.BAD_REQUEST, e);
     }
     try {

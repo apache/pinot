@@ -2434,8 +2434,8 @@ public class PinotLLCRealtimeSegmentManager {
 
   /**
    * Pause consumption on a table by
-   *   1) update PauseState in the table ideal state and
-   *   2) sending force commit messages to servers
+   *   1) Update PauseState in the table ideal state and
+   *   2) Sending force commit messages to servers
    */
   public PauseStatusDetails pauseConsumption(String tableNameWithType, PauseState.ReasonCode reasonCode,
       @Nullable String comment, @Nullable ForceCommitBatchConfig batchConfig) {
