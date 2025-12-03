@@ -23,9 +23,12 @@ import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
 import javax.annotation.Nullable;
+import org.apache.commons.collections4.CollectionUtils;
 import org.apache.pinot.spi.config.table.TableConfig;
+import org.apache.pinot.spi.config.table.UpsertConfig;
 import org.apache.pinot.spi.config.table.ingestion.EnrichmentConfig;
 import org.apache.pinot.spi.config.table.ingestion.IngestionConfig;
+import org.apache.pinot.spi.config.table.ingestion.TransformConfig;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.recordtransformer.RecordTransformer;
 import org.apache.pinot.spi.recordtransformer.enricher.RecordEnricher;
@@ -87,6 +90,31 @@ public class RecordTransformerUtils {
 
   public static List<RecordTransformer> getDefaultTransformers(TableConfig tableConfig, Schema schema) {
     return getTransformers(tableConfig, schema, false, false, false, false);
+  }
+
+  /**
+   * Returns transformers to apply after a partial upsert merge. Only post-merge transform configs are honored to avoid
+   * re-running ingestion-time transforms.
+   */
+  public static List<RecordTransformer> getPostPartialUpsertTransformers(TableConfig tableConfig, Schema schema) {
+    UpsertConfig upsertConfig = tableConfig.getUpsertConfig();
+    if (upsertConfig == null) {
+      return List.of();
+    }
+    List<TransformConfig> postUpdateTransformConfigs = upsertConfig.getPartialUpsertPostUpdateTransformConfigs();
+    if (CollectionUtils.isEmpty(postUpdateTransformConfigs)) {
+      return List.of();
+    }
+    List<RecordTransformer> transformers = new ArrayList<>();
+    addIfNotNoOp(transformers,
+        new ExpressionTransformer(tableConfig, schema, postUpdateTransformConfigs,
+            false /* includeFieldSpecTransforms */, true /* overwriteExistingValues */));
+    addIfNotNoOp(transformers, new DataTypeTransformer(tableConfig, schema));
+    addIfNotNoOp(transformers, new TimeValidationTransformer(tableConfig, schema));
+    addIfNotNoOp(transformers, new SpecialValueTransformer(schema));
+    addIfNotNoOp(transformers, new NullValueTransformer(tableConfig, schema));
+    addIfNotNoOp(transformers, new SanitizationTransformer(schema));
+    return transformers;
   }
 
   private static void addIfNotNoOp(List<RecordTransformer> transformers, @Nullable RecordTransformer transformer) {

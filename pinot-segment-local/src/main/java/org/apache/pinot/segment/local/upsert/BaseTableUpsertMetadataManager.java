@@ -64,7 +64,7 @@ public abstract class BaseTableUpsertMetadataManager implements TableUpsertMetad
 
     PartialUpsertHandler partialUpsertHandler = null;
     if (upsertConfig.getMode() == UpsertConfig.Mode.PARTIAL) {
-      partialUpsertHandler = new PartialUpsertHandler(schema, comparisonColumns, upsertConfig);
+      partialUpsertHandler = new PartialUpsertHandler(tableConfig, schema, comparisonColumns, upsertConfig);
     }
 
     boolean enableSnapshot = upsertConfig.getSnapshot()
