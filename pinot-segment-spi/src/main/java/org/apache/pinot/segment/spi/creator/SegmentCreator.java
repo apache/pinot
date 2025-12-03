@@ -28,6 +28,7 @@ import org.apache.commons.configuration2.ex.ConfigurationException;
 import org.apache.pinot.segment.spi.IndexSegment;
 import org.apache.pinot.segment.spi.index.creator.SegmentIndexCreationInfo;
 import org.apache.pinot.segment.spi.index.mutable.ThreadSafeMutableRoaringBitmap;
+import org.apache.pinot.spi.config.instance.InstanceType;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.data.readers.ColumnReader;
 import org.apache.pinot.spi.data.readers.GenericRow;
@@ -106,4 +107,17 @@ public interface SegmentCreator extends Closeable, Serializable {
    */
   void seal()
       throws ConfigurationException, IOException;
+
+  String getSegmentName();
+
+  /**
+   * Finalize the segment with all post-creation operations including sealing,
+   * format conversion, index building, and metadata persistence.
+   *
+   * @param instanceType Instance type for metrics tracking (nullable)
+   * @return Final segment directory
+   * @throws Exception If finalization fails
+   */
+  File finalizeSegment(@Nullable InstanceType instanceType)
+      throws Exception;
 }

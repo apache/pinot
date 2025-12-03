@@ -455,12 +455,9 @@ public class SegmentIndexCreationDriverImpl implements SegmentIndexCreationDrive
 
   private void handlePostCreation()
       throws Exception {
-    ColumnStatistics timeStats = _segmentStats.getColumnProfileFor(_config.getTimeColumnName());
-    // Create finalizer and execute all post-creation operations
-    SegmentCreationFinalizer finalizer = new SegmentCreationFinalizer(
-        _config, _instanceType, _indexCreator, timeStats, _totalDocs);
-    _outputSegmentDir = finalizer.finalizeSegment(_tempIndexDir);
-    _segmentName = finalizer.getSegmentName();
+    // Execute all post-creation operations directly on the index creator
+    _outputSegmentDir = _indexCreator.finalizeSegment(_instanceType);
+    _segmentName = _indexCreator.getSegmentName();
 
     LOGGER.info("Driver, record read time (in ms) : {}", TimeUnit.NANOSECONDS.toMillis(_totalRecordReadTimeNs));
     LOGGER.info("Driver, stats collector time (in ms) : {}", TimeUnit.NANOSECONDS.toMillis(_totalStatsCollectorTimeNs));
