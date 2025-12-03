@@ -410,7 +410,8 @@ public abstract class BaseSegmentProcessorFrameworkTest {
     FileUtils.forceMkdir(workingDir);
 
     // Time filter
-    SegmentProcessorConfig config = new SegmentProcessorConfig.Builder().setTableConfig(_tableConfig).setSchema(_schema).setTimeHandlerConfig(
+    SegmentProcessorConfig config = new SegmentProcessorConfig.Builder()
+        .setTableConfig(_tableConfig).setSchema(_schema).setTimeHandlerConfig(
             new TimeHandlerConfig.Builder(TimeHandler.Type.EPOCH).setTimeRange(1597795200000L, 1597881600000L).build())
         .build();
     List<File> outputSegments = processSegments(_singleSegment, config, workingDir);
