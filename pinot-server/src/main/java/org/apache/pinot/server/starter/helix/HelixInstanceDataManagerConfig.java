@@ -105,6 +105,10 @@ public class HelixInstanceDataManagerConfig implements InstanceDataManagerConfig
   public static final String ENABLE_ASYNC_SEGMENT_REFRESH = "enable.async.segment.refresh";
   private static final boolean DEFAULT_ENABLE_ASYNC_SEGMENT_REFRESH = false;
 
+  // Whether to disable preloading for dimension tables. Preload Enabled by default.
+  public static final String DIMENSION_TABLE_DISABLE_PRELOAD = "dimTable.disablePreload.default";
+  private static final boolean DEFAULT_DIMENSION_TABLE_DISABLE_PRELOAD = false;
+
   // To preload segments of table using upsert in parallel for fast upsert metadata recovery.
   private static final String MAX_SEGMENT_PRELOAD_THREADS = "max.segment.preload.threads";
 
@@ -348,5 +352,11 @@ public class HelixInstanceDataManagerConfig implements InstanceDataManagerConfig
   @Override
   public boolean shouldCheckCRCOnSegmentLoad() {
     return _serverConfig.getProperty(CHECK_CRC_ON_SEGMENT_LOAD, DEFAULT_CHECK_CRC_ON_SEGMENT_LOAD);
+  }
+
+  @Override
+  public boolean isDimensionTableDisablePreloadEnabled() {
+    return _serverConfig.getProperty(DIMENSION_TABLE_DISABLE_PRELOAD,
+        DEFAULT_DIMENSION_TABLE_DISABLE_PRELOAD);
   }
 }

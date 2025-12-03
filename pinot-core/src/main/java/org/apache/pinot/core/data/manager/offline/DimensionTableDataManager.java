@@ -103,7 +103,7 @@ public class DimensionTableDataManager extends OfflineTableDataManager {
   // anyway
   private final AtomicInteger _loadToken = new AtomicInteger();
 
-  private boolean _disablePreload = false;
+  private boolean _disablePreload;
   private boolean _errorOnDuplicatePrimaryKey = false;
 
   @Override
@@ -118,6 +118,7 @@ public class DimensionTableDataManager extends OfflineTableDataManager {
     Preconditions.checkState(CollectionUtils.isNotEmpty(primaryKeyColumns),
         "Primary key columns must be configured for dimension table: %s", _tableNameWithType);
 
+    _disablePreload = getInstanceDataManagerConfig().isDimensionTableDisablePreloadEnabled();
     DimensionTableConfig dimensionTableConfig = tableConfig.getDimensionTableConfig();
     if (dimensionTableConfig != null) {
       _disablePreload = dimensionTableConfig.isDisablePreload();

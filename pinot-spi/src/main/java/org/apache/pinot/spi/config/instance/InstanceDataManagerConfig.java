@@ -90,4 +90,6 @@ public interface InstanceDataManagerConfig {
   boolean isUploadSegmentToDeepStore();
 
   boolean shouldCheckCRCOnSegmentLoad();
+
+  boolean isDimensionTableDisablePreloadEnabled();
 }
