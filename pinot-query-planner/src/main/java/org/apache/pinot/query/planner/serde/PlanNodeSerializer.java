@@ -283,15 +283,11 @@ public class PlanNodeSerializer {
     @Override
     public Void visitUnnest(UnnestNode node, Plan.PlanNode.Builder builder) {
       UnnestNode.TableFunctionContext context = node.getTableFunctionContext();
-      Plan.TableFunctionSpec.Builder tableFunctionSpecBuilder = Plan.TableFunctionSpec.newBuilder()
-          .addAllColumnAliases(context.getColumnAliases())
-          .setWithOrdinality(context.isWithOrdinality())
-          .setOrdinalityAlias(context.getOrdinalityAlias() == null ? "" : context.getOrdinalityAlias())
-          .addAllElementIndexes(context.getElementIndexes())
-          .setOrdinalityIndex(context.getOrdinalityIndex());
       Plan.UnnestNode.Builder unnestNodeBuilder = Plan.UnnestNode.newBuilder()
           .addAllArrayExprs(convertExpressions(node.getArrayExprs()))
-          .setTableFunctionSpec(tableFunctionSpecBuilder);
+          .setWithOrdinality(context.isWithOrdinality())
+          .addAllElementIndexes(context.getElementIndexes())
+          .setOrdinalityIndex(context.getOrdinalityIndex());
       builder.setUnnestNode(unnestNodeBuilder.build());
       return null;
     }

@@ -47,7 +47,6 @@ import org.apache.pinot.query.planner.plannode.ExchangeNode;
 import org.apache.pinot.query.planner.plannode.MailboxReceiveNode;
 import org.apache.pinot.query.planner.plannode.MailboxSendNode;
 import org.apache.pinot.query.planner.plannode.PlanNode;
-import org.apache.pinot.spi.utils.CommonConstants;
 
 
 /**
@@ -63,14 +62,7 @@ public class PinotLogicalQueryPlanner {
   public static SubPlan makePlan(RelRoot relRoot,
       @Nullable TransformationTracker.Builder<PlanNode, RelNode> tracker, boolean useSpools,
       String hashFunction) {
-    return makePlan(relRoot, tracker, useSpools, hashFunction,
-        !CommonConstants.Helix.DEFAULT_ENABLE_CASE_INSENSITIVE);
-  }
-
-  public static SubPlan makePlan(RelRoot relRoot,
-      @Nullable TransformationTracker.Builder<PlanNode, RelNode> tracker, boolean useSpools, String hashFunction,
-      boolean caseSensitive) {
-    PlanNode rootNode = new RelToPlanNodeConverter(tracker, hashFunction, caseSensitive).toPlanNode(relRoot.rel);
+    PlanNode rootNode = new RelToPlanNodeConverter(tracker, hashFunction).toPlanNode(relRoot.rel);
 
     PlanFragment rootFragment = planNodeToPlanFragment(rootNode, tracker, useSpools, hashFunction);
     return new SubPlan(rootFragment,

@@ -164,4 +164,38 @@ public class UnnestOperatorTest {
     assertEquals(rows.get(1)[2], 2);
     assertEquals(rows.get(1)[3], "y");
   }
+
+  @Test
+  public void shouldZipMultipleArraysIntoColumns() {
+    DataSchema inputSchema = new DataSchema(new String[]{"id", "a1", "a2"}, new ColumnDataType[]{
+        ColumnDataType.INT, ColumnDataType.INT_ARRAY, ColumnDataType.STRING_ARRAY
+    });
+    when(_input.nextBlock()).thenReturn(
+        OperatorTestUtil.block(inputSchema,
+            new Object[]{10, new int[]{1, 2}, new String[]{"x", "y"}},
+            new Object[]{11, new int[]{3}, new String[]{"z"}}));
+
+    DataSchema resultSchema = new DataSchema(new String[]{"id", "a1", "a2", "v1", "v2"}, new ColumnDataType[]{
+        ColumnDataType.INT, ColumnDataType.INT_ARRAY, ColumnDataType.STRING_ARRAY, ColumnDataType.INT,
+        ColumnDataType.STRING
+    });
+    RexExpression array1 = new RexExpression.InputRef(1);
+    RexExpression array2 = new RexExpression.InputRef(2);
+    UnnestNode node =
+        new UnnestNode(-1, resultSchema, PlanNode.NodeHint.EMPTY, List.of(), List.of(array1, array2),
+            List.of("v1", "v2"), false, null);
+    UnnestOperator operator = new UnnestOperator(OperatorTestUtil.getTracingContext(), _input, inputSchema, node);
+
+    List<Object[]> rows = ((MseBlock.Data) operator.nextBlock()).asRowHeap().getRows();
+    assertEquals(rows.size(), 3);
+    assertEquals(rows.get(0)[0], 10);
+    assertEquals(rows.get(0)[3], 1);
+    assertEquals(rows.get(0)[4], "x");
+    assertEquals(rows.get(1)[0], 10);
+    assertEquals(rows.get(1)[3], 2);
+    assertEquals(rows.get(1)[4], "y");
+    assertEquals(rows.get(2)[0], 11);
+    assertEquals(rows.get(2)[3], 3);
+    assertEquals(rows.get(2)[4], "z");
+  }
 }

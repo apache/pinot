@@ -169,10 +169,16 @@ class PlanNodeMerger {
         return null;
       }
       UnnestNode otherNode = (UnnestNode) context;
-      if (!Objects.equals(node.getArrayExpr(), otherNode.getArrayExpr())) {
+      if (!Objects.equals(node.getArrayExprs(), otherNode.getArrayExprs())) {
         return null;
       }
-      if (!Objects.equals(node.getColumnAlias(), otherNode.getColumnAlias())) {
+      if (node.isWithOrdinality() != otherNode.isWithOrdinality()) {
+        return null;
+      }
+      if (!Objects.equals(node.getElementIndexes(), otherNode.getElementIndexes())) {
+        return null;
+      }
+      if (node.getOrdinalityIndex() != otherNode.getOrdinalityIndex()) {
         return null;
       }
       List<PlanNode> children = mergeChildren(node, context);

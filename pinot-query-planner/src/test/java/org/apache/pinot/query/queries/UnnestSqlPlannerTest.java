@@ -73,8 +73,6 @@ public class UnnestSqlPlannerTest extends QueryEnvironmentTestBase {
     UnnestNode unnestNode = unnestNodes.get(0);
     Assert.assertEquals(unnestNode.getArrayExprs().size(), expectedArrayExprCount,
         "Unexpected number of array expressions for query: " + sql);
-    Assert.assertEquals(unnestNode.getColumnAliases().size(), expectedArrayExprCount,
-        "Unexpected number of column aliases for query: " + sql);
     DispatchablePlanFragment rootFragment = subPlan.getQueryStageMap().get(0);
     PlanNode rootNode = rootFragment.getPlanFragment().getFragmentRoot();
     if (expectedOutputColumns != null) {
@@ -110,8 +108,11 @@ public class UnnestSqlPlannerTest extends QueryEnvironmentTestBase {
     FilterNode filterNode = chain._filterNode;
     UnnestNode unnestNode = chain._unnestNode;
     List<String> filterColumns = Arrays.asList(filterNode.getDataSchema().getColumnNames());
-    Assert.assertTrue(filterColumns.contains(unnestNode.getOrdinalityAlias()),
-        "Filter data schema should contain the ordinality column alias '" + unnestNode.getOrdinalityAlias()
+    int ordIdx = unnestNode.getOrdinalityIndex();
+    String ordName = ordIdx >= 0 && ordIdx < filterNode.getDataSchema().size()
+        ? filterNode.getDataSchema().getColumnName(ordIdx) : null;
+    Assert.assertTrue(filterColumns.contains(ordName),
+        "Filter data schema should contain the ordinality column name '" + ordName
             + "', found: " + filterColumns);
     RexExpression.FunctionCall filterCondition = (RexExpression.FunctionCall) filterNode.getCondition();
     Assert.assertEquals(filterCondition.getFunctionName(), "EQUALS", "Expected ordinality equality filter");
@@ -135,8 +136,6 @@ public class UnnestSqlPlannerTest extends QueryEnvironmentTestBase {
     Assert.assertEquals(unnestNodes.size(), 1, "Expected single UNNEST node for multi-array query");
     UnnestNode unnestNode = unnestNodes.get(0);
     Assert.assertEquals(unnestNode.getArrayExprs().size(), 2, "Expected two array expressions to be unnested");
-    Assert.assertEquals(unnestNode.getColumnAliases().size(), 2, "Expected two column aliases for element outputs");
-    Assert.assertNotNull(unnestNode.getOrdinalityAlias(), "Ordinality alias should be present");
 
     AggregateFilterUnnestChain chain = null;
     for (DispatchablePlanFragment fragment : subPlan.getQueryStageMap().values()) {
@@ -152,8 +151,10 @@ public class UnnestSqlPlannerTest extends QueryEnvironmentTestBase {
     Assert.assertSame(chain._unnestNode, unnestNode, "Filter should operate on the same UNNEST node");
 
     List<String> filterColumns = Arrays.asList(filterNode.getDataSchema().getColumnNames());
-    Assert.assertTrue(filterColumns.contains(unnestNode.getOrdinalityAlias()),
-        "Filter schema should include the ordinality alias '" + unnestNode.getOrdinalityAlias() + "'");
+    int ordIdx = unnestNode.getOrdinalityIndex();
+    String ordName = ordIdx >= 0 ? filterNode.getDataSchema().getColumnName(ordIdx) : null;
+    Assert.assertTrue(filterColumns.contains(ordName),
+        "Filter schema should include the ordinality column name '" + ordName + "'");
 
     RexExpression.FunctionCall filterCondition = (RexExpression.FunctionCall) filterNode.getCondition();
     Assert.assertEquals(filterCondition.getFunctionName(), "EQUALS", "Expected equality filter on ordinality");
@@ -212,9 +213,7 @@ public class UnnestSqlPlannerTest extends QueryEnvironmentTestBase {
   private static void assertOrdinality(UnnestNode node, boolean expected) {
     Assert.assertEquals(node.isWithOrdinality(), expected, "Unexpected ordinality flag");
     if (expected) {
-      Assert.assertNotNull(node.getOrdinalityAlias(), "Ordinality alias should be present");
-    } else {
-      Assert.assertNull(node.getOrdinalityAlias(), "Ordinality alias should be null when not requested");
+      Assert.assertTrue(node.getOrdinalityIndex() >= 0, "Ordinality index should be present");
     }
   }
 
@@ -224,7 +223,6 @@ public class UnnestSqlPlannerTest extends QueryEnvironmentTestBase {
     Assert.assertEquals(unnestNodes.size(), 1, "Expected exactly one UnnestNode for query: " + sql);
     UnnestNode node = unnestNodes.get(0);
     Assert.assertEquals(node.getArrayExprs().size(), 1, "Expected single array expression");
-    Assert.assertEquals(node.getColumnAliases().size(), 1, "Expected single column alias");
     assertOrdinality(node, true);
     return subPlan;
   }

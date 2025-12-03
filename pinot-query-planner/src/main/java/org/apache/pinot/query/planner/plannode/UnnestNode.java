@@ -43,15 +43,14 @@ public class UnnestNode extends BasePlanNode {
       List<RexExpression> arrayExprs, List<String> columnAliases, boolean withOrdinality,
       @Nullable String ordinalityAlias) {
     this(stageId, dataSchema, nodeHint, inputs, arrayExprs,
-        new TableFunctionContext(columnAliases, withOrdinality, ordinalityAlias,
-            defaultElementIndexes(arrayExprs.size()), UNSPECIFIED_INDEX));
+        new TableFunctionContext(withOrdinality, defaultElementIndexes(arrayExprs.size()), UNSPECIFIED_INDEX));
   }
 
   public UnnestNode(int stageId, DataSchema dataSchema, NodeHint nodeHint, List<PlanNode> inputs,
       List<RexExpression> arrayExprs, List<String> columnAliases, boolean withOrdinality,
       @Nullable String ordinalityAlias, List<Integer> elementIndexes, int ordinalityIndex) {
     this(stageId, dataSchema, nodeHint, inputs, arrayExprs,
-        new TableFunctionContext(columnAliases, withOrdinality, ordinalityAlias, elementIndexes, ordinalityIndex));
+        new TableFunctionContext(withOrdinality, elementIndexes, ordinalityIndex));
   }
 
   public UnnestNode(int stageId, DataSchema dataSchema, NodeHint nodeHint, List<PlanNode> inputs,
@@ -90,23 +89,8 @@ public class UnnestNode extends BasePlanNode {
     return _tableFunctionContext;
   }
 
-  public List<String> getColumnAliases() {
-    return _tableFunctionContext.getColumnAliases();
-  }
-
-  // Backward compatibility method
-  @Nullable
-  public String getColumnAlias() {
-    return getColumnAliases().isEmpty() ? null : getColumnAliases().get(0);
-  }
-
   public boolean isWithOrdinality() {
     return _tableFunctionContext.isWithOrdinality();
-  }
-
-  @Nullable
-  public String getOrdinalityAlias() {
-    return _tableFunctionContext.getOrdinalityAlias();
   }
 
   public List<Integer> getElementIndexes() {
@@ -170,33 +154,18 @@ public class UnnestNode extends BasePlanNode {
    * Encapsulates standard SQL table function metadata (column aliases, ordinality) for UNNEST.
    */
   public static final class TableFunctionContext {
-    private final List<String> _columnAliases;
     private final boolean _withOrdinality;
-    @Nullable
-    private final String _ordinalityAlias;
     private final List<Integer> _elementIndexes;
     private final int _ordinalityIndex;
 
-    public TableFunctionContext(List<String> columnAliases, boolean withOrdinality, @Nullable String ordinalityAlias,
-        List<Integer> elementIndexes, int ordinalityIndex) {
-      _columnAliases = List.copyOf(columnAliases);
+    public TableFunctionContext(boolean withOrdinality, List<Integer> elementIndexes, int ordinalityIndex) {
       _withOrdinality = withOrdinality;
-      _ordinalityAlias = ordinalityAlias;
       _elementIndexes = List.copyOf(elementIndexes);
       _ordinalityIndex = ordinalityIndex;
     }
 
-    public List<String> getColumnAliases() {
-      return _columnAliases;
-    }
-
     public boolean isWithOrdinality() {
       return _withOrdinality;
-    }
-
-    @Nullable
-    public String getOrdinalityAlias() {
-      return _ordinalityAlias;
     }
 
     public List<Integer> getElementIndexes() {
@@ -208,8 +177,7 @@ public class UnnestNode extends BasePlanNode {
     }
 
     public TableFunctionContext copy() {
-      return new TableFunctionContext(_columnAliases, _withOrdinality, _ordinalityAlias, _elementIndexes,
-          _ordinalityIndex);
+      return new TableFunctionContext(_withOrdinality, _elementIndexes, _ordinalityIndex);
     }
 
     @Override
@@ -222,14 +190,12 @@ public class UnnestNode extends BasePlanNode {
       }
       TableFunctionContext that = (TableFunctionContext) o;
       return _withOrdinality == that._withOrdinality && _ordinalityIndex == that._ordinalityIndex
-          && Objects.equals(_columnAliases, that._columnAliases)
-          && Objects.equals(_ordinalityAlias, that._ordinalityAlias)
           && Objects.equals(_elementIndexes, that._elementIndexes);
     }
 
     @Override
     public int hashCode() {
-      return Objects.hash(_columnAliases, _withOrdinality, _ordinalityAlias, _elementIndexes, _ordinalityIndex);
+      return Objects.hash(_withOrdinality, _elementIndexes, _ordinalityIndex);
     }
   }
 }
