@@ -119,6 +119,7 @@ public class TableConfigBuilder {
   private boolean _optimizeDictionaryType;
   private double _noDictionarySizeRatioThreshold;
   private double _noDictionaryCardinalityRatioThreshold;
+  private Boolean _skipCrcCheckOnLoad = false;
 
   private TableCustomConfig _customConfig;
   private QuotaConfig _quotaConfig;
@@ -387,6 +388,11 @@ public class TableConfigBuilder {
     return this;
   }
 
+  public TableConfigBuilder setSkipCrcCheckOnLoad(boolean skipCrcCheckOnLoad) {
+    _skipCrcCheckOnLoad = skipCrcCheckOnLoad;
+    return this;
+  }
+
   public TableConfigBuilder setCustomConfig(TableCustomConfig customConfig) {
     _customConfig = customConfig;
     return this;
@@ -495,6 +501,7 @@ public class TableConfigBuilder {
     validationConfig.setReplication(_numReplicas);
     validationConfig.setPeerSegmentDownloadScheme(_peerSegmentDownloadScheme);
     validationConfig.setCrypterClassName(_crypterClassName);
+    validationConfig.setSkipCrcCheckOnLoad(_skipCrcCheckOnLoad);
 
     // Tenant config
     TenantConfig tenantConfig = new TenantConfig(_brokerTenant, _serverTenant, _tagOverrideConfig);
