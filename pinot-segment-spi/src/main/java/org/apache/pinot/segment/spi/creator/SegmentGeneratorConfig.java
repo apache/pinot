@@ -39,6 +39,7 @@ import org.apache.pinot.segment.spi.index.FieldIndexConfigs;
 import org.apache.pinot.segment.spi.index.FieldIndexConfigsUtil;
 import org.apache.pinot.segment.spi.index.IndexType;
 import org.apache.pinot.segment.spi.index.StandardIndexes;
+import org.apache.pinot.spi.config.instance.InstanceType;
 import org.apache.pinot.spi.config.table.FieldConfig;
 import org.apache.pinot.spi.config.table.IndexingConfig;
 import org.apache.pinot.spi.config.table.MultiColumnTextIndexConfig;
@@ -126,6 +127,7 @@ public class SegmentGeneratorConfig implements Serializable {
   private final Map<String, Map<String, String>> _columnProperties = new HashMap<>();
 
   private SegmentZKPropsConfig _segmentZKPropsConfig;
+  private InstanceType _instanceType;
 
   /**
    * Constructs the SegmentGeneratorConfig with table config and schema.
@@ -723,5 +725,14 @@ public class SegmentGeneratorConfig implements Serializable {
 
   public Map<String, FieldIndexConfigs> getIndexConfigsByColName() {
     return _indexConfigsByColName;
+  }
+
+  @Nullable
+  public InstanceType getInstanceType() {
+    return _instanceType;
+  }
+
+  public void setInstanceType(@Nullable InstanceType instanceType) {
+    _instanceType = instanceType;
   }
 }

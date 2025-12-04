@@ -152,8 +152,9 @@ public class RealtimeToOfflineSegmentsTaskExecutorTest {
       config.setOutDir(ORIGINAL_SEGMENT_DIR.getPath());
       config.setTableName(TABLE_NAME);
       config.setSegmentName(segmentName);
+      config.setInstanceType(InstanceType.MINION);
       SegmentIndexCreationDriverImpl driver = new SegmentIndexCreationDriverImpl();
-      driver.init(config, recordReader, InstanceType.MINION);
+      driver.init(config, recordReader);
       driver.build();
       _segmentIndexDirList.add(new File(ORIGINAL_SEGMENT_DIR, segmentName));
     }
@@ -167,8 +168,9 @@ public class RealtimeToOfflineSegmentsTaskExecutorTest {
       config.setOutDir(ORIGINAL_SEGMENT_DIR.getPath());
       config.setTableName(TABLE_NAME_EPOCH_HOURS);
       config.setSegmentName(segmentName);
+      config.setInstanceType(InstanceType.MINION);
       SegmentIndexCreationDriverImpl driver = new SegmentIndexCreationDriverImpl();
-      driver.init(config, recordReader, InstanceType.MINION);
+      driver.init(config, recordReader);
       driver.build();
       _segmentIndexDirListEpochHours.add(new File(ORIGINAL_SEGMENT_DIR, segmentName));
     }
@@ -182,8 +184,9 @@ public class RealtimeToOfflineSegmentsTaskExecutorTest {
       config.setOutDir(ORIGINAL_SEGMENT_DIR.getPath());
       config.setTableName(TABLE_NAME_SDF);
       config.setSegmentName(segmentName);
+      config.setInstanceType(InstanceType.MINION);
       SegmentIndexCreationDriverImpl driver = new SegmentIndexCreationDriverImpl();
-      driver.init(config, recordReader, InstanceType.MINION);
+      driver.init(config, recordReader);
       driver.build();
       _segmentIndexDirListSDF.add(new File(ORIGINAL_SEGMENT_DIR, segmentName));
     }

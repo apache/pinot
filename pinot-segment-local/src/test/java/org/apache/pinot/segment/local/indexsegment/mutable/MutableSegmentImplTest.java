@@ -78,8 +78,9 @@ public class MutableSegmentImplTest {
 
     SegmentGeneratorConfig config =
         SegmentTestUtils.getSegmentGeneratorConfigWithoutTimeColumn(avroFile, TEMP_DIR, "testTable");
+    config.setInstanceType(InstanceType.SERVER);
     SegmentIndexCreationDriver driver = new SegmentIndexCreationDriverImpl();
-    driver.init(config, InstanceType.SERVER);
+    driver.init(config);
     driver.build();
     _immutableSegment = ImmutableSegmentLoader.load(new File(TEMP_DIR, driver.getSegmentName()), ReadMode.mmap);
 

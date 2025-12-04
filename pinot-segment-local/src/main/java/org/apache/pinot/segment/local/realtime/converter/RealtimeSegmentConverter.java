@@ -215,7 +215,8 @@ public class RealtimeSegmentConverter {
           new RealtimeSegmentSegmentCreationDataSource(_realtimeSegmentImpl, (PinotSegmentRecordReader) recordReader);
     }
     // initializes reader
-    driver.init(genConfig, dataSource, TransformPipeline.getPassThroughPipeline(_tableName), InstanceType.SERVER);
+    genConfig.setInstanceType(InstanceType.SERVER);
+    driver.init(genConfig, dataSource, TransformPipeline.getPassThroughPipeline(_tableName));
 
     if (!_enableColumnMajor) {
       driver.build();

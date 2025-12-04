@@ -20,7 +20,6 @@ package org.apache.pinot.segment.spi.creator;
 
 import java.io.File;
 import java.io.Serializable;
-import org.apache.pinot.spi.config.instance.InstanceType;
 import org.apache.pinot.spi.data.IngestionSchemaValidator;
 
 
@@ -33,21 +32,13 @@ public interface SegmentIndexCreationDriver extends Serializable {
   /**
    * Configures the segment generator with the given segment generator configuration, which contains the input file
    * location, format, schema and other necessary information to create an index segment.
+   * 
+   * If InstanceType is needed for metrics, it should be set on the config via 
+   * config.setInstanceType(instanceType) before calling this method.
    *
    * @param config The configuration to use when building an index segment
    */
   void init(SegmentGeneratorConfig config)
-      throws Exception;
-
-  /**
-   * Configures the segment generator with the given segment generator configuration, which contains the input file
-   * location, format, schema and other necessary information to create an index segment.
-   * The instance type is used to determine which metrics to instantiate (minion vs server).
-   *
-   * @param config The configuration to use when building an index segment
-   * @param instanceType The type of instance (MINION, SERVER, etc.) for appropriate metrics
-   */
-  void init(SegmentGeneratorConfig config, InstanceType instanceType)
       throws Exception;
 
   /**

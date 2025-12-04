@@ -24,10 +24,10 @@ import java.io.IOException;
 import java.io.Serializable;
 import java.util.TreeMap;
 import javax.annotation.Nullable;
-import org.apache.commons.configuration2.ex.ConfigurationException;
 import org.apache.pinot.segment.spi.IndexSegment;
 import org.apache.pinot.segment.spi.index.creator.SegmentIndexCreationInfo;
 import org.apache.pinot.segment.spi.index.mutable.ThreadSafeMutableRoaringBitmap;
+import org.apache.pinot.spi.config.instance.InstanceType;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.data.readers.ColumnReader;
 import org.apache.pinot.spi.data.readers.GenericRow;
@@ -91,19 +91,18 @@ public interface SegmentCreator extends Closeable, Serializable {
     indexColumn(columnName, sortedDocIds, segment);
   }
 
-  /**
-   * Sets the name of the segment.
-   *
-   * @param segmentName The name of the segment
-   */
-  void setSegmentName(String segmentName);
+  String getSegmentName();
 
   /**
-   * Seals the segment, flushing it to disk.
+   * Create the final segment. This method is supposed to
+   * 1. flush all column indexes to disk
+   * 2. convert the segment to the final format
+   * 3. build other indexes (startree index, etc.) if needed.
+   * 4. persist the segment metadata and creation info files.
    *
-   * @throws ConfigurationException
-   * @throws IOException
+   * @return Final segment directory
+   * @throws Exception If finalization fails
    */
-  void seal()
-      throws ConfigurationException, IOException;
+  File createSegment()
+      throws Exception;
 }

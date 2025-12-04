@@ -269,8 +269,9 @@ public class SegmentPreProcessorTest implements PinotBuffersAfterClassCheckRule 
             _schema);
     config.setOutDir(TEMP_DIR.getPath());
     config.setSegmentName(SEGMENT_NAME);
+    config.setInstanceType(InstanceType.SERVER);
     SegmentIndexCreationDriverImpl driver = new SegmentIndexCreationDriverImpl();
-    driver.init(config, InstanceType.SERVER);
+    driver.init(config);
     driver.build();
   }
 
@@ -1948,8 +1949,9 @@ public class SegmentPreProcessorTest implements PinotBuffersAfterClassCheckRule 
       rows.add(row);
     }
 
+    config.setInstanceType(InstanceType.SERVER);
     SegmentIndexCreationDriverImpl driver = new SegmentIndexCreationDriverImpl();
-    driver.init(config, new GenericRowRecordReader(rows), InstanceType.SERVER);
+    driver.init(config, new GenericRowRecordReader(rows));
     driver.build();
   }
 
