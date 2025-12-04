@@ -456,7 +456,7 @@ public class SegmentIndexCreationDriverImpl implements SegmentIndexCreationDrive
   private void handlePostCreation()
       throws Exception {
     // Execute all post-creation operations directly on the index creator
-    _outputSegmentDir = _indexCreator.finalizeSegment(_instanceType);
+    _outputSegmentDir = _indexCreator.createSegment(_instanceType);
     _segmentName = _indexCreator.getSegmentName();
 
     LOGGER.info("Driver, record read time (in ms) : {}", TimeUnit.NANOSECONDS.toMillis(_totalRecordReadTimeNs));

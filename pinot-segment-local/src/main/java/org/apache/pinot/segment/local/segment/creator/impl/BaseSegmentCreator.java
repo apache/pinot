@@ -404,11 +404,6 @@ public abstract class BaseSegmentCreator implements SegmentCreator {
     return rawValue;
   }
 
-  @Override
-  public void setSegmentName(String segmentName) {
-    _segmentName = segmentName;
-  }
-
   /**
    * Writes segment metadata to disk.
    */
@@ -739,23 +734,16 @@ public abstract class BaseSegmentCreator implements SegmentCreator {
   }
 
   /**
-   * Finalize the segment with all post-creation operations.
-   * This method handles:
-   * - Sealing and closing the index creator
-   * - Directory operations (move temp to final location)
-   * - Format conversion (v1 to v3 if configured)
-   * - Star-tree V2 index building
-   * - Multi-column text index building
-   * - Post-segment creation index updates
-   * - CRC computation and metadata persistence
+   * Writes the index files to disk.
    */
+  abstract void seal() throws Exception;
+
   @Override
-  public File finalizeSegment(@Nullable InstanceType instanceType)
+  public File createSegment(@Nullable InstanceType instanceType)
       throws Exception {
-    String segmentName = generateSegmentName();
+    _segmentName = generateSegmentName();
     try {
       // Write the index files to disk
-      setSegmentName(segmentName);
       seal();
     } finally {
       close();
@@ -763,8 +751,8 @@ public abstract class BaseSegmentCreator implements SegmentCreator {
     LOGGER.info("Finished segment seal for: {}", _segmentName);
 
     // Delete the directory named after the segment name, if it exists
-    final File outputDir = new File(_config.getOutDir());
-    final File segmentOutputDir = new File(outputDir, _segmentName);
+    File outputDir = new File(_config.getOutDir());
+    File segmentOutputDir = new File(outputDir, _segmentName);
     if (segmentOutputDir.exists()) {
       FileUtils.deleteDirectory(segmentOutputDir);
     }
