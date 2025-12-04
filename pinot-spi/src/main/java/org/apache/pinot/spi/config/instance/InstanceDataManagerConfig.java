@@ -91,5 +91,5 @@ public interface InstanceDataManagerConfig {
 
   boolean shouldCheckCRCOnSegmentLoad();
 
-  boolean isDimensionTableDisablePreloadEnabled();
+  boolean isDimensionTablePreloadDisabled();
 }

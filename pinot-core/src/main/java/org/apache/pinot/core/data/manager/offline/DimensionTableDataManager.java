@@ -118,7 +118,7 @@ public class DimensionTableDataManager extends OfflineTableDataManager {
     Preconditions.checkState(CollectionUtils.isNotEmpty(primaryKeyColumns),
         "Primary key columns must be configured for dimension table: %s", _tableNameWithType);
 
-    _disablePreload = getInstanceDataManagerConfig().isDimensionTableDisablePreloadEnabled();
+    _disablePreload = getInstanceDataManagerConfig().isDimensionTablePreloadDisabled();
     DimensionTableConfig dimensionTableConfig = tableConfig.getDimensionTableConfig();
     if (dimensionTableConfig != null) {
       _disablePreload = dimensionTableConfig.isDisablePreload();
