@@ -734,9 +734,9 @@ public abstract class BaseSegmentCreator implements SegmentCreator {
   }
 
   /**
-   * Writes the index files to disk.
+   * Writes the individual column index files to disk.
    */
-  abstract void seal() throws Exception;
+  protected abstract void seal() throws Exception;
 
   @Override
   public File createSegment(@Nullable InstanceType instanceType)
