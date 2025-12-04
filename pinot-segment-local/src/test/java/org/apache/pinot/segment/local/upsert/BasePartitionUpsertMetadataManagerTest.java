@@ -1062,5 +1062,15 @@ public class BasePartitionUpsertMetadataManagerTest {
     @Override
     protected void doRemoveExpiredPrimaryKeys() {
     }
+
+    @Override
+    protected void revertCurrentSegmentUpsertMetadata() {
+
+    }
+
+    @Override
+    protected void eraseKeyToPreviousLocationMap() {
+
+    }
   }
 }

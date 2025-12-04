@@ -289,6 +289,7 @@ public abstract class BasePartitionUpsertMetadataManager implements PartitionUps
     }
     try {
       doAddSegment((ImmutableSegmentImpl) segment);
+      eraseKeyToPreviousLocationMap();
       _trackedSegments.add(segment);
       if (_enableSnapshot) {
         _updatedSegmentsSinceLastSnapshot.add(segment);
@@ -404,6 +405,7 @@ public abstract class BasePartitionUpsertMetadataManager implements PartitionUps
     }
     try {
       doPreloadSegment((ImmutableSegmentImpl) segment);
+      eraseKeyToPreviousLocationMap();
       _trackedSegments.add(segment);
       _updatedSegmentsSinceLastSnapshot.add(segment);
     } finally {
@@ -571,6 +573,7 @@ public abstract class BasePartitionUpsertMetadataManager implements PartitionUps
     }
     try {
       doReplaceSegment(segment, oldSegment);
+      eraseKeyToPreviousLocationMap();
       if (!(segment instanceof EmptyIndexSegment)) {
         _trackedSegments.add(segment);
         if (_enableSnapshot) {
@@ -669,10 +672,14 @@ public abstract class BasePartitionUpsertMetadataManager implements PartitionUps
         // of the other server
         _logger.warn(
             "Found {} primary keys not replaced when replacing segment: {} for upsert table with dropOutOfOrderRecord"
-                + " enabled with no consistency mode. This can potentially cause inconsistency between replicas",
-            numKeysNotReplaced, segmentName);
+                + " enabled with no consistency mode. This can potentially cause inconsistency between replicas. "
+                + "Reverting metadata changes and triggering segment replacement.", numKeysNotReplaced, segmentName);
         _serverMetrics.addMeteredTableValue(_tableNameWithType, ServerMeter.REALTIME_UPSERT_INCONSISTENT_ROWS,
             numKeysNotReplaced);
+        // Revert consuming segment pks to previous segment locations and perform metadata replacement again
+        revertCurrentSegmentUpsertMetadata();
+        addOrReplaceSegment((ImmutableSegmentImpl) segment, validDocIds, queryableDocIds, recordInfoIterator,
+            oldSegment, validDocIdsForOldSegment);
       } else if (_partialUpsertHandler != null) {
         // For partial-upsert table, because we do not restore the original record location when removing the primary
         // keys not replaced, it can potentially cause inconsistency between replicas. This can happen when a
@@ -680,14 +687,25 @@ public abstract class BasePartitionUpsertMetadataManager implements PartitionUps
         // different records (some stream consumer cannot guarantee consuming the messages in the same order/
         // when a segment is replaced with lesser consumed rows from the other server).
         _logger.warn("Found {} primary keys not replaced when replacing segment: {} for partial-upsert table. This "
-            + "can potentially cause inconsistency between replicas", numKeysNotReplaced, segmentName);
+            + "can potentially cause inconsistency between replicas. "
+            + "Reverting metadata changes and triggering segment replacement.", numKeysNotReplaced, segmentName);
         _serverMetrics.addMeteredTableValue(_tableNameWithType, ServerMeter.PARTIAL_UPSERT_KEYS_NOT_REPLACED,
             numKeysNotReplaced);
+        // Revert consuming segment pks to previous segment locations and perform metadata replacement again
+        revertCurrentSegmentUpsertMetadata();
+        addOrReplaceSegment((ImmutableSegmentImpl) segment, validDocIds, queryableDocIds, recordInfoIterator,
+            oldSegment, validDocIdsForOldSegment);
       } else {
         _logger.info("Found {} primary keys not replaced when replacing segment: {}", numKeysNotReplaced, segmentName);
       }
       removeSegment(oldSegment, validDocIdsForOldSegment);
     }
+  }
+
+  protected void eraseKeyToPreviousLocationMap() {
+  }
+
+  protected void revertCurrentSegmentUpsertMetadata() {
   }
 
   private MutableRoaringBitmap getValidDocIdsForOldSegment(IndexSegment oldSegment) {
