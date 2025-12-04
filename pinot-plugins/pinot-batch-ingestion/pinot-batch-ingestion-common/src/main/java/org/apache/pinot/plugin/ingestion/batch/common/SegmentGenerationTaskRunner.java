@@ -112,8 +112,9 @@ public class SegmentGenerationTaskRunner implements Serializable {
     segmentGeneratorConfig.setSegmentNameGenerator(segmentNameGenerator);
 
     //build segment
+    segmentGeneratorConfig.setInstanceType(InstanceType.MINION);
     SegmentIndexCreationDriverImpl segmentIndexCreationDriver = new SegmentIndexCreationDriverImpl();
-    segmentIndexCreationDriver.init(segmentGeneratorConfig, InstanceType.MINION);
+    segmentIndexCreationDriver.init(segmentGeneratorConfig);
     segmentIndexCreationDriver.build();
     return segmentIndexCreationDriver.getSegmentName();
   }

@@ -739,7 +739,7 @@ public abstract class BaseSegmentCreator implements SegmentCreator {
   protected abstract void seal() throws Exception;
 
   @Override
-  public File createSegment(@Nullable InstanceType instanceType)
+  public File createSegment()
       throws Exception {
     _segmentName = generateSegmentName();
     try {
@@ -765,7 +765,7 @@ public abstract class BaseSegmentCreator implements SegmentCreator {
 
     // Build indexes if there are documents
     if (_totalDocs > 0) {
-      buildStarTreeV2IfNecessary(segmentOutputDir, instanceType);
+      buildStarTreeV2IfNecessary(segmentOutputDir);
       buildMultiColumnTextIndex(segmentOutputDir);
     }
 
@@ -834,14 +834,7 @@ public abstract class BaseSegmentCreator implements SegmentCreator {
     converter.convert(segmentDirectory);
   }
 
-  /**
-   * Build star-tree V2 index if configured.
-   *
-   * @param indexDir Segment index directory
-   * @param instanceType Instance type for metrics tracking (nullable)
-   * @throws Exception If star-tree index building fails
-   */
-  private void buildStarTreeV2IfNecessary(File indexDir, @Nullable InstanceType instanceType)
+  private void buildStarTreeV2IfNecessary(File indexDir)
       throws Exception {
     List<StarTreeIndexConfig> starTreeIndexConfigs = _config.getStarTreeIndexConfigs();
     boolean enableDefaultStarTree = _config.isEnableDefaultStarTree();
@@ -862,8 +855,8 @@ public abstract class BaseSegmentCreator implements SegmentCreator {
         String tableNameWithType = _config.getTableConfig().getTableName();
         LOGGER.error("Failed to build star-tree index for table: {}, skipping", tableNameWithType, e);
         // Track metrics only if instance type is provided
-        if (instanceType != null) {
-          if (instanceType == InstanceType.MINION) {
+        if (_config.getInstanceType() != null) {
+          if (_config.getInstanceType() == InstanceType.MINION) {
             MinionMetrics.get().addMeteredTableValue(tableNameWithType, MinionMeter.STAR_TREE_INDEX_BUILD_FAILURES, 1);
           } else {
             ServerMetrics.get().addMeteredTableValue(tableNameWithType, ServerMeter.STAR_TREE_INDEX_BUILD_FAILURES, 1);

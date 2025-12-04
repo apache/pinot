@@ -89,8 +89,9 @@ public class MergeRollupTaskExecutorTest {
       config.setOutDir(ORIGINAL_SEGMENT_DIR.getPath());
       config.setTableName(TABLE_NAME);
       config.setSegmentName(segmentName);
+      config.setInstanceType(InstanceType.MINION);
       SegmentIndexCreationDriverImpl driver = new SegmentIndexCreationDriverImpl();
-      driver.init(config, recordReader, InstanceType.MINION);
+      driver.init(config, recordReader);
       driver.build();
       _segmentIndexDirList.add(new File(ORIGINAL_SEGMENT_DIR, segmentName));
     }

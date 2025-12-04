@@ -99,18 +99,11 @@ public class SegmentIndexCreationDriverImpl implements SegmentIndexCreationDrive
   private int _incompleteRowsFound = 0;
   private int _skippedRowsFound = 0;
   private int _sanitizedRowsFound = 0;
-  @Nullable private InstanceType _instanceType;
 
   @Override
   public void init(SegmentGeneratorConfig config)
       throws Exception {
-    init(config, getRecordReader(config), null);
-  }
-
-  @Override
-  public void init(SegmentGeneratorConfig config, @Nullable InstanceType instanceType)
-      throws Exception {
-    init(config, getRecordReader(config), instanceType);
+    init(config, getRecordReader(config));
   }
 
   private RecordReader getRecordReader(SegmentGeneratorConfig segmentGeneratorConfig)
@@ -154,13 +147,7 @@ public class SegmentIndexCreationDriverImpl implements SegmentIndexCreationDrive
   public void init(SegmentGeneratorConfig config, RecordReader recordReader)
       throws Exception {
     init(config, new RecordReaderSegmentCreationDataSource(recordReader),
-        new TransformPipeline(config.getTableConfig(), config.getSchema()), null);
-  }
-
-  public void init(SegmentGeneratorConfig config, RecordReader recordReader, @Nullable InstanceType instanceType)
-      throws Exception {
-    init(config, new RecordReaderSegmentCreationDataSource(recordReader),
-        new TransformPipeline(config.getTableConfig(), config.getSchema()), instanceType);
+        new TransformPipeline(config.getTableConfig(), config.getSchema()));
   }
 
   /**
@@ -183,22 +170,22 @@ public class SegmentIndexCreationDriverImpl implements SegmentIndexCreationDrive
     ColumnarSegmentCreationDataSource columnarDataSource = new ColumnarSegmentCreationDataSource(columnReaders);
 
     // Use the existing init method with columnar data source and no transform pipeline
-    init(config, columnarDataSource, null, null);
+    init(config, columnarDataSource, null);
 
     LOGGER.info("Initialized SegmentIndexCreationDriverImpl for columnar data source building with {} columns",
         columnReaders.size());
   }
 
   public void init(SegmentGeneratorConfig config, SegmentCreationDataSource dataSource,
-      TransformPipeline transformPipeline, @Nullable InstanceType instanceType)
+      TransformPipeline transformPipeline)
       throws Exception {
     _config = config;
     _dataSchema = config.getSchema();
     _continueOnError = config.isContinueOnError();
     String readerClassName = null;
+    InstanceType instanceType = config.getInstanceType();
     Preconditions.checkState(instanceType == null || instanceType == InstanceType.SERVER
         || instanceType == InstanceType.MINION, "InstanceType passed must be for minion or server or null");
-    _instanceType = instanceType;
 
     // Handle columnar data sources differently
     if (dataSource instanceof ColumnarSegmentCreationDataSource) {
@@ -379,12 +366,13 @@ public class SegmentIndexCreationDriverImpl implements SegmentIndexCreationDrive
   }
 
   private void updateMetrics(String tableNameWithType) {
-    if (_instanceType == null) {
+    InstanceType instanceType = _config.getInstanceType();
+    if (instanceType == null) {
       return;
     }
 
     // Use appropriate metrics based on instance type
-    if (_instanceType == InstanceType.MINION) {
+    if (instanceType == InstanceType.MINION) {
       MinionMetrics metrics = MinionMetrics.get();
       if (_incompleteRowsFound > 0) {
         metrics.addMeteredTableValue(tableNameWithType, MinionMeter.TRANSFORMATION_ERROR_COUNT, _incompleteRowsFound);
@@ -395,7 +383,7 @@ public class SegmentIndexCreationDriverImpl implements SegmentIndexCreationDrive
       if (_sanitizedRowsFound > 0) {
         metrics.addMeteredTableValue(tableNameWithType, MinionMeter.CORRUPTED_RECORD_COUNT, _sanitizedRowsFound);
       }
-    } else if (_instanceType == InstanceType.SERVER) {
+    } else if (instanceType == InstanceType.SERVER) {
       ServerMetrics metrics = ServerMetrics.get();
       if (_incompleteRowsFound > 0) {
         metrics.addMeteredTableValue(tableNameWithType, ServerMeter.TRANSFORMATION_ERROR_COUNT, _incompleteRowsFound);
@@ -456,7 +444,7 @@ public class SegmentIndexCreationDriverImpl implements SegmentIndexCreationDrive
   private void handlePostCreation()
       throws Exception {
     // Execute all post-creation operations directly on the index creator
-    _outputSegmentDir = _indexCreator.createSegment(_instanceType);
+    _outputSegmentDir = _indexCreator.createSegment();
     _segmentName = _indexCreator.getSegmentName();
 
     LOGGER.info("Driver, record read time (in ms) : {}", TimeUnit.NANOSECONDS.toMillis(_totalRecordReadTimeNs));

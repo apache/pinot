@@ -104,8 +104,9 @@ public class UpsertCompactionTaskExecutor extends BaseSingleSegmentConversionExe
       compactedRecordReader.init(indexDir, null, null);
       SegmentGeneratorConfig config = getSegmentGeneratorConfig(workingDir, tableConfig, segmentMetadata, segmentName,
           getSchema(tableNameWithType));
+      config.setInstanceType(InstanceType.MINION);
       SegmentIndexCreationDriverImpl driver = new SegmentIndexCreationDriverImpl();
-      driver.init(config, compactedRecordReader, InstanceType.MINION);
+      driver.init(config, compactedRecordReader);
       driver.build();
       _eventObserver.notifyProgress(pinotTaskConfig,
           "Segment processing stats - incomplete rows:" + driver.getIncompleteRowsFound() + ", dropped rows:"

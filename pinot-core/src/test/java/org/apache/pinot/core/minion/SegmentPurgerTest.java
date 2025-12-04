@@ -105,8 +105,9 @@ public class SegmentPurgerTest {
     config.setOutDir(ORIGINAL_SEGMENT_DIR.getPath());
     config.setSegmentName(SEGMENT_NAME);
 
+    config.setInstanceType(InstanceType.MINION);
     SegmentIndexCreationDriverImpl driver = new SegmentIndexCreationDriverImpl();
-    driver.init(config, genericRowRecordReader, InstanceType.MINION);
+    driver.init(config, genericRowRecordReader);
     driver.build();
     _originalIndexDir = new File(ORIGINAL_SEGMENT_DIR, SEGMENT_NAME);
   }

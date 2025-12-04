@@ -107,9 +107,10 @@ public class SegmentPurger {
         _segmentGeneratorConfig.setSegmentTimeUnit(segmentMetadata.getTimeUnit());
       }
 
+      _segmentGeneratorConfig.setInstanceType(InstanceType.MINION);
       SegmentIndexCreationDriverImpl driver = new SegmentIndexCreationDriverImpl();
       purgeRecordReader.rewind();
-      driver.init(_segmentGeneratorConfig, purgeRecordReader, InstanceType.MINION);
+      driver.init(_segmentGeneratorConfig, purgeRecordReader);
       driver.build();
     }
 

@@ -100,11 +100,9 @@ public interface SegmentCreator extends Closeable, Serializable {
    * 3. build other indexes (startree index, etc.) if needed.
    * 4. persist the segment metadata and creation info files.
    *
-   * @param instanceType Instance type that's used to select the metrics for observability
-   *                     TODO - Move instanceType to SegmentGeneratorConfig and avoid passing it here
    * @return Final segment directory
    * @throws Exception If finalization fails
    */
-  File createSegment(@Nullable InstanceType instanceType)
+  File createSegment()
       throws Exception;
 }
