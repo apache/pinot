@@ -93,12 +93,10 @@ public class DummyTableUpsertMetadataManager extends BaseTableUpsertMetadataMana
 
     @Override
     protected void revertCurrentSegmentUpsertMetadata() {
-
     }
 
     @Override
     protected void eraseKeyToPreviousLocationMap() {
-
     }
   }
 }

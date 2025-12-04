@@ -287,9 +287,7 @@ public class ConcurrentMapPartitionUpsertMetadataManager extends BasePartitionUp
               if (segment == currentSegment) {
                 replaceDocId(segment, validDocIds, queryableDocIds, currentDocId, newDocId, recordInfo);
               } else {
-                if (!_previousKeyToRecordLocationMap.containsKey(primaryKey)) {
-                  _previousKeyToRecordLocationMap.put(primaryKey, currentRecordLocation);
-                }
+                _previousKeyToRecordLocationMap.put(primaryKey, currentRecordLocation);
                 replaceDocId(segment, validDocIds, queryableDocIds, currentSegment, currentDocId, newDocId, recordInfo);
               }
               return new RecordLocation(segment, newDocId, newComparisonValue);

@@ -1065,12 +1065,10 @@ public class BasePartitionUpsertMetadataManagerTest {
 
     @Override
     protected void revertCurrentSegmentUpsertMetadata() {
-
     }
 
     @Override
     protected void eraseKeyToPreviousLocationMap() {
-
     }
   }
 }
