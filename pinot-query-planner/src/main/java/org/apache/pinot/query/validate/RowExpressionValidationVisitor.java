@@ -38,6 +38,11 @@ public class RowExpressionValidationVisitor extends SqlBasicVisitor<Void> {
 
     if (this.isComparisonOperator(kind)) {
       this.validateRowComparison(call);
+      // If this comparison involves ROW expressions, stop traversal here
+      // to avoid re-validating the inner ROW nodes out of context
+      if (hasRowOperands(call)) {
+        return null;
+      }
     } else {
       this.validateNoRowInOperands(call);
     }
@@ -69,6 +74,13 @@ public class RowExpressionValidationVisitor extends SqlBasicVisitor<Void> {
           if (leftIsRow && rightIsRow) {
             SqlCall leftRow = (SqlCall) left;
             SqlCall rightRow = (SqlCall) right;
+            // Unwrap CAST if present
+            if (leftRow.getKind() == SqlKind.CAST) {
+              leftRow = (SqlCall) leftRow.getOperandList().get(0);
+            }
+            if (rightRow.getKind() == SqlKind.CAST) {
+              rightRow = (SqlCall) rightRow.getOperandList().get(0);
+            }
             int leftSize = leftRow.getOperandList().size();
             int rightSize = rightRow.getOperandList().size();
             if (leftSize != rightSize) {
@@ -93,6 +105,10 @@ public class RowExpressionValidationVisitor extends SqlBasicVisitor<Void> {
   }
 
   private void validateNoRowInOperands(SqlCall call) {
+    if (isAllowedRowContext(call.getKind())) {
+      // VALUES, INSERT, etc. - ROW expressions are allowed here
+      return;
+    }
     List<SqlNode> operands = call.getOperandList();
     for (SqlNode operand : operands) {
       if (operand == null) {
@@ -120,7 +136,37 @@ public class RowExpressionValidationVisitor extends SqlBasicVisitor<Void> {
   }
 
   private boolean isRowExpression(SqlNode node) {
-    return node instanceof SqlCall && ((SqlCall) node).getKind() == SqlKind.ROW;
+    if (!(node instanceof SqlCall)) {
+      return false;
+    }
+    SqlCall call = (SqlCall) node;
+    if (call.getKind() == SqlKind.ROW) {
+      return true;
+    }
+    // handle CAST wrapping
+    if (call.getKind() == SqlKind.CAST && !call.getOperandList().isEmpty()) {
+      SqlNode operand = call.getOperandList().get(0);
+      if (operand instanceof SqlCall && ((SqlCall) operand).getKind() == SqlKind.ROW) {
+        return true;
+      }
+    }
+
+    return false;
+  }
+
+  private boolean isAllowedRowContext(SqlKind kind) {
+    return kind == SqlKind.VALUES
+        || kind == SqlKind.INSERT
+        || kind == SqlKind.ARRAY_VALUE_CONSTRUCTOR;
+  }
+
+  private boolean hasRowOperands(SqlCall call) {
+    for (SqlNode operand : call.getOperandList()) {
+      if (isRowExpression(operand)) {
+        return true;
+      }
+    }
+    return false;
   }
 
   private boolean isComparisonOperator(SqlKind kind) {

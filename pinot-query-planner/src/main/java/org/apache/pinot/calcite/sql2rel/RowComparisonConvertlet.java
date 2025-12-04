@@ -58,19 +58,20 @@ public class RowComparisonConvertlet implements SqlRexConvertlet {
     SqlNode rightNode = call.operand(1);
 
     // Validate both operands are ROW expressions
-    if (!(leftNode instanceof SqlCall && ((SqlCall) leftNode).getKind() == SqlKind.ROW)) {
+    if (!isRowExpression(leftNode)) {
       throw new IllegalArgumentException(
-          "Left operand of ROW comparison must be a ROW expression. Got: " + leftNode.getKind()
+          "Left operand of ROW comparison must be a ROW expression. Got: " + getNodeKind(leftNode)
               + ". Both operands must be ROW expressions for comparison.");
     }
-    if (!(rightNode instanceof SqlCall && ((SqlCall) rightNode).getKind() == SqlKind.ROW)) {
+    if (!isRowExpression(rightNode)) {
       throw new IllegalArgumentException(
-          "Right operand of ROW comparison must be a ROW expression. Got: " + rightNode.getKind()
+          "Right operand of ROW comparison must be a ROW expression. Got: " + getNodeKind(rightNode)
               + ". Both operands must be ROW expressions for comparison.");
     }
 
-    SqlCall leftRow = (SqlCall) leftNode;
-    SqlCall rightRow = (SqlCall) rightNode;
+    // Unwrap CAST to get the actual ROW expressions
+    SqlCall leftRow = unwrapCastToRow(leftNode);
+    SqlCall rightRow = unwrapCastToRow(rightNode);
 
     // Validate both ROW expressions have the same number of fields
     int leftSize = leftRow.getOperandList().size();
@@ -115,6 +116,58 @@ public class RowComparisonConvertlet implements SqlRexConvertlet {
     }
   }
 
+  private static boolean isRowExpression(SqlNode node) {
+    if (!(node instanceof SqlCall)) {
+      return false;
+    }
+
+    SqlCall call = (SqlCall) node;
+    if (call.getKind() == SqlKind.ROW) {
+      return true;
+    }
+    // ROW wrapped in CAST
+    if (call.getKind() == SqlKind.CAST && call.getOperandList().size() > 0) {
+      SqlNode castOperand = call.getOperandList().get(0);
+      if (castOperand instanceof SqlCall && ((SqlCall) castOperand).getKind() == SqlKind.ROW) {
+        return true;
+      }
+    }
+    return false;
+  }
+
+  private static SqlCall unwrapCastToRow(SqlNode node) {
+    if (!(node instanceof SqlCall)) {
+      throw new IllegalArgumentException("Expected SqlCall, got: " + node.getClass());
+    }
+
+    SqlCall call = (SqlCall) node;
+    if (call.getKind() == SqlKind.ROW) {
+      return call;
+    }
+    // CAST(ROW(...) AS ...) - extract the ROW
+    if (call.getKind() == SqlKind.CAST && call.getOperandList().size() > 0) {
+      SqlNode operand = call.getOperandList().get(0);
+      if (operand instanceof SqlCall && ((SqlCall) operand).getKind() == SqlKind.ROW) {
+        return (SqlCall) operand;
+      }
+    }
+    throw new IllegalArgumentException("Expected ROW or CAST(ROW), got: " + call.getKind());
+  }
+
+  private static SqlKind getNodeKind(SqlNode node) {
+    if (!(node instanceof SqlCall)) {
+      return SqlKind.OTHER;
+    }
+
+    SqlCall call = (SqlCall) node;
+    if (call.getKind() == SqlKind.CAST && call.getOperandList().size() > 0) {
+      SqlNode operand = call.getOperandList().get(0);
+      if (operand instanceof SqlCall) {
+        return ((SqlCall) operand).getKind();
+      }
+    }
+    return call.getKind();
+  }
 
   private RexNode rewriteEquals(RexBuilder rexBuilder, List<RexNode> left, List<RexNode> right) {
     List<RexNode> conditions = new ArrayList<>(left.size());
