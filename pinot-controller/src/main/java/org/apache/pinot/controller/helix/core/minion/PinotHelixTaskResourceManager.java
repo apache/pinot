@@ -959,6 +959,66 @@ public class PinotHelixTaskResourceManager {
   }
 
   /**
+   * Get a summary of all tasks across all task types.
+   * This consolidates the existing logic from /tasks/tasktypes and /tasks/{taskType}/taskcounts
+   * into a single endpoint.
+   *
+   * @return TaskSummaryResponse containing aggregated task counts and breakdown by task type
+   */
+  public synchronized TaskSummaryResponse getTasksSummary() {
+    TaskSummaryResponse response = new TaskSummaryResponse();
+    Set<String> taskTypes = getTaskTypes();
+
+    if (taskTypes == null || taskTypes.isEmpty()) {
+      return response;
+    }
+
+    int totalRunning = 0;
+    int totalWaiting = 0;
+    int inProgressTaskTypes = 0;
+    List<TaskTypeBreakdown> taskTypeBreakdownList = new ArrayList<>();
+
+    for (String taskType : taskTypes) {
+      // Get all task counts for this task type
+      Map<String, TaskCount> taskCounts = getTaskCounts(taskType);
+
+      if (taskCounts == null || taskCounts.isEmpty()) {
+        continue;
+      }
+
+      // Aggregate counts across all tasks for this task type
+      TaskCount aggregatedCount = new TaskCount();
+      for (TaskCount taskCount : taskCounts.values()) {
+        aggregatedCount.accumulate(taskCount);
+      }
+
+      int taskTypeRunning = aggregatedCount.getRunning();
+      int taskTypeWaiting = aggregatedCount.getWaiting();
+
+      // Only include task types that have running or waiting tasks
+      if (taskTypeRunning > 0 || taskTypeWaiting > 0) {
+        inProgressTaskTypes++;
+        totalRunning += taskTypeRunning;
+        totalWaiting += taskTypeWaiting;
+
+        TaskTypeBreakdown taskTypeBreakdown = new TaskTypeBreakdown(
+            taskType,
+            taskTypeRunning,
+            taskTypeWaiting
+        );
+        taskTypeBreakdownList.add(taskTypeBreakdown);
+      }
+    }
+
+    response.setTotalRunningTasks(totalRunning);
+    response.setTotalWaitingTasks(totalWaiting);
+    response.setTotalInProgressTaskTypes(inProgressTaskTypes);
+    response.setTaskTypeBreakdown(taskTypeBreakdownList);
+
+    return response;
+  }
+
+  /**
    * Given a taskType, helper method to debug all the HelixJobs for the taskType.
    * For each of the HelixJobs, collects status of the (sub)tasks in the taskbatch.
    *
@@ -1516,6 +1576,99 @@ public class PinotHelixTaskResourceManager {
 
     public void setSubtaskRunningTimes(Map<String, Long> subtaskRunningTimes) {
       _subtaskRunningTimes = subtaskRunningTimes;
+    }
+  }
+
+  /**
+   * Response model for the /tasks/summary endpoint
+   */
+  @JsonPropertyOrder({"totalRunningTasks", "totalWaitingTasks", "totalInProgressTaskTypes", "taskTypeBreakdown"})
+  public static class TaskSummaryResponse {
+    private int _totalRunningTasks;
+    private int _totalWaitingTasks;
+    private int _totalInProgressTaskTypes;
+    private List<TaskTypeBreakdown> _taskTypeBreakdown;
+
+    public TaskSummaryResponse() {
+      _totalRunningTasks = 0;
+      _totalWaitingTasks = 0;
+      _totalInProgressTaskTypes = 0;
+      _taskTypeBreakdown = new ArrayList<>();
+    }
+
+    public int getTotalRunningTasks() {
+      return _totalRunningTasks;
+    }
+
+    public void setTotalRunningTasks(int totalRunningTasks) {
+      _totalRunningTasks = totalRunningTasks;
+    }
+
+    public int getTotalWaitingTasks() {
+      return _totalWaitingTasks;
+    }
+
+    public void setTotalWaitingTasks(int totalWaitingTasks) {
+      _totalWaitingTasks = totalWaitingTasks;
+    }
+
+    public int getTotalInProgressTaskTypes() {
+      return _totalInProgressTaskTypes;
+    }
+
+    public void setTotalInProgressTaskTypes(int totalInProgressTaskTypes) {
+      _totalInProgressTaskTypes = totalInProgressTaskTypes;
+    }
+
+    public List<TaskTypeBreakdown> getTaskTypeBreakdown() {
+      return _taskTypeBreakdown;
+    }
+
+    public void setTaskTypeBreakdown(List<TaskTypeBreakdown> taskTypeBreakdown) {
+      _taskTypeBreakdown = taskTypeBreakdown;
+    }
+  }
+
+  /**
+   * Breakdown of task counts by task type
+   */
+  @JsonPropertyOrder({"taskType", "runningCount", "waitingCount"})
+  public static class TaskTypeBreakdown {
+    private String _taskType;
+    private int _runningCount;
+    private int _waitingCount;
+
+    public TaskTypeBreakdown() {
+    }
+
+    public TaskTypeBreakdown(String taskType, int runningCount, int waitingCount) {
+      _taskType = taskType;
+      _runningCount = runningCount;
+      _waitingCount = waitingCount;
+    }
+
+    public String getTaskType() {
+      return _taskType;
+    }
+
+    public void setTaskType(String taskType) {
+      _taskType = taskType;
+    }
+
+    public int getRunningCount() {
+      return _runningCount;
+    }
+
+    public void setRunningCount(int runningCount) {
+      _runningCount = runningCount;
+    }
+
+    public int getWaitingCount() {
+      return _waitingCount;
+    }
+
+    public void setWaitingCount(int waitingCount) {
+      _waitingCount = waitingCount;
     }
   }
 }

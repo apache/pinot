@@ -185,6 +185,15 @@ public class PinotTaskRestletResource {
   }
 
   @GET
+  @Path("/tasks/summary")
+  @Authorize(targetType = TargetType.CLUSTER, action = Actions.Cluster.GET_TASK)
+  @Produces(MediaType.APPLICATION_JSON)
+  @ApiOperation("Get summary of all tasks across all task types.")
+  public PinotHelixTaskResourceManager.TaskSummaryResponse getTasksSummary() {
+    return _pinotHelixTaskResourceManager.getTasksSummary();
+  }
+
+  @GET
   @Path("/tasks/{taskType}/state")
   @Authorize(targetType = TargetType.CLUSTER, action = Actions.Cluster.GET_TASK)
   @Produces(MediaType.APPLICATION_JSON)
