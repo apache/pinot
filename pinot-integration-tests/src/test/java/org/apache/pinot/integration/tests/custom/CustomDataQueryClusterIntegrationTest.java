@@ -18,12 +18,17 @@
  */
 package org.apache.pinot.integration.tests.custom;
 
+import java.io.Closeable;
 import java.io.File;
 import java.io.IOException;
+import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import javax.annotation.Nullable;
+import org.apache.avro.file.DataFileWriter;
+import org.apache.avro.generic.GenericData;
+import org.apache.avro.generic.GenericDatumWriter;
 import org.apache.commons.io.FileUtils;
 import org.apache.pinot.integration.tests.BaseClusterIntegrationTest;
 import org.apache.pinot.integration.tests.ClusterIntegrationTestUtils;
@@ -131,6 +136,12 @@ public abstract class CustomDataQueryClusterIntegrationTest extends BaseClusterI
     }
     FileUtils.deleteDirectory(_tempDir);
     LOGGER.warn("Finished tearing down integration test class: {}", getClass().getSimpleName());
+  }
+
+  @Override
+  protected void startServer()
+      throws Exception {
+    startServers(2);
   }
 
   @Override
@@ -262,7 +273,51 @@ public abstract class CustomDataQueryClusterIntegrationTest extends BaseClusterI
   public abstract List<File> createAvroFiles()
       throws Exception;
 
+  public int getNumAvroFiles() {
+    return 2;
+  }
+
   public boolean isRealtimeTable() {
     return false;
+  }
+
+  protected AvroFilesAndWriters createAvroFilesAndWriters(org.apache.avro.Schema avroSchema)
+      throws IOException {
+    List<File> avroFiles = new ArrayList<>();
+    List<DataFileWriter<GenericData.Record>> writers = new ArrayList<>();
+    for (int i = 0; i < getNumAvroFiles(); i++) {
+      File avroFile = new File(_tempDir, "data-" + i + ".avro");
+      avroFiles.add(avroFile);
+      DataFileWriter<GenericData.Record> fileWriter = new DataFileWriter<>(new GenericDatumWriter<>(avroSchema));
+      writers.add(fileWriter);
+      fileWriter.create(avroSchema, avroFile);
+    }
+    return new AvroFilesAndWriters(avroFiles, writers);
+  }
+
+  protected static class AvroFilesAndWriters implements Closeable {
+    private final List<File> _avroFiles;
+    private final List<DataFileWriter<GenericData.Record>> _writers;
+
+    AvroFilesAndWriters(List<File> avroFiles, List<DataFileWriter<GenericData.Record>> writers) {
+      _avroFiles = avroFiles;
+      _writers = writers;
+    }
+
+    public List<File> getAvroFiles() {
+      return _avroFiles;
+    }
+
+    public List<DataFileWriter<GenericData.Record>> getWriters() {
+      return _writers;
+    }
+
+    @Override
+    public void close()
+        throws IOException {
+      for (DataFileWriter<GenericData.Record> writer : _writers) {
+        writer.close();
+      }
+    }
   }
 }

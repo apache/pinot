@@ -138,7 +138,10 @@ public class SumArrayDoubleAggregationFunction
 
   @Override
   public DataSchema.ColumnDataType getIntermediateResultColumnType() {
-    return DataSchema.ColumnDataType.DOUBLE_ARRAY;
+    // AggregationResultsBlock#setIntermediateResult and AggregationFunctionUtils#getIntermediateResult only serialize
+    // intermediate results whose stored type is INT/LONG/DOUBLE/STRING/OBJECT, so we need the OBJECT/custom ser-de path
+    // for DoubleArrayList payloads.
+    return DataSchema.ColumnDataType.OBJECT;
   }
 
   @Override

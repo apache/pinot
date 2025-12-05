@@ -27,7 +27,6 @@ import java.util.List;
 import java.util.Map;
 import org.apache.avro.file.DataFileWriter;
 import org.apache.avro.generic.GenericData;
-import org.apache.avro.generic.GenericDatumWriter;
 import org.apache.pinot.spi.config.table.FieldConfig;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.TableType;
@@ -48,14 +47,14 @@ public class MapFieldTypeTest extends CustomDataQueryClusterIntegrationTest {
   // Default settings
   private static final int V1_DEFAULT_SELECTION_COUNT = 10;
   protected static final String DEFAULT_TABLE_NAME = "MapFieldTypeTest";
-  private static final int NUM_DOCS = 1000;
+  private static final int NUM_DOCS_PER_SEGMENT = 1000;
   private static final String STRING_MAP_FIELD_NAME = "stringMap";
   private static final String INT_MAP_FIELD_NAME = "intMap";
   private int _setSelectionDefaultDocCount = 10;
 
   @Override
   protected long getCountStarResult() {
-    return NUM_DOCS;
+    return (long) NUM_DOCS_PER_SEGMENT * getNumAvroFiles();
   }
 
   @Override
@@ -141,10 +140,8 @@ public class MapFieldTypeTest extends CustomDataQueryClusterIntegrationTest {
             new org.apache.avro.Schema.Field(INT_MAP_FIELD_NAME, intMapAvroSchema, null, null));
     avroSchema.setFields(fields);
 
-    File avroFile = new File(_tempDir, "data.avro");
-    try (DataFileWriter<GenericData.Record> fileWriter = new DataFileWriter<>(new GenericDatumWriter<>(avroSchema))) {
-      fileWriter.create(avroSchema, avroFile);
-      for (int i = 0; i < NUM_DOCS; i++) {
+    try (AvroFilesAndWriters avroFilesAndWriters = createAvroFilesAndWriters(avroSchema)) {
+      for (int i = 0; i < NUM_DOCS_PER_SEGMENT; i++) {
         Map<String, String> stringMap = new HashMap<>();
         Map<String, Integer> intMap = new HashMap<>();
         for (int j = 0; j < i; j++) {
@@ -155,10 +152,12 @@ public class MapFieldTypeTest extends CustomDataQueryClusterIntegrationTest {
         GenericData.Record record = new GenericData.Record(avroSchema);
         record.put(STRING_MAP_FIELD_NAME, stringMap);
         record.put(INT_MAP_FIELD_NAME, intMap);
-        fileWriter.append(record);
+        for (DataFileWriter<GenericData.Record> writer : avroFilesAndWriters.getWriters()) {
+          writer.append(record);
+        }
       }
+      return avroFilesAndWriters.getAvroFiles();
     }
-    return List.of(avroFile);
   }
 
   protected int getSelectionDefaultDocCount() {
@@ -178,9 +177,9 @@ public class MapFieldTypeTest extends CustomDataQueryClusterIntegrationTest {
     for (int i = 0; i < getSelectionDefaultDocCount(); i++) {
       JsonNode intMap = rows.get(i).get(0);
       JsonNode stringMap = rows.get(i).get(1);
-      for (int j = 0; j < i; j++) {
-        assertEquals(intMap.get("k" + j).intValue(), i);
-        assertEquals(stringMap.get("k" + j).textValue(), "v" + i);
+      for (int j = 0; j < i % NUM_DOCS_PER_SEGMENT; j++) {
+        assertEquals(intMap.get("k" + j).intValue(), i % NUM_DOCS_PER_SEGMENT);
+        assertEquals(stringMap.get("k" + j).textValue(), "v" + i % NUM_DOCS_PER_SEGMENT);
       }
     }
     // Selection only
@@ -192,9 +191,13 @@ public class MapFieldTypeTest extends CustomDataQueryClusterIntegrationTest {
 
     assertEquals(rows.get(0).get(0).textValue(), "null");
     assertEquals(rows.get(0).get(1).intValue(), -2147483648);
-    for (int i = 1; i < getSelectionDefaultDocCount(); i++) {
-      assertEquals(rows.get(i).get(0).textValue(), "v" + i);
-      assertEquals(rows.get(i).get(1).intValue(), i);
+    for (int i = 1; i < NUM_DOCS_PER_SEGMENT; i++) {
+      for (int j = 0; j < getNumAvroFiles(); j++) {
+        if (i + NUM_DOCS_PER_SEGMENT < getSelectionDefaultDocCount()) {
+          assertEquals(rows.get(i + NUM_DOCS_PER_SEGMENT * j).get(0).textValue(), "v" + i);
+          assertEquals(rows.get(i + NUM_DOCS_PER_SEGMENT * j).get(1).intValue(), i);
+        }
+      }
     }
 
     // Selection order-by
@@ -208,22 +211,28 @@ public class MapFieldTypeTest extends CustomDataQueryClusterIntegrationTest {
     assertEquals(rows.get(0).get(0).intValue(), -2147483648);
     assertEquals(rows.get(0).get(1).intValue(), -2147483648);
     assertEquals(rows.get(0).get(2).textValue(), "null");
-    assertEquals(rows.get(1).get(0).intValue(), 1);
+    assertEquals(rows.get(1).get(0).intValue(), -2147483648);
     assertEquals(rows.get(1).get(1).intValue(), -2147483648);
-    assertEquals(rows.get(1).get(2).textValue(), "v1");
-    for (int i = 2; i < getSelectionDefaultDocCount(); i++) {
-      assertEquals(rows.get(i).get(0).intValue(), i);
-      assertEquals(rows.get(i).get(1).intValue(), i);
-      assertEquals(rows.get(i).get(2).textValue(), "v" + i);
-      assertEquals(rows.get(i).get(3).textValue(), "v" + i);
+    assertEquals(rows.get(1).get(2).textValue(), "null");
+    assertEquals(rows.get(2).get(0).intValue(), 1);
+    assertEquals(rows.get(2).get(1).intValue(), -2147483648);
+    assertEquals(rows.get(2).get(2).textValue(), "v1");
+    assertEquals(rows.get(3).get(0).intValue(), 1);
+    assertEquals(rows.get(3).get(1).intValue(), -2147483648);
+    assertEquals(rows.get(3).get(2).textValue(), "v1");
+    for (int i = 4; i < getSelectionDefaultDocCount(); i++) {
+      assertEquals(rows.get(i).get(0).intValue(), i / getNumAvroFiles());
+      assertEquals(rows.get(i).get(1).intValue(), i / getNumAvroFiles());
+      assertEquals(rows.get(i).get(2).textValue(), "v" + i / getNumAvroFiles());
+      assertEquals(rows.get(i).get(3).textValue(), "v" + i / getNumAvroFiles());
     }
 
     // Aggregation only
     query = "SELECT MAX(intMap['k0']), MAX(intMap['k1']) FROM " + getTableName();
     pinotResponse = postQuery(query);
     assertEquals(pinotResponse.get("exceptions").size(), 0);
-    assertEquals(pinotResponse.get("resultTable").get("rows").get(0).get(0).intValue(), NUM_DOCS - 1);
-    assertEquals(pinotResponse.get("resultTable").get("rows").get(0).get(1).intValue(), NUM_DOCS - 1);
+    assertEquals(pinotResponse.get("resultTable").get("rows").get(0).get(0).intValue(), NUM_DOCS_PER_SEGMENT - 1);
+    assertEquals(pinotResponse.get("resultTable").get("rows").get(0).get(1).intValue(), NUM_DOCS_PER_SEGMENT - 1);
 
     // Aggregation group-by
     query = "SELECT stringMap['k0'] AS key, MIN(intMap['k0']) AS value FROM " + getTableName()
@@ -231,10 +240,10 @@ public class MapFieldTypeTest extends CustomDataQueryClusterIntegrationTest {
     pinotResponse = postQuery(query);
     assertEquals(pinotResponse.get("exceptions").size(), 0);
     rows = pinotResponse.get("resultTable").get("rows");
-    assertEquals(rows.size(), getSelectionDefaultDocCount());
+    assertEquals(rows.size(), Math.min(getSelectionDefaultDocCount(), NUM_DOCS_PER_SEGMENT));
     assertEquals(rows.get(0).get(0).textValue(), "null");
     assertEquals(rows.get(0).get(1).intValue(), Integer.MIN_VALUE);
-    for (int i = 1; i < getSelectionDefaultDocCount(); i++) {
+    for (int i = 1; i < Math.min(getSelectionDefaultDocCount(), NUM_DOCS_PER_SEGMENT); i++) {
       assertEquals(rows.get(i).get(0).textValue(), "v" + i);
       assertEquals(rows.get(i).get(1).intValue(), i);
     }
@@ -244,14 +253,14 @@ public class MapFieldTypeTest extends CustomDataQueryClusterIntegrationTest {
     pinotResponse = postQuery(query);
     assertEquals(pinotResponse.get("exceptions").size(), 0);
     rows = pinotResponse.get("resultTable").get("rows");
-    assertEquals(rows.size(), 1);
+    assertEquals(rows.size(), getNumAvroFiles());
     assertEquals(rows.get(0).get(0).textValue(), "v25");
 
     query = "SELECT intMap['k2'] FROM " + getTableName() + " WHERE intMap['k1'] = 25";
     pinotResponse = postQuery(query);
     assertEquals(pinotResponse.get("exceptions").size(), 0);
     rows = pinotResponse.get("resultTable").get("rows");
-    assertEquals(rows.size(), 1);
+    assertEquals(rows.size(), getNumAvroFiles());
     assertEquals(rows.get(0).get(0).intValue(), 25);
 
     // Filter on non-existing key
@@ -324,7 +333,7 @@ public class MapFieldTypeTest extends CustomDataQueryClusterIntegrationTest {
     assertEquals(pinotResponse.get("exceptions").size(), 0);
     JsonNode rows = pinotResponse.get("resultTable").get("rows");
     // Only records with k1 = 'v25' or 'v26' should be returned
-    assertEquals(rows.size(), 2);
+    assertEquals(rows.size(), 2 * getNumAvroFiles());
 
     // Verify the returned values
     for (int i = 0; i < rows.size(); i++) {
@@ -338,7 +347,7 @@ public class MapFieldTypeTest extends CustomDataQueryClusterIntegrationTest {
     assertEquals(pinotResponse.get("exceptions").size(), 0);
     rows = pinotResponse.get("resultTable").get("rows");
     // Only records with k1 = 25 or 26 should be returned
-    assertEquals(rows.size(), 2);
+    assertEquals(rows.size(), 2 * getNumAvroFiles());
 
     // Verify the returned values
     for (int i = 0; i < rows.size(); i++) {
@@ -443,6 +452,6 @@ public class MapFieldTypeTest extends CustomDataQueryClusterIntegrationTest {
   @Override
   protected void setUseMultiStageQueryEngine(boolean useMultiStageQueryEngine) {
     super.setUseMultiStageQueryEngine(useMultiStageQueryEngine);
-    _setSelectionDefaultDocCount = useMultiStageQueryEngine ? NUM_DOCS : V1_DEFAULT_SELECTION_COUNT;
+    _setSelectionDefaultDocCount = useMultiStageQueryEngine ? (int) getCountStarResult() : V1_DEFAULT_SELECTION_COUNT;
   }
 }

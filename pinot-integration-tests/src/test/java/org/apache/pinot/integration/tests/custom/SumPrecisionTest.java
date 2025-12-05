@@ -27,7 +27,6 @@ import java.util.List;
 import java.util.Random;
 import org.apache.avro.file.DataFileWriter;
 import org.apache.avro.generic.GenericData;
-import org.apache.avro.generic.GenericDatumWriter;
 import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.utils.BigDecimalUtils;
@@ -81,13 +80,11 @@ public class SumPrecisionTest extends CustomDataQueryClusterIntegrationTest {
         new org.apache.avro.Schema.Field(MET_LONG, org.apache.avro.Schema.create(org.apache.avro.Schema.Type.LONG),
             null, null)));
 
-    // create avro file
-    File avroFile = new File(_tempDir, "data.avro");
-    try (DataFileWriter<GenericData.Record> fileWriter = new DataFileWriter<>(new GenericDatumWriter<>(avroSchema))) {
-      fileWriter.create(avroSchema, avroFile);
-      int dimCardinality = 50;
-      BigDecimal bigDecimalBase = BigDecimal.valueOf(Integer.MAX_VALUE + 1L);
-      Random random = new Random();
+    int dimCardinality = 50;
+    BigDecimal bigDecimalBase = BigDecimal.valueOf(Integer.MAX_VALUE + 1L);
+    Random random = new Random();
+    try (AvroFilesAndWriters avroFilesAndWriters = createAvroFilesAndWriters(avroSchema)) {
+      List<DataFileWriter<GenericData.Record>> writers = avroFilesAndWriters.getWriters();
       for (int i = 0; i < getCountStarResult(); i++) {
         // create avro record
         GenericData.Record record = new GenericData.Record(avroSchema);
@@ -100,10 +97,10 @@ public class SumPrecisionTest extends CustomDataQueryClusterIntegrationTest {
         record.put(MET_LONG, bigDecimalValue.longValue());
 
         // add avro record to file
-        fileWriter.append(record);
+        writers.get(i % getNumAvroFiles()).append(record);
       }
+      return avroFilesAndWriters.getAvroFiles();
     }
-    return List.of(avroFile);
   }
 
   @Override
