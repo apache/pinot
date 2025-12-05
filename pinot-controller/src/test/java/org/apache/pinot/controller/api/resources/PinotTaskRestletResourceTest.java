@@ -21,6 +21,7 @@ package org.apache.pinot.controller.api.resources;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import java.net.URI;
 import java.net.URISyntaxException;
+import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 import java.util.Map;
@@ -46,7 +47,9 @@ import static org.mockito.ArgumentMatchers.anyMap;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.when;
 import static org.testng.Assert.assertEquals;
+import static org.testng.Assert.assertNotNull;
 import static org.testng.Assert.assertThrows;
+import static org.testng.Assert.assertTrue;
 
 
 public class PinotTaskRestletResourceTest {
@@ -133,5 +136,91 @@ public class PinotTaskRestletResourceTest {
         .thenThrow(new RuntimeException());
     assertThrows(ControllerApplicationException.class,
         () -> _pinotTaskRestletResource.getSubtaskOnWorkerProgress(httpHeaders, "IN_PROGRESS", null));
+  }
+
+  @Test
+  public void testGetTasksSummaryWithNoTasks() {
+    // Create an empty TaskSummaryResponse
+    PinotHelixTaskResourceManager.TaskSummaryResponse emptyResponse =
+        new PinotHelixTaskResourceManager.TaskSummaryResponse();
+
+    when(_pinotHelixTaskResourceManager.getTasksSummary()).thenReturn(emptyResponse);
+
+    PinotHelixTaskResourceManager.TaskSummaryResponse response = _pinotTaskRestletResource.getTasksSummary();
+
+    assertNotNull(response);
+    assertEquals(response.getTotalRunningTasks(), 0);
+    assertEquals(response.getTotalWaitingTasks(), 0);
+    assertEquals(response.getTotalInProgressTaskTypes(), 0);
+    assertTrue(response.getTaskTypeBreakdown().isEmpty());
+  }
+
+  @Test
+  public void testGetTasksSummaryWithMultipleTaskTypes() {
+    // Create a TaskSummaryResponse with multiple task types
+    PinotHelixTaskResourceManager.TaskSummaryResponse response =
+        new PinotHelixTaskResourceManager.TaskSummaryResponse();
+    response.setTotalRunningTasks(150);
+    response.setTotalWaitingTasks(50);
+    response.setTotalInProgressTaskTypes(2);
+
+    List<PinotHelixTaskResourceManager.TaskTypeBreakdown> breakdownList = new ArrayList<>();
+    breakdownList.add(new PinotHelixTaskResourceManager.TaskTypeBreakdown(
+        "SegmentGenerationAndPushTask", 100, 30));
+    breakdownList.add(new PinotHelixTaskResourceManager.TaskTypeBreakdown(
+        "RealtimeToOfflineSegmentsTask", 50, 20));
+    response.setTaskTypeBreakdown(breakdownList);
+
+    when(_pinotHelixTaskResourceManager.getTasksSummary()).thenReturn(response);
+
+    PinotHelixTaskResourceManager.TaskSummaryResponse actualResponse = _pinotTaskRestletResource.getTasksSummary();
+
+    assertNotNull(actualResponse);
+    assertEquals(actualResponse.getTotalRunningTasks(), 150);
+    assertEquals(actualResponse.getTotalWaitingTasks(), 50);
+    assertEquals(actualResponse.getTotalInProgressTaskTypes(), 2);
+    assertEquals(actualResponse.getTaskTypeBreakdown().size(), 2);
+
+    // Verify the first task type breakdown
+    PinotHelixTaskResourceManager.TaskTypeBreakdown breakdown1 = actualResponse.getTaskTypeBreakdown().get(0);
+    assertEquals(breakdown1.getTaskType(), "SegmentGenerationAndPushTask");
+    assertEquals(breakdown1.getRunningCount(), 100);
+    assertEquals(breakdown1.getWaitingCount(), 30);
+
+    // Verify the second task type breakdown
+    PinotHelixTaskResourceManager.TaskTypeBreakdown breakdown2 = actualResponse.getTaskTypeBreakdown().get(1);
+    assertEquals(breakdown2.getTaskType(), "RealtimeToOfflineSegmentsTask");
+    assertEquals(breakdown2.getRunningCount(), 50);
+    assertEquals(breakdown2.getWaitingCount(), 20);
+  }
+
+  @Test
+  public void testGetTasksSummaryWithOnlyRunningTasks() {
+    // Create a TaskSummaryResponse with only running tasks, no waiting tasks
+    PinotHelixTaskResourceManager.TaskSummaryResponse response =
+        new PinotHelixTaskResourceManager.TaskSummaryResponse();
+    response.setTotalRunningTasks(3);
+    response.setTotalWaitingTasks(0);
+    response.setTotalInProgressTaskTypes(1);
+
+    List<PinotHelixTaskResourceManager.TaskTypeBreakdown> breakdownList = new ArrayList<>();
+    breakdownList.add(new PinotHelixTaskResourceManager.TaskTypeBreakdown(
+        "MergeRollupTask", 3, 0));
+    response.setTaskTypeBreakdown(breakdownList);
+
+    when(_pinotHelixTaskResourceManager.getTasksSummary()).thenReturn(response);
+
+    PinotHelixTaskResourceManager.TaskSummaryResponse actualResponse = _pinotTaskRestletResource.getTasksSummary();
+
+    assertNotNull(actualResponse);
+    assertEquals(actualResponse.getTotalRunningTasks(), 3);
+    assertEquals(actualResponse.getTotalWaitingTasks(), 0);
+    assertEquals(actualResponse.getTotalInProgressTaskTypes(), 1);
+    assertEquals(actualResponse.getTaskTypeBreakdown().size(), 1);
+
+    PinotHelixTaskResourceManager.TaskTypeBreakdown breakdown = actualResponse.getTaskTypeBreakdown().get(0);
+    assertEquals(breakdown.getTaskType(), "MergeRollupTask");
+    assertEquals(breakdown.getRunningCount(), 3);
+    assertEquals(breakdown.getWaitingCount(), 0);
   }
 }
