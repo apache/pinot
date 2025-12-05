@@ -702,11 +702,9 @@ public abstract class BasePartitionUpsertMetadataManager implements PartitionUps
     }
   }
 
-  protected void eraseKeyToPreviousLocationMap() {
-  }
+  protected abstract void eraseKeyToPreviousLocationMap();
 
-  protected void revertCurrentSegmentUpsertMetadata() {
-  }
+  protected abstract void revertCurrentSegmentUpsertMetadata();
 
   private MutableRoaringBitmap getValidDocIdsForOldSegment(IndexSegment oldSegment) {
     return oldSegment.getValidDocIds() != null ? oldSegment.getValidDocIds().getMutableRoaringBitmap() : null;
