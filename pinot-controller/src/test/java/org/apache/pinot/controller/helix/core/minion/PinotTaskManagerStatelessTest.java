@@ -572,7 +572,8 @@ public class PinotTaskManagerStatelessTest extends ControllerTest {
   private void addTableConfig(TableConfig tableConfig, String validationTypesToSkip)
       throws IOException {
     String createTableUriStr =
-        String.format(_controllerRequestURLBuilder.forTableCreate() + "?validationTypesToSkip=%s",
+        String.format(
+            getOrCreateAdminClient().getControllerRequestURLBuilder().forTableCreate() + "?validationTypesToSkip=%s",
             validationTypesToSkip);
     try {
       HttpClient.wrapAndThrowHttpException(
@@ -586,7 +587,8 @@ public class PinotTaskManagerStatelessTest extends ControllerTest {
   private void updateTableConfig(TableConfig tableConfig, String validationTypesToSkip)
       throws IOException {
     String updateTableUriStr = String.format(
-        _controllerRequestURLBuilder.forUpdateTableConfig(tableConfig.getTableName()) + "?validationTypesToSkip=%s",
+        getOrCreateAdminClient().getControllerRequestURLBuilder().forUpdateTableConfig(tableConfig.getTableName())
+            + "?validationTypesToSkip=%s",
         validationTypesToSkip);
     try {
       HttpClient.wrapAndThrowHttpException(

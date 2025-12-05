@@ -23,6 +23,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.CompletableFuture;
+import javax.annotation.Nullable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -92,7 +93,7 @@ public class PinotTenantAdminClient {
    * @return Tenant instances as JSON string
    * @throws PinotAdminException If the request fails
    */
-  public String getTenantInstances(String tenantName, String tenantType, String tableType)
+  public String getTenantInstances(String tenantName, @Nullable String tenantType, @Nullable String tableType)
       throws PinotAdminException {
     Map<String, String> queryParams = new HashMap<>();
     if (tenantType != null) {
@@ -127,7 +128,7 @@ public class PinotTenantAdminClient {
    * @return Success response
    * @throws PinotAdminException If the request fails
    */
-  public String setTenantState(String tenantName, String tenantType, String state)
+  public String setTenantState(String tenantName, @Nullable String tenantType, String state)
       throws PinotAdminException {
     Map<String, String> queryParams = new HashMap<>();
     if (tenantType != null) {
@@ -149,7 +150,7 @@ public class PinotTenantAdminClient {
    * @return Tenant tables as JSON string
    * @throws PinotAdminException If the request fails
    */
-  public String getTenantTables(String tenantName, String tenantType, boolean withTableProperties)
+  public String getTenantTables(String tenantName, @Nullable String tenantType, boolean withTableProperties)
       throws PinotAdminException {
     Map<String, String> queryParams = new HashMap<>();
     if (tenantType != null) {
@@ -206,7 +207,7 @@ public class PinotTenantAdminClient {
    * @return Tenant metadata as JSON string
    * @throws PinotAdminException If the request fails
    */
-  public String getTenantMetadata(String tenantName, String tenantType)
+  public String getTenantMetadata(String tenantName, @Nullable String tenantType)
       throws PinotAdminException {
     Map<String, String> queryParams = new HashMap<>();
     if (tenantType != null) {
@@ -227,7 +228,7 @@ public class PinotTenantAdminClient {
    * @return Success response
    * @throws PinotAdminException If the request fails
    */
-  public String changeTenantState(String tenantName, String tenantType, String state)
+  public String changeTenantState(String tenantName, @Nullable String tenantType, String state)
       throws PinotAdminException {
     Map<String, String> queryParams = new HashMap<>();
     if (tenantType != null) {
@@ -280,8 +281,8 @@ public class PinotTenantAdminClient {
    * @return Rebalance result
    * @throws PinotAdminException If the request fails
    */
-  public String rebalanceTenant(String tenantName, int degreeOfParallelism, String includeTableTypes,
-      String excludeTableTypes, String rebalanceMode)
+  public String rebalanceTenant(String tenantName, int degreeOfParallelism, @Nullable String includeTableTypes,
+      @Nullable String excludeTableTypes, @Nullable String rebalanceMode)
       throws PinotAdminException {
     Map<String, String> queryParams = new HashMap<>();
     queryParams.put("degreeOfParallelism", String.valueOf(degreeOfParallelism));
@@ -348,7 +349,7 @@ public class PinotTenantAdminClient {
   /**
    * Gets tenant metadata information (async).
    */
-  public CompletableFuture<String> getTenantMetadataAsync(String tenantName, String tenantType) {
+  public CompletableFuture<String> getTenantMetadataAsync(String tenantName, @Nullable String tenantType) {
     Map<String, String> queryParams = new HashMap<>();
     if (tenantType != null) {
       queryParams.put("type", tenantType);

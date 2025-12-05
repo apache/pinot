@@ -82,9 +82,9 @@ public class PeerDownloadLLCRealtimeClusterIntegrationTest extends BaseRealtimeC
   @Override
   public void setUp()
       throws Exception {
-    System.out.println(String.format(
-        "Using random seed: %s, isDirectAlloc: %s, isConsumerDirConfigured: %s, enableLeadControllerResource: %s",
-        RANDOM_SEED, _isDirectAlloc, _isConsumerDirConfigured, _enableLeadControllerResource));
+    System.out.printf(
+        "Using random seed: %s, isDirectAlloc: %s, isConsumerDirConfigured: %s, enableLeadControllerResource: %s%n",
+        RANDOM_SEED, _isDirectAlloc, _isConsumerDirConfigured, _enableLeadControllerResource);
 
     _pinotFsRootDir = new File(FileUtils.getTempDirectoryPath() + File.separator + System.currentTimeMillis() + "/");
     Preconditions.checkState(_pinotFsRootDir.mkdir(), "Failed to make a dir for " + _pinotFsRootDir.getPath());
@@ -142,7 +142,8 @@ public class PeerDownloadLLCRealtimeClusterIntegrationTest extends BaseRealtimeC
     tableConfig.setValidationConfig(segmentsValidationAndRetentionConfig);
     tableConfig.getValidationConfig().setTimeColumnName(this.getTimeColumnName());
 
-    sendPostRequest(_controllerRequestURLBuilder.forTableCreate(), tableConfig.toJsonString());
+    sendPostRequest(getOrCreateAdminClient().getControllerRequestURLBuilder().forTableCreate(),
+        tableConfig.toJsonString());
   }
 
   @Override
