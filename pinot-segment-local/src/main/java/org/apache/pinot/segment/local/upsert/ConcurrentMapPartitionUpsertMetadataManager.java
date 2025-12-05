@@ -54,6 +54,7 @@ public class ConcurrentMapPartitionUpsertMetadataManager extends BasePartitionUp
   @VisibleForTesting
   final ConcurrentHashMap<Object, RecordLocation> _primaryKeyToRecordLocationMap = new ConcurrentHashMap<>();
 
+  final ConcurrentHashMap<Object, RecordLocation> _previousKeyToRecordLocationMap = new ConcurrentHashMap<>();
   public ConcurrentMapPartitionUpsertMetadataManager(String tableNameWithType, int partitionId, UpsertContext context) {
     super(tableNameWithType, partitionId, context);
   }
@@ -246,6 +247,19 @@ public class ConcurrentMapPartitionUpsertMetadataManager extends BasePartitionUp
   }
 
   @Override
+  protected void revertCurrentSegmentUpsertMetadata() {
+    _logger.info("Reverting Upsert metadata for {} keys", _previousKeyToRecordLocationMap.size());
+    // Revert to previous locations present in other segments
+    // For the newly added keys into the segment, it will be considered new when metadata is replaced again
+    _primaryKeyToRecordLocationMap.putAll(_previousKeyToRecordLocationMap);
+  }
+
+  @Override
+  protected void eraseKeyToPreviousLocationMap() {
+    _previousKeyToRecordLocationMap.clear();
+  }
+
+  @Override
   protected boolean doAddRecord(MutableSegment segment, RecordInfo recordInfo) {
     AtomicBoolean isOutOfOrderRecord = new AtomicBoolean(false);
     ThreadSafeMutableRoaringBitmap validDocIds = Objects.requireNonNull(segment.getValidDocIds());
@@ -264,18 +278,22 @@ public class ConcurrentMapPartitionUpsertMetadataManager extends BasePartitionUp
           if (currentRecordLocation != null) {
             // Existing primary key
 
+            IndexSegment currentSegment = currentRecordLocation.getSegment();
             // Update the record location when the new comparison value is greater than or equal to the current value.
             // Update the record location when there is a tie to keep the newer record.
             if (newComparisonValue.compareTo(currentRecordLocation.getComparisonValue()) >= 0) {
-              IndexSegment currentSegment = currentRecordLocation.getSegment();
               int currentDocId = currentRecordLocation.getDocId();
               if (segment == currentSegment) {
                 replaceDocId(segment, validDocIds, queryableDocIds, currentDocId, newDocId, recordInfo);
               } else {
+                _previousKeyToRecordLocationMap.put(primaryKey, currentRecordLocation);
                 replaceDocId(segment, validDocIds, queryableDocIds, currentSegment, currentDocId, newDocId, recordInfo);
               }
               return new RecordLocation(segment, newDocId, newComparisonValue);
             } else {
+              if (segment != currentSegment) {
+                _previousKeyToRecordLocationMap.put(primaryKey, currentRecordLocation);
+              }
               // Out-of-order record
               handleOutOfOrderEvent(currentRecordLocation.getComparisonValue(), recordInfo.getComparisonValue());
               isOutOfOrderRecord.set(true);

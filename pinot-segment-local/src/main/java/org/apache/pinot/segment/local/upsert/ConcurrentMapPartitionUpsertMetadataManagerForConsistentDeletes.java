@@ -67,6 +67,9 @@ public class ConcurrentMapPartitionUpsertMetadataManagerForConsistentDeletes
   @VisibleForTesting
   final ConcurrentHashMap<Object, ConcurrentMapPartitionUpsertMetadataManagerForConsistentDeletes.RecordLocation>
       _primaryKeyToRecordLocationMap = new ConcurrentHashMap<>();
+
+  final ConcurrentHashMap<Object, ConcurrentMapPartitionUpsertMetadataManagerForConsistentDeletes.RecordLocation>
+      _previousKeyToRecordLocationMap = new ConcurrentHashMap<>();
   // Used to initialize a reference to previous row for merging in partial upsert
   private final LazyRow _reusePreviousRow = new LazyRow();
   private final Map<String, Object> _reuseMergeResultHolder = new HashMap<>();
@@ -346,6 +349,19 @@ public class ConcurrentMapPartitionUpsertMetadataManagerForConsistentDeletes
   }
 
   @Override
+  protected void revertCurrentSegmentUpsertMetadata() {
+    _logger.info("Reverting Upsert metadata for {} keys", _previousKeyToRecordLocationMap.size());
+    // Revert to previous locations present in other segments
+    // For the newly added keys into the segment, it will be considered new when metadata is replaced again
+    _primaryKeyToRecordLocationMap.putAll(_previousKeyToRecordLocationMap);
+  }
+
+  @Override
+  protected void eraseKeyToPreviousLocationMap() {
+    _previousKeyToRecordLocationMap.clear();
+  }
+
+  @Override
   protected boolean doAddRecord(MutableSegment segment, RecordInfo recordInfo) {
     AtomicBoolean isOutOfOrderRecord = new AtomicBoolean(false);
     ThreadSafeMutableRoaringBitmap validDocIds = Objects.requireNonNull(segment.getValidDocIds());
@@ -373,6 +389,7 @@ public class ConcurrentMapPartitionUpsertMetadataManagerForConsistentDeletes
                 return new RecordLocation(segment, newDocId, newComparisonValue,
                     currentRecordLocation.getDistinctSegmentCount());
               } else {
+                _previousKeyToRecordLocationMap.put(primaryKey, currentRecordLocation);
                 replaceDocId(segment, validDocIds, queryableDocIds, currentSegment, currentDocId, newDocId, recordInfo);
                 return new RecordLocation(segment, newDocId, newComparisonValue,
                     RecordLocation.incrementSegmentCount(currentRecordLocation.getDistinctSegmentCount()));
@@ -384,6 +401,7 @@ public class ConcurrentMapPartitionUpsertMetadataManagerForConsistentDeletes
               if (segment == currentSegment) {
                 return currentRecordLocation;
               } else {
+                _previousKeyToRecordLocationMap.put(primaryKey, currentRecordLocation);
                 return new RecordLocation(currentSegment, currentRecordLocation.getDocId(),
                     currentRecordLocation.getComparisonValue(),
                     _context.isDropOutOfOrderRecord() ? currentRecordLocation.getDistinctSegmentCount()
