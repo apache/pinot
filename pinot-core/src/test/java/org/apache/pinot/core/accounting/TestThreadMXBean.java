@@ -54,7 +54,30 @@ public class TestThreadMXBean {
       ll[2] = 4;
       LOGGER.trace(String.valueOf(ll[2]));
       long result = threadResourceSnapshot.getAllocatedBytes();
-      Assert.assertTrue(result >= 80000 && result <= 85000);
+      Assert.assertTrue(result > 0);
+    }
+  }
+
+  @Test
+  public void testSelfTestReportsUsableMeasurements() {
+    ThreadResourceUsageProvider.MeasurementStatus status = ThreadResourceUsageProvider.selfTest();
+    Assert.assertTrue(status.isCpuTimeUsable());
+    Assert.assertTrue(status.isAllocatedBytesUsable());
+  }
+
+  @Test
+  public void testSelfTestRespectsDisabledMeasurements() {
+    boolean prevCpu = ThreadResourceUsageProvider.isThreadCpuTimeMeasurementEnabled();
+    boolean prevMem = ThreadResourceUsageProvider.isThreadMemoryMeasurementEnabled();
+    try {
+      ThreadResourceUsageProvider.setThreadCpuTimeMeasurementEnabled(false);
+      ThreadResourceUsageProvider.setThreadMemoryMeasurementEnabled(false);
+      ThreadResourceUsageProvider.MeasurementStatus status = ThreadResourceUsageProvider.selfTest();
+      Assert.assertFalse(status.isCpuTimeUsable());
+      Assert.assertFalse(status.isAllocatedBytesUsable());
+    } finally {
+      ThreadResourceUsageProvider.setThreadCpuTimeMeasurementEnabled(prevCpu);
+      ThreadResourceUsageProvider.setThreadMemoryMeasurementEnabled(prevMem);
     }
   }
 

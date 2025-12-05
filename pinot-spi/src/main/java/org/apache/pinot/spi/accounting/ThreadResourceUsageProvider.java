@@ -106,20 +106,68 @@ public class ThreadResourceUsageProvider {
   public static void setThreadMemoryMeasurementEnabled(boolean enable) {
 
     boolean isThreadAllocateMemoryEnabled = IS_THREAD_ALLOCATED_MEMORY_ENABLED_DEFAULT;
-    // if the jvm default enabling config is different
-    if (enable != IS_THREAD_ALLOCATED_MEMORY_ENABLED_DEFAULT) {
-      try {
-        Class<?> sunThreadMXBeanClass = Class.forName(SUN_THREAD_MXBEAN_CLASS_NAME);
-        sunThreadMXBeanClass.getMethod(SUN_THREAD_MXBEAN_SET_THREAD_ALLOCATED_MEMORY_ENABLED_NAME, Boolean.TYPE)
-            .invoke(MX_BEAN, enable);
-        isThreadAllocateMemoryEnabled = (boolean) sunThreadMXBeanClass
-            .getMethod(SUN_THREAD_MXBEAN_IS_THREAD_ALLOCATED_MEMORY_ENABLED_NAME)
-            .invoke(MX_BEAN);
-      } catch (ClassNotFoundException | IllegalAccessException | NoSuchMethodException | InvocationTargetException e) {
-        LOGGER.error("Not able to call isThreadAllocatedMemoryEnabled or setThreadAllocatedMemoryEnabled, ", e);
-      }
+    try {
+      Class<?> sunThreadMXBeanClass = Class.forName(SUN_THREAD_MXBEAN_CLASS_NAME);
+      sunThreadMXBeanClass.getMethod(SUN_THREAD_MXBEAN_SET_THREAD_ALLOCATED_MEMORY_ENABLED_NAME, Boolean.TYPE)
+          .invoke(MX_BEAN, enable);
+      isThreadAllocateMemoryEnabled = (boolean) sunThreadMXBeanClass
+          .getMethod(SUN_THREAD_MXBEAN_IS_THREAD_ALLOCATED_MEMORY_ENABLED_NAME)
+          .invoke(MX_BEAN);
+    } catch (ClassNotFoundException | IllegalAccessException | NoSuchMethodException | InvocationTargetException e) {
+      LOGGER.error("Not able to call isThreadAllocatedMemoryEnabled or setThreadAllocatedMemoryEnabled, ", e);
     }
     _isThreadMemoryMeasurementEnabled = enable && IS_THREAD_ALLOCATED_MEMORY_SUPPORTED && isThreadAllocateMemoryEnabled;
+  }
+
+  /**
+   * Lightweight self-test to verify whether CPU time and allocated-bytes measurements are usable in the
+   * current JVM after {@code setThread*MeasurementEnabled(...)} calls.
+   */
+  public static MeasurementStatus selfTest() {
+    boolean cpuTimeUsable = false;
+    if (_isThreadCpuTimeMeasurementEnabled) {
+      long startCpu = MX_BEAN.getCurrentThreadCpuTime();
+      long accumulator = 0;
+      for (int i = 0; i < 1_000; i++) {
+        accumulator += i;
+      }
+      long endCpu = MX_BEAN.getCurrentThreadCpuTime();
+      cpuTimeUsable = endCpu > startCpu;
+      if (accumulator == Long.MIN_VALUE) {
+        LOGGER.debug("Unreachable guard to prevent JIT elimination");
+      }
+    }
+
+    boolean allocatedBytesUsable = false;
+    if (_isThreadMemoryMeasurementEnabled) {
+      long startAllocated = getCurrentThreadAllocatedBytes();
+      byte[] padding = new byte[1_024];
+      long endAllocated = getCurrentThreadAllocatedBytes();
+      allocatedBytesUsable = endAllocated > startAllocated;
+      if (padding[0] == Byte.MIN_VALUE) {
+        LOGGER.debug("Unreachable guard to prevent JIT elimination");
+      }
+    }
+
+    return new MeasurementStatus(cpuTimeUsable, allocatedBytesUsable);
+  }
+
+  public static final class MeasurementStatus {
+    private final boolean _cpuTimeUsable;
+    private final boolean _allocatedBytesUsable;
+
+    public MeasurementStatus(boolean cpuTimeUsable, boolean allocatedBytesUsable) {
+      _cpuTimeUsable = cpuTimeUsable;
+      _allocatedBytesUsable = allocatedBytesUsable;
+    }
+
+    public boolean isCpuTimeUsable() {
+      return _cpuTimeUsable;
+    }
+
+    public boolean isAllocatedBytesUsable() {
+      return _allocatedBytesUsable;
+    }
   }
 
   //initialize the com.sun.management.ThreadMXBean related variables using reflection
