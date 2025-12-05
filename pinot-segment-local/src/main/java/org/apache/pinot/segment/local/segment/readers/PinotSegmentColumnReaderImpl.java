@@ -110,6 +110,11 @@ public class PinotSegmentColumnReaderImpl implements ColumnReader {
   }
 
   @Override
+  public boolean isSingleValue() {
+    return _segmentColumnReader.isSingleValue();
+  }
+
+  @Override
   public boolean isInt() {
     return _dataType == FieldSpec.DataType.INT;
   }
@@ -312,6 +317,12 @@ public class PinotSegmentColumnReaderImpl implements ColumnReader {
   @Override
   public byte[] getBytes(int docId) {
     return _segmentColumnReader.getBytes(docId);
+  }
+
+  @Override
+  public Object getValue(int docId)
+      throws IOException {
+    return _segmentColumnReader.getValue(docId);
   }
 
   // Multi-value accessors

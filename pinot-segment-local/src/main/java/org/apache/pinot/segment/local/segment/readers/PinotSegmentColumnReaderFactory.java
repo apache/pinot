@@ -91,17 +91,12 @@ public class PinotSegmentColumnReaderFactory implements ColumnReaderFactory {
   }
 
   @Override
-  public ColumnReader getColumnReader(String columnName)
-      throws IOException {
+  public ColumnReader getColumnReader(String columnName) {
     if (_targetSchema == null) {
       throw new IllegalStateException("Factory not initialized. Call init() first.");
     }
 
-    ColumnReader reader = _columnReaders.get(columnName);
-    if (reader == null) {
-      throw new IOException("Column reader not found for column: " + columnName);
-    }
-    return reader;
+    return _columnReaders.get(columnName);
   }
 
   /**
