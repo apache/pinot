@@ -1681,13 +1681,14 @@ public class PinotHelixResourceManagerStatelessTest extends ControllerTest {
   @Test
   public void testAddRealtimeTableWithConsumingMetadata()
       throws Exception {
-    final String realtimeTableName = "testTable_REALTIME";
+    final String rawTableName = "testTable2";
+    final String realtimeTableName = rawTableName + "_REALTIME";
     TableConfig tableConfig =
-        new TableConfigBuilder(TableType.REALTIME).setTableName(RAW_TABLE_NAME).setBrokerTenant(BROKER_TENANT_NAME)
+        new TableConfigBuilder(TableType.REALTIME).setTableName(rawTableName).setBrokerTenant(BROKER_TENANT_NAME)
             .setServerTenant(SERVER_TENANT_NAME)
             .setStreamConfigs(FakeStreamConfigUtils.getDefaultLowLevelStreamConfigs().getStreamConfigsMap()).build();
     waitForEVToDisappear(tableConfig.getTableName());
-    addDummySchema(RAW_TABLE_NAME);
+    addDummySchema(rawTableName);
 
     List<PartitionGroupInfo> consumingMetadata = new ArrayList<>();
     // Partition 0, sequence 5
@@ -1719,7 +1720,7 @@ public class PinotHelixResourceManagerStatelessTest extends ControllerTest {
       }
     }
 
-    _helixResourceManager.deleteRealtimeTable(RAW_TABLE_NAME);
-    deleteSchema(RAW_TABLE_NAME);
+    _helixResourceManager.deleteRealtimeTable(rawTableName);
+    deleteSchema(rawTableName);
   }
 }
