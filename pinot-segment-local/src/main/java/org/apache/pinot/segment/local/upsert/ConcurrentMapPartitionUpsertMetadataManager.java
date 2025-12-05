@@ -247,6 +247,7 @@ public class ConcurrentMapPartitionUpsertMetadataManager extends BasePartitionUp
     }
   }
 
+  @Override
   protected void revertCurrentSegmentUpsertMetadata() {
     _logger.info("Reverting Upsert metadata for {} keys", _previousKeyToRecordLocationMap.size());
     // Revert to previous locations present in other segments
