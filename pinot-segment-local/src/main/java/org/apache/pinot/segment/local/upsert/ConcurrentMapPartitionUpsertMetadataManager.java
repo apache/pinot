@@ -52,11 +52,10 @@ public class ConcurrentMapPartitionUpsertMetadataManager extends BasePartitionUp
   private final Map<String, Object> _reuseMergeResultHolder = new HashMap<>();
 
   @VisibleForTesting
-  final ConcurrentHashMap<Object, RecordLocation> _previousKeyToRecordLocationMap = new ConcurrentHashMap<>();
-
   final ConcurrentHashMap<Object, ConcurrentMapPartitionUpsertMetadataManager.RecordLocation>
       _primaryKeyToRecordLocationMap = new ConcurrentHashMap<>();
 
+  final ConcurrentHashMap<Object, RecordLocation> _previousKeyToRecordLocationMap = new ConcurrentHashMap<>();
   public ConcurrentMapPartitionUpsertMetadataManager(String tableNameWithType, int partitionId, UpsertContext context) {
     super(tableNameWithType, partitionId, context);
   }
