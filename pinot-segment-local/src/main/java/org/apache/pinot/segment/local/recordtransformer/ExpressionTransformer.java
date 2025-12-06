@@ -55,10 +55,20 @@ public class ExpressionTransformer implements RecordTransformer {
   final LinkedHashMap<String, FunctionEvaluator> _expressionEvaluators = new LinkedHashMap<>();
   private final boolean _continueOnError;
   private final ThrottledLogger _throttledLogger;
+  /**
+   * If {@code true}, transform functions overwrite existing non-null values instead of skipping them. This is enabled
+   * for post-upsert transforms where derived columns should be recomputed on the merged row; otherwise transforms only
+   * populate missing or null-valued columns.
+   */
   private final boolean _overwriteExistingValues;
 
   public ExpressionTransformer(TableConfig tableConfig, Schema schema) {
     this(tableConfig, schema, null, true, false);
+  }
+
+  public ExpressionTransformer(TableConfig tableConfig, Schema schema, List<TransformConfig> transformConfigs,
+      boolean overwriteExistingValues) {
+    this(tableConfig, schema, transformConfigs, false /* includeFieldSpecTransforms */, overwriteExistingValues);
   }
 
   public ExpressionTransformer(TableConfig tableConfig, Schema schema,
@@ -154,18 +164,15 @@ public class ExpressionTransformer implements RecordTransformer {
       String column = entry.getKey();
       FunctionEvaluator transformFunctionEvaluator = entry.getValue();
       Object existingValue = record.getValue(column);
-      boolean treatAsNull = _overwriteExistingValues || existingValue == null || record.isNullValue(column);
-      if (treatAsNull) {
+      boolean shouldApplyTransform = _overwriteExistingValues || existingValue == null || record.isNullValue(column);
+      if (shouldApplyTransform) {
         try {
           // Skip transformation if column value already exists
           // NOTE: column value might already exist for OFFLINE data,
           // For backward compatibility, The only exception here is that we will override nested field like array,
           // collection or map since they were not included in the record transformation before.
           Object transformedValue = transformFunctionEvaluator.evaluate(record);
-          if (transformedValue != null) {
-            record.removeNullValueField(column);
-          }
-          record.putValue(column, transformedValue);
+          applyTransformedValue(record, column, transformedValue);
         } catch (Exception e) {
           if (!_continueOnError) {
             throw new RuntimeException("Caught exception while evaluation transform function for column: " + column, e);
@@ -180,10 +187,7 @@ public class ExpressionTransformer implements RecordTransformer {
           // For backward compatibility, The only exception here is that we will override nested field like array,
           // collection or map since they were not included in the record transformation before.
           if (!isTypeCompatible(existingValue, transformedValue)) {
-            if (transformedValue != null) {
-              record.removeNullValueField(column);
-            }
-            record.putValue(column, transformedValue);
+            applyTransformedValue(record, column, transformedValue);
           }
         } catch (Exception e) {
           LOGGER.debug("Caught exception while evaluation transform function for column: {}", column, e);
@@ -192,7 +196,20 @@ public class ExpressionTransformer implements RecordTransformer {
     }
   }
 
-  private boolean isTypeCompatible(Object existingValue, Object transformedValue) {
+  private void applyTransformedValue(GenericRow record, String column, @Nullable Object transformedValue) {
+    if (transformedValue != null) {
+      record.removeNullValueField(column);
+      record.putValue(column, transformedValue);
+    } else {
+      record.removeValue(column);
+      record.addNullValueField(column);
+    }
+  }
+
+  private boolean isTypeCompatible(Object existingValue, @Nullable Object transformedValue) {
+    if (transformedValue == null || existingValue == null) {
+      return transformedValue == existingValue;
+    }
     if (transformedValue.getClass() == existingValue.getClass()) {
       return true;
     }
