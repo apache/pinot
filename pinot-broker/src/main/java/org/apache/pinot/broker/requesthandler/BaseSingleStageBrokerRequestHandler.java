@@ -27,6 +27,7 @@ import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.BlockingQueue;
@@ -76,6 +77,7 @@ import org.apache.pinot.common.response.BrokerResponse;
 import org.apache.pinot.common.response.broker.BrokerResponseNative;
 import org.apache.pinot.common.response.broker.QueryProcessingException;
 import org.apache.pinot.common.response.broker.ResultTable;
+import org.apache.pinot.common.systemtable.SystemTableRegistry;
 import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.common.utils.DataSchema.ColumnDataType;
 import org.apache.pinot.common.utils.DatabaseUtils;
@@ -107,14 +109,20 @@ import org.apache.pinot.spi.config.table.QueryConfig;
 import org.apache.pinot.spi.config.table.RoutingConfig;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.data.DimensionFieldSpec;
+import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.LogicalTableConfig;
 import org.apache.pinot.spi.data.Schema;
+import org.apache.pinot.spi.data.readers.GenericRow;
 import org.apache.pinot.spi.env.PinotConfiguration;
 import org.apache.pinot.spi.exception.BadQueryRequestException;
 import org.apache.pinot.spi.exception.DatabaseConflictException;
 import org.apache.pinot.spi.exception.QueryErrorCode;
 import org.apache.pinot.spi.query.QueryExecutionContext;
 import org.apache.pinot.spi.query.QueryThreadContext;
+import org.apache.pinot.spi.systemtable.SystemTableFilter;
+import org.apache.pinot.spi.systemtable.SystemTableProvider;
+import org.apache.pinot.spi.systemtable.SystemTableRequest;
+import org.apache.pinot.spi.systemtable.SystemTableResponse;
 import org.apache.pinot.spi.trace.RequestContext;
 import org.apache.pinot.spi.utils.CommonConstants;
 import org.apache.pinot.spi.utils.CommonConstants.Broker;
@@ -176,13 +184,15 @@ public abstract class BaseSingleStageBrokerRequestHandler extends BaseBrokerRequ
   protected BlockingQueue<Pair<String, String>> _multistageCompileQueryQueue;
   protected ImplicitHybridTableRouteProvider _implicitHybridTableRouteProvider;
   protected LogicalTableRouteProvider _logicalTableRouteProvider;
+  protected final SystemTableRegistry _systemTableRegistry;
 
   public BaseSingleStageBrokerRequestHandler(PinotConfiguration config, String brokerId,
       BrokerRequestIdGenerator requestIdGenerator, RoutingManager routingManager,
       AccessControlFactory accessControlFactory, QueryQuotaManager queryQuotaManager, TableCache tableCache,
-      ThreadAccountant threadAccountant) {
+      SystemTableRegistry systemTableRegistry, ThreadAccountant threadAccountant) {
     super(config, brokerId, requestIdGenerator, routingManager, accessControlFactory, queryQuotaManager, tableCache,
         threadAccountant);
+    _systemTableRegistry = systemTableRegistry;
     _disableGroovy = _config.getProperty(Broker.DISABLE_GROOVY, Broker.DEFAULT_DISABLE_GROOVY);
     _useApproximateFunction = _config.getProperty(Broker.USE_APPROXIMATE_FUNCTION, false);
     _defaultHllLog2m = _config.getProperty(CommonConstants.Helix.DEFAULT_HYPERLOGLOG_LOG2M_KEY,
@@ -407,6 +417,9 @@ public abstract class BaseSingleStageBrokerRequestHandler extends BaseBrokerRequ
     String rawTableName = compileResult._rawTableName;
     PinotQuery pinotQuery = compileResult._pinotQuery;
     PinotQuery serverPinotQuery = compileResult._serverPinotQuery;
+    if (isSystemTable(tableName)) {
+      return handleSystemTableQuery(pinotQuery, tableName, requestContext, requesterIdentity, query);
+    }
     LogicalTableConfig logicalTableConfig = _tableCache.getLogicalTableConfig(rawTableName);
     String database = DatabaseUtils.extractDatabaseFromFullyQualifiedTableName(tableName);
     long compilationEndTimeNs = System.nanoTime();
@@ -1031,6 +1044,246 @@ public abstract class BaseSingleStageBrokerRequestHandler extends BaseBrokerRequ
       failureMessage = "Reason: " + failureMessage;
     }
     throw new WebApplicationException("Permission denied." + failureMessage, Response.Status.FORBIDDEN);
+  }
+
+  private boolean isSystemTable(String tableName) {
+    return tableName != null && tableName.toLowerCase(Locale.ROOT).startsWith("system.");
+  }
+
+  private BrokerResponse handleSystemTableQuery(PinotQuery pinotQuery, String tableName,
+      RequestContext requestContext, @Nullable RequesterIdentity requesterIdentity, String query) {
+    if (pinotQuery.isExplain()) {
+      return BrokerResponseNative.BROKER_ONLY_EXPLAIN_PLAN_OUTPUT;
+    }
+    SystemTableProvider provider = _systemTableRegistry.get(tableName);
+    if (provider == null) {
+      requestContext.setErrorCode(QueryErrorCode.TABLE_DOES_NOT_EXIST);
+      return BrokerResponseNative.TABLE_DOES_NOT_EXIST;
+    }
+    try {
+      if (!isSupportedSystemTableQuery(pinotQuery)) {
+        requestContext.setErrorCode(QueryErrorCode.QUERY_VALIDATION);
+        return new BrokerResponseNative(QueryErrorCode.QUERY_VALIDATION,
+            "System tables only support simple projection/filter/limit queries");
+      }
+      Schema systemSchema = provider.getSchema();
+      List<String> projectionColumns = extractProjectionColumns(pinotQuery, systemSchema);
+      int offset = Math.max(0, pinotQuery.getOffset());
+      int limit = Math.max(0, pinotQuery.getLimit());
+      SystemTableRequest systemTableRequest =
+          new SystemTableRequest(projectionColumns, toSystemTableFilter(pinotQuery.getFilterExpression()), offset,
+              limit);
+      SystemTableResponse systemTableResponse = provider.getRows(systemTableRequest);
+      BrokerResponseNative brokerResponse =
+          buildSystemTableBrokerResponse(tableName, systemSchema, projectionColumns, systemTableResponse,
+              requestContext);
+      brokerResponse.setTimeUsedMs(System.currentTimeMillis() - requestContext.getRequestArrivalTimeMillis());
+      _queryLogger.log(new QueryLogger.QueryLogParams(requestContext, tableName, brokerResponse,
+          QueryLogger.QueryLogParams.QueryEngine.SINGLE_STAGE, requesterIdentity, null));
+      return brokerResponse;
+    } catch (BadQueryRequestException e) {
+      requestContext.setErrorCode(QueryErrorCode.QUERY_VALIDATION);
+      _brokerMetrics.addMeteredGlobalValue(BrokerMeter.QUERY_VALIDATION_EXCEPTIONS, 1);
+      return new BrokerResponseNative(QueryErrorCode.QUERY_VALIDATION, e.getMessage());
+    } catch (Exception e) {
+      LOGGER.warn("Caught exception while handling system table query {}: {}", tableName, e.getMessage(), e);
+      requestContext.setErrorCode(QueryErrorCode.QUERY_EXECUTION);
+      return new BrokerResponseNative(QueryErrorCode.QUERY_EXECUTION, e.getMessage());
+    }
+  }
+
+  private boolean isSupportedSystemTableQuery(PinotQuery pinotQuery) {
+    return (pinotQuery.getGroupByList() == null || pinotQuery.getGroupByList().isEmpty())
+        && pinotQuery.getHavingExpression() == null
+        && (pinotQuery.getOrderByList() == null || pinotQuery.getOrderByList().isEmpty());
+  }
+
+  private List<String> extractProjectionColumns(PinotQuery pinotQuery, Schema schema)
+      throws BadQueryRequestException {
+    List<String> projections = new ArrayList<>();
+    boolean hasStar = false;
+    List<Expression> selectList = pinotQuery.getSelectList();
+    if (CollectionUtils.isEmpty(selectList)) {
+      throw new BadQueryRequestException("System tables require a projection list");
+    }
+    for (Expression expression : selectList) {
+      Identifier identifier = expression.getIdentifier();
+      if (identifier != null) {
+        if ("*".equals(identifier.getName())) {
+          hasStar = true;
+        } else {
+          projections.add(identifier.getName());
+        }
+        continue;
+      }
+      Function function = expression.getFunctionCall();
+      if (function != null && "AS".equalsIgnoreCase(function.getOperator()) && !function.getOperands().isEmpty()) {
+        Identifier aliased = function.getOperands().get(0).getIdentifier();
+        if (aliased != null) {
+          projections.add(aliased.getName());
+          continue;
+        }
+      }
+      throw new BadQueryRequestException("System tables only support column projections or '*'");
+    }
+    if (hasStar || projections.isEmpty()) {
+      projections = new ArrayList<>(schema.getColumnNames());
+    }
+    List<String> normalized = new ArrayList<>(projections.size());
+    for (String column : projections) {
+      if (schema.hasColumn(column)) {
+        normalized.add(column);
+        continue;
+      }
+      String matched = null;
+      for (String schemaColumn : schema.getColumnNames()) {
+        if (schemaColumn.equalsIgnoreCase(column)) {
+          matched = schemaColumn;
+          break;
+        }
+      }
+      if (matched == null) {
+        throw new BadQueryRequestException("Unknown column in system table: " + column);
+      }
+      normalized.add(matched);
+    }
+    return normalized;
+  }
+
+  private BrokerResponseNative buildSystemTableBrokerResponse(String tableName, Schema schema,
+      List<String> projectionColumns, SystemTableResponse response, RequestContext requestContext) {
+    DataSchema dataSchema = buildSystemTableDataSchema(schema, projectionColumns);
+    List<GenericRow> rows = response != null ? response.getRows() : Collections.emptyList();
+    List<Object[]> resultRows = new ArrayList<>();
+    if (rows != null) {
+      for (GenericRow row : rows) {
+        Object[] values = new Object[projectionColumns.size()];
+        for (int i = 0; i < projectionColumns.size(); i++) {
+          values[i] = row.getValue(projectionColumns.get(i));
+        }
+        resultRows.add(values);
+      }
+    }
+    BrokerResponseNative brokerResponse = new BrokerResponseNative();
+    brokerResponse.setResultTable(new ResultTable(dataSchema, resultRows));
+    brokerResponse.setNumDocsScanned(resultRows.size());
+    brokerResponse.setNumEntriesScannedPostFilter(resultRows.size());
+    if (response != null) {
+      brokerResponse.setTotalDocs(response.getTotalRows());
+    }
+    brokerResponse.setTablesQueried(Set.of(TableNameBuilder.extractRawTableName(tableName)));
+    return brokerResponse;
+  }
+
+  private DataSchema buildSystemTableDataSchema(Schema schema, List<String> projectionColumns) {
+    String[] columnNames = new String[projectionColumns.size()];
+    ColumnDataType[] columnTypes = new ColumnDataType[projectionColumns.size()];
+    for (int i = 0; i < projectionColumns.size(); i++) {
+      String column = projectionColumns.get(i);
+      FieldSpec fieldSpec = schema.getFieldSpecFor(column);
+      ColumnDataType columnDataType =
+          fieldSpec != null ? ColumnDataType.fromDataType(fieldSpec.getDataType(), fieldSpec.isSingleValueField())
+              : ColumnDataType.STRING;
+      columnNames[i] = column;
+      columnTypes[i] = columnDataType;
+    }
+    return new DataSchema(columnNames, columnTypes);
+  }
+
+  private @Nullable SystemTableFilter toSystemTableFilter(@Nullable Expression filterExpression) {
+    if (filterExpression == null) {
+      return null;
+    }
+    Function function = filterExpression.getFunctionCall();
+    if (function == null) {
+      return null;
+    }
+    FilterKind filterKind;
+    try {
+      filterKind = FilterKind.valueOf(function.getOperator().toUpperCase(Locale.ROOT));
+    } catch (Exception e) {
+      return null;
+    }
+    switch (filterKind) {
+      case AND:
+      case OR:
+        List<SystemTableFilter> children = new ArrayList<>();
+        for (Expression child : function.getOperands()) {
+          SystemTableFilter converted = toSystemTableFilter(child);
+          if (converted != null) {
+            children.add(converted);
+          }
+        }
+        if (children.isEmpty()) {
+          return null;
+        }
+        return SystemTableFilter.booleanOperator(
+            filterKind == FilterKind.AND ? SystemTableFilter.Operator.AND : SystemTableFilter.Operator.OR, children);
+      case NOT:
+        if (function.getOperandsSize() == 0) {
+          return null;
+        }
+        SystemTableFilter operand = toSystemTableFilter(function.getOperands().get(0));
+        return operand == null ? null
+            : SystemTableFilter.booleanOperator(SystemTableFilter.Operator.NOT, Collections.singletonList(operand));
+      default:
+        SystemTableFilter.Operator operator = toSystemTableOperator(filterKind);
+        if (operator == null) {
+          return null;
+        }
+        String column = extractIdentifier(function.getOperands());
+        if (column == null) {
+          return null;
+        }
+        List<String> values = extractLiteralValues(function.getOperands());
+        return values.isEmpty() ? null : SystemTableFilter.predicate(column, operator, values);
+    }
+  }
+
+  private @Nullable SystemTableFilter.Operator toSystemTableOperator(FilterKind filterKind) {
+    switch (filterKind) {
+      case EQUALS:
+        return SystemTableFilter.Operator.EQ;
+      case NOT_EQUALS:
+        return SystemTableFilter.Operator.NEQ;
+      case GREATER_THAN:
+        return SystemTableFilter.Operator.GT;
+      case GREATER_THAN_OR_EQUAL:
+        return SystemTableFilter.Operator.GTE;
+      case LESS_THAN:
+        return SystemTableFilter.Operator.LT;
+      case LESS_THAN_OR_EQUAL:
+        return SystemTableFilter.Operator.LTE;
+      case IN:
+        return SystemTableFilter.Operator.IN;
+      case BETWEEN:
+        return SystemTableFilter.Operator.BETWEEN;
+      case REGEXP_LIKE:
+        return SystemTableFilter.Operator.REGEXP_LIKE;
+      default:
+        return null;
+    }
+  }
+
+  private @Nullable String extractIdentifier(List<Expression> operands) {
+    for (Expression operand : operands) {
+      Identifier identifier = operand.getIdentifier();
+      if (identifier != null) {
+        return identifier.getName();
+      }
+    }
+    return null;
+  }
+
+  private List<String> extractLiteralValues(List<Expression> operands) {
+    List<String> values = new ArrayList<>();
+    for (Expression operand : operands) {
+      Literal literal = operand.getLiteral();
+      if (literal != null && literal.getFieldValue() != null) {
+        values.add(literal.getFieldValue().toString());
+      }
+    }
+    return values;
   }
 
   private boolean isDefaultQueryResponseLimitEnabled() {

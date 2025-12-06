@@ -35,6 +35,11 @@
   <dependencies>
     <dependency>
       <groupId>org.apache.pinot</groupId>
+      <artifactId>pinot-java-client</artifactId>
+      <version>${project.version}</version>
+    </dependency>
+    <dependency>
+      <groupId>org.apache.pinot</groupId>
       <artifactId>pinot-query-runtime</artifactId>
     </dependency>
     <dependency>
