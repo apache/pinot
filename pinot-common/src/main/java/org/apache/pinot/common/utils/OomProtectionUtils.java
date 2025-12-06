@@ -89,32 +89,6 @@ public final class OomProtectionUtils {
       return true;
     }
 
-    boolean hasFlag = hasDisableAdaptiveIhopFlag(jvmInputArgs);
-    if (!hasFlag) {
-      LOGGER.warn("Required GC option -XX:-G1UseAdaptiveIHOP not found. Disabling OOM protection.");
-      config.setProperty(CommonConstants.Accounting.FULLY_QUALIFIED_CONFIG_OF_OOM_PROTECTION_KILLING_QUERY, false);
-      return true;
-    }
-    // Ensure IHOP threshold is below all OOM protection levels so GC triggers before protections
-    // Default IHOP threshold is 45% if not explicitly set by `-XX:InitiatingHeapOccupancyPercent=45`
-    double ihopRatio = 0.45;
-    if (jvmInputArgs != null) {
-      for (String arg : jvmInputArgs) {
-        if (arg != null && arg.startsWith("-XX:InitiatingHeapOccupancyPercent=")) {
-          int idx = arg.indexOf('=');
-          if (idx > 0 && idx + 1 < arg.length()) {
-            try {
-              ihopRatio = Double.parseDouble(arg.substring(idx + 1)) / 100.0;
-            } catch (Exception ignore) {
-              // keep default on parse failures
-            }
-          }
-        }
-      }
-    }
-    // We want to ensure IHOP threshold is below all OOM protection levels so GC triggers before protections
-    // So we add 20% to the default IHOP threshold
-    double ihopRatioThreshold = ihopRatio + 0.20;
     PinotConfiguration accountingConfigs = config.subset(CommonConstants.PINOT_QUERY_SCHEDULER_PREFIX);
     double alarmingRatio = accountingConfigs.getProperty(
         CommonConstants.Accounting.CONFIG_OF_ALARMING_LEVEL_HEAP_USAGE_RATIO,
@@ -125,15 +99,27 @@ public final class OomProtectionUtils {
     double panicRatio = accountingConfigs.getProperty(
         CommonConstants.Accounting.CONFIG_OF_PANIC_LEVEL_HEAP_USAGE_RATIO,
         CommonConstants.Accounting.DEFAULT_PANIC_LEVEL_HEAP_USAGE_RATIO);
+    double lowestOomThreshold = Math.min(alarmingRatio, Math.min(criticalRatio, panicRatio));
 
-    if (ihopRatioThreshold > alarmingRatio || ihopRatioThreshold > criticalRatio
-        || ihopRatioThreshold > panicRatio) {
-      int expectedIhopRatio = (int) Math.min(Math.min(alarmingRatio, criticalRatio), panicRatio) * 100 - 20;
-      LOGGER.warn(
-          "InitiatingHeapOccupancyPercent ratio {} is not below 20% of OOM thresholds (alarming={}, critical={}, "
-              + "panic={}). Disabling OOM protection as GC may not be triggered or fast enough. Please ensure you "
-              + "set a lower value than -XX:InitiatingHeapOccupancyPercent={} in the JVM options.",
-          ihopRatio, alarmingRatio, criticalRatio, panicRatio, expectedIhopRatio);
+    if (!hasDisableAdaptiveIhopFlag(jvmInputArgs)) {
+      LOGGER.error(
+          "Adaptive IHOP is enabled (missing -XX:-G1UseAdaptiveIHOP). Cannot guarantee G1 old-gen GC before OOM "
+              + "protection thresholds (alarming={}, critical={}, panic={}). Disabling OOM protection.",
+          alarmingRatio, criticalRatio, panicRatio);
+      config.setProperty(CommonConstants.Accounting.FULLY_QUALIFIED_CONFIG_OF_OOM_PROTECTION_KILLING_QUERY, false);
+      return true;
+    }
+    double ihopRatio = getIhopRatio(jvmInputArgs);
+    if (ihopRatio >= lowestOomThreshold) {
+      int ihopPercent = (int) Math.round(ihopRatio * 100);
+      int lowestOomPercent = (int) Math.round(lowestOomThreshold * 100);
+      int recommendedIhopPercent = Math.max(0, lowestOomPercent - 1);
+      LOGGER.error(
+          "InitiatingHeapOccupancyPercent {}% is not below OOM protection thresholds (alarming={}%, critical={}%, "
+              + "panic={}%). Disabling OOM protection to avoid throttling/killing queries before old-gen GC has a "
+              + "chance to run. Please configure -XX:InitiatingHeapOccupancyPercent to be lower than {}%.",
+          ihopPercent, (int) Math.round(alarmingRatio * 100), (int) Math.round(criticalRatio * 100),
+          (int) Math.round(panicRatio * 100), recommendedIhopPercent);
       config.setProperty(CommonConstants.Accounting.FULLY_QUALIFIED_CONFIG_OF_OOM_PROTECTION_KILLING_QUERY, false);
       return true;
     }
@@ -169,5 +155,25 @@ public final class OomProtectionUtils {
     }
     String sysProp = System.getProperty(CommonConstants.Accounting.SYS_PROP_OF_SKIP_OOM_GC_ENFORCEMENT_FOR_TESTS);
     return sysProp != null && Boolean.parseBoolean(sysProp);
+  }
+
+  private static double getIhopRatio(List<String> jvmInputArgs) {
+    // Default IHOP threshold is 45% if not explicitly set by `-XX:InitiatingHeapOccupancyPercent=45`
+    double ihopRatio = 0.45;
+    if (jvmInputArgs != null) {
+      for (String arg : jvmInputArgs) {
+        if (arg != null && arg.startsWith("-XX:InitiatingHeapOccupancyPercent=")) {
+          int idx = arg.indexOf('=');
+          if (idx > 0 && idx + 1 < arg.length()) {
+            try {
+              ihopRatio = Double.parseDouble(arg.substring(idx + 1)) / 100.0;
+            } catch (Exception ignore) {
+              // keep default on parse failures
+            }
+          }
+        }
+      }
+    }
+    return ihopRatio;
   }
 }

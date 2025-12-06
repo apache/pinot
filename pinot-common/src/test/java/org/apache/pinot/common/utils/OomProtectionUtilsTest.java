@@ -30,6 +30,8 @@ import org.testng.annotations.Test;
 
 public class OomProtectionUtilsTest {
   private static final Logger LOGGER = LoggerFactory.getLogger(OomProtectionUtilsTest.class);
+  private static final String OOM_PROTECTION_CONFIG_KEY = CommonConstants.PINOT_QUERY_SCHEDULER_PREFIX + "."
+      + CommonConstants.Accounting.CONFIG_OF_OOM_PROTECTION_KILLING_QUERY;
 
   @Test
   public void testHasDisableAdaptiveIhopFlag() {
@@ -41,24 +43,35 @@ public class OomProtectionUtilsTest {
   }
 
   @Test
-  public void testEnforceIhopGcOrDisableOom() {
+  public void testEnforceIhopGcFailsWhenAdaptiveIhopEnabled() {
     PinotConfiguration cfg = new PinotConfiguration();
-    cfg.setProperty(CommonConstants.PINOT_QUERY_SCHEDULER_PREFIX + "."
-        + CommonConstants.Accounting.CONFIG_OF_OOM_PROTECTION_KILLING_QUERY, true);
+    cfg.setProperty(OOM_PROTECTION_CONFIG_KEY, true);
 
     boolean changed = OomProtectionUtils.enforceIhopGcOrDisableOom(cfg,
-        Arrays.asList("-Xmx1G", "-Xms1G"));
+        Arrays.asList("-Xmx1G", "-Xms1G", "-XX:+UseG1GC"));
     Assert.assertTrue(changed);
-    Assert.assertFalse(cfg.getProperty(CommonConstants.PINOT_QUERY_SCHEDULER_PREFIX + "."
-        + CommonConstants.Accounting.CONFIG_OF_OOM_PROTECTION_KILLING_QUERY, true));
+    Assert.assertFalse(cfg.getProperty(OOM_PROTECTION_CONFIG_KEY, true));
+  }
 
-    PinotConfiguration cfg2 = new PinotConfiguration();
-    cfg2.setProperty(CommonConstants.PINOT_QUERY_SCHEDULER_PREFIX + "."
-        + CommonConstants.Accounting.CONFIG_OF_OOM_PROTECTION_KILLING_QUERY, true);
-    boolean changed2 = OomProtectionUtils.enforceIhopGcOrDisableOom(cfg2,
-        Arrays.asList("-XX:-G1UseAdaptiveIHOP", "-Xmx1G"));
-    Assert.assertFalse(changed2);
-    Assert.assertTrue(cfg2.getProperty(CommonConstants.PINOT_QUERY_SCHEDULER_PREFIX + "."
-        + CommonConstants.Accounting.CONFIG_OF_OOM_PROTECTION_KILLING_QUERY, false));
+  @Test
+  public void testEnforceIhopGcFailsWhenIhopAboveThreshold() {
+    PinotConfiguration cfg = new PinotConfiguration();
+    cfg.setProperty(OOM_PROTECTION_CONFIG_KEY, true);
+
+    boolean changed = OomProtectionUtils.enforceIhopGcOrDisableOom(cfg,
+        Arrays.asList("-XX:-G1UseAdaptiveIHOP", "-XX:+UseG1GC", "-XX:InitiatingHeapOccupancyPercent=90"));
+    Assert.assertTrue(changed);
+    Assert.assertFalse(cfg.getProperty(OOM_PROTECTION_CONFIG_KEY, true));
+  }
+
+  @Test
+  public void testEnforceIhopGcSucceedsWhenIhopBelowThreshold() {
+    PinotConfiguration cfg = new PinotConfiguration();
+    cfg.setProperty(OOM_PROTECTION_CONFIG_KEY, true);
+
+    boolean changed = OomProtectionUtils.enforceIhopGcOrDisableOom(cfg,
+        Arrays.asList("-XX:-G1UseAdaptiveIHOP", "-XX:+UseG1GC", "-XX:InitiatingHeapOccupancyPercent=40"));
+    Assert.assertFalse(changed);
+    Assert.assertTrue(cfg.getProperty(OOM_PROTECTION_CONFIG_KEY, false));
   }
 }
