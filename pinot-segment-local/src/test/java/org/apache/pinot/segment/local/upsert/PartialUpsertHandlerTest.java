@@ -18,7 +18,6 @@
  */
 package org.apache.pinot.segment.local.upsert;
 
-import java.lang.reflect.Field;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashMap;
@@ -136,16 +135,6 @@ public class PartialUpsertHandlerTest {
     assertFalse(postUpdateTransformers.isEmpty());
     PartialUpsertHandler handler =
         new PartialUpsertHandler(tableConfig, schema, List.of("hoursSinceEpoch"), upsertConfig);
-    List<RecordTransformer> handlerTransformers;
-    try {
-      Field transformersField = PartialUpsertHandler.class.getDeclaredField("_postUpdateTransformers");
-      transformersField.setAccessible(true);
-      //noinspection unchecked
-      handlerTransformers = (List<RecordTransformer>) transformersField.get(handler);
-    } catch (Exception e) {
-      throw new RuntimeException(e);
-    }
-    assertFalse(handlerTransformers.isEmpty());
 
     LazyRow previousRow = mock(LazyRow.class);
     when(previousRow.getColumnNames()).thenReturn(

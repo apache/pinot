@@ -20,7 +20,7 @@ package org.apache.pinot.segment.local.recordtransformer;
 
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
-import java.util.Collections;
+import java.util.Collection;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.LinkedHashMap;
@@ -55,6 +55,10 @@ public class ExpressionTransformer implements RecordTransformer {
   final LinkedHashMap<String, FunctionEvaluator> _expressionEvaluators = new LinkedHashMap<>();
   private final boolean _continueOnError;
   private final ThrottledLogger _throttledLogger;
+  /**
+   * When true, transforms run even if the column already has a non-null value. This is used for post-upsert transforms
+   * where derived columns should be recomputed on the merged row.
+   */
   private final boolean _overwriteExistingValues;
 
   public ExpressionTransformer(TableConfig tableConfig, Schema schema) {
@@ -154,8 +158,8 @@ public class ExpressionTransformer implements RecordTransformer {
       String column = entry.getKey();
       FunctionEvaluator transformFunctionEvaluator = entry.getValue();
       Object existingValue = record.getValue(column);
-      boolean treatAsNull = _overwriteExistingValues || existingValue == null || record.isNullValue(column);
-      if (treatAsNull) {
+      boolean shouldApplyTransform = _overwriteExistingValues || existingValue == null || record.isNullValue(column);
+      if (shouldApplyTransform) {
         try {
           // Skip transformation if column value already exists
           // NOTE: column value might already exist for OFFLINE data,
@@ -173,7 +177,7 @@ public class ExpressionTransformer implements RecordTransformer {
           _throttledLogger.warn("Caught exception while evaluation transform function for column: " + column, e);
           record.markIncomplete();
         }
-      } else if (existingValue.getClass().isArray() || existingValue instanceof Collections
+      } else if (existingValue.getClass().isArray() || existingValue instanceof Collection
           || existingValue instanceof Map) {
         try {
           Object transformedValue = transformFunctionEvaluator.evaluate(record);
@@ -192,11 +196,14 @@ public class ExpressionTransformer implements RecordTransformer {
     }
   }
 
-  private boolean isTypeCompatible(Object existingValue, Object transformedValue) {
+  private boolean isTypeCompatible(Object existingValue, @Nullable Object transformedValue) {
+    if (transformedValue == null || existingValue == null) {
+      return transformedValue == existingValue;
+    }
     if (transformedValue.getClass() == existingValue.getClass()) {
       return true;
     }
-    if (transformedValue instanceof Collections && existingValue instanceof Collections) {
+    if (transformedValue instanceof Collection && existingValue instanceof Collection) {
       return true;
     }
     if (transformedValue instanceof Map && existingValue instanceof Map) {
