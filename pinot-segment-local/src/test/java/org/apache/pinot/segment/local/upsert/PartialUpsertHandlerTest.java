@@ -18,13 +18,13 @@
  */
 package org.apache.pinot.segment.local.upsert;
 
-import java.lang.reflect.Field;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import org.apache.commons.lang3.StringUtils;
 import org.apache.pinot.segment.local.function.FunctionEvaluatorFactory;
 import org.apache.pinot.segment.local.indexsegment.immutable.ImmutableSegmentImpl;
 import org.apache.pinot.segment.local.recordtransformer.RecordTransformerUtils;
@@ -128,7 +128,7 @@ public class PartialUpsertHandlerTest {
 
     UpsertConfig upsertConfig = new UpsertConfig(UpsertConfig.Mode.PARTIAL);
     upsertConfig.setComparisonColumns(List.of("hoursSinceEpoch"));
-    upsertConfig.setPartialUpsertPostUpdateTransformConfigs(
+    upsertConfig.setPostPartialUpsertTransformConfigs(
         List.of(new TransformConfig("fullName", "concat(firstName,lastName)")));
     TableConfig tableConfig = createTableConfig(schema, upsertConfig);
     List<RecordTransformer> postUpdateTransformers =
@@ -136,16 +136,6 @@ public class PartialUpsertHandlerTest {
     assertFalse(postUpdateTransformers.isEmpty());
     PartialUpsertHandler handler =
         new PartialUpsertHandler(tableConfig, schema, List.of("hoursSinceEpoch"), upsertConfig);
-    List<RecordTransformer> handlerTransformers;
-    try {
-      Field transformersField = PartialUpsertHandler.class.getDeclaredField("_postUpdateTransformers");
-      transformersField.setAccessible(true);
-      //noinspection unchecked
-      handlerTransformers = (List<RecordTransformer>) transformersField.get(handler);
-    } catch (Exception e) {
-      throw new RuntimeException(e);
-    }
-    assertFalse(handlerTransformers.isEmpty());
 
     LazyRow previousRow = mock(LazyRow.class);
     when(previousRow.getColumnNames()).thenReturn(
@@ -267,7 +257,7 @@ public class PartialUpsertHandlerTest {
 
   private TableConfig createTableConfig(Schema schema, UpsertConfig upsertConfig) {
     String tableName = schema.getSchemaName();
-    if (tableName == null || tableName.isEmpty()) {
+    if (StringUtils.isEmpty(tableName)) {
       tableName = "testTable";
     }
     return new TableConfigBuilder(TableType.REALTIME).setTableName(tableName)

@@ -334,7 +334,7 @@ public class UpsertTableIntegrationTest extends BaseClusterIntegrationTest {
 
     UpsertConfig upsertConfig = new UpsertConfig(UpsertConfig.Mode.PARTIAL);
     upsertConfig.setComparisonColumn(TIME_COL_NAME);
-    upsertConfig.setPartialUpsertPostUpdateTransformConfigs(
+    upsertConfig.setPostPartialUpsertTransformConfigs(
         List.of(new TransformConfig("total", "plus(score,bonus)")));
 
     Map<String, String> csvDecoderProperties =
@@ -346,6 +346,13 @@ public class UpsertTableIntegrationTest extends BaseClusterIntegrationTest {
             upsertConfig, "id");
     addTableConfig(tableConfig);
 
+    // Test scenario:
+    // First record: id=1, score=5, bonus=NULL, total=NULL, timestamp=1000
+    // Second record: id=1, score=NULL, bonus=10, total=NULL, timestamp=2000
+    // After partial upsert (using timestamp as comparison column), the merged row for id=1 is:
+    //   score=5 (from first record), bonus=10 (from second record), total=NULL
+    // Post-update transform computes total=score+bonus=5+10=15
+    // Expected: score=5, bonus=10, total=15
     // First record sets score, second sets bonus. Post-upsert transform should compute total from the merged row.
     List<String> records = List.of("1,5,NULL,NULL,1000", "1,NULL,10,NULL,2000");
     pushCsvIntoKafka(records, kafkaTopicName, 0);

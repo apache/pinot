@@ -31,6 +31,7 @@ import javax.annotation.Nullable;
 import org.apache.pinot.common.utils.ThrottledLogger;
 import org.apache.pinot.segment.local.function.FunctionEvaluator;
 import org.apache.pinot.segment.local.function.FunctionEvaluatorFactory;
+import org.apache.pinot.segment.local.utils.SchemaUtils;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.ingestion.IngestionConfig;
 import org.apache.pinot.spi.config.table.ingestion.TransformConfig;
@@ -53,37 +54,45 @@ public class ExpressionTransformer implements RecordTransformer {
 
   @VisibleForTesting
   final LinkedHashMap<String, FunctionEvaluator> _expressionEvaluators = new LinkedHashMap<>();
+  private final Set<String> _implicitMapTransformColumns = new HashSet<>();
   private final boolean _continueOnError;
   private final ThrottledLogger _throttledLogger;
+  /**
+   * If {@code true}, transform functions overwrite existing non-null values instead of skipping them. This is enabled
+   * for post-upsert transforms where derived columns should be recomputed on the merged row; otherwise transforms only
+   * populate missing or null-valued columns.
+   */
   private final boolean _overwriteExistingValues;
 
   public ExpressionTransformer(TableConfig tableConfig, Schema schema) {
-    this(tableConfig, schema, null, true, false);
+    this(tableConfig, schema, null, false);
   }
 
   public ExpressionTransformer(TableConfig tableConfig, Schema schema,
-      @Nullable List<TransformConfig> transformConfigsOverride, boolean includeFieldSpecTransforms,
-      boolean overwriteExistingValues) {
+      @Nullable List<TransformConfig> transformConfigs, boolean overwriteExistingValues) {
     Map<String, FunctionEvaluator> expressionEvaluators = new HashMap<>();
     IngestionConfig ingestionConfig = tableConfig.getIngestionConfig();
-    List<TransformConfig> transformConfigs =
-        transformConfigsOverride != null ? transformConfigsOverride
+    List<TransformConfig> resolvedTransformConfigs =
+        transformConfigs != null ? transformConfigs
             : ingestionConfig != null ? ingestionConfig.getTransformConfigs() : null;
-    if (transformConfigs != null) {
-      for (TransformConfig transformConfig : transformConfigs) {
+    if (resolvedTransformConfigs != null) {
+      for (TransformConfig transformConfig : resolvedTransformConfigs) {
         FunctionEvaluator previous = expressionEvaluators.put(transformConfig.getColumnName(),
             FunctionEvaluatorFactory.getExpressionEvaluator(transformConfig.getTransformFunction()));
         Preconditions.checkState(previous == null,
             "Cannot set more than one ingestion transform function on column: %s.", transformConfig.getColumnName());
       }
     }
-    if (includeFieldSpecTransforms) {
+    if (transformConfigs == null) {
       for (FieldSpec fieldSpec : schema.getAllFieldSpecs()) {
         String fieldName = fieldSpec.getName();
         if (!fieldSpec.isVirtualColumn() && !expressionEvaluators.containsKey(fieldName)) {
           FunctionEvaluator functionEvaluator = FunctionEvaluatorFactory.getExpressionEvaluator(fieldSpec);
           if (functionEvaluator != null) {
             expressionEvaluators.put(fieldName, functionEvaluator);
+            if (isImplicitMapTransform(fieldSpec)) {
+              _implicitMapTransformColumns.add(fieldName);
+            }
           }
         }
       }
@@ -124,8 +133,8 @@ public class ExpressionTransformer implements RecordTransformer {
       _expressionEvaluators.put(column, functionEvaluator);
       discoveredNames.remove(column);
     } else {
-      throw new IllegalStateException(
-          "Expression cycle found for column '" + column + "' in Ingestion Transform " + "Function definitions.");
+      throw new IllegalStateException(String.format(
+          "Expression cycle found for column '%s' in Ingestion Transform Function definitions.", column));
     }
   }
 
@@ -154,18 +163,15 @@ public class ExpressionTransformer implements RecordTransformer {
       String column = entry.getKey();
       FunctionEvaluator transformFunctionEvaluator = entry.getValue();
       Object existingValue = record.getValue(column);
-      boolean treatAsNull = _overwriteExistingValues || existingValue == null || record.isNullValue(column);
-      if (treatAsNull) {
+      boolean shouldApplyTransform = _overwriteExistingValues || existingValue == null || record.isNullValue(column);
+      if (shouldApplyTransform) {
         try {
-          // Skip transformation if column value already exists
-          // NOTE: column value might already exist for OFFLINE data,
-          // For backward compatibility, The only exception here is that we will override nested field like array,
-          // collection or map since they were not included in the record transformation before.
+          // Apply transformation when overwriting is enabled or when the current value is null.
+          // NOTE: column value might already exist for OFFLINE data. For backward compatibility, we may override
+          // nested fields like arrays, collections, or maps since they were not included in the record
+          // transformation before.
           Object transformedValue = transformFunctionEvaluator.evaluate(record);
-          if (transformedValue != null) {
-            record.removeNullValueField(column);
-          }
-          record.putValue(column, transformedValue);
+          applyTransformedValue(record, column, transformedValue);
         } catch (Exception e) {
           if (!_continueOnError) {
             throw new RuntimeException("Caught exception while evaluation transform function for column: " + column, e);
@@ -177,13 +183,13 @@ public class ExpressionTransformer implements RecordTransformer {
           || existingValue instanceof Map) {
         try {
           Object transformedValue = transformFunctionEvaluator.evaluate(record);
+          if (transformedValue == null && _implicitMapTransformColumns.contains(column)) {
+            continue;
+          }
           // For backward compatibility, The only exception here is that we will override nested field like array,
           // collection or map since they were not included in the record transformation before.
           if (!isTypeCompatible(existingValue, transformedValue)) {
-            if (transformedValue != null) {
-              record.removeNullValueField(column);
-            }
-            record.putValue(column, transformedValue);
+            applyTransformedValue(record, column, transformedValue);
           }
         } catch (Exception e) {
           LOGGER.debug("Caught exception while evaluation transform function for column: {}", column, e);
@@ -192,7 +198,29 @@ public class ExpressionTransformer implements RecordTransformer {
     }
   }
 
-  private boolean isTypeCompatible(Object existingValue, Object transformedValue) {
+  private static boolean isImplicitMapTransform(FieldSpec fieldSpec) {
+    if (fieldSpec.getTransformFunction() != null) {
+      return false;
+    }
+    String fieldName = fieldSpec.getName();
+    return fieldName.endsWith(SchemaUtils.MAP_KEY_COLUMN_SUFFIX)
+        || fieldName.endsWith(SchemaUtils.MAP_VALUE_COLUMN_SUFFIX);
+  }
+
+  private void applyTransformedValue(GenericRow record, String column, @Nullable Object transformedValue) {
+    if (transformedValue != null) {
+      record.removeNullValueField(column);
+      record.putValue(column, transformedValue);
+    } else {
+      record.removeValue(column);
+      record.addNullValueField(column);
+    }
+  }
+
+  private boolean isTypeCompatible(Object existingValue, @Nullable Object transformedValue) {
+    if (transformedValue == null || existingValue == null) {
+      return transformedValue == existingValue;
+    }
     if (transformedValue.getClass() == existingValue.getClass()) {
       return true;
     }
