@@ -391,6 +391,14 @@ public abstract class MultiStageOperator implements Operator<MseBlock>, AutoClos
         response.mergeMaxRowsInOperator(stats.getLong(TransformOperator.StatKey.EMITTED_ROWS));
       }
     },
+    UNNEST(UnnestOperator.StatKey.class) {
+      @Override
+      public void mergeInto(BrokerResponseNativeV2 response, StatMap<?> map) {
+        @SuppressWarnings("unchecked")
+        StatMap<UnnestOperator.StatKey> stats = (StatMap<UnnestOperator.StatKey>) map;
+        response.mergeMaxRowsInOperator(stats.getLong(UnnestOperator.StatKey.EMITTED_ROWS));
+      }
+    },
     UNION(SetOperator.StatKey.class) {
       @Override
       public void mergeInto(BrokerResponseNativeV2 response, StatMap<?> map) {

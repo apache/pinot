@@ -40,6 +40,7 @@ import org.apache.pinot.query.planner.plannode.ProjectNode;
 import org.apache.pinot.query.planner.plannode.SetOpNode;
 import org.apache.pinot.query.planner.plannode.SortNode;
 import org.apache.pinot.query.planner.plannode.TableScanNode;
+import org.apache.pinot.query.planner.plannode.UnnestNode;
 import org.apache.pinot.query.planner.plannode.ValueNode;
 import org.apache.pinot.query.planner.plannode.WindowNode;
 
@@ -174,5 +175,12 @@ public class DispatchablePlanVisitor implements PlanNodeVisitor<Void, Dispatchab
   @Override
   public Void visitExplained(ExplainedNode node, DispatchablePlanContext context) {
     throw new UnsupportedOperationException("ExplainedNode should not be visited by DispatchablePlanVisitor");
+  }
+
+  @Override
+  public Void visitUnnest(UnnestNode node, DispatchablePlanContext context) {
+    node.getInputs().get(0).visit(this, context);
+    getOrCreateDispatchablePlanMetadata(node, context);
+    return null;
   }
 }
