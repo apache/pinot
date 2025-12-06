@@ -95,13 +95,17 @@ public class RecordTransformerUtils {
   /**
    * Returns transformers to apply after a partial upsert merge. Only post-merge transform configs are honored to avoid
    * re-running ingestion-time transforms.
+   *
+   * @param tableConfig The table configuration containing post-update transform configs
+   * @param schema The table schema used for validation and type conversion
+   * @return List of transformers to apply after merge, or empty list if none configured
    */
   public static List<RecordTransformer> getPostPartialUpsertTransformers(TableConfig tableConfig, Schema schema) {
     UpsertConfig upsertConfig = tableConfig.getUpsertConfig();
     if (upsertConfig == null) {
       return List.of();
     }
-    List<TransformConfig> postUpdateTransformConfigs = upsertConfig.getPartialUpsertPostUpdateTransformConfigs();
+    List<TransformConfig> postUpdateTransformConfigs = upsertConfig.getPostPartialUpsertTransformConfigs();
     if (CollectionUtils.isEmpty(postUpdateTransformConfigs)) {
       return List.of();
     }

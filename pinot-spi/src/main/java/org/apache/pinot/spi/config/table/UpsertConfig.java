@@ -59,9 +59,10 @@ public class UpsertConfig extends BaseJsonConfig {
   @Nullable
   private Map<String, Strategy> _partialUpsertStrategies;
 
-  @JsonPropertyDescription("Transform configs evaluated after partial upsert merge to populate derived columns.")
+  @JsonPropertyDescription("Transform configs evaluated after partial upsert merge to populate derived columns. Lives "
+      + "under UpsertConfig because these transforms are applied on the merged upsert view, not during ingestion.")
   @Nullable
-  private List<TransformConfig> _partialUpsertPostUpdateTransformConfigs;
+  private List<TransformConfig> _postPartialUpsertTransformConfigs;
 
   @JsonPropertyDescription("default upsert strategy for partial mode")
   private Strategy _defaultPartialUpsertStrategy = Strategy.OVERWRITE;
@@ -178,16 +179,16 @@ public class UpsertConfig extends BaseJsonConfig {
   }
 
   @Nullable
-  public List<TransformConfig> getPartialUpsertPostUpdateTransformConfigs() {
-    return _partialUpsertPostUpdateTransformConfigs;
+  public List<TransformConfig> getPostPartialUpsertTransformConfigs() {
+    return _postPartialUpsertTransformConfigs;
   }
 
-  public void setPartialUpsertPostUpdateTransformConfigs(
-      @Nullable List<TransformConfig> partialUpsertPostUpdateTransformConfigs) {
-    if (CollectionUtils.isNotEmpty(partialUpsertPostUpdateTransformConfigs)) {
-      _partialUpsertPostUpdateTransformConfigs = partialUpsertPostUpdateTransformConfigs;
+  public void setPostPartialUpsertTransformConfigs(
+      @Nullable List<TransformConfig> postPartialUpsertTransformConfigs) {
+    if (CollectionUtils.isNotEmpty(postPartialUpsertTransformConfigs)) {
+      _postPartialUpsertTransformConfigs = postPartialUpsertTransformConfigs;
     } else {
-      _partialUpsertPostUpdateTransformConfigs = null;
+      _postPartialUpsertTransformConfigs = null;
     }
   }
 
