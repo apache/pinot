@@ -23,6 +23,7 @@ import com.fasterxml.jackson.annotation.JsonProperty;
 import com.fasterxml.jackson.annotation.JsonPropertyDescription;
 import com.google.common.base.Preconditions;
 import java.util.List;
+import java.util.Map;
 import java.util.Objects;
 import javax.annotation.Nullable;
 import org.apache.pinot.spi.config.BaseJsonConfig;
@@ -37,6 +38,7 @@ public class UserConfig extends BaseJsonConfig {
     public static final String TABLES_KEY = "tables";
     public static final String EXCLUDE_TABLES_KEY = "excludeTables";
     public static final String PERMISSIONS_KEY = "permissions";
+    public static final String RLS_FILTERS_KEY = "rlsFilters";
 
     @JsonPropertyDescription("The name of User")
     private String _username;
@@ -59,6 +61,9 @@ public class UserConfig extends BaseJsonConfig {
     @JsonPropertyDescription("The table permission of User")
     private List<AccessType> _permissions;
 
+    @JsonPropertyDescription("The RLS filters for User per table")
+    private Map<String, List<String>> _rlsFilters;
+
     @JsonCreator
     public UserConfig(@JsonProperty(value = USERNAME_KEY, required = true) String username,
         @JsonProperty(value = PASSWORD_KEY, required = true) String password,
@@ -66,7 +71,8 @@ public class UserConfig extends BaseJsonConfig {
         @JsonProperty(value = ROLE_KEY, required = true) String role,
         @JsonProperty(value = TABLES_KEY) @Nullable List<String> tableList,
         @JsonProperty(value = EXCLUDE_TABLES_KEY) @Nullable List<String> excludeTableList,
-        @JsonProperty(value = PERMISSIONS_KEY) @Nullable List<AccessType> permissionList
+        @JsonProperty(value = PERMISSIONS_KEY) @Nullable List<AccessType> permissionList,
+        @JsonProperty(value = RLS_FILTERS_KEY) @Nullable Map<String, List<String>> rlsFilters
     ) {
         Preconditions.checkArgument(username != null, "'username' must be configured");
         Preconditions.checkArgument(password != null, "'password' must be configured");
@@ -79,6 +85,16 @@ public class UserConfig extends BaseJsonConfig {
         _tables = tableList;
         _excludeTables = excludeTableList;
         _permissions = permissionList;
+        _rlsFilters = rlsFilters;
+    }
+
+    /**
+     * Constructor for backward compatibility without RLS filters.
+     * This allows existing code to continue working without modification.
+     */
+    public UserConfig(String username, String password, String component, String role,
+        List<String> tableList, List<String> excludeTableList, List<AccessType> permissionList) {
+      this(username, password, component, role, tableList, excludeTableList, permissionList, null);
     }
 
     @JsonProperty(USERNAME_KEY)
@@ -112,6 +128,11 @@ public class UserConfig extends BaseJsonConfig {
     @JsonProperty(PERMISSIONS_KEY)
     public List<AccessType> getPermissios() {
         return _permissions;
+    }
+
+    @JsonProperty(RLS_FILTERS_KEY)
+    public Map<String, List<String>> getRlsFilters() {
+        return _rlsFilters;
     }
 
     @JsonProperty(COMPONET_KEY)

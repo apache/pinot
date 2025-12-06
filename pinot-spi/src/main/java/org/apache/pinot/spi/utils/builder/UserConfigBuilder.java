@@ -19,10 +19,12 @@
 package org.apache.pinot.spi.utils.builder;
 
 import java.util.List;
+import java.util.Map;
 import org.apache.pinot.spi.config.user.AccessType;
 import org.apache.pinot.spi.config.user.ComponentType;
 import org.apache.pinot.spi.config.user.RoleType;
 import org.apache.pinot.spi.config.user.UserConfig;
+
 
 public class UserConfigBuilder {
 
@@ -33,6 +35,7 @@ public class UserConfigBuilder {
     private List<String> _tableList;
     private List<String> _excludeTableList;
     private List<AccessType> _permissionList;
+    private Map<String, List<String>> _rlsFilters;
 
     public UserConfigBuilder setComponentType(ComponentType componentType) {
         _componentType = componentType;
@@ -69,8 +72,13 @@ public class UserConfigBuilder {
         return this;
     }
 
+    public UserConfigBuilder setRlsFilters(Map<String, List<String>> rlsFilters) {
+        _rlsFilters = rlsFilters;
+        return this;
+    }
+
     public UserConfig build() {
         return new UserConfig(_username, _password, _componentType.toString(), _roleType.toString(), _tableList,
-            _excludeTableList, _permissionList);
+            _excludeTableList, _permissionList, _rlsFilters);
     }
 }
