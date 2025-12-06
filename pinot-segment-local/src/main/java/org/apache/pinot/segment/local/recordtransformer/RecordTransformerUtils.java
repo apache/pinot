@@ -94,21 +94,27 @@ public class RecordTransformerUtils {
 
   /**
    * Returns transformers to apply after a partial upsert merge. Only post-merge transform configs are honored to avoid
-   * re-running ingestion-time transforms.
+   * re-running ingestion-time transforms. Derived columns must exist in the schema to be queryable.
+   *
+   * @param tableConfig The table configuration containing post-partial-upsert transform configs
+   * @param schema The table schema used for validation and type conversion
+   * @return List of transformers to apply after merge, or empty list if none configured
    */
   public static List<RecordTransformer> getPostPartialUpsertTransformers(TableConfig tableConfig, Schema schema) {
     UpsertConfig upsertConfig = tableConfig.getUpsertConfig();
     if (upsertConfig == null) {
       return List.of();
     }
-    List<TransformConfig> postUpdateTransformConfigs = upsertConfig.getPartialUpsertPostUpdateTransformConfigs();
-    if (CollectionUtils.isEmpty(postUpdateTransformConfigs)) {
+    List<TransformConfig> postPartialUpsertTransformConfigs = upsertConfig.getPostPartialUpsertTransformConfigs();
+    if (CollectionUtils.isEmpty(postPartialUpsertTransformConfigs)) {
       return List.of();
     }
     List<RecordTransformer> transformers = new ArrayList<>();
+    // TODO: Only re-apply transforms to columns touched by the partial upsert merge to avoid recomputing unrelated
+    //       derived fields.
     addIfNotNoOp(transformers,
-        new ExpressionTransformer(tableConfig, schema, postUpdateTransformConfigs,
-            false /* includeFieldSpecTransforms */, true /* overwriteExistingValues */));
+        new ExpressionTransformer(tableConfig, schema, postPartialUpsertTransformConfigs,
+            true /* overwriteExistingValues */));
     addIfNotNoOp(transformers, new DataTypeTransformer(tableConfig, schema));
     addIfNotNoOp(transformers, new TimeValidationTransformer(tableConfig, schema));
     addIfNotNoOp(transformers, new SpecialValueTransformer(schema));
