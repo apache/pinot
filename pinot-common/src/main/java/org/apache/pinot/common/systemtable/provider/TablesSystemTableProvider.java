@@ -72,6 +72,18 @@ public final class TablesSystemTableProvider implements SystemTableProvider {
       .addSingleValueDimension("tableConfig", FieldSpec.DataType.STRING)
       .build();
 
+  private static final boolean IS_ADMIN_CLIENT_AVAILABLE;
+  static {
+    boolean available;
+    try {
+      Class.forName("org.apache.pinot.client.admin.PinotAdminClient");
+      available = true;
+    } catch (ClassNotFoundException e) {
+      available = false;
+    }
+    IS_ADMIN_CLIENT_AVAILABLE = available;
+  }
+
   private final TableCache _tableCache;
   private final @Nullable HelixAdmin _helixAdmin;
   private final @Nullable String _clusterName;
@@ -130,12 +142,12 @@ public final class TablesSystemTableProvider implements SystemTableProvider {
     List<String> sortedTableNames = new ArrayList<>(tableNamesWithType);
     sortedTableNames.sort(Comparator.naturalOrder());
 
-    List<GenericRow> rows = new ArrayList<>(sortedTableNames.size());
-    int offset = request.getOffset();
+    int offset = Math.max(0, request.getOffset());
     int limit = request.getLimit();
-    if (limit == 0) {
-      return new SystemTableResponse(List.of(), System.currentTimeMillis(), 0);
-    }
+    boolean hasLimit = limit > 0;
+    int totalRows = 0;
+    int initialCapacity = hasLimit ? Math.min(sortedTableNames.size(), limit) : 0;
+    List<GenericRow> rows = new ArrayList<>(initialCapacity);
     for (String tableNameWithType : sortedTableNames) {
       TableType tableType = TableNameBuilder.getTableTypeFromTableName(tableNameWithType);
       if (tableType == null) {
@@ -144,6 +156,17 @@ public final class TablesSystemTableProvider implements SystemTableProvider {
       String rawTableName = TableNameBuilder.extractRawTableName(tableNameWithType);
       TableStats stats = buildStats(tableNameWithType, tableType);
       if (!matchesFilter(request.getFilter(), stats, rawTableName)) {
+        continue;
+      }
+      totalRows++;
+      if (offset > 0) {
+        offset--;
+        continue;
+      }
+      if (limit == 0) {
+        continue;
+      }
+      if (hasLimit && rows.size() >= limit) {
         continue;
       }
       GenericRow row = new GenericRow();
@@ -159,16 +182,9 @@ public final class TablesSystemTableProvider implements SystemTableProvider {
       row.putValue("serverTenant", stats._serverTenant);
       row.putValue("replicas", stats._replicas);
       row.putValue("tableConfig", stats._tableConfig);
-      if (offset > 0) {
-        offset--;
-        continue;
-      }
       rows.add(row);
-      if (limit > 0 && rows.size() >= limit) {
-        break;
-      }
     }
-    return new SystemTableResponse(rows, System.currentTimeMillis(), rows.size());
+    return new SystemTableResponse(rows, System.currentTimeMillis(), totalRows);
   }
 
   private TableStats buildStats(String tableNameWithType, TableType tableType) {
@@ -364,7 +380,7 @@ public final class TablesSystemTableProvider implements SystemTableProvider {
               baseUrl, response.statusCode(), response.body());
         }
       } catch (Exception e) {
-        LOGGER.warn("system.tables: error fetching table size for {} via {}: {}", tableName, baseUrl, e.toString(), e);
+        LOGGER.warn("system.tables: error fetching table size for {} via {}", tableName, baseUrl, e);
       }
     }
     return null;
@@ -453,13 +469,10 @@ public final class TablesSystemTableProvider implements SystemTableProvider {
   }
 
   private boolean isAdminClientAvailable() {
-    try {
-      Class.forName("org.apache.pinot.client.admin.PinotAdminClient");
-      return true;
-    } catch (ClassNotFoundException e) {
+    if (!IS_ADMIN_CLIENT_AVAILABLE) {
       LOGGER.debug("PinotAdminClient not on classpath; falling back to HTTP for table size fetch");
-      return false;
     }
+    return IS_ADMIN_CLIENT_AVAILABLE;
   }
 
   private @Nullable TableSize fetchWithAdminClient(List<String> controllers, String tableNameWithType) {

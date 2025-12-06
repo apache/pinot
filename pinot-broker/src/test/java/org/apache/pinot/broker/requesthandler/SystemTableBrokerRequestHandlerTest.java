@@ -152,7 +152,21 @@ public class SystemTableBrokerRequestHandlerTest {
       row2.putValue("status", "OFFLINE");
       rows.add(row2);
 
-      return new SystemTableResponse(rows, System.currentTimeMillis(), rows.size());
+      int totalRows = rows.size();
+      int offset = Math.max(0, request.getOffset());
+      int limit = request.getLimit();
+      if (offset > 0) {
+        if (offset >= rows.size()) {
+          return new SystemTableResponse(List.of(), System.currentTimeMillis(), totalRows);
+        }
+        rows = new ArrayList<>(rows.subList(offset, rows.size()));
+      }
+      if (limit == 0) {
+        rows = List.of();
+      } else if (limit > 0 && rows.size() > limit) {
+        rows = new ArrayList<>(rows.subList(0, limit));
+      }
+      return new SystemTableResponse(rows, System.currentTimeMillis(), totalRows);
     }
   }
 }

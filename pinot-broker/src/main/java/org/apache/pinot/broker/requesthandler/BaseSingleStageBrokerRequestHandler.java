@@ -1155,19 +1155,17 @@ public abstract class BaseSingleStageBrokerRequestHandler extends BaseBrokerRequ
     DataSchema dataSchema = buildSystemTableDataSchema(schema, projectionColumns);
     List<GenericRow> rows = response != null ? response.getRows() : Collections.emptyList();
     List<Object[]> resultRows = new ArrayList<>();
-    if (rows != null) {
-      for (GenericRow row : rows) {
-        Object[] values = new Object[projectionColumns.size()];
-        for (int i = 0; i < projectionColumns.size(); i++) {
-          values[i] = row.getValue(projectionColumns.get(i));
-        }
-        resultRows.add(values);
+    for (GenericRow row : rows) {
+      Object[] values = new Object[projectionColumns.size()];
+      for (int i = 0; i < projectionColumns.size(); i++) {
+        values[i] = row.getValue(projectionColumns.get(i));
       }
+      resultRows.add(values);
     }
     BrokerResponseNative brokerResponse = new BrokerResponseNative();
     brokerResponse.setResultTable(new ResultTable(dataSchema, resultRows));
     brokerResponse.setNumDocsScanned(resultRows.size());
-    brokerResponse.setNumEntriesScannedPostFilter(resultRows.size());
+    brokerResponse.setNumEntriesScannedPostFilter(response != null ? response.getTotalRows() : 0);
     if (response != null) {
       brokerResponse.setTotalDocs(response.getTotalRows());
     }
