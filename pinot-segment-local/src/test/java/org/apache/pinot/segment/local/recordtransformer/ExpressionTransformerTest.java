@@ -242,6 +242,43 @@ public class ExpressionTransformerTest {
   }
 
   @Test
+  public void testNullTransformMarksNullField() {
+    Schema schema =
+        new Schema.SchemaBuilder().addSingleValueDimension("fullName", FieldSpec.DataType.STRING).build();
+    IngestionConfig ingestionConfig = new IngestionConfig();
+    ingestionConfig.setTransformConfigs(Collections.singletonList(new TransformConfig("fullName", "Groovy({null})")));
+    TableConfig tableConfig =
+        new TableConfigBuilder(TableType.REALTIME).setTableName("testNullTransform").setIngestionConfig(ingestionConfig)
+            .build();
+    ExpressionTransformer expressionTransformer = new ExpressionTransformer(tableConfig, schema);
+
+    GenericRow row = new GenericRow();
+    expressionTransformer.transform(row);
+
+    Assert.assertNull(row.getValue("fullName"));
+    Assert.assertFalse(row.isNullValue("fullName"));
+  }
+
+  @Test
+  public void testNullTransformMarksNullFieldWhenValueAlreadyExists() {
+    Schema schema =
+        new Schema.SchemaBuilder().addMultiValueDimension("tags", FieldSpec.DataType.STRING).build();
+    IngestionConfig ingestionConfig = new IngestionConfig();
+    ingestionConfig.setTransformConfigs(Collections.singletonList(new TransformConfig("tags", "Groovy({null})")));
+    TableConfig tableConfig =
+        new TableConfigBuilder(TableType.REALTIME).setTableName("testNullTransformExisting")
+            .setIngestionConfig(ingestionConfig).build();
+    ExpressionTransformer expressionTransformer = new ExpressionTransformer(tableConfig, schema);
+
+    GenericRow row = new GenericRow();
+    row.putValue("tags", new String[]{"foo", "bar"});
+    expressionTransformer.transform(row);
+
+    Assert.assertNull(row.getValue("tags"));
+    Assert.assertFalse(row.isNullValue("tags"));
+  }
+
+  @Test
   public void testTransformFunctionSortOrder() {
     Schema schema = new Schema.SchemaBuilder().addSingleValueDimension("a", FieldSpec.DataType.STRING)
         .addSingleValueDimension("b", FieldSpec.DataType.STRING).addSingleValueDimension("c", FieldSpec.DataType.STRING)
