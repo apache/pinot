@@ -902,7 +902,7 @@ public class TablesResource {
   @Produces(MediaType.APPLICATION_JSON)
   @ApiOperation(value = "Upload a low level consumer segment to segment store and return the segment download url,"
       + "crc and other segment metadata",
-      notes = "Upload a low level consumer segment to segment store and return the segment download url, crc "
+      notes = "Upload a low level consumer segment to segment store and return the segment download url, crc, data crc "
           + "and other segment metadata")
   @ApiResponses(value = {
       @ApiResponse(code = 200, message = "Success"),
@@ -949,8 +949,11 @@ public class TablesResource {
     try {
       segmentTarFile = createSegmentTarFile(tableDataManager, segmentName);
       String downloadUrl = uploadSegment(segmentTarFile, realtimeTableNameWithType, segmentName, timeoutMs);
-      return new TableLLCSegmentUploadResponse(segmentName,
-          Long.parseLong(segmentDataManager.getSegment().getSegmentMetadata().getCrc()), downloadUrl);
+      return new TableLLCSegmentUploadResponse(
+          segmentName,
+          Long.parseLong(segmentDataManager.getSegment().getSegmentMetadata().getCrc()),
+          Long.parseLong(segmentDataManager.getSegment().getSegmentMetadata().getDataCrc()),
+          downloadUrl);
     } finally {
       FileUtils.deleteQuietly(segmentTarFile);
       tableDataManager.releaseSegment(segmentDataManager);
