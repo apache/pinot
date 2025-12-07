@@ -25,15 +25,23 @@ import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicReference;
+import org.apache.pinot.common.metrics.AbstractMetrics;
+import org.apache.pinot.common.metrics.BrokerMeter;
+import org.apache.pinot.common.metrics.BrokerMetrics;
+import org.apache.pinot.common.metrics.ServerMeter;
+import org.apache.pinot.common.metrics.ServerMetrics;
 import org.apache.pinot.spi.accounting.WorkloadBudgetManager;
+import org.apache.pinot.spi.accounting.WorkloadBudgetManagerFactory;
 import org.apache.pinot.spi.config.instance.InstanceType;
 import org.apache.pinot.spi.exception.QueryErrorCode;
+import org.apache.pinot.spi.metrics.PinotMetricUtils;
 import org.apache.pinot.spi.query.QueryExecutionContext;
 import org.apache.pinot.spi.query.QueryThreadContext;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 
+@SuppressWarnings({"rawtypes", "unchecked"})
 public class WorkloadResourceAggregator implements ResourceAggregator {
   private static final Logger LOGGER = LoggerFactory.getLogger(WorkloadResourceAggregator.class);
 
@@ -50,6 +58,8 @@ public class WorkloadResourceAggregator implements ResourceAggregator {
   private final boolean _memorySamplingEnabled;
   private final AtomicReference<QueryMonitorConfig> _queryMonitorConfig;
   private final WorkloadBudgetManager _workloadBudgetManager;
+  private final AbstractMetrics _metrics;
+  private final AbstractMetrics.Meter _workloadBudgetExceededMeter;
 
   // Tracks the CPU and memory usage for workloads.
   private Map<String, LongLongMutablePair> _previousCpuMemUsage = new HashMap<>();
@@ -62,7 +72,22 @@ public class WorkloadResourceAggregator implements ResourceAggregator {
     _cpuSamplingEnabled = cpuSamplingEnabled;
     _memorySamplingEnabled = memorySamplingEnabled;
     _queryMonitorConfig = queryMonitorConfig;
-    _workloadBudgetManager = WorkloadBudgetManager.get();
+    _workloadBudgetManager = WorkloadBudgetManagerFactory.get();
+    switch (_instanceType) {
+      case SERVER:
+        _metrics = ServerMetrics.get();
+        _workloadBudgetExceededMeter = ServerMeter.WORKLOAD_BUDGET_EXCEEDED;
+        break;
+      case BROKER:
+        _metrics = BrokerMetrics.get();
+        _workloadBudgetExceededMeter = BrokerMeter.WORKLOAD_BUDGET_EXCEEDED;
+        break;
+      default:
+        LOGGER.error("instanceType: {} not supported, using server metrics", _instanceType);
+        _metrics = new ServerMetrics(PinotMetricUtils.getPinotMetricsRegistry());
+        _workloadBudgetExceededMeter = ServerMeter.WORKLOAD_BUDGET_EXCEEDED;
+        break;
+    }
   }
 
   @Override
@@ -132,6 +157,8 @@ public class WorkloadResourceAggregator implements ResourceAggregator {
             "Killed on " + _instanceType + ": " + _instanceId + " as workload cost exceeded. Remaining budget CPU: "
                 + budgetStats._cpuRemaining + ", Memory: " + budgetStats._memoryRemaining;
         for (QueryExecutionContext executionContext : entry.getValue()) {
+          _metrics.addMeteredValue(workloadName, _workloadBudgetExceededMeter, 1);
+          _metrics.addMeteredGlobalValue(_workloadBudgetExceededMeter, 1);
           executionContext.terminate(QueryErrorCode.SERVER_RESOURCE_LIMIT_EXCEEDED, errorMessage);
         }
       }

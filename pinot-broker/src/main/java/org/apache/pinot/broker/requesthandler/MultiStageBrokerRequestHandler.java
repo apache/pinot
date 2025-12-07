@@ -328,7 +328,7 @@ public class MultiStageBrokerRequestHandler extends BaseBrokerRequestHandler {
         return explain(compiledQuery, requestId, requestContext, queryTimer);
       } else {
         return query(compiledQuery, requestId, requesterIdentity, requestContext, httpHeaders, queryTimer,
-            rlsFiltersApplied.get());
+            rlsFiltersApplied.get(), workloadName);
       }
     }
   }
@@ -487,8 +487,7 @@ public class MultiStageBrokerRequestHandler extends BaseBrokerRequestHandler {
 
   private BrokerResponse query(QueryEnvironment.CompiledQuery query, long requestId,
       RequesterIdentity requesterIdentity, RequestContext requestContext, HttpHeaders httpHeaders, Timer timer,
-      boolean rlsFiltersApplied)
-      throws QueryException, WebApplicationException {
+      boolean rlsFiltersApplied, String workloadName) throws QueryException, WebApplicationException {
     QueryEnvironment.QueryPlannerResult queryPlanResult = callAsync(requestId, query.getTextQuery(),
         () -> query.planQuery(requestId), timer);
 
@@ -641,7 +640,7 @@ public class MultiStageBrokerRequestHandler extends BaseBrokerRequestHandler {
       // Log query and stats
       _queryLogger.log(
           new QueryLogger.QueryLogParams(requestContext, tableNames.toString(), brokerResponse,
-              QueryLogger.QueryLogParams.QueryEngine.MULTI_STAGE, requesterIdentity, null));
+              QueryLogger.QueryLogParams.QueryEngine.MULTI_STAGE, requesterIdentity, null, workloadName));
 
       return brokerResponse;
     } finally {

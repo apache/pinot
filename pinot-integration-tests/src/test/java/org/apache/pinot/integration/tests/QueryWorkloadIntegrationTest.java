@@ -20,17 +20,18 @@ package org.apache.pinot.integration.tests;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import java.io.File;
-import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import org.apache.pinot.common.utils.config.TagNameUtils;
+import org.apache.pinot.core.query.scheduler.QuerySchedulerFactory;
+import org.apache.pinot.spi.accounting.WorkloadBudgetManagerFactory;
+import org.apache.pinot.spi.config.instance.InstanceType;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.TableType;
 import org.apache.pinot.spi.config.table.assignment.InstanceAssignmentConfig;
-import org.apache.pinot.spi.config.table.assignment.InstanceConstraintConfig;
 import org.apache.pinot.spi.config.table.assignment.InstanceReplicaGroupPartitionConfig;
 import org.apache.pinot.spi.config.table.assignment.InstanceTagPoolConfig;
 import org.apache.pinot.spi.config.workload.EnforcementProfile;
@@ -40,29 +41,65 @@ import org.apache.pinot.spi.config.workload.PropagationScheme;
 import org.apache.pinot.spi.config.workload.QueryWorkloadConfig;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.env.PinotConfiguration;
+import org.apache.pinot.spi.exception.QueryErrorCode;
 import org.apache.pinot.spi.utils.CommonConstants;
+import org.apache.pinot.spi.utils.InstanceTypeUtils;
 import org.apache.pinot.spi.utils.JsonUtils;
+import org.apache.pinot.spi.utils.builder.TableNameBuilder;
 import org.apache.pinot.util.TestUtils;
+import org.testng.annotations.AfterClass;
 import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
 
 import static org.testng.Assert.assertEquals;
+import static org.testng.Assert.assertFalse;
+import static org.testng.Assert.assertNotEquals;
 import static org.testng.Assert.assertNotNull;
 
 public class QueryWorkloadIntegrationTest extends BaseClusterIntegrationTest {
   private static final int NUM_OFFLINE_SEGMENTS = 8;
   private static final int NUM_REALTIME_SEGMENTS = 6;
+  private static final int NUM_SERVERS = 2;
+  private static final int NUM_BROKERS = 2;
 
   @Override
   protected void overrideBrokerConf(PinotConfiguration configuration) {
-    configuration.setProperty(CommonConstants.PINOT_QUERY_SCHEDULER_PREFIX + "."
-        + CommonConstants.Accounting.CONFIG_OF_WORKLOAD_ENABLE_COST_COLLECTION, true);
+    enableQueryWorkloadWithEnforcement(configuration, InstanceType.BROKER);
   }
 
   @Override
   protected void overrideServerConf(PinotConfiguration configuration) {
+    enableQueryWorkloadWithEnforcement(configuration, InstanceType.SERVER);
+  }
+
+  private void enableQueryWorkloadWithEnforcement(PinotConfiguration configuration, InstanceType instanceType) {
     configuration.setProperty(CommonConstants.PINOT_QUERY_SCHEDULER_PREFIX + "."
         + CommonConstants.Accounting.CONFIG_OF_WORKLOAD_ENABLE_COST_COLLECTION, true);
+    configuration.setProperty(CommonConstants.PINOT_QUERY_SCHEDULER_PREFIX + "."
+        + CommonConstants.Accounting.CONFIG_OF_ENABLE_THREAD_CPU_SAMPLING, true);
+    configuration.setProperty(CommonConstants.PINOT_QUERY_SCHEDULER_PREFIX + "."
+        + CommonConstants.Accounting.CONFIG_OF_ENABLE_THREAD_MEMORY_SAMPLING, true);
+    configuration.setProperty(CommonConstants.PINOT_QUERY_SCHEDULER_PREFIX + "."
+        + CommonConstants.Accounting.CONFIG_OF_FACTORY_NAME,
+        "org.apache.pinot.core.accounting.ResourceUsageAccountantFactory");
+    // Set the sleep time to 0 to enable precise measurement and enforcement in tests
+    configuration.setProperty(CommonConstants.PINOT_QUERY_SCHEDULER_PREFIX + "."
+        + CommonConstants.Accounting.CONFIG_OF_WORKLOAD_SLEEP_TIME_MS, 0);
+    configuration.setProperty(CommonConstants.PINOT_QUERY_SCHEDULER_PREFIX + "."
+        + CommonConstants.Accounting.CONFIG_OF_WORKLOAD_ENABLE_COST_ENFORCEMENT, true);
+    if (instanceType == InstanceType.BROKER) {
+      configuration.setProperty(CommonConstants.Broker.CONFIG_OF_ENABLE_THREAD_CPU_TIME_MEASUREMENT,
+          true);
+      configuration.setProperty(CommonConstants.Broker.CONFIG_OF_ENABLE_THREAD_ALLOCATED_BYTES_MEASUREMENT,
+          true);
+    } else {
+      configuration.setProperty(CommonConstants.Server.CONFIG_OF_ENABLE_THREAD_CPU_TIME_MEASUREMENT,
+          true);
+      configuration.setProperty(CommonConstants.Server.CONFIG_OF_ENABLE_THREAD_ALLOCATED_BYTES_MEASUREMENT,
+          true);
+      configuration.setProperty(CommonConstants.PINOT_QUERY_SCHEDULER_PREFIX + "."
+          + QuerySchedulerFactory.ALGORITHM_NAME_CONFIG_KEY, QuerySchedulerFactory.WORKLOAD_SCHEDULER_ALGORITHM);
+    }
   }
 
   @BeforeClass
@@ -73,8 +110,8 @@ public class QueryWorkloadIntegrationTest extends BaseClusterIntegrationTest {
     // Start Zk, Kafka and Pinot
     startZk();
     startController();
-    startBroker();
-    startServer();
+    startBrokers(NUM_BROKERS);
+    startServers(NUM_SERVERS);
     startKafka();
 
     List<File> avroFiles = getAllAvroFiles();
@@ -87,15 +124,11 @@ public class QueryWorkloadIntegrationTest extends BaseClusterIntegrationTest {
     // Add offline table config
     TableConfig offlineTableConfig = createOfflineTableConfig();
     Map<String, InstanceAssignmentConfig> instanceAssignmentConfigMap =
-        Collections.singletonMap("OFFLINE", createInstanceAssignmentConfig(true, TableType.OFFLINE));
+        Collections.singletonMap("OFFLINE", createInstanceAssignmentConfig());
     offlineTableConfig.setInstanceAssignmentConfigMap(instanceAssignmentConfigMap);
     addTableConfig(offlineTableConfig);
     // Add realtime table config
-    TableConfig realtimeTableConfig = createRealtimeTableConfig(realtimeAvroFiles.get(0));
-    instanceAssignmentConfigMap =
-        Collections.singletonMap("COMPLETED", createInstanceAssignmentConfig(false, TableType.REALTIME));
-    realtimeTableConfig.setInstanceAssignmentConfigMap(instanceAssignmentConfigMap);
-    addTableConfig(realtimeTableConfig);
+    addTableConfig(createRealtimeTableConfig(realtimeAvroFiles.get(0)));
 
     // Create and upload segments
     ClusterIntegrationTestUtils.buildSegmentsFromAvro(offlineAvroFiles, offlineTableConfig, schema, 0, _segmentDir,
@@ -115,53 +148,180 @@ public class QueryWorkloadIntegrationTest extends BaseClusterIntegrationTest {
     waitForAllDocsLoaded(100_000L);
   }
 
-  // TODO: Expand tests to cover more scenarios for workload enforcement
+  @AfterClass
+  public void tearDown() {
+    // Clean up workload budget manager state before parent teardown
+    WorkloadBudgetManagerFactory.unregister();
+  }
+
+  /**
+   * Test basic workload config creation and cost propagation
+   */
   @Test
-  public void testQueryWorkloadConfig() throws Exception {
-    EnforcementProfile enforcementProfile = new EnforcementProfile(1000, 1000);
-    PropagationEntity entity = new PropagationEntity(DEFAULT_TABLE_NAME + "_OFFLINE", 1000L, 1000L, null);
+  public void testQueryWorkloadConfigPropagation() throws Exception {
+    EnforcementProfile enforcementProfile = new EnforcementProfile(Long.MAX_VALUE, Long.MAX_VALUE);
+    PropagationEntity entity = new PropagationEntity(DEFAULT_TABLE_NAME, Long.MAX_VALUE, Long.MAX_VALUE, null);
     PropagationScheme propagationScheme = new PropagationScheme(PropagationScheme.Type.TABLE, List.of(entity));
-    NodeConfig nodeConfig = new NodeConfig(NodeConfig.Type.SERVER_NODE, enforcementProfile, propagationScheme);
-    QueryWorkloadConfig queryWorkloadConfig = new QueryWorkloadConfig("testWorkload", List.of(nodeConfig));
+    NodeConfig serverNode = new NodeConfig(NodeConfig.Type.SERVER_NODE, enforcementProfile, propagationScheme);
+    NodeConfig brokerNode = new NodeConfig(NodeConfig.Type.BROKER_NODE, enforcementProfile, propagationScheme);
+    String workloadName = "testWorkload";
+    QueryWorkloadConfig workloadConfig = new QueryWorkloadConfig(workloadName, List.of(serverNode, brokerNode));
     try {
-      getControllerRequestClient().updateQueryWorkloadConfig(queryWorkloadConfig);
-      TestUtils.waitForCondition(aVoid -> {
-        try {
-          QueryWorkloadConfig retrievedConfig = getControllerRequestClient().getQueryWorkloadConfig("testWorkload");
-          return retrievedConfig != null && retrievedConfig.equals(queryWorkloadConfig);
-        } catch (Exception e) {
-          throw new RuntimeException(e);
-        }
-      }, 60_000L, "Failed to retrieve the created query workload config");
-      // Get server instances that actually serve this specific table
-      String tableName = getTableName();
-      Set<String> serverInstances = getServerInstancesForTable(tableName);
-      long expectedCpuCostNs = entity.getCpuCostNs() / serverInstances.size();
-      long expectedMemoryCostBytes = entity.getMemoryCostBytes() / serverInstances.size();
-      // Test calling the endpoints on each server that serves this table
-      for (String serverInstance : serverInstances) {
-        testServerQueryWorkloadEndpoints(serverInstance, "testWorkload", expectedCpuCostNs, expectedMemoryCostBytes);
-      }
+      updateAndValidateWorkloadConfigPropagation(workloadConfig);
     } finally {
-      getControllerRequestClient().deleteQueryWorkloadConfig("testWorkload");
+      cleanupWorkload(workloadName);
+    }
+  }
+
+  /**
+   * Test query execution with budget configuration
+   */
+  @Test
+  public void testWorkloadEnforcement() throws Exception {
+    // Test enforcement with high budget - should succeed (no rejection)
+    EnforcementProfile enforcementProfile = new EnforcementProfile(Long.MAX_VALUE, Long.MAX_VALUE);
+    PropagationEntity entity = new PropagationEntity(DEFAULT_TABLE_NAME, Long.MAX_VALUE, Long.MAX_VALUE, null);
+    PropagationScheme propagationScheme = new PropagationScheme(PropagationScheme.Type.TABLE, List.of(entity));
+    NodeConfig brokerConfig = new NodeConfig(NodeConfig.Type.BROKER_NODE, enforcementProfile, propagationScheme);
+    NodeConfig serverConfig = new NodeConfig(NodeConfig.Type.SERVER_NODE, enforcementProfile, propagationScheme);
+    String workloadName = "highBudgetWorkload";
+    QueryWorkloadConfig workloadConfig = new QueryWorkloadConfig(workloadName, List.of(brokerConfig, serverConfig));
+    testWorkloadEnforcementWithBudgets(workloadConfig, false);
+
+    // Test broker enforcement with low budgets (rejection expected)
+    enforcementProfile = new EnforcementProfile(1, 1);
+    entity = new PropagationEntity(DEFAULT_TABLE_NAME, 1L, 1L, null);
+    propagationScheme = new PropagationScheme(PropagationScheme.Type.TABLE, List.of(entity));
+    brokerConfig = new NodeConfig(NodeConfig.Type.BROKER_NODE, enforcementProfile, propagationScheme);
+    workloadConfig = new QueryWorkloadConfig("lowBudgetBrokerWorkload", List.of(brokerConfig));
+    testWorkloadEnforcementWithBudgets(workloadConfig, true);
+  }
+
+  @Test
+  public void testGetWorkloadBudgetOnStartup() throws Exception {
+    EnforcementProfile enforcementProfile = new EnforcementProfile(Long.MAX_VALUE, Long.MAX_VALUE);
+    PropagationEntity entity = new PropagationEntity(DEFAULT_TABLE_NAME, Long.MAX_VALUE, Long.MAX_VALUE, null);
+    PropagationScheme propagationScheme = new PropagationScheme(PropagationScheme.Type.TABLE, List.of(entity));
+    NodeConfig serverNode = new NodeConfig(NodeConfig.Type.SERVER_NODE, enforcementProfile, propagationScheme);
+    NodeConfig brokerNode = new NodeConfig(NodeConfig.Type.BROKER_NODE, enforcementProfile, propagationScheme);
+    String workloadName = "testWorkload";
+    QueryWorkloadConfig workloadConfig = new QueryWorkloadConfig(workloadName, List.of(serverNode, brokerNode));
+    try {
+      updateAndValidateWorkloadConfigPropagation(workloadConfig);
+      // Restart servers and brokers
+      restartServers();
+      restartBrokers();
+      // Validate workload budget is present after restart
+      validateCostPropagation(workloadConfig);
+    } finally {
+      cleanupWorkload(workloadName);
+    }
+  }
+
+  private void testWorkloadEnforcementWithBudgets(QueryWorkloadConfig workloadConfig, boolean expectRejection)
+      throws Exception {
+    String workloadName = workloadConfig.getQueryWorkloadName();
+    try {
+      updateAndValidateWorkloadConfigPropagation(workloadConfig);
+      // Test query execution
+      testQueryExecution(workloadName, expectRejection);
+    } finally {
+      cleanupWorkload(workloadName);
+    }
+  }
+
+  /**
+   * Helper method to properly clean up a workload and wait for deletion to propagate
+   */
+  private void cleanupWorkload(String workloadName) throws Exception {
+    getControllerRequestClient().deleteQueryWorkloadConfig(workloadName);
+    // Wait for deletion to propagate - verify workload is actually removed from controller
+    TestUtils.waitForCondition(aVoid -> {
+      try {
+        QueryWorkloadConfig retrievedConfig = getControllerRequestClient().getQueryWorkloadConfig(workloadName);
+        return retrievedConfig == null;
+      } catch (Exception e) {
+        // Exception means workload doesn't exist, which is what we want
+        return true;
+      }
+    }, 10_000L, "Failed to delete query workload config: " + workloadName);
+  }
+
+  /**
+   * Helper method to test cost propagation to all instances (servers and brokers)
+   */
+  private void validateCostPropagation(QueryWorkloadConfig queryWorkloadConfig) throws Exception {
+    for (NodeConfig nodeConfig : queryWorkloadConfig.getNodeConfigs()) {
+      PropagationScheme propagationScheme = nodeConfig.getPropagationScheme();
+      NodeConfig.Type nodeType = nodeConfig.getNodeType();
+      if (propagationScheme.getPropagationType() != PropagationScheme.Type.TABLE) {
+        throw new IllegalStateException("Only TABLE propagation test is supported currently");
+      }
+      for (PropagationEntity entity : propagationScheme.getPropagationEntities()) {
+        String tableName = TableNameBuilder.extractRawTableName(entity.getEntity());
+        Set<String> instances;
+        if (nodeType == NodeConfig.Type.BROKER_NODE) {
+          instances = getInstancesForTable(tableName, InstanceType.BROKER);
+        } else if (nodeType == NodeConfig.Type.SERVER_NODE) {
+          instances = getInstancesForTable(tableName, InstanceType.SERVER);
+        } else {
+          throw new IllegalStateException("Unsupported node type for cost propagation test: " + nodeType);
+        }
+        long expectedCpuCostNs = entity.getCpuCostNs() / instances.size();
+        long expectedMemoryCostBytes = entity.getMemoryCostBytes() / instances.size();
+        for (String instance : instances) {
+          validateCostPropagationOnInstances(instance, queryWorkloadConfig.getQueryWorkloadName(), expectedCpuCostNs,
+              expectedMemoryCostBytes);
+        }
+      }
+    }
+  }
+
+  /**
+   * Helper method to test query execution with workload and verify expected behavior
+   */
+  private void testQueryExecution(String workloadName, boolean expectRejection) throws Exception {
+    String query = "SELECT DISTINCTCOUNT(AirlineID), DISTINCTCOUNT(Carrier) FROM myTable GROUP BY ArrTimeBlk"
+        + " LIMIT 10000;" + "SET workloadName='" + workloadName + "'";
+    JsonNode response = postQuery(query);
+    JsonNode exceptions = response.get("exceptions");
+
+    if (expectRejection) {
+      assertFalse(exceptions.isEmpty(), "Expected workload enforcement to reject query for: " + workloadName);
+      int errorCode = exceptions.get(0).get("errorCode").asInt();
+      assertEquals(errorCode, QueryErrorCode.SERVER_RESOURCE_LIMIT_EXCEEDED.getId(),
+          "Expected workload budget exceeded error but got: " + exceptions);
+    } else {
+      // For high budget scenarios, we expect the query to succeed (no exceptions or empty exceptions)
+      if (exceptions != null && !exceptions.isEmpty()) {
+        // If there are exceptions, they should not be budget-related
+        int errorCode = exceptions.get(0).get("errorCode").asInt();
+        assertNotEquals(errorCode, QueryErrorCode.SERVER_RESOURCE_LIMIT_EXCEEDED.getId(),
+            "Unexpected workload budget exceeded error for high budget scenario: " + exceptions);
+      }
     }
   }
 
   /**
    * Test QueryWorkloadResource endpoints on a specific server instance for a specific workload
    */
-  private void testServerQueryWorkloadEndpoints(String serverInstance, String workloadName,
-                                                long expectedCpuBudgetNs, long expectedMemoryBudgetBytes)
+  private void validateCostPropagationOnInstances(String instance, String workloadName,
+                                                  long expectedCpuBudgetNs, long expectedMemoryBudgetBytes)
       throws Exception {
     // Extract host from server instance name (format: Server_hostname_port)
-    String[] parts = serverInstance.split("_");
+    String[] parts = instance.split("_");
     String host = parts[1];
 
-    // Use the proper admin API port (not the netty port from instance name)
-    String serverBaseApiUrl = "http://" + host + ":" + getServerAdminApiPort();
-
+    String baseUrl;
+    if (InstanceTypeUtils.isServer(instance)) {
+      baseUrl = "http://" + host + ":" + getServerAdminApiPort();
+    } else if (InstanceTypeUtils.isBroker(instance)) {
+      baseUrl = "http://" + host + ":" + parts[2];
+    } else {
+      throw new IllegalArgumentException("Instance is neither server nor broker: " + instance);
+    }
     // Test the get specific workload endpoint (GET /queryWorkloadCost/{workloadName})
-    String getWorkloadUrl = serverBaseApiUrl + "/debug/queryWorkloadCost/" + workloadName;
+    String getWorkloadUrl = baseUrl + "/debug/queryWorkloadCost/" + workloadName;
     String workloadResponse = sendGetRequest(getWorkloadUrl);
 
     // Verify response is valid JSON and contains InstanceCost structure
@@ -174,20 +334,29 @@ public class QueryWorkloadIntegrationTest extends BaseClusterIntegrationTest {
   }
 
   /**
-   * Get the definitive list of server instances that serve a specific table
+   * Get the definitive list of instances that serve a specific table
    */
-  private Set<String> getServerInstancesForTable(String tableName) throws Exception {
-    // Use the controller API to get server instances for the specific table
-    String url = _controllerRequestURLBuilder.forTableGetServerInstances(tableName);
+  private Set<String> getInstancesForTable(String tableName, InstanceType instanceType) throws Exception {
+    String url;
+    String tag;
+    if (instanceType == InstanceType.BROKER) {
+      url = _controllerRequestURLBuilder.forTableGetBrokerInstances(tableName);
+      tag = "brokers";
+    } else if (instanceType == InstanceType.SERVER) {
+      url = _controllerRequestURLBuilder.forTableGetServerInstances(tableName);
+      tag = "server";
+    } else {
+      throw new IllegalArgumentException("Unsupported instance type: " + instanceType);
+    }
     String response = sendGetRequest(url);
 
     // Parse the JSON response to extract server instance names
     JsonNode responseJson = JsonUtils.stringToJsonNode(response);
-    JsonNode serverInstancesNode = responseJson.get("server");
+    JsonNode instanceNodes = responseJson.get(tag);
 
     Set<String> serverInstances = new HashSet<>();
-    if (serverInstancesNode != null && serverInstancesNode.isArray()) {
-      for (JsonNode instanceNode : serverInstancesNode) {
+    if (instanceNodes != null && instanceNodes.isArray()) {
+      for (JsonNode instanceNode : instanceNodes) {
         for (JsonNode instance : instanceNode.get("instances")) {
           serverInstances.add(instance.asText());
         }
@@ -196,17 +365,34 @@ public class QueryWorkloadIntegrationTest extends BaseClusterIntegrationTest {
     return serverInstances;
   }
 
-  private InstanceAssignmentConfig createInstanceAssignmentConfig(boolean minimizeDataMovement, TableType tableType) {
+  /**
+   * Helper method to wait for workload config propagation
+   */
+  private void updateAndValidateWorkloadConfigPropagation(QueryWorkloadConfig queryWorkloadConfig)
+      throws Exception {
+    getControllerRequestClient().updateQueryWorkloadConfig(queryWorkloadConfig);
+    String workloadName = queryWorkloadConfig.getQueryWorkloadName();
+    TestUtils.waitForCondition(aVoid -> {
+      try {
+        QueryWorkloadConfig retrievedConfig = getControllerRequestClient().getQueryWorkloadConfig(workloadName);
+        return retrievedConfig != null && retrievedConfig.equals(queryWorkloadConfig);
+      } catch (Exception e) {
+        throw new RuntimeException(e);
+      }
+    }, 60_000L, "Failed to retrieve the created query workload config: " + workloadName);
+    validateCostPropagation(queryWorkloadConfig);
+  }
+
+
+  private InstanceAssignmentConfig createInstanceAssignmentConfig() {
     InstanceTagPoolConfig instanceTagPoolConfig =
-        new InstanceTagPoolConfig(TagNameUtils.getServerTagForTenant(getServerTenant(), tableType), false, 1, null);
-    List<String> constraints = new ArrayList<>();
-    constraints.add("constraints1");
-    InstanceConstraintConfig instanceConstraintConfig = new InstanceConstraintConfig(constraints);
+        new InstanceTagPoolConfig(TagNameUtils.getServerTagForTenant(getServerTenant(), TableType.OFFLINE), false,
+            1, null);
     InstanceReplicaGroupPartitionConfig instanceReplicaGroupPartitionConfig =
-        new InstanceReplicaGroupPartitionConfig(true, 1, 1,
-            1, 1, 1, minimizeDataMovement,
+        new InstanceReplicaGroupPartitionConfig(true, 0, 1,
+            NUM_SERVERS, 1, NUM_SERVERS, false,
             null);
     return new InstanceAssignmentConfig(instanceTagPoolConfig,
-        instanceConstraintConfig, instanceReplicaGroupPartitionConfig, null, minimizeDataMovement);
+        null, instanceReplicaGroupPartitionConfig, null, false);
   }
 }

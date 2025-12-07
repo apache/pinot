@@ -74,6 +74,7 @@ import org.apache.pinot.common.metrics.BrokerTimer;
 import org.apache.pinot.common.utils.PinotAppConfigs;
 import org.apache.pinot.common.utils.ServiceStartableUtils;
 import org.apache.pinot.common.utils.ServiceStatus;
+import org.apache.pinot.common.utils.config.QueryWorkloadConfigUtils;
 import org.apache.pinot.common.utils.config.TagNameUtils;
 import org.apache.pinot.common.utils.helix.HelixHelper;
 import org.apache.pinot.common.utils.tls.PinotInsecureMode;
@@ -91,7 +92,7 @@ import org.apache.pinot.segment.local.function.GroovyFunctionEvaluator;
 import org.apache.pinot.spi.accounting.ThreadAccountant;
 import org.apache.pinot.spi.accounting.ThreadAccountantUtils;
 import org.apache.pinot.spi.accounting.ThreadResourceUsageProvider;
-import org.apache.pinot.spi.accounting.WorkloadBudgetManager;
+import org.apache.pinot.spi.accounting.WorkloadBudgetManagerFactory;
 import org.apache.pinot.spi.cursors.ResponseStoreService;
 import org.apache.pinot.spi.env.PinotConfiguration;
 import org.apache.pinot.spi.eventlistener.query.BrokerQueryEventListenerFactory;
@@ -366,10 +367,12 @@ public abstract class BaseBrokerStarter implements ServiceStartable {
     // Initialize workload budget manager and thread resource usage accountant. Workload budget manager must be
     // initialized first because it might be used by the accountant.
     PinotConfiguration schedulerConfig = _brokerConf.subset(CommonConstants.PINOT_QUERY_SCHEDULER_PREFIX);
-    WorkloadBudgetManager.set(createWorkloadBudgetManager(schedulerConfig));
+    WorkloadBudgetManagerFactory.register(schedulerConfig);
     _threadAccountant = ThreadAccountantUtils.createAccountant(schedulerConfig, _instanceId,
         org.apache.pinot.spi.config.instance.InstanceType.BROKER);
     _threadAccountant.startWatcherTask();
+    // Get all workload budgets this instance should support
+    QueryWorkloadConfigUtils.getAndUpdateWorkloadBudgets(_instanceId, _spectatorHelixManager);
 
     // Create Broker request handler.
     String brokerId = _brokerConf.getProperty(Broker.CONFIG_OF_BROKER_ID, getDefaultBrokerId());
@@ -549,13 +552,6 @@ public abstract class BaseBrokerStarter implements ServiceStartable {
    * @param brokerAdminApplication is the application
    */
   protected void registerExtraComponents(BrokerAdminApiApplication brokerAdminApplication) {
-  }
-
-  /**
-   * Can be overridden to create a custom WorkloadBudgetManager.
-   */
-  protected WorkloadBudgetManager createWorkloadBudgetManager(PinotConfiguration brokerConf) {
-    return new WorkloadBudgetManager(brokerConf);
   }
 
   private QueryDispatcher createQueryDispatcher(PinotConfiguration brokerConf) {

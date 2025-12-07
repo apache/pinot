@@ -300,6 +300,14 @@ public abstract class ClusterTest extends ControllerTest {
     return serverStarter;
   }
 
+  protected BaseBrokerStarter startOneBroker(PinotConfiguration brokerConfig)
+      throws Exception {
+    BaseBrokerStarter brokerStarter = createBrokerStarter();
+    brokerStarter.init(brokerConfig);
+    brokerStarter.start();
+    return brokerStarter;
+  }
+
   /**
    * Can be overridden to add more properties.
    */
@@ -388,6 +396,24 @@ public abstract class ClusterTest extends ControllerTest {
     PinotConfiguration serverConfig = serverStarter.getConfig();
     serverStarter.stop();
     return startOneServer(serverConfig);
+  }
+
+  protected void restartBrokers()
+      throws Exception {
+    assertNotNull(_brokerStarters, "Brokers are not started");
+    List<BaseBrokerStarter> oldBrokers = new ArrayList<>(_brokerStarters);
+    int numBrokers = _brokerStarters.size();
+    _brokerStarters.clear();
+    for (int i = 0; i < numBrokers; i++) {
+      _brokerStarters.add(restartBroker(oldBrokers.get(i)));
+    }
+  }
+
+  protected BaseBrokerStarter restartBroker(BaseBrokerStarter brokerStarter)
+      throws Exception {
+    PinotConfiguration brokerConfig = brokerStarter.getConfig();
+    brokerStarter.stop();
+    return startOneBroker(brokerConfig);
   }
 
   /**

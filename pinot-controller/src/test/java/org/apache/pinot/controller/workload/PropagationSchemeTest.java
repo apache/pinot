@@ -27,9 +27,10 @@ import java.util.Set;
 import java.util.stream.Collectors;
 import javax.annotation.Nullable;
 import org.apache.helix.AccessOption;
-import org.apache.helix.HelixAdmin;
+import org.apache.helix.HelixDataAccessor;
 import org.apache.helix.HelixManager;
-import org.apache.helix.model.ExternalView;
+import org.apache.helix.PropertyKey;
+import org.apache.helix.model.IdealState;
 import org.apache.helix.model.InstanceConfig;
 import org.apache.helix.store.zk.ZkHelixPropertyStore;
 import org.apache.helix.zookeeper.datamodel.ZNRecord;
@@ -86,14 +87,9 @@ public class PropagationSchemeTest {
     }
     Mockito.when(_pinotHelixResourceManager.getPropertyStore()).thenReturn(propertyStore);
 
-    // Create Broker Resource ExternalView
-    ExternalView externalView = new ExternalView("brokerResource");
-    Map<String, String> table1OfflineStateMap = createBrokerResourceStateMap(offlineTable, 2);
-    externalView.setStateMap(offlineTable + "_OFFLINE", table1OfflineStateMap);
-    Map<String, String> table2RealtimeStateMap = createBrokerResourceStateMap(realtimeTable, 2);
-    externalView.setStateMap(realtimeTable + "_REALTIME", table2RealtimeStateMap);
-    // Mock the behavior of getResourceExternalView to return the broker resource
-    mockBrokerResource(externalView);
+    // Create and mock Broker Resource IdealState
+    IdealState brokerIdealState = createBrokerResourceIdealState(offlineTable, realtimeTable, 2);
+    mockBrokerResource(brokerIdealState);
 
     // Case 1 : Test for Server instance resolution for table1 (offline) and table2 (realtime)
     NodeConfig nodeConfigServer = new NodeConfig(NodeConfig.Type.SERVER_NODE, profile, propagationScheme);
@@ -112,7 +108,7 @@ public class PropagationSchemeTest {
       Set<String> expectedInstances = _tablePropagationScheme.resolveInstances(entity, nodeConfigBroker.getNodeType(),
           null);
       assertTableSchemeResponse(entity, expectedInstances, NodeConfig.Type.BROKER_NODE, null, null,
-          externalView);
+          brokerIdealState);
     }
 
     // Case 3 : Test for instance resolution with overrides for consuming and completed
@@ -154,7 +150,7 @@ public class PropagationSchemeTest {
                                          NodeConfig.Type nodeType,
                                          @Nullable PropagationEntityOverrides override,
                                          @Nullable List<InstancePartitions> instancePartitions,
-                                         @Nullable ExternalView externalView) {
+                                         @Nullable IdealState idealState) {
     int totalNumInstancesExpected = 0;
     Set<String> actualInstances = new HashSet<>();
     // For servers, get expected instances from instance partitions
@@ -175,10 +171,10 @@ public class PropagationSchemeTest {
         actualInstances.addAll(instances);
         totalNumInstancesExpected += instances.size();
       }
-    } else { // For brokers, get expected instances from broker resource external view
-      Set<String> instances = externalView.getPartitionSet().stream()
+    } else { // For brokers, get expected instances from broker resource ideal state
+      Set<String> instances = idealState.getPartitionSet().stream()
           .filter(partition -> partition.startsWith(entity.getEntity() + "_"))
-          .map(partition -> externalView.getStateMap(partition).keySet())
+          .map(partition -> idealState.getInstanceStateMap(partition).keySet())
           .flatMap(Set::stream)
           .collect(Collectors.toSet());
       actualInstances.addAll(instances);
@@ -190,13 +186,17 @@ public class PropagationSchemeTest {
         + totalNumInstancesExpected + ", but found: " + actualInstances.size();
   }
 
-  private void mockBrokerResource(ExternalView externalView) {
+  private void mockBrokerResource(IdealState idealState) {
     HelixManager helixManager = Mockito.mock(HelixManager.class);
-    HelixAdmin helixAdmin = Mockito.mock(HelixAdmin.class);
+    HelixDataAccessor helixDataAccessor = Mockito.mock(HelixDataAccessor.class);
+    PropertyKey.Builder keyBuilder = Mockito.mock(PropertyKey.Builder.class);
+    PropertyKey idealStateKey = Mockito.mock(PropertyKey.class);
+
     Mockito.when(_pinotHelixResourceManager.getHelixZkManager()).thenReturn(helixManager);
-    Mockito.when(helixManager.getClusterManagmentTool()).thenReturn(helixAdmin);
-    Mockito.when(helixAdmin.getResourceExternalView(Mockito.any(), Mockito.eq("brokerResource")))
-        .thenReturn(externalView);
+    Mockito.when(helixManager.getHelixDataAccessor()).thenReturn(helixDataAccessor);
+    Mockito.when(helixDataAccessor.keyBuilder()).thenReturn(keyBuilder);
+    Mockito.when(keyBuilder.idealStates("brokerResource")).thenReturn(idealStateKey);
+    Mockito.when(helixDataAccessor.getProperty(idealStateKey)).thenReturn(idealState);
   }
 
   private InstancePartitions createInstancePartitions(String tableName, InstancePartitionsType type, int numInstances) {
@@ -215,6 +215,22 @@ public class PropagationSchemeTest {
       stateMap.put(tableName + "_BROKER_instance" + i + "_9000", "ONLINE");
     }
     return stateMap;
+  }
+
+  private IdealState createBrokerResourceIdealState(String offlineTable, String realtimeTable, int numInstances) {
+    IdealState idealState = new IdealState("brokerResource");
+    idealState.setRebalanceMode(IdealState.RebalanceMode.CUSTOMIZED);
+    // Set broker instances for both offline and realtime tables
+    Map<String, String> tableToType = Map.of(offlineTable, "OFFLINE", realtimeTable, "REALTIME");
+    for (Map.Entry<String, String> entry : tableToType.entrySet()) {
+      String tableName = entry.getKey();
+      String tableType = entry.getValue();
+      for (int i = 1; i <= numInstances; i++) {
+        idealState.setPartitionState(tableName + "_" + tableType,
+            tableName + "_BROKER_instance" + i + "_9000", "ONLINE");
+      }
+    }
+    return idealState;
   }
 
   @Test
