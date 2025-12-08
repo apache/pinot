@@ -986,8 +986,9 @@ public class PinotHelixTaskResourceManager {
 
   /**
    * Get a summary of all tasks across all task types, grouped by tenant.
-   * This consolidates the existing logic from /tasks/tasktypes and /tasks/{taskType}/taskcounts
-   * into a single endpoint. Tasks are broken down by table, then grouped by tenant.
+   *
+   * <p>Only includes tasks with RUNNING or WAITING subtasks. Completed, failed, or aborted tasks are excluded.
+   * Tasks are first resolved to their table, then grouped by the table's server tenant.
    *
    * @param tenantFilter Optional tenant name to filter results. If null, returns all tenants.
    * @return TaskSummaryResponse containing aggregated task counts grouped by tenant
@@ -1655,7 +1656,21 @@ public class PinotHelixTaskResourceManager {
   }
 
   /**
-   * Response model for the /tasks/summary endpoint
+   * Response model for the {@code GET /tasks/summary} endpoint.
+   *
+   * <p>Provides summary information about tasks currently managed by the Pinot cluster, grouped by tenant.
+   * Only tasks with RUNNING or WAITING subtasks are included; completed, failed, or aborted tasks are excluded.
+   *
+   * <p>Fields:
+   * <ul>
+   *   <li>{@code totalRunningTasks}: Total tasks in RUNNING or INIT state across all tenants</li>
+   *   <li>{@code totalWaitingTasks}: Total tasks in WAITING state (not yet assigned to a worker)</li>
+   *   <li>{@code taskBreakdown}: Task counts grouped by tenant and task type. Tasks with unknown tenant
+   *       configuration appear under tenant name "unknown"</li>
+   * </ul>
+   *
+   * @see TenantTaskBreakdown
+   * @see TaskTypeBreakdown
    */
   @JsonPropertyOrder({"totalRunningTasks", "totalWaitingTasks", "taskBreakdown"})
   public static class TaskSummaryResponse {
@@ -1695,7 +1710,18 @@ public class PinotHelixTaskResourceManager {
   }
 
   /**
-   * Breakdown of tasks by tenant
+   * Tenant-level breakdown of task counts for the {@code /tasks/summary} API response.
+   *
+   * <p>Fields:
+   * <ul>
+   *   <li>{@code tenant}: Server tenant name from table configuration (or "unknown" if not configured)</li>
+   *   <li>{@code runningTasks}: Total tasks in RUNNING or INIT state for this tenant</li>
+   *   <li>{@code waitingTasks}: Total tasks waiting to be assigned for this tenant</li>
+   *   <li>{@code taskTypeBreakdown}: Running/waiting counts per task type for this tenant</li>
+   * </ul>
+   *
+   * @see TaskSummaryResponse
+   * @see TaskTypeBreakdown
    */
   @JsonPropertyOrder({"tenant", "runningTasks", "waitingTasks", "taskTypeBreakdown"})
   public static class TenantTaskBreakdown {
@@ -1750,7 +1776,17 @@ public class PinotHelixTaskResourceManager {
   }
 
   /**
-   * Breakdown of task counts by task type
+   * Task type breakdown of task counts for the {@code /tasks/summary} API response.
+   *
+   * <p>Fields:
+   * <ul>
+   *   <li>{@code taskType}: Task type name (e.g., "SegmentGenerationAndPushTask", "MergeRollupTask")</li>
+   *   <li>{@code runningCount}: Tasks in RUNNING state</li>
+   *   <li>{@code waitingCount}: Tasks waiting to be scheduled</li>
+   * </ul>
+   *
+   * @see TaskSummaryResponse
+   * @see TenantTaskBreakdown
    */
   @JsonPropertyOrder({"taskType", "runningCount", "waitingCount"})
   public static class TaskTypeBreakdown {
