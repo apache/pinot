@@ -375,19 +375,24 @@ public class PinotTableRestletResource {
     if (tagPoolReplacementMap == null || tagPoolReplacementMap.isEmpty()) {
       return;
     }
-    JsonNode instanceAssignmentConfigMap = realtimeTableConfigNode.path("instanceAssignmentConfigMap");
+    JsonNode instanceAssignmentConfigMap = realtimeTableConfigNode.get("instanceAssignmentConfigMap");
     if (instanceAssignmentConfigMap == null) {
       return;
     }
-    instanceAssignmentConfigMap.forEachEntry((state, instanceAssignmentConfig) -> {
+    java.util.Iterator<Map.Entry<String, JsonNode>> iterator = instanceAssignmentConfigMap.fields();
+    while (iterator.hasNext()) {
+      Map.Entry<String, JsonNode> entry = iterator.next();
+      JsonNode instanceAssignmentConfig = entry.getValue();
       // tagPoolConfig is a required field
-      ObjectNode tagPoolConfig = (ObjectNode) instanceAssignmentConfig.path("tagPoolConfig");
+      ObjectNode tagPoolConfig = (ObjectNode) instanceAssignmentConfig.get("tagPoolConfig");
       // tag is a required json field
-      String srcTag = tagPoolConfig.get("tag").asText();
-      if (tagPoolReplacementMap.containsKey(srcTag)) {
-        tagPoolConfig.put("tag", tagPoolReplacementMap.get(srcTag));
+      if (tagPoolConfig != null) {
+        String srcTag = tagPoolConfig.get("tag").asText();
+        if (tagPoolReplacementMap.containsKey(srcTag)) {
+          tagPoolConfig.put("tag", tagPoolReplacementMap.get(srcTag));
+        }
       }
-    });
+    }
   }
 
   @PUT
