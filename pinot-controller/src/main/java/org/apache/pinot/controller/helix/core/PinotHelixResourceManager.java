@@ -1746,6 +1746,9 @@ public class PinotHelixResourceManager {
       throws IOException {
     String tableNameWithType = tableConfig.getTableName();
     LOGGER.info("Adding table {}: Start", tableNameWithType);
+    if (consumeMeta != null && !consumeMeta.isEmpty()) {
+      LOGGER.info("[copyTable] Adding table {} with {} partition group infos", tableNameWithType, consumeMeta.size());
+    }
 
     if (getTableConfig(tableNameWithType) != null) {
       throw new TableAlreadyExistsException("Table config for " + tableNameWithType
