@@ -306,6 +306,8 @@ public class PinotTableRestletResource {
       String serverTenant = copyTablePayload.getServerTenant();
       Map<String, String> tagReplacementMap = copyTablePayload.getTagPoolReplacementMap();
 
+      LOGGER.info("[copyTable] Start copying table: {} from source: {}", tableName, sourceControllerUri);
+
       // Fetch and add schema
       URI schemaUri = new URI(sourceControllerUri + "/tables/" + tableName + "/schema");
       SimpleHttpResponse schemaResponse = HttpClient.wrapAndThrowHttpException(
@@ -313,6 +315,7 @@ public class PinotTableRestletResource {
       String schemaJson = schemaResponse.getResponse();
       Schema schema = Schema.fromString(schemaJson);
       _pinotHelixResourceManager.addSchema(schema, true, false);
+      LOGGER.info("[copyTable] Successfully added schema for table: {}", tableName);
 
       // Fetch and add table configs
       URI tableConfigUri = new URI(sourceControllerUri + "/tables/" + tableName);
@@ -325,6 +328,7 @@ public class PinotTableRestletResource {
         ObjectNode realtimeTableConfigNode = (ObjectNode) tableConfigNode.get(TableType.REALTIME.name());
         tweakRealtimeTableConfig(realtimeTableConfigNode, brokerTenant, serverTenant, tagReplacementMap);
         TableConfig realtimeTableConfig = JsonUtils.jsonNodeToObject(realtimeTableConfigNode, TableConfig.class);
+        LOGGER.info("[copyTable] Successfully fetched and tweaked table config for table: {}", tableName);
 
         URI watermarkUri = new URI(sourceControllerUri + "/tables/" + tableName + "/consumerWatermarks");
         SimpleHttpResponse watermarkResponse = HttpClient.wrapAndThrowHttpException(
@@ -332,6 +336,7 @@ public class PinotTableRestletResource {
         String watermarkJson = watermarkResponse.getResponse();
         WatermarkInductionResult watermarkInductionResult =
             JsonUtils.stringToObject(watermarkJson, WatermarkInductionResult.class);
+        LOGGER.info("[copyTable] Fetched watermarks for table: {}. Result: {}", tableName, watermarkJson);
 
         List<PartitionGroupInfo> partitionGroupInfos = watermarkInductionResult.getWatermarks().stream()
             .map(PartitionGroupInfo::from)
@@ -339,6 +344,7 @@ public class PinotTableRestletResource {
 
         _pinotHelixResourceManager.addTable(realtimeTableConfig, partitionGroupInfos);
       }
+      LOGGER.info("[copyTable] Finished Table Config copy: {}", tableName);
       return new CopyTableResponse("success");
     } catch (Exception e) {
       throw new ControllerApplicationException(LOGGER, "Error copying table: " + e.getMessage(),
