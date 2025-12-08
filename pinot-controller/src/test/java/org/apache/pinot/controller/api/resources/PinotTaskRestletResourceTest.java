@@ -144,83 +144,103 @@ public class PinotTaskRestletResourceTest {
     PinotHelixTaskResourceManager.TaskSummaryResponse emptyResponse =
         new PinotHelixTaskResourceManager.TaskSummaryResponse();
 
-    when(_pinotHelixTaskResourceManager.getTasksSummary()).thenReturn(emptyResponse);
+    when(_pinotHelixTaskResourceManager.getTasksSummary(null)).thenReturn(emptyResponse);
 
-    PinotHelixTaskResourceManager.TaskSummaryResponse response = _pinotTaskRestletResource.getTasksSummary();
+    PinotHelixTaskResourceManager.TaskSummaryResponse response = _pinotTaskRestletResource.getTasksSummary(null);
 
     assertNotNull(response);
     assertEquals(response.getTotalRunningTasks(), 0);
     assertEquals(response.getTotalWaitingTasks(), 0);
-    assertEquals(response.getTotalInProgressTaskTypes(), 0);
-    assertTrue(response.getTaskTypeBreakdown().isEmpty());
+    assertTrue(response.getTaskBreakdown().isEmpty());
   }
 
   @Test
-  public void testGetTasksSummaryWithMultipleTaskTypes() {
-    // Create a TaskSummaryResponse with multiple task types
+  public void testGetTasksSummaryWithMultipleTenants() {
+    // Create a TaskSummaryResponse with multiple tenants
     PinotHelixTaskResourceManager.TaskSummaryResponse response =
         new PinotHelixTaskResourceManager.TaskSummaryResponse();
     response.setTotalRunningTasks(150);
     response.setTotalWaitingTasks(50);
-    response.setTotalInProgressTaskTypes(2);
 
-    List<PinotHelixTaskResourceManager.TaskTypeBreakdown> breakdownList = new ArrayList<>();
-    breakdownList.add(new PinotHelixTaskResourceManager.TaskTypeBreakdown(
+    // Tenant 1: defaultTenant
+    List<PinotHelixTaskResourceManager.TaskTypeBreakdown> tenant1TaskTypes = new ArrayList<>();
+    tenant1TaskTypes.add(new PinotHelixTaskResourceManager.TaskTypeBreakdown(
         "SegmentGenerationAndPushTask", 100, 30));
-    breakdownList.add(new PinotHelixTaskResourceManager.TaskTypeBreakdown(
+    PinotHelixTaskResourceManager.TenantTaskBreakdown tenant1 =
+        new PinotHelixTaskResourceManager.TenantTaskBreakdown("defaultTenant", 100, 30, tenant1TaskTypes);
+
+    // Tenant 2: tenant2
+    List<PinotHelixTaskResourceManager.TaskTypeBreakdown> tenant2TaskTypes = new ArrayList<>();
+    tenant2TaskTypes.add(new PinotHelixTaskResourceManager.TaskTypeBreakdown(
         "RealtimeToOfflineSegmentsTask", 50, 20));
-    response.setTaskTypeBreakdown(breakdownList);
+    PinotHelixTaskResourceManager.TenantTaskBreakdown tenant2 =
+        new PinotHelixTaskResourceManager.TenantTaskBreakdown("tenant2", 50, 20, tenant2TaskTypes);
 
-    when(_pinotHelixTaskResourceManager.getTasksSummary()).thenReturn(response);
+    List<PinotHelixTaskResourceManager.TenantTaskBreakdown> taskBreakdown = new ArrayList<>();
+    taskBreakdown.add(tenant1);
+    taskBreakdown.add(tenant2);
+    response.setTaskBreakdown(taskBreakdown);
 
-    PinotHelixTaskResourceManager.TaskSummaryResponse actualResponse = _pinotTaskRestletResource.getTasksSummary();
+    when(_pinotHelixTaskResourceManager.getTasksSummary(null)).thenReturn(response);
+
+    PinotHelixTaskResourceManager.TaskSummaryResponse actualResponse = _pinotTaskRestletResource.getTasksSummary(null);
 
     assertNotNull(actualResponse);
     assertEquals(actualResponse.getTotalRunningTasks(), 150);
     assertEquals(actualResponse.getTotalWaitingTasks(), 50);
-    assertEquals(actualResponse.getTotalInProgressTaskTypes(), 2);
-    assertEquals(actualResponse.getTaskTypeBreakdown().size(), 2);
+    assertEquals(actualResponse.getTaskBreakdown().size(), 2);
 
-    // Verify the first task type breakdown
-    PinotHelixTaskResourceManager.TaskTypeBreakdown breakdown1 = actualResponse.getTaskTypeBreakdown().get(0);
-    assertEquals(breakdown1.getTaskType(), "SegmentGenerationAndPushTask");
-    assertEquals(breakdown1.getRunningCount(), 100);
-    assertEquals(breakdown1.getWaitingCount(), 30);
+    // Verify first tenant breakdown
+    PinotHelixTaskResourceManager.TenantTaskBreakdown tenantBreakdown1 = actualResponse.getTaskBreakdown().get(0);
+    assertEquals(tenantBreakdown1.getTenant(), "defaultTenant");
+    assertEquals(tenantBreakdown1.getRunningTasks(), 100);
+    assertEquals(tenantBreakdown1.getWaitingTasks(), 30);
+    assertEquals(tenantBreakdown1.getTaskTypeBreakdown().size(), 1);
+    assertEquals(tenantBreakdown1.getTaskTypeBreakdown().get(0).getTaskType(), "SegmentGenerationAndPushTask");
 
-    // Verify the second task type breakdown
-    PinotHelixTaskResourceManager.TaskTypeBreakdown breakdown2 = actualResponse.getTaskTypeBreakdown().get(1);
-    assertEquals(breakdown2.getTaskType(), "RealtimeToOfflineSegmentsTask");
-    assertEquals(breakdown2.getRunningCount(), 50);
-    assertEquals(breakdown2.getWaitingCount(), 20);
+    // Verify second tenant breakdown
+    PinotHelixTaskResourceManager.TenantTaskBreakdown tenantBreakdown2 = actualResponse.getTaskBreakdown().get(1);
+    assertEquals(tenantBreakdown2.getTenant(), "tenant2");
+    assertEquals(tenantBreakdown2.getRunningTasks(), 50);
+    assertEquals(tenantBreakdown2.getWaitingTasks(), 20);
+    assertEquals(tenantBreakdown2.getTaskTypeBreakdown().size(), 1);
+    assertEquals(tenantBreakdown2.getTaskTypeBreakdown().get(0).getTaskType(), "RealtimeToOfflineSegmentsTask");
   }
 
   @Test
-  public void testGetTasksSummaryWithOnlyRunningTasks() {
-    // Create a TaskSummaryResponse with only running tasks, no waiting tasks
+  public void testGetTasksSummaryWithTenantFilter() {
+    // Create a TaskSummaryResponse filtered to a specific tenant
     PinotHelixTaskResourceManager.TaskSummaryResponse response =
         new PinotHelixTaskResourceManager.TaskSummaryResponse();
-    response.setTotalRunningTasks(3);
-    response.setTotalWaitingTasks(0);
-    response.setTotalInProgressTaskTypes(1);
+    response.setTotalRunningTasks(100);
+    response.setTotalWaitingTasks(30);
 
-    List<PinotHelixTaskResourceManager.TaskTypeBreakdown> breakdownList = new ArrayList<>();
-    breakdownList.add(new PinotHelixTaskResourceManager.TaskTypeBreakdown(
-        "MergeRollupTask", 3, 0));
-    response.setTaskTypeBreakdown(breakdownList);
+    List<PinotHelixTaskResourceManager.TaskTypeBreakdown> taskTypes = new ArrayList<>();
+    taskTypes.add(new PinotHelixTaskResourceManager.TaskTypeBreakdown(
+        "SegmentGenerationAndPushTask", 100, 30));
 
-    when(_pinotHelixTaskResourceManager.getTasksSummary()).thenReturn(response);
+    PinotHelixTaskResourceManager.TenantTaskBreakdown tenantBreakdown =
+        new PinotHelixTaskResourceManager.TenantTaskBreakdown("defaultTenant", 100, 30, taskTypes);
 
-    PinotHelixTaskResourceManager.TaskSummaryResponse actualResponse = _pinotTaskRestletResource.getTasksSummary();
+    List<PinotHelixTaskResourceManager.TenantTaskBreakdown> taskBreakdown = new ArrayList<>();
+    taskBreakdown.add(tenantBreakdown);
+    response.setTaskBreakdown(taskBreakdown);
+
+    when(_pinotHelixTaskResourceManager.getTasksSummary("defaultTenant")).thenReturn(response);
+
+    PinotHelixTaskResourceManager.TaskSummaryResponse actualResponse =
+        _pinotTaskRestletResource.getTasksSummary("defaultTenant");
 
     assertNotNull(actualResponse);
-    assertEquals(actualResponse.getTotalRunningTasks(), 3);
-    assertEquals(actualResponse.getTotalWaitingTasks(), 0);
-    assertEquals(actualResponse.getTotalInProgressTaskTypes(), 1);
-    assertEquals(actualResponse.getTaskTypeBreakdown().size(), 1);
+    assertEquals(actualResponse.getTotalRunningTasks(), 100);
+    assertEquals(actualResponse.getTotalWaitingTasks(), 30);
+    assertEquals(actualResponse.getTaskBreakdown().size(), 1);
 
-    PinotHelixTaskResourceManager.TaskTypeBreakdown breakdown = actualResponse.getTaskTypeBreakdown().get(0);
-    assertEquals(breakdown.getTaskType(), "MergeRollupTask");
-    assertEquals(breakdown.getRunningCount(), 3);
-    assertEquals(breakdown.getWaitingCount(), 0);
+    PinotHelixTaskResourceManager.TenantTaskBreakdown tenant = actualResponse.getTaskBreakdown().get(0);
+    assertEquals(tenant.getTenant(), "defaultTenant");
+    assertEquals(tenant.getRunningTasks(), 100);
+    assertEquals(tenant.getWaitingTasks(), 30);
+    assertEquals(tenant.getTaskTypeBreakdown().size(), 1);
+    assertEquals(tenant.getTaskTypeBreakdown().get(0).getTaskType(), "SegmentGenerationAndPushTask");
   }
 }

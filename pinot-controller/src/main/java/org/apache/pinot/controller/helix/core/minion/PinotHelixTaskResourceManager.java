@@ -60,6 +60,7 @@ import org.apache.pinot.controller.helix.core.PinotHelixResourceManager;
 import org.apache.pinot.controller.util.CompletionServiceHelper;
 import org.apache.pinot.core.common.MinionConstants;
 import org.apache.pinot.core.minion.PinotTaskConfig;
+import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.ingestion.batch.BatchConfigProperties;
 import org.apache.pinot.spi.utils.CommonConstants;
 import org.apache.pinot.spi.utils.CommonConstants.Helix;
@@ -959,13 +960,39 @@ public class PinotHelixTaskResourceManager {
   }
 
   /**
-   * Get a summary of all tasks across all task types.
-   * This consolidates the existing logic from /tasks/tasktypes and /tasks/{taskType}/taskcounts
-   * into a single endpoint.
+   * Get the server tenant name for a given table by looking up its configuration.
+   * Returns "unknown" if the table or tenant cannot be determined.
    *
-   * @return TaskSummaryResponse containing aggregated task counts and breakdown by task type
+   * @param tableName Table name with type (e.g., "myTable_OFFLINE")
+   * @return Server tenant name or "unknown"
    */
-  public synchronized TaskSummaryResponse getTasksSummary() {
+  private String getTenantForTable(String tableName) {
+    if (tableName == null || UNKNOWN_TABLE_NAME.equals(tableName)) {
+      return UNKNOWN_TABLE_NAME;
+    }
+
+    try {
+      TableConfig tableConfig = _helixResourceManager.getTableConfig(tableName);
+      if (tableConfig != null && tableConfig.getTenantConfig() != null) {
+        String serverTenant = tableConfig.getTenantConfig().getServer();
+        return serverTenant != null ? serverTenant : UNKNOWN_TABLE_NAME;
+      }
+      return UNKNOWN_TABLE_NAME;
+    } catch (Exception e) {
+      LOGGER.warn("Failed to determine tenant for table: {}", tableName, e);
+      return UNKNOWN_TABLE_NAME;
+    }
+  }
+
+  /**
+   * Get a summary of all tasks across all task types, grouped by tenant.
+   * This consolidates the existing logic from /tasks/tasktypes and /tasks/{taskType}/taskcounts
+   * into a single endpoint. Tasks are broken down by table, then grouped by tenant.
+   *
+   * @param tenantFilter Optional tenant name to filter results. If null, returns all tenants.
+   * @return TaskSummaryResponse containing aggregated task counts grouped by tenant
+   */
+  public synchronized TaskSummaryResponse getTasksSummary(@Nullable String tenantFilter) {
     TaskSummaryResponse response = new TaskSummaryResponse();
     Set<String> taskTypes = getTaskTypes();
 
@@ -973,47 +1000,95 @@ public class PinotHelixTaskResourceManager {
       return response;
     }
 
+    // Map: tenant -> taskType -> aggregated TaskCount
+    Map<String, Map<String, TaskCount>> tenantToTaskTypeCounts = new TreeMap<>();
     int totalRunning = 0;
     int totalWaiting = 0;
-    int inProgressTaskTypes = 0;
-    List<TaskTypeBreakdown> taskTypeBreakdownList = new ArrayList<>();
 
     for (String taskType : taskTypes) {
-      // Get all task counts for this task type
       Map<String, TaskCount> taskCounts = getTaskCounts(taskType);
-
       if (taskCounts == null || taskCounts.isEmpty()) {
         continue;
       }
 
-      // Aggregate counts across all tasks for this task type
-      TaskCount aggregatedCount = new TaskCount();
-      for (TaskCount taskCount : taskCounts.values()) {
-        aggregatedCount.accumulate(taskCount);
+      // For each parent task, only fetch table breakdown if it has active tasks
+      for (Map.Entry<String, TaskCount> entry : taskCounts.entrySet()) {
+        String taskName = entry.getKey();
+        TaskCount totalTaskCount = entry.getValue();
+
+        // Skip if this parent task has no running/waiting tasks (optimization: avoid table breakdown call)
+        if (totalTaskCount.getRunning() == 0 && totalTaskCount.getWaiting() == 0) {
+          continue;
+        }
+
+        // Get the table name from the first subtask
+        // Note: In practice, all subtasks in a parent task belong to the same table
+        List<PinotTaskConfig> subtaskConfigs = getSubtaskConfigs(taskName);
+        if (subtaskConfigs.isEmpty()) {
+          continue;
+        }
+
+        Map<String, String> configs = subtaskConfigs.get(0).getConfigs();
+        String tableName = (configs != null)
+            ? configs.getOrDefault(MinionConstants.TABLE_NAME_KEY, UNKNOWN_TABLE_NAME)
+            : UNKNOWN_TABLE_NAME;
+
+        if (UNKNOWN_TABLE_NAME.equals(tableName)) {
+          continue;
+        }
+
+        // Get tenant for this table
+        String tenant = getTenantForTable(tableName);
+
+        // Apply tenant filter if specified
+        if (tenantFilter != null && !tenantFilter.equals(tenant)) {
+          continue;
+        }
+
+        // Accumulate counts for this tenant and task type
+        tenantToTaskTypeCounts
+            .computeIfAbsent(tenant, k -> new TreeMap<>())
+            .computeIfAbsent(taskType, k -> new TaskCount())
+            .accumulate(totalTaskCount);
+      }
+    }
+
+    // Build tenant breakdown from aggregated data
+    List<TenantTaskBreakdown> tenantBreakdowns = new ArrayList<>();
+    for (Map.Entry<String, Map<String, TaskCount>> tenantEntry : tenantToTaskTypeCounts.entrySet()) {
+      String tenant = tenantEntry.getKey();
+      Map<String, TaskCount> taskTypeCounts = tenantEntry.getValue();
+
+      int tenantRunning = 0;
+      int tenantWaiting = 0;
+      List<TaskTypeBreakdown> taskTypeBreakdowns = new ArrayList<>();
+
+      for (Map.Entry<String, TaskCount> taskTypeEntry : taskTypeCounts.entrySet()) {
+        String taskType = taskTypeEntry.getKey();
+        TaskCount aggregatedCount = taskTypeEntry.getValue();
+
+        int running = aggregatedCount.getRunning();
+        int waiting = aggregatedCount.getWaiting();
+
+        // Only include task types that have running or waiting tasks
+        if (running > 0 || waiting > 0) {
+          tenantRunning += running;
+          tenantWaiting += waiting;
+          taskTypeBreakdowns.add(new TaskTypeBreakdown(taskType, running, waiting));
+        }
       }
 
-      int taskTypeRunning = aggregatedCount.getRunning();
-      int taskTypeWaiting = aggregatedCount.getWaiting();
-
-      // Only include task types that have running or waiting tasks
-      if (taskTypeRunning > 0 || taskTypeWaiting > 0) {
-        inProgressTaskTypes++;
-        totalRunning += taskTypeRunning;
-        totalWaiting += taskTypeWaiting;
-
-        TaskTypeBreakdown taskTypeBreakdown = new TaskTypeBreakdown(
-            taskType,
-            taskTypeRunning,
-            taskTypeWaiting
-        );
-        taskTypeBreakdownList.add(taskTypeBreakdown);
+      // Only include tenants that have active tasks
+      if (tenantRunning > 0 || tenantWaiting > 0) {
+        totalRunning += tenantRunning;
+        totalWaiting += tenantWaiting;
+        tenantBreakdowns.add(new TenantTaskBreakdown(tenant, tenantRunning, tenantWaiting, taskTypeBreakdowns));
       }
     }
 
     response.setTotalRunningTasks(totalRunning);
     response.setTotalWaitingTasks(totalWaiting);
-    response.setTotalInProgressTaskTypes(inProgressTaskTypes);
-    response.setTaskTypeBreakdown(taskTypeBreakdownList);
+    response.setTaskBreakdown(tenantBreakdowns);
 
     return response;
   }
@@ -1582,18 +1657,16 @@ public class PinotHelixTaskResourceManager {
   /**
    * Response model for the /tasks/summary endpoint
    */
-  @JsonPropertyOrder({"totalRunningTasks", "totalWaitingTasks", "totalInProgressTaskTypes", "taskTypeBreakdown"})
+  @JsonPropertyOrder({"totalRunningTasks", "totalWaitingTasks", "taskBreakdown"})
   public static class TaskSummaryResponse {
     private int _totalRunningTasks;
     private int _totalWaitingTasks;
-    private int _totalInProgressTaskTypes;
-    private List<TaskTypeBreakdown> _taskTypeBreakdown;
+    private List<TenantTaskBreakdown> _taskBreakdown;
 
     public TaskSummaryResponse() {
       _totalRunningTasks = 0;
       _totalWaitingTasks = 0;
-      _totalInProgressTaskTypes = 0;
-      _taskTypeBreakdown = new ArrayList<>();
+      _taskBreakdown = new ArrayList<>();
     }
 
     public int getTotalRunningTasks() {
@@ -1612,12 +1685,59 @@ public class PinotHelixTaskResourceManager {
       _totalWaitingTasks = totalWaitingTasks;
     }
 
-    public int getTotalInProgressTaskTypes() {
-      return _totalInProgressTaskTypes;
+    public List<TenantTaskBreakdown> getTaskBreakdown() {
+      return _taskBreakdown;
     }
 
-    public void setTotalInProgressTaskTypes(int totalInProgressTaskTypes) {
-      _totalInProgressTaskTypes = totalInProgressTaskTypes;
+    public void setTaskBreakdown(List<TenantTaskBreakdown> taskBreakdown) {
+      _taskBreakdown = taskBreakdown;
+    }
+  }
+
+  /**
+   * Breakdown of tasks by tenant
+   */
+  @JsonPropertyOrder({"tenant", "runningTasks", "waitingTasks", "taskTypeBreakdown"})
+  public static class TenantTaskBreakdown {
+    private String _tenant;
+    private int _runningTasks;
+    private int _waitingTasks;
+    private List<TaskTypeBreakdown> _taskTypeBreakdown;
+
+    public TenantTaskBreakdown() {
+      _taskTypeBreakdown = new ArrayList<>();
+    }
+
+    public TenantTaskBreakdown(String tenant, int runningTasks, int waitingTasks,
+        List<TaskTypeBreakdown> taskTypeBreakdown) {
+      _tenant = tenant;
+      _runningTasks = runningTasks;
+      _waitingTasks = waitingTasks;
+      _taskTypeBreakdown = taskTypeBreakdown;
+    }
+
+    public String getTenant() {
+      return _tenant;
+    }
+
+    public void setTenant(String tenant) {
+      _tenant = tenant;
+    }
+
+    public int getRunningTasks() {
+      return _runningTasks;
+    }
+
+    public void setRunningTasks(int runningTasks) {
+      _runningTasks = runningTasks;
+    }
+
+    public int getWaitingTasks() {
+      return _waitingTasks;
+    }
+
+    public void setWaitingTasks(int waitingTasks) {
+      _waitingTasks = waitingTasks;
     }
 
     public List<TaskTypeBreakdown> getTaskTypeBreakdown() {
