@@ -84,6 +84,7 @@ public class PinotHelixTaskResourceManager {
   private static final String TASK_QUEUE_PREFIX = "TaskQueue" + TASK_NAME_SEPARATOR;
   private static final String TASK_PREFIX = "Task" + TASK_NAME_SEPARATOR;
   private static final String UNKNOWN_TABLE_NAME = "unknown";
+  private static final String UNKNOWN_TENANT_NAME = "unknown";
 
   private final TaskDriver _taskDriver;
   private final PinotHelixResourceManager _helixResourceManager;
@@ -968,19 +969,19 @@ public class PinotHelixTaskResourceManager {
    */
   private String getTenantForTable(String tableName) {
     if (tableName == null || UNKNOWN_TABLE_NAME.equals(tableName)) {
-      return UNKNOWN_TABLE_NAME;
+      return UNKNOWN_TENANT_NAME;
     }
 
     try {
       TableConfig tableConfig = _helixResourceManager.getTableConfig(tableName);
       if (tableConfig != null && tableConfig.getTenantConfig() != null) {
         String serverTenant = tableConfig.getTenantConfig().getServer();
-        return serverTenant != null ? serverTenant : UNKNOWN_TABLE_NAME;
+        return serverTenant != null ? serverTenant : UNKNOWN_TENANT_NAME;
       }
-      return UNKNOWN_TABLE_NAME;
+      return UNKNOWN_TENANT_NAME;
     } catch (Exception e) {
       LOGGER.warn("Failed to determine tenant for table: {}", tableName, e);
-      return UNKNOWN_TABLE_NAME;
+      return UNKNOWN_TENANT_NAME;
     }
   }
 
@@ -1017,19 +1018,20 @@ public class PinotHelixTaskResourceManager {
         String taskName = entry.getKey();
         TaskCount totalTaskCount = entry.getValue();
 
-        // Skip if this parent task has no running/waiting tasks (optimization: avoid table breakdown call)
+        // Skip if this parent task has no running/waiting tasks
         if (totalTaskCount.getRunning() == 0 && totalTaskCount.getWaiting() == 0) {
           continue;
         }
 
         // Get the table name from the first subtask
-        // Note: In practice, all subtasks in a parent task belong to the same table
+        // Note: All subtasks in a parent task belong to the same table
         List<PinotTaskConfig> subtaskConfigs = getSubtaskConfigs(taskName);
         if (subtaskConfigs.isEmpty()) {
           continue;
         }
 
-        Map<String, String> configs = subtaskConfigs.get(0).getConfigs();
+        PinotTaskConfig firstSubtaskConfig = subtaskConfigs.get(0);
+        Map<String, String> configs = firstSubtaskConfig.getConfigs();
         String tableName = (configs != null)
             ? configs.getOrDefault(MinionConstants.TABLE_NAME_KEY, UNKNOWN_TABLE_NAME)
             : UNKNOWN_TABLE_NAME;

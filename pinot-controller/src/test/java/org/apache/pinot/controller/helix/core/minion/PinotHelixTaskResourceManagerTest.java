@@ -1358,7 +1358,7 @@ public class PinotHelixTaskResourceManagerTest {
     PinotHelixTaskResourceManager.TaskCount taskCount = new PinotHelixTaskResourceManager.TaskCount();
     taskCount.addTaskState(TaskPartitionState.RUNNING);
     taskCount.addTaskState(TaskPartitionState.RUNNING);
-    taskCount.addTaskState(null);
+    taskCount.addTaskState(null); // null state counts as waiting
     Map<String, PinotHelixTaskResourceManager.TaskCount> taskCounts = new HashMap<>();
     taskCounts.put(taskName, taskCount);
     when(spyMgr.getTaskCounts(taskType)).thenReturn(taskCounts);
@@ -1627,7 +1627,7 @@ public class PinotHelixTaskResourceManagerTest {
 
     // Task 2: TaskType2 with waiting tasks
     PinotHelixTaskResourceManager.TaskCount taskCount2 = new PinotHelixTaskResourceManager.TaskCount();
-    taskCount2.addTaskState(null);
+    taskCount2.addTaskState(null); // null state counts as waiting
     Map<String, PinotHelixTaskResourceManager.TaskCount> taskCounts2 = new HashMap<>();
     taskCounts2.put(taskName2, taskCount2);
     when(spyMgr.getTaskCounts(taskType2)).thenReturn(taskCounts2);
