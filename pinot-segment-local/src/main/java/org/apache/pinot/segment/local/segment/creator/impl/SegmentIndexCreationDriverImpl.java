@@ -27,6 +27,7 @@ import java.util.TreeSet;
 import java.util.UUID;
 import java.util.concurrent.TimeUnit;
 import javax.annotation.Nullable;
+import org.apache.commons.io.FileUtils;
 import org.apache.pinot.common.metrics.MinionMeter;
 import org.apache.pinot.common.metrics.MinionMetrics;
 import org.apache.pinot.common.metrics.ServerMeter;
@@ -91,7 +92,6 @@ public class SegmentIndexCreationDriverImpl implements SegmentIndexCreationDrive
   private int _totalDocs = 0;
   private File _tempIndexDir;
   private String _segmentName;
-  private File _outputSegmentDir;
   private long _totalRecordReadTimeNs = 0;
   private long _totalIndexTimeNs = 0;
   private long _totalStatsCollectorTimeNs = 0;
@@ -318,7 +318,7 @@ public class SegmentIndexCreationDriverImpl implements SegmentIndexCreationDrive
       // TODO: _indexCreationInfoMap holds the reference to all unique values on heap (ColumnIndexCreationInfo ->
       //       ColumnStatistics) throughout the segment creation. Find a way to release the memory early.
       _indexCreator.init(_config, _segmentIndexCreationInfo, _indexCreationInfoMap, _dataSchema, _tempIndexDir,
-          immutableToMutableIdMap);
+          immutableToMutableIdMap, _instanceType);
 
       // Build the index
       _recordReader.rewind();
@@ -427,7 +427,7 @@ public class SegmentIndexCreationDriverImpl implements SegmentIndexCreationDrive
       // TODO: _indexCreationInfoMap holds the reference to all unique values on heap (ColumnIndexCreationInfo ->
       //       ColumnStatistics) throughout the segment creation. Find a way to release the memory early.
       _indexCreator.init(_config, _segmentIndexCreationInfo, _indexCreationInfoMap, _dataSchema, _tempIndexDir,
-          immutableToMutableIdMap);
+          immutableToMutableIdMap, _instanceType);
 
       // Build the indexes
       LOGGER.info("Start building Index by column");
@@ -456,8 +456,17 @@ public class SegmentIndexCreationDriverImpl implements SegmentIndexCreationDrive
   private void handlePostCreation()
       throws Exception {
     // Execute all post-creation operations directly on the index creator
-    _outputSegmentDir = _indexCreator.createSegment(_instanceType);
+    _indexCreator.seal();
     _segmentName = _indexCreator.getSegmentName();
+
+    // Move the segment from the temporary directory to the final output directory
+    File outputDir = new File(_config.getOutDir());
+    File segmentOutputDir = new File(outputDir, _segmentName);
+    if (segmentOutputDir.exists()) {
+      FileUtils.deleteDirectory(segmentOutputDir);
+    }
+    FileUtils.moveDirectory(_tempIndexDir, segmentOutputDir);
+    FileUtils.deleteQuietly(_tempIndexDir);
 
     LOGGER.info("Driver, record read time (in ms) : {}", TimeUnit.NANOSECONDS.toMillis(_totalRecordReadTimeNs));
     LOGGER.info("Driver, stats collector time (in ms) : {}", TimeUnit.NANOSECONDS.toMillis(_totalStatsCollectorTimeNs));
@@ -534,7 +543,7 @@ public class SegmentIndexCreationDriverImpl implements SegmentIndexCreationDrive
    */
   @Override
   public File getOutputDirectory() {
-    return _outputSegmentDir;
+    return new File(new File(_config.getOutDir()), _segmentName);
   }
 
   /**
@@ -598,7 +607,8 @@ public class SegmentIndexCreationDriverImpl implements SegmentIndexCreationDrive
       }
 
       // Initialize the index creation using the per-column statistics information
-      _indexCreator.init(_config, _segmentIndexCreationInfo, _indexCreationInfoMap, _dataSchema, _tempIndexDir, null);
+      _indexCreator.init(_config, _segmentIndexCreationInfo, _indexCreationInfoMap, _dataSchema, _tempIndexDir,
+          null, _instanceType);
 
       // Build the indexes column-wise (true column-major approach)
       LOGGER.info("Start building Index using columnar approach");

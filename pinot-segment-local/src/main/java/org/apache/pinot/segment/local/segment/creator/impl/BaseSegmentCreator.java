@@ -38,7 +38,6 @@ import javax.annotation.Nullable;
 import org.apache.commons.collections4.CollectionUtils;
 import org.apache.commons.configuration2.PropertiesConfiguration;
 import org.apache.commons.configuration2.ex.ConfigurationException;
-import org.apache.commons.io.FileUtils;
 import org.apache.pinot.common.metrics.MinionMeter;
 import org.apache.pinot.common.metrics.MinionMetrics;
 import org.apache.pinot.common.metrics.ServerMeter;
@@ -115,13 +114,16 @@ public abstract class BaseSegmentCreator implements SegmentCreator {
   private SegmentGeneratorConfig _config;
   private String _segmentName;
   private File _indexDir;
+  @Nullable
+  private InstanceType _instanceType;
 
   /**
    * Common initialization logic for setting up directory and basic fields.
    */
   protected void initializeCommon(SegmentGeneratorConfig segmentCreationSpec, SegmentIndexCreationInfo creationInfo,
       NavigableMap<String, ColumnIndexCreationInfo> indexCreationInfoMap, Schema schema, File outDir,
-      Map<String, ColumnIndexCreators> colIndexes, @Nullable int[] immutableToMutableIdMap)
+      Map<String, ColumnIndexCreators> colIndexes, @Nullable int[] immutableToMutableIdMap,
+      @Nullable InstanceType instanceType)
       throws Exception {
     // Check that the output directory does not exist
     Preconditions.checkState(!outDir.exists(), "Segment output directory: %s already exists", outDir);
@@ -133,6 +135,7 @@ public abstract class BaseSegmentCreator implements SegmentCreator {
     _indexDir = outDir;
     _schema = schema;
     _totalDocs = creationInfo.getTotalDocs();
+    _instanceType = instanceType;
 
     initColSegmentCreationInfo(immutableToMutableIdMap);
   }
@@ -142,7 +145,7 @@ public abstract class BaseSegmentCreator implements SegmentCreator {
     Map<String, FieldIndexConfigs> indexConfigs = _config.getIndexConfigsByColName();
     for (String columnName : indexConfigs.keySet()) {
       if (canColumnBeIndexed(columnName) && _totalDocs > 0 && _indexCreationInfoMap.containsKey(columnName)) {
-        ColumnIndexCreators result = createColIndexeCreators(columnName, immutableToMutableIdMap);
+        ColumnIndexCreators result = createColIndexCreators(columnName, immutableToMutableIdMap);
         _colIndexes.put(columnName, result);
       } else {
         FieldSpec fieldSpec = _schema.getFieldSpecFor(columnName);
@@ -156,7 +159,7 @@ public abstract class BaseSegmentCreator implements SegmentCreator {
    * Initializes a single column's dictionary and index creators.
    * This encapsulates the common logic shared between different segment creator implementations.
    */
-  protected ColumnIndexCreators createColIndexeCreators(String columnName,
+  protected ColumnIndexCreators createColIndexCreators(String columnName,
       @Nullable int[] immutableToMutableIdMap)
       throws Exception {
     FieldSpec fieldSpec = _schema.getFieldSpecFor(columnName);
@@ -736,47 +739,36 @@ public abstract class BaseSegmentCreator implements SegmentCreator {
   /**
    * Writes the individual column index files to disk.
    */
-  protected abstract void seal() throws Exception;
+  protected abstract void flushColIndexes() throws Exception;
 
   @Override
-  public File createSegment(@Nullable InstanceType instanceType)
+  public void seal()
       throws Exception {
     _segmentName = generateSegmentName();
     try {
       // Write the index files to disk
-      seal();
+      flushColIndexes();
     } finally {
       close();
     }
     LOGGER.info("Finished segment seal for: {}", _segmentName);
 
-    // Delete the directory named after the segment name, if it exists
-    File outputDir = new File(_config.getOutDir());
-    File segmentOutputDir = new File(outputDir, _segmentName);
-    if (segmentOutputDir.exists()) {
-      FileUtils.deleteDirectory(segmentOutputDir);
-    }
-    // Move the temporary directory into its final location
-    FileUtils.moveDirectory(_indexDir, segmentOutputDir);
-    FileUtils.deleteQuietly(_indexDir);
-
     // Format conversion
-    convertFormatIfNecessary(segmentOutputDir);
+    convertFormatIfNecessary(_indexDir);
 
     // Build indexes if there are documents
     if (_totalDocs > 0) {
-      buildStarTreeV2IfNecessary(segmentOutputDir, instanceType);
-      buildMultiColumnTextIndex(segmentOutputDir);
+      buildStarTreeV2IfNecessary(_indexDir);
+      buildMultiColumnTextIndex(_indexDir);
     }
 
     // Update post-creation indexes
-    updatePostSegmentCreationIndexes(segmentOutputDir);
+    updatePostSegmentCreationIndexes(_indexDir);
 
     // Persist creation metadata
-    persistCreationMeta(segmentOutputDir);
+    persistCreationMeta(_indexDir);
 
-    LOGGER.info("Successfully finalized segment: {}", _segmentName);
-    return segmentOutputDir;
+    LOGGER.info("Successfully created segment: {} in {}", _segmentName, _indexDir);
   }
 
   /**
@@ -811,7 +803,7 @@ public abstract class BaseSegmentCreator implements SegmentCreator {
   // Explanation of why we are using format converter:
   // There are 3 options to correctly generate segments to v3 format
   // 1. Generate v3 directly: This is efficient but v3 index writer needs to know buffer size upfront.
-  // Inverted, star and raw indexes don't have the index size upfront. This is also least flexible approach
+  // Inverted, star and raw indexes don't have the index size upfront. This is also the least flexible approach
   // if we add more indexes in the future.
   // 2. Hold data in-memory: One way to work around predeclaring sizes in (1) is to allocate "large" buffer (2GB?)
   // and hold the data in memory and write the buffer at the end. The memory requirement in this case increases linearly
@@ -836,12 +828,8 @@ public abstract class BaseSegmentCreator implements SegmentCreator {
 
   /**
    * Build star-tree V2 index if configured.
-   *
-   * @param indexDir Segment index directory
-   * @param instanceType Instance type for metrics tracking (nullable)
-   * @throws Exception If star-tree index building fails
    */
-  private void buildStarTreeV2IfNecessary(File indexDir, @Nullable InstanceType instanceType)
+  private void buildStarTreeV2IfNecessary(File indexDir)
       throws Exception {
     List<StarTreeIndexConfig> starTreeIndexConfigs = _config.getStarTreeIndexConfigs();
     boolean enableDefaultStarTree = _config.isEnableDefaultStarTree();
@@ -862,8 +850,8 @@ public abstract class BaseSegmentCreator implements SegmentCreator {
         String tableNameWithType = _config.getTableConfig().getTableName();
         LOGGER.error("Failed to build star-tree index for table: {}, skipping", tableNameWithType, e);
         // Track metrics only if instance type is provided
-        if (instanceType != null) {
-          if (instanceType == InstanceType.MINION) {
+        if (_instanceType != null) {
+          if (_instanceType == InstanceType.MINION) {
             MinionMetrics.get().addMeteredTableValue(tableNameWithType, MinionMeter.STAR_TREE_INDEX_BUILD_FAILURES, 1);
           } else {
             ServerMetrics.get().addMeteredTableValue(tableNameWithType, ServerMeter.STAR_TREE_INDEX_BUILD_FAILURES, 1);

@@ -37,6 +37,7 @@ import org.apache.pinot.segment.spi.creator.SegmentGeneratorConfig;
 import org.apache.pinot.segment.spi.index.IndexCreator;
 import org.apache.pinot.segment.spi.index.creator.SegmentIndexCreationInfo;
 import org.apache.pinot.segment.spi.index.mutable.ThreadSafeMutableRoaringBitmap;
+import org.apache.pinot.spi.config.instance.InstanceType;
 import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.FieldSpec.FieldType;
 import org.apache.pinot.spi.data.Schema;
@@ -54,13 +55,13 @@ public class SegmentColumnarIndexCreator extends BaseSegmentCreator {
   @Override
   public void init(SegmentGeneratorConfig segmentCreationSpec, SegmentIndexCreationInfo segmentIndexCreationInfo,
       TreeMap<String, ColumnIndexCreationInfo> indexCreationInfoMap, Schema schema, File outDir,
-      @Nullable int[] immutableToMutableIdMap)
+      @Nullable int[] immutableToMutableIdMap, @Nullable InstanceType instanceType)
       throws Exception {
     _docIdCounter = 0;
     Map<String, ColumnIndexCreators> colIndexes = Maps.newHashMapWithExpectedSize(
         segmentCreationSpec.getIndexConfigsByColName().size());
     initializeCommon(segmentCreationSpec, segmentIndexCreationInfo, indexCreationInfoMap,
-        schema, outDir, colIndexes, immutableToMutableIdMap);
+        schema, outDir, colIndexes, immutableToMutableIdMap, instanceType);
   }
 
   /**
@@ -257,7 +258,7 @@ public class SegmentColumnarIndexCreator extends BaseSegmentCreator {
   }
 
   @Override
-  public void seal()
+  public void flushColIndexes()
       throws ConfigurationException, IOException {
     for (ColumnIndexCreators colIndexes : _colIndexes.values()) {
       if (colIndexes.getDictionaryCreator() != null) {

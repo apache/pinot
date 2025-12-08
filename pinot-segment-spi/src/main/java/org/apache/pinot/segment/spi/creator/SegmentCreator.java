@@ -47,11 +47,14 @@ public interface SegmentCreator extends Closeable, Serializable {
    * @param indexCreationInfoMap
    * @param schema
    * @param outDir
+   * @param immutableToMutableIdMap
+   * @param instanceType - Instance type that's used to select the metrics for observability
+   * TODO - Move instanceType to SegmentGeneratorConfig and avoid passing it here
    * @throws Exception
    */
   void init(SegmentGeneratorConfig segmentCreationSpec, SegmentIndexCreationInfo segmentIndexCreationInfo,
       TreeMap<String, ColumnIndexCreationInfo> indexCreationInfoMap, Schema schema, File outDir,
-      @Nullable int[] immutableToMutableIdMap)
+      @Nullable int[] immutableToMutableIdMap, @Nullable InstanceType instanceType)
       throws Exception;
 
   /**
@@ -94,17 +97,16 @@ public interface SegmentCreator extends Closeable, Serializable {
   String getSegmentName();
 
   /**
-   * Create the final segment. This method is supposed to
+   * Seals and creates the final segment in outDir provided in init().
+   * This method is supposed to
    * 1. flush all column indexes to disk
-   * 2. convert the segment to the final format
-   * 3. build other indexes (startree index, etc.) if needed.
-   * 4. persist the segment metadata and creation info files.
+   * 2. generate the segment name
+   * 3. convert the segment to the final format
+   * 4. build other indexes (startree index, etc.) if needed.
+   * 5. persist the segment metadata and creation info files.
    *
-   * @param instanceType Instance type that's used to select the metrics for observability
-   *                     TODO - Move instanceType to SegmentGeneratorConfig and avoid passing it here
-   * @return Final segment directory
    * @throws Exception If finalization fails
    */
-  File createSegment(@Nullable InstanceType instanceType)
+  void seal()
       throws Exception;
 }
