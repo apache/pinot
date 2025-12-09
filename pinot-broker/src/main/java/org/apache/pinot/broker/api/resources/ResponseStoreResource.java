@@ -149,7 +149,8 @@ public class ResponseStoreResource {
             CommonConstants.CursorConfigs.DEFAULT_CURSOR_FETCH_ROWS);
       }
       asyncResponse.resume(
-          PinotClientRequest.getPinotQueryResponse(_responseStore.handleCursorRequest(requestId, offset, numRows), headers));
+          PinotClientRequest.getPinotQueryResponse(_responseStore.handleCursorRequest(requestId, offset, numRows),
+              headers));
     } catch (WebApplicationException wae) {
       asyncResponse.resume(wae);
     } catch (Exception e) {
