@@ -69,7 +69,16 @@ jobs:
             --add-exports=jdk.compiler/com.sun.tools.javac.parser=ALL-UNNAMED
             --add-exports=jdk.compiler/com.sun.tools.javac.tree=ALL-UNNAMED
             --add-exports=jdk.compiler/com.sun.tools.javac.util=ALL-UNNAMED
-        run: .github/workflows/scripts/.pinot_compatibility_verifier.sh
+        uses: nick-fields/retry@v3
+        with:
+          max_attempts: 3
+          retry_wait_seconds: 20
+          timeout_minutes: 120
+          retry_on_exit_code: 75
+          command: |
+            cat <<'EOF' | .github/workflows/scripts/retry_on_fast_fail.sh
+            .github/workflows/scripts/.pinot_compatibility_verifier.sh
+            EOF
       - name: Archive artifacts into zip
         if: always()
         run: |
