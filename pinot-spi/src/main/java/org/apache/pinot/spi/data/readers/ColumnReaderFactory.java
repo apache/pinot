@@ -71,6 +71,7 @@ public interface ColumnReaderFactory extends Closeable, Serializable {
    * Implementations may cache and reuse readers for efficiency.
    *
    * @param columnName Name of the column to read
+   *                   Can return null if column doesn't exist in the source
    * @return ColumnReader instance for the specified column (may be cached)
    */
   @Nullable ColumnReader getColumnReader(String columnName);

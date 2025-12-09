@@ -65,7 +65,7 @@ public class DefaultValueColumnReaderTest {
     int expectedValue = ((Number) fieldSpec.getDefaultNullValue()).intValue();
     for (int i = 0; i < NUM_DOCS; i++) {
       Assert.assertTrue(reader.hasNext());
-      Assert.assertTrue(reader.isNextNull());
+      Assert.assertFalse(reader.isNextNull());
       Assert.assertEquals(reader.nextInt(), expectedValue);
     }
     Assert.assertFalse(reader.hasNext());
@@ -79,7 +79,7 @@ public class DefaultValueColumnReaderTest {
     // Test random access
     reader.rewind();
     for (int i = 0; i < NUM_DOCS; i++) {
-      Assert.assertTrue(reader.isNull(i));
+      Assert.assertFalse(reader.isNull(i));
       Assert.assertEquals(reader.getInt(i), expectedValue);
     }
 
@@ -431,8 +431,8 @@ public class DefaultValueColumnReaderTest {
 
     // Default values are never null
     for (int i = 0; i < NUM_DOCS; i++) {
-      Assert.assertTrue(reader.isNull(i));
-      Assert.assertTrue(reader.isNextNull());
+      Assert.assertFalse(reader.isNull(i));
+      Assert.assertFalse(reader.isNextNull());
       reader.skipNext();
     }
 

@@ -284,7 +284,8 @@ public interface ColumnReader extends Closeable, Serializable {
    * Get the value at the given document ID as a Java Object.
    * Can be used for both single-value and multi-value columns.
    * This should be used if
-   * 1. The data type is not known at compile time
+   * 1. Certain API's don't yet support primitive type specific methods (eg: TimeHandler, Partitioner, etc.) and
+   *    thus will be boxed anyway.
    * 2. The required data type does not match the actual type and the client will handle the conversion
    * Document ID is 0-based. Valid values are 0 to {@link #getTotalDocs()} - 1.
    *
