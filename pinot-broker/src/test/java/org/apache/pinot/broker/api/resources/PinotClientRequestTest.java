@@ -110,7 +110,7 @@ public class PinotClientRequestTest {
         CommonConstants.Controller.PINOT_HTTP_RESPONSE_CODE_REPRESENT_ERROR_HEADER)).thenReturn("true");
     Response tableDoesNotExistResponseWithHttpResponseCode =
         PinotClientRequest.getPinotQueryResponse(tableDoesNotExistBrokerResponse, _httpHeaders);
-    assertEquals(tableDoesNotExistResponseWithHttpResponseCode.getStatus(), Response.Status.OK.getStatusCode());
+    assertEquals(tableDoesNotExistResponseWithHttpResponseCode.getStatus(), Response.Status.NOT_FOUND.getStatusCode());
     Assert.assertTrue(
         tableDoesNotExistResponseWithHttpResponseCode.getHeaders().containsKey(PINOT_QUERY_ERROR_CODE_HEADER));
     assertEquals(tableDoesNotExistResponseWithHttpResponseCode.getHeaders().get(PINOT_QUERY_ERROR_CODE_HEADER).size(),
