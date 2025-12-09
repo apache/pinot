@@ -610,8 +610,8 @@ public class PinotClientRequest {
       queryErrorCodeHeaderValue = exceptions.get(0).getErrorCode();
 
       // Check if the client wants actual HTTP error codes instead of 200 OK
-      if ("true".equalsIgnoreCase(httpHeaders.getHeaderString(
-          CommonConstants.Controller.PINOT_HTTP_RESPONSE_CODE_REPRESENT_ERROR_HEADER))) {
+      if (Boolean.parseBoolean(httpHeaders.getHeaderString(
+          CommonConstants.Broker.PINOT_USE_HTTP_STATUS_FOR_ERRORS_HEADER))) {
         QueryErrorCode queryErrorCode = QueryErrorCode.fromErrorCode(queryErrorCodeHeaderValue);
         httpStatus = queryErrorCode.getHttpResponseStatus();
       }

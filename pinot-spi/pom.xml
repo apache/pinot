@@ -159,6 +159,10 @@
     </dependency>
 
     <dependency>
+      <groupId>jakarta.ws.rs</groupId>
+      <artifactId>jakarta.ws.rs-api</artifactId>
+    </dependency>
+    <dependency>
       <groupId>org.codehaus.plexus</groupId>
       <artifactId>plexus-classworlds</artifactId>
     </dependency>
@@ -232,10 +236,6 @@
       <artifactId>assertj-core</artifactId>
       <scope>test</scope>
     </dependency>
-      <dependency>
-          <groupId>jakarta.ws.rs</groupId>
-          <artifactId>jakarta.ws.rs-api</artifactId>
-      </dependency>
   </dependencies>
   <profiles>
     <profile>
