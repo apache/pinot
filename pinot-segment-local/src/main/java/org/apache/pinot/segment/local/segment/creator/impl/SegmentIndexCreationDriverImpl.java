@@ -522,6 +522,13 @@ public class SegmentIndexCreationDriverImpl implements SegmentIndexCreationDrive
     // Delete the temporary directory
     FileUtils.deleteQuietly(_tempIndexDir);
 
+    // Compute data crc before segment format conversion applies since v3 puts all index files into a single one
+    // Compute data crc only if no column has fwd index disabled
+    boolean hasForwardIndexDisabledCols = hasAnyColumnWithForwardIndexDisabled();
+    long dataCrc = Long.MIN_VALUE;
+    if (!hasForwardIndexDisabledCols) {
+      dataCrc = CrcUtils.forAllFilesInFolder(segmentOutputDir).computeDataCrc();
+    }
     convertFormatIfNecessary(segmentOutputDir);
 
     if (_totalDocs > 0) {
@@ -546,7 +553,7 @@ public class SegmentIndexCreationDriverImpl implements SegmentIndexCreationDrive
     }
 
     // Persist creation metadata to disk
-    persistCreationMeta(segmentOutputDir, crc, creationTime);
+    persistCreationMeta(segmentOutputDir, crc, dataCrc, creationTime);
 
     LOGGER.info("Driver, record read time (in ms) : {}", TimeUnit.NANOSECONDS.toMillis(_totalRecordReadTimeNs));
     LOGGER.info("Driver, stats collector time (in ms) : {}", TimeUnit.NANOSECONDS.toMillis(_totalStatsCollectorTimeNs));
@@ -675,19 +682,44 @@ public class SegmentIndexCreationDriverImpl implements SegmentIndexCreationDrive
     converter.convert(segmentDirectory);
   }
 
+  private boolean hasAnyColumnWithForwardIndexDisabled() {
+    Map<String, FieldIndexConfigs> indexConfigsMap = _config.getIndexConfigsByColName();
+    for (FieldSpec fieldSpec : _dataSchema.getAllFieldSpecs()) {
+      // Ignore virtual columns
+      if (fieldSpec.isVirtualColumn()) {
+        continue;
+      }
+      String column = fieldSpec.getName();
+      boolean isFwdIndexEnabled = indexConfigsMap
+          .get(column)
+          .getConfig(StandardIndexes.forward())
+          .isEnabled();
+
+      if (!isFwdIndexEnabled) {
+        return true;
+      }
+    }
+    return false;
+  }
+
   @Override
   public ColumnStatistics getColumnStatisticsCollector(final String columnName)
       throws Exception {
     return _segmentStats.getColumnProfileFor(columnName);
   }
 
-  public static void persistCreationMeta(File indexDir, long crc, long creationTime)
+  public static void persistCreationMeta(File indexDir, long crc, long dataCrc, long creationTime)
       throws IOException {
     File segmentDir = SegmentDirectoryPaths.findSegmentDirectory(indexDir);
     File creationMetaFile = new File(segmentDir, V1Constants.SEGMENT_CREATION_META);
     try (DataOutputStream output = new DataOutputStream(new FileOutputStream(creationMetaFile))) {
       output.writeLong(crc);
       output.writeLong(creationTime);
+      // might be negative if the data CRC could not be computed for the segment. eg. in case a column has fwd index
+      // disabled
+      if (dataCrc >= 0) {
+        output.writeLong(dataCrc);
+      }
     }
   }
 
