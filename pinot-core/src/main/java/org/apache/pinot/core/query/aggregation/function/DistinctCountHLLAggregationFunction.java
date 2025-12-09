@@ -238,7 +238,8 @@ public class DistinctCountHLLAggregationFunction extends BaseSingleInputAggregat
 
           // Convert to HLL if cardinality exceeds threshold
           if (dictIdBitmap.getCardinality() > _dictIdCardinalityThreshold) {
-            HyperLogLog hyperLogLog = convertDictIdsToHyperLogLog((DictIdsWrapper) groupByResultHolder.getResult(groupKey));
+            HyperLogLog hyperLogLog =
+                convertDictIdsToHyperLogLog((DictIdsWrapper) groupByResultHolder.getResult(groupKey));
             groupByResultHolder.setValueForKey(groupKey, hyperLogLog);
           }
         }
@@ -524,7 +525,8 @@ public class DistinctCountHLLAggregationFunction extends BaseSingleInputAggregat
 
         // Convert to HLL if cardinality exceeds threshold
         if (dictIdBitmap.getCardinality() > _dictIdCardinalityThreshold) {
-          HyperLogLog hyperLogLog = convertDictIdsToHyperLogLog((DictIdsWrapper) groupByResultHolder.getResult(groupKey));
+          HyperLogLog hyperLogLog =
+              convertDictIdsToHyperLogLog((DictIdsWrapper) groupByResultHolder.getResult(groupKey));
           groupByResultHolder.setValueForKey(groupKey, hyperLogLog);
         }
       }

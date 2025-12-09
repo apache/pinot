@@ -21,6 +21,12 @@ package org.apache.pinot.core.query.aggregation.function;
 import com.clearspring.analytics.stream.cardinality.CardinalityMergeException;
 import com.clearspring.analytics.stream.cardinality.HyperLogLog;
 import com.google.common.base.Preconditions;
+import it.unimi.dsi.fastutil.doubles.DoubleOpenHashSet;
+import it.unimi.dsi.fastutil.floats.FloatOpenHashSet;
+import it.unimi.dsi.fastutil.ints.IntOpenHashSet;
+import it.unimi.dsi.fastutil.ints.IntSet;
+import it.unimi.dsi.fastutil.longs.LongOpenHashSet;
+import it.unimi.dsi.fastutil.objects.ObjectOpenHashSet;
 import it.unimi.dsi.fastutil.objects.ObjectSet;
 import java.util.List;
 import java.util.Map;
@@ -32,6 +38,9 @@ import org.apache.pinot.common.utils.DataSchema.ColumnDataType;
 import org.apache.pinot.core.common.BlockValSet;
 import org.apache.pinot.core.common.ObjectSerDeUtils;
 import org.apache.pinot.core.query.aggregation.AggregationResultHolder;
+import org.apache.pinot.core.query.aggregation.ObjectAggregationResultHolder;
+import org.apache.pinot.core.query.aggregation.groupby.GroupByResultHolder;
+import org.apache.pinot.core.query.aggregation.groupby.ObjectGroupByResultHolder;
 import org.apache.pinot.segment.spi.AggregationFunctionType;
 import org.apache.pinot.segment.spi.index.reader.Dictionary;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
@@ -51,13 +60,23 @@ import org.roaringbitmap.RoaringBitmap;
  * - threshold: Threshold of the number of distinct values to trigger the conversion, 100_000 by default. Non-positive
  *              value means never convert.
  * - log2m: Log2m for the converted HyperLogLog, 12 by default.
- * Example of second argument: 'threshold=10;log2m=8'
+ * - dictThreshold: Threshold of the number of dictionary IDs to trigger the conversion, 100_000 by default.
+ * Non-positive
+ *                  value means never convert.
+ * Example of second argument: 'threshold=10;log2m=8;dictThreshold=100000'
  */
 @SuppressWarnings({"rawtypes", "unchecked"})
-public class DistinctCountSmartHLLAggregationFunction extends BaseDistinctCountSmartSketchAggregationFunction {
+public class DistinctCountSmartHLLAggregationFunction extends BaseSingleInputAggregationFunction<Object, Integer> {
+  // Use empty IntOpenHashSet as a placeholder for empty result
+  private static final IntSet EMPTY_PLACEHOLDER = new IntOpenHashSet();
 
   private final int _threshold;
   private final int _log2m;
+  // For dictionary RoaringBitmap → HLL conversion
+  private final int _dictIdCardinalityThreshold;
+  // Skip cardinality checks entirely if false
+  private final boolean _enableDictAdaptiveConversion;
+
 
   public DistinctCountSmartHLLAggregationFunction(List<ExpressionContext> arguments) {
     super(arguments.get(0));
@@ -66,18 +85,30 @@ public class DistinctCountSmartHLLAggregationFunction extends BaseDistinctCountS
       Parameters parameters = new Parameters(arguments.get(1).getLiteral().getStringValue());
       _threshold = parameters._threshold;
       _log2m = parameters._log2m;
+      _dictIdCardinalityThreshold = parameters._dictThreshold;
     } else {
       _threshold = Parameters.DEFAULT_THRESHOLD;
       _log2m = Parameters.DEFAULT_LOG2M;
+      _dictIdCardinalityThreshold = Parameters.DEFAULT_DICT_THRESHOLD;
     }
+    // Enable adaptive conversion if dictThreshold is not set to default
+    _enableDictAdaptiveConversion = _dictIdCardinalityThreshold != Parameters.DEFAULT_DICT_THRESHOLD;
   }
 
   public int getThreshold() {
     return _threshold;
   }
 
+  public int getDictIdCardinalityThreshold() {
+    return _dictIdCardinalityThreshold;
+  }
+
   public int getLog2m() {
     return _log2m;
+  }
+
+  public boolean getEnableDictAdaptiveConversion() {
+    return _enableDictAdaptiveConversion;
   }
 
   @Override
@@ -85,26 +116,34 @@ public class DistinctCountSmartHLLAggregationFunction extends BaseDistinctCountS
     return AggregationFunctionType.DISTINCTCOUNTSMARTHLL;
   }
 
-  // Result holder creators are provided by the base class
+  @Override
+  public AggregationResultHolder createAggregationResultHolder() {
+    return new ObjectAggregationResultHolder();
+  }
+
+  @Override
+  public GroupByResultHolder createGroupByResultHolder(int initialCapacity, int maxCapacity) {
+    return new ObjectGroupByResultHolder(initialCapacity, maxCapacity);
+  }
 
   @Override
   public void aggregate(int length, AggregationResultHolder aggregationResultHolder,
-      Map<ExpressionContext, BlockValSet> blockValSetMap) {
+                        Map<ExpressionContext, BlockValSet> blockValSetMap) {
     BlockValSet blockValSet = blockValSetMap.get(_expression);
 
-    // For dictionary-encoded expression, store dictionary ids into the bitmap
+    // For dictionary-encoded expression, use adaptive conversion strategy
     Dictionary dictionary = blockValSet.getDictionary();
     if (dictionary != null) {
-      RoaringBitmap dictIdBitmap = getDictIdBitmap(aggregationResultHolder, dictionary);
-      if (blockValSet.isSingleValue()) {
-        int[] dictIds = blockValSet.getDictionaryIdsSV();
-        dictIdBitmap.addN(dictIds, 0, length);
-      } else {
-        int[][] dictIds = blockValSet.getDictionaryIdsMV();
-        for (int i = 0; i < length; i++) {
-          dictIdBitmap.add(dictIds[i]);
-        }
+      Object result = aggregationResultHolder.getResult();
+      // If already converted to HLL, aggregate directly
+      if (result instanceof HyperLogLog) {
+        aggregateDictIdsIntoHLL((HyperLogLog) result, dictionary, blockValSet, length);
+        return;
       }
+      // Otherwise, use RoaringBitmap and check threshold once per batch
+      RoaringBitmap dictIdBitmap = getDictIdBitmap(aggregationResultHolder, dictionary);
+      aggregateDictIdsIntoBitmap(dictIdBitmap, blockValSet, length);
+      checkAndConvertToHLL(aggregationResultHolder, dictIdBitmap);
       return;
     }
 
@@ -209,7 +248,117 @@ public class DistinctCountSmartHLLAggregationFunction extends BaseDistinctCountS
     }
   }
 
-  // aggregateIntoSet is handled by the base class
+  private void aggregateIntoSet(int length, AggregationResultHolder aggregationResultHolder, BlockValSet blockValSet) {
+    DataType valueType = blockValSet.getValueType();
+    DataType storedType = valueType.getStoredType();
+    Set valueSet = getValueSet(aggregationResultHolder, storedType);
+    if (blockValSet.isSingleValue()) {
+      switch (storedType) {
+        case INT:
+          IntOpenHashSet intSet = (IntOpenHashSet) valueSet;
+          int[] intValues = blockValSet.getIntValuesSV();
+          for (int i = 0; i < length; i++) {
+            intSet.add(intValues[i]);
+          }
+          break;
+        case LONG:
+          LongOpenHashSet longSet = (LongOpenHashSet) valueSet;
+          long[] longValues = blockValSet.getLongValuesSV();
+          for (int i = 0; i < length; i++) {
+            longSet.add(longValues[i]);
+          }
+          break;
+        case FLOAT:
+          FloatOpenHashSet floatSet = (FloatOpenHashSet) valueSet;
+          float[] floatValues = blockValSet.getFloatValuesSV();
+          for (int i = 0; i < length; i++) {
+            floatSet.add(floatValues[i]);
+          }
+          break;
+        case DOUBLE:
+          DoubleOpenHashSet doubleSet = (DoubleOpenHashSet) valueSet;
+          double[] doubleValues = blockValSet.getDoubleValuesSV();
+          for (int i = 0; i < length; i++) {
+            doubleSet.add(doubleValues[i]);
+          }
+          break;
+        case STRING:
+          ObjectOpenHashSet<String> stringSet = (ObjectOpenHashSet<String>) valueSet;
+          String[] stringValues = blockValSet.getStringValuesSV();
+          //noinspection ManualArrayToCollectionCopy
+          for (int i = 0; i < length; i++) {
+            stringSet.add(stringValues[i]);
+          }
+          break;
+        case BYTES:
+          ObjectOpenHashSet<ByteArray> bytesSet = (ObjectOpenHashSet<ByteArray>) valueSet;
+          byte[][] bytesValues = blockValSet.getBytesValuesSV();
+          for (int i = 0; i < length; i++) {
+            bytesSet.add(new ByteArray(bytesValues[i]));
+          }
+          break;
+        default:
+          throw getIllegalDataTypeException(valueType, true);
+      }
+    } else {
+      switch (storedType) {
+        case INT:
+          IntOpenHashSet intSet = (IntOpenHashSet) valueSet;
+          int[][] intValues = blockValSet.getIntValuesMV();
+          for (int i = 0; i < length; i++) {
+            for (int value : intValues[i]) {
+              intSet.add(value);
+            }
+          }
+          break;
+        case LONG:
+          LongOpenHashSet longSet = (LongOpenHashSet) valueSet;
+          long[][] longValues = blockValSet.getLongValuesMV();
+          for (int i = 0; i < length; i++) {
+            for (long value : longValues[i]) {
+              longSet.add(value);
+            }
+          }
+          break;
+        case FLOAT:
+          FloatOpenHashSet floatSet = (FloatOpenHashSet) valueSet;
+          float[][] floatValues = blockValSet.getFloatValuesMV();
+          for (int i = 0; i < length; i++) {
+            for (float value : floatValues[i]) {
+              floatSet.add(value);
+            }
+          }
+          break;
+        case DOUBLE:
+          DoubleOpenHashSet doubleSet = (DoubleOpenHashSet) valueSet;
+          double[][] doubleValues = blockValSet.getDoubleValuesMV();
+          for (int i = 0; i < length; i++) {
+            for (double value : doubleValues[i]) {
+              doubleSet.add(value);
+            }
+          }
+          break;
+        case STRING:
+          ObjectOpenHashSet<String> stringSet = (ObjectOpenHashSet<String>) valueSet;
+          String[][] stringValues = blockValSet.getStringValuesMV();
+          for (int i = 0; i < length; i++) {
+            //noinspection ManualArrayToCollectionCopy
+            for (String value : stringValues[i]) {
+              //noinspection UseBulkOperation
+              stringSet.add(value);
+            }
+          }
+          break;
+        default:
+          throw getIllegalDataTypeException(valueType, false);
+      }
+    }
+
+    // Convert to HLL if the set size exceeds the threshold
+    if (valueSet.size() > _threshold) {
+      aggregationResultHolder.setValue(convertSetToHLL(valueSet, storedType));
+    }
+  }
 
   protected HyperLogLog convertSetToHLL(Set valueSet, DataType storedType) {
     if (storedType == DataType.BYTES) {
@@ -235,13 +384,315 @@ public class DistinctCountSmartHLLAggregationFunction extends BaseDistinctCountS
     return hll;
   }
 
-  // group-by SV handled by the base class
+  @Override
+  public void aggregateGroupBySV(int length, int[] groupKeyArray, GroupByResultHolder groupByResultHolder,
+                                 Map<ExpressionContext, BlockValSet> blockValSetMap) {
+    BlockValSet blockValSet = blockValSetMap.get(_expression);
 
-  // group-by MV handled by the base class
+    // For dictionary-encoded expression, use adaptive conversion strategy
+    Dictionary dictionary = blockValSet.getDictionary();
+    if (dictionary != null) {
+      // Track which groups were modified to check cardinality only once per group per batch
+      IntSet modifiedGroups = new IntOpenHashSet();
+      if (blockValSet.isSingleValue()) {
+        int[] dictIds = blockValSet.getDictionaryIdsSV();
+        for (int i = 0; i < length; i++) {
+          aggregateDictIdForGroup(groupByResultHolder, groupKeyArray[i], dictionary, dictIds[i], modifiedGroups);
+        }
+      } else {
+        int[][] dictIds = blockValSet.getDictionaryIdsMV();
+        for (int i = 0; i < length; i++) {
+          aggregateDictIdsForGroup(groupByResultHolder, groupKeyArray[i], dictionary, dictIds[i], modifiedGroups);
+        }
+      }
+      // Check cardinality only once per modified group after all additions
+      checkAndConvertToHLLForGroups(groupByResultHolder, modifiedGroups);
+      return;
+    }
 
-  // extraction is handled by the base class
+    // For non-dictionary-encoded expression, store values into the value set
+    DataType valueType = blockValSet.getValueType();
+    DataType storedType = valueType.getStoredType();
+    if (blockValSet.isSingleValue()) {
+      switch (storedType) {
+        case INT:
+          int[] intValues = blockValSet.getIntValuesSV();
+          for (int i = 0; i < length; i++) {
+            ((IntOpenHashSet) getValueSet(groupByResultHolder, groupKeyArray[i], DataType.INT)).add(intValues[i]);
+          }
+          break;
+        case LONG:
+          long[] longValues = blockValSet.getLongValuesSV();
+          for (int i = 0; i < length; i++) {
+            ((LongOpenHashSet) getValueSet(groupByResultHolder, groupKeyArray[i], DataType.LONG)).add(longValues[i]);
+          }
+          break;
+        case FLOAT:
+          float[] floatValues = blockValSet.getFloatValuesSV();
+          for (int i = 0; i < length; i++) {
+            ((FloatOpenHashSet) getValueSet(groupByResultHolder, groupKeyArray[i], DataType.FLOAT)).add(floatValues[i]);
+          }
+          break;
+        case DOUBLE:
+          double[] doubleValues = blockValSet.getDoubleValuesSV();
+          for (int i = 0; i < length; i++) {
+            ((DoubleOpenHashSet) getValueSet(groupByResultHolder, groupKeyArray[i], DataType.DOUBLE)).add(
+                doubleValues[i]);
+          }
+          break;
+        case STRING:
+          String[] stringValues = blockValSet.getStringValuesSV();
+          for (int i = 0; i < length; i++) {
+            ((ObjectOpenHashSet<String>) getValueSet(groupByResultHolder, groupKeyArray[i], DataType.STRING)).add(
+                stringValues[i]);
+          }
+          break;
+        case BYTES:
+          byte[][] bytesValues = blockValSet.getBytesValuesSV();
+          for (int i = 0; i < length; i++) {
+            ((ObjectOpenHashSet<ByteArray>) getValueSet(groupByResultHolder, groupKeyArray[i], DataType.BYTES)).add(
+                new ByteArray(bytesValues[i]));
+          }
+          break;
+        default:
+          throw getIllegalDataTypeException(valueType, true);
+      }
+    } else {
+      switch (storedType) {
+        case INT:
+          int[][] intValues = blockValSet.getIntValuesMV();
+          for (int i = 0; i < length; i++) {
+            IntOpenHashSet intSet = (IntOpenHashSet) getValueSet(groupByResultHolder, groupKeyArray[i], DataType.INT);
+            for (int value : intValues[i]) {
+              intSet.add(value);
+            }
+          }
+          break;
+        case LONG:
+          long[][] longValues = blockValSet.getLongValuesMV();
+          for (int i = 0; i < length; i++) {
+            LongOpenHashSet longSet =
+                (LongOpenHashSet) getValueSet(groupByResultHolder, groupKeyArray[i], DataType.LONG);
+            for (long value : longValues[i]) {
+              longSet.add(value);
+            }
+          }
+          break;
+        case FLOAT:
+          float[][] floatValues = blockValSet.getFloatValuesMV();
+          for (int i = 0; i < length; i++) {
+            FloatOpenHashSet floatSet =
+                (FloatOpenHashSet) getValueSet(groupByResultHolder, groupKeyArray[i], DataType.FLOAT);
+            for (float value : floatValues[i]) {
+              floatSet.add(value);
+            }
+          }
+          break;
+        case DOUBLE:
+          double[][] doubleValues = blockValSet.getDoubleValuesMV();
+          for (int i = 0; i < length; i++) {
+            DoubleOpenHashSet doubleSet =
+                (DoubleOpenHashSet) getValueSet(groupByResultHolder, groupKeyArray[i], DataType.DOUBLE);
+            for (double value : doubleValues[i]) {
+              doubleSet.add(value);
+            }
+          }
+          break;
+        case STRING:
+          String[][] stringValues = blockValSet.getStringValuesMV();
+          for (int i = 0; i < length; i++) {
+            ObjectOpenHashSet<String> stringSet =
+                (ObjectOpenHashSet<String>) getValueSet(groupByResultHolder, groupKeyArray[i], DataType.STRING);
+            //noinspection ManualArrayToCollectionCopy
+            for (String value : stringValues[i]) {
+              //noinspection UseBulkOperation
+              stringSet.add(value);
+            }
+          }
+          break;
+        default:
+          throw getIllegalDataTypeException(valueType, false);
+      }
+    }
+  }
 
-  // extraction is handled by the base class
+  @Override
+  public void aggregateGroupByMV(int length, int[][] groupKeysArray, GroupByResultHolder groupByResultHolder,
+                                 Map<ExpressionContext, BlockValSet> blockValSetMap) {
+    BlockValSet blockValSet = blockValSetMap.get(_expression);
+
+    // For dictionary-encoded expression, use adaptive conversion strategy
+    Dictionary dictionary = blockValSet.getDictionary();
+    if (dictionary != null) {
+      // Track which groups were modified to check cardinality only once per group per batch
+      IntSet modifiedGroups = new IntOpenHashSet();
+
+      if (blockValSet.isSingleValue()) {
+        int[] dictIds = blockValSet.getDictionaryIdsSV();
+        for (int i = 0; i < length; i++) {
+          for (int groupKey : groupKeysArray[i]) {
+            aggregateDictIdForGroup(groupByResultHolder, groupKey, dictionary, dictIds[i], modifiedGroups);
+          }
+        }
+      } else {
+        int[][] dictIds = blockValSet.getDictionaryIdsMV();
+        for (int i = 0; i < length; i++) {
+          for (int groupKey : groupKeysArray[i]) {
+            aggregateDictIdsForGroup(groupByResultHolder, groupKey, dictionary, dictIds[i], modifiedGroups);
+          }
+        }
+      }
+      checkAndConvertToHLLForGroups(groupByResultHolder, modifiedGroups);
+      return;
+    }
+
+    // For non-dictionary-encoded expression, store values into the value set
+    DataType valueType = blockValSet.getValueType();
+    DataType storedType = valueType.getStoredType();
+    if (blockValSet.isSingleValue()) {
+      switch (storedType) {
+        case INT:
+          int[] intValues = blockValSet.getIntValuesSV();
+          for (int i = 0; i < length; i++) {
+            setValueForGroupKeys(groupByResultHolder, groupKeysArray[i], intValues[i]);
+          }
+          break;
+        case LONG:
+          long[] longValues = blockValSet.getLongValuesSV();
+          for (int i = 0; i < length; i++) {
+            setValueForGroupKeys(groupByResultHolder, groupKeysArray[i], longValues[i]);
+          }
+          break;
+        case FLOAT:
+          float[] floatValues = blockValSet.getFloatValuesSV();
+          for (int i = 0; i < length; i++) {
+            setValueForGroupKeys(groupByResultHolder, groupKeysArray[i], floatValues[i]);
+          }
+          break;
+        case DOUBLE:
+          double[] doubleValues = blockValSet.getDoubleValuesSV();
+          for (int i = 0; i < length; i++) {
+            setValueForGroupKeys(groupByResultHolder, groupKeysArray[i], doubleValues[i]);
+          }
+          break;
+        case STRING:
+          String[] stringValues = blockValSet.getStringValuesSV();
+          for (int i = 0; i < length; i++) {
+            setValueForGroupKeys(groupByResultHolder, groupKeysArray[i], stringValues[i]);
+          }
+          break;
+        case BYTES:
+          byte[][] bytesValues = blockValSet.getBytesValuesSV();
+          for (int i = 0; i < length; i++) {
+            setValueForGroupKeys(groupByResultHolder, groupKeysArray[i], new ByteArray(bytesValues[i]));
+          }
+          break;
+        default:
+          throw getIllegalDataTypeException(valueType, true);
+      }
+    } else {
+      switch (storedType) {
+        case INT:
+          int[][] intValues = blockValSet.getIntValuesMV();
+          for (int i = 0; i < length; i++) {
+            for (int groupKey : groupKeysArray[i]) {
+              IntOpenHashSet intSet = (IntOpenHashSet) getValueSet(groupByResultHolder, groupKey, DataType.INT);
+              for (int value : intValues[i]) {
+                intSet.add(value);
+              }
+            }
+          }
+          break;
+        case LONG:
+          long[][] longValues = blockValSet.getLongValuesMV();
+          for (int i = 0; i < length; i++) {
+            for (int groupKey : groupKeysArray[i]) {
+              LongOpenHashSet longSet = (LongOpenHashSet) getValueSet(groupByResultHolder, groupKey, DataType.LONG);
+              for (long value : longValues[i]) {
+                longSet.add(value);
+              }
+            }
+          }
+          break;
+        case FLOAT:
+          float[][] floatValues = blockValSet.getFloatValuesMV();
+          for (int i = 0; i < length; i++) {
+            for (int groupKey : groupKeysArray[i]) {
+              FloatOpenHashSet floatSet = (FloatOpenHashSet) getValueSet(groupByResultHolder, groupKey, DataType.FLOAT);
+              for (float value : floatValues[i]) {
+                floatSet.add(value);
+              }
+            }
+          }
+          break;
+        case DOUBLE:
+          double[][] doubleValues = blockValSet.getDoubleValuesMV();
+          for (int i = 0; i < length; i++) {
+            for (int groupKey : groupKeysArray[i]) {
+              DoubleOpenHashSet doubleSet =
+                  (DoubleOpenHashSet) getValueSet(groupByResultHolder, groupKey, DataType.DOUBLE);
+              for (double value : doubleValues[i]) {
+                doubleSet.add(value);
+              }
+            }
+          }
+          break;
+        case STRING:
+          String[][] stringValues = blockValSet.getStringValuesMV();
+          for (int i = 0; i < length; i++) {
+            for (int groupKey : groupKeysArray[i]) {
+              ObjectOpenHashSet<String> stringSet =
+                  (ObjectOpenHashSet<String>) getValueSet(groupByResultHolder, groupKey, DataType.STRING);
+              //noinspection ManualArrayToCollectionCopy
+              for (String value : stringValues[i]) {
+                //noinspection UseBulkOperation
+                stringSet.add(value);
+              }
+            }
+          }
+          break;
+        default:
+          throw getIllegalDataTypeException(valueType, false);
+      }
+    }
+  }
+
+  @Override
+  public Object extractAggregationResult(AggregationResultHolder aggregationResultHolder) {
+    Object result = aggregationResultHolder.getResult();
+    if (result == null) {
+      return EMPTY_PLACEHOLDER;
+    }
+
+    if (result instanceof DictIdsWrapper) {
+      // For dictionary-encoded expression, convert dictionary ids to values
+      DictIdsWrapper dictIdsWrapper = (DictIdsWrapper) result;
+      if (dictIdsWrapper._dictIdBitmap.cardinalityExceeds(_threshold)) {
+        return convertToHLL(dictIdsWrapper);
+      } else {
+        return convertToValueSet(dictIdsWrapper);
+      }
+    } else {
+      // For non-dictionary-encoded expression, directly return the value set
+      return result;
+    }
+  }
+
+  @Override
+  public Set extractGroupByResult(GroupByResultHolder groupByResultHolder, int groupKey) {
+    Object result = groupByResultHolder.getResult(groupKey);
+    if (result == null) {
+      return EMPTY_PLACEHOLDER;
+    }
+
+    if (result instanceof DictIdsWrapper) {
+      // For dictionary-encoded expression, convert dictionary ids to values
+      return convertToValueSet((DictIdsWrapper) result);
+    } else {
+      // For non-dictionary-encoded expression, directly return the value set
+      return (Set) result;
+    }
+  }
 
   @Override
   public Object merge(Object intermediateResult1, Object intermediateResult2) {
@@ -339,12 +790,287 @@ public class DistinctCountSmartHLLAggregationFunction extends BaseDistinctCountS
   /**
    * Returns the dictionary id bitmap from the result holder or creates a new one if it does not exist.
    */
-  // helper methods for dict/value set conversions are provided by the base class
+  protected static RoaringBitmap getDictIdBitmap(AggregationResultHolder aggregationResultHolder,
+                                                 Dictionary dictionary) {
+    DictIdsWrapper dictIdsWrapper = aggregationResultHolder.getResult();
+    if (dictIdsWrapper == null) {
+      dictIdsWrapper = new DictIdsWrapper(dictionary);
+      aggregationResultHolder.setValue(dictIdsWrapper);
+    }
+    return dictIdsWrapper._dictIdBitmap;
+  }
+
+  /**
+   * Returns the value set from the result holder or creates a new one if it does not exist.
+   */
+  protected static Set getValueSet(AggregationResultHolder aggregationResultHolder, DataType valueType) {
+    Set valueSet = aggregationResultHolder.getResult();
+    if (valueSet == null) {
+      valueSet = getValueSet(valueType);
+      aggregationResultHolder.setValue(valueSet);
+    }
+    return valueSet;
+  }
+
+  /**
+   * Helper method to create a value set for the given value type.
+   */
+  private static Set getValueSet(DataType valueType) {
+    switch (valueType) {
+      case INT:
+        return new IntOpenHashSet();
+      case LONG:
+        return new LongOpenHashSet();
+      case FLOAT:
+        return new FloatOpenHashSet();
+      case DOUBLE:
+        return new DoubleOpenHashSet();
+      case STRING:
+      case BYTES:
+        return new ObjectOpenHashSet();
+      default:
+        throw new IllegalStateException("Illegal data type for DISTINCT_COUNT aggregation function: " + valueType);
+    }
+  }
+
+  /**
+   * Returns the dictionary id bitmap for the given group key or creates a new one if it does not exist.
+   */
+  protected static RoaringBitmap getDictIdBitmap(GroupByResultHolder groupByResultHolder, int groupKey,
+                                                 Dictionary dictionary) {
+    DictIdsWrapper dictIdsWrapper = groupByResultHolder.getResult(groupKey);
+    if (dictIdsWrapper == null) {
+      dictIdsWrapper = new DictIdsWrapper(dictionary);
+      groupByResultHolder.setValueForKey(groupKey, dictIdsWrapper);
+    }
+    return dictIdsWrapper._dictIdBitmap;
+  }
+
+  /**
+   * Returns the value set for the given group key or creates a new one if it does not exist.
+   */
+  protected static Set getValueSet(GroupByResultHolder groupByResultHolder, int groupKey, DataType valueType) {
+    Set valueSet = groupByResultHolder.getResult(groupKey);
+    if (valueSet == null) {
+      valueSet = getValueSet(valueType);
+      groupByResultHolder.setValueForKey(groupKey, valueSet);
+    }
+    return valueSet;
+  }
+
+  /**
+   * Helper method to set dictionary id for the given group keys into the result holder.
+   */
+  private static void setDictIdForGroupKeys(GroupByResultHolder groupByResultHolder, int[] groupKeys,
+                                            Dictionary dictionary, int dictId) {
+    for (int groupKey : groupKeys) {
+      getDictIdBitmap(groupByResultHolder, groupKey, dictionary).add(dictId);
+    }
+  }
+
+  /**
+   * Helper method to set INT value for the given group keys into the result holder.
+   */
+  private static void setValueForGroupKeys(GroupByResultHolder groupByResultHolder, int[] groupKeys, int value) {
+    for (int groupKey : groupKeys) {
+      ((IntOpenHashSet) getValueSet(groupByResultHolder, groupKey, DataType.INT)).add(value);
+    }
+  }
+
+  /**
+   * Helper method to set LONG value for the given group keys into the result holder.
+   */
+  private static void setValueForGroupKeys(GroupByResultHolder groupByResultHolder, int[] groupKeys, long value) {
+    for (int groupKey : groupKeys) {
+      ((LongOpenHashSet) getValueSet(groupByResultHolder, groupKey, DataType.LONG)).add(value);
+    }
+  }
+
+  /**
+   * Helper method to set FLOAT value for the given group keys into the result holder.
+   */
+  private static void setValueForGroupKeys(GroupByResultHolder groupByResultHolder, int[] groupKeys, float value) {
+    for (int groupKey : groupKeys) {
+      ((FloatOpenHashSet) getValueSet(groupByResultHolder, groupKey, DataType.FLOAT)).add(value);
+    }
+  }
+
+  /**
+   * Helper method to set DOUBLE value for the given group keys into the result holder.
+   */
+  private static void setValueForGroupKeys(GroupByResultHolder groupByResultHolder, int[] groupKeys, double value) {
+    for (int groupKey : groupKeys) {
+      ((DoubleOpenHashSet) getValueSet(groupByResultHolder, groupKey, DataType.DOUBLE)).add(value);
+    }
+  }
+
+  /**
+   * Helper method to set STRING value for the given group keys into the result holder.
+   */
+  private static void setValueForGroupKeys(GroupByResultHolder groupByResultHolder, int[] groupKeys, String value) {
+    for (int groupKey : groupKeys) {
+      ((ObjectOpenHashSet<String>) getValueSet(groupByResultHolder, groupKey, DataType.STRING)).add(value);
+    }
+  }
+
+  /**
+   * Helper method to set BYTES value for the given group keys into the result holder.
+   */
+  private static void setValueForGroupKeys(GroupByResultHolder groupByResultHolder, int[] groupKeys, ByteArray value) {
+    for (int groupKey : groupKeys) {
+      ((ObjectOpenHashSet<ByteArray>) getValueSet(groupByResultHolder, groupKey, DataType.BYTES)).add(value);
+    }
+  }
+
+  /**
+   * Aggregate dictionary IDs into HLL (when already converted).
+   */
+  private void aggregateDictIdsIntoHLL(HyperLogLog hyperLogLog, Dictionary dictionary, BlockValSet blockValSet,
+                                       int length) {
+    if (blockValSet.isSingleValue()) {
+      int[] dictIds = blockValSet.getDictionaryIdsSV();
+      for (int i = 0; i < length; i++) {
+        hyperLogLog.offer(dictionary.get(dictIds[i]));
+      }
+    } else {
+      int[][] dictIds = blockValSet.getDictionaryIdsMV();
+      for (int i = 0; i < length; i++) {
+        for (int dictId : dictIds[i]) {
+          hyperLogLog.offer(dictionary.get(dictId));
+        }
+      }
+    }
+  }
+
+  /**
+   * Aggregate dictionary IDs into RoaringBitmap (before conversion to HLL).
+   */
+  private void aggregateDictIdsIntoBitmap(RoaringBitmap dictIdBitmap, BlockValSet blockValSet, int length) {
+    if (blockValSet.isSingleValue()) {
+      int[] dictIds = blockValSet.getDictionaryIdsSV();
+      dictIdBitmap.addN(dictIds, 0, length);
+    } else {
+      int[][] dictIds = blockValSet.getDictionaryIdsMV();
+      for (int i = 0; i < length; i++) {
+        dictIdBitmap.add(dictIds[i]);
+      }
+    }
+  }
+
+  /**
+   * Check and convert to HLL if cardinality threshold exceeded for non-group-by aggregation.
+   */
+  private void checkAndConvertToHLL(AggregationResultHolder aggregationResultHolder, RoaringBitmap dictIdBitmap) {
+    if (_enableDictAdaptiveConversion && dictIdBitmap.getCardinality() > _dictIdCardinalityThreshold) {
+      aggregationResultHolder.setValue(convertToHLL(aggregationResultHolder.getResult()));
+    }
+  }
+
+  /**
+   * Check and convert to HLL if cardinality threshold exceeded for group-by aggregation.
+   */
+  private void checkAndConvertToHLLForGroups(GroupByResultHolder groupByResultHolder, IntSet modifiedGroups) {
+    if (_enableDictAdaptiveConversion) {
+      for (int groupKey : modifiedGroups) {
+        Object result = groupByResultHolder.getResult(groupKey);
+        if (result instanceof DictIdsWrapper) {
+          DictIdsWrapper dictIdsWrapper = (DictIdsWrapper) result;
+          if (dictIdsWrapper._dictIdBitmap.getCardinality() > _dictIdCardinalityThreshold) {
+            groupByResultHolder.setValueForKey(groupKey, convertToHLL(dictIdsWrapper));
+          }
+        }
+      }
+    }
+  }
+
+  /**
+   * Aggregate a single dictionary ID for a group. If already HLL, offer directly.
+   * Otherwise add to bitmap and track as modified.
+   */
+  private void aggregateDictIdForGroup(GroupByResultHolder groupByResultHolder, int groupKey, Dictionary dictionary,
+                                       int dictId, IntSet modifiedGroups) {
+    Object result = groupByResultHolder.getResult(groupKey);
+    if (result instanceof HyperLogLog) {
+      ((HyperLogLog) result).offer(dictionary.get(dictId));
+    } else {
+      getDictIdBitmap(groupByResultHolder, groupKey, dictionary).add(dictId);
+      modifiedGroups.add(groupKey);
+    }
+  }
+
+  /**
+   * Aggregate multiple dictionary IDs for a group. If already HLL, offer directly.
+   * Otherwise add to bitmap and track as modified.
+   */
+  private void aggregateDictIdsForGroup(GroupByResultHolder groupByResultHolder, int groupKey, Dictionary dictionary,
+                                        int[] dictIds, IntSet modifiedGroups) {
+    Object result = groupByResultHolder.getResult(groupKey);
+    if (result instanceof HyperLogLog) {
+      HyperLogLog hll = (HyperLogLog) result;
+      for (int dictId : dictIds) {
+        hll.offer(dictionary.get(dictId));
+      }
+    } else {
+      getDictIdBitmap(groupByResultHolder, groupKey, dictionary).add(dictIds);
+      modifiedGroups.add(groupKey);
+    }
+  }
+
+  /**
+   * Helper method to read dictionary and convert dictionary ids to a value set for dictionary-encoded expression.
+   */
+  private static Set convertToValueSet(DictIdsWrapper dictIdsWrapper) {
+    Dictionary dictionary = dictIdsWrapper._dictionary;
+    RoaringBitmap dictIdBitmap = dictIdsWrapper._dictIdBitmap;
+    int numValues = dictIdBitmap.getCardinality();
+    PeekableIntIterator iterator = dictIdBitmap.getIntIterator();
+    DataType storedType = dictionary.getValueType();
+    switch (storedType) {
+      case INT:
+        IntOpenHashSet intSet = new IntOpenHashSet(numValues);
+        while (iterator.hasNext()) {
+          intSet.add(dictionary.getIntValue(iterator.next()));
+        }
+        return intSet;
+      case LONG:
+        LongOpenHashSet longSet = new LongOpenHashSet(numValues);
+        while (iterator.hasNext()) {
+          longSet.add(dictionary.getLongValue(iterator.next()));
+        }
+        return longSet;
+      case FLOAT:
+        FloatOpenHashSet floatSet = new FloatOpenHashSet(numValues);
+        while (iterator.hasNext()) {
+          floatSet.add(dictionary.getFloatValue(iterator.next()));
+        }
+        return floatSet;
+      case DOUBLE:
+        DoubleOpenHashSet doubleSet = new DoubleOpenHashSet(numValues);
+        while (iterator.hasNext()) {
+          doubleSet.add(dictionary.getDoubleValue(iterator.next()));
+        }
+        return doubleSet;
+      case STRING:
+        ObjectOpenHashSet<String> stringSet = new ObjectOpenHashSet<>(numValues);
+        while (iterator.hasNext()) {
+          stringSet.add(dictionary.getStringValue(iterator.next()));
+        }
+        return stringSet;
+      case BYTES:
+        ObjectOpenHashSet<ByteArray> bytesSet = new ObjectOpenHashSet<>(numValues);
+        while (iterator.hasNext()) {
+          bytesSet.add(new ByteArray(dictionary.getBytesValue(iterator.next())));
+        }
+        return bytesSet;
+      default:
+        throw new IllegalStateException("Illegal data type for DISTINCT_COUNT aggregation function: " + storedType);
+    }
+  }
 
   /**
    * Helper method to read dictionary and convert dictionary ids to a HyperLogLog for dictionary-encoded expression.
    */
-  private HyperLogLog convertToHLL(BaseDistinctCountSmartSketchAggregationFunction.DictIdsWrapper dictIdsWrapper) {
+  private HyperLogLog convertToHLL(DictIdsWrapper dictIdsWrapper) {
     HyperLogLog hyperLogLog = new HyperLogLog(_log2m);
     Dictionary dictionary = dictIdsWrapper._dictionary;
     RoaringBitmap dictIdBitmap = dictIdsWrapper._dictIdBitmap;
@@ -355,21 +1081,20 @@ public class DistinctCountSmartHLLAggregationFunction extends BaseDistinctCountS
     return hyperLogLog;
   }
 
-  @Override
-  protected Object convertSetToSketch(Set valueSet, DataType storedType) {
-    return convertSetToHLL(valueSet, storedType);
-  }
-
-  @Override
-  protected Object convertToSketch(BaseDistinctCountSmartSketchAggregationFunction.DictIdsWrapper dictIdsWrapper) {
-    return convertToHLL(dictIdsWrapper);
-  }
-
-  @Override
-  protected IllegalStateException getIllegalDataTypeException(DataType dataType, boolean singleValue) {
+  private static IllegalStateException getIllegalDataTypeException(DataType dataType, boolean singleValue) {
     return new IllegalStateException(
         "Illegal data type for DISTINCT_COUNT_SMART_HLL aggregation function: " + dataType + (singleValue ? ""
             : "_MV"));
+  }
+
+  private static final class DictIdsWrapper {
+    final Dictionary _dictionary;
+    final RoaringBitmap _dictIdBitmap;
+
+    private DictIdsWrapper(Dictionary dictionary) {
+      _dictionary = dictionary;
+      _dictIdBitmap = new RoaringBitmap();
+    }
   }
 
   /**
@@ -380,10 +1105,15 @@ public class DistinctCountSmartHLLAggregationFunction extends BaseDistinctCountS
     static final char PARAMETER_KEY_VALUE_SEPARATOR = '=';
 
     static final String THRESHOLD_KEY = "THRESHOLD";
-    // 100K values to trigger HLL conversion by default
+    // 100K values to trigger Set → HLL conversion by default
     static final int DEFAULT_THRESHOLD = 100_000;
     @Deprecated
     static final String DEPRECATED_THRESHOLD_KEY = "HLLCONVERSIONTHRESHOLD";
+
+    static final String DICT_THRESHOLD_KEY = "DICTTHRESHOLD";
+    // TODO: To remove after initial validation in prod and set to a reasonable value like 100K
+    // Setting to Integer.MIN_VALUE to disable adaptive conversion and only convert at finalization
+    static final int DEFAULT_DICT_THRESHOLD = Integer.MAX_VALUE;
 
     static final String LOG2M_KEY = "LOG2M";
     // Use 12 by default to get good accuracy for DistinctCount
@@ -393,6 +1123,7 @@ public class DistinctCountSmartHLLAggregationFunction extends BaseDistinctCountS
 
     int _threshold = DEFAULT_THRESHOLD;
     int _log2m = DEFAULT_LOG2M;
+    int _dictThreshold = DEFAULT_DICT_THRESHOLD;
 
     Parameters(String parametersString) {
       StringUtils.deleteWhitespace(parametersString);
@@ -409,6 +1140,13 @@ public class DistinctCountSmartHLLAggregationFunction extends BaseDistinctCountS
             // Treat non-positive threshold as unlimited
             if (_threshold <= 0) {
               _threshold = Integer.MAX_VALUE;
+            }
+            break;
+          case DICT_THRESHOLD_KEY:
+            _dictThreshold = Integer.parseInt(value);
+            // Treat non-positive threshold as unlimited
+            if (_dictThreshold <= 0) {
+              _dictThreshold = DEFAULT_DICT_THRESHOLD;
             }
             break;
           case LOG2M_KEY:
