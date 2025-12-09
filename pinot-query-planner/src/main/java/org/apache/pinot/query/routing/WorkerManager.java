@@ -23,6 +23,7 @@ import com.google.common.collect.Maps;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
+import java.util.Comparator;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Iterator;
@@ -114,7 +115,6 @@ public class WorkerManager {
     }
   }
 
-  // TODO: Ensure that workerId to server assignment is deterministic across all stages in a query.
   private void assignWorkersToNonRootFragment(PlanFragment fragment, DispatchablePlanContext context) {
     List<PlanFragment> children = fragment.getChildren();
     for (PlanFragment child : children) {
@@ -362,6 +362,10 @@ public class WorkerManager {
     } else {
       candidateServers = getCandidateServersPerTables(context);
     }
+    // Sort to ensure deterministic worker ID assignment across stages.
+    // This is critical for pre-partitioned exchanges where worker ID N on one stage
+    // must map to the same physical server as worker ID N on another stage.
+    candidateServers.sort(Comparator.comparing(QueryServerInstance::getInstanceId));
     return candidateServers;
   }
 
@@ -502,12 +506,18 @@ public class WorkerManager {
         metadata.addUnavailableSegments(tableName, routingTable.getUnavailableSegments());
       }
     }
+    // Sort server instances to ensure deterministic worker ID assignment.
+    // This is critical for pre-partitioned exchanges where worker ID N on one stage
+    // must map to the same physical server as worker ID N on another stage.
+    List<ServerInstance> sortedServers = new ArrayList<>(serverInstanceToSegmentsMap.keySet());
+    sortedServers.sort(Comparator.comparing(ServerInstance::getInstanceId));
+
     int workerId = 0;
     Map<Integer, QueryServerInstance> workerIdToServerInstanceMap = new HashMap<>();
     Map<Integer, Map<String, List<String>>> workerIdToSegmentsMap = new HashMap<>();
-    for (Map.Entry<ServerInstance, Map<String, List<String>>> entry : serverInstanceToSegmentsMap.entrySet()) {
-      workerIdToServerInstanceMap.put(workerId, new QueryServerInstance(entry.getKey()));
-      workerIdToSegmentsMap.put(workerId, entry.getValue());
+    for (ServerInstance serverInstance : sortedServers) {
+      workerIdToServerInstanceMap.put(workerId, new QueryServerInstance(serverInstance));
+      workerIdToSegmentsMap.put(workerId, serverInstanceToSegmentsMap.get(serverInstance));
       workerId++;
     }
     metadata.setWorkerIdToServerInstanceMap(workerIdToServerInstanceMap);
@@ -657,13 +667,18 @@ public class WorkerManager {
       }
     }
 
+    // Sort server instances to ensure deterministic worker ID assignment.
+    // This is critical for pre-partitioned exchanges where worker ID N on one stage
+    // must map to the same physical server as worker ID N on another stage.
+    List<ServerInstance> sortedServers = new ArrayList<>(serverInstanceToLogicalSegmentsMap.keySet());
+    sortedServers.sort(Comparator.comparing(ServerInstance::getInstanceId));
+
     int workerId = 0;
     Map<Integer, QueryServerInstance> workerIdToServerInstanceMap = new HashMap<>();
     Map<Integer, Map<String, List<String>>> workerIdToLogicalTableSegmentsMap = new HashMap<>();
-    for (Map.Entry<ServerInstance, Map<String, List<String>>> entry
-        : serverInstanceToLogicalSegmentsMap.entrySet()) {
-      workerIdToServerInstanceMap.put(workerId, new QueryServerInstance(entry.getKey()));
-      workerIdToLogicalTableSegmentsMap.put(workerId, entry.getValue());
+    for (ServerInstance serverInstance : sortedServers) {
+      workerIdToServerInstanceMap.put(workerId, new QueryServerInstance(serverInstance));
+      workerIdToLogicalTableSegmentsMap.put(workerId, serverInstanceToLogicalSegmentsMap.get(serverInstance));
       workerId++;
     }
 
@@ -966,7 +981,7 @@ public class WorkerManager {
       if (!tablePartitionReplicatedServersInfo.getSegmentsWithInvalidPartition().isEmpty()) {
         throw new IllegalStateException(
             "Find " + tablePartitionReplicatedServersInfo.getSegmentsWithInvalidPartition().size()
-            + " segments with invalid partition");
+                + " segments with invalid partition");
       }
 
       int numPartitions = tablePartitionReplicatedServersInfo.getNumPartitions();
