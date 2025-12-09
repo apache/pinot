@@ -1505,6 +1505,8 @@ public class CommonConstants {
     public static final String SEGMENT_NAME_HTTP_HEADER = "Pinot-Segment-Name";
     public static final String TABLE_NAME_HTTP_HEADER = "Pinot-Table-Name";
     public static final String PINOT_QUERY_ERROR_CODE_HEADER = "X-Pinot-Error-Code";
+    public static final String PINOT_HTTP_RESPONSE_CODE_REPRESENT_ERROR_HEADER =
+        "X-PINOT-HTTP-RESPONSE-CODE-REPRESENT-ERROR";
     public static final String INGESTION_DESCRIPTOR = "Pinot-Ingestion-Descriptor";
     public static final String PREFIX_OF_CONFIG_OF_PINOT_CRYPTER = "pinot.controller.crypter";
 
@@ -1722,7 +1724,7 @@ public class CommonConstants {
       public enum Status {
         IN_PROGRESS, // The segment is still consuming data
         COMMITTING, // This state will only be utilised by pauseless ingestion when the segment has been consumed but
-                    // is yet to be build and uploaded by the server.
+        // is yet to be build and uploaded by the server.
         DONE, // The segment has finished consumption and has been committed to the segment store
         UPLOADED; // The segment is uploaded by an external party
 
