@@ -456,7 +456,11 @@ public class SegmentIndexCreationDriverImpl implements SegmentIndexCreationDrive
   private void handlePostCreation()
       throws Exception {
     // Execute all post-creation operations directly on the index creator
-    _indexCreator.seal();
+    try {
+      _indexCreator.seal();
+    } finally {
+      _indexCreator.close();
+    }
     _segmentName = _indexCreator.getSegmentName();
 
     // Move the segment from the temporary directory to the final output directory

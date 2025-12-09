@@ -26,7 +26,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.TreeMap;
 import javax.annotation.Nullable;
-import org.apache.commons.configuration2.ex.ConfigurationException;
 import org.apache.pinot.segment.local.segment.creator.impl.nullvalue.NullValueVectorCreator;
 import org.apache.pinot.segment.local.segment.index.forward.ForwardIndexType;
 import org.apache.pinot.segment.local.segment.readers.PinotSegmentColumnReader;
@@ -255,22 +254,5 @@ public class SegmentColumnarIndexCreator extends BaseSegmentCreator {
     for (IndexCreator creator : creatorsByIndex) {
       creator.add(values, dictId);
     }
-  }
-
-  @Override
-  public void flushColIndexes()
-      throws ConfigurationException, IOException {
-    for (ColumnIndexCreators colIndexes : _colIndexes.values()) {
-      if (colIndexes.getDictionaryCreator() != null) {
-        colIndexes.getDictionaryCreator().seal();
-      }
-      if (colIndexes.getNullValueVectorCreator() != null) {
-        colIndexes.getNullValueVectorCreator().seal();
-      }
-      for (IndexCreator creator : colIndexes.getIndexCreators()) {
-        creator.seal();
-      }
-    }
-    writeMetadata();
   }
 }

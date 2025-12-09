@@ -42,6 +42,8 @@ import org.apache.pinot.common.metrics.MinionMeter;
 import org.apache.pinot.common.metrics.MinionMetrics;
 import org.apache.pinot.common.metrics.ServerMeter;
 import org.apache.pinot.common.metrics.ServerMetrics;
+import org.apache.pinot.common.utils.FileUtils;
+import org.apache.pinot.segment.local.io.util.PinotDataBitSet;
 import org.apache.pinot.segment.local.segment.creator.impl.nullvalue.NullValueVectorCreator;
 import org.apache.pinot.segment.local.segment.index.converter.SegmentFormatConverterFactory;
 import org.apache.pinot.segment.local.segment.index.dictionary.DictionaryIndexPlugin;
@@ -66,10 +68,12 @@ import org.apache.pinot.segment.spi.index.IndexHandler;
 import org.apache.pinot.segment.spi.index.IndexService;
 import org.apache.pinot.segment.spi.index.IndexType;
 import org.apache.pinot.segment.spi.index.StandardIndexes;
+import org.apache.pinot.segment.spi.index.TextIndexConfig;
 import org.apache.pinot.segment.spi.index.creator.ForwardIndexCreator;
 import org.apache.pinot.segment.spi.index.creator.SegmentIndexCreationInfo;
 import org.apache.pinot.segment.spi.loader.SegmentDirectoryLoaderContext;
 import org.apache.pinot.segment.spi.loader.SegmentDirectoryLoaderRegistry;
+import org.apache.pinot.segment.spi.partition.PartitionFunction;
 import org.apache.pinot.segment.spi.store.SegmentDirectory;
 import org.apache.pinot.segment.spi.store.SegmentDirectoryPaths;
 import org.apache.pinot.spi.config.instance.InstanceType;
@@ -382,7 +386,7 @@ public abstract class BaseSegmentCreator implements SegmentCreator {
     if (dictEnabledColumn) {
       return null;
     }
-    org.apache.pinot.segment.spi.index.TextIndexConfig textConfig = configs.getConfig(StandardIndexes.text());
+    TextIndexConfig textConfig = configs.getConfig(StandardIndexes.text());
     if (!textConfig.isEnabled()) {
       return null;
     }
@@ -562,7 +566,7 @@ public abstract class BaseSegmentCreator implements SegmentCreator {
     //       Consider changing it after releasing 1.5.0.
     //       See https://github.com/apache/pinot/pull/16921 for details
     properties.setProperty(getKeyFor(column, BITS_PER_ELEMENT),
-        String.valueOf(org.apache.pinot.segment.local.io.util.PinotDataBitSet.getNumBitsPerValue(cardinality - 1)));
+        String.valueOf(PinotDataBitSet.getNumBitsPerValue(cardinality - 1)));
     FieldType fieldType = fieldSpec.getFieldType();
     properties.setProperty(getKeyFor(column, DICTIONARY_ELEMENT_SIZE), String.valueOf(dictionaryElementSize));
     properties.setProperty(getKeyFor(column, COLUMN_TYPE), String.valueOf(fieldType));
@@ -587,7 +591,7 @@ public abstract class BaseSegmentCreator implements SegmentCreator {
       }
     }
 
-    org.apache.pinot.segment.spi.partition.PartitionFunction partitionFunction =
+    PartitionFunction partitionFunction =
         columnIndexCreationInfo.getPartitionFunction();
     if (partitionFunction != null) {
       properties.setProperty(getKeyFor(column, PARTITION_FUNCTION), partitionFunction.getName());
@@ -736,11 +740,6 @@ public abstract class BaseSegmentCreator implements SegmentCreator {
     return _segmentName;
   }
 
-  /**
-   * Writes the individual column index files to disk.
-   */
-  protected abstract void flushColIndexes() throws Exception;
-
   @Override
   public void seal()
       throws Exception {
@@ -749,7 +748,7 @@ public abstract class BaseSegmentCreator implements SegmentCreator {
       // Write the index files to disk
       flushColIndexes();
     } finally {
-      close();
+      closeColIndexes();
     }
     LOGGER.info("Finished segment seal for: {}", _segmentName);
 
@@ -798,6 +797,21 @@ public abstract class BaseSegmentCreator implements SegmentCreator {
     } else {
       return _config.getSegmentNameGenerator().generateSegmentName(_config.getSequenceId(), null, null);
     }
+  }
+
+  /**
+   * Writes the individual column index files to disk.
+   */
+  private void flushColIndexes() throws Exception {
+    for (ColumnIndexCreators colIndexes : _colIndexes.values()) {
+      colIndexes.seal();
+    }
+    writeMetadata();
+  }
+
+  private void closeColIndexes() throws IOException {
+    List<Closeable> creators = new ArrayList<>(_colIndexes.values());
+    FileUtils.close(creators);
   }
 
   // Explanation of why we are using format converter:
@@ -967,16 +981,6 @@ public abstract class BaseSegmentCreator implements SegmentCreator {
   @Override
   public void close()
       throws IOException {
-    List<Closeable> creators = new ArrayList<>();
-    for (ColumnIndexCreators colIndexes : _colIndexes.values()) {
-      if (colIndexes.getDictionaryCreator() != null) {
-        creators.add(colIndexes.getDictionaryCreator());
-      }
-      if (colIndexes.getNullValueVectorCreator() != null) {
-        creators.add(colIndexes.getNullValueVectorCreator());
-      }
-      creators.addAll(colIndexes.getIndexCreators());
-    }
-    org.apache.pinot.common.utils.FileUtils.close(creators);
+    closeColIndexes();
   }
 }
