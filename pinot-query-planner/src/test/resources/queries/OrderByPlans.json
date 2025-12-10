@@ -62,6 +62,29 @@
         ]
       },
       {
+        "description": "Select * with order by and super large limit but query option",
+        "sql": "SET sortExchangeCopyThreshold=20000000; EXPLAIN PLAN FOR SELECT * FROM b order by col1 LIMIT 10000000",
+        "output": [
+          "Execution Plan",
+          "\nLogicalSort(sort0=[$0], dir0=[ASC], offset=[0], fetch=[10000000])",
+          "\n  PinotLogicalSortExchange(distribution=[hash], collation=[[0]], isSortOnSender=[false], isSortOnReceiver=[true])",
+          "\n    LogicalSort(sort0=[$0], dir0=[ASC], fetch=[10000000])",
+          "\n      PinotLogicalTableScan(table=[[default, b]])",
+          "\n"
+        ]
+      },
+      {
+        "description": "Select * with order by and small large limit but query option",
+        "sql": "SET sortExchangeCopyThreshold=10; EXPLAIN PLAN FOR SELECT * FROM b order by col1 LIMIT 20",
+        "output": [
+          "Execution Plan",
+          "\nLogicalSort(sort0=[$0], dir0=[ASC], fetch=[20])",
+          "\n  PinotLogicalSortExchange(distribution=[hash], collation=[[0]], isSortOnSender=[false], isSortOnReceiver=[true])",
+          "\n    PinotLogicalTableScan(table=[[default, b]])",
+          "\n"
+        ]
+      },
+      {
         "description": "Select * order by on 2 columns with super large limit",
         "sql": "EXPLAIN PLAN FOR SELECT * FROM b ORDER BY col1, col2 DESC LIMIT 10000000",
         "output": [
