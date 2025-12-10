@@ -75,6 +75,7 @@ import org.apache.pinot.core.routing.RoutingManager;
 import org.apache.pinot.core.transport.ServerInstance;
 import org.apache.pinot.query.ImmutableQueryEnvironment;
 import org.apache.pinot.query.QueryEnvironment;
+import org.apache.pinot.query.QueryEnvironmentConfigFactory;
 import org.apache.pinot.query.mailbox.MailboxService;
 import org.apache.pinot.query.planner.explain.AskingServerStageExplainer;
 import org.apache.pinot.query.planner.physical.DispatchablePlanFragment;
@@ -416,68 +417,8 @@ public class MultiStageBrokerRequestHandler extends BaseBrokerRequestHandler {
   private ImmutableQueryEnvironment.Config getQueryEnvConf(HttpHeaders httpHeaders, Map<String, String> queryOptions,
       long requestId) {
     String database = DatabaseUtils.extractDatabaseFromQueryRequest(queryOptions, httpHeaders);
-    boolean inferPartitionHint = _config.getProperty(CommonConstants.Broker.CONFIG_OF_INFER_PARTITION_HINT,
-        CommonConstants.Broker.DEFAULT_INFER_PARTITION_HINT);
-    boolean defaultUseSpool = _config.getProperty(CommonConstants.Broker.CONFIG_OF_SPOOLS,
-        CommonConstants.Broker.DEFAULT_OF_SPOOLS);
-    boolean defaultUseLeafServerForIntermediateStage = _config.getProperty(
-        CommonConstants.Broker.CONFIG_OF_USE_LEAF_SERVER_FOR_INTERMEDIATE_STAGE,
-        CommonConstants.Broker.DEFAULT_USE_LEAF_SERVER_FOR_INTERMEDIATE_STAGE);
-    boolean defaultEnableGroupTrim = _config.getProperty(CommonConstants.Broker.CONFIG_OF_MSE_ENABLE_GROUP_TRIM,
-        CommonConstants.Broker.DEFAULT_MSE_ENABLE_GROUP_TRIM);
-    boolean defaultEnableDynamicFilteringSemiJoin = _config.getProperty(
-        CommonConstants.Broker.CONFIG_OF_BROKER_ENABLE_DYNAMIC_FILTERING_SEMI_JOIN,
-        CommonConstants.Broker.DEFAULT_ENABLE_DYNAMIC_FILTERING_SEMI_JOIN);
-    boolean defaultUsePhysicalOptimizer = _config.getProperty(
-        CommonConstants.Broker.CONFIG_OF_USE_PHYSICAL_OPTIMIZER,
-        CommonConstants.Broker.DEFAULT_USE_PHYSICAL_OPTIMIZER);
-    boolean defaultUseLiteMode = _config.getProperty(
-        CommonConstants.Broker.CONFIG_OF_USE_LITE_MODE,
-        CommonConstants.Broker.DEFAULT_USE_LITE_MODE);
-    boolean defaultRunInBroker = _config.getProperty(
-        CommonConstants.Broker.CONFIG_OF_RUN_IN_BROKER,
-        CommonConstants.Broker.DEFAULT_RUN_IN_BROKER);
-    boolean defaultUseBrokerPruning = _config.getProperty(
-        CommonConstants.Broker.CONFIG_OF_USE_BROKER_PRUNING,
-        CommonConstants.Broker.DEFAULT_USE_BROKER_PRUNING);
-    int defaultLiteModeLeafStageLimit = _config.getProperty(
-        CommonConstants.Broker.CONFIG_OF_LITE_MODE_LEAF_STAGE_LIMIT,
-        CommonConstants.Broker.DEFAULT_LITE_MODE_LEAF_STAGE_LIMIT);
-    int defaultLiteModeFanoutAdjustedLimit = _config.getProperty(
-        CommonConstants.Broker.CONFIG_OF_LITE_MODE_LEAF_STAGE_FANOUT_ADJUSTED_LIMIT,
-        CommonConstants.Broker.DEFAULT_LITE_MODE_LEAF_STAGE_FAN_OUT_ADJUSTED_LIMIT);
-    boolean defaultLiteModeEnableJoins = _config.getProperty(
-        CommonConstants.Broker.CONFIG_OF_LITE_MODE_ENABLE_JOINS,
-        CommonConstants.Broker.DEFAULT_LITE_MODE_ENABLE_JOINS);
-    String defaultHashFunction = _config.getProperty(
-        CommonConstants.Broker.CONFIG_OF_BROKER_DEFAULT_HASH_FUNCTION,
-        CommonConstants.Broker.DEFAULT_BROKER_DEFAULT_HASH_FUNCTION);
-    boolean caseSensitive = !_config.getProperty(
-        CommonConstants.Helix.ENABLE_CASE_INSENSITIVE_KEY,
-        CommonConstants.Helix.DEFAULT_ENABLE_CASE_INSENSITIVE
-    );
-    return QueryEnvironment.configBuilder()
-        .requestId(requestId)
-        .database(database)
-        .tableCache(_tableCache)
-        .workerManager(_workerManager)
-        .isCaseSensitive(caseSensitive)
-        .isNullHandlingEnabled(QueryOptionsUtils.isNullHandlingEnabled(queryOptions))
-        .defaultInferPartitionHint(inferPartitionHint)
-        .defaultUseSpools(defaultUseSpool)
-        .defaultUseLeafServerForIntermediateStage(defaultUseLeafServerForIntermediateStage)
-        .defaultEnableGroupTrim(defaultEnableGroupTrim)
-        .defaultEnableDynamicFilteringSemiJoin(defaultEnableDynamicFilteringSemiJoin)
-        .defaultUsePhysicalOptimizer(defaultUsePhysicalOptimizer)
-        .defaultUseLiteMode(defaultUseLiteMode)
-        .defaultRunInBroker(defaultRunInBroker)
-        .defaultUseBrokerPruning(defaultUseBrokerPruning)
-        .defaultLiteModeLeafStageLimit(defaultLiteModeLeafStageLimit)
-        .defaultLiteModeLeafStageFanOutAdjustedLimit(defaultLiteModeFanoutAdjustedLimit)
-        .defaultLiteModeEnableJoins(defaultLiteModeEnableJoins)
-        .defaultHashFunction(defaultHashFunction)
-        .defaultDisabledPlannerRules(_defaultDisabledPlannerRules)
-        .build();
+    return QueryEnvironmentConfigFactory.create(database, queryOptions, requestId, _config, _tableCache, _workerManager,
+        _defaultDisabledPlannerRules);
   }
 
   private long getTimeoutMs(Map<String, String> queryOptions) {
