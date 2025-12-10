@@ -30,10 +30,10 @@ import org.apache.pinot.common.utils.request.RequestUtils;
 /**
  * AggregationOptimizer optimizes aggregation functions by leveraging mathematical properties.
  * Currently supports:
- * - sum(column + constant) → sum(column) + constant * count(1)
- * - sum(column - constant) → sum(column) - constant * count(1)
- * - sum(constant + column) → sum(column) + constant * count(1)
- * - sum(constant - column) → constant * count(1) - sum(column)
+ * - sum(column + constant) → sum(column) + constant * count(column)
+ * - sum(column - constant) → sum(column) - constant * count(column)
+ * - sum(constant + column) → sum(column) + constant * count(column)
+ * - sum(constant - column) → constant * count(column) - sum(column)
  * - sum/avg/min/max(column * constant) → aggregation(column) * constant
  *   (for min/max, negative constants flip the aggregation to max/min)
  */
@@ -163,7 +163,7 @@ public class AggregationOptimizer implements QueryRewriter {
       } else if ("sub".equalsIgnoreCase(operator) || "minus".equalsIgnoreCase(operator)) {
         return optimizeSubtractionForFunction(left, right, aggregationFunction);
       } else if ("mul".equalsIgnoreCase(operator) || "mult".equalsIgnoreCase(operator)
-          || "multiply".equalsIgnoreCase(operator)) {
+          || "multiply".equalsIgnoreCase(operator) || "times".equalsIgnoreCase(operator)) {
         return optimizeMultiplicationForFunction(left, right, aggregationFunction);
       }
     }
@@ -190,11 +190,11 @@ public class AggregationOptimizer implements QueryRewriter {
   private Expression optimizeAdditionForFunction(Expression left, Expression right, String aggregationFunction) {
     if (isColumn(left) && isConstant(right)) {
       // AGG(column + constant) → AGG(column) + constant (for avg/min/max)
-      // or AGG(column) + constant * count(1) (for sum)
+      // or AGG(column) + constant * count(column) (for sum)
       return createOptimizedAddition(left, right, aggregationFunction);
     } else if (isConstant(left) && isColumn(right)) {
       // AGG(constant + column) → AGG(column) + constant (for avg/min/max)
-      // or AGG(column) + constant * count(1) (for sum)
+      // or AGG(column) + constant * count(column) (for sum)
       return createOptimizedAddition(right, left, aggregationFunction);
     }
     return null;
@@ -206,7 +206,7 @@ public class AggregationOptimizer implements QueryRewriter {
   private Expression optimizeSubtractionForFunction(Expression left, Expression right, String aggregationFunction) {
     if (isColumn(left) && isConstant(right)) {
       // AGG(column - constant) → AGG(column) - constant (for avg/min/max)
-      // or AGG(column) - constant * count(1) (for sum)
+      // or AGG(column) - constant * count(column) (for sum)
       return createOptimizedSubtraction(left, right, aggregationFunction);
     } else if (isConstant(left) && isColumn(right)) {
       // Special cases: constant - AGG(column)
@@ -232,7 +232,7 @@ public class AggregationOptimizer implements QueryRewriter {
 
   /**
    * Creates the optimized expression for addition based on aggregation function.
-   * For sum: AGG(column) + constant * count(1)
+   * For sum: AGG(column) + constant * count(column)
    * For avg/min/max: AGG(column) + constant
    */
   private Expression createOptimizedAddition(Expression column, Expression constant, String aggregationFunction) {
@@ -240,7 +240,7 @@ public class AggregationOptimizer implements QueryRewriter {
     Expression rightOperand;
 
     if ("sum".equals(aggregationFunction)) {
-      rightOperand = createConstantTimesCount(constant);
+      rightOperand = createConstantTimesCount(constant, column);
     } else {
       rightOperand = constant;
     }
@@ -250,7 +250,7 @@ public class AggregationOptimizer implements QueryRewriter {
 
   /**
    * Creates the optimized expression for subtraction based on aggregation function.
-   * For sum: AGG(column) - constant * count(1)
+   * For sum: AGG(column) - constant * count(column)
    * For avg/min/max: AGG(column) - constant
    */
   private Expression createOptimizedSubtraction(Expression column, Expression constant, String aggregationFunction) {
@@ -258,7 +258,7 @@ public class AggregationOptimizer implements QueryRewriter {
     Expression rightOperand;
 
     if ("sum".equals(aggregationFunction)) {
-      rightOperand = createConstantTimesCount(constant);
+      rightOperand = createConstantTimesCount(constant, column);
     } else {
       rightOperand = constant;
     }
@@ -268,7 +268,7 @@ public class AggregationOptimizer implements QueryRewriter {
 
   /**
    * Creates the optimized expression for reversed subtraction based on aggregation function.
-   * For sum: constant * count(1) - sum(column)
+   * For sum: constant * count(column) - sum(column)
    * For avg: constant - avg(column)
    * For min: constant - max(column)
    * For max: constant - min(column)
@@ -279,7 +279,7 @@ public class AggregationOptimizer implements QueryRewriter {
     Expression aggColumn;
 
     if ("sum".equals(aggregationFunction)) {
-      leftOperand = createConstantTimesCount(constant);
+      leftOperand = createConstantTimesCount(constant, column);
       aggColumn = createAggregationExpression(column, "sum");
     } else if ("min".equals(aggregationFunction)) {
       leftOperand = constant;
@@ -324,22 +324,11 @@ public class AggregationOptimizer implements QueryRewriter {
   }
 
   /**
-   * Creates constant * count(1) expression
+   * Creates constant * count(column) expression.
    */
-  private Expression createConstantTimesCount(Expression constant) {
-    Expression countOne = createCountOneExpression();
-    return RequestUtils.getFunctionExpression("mult", constant, countOne);
-  }
-
-  /**
-   * Creates count(1) expression
-   */
-  private Expression createCountOneExpression() {
-    Literal oneLiteral = new Literal();
-    oneLiteral.setIntValue(1);
-    Expression oneExpression = new Expression(ExpressionType.LITERAL);
-    oneExpression.setLiteral(oneLiteral);
-    return RequestUtils.getFunctionExpression("count", oneExpression);
+  private Expression createConstantTimesCount(Expression constant, Expression column) {
+    Expression countExpr = RequestUtils.getFunctionExpression("count", column);
+    return RequestUtils.getFunctionExpression("mult", constant, countExpr);
   }
 
   /**
