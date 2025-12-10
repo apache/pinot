@@ -78,7 +78,9 @@ public class LagValueWindowFunction extends ValueWindowFunction {
     int numRows = rows.size();
     Object[] result = new Object[numRows];
     if (_defaultValue != null) {
-      Arrays.fill(result, 0, _offset, _defaultValue);
+      // We only fill up to numRows to handle the case where the offset
+      // is larger than numRows
+      Arrays.fill(result, 0, numRows, _defaultValue);
     }
     for (int i = _offset; i < numRows; i++) {
       result[i] = extractValueFromRow(rows.get(i - _offset));

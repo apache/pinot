@@ -637,6 +637,62 @@ public class WindowAggregateOperatorTest {
     assertTrue(operator.nextBlock().isSuccess(), "Second block is EOS (done processing)");
   }
 
+  @Test
+  public void testLeadLagWindowFunctionWithOffsetGreaterThanNumberOfRows() {
+    // Given: Test with offset much larger than partition size to verify overflow handling
+    // Input should be in sorted order on the order by key as SortExchange will handle pre-sorting the data
+    DataSchema inputSchema = new DataSchema(new String[]{"group", "arg"}, new ColumnDataType[]{INT, STRING});
+    MultiStageOperator input = new BlockListMultiStageOperator.Builder(inputSchema)
+        .addRow(1, "alpha")
+        .addRow(1, "beta")
+        .addRow(1, "gamma")
+        .addRow(2, "bar")
+        .addRow(2, "foo")
+        .addRow(3, "single")
+        .buildWithEos();
+    DataSchema resultSchema =
+        new DataSchema(new String[]{"group", "arg", "lead_no_default", "lag_no_default", "lead_with_default", "lag_with_default"},
+            new ColumnDataType[]{INT, STRING, INT, INT, INT, INT});
+    List<Integer> keys = List.of(0);
+    List<RelFieldCollation> collations =
+        List.of(new RelFieldCollation(1, RelFieldCollation.Direction.ASCENDING, RelFieldCollation.NullDirection.LAST));
+    List<RexExpression.FunctionCall> aggCalls = List.of(
+        // LEAD with offset 1000, no default value - should return null
+        new RexExpression.FunctionCall(ColumnDataType.INT, SqlKind.LEAD.name(),
+            List.of(new RexExpression.InputRef(0), new RexExpression.Literal(ColumnDataType.INT, 1000))),
+        // LAG with offset 1000, no default value - should return null
+        new RexExpression.FunctionCall(ColumnDataType.INT, SqlKind.LAG.name(),
+            List.of(new RexExpression.InputRef(0), new RexExpression.Literal(ColumnDataType.INT, 1000))),
+        // LEAD with offset Integer.MAX_VALUE and default value 9999
+        new RexExpression.FunctionCall(ColumnDataType.INT, SqlKind.LEAD.name(),
+            List.of(new RexExpression.InputRef(0), new RexExpression.Literal(ColumnDataType.INT, Integer.MAX_VALUE),
+                new RexExpression.Literal(ColumnDataType.INT, 9999))),
+        // LAG with offset Integer.MAX_VALUE and default value 8888
+        new RexExpression.FunctionCall(ColumnDataType.INT, SqlKind.LAG.name(),
+            List.of(new RexExpression.InputRef(0), new RexExpression.Literal(ColumnDataType.INT, Integer.MAX_VALUE),
+                new RexExpression.Literal(ColumnDataType.INT, 8888))));
+    WindowAggregateOperator operator =
+        getOperator(inputSchema, resultSchema, keys, collations, aggCalls, WindowNode.WindowFrameType.RANGE,
+            Integer.MIN_VALUE, 0, input);
+
+    // When:
+    List<Object[]> resultRows = ((MseBlock.Data) operator.nextBlock()).asRowHeap().getRows();
+
+    // Then: All rows should return null or default value since offset exceeds partition size
+    verifyResultRows(resultRows, keys, Map.of(
+        1, List.of(
+            new Object[]{1, "alpha", null, null, 9999, 8888},
+            new Object[]{1, "beta", null, null, 9999, 8888},
+            new Object[]{1, "gamma", null, null, 9999, 8888}),
+        2, List.of(
+            new Object[]{2, "bar", null, null, 9999, 8888},
+            new Object[]{2, "foo", null, null, 9999, 8888}),
+        3, List.<Object[]>of(
+            new Object[]{3, "single", null, null, 9999, 8888})
+    ));
+    assertTrue(operator.nextBlock().isSuccess(), "Second block is EOS (done processing)");
+  }
+
   @Test(dataProvider = "windowFrameTypes")
   public void testSumWithUnboundedPrecedingLowerAndUnboundedFollowingUpper(WindowNode.WindowFrameType frameType) {
     // Given:
