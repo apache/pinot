@@ -105,9 +105,9 @@ public class PinotClientRequestTest {
         QueryErrorCode.TABLE_DOES_NOT_EXIST.getId());
 
     // for failed query result the response code should be corresponding http response code of the Error code if
-    // PINOT_USE_HTTP_STATUS_FOR_ERRORS_HEADER is set to true.
+    // USE_HTTP_STATUS_FOR_ERRORS_HEADER is set to true.
     when(_httpHeaders.getHeaderString(
-        CommonConstants.Broker.PINOT_USE_HTTP_STATUS_FOR_ERRORS_HEADER)).thenReturn("true");
+        CommonConstants.Broker.USE_HTTP_STATUS_FOR_ERRORS_HEADER)).thenReturn("true");
     Response tableDoesNotExistResponseWithHttpResponseCode =
         PinotClientRequest.getPinotQueryResponse(tableDoesNotExistBrokerResponse, _httpHeaders);
     assertEquals(tableDoesNotExistResponseWithHttpResponseCode.getStatus(), Response.Status.NOT_FOUND.getStatusCode());

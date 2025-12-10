@@ -590,7 +590,7 @@ public class PinotClientRequest {
    * otherwise, the first error code of the broker response exception array will become the header value.
    *
    * By default, returns HTTP 200 OK even for errors. If the request header
-   * 'X-PINOT-HTTP-RESPONSE-CODE-REPRESENT-ERROR' is set to 'true', returns appropriate HTTP status
+   * 'Pinot-Use-Http-Status-For-Errors' is set to 'true', returns appropriate HTTP status
    * codes based on the error type from QueryErrorCode.getHttpResponseStatus().
    *
    * @param brokerResponse The broker response containing query results or errors
@@ -611,7 +611,7 @@ public class PinotClientRequest {
 
       // Check if the client wants actual HTTP error codes instead of 200 OK
       if (Boolean.parseBoolean(httpHeaders.getHeaderString(
-          CommonConstants.Broker.PINOT_USE_HTTP_STATUS_FOR_ERRORS_HEADER))) {
+          CommonConstants.Broker.USE_HTTP_STATUS_FOR_ERRORS_HEADER))) {
         QueryErrorCode queryErrorCode = QueryErrorCode.fromErrorCode(queryErrorCodeHeaderValue);
         httpStatus = queryErrorCode.getHttpResponseStatus();
       }
