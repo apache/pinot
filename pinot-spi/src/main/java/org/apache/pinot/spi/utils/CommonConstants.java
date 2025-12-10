@@ -1052,6 +1052,9 @@ public class CommonConstants {
     public static final String USE_MSE_TO_FILL_EMPTY_RESPONSE_SCHEMA =
         "pinot.broker.use.mse.to.fill.empty.response.schema";
     public static final boolean DEFAULT_USE_MSE_TO_FILL_EMPTY_RESPONSE_SCHEMA = false;
+
+    public static final String USE_HTTP_STATUS_FOR_ERRORS_HEADER =
+        "Pinot-Use-Http-Status-For-Errors";
   }
 
   public static class Server {
