@@ -651,7 +651,8 @@ public class WindowAggregateOperatorTest {
         .addRow(3, "single")
         .buildWithEos();
     DataSchema resultSchema =
-        new DataSchema(new String[]{"group", "arg", "lead_no_default", "lag_no_default", "lead_with_default", "lag_with_default"},
+        new DataSchema(
+            new String[]{"group", "arg", "lead_no_default", "lag_no_default", "lead_with_default", "lag_with_default"},
             new ColumnDataType[]{INT, STRING, INT, INT, INT, INT});
     List<Integer> keys = List.of(0);
     List<RelFieldCollation> collations =
