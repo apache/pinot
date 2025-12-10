@@ -140,7 +140,9 @@ public class DispatchablePlanVisitor implements PlanNodeVisitor<Void, Dispatchab
   public Void visitSort(SortNode node, DispatchablePlanContext context) {
     node.getInputs().get(0).visit(this, context);
     DispatchablePlanMetadata dispatchablePlanMetadata = getOrCreateDispatchablePlanMetadata(node, context);
-    dispatchablePlanMetadata.setRequireSingleton(!node.getCollations().isEmpty() && node.getOffset() != -1);
+    // Final sort (receives from sort exchange) needs singleton worker
+    boolean isFinalSort = node.getInputs().get(0) instanceof MailboxReceiveNode;
+    dispatchablePlanMetadata.setRequireSingleton(isFinalSort);
     return null;
   }
 
