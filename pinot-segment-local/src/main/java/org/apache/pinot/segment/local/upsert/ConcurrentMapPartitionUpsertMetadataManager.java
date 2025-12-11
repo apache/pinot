@@ -150,6 +150,12 @@ public class ConcurrentMapPartitionUpsertMetadataManager extends BasePartitionUp
             }
           });
     }
+    System.out.println("Number of set bits in segment:" + segment.getSegmentName() + " are: " + segment.getValidDocIds()
+        .getMutableRoaringBitmap()
+        .getCardinality());
+    int bitMapCardinality = segment.getValidDocIds()
+        .getMutableRoaringBitmap()
+        .getCardinality();
     int numKeys = numKeysInWrongSegment.get();
     if (numKeys > 0) {
       _logger.warn("Found {} primary keys in the wrong segment when adding segment: {}", numKeys, segmentName);
