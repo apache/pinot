@@ -235,7 +235,7 @@ public class PinotConfigurationTest {
       throws ConfigurationException {
     PropertiesConfiguration propertiesConfiguration = CommonsConfigurationUtils.fromPath(
         PropertiesConfiguration.class.getClassLoader().getResource("pinot-configuration-1.properties").getFile(),
-        true, PropertyIOFactoryKind.ConfigFileIOFactory);
+        true, PropertyIOFactoryKind.ConfigFileIOFactory, true);
 
     PinotConfiguration config = new PinotConfiguration(propertiesConfiguration);
 
