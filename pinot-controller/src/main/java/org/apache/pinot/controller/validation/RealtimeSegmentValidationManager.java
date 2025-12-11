@@ -22,8 +22,10 @@ import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import java.util.Properties;
+import java.util.Set;
 import java.util.concurrent.TimeUnit;
 import org.apache.pinot.common.metadata.segment.SegmentZKMetadata;
 import org.apache.pinot.common.metrics.ControllerGauge;
@@ -37,6 +39,7 @@ import org.apache.pinot.controller.api.resources.PauseStatusDetails;
 import org.apache.pinot.controller.helix.core.PinotHelixResourceManager;
 import org.apache.pinot.controller.helix.core.periodictask.ControllerPeriodicTask;
 import org.apache.pinot.controller.helix.core.realtime.PinotLLCRealtimeSegmentManager;
+import org.apache.pinot.spi.config.table.DisasterRecoveryMode;
 import org.apache.pinot.spi.config.table.PauseState;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.stream.OffsetCriteria;
@@ -54,20 +57,20 @@ import org.slf4j.LoggerFactory;
  */
 public class RealtimeSegmentValidationManager extends ControllerPeriodicTask<RealtimeSegmentValidationManager.Context> {
   private static final Logger LOGGER = LoggerFactory.getLogger(RealtimeSegmentValidationManager.class);
+  public static final String OFFSET_CRITERIA = "offsetCriteria";
+  public static final String REPAIR_ERROR_SEGMENTS_FOR_PARTIAL_UPSERT_OR_DEDUP =
+      "repairErrorSegmentsForPartialUpsertOrDedup";
 
   private final PinotLLCRealtimeSegmentManager _llcRealtimeSegmentManager;
   private final ValidationMetrics _validationMetrics;
   private final ControllerMetrics _controllerMetrics;
   private final StorageQuotaChecker _storageQuotaChecker;
   private final ResourceUtilizationManager _resourceUtilizationManager;
-
   private final int _segmentLevelValidationIntervalInSeconds;
-  private long _lastSegmentLevelValidationRunTimeMs = 0L;
   private final boolean _segmentAutoResetOnErrorAtValidation;
 
-  public static final String OFFSET_CRITERIA = "offsetCriteria";
-  public static final String REPAIR_ERROR_SEGMENTS_FOR_PARTIAL_UPSERT_OR_DEDUP =
-      "repairErrorSegmentsForPartialUpsertOrDedup";
+  private long _lastSegmentLevelValidationRunTimeMs = 0L;
+  private volatile DisasterRecoveryMode _disasterRecoveryMode;
 
   public RealtimeSegmentValidationManager(ControllerConf config, PinotHelixResourceManager pinotHelixResourceManager,
       LeadControllerManager leadControllerManager, PinotLLCRealtimeSegmentManager llcRealtimeSegmentManager,
@@ -84,6 +87,7 @@ public class RealtimeSegmentValidationManager extends ControllerPeriodicTask<Rea
 
     _segmentLevelValidationIntervalInSeconds = config.getSegmentLevelValidationIntervalInSeconds();
     _segmentAutoResetOnErrorAtValidation = config.isAutoResetErrorSegmentsOnValidationEnabled();
+    _disasterRecoveryMode = config.getDisasterRecoveryMode();
     Preconditions.checkState(_segmentLevelValidationIntervalInSeconds > 0);
   }
 
@@ -281,15 +285,19 @@ public class RealtimeSegmentValidationManager extends ControllerPeriodicTask<Rea
   }
 
   private boolean shouldRepairErrorSegmentsForPartialUpsertOrDedup(Properties periodicTaskProperties) {
-    return Optional.ofNullable(periodicTaskProperties.getProperty(REPAIR_ERROR_SEGMENTS_FOR_PARTIAL_UPSERT_OR_DEDUP))
-        .map(value -> {
-          try {
-            return Boolean.parseBoolean(value);
-          } catch (Exception e) {
-            return false;
-          }
-        })
-        .orElse(false);
+    String property = periodicTaskProperties.getProperty(REPAIR_ERROR_SEGMENTS_FOR_PARTIAL_UPSERT_OR_DEDUP);
+
+    if (property == null) {
+      return _llcRealtimeSegmentManager.shouldRepairErrorSegmentsForPartialUpsertOrDedup(_disasterRecoveryMode);
+    }
+
+    try {
+      return Boolean.parseBoolean(property);
+    } catch (Exception e) {
+      LOGGER.warn("Failed to parse property '{}' for '{}'. Returning false.", property,
+          REPAIR_ERROR_SEGMENTS_FOR_PARTIAL_UPSERT_OR_DEDUP, e);
+      return false;
+    }
   }
 
   @Override
@@ -315,6 +323,20 @@ public class RealtimeSegmentValidationManager extends ControllerPeriodicTask<Rea
   public void cleanUpTask() {
     LOGGER.info("Unregister all the validation metrics.");
     _validationMetrics.unregisterAllMetrics();
+  }
+
+  @Override
+  public void onChange(Set<String> changedConfigs, Map<String, String> clusterConfigs) {
+    if (changedConfigs.contains(ControllerConf.ControllerPeriodicTasksConf.DISASTER_RECOVERY_MODE_CONFIG_KEY)) {
+      String disasterRecoveryModeString =
+          clusterConfigs.get(ControllerConf.ControllerPeriodicTasksConf.DISASTER_RECOVERY_MODE_CONFIG_KEY);
+      _disasterRecoveryMode = ControllerConf.getDisasterRecoveryMode(disasterRecoveryModeString);
+    }
+  }
+
+  @VisibleForTesting
+  DisasterRecoveryMode getDisasterRecoveryMode() {
+    return _disasterRecoveryMode;
   }
 
   public static final class Context {

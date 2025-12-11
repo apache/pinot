@@ -2808,6 +2808,10 @@ public class PinotLLCRealtimeSegmentManager {
     }
   }
 
+  public boolean shouldRepairErrorSegmentsForPartialUpsertOrDedup(DisasterRecoveryMode disasterRecoveryMode) {
+    return disasterRecoveryMode == DisasterRecoveryMode.ALWAYS;
+  }
+
   /**
    * Whether to allow repairing the ERROR segments with ZK status: COMMITTING
    * This method is only useful for pauseless ingestion with features like dedup enabled (Since repairing committing
@@ -2827,7 +2831,7 @@ public class PinotLLCRealtimeSegmentManager {
         != null)) {
       DisasterRecoveryMode disasterRecoveryMode =
           tableConfig.getIngestionConfig().getStreamIngestionConfig().getDisasterRecoveryMode();
-      if (disasterRecoveryMode == DisasterRecoveryMode.ALWAYS) {
+      if (shouldRepairErrorSegmentsForPartialUpsertOrDedup(disasterRecoveryMode)) {
         return true;
       }
     }
