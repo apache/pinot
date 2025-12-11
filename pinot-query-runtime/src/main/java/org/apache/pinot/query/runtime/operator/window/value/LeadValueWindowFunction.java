@@ -82,9 +82,9 @@ public class LeadValueWindowFunction extends ValueWindowFunction {
     }
     if (_defaultValue != null) {
       // If an offset is provided beyond the number of rows, fill all with default value
-      // only down to 0
-      int from = Math.max(numRows - _offset, 0);
-      Arrays.fill(result, from, numRows, _defaultValue);
+      // only down to 0.
+      int fillFrom = Math.max(numRows - _offset, 0);
+      Arrays.fill(result, fillFrom, numRows, _defaultValue);
     }
     return Arrays.asList(result);
   }
