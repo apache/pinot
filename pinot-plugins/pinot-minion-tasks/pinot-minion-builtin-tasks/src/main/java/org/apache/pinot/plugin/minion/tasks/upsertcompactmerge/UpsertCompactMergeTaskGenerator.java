@@ -240,6 +240,12 @@ public class UpsertCompactMergeTaskGenerator extends BaseTaskGenerator {
     return pinotTaskConfigs;
   }
 
+  /**
+   * Processes validDocIds metadata to determine segments eligible for deletion or compaction.
+   * Evaluates segments based on valid/invalid document counts, server readiness, and CRC consistency.
+   * Requires consensus across all replicas on validDoc counts before proceeding with any operations.
+   * Marks segments with zero valid documents for deletion and groups others by partition for compaction.
+   */
   @VisibleForTesting
   public static SegmentSelectionResult processValidDocIdsMetadata(String tableNameWithType,
       Map<String, String> taskConfigs, Map<String, SegmentZKMetadata> candidateSegmentsMap,
@@ -286,7 +292,17 @@ public class UpsertCompactMergeTaskGenerator extends BaseTaskGenerator {
         continue;
       }
       SegmentZKMetadata segment = candidateSegmentsMap.get(segmentName);
-      for (ValidDocIdsMetadataInfo validDocIdsMetadata : validDocIdsMetadataInfoMap.get(segmentName)) {
+      List<ValidDocIdsMetadataInfo> replicaMetadataList = validDocIdsMetadataInfoMap.get(segmentName);
+
+      // Check consensus across all replicas before proceeding with any operations
+      if (!hasValidDocConsensus(segmentName, replicaMetadataList)) {
+        LOGGER.info("Skipping segment {} for table {} - no consensus on validDoc counts across replicas",
+            segmentName, tableNameWithType);
+        continue;
+      }
+
+      // Process with existing logic using the first replica with matching CRC (since all have consensus)
+      for (ValidDocIdsMetadataInfo validDocIdsMetadata : replicaMetadataList) {
         long totalInvalidDocs = validDocIdsMetadata.getTotalInvalidDocs();
         long totalValidDocs = validDocIdsMetadata.getTotalValidDocs();
         long segmentSizeInBytes = validDocIdsMetadata.getSegmentSizeInBytes();
@@ -298,20 +314,11 @@ public class UpsertCompactMergeTaskGenerator extends BaseTaskGenerator {
           continue;
         }
 
-        // skipping segments for which their servers are not in READY state. The bitmaps would be inconsistent when
-        // server is NOT READY as UPDATING segments might be updating the ONLINE segments
-        if (validDocIdsMetadata.getServerStatus() != null && !validDocIdsMetadata.getServerStatus()
-            .equals(ServiceStatus.Status.GOOD)) {
-          LOGGER.warn("Server {} is in {} state, skipping {} generation for segment: {}",
-              validDocIdsMetadata.getInstanceId(), validDocIdsMetadata.getServerStatus(),
-              MinionConstants.UpsertCompactMergeTask.TASK_TYPE, segmentName);
-          continue;
-        }
-
         // segments eligible for deletion with no valid records
         long totalDocs = validDocIdsMetadata.getTotalDocs();
         if (totalInvalidDocs == totalDocs) {
           segmentsForDeletion.add(segmentName);
+          LOGGER.info("Segment {} marked for deletion - all replicas agree it has zero valid documents", segmentName);
         } else if (alreadyMergedSegments.contains(segmentName)) {
           LOGGER.debug("Segment {} already merged. Skipping it for {}", segmentName,
               MinionConstants.UpsertCompactMergeTask.TASK_TYPE);
@@ -408,6 +415,48 @@ public class UpsertCompactMergeTaskGenerator extends BaseTaskGenerator {
       }
     }
     return new SegmentSelectionResult(groupedSegments, new ArrayList<>(segmentsForDeletion));
+  }
+
+  /**
+   * Checks if all replicas have consensus on validDoc counts for a segment.
+   * SAFETY LOGIC:
+   * 1. Only proceed with operations when ALL replicas agree on totalValidDocs count
+   * 2. Skip operations if ANY server hosting the segment is not in READY state
+   * 3. Include all replicas (even those with CRC mismatches) in consensus for deletion safety
+   */
+  @VisibleForTesting
+  public static boolean hasValidDocConsensus(String segmentName,
+      List<ValidDocIdsMetadataInfo> replicaMetadataList) {
+
+    if (replicaMetadataList == null || replicaMetadataList.isEmpty()) {
+      LOGGER.warn("No replica metadata available for segment: {}", segmentName);
+      return false;
+    }
+
+    // Check server readiness for ALL replicas - skip if ANY server is not ready
+    for (ValidDocIdsMetadataInfo metadata : replicaMetadataList) {
+      if (metadata.getServerStatus() != null && !metadata.getServerStatus().equals(ServiceStatus.Status.GOOD)) {
+        LOGGER.warn("Server {} is in {} state for segment: {}, skipping consensus check",
+            metadata.getInstanceId(), metadata.getServerStatus(), segmentName);
+        return false;
+      }
+    }
+
+    // Check if all replicas have the same totalValidDocs count
+    Long consensusValidDocs = null;
+    for (ValidDocIdsMetadataInfo metadata : replicaMetadataList) {
+      long validDocs = metadata.getTotalValidDocs();
+
+      if (consensusValidDocs == null) {
+        //first iteration, we record the value to compare against
+        consensusValidDocs = validDocs;
+      } else if (!consensusValidDocs.equals(validDocs)) {
+        LOGGER.warn("Inconsistent validDoc counts across replicas for segment: {}. Expected: {}, but found: {}",
+            segmentName, consensusValidDocs, validDocs);
+        return false;
+      }
+    }
+    return true;
   }
 
   @VisibleForTesting
