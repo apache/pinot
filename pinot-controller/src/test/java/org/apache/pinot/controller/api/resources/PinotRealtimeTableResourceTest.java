@@ -74,10 +74,10 @@ public class PinotRealtimeTableResourceTest {
     assertNotNull(actual);
     assertEquals(actual.getConsumingSegments(), expectedDetails.getConsumingSegments());
 
-    ArgumentCaptor<ForceCommitBatchConfig> configCaptor = ArgumentCaptor.forClass(ForceCommitBatchConfig.class);
+    ArgumentCaptor<BatchConfig> configCaptor = ArgumentCaptor.forClass(BatchConfig.class);
     verify(segmentManager).pauseConsumption(eq(tableNameWithType), eq(PauseState.ReasonCode.ADMINISTRATIVE),
         eq("comment"), configCaptor.capture());
-    ForceCommitBatchConfig capturedConfig = configCaptor.getValue();
+    BatchConfig capturedConfig = configCaptor.getValue();
     assertNotNull(capturedConfig);
     assertEquals(capturedConfig.getBatchSize(), 4);
     assertEquals(capturedConfig.getBatchStatusCheckIntervalMs(), 7000);

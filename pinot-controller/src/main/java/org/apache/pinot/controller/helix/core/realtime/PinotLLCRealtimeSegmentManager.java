@@ -89,7 +89,7 @@ import org.apache.pinot.common.utils.http.HttpClient;
 import org.apache.pinot.controller.ControllerConf;
 import org.apache.pinot.controller.api.events.MetadataEventNotifierFactory;
 import org.apache.pinot.controller.api.resources.Constants;
-import org.apache.pinot.controller.api.resources.ForceCommitBatchConfig;
+import org.apache.pinot.controller.api.resources.BatchConfig;
 import org.apache.pinot.controller.api.resources.PauseStatusDetails;
 import org.apache.pinot.controller.helix.core.PinotHelixResourceManager;
 import org.apache.pinot.controller.helix.core.PinotTableIdealStateBuilder;
@@ -2286,7 +2286,7 @@ public class PinotLLCRealtimeSegmentManager {
    * @return the set of consuming segments for which commit was initiated
    */
   public Set<String> forceCommit(String tableNameWithType, @Nullable String partitionGroupIdsToCommit,
-      @Nullable String segmentsToCommit, @Nullable ForceCommitBatchConfig batchConfig) {
+      @Nullable String segmentsToCommit, @Nullable BatchConfig batchConfig) {
     IdealState idealState = getIdealState(tableNameWithType);
     Set<String> allConsumingSegments = findConsumingSegments(idealState);
     Set<String> targetConsumingSegments =
@@ -2305,7 +2305,7 @@ public class PinotLLCRealtimeSegmentManager {
   }
 
   private void processBatchesSequentially(List<Set<String>> segmentBatchList, String tableNameWithType,
-      ForceCommitBatchConfig forceCommitBatchConfig) {
+      BatchConfig forceCommitBatchConfig) {
     Set<String> prevBatch = null;
     try {
       for (Set<String> segmentBatchToCommit : segmentBatchList) {
@@ -2322,7 +2322,7 @@ public class PinotLLCRealtimeSegmentManager {
   }
 
   public void waitUntilSegmentsForceCommitted(String tableNameWithType, Set<String> segmentsToWait,
-      ForceCommitBatchConfig forceCommitBatchConfig)
+      BatchConfig forceCommitBatchConfig)
       throws InterruptedException {
     int batchStatusCheckIntervalMs = forceCommitBatchConfig.getBatchStatusCheckIntervalMs();
     int batchStatusCheckTimeoutMs = forceCommitBatchConfig.getBatchStatusCheckTimeoutMs();
@@ -2459,7 +2459,7 @@ public class PinotLLCRealtimeSegmentManager {
    *   2) Sending force commit messages to servers
    */
   public PauseStatusDetails pauseConsumption(String tableNameWithType, PauseState.ReasonCode reasonCode,
-      @Nullable String comment, @Nullable ForceCommitBatchConfig batchConfig) {
+      @Nullable String comment, @Nullable BatchConfig batchConfig) {
     IdealState updatedIdealState = updatePauseStateInIdealState(tableNameWithType, true, reasonCode, comment);
     Set<String> consumingSegments = findConsumingSegments(updatedIdealState);
     forceCommit(tableNameWithType, null, null, batchConfig);

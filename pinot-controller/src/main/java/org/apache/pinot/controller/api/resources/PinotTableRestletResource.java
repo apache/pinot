@@ -785,13 +785,13 @@ public class PinotTableRestletResource {
       @DefaultValue("false")
       @QueryParam("forceCommit") boolean forceCommit,
       @ApiParam(value = "Batch size for force commit operations")
-      @DefaultValue(ForceCommitBatchConfig.DEFAULT_BATCH_SIZE + "")
+      @DefaultValue(BatchConfig.DEFAULT_BATCH_SIZE + "")
       @QueryParam("forceCommitBatchSize") int forceCommitBatchSize,
       @ApiParam(value = "Interval in milliseconds for checking force commit batch status")
-      @DefaultValue(ForceCommitBatchConfig.DEFAULT_STATUS_CHECK_INTERVAL_SEC * 1000 + "")
+      @DefaultValue(BatchConfig.DEFAULT_STATUS_CHECK_INTERVAL_SEC * 1000 + "")
       @QueryParam("forceCommitBatchStatusCheckIntervalMs") int forceCommitBatchStatusCheckIntervalMs,
       @ApiParam(value = "Timeout in milliseconds for force commit batch status check")
-      @DefaultValue(ForceCommitBatchConfig.DEFAULT_STATUS_CHECK_TIMEOUT_SEC * 1000 + "")
+      @DefaultValue(BatchConfig.DEFAULT_STATUS_CHECK_TIMEOUT_SEC * 1000 + "")
       @QueryParam("forceCommitBatchStatusCheckTimeoutMs") int forceCommitBatchStatusCheckTimeoutMs,
       @Context HttpHeaders headers
       //@formatter:on

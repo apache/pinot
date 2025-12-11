@@ -64,7 +64,7 @@ import org.apache.pinot.common.utils.FileUploadDownloadClient;
 import org.apache.pinot.common.utils.LLCSegmentName;
 import org.apache.pinot.common.utils.URIUtils;
 import org.apache.pinot.controller.ControllerConf;
-import org.apache.pinot.controller.api.resources.ForceCommitBatchConfig;
+import org.apache.pinot.controller.api.resources.BatchConfig;
 import org.apache.pinot.controller.api.resources.PauseStatusDetails;
 import org.apache.pinot.controller.helix.core.PinotHelixResourceManager;
 import org.apache.pinot.controller.helix.core.assignment.segment.SegmentAssignment;
@@ -355,7 +355,7 @@ public class PinotLLCRealtimeSegmentManagerTest {
     // Provide a segment that is not in CONSUMING state (non-existent); should be ignored without exception
     String nonConsumingSegment = "nonExistingSegment";
     Set<String> committed = segmentManager.forceCommit(REALTIME_TABLE_NAME, null, nonConsumingSegment,
-        ForceCommitBatchConfig.of(1, 1, 5));
+        BatchConfig.of(1, 1, 5));
     assertTrue(committed.isEmpty(), "Expected no segments to be committed when only non-consuming segments provided");
   }
 
@@ -380,7 +380,7 @@ public class PinotLLCRealtimeSegmentManagerTest {
     String consumingSegment = new LLCSegmentName(RAW_TABLE_NAME, 0, 0, CURRENT_TIME_MS).getSegmentName();
     segmentManager._idealState.setPartitionState(consumingSegment, "Server_0", SegmentStateModel.CONSUMING);
     try {
-      segmentManager.forceCommit(REALTIME_TABLE_NAME, null, consumingSegment, ForceCommitBatchConfig.of(1, 1, 5));
+      segmentManager.forceCommit(REALTIME_TABLE_NAME, null, consumingSegment, BatchConfig.of(1, 1, 5));
       fail("Expected IllegalStateException for partial upsert table with RF > 1");
     } catch (IllegalStateException e) {
       assertTrue(e.getMessage().contains("Force commit is not allowed when replication > 1 for partial-upsert tables"),
@@ -407,7 +407,7 @@ public class PinotLLCRealtimeSegmentManagerTest {
     String consumingSegment = new LLCSegmentName(RAW_TABLE_NAME, 0, 0, CURRENT_TIME_MS).getSegmentName();
     segmentManager._idealState.setPartitionState(consumingSegment, "Server_0", SegmentStateModel.CONSUMING);
     try {
-      segmentManager.forceCommit(REALTIME_TABLE_NAME, null, consumingSegment, ForceCommitBatchConfig.of(1, 1, 5));
+      segmentManager.forceCommit(REALTIME_TABLE_NAME, null, consumingSegment, BatchConfig.of(1, 1, 5));
       fail("Expected IllegalStateException for partial upsert table with RF > 1");
     } catch (IllegalStateException e) {
       assertTrue(e.getMessage().contains(
@@ -439,7 +439,7 @@ public class PinotLLCRealtimeSegmentManagerTest {
 
     // Force commit should succeed for partial upsert table with RF = 1 (no exception thrown)
     try {
-      segmentManager.forceCommit(REALTIME_TABLE_NAME, null, consumingSegment, ForceCommitBatchConfig.of(1, 1, 5));
+      segmentManager.forceCommit(REALTIME_TABLE_NAME, null, consumingSegment, BatchConfig.of(1, 1, 5));
       // If we reach here without exception, test passes
     } catch (IllegalStateException e) {
       fail("Should not throw exception for partial upsert table with RF = 1, but got: " + e.getMessage());
@@ -463,7 +463,7 @@ public class PinotLLCRealtimeSegmentManagerTest {
 
     try {
       Set<String> committed = segmentManager.forceCommit(REALTIME_TABLE_NAME, null, consumingSegment,
-          ForceCommitBatchConfig.of(1, 1, 5));
+          BatchConfig.of(1, 1, 5));
       assertFalse(committed.isEmpty(), "Expected segments to be committed");
       // If we reach here without exception, test passes
     } catch (IllegalStateException e) {
@@ -502,8 +502,8 @@ public class PinotLLCRealtimeSegmentManagerTest {
     doReturn(pausedIdealState).when(segmentManager).updatePauseStateInIdealState(eq(tableNameWithType), eq(true),
         eq(PauseState.ReasonCode.ADMINISTRATIVE), any());
 
-    ForceCommitBatchConfig batchConfig = ForceCommitBatchConfig.of(2, 3, 10);
-    final ForceCommitBatchConfig[] capturedConfig = new ForceCommitBatchConfig[1];
+    BatchConfig batchConfig = BatchConfig.of(2, 3, 10);
+    final BatchConfig[] capturedConfig = new BatchConfig[1];
     doAnswer(invocation -> {
       capturedConfig[0] = invocation.getArgument(3);
       return Collections.singleton(consumingSegment);

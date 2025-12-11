@@ -115,22 +115,22 @@ public class PinotRealtimeTableResource {
       @ApiParam(value = "Name of the table", required = true) @PathParam("tableName") String tableName,
       @ApiParam(value = "Comment on pausing the consumption") @QueryParam("comment") String comment,
       @ApiParam(value = "Max number of consuming segments to commit at once")
-      @QueryParam("batchSize") @DefaultValue(ForceCommitBatchConfig.DEFAULT_BATCH_SIZE + "") int batchSize,
+      @QueryParam("batchSize") @DefaultValue(BatchConfig.DEFAULT_BATCH_SIZE + "") int batchSize,
       @ApiParam(value = "How often to check whether the current batch of segments have been successfully committed or"
           + " not")
       @QueryParam("batchStatusCheckIntervalSec")
-      @DefaultValue(ForceCommitBatchConfig.DEFAULT_STATUS_CHECK_INTERVAL_SEC + "") int batchStatusCheckIntervalSec,
+      @DefaultValue(BatchConfig.DEFAULT_STATUS_CHECK_INTERVAL_SEC + "") int batchStatusCheckIntervalSec,
       @ApiParam(value = "Timeout based on which the controller will stop checking the forceCommit status of the batch"
           + " of segments and throw an exception")
       @QueryParam("batchStatusCheckTimeoutSec")
-      @DefaultValue(ForceCommitBatchConfig.DEFAULT_STATUS_CHECK_TIMEOUT_SEC + "") int batchStatusCheckTimeoutSec,
+      @DefaultValue(BatchConfig.DEFAULT_STATUS_CHECK_TIMEOUT_SEC + "") int batchStatusCheckTimeoutSec,
       @Context HttpHeaders headers) {
     tableName = DatabaseUtils.translateTableName(tableName, headers);
     String tableNameWithType = TableNameBuilder.REALTIME.tableNameWithType(tableName);
     validateTable(tableNameWithType);
-    ForceCommitBatchConfig batchConfig;
+    BatchConfig batchConfig;
     try {
-      batchConfig = ForceCommitBatchConfig.of(batchSize, batchStatusCheckIntervalSec, batchStatusCheckTimeoutSec);
+      batchConfig = BatchConfig.of(batchSize, batchStatusCheckIntervalSec, batchStatusCheckTimeoutSec);
     } catch (IllegalArgumentException e) {
       throw new ControllerApplicationException(LOGGER, "Invalid batch config", Response.Status.BAD_REQUEST, e);
     }
@@ -262,24 +262,24 @@ public class PinotRealtimeTableResource {
       @ApiParam(value = "Comma separated list of consuming segments to be committed") @QueryParam("segments")
       String consumingSegments,
       @ApiParam(value = "Max number of consuming segments to commit at once")
-      @QueryParam("batchSize") @DefaultValue(ForceCommitBatchConfig.DEFAULT_BATCH_SIZE + "") int batchSize,
+      @QueryParam("batchSize") @DefaultValue(BatchConfig.DEFAULT_BATCH_SIZE + "") int batchSize,
       @ApiParam(value = "How often to check whether the current batch of segments have been successfully committed or"
           + " not")
       @QueryParam("batchStatusCheckIntervalSec")
-      @DefaultValue(ForceCommitBatchConfig.DEFAULT_STATUS_CHECK_INTERVAL_SEC + "") int batchStatusCheckIntervalSec,
+      @DefaultValue(BatchConfig.DEFAULT_STATUS_CHECK_INTERVAL_SEC + "") int batchStatusCheckIntervalSec,
       @ApiParam(value = "Timeout based on which the controller will stop checking the forceCommit status of the batch"
           + " of segments and throw an exception")
       @QueryParam("batchStatusCheckTimeoutSec")
-      @DefaultValue(ForceCommitBatchConfig.DEFAULT_STATUS_CHECK_TIMEOUT_SEC + "") int batchStatusCheckTimeoutSec,
+      @DefaultValue(BatchConfig.DEFAULT_STATUS_CHECK_TIMEOUT_SEC + "") int batchStatusCheckTimeoutSec,
       @Context HttpHeaders headers) {
     tableName = DatabaseUtils.translateTableName(tableName, headers);
     if (partitionGroupIds != null && consumingSegments != null) {
       throw new ControllerApplicationException(LOGGER, "Cannot specify both partitions and segments to commit",
           Response.Status.BAD_REQUEST);
     }
-    ForceCommitBatchConfig batchConfig;
+    BatchConfig batchConfig;
     try {
-      batchConfig = ForceCommitBatchConfig.of(batchSize, batchStatusCheckIntervalSec, batchStatusCheckTimeoutSec);
+      batchConfig = BatchConfig.of(batchSize, batchStatusCheckIntervalSec, batchStatusCheckTimeoutSec);
     } catch (Exception e) {
       throw new ControllerApplicationException(LOGGER, "Invalid batch config", Response.Status.BAD_REQUEST, e);
     }
