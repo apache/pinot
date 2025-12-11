@@ -25,6 +25,8 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import org.apache.commons.collections4.CollectionUtils;
+import org.apache.pinot.common.request.ArrayJoinOperand;
+import org.apache.pinot.common.request.ArrayJoinSpec;
 import org.apache.pinot.common.request.DataSource;
 import org.apache.pinot.common.request.Expression;
 import org.apache.pinot.common.request.Function;
@@ -34,6 +36,7 @@ import org.apache.pinot.common.request.context.FilterContext;
 import org.apache.pinot.common.request.context.OrderByExpressionContext;
 import org.apache.pinot.common.request.context.RequestContextUtils;
 import org.apache.pinot.common.utils.config.QueryOptionsUtils;
+import org.apache.pinot.core.query.request.context.ArrayJoinContext;
 import org.apache.pinot.core.query.request.context.ExplainMode;
 import org.apache.pinot.core.query.request.context.QueryContext;
 import org.apache.pinot.sql.parsers.CalciteSqlParser;
@@ -91,6 +94,20 @@ public class QueryContextConverterUtils {
         aliasList.add(null);
       }
       selectExpressions.add(RequestContextUtils.getExpression(expressionWithoutAlias));
+    }
+
+    List<ArrayJoinContext> arrayJoinContexts = null;
+    List<ArrayJoinSpec> arrayJoinSpecs = pinotQuery.getArrayJoinList();
+    if (CollectionUtils.isNotEmpty(arrayJoinSpecs)) {
+      arrayJoinContexts = new ArrayList<>(arrayJoinSpecs.size());
+      for (ArrayJoinSpec spec : arrayJoinSpecs) {
+        List<ArrayJoinContext.Operand> operands = new ArrayList<>(spec.getOperandsSize());
+        for (ArrayJoinOperand operand : spec.getOperands()) {
+          operands.add(new ArrayJoinContext.Operand(RequestContextUtils.getExpression(operand.getExpression()),
+              operand.getAlias()));
+        }
+        arrayJoinContexts.add(new ArrayJoinContext(spec.getType(), operands));
+      }
     }
 
     // WHERE
@@ -172,6 +189,7 @@ public class QueryContextConverterUtils {
         .setSelectExpressions(selectExpressions)
         .setDistinct(distinct)
         .setAliasList(aliasList)
+        .setArrayJoinContexts(arrayJoinContexts)
         .setFilter(filter)
         .setGroupByExpressions(groupByExpressions)
         .setOrderByExpressions(orderByExpressions)

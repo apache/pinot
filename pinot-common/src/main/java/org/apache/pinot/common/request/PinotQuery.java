@@ -41,6 +41,7 @@ public class PinotQuery implements org.apache.thrift.TBase<PinotQuery, PinotQuer
   private static final org.apache.thrift.protocol.TField QUERY_OPTIONS_FIELD_DESC = new org.apache.thrift.protocol.TField("queryOptions", org.apache.thrift.protocol.TType.MAP, (short)11);
   private static final org.apache.thrift.protocol.TField EXPLAIN_FIELD_DESC = new org.apache.thrift.protocol.TField("explain", org.apache.thrift.protocol.TType.BOOL, (short)12);
   private static final org.apache.thrift.protocol.TField EXPRESSION_OVERRIDE_HINTS_FIELD_DESC = new org.apache.thrift.protocol.TField("expressionOverrideHints", org.apache.thrift.protocol.TType.MAP, (short)13);
+  private static final org.apache.thrift.protocol.TField ARRAY_JOIN_LIST_FIELD_DESC = new org.apache.thrift.protocol.TField("arrayJoinList", org.apache.thrift.protocol.TType.LIST, (short)14);
 
   private static final org.apache.thrift.scheme.SchemeFactory STANDARD_SCHEME_FACTORY = new PinotQueryStandardSchemeFactory();
   private static final org.apache.thrift.scheme.SchemeFactory TUPLE_SCHEME_FACTORY = new PinotQueryTupleSchemeFactory();
@@ -57,6 +58,7 @@ public class PinotQuery implements org.apache.thrift.TBase<PinotQuery, PinotQuer
   private @org.apache.thrift.annotation.Nullable java.util.Map<java.lang.String,java.lang.String> queryOptions; // optional
   private boolean explain; // optional
   private @org.apache.thrift.annotation.Nullable java.util.Map<Expression,Expression> expressionOverrideHints; // optional
+  private @org.apache.thrift.annotation.Nullable java.util.List<ArrayJoinSpec> arrayJoinList; // optional
 
   /** The set of fields this struct contains, along with convenience methods for finding and manipulating them. */
   public enum _Fields implements org.apache.thrift.TFieldIdEnum {
@@ -71,7 +73,8 @@ public class PinotQuery implements org.apache.thrift.TBase<PinotQuery, PinotQuer
     OFFSET((short)9, "offset"),
     QUERY_OPTIONS((short)11, "queryOptions"),
     EXPLAIN((short)12, "explain"),
-    EXPRESSION_OVERRIDE_HINTS((short)13, "expressionOverrideHints");
+    EXPRESSION_OVERRIDE_HINTS((short)13, "expressionOverrideHints"),
+    ARRAY_JOIN_LIST((short)14, "arrayJoinList");
 
     private static final java.util.Map<java.lang.String, _Fields> byName = new java.util.HashMap<java.lang.String, _Fields>();
 
@@ -111,6 +114,8 @@ public class PinotQuery implements org.apache.thrift.TBase<PinotQuery, PinotQuer
           return EXPLAIN;
         case 13: // EXPRESSION_OVERRIDE_HINTS
           return EXPRESSION_OVERRIDE_HINTS;
+        case 14: // ARRAY_JOIN_LIST
+          return ARRAY_JOIN_LIST;
         default:
           return null;
       }
@@ -159,7 +164,7 @@ public class PinotQuery implements org.apache.thrift.TBase<PinotQuery, PinotQuer
   private static final int __OFFSET_ISSET_ID = 2;
   private static final int __EXPLAIN_ISSET_ID = 3;
   private byte __isset_bitfield = 0;
-  private static final _Fields optionals[] = {_Fields.VERSION,_Fields.DATA_SOURCE,_Fields.SELECT_LIST,_Fields.FILTER_EXPRESSION,_Fields.GROUP_BY_LIST,_Fields.ORDER_BY_LIST,_Fields.HAVING_EXPRESSION,_Fields.LIMIT,_Fields.OFFSET,_Fields.QUERY_OPTIONS,_Fields.EXPLAIN,_Fields.EXPRESSION_OVERRIDE_HINTS};
+  private static final _Fields optionals[] = {_Fields.VERSION,_Fields.DATA_SOURCE,_Fields.SELECT_LIST,_Fields.FILTER_EXPRESSION,_Fields.GROUP_BY_LIST,_Fields.ORDER_BY_LIST,_Fields.HAVING_EXPRESSION,_Fields.LIMIT,_Fields.OFFSET,_Fields.QUERY_OPTIONS,_Fields.EXPLAIN,_Fields.EXPRESSION_OVERRIDE_HINTS,_Fields.ARRAY_JOIN_LIST};
   public static final java.util.Map<_Fields, org.apache.thrift.meta_data.FieldMetaData> metaDataMap;
   static {
     java.util.Map<_Fields, org.apache.thrift.meta_data.FieldMetaData> tmpMap = new java.util.EnumMap<_Fields, org.apache.thrift.meta_data.FieldMetaData>(_Fields.class);
@@ -194,6 +199,9 @@ public class PinotQuery implements org.apache.thrift.TBase<PinotQuery, PinotQuer
         new org.apache.thrift.meta_data.MapMetaData(org.apache.thrift.protocol.TType.MAP, 
             new org.apache.thrift.meta_data.StructMetaData(org.apache.thrift.protocol.TType.STRUCT, Expression.class), 
             new org.apache.thrift.meta_data.StructMetaData(org.apache.thrift.protocol.TType.STRUCT, Expression.class))));
+    tmpMap.put(_Fields.ARRAY_JOIN_LIST, new org.apache.thrift.meta_data.FieldMetaData("arrayJoinList", org.apache.thrift.TFieldRequirementType.OPTIONAL, 
+        new org.apache.thrift.meta_data.ListMetaData(org.apache.thrift.protocol.TType.LIST, 
+            new org.apache.thrift.meta_data.StructMetaData(org.apache.thrift.protocol.TType.STRUCT, ArrayJoinSpec.class))));
     metaDataMap = java.util.Collections.unmodifiableMap(tmpMap);
     org.apache.thrift.meta_data.FieldMetaData.addStructMetaDataMap(PinotQuery.class, metaDataMap);
   }
@@ -263,6 +271,13 @@ public class PinotQuery implements org.apache.thrift.TBase<PinotQuery, PinotQuer
       }
       this.expressionOverrideHints = __this__expressionOverrideHints;
     }
+    if (other.isSetArrayJoinList()) {
+      java.util.List<ArrayJoinSpec> __this__arrayJoinList = new java.util.ArrayList<ArrayJoinSpec>(other.arrayJoinList.size());
+      for (ArrayJoinSpec other_element : other.arrayJoinList) {
+        __this__arrayJoinList.add(new ArrayJoinSpec(other_element));
+      }
+      this.arrayJoinList = __this__arrayJoinList;
+    }
   }
 
   @Override
@@ -288,6 +303,7 @@ public class PinotQuery implements org.apache.thrift.TBase<PinotQuery, PinotQuer
     setExplainIsSet(false);
     this.explain = false;
     this.expressionOverrideHints = null;
+    this.arrayJoinList = null;
   }
 
   public int getVersion() {
@@ -640,6 +656,46 @@ public class PinotQuery implements org.apache.thrift.TBase<PinotQuery, PinotQuer
     }
   }
 
+  public int getArrayJoinListSize() {
+    return (this.arrayJoinList == null) ? 0 : this.arrayJoinList.size();
+  }
+
+  @org.apache.thrift.annotation.Nullable
+  public java.util.Iterator<ArrayJoinSpec> getArrayJoinListIterator() {
+    return (this.arrayJoinList == null) ? null : this.arrayJoinList.iterator();
+  }
+
+  public void addToArrayJoinList(ArrayJoinSpec elem) {
+    if (this.arrayJoinList == null) {
+      this.arrayJoinList = new java.util.ArrayList<ArrayJoinSpec>();
+    }
+    this.arrayJoinList.add(elem);
+  }
+
+  @org.apache.thrift.annotation.Nullable
+  public java.util.List<ArrayJoinSpec> getArrayJoinList() {
+    return this.arrayJoinList;
+  }
+
+  public void setArrayJoinList(@org.apache.thrift.annotation.Nullable java.util.List<ArrayJoinSpec> arrayJoinList) {
+    this.arrayJoinList = arrayJoinList;
+  }
+
+  public void unsetArrayJoinList() {
+    this.arrayJoinList = null;
+  }
+
+  /** Returns true if field arrayJoinList is set (has been assigned a value) and false otherwise */
+  public boolean isSetArrayJoinList() {
+    return this.arrayJoinList != null;
+  }
+
+  public void setArrayJoinListIsSet(boolean value) {
+    if (!value) {
+      this.arrayJoinList = null;
+    }
+  }
+
   @Override
   public void setFieldValue(_Fields field, @org.apache.thrift.annotation.Nullable java.lang.Object value) {
     switch (field) {
@@ -739,6 +795,14 @@ public class PinotQuery implements org.apache.thrift.TBase<PinotQuery, PinotQuer
       }
       break;
 
+    case ARRAY_JOIN_LIST:
+      if (value == null) {
+        unsetArrayJoinList();
+      } else {
+        setArrayJoinList((java.util.List<ArrayJoinSpec>)value);
+      }
+      break;
+
     }
   }
 
@@ -782,6 +846,9 @@ public class PinotQuery implements org.apache.thrift.TBase<PinotQuery, PinotQuer
     case EXPRESSION_OVERRIDE_HINTS:
       return getExpressionOverrideHints();
 
+    case ARRAY_JOIN_LIST:
+      return getArrayJoinList();
+
     }
     throw new java.lang.IllegalStateException();
   }
@@ -818,6 +885,8 @@ public class PinotQuery implements org.apache.thrift.TBase<PinotQuery, PinotQuer
       return isSetExplain();
     case EXPRESSION_OVERRIDE_HINTS:
       return isSetExpressionOverrideHints();
+    case ARRAY_JOIN_LIST:
+      return isSetArrayJoinList();
     }
     throw new java.lang.IllegalStateException();
   }
@@ -943,6 +1012,15 @@ public class PinotQuery implements org.apache.thrift.TBase<PinotQuery, PinotQuer
         return false;
     }
 
+    boolean this_present_arrayJoinList = true && this.isSetArrayJoinList();
+    boolean that_present_arrayJoinList = true && that.isSetArrayJoinList();
+    if (this_present_arrayJoinList || that_present_arrayJoinList) {
+      if (!(this_present_arrayJoinList && that_present_arrayJoinList))
+        return false;
+      if (!this.arrayJoinList.equals(that.arrayJoinList))
+        return false;
+    }
+
     return true;
   }
 
@@ -997,6 +1075,10 @@ public class PinotQuery implements org.apache.thrift.TBase<PinotQuery, PinotQuer
     hashCode = hashCode * 8191 + ((isSetExpressionOverrideHints()) ? 131071 : 524287);
     if (isSetExpressionOverrideHints())
       hashCode = hashCode * 8191 + expressionOverrideHints.hashCode();
+
+    hashCode = hashCode * 8191 + ((isSetArrayJoinList()) ? 131071 : 524287);
+    if (isSetArrayJoinList())
+      hashCode = hashCode * 8191 + arrayJoinList.hashCode();
 
     return hashCode;
   }
@@ -1129,6 +1211,16 @@ public class PinotQuery implements org.apache.thrift.TBase<PinotQuery, PinotQuer
         return lastComparison;
       }
     }
+    lastComparison = java.lang.Boolean.compare(isSetArrayJoinList(), other.isSetArrayJoinList());
+    if (lastComparison != 0) {
+      return lastComparison;
+    }
+    if (isSetArrayJoinList()) {
+      lastComparison = org.apache.thrift.TBaseHelper.compareTo(this.arrayJoinList, other.arrayJoinList);
+      if (lastComparison != 0) {
+        return lastComparison;
+      }
+    }
     return 0;
   }
 
@@ -1253,6 +1345,16 @@ public class PinotQuery implements org.apache.thrift.TBase<PinotQuery, PinotQuer
         sb.append("null");
       } else {
         sb.append(this.expressionOverrideHints);
+      }
+      first = false;
+    }
+    if (isSetArrayJoinList()) {
+      if (!first) sb.append(", ");
+      sb.append("arrayJoinList:");
+      if (this.arrayJoinList == null) {
+        sb.append("null");
+      } else {
+        sb.append(this.arrayJoinList);
       }
       first = false;
     }
@@ -1470,6 +1572,25 @@ public class PinotQuery implements org.apache.thrift.TBase<PinotQuery, PinotQuer
               org.apache.thrift.protocol.TProtocolUtil.skip(iprot, schemeField.type);
             }
             break;
+          case 14: // ARRAY_JOIN_LIST
+            if (schemeField.type == org.apache.thrift.protocol.TType.LIST) {
+              {
+                org.apache.thrift.protocol.TList _list17 = iprot.readListBegin();
+                struct.arrayJoinList = new java.util.ArrayList<ArrayJoinSpec>(_list17.size);
+                @org.apache.thrift.annotation.Nullable ArrayJoinSpec _elem18;
+                for (int _i19 = 0; _i19 < _list17.size; ++_i19)
+                {
+                  _elem18 = new ArrayJoinSpec();
+                  _elem18.read(iprot);
+                  struct.arrayJoinList.add(_elem18);
+                }
+                iprot.readListEnd();
+              }
+              struct.setArrayJoinListIsSet(true);
+            } else { 
+              org.apache.thrift.protocol.TProtocolUtil.skip(iprot, schemeField.type);
+            }
+            break;
           default:
             org.apache.thrift.protocol.TProtocolUtil.skip(iprot, schemeField.type);
         }
@@ -1597,6 +1718,20 @@ public class PinotQuery implements org.apache.thrift.TBase<PinotQuery, PinotQuer
           oprot.writeFieldEnd();
         }
       }
+      if (struct.arrayJoinList != null) {
+        if (struct.isSetArrayJoinList()) {
+          oprot.writeFieldBegin(ARRAY_JOIN_LIST_FIELD_DESC);
+          {
+            oprot.writeListBegin(new org.apache.thrift.protocol.TList(org.apache.thrift.protocol.TType.STRUCT, struct.arrayJoinList.size()));
+            for (ArrayJoinSpec _iter22 : struct.arrayJoinList)
+            {
+              _iter22.write(oprot);
+            }
+            oprot.writeListEnd();
+          }
+          oprot.writeFieldEnd();
+        }
+      }
       oprot.writeFieldStop();
       oprot.writeStructEnd();
     }
@@ -1652,7 +1787,10 @@ public class PinotQuery implements org.apache.thrift.TBase<PinotQuery, PinotQuer
       if (struct.isSetExpressionOverrideHints()) {
         optionals.set(11);
       }
-      oprot.writeBitSet(optionals, 12);
+      if (struct.isSetArrayJoinList()) {
+        optionals.set(12);
+      }
+      oprot.writeBitSet(optionals, 13);
       if (struct.isSetVersion()) {
         oprot.writeI32(struct.version);
       }
@@ -1721,12 +1859,21 @@ public class PinotQuery implements org.apache.thrift.TBase<PinotQuery, PinotQuer
           }
         }
       }
+      if (struct.isSetArrayJoinList()) {
+        {
+          oprot.writeI32(struct.arrayJoinList.size());
+          for (ArrayJoinSpec _iter27 : struct.arrayJoinList)
+          {
+            _iter27.write(oprot);
+          }
+        }
+      }
     }
 
     @Override
     public void read(org.apache.thrift.protocol.TProtocol prot, PinotQuery struct) throws org.apache.thrift.TException {
       org.apache.thrift.protocol.TTupleProtocol iprot = (org.apache.thrift.protocol.TTupleProtocol) prot;
-      java.util.BitSet incoming = iprot.readBitSet(12);
+      java.util.BitSet incoming = iprot.readBitSet(13);
       if (incoming.get(0)) {
         struct.version = iprot.readI32();
         struct.setVersionIsSet(true);
@@ -1832,6 +1979,20 @@ public class PinotQuery implements org.apache.thrift.TBase<PinotQuery, PinotQuer
         }
         struct.setExpressionOverrideHintsIsSet(true);
       }
+      if (incoming.get(12)) {
+        {
+          org.apache.thrift.protocol.TList _list28 = iprot.readListBegin(org.apache.thrift.protocol.TType.STRUCT);
+          struct.arrayJoinList = new java.util.ArrayList<ArrayJoinSpec>(_list28.size);
+          @org.apache.thrift.annotation.Nullable ArrayJoinSpec _elem29;
+          for (int _i30 = 0; _i30 < _list28.size; ++_i30)
+          {
+            _elem29 = new ArrayJoinSpec();
+            _elem29.read(iprot);
+            struct.arrayJoinList.add(_elem29);
+          }
+        }
+        struct.setArrayJoinListIsSet(true);
+      }
     }
   }
 
@@ -1839,4 +2000,3 @@ public class PinotQuery implements org.apache.thrift.TBase<PinotQuery, PinotQuer
     return (org.apache.thrift.scheme.StandardScheme.class.equals(proto.getScheme()) ? STANDARD_SCHEME_FACTORY : TUPLE_SCHEME_FACTORY).getScheme();
   }
 }
-
