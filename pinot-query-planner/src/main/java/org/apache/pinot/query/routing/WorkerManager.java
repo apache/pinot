@@ -509,17 +509,24 @@ public class WorkerManager {
     // Sort server instances to ensure deterministic worker ID assignment.
     // This is critical for pre-partitioned exchanges where worker ID N on one stage
     // must map to the same physical server as worker ID N on another stage.
-    List<ServerInstance> sortedServers = new ArrayList<>(serverInstanceToSegmentsMap.keySet());
-    sortedServers.sort(Comparator.comparing(ServerInstance::getInstanceId));
+    List<Map.Entry<ServerInstance, Map<String, List<String>>>> sortedServerInstanceToSegmentsMap =
+        new ArrayList<>(serverInstanceToSegmentsMap.entrySet());
+    sortedServerInstanceToSegmentsMap.sort(Comparator.comparing(entry -> entry.getKey().getInstanceId()));
 
-    int workerId = 0;
     Map<Integer, QueryServerInstance> workerIdToServerInstanceMap = new HashMap<>();
     Map<Integer, Map<String, List<String>>> workerIdToSegmentsMap = new HashMap<>();
-    for (ServerInstance serverInstance : sortedServers) {
-      workerIdToServerInstanceMap.put(workerId, new QueryServerInstance(serverInstance));
-      workerIdToSegmentsMap.put(workerId, serverInstanceToSegmentsMap.get(serverInstance));
-      workerId++;
+
+    // Assign 1 worker per server
+    for (int workerId = 0; workerId < sortedServerInstanceToSegmentsMap.size(); workerId++) {
+      Map.Entry<ServerInstance, Map<String, List<String>>> serverEntry =
+          sortedServerInstanceToSegmentsMap.get(workerId);
+      QueryServerInstance server = new QueryServerInstance(serverEntry.getKey());
+      Map<String, List<String>> segmentsMap = serverEntry.getValue();
+
+      workerIdToServerInstanceMap.put(workerId, server);
+      workerIdToSegmentsMap.put(workerId, segmentsMap);
     }
+
     metadata.setWorkerIdToServerInstanceMap(workerIdToServerInstanceMap);
     metadata.setWorkerIdToSegmentsMap(workerIdToSegmentsMap);
   }
@@ -670,16 +677,22 @@ public class WorkerManager {
     // Sort server instances to ensure deterministic worker ID assignment.
     // This is critical for pre-partitioned exchanges where worker ID N on one stage
     // must map to the same physical server as worker ID N on another stage.
-    List<ServerInstance> sortedServers = new ArrayList<>(serverInstanceToLogicalSegmentsMap.keySet());
-    sortedServers.sort(Comparator.comparing(ServerInstance::getInstanceId));
+    List<Map.Entry<ServerInstance, Map<String, List<String>>>> sortedServerInstanceToSegmentsMap =
+        new ArrayList<>(serverInstanceToLogicalSegmentsMap.entrySet());
+    sortedServerInstanceToSegmentsMap.sort(Comparator.comparing(entry -> entry.getKey().getInstanceId()));
 
-    int workerId = 0;
     Map<Integer, QueryServerInstance> workerIdToServerInstanceMap = new HashMap<>();
     Map<Integer, Map<String, List<String>>> workerIdToLogicalTableSegmentsMap = new HashMap<>();
-    for (ServerInstance serverInstance : sortedServers) {
-      workerIdToServerInstanceMap.put(workerId, new QueryServerInstance(serverInstance));
-      workerIdToLogicalTableSegmentsMap.put(workerId, serverInstanceToLogicalSegmentsMap.get(serverInstance));
-      workerId++;
+
+    // Assign 1 worker per server
+    for (int workerId = 0; workerId < sortedServerInstanceToSegmentsMap.size(); workerId++) {
+      Map.Entry<ServerInstance, Map<String, List<String>>> serverEntry =
+          sortedServerInstanceToSegmentsMap.get(workerId);
+      QueryServerInstance server = new QueryServerInstance(serverEntry.getKey());
+      Map<String, List<String>> segmentsMap = serverEntry.getValue();
+
+      workerIdToServerInstanceMap.put(workerId, server);
+      workerIdToLogicalTableSegmentsMap.put(workerId, segmentsMap);
     }
 
     metadata.setWorkerIdToServerInstanceMap(workerIdToServerInstanceMap);
