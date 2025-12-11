@@ -19,12 +19,17 @@
 package org.apache.pinot.common.assignment;
 
 import com.google.common.base.Preconditions;
+import java.util.ArrayList;
 import java.util.Collections;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import javax.annotation.Nullable;
+import org.apache.commons.lang3.tuple.Pair;
 import org.apache.helix.AccessOption;
 import org.apache.helix.HelixManager;
+import org.apache.helix.model.IdealState;
 import org.apache.helix.store.HelixPropertyStore;
 import org.apache.helix.store.zk.ZkHelixPropertyStore;
 import org.apache.helix.zookeeper.datamodel.ZNRecord;
@@ -47,6 +52,19 @@ public class InstancePartitionsUtils {
 
   public static final char TYPE_SUFFIX_SEPARATOR = '_';
   public static final String TIER_SUFFIX = "__TIER__";
+  public static final String IDEAL_STATE_IP_PREFIX = "INSTANCE_PARTITIONS__";
+  public static final String IDEAL_STATE_IP_SEPARATOR = "__";
+
+  /**
+   * Takes in an InstancePartitions key like "1_1" and returns a pair of integers {1, 1} with the left integer
+   * representing the partition ID and the right integer representing the replica group ID.
+   */
+  public static Pair<Integer, Integer> getPartitionIdAndReplicaGroupId(String key) {
+    int separatorIndex = key.indexOf(InstancePartitions.PARTITION_REPLICA_GROUP_SEPARATOR);
+    int partitionId = Integer.parseInt(key.substring(0, separatorIndex));
+    int replicaGroupId = Integer.parseInt(key.substring(separatorIndex + 1));
+    return Pair.of(partitionId, replicaGroupId);
+  }
 
   /**
    * Returns the name of the instance partitions for the given table name (with or without type suffix) and instance
@@ -211,5 +229,34 @@ public class InstancePartitionsUtils {
       InstancePartitionsType instancePartitionsType) {
     return hasPreConfiguredInstancePartitions(tableConfig, instancePartitionsType)
         && !InstanceAssignmentConfigUtils.isMirrorServerSetAssignment(tableConfig, instancePartitionsType);
+  }
+
+  /**
+   * Combine a given set of instance partitions into an ideal state's instance partitions metadata maintained in its
+   * list fields.
+   *
+   * @param idealState Current ideal state
+   * @param instancePartitionsList List of instance partitions to be combined into the ideal state instance partitions
+   *                               metadata.
+   */
+  public static void combineInstancePartitionsInIdealState(IdealState idealState,
+      List<InstancePartitions> instancePartitionsList) {
+    Map<String, List<String>> idealStateListFields = idealState.getRecord().getListFields();
+    for (InstancePartitions instancePartitions : instancePartitionsList) {
+      String instancePartitionsName = instancePartitions.getInstancePartitionsName();
+      for (String partitionReplica : instancePartitions.getPartitionToInstancesMap().keySet()) {
+        String idealStateListKey = InstancePartitionsUtils.IDEAL_STATE_IP_PREFIX + instancePartitionsName
+            + InstancePartitionsUtils.IDEAL_STATE_IP_SEPARATOR + partitionReplica;
+
+        if (idealStateListFields.containsKey(idealStateListKey)) {
+          Set<String> oldAndNewInstances = new HashSet<>(idealStateListFields.get(idealStateListKey));
+          oldAndNewInstances.addAll(instancePartitions.getInstances(partitionReplica));
+          idealStateListFields.put(idealStateListKey, new ArrayList<>(oldAndNewInstances));
+        } else {
+          idealStateListFields.put(idealStateListKey,
+              new ArrayList<>(instancePartitions.getInstances(partitionReplica)));
+        }
+      }
+    }
   }
 }
