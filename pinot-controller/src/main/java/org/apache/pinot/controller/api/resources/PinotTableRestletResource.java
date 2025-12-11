@@ -305,6 +305,9 @@ public class PinotTableRestletResource {
 
       CopyTablePayload copyTablePayload = JsonUtils.stringToObject(payload, CopyTablePayload.class);
       String sourceControllerUri = copyTablePayload.getSourceClusterUri();
+      if (!sourceControllerUri.startsWith("http://") && !sourceControllerUri.startsWith("https://")) {
+        sourceControllerUri = "http://" + sourceControllerUri;
+      }
       Map<String, String> requestHeaders = copyTablePayload.getHeaders();
 
       LOGGER.info("[copyTable] Start copying table: {} from source: {}", tableName, sourceControllerUri);
