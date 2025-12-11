@@ -25,6 +25,7 @@ import org.apache.pinot.query.context.PhysicalPlannerContext;
 import org.apache.pinot.query.planner.physical.v2.opt.rules.AggregatePushdownRule;
 import org.apache.pinot.query.planner.physical.v2.opt.rules.LeafStageAggregateRule;
 import org.apache.pinot.query.planner.physical.v2.opt.rules.LeafStageBoundaryRule;
+import org.apache.pinot.query.planner.physical.v2.opt.rules.LeafStageSortJoinRule;
 import org.apache.pinot.query.planner.physical.v2.opt.rules.LeafStageWorkerAssignmentRule;
 import org.apache.pinot.query.planner.physical.v2.opt.rules.LiteModeSortInsertRule;
 import org.apache.pinot.query.planner.physical.v2.opt.rules.LiteModeWorkerAssignmentRule;
@@ -43,6 +44,7 @@ public class PhysicalOptRuleSet {
     transformers.add(create(new LeafStageWorkerAssignmentRule(context, tableCache), RuleExecutors.Type.POST_ORDER,
         context));
     transformers.add(create(new LeafStageAggregateRule(context), RuleExecutors.Type.POST_ORDER, context));
+    transformers.add(create(new LeafStageSortJoinRule(context), RuleExecutors.Type.POST_ORDER, context));
     transformers.add(createWorkerAssignmentRule(context));
     transformers.add(create(new AggregatePushdownRule(context), RuleExecutors.Type.POST_ORDER, context));
     transformers.add(create(new SortPushdownRule(context), RuleExecutors.Type.POST_ORDER, context));
