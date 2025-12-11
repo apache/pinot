@@ -232,14 +232,14 @@ public class PinotLLCRealtimeSegmentManager {
         MetadataEventNotifierFactory.loadFactory(controllerConf.subset(METADATA_EVENT_NOTIFIER_PREFIX),
             helixResourceManager);
     _flushThresholdUpdateManager = new FlushThresholdUpdateManager();
+
     _isDeepStoreLLCSegmentUploadRetryEnabled = controllerConf.isDeepStoreRetryUploadLLCSegmentEnabled();
+    _fileUploadDownloadClient = initFileUploadDownloadClient();
+    _deepStoreUploadExecutor = Executors.newFixedThreadPool(controllerConf.getDeepStoreRetryUploadParallelism());
+    _deepStoreUploadExecutorPendingSegments = ConcurrentHashMap.newKeySet();
+
     _isTmpSegmentAsyncDeletionEnabled = controllerConf.isTmpSegmentAsyncDeletionEnabled();
     _deepstoreUploadRetryTimeoutMs = controllerConf.getDeepStoreRetryUploadTimeoutMs();
-    _fileUploadDownloadClient = _isDeepStoreLLCSegmentUploadRetryEnabled ? initFileUploadDownloadClient() : null;
-    _deepStoreUploadExecutor = _isDeepStoreLLCSegmentUploadRetryEnabled ? Executors.newFixedThreadPool(
-        controllerConf.getDeepStoreRetryUploadParallelism()) : null;
-    _deepStoreUploadExecutorPendingSegments =
-        _isDeepStoreLLCSegmentUploadRetryEnabled ? ConcurrentHashMap.newKeySet() : null;
   }
 
   public boolean isDeepStoreLLCSegmentUploadRetryEnabled() {
@@ -364,6 +364,10 @@ public class PinotLLCRealtimeSegmentManager {
       } catch (IOException e) {
         LOGGER.error("Failed to close fileUploadDownloadClient.");
       }
+    }
+
+    if (_deepStoreUploadExecutor != null) {
+      _deepStoreUploadExecutor.shutdown();
     }
   }
 
