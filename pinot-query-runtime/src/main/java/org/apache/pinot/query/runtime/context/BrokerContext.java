@@ -18,8 +18,10 @@
  */
 package org.apache.pinot.query.runtime.context;
 
+import io.grpc.netty.shaded.io.netty.handler.ssl.SslContext;
 import java.util.Objects;
 import javax.annotation.Nullable;
+import javax.net.ssl.SSLContext;
 import org.apache.pinot.query.runtime.operator.factory.QueryOperatorFactoryProvider;
 
 
@@ -39,6 +41,14 @@ public class BrokerContext {
   // Must be set during broker initialization; null indicates no provider configured yet.
   @Nullable
   private QueryOperatorFactoryProvider _queryOperatorFactoryProvider;
+  @Nullable
+  private SslContext _clientGrpcSslContext;
+  @Nullable
+  private SslContext _serverGrpcSslContext;
+  @Nullable
+  private SSLContext _clientHttpsContext;
+  @Nullable
+  private SSLContext _serverHttpsContext;
 
   /**
    * Returns the configured provider or null if none has been set yet.
@@ -51,5 +61,43 @@ public class BrokerContext {
   public void setQueryOperatorFactoryProvider(QueryOperatorFactoryProvider queryOperatorFactoryProvider) {
     _queryOperatorFactoryProvider =
         Objects.requireNonNull(queryOperatorFactoryProvider, "queryOperatorFactoryProvider must be set");
+  }
+
+  @Nullable
+  public SslContext getClientGrpcSslContext() {
+    return _clientGrpcSslContext;
+  }
+
+  public void setClientGrpcSslContext(SslContext clientGrpcSslContext) {
+    _clientGrpcSslContext =
+        Objects.requireNonNull(clientGrpcSslContext, "clientGrpcSslContext must be set");
+  }
+
+  @Nullable
+  public SslContext getServerGrpcSslContext() {
+    return _serverGrpcSslContext;
+  }
+
+  public void setServerGrpcSslContext(SslContext serverGrpcSslContext) {
+    _serverGrpcSslContext =
+        Objects.requireNonNull(serverGrpcSslContext, "serverGrpcSslContext must be set");
+  }
+
+  @Nullable
+  public SSLContext getClientHttpsContext() {
+    return _clientHttpsContext;
+  }
+
+  public void setClientHttpsContext(SSLContext clientHttpsContext) {
+    _clientHttpsContext = Objects.requireNonNull(clientHttpsContext, "clientHttpsContext must be set");
+  }
+
+  @Nullable
+  public SSLContext getServerHttpsContext() {
+    return _serverHttpsContext;
+  }
+
+  public void setServerHttpsContext(SSLContext serverHttpsContext) {
+    _serverHttpsContext = Objects.requireNonNull(serverHttpsContext, "serverHttpsContext must be set");
   }
 }
