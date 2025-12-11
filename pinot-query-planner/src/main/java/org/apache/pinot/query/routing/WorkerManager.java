@@ -114,6 +114,7 @@ public class WorkerManager {
     }
   }
 
+  // TODO: Ensure that workerId to server assignment is deterministic across all stages in a query.
   private void assignWorkersToNonRootFragment(PlanFragment fragment, DispatchablePlanContext context) {
     List<PlanFragment> children = fragment.getChildren();
     for (PlanFragment child : children) {

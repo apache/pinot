@@ -38,6 +38,7 @@ import org.apache.pinot.query.planner.plannode.ProjectNode;
 import org.apache.pinot.query.planner.plannode.SetOpNode;
 import org.apache.pinot.query.planner.plannode.SortNode;
 import org.apache.pinot.query.planner.plannode.TableScanNode;
+import org.apache.pinot.query.planner.plannode.UnnestNode;
 import org.apache.pinot.query.planner.plannode.ValueNode;
 import org.apache.pinot.query.planner.plannode.WindowNode;
 import org.apache.pinot.query.runtime.operator.AggregateOperator;
@@ -57,6 +58,7 @@ import org.apache.pinot.query.runtime.operator.OpChain;
 import org.apache.pinot.query.runtime.operator.SortOperator;
 import org.apache.pinot.query.runtime.operator.SortedMailboxReceiveOperator;
 import org.apache.pinot.query.runtime.operator.TransformOperator;
+import org.apache.pinot.query.runtime.operator.UnnestOperator;
 import org.apache.pinot.query.runtime.operator.WindowAggregateOperator;
 import org.apache.pinot.query.runtime.operator.set.IntersectAllOperator;
 import org.apache.pinot.query.runtime.operator.set.IntersectOperator;
@@ -320,6 +322,18 @@ public class PlanNodeToOpChain {
     public MultiStageOperator visitExplained(ExplainedNode node, OpChainExecutionContext context) {
       return new ErrorOperator(context, QueryErrorCode.QUERY_EXECUTION,
           "Plan node of type ExplainedNode is not supported in OpChain execution.");
+    }
+
+    @Override
+    public MultiStageOperator visitUnnest(UnnestNode node, OpChainExecutionContext context) {
+      MultiStageOperator child = null;
+      try {
+        PlanNode input = node.getInputs().get(0);
+        child = visit(input, context);
+        return new UnnestOperator(context, child, input.getDataSchema(), node);
+      } catch (Exception e) {
+        return new ErrorOperator(context, QueryErrorCode.QUERY_EXECUTION, e.getMessage(), child);
+      }
     }
   }
 }

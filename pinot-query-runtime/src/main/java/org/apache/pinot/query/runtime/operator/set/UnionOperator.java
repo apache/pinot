@@ -78,6 +78,7 @@ public class UnionOperator extends SetOperator {
             rows.add(row);
           }
         }
+        checkTerminationAndSampleUsage();
         if (!rows.isEmpty()) {
           return new RowHeapDataBlock(rows, _dataSchema);
         }
