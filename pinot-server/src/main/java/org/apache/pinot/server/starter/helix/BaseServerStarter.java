@@ -37,6 +37,8 @@ import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
 import java.util.function.Supplier;
 import javax.annotation.Nullable;
+import javax.net.ssl.SSLContext;
+import nl.altindag.ssl.SSLFactory;
 import org.apache.commons.io.FileUtils;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.helix.HelixAdmin;
@@ -75,6 +77,7 @@ import org.apache.pinot.common.utils.fetcher.SegmentFetcherFactory;
 import org.apache.pinot.common.utils.helix.HelixHelper;
 import org.apache.pinot.common.utils.regex.PatternFactory;
 import org.apache.pinot.common.utils.tls.PinotInsecureMode;
+import org.apache.pinot.common.utils.tls.RenewableTlsUtils;
 import org.apache.pinot.common.utils.tls.TlsUtils;
 import org.apache.pinot.common.version.PinotVersion;
 import org.apache.pinot.core.common.datatable.DataTableBuilderFactory;
@@ -85,7 +88,6 @@ import org.apache.pinot.core.query.scheduler.resources.ResourceManager;
 import org.apache.pinot.core.transport.ListenerConfig;
 import org.apache.pinot.core.util.ListenerConfigUtil;
 import org.apache.pinot.core.util.trace.ContinuousJfrStarter;
-import org.apache.pinot.query.runtime.context.ServerContext;
 import org.apache.pinot.query.runtime.operator.factory.DefaultQueryOperatorFactoryProvider;
 import org.apache.pinot.query.runtime.operator.factory.QueryOperatorFactoryProvider;
 import org.apache.pinot.segment.local.realtime.impl.invertedindex.RealtimeLuceneIndexRefreshManager;
@@ -100,6 +102,7 @@ import org.apache.pinot.segment.local.utils.SegmentStarTreePreprocessThrottler;
 import org.apache.pinot.segment.local.utils.ServerReloadJobStatusCache;
 import org.apache.pinot.segment.spi.memory.PinotDataBuffer;
 import org.apache.pinot.segment.spi.memory.unsafe.MmapMemoryConfig;
+import org.apache.pinot.server.ServerContext;
 import org.apache.pinot.server.access.AccessControlFactory;
 import org.apache.pinot.server.api.AdminApiApplication;
 import org.apache.pinot.server.conf.ServerConf;
@@ -650,6 +653,17 @@ public abstract class BaseServerStarter implements ServiceStartable {
         tlsDefaults.getTrustStorePath())) {
       LOGGER.info("Installing default SSL context for any client requests");
       TlsUtils.installDefaultSSLSocketFactory(tlsDefaults);
+      SSLFactory sslFactory =
+          RenewableTlsUtils.createSSLFactoryAndEnableAutoRenewalWhenUsingFileStores(tlsDefaults,
+              PinotInsecureMode::isPinotInInsecureMode);
+      SSLContext sslContext = sslFactory.getSslContext();
+      ServerContext serverContext = ServerContext.getInstance();
+      if (serverContext.getClientHttpsContext() == null) {
+        serverContext.setClientHttpsContext(sslContext);
+      }
+      if (serverContext.getServerHttpsContext() == null) {
+        serverContext.setServerHttpsContext(sslContext);
+      }
     }
 
     LOGGER.info("Initializing accessControlFactory");
