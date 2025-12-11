@@ -6,7 +6,9 @@ Instructions:
    4. `ui`
    5. `backward-incompat`
    6. `release-notes` (**)
-2. Remove these instructions before publishing the PR.
+2. Update the [dev documentation](/docs/dev) if you are adding new features or changing existing ones.
+   This is important to keep the documentation in sync with the codebase.
+3. Remove these instructions before publishing the PR.
  
 (*) Other labels to consider:
 - `testing`

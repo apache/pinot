@@ -1,0 +1,90 @@
+# How to run mkdocs:
+#  serve (Start the live-reloading docs server):
+#    docker run --user $UID:$GID --rm -v $(pwd):/docs -p 8000:8000 squidfunk/mkdocs-material
+#  build (Build the documentation site with html pages ready to publish into `/site` directory):
+#    docker run --user $UID:$GID --rm -v $(pwd):/docs squidfunk/mkdocs-material build
+# You can also provide the `--strict` argument to fail the build on warnings (ie when links are broken)
+
+# Doc project layout
+# /
+# ├── mkdocs.yml: Configuration file
+# ├── docs/: The documentation files (usually md files)
+# │   ├── dev/: Dev guide
+# ├── mkdocs/: Custom theme files
+# │   ├── includes/: Custom md files to be implicitly included in the docs
+
+site_name: Apache Pinot Dev Documentation
+site_url: !ENV [MKDOCS_SITE_URL]
+nav:
+  - Dev:
+    - dev/index.md
+    - "About dev docs":
+        - dev/about-dev-doc/index.md
+        - dev/about-dev-doc/how-to-generate-dev-doc.md
+        - dev/about-dev-doc/mkdocs-tips.md
+        - dev/about-dev-doc/dev-docs-codestyle.md
+    - "Query":
+      - "Query tree lifecycle": dev/query/msq/tree-lifecycle.md
+      - "Multi stage query execution": dev/query/msq/execution.md
+    - "Index":
+        - "Timestamp index": dev/index/timestamp_index.md
+
+
+theme:
+  name: material
+  custom_dir: mkdocs
+  palette:
+#    primary: blue
+  features: # sorted alphabetically
+    - announce.dismiss
+
+    - content.action.edit
+    - content.code.copy
+    - content.code.select
+    - content.code.annotate
+    - content.tooltips
+
+    - navigation.expand
+    - navigation.footer
+    - navigation.indexes # incompatible with toc.integrate
+    - navigation.instant
+    - navigation.instant.prefetch
+    - navigation.instant.progress
+    - navigation.path
+    - navigation.sections
+    #- navigation.tabs
+    - navigation.tracking
+
+    - search.suggest
+    - search.highlight
+
+#    - toc.integrate # incompatible with navigation.indexes
+  icon:
+    repo: fontawesome/brands/github
+markdown_extensions:
+  - abbr
+  - admonition
+  - attr_list
+  - footnotes
+  - pymdownx.details
+  - pymdownx.highlight:
+      anchor_linenums: true
+  - pymdownx.snippets:
+      auto_append:
+        - mkdocs/includes/abbreviations.md
+  - pymdownx.superfences:
+      custom_fences:
+        - name: mermaid
+          class: mermaid
+          format: !!python/name:pymdownx.superfences.fence_code_format
+  - pymdownx.tabbed:
+      alternate_style: true
+  - toc:
+      permalink: true
+plugins:
+  - search
+  - redirects:
+      redirect_maps:
+        'index.md': 'dev/index.md'
+repo_name: apache/pinot
+repo_url: https://github.com/apache/pinot
