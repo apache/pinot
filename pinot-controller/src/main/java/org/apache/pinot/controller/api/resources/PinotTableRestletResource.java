@@ -302,6 +302,9 @@ public class PinotTableRestletResource {
       tableName = DatabaseUtils.translateTableName(tableName, headers);
       CopyTablePayload copyTablePayload = JsonUtils.stringToObject(payload, CopyTablePayload.class);
       String sourceControllerUri = copyTablePayload.getSourceClusterUri();
+      if (!sourceControllerUri.startsWith("http://") && !sourceControllerUri.startsWith("https://")) {
+        sourceControllerUri = "http://" + sourceControllerUri;
+      }
       Map<String, String> requestHeaders = copyTablePayload.getHeaders();
       String brokerTenant = copyTablePayload.getBrokerTenant();
       String serverTenant = copyTablePayload.getServerTenant();
