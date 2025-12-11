@@ -18,13 +18,24 @@
  */
 package org.apache.pinot.segment.local.utils;
 
+import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
+import com.fasterxml.jackson.annotation.JsonProperty;
+
 /**
  * Configuration for ReloadJobStatusCache.
+ * Uses Jackson annotations for automatic JSON mapping from ClusterConfiguration.
  */
+@JsonIgnoreProperties(ignoreUnknown = true)
 public class ServerReloadJobStatusCacheConfig {
 
+  @JsonProperty("size.max")
   private int _maxSize = 10000;
+
+  @JsonProperty("ttl.days")
   private int _ttlDays = 30;
+
+  @JsonProperty("segment.failure.details.count")
+  private int _segmentFailureDetailsCount = 5;
 
   public int getMaxSize() {
     return _maxSize;
@@ -44,8 +55,18 @@ public class ServerReloadJobStatusCacheConfig {
     return this;
   }
 
+  public int getSegmentFailureDetailsCount() {
+    return _segmentFailureDetailsCount;
+  }
+
+  public ServerReloadJobStatusCacheConfig setSegmentFailureDetailsCount(int segmentFailureDetailsCount) {
+    _segmentFailureDetailsCount = segmentFailureDetailsCount;
+    return this;
+  }
+
   @Override
   public String toString() {
-    return "ServerReloadJobStatusCacheConfig{maxSize=" + _maxSize + ", ttlDays=" + _ttlDays + '}';
+    return "ServerReloadJobStatusCacheConfig{maxSize=" + _maxSize + ", ttlDays=" + _ttlDays
+        + ", segmentFailureDetailsCount=" + _segmentFailureDetailsCount + '}';
   }
 }

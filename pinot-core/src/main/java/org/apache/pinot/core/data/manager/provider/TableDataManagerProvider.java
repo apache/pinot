@@ -63,6 +63,6 @@ public interface TableDataManagerProvider {
   @VisibleForTesting
   default TableDataManager getTableDataManager(TableConfig tableConfig, Schema schema) {
     return getTableDataManager(tableConfig, schema, new SegmentReloadSemaphore(1), Executors.newSingleThreadExecutor(),
-        null, null, () -> true, false, new ServerReloadJobStatusCache());
+        null, null, () -> true, false, new ServerReloadJobStatusCache("testInstance"));
   }
 }

@@ -133,15 +133,18 @@ public class RealtimeSegmentValidationManager extends ControllerPeriodicTask<Rea
       LOGGER.info("Skipping segment-level validation for table: {}", tableConfig.getTableName());
     }
 
-    boolean isPauselessConsumptionEnabled = PauselessConsumptionUtils.isPauselessEnabled(tableConfig);
-    if (isPauselessConsumptionEnabled) {
-      // For pauseless tables without dedup or partial upsert, repair segments in error state
-      _llcRealtimeSegmentManager.repairSegmentsInErrorStateForPauselessConsumption(tableConfig,
-          context._repairErrorSegmentsForPartialUpsertOrDedup, _segmentAutoResetOnErrorAtValidation);
-    } else if (_segmentAutoResetOnErrorAtValidation) {
-      // Reset for pauseless tables is already handled in repairSegmentsInErrorStateForPauselessConsumption method with
-      // additional checks for pauseless consumption
-      _pinotHelixResourceManager.resetSegments(tableConfig.getTableName(), null, true);
+    boolean isPauselessTable = PauselessConsumptionUtils.isPauselessEnabled(tableConfig);
+    if (isPauselessTable || _segmentAutoResetOnErrorAtValidation) {
+      // For realtime tables without dedup or partial upsert, repair segments in error state.
+      // When pauseless consumption is disabled, this behavior remains gated by
+      // _segmentAutoResetOnErrorAtValidation to preserve legacy semantics.
+      _llcRealtimeSegmentManager.repairSegmentsInErrorState(tableConfig,
+          context._repairErrorSegmentsForPartialUpsertOrDedup);
+    } else {
+      LOGGER.debug(
+          "Skipping segment error repair for table {} because pauseless consumption is disabled and "
+              + "_segmentAutoResetOnErrorAtValidation=false",
+          tableConfig.getTableName());
     }
   }
 
@@ -187,7 +190,7 @@ public class RealtimeSegmentValidationManager extends ControllerPeriodicTask<Rea
       // The table was previously paused due to exceeding resource utilization, but the current status cannot be
       // determined. To be safe, leave it as paused and once the status is available take the correct action
       LOGGER.warn("Resource utilization limit could not be determined for for table: {}, and it is paused, leave it as "
-              + "paused", tableNameWithType);
+          + "paused", tableNameWithType);
       return false;
     }
     _controllerMetrics.setOrUpdateTableGauge(tableNameWithType, ControllerGauge.RESOURCE_UTILIZATION_LIMIT_EXCEEDED,
@@ -236,12 +239,15 @@ public class RealtimeSegmentValidationManager extends ControllerPeriodicTask<Rea
 
     // Ensures all segments in COMMITTING state are properly tracked in ZooKeeper.
     // Acts as a recovery mechanism for segments that may have failed to register during start of commit protocol.
-    if (PauselessConsumptionUtils.isPauselessEnabled(tableConfig)) {
+    boolean pauselessEnabled = PauselessConsumptionUtils.isPauselessEnabled(tableConfig);
+    if (pauselessEnabled) {
       syncCommittingSegmentsFromMetadata(realtimeTableName, segmentsZKMetadata);
     }
 
     // Check missing segments and upload them to the deep store
-    if (_llcRealtimeSegmentManager.isDeepStoreLLCSegmentUploadRetryEnabled()) {
+    // If pauseless consumption is enabled, always run uploadToDeepStoreIfMissing step because in pauseless
+    // consumption, the segment commit can be marked completed even if segment was not uploaded to the deep store.
+    if (pauselessEnabled || _llcRealtimeSegmentManager.isDeepStoreLLCSegmentUploadRetryEnabled()) {
       _llcRealtimeSegmentManager.uploadToDeepStoreIfMissing(tableConfig, segmentsZKMetadata);
     }
   }

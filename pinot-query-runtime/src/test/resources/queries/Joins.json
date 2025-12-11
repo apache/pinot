@@ -1,0 +1,112 @@
+{
+  "hash_distributed_join_with_aggregates": {
+    "comment": "Tests join correctness when both inputs are already hash-distributed on the join keys via aggregation thus resulting in a pre-partitioned distribution.",
+    "tables": {
+      "left_tbl": {
+        "schema": [
+          {"name": "key_col", "type": "STRING"},
+          {"name": "value_col", "type": "INT"}
+        ],
+        "inputs": [
+          ["a", 1],
+          ["a", 2],
+          ["b", 3],
+          ["b", 4],
+          ["c", 5],
+          ["c", 6],
+          ["d", 7],
+          ["d", 8],
+          ["e", 9],
+          ["e", 10]
+        ]
+      },
+      "right_tbl": {
+        "schema": [
+          {"name": "key_col", "type": "STRING"},
+          {"name": "metric_col", "type": "INT"}
+        ],
+        "inputs": [
+          ["a", 100],
+          ["a", 200],
+          ["b", 300],
+          ["b", 400],
+          ["c", 500],
+          ["c", 600],
+          ["d", 700],
+          ["d", 800],
+          ["e", 900],
+          ["e", 1000]
+        ]
+      }
+    },
+    "queries": [
+      {
+        "description": "Join with aggregation on both sides - exercises hash-distributed exchange routing",
+        "sql": "SELECT l.key_col, l.sum_val, r.sum_metric FROM (SELECT key_col, SUM(value_col) AS sum_val FROM {left_tbl} GROUP BY key_col) l JOIN (SELECT key_col, SUM(metric_col) AS sum_metric FROM {right_tbl} GROUP BY key_col) r ON l.key_col = r.key_col ORDER BY l.key_col"
+      },
+      {
+        "description": "Count joined rows with aggregated inputs",
+        "sql": "SELECT COUNT(*) FROM (SELECT key_col, SUM(value_col) AS sum_val FROM {left_tbl} GROUP BY key_col) l JOIN (SELECT key_col, SUM(metric_col) AS sum_metric FROM {right_tbl} GROUP BY key_col) r ON l.key_col = r.key_col"
+      },
+      {
+        "description": "Sum of joined values",
+        "sql": "SELECT SUM(l.sum_val), SUM(r.sum_metric) FROM (SELECT key_col, SUM(value_col) AS sum_val FROM {left_tbl} GROUP BY key_col) l JOIN (SELECT key_col, SUM(metric_col) AS sum_metric FROM {right_tbl} GROUP BY key_col) r ON l.key_col = r.key_col"
+      },
+      {
+        "description": "Direct join with same group keys as join keys",
+        "sql": "SELECT a.key_col, SUM(a.value_col), SUM(b.metric_col) FROM {left_tbl} a JOIN {right_tbl} b ON a.key_col = b.key_col GROUP BY a.key_col ORDER BY a.key_col"
+      }
+    ]
+  },
+  "multi_table_join_chain": {
+    "comment": "Tests join chains that create multiple hash-distributed exchanges",
+    "tables": {
+      "orders": {
+        "schema": [
+          {"name": "order_id", "type": "INT"},
+          {"name": "customer_id", "type": "STRING"},
+          {"name": "amount", "type": "INT"}
+        ],
+        "inputs": [
+          [1, "c1", 100],
+          [2, "c1", 200],
+          [3, "c2", 150],
+          [4, "c2", 250],
+          [5, "c3", 300]
+        ]
+      },
+      "customers": {
+        "schema": [
+          {"name": "customer_id", "type": "STRING"},
+          {"name": "name", "type": "STRING"}
+        ],
+        "inputs": [
+          ["c1", "Alice"],
+          ["c2", "Bob"],
+          ["c3", "Charlie"]
+        ]
+      },
+      "regions": {
+        "schema": [
+          {"name": "customer_id", "type": "STRING"},
+          {"name": "region", "type": "STRING"}
+        ],
+        "inputs": [
+          ["c1", "North"],
+          ["c2", "South"],
+          ["c3", "East"]
+        ]
+      }
+    },
+    "queries": [
+      {
+        "description": "Three-way join with aggregation",
+        "sql": "SELECT c.name, r.region, SUM(o.amount) as total FROM {orders} o JOIN {customers} c ON o.customer_id = c.customer_id JOIN {regions} r ON c.customer_id = r.customer_id GROUP BY c.name, r.region ORDER BY c.name"
+      },
+      {
+        "description": "Join with pre-aggregated subquery",
+        "sql": "SELECT c.name, o.total_amount FROM {customers} c JOIN (SELECT customer_id, SUM(amount) as total_amount FROM {orders} GROUP BY customer_id) o ON c.customer_id = o.customer_id ORDER BY c.name"
+      }
+    ]
+  }
+}

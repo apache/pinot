@@ -24,6 +24,8 @@ import java.util.Map;
 import org.apache.pinot.segment.spi.creator.ColumnStatistics;
 import org.apache.pinot.segment.spi.creator.SegmentPreIndexStatsCollector;
 import org.apache.pinot.segment.spi.creator.StatsCollectorConfig;
+import org.apache.pinot.segment.spi.index.FieldIndexConfigs;
+import org.apache.pinot.segment.spi.index.FieldIndexConfigsUtil;
 import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.data.readers.ColumnReader;
@@ -75,14 +77,16 @@ public class ColumnarSegmentPreIndexStatsContainer implements SegmentPreIndexSta
    * Initialize stats collectors for all columns in the target schema.
    */
   private void initializeStatsCollectors() {
+    Map<String, FieldIndexConfigs> indexConfigsByCol = FieldIndexConfigsUtil.createIndexConfigsByColName(
+        _statsCollectorConfig.getTableConfig(), _statsCollectorConfig.getSchema());
     for (FieldSpec fieldSpec : _targetSchema.getAllFieldSpecs()) {
       if (fieldSpec.isVirtualColumn()) {
         continue;
       }
 
       String columnName = fieldSpec.getName();
-      AbstractColumnStatisticsCollector collector =
-          StatsCollectorUtil.createStatsCollector(columnName, fieldSpec, _statsCollectorConfig);
+      AbstractColumnStatisticsCollector collector = StatsCollectorUtil.createStatsCollector(
+          columnName, fieldSpec, indexConfigsByCol.get(columnName), _statsCollectorConfig);
       _columnStatsCollectorMap.put(columnName, collector);
     }
   }

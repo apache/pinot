@@ -156,7 +156,7 @@ public class QueryCompilationTest extends QueryEnvironmentTestBase {
   public void testJoinPushTransitivePredicate() {
     // queries involving extra predicate on join keys
     // should be optimized to push the predicate to both sides of the join if applicable
-    String query = "EXPLAIN PLAN FOR\n"
+    String query = "SET usePlannerRules='JoinPushTransitivePredicates'; EXPLAIN PLAN FOR\n"
         + "SELECT * FROM a\n"
         + "JOIN b\n"
         + "ON a.col1 = b.col1\n"
@@ -685,6 +685,45 @@ public class QueryCompilationTest extends QueryEnvironmentTestBase {
         + "     )\n"
         + "GROUP BY col1;";
     _queryEnvironment.planQuery(query);
+  }
+
+  /**
+   * Tests that queries with ORDER BY / LIMIT use singleton worker for the intermediate sort stage.
+   */
+  @Test
+  public void testSingletonWorkerForLimitAndOrderByQueries() {
+    String[] queries =
+        new String[]{"SELECT * FROM a LIMIT 10", "SELECT * FROM a OFFSET 10", "SELECT * FROM a ORDER BY col1",
+            "SELECT * FROM a LIMIT 10 OFFSET 5", "SELECT * FROM a ORDER BY col1 LIMIT 10", "SELECT * FROM a ORDER BY "
+            + "col1 OFFSET 10", "SELECT * FROM a ORDER BY col1 LIMIT 10 OFFSET 5"};
+
+    for (String query : queries) {
+      DispatchableSubPlan dispatchableSubPlan = _queryEnvironment.planQuery(query);
+
+      // Find the intermediate stage (non-leaf, non-root)
+      DispatchablePlanFragment intermediateStage = findIntermediateStage(dispatchableSubPlan);
+      assertNotNull(intermediateStage, "Should have an intermediate stage");
+
+      // Should use singleton worker (1 server, 1 worker)
+      assertEquals(intermediateStage.getServerInstanceToWorkerIdMap().size(), 1,
+          "LIMIT / ORDER BY query should use singleton worker for intermediate stage");
+      assertEquals(intermediateStage.getWorkerMetadataList().size(), 1,
+          "LIMIT / ORDER BY query should use singleton worker for intermediate stage");
+    }
+  }
+
+  /**
+   * Helper method to find an intermediate stage (non-leaf, non-root).
+   */
+  private DispatchablePlanFragment findIntermediateStage(DispatchableSubPlan dispatchableSubPlan) {
+    for (DispatchablePlanFragment fragment : dispatchableSubPlan.getQueryStages()) {
+      int stageId = fragment.getPlanFragment().getFragmentId();
+      // Skip stage 0 (broker/root) and leaf stages (have table names)
+      if (stageId > 0 && fragment.getTableName() == null) {
+        return fragment;
+      }
+    }
+    return null;
   }
 
   // --------------------------------------------------------------------------

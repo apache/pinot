@@ -288,16 +288,16 @@ public class QueryRunner {
     OpChainExecutionContext executionContext =
         OpChainExecutionContext.fromQueryContext(_mailboxService, opChainMetadata, stageMetadata, workerMetadata,
             pipelineBreakerResult, _sendStats.getAsBoolean());
-    OpChain opChain;
-    if (workerMetadata.isLeafStageWorker()) {
-      Map<String, String> rlsFilters = RlsUtils.extractRlsFilters(requestMetadata);
-      opChain =
-          ServerPlanRequestUtils.compileLeafStage(executionContext, stagePlan, _leafQueryExecutor, _executorService,
-              rlsFilters);
-    } else {
-      opChain = PlanNodeToOpChain.convert(stagePlan.getRootNode(), executionContext);
-    }
     try {
+      OpChain opChain;
+      if (workerMetadata.isLeafStageWorker()) {
+        Map<String, String> rlsFilters = RlsUtils.extractRlsFilters(requestMetadata);
+        opChain =
+            ServerPlanRequestUtils.compileLeafStage(executionContext, stagePlan, _leafQueryExecutor, _executorService,
+                rlsFilters);
+      } else {
+        opChain = PlanNodeToOpChain.convert(stagePlan.getRootNode(), executionContext);
+      }
       // This can fail if the executor rejects the task.
       _opChainScheduler.register(opChain);
     } catch (RuntimeException e) {
@@ -404,9 +404,11 @@ public class QueryRunner {
             currentPlanId = fragmentRoots.get(index).getId();
             BaseTimeSeriesOperator fragmentOpChain = fragmentOpChains.get(index);
             TimeSeriesBlock seriesBlock = fragmentOpChain.nextBlock();
+            Map<String, String> metadataMap = new HashMap<>(seriesBlock.getMetadata());
+            metadataMap.put(Response.MetadataKeys.TimeSeries.PLAN_ID, currentPlanId);
             Worker.TimeSeriesResponse response = Worker.TimeSeriesResponse.newBuilder()
                 .setPayload(TimeSeriesBlockSerde.serializeTimeSeriesBlock(seriesBlock))
-                .putAllMetadata(Map.of(Response.MetadataKeys.TimeSeries.PLAN_ID, currentPlanId))
+                .putAllMetadata(metadataMap)
                 .build();
             responseObserver.onNext(response);
           }

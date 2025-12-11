@@ -69,6 +69,7 @@ import org.apache.pinot.segment.spi.loader.SegmentDirectoryLoaderContext;
 import org.apache.pinot.segment.spi.loader.SegmentDirectoryLoaderRegistry;
 import org.apache.pinot.server.realtime.ServerSegmentCompletionProtocolHandler;
 import org.apache.pinot.spi.config.table.TableConfig;
+import org.apache.pinot.spi.config.table.UpsertConfig;
 import org.apache.pinot.spi.data.LogicalTableConfig;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.env.PinotConfiguration;
@@ -552,15 +553,19 @@ public class HelixInstanceDataManager implements InstanceDataManager {
         if (segmentDataManager != null) {
           try {
             if (segmentDataManager instanceof RealtimeSegmentDataManager) {
-              // For partial upsert tables, force-committing consuming segments is disabled.
-              // In some cases (especially when replication > 1), the server with fewer consumed rows
-              // was incorrectly chosen as the winner, causing other servers to reconsume rows
-              // and leading to inconsistent data.
+              // For partial-upsert tables or upserts with out-of-order events enabled, force-committing
+              // consuming segments is disabled. In some cases (especially when replication > 1), the
+              // server that consumed fewer rows was incorrectly selected as the winner, causing other
+              // servers to reconsume rows and resulting in inconsistent data when previous state must
+              // be referenced for add/update operations.
+
               // TODO: Temporarily disabled until a proper fix is implemented.
               TableConfig tableConfig = tableDataManager.getCachedTableConfigAndSchema().getLeft();
-              if (TableConfigUtils.checkForPartialUpsertWithReplicas(tableConfig)) {
-                LOGGER.warn("Force commit is not allowed on a Partial Upsert Table: {} when replication > 1",
-                    tableNameWithType);
+              if (TableConfigUtils.checkForInconsistentStateConfigs(tableConfig)) {
+                LOGGER.warn(
+                    "Force commit is not allowed when replication > 1 for partial-upsert tables, or for upsert tables"
+                        + " when dropOutOfOrder is enabled with consistency mode: {}" + "for the table: {} ",
+                    UpsertConfig.ConsistencyMode.NONE, tableNameWithType);
               } else {
                 ((RealtimeSegmentDataManager) segmentDataManager).forceCommit();
               }

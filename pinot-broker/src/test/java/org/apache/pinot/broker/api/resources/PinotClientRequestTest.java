@@ -26,6 +26,7 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.Executor;
 import javax.ws.rs.container.AsyncResponse;
+import javax.ws.rs.core.HttpHeaders;
 import javax.ws.rs.core.Response;
 import org.apache.hc.client5.http.io.HttpClientConnectionManager;
 import org.apache.pinot.broker.requesthandler.BrokerRequestHandler;
@@ -56,12 +57,20 @@ import static org.testng.Assert.assertFalse;
 
 public class PinotClientRequestTest {
 
-  @Mock private SqlQueryExecutor _sqlQueryExecutor;
-  @Mock private BrokerRequestHandler _requestHandler;
-  @Mock private BrokerMetrics _brokerMetrics;
-  @Mock private Executor _executor;
-  @Mock private HttpClientConnectionManager _httpConnMgr;
-  @InjectMocks private PinotClientRequest _pinotClientRequest;
+  @Mock
+  private SqlQueryExecutor _sqlQueryExecutor;
+  @Mock
+  private BrokerRequestHandler _requestHandler;
+  @Mock
+  private BrokerMetrics _brokerMetrics;
+  @Mock
+  private Executor _executor;
+  @Mock
+  private HttpClientConnectionManager _httpConnMgr;
+  @Mock
+  private HttpHeaders _httpHeaders;
+  @InjectMocks
+  private PinotClientRequest _pinotClientRequest;
 
   @BeforeMethod
   public void setUp() {
@@ -79,7 +88,7 @@ public class PinotClientRequestTest {
 
     // for successful query result the 'X-Pinot-Error-Code' should be -1
     BrokerResponse emptyResultBrokerResponse = BrokerResponseNative.EMPTY_RESULT;
-    Response successfulResponse = PinotClientRequest.getPinotQueryResponse(emptyResultBrokerResponse);
+    Response successfulResponse = PinotClientRequest.getPinotQueryResponse(emptyResultBrokerResponse, _httpHeaders);
     assertEquals(successfulResponse.getStatus(), Response.Status.OK.getStatusCode());
     Assert.assertTrue(successfulResponse.getHeaders().containsKey(PINOT_QUERY_ERROR_CODE_HEADER));
     assertEquals(successfulResponse.getHeaders().get(PINOT_QUERY_ERROR_CODE_HEADER).size(), 1);
@@ -87,11 +96,26 @@ public class PinotClientRequestTest {
 
     // for failed query result the 'X-Pinot-Error-Code' should be Error code fo exception.
     BrokerResponse tableDoesNotExistBrokerResponse = BrokerResponseNative.TABLE_DOES_NOT_EXIST;
-    Response tableDoesNotExistResponse = PinotClientRequest.getPinotQueryResponse(tableDoesNotExistBrokerResponse);
+    Response tableDoesNotExistResponse =
+        PinotClientRequest.getPinotQueryResponse(tableDoesNotExistBrokerResponse, _httpHeaders);
     assertEquals(tableDoesNotExistResponse.getStatus(), Response.Status.OK.getStatusCode());
     Assert.assertTrue(tableDoesNotExistResponse.getHeaders().containsKey(PINOT_QUERY_ERROR_CODE_HEADER));
     assertEquals(tableDoesNotExistResponse.getHeaders().get(PINOT_QUERY_ERROR_CODE_HEADER).size(), 1);
     assertEquals(tableDoesNotExistResponse.getHeaders().get(PINOT_QUERY_ERROR_CODE_HEADER).get(0),
+        QueryErrorCode.TABLE_DOES_NOT_EXIST.getId());
+
+    // for failed query result the response code should be corresponding http response code of the Error code if
+    // USE_HTTP_STATUS_FOR_ERRORS_HEADER is set to true.
+    when(_httpHeaders.getHeaderString(
+        CommonConstants.Broker.USE_HTTP_STATUS_FOR_ERRORS_HEADER)).thenReturn("true");
+    Response tableDoesNotExistResponseWithHttpResponseCode =
+        PinotClientRequest.getPinotQueryResponse(tableDoesNotExistBrokerResponse, _httpHeaders);
+    assertEquals(tableDoesNotExistResponseWithHttpResponseCode.getStatus(), Response.Status.NOT_FOUND.getStatusCode());
+    Assert.assertTrue(
+        tableDoesNotExistResponseWithHttpResponseCode.getHeaders().containsKey(PINOT_QUERY_ERROR_CODE_HEADER));
+    assertEquals(tableDoesNotExistResponseWithHttpResponseCode.getHeaders().get(PINOT_QUERY_ERROR_CODE_HEADER).size(),
+        1);
+    assertEquals(tableDoesNotExistResponseWithHttpResponseCode.getHeaders().get(PINOT_QUERY_ERROR_CODE_HEADER).get(0),
         QueryErrorCode.TABLE_DOES_NOT_EXIST.getId());
   }
 

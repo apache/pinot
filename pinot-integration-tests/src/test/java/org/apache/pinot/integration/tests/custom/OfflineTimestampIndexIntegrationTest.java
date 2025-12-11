@@ -23,6 +23,7 @@ import java.io.File;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.regex.Pattern;
 import org.apache.pinot.integration.tests.BaseClusterIntegrationTest;
 import org.apache.pinot.integration.tests.ClusterIntegrationTestUtils;
 import org.apache.pinot.integration.tests.ExplainIntegrationTestTrait;
@@ -33,7 +34,7 @@ import org.apache.pinot.spi.config.table.TimestampIndexGranularity;
 import org.apache.pinot.spi.config.table.ingestion.IngestionConfig;
 import org.apache.pinot.spi.config.table.ingestion.TransformConfig;
 import org.apache.pinot.spi.data.DateTimeFieldSpec;
-import org.apache.pinot.spi.data.FieldSpec;
+import org.apache.pinot.spi.data.FieldSpec.DataType;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.env.PinotConfiguration;
 import org.apache.pinot.spi.utils.CommonConstants;
@@ -44,7 +45,8 @@ import org.testng.annotations.Test;
 import static org.testng.Assert.assertTrue;
 
 
-public class TimestampIndexMseTest extends BaseClusterIntegrationTest implements ExplainIntegrationTestTrait {
+public class OfflineTimestampIndexIntegrationTest extends BaseClusterIntegrationTest
+    implements ExplainIntegrationTestTrait {
 
   @BeforeClass
   public void setUp()
@@ -84,7 +86,7 @@ public class TimestampIndexMseTest extends BaseClusterIntegrationTest implements
   protected Schema createSchema()
       throws IOException {
     Schema schema = super.createSchema();
-    schema.addField(new DateTimeFieldSpec("ts", FieldSpec.DataType.TIMESTAMP, "TIMESTAMP", "1:DAYS"));
+    schema.addField(new DateTimeFieldSpec("ts", DataType.TIMESTAMP, "TIMESTAMP", "1:DAYS"));
     return schema;
   }
 
@@ -104,7 +106,20 @@ public class TimestampIndexMseTest extends BaseClusterIntegrationTest implements
   }
 
   @Test
-  public void timestampIndexSubstitutedInProjections() {
+  public void testProjectionSse() {
+    setUseMultiStageQueryEngine(false);
+    explainSse("SELECT datetrunc('SECOND', ts) FROM mytable",
+        "[BROKER_REDUCE(limit:10), 1, 0]",
+        "[COMBINE_SELECT, 2, 1]",
+        "[PLAN_START(numSegmentsForThisPlan:1), -1, -1]",
+        "[SELECT(selectList:$ts$SECOND), 3, 2]",
+        "[PROJECT($ts$SECOND), 4, 3]",
+        "[DOC_ID_SET, 5, 4]",
+        Pattern.compile("\\[FILTER_MATCH_ENTIRE_SEGMENT\\(docs:[0-9]+\\), 6, 5]"));
+  }
+
+  @Test
+  public void testProjectionMse() {
     setUseMultiStageQueryEngine(true);
     explain("SELECT datetrunc('SECOND', ts) FROM mytable",
         "Execution Plan\n"
@@ -118,8 +133,22 @@ public class TimestampIndexMseTest extends BaseClusterIntegrationTest implements
             + "              FilterMatchEntireSegment(numDocs=[115545])\n");
   }
 
-  @Test(enabled = false)
-  public void timestampIndexSubstitutedInAggregateFilter() {
+  @Test
+  public void testAggregateFilterSse() {
+    setUseMultiStageQueryEngine(false);
+    explainSse("SELECT sum(case when datetrunc('SECOND', ts) > 1577836801000 then 2 else 0 end) FROM mytable",
+        "[BROKER_REDUCE(limit:10), 1, 0]",
+        "[COMBINE_AGGREGATE, 2, 1]",
+        "[PLAN_START(numSegmentsForThisPlan:1), -1, -1]",
+        "[AGGREGATE(aggregations:sum(case(greater_than($ts$SECOND,'1577836801000'),'2','0'))), 3, 2]",
+        "[TRANSFORM(case(greater_than($ts$SECOND,'1577836801000'),'2','0')), 4, 3]",
+        "[PROJECT($ts$SECOND), 5, 4]",
+        "[DOC_ID_SET, 6, 5]",
+        Pattern.compile("\\[FILTER_MATCH_ENTIRE_SEGMENT\\(docs:[0-9]+\\), 7, 6]"));
+  }
+
+  @Test
+  public void testAggregateFilterMse() {
     setUseMultiStageQueryEngine(true);
     explain("SELECT sum(case when datetrunc('SECOND', ts) > 1577836801000 then 2 else 0 end) FROM mytable",
         "Execution Plan\n"
@@ -140,8 +169,8 @@ public class TimestampIndexMseTest extends BaseClusterIntegrationTest implements
             + "                  FilterMatchEntireSegment(numDocs=[115545])\n");
   }
 
-  @Test(enabled = false)
-  public void timestampIndexCompoundAggregateFilter()
+  @Test
+  public void testCompoundAggregateFilterMse()
       throws Exception {
     setUseMultiStageQueryEngine(true);
     String query =
@@ -171,7 +200,20 @@ public class TimestampIndexMseTest extends BaseClusterIntegrationTest implements
   }
 
   @Test
-  public void timestampIndexSubstitutedInGroupBy() {
+  public void testGroupBySse() {
+    setUseMultiStageQueryEngine(false);
+    explainSse("SELECT count(*) FROM mytable group by datetrunc('SECOND', ts)",
+        "[BROKER_REDUCE(limit:10), 1, 0]",
+        "[COMBINE_GROUP_BY, 2, 1]",
+        "[PLAN_START(numSegmentsForThisPlan:1), -1, -1]",
+        "[GROUP_BY(groupKeys:$ts$SECOND, aggregations:count(*)), 3, 2]",
+        "[PROJECT($ts$SECOND), 4, 3]",
+        "[DOC_ID_SET, 5, 4]",
+        Pattern.compile("\\[FILTER_MATCH_ENTIRE_SEGMENT\\(docs:[0-9]+\\), 6, 5]"));
+  }
+
+  @Test
+  public void testGroupByMse() {
     setUseMultiStageQueryEngine(true);
     explain("SELECT count(*) FROM mytable group by datetrunc('SECOND', ts)",
         "Execution Plan\n"
@@ -188,7 +230,7 @@ public class TimestampIndexMseTest extends BaseClusterIntegrationTest implements
   }
 
   @Test
-  public void timestampIndexSubstitutedInJoinMSE() {
+  public void testJoinMse() {
     setUseMultiStageQueryEngine(true);
     explain("SELECT 1 "
             + "FROM mytable as a1 "

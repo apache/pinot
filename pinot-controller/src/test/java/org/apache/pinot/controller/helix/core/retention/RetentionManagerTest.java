@@ -833,6 +833,7 @@ public class RetentionManagerTest {
     when(segmentZKMetadata.getCreationTime()).thenReturn(creationTime);
     when(segmentZKMetadata.getStartTimeMs()).thenReturn(timeUnit.toMillis(startTime));
     when(segmentZKMetadata.getEndTimeMs()).thenReturn(timeUnit.toMillis(endTime));
+    when(segmentZKMetadata.getStatus()).thenReturn(CommonConstants.Segment.Realtime.Status.DONE);
     return segmentZKMetadata;
   }
 

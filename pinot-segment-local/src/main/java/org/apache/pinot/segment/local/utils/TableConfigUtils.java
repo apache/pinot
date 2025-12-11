@@ -90,6 +90,7 @@ import org.apache.pinot.spi.config.table.ingestion.IngestionConfig;
 import org.apache.pinot.spi.config.table.ingestion.SchemaConformingTransformerConfig;
 import org.apache.pinot.spi.config.table.ingestion.StreamIngestionConfig;
 import org.apache.pinot.spi.config.table.ingestion.TransformConfig;
+import org.apache.pinot.spi.data.DateTimeFieldSpec;
 import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
 import org.apache.pinot.spi.data.Schema;
@@ -189,8 +190,10 @@ public final class TableConfigUtils {
       validatePartialUpsertStrategies(tableConfig, schema);
     }
 
+    validateTaskConfig(tableConfig);
+
     if (_enforcePoolBasedAssignment) {
-      validateInstancePoolsNReplicaGroups(tableConfig);
+      validateInstancePoolsAndReplicaGroups(tableConfig);
     }
   }
 
@@ -218,7 +221,17 @@ public final class TableConfigUtils {
     return status;
   }
 
-  public static void validateInstancePoolsNReplicaGroups(TableConfig tableConfig) {
+  public static void validateInstancePoolsAndReplicaGroups(TableConfig tableConfig) {
+    // Instance pools / replica groups aren't relevant for dimension tables
+    if (tableConfig.isDimTable()) {
+      return;
+    }
+    // If the table is set up to point to a pre-existing instance partitions (like that of a reference table to support
+    // colocated joins), we don't need to validate instance pools and replica groups since that check should be done on
+    // the reference source.
+    if (tableConfig.getInstancePartitionsMap() != null) {
+      return;
+    }
     Preconditions.checkState(isTableUsingInstancePoolAndReplicaGroup(tableConfig),
         "Instance pool and replica group configurations must be enabled");
   }
@@ -798,6 +811,8 @@ public final class TableConfigUtils {
     // specifically for upsert
     UpsertConfig upsertConfig = tableConfig.getUpsertConfig();
     if (upsertConfig != null) {
+      // Currently, only one tier is allowed for upsert table, as the committed segments can't be moved to other tiers.
+      Preconditions.checkState(tableConfig.getTierConfigsList() == null, "The upsert table cannot have multi-tiers");
       // no startree index
       Preconditions.checkState(CollectionUtils.isEmpty(tableConfig.getIndexingConfig().getStarTreeIndexConfigs())
               && !tableConfig.getIndexingConfig().isEnableDefaultStarTree(),
@@ -879,6 +894,18 @@ public final class TableConfigUtils {
   }
 
   /**
+   * Checks if a data type is valid for time-based comparison operations (upsert/dedup).
+   * Valid types include numeric types and types with stored data as a numeric type:
+   *   e.g. TIMESTAMP which is stored as LONG internally.
+   *
+   * @param dataType the data type to check
+   * @return true if the data type can be used for time-based comparison, false otherwise
+   */
+  private static boolean isValidTimeComparisonType(DataType dataType) {
+    return dataType.isNumeric() || dataType.getStoredType().isNumeric();
+  }
+
+  /**
    * Validates the upsert config related to TTL.
    */
   @VisibleForTesting
@@ -894,15 +921,15 @@ public final class TableConfigUtils {
           "MetadataTTL / DeletedKeysTTL does not work with multiple comparison columns");
       String comparisonColumn = comparisonColumns.get(0);
       DataType comparisonColumnDataType = schema.getFieldSpecFor(comparisonColumn).getDataType();
-      Preconditions.checkState(comparisonColumnDataType.isNumeric(),
-          "MetadataTTL / DeletedKeysTTL must have comparison column: %s in numeric type, found: %s", comparisonColumn,
-          comparisonColumnDataType);
+      Preconditions.checkState(isValidTimeComparisonType(comparisonColumnDataType),
+          "MetadataTTL / DeletedKeysTTL must have comparison column: %s in numeric type, found: %s",
+          comparisonColumn, comparisonColumnDataType);
     } else {
       String comparisonColumn = tableConfig.getValidationConfig().getTimeColumnName();
       DataType comparisonColumnDataType = schema.getFieldSpecFor(comparisonColumn).getDataType();
-      Preconditions.checkState(comparisonColumnDataType.isNumeric(),
-          "MetadataTTL / DeletedKeysTTL must have time column: %s in numeric type, found: %s", comparisonColumn,
-          comparisonColumnDataType);
+      Preconditions.checkState(isValidTimeComparisonType(comparisonColumnDataType),
+          "MetadataTTL / DeletedKeysTTL must have time column: %s in numeric type, found: %s",
+          comparisonColumn, comparisonColumnDataType);
     }
 
     if (upsertConfig.getMetadataTTL() > 0) {
@@ -930,15 +957,50 @@ public final class TableConfigUtils {
     String dedupTimeColumn = dedupConfig.getDedupTimeColumn();
     if (dedupTimeColumn != null && !dedupTimeColumn.isEmpty()) {
       DataType comparisonColumnDataType = schema.getFieldSpecFor(dedupTimeColumn).getDataType();
-      Preconditions.checkState(comparisonColumnDataType.isNumeric(),
+      Preconditions.checkState(isValidTimeComparisonType(comparisonColumnDataType),
           "MetadataTTL must have dedupTimeColumn: %s in numeric type, found: %s", dedupTimeColumn,
           comparisonColumnDataType);
     } else {
       String timeColumn = tableConfig.getValidationConfig().getTimeColumnName();
       DataType timeColumnDataType = schema.getFieldSpecFor(timeColumn).getDataType();
-      Preconditions.checkState(timeColumnDataType.isNumeric(),
-          "MetadataTTL must have time column: %s in numeric type, found: %s", timeColumn, timeColumnDataType);
+      Preconditions.checkState(isValidTimeComparisonType(timeColumnDataType),
+          "MetadataTTL must have time column: %s in numeric type, found: %s", timeColumn,
+          timeColumnDataType);
     }
+    if (tableConfig.getTierConfigsList() != null) {
+      validateTTLAndTierConfigsForDedupTable(tableConfig, schema);
+    }
+  }
+
+  @VisibleForTesting
+  static void validateTTLAndTierConfigsForDedupTable(TableConfig tableConfig, Schema schema) {
+    DedupConfig dedupConfig = tableConfig.getDedupConfig();
+    // Tiers are required to use segmentAge selector, and the min of them should be >= TTL, so that only segments
+    // out of TTL are moved to other tiers. Also, TTL must be defined on timeColumn to compare with segmentAges.
+    String timeColumn = tableConfig.getValidationConfig().getTimeColumnName();
+    String dedupTimeColumn = dedupConfig.getDedupTimeColumn();
+    if (dedupTimeColumn != null && !dedupTimeColumn.isEmpty()) {
+      Preconditions.checkState(timeColumn.equalsIgnoreCase(dedupTimeColumn),
+          "DedupTimeColumn: %s is different from table's timeColumn: %s", dedupTimeColumn, timeColumn);
+    }
+    long minSegmentAgeInMs = Long.MAX_VALUE;
+    for (TierConfig tierConfig : tableConfig.getTierConfigsList()) {
+      String tierName = tierConfig.getName();
+      String segmentSelectorType = tierConfig.getSegmentSelectorType();
+      Preconditions.checkState(segmentSelectorType.equalsIgnoreCase(TierFactory.TIME_SEGMENT_SELECTOR_TYPE),
+          "Time based segment selector is required but tier: %s uses selector: %s", tierName, segmentSelectorType);
+      String segmentAge = tierConfig.getSegmentAge();
+      minSegmentAgeInMs = Math.min(minSegmentAgeInMs, TimeUtils.convertPeriodToMillis(segmentAge));
+    }
+    // Convert TTL value to millisecond based on timeColumn fieldSpec in order to compare with segment ages.
+    DateTimeFieldSpec dateTimeSpec = schema.getSpecForTimeColumn(timeColumn);
+    long ttl = (long) dedupConfig.getMetadataTTL();
+    long ttlInMs = dateTimeSpec.getFormatSpec().fromFormatToMillis(ttl);
+    LOGGER.debug(
+        "Converting MetadataTTL: {} to {}ms with DateTimeFieldSpec: {} and to compare with minSegmentAge: {}ms", ttl,
+        ttlInMs, dateTimeSpec, minSegmentAgeInMs);
+    Preconditions.checkState(ttlInMs < minSegmentAgeInMs,
+        "MetadataTTL: %s(ms) must be smaller than the minimum segmentAge: %s(ms)", ttlInMs, minSegmentAgeInMs);
   }
 
   /**
@@ -1100,6 +1162,37 @@ public final class TableConfigUtils {
   }
 
   /**
+   * Validates task configuration to ensure no conflicting task types are configured.
+   */
+  @VisibleForTesting
+  static void validateTaskConfig(TableConfig tableConfig) {
+    TableTaskConfig taskConfig = tableConfig.getTaskConfig();
+    if (taskConfig == null || taskConfig.getTaskTypeConfigsMap() == null) {
+      return;
+    }
+
+    Map<String, Map<String, String>> taskTypeConfigsMap = taskConfig.getTaskTypeConfigsMap();
+
+    String minNumSegmentsPerTaskKey = "minNumSegmentsPerTask";
+    if (taskTypeConfigsMap.containsKey(UPSERT_COMPACT_MERGE_TASK_TYPE)
+        && taskTypeConfigsMap.containsKey(UPSERT_COMPACTION_TASK_TYPE)) {
+
+      Map<String, String> upsertCompactMergeConfig = taskTypeConfigsMap.get(UPSERT_COMPACT_MERGE_TASK_TYPE);
+
+      if (upsertCompactMergeConfig != null) {
+        long minNumSegments = Long.parseLong(
+            upsertCompactMergeConfig.getOrDefault(minNumSegmentsPerTaskKey, String.valueOf(2)));
+
+        Preconditions.checkState(minNumSegments > 1, String.format(
+            "When %s.%s is set to 1, %s should not be configured to avoid indeterministic behavior. "
+                + "Please remove %s configuration or set %s to a value greater than 1.",
+            UPSERT_COMPACT_MERGE_TASK_TYPE, minNumSegmentsPerTaskKey, UPSERT_COMPACTION_TASK_TYPE,
+            UPSERT_COMPACTION_TASK_TYPE, minNumSegmentsPerTaskKey));
+      }
+    }
+  }
+
+  /**
    * Validates the tier configs
    * Checks for the right segmentSelectorType and its required properties
    * Checks for the right storageType and its required properties
@@ -1116,8 +1209,8 @@ public final class TableConfigUtils {
       Preconditions.checkState(tierNames.add(tierName), "Tier name: %s already exists in tier configs", tierName);
 
       String segmentSelectorType = tierConfig.getSegmentSelectorType();
-      String segmentAge = tierConfig.getSegmentAge();
       if (segmentSelectorType.equalsIgnoreCase(TierFactory.TIME_SEGMENT_SELECTOR_TYPE)) {
+        String segmentAge = tierConfig.getSegmentAge();
         Preconditions.checkState(segmentAge != null,
             "Must provide 'segmentAge' for segmentSelectorType: %s in tier: %s", segmentSelectorType, tierName);
         Preconditions.checkState(TimeUtils.isPeriodValid(segmentAge),
@@ -1335,7 +1428,7 @@ public final class TableConfigUtils {
           }
           String column = columnPair.getColumn();
           if (!column.equals(AggregationFunctionColumnPair.STAR)) {
-              aggregatedColumns.add(column);
+            aggregatedColumns.add(column);
           } else if (columnPair.getFunctionType() != AggregationFunctionType.COUNT) {
             throw new IllegalStateException("Non-COUNT function set the column as '*' in the functionColumnPair: "
                 + functionColumnPair + ". Please configure an actual column for the function");
@@ -1364,7 +1457,7 @@ public final class TableConfigUtils {
           }
           String column = columnPair.getColumn();
           if (!column.equals(AggregationFunctionColumnPair.STAR)) {
-              aggregatedColumns.add(column);
+            aggregatedColumns.add(column);
           } else if (columnPair.getFunctionType() != AggregationFunctionType.COUNT) {
             throw new IllegalStateException("Non-COUNT function set the column as '*' in the aggregationConfig for "
                 + "function: " + aggregationConfig.getAggregationFunction()
@@ -1511,9 +1604,11 @@ public final class TableConfigUtils {
     }
   }
 
-  public static boolean checkForPartialUpsertWithReplicas(TableConfig tableConfig) {
-    return tableConfig != null && tableConfig.getReplication() > 1 && tableConfig.getUpsertConfig() != null
-        && tableConfig.getUpsertConfig().getMode() == UpsertConfig.Mode.PARTIAL;
+  public static boolean checkForInconsistentStateConfigs(TableConfig tableConfig) {
+    return tableConfig != null && tableConfig.getUpsertConfig() != null && tableConfig.getReplication() > 1 && (
+        tableConfig.getUpsertConfig().getMode() == UpsertConfig.Mode.PARTIAL || (
+            tableConfig.getUpsertConfig().isDropOutOfOrderRecord()
+                && tableConfig.getUpsertConfig().getConsistencyMode() == UpsertConfig.ConsistencyMode.NONE));
   }
 
   // enum of all the skip-able validation types.
