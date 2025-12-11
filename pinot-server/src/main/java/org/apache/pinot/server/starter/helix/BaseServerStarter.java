@@ -85,6 +85,9 @@ import org.apache.pinot.core.query.scheduler.resources.ResourceManager;
 import org.apache.pinot.core.transport.ListenerConfig;
 import org.apache.pinot.core.util.ListenerConfigUtil;
 import org.apache.pinot.core.util.trace.ContinuousJfrStarter;
+import org.apache.pinot.query.runtime.context.ServerContext;
+import org.apache.pinot.query.runtime.operator.factory.DefaultQueryOperatorFactoryProvider;
+import org.apache.pinot.query.runtime.operator.factory.QueryOperatorFactoryProvider;
 import org.apache.pinot.segment.local.realtime.impl.invertedindex.RealtimeLuceneIndexRefreshManager;
 import org.apache.pinot.segment.local.realtime.impl.invertedindex.RealtimeLuceneTextIndexSearcherPool;
 import org.apache.pinot.segment.local.segment.store.TextIndexUtils;
@@ -190,6 +193,7 @@ public abstract class BaseServerStarter implements ServiceStartable {
     _helixClusterName = _serverConf.getProperty(CommonConstants.Helix.CONFIG_OF_CLUSTER_NAME);
     ServiceStartableUtils.applyClusterConfig(_serverConf, _zkAddress, _helixClusterName, ServiceRole.SERVER);
     applyCustomConfigs(_serverConf);
+    ServerContext.getInstance().setQueryOperatorFactoryProvider(createQueryOperatorFactoryProvider(_serverConf));
 
     PinotInsecureMode.setPinotInInsecureMode(
         _serverConf.getProperty(CommonConstants.CONFIG_OF_PINOT_INSECURE_MODE, false));
@@ -282,6 +286,13 @@ public abstract class BaseServerStarter implements ServiceStartable {
 
   /// Can be overridden to apply custom configs to the server conf.
   protected void applyCustomConfigs(PinotConfiguration serverConf) {
+  }
+
+  /**
+   * Override to customize the query operator factory provider used by the multi-stage engine.
+   */
+  protected QueryOperatorFactoryProvider createQueryOperatorFactoryProvider(PinotConfiguration serverConf) {
+    return DefaultQueryOperatorFactoryProvider.INSTANCE;
   }
 
   /**
