@@ -42,7 +42,7 @@ public class FunctionRegistryTest {
       // TODO: Support these functions
       TransformFunctionType.IN, TransformFunctionType.NOT_IN, TransformFunctionType.IS_TRUE,
       TransformFunctionType.IS_NOT_TRUE, TransformFunctionType.IS_FALSE, TransformFunctionType.IS_NOT_FALSE,
-      TransformFunctionType.AND, TransformFunctionType.OR, TransformFunctionType.JSON_EXTRACT_SCALAR,
+      TransformFunctionType.JSON_EXTRACT_SCALAR,
       TransformFunctionType.JSON_EXTRACT_KEY, TransformFunctionType.TIME_CONVERT,
       TransformFunctionType.DATE_TIME_CONVERT_WINDOW_HOP, TransformFunctionType.ARRAY_LENGTH,
       TransformFunctionType.ARRAY_AVERAGE, TransformFunctionType.ARRAY_MIN, TransformFunctionType.ARRAY_MAX,
@@ -54,7 +54,7 @@ public class FunctionRegistryTest {
       // Special filter functions without implementation
       FilterKind.TEXT_MATCH, FilterKind.TEXT_CONTAINS, FilterKind.JSON_MATCH, FilterKind.VECTOR_SIMILARITY,
       // TODO: Support these functions
-      FilterKind.AND, FilterKind.OR, FilterKind.RANGE, FilterKind.IN, FilterKind.NOT_IN);
+      FilterKind.RANGE, FilterKind.IN, FilterKind.NOT_IN);
 
   @Test
   public void testTransformAndFilterFunctionsRegistered() {

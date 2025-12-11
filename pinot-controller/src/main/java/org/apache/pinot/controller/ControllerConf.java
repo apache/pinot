@@ -273,6 +273,7 @@ public class ControllerConf extends PinotConfiguration {
     public static final int MIN_INITIAL_DELAY_IN_SECONDS = 120;
     public static final int MAX_INITIAL_DELAY_IN_SECONDS = 300;
     public static final int DEFAULT_SPLIT_COMMIT_TMP_SEGMENT_LIFETIME_SECOND = 60 * 60; // 1 Hour.
+    public static final int DEFAULT_DEEP_STORE_RETRY_UPLOAD_PARALLELISM = 1;
 
     public static final Random RANDOM = new Random();
 
@@ -1180,7 +1181,8 @@ public class ControllerConf extends PinotConfiguration {
   }
 
   public int getDeepStoreRetryUploadParallelism() {
-    return getProperty(ControllerPeriodicTasksConf.DEEP_STORE_RETRY_UPLOAD_PARALLELISM, 1);
+    return getProperty(ControllerPeriodicTasksConf.DEEP_STORE_RETRY_UPLOAD_PARALLELISM,
+        ControllerPeriodicTasksConf.DEFAULT_DEEP_STORE_RETRY_UPLOAD_PARALLELISM);
   }
 
   public int getTmpSegmentRetentionInSeconds() {

@@ -23,8 +23,11 @@ import org.apache.pinot.controller.ControllerConf;
 import org.apache.pinot.controller.api.resources.PauseStatusDetails;
 import org.apache.pinot.controller.helix.core.PinotHelixResourceManager;
 import org.apache.pinot.controller.helix.core.realtime.PinotLLCRealtimeSegmentManager;
+import org.apache.pinot.core.realtime.impl.fakestream.FakeStreamConfigUtils;
 import org.apache.pinot.spi.config.table.PauseState;
 import org.apache.pinot.spi.config.table.TableConfig;
+import org.apache.pinot.spi.config.table.TableType;
+import org.apache.pinot.spi.utils.builder.TableConfigBuilder;
 import org.mockito.Mock;
 import org.mockito.MockitoAnnotations;
 import org.testng.Assert;
@@ -64,6 +67,52 @@ public class RealtimeSegmentValidationManagerTest {
             _llcRealtimeSegmentManager, null, _controllerMetrics, _storageQuotaChecker, _resourceUtilizationManager);
   }
 
+  @Test
+  public void testReingestionCalledWhenPauselessDisabled() {
+    String rawTable = "testTable";
+    String tableName = rawTable + "_REALTIME";
+    TableConfig tableConfig = new TableConfigBuilder(TableType.REALTIME).setTableName(rawTable)
+        .setStreamConfigs(FakeStreamConfigUtils.getDefaultLowLevelStreamConfigs().getStreamConfigsMap()).build();
+
+    // Force shouldEnsureConsuming=false by simulating admin pause
+    when(_pinotHelixResourceManager.getTableConfig(tableName)).thenReturn(tableConfig);
+    when(_llcRealtimeSegmentManager.getPauseStatusDetails(tableName))
+        .thenReturn(new PauseStatusDetails(true, null, PauseState.ReasonCode.ADMINISTRATIVE, null, null));
+
+    _realtimeSegmentValidationManager.processTable(tableName, new RealtimeSegmentValidationManager.Context());
+
+    verify(_llcRealtimeSegmentManager, times(1))
+        .repairSegmentsInErrorState(eq(tableConfig), anyBoolean());
+  }
+
+  @Test
+  public void testNoReingestionWhenPauselessEnabled() {
+    String rawTable = "testTable";
+    String tableName = rawTable + "_REALTIME";
+    TableConfig tableConfig = new TableConfigBuilder(TableType.REALTIME).setTableName(rawTable)
+        .setStreamConfigs(FakeStreamConfigUtils.getDefaultLowLevelStreamConfigs().getStreamConfigsMap()).build();
+
+    // Enable pauseless on ingestion config
+    org.apache.pinot.spi.config.table.ingestion.IngestionConfig ingestionConfig =
+        new org.apache.pinot.spi.config.table.ingestion.IngestionConfig();
+    org.apache.pinot.spi.config.table.ingestion.StreamIngestionConfig streamIngestionConfig =
+        new org.apache.pinot.spi.config.table.ingestion.StreamIngestionConfig(
+            java.util.List.of(FakeStreamConfigUtils.getDefaultLowLevelStreamConfigs().getStreamConfigsMap()));
+    streamIngestionConfig.setPauselessConsumptionEnabled(true);
+    ingestionConfig.setStreamIngestionConfig(streamIngestionConfig);
+    tableConfig.setIngestionConfig(ingestionConfig);
+
+    // Force shouldEnsureConsuming=false by simulating admin pause (to avoid ensureAllPartitionsConsuming)
+    when(_pinotHelixResourceManager.getTableConfig(tableName)).thenReturn(tableConfig);
+    when(_llcRealtimeSegmentManager.getPauseStatusDetails(tableName))
+        .thenReturn(new PauseStatusDetails(true, null, PauseState.ReasonCode.ADMINISTRATIVE, null, null));
+
+    _realtimeSegmentValidationManager.processTable(tableName, new RealtimeSegmentValidationManager.Context());
+
+    verify(_llcRealtimeSegmentManager, times(1))
+        .repairSegmentsInErrorState(eq(tableConfig), anyBoolean());
+  }
+
   @AfterMethod
   public void tearDown()
       throws Exception {
@@ -77,21 +126,32 @@ public class RealtimeSegmentValidationManagerTest {
         {true, PauseState.ReasonCode.ADMINISTRATIVE, UtilizationChecker.CheckResult.PASS, false, false},
 
         // Resource utilization exceeded and pause state is updated, should return false
-        {false, PauseState.ReasonCode.RESOURCE_UTILIZATION_LIMIT_EXCEEDED, UtilizationChecker.CheckResult.FAIL, false,
-            false},
+        {
+            false, PauseState.ReasonCode.RESOURCE_UTILIZATION_LIMIT_EXCEEDED, UtilizationChecker.CheckResult.FAIL,
+            false,
+            false
+        },
 
         // Resource utilization is within limits but was previously paused due to resource utilization,
         // should return true
-        {true, PauseState.ReasonCode.RESOURCE_UTILIZATION_LIMIT_EXCEEDED, UtilizationChecker.CheckResult.PASS, false,
-            true},
+        {
+            true, PauseState.ReasonCode.RESOURCE_UTILIZATION_LIMIT_EXCEEDED, UtilizationChecker.CheckResult.PASS, false,
+            true
+        },
 
         // Resource utilization is STALE but was previously paused due to resource utilization, should return false
-        {true, PauseState.ReasonCode.RESOURCE_UTILIZATION_LIMIT_EXCEEDED, UtilizationChecker.CheckResult.UNDETERMINED,
-            false, false},
+        {
+            true, PauseState.ReasonCode.RESOURCE_UTILIZATION_LIMIT_EXCEEDED,
+            UtilizationChecker.CheckResult.UNDETERMINED,
+            false, false
+        },
 
         // Resource utilization is STALE but was not previously paused due to resource utilization, should return true
-        {false, PauseState.ReasonCode.RESOURCE_UTILIZATION_LIMIT_EXCEEDED, UtilizationChecker.CheckResult.UNDETERMINED,
-            false, true},
+        {
+            false, PauseState.ReasonCode.RESOURCE_UTILIZATION_LIMIT_EXCEEDED,
+            UtilizationChecker.CheckResult.UNDETERMINED,
+            false, true
+        },
 
         // Resource utilization is within limits but was previously paused due to storage quota exceeded,
         // should return false
@@ -101,7 +161,8 @@ public class RealtimeSegmentValidationManagerTest {
         {false, PauseState.ReasonCode.STORAGE_QUOTA_EXCEEDED, UtilizationChecker.CheckResult.PASS, true, false},
 
         // Storage quota within limits but was previously paused due to storage quota exceeded, should return true
-        {true, PauseState.ReasonCode.STORAGE_QUOTA_EXCEEDED, UtilizationChecker.CheckResult.PASS, false, true}};
+        {true, PauseState.ReasonCode.STORAGE_QUOTA_EXCEEDED, UtilizationChecker.CheckResult.PASS, false, true}
+    };
   }
 
   @Test(dataProvider = "testCases")
