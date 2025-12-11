@@ -137,4 +137,33 @@ public class PinotApplicationQuotaRestletResource {
       throw new ControllerApplicationException(LOGGER, e.getMessage(), Response.Status.INTERNAL_SERVER_ERROR, e);
     }
   }
+
+  /**
+   * API to update the quota config for application with minutes/seconds level control
+   */
+  @POST
+  @Produces(MediaType.APPLICATION_JSON)
+  @Consumes(MediaType.APPLICATION_JSON)
+  @Path("/applicationQuotas/{appName}/v2")
+  @Authorize(targetType = TargetType.CLUSTER, action = Actions.Cluster.UPDATE_APPLICATION_QUOTA)
+  @ApiOperation(value = "Update application quota (v2)", notes = "Update application quota with rate limiter")
+  public SuccessResponse setApplicationQuota(@PathParam("appName") String appName,
+      @QueryParam("ratelimiterUnit") String ratelimiterUnit,
+      @QueryParam("ratelimiterDuration") Double ratelimiterDuration,
+      @QueryParam("maxQueriesValue") Double maxQueriesValue,
+      @Context HttpHeaders httpHeaders) {
+    try {
+      try {
+        _pinotHelixResourceManager.updateApplicationQpsQuota(appName, ratelimiterUnit, ratelimiterDuration,
+            maxQueriesValue);
+      } catch (NumberFormatException nfe) {
+        throw new ControllerApplicationException(LOGGER, "Application query quota value is not a number",
+            Response.Status.INTERNAL_SERVER_ERROR, nfe);
+      }
+
+      return new SuccessResponse("Query quota for application " + appName + " successfully updated");
+    } catch (Exception e) {
+      throw new ControllerApplicationException(LOGGER, e.getMessage(), Response.Status.INTERNAL_SERVER_ERROR, e);
+    }
+  }
 }

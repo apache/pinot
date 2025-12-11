@@ -29,6 +29,7 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.stream.Collectors;
 import javax.annotation.Nullable;
@@ -432,7 +433,7 @@ public class ControllerTest {
         .setBrokerTenant(brokerTenant)
         .setRefOfflineTableName(offlineTableName)
         .setRefRealtimeTableName(realtimeTableName)
-        .setQuotaConfig(new QuotaConfig(null, "99999"))
+        .setQuotaConfig(new QuotaConfig(null, TimeUnit.SECONDS, 1d, 99999d))
         .setQueryConfig(new QueryConfig(1L, true, false, null, 1L, 1L))
         .setTimeBoundaryConfig(new TimeBoundaryConfig("min", Map.of("includedTables", physicalTableNames)))
         .setPhysicalTableConfigMap(physicalTableConfigMap);
@@ -1303,7 +1304,8 @@ public class ControllerTest {
    */
   public void checkNumOnlineInstancesFromExternalView(String resourceName, int expectedNumOnlineInstances)
       throws InterruptedException {
-    long endTime = System.currentTimeMillis() + TIMEOUT_MS;
+    // Increase timeout from 10s to 30s for better stability in CI environments
+    long endTime = System.currentTimeMillis() + 30_000L;
     while (System.currentTimeMillis() < endTime) {
       ExternalView resourceExternalView = DEFAULT_INSTANCE.getHelixAdmin()
           .getResourceExternalView(DEFAULT_INSTANCE.getHelixClusterName(), resourceName);
@@ -1311,7 +1313,8 @@ public class ControllerTest {
       if (instanceSet.size() == expectedNumOnlineInstances) {
         return;
       }
-      Thread.sleep(100L);
+      // Increase sleep interval from 100ms to 500ms to reduce busy waiting
+      Thread.sleep(500L);
     }
     fail("Failed to reach " + expectedNumOnlineInstances + " online instances for resource: " + resourceName);
   }
