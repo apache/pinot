@@ -167,7 +167,8 @@ public class PinotSinkIntegrationTestUpsertTable extends BaseClusterIntegrationT
       throws IOException {
     String tableNameWithType = TableNameBuilder.REALTIME.tableNameWithType(_rawTableName);
     JsonNode segments = JsonUtils.stringToJsonNode(sendGetRequest(
-            _controllerRequestURLBuilder.forSegmentListAPI(tableNameWithType, TableType.REALTIME.toString()))).get(0)
+            getAdminUrlBuilder()
+                .forSegmentListAPI(tableNameWithType, TableType.REALTIME.toString()))).get(0)
         .get("REALTIME");
     Set<String> segmentNames = new HashSet<>();
     for (int i = 0; i < segments.size(); i++) {
@@ -184,7 +185,8 @@ public class PinotSinkIntegrationTestUpsertTable extends BaseClusterIntegrationT
       throws IOException {
     String tableNameWithType = TableNameBuilder.REALTIME.tableNameWithType(_rawTableName);
     JsonNode segments = JsonUtils.stringToJsonNode(sendGetRequest(
-            _controllerRequestURLBuilder.forSegmentListAPI(tableNameWithType, TableType.REALTIME.toString()))).get(0)
+            getAdminUrlBuilder()
+                .forSegmentListAPI(tableNameWithType, TableType.REALTIME.toString()))).get(0)
         .get("REALTIME");
     assertEquals(segments.size(), numSegments);
     int actualNumTotalDocs = 0;
@@ -192,7 +194,8 @@ public class PinotSinkIntegrationTestUpsertTable extends BaseClusterIntegrationT
     for (int i = 0; i < numSegments; i++) {
       String segmentName = segments.get(i).asText();
       JsonNode segmentMetadata = JsonUtils.stringToJsonNode(
-          sendGetRequest(_controllerRequestURLBuilder.forSegmentMetadata(tableNameWithType, segmentName)));
+          sendGetRequest(getAdminUrlBuilder()
+              .forSegmentMetadata(tableNameWithType, segmentName)));
       if (segmentMetadata.get("segment.realtime.status").asText().equals("IN_PROGRESS")) {
         continue;
       }

@@ -33,8 +33,8 @@ import static org.testng.Assert.assertTrue;
 public class TenantRebalanceIntegrationTest extends BaseHybridClusterIntegrationTest {
 
   private String getRebalanceUrl() {
-    return StringUtil.join("/", getControllerRequestURLBuilder().getBaseUrl(), "tenants", getServerTenant(),
-        "rebalance");
+    ControllerRequestURLBuilder urlBuilder = getAdminUrlBuilder();
+    return StringUtil.join("/", urlBuilder.getBaseUrl(), "tenants", getServerTenant(), "rebalance");
   }
 
   @Test

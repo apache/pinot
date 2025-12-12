@@ -51,14 +51,14 @@ public class ControllerInstanceToggleTest extends ControllerTest {
   public void testInstanceToggle()
       throws Exception {
     // Create schema
-    sendPostRequest(DEFAULT_INSTANCE.getControllerRequestURLBuilder().forSchemaCreate(),
+    sendPostRequest(DEFAULT_INSTANCE.getAdminUrlBuilder().forSchemaCreate(),
         createDummySchema(RAW_TABLE_NAME).toPrettyJsonString());
 
     // Create an offline table
     TableConfig tableConfig =
         new TableConfigBuilder(TableType.OFFLINE).setTableName(RAW_TABLE_NAME).setNumReplicas(DEFAULT_MIN_NUM_REPLICAS)
             .build();
-    sendPostRequest(DEFAULT_INSTANCE.getControllerRequestURLBuilder().forTableCreate(), tableConfig.toJsonString());
+    sendPostRequest(DEFAULT_INSTANCE.getAdminUrlBuilder().forTableCreate(), tableConfig.toJsonString());
     assertEquals(DEFAULT_INSTANCE.getHelixAdmin()
         .getResourceIdealState(DEFAULT_INSTANCE.getHelixClusterName(), CommonConstants.Helix.BROKER_RESOURCE_INSTANCE)
         .getPartitionSet().size(), 1);
@@ -110,7 +110,7 @@ public class ControllerInstanceToggleTest extends ControllerTest {
     }
 
     // Delete table
-    sendDeleteRequest(DEFAULT_INSTANCE.getControllerRequestURLBuilder().forTableDelete(RAW_TABLE_NAME));
+    sendDeleteRequest(DEFAULT_INSTANCE.getAdminUrlBuilder().forTableDelete(RAW_TABLE_NAME));
     assertEquals(DEFAULT_INSTANCE.getHelixAdmin()
         .getResourceIdealState(DEFAULT_INSTANCE.getHelixClusterName(), CommonConstants.Helix.BROKER_RESOURCE_INSTANCE)
         .getPartitionSet().size(), 0);
@@ -121,7 +121,7 @@ public class ControllerInstanceToggleTest extends ControllerTest {
     TestUtils.waitForCondition(aVoid -> {
       try {
         sendPutRequest(
-            DEFAULT_INSTANCE.getControllerRequestURLBuilder().forInstanceState(instanceName) + "?state=" + state);
+            DEFAULT_INSTANCE.getAdminUrlBuilder().forInstanceState(instanceName) + "?state=" + state);
       } catch (IOException ioe) {
         // receive non-200 status code
         return false;

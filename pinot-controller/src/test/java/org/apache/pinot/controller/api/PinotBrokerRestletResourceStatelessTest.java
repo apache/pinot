@@ -68,7 +68,8 @@ public class PinotBrokerRestletResourceStatelessTest extends ControllerTest {
       }
     }
     Map<String, Map<String, List<String>>> allMap =
-        JsonUtils.stringToObject(sendGetRequest(_controllerRequestURLBuilder.forBrokersGet(state)), Map.class);
+        JsonUtils.stringToObject(sendGetRequest(getAdminUrlBuilder()
+            .forBrokersGet(state)), Map.class);
 
     for (String expectedBroker : expectedBrokers) {
       Assert.assertTrue(allMap.get("tenants").get("DefaultTenant").contains(expectedBroker));
@@ -77,57 +78,66 @@ public class PinotBrokerRestletResourceStatelessTest extends ControllerTest {
     }
 
     Map<String, List<String>> tenantsMap =
-        JsonUtils.stringToObject(sendGetRequest(_controllerRequestURLBuilder.forBrokerTenantsGet(state)), Map.class);
+        JsonUtils.stringToObject(sendGetRequest(getAdminUrlBuilder()
+            .forBrokerTenantsGet(state)), Map.class);
     for (String expectedBroker : expectedBrokers) {
       Assert.assertTrue(tenantsMap.get("DefaultTenant").contains(expectedBroker));
     }
 
     List<String> tenantBrokers = JsonUtils
-        .stringToObject(sendGetRequest(_controllerRequestURLBuilder.forBrokerTenantGet("DefaultTenant", state)),
+        .stringToObject(sendGetRequest(getAdminUrlBuilder()
+            .forBrokerTenantGet("DefaultTenant", state)),
             List.class);
     for (String expectedBroker : expectedBrokers) {
       Assert.assertTrue(tenantBrokers.contains(expectedBroker));
     }
 
     try {
-      sendGetRequest(_controllerRequestURLBuilder.forBrokerTenantGet("nonExistTenant", state));
+      sendGetRequest(getAdminUrlBuilder()
+          .forBrokerTenantGet("nonExistTenant", state));
       Assert.fail("Shouldn't reach here");
     } catch (Exception e) {
     }
 
     Map<String, List<String>> tablesMap =
-        JsonUtils.stringToObject(sendGetRequest(_controllerRequestURLBuilder.forBrokerTablesGet(state)), Map.class);
+        JsonUtils.stringToObject(sendGetRequest(getAdminUrlBuilder()
+            .forBrokerTablesGet(state)), Map.class);
     for (String expectedBroker : expectedBrokers) {
       Assert.assertTrue(tablesMap.get("testTable1").contains(expectedBroker));
       Assert.assertTrue(tablesMap.get("testTable2").contains(expectedBroker));
     }
 
     List<String> tableBrokers = JsonUtils
-        .stringToObject(sendGetRequest(_controllerRequestURLBuilder.forBrokerTableGet("testTable1", "OFFLINE", state)),
+        .stringToObject(sendGetRequest(getAdminUrlBuilder()
+            .forBrokerTableGet("testTable1", "OFFLINE", state)),
             List.class);
     for (String expectedBroker : expectedBrokers) {
       Assert.assertTrue(tableBrokers.contains(expectedBroker));
     }
     tableBrokers = JsonUtils
-        .stringToObject(sendGetRequest(_controllerRequestURLBuilder.forBrokerTableGet("testTable1", null, state)),
+        .stringToObject(sendGetRequest(getAdminUrlBuilder()
+            .forBrokerTableGet("testTable1", null, state)),
             List.class);
     for (String expectedBroker : expectedBrokers) {
       Assert.assertTrue(tableBrokers.contains(expectedBroker));
     }
     tableBrokers = JsonUtils
-        .stringToObject(sendGetRequest(_controllerRequestURLBuilder.forBrokerTableGet("testTable2", "OFFLINE", state)),
+        .stringToObject(sendGetRequest(getAdminUrlBuilder()
+            .forBrokerTableGet("testTable2", "OFFLINE", state)),
             List.class);
     for (String expectedBroker : expectedBrokers) {
       Assert.assertTrue(tableBrokers.contains(expectedBroker));
     }
     tableBrokers = JsonUtils
-        .stringToObject(sendGetRequest(_controllerRequestURLBuilder.forBrokerTableGet("testTable2", null, state)),
+        .stringToObject(sendGetRequest(getAdminUrlBuilder()
+            .forBrokerTableGet("testTable2", null, state)),
             List.class);
     for (String expectedBroker : expectedBrokers) {
       Assert.assertTrue(tableBrokers.contains(expectedBroker));
     }
     try {
-      sendGetRequest(_controllerRequestURLBuilder.forBrokerTableGet("nonExistTable", null, state));
+      sendGetRequest(getAdminUrlBuilder()
+          .forBrokerTableGet("nonExistTable", null, state));
       Assert.fail("Shouldn't reach here");
     } catch (Exception e) {
     }

@@ -42,7 +42,7 @@ public class ZookeeperResourceTest {
   @Test
   public void testZookeeperDataEndpoints()
       throws Exception {
-    String urlPut = TEST_INSTANCE.getControllerRequestURLBuilder().forZkPut();
+    String urlPut = TEST_INSTANCE.getAdminUrlBuilder().forZkPut();
     String path = "/zookeeper";
     int expectedVersion = -1;
     int accessOption = 1;
@@ -60,7 +60,7 @@ public class ZookeeperResourceTest {
     Assert.assertTrue(result.toLowerCase().contains("successfully updated"));
 
     // validate zk/get results in correct data
-    String urlGet = TEST_INSTANCE.getControllerRequestURLBuilder().forZkGet(path1);
+    String urlGet = TEST_INSTANCE.getAdminUrlBuilder().forZkGet(path1);
     result = ControllerTest.sendGetRequest(urlGet);
 
     ZNRecord znRecord = ZookeeperResource.MAPPER.readValue(result.getBytes(StandardCharsets.UTF_8), ZNRecord.class);
@@ -68,7 +68,7 @@ public class ZookeeperResourceTest {
     Assert.assertEquals(znRecord.getSimpleField("key"), "value");
 
     // validate zk/getChildren in parent path
-    urlGet = TEST_INSTANCE.getControllerRequestURLBuilder().forZkGetChildren(path);
+    urlGet = TEST_INSTANCE.getAdminUrlBuilder().forZkGetChildren(path);
     result = ControllerTest.sendGetRequest(urlGet);
 
     List<ZNRecord> recordList1 = ZookeeperResource.MAPPER.readValue(result.getBytes(StandardCharsets.UTF_8),
@@ -109,7 +109,7 @@ public class ZookeeperResourceTest {
     Assert.assertTrue(result.toLowerCase().contains("successfully updated"));
 
     // validate that zk/getChildren return 2 items.
-    urlGet = TEST_INSTANCE.getControllerRequestURLBuilder().forZkGetChildren(path);
+    urlGet = TEST_INSTANCE.getAdminUrlBuilder().forZkGetChildren(path);
     result = ControllerTest.sendGetRequest(urlGet);
 
     List<ZNRecord> recordList3 = ZookeeperResource.MAPPER.readValue(result.getBytes(StandardCharsets.UTF_8),
@@ -121,12 +121,12 @@ public class ZookeeperResourceTest {
     params = "path=" + path4 + "&expectedVersion=" + expectedVersion + "&accessOption=" + accessOption;
 
     // validate that zk/putChildren will insert all correctly to another path
-    urlPut = TEST_INSTANCE.getControllerRequestURLBuilder().forZkPutChildren(path);
+    urlPut = TEST_INSTANCE.getAdminUrlBuilder().forZkPutChildren(path);
     String encodedChildrenData = ZookeeperResource.MAPPER.writeValueAsString(recordList3);
     result = ControllerTest.sendPutRequest(urlPut + "?" + params, encodedChildrenData);
 
     // validate that zk/getChildren from new path should result in the same recordList
-    urlGet = TEST_INSTANCE.getControllerRequestURLBuilder().forZkGetChildren(path);
+    urlGet = TEST_INSTANCE.getAdminUrlBuilder().forZkGetChildren(path);
     result = ControllerTest.sendGetRequest(urlGet);
 
     List<ZNRecord> recordList4 = ZookeeperResource.MAPPER.readValue(result.getBytes(StandardCharsets.UTF_8),

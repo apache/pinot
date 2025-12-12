@@ -130,14 +130,15 @@ public class MultiNodesOfflineClusterIntegrationTest extends OfflineClusterInteg
 
     // Dropping the broker should fail because it is still in the broker resource
     try {
-      sendDeleteRequest(_controllerRequestURLBuilder.forInstance(brokerId));
+      sendDeleteRequest(getAdminUrlBuilder().forInstance(brokerId));
       fail("Dropping instance should fail because it is still in the broker resource");
     } catch (Exception e) {
       // Expected
     }
 
     // Untag the broker and update the broker resource so that it is removed from the broker resource
-    sendPutRequest(_controllerRequestURLBuilder.forInstanceUpdateTags(brokerId, Collections.emptyList(), true));
+    sendPutRequest(getAdminUrlBuilder()
+        .forInstanceUpdateTags(brokerId, Collections.emptyList(), true));
 
     // Check if broker is removed from all the tables in broker resource
     brokerResourceIdealState = _helixAdmin.getResourceIdealState(clusterName, Helix.BROKER_RESOURCE_INSTANCE);
@@ -156,7 +157,7 @@ public class MultiNodesOfflineClusterIntegrationTest extends OfflineClusterInteg
     }, 60_000L, "Failed to remove broker from broker resource ExternalView");
 
     // Dropping the broker should success now
-    sendDeleteRequest(_controllerRequestURLBuilder.forInstance(brokerId));
+    sendDeleteRequest(getAdminUrlBuilder().forInstance(brokerId));
 
     // Check if broker is dropped from the cluster
     assertFalse(_helixAdmin.getInstancesInCluster(clusterName).contains(brokerId));

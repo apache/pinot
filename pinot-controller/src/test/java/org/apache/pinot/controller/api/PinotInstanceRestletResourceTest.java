@@ -63,7 +63,7 @@ public class PinotInstanceRestletResourceTest extends ControllerTest {
   public void setUp()
       throws Exception {
     DEFAULT_INSTANCE.setupSharedStateAndValidate();
-    _urlBuilder = DEFAULT_INSTANCE.getControllerRequestURLBuilder();
+    _urlBuilder = DEFAULT_INSTANCE.getAdminUrlBuilder();
   }
 
   @Test
