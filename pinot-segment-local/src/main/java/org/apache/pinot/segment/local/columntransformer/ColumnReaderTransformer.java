@@ -58,19 +58,15 @@ import org.apache.pinot.spi.data.readers.ColumnReader;
  *   <li><b>_allTransformersExceptNullTransformer</b> - All transformers except {@link NullValueColumnTransformer}</li>
  * </ul>
  * This segregation is necessary because {@link NullValueColumnTransformer} requires boxing primitive types to
- * {@link Object}, which introduces significant performance overhead. By separating it, we can avoid this cost
- * for primitive numeric types when null handling is not needed.
+ * {@link Object}, which introduces significant performance overhead. By separating it, we can check if any other
+ * transformations are needed. If not, we can bypass transformation logic entirely for primitive types.
  * </p>
  *
  * <h4>2. Type-Specific Optimization</h4>
  * <p>
  * The class optimizes differently based on data type:
  * <ul>
- *   <li><b>Primitive numeric types (int, long, float, double)</b> - Uses {@code _allTransformersExceptNullTransformer}
- *       to avoid boxing overhead. When no transformers are present, directly delegates to the underlying reader
- *       for zero transformation cost.</li>
- *   <li><b>String and byte[] types</b> - Always uses {@code _allTransformers} since these are already reference
- *       types and don't incur boxing penalties.</li>
+ *   <li><b>Primitive numeric types (int, long, float, double)</b> - Can be used when transform isn't required.</li>
  * </ul>
  * </p>
  *
@@ -104,6 +100,8 @@ public class ColumnReaderTransformer implements ColumnReader {
   // Since NullValueColumnTransformer is required for all columns, but has perf overhead (casting to Object),
   // we separate it out to avoid calling it unless necessary.
   private final List<ColumnTransformer> _allTransformersExceptNullTransformer;
+
+  private final ColumnTransformer _nullValueTransformer;
   private final ColumnReader _columnReader;
 
   /**
@@ -129,8 +127,9 @@ public class ColumnReaderTransformer implements ColumnReader {
       FieldSpec fieldSpec, ColumnReader columnReader, List<ColumnTransformer> additionalTransformers) {
     _columnReader = columnReader;
     _allTransformers = new ArrayList<>();
+    _nullValueTransformer = new NullValueColumnTransformer(tableConfig, fieldSpec, schema);
     addIfNotNoOp(_allTransformers, new DataTypeColumnTransformer(tableConfig, fieldSpec, columnReader));
-    addIfNotNoOp(_allTransformers, new NullValueColumnTransformer(tableConfig, fieldSpec, schema));
+    addIfNotNoOp(_allTransformers, _nullValueTransformer);
     for (ColumnTransformer transformer : additionalTransformers) {
       addIfNotNoOp(_allTransformers, transformer);
     }
@@ -149,11 +148,19 @@ public class ColumnReaderTransformer implements ColumnReader {
     }
   }
 
-  private Object applyTransformers(Object value, List<ColumnTransformer> transformers) {
-    for (ColumnTransformer transformer : transformers) {
+  private Object applyTransformers(Object value) {
+    for (ColumnTransformer transformer : _allTransformers) {
       value = transformer.transform(value);
     }
     return value;
+  }
+
+  /**
+   * This API helps the client to either call type specific APIs (nextInt, nextLong, etc.) or
+   * call the generic next() API based on whether any transformation is required.
+   */
+  public boolean requiresTransformation() {
+    return !_allTransformersExceptNullTransformer.isEmpty();
   }
 
   @Override
@@ -165,7 +172,7 @@ public class ColumnReaderTransformer implements ColumnReader {
   @Override
   public Object next()
       throws IOException {
-    return applyTransformers(_columnReader.next(), _allTransformers);
+    return applyTransformers(_columnReader.next());
   }
 
   @Override
@@ -221,113 +228,121 @@ public class ColumnReaderTransformer implements ColumnReader {
   @Override
   public int nextInt()
       throws IOException {
-    if (_allTransformersExceptNullTransformer.isEmpty()) {
-      // If there are no transformers, avoid casting to Object unnecessarily
-      return _columnReader.nextInt();
+    if (isNextNull()) {
+      return (int) _nullValueTransformer.transform(null);
     } else {
-      return (int) applyTransformers(_columnReader.nextInt(), _allTransformersExceptNullTransformer);
+      return _columnReader.nextInt();
     }
   }
 
   @Override
   public long nextLong()
       throws IOException {
-    if (_allTransformersExceptNullTransformer.isEmpty()) {
-      // If there are no transformers, avoid casting to Object unnecessarily
-      return _columnReader.nextLong();
+    if (isNextNull()) {
+      return (long) _nullValueTransformer.transform(null);
     } else {
-      return (long) applyTransformers(_columnReader.nextLong(), _allTransformersExceptNullTransformer);
+      return _columnReader.nextLong();
     }
   }
 
   @Override
   public float nextFloat()
       throws IOException {
-    if (_allTransformersExceptNullTransformer.isEmpty()) {
-      // If there are no transformers, avoid casting to Object unnecessarily
-      return _columnReader.nextFloat();
+    if (isNextNull()) {
+      return (float) _nullValueTransformer.transform(null);
     } else {
-      return (float) applyTransformers(_columnReader.nextFloat(), _allTransformersExceptNullTransformer);
+      return _columnReader.nextFloat();
     }
   }
 
   @Override
   public double nextDouble()
       throws IOException {
-    if (_allTransformersExceptNullTransformer.isEmpty()) {
-      // If there are no transformers, avoid casting to Object unnecessarily
-      return _columnReader.nextDouble();
+    if (isNextNull()) {
+      return (double) _nullValueTransformer.transform(null);
     } else {
-      return (double) applyTransformers(_columnReader.nextDouble(), _allTransformersExceptNullTransformer);
+      return _columnReader.nextDouble();
     }
   }
 
   @Override
   public String nextString()
       throws IOException {
-    return (String) applyTransformers(_columnReader.nextString(), _allTransformers);
+    return (String) applyTransformers(_columnReader.nextString());
   }
 
   @Override
   public byte[] nextBytes()
       throws IOException {
-    return (byte[]) applyTransformers(_columnReader.nextBytes(), _allTransformers);
+    return (byte[]) applyTransformers(_columnReader.nextBytes());
   }
 
   @Override
   public int[] nextIntMV()
       throws IOException {
-    if (_allTransformersExceptNullTransformer.isEmpty()) {
-      // If there are no transformers, avoid casting to Object unnecessarily
-      return _columnReader.nextIntMV();
+    if (isNextNull()) {
+      return (int[]) _nullValueTransformer.transform(null);
+    }
+    int[] value = _columnReader.nextIntMV();
+    if (value.length == 0) {
+      return (int[]) _nullValueTransformer.transform(null);
     } else {
-      return (int[]) applyTransformers(_columnReader.nextIntMV(), _allTransformersExceptNullTransformer);
+      return value;
     }
   }
 
   @Override
   public long[] nextLongMV()
       throws IOException {
-    if (_allTransformersExceptNullTransformer.isEmpty()) {
-      // If there are no transformers, avoid casting to Object unnecessarily
-      return _columnReader.nextLongMV();
+    if (isNextNull()) {
+      return (long[]) _nullValueTransformer.transform(null);
+    }
+    long[] value = _columnReader.nextLongMV();
+    if (value.length == 0) {
+      return (long[]) _nullValueTransformer.transform(null);
     } else {
-      return (long[]) applyTransformers(_columnReader.nextLongMV(), _allTransformersExceptNullTransformer);
+      return value;
     }
   }
 
   @Override
   public float[] nextFloatMV()
       throws IOException {
-    if (_allTransformersExceptNullTransformer.isEmpty()) {
-      // If there are no transformers, avoid casting to Object unnecessarily
-      return _columnReader.nextFloatMV();
+    if (isNextNull()) {
+      return (float[]) _nullValueTransformer.transform(null);
+    }
+    float[] value = _columnReader.nextFloatMV();
+    if (value.length == 0) {
+      return (float[]) _nullValueTransformer.transform(null);
     } else {
-      return (float[]) applyTransformers(_columnReader.nextFloatMV(), _allTransformersExceptNullTransformer);
+      return value;
     }
   }
 
   @Override
   public double[] nextDoubleMV()
       throws IOException {
-    if (_allTransformersExceptNullTransformer.isEmpty()) {
-      // If there are no transformers, avoid casting to Object unnecessarily
-      return _columnReader.nextDoubleMV();
+    if (isNextNull()) {
+      return (double[]) _nullValueTransformer.transform(null);
+    }
+    double[] value = _columnReader.nextDoubleMV();
+    if (value.length == 0) {
+      return (double[]) _nullValueTransformer.transform(null);
     } else {
-      return (double[]) applyTransformers(_columnReader.nextDoubleMV(), _allTransformersExceptNullTransformer);
+      return value;
     }
   }
 
   @Override
   public String[] nextStringMV()
       throws IOException {
-    return (String[]) applyTransformers(_columnReader.nextStringMV(), _allTransformers);
+    return (String[]) applyTransformers(_columnReader.nextStringMV());
   }
 
   @Override
   public byte[][] nextBytesMV()
       throws IOException {
-    return (byte[][]) applyTransformers(_columnReader.nextBytesMV(), _allTransformers);
+    return (byte[][]) applyTransformers(_columnReader.nextBytesMV());
   }
 
   @Override
@@ -347,7 +362,8 @@ public class ColumnReaderTransformer implements ColumnReader {
   }
 
   // Check if the value itself is null or if any of the transformers would return null for the value
-  // The latter is important because NullValueColumnTransformer will transform null to default value
+  // Eg: DataTypeColumnTransformer may convert to null (transform exceptions during MV to SV, String to Int, etc.)
+  // This case is important because NullValueColumnTransformer will transform null to default value
   // In those cases, we still want isNull to return true so that the null vector index can be built correctly
   @Override
   public boolean isNull(int docId)
@@ -371,119 +387,127 @@ public class ColumnReaderTransformer implements ColumnReader {
   @Override
   public int getInt(int docId)
       throws IOException {
-    if (_allTransformersExceptNullTransformer.isEmpty()) {
-      // If there are no transformers, avoid casting to Object unnecessarily
-      return _columnReader.getInt(docId);
+    if (_columnReader.isNull(docId)) {
+      return (int) _nullValueTransformer.transform(null);
     } else {
-      return (int) applyTransformers(_columnReader.getInt(docId), _allTransformersExceptNullTransformer);
+      return _columnReader.getInt(docId);
     }
   }
 
   @Override
   public long getLong(int docId)
       throws IOException {
-    if (_allTransformersExceptNullTransformer.isEmpty()) {
-      // If there are no transformers, avoid casting to Object unnecessarily
-      return _columnReader.getLong(docId);
+    if (_columnReader.isNull(docId)) {
+      return (long) _nullValueTransformer.transform(null);
     } else {
-      return (long) applyTransformers(_columnReader.getLong(docId), _allTransformersExceptNullTransformer);
+      return _columnReader.getLong(docId);
     }
   }
 
   @Override
   public float getFloat(int docId)
       throws IOException {
-    if (_allTransformersExceptNullTransformer.isEmpty()) {
-      // If there are no transformers, avoid casting to Object unnecessarily
-      return _columnReader.getFloat(docId);
+    if (_columnReader.isNull(docId)) {
+      return (float) _nullValueTransformer.transform(null);
     } else {
-      return (float) applyTransformers(_columnReader.getFloat(docId), _allTransformersExceptNullTransformer);
+      return _columnReader.getFloat(docId);
     }
   }
 
   @Override
   public double getDouble(int docId)
       throws IOException {
-    if (_allTransformersExceptNullTransformer.isEmpty()) {
-      // If there are no transformers, avoid casting to Object unnecessarily
-      return _columnReader.getDouble(docId);
+    if (_columnReader.isNull(docId)) {
+      return (double) _nullValueTransformer.transform(null);
     } else {
-      return (double) applyTransformers(_columnReader.getDouble(docId), _allTransformersExceptNullTransformer);
+      return _columnReader.getDouble(docId);
     }
   }
 
   @Override
   public String getString(int docId)
       throws IOException {
-    return (String) applyTransformers(_columnReader.getString(docId), _allTransformers);
+    return (String) applyTransformers(_columnReader.getString(docId));
   }
 
   @Override
   public byte[] getBytes(int docId)
       throws IOException {
-    return (byte[]) applyTransformers(_columnReader.getBytes(docId), _allTransformers);
+    return (byte[]) applyTransformers(_columnReader.getBytes(docId));
   }
 
   @Override
   public Object getValue(int docId)
       throws IOException {
-    return applyTransformers(_columnReader.getValue(docId), _allTransformers);
+    return applyTransformers(_columnReader.getValue(docId));
   }
 
   @Override
   public int[] getIntMV(int docId)
       throws IOException {
-    if (_allTransformersExceptNullTransformer.isEmpty()) {
-      // If there are no transformers, avoid casting to Object unnecessarily
-      return _columnReader.getIntMV(docId);
+    if (_columnReader.isNull(docId)) {
+      return (int[]) _nullValueTransformer.transform(null);
+    }
+    int[] value = _columnReader.getIntMV(docId);
+    if (value.length == 0) {
+      return (int[]) _nullValueTransformer.transform(null);
     } else {
-      return (int[]) applyTransformers(_columnReader.getIntMV(docId), _allTransformersExceptNullTransformer);
+      return value;
     }
   }
 
   @Override
   public long[] getLongMV(int docId)
       throws IOException {
-    if (_allTransformersExceptNullTransformer.isEmpty()) {
-      // If there are no transformers, avoid casting to Object unnecessarily
-      return _columnReader.getLongMV(docId);
+    if (_columnReader.isNull(docId)) {
+      return (long[]) _nullValueTransformer.transform(null);
+    }
+    long[] value = _columnReader.getLongMV(docId);
+    if (value.length == 0) {
+      return (long[]) _nullValueTransformer.transform(null);
     } else {
-      return (long[]) applyTransformers(_columnReader.getLongMV(docId), _allTransformersExceptNullTransformer);
+      return value;
     }
   }
 
   @Override
   public float[] getFloatMV(int docId)
       throws IOException {
-    if (_allTransformersExceptNullTransformer.isEmpty()) {
-      // If there are no transformers, avoid casting to Object unnecessarily
-      return _columnReader.getFloatMV(docId);
+    if (_columnReader.isNull(docId)) {
+      return (float[]) _nullValueTransformer.transform(null);
+    }
+    float[] value = _columnReader.getFloatMV(docId);
+    if (value.length == 0) {
+      return (float[]) _nullValueTransformer.transform(null);
     } else {
-      return (float[]) applyTransformers(_columnReader.getFloatMV(docId), _allTransformersExceptNullTransformer);
+      return value;
     }
   }
 
   @Override
   public double[] getDoubleMV(int docId)
       throws IOException {
-    if (_allTransformersExceptNullTransformer.isEmpty()) {
-      // If there are no transformers, avoid casting to Object unnecessarily
-      return _columnReader.getDoubleMV(docId);
+    if (_columnReader.isNull(docId)) {
+      return (double[]) _nullValueTransformer.transform(null);
+    }
+    double[] value = _columnReader.getDoubleMV(docId);
+    if (value.length == 0) {
+      return (double[]) _nullValueTransformer.transform(null);
     } else {
-      return (double[]) applyTransformers(_columnReader.getDoubleMV(docId), _allTransformersExceptNullTransformer);
+      return value;
     }
   }
 
   @Override
   public String[] getStringMV(int docId)
       throws IOException {
-    return (String[]) applyTransformers(_columnReader.getStringMV(docId), _allTransformers);
+    return (String[]) applyTransformers(_columnReader.getStringMV(docId));
   }
 
   @Override
   public byte[][] getBytesMV(int docId)
       throws IOException {
-    return (byte[][]) applyTransformers(_columnReader.getBytesMV(docId), _allTransformers);
+    return (byte[][]) applyTransformers(_columnReader.getBytesMV(docId));
   }
 
   @Override

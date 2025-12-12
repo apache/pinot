@@ -45,6 +45,15 @@ public class NullValueColumnTransformer implements ColumnTransformer {
 
   @Override
   public Object transform(Object value) {
+    if (value instanceof Object[] && ((Object[]) value).length == 0) {
+      // Special case: empty array should be treated as null
+      // TODO - Currently this is done in DataTypeTransformerUtils
+      //  Should this be moved from DataTypeTransformerUtils to NullValueTransformerUtils ?
+      //  In Row major build, DataTypeTransformer is called always
+      //  But in Column major build, DataTypeTransformer is not called if source and destination data types are same
+      //  If we move this logic to NullValueTransformerUtils, the logic stays at one place
+      value = null;
+    }
     return NullValueTransformerUtils.transformValue(value, _defaultNullValue);
   }
 }
