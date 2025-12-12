@@ -536,7 +536,7 @@ public class PinotClientRequest {
       _brokerMetrics.addMeteredGlobalValue(BrokerMeter.CURSOR_QUERIES_GLOBAL, 1);
     }
     PinotSqlType sqlType = sqlNodeAndOptions.getSqlType();
-    if (onlyDql && sqlType != PinotSqlType.DQL) {
+    if (onlyDql && sqlType != PinotSqlType.DQL && sqlType != PinotSqlType.METADATA) {
       return new BrokerResponseNative(QueryErrorCode.SQL_PARSING,
           "Unsupported SQL type - " + sqlType + ", this API only supports DQL.");
     }
@@ -558,6 +558,16 @@ public class PinotClientRequest {
           return _sqlQueryExecutor.executeDMLStatement(sqlNodeAndOptions, headers);
         } catch (Exception e) {
           LOGGER.error("Error handling DML request:\n{}", sqlRequestJson, e);
+          throw e;
+        }
+      case METADATA:
+        try {
+          Map<String, String> headers = new HashMap<>();
+          httpRequesterIdentity.getHttpHeaders().entries()
+              .forEach(entry -> headers.put(entry.getKey(), entry.getValue()));
+          return _sqlQueryExecutor.executeMetadataStatement(sqlNodeAndOptions, headers);
+        } catch (Exception e) {
+          LOGGER.error("Error handling metadata request:\n{}", sqlRequestJson, e);
           throw e;
         }
       default:

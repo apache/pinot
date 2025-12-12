@@ -44,6 +44,9 @@ data: {
     keywords: [
       "FILE"
       "ARCHIVE"
+      "DATABASES"
+      "TABLES"
+      "SCHEMAS"
       # Pinot types allowed in CAST function
       # LONG - for BIGINT
       # BIG_DECIMAL - for DECIMAL
@@ -70,6 +73,9 @@ data: {
       "DATETIME"
       "VARIANT"
       "UUID"
+      "DATABASES"
+      "TABLES"
+      "SCHEMAS"
 
       # The following keywords are reserved in core Calcite,
       # are reserved in some version of SQL,
@@ -568,6 +574,9 @@ data: {
     statementParserMethods: [
       "SqlInsertFromFile()"
       "SqlPhysicalExplain()"
+      "SqlShowDatabases()"
+      "SqlShowTables()"
+      "SqlShowSchemas()"
     ]
 
     # List of methods for parsing custom literals.

@@ -109,3 +109,49 @@ SqlNode SqlPhysicalExplain() :
             nDynamicParams);
     }
 }
+
+SqlNode SqlShowDatabases() :
+{
+    SqlParserPos pos;
+}
+{
+    <SHOW> { pos = getPos(); }
+    <DATABASES>
+    {
+        return new SqlShowDatabases(pos);
+    }
+}
+
+SqlNode SqlShowTables() :
+{
+    SqlParserPos pos;
+    SqlIdentifier dbName = null;
+}
+{
+    <SHOW> { pos = getPos(); }
+    <TABLES>
+    [
+        <FROM>
+        dbName = CompoundIdentifier()
+    ]
+    {
+        return new SqlShowTables(pos, dbName);
+    }
+}
+
+SqlNode SqlShowSchemas() :
+{
+    SqlParserPos pos;
+    SqlNode likePattern = null;
+}
+{
+    <SHOW> { pos = getPos(); }
+    <SCHEMAS>
+    [
+        <LIKE>
+        likePattern = StringLiteral()
+    ]
+    {
+        return new SqlShowSchemas(pos, likePattern == null ? null : SqlLiteral.unchain(likePattern));
+    }
+}
