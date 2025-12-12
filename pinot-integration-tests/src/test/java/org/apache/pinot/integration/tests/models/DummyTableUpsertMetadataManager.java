@@ -79,6 +79,11 @@ public class DummyTableUpsertMetadataManager extends BaseTableUpsertMetadataMana
     }
 
     @Override
+    protected void removeNewlyAddedKeys(IndexSegment oldSegment) {
+
+    }
+
+    @Override
     protected void removeSegment(IndexSegment segment, MutableRoaringBitmap validDocIds) {
     }
 
@@ -92,7 +97,8 @@ public class DummyTableUpsertMetadataManager extends BaseTableUpsertMetadataMana
     }
 
     @Override
-    protected void revertCurrentSegmentUpsertMetadata() {
+    protected void revertCurrentSegmentUpsertMetadata(IndexSegment oldSegment,
+        ThreadSafeMutableRoaringBitmap validDocIds, ThreadSafeMutableRoaringBitmap queryableDocIds) {
     }
 
     @Override
