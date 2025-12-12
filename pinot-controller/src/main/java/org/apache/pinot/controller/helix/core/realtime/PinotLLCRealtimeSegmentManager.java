@@ -88,8 +88,8 @@ import org.apache.pinot.common.utils.helix.IdealStateSingleCommit;
 import org.apache.pinot.common.utils.http.HttpClient;
 import org.apache.pinot.controller.ControllerConf;
 import org.apache.pinot.controller.api.events.MetadataEventNotifierFactory;
+import org.apache.pinot.controller.api.resources.BatchConfig;
 import org.apache.pinot.controller.api.resources.Constants;
-import org.apache.pinot.controller.api.resources.ForceCommitBatchConfig;
 import org.apache.pinot.controller.api.resources.PauseStatusDetails;
 import org.apache.pinot.controller.helix.core.PinotHelixResourceManager;
 import org.apache.pinot.controller.helix.core.PinotTableIdealStateBuilder;
@@ -2286,17 +2286,17 @@ public class PinotLLCRealtimeSegmentManager {
    * @return the set of consuming segments for which commit was initiated
    */
   public Set<String> forceCommit(String tableNameWithType, @Nullable String partitionGroupIdsToCommit,
-      @Nullable String segmentsToCommit, ForceCommitBatchConfig batchConfig) {
+      @Nullable String segmentsToCommit, @Nullable BatchConfig batchConfig) {
     IdealState idealState = getIdealState(tableNameWithType);
     Set<String> allConsumingSegments = findConsumingSegments(idealState);
     Set<String> targetConsumingSegments =
         filterSegmentsToCommit(allConsumingSegments, partitionGroupIdsToCommit, segmentsToCommit);
-    int batchSize = batchConfig.getBatchSize();
-    if (batchSize >= targetConsumingSegments.size()) {
+    if ((batchConfig == null) || (batchConfig.getBatchSize() >= targetConsumingSegments.size())) {
       // No need to divide segments in batches.
       sendForceCommitMessageToServers(tableNameWithType, targetConsumingSegments);
     } else {
-      List<Set<String>> segmentBatchList = getSegmentBatchList(idealState, targetConsumingSegments, batchSize);
+      List<Set<String>> segmentBatchList =
+          getSegmentBatchList(idealState, targetConsumingSegments, batchConfig.getBatchSize());
       ExecutorService executor = Executors.newSingleThreadExecutor();
       executor.submit(() -> processBatchesSequentially(segmentBatchList, tableNameWithType, batchConfig));
       executor.shutdown();
@@ -2305,7 +2305,7 @@ public class PinotLLCRealtimeSegmentManager {
   }
 
   private void processBatchesSequentially(List<Set<String>> segmentBatchList, String tableNameWithType,
-      ForceCommitBatchConfig forceCommitBatchConfig) {
+      BatchConfig forceCommitBatchConfig) {
     Set<String> prevBatch = null;
     try {
       for (Set<String> segmentBatchToCommit : segmentBatchList) {
@@ -2322,7 +2322,7 @@ public class PinotLLCRealtimeSegmentManager {
   }
 
   public void waitUntilSegmentsForceCommitted(String tableNameWithType, Set<String> segmentsToWait,
-      ForceCommitBatchConfig forceCommitBatchConfig)
+      BatchConfig forceCommitBatchConfig)
       throws InterruptedException {
     int batchStatusCheckIntervalMs = forceCommitBatchConfig.getBatchStatusCheckIntervalMs();
     int batchStatusCheckTimeoutMs = forceCommitBatchConfig.getBatchStatusCheckTimeoutMs();
@@ -2450,9 +2450,19 @@ public class PinotLLCRealtimeSegmentManager {
    */
   public PauseStatusDetails pauseConsumption(String tableNameWithType, PauseState.ReasonCode reasonCode,
       @Nullable String comment) {
+    return pauseConsumption(tableNameWithType, reasonCode, comment, null);
+  }
+
+  /**
+   * Pause consumption on a table by
+   *   1) Update PauseState in the table ideal state and
+   *   2) Sending force commit messages to servers
+   */
+  public PauseStatusDetails pauseConsumption(String tableNameWithType, PauseState.ReasonCode reasonCode,
+      @Nullable String comment, @Nullable BatchConfig batchConfig) {
     IdealState updatedIdealState = updatePauseStateInIdealState(tableNameWithType, true, reasonCode, comment);
     Set<String> consumingSegments = findConsumingSegments(updatedIdealState);
-    sendForceCommitMessageToServers(tableNameWithType, consumingSegments);
+    forceCommit(tableNameWithType, null, null, batchConfig);
     return new PauseStatusDetails(true, consumingSegments, reasonCode, comment != null ? comment
         : "Pause flag is set. Consuming segments are being committed."
             + " Use /pauseStatus endpoint in a few moments to check if all consuming segments have been committed.",
