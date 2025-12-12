@@ -69,7 +69,7 @@ import org.apache.pinot.common.tier.TierFactory;
 import org.apache.pinot.common.utils.PauselessConsumptionUtils;
 import org.apache.pinot.common.utils.SegmentUtils;
 import org.apache.pinot.common.utils.config.TierConfigUtils;
-import org.apache.pinot.controller.api.resources.ForceCommitBatchConfig;
+import org.apache.pinot.controller.api.resources.BatchConfig;
 import org.apache.pinot.controller.helix.core.assignment.instance.InstanceAssignmentDriver;
 import org.apache.pinot.controller.helix.core.assignment.segment.BaseStrictRealtimeSegmentAssignment;
 import org.apache.pinot.controller.helix.core.assignment.segment.SegmentAssignment;
@@ -2226,8 +2226,8 @@ public class TableRebalancer {
     tableRebalanceLogger.info("Force committing {} consuming segments before moving them", segmentsToCommit.size());
     Preconditions.checkState(_pinotLLCRealtimeSegmentManager != null,
         "PinotLLCRealtimeSegmentManager is not initialized");
-    ForceCommitBatchConfig forceCommitBatchConfig =
-        ForceCommitBatchConfig.of(forceCommitBatchSize, forceCommitBatchStatusCheckIntervalMs / 1000,
+    BatchConfig forceCommitBatchConfig =
+        BatchConfig.of(forceCommitBatchSize, forceCommitBatchStatusCheckIntervalMs / 1000,
             forceCommitBatchStatusCheckTimeoutMs / 1000);
     segmentsToCommit = _pinotLLCRealtimeSegmentManager.forceCommit(tableNameWithType, null,
         StringUtil.join(",", segmentsToCommit.toArray(String[]::new)), forceCommitBatchConfig);
