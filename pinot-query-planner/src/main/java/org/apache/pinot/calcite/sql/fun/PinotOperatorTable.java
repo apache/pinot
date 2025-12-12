@@ -231,6 +231,7 @@ public class PinotOperatorTable implements SqlOperatorTable {
 //      SqlStdOperatorTable.CASE,
       SqlStdOperatorTable.OVER,
       SqlStdOperatorTable.NULLIF,
+      SqlStdOperatorTable.ROW,
 
       // FUNCTIONS
       // String functions

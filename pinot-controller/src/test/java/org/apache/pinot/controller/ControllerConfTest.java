@@ -25,6 +25,7 @@ import java.util.Random;
 import java.util.concurrent.TimeUnit;
 import org.apache.commons.lang3.RandomStringUtils;
 import org.apache.pinot.controller.helix.core.rebalance.RebalanceConfig;
+import org.apache.pinot.spi.config.table.DisasterRecoveryMode;
 import org.apache.pinot.spi.utils.Enablement;
 import org.apache.pinot.spi.utils.TimeUtils;
 import org.testng.Assert;
@@ -198,6 +199,18 @@ public class ControllerConfTest {
     Assert.assertTrue(conf.isSegmentRelocatorIncludingConsuming());
     Assert.assertEquals(conf.getSegmentRelocatorMinimizeDataMovement(), Enablement.DISABLE);
     Assert.assertEquals(conf.getSegmentRelocatorBatchSizePerServer(), 42);
+  }
+
+  @Test
+  public void testGetDisasterRecoveryMode() {
+    Map<String, Object> controllerConfig = new HashMap<>();
+    ControllerConf conf = new ControllerConf(controllerConfig);
+    Assert.assertEquals(conf.getDisasterRecoveryMode(), DisasterRecoveryMode.DEFAULT);
+
+    controllerConfig = new HashMap<>();
+    controllerConfig.put(DISASTER_RECOVERY_MODE_CONFIG_KEY, "ALWAYS");
+    conf = new ControllerConf(controllerConfig);
+    Assert.assertEquals(conf.getDisasterRecoveryMode(), DisasterRecoveryMode.ALWAYS);
   }
 
   @Test
