@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.calcite.rel.rules;
 
+import java.util.ArrayList;
 import java.util.List;
 import org.apache.calcite.plan.RelOptRule;
 import org.apache.calcite.rel.rules.AggregateCaseToFilterRule;
@@ -45,6 +46,7 @@ import org.apache.calcite.rel.rules.SortRemoveRule;
 import org.apache.calcite.rel.rules.UnionToDistinctRule;
 import org.apache.pinot.calcite.rel.rules.PinotFilterJoinRule.PinotFilterIntoJoinRule;
 import org.apache.pinot.calcite.rel.rules.PinotFilterJoinRule.PinotJoinConditionPushRule;
+import org.apache.pinot.query.QueryEnvironment;
 import org.apache.pinot.spi.utils.CommonConstants.Broker.PlannerRuleNames;
 
 
@@ -252,4 +254,33 @@ public class PinotQueryRuleSets {
       CoreRules.FILTER_REDUCE_EXPRESSIONS
   );
   //@formatter:on
+
+  public static List<RelOptRule> getPinotPostRules(QueryEnvironment.Config envConfig) {
+    int sortExchangeCopyLimit = envConfig.getSortExchangeCopyLimit();
+    if (sortExchangeCopyLimit == -1) {
+      return PINOT_POST_RULES;
+    } else {
+      return replaceAll(
+          PINOT_POST_RULES,
+          PinotSortExchangeCopyRule.class,
+          ImmutablePinotSortExchangeCopyRule.Config.builder()
+              .from(PinotSortExchangeCopyRule.Config.DEFAULT)
+              .fetchLimitThreshold(sortExchangeCopyLimit)
+              .build()
+              .toRule()
+      );
+    }
+  }
+
+  private static <C extends RelOptRule> List<RelOptRule> replaceAll(List<? extends RelOptRule> rules,
+      Class<? extends C> clazz, C newRule) {
+    List<RelOptRule> updatedRules = new ArrayList<>(rules);
+    for (int i = 0; i < updatedRules.size(); i++) {
+      RelOptRule rule = updatedRules.get(i);
+      if (clazz.isInstance(rule)) {
+        updatedRules.set(i, newRule);
+      }
+    }
+    return updatedRules;
+  }
 }

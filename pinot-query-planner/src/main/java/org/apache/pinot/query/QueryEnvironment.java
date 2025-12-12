@@ -623,7 +623,7 @@ public class QueryEnvironment {
     // ----
     // Run pinot specific rules that should run after all other rules, using 1 HepInstruction per rule.
     if (!usePhysicalOptimizer) {
-      for (RelOptRule relOptRule : PinotQueryRuleSets.PINOT_POST_RULES) {
+      for (RelOptRule relOptRule : PinotQueryRuleSets.getPinotPostRules(config)) {
         if (isEligibleQueryPostRule(relOptRule, config)) {
           hepProgramBuilder.addRuleInstance(relOptRule);
         }
@@ -844,6 +844,12 @@ public class QueryEnvironment {
      */
     @Nullable
     WorkerManager getWorkerManager();
+
+    /// See [CommonConstants.Broker#CONFIG_OF_SORT_EXCHANGE_COPY_THRESHOLD]
+    @Value.Default
+    default int getSortExchangeCopyLimit() {
+      return -1;
+    }
   }
 
   /// A query that have been parsed, validates, transformed into a [RelNode] and optimized with Calcite.
