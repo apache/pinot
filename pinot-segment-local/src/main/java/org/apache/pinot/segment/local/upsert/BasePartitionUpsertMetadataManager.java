@@ -613,7 +613,8 @@ public abstract class BasePartitionUpsertMetadataManager implements PartitionUps
       replaceSegment(segment, null, null, recordInfoIterator, oldSegment);
     } catch (Exception e) {
       throw new RuntimeException(
-          String.format("Caught exception while replacing segment: %s, table: %s, message: %s", segmentName, _tableNameWithType, e.getMessage()), e);
+          String.format("Caught exception while replacing segment: %s, table: %s, message: %s", segmentName,
+              _tableNameWithType, e.getMessage()), e);
     }
 
     // Update metrics
