@@ -26,6 +26,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.TimeUnit;
+import java.util.stream.Collectors;
 import org.apache.helix.model.IdealState;
 import org.apache.pinot.common.metadata.segment.SegmentZKMetadata;
 import org.apache.pinot.common.restlet.resources.ValidDocIdsMetadataInfo;
@@ -233,13 +234,13 @@ public class UpsertCompactionTaskGeneratorTest {
     // no completed segments scenario, there shouldn't be any segment selected for compaction
     UpsertCompactionTaskGenerator.SegmentSelectionResult segmentSelectionResult =
         UpsertCompactionTaskGenerator.processValidDocIdsMetadata(compactionConfigs, new HashMap<>(),
-            validDocIdsMetadataInfo);
+            validDocIdsMetadataInfo, 10);
     assertEquals(segmentSelectionResult.getSegmentsForCompaction().size(), 0);
 
     // test with valid crc and thresholds
     segmentSelectionResult =
         UpsertCompactionTaskGenerator.processValidDocIdsMetadata(compactionConfigs, _completedSegmentsMap,
-            validDocIdsMetadataInfo);
+            validDocIdsMetadataInfo, 10);
     assertEquals(segmentSelectionResult.getSegmentsForCompaction().size(), 1);
     assertEquals(segmentSelectionResult.getSegmentsForDeletion().size(), 1);
     assertEquals(segmentSelectionResult.getSegmentsForCompaction().get(0).getSegmentName(),
@@ -250,7 +251,7 @@ public class UpsertCompactionTaskGeneratorTest {
     compactionConfigs = getCompactionConfigs("60", "10");
     segmentSelectionResult =
         UpsertCompactionTaskGenerator.processValidDocIdsMetadata(compactionConfigs, _completedSegmentsMap,
-            validDocIdsMetadataInfo);
+            validDocIdsMetadataInfo, 10);
     assertTrue(segmentSelectionResult.getSegmentsForCompaction().isEmpty());
     assertEquals(segmentSelectionResult.getSegmentsForDeletion().size(), 1);
     assertEquals(segmentSelectionResult.getSegmentsForDeletion().get(0), _completedSegment2.getSegmentName());
@@ -259,7 +260,7 @@ public class UpsertCompactionTaskGeneratorTest {
     compactionConfigs = getCompactionConfigs("0", "10");
     segmentSelectionResult =
         UpsertCompactionTaskGenerator.processValidDocIdsMetadata(compactionConfigs, _completedSegmentsMap,
-            validDocIdsMetadataInfo);
+            validDocIdsMetadataInfo, 10);
     assertEquals(segmentSelectionResult.getSegmentsForDeletion().size(), 1);
     assertEquals(segmentSelectionResult.getSegmentsForCompaction().size(), 1);
     assertEquals(segmentSelectionResult.getSegmentsForCompaction().get(0).getSegmentName(),
@@ -270,7 +271,7 @@ public class UpsertCompactionTaskGeneratorTest {
     compactionConfigs = getCompactionConfigs("30", "0");
     segmentSelectionResult =
         UpsertCompactionTaskGenerator.processValidDocIdsMetadata(compactionConfigs, _completedSegmentsMap,
-            validDocIdsMetadataInfo);
+            validDocIdsMetadataInfo, 10);
     assertEquals(segmentSelectionResult.getSegmentsForDeletion().size(), 1);
     assertEquals(segmentSelectionResult.getSegmentsForCompaction().size(), 1);
     assertEquals(segmentSelectionResult.getSegmentsForCompaction().get(0).getSegmentName(),
@@ -289,7 +290,7 @@ public class UpsertCompactionTaskGeneratorTest {
     });
     segmentSelectionResult =
         UpsertCompactionTaskGenerator.processValidDocIdsMetadata(compactionConfigs, _completedSegmentsMap,
-            validDocIdsMetadataInfo);
+            validDocIdsMetadataInfo, 10);
 
     // completedSegment is supposed to be filtered out
     Assert.assertEquals(segmentSelectionResult.getSegmentsForCompaction().size(), 0);
@@ -314,7 +315,7 @@ public class UpsertCompactionTaskGeneratorTest {
     compactionConfigs = getCompactionConfigs("30", "0");
     segmentSelectionResult =
         UpsertCompactionTaskGenerator.processValidDocIdsMetadata(compactionConfigs, _completedSegmentsMap,
-            validDocIdsMetadataInfo);
+            validDocIdsMetadataInfo, 10);
     Assert.assertEquals(segmentSelectionResult.getSegmentsForCompaction().size(), 2);
     Assert.assertEquals(segmentSelectionResult.getSegmentsForDeletion().size(), 0);
     assertEquals(segmentSelectionResult.getSegmentsForCompaction().get(0).getSegmentName(),
@@ -325,6 +326,76 @@ public class UpsertCompactionTaskGeneratorTest {
     // Check segmentCreationTimeMillis is deserialized correctly
     assertEquals(validDocIdsMetadataInfo.get("testTable__0").get(0).getSegmentCreationTimeMillis(), 1234567890L);
     assertEquals(validDocIdsMetadataInfo.get("testTable__1").get(0).getSegmentCreationTimeMillis(), 9876543210L);
+  }
+
+  @Test
+  public void testSegmentSelectionRandomization() {
+    // Create multiple segments for testing randomization
+    Map<String, SegmentZKMetadata> segmentsMap = new HashMap<>();
+    for (int i = 0; i < 10; i++) {
+      SegmentZKMetadata segment = new SegmentZKMetadata("testTable__" + i);
+      segment.setCrc(1000L + i);
+      segment.setStatus(CommonConstants.Segment.Realtime.Status.DONE);
+      segmentsMap.put(segment.getSegmentName(), segment);
+    }
+
+    // Create metadata with different invalid record counts (descending order)
+    StringBuilder jsonBuilder = new StringBuilder("{");
+    for (int i = 0; i < 10; i++) {
+      if (i > 0) {
+        jsonBuilder.append(", ");
+      }
+      String segmentName = "testTable__" + i;
+      long invalidDocs = 100 - (i * 10); // 100, 90, 80, ..., 10
+      jsonBuilder.append("\"").append(segmentName).append("\": [{")
+          .append("\"totalValidDocs\": 50, ")
+          .append("\"totalInvalidDocs\": ").append(invalidDocs).append(", ")
+          .append("\"segmentName\": \"").append(segmentName).append("\", ")
+          .append("\"segmentCrc\": \"").append(1000L + i).append("\", ")
+          .append("\"totalDocs\": ").append(50 + invalidDocs).append(", ")
+          .append("\"segmentCreationTimeMillis\": 1234567890, ")
+          .append("\"serverStatus\": \"GOOD\", ")
+          .append("\"instanceId\": \"server1\"}]");
+    }
+    jsonBuilder.append("}");
+
+    Map<String, List<ValidDocIdsMetadataInfo>> validDocIdsMetadataInfo;
+    try {
+      validDocIdsMetadataInfo = JsonUtils.stringToObject(jsonBuilder.toString(), new TypeReference<>() {
+      });
+    } catch (IOException e) {
+      throw new RuntimeException(e);
+    }
+
+    // Test without randomization (factor = 1.0, explicitly set)
+    Map<String, String> configsNoRandomization = getCompactionConfigs("30", "0");
+    configsNoRandomization.put(UpsertCompactionTask.SEGMENT_SELECTION_RANDOMIZATION_FACTOR, "1.0");
+    UpsertCompactionTaskGenerator.SegmentSelectionResult resultNoRandomization =
+        UpsertCompactionTaskGenerator.processValidDocIdsMetadata(configsNoRandomization, segmentsMap,
+            validDocIdsMetadataInfo, 5);
+
+    // Should select top 5 segments in order (testTable__0 to testTable__4)
+    assertEquals(resultNoRandomization.getSegmentsForCompaction().size(), 5);
+    assertEquals(resultNoRandomization.getSegmentsForCompaction().get(0).getSegmentName(), "testTable__0");
+    assertEquals(resultNoRandomization.getSegmentsForCompaction().get(4).getSegmentName(), "testTable__4");
+
+    // Test with randomization (factor = 2.0)
+    Map<String, String> configsWithRandomization = getCompactionConfigs("30", "0");
+    configsWithRandomization.put(UpsertCompactionTask.SEGMENT_SELECTION_RANDOMIZATION_FACTOR, "2.0");
+
+    UpsertCompactionTaskGenerator.SegmentSelectionResult resultWithRandomization =
+        UpsertCompactionTaskGenerator.processValidDocIdsMetadata(configsWithRandomization, segmentsMap,
+            validDocIdsMetadataInfo, 5);
+
+    // Should still select 5 segments, but they might be in different order due to randomization
+    assertEquals(resultWithRandomization.getSegmentsForCompaction().size(), 5);
+
+    // All selected segments should be from the top 10 candidates (which is all segments in this case)
+    List<String> selectedSegmentNames = resultWithRandomization.getSegmentsForCompaction().stream()
+        .map(SegmentZKMetadata::getSegmentName).collect(Collectors.toList());
+    for (String segmentName : selectedSegmentNames) {
+      assertTrue(segmentName.startsWith("testTable__"));
+    }
   }
 
   @Test
@@ -384,6 +455,17 @@ public class UpsertCompactionTaskGeneratorTest {
         .build();
     Assert.assertThrows(IllegalStateException.class,
         () -> _taskGenerator.validateTaskConfigs(invalidTableConfig, new Schema(), upsertCompactionTaskConfig5));
+
+    // test with valid randomization factor
+    Map<String, String> upsertCompactionTaskConfig6 =
+        Map.of("invalidRecordsThresholdPercent", "1", "segmentSelectionRandomizationFactor", "2.0");
+    _taskGenerator.validateTaskConfigs(tableConfig, new Schema(), upsertCompactionTaskConfig6);
+
+    // test with invalid randomization factor (< 1.0)
+    Map<String, String> upsertCompactionTaskConfig7 =
+        Map.of("invalidRecordsThresholdPercent", "1", "segmentSelectionRandomizationFactor", "0.5");
+    Assert.assertThrows(IllegalStateException.class,
+        () -> _taskGenerator.validateTaskConfigs(tableConfig, new Schema(), upsertCompactionTaskConfig7));
   }
 
   @Test
