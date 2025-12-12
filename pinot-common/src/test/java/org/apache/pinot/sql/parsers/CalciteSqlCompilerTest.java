@@ -38,6 +38,9 @@ import org.apache.pinot.segment.spi.AggregationFunctionType;
 import org.apache.pinot.sql.FilterKind;
 import org.apache.pinot.sql.parsers.parser.ParseException;
 import org.apache.pinot.sql.parsers.parser.SqlInsertFromFile;
+import org.apache.pinot.sql.parsers.parser.SqlShowDatabases;
+import org.apache.pinot.sql.parsers.parser.SqlShowSchemas;
+import org.apache.pinot.sql.parsers.parser.SqlShowTables;
 import org.apache.pinot.sql.parsers.rewriter.CompileTimeFunctionsInvoker;
 import org.testng.Assert;
 import org.testng.annotations.Test;
@@ -3332,5 +3335,22 @@ public class CalciteSqlCompilerTest {
       + "NOT_EQUALS filter is not supported")
   public void testInEqualFilterWithNullFails() {
     compileToPinotQuery("SELECT * FROM testTable WHERE column1 != null");
+  }
+
+  @Test
+  public void testMetadataStatementsAreParsed() {
+    SqlNodeAndOptions sqlNodeAndOptions = CalciteSqlParser.compileToSqlNodeAndOptions("SHOW DATABASES");
+    Assert.assertEquals(sqlNodeAndOptions.getSqlType(), PinotSqlType.METADATA);
+    Assert.assertTrue(sqlNodeAndOptions.getSqlNode() instanceof SqlShowDatabases);
+
+    sqlNodeAndOptions = CalciteSqlParser.compileToSqlNodeAndOptions("SHOW TABLES FROM myDb");
+    Assert.assertEquals(sqlNodeAndOptions.getSqlType(), PinotSqlType.METADATA);
+    Assert.assertTrue(sqlNodeAndOptions.getSqlNode() instanceof SqlShowTables);
+    Assert.assertEquals(((SqlShowTables) sqlNodeAndOptions.getSqlNode()).getDatabaseName().toString(), "myDb");
+
+    sqlNodeAndOptions = CalciteSqlParser.compileToSqlNodeAndOptions("SHOW SCHEMAS LIKE 'foo_%'");
+    Assert.assertEquals(sqlNodeAndOptions.getSqlType(), PinotSqlType.METADATA);
+    Assert.assertTrue(sqlNodeAndOptions.getSqlNode() instanceof SqlShowSchemas);
+    Assert.assertNotNull(((SqlShowSchemas) sqlNodeAndOptions.getSqlNode()).getLikePattern());
   }
 }

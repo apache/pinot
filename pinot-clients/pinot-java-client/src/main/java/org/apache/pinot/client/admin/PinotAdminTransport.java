@@ -331,16 +331,33 @@ public class PinotAdminTransport implements AutoCloseable {
   }
 
   /**
-   * Parses a JSON array field into a List of Strings.
-   * Handles both actual JSON arrays and comma-separated strings for backward compatibility.
+   * Parses a JSON response into a {@link List} of strings.
+   * <ul>
+   *   <li>If the response is a root-level JSON array, parses the array elements as strings.</li>
+   *   <li>Otherwise, parses the {@code fieldName} field, supporting both JSON arrays and comma-separated strings for
+   *   backward compatibility.</li>
+   * </ul>
    *
    * @param response JSON response node
-   * @param fieldName Name of the field containing the array
-   * @return List of strings from the array field
+   * @param fieldName Name of the field containing the array (ignored for root-level arrays)
+   * @return List of strings from the array
    * @throws PinotAdminException If the field is missing, null, or not in expected format
    */
   public List<String> parseStringArray(JsonNode response, String fieldName)
       throws PinotAdminException {
+    if (response == null) {
+      throw new PinotAdminException("Response is null");
+    }
+
+    // Some endpoints return a root-level JSON array (e.g. GET /schemas, GET /databases)
+    if (response.isArray()) {
+      List<String> result = new ArrayList<>();
+      for (JsonNode element : response) {
+        result.add(element.asText());
+      }
+      return result;
+    }
+
     JsonNode arrayNode = response.get(fieldName);
     if (arrayNode == null) {
       throw new PinotAdminException("Response missing '" + fieldName + "' field");

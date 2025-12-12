@@ -382,6 +382,13 @@ public class PinotQueryResource {
             _sqlQueryExecutor.executeDMLStatement(sqlNodeAndOptions, headers).toOutputStream(os);
           }
         };
+      case METADATA:
+        Map<String, String> metadataHeaders = extractHeaders(httpHeaders);
+        return output -> {
+          try (OutputStream os = output) {
+            _sqlQueryExecutor.executeMetadataStatement(sqlNodeAndOptions, metadataHeaders).toOutputStream(os);
+          }
+        };
       default:
         throw QueryErrorCode.INTERNAL.asException("Unsupported SQL type - " + sqlType);
     }

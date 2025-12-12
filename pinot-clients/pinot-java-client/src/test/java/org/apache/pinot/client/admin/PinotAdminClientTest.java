@@ -110,6 +110,20 @@ public class PinotAdminClientTest {
   }
 
   @Test
+  public void testListDatabases()
+      throws Exception {
+    String jsonResponse = "[\"default\", \"analytics_db\"]";
+    JsonNode mockResponse = new ObjectMapper().readTree(jsonResponse);
+    lenient().when(_mockTransport.executeGet(anyString(), anyString(), any(), any()))
+        .thenReturn(mockResponse);
+
+    List<String> databases = _adminClient.getDatabaseClient().listDatabaseNames();
+    assertNotNull(databases);
+    assertEquals(databases.size(), 2);
+    assertEquals(databases.get(0), "default");
+  }
+
+  @Test
   public void testAsyncListSchemas()
       throws Exception {
     String jsonResponse = "{\"schemas\": [\"sch1\"]}";
