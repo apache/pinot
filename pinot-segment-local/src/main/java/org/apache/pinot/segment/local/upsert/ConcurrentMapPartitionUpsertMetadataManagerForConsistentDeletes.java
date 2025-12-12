@@ -268,15 +268,14 @@ public class ConcurrentMapPartitionUpsertMetadataManagerForConsistentDeletes
     }
   }
 
-
   @Override
   protected void removeNewlyAddedKeys(IndexSegment oldSegment) {
     for (Object entry : _newlyAddedKeys) {
       RecordLocation value = _primaryKeyToRecordLocationMap.get(entry);
       _primaryKeyToRecordLocationMap.remove(entry);
-      _newlyAddedKeys.remove(entry);
       removeDocId(oldSegment, value.getDocId());
     }
+    _newlyAddedKeys.clear();
   }
 
   @Override
@@ -367,7 +366,7 @@ public class ConcurrentMapPartitionUpsertMetadataManagerForConsistentDeletes
   protected void revertCurrentSegmentUpsertMetadata(IndexSegment oldSegment, ThreadSafeMutableRoaringBitmap validDocIds,
       ThreadSafeMutableRoaringBitmap queryableDocIds) {
     _logger.info("Reverting Upsert metadata for {} keys", _previousKeyToRecordLocationMap.size());
-    // Revert to previous locations present in other segments and update docId to previous record location
+    // Revert to previous locations present in other segments and update docId to the other segment location
     // For the newly added keys into the segment, remove the pk and valid doc id
     for (Map.Entry<Object, RecordLocation> obj : _primaryKeyToRecordLocationMap.entrySet()) {
       IndexSegment prevSegment = obj.getValue().getSegment();
@@ -389,6 +388,7 @@ public class ConcurrentMapPartitionUpsertMetadataManagerForConsistentDeletes
   @Override
   protected void eraseKeyToPreviousLocationMap() {
     _previousKeyToRecordLocationMap.clear();
+    _newlyAddedKeys.clear();
   }
 
   @Override
