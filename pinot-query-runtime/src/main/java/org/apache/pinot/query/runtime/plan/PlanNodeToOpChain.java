@@ -41,25 +41,20 @@ import org.apache.pinot.query.planner.plannode.TableScanNode;
 import org.apache.pinot.query.planner.plannode.UnnestNode;
 import org.apache.pinot.query.planner.plannode.ValueNode;
 import org.apache.pinot.query.planner.plannode.WindowNode;
-import org.apache.pinot.query.runtime.operator.AggregateOperator;
-import org.apache.pinot.query.runtime.operator.AsofJoinOperator;
-import org.apache.pinot.query.runtime.operator.EnrichedHashJoinOperator;
 import org.apache.pinot.query.runtime.operator.ErrorOperator;
 import org.apache.pinot.query.runtime.operator.FilterOperator;
-import org.apache.pinot.query.runtime.operator.HashJoinOperator;
 import org.apache.pinot.query.runtime.operator.LeafOperator;
 import org.apache.pinot.query.runtime.operator.LiteralValueOperator;
-import org.apache.pinot.query.runtime.operator.LookupJoinOperator;
 import org.apache.pinot.query.runtime.operator.MailboxReceiveOperator;
 import org.apache.pinot.query.runtime.operator.MailboxSendOperator;
 import org.apache.pinot.query.runtime.operator.MultiStageOperator;
-import org.apache.pinot.query.runtime.operator.NonEquiJoinOperator;
 import org.apache.pinot.query.runtime.operator.OpChain;
 import org.apache.pinot.query.runtime.operator.SortOperator;
 import org.apache.pinot.query.runtime.operator.SortedMailboxReceiveOperator;
 import org.apache.pinot.query.runtime.operator.TransformOperator;
 import org.apache.pinot.query.runtime.operator.UnnestOperator;
-import org.apache.pinot.query.runtime.operator.WindowAggregateOperator;
+import org.apache.pinot.query.runtime.operator.factory.AggregateOperatorFactory;
+import org.apache.pinot.query.runtime.operator.factory.JoinOperatorFactory;
 import org.apache.pinot.query.runtime.operator.set.IntersectAllOperator;
 import org.apache.pinot.query.runtime.operator.set.IntersectOperator;
 import org.apache.pinot.query.runtime.operator.set.MinusAllOperator;
@@ -148,8 +143,11 @@ public class PlanNodeToOpChain {
     public MultiStageOperator visitAggregate(AggregateNode node, OpChainExecutionContext context) {
       MultiStageOperator child = null;
       try {
-        child = visit(node.getInputs().get(0), context);
-        return new AggregateOperator(context, child, node);
+        PlanNode input = node.getInputs().get(0);
+        child = visit(input, context);
+        AggregateOperatorFactory aggregateOperatorFactory =
+            context.getQueryOperatorFactoryProvider().getAggregateOperatorFactory();
+        return aggregateOperatorFactory.createAggregateOperator(context, child, input, node);
       } catch (Exception e) {
         return new ErrorOperator(context, QueryErrorCode.QUERY_EXECUTION, e.getMessage(), child);
       }
@@ -161,7 +159,9 @@ public class PlanNodeToOpChain {
       try {
         PlanNode input = node.getInputs().get(0);
         child = visit(input, context);
-        return new WindowAggregateOperator(context, child, input.getDataSchema(), node);
+        AggregateOperatorFactory aggregateOperatorFactory =
+            context.getQueryOperatorFactoryProvider().getAggregateOperatorFactory();
+        return aggregateOperatorFactory.createWindowAggregateOperator(context, child, input, node);
       } catch (Exception e) {
         return new ErrorOperator(context, QueryErrorCode.QUERY_EXECUTION, e.getMessage(), child);
       }
@@ -223,22 +223,8 @@ public class PlanNodeToOpChain {
         PlanNode right = inputs.get(1);
         rightOperator = visit(right, context);
 
-        JoinNode.JoinStrategy joinStrategy = node.getJoinStrategy();
-        switch (joinStrategy) {
-          case HASH:
-            if (node.getLeftKeys().isEmpty()) {
-              // TODO: Consider adding non-equi as a separate join strategy.
-              return new NonEquiJoinOperator(context, leftOperator, left.getDataSchema(), rightOperator, node);
-            } else {
-              return new HashJoinOperator(context, leftOperator, left.getDataSchema(), rightOperator, node);
-            }
-          case LOOKUP:
-            return new LookupJoinOperator(context, leftOperator, rightOperator, node);
-          case ASOF:
-            return new AsofJoinOperator(context, leftOperator, left.getDataSchema(), rightOperator, node);
-          default:
-            throw new IllegalStateException("Unsupported JoinStrategy: " + joinStrategy);
-        }
+        JoinOperatorFactory joinOperatorFactory = context.getQueryOperatorFactoryProvider().getJoinOperatorFactory();
+        return joinOperatorFactory.createJoinOperator(context, leftOperator, left, rightOperator, right, node);
       } catch (Exception e) {
         List<MultiStageOperator> children = Stream.of(leftOperator, rightOperator)
             .filter(Objects::nonNull)
@@ -257,21 +243,8 @@ public class PlanNodeToOpChain {
         leftOperator = visit(left, context);
         PlanNode right = inputs.get(1);
         rightOperator = visit(right, context);
-        JoinNode.JoinStrategy joinStrategy = node.getJoinStrategy();
-        switch (joinStrategy) {
-          case HASH:
-            if (node.getLeftKeys().isEmpty()) {
-              throw new UnsupportedOperationException("NonEquiJoin yet to be supported for EnrichedJoin");
-            } else {
-              return new EnrichedHashJoinOperator(context, leftOperator, left.getDataSchema(), rightOperator, node);
-            }
-          case LOOKUP:
-            throw new UnsupportedOperationException("LookupJoin yet to be supported for EnrichedJoin");
-          case ASOF:
-            throw new UnsupportedOperationException("AsOfJoin yet to be supported for EnrichedJoin");
-          default:
-            throw new IllegalStateException("Unsupported JoinStrategy for EnrichedJoin: " + joinStrategy);
-        }
+        JoinOperatorFactory joinOperatorFactory = context.getQueryOperatorFactoryProvider().getJoinOperatorFactory();
+        return joinOperatorFactory.createEnrichedJoinOperator(context, leftOperator, left, rightOperator, right, node);
       } catch (Exception e) {
         List<MultiStageOperator> children = Stream.of(leftOperator, rightOperator)
             .filter(Objects::nonNull)
