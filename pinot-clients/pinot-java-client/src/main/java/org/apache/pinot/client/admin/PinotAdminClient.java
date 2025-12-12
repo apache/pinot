@@ -39,6 +39,7 @@ public class PinotAdminClient implements AutoCloseable {
 
   // Service clients
   private PinotTableAdminClient _tableClient;
+  private PinotDatabaseAdminClient _databaseClient;
   private PinotSchemaAdminClient _schemaClient;
   private PinotInstanceAdminClient _instanceClient;
   private PinotSegmentAdminClient _segmentClient;
@@ -123,6 +124,18 @@ public class PinotAdminClient implements AutoCloseable {
       _tableClient = new PinotTableAdminClient(_transport, _controllerAddress, _headers);
     }
     return _tableClient;
+  }
+
+  /**
+   * Gets the database administration client.
+   *
+   * @return Database administration operations
+   */
+  public PinotDatabaseAdminClient getDatabaseClient() {
+    if (_databaseClient == null) {
+      _databaseClient = new PinotDatabaseAdminClient(_transport, _controllerAddress, _headers);
+    }
+    return _databaseClient;
   }
 
   /**

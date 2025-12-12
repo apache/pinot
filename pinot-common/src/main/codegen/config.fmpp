@@ -41,9 +41,16 @@ data: {
 
     # List of new keywords. Example: "DATABASES", "TABLES". If the keyword is
     # not a reserved keyword, add it to the 'nonReservedKeywords' section.
+    #
+    # NOTE: Some keywords are intentionally listed in both `keywords` and `nonReservedKeywordsToAdd`:
+    # - `keywords` adds lexical tokens for parsing
+    # - `nonReservedKeywordsToAdd` keeps them usable as identifiers to avoid breaking existing schemas/queries
     keywords: [
       "FILE"
       "ARCHIVE"
+      "DATABASES"
+      "TABLES"
+      "SCHEMAS"
       # Pinot types allowed in CAST function
       # LONG - for BIGINT
       # BIG_DECIMAL - for DECIMAL
@@ -60,6 +67,9 @@ data: {
     nonReservedKeywordsToAdd: [
       "FILE"
       "ARCHIVE"
+      "DATABASES"
+      "TABLES"
+      "SCHEMAS"
       # Pinot allows using DEFAULT as the catalog name
       "DEFAULT_"
       # Pinot allows using LONG/BIG_DECIMAL/STRING/BYTES/DATETIME/VARIANT/UUID as column name
@@ -568,6 +578,9 @@ data: {
     statementParserMethods: [
       "SqlInsertFromFile()"
       "SqlPhysicalExplain()"
+      "SqlShowDatabases()"
+      "SqlShowTables()"
+      "SqlShowSchemas()"
     ]
 
     # List of methods for parsing custom literals.

@@ -501,19 +501,20 @@ public class PinotClientRequest {
   }
 
   private BrokerResponse executeSqlQuery(ObjectNode sqlRequestJson, HttpRequesterIdentity httpRequesterIdentity,
-      boolean onlyDql, HttpHeaders httpHeaders)
+      boolean onlyQueryStatements, HttpHeaders httpHeaders)
       throws Exception {
-    return executeSqlQuery(sqlRequestJson, httpRequesterIdentity, onlyDql, httpHeaders, false);
+    return executeSqlQuery(sqlRequestJson, httpRequesterIdentity, onlyQueryStatements, httpHeaders, false);
   }
 
   private BrokerResponse executeSqlQuery(ObjectNode sqlRequestJson, HttpRequesterIdentity httpRequesterIdentity,
-      boolean onlyDql, HttpHeaders httpHeaders, boolean forceUseMultiStage)
+      boolean onlyQueryStatements, HttpHeaders httpHeaders, boolean forceUseMultiStage)
       throws Exception {
-    return executeSqlQuery(sqlRequestJson, httpRequesterIdentity, onlyDql, httpHeaders, forceUseMultiStage, false, 0);
+    return executeSqlQuery(sqlRequestJson, httpRequesterIdentity, onlyQueryStatements, httpHeaders, forceUseMultiStage,
+        false, 0);
   }
 
   private BrokerResponse executeSqlQuery(ObjectNode sqlRequestJson, HttpRequesterIdentity httpRequesterIdentity,
-      boolean onlyDql, HttpHeaders httpHeaders, boolean forceUseMultiStage, boolean getCursor, int numRows)
+      boolean onlyQueryStatements, HttpHeaders httpHeaders, boolean forceUseMultiStage, boolean getCursor, int numRows)
       throws Exception {
     long requestArrivalTimeMs = System.currentTimeMillis();
     SqlNodeAndOptions sqlNodeAndOptions;
@@ -536,9 +537,9 @@ public class PinotClientRequest {
       _brokerMetrics.addMeteredGlobalValue(BrokerMeter.CURSOR_QUERIES_GLOBAL, 1);
     }
     PinotSqlType sqlType = sqlNodeAndOptions.getSqlType();
-    if (onlyDql && sqlType != PinotSqlType.DQL) {
+    if (onlyQueryStatements && sqlType != PinotSqlType.DQL && sqlType != PinotSqlType.METADATA) {
       return new BrokerResponseNative(QueryErrorCode.SQL_PARSING,
-          "Unsupported SQL type - " + sqlType + ", this API only supports DQL.");
+          "Unsupported SQL type - " + sqlType + ", this API only supports DQL and METADATA statements.");
     }
     switch (sqlType) {
       case DQL:
@@ -558,6 +559,16 @@ public class PinotClientRequest {
           return _sqlQueryExecutor.executeDMLStatement(sqlNodeAndOptions, headers);
         } catch (Exception e) {
           LOGGER.error("Error handling DML request:\n{}", sqlRequestJson, e);
+          throw e;
+        }
+      case METADATA:
+        try {
+          Map<String, String> headers = new HashMap<>();
+          httpRequesterIdentity.getHttpHeaders().entries()
+              .forEach(entry -> headers.put(entry.getKey(), entry.getValue()));
+          return _sqlQueryExecutor.executeMetadataStatement(sqlNodeAndOptions, headers);
+        } catch (Exception e) {
+          LOGGER.error("Error handling metadata request:\n{}", sqlRequestJson, e);
           throw e;
         }
       default:
