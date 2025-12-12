@@ -157,7 +157,7 @@ public class ConcurrentMapPartitionUpsertMetadataManager extends BasePartitionUp
             } else {
               // New primary key
               addDocId(segment, validDocIds, queryableDocIds, newDocId, recordInfo);
-              _newlyAddedKeys.add(segment);
+              _newlyAddedKeys.add(primaryKey);
               return new RecordLocation(segment, newDocId, newComparisonValue);
             }
           });
