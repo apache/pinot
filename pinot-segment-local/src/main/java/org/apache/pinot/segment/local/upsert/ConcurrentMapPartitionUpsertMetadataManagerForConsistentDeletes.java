@@ -367,7 +367,7 @@ public class ConcurrentMapPartitionUpsertMetadataManagerForConsistentDeletes
       ThreadSafeMutableRoaringBitmap queryableDocIds) {
     _logger.info("Reverting Upsert metadata for {} keys", _previousKeyToRecordLocationMap.size());
     // Revert to previous locations present in other segment
-    for (Map.Entry<Object, RecordLocation> obj : _primaryKeyToRecordLocationMap.entrySet()) {
+    for (Map.Entry<Object, RecordLocation> obj : _previousKeyToRecordLocationMap.entrySet()) {
       IndexSegment prevSegment = obj.getValue().getSegment();
       try (UpsertUtils.RecordInfoReader recordInfoReader = new UpsertUtils.RecordInfoReader(prevSegment,
           _primaryKeyColumns, _comparisonColumns, _deleteRecordColumn)) {
