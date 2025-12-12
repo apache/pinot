@@ -34,10 +34,13 @@ import io.swagger.annotations.Authorization;
 import io.swagger.annotations.SecurityDefinition;
 import io.swagger.annotations.SwaggerDefinition;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import java.util.Set;
+import java.util.TreeSet;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.Executor;
 import javax.inject.Inject;
@@ -113,6 +116,13 @@ import static org.apache.pinot.spi.utils.CommonConstants.SWAGGER_AUTHORIZATION_K
 public class PinotClientRequest {
   private static final Logger LOGGER = LoggerFactory.getLogger(PinotClientRequest.class);
   private static final Marker RESPONSE_EXCEPTION_MARKER = MarkerFactory.getMarker("QUERY_RESPONSE_EXCEPTION");
+  // Drop hop-by-hop and transport-specific headers when replaying broker requests to controller/minion sidecars.
+  private static final Set<String> NON_FORWARDABLE_HEADERS = new TreeSet<>(String.CASE_INSENSITIVE_ORDER);
+
+  static {
+    NON_FORWARDABLE_HEADERS.addAll(Arrays.asList("Host", "Connection", "Content-Length", "Transfer-Encoding",
+        "Expect", "Keep-Alive", "Proxy-Connection", "TE", "Trailer", "Upgrade"));
+  }
 
   @Inject
   PinotConfiguration _brokerConf;
@@ -555,19 +565,20 @@ public class PinotClientRequest {
   }
 
   private BrokerResponse executeSqlQuery(ObjectNode sqlRequestJson, HttpRequesterIdentity httpRequesterIdentity,
-      boolean onlyDql, HttpHeaders httpHeaders)
+      boolean onlyQueryStatements, HttpHeaders httpHeaders)
       throws Exception {
-    return executeSqlQuery(sqlRequestJson, httpRequesterIdentity, onlyDql, httpHeaders, false);
+    return executeSqlQuery(sqlRequestJson, httpRequesterIdentity, onlyQueryStatements, httpHeaders, false);
   }
 
   private BrokerResponse executeSqlQuery(ObjectNode sqlRequestJson, HttpRequesterIdentity httpRequesterIdentity,
-      boolean onlyDql, HttpHeaders httpHeaders, boolean forceUseMultiStage)
+      boolean onlyQueryStatements, HttpHeaders httpHeaders, boolean forceUseMultiStage)
       throws Exception {
-    return executeSqlQuery(sqlRequestJson, httpRequesterIdentity, onlyDql, httpHeaders, forceUseMultiStage, false, 0);
+    return executeSqlQuery(sqlRequestJson, httpRequesterIdentity, onlyQueryStatements, httpHeaders, forceUseMultiStage,
+        false, 0);
   }
 
   private BrokerResponse executeSqlQuery(ObjectNode sqlRequestJson, HttpRequesterIdentity httpRequesterIdentity,
-      boolean onlyDql, HttpHeaders httpHeaders, boolean forceUseMultiStage, boolean getCursor, int numRows)
+      boolean onlyQueryStatements, HttpHeaders httpHeaders, boolean forceUseMultiStage, boolean getCursor, int numRows)
       throws Exception {
     long requestArrivalTimeMs = System.currentTimeMillis();
     SqlNodeAndOptions sqlNodeAndOptions;
@@ -590,9 +601,9 @@ public class PinotClientRequest {
       _brokerMetrics.addMeteredGlobalValue(BrokerMeter.CURSOR_QUERIES_GLOBAL, 1);
     }
     PinotSqlType sqlType = sqlNodeAndOptions.getSqlType();
-    if (onlyDql && sqlType != PinotSqlType.DQL) {
+    if (onlyQueryStatements && sqlType != PinotSqlType.DQL && sqlType != PinotSqlType.METADATA) {
       return new BrokerResponseNative(QueryErrorCode.SQL_PARSING,
-          "Unsupported SQL type - " + sqlType + ", this API only supports DQL.");
+          "Unsupported SQL type - " + sqlType + ", this API only supports DQL and METADATA statements.");
     }
     switch (sqlType) {
       case DQL:
@@ -606,12 +617,18 @@ public class PinotClientRequest {
         }
       case DML:
         try {
-          Map<String, String> headers = new HashMap<>();
-          httpRequesterIdentity.getHttpHeaders().entries()
-              .forEach(entry -> headers.put(entry.getKey(), entry.getValue()));
+          Map<String, String> headers = extractForwardHeaders(httpRequesterIdentity);
           return _sqlQueryExecutor.executeDMLStatement(sqlNodeAndOptions, headers);
         } catch (Exception e) {
           LOGGER.error("Error handling DML request:\n{}", sqlRequestJson, e);
+          throw e;
+        }
+      case METADATA:
+        try {
+          Map<String, String> headers = extractForwardHeaders(httpRequesterIdentity);
+          return _sqlQueryExecutor.executeMetadataStatement(sqlNodeAndOptions, headers);
+        } catch (Exception e) {
+          LOGGER.error("Error handling metadata request:\n{}", sqlRequestJson, e);
           throw e;
         }
       default:
@@ -661,6 +678,17 @@ public class PinotClientRequest {
     identity.setEndpointUrl(context.getRequestURL().toString());
 
     return identity;
+  }
+
+  @VisibleForTesting
+  static Map<String, String> extractForwardHeaders(HttpRequesterIdentity httpRequesterIdentity) {
+    Map<String, String> headers = new HashMap<>();
+    httpRequesterIdentity.getHttpHeaders().entries().forEach(entry -> {
+      if (!NON_FORWARDABLE_HEADERS.contains(entry.getKey())) {
+        headers.put(entry.getKey(), entry.getValue());
+      }
+    });
+    return headers;
   }
 
   /**

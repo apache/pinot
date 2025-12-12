@@ -40,21 +40,14 @@ public class PinotAdminClient implements AutoCloseable {
   private final Map<String, String> _headers;
 
   // Service clients
-  private TableAdminClient _tableClient;
-  private SchemaAdminClient _schemaClient;
-  private InstanceAdminClient _instanceClient;
-  private SegmentAdminClient _segmentClient;
-  private TenantAdminClient _tenantClient;
-  private TaskAdminClient _taskClient;
-  private LogicalTableAdminClient _logicalTableClient;
-  private ClusterAdminClient _clusterClient;
-  private RebalanceAdminClient _rebalanceClient;
-  private QueryWorkloadAdminClient _queryWorkloadClient;
-  private QueryAdminClient _queryClient;
-  private UserAdminClient _userClient;
-  private BrokerAdminClient _brokerClient;
-  private ZookeeperAdminClient _zookeeperClient;
-  private FileIngestClient _fileIngestClient;
+  private PinotTableAdminClient _tableClient;
+  private PinotDatabaseAdminClient _databaseClient;
+  private PinotSchemaAdminClient _schemaClient;
+  private PinotInstanceAdminClient _instanceClient;
+  private PinotSegmentAdminClient _segmentClient;
+  private PinotTenantAdminClient _tenantClient;
+  private PinotTaskAdminClient _taskClient;
+  private PinotSegmentApiClient _segmentApiClient;
 
   /**
    * Creates a PinotAdminClient with the specified controller address.
@@ -149,6 +142,30 @@ public class PinotAdminClient implements AutoCloseable {
       _tableClient = new TableAdminClient(_transport, _controllerAddress, _headers);
     }
     return _tableClient;
+  }
+
+  /**
+   * Gets the database administration client.
+   *
+   * @return Database administration operations
+   */
+  public PinotDatabaseAdminClient getDatabaseClient() {
+    if (_databaseClient == null) {
+      _databaseClient = new PinotDatabaseAdminClient(_transport, _controllerAddress, _headers);
+    }
+    return _databaseClient;
+  }
+
+  /**
+   * Gets the segment api client.
+   *
+   * @return Segment administration operations
+   */
+  public PinotSegmentApiClient getSegmentApiClient() {
+    if (_segmentApiClient == null) {
+      _segmentApiClient = new PinotSegmentApiClient(_transport, _controllerAddress, _headers);
+    }
+    return _segmentApiClient;
   }
 
   /**

@@ -25,6 +25,7 @@ import com.fasterxml.jackson.databind.node.ObjectNode;
 import java.io.ByteArrayOutputStream;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 import java.util.concurrent.Executor;
 import javax.ws.rs.container.AsyncResponse;
 import javax.ws.rs.core.HttpHeaders;
@@ -181,6 +182,33 @@ public class PinotClientRequestTest {
 
     verify(_requestHandler, never()).handleRequest(any(), any(), any(), any(), any());
     verify(asyncResponse, times(1)).resume(any(Throwable.class));
+  }
+
+  @Test
+  public void testProcessSqlQueryGetRoutesMetadataStatementsToSqlExecutor()
+      throws Exception {
+    AsyncResponse asyncResponse = mock(AsyncResponse.class);
+    Request request = mock(Request.class);
+    when(request.getRequestURL()).thenReturn(new StringBuilder("http://localhost/query/sql"));
+    when(request.getHeaderNames()).thenReturn(List.of("Host", "database", "Authorization", "Connection"));
+    when(request.getHeaders("Host")).thenReturn(List.of("localhost:21000"));
+    when(request.getHeaders("database")).thenReturn(List.of(CommonConstants.DEFAULT_DATABASE));
+    when(request.getHeaders("Authorization")).thenReturn(List.of("Bearer token"));
+    when(request.getHeaders("Connection")).thenReturn(List.of("keep-alive"));
+    when(_sqlQueryExecutor.executeMetadataStatement(any(), any())).thenReturn(BrokerResponseNative.EMPTY_RESULT);
+
+    _pinotClientRequest.processSqlQueryGet("SHOW TABLES", null, asyncResponse, request, _httpHeaders);
+
+    ArgumentCaptor<Map<String, String>> headersCaptor = ArgumentCaptor.forClass(Map.class);
+    verify(_sqlQueryExecutor, times(1)).executeMetadataStatement(any(), headersCaptor.capture());
+    verify(_requestHandler, never()).handleRequest(any(), any(), any(), any(), any());
+    verify(asyncResponse, times(1)).resume(any(Response.class));
+
+    Map<String, String> forwardedHeaders = headersCaptor.getValue();
+    Assert.assertEquals(forwardedHeaders.get("database"), CommonConstants.DEFAULT_DATABASE);
+    Assert.assertEquals(forwardedHeaders.get(HttpHeaders.AUTHORIZATION), "Bearer token");
+    Assert.assertFalse(forwardedHeaders.containsKey("Host"));
+    Assert.assertFalse(forwardedHeaders.containsKey("Connection"));
   }
 
   @Test
