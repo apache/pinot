@@ -27,6 +27,8 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.TimeUnit;
+import javax.net.ssl.SSLContext;
+import nl.altindag.ssl.SSLFactory;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.helix.HelixAdmin;
 import org.apache.helix.HelixConstants.ChangeType;
@@ -77,6 +79,7 @@ import org.apache.pinot.common.utils.ServiceStatus;
 import org.apache.pinot.common.utils.config.TagNameUtils;
 import org.apache.pinot.common.utils.helix.HelixHelper;
 import org.apache.pinot.common.utils.tls.PinotInsecureMode;
+import org.apache.pinot.common.utils.tls.RenewableTlsUtils;
 import org.apache.pinot.common.utils.tls.TlsUtils;
 import org.apache.pinot.common.version.PinotVersion;
 import org.apache.pinot.core.query.executor.sql.SqlQueryExecutor;
@@ -399,6 +402,17 @@ public abstract class BaseBrokerStarter implements ServiceStartable {
       TlsConfig tlsDefaults = null;
       if (_brokerConf.getProperty(Broker.BROKER_NETTYTLS_ENABLED, false)) {
         tlsDefaults = TlsUtils.extractTlsConfig(_brokerConf, Broker.BROKER_TLS_PREFIX);
+        SSLFactory sslFactory =
+            RenewableTlsUtils.createSSLFactoryAndEnableAutoRenewalWhenUsingFileStores(tlsDefaults,
+                PinotInsecureMode::isPinotInInsecureMode);
+        SSLContext sslContext = sslFactory.getSslContext();
+        BrokerContext brokerContext = BrokerContext.getInstance();
+        if (brokerContext.getClientHttpsContext() == null) {
+          brokerContext.setClientHttpsContext(sslContext);
+        }
+        if (brokerContext.getServerHttpsContext() == null) {
+          brokerContext.setServerHttpsContext(sslContext);
+        }
       }
       singleStageBrokerRequestHandler =
           new SingleConnectionBrokerRequestHandler(_brokerConf, brokerId, requestIdGenerator, _routingManager,

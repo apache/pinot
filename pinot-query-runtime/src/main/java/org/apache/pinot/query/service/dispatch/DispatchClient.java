@@ -22,6 +22,7 @@ import io.grpc.Deadline;
 import io.grpc.ManagedChannel;
 import io.grpc.ManagedChannelBuilder;
 import io.grpc.netty.shaded.io.grpc.netty.NettyChannelBuilder;
+import io.grpc.netty.shaded.io.netty.handler.ssl.SslContext;
 import io.grpc.stub.StreamObserver;
 import java.util.List;
 import java.util.function.Consumer;
@@ -46,11 +47,16 @@ class DispatchClient {
   private final PinotQueryWorkerGrpc.PinotQueryWorkerStub _dispatchStub;
 
   public DispatchClient(String host, int port, @Nullable TlsConfig tlsConfig) {
+    this(host, port, tlsConfig, null);
+  }
+
+  public DispatchClient(String host, int port, @Nullable TlsConfig tlsConfig, @Nullable SslContext sslContext) {
     if (tlsConfig == null) {
       _channel = ManagedChannelBuilder.forAddress(host, port).usePlaintext().build();
     } else {
+      SslContext contextToUse = sslContext != null ? sslContext : ServerGrpcQueryClient.buildSslContext(tlsConfig);
       _channel = NettyChannelBuilder.forAddress(host, port)
-          .sslContext(ServerGrpcQueryClient.buildSslContext(tlsConfig))
+          .sslContext(contextToUse)
           .build();
     }
     _dispatchStub = PinotQueryWorkerGrpc.newStub(_channel);

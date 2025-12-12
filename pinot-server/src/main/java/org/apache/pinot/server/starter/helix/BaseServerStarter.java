@@ -37,6 +37,8 @@ import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
 import java.util.function.Supplier;
 import javax.annotation.Nullable;
+import javax.net.ssl.SSLContext;
+import nl.altindag.ssl.SSLFactory;
 import org.apache.commons.io.FileUtils;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.helix.HelixAdmin;
@@ -75,6 +77,7 @@ import org.apache.pinot.common.utils.fetcher.SegmentFetcherFactory;
 import org.apache.pinot.common.utils.helix.HelixHelper;
 import org.apache.pinot.common.utils.regex.PatternFactory;
 import org.apache.pinot.common.utils.tls.PinotInsecureMode;
+import org.apache.pinot.common.utils.tls.RenewableTlsUtils;
 import org.apache.pinot.common.utils.tls.TlsUtils;
 import org.apache.pinot.common.version.PinotVersion;
 import org.apache.pinot.core.common.datatable.DataTableBuilderFactory;
@@ -650,6 +653,17 @@ public abstract class BaseServerStarter implements ServiceStartable {
         tlsDefaults.getTrustStorePath())) {
       LOGGER.info("Installing default SSL context for any client requests");
       TlsUtils.installDefaultSSLSocketFactory(tlsDefaults);
+      SSLFactory sslFactory =
+          RenewableTlsUtils.createSSLFactoryAndEnableAutoRenewalWhenUsingFileStores(tlsDefaults,
+              PinotInsecureMode::isPinotInInsecureMode);
+      SSLContext sslContext = sslFactory.getSslContext();
+      ServerContext serverContext = ServerContext.getInstance();
+      if (serverContext.getClientHttpsContext() == null) {
+        serverContext.setClientHttpsContext(sslContext);
+      }
+      if (serverContext.getServerHttpsContext() == null) {
+        serverContext.setServerHttpsContext(sslContext);
+      }
     }
 
     LOGGER.info("Initializing accessControlFactory");

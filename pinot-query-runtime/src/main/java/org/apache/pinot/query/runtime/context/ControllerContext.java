@@ -18,16 +18,65 @@
  */
 package org.apache.pinot.query.runtime.context;
 
+import io.grpc.netty.shaded.io.netty.handler.ssl.SslContext;
+import java.util.Objects;
+import javax.annotation.Nullable;
+import javax.net.ssl.SSLContext;
+
 /**
  * The <code>ControllerContext</code> class is a singleton class which contains all controller related context.
  */
 public class ControllerContext {
   private static final ControllerContext INSTANCE = new ControllerContext();
+  @Nullable
+  private SslContext _clientGrpcSslContext;
+  @Nullable
+  private SslContext _serverGrpcSslContext;
+  @Nullable
+  private SSLContext _clientHttpsContext;
+  @Nullable
+  private SSLContext _serverHttpsContext;
 
   private ControllerContext() {
   }
 
   public static ControllerContext getInstance() {
     return INSTANCE;
+  }
+
+  @Nullable
+  public SslContext getClientGrpcSslContext() {
+    return _clientGrpcSslContext;
+  }
+
+  public void setClientGrpcSslContext(SslContext clientGrpcSslContext) {
+    _clientGrpcSslContext = Objects.requireNonNull(clientGrpcSslContext, "clientGrpcSslContext must be set");
+  }
+
+  @Nullable
+  public SslContext getServerGrpcSslContext() {
+    return _serverGrpcSslContext;
+  }
+
+  public void setServerGrpcSslContext(SslContext serverGrpcSslContext) {
+    _serverGrpcSslContext = Objects.requireNonNull(serverGrpcSslContext, "serverGrpcSslContext must be set");
+  }
+
+  @Nullable
+  public SSLContext getClientHttpsContext() {
+    return _clientHttpsContext;
+  }
+
+  public void setClientHttpsContext(SSLContext clientHttpsContext) {
+    _clientHttpsContext = Objects.requireNonNull(clientHttpsContext, "clientHttpsContext must be set");
+  }
+
+  @Nullable
+  public SSLContext getServerHttpsContext() {
+    return _serverHttpsContext;
+  }
+
+  public void setServerHttpsContext(SSLContext serverHttpsContext) {
+    _serverHttpsContext = Objects.requireNonNull(serverHttpsContext, "serverHttpsContext must be set");
   }
 }

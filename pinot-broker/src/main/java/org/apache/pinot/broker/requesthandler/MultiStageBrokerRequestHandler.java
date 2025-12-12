@@ -41,9 +41,11 @@ import java.util.concurrent.TimeoutException;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.stream.Collectors;
 import javax.annotation.Nullable;
+import javax.net.ssl.SSLContext;
 import javax.ws.rs.WebApplicationException;
 import javax.ws.rs.core.HttpHeaders;
 import javax.ws.rs.core.Response;
+import nl.altindag.ssl.SSLFactory;
 import org.apache.calcite.sql.SqlKind;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.hc.client5.http.io.HttpClientConnectionManager;
@@ -69,9 +71,13 @@ import org.apache.pinot.common.utils.ExceptionUtils;
 import org.apache.pinot.common.utils.NamedThreadFactory;
 import org.apache.pinot.common.utils.Timer;
 import org.apache.pinot.common.utils.config.QueryOptionsUtils;
+import org.apache.pinot.common.utils.grpc.ServerGrpcQueryClient;
+import org.apache.pinot.common.utils.tls.PinotInsecureMode;
+import org.apache.pinot.common.utils.tls.RenewableTlsUtils;
 import org.apache.pinot.common.utils.tls.TlsUtils;
 import org.apache.pinot.core.routing.RoutingManager;
 import org.apache.pinot.core.transport.ServerInstance;
+import org.apache.pinot.core.transport.grpc.GrpcQueryServer;
 import org.apache.pinot.query.ImmutableQueryEnvironment;
 import org.apache.pinot.query.QueryEnvironment;
 import org.apache.pinot.query.mailbox.MailboxService;
@@ -82,6 +88,7 @@ import org.apache.pinot.query.planner.plannode.PlanNode;
 import org.apache.pinot.query.routing.QueryServerInstance;
 import org.apache.pinot.query.routing.WorkerManager;
 import org.apache.pinot.query.runtime.MultiStageStatsTreeBuilder;
+import org.apache.pinot.query.runtime.context.BrokerContext;
 import org.apache.pinot.query.runtime.plan.MultiStageQueryStats;
 import org.apache.pinot.query.service.dispatch.QueryDispatcher;
 import org.apache.pinot.spi.accounting.ThreadAccountant;
@@ -145,6 +152,25 @@ public class MultiStageBrokerRequestHandler extends BaseBrokerRequestHandler {
     TlsConfig tlsConfig = config.getProperty(CommonConstants.Helix.CONFIG_OF_MULTI_STAGE_ENGINE_TLS_ENABLED,
         CommonConstants.Helix.DEFAULT_MULTI_STAGE_ENGINE_TLS_ENABLED) ? TlsUtils.extractTlsConfig(config,
         CommonConstants.Broker.BROKER_TLS_PREFIX) : null;
+    if (tlsConfig != null) {
+      BrokerContext brokerContext = BrokerContext.getInstance();
+      if (brokerContext.getClientGrpcSslContext() == null) {
+        brokerContext.setClientGrpcSslContext(ServerGrpcQueryClient.buildSslContext(tlsConfig));
+      }
+      if (brokerContext.getServerGrpcSslContext() == null) {
+        brokerContext.setServerGrpcSslContext(GrpcQueryServer.buildGrpcSslContext(tlsConfig));
+      }
+      SSLFactory sslFactory =
+          RenewableTlsUtils.createSSLFactoryAndEnableAutoRenewalWhenUsingFileStores(tlsConfig,
+              PinotInsecureMode::isPinotInInsecureMode);
+      SSLContext sslContext = sslFactory.getSslContext();
+      if (brokerContext.getClientHttpsContext() == null) {
+        brokerContext.setClientHttpsContext(sslContext);
+      }
+      if (brokerContext.getServerHttpsContext() == null) {
+        brokerContext.setServerHttpsContext(sslContext);
+      }
+    }
 
     _extraPassiveTimeoutMs = config.getProperty(
         CommonConstants.Broker.CONFIG_OF_EXTRA_PASSIVE_TIMEOUT_MS,
