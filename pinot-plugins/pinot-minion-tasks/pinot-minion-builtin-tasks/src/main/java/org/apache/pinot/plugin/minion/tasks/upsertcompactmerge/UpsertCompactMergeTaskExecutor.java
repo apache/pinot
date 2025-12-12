@@ -133,7 +133,7 @@ public class UpsertCompactMergeTaskExecutor extends BaseMultipleSegmentsConversi
     }
 
     // create new UploadedRealtimeSegment
-    // set the creation time to maxCreationTimeOfMergingSegments + 1 to ensure that the all records in merging
+    // set the creation time to maxCreationTimeOfMergingSegments + 1 to ensure that all records in merging
     // segments are replaced with new merged segment
     segmentProcessorConfigBuilder.setCustomCreationTime(maxCreationTimeOfMergingSegments + 1);
     segmentProcessorConfigBuilder.setSegmentNameGenerator(
