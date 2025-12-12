@@ -96,7 +96,9 @@ import org.apache.pinot.controller.api.upload.SegmentValidationUtils;
 import org.apache.pinot.controller.api.upload.ZKOperator;
 import org.apache.pinot.controller.helix.core.PinotHelixResourceManager;
 import org.apache.pinot.controller.helix.core.retention.RetentionManager;
+import org.apache.pinot.controller.validation.ResourceUtilizationManager;
 import org.apache.pinot.controller.validation.StorageQuotaChecker;
+import org.apache.pinot.controller.validation.UtilizationChecker;
 import org.apache.pinot.core.auth.Actions;
 import org.apache.pinot.core.auth.Authorize;
 import org.apache.pinot.core.auth.TargetType;
@@ -126,15 +128,18 @@ import static org.apache.pinot.spi.utils.CommonConstants.DATABASE;
 import static org.apache.pinot.spi.utils.CommonConstants.SWAGGER_AUTHORIZATION_KEY;
 
 
-@Api(tags = Constants.SEGMENT_TAG, authorizations = {@Authorization(value = SWAGGER_AUTHORIZATION_KEY),
-    @Authorization(value = DATABASE)})
+@Api(tags = Constants.SEGMENT_TAG, authorizations = {
+    @Authorization(value = SWAGGER_AUTHORIZATION_KEY),
+    @Authorization(value = DATABASE)
+})
 @SwaggerDefinition(securityDefinition = @SecurityDefinition(apiKeyAuthDefinitions = {
     @ApiKeyAuthDefinition(name = HttpHeaders.AUTHORIZATION, in = ApiKeyAuthDefinition.ApiKeyLocation.HEADER,
         key = SWAGGER_AUTHORIZATION_KEY,
         description = "The format of the key is  ```\"Basic <token>\" or \"Bearer <token>\"```"),
     @ApiKeyAuthDefinition(name = DATABASE, in = ApiKeyAuthDefinition.ApiKeyLocation.HEADER, key = DATABASE,
         description = "Database context passed through http header. If no context is provided 'default' database "
-            + "context will be considered.")}))
+            + "context will be considered.")
+}))
 @Path("/")
 public class PinotSegmentUploadDownloadRestletResource {
   private static final Logger LOGGER = LoggerFactory.getLogger(PinotSegmentUploadDownloadRestletResource.class);
@@ -155,6 +160,9 @@ public class PinotSegmentUploadDownloadRestletResource {
 
   @Inject
   AccessControlFactory _accessControlFactory;
+
+  @Inject
+  ResourceUtilizationManager _resourceUtilizationManager;
 
   @GET
   @Produces(MediaType.APPLICATION_OCTET_STREAM)
@@ -403,6 +411,25 @@ public class PinotSegmentUploadDownloadRestletResource {
       SegmentValidationUtils.checkStorageQuota(segmentName, segmentSizeInBytes, untarredSegmentSizeInBytes, tableConfig,
           _storageQuotaChecker);
 
+      // Perform resource utilization checks
+      UtilizationChecker.CheckResult isResourceUtilizationWithinLimits =
+          _resourceUtilizationManager.isResourceUtilizationWithinLimits(tableNameWithType,
+              UtilizationChecker.CheckPurpose.OFFLINE_SEGMENT_UPLOAD);
+      if (isResourceUtilizationWithinLimits == UtilizationChecker.CheckResult.FAIL) {
+        _controllerMetrics.setOrUpdateTableGauge(tableNameWithType, ControllerGauge.RESOURCE_UTILIZATION_LIMIT_EXCEEDED,
+            1L);
+        throw new ControllerApplicationException(LOGGER,
+            "Resource utilization limit exceeded for table, rejecting segment upload: " + tableNameWithType,
+            Response.Status.FORBIDDEN);
+      } else if (isResourceUtilizationWithinLimits == UtilizationChecker.CheckResult.UNDETERMINED) {
+        LOGGER.warn(
+            "Resource utilization limit could not be determined for for table: {}. Will allow the segment upload to "
+                + "proceed.",
+            tableNameWithType);
+      }
+      _controllerMetrics.setOrUpdateTableGauge(tableNameWithType, ControllerGauge.RESOURCE_UTILIZATION_LIMIT_EXCEEDED,
+          0L);
+
       // Encrypt segment
       String crypterNameInTableConfig = tableConfig.getValidationConfig().getCrypterClassName();
       Pair<String, File> encryptionInfo =
@@ -580,7 +607,7 @@ public class PinotSegmentUploadDownloadRestletResource {
 
     try {
       int entryCount = 0;
-      for (Map.Entry<String, SegmentMetadataInfo> entry: segmentsMetadataInfoMap.entrySet()) {
+      for (Map.Entry<String, SegmentMetadataInfo> entry : segmentsMetadataInfoMap.entrySet()) {
         String segmentName = entry.getKey();
         SegmentMetadataInfo segmentMetadataInfo = entry.getValue();
         segmentNames.add(segmentName);
@@ -1197,7 +1224,7 @@ public class PinotSegmentUploadDownloadRestletResource {
     }
 
     Map<String, SegmentMetadataInfo> segmentsMetadataInfoMap = new HashMap<>();
-    for (File file: segmentsMetadataFiles) {
+    for (File file : segmentsMetadataFiles) {
       String fileName = file.getName();
       if (fileName.equalsIgnoreCase(SegmentUploadConstants.ALL_SEGMENTS_METADATA_FILENAME)) {
         try (InputStream inputStream = FileUtils.openInputStream(file)) {
