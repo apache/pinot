@@ -48,7 +48,7 @@ public class TaskGeneratorUtils {
    * STOPPED is not a final task state in helix task framework, as a stopped task
    * is just paused and can be resumed to rerun.
    */
-  private static final EnumSet<TaskState> TASK_FINAL_STATES =
+  public static final EnumSet<TaskState> TASK_FINAL_STATES =
       EnumSet.of(TaskState.COMPLETED, TaskState.FAILED, TaskState.ABORTED, TaskState.TIMED_OUT);
 
   /**

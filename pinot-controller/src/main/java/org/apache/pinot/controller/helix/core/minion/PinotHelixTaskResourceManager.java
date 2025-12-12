@@ -1289,7 +1289,7 @@ public class PinotHelixTaskResourceManager {
    * @param helixJobName Helix Job name
    * @return Pinot task name
    */
-  private static String getPinotTaskName(String helixJobName) {
+  public static String getPinotTaskName(String helixJobName) {
     return helixJobName.substring(TASK_QUEUE_PREFIX.length() + getTaskType(helixJobName).length() + 1);
   }
 
@@ -1302,7 +1302,7 @@ public class PinotHelixTaskResourceManager {
    * @param name Pinot task name, Helix JobQueue name or Helix Job name
    * @return Task type
    */
-  private static String getTaskType(String name) {
+  public static String getTaskType(String name) {
     String[] parts = name.split(TASK_NAME_SEPARATOR);
     if (parts.length < 2) {
       throw new IllegalArgumentException(String.format("Invalid task name : %s. Missing separator %s",
