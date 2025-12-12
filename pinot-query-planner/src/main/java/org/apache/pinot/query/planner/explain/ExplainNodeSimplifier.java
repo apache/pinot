@@ -37,6 +37,7 @@ import org.apache.pinot.query.planner.plannode.ProjectNode;
 import org.apache.pinot.query.planner.plannode.SetOpNode;
 import org.apache.pinot.query.planner.plannode.SortNode;
 import org.apache.pinot.query.planner.plannode.TableScanNode;
+import org.apache.pinot.query.planner.plannode.UnnestNode;
 import org.apache.pinot.query.planner.plannode.ValueNode;
 import org.apache.pinot.query.planner.plannode.WindowNode;
 import org.slf4j.Logger;
@@ -160,6 +161,11 @@ public class ExplainNodeSimplifier {
       }
       return new ExplainedNode(node.getStageId(), node.getDataSchema(), node.getNodeHint(),
           Collections.singletonList(child1), node.getTitle(), node.getAttributes());
+    }
+
+    @Override
+    public PlanNode visitUnnest(UnnestNode node, Void context) {
+      return defaultNode(node);
     }
 
     private List<PlanNode> simplifyChildren(List<PlanNode> children) {

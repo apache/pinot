@@ -90,6 +90,7 @@ import org.apache.pinot.query.planner.plannode.PlanNode;
 import org.apache.pinot.query.routing.WorkerManager;
 import org.apache.pinot.query.type.TypeFactory;
 import org.apache.pinot.query.validate.BytesCastVisitor;
+import org.apache.pinot.query.validate.RowExpressionValidationVisitor;
 import org.apache.pinot.spi.exception.QueryErrorCode;
 import org.apache.pinot.spi.exception.QueryException;
 import org.apache.pinot.spi.utils.CommonConstants;
@@ -401,6 +402,7 @@ public class QueryEnvironment {
         throw new IllegalArgumentException("Unsupported SQL query, failed to validate query:\n" + sqlNode);
       }
       validated.accept(new BytesCastVisitor(plannerContext.getValidator()));
+      validated.accept(new RowExpressionValidationVisitor());
       return validated;
     } catch (QueryException e) {
       throw e;

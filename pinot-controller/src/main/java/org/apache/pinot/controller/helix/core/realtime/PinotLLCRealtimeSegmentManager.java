@@ -232,14 +232,14 @@ public class PinotLLCRealtimeSegmentManager {
         MetadataEventNotifierFactory.loadFactory(controllerConf.subset(METADATA_EVENT_NOTIFIER_PREFIX),
             helixResourceManager);
     _flushThresholdUpdateManager = new FlushThresholdUpdateManager();
+
     _isDeepStoreLLCSegmentUploadRetryEnabled = controllerConf.isDeepStoreRetryUploadLLCSegmentEnabled();
+    _fileUploadDownloadClient = initFileUploadDownloadClient();
+    _deepStoreUploadExecutor = Executors.newFixedThreadPool(controllerConf.getDeepStoreRetryUploadParallelism());
+    _deepStoreUploadExecutorPendingSegments = ConcurrentHashMap.newKeySet();
+
     _isTmpSegmentAsyncDeletionEnabled = controllerConf.isTmpSegmentAsyncDeletionEnabled();
     _deepstoreUploadRetryTimeoutMs = controllerConf.getDeepStoreRetryUploadTimeoutMs();
-    _fileUploadDownloadClient = _isDeepStoreLLCSegmentUploadRetryEnabled ? initFileUploadDownloadClient() : null;
-    _deepStoreUploadExecutor = _isDeepStoreLLCSegmentUploadRetryEnabled ? Executors.newFixedThreadPool(
-        controllerConf.getDeepStoreRetryUploadParallelism()) : null;
-    _deepStoreUploadExecutorPendingSegments =
-        _isDeepStoreLLCSegmentUploadRetryEnabled ? ConcurrentHashMap.newKeySet() : null;
   }
 
   public boolean isDeepStoreLLCSegmentUploadRetryEnabled() {
@@ -364,6 +364,10 @@ public class PinotLLCRealtimeSegmentManager {
       } catch (IOException e) {
         LOGGER.error("Failed to close fileUploadDownloadClient.");
       }
+    }
+
+    if (_deepStoreUploadExecutor != null) {
+      _deepStoreUploadExecutor.shutdown();
     }
   }
 
@@ -2804,6 +2808,10 @@ public class PinotLLCRealtimeSegmentManager {
     }
   }
 
+  public boolean shouldRepairErrorSegmentsForPartialUpsertOrDedup(DisasterRecoveryMode disasterRecoveryMode) {
+    return disasterRecoveryMode == DisasterRecoveryMode.ALWAYS;
+  }
+
   /**
    * Whether to allow repairing the ERROR segments with ZK status: COMMITTING
    * This method is only useful for pauseless ingestion with features like dedup enabled (Since repairing committing
@@ -2823,7 +2831,7 @@ public class PinotLLCRealtimeSegmentManager {
         != null)) {
       DisasterRecoveryMode disasterRecoveryMode =
           tableConfig.getIngestionConfig().getStreamIngestionConfig().getDisasterRecoveryMode();
-      if (disasterRecoveryMode == DisasterRecoveryMode.ALWAYS) {
+      if (shouldRepairErrorSegmentsForPartialUpsertOrDedup(disasterRecoveryMode)) {
         return true;
       }
     }

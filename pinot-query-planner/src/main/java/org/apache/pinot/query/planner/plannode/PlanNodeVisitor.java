@@ -66,6 +66,8 @@ public interface PlanNodeVisitor<T, C> {
 
   T visitExplained(ExplainedNode node, C context);
 
+  T visitUnnest(UnnestNode node, C context);
+
   /**
    * A depth-first visitor that visits all children of a node before visiting the node itself.
    *
@@ -237,6 +239,13 @@ public interface PlanNodeVisitor<T, C> {
 
     @Override
     public T visitExplained(ExplainedNode node, C context) {
+      preChildren(node, context);
+      visitChildren(node, context);
+      return postChildren(node, context);
+    }
+
+    @Override
+    public T visitUnnest(UnnestNode node, C context) {
       preChildren(node, context);
       visitChildren(node, context);
       return postChildren(node, context);
