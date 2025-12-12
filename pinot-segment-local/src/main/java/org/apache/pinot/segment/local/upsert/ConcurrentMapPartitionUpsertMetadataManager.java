@@ -261,8 +261,8 @@ public class ConcurrentMapPartitionUpsertMetadataManager extends BasePartitionUp
   protected void revertCurrentSegmentUpsertMetadata(IndexSegment oldSegment, ThreadSafeMutableRoaringBitmap validDocIds,
       ThreadSafeMutableRoaringBitmap queryableDocIds) {
     _logger.info("Reverting Upsert metadata for {} keys", _previousKeyToRecordLocationMap.size());
-    // Revert to previous locations present in other segments
-    // For the newly added keys into the segment, it will be considered new when metadata is replaced again
+    // Revert to previous locations present in other segments and update docId to previous record location
+    // For the newly added keys into the segment, remove the pk and valid doc id
     for (Map.Entry<Object, RecordLocation> obj : _primaryKeyToRecordLocationMap.entrySet()) {
       IndexSegment prevSegment = obj.getValue().getSegment();
       try (UpsertUtils.RecordInfoReader recordInfoReader = new UpsertUtils.RecordInfoReader(prevSegment,
