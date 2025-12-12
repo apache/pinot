@@ -285,14 +285,15 @@ public class ConcurrentMapPartitionUpsertMetadataManager extends BasePartitionUp
     for (Object entry : _newlyAddedKeys) {
       RecordLocation value = _primaryKeyToRecordLocationMap.get(entry);
       _primaryKeyToRecordLocationMap.remove(entry);
-      _newlyAddedKeys.remove(entry);
       removeDocId(oldSegment, value.getDocId());
     }
+    _newlyAddedKeys.clear();
   }
 
   @Override
   protected void eraseKeyToPreviousLocationMap() {
     _previousKeyToRecordLocationMap.clear();
+    _newlyAddedKeys.clear();
   }
 
   @Override
