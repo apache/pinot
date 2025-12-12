@@ -144,12 +144,12 @@ public class ConcurrentMapPartitionUpsertMetadataManager extends BasePartitionUp
                   currentSegmentName, getAuthoritativeCreationTime(segment),
                   getAuthoritativeCreationTime(currentSegment)))) {
                 replaceDocId(segment, validDocIds, queryableDocIds, currentSegment, currentDocId, newDocId, recordInfo);
-                if(currentSegment != segment) {
+                if (currentSegment != segment) {
                   _previousKeyToRecordLocationMap.put(primaryKey, currentRecordLocation);
                 }
                 return new RecordLocation(segment, newDocId, newComparisonValue);
               } else {
-                if(currentSegment != segment) {
+                if (currentSegment != segment) {
                   _previousKeyToRecordLocationMap.put(primaryKey, currentRecordLocation);
                 }
                 return currentRecordLocation;

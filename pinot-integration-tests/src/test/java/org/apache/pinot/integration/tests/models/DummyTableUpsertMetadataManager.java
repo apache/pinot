@@ -80,7 +80,6 @@ public class DummyTableUpsertMetadataManager extends BaseTableUpsertMetadataMana
 
     @Override
     protected void removeNewlyAddedKeys(IndexSegment oldSegment) {
-
     }
 
     @Override

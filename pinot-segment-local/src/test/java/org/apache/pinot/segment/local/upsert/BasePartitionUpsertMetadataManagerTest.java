@@ -1052,7 +1052,6 @@ public class BasePartitionUpsertMetadataManagerTest {
 
     @Override
     protected void removeNewlyAddedKeys(IndexSegment oldSegment) {
-
     }
 
     @Override
