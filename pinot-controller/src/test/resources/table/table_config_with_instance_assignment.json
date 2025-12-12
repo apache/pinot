@@ -1,12 +1,12 @@
 {
   "tenants": {
     "broker": "broker1",
-    "server": "rtaShared2"
+    "server": "server1"
   },
   "instanceAssignmentConfigMap": {
     "CONSUMING": {
       "tagPoolConfig": {
-        "tag": "rtaShared2_REALTIME",
+        "tag": "server1_REALTIME",
         "poolBased": true,
         "numPools": 2
       }
