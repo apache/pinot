@@ -132,6 +132,11 @@ public class IFSTIndexType extends AbstractIndexType<FstIndexConfig, TextIndexRe
   }
 
   @Override
+  public boolean requiresDictionary(FieldSpec fieldSpec, FieldIndexConfigs fieldIndexConfigs) {
+    return fieldIndexConfigs.getConfig(StandardIndexes.ifst()).isEnabled();
+  }
+
+  @Override
   public List<String> getFileExtensions(@Nullable ColumnMetadata columnMetadata) {
     return EXTENSIONS;
   }
