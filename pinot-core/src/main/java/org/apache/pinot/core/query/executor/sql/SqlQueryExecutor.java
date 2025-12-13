@@ -18,10 +18,24 @@
  */
 package org.apache.pinot.core.query.executor.sql;
 
+import com.fasterxml.jackson.databind.JsonNode;
+import java.io.IOException;
+import java.io.InputStream;
+import java.net.HttpURLConnection;
+import java.net.URL;
+import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.regex.Pattern;
+import java.util.stream.Collectors;
 import javax.annotation.Nullable;
+import org.apache.calcite.sql.SqlIdentifier;
+import org.apache.calcite.sql.SqlLiteral;
+import org.apache.calcite.sql.SqlNode;
+import org.apache.commons.io.IOUtils;
+import org.apache.commons.lang3.StringUtils;
 import org.apache.helix.HelixDataAccessor;
 import org.apache.helix.HelixManager;
 import org.apache.helix.PropertyKey;
@@ -31,13 +45,21 @@ import org.apache.pinot.common.response.BrokerResponse;
 import org.apache.pinot.common.response.broker.BrokerResponseNative;
 import org.apache.pinot.common.response.broker.QueryProcessingException;
 import org.apache.pinot.common.response.broker.ResultTable;
+import org.apache.pinot.common.utils.DataSchema;
+import org.apache.pinot.common.utils.DataSchema.ColumnDataType;
+import org.apache.pinot.common.utils.DatabaseUtils;
 import org.apache.pinot.common.utils.helix.LeadControllerUtils;
 import org.apache.pinot.spi.config.task.AdhocTaskConfig;
+import org.apache.pinot.spi.exception.DatabaseConflictException;
 import org.apache.pinot.spi.exception.QueryErrorCode;
 import org.apache.pinot.spi.utils.CommonConstants;
+import org.apache.pinot.spi.utils.JsonUtils;
 import org.apache.pinot.sql.parsers.SqlNodeAndOptions;
 import org.apache.pinot.sql.parsers.dml.DataManipulationStatement;
 import org.apache.pinot.sql.parsers.dml.DataManipulationStatementParser;
+import org.apache.pinot.sql.parsers.parser.SqlShowDatabases;
+import org.apache.pinot.sql.parsers.parser.SqlShowSchemas;
+import org.apache.pinot.sql.parsers.parser.SqlShowTables;
 
 
 /**
@@ -121,11 +143,207 @@ public class SqlQueryExecutor {
     return result;
   }
 
+  /**
+   * Execute metadata (SHOW/USE) statements.
+   */
+  public BrokerResponse executeMetadataStatement(SqlNodeAndOptions sqlNodeAndOptions,
+      @Nullable Map<String, String> headers) {
+    BrokerResponseNative result = new BrokerResponseNative();
+    try {
+      ResultTable resultTable =
+          buildMetadataResult(sqlNodeAndOptions.getSqlNode(), sqlNodeAndOptions.getOptions(), headers);
+      result.setResultTable(resultTable);
+    } catch (Exception e) {
+      result.addException(new QueryProcessingException(QueryErrorCode.QUERY_EXECUTION, e.getMessage()));
+    }
+    return result;
+  }
+
   private MinionClient getMinionClient() {
     // NOTE: using null auth provider here as auth headers injected by caller in "executeDMLStatement()"
     if (_helixManager != null) {
       return new MinionClient(getControllerBaseUrl(_helixManager), null);
     }
     return new MinionClient(_controllerUrl, null);
+  }
+
+  private ResultTable buildMetadataResult(SqlNode sqlNode, Map<String, String> options,
+      @Nullable Map<String, String> headers)
+      throws Exception {
+    if (sqlNode instanceof SqlShowDatabases) {
+      return toSingleStringColumnResult("databaseName", fetchDatabases(headers));
+    }
+    if (sqlNode instanceof SqlShowTables) {
+      SqlShowTables showTables = (SqlShowTables) sqlNode;
+      String database = resolveDatabase(showTables.getDatabaseName(), options, headers);
+      List<String> tables = stripDatabasePrefix(fetchTables(database, headers), database);
+      return toSingleStringColumnResult("tableName", tables);
+    }
+    if (sqlNode instanceof SqlShowSchemas) {
+      SqlShowSchemas showSchemas = (SqlShowSchemas) sqlNode;
+      String database = resolveDatabase(null, options, headers);
+      List<String> schemas = stripDatabasePrefix(fetchSchemas(database, headers), database);
+      String likePattern = getLikePattern(showSchemas.getLikePattern());
+      schemas = applyLikeFilter(schemas, likePattern);
+      return toSingleStringColumnResult("schemaName", schemas);
+    }
+    throw new UnsupportedOperationException("Unsupported METADATA SqlKind - " + sqlNode.getKind());
+  }
+
+  private ResultTable toSingleStringColumnResult(String columnName, List<String> values) {
+    DataSchema dataSchema = new DataSchema(new String[]{columnName}, new ColumnDataType[]{ColumnDataType.STRING});
+    List<Object[]> rows = values.stream().map(value -> new Object[]{value}).collect(Collectors.toList());
+    return new ResultTable(dataSchema, rows);
+  }
+
+  private String resolveDatabase(@Nullable SqlIdentifier explicitDatabase, Map<String, String> options,
+      @Nullable Map<String, String> headers)
+      throws DatabaseConflictException {
+    String databaseFromSql = explicitDatabase != null ? explicitDatabase.toString() : null;
+    String databaseFromOptions = options.get(CommonConstants.DATABASE);
+    String databaseFromHeaders = getHeaderValue(headers, CommonConstants.DATABASE);
+
+    if (databaseFromSql != null) {
+      if (databaseFromOptions != null && !databaseFromSql.equalsIgnoreCase(databaseFromOptions)) {
+        throw new DatabaseConflictException(
+            "Database name '" + databaseFromSql + "' from statement does not match database name '"
+                + databaseFromOptions + "' from query options and database name '" + databaseFromHeaders
+                + "' from request header");
+      }
+      if (databaseFromHeaders != null && !databaseFromSql.equalsIgnoreCase(databaseFromHeaders)) {
+        throw new DatabaseConflictException(
+            "Database name '" + databaseFromSql + "' from statement does not match database name '"
+                + databaseFromHeaders + "' from request header and database name '" + databaseFromOptions
+                + "' from query options");
+      }
+      return databaseFromSql;
+    }
+
+    if (databaseFromOptions != null && databaseFromHeaders != null
+        && !databaseFromOptions.equalsIgnoreCase(databaseFromHeaders)) {
+      throw new DatabaseConflictException("Database name '" + databaseFromHeaders + "' from request header does not "
+          + "match database name '" + databaseFromOptions + "' from query options");
+    }
+
+    return databaseFromOptions != null ? databaseFromOptions
+        : databaseFromHeaders != null ? databaseFromHeaders : CommonConstants.DEFAULT_DATABASE;
+  }
+
+  private List<String> stripDatabasePrefix(List<String> names, String database) {
+    if (names.isEmpty()) {
+      return names;
+    }
+    return names.stream()
+        .map(name -> DatabaseUtils.isPartOfDatabase(name, database)
+            ? DatabaseUtils.removeDatabasePrefix(name, database)
+            : name)
+        .collect(Collectors.toList());
+  }
+
+  private List<String> applyLikeFilter(List<String> values, @Nullable String likePattern) {
+    if (StringUtils.isEmpty(likePattern)) {
+      return values;
+    }
+    Pattern pattern = buildLikeRegex(likePattern);
+    return values.stream().filter(value -> pattern.matcher(value).matches()).collect(Collectors.toList());
+  }
+
+  private Pattern buildLikeRegex(String likePattern) {
+    StringBuilder regex = new StringBuilder();
+    boolean escaped = false;
+    for (char c : likePattern.toCharArray()) {
+      if (escaped) {
+        regex.append(Pattern.quote(String.valueOf(c)));
+        escaped = false;
+      } else if (c == '\\') {
+        escaped = true;
+      } else if (c == '%') {
+        regex.append(".*");
+      } else if (c == '_') {
+        regex.append('.');
+      } else {
+        regex.append(Pattern.quote(String.valueOf(c)));
+      }
+    }
+    return Pattern.compile(regex.toString(), Pattern.CASE_INSENSITIVE);
+  }
+
+  private String getLikePattern(@Nullable SqlLiteral likeLiteral) {
+    return likeLiteral == null ? null : likeLiteral.toValue();
+  }
+
+  private List<String> fetchDatabases(@Nullable Map<String, String> headers)
+      throws IOException {
+    String response = sendGetRequest("/databases", headers);
+    JsonNode jsonNode = JsonUtils.stringToJsonNode(response);
+    List<String> databases = new ArrayList<>();
+    jsonNode.forEach(node -> databases.add(node.asText()));
+    return databases;
+  }
+
+  private List<String> fetchTables(String database, @Nullable Map<String, String> headers)
+      throws IOException {
+    Map<String, String> requestHeaders = new HashMap<>();
+    if (headers != null) {
+      requestHeaders.putAll(headers);
+    }
+    requestHeaders.put(CommonConstants.DATABASE, database);
+    String response = sendGetRequest("/tables", requestHeaders);
+    JsonNode jsonNode = JsonUtils.stringToJsonNode(response);
+    JsonNode tablesNode = jsonNode.has("tables") ? jsonNode.get("tables") : jsonNode;
+    List<String> tables = new ArrayList<>();
+    tablesNode.forEach(node -> tables.add(node.asText()));
+    return tables;
+  }
+
+  private List<String> fetchSchemas(String database, @Nullable Map<String, String> headers)
+      throws IOException {
+    Map<String, String> requestHeaders = new HashMap<>();
+    if (headers != null) {
+      requestHeaders.putAll(headers);
+    }
+    requestHeaders.put(CommonConstants.DATABASE, database);
+    String response = sendGetRequest("/schemas", requestHeaders);
+    JsonNode jsonNode = JsonUtils.stringToJsonNode(response);
+    List<String> schemas = new ArrayList<>();
+    jsonNode.forEach(node -> schemas.add(node.asText()));
+    return schemas;
+  }
+
+  private String sendGetRequest(String path, @Nullable Map<String, String> headers)
+      throws IOException {
+    String baseUrl = _helixManager != null ? getControllerBaseUrl(_helixManager) : _controllerUrl;
+    if (baseUrl == null) {
+      throw new IOException("Controller URL is not configured for metadata query");
+    }
+    String urlString = baseUrl.endsWith("/") ? baseUrl.substring(0, baseUrl.length() - 1) + path : baseUrl + path;
+    HttpURLConnection connection = (HttpURLConnection) new URL(urlString).openConnection();
+    connection.setRequestMethod("GET");
+    if (headers != null) {
+      headers.forEach(connection::setRequestProperty);
+    }
+    int responseCode = connection.getResponseCode();
+    try (InputStream inputStream =
+        responseCode >= 200 && responseCode < 300 ? connection.getInputStream() : connection.getErrorStream()) {
+      String response =
+          inputStream != null ? IOUtils.toString(inputStream, StandardCharsets.UTF_8) : StringUtils.EMPTY;
+      if (responseCode >= 200 && responseCode < 300) {
+        return response;
+      }
+      throw new IOException(
+          "Failed to fetch metadata from controller: HTTP " + responseCode + " response: " + response);
+    }
+  }
+
+  private String getHeaderValue(@Nullable Map<String, String> headers, String key) {
+    if (headers == null || headers.isEmpty()) {
+      return null;
+    }
+    for (Map.Entry<String, String> entry : headers.entrySet()) {
+      if (entry.getKey().equalsIgnoreCase(key)) {
+        return entry.getValue();
+      }
+    }
+    return null;
   }
 }

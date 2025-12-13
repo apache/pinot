@@ -59,6 +59,7 @@ import org.apache.pinot.common.response.encoder.ResponseEncoderFactory;
 import org.apache.pinot.common.utils.request.RequestUtils;
 import org.apache.pinot.common.utils.tls.RenewableTlsUtils;
 import org.apache.pinot.common.utils.tls.TlsUtils;
+import org.apache.pinot.core.query.executor.sql.SqlQueryExecutor;
 import org.apache.pinot.spi.auth.broker.RequesterIdentity;
 import org.apache.pinot.spi.env.PinotConfiguration;
 import org.apache.pinot.spi.exception.QueryErrorCode;
@@ -66,6 +67,7 @@ import org.apache.pinot.spi.trace.DefaultRequestContext;
 import org.apache.pinot.spi.trace.RequestContext;
 import org.apache.pinot.spi.utils.CommonConstants;
 import org.apache.pinot.spi.utils.JsonUtils;
+import org.apache.pinot.sql.parsers.PinotSqlType;
 import org.apache.pinot.sql.parsers.SqlNodeAndOptions;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -81,6 +83,7 @@ public class BrokerGrpcServer extends PinotQueryBrokerGrpc.PinotQueryBrokerImplB
   private final GrpcConfig _queryClientConfig;
   private final BrokerMetrics _brokerMetrics;
   private final BrokerRequestHandler _brokerRequestHandler;
+  private final SqlQueryExecutor _sqlQueryExecutor;
 
   // Filter to keep track of gRPC connections.
   private class BrokerGrpcTransportFilter extends ServerTransportFilter {
@@ -104,7 +107,7 @@ public class BrokerGrpcServer extends PinotQueryBrokerGrpc.PinotQueryBrokerImplB
   }
 
   public BrokerGrpcServer(PinotConfiguration brokerConf, String brokerId, BrokerMetrics brokerMetrics,
-      BrokerRequestHandler brokerRequestHandler) {
+      BrokerRequestHandler brokerRequestHandler, SqlQueryExecutor sqlQueryExecutor) {
     _brokerMetrics = brokerMetrics;
     _grpcPort = brokerConf.getProperty(CommonConstants.Broker.Grpc.KEY_OF_GRPC_PORT, -1);
     _queryClientConfig = createQueryClientConfig(brokerConf);
@@ -112,6 +115,7 @@ public class BrokerGrpcServer extends PinotQueryBrokerGrpc.PinotQueryBrokerImplB
     _secureGrpcPort = brokerConf.getProperty(CommonConstants.Broker.Grpc.KEY_OF_GRPC_TLS_PORT, -1);
     _brokerId = brokerId;
     _brokerRequestHandler = brokerRequestHandler;
+    _sqlQueryExecutor = sqlQueryExecutor;
 
     // Determine which port to use
     int portToUse;
@@ -250,12 +254,26 @@ public class BrokerGrpcServer extends PinotQueryBrokerGrpc.PinotQueryBrokerImplB
     RequestContext requestContext = new DefaultRequestContext();
     BrokerResponse brokerResponse;
     try {
-      brokerResponse =
-          _brokerRequestHandler.handleRequest(requestJsonNode, sqlNodeAndOptions, requesterIdentify, requestContext,
-              null);
+      PinotSqlType sqlType = sqlNodeAndOptions.getSqlType();
+      switch (sqlType) {
+        case DQL:
+          brokerResponse =
+              _brokerRequestHandler.handleRequest(requestJsonNode, sqlNodeAndOptions, requesterIdentify, requestContext,
+                  null);
+          break;
+        case DML:
+          brokerResponse = _sqlQueryExecutor.executeDMLStatement(sqlNodeAndOptions, metadataMap);
+          break;
+        case METADATA:
+          brokerResponse = _sqlQueryExecutor.executeMetadataStatement(sqlNodeAndOptions, metadataMap);
+          break;
+        default:
+          brokerResponse = new BrokerResponseNative(QueryErrorCode.SQL_PARSING, "Unsupported SQL type - " + sqlType);
+          break;
+      }
     } catch (Exception e) {
       _brokerMetrics.addMeteredGlobalValue(BrokerMeter.GRPC_QUERY_EXCEPTIONS, 1);
-      LOGGER.error("Error handling DQL request:\n{}\nException: {}", requestJsonNode, e);
+      LOGGER.error("Error handling request:\n{}\nException: {}", requestJsonNode, e);
       responseObserver.onError(
           Status.INTERNAL.withDescription(e.getMessage()).withCause(e)
               .asRuntimeException());

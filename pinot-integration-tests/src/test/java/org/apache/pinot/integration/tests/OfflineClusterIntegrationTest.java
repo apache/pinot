@@ -54,6 +54,7 @@ import org.apache.helix.model.IdealState;
 import org.apache.helix.model.builder.HelixConfigScopeBuilder;
 import org.apache.pinot.client.PinotConnection;
 import org.apache.pinot.client.PinotDriver;
+import org.apache.pinot.client.admin.PinotAdminClient;
 import org.apache.pinot.common.exception.HttpErrorStatusException;
 import org.apache.pinot.common.metadata.segment.SegmentZKMetadata;
 import org.apache.pinot.common.response.server.TableIndexMetadataResponse;
@@ -350,6 +351,22 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
     assertEquals(_serviceStatusCallbacks.size(), getNumBrokers() + getNumServers());
     for (ServiceStatus.ServiceStatusCallback serviceStatusCallback : _serviceStatusCallbacks) {
       assertEquals(serviceStatusCallback.getServiceStatus(), ServiceStatus.Status.GOOD);
+    }
+  }
+
+  @Test
+  public void testShowTablesMatchesPinotAdminClient()
+      throws Exception {
+    JsonNode response = postQuery("SHOW TABLES");
+    assertTrue(response.get("exceptions").isEmpty());
+    List<String> showTables = new ArrayList<>();
+    response.get("resultTable").get("rows").forEach(row -> showTables.add(row.get(0).asText()));
+    Collections.sort(showTables);
+
+    try (PinotAdminClient adminClient = new PinotAdminClient("localhost:" + getControllerPort())) {
+      List<String> adminTables = adminClient.getTableClient().listTables(null, null, null);
+      Collections.sort(adminTables);
+      assertEquals(showTables, adminTables);
     }
   }
 
