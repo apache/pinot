@@ -122,10 +122,14 @@ public final class BasicAuthUtils {
               .orElseGet(() -> Collections.emptyList())
               .stream().map(x -> x.toString())
               .collect(Collectors.toSet());
-          //todo: Handle RLS filters properly
+
+          // Extract RLS filters from UserConfig
+          Map<String, List<String>> rlsFilters = Optional.ofNullable(user.getRlsFilters())
+              .orElseGet(() -> Collections.emptyMap());
+
           return new ZkBasicAuthPrincipal(name,
               org.apache.pinot.common.auth.BasicAuthUtils.toBasicAuthToken(name, password), password, component, role,
-              tables, excludeTables, permissions, Map.of());
+              tables, excludeTables, permissions, rlsFilters);
         }).collect(Collectors.toList());
   }
 
