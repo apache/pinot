@@ -21,6 +21,7 @@ package org.apache.pinot.controller.api.resources;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.node.ObjectNode;
+import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
 import com.google.common.collect.BiMap;
 import io.swagger.annotations.Api;
@@ -36,6 +37,7 @@ import it.unimi.dsi.fastutil.Arrays;
 import it.unimi.dsi.fastutil.Swapper;
 import it.unimi.dsi.fastutil.ints.IntComparator;
 import java.io.IOException;
+import java.net.URI;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Comparator;
@@ -86,7 +88,9 @@ import org.apache.pinot.common.restlet.resources.TableSegmentValidationInfo;
 import org.apache.pinot.common.restlet.resources.ValidDocIdsType;
 import org.apache.pinot.common.utils.DatabaseUtils;
 import org.apache.pinot.common.utils.LogicalTableConfigUtils;
+import org.apache.pinot.common.utils.SimpleHttpResponse;
 import org.apache.pinot.common.utils.helix.HelixHelper;
+import org.apache.pinot.common.utils.http.HttpClient;
 import org.apache.pinot.controller.ControllerConf;
 import org.apache.pinot.controller.api.access.AccessControlFactory;
 import org.apache.pinot.controller.api.access.AccessType;
@@ -96,9 +100,11 @@ import org.apache.pinot.controller.api.exception.InvalidTableConfigException;
 import org.apache.pinot.controller.api.exception.TableAlreadyExistsException;
 import org.apache.pinot.controller.helix.core.PinotHelixResourceManager;
 import org.apache.pinot.controller.helix.core.PinotResourceManagerResponse;
+import org.apache.pinot.controller.helix.core.WatermarkInductionResult;
 import org.apache.pinot.controller.helix.core.controllerjob.ControllerJobTypes;
 import org.apache.pinot.controller.helix.core.minion.PinotHelixTaskResourceManager;
 import org.apache.pinot.controller.helix.core.minion.PinotTaskManager;
+import org.apache.pinot.controller.helix.core.realtime.PartitionGroupInfo;
 import org.apache.pinot.controller.helix.core.rebalance.RebalanceConfig;
 import org.apache.pinot.controller.helix.core.rebalance.RebalanceResult;
 import org.apache.pinot.controller.helix.core.rebalance.TableRebalanceManager;
@@ -279,6 +285,109 @@ public class PinotTableRestletResource {
         throw e;
       } else {
         throw new ControllerApplicationException(LOGGER, e.getMessage(), Response.Status.INTERNAL_SERVER_ERROR, e);
+      }
+    }
+  }
+
+  @POST
+  @Path("/tables/{tableName}/copy")
+  @Authorize(targetType = TargetType.TABLE, action = Actions.Table.CREATE_TABLE)
+  @Produces(MediaType.APPLICATION_JSON)
+  @ApiOperation(value = "Copy a table's schema and config from another cluster", notes = "Non upsert table only")
+  public CopyTableResponse copyTable(
+      @ApiParam(value = "Name of the table", required = true) @PathParam("tableName") String tableName, String payload,
+      @Context HttpHeaders headers) {
+    try {
+      LOGGER.info("[copyTable] received request for table: {}, payload: {}", tableName, payload);
+      tableName = DatabaseUtils.translateTableName(tableName, headers);
+      CopyTablePayload copyTablePayload = JsonUtils.stringToObject(payload, CopyTablePayload.class);
+      String sourceControllerUri = copyTablePayload.getSourceClusterUri();
+      Map<String, String> requestHeaders = copyTablePayload.getHeaders();
+      String brokerTenant = copyTablePayload.getBrokerTenant();
+      String serverTenant = copyTablePayload.getServerTenant();
+      Map<String, String> tagReplacementMap = copyTablePayload.getTagPoolReplacementMap();
+
+      LOGGER.info("[copyTable] Start copying table: {} from source: {}", tableName, sourceControllerUri);
+
+      // Fetch and add schema
+      URI schemaUri = new URI(sourceControllerUri + "/tables/" + tableName + "/schema");
+      SimpleHttpResponse schemaResponse = HttpClient.wrapAndThrowHttpException(
+          HttpClient.getInstance().sendGetRequest(schemaUri, requestHeaders));
+      String schemaJson = schemaResponse.getResponse();
+      Schema schema = Schema.fromString(schemaJson);
+      _pinotHelixResourceManager.addSchema(schema, true, false);
+      LOGGER.info("[copyTable] Successfully added schema for table: {}, schema: {}", tableName, schema);
+
+      // Fetch and add table configs
+      URI tableConfigUri = new URI(sourceControllerUri + "/tables/" + tableName);
+      SimpleHttpResponse tableConfigResponse = HttpClient.wrapAndThrowHttpException(
+          HttpClient.getInstance().sendGetRequest(tableConfigUri, requestHeaders));
+      String tableConfigJson = tableConfigResponse.getResponse();
+      LOGGER.info("[copyTable] Fetched table config for table: {}, tableConfig: {}", tableName, tableConfigJson);
+      JsonNode tableConfigNode = JsonUtils.stringToJsonNode(tableConfigJson);
+
+      if (tableConfigNode.has(TableType.REALTIME.name())) {
+        ObjectNode realtimeTableConfigNode = (ObjectNode) tableConfigNode.get(TableType.REALTIME.name());
+        tweakRealtimeTableConfig(realtimeTableConfigNode, brokerTenant, serverTenant, tagReplacementMap);
+        TableConfig realtimeTableConfig = JsonUtils.jsonNodeToObject(realtimeTableConfigNode, TableConfig.class);
+        LOGGER.info("[copyTable] Successfully fetched and tweaked table config for table: {}, tableConfig: {}",
+            tableName, realtimeTableConfig.toString());
+
+        URI watermarkUri = new URI(sourceControllerUri + "/tables/" + tableName + "/consumerWatermarks");
+        SimpleHttpResponse watermarkResponse = HttpClient.wrapAndThrowHttpException(
+            HttpClient.getInstance().sendGetRequest(watermarkUri, requestHeaders));
+        String watermarkJson = watermarkResponse.getResponse();
+        LOGGER.info("[copyTable] Fetched watermarks for table: {}. Result: {}", tableName, watermarkJson);
+        WatermarkInductionResult watermarkInductionResult =
+            JsonUtils.stringToObject(watermarkJson, WatermarkInductionResult.class);
+
+        List<PartitionGroupInfo> partitionGroupInfos = watermarkInductionResult.getWatermarks().stream()
+            .map(PartitionGroupInfo::from)
+            .collect(Collectors.toList());
+
+        _pinotHelixResourceManager.addTable(realtimeTableConfig, partitionGroupInfos);
+      }
+      LOGGER.info("[copyTable] Finished Table Config copy: {}", tableName);
+      return new CopyTableResponse("success");
+    } catch (Exception e) {
+      LOGGER.error("[copyTable] Error copying table: {}", tableName, e);
+      throw new ControllerApplicationException(LOGGER, "Error copying table: " + e.getMessage(),
+          Response.Status.INTERNAL_SERVER_ERROR, e);
+    }
+  }
+
+  /**
+   * Tweaks the realtime table config with the given broker and server tenants.
+   *
+   * @param realtimeTableConfigNode The JSON object representing the realtime table config.
+   * @param brokerTenant The broker tenant to set in the config.
+   * @param serverTenant The server tenant to set in the config.
+   */
+  @VisibleForTesting
+  static void tweakRealtimeTableConfig(ObjectNode realtimeTableConfigNode, String brokerTenant, String serverTenant,
+      @Nullable Map<String, String> tagPoolReplacementMap) {
+    ObjectNode tenantConfig = (ObjectNode) realtimeTableConfigNode.get("tenants");
+    tenantConfig.put("broker", brokerTenant);
+    tenantConfig.put("server", serverTenant);
+    if (tagPoolReplacementMap == null || tagPoolReplacementMap.isEmpty()) {
+      return;
+    }
+    JsonNode instanceAssignmentConfigMap = realtimeTableConfigNode.get("instanceAssignmentConfigMap");
+    if (instanceAssignmentConfigMap == null) {
+      return;
+    }
+    java.util.Iterator<Map.Entry<String, JsonNode>> iterator = instanceAssignmentConfigMap.fields();
+    while (iterator.hasNext()) {
+      Map.Entry<String, JsonNode> entry = iterator.next();
+      JsonNode instanceAssignmentConfig = entry.getValue();
+      // tagPoolConfig is a required field
+      ObjectNode tagPoolConfig = (ObjectNode) instanceAssignmentConfig.get("tagPoolConfig");
+      // tag is a required json field
+      if (tagPoolConfig != null) {
+        String srcTag = tagPoolConfig.get("tag").asText();
+        if (tagPoolReplacementMap.containsKey(srcTag)) {
+          tagPoolConfig.put("tag", tagPoolReplacementMap.get(srcTag));
+        }
       }
     }
   }
