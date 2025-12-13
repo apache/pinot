@@ -71,6 +71,9 @@ import org.apache.pinot.common.metrics.BrokerGauge;
 import org.apache.pinot.common.metrics.BrokerMeter;
 import org.apache.pinot.common.metrics.BrokerMetrics;
 import org.apache.pinot.common.metrics.BrokerTimer;
+import org.apache.pinot.common.systemtable.SystemTableRegistry;
+import org.apache.pinot.common.systemtable.provider.InstancesSystemTableProvider;
+import org.apache.pinot.common.systemtable.provider.TablesSystemTableProvider;
 import org.apache.pinot.common.utils.PinotAppConfigs;
 import org.apache.pinot.common.utils.ServiceStartableUtils;
 import org.apache.pinot.common.utils.ServiceStatus;
@@ -354,6 +357,12 @@ public abstract class BaseBrokerStarter implements ServiceStartable {
     boolean caseInsensitive =
         _brokerConf.getProperty(Helix.ENABLE_CASE_INSENSITIVE_KEY, Helix.DEFAULT_ENABLE_CASE_INSENSITIVE);
     TableCache tableCache = new ZkTableCache(_propertyStore, caseInsensitive);
+    if (!SystemTableRegistry.INSTANCE.isRegistered("system.tables")) {
+      SystemTableRegistry.INSTANCE.register(new TablesSystemTableProvider(tableCache, _helixAdmin, _clusterName));
+    }
+    if (!SystemTableRegistry.INSTANCE.isRegistered("system.instances")) {
+      SystemTableRegistry.INSTANCE.register(new InstancesSystemTableProvider());
+    }
 
     LOGGER.info("Initializing Broker Event Listener Factory");
     BrokerQueryEventListenerFactory.init(_brokerConf.subset(Broker.EVENT_LISTENER_CONFIG_PREFIX));
@@ -391,7 +400,8 @@ public abstract class BaseBrokerStarter implements ServiceStartable {
     if (brokerRequestHandlerType.equalsIgnoreCase(Broker.GRPC_BROKER_REQUEST_HANDLER_TYPE)) {
       singleStageBrokerRequestHandler =
           new GrpcBrokerRequestHandler(_brokerConf, brokerId, requestIdGenerator, _routingManager,
-              _accessControlFactory, _queryQuotaManager, tableCache, _failureDetector, _threadAccountant);
+              _accessControlFactory, _queryQuotaManager, tableCache, SystemTableRegistry.INSTANCE, _failureDetector,
+              _threadAccountant);
     } else {
       // Default request handler type, i.e. netty
       NettyConfig nettyDefaults = NettyConfig.extractNettyConfig(_brokerConf, Broker.BROKER_NETTY_PREFIX);
@@ -402,7 +412,8 @@ public abstract class BaseBrokerStarter implements ServiceStartable {
       }
       singleStageBrokerRequestHandler =
           new SingleConnectionBrokerRequestHandler(_brokerConf, brokerId, requestIdGenerator, _routingManager,
-              _accessControlFactory, _queryQuotaManager, tableCache, nettyDefaults, tlsDefaults,
+              _accessControlFactory, _queryQuotaManager, tableCache, SystemTableRegistry.INSTANCE, nettyDefaults,
+              tlsDefaults,
               _serverRoutingStatsManager, _failureDetector, _threadAccountant);
     }
     MultiStageBrokerRequestHandler multiStageBrokerRequestHandler = null;
@@ -741,6 +752,11 @@ public abstract class BaseBrokerStarter implements ServiceStartable {
       PinotFSFactory.shutdown();
     } catch (IOException e) {
       LOGGER.error("Caught exception when shutting down PinotFsFactory", e);
+    }
+    try {
+      SystemTableRegistry.INSTANCE.close();
+    } catch (Exception e) {
+      LOGGER.warn("Failed to close system table registry cleanly", e);
     }
 
     LOGGER.info("Disconnecting spectator Helix manager");
