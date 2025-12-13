@@ -57,6 +57,7 @@ public class DictionaryBasedMultiColumnDistinctExecutor implements DistinctExecu
   private final HashSet<DictIds> _dictIdsSet;
 
   private ObjectHeapPriorityQueue<DictIds> _priorityQueue;
+  private int _rowsRemaining = Integer.MAX_VALUE;
 
   public DictionaryBasedMultiColumnDistinctExecutor(List<ExpressionContext> expressions, boolean hasMVExpression,
       DataSchema dataSchema, List<Dictionary> dictionaries, int limit, boolean nullHandlingEnabled,
@@ -99,8 +100,16 @@ public class DictionaryBasedMultiColumnDistinctExecutor implements DistinctExecu
   }
 
   @Override
+  public void setMaxRowsToProcess(int maxRows) {
+    _rowsRemaining = maxRows;
+  }
+
+  @Override
   public boolean process(ValueBlock valueBlock) {
-    int numDocs = valueBlock.getNumDocs();
+    if (_rowsRemaining <= 0) {
+      return true;
+    }
+    int numDocs = Math.min(valueBlock.getNumDocs(), _rowsRemaining);
     int numExpressions = _expressions.size();
     if (!_hasMVExpression) {
       int[][] dictIdsArray = new int[numDocs][numExpressions];
@@ -161,6 +170,10 @@ public class DictionaryBasedMultiColumnDistinctExecutor implements DistinctExecu
           }
         }
       }
+    }
+    consumeRows(numDocs);
+    if (_rowsRemaining <= 0) {
+      return true;
     }
     return false;
   }
@@ -225,6 +238,12 @@ public class DictionaryBasedMultiColumnDistinctExecutor implements DistinctExecu
     };
   }
 
+  private void consumeRows(int count) {
+    if (_rowsRemaining != Integer.MAX_VALUE) {
+      _rowsRemaining -= count;
+    }
+  }
+
   @Override
   public DistinctTable getResult() {
     MultiColumnDistinctTable distinctTable =
@@ -252,6 +271,16 @@ public class DictionaryBasedMultiColumnDistinctExecutor implements DistinctExecu
       }
     }
     return distinctTable;
+  }
+
+  @Override
+  public int getRemainingRowsToProcess() {
+    return _rowsRemaining;
+  }
+
+  @Override
+  public int getNumDistinctRowsCollected() {
+    return _dictIdsSet.size();
   }
 
   private static class DictIds {

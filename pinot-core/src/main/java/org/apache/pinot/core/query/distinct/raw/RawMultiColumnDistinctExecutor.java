@@ -48,6 +48,7 @@ public class RawMultiColumnDistinctExecutor implements DistinctExecutor {
   private final boolean _hasMVExpression;
   private final boolean _nullHandlingEnabled;
   private final MultiColumnDistinctTable _distinctTable;
+  private int _rowsRemaining = Integer.MAX_VALUE;
 
   public RawMultiColumnDistinctExecutor(List<ExpressionContext> expressions, boolean hasMVExpression,
       DataSchema dataSchema, int limit, boolean nullHandlingEnabled,
@@ -59,8 +60,16 @@ public class RawMultiColumnDistinctExecutor implements DistinctExecutor {
   }
 
   @Override
+  public void setMaxRowsToProcess(int maxRows) {
+    _rowsRemaining = maxRows;
+  }
+
+  @Override
   public boolean process(ValueBlock valueBlock) {
-    int numDocs = valueBlock.getNumDocs();
+    if (_rowsRemaining <= 0) {
+      return true;
+    }
+    int numDocs = Math.min(valueBlock.getNumDocs(), _rowsRemaining);
     int numExpressions = _expressions.size();
     if (!_hasMVExpression) {
       BlockValSet[] blockValSets = new BlockValSet[numExpressions];
@@ -88,7 +97,11 @@ public class RawMultiColumnDistinctExecutor implements DistinctExecutor {
           RoaringBitmap nullBitmap = nullBitmaps[i];
           if (nullBitmap != null && !nullBitmap.isEmpty()) {
             int finalI = i;
-            nullBitmap.forEach((IntConsumer) j -> values[j][finalI] = null);
+            nullBitmap.forEach((IntConsumer) j -> {
+              if (j < numDocs) {
+                values[j][finalI] = null;
+              }
+            });
           }
         }
         for (int i = 0; i < numDocs; i++) {
@@ -136,6 +149,10 @@ public class RawMultiColumnDistinctExecutor implements DistinctExecutor {
           }
         }
       }
+    }
+    consumeRows(numDocs);
+    if (_rowsRemaining <= 0) {
+      return true;
     }
     return false;
   }
@@ -256,5 +273,21 @@ public class RawMultiColumnDistinctExecutor implements DistinctExecutor {
   @Override
   public DistinctTable getResult() {
     return _distinctTable;
+  }
+
+  @Override
+  public int getNumDistinctRowsCollected() {
+    return _distinctTable.size();
+  }
+
+  @Override
+  public int getRemainingRowsToProcess() {
+    return _rowsRemaining;
+  }
+
+  private void consumeRows(int count) {
+    if (_rowsRemaining != Integer.MAX_VALUE) {
+      _rowsRemaining -= count;
+    }
   }
 }
