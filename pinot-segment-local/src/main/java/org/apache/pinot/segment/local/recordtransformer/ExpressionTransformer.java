@@ -20,7 +20,7 @@ package org.apache.pinot.segment.local.recordtransformer;
 
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
-import java.util.Collections;
+import java.util.Collection;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.LinkedHashMap;
@@ -154,7 +154,7 @@ public class ExpressionTransformer implements RecordTransformer {
           _throttledLogger.warn("Caught exception while evaluation transform function for column: " + column, e);
           record.markIncomplete();
         }
-      } else if (existingValue.getClass().isArray() || existingValue instanceof Collections
+      } else if (existingValue.getClass().isArray() || existingValue instanceof Collection
           || existingValue instanceof Map) {
         try {
           Object transformedValue = transformFunctionEvaluator.evaluate(record);
@@ -174,7 +174,7 @@ public class ExpressionTransformer implements RecordTransformer {
     if (transformedValue.getClass() == existingValue.getClass()) {
       return true;
     }
-    if (transformedValue instanceof Collections && existingValue instanceof Collections) {
+    if (transformedValue instanceof Collection && existingValue instanceof Collection) {
       return true;
     }
     if (transformedValue instanceof Map && existingValue instanceof Map) {
