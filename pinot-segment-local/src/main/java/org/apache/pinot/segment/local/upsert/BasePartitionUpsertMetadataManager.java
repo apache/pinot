@@ -735,8 +735,8 @@ public abstract class BasePartitionUpsertMetadataManager implements PartitionUps
       removeSegment(segment, UpsertUtils.getPrimaryKeyIterator(primaryKeyReader, validDocIds));
     } catch (Exception e) {
       throw new RuntimeException(
-          String.format("Caught exception while removing segment: %s, table: %s", segment.getSegmentName(),
-              _tableNameWithType), e);
+          String.format("Caught exception while removing segment: %s, table: %s, message: %s", segment.getSegmentName(),
+              _tableNameWithType, e.getMessage()), e);
     }
   }
 
