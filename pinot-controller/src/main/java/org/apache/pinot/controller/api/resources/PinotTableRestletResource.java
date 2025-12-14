@@ -415,6 +415,18 @@ public class PinotTableRestletResource {
     }
   }
 
+  @GET
+  @Path("/tables/copyStatus/{jobId}")
+  @Authorize(targetType = TargetType.CLUSTER, action = Actions.Cluster.GET_TABLE_COPY_STATUS)
+  @Produces(MediaType.APPLICATION_JSON)
+  @ApiOperation(value = "Get status for a submitted table replication job",
+      notes = "Get status for a submitted table replication job")
+  public JsonNode getForceCommitJobStatus(
+      @ApiParam(value = "job id", required = true) @PathParam("jobId") String id) {
+    return JsonUtils.objectToJsonNode(
+        _pinotHelixResourceManager.getControllerJobZKMetadata(id, ControllerJobTypes.TABLE_REPLICATION));
+  }
+
   @PUT
   @Produces(MediaType.APPLICATION_JSON)
   @Path("/tables/recommender")
