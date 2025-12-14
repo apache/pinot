@@ -1647,6 +1647,9 @@ public class CommonConstants {
     public static final String NUM_CONSUMING_SEGMENTS_YET_TO_BE_COMMITTED = "numberOfSegmentsYetToBeCommitted";
     // Table Replication job props
     public static final String SEGMENTS_TO_BE_COPIED = "segmentsToBeCopied";
+    public static final String CONSUMER_WATERMARKS = "consumerWatermarks";
+    public static final String REPLICATION_PROGRESS = "replicationProgress";
+    public static final String REPLICATION_JOB_STATUS = "replicationJobStatus";
   }
 
   // prefix for scheduler related features, e.g. query accountant

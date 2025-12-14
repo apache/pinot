@@ -80,6 +80,7 @@ public class TableReplicator {
       throws Exception {
     // TODO: throw IllegalStateException if any previous jobs doesn't expire.
     // TODO: replication job canceling mechanism
+    LOGGER.info("[copyTable] Start replicating table: {} with jobId: {}", tableNameWithType, jobId);
     URI zkMetadataUri = new URI(copyTablePayload.getSourceClusterUri()
         + String.format(SEGMENT_ZK_METADATA_ENDPOINT_TEMPLATE, tableNameWithType));
     SimpleHttpResponse zkMetadataResponse = HttpClient.wrapAndThrowHttpException(
@@ -88,15 +89,16 @@ public class TableReplicator {
     Map<String, Map<String, String>> zkMetadataMap =
         new ObjectMapper().readValue(zkMetadataJson, new TypeReference<Map<String, Map<String, String>>>() {
         });
+    LOGGER.info("[copyTable] Fetched ZK metadata for {} segments", zkMetadataMap.size());
 
-    List<String> segments = new ArrayList<>(zkMetadataMap.keySet());
+    List<String> segments = new ArrayList<>(res.getHistoricalSegments());
     long submitTS = System.currentTimeMillis();
 
-    if (!_pinotHelixResourceManager.addNewSegmentCopyXClusterJob(tableNameWithType, jobId, submitTS, segments)) {
+    if (!_pinotHelixResourceManager.addNewTableReplicationJob(tableNameWithType, jobId, submitTS, res)) {
       throw new Exception("Failed to add segments to replicated table");
     }
-    ZkBasedTableReplicationObserver observer = new ZkBasedTableReplicationObserver(jobId, tableNameWithType,
-        res.getHistoricalSegments(), _pinotHelixResourceManager);
+    ZkBasedTableReplicationObserver observer = new ZkBasedTableReplicationObserver(jobId, tableNameWithType, res,
+        _pinotHelixResourceManager);
     observer.onTrigger(TableReplicationObserver.Trigger.START_TRIGGER, null);
     ConcurrentLinkedQueue<String> q = new ConcurrentLinkedQueue<>(segments);
     for (int i = 0; i < 4; i++) {
@@ -107,6 +109,7 @@ public class TableReplicator {
             break;
           }
           try {
+            LOGGER.info("[copyTable] Starting to copy segment: {} for table: {}", segment, tableNameWithType);
             Map<String, String> segmentZKMetadata = zkMetadataMap.get(segment);
             if (segmentZKMetadata == null) {
               throw new RuntimeException("Segment ZK metadata not found for segment: " + segment);
@@ -120,5 +123,6 @@ public class TableReplicator {
         }
       });
     }
+    LOGGER.info("[copyTable] Submitted replication tasks to executor service for job: {}", jobId);
   }
 }

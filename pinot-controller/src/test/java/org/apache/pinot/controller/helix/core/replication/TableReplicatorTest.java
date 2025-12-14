@@ -40,7 +40,6 @@ import org.testng.annotations.BeforeMethod;
 import org.testng.annotations.Test;
 
 import static org.mockito.Mockito.any;
-import static org.mockito.Mockito.anyList;
 import static org.mockito.Mockito.anyLong;
 import static org.mockito.Mockito.anyMap;
 import static org.mockito.Mockito.anyString;
@@ -102,16 +101,16 @@ public class TableReplicatorTest {
     when(response.getStatusCode()).thenReturn(200);
 
     when(_httpClient.sendGetRequest(any(URI.class), anyMap())).thenReturn(response);
-    when(_pinotHelixResourceManager.addNewSegmentCopyXClusterJob(anyString(), anyString(), anyLong(), anyList()))
-        .thenReturn(true);
+    when(_pinotHelixResourceManager.addNewTableReplicationJob(anyString(), anyString(), anyLong(),
+        any(WatermarkInductionResult.class))).thenReturn(true);
 
     _tableReplicator.replicateTable(jobId, tableName, copyTablePayload, watermarkInductionResult);
 
-    ArgumentCaptor<List> segmentsCaptor = ArgumentCaptor.forClass(List.class);
-    verify(_pinotHelixResourceManager).addNewSegmentCopyXClusterJob(eq(tableName), eq(jobId), anyLong(),
-        segmentsCaptor.capture());
+    ArgumentCaptor<WatermarkInductionResult> resultCaptor = ArgumentCaptor.forClass(WatermarkInductionResult.class);
+    verify(_pinotHelixResourceManager).addNewTableReplicationJob(eq(tableName), eq(jobId), anyLong(),
+        resultCaptor.capture());
 
-    List<String> capturedSegments = segmentsCaptor.getValue();
+    List<String> capturedSegments = resultCaptor.getValue().getHistoricalSegments();
     Assert.assertEquals(capturedSegments.size(), 2);
     Assert.assertTrue(capturedSegments.contains("seg1"));
     Assert.assertTrue(capturedSegments.contains("seg2"));
