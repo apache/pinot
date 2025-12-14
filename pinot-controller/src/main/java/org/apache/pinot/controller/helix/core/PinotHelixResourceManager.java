@@ -2519,8 +2519,16 @@ public class PinotHelixResourceManager {
     return addControllerJobToZK(jobId, jobMetadata, ControllerJobTypes.FORCE_COMMIT);
   }
 
-  public boolean addNewSegmentCopyXClusterJob(String tableNameWithType, String jobId, long jobSubmissionTimeMs,
-      List<String> consumingSegmentsCommitted)
+  public boolean addNewTableReplicationJob(String tableNameWithType, String jobId, long jobSubmissionTimeMs,
+      WatermarkInductionResult res)
+      throws JsonProcessingException {
+    Map<String, String> jobMetadata =
+        commonTableReplicationJobMetadata(tableNameWithType, jobId, jobSubmissionTimeMs, res);
+    return addControllerJobToZK(jobId, jobMetadata, ControllerJobTypes.TABLE_REPLICATION);
+  }
+
+  public Map<String, String> commonTableReplicationJobMetadata(String tableNameWithType, String jobId,
+      long jobSubmissionTimeMs, WatermarkInductionResult res)
       throws JsonProcessingException {
     Map<String, String> jobMetadata = new HashMap<>();
     jobMetadata.put(CommonConstants.ControllerJob.JOB_ID, jobId);
@@ -2528,8 +2536,10 @@ public class PinotHelixResourceManager {
     jobMetadata.put(CommonConstants.ControllerJob.SUBMISSION_TIME_MS, Long.toString(jobSubmissionTimeMs));
     jobMetadata.put(CommonConstants.ControllerJob.TABLE_NAME_WITH_TYPE, tableNameWithType);
     jobMetadata.put(CommonConstants.ControllerJob.SEGMENTS_TO_BE_COPIED,
-        JsonUtils.objectToString(consumingSegmentsCommitted));
-    return addControllerJobToZK(jobId, jobMetadata, ControllerJobTypes.TABLE_REPLICATION);
+        Integer.toString(res.getHistoricalSegments().size()));
+    jobMetadata.put(CommonConstants.ControllerJob.CONSUMER_WATERMARKS, JsonUtils.objectToString(res.getWatermarks()));
+    jobMetadata.put(CommonConstants.ControllerJob.REPLICATION_JOB_STATUS, "IN_PROGRESS");
+    return jobMetadata;
   }
 
   /**

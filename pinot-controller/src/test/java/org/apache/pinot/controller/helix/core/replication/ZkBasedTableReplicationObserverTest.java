@@ -19,9 +19,11 @@
 package org.apache.pinot.controller.helix.core.replication;
 
 import java.util.Arrays;
+import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import org.apache.pinot.controller.helix.core.PinotHelixResourceManager;
+import org.apache.pinot.controller.helix.core.WatermarkInductionResult;
 import org.apache.pinot.controller.helix.core.controllerjob.ControllerJobTypes;
 import org.apache.pinot.spi.utils.CommonConstants;
 import org.mockito.ArgumentCaptor;
@@ -61,9 +63,10 @@ public class ZkBasedTableReplicationObserverTest {
     String jobId = "job1";
     String tableName = "table1";
     List<String> segments = Arrays.asList("seg1", "seg2", "seg3");
+    WatermarkInductionResult res = new WatermarkInductionResult(Collections.emptyList(), segments);
 
     ZkBasedTableReplicationObserver observer =
-        new ZkBasedTableReplicationObserver(jobId, tableName, segments, _pinotHelixResourceManager);
+        new ZkBasedTableReplicationObserver(jobId, tableName, res, _pinotHelixResourceManager);
 
     // Trigger completion (1st segment) - no ZK update (only every 100 or error)
     // Total 3. remaining starts at 3.
@@ -93,9 +96,10 @@ public class ZkBasedTableReplicationObserverTest {
     String jobId = "job1";
     String tableName = "table1";
     List<String> segments = Arrays.asList("seg1");
+    WatermarkInductionResult res = new WatermarkInductionResult(Collections.emptyList(), segments);
 
     ZkBasedTableReplicationObserver observer =
-        new ZkBasedTableReplicationObserver(jobId, tableName, segments, _pinotHelixResourceManager);
+        new ZkBasedTableReplicationObserver(jobId, tableName, res, _pinotHelixResourceManager);
 
     observer.onTrigger(TableReplicationObserver.Trigger.SEGMENT_REPLICATE_ERRORED_TRIGGER, "seg1");
 
