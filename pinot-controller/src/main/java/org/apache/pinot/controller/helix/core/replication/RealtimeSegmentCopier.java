@@ -77,11 +77,12 @@ public class RealtimeSegmentCopier implements SegmentCopier {
       }
 
       // 2. Copy the segment from the source deep store to the destination deep store
-      URI sourceSegmentUri = new URI(downloadUrl);
-      PinotFS sourcePinotFS = getPinotFS(sourceSegmentUri);
       String destSegmentUriStr = _destinationDeepStoreUri + "/" + tableName + "/" + segmentName;
+      LOGGER.info("[copyTable] Copying segment: {} from url: {} to destination: {}", segmentName, downloadUrl,
+          destSegmentUriStr);
+      URI sourceSegmentUri = new URI(downloadUrl);
       URI destSegmentUri = new URI(destSegmentUriStr);
-
+      PinotFS sourcePinotFS = getPinotFS(sourceSegmentUri);
       PinotFS destPinotFS = getPinotFS(destSegmentUri);
 
       // TODO: use local file system as an intermediate store to support different file system
@@ -91,20 +92,22 @@ public class RealtimeSegmentCopier implements SegmentCopier {
 
       if (!destPinotFS.exists(destSegmentUri)) {
         sourcePinotFS.copy(sourceSegmentUri, destSegmentUri);
-        LOGGER.info("Copied segment {} from {} to {}", segmentName, sourceSegmentUri, destSegmentUri);
+        LOGGER.info("[copyTable] Copied segment {} from {} to {}", segmentName, sourceSegmentUri, destSegmentUri);
       } else {
-        LOGGER.info("Segment {} already exists at destination {}", segmentName, destSegmentUri);
+        LOGGER.info("[copyTable] Segment {} already exists at destination {}", segmentName, destSegmentUri);
       }
 
       // 3. Upload the segment to the destination controller
       String payload = "{\"segmentUri\":\"" + destSegmentUriStr + "\"}";
+      LOGGER.info("[copyTable] Uploading segment {} to destination controller, payload: {}", segmentName, payload);
       URI uri = new URI(copyTablePayload.getDestinationClusterUri() + String.format(SEGMENT_UPLOAD_ENDPOINT_TEMPLATE,
           tableName));
       SimpleHttpResponse response =
           _httpClient.sendJsonPostRequest(uri, payload, copyTablePayload.getDestinationClusterHeaders());
-      LOGGER.info("Uploaded segment {} to destination controller, status: {}", segmentName, response.getStatusCode());
+      LOGGER.info("[copyTable] Uploaded segment {} to destination controller, status: {}", segmentName,
+          response.getStatusCode());
     } catch (Exception e) {
-      LOGGER.error("Caught exception while copying segment {}", segmentName, e);
+      LOGGER.error("[copyTable] Caught exception while copying segment {}", segmentName, e);
       throw new RuntimeException(e);
     }
   }
