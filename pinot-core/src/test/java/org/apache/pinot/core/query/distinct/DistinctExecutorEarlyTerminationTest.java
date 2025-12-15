@@ -40,6 +40,7 @@ import org.apache.pinot.spi.data.FieldSpec.DataType;
 import org.testng.annotations.Test;
 
 import static org.testng.Assert.assertEquals;
+import static org.testng.Assert.assertTrue;
 
 
 public class DistinctExecutorEarlyTerminationTest {
@@ -107,6 +108,77 @@ public class DistinctExecutorEarlyTerminationTest {
 
     assertEquals(executor.getRemainingRowsToProcess(), 0);
     assertEquals(result.size(), 4);
+  }
+
+  @Test
+  public void testRawSingleColumnExecutorStopsAfterNoChangeWithinBlock() {
+    ExpressionContext expression = ExpressionContext.forIdentifier("c1");
+    IntDistinctExecutor executor =
+        new IntDistinctExecutor(expression, DataType.INT, /*limit*/ 10, false, null);
+    executor.setNumRowsWithoutChangeInDistinct(2);
+    int[] values = new int[]{10, 10, 10, 11};
+    ValueBlock block = new SimpleValueBlock(4, Map.of(expression, new IntBlockValSet(values)));
+
+    boolean satisfied = executor.process(block);
+
+    assertTrue(satisfied, "should terminate when no-change budget is hit within a block");
+    assertTrue(executor.isNumRowsWithoutChangeLimitReached());
+    assertEquals(executor.getNumRowsProcessed(), 3);
+    assertEquals(executor.getNumDistinctRowsCollected(), 1);
+  }
+
+  @Test
+  public void testRawMultiColumnExecutorStopsAfterNoChangeWithinBlock() {
+    ExpressionContext col1 = ExpressionContext.forIdentifier("c1");
+    ExpressionContext col2 = ExpressionContext.forIdentifier("c2");
+    List<ExpressionContext> expressions = List.of(col1, col2);
+    DataSchema schema = new DataSchema(new String[]{"c1", "c2"},
+        new ColumnDataType[]{ColumnDataType.INT, ColumnDataType.INT});
+    RawMultiColumnDistinctExecutor executor =
+        new RawMultiColumnDistinctExecutor(expressions, false, schema, 10, false, null);
+    executor.setNumRowsWithoutChangeInDistinct(2);
+
+    Map<ExpressionContext, BlockValSet> blockValSets = Map.of(
+        col1, new IntBlockValSet(new int[]{0, 0, 0, 1}),
+        col2, new IntBlockValSet(new int[]{10, 10, 10, 11})
+    );
+    ValueBlock block = new SimpleValueBlock(4, blockValSets);
+
+    boolean satisfied = executor.process(block);
+    DistinctTable result = executor.getResult();
+
+    assertTrue(satisfied);
+    assertTrue(executor.isNumRowsWithoutChangeLimitReached());
+    assertEquals(executor.getNumRowsProcessed(), 3);
+    assertEquals(result.size(), 1);
+  }
+
+  @Test
+  public void testDictionaryBasedMultiColumnExecutorStopsAfterNoChangeWithinBlock() {
+    ExpressionContext col1 = ExpressionContext.forIdentifier("c1");
+    ExpressionContext col2 = ExpressionContext.forIdentifier("c2");
+    List<ExpressionContext> expressions = List.of(col1, col2);
+    DataSchema schema = new DataSchema(new String[]{"c1", "c2"},
+        new ColumnDataType[]{ColumnDataType.INT, ColumnDataType.INT});
+    Dictionary dictionary = new SimpleIntDictionary(new int[]{0, 1, 2, 3, 4});
+    DictionaryBasedMultiColumnDistinctExecutor executor =
+        new DictionaryBasedMultiColumnDistinctExecutor(expressions, false, schema,
+            List.of(dictionary, dictionary), 10, false, null);
+    executor.setNumRowsWithoutChangeInDistinct(2);
+
+    Map<ExpressionContext, BlockValSet> blockValSets = Map.of(
+        col1, new DictionaryBlockValSet(new int[]{0, 0, 0, 1}),
+        col2, new DictionaryBlockValSet(new int[]{4, 4, 4, 3})
+    );
+    ValueBlock block = new SimpleValueBlock(4, blockValSets);
+
+    boolean satisfied = executor.process(block);
+    DistinctTable result = executor.getResult();
+
+    assertTrue(satisfied);
+    assertTrue(executor.isNumRowsWithoutChangeLimitReached());
+    assertEquals(executor.getNumRowsProcessed(), 3);
+    assertEquals(result.size(), 1);
   }
 
   /**

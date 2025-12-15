@@ -78,6 +78,7 @@ public class DistinctOperator extends BaseOperator<DistinctResultsBlock> {
   protected DistinctResultsBlock getNextBlock() {
     DistinctExecutor executor = DistinctExecutorFactory.getDistinctExecutor(_projectOperator, _queryContext);
     executor.setMaxRowsToProcess(_maxRowsInDistinct);
+    executor.setNumRowsWithoutChangeInDistinct(_numRowsWithoutChangeInDistinct);
     ValueBlock valueBlock;
     boolean enforceRowLimit = _maxRowsInDistinct != UNLIMITED_ROWS;
     boolean enforceNoChangeLimit = _numRowsWithoutChangeInDistinct != UNLIMITED_ROWS;
@@ -86,24 +87,30 @@ public class DistinctOperator extends BaseOperator<DistinctResultsBlock> {
         _hitMaxRowsLimit = true;
         break;
       }
-      int rowsRemainingBefore = executor.getRemainingRowsToProcess();
+      if (enforceNoChangeLimit && executor.isNumRowsWithoutChangeLimitReached()) {
+        _hitNoChangeLimit = true;
+        break;
+      }
+      int rowsProcessedBefore = executor.getNumRowsProcessed();
       int distinctCountBeforeBlock = enforceNoChangeLimit ? executor.getNumDistinctRowsCollected() : -1;
       boolean satisfied = executor.process(valueBlock);
-      int rowsRemainingAfter = executor.getRemainingRowsToProcess();
-      int docsProcessedForLimit =
-          enforceRowLimit ? Math.max(0, rowsRemainingBefore - rowsRemainingAfter) : valueBlock.getNumDocs();
-      _numDocsScanned += docsProcessedForLimit;
+      int rowsProcessedForBlock = executor.getNumRowsProcessed() - rowsProcessedBefore;
+      _numDocsScanned += rowsProcessedForBlock;
       if (enforceRowLimit && _numDocsScanned >= _maxRowsInDistinct) {
         _hitMaxRowsLimit = true;
       }
       if (enforceNoChangeLimit) {
-        int distinctCountAfterBlock = executor.getNumDistinctRowsCollected();
-        if (distinctCountAfterBlock > distinctCountBeforeBlock) {
-          _numRowsWithoutNewDistinct = 0;
+        if (executor.isNumRowsWithoutChangeLimitReached()) {
+          _hitNoChangeLimit = true;
         } else {
-          _numRowsWithoutNewDistinct += docsProcessedForLimit;
-          if (_numRowsWithoutNewDistinct >= _numRowsWithoutChangeInDistinct) {
-            _hitNoChangeLimit = true;
+          int distinctCountAfterBlock = executor.getNumDistinctRowsCollected();
+          if (distinctCountAfterBlock > distinctCountBeforeBlock) {
+            _numRowsWithoutNewDistinct = 0;
+          } else {
+            _numRowsWithoutNewDistinct += rowsProcessedForBlock;
+            if (_numRowsWithoutNewDistinct >= _numRowsWithoutChangeInDistinct) {
+              _hitNoChangeLimit = true;
+            }
           }
         }
       }

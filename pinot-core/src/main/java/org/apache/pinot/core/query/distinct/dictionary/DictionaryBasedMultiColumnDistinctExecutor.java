@@ -44,6 +44,8 @@ import org.roaringbitmap.RoaringBitmap;
  * {@link DistinctExecutor} for multiple dictionary-encoded columns.
  */
 public class DictionaryBasedMultiColumnDistinctExecutor implements DistinctExecutor {
+  private static final int UNLIMITED_ROWS = Integer.MAX_VALUE;
+
   private final List<ExpressionContext> _expressions;
   private final boolean _hasMVExpression;
   private final DataSchema _dataSchema;
@@ -57,7 +59,11 @@ public class DictionaryBasedMultiColumnDistinctExecutor implements DistinctExecu
   private final HashSet<DictIds> _dictIdsSet;
 
   private ObjectHeapPriorityQueue<DictIds> _priorityQueue;
-  private int _rowsRemaining = Integer.MAX_VALUE;
+  private int _rowsRemaining = UNLIMITED_ROWS;
+  private int _numRowsProcessed = 0;
+  private int _numRowsWithoutChangeLimit = UNLIMITED_ROWS;
+  private int _numRowsWithoutChange = 0;
+  private boolean _numRowsWithoutChangeLimitReached = false;
 
   public DictionaryBasedMultiColumnDistinctExecutor(List<ExpressionContext> expressions, boolean hasMVExpression,
       DataSchema dataSchema, List<Dictionary> dictionaries, int limit, boolean nullHandlingEnabled,
@@ -105,11 +111,30 @@ public class DictionaryBasedMultiColumnDistinctExecutor implements DistinctExecu
   }
 
   @Override
+  public void setNumRowsWithoutChangeInDistinct(int numRowsWithoutChangeInDistinct) {
+    _numRowsWithoutChangeLimit = numRowsWithoutChangeInDistinct;
+  }
+
+  @Override
+  public boolean isNumRowsWithoutChangeLimitReached() {
+    return _numRowsWithoutChangeLimitReached;
+  }
+
+  @Override
+  public int getNumRowsProcessed() {
+    return _numRowsProcessed;
+  }
+
+  @Override
   public boolean process(ValueBlock valueBlock) {
-    if (_rowsRemaining <= 0) {
+    if (shouldStopProcessing()) {
       return true;
     }
-    int numDocs = Math.min(valueBlock.getNumDocs(), _rowsRemaining);
+    int numDocs = clampToRemaining(valueBlock.getNumDocs());
+    if (numDocs <= 0) {
+      return true;
+    }
+    boolean limitReached = false;
     int numExpressions = _expressions.size();
     if (!_hasMVExpression) {
       int[][] dictIdsArray = new int[numDocs][numExpressions];
@@ -122,17 +147,35 @@ public class DictionaryBasedMultiColumnDistinctExecutor implements DistinctExecu
       }
       if (_limit == Integer.MAX_VALUE) {
         for (int i = 0; i < numDocs; i++) {
+          if (shouldStopProcessing()) {
+            break;
+          }
+          int sizeBefore = _dictIdsSet.size();
           addUnbounded(new DictIds(dictIdsArray[i]));
+          recordRowProcessed(_dictIdsSet.size() > sizeBefore);
         }
       } else if (_orderByExpressions == null) {
         for (int i = 0; i < numDocs; i++) {
+          if (shouldStopProcessing()) {
+            break;
+          }
+          int sizeBefore = _dictIdsSet.size();
           if (addWithoutOrderBy(new DictIds(dictIdsArray[i]))) {
-            return true;
+            limitReached = true;
+          }
+          recordRowProcessed(_dictIdsSet.size() > sizeBefore);
+          if (limitReached) {
+            break;
           }
         }
       } else {
         for (int i = 0; i < numDocs; i++) {
+          if (shouldStopProcessing()) {
+            break;
+          }
+          int sizeBefore = _dictIdsSet.size();
           addWithOrderBy(new DictIds(dictIdsArray[i]));
+          recordRowProcessed(_dictIdsSet.size() > sizeBefore);
         }
       }
     } else {
@@ -148,34 +191,49 @@ public class DictionaryBasedMultiColumnDistinctExecutor implements DistinctExecu
       }
       if (_limit == Integer.MAX_VALUE) {
         for (int i = 0; i < numDocs; i++) {
+          if (shouldStopProcessing()) {
+            break;
+          }
+          int sizeBefore = _dictIdsSet.size();
           int[][] dictIdsArray = DistinctExecutorUtils.getDictIds(svDictIds, mvDictIds, i);
           for (int[] dictIds : dictIdsArray) {
             addUnbounded(new DictIds(dictIds));
           }
+          recordRowProcessed(_dictIdsSet.size() > sizeBefore);
         }
       } else if (_orderByExpressions == null) {
         for (int i = 0; i < numDocs; i++) {
+          if (shouldStopProcessing()) {
+            break;
+          }
+          int sizeBefore = _dictIdsSet.size();
           int[][] dictIdsArray = DistinctExecutorUtils.getDictIds(svDictIds, mvDictIds, i);
           for (int[] dictIds : dictIdsArray) {
             if (addWithoutOrderBy(new DictIds(dictIds))) {
-              return true;
+              limitReached = true;
+              break;
             }
+          }
+          recordRowProcessed(_dictIdsSet.size() > sizeBefore);
+          if (limitReached) {
+            break;
           }
         }
       } else {
         for (int i = 0; i < numDocs; i++) {
+          if (shouldStopProcessing()) {
+            break;
+          }
+          int sizeBefore = _dictIdsSet.size();
           int[][] dictIdsArray = DistinctExecutorUtils.getDictIds(svDictIds, mvDictIds, i);
           for (int[] dictIds : dictIdsArray) {
             addWithOrderBy(new DictIds(dictIds));
           }
+          recordRowProcessed(_dictIdsSet.size() > sizeBefore);
         }
       }
     }
-    consumeRows(numDocs);
-    if (_rowsRemaining <= 0) {
-      return true;
-    }
-    return false;
+    return shouldStopProcessing() || limitReached;
   }
 
   private int[] getDictIdsSV(BlockValSet blockValueSet, int expressionIndex) {
@@ -238,10 +296,35 @@ public class DictionaryBasedMultiColumnDistinctExecutor implements DistinctExecu
     };
   }
 
-  private void consumeRows(int count) {
-    if (_rowsRemaining != Integer.MAX_VALUE) {
-      _rowsRemaining -= count;
+  private int clampToRemaining(int numDocs) {
+    if (_rowsRemaining == UNLIMITED_ROWS) {
+      return numDocs;
     }
+    if (_rowsRemaining <= 0) {
+      return 0;
+    }
+    return Math.min(numDocs, _rowsRemaining);
+  }
+
+  private void recordRowProcessed(boolean distinctChanged) {
+    _numRowsProcessed++;
+    if (_rowsRemaining != UNLIMITED_ROWS) {
+      _rowsRemaining--;
+    }
+    if (_numRowsWithoutChangeLimit != UNLIMITED_ROWS) {
+      if (distinctChanged) {
+        _numRowsWithoutChange = 0;
+      } else {
+        _numRowsWithoutChange++;
+        if (_numRowsWithoutChange >= _numRowsWithoutChangeLimit) {
+          _numRowsWithoutChangeLimitReached = true;
+        }
+      }
+    }
+  }
+
+  private boolean shouldStopProcessing() {
+    return _rowsRemaining <= 0 || _numRowsWithoutChangeLimitReached;
   }
 
   @Override

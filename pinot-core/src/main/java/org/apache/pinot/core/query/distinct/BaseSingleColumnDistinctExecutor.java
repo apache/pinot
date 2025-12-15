@@ -22,7 +22,6 @@ import org.apache.pinot.common.request.context.ExpressionContext;
 import org.apache.pinot.core.common.BlockValSet;
 import org.apache.pinot.core.operator.blocks.ValueBlock;
 import org.apache.pinot.core.query.distinct.table.DistinctTable;
-import org.roaringbitmap.PeekableIntIterator;
 import org.roaringbitmap.RoaringBitmap;
 
 
@@ -35,6 +34,10 @@ public abstract class BaseSingleColumnDistinctExecutor<T extends DistinctTable, 
   protected final ExpressionContext _expression;
   protected final T _distinctTable;
   private int _rowsRemaining = UNLIMITED_ROWS;
+  private int _numRowsProcessed = 0;
+  private int _numRowsWithoutChangeLimit = UNLIMITED_ROWS;
+  private int _numRowsWithoutChange = 0;
+  private boolean _numRowsWithoutChangeLimitReached = false;
 
   public BaseSingleColumnDistinctExecutor(ExpressionContext expression, T distinctTable) {
     _expression = expression;
@@ -47,86 +50,78 @@ public abstract class BaseSingleColumnDistinctExecutor<T extends DistinctTable, 
   }
 
   @Override
+  public void setNumRowsWithoutChangeInDistinct(int numRowsWithoutChangeInDistinct) {
+    _numRowsWithoutChangeLimit = numRowsWithoutChangeInDistinct;
+  }
+
+  @Override
+  public boolean isNumRowsWithoutChangeLimitReached() {
+    return _numRowsWithoutChangeLimitReached;
+  }
+
+  @Override
+  public int getNumRowsProcessed() {
+    return _numRowsProcessed;
+  }
+
+  @Override
   public boolean process(ValueBlock valueBlock) {
-    if (_rowsRemaining <= 0) {
+    if (shouldStopProcessing()) {
       return true;
     }
     BlockValSet blockValueSet = valueBlock.getBlockValueSet(_expression);
-    int numDocs = valueBlock.getNumDocs();
+    int numDocs = clampToRemaining(valueBlock.getNumDocs());
+    if (numDocs <= 0) {
+      return true;
+    }
+    boolean limitReached = false;
     if (_distinctTable.isNullHandlingEnabled() && blockValueSet.isSingleValue()) {
       RoaringBitmap nullBitmap = blockValueSet.getNullBitmap();
-      if (nullBitmap != null && !nullBitmap.isEmpty()) {
-        return processWithNull(blockValueSet, numDocs, nullBitmap);
-      } else {
-        return processWithoutNull(blockValueSet, numDocs);
-      }
-    } else {
-      return processWithoutNull(blockValueSet, numDocs);
-    }
-  }
-
-  private boolean processWithNull(BlockValSet blockValueSet, int numDocs, RoaringBitmap nullBitmap) {
-    int limitedNumDocs = clampToRemaining(0, numDocs);
-    if (limitedNumDocs <= 0) {
-      return true;
-    }
-    _distinctTable.addNull();
-    S values = getValuesSV(blockValueSet);
-    PeekableIntIterator nullIterator = nullBitmap.getIntIterator();
-    int prev = 0;
-    while (nullIterator.hasNext() && prev < limitedNumDocs) {
-      int nextNull = nullIterator.next();
-      if (nextNull > prev) {
-        int rangeEnd = Math.min(nextNull, limitedNumDocs);
-        if (processSVRange(values, prev, rangeEnd)) {
-          return true;
+      S values = getValuesSV(blockValueSet);
+      for (int docId = 0; docId < numDocs; docId++) {
+        if (shouldStopProcessing()) {
+          break;
+        }
+        boolean isNull = nullBitmap != null && nullBitmap.contains(docId);
+        int sizeBefore = _distinctTable.size();
+        if (isNull) {
+          _distinctTable.addNull();
+        } else {
+          limitReached = processSV(values, docId, docId + 1);
+        }
+        recordRowProcessed(_distinctTable.size() > sizeBefore);
+        if (limitReached) {
+          break;
         }
       }
-      prev = nextNull + 1;
-    }
-    if (prev < limitedNumDocs) {
-      return processSVRange(values, prev, limitedNumDocs);
-    }
-    return false;
-  }
-
-  /**
-   * Processes a range of single-value values, respecting the row budget.
-   * @param values the single-value values
-   * @param from the start index (inclusive)
-   * @param to the end index (exclusive)
-   * @return true if processing should stop early, false otherwise
-   */
-  private boolean processSVRange(S values, int from, int to) {
-    int limitedTo = clampToRemaining(from, to);
-    if (limitedTo <= from) {
-      return true;
-    }
-    if (processSV(values, from, limitedTo)) {
-      return true;
-    }
-    consumeRows(limitedTo - from);
-    return _rowsRemaining <= 0;
-  }
-
-  private boolean processWithoutNull(BlockValSet blockValueSet, int numDocs) {
-    if (blockValueSet.isSingleValue()) {
-      int limitedTo = clampToRemaining(0, numDocs);
-      if (limitedTo <= 0) {
-        return true;
+    } else if (blockValueSet.isSingleValue()) {
+      S values = getValuesSV(blockValueSet);
+      for (int docId = 0; docId < numDocs; docId++) {
+        if (shouldStopProcessing()) {
+          break;
+        }
+        int sizeBefore = _distinctTable.size();
+        limitReached = processSV(values, docId, docId + 1);
+        recordRowProcessed(_distinctTable.size() > sizeBefore);
+        if (limitReached) {
+          break;
+        }
       }
-      boolean satisfied = processSV(getValuesSV(blockValueSet), 0, limitedTo);
-      consumeRows(limitedTo);
-      return satisfied || _rowsRemaining <= 0;
     } else {
-      int limitedTo = clampToRemaining(0, numDocs);
-      if (limitedTo <= 0) {
-        return true;
+      M values = getValuesMV(blockValueSet);
+      for (int docId = 0; docId < numDocs; docId++) {
+        if (shouldStopProcessing()) {
+          break;
+        }
+        int sizeBefore = _distinctTable.size();
+        limitReached = processMV(values, docId, docId + 1);
+        recordRowProcessed(_distinctTable.size() > sizeBefore);
+        if (limitReached) {
+          break;
+        }
       }
-      boolean satisfied = processMV(getValuesMV(blockValueSet), 0, limitedTo);
-      consumeRows(limitedTo);
-      return satisfied || _rowsRemaining <= 0;
     }
+    return limitReached || shouldStopProcessing();
   }
 
   /**
@@ -164,19 +159,34 @@ public abstract class BaseSingleColumnDistinctExecutor<T extends DistinctTable, 
     return _rowsRemaining;
   }
 
-  private int clampToRemaining(int from, int to) {
+  private int clampToRemaining(int numDocs) {
     if (_rowsRemaining == UNLIMITED_ROWS) {
-      return to;
+      return numDocs;
     }
     if (_rowsRemaining <= 0) {
-      return from;
+      return 0;
     }
-    return Math.min(to, from + _rowsRemaining);
+    return Math.min(numDocs, _rowsRemaining);
   }
 
-  private void consumeRows(int count) {
+  private void recordRowProcessed(boolean distinctChanged) {
+    _numRowsProcessed++;
     if (_rowsRemaining != UNLIMITED_ROWS) {
-      _rowsRemaining -= count;
+      _rowsRemaining--;
     }
+    if (_numRowsWithoutChangeLimit != UNLIMITED_ROWS) {
+      if (distinctChanged) {
+        _numRowsWithoutChange = 0;
+      } else {
+        _numRowsWithoutChange++;
+        if (_numRowsWithoutChange >= _numRowsWithoutChangeLimit) {
+          _numRowsWithoutChangeLimitReached = true;
+        }
+      }
+    }
+  }
+
+  private boolean shouldStopProcessing() {
+    return _rowsRemaining <= 0 || _numRowsWithoutChangeLimitReached;
   }
 }

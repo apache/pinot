@@ -44,11 +44,17 @@ import org.roaringbitmap.RoaringBitmap;
  * {@link DistinctExecutor} for multiple columns where some columns are raw (non-dictionary-encoded).
  */
 public class RawMultiColumnDistinctExecutor implements DistinctExecutor {
+  private static final int UNLIMITED_ROWS = Integer.MAX_VALUE;
+
   private final List<ExpressionContext> _expressions;
   private final boolean _hasMVExpression;
   private final boolean _nullHandlingEnabled;
   private final MultiColumnDistinctTable _distinctTable;
-  private int _rowsRemaining = Integer.MAX_VALUE;
+  private int _rowsRemaining = UNLIMITED_ROWS;
+  private int _numRowsProcessed = 0;
+  private int _numRowsWithoutChangeLimit = UNLIMITED_ROWS;
+  private int _numRowsWithoutChange = 0;
+  private boolean _numRowsWithoutChangeLimitReached = false;
 
   public RawMultiColumnDistinctExecutor(List<ExpressionContext> expressions, boolean hasMVExpression,
       DataSchema dataSchema, int limit, boolean nullHandlingEnabled,
@@ -65,11 +71,30 @@ public class RawMultiColumnDistinctExecutor implements DistinctExecutor {
   }
 
   @Override
+  public void setNumRowsWithoutChangeInDistinct(int numRowsWithoutChangeInDistinct) {
+    _numRowsWithoutChangeLimit = numRowsWithoutChangeInDistinct;
+  }
+
+  @Override
+  public boolean isNumRowsWithoutChangeLimitReached() {
+    return _numRowsWithoutChangeLimitReached;
+  }
+
+  @Override
+  public int getNumRowsProcessed() {
+    return _numRowsProcessed;
+  }
+
+  @Override
   public boolean process(ValueBlock valueBlock) {
-    if (_rowsRemaining <= 0) {
+    if (shouldStopProcessing()) {
       return true;
     }
-    int numDocs = Math.min(valueBlock.getNumDocs(), _rowsRemaining);
+    int numDocs = clampToRemaining(valueBlock.getNumDocs());
+    if (numDocs <= 0) {
+      return true;
+    }
+    boolean limitReached = false;
     int numExpressions = _expressions.size();
     if (!_hasMVExpression) {
       BlockValSet[] blockValSets = new BlockValSet[numExpressions];
@@ -105,24 +130,40 @@ public class RawMultiColumnDistinctExecutor implements DistinctExecutor {
           }
         }
         for (int i = 0; i < numDocs; i++) {
+          if (shouldStopProcessing()) {
+            break;
+          }
+          int sizeBefore = _distinctTable.size();
           Record record = new Record(values[i]);
           if (_distinctTable.hasOrderBy()) {
             _distinctTable.addWithOrderBy(record);
           } else {
             if (_distinctTable.addWithoutOrderBy(record)) {
-              return true;
+              limitReached = true;
             }
+          }
+          recordRowProcessed(_distinctTable.size() > sizeBefore);
+          if (limitReached) {
+            break;
           }
         }
       } else {
         for (int i = 0; i < numDocs; i++) {
+          if (shouldStopProcessing()) {
+            break;
+          }
+          int sizeBefore = _distinctTable.size();
           Record record = new Record(valueFetcher.getRow(i));
           if (_distinctTable.hasOrderBy()) {
             _distinctTable.addWithOrderBy(record);
           } else {
             if (_distinctTable.addWithoutOrderBy(record)) {
-              return true;
+              limitReached = true;
             }
+          }
+          recordRowProcessed(_distinctTable.size() > sizeBefore);
+          if (limitReached) {
+            break;
           }
         }
       }
@@ -138,23 +179,28 @@ public class RawMultiColumnDistinctExecutor implements DistinctExecutor {
         }
       }
       for (int i = 0; i < numDocs; i++) {
+        if (shouldStopProcessing()) {
+          break;
+        }
+        int sizeBefore = _distinctTable.size();
         Object[][] records = DistinctExecutorUtils.getRecords(svValues, mvValues, i);
         for (Object[] record : records) {
           if (_distinctTable.hasOrderBy()) {
             _distinctTable.addWithOrderBy(new Record(record));
           } else {
             if (_distinctTable.addWithoutOrderBy(new Record(record))) {
-              return true;
+              limitReached = true;
+              break;
             }
           }
         }
+        recordRowProcessed(_distinctTable.size() > sizeBefore);
+        if (limitReached) {
+          break;
+        }
       }
     }
-    consumeRows(numDocs);
-    if (_rowsRemaining <= 0) {
-      return true;
-    }
-    return false;
+    return limitReached || shouldStopProcessing();
   }
 
   private Object[] getSVValues(BlockValSet blockValueSet, int numDocs) {
@@ -285,9 +331,34 @@ public class RawMultiColumnDistinctExecutor implements DistinctExecutor {
     return _rowsRemaining;
   }
 
-  private void consumeRows(int count) {
-    if (_rowsRemaining != Integer.MAX_VALUE) {
-      _rowsRemaining -= count;
+  private int clampToRemaining(int numDocs) {
+    if (_rowsRemaining == UNLIMITED_ROWS) {
+      return numDocs;
     }
+    if (_rowsRemaining <= 0) {
+      return 0;
+    }
+    return Math.min(numDocs, _rowsRemaining);
+  }
+
+  private void recordRowProcessed(boolean distinctChanged) {
+    _numRowsProcessed++;
+    if (_rowsRemaining != UNLIMITED_ROWS) {
+      _rowsRemaining--;
+    }
+    if (_numRowsWithoutChangeLimit != UNLIMITED_ROWS) {
+      if (distinctChanged) {
+        _numRowsWithoutChange = 0;
+      } else {
+        _numRowsWithoutChange++;
+        if (_numRowsWithoutChange >= _numRowsWithoutChangeLimit) {
+          _numRowsWithoutChangeLimitReached = true;
+        }
+      }
+    }
+  }
+
+  private boolean shouldStopProcessing() {
+    return _rowsRemaining <= 0 || _numRowsWithoutChangeLimitReached;
   }
 }

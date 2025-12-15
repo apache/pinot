@@ -45,6 +45,27 @@ public interface DistinctExecutor {
   }
 
   /**
+   * Sets the maximum number of rows to scan without adding any new distinct value before early-terminating.
+   */
+  default void setNumRowsWithoutChangeInDistinct(int numRowsWithoutChangeInDistinct) {
+  }
+
+  /**
+   * Returns {@code true} if the executor has early-terminated because no new distinct values were found after scanning
+   * the configured number of rows.
+   */
+  default boolean isNumRowsWithoutChangeLimitReached() {
+    return false;
+  }
+
+  /**
+   * Returns the total number of rows processed so far.
+   */
+  default int getNumRowsProcessed() {
+    return 0;
+  }
+
+  /**
    * Processes the given value block, returns {@code true} if the query is already satisfied, {@code false}
    * otherwise. No more calls should be made after it returns {@code true}.
    */
