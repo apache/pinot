@@ -19,13 +19,12 @@
 package org.apache.pinot.controller.helix.core.replication;
 
 import java.net.URI;
-import java.util.Collections;
+import java.net.URISyntaxException;
 import java.util.Map;
 import org.apache.hc.core5.http.ClassicHttpRequest;
 import org.apache.hc.core5.http.HttpHeaders;
 import org.apache.hc.core5.http.HttpVersion;
 import org.apache.hc.core5.http.io.support.ClassicRequestBuilder;
-import org.apache.hc.core5.http.message.BasicNameValuePair;
 import org.apache.pinot.common.exception.HttpErrorStatusException;
 import org.apache.pinot.common.utils.FileUploadDownloadClient;
 import org.apache.pinot.common.utils.SimpleHttpResponse;
@@ -112,14 +111,13 @@ public class RealtimeSegmentCopier implements SegmentCopier {
       // 3. Upload the segment to the destination controller
       LOGGER.info("[copyTable] Uploading segment {} to destination controller", segmentName);
       String dstControllerURIStr = copyTablePayload.getDestinationClusterUri();
-      URI segmentPushURI = FileUploadDownloadClient.getUploadSegmentURI(new URI(dstControllerURIStr));
 
       // TODO: Refactor SegmentPushUtils.java and FileUploadDownloadClient to dedup code
       RetryPolicies.exponentialBackoffRetryPolicy(1, 5000, 5).attempt(() -> {
         try {
           SimpleHttpResponse response = HttpClient.wrapAndThrowHttpException(
               _httpClient.sendRequest(
-                  getSendSegmentUriRequest(segmentPushURI, destSegmentUriStr,
+                  getSendSegmentUriRequest(dstControllerURIStr, destSegmentUriStr,
                       copyTablePayload.getDestinationClusterHeaders(), tableName),
                   HttpClient.DEFAULT_SOCKET_TIMEOUT_MS));
           LOGGER.info("[copyTable] Response for pushing table {} segment uri {} to location {} - {}: {}", tableName,
@@ -147,20 +145,17 @@ public class RealtimeSegmentCopier implements SegmentCopier {
     }
   }
 
-  static ClassicHttpRequest getSendSegmentUriRequest(URI uri, String downloadUri,
-      Map<String, String> headers, String tableNameWithoutType) {
-    ClassicRequestBuilder requestBuilder = ClassicRequestBuilder.post(uri).setVersion(HttpVersion.HTTP_1_1)
+  static ClassicHttpRequest getSendSegmentUriRequest(String controllerUriStr, String downloadUri,
+      Map<String, String> headers, String tableNameWithoutType) throws URISyntaxException {
+    URI segmentPushURI = new URI(controllerUriStr + "?tableName=" + tableNameWithoutType);
+    ClassicRequestBuilder requestBuilder = ClassicRequestBuilder.post(segmentPushURI).setVersion(HttpVersion.HTTP_1_1)
         .setHeader(
             FileUploadDownloadClient.CustomHeaders.UPLOAD_TYPE, FileUploadDownloadClient.FileUploadType.URI.toString())
         .setHeader(FileUploadDownloadClient.CustomHeaders.DOWNLOAD_URI, downloadUri)
         .setHeader(HttpHeaders.CONTENT_TYPE, HttpClient.JSON_CONTENT_TYPE);
-
     for (Map.Entry<String, String> pair: headers.entrySet()) {
       requestBuilder.setHeader(pair.getKey(), pair.getValue());
     }
-
-    HttpClient.addHeadersAndParameters(requestBuilder, Collections.emptyList(), Collections.singletonList(
-        new BasicNameValuePair("tableName", tableNameWithoutType)));
     return requestBuilder.build();
   }
 
