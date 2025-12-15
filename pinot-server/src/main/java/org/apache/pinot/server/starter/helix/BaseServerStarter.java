@@ -927,14 +927,23 @@ public abstract class BaseServerStarter implements ServiceStartable {
    * Can be overridden to perform operations before server starts serving queries.
    */
   protected void preServeQueries() {
+    triggerPageCacheWarmup();
     _segmentOperationsThrottler.startServingQueries();
   }
-
   /**
    * Can be overridden to create a custom WorkloadBudgetManager.
    */
   protected WorkloadBudgetManager createWorkloadBudgetManager(PinotConfiguration config) {
     return new WorkloadBudgetManager(config);
+  }
+
+  protected void triggerPageCacheWarmup() {
+    try {
+      _serverInstance.startQueryServer();
+      _serverInstance.getPageCacheWarmupServerQueryExecutor().startWarmupOnRestart();
+    } catch (Exception e) {
+      LOGGER.warn("Caught exception while pre-serving queries,", e);
+    }
   }
 
   @Override

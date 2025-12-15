@@ -706,4 +706,8 @@ public class ControllerRequestURLBuilder {
   public String forBaseQueryWorkloadConfig(String config) {
     return StringUtil.join("/", _baseUrl, "queryWorkloadConfigs", config);
   }
+
+  public String forPageCacheWarmupQueries(String tableName, String tableType) {
+    return StringUtil.join("/", _baseUrl, "pagecache", "queries", tableName) + "?tableType=" + tableType;
+  }
 }

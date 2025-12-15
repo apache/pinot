@@ -31,6 +31,7 @@ import org.apache.pinot.spi.config.table.FieldConfig;
 import org.apache.pinot.spi.config.table.IndexingConfig;
 import org.apache.pinot.spi.config.table.JsonIndexConfig;
 import org.apache.pinot.spi.config.table.MultiColumnTextIndexConfig;
+import org.apache.pinot.spi.config.table.PageCacheWarmupConfig;
 import org.apache.pinot.spi.config.table.QueryConfig;
 import org.apache.pinot.spi.config.table.QuotaConfig;
 import org.apache.pinot.spi.config.table.ReplicaGroupStrategyConfig;
@@ -139,6 +140,7 @@ public class TableConfigBuilder {
   private JsonNode _tierOverwrites;
   private Map<String, JsonIndexConfig> _jsonIndexConfigs;
   private MultiColumnTextIndexConfig _multiColumnTextIndexConfig;
+  private PageCacheWarmupConfig _pageCacheWarmupConfig;
 
   public TableConfigBuilder(TableType tableType) {
     _tableType = tableType;
@@ -479,6 +481,11 @@ public class TableConfigBuilder {
     return this;
   }
 
+  public TableConfigBuilder setPageCacheWarmupConfig(PageCacheWarmupConfig pageCacheWarmupConfig) {
+    _pageCacheWarmupConfig = pageCacheWarmupConfig;
+    return this;
+  }
+
   public TableConfig build() {
     // Validation config
     SegmentsValidationAndRetentionConfig validationConfig = new SegmentsValidationAndRetentionConfig();
@@ -538,6 +545,6 @@ public class TableConfigBuilder {
     return new TableConfig(_tableName, _tableType.toString(), validationConfig, tenantConfig, indexingConfig,
         _customConfig, _quotaConfig, _taskConfig, _routingConfig, _queryConfig, _instanceAssignmentConfigMap,
         _fieldConfigList, _upsertConfig, _dedupConfig, _dimensionTableConfig, _ingestionConfig, _tierConfigList,
-        _isDimTable, _tunerConfigList, _instancePartitionsMap, _segmentAssignmentConfigMap);
+        _isDimTable, _tunerConfigList, _instancePartitionsMap, _segmentAssignmentConfigMap, _pageCacheWarmupConfig);
   }
 }

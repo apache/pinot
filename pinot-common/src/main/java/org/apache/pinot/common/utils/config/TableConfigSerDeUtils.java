@@ -30,6 +30,7 @@ import org.apache.pinot.spi.config.table.DedupConfig;
 import org.apache.pinot.spi.config.table.DimensionTableConfig;
 import org.apache.pinot.spi.config.table.FieldConfig;
 import org.apache.pinot.spi.config.table.IndexingConfig;
+import org.apache.pinot.spi.config.table.PageCacheWarmupConfig;
 import org.apache.pinot.spi.config.table.QueryConfig;
 import org.apache.pinot.spi.config.table.QuotaConfig;
 import org.apache.pinot.spi.config.table.RoutingConfig;
@@ -176,10 +177,16 @@ public class TableConfigSerDeUtils {
       });
     }
 
+    PageCacheWarmupConfig pageCacheWarmupConfig = null;
+    String pageCacheWarmupConfigString = simpleFields.get(TableConfig.PAGE_CACHE_WARMUP_CONFIG_KEY);
+    if (pageCacheWarmupConfigString != null) {
+      pageCacheWarmupConfig = JsonUtils.stringToObject(pageCacheWarmupConfigString, PageCacheWarmupConfig.class);
+    }
+
     return new TableConfig(tableName, tableType, validationConfig, tenantConfig, indexingConfig, customConfig,
         quotaConfig, taskConfig, routingConfig, queryConfig, instanceAssignmentConfigMap, fieldConfigList, upsertConfig,
         dedupConfig, dimensionTableConfig, ingestionConfig, tierConfigList, isDimTable, tunerConfigList,
-        instancePartitionsMap, segmentAssignmentConfigMap);
+        instancePartitionsMap, segmentAssignmentConfigMap, pageCacheWarmupConfig);
   }
 
   public static ZNRecord toZNRecord(TableConfig tableConfig)

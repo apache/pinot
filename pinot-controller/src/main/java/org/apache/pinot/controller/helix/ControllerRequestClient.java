@@ -524,4 +524,37 @@ public class ControllerRequestClient {
       throw new IOException(e);
     }
   }
+
+  public boolean storePageCacheWarmupQueries(String tableName, String tableType, List<String> queries)
+      throws IOException {
+    try {
+      SimpleHttpResponse response = HttpClient.wrapAndThrowHttpException(_httpClient.sendJsonPostRequest(
+          new URI(_controllerRequestURLBuilder.forPageCacheWarmupQueries(tableName, tableType)),
+          JsonUtils.objectToString(queries), _headers));
+      return response.getResponse() != null && response.getStatusCode() == 200;
+    } catch (HttpErrorStatusException | URISyntaxException e) {
+      throw new IOException(e);
+    }
+  }
+
+  public List<String> getPageCacheWarmupQueries(String tableName, String tableType)
+      throws IOException {
+    try {
+      SimpleHttpResponse response = HttpClient.wrapAndThrowHttpException(_httpClient.sendGetRequest(
+          new URI(_controllerRequestURLBuilder.forPageCacheWarmupQueries(tableName, tableType)), _headers));
+      return JsonUtils.stringToObject(response.getResponse(), List.class);
+    } catch (HttpErrorStatusException | URISyntaxException e) {
+      throw new IOException(e);
+    }
+  }
+
+  public void deletePageCacheWarmupQueries(String tableName, String tableType)
+      throws IOException {
+    try {
+      HttpClient.wrapAndThrowHttpException(_httpClient.sendDeleteRequest(
+          new URI(_controllerRequestURLBuilder.forPageCacheWarmupQueries(tableName, tableType)), _headers));
+    } catch (HttpErrorStatusException | URISyntaxException e) {
+      throw new IOException(e);
+    }
+  }
 }
