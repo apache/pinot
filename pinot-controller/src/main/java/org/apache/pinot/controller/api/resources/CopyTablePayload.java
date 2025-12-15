@@ -83,7 +83,7 @@ public class CopyTablePayload {
 
   @JsonGetter("destinationClusterUri")
   public String getDestinationClusterUri() {
-    return _sourceClusterUri;
+    return _destinationClusterUri;
   }
 
   @JsonGetter("destinationClusterHeaders")

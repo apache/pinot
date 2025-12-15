@@ -19,13 +19,22 @@
 package org.apache.pinot.controller.helix.core.replication;
 
 import java.net.URI;
+import java.util.Collections;
 import java.util.Map;
+import org.apache.hc.core5.http.ClassicHttpRequest;
+import org.apache.hc.core5.http.HttpHeaders;
+import org.apache.hc.core5.http.HttpVersion;
+import org.apache.hc.core5.http.io.support.ClassicRequestBuilder;
+import org.apache.hc.core5.http.message.BasicNameValuePair;
+import org.apache.pinot.common.exception.HttpErrorStatusException;
+import org.apache.pinot.common.utils.FileUploadDownloadClient;
 import org.apache.pinot.common.utils.SimpleHttpResponse;
 import org.apache.pinot.common.utils.http.HttpClient;
 import org.apache.pinot.controller.ControllerConf;
 import org.apache.pinot.controller.api.resources.CopyTablePayload;
 import org.apache.pinot.spi.filesystem.PinotFS;
 import org.apache.pinot.spi.filesystem.PinotFSFactory;
+import org.apache.pinot.spi.utils.retry.RetryPolicies;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -91,25 +100,68 @@ public class RealtimeSegmentCopier implements SegmentCopier {
       }
 
       if (!destPinotFS.exists(destSegmentUri)) {
-        sourcePinotFS.copy(sourceSegmentUri, destSegmentUri);
+        if (!destPinotFS.copy(sourceSegmentUri, destSegmentUri)) {
+          throw new RuntimeException("Failed to copy segment " + segmentName + " from " + downloadUrl + " to "
+              + destSegmentUriStr);
+        }
         LOGGER.info("[copyTable] Copied segment {} from {} to {}", segmentName, sourceSegmentUri, destSegmentUri);
       } else {
         LOGGER.info("[copyTable] Segment {} already exists at destination {}", segmentName, destSegmentUri);
       }
 
       // 3. Upload the segment to the destination controller
-      String payload = "{\"segmentUri\":\"" + destSegmentUriStr + "\"}";
-      LOGGER.info("[copyTable] Uploading segment {} to destination controller, payload: {}", segmentName, payload);
-      URI uri = new URI(copyTablePayload.getDestinationClusterUri() + String.format(SEGMENT_UPLOAD_ENDPOINT_TEMPLATE,
-          tableName));
-      SimpleHttpResponse response =
-          _httpClient.sendJsonPostRequest(uri, payload, copyTablePayload.getDestinationClusterHeaders());
-      LOGGER.info("[copyTable] Uploaded segment {} to destination controller, status: {}", segmentName,
-          response.getStatusCode());
+      LOGGER.info("[copyTable] Uploading segment {} to destination controller", segmentName);
+      String dstControllerURIStr = copyTablePayload.getDestinationClusterUri();
+      URI segmentPushURI = FileUploadDownloadClient.getUploadSegmentURI(new URI(dstControllerURIStr));
+
+      // TODO: Refactor SegmentPushUtils.java and FileUploadDownloadClient to dedup code
+      RetryPolicies.exponentialBackoffRetryPolicy(1, 5000, 5).attempt(() -> {
+        try {
+          SimpleHttpResponse response = HttpClient.wrapAndThrowHttpException(
+              _httpClient.sendRequest(
+                  getSendSegmentUriRequest(segmentPushURI, destSegmentUriStr,
+                      copyTablePayload.getDestinationClusterHeaders(), tableName),
+                  HttpClient.DEFAULT_SOCKET_TIMEOUT_MS));
+          LOGGER.info("[copyTable] Response for pushing table {} segment uri {} to location {} - {}: {}", tableName,
+              destSegmentUriStr, dstControllerURIStr, response.getStatusCode(),
+              response.getResponse());
+          return true;
+        } catch (HttpErrorStatusException e) {
+          int statusCode = e.getStatusCode();
+          if (statusCode >= 500) {
+            // Temporary exception
+            LOGGER.warn("[copyTable] Caught temporary error when pushing table: {} segment uri: {} to {}, will retry",
+                tableName, destSegmentUriStr, dstControllerURIStr, e);
+            return false;
+          } else {
+            // Permanent exception
+            LOGGER.error("[copyTable] Caught permanent error when pushing table: {} segment uri: {} to {}, won't retry",
+                tableName, destSegmentUriStr, dstControllerURIStr, e);
+            throw e;
+          }
+        }
+      });
     } catch (Exception e) {
       LOGGER.error("[copyTable] Caught exception while copying segment {}", segmentName, e);
       throw new RuntimeException(e);
     }
+  }
+
+  static ClassicHttpRequest getSendSegmentUriRequest(URI uri, String downloadUri,
+      Map<String, String> headers, String tableNameWithoutType) {
+    ClassicRequestBuilder requestBuilder = ClassicRequestBuilder.post(uri).setVersion(HttpVersion.HTTP_1_1)
+        .setHeader(
+            FileUploadDownloadClient.CustomHeaders.UPLOAD_TYPE, FileUploadDownloadClient.FileUploadType.URI.toString())
+        .setHeader(FileUploadDownloadClient.CustomHeaders.DOWNLOAD_URI, downloadUri)
+        .setHeader(HttpHeaders.CONTENT_TYPE, HttpClient.JSON_CONTENT_TYPE);
+
+    for (Map.Entry<String, String> pair: headers.entrySet()) {
+      requestBuilder.setHeader(pair.getKey(), pair.getValue());
+    }
+
+    HttpClient.addHeadersAndParameters(requestBuilder, Collections.emptyList(), Collections.singletonList(
+        new BasicNameValuePair("tableName", tableNameWithoutType)));
+    return requestBuilder.build();
   }
 
   static String getScheme(URI uri) {
