@@ -19,21 +19,14 @@
 package org.apache.pinot.segment.local.segment.creator.impl;
 
 import com.google.common.base.Preconditions;
-import java.io.DataOutputStream;
 import java.io.File;
-import java.io.FileOutputStream;
-import java.io.IOException;
-import java.util.HashMap;
-import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.TreeMap;
 import java.util.TreeSet;
 import java.util.UUID;
 import java.util.concurrent.TimeUnit;
-import java.util.stream.Collectors;
 import javax.annotation.Nullable;
-import org.apache.commons.collections4.CollectionUtils;
 import org.apache.commons.io.FileUtils;
 import org.apache.pinot.common.metrics.MinionMeter;
 import org.apache.pinot.common.metrics.MinionMetrics;
@@ -43,18 +36,11 @@ import org.apache.pinot.segment.local.realtime.converter.stats.RealtimeSegmentSe
 import org.apache.pinot.segment.local.segment.creator.ColumnarSegmentCreationDataSource;
 import org.apache.pinot.segment.local.segment.creator.RecordReaderSegmentCreationDataSource;
 import org.apache.pinot.segment.local.segment.creator.TransformPipeline;
-import org.apache.pinot.segment.local.segment.index.converter.SegmentFormatConverterFactory;
 import org.apache.pinot.segment.local.segment.index.dictionary.DictionaryIndexType;
-import org.apache.pinot.segment.local.segment.index.loader.IndexLoadingConfig;
-import org.apache.pinot.segment.local.segment.index.loader.invertedindex.MultiColumnTextIndexHandler;
 import org.apache.pinot.segment.local.segment.readers.CompactedPinotSegmentRecordReader;
 import org.apache.pinot.segment.local.segment.readers.PinotSegmentRecordReader;
-import org.apache.pinot.segment.local.startree.v2.builder.MultipleTreesBuilder;
-import org.apache.pinot.segment.local.utils.CrcUtils;
 import org.apache.pinot.segment.local.utils.IngestionUtils;
 import org.apache.pinot.segment.spi.IndexSegment;
-import org.apache.pinot.segment.spi.V1Constants;
-import org.apache.pinot.segment.spi.converter.SegmentFormatConverter;
 import org.apache.pinot.segment.spi.creator.ColumnIndexCreationInfo;
 import org.apache.pinot.segment.spi.creator.ColumnStatistics;
 import org.apache.pinot.segment.spi.creator.SegmentCreationDataSource;
@@ -62,22 +48,13 @@ import org.apache.pinot.segment.spi.creator.SegmentCreator;
 import org.apache.pinot.segment.spi.creator.SegmentGeneratorConfig;
 import org.apache.pinot.segment.spi.creator.SegmentIndexCreationDriver;
 import org.apache.pinot.segment.spi.creator.SegmentPreIndexStatsContainer;
-import org.apache.pinot.segment.spi.creator.SegmentVersion;
 import org.apache.pinot.segment.spi.creator.StatsCollectorConfig;
 import org.apache.pinot.segment.spi.index.DictionaryIndexConfig;
 import org.apache.pinot.segment.spi.index.FieldIndexConfigs;
-import org.apache.pinot.segment.spi.index.IndexHandler;
-import org.apache.pinot.segment.spi.index.IndexService;
-import org.apache.pinot.segment.spi.index.IndexType;
 import org.apache.pinot.segment.spi.index.StandardIndexes;
 import org.apache.pinot.segment.spi.index.creator.SegmentIndexCreationInfo;
 import org.apache.pinot.segment.spi.index.mutable.ThreadSafeMutableRoaringBitmap;
-import org.apache.pinot.segment.spi.loader.SegmentDirectoryLoaderContext;
-import org.apache.pinot.segment.spi.loader.SegmentDirectoryLoaderRegistry;
-import org.apache.pinot.segment.spi.store.SegmentDirectory;
-import org.apache.pinot.segment.spi.store.SegmentDirectoryPaths;
 import org.apache.pinot.spi.config.instance.InstanceType;
-import org.apache.pinot.spi.config.table.StarTreeIndexConfig;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
@@ -90,9 +67,7 @@ import org.apache.pinot.spi.data.readers.FileFormat;
 import org.apache.pinot.spi.data.readers.GenericRow;
 import org.apache.pinot.spi.data.readers.RecordReader;
 import org.apache.pinot.spi.data.readers.RecordReaderFactory;
-import org.apache.pinot.spi.env.PinotConfiguration;
 import org.apache.pinot.spi.utils.ByteArray;
-import org.apache.pinot.spi.utils.ReadMode;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 /**
@@ -343,7 +318,7 @@ public class SegmentIndexCreationDriverImpl implements SegmentIndexCreationDrive
       // TODO: _indexCreationInfoMap holds the reference to all unique values on heap (ColumnIndexCreationInfo ->
       //       ColumnStatistics) throughout the segment creation. Find a way to release the memory early.
       _indexCreator.init(_config, _segmentIndexCreationInfo, _indexCreationInfoMap, _dataSchema, _tempIndexDir,
-          immutableToMutableIdMap);
+          immutableToMutableIdMap, _instanceType);
 
       // Build the index
       _recordReader.rewind();
@@ -452,7 +427,7 @@ public class SegmentIndexCreationDriverImpl implements SegmentIndexCreationDrive
       // TODO: _indexCreationInfoMap holds the reference to all unique values on heap (ColumnIndexCreationInfo ->
       //       ColumnStatistics) throughout the segment creation. Find a way to release the memory early.
       _indexCreator.init(_config, _segmentIndexCreationInfo, _indexCreationInfoMap, _dataSchema, _tempIndexDir,
-          immutableToMutableIdMap);
+          immutableToMutableIdMap, _instanceType);
 
       // Build the indexes
       LOGGER.info("Start building Index by column");
@@ -480,46 +455,21 @@ public class SegmentIndexCreationDriverImpl implements SegmentIndexCreationDrive
 
   private void handlePostCreation()
       throws Exception {
-    ColumnStatistics timeColumnStatistics = _segmentStats.getColumnProfileFor(_config.getTimeColumnName());
-    int sequenceId = _config.getSequenceId();
-    if (timeColumnStatistics != null) {
-      if (_totalDocs > 0) {
-        _segmentName = _config.getSegmentNameGenerator()
-            .generateSegmentName(sequenceId, timeColumnStatistics.getMinValue(), timeColumnStatistics.getMaxValue());
-      } else {
-        // When totalDoc is 0, check whether 'failOnEmptySegment' option is true. If so, directly fail the segment
-        // creation.
-        Preconditions.checkArgument(!_config.isFailOnEmptySegment(),
-            "Failing the empty segment creation as the option 'failOnEmptySegment' is set to: "
-                + _config.isFailOnEmptySegment());
-        // Generate a unique name for a segment with no rows
-        long now = System.currentTimeMillis();
-        _segmentName = _config.getSegmentNameGenerator().generateSegmentName(sequenceId, now, now);
-      }
-    } else {
-      _segmentName = _config.getSegmentNameGenerator().generateSegmentName(sequenceId, null, null);
-    }
-
+    // Execute all post-creation operations directly on the index creator
     try {
-      // Write the index files to disk
-      _indexCreator.setSegmentName(_segmentName);
       _indexCreator.seal();
     } finally {
       _indexCreator.close();
     }
-    LOGGER.info("Finished segment seal!");
+    _segmentName = _indexCreator.getSegmentName();
 
-    // Delete the directory named after the segment name, if it exists
-    final File outputDir = new File(_config.getOutDir());
-    final File segmentOutputDir = new File(outputDir, _segmentName);
+    // Move the segment from the temporary directory to the final output directory
+    File outputDir = new File(_config.getOutDir());
+    File segmentOutputDir = new File(outputDir, _segmentName);
     if (segmentOutputDir.exists()) {
       FileUtils.deleteDirectory(segmentOutputDir);
     }
-
-    // Move the temporary directory into its final location
     FileUtils.moveDirectory(_tempIndexDir, segmentOutputDir);
-
-    // Delete the temporary directory
     FileUtils.deleteQuietly(_tempIndexDir);
 
     // Compute data crc before segment format conversion applies since v3 puts all index files into a single one
@@ -851,7 +801,8 @@ public class SegmentIndexCreationDriverImpl implements SegmentIndexCreationDrive
       }
 
       // Initialize the index creation using the per-column statistics information
-      _indexCreator.init(_config, _segmentIndexCreationInfo, _indexCreationInfoMap, _dataSchema, _tempIndexDir, null);
+      _indexCreator.init(_config, _segmentIndexCreationInfo, _indexCreationInfoMap, _dataSchema, _tempIndexDir,
+          null, _instanceType);
 
       // Build the indexes column-wise (true column-major approach)
       LOGGER.info("Start building Index using columnar approach");

@@ -26,7 +26,11 @@ import org.apache.pinot.query.mailbox.MailboxService;
 import org.apache.pinot.query.routing.StageMetadata;
 import org.apache.pinot.query.routing.VirtualServerAddress;
 import org.apache.pinot.query.routing.WorkerMetadata;
+import org.apache.pinot.query.runtime.context.BrokerContext;
+import org.apache.pinot.query.runtime.context.ServerContext;
 import org.apache.pinot.query.runtime.operator.OpChainId;
+import org.apache.pinot.query.runtime.operator.factory.DefaultQueryOperatorFactoryProvider;
+import org.apache.pinot.query.runtime.operator.factory.QueryOperatorFactoryProvider;
 import org.apache.pinot.query.runtime.plan.pipeline.PipelineBreakerResult;
 import org.apache.pinot.query.runtime.plan.server.ServerPlanRequestContext;
 import org.apache.pinot.spi.query.QueryExecutionContext;
@@ -54,6 +58,7 @@ public class OpChainExecutionContext {
   @Nullable
   private final PipelineBreakerResult _pipelineBreakerResult;
   private final boolean _traceEnabled;
+  private final QueryOperatorFactoryProvider _queryOperatorFactoryProvider;
   @Nullable
   private ServerPlanRequestContext _leafStageContext;
   private final boolean _sendStats;
@@ -78,6 +83,7 @@ public class OpChainExecutionContext {
     _id = new OpChainId(requestId, workerMetadata.getWorkerId(), stageMetadata.getStageId());
     _pipelineBreakerResult = pipelineBreakerResult;
     _traceEnabled = Boolean.parseBoolean(opChainMetadata.get(CommonConstants.Broker.Request.TRACE));
+    _queryOperatorFactoryProvider = getDefaultQueryOperatorFactoryProvider();
   }
 
   public static OpChainExecutionContext fromQueryContext(MailboxService mailboxService,
@@ -177,6 +183,10 @@ public class OpChainExecutionContext {
     return _traceEnabled;
   }
 
+  public QueryOperatorFactoryProvider getQueryOperatorFactoryProvider() {
+    return _queryOperatorFactoryProvider;
+  }
+
   @Nullable
   public ServerPlanRequestContext getLeafStageContext() {
     return _leafStageContext;
@@ -188,5 +198,20 @@ public class OpChainExecutionContext {
 
   public boolean isSendStats() {
     return _sendStats;
+  }
+
+  private static QueryOperatorFactoryProvider getDefaultQueryOperatorFactoryProvider() {
+    // Prefer server context when explicitly configured, otherwise fall back to broker, then default.
+    QueryOperatorFactoryProvider serverProvider =
+        ServerContext.getInstance().getQueryOperatorFactoryProvider();
+    if (serverProvider != null) {
+      return serverProvider;
+    }
+    QueryOperatorFactoryProvider brokerProvider =
+        BrokerContext.getInstance().getQueryOperatorFactoryProvider();
+    if (brokerProvider != null) {
+      return brokerProvider;
+    }
+    return DefaultQueryOperatorFactoryProvider.INSTANCE;
   }
 }

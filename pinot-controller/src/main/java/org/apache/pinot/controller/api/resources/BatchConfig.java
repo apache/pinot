@@ -21,7 +21,7 @@ package org.apache.pinot.controller.api.resources;
 import com.google.common.base.Preconditions;
 
 
-public class ForceCommitBatchConfig {
+public class BatchConfig {
   public static final int DEFAULT_BATCH_SIZE = Integer.MAX_VALUE;
   public static final int DEFAULT_STATUS_CHECK_INTERVAL_SEC = 5;
   public static final int DEFAULT_STATUS_CHECK_TIMEOUT_SEC = 180;
@@ -29,20 +29,20 @@ public class ForceCommitBatchConfig {
   private final int _batchStatusCheckIntervalMs;
   private final int _batchStatusCheckTimeoutMs;
 
-  private ForceCommitBatchConfig(int batchSize, int batchStatusCheckIntervalMs, int batchStatusCheckTimeoutMs) {
+  private BatchConfig(int batchSize, int batchStatusCheckIntervalMs, int batchStatusCheckTimeoutMs) {
     _batchSize = batchSize;
     _batchStatusCheckIntervalMs = batchStatusCheckIntervalMs;
     _batchStatusCheckTimeoutMs = batchStatusCheckTimeoutMs;
   }
 
-  public static ForceCommitBatchConfig of(int batchSize, int batchStatusCheckIntervalSec,
+  public static BatchConfig of(int batchSize, int batchStatusCheckIntervalSec,
       int batchStatusCheckTimeoutSec) {
     Preconditions.checkArgument(batchSize > 0, "Batch size should be greater than zero");
     Preconditions.checkArgument(batchStatusCheckIntervalSec > 0,
         "Batch status check interval should be greater than zero");
     Preconditions.checkArgument(batchStatusCheckTimeoutSec > 0,
         "Batch status check timeout should be greater than zero");
-    return new ForceCommitBatchConfig(batchSize, batchStatusCheckIntervalSec * 1000, batchStatusCheckTimeoutSec * 1000);
+    return new BatchConfig(batchSize, batchStatusCheckIntervalSec * 1000, batchStatusCheckTimeoutSec * 1000);
   }
 
   public int getBatchSize() {

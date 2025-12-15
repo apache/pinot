@@ -63,7 +63,7 @@ class ExitHelper {
   }
 }
 
-// Record the status of the pre-download to be consumed by odin-pinot-worker.
+// Record the status of the pre-download to be consumed by start up orchestration worker/service.
 public class PredownloadStatusRecorder {
   private static final Logger LOGGER = LoggerFactory.getLogger(PredownloadStatusRecorder.class);
   private static final long STATUS_RECORD_EXPIRATION_SEC = 3600 * 6; // 6 hours

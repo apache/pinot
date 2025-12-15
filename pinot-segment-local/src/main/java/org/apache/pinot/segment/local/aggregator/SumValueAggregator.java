@@ -41,12 +41,12 @@ public class SumValueAggregator implements ValueAggregator<Object, Double> {
     if (rawValue == null) {
       return 0.0;
     }
-    return ValueAggregatorUtils.toDouble(rawValue);
+    return processRawValue(rawValue);
   }
 
   @Override
   public Double applyRawValue(Double value, Object rawValue) {
-    return value + ValueAggregatorUtils.toDouble(rawValue);
+    return value + processRawValue(rawValue);
   }
 
   @Override
@@ -77,5 +77,23 @@ public class SumValueAggregator implements ValueAggregator<Object, Double> {
   @Override
   public Double deserializeAggregatedValue(byte[] bytes) {
     throw new UnsupportedOperationException();
+  }
+
+  /**
+   * Processes a raw value (single number or multi-value array) and returns the sum.
+   */
+  protected Double processRawValue(@Nullable Object rawValue) {
+    if (rawValue instanceof Object[]) {
+      Object[] values = (Object[]) rawValue;
+      double sum = 0.0;
+      for (Object value : values) {
+        if (value != null) {
+          sum += ValueAggregatorUtils.toDouble(value);
+        }
+      }
+      return sum;
+    } else {
+      return ValueAggregatorUtils.toDouble(rawValue);
+    }
   }
 }

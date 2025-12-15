@@ -660,11 +660,25 @@ public abstract class BasePartitionUpsertMetadataManager implements PartitionUps
     }
     if (validDocIdsForOldSegment != null && !validDocIdsForOldSegment.isEmpty()) {
       int numKeysNotReplaced = validDocIdsForOldSegment.getCardinality();
-      if (_partialUpsertHandler != null) {
+      // Add the new metric tracking here
+      if (_context.isDropOutOfOrderRecord() && _context.getConsistencyMode() == UpsertConfig.ConsistencyMode.NONE) {
+        // For Upsert tables when some of the records get dropped when dropOutOfOrderRecord is enabled, we donot
+        // store the original record location when keys are not replaced, this can potentially cause inconsistencies
+        // leading to some rows not getting dropped when reconsumed. This can be caused when a consuming segment
+        // that is consumed from a different server is replaced with the existing segment which consumed rows ahead
+        // of the other server
+        _logger.warn(
+            "Found {} primary keys not replaced when replacing segment: {} for upsert table with dropOutOfOrderRecord"
+                + " enabled with no consistency mode. This can potentially cause inconsistency between replicas",
+            numKeysNotReplaced, segmentName);
+        _serverMetrics.addMeteredTableValue(_tableNameWithType, ServerMeter.REALTIME_UPSERT_INCONSISTENT_ROWS,
+            numKeysNotReplaced);
+      } else if (_partialUpsertHandler != null) {
         // For partial-upsert table, because we do not restore the original record location when removing the primary
         // keys not replaced, it can potentially cause inconsistency between replicas. This can happen when a
         // consuming segment is replaced by a committed segment that is consumed from a different server with
-        // different records (some stream consumer cannot guarantee consuming the messages in the same order).
+        // different records (some stream consumer cannot guarantee consuming the messages in the same order/
+        // when a segment is replaced with lesser consumed rows from the other server).
         _logger.warn("Found {} primary keys not replaced when replacing segment: {} for partial-upsert table. This "
             + "can potentially cause inconsistency between replicas", numKeysNotReplaced, segmentName);
         _serverMetrics.addMeteredTableValue(_tableNameWithType, ServerMeter.PARTIAL_UPSERT_KEYS_NOT_REPLACED,

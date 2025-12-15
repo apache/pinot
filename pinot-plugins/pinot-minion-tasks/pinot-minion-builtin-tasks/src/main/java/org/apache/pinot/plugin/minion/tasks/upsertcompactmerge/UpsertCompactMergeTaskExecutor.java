@@ -133,7 +133,9 @@ public class UpsertCompactMergeTaskExecutor extends BaseMultipleSegmentsConversi
     }
 
     // create new UploadedRealtimeSegment
-    segmentProcessorConfigBuilder.setCustomCreationTime(maxCreationTimeOfMergingSegments);
+    // set the creation time to maxCreationTimeOfMergingSegments + 1 to ensure that all records in merging
+    // segments are replaced with new merged segment
+    segmentProcessorConfigBuilder.setCustomCreationTime(maxCreationTimeOfMergingSegments + 1);
     segmentProcessorConfigBuilder.setSegmentNameGenerator(
         new UploadedRealtimeSegmentNameGenerator(TableNameBuilder.extractRawTableName(tableNameWithType), partitionID,
             System.currentTimeMillis(), MinionConstants.UpsertCompactMergeTask.MERGED_SEGMENT_NAME_PREFIX, null));

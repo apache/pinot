@@ -34,6 +34,7 @@ import javax.annotation.Nullable;
 import org.apache.calcite.rel.RelDistribution;
 import org.apache.commons.collections4.CollectionUtils;
 import org.apache.pinot.calcite.rel.hint.PinotHintOptions;
+import org.apache.pinot.calcite.rel.logical.PinotRelExchangeType;
 import org.apache.pinot.calcite.rel.rules.ImmutableTableOptions;
 import org.apache.pinot.calcite.rel.rules.TableOptions;
 import org.apache.pinot.common.request.BrokerRequest;
@@ -113,6 +114,7 @@ public class WorkerManager {
     }
   }
 
+  // TODO: Ensure that workerId to server assignment is deterministic across all stages in a query.
   private void assignWorkersToNonRootFragment(PlanFragment fragment, DispatchablePlanContext context) {
     List<PlanFragment> children = fragment.getChildren();
     for (PlanFragment child : children) {
@@ -124,7 +126,7 @@ public class WorkerManager {
       // TODO: Revisit this logic and see if we can generalize this
       // For LOOKUP join, join is leaf stage because there is no exchange added to the right side of the join. When we
       // find a single local exchange child in the leaf stage, assign workers based on the local exchange child.
-      if (children.size() == 1 && isLocalExchange(children.get(0), context)) {
+      if (isLookupJoin(children)) {
         DispatchablePlanMetadata childMetadata = metadataMap.get(children.get(0).getFragmentId());
         Map<Integer, QueryServerInstance> workerIdToServerInstanceMap = assignWorkersForLocalExchange(childMetadata);
         metadata.setWorkerIdToServerInstanceMap(workerIdToServerInstanceMap);
@@ -144,6 +146,20 @@ public class WorkerManager {
     } else {
       assignWorkersToIntermediateFragment(fragment, context);
     }
+  }
+
+  private boolean isLookupJoin(List<PlanFragment> children) {
+    if (children.size() != 1) {
+      return false;
+    }
+    PlanNode planNode = children.get(0).getFragmentRoot();
+    if (!(planNode instanceof MailboxSendNode)) {
+      return false;
+    }
+    MailboxSendNode mailboxSendNode = (MailboxSendNode) planNode;
+    // NOTE: Exclude colocated semi-join which also contains a single SINGLETON exchange.
+    return mailboxSendNode.getDistributionType() == RelDistribution.Type.SINGLETON
+        && mailboxSendNode.getExchangeType() != PinotRelExchangeType.PIPELINE_BREAKER;
   }
 
   private boolean isLocalExchange(PlanFragment fragment, DispatchablePlanContext context) {

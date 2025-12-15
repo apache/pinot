@@ -140,6 +140,8 @@ public abstract class BaseSingleStageBrokerRequestHandler extends BaseBrokerRequ
   private static final Expression TRUE = RequestUtils.getLiteralExpression(true);
   private static final Expression STAR = RequestUtils.getIdentifierExpression("*");
   private static final int MAX_UNAVAILABLE_SEGMENTS_TO_PRINT_IN_QUERY_EXCEPTION = 10;
+  // TODO: After the next release, remove overrides here for consolidated aggregation functions
+  //  (see https://github.com/apache/pinot/issues/17061)
   private static final Map<String, String> MV_COL_AGG_FUNCTION_OVERRIDE_MAP = Map.ofEntries(
       Map.entry("distinctcount", "distinctcountmv"),
       Map.entry("distinctcountbitmap", "distinctcountbitmapmv"),

@@ -88,8 +88,8 @@ import org.apache.pinot.common.utils.helix.IdealStateSingleCommit;
 import org.apache.pinot.common.utils.http.HttpClient;
 import org.apache.pinot.controller.ControllerConf;
 import org.apache.pinot.controller.api.events.MetadataEventNotifierFactory;
+import org.apache.pinot.controller.api.resources.BatchConfig;
 import org.apache.pinot.controller.api.resources.Constants;
-import org.apache.pinot.controller.api.resources.ForceCommitBatchConfig;
 import org.apache.pinot.controller.api.resources.PauseStatusDetails;
 import org.apache.pinot.controller.helix.core.PinotHelixResourceManager;
 import org.apache.pinot.controller.helix.core.PinotTableIdealStateBuilder;
@@ -232,14 +232,14 @@ public class PinotLLCRealtimeSegmentManager {
         MetadataEventNotifierFactory.loadFactory(controllerConf.subset(METADATA_EVENT_NOTIFIER_PREFIX),
             helixResourceManager);
     _flushThresholdUpdateManager = new FlushThresholdUpdateManager();
+
     _isDeepStoreLLCSegmentUploadRetryEnabled = controllerConf.isDeepStoreRetryUploadLLCSegmentEnabled();
+    _fileUploadDownloadClient = initFileUploadDownloadClient();
+    _deepStoreUploadExecutor = Executors.newFixedThreadPool(controllerConf.getDeepStoreRetryUploadParallelism());
+    _deepStoreUploadExecutorPendingSegments = ConcurrentHashMap.newKeySet();
+
     _isTmpSegmentAsyncDeletionEnabled = controllerConf.isTmpSegmentAsyncDeletionEnabled();
     _deepstoreUploadRetryTimeoutMs = controllerConf.getDeepStoreRetryUploadTimeoutMs();
-    _fileUploadDownloadClient = _isDeepStoreLLCSegmentUploadRetryEnabled ? initFileUploadDownloadClient() : null;
-    _deepStoreUploadExecutor = _isDeepStoreLLCSegmentUploadRetryEnabled ? Executors.newFixedThreadPool(
-        controllerConf.getDeepStoreRetryUploadParallelism()) : null;
-    _deepStoreUploadExecutorPendingSegments =
-        _isDeepStoreLLCSegmentUploadRetryEnabled ? ConcurrentHashMap.newKeySet() : null;
   }
 
   public boolean isDeepStoreLLCSegmentUploadRetryEnabled() {
@@ -365,6 +365,10 @@ public class PinotLLCRealtimeSegmentManager {
         LOGGER.error("Failed to close fileUploadDownloadClient.");
       }
     }
+
+    if (_deepStoreUploadExecutor != null) {
+      _deepStoreUploadExecutor.shutdown();
+    }
   }
 
   /**
@@ -393,11 +397,11 @@ public class PinotLLCRealtimeSegmentManager {
     long currentTimeMs = getCurrentTimeMs();
     Map<String, Map<String, String>> instanceStatesMap = idealState.getRecord().getMapFields();
     for (PartitionGroupMetadata partitionGroupMetadata : newPartitionGroupMetadataList) {
-      int streamConfigIdx = IngestionConfigUtils.getStreamConfigIndexFromPinotPartitionId(
+      StreamConfig streamConfig = IngestionConfigUtils.getStreamConfigFromPinotPartitionId(streamConfigs,
           partitionGroupMetadata.getPartitionGroupId());
       String segmentName =
-          setupNewPartitionGroup(tableConfig, streamConfigs.get(streamConfigIdx), partitionGroupMetadata, currentTimeMs,
-              instancePartitions, numPartitionGroups, numReplicas);
+          setupNewPartitionGroup(tableConfig, streamConfig, partitionGroupMetadata, currentTimeMs, instancePartitions,
+              numPartitionGroups, numReplicas);
       updateInstanceStatesForNewConsumingSegment(instanceStatesMap, null, segmentName, segmentAssignment,
           instancePartitionsMap);
     }
@@ -790,8 +794,6 @@ public class PinotLLCRealtimeSegmentManager {
     if (!isTablePaused(idealState) && !isTopicPaused(idealState, committingSegmentName)) {
       LLCSegmentName committingLLCSegment = new LLCSegmentName(committingSegmentName);
       int committingSegmentPartitionGroupId = committingLLCSegment.getPartitionGroupId();
-      int streamConfigIdx = IngestionConfigUtils.getStreamConfigIndexFromPinotPartitionId(
-          committingSegmentPartitionGroupId);
 
       List<StreamConfig> streamConfigs = IngestionConfigUtils.getStreamConfigs(tableConfig);
       Set<Integer> partitionIds = getPartitionIds(streamConfigs, idealState);
@@ -802,9 +804,11 @@ public class PinotLLCRealtimeSegmentManager {
         LLCSegmentName newLLCSegment = new LLCSegmentName(rawTableName, committingSegmentPartitionGroupId,
             committingLLCSegment.getSequenceNumber() + 1, newSegmentCreationTimeMs);
 
-        createNewSegmentZKMetadata(tableConfig, streamConfigs.get(streamConfigIdx), newLLCSegment,
-            newSegmentCreationTimeMs, committingSegmentDescriptor, committingSegmentZKMetadata, instancePartitions,
-            partitionIds.size(), numReplicas);
+        StreamConfig streamConfig =
+            IngestionConfigUtils.getStreamConfigFromPinotPartitionId(streamConfigs, committingSegmentPartitionGroupId);
+        createNewSegmentZKMetadata(tableConfig, streamConfig, newLLCSegment, newSegmentCreationTimeMs,
+            committingSegmentDescriptor, committingSegmentZKMetadata, instancePartitions, partitionIds.size(),
+            numReplicas);
         newConsumingSegmentName = newLLCSegment.getSegmentName();
         LOGGER.info("Created new segment metadata for segment: {} with status: {}.", newConsumingSegmentName,
             Status.IN_PROGRESS);
@@ -1064,7 +1068,7 @@ public class PinotLLCRealtimeSegmentManager {
       // For multi-stream tables, convert Pinot partition ID (which includes padding offset) to stream partition ID.
       // This ensures the partition metadata stored in ZK matches what the broker's partition function computes
       // during query pruning. For example, stream 1 partition 5 has Pinot partition ID 10005, but should store 5.
-      int streamPartitionId = IngestionConfigUtils.getStreamPartitionIdFromPinotPartitionId(partitionId);
+      int streamPartitionId = IngestionConfigUtils.getStreamPartitionIdFromPinotPartitionId(tableConfig, partitionId);
       ColumnPartitionMetadata columnPartitionMetadata =
           new ColumnPartitionMetadata(columnPartitionConfig.getFunctionName(), numPartitionGroups,
               Collections.singleton(streamPartitionId), columnPartitionConfig.getFunctionConfig());
@@ -2288,17 +2292,17 @@ public class PinotLLCRealtimeSegmentManager {
    * @return the set of consuming segments for which commit was initiated
    */
   public Set<String> forceCommit(String tableNameWithType, @Nullable String partitionGroupIdsToCommit,
-      @Nullable String segmentsToCommit, ForceCommitBatchConfig batchConfig) {
+      @Nullable String segmentsToCommit, @Nullable BatchConfig batchConfig) {
     IdealState idealState = getIdealState(tableNameWithType);
     Set<String> allConsumingSegments = findConsumingSegments(idealState);
     Set<String> targetConsumingSegments =
         filterSegmentsToCommit(allConsumingSegments, partitionGroupIdsToCommit, segmentsToCommit);
-    int batchSize = batchConfig.getBatchSize();
-    if (batchSize >= targetConsumingSegments.size()) {
+    if ((batchConfig == null) || (batchConfig.getBatchSize() >= targetConsumingSegments.size())) {
       // No need to divide segments in batches.
       sendForceCommitMessageToServers(tableNameWithType, targetConsumingSegments);
     } else {
-      List<Set<String>> segmentBatchList = getSegmentBatchList(idealState, targetConsumingSegments, batchSize);
+      List<Set<String>> segmentBatchList =
+          getSegmentBatchList(idealState, targetConsumingSegments, batchConfig.getBatchSize());
       ExecutorService executor = Executors.newSingleThreadExecutor();
       executor.submit(() -> processBatchesSequentially(segmentBatchList, tableNameWithType, batchConfig));
       executor.shutdown();
@@ -2307,7 +2311,7 @@ public class PinotLLCRealtimeSegmentManager {
   }
 
   private void processBatchesSequentially(List<Set<String>> segmentBatchList, String tableNameWithType,
-      ForceCommitBatchConfig forceCommitBatchConfig) {
+      BatchConfig forceCommitBatchConfig) {
     Set<String> prevBatch = null;
     try {
       for (Set<String> segmentBatchToCommit : segmentBatchList) {
@@ -2324,7 +2328,7 @@ public class PinotLLCRealtimeSegmentManager {
   }
 
   public void waitUntilSegmentsForceCommitted(String tableNameWithType, Set<String> segmentsToWait,
-      ForceCommitBatchConfig forceCommitBatchConfig)
+      BatchConfig forceCommitBatchConfig)
       throws InterruptedException {
     int batchStatusCheckIntervalMs = forceCommitBatchConfig.getBatchStatusCheckIntervalMs();
     int batchStatusCheckTimeoutMs = forceCommitBatchConfig.getBatchStatusCheckTimeoutMs();
@@ -2427,8 +2431,7 @@ public class PinotLLCRealtimeSegmentManager {
       if (!invalidSegments.isEmpty()) {
         LOGGER.warn("Cannot commit segments that are not in CONSUMING state. All consuming segments: {}, "
                 + "provided segments to commit: {}. Ignoring all non-consuming segments, sampling 10: {}",
-            allConsumingSegments,
-            segmentsToCommitStr, invalidSegments.stream().limit(10).collect(Collectors.toSet()));
+            allConsumingSegments, segmentsToCommitStr, invalidSegments.stream().limit(10).collect(Collectors.toSet()));
       }
       return validSegmentsToCommit;
     }
@@ -2453,9 +2456,19 @@ public class PinotLLCRealtimeSegmentManager {
    */
   public PauseStatusDetails pauseConsumption(String tableNameWithType, PauseState.ReasonCode reasonCode,
       @Nullable String comment) {
+    return pauseConsumption(tableNameWithType, reasonCode, comment, null);
+  }
+
+  /**
+   * Pause consumption on a table by
+   *   1) Update PauseState in the table ideal state and
+   *   2) Sending force commit messages to servers
+   */
+  public PauseStatusDetails pauseConsumption(String tableNameWithType, PauseState.ReasonCode reasonCode,
+      @Nullable String comment, @Nullable BatchConfig batchConfig) {
     IdealState updatedIdealState = updatePauseStateInIdealState(tableNameWithType, true, reasonCode, comment);
     Set<String> consumingSegments = findConsumingSegments(updatedIdealState);
-    sendForceCommitMessageToServers(tableNameWithType, consumingSegments);
+    forceCommit(tableNameWithType, null, null, batchConfig);
     return new PauseStatusDetails(true, consumingSegments, reasonCode, comment != null ? comment
         : "Pause flag is set. Consuming segments are being committed."
             + " Use /pauseStatus endpoint in a few moments to check if all consuming segments have been committed.",
@@ -2553,15 +2566,18 @@ public class PinotLLCRealtimeSegmentManager {
   }
 
   private void sendForceCommitMessageToServers(String tableNameWithType, Set<String> consumingSegments) {
-    // For partial upsert tables, force-committing consuming segments is disabled.
-    // In some cases (especially when replication > 1), the server with fewer consumed rows
-    // was incorrectly chosen as the winner, causing other servers to reconsume rows
-    // and leading to inconsistent data.
+    // For partial-upsert tables or upserts with out-of-order events enabled, force-committing
+    // consuming segments is disabled. In some cases (especially when replication > 1), the
+    // server that consumed fewer rows was incorrectly selected as the winner, causing other
+    // servers to reconsume rows and resulting in inconsistent data when previous state must
+    // be referenced for add/update operations.
     // TODO: Temporarily disabled until a proper fix is implemented.
     TableConfig tableConfig = _helixResourceManager.getTableConfig(tableNameWithType);
-    if (TableConfigUtils.checkForPartialUpsertWithReplicas(tableConfig)) {
+    if (TableConfigUtils.checkForInconsistentStateConfigs(tableConfig)) {
       throw new IllegalStateException(
-          "Force commit is not allowed for partial upsert tables: {} when replication > 1" + tableNameWithType);
+          "Force commit is not allowed when replication > 1 for partial-upsert tables, or for upsert tables"
+              + " when dropOutOfOrder is enabled with consistency mode: " + UpsertConfig.ConsistencyMode.NONE
+              + " for the table: " + tableNameWithType);
     }
 
     if (!consumingSegments.isEmpty()) {
@@ -2643,6 +2659,7 @@ public class PinotLLCRealtimeSegmentManager {
   }
 
   /**
+   * Repair segments in error state:
    * Re-ingests segments that are in ERROR state in EV but ONLINE in IS with no peer copy on any server. This method
    * will call the server reingestSegment API on one of the alive servers that are supposed to host that segment
    * according to IdealState.
@@ -2651,18 +2668,17 @@ public class PinotLLCRealtimeSegmentManager {
    * <p>
    * If segment is in ERROR state in only few replicas but has download URL, we instead trigger a segment reset
    *
-   * @param tableConfig                         The table config
-   * @param segmentAutoResetOnErrorAtValidation flag to determine whether to reset the error segments or not
+   * @param tableConfig The table config
    */
-  public void repairSegmentsInErrorStateForPauselessConsumption(TableConfig tableConfig,
-      boolean repairErrorSegmentsForPartialUpsertOrDedup, boolean segmentAutoResetOnErrorAtValidation) {
+  public void repairSegmentsInErrorState(TableConfig tableConfig,
+      boolean repairErrorSegmentsForPartialUpsertOrDedup) {
+    boolean isPauselessTable = PauselessConsumptionUtils.isPauselessEnabled(tableConfig);
     String realtimeTableName = tableConfig.getTableName();
     // Fetch ideal state and external view
     IdealState idealState = getIdealState(realtimeTableName);
     ExternalView externalView = _helixResourceManager.getTableExternalView(realtimeTableName);
     if (externalView == null) {
-      LOGGER.warn(
-          "External view not found for table: {}, skipping repairing segments in error state for pauseless consumption",
+      LOGGER.warn("External view not found for table: {}, skipping repairing segments in error state",
           realtimeTableName);
       return;
     }
@@ -2709,9 +2725,14 @@ public class PinotLLCRealtimeSegmentManager {
     }
 
     if (segmentsInErrorStateInAtLeastOneReplica.isEmpty()) {
-      _controllerMetrics.setOrUpdateTableGauge(realtimeTableName, ControllerGauge.PAUSELESS_SEGMENTS_IN_ERROR_COUNT, 0);
-      _controllerMetrics.setOrUpdateTableGauge(realtimeTableName,
-          ControllerGauge.PAUSELESS_SEGMENTS_IN_UNRECOVERABLE_ERROR_COUNT, 0);
+      if (isPauselessTable) {
+        _controllerMetrics.setOrUpdateTableGauge(realtimeTableName, ControllerGauge.PAUSELESS_SEGMENTS_IN_ERROR_COUNT,
+            0);
+        _controllerMetrics.setOrUpdateTableGauge(realtimeTableName,
+            ControllerGauge.PAUSELESS_SEGMENTS_IN_UNRECOVERABLE_ERROR_COUNT, 0);
+      } else {
+        _controllerMetrics.setOrUpdateTableGauge(realtimeTableName, ControllerGauge.SEGMENTS_IN_ERROR_STATE, 0);
+      }
       return;
     }
 
@@ -2720,12 +2741,26 @@ public class PinotLLCRealtimeSegmentManager {
         segmentsInErrorStateInAtLeastOneReplica.size(), segmentsInErrorStateInAtLeastOneReplica,
         segmentsInErrorStateInAllReplicas.size(), segmentsInErrorStateInAllReplicas, realtimeTableName);
 
-    _controllerMetrics.setOrUpdateTableGauge(realtimeTableName, ControllerGauge.PAUSELESS_SEGMENTS_IN_ERROR_COUNT,
-        segmentsInErrorStateInAllReplicas.size());
-
     boolean repairCommittingSegments =
         allowRepairOfCommittingSegments(repairErrorSegmentsForPartialUpsertOrDedup, tableConfig);
     int segmentsInUnRecoverableState = 0;
+    if (isPauselessTable && !repairCommittingSegments) {
+      // We do not run reingestion for dedup and partial upsert tables in pauseless as it can
+      // lead to data inconsistencies
+      _controllerMetrics.setOrUpdateTableGauge(realtimeTableName,
+          ControllerGauge.PAUSELESS_SEGMENTS_IN_UNRECOVERABLE_ERROR_COUNT, segmentsInErrorStateInAllReplicas.size());
+      return;
+    } else {
+      LOGGER.info("Repairing error segments in table: {}.", realtimeTableName);
+    }
+
+    if (isPauselessTable) {
+      _controllerMetrics.setOrUpdateTableGauge(realtimeTableName, ControllerGauge.PAUSELESS_SEGMENTS_IN_ERROR_COUNT,
+          segmentsInErrorStateInAllReplicas.size());
+    } else {
+      _controllerMetrics.setOrUpdateTableGauge(realtimeTableName, ControllerGauge.SEGMENTS_IN_ERROR_STATE,
+          segmentsInErrorStateInAllReplicas.size());
+    }
 
     for (String segmentName : segmentsInErrorStateInAtLeastOneReplica) {
       SegmentZKMetadata segmentZKMetadata = _helixResourceManager.getSegmentZKMetadata(realtimeTableName, segmentName);
@@ -2734,10 +2769,11 @@ public class PinotLLCRealtimeSegmentManager {
             realtimeTableName);
         continue;
       }
-      // We only consider segments that are in COMMITTING state for reingestion
-      if (segmentZKMetadata.getStatus() == Status.COMMITTING && segmentsInErrorStateInAllReplicas.contains(
-          segmentName)) {
 
+      Status status = segmentZKMetadata.getStatus();
+
+      // 1) For COMMITTING segments where all replicas are in ERROR, try re-ingestion (subject to policy)
+      if (status == Status.COMMITTING && segmentsInErrorStateInAllReplicas.contains(segmentName)) {
         if (!repairCommittingSegments) {
           segmentsInUnRecoverableState += 1;
           LOGGER.info(
@@ -2759,20 +2795,37 @@ public class PinotLLCRealtimeSegmentManager {
               realtimeTableName);
           continue;
         }
-
         try {
           triggerReingestion(aliveServer, segmentName);
           LOGGER.info("Successfully triggered re-ingestion for segment: {} on server: {}", segmentName, aliveServer);
         } catch (Exception e) {
-          LOGGER.error("Failed to call reingestSegment for segment: {} on server: {}", segmentName, aliveServer, e);
+          LOGGER.error("Failed to trigger re-ingestion for segment: {} on server: {}", segmentName, aliveServer, e);
         }
-      } else if (segmentAutoResetOnErrorAtValidation) {
+        continue;
+      }
+
+      // 2) For IN_PROGRESS segments where all replicas are in ERROR, issue a reset to allow ERROR->OFFLINE and retry
+      if (status == Status.IN_PROGRESS && segmentsInErrorStateInAllReplicas.contains(segmentName)) {
+        LOGGER.info("Resetting IN_PROGRESS segment: {} in table: {} since all replicas are in ERROR state.",
+            segmentName, realtimeTableName);
+        _helixResourceManager.resetSegment(realtimeTableName, segmentName, null);
+        continue;
+      }
+
+      // 3) For all other non-IN_PROGRESS statuses with any ERROR replica, trigger a reset to download/refresh
+      if (status != Status.IN_PROGRESS) {
         _helixResourceManager.resetSegment(realtimeTableName, segmentName, null);
       }
     }
 
-    _controllerMetrics.setOrUpdateTableGauge(realtimeTableName,
-        ControllerGauge.PAUSELESS_SEGMENTS_IN_UNRECOVERABLE_ERROR_COUNT, segmentsInUnRecoverableState);
+    if (isPauselessTable) {
+      _controllerMetrics.setOrUpdateTableGauge(realtimeTableName,
+          ControllerGauge.PAUSELESS_SEGMENTS_IN_UNRECOVERABLE_ERROR_COUNT, segmentsInUnRecoverableState);
+    }
+  }
+
+  public boolean shouldRepairErrorSegmentsForPartialUpsertOrDedup(DisasterRecoveryMode disasterRecoveryMode) {
+    return disasterRecoveryMode == DisasterRecoveryMode.ALWAYS;
   }
 
   /**
@@ -2794,7 +2847,7 @@ public class PinotLLCRealtimeSegmentManager {
         != null)) {
       DisasterRecoveryMode disasterRecoveryMode =
           tableConfig.getIngestionConfig().getStreamIngestionConfig().getDisasterRecoveryMode();
-      if (disasterRecoveryMode == DisasterRecoveryMode.ALWAYS) {
+      if (shouldRepairErrorSegmentsForPartialUpsertOrDedup(disasterRecoveryMode)) {
         return true;
       }
     }

@@ -193,7 +193,7 @@ public final class TableConfigUtils {
     validateTaskConfig(tableConfig);
 
     if (_enforcePoolBasedAssignment) {
-      validateInstancePoolsNReplicaGroups(tableConfig);
+      validateInstancePoolsAndReplicaGroups(tableConfig);
     }
   }
 
@@ -221,7 +221,17 @@ public final class TableConfigUtils {
     return status;
   }
 
-  public static void validateInstancePoolsNReplicaGroups(TableConfig tableConfig) {
+  public static void validateInstancePoolsAndReplicaGroups(TableConfig tableConfig) {
+    // Instance pools / replica groups aren't relevant for dimension tables
+    if (tableConfig.isDimTable()) {
+      return;
+    }
+    // If the table is set up to point to a pre-existing instance partitions (like that of a reference table to support
+    // colocated joins), we don't need to validate instance pools and replica groups since that check should be done on
+    // the reference source.
+    if (tableConfig.getInstancePartitionsMap() != null) {
+      return;
+    }
     Preconditions.checkState(isTableUsingInstancePoolAndReplicaGroup(tableConfig),
         "Instance pool and replica group configurations must be enabled");
   }
@@ -1594,9 +1604,11 @@ public final class TableConfigUtils {
     }
   }
 
-  public static boolean checkForPartialUpsertWithReplicas(TableConfig tableConfig) {
-    return tableConfig != null && tableConfig.getReplication() > 1 && tableConfig.getUpsertConfig() != null
-        && tableConfig.getUpsertConfig().getMode() == UpsertConfig.Mode.PARTIAL;
+  public static boolean checkForInconsistentStateConfigs(TableConfig tableConfig) {
+    return tableConfig != null && tableConfig.getUpsertConfig() != null && tableConfig.getReplication() > 1 && (
+        tableConfig.getUpsertConfig().getMode() == UpsertConfig.Mode.PARTIAL || (
+            tableConfig.getUpsertConfig().isDropOutOfOrderRecord()
+                && tableConfig.getUpsertConfig().getConsistencyMode() == UpsertConfig.ConsistencyMode.NONE));
   }
 
   // enum of all the skip-able validation types.

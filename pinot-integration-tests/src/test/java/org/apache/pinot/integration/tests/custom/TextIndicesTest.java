@@ -33,7 +33,6 @@ import org.apache.avro.Schema.Field;
 import org.apache.avro.Schema.Type;
 import org.apache.avro.file.DataFileWriter;
 import org.apache.avro.generic.GenericData;
-import org.apache.avro.generic.GenericDatumWriter;
 import org.apache.pinot.spi.config.table.FieldConfig;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.TableType;
@@ -185,7 +184,6 @@ public class TextIndicesTest extends CustomDataQueryClusterIntegrationTest {
     }
     assertEquals(skills.size(), NUM_SKILLS);
 
-    File avroFile = new File(_tempDir, "data.avro");
     org.apache.avro.Schema avroSchema = org.apache.avro.Schema.createRecord("myRecord", null, null, false);
     avroSchema.setFields(Arrays.asList(
         new Field(TEXT_COLUMN_NULL_NAME, createUnion(create(Type.NULL), create(Type.STRING)), null, null),
@@ -197,8 +195,8 @@ public class TextIndicesTest extends CustomDataQueryClusterIntegrationTest {
             create(Type.STRING), null, null),
         new Field(TIME_COLUMN_NAME,
             create(Type.LONG), null, null)));
-    try (DataFileWriter<GenericData.Record> fileWriter = new DataFileWriter<>(new GenericDatumWriter<>(avroSchema))) {
-      fileWriter.create(avroSchema, avroFile);
+    try (AvroFilesAndWriters avroFilesAndWriters = createAvroFilesAndWriters(avroSchema)) {
+      List<DataFileWriter<GenericData.Record>> writers = avroFilesAndWriters.getWriters();
       for (int i = 0; i < NUM_RECORDS; i++) {
         GenericData.Record record = new GenericData.Record(avroSchema);
         record.put(TEXT_COLUMN_NULL_NAME, i % 2 == 0 ? null : skills.get(i % NUM_SKILLS));
@@ -206,10 +204,10 @@ public class TextIndicesTest extends CustomDataQueryClusterIntegrationTest {
         record.put(TEXT_COLUMN_NAME_CASE_SENSITIVE, skills.get(i % NUM_SKILLS));
         record.put(TEXT_COLUMN_NAME_NATIVE, skills.get(i % NUM_SKILLS));
         record.put(TIME_COLUMN_NAME, System.currentTimeMillis());
-        fileWriter.append(record);
+        writers.get(i % getNumAvroFiles()).append(record);
       }
+      return avroFilesAndWriters.getAvroFiles();
     }
-    return List.of(avroFile);
   }
 
   @Override
