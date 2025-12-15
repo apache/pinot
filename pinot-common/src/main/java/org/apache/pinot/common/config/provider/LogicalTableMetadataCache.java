@@ -72,6 +72,14 @@ public class LogicalTableMetadataCache {
     // Add child listeners to the property store for logical table config changes
     _propertyStore.subscribeChildChanges(ZkPaths.LOGICAL_TABLE_PARENT_PATH, _zkLogicalTableConfigChangeListener);
 
+    // Initialize the cache with existing logical table configs.
+    List<String> existingLogicalTables = _propertyStore.getChildNames(ZkPaths.LOGICAL_TABLE_PARENT_PATH,
+        AccessOption.PERSISTENT);
+    LOGGER.info("Found {} existing logical tables in the property store, initializing", existingLogicalTables.size());
+    if (CollectionUtils.isNotEmpty(existingLogicalTables)) {
+      _zkLogicalTableConfigChangeListener.handleChildChange(ZkPaths.LOGICAL_TABLE_PARENT_PATH, existingLogicalTables);
+    }
+
     LOGGER.info("Logical table metadata cache initialized");
   }
 
