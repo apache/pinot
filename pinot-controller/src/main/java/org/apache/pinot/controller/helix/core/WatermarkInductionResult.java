@@ -31,7 +31,7 @@ public class WatermarkInductionResult {
 
   private List<Watermark> _watermarks;
 
-  public List<String> _historicalSegments;
+  private List<String> _historicalSegments;
 
   /**
    * The @JsonCreator annotation marks this constructor to be used for deserializing
