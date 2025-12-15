@@ -102,6 +102,8 @@ public class ColumnReaderTransformer implements ColumnReader {
   private final List<ColumnTransformer> _allTransformersExceptNullTransformer;
 
   private final ColumnTransformer _nullValueTransformer;
+  private final Object _defaultNullValue;
+  
   private final ColumnReader _columnReader;
 
   /**
@@ -127,6 +129,8 @@ public class ColumnReaderTransformer implements ColumnReader {
       FieldSpec fieldSpec, ColumnReader columnReader, List<ColumnTransformer> additionalTransformers) {
     _columnReader = columnReader;
     _allTransformers = new ArrayList<>();
+    _allTransformersExceptNullTransformer = new ArrayList<>();
+
     _nullValueTransformer = new NullValueColumnTransformer(tableConfig, fieldSpec, schema);
     addIfNotNoOp(_allTransformers, new DataTypeColumnTransformer(tableConfig, fieldSpec, columnReader));
     addIfNotNoOp(_allTransformers, _nullValueTransformer);
@@ -134,12 +138,13 @@ public class ColumnReaderTransformer implements ColumnReader {
       addIfNotNoOp(_allTransformers, transformer);
     }
 
-    _allTransformersExceptNullTransformer = new ArrayList<>();
     for (ColumnTransformer transformer : _allTransformers) {
       if (!(transformer instanceof NullValueColumnTransformer)) {
         _allTransformersExceptNullTransformer.add(transformer);
       }
     }
+
+    _defaultNullValue = _nullValueTransformer.transform(null);
   }
 
   private static void addIfNotNoOp(List<ColumnTransformer> transformers, @Nullable ColumnTransformer transformer) {
@@ -229,7 +234,7 @@ public class ColumnReaderTransformer implements ColumnReader {
   public int nextInt()
       throws IOException {
     if (isNextNull()) {
-      return (int) _nullValueTransformer.transform(null);
+      return (int) _defaultNullValue;
     } else {
       return _columnReader.nextInt();
     }
@@ -239,7 +244,7 @@ public class ColumnReaderTransformer implements ColumnReader {
   public long nextLong()
       throws IOException {
     if (isNextNull()) {
-      return (long) _nullValueTransformer.transform(null);
+      return (long) _defaultNullValue;
     } else {
       return _columnReader.nextLong();
     }
@@ -249,7 +254,7 @@ public class ColumnReaderTransformer implements ColumnReader {
   public float nextFloat()
       throws IOException {
     if (isNextNull()) {
-      return (float) _nullValueTransformer.transform(null);
+      return (float) _defaultNullValue;
     } else {
       return _columnReader.nextFloat();
     }
@@ -259,7 +264,7 @@ public class ColumnReaderTransformer implements ColumnReader {
   public double nextDouble()
       throws IOException {
     if (isNextNull()) {
-      return (double) _nullValueTransformer.transform(null);
+      return (double) _defaultNullValue;
     } else {
       return _columnReader.nextDouble();
     }
@@ -280,69 +285,79 @@ public class ColumnReaderTransformer implements ColumnReader {
   @Override
   public int[] nextIntMV()
       throws IOException {
-    if (isNextNull()) {
-      return (int[]) _nullValueTransformer.transform(null);
+    if (!isNextNull()) {
+      int[] value = _columnReader.nextIntMV();
+      if (value.length != 0) {
+        return value;
+      }
     }
-    int[] value = _columnReader.nextIntMV();
-    if (value.length == 0) {
-      return (int[]) _nullValueTransformer.transform(null);
-    } else {
-      return value;
-    }
+    // Empty arrays also need to be treated as nulls.
+    return getDefaultIntMV();
   }
 
   @Override
   public long[] nextLongMV()
       throws IOException {
-    if (isNextNull()) {
-      return (long[]) _nullValueTransformer.transform(null);
+    if (!isNextNull()) {
+      long[] value = _columnReader.nextLongMV();
+      if (value.length != 0) {
+        return value;
+      }
     }
-    long[] value = _columnReader.nextLongMV();
-    if (value.length == 0) {
-      return (long[]) _nullValueTransformer.transform(null);
-    } else {
-      return value;
-    }
+    // Empty arrays also need to be treated as nulls.
+    return getDefaultLongMV();
   }
 
   @Override
   public float[] nextFloatMV()
       throws IOException {
-    if (isNextNull()) {
-      return (float[]) _nullValueTransformer.transform(null);
+    if (!isNextNull()) {
+      float[] value = _columnReader.nextFloatMV();
+      if (value.length != 0) {
+        return value;
+      }
     }
-    float[] value = _columnReader.nextFloatMV();
-    if (value.length == 0) {
-      return (float[]) _nullValueTransformer.transform(null);
-    } else {
-      return value;
-    }
+    // Empty arrays also need to be treated as nulls.
+    return getDefaultFloatMV();
   }
 
   @Override
   public double[] nextDoubleMV()
       throws IOException {
-    if (isNextNull()) {
-      return (double[]) _nullValueTransformer.transform(null);
+    if (!isNextNull()) {
+      double[] value = _columnReader.nextDoubleMV();
+      if (value.length != 0) {
+        return value;
+      }
     }
-    double[] value = _columnReader.nextDoubleMV();
-    if (value.length == 0) {
-      return (double[]) _nullValueTransformer.transform(null);
-    } else {
-      return value;
-    }
+    // Empty arrays also need to be treated as nulls.
+    return getDefaultDoubleMV();
   }
 
   @Override
   public String[] nextStringMV()
       throws IOException {
-    return (String[]) applyTransformers(_columnReader.nextStringMV());
+    if (!isNextNull()) {
+      String[] value = _columnReader.nextStringMV();
+      if (value.length != 0) {
+        return value;
+      }
+    }
+    // Empty arrays also need to be treated as nulls.
+    return getDefaultStringMV();
   }
 
   @Override
   public byte[][] nextBytesMV()
       throws IOException {
-    return (byte[][]) applyTransformers(_columnReader.nextBytesMV());
+    if (!isNextNull()) {
+      byte[][] value = _columnReader.nextBytesMV();
+      if (value.length != 0) {
+        return value;
+      }
+    }
+    // Empty arrays also need to be treated as nulls.
+    return getDefaultBytesMV();
   }
 
   @Override
@@ -388,7 +403,7 @@ public class ColumnReaderTransformer implements ColumnReader {
   public int getInt(int docId)
       throws IOException {
     if (_columnReader.isNull(docId)) {
-      return (int) _nullValueTransformer.transform(null);
+      return (int) _defaultNullValue;
     } else {
       return _columnReader.getInt(docId);
     }
@@ -398,7 +413,7 @@ public class ColumnReaderTransformer implements ColumnReader {
   public long getLong(int docId)
       throws IOException {
     if (_columnReader.isNull(docId)) {
-      return (long) _nullValueTransformer.transform(null);
+      return (long) _defaultNullValue;
     } else {
       return _columnReader.getLong(docId);
     }
@@ -408,7 +423,7 @@ public class ColumnReaderTransformer implements ColumnReader {
   public float getFloat(int docId)
       throws IOException {
     if (_columnReader.isNull(docId)) {
-      return (float) _nullValueTransformer.transform(null);
+      return (float) _defaultNullValue;
     } else {
       return _columnReader.getFloat(docId);
     }
@@ -418,7 +433,7 @@ public class ColumnReaderTransformer implements ColumnReader {
   public double getDouble(int docId)
       throws IOException {
     if (_columnReader.isNull(docId)) {
-      return (double) _nullValueTransformer.transform(null);
+      return (double) _defaultNullValue;
     } else {
       return _columnReader.getDouble(docId);
     }
@@ -445,74 +460,142 @@ public class ColumnReaderTransformer implements ColumnReader {
   @Override
   public int[] getIntMV(int docId)
       throws IOException {
-    if (_columnReader.isNull(docId)) {
-      return (int[]) _nullValueTransformer.transform(null);
+    if (!_columnReader.isNull(docId)) {
+      int[] value = _columnReader.getIntMV(docId);
+      if (value.length != 0) {
+        return value;
+      }
     }
-    int[] value = _columnReader.getIntMV(docId);
-    if (value.length == 0) {
-      return (int[]) _nullValueTransformer.transform(null);
-    } else {
-      return value;
-    }
+    // Empty arrays also need to be treated as nulls.
+    // For row based readers, this happens in DataTypeTransformer
+    return getDefaultIntMV();
   }
 
   @Override
   public long[] getLongMV(int docId)
       throws IOException {
-    if (_columnReader.isNull(docId)) {
-      return (long[]) _nullValueTransformer.transform(null);
+    if (!_columnReader.isNull(docId)) {
+      long[] value = _columnReader.getLongMV(docId);
+      if (value.length != 0) {
+        return value;
+      }
     }
-    long[] value = _columnReader.getLongMV(docId);
-    if (value.length == 0) {
-      return (long[]) _nullValueTransformer.transform(null);
-    } else {
-      return value;
-    }
+    // Empty arrays also need to be treated as nulls.
+    // For row based readers, this happens in DataTypeTransformer
+    return getDefaultLongMV();
   }
 
   @Override
   public float[] getFloatMV(int docId)
       throws IOException {
-    if (_columnReader.isNull(docId)) {
-      return (float[]) _nullValueTransformer.transform(null);
+    if (!_columnReader.isNull(docId)) {
+      float[] value = _columnReader.getFloatMV(docId);
+      if (value.length != 0) {
+        return value;
+      }
     }
-    float[] value = _columnReader.getFloatMV(docId);
-    if (value.length == 0) {
-      return (float[]) _nullValueTransformer.transform(null);
-    } else {
-      return value;
-    }
+    // Empty arrays also need to be treated as nulls.
+    // For row based readers, this happens in DataTypeTransformer
+    return getDefaultFloatMV();
   }
 
   @Override
   public double[] getDoubleMV(int docId)
       throws IOException {
-    if (_columnReader.isNull(docId)) {
-      return (double[]) _nullValueTransformer.transform(null);
+    if (!_columnReader.isNull(docId)) {
+      double[] value = _columnReader.getDoubleMV(docId);
+      if (value.length != 0) {
+        return value;
+      }
     }
-    double[] value = _columnReader.getDoubleMV(docId);
-    if (value.length == 0) {
-      return (double[]) _nullValueTransformer.transform(null);
-    } else {
-      return value;
-    }
+    // Empty arrays also need to be treated as nulls.
+    // For row based readers, this happens in DataTypeTransformer
+    return getDefaultDoubleMV();
   }
 
   @Override
   public String[] getStringMV(int docId)
       throws IOException {
-    return (String[]) applyTransformers(_columnReader.getStringMV(docId));
+    if (!_columnReader.isNull(docId)) {
+      String[] value = _columnReader.getStringMV(docId);
+      if (value.length != 0) {
+        return value;
+      }
+    }
+    // Empty arrays also need to be treated as nulls.
+    return getDefaultStringMV();
   }
 
   @Override
   public byte[][] getBytesMV(int docId)
       throws IOException {
-    return (byte[][]) applyTransformers(_columnReader.getBytesMV(docId));
+    if (!_columnReader.isNull(docId)) {
+      byte[][] value = _columnReader.getBytesMV(docId);
+      if (value.length != 0) {
+        return value;
+      }
+    }
+    // Empty arrays also need to be treated as nulls.
+    return getDefaultBytesMV();
   }
 
   @Override
   public void close()
       throws IOException {
     _columnReader.close();
+  }
+
+  private int[] getDefaultIntMV() {
+    Object[] value = (Object[]) _defaultNullValue;
+    int[] primitiveValue = new int[value.length];
+    for (int i = 0; i < value.length; i++) {
+      primitiveValue[i] = (int) value[i];
+    }
+    return primitiveValue;
+  }
+
+  private long[] getDefaultLongMV() {
+    Object[] value = (Object[]) _defaultNullValue;
+    long[] primitiveValue = new long[value.length];
+    for (int i = 0; i < value.length; i++) {
+      primitiveValue[i] = (long) value[i];
+    }
+    return primitiveValue;
+  }
+
+  private float[] getDefaultFloatMV() {
+    Object[] value = (Object[]) _defaultNullValue;
+    float[] primitiveValue = new float[value.length];
+    for (int i = 0; i < value.length; i++) {
+      primitiveValue[i] = (float) value[i];
+    }
+    return primitiveValue;
+  }
+
+  private double[] getDefaultDoubleMV() {
+    Object[] value = (Object[]) _defaultNullValue;
+    double[] primitiveValue = new double[value.length];
+    for (int i = 0; i < value.length; i++) {
+      primitiveValue[i] = (double) value[i];
+    }
+    return primitiveValue;
+  }
+
+  private String[] getDefaultStringMV() {
+    Object[] value = (Object[]) _defaultNullValue;
+    String[] primitiveValue = new String[value.length];
+    for (int i = 0; i < value.length; i++) {
+      primitiveValue[i] = (String) value[i];
+    }
+    return primitiveValue;
+  }
+
+  private byte[][] getDefaultBytesMV() {
+    Object[] value = (Object[]) _defaultNullValue;
+    byte[][] primitiveValue = new byte[value.length][];
+    for (int i = 0; i < value.length; i++) {
+      primitiveValue[i] = (byte[]) value[i];
+    }
+    return primitiveValue;
   }
 }
