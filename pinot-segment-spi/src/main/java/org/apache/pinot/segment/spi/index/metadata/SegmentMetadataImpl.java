@@ -190,17 +190,15 @@ public class SegmentMetadataImpl implements SegmentMetadata {
   private void loadCreationMeta(File crcFile)
       throws IOException {
     if (crcFile.exists()) {
-      final DataInputStream ds = new DataInputStream(new FileInputStream(crcFile));
-      _crc = ds.readLong();
-      _creationTime = ds.readLong();
-      try {
-        _dataCrc = ds.readLong();
-      } catch (IOException e) {
-        LOGGER.debug("Could not find data crc, falling back to default LONG_MIN value");
-      } finally {
-        ds.close();
+      try (DataInputStream ds = new DataInputStream(new FileInputStream(crcFile))) {
+        _crc = ds.readLong();
+        _creationTime = ds.readLong();
+        try {
+          _dataCrc = ds.readLong();
+        } catch (IOException e) {
+          LOGGER.debug("Could not find data crc, falling back to default LONG_MIN value");
+        }
       }
-      ds.close();
     }
   }
 

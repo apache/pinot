@@ -36,52 +36,57 @@ import org.slf4j.LoggerFactory;
 
 @SuppressWarnings("Duplicates")
 public class CrcUtils {
+  private CrcUtils() {
+  }
+
   private static final Logger LOGGER = LoggerFactory.getLogger(CrcUtils.class);
   private static final int BUFFER_SIZE = 65536;
   private static final String CRC_FILE_EXTENSTION = ".crc";
   private static final List<String> DATA_FILE_EXTENSIONS = Arrays.asList(".fwd", ".dict");
 
-  private final List<File> _files;
-  private final List<File> _dataFiles;
 
-  private CrcUtils(List<File> files, List<File> dataFiles) {
-    _files = files;
-    _dataFiles = dataFiles;
+  public static long computeCrc(File indexDir) throws IOException {
+    List<File> allNormalFiles = new ArrayList<>();
+    collectFiles(indexDir, allNormalFiles, false);
+    Collections.sort(allNormalFiles);
+    return crcForFiles(allNormalFiles);
   }
 
-  public static CrcUtils forAllFilesInFolder(File dir) {
-    List<File> allNormalFiles = new ArrayList<>();
+  public static long computeDataCrc(File indexDir) throws IOException {
     List<File> dataFiles = new ArrayList<>();
-    collectFiles(dir, allNormalFiles, dataFiles);
-    Collections.sort(allNormalFiles);
+    collectFiles(indexDir, dataFiles, true);
     Collections.sort(dataFiles);
-    return new CrcUtils(allNormalFiles, dataFiles);
+    return crcForFiles(dataFiles);
   }
 
   /**
-   * Helper method to get all files (normal and data files) in the directory to later compute CRC for them.
+   * Helper method to get files in the directory to later compute CRC for them.
    * <p>NOTE: do not include the segment creation meta file.
+   * @param dir the directory to collect files from
+   * @param files the list to add collected files to
+   * @param dataFilesOnly if true, only collect data files (.fwd, .dict); if false, collect all normal files
    */
-  private static void collectFiles(File dir, List<File> normalFiles, List<File> dataFiles) {
-    File[] files = dir.listFiles();
-    Preconditions.checkNotNull(files);
-    for (File file : files) {
+  private static void collectFiles(File dir, List<File> files, boolean dataFilesOnly) {
+    File[] dirFiles = dir.listFiles();
+    Preconditions.checkNotNull(dirFiles);
+    for (File file : dirFiles) {
       if (file.isFile()) {
         String fileName = file.getName();
         // Certain file systems, e.g. HDFS will create .crc files when perform data copy.
         // We should ignore both SEGMENT_CREATION_META and generated '.crc' files.
-        if (!fileName.equals(V1Constants.SEGMENT_CREATION_META) && !fileName
-            .endsWith(CRC_FILE_EXTENSTION)) {
-          // add all files to normal files
-          normalFiles.add(file);
-          //include data extension files to dataFiles
-          // Conditionally add to the data-only list
-          if (isDataFile(fileName)) {
-            dataFiles.add(file);
+        if (!fileName.equals(V1Constants.SEGMENT_CREATION_META) && !fileName.endsWith(CRC_FILE_EXTENSTION)) {
+          if (dataFilesOnly) {
+            // Only add data files
+            if (isDataFile(fileName)) {
+              files.add(file);
+            }
+          } else {
+            // Add all normal files
+            files.add(file);
           }
         }
       } else {
-        collectFiles(file, normalFiles, dataFiles);
+        collectFiles(file, files, dataFilesOnly);
       }
     }
   }
@@ -98,15 +103,7 @@ public class CrcUtils {
     return false;
   }
 
-  public long computeCrc() throws IOException {
-    return crcForFiles(_files);
-  }
-
-  public long computeDataCrc() throws IOException {
-    return crcForFiles(_dataFiles);
-  }
-
-  private long crcForFiles(List<File> filesToComputeCrc) throws IOException {
+  private static long crcForFiles(List<File> filesToComputeCrc) throws IOException {
     byte[] buffer = new byte[BUFFER_SIZE];
     Checksum checksum = new Adler32();
 
