@@ -33,6 +33,7 @@ public class RoutingConfig extends BaseJsonConfig {
   public static final String REPLICA_GROUP_INSTANCE_SELECTOR_TYPE = "replicaGroup";
   public static final String STRICT_REPLICA_GROUP_INSTANCE_SELECTOR_TYPE = "strictReplicaGroup";
   public static final String MULTI_STAGE_REPLICA_GROUP_SELECTOR_TYPE = "multiStageReplicaGroup";
+  public static final String DEFAULT_INSTANCE_SELECTOR_TYPE = BALANCED_INSTANCE_SELECTOR_TYPE;
 
   // Replaced by _segmentPrunerTypes and _instanceSelectorType
   @Deprecated

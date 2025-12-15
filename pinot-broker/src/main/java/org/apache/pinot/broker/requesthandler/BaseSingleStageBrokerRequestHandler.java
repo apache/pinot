@@ -1064,10 +1064,10 @@ public abstract class BaseSingleStageBrokerRequestHandler extends BaseBrokerRequ
   private static String getRoutingPolicy(TableConfig tableConfig) {
     RoutingConfig routingConfig = tableConfig.getRoutingConfig();
     if (routingConfig == null) {
-      return RoutingConfig.BALANCED_INSTANCE_SELECTOR_TYPE;
+      return RoutingConfig.DEFAULT_INSTANCE_SELECTOR_TYPE;
     }
     String selectorType = routingConfig.getInstanceSelectorType();
-    return selectorType != null ? selectorType : RoutingConfig.BALANCED_INSTANCE_SELECTOR_TYPE;
+    return selectorType != null ? selectorType : RoutingConfig.DEFAULT_INSTANCE_SELECTOR_TYPE;
   }
 
   private BrokerResponseNative getEmptyBrokerOnlyResponse(PinotQuery pinotQuery, PinotQuery serverPinotQuery,
