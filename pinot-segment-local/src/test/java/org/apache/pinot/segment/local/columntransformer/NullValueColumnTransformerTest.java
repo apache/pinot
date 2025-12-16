@@ -263,7 +263,7 @@ public class NullValueColumnTransformerTest {
     FieldSpec fieldSpec = schema.getFieldSpecFor("stringCol");
 
     NullValueColumnTransformer transformer = new NullValueColumnTransformer(TABLE_CONFIG, fieldSpec, schema);
-    
+
     // Empty Object[] should be treated as null
     Object result = transformer.transform(new Object[0]);
 
@@ -279,7 +279,7 @@ public class NullValueColumnTransformerTest {
     FieldSpec fieldSpec = schema.getFieldSpecFor("stringMVCol");
 
     NullValueColumnTransformer transformer = new NullValueColumnTransformer(TABLE_CONFIG, fieldSpec, schema);
-    
+
     // Empty Object[] should be treated as null
     Object result = transformer.transform(new Object[0]);
 
@@ -298,7 +298,7 @@ public class NullValueColumnTransformerTest {
     FieldSpec fieldSpec = schema.getFieldSpecFor("intCol");
 
     NullValueColumnTransformer transformer = new NullValueColumnTransformer(TABLE_CONFIG, fieldSpec, schema);
-    
+
     Integer testValue = 42;
     Object result = transformer.transform(testValue);
 
@@ -313,7 +313,7 @@ public class NullValueColumnTransformerTest {
     FieldSpec fieldSpec = schema.getFieldSpecFor("stringCol");
 
     NullValueColumnTransformer transformer = new NullValueColumnTransformer(TABLE_CONFIG, fieldSpec, schema);
-    
+
     String testValue = "test string";
     Object result = transformer.transform(testValue);
 
@@ -328,7 +328,7 @@ public class NullValueColumnTransformerTest {
     FieldSpec fieldSpec = schema.getFieldSpecFor("intMVCol");
 
     NullValueColumnTransformer transformer = new NullValueColumnTransformer(TABLE_CONFIG, fieldSpec, schema);
-    
+
     int[] testValue = new int[]{1, 2, 3};
     Object result = transformer.transform(testValue);
 
@@ -341,12 +341,12 @@ public class NullValueColumnTransformerTest {
     Schema schema = new Schema.SchemaBuilder()
         .addDateTime("timeCol", FieldSpec.DataType.LONG, "1:MILLISECONDS:EPOCH", "1:MILLISECONDS")
         .build();
-    
+
     TableConfig tableConfig = new TableConfigBuilder(TableType.OFFLINE)
         .setTableName("testTable")
         .setTimeColumnName("timeCol")
         .build();
-    
+
     FieldSpec fieldSpec = schema.getFieldSpecFor("timeCol");
 
     NullValueColumnTransformer transformer = new NullValueColumnTransformer(tableConfig, fieldSpec, schema);
@@ -361,14 +361,14 @@ public class NullValueColumnTransformerTest {
   public void testTimeColumnWithInvalidDefault() {
     // Create a time column with an invalid default value (far future)
     Schema schema = new Schema.SchemaBuilder()
-        .addDateTimeField("timeCol", FieldSpec.DataType.LONG, "1:MILLISECONDS:EPOCH", "1:MILLISECONDS") // Invalid default - too far in future
+        .addDateTimeField("timeCol", FieldSpec.DataType.LONG, "1:MILLISECONDS:EPOCH", "1:MILLISECONDS")
         .build();
-    
+
     TableConfig tableConfig = new TableConfigBuilder(TableType.OFFLINE)
         .setTableName("testTable")
         .setTimeColumnName("timeCol")
         .build();
-    
+
     FieldSpec fieldSpec = schema.getFieldSpecFor("timeCol");
 
     NullValueColumnTransformer transformer = new NullValueColumnTransformer(tableConfig, fieldSpec, schema);
@@ -380,7 +380,7 @@ public class NullValueColumnTransformerTest {
     long resultTime = (Long) result;
     long currentTime = System.currentTimeMillis();
     // Result should be close to current time (within 1 second)
-    assertTrue(Math.abs(resultTime - currentTime) < 1000, 
+    assertTrue(Math.abs(resultTime - currentTime) < 1000,
         "Time should be close to current time, got: " + resultTime + ", current: " + currentTime);
   }
 
@@ -442,4 +442,3 @@ public class NullValueColumnTransformerTest {
     assertEquals(result, "");
   }
 }
-

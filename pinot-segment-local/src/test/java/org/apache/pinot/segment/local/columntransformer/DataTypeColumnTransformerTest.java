@@ -311,7 +311,7 @@ public class DataTypeColumnTransformerTest {
         .addSingleValueDimension(COLUMN_NAME, FieldSpec.DataType.INT)
         .build();
     FieldSpec fieldSpec = schema.getFieldSpecFor(COLUMN_NAME);
-    
+
     // Default table config has continueOnError = false
     TableConfig tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName("testTable").build();
 
@@ -328,7 +328,7 @@ public class DataTypeColumnTransformerTest {
         .addSingleValueDimension(COLUMN_NAME, FieldSpec.DataType.INT)
         .build();
     FieldSpec fieldSpec = schema.getFieldSpecFor(COLUMN_NAME);
-    
+
     // Set continueOnError = true
     IngestionConfig ingestionConfig = new IngestionConfig();
     ingestionConfig.setContinueOnError(true);
@@ -402,7 +402,7 @@ public class DataTypeColumnTransformerTest {
         .addSingleValueDimension(COLUMN_NAME, FieldSpec.DataType.INT)
         .build();
     FieldSpec fieldSpec = schema.getFieldSpecFor(COLUMN_NAME);
-    
+
     TableConfig tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName("testTable").build();
 
     ColumnReader reader = createMockColumnReader(COLUMN_NAME, true, false, false, false, false, false, false);
@@ -440,7 +440,7 @@ public class DataTypeColumnTransformerTest {
 
     Object result = transformer.transform("true");
     assertEquals(result, 1); // Boolean true is stored as 1
-    
+
     result = transformer.transform("false");
     assertEquals(result, 0); // Boolean false is stored as 0
   }
@@ -541,4 +541,3 @@ public class DataTypeColumnTransformerTest {
     assertFalse(transformer.isNoOp());
   }
 }
-
