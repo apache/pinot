@@ -23,6 +23,7 @@ import javax.annotation.Nullable;
 import org.apache.pinot.segment.spi.IndexSegment;
 import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.readers.ColumnReader;
+import org.apache.pinot.spi.data.readers.MultiValueResult;
 
 
 /**
@@ -205,43 +206,43 @@ public class PinotSegmentColumnReaderImpl implements ColumnReader {
   }
 
   @Override
-  public int[] nextIntMV() {
+  public MultiValueResult<int[]> nextIntMV() {
     if (!hasNext()) {
       throw new IllegalStateException("No more values available");
     }
     int[] value = _segmentColumnReader.getIntMV(_currentIndex);
     _currentIndex++;
-    return value;
+    return MultiValueResult.of(value, null);
   }
 
   @Override
-  public long[] nextLongMV() {
+  public MultiValueResult<long[]> nextLongMV() {
     if (!hasNext()) {
       throw new IllegalStateException("No more values available");
     }
     long[] value = _segmentColumnReader.getLongMV(_currentIndex);
     _currentIndex++;
-    return value;
+    return MultiValueResult.of(value, null);
   }
 
   @Override
-  public float[] nextFloatMV() {
+  public MultiValueResult<float[]> nextFloatMV() {
     if (!hasNext()) {
       throw new IllegalStateException("No more values available");
     }
     float[] value = _segmentColumnReader.getFloatMV(_currentIndex);
     _currentIndex++;
-    return value;
+    return MultiValueResult.of(value, null);
   }
 
   @Override
-  public double[] nextDoubleMV() {
+  public MultiValueResult<double[]> nextDoubleMV() {
     if (!hasNext()) {
       throw new IllegalStateException("No more values available");
     }
     double[] value = _segmentColumnReader.getDoubleMV(_currentIndex);
     _currentIndex++;
-    return value;
+    return MultiValueResult.of(value, null);
   }
 
   @Override
@@ -328,23 +329,23 @@ public class PinotSegmentColumnReaderImpl implements ColumnReader {
   // Multi-value accessors
 
   @Override
-  public int[] getIntMV(int docId) {
-    return _segmentColumnReader.getIntMV(docId);
+  public MultiValueResult<int[]> getIntMV(int docId) {
+    return MultiValueResult.of(_segmentColumnReader.getIntMV(docId), null);
   }
 
   @Override
-  public long[] getLongMV(int docId) {
-    return _segmentColumnReader.getLongMV(docId);
+  public MultiValueResult<long[]> getLongMV(int docId) {
+    return MultiValueResult.of(_segmentColumnReader.getLongMV(docId), null);
   }
 
   @Override
-  public float[] getFloatMV(int docId) {
-    return _segmentColumnReader.getFloatMV(docId);
+  public MultiValueResult<float[]> getFloatMV(int docId) {
+    return MultiValueResult.of(_segmentColumnReader.getFloatMV(docId), null);
   }
 
   @Override
-  public double[] getDoubleMV(int docId) {
-    return _segmentColumnReader.getDoubleMV(docId);
+  public MultiValueResult<double[]> getDoubleMV(int docId) {
+    return MultiValueResult.of(_segmentColumnReader.getDoubleMV(docId), null);
   }
 
   @Override
