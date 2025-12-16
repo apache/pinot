@@ -517,7 +517,7 @@ public class RealtimeTableDataManager extends BaseTableDataManager {
       // marked DONE.
       // This ensures the segment's download URL is available before discarding the locally built copy, preventing
       // data loss if COMMIT_END_METADATA fails.
-      replaceSegmentIfCrcMismatch(segmentDataManager, zkMetadata, indexLoadingConfig);
+      replaceSegmentIfCrcMismatch(segmentDataManager, zkMetadata, indexLoadingConfig, true);
     }
     // Register the segment into the consumer coordinator if consumption order is enforced.
     if (_enforceConsumptionInOrder) {

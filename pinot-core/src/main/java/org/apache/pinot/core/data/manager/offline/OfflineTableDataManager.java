@@ -53,7 +53,7 @@ public class OfflineTableDataManager extends BaseTableDataManager {
     if (segmentDataManager == null) {
       addNewOnlineSegment(zkMetadata, indexLoadingConfig);
     } else {
-      replaceSegmentIfCrcMismatch(segmentDataManager, zkMetadata, indexLoadingConfig);
+      replaceSegmentIfCrcMismatch(segmentDataManager, zkMetadata, indexLoadingConfig, true);
     }
   }
 
