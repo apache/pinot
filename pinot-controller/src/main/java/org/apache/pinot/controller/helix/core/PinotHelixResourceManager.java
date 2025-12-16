@@ -3603,6 +3603,50 @@ public class PinotHelixResourceManager {
   }
 
   /**
+   * Drains a minion instance by preventing new task assignments while allowing existing tasks to complete.
+   * This is achieved by changing the instance tag from minion_untagged to minion_drained, which prevents
+   * Helix from assigning new tasks to this instance.
+   *
+   * @param instanceName Name of the minion instance to drain
+   * @return Response indicating success or failure
+   */
+  public synchronized PinotResourceManagerResponse drainMinionInstance(String instanceName) {
+    InstanceConfig instanceConfig = getHelixInstanceConfig(instanceName);
+    if (instanceConfig == null) {
+      return PinotResourceManagerResponse.failure("Instance " + instanceName + " not found");
+    }
+
+    // Replace minion_untagged with minion_drained tag
+    List<String> updatedTags = replaceMinionTag(instanceConfig.getTags());
+    instanceConfig.getRecord().setListField(
+        InstanceConfig.InstanceConfigProperty.TAG_LIST.name(), updatedTags);
+
+    // Save to Helix
+    if (!_helixDataAccessor.setProperty(_keyBuilder.instanceConfig(instanceName), instanceConfig)) {
+      return PinotResourceManagerResponse.failure("Failed to set instance config for instance: " + instanceName);
+    }
+
+    LOGGER.info("Successfully drained minion instance: {}", instanceName);
+    return PinotResourceManagerResponse.success(
+        "Successfully drained minion instance: " + instanceName);
+  }
+
+  /**
+   * Replaces minion_untagged tag with minion_drained tag in the given tag list.
+   *
+   * @param currentTags Current list of instance tags
+   * @return Updated list with a minion_drained tag instead of minion_untagged
+   */
+  private List<String> replaceMinionTag(List<String> currentTags) {
+    List<String> updatedTags = new ArrayList<>(currentTags);
+    updatedTags.remove(Helix.UNTAGGED_MINION_INSTANCE);
+    if (!updatedTags.contains(Helix.DRAINED_MINION_INSTANCE)) {
+      updatedTags.add(Helix.DRAINED_MINION_INSTANCE);
+    }
+    return updatedTags;
+  }
+
+  /**
    * Utility to perform a safety check of the operation to drop an instance.
    * If the resource is not safe to drop the utility lists all the possible reasons.
    * @param instanceName Pinot instance name
