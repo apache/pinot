@@ -40,32 +40,8 @@ import org.roaringbitmap.PeekableIntIterator;
 import org.roaringbitmap.RoaringBitmap;
 
 
-/**
- * DISTINCTCOUNTHLL aggregation function with adaptive cardinality handling.
- *
- * <p>For dictionary-encoded columns, this function uses an intelligent strategy:
- * <ul>
- *   <li><b>Low cardinality (&lt;10K):</b> Uses RoaringBitmap to track dictionary IDs (memory efficient)</li>
- *   <li><b>High cardinality (&gt;10K):</b> Converts to HyperLogLog (avoids expensive bitmap operations)</li>
- * </ul>
- *
- * <p>This optimization prevents the performance degradation seen with RoaringBitmap operations
- * (addN, ArrayContainer.add, unsignedBinarySearch) when cardinality is high, while still
- * maintaining efficiency for low cardinality cases.
- *
- * <p>The threshold (10K) is chosen to balance:
- * <ul>
- *   <li>RoaringBitmap: O(n log n) insertions but exact counts</li>
- *   <li>HyperLogLog: O(1) insertions but ~2% error rate</li>
- * </ul>
- */
 public class DistinctCountHLLAggregationFunction extends BaseSingleInputAggregationFunction<HyperLogLog, Long> {
-  // Threshold to switch from RoaringBitmap to HyperLogLog for dictionary-encoded columns
-  // This prevents expensive bitmap operations for high cardinality
-  protected static final int DEFAULT_DICT_ID_CARDINALITY_THRESHOLD = 10;
-
   protected final int _log2m;
-  protected final int _dictIdCardinalityThreshold;
 
   public DistinctCountHLLAggregationFunction(List<ExpressionContext> arguments) {
     super(arguments.get(0));
@@ -78,7 +54,6 @@ public class DistinctCountHLLAggregationFunction extends BaseSingleInputAggregat
     } else {
       _log2m = CommonConstants.Helix.DEFAULT_HYPERLOGLOG_LOG2M;
     }
-    _dictIdCardinalityThreshold = DEFAULT_DICT_ID_CARDINALITY_THRESHOLD;
   }
 
   public int getLog2m() {
@@ -128,31 +103,11 @@ public class DistinctCountHLLAggregationFunction extends BaseSingleInputAggregat
       return;
     }
 
-    // For dictionary-encoded expression, use adaptive strategy:
-    // 1. Start with RoaringBitmap for low cardinality (memory efficient)
-    // 2. Convert to HyperLogLog when cardinality exceeds threshold (avoids expensive bitmap operations)
+    // For dictionary-encoded expression, store dictionary ids into the bitmap
     Dictionary dictionary = blockValSet.getDictionary();
     if (dictionary != null) {
-      Object result = aggregationResultHolder.getResult();
-      // If already converted to HLL, aggregate directly into it
-      if (result instanceof HyperLogLog) {
-        HyperLogLog hyperLogLog = (HyperLogLog) result;
-        int[] dictIds = blockValSet.getDictionaryIdsSV();
-        for (int i = 0; i < length; i++) {
-          hyperLogLog.offer(dictionary.get(dictIds[i]));
-        }
-        return;
-      }
-      // Otherwise, use RoaringBitmap and check if conversion is needed
       int[] dictIds = blockValSet.getDictionaryIdsSV();
-      RoaringBitmap dictIdBitmap = getDictIdBitmap(aggregationResultHolder, dictionary);
-      dictIdBitmap.addN(dictIds, 0, length);
-
-      // Convert to HLL if cardinality exceeds threshold
-      if (dictIdBitmap.getCardinality() > _dictIdCardinalityThreshold) {
-        HyperLogLog hyperLogLog = convertDictIdsToHyperLogLog((DictIdsWrapper) aggregationResultHolder.getResult());
-        aggregationResultHolder.setValue(hyperLogLog);
-      }
+      getDictIdBitmap(aggregationResultHolder, dictionary).addN(dictIds, 0, length);
       return;
     }
 
@@ -220,29 +175,12 @@ public class DistinctCountHLLAggregationFunction extends BaseSingleInputAggregat
       return;
     }
 
-    // For dictionary-encoded expression, use adaptive strategy
+    // For dictionary-encoded expression, store dictionary ids into the bitmap
     Dictionary dictionary = blockValSet.getDictionary();
     if (dictionary != null) {
       int[] dictIds = blockValSet.getDictionaryIdsSV();
       for (int i = 0; i < length; i++) {
-        int groupKey = groupKeyArray[i];
-        Object result = groupByResultHolder.getResult(groupKey);
-
-        // If already converted to HLL for this group, aggregate directly
-        if (result instanceof HyperLogLog) {
-          ((HyperLogLog) result).offer(dictionary.get(dictIds[i]));
-        } else {
-          // Use RoaringBitmap and check if conversion is needed
-          RoaringBitmap dictIdBitmap = getDictIdBitmap(groupByResultHolder, groupKey, dictionary);
-          dictIdBitmap.add(dictIds[i]);
-
-          // Convert to HLL if cardinality exceeds threshold
-          if (dictIdBitmap.getCardinality() > _dictIdCardinalityThreshold) {
-            HyperLogLog hyperLogLog =
-                convertDictIdsToHyperLogLog((DictIdsWrapper) groupByResultHolder.getResult(groupKey));
-            groupByResultHolder.setValueForKey(groupKey, hyperLogLog);
-          }
-        }
+        getDictIdBitmap(groupByResultHolder, groupKeyArray[i], dictionary).add(dictIds[i]);
       }
       return;
     }
@@ -508,28 +446,11 @@ public class DistinctCountHLLAggregationFunction extends BaseSingleInputAggregat
 
   /**
    * Helper method to set dictionary id for the given group keys into the result holder.
-   * Uses adaptive strategy: starts with RoaringBitmap, converts to HLL when cardinality exceeds threshold.
    */
-  private void setDictIdForGroupKeys(GroupByResultHolder groupByResultHolder, int[] groupKeys,
+  private static void setDictIdForGroupKeys(GroupByResultHolder groupByResultHolder, int[] groupKeys,
       Dictionary dictionary, int dictId) {
     for (int groupKey : groupKeys) {
-      Object result = groupByResultHolder.getResult(groupKey);
-
-      // If already converted to HLL for this group, aggregate directly
-      if (result instanceof HyperLogLog) {
-        ((HyperLogLog) result).offer(dictionary.get(dictId));
-      } else {
-        // Use RoaringBitmap and check if conversion is needed
-        RoaringBitmap dictIdBitmap = getDictIdBitmap(groupByResultHolder, groupKey, dictionary);
-        dictIdBitmap.add(dictId);
-
-        // Convert to HLL if cardinality exceeds threshold
-        if (dictIdBitmap.getCardinality() > _dictIdCardinalityThreshold) {
-          HyperLogLog hyperLogLog =
-              convertDictIdsToHyperLogLog((DictIdsWrapper) groupByResultHolder.getResult(groupKey));
-          groupByResultHolder.setValueForKey(groupKey, hyperLogLog);
-        }
-      }
+      getDictIdBitmap(groupByResultHolder, groupKey, dictionary).add(dictId);
     }
   }
 
@@ -554,14 +475,6 @@ public class DistinctCountHLLAggregationFunction extends BaseSingleInputAggregat
       hyperLogLog.offer(dictionary.get(iterator.next()));
     }
     return hyperLogLog;
-  }
-
-  /**
-   * Converts dictionary IDs in RoaringBitmap to HyperLogLog.
-   * This is called when cardinality exceeds threshold during aggregation.
-   */
-  private HyperLogLog convertDictIdsToHyperLogLog(DictIdsWrapper dictIdsWrapper) {
-    return convertToHyperLogLog(dictIdsWrapper);
   }
 
   private static final class DictIdsWrapper {
