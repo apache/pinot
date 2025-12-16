@@ -45,11 +45,7 @@ import org.testng.annotations.AfterClass;
 import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
 
-import static org.testng.Assert.assertEquals;
-import static org.testng.Assert.assertNotNull;
-import static org.testng.Assert.assertNull;
-import static org.testng.Assert.assertThrows;
-import static org.testng.Assert.assertTrue;
+import static org.testng.Assert.*;
 
 
 /**
@@ -294,6 +290,184 @@ public class PinotInstanceRestletResourceTest extends ControllerTest {
       tags.add(tag.asText());
     }
     return tags;
+  }
+
+  @Test
+  public void testDrainMinionInstance()
+      throws Exception {
+    // Create a minion instance with minion_untagged tag
+    String createInstanceUrl = _urlBuilder.forInstanceCreate();
+    Instance minionInstance =
+        new Instance("minion1.test.com", 9514, InstanceType.MINION,
+            Collections.singletonList(Helix.UNTAGGED_MINION_INSTANCE),
+            null, 0, 0, 0, 0, false);
+    sendPostRequest(createInstanceUrl, minionInstance.toJsonString());
+    String minionInstanceId = "Minion_minion1.test.com_9514";
+
+    // Verify the minion was created with minion_untagged tag
+    checkInstanceInfo(minionInstanceId, "minion1.test.com", 9514, new String[]{Helix.UNTAGGED_MINION_INSTANCE},
+        null, -1, -1, -1, -1, false);
+
+    // Drain the minion instance
+    String drainUrl = _urlBuilder.forInstanceState(minionInstanceId);
+    sendPutRequest(drainUrl + "?state=DRAIN", "");
+
+    // Verify the minion now has minion_drained tag instead of minion_untagged
+    JsonNode response = JsonUtils.stringToJsonNode(sendGetRequest(_urlBuilder.forInstance(minionInstanceId)));
+    assertEquals(response.get("instanceName").asText(), minionInstanceId);
+    JsonNode tags = response.get("tags");
+    assertEquals(tags.size(), 1);
+    assertEquals(tags.get(0).asText(), Helix.DRAINED_MINION_INSTANCE);
+
+    // Cleanup - delete the minion instance
+    sendDeleteRequest(_urlBuilder.forInstance(minionInstanceId));
+  }
+
+  @Test
+  public void testDrainMinionInstanceWithMultipleTags()
+      throws Exception {
+    // Create a minion instance with multiple tags including minion_untagged
+    String createInstanceUrl = _urlBuilder.forInstanceCreate();
+    List<String> tags = Arrays.asList(Helix.UNTAGGED_MINION_INSTANCE, "custom_tag1", "custom_tag2");
+    Instance minionInstance =
+        new Instance("minion2.test.com", 9515, InstanceType.MINION, tags, null, 0, 0, 0, 0, false);
+    sendPostRequest(createInstanceUrl, minionInstance.toJsonString());
+    String minionInstanceId = "Minion_minion2.test.com_9515";
+
+    // Drain the minion instance
+    String drainUrl = _urlBuilder.forInstanceState(minionInstanceId);
+    sendPutRequest(drainUrl + "?state=DRAIN", "");
+
+    // Verify minion_untagged was replaced with minion_drained, other tags remain
+    JsonNode response = JsonUtils.stringToJsonNode(sendGetRequest(_urlBuilder.forInstance(minionInstanceId)));
+    JsonNode responseTags = response.get("tags");
+    assertEquals(responseTags.size(), 3);
+    List<String> actualTags = new ArrayList<>();
+    for (JsonNode tag : responseTags) {
+      actualTags.add(tag.asText());
+    }
+    assertTrue(actualTags.contains(Helix.DRAINED_MINION_INSTANCE));
+    assertTrue(actualTags.contains("custom_tag1"));
+    assertTrue(actualTags.contains("custom_tag2"));
+    assertFalse(actualTags.contains(Helix.UNTAGGED_MINION_INSTANCE));
+
+    // Cleanup
+    sendDeleteRequest(_urlBuilder.forInstance(minionInstanceId));
+  }
+
+  @Test
+  public void testDrainMinionInstanceWithoutUntaggedTag()
+      throws Exception {
+    // Create a minion instance without minion_untagged tag
+    String createInstanceUrl = _urlBuilder.forInstanceCreate();
+    List<String> tags = List.of("custom_tag");
+    Instance minionInstance =
+        new Instance("minion3.test.com", 9516, InstanceType.MINION, tags, null, 0, 0, 0, 0, false);
+    sendPostRequest(createInstanceUrl, minionInstance.toJsonString());
+    String minionInstanceId = "Minion_minion3.test.com_9516";
+
+    // Drain the minion instance
+    String drainUrl = _urlBuilder.forInstanceState(minionInstanceId);
+    sendPutRequest(drainUrl + "?state=DRAIN", "");
+
+    // Verify minion_drained tag was added, custom_tag remains
+    JsonNode response = JsonUtils.stringToJsonNode(sendGetRequest(_urlBuilder.forInstance(minionInstanceId)));
+    JsonNode responseTags = response.get("tags");
+    assertEquals(responseTags.size(), 2);
+    List<String> actualTags = new ArrayList<>();
+    for (JsonNode tag : responseTags) {
+      actualTags.add(tag.asText());
+    }
+    assertTrue(actualTags.contains(Helix.DRAINED_MINION_INSTANCE));
+    assertTrue(actualTags.contains("custom_tag"));
+
+    // Cleanup
+    sendDeleteRequest(_urlBuilder.forInstance(minionInstanceId));
+  }
+
+  @Test
+  public void testDrainMinionInstanceAlreadyDrained()
+      throws Exception {
+    // Create a minion instance that's already drained
+    String createInstanceUrl = _urlBuilder.forInstanceCreate();
+    List<String> tags = Arrays.asList(Helix.DRAINED_MINION_INSTANCE, "custom_tag");
+    Instance minionInstance =
+        new Instance("minion4.test.com", 9517, InstanceType.MINION, tags, null, 0, 0, 0, 0, false);
+    sendPostRequest(createInstanceUrl, minionInstance.toJsonString());
+    String minionInstanceId = "Minion_minion4.test.com_9517";
+
+    // Drain the already drained minion instance (should be idempotent)
+    String drainUrl = _urlBuilder.forInstanceState(minionInstanceId);
+    sendPutRequest(drainUrl + "?state=DRAIN", "");
+
+    // Verify it still has a minion_drained tag and no duplicates
+    JsonNode response = JsonUtils.stringToJsonNode(sendGetRequest(_urlBuilder.forInstance(minionInstanceId)));
+    JsonNode responseTags = response.get("tags");
+    assertEquals(responseTags.size(), 2);
+    List<String> actualTags = new ArrayList<>();
+    for (JsonNode tag : responseTags) {
+      actualTags.add(tag.asText());
+    }
+    assertTrue(actualTags.contains(Helix.DRAINED_MINION_INSTANCE));
+    assertTrue(actualTags.contains("custom_tag"));
+    // Count occurrences to ensure no duplicates
+    assertEquals(actualTags.stream().filter(t -> t.equals(Helix.DRAINED_MINION_INSTANCE)).count(), 1);
+
+    // Cleanup
+    sendDeleteRequest(_urlBuilder.forInstance(minionInstanceId));
+  }
+
+  @Test
+  public void testDrainNonMinionInstanceFails()
+      throws Exception {
+    // Try to drain a broker instance (should fail)
+    String brokerInstanceId = "Broker_localhost_1234";
+    Instance brokerInstance =
+        new Instance("localhost", 1234, InstanceType.BROKER, Collections.singletonList("broker_tag"), null, 0, 0, 0, 0,
+            false);
+    sendPostRequest(_urlBuilder.forInstanceCreate(), brokerInstance.toJsonString());
+
+    // Attempt to drain the broker - should fail with 400 Bad Request
+    String drainUrl = _urlBuilder.forInstanceState(brokerInstanceId);
+    assertThrows(IOException.class, () -> sendPutRequest(drainUrl + "?state=DRAIN", ""));
+
+    // Cleanup
+    sendDeleteRequest(_urlBuilder.forInstance(brokerInstanceId));
+  }
+
+  @Test
+  public void testDrainNonExistentMinionFails()
+      throws Exception {
+    // Try to drain a non-existent minion instance
+    String nonExistentMinionId = "Minion_nonexistent_9999";
+    String drainUrl = _urlBuilder.forInstanceState(nonExistentMinionId);
+
+    // Should fail with 404 Not Found
+    assertThrows(IOException.class, () -> sendPutRequest(drainUrl + "?state=DRAIN", ""));
+  }
+
+  @Test
+  public void testDrainMinionWithEmptyTags()
+      throws Exception {
+    // Create a minion instance with no tags
+    String createInstanceUrl = _urlBuilder.forInstanceCreate();
+    Instance minionInstance =
+        new Instance("minion5.test.com", 9518, InstanceType.MINION, null, null, 0, 0, 0, 0, false);
+    sendPostRequest(createInstanceUrl, minionInstance.toJsonString());
+    String minionInstanceId = "Minion_minion5.test.com_9518";
+
+    // Drain the minion instance
+    String drainUrl = _urlBuilder.forInstanceState(minionInstanceId);
+    sendPutRequest(drainUrl + "?state=DRAIN", "");
+
+    // Verify minion_drained tag was added
+    JsonNode response = JsonUtils.stringToJsonNode(sendGetRequest(_urlBuilder.forInstance(minionInstanceId)));
+    JsonNode responseTags = response.get("tags");
+    assertEquals(responseTags.size(), 1);
+    assertEquals(responseTags.get(0).asText(), Helix.DRAINED_MINION_INSTANCE);
+
+    // Cleanup
+    sendDeleteRequest(_urlBuilder.forInstance(minionInstanceId));
   }
 
   @AfterClass
