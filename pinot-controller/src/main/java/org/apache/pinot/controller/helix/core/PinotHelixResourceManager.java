@@ -3638,6 +3638,11 @@ public class PinotHelixResourceManager {
    * @return Updated list with a minion_drained tag instead of minion_untagged
    */
   private List<String> replaceMinionTag(List<String> currentTags) {
+    if (currentTags == null) {
+      // If currentTags is null, return a list containing only the drained minion tag
+      return Collections.singletonList(Helix.DRAINED_MINION_INSTANCE);
+    }
+
     List<String> updatedTags = new ArrayList<>(currentTags);
     updatedTags.remove(Helix.UNTAGGED_MINION_INSTANCE);
     if (!updatedTags.contains(Helix.DRAINED_MINION_INSTANCE)) {
