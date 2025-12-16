@@ -118,7 +118,7 @@ public class RealtimeSegmentCopier implements SegmentCopier {
           SimpleHttpResponse response = HttpClient.wrapAndThrowHttpException(
               _httpClient.sendRequest(
                   getSendSegmentUriRequest(dstControllerURIStr, destSegmentUriStr,
-                      copyTablePayload.getDestinationClusterHeaders(), tableName),
+                      copyTablePayload.getDestinationClusterHeaders(), tableName, "REALTIME"),
                   HttpClient.DEFAULT_SOCKET_TIMEOUT_MS));
           LOGGER.info("[copyTable] Response for pushing table {} segment uri {} to location {} - {}: {}", tableName,
               destSegmentUriStr, dstControllerURIStr, response.getStatusCode(),
@@ -146,8 +146,9 @@ public class RealtimeSegmentCopier implements SegmentCopier {
   }
 
   static ClassicHttpRequest getSendSegmentUriRequest(String controllerUriStr, String downloadUri,
-      Map<String, String> headers, String tableNameWithoutType) throws URISyntaxException {
-    URI segmentPushURI = new URI(controllerUriStr + "/v2/segments?tableName=" + tableNameWithoutType);
+      Map<String, String> headers, String tableNameWithoutType, String tableType) throws URISyntaxException {
+    URI segmentPushURI = new URI(controllerUriStr + "/v2/segments?tableName=" + tableNameWithoutType + "&tableType="
+        + tableType);
     ClassicRequestBuilder requestBuilder = ClassicRequestBuilder.post(segmentPushURI).setVersion(HttpVersion.HTTP_1_1)
         .setHeader(
             FileUploadDownloadClient.CustomHeaders.UPLOAD_TYPE, FileUploadDownloadClient.FileUploadType.URI.toString())
