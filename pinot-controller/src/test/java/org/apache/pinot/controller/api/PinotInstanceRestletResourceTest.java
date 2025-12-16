@@ -46,11 +46,11 @@ import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
 
 import static org.testng.Assert.assertEquals;
+import static org.testng.Assert.assertFalse;
 import static org.testng.Assert.assertNotNull;
 import static org.testng.Assert.assertNull;
 import static org.testng.Assert.assertThrows;
 import static org.testng.Assert.assertTrue;
-import static org.testng.Assert.assertFalse;
 
 
 /**
@@ -365,7 +365,7 @@ public class PinotInstanceRestletResourceTest extends ControllerTest {
       throws Exception {
     // Create a minion instance without minion_untagged tag
     String createInstanceUrl = _urlBuilder.forInstanceCreate();
-    List<String> tags = List.of("custom_tag");
+    List<String> tags = Arrays.asList("custom_tag");
     Instance minionInstance =
         new Instance("minion3.test.com", 9516, InstanceType.MINION, tags, null, 0, 0, 0, 0, false);
     sendPostRequest(createInstanceUrl, minionInstance.toJsonString());
