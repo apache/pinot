@@ -181,6 +181,22 @@ public class DistinctExecutorEarlyTerminationTest {
     assertEquals(result.size(), 1);
   }
 
+  @Test
+  public void testRawSingleColumnExecutorStopsWhenTimeBudgetConsumed() {
+    ExpressionContext expression = ExpressionContext.forIdentifier("c1");
+    IntDistinctExecutor executor =
+        new IntDistinctExecutor(expression, DataType.INT, /*limit*/ 10, false, null);
+    executor.setRemainingTimeNanos(0);
+    int[] values = new int[]{1, 2, 3, 4, 5};
+    ValueBlock block = new SimpleValueBlock(values.length, Map.of(expression, new IntBlockValSet(values)));
+
+    boolean satisfied = executor.process(block);
+
+    assertTrue(satisfied, "should stop immediately when time budget is exhausted");
+    assertEquals(executor.getNumRowsProcessed(), 0);
+    assertEquals(executor.getResult().size(), 0);
+  }
+
   /**
    * {@link ValueBlock} implementation backed by a simple map.
    */

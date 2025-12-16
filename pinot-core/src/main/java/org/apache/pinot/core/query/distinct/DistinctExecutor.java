@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.core.query.distinct;
 
+import java.util.function.LongSupplier;
 import org.apache.pinot.core.operator.blocks.ValueBlock;
 import org.apache.pinot.core.query.distinct.table.DistinctTable;
 
@@ -48,6 +49,20 @@ public interface DistinctExecutor {
    * Sets the maximum number of rows to scan without adding any new distinct value before early-terminating.
    */
   default void setNumRowsWithoutChangeInDistinct(int numRowsWithoutChangeInDistinct) {
+  }
+
+  /**
+   * Sets the time supplier used by the executor to evaluate time-based early termination. Implementations should call
+   * {@link LongSupplier#getAsLong()} in nanoseconds and treat it as a monotonic clock (e.g. {@link System#nanoTime()}).
+   */
+  default void setTimeSupplier(LongSupplier timeSupplier) {
+  }
+
+  /**
+   * Updates the remaining time budget in nanoseconds. Implementations may use this to early terminate work within a
+   * block when the time budget is exhausted.
+   */
+  default void setRemainingTimeNanos(long remainingTimeNanos) {
   }
 
   /**

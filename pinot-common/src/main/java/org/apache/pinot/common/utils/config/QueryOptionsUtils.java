@@ -118,6 +118,12 @@ public class QueryOptionsUtils {
   }
 
   @Nullable
+  public static Long getMaxExecutionTimeMsInDistinct(Map<String, String> queryOptions) {
+    String maxExecutionTimeMs = queryOptions.get(QueryOptionKey.MAX_EXECUTION_TIME_MS_IN_DISTINCT);
+    return checkedParseLong(QueryOptionKey.MAX_EXECUTION_TIME_MS_IN_DISTINCT, maxExecutionTimeMs, 0);
+  }
+
+  @Nullable
   public static Long getMaxServerResponseSizeBytes(Map<String, String> queryOptions) {
     String responseSize = queryOptions.get(QueryOptionKey.MAX_SERVER_RESPONSE_SIZE_BYTES);
     return checkedParseLongPositive(QueryOptionKey.MAX_SERVER_RESPONSE_SIZE_BYTES, responseSize);

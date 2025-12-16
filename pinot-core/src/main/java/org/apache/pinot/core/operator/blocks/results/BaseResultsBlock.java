@@ -40,7 +40,8 @@ public abstract class BaseResultsBlock implements Block {
   public enum EarlyTerminationReason {
     NONE,
     DISTINCT_MAX_ROWS,
-    DISTINCT_NO_NEW_VALUES
+    DISTINCT_NO_NEW_VALUES,
+    TIME_LIMIT
   }
 
   private List<QueryErrorMessage> _processingExceptions;

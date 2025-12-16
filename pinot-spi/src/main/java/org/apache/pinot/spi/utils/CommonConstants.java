@@ -754,6 +754,9 @@ public class CommonConstants {
         public static final String MAX_ROWS_IN_JOIN = "maxRowsInJoin";
         public static final String JOIN_OVERFLOW_MODE = "joinOverflowMode";
 
+        // Early terminate DISTINCT queries based on wall-clock execution time on server
+        public static final String MAX_EXECUTION_TIME_MS_IN_DISTINCT = "maxExecutionTimeMsInDistinct";
+
         // Handle DISTINCT early termination
         // Early terminate after scanning this many rows, regardless of whether the DISTINCT limit is satisfied.
         public static final String MAX_ROWS_IN_DISTINCT = "maxRowsInDistinct";

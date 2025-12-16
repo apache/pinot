@@ -411,6 +411,15 @@ public class DistinctQueriesTest extends BaseQueriesTest {
   }
 
   @Test
+  public void testTimeLimitEarlyTerminationInnerSegment() {
+    String query =
+        "SET \"maxExecutionTimeMsInDistinct\" = 0; SELECT DISTINCT(rawIntColumn) FROM testTable LIMIT 200";
+    BaseOperator<DistinctResultsBlock> operator = getOperator(query);
+    DistinctResultsBlock resultsBlock = operator.nextBlock();
+    assertEquals(resultsBlock.getEarlyTerminationReason(), BaseResultsBlock.EarlyTerminationReason.TIME_LIMIT);
+  }
+
+  @Test
   public void testBrokerResponseIncludesDistinctEarlyTerminationFlags() {
     String query = "SELECT DISTINCT(rawIntColumn) FROM testTable LIMIT 200";
     BrokerResponseNative response =
@@ -422,6 +431,11 @@ public class DistinctQueriesTest extends BaseQueriesTest {
         Collections.singletonMap(QueryOptionKey.NUM_ROWS_WITHOUT_CHANGE_IN_DISTINCT, "10"));
     assertTrue(noChangeResponse.isNumRowsWithoutChangeInDistinctReached());
     assertTrue(noChangeResponse.isPartialResult());
+
+    BrokerResponseNative timeResponse = getBrokerResponse(query,
+        Collections.singletonMap(QueryOptionKey.MAX_EXECUTION_TIME_MS_IN_DISTINCT, "0"));
+    assertTrue(timeResponse.isTimeLimitInDistinctReached());
+    assertTrue(timeResponse.isPartialResult());
   }
 
   @Test

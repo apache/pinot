@@ -76,6 +76,7 @@ public class ExecutionStatsAggregator {
   private boolean _numGroupsWarningLimitReached = false;
   private boolean _maxRowsInDistinctReached = false;
   private boolean _numRowsWithoutChangeInDistinctReached = false;
+  private boolean _timeLimitInDistinctReached = false;
 
   public ExecutionStatsAggregator(boolean enableTrace) {
     _enableTrace = enableTrace;
@@ -250,6 +251,9 @@ public class ExecutionStatsAggregator {
           case DISTINCT_NO_NEW_VALUES:
             _numRowsWithoutChangeInDistinctReached = true;
             break;
+          case TIME_LIMIT:
+            _timeLimitInDistinctReached = true;
+            break;
           default:
             break;
         }
@@ -282,6 +286,7 @@ public class ExecutionStatsAggregator {
     brokerResponseNative.setNumGroupsWarningLimitReached(_numGroupsWarningLimitReached);
     brokerResponseNative.setMaxRowsInDistinctReached(_maxRowsInDistinctReached);
     brokerResponseNative.setNumRowsWithoutChangeInDistinctReached(_numRowsWithoutChangeInDistinctReached);
+    brokerResponseNative.setTimeLimitInDistinctReached(_timeLimitInDistinctReached);
     brokerResponseNative.setOfflineThreadCpuTimeNs(_offlineThreadCpuTimeNs);
     brokerResponseNative.setRealtimeThreadCpuTimeNs(_realtimeThreadCpuTimeNs);
     brokerResponseNative.setOfflineSystemActivitiesCpuTimeNs(_offlineSystemActivitiesCpuTimeNs);

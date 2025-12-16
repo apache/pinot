@@ -22,6 +22,8 @@ import com.google.common.base.CaseFormat;
 import java.util.Collections;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.TimeUnit;
+import java.util.function.LongSupplier;
 import java.util.stream.Collectors;
 import org.apache.pinot.common.request.context.ExpressionContext;
 import org.apache.pinot.common.utils.config.QueryOptionsUtils;
@@ -55,12 +57,21 @@ public class DistinctOperator extends BaseOperator<DistinctResultsBlock> {
   private int _numRowsWithoutNewDistinct = 0;
   private boolean _hitMaxRowsLimit = false;
   private boolean _hitNoChangeLimit = false;
+  private final long _maxExecutionTimeNs;
+  private boolean _hitTimeLimit = false;
+  private final LongSupplier _timeSupplier;
 
   public DistinctOperator(IndexSegment indexSegment, QueryContext queryContext,
       BaseProjectOperator<?> projectOperator) {
+    this(indexSegment, queryContext, projectOperator, System::nanoTime);
+  }
+
+  DistinctOperator(IndexSegment indexSegment, QueryContext queryContext, BaseProjectOperator<?> projectOperator,
+      LongSupplier timeSupplier) {
     _indexSegment = indexSegment;
     _queryContext = queryContext;
     _projectOperator = projectOperator;
+    _timeSupplier = timeSupplier;
     Map<String, String> queryOptions = queryContext.getQueryOptions();
     if (queryOptions != null) {
       Integer maxRowsInDistinct = QueryOptionsUtils.getMaxRowsInDistinct(queryOptions);
@@ -68,21 +79,37 @@ public class DistinctOperator extends BaseOperator<DistinctResultsBlock> {
       Integer numRowsWithoutChange = QueryOptionsUtils.getNumRowsWithoutChangeInDistinct(queryOptions);
       _numRowsWithoutChangeInDistinct =
           numRowsWithoutChange != null ? numRowsWithoutChange : UNLIMITED_ROWS;
+      Long maxExecutionTimeMs = QueryOptionsUtils.getMaxExecutionTimeMsInDistinct(queryOptions);
+      _maxExecutionTimeNs =
+          maxExecutionTimeMs != null ? TimeUnit.MILLISECONDS.toNanos(maxExecutionTimeMs) : Long.MAX_VALUE;
     } else {
       _maxRowsInDistinct = UNLIMITED_ROWS;
       _numRowsWithoutChangeInDistinct = UNLIMITED_ROWS;
+      _maxExecutionTimeNs = Long.MAX_VALUE;
     }
   }
 
   @Override
   protected DistinctResultsBlock getNextBlock() {
     DistinctExecutor executor = DistinctExecutorFactory.getDistinctExecutor(_projectOperator, _queryContext);
+    executor.setTimeSupplier(_timeSupplier);
     executor.setMaxRowsToProcess(_maxRowsInDistinct);
     executor.setNumRowsWithoutChangeInDistinct(_numRowsWithoutChangeInDistinct);
     ValueBlock valueBlock;
     boolean enforceRowLimit = _maxRowsInDistinct != UNLIMITED_ROWS;
     boolean enforceNoChangeLimit = _numRowsWithoutChangeInDistinct != UNLIMITED_ROWS;
+    boolean enforceTimeLimit = _maxExecutionTimeNs != Long.MAX_VALUE;
+    final long startTimeNs = _timeSupplier.getAsLong();
     while ((valueBlock = _projectOperator.nextBlock()) != null) {
+      if (enforceTimeLimit) {
+        long elapsed = _timeSupplier.getAsLong() - startTimeNs;
+        long remaining = _maxExecutionTimeNs - elapsed;
+        executor.setRemainingTimeNanos(remaining);
+      }
+      if (enforceTimeLimit && hasExceededTimeLimit(startTimeNs)) {
+        _hitTimeLimit = true;
+        break;
+      }
       if (enforceRowLimit && executor.getRemainingRowsToProcess() <= 0) {
         _hitMaxRowsLimit = true;
         break;
@@ -114,13 +141,18 @@ public class DistinctOperator extends BaseOperator<DistinctResultsBlock> {
           }
         }
       }
-      if (_hitMaxRowsLimit || _hitNoChangeLimit || satisfied) {
+      if (enforceTimeLimit && hasExceededTimeLimit(startTimeNs)) {
+        _hitTimeLimit = true;
+      }
+      if (_hitTimeLimit || _hitMaxRowsLimit || _hitNoChangeLimit || satisfied) {
         break;
       }
     }
     DistinctResultsBlock resultsBlock = new DistinctResultsBlock(executor.getResult(), _queryContext);
     resultsBlock.setNumDocsScanned(_numDocsScanned);
-    if (_hitMaxRowsLimit) {
+    if (_hitTimeLimit) {
+      resultsBlock.setEarlyTerminationReason(BaseResultsBlock.EarlyTerminationReason.TIME_LIMIT);
+    } else if (_hitMaxRowsLimit) {
       resultsBlock.setEarlyTerminationReason(BaseResultsBlock.EarlyTerminationReason.DISTINCT_MAX_ROWS);
     } else if (_hitNoChangeLimit) {
       resultsBlock.setEarlyTerminationReason(BaseResultsBlock.EarlyTerminationReason.DISTINCT_NO_NEW_VALUES);
@@ -175,5 +207,9 @@ public class DistinctOperator extends BaseOperator<DistinctResultsBlock> {
         .map(ExpressionContext::toString)
         .collect(Collectors.toList());
     attributeBuilder.putStringList("keyColumns", expressions);
+  }
+
+  private boolean hasExceededTimeLimit(long startTimeNs) {
+    return _timeSupplier.getAsLong() - startTimeNs >= _maxExecutionTimeNs;
   }
 }

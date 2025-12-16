@@ -44,7 +44,8 @@ import org.apache.pinot.spi.utils.JsonUtils;
  */
 @JsonPropertyOrder({
     "resultTable", "numRowsResultSet", "partialResult", "exceptions", "numGroupsLimitReached",
-    "numGroupsWarningLimitReached", "maxRowsInDistinctReached", "numRowsWithoutChangeInDistinctReached", "timeUsedMs",
+    "numGroupsWarningLimitReached", "maxRowsInDistinctReached", "numRowsWithoutChangeInDistinctReached",
+    "timeLimitInDistinctReached", "timeUsedMs",
     "requestId", "clientRequestId", "brokerId", "numDocsScanned", "totalDocs", "numEntriesScannedInFilter",
     "numEntriesScannedPostFilter", "numServersQueried", "numServersResponded", "numSegmentsQueried",
     "numSegmentsProcessed", "numSegmentsMatched", "numConsumingSegmentsQueried", "numConsumingSegmentsProcessed",
@@ -77,6 +78,7 @@ public class BrokerResponseNative implements BrokerResponse {
   private boolean _numGroupsWarningLimitReached = false;
   private boolean _maxRowsInDistinctReached = false;
   private boolean _numRowsWithoutChangeInDistinctReached = false;
+  private boolean _timeLimitInDistinctReached = false;
   private long _timeUsedMs = 0L;
   private String _requestId;
   private String _clientRequestId;
@@ -193,7 +195,7 @@ public class BrokerResponseNative implements BrokerResponse {
   @Override
   public boolean isPartialResult() {
     return getExceptionsSize() > 0 || isNumGroupsLimitReached() || isMaxRowsInDistinctReached()
-        || isNumRowsWithoutChangeInDistinctReached();
+        || isNumRowsWithoutChangeInDistinctReached() || isTimeLimitInDistinctReached();
   }
 
   @Override
@@ -250,6 +252,14 @@ public class BrokerResponseNative implements BrokerResponse {
 
   public void setNumRowsWithoutChangeInDistinctReached(boolean numRowsWithoutChangeInDistinctReached) {
     _numRowsWithoutChangeInDistinctReached = numRowsWithoutChangeInDistinctReached;
+  }
+
+  public boolean isTimeLimitInDistinctReached() {
+    return _timeLimitInDistinctReached;
+  }
+
+  public void setTimeLimitInDistinctReached(boolean timeLimitInDistinctReached) {
+    _timeLimitInDistinctReached = timeLimitInDistinctReached;
   }
 
   @JsonIgnore

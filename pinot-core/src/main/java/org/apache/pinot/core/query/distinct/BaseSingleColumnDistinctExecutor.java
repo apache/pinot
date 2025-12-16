@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.core.query.distinct;
 
+import java.util.function.LongSupplier;
 import org.apache.pinot.common.request.context.ExpressionContext;
 import org.apache.pinot.core.common.BlockValSet;
 import org.apache.pinot.core.operator.blocks.ValueBlock;
@@ -29,15 +30,9 @@ import org.roaringbitmap.RoaringBitmap;
  * Base implementation of {@link DistinctExecutor} for single column.
  */
 public abstract class BaseSingleColumnDistinctExecutor<T extends DistinctTable, S, M> implements DistinctExecutor {
-  private static final int UNLIMITED_ROWS = Integer.MAX_VALUE;
-
   protected final ExpressionContext _expression;
   protected final T _distinctTable;
-  private int _rowsRemaining = UNLIMITED_ROWS;
-  private int _numRowsProcessed = 0;
-  private int _numRowsWithoutChangeLimit = UNLIMITED_ROWS;
-  private int _numRowsWithoutChange = 0;
-  private boolean _numRowsWithoutChangeLimitReached = false;
+  private final DistinctEarlyTerminationContext _earlyTerminationContext = new DistinctEarlyTerminationContext();
 
   public BaseSingleColumnDistinctExecutor(ExpressionContext expression, T distinctTable) {
     _expression = expression;
@@ -46,22 +41,32 @@ public abstract class BaseSingleColumnDistinctExecutor<T extends DistinctTable, 
 
   @Override
   public void setMaxRowsToProcess(int maxRows) {
-    _rowsRemaining = maxRows;
+    _earlyTerminationContext.setMaxRowsToProcess(maxRows);
   }
 
   @Override
   public void setNumRowsWithoutChangeInDistinct(int numRowsWithoutChangeInDistinct) {
-    _numRowsWithoutChangeLimit = numRowsWithoutChangeInDistinct;
+    _earlyTerminationContext.setNumRowsWithoutChangeInDistinct(numRowsWithoutChangeInDistinct);
+  }
+
+  @Override
+  public void setTimeSupplier(LongSupplier timeSupplier) {
+    _earlyTerminationContext.setTimeSupplier(timeSupplier);
+  }
+
+  @Override
+  public void setRemainingTimeNanos(long remainingTimeNanos) {
+    _earlyTerminationContext.setRemainingTimeNanos(remainingTimeNanos);
   }
 
   @Override
   public boolean isNumRowsWithoutChangeLimitReached() {
-    return _numRowsWithoutChangeLimitReached;
+    return _earlyTerminationContext.isNumRowsWithoutChangeLimitReached();
   }
 
   @Override
   public int getNumRowsProcessed() {
-    return _numRowsProcessed;
+    return _earlyTerminationContext.getNumRowsProcessed();
   }
 
   @Override
@@ -156,37 +161,18 @@ public abstract class BaseSingleColumnDistinctExecutor<T extends DistinctTable, 
 
   @Override
   public int getRemainingRowsToProcess() {
-    return _rowsRemaining;
+    return _earlyTerminationContext.getRemainingRowsToProcess();
   }
 
   private int clampToRemaining(int numDocs) {
-    if (_rowsRemaining == UNLIMITED_ROWS) {
-      return numDocs;
-    }
-    if (_rowsRemaining <= 0) {
-      return 0;
-    }
-    return Math.min(numDocs, _rowsRemaining);
+    return _earlyTerminationContext.clampToRemaining(numDocs);
   }
 
   private void recordRowProcessed(boolean distinctChanged) {
-    _numRowsProcessed++;
-    if (_rowsRemaining != UNLIMITED_ROWS) {
-      _rowsRemaining--;
-    }
-    if (_numRowsWithoutChangeLimit != UNLIMITED_ROWS) {
-      if (distinctChanged) {
-        _numRowsWithoutChange = 0;
-      } else {
-        _numRowsWithoutChange++;
-        if (_numRowsWithoutChange >= _numRowsWithoutChangeLimit) {
-          _numRowsWithoutChangeLimitReached = true;
-        }
-      }
-    }
+    _earlyTerminationContext.recordRowProcessed(distinctChanged);
   }
 
   private boolean shouldStopProcessing() {
-    return _rowsRemaining <= 0 || _numRowsWithoutChangeLimitReached;
+    return _earlyTerminationContext.shouldStopProcessing();
   }
 }
