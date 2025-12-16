@@ -147,7 +147,7 @@ public class RealtimeSegmentCopier implements SegmentCopier {
 
   static ClassicHttpRequest getSendSegmentUriRequest(String controllerUriStr, String downloadUri,
       Map<String, String> headers, String tableNameWithoutType) throws URISyntaxException {
-    URI segmentPushURI = new URI(controllerUriStr + "?tableName=" + tableNameWithoutType);
+    URI segmentPushURI = new URI(controllerUriStr + "/v2/segments?tableName=" + tableNameWithoutType);
     ClassicRequestBuilder requestBuilder = ClassicRequestBuilder.post(segmentPushURI).setVersion(HttpVersion.HTTP_1_1)
         .setHeader(
             FileUploadDownloadClient.CustomHeaders.UPLOAD_TYPE, FileUploadDownloadClient.FileUploadType.URI.toString())
