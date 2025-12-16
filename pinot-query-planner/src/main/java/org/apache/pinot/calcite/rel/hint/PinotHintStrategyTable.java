@@ -40,6 +40,7 @@ public class PinotHintStrategyTable {
       .hintStrategy(PinotHintOptions.AGGREGATE_HINT_OPTIONS, HintPredicates.AGGREGATE)
       .hintStrategy(PinotHintOptions.JOIN_HINT_OPTIONS, HintPredicates.JOIN)
       .hintStrategy(PinotHintOptions.TABLE_HINT_OPTIONS, HintPredicates.TABLE_SCAN)
+      .hintStrategy(PinotHintOptions.WINDOW_HINT_OPTIONS, HintPredicates.WINDOW)
       .build();
 
   /**
