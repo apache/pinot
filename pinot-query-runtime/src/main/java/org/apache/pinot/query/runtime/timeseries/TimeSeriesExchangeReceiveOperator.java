@@ -125,14 +125,18 @@ public class TimeSeriesExchangeReceiveOperator extends BaseTimeSeriesOperator {
       long remainingTimeMs = _deadlineMs - System.currentTimeMillis();
       if (remainingTimeMs <= 0) {
         timeoutException = new QueryException(QueryErrorCode.SERVER_NOT_RESPONDING,
-            "Timed out before polling all servers. Successfully Polled: %s of %s" + index + " of " +
-                _numServersQueried);
+          "Timed out before polling all servers. Successfully Polled: %s of %s"
+            + index
+            + " of "
+            + _numServersQueried);
         break;
       }
       Object result = poll(remainingTimeMs);
       if (result == null) {
         timeoutException = new QueryException(QueryErrorCode.SERVER_NOT_RESPONDING,
-            "Timed out waiting for response. Waited: " + remainingTimeMs + " ms");
+          "Timed out waiting for response. Waited: "
+            + remainingTimeMs
+            + " ms");
         break;
       }
       if (result instanceof Throwable) {
@@ -214,14 +218,18 @@ public class TimeSeriesExchangeReceiveOperator extends BaseTimeSeriesOperator {
       long remainingTimeMs = _deadlineMs - System.currentTimeMillis();
       if (remainingTimeMs <= 0) {
         timeoutException = new QueryException(QueryErrorCode.SERVER_NOT_RESPONDING,
-            "Timed out before polling all servers. Successfully Polled: %s of %s" + index + " of " +
-                _numServersQueried);
+          "Timed out before polling all servers. Successfully Polled: %s of %s"
+            + index
+            + " of "
+            + _numServersQueried);
         break;
       }
       Object result = _receiver.poll(remainingTimeMs, TimeUnit.MILLISECONDS);
       if (result == null) {
         timeoutException = new QueryException(QueryErrorCode.SERVER_NOT_RESPONDING,
-            "Timed out waiting for response. Waited: " + remainingTimeMs + " ms");
+          "Timed out waiting for response. Waited: "
+            + remainingTimeMs
+            + " ms");
         break;
       }
       if (result instanceof Throwable) {
