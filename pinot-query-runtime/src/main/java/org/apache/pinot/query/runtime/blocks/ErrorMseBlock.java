@@ -142,7 +142,8 @@ public class ErrorMseBlock implements MseBlock.Eos {
   /// Returns the main error code of the block.
   ///
   /// Right now this just returns the first error code in the map or UNKNOWN if the map is empty,
-  /// but in the future we might want to have a more sophisticated
+  /// but in the future we might want to have a more sophisticated technique.
+  /// Alternatively, we can change the error blocks to only have one error code.
   public QueryErrorCode getMainErrorCode() {
     Iterator<QueryErrorCode> iterator = _errorMessages.keySet().iterator();
     if (!iterator.hasNext()) {
