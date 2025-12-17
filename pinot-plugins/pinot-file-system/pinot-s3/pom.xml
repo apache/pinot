@@ -53,6 +53,19 @@
       <artifactId>s3mock-testcontainers</artifactId>
       <version>${s3mock.version}</version>
       <scope>test</scope>
+      <exclusions>
+        <exclusion>
+          <groupId>org.testcontainers</groupId>
+          <artifactId>testcontainers</artifactId>
+        </exclusion>
+      </exclusions>
+    </dependency>
+    <!-- Add explicit testcontainers dependency with version 2.0.0 -->
+    <dependency>
+      <groupId>org.testcontainers</groupId>
+      <artifactId>testcontainers</artifactId>
+      <version>${testcontainers.version}</version>
+      <scope>test</scope>
     </dependency>
     <dependency>
       <groupId>com.google.guava</groupId>
