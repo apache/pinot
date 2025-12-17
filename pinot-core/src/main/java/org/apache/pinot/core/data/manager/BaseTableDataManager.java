@@ -442,9 +442,9 @@ public abstract class BaseTableDataManager implements TableDataManager {
       _logger.info("Segment: {} has CRC: {} same as before, not replacing it", segmentName, localMetadata.getCrc());
       return;
     }
-    if (!_instanceDataManagerConfig.shouldCheckCRCOnSegmentLoad() || _skipCrcCheckForThisTable) {
+    if (!_instanceDataManagerConfig.shouldCheckCRCOnSegmentLoad()) {
       _logger.info("Skipping replacing segment: {} even though its CRC has changed from: {} to: {} because "
-          + "instance.check.crc.on.segment.load is set to false or skipCrcCheckOnLoad is enabled", segmentName,
+          + "instance.check.crc.on.segment.load is set to false", segmentName,
           localMetadata.getCrc(), zkMetadata.getCrc());
       return;
     }
