@@ -47,6 +47,8 @@ public class TimeSeriesBlock {
   /**
    * Holds exceptions encountered during processing of the block.
    */
+  // TODO(timeseries): Exceptions are not serialized and propagated from servers to brokers currently, need to pass
+  // all exceptions from servers to broker through this only.
   private final List<QueryException> _exceptions;
 
   public TimeSeriesBlock(@Nullable TimeBuckets timeBuckets, Map<Long, List<TimeSeries>> seriesMap) {
