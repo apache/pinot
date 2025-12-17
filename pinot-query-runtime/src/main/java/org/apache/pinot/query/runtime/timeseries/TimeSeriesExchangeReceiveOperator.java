@@ -110,6 +110,9 @@ public class TimeSeriesExchangeReceiveOperator extends BaseTimeSeriesOperator {
   @VisibleForTesting
   protected Object poll(long remainingTimeMs)
       throws InterruptedException {
+    if (remainingTimeMs <= 0) {
+      return null;
+    }
     return _receiver.poll(remainingTimeMs, TimeUnit.MILLISECONDS);
   }
 
