@@ -167,8 +167,7 @@ public interface ColumnReader extends Closeable, Serializable {
   /**
    * Check if the next value to be read is null.
    */
-  boolean isNextNull()
-      throws IOException;
+  boolean isNextNull() throws IOException;
 
   /**
    * Move the reader to skip the next value in the column and advance to the following value.
@@ -187,8 +186,7 @@ public interface ColumnReader extends Closeable, Serializable {
    *
    * @throws IOException If an I/O error occurs while skipping
    */
-  void skipNext()
-      throws IOException;
+  void skipNext() throws IOException;
 
   /**
    * Check if the column data is single-value or multi-value.
@@ -218,23 +216,17 @@ public interface ColumnReader extends Closeable, Serializable {
    * Should be called only if isNextNull() returns false.
    * @throws IOException If an I/O error occurs while reading
    */
-  int nextInt()
-      throws IOException;
+  int nextInt() throws IOException;
 
-  long nextLong()
-      throws IOException;
+  long nextLong() throws IOException;
 
-  float nextFloat()
-      throws IOException;
+  float nextFloat() throws IOException;
 
-  double nextDouble()
-      throws IOException;
+  double nextDouble() throws IOException;
 
-  String nextString()
-      throws IOException;
+  String nextString() throws IOException;
 
-  byte[] nextBytes()
-      throws IOException;
+  byte[] nextBytes() throws IOException;
 
   /**
    * Get the next int[] / long[] / float[] / double[] / string[] / bytes[][] values for multi-value columns.
@@ -269,8 +261,7 @@ public interface ColumnReader extends Closeable, Serializable {
    *
    * @throws IOException If an I/O error occurs while rewinding
    */
-  void rewind()
-      throws IOException;
+  void rewind() throws IOException;
 
   /**
    * Get the name of the column.
@@ -294,8 +285,7 @@ public interface ColumnReader extends Closeable, Serializable {
    * @return true if the value is null, false otherwise
    * @throws IndexOutOfBoundsException If docId is out of range
    */
-  boolean isNull(int docId)
-      throws IOException;
+  boolean isNull(int docId) throws IOException;
 
   // Single-value accessors
 
@@ -308,23 +298,17 @@ public interface ColumnReader extends Closeable, Serializable {
    * @throws IndexOutOfBoundsException If docId is out of range
    * @throws IOException If an I/O error occurs while reading
    */
-  int getInt(int docId)
-      throws IOException;
+  int getInt(int docId) throws IOException;
 
-  long getLong(int docId)
-      throws IOException;
+  long getLong(int docId) throws IOException;
 
-  float getFloat(int docId)
-      throws IOException;
+  float getFloat(int docId) throws IOException;
 
-  double getDouble(int docId)
-      throws IOException;
+  double getDouble(int docId) throws IOException;
 
-  String getString(int docId)
-      throws IOException;
+  String getString(int docId) throws IOException;
 
-  byte[] getBytes(int docId)
-      throws IOException;
+  byte[] getBytes(int docId) throws IOException;
 
   /**
    * Get the value at the given document ID as a Java Object.
@@ -356,21 +340,15 @@ public interface ColumnReader extends Closeable, Serializable {
    * @throws IndexOutOfBoundsException If docId is out of range
    * @throws IOException If an I/O error occurs while reading
    */
-  MultiValueResult<int[]> getIntMV(int docId)
-      throws IOException;
+  MultiValueResult<int[]> getIntMV(int docId) throws IOException;
 
-  MultiValueResult<long[]> getLongMV(int docId)
-      throws IOException;
+  MultiValueResult<long[]> getLongMV(int docId) throws IOException;
 
-  MultiValueResult<float[]> getFloatMV(int docId)
-      throws IOException;
+  MultiValueResult<float[]> getFloatMV(int docId) throws IOException;
 
-  MultiValueResult<double[]> getDoubleMV(int docId)
-      throws IOException;
+  MultiValueResult<double[]> getDoubleMV(int docId) throws IOException;
 
-  String[] getStringMV(int docId)
-      throws IOException;
+  String[] getStringMV(int docId) throws IOException;
 
-  byte[][] getBytesMV(int docId)
-      throws IOException;
+  byte[][] getBytesMV(int docId) throws IOException;
 }
