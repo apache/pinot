@@ -160,6 +160,7 @@ public class SegmentZKMetadataUtils {
     segmentZKMetadata.setIndexVersion(segmentVersion != null ? segmentVersion.toString() : null);
     segmentZKMetadata.setTotalDocs(segmentMetadata.getTotalDocs());
     segmentZKMetadata.setCrc(Long.parseLong(segmentMetadata.getCrc()));
+    segmentZKMetadata.setDataCrc(Long.parseLong(segmentMetadata.getDataCrc()));
     segmentZKMetadata.setDownloadUrl(downloadUrl);
     segmentZKMetadata.setCrypterName(crypterName);
     segmentZKMetadata.setSizeInBytes(segmentSizeInBytes);

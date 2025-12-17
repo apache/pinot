@@ -709,9 +709,8 @@ public class BrokerRoutingManager implements RoutingManager, ClusterChangeHandle
           AdaptiveServerSelectorFactory.getAdaptiveServerSelector(_serverRoutingStatsManager, _pinotConfig);
       InstanceSelector instanceSelector =
           InstanceSelectorFactory.getInstanceSelector(tableConfig, _propertyStore, _brokerMetrics,
-              adaptiveServerSelector, _pinotConfig);
-      instanceSelector.init(_routableServers, _enabledServerInstanceMap, idealState, externalView,
-          preSelectedOnlineSegments);
+              adaptiveServerSelector, _pinotConfig, _routableServers, _enabledServerInstanceMap, idealState,
+              externalView, preSelectedOnlineSegments);
 
       // Add time boundary manager if both offline and real-time part exist for a hybrid table
       TimeBoundaryManager timeBoundaryManager = null;

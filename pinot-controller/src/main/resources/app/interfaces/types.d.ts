@@ -213,7 +213,7 @@ declare module 'Models' {
     numEntriesScannedPostFilter: number
     numGroupsLimitReached: boolean
     numGroupsWarningLimitReached: boolean
-    partialResponse?: number
+    partialResult?: boolean
     minConsumingFreshnessTimeMs: number
     offlineThreadCpuTimeNs: number
     realtimeThreadCpuTimeNs: number
