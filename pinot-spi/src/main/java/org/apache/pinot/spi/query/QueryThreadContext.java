@@ -133,9 +133,7 @@ public class QueryThreadContext implements AutoCloseable {
     THREAD_LOCAL.remove();
     LoggerConstants.REQUEST_ID_KEY.unregisterFromMdc();
     LoggerConstants.CORRELATION_ID_KEY.unregisterFromMdc();
-    if (_executionContext.getQueryHash() != null) {
-      LoggerConstants.QUERY_HASH_KEY.unregisterFromMdc();
-    }
+    LoggerConstants.QUERY_HASH_KEY.unregisterFromMdc();
     if (_mseWorkerInfo != null) {
       LoggerConstants.STAGE_ID_KEY.unregisterFromMdc();
       LoggerConstants.WORKER_ID_KEY.unregisterFromMdc();

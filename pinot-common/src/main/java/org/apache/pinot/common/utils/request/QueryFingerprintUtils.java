@@ -58,8 +58,8 @@ public class QueryFingerprintUtils {
       return null;
     }
 
-    // Normalize whitespace: replace newlines with spaces, collapse multiple spaces into one, and trim
-    fingerprint = fingerprint.replace("\n", " ").replaceAll("\\s+", " ").trim();
+    // Normalize whitespace: collapse multiple whitespace characters into one space, and trim
+    fingerprint = fingerprint.replaceAll("\\s+", " ").trim();
 
     return new QueryFingerprint(hashString(fingerprint), fingerprint);
   }

@@ -50,6 +50,9 @@ import org.apache.calcite.sql.util.SqlShuttle;
  *   <li>Window functions: window specification (operand 1) are preserved.</li>
  * </ul>
  * </p>
+ *
+ * <p><b>Note:</b> This visitor maintains internal state (dynamic parameter index) that is not reset between visits.
+ * A new instance should be created for each query fingerprint.</p>
  */
 public class QueryFingerprintVisitor extends SqlShuttle {
   // SqlSelect operand index for hints, see {@link org.apache.calcite.sql.SqlSelect}.
@@ -60,7 +63,23 @@ public class QueryFingerprintVisitor extends SqlShuttle {
   private static final int SQLJOIN_JOIN_TYPE_OPERAND_INDEX = 2;
   private static final int SQLJOIN_CONDITION_TYPE_OPERAND_INDEX = 4;
 
-  private int _dynamicParamIndex = 0;
+  private final boolean _squashNullInList;
+  private int _dynamicParamIndex;
+
+  public QueryFingerprintVisitor() {
+    this(false);
+  }
+
+  /**
+   * Creates a QueryFingerprintVisitor with configurable NULL handling in IN-lists.
+   *
+   * @param squashNullInList if true, NULL values in IN/NOT IN lists are treated as data literals
+   *                         and squashed together with other values into a single placeholder.
+   */
+  public QueryFingerprintVisitor(boolean squashNullInList) {
+    _squashNullInList = squashNullInList;
+    _dynamicParamIndex = 0;
+  }
 
   @Override
   public SqlNode visit(SqlLiteral literal) {
@@ -222,18 +241,22 @@ public class QueryFingerprintVisitor extends SqlShuttle {
   /**
    * Visit IN/NOT IN clause and normalize data literals.
    * <p>
-   * Two cases:
+   * Three cases:
    * <ul>
    *   <li><b>Case 1:</b> All values are data literals → replace entire list with a single ?
    *       <br>Example: IN (1, 2, 3) → IN (?)</li>
    *   <li><b>Case 2:</b> Contains any of the following → visit each value individually and replace only data literals:
    *       <ul>
-   *         <li>Preserved literals (NULL, DISTINCT, ASC, DESC, etc.): IN (1, NULL, 3) → IN (?, NULL, ?)</li>
    *         <li>Expressions: IN (col1 + 1, 2) → IN (col1 + ?, ?)</li>
    *         <li>Function calls: IN (UPPER('a'), LOWER('b')) → IN (UPPER(?), LOWER(?))</li>
    *         <li>Subquery: IN (SELECT ...) → visits the subquery normally</li>
    *       </ul>
    *   </li>
+   *   <li><b>Case 3:</b> Contains NULL </li>
+   *       <ul>
+   *         <li>preserve NULL if _squashNullInList is false: IN (1, NULL, 3) → IN (1, NULL, 3)</li>
+   *         <li>squash NULL if _squashNullInList is true: IN (1, NULL, 3) → IN (?)</li>
+   *       </ul>
    * </ul>
    * </p>
    */
@@ -260,7 +283,14 @@ public class QueryFingerprintVisitor extends SqlShuttle {
       // - SqlCall: expressions (col1 + 1), function calls (UPPER('a')), etc.
       boolean allDataLiterals = true;
       for (SqlNode node : valueList.getList()) {
-        if (!(node instanceof SqlLiteral) || shouldPreserveLiteral((SqlLiteral) node)) {
+        if (!(node instanceof SqlLiteral)) {
+          allDataLiterals = false;
+          break;
+        }
+        SqlLiteral literal = (SqlLiteral) node;
+        // Allow NULL to be squashed if _squashNullInList is true
+        boolean isNullAndSquashable = _squashNullInList && literal.getTypeName() == SqlTypeName.NULL;
+        if (shouldPreserveLiteral(literal) && !isNullAndSquashable) {
           allDataLiterals = false;
           break;
         }

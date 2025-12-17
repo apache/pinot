@@ -94,7 +94,6 @@ import org.apache.pinot.spi.exception.QueryErrorCode;
 import org.apache.pinot.spi.exception.QueryException;
 import org.apache.pinot.spi.query.QueryExecutionContext;
 import org.apache.pinot.spi.query.QueryThreadContext;
-import org.apache.pinot.spi.trace.LoggerConstants;
 import org.apache.pinot.spi.trace.QueryFingerprint;
 import org.apache.pinot.spi.trace.RequestContext;
 import org.apache.pinot.spi.utils.CommonConstants;
@@ -314,8 +313,8 @@ public class MultiStageBrokerRequestHandler extends BaseBrokerRequestHandler {
       try {
         QueryFingerprint queryFingerprint = QueryFingerprintUtils.generateFingerprint(sqlNodeAndOptions);
         if (queryFingerprint != null) {
+          queryHash = queryFingerprint.getQueryHash();
           requestContext.setQueryFingerprint(queryFingerprint);
-          LoggerConstants.QUERY_HASH_KEY.registerInMdc(queryFingerprint.getQueryHash());
         }
       } catch (Exception e) {
         LOGGER.warn("Failed to generate query fingerprint for request {}: {}. {}", requestId, query, e.getMessage());

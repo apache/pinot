@@ -28,7 +28,7 @@
       https://logging.apache.org/log4j/2.x/manual/pattern-layout.html#converter-not-empty
       and https://logging.apache.org/log4j/2.x/manual/pattern-layout.html#converter-thread-context-map
     -->
-    <Property name="LOG_PATTERN">%d{yyyy/MM/dd HH:mm:ss.SSS} %p [%c{1}] [%t]%notEmpty{ [cid=%X{pinot.query.cid}%notEmpty{,queryHash=%X{pinot.query.hash}}%notEmpty{,stg=%X{pinot.mse.stageId}}]} %m%n</Property>
+    <Property name="LOG_PATTERN">%d{yyyy/MM/dd HH:mm:ss.SSS} %p [%c{1}] [%t]%notEmpty{ [cid=%X{pinot.query.cid}%notEmpty{,hash=%X{pinot.query.hash}}%notEmpty{,stg=%X{pinot.mse.stageId}}]} %m%n</Property>
     <Property name="PINOT_COMPONENT">all</Property>
   </Properties>
   <Appenders>
