@@ -24,26 +24,26 @@ import static org.testng.Assert.assertEquals;
 import static org.testng.Assert.assertThrows;
 
 
-public class ForceCommitBatchConfigTest {
+public class BatchConfigTest {
 
   @Test
   public void testForceCommitBatchConfig() {
-    ForceCommitBatchConfig forceCommitBatchConfig = ForceCommitBatchConfig.of(Integer.MAX_VALUE, 5, 180);
+    BatchConfig forceCommitBatchConfig = BatchConfig.of(Integer.MAX_VALUE, 5, 180);
     assertEquals(forceCommitBatchConfig.getBatchSize(), Integer.MAX_VALUE);
     assertEquals(forceCommitBatchConfig.getBatchStatusCheckIntervalMs(), 5000);
     assertEquals(forceCommitBatchConfig.getBatchStatusCheckTimeoutMs(), 180000);
 
-    forceCommitBatchConfig = ForceCommitBatchConfig.of(1, 5, 180);
+    forceCommitBatchConfig = BatchConfig.of(1, 5, 180);
     assertEquals(forceCommitBatchConfig.getBatchSize(), 1);
     assertEquals(forceCommitBatchConfig.getBatchStatusCheckIntervalMs(), 5000);
     assertEquals(forceCommitBatchConfig.getBatchStatusCheckTimeoutMs(), 180000);
 
-    forceCommitBatchConfig = ForceCommitBatchConfig.of(1, 23, 37);
+    forceCommitBatchConfig = BatchConfig.of(1, 23, 37);
     assertEquals(forceCommitBatchConfig.getBatchSize(), 1);
     assertEquals(forceCommitBatchConfig.getBatchStatusCheckIntervalMs(), 23000);
     assertEquals(forceCommitBatchConfig.getBatchStatusCheckTimeoutMs(), 37000);
 
-    assertThrows(IllegalArgumentException.class, () -> ForceCommitBatchConfig.of(0, 5, 180));
-    assertThrows(IllegalArgumentException.class, () -> ForceCommitBatchConfig.of(32, 0, 0));
+    assertThrows(IllegalArgumentException.class, () -> BatchConfig.of(0, 5, 180));
+    assertThrows(IllegalArgumentException.class, () -> BatchConfig.of(32, 0, 0));
   }
 }

@@ -33,6 +33,7 @@ public class DefaultValueColumnReader implements ColumnReader {
 
   private final String _columnName;
   private final int _numDocs;
+  private final FieldSpec _fieldSpec;
   private final FieldSpec.DataType _dataType;
 
   private int _currentIndex;
@@ -48,6 +49,7 @@ public class DefaultValueColumnReader implements ColumnReader {
     _columnName = columnName;
     _numDocs = numDocs;
     _currentIndex = 0;
+    _fieldSpec = fieldSpec;
     _dataType = fieldSpec.getDataType();
   }
 
@@ -85,6 +87,11 @@ public class DefaultValueColumnReader implements ColumnReader {
       throw new IllegalStateException("No more values available");
     }
     _currentIndex++;
+  }
+
+  @Override
+  public boolean isSingleValue() {
+    return _fieldSpec.isSingleValueField();
   }
 
   @Override
@@ -265,6 +272,12 @@ public class DefaultValueColumnReader implements ColumnReader {
   public byte[] getBytes(int docId) {
     validateDocId(docId);
     return null;
+  }
+
+  @Override
+  public Object getValue(int docId) {
+    validateDocId(docId);
+    return _defaultValue;
   }
 
   // Multi-value accessors

@@ -105,10 +105,9 @@ public class EpochTimeHandler implements TimeHandler {
   @Override
   @Nullable
   public Object getModifiedTimeValue(Object columnValue) {
-    long timeMs = _formatSpec.fromFormatToMillis(columnValue.toString());
-
     // Round time if needed
     if (_roundBucketMs > 0) {
+      long timeMs = _formatSpec.fromFormatToMillis(columnValue.toString());
       timeMs = (timeMs / _roundBucketMs) * _roundBucketMs;
       return _dataType.convert(_formatSpec.fromMillisToFormat(timeMs));
     } else {

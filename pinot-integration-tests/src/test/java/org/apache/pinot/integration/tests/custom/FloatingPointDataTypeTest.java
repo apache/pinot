@@ -24,7 +24,6 @@ import java.io.IOException;
 import java.util.List;
 import org.apache.avro.file.DataFileWriter;
 import org.apache.avro.generic.GenericData;
-import org.apache.avro.generic.GenericDatumWriter;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.TableType;
 import org.apache.pinot.spi.data.FieldSpec;
@@ -96,12 +95,10 @@ public class FloatingPointDataTypeTest extends CustomDataQueryClusterIntegration
         new org.apache.avro.Schema.Field(MET_FLOAT_UNSORTED_NO_DIC,
             org.apache.avro.Schema.create(org.apache.avro.Schema.Type.DOUBLE), null, null)));
 
-    // create avro file
-    File avroFile = new File(_tempDir, "data.avro");
-    try (DataFileWriter<GenericData.Record> fileWriter = new DataFileWriter<>(new GenericDatumWriter<>(avroSchema))) {
-      fileWriter.create(avroSchema, avroFile);
-      double sortedValue = 0.0;
-      double unsortedValue = 0.05;
+    double sortedValue = 0.0;
+    double unsortedValue = 0.05;
+    try (AvroFilesAndWriters avroFilesAndWriters = createAvroFilesAndWriters(avroSchema)) {
+      List<DataFileWriter<GenericData.Record>> writers = avroFilesAndWriters.getWriters();
       for (int i = 0; i < NUM_DOCS; i++) {
         // create avro record
         GenericData.Record record = new GenericData.Record(avroSchema);
@@ -120,10 +117,10 @@ public class FloatingPointDataTypeTest extends CustomDataQueryClusterIntegration
         }
 
         // add avro record to file
-        fileWriter.append(record);
+        writers.get(i % getNumAvroFiles()).append(record);
       }
+      return avroFilesAndWriters.getAvroFiles();
     }
-    return List.of(avroFile);
   }
 
   @Override

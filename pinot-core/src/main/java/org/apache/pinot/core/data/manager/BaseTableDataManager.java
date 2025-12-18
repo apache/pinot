@@ -1341,6 +1341,7 @@ public abstract class BaseTableDataManager implements TableDataManager {
         IndexSegment segment = segmentDataManager.getSegment();
         if (segment instanceof ImmutableSegmentImpl) {
           ImmutableSegmentImpl immutableSegment = (ImmutableSegmentImpl) segment;
+          indexLoadingConfig.setSegmentTier(immutableSegment.getTier());
           if (immutableSegment.isReloadNeeded(indexLoadingConfig)) {
             needReload = true;
             break;

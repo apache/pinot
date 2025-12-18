@@ -28,7 +28,6 @@ import java.util.List;
 import java.util.Map;
 import org.apache.avro.file.DataFileWriter;
 import org.apache.avro.generic.GenericData;
-import org.apache.avro.generic.GenericDatumWriter;
 import org.apache.commons.lang3.tuple.ImmutablePair;
 import org.apache.commons.lang3.tuple.Pair;
 import org.apache.datasketches.theta.UpdateSketch;
@@ -99,13 +98,11 @@ public class ThetaSketchTest extends CustomDataQueryClusterIntegrationTest {
         new org.apache.avro.Schema.Field(THETA_SKETCH, org.apache.avro.Schema.create(org.apache.avro.Schema.Type.BYTES),
             null, null)));
 
-    // create avro file
-    File avroFile = new File(_tempDir, "data.avro");
-    try (DataFileWriter<GenericData.Record> fileWriter = new DataFileWriter<>(new GenericDatumWriter<>(avroSchema))) {
-      fileWriter.create(avroSchema, avroFile);
-
-      int studentId = 0;
-      int cardinality = 50;
+    int studentId = 0;
+    int cardinality = 50;
+    int recordId = 0;
+    try (AvroFilesAndWriters avroFilesAndWriters = createAvroFilesAndWriters(avroSchema)) {
+      List<DataFileWriter<GenericData.Record>> writers = avroFilesAndWriters.getWriters();
       for (int shardId = 0; shardId < 2; shardId++) {
 
         // populate student-course data (studentId, gender, course) for this shard id
@@ -142,7 +139,8 @@ public class ThetaSketchTest extends CustomDataQueryClusterIntegrationTest {
           record.put(THETA_SKETCH, ByteBuffer.wrap(sketch.compact().toByteArray()));
 
           // add avro record to file
-          fileWriter.append(record);
+          writers.get(recordId % getNumAvroFiles()).append(record);
+          recordId++;
         }
 
         // [course dimension] calculate theta sketches & add them to avro file
@@ -164,12 +162,12 @@ public class ThetaSketchTest extends CustomDataQueryClusterIntegrationTest {
           record.put(THETA_SKETCH, ByteBuffer.wrap(sketch.compact().toByteArray()));
 
           // add avro record to file
-          fileWriter.append(record);
+          writers.get(recordId % getNumAvroFiles()).append(record);
+          recordId++;
         }
       }
+      return avroFilesAndWriters.getAvroFiles();
     }
-
-    return List.of(avroFile);
   }
 
   @Test(dataProvider = "useV1QueryEngine")
