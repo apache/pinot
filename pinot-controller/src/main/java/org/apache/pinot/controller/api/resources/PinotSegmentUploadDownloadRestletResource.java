@@ -419,12 +419,13 @@ public class PinotSegmentUploadDownloadRestletResource {
         _controllerMetrics.setOrUpdateTableGauge(tableNameWithType, ControllerGauge.RESOURCE_UTILIZATION_LIMIT_EXCEEDED,
             1L);
         throw new ControllerApplicationException(LOGGER,
-            "Resource utilization limit exceeded for table, rejecting segment upload: " + tableNameWithType,
+            String.format("Disk utilization limit exceeded for table: %s, rejecting upload for segment: %s",
+                tableNameWithType,
+                segmentName),
             Response.Status.FORBIDDEN);
       } else if (isResourceUtilizationWithinLimits == UtilizationChecker.CheckResult.UNDETERMINED) {
         LOGGER.warn(
-            "Resource utilization limit could not be determined for for table: {}. Will allow the segment upload to "
-                + "proceed.",
+            "Disk utilization status could not be determined for for table: {}. Will allow segment upload to proceed.",
             tableNameWithType);
       }
       _controllerMetrics.setOrUpdateTableGauge(tableNameWithType, ControllerGauge.RESOURCE_UTILIZATION_LIMIT_EXCEEDED,
