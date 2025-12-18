@@ -31,6 +31,8 @@ public class WatermarkInductionResult {
 
   private List<Watermark> _watermarks;
 
+  public List<String> _historicalSegments;
+
   /**
    * The @JsonCreator annotation marks this constructor to be used for deserializing
    * a JSON array back into a WaterMarks object.
@@ -38,8 +40,10 @@ public class WatermarkInductionResult {
    * @param watermarks The list of watermarks.
    */
   @JsonCreator
-  public WatermarkInductionResult(@JsonProperty("watermarks") List<Watermark> watermarks) {
+  public WatermarkInductionResult(@JsonProperty("watermarks") List<Watermark> watermarks,
+      @JsonProperty("historicalSegments") List<String> historicalSegments) {
     _watermarks = watermarks;
+    _historicalSegments = historicalSegments;
   }
 
   /**
@@ -50,6 +54,11 @@ public class WatermarkInductionResult {
   @JsonGetter("watermarks")
   public List<Watermark> getWatermarks() {
     return _watermarks;
+  }
+
+  @JsonGetter("historicalSegments")
+  public List<String> getHistoricalSegments() {
+    return _historicalSegments;
   }
 
   /**
