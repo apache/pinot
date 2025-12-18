@@ -117,6 +117,8 @@ import org.apache.pinot.controller.helix.core.rebalance.TableRebalanceManager;
 import org.apache.pinot.controller.helix.core.rebalance.tenant.TenantRebalanceChecker;
 import org.apache.pinot.controller.helix.core.rebalance.tenant.TenantRebalancer;
 import org.apache.pinot.controller.helix.core.relocation.SegmentRelocator;
+import org.apache.pinot.controller.helix.core.replication.RealtimeSegmentCopier;
+import org.apache.pinot.controller.helix.core.replication.TableReplicator;
 import org.apache.pinot.controller.helix.core.retention.RetentionManager;
 import org.apache.pinot.controller.helix.core.statemodel.LeadControllerResourceMasterSlaveStateModelFactory;
 import org.apache.pinot.controller.helix.core.util.HelixSetupUtils;
@@ -225,6 +227,7 @@ public abstract class BaseControllerStarter implements ServiceStartable {
   protected TaskMetricsEmitter _taskMetricsEmitter;
   protected PoolingHttpClientConnectionManager _connectionManager;
   protected TenantRebalancer _tenantRebalancer;
+  protected TableReplicator _tableReplicator;
   // This executor should be used by all code paths for user initiated rebalances, so that the controller config
   // CONTROLLER_EXECUTOR_REBALANCE_NUM_THREADS is honored.
   protected ExecutorService _rebalancerExecutorService;
@@ -647,6 +650,7 @@ public abstract class BaseControllerStarter implements ServiceStartable {
             _rebalancerExecutorService);
     _tenantRebalancer =
         new TenantRebalancer(_tableRebalanceManager, _helixResourceManager, _rebalancerExecutorService);
+    _tableReplicator = new TableReplicator(_helixResourceManager, _executorService, new RealtimeSegmentCopier(_config));
 
     // Setting up periodic tasks
     List<PeriodicTask> controllerPeriodicTasks = setupControllerPeriodicTasks();
@@ -708,6 +712,7 @@ public abstract class BaseControllerStarter implements ServiceStartable {
         bind(_sqlQueryExecutor).to(SqlQueryExecutor.class);
         bind(_pinotLLCRealtimeSegmentManager).to(PinotLLCRealtimeSegmentManager.class);
         bind(_tenantRebalancer).to(TenantRebalancer.class);
+        bind(_tableReplicator).to(TableReplicator.class);
         bind(_tableSizeReader).to(TableSizeReader.class);
         bind(_storageQuotaChecker).to(StorageQuotaChecker.class);
         bind(_diskUtilizationChecker).to(DiskUtilizationChecker.class);

@@ -1645,6 +1645,8 @@ public class CommonConstants {
     public static final String CONSUMING_SEGMENTS_FORCE_COMMITTED_LIST = "segmentsForceCommitted";
     public static final String CONSUMING_SEGMENTS_YET_TO_BE_COMMITTED_LIST = "segmentsYetToBeCommitted";
     public static final String NUM_CONSUMING_SEGMENTS_YET_TO_BE_COMMITTED = "numberOfSegmentsYetToBeCommitted";
+    // Table Replication job props
+    public static final String SEGMENTS_TO_BE_COPIED = "segmentsToBeCopied";
   }
 
   // prefix for scheduler related features, e.g. query accountant
