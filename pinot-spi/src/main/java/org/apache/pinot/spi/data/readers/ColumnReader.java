@@ -189,6 +189,11 @@ public interface ColumnReader extends Closeable, Serializable {
   void skipNext() throws IOException;
 
   /**
+   * Check if the column data is single-value or multi-value.
+   */
+  boolean isSingleValue();
+
+  /**
    * Check if the column data type from the actual reader can be returned as the expected type directly.
    * For multi-value columns, this indicates if the multi-value type specific methods can be called directly.
    * If true, the type specific methods like nextInt() can be called directly.
@@ -262,7 +267,7 @@ public interface ColumnReader extends Closeable, Serializable {
   /**
    * Get int / long / float / double / string / byte[] value at the given document ID for single-value columns.
    * Should be called only if isNull(docId) returns false.
-   * <p>Document ID is 0-based. Valid values are 0 to {@link #getTotalDocs()} - 1.
+   * Document ID is 0-based. Valid values are 0 to {@link #getTotalDocs()} - 1.
    *
    * @param docId Document ID (0-based)
    * @throws IndexOutOfBoundsException If docId is out of range
@@ -274,6 +279,21 @@ public interface ColumnReader extends Closeable, Serializable {
   double getDouble(int docId) throws IOException;
   String getString(int docId) throws IOException;
   byte[] getBytes(int docId) throws IOException;
+
+  /**
+   * Get the value at the given document ID as a Java Object.
+   * Can be used for both single-value and multi-value columns.
+   * This should be used if
+   * 1. Certain API's don't yet support primitive type specific methods (eg: TimeHandler, Partitioner, etc.) and
+   *    thus will be boxed anyway.
+   * 2. The required data type does not match the actual type and the client will handle the conversion
+   * Document ID is 0-based. Valid values are 0 to {@link #getTotalDocs()} - 1.
+   *
+   * @param docId Document ID (0-based)
+   * @throws IndexOutOfBoundsException If docId is out of range
+   * @throws IOException If an I/O error occurs while reading
+   */
+  Object getValue(int docId) throws IOException;
 
   // Multi-value accessors
 
