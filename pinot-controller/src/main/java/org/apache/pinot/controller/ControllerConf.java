@@ -405,6 +405,7 @@ public class ControllerConf extends PinotConfiguration {
   public static final String CONFIG_OF_MAX_TENANT_REBALANCE_JOBS_IN_ZK = "controller.tenant.rebalance.maxJobsInZK";
   public static final String CONFIG_OF_MAX_RELOAD_SEGMENT_JOBS_IN_ZK = "controller.reload.segment.maxJobsInZK";
   public static final String CONFIG_OF_MAX_FORCE_COMMIT_JOBS_IN_ZK = "controller.force.commit.maxJobsInZK";
+  public static final String CONFIG_OF_MAX_TABLE_REPLICATION_JOBS_IN_ZK = "controller.table.replication.maxJobsInZK";
 
   private final Map<String, String> _invalidConfigs = new ConcurrentHashMap<>();
 
@@ -1400,5 +1401,9 @@ public class ControllerConf extends PinotConfiguration {
 
   public boolean getSegmentCompletionGroupCommitEnabled() {
     return getProperty(CONTROLLER_SEGMENT_COMPLETION_GROUP_COMMIT_ENABLED, true);
+  }
+
+  public int getMaxTableReplicationZkJobs() {
+    return getProperty(CONFIG_OF_MAX_FORCE_COMMIT_JOBS_IN_ZK, ControllerJob.DEFAULT_MAXIMUM_CONTROLLER_JOBS_IN_ZK);
   }
 }
