@@ -205,6 +205,9 @@ public class PinotSegmentColumnReaderImpl implements ColumnReader {
     return value;
   }
 
+  // For all multi-value primitive type methods (nextIntMV, nextLongMV, nextFloatMV, nextDoubleMV,
+  // getIntMV, getLongMV, getFloatMV, getDoubleMV), we pass null for the validity bitset since
+  // multi-value primitive types cannot have null elements. Nulls are removed by NullValueTransformer
   @Override
   public MultiValueResult<int[]> nextIntMV() {
     if (!hasNext()) {
