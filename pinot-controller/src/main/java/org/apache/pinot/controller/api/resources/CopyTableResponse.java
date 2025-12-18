@@ -22,11 +22,23 @@ package org.apache.pinot.controller.api.resources;
 import com.fasterxml.jackson.annotation.JsonProperty;
 
 public class CopyTableResponse {
+  @JsonProperty("msg")
+  private String _msg;
+
   @JsonProperty("status")
   private String _status;
 
-  public CopyTableResponse(String status) {
+  public CopyTableResponse(String status, String msg) {
     _status = status;
+    _msg = msg;
+  }
+
+  public String getMsg() {
+    return _msg;
+  }
+
+  public void setMsg(String msg) {
+    _msg = msg;
   }
 
   public String getStatus() {
