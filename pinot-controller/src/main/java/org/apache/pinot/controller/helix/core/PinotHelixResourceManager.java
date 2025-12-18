@@ -4749,13 +4749,16 @@ public class PinotHelixResourceManager {
     List<StreamConfig> streamConfigs = IngestionConfigUtils.getStreamConfigs(tableConfig);
     IdealState idealState = _helixAdmin
         .getResourceIdealState(getHelixClusterName(), tableNameWithType);
+    if (idealState == null) {
+      throw new IllegalStateException("Null IdealState of the table " + tableNameWithType);
+    }
     List<PartitionGroupConsumptionStatus> lst = _pinotLLCRealtimeSegmentManager
         .getPartitionGroupConsumptionStatusList(idealState, streamConfigs);
     List<WatermarkInductionResult.Watermark> watermarks = lst.stream().map(status -> {
       long seq = status.getSequenceNumber();
       long startOffset;
       try {
-        if (status.getStatus().equalsIgnoreCase("done")) {
+        if ("DONE".equalsIgnoreCase(status.getStatus())) {
           Preconditions.checkNotNull(status.getEndOffset());
           startOffset = NumberUtils.parseLong(status.getEndOffset().toString());
           seq++;

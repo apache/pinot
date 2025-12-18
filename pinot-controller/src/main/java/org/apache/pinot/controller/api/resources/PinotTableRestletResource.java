@@ -366,6 +366,7 @@ public class PinotTableRestletResource {
   @VisibleForTesting
   static void tweakRealtimeTableConfig(ObjectNode realtimeTableConfigNode, String brokerTenant, String serverTenant,
       @Nullable Map<String, String> tagPoolReplacementMap) {
+    // TenantConfig is a mandatory field. Thus skip the null check.
     ObjectNode tenantConfig = (ObjectNode) realtimeTableConfigNode.get("tenants");
     tenantConfig.put("broker", brokerTenant);
     tenantConfig.put("server", serverTenant);
@@ -380,14 +381,12 @@ public class PinotTableRestletResource {
     while (iterator.hasNext()) {
       Map.Entry<String, JsonNode> entry = iterator.next();
       JsonNode instanceAssignmentConfig = entry.getValue();
-      // tagPoolConfig is a required field
+      // TagPoolConfig is a mandatory field. Thus skip the null check.
       ObjectNode tagPoolConfig = (ObjectNode) instanceAssignmentConfig.get("tagPoolConfig");
-      // tag is a required json field
-      if (tagPoolConfig != null) {
-        String srcTag = tagPoolConfig.get("tag").asText();
-        if (tagPoolReplacementMap.containsKey(srcTag)) {
-          tagPoolConfig.put("tag", tagPoolReplacementMap.get(srcTag));
-        }
+      // Tag is a mandatory field. Thus skip the null check.
+      String srcTag = tagPoolConfig.get("tag").asText();
+      if (tagPoolReplacementMap.containsKey(srcTag)) {
+        tagPoolConfig.put("tag", tagPoolReplacementMap.get(srcTag));
       }
     }
   }
