@@ -29,7 +29,7 @@ import java.util.List;
  */
 public class WatermarkInductionResult {
 
-  public List<Watermark> _watermarks;
+  private List<Watermark> _watermarks;
 
   /**
    * The @JsonCreator annotation marks this constructor to be used for deserializing
@@ -56,9 +56,9 @@ public class WatermarkInductionResult {
    * Represents a single watermark with its partition, sequence, and offset.
    */
   public static class Watermark {
-    public long _partitionGroupId;
-    public long _sequenceNumber;
-    public long _offset;
+    private long _partitionGroupId;
+    private long _sequenceNumber;
+    private long _offset;
 
     /**
      * The @JsonCreator annotation tells Jackson to use this constructor to create
