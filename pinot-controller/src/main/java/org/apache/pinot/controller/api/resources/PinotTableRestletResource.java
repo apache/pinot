@@ -326,10 +326,14 @@ public class PinotTableRestletResource {
       LOGGER.info("[copyTable] Fetched table config for table: {}, tableConfig: {}", tableName, tableConfigJson);
       JsonNode tableConfigNode = JsonUtils.stringToJsonNode(tableConfigJson);
 
+      boolean hasOffline = tableConfigNode.has(TableType.OFFLINE.name());
       if (tableConfigNode.has(TableType.REALTIME.name())) {
         ObjectNode realtimeTableConfigNode = (ObjectNode) tableConfigNode.get(TableType.REALTIME.name());
         tweakRealtimeTableConfig(realtimeTableConfigNode, brokerTenant, serverTenant, tagReplacementMap);
         TableConfig realtimeTableConfig = JsonUtils.jsonNodeToObject(realtimeTableConfigNode, TableConfig.class);
+        if (realtimeTableConfig.getUpsertConfig() != null) {
+          return new CopyTableResponse("fail", "upsert table copy not supported");
+        }
         LOGGER.info("[copyTable] Successfully fetched and tweaked table config for table: {}, tableConfig: {}",
             tableName, realtimeTableConfig.toString());
 
@@ -346,9 +350,12 @@ public class PinotTableRestletResource {
             .collect(Collectors.toList());
 
         _pinotHelixResourceManager.addTable(realtimeTableConfig, partitionGroupInfos);
+        if (hasOffline) {
+          return new CopyTableResponse("warn", "detect offline; copy real-time only");
+        }
+        return new CopyTableResponse("success", "");
       }
-      LOGGER.info("[copyTable] Finished Table Config copy: {}", tableName);
-      return new CopyTableResponse("success");
+      return new CopyTableResponse("fail", "offline table copy not supported");
     } catch (Exception e) {
       LOGGER.error("[copyTable] Error copying table: {}", tableName, e);
       throw new ControllerApplicationException(LOGGER, "Error copying table: " + e.getMessage(),
