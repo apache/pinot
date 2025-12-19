@@ -23,17 +23,17 @@ import javax.annotation.Nullable;
 
 
 /**
- * Result wrapper for multi-value column reads that tracks element-level null validity.
+ * Result wrapper for multi-value column reads that tracks element-level nulls.
  *
  * <p>This class addresses a limitation where bulk reads from columnar formats (like Arrow)
  * don't check the validity bitmap for null elements. By returning both the values array
- * and a validity BitSet, callers can properly handle null elements within multi-value columns.
+ * and a nulls BitSet, callers can properly handle null elements within multi-value columns.
  *
  * <p><b>BitSet Semantics:</b>
  * <ul>
- *   <li>Set bit (1) = valid/non-null element</li>
- *   <li>Unset bit (0) = null element</li>
- *   <li>Null validity BitSet = no nulls in the range (fast path)</li>
+ *   <li>Set bit (1) = null element</li>
+ *   <li>Unset bit (0) = valid/non-null element</li>
+ *   <li>Null nulls BitSet = no nulls in the range (fast path)</li>
  * </ul>
  *
  * <p><b>Usage Example:</b>
@@ -59,24 +59,24 @@ import javax.annotation.Nullable;
 public class MultiValueResult<T> {
   private final T _values;
   @Nullable
-  private final BitSet _validity;
+  private final BitSet _nulls;
 
-  private MultiValueResult(T values, @Nullable BitSet validity) {
+  private MultiValueResult(T values, @Nullable BitSet nulls) {
     _values = values;
-    _validity = validity;
+    _nulls = nulls;
   }
 
   /**
-   * Create a MultiValueResult with optional validity information.
+   * Create a MultiValueResult with optional nulls information.
    *
    * @param values The values array (int[], long[], float[], double[])
-   * @param validity BitSet where set bits indicate valid (non-null) elements,
-   *                 or null if no nulls exist in the range
+   * @param nulls BitSet where set bits indicate null elements,
+   *              or null if no nulls exist in the range
    * @param <T> The array type
    * @return A new MultiValueResult instance
    */
-  public static <T> MultiValueResult<T> of(T values, @Nullable BitSet validity) {
-    return new MultiValueResult<>(values, validity);
+  public static <T> MultiValueResult<T> of(T values, @Nullable BitSet nulls) {
+    return new MultiValueResult<>(values, nulls);
   }
 
   /**
@@ -85,7 +85,7 @@ public class MultiValueResult<T> {
    * @return true if there are null elements, false otherwise
    */
   public boolean hasNulls() {
-    return _validity != null;
+    return _nulls != null;
   }
 
   /**
@@ -95,7 +95,7 @@ public class MultiValueResult<T> {
    * @return true if the element is null, false if it's valid
    */
   public boolean isNull(int index) {
-    return _validity != null && !_validity.get(index);
+    return _nulls != null && _nulls.get(index);
   }
 
   /**
@@ -112,12 +112,12 @@ public class MultiValueResult<T> {
   }
 
   /**
-   * Get the validity BitSet.
+   * Get the nulls BitSet.
    *
-   * @return The validity BitSet, or null if no nulls exist in this result
+   * @return The nulls BitSet where set bits indicate null elements, or null if no nulls exist
    */
   @Nullable
-  public BitSet getValidity() {
-    return _validity;
+  public BitSet getNulls() {
+    return _nulls;
   }
 }
