@@ -111,7 +111,7 @@ public class PipelineBreakerExecutorTest {
     QueryExecutionContext executionContext =
         new QueryExecutionContext(QueryExecutionContext.QueryType.MSE, requestId, Long.toString(requestId),
             Accounting.DEFAULT_WORKLOAD_NAME, System.currentTimeMillis(), deadlineMs, deadlineMs, "brokerId",
-            "serverId");
+            "serverId", "");
     QueryThreadContext.MseWorkerInfo workerInfo = new QueryThreadContext.MseWorkerInfo(1, 2);
     try (QueryThreadContext ignore = QueryThreadContext.open(executionContext, workerInfo,
         ThreadAccountantUtils.getNoOpAccountant())) {

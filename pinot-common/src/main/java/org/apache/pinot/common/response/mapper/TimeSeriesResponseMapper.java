@@ -60,6 +60,9 @@ public class TimeSeriesResponseMapper {
 
     ResultTable resultTable = new ResultTable(dataSchema, rows);
     brokerResponse.setResultTable(resultTable);
+    for (QueryException exception : timeSeriesBlock.getExceptions()) {
+      brokerResponse.addException(QueryProcessingException.fromQueryException(exception));
+    }
     setStats(brokerResponse, timeSeriesBlock.getMetadata());
     return brokerResponse;
   }

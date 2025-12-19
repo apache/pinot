@@ -449,7 +449,6 @@ class SingleFileIndexDirectory extends ColumnIndexDirectory {
     // Text index is kept in its own files, thus can be removed directly.
     if (indexType == StandardIndexes.text()) {
       TextIndexUtils.cleanupTextIndex(_segmentDirectory, columnName);
-      return;
     }
     if (indexType == StandardIndexes.vector()) {
       VectorIndexUtils.cleanupVectorIndex(_segmentDirectory, columnName);
