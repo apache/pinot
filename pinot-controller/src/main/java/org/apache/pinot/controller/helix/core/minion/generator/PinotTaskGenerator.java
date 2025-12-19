@@ -131,4 +131,17 @@ public interface PinotTaskGenerator {
    */
   default void validateTaskConfigs(TableConfig tableConfig, Schema schema, Map<String, String> taskConfigs) {
   }
+
+  /**
+   * Performs a dry run for the given task type and returns the planned actions as a string.
+   * @param tableConfig The table configuration for which the dry run is performed.
+   * @param taskConfigs The task type specific task configuration for the dry run.
+   * @param verbose If true, returns a verbose output with per-segment details.
+   * @return The planned actions as a string.
+   * @throws Exception If any error occurs during the dry run.
+   */
+  default String dryRun(TableConfig tableConfig, Map<String, String> taskConfigs, boolean verbose)
+      throws Exception {
+    throw new UnsupportedOperationException("Dryrun not supported for task type: " + getTaskType());
+  }
 }
