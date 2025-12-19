@@ -57,7 +57,7 @@ import javax.annotation.Nullable;
  *   } catch (Exception e) {
  *    // Handle exception / log
  *    continue;
-*    }
+ *    }
  *   if (value != null) {
  *     // Process non-null value
  *     processValue(value);
@@ -200,10 +200,15 @@ public interface ColumnReader extends Closeable, Serializable {
    * Otherwise, clients should use next() and cast the result.
    */
   boolean isInt();
+
   boolean isLong();
+
   boolean isFloat();
+
   boolean isDouble();
+
   boolean isString();
+
   boolean isBytes();
 
   /**
@@ -212,24 +217,44 @@ public interface ColumnReader extends Closeable, Serializable {
    * @throws IOException If an I/O error occurs while reading
    */
   int nextInt() throws IOException;
+
   long nextLong() throws IOException;
+
   float nextFloat() throws IOException;
+
   double nextDouble() throws IOException;
+
   String nextString() throws IOException;
+
   byte[] nextBytes() throws IOException;
 
   /**
    * Get the next int[] / long[] / float[] / double[] / string[] / bytes[][] values for multi-value columns.
    * Should be called only if isNextNull() returns false.
    *
+   * <p>For primitive types (int, long, float, double), returns a {@link MultiValueResult} that includes
+   * element-level null validity tracking. Use {@link MultiValueResult#hasNulls()} and
+   * {@link MultiValueResult#isNull(int)} to check for null elements within the array.
+   *
    * @throws IOException If an I/O error occurs while reading
    */
-  int[] nextIntMV() throws IOException;
-  long[] nextLongMV() throws IOException;
-  float[] nextFloatMV() throws IOException;
-  double[] nextDoubleMV() throws IOException;
-  String[] nextStringMV() throws IOException;
-  byte[][] nextBytesMV() throws IOException;
+  MultiValueResult<int[]> nextIntMV()
+      throws IOException;
+
+  MultiValueResult<long[]> nextLongMV()
+      throws IOException;
+
+  MultiValueResult<float[]> nextFloatMV()
+      throws IOException;
+
+  MultiValueResult<double[]> nextDoubleMV()
+      throws IOException;
+
+  String[] nextStringMV()
+      throws IOException;
+
+  byte[][] nextBytesMV()
+      throws IOException;
 
   /**
    * Rewind the reader to start reading from the first value again.
@@ -274,10 +299,15 @@ public interface ColumnReader extends Closeable, Serializable {
    * @throws IOException If an I/O error occurs while reading
    */
   int getInt(int docId) throws IOException;
+
   long getLong(int docId) throws IOException;
+
   float getFloat(int docId) throws IOException;
+
   double getDouble(int docId) throws IOException;
+
   String getString(int docId) throws IOException;
+
   byte[] getBytes(int docId) throws IOException;
 
   /**
@@ -302,14 +332,23 @@ public interface ColumnReader extends Closeable, Serializable {
    * Should be called only if isNull(docId) returns false.
    * <p>Document ID is 0-based. Valid values are 0 to {@link #getTotalDocs()} - 1.
    *
+   * <p>For primitive types (int, long, float, double), returns a {@link MultiValueResult} that includes
+   * element-level null validity tracking. Use {@link MultiValueResult#hasNulls()} and
+   * {@link MultiValueResult#isNull(int)} to check for null elements within the array.
+   *
    * @param docId Document ID (0-based)
    * @throws IndexOutOfBoundsException If docId is out of range
    * @throws IOException If an I/O error occurs while reading
    */
-  int[] getIntMV(int docId) throws IOException;
-  long[] getLongMV(int docId) throws IOException;
-  float[] getFloatMV(int docId) throws IOException;
-  double[] getDoubleMV(int docId) throws IOException;
+  MultiValueResult<int[]> getIntMV(int docId) throws IOException;
+
+  MultiValueResult<long[]> getLongMV(int docId) throws IOException;
+
+  MultiValueResult<float[]> getFloatMV(int docId) throws IOException;
+
+  MultiValueResult<double[]> getDoubleMV(int docId) throws IOException;
+
   String[] getStringMV(int docId) throws IOException;
+
   byte[][] getBytesMV(int docId) throws IOException;
 }

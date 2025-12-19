@@ -21,6 +21,7 @@ package org.apache.pinot.segment.local.segment.readers;
 import javax.annotation.Nullable;
 import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.readers.ColumnReader;
+import org.apache.pinot.spi.data.readers.MultiValueResult;
 
 
 /**
@@ -238,39 +239,39 @@ public class DefaultValueColumnReader implements ColumnReader {
   }
 
   @Override
-  public int[] nextIntMV() {
+  public MultiValueResult<int[]> nextIntMV() {
     if (!hasNext()) {
       throw new IllegalStateException("No more values available");
     }
     _currentIndex++;
-    return _defaultIntMV;
+    return MultiValueResult.of(_defaultIntMV, null);
   }
 
   @Override
-  public long[] nextLongMV() {
+  public MultiValueResult<long[]> nextLongMV() {
     if (!hasNext()) {
       throw new IllegalStateException("No more values available");
     }
     _currentIndex++;
-    return _defaultLongMV;
+    return MultiValueResult.of(_defaultLongMV, null);
   }
 
   @Override
-  public float[] nextFloatMV() {
+  public MultiValueResult<float[]> nextFloatMV() {
     if (!hasNext()) {
       throw new IllegalStateException("No more values available");
     }
     _currentIndex++;
-    return _defaultFloatMV;
+    return MultiValueResult.of(_defaultFloatMV, null);
   }
 
   @Override
-  public double[] nextDoubleMV() {
+  public MultiValueResult<double[]> nextDoubleMV() {
     if (!hasNext()) {
       throw new IllegalStateException("No more values available");
     }
     _currentIndex++;
-    return _defaultDoubleMV;
+    return MultiValueResult.of(_defaultDoubleMV, null);
   }
 
   @Override
@@ -354,27 +355,27 @@ public class DefaultValueColumnReader implements ColumnReader {
   // Multi-value accessors
 
   @Override
-  public int[] getIntMV(int docId) {
+  public MultiValueResult<int[]> getIntMV(int docId) {
     validateDocId(docId);
-    return _defaultIntMV;
+    return MultiValueResult.of(_defaultIntMV, null);
   }
 
   @Override
-  public long[] getLongMV(int docId) {
+  public MultiValueResult<long[]> getLongMV(int docId) {
     validateDocId(docId);
-    return _defaultLongMV;
+    return MultiValueResult.of(_defaultLongMV, null);
   }
 
   @Override
-  public float[] getFloatMV(int docId) {
+  public MultiValueResult<float[]> getFloatMV(int docId) {
     validateDocId(docId);
-    return _defaultFloatMV;
+    return MultiValueResult.of(_defaultFloatMV, null);
   }
 
   @Override
-  public double[] getDoubleMV(int docId) {
+  public MultiValueResult<double[]> getDoubleMV(int docId) {
     validateDocId(docId);
-    return _defaultDoubleMV;
+    return MultiValueResult.of(_defaultDoubleMV, null);
   }
 
   @Override
