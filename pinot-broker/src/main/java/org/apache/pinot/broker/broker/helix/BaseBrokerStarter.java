@@ -356,7 +356,7 @@ public abstract class BaseBrokerStarter implements ServiceStartable {
     boolean caseInsensitive =
         _brokerConf.getProperty(Helix.ENABLE_CASE_INSENSITIVE_KEY, Helix.DEFAULT_ENABLE_CASE_INSENSITIVE);
     TableCache tableCache = new ZkTableCache(_propertyStore, caseInsensitive);
-    SystemTableRegistry.INSTANCE.init(tableCache, _helixAdmin, _clusterName);
+    SystemTableRegistry.init(tableCache, _helixAdmin, _clusterName);
 
     LOGGER.info("Initializing Broker Event Listener Factory");
     BrokerQueryEventListenerFactory.init(_brokerConf.subset(Broker.EVENT_LISTENER_CONFIG_PREFIX));
@@ -448,7 +448,7 @@ public abstract class BaseBrokerStarter implements ServiceStartable {
 
     SystemTableBrokerRequestHandler systemTableBrokerRequestHandler =
         new SystemTableBrokerRequestHandler(_brokerConf, brokerId, requestIdGenerator, _routingManager,
-            _accessControlFactory, _queryQuotaManager, tableCache, SystemTableRegistry.INSTANCE, _threadAccountant);
+            _accessControlFactory, _queryQuotaManager, tableCache, _threadAccountant);
     _brokerRequestHandler =
         new BrokerRequestHandlerDelegate(singleStageBrokerRequestHandler, systemTableBrokerRequestHandler,
             multiStageBrokerRequestHandler, timeSeriesRequestHandler, _responseStore);
@@ -749,7 +749,7 @@ public abstract class BaseBrokerStarter implements ServiceStartable {
       LOGGER.error("Caught exception when shutting down PinotFsFactory", e);
     }
     try {
-      SystemTableRegistry.INSTANCE.close();
+      SystemTableRegistry.close();
     } catch (Exception e) {
       LOGGER.warn("Failed to close system table registry cleanly", e);
     }

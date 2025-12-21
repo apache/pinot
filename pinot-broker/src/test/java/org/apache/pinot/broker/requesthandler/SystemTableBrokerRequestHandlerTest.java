@@ -46,6 +46,7 @@ import org.apache.pinot.spi.utils.builder.TableConfigBuilder;
 import org.mockito.Mockito;
 import org.testng.Assert;
 import org.testng.annotations.BeforeClass;
+import org.testng.annotations.BeforeMethod;
 import org.testng.annotations.Test;
 
 import static org.mockito.ArgumentMatchers.anyString;
@@ -62,11 +63,16 @@ public class SystemTableBrokerRequestHandlerTest {
     BrokerQueryEventListenerFactory.init(new PinotConfiguration());
   }
 
+  @BeforeMethod
+  public void clearSystemTableRegistry()
+      throws Exception {
+    SystemTableRegistry.close();
+  }
+
   @Test
   public void testSystemTablesQuery()
       throws Exception {
-    SystemTableRegistry registry = new SystemTableRegistry();
-    registry.register(new FakeTablesProvider());
+    SystemTableRegistry.register(new FakeTablesProvider());
 
     TableCache tableCache = Mockito.mock(TableCache.class);
     Mockito.when(tableCache.getColumnNameMap(anyString())).thenReturn(null);
@@ -74,7 +80,7 @@ public class SystemTableBrokerRequestHandlerTest {
 
     SystemTableBrokerRequestHandler handler =
         new SystemTableBrokerRequestHandler(new PinotConfiguration(), "testBrokerId",
-            new BrokerRequestIdGenerator(), null, ACCESS_CONTROL_FACTORY, null, tableCache, registry,
+            new BrokerRequestIdGenerator(), null, ACCESS_CONTROL_FACTORY, null, tableCache,
             ThreadAccountantUtils.getNoOpAccountant());
 
     BrokerResponse response = handler.handleRequest("SELECT tableName,status FROM system.tables");
@@ -98,8 +104,7 @@ public class SystemTableBrokerRequestHandlerTest {
   @Test
   public void testSystemTablesNativeResponsePassThrough()
       throws Exception {
-    SystemTableRegistry registry = new SystemTableRegistry();
-    registry.register(new NativeResponseProvider());
+    SystemTableRegistry.register(new NativeResponseProvider());
 
     TableCache tableCache = Mockito.mock(TableCache.class);
     Mockito.when(tableCache.getColumnNameMap(anyString())).thenReturn(null);
@@ -107,7 +112,7 @@ public class SystemTableBrokerRequestHandlerTest {
 
     SystemTableBrokerRequestHandler handler =
         new SystemTableBrokerRequestHandler(new PinotConfiguration(), "testBrokerId",
-            new BrokerRequestIdGenerator(), null, ACCESS_CONTROL_FACTORY, null, tableCache, registry,
+            new BrokerRequestIdGenerator(), null, ACCESS_CONTROL_FACTORY, null, tableCache,
             ThreadAccountantUtils.getNoOpAccountant());
 
     BrokerResponse response = handler.handleRequest("SELECT tableName,latencyMs FROM system.native_latency");
@@ -127,8 +132,7 @@ public class SystemTableBrokerRequestHandlerTest {
   @Test
   public void testSystemTablesOffsetLimit()
       throws Exception {
-    SystemTableRegistry registry = new SystemTableRegistry();
-    registry.register(new FakeTablesProvider());
+    SystemTableRegistry.register(new FakeTablesProvider());
 
     TableCache tableCache = Mockito.mock(TableCache.class);
     Mockito.when(tableCache.getColumnNameMap(anyString())).thenReturn(null);
@@ -136,7 +140,7 @@ public class SystemTableBrokerRequestHandlerTest {
 
     SystemTableBrokerRequestHandler handler =
         new SystemTableBrokerRequestHandler(new PinotConfiguration(), "testBrokerId",
-            new BrokerRequestIdGenerator(), null, ACCESS_CONTROL_FACTORY, null, tableCache, registry,
+            new BrokerRequestIdGenerator(), null, ACCESS_CONTROL_FACTORY, null, tableCache,
             ThreadAccountantUtils.getNoOpAccountant());
 
     BrokerResponse response = handler.handleRequest("SELECT tableName,status FROM system.tables LIMIT 1 OFFSET 1");

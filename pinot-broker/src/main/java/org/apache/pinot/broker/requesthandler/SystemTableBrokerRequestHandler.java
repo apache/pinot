@@ -61,15 +61,12 @@ import org.slf4j.LoggerFactory;
 public class SystemTableBrokerRequestHandler extends BaseBrokerRequestHandler {
   private static final Logger LOGGER = LoggerFactory.getLogger(SystemTableBrokerRequestHandler.class);
 
-  private final SystemTableRegistry _systemTableRegistry;
-
   public SystemTableBrokerRequestHandler(PinotConfiguration config, String brokerId,
       BrokerRequestIdGenerator requestIdGenerator, RoutingManager routingManager,
       AccessControlFactory accessControlFactory, QueryQuotaManager queryQuotaManager, TableCache tableCache,
-      SystemTableRegistry systemTableRegistry, ThreadAccountant threadAccountant) {
+      ThreadAccountant threadAccountant) {
     super(config, brokerId, requestIdGenerator, routingManager, accessControlFactory, queryQuotaManager, tableCache,
         threadAccountant);
-    _systemTableRegistry = systemTableRegistry;
   }
 
   @Override
@@ -81,7 +78,7 @@ public class SystemTableBrokerRequestHandler extends BaseBrokerRequestHandler {
   }
 
   public boolean canHandle(String tableName) {
-    return isSystemTable(tableName) && _systemTableRegistry.isRegistered(tableName);
+    return isSystemTable(tableName) && SystemTableRegistry.isRegistered(tableName);
   }
 
   @Override
@@ -153,7 +150,7 @@ public class SystemTableBrokerRequestHandler extends BaseBrokerRequestHandler {
     if (pinotQuery.isExplain()) {
       return BrokerResponseNative.BROKER_ONLY_EXPLAIN_PLAN_OUTPUT;
     }
-    SystemTableDataProvider provider = _systemTableRegistry.get(tableName);
+    SystemTableDataProvider provider = SystemTableRegistry.get(tableName);
     if (provider == null) {
       requestContext.setErrorCode(QueryErrorCode.TABLE_DOES_NOT_EXIST);
       return BrokerResponseNative.TABLE_DOES_NOT_EXIST;

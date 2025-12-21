@@ -20,6 +20,7 @@ package org.apache.pinot.common.systemtable;
 
 import java.util.Collection;
 import java.util.Collections;
+import java.util.IdentityHashMap;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Optional;
@@ -37,26 +38,29 @@ import org.slf4j.LoggerFactory;
 /**
  * Registry to hold and lifecycle-manage system table data providers.
  */
-public final class SystemTableRegistry implements AutoCloseable {
-  public static final SystemTableRegistry INSTANCE = new SystemTableRegistry();
+public final class SystemTableRegistry {
   private static final Logger LOGGER = LoggerFactory.getLogger(SystemTableRegistry.class);
 
-  private final Map<String, SystemTableDataProvider> _providers = new ConcurrentHashMap<>();
+  private static final Map<String, SystemTableDataProvider> PROVIDERS = new ConcurrentHashMap<>();
 
-  public void register(SystemTableDataProvider provider) {
-    _providers.put(normalize(provider.getTableName()), provider);
+  private SystemTableRegistry() {
+    throw new UnsupportedOperationException("This is a utility class and cannot be instantiated");
   }
 
-  public @Nullable SystemTableDataProvider get(String tableName) {
-    return _providers.get(normalize(tableName));
+  public static void register(SystemTableDataProvider provider) {
+    PROVIDERS.put(normalize(provider.getTableName()), provider);
   }
 
-  public boolean isRegistered(String tableName) {
-    return _providers.containsKey(normalize(tableName));
+  public static @Nullable SystemTableDataProvider get(String tableName) {
+    return PROVIDERS.get(normalize(tableName));
   }
 
-  public Collection<SystemTableDataProvider> getProviders() {
-    return Collections.unmodifiableCollection(_providers.values());
+  public static boolean isRegistered(String tableName) {
+    return PROVIDERS.containsKey(normalize(tableName));
+  }
+
+  public static Collection<SystemTableDataProvider> getProviders() {
+    return Collections.unmodifiableCollection(PROVIDERS.values());
   }
 
   /**
@@ -64,15 +68,15 @@ public final class SystemTableRegistry implements AutoCloseable {
    * Follows the ScalarFunction pattern: any class annotated with @SystemTable under a "*.systemtable.*" package
    * will be discovered via reflection and registered.
    */
-  public void registerAnnotatedProviders(TableCache tableCache, HelixAdmin helixAdmin, String clusterName) {
+  public static void registerAnnotatedProviders(TableCache tableCache, HelixAdmin helixAdmin, String clusterName) {
     Set<Class<?>> classes =
         PinotReflectionUtils.getClassesThroughReflection(".*\\.systemtable\\..*", SystemTable.class);
     for (Class<?> clazz : classes) {
       if (!SystemTableDataProvider.class.isAssignableFrom(clazz)) {
         continue;
       }
-      Optional<SystemTableDataProvider> instantiated =
-          instantiateProvider((Class<? extends SystemTableDataProvider>) clazz, tableCache, helixAdmin, clusterName);
+      Optional<SystemTableDataProvider> instantiated = instantiateProvider(
+          clazz.asSubclass(SystemTableDataProvider.class), tableCache, helixAdmin, clusterName);
       instantiated.ifPresent(provider -> {
         if (isRegistered(provider.getTableName())) {
           return;
@@ -83,18 +87,38 @@ public final class SystemTableRegistry implements AutoCloseable {
     }
   }
 
-  @Override
-  public void close()
+  public static void close()
       throws Exception {
-    for (SystemTableDataProvider provider : _providers.values()) {
-      provider.close();
+    Exception firstException = null;
+    // Snapshot providers to avoid concurrent modifications and to close each provider at most once.
+    Map<SystemTableDataProvider, Boolean> providersToClose = new IdentityHashMap<>();
+    for (SystemTableDataProvider provider : PROVIDERS.values()) {
+      providersToClose.put(provider, Boolean.TRUE);
+    }
+    try {
+      for (SystemTableDataProvider provider : providersToClose.keySet()) {
+        try {
+          provider.close();
+        } catch (Exception e) {
+          if (firstException == null) {
+            firstException = e;
+          } else {
+            firstException.addSuppressed(e);
+          }
+        }
+      }
+    } finally {
+      PROVIDERS.clear();
+    }
+    if (firstException != null) {
+      throw firstException;
     }
   }
 
   /**
    * Initialize and register all annotated system table providers.
    */
-  public void init(TableCache tableCache, HelixAdmin helixAdmin, String clusterName) {
+  public static void init(TableCache tableCache, HelixAdmin helixAdmin, String clusterName) {
     registerAnnotatedProviders(tableCache, helixAdmin, clusterName);
   }
 
@@ -102,7 +126,7 @@ public final class SystemTableRegistry implements AutoCloseable {
     return tableName.toLowerCase(Locale.ROOT);
   }
 
-  private Optional<SystemTableDataProvider> instantiateProvider(Class<? extends SystemTableDataProvider> clazz,
+  private static Optional<SystemTableDataProvider> instantiateProvider(Class<? extends SystemTableDataProvider> clazz,
       TableCache tableCache, HelixAdmin helixAdmin, String clusterName) {
     try {
       // Prefer the most specific constructor available.
