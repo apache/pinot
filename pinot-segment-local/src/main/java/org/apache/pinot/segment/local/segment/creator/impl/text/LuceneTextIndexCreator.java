@@ -73,6 +73,7 @@ public class LuceneTextIndexCreator extends AbstractTextIndexCreator {
   private IndexWriter _indexWriter;
   private File _segmentDirectory = null;
   private int _nextDocId = 0;
+  private final TextIndexConfig _config;
 
   public static HashSet<String> getDefaultEnglishStopWordsSet() {
     return new HashSet<>(
@@ -118,6 +119,7 @@ public class LuceneTextIndexCreator extends AbstractTextIndexCreator {
     _commitOnClose = commit;
     _combineAndCleanupFiles = combineAndCleanupFiles;
     _segmentDirectory = segmentIndexDir;
+    _config = config;
     String luceneAnalyzerClass = config.getLuceneAnalyzerClass();
     try {
       // segment generation is always in V1 and later we convert (as part of post creation processing)
@@ -380,7 +382,7 @@ public class LuceneTextIndexCreator extends AbstractTextIndexCreator {
     // Find the lucene text index directory first
     File textIndexFile = SegmentDirectoryPaths.findTextIndexIndexFile(_segmentDirectory, _textColumn);
     if (textIndexFile != null && textIndexFile.exists()) {
-      LuceneTextIndexCombined.combineLuceneIndexFiles(textIndexFile, outputFilePath);
+      LuceneTextIndexCombined.combineLuceneIndexFiles(textIndexFile, outputFilePath, _segmentDirectory, _textColumn);
     } else {
       LOGGER.warn("Text index directory not found for combining: {}", _textColumn);
     }
@@ -407,6 +409,18 @@ public class LuceneTextIndexCreator extends AbstractTextIndexCreator {
     try {
       // based on the commit flag set in IndexWriterConfig, this will decide to commit or not
       _indexWriter.close();
+      // Build docIdMapping file if storeInSegmentFile is true
+      // This allows the mapping file to be available during read without building it on-the-fly
+      if (_config.isStoreInSegmentFile()) {
+        //Check if mapping file already exists
+        if (new File(SegmentDirectoryPaths.findSegmentDirectory(_segmentDirectory),
+            _textColumn + V1Constants.Indexes.LUCENE_TEXT_INDEX_DOCID_MAPPING_FILE_EXTENSION).exists()) {
+          return;
+        }
+        LOGGER.info("lucene doc IdMapping file doesn't exists for column: {},  building mapping file", _textColumn);
+        // Build the docId mapping file so it's available during segment load
+        buildMappingFile(_segmentDirectory, _textColumn, _indexDirectory, null);
+      }
       _indexDirectory.close();
     } catch (Exception e) {
       throw new RuntimeException("Caught exception while closing the Lucene index for column: " + _textColumn, e);
