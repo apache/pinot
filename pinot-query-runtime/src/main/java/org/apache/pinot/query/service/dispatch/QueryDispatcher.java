@@ -165,7 +165,11 @@ public class QueryDispatcher {
     Set<QueryServerInstance> servers = new HashSet<>();
     try {
       submit(requestId, dispatchableSubPlan, timeoutMs, servers, queryOptions);
-      return runReducer(dispatchableSubPlan, queryOptions, _mailboxService);
+      QueryResult result = runReducer(dispatchableSubPlan, queryOptions, _mailboxService);
+      if (result.getProcessingException() != null) {
+        cancel(requestId);
+      }
+      return result;
     } catch (Exception ex) {
       return tryRecover(context.getRequestId(), servers, ex);
     } catch (Throwable e) {
