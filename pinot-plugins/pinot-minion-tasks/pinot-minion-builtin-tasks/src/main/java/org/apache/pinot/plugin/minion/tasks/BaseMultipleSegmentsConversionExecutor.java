@@ -44,6 +44,7 @@ import org.apache.hc.core5.http.NameValuePair;
 import org.apache.hc.core5.http.message.BasicHeader;
 import org.apache.hc.core5.http.message.BasicNameValuePair;
 import org.apache.pinot.common.auth.AuthProviderUtils;
+import org.apache.pinot.common.auth.NullAuthProvider;
 import org.apache.pinot.common.metadata.segment.SegmentZKMetadataCustomMapModifier;
 import org.apache.pinot.common.metrics.MinionMeter;
 import org.apache.pinot.common.restlet.resources.StartReplaceSegmentsRequest;
@@ -124,7 +125,11 @@ public abstract class BaseMultipleSegmentsConversionExecutor extends BaseTaskExe
     String tableNameWithType = configs.get(MinionConstants.TABLE_NAME_KEY);
     String inputSegmentNames = configs.get(MinionConstants.SEGMENT_NAME_KEY);
     String uploadURL = configs.get(MinionConstants.UPLOAD_URL_KEY);
-    AuthProvider authProvider = AuthProviderUtils.makeAuthProvider(configs.get(MinionConstants.AUTH_TOKEN));
+    // Prefer the runtime minion AuthProvider; fallback to token if needed.
+    AuthProvider authProvider = MINION_CONTEXT.getTaskAuthProvider();
+    if (authProvider == null || authProvider instanceof NullAuthProvider) {
+      authProvider = AuthProviderUtils.makeAuthProvider(configs.get(MinionConstants.AUTH_TOKEN));
+    }
     Set<String> segmentNamesForTable = SegmentConversionUtils.getSegmentNamesForTable(tableNameWithType,
         FileUploadDownloadClient.extractBaseURI(new URI(uploadURL)), authProvider);
     Set<String> nonExistingSegmentNames =
@@ -194,7 +199,11 @@ public abstract class BaseMultipleSegmentsConversionExecutor extends BaseTaskExe
     String uploadURL = taskConfigs.get(MinionConstants.UPLOAD_URL_KEY);
     String downloadURLString = taskConfigs.get(MinionConstants.DOWNLOAD_URL_KEY);
     String[] downloadURLs = downloadURLString.split(MinionConstants.URL_SEPARATOR);
-    AuthProvider authProvider = AuthProviderUtils.makeAuthProvider(taskConfigs.get(MinionConstants.AUTH_TOKEN));
+    // Prefer the runtime minion AuthProvider; fallback to token if needed.
+    AuthProvider authProvider = MINION_CONTEXT.getTaskAuthProvider();
+    if (authProvider == null || authProvider instanceof NullAuthProvider) {
+      authProvider = AuthProviderUtils.makeAuthProvider(taskConfigs.get(MinionConstants.AUTH_TOKEN));
+    }
     File tempDataDir = new File(new File(MINION_CONTEXT.getDataDir(), taskType), "tmp-" + UUID.randomUUID());
     Preconditions.checkState(tempDataDir.mkdirs());
     int numRecords;
@@ -613,7 +622,13 @@ public abstract class BaseMultipleSegmentsConversionExecutor extends BaseTaskExe
       Map<String, String> configs = pinotTaskConfig.getConfigs();
       _tableNameWithType = configs.get(MinionConstants.TABLE_NAME_KEY);
       _uploadURL = configs.get(MinionConstants.UPLOAD_URL_KEY);
-      _authProvider = AuthProviderUtils.makeAuthProvider(configs.get(MinionConstants.AUTH_TOKEN));
+      // Prefer the runtime minion AuthProvider; fallback to token if needed.
+      AuthProvider runtimeProvider = MINION_CONTEXT.getTaskAuthProvider();
+      if (runtimeProvider != null && !(runtimeProvider instanceof NullAuthProvider)) {
+        _authProvider = runtimeProvider;
+      } else {
+        _authProvider = AuthProviderUtils.makeAuthProvider(configs.get(MinionConstants.AUTH_TOKEN));
+      }
       _inputSegmentNames = configs.get(MinionConstants.SEGMENT_NAME_KEY);
       String replaceSegmentsString = configs.get(MinionConstants.ENABLE_REPLACE_SEGMENTS_KEY);
       _replaceSegmentsEnabled = Boolean.parseBoolean(replaceSegmentsString);
