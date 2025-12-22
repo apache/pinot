@@ -398,6 +398,18 @@ public class LuceneTextIndexCreator extends AbstractTextIndexCreator {
     } else {
       LOGGER.warn("Text index directory not found or does not exist for column: {}", _textColumn);
     }
+
+    // Delete the lucene mapping file if it exists
+    File docIdMappingFile = new File(SegmentDirectoryPaths.findSegmentDirectory(_segmentDirectory),
+        _textColumn + V1Constants.Indexes.LUCENE_TEXT_INDEX_DOCID_MAPPING_FILE_EXTENSION);
+    if (docIdMappingFile.exists()) {
+      try {
+        FileUtils.delete(docIdMappingFile);
+        LOGGER.info("Successfully deleted Lucene text index mapping file: {}", docIdMappingFile.getAbsolutePath());
+      } catch (IOException e) {
+        LOGGER.warn("Failed to delete Lucene text index mapping file: {}", docIdMappingFile.getAbsolutePath(), e);
+      }
+    }
   }
 
   @Override
