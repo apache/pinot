@@ -18,7 +18,6 @@
  */
 package org.apache.pinot.calcite.rel.rules;
 
-import java.util.ArrayList;
 import java.util.List;
 import org.apache.calcite.plan.RelOptRule;
 import org.apache.calcite.rel.rules.AggregateCaseToFilterRule;
@@ -255,30 +254,42 @@ public class PinotQueryRuleSets {
   //@formatter:on
 
   public static List<RelOptRule> getPinotPostRules(int sortExchangeCopyLimit) {
-    if (sortExchangeCopyLimit == -1) {
-      return PINOT_POST_RULES;
-    } else {
-      return replaceAll(
-          PINOT_POST_RULES,
-          PinotSortExchangeCopyRule.class,
-          ImmutablePinotSortExchangeCopyRule.Config.builder()
-              .from(PinotSortExchangeCopyRule.Config.DEFAULT)
-              .fetchLimitThreshold(sortExchangeCopyLimit)
-              .build()
-              .toRule()
-      );
-    }
-  }
 
-  private static <C extends RelOptRule> List<RelOptRule> replaceAll(List<? extends RelOptRule> rules,
-      Class<? extends C> clazz, C newRule) {
-    List<RelOptRule> updatedRules = new ArrayList<>(rules);
-    for (int i = 0; i < updatedRules.size(); i++) {
-      RelOptRule rule = updatedRules.get(i);
-      if (clazz.isInstance(rule)) {
-        updatedRules.set(i, newRule);
-      }
+    // copy exchanges down, this must be done after SortExchangeNodeInsertRule
+    PinotSortExchangeCopyRule sortExchangeCopyRule;
+    if (sortExchangeCopyLimit > 0) {
+      sortExchangeCopyRule = ImmutablePinotSortExchangeCopyRule.Config.builder()
+          .from(PinotSortExchangeCopyRule.Config.DEFAULT)
+          .fetchLimitThreshold(sortExchangeCopyLimit)
+          .build()
+          .toRule();
+    } else {
+      sortExchangeCopyRule = PinotSortExchangeCopyRule.SORT_EXCHANGE_COPY;
     }
-    return updatedRules;
+    return List.of(
+        // TODO: Merge the following 2 rules into a single rule
+        // add an extra exchange for sort
+        PinotSortExchangeNodeInsertRule.INSTANCE,
+        sortExchangeCopyRule,
+
+        PinotSingleValueAggregateRemoveRule.INSTANCE,
+        PinotJoinExchangeNodeInsertRule.INSTANCE,
+        PinotAggregateExchangeNodeInsertRule.SortProjectAggregate.INSTANCE,
+        PinotAggregateExchangeNodeInsertRule.SortAggregate.INSTANCE,
+        PinotAggregateExchangeNodeInsertRule.WithoutSort.INSTANCE,
+        PinotWindowSplitRule.INSTANCE,
+        PinotWindowExchangeNodeInsertRule.INSTANCE,
+        PinotSetOpExchangeNodeInsertRule.INSTANCE,
+
+        // apply dynamic broadcast rule after exchange is inserted/
+        PinotJoinToDynamicBroadcastRule.INSTANCE,
+
+        // remove exchanges when there's duplicates
+        PinotExchangeEliminationRule.INSTANCE,
+
+        // Evaluate the Literal filter nodes
+        CoreRules.FILTER_REDUCE_EXPRESSIONS,
+        PinotTableScanConverterRule.INSTANCE
+    );
   }
 }
