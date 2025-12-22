@@ -863,6 +863,8 @@ public class CommonConstants {
 
         /// Option to customize the value of [Broker#CONFIG_OF_SORT_EXCHANGE_COPY_THRESHOLD]
         public static final String SORT_EXCHANGE_COPY_THRESHOLD = "sortExchangeCopyThreshold";
+
+        public static final int DEFAULT_SORT_EXCHANGE_COPY_THRESHOLD = -1;
       }
 
       public static class QueryOptionValue {

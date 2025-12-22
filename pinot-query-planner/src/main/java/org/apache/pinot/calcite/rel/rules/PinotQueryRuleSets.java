@@ -46,7 +46,6 @@ import org.apache.calcite.rel.rules.SortRemoveRule;
 import org.apache.calcite.rel.rules.UnionToDistinctRule;
 import org.apache.pinot.calcite.rel.rules.PinotFilterJoinRule.PinotFilterIntoJoinRule;
 import org.apache.pinot.calcite.rel.rules.PinotFilterJoinRule.PinotJoinConditionPushRule;
-import org.apache.pinot.query.QueryEnvironment;
 import org.apache.pinot.spi.utils.CommonConstants.Broker.PlannerRuleNames;
 
 
@@ -255,8 +254,7 @@ public class PinotQueryRuleSets {
   );
   //@formatter:on
 
-  public static List<RelOptRule> getPinotPostRules(QueryEnvironment.Config envConfig) {
-    int sortExchangeCopyLimit = envConfig.getSortExchangeCopyLimit();
+  public static List<RelOptRule> getPinotPostRules(int sortExchangeCopyLimit) {
     if (sortExchangeCopyLimit == -1) {
       return PINOT_POST_RULES;
     } else {

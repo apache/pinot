@@ -30,7 +30,6 @@ import javax.annotation.Nullable;
 import org.apache.commons.collections4.MapUtils;
 import org.apache.commons.lang3.tuple.Pair;
 import org.apache.pinot.common.config.provider.TableCache;
-import org.apache.pinot.common.utils.request.RequestUtils;
 import org.apache.pinot.core.routing.MockRoutingManagerFactory;
 import org.apache.pinot.core.routing.RoutingManager;
 import org.apache.pinot.core.routing.TablePartitionReplicatedServersInfo;
@@ -38,9 +37,7 @@ import org.apache.pinot.core.routing.TablePartitionReplicatedServersInfo.Partiti
 import org.apache.pinot.query.routing.WorkerManager;
 import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.Schema;
-import org.apache.pinot.spi.env.PinotConfiguration;
 import org.apache.pinot.spi.utils.CommonConstants;
-import org.apache.pinot.sql.parsers.SqlNodeAndOptions;
 import org.testng.annotations.BeforeClass;
 import org.testng.annotations.DataProvider;
 
@@ -104,13 +101,8 @@ public class QueryEnvironmentTestBase {
   @BeforeClass
   public void setUp() {
     // the port doesn't matter as we are not actually making a server call.
-    _queryEnvironment = getQueryEnvironment(3, 1, 2, TABLE_SCHEMAS, SERVER1_SEGMENTS, SERVER2_SEGMENTS,
-        PARTITIONED_SEGMENTS_MAP, null);
-  }
-
-  public QueryEnvironment customQueryEnvironment(@Nullable String query) {
-    return getQueryEnvironment(3, 1, 2, TABLE_SCHEMAS, SERVER1_SEGMENTS, SERVER2_SEGMENTS,
-        PARTITIONED_SEGMENTS_MAP, query);
+    _queryEnvironment =
+        getQueryEnvironment(3, 1, 2, TABLE_SCHEMAS, SERVER1_SEGMENTS, SERVER2_SEGMENTS, PARTITIONED_SEGMENTS_MAP);
   }
 
   @DataProvider(name = "testQueryDataProvider")
@@ -303,13 +295,6 @@ public class QueryEnvironmentTestBase {
   public static QueryEnvironment getQueryEnvironment(int reducerPort, int port1, int port2,
       Map<String, Schema> schemaMap, Map<String, List<String>> segmentMap1, Map<String, List<String>> segmentMap2,
       @Nullable Map<String, Pair<String, List<List<String>>>> partitionedSegmentsMap) {
-    return getQueryEnvironment(reducerPort, port1, port2, schemaMap, segmentMap1, segmentMap2,
-        partitionedSegmentsMap, null);
-  }
-
-  public static QueryEnvironment getQueryEnvironment(int reducerPort, int port1, int port2,
-      Map<String, Schema> schemaMap, Map<String, List<String>> segmentMap1, Map<String, List<String>> segmentMap2,
-      @Nullable Map<String, Pair<String, List<List<String>>>> partitionedSegmentsMap, @Nullable String query) {
     MockRoutingManagerFactory factory = new MockRoutingManagerFactory(port1, port2);
     for (Map.Entry<String, Schema> entry : schemaMap.entrySet()) {
       factory.registerTable(entry.getValue(), entry.getKey());
@@ -347,21 +332,8 @@ public class QueryEnvironmentTestBase {
     }
     RoutingManager routingManager = factory.buildRoutingManager(partitionInfoMap);
     TableCache tableCache = factory.buildTableCache();
-
-    Map<String, String> queryOptions;
-    if (query != null) {
-      SqlNodeAndOptions sqlNodeAndOptions = RequestUtils.parseQuery(query);
-      queryOptions = sqlNodeAndOptions.getOptions();
-    } else {
-      queryOptions = Collections.emptyMap();
-    }
-
-    ImmutableQueryEnvironment.Config queryEnvConf = QueryEnvironmentConfigFactory.create(
-        CommonConstants.DEFAULT_DATABASE, queryOptions, 1234, new PinotConfiguration(), tableCache,
-        new WorkerManager("Broker_localhost", "localhost", reducerPort, routingManager),
-        CommonConstants.Broker.DEFAULT_DISABLED_RULES);
-
-    return new QueryEnvironment(queryEnvConf);
+    return new QueryEnvironment(CommonConstants.DEFAULT_DATABASE, tableCache,
+        new WorkerManager("Broker_localhost", "localhost", reducerPort, routingManager));
   }
 
   /**

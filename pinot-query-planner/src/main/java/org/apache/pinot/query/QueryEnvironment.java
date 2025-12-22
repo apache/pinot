@@ -201,9 +201,12 @@ public class QueryEnvironment {
         optProgram = getOptProgram(skipRuleSet, useRuleSet, _defaultDisabledPlannerRules);
       }
     }
-    boolean usePhysicalOptimizer = QueryOptionsUtils.isUsePhysicalOptimizer(sqlNodeAndOptions.getOptions(),
+    int sortExchangeCopyLimit = QueryOptionsUtils.getSortExchangeCopyThreshold(options,
+        _envConfig.defaultSortExchangeCopyLimit());
+    boolean usePhysicalOptimizer = QueryOptionsUtils.isUsePhysicalOptimizer(options,
         _envConfig.defaultUsePhysicalOptimizer());
-    HepProgram traitProgram = getTraitProgram(workerManager, _envConfig, usePhysicalOptimizer, useRuleSet);
+    HepProgram traitProgram = getTraitProgram(
+        workerManager, _envConfig, usePhysicalOptimizer, useRuleSet, sortExchangeCopyLimit);
     SqlExplainFormat format = SqlExplainFormat.DOT;
     if (sqlNodeAndOptions.getSqlNode().getKind().equals(SqlKind.EXPLAIN)) {
       SqlExplain explain = (SqlExplain) sqlNodeAndOptions.getSqlNode();
@@ -614,7 +617,7 @@ public class QueryEnvironment {
   }
 
   private static HepProgram getTraitProgram(@Nullable WorkerManager workerManager, Config config,
-      boolean usePhysicalOptimizer, Set<String> useRuleSet) {
+      boolean usePhysicalOptimizer, Set<String> useRuleSet, int sortExchangeCopyLimit) {
     HepProgramBuilder hepProgramBuilder = new HepProgramBuilder();
 
     // Set the match order as BOTTOM_UP.
@@ -623,7 +626,7 @@ public class QueryEnvironment {
     // ----
     // Run pinot specific rules that should run after all other rules, using 1 HepInstruction per rule.
     if (!usePhysicalOptimizer) {
-      for (RelOptRule relOptRule : PinotQueryRuleSets.getPinotPostRules(config)) {
+      for (RelOptRule relOptRule : PinotQueryRuleSets.getPinotPostRules(sortExchangeCopyLimit)) {
         if (isEligibleQueryPostRule(relOptRule, config)) {
           hepProgramBuilder.addRuleInstance(relOptRule);
         }
@@ -847,7 +850,7 @@ public class QueryEnvironment {
 
     /// See [CommonConstants.Broker#CONFIG_OF_SORT_EXCHANGE_COPY_THRESHOLD]
     @Value.Default
-    default int getSortExchangeCopyLimit() {
+    default int defaultSortExchangeCopyLimit() {
       return -1;
     }
   }

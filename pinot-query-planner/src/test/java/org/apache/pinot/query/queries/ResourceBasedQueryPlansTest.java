@@ -51,14 +51,13 @@ public class ResourceBasedQueryPlansTest extends QueryEnvironmentTestBase {
       String output) {
     try {
       long requestId = RANDOM_REQUEST_ID_GEN.nextLong();
-      String explainedPlan = customQueryEnvironment(query).explainQuery(query, requestId);
+      String explainedPlan = _queryEnvironment.explainQuery(query, requestId);
       Assert.assertEquals(explainedPlan, output,
           String.format("Test case %s for query %s (%s) doesn't match expected output: %s", testCaseName, description,
               query, output));
       // use a regex to exclude the
       String queryWithoutExplainPlan = query.replaceFirst(EXPLAIN_REGEX, "");
-      DispatchableSubPlan dispatchableSubPlan = customQueryEnvironment(queryWithoutExplainPlan)
-          .planQuery(queryWithoutExplainPlan);
+      DispatchableSubPlan dispatchableSubPlan = _queryEnvironment.planQuery(queryWithoutExplainPlan);
       Assert.assertNotNull(dispatchableSubPlan,
           String.format("Test case %s for query %s should not have a null QueryPlan",
               testCaseName, queryWithoutExplainPlan));
