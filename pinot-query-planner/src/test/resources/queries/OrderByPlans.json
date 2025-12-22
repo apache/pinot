@@ -74,7 +74,7 @@
         ]
       },
       {
-        "description": "Select * with order by and small large limit but query option",
+        "description": "Select * with order by and small limit but query option",
         "sql": "SET sortExchangeCopyThreshold=10; EXPLAIN PLAN FOR SELECT * FROM b order by col1 LIMIT 20",
         "output": [
           "Execution Plan",
