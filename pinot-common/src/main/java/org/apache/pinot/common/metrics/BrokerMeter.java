@@ -275,6 +275,13 @@ public class BrokerMeter implements AbstractMetrics.Meter {
   public static final BrokerMeter AUDIT_REQUEST_PAYLOAD_TRUNCATED = create("AUDIT_REQUEST_PAYLOAD_TRUNCATED",
       "count", true);
 
+  /**
+   * Total bytes of final query responses sent to clients.
+   * <p>
+   * This metric tracks the serialized JSON response size in bytes for all queries.
+   */
+  public static final BrokerMeter QUERY_RESPONSE_SIZE_BYTES = create("QUERY_RESPONSE_SIZE_BYTES", "bytes", true);
+
   private static final Map<QueryErrorCode, BrokerMeter> QUERY_ERROR_CODE_METER_MAP;
 
   // Iterate through all query error codes from QueryErrorCode.getAllValues() and create a metric for each

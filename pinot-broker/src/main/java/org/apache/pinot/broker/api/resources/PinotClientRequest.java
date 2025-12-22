@@ -23,6 +23,7 @@ import com.fasterxml.jackson.databind.node.ObjectNode;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.collect.ArrayListMultimap;
 import com.google.common.collect.Multimap;
+import com.google.common.io.CountingOutputStream;
 import io.swagger.annotations.Api;
 import io.swagger.annotations.ApiKeyAuthDefinition;
 import io.swagger.annotations.ApiOperation;
@@ -689,7 +690,13 @@ public class PinotClientRequest {
     // returning the Response with appropriate status and header value.
     return Response.status(httpStatus)
         .header(PINOT_QUERY_ERROR_CODE_HEADER, queryErrorCodeHeaderValue)
-        .entity((StreamingOutput) brokerResponse::toOutputStream).type(MediaType.APPLICATION_JSON)
+        .type(MediaType.APPLICATION_JSON)
+        .entity((StreamingOutput) outputStream -> {
+          CountingOutputStream countingOutputStream = new CountingOutputStream(outputStream);
+          brokerResponse.toOutputStream(countingOutputStream);
+          BrokerMetrics.get()
+              .addMeteredGlobalValue(BrokerMeter.QUERY_RESPONSE_SIZE_BYTES, countingOutputStream.getCount());
+        })
         .build();
   }
 
