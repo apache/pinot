@@ -19,6 +19,7 @@
 package org.apache.pinot.broker.routing;
 
 import com.google.common.annotations.VisibleForTesting;
+import com.google.common.base.Preconditions;
 import java.util.HashSet;
 import java.util.Set;
 import java.util.concurrent.Executors;
@@ -69,22 +70,28 @@ public class RemoteClusterBrokerRoutingManager extends BrokerRoutingManager {
     LOGGER.info("Processing routing changes for remote cluster: {}", _remoteClusterName);
     long startTimeMs = System.currentTimeMillis();
 
-    String externalViewPath = _externalViewPathPrefix.substring(0, _externalViewPathPrefix.length() - 1);
-    Set<String> currentTables = _zkDataAccessor.getChildNames(externalViewPath, 0).stream()
-        .filter(t -> TableNameBuilder.getTableTypeFromTableName(t) != null)
-        .collect(Collectors.toSet());
-    Set<String> knownTables = new HashSet<>(_routingEntryMap.keySet());
+    try {
+      Preconditions.checkArgument(_externalViewPathPrefix.endsWith("/"),
+          "External view path prefix: %s should end with a '/'", _externalViewPathPrefix);
+      String externalViewPath = _externalViewPathPrefix.substring(0, _externalViewPathPrefix.length() - 1);
+      Set<String> currentTables = _zkDataAccessor.getChildNames(externalViewPath, 0).stream()
+          .filter(t -> TableNameBuilder.getTableTypeFromTableName(t) != null)
+          .collect(Collectors.toSet());
+      Set<String> knownTables = new HashSet<>(_routingEntryMap.keySet());
 
-    Set<String> toAdd = new HashSet<>(currentTables);
-    toAdd.removeAll(knownTables);
-    Set<String> toRemove = new HashSet<>(knownTables);
-    toRemove.removeAll(currentTables);
+      Set<String> toAdd = new HashSet<>(currentTables);
+      toAdd.removeAll(knownTables);
+      Set<String> toRemove = new HashSet<>(knownTables);
+      toRemove.removeAll(currentTables);
 
-    toAdd.forEach(this::addRouting);
-    toRemove.forEach(this::dropRouting);
-
-    _brokerMetrics.addTimedValue(_remoteClusterName, BrokerTimer.REMOTE_CLUSTER_BROKER_ROUTING_CALCULATION_TIME_MS,
-        System.currentTimeMillis() - startTimeMs, TimeUnit.MILLISECONDS);
+      toAdd.forEach(this::addRouting);
+      toRemove.forEach(this::dropRouting);
+    } catch (Exception e) {
+      LOGGER.error("Caught exception while determining routing changes for remote cluster: {}", _remoteClusterName, e);
+    } finally {
+      _brokerMetrics.addTimedValue(_remoteClusterName, BrokerTimer.REMOTE_CLUSTER_BROKER_ROUTING_CALCULATION_TIME_MS,
+          System.currentTimeMillis() - startTimeMs, TimeUnit.MILLISECONDS);
+    }
   }
 
   private void addRouting(String table) {

@@ -23,9 +23,11 @@ import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Set;
 import java.util.function.Function;
 import java.util.function.Predicate;
+import java.util.stream.Stream;
 import javax.annotation.Nullable;
 import org.apache.pinot.common.request.BrokerRequest;
 import org.apache.pinot.core.routing.RoutingManager;
@@ -60,35 +62,28 @@ public class MultiClusterRoutingManager implements RoutingManager {
     _remoteClusterRoutingManagers = remoteClusterRoutingManagers;
   }
 
+  private Stream<BrokerRoutingManager> allClusters() {
+    return Stream.concat(Stream.of(_localClusterRoutingManager), _remoteClusterRoutingManagers.stream());
+  }
+
   @Nullable
   private <T> T findFirst(Function<BrokerRoutingManager, T> getter, String tableNameForLog) {
-    T result = getter.apply(_localClusterRoutingManager);
-    if (result != null) {
-      return result;
-    }
-    for (BrokerRoutingManager remoteCluster : _remoteClusterRoutingManagers) {
-      try {
-        result = getter.apply(remoteCluster);
-        if (result != null) {
-          return result;
-        }
-      } catch (Exception e) {
-        LOGGER.error("Error querying remote cluster routing manager for table {}", tableNameForLog, e);
-      }
-    }
-    return null;
+    return allClusters()
+        .map(mgr -> {
+          try {
+            return getter.apply(mgr);
+          } catch (Exception e) {
+            LOGGER.error("Error querying remote cluster routing manager for table {}", tableNameForLog, e);
+            return null;
+          }
+        })
+        .filter(Objects::nonNull)
+        .findFirst()
+        .orElse(null);
   }
 
   private boolean anyMatch(Predicate<BrokerRoutingManager> predicate) {
-    if (predicate.test(_localClusterRoutingManager)) {
-      return true;
-    }
-    for (BrokerRoutingManager remoteCluster : _remoteClusterRoutingManagers) {
-      if (predicate.test(remoteCluster)) {
-        return true;
-      }
-    }
-    return false;
+    return allClusters().anyMatch(predicate);
   }
 
   @Override

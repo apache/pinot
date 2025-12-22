@@ -198,7 +198,6 @@ public class RemoteClusterBrokerRoutingManagerTest extends ControllerTest {
           for (int i = 0; i < 10; i++) {
             boolean exists = _routingManager.routingExists(table1);
             Assert.assertTrue(exists, "Existing table should remain queryable during discovery");
-            Thread.sleep(5);
           }
         } catch (Exception e) {
           query1Exception.set(e);
@@ -211,11 +210,9 @@ public class RemoteClusterBrokerRoutingManagerTest extends ControllerTest {
       Future<?> query2Task = executor.submit(() -> {
         try {
           startLatch.await();
-          Thread.sleep(20); // Let discovery happen first
           for (int i = 0; i < 5; i++) {
             _routingManager.routingExists(table1);
             _routingManager.routingExists(table2);
-            Thread.sleep(10);
           }
         } catch (Exception e) {
           query2Exception.set(e);
@@ -338,7 +335,6 @@ public class RemoteClusterBrokerRoutingManagerTest extends ControllerTest {
       Future<?> shutdownTask = executor.submit(() -> {
         try {
           startLatch.await();
-          Thread.sleep(10);
           _routingManager.shutdown();
         } catch (Exception e) {
           shutdownException.set(e);
