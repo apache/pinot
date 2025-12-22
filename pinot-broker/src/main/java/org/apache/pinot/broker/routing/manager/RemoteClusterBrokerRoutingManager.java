@@ -16,7 +16,7 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.pinot.broker.routing;
+package org.apache.pinot.broker.routing.manager;
 
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
@@ -42,7 +42,7 @@ import org.slf4j.LoggerFactory;
  * federation. It periodically checks for changes in the set of tables available in the remote cluster and updates the
  * routing accordingly.
  */
-public class RemoteClusterBrokerRoutingManager extends BrokerRoutingManager {
+public class RemoteClusterBrokerRoutingManager extends BaseBrokerRoutingManager {
   private static final Logger LOGGER = LoggerFactory.getLogger(RemoteClusterBrokerRoutingManager.class);
   private static final long ROUTING_CHANGE_DETECTION_INTERVAL_MS = 10_000L;
 

@@ -16,7 +16,7 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.pinot.broker.routing;
+package org.apache.pinot.broker.routing.manager;
 
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -62,12 +62,12 @@ public class MultiClusterRoutingManager implements RoutingManager {
     _remoteClusterRoutingManagers = remoteClusterRoutingManagers;
   }
 
-  private Stream<BrokerRoutingManager> allClusters() {
+  private Stream<BaseBrokerRoutingManager> allClusters() {
     return Stream.concat(Stream.of(_localClusterRoutingManager), _remoteClusterRoutingManagers.stream());
   }
 
   @Nullable
-  private <T> T findFirst(Function<BrokerRoutingManager, T> getter, String tableNameForLog) {
+  private <T> T findFirst(Function<BaseBrokerRoutingManager, T> getter, String tableNameForLog) {
     return allClusters()
         .map(mgr -> {
           try {
@@ -82,7 +82,7 @@ public class MultiClusterRoutingManager implements RoutingManager {
         .orElse(null);
   }
 
-  private boolean anyMatch(Predicate<BrokerRoutingManager> predicate) {
+  private boolean anyMatch(Predicate<BaseBrokerRoutingManager> predicate) {
     return allClusters().anyMatch(predicate);
   }
 
@@ -117,7 +117,7 @@ public class MultiClusterRoutingManager implements RoutingManager {
         ? new ArrayList<>(localTable.getUnavailableSegments()) : new ArrayList<>();
     int prunedCount = localTable != null ? localTable.getNumPrunedSegments() : 0;
 
-    for (BrokerRoutingManager remoteCluster : _remoteClusterRoutingManagers) {
+    for (BaseBrokerRoutingManager remoteCluster : _remoteClusterRoutingManagers) {
       try {
         RoutingTable remoteTable = remoteCluster.getRoutingTable(brokerRequest, tableNameWithType, requestId);
         if (remoteTable != null) {
@@ -154,7 +154,7 @@ public class MultiClusterRoutingManager implements RoutingManager {
   @Override
   public Map<String, ServerInstance> getEnabledServerInstanceMap() {
     Map<String, ServerInstance> combined = new HashMap<>(_localClusterRoutingManager.getEnabledServerInstanceMap());
-    for (BrokerRoutingManager remoteCluster : _remoteClusterRoutingManagers) {
+    for (BaseBrokerRoutingManager remoteCluster : _remoteClusterRoutingManagers) {
       combined.putAll(remoteCluster.getEnabledServerInstanceMap());
     }
     return combined;
@@ -172,7 +172,7 @@ public class MultiClusterRoutingManager implements RoutingManager {
     if (localInstances != null) {
       combined.addAll(localInstances);
     }
-    for (BrokerRoutingManager remoteCluster : _remoteClusterRoutingManagers) {
+    for (BaseBrokerRoutingManager remoteCluster : _remoteClusterRoutingManagers) {
       try {
         Set<String> instances = remoteCluster.getServingInstances(tableNameWithType);
         if (instances != null) {
@@ -192,7 +192,7 @@ public class MultiClusterRoutingManager implements RoutingManager {
     if (localSegments != null) {
       combined.addAll(localSegments);
     }
-    for (BrokerRoutingManager remoteCluster : _remoteClusterRoutingManagers) {
+    for (BaseBrokerRoutingManager remoteCluster : _remoteClusterRoutingManagers) {
       try {
         List<String> remoteSegments = remoteCluster.getSegments(brokerRequest);
         if (remoteSegments != null) {

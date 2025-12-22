@@ -16,7 +16,7 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.pinot.broker.routing;
+package org.apache.pinot.broker.routing.manager;
 
 import com.google.common.base.Preconditions;
 import com.google.common.util.concurrent.ThreadFactoryBuilder;
@@ -117,8 +117,8 @@ import org.slf4j.LoggerFactory;
  * TODO: Expose RoutingEntry class to get a consistent view in the broker request handler and save the redundant map
  *       lookups.
  */
-public class BrokerRoutingManager implements RoutingManager, ClusterChangeHandler {
-  private static final Logger LOGGER = LoggerFactory.getLogger(BrokerRoutingManager.class);
+public class BaseBrokerRoutingManager implements RoutingManager, ClusterChangeHandler {
+  private static final Logger LOGGER = LoggerFactory.getLogger(BaseBrokerRoutingManager.class);
 
   protected final BrokerMetrics _brokerMetrics;
   protected final Map<String, RoutingEntry> _routingEntryMap = new ConcurrentHashMap<>();
@@ -155,7 +155,7 @@ public class BrokerRoutingManager implements RoutingManager, ClusterChangeHandle
   // race conditions with processSegmentAssignmentChange()
   private long _processAssignmentChangeSnapshotTimestampMs;
 
-  public BrokerRoutingManager(BrokerMetrics brokerMetrics, ServerRoutingStatsManager serverRoutingStatsManager,
+  public BaseBrokerRoutingManager(BrokerMetrics brokerMetrics, ServerRoutingStatsManager serverRoutingStatsManager,
       PinotConfiguration pinotConfig) {
     _brokerMetrics = brokerMetrics;
     _serverRoutingStatsManager = serverRoutingStatsManager;
