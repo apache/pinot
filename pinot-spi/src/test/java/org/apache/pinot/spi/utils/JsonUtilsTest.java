@@ -19,7 +19,6 @@
 package org.apache.pinot.spi.utils;
 
 import com.fasterxml.jackson.databind.JsonNode;
-import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.ImmutableSet;
 import java.io.File;
 import java.io.IOException;
@@ -577,7 +576,7 @@ public class JsonUtilsTest {
     ClassLoader classLoader = JsonUtilsTest.class.getClassLoader();
     File file = new File(Objects.requireNonNull(classLoader.getResource(JSON_FILE)).getFile());
     Map<String, FieldSpec.FieldType> fieldSpecMap =
-        ImmutableMap.of("d1", FieldSpec.FieldType.DIMENSION, "hoursSinceEpoch", FieldSpec.FieldType.DATE_TIME, "m1",
+        Map.of("d1", FieldSpec.FieldType.DIMENSION, "hoursSinceEpoch", FieldSpec.FieldType.DATE_TIME, "m1",
             FieldSpec.FieldType.METRIC);
     Schema inferredPinotSchema =
         JsonUtils.getPinotSchemaFromJsonFile(file, fieldSpecMap, TimeUnit.HOURS, new ArrayList<>(), ".",
@@ -588,7 +587,7 @@ public class JsonUtilsTest {
         .addSingleValueDimension("tuple.address.city", FieldSpec.DataType.STRING)
         .addSingleValueDimension("entries", FieldSpec.DataType.STRING)
         .addMultiValueDimension("d2", FieldSpec.DataType.INT)
-        .addDateTime("hoursSinceEpoch", FieldSpec.DataType.INT, "1:HOURS:EPOCH", "1:HOURS").build();
+        .addDateTime("hoursSinceEpoch", FieldSpec.DataType.INT, "EPOCH|HOURS", "1:HOURS").build();
     Assert.assertEquals(inferredPinotSchema, expectedSchema);
 
     // unnest collection entries
@@ -602,7 +601,7 @@ public class JsonUtilsTest {
         .addSingleValueDimension("entries.id", FieldSpec.DataType.INT)
         .addSingleValueDimension("entries.description", FieldSpec.DataType.STRING)
         .addMultiValueDimension("d2", FieldSpec.DataType.INT)
-        .addDateTime("hoursSinceEpoch", FieldSpec.DataType.INT, "1:HOURS:EPOCH", "1:HOURS").build();
+        .addDateTime("hoursSinceEpoch", FieldSpec.DataType.INT, "EPOCH|HOURS", "1:HOURS").build();
     Assert.assertEquals(inferredPinotSchema, expectedSchema);
 
     // change delimiter
@@ -615,7 +614,7 @@ public class JsonUtilsTest {
         .addSingleValueDimension("tuple_address_city", FieldSpec.DataType.STRING)
         .addSingleValueDimension("entries", FieldSpec.DataType.STRING)
         .addMultiValueDimension("d2", FieldSpec.DataType.INT)
-        .addDateTime("hoursSinceEpoch", FieldSpec.DataType.INT, "1:HOURS:EPOCH", "1:HOURS").build();
+        .addDateTime("hoursSinceEpoch", FieldSpec.DataType.INT, "EPOCH|HOURS", "1:HOURS").build();
     Assert.assertEquals(inferredPinotSchema, expectedSchema);
 
     // change the handling of collection-to-json option, d2 will become string
@@ -629,7 +628,7 @@ public class JsonUtilsTest {
         .addSingleValueDimension("entries.id", FieldSpec.DataType.INT)
         .addSingleValueDimension("entries.description", FieldSpec.DataType.STRING)
         .addSingleValueDimension("d2", FieldSpec.DataType.STRING)
-        .addDateTime("hoursSinceEpoch", FieldSpec.DataType.INT, "1:HOURS:EPOCH", "1:HOURS").build();
+        .addDateTime("hoursSinceEpoch", FieldSpec.DataType.INT, "EPOCH|HOURS", "1:HOURS").build();
     Assert.assertEquals(inferredPinotSchema, expectedSchema);
   }
 

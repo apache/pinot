@@ -18,43 +18,28 @@
  */
 package org.apache.pinot.query.runtime.operator.set;
 
-import com.google.common.base.Preconditions;
 import java.util.List;
 import org.apache.pinot.common.datatable.StatMap;
 import org.apache.pinot.common.utils.DataSchema;
-import org.apache.pinot.core.common.ExplainPlanRows;
-import org.apache.pinot.core.operator.ExecutionStatistics;
-import org.apache.pinot.query.runtime.blocks.MseBlock;
 import org.apache.pinot.query.runtime.operator.MultiStageOperator;
 import org.apache.pinot.query.runtime.plan.OpChainExecutionContext;
-import org.apache.pinot.segment.spi.IndexSegment;
 
 
 /**
- * Set operator, which supports UNION, INTERSECT and EXCEPT.
- * This has two child operators, and the left child operator is the one that is used to construct the result.
- * The right child operator is used to construct a set of rows that are used to filter the left child operator.
- * The right child operator is consumed in a blocking manner, and the left child operator is consumed in a non-blocking
- * UnionOperator: The right child operator is consumed in a blocking manner.
+ * Set operator, which supports UNION (ALL), INTERSECT (ALL) and EXCEPT / MINUS (ALL).
  */
 public abstract class SetOperator extends MultiStageOperator {
 
-  protected final MultiStageOperator _leftChildOperator;
-  protected final MultiStageOperator _rightChildOperator;
+  protected final List<MultiStageOperator> _inputOperators;
   protected final DataSchema _dataSchema;
 
-  private boolean _isRightChildOperatorProcessed;
-  private MseBlock.Eos _eos;
   private final StatMap<StatKey> _statMap = new StatMap<>(StatKey.class);
 
   public SetOperator(OpChainExecutionContext opChainExecutionContext, List<MultiStageOperator> inputOperators,
       DataSchema dataSchema) {
     super(opChainExecutionContext);
     _dataSchema = dataSchema;
-    Preconditions.checkState(inputOperators.size() == 2, "Set operator should have 2 child operators");
-    _leftChildOperator = inputOperators.get(0);
-    _rightChildOperator = inputOperators.get(1);
-    _isRightChildOperatorProcessed = false;
+    _inputOperators = inputOperators;
   }
 
   @Override
@@ -67,61 +52,8 @@ public abstract class SetOperator extends MultiStageOperator {
 
   @Override
   public List<MultiStageOperator> getChildOperators() {
-    return List.of(_leftChildOperator, _rightChildOperator);
+    return _inputOperators;
   }
-
-  @Override
-  public void prepareForExplainPlan(ExplainPlanRows explainPlanRows) {
-    super.prepareForExplainPlan(explainPlanRows);
-  }
-
-  @Override
-  public void explainPlan(ExplainPlanRows explainPlanRows, int[] globalId, int parentId) {
-    super.explainPlan(explainPlanRows, globalId, parentId);
-  }
-
-  @Override
-  public IndexSegment getIndexSegment() {
-    return super.getIndexSegment();
-  }
-
-  @Override
-  public ExecutionStatistics getExecutionStatistics() {
-    return super.getExecutionStatistics();
-  }
-
-  @Override
-  protected MseBlock getNextBlock() {
-    if (_eos != null) {
-      return _eos;
-    }
-
-    if (!_isRightChildOperatorProcessed) {
-      MseBlock mseBlock = processRightOperator();
-
-      if (mseBlock.isData()) {
-        return mseBlock;
-      } else if (mseBlock.isError()) {
-        _eos = (MseBlock.Eos) mseBlock;
-        return _eos;
-      } else if (mseBlock.isSuccess()) {
-        // If it's a regular EOS block, we continue to process the left child operator.
-        _isRightChildOperatorProcessed = true;
-      }
-    }
-
-    MseBlock mseBlock = processLeftOperator();
-    if (mseBlock.isEos()) {
-      _eos = (MseBlock.Eos) mseBlock;
-      return _eos;
-    } else {
-      return mseBlock;
-    }
-  }
-
-  protected abstract MseBlock processLeftOperator();
-
-  protected abstract MseBlock processRightOperator();
 
   @Override
   protected StatMap<?> copyStatMaps() {

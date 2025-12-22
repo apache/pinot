@@ -18,7 +18,6 @@
  */
 package org.apache.pinot.common.utils.config;
 
-import com.google.common.collect.ImmutableMap;
 import java.lang.reflect.Field;
 import java.lang.reflect.Modifier;
 import java.util.ArrayList;
@@ -75,7 +74,7 @@ public class QueryOptionsUtils {
       classLoadError = e;
     }
 
-    CONFIG_RESOLVER = configResolver == null ? null : ImmutableMap.copyOf(configResolver);
+    CONFIG_RESOLVER = configResolver == null ? null : Map.copyOf(configResolver);
     CLASS_LOAD_ERROR = classLoadError == null ? null
         : new RuntimeException("Failure to build case insensitive mapping.", classLoadError);
   }
@@ -168,6 +167,10 @@ public class QueryOptionsUtils {
     return Boolean.parseBoolean(queryOptions.get(QueryOptionKey.COLLECT_GC_STATS));
   }
 
+  public static String getQueryHash(Map<String, String> queryOptions) {
+    return queryOptions.getOrDefault(QueryOptionKey.QUERY_HASH, CommonConstants.Broker.DEFAULT_QUERY_HASH);
+  }
+
   @Nullable
   public static Map<String, Set<FieldConfig.IndexType>> getSkipIndexes(Map<String, String> queryOptions) {
     // Example config:  skipIndexes='col1=inverted,range&col2=inverted'
@@ -198,26 +201,26 @@ public class QueryOptionsUtils {
 
   public static Set<String> getSkipPlannerRules(Map<String, String> queryOptions) {
     // Example config:  skipPlannerRules='FilterIntoJoin,FilterAggregateTranspose'
-    String skipIndexesStr = queryOptions.get(QueryOptionKey.SKIP_PLANNER_RULES);
-    if (skipIndexesStr == null) {
+    String skipPlannerRulesStr = queryOptions.get(QueryOptionKey.SKIP_PLANNER_RULES);
+    if (skipPlannerRulesStr == null) {
       return Set.of();
     }
 
-    String[] skippedRules = StringUtils.split(skipIndexesStr, ',');
+    String[] skippedRules = StringUtils.split(skipPlannerRulesStr, ',');
 
     return new HashSet<>(List.of(skippedRules));
   }
 
   public static Set<String> getUsePlannerRules(Map<String, String> queryOptions) {
     // Example config:  usePlannerRules='SortJoinTranspose, AggregateJoinTransposeExtended'
-    String usedIndexesStr = queryOptions.get(QueryOptionKey.USE_PLANNER_RULES);
-    if (usedIndexesStr == null) {
+    String usePlannerRulesStr = queryOptions.get(QueryOptionKey.USE_PLANNER_RULES);
+    if (usePlannerRulesStr == null) {
       return Set.of();
     }
 
-    String[] usedRules = StringUtils.split(usedIndexesStr, ',');
+    String[] useRules = StringUtils.split(usePlannerRulesStr, ',');
 
-    return new HashSet<>(List.of(usedRules));
+    return new HashSet<>(List.of(useRules));
   }
 
   @Nullable
@@ -234,10 +237,6 @@ public class QueryOptionsUtils {
 
   public static List<Integer> getOrderedPreferredPools(Map<String, String> queryOptions) {
     String orderedPreferredPools = queryOptions.get(QueryOptionKey.ORDERED_PREFERRED_POOLS);
-    if (StringUtils.isEmpty(orderedPreferredPools)) {
-      // backward compatibility
-      orderedPreferredPools = queryOptions.get(QueryOptionKey.ORDERED_PREFERRED_REPLICAS);
-    }
     if (StringUtils.isEmpty(orderedPreferredPools)) {
       return Collections.emptyList();
     }

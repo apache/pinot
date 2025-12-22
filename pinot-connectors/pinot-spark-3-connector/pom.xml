@@ -56,6 +56,12 @@
                       <includes>
                         <include>com.google.protobuf.**</include>
                         <include>com.google.common.**</include>
+                      </includes>
+                    </relocation>
+                    <relocation>
+                      <pattern>io</pattern>
+                      <shadedPattern>${shadeBase}.io</shadedPattern>
+                      <includes>
                         <include>io.grpc.**</include>
                       </includes>
                     </relocation>

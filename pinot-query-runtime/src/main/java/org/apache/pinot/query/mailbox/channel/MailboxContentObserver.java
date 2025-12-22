@@ -49,6 +49,7 @@ public class MailboxContentObserver implements StreamObserver<MailboxContent> {
   private final MailboxService _mailboxService;
   private final StreamObserver<MailboxStatus> _responseObserver;
   private final List<ByteBuffer> _mailboxBuffers = Collections.synchronizedList(new ArrayList<>());
+  private boolean _closedStream = false;
 
   private volatile ReceivingMailbox _mailbox;
 
@@ -61,6 +62,10 @@ public class MailboxContentObserver implements StreamObserver<MailboxContent> {
 
   @Override
   public void onNext(MailboxContent mailboxContent) {
+    if (_closedStream) {
+      LOGGER.debug("Received a late message once the stream was closed. Ignoring it.");
+      return;
+    }
     String mailboxId = mailboxContent.getMailboxId();
     if (_mailbox == null) {
       _mailbox = _mailboxService.getReceivingMailbox(mailboxId);
@@ -72,49 +77,45 @@ public class MailboxContentObserver implements StreamObserver<MailboxContent> {
     try {
       long timeoutMs = Context.current().getDeadline().timeRemaining(TimeUnit.MILLISECONDS);
       ReceivingMailbox.ReceivingMailboxStatus status = _mailbox.offerRaw(_mailboxBuffers, timeoutMs);
-      _mailboxBuffers.clear();
       switch (status) {
         case SUCCESS:
           _responseObserver.onNext(MailboxStatus.newBuilder().setMailboxId(mailboxId)
               .putMetadata(ChannelUtils.MAILBOX_METADATA_BUFFER_SIZE_KEY,
                   Integer.toString(_mailbox.getNumPendingBlocks())).build());
           break;
-        case CANCELLED:
-          LOGGER.warn("Mailbox: {} already cancelled from upstream", mailboxId);
-          cancelStream();
-          break;
-        case FIRST_ERROR:
-          return;
-        case ERROR:
-          LOGGER.warn("Mailbox: {} already errored out (received error block before)", mailboxId);
-          cancelStream();
-          break;
-        case TIMEOUT:
-          LOGGER.warn("Timed out adding block into mailbox: {} with timeout: {}ms", mailboxId, timeoutMs);
-          cancelStream();
-          break;
-        case EARLY_TERMINATED:
-          LOGGER.debug("Mailbox: {} has been early terminated", mailboxId);
+        case WAITING_EOS:
+          // The receiving mailbox is early terminated, inform the sender to stop sending more data. Only EOS block is
+          // expected to be sent afterward.
           _responseObserver.onNext(MailboxStatus.newBuilder().setMailboxId(mailboxId)
               .putMetadata(ChannelUtils.MAILBOX_METADATA_REQUEST_EARLY_TERMINATE, "true").build());
+          break;
+        case LAST_BLOCK:
+          LOGGER.debug("Mailbox: {} has received the last block, closing the stream", mailboxId);
+          closeStream();
+          break;
+        case ALREADY_TERMINATED:
+          // this can happen when the mailbox is cancelled by the receiver. No more messages are going to be accepted.
+          closeStream();
           break;
         default:
           throw new IllegalStateException("Unsupported mailbox status: " + status);
       }
     } catch (Exception e) {
-      _mailboxBuffers.clear();
       String errorMessage = "Caught exception while processing blocks for mailbox: " + mailboxId;
       LOGGER.error(errorMessage, e);
+      closeStream();
       _mailbox.setErrorBlock(
           ErrorMseBlock.fromException(new RuntimeException(errorMessage, e)), Collections.emptyList());
-      cancelStream();
+    } finally {
+      _mailboxBuffers.clear();
     }
   }
 
-  private void cancelStream() {
+  private void closeStream() {
     try {
       // NOTE: DO NOT use onError() because it will terminate the stream, and sender might not get the callback
       _responseObserver.onCompleted();
+      _closedStream = true;
     } catch (Exception e) {
       // Exception can be thrown if the stream is already closed, so we simply ignore it
       LOGGER.debug("Caught exception cancelling mailbox: {}", _mailbox != null ? _mailbox.getId() : "unknown", e);
@@ -123,20 +124,28 @@ public class MailboxContentObserver implements StreamObserver<MailboxContent> {
 
   @Override
   public void onError(Throwable t) {
-    LOGGER.warn("Error on receiver side", t);
+    LOGGER.warn("Receiving mailbox received an error from sender side", t);
     _mailboxBuffers.clear();
     if (_mailbox != null) {
       String msg = t != null ? t.getMessage() : "Unknown";
-      _mailbox.setErrorBlock(ErrorMseBlock.fromError(
-          QueryErrorCode.QUERY_CANCELLATION, "Cancelled by sender with exception: " + msg), List.of());
+      String errorMessage = "GRPC mailbox cancelled by sender with exception: " + msg;
+      _mailbox.setErrorBlock(ErrorMseBlock.fromError(QueryErrorCode.INTERNAL, errorMessage), List.of());
     } else {
       LOGGER.error("Got error before mailbox is set up", t);
+    }
+    if (!_closedStream) {
+      _closedStream = true;
+      _responseObserver.onError(t);
     }
   }
 
   @Override
   public void onCompleted() {
     _mailboxBuffers.clear();
+    if (_closedStream) {
+      return;
+    }
+    _closedStream = true;
     try {
       _responseObserver.onCompleted();
     } catch (Exception e) {

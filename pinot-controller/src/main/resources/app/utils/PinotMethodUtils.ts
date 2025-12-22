@@ -114,7 +114,8 @@ import {
   pauseConsumption,
   resumeConsumption,
   getPauseStatus,
-  getVersions
+  getVersions,
+  getLogicalTables
 } from '../requests';
 import { baseApi } from './axios-config';
 import Utils from './Utils';
@@ -277,6 +278,22 @@ const getQueryTablesList = ({bothType = false}) => {
   });
 };
 
+// This method is used to display logical table listing on query page
+// API: /logicalTables
+// Expected Output: {columns: [], records: []}
+const getQueryLogicalTablesList = () => {
+  return getLogicalTables().then(({ data }) => {
+    const responseObj = {
+      columns: ['Logical Tables'],
+      records: []
+    };
+    data.map((logicalTable) => {
+      responseObj.records.push([logicalTable]);
+    });
+    return responseObj;
+  });
+};
+
 // This method is used to display particular table schema on query page
 // API: /tables/:tableName/schema
 const getTableSchemaData = (tableName) => {
@@ -339,7 +356,7 @@ const getQueryResults = (params) => {
       'numEntriesScannedPostFilter',
       'numGroupsLimitReached',
       'numGroupsWarningLimitReached',
-      'partialResponse',
+      'partialResult',
       'minConsumingFreshnessTimeMs',
       'offlineThreadCpuTimeNs',
       'realtimeThreadCpuTimeNs',
@@ -350,6 +367,8 @@ const getQueryResults = (params) => {
       'offlineTotalCpuTimeNs',
       'realtimeTotalCpuTimeNs'
     ];
+
+    const partialResult = queryResponse.partialResult ?? queryResponse.partialResponse;
 
     return {
       exceptions: exceptions,
@@ -362,7 +381,7 @@ const getQueryResults = (params) => {
         records: [[queryResponse.timeUsedMs, queryResponse.numDocsScanned, queryResponse.totalDocs, queryResponse.numServersQueried, queryResponse.numServersResponded,
           queryResponse.numSegmentsQueried, queryResponse.numSegmentsProcessed, queryResponse.numSegmentsMatched, queryResponse.numConsumingSegmentsQueried,
           queryResponse.numEntriesScannedInFilter, queryResponse.numEntriesScannedPostFilter, queryResponse.numGroupsLimitReached, queryResponse.numGroupsWarningLimitReached,
-          queryResponse.partialResponse ? queryResponse.partialResponse : '-', queryResponse.minConsumingFreshnessTimeMs,
+          partialResult ?? '-', queryResponse.minConsumingFreshnessTimeMs,
           queryResponse.offlineThreadCpuTimeNs, queryResponse.realtimeThreadCpuTimeNs,
           queryResponse.offlineSystemActivitiesCpuTimeNs, queryResponse.realtimeSystemActivitiesCpuTimeNs,
           queryResponse.offlineResponseSerializationCpuTimeNs, queryResponse.realtimeResponseSerializationCpuTimeNs,
@@ -943,7 +962,7 @@ const getTasksList = async (tableName, taskType) => {
     getTasks(tableName, taskType).then(async (response)=>{
       const promiseArr = [];
       const fetchInfo = async (taskID, status) => {
-        const debugData = await getTaskDebugData(taskID);
+        const debugData = await getTaskDebugData(taskID, tableName);
         const subtaskCount = get(debugData, 'data.subtaskCount', {});
         const total = get(subtaskCount, 'total', 0);
         const completed = get(subtaskCount, 'completed', 0);
@@ -980,8 +999,8 @@ const getTaskRuntimeConfigData = async (taskName: string) => {
   return response.data;
 }
 
-const getTaskDebugData = async (taskName) => {
-  const debugRes = await getTaskDebug(taskName);
+const getTaskDebugData = async (taskName, tableName) => {
+  const debugRes = await getTaskDebug(taskName, tableName);
   return debugRes;
 };
 
@@ -1377,6 +1396,7 @@ export default {
   getClusterConfigData,
   getClusterConfigJSON,
   getQueryTablesList,
+  getQueryLogicalTablesList,
   getTableSchemaData,
   getQueryResults,
   getTenantTableData,

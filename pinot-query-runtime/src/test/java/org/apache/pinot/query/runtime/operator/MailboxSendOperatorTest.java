@@ -20,7 +20,6 @@ package org.apache.pinot.query.runtime.operator;
 
 import java.util.List;
 import java.util.Map;
-import java.util.concurrent.TimeoutException;
 import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.common.utils.DataSchema.ColumnDataType;
 import org.apache.pinot.query.mailbox.MailboxService;
@@ -102,26 +101,6 @@ public class MailboxSendOperatorTest {
     ArgumentCaptor<MseBlock.Eos> captor = ArgumentCaptor.forClass(MseBlock.Eos.class);
     verify(_exchange).send(captor.capture(), anyList());
     assertTrue(captor.getValue().isError(), "expected to send error block to exchange");
-  }
-
-  @Test
-  public void shouldNotSendErrorBlockWhenTimedOut()
-      throws Exception {
-    // Given:
-    MseBlock.Data dataBlock = getDummyDataBlock();
-    when(_input.nextBlock()).thenReturn(dataBlock);
-    doThrow(new TimeoutException()).when(_exchange).send(any());
-
-    // When:
-    MseBlock block = getOperator().nextBlock();
-
-    // Then:
-    assertTrue(block.isError(), "expected error block to propagate");
-    ArgumentCaptor<MseBlock.Data> captor = ArgumentCaptor.forClass(MseBlock.Data.class);
-    verify(_exchange).send(captor.capture());
-    assertSame(captor.getValue(), dataBlock, "expected to send data block to exchange");
-
-    verify(_exchange, never()).send(any(), anyList());
   }
 
   @Test

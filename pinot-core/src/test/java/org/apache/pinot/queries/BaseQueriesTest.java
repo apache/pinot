@@ -47,7 +47,6 @@ import org.apache.pinot.core.transport.ServerRoutingInstance;
 import org.apache.pinot.core.util.GapfillUtils;
 import org.apache.pinot.segment.spi.IndexSegment;
 import org.apache.pinot.segment.spi.SegmentContext;
-import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.TableType;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.env.PinotConfiguration;
@@ -270,9 +269,9 @@ public abstract class BaseQueriesTest {
    * @see StatisticalQueriesTest for an example use case.
    */
   protected BrokerResponseNative getBrokerResponseForOptimizedQuery(@Language("sql") String query,
-      @Nullable TableConfig config, @Nullable Schema schema) {
+      @Nullable Schema schema) {
     PinotQuery pinotQuery = CalciteSqlParser.compileToPinotQuery(query);
-    OPTIMIZER.optimize(pinotQuery, config, schema);
+    OPTIMIZER.optimize(pinotQuery, schema);
     return getBrokerResponse(pinotQuery, PLAN_MAKER);
   }
 

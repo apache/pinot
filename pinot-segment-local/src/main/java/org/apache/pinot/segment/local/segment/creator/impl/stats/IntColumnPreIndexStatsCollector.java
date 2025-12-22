@@ -40,32 +40,38 @@ public class IntColumnPreIndexStatsCollector extends AbstractColumnStatisticsCol
 
     if (entry instanceof Object[]) {
       Object[] values = (Object[]) entry;
-      for (Object obj : values) {
-        int value = (int) obj;
-        _values.add(value);
-      }
-
-      _maxNumberOfMultiValues = Math.max(_maxNumberOfMultiValues, values.length);
-      updateTotalNumberOfEntries(values);
+      collectMultiValue(values.length, i -> (int) values[i]);
     } else if (entry instanceof int[]) {
-      int[] values = (int[]) entry;
-      for (int value : values) {
-        _values.add(value);
-      }
-
-      _maxNumberOfMultiValues = Math.max(_maxNumberOfMultiValues, values.length);
-      updateTotalNumberOfEntries(values.length);
+      collect((int[]) entry);
     } else {
-      int value = (int) entry;
-      addressSorted(value);
-      if (_values.add(value)) {
-        if (isPartitionEnabled()) {
-          updatePartition(Integer.toString(value));
-        }
-      }
-
-      _totalNumberOfEntries++;
+      collect((int) entry);
     }
+  }
+
+  @Override
+  public void collect(int value) {
+    assert !_sealed;
+    addressSorted(value);
+    if (_values.add(value)) {
+      if (isPartitionEnabled()) {
+        updatePartition(Integer.toString(value));
+      }
+    }
+    _totalNumberOfEntries++;
+  }
+
+  @Override
+  public void collect(int[] values) {
+    assert !_sealed;
+    collectMultiValue(values.length, i -> values[i]);
+  }
+
+  private void collectMultiValue(int length, java.util.function.IntFunction<Integer> valueGetter) {
+    for (int i = 0; i < length; i++) {
+      _values.add(valueGetter.apply(i));
+    }
+    _maxNumberOfMultiValues = Math.max(_maxNumberOfMultiValues, length);
+    updateTotalNumberOfEntries(length);
   }
 
   private void addressSorted(int entry) {

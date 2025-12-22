@@ -120,8 +120,8 @@ import org.slf4j.LoggerFactory;
 public class BrokerRoutingManager implements RoutingManager, ClusterChangeHandler {
   private static final Logger LOGGER = LoggerFactory.getLogger(BrokerRoutingManager.class);
 
-  private final BrokerMetrics _brokerMetrics;
-  private final Map<String, RoutingEntry> _routingEntryMap = new ConcurrentHashMap<>();
+  protected final BrokerMetrics _brokerMetrics;
+  protected final Map<String, RoutingEntry> _routingEntryMap = new ConcurrentHashMap<>();
   private final Map<String, ServerInstance> _enabledServerInstanceMap = new ConcurrentHashMap<>();
   // NOTE: _excludedServers doesn't need to be concurrent because it is only accessed within the _globalLock write lock
   private final Set<String> _excludedServers = new HashSet<>();
@@ -143,11 +143,11 @@ public class BrokerRoutingManager implements RoutingManager, ClusterChangeHandle
   // Per-table build start time in millis. Any request before this time should be ignored
   private final Map<String, Long> _routingTableBuildStartTimeMs = new ConcurrentHashMap<>();
 
-  private BaseDataAccessor<ZNRecord> _zkDataAccessor;
-  private String _externalViewPathPrefix;
+  protected BaseDataAccessor<ZNRecord> _zkDataAccessor;
+  protected String _externalViewPathPrefix;
   private String _idealStatePathPrefix;
   private String _instanceConfigsPath;
-  private ZkHelixPropertyStore<ZNRecord> _propertyStore;
+  protected ZkHelixPropertyStore<ZNRecord> _propertyStore;
 
   private Set<String> _routableServers;
 
@@ -214,7 +214,7 @@ public class BrokerRoutingManager implements RoutingManager, ClusterChangeHandle
     }
   }
 
-  private void processSegmentAssignmentChangeInternal() {
+  protected void processSegmentAssignmentChangeInternal() {
     LOGGER.info("Processing segment assignment change");
     long startTimeMs = System.currentTimeMillis();
 
@@ -709,9 +709,8 @@ public class BrokerRoutingManager implements RoutingManager, ClusterChangeHandle
           AdaptiveServerSelectorFactory.getAdaptiveServerSelector(_serverRoutingStatsManager, _pinotConfig);
       InstanceSelector instanceSelector =
           InstanceSelectorFactory.getInstanceSelector(tableConfig, _propertyStore, _brokerMetrics,
-              adaptiveServerSelector, _pinotConfig);
-      instanceSelector.init(_routableServers, _enabledServerInstanceMap, idealState, externalView,
-          preSelectedOnlineSegments);
+              adaptiveServerSelector, _pinotConfig, _routableServers, _enabledServerInstanceMap, idealState,
+              externalView, preSelectedOnlineSegments);
 
       // Add time boundary manager if both offline and real-time part exist for a hybrid table
       TimeBoundaryManager timeBoundaryManager = null;

@@ -19,17 +19,14 @@
 package org.apache.pinot.integration.tests.custom;
 
 import com.fasterxml.jackson.databind.JsonNode;
-import com.google.common.collect.ImmutableList;
 import java.io.File;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.List;
 import java.util.Map;
-import java.util.Random;
 import java.util.stream.IntStream;
 import org.apache.avro.file.DataFileWriter;
 import org.apache.avro.generic.GenericData;
-import org.apache.avro.generic.GenericDatumWriter;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.pinot.common.function.scalar.VectorFunctions;
 import org.apache.pinot.spi.config.table.FieldConfig;
@@ -256,7 +253,7 @@ public class VectorTest extends CustomDataQueryClusterIntegrationTest {
       throws Exception {
     // create avro schema
     org.apache.avro.Schema avroSchema = org.apache.avro.Schema.createRecord("myRecord", null, null, false);
-    avroSchema.setFields(ImmutableList.of(
+    avroSchema.setFields(List.of(
         new org.apache.avro.Schema.Field(VECTOR_1, org.apache.avro.Schema.createArray(org.apache.avro.Schema.create(
             org.apache.avro.Schema.Type.FLOAT)), null,
             null),
@@ -292,10 +289,8 @@ public class VectorTest extends CustomDataQueryClusterIntegrationTest {
             null, null)
     ));
 
-    // create avro file
-    File avroFile = new File(_tempDir, "data.avro");
-    try (DataFileWriter<GenericData.Record> fileWriter = new DataFileWriter<>(new GenericDatumWriter<>(avroSchema))) {
-      fileWriter.create(avroSchema, avroFile);
+    try (AvroFilesAndWriters avroFilesAndWriters = createAvroFilesAndWriters(avroSchema)) {
+      List<DataFileWriter<GenericData.Record>> writers = avroFilesAndWriters.getWriters();
       for (int i = 0; i < getCountStarResult(); i++) {
         // create avro record
         GenericData.Record record = new GenericData.Record(avroSchema);
@@ -317,10 +312,10 @@ public class VectorTest extends CustomDataQueryClusterIntegrationTest {
         record.put(VECTOR_ZERO_L2_DIST, VectorFunctions.l2Distance(vector1, zeroVector));
 
         // add avro record to file
-        fileWriter.append(record);
+        writers.get(i % getNumAvroFiles()).append(record);
       }
+      return avroFilesAndWriters.getAvroFiles();
     }
-    return List.of(avroFile);
   }
 
   private float[] createZeroVector(int vectorDimSize) {
@@ -331,9 +326,8 @@ public class VectorTest extends CustomDataQueryClusterIntegrationTest {
 
   private float[] createRandomVector(int vectorDimSize) {
     float[] vector = new float[vectorDimSize];
-    Random random = new Random();
     for (int i = 0; i < vectorDimSize; i++) {
-      vector[i] = random.nextFloat();
+      vector[i] = RANDOM.nextFloat();
     }
     return vector;
   }

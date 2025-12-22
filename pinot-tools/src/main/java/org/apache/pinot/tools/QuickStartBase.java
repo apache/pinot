@@ -21,7 +21,6 @@ package org.apache.pinot.tools;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.node.ArrayNode;
 import com.google.common.base.Preconditions;
-import com.google.common.collect.ImmutableMap;
 import java.io.File;
 import java.io.FileInputStream;
 import java.io.FileOutputStream;
@@ -82,18 +81,17 @@ public abstract class QuickStartBase {
       "examples/batch/testUnnest",
   };
 
-  protected static final Map<String, String> DEFAULT_STREAM_TABLE_DIRECTORIES = ImmutableMap.<String, String>builder()
-      .put("airlineStats", "examples/stream/airlineStats")
-      .put("dailySales", "examples/stream/dailySales")
-      .put("githubEvents", "examples/stream/githubEvents")
-      .put("meetupRsvp", "examples/stream/meetupRsvp")
-      .put("meetupRsvpJson", "examples/stream/meetupRsvpJson")
-      .put("meetupRsvpComplexType", "examples/stream/meetupRsvpComplexType")
-      .put("upsertMeetupRsvp", "examples/stream/upsertMeetupRsvp")
-      .put("upsertJsonMeetupRsvp", "examples/stream/upsertJsonMeetupRsvp")
-      .put("upsertPartialMeetupRsvp", "examples/stream/upsertPartialMeetupRsvp")
-      .put("fineFoodReviews", "examples/stream/fineFoodReviews")
-      .build();
+  protected static final Map<String, String> DEFAULT_STREAM_TABLE_DIRECTORIES = Map.of(
+      "airlineStats", "examples/stream/airlineStats",
+      "dailySales", "examples/stream/dailySales",
+      "githubEvents", "examples/stream/githubEvents",
+      "meetupRsvp", "examples/stream/meetupRsvp",
+      "meetupRsvpJson", "examples/stream/meetupRsvpJson",
+      "meetupRsvpComplexType", "examples/stream/meetupRsvpComplexType",
+      "upsertMeetupRsvp", "examples/stream/upsertMeetupRsvp",
+      "upsertJsonMeetupRsvp", "examples/stream/upsertJsonMeetupRsvp",
+      "upsertPartialMeetupRsvp", "examples/stream/upsertPartialMeetupRsvp",
+      "fineFoodReviews", "examples/stream/fineFoodReviews");
 
   protected File _dataDir = FileUtils.getTempDirectory();
   protected boolean _setCustomDataDir;
@@ -285,7 +283,7 @@ public abstract class QuickStartBase {
 
   protected Map<String, Object> getConfigOverrides() {
     try {
-      return StringUtils.isEmpty(_configFilePath) ? ImmutableMap.of()
+      return StringUtils.isEmpty(_configFilePath) ? Map.of()
           : PinotConfigUtils.readConfigFromFile(_configFilePath);
     } catch (ConfigurationException e) {
       throw new RuntimeException(e);

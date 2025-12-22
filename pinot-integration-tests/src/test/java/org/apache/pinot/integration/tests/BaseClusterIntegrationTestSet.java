@@ -211,6 +211,22 @@ public abstract class BaseClusterIntegrationTestSet extends BaseClusterIntegrati
     query = "SELECT count(*) FROM mytable WHERE (NOT DaysSinceEpoch = 16312) AND Carrier = 'DL'";
     testQuery(query);
 
+    // BETWEEN
+    query = "SELECT count(*) FROM mytable WHERE OriginState BETWEEN 'DE' AND 'PA'";
+    testQuery(query);
+
+    query = "SELECT count(*) FROM mytable WHERE OriginState BETWEEN 'PA' AND 'DE'";
+    testQuery(query);
+
+    query = "SELECT count(*) FROM mytable WHERE DaysSinceEpoch BETWEEN 16312 AND 16318";
+    testQuery(query);
+
+    query = "SELECT Carrier BETWEEN 'AA' AND 'QQ' FROM mytable";
+    testQuery(query);
+
+    query = "SELECT DaysSinceEpoch BETWEEN 16312 AND 16318 FROM mytable";
+    testQuery(query);
+
     // Post-aggregation in ORDER-BY
     query = "SELECT MAX(ArrTime) FROM mytable GROUP BY DaysSinceEpoch ORDER BY MAX(ArrTime) - MIN(ArrTime)";
     testQuery(query);
@@ -309,6 +325,14 @@ public abstract class BaseClusterIntegrationTestSet extends BaseClusterIntegrati
         "SELECT CAST(CAST(ArrTime AS VARCHAR) AS BIGINT) FROM mytable WHERE DaysSinceEpoch <> 16312 AND Carrier = "
             + "'DL' ORDER BY ArrTime DESC";
     testQuery(query, h2Query);
+
+    // Test MIN / MAX on STRING columns (automatically rewritten to MINSTRING / MAXSTRING internally)
+    query = "SELECT MIN(OriginCityName), MAX(OriginCityName) FROM mytable";
+    testQuery("SET autoRewriteAggregationType=true;" + query, query);
+
+    // Test MIN / MAX / SUM on LONG columns (automatically rewritten to MINLONG / MAXLONG / SUMLONG internally)
+    query = "SELECT MIN(AirlineID), MAX(AirlineID), SUM(AirlineID) FROM mytable";
+    testQuery(query);
 
     // Test orderedPreferredPools option which will fallbacks to non preferred Pools
     // when non of preferred Pools is available
@@ -698,79 +722,149 @@ public abstract class BaseClusterIntegrationTestSet extends BaseClusterIntegrati
     return jobStatus.get("totalSegmentCount").asInt() == jobStatus.get("successCount").asInt();
   }
 
-  /**
-   * TODO: Support removing new added columns for MutableSegment and remove the new added columns before running the
-   *       next test. Use this to replace {@link OfflineClusterIntegrationTest#testDefaultColumns(boolean)}.
-   */
+  /// TODO: Unify this and [OfflineClusterIntegrationTest#testDefaultColumns(boolean)]
   public void testReload(boolean includeOfflineTable)
       throws Exception {
+    testReload(includeOfflineTable, false);
+    testReload(includeOfflineTable, true);
+  }
+
+  private void testReload(boolean includeOfflineTable, boolean forceDownload)
+      throws Exception {
     String rawTableName = getTableName();
-    Schema schema = getSchema(getTableName());
+    Schema oldSchema = getSchema(rawTableName);
 
     String selectStarQuery = "SELECT * FROM " + rawTableName;
     JsonNode queryResponse = postQuery(selectStarQuery);
-    assertEquals(queryResponse.get("resultTable").get("dataSchema").get("columnNames").size(), schema.size());
+    assertEquals(queryResponse.get("resultTable").get("dataSchema").get("columnNames").size(), oldSchema.size());
     long numTotalDocs = queryResponse.get("totalDocs").asLong();
 
-    addNewSchemaFields(schema);
-    String offlineTableName = TableNameBuilder.forType(TableType.OFFLINE).tableNameWithType(rawTableName);
+    Schema newSchema = createSchema();
+    addNewSchemaFields(newSchema);
+
+    // Without reload, select star should be able to include new added columns after schema change is propagated to both
+    // broker and server
+    TestUtils.waitForCondition(aVoid -> {
+      try {
+        JsonNode testQueryResponse = postQuery(selectStarQuery);
+        // If schema change is propagated to broker before server, server might not be able to find the column for a
+        // short period of time
+        if (!testQueryResponse.get("exceptions").isEmpty()) {
+          return false;
+        }
+        return testQueryResponse.get("resultTable").get("dataSchema").get("columnNames").size() == newSchema.size();
+      } catch (Exception e) {
+        throw new RuntimeException(e);
+      }
+    }, 60_000L, "Failed to generate default virtual columns without reload");
+
+    // Test reload needed, and trigger reload
     String realtimeTableName = TableNameBuilder.forType(TableType.REALTIME).tableNameWithType(rawTableName);
-    String reloadJob;
-    // Tests that reload is needed on the table from controller api segments/{tableNameWithType}/needReload
+    testTableNeedReload(realtimeTableName, true);
+    String realtimeReloadJobId = reloadTableAndValidateResponse(rawTableName, TableType.REALTIME, forceDownload);
+    String offlineTableName = TableNameBuilder.forType(TableType.OFFLINE).tableNameWithType(rawTableName);
+    String offlineReloadJobId;
     if (includeOfflineTable) {
       testTableNeedReload(offlineTableName, true);
-      // Reload the table
-      reloadJob = reloadTableAndValidateResponse(rawTableName, TableType.OFFLINE, false);
+      offlineReloadJobId = reloadTableAndValidateResponse(rawTableName, TableType.OFFLINE, forceDownload);
+    } else {
+      offlineReloadJobId = null;
     }
-    testTableNeedReload(realtimeTableName, true);
-    reloadJob = reloadTableAndValidateResponse(rawTableName, TableType.REALTIME, false);
 
-    // Wait for all segments to finish reloading, and test filter on all newly added columns
-    // NOTE: Use count query to prevent schema inconsistency error
-    String testQuery = "SELECT COUNT(*) FROM " + rawTableName
+    // Wait for reload job to finish
+    TestUtils.waitForCondition(aVoid -> {
+      try {
+        JsonNode testQueryResponse = postQuery(selectStarQuery);
+        // Should not throw exception during reload
+        assertEquals(testQueryResponse.get("exceptions").size(), 0,
+            String.format("Found exceptions when testing reload for query: %s and response: %s", selectStarQuery,
+                testQueryResponse));
+        // Total docs should not change during reload
+        assertEquals(testQueryResponse.get("totalDocs").asLong(), numTotalDocs,
+            String.format("Total docs changed after reload, query: %s and response: %s", selectStarQuery,
+                testQueryResponse));
+        assertEquals(testQueryResponse.get("resultTable").get("dataSchema").get("columnNames").size(),
+            newSchema.size());
+        return isReloadJobCompleted(realtimeReloadJobId) && (offlineReloadJobId == null || isReloadJobCompleted(
+            offlineReloadJobId));
+      } catch (Exception e) {
+        throw new RuntimeException(e);
+      }
+    }, 600_000L, "Failed to finish reload job");
+
+    // Test reload not needed after previous reload completed
+    testTableNeedReload(realtimeTableName, false);
+    if (includeOfflineTable) {
+      testTableNeedReload(offlineTableName, false);
+    }
+
+    // Test filter on all newly added columns
+    String filterQuery = "SELECT COUNT(*) FROM " + rawTableName
         + " WHERE NewIntSVDimension < 0 AND NewLongSVDimension < 0 AND NewFloatSVDimension < 0 AND "
         + "NewDoubleSVDimension < 0 AND NewStringSVDimension = 'null' AND NewIntMVDimension < 0 AND "
         + "NewLongMVDimension < 0 AND NewFloatMVDimension < 0 AND NewDoubleMVDimension < 0 AND "
         + "NewStringMVDimension = 'null' AND NewIntMetric = 0 AND NewLongMetric = 0 AND NewFloatMetric = 0 "
         + "AND NewDoubleMetric = 0 AND NewBytesMetric = ''";
-    long countStarResult = getCountStarResult();
-    String finalReloadJob = reloadJob;
+    queryResponse = postQuery(filterQuery);
+    assertTrue(queryResponse.get("exceptions").isEmpty());
+    assertEquals(queryResponse.get("totalDocs").asLong(), numTotalDocs);
+    assertEquals(queryResponse.get("resultTable").get("rows").get(0).get(0).asLong(), getCountStarResult());
+
+    // Remove the extra columns
+    forceUpdateSchema(oldSchema);
+
+    // Wait for schema change being propagated to broker
     TestUtils.waitForCondition(aVoid -> {
       try {
-        JsonNode testQueryResponse = postQuery(testQuery);
-        // Should not throw exception during reload
-        assertEquals(testQueryResponse.get("exceptions").size(), 0,
-            String.format("Found exceptions when testing reload for query: %s and response: %s", testQuery,
-                testQueryResponse));
-        // Total docs should not change during reload
-        assertEquals(testQueryResponse.get("totalDocs").asLong(), numTotalDocs,
-            String.format("Total docs changed after reload, query: %s and response: %s", testQuery, testQueryResponse));
-        return testQueryResponse.get("resultTable").get("rows").get(0).get(0).asLong() == countStarResult
-            && isReloadJobCompleted(finalReloadJob);
+        JsonNode testQueryResponse = postQuery(selectStarQuery);
+        // If schema change is propagated to server before broker, server might not be able to find the column for a
+        // short period of time
+        if (!testQueryResponse.get("exceptions").isEmpty()) {
+          return false;
+        }
+        return testQueryResponse.get("resultTable").get("dataSchema").get("columnNames").size() == oldSchema.size();
       } catch (Exception e) {
         throw new RuntimeException(e);
       }
-    }, 600_000L, "Failed to generate default values for new columns");
+    }, 60_000L, "Failed to propagate schema change to broker");
 
-    // Select star query should return all the columns
-    queryResponse = postQuery(selectStarQuery);
-    assertEquals(queryResponse.get("exceptions").size(), 0);
-    JsonNode resultTable = queryResponse.get("resultTable");
-    assertEquals(resultTable.get("dataSchema").get("columnNames").size(), schema.size());
-    assertEquals(resultTable.get("rows").size(), 10);
-    assertEquals(queryResponse.get("totalDocs").asLong(), numTotalDocs);
+    // Test reload needed, and trigger reload
+    testTableNeedReload(realtimeTableName, true);
+    String realtimeReloadJobId2 = reloadTableAndValidateResponse(rawTableName, TableType.REALTIME, forceDownload);
+    String offlineReloadJobId2;
+    if (includeOfflineTable) {
+      testTableNeedReload(offlineTableName, true);
+      offlineReloadJobId2 = reloadTableAndValidateResponse(rawTableName, TableType.OFFLINE, forceDownload);
+    } else {
+      offlineReloadJobId2 = null;
+    }
 
-    // Test aggregation query to include querying all segemnts (including realtime)
-    String aggregationQuery = "SELECT SUMMV(NewIntMVDimension) FROM " + rawTableName;
-    queryResponse = postQuery(aggregationQuery);
-    assertEquals(queryResponse.get("exceptions").size(), 0);
+    // Wait for reload job to finish
+    TestUtils.waitForCondition(aVoid -> {
+      try {
+        JsonNode testQueryResponse = postQuery(selectStarQuery);
+        // Should not throw exception during reload
+        assertEquals(testQueryResponse.get("exceptions").size(), 0,
+            String.format("Found exceptions when testing reload for query: %s and response: %s", selectStarQuery,
+                testQueryResponse));
+        // Total docs should not change during reload
+        assertEquals(testQueryResponse.get("totalDocs").asLong(), numTotalDocs,
+            String.format("Total docs changed after reload, query: %s and response: %s", selectStarQuery,
+                testQueryResponse));
+        assertEquals(testQueryResponse.get("resultTable").get("dataSchema").get("columnNames").size(),
+            oldSchema.size());
+        return isReloadJobCompleted(realtimeReloadJobId2) && (offlineReloadJobId2 == null || isReloadJobCompleted(
+            offlineReloadJobId2));
+      } catch (Exception e) {
+        throw new RuntimeException(e);
+      }
+    }, 600_000L, "Failed to finish reload job");
 
-    // Tests that reload is not needed on the table after reloading all segments from controller api
-    // segments/{tableNameWithType}/needReload
+    // Test reload not needed after previous reload completed
+    testTableNeedReload(realtimeTableName, false);
     if (includeOfflineTable) {
       testTableNeedReload(offlineTableName, false);
     }
-    testTableNeedReload(realtimeTableName, false);
   }
 
   private void addNewSchemaFields(Schema schema)
@@ -791,7 +885,7 @@ public abstract class BaseClusterIntegrationTestSet extends BaseClusterIntegrati
     schema.addField(constructNewMetric(FieldSpec.DataType.DOUBLE));
     schema.addField(constructNewMetric(FieldSpec.DataType.BYTES));
     // Upload the schema with extra columns
-    addSchema(schema);
+    updateSchema(schema);
   }
 
   private void testTableNeedReload(String tableNameWithType, boolean expectedNeedReload)

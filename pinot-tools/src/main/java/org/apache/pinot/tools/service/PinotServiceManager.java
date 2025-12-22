@@ -18,7 +18,6 @@
  */
 package org.apache.pinot.tools.service;
 
-import com.google.common.collect.ImmutableList;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
@@ -268,7 +267,7 @@ public class PinotServiceManager {
   }
 
   public List<String> getRunningInstanceIds() {
-    return ImmutableList.copyOf(_runningInstanceMap.keySet());
+    return List.copyOf(_runningInstanceMap.keySet());
   }
 
   public String getZkAddress() {

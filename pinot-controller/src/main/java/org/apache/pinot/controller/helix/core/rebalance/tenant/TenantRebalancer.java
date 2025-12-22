@@ -21,6 +21,7 @@ package org.apache.pinot.controller.helix.core.rebalance.tenant;
 import com.fasterxml.jackson.annotation.JsonCreator;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import com.google.common.annotations.VisibleForTesting;
+import com.google.common.base.Preconditions;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.LinkedList;
@@ -355,11 +356,19 @@ public class TenantRebalancer {
     Queue<TenantTableRebalanceJobContext> lastQueue = new LinkedList<>();
     Set<String> dimTables = getDimensionalTables(config.getTenantName());
     dryRunResults.forEach((table, dryRunResult) -> {
-      TenantTableRebalanceJobContext jobContext =
-          new TenantTableRebalanceJobContext(table, dryRunResult.getJobId(), dryRunResult.getRebalanceSummaryResult()
-              .getSegmentInfo()
-              .getReplicationFactor()
-              .getExpectedValueAfterRebalance() == 1);
+      TenantTableRebalanceJobContext jobContext;
+      if (dryRunResult.getStatus() == RebalanceResult.Status.FAILED) {
+        jobContext = new TenantTableRebalanceJobContext(table, dryRunResult.getJobId(), false);
+        LOGGER.warn("Proceeding with table rebalance: {} despite its failed dry-run", table);
+      } else {
+        Preconditions.checkState(dryRunResult.getRebalanceSummaryResult() != null,
+            "Non-failed dry-run result missing summary");
+        jobContext =
+            new TenantTableRebalanceJobContext(table, dryRunResult.getJobId(), dryRunResult.getRebalanceSummaryResult()
+                .getSegmentInfo()
+                .getReplicationFactor()
+                .getExpectedValueAfterRebalance() == 1);
+      }
       if (dimTables.contains(table)) {
         // check if the dimension table is a pure scale out or scale in.
         // pure scale out means that only new servers are added and no servers are removed, vice versa

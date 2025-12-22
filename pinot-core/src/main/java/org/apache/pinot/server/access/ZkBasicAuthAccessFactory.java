@@ -95,8 +95,10 @@ public class ZkBasicAuthAccessFactory implements AccessControlFactory {
           .collect(Collectors.toMap(ZkBasicAuthPrincipal::getName, p -> p));
 
       Map<String, String> name2password = tokens.stream().collect(
-          Collectors.toMap(org.apache.pinot.common.auth.BasicAuthUtils::extractUsername,
-              org.apache.pinot.common.auth.BasicAuthUtils::extractPassword));
+          Collectors.toMap(
+              org.apache.pinot.common.auth.BasicAuthUtils::extractUsername,
+              org.apache.pinot.common.auth.BasicAuthUtils::extractPassword,
+              (v1, v2) -> v2));
       Map<String, ZkBasicAuthPrincipal> password2principal =
           name2password.keySet().stream().collect(Collectors.toMap(name2password::get, _name2principal::get));
       return password2principal.entrySet().stream().filter(

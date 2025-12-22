@@ -595,7 +595,7 @@ public class StringFunctions {
    * @see StringUtils#repeat(String, String, int)
    * @param input
    * @param times
-   * @return concatenate the string to itself specified number of times with specified seperator
+   * @return concatenate the string to itself specified number of times with specified separator
    */
   @ScalarFunction
   public static String repeat(String input, String sep, int times) {
@@ -630,6 +630,55 @@ public class StringFunctions {
       }
     }
     return distance;
+  }
+
+  /**
+   * Calculates the Levenshtein edit distance between two strings.
+   * The Levenshtein distance is the minimum number of single-character edits
+   * (insertions, deletions, or substitutions) needed to transform one string into another.
+   * This complements the existing hammingDistance function by handling strings of different lengths.
+   *
+   * @param input1 First string
+   * @param input2 Second string
+   * @return The Levenshtein distance between the two strings
+   */
+  @ScalarFunction
+  public static int levenshteinDistance(String input1, String input2) {
+    int len1 = input1.length();
+    int len2 = input2.length();
+
+    // If one string is empty, return the length of the other
+    if (len1 == 0) {
+      return len2;
+    }
+    if (len2 == 0) {
+      return len1;
+    }
+
+    // Create a matrix to store distances
+    int[][] dp = new int[len1 + 1][len2 + 1];
+
+    // Initialize first row and column
+    for (int i = 0; i <= len1; i++) {
+      dp[i][0] = i;
+    }
+    for (int j = 0; j <= len2; j++) {
+      dp[0][j] = j;
+    }
+
+    // Fill the matrix using dynamic programming
+    for (int i = 1; i <= len1; i++) {
+      for (int j = 1; j <= len2; j++) {
+        int cost = (input1.charAt(i - 1) == input2.charAt(j - 1)) ? 0 : 1;
+        dp[i][j] = Math.min(
+            Math.min(dp[i - 1][j] + 1,      // deletion
+                     dp[i][j - 1] + 1),     // insertion
+            dp[i - 1][j - 1] + cost         // substitution
+        );
+      }
+    }
+
+    return dp[len1][len2];
   }
 
   /**

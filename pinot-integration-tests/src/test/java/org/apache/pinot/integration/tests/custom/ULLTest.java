@@ -20,15 +20,12 @@ package org.apache.pinot.integration.tests.custom;
 
 import com.dynatrace.hash4j.distinctcount.UltraLogLog;
 import com.fasterxml.jackson.databind.JsonNode;
-import com.google.common.collect.ImmutableList;
 import java.io.File;
 import java.nio.ByteBuffer;
 import java.util.Base64;
 import java.util.List;
-import java.util.Random;
 import org.apache.avro.file.DataFileWriter;
 import org.apache.avro.generic.GenericData;
-import org.apache.avro.generic.GenericDatumWriter;
 import org.apache.pinot.core.common.ObjectSerDeUtils;
 import org.apache.pinot.segment.local.utils.UltraLogLogUtils;
 import org.apache.pinot.spi.data.FieldSpec;
@@ -56,7 +53,7 @@ public class ULLTest extends CustomDataQueryClusterIntegrationTest {
       throws Exception {
     setUseMultiStageQueryEngine(useMultiStageQueryEngine);
     String query = String.format("SELECT DISTINCT_COUNT_ULL(%s), DISTINCT_COUNT_RAW_ULL(%s) FROM %s",
-       COLUMN, COLUMN, getTableName());
+        COLUMN, COLUMN, getTableName());
     JsonNode jsonNode = postQuery(query);
     long distinctCount = jsonNode.get("resultTable").get("rows").get(0).get(0).asLong();
     byte[] rawSketchBytes = Base64.getDecoder().decode(jsonNode.get("resultTable").get("rows").get(0).get(1).asText());
@@ -70,13 +67,18 @@ public class ULLTest extends CustomDataQueryClusterIntegrationTest {
   public void testUnionWithSketchQueries(boolean useMultiStageQueryEngine)
       throws Exception {
     setUseMultiStageQueryEngine(useMultiStageQueryEngine);
-
     String query = String.format(
-        "SELECT " + "DISTINCT_COUNT_ULL(%s), " + "DISTINCT_COUNT_RAW_ULL(%s) " + "FROM " + "("
-            + "SELECT %s FROM %s WHERE %s = 4 " + "UNION ALL " + "SELECT %s FROM %s WHERE %s = 5 " + "UNION ALL "
-            + "SELECT %s FROM %s WHERE %s = 6 " + "UNION ALL " + "SELECT %s FROM %s WHERE %s = 7 " + ")",
-        COLUMN, COLUMN, COLUMN, getTableName(), ID, COLUMN,
-        getTableName(), ID, COLUMN, getTableName(), ID, COLUMN, getTableName(), ID);
+        "SELECT " + "DISTINCT_COUNT_ULL(%s), " + "DISTINCT_COUNT_RAW_ULL(%s) "
+            + "FROM " + "("
+            + "SELECT %s FROM %s WHERE %s = 4 " + "UNION ALL "
+            + "SELECT %s FROM %s WHERE %s = 5 " + "UNION ALL "
+            + "SELECT %s FROM %s WHERE %s = 6 " + "UNION ALL "
+            + "SELECT %s FROM %s WHERE %s = 7 " + ")",
+        COLUMN, COLUMN,
+        COLUMN, getTableName(), ID,
+        COLUMN, getTableName(), ID,
+        COLUMN, getTableName(), ID,
+        COLUMN, getTableName(), ID);
     JsonNode jsonNode = postQuery(query);
     long distinctCount = jsonNode.get("resultTable").get("rows").get(0).get(0).asLong();
     byte[] rawSketchBytes = Base64.getDecoder().decode(jsonNode.get("resultTable").get("rows").get(0).get(1).asText());
@@ -128,26 +130,23 @@ public class ULLTest extends CustomDataQueryClusterIntegrationTest {
       throws Exception {
     // create avro schema
     org.apache.avro.Schema avroSchema = org.apache.avro.Schema.createRecord("myRecord", null, null, false);
-    avroSchema.setFields(ImmutableList.of(
+    avroSchema.setFields(List.of(
         new org.apache.avro.Schema.Field(ID, org.apache.avro.Schema.create(org.apache.avro.Schema.Type.INT), null,
             null), new org.apache.avro.Schema.Field(COLUMN,
             org.apache.avro.Schema.create(org.apache.avro.Schema.Type.BYTES), null, null)));
 
-    // create avro file
-    File avroFile = new File(_tempDir, "data.avro");
-    try (DataFileWriter<GenericData.Record> fileWriter = new DataFileWriter<>(new GenericDatumWriter<>(avroSchema))) {
-      Random random = new Random();
-      fileWriter.create(avroSchema, avroFile);
+    try (AvroFilesAndWriters avroFilesAndWriters = createAvroFilesAndWriters(avroSchema)) {
+      List<DataFileWriter<GenericData.Record>> writers = avroFilesAndWriters.getWriters();
       for (int i = 0; i < getCountStarResult(); i++) {
         // create avro record
         GenericData.Record record = new GenericData.Record(avroSchema);
-        record.put(ID, random.nextInt(10));
+        record.put(ID, RANDOM.nextInt(10));
         record.put(COLUMN, ByteBuffer.wrap(getRandomRawValue()));
         // add avro record to file
-        fileWriter.append(record);
+        writers.get(i % getNumAvroFiles()).append(record);
       }
+      return avroFilesAndWriters.getAvroFiles();
     }
-    return List.of(avroFile);
   }
 
   private byte[] getRandomRawValue() {

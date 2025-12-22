@@ -20,7 +20,6 @@ package org.apache.pinot.core.query.aggregation.function.array;
 
 import it.unimi.dsi.fastutil.objects.ObjectOpenHashSet;
 import it.unimi.dsi.fastutil.objects.ObjectSet;
-import java.util.Arrays;
 import java.util.Map;
 import org.apache.pinot.common.CustomObject;
 import org.apache.pinot.common.request.context.ExpressionContext;
@@ -39,11 +38,27 @@ public class ArrayAggDistinctStringFunction extends BaseArrayAggStringFunction<O
   public void aggregate(int length, AggregationResultHolder aggregationResultHolder,
       Map<ExpressionContext, BlockValSet> blockValSetMap) {
     BlockValSet blockValSet = blockValSetMap.get(_expression);
-    String[] value = blockValSet.getStringValuesSV();
     ObjectOpenHashSet<String> valueSet =
         aggregationResultHolder.getResult() != null ? aggregationResultHolder.getResult()
             : new ObjectOpenHashSet<>(length);
-    forEachNotNull(length, blockValSet, (from, to) -> valueSet.addAll(Arrays.asList(value).subList(from, to)));
+    if (blockValSet.isSingleValue()) {
+      String[] values = blockValSet.getStringValuesSV();
+      forEachNotNull(length, blockValSet, (from, to) -> {
+        for (int i = from; i < to; i++) {
+          valueSet.add(values[i]);
+        }
+      });
+    } else {
+      String[][] valuesArray = blockValSet.getStringValuesMV();
+      forEachNotNull(length, blockValSet, (from, to) -> {
+        for (int i = from; i < to; i++) {
+          String[] values = valuesArray[i];
+          for (String v : values) {
+            valueSet.add(v);
+          }
+        }
+      });
+    }
     aggregationResultHolder.setValue(valueSet);
   }
 

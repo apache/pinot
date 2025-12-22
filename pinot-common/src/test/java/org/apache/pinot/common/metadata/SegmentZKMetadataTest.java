@@ -18,7 +18,6 @@
  */
 package org.apache.pinot.common.metadata;
 
-import com.google.common.collect.ImmutableMap;
 import java.io.IOException;
 import java.util.Arrays;
 import java.util.HashMap;
@@ -140,6 +139,7 @@ public class SegmentZKMetadataTest {
     record.setSimpleField(CommonConstants.Segment.TIME_UNIT, TimeUnit.HOURS.toString());
     record.setLongField(CommonConstants.Segment.TOTAL_DOCS, 10000);
     record.setLongField(CommonConstants.Segment.CRC, 1234);
+    record.setLongField(CommonConstants.Segment.DATA_CRC, 4567);
     record.setLongField(CommonConstants.Segment.CREATION_TIME, 3000);
     record.setIntField(CommonConstants.Segment.Realtime.FLUSH_THRESHOLD_SIZE, 1234);
     return record;
@@ -154,6 +154,7 @@ public class SegmentZKMetadataTest {
     realtimeSegmentMetadata.setStatus(Status.DONE);
     realtimeSegmentMetadata.setTotalDocs(10000);
     realtimeSegmentMetadata.setCrc(1234);
+    realtimeSegmentMetadata.setDataCrc(4567);
     realtimeSegmentMetadata.setCreationTime(3000);
     realtimeSegmentMetadata.setSizeThresholdToFlushSegment(1234);
     return realtimeSegmentMetadata;
@@ -196,7 +197,7 @@ public class SegmentZKMetadataTest {
     record.setSimpleField(CommonConstants.Segment.DOWNLOAD_URL, "http://localhost:8000/testTable_O_3000_4000");
     record.setLongField(CommonConstants.Segment.PUSH_TIME, 4000);
     record.setLongField(CommonConstants.Segment.REFRESH_TIME, 8000);
-    record.setMapField(CommonConstants.Segment.CUSTOM_MAP, ImmutableMap.of("k1", "v1", "k2", "v2"));
+    record.setMapField(CommonConstants.Segment.CUSTOM_MAP, Map.of("k1", "v1", "k2", "v2"));
     return record;
   }
 
@@ -209,11 +210,12 @@ public class SegmentZKMetadataTest {
     offlineSegmentMetadata.setTimeUnit(TimeUnit.HOURS);
     offlineSegmentMetadata.setTotalDocs(50000);
     offlineSegmentMetadata.setCrc(54321);
+    offlineSegmentMetadata.setDataCrc(-1);
     offlineSegmentMetadata.setCreationTime(1000);
     offlineSegmentMetadata.setDownloadUrl("http://localhost:8000/testTable_O_3000_4000");
     offlineSegmentMetadata.setPushTime(4000);
     offlineSegmentMetadata.setRefreshTime(8000);
-    offlineSegmentMetadata.setCustomMap(ImmutableMap.of("k1", "v1", "k2", "v2"));
+    offlineSegmentMetadata.setCustomMap(Map.of("k1", "v1", "k2", "v2"));
     return offlineSegmentMetadata;
   }
 }

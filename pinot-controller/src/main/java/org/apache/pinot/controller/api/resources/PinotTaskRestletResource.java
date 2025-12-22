@@ -185,6 +185,18 @@ public class PinotTaskRestletResource {
   }
 
   @GET
+  @Path("/tasks/summary")
+  @Authorize(targetType = TargetType.CLUSTER, action = Actions.Cluster.GET_TASK)
+  @Produces(MediaType.APPLICATION_JSON)
+  @ApiOperation("Get summary of all tasks across all task types, grouped by tenant. "
+      + "Optionally filter by server tenant name to get tasks for a specific tenant only.")
+  public PinotHelixTaskResourceManager.TaskSummaryResponse getTasksSummary(
+      @ApiParam(value = "Server tenant name to filter tasks. If not specified, returns all tenants grouped.")
+      @QueryParam("tenant") @Nullable String tenantName) {
+    return _pinotHelixTaskResourceManager.getTasksSummary(tenantName);
+  }
+
+  @GET
   @Path("/tasks/{taskType}/state")
   @Authorize(targetType = TargetType.CLUSTER, action = Actions.Cluster.GET_TASK)
   @Produces(MediaType.APPLICATION_JSON)
@@ -384,8 +396,14 @@ public class PinotTaskRestletResource {
       @ApiParam(value = "verbosity (Prints information for the given task name."
           + "By default, only prints subtask details for running and error tasks. "
           + "Value of > 0 prints subtask details for all tasks)")
-      @DefaultValue("0") @QueryParam("verbosity") int verbosity) {
-    return _pinotHelixTaskResourceManager.getTaskDebugInfo(taskName, verbosity);
+      @DefaultValue("0") @QueryParam("verbosity") int verbosity,
+      @ApiParam(value = "Table name with type (e.g., 'myTable_OFFLINE') to filter subtasks by table. "
+          + "Only subtasks for this table will be returned.")
+      @QueryParam("tableName") @Nullable String tableNameWithType, @Context HttpHeaders httpHeaders) {
+    if (tableNameWithType != null) {
+      tableNameWithType = DatabaseUtils.translateTableName(tableNameWithType, httpHeaders);
+    }
+    return _pinotHelixTaskResourceManager.getTaskDebugInfo(taskName, tableNameWithType, verbosity);
   }
 
   @GET
@@ -784,5 +802,26 @@ public class PinotTaskRestletResource {
       @DefaultValue("false") @QueryParam("forceDelete") boolean forceDelete) {
     _pinotHelixTaskResourceManager.deleteTask(taskName, forceDelete);
     return new SuccessResponse("Successfully deleted task: " + taskName);
+  }
+
+  @DELETE
+  @Path("/tasks/lock/forceRelease")
+  @Authorize(targetType = TargetType.TABLE, action = Actions.Table.FORCE_RELEASE_TASK_GENERATION_LOCK,
+      paramName = "tableNameWithType")
+  @Produces(MediaType.APPLICATION_JSON)
+  @Authenticate(AccessType.DELETE)
+  @ApiOperation("Force releases the task generation lock for a given table. Call this API with caution")
+  public SuccessResponse forceReleaseTaskGenerationLock(
+      @ApiParam(value = "Table name (with type suffix).", required = true)
+      @QueryParam("tableNameWithType") String tableNameWithType) {
+    try {
+      _pinotTaskManager.forceReleaseLock(tableNameWithType);
+      return new SuccessResponse("Successfully released task generation lock on table " + tableNameWithType
+          + " for all task types");
+    } catch (Exception e) {
+      throw new ControllerApplicationException(LOGGER, "Failed to release task generation lock on table: "
+          + tableNameWithType + ", with exception: " + ExceptionUtils.getStackTrace(e),
+          Response.Status.INTERNAL_SERVER_ERROR, e);
+    }
   }
 }

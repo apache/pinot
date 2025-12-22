@@ -21,6 +21,7 @@ package org.apache.pinot.core.operator.query;
 import com.clearspring.analytics.stream.cardinality.HyperLogLog;
 import com.clearspring.analytics.stream.cardinality.HyperLogLogPlus;
 import com.dynatrace.hash4j.distinctcount.UltraLogLog;
+import com.google.common.base.Preconditions;
 import it.unimi.dsi.fastutil.doubles.DoubleOpenHashSet;
 import it.unimi.dsi.fastutil.floats.FloatOpenHashSet;
 import it.unimi.dsi.fastutil.ints.IntOpenHashSet;
@@ -43,6 +44,7 @@ import org.apache.pinot.core.query.aggregation.function.DistinctCountOffHeapAggr
 import org.apache.pinot.core.query.aggregation.function.DistinctCountRawHLLAggregationFunction;
 import org.apache.pinot.core.query.aggregation.function.DistinctCountRawHLLPlusAggregationFunction;
 import org.apache.pinot.core.query.aggregation.function.DistinctCountSmartHLLAggregationFunction;
+import org.apache.pinot.core.query.aggregation.function.DistinctCountSmartHLLPlusAggregationFunction;
 import org.apache.pinot.core.query.aggregation.function.DistinctCountSmartULLAggregationFunction;
 import org.apache.pinot.core.query.aggregation.function.DistinctCountULLAggregationFunction;
 import org.apache.pinot.core.query.request.context.QueryContext;
@@ -50,7 +52,8 @@ import org.apache.pinot.segment.local.customobject.MinMaxRangePair;
 import org.apache.pinot.segment.local.utils.UltraLogLogUtils;
 import org.apache.pinot.segment.spi.datasource.DataSource;
 import org.apache.pinot.segment.spi.index.reader.Dictionary;
-import org.apache.pinot.spi.data.FieldSpec;
+import org.apache.pinot.spi.data.FieldSpec.DataType;
+import org.apache.pinot.spi.query.QueryThreadContext;
 import org.apache.pinot.spi.utils.ByteArray;
 
 
@@ -99,15 +102,29 @@ public class NonScanBasedAggregationOperator extends BaseOperator<AggregationRes
           break;
         case MIN:
         case MINMV:
-          result = getMinValue(dataSource);
+          result = getMinValueNumeric(dataSource);
+          break;
+        case MINLONG:
+          result = getMinValueLong(dataSource);
+          break;
+        case MINSTRING:
+          assert dataSource.getDictionary() != null;
+          result = dataSource.getDictionary().getMinVal();
           break;
         case MAX:
         case MAXMV:
-          result = getMaxValue(dataSource);
+          result = getMaxValueNumeric(dataSource);
+          break;
+        case MAXLONG:
+          result = getMaxValueLong(dataSource);
+          break;
+        case MAXSTRING:
+          assert dataSource.getDictionary() != null;
+          result = dataSource.getDictionary().getMaxVal();
           break;
         case MINMAXRANGE:
         case MINMAXRANGEMV:
-          result = new MinMaxRangePair(getMinValue(dataSource), getMaxValue(dataSource));
+          result = new MinMaxRangePair(getMinValueNumeric(dataSource), getMaxValueNumeric(dataSource));
           break;
         case DISTINCTCOUNT:
         case DISTINCTSUM:
@@ -149,6 +166,10 @@ public class NonScanBasedAggregationOperator extends BaseOperator<AggregationRes
           result = getDistinctCountSmartHLLResult(Objects.requireNonNull(dataSource.getDictionary()),
               (DistinctCountSmartHLLAggregationFunction) aggregationFunction);
           break;
+        case DISTINCTCOUNTSMARTHLLPLUS:
+          result = getDistinctCountSmartHLLPlusResult(Objects.requireNonNull(dataSource.getDictionary()),
+              (DistinctCountSmartHLLPlusAggregationFunction) aggregationFunction);
+          break;
         case DISTINCTCOUNTULL:
           result = getDistinctCountULLResult(Objects.requireNonNull(dataSource.getDictionary()),
               (DistinctCountULLAggregationFunction) aggregationFunction);
@@ -172,7 +193,7 @@ public class NonScanBasedAggregationOperator extends BaseOperator<AggregationRes
     return new AggregationResultsBlock(_aggregationFunctions, aggregationResults, _queryContext);
   }
 
-  private static Double getMinValue(DataSource dataSource) {
+  private static Double getMinValueNumeric(DataSource dataSource) {
     Dictionary dictionary = dataSource.getDictionary();
     if (dictionary != null) {
       return toDouble(dictionary.getMinVal());
@@ -180,12 +201,36 @@ public class NonScanBasedAggregationOperator extends BaseOperator<AggregationRes
     return toDouble(dataSource.getDataSourceMetadata().getMinValue());
   }
 
-  private static Double getMaxValue(DataSource dataSource) {
+  private static Long getMinValueLong(DataSource dataSource) {
+    DataType dataType = dataSource.getDataSourceMetadata().getDataType().getStoredType();
+    Preconditions.checkArgument(
+        dataType == DataType.LONG || dataType == DataType.INT,
+        "MINLONG aggregation function can only be applied to columns of integer types");
+    Dictionary dictionary = dataSource.getDictionary();
+    if (dictionary != null) {
+      return ((Number) dictionary.getMinVal()).longValue();
+    }
+    return ((Number) dataSource.getDataSourceMetadata().getMinValue()).longValue();
+  }
+
+  private static Double getMaxValueNumeric(DataSource dataSource) {
     Dictionary dictionary = dataSource.getDictionary();
     if (dictionary != null) {
       return toDouble(dictionary.getMaxVal());
     }
     return toDouble(dataSource.getDataSourceMetadata().getMaxValue());
+  }
+
+  private static Long getMaxValueLong(DataSource dataSource) {
+    DataType dataType = dataSource.getDataSourceMetadata().getDataType().getStoredType();
+    Preconditions.checkArgument(
+        dataType == DataType.LONG || dataType == DataType.INT,
+        "MAXLONG aggregation function can only be applied to columns of integer types");
+    Dictionary dictionary = dataSource.getDictionary();
+    if (dictionary != null) {
+      return ((Number) dictionary.getMaxVal()).longValue();
+    }
+    return ((Number) dataSource.getDataSourceMetadata().getMaxValue()).longValue();
   }
 
   private static Double toDouble(Comparable<?> value) {
@@ -204,36 +249,42 @@ public class NonScanBasedAggregationOperator extends BaseOperator<AggregationRes
       case INT:
         IntOpenHashSet intSet = new IntOpenHashSet(dictionarySize);
         for (int dictId = 0; dictId < dictionarySize; dictId++) {
+          QueryThreadContext.checkTerminationAndSampleUsagePeriodically(dictId, EXPLAIN_NAME);
           intSet.add(dictionary.getIntValue(dictId));
         }
         return intSet;
       case LONG:
         LongOpenHashSet longSet = new LongOpenHashSet(dictionarySize);
         for (int dictId = 0; dictId < dictionarySize; dictId++) {
+          QueryThreadContext.checkTerminationAndSampleUsagePeriodically(dictId, EXPLAIN_NAME);
           longSet.add(dictionary.getLongValue(dictId));
         }
         return longSet;
       case FLOAT:
         FloatOpenHashSet floatSet = new FloatOpenHashSet(dictionarySize);
         for (int dictId = 0; dictId < dictionarySize; dictId++) {
+          QueryThreadContext.checkTerminationAndSampleUsagePeriodically(dictId, EXPLAIN_NAME);
           floatSet.add(dictionary.getFloatValue(dictId));
         }
         return floatSet;
       case DOUBLE:
         DoubleOpenHashSet doubleSet = new DoubleOpenHashSet(dictionarySize);
         for (int dictId = 0; dictId < dictionarySize; dictId++) {
+          QueryThreadContext.checkTerminationAndSampleUsagePeriodically(dictId, EXPLAIN_NAME);
           doubleSet.add(dictionary.getDoubleValue(dictId));
         }
         return doubleSet;
       case STRING:
         ObjectOpenHashSet<String> stringSet = new ObjectOpenHashSet<>(dictionarySize);
         for (int dictId = 0; dictId < dictionarySize; dictId++) {
+          QueryThreadContext.checkTerminationAndSampleUsagePeriodically(dictId, EXPLAIN_NAME);
           stringSet.add(dictionary.getStringValue(dictId));
         }
         return stringSet;
       case BYTES:
         ObjectOpenHashSet<ByteArray> bytesSet = new ObjectOpenHashSet<>(dictionarySize);
         for (int dictId = 0; dictId < dictionarySize; dictId++) {
+          QueryThreadContext.checkTerminationAndSampleUsagePeriodically(dictId, EXPLAIN_NAME);
           bytesSet.add(new ByteArray(dictionary.getBytesValue(dictId)));
         }
         return bytesSet;
@@ -246,6 +297,7 @@ public class NonScanBasedAggregationOperator extends BaseOperator<AggregationRes
     HyperLogLog hll = new HyperLogLog(log2m);
     int length = dictionary.length();
     for (int i = 0; i < length; i++) {
+      QueryThreadContext.checkTerminationAndSampleUsagePeriodically(i, EXPLAIN_NAME);
       hll.offer(dictionary.get(i));
     }
     return hll;
@@ -255,6 +307,7 @@ public class NonScanBasedAggregationOperator extends BaseOperator<AggregationRes
     UltraLogLog ull = UltraLogLog.create(p);
     int length = dictionary.length();
     for (int i = 0; i < length; i++) {
+      QueryThreadContext.checkTerminationAndSampleUsagePeriodically(i, EXPLAIN_NAME);
       Object value = dictionary.get(i);
       UltraLogLogUtils.hashObject(value).ifPresent(ull::add);
     }
@@ -265,6 +318,7 @@ public class NonScanBasedAggregationOperator extends BaseOperator<AggregationRes
     HyperLogLogPlus hllPlus = new HyperLogLogPlus(p, sp);
     int length = dictionary.length();
     for (int i = 0; i < length; i++) {
+      QueryThreadContext.checkTerminationAndSampleUsagePeriodically(i, EXPLAIN_NAME);
       hllPlus.offer(dictionary.get(i));
     }
     return hllPlus;
@@ -272,12 +326,14 @@ public class NonScanBasedAggregationOperator extends BaseOperator<AggregationRes
 
   private static HyperLogLog getDistinctCountHLLResult(Dictionary dictionary,
       DistinctCountHLLAggregationFunction function) {
-    if (dictionary.getValueType() == FieldSpec.DataType.BYTES) {
+    if (dictionary.getValueType() == DataType.BYTES) {
       // Treat BYTES value as serialized HyperLogLog
       try {
+        QueryThreadContext.checkTerminationAndSampleUsage(EXPLAIN_NAME);
         HyperLogLog hll = ObjectSerDeUtils.HYPER_LOG_LOG_SER_DE.deserialize(dictionary.getBytesValue(0));
         int length = dictionary.length();
         for (int i = 1; i < length; i++) {
+          QueryThreadContext.checkTerminationAndSampleUsagePeriodically(i, EXPLAIN_NAME);
           hll.addAll(ObjectSerDeUtils.HYPER_LOG_LOG_SER_DE.deserialize(dictionary.getBytesValue(i)));
         }
         return hll;
@@ -291,12 +347,14 @@ public class NonScanBasedAggregationOperator extends BaseOperator<AggregationRes
 
   private static HyperLogLogPlus getDistinctCountHLLPlusResult(Dictionary dictionary,
       DistinctCountHLLPlusAggregationFunction function) {
-    if (dictionary.getValueType() == FieldSpec.DataType.BYTES) {
+    if (dictionary.getValueType() == DataType.BYTES) {
       // Treat BYTES value as serialized HyperLogLogPlus
       try {
+        QueryThreadContext.checkTerminationAndSampleUsage(EXPLAIN_NAME);
         HyperLogLogPlus hllplus = ObjectSerDeUtils.HYPER_LOG_LOG_PLUS_SER_DE.deserialize(dictionary.getBytesValue(0));
         int length = dictionary.length();
         for (int i = 1; i < length; i++) {
+          QueryThreadContext.checkTerminationAndSampleUsagePeriodically(i, EXPLAIN_NAME);
           hllplus.addAll(ObjectSerDeUtils.HYPER_LOG_LOG_PLUS_SER_DE.deserialize(dictionary.getBytesValue(i)));
         }
         return hllplus;
@@ -318,14 +376,26 @@ public class NonScanBasedAggregationOperator extends BaseOperator<AggregationRes
     }
   }
 
+  private static Object getDistinctCountSmartHLLPlusResult(Dictionary dictionary,
+      DistinctCountSmartHLLPlusAggregationFunction function) {
+    if (dictionary.length() > function.getThreshold()) {
+      // Store values into a HLLPlus when the dictionary size exceeds the conversion threshold
+      return getDistinctValueHLLPlus(dictionary, function.getP(), function.getSp());
+    } else {
+      return getDistinctValueSet(dictionary);
+    }
+  }
+
   private static UltraLogLog getDistinctCountULLResult(Dictionary dictionary,
       DistinctCountULLAggregationFunction function) {
-    if (dictionary.getValueType() == FieldSpec.DataType.BYTES) {
+    if (dictionary.getValueType() == DataType.BYTES) {
       // Treat BYTES value as serialized UltraLogLog and merge
       try {
+        QueryThreadContext.checkTerminationAndSampleUsage(EXPLAIN_NAME);
         UltraLogLog ull = ObjectSerDeUtils.ULTRA_LOG_LOG_OBJECT_SER_DE.deserialize(dictionary.getBytesValue(0));
         int length = dictionary.length();
         for (int i = 1; i < length; i++) {
+          QueryThreadContext.checkTerminationAndSampleUsagePeriodically(i, EXPLAIN_NAME);
           ull.add(ObjectSerDeUtils.ULTRA_LOG_LOG_OBJECT_SER_DE.deserialize(dictionary.getBytesValue(i)));
         }
         return ull;

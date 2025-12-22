@@ -18,7 +18,6 @@
  */
 package org.apache.pinot.query.runtime.operator.set;
 
-import com.google.common.collect.ImmutableList;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
@@ -42,6 +41,7 @@ public class UnionAllOperatorTest {
     MultiStageOperator leftOperator = new BlockListMultiStageOperator.Builder(schema)
         .addRow(1, "AA")
         .addRow(2, "BB")
+        .addRow(3, "aa")
         .buildWithEos();
     MultiStageOperator rightOperator = new BlockListMultiStageOperator.Builder(schema)
         .addRow(3, "aa")
@@ -50,7 +50,7 @@ public class UnionAllOperatorTest {
         .buildWithEos();
 
     UnionAllOperator unionAllOperator =
-        new UnionAllOperator(OperatorTestUtil.getTracingContext(), ImmutableList.of(leftOperator, rightOperator),
+        new UnionAllOperator(OperatorTestUtil.getTracingContext(), List.of(leftOperator, rightOperator),
             schema);
     List<Object[]> resultRows = new ArrayList<>();
     MseBlock result = unionAllOperator.nextBlock();
@@ -58,11 +58,9 @@ public class UnionAllOperatorTest {
       resultRows.addAll(((MseBlock.Data) result).asRowHeap().getRows());
       result = unionAllOperator.nextBlock();
     }
-    // Note that UNION ALL does not guarantee the order of rows, and our implementation adds rows from the right child
-    // first
     List<Object[]> expectedRows =
-        Arrays.asList(new Object[]{3, "aa"}, new Object[]{4, "bb"}, new Object[]{5, "cc"}, new Object[]{1, "AA"},
-            new Object[]{2, "BB"});
+        Arrays.asList(new Object[]{1, "AA"}, new Object[]{2, "BB"}, new Object[]{3, "aa"}, new Object[]{3, "aa"},
+            new Object[]{4, "bb"}, new Object[]{5, "cc"});
     Assert.assertEquals(resultRows.size(), expectedRows.size());
     for (int i = 0; i < resultRows.size(); i++) {
       Assert.assertEquals(resultRows.get(i), expectedRows.get(i));
@@ -82,7 +80,7 @@ public class UnionAllOperatorTest {
         .buildWithError(ErrorMseBlock.fromException(new RuntimeException("Error in right operator")));
 
     UnionAllOperator unionAllOperator =
-        new UnionAllOperator(OperatorTestUtil.getTracingContext(), ImmutableList.of(leftOperator, rightOperator),
+        new UnionAllOperator(OperatorTestUtil.getTracingContext(), List.of(leftOperator, rightOperator),
             schema);
     MseBlock result = unionAllOperator.nextBlock();
     // Keep calling nextBlock until we get an EoS block
@@ -105,7 +103,7 @@ public class UnionAllOperatorTest {
         .buildWithEos();
 
     UnionAllOperator unionAllOperator =
-        new UnionAllOperator(OperatorTestUtil.getTracingContext(), ImmutableList.of(leftOperator, rightOperator),
+        new UnionAllOperator(OperatorTestUtil.getTracingContext(), List.of(leftOperator, rightOperator),
             schema);
     MseBlock result = unionAllOperator.nextBlock();
     // Keep calling nextBlock until we get an EoS block

@@ -18,7 +18,6 @@
  */
 package org.apache.pinot.common.utils.tls;
 
-import com.google.common.collect.ImmutableMap;
 import java.io.File;
 import java.io.IOException;
 import java.io.InputStream;
@@ -55,6 +54,7 @@ import nl.altindag.ssl.trustmanager.HotSwappableX509ExtendedTrustManager;
 import nl.altindag.ssl.trustmanager.UnsafeX509ExtendedTrustManager;
 import org.apache.commons.io.FileUtils;
 import org.apache.pinot.common.config.TlsConfig;
+import org.apache.pinot.common.utils.NamedThreadFactory;
 import org.testng.annotations.AfterMethod;
 import org.testng.annotations.BeforeMethod;
 import org.testng.annotations.Test;
@@ -82,15 +82,18 @@ public class RenewableTlsUtilsTest {
   private static final String DEFAULT_TEST_TLS_DIR
       = new File(FileUtils.getTempDirectoryPath(), "test-tls-dir" + System.currentTimeMillis()).getAbsolutePath();
   private static final String KEY_NAME_ALIAS = "mykey";
+  private static final long SSL_FACTORY_RELOAD_TIMEOUT_MS = 5000L;
+  private static final long SSL_FACTORY_RELOAD_POLL_INTERVAL_MS = 100L;
 
   private static final String TLS_KEYSTORE_FILE_PATH = DEFAULT_TEST_TLS_DIR + "/" + TLS_KEYSTORE_FILE;
   private static final String TLS_TRUSTSTORE_FILE_PATH = DEFAULT_TEST_TLS_DIR + "/" + TLS_TRUSTSTORE_FILE;
+  private static final String SSL_RELOAD_THREAD_PREFIX = "ssl-reload-test";
 
   @BeforeMethod
   public void setUp()
       throws IOException, URISyntaxException {
     copyResourceFilesToTempFolder(
-        ImmutableMap.of(TLS_KEYSTORE_FILE, TLS_KEYSTORE_FILE, TLS_TRUSTSTORE_FILE, TLS_TRUSTSTORE_FILE));
+        Map.of(TLS_KEYSTORE_FILE, TLS_KEYSTORE_FILE, TLS_TRUSTSTORE_FILE, TLS_TRUSTSTORE_FILE));
   }
 
   private static void copyResourceFilesToTempFolder(Map<String, String> srcAndDestFileMap)
@@ -108,8 +111,6 @@ public class RenewableTlsUtilsTest {
         Path destinationPath = Paths.get(DEFAULT_TEST_TLS_DIR, entry.getValue());
         // Use Files.copy to copy the file to the destination folder
         Files.copy(resourceStream, destinationPath, StandardCopyOption.REPLACE_EXISTING);
-      } catch (IOException e) {
-        e.printStackTrace(); // Handle the exception as needed
       }
     }
   }
@@ -184,7 +185,8 @@ public class RenewableTlsUtilsTest {
 
     // Start a new thread to reload the ssl factory when the tls files change
     // Avoid early finalization by not using Executors.newSingleThreadExecutor (java <= 20, JDK-8145304)
-    ExecutorService executorService = Executors.newFixedThreadPool(1);
+    ExecutorService executorService = Executors.newFixedThreadPool(1,
+            new NamedThreadFactory(SSL_RELOAD_THREAD_PREFIX, true));
     executorService.execute(
         () -> {
           try {
@@ -195,6 +197,7 @@ public class RenewableTlsUtilsTest {
           }
         });
     updateTlsFilesAndWaitForSslFactoryToBeRenewed();
+    waitForTlsMaterialChange(sslFactory, privateKey, certForPrivateKey, acceptedIssuerForCert);
     executorService.shutdown();
 
     // after tls file update, the returned values should be the same, since the wrapper is the same
@@ -344,24 +347,41 @@ public class RenewableTlsUtilsTest {
     return tlsConfig;
   }
 
+  private void waitForTlsMaterialChange(SSLFactory sslFactory, PrivateKey privateKey, Certificate certForPrivateKey,
+      X509Certificate acceptedIssuerForCert)
+      throws InterruptedException {
+    long deadline = System.currentTimeMillis() + SSL_FACTORY_RELOAD_TIMEOUT_MS;
+    while (System.currentTimeMillis() < deadline) {
+      X509ExtendedKeyManager keyManager = sslFactory.getKeyManager().orElseThrow();
+      X509ExtendedTrustManager trustManager = sslFactory.getTrustManager().orElseThrow();
+      boolean keyChanged = !privateKey.equals(keyManager.getPrivateKey(KEY_NAME_ALIAS));
+      boolean certChanged = !certForPrivateKey.equals(keyManager.getCertificateChain(KEY_NAME_ALIAS)[0]);
+      boolean issuerChanged = !acceptedIssuerForCert.equals(trustManager.getAcceptedIssuers()[0]);
+      if (keyChanged && certChanged && issuerChanged) {
+        return;
+      }
+      Thread.sleep(SSL_FACTORY_RELOAD_POLL_INTERVAL_MS);
+    }
+    fail("SSLFactory was not reloaded with updated TLS material within " + SSL_FACTORY_RELOAD_TIMEOUT_MS + "ms");
+  }
+
   private void updateTlsFilesAndWaitForSslFactoryToBeRenewed()
       throws IOException, URISyntaxException, InterruptedException {
-    WatchService watchService = FileSystems.getDefault().newWatchService();
-    Map<WatchKey, Set<Path>> watchKeyPathMap = new HashMap<>();
-    RenewableTlsUtils.registerFile(watchService, watchKeyPathMap, TLS_KEYSTORE_FILE_PATH);
-    RenewableTlsUtils.registerFile(watchService, watchKeyPathMap, TLS_TRUSTSTORE_FILE_PATH);
+    try (WatchService watchService = FileSystems.getDefault().newWatchService()) {
+      Map<WatchKey, Set<Path>> watchKeyPathMap = new HashMap<>();
+      RenewableTlsUtils.registerFile(watchService, watchKeyPathMap, TLS_KEYSTORE_FILE_PATH);
+      RenewableTlsUtils.registerFile(watchService, watchKeyPathMap, TLS_TRUSTSTORE_FILE_PATH);
 
-    // wait for the new thread to start
-    Thread.sleep(100);
+      // wait for the new thread to start
+      Thread.sleep(100);
 
-    // update tls files
-    copyResourceFilesToTempFolder(
-        ImmutableMap.of(TLS_KEYSTORE_UPDATED_FILE, TLS_KEYSTORE_FILE, TLS_TRUSTSTORE_UPDATED_FILE,
-            TLS_TRUSTSTORE_FILE));
+      // update tls files
+      copyResourceFilesToTempFolder(
+          Map.of(TLS_KEYSTORE_UPDATED_FILE, TLS_KEYSTORE_FILE, TLS_TRUSTSTORE_UPDATED_FILE,
+              TLS_TRUSTSTORE_FILE));
 
-    // wait for the file change event to be detected
-    watchService.take();
-    // it will take some time for the thread to be notified and reload the ssl factory
-    Thread.sleep(500);
+      // wait for the file change event to be detected
+      watchService.take();
+    }
   }
 }

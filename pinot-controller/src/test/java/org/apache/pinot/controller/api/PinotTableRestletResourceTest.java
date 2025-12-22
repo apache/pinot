@@ -21,7 +21,6 @@ package org.apache.pinot.controller.api;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.node.ObjectNode;
-import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.Lists;
 import java.io.IOException;
 import java.net.URLEncoder;
@@ -262,8 +261,8 @@ public class PinotTableRestletResourceTest extends ControllerTest {
     DEFAULT_INSTANCE.addDummySchema(rawTableName);
     // Failed to create a table
     TableConfig tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName(rawTableName).setTaskConfig(
-        new TableTaskConfig(ImmutableMap.of(MinionConstants.SegmentGenerationAndPushTask.TASK_TYPE,
-            ImmutableMap.of(PinotTaskManager.SCHEDULE_KEY, "* * * * * * *")))).build();
+        new TableTaskConfig(Map.of(MinionConstants.SegmentGenerationAndPushTask.TASK_TYPE,
+            Map.of(PinotTaskManager.SCHEDULE_KEY, "* * * * * * *")))).build();
     try {
       sendPostRequest(_createTableUrl, tableConfig.toJsonString());
       fail("Creation of an OFFLINE table with an invalid cron expression does not fail");
@@ -274,8 +273,8 @@ public class PinotTableRestletResourceTest extends ControllerTest {
 
     // Succeed to create a table
     tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName(rawTableName).setTaskConfig(
-        new TableTaskConfig(ImmutableMap.of(MinionConstants.SegmentGenerationAndPushTask.TASK_TYPE,
-            ImmutableMap.of(PinotTaskManager.SCHEDULE_KEY, "0 */10 * ? * * *")))).build();
+        new TableTaskConfig(Map.of(MinionConstants.SegmentGenerationAndPushTask.TASK_TYPE,
+            Map.of(PinotTaskManager.SCHEDULE_KEY, "0 */10 * ? * * *")))).build();
     try {
       String response = sendPostRequest(_createTableUrl, tableConfig.toJsonString());
       assertEquals(response,
@@ -287,8 +286,8 @@ public class PinotTableRestletResourceTest extends ControllerTest {
 
     // Failed to update the table
     tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName(rawTableName).setTaskConfig(
-        new TableTaskConfig(ImmutableMap.of(MinionConstants.SegmentGenerationAndPushTask.TASK_TYPE,
-            ImmutableMap.of(PinotTaskManager.SCHEDULE_KEY, "5 5 5 5 5 5 5")))).build();
+        new TableTaskConfig(Map.of(MinionConstants.SegmentGenerationAndPushTask.TASK_TYPE,
+            Map.of(PinotTaskManager.SCHEDULE_KEY, "5 5 5 5 5 5 5")))).build();
     try {
       sendPutRequest(DEFAULT_INSTANCE.getControllerRequestURLBuilder().forUpdateTableConfig(rawTableName),
           tableConfig.toJsonString());
@@ -1067,7 +1066,7 @@ public class PinotTableRestletResourceTest extends ControllerTest {
     DEFAULT_INSTANCE.addDummySchema(tableName);
 
     TableConfig offlineTableConfig = getOfflineTableBuilder(tableName)
-        .setTaskConfig(new TableTaskConfig(ImmutableMap.of(
+        .setTaskConfig(new TableTaskConfig(Map.of(
             MinionConstants.SegmentGenerationAndPushTask.TASK_TYPE, Map.of("schedule", "0 0 * * * ? *"))))
         .build();
 
@@ -1100,8 +1099,8 @@ public class PinotTableRestletResourceTest extends ControllerTest {
     DEFAULT_INSTANCE.addDummySchema(tableName);
 
     TableConfig offlineTableConfig = getOfflineTableBuilder(tableName)
-        .setTaskConfig(new TableTaskConfig(ImmutableMap.of(
-            MinionConstants.SegmentGenerationAndPushTask.TASK_TYPE, ImmutableMap.of())))
+        .setTaskConfig(new TableTaskConfig(Map.of(
+            MinionConstants.SegmentGenerationAndPushTask.TASK_TYPE, Map.of())))
         .build();
 
     // Should succeed when no dangling tasks exist
@@ -1120,9 +1119,9 @@ public class PinotTableRestletResourceTest extends ControllerTest {
     DEFAULT_INSTANCE.addDummySchema(tableName);
 
     TableConfig offlineTableConfig = getOfflineTableBuilder(tableName)
-        .setTaskConfig(new TableTaskConfig(ImmutableMap.of(
+        .setTaskConfig(new TableTaskConfig(Map.of(
             MinionConstants.SegmentGenerationAndPushTask.TASK_TYPE,
-            ImmutableMap.of(PinotTaskManager.SCHEDULE_KEY, "0 */10 * ? * * *",
+            Map.of(PinotTaskManager.SCHEDULE_KEY, "0 */10 * ? * * *",
                 CommonConstants.TABLE_NAME, tableName + "_OFFLINE"))))
         .build();
 
@@ -1181,9 +1180,9 @@ public class PinotTableRestletResourceTest extends ControllerTest {
     DEFAULT_INSTANCE.addDummySchema(tableName);
 
     TableConfig offlineTableConfig = getOfflineTableBuilder(tableName)
-        .setTaskConfig(new TableTaskConfig(ImmutableMap.of(
+        .setTaskConfig(new TableTaskConfig(Map.of(
             MinionConstants.SegmentGenerationAndPushTask.TASK_TYPE,
-            ImmutableMap.of(PinotTaskManager.SCHEDULE_KEY, "0 */10 * ? * * *",
+            Map.of(PinotTaskManager.SCHEDULE_KEY, "0 */10 * ? * * *",
                 CommonConstants.TABLE_NAME, tableName + "_OFFLINE"))))
         .build();
 
@@ -1231,9 +1230,9 @@ public class PinotTableRestletResourceTest extends ControllerTest {
     DEFAULT_INSTANCE.addDummySchema(tableName);
 
     TableConfig offlineTableConfig = getOfflineTableBuilder(tableName)
-        .setTaskConfig(new TableTaskConfig(ImmutableMap.of(
+        .setTaskConfig(new TableTaskConfig(Map.of(
             MinionConstants.SegmentGenerationAndPushTask.TASK_TYPE,
-            ImmutableMap.of(PinotTaskManager.SCHEDULE_KEY, "0 */10 * ? * * *",
+            Map.of(PinotTaskManager.SCHEDULE_KEY, "0 */10 * ? * * *",
                 CommonConstants.TABLE_NAME, tableName + "_OFFLINE"))))
         .build();
 

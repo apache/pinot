@@ -55,6 +55,8 @@ public interface InstanceDataManagerConfig {
 
   int getMaxParallelRefreshThreads();
 
+  boolean isAsyncSegmentRefreshEnabled();
+
   int getMaxSegmentPreloadThreads();
 
   int getMaxParallelSegmentBuilds();
@@ -88,4 +90,6 @@ public interface InstanceDataManagerConfig {
   boolean isUploadSegmentToDeepStore();
 
   boolean shouldCheckCRCOnSegmentLoad();
+
+  boolean isDimensionTablePreloadDisabled();
 }

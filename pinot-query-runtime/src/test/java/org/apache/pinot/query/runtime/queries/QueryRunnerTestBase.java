@@ -173,7 +173,7 @@ public abstract class QueryRunnerTestBase extends QueryTestSet {
     }
     QueryExecutionContext executionContext =
         new QueryExecutionContext(QueryExecutionContext.QueryType.MSE, requestId, cid, workloadName, startTimeMs,
-            activeDeadlineMs, passiveDeadlineMs, "brokerId", "brokerId");
+            activeDeadlineMs, passiveDeadlineMs, "brokerId", "brokerId", "");
     QueryThreadContext.MseWorkerInfo mseWorkerInfo = new QueryThreadContext.MseWorkerInfo(0, 0);
     try (QueryThreadContext ignore = QueryThreadContext.open(executionContext, mseWorkerInfo,
         ThreadAccountantUtils.getNoOpAccountant())) {
@@ -306,6 +306,9 @@ public abstract class QueryRunnerTestBase extends QueryTestSet {
             "Got unexpected value type: " + value.getClass() + " for BYTES column, expected: String or byte[]");
         return value;
       case INT_ARRAY:
+        if (value instanceof List) {
+          return ((List) value).stream().mapToInt(i -> (int) i).toArray();
+        }
         if (value instanceof JdbcArray) {
           try {
             Object[] array = (Object[]) ((JdbcArray) value).getArray();

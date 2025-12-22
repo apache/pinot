@@ -487,10 +487,10 @@ public class BenchmarkAggregateGroupByOrderByQueriesSSE {
    * This can be particularly useful to test statistical aggregation functions.
    * @see StatisticalQueriesTest for an example use case.
    */
-  protected BrokerResponseNative getBrokerResponseForOptimizedQuery(
-      @Language("sql") String query, @Nullable TableConfig config, @Nullable Schema schema) {
+  protected BrokerResponseNative getBrokerResponseForOptimizedQuery(@Language("sql") String query,
+      @Nullable Schema schema) {
     PinotQuery pinotQuery = CalciteSqlParser.compileToPinotQuery(query);
-    OPTIMIZER.optimize(pinotQuery, config, schema);
+    OPTIMIZER.optimize(pinotQuery, schema);
     return getBrokerResponse(pinotQuery, PLAN_MAKER);
   }
 

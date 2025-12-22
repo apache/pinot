@@ -100,6 +100,15 @@ public class HelixInstanceDataManagerConfig implements InstanceDataManagerConfig
   //
   public static final String MAX_PARALLEL_REFRESH_THREADS = "max.parallel.refresh.threads";
 
+  // Whether to process SEGMENT_REFRESH in a synchronous or asynchronous manner when the messaged is received.
+  // Defaults to false, meaning SEGMENT_REFRESH will be processed in a synchronous manner.
+  public static final String ENABLE_ASYNC_SEGMENT_REFRESH = "enable.async.segment.refresh";
+  private static final boolean DEFAULT_ENABLE_ASYNC_SEGMENT_REFRESH = false;
+
+  // Whether to disable preloading for dimension tables. Preload Enabled by default.
+  public static final String DISABLE_DIMENSION_TABLE_PRELOAD = "disable.dimension.table.preload";
+  private static final boolean DEFAULT_DISABLE_DIMENSION_TABLE_PRELOAD = false;
+
   // To preload segments of table using upsert in parallel for fast upsert metadata recovery.
   private static final String MAX_SEGMENT_PRELOAD_THREADS = "max.segment.preload.threads";
 
@@ -253,6 +262,11 @@ public class HelixInstanceDataManagerConfig implements InstanceDataManagerConfig
   }
 
   @Override
+  public boolean isAsyncSegmentRefreshEnabled() {
+    return _serverConfig.getProperty(ENABLE_ASYNC_SEGMENT_REFRESH, DEFAULT_ENABLE_ASYNC_SEGMENT_REFRESH);
+  }
+
+  @Override
   public int getMaxSegmentPreloadThreads() {
     return _serverConfig.getProperty(MAX_SEGMENT_PRELOAD_THREADS, 0);
   }
@@ -338,5 +352,11 @@ public class HelixInstanceDataManagerConfig implements InstanceDataManagerConfig
   @Override
   public boolean shouldCheckCRCOnSegmentLoad() {
     return _serverConfig.getProperty(CHECK_CRC_ON_SEGMENT_LOAD, DEFAULT_CHECK_CRC_ON_SEGMENT_LOAD);
+  }
+
+  @Override
+  public boolean isDimensionTablePreloadDisabled() {
+    return _serverConfig.getProperty(DISABLE_DIMENSION_TABLE_PRELOAD,
+        DEFAULT_DISABLE_DIMENSION_TABLE_PRELOAD);
   }
 }

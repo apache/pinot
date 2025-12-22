@@ -18,15 +18,17 @@
  */
 package org.apache.pinot.controller.helix.core.rebalance;
 
+import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import com.google.common.base.Preconditions;
 import io.swagger.annotations.ApiModel;
 import io.swagger.annotations.ApiModelProperty;
 import java.util.Objects;
-import org.apache.pinot.controller.api.resources.ForceCommitBatchConfig;
+import org.apache.pinot.controller.api.resources.BatchConfig;
 import org.apache.pinot.spi.utils.Enablement;
 
 
+@JsonIgnoreProperties(ignoreUnknown = true)
 @ApiModel
 public class RebalanceConfig {
   public static final int DISABLE_BATCH_SIZE_PER_SERVER = -1;
@@ -165,16 +167,16 @@ public class RebalanceConfig {
   private boolean _forceCommit = false;
 
   @JsonProperty("forceCommitBatchSize")
-  @ApiModelProperty(example = ForceCommitBatchConfig.DEFAULT_BATCH_SIZE + "")
-  private int _forceCommitBatchSize = ForceCommitBatchConfig.DEFAULT_BATCH_SIZE;
+  @ApiModelProperty(example = BatchConfig.DEFAULT_BATCH_SIZE + "")
+  private int _forceCommitBatchSize = BatchConfig.DEFAULT_BATCH_SIZE;
 
   @JsonProperty("forceCommitBatchStatusCheckIntervalMs")
-  @ApiModelProperty(example = ForceCommitBatchConfig.DEFAULT_STATUS_CHECK_INTERVAL_SEC * 1000 + "")
-  private int _forceCommitBatchStatusCheckIntervalMs = ForceCommitBatchConfig.DEFAULT_STATUS_CHECK_INTERVAL_SEC * 1000;
+  @ApiModelProperty(example = BatchConfig.DEFAULT_STATUS_CHECK_INTERVAL_SEC * 1000 + "")
+  private int _forceCommitBatchStatusCheckIntervalMs = BatchConfig.DEFAULT_STATUS_CHECK_INTERVAL_SEC * 1000;
 
   @JsonProperty("forceCommitBatchStatusCheckTimeoutMs")
-  @ApiModelProperty(example = ForceCommitBatchConfig.DEFAULT_STATUS_CHECK_TIMEOUT_SEC * 1000 + "")
-  private int _forceCommitBatchStatusCheckTimeoutMs = ForceCommitBatchConfig.DEFAULT_STATUS_CHECK_TIMEOUT_SEC * 1000;
+  @ApiModelProperty(example = BatchConfig.DEFAULT_STATUS_CHECK_TIMEOUT_SEC * 1000 + "")
+  private int _forceCommitBatchStatusCheckTimeoutMs = BatchConfig.DEFAULT_STATUS_CHECK_TIMEOUT_SEC * 1000;
 
   public boolean isDryRun() {
     return _dryRun;
