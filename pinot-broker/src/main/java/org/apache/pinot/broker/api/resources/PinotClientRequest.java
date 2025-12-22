@@ -158,7 +158,7 @@ public class PinotClientRequest {
       }
       BrokerResponse brokerResponse = executeSqlQuery(requestJson, makeHttpIdentity(requestContext), true, httpHeaders);
       brokerResponse.emitBrokerResponseMetrics(_brokerMetrics);
-      asyncResponse.resume(getPinotQueryResponse(brokerResponse, httpHeaders));
+      asyncResponse.resume(getPinotQueryResponse(brokerResponse, httpHeaders, _brokerMetrics));
     } catch (WebApplicationException wae) {
       _brokerMetrics.addMeteredGlobalValue(BrokerMeter.WEB_APPLICATION_EXCEPTIONS, 1L);
       asyncResponse.resume(wae);
@@ -195,7 +195,7 @@ public class PinotClientRequest {
           executeSqlQuery((ObjectNode) requestJson, makeHttpIdentity(requestContext), false, httpHeaders, false,
               getCursor, numRows);
       brokerResponse.emitBrokerResponseMetrics(_brokerMetrics);
-      asyncResponse.resume(getPinotQueryResponse(brokerResponse, httpHeaders));
+      asyncResponse.resume(getPinotQueryResponse(brokerResponse, httpHeaders, _brokerMetrics));
     } catch (WebApplicationException wae) {
       _brokerMetrics.addMeteredGlobalValue(BrokerMeter.WEB_APPLICATION_EXCEPTIONS, 1L);
       asyncResponse.resume(wae);
@@ -266,7 +266,7 @@ public class PinotClientRequest {
       BrokerResponse brokerResponse =
           executeSqlQuery(requestJson, makeHttpIdentity(requestContext), true, httpHeaders, true);
       brokerResponse.emitBrokerResponseMetrics(_brokerMetrics);
-      asyncResponse.resume(getPinotQueryResponse(brokerResponse, httpHeaders));
+      asyncResponse.resume(getPinotQueryResponse(brokerResponse, httpHeaders, _brokerMetrics));
     } catch (WebApplicationException wae) {
       _brokerMetrics.addMeteredGlobalValue(BrokerMeter.WEB_APPLICATION_EXCEPTIONS, 1L);
       asyncResponse.resume(wae);
@@ -303,7 +303,7 @@ public class PinotClientRequest {
           executeSqlQuery((ObjectNode) requestJson, makeHttpIdentity(requestContext), false, httpHeaders, true,
               getCursor, numRows);
       brokerResponse.emitBrokerResponseMetrics(_brokerMetrics);
-      asyncResponse.resume(getPinotQueryResponse(brokerResponse, httpHeaders));
+      asyncResponse.resume(getPinotQueryResponse(brokerResponse, httpHeaders, _brokerMetrics));
     } catch (WebApplicationException wae) {
       _brokerMetrics.addMeteredGlobalValue(BrokerMeter.WEB_APPLICATION_EXCEPTIONS, 1L);
       asyncResponse.resume(wae);
@@ -659,7 +659,8 @@ public class PinotClientRequest {
    * @throws Exception
    */
   @VisibleForTesting
-  public static Response getPinotQueryResponse(BrokerResponse brokerResponse, HttpHeaders httpHeaders)
+  public static Response getPinotQueryResponse(BrokerResponse brokerResponse, HttpHeaders httpHeaders,
+      BrokerMetrics brokerMetrics)
       throws Exception {
     int queryErrorCodeHeaderValue = -1; // default value of the header.
     Response.Status httpStatus = Response.Status.OK;
@@ -694,8 +695,7 @@ public class PinotClientRequest {
         .entity((StreamingOutput) outputStream -> {
           CountingOutputStream countingOutputStream = new CountingOutputStream(outputStream);
           brokerResponse.toOutputStream(countingOutputStream);
-          BrokerMetrics.get()
-              .addMeteredGlobalValue(BrokerMeter.QUERY_RESPONSE_SIZE_BYTES, countingOutputStream.getCount());
+          brokerMetrics.addMeteredGlobalValue(BrokerMeter.QUERY_RESPONSE_SIZE_BYTES, countingOutputStream.getCount());
         })
         .build();
   }

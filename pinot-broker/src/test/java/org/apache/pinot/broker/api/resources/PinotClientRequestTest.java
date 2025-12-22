@@ -47,7 +47,6 @@ import org.glassfish.grizzly.http.server.Request;
 import org.mockito.ArgumentCaptor;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
-import org.mockito.MockedStatic;
 import org.mockito.MockitoAnnotations;
 import org.testng.Assert;
 import org.testng.annotations.BeforeMethod;
@@ -93,7 +92,8 @@ public class PinotClientRequestTest {
 
     // for successful query result the 'X-Pinot-Error-Code' should be -1
     BrokerResponse emptyResultBrokerResponse = BrokerResponseNative.EMPTY_RESULT;
-    Response successfulResponse = PinotClientRequest.getPinotQueryResponse(emptyResultBrokerResponse, _httpHeaders);
+    Response successfulResponse =
+        PinotClientRequest.getPinotQueryResponse(emptyResultBrokerResponse, _httpHeaders, _brokerMetrics);
     assertEquals(successfulResponse.getStatus(), Response.Status.OK.getStatusCode());
     Assert.assertTrue(successfulResponse.getHeaders().containsKey(PINOT_QUERY_ERROR_CODE_HEADER));
     assertEquals(successfulResponse.getHeaders().get(PINOT_QUERY_ERROR_CODE_HEADER).size(), 1);
@@ -102,7 +102,7 @@ public class PinotClientRequestTest {
     // for failed query result the 'X-Pinot-Error-Code' should be Error code fo exception.
     BrokerResponse tableDoesNotExistBrokerResponse = BrokerResponseNative.TABLE_DOES_NOT_EXIST;
     Response tableDoesNotExistResponse =
-        PinotClientRequest.getPinotQueryResponse(tableDoesNotExistBrokerResponse, _httpHeaders);
+        PinotClientRequest.getPinotQueryResponse(tableDoesNotExistBrokerResponse, _httpHeaders, _brokerMetrics);
     assertEquals(tableDoesNotExistResponse.getStatus(), Response.Status.OK.getStatusCode());
     Assert.assertTrue(tableDoesNotExistResponse.getHeaders().containsKey(PINOT_QUERY_ERROR_CODE_HEADER));
     assertEquals(tableDoesNotExistResponse.getHeaders().get(PINOT_QUERY_ERROR_CODE_HEADER).size(), 1);
@@ -114,7 +114,7 @@ public class PinotClientRequestTest {
     when(_httpHeaders.getHeaderString(
         CommonConstants.Broker.USE_HTTP_STATUS_FOR_ERRORS_HEADER)).thenReturn("true");
     Response tableDoesNotExistResponseWithHttpResponseCode =
-        PinotClientRequest.getPinotQueryResponse(tableDoesNotExistBrokerResponse, _httpHeaders);
+        PinotClientRequest.getPinotQueryResponse(tableDoesNotExistBrokerResponse, _httpHeaders, _brokerMetrics);
     assertEquals(tableDoesNotExistResponseWithHttpResponseCode.getStatus(), Response.Status.NOT_FOUND.getStatusCode());
     Assert.assertTrue(
         tableDoesNotExistResponseWithHttpResponseCode.getHeaders().containsKey(PINOT_QUERY_ERROR_CODE_HEADER));
@@ -292,30 +292,23 @@ public class PinotClientRequestTest {
     rows.add(new Object[]{"value2", 200});
     brokerResponse.setResultTable(new ResultTable(dataSchema, rows));
 
-    // Mock BrokerMetrics.get() to return our mock
-    BrokerMetrics mockBrokerMetrics = mock(BrokerMetrics.class);
+    // Get the response
+    Response response = PinotClientRequest.getPinotQueryResponse(brokerResponse, _httpHeaders, _brokerMetrics);
+    assertEquals(response.getStatus(), Response.Status.OK.getStatusCode());
 
-    try (MockedStatic<BrokerMetrics> mockedStatic = mockStatic(BrokerMetrics.class)) {
-      mockedStatic.when(BrokerMetrics::get).thenReturn(mockBrokerMetrics);
+    // Write the response to capture the size
+    StreamingOutput streamingOutput = (StreamingOutput) response.getEntity();
+    ByteArrayOutputStream outputStream = new ByteArrayOutputStream();
+    streamingOutput.write(outputStream);
 
-      // Get the response
-      Response response = PinotClientRequest.getPinotQueryResponse(brokerResponse, _httpHeaders);
-      assertEquals(response.getStatus(), Response.Status.OK.getStatusCode());
+    // Verify the metric was recorded with the correct size
+    long expectedSize = outputStream.size();
+    Assert.assertTrue(expectedSize > 0, "Response size should be greater than 0");
 
-      // Write the response to capture the size
-      StreamingOutput streamingOutput = (StreamingOutput) response.getEntity();
-      ByteArrayOutputStream outputStream = new ByteArrayOutputStream();
-      streamingOutput.write(outputStream);
-
-      // Verify the metric was recorded with the correct size
-      long expectedSize = outputStream.size();
-      Assert.assertTrue(expectedSize > 0, "Response size should be greater than 0");
-
-      // Verify addMeteredGlobalValue was called with QUERY_RESPONSE_SIZE_BYTES and the correct size
-      ArgumentCaptor<Long> sizeCaptor = ArgumentCaptor.forClass(Long.class);
-      verify(mockBrokerMetrics).addMeteredGlobalValue(eq(BrokerMeter.QUERY_RESPONSE_SIZE_BYTES), sizeCaptor.capture());
-      assertEquals(sizeCaptor.getValue().longValue(), expectedSize,
-          "Metric should record the actual response size in bytes");
-    }
+    // Verify addMeteredGlobalValue was called with QUERY_RESPONSE_SIZE_BYTES and the correct size
+    ArgumentCaptor<Long> sizeCaptor = ArgumentCaptor.forClass(Long.class);
+    verify(_brokerMetrics).addMeteredGlobalValue(eq(BrokerMeter.QUERY_RESPONSE_SIZE_BYTES), sizeCaptor.capture());
+    assertEquals(sizeCaptor.getValue().longValue(), expectedSize,
+        "Metric should record the actual response size in bytes");
   }
 }
