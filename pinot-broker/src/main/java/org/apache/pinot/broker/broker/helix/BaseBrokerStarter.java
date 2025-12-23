@@ -379,6 +379,7 @@ public abstract class BaseBrokerStarter implements ServiceStartable {
         org.apache.pinot.spi.config.instance.InstanceType.BROKER);
     _threadAccountant.startWatcherTask();
 
+    // TODO: Hook multiClusterRoutingContext into request handlers subsequently.
     MultiClusterRoutingContext multiClusterRoutingContext = getMultiClusterRoutingContext();
 
     // Create Broker request handler.
