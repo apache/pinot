@@ -52,6 +52,10 @@ import org.apache.pinot.spi.utils.CommonConstants.Broker.PlannerRuleNames;
  * Default rule sets for Pinot query
  * Defaultly disabled rules are defined in
  * {@link org.apache.pinot.spi.utils.CommonConstants.Broker#DEFAULT_DISABLED_RULES}
+ *
+ * TODO: This class started as a list of constant rule sets, but since then we have added dynamic rule generation
+ *   to it as well. We should probably refactor the class to make it easier to understand, maintain and change the rules
+ *   based on contextual information like query options.
  */
 public class PinotQueryRuleSets {
   private PinotQueryRuleSets() {
