@@ -22,7 +22,7 @@ import java.lang.reflect.Field;
 import java.util.Collections;
 import java.util.List;
 import javax.ws.rs.core.HttpHeaders;
-import org.apache.pinot.broker.routing.BrokerRoutingManager;
+import org.apache.pinot.broker.routing.manager.BrokerRoutingManager;
 import org.apache.pinot.common.request.BrokerRequest;
 import org.apache.pinot.core.routing.RoutingTable;
 import org.mockito.ArgumentCaptor;
