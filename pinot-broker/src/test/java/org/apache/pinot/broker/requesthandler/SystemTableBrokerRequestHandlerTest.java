@@ -155,6 +155,26 @@ public class SystemTableBrokerRequestHandlerTest {
     assertEquals(response.getTotalDocs(), 2);
   }
 
+  @Test
+  public void testUnsupportedFeaturesIncludeDetails()
+      throws Exception {
+    SystemTableRegistry.register(new FakeTablesProvider());
+
+    TableCache tableCache = Mockito.mock(TableCache.class);
+    Mockito.when(tableCache.getColumnNameMap(anyString())).thenReturn(null);
+    Mockito.when(tableCache.getSchema(anyString())).thenReturn(null);
+
+    SystemTableBrokerRequestHandler handler =
+        new SystemTableBrokerRequestHandler(new PinotConfiguration(), "testBrokerId",
+            new BrokerRequestIdGenerator(), null, ACCESS_CONTROL_FACTORY, null, tableCache,
+            ThreadAccountantUtils.getNoOpAccountant());
+
+    BrokerResponse response = handler.handleRequest("SELECT tableName FROM system.tables ORDER BY tableName");
+    assertEquals(response.getExceptionsSize(), 1);
+    String message = ((BrokerResponseNative) response).getExceptions().get(0).getMessage();
+    Assert.assertTrue(message.contains("ORDER BY"), message);
+  }
+
   private static class FakeTablesProvider implements SystemTableDataProvider {
     private final Schema _schema = new Schema.SchemaBuilder().setSchemaName("system.tables")
         .addSingleValueDimension("tableName", FieldSpec.DataType.STRING)

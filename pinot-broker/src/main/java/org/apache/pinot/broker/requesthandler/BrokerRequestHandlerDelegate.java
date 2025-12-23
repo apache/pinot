@@ -41,15 +41,17 @@ import org.apache.pinot.spi.utils.CommonConstants.Broker.Request;
 import org.apache.pinot.sql.parsers.CalciteSqlParser;
 import org.apache.pinot.sql.parsers.SqlNodeAndOptions;
 import org.apache.pinot.tsdb.spi.series.TimeSeriesBlock;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 
 /**
  * {@code BrokerRequestHandlerDelegate} delegates the inbound broker request to one of the enabled
- * {@link BrokerRequestHandler} based on the requested handle type.
- *
- * {@see: @CommonConstant
+ * {@link BrokerRequestHandler} implementations based on the request type.
  */
 public class BrokerRequestHandlerDelegate implements BrokerRequestHandler {
+  private static final Logger LOGGER = LoggerFactory.getLogger(BrokerRequestHandlerDelegate.class);
+
   private final BaseSingleStageBrokerRequestHandler _singleStageBrokerRequestHandler;
   private final SystemTableBrokerRequestHandler _systemTableBrokerRequestHandler;
   private final MultiStageBrokerRequestHandler _multiStageBrokerRequestHandler;
@@ -117,13 +119,15 @@ public class BrokerRequestHandlerDelegate implements BrokerRequestHandler {
     if (_systemTableBrokerRequestHandler != null) {
       try {
         // NOTE: compileToPinotQuery(SqlNodeAndOptions) mutates the SqlNode (e.g. SqlOrderBy -> SqlSelect).
-        // Re-parse from raw SQL so the SqlNodeAndOptions passed to the handler is unchanged (important for MSE).
+        // Re-parse from raw SQL so the SqlNodeAndOptions passed to the handler is unchanged (important for
+        // Multi-Stage Engine (MSE)).
         JsonNode sql = request.get(Request.SQL);
         String sqlQuery =
             (sql != null && sql.isTextual()) ? sql.asText() : sqlNodeAndOptions.getSqlNode().toString();
         tableNames = RequestUtils.getTableNames(CalciteSqlParser.compileToPinotQuery(sqlQuery));
       } catch (Exception e) {
         // Ignore compilation exceptions here; the selected request handler will surface them appropriately.
+        LOGGER.debug("Failed to compile query while determining request handler", e);
       }
     }
     BaseBrokerRequestHandler requestHandler = _singleStageBrokerRequestHandler;
@@ -176,7 +180,7 @@ public class BrokerRequestHandlerDelegate implements BrokerRequestHandler {
       throws Exception {
     if (_multiStageBrokerRequestHandler != null && _multiStageBrokerRequestHandler.cancelQuery(
         queryId, timeoutMs, executor, connMgr, serverResponses)) {
-        return true;
+      return true;
     }
     return _singleStageBrokerRequestHandler.cancelQuery(queryId, timeoutMs, executor, connMgr, serverResponses);
   }

@@ -20,10 +20,6 @@ package org.apache.pinot.common.systemtable.provider;
 
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import com.fasterxml.jackson.annotation.JsonProperty;
-import java.net.URI;
-import java.net.http.HttpClient;
-import java.net.http.HttpRequest;
-import java.net.http.HttpResponse;
 import java.time.Duration;
 import java.util.ArrayList;
 import java.util.Comparator;
@@ -31,10 +27,11 @@ import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+import java.util.Properties;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.function.Function;
-import java.util.stream.Collectors;
 import javax.annotation.Nullable;
 import org.apache.helix.HelixAdmin;
 import org.apache.pinot.common.config.provider.TableCache;
@@ -48,6 +45,7 @@ import org.apache.pinot.spi.config.table.TableType;
 import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.data.readers.GenericRow;
+import org.apache.pinot.spi.exception.BadQueryRequestException;
 import org.apache.pinot.spi.systemtable.SystemTable;
 import org.apache.pinot.spi.utils.InstanceTypeUtils;
 import org.apache.pinot.spi.utils.JsonUtils;
@@ -65,7 +63,19 @@ import org.slf4j.LoggerFactory;
 public final class TablesSystemTableProvider implements SystemTableDataProvider {
   private static final Logger LOGGER = LoggerFactory.getLogger(TablesSystemTableProvider.class);
   public static final String TABLE_NAME = "system.tables";
-  private static final long SIZE_CACHE_TTL_MS = Duration.ofMinutes(1).toMillis();
+  private static final String PINOT_ADMIN_CLIENT_CLASS_NAME = "org.apache.pinot.client.admin.PinotAdminClient";
+  private static final String SIZE_CACHE_TTL_MS_PROPERTY = "pinot.systemtable.tables.sizeCacheTtlMs";
+  private static final long DEFAULT_SIZE_CACHE_TTL_MS = Duration.ofMinutes(1).toMillis();
+  private static final long SIZE_CACHE_TTL_MS = getNonNegativeLongProperty(SIZE_CACHE_TTL_MS_PROPERTY,
+      DEFAULT_SIZE_CACHE_TTL_MS);
+
+  private static final String CONTROLLER_TIMEOUT_MS_PROPERTY = "pinot.systemtable.tables.controllerTimeoutMs";
+  private static final long DEFAULT_CONTROLLER_TIMEOUT_MS = Duration.ofSeconds(5).toMillis();
+  private static final long CONTROLLER_TIMEOUT_MS = getPositiveLongProperty(CONTROLLER_TIMEOUT_MS_PROPERTY,
+      DEFAULT_CONTROLLER_TIMEOUT_MS);
+
+  private static final String ADMIN_TRANSPORT_REQUEST_TIMEOUT_MS = "pinot.admin.request.timeout.ms";
+  private static final String ADMIN_TRANSPORT_SCHEME = "pinot.admin.scheme";
 
   private static final Schema SCHEMA = new Schema.SchemaBuilder().setSchemaName(TABLE_NAME)
       .addSingleValueDimension("tableName", FieldSpec.DataType.STRING)
@@ -82,25 +92,16 @@ public final class TablesSystemTableProvider implements SystemTableDataProvider 
       .addSingleValueDimension("tableConfig", FieldSpec.DataType.STRING)
       .build();
 
-  private static final boolean IS_ADMIN_CLIENT_AVAILABLE;
-  static {
-    boolean available;
-    try {
-      Class.forName("org.apache.pinot.client.admin.PinotAdminClient");
-      available = true;
-    } catch (ClassNotFoundException e) {
-      available = false;
-    }
-    IS_ADMIN_CLIENT_AVAILABLE = available;
-  }
+  private static final @Nullable Class<?> PINOT_ADMIN_CLIENT_CLASS = loadAdminClientClass();
 
   private final TableCache _tableCache;
   private final @Nullable HelixAdmin _helixAdmin;
   private final @Nullable String _clusterName;
-  private final HttpClient _httpClient;
   private final @Nullable Function<String, TableSize> _tableSizeFetcherOverride;
   private final List<String> _staticControllerUrls;
   private final Map<String, CachedSize> _sizeCache = new ConcurrentHashMap<>();
+  private final Map<String, AutoCloseable> _adminClientCache = new ConcurrentHashMap<>();
+  private final AtomicBoolean _loggedSizeFetchFailure = new AtomicBoolean();
 
   public TablesSystemTableProvider() {
     this(null, null, null, null, null);
@@ -124,7 +125,6 @@ public final class TablesSystemTableProvider implements SystemTableDataProvider 
     _tableCache = tableCache;
     _helixAdmin = helixAdmin;
     _clusterName = clusterName;
-    _httpClient = HttpClient.newBuilder().connectTimeout(Duration.ofSeconds(5)).build();
     _tableSizeFetcherOverride = tableSizeFetcherOverride;
     _staticControllerUrls = controllerUrls != null ? new ArrayList<>(controllerUrls) : List.of();
   }
@@ -145,10 +145,21 @@ public final class TablesSystemTableProvider implements SystemTableDataProvider 
   }
 
   @Override
+  public void close()
+      throws Exception {
+    for (Map.Entry<String, AutoCloseable> entry : _adminClientCache.entrySet()) {
+      try {
+        entry.getValue().close();
+      } catch (Exception e) {
+        LOGGER.debug("Failed to close admin client for {}: {}", entry.getKey(), e.toString());
+      }
+    }
+    _adminClientCache.clear();
+  }
+
+  @Override
   public BrokerResponseNative getBrokerResponse(PinotQuery pinotQuery) {
-    List<String> projectionColumns = pinotQuery.getSelectList() != null
-        ? pinotQuery.getSelectList().stream().map(expr -> expr.getIdentifier().getName()).collect(Collectors.toList())
-        : List.of();
+    List<String> projectionColumns = getProjectionColumns(pinotQuery);
     if (_tableCache == null) {
       return SystemTableResponseUtils.buildBrokerResponse(TABLE_NAME, SCHEMA, projectionColumns, List.of(), 0);
     }
@@ -164,8 +175,35 @@ public final class TablesSystemTableProvider implements SystemTableDataProvider 
     int offset = Math.max(0, pinotQuery.getOffset());
     int limit = pinotQuery.getLimit();
     boolean hasLimit = limit > 0;
+    org.apache.pinot.common.request.Expression filterExpression = pinotQuery.getFilterExpression();
+    List<String> controllerBaseUrls = getControllerBaseUrls();
+    Function<String, TableSize> sizeFetcher = getSizeFetcher();
+
+    if (filterExpression == null) {
+      int totalRows = sortedTableNames.size();
+      int startIndex = Math.min(offset, totalRows);
+      int endIndex = totalRows;
+      if (limit == 0) {
+        endIndex = startIndex;
+      } else if (hasLimit) {
+        endIndex = Math.min(totalRows, startIndex + limit);
+      }
+      List<GenericRow> rows = new ArrayList<>(Math.max(0, endIndex - startIndex));
+      for (int i = startIndex; i < endIndex; i++) {
+        String tableNameWithType = sortedTableNames.get(i);
+        TableType tableType = TableNameBuilder.getTableTypeFromTableName(tableNameWithType);
+        if (tableType == null) {
+          continue;
+        }
+        String rawTableName = TableNameBuilder.extractRawTableName(tableNameWithType);
+        TableStats stats = buildStats(tableNameWithType, tableType, sizeFetcher, controllerBaseUrls);
+        rows.add(buildRow(rawTableName, stats));
+      }
+      return SystemTableResponseUtils.buildBrokerResponse(TABLE_NAME, SCHEMA, projectionColumns, rows, totalRows);
+    }
+
     int totalRows = 0;
-    int initialCapacity = hasLimit ? Math.min(sortedTableNames.size(), limit) : 0;
+    int initialCapacity = hasLimit ? Math.min(sortedTableNames.size(), limit) : sortedTableNames.size();
     List<GenericRow> rows = new ArrayList<>(initialCapacity);
     for (String tableNameWithType : sortedTableNames) {
       TableType tableType = TableNameBuilder.getTableTypeFromTableName(tableNameWithType);
@@ -173,41 +211,44 @@ public final class TablesSystemTableProvider implements SystemTableDataProvider 
         continue;
       }
       String rawTableName = TableNameBuilder.extractRawTableName(tableNameWithType);
-      TableStats stats = buildStats(tableNameWithType, tableType);
-      if (!matchesFilter(pinotQuery.getFilterExpression(), stats, rawTableName)) {
-        continue;
-      }
-      if (offset > 0) {
-        offset--;
-        totalRows++;
+      TableStats stats = buildStats(tableNameWithType, tableType, sizeFetcher, controllerBaseUrls);
+      if (!matchesFilter(filterExpression, stats, rawTableName)) {
         continue;
       }
       totalRows++;
+      if (totalRows <= offset) {
+        continue;
+      }
       if (limit == 0) {
         continue;
       }
       if (hasLimit && rows.size() >= limit) {
         continue;
       }
-      GenericRow row = new GenericRow();
-      row.putValue("tableName", rawTableName);
-      row.putValue("type", stats._type);
-      row.putValue("status", stats._status);
-      row.putValue("segments", stats._segments);
-      row.putValue("totalDocs", stats._totalDocs);
-      row.putValue("reportedSize", stats._reportedSizeInBytes);
-      row.putValue("estimatedSize", stats._estimatedSizeInBytes);
-      row.putValue("storageTier", stats._storageTier);
-      row.putValue("brokerTenant", stats._brokerTenant);
-      row.putValue("serverTenant", stats._serverTenant);
-      row.putValue("replicas", stats._replicas);
-      row.putValue("tableConfig", stats._tableConfig);
-      rows.add(row);
+      rows.add(buildRow(rawTableName, stats));
     }
     return SystemTableResponseUtils.buildBrokerResponse(TABLE_NAME, SCHEMA, projectionColumns, rows, totalRows);
   }
 
-  private TableStats buildStats(String tableNameWithType, TableType tableType) {
+  private GenericRow buildRow(String rawTableName, TableStats stats) {
+    GenericRow row = new GenericRow();
+    row.putValue("tableName", rawTableName);
+    row.putValue("type", stats._type);
+    row.putValue("status", stats._status);
+    row.putValue("segments", stats._segments);
+    row.putValue("totalDocs", stats._totalDocs);
+    row.putValue("reportedSize", stats._reportedSizeInBytes);
+    row.putValue("estimatedSize", stats._estimatedSizeInBytes);
+    row.putValue("storageTier", stats._storageTier);
+    row.putValue("brokerTenant", stats._brokerTenant);
+    row.putValue("serverTenant", stats._serverTenant);
+    row.putValue("replicas", stats._replicas);
+    row.putValue("tableConfig", stats._tableConfig);
+    return row;
+  }
+
+  private TableStats buildStats(String tableNameWithType, TableType tableType,
+      @Nullable Function<String, TableSize> tableSizeFetcher, List<String> controllerBaseUrls) {
     TableConfig tableConfig = _tableCache.getTableConfig(tableNameWithType);
     int segments = 0;
     long totalDocs = 0;
@@ -226,7 +267,7 @@ public final class TablesSystemTableProvider implements SystemTableDataProvider 
       replicas = repl != null ? repl : replicas;
     }
     // Use controller API only
-    TableSize sizeFromController = fetchTableSize(tableNameWithType);
+    TableSize sizeFromController = fetchTableSize(tableNameWithType, tableSizeFetcher, controllerBaseUrls);
     if (sizeFromController != null) {
       if (sizeFromController._reportedSizeInBytes >= 0) {
         reportedSize = sizeFromController._reportedSizeInBytes;
@@ -237,7 +278,7 @@ public final class TablesSystemTableProvider implements SystemTableDataProvider 
       segments = getSegmentCount(sizeFromController, tableType);
       totalDocs = getTotalDocs(sizeFromController, tableType);
     }
-    String status = tableConfig != null ? "ONLINE" : (segments > 0 ? "ONLINE" : "UNKNOWN");
+    String status = (tableConfig != null || segments > 0) ? "ONLINE" : "UNKNOWN";
     String tableConfigJson = "";
     if (tableConfig != null) {
       try {
@@ -421,17 +462,20 @@ public final class TablesSystemTableProvider implements SystemTableDataProvider 
     }
   }
 
-  private @Nullable TableSize fetchTableSize(String tableNameWithType) {
-    TableSize cached = getCachedSize(tableNameWithType);
+  private @Nullable TableSize fetchTableSize(String tableNameWithType,
+      @Nullable Function<String, TableSize> fetcher, List<String> controllerBaseUrls) {
+    boolean cacheEnabled = SIZE_CACHE_TTL_MS > 0;
+    TableSize cached = cacheEnabled ? getCachedSize(tableNameWithType) : null;
     if (cached != null) {
       return cached;
     }
-    Function<String, TableSize> fetcher = getSizeFetcher();
     if (fetcher != null) {
       try {
         TableSize fetched = fetcher.apply(tableNameWithType);
         if (fetched != null) {
-          cacheSize(tableNameWithType, fetched);
+          if (cacheEnabled) {
+            cacheSize(tableNameWithType, fetched);
+          }
           return fetched;
         }
       } catch (Exception e) {
@@ -439,46 +483,58 @@ public final class TablesSystemTableProvider implements SystemTableDataProvider 
       }
     }
     String rawTableName = TableNameBuilder.extractRawTableName(tableNameWithType);
-    TableSize size = fetchTableSizeForName(rawTableName);
+    TableSize size = fetchTableSizeForName(controllerBaseUrls, rawTableName);
     if (size == null) {
-      size = fetchTableSizeForName(tableNameWithType);
+      size = fetchTableSizeForName(controllerBaseUrls, tableNameWithType);
       if (size == null) {
-        LOGGER.warn("{}: failed to fetch size for {} (raw: {}), returning null", TABLE_NAME, tableNameWithType,
-            rawTableName);
+        logSizeFetchFailure("{}: failed to fetch size for {} from controllers {} (tried '{}' and '{}')", TABLE_NAME,
+            tableNameWithType, controllerBaseUrls, rawTableName, tableNameWithType);
       }
     }
-    if (size != null) {
+    if (size != null && cacheEnabled) {
       cacheSize(tableNameWithType, size);
     }
     return size;
   }
 
-  private @Nullable TableSize fetchTableSizeForName(String tableName) {
-    for (String baseUrl : getControllerBaseUrls()) {
+  private @Nullable TableSize fetchTableSizeForName(List<String> controllerBaseUrls, String tableName) {
+    Class<?> clientClass = PINOT_ADMIN_CLIENT_CLASS;
+    if (clientClass == null) {
+      return null;
+    }
+    for (String baseUrl : controllerBaseUrls) {
       try {
-        String url = baseUrl + "/tables/" + tableName + "/size?verbose=true&includeReplacedSegments=false";
-        HttpRequest request = HttpRequest.newBuilder(URI.create(url))
-            .timeout(Duration.ofSeconds(5))
-            .GET()
-            .header("Accept", "application/json")
-            .build();
-        HttpResponse<String> response = _httpClient.send(request, HttpResponse.BodyHandlers.ofString());
-        if (response.statusCode() >= 200 && response.statusCode() < 300) {
-          TableSize parsed = JsonUtils.stringToObject(response.body(), TableSize.class);
-          LOGGER.debug("{}: controller size response for {} via {} -> segments offline={}, realtime={}, "
-                  + "reportedSize={}, estimatedSize={}", TABLE_NAME, tableName, baseUrl,
-              parsed._offlineSegments != null && parsed._offlineSegments._segments != null
-                  ? parsed._offlineSegments._segments.size() : 0,
-              parsed._realtimeSegments != null && parsed._realtimeSegments._segments != null
-                  ? parsed._realtimeSegments._segments.size() : 0,
-              parsed._reportedSizeInBytes, parsed._estimatedSizeInBytes);
-          return parsed;
-        } else {
-          LOGGER.warn("{}: failed to fetch table size for {} via {}: status {}, body={}", TABLE_NAME, tableName,
-              baseUrl, response.statusCode(), response.body());
+        AutoCloseable adminClient = getOrCreateAdminClient(baseUrl);
+        if (adminClient == null) {
+          continue;
         }
+
+        Object sizeNode;
+        try {
+          sizeNode = clientClass.getMethod("getTableSize", String.class, boolean.class, boolean.class)
+              .invoke(adminClient, tableName, true, false);
+        } catch (NoSuchMethodException e) {
+          Object tableClient = clientClass.getMethod("getTableClient").invoke(adminClient);
+          sizeNode = tableClient.getClass().getMethod("getTableSize", String.class, boolean.class, boolean.class)
+              .invoke(tableClient, tableName, true, false);
+        }
+
+        if (sizeNode == null) {
+          continue;
+        }
+
+        TableSize parsed = JsonUtils.stringToObject(sizeNode.toString(), TableSize.class);
+        LOGGER.debug("{}: controller size response for {} via {} -> segments offline={}, realtime={}, "
+                + "reportedSize={}, estimatedSize={}", TABLE_NAME, tableName, baseUrl,
+            parsed._offlineSegments != null && parsed._offlineSegments._segments != null
+                ? parsed._offlineSegments._segments.size() : 0,
+            parsed._realtimeSegments != null && parsed._realtimeSegments._segments != null
+                ? parsed._realtimeSegments._segments.size() : 0,
+            parsed._reportedSizeInBytes, parsed._estimatedSizeInBytes);
+        return parsed;
       } catch (Exception e) {
-        LOGGER.warn("{}: error fetching table size for {} via {}", TABLE_NAME, tableName, baseUrl, e);
+        logSizeFetchFailure("{}: error fetching table size for {} via {} using admin client", TABLE_NAME, tableName,
+            baseUrl, e);
       }
     }
     return null;
@@ -533,11 +589,7 @@ public final class TablesSystemTableProvider implements SystemTableDataProvider 
     if (_tableSizeFetcherOverride != null) {
       return _tableSizeFetcherOverride;
     }
-    List<String> controllers = getControllerBaseUrls();
-    if (controllers.isEmpty() || !isAdminClientAvailable()) {
-      return null;
-    }
-    return tableNameWithType -> fetchWithAdminClient(controllers, tableNameWithType);
+    return null;
   }
 
   private List<String> discoverControllersFromHelix() {
@@ -559,10 +611,11 @@ public final class TablesSystemTableProvider implements SystemTableDataProvider 
           if (!host.isEmpty() && !port.isEmpty()) {
             urls.add(host + ":" + port);
           } else {
-            LOGGER.warn("Unable to parse controller address from instance id (empty host/port): {}", controllerId);
+            LOGGER.warn("Unable to parse controller address from instance id (empty host or port): {}", controllerId);
           }
         } else {
-          LOGGER.warn("Unable to parse controller address from instance id: {}", controllerId);
+          LOGGER.warn("Unable to parse controller address from instance id '{}' (expected 'Controller_<host>_<port>')",
+              controllerId);
         }
       }
     } catch (Exception e) {
@@ -571,44 +624,28 @@ public final class TablesSystemTableProvider implements SystemTableDataProvider 
     return urls;
   }
 
-  private boolean isAdminClientAvailable() {
-    if (!IS_ADMIN_CLIENT_AVAILABLE) {
-      LOGGER.debug("PinotAdminClient not on classpath; falling back to HTTP for table size fetch");
+  private @Nullable AutoCloseable getOrCreateAdminClient(String controllerBaseUrl) {
+    Class<?> clientClass = PINOT_ADMIN_CLIENT_CLASS;
+    if (clientClass == null) {
+      return null;
     }
-    return IS_ADMIN_CLIENT_AVAILABLE;
-  }
-
-  private @Nullable TableSize fetchWithAdminClient(List<String> controllers, String tableNameWithType) {
-    String rawTableName = TableNameBuilder.extractRawTableName(tableNameWithType);
-    for (String controller : controllers) {
-      AutoCloseable adminClient = null;
+    String normalized = normalizeControllerUrl(controllerBaseUrl);
+    if (normalized == null) {
+      return null;
+    }
+    return _adminClientCache.computeIfAbsent(normalized, controller -> {
       try {
-        Class<?> clientClass = Class.forName("org.apache.pinot.client.admin.PinotAdminClient");
         String controllerAddress = stripScheme(controller);
-        adminClient = (AutoCloseable) clientClass.getConstructor(String.class).newInstance(controllerAddress);
-        Object tableClient = clientClass.getMethod("getTableClient").invoke(adminClient);
-        Object sizeNode =
-            tableClient.getClass().getMethod("getTableSize", String.class, boolean.class, boolean.class)
-                .invoke(tableClient, rawTableName, true, false);
-        if (sizeNode != null) {
-          return JsonUtils.stringToObject(sizeNode.toString(), TableSize.class);
-        }
-      } catch (ClassNotFoundException e) {
-        return null;
+        Properties properties = new Properties();
+        properties.setProperty(ADMIN_TRANSPORT_REQUEST_TIMEOUT_MS, String.valueOf(CONTROLLER_TIMEOUT_MS));
+        properties.setProperty(ADMIN_TRANSPORT_SCHEME, controller.startsWith("https://") ? "https" : "http");
+        return (AutoCloseable) clientClass.getConstructor(String.class, Properties.class)
+            .newInstance(controllerAddress, properties);
       } catch (Exception e) {
-        LOGGER.warn("Failed to fetch table size for {} from controller {} via admin client: {}", rawTableName,
-            controller, e.toString());
-      } finally {
-        if (adminClient != null) {
-          try {
-            adminClient.close();
-          } catch (Exception e) {
-            LOGGER.debug("Failed to close admin client for {}: {}", controller, e.toString());
-          }
-        }
+        LOGGER.warn("Failed to create admin client for {}: {}", controller, e.toString());
+        return null;
       }
-    }
-    return null;
+    });
   }
 
   private static String normalizeControllerUrl(@Nullable String controllerUrl) {
@@ -698,7 +735,91 @@ public final class TablesSystemTableProvider implements SystemTableDataProvider 
     public long _totalDocs = 0;
   }
 
+  private static @Nullable Class<?> loadAdminClientClass() {
+    try {
+      return Class.forName(PINOT_ADMIN_CLIENT_CLASS_NAME);
+    } catch (ClassNotFoundException e) {
+      return null;
+    }
+  }
+
+  private static long getPositiveLongProperty(String key, long defaultValue) {
+    long value = Long.getLong(key, defaultValue);
+    return value > 0 ? value : defaultValue;
+  }
+
+  private static long getNonNegativeLongProperty(String key, long defaultValue) {
+    long value = Long.getLong(key, defaultValue);
+    return value >= 0 ? value : defaultValue;
+  }
+
+  private void logSizeFetchFailure(String message, Object... args) {
+    if (_loggedSizeFetchFailure.compareAndSet(false, true)) {
+      LOGGER.warn(message, args);
+    } else {
+      LOGGER.debug(message, args);
+    }
+  }
+
+  private static List<String> getProjectionColumns(PinotQuery pinotQuery) {
+    List<org.apache.pinot.common.request.Expression> selectList = pinotQuery.getSelectList();
+    if (selectList == null || selectList.isEmpty()) {
+      throw new BadQueryRequestException("System tables require a projection list");
+    }
+    List<String> projections = new ArrayList<>();
+    boolean hasStar = false;
+    for (org.apache.pinot.common.request.Expression expression : selectList) {
+      org.apache.pinot.common.request.Identifier identifier = expression.getIdentifier();
+      if (identifier != null) {
+        if ("*".equals(identifier.getName())) {
+          hasStar = true;
+        } else {
+          projections.add(identifier.getName());
+        }
+        continue;
+      }
+      org.apache.pinot.common.request.Function function = expression.getFunctionCall();
+      if (function != null && "AS".equalsIgnoreCase(function.getOperator()) && function.getOperandsSize() > 0) {
+        org.apache.pinot.common.request.Identifier aliased = function.getOperands().get(0).getIdentifier();
+        if (aliased != null) {
+          projections.add(aliased.getName());
+          continue;
+        }
+      }
+      throw new BadQueryRequestException("System tables only support column projections or '*': " + expression);
+    }
+    if (hasStar || projections.isEmpty()) {
+      projections = new ArrayList<>(SCHEMA.getColumnNames());
+    }
+    return normalizeProjectionColumns(projections);
+  }
+
+  private static List<String> normalizeProjectionColumns(List<String> projectionColumns) {
+    List<String> normalized = new ArrayList<>(projectionColumns.size());
+    for (String column : projectionColumns) {
+      if (SCHEMA.hasColumn(column)) {
+        normalized.add(column);
+        continue;
+      }
+      String matched = null;
+      for (String schemaColumn : SCHEMA.getColumnNames()) {
+        if (schemaColumn.equalsIgnoreCase(column)) {
+          matched = schemaColumn;
+          break;
+        }
+      }
+      if (matched == null) {
+        throw new BadQueryRequestException("Unknown column in system table: " + column);
+      }
+      normalized.add(matched);
+    }
+    return normalized;
+  }
+
   private @Nullable TableSize getCachedSize(String tableNameWithType) {
+    if (SIZE_CACHE_TTL_MS <= 0) {
+      return null;
+    }
     CachedSize cached = _sizeCache.get(tableNameWithType);
     if (cached == null) {
       return null;
@@ -711,6 +832,9 @@ public final class TablesSystemTableProvider implements SystemTableDataProvider 
   }
 
   private void cacheSize(String tableNameWithType, TableSize size) {
+    if (SIZE_CACHE_TTL_MS <= 0) {
+      return;
+    }
     _sizeCache.put(tableNameWithType, new CachedSize(size, System.currentTimeMillis()));
   }
 

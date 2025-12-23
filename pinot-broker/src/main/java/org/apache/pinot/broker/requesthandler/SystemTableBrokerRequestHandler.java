@@ -156,10 +156,11 @@ public class SystemTableBrokerRequestHandler extends BaseBrokerRequestHandler {
       return BrokerResponseNative.TABLE_DOES_NOT_EXIST;
     }
     try {
-      if (!isSupportedSystemTableQuery(pinotQuery)) {
+      String unsupportedFeatures = getUnsupportedFeatures(pinotQuery);
+      if (unsupportedFeatures != null) {
         requestContext.setErrorCode(QueryErrorCode.QUERY_VALIDATION);
         return new BrokerResponseNative(QueryErrorCode.QUERY_VALIDATION,
-            "System tables only support simple projection/filter/limit queries");
+            "System tables do not support: " + unsupportedFeatures);
       }
       BrokerResponseNative brokerResponse = provider.getBrokerResponse(pinotQuery);
       if (CollectionUtils.isEmpty(brokerResponse.getTablesQueried())) {
@@ -180,9 +181,24 @@ public class SystemTableBrokerRequestHandler extends BaseBrokerRequestHandler {
     }
   }
 
-  private boolean isSupportedSystemTableQuery(PinotQuery pinotQuery) {
-    return (pinotQuery.getGroupByList() == null || pinotQuery.getGroupByList().isEmpty())
-        && pinotQuery.getHavingExpression() == null
-        && (pinotQuery.getOrderByList() == null || pinotQuery.getOrderByList().isEmpty());
+  @Nullable
+  private String getUnsupportedFeatures(PinotQuery pinotQuery) {
+    StringBuilder unsupported = new StringBuilder();
+    if (pinotQuery.getGroupByList() != null && !pinotQuery.getGroupByList().isEmpty()) {
+      unsupported.append("GROUP BY");
+    }
+    if (pinotQuery.getHavingExpression() != null) {
+      if (unsupported.length() != 0) {
+        unsupported.append(", ");
+      }
+      unsupported.append("HAVING");
+    }
+    if (pinotQuery.getOrderByList() != null && !pinotQuery.getOrderByList().isEmpty()) {
+      if (unsupported.length() != 0) {
+        unsupported.append(", ");
+      }
+      unsupported.append("ORDER BY");
+    }
+    return unsupported.length() == 0 ? null : unsupported.toString();
   }
 }

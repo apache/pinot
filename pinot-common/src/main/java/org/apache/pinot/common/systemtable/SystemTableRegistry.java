@@ -20,12 +20,11 @@ package org.apache.pinot.common.systemtable;
 
 import java.util.Collection;
 import java.util.Collections;
+import java.util.HashMap;
 import java.util.IdentityHashMap;
 import java.util.Locale;
 import java.util.Map;
-import java.util.Optional;
 import java.util.Set;
-import java.util.concurrent.ConcurrentHashMap;
 import javax.annotation.Nullable;
 import org.apache.helix.HelixAdmin;
 import org.apache.pinot.common.config.provider.TableCache;
@@ -41,26 +40,36 @@ import org.slf4j.LoggerFactory;
 public final class SystemTableRegistry {
   private static final Logger LOGGER = LoggerFactory.getLogger(SystemTableRegistry.class);
 
-  private static final Map<String, SystemTableDataProvider> PROVIDERS = new ConcurrentHashMap<>();
+  // Providers are registered once at broker startup.
+  private static final Map<String, SystemTableDataProvider> PROVIDERS = new HashMap<>();
 
   private SystemTableRegistry() {
     throw new UnsupportedOperationException("This is a utility class and cannot be instantiated");
   }
 
   public static void register(SystemTableDataProvider provider) {
-    PROVIDERS.put(normalize(provider.getTableName()), provider);
+    synchronized (PROVIDERS) {
+      PROVIDERS.put(normalize(provider.getTableName()), provider);
+    }
   }
 
-  public static @Nullable SystemTableDataProvider get(String tableName) {
-    return PROVIDERS.get(normalize(tableName));
+  @Nullable
+  public static SystemTableDataProvider get(String tableName) {
+    synchronized (PROVIDERS) {
+      return PROVIDERS.get(normalize(tableName));
+    }
   }
 
   public static boolean isRegistered(String tableName) {
-    return PROVIDERS.containsKey(normalize(tableName));
+    synchronized (PROVIDERS) {
+      return PROVIDERS.containsKey(normalize(tableName));
+    }
   }
 
   public static Collection<SystemTableDataProvider> getProviders() {
-    return Collections.unmodifiableCollection(PROVIDERS.values());
+    synchronized (PROVIDERS) {
+      return Collections.unmodifiableCollection(new java.util.ArrayList<>(PROVIDERS.values()));
+    }
   }
 
   /**
@@ -75,15 +84,16 @@ public final class SystemTableRegistry {
       if (!SystemTableDataProvider.class.isAssignableFrom(clazz)) {
         continue;
       }
-      Optional<SystemTableDataProvider> instantiated = instantiateProvider(
+      SystemTableDataProvider provider = instantiateProvider(
           clazz.asSubclass(SystemTableDataProvider.class), tableCache, helixAdmin, clusterName);
-      instantiated.ifPresent(provider -> {
-        if (isRegistered(provider.getTableName())) {
-          return;
-        }
-        LOGGER.info("Registering system table provider: {}", provider.getTableName());
-        register(provider);
-      });
+      if (provider == null) {
+        continue;
+      }
+      if (isRegistered(provider.getTableName())) {
+        continue;
+      }
+      LOGGER.info("Registering system table provider: {}", provider.getTableName());
+      register(provider);
     }
   }
 
@@ -92,8 +102,10 @@ public final class SystemTableRegistry {
     Exception firstException = null;
     // Snapshot providers to avoid concurrent modifications and to close each provider at most once.
     Map<SystemTableDataProvider, Boolean> providersToClose = new IdentityHashMap<>();
-    for (SystemTableDataProvider provider : PROVIDERS.values()) {
-      providersToClose.put(provider, Boolean.TRUE);
+    synchronized (PROVIDERS) {
+      for (SystemTableDataProvider provider : PROVIDERS.values()) {
+        providersToClose.put(provider, Boolean.TRUE);
+      }
     }
     try {
       for (SystemTableDataProvider provider : providersToClose.keySet()) {
@@ -108,7 +120,9 @@ public final class SystemTableRegistry {
         }
       }
     } finally {
-      PROVIDERS.clear();
+      synchronized (PROVIDERS) {
+        PROVIDERS.clear();
+      }
     }
     if (firstException != null) {
       throw firstException;
@@ -126,31 +140,30 @@ public final class SystemTableRegistry {
     return tableName.toLowerCase(Locale.ROOT);
   }
 
-  private static Optional<SystemTableDataProvider> instantiateProvider(Class<? extends SystemTableDataProvider> clazz,
+  private static @Nullable SystemTableDataProvider instantiateProvider(Class<? extends SystemTableDataProvider> clazz,
       TableCache tableCache, HelixAdmin helixAdmin, String clusterName) {
     try {
       // Prefer the most specific constructor available.
       try {
-        return Optional.of(clazz.getDeclaredConstructor(TableCache.class, HelixAdmin.class, String.class)
-            .newInstance(tableCache, helixAdmin, clusterName));
+        return clazz.getDeclaredConstructor(TableCache.class, HelixAdmin.class, String.class)
+            .newInstance(tableCache, helixAdmin, clusterName);
       } catch (NoSuchMethodException ignored) {
         // fall through
       }
       try {
-        return Optional.of(
-            clazz.getDeclaredConstructor(TableCache.class, HelixAdmin.class).newInstance(tableCache, helixAdmin));
+        return clazz.getDeclaredConstructor(TableCache.class, HelixAdmin.class).newInstance(tableCache, helixAdmin);
       } catch (NoSuchMethodException ignored) {
         // fall through
       }
       try {
-        return Optional.of(clazz.getDeclaredConstructor(TableCache.class).newInstance(tableCache));
+        return clazz.getDeclaredConstructor(TableCache.class).newInstance(tableCache);
       } catch (NoSuchMethodException ignored) {
         // fall through
       }
-      return Optional.of(clazz.getDeclaredConstructor().newInstance());
+      return clazz.getDeclaredConstructor().newInstance();
     } catch (Exception e) {
       LOGGER.warn("Failed to instantiate system table provider {}: {}", clazz.getName(), e.toString());
-      return Optional.empty();
+      return null;
     }
   }
 }
