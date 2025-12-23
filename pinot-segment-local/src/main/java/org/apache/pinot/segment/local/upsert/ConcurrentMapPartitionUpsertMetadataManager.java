@@ -21,11 +21,9 @@ package org.apache.pinot.segment.local.upsert;
 import com.google.common.annotations.VisibleForTesting;
 import java.io.IOException;
 import java.util.HashMap;
-import java.util.HashSet;
 import java.util.Iterator;
 import java.util.Map;
 import java.util.Objects;
-import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
@@ -58,7 +56,7 @@ public class ConcurrentMapPartitionUpsertMetadataManager extends BasePartitionUp
   final ConcurrentHashMap<Object, RecordLocation> _primaryKeyToRecordLocationMap = new ConcurrentHashMap<>();
 
   final ConcurrentHashMap<Object, RecordLocation> _previousKeyToRecordLocationMap = new ConcurrentHashMap<>();
-  final Set<Object> _newlyAddedKeys = new HashSet<>();
+  final Map<Object, RecordLocation> _newlyAddedKeys = new ConcurrentHashMap<>();
   public ConcurrentMapPartitionUpsertMetadataManager(String tableNameWithType, int partitionId, UpsertContext context) {
     super(tableNameWithType, partitionId, context);
   }
@@ -94,7 +92,12 @@ public class ConcurrentMapPartitionUpsertMetadataManager extends BasePartitionUp
               if (currentSegment == segment) {
                 if (comparisonResult >= 0) {
                   replaceDocId(segment, validDocIds, queryableDocIds, currentDocId, newDocId, recordInfo);
-                  return new RecordLocation(segment, newDocId, newComparisonValue);
+                  RecordLocation newRecordLocation = new RecordLocation(segment, newDocId, newComparisonValue);
+                  // Track the record location of the newly added keys
+                  if (_newlyAddedKeys.containsKey(primaryKey)) {
+                    _newlyAddedKeys.put(primaryKey, newRecordLocation);
+                  }
+                  return newRecordLocation;
                 } else {
                   return currentRecordLocation;
                 }
@@ -157,8 +160,9 @@ public class ConcurrentMapPartitionUpsertMetadataManager extends BasePartitionUp
             } else {
               // New primary key
               addDocId(segment, validDocIds, queryableDocIds, newDocId, recordInfo);
-              _newlyAddedKeys.add(primaryKey);
-              return new RecordLocation(segment, newDocId, newComparisonValue);
+              RecordLocation newRecordLocation = new RecordLocation(segment, newDocId, newComparisonValue);
+              _newlyAddedKeys.put(primaryKey, newRecordLocation);
+              return newRecordLocation;
             }
           });
     }
@@ -283,10 +287,9 @@ public class ConcurrentMapPartitionUpsertMetadataManager extends BasePartitionUp
 
   @Override
   protected void removeNewlyAddedKeys(IndexSegment oldSegment) {
-    for (Object entry : _newlyAddedKeys) {
-      RecordLocation value = _primaryKeyToRecordLocationMap.get(entry);
-      _primaryKeyToRecordLocationMap.remove(entry);
-      removeDocId(oldSegment, value.getDocId());
+    for (Map.Entry<Object, RecordLocation> entry : _newlyAddedKeys.entrySet()) {
+      _primaryKeyToRecordLocationMap.remove(entry.getKey());
+      removeDocId(oldSegment, entry.getValue().getDocId());
     }
     _newlyAddedKeys.clear();
   }
@@ -315,19 +318,23 @@ public class ConcurrentMapPartitionUpsertMetadataManager extends BasePartitionUp
         (primaryKey, currentRecordLocation) -> {
           if (currentRecordLocation != null) {
             // Existing primary key
-
             IndexSegment currentSegment = currentRecordLocation.getSegment();
             // Update the record location when the new comparison value is greater than or equal to the current value.
             // Update the record location when there is a tie to keep the newer record.
             if (newComparisonValue.compareTo(currentRecordLocation.getComparisonValue()) >= 0) {
               int currentDocId = currentRecordLocation.getDocId();
+              RecordLocation newRecordLocation = new RecordLocation(segment, newDocId, newComparisonValue);
               if (segment == currentSegment) {
                 replaceDocId(segment, validDocIds, queryableDocIds, currentDocId, newDocId, recordInfo);
+                // Track the record location of the newly added keys
+                if (_newlyAddedKeys.containsKey(primaryKey)) {
+                  _newlyAddedKeys.put(primaryKey, newRecordLocation);
+                }
               } else {
                 _previousKeyToRecordLocationMap.put(primaryKey, currentRecordLocation);
                 replaceDocId(segment, validDocIds, queryableDocIds, currentSegment, currentDocId, newDocId, recordInfo);
               }
-              return new RecordLocation(segment, newDocId, newComparisonValue);
+              return newRecordLocation;
             } else {
               if (segment != currentSegment) {
                 _previousKeyToRecordLocationMap.put(primaryKey, currentRecordLocation);
@@ -340,8 +347,9 @@ public class ConcurrentMapPartitionUpsertMetadataManager extends BasePartitionUp
           } else {
             // New primary key
             addDocId(segment, validDocIds, queryableDocIds, newDocId, recordInfo);
-            _newlyAddedKeys.add(primaryKey);
-            return new RecordLocation(segment, newDocId, newComparisonValue);
+            RecordLocation newRecordLocation = new RecordLocation(segment, newDocId, newComparisonValue);
+            _newlyAddedKeys.put(primaryKey, newRecordLocation);
+            return newRecordLocation;
           }
         });
 
