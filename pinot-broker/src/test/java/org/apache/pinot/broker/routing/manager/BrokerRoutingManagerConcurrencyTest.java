@@ -177,7 +177,9 @@ public class BrokerRoutingManagerConcurrencyTest extends ControllerTest {
   private void clearRoutingEntries() {
     // Clear existing routing entries to ensure test isolation
     try {
-      java.lang.reflect.Field routingEntryMapField = BrokerRoutingManager.class.getDeclaredField("_routingEntryMap");
+      // Access the inherited field from the parent class (BaseBrokerRoutingManager)
+      Class<?> baseClass = _routingManager.getClass().getSuperclass();
+      java.lang.reflect.Field routingEntryMapField = baseClass.getDeclaredField("_routingEntryMap");
       routingEntryMapField.setAccessible(true);
       Map<?, ?> routingEntryMap = (Map<?, ?>) routingEntryMapField.get(_routingManager);
       routingEntryMap.clear();
@@ -436,7 +438,9 @@ public class BrokerRoutingManagerConcurrencyTest extends ControllerTest {
     // Set a future last build start time to force skipping the current build call
     long futureStart = System.currentTimeMillis() + 10_000L;
 
-    Field startTimesField = BrokerRoutingManager.class.getDeclaredField("_routingTableBuildStartTimeMs");
+    // Access the field from the parent class (BaseBrokerRoutingManager)
+    Class<?> baseClass = manager.getClass().getSuperclass();
+    Field startTimesField = baseClass.getDeclaredField("_routingTableBuildStartTimeMs");
     startTimesField.setAccessible(true);
     Map<String, Long> startTimes = (Map<String, Long>) startTimesField.get(manager);
     if (startTimes == null) {
@@ -715,8 +719,9 @@ public class BrokerRoutingManagerConcurrencyTest extends ControllerTest {
 
   private Object getRoutingEntry(String tableNameWithType) {
     try {
-      // Use reflection to access the private _routingEntryMap
-      java.lang.reflect.Field field = BrokerRoutingManager.class.getDeclaredField("_routingEntryMap");
+      // Use reflection to access the private _routingEntryMap from the parent class (BaseBrokerRoutingManager)
+      Class<?> baseClass = _routingManager.getClass().getSuperclass();
+      java.lang.reflect.Field field = baseClass.getDeclaredField("_routingEntryMap");
       field.setAccessible(true);
       @SuppressWarnings("unchecked")
       java.util.Map<String, Object> routingEntryMap = (java.util.Map<String, Object>) field.get(_routingManager);
