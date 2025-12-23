@@ -166,6 +166,25 @@ public class StatMap<K extends Enum<K> & StatMap.Key> {
     }
   }
 
+  /// Returns the value associated with the key name.
+  ///
+  /// In general, it is better to use the type-specific getters with the enum key directly, but sometimes it is
+  /// impossible or requires complex to read code (like complex unsafe casts).
+  ///
+  /// @param keyName The name of the key.
+  /// @param defaultValue The default value to return if the key is not found.
+  /// @throws ClassCastException if the value cannot be cast to the same static type as the default value.
+  public <E> E getUnsafe(String keyName, E defaultValue)
+      throws ClassCastException {
+    K[] keys = keys();
+    for (K key : keys) {
+      if (key.name().equals(keyName)) {
+        return (E) getAny(key);
+      }
+    }
+    return defaultValue;
+  }
+
   /**
    * Modifies this object to merge the values of the other object.
    *
@@ -201,11 +220,15 @@ public class StatMap<K extends Enum<K> & StatMap.Key> {
     return this;
   }
 
+  private K[] keys() {
+    return (K[]) KEYS_BY_CLASS.computeIfAbsent(_keyClass, k -> k.getEnumConstants());
+  }
+
   public StatMap<K> merge(DataInput input)
       throws IOException {
     byte serializedKeys = input.readByte();
 
-    K[] keys = (K[]) KEYS_BY_CLASS.computeIfAbsent(_keyClass, k -> k.getEnumConstants());
+    K[] keys = keys();
     for (byte i = 0; i < serializedKeys; i++) {
       int ordinal = input.readByte();
       K key = keys[ordinal];
