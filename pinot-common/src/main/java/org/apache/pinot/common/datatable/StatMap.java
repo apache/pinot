@@ -25,6 +25,7 @@ import java.io.DataOutput;
 import java.io.IOException;
 import java.util.Collections;
 import java.util.EnumMap;
+import java.util.HashMap;
 import java.util.Map;
 import java.util.Objects;
 import java.util.concurrent.ConcurrentHashMap;
@@ -54,6 +55,8 @@ public class StatMap<K extends Enum<K> & StatMap.Key> {
   private final Map<K, Object> _map;
 
   private static final ConcurrentHashMap<Class<?>, Object[]> KEYS_BY_CLASS = new ConcurrentHashMap<>();
+  private static final ConcurrentHashMap<Class<?>, Map<String, Object>> KEYS_BY_STRING_BY_CLASS
+      = new ConcurrentHashMap<>();
 
   public StatMap(Class<K> keyClass) {
     _keyClass = keyClass;
@@ -174,16 +177,15 @@ public class StatMap<K extends Enum<K> & StatMap.Key> {
    *
    * @param keyName The name of the key.
    * @param defaultValue The default value to return if the key is not found.
+   * @throws ClassCastException if the value cannot be cast to the same static type as the default value.
    */
   public <E> E getUnsafe(String keyName, E defaultValue)
       throws ClassCastException {
-    K[] keys = keys();
-    for (K key : keys) {
-      if (key.name().equals(keyName)) {
-        return (E) getAny(key);
-      }
+    K key = getKey(keyName);
+    if (key == null) {
+      return defaultValue;
     }
-    return defaultValue;
+    return (E) getAny(key);
   }
 
   /**
@@ -223,6 +225,19 @@ public class StatMap<K extends Enum<K> & StatMap.Key> {
 
   private K[] keys() {
     return (K[]) KEYS_BY_CLASS.computeIfAbsent(_keyClass, k -> k.getEnumConstants());
+  }
+
+  @Nullable
+  private K getKey(String name) {
+    Map<String, Object> cachedMap = KEYS_BY_STRING_BY_CLASS.computeIfAbsent(_keyClass, k -> {
+      K[] keys = (K[]) k.getEnumConstants();
+      Map<String, Object> mapValue = new HashMap<>();
+      for (K key : keys) {
+        mapValue.put(key.name(), key);
+      }
+      return mapValue;
+    });
+    return (K) cachedMap.get(name);
   }
 
   public StatMap<K> merge(DataInput input)
