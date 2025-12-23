@@ -90,9 +90,11 @@ public class DataTypeColumnTransformer implements ColumnTransformer {
       return DataTypeTransformerUtils.transformValue(columnName, value, _destDataType);
     } catch (Exception e) {
       if (!_continueOnError) {
-        throw new RuntimeException("Caught exception while transforming data type for column: " + columnName, e);
+        throw new RuntimeException("Caught exception while transforming data type for column: " + columnName +
+            " to data type: " + _destDataType, e);
       }
-      _throttledLogger.warn("Caught exception while transforming data type for column: " + columnName, e);
+      _throttledLogger.warn("Caught exception while transforming data type for column: " + columnName +
+          " to data type: " + _destDataType + ". Returning null. Exception: {}", e);
       return null;
     }
   }

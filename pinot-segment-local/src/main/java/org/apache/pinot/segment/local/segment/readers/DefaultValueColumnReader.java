@@ -280,7 +280,7 @@ public class DefaultValueColumnReader implements ColumnReader {
       throw new IllegalStateException("No more values available");
     }
     _currentIndex++;
-    return null;
+    return _defaultStringMV;
   }
 
   @Override
@@ -289,7 +289,7 @@ public class DefaultValueColumnReader implements ColumnReader {
       throw new IllegalStateException("No more values available");
     }
     _currentIndex++;
-    return null;
+    return _defaultBytesMV;
   }
 
   @Override
@@ -305,7 +305,7 @@ public class DefaultValueColumnReader implements ColumnReader {
   @Override
   public boolean isNull(int docId) {
     validateDocId(docId);
-    return true;
+    return _defaultValue == null;
   }
 
   // Single-value accessors
@@ -358,40 +358,36 @@ public class DefaultValueColumnReader implements ColumnReader {
   public MultiValueResult<int[]> getIntMV(int docId) {
     validateDocId(docId);
     return MultiValueResult.of(_defaultIntMV, null);
-
   }
 
   @Override
   public MultiValueResult<long[]> getLongMV(int docId) {
     validateDocId(docId);
     return MultiValueResult.of(_defaultLongMV, null);
-
   }
 
   @Override
   public MultiValueResult<float[]> getFloatMV(int docId) {
     validateDocId(docId);
     return MultiValueResult.of(_defaultFloatMV, null);
-
   }
 
   @Override
   public MultiValueResult<double[]> getDoubleMV(int docId) {
     validateDocId(docId);
     return MultiValueResult.of(_defaultDoubleMV, null);
-
   }
 
   @Override
   public String[] getStringMV(int docId) {
     validateDocId(docId);
-    return null;
+    return _defaultStringMV;
   }
 
   @Override
   public byte[][] getBytesMV(int docId) {
     validateDocId(docId);
-    return null;
+    return _defaultBytesMV;
   }
 
   /**
