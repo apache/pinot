@@ -281,6 +281,10 @@ public class OpChainSchedulerService {
     private final PinotMeter _cpuExecutionTimeMs = ServerMeter.MSE_CPU_EXECUTION_TIME_MS.getGlobalMeter();
     private final PinotMeter _memoryAllocatedBytes = ServerMeter.MSE_MEMORY_ALLOCATED_BYTES.getGlobalMeter();
 
+    private static final String EMITTED_ROWS = "EMITTED_ROWS";
+    private static final String EXECUTION_TIME_MS = "EXECUTION_TIME_MS";
+    private static final String ALLOCATED_MEMORY_BYTES = "ALLOCATED_MEMORY_BYTES";
+
     public void onOpChainStarted() {
       _startedOpchains.mark();
     }
@@ -288,9 +292,9 @@ public class OpChainSchedulerService {
     public void onOpChainFinished(MultiStageOperator rootOperator) {
       _competedOpchains.mark();
       StatMap<?> operatorStats = rootOperator.copyStatMaps();
-      _emittedRows.mark(operatorStats.getUnsafe("EMITTED_ROWS", 0L));
-      _cpuExecutionTimeMs.mark(operatorStats.getUnsafe("EXECUTION_TIME_MS", 0L));
-      _memoryAllocatedBytes.mark(operatorStats.getUnsafe("ALLOCATED_MEMORY_BYTES", 0L));
+      _emittedRows.mark(operatorStats.getUnsafe(EMITTED_ROWS, 0L));
+      _cpuExecutionTimeMs.mark(operatorStats.getUnsafe(EXECUTION_TIME_MS, 0L));
+      _memoryAllocatedBytes.mark(operatorStats.getUnsafe(ALLOCATED_MEMORY_BYTES, 0L));
     }
   }
 }
