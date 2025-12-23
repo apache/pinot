@@ -22,6 +22,7 @@ import java.io.IOException;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.Set;
+import javax.annotation.Nullable;
 import org.apache.pinot.segment.spi.IndexSegment;
 import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.Schema;
@@ -49,6 +50,7 @@ public class PinotSegmentColumnReaderFactory implements ColumnReaderFactory {
   private Schema _targetSchema;
   private Set<String> _colsToRead;
   private Map<String, ColumnReader> _columnReaders;
+  private final boolean _initializeDefaultValueReaders;
 
   /**
    * Create a PinotSegmentColumnReaderFactory.
@@ -56,8 +58,22 @@ public class PinotSegmentColumnReaderFactory implements ColumnReaderFactory {
    * @param indexSegment Source segment to read from
    */
   public PinotSegmentColumnReaderFactory(IndexSegment indexSegment) {
+    this(indexSegment, true);
+  }
+
+  /**
+   * Create a PinotSegmentColumnReaderFactory.
+   *
+   * @param indexSegment Source segment to read from
+   * @param initializeDefaultValueReaders Whether to initialize default value readers for missing columns
+   *           TODO - Ideally this factory shouldn't initialize default value readers.
+   *                  The clients of this factory should decide whether to create default value readers or not.
+   *                  This parameter is kept for backward compatibility and will be removed in future.
+   */
+  public PinotSegmentColumnReaderFactory(IndexSegment indexSegment, boolean initializeDefaultValueReaders) {
     _indexSegment = indexSegment;
     _columnReaders = new HashMap<>();
+    _initializeDefaultValueReaders = initializeDefaultValueReaders;
   }
 
   @Override
@@ -103,21 +119,24 @@ public class PinotSegmentColumnReaderFactory implements ColumnReaderFactory {
    * Internal method to create a column reader for the specified column.
    * This method is called during initialization to create all readers.
    */
+  @Nullable
   private ColumnReader createColumnReader(String columnName, FieldSpec targetFieldSpec) {
     if (targetFieldSpec.isVirtualColumn()) {
       throw new IllegalStateException("Target field spec is a virtual column.");
     }
 
-    ColumnReader columnReader;
+    ColumnReader columnReader = null;
 
     if (hasColumn(columnName)) {
       // Column exists in source segment - create a segment column reader
       LOGGER.debug("Creating segment column reader for existing column: {}", columnName);
       columnReader = new PinotSegmentColumnReaderImpl(_indexSegment, columnName);
     } else {
-      // New column - create a default value reader
-      LOGGER.debug("Creating default value reader for new column: {}", columnName);
-      columnReader = new DefaultValueColumnReader(columnName, getNumDocs(), targetFieldSpec);
+      if (_initializeDefaultValueReaders) {
+        // New column - create a default value reader
+        LOGGER.debug("Creating default value reader for new column: {}", columnName);
+        columnReader = new DefaultValueColumnReader(columnName, getNumDocs(), targetFieldSpec);
+      }
     }
 
     return columnReader;
@@ -146,7 +165,9 @@ public class PinotSegmentColumnReaderFactory implements ColumnReaderFactory {
         continue;
       }
       ColumnReader reader = createColumnReader(columnName, fieldSpec);
-      allReaders.put(columnName, reader);
+      if (reader != null) {
+        allReaders.put(columnName, reader);
+      }
     }
 
     return allReaders;

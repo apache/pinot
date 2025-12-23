@@ -45,7 +45,7 @@ public class PinotSegmentColumnarDataSource implements ColumnarDataSource {
 
   @Override
   public ColumnReaderFactory createColumnReaderFactory() {
-    return new PinotSegmentColumnReaderFactory(_indexSegment);
+    return new PinotSegmentColumnReaderFactory(_indexSegment, false);
   }
 
   @Override
