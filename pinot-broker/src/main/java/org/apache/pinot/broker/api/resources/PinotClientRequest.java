@@ -23,6 +23,7 @@ import com.fasterxml.jackson.databind.node.ObjectNode;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.collect.ArrayListMultimap;
 import com.google.common.collect.Multimap;
+import com.google.common.io.CountingOutputStream;
 import io.swagger.annotations.Api;
 import io.swagger.annotations.ApiKeyAuthDefinition;
 import io.swagger.annotations.ApiOperation;
@@ -157,7 +158,7 @@ public class PinotClientRequest {
       }
       BrokerResponse brokerResponse = executeSqlQuery(requestJson, makeHttpIdentity(requestContext), true, httpHeaders);
       brokerResponse.emitBrokerResponseMetrics(_brokerMetrics);
-      asyncResponse.resume(getPinotQueryResponse(brokerResponse, httpHeaders));
+      asyncResponse.resume(getPinotQueryResponse(brokerResponse, httpHeaders, _brokerMetrics));
     } catch (WebApplicationException wae) {
       _brokerMetrics.addMeteredGlobalValue(BrokerMeter.WEB_APPLICATION_EXCEPTIONS, 1L);
       asyncResponse.resume(wae);
@@ -194,7 +195,7 @@ public class PinotClientRequest {
           executeSqlQuery((ObjectNode) requestJson, makeHttpIdentity(requestContext), false, httpHeaders, false,
               getCursor, numRows);
       brokerResponse.emitBrokerResponseMetrics(_brokerMetrics);
-      asyncResponse.resume(getPinotQueryResponse(brokerResponse, httpHeaders));
+      asyncResponse.resume(getPinotQueryResponse(brokerResponse, httpHeaders, _brokerMetrics));
     } catch (WebApplicationException wae) {
       _brokerMetrics.addMeteredGlobalValue(BrokerMeter.WEB_APPLICATION_EXCEPTIONS, 1L);
       asyncResponse.resume(wae);
@@ -265,7 +266,7 @@ public class PinotClientRequest {
       BrokerResponse brokerResponse =
           executeSqlQuery(requestJson, makeHttpIdentity(requestContext), true, httpHeaders, true);
       brokerResponse.emitBrokerResponseMetrics(_brokerMetrics);
-      asyncResponse.resume(getPinotQueryResponse(brokerResponse, httpHeaders));
+      asyncResponse.resume(getPinotQueryResponse(brokerResponse, httpHeaders, _brokerMetrics));
     } catch (WebApplicationException wae) {
       _brokerMetrics.addMeteredGlobalValue(BrokerMeter.WEB_APPLICATION_EXCEPTIONS, 1L);
       asyncResponse.resume(wae);
@@ -302,7 +303,7 @@ public class PinotClientRequest {
           executeSqlQuery((ObjectNode) requestJson, makeHttpIdentity(requestContext), false, httpHeaders, true,
               getCursor, numRows);
       brokerResponse.emitBrokerResponseMetrics(_brokerMetrics);
-      asyncResponse.resume(getPinotQueryResponse(brokerResponse, httpHeaders));
+      asyncResponse.resume(getPinotQueryResponse(brokerResponse, httpHeaders, _brokerMetrics));
     } catch (WebApplicationException wae) {
       _brokerMetrics.addMeteredGlobalValue(BrokerMeter.WEB_APPLICATION_EXCEPTIONS, 1L);
       asyncResponse.resume(wae);
@@ -658,7 +659,8 @@ public class PinotClientRequest {
    * @throws Exception
    */
   @VisibleForTesting
-  public static Response getPinotQueryResponse(BrokerResponse brokerResponse, HttpHeaders httpHeaders)
+  public static Response getPinotQueryResponse(BrokerResponse brokerResponse, HttpHeaders httpHeaders,
+      BrokerMetrics brokerMetrics)
       throws Exception {
     int queryErrorCodeHeaderValue = -1; // default value of the header.
     Response.Status httpStatus = Response.Status.OK;
@@ -689,7 +691,12 @@ public class PinotClientRequest {
     // returning the Response with appropriate status and header value.
     return Response.status(httpStatus)
         .header(PINOT_QUERY_ERROR_CODE_HEADER, queryErrorCodeHeaderValue)
-        .entity((StreamingOutput) brokerResponse::toOutputStream).type(MediaType.APPLICATION_JSON)
+        .type(MediaType.APPLICATION_JSON)
+        .entity((StreamingOutput) outputStream -> {
+          CountingOutputStream countingOutputStream = new CountingOutputStream(outputStream);
+          brokerResponse.toOutputStream(countingOutputStream);
+          brokerMetrics.addMeteredGlobalValue(BrokerMeter.QUERY_RESPONSE_SIZE_BYTES, countingOutputStream.getCount());
+        })
         .build();
   }
 

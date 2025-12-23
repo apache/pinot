@@ -22,14 +22,17 @@ import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.ObjectNode;
+import java.io.ByteArrayOutputStream;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.Executor;
 import javax.ws.rs.container.AsyncResponse;
 import javax.ws.rs.core.HttpHeaders;
 import javax.ws.rs.core.Response;
+import javax.ws.rs.core.StreamingOutput;
 import org.apache.hc.client5.http.io.HttpClientConnectionManager;
 import org.apache.pinot.broker.requesthandler.BrokerRequestHandler;
+import org.apache.pinot.common.metrics.BrokerMeter;
 import org.apache.pinot.common.metrics.BrokerMetrics;
 import org.apache.pinot.common.response.BrokerResponse;
 import org.apache.pinot.common.response.broker.BrokerResponseNative;
@@ -89,7 +92,8 @@ public class PinotClientRequestTest {
 
     // for successful query result the 'X-Pinot-Error-Code' should be -1
     BrokerResponse emptyResultBrokerResponse = BrokerResponseNative.EMPTY_RESULT;
-    Response successfulResponse = PinotClientRequest.getPinotQueryResponse(emptyResultBrokerResponse, _httpHeaders);
+    Response successfulResponse =
+        PinotClientRequest.getPinotQueryResponse(emptyResultBrokerResponse, _httpHeaders, _brokerMetrics);
     assertEquals(successfulResponse.getStatus(), Response.Status.OK.getStatusCode());
     Assert.assertTrue(successfulResponse.getHeaders().containsKey(PINOT_QUERY_ERROR_CODE_HEADER));
     assertEquals(successfulResponse.getHeaders().get(PINOT_QUERY_ERROR_CODE_HEADER).size(), 1);
@@ -98,7 +102,7 @@ public class PinotClientRequestTest {
     // for failed query result the 'X-Pinot-Error-Code' should be Error code fo exception.
     BrokerResponse tableDoesNotExistBrokerResponse = BrokerResponseNative.TABLE_DOES_NOT_EXIST;
     Response tableDoesNotExistResponse =
-        PinotClientRequest.getPinotQueryResponse(tableDoesNotExistBrokerResponse, _httpHeaders);
+        PinotClientRequest.getPinotQueryResponse(tableDoesNotExistBrokerResponse, _httpHeaders, _brokerMetrics);
     assertEquals(tableDoesNotExistResponse.getStatus(), Response.Status.OK.getStatusCode());
     Assert.assertTrue(tableDoesNotExistResponse.getHeaders().containsKey(PINOT_QUERY_ERROR_CODE_HEADER));
     assertEquals(tableDoesNotExistResponse.getHeaders().get(PINOT_QUERY_ERROR_CODE_HEADER).size(), 1);
@@ -110,7 +114,7 @@ public class PinotClientRequestTest {
     when(_httpHeaders.getHeaderString(
         CommonConstants.Broker.USE_HTTP_STATUS_FOR_ERRORS_HEADER)).thenReturn("true");
     Response tableDoesNotExistResponseWithHttpResponseCode =
-        PinotClientRequest.getPinotQueryResponse(tableDoesNotExistBrokerResponse, _httpHeaders);
+        PinotClientRequest.getPinotQueryResponse(tableDoesNotExistBrokerResponse, _httpHeaders, _brokerMetrics);
     assertEquals(tableDoesNotExistResponseWithHttpResponseCode.getStatus(), Response.Status.NOT_FOUND.getStatusCode());
     Assert.assertTrue(
         tableDoesNotExistResponseWithHttpResponseCode.getHeaders().containsKey(PINOT_QUERY_ERROR_CODE_HEADER));
@@ -274,5 +278,37 @@ public class PinotClientRequestTest {
 
     assertEquals(response.getStatus(), Response.Status.INTERNAL_SERVER_ERROR.getStatusCode(),
         "Invalid SQL query should return INTERNAL_SERVER_ERROR status");
+  }
+
+  @Test
+  public void testQueryResponseSizeMetric()
+      throws Exception {
+    // Create a broker response with some result data
+    BrokerResponseNative brokerResponse = new BrokerResponseNative();
+    DataSchema dataSchema = new DataSchema(new String[]{"col1", "col2"},
+        new DataSchema.ColumnDataType[]{DataSchema.ColumnDataType.STRING, DataSchema.ColumnDataType.INT});
+    List<Object[]> rows = new ArrayList<>();
+    rows.add(new Object[]{"value1", 100});
+    rows.add(new Object[]{"value2", 200});
+    brokerResponse.setResultTable(new ResultTable(dataSchema, rows));
+
+    // Get the response
+    Response response = PinotClientRequest.getPinotQueryResponse(brokerResponse, _httpHeaders, _brokerMetrics);
+    assertEquals(response.getStatus(), Response.Status.OK.getStatusCode());
+
+    // Write the response to capture the size
+    StreamingOutput streamingOutput = (StreamingOutput) response.getEntity();
+    ByteArrayOutputStream outputStream = new ByteArrayOutputStream();
+    streamingOutput.write(outputStream);
+
+    // Verify the metric was recorded with the correct size
+    long expectedSize = outputStream.size();
+    Assert.assertTrue(expectedSize > 0, "Response size should be greater than 0");
+
+    // Verify addMeteredGlobalValue was called with QUERY_RESPONSE_SIZE_BYTES and the correct size
+    ArgumentCaptor<Long> sizeCaptor = ArgumentCaptor.forClass(Long.class);
+    verify(_brokerMetrics).addMeteredGlobalValue(eq(BrokerMeter.QUERY_RESPONSE_SIZE_BYTES), sizeCaptor.capture());
+    assertEquals(sizeCaptor.getValue().longValue(), expectedSize,
+        "Metric should record the actual response size in bytes");
   }
 }
