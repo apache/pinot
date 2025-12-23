@@ -19,6 +19,7 @@
 package org.apache.pinot.common.metrics;
 
 import org.apache.pinot.common.Utils;
+import org.apache.pinot.spi.metrics.PinotMeter;
 
 
 /**
@@ -246,7 +247,24 @@ public enum ServerMeter implements AbstractMetrics.Meter {
 
   TRANSFORMATION_ERROR_COUNT("rows", false),
   DROPPED_RECORD_COUNT("rows", false),
-  CORRUPTED_RECORD_COUNT("rows", false);
+  CORRUPTED_RECORD_COUNT("rows", false),
+
+  /// Number of multi-stage execution opchains started.
+  /// This is equal to the number of stages times the average parallelism
+  MSE_OPCHAINS_STARTED("opchains", false),
+  /// Number of multi-stage execution opchains completed.
+  /// This is equal to the number of stages times the average parallelism
+  MSE_OPCHAINS_COMPLETED("opchains", false),
+
+  /// Total execution time spent in multi-stage execution on CPU in milliseconds.
+  /// This is equal to the sum of the executionTimeMs reported by the root of all the opchains executed in the server.
+  MSE_CPU_EXECUTION_TIME_MS("milliseconds", false),
+  /// Total memory allocated in bytes for multi-stage execution.
+  /// This is equal to the sum of the allocatedMemoryBytes reported by all the opchains executed in the server.
+  MSE_MEMORY_ALLOCATED_BYTES("bytes", false),
+  /// Total number of rows emitted by multi-stage execution.
+  /// This is equal to the sum of the emittedRows reported by the root of all the opchains executed in the server.
+  MSE_EMITTED_ROWS("rows", false);
 
   private final String _meterName;
   private final String _unit;
@@ -287,5 +305,9 @@ public enum ServerMeter implements AbstractMetrics.Meter {
   @Override
   public String getDescription() {
     return _description;
+  }
+
+  public PinotMeter getGlobalMeter() {
+    return ServerMetrics.get().getMeteredValue(this);
   }
 }

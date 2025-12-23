@@ -84,7 +84,7 @@ public class BlockListMultiStageOperator extends MultiStageOperator {
   }
 
   @Override
-  protected StatMap<?> copyStatMaps() {
+  public StatMap<LiteralValueOperator.StatKey> copyStatMaps() {
     return new StatMap<>(_statMap);
   }
 
