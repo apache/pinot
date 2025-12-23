@@ -45,7 +45,7 @@ import { Resizable } from 're-resizable';
 import SimpleAccordion from '../SimpleAccordion';
 import TimeseriesChart from './TimeseriesChart';
 import MetricStatsTable from './MetricStatsTable';
-import { parseTimeseriesResponse, isPrometheusFormat } from '../../utils/TimeseriesUtils';
+import { parseTimeseriesResponse, isPrometheusFormat, isBrokerFormat, convertBrokerToPrometheusFormat } from '../../utils/TimeseriesUtils';
 import { ChartSeries } from 'Models';
 import { DEFAULT_SERIES_LIMIT } from '../../utils/ChartConstants';
 
@@ -244,6 +244,7 @@ interface TimeseriesQueryConfig {
   startTime: string;
   endTime: string;
   timeout: number;
+  apiType: 'prometheus' | 'broker';
 }
 
 const TimeseriesQueryPage = () => {
@@ -260,6 +261,7 @@ const TimeseriesQueryPage = () => {
     startTime: getOneMinuteAgoTimestamp(),
     endTime: getCurrentTimestamp(),
     timeout: 60000,
+    apiType: 'prometheus',
   });
 
   const [supportedLanguages, setSupportedLanguages] = useState<Array<string>>([]);
@@ -299,12 +301,14 @@ const TimeseriesQueryPage = () => {
   // Update config when URL parameters change
   useEffect(() => {
     const urlParams = new URLSearchParams(location.search);
+    const apiTypeParam = urlParams.get('apiType');
     const newConfig = {
       queryLanguage: urlParams.get('language') || 'm3ql',
       query: urlParams.get('query') || '',
       startTime: urlParams.get('start') || getOneMinuteAgoTimestamp(),
       endTime: urlParams.get('end') || getCurrentTimestamp(),
       timeout: parseInt(urlParams.get('timeout') || '60000'),
+      apiType: (apiTypeParam === 'broker' ? 'broker' : 'prometheus') as 'prometheus' | 'broker',
     };
 
     setConfig(newConfig);
@@ -331,6 +335,9 @@ const TimeseriesQueryPage = () => {
     if (newConfig.endTime) params.set('end', newConfig.endTime);
     if (newConfig.timeout && newConfig.timeout !== 60000) {
       params.set('timeout', newConfig.timeout.toString());
+    }
+    if (newConfig.apiType && newConfig.apiType !== 'prometheus') {
+      params.set('apiType', newConfig.apiType);
     }
 
     const newURL = params.toString() ? `?${params.toString()}` : '';
@@ -364,28 +371,32 @@ const TimeseriesQueryPage = () => {
   }, [handleQueryInterfaceKeyDown]);
 
   // Extract data processing logic
-  const processQueryResponse = useCallback((parsedData: TimeseriesQueryResponse) => {
+  const processQueryResponse = useCallback((parsedData: any) => {
     setRawOutput(JSON.stringify(parsedData, null, 2));
 
-    // Check if this is an error response
-    if (parsedData.error != null && parsedData.error !== '') {
-      setError(parsedData.error);
+    // Check for errors
+    const errorMsg = parsedData.error ||
+      (parsedData.exceptions?.length > 0 ?
+        parsedData.exceptions.map((e: any) => e.message || e.toString()).join('; ') : '');
+
+    if (errorMsg) {
+      setError(errorMsg);
       setChartSeries([]);
       setTotalSeriesCount(0);
       return;
     }
 
-    // Parse timeseries data for chart and stats
-    if (isPrometheusFormat(parsedData)) {
-      const series = parseTimeseriesResponse(parsedData);
+    // Convert broker format to Prometheus if needed, then parse
+    const prometheusData = isBrokerFormat(parsedData) ? convertBrokerToPrometheusFormat(parsedData) : parsedData;
+
+    if (isPrometheusFormat(prometheusData)) {
+      const series = parseTimeseriesResponse(prometheusData);
       setTotalSeriesCount(series.length);
 
       // Create truncated series for visualization (limit to seriesLimitInput or default to DEFAULT_SERIES_LIMIT)
       const limit = parseInt(seriesLimitInput, 10);
       const effectiveLimit = !isNaN(limit) && limit > 0 ? limit : DEFAULT_SERIES_LIMIT;
-
-      const truncatedSeries = series.slice(0, effectiveLimit);
-      setChartSeries(truncatedSeries);
+      setChartSeries(series.slice(0, effectiveLimit));
     } else {
       setChartSeries([]);
       setTotalSeriesCount(0);
@@ -417,7 +428,7 @@ const TimeseriesQueryPage = () => {
         queryOptions: `timeoutMs=${config.timeout}`
       };
 
-      const response = await getTimeSeriesQueryResult(requestPayload);
+      const response = await getTimeSeriesQueryResult(requestPayload, config.apiType === 'broker');
 
       // Handle response data - it might be stringified JSON or already an object
       const parsedData = typeof response.data === 'string'
@@ -503,6 +514,20 @@ const TimeseriesQueryPage = () => {
                     {lang}
                   </MenuItem>
                 ))}
+              </Select>
+            </FormControl>
+          </Grid>
+
+          <Grid item xs={12} sm={6} md={2} className={classes.gridItem}>
+            <FormControl fullWidth={true} className={classes.formControl}>
+              <InputLabel>API Type</InputLabel>
+              <Select
+                value={config.apiType}
+                onChange={(e) => handleConfigChange('apiType', e.target.value as 'prometheus' | 'broker')}
+                disabled={supportedLanguages.length === 0}
+              >
+                <MenuItem value="prometheus">Prometheus API</MenuItem>
+                <MenuItem value="broker">Broker Response API</MenuItem>
               </Select>
             </FormControl>
           </Grid>

@@ -27,6 +27,18 @@ interface PrometheusResponse {
   };
 }
 
+interface BrokerResponse {
+  resultTable?: {
+    dataSchema: {
+      columnNames: string[];
+      columnDataTypes: string[];
+    };
+    rows: any[][];
+  };
+  exceptions?: any[];
+  error?: string;
+}
+
 /**
  * Parse Prometheus-compatible timeseries response
  */
@@ -139,10 +151,77 @@ export const formatSeriesName = (metric: Record<string, string>): string => {
 /**
  * Check if response is in Prometheus format
  */
-export const isPrometheusFormat = (response: PrometheusResponse): boolean => {
-  return response &&
-         response.data &&
-         Array.isArray(response.data.result);
+export const isPrometheusFormat = (response: any): boolean => {
+  return response?.data && Array.isArray(response.data.result);
+};
+
+/**
+ * Check if response is in Broker compatible format
+ */
+export const isBrokerFormat = (response: any): boolean => {
+  return response?.resultTable?.dataSchema && Array.isArray(response.resultTable.rows);
+};
+
+/**
+ * Convert Broker format to Prometheus format for chart rendering
+ */
+export const convertBrokerToPrometheusFormat = (brokerResponse: BrokerResponse): PrometheusResponse => {
+  if (!brokerResponse?.resultTable?.dataSchema) {
+    return { data: { resultType: 'matrix', result: [] } };
+  }
+
+  const { columnNames } = brokerResponse.resultTable.dataSchema;
+  const rows = brokerResponse.resultTable.rows || [];
+
+  const tsIdx = columnNames.indexOf('ts');
+  const valuesIdx = columnNames.indexOf('values');
+  const nameIdx = columnNames.indexOf('__name__');
+
+  if (tsIdx === -1 || valuesIdx === -1 || nameIdx === -1) {
+    return { data: { resultType: 'matrix', result: [] } };
+  }
+
+  const result: TimeseriesData[] = rows.map(row => {
+    if (!row) return null;
+
+    const timestamps = parseArray(row[tsIdx]);
+    const values = parseArray(row[valuesIdx]);
+    const metric: Record<string, string> = { __name__: String(row[nameIdx] || '') };
+
+    // Add tag columns
+    columnNames.forEach((col, idx) => {
+      if (col !== 'ts' && col !== 'values' && col !== '__name__' && row[idx] != null) {
+        metric[col] = String(row[idx]);
+      }
+    });
+
+    // Create value pairs - TimeseriesData expects [number, number][]
+    const valuePairs: [number, number][] = [];
+    const len = Math.min(timestamps.length, values.length);
+    for (let i = 0; i < len; i++) {
+      const ts = timestamps[i];
+      const val = values[i];
+      const tsSeconds = ts > 1e12 ? Math.floor(ts / 1000) : ts;
+      valuePairs.push([tsSeconds, val == null ? 0 : val]);
+    }
+
+    return { metric, values: valuePairs };
+  }).filter((item): item is TimeseriesData => item !== null);
+
+  return { data: { resultType: 'matrix', result } };
+};
+
+const parseArray = (data: any): number[] => {
+  if (Array.isArray(data)) {
+    return data.map(v => v == null ? null as any : (typeof v === 'number' ? v : parseFloat(String(v))));
+  }
+  if (typeof data === 'string') {
+    try {
+      const parsed = JSON.parse(data);
+      if (Array.isArray(parsed)) return parseArray(parsed);
+    } catch (e) { /* ignore */ }
+  }
+  return [];
 };
 
 /**
