@@ -117,7 +117,7 @@ import org.slf4j.LoggerFactory;
  * TODO: Expose RoutingEntry class to get a consistent view in the broker request handler and save the redundant map
  *       lookups.
  */
-public class BaseBrokerRoutingManager implements RoutingManager, ClusterChangeHandler {
+public abstract class BaseBrokerRoutingManager implements RoutingManager, ClusterChangeHandler {
   private static final Logger LOGGER = LoggerFactory.getLogger(BaseBrokerRoutingManager.class);
 
   protected final BrokerMetrics _brokerMetrics;
