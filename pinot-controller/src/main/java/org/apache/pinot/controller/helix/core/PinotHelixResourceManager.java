@@ -2765,13 +2765,6 @@ public class PinotHelixResourceManager {
     LOGGER.info("Sending reload messages for table: {} with forceDownload: {}, and instanceToSegmentsMap: {}",
         tableNameWithType, forceDownload, instanceToSegmentsMap);
 
-    if (forceDownload) {
-      TableType tt = TableNameBuilder.getTableTypeFromTableName(tableNameWithType);
-      // TODO: support to force download immutable segments from RealTime table.
-      Preconditions.checkArgument(tt == TableType.OFFLINE,
-          "Table: %s is not an OFFLINE table, which is required to force to download segments", tableNameWithType);
-    }
-
     ClusterMessagingService messagingService = _helixZkManager.getMessagingService();
     Map<String, Pair<Integer, String>> instanceMsgInfoMap = new HashMap<>();
     for (Map.Entry<String, List<String>> entry : instanceToSegmentsMap.entrySet()) {
@@ -2795,13 +2788,6 @@ public class PinotHelixResourceManager {
     LOGGER.info("Sending reload message for table: {} with forceDownload: {}, and target: {}", tableNameWithType,
         forceDownload, targetInstance == null ? "every instance" : targetInstance);
 
-    if (forceDownload) {
-      TableType tt = TableNameBuilder.getTableTypeFromTableName(tableNameWithType);
-      // TODO: support to force download immutable segments from RealTime table.
-      Preconditions.checkArgument(tt == TableType.OFFLINE,
-          "Table: %s is not an OFFLINE table, which is required to force to download segments", tableNameWithType);
-    }
-
     ClusterMessagingService messagingService = _helixZkManager.getMessagingService();
     SegmentReloadMessage message = new SegmentReloadMessage(tableNameWithType, forceDownload);
     int numMessagesSent =
@@ -2819,14 +2805,6 @@ public class PinotHelixResourceManager {
       @Nullable String targetInstance) {
     LOGGER.info("Sending reload message for segment: {} in table: {} with forceDownload: {}, and target: {}",
         segmentName, tableNameWithType, forceDownload, targetInstance == null ? "every instance" : targetInstance);
-
-    if (forceDownload) {
-      TableType tt = TableNameBuilder.getTableTypeFromTableName(tableNameWithType);
-      // TODO: support to force download immutable segments from RealTime table.
-      Preconditions.checkArgument(tt == TableType.OFFLINE,
-          "Table: %s is not an OFFLINE table, which is required to force to download segment: %s", tableNameWithType,
-          segmentName);
-    }
 
     ClusterMessagingService messagingService = _helixZkManager.getMessagingService();
     SegmentReloadMessage message = new SegmentReloadMessage(tableNameWithType, List.of(segmentName), forceDownload);

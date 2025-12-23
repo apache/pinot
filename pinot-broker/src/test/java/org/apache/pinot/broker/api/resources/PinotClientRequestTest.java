@@ -37,6 +37,7 @@ import org.apache.pinot.common.response.broker.ResultTable;
 import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.core.query.executor.sql.SqlQueryExecutor;
 import org.apache.pinot.spi.exception.QueryErrorCode;
+import org.apache.pinot.spi.trace.QueryFingerprint;
 import org.apache.pinot.spi.utils.CommonConstants;
 import org.apache.pinot.sql.parsers.SqlNodeAndOptions;
 import org.glassfish.grizzly.http.server.Request;
@@ -225,5 +226,53 @@ public class PinotClientRequestTest {
 
     assertEquals(comparisonAnalysis.size(), 1);
     Assert.assertTrue(comparisonAnalysis.get(0).contains("Mismatch in number of rows returned"));
+  }
+
+  @Test
+  public void testGetQueryFingerprintSuccess() throws Exception {
+    Request request = mock(Request.class);
+    when(request.getRequestURL()).thenReturn(new StringBuilder());
+
+    // single stage query
+    String requestJson = "{\"sql\": \"SELECT * FROM myTable WHERE id IN (1, 2, 3)\"}";
+    Response response = _pinotClientRequest.getQueryFingerprint(requestJson, request, null);
+
+    assertEquals(response.getStatus(), Response.Status.OK.getStatusCode());
+    QueryFingerprint fingerprint = (QueryFingerprint) response.getEntity();
+    Assert.assertNotNull(fingerprint, "Valid Single-stage query should return a non-null QueryFingerprint object");
+    Assert.assertNotNull(fingerprint.getQueryHash(),
+        "Valid Single-stage query fingerprint should contain a non-null query hash");
+    Assert.assertNotNull(fingerprint.getFingerprint(),
+        "Valid Single-stage query fingerprint should contain a non-null SQL fingerprint");
+    assertEquals(fingerprint.getFingerprint(), "SELECT * FROM `myTable` WHERE `id` IN (?)",
+        "Valid Single-stage query fingerprint should normalize literals to placeholders");
+
+    // multi stage query
+    requestJson = "{\"sql\": \"SET useMultistageEngine=true; \\n"
+      + "SELECT * FROM table1 t1 LEFT JOIN table2 t2 ON t1.id = t2.id WHERE t1.col1 > 100\"}";
+    response = _pinotClientRequest.getQueryFingerprint(requestJson, request, null);
+
+    assertEquals(response.getStatus(), Response.Status.OK.getStatusCode());
+    fingerprint = (QueryFingerprint) response.getEntity();
+    Assert.assertNotNull(fingerprint, "Valid Multi-stage query should return a non-null QueryFingerprint object");
+    Assert.assertNotNull(fingerprint.getQueryHash(),
+        "Valid Multi-stage query fingerprint should contain a non-null query hash");
+    Assert.assertNotNull(fingerprint.getFingerprint(),
+        "Valid Multi-stage query fingerprint should contain a non-null SQL fingerprint");
+    assertEquals(fingerprint.getFingerprint(),
+        "SELECT * FROM `table1` AS `t1` LEFT JOIN `table2` AS `t2` ON `t1`.`id` = `t2`.`id` WHERE `t1`.`col1` > ?",
+        "Valid Multi-stage query fingerprint should normalize literals and preserve JOIN structure");
+  }
+
+  @Test
+  public void testGetQueryFingerprintWithInvalidSql() throws Exception {
+    Request request = mock(Request.class);
+    when(request.getRequestURL()).thenReturn(new StringBuilder());
+
+    String requestJson = "{\"sql\": \"INVALID SQL QUERY\"}";
+    Response response = _pinotClientRequest.getQueryFingerprint(requestJson, request, null);
+
+    assertEquals(response.getStatus(), Response.Status.INTERNAL_SERVER_ERROR.getStatusCode(),
+        "Invalid SQL query should return INTERNAL_SERVER_ERROR status");
   }
 }
