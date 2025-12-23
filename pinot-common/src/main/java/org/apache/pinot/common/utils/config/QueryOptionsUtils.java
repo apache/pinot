@@ -595,4 +595,17 @@ public class QueryOptionsUtils {
     String regexDictSizeThreshold = queryOptions.get(QueryOptionKey.REGEX_DICT_SIZE_THRESHOLD);
     return uncheckedParseInt(QueryOptionKey.REGEX_DICT_SIZE_THRESHOLD, regexDictSizeThreshold);
   }
+
+  public static int getSortExchangeCopyThreshold(Map<String, String> options, int i) {
+    String sortExchangeCopyThreshold = options.get(QueryOptionKey.SORT_EXCHANGE_COPY_THRESHOLD);
+    if (sortExchangeCopyThreshold != null) {
+      try {
+        return Integer.parseInt(sortExchangeCopyThreshold);
+      } catch (NumberFormatException e) {
+        throw new IllegalArgumentException(String.format("%s must be an integer, got: %s",
+            QueryOptionKey.SORT_EXCHANGE_COPY_THRESHOLD, sortExchangeCopyThreshold));
+      }
+    }
+    return i;
+  }
 }

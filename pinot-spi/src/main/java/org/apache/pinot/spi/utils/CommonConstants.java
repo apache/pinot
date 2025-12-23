@@ -604,6 +604,19 @@ public class CommonConstants {
     public static final String CONFIG_OF_BROKER_QUERY_ENABLE_AUTO_REWRITE_AGGREGATION_TYPE =
         "pinot.broker.query.enable.auto.rewrite.aggregation.type";
 
+    /// Config for sort exchange copy threshold in multi-stage engine.
+    ///
+    /// When there is an `order by X limit Y` clause in the query, during the distributed execution
+    /// we have to perform a sort exchange to gather the top Y rows from all the workers.
+    /// This can be optimized by having each upstream send only the top Y rows to the downstream.
+    ///
+    /// We only apply this optimization when Y is small smaller than the value of this property.
+    /// The default value is a heuristic value which may change from Pinot version to version.
+    public static final String CONFIG_OF_SORT_EXCHANGE_COPY_THRESHOLD =
+        "pinot.broker.multistage.sort.exchange.copy.threshold";
+    // TODO: Change this default to something very high, as this _optimnization_ is usually not beneficial.
+    public static final int DEFAULT_SORT_EXCHANGE_COPY_THRESHOLD = 10_000;
+
     public static class Request {
       public static final String SQL = "sql";
       public static final String SQL_V1 = "sqlV1";
@@ -849,6 +862,9 @@ public class CommonConstants {
         // MAX(stringCol) -> MAXSTRING(stringCol)
         // SUM(intCol) -> SUMINT(intCol)
         public static final String AUTO_REWRITE_AGGREGATION_TYPE = "autoRewriteAggregationType";
+
+        /// Option to customize the value of [Broker#CONFIG_OF_SORT_EXCHANGE_COPY_THRESHOLD]
+        public static final String SORT_EXCHANGE_COPY_THRESHOLD = "sortExchangeCopyThreshold";
       }
 
       public static class QueryOptionValue {

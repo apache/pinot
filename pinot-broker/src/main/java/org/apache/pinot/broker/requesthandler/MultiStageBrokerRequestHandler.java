@@ -456,6 +456,9 @@ public class MultiStageBrokerRequestHandler extends BaseBrokerRequestHandler {
         CommonConstants.Helix.ENABLE_CASE_INSENSITIVE_KEY,
         CommonConstants.Helix.DEFAULT_ENABLE_CASE_INSENSITIVE
     );
+    int sortExchangeCopyThreshold = _config.getProperty(
+        CommonConstants.Broker.CONFIG_OF_SORT_EXCHANGE_COPY_THRESHOLD,
+        CommonConstants.Broker.DEFAULT_SORT_EXCHANGE_COPY_THRESHOLD);
     return QueryEnvironment.configBuilder()
         .requestId(requestId)
         .database(database)
@@ -477,6 +480,7 @@ public class MultiStageBrokerRequestHandler extends BaseBrokerRequestHandler {
         .defaultLiteModeEnableJoins(defaultLiteModeEnableJoins)
         .defaultHashFunction(defaultHashFunction)
         .defaultDisabledPlannerRules(_defaultDisabledPlannerRules)
+        .defaultSortExchangeCopyLimit(sortExchangeCopyThreshold)
         .build();
   }
 
