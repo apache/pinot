@@ -45,7 +45,7 @@ import { Resizable } from 're-resizable';
 import SimpleAccordion from '../SimpleAccordion';
 import TimeseriesChart from './TimeseriesChart';
 import MetricStatsTable from './MetricStatsTable';
-import { parseTimeseriesResponse, isPrometheusFormat, isBrokerFormat, convertBrokerToPrometheusFormat } from '../../utils/TimeseriesUtils';
+import { parseTimeseriesResponse, isBrokerFormat } from '../../utils/TimeseriesUtils';
 import { ChartSeries } from 'Models';
 import { DEFAULT_SERIES_LIMIT } from '../../utils/ChartConstants';
 
@@ -244,7 +244,6 @@ interface TimeseriesQueryConfig {
   startTime: string;
   endTime: string;
   timeout: number;
-  apiType: 'prometheus' | 'broker';
 }
 
 const TimeseriesQueryPage = () => {
@@ -261,7 +260,6 @@ const TimeseriesQueryPage = () => {
     startTime: getOneMinuteAgoTimestamp(),
     endTime: getCurrentTimestamp(),
     timeout: 60000,
-    apiType: 'prometheus',
   });
 
   const [supportedLanguages, setSupportedLanguages] = useState<Array<string>>([]);
@@ -301,14 +299,12 @@ const TimeseriesQueryPage = () => {
   // Update config when URL parameters change
   useEffect(() => {
     const urlParams = new URLSearchParams(location.search);
-    const apiTypeParam = urlParams.get('apiType');
     const newConfig = {
       queryLanguage: urlParams.get('language') || 'm3ql',
       query: urlParams.get('query') || '',
       startTime: urlParams.get('start') || getOneMinuteAgoTimestamp(),
       endTime: urlParams.get('end') || getCurrentTimestamp(),
       timeout: parseInt(urlParams.get('timeout') || '60000'),
-      apiType: (apiTypeParam === 'broker' ? 'broker' : 'prometheus') as 'prometheus' | 'broker',
     };
 
     setConfig(newConfig);
@@ -335,9 +331,6 @@ const TimeseriesQueryPage = () => {
     if (newConfig.endTime) params.set('end', newConfig.endTime);
     if (newConfig.timeout && newConfig.timeout !== 60000) {
       params.set('timeout', newConfig.timeout.toString());
-    }
-    if (newConfig.apiType && newConfig.apiType !== 'prometheus') {
-      params.set('apiType', newConfig.apiType);
     }
 
     const newURL = params.toString() ? `?${params.toString()}` : '';
@@ -386,11 +379,9 @@ const TimeseriesQueryPage = () => {
       return;
     }
 
-    // Convert broker format to Prometheus if needed, then parse
-    const prometheusData = isBrokerFormat(parsedData) ? convertBrokerToPrometheusFormat(parsedData) : parsedData;
-
-    if (isPrometheusFormat(prometheusData)) {
-      const series = parseTimeseriesResponse(prometheusData);
+    // Parse broker response directly
+    if (isBrokerFormat(parsedData)) {
+      const series = parseTimeseriesResponse(parsedData);
       setTotalSeriesCount(series.length);
 
       // Create truncated series for visualization (limit to seriesLimitInput or default to DEFAULT_SERIES_LIMIT)
@@ -428,7 +419,7 @@ const TimeseriesQueryPage = () => {
         queryOptions: `timeoutMs=${config.timeout}`
       };
 
-      const response = await getTimeSeriesQueryResult(requestPayload, config.apiType === 'broker');
+      const response = await getTimeSeriesQueryResult(requestPayload);
 
       // Handle response data - it might be stringified JSON or already an object
       const parsedData = typeof response.data === 'string'
@@ -514,20 +505,6 @@ const TimeseriesQueryPage = () => {
                     {lang}
                   </MenuItem>
                 ))}
-              </Select>
-            </FormControl>
-          </Grid>
-
-          <Grid item xs={12} sm={6} md={2} className={classes.gridItem}>
-            <FormControl fullWidth={true} className={classes.formControl}>
-              <InputLabel>API Type</InputLabel>
-              <Select
-                value={config.apiType}
-                onChange={(e) => handleConfigChange('apiType', e.target.value as 'prometheus' | 'broker')}
-                disabled={supportedLanguages.length === 0}
-              >
-                <MenuItem value="prometheus">Prometheus API</MenuItem>
-                <MenuItem value="broker">Broker Response API</MenuItem>
               </Select>
             </FormControl>
           </Grid>
@@ -642,7 +619,7 @@ const TimeseriesQueryPage = () => {
                       No Chart Data Available
                     </Typography>
                     <Typography variant="body2" color="textSecondary">
-                      The query response is not in Prometheus-compatible format or contains no timeseries data.
+                      The query response does not contain valid timeseries data.
                       <br />
                       Switch to JSON view to see the raw response.
                     </Typography>

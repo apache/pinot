@@ -239,15 +239,8 @@ export const getTableSchema = (name: string): Promise<AxiosResponse<TableSchema>
 export const getQueryResult = (params: Object): Promise<AxiosResponse<SQLResult>> =>
   transformApi.post(`/sql`, params, {headers});
 
-export const getTimeSeriesQueryResult = (params: Object, useBrokerCompatibleApi: boolean = false): Promise<AxiosResponse<any>> => {
-  if (useBrokerCompatibleApi) {
-    // Use POST /query/timeseries endpoint (broker compatible API)
-    return transformApi.post(`/query/timeseries`, params);
-  } else {
-    // Use GET /timeseries/api/v1/query_range endpoint (Prometheus compatible API)
-    return transformApi.get(`/timeseries/api/v1/query_range`, { params });
-  }
-};
+export const getTimeSeriesQueryResult = (params: Object): Promise<AxiosResponse<any>> =>
+  transformApi.post(`/query/timeseries`, params);
 
 export const getTimeSeriesLanguages = (): Promise<AxiosResponse<string[]>> =>
   baseApi.get('/timeseries/languages');

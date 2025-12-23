@@ -17,16 +17,9 @@
  * under the License.
  */
 
-import { ChartSeries, TimeseriesData, ChartDataPoint, MetricStats } from 'Models';
+import { ChartSeries, ChartDataPoint, MetricStats } from 'Models';
 
 // Define proper types for API responses
-interface PrometheusResponse {
-  data: {
-    resultType?: string;
-    result: TimeseriesData[];
-  };
-}
-
 interface BrokerResponse {
   resultTable?: {
     dataSchema: {
@@ -40,29 +33,77 @@ interface BrokerResponse {
 }
 
 /**
- * Parse Prometheus-compatible timeseries response
+ * Parse broker timeseries response directly to ChartSeries
  */
-export const parseTimeseriesResponse = (response: PrometheusResponse): ChartSeries[] => {
-  if (!response || !response.data || !response.data.result) {
+export const parseTimeseriesResponse = (brokerResponse: BrokerResponse): ChartSeries[] => {
+  if (!brokerResponse?.resultTable?.dataSchema) {
     return [];
   }
 
-  return response.data.result.map((series: TimeseriesData) => {
-    const dataPoints: ChartDataPoint[] = series.values.map(([timestamp, value]) => ({
-      timestamp: timestamp * 1000, // Convert to milliseconds
-      value: parseFloat(String(value)),
-      formattedTime: new Date(timestamp * 1000).toLocaleString()
-    }));
+  const { columnNames } = brokerResponse.resultTable.dataSchema;
+  const rows = brokerResponse.resultTable.rows || [];
 
-    const stats = calculateMetricStats(dataPoints);
-    const seriesName = formatSeriesName(series.metric);
+  const tsIdx = columnNames.indexOf('ts');
+  const valuesIdx = columnNames.indexOf('values');
+  const nameIdx = columnNames.indexOf('__name__');
 
-    return {
-      name: seriesName,
-      data: dataPoints,
-      stats
-    };
-  });
+  if (tsIdx === -1 || valuesIdx === -1 || nameIdx === -1) {
+    return [];
+  }
+
+  return rows
+    .filter(row => row != null)
+    .map(row => {
+      const timestamps = parseArray(row[tsIdx]);
+      const values = parseArray(row[valuesIdx]);
+      const metric: Record<string, string> = { __name__: String(row[nameIdx] || '') };
+
+      // Add tag columns
+      columnNames.forEach((col, idx) => {
+        if (col !== 'ts' && col !== 'values' && col !== '__name__' && row[idx] != null) {
+          metric[col] = String(row[idx]);
+        }
+      });
+
+      // Create data points directly
+      const dataPoints: ChartDataPoint[] = [];
+      const len = Math.min(timestamps.length, values.length);
+      for (let i = 0; i < len; i++) {
+        const ts = timestamps[i];
+        const val = values[i];
+        const tsSeconds = ts > 1e12 ? Math.floor(ts / 1000) : ts;
+        dataPoints.push({
+          timestamp: tsSeconds * 1000, // Convert to milliseconds for chart
+          value: val == null ? 0 : val,
+          formattedTime: new Date(tsSeconds * 1000).toLocaleString()
+        });
+      }
+
+      const stats = calculateMetricStats(dataPoints);
+      const seriesName = formatSeriesName(metric);
+
+      return {
+        name: seriesName,
+        data: dataPoints,
+        stats
+      };
+    });
+};
+
+/**
+ * Helper function to parse array data from broker response
+ */
+const parseArray = (data: any): number[] => {
+  if (Array.isArray(data)) {
+    return data.map(v => v == null ? null as any : (typeof v === 'number' ? v : parseFloat(String(v))));
+  }
+  if (typeof data === 'string') {
+    try {
+      const parsed = JSON.parse(data);
+      if (Array.isArray(parsed)) return parseArray(parsed);
+    } catch (e) { /* ignore */ }
+  }
+  return [];
 };
 
 /**
@@ -149,79 +190,10 @@ export const formatSeriesName = (metric: Record<string, string>): string => {
 };
 
 /**
- * Check if response is in Prometheus format
- */
-export const isPrometheusFormat = (response: any): boolean => {
-  return response?.data && Array.isArray(response.data.result);
-};
-
-/**
  * Check if response is in Broker compatible format
  */
 export const isBrokerFormat = (response: any): boolean => {
   return response?.resultTable?.dataSchema && Array.isArray(response.resultTable.rows);
-};
-
-/**
- * Convert Broker format to Prometheus format for chart rendering
- */
-export const convertBrokerToPrometheusFormat = (brokerResponse: BrokerResponse): PrometheusResponse => {
-  if (!brokerResponse?.resultTable?.dataSchema) {
-    return { data: { resultType: 'matrix', result: [] } };
-  }
-
-  const { columnNames } = brokerResponse.resultTable.dataSchema;
-  const rows = brokerResponse.resultTable.rows || [];
-
-  const tsIdx = columnNames.indexOf('ts');
-  const valuesIdx = columnNames.indexOf('values');
-  const nameIdx = columnNames.indexOf('__name__');
-
-  if (tsIdx === -1 || valuesIdx === -1 || nameIdx === -1) {
-    return { data: { resultType: 'matrix', result: [] } };
-  }
-
-  const result: TimeseriesData[] = rows.map(row => {
-    if (!row) return null;
-
-    const timestamps = parseArray(row[tsIdx]);
-    const values = parseArray(row[valuesIdx]);
-    const metric: Record<string, string> = { __name__: String(row[nameIdx] || '') };
-
-    // Add tag columns
-    columnNames.forEach((col, idx) => {
-      if (col !== 'ts' && col !== 'values' && col !== '__name__' && row[idx] != null) {
-        metric[col] = String(row[idx]);
-      }
-    });
-
-    // Create value pairs - TimeseriesData expects [number, number][]
-    const valuePairs: [number, number][] = [];
-    const len = Math.min(timestamps.length, values.length);
-    for (let i = 0; i < len; i++) {
-      const ts = timestamps[i];
-      const val = values[i];
-      const tsSeconds = ts > 1e12 ? Math.floor(ts / 1000) : ts;
-      valuePairs.push([tsSeconds, val == null ? 0 : val]);
-    }
-
-    return { metric, values: valuePairs };
-  }).filter((item): item is TimeseriesData => item !== null);
-
-  return { data: { resultType: 'matrix', result } };
-};
-
-const parseArray = (data: any): number[] => {
-  if (Array.isArray(data)) {
-    return data.map(v => v == null ? null as any : (typeof v === 'number' ? v : parseFloat(String(v))));
-  }
-  if (typeof data === 'string') {
-    try {
-      const parsed = JSON.parse(data);
-      if (Array.isArray(parsed)) return parseArray(parsed);
-    } catch (e) { /* ignore */ }
-  }
-  return [];
 };
 
 /**
