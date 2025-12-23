@@ -1866,7 +1866,6 @@ public class ConcurrentMapPartitionUpsertMetadataManagerTest {
   }
 
   // Tests for upsert metadata reversion functionality
-
   @Test
   public void testPartialUpsertSameDocsReplacement() throws IOException {
     // Test partial upserts with old and new segments having same number of docs
@@ -1878,7 +1877,6 @@ public class ConcurrentMapPartitionUpsertMetadataManagerTest {
     ConcurrentMapPartitionUpsertMetadataManager upsertMetadataManager =
         new ConcurrentMapPartitionUpsertMetadataManager(REALTIME_TABLE_NAME, 0, upsertContext);
 
-    // Create old segment with 3 records
     int numRecords1 = 3;
     int[] primaryKeys1 = new int[]{1, 2, 3};
     int[] timestamps1 = new int[]{100, 200, 300};
@@ -1894,7 +1892,6 @@ public class ConcurrentMapPartitionUpsertMetadataManagerTest {
 
     upsertMetadataManager.addSegment(segment1, validDocIds1, null, recordInfoList1.iterator());
 
-    // Verify initial state
     Map<Object, RecordLocation> recordLocationMap = upsertMetadataManager._primaryKeyToRecordLocationMap;
     assertEquals(recordLocationMap.size(), 3);
     checkRecordLocation(recordLocationMap, 1, segment1, 0, 100, HashFunction.NONE);
@@ -1991,7 +1988,6 @@ public class ConcurrentMapPartitionUpsertMetadataManagerTest {
     ConcurrentMapPartitionUpsertMetadataManager upsertMetadataManager =
         new ConcurrentMapPartitionUpsertMetadataManager(REALTIME_TABLE_NAME, 0, upsertContext);
 
-    // Create old segment with 2 records
     int numRecords1 = 2;
     int[] primaryKeys1 = new int[]{1, 2};
     int[] timestamps1 = new int[]{100, 200};
