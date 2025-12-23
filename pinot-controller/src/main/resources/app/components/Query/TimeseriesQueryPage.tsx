@@ -51,14 +51,15 @@ import { DEFAULT_SERIES_LIMIT } from '../../utils/ChartConstants';
 
 // Define proper types
 interface TimeseriesQueryResponse {
-  error: string;
-  data: {
-    resultType: string;
-    result: Array<{
-      metric: Record<string, string>;
-      values: [number, number][];
-    }>;
+  resultTable?: {
+    dataSchema: {
+      columnNames: string[];
+      columnDataTypes: string[];
+    };
+    rows: any[][];
   };
+  exceptions?: any[];
+  error?: string;
 }
 
 interface CodeMirrorEditor {
@@ -364,14 +365,13 @@ const TimeseriesQueryPage = () => {
   }, [handleQueryInterfaceKeyDown]);
 
   // Extract data processing logic
-  const processQueryResponse = useCallback((parsedData: any) => {
+  const processQueryResponse = useCallback((parsedData: TimeseriesQueryResponse) => {
     setRawOutput(JSON.stringify(parsedData, null, 2));
 
     // Check for errors
     const errorMsg = parsedData.error ||
       (parsedData.exceptions?.length > 0 ?
         parsedData.exceptions.map((e: any) => e.message || e.toString()).join('; ') : '');
-
     if (errorMsg) {
       setError(errorMsg);
       setChartSeries([]);
@@ -387,7 +387,9 @@ const TimeseriesQueryPage = () => {
       // Create truncated series for visualization (limit to seriesLimitInput or default to DEFAULT_SERIES_LIMIT)
       const limit = parseInt(seriesLimitInput, 10);
       const effectiveLimit = !isNaN(limit) && limit > 0 ? limit : DEFAULT_SERIES_LIMIT;
-      setChartSeries(series.slice(0, effectiveLimit));
+
+      const truncatedSeries = series.slice(0, effectiveLimit);
+      setChartSeries(truncatedSeries);
     } else {
       setChartSeries([]);
       setTotalSeriesCount(0);
