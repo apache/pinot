@@ -214,34 +214,6 @@ public class PinotQueryRuleSets {
           .withDescription(PlannerRuleNames.PRUNE_EMPTY_UNION).toRule()
   );
 
-  // Pinot specific rules that should be run AFTER all other rules
-  public static final List<RelOptRule> PINOT_POST_RULES = List.of(
-      // TODO: Merge the following 2 rules into a single rule
-      // add an extra exchange for sort
-      PinotSortExchangeNodeInsertRule.INSTANCE,
-      // copy exchanges down, this must be done after SortExchangeNodeInsertRule
-      PinotSortExchangeCopyRule.SORT_EXCHANGE_COPY,
-
-      PinotSingleValueAggregateRemoveRule.INSTANCE,
-      PinotJoinExchangeNodeInsertRule.INSTANCE,
-      PinotAggregateExchangeNodeInsertRule.SortProjectAggregate.INSTANCE,
-      PinotAggregateExchangeNodeInsertRule.SortAggregate.INSTANCE,
-      PinotAggregateExchangeNodeInsertRule.WithoutSort.INSTANCE,
-      PinotWindowSplitRule.INSTANCE,
-      PinotWindowExchangeNodeInsertRule.INSTANCE,
-      PinotSetOpExchangeNodeInsertRule.INSTANCE,
-
-      // apply dynamic broadcast rule after exchange is inserted/
-      PinotJoinToDynamicBroadcastRule.INSTANCE,
-
-      // remove exchanges when there's duplicates
-      PinotExchangeEliminationRule.INSTANCE,
-
-      // Evaluate the Literal filter nodes
-      CoreRules.FILTER_REDUCE_EXPRESSIONS,
-      PinotTableScanConverterRule.INSTANCE
-  );
-
   public static final List<RelOptRule> PINOT_POST_RULES_V2 = List.of(
       PinotTableScanConverterRule.INSTANCE,
       PinotLogicalAggregateRule.SortProjectAggregate.INSTANCE,
@@ -253,6 +225,7 @@ public class PinotQueryRuleSets {
   );
   //@formatter:on
 
+  /// Pinot specific rules that should be run AFTER all other rules
   public static List<RelOptRule> getPinotPostRules(int sortExchangeCopyLimit) {
 
     // copy exchanges down, this must be done after SortExchangeNodeInsertRule
