@@ -166,14 +166,15 @@ public class StatMap<K extends Enum<K> & StatMap.Key> {
     }
   }
 
-  /// Returns the value associated with the key name.
-  ///
-  /// In general, it is better to use the type-specific getters with the enum key directly, but sometimes it is
-  /// impossible or requires complex to read code (like complex unsafe casts).
-  ///
-  /// @param keyName The name of the key.
-  /// @param defaultValue The default value to return if the key is not found.
-  /// @throws ClassCastException if the value cannot be cast to the same static type as the default value.
+  /**
+   * Returns the value associated with the key name.
+   *
+   * In general, it is better to use the type-specific getters with the enum key directly, but sometimes it is
+   * impossible or requires complex to read code (like complex unsafe casts).
+   *
+   * @param keyName The name of the key.
+   * @param defaultValue The default value to return if the key is not found.
+   */
   public <E> E getUnsafe(String keyName, E defaultValue)
       throws ClassCastException {
     K[] keys = keys();
