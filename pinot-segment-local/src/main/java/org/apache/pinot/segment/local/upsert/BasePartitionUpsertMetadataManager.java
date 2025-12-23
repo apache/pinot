@@ -678,8 +678,7 @@ public abstract class BasePartitionUpsertMetadataManager implements PartitionUps
         _serverMetrics.addMeteredTableValue(_tableNameWithType, ServerMeter.REALTIME_UPSERT_INCONSISTENT_ROWS,
             numKeysNotReplaced);
         // Revert consuming segment pks to previous segment locations and perform metadata replacement again
-        revertSegmentUpsertMetadata(segment, validDocIds, queryableDocIds, oldSegment, segmentName,
-            validDocIdsForOldSegment);
+        revertSegmentUpsertMetadata(segment, validDocIds, queryableDocIds, oldSegment, segmentName);
       } else if (_partialUpsertHandler != null) {
         // For partial-upsert table, because we do not restore the original record location when removing the primary
         // keys not replaced, it can potentially cause inconsistency between replicas. This can happen when a
@@ -692,8 +691,7 @@ public abstract class BasePartitionUpsertMetadataManager implements PartitionUps
         _serverMetrics.addMeteredTableValue(_tableNameWithType, ServerMeter.PARTIAL_UPSERT_KEYS_NOT_REPLACED,
             numKeysNotReplaced);
         // Revert consuming segment pks to previous segment locations and perform metadata replacement again
-        revertSegmentUpsertMetadata(segment, validDocIds, queryableDocIds, oldSegment, segmentName,
-            validDocIdsForOldSegment);
+        revertSegmentUpsertMetadata(segment, validDocIds, queryableDocIds, oldSegment, segmentName);
       } else {
         _logger.info("Found {} primary keys not replaced when replacing segment: {}", numKeysNotReplaced, segmentName);
       }
@@ -702,10 +700,9 @@ public abstract class BasePartitionUpsertMetadataManager implements PartitionUps
   }
 
   private void revertSegmentUpsertMetadata(ImmutableSegment segment, ThreadSafeMutableRoaringBitmap validDocIds,
-      ThreadSafeMutableRoaringBitmap queryableDocIds, IndexSegment oldSegment, String segmentName,
-      MutableRoaringBitmap validDocIdsForOldSegment) {
+      ThreadSafeMutableRoaringBitmap queryableDocIds, IndexSegment oldSegment, String segmentName) {
     revertCurrentSegmentUpsertMetadata(oldSegment, validDocIds, queryableDocIds);
-    validDocIdsForOldSegment = getValidDocIdsForOldSegment(oldSegment);
+    MutableRoaringBitmap validDocIdsForOldSegment = getValidDocIdsForOldSegment(oldSegment);
     try (UpsertUtils.RecordInfoReader recordInfoReader = new UpsertUtils.RecordInfoReader(segment, _primaryKeyColumns,
         _comparisonColumns, _deleteRecordColumn)) {
       Iterator<RecordInfo> latestRecordInfoIterator =
