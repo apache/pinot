@@ -563,13 +563,13 @@ const TimeseriesQueryPage = () => {
         {rawOutput && (
           <Grid item xs style={{ backgroundColor: 'white' }}>
                          <ViewToggle
-              viewType={viewType}
-              onViewChange={setViewType}
-              isChartDisabled={chartSeries.length === 0}
-              onCopy={copyToClipboard}
-              copyMsg={copyMsg}
-              classes={classes}
-            />
+               viewType={viewType}
+               onViewChange={setViewType}
+               isChartDisabled={chartSeries.length === 0}
+               onCopy={copyToClipboard}
+               copyMsg={copyMsg}
+               classes={classes}
+             />
 
               {error && (
                 <Alert severity="error" className={classes.sqlError}>
