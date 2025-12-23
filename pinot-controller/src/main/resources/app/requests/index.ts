@@ -240,7 +240,7 @@ export const getQueryResult = (params: Object): Promise<AxiosResponse<SQLResult>
   transformApi.post(`/sql`, params, {headers});
 
 export const getTimeSeriesQueryResult = (params: Object): Promise<AxiosResponse<any>> =>
-  transformApi.get(`/timeseries/api/v1/query_range`, { params });
+  transformApi.post(`/query/timeseries`, params);
 
 export const getTimeSeriesLanguages = (): Promise<AxiosResponse<string[]>> =>
   baseApi.get('/timeseries/languages');
