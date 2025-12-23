@@ -69,10 +69,12 @@ public class ConcurrentMapPartitionUpsertMetadataManagerForConsistentDeletes
   final ConcurrentHashMap<Object, ConcurrentMapPartitionUpsertMetadataManagerForConsistentDeletes.RecordLocation>
       _primaryKeyToRecordLocationMap = new ConcurrentHashMap<>();
 
-  final ConcurrentHashMap<Object, ConcurrentMapPartitionUpsertMetadataManagerForConsistentDeletes.RecordLocation>
+  private final ConcurrentHashMap<Object,
+      ConcurrentMapPartitionUpsertMetadataManagerForConsistentDeletes.RecordLocation>
       _previousKeyToRecordLocationMap = new ConcurrentHashMap<>();
 
-  final Set<Object> _newlyAddedKeys = new HashSet<>();
+  private final Map<Object, ConcurrentMapPartitionUpsertMetadataManagerForConsistentDeletes.RecordLocation>
+      _newlyAddedKeys = new ConcurrentHashMap<>();
 
   // Used to initialize a reference to previous row for merging in partial upsert
   private final LazyRow _reusePreviousRow = new LazyRow();
@@ -122,8 +124,13 @@ public class ConcurrentMapPartitionUpsertMetadataManagerForConsistentDeletes
               if (currentSegment == segment) {
                 if (comparisonResult >= 0) {
                   replaceDocId(segment, validDocIds, queryableDocIds, currentDocId, newDocId, recordInfo);
-                  return new ConcurrentMapPartitionUpsertMetadataManagerForConsistentDeletes.RecordLocation(segment,
+                  RecordLocation newRecordLocation = new RecordLocation(segment,
                       newDocId, newComparisonValue, currentDistinctSegmentCount);
+                  // Track the record location of the newly added keys
+                  if (_newlyAddedKeys.containsKey(primaryKey)) {
+                    _newlyAddedKeys.put(primaryKey, newRecordLocation);
+                  }
+                  return newRecordLocation;
                 } else {
                   return currentRecordLocation;
                 }
@@ -185,7 +192,9 @@ public class ConcurrentMapPartitionUpsertMetadataManagerForConsistentDeletes
             } else {
               // New primary key
               addDocId(segment, validDocIds, queryableDocIds, newDocId, recordInfo);
-              return new RecordLocation(segment, newDocId, newComparisonValue, 1);
+              RecordLocation newRecordLocation = new RecordLocation(segment, newDocId, newComparisonValue, 1);
+              _newlyAddedKeys.put(primaryKey, newRecordLocation);
+              return newRecordLocation;
             }
           });
     }
@@ -270,10 +279,9 @@ public class ConcurrentMapPartitionUpsertMetadataManagerForConsistentDeletes
 
   @Override
   protected void removeNewlyAddedKeys(IndexSegment oldSegment) {
-    for (Object entry : _newlyAddedKeys) {
-      RecordLocation value = _primaryKeyToRecordLocationMap.get(entry);
-      _primaryKeyToRecordLocationMap.remove(entry);
-      removeDocId(oldSegment, value.getDocId());
+    for (Map.Entry<Object, RecordLocation> entry : _newlyAddedKeys.entrySet()) {
+      _primaryKeyToRecordLocationMap.remove(entry.getKey());
+      removeDocId(oldSegment, entry.getValue().getDocId());
     }
     _newlyAddedKeys.clear();
   }
