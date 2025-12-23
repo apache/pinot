@@ -38,7 +38,7 @@ import { UnControlled as CodeMirror } from 'react-codemirror2';
 import 'codemirror/lib/codemirror.css';
 import 'codemirror/theme/material.css';
 import 'codemirror/mode/javascript/javascript';
-import { getTimeSeriesQueryResult, getTimeSeriesLanguages } from '../../requests';
+import { getTimeSeriesLanguages } from '../../requests';
 import { useHistory, useLocation } from 'react-router';
 import TableToolbar from '../TableToolbar';
 import { Resizable } from 're-resizable';
@@ -46,21 +46,10 @@ import SimpleAccordion from '../SimpleAccordion';
 import TimeseriesChart from './TimeseriesChart';
 import MetricStatsTable from './MetricStatsTable';
 import { parseTimeseriesResponse, isBrokerFormat } from '../../utils/TimeseriesUtils';
-import { ChartSeries } from 'Models';
+import { ChartSeries, TableData } from 'Models';
 import { DEFAULT_SERIES_LIMIT } from '../../utils/ChartConstants';
-
-// Define proper types
-interface TimeseriesQueryResponse {
-  resultTable?: {
-    dataSchema: {
-      columnNames: string[];
-      columnDataTypes: string[];
-    };
-    rows: any[][];
-  };
-  exceptions?: any[];
-  error?: string;
-}
+import CustomizedTables from '../Table';
+import PinotMethodUtils from '../../utils/PinotMethodUtils';
 
 interface CodeMirrorEditor {
   getValue: () => string;
@@ -276,6 +265,10 @@ const TimeseriesQueryPage = () => {
   const [viewType, setViewType] = useState<'json' | 'chart'>('chart');
   const [selectedMetric, setSelectedMetric] = useState<string | null>(null);
   const [seriesLimitInput, setSeriesLimitInput] = useState<string>(DEFAULT_SERIES_LIMIT.toString());
+  const [queryStats, setQueryStats] = useState<TableData>({
+    columns: [],
+    records: [],
+  });
 
 
   // Fetch supported languages from controller configuration
@@ -364,38 +357,6 @@ const TimeseriesQueryPage = () => {
     handleQueryInterfaceKeyDownRef.current = handleQueryInterfaceKeyDown;
   }, [handleQueryInterfaceKeyDown]);
 
-  // Extract data processing logic
-  const processQueryResponse = useCallback((parsedData: TimeseriesQueryResponse) => {
-    setRawOutput(JSON.stringify(parsedData, null, 2));
-
-    // Check for errors
-    const errorMsg = parsedData.error ||
-      (parsedData.exceptions?.length > 0 ?
-        parsedData.exceptions.map((e: any) => e.message || e.toString()).join('; ') : '');
-    if (errorMsg) {
-      setError(errorMsg);
-      setChartSeries([]);
-      setTotalSeriesCount(0);
-      return;
-    }
-
-    // Parse broker response directly
-    if (isBrokerFormat(parsedData)) {
-      const series = parseTimeseriesResponse(parsedData);
-      setTotalSeriesCount(series.length);
-
-      // Create truncated series for visualization (limit to seriesLimitInput or default to DEFAULT_SERIES_LIMIT)
-      const limit = parseInt(seriesLimitInput, 10);
-      const effectiveLimit = !isNaN(limit) && limit > 0 ? limit : DEFAULT_SERIES_LIMIT;
-
-      const truncatedSeries = series.slice(0, effectiveLimit);
-      setChartSeries(truncatedSeries);
-    } else {
-      setChartSeries([]);
-      setTotalSeriesCount(0);
-    }
-  }, [seriesLimitInput]);
-
   const handleExecuteQuery = useCallback(async () => {
     if (!config.query.trim()) {
       setError('Please enter a query');
@@ -409,6 +370,7 @@ const TimeseriesQueryPage = () => {
     setSelectedMetric(null);
     setChartSeries([]);
     setTotalSeriesCount(0);
+    setQueryStats({ columns: [], records: [] });
 
     try {
       const requestPayload = {
@@ -421,14 +383,39 @@ const TimeseriesQueryPage = () => {
         queryOptions: `timeoutMs=${config.timeout}`
       };
 
-      const response = await getTimeSeriesQueryResult(requestPayload);
+      // Call the API and process with the shared broker response processor
+      const results = await PinotMethodUtils.getTimeseriesQueryResults(requestPayload);
 
-      // Handle response data - it might be stringified JSON or already an object
-      const parsedData = typeof response.data === 'string'
-        ? JSON.parse(response.data)
-        : response.data;
+      // Set raw output
+      setRawOutput(JSON.stringify(results.data, null, 2));
 
-      processQueryResponse(parsedData);
+      // Set query stats (already extracted by the utility)
+      setQueryStats(results.queryStats || { columns: [], records: [] });
+
+      // Handle exceptions/errors
+      if (results.exceptions && results.exceptions.length > 0) {
+        const errorMsg = results.exceptions.map((e: any) => e.message || e.toString()).join('; ');
+        setError(errorMsg);
+        setChartSeries([]);
+        setTotalSeriesCount(0);
+        return;
+      }
+
+      // Parse timeseries data for visualization
+      if (isBrokerFormat(results.data)) {
+        const series = parseTimeseriesResponse(results.data);
+        setTotalSeriesCount(series.length);
+
+        // Create truncated series for visualization
+        const limit = parseInt(seriesLimitInput, 10);
+        const effectiveLimit = !isNaN(limit) && limit > 0 ? limit : DEFAULT_SERIES_LIMIT;
+
+        const truncatedSeries = series.slice(0, effectiveLimit);
+        setChartSeries(truncatedSeries);
+      } else {
+        setChartSeries([]);
+        setTotalSeriesCount(0);
+      }
     } catch (error) {
       console.error('Error executing timeseries query:', error);
       const errorMessage = error.response?.data?.message || error.message || 'Unknown error occurred';
@@ -436,7 +423,7 @@ const TimeseriesQueryPage = () => {
     } finally {
       setIsLoading(false);
     }
-  }, [config, updateURL, processQueryResponse]);
+  }, [config, updateURL, seriesLimitInput]);
 
   const copyToClipboard = () => {
     const aux = document.createElement('input');
@@ -562,16 +549,27 @@ const TimeseriesQueryPage = () => {
           </Grid>
         </Grid>
 
+        {queryStats.columns.length > 0 && (
+                <Grid item xs style={{ backgroundColor: 'white' }}>
+                  <CustomizedTables
+                    title="Query Response Stats"
+                    data={queryStats}
+                    showSearchBox={true}
+                    inAccordionFormat={true}
+                  />
+                </Grid>
+              )}
+
         {rawOutput && (
           <Grid item xs style={{ backgroundColor: 'white' }}>
                          <ViewToggle
-               viewType={viewType}
-               onViewChange={setViewType}
-               isChartDisabled={chartSeries.length === 0}
-               onCopy={copyToClipboard}
-               copyMsg={copyMsg}
-               classes={classes}
-             />
+              viewType={viewType}
+              onViewChange={setViewType}
+              isChartDisabled={chartSeries.length === 0}
+              onCopy={copyToClipboard}
+              copyMsg={copyMsg}
+              classes={classes}
+            />
 
               {error && (
                 <Alert severity="error" className={classes.sqlError}>

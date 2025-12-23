@@ -62,6 +62,7 @@ import {
   getQueryTables,
   getTableSchema,
   getQueryResult,
+  getTimeSeriesQueryResult,
   getTenantTable,
   getTableSize,
   getIdealState,
@@ -313,82 +314,106 @@ const getAsObject = (str: SQLResult) => {
   return str;
 };
 
+// Query stats column names (used for both SQL and Timeseries queries)
+const QUERY_STATS_COLUMNS = ['timeUsedMs',
+  'numDocsScanned',
+  'totalDocs',
+  'numServersQueried',
+  'numServersResponded',
+  'numSegmentsQueried',
+  'numSegmentsProcessed',
+  'numSegmentsMatched',
+  'numConsumingSegmentsQueried',
+  'numEntriesScannedInFilter',
+  'numEntriesScannedPostFilter',
+  'numGroupsLimitReached',
+  'numGroupsWarningLimitReached',
+  'partialResult',
+  'minConsumingFreshnessTimeMs',
+  'offlineThreadCpuTimeNs',
+  'realtimeThreadCpuTimeNs',
+  'offlineSystemActivitiesCpuTimeNs',
+  'realtimeSystemActivitiesCpuTimeNs',
+  'offlineResponseSerializationCpuTimeNs',
+  'realtimeResponseSerializationCpuTimeNs',
+  'offlineTotalCpuTimeNs',
+  'realtimeTotalCpuTimeNs'
+];
+
+// Extract query stats from broker response
+// This utility can be used for both SQL and Timeseries queries
+const extractQueryStatsFromResponse = (queryResponse) => {
+  const partialResult = queryResponse.partialResult ?? queryResponse.partialResponse;
+
+  return {
+    columns: QUERY_STATS_COLUMNS,
+    records: [[queryResponse.timeUsedMs, queryResponse.numDocsScanned, queryResponse.totalDocs, queryResponse.numServersQueried, queryResponse.numServersResponded,
+      queryResponse.numSegmentsQueried, queryResponse.numSegmentsProcessed, queryResponse.numSegmentsMatched, queryResponse.numConsumingSegmentsQueried,
+      queryResponse.numEntriesScannedInFilter, queryResponse.numEntriesScannedPostFilter, queryResponse.numGroupsLimitReached, queryResponse.numGroupsWarningLimitReached,
+      partialResult ?? '-', queryResponse.minConsumingFreshnessTimeMs,
+      queryResponse.offlineThreadCpuTimeNs, queryResponse.realtimeThreadCpuTimeNs,
+      queryResponse.offlineSystemActivitiesCpuTimeNs, queryResponse.realtimeSystemActivitiesCpuTimeNs,
+      queryResponse.offlineResponseSerializationCpuTimeNs, queryResponse.realtimeResponseSerializationCpuTimeNs,
+      queryResponse.offlineTotalCpuTimeNs, queryResponse.realtimeTotalCpuTimeNs]]
+  };
+};
+
+// Process broker response (used for both SQL and Timeseries queries)
+// Both APIs return BrokerResponseNativeV2 structure
+const processBrokerResponse = (queryResponse) => {
+  let exceptions: SqlException[] = [];
+  let dataArray = [];
+  let columnList = [];
+
+  // if sql api throws error, handle here
+  if(typeof queryResponse === 'string'){
+    exceptions.push({errorCode: null, message: queryResponse});
+  }
+  // if sql api returns a structured error with a `code`, handle here
+  if (queryResponse && queryResponse.code) {
+    if (queryResponse.error) {
+      exceptions.push({errorCode: null, message: "Query failed with error code: " + queryResponse.code + " and error: " + queryResponse.error});
+    } else {
+      exceptions.push({errorCode: null, message: "Query failed with error code: " + queryResponse.code + " but no logs. Please see controller logs for error."});
+    }
+  }
+  if (queryResponse && queryResponse.exceptions && queryResponse.exceptions.length) {
+    exceptions = queryResponse.exceptions as SqlException[];
+  }
+  if (queryResponse.resultTable?.dataSchema?.columnNames?.length) {
+    columnList = queryResponse.resultTable.dataSchema.columnNames;
+    dataArray = queryResponse.resultTable.rows;
+  }
+
+  return {
+    exceptions: exceptions,
+    result: {
+      columns: columnList,
+      records: dataArray,
+    },
+    queryStats: extractQueryStatsFromResponse(queryResponse),
+    data: queryResponse,
+  };
+};
+
 // This method is used to display query output in tabular format as well as JSON format on query page
 // API: /:urlName (Eg: sql or pql)
 // Expected Output: {columns: [], records: []}
 const getQueryResults = (params) => {
   return getQueryResult(params).then(({ data }) => {
     let queryResponse = getAsObject(data);
+    return processBrokerResponse(queryResponse);
+  });
+};
 
-    let exceptions: SqlException[] = [];
-    let dataArray = [];
-    let columnList = [];
-    // if sql api throws error, handle here
-    if(typeof queryResponse === 'string'){
-      exceptions.push({errorCode: null, message: queryResponse});
-    }
-    // if sql api returns a structured error with a `code`, handle here
-    if (queryResponse && queryResponse.code) {
-      if (queryResponse.error) {
-        exceptions.push({errorCode: null, message: "Query failed with error code: " + queryResponse.code + " and error: " + queryResponse.error});
-      } else {
-        exceptions.push({errorCode: null, message: "Query failed with error code: " + queryResponse.code + " but no logs. Please see controller logs for error."});
-      }
-    }
-    if (queryResponse && queryResponse.exceptions && queryResponse.exceptions.length) {
-      exceptions = queryResponse.exceptions as SqlException[];
-    }
-    if (queryResponse.resultTable?.dataSchema?.columnNames?.length) {
-      columnList = queryResponse.resultTable.dataSchema.columnNames;
-      dataArray = queryResponse.resultTable.rows;
-    }
-
-    const columnStats = ['timeUsedMs',
-      'numDocsScanned',
-      'totalDocs',
-      'numServersQueried',
-      'numServersResponded',
-      'numSegmentsQueried',
-      'numSegmentsProcessed',
-      'numSegmentsMatched',
-      'numConsumingSegmentsQueried',
-      'numEntriesScannedInFilter',
-      'numEntriesScannedPostFilter',
-      'numGroupsLimitReached',
-      'numGroupsWarningLimitReached',
-      'partialResult',
-      'minConsumingFreshnessTimeMs',
-      'offlineThreadCpuTimeNs',
-      'realtimeThreadCpuTimeNs',
-      'offlineSystemActivitiesCpuTimeNs',
-      'realtimeSystemActivitiesCpuTimeNs',
-      'offlineResponseSerializationCpuTimeNs',
-      'realtimeResponseSerializationCpuTimeNs',
-      'offlineTotalCpuTimeNs',
-      'realtimeTotalCpuTimeNs'
-    ];
-
-    const partialResult = queryResponse.partialResult ?? queryResponse.partialResponse;
-
-    return {
-      exceptions: exceptions,
-      result: {
-        columns: columnList,
-        records: dataArray,
-      },
-      queryStats: {
-        columns: columnStats,
-        records: [[queryResponse.timeUsedMs, queryResponse.numDocsScanned, queryResponse.totalDocs, queryResponse.numServersQueried, queryResponse.numServersResponded,
-          queryResponse.numSegmentsQueried, queryResponse.numSegmentsProcessed, queryResponse.numSegmentsMatched, queryResponse.numConsumingSegmentsQueried,
-          queryResponse.numEntriesScannedInFilter, queryResponse.numEntriesScannedPostFilter, queryResponse.numGroupsLimitReached, queryResponse.numGroupsWarningLimitReached,
-          partialResult ?? '-', queryResponse.minConsumingFreshnessTimeMs,
-          queryResponse.offlineThreadCpuTimeNs, queryResponse.realtimeThreadCpuTimeNs,
-          queryResponse.offlineSystemActivitiesCpuTimeNs, queryResponse.realtimeSystemActivitiesCpuTimeNs,
-          queryResponse.offlineResponseSerializationCpuTimeNs, queryResponse.realtimeResponseSerializationCpuTimeNs,
-          queryResponse.offlineTotalCpuTimeNs, queryResponse.realtimeTotalCpuTimeNs]]
-      },
-      data: queryResponse,
-    };
+// This method processes timeseries query results
+// Uses the same processBrokerResponse as SQL queries since both return BrokerResponseNativeV2
+// API: /query/timeseries
+// Expected Output: {exceptions: [], result: {columns: [], records: []}, queryStats: {columns: [], records: []}, data: {}}
+const getTimeseriesQueryResults = (params) => {
+  return getTimeSeriesQueryResult(params).then(({ data }) => {
+    let queryResponse = getAsObject(data);
+    return processBrokerResponse(queryResponse);
   });
 };
 
@@ -1381,7 +1406,7 @@ const getPackageVersionsData = () => {
       packageName,
       String(version)
     ]);
-    
+
     return {
       columns: ['Package', 'Version'],
       records: records
@@ -1399,6 +1424,7 @@ export default {
   getQueryLogicalTablesList,
   getTableSchemaData,
   getQueryResults,
+  getTimeseriesQueryResults,
   getTenantTableData,
   allTableDetailsColumnHeader,
   getAllTableDetails,
@@ -1490,3 +1516,6 @@ export default {
   getConsumingSegmentsInfoData,
   getPackageVersionsData
 };
+
+// Named exports for shared constants and utilities
+export { QUERY_STATS_COLUMNS, processBrokerResponse };
