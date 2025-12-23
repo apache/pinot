@@ -611,9 +611,11 @@ public class CommonConstants {
     /// This can be optimized by having each upstream send only the top Y rows to the downstream.
     ///
     /// We only apply this optimization when Y is small smaller than the value of this property.
-    /// The default value of -1 means to use a heuristic value which may change from Pinot version to version.
+    /// The default value is a heuristic value which may change from Pinot version to version.
     public static final String CONFIG_OF_SORT_EXCHANGE_COPY_THRESHOLD =
         "pinot.broker.multistage.sort.exchange.copy.threshold";
+    // TODO: Change this default to something very high, as this _optimnization_ is usually not beneficial.
+    public static final int DEFAULT_SORT_EXCHANGE_COPY_THRESHOLD = 10_000;
 
     public static class Request {
       public static final String SQL = "sql";
@@ -863,8 +865,6 @@ public class CommonConstants {
 
         /// Option to customize the value of [Broker#CONFIG_OF_SORT_EXCHANGE_COPY_THRESHOLD]
         public static final String SORT_EXCHANGE_COPY_THRESHOLD = "sortExchangeCopyThreshold";
-
-        public static final int DEFAULT_SORT_EXCHANGE_COPY_THRESHOLD = -1;
       }
 
       public static class QueryOptionValue {

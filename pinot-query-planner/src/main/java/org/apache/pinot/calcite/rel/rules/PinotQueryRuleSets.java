@@ -230,7 +230,7 @@ public class PinotQueryRuleSets {
 
     // copy exchanges down, this must be done after SortExchangeNodeInsertRule
     PinotSortExchangeCopyRule sortExchangeCopyRule;
-    if (sortExchangeCopyLimit > 0) {
+    if (sortExchangeCopyLimit != PinotSortExchangeCopyRule.SORT_EXCHANGE_COPY.config.getFetchLimitThreshold()) {
       sortExchangeCopyRule = ImmutablePinotSortExchangeCopyRule.Config.builder()
           .from(PinotSortExchangeCopyRule.Config.DEFAULT)
           .fetchLimitThreshold(sortExchangeCopyLimit)

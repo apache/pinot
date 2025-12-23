@@ -35,14 +35,14 @@ import org.apache.calcite.sql.type.SqlTypeName;
 import org.apache.pinot.calcite.rel.logical.PinotLogicalSortExchange;
 import org.apache.pinot.query.planner.logical.RexExpressionUtils;
 import org.apache.pinot.query.type.TypeFactory;
+import org.apache.pinot.spi.utils.CommonConstants;
 import org.immutables.value.Value;
 
 
 @Value.Enclosing
-public class PinotSortExchangeCopyRule extends RelRule<RelRule.Config> {
+public class PinotSortExchangeCopyRule extends RelRule<PinotSortExchangeCopyRule.Config> {
   public static final PinotSortExchangeCopyRule SORT_EXCHANGE_COPY =
       PinotSortExchangeCopyRule.Config.DEFAULT.toRule();
-  private static final int DEFAULT_SORT_EXCHANGE_COPY_THRESHOLD = 10_000;
   private static final TypeFactory TYPE_FACTORY = new TypeFactory();
   private static final RexBuilder REX_BUILDER = new RexBuilder(TYPE_FACTORY);
   private static final RexLiteral REX_ZERO = REX_BUILDER.makeLiteral(0,
@@ -119,7 +119,7 @@ public class PinotSortExchangeCopyRule extends RelRule<RelRule.Config> {
 
     @Value.Default
     default int getFetchLimitThreshold() {
-      return DEFAULT_SORT_EXCHANGE_COPY_THRESHOLD;
+      return CommonConstants.Broker.DEFAULT_SORT_EXCHANGE_COPY_THRESHOLD;
     }
   }
 }
