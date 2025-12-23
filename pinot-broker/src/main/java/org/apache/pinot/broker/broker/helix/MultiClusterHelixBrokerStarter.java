@@ -81,21 +81,72 @@ public class MultiClusterHelixBrokerStarter extends BaseBrokerStarter {
       throws Exception {
     LOGGER.info("[multi-cluster] Starting multi-cluster broker");
     super.start();
-    startForRemoteClusters();
+    // build routing tables for remote clusters
+    initRemoteClusterRouting();
     LOGGER.info("[multi-cluster] Multi-cluster broker started successfully");
   }
 
-  public void startForRemoteClusters() throws Exception {
-    // setup spectator Helix managers for remote clusters
-    initRemoteClusterSpectatorHelixManagers();
-    // setup federated routing manager for remote clusters
-    initRemoteClusterFederatedRoutingManager();
-    initRemoteClusterFederationProvider(_tableCache,
-        _brokerConf.getProperty(Helix.ENABLE_CASE_INSENSITIVE_KEY, Helix.DEFAULT_ENABLE_CASE_INSENSITIVE));
-    // build routing tables for remote clusters
-    initRemoteClusterRouting();
-    // setup cluster change mediators for remote clusters
-    initRemoteClusterChangeMediator();
+  @Override
+  protected void initSpectatorHelixManager() throws Exception {
+    super.initSpectatorHelixManager();
+    try {
+      initRemoteClusterSpectatorHelixManagers();
+    } catch (Exception e) {
+      LOGGER.error("[multi-cluster] Failed to initialize remote cluster spectator Helix managers", e);
+    }
+  }
+
+  @Override
+  protected void initRoutingManager() throws Exception {
+    super.initRoutingManager();
+    try {
+      initRemoteClusterFederatedRoutingManager();
+    } catch (Exception e) {
+      LOGGER.error("[multi-cluster] Failed to initialize remote cluster federated routing manager", e);
+    }
+  }
+
+  @Override
+  protected void initClusterChangeMediator() throws Exception {
+    super.initClusterChangeMediator();
+    try {
+      initRemoteClusterChangeMediator();
+    } catch (Exception e) {
+      LOGGER.error("[multi-cluster] Failed to initialize remote cluster change mediator", e);
+    }
+  }
+
+  private void initRemoteClusterSpectatorHelixManagers() throws Exception {
+    if (_remoteZkServers == null || _remoteZkServers.isEmpty()) {
+      LOGGER.info("[multi-cluster] No remote ZK servers configured - skipping spectator Helix manager init");
+      return;
+    }
+
+    LOGGER.info("[multi-cluster] Initializing spectator Helix managers for {} remote clusters",
+      _remoteZkServers.size());
+    _remoteSpectatorHelixManager = new HashMap<>();
+
+    for (Map.Entry<String, String> entry : _remoteZkServers.entrySet()) {
+      String clusterName = entry.getKey();
+      String zkServers = entry.getValue();
+      try {
+        HelixManager helixManager = HelixManagerFactory.getZKHelixManager(
+          clusterName, _instanceId, InstanceType.SPECTATOR, zkServers);
+        helixManager.connect();
+        _remoteSpectatorHelixManager.put(clusterName, helixManager);
+        LOGGER.info("[multi-cluster] Connected to remote cluster '{}' at ZK: {}", clusterName, zkServers);
+      } catch (Exception e) {
+        LOGGER.error("[multi-cluster] Failed to connect to cluster '{}' at ZK: {}", clusterName, zkServers, e);
+      }
+    }
+
+    if (_remoteSpectatorHelixManager.isEmpty()) {
+      LOGGER.error("[multi-cluster] Failed to connect to any remote clusters - "
+        + "multi-cluster will not be functional");
+    } else {
+      LOGGER.info("[multi-cluster] Connected to {}/{} remote clusters: {}", _remoteSpectatorHelixManager.size(),
+        _remoteZkServers.size(), _remoteSpectatorHelixManager.keySet());
+    }
   }
 
   protected void stopRemoteClusterComponents() {
@@ -146,39 +197,6 @@ public class MultiClusterHelixBrokerStarter extends BaseBrokerStarter {
     } else {
       LOGGER.info("[multi-cluster] Initialized {} remote cluster(s): {}", _remoteZkServers.size(),
           _remoteZkServers.keySet());
-    }
-  }
-
-  private void initRemoteClusterSpectatorHelixManagers() throws Exception {
-    if (_remoteZkServers == null || _remoteZkServers.isEmpty()) {
-      LOGGER.info("[multi-cluster] No remote ZK servers configured - skipping spectator Helix manager init");
-      return;
-    }
-
-    LOGGER.info("[multi-cluster] Initializing spectator Helix managers for {} remote clusters",
-        _remoteZkServers.size());
-    _remoteSpectatorHelixManager = new HashMap<>();
-
-    for (Map.Entry<String, String> entry : _remoteZkServers.entrySet()) {
-      String clusterName = entry.getKey();
-      String zkServers = entry.getValue();
-      try {
-        HelixManager helixManager = HelixManagerFactory.getZKHelixManager(
-            clusterName, _instanceId, InstanceType.SPECTATOR, zkServers);
-        helixManager.connect();
-        _remoteSpectatorHelixManager.put(clusterName, helixManager);
-        LOGGER.info("[multi-cluster] Connected to remote cluster '{}' at ZK: {}", clusterName, zkServers);
-      } catch (Exception e) {
-        LOGGER.error("[multi-cluster] Failed to connect to cluster '{}' at ZK: {}", clusterName, zkServers, e);
-      }
-    }
-
-    if (_remoteSpectatorHelixManager.isEmpty()) {
-      LOGGER.error("[multi-cluster] Failed to connect to any remote clusters - "
-          + "multi-cluster will not be functional");
-    } else {
-      LOGGER.info("[multi-cluster] Connected to {}/{} remote clusters: {}", _remoteSpectatorHelixManager.size(),
-          _remoteZkServers.size(), _remoteSpectatorHelixManager.keySet());
     }
   }
 
@@ -321,6 +339,13 @@ public class MultiClusterHelixBrokerStarter extends BaseBrokerStarter {
 
     LOGGER.info("[multi-cluster] Initialized {}/{} cluster change mediators", _remoteClusterChangeMediator.size(),
         _remoteSpectatorHelixManager.size());
+  }
+
+  @Override
+  protected MultiClusterRoutingContext getMultiClusterRoutingContext() {
+    initRemoteClusterFederationProvider(_tableCache,
+      _brokerConf.getProperty(Helix.ENABLE_CASE_INSENSITIVE_KEY, Helix.DEFAULT_ENABLE_CASE_INSENSITIVE));
+    return _multiClusterRoutingContext;
   }
 
   @Override
