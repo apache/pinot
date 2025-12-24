@@ -27,7 +27,6 @@ import org.apache.commons.io.FileUtils;
 import org.apache.pinot.client.Connection;
 import org.apache.pinot.client.ConnectionFactory;
 import org.apache.pinot.client.JsonAsyncHttpPinotClientTransportFactory;
-import org.apache.pinot.controller.helix.ControllerRequestClient;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.env.PinotConfiguration;
@@ -102,12 +101,8 @@ public class RowLevelSecurityIntegrationTest extends BaseClusterIntegrationTest 
   }
 
   @Override
-  public ControllerRequestClient getControllerRequestClient() {
-    if (_controllerRequestClient == null) {
-      _controllerRequestClient =
-          new ControllerRequestClient(_controllerRequestURLBuilder, getHttpClient(), AUTH_HEADER);
-    }
-    return _controllerRequestClient;
+  protected Map<String, String> getControllerRequestClientHeaders() {
+    return AUTH_HEADER;
   }
 
   @Override

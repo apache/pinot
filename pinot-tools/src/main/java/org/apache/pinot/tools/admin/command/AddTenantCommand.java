@@ -18,13 +18,13 @@
  */
 package org.apache.pinot.tools.admin.command;
 
-import org.apache.pinot.common.auth.AuthProviderUtils;
+import java.net.URI;
+import org.apache.pinot.client.admin.PinotAdminClient;
+import org.apache.pinot.client.admin.PinotAdminException;
 import org.apache.pinot.spi.auth.AuthProvider;
 import org.apache.pinot.spi.config.tenant.Tenant;
 import org.apache.pinot.spi.config.tenant.TenantRole;
-import org.apache.pinot.spi.utils.CommonConstants;
 import org.apache.pinot.spi.utils.NetUtils;
-import org.apache.pinot.spi.utils.builder.ControllerRequestURLBuilder;
 import org.apache.pinot.tools.Command;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -32,17 +32,8 @@ import picocli.CommandLine;
 
 
 @CommandLine.Command(name = "AddTenant", mixinStandardHelpOptions = true)
-public class AddTenantCommand extends AbstractBaseAdminCommand implements Command {
+public class AddTenantCommand extends AbstractDatabaseBaseAdminCommand implements Command {
   private static final Logger LOGGER = LoggerFactory.getLogger(AddTenantCommand.class);
-
-  @CommandLine.Option(names = {"-controllerHost"}, required = false, description = "Host name for controller.")
-  private String _controllerHost;
-
-  @CommandLine.Option(names = {"-controllerPort"}, required = false, description = "Port number for controller.")
-  private String _controllerPort = DEFAULT_CONTROLLER_PORT;
-
-  @CommandLine.Option(names = {"-controllerProtocol"}, required = false, description = "Protocol for controller.")
-  private String _controllerProtocol = CommonConstants.HTTP_PROTOCOL;
 
   @CommandLine.Option(names = {"-name"}, required = true, description = "Name of the tenant to be created")
   private String _name;
@@ -60,30 +51,6 @@ public class AddTenantCommand extends AbstractBaseAdminCommand implements Comman
   @CommandLine.Option(names = {"-realTimeInstanceCount"}, required = false,
       description = "Number of realtime instances.")
   private Integer _realtimeInstanceCount;
-
-  @CommandLine.Option(names = {"-exec"}, required = false, description = "Execute the command.")
-  private boolean _exec;
-
-  @CommandLine.Option(names = {"-user"}, required = false, description = "Username for basic auth.")
-  private String _user;
-
-  @CommandLine.Option(names = {"-password"}, required = false, description = "Password for basic auth.")
-  private String _password;
-
-  @CommandLine.Option(names = {"-authToken"}, required = false, description = "Http auth token.")
-  private String _authToken;
-
-  @CommandLine.Option(names = {"-authTokenUrl"}, required = false, description = "Http auth token url.")
-  private String _authTokenUrl;
-
-  private String _controllerAddress;
-
-  private AuthProvider _authProvider;
-
-  public AddTenantCommand setControllerUrl(String url) {
-    _controllerAddress = url;
-    return this;
-  }
 
   public AddTenantCommand setName(String name) {
     _name = name;
@@ -110,36 +77,36 @@ public class AddTenantCommand extends AbstractBaseAdminCommand implements Comman
     return this;
   }
 
-  public AddTenantCommand setUser(String user) {
-    _user = user;
-    return this;
-  }
-
-  public AddTenantCommand setPassword(String password) {
-    _password = password;
+  public AddTenantCommand setControllerUrl(String url) {
+    URI uri = URI.create(url);
+    if (uri.getScheme() != null) {
+      _controllerProtocol = uri.getScheme();
+    }
+    if (uri.getHost() != null) {
+      _controllerHost = uri.getHost();
+    }
+    if (uri.getPort() > 0) {
+      _controllerPort = Integer.toString(uri.getPort());
+    }
     return this;
   }
 
   public AddTenantCommand setExecute(boolean exec) {
-    _exec = exec;
+    super.setExecute(exec);
     return this;
   }
 
   public AddTenantCommand setAuthProvider(AuthProvider authProvider) {
-    _authProvider = authProvider;
+    super.setAuthProvider(authProvider);
     return this;
   }
 
   @Override
   public boolean execute()
       throws Exception {
-    if (_controllerAddress == null) {
-      if (_controllerHost == null) {
-        _controllerHost = NetUtils.getHostAddress();
-      }
-      _controllerAddress = _controllerProtocol + "://" + _controllerHost + ":" + _controllerPort;
+    if (_controllerHost == null) {
+      _controllerHost = NetUtils.getHostAddress();
     }
-
     if (!_exec) {
       LOGGER.warn("Dry Running Command: {}", toString());
       LOGGER.warn("Use the -exec option to actually execute the command.");
@@ -156,15 +123,15 @@ public class AddTenantCommand extends AbstractBaseAdminCommand implements Comman
     }
 
     Tenant tenant = new Tenant(_role, _name, _instanceCount, _offlineInstanceCount, _realtimeInstanceCount);
-    String res = AbstractBaseAdminCommand
-        .sendRequest("POST", ControllerRequestURLBuilder.baseUrl(_controllerAddress).forTenantCreate(),
-            tenant.toJsonString(), AuthProviderUtils.makeAuthHeaders(
-                AuthProviderUtils.makeAuthProvider(_authProvider, _authTokenUrl, _authToken, _user,
-                _password)));
-
-    LOGGER.info(res);
-    System.out.print(res);
-    return true;
+    try (PinotAdminClient adminClient = getPinotAdminClient()) {
+      String res = adminClient.getTenantClient().createTenant(tenant.toJsonString());
+      LOGGER.info(res);
+      System.out.print(res);
+      return true;
+    } catch (PinotAdminException e) {
+      LOGGER.error("Failed to create tenant {}", _name, e);
+      return false;
+    }
   }
 
   @Override
@@ -174,12 +141,10 @@ public class AddTenantCommand extends AbstractBaseAdminCommand implements Comman
 
   @Override
   public String toString() {
-    String retString = ("AddTenant -controllerProtocol " + _controllerProtocol + " -controllerHost " + _controllerHost
-        + " -controllerPort " + _controllerPort + " -name " + _name + " -role " + _role + " -instanceCount "
+    String retString = ("AddTenant -name " + _name + " -role " + _role + " -instanceCount "
         + _instanceCount + " -offlineInstanceCount " + _offlineInstanceCount + " -realTimeInstanceCount "
         + _realtimeInstanceCount);
-
-    return ((_exec) ? (retString + " -exec") : retString);
+    return retString + super.toString();
   }
 
   @Override

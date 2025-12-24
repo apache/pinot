@@ -19,14 +19,10 @@
 package org.apache.pinot.tools.admin.command;
 
 import com.fasterxml.jackson.databind.JsonNode;
-import java.util.Collections;
-import java.util.Iterator;
-import java.util.List;
+import java.util.Locale;
 import org.apache.commons.lang3.StringUtils;
-import org.apache.hc.core5.http.Header;
-import org.apache.pinot.common.auth.AuthProviderUtils;
-import org.apache.pinot.spi.auth.AuthProvider;
-import org.apache.pinot.spi.utils.CommonConstants;
+import org.apache.pinot.client.admin.PinotAdminClient;
+import org.apache.pinot.client.admin.PinotAdminException;
 import org.apache.pinot.spi.utils.JsonUtils;
 import org.apache.pinot.spi.utils.NetUtils;
 import org.apache.pinot.tools.Command;
@@ -36,29 +32,8 @@ import picocli.CommandLine;
 
 
 @CommandLine.Command(name = "OperateClusterConfig", mixinStandardHelpOptions = true)
-public class OperateClusterConfigCommand extends AbstractBaseAdminCommand implements Command {
+public class OperateClusterConfigCommand extends AbstractDatabaseBaseAdminCommand implements Command {
   private static final Logger LOGGER = LoggerFactory.getLogger(OperateClusterConfigCommand.class.getName());
-
-  @CommandLine.Option(names = {"-controllerHost"}, required = false, description = "Host name for controller.")
-  private String _controllerHost;
-
-  @CommandLine.Option(names = {"-controllerPort"}, required = false, description = "Port number for controller.")
-  private String _controllerPort = DEFAULT_CONTROLLER_PORT;
-
-  @CommandLine.Option(names = {"-controllerProtocol"}, required = false, description = "Protocol for controller.")
-  private String _controllerProtocol = CommonConstants.HTTP_PROTOCOL;
-
-  @CommandLine.Option(names = {"-user"}, required = false, description = "Username for basic auth.")
-  private String _user;
-
-  @CommandLine.Option(names = {"-password"}, required = false, description = "Password for basic auth.")
-  private String _password;
-
-  @CommandLine.Option(names = {"-authToken"}, required = false, description = "Http auth token.")
-  private String _authToken;
-
-  @CommandLine.Option(names = {"-authTokenUrl"}, required = false, description = "Http auth token url.")
-  private String _authTokenUrl;
 
   @CommandLine.Option(names = {"-config"}, description = "Cluster config to operate.")
   private String _config;
@@ -67,11 +42,9 @@ public class OperateClusterConfigCommand extends AbstractBaseAdminCommand implem
       description = "Operation to take for Cluster config, currently support GET/ADD/UPDATE/DELETE.")
   private String _operation;
 
-  private AuthProvider _authProvider;
-
   @Override
   public String getName() {
-    return "DeleteClusterConfig";
+    return "OperateClusterConfig";
   }
 
   @Override
@@ -82,7 +55,7 @@ public class OperateClusterConfigCommand extends AbstractBaseAdminCommand implem
     if (_config != null) {
       toString += " -config " + _config;
     }
-    return toString;
+    return toString + super.toString();
   }
 
   @Override
@@ -95,31 +68,6 @@ public class OperateClusterConfigCommand extends AbstractBaseAdminCommand implem
         + "-config pinot.broker.enable.query.limit.override`";
   }
 
-  public OperateClusterConfigCommand setControllerHost(String host) {
-    _controllerHost = host;
-    return this;
-  }
-
-  public OperateClusterConfigCommand setControllerPort(String port) {
-    _controllerPort = port;
-    return this;
-  }
-
-  public OperateClusterConfigCommand setControllerProtocol(String controllerProtocol) {
-    _controllerProtocol = controllerProtocol;
-    return this;
-  }
-
-  public OperateClusterConfigCommand setUser(String user) {
-    _user = user;
-    return this;
-  }
-
-  public OperateClusterConfigCommand setPassword(String password) {
-    _password = password;
-    return this;
-  }
-
   public OperateClusterConfigCommand setConfig(String config) {
     _config = config;
     return this;
@@ -127,11 +75,6 @@ public class OperateClusterConfigCommand extends AbstractBaseAdminCommand implem
 
   public OperateClusterConfigCommand setOperation(String operation) {
     _operation = operation;
-    return this;
-  }
-
-  public OperateClusterConfigCommand setAuthProvider(AuthProvider authProvider) {
-    _authProvider = authProvider;
     return this;
   }
 
@@ -144,36 +87,34 @@ public class OperateClusterConfigCommand extends AbstractBaseAdminCommand implem
     if (StringUtils.isEmpty(_config) && !_operation.equalsIgnoreCase("GET")) {
       throw new UnsupportedOperationException("Empty config: " + _config);
     }
-    String clusterConfigUrl =
-        _controllerProtocol + "://" + _controllerHost + ":" + _controllerPort + "/cluster/configs";
-    List<Header> headers = AuthProviderUtils.makeAuthHeaders(
-        AuthProviderUtils.makeAuthProvider(_authProvider, _authTokenUrl, _authToken, _user,
-        _password));
-    switch (_operation.toUpperCase()) {
-      case "ADD":
-      case "UPDATE":
-        String[] splits = _config.split("=");
-        if (splits.length != 2) {
-          throw new UnsupportedOperationException(
-              "Bad config: " + _config + ". Please follow the pattern of [Config Key]=[Config Value]");
-        }
-        String request = JsonUtils.objectToString(Collections.singletonMap(splits[0], splits[1]));
-        return sendRequest("POST", clusterConfigUrl, request, headers);
-      case "GET":
-        String response = sendRequest("GET", clusterConfigUrl, null, headers);
-        JsonNode jsonNode = JsonUtils.stringToJsonNode(response);
-        Iterator<String> fieldNamesIterator = jsonNode.fieldNames();
-        String results = "";
-        while (fieldNamesIterator.hasNext()) {
-          String key = fieldNamesIterator.next();
-          String value = jsonNode.get(key).textValue();
-          results += String.format("%s=%s\n", key, value);
-        }
-        return results;
-      case "DELETE":
-        return sendRequest("DELETE", String.format("%s/%s", clusterConfigUrl, _config), null, headers);
-      default:
-        throw new UnsupportedOperationException("Unsupported operation: " + _operation);
+    String normalizedOperation = _operation.toUpperCase(Locale.ROOT);
+    try (PinotAdminClient adminClient = getPinotAdminClient()) {
+      switch (normalizedOperation) {
+        case "ADD":
+        case "UPDATE":
+          String[] splits = _config.split("=");
+          if (splits.length != 2) {
+            throw new UnsupportedOperationException(
+                "Bad config: " + _config + ". Please follow the pattern of [Config Key]=[Config Value]");
+          }
+          String request = JsonUtils.objectToString(java.util.Collections.singletonMap(splits[0], splits[1]));
+          return adminClient.getClusterClient().updateClusterConfig(request);
+        case "GET":
+          String response = adminClient.getClusterClient().getClusterConfigs();
+          JsonNode jsonNode = JsonUtils.stringToJsonNode(response);
+          StringBuilder results = new StringBuilder();
+          jsonNode.fieldNames().forEachRemaining(key -> {
+            String value = jsonNode.get(key).textValue();
+            results.append(String.format("%s=%s%n", key, value));
+          });
+          return results.toString();
+        case "DELETE":
+          return adminClient.getClusterClient().deleteClusterConfig(_config);
+        default:
+          throw new UnsupportedOperationException("Unsupported operation: " + _operation);
+      }
+    } catch (PinotAdminException e) {
+      throw new RuntimeException("Failed to operate on cluster config", e);
     }
   }
 

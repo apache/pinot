@@ -18,11 +18,11 @@
  */
 package org.apache.pinot.integration.tests;
 
-import java.nio.charset.StandardCharsets;
+import java.util.Map;
+import javax.annotation.Nullable;
 import org.apache.pinot.controller.helix.core.rebalance.tenant.TenantRebalanceConfig;
 import org.apache.pinot.controller.helix.core.rebalance.tenant.TenantRebalanceResult;
 import org.apache.pinot.spi.utils.JsonUtils;
-import org.apache.pinot.spi.utils.StringUtil;
 import org.testng.annotations.Test;
 
 import static org.testng.Assert.assertFalse;
@@ -32,9 +32,16 @@ import static org.testng.Assert.assertTrue;
 
 public class TenantRebalanceIntegrationTest extends BaseHybridClusterIntegrationTest {
 
-  private String getRebalanceUrl() {
-    return StringUtil.join("/", getControllerRequestURLBuilder().getBaseUrl(), "tenants", getServerTenant(),
-        "rebalance");
+  private TenantRebalanceResult rebalanceTenant(TenantRebalanceConfig config, @Nullable Map<String, String> queryParams)
+      throws Exception {
+    String response = getOrCreateAdminClient().getTenantClient()
+        .rebalanceTenantWithConfig(config.getTenantName(), JsonUtils.objectToString(config), queryParams);
+    return JsonUtils.stringToObject(response, TenantRebalanceResult.class);
+  }
+
+  private TenantRebalanceResult rebalanceTenant(TenantRebalanceConfig config)
+      throws Exception {
+    return rebalanceTenant(config, null);
   }
 
   @Test
@@ -51,10 +58,7 @@ public class TenantRebalanceIntegrationTest extends BaseHybridClusterIntegration
     config.getParallelBlacklist().add(table2);
 
     // Call the rebalance endpoint with the config
-    TenantRebalanceResult result = JsonUtils.stringToObject(
-        sendPostRequest(getRebalanceUrl(), JsonUtils.objectToString(config)),
-        TenantRebalanceResult.class
-    );
+    TenantRebalanceResult result = rebalanceTenant(config);
 
     // Assert that the result contains the expected tables and statuses
     assertNotNull(result);
@@ -75,11 +79,8 @@ public class TenantRebalanceIntegrationTest extends BaseHybridClusterIntegration
     config.getIncludeTables().add(table2);
 
     // Pass only table1 in the query param, should override the body
-    String urlWithQuery = getRebalanceUrl() + "?includeTables=" + table1;
-    TenantRebalanceResult result = JsonUtils.stringToObject(
-        sendPostRequest(urlWithQuery, JsonUtils.objectToString(config)),
-        TenantRebalanceResult.class
-    );
+    TenantRebalanceResult result =
+        rebalanceTenant(config, Map.of("includeTables", table1));
     assertNotNull(result);
     assertTrue(result.getRebalanceTableResults().containsKey(table1));
     assertFalse(result.getRebalanceTableResults().containsKey(table2), "Query param should override body");
@@ -97,10 +98,7 @@ public class TenantRebalanceIntegrationTest extends BaseHybridClusterIntegration
     config.getIncludeTables().add(table2);
 
     // No query param, should use body
-    TenantRebalanceResult result = JsonUtils.stringToObject(
-        sendPostRequest(getRebalanceUrl(), JsonUtils.objectToString(config)),
-        TenantRebalanceResult.class
-    );
+    TenantRebalanceResult result = rebalanceTenant(config);
     assertNotNull(result);
     assertTrue(result.getRebalanceTableResults().containsKey(table2));
     assertFalse(result.getRebalanceTableResults().containsKey(table1), "Should only use body if no query param");
@@ -116,14 +114,9 @@ public class TenantRebalanceIntegrationTest extends BaseHybridClusterIntegration
     String table2 = getTableName() + "_REALTIME";
 
     // Pass includeTables and excludeTables as comma separated list with spaces and quotes
-    String urlWithQuery =
-        getRebalanceUrl() + "?includeTables=" + java.net.URLEncoder.encode(" " + table1 + " , \"" + table2 + "\" , ",
-            StandardCharsets.UTF_8) + "&excludeTables=" + java.net.URLEncoder.encode(" " + table2 + ", ",
-            StandardCharsets.UTF_8);
-    TenantRebalanceResult result = JsonUtils.stringToObject(
-        sendPostRequest(urlWithQuery, JsonUtils.objectToString(config)),
-        TenantRebalanceResult.class
-    );
+    Map<String, String> queryParams = Map.of("includeTables", " " + table1 + " , \"" + table2 + "\" , ",
+        "excludeTables", " " + table2 + ", ");
+    TenantRebalanceResult result = rebalanceTenant(config, queryParams);
     assertNotNull(result);
     // Should only include table1, table2 are excluded
     assertTrue(result.getRebalanceTableResults().containsKey(table1));
