@@ -32,6 +32,7 @@ import org.apache.pinot.broker.routing.manager.MultiClusterRoutingManager;
 import org.apache.pinot.broker.routing.manager.RemoteClusterBrokerRoutingManager;
 import org.apache.pinot.common.config.provider.TableCache;
 import org.apache.pinot.common.config.provider.ZkTableCache;
+import org.apache.pinot.common.metrics.BrokerMeter;
 import org.apache.pinot.core.routing.MultiClusterRoutingContext;
 import org.apache.pinot.spi.env.PinotConfiguration;
 import org.apache.pinot.spi.utils.CommonConstants.Helix;
@@ -93,6 +94,7 @@ public class MultiClusterHelixBrokerStarter extends BaseBrokerStarter {
       initRemoteClusterSpectatorHelixManagers();
     } catch (Exception e) {
       LOGGER.error("[multi-cluster] Failed to initialize remote cluster spectator Helix managers", e);
+      _brokerMetrics.addMeteredGlobalValue(BrokerMeter.MULTI_CLUSTER_BROKER_STARTUP_FAILURE, 1);
     }
   }
 
@@ -103,6 +105,7 @@ public class MultiClusterHelixBrokerStarter extends BaseBrokerStarter {
       initRemoteClusterFederatedRoutingManager();
     } catch (Exception e) {
       LOGGER.error("[multi-cluster] Failed to initialize remote cluster federated routing manager", e);
+      _brokerMetrics.addMeteredGlobalValue(BrokerMeter.MULTI_CLUSTER_BROKER_STARTUP_FAILURE, 1);
     }
   }
 
@@ -113,6 +116,7 @@ public class MultiClusterHelixBrokerStarter extends BaseBrokerStarter {
       initRemoteClusterChangeMediator();
     } catch (Exception e) {
       LOGGER.error("[multi-cluster] Failed to initialize remote cluster change mediator", e);
+      _brokerMetrics.addMeteredGlobalValue(BrokerMeter.MULTI_CLUSTER_BROKER_STARTUP_FAILURE, 1);
     }
   }
 
@@ -137,11 +141,12 @@ public class MultiClusterHelixBrokerStarter extends BaseBrokerStarter {
         LOGGER.info("[multi-cluster] Connected to remote cluster '{}' at ZK: {}", clusterName, zkServers);
       } catch (Exception e) {
         LOGGER.error("[multi-cluster] Failed to connect to cluster '{}' at ZK: {}", clusterName, zkServers, e);
+        _brokerMetrics.addMeteredGlobalValue(BrokerMeter.MULTI_CLUSTER_BROKER_STARTUP_FAILURE, 1);
       }
     }
 
     if (_remoteSpectatorHelixManager.isEmpty()) {
-      LOGGER.error("[multi-cluster] Failed to connect to any remote clusters - "
+      LOGGER.warn("[multi-cluster] Failed to connect to any remote clusters - "
         + "multi-cluster will not be functional");
     } else {
       LOGGER.info("[multi-cluster] Connected to {}/{} remote clusters: {}", _remoteSpectatorHelixManager.size(),
@@ -194,6 +199,7 @@ public class MultiClusterHelixBrokerStarter extends BaseBrokerStarter {
     if (_remoteZkServers.isEmpty()) {
       LOGGER.error("[multi-cluster] No valid ZooKeeper configurations found - multi-cluster will not be functional");
       _remoteClusterNames = null;
+      _brokerMetrics.addMeteredGlobalValue(BrokerMeter.MULTI_CLUSTER_BROKER_STARTUP_FAILURE, 1);
     } else {
       LOGGER.info("[multi-cluster] Initialized {} remote cluster(s): {}", _remoteZkServers.size(),
           _remoteZkServers.keySet());
@@ -219,6 +225,7 @@ public class MultiClusterHelixBrokerStarter extends BaseBrokerStarter {
         _remoteRoutingManagers.put(clusterName, routingManager);
       } catch (Exception e) {
         LOGGER.error("[multi-cluster] Failed to initialize routing manager for cluster '{}'", clusterName, e);
+        _brokerMetrics.addMeteredGlobalValue(BrokerMeter.MULTI_CLUSTER_BROKER_STARTUP_FAILURE, 1);
       }
     }
 
@@ -259,6 +266,7 @@ public class MultiClusterHelixBrokerStarter extends BaseBrokerStarter {
         tableCacheMap.put(clusterName, remoteCache);
       } catch (Exception e) {
         LOGGER.error("[multi-cluster] Failed to create table cache for cluster '{}'", clusterName, e);
+        _brokerMetrics.addMeteredGlobalValue(BrokerMeter.MULTI_CLUSTER_BROKER_STARTUP_FAILURE, 1);
       }
     }
 
@@ -284,6 +292,7 @@ public class MultiClusterHelixBrokerStarter extends BaseBrokerStarter {
         initialized++;
       } catch (Exception e) {
         LOGGER.error("[multi-cluster] Failed to initialize routing tables for cluster '{}'", entry.getKey(), e);
+        _brokerMetrics.addMeteredGlobalValue(BrokerMeter.MULTI_CLUSTER_BROKER_STARTUP_FAILURE, 1);
       }
     }
 
@@ -312,6 +321,7 @@ public class MultiClusterHelixBrokerStarter extends BaseBrokerStarter {
       if (routingManager == null) {
         LOGGER.error("[multi-cluster] Routing manager not found for cluster '{}' - skipping mediator setup",
             clusterName);
+        _brokerMetrics.addMeteredGlobalValue(BrokerMeter.MULTI_CLUSTER_BROKER_STARTUP_FAILURE, 1);
         continue;
       }
 
@@ -334,6 +344,7 @@ public class MultiClusterHelixBrokerStarter extends BaseBrokerStarter {
         helixManager.addClusterfigChangeListener(mediator);
       } catch (Exception e) {
         LOGGER.error("[multi-cluster] Failed to initialize cluster change mediator for cluster '{}'", clusterName, e);
+        _brokerMetrics.addMeteredGlobalValue(BrokerMeter.MULTI_CLUSTER_BROKER_STARTUP_FAILURE, 1);
       }
     }
 
