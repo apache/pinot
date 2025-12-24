@@ -159,6 +159,10 @@ public class PinotInstanceRestletResource {
     if ("true".equalsIgnoreCase(queriesDisabled)) {
       response.put(CommonConstants.Helix.QUERIES_DISABLED, "true");
     }
+    // Add shutdown in progress status
+    boolean shutdownInProgress = instanceConfig.getRecord().getBooleanField(
+        CommonConstants.Helix.IS_SHUTDOWN_IN_PROGRESS, false);
+    response.put(CommonConstants.Helix.IS_SHUTDOWN_IN_PROGRESS, shutdownInProgress);
     response.put("systemResourceInfo", JsonUtils.objectToJsonNode(getSystemResourceInfo(instanceConfig)));
     return response.toString();
   }
