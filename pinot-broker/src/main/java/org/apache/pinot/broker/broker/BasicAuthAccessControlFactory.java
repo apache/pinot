@@ -29,9 +29,10 @@ import java.util.Set;
 import java.util.stream.Collectors;
 import javax.ws.rs.NotAuthorizedException;
 import org.apache.pinot.broker.api.AccessControl;
+import org.apache.pinot.common.auth.BasicAuthTokenUtils;
 import org.apache.pinot.common.request.BrokerRequest;
 import org.apache.pinot.core.auth.BasicAuthPrincipal;
-import org.apache.pinot.core.auth.BasicAuthUtils;
+import org.apache.pinot.core.auth.BasicAuthPrincipalUtils;
 import org.apache.pinot.spi.auth.AuthorizationResult;
 import org.apache.pinot.spi.auth.TableAuthorizationResult;
 import org.apache.pinot.spi.auth.TableRowColAccessResult;
@@ -62,7 +63,8 @@ public class BasicAuthAccessControlFactory extends AccessControlFactory {
 
   @Override
   public void init(PinotConfiguration configuration) {
-    _accessControl = new BasicAuthAccessControl(BasicAuthUtils.extractBasicAuthPrincipals(configuration, PREFIX));
+    _accessControl = new BasicAuthAccessControl(
+        BasicAuthPrincipalUtils.extractBasicAuthPrincipals(configuration, PREFIX));
   }
 
   @Override
@@ -160,7 +162,7 @@ public class BasicAuthAccessControlFactory extends AccessControlFactory {
       if (tokens.isEmpty()) {
         return Optional.empty();
       }
-      return tokens.stream().map(org.apache.pinot.common.auth.BasicAuthUtils::normalizeBase64Token)
+      return tokens.stream().map(BasicAuthTokenUtils::normalizeBase64Token)
           .map(_token2principal::get).filter(Objects::nonNull)
           .findFirst();
     }
