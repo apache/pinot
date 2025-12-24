@@ -169,7 +169,7 @@ public class BaseTableDataManagerEnqueueSegmentToReplaceTest {
       replaceSegmentIfCrcMismatchCalled.set(true);
       latch.countDown();
       return null;
-    }).when(_tableDataManager).replaceSegmentIfCrcMismatch(any(), any(), any());
+    }).when(_tableDataManager).replaceSegmentIfCrcMismatch(any(), any(), any(), anyBoolean());
 
     // Test the method
     _tableDataManager.replaceSegment(SEGMENT_NAME);
@@ -205,7 +205,7 @@ public class BaseTableDataManagerEnqueueSegmentToReplaceTest {
 
     // Verify that replaceSegment was never called
     verify(_tableDataManager, never()).replaceSegmentInternal(SEGMENT_NAME);
-    verify(_tableDataManager, never()).replaceSegmentIfCrcMismatch(any(), any(), any());
+    verify(_tableDataManager, never()).replaceSegmentIfCrcMismatch(any(), any(), any(), anyBoolean());
   }
 
   /**
