@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.server.starter.helix;
 
+import java.util.concurrent.ExecutorService;
 import org.apache.helix.NotificationContext;
 import org.apache.helix.model.Message;
 import org.apache.helix.participant.statemachine.StateModel;
@@ -40,10 +41,13 @@ public class SegmentOnlineOfflineStateModelFactory extends StateModelFactory<Sta
 
   private final String _instanceId;
   private final InstanceDataManager _instanceDataManager;
+  private final ServerThreadPoolManager _serverThreadPoolManager;
 
-  public SegmentOnlineOfflineStateModelFactory(String instanceId, InstanceDataManager instanceDataManager) {
+  public SegmentOnlineOfflineStateModelFactory(String instanceId, InstanceDataManager instanceDataManager,
+      ServerThreadPoolManager serverThreadPoolManager) {
     _instanceId = instanceId;
     _instanceDataManager = instanceDataManager;
+    _serverThreadPoolManager = serverThreadPoolManager;
   }
 
   public static String getStateModelName() {
@@ -162,7 +166,6 @@ public class SegmentOnlineOfflineStateModelFactory extends StateModelFactory<Sta
     public void onBecomeOnlineFromOffline(Message message, NotificationContext context)
         throws Exception {
       _logger.info("SegmentOnlineOfflineStateModel.onBecomeOnlineFromOffline() : {}", message);
-
       try {
         _instanceDataManager.addOnlineSegment(message.getResourceName(), message.getPartitionName());
       } catch (Exception e) {
@@ -246,5 +249,13 @@ public class SegmentOnlineOfflineStateModelFactory extends StateModelFactory<Sta
         throw e;
       }
     }
+  }
+
+  @Override
+  public ExecutorService getExecutorService(String resourceName, String fromState, String toState) {
+    if (fromState.equals("CONSUMING") || toState.equals("CONSUMING")) {
+      return _serverThreadPoolManager.getHelixConsumingTransitionExecutor();
+    }
+    return _serverThreadPoolManager.getHelixTransitionExecutor();
   }
 }

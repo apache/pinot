@@ -178,6 +178,7 @@ public abstract class BaseServerStarter implements ServiceStartable {
   protected RealtimeLuceneIndexRefreshManager _realtimeLuceneTextIndexRefreshManager;
   protected PinotEnvironmentProvider _pinotEnvironmentProvider;
   protected SegmentOperationsThrottler _segmentOperationsThrottler;
+  protected ServerThreadPoolManager _serverThreadPoolManager;
   protected ThreadAccountant _threadAccountant;
   protected DefaultClusterConfigChangeHandler _clusterConfigChangeHandler;
   protected volatile boolean _isServerReadyToServeQueries = false;
@@ -701,6 +702,9 @@ public abstract class BaseServerStarter implements ServiceStartable {
               segmentDownloadThrottler, segmentMultiColTextIndexPreprocessThrottler);
     }
 
+    _serverThreadPoolManager = new ServerThreadPoolManager(_serverConf);
+    _clusterConfigChangeHandler.registerClusterConfigChangeListener(_serverThreadPoolManager);
+
     // Enable/disable thread CPU time measurement through instance config.
     ThreadResourceUsageProvider.setThreadCpuTimeMeasurementEnabled(
         _serverConf.getProperty(Server.CONFIG_OF_ENABLE_THREAD_CPU_TIME_MEASUREMENT,
@@ -732,7 +736,7 @@ public abstract class BaseServerStarter implements ServiceStartable {
 
     initSegmentFetcher(_serverConf);
     StateModelFactory<?> stateModelFactory =
-        new SegmentOnlineOfflineStateModelFactory(_instanceId, instanceDataManager);
+        new SegmentOnlineOfflineStateModelFactory(_instanceId, instanceDataManager, _serverThreadPoolManager);
     _helixManager.getStateMachineEngine()
         .registerStateModelFactory(SegmentOnlineOfflineStateModelFactory.getStateModelName(), stateModelFactory);
     // Start the data manager as a pre-connect callback so that it starts after connecting to the ZK in order to access
@@ -945,7 +949,7 @@ public abstract class BaseServerStarter implements ServiceStartable {
     _adminApiApplication.startShuttingDown();
     _helixAdmin.setConfig(_instanceConfigScope,
         Collections.singletonMap(Helix.IS_SHUTDOWN_IN_PROGRESS, Boolean.toString(true)));
-
+    _serverThreadPoolManager.shutdown();
     long endTimeMs =
         startTimeMs + _serverConf.getProperty(Server.CONFIG_OF_SHUTDOWN_TIMEOUT_MS, Server.DEFAULT_SHUTDOWN_TIMEOUT_MS);
     if (_serverConf.getProperty(Server.CONFIG_OF_SHUTDOWN_ENABLE_QUERY_CHECK,
