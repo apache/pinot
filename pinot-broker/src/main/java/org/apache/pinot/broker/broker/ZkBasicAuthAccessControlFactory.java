@@ -22,11 +22,11 @@ import java.util.Collection;
 import java.util.Collections;
 import java.util.HashSet;
 import java.util.Map;
-import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
 import java.util.stream.Collectors;
 import javax.ws.rs.NotAuthorizedException;
+import org.apache.commons.lang3.StringUtils;
 import org.apache.helix.store.zk.ZkHelixPropertyStore;
 import org.apache.helix.zookeeper.datamodel.ZNRecord;
 import org.apache.pinot.broker.api.AccessControl;
@@ -122,24 +122,39 @@ public class ZkBasicAuthAccessControlFactory extends AccessControlFactory {
 
     private Optional<ZkBasicAuthPrincipal> getPrincipalAuth(RequesterIdentity requesterIdentity) {
       Collection<String> tokens = extractAuthorizationTokens(requesterIdentity);
-      if (tokens.isEmpty()) {
+      if (tokens == null || tokens.isEmpty()) {
         return Optional.empty();
       }
 
-      _name2principal = BasicAuthUtils.extractBasicAuthPrincipals(_userCache.getAllBrokerUserConfig()).stream()
-          .collect(Collectors.toMap(BasicAuthPrincipal::getName, p -> p));
+      Map<String, ZkBasicAuthPrincipal> name2principal =
+          BasicAuthUtils.extractBasicAuthPrincipals(_userCache.getAllBrokerUserConfig()).stream()
+              .collect(Collectors.toMap(BasicAuthPrincipal::getName, p -> p));
 
-      Map<String, String> name2password = tokens.stream().collect(
-          Collectors.toMap(
-              org.apache.pinot.common.auth.BasicAuthUtils::extractUsername,
-              org.apache.pinot.common.auth.BasicAuthUtils::extractPassword,
-              (v1, v2) -> v2));
-      Map<String, ZkBasicAuthPrincipal> password2principal =
-          name2password.keySet().stream().collect(Collectors.toMap(name2password::get, _name2principal::get));
+      for (String token : tokens) {
+        String username = org.apache.pinot.common.auth.BasicAuthUtils.extractUsername(token);
+        String password = org.apache.pinot.common.auth.BasicAuthUtils.extractPassword(token);
 
-      return password2principal.entrySet().stream().filter(
-          entry -> BcryptUtils.checkpwWithCache(entry.getKey(), entry.getValue().getPassword(),
-              _userCache.getUserPasswordAuthCache())).map(u -> u.getValue()).filter(Objects::nonNull).findFirst();
+        if (StringUtils.isEmpty(username) || StringUtils.isEmpty(password)) {
+          continue;
+        }
+
+        ZkBasicAuthPrincipal principal = name2principal.get(username);
+        if (principal == null) {
+          continue;
+        }
+
+        if (passwordMatches(principal, password)) {
+          return Optional.of(principal);
+        }
+      }
+      return Optional.empty();
+    }
+
+    private boolean passwordMatches(ZkBasicAuthPrincipal principal, String password) {
+      return BcryptUtils.checkpwWithCache(
+          password,
+          principal.getPassword(),
+          _userCache.getUserPasswordAuthCache());
     }
   }
 }
