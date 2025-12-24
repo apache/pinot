@@ -77,4 +77,20 @@
       </plugin>
     </plugins>
   </build>
+
+  <profiles>
+    <profile>
+      <id>skip-invoker-its-when-skipTests</id>
+      <!-- maven-invoker-plugin does not honor -DskipTests; propagate it to invoker.skip to skip these ITs as well. -->
+      <activation>
+        <property>
+          <name>skipTests</name>
+          <value>true</value>
+        </property>
+      </activation>
+      <properties>
+        <invoker.skip>true</invoker.skip>
+      </properties>
+    </profile>
+  </profiles>
 </project>

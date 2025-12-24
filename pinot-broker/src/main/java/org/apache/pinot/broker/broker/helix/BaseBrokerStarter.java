@@ -464,7 +464,8 @@ public abstract class BaseBrokerStarter implements ServiceStartable {
 
     if (BrokerGrpcServer.isEnabled(_brokerConf)) {
       LOGGER.info("Initializing BrokerGrpcServer");
-      _brokerGrpcServer = new BrokerGrpcServer(_brokerConf, brokerId, _brokerMetrics, _brokerRequestHandler);
+      _brokerGrpcServer =
+          new BrokerGrpcServer(_brokerConf, brokerId, _brokerMetrics, _brokerRequestHandler, _sqlQueryExecutor);
       _brokerGrpcServer.start();
     } else {
       LOGGER.info("BrokerGrpcServer is not enabled");
