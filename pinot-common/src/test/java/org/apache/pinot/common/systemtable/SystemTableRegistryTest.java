@@ -18,9 +18,10 @@
  */
 package org.apache.pinot.common.systemtable;
 
+import java.util.Collections;
 import java.util.concurrent.atomic.AtomicInteger;
-import org.apache.pinot.common.request.PinotQuery;
-import org.apache.pinot.common.response.broker.BrokerResponseNative;
+import org.apache.pinot.common.systemtable.datasource.InMemorySystemTableSegment;
+import org.apache.pinot.segment.spi.IndexSegment;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.TableType;
 import org.apache.pinot.spi.data.FieldSpec;
@@ -87,8 +88,8 @@ public class SystemTableRegistryTest {
     }
 
     @Override
-    public BrokerResponseNative getBrokerResponse(PinotQuery pinotQuery) {
-      return new BrokerResponseNative();
+    public IndexSegment getDataSource() {
+      return new InMemorySystemTableSegment(_tableName, _schema, 0, Collections.emptyMap());
     }
 
     @Override

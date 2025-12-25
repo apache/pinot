@@ -20,38 +20,36 @@ package org.apache.pinot.common.systemtable.provider;
 
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import com.fasterxml.jackson.annotation.JsonProperty;
+import com.fasterxml.jackson.databind.JsonNode;
 import java.time.Duration;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.Comparator;
 import java.util.LinkedHashSet;
 import java.util.List;
-import java.util.Locale;
 import java.util.Map;
 import java.util.Properties;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.function.Function;
+import java.util.function.IntFunction;
 import javax.annotation.Nullable;
 import org.apache.helix.HelixAdmin;
 import org.apache.pinot.common.config.provider.TableCache;
-import org.apache.pinot.common.request.PinotQuery;
-import org.apache.pinot.common.response.broker.BrokerResponseNative;
 import org.apache.pinot.common.systemtable.SystemTableDataProvider;
-import org.apache.pinot.common.systemtable.SystemTableResponseUtils;
-import org.apache.pinot.common.utils.request.RequestUtils;
+import org.apache.pinot.common.systemtable.datasource.InMemorySystemTableSegment;
+import org.apache.pinot.segment.spi.IndexSegment;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.TableType;
 import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.Schema;
-import org.apache.pinot.spi.data.readers.GenericRow;
-import org.apache.pinot.spi.exception.BadQueryRequestException;
 import org.apache.pinot.spi.systemtable.SystemTable;
+import org.apache.pinot.spi.utils.CommonConstants;
 import org.apache.pinot.spi.utils.InstanceTypeUtils;
 import org.apache.pinot.spi.utils.JsonUtils;
 import org.apache.pinot.spi.utils.builder.TableConfigBuilder;
 import org.apache.pinot.spi.utils.builder.TableNameBuilder;
-import org.apache.pinot.sql.FilterKind;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -85,7 +83,6 @@ public final class TablesSystemTableProvider implements SystemTableDataProvider 
       .addSingleValueDimension("totalDocs", FieldSpec.DataType.LONG)
       .addMetric("reportedSize", FieldSpec.DataType.LONG)
       .addMetric("estimatedSize", FieldSpec.DataType.LONG)
-      .addSingleValueDimension("storageTier", FieldSpec.DataType.STRING)
       .addSingleValueDimension("brokerTenant", FieldSpec.DataType.STRING)
       .addSingleValueDimension("serverTenant", FieldSpec.DataType.STRING)
       .addSingleValueDimension("replicas", FieldSpec.DataType.INT)
@@ -158,11 +155,11 @@ public final class TablesSystemTableProvider implements SystemTableDataProvider 
   }
 
   @Override
-  public BrokerResponseNative getBrokerResponse(PinotQuery pinotQuery) {
-    List<String> projectionColumns = getProjectionColumns(pinotQuery);
+  public IndexSegment getDataSource() {
     if (_tableCache == null) {
-      return SystemTableResponseUtils.buildBrokerResponse(TABLE_NAME, SCHEMA, projectionColumns, List.of(), 0);
+      return new InMemorySystemTableSegment(TABLE_NAME, SCHEMA, 0, Collections.emptyMap());
     }
+
     Set<String> tableNamesWithType = new LinkedHashSet<>();
     for (String tableName : _tableCache.getTableNameMap().values()) {
       if (TableNameBuilder.getTableTypeFromTableName(tableName) != null) {
@@ -172,297 +169,156 @@ public final class TablesSystemTableProvider implements SystemTableDataProvider 
     List<String> sortedTableNames = new ArrayList<>(tableNamesWithType);
     sortedTableNames.sort(Comparator.naturalOrder());
 
-    int offset = Math.max(0, pinotQuery.getOffset());
-    int limit = pinotQuery.getLimit();
-    boolean hasLimit = limit > 0;
-    org.apache.pinot.common.request.Expression filterExpression = pinotQuery.getFilterExpression();
     List<String> controllerBaseUrls = getControllerBaseUrls();
     Function<String, TableSize> sizeFetcher = getSizeFetcher();
+    class TableRow {
+      final String _tableNameWithType;
+      final TableType _tableType;
+      final String _rawTableName;
+      final @Nullable TableConfig _tableConfig;
+      private volatile @Nullable String _tableConfigJson;
+      private volatile @Nullable TableSize _tableSize;
+      private volatile boolean _tableSizeFetched;
 
-    if (filterExpression == null) {
-      int totalRows = sortedTableNames.size();
-      int startIndex = Math.min(offset, totalRows);
-      int endIndex = totalRows;
-      if (limit == 0) {
-        endIndex = startIndex;
-      } else if (hasLimit) {
-        endIndex = Math.min(totalRows, startIndex + limit);
+      private TableRow(String tableNameWithType, TableType tableType, String rawTableName,
+          @Nullable TableConfig tableConfig) {
+        _tableNameWithType = tableNameWithType;
+        _tableType = tableType;
+        _rawTableName = rawTableName;
+        _tableConfig = tableConfig;
       }
-      List<GenericRow> rows = new ArrayList<>(Math.max(0, endIndex - startIndex));
-      for (int i = startIndex; i < endIndex; i++) {
-        String tableNameWithType = sortedTableNames.get(i);
-        TableType tableType = TableNameBuilder.getTableTypeFromTableName(tableNameWithType);
-        if (tableType == null) {
-          continue;
+
+      @Nullable
+      private TableSize getTableSize() {
+        if (_tableSizeFetched) {
+          return _tableSize;
         }
-        String rawTableName = TableNameBuilder.extractRawTableName(tableNameWithType);
-        TableStats stats = buildStats(tableNameWithType, tableType, sizeFetcher, controllerBaseUrls);
-        rows.add(buildRow(rawTableName, stats));
+        synchronized (this) {
+          if (_tableSizeFetched) {
+            return _tableSize;
+          }
+          _tableSize = fetchTableSize(_tableNameWithType, sizeFetcher, controllerBaseUrls);
+          _tableSizeFetched = true;
+          return _tableSize;
+        }
       }
-      return SystemTableResponseUtils.buildBrokerResponse(TABLE_NAME, SCHEMA, projectionColumns, rows, totalRows);
+
+      private String getStatus() {
+        if (_tableConfig != null) {
+          return "ONLINE";
+        }
+        TableSize sizeFromController = getTableSize();
+        int segments = sizeFromController != null ? getSegmentCount(sizeFromController, _tableType) : 0;
+        return segments > 0 ? "ONLINE" : "UNKNOWN";
+      }
+
+      private int getSegments() {
+        TableSize sizeFromController = getTableSize();
+        return sizeFromController != null ? getSegmentCount(sizeFromController, _tableType) : 0;
+      }
+
+      private long getTotalDocs() {
+        TableSize sizeFromController = getTableSize();
+        return sizeFromController != null ? TablesSystemTableProvider.this.getTotalDocs(sizeFromController, _tableType,
+            _tableNameWithType, controllerBaseUrls) : 0L;
+      }
+
+      private long getReportedSize() {
+        TableSize sizeFromController = getTableSize();
+        if (sizeFromController == null || sizeFromController._reportedSizeInBytes < 0) {
+          return 0L;
+        }
+        return sizeFromController._reportedSizeInBytes;
+      }
+
+      private long getEstimatedSize() {
+        TableSize sizeFromController = getTableSize();
+        if (sizeFromController == null || sizeFromController._estimatedSizeInBytes < 0) {
+          return 0L;
+        }
+        return sizeFromController._estimatedSizeInBytes;
+      }
+
+      private String getBrokerTenant() {
+        if (_tableConfig != null && _tableConfig.getTenantConfig() != null) {
+          String tenant = _tableConfig.getTenantConfig().getBroker();
+          return tenant != null ? tenant : "";
+        }
+        return "";
+      }
+
+      private String getServerTenant() {
+        if (_tableConfig != null && _tableConfig.getTenantConfig() != null) {
+          String tenant = _tableConfig.getTenantConfig().getServer();
+          return tenant != null ? tenant : "";
+        }
+        return "";
+      }
+
+      private int getReplicas() {
+        if (_tableConfig != null && _tableConfig.getValidationConfig() != null) {
+          Integer replicationNumber = _tableConfig.getValidationConfig().getReplicationNumber();
+          if (replicationNumber != null) {
+            return replicationNumber;
+          }
+        }
+        return 0;
+      }
+
+      private String getTableConfigJson() {
+        String cached = _tableConfigJson;
+        if (cached != null) {
+          return cached;
+        }
+        synchronized (this) {
+          cached = _tableConfigJson;
+          if (cached != null) {
+            return cached;
+          }
+          cached = "";
+          if (_tableConfig != null) {
+            try {
+              cached = JsonUtils.objectToString(_tableConfig);
+            } catch (Exception e) {
+              LOGGER.warn("Failed to serialize table config for {}: {}", _tableNameWithType, e.toString());
+              cached = _tableConfig.toString();
+            }
+          }
+          _tableConfigJson = cached;
+          return cached;
+        }
+      }
     }
 
-    int totalRows = 0;
-    int initialCapacity = hasLimit ? Math.min(sortedTableNames.size(), limit) : sortedTableNames.size();
-    List<GenericRow> rows = new ArrayList<>(initialCapacity);
+    List<TableRow> tableRows = new ArrayList<>(sortedTableNames.size());
     for (String tableNameWithType : sortedTableNames) {
       TableType tableType = TableNameBuilder.getTableTypeFromTableName(tableNameWithType);
       if (tableType == null) {
         continue;
       }
       String rawTableName = TableNameBuilder.extractRawTableName(tableNameWithType);
-      TableStats stats = buildStats(tableNameWithType, tableType, sizeFetcher, controllerBaseUrls);
-      if (!matchesFilter(filterExpression, stats, rawTableName)) {
-        continue;
-      }
-      totalRows++;
-      if (totalRows <= offset) {
-        continue;
-      }
-      if (limit == 0) {
-        continue;
-      }
-      if (hasLimit && rows.size() >= limit) {
-        continue;
-      }
-      rows.add(buildRow(rawTableName, stats));
+      TableConfig tableConfig = _tableCache.getTableConfig(tableNameWithType);
+      tableRows.add(new TableRow(tableNameWithType, tableType, rawTableName, tableConfig));
     }
-    return SystemTableResponseUtils.buildBrokerResponse(TABLE_NAME, SCHEMA, projectionColumns, rows, totalRows);
+
+    Map<String, IntFunction<Object>> valueProviders = new java.util.HashMap<>();
+    valueProviders.put("tableName", docId -> tableRows.get(docId)._rawTableName);
+    valueProviders.put("type", docId -> tableRows.get(docId)._tableType.name());
+    valueProviders.put("status", docId -> tableRows.get(docId).getStatus());
+    valueProviders.put("segments", docId -> tableRows.get(docId).getSegments());
+    valueProviders.put("totalDocs", docId -> tableRows.get(docId).getTotalDocs());
+    valueProviders.put("reportedSize", docId -> tableRows.get(docId).getReportedSize());
+    valueProviders.put("estimatedSize", docId -> tableRows.get(docId).getEstimatedSize());
+    valueProviders.put("brokerTenant", docId -> tableRows.get(docId).getBrokerTenant());
+    valueProviders.put("serverTenant", docId -> tableRows.get(docId).getServerTenant());
+    valueProviders.put("replicas", docId -> tableRows.get(docId).getReplicas());
+    valueProviders.put("tableConfig", docId -> tableRows.get(docId).getTableConfigJson());
+
+    return new InMemorySystemTableSegment(TABLE_NAME, SCHEMA, tableRows.size(), valueProviders);
   }
 
-  private GenericRow buildRow(String rawTableName, TableStats stats) {
-    GenericRow row = new GenericRow();
-    row.putValue("tableName", rawTableName);
-    row.putValue("type", stats._type);
-    row.putValue("status", stats._status);
-    row.putValue("segments", stats._segments);
-    row.putValue("totalDocs", stats._totalDocs);
-    row.putValue("reportedSize", stats._reportedSizeInBytes);
-    row.putValue("estimatedSize", stats._estimatedSizeInBytes);
-    row.putValue("storageTier", stats._storageTier);
-    row.putValue("brokerTenant", stats._brokerTenant);
-    row.putValue("serverTenant", stats._serverTenant);
-    row.putValue("replicas", stats._replicas);
-    row.putValue("tableConfig", stats._tableConfig);
-    return row;
-  }
-
-  private TableStats buildStats(String tableNameWithType, TableType tableType,
-      @Nullable Function<String, TableSize> tableSizeFetcher, List<String> controllerBaseUrls) {
-    TableConfig tableConfig = _tableCache.getTableConfig(tableNameWithType);
-    int segments = 0;
-    long totalDocs = 0;
-    long reportedSize = 0;
-    long estimatedSize = 0;
-    String tierValue = "";
-    String brokerTenant = "";
-    String serverTenant = "";
-    int replicas = 0;
-    if (tableConfig != null && tableConfig.getTenantConfig() != null) {
-      brokerTenant = tableConfig.getTenantConfig().getBroker();
-      serverTenant = tableConfig.getTenantConfig().getServer();
-    }
-    if (tableConfig != null && tableConfig.getValidationConfig() != null) {
-      Integer repl = tableConfig.getValidationConfig().getReplicationNumber();
-      replicas = repl != null ? repl : replicas;
-    }
-    // Use controller API only
-    TableSize sizeFromController = fetchTableSize(tableNameWithType, tableSizeFetcher, controllerBaseUrls);
-    if (sizeFromController != null) {
-      if (sizeFromController._reportedSizeInBytes >= 0) {
-        reportedSize = sizeFromController._reportedSizeInBytes;
-      }
-      if (sizeFromController._estimatedSizeInBytes >= 0) {
-        estimatedSize = sizeFromController._estimatedSizeInBytes;
-      }
-      segments = getSegmentCount(sizeFromController, tableType);
-      totalDocs = getTotalDocs(sizeFromController, tableType);
-    }
-    String status = (tableConfig != null || segments > 0) ? "ONLINE" : "UNKNOWN";
-    String tableConfigJson = "";
-    if (tableConfig != null) {
-      try {
-        tableConfigJson = JsonUtils.objectToString(tableConfig);
-      } catch (Exception e) {
-        LOGGER.warn("Failed to serialize table config for {}: {}", tableNameWithType, e.toString());
-        tableConfigJson = tableConfig.toString();
-      }
-    }
-    return new TableStats(tableType.name(), status, segments, totalDocs, reportedSize, estimatedSize, tierValue,
-        tableConfigJson, brokerTenant, serverTenant, replicas);
-  }
-
-  private boolean matchesFilter(@Nullable org.apache.pinot.common.request.Expression filterExpression, TableStats stats,
-      String rawTableName) {
-    if (filterExpression == null) {
-      return true;
-    }
-    org.apache.pinot.common.request.Function function = filterExpression.getFunctionCall();
-    if (function == null) {
-      return true;
-    }
-    FilterKind filterKind = toFilterKind(function.getOperator());
-    if (filterKind == null) {
-      return true;
-    }
-    switch (filterKind) {
-      case AND:
-        for (org.apache.pinot.common.request.Expression child : function.getOperands()) {
-          if (!matchesFilter(child, stats, rawTableName)) {
-            return false;
-          }
-        }
-        return true;
-      case OR:
-        for (org.apache.pinot.common.request.Expression child : function.getOperands()) {
-          if (matchesFilter(child, stats, rawTableName)) {
-            return true;
-          }
-        }
-        return false;
-      case NOT:
-        if (function.getOperandsSize() == 0) {
-          return true;
-        }
-        return !matchesFilter(function.getOperands().get(0), stats, rawTableName);
-      default:
-        return matchesLeafFilter(filterKind, function.getOperands(), stats, rawTableName);
-    }
-  }
-
-  private boolean matchesLeafFilter(FilterKind filterKind,
-      List<org.apache.pinot.common.request.Expression> operands, TableStats stats, String rawTableName) {
-    String column = extractIdentifier(operands);
-    if (column == null) {
-      return true;
-    }
-    List<String> values = extractLiteralValues(operands);
-    if (values.isEmpty()) {
-      return true;
-    }
-    switch (column.toLowerCase(Locale.ROOT)) {
-      case "tablename":
-        return matchesString(values, rawTableName, filterKind);
-      case "type":
-        return matchesString(values, stats._type, filterKind);
-      case "status":
-        return matchesString(values, stats._status, filterKind);
-      case "segments":
-        return matchesNumber(values, stats._segments, filterKind);
-      case "reportedsize":
-        return matchesNumber(values, stats._reportedSizeInBytes, filterKind);
-      case "estimatedsize":
-        return matchesNumber(values, stats._estimatedSizeInBytes, filterKind);
-      default:
-        return true;
-    }
-  }
-
-  private boolean matchesString(List<String> candidates, String actual, FilterKind filterKind) {
-    switch (filterKind) {
-      case EQUALS:
-      case IN:
-        return candidates.stream().anyMatch(v -> v.equalsIgnoreCase(actual));
-      case NOT_EQUALS:
-        return candidates.stream().noneMatch(v -> v.equalsIgnoreCase(actual));
-      default:
-        return true;
-    }
-  }
-
-  private boolean matchesNumber(List<String> candidates, long actual, FilterKind filterKind) {
-    try {
-      switch (filterKind) {
-        case EQUALS:
-          return candidates.stream().anyMatch(v -> Long.parseLong(v) == actual);
-        case NOT_EQUALS:
-          return candidates.stream().noneMatch(v -> Long.parseLong(v) == actual);
-        case GREATER_THAN:
-          return candidates.stream().anyMatch(v -> actual > Long.parseLong(v));
-        case GREATER_THAN_OR_EQUAL:
-          return candidates.stream().anyMatch(v -> actual >= Long.parseLong(v));
-        case LESS_THAN:
-          return candidates.stream().anyMatch(v -> actual < Long.parseLong(v));
-        case LESS_THAN_OR_EQUAL:
-          return candidates.stream().anyMatch(v -> actual <= Long.parseLong(v));
-        case IN:
-          for (String candidate : candidates) {
-            if (actual == Long.parseLong(candidate)) {
-              return true;
-            }
-          }
-          return false;
-        case RANGE:
-        case BETWEEN:
-          if (candidates.size() >= 2) {
-            long lower = Long.parseLong(candidates.get(0));
-            long upper = Long.parseLong(candidates.get(1));
-            return actual >= lower && actual <= upper;
-          }
-          return true;
-        default:
-          return true;
-      }
-    } catch (NumberFormatException e) {
-      LOGGER.debug("Failed to parse numeric filter value {}: {}", candidates, e.toString());
-      return true;
-    }
-  }
-
-  private @Nullable String extractIdentifier(List<org.apache.pinot.common.request.Expression> operands) {
-    for (org.apache.pinot.common.request.Expression operand : operands) {
-      org.apache.pinot.common.request.Identifier identifier = operand.getIdentifier();
-      if (identifier != null) {
-        return identifier.getName();
-      }
-    }
-    return null;
-  }
-
-  private List<String> extractLiteralValues(List<org.apache.pinot.common.request.Expression> operands) {
-    List<String> values = new ArrayList<>();
-    for (org.apache.pinot.common.request.Expression operand : operands) {
-      org.apache.pinot.common.request.Literal literal = operand.getLiteral();
-      if (literal != null) {
-        if (literal.getSetField() == org.apache.pinot.common.request.Literal._Fields.NULL_VALUE) {
-          values.add("null");
-          continue;
-        }
-        try {
-          values.add(RequestUtils.getLiteralString(literal));
-        } catch (Exception e) {
-          values.add(String.valueOf(RequestUtils.getLiteralValue(literal)));
-        }
-      }
-    }
-    return values;
-  }
-
-  private @Nullable FilterKind toFilterKind(String operator) {
-    String normalized = operator.toUpperCase(Locale.ROOT);
-    switch (normalized) {
-      case "EQ":
-        return FilterKind.EQUALS;
-      case "NEQ":
-        return FilterKind.NOT_EQUALS;
-      case "GT":
-        return FilterKind.GREATER_THAN;
-      case "GTE":
-        return FilterKind.GREATER_THAN_OR_EQUAL;
-      case "LT":
-        return FilterKind.LESS_THAN;
-      case "LTE":
-        return FilterKind.LESS_THAN_OR_EQUAL;
-      default:
-        try {
-          return FilterKind.valueOf(normalized);
-        } catch (Exception e) {
-          return null;
-        }
-    }
-  }
-
-  private @Nullable TableSize fetchTableSize(String tableNameWithType,
+  @Nullable
+  private TableSize fetchTableSize(String tableNameWithType,
       @Nullable Function<String, TableSize> fetcher, List<String> controllerBaseUrls) {
     boolean cacheEnabled = SIZE_CACHE_TTL_MS > 0;
     TableSize cached = cacheEnabled ? getCachedSize(tableNameWithType) : null;
@@ -497,7 +353,8 @@ public final class TablesSystemTableProvider implements SystemTableDataProvider 
     return size;
   }
 
-  private @Nullable TableSize fetchTableSizeForName(List<String> controllerBaseUrls, String tableName) {
+  @Nullable
+  private TableSize fetchTableSizeForName(List<String> controllerBaseUrls, String tableName) {
     Class<?> clientClass = PINOT_ADMIN_CLIENT_CLASS;
     if (clientClass == null) {
       return null;
@@ -571,7 +428,7 @@ public final class TablesSystemTableProvider implements SystemTableDataProvider 
     return 0;
   }
 
-  private long getTotalDocs(TableSize sizeFromController, TableType tableType) {
+  private long getTotalDocsFromSize(TableSize sizeFromController, TableType tableType) {
     if (tableType == TableType.OFFLINE && sizeFromController._offlineSegments != null
         && sizeFromController._offlineSegments._segments != null) {
       return sizeFromController._offlineSegments._segments.values().stream()
@@ -585,7 +442,100 @@ public final class TablesSystemTableProvider implements SystemTableDataProvider 
     return 0;
   }
 
-  private @Nullable Function<String, TableSize> getSizeFetcher() {
+  private long getTotalDocs(TableSize sizeFromController, TableType tableType, String tableNameWithType,
+      List<String> controllerBaseUrls) {
+    if (tableType == TableType.OFFLINE && sizeFromController._offlineSegments != null
+        && sizeFromController._offlineSegments._segments != null) {
+      if (sizeFromController._offlineTotalDocs >= 0) {
+        return sizeFromController._offlineTotalDocs;
+      }
+      long totalDocsFromSize = getTotalDocsFromSize(sizeFromController, tableType);
+      if (totalDocsFromSize > 0) {
+        sizeFromController._offlineTotalDocs = totalDocsFromSize;
+        return totalDocsFromSize;
+      }
+      long fetched = fetchTotalDocsFromSegmentMetadata(tableNameWithType, sizeFromController._offlineSegments._segments,
+          controllerBaseUrls);
+      sizeFromController._offlineTotalDocs = fetched;
+      return fetched;
+    }
+    if (tableType == TableType.REALTIME && sizeFromController._realtimeSegments != null
+        && sizeFromController._realtimeSegments._segments != null) {
+      if (sizeFromController._realtimeTotalDocs >= 0) {
+        return sizeFromController._realtimeTotalDocs;
+      }
+      long totalDocsFromSize = getTotalDocsFromSize(sizeFromController, tableType);
+      if (totalDocsFromSize > 0) {
+        sizeFromController._realtimeTotalDocs = totalDocsFromSize;
+        return totalDocsFromSize;
+      }
+      long fetched = fetchTotalDocsFromSegmentMetadata(tableNameWithType,
+          sizeFromController._realtimeSegments._segments, controllerBaseUrls);
+      sizeFromController._realtimeTotalDocs = fetched;
+      return fetched;
+    }
+    return 0;
+  }
+
+  private long fetchTotalDocsFromSegmentMetadata(String tableNameWithType, Map<String, SegmentSize> segments,
+      List<String> controllerBaseUrls) {
+    if (segments.isEmpty()) {
+      return 0;
+    }
+    Class<?> clientClass = PINOT_ADMIN_CLIENT_CLASS;
+    if (clientClass == null) {
+      return 0;
+    }
+    for (String baseUrl : controllerBaseUrls) {
+      try {
+        AutoCloseable adminClient = getOrCreateAdminClient(baseUrl);
+        if (adminClient == null) {
+          continue;
+        }
+        Object segmentMetadataFetcher;
+        java.lang.reflect.Method getSegmentMetadataMethod;
+        boolean returnsJsonNode;
+        try {
+          segmentMetadataFetcher = clientClass.getMethod("getSegmentApiClient").invoke(adminClient);
+          getSegmentMetadataMethod =
+              segmentMetadataFetcher.getClass().getMethod("getSegmentMetadata", String.class, String.class);
+          returnsJsonNode = true;
+        } catch (NoSuchMethodException e) {
+          segmentMetadataFetcher = clientClass.getMethod("getSegmentClient").invoke(adminClient);
+          getSegmentMetadataMethod = segmentMetadataFetcher.getClass()
+              .getMethod("getSegmentMetadata", String.class, String.class, List.class);
+          returnsJsonNode = false;
+        }
+
+        long totalDocs = 0;
+        if (returnsJsonNode) {
+          for (String segmentName : segments.keySet()) {
+            JsonNode segmentMetadata = (JsonNode) getSegmentMetadataMethod.invoke(segmentMetadataFetcher,
+                tableNameWithType, segmentName);
+            totalDocs += segmentMetadata.path(CommonConstants.Segment.TOTAL_DOCS).asLong(0);
+          }
+        } else {
+          for (String segmentName : segments.keySet()) {
+            @SuppressWarnings("unchecked")
+            Map<String, Object> segmentMetadata = (Map<String, Object>) getSegmentMetadataMethod
+                .invoke(segmentMetadataFetcher, tableNameWithType, segmentName, List.of());
+            Object totalDocsObj = segmentMetadata.get(CommonConstants.Segment.TOTAL_DOCS);
+            if (totalDocsObj != null) {
+              totalDocs += Long.parseLong(totalDocsObj.toString());
+            }
+          }
+        }
+        return totalDocs;
+      } catch (Exception e) {
+        logSizeFetchFailure("{}: error fetching segment metadata for {} via {}", TABLE_NAME, tableNameWithType, baseUrl,
+            e);
+      }
+    }
+    return 0;
+  }
+
+  @Nullable
+  private Function<String, TableSize> getSizeFetcher() {
     if (_tableSizeFetcherOverride != null) {
       return _tableSizeFetcherOverride;
     }
@@ -624,7 +574,8 @@ public final class TablesSystemTableProvider implements SystemTableDataProvider 
     return urls;
   }
 
-  private @Nullable AutoCloseable getOrCreateAdminClient(String controllerBaseUrl) {
+  @Nullable
+  private AutoCloseable getOrCreateAdminClient(String controllerBaseUrl) {
     Class<?> clientClass = PINOT_ADMIN_CLIENT_CLASS;
     if (clientClass == null) {
       return null;
@@ -675,36 +626,6 @@ public final class TablesSystemTableProvider implements SystemTableDataProvider 
     return controllerUrl;
   }
 
-  private static final class TableStats {
-    private final String _type;
-    private final String _status;
-    private final int _segments;
-    private final long _totalDocs;
-    private final long _reportedSizeInBytes;
-    private final long _estimatedSizeInBytes;
-    private final String _storageTier;
-    private final String _tableConfig;
-    private final String _brokerTenant;
-    private final String _serverTenant;
-    private final int _replicas;
-
-    TableStats(String type, String status, int segments, long totalDocs, long reportedSizeInBytes,
-        long estimatedSizeInBytes, String storageTier, String tableConfigJson, String brokerTenant,
-        String serverTenant, int replicas) {
-      _type = type;
-      _status = status;
-      _segments = segments;
-      _totalDocs = totalDocs;
-      _reportedSizeInBytes = reportedSizeInBytes;
-      _estimatedSizeInBytes = estimatedSizeInBytes;
-      _storageTier = storageTier;
-      _tableConfig = tableConfigJson;
-      _brokerTenant = brokerTenant;
-      _serverTenant = serverTenant;
-      _replicas = replicas;
-    }
-  }
-
   /**
    * Minimal shape of controller table size response.
    */
@@ -721,6 +642,9 @@ public final class TablesSystemTableProvider implements SystemTableDataProvider 
 
     @JsonProperty("realtimeSegments")
     public TableSubType _realtimeSegments;
+
+    public long _offlineTotalDocs = -1;
+    public long _realtimeTotalDocs = -1;
   }
 
   @JsonIgnoreProperties(ignoreUnknown = true)
@@ -761,62 +685,8 @@ public final class TablesSystemTableProvider implements SystemTableDataProvider 
     }
   }
 
-  private static List<String> getProjectionColumns(PinotQuery pinotQuery) {
-    List<org.apache.pinot.common.request.Expression> selectList = pinotQuery.getSelectList();
-    if (selectList == null || selectList.isEmpty()) {
-      throw new BadQueryRequestException("System tables require a projection list");
-    }
-    List<String> projections = new ArrayList<>();
-    boolean hasStar = false;
-    for (org.apache.pinot.common.request.Expression expression : selectList) {
-      org.apache.pinot.common.request.Identifier identifier = expression.getIdentifier();
-      if (identifier != null) {
-        if ("*".equals(identifier.getName())) {
-          hasStar = true;
-        } else {
-          projections.add(identifier.getName());
-        }
-        continue;
-      }
-      org.apache.pinot.common.request.Function function = expression.getFunctionCall();
-      if (function != null && "AS".equalsIgnoreCase(function.getOperator()) && function.getOperandsSize() > 0) {
-        org.apache.pinot.common.request.Identifier aliased = function.getOperands().get(0).getIdentifier();
-        if (aliased != null) {
-          projections.add(aliased.getName());
-          continue;
-        }
-      }
-      throw new BadQueryRequestException("System tables only support column projections or '*': " + expression);
-    }
-    if (hasStar || projections.isEmpty()) {
-      projections = new ArrayList<>(SCHEMA.getColumnNames());
-    }
-    return normalizeProjectionColumns(projections);
-  }
-
-  private static List<String> normalizeProjectionColumns(List<String> projectionColumns) {
-    List<String> normalized = new ArrayList<>(projectionColumns.size());
-    for (String column : projectionColumns) {
-      if (SCHEMA.hasColumn(column)) {
-        normalized.add(column);
-        continue;
-      }
-      String matched = null;
-      for (String schemaColumn : SCHEMA.getColumnNames()) {
-        if (schemaColumn.equalsIgnoreCase(column)) {
-          matched = schemaColumn;
-          break;
-        }
-      }
-      if (matched == null) {
-        throw new BadQueryRequestException("Unknown column in system table: " + column);
-      }
-      normalized.add(matched);
-    }
-    return normalized;
-  }
-
-  private @Nullable TableSize getCachedSize(String tableNameWithType) {
+  @Nullable
+  private TableSize getCachedSize(String tableNameWithType) {
     if (SIZE_CACHE_TTL_MS <= 0) {
       return null;
     }

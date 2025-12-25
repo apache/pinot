@@ -18,21 +18,23 @@
  */
 package org.apache.pinot.common.systemtable;
 
-import org.apache.pinot.common.request.PinotQuery;
-import org.apache.pinot.common.response.broker.BrokerResponseNative;
+import org.apache.pinot.segment.spi.IndexSegment;
 import org.apache.pinot.spi.systemtable.SystemTableProvider;
 
 
 /**
- * Extension of {@link SystemTableProvider} that can supply data for a system table query using the standard query
- * request/response types.
+ * Extension of {@link SystemTableProvider} that can supply data for a system table query using the standard v1 query
+ * engine.
  */
 public interface SystemTableDataProvider extends SystemTableProvider {
 
   /**
-   * Fetch rows for a system table query using the parsed {@link PinotQuery}. Implementations should respect the
-   * projection/filter/offset/limit encoded in the query and return a fully-formed {@link BrokerResponseNative}.
+   * Returns an {@link IndexSegment} representing the system table contents.
+   * <p>
+   * The returned segment is used for query execution on the broker. Implementations may return a new segment for each
+   * call (recommended) or a cached segment. Callers should invoke {@link IndexSegment#destroy()} when done with the
+   * returned segment.
    */
-  BrokerResponseNative getBrokerResponse(PinotQuery pinotQuery)
+  IndexSegment getDataSource()
       throws Exception;
 }

@@ -18,25 +18,19 @@
  */
 package org.apache.pinot.common.systemtable.provider;
 
-import java.util.List;
 import java.util.Map;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.Function;
 import org.apache.pinot.common.config.provider.TableCache;
-import org.apache.pinot.common.request.PinotQuery;
-import org.apache.pinot.common.response.broker.BrokerResponseNative;
-import org.apache.pinot.common.utils.DataSchema;
-import org.apache.pinot.common.utils.request.RequestUtils;
+import org.apache.pinot.segment.spi.IndexSegment;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.TableType;
-import org.apache.pinot.spi.exception.BadQueryRequestException;
 import org.apache.pinot.spi.utils.builder.TableConfigBuilder;
 import org.testng.annotations.Test;
 
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 import static org.testng.Assert.assertEquals;
-import static org.testng.Assert.assertNotNull;
 import static org.testng.Assert.assertTrue;
 
 
@@ -65,27 +59,23 @@ public class TablesSystemTableProviderTest {
 
     TablesSystemTableProvider provider =
         new TablesSystemTableProvider(tableCache, null, null, fetcher, null);
-    PinotQuery pinotQuery = new PinotQuery();
-    pinotQuery.setSelectList(List.of(
-        identifier("tableName"), identifier("type"), identifier("status"), identifier("segments"),
-        identifier("totalDocs"), identifier("reportedSize"), identifier("estimatedSize"), identifier("storageTier"),
-        identifier("brokerTenant"), identifier("serverTenant"), identifier("replicas"), identifier("tableConfig")));
-    pinotQuery.setOffset(0);
-    pinotQuery.setLimit(10);
-    BrokerResponseNative response = provider.getBrokerResponse(pinotQuery);
-    assertEquals(response.getResultTable().getRows().size(), 1);
-    Object[] values = response.getResultTable().getRows().get(0);
-    assertEquals(values[0], "mytable");
-    assertEquals(values[1], "OFFLINE");
-    assertEquals(values[2], "ONLINE");
-    assertEquals(values[3], 2);
-    assertEquals(values[4], 30L);
-    assertEquals(values[5], 1234L);
-    assertEquals(values[6], 2000L);
-    assertEquals(values[8], "defaultTenant");
-    assertEquals(values[9], "defaultTenant");
-    assertEquals(values[10], 1);
-    assertTrue(((String) values[11]).contains("mytable"));
+    IndexSegment segment = provider.getDataSource();
+    try {
+      assertEquals(segment.getSegmentMetadata().getTotalDocs(), 1);
+      assertEquals(segment.getValue(0, "tableName"), "mytable");
+      assertEquals(segment.getValue(0, "type"), "OFFLINE");
+      assertEquals(segment.getValue(0, "status"), "ONLINE");
+      assertEquals(segment.getValue(0, "segments"), 2);
+      assertEquals(segment.getValue(0, "totalDocs"), 30L);
+      assertEquals(segment.getValue(0, "reportedSize"), 1234L);
+      assertEquals(segment.getValue(0, "estimatedSize"), 2000L);
+      assertEquals(segment.getValue(0, "brokerTenant"), "defaultTenant");
+      assertEquals(segment.getValue(0, "serverTenant"), "defaultTenant");
+      assertEquals(segment.getValue(0, "replicas"), 1);
+      assertTrue(((String) segment.getValue(0, "tableConfig")).contains("mytable"));
+    } finally {
+      segment.destroy();
+    }
   }
 
   @Test
@@ -103,104 +93,20 @@ public class TablesSystemTableProviderTest {
     };
 
     TablesSystemTableProvider provider = new TablesSystemTableProvider(tableCache, null, null, fetcher, null);
-    PinotQuery pinotQuery = new PinotQuery();
-    pinotQuery.setSelectList(List.of(identifier("tableName"), identifier("totalDocs")));
-    pinotQuery.setOffset(0);
-    pinotQuery.setLimit(10);
+    IndexSegment segment1 = provider.getDataSource();
+    try {
+      segment1.getValue(0, "segments");
+    } finally {
+      segment1.destroy();
+    }
 
-    provider.getBrokerResponse(pinotQuery);
-    provider.getBrokerResponse(pinotQuery);
+    IndexSegment segment2 = provider.getDataSource();
+    try {
+      segment2.getValue(0, "segments");
+    } finally {
+      segment2.destroy();
+    }
     assertEquals(calls.get(), 1);
-  }
-
-  @Test
-  public void testFilterOffsetLimitAndTotalRows() {
-    TableCache tableCache = mock(TableCache.class);
-    when(tableCache.getTableNameMap()).thenReturn(Map.of(
-        "tblA_offline", "tblA_OFFLINE",
-        "tblB_offline", "tblB_OFFLINE",
-        "tblC_offline", "tblC_OFFLINE"));
-    when(tableCache.getTableConfig("tblA_OFFLINE"))
-        .thenReturn(new TableConfigBuilder(TableType.OFFLINE).setTableName("tblA").build());
-    when(tableCache.getTableConfig("tblB_OFFLINE"))
-        .thenReturn(new TableConfigBuilder(TableType.OFFLINE).setTableName("tblB").build());
-    when(tableCache.getTableConfig("tblC_OFFLINE"))
-        .thenReturn(new TableConfigBuilder(TableType.OFFLINE).setTableName("tblC").build());
-
-    Function<String, TablesSystemTableProvider.TableSize> fetcher = tableNameWithType -> {
-      if (tableNameWithType.startsWith("tblA")) {
-        return tableSizeWithOfflineSegments(Map.of());
-      }
-      if (tableNameWithType.startsWith("tblB")) {
-        return tableSizeWithOfflineSegments(Map.of("seg1", 10L, "seg2", 20L));
-      }
-      return tableSizeWithOfflineSegments(Map.of("seg1", 5L));
-    };
-
-    TablesSystemTableProvider provider = new TablesSystemTableProvider(tableCache, null, null, fetcher, null);
-    PinotQuery pinotQuery = new PinotQuery();
-    pinotQuery.setSelectList(List.of(identifier("tableName"), identifier("segments"), identifier("totalDocs")));
-    pinotQuery.setFilterExpression(RequestUtils.getFunctionExpression("GT",
-        RequestUtils.getIdentifierExpression("segments"), RequestUtils.getLiteralExpression(0)));
-    pinotQuery.setOffset(1);
-    pinotQuery.setLimit(1);
-
-    BrokerResponseNative response = provider.getBrokerResponse(pinotQuery);
-    assertEquals(response.getTotalDocs(), 2);
-    assertNotNull(response.getResultTable());
-    assertEquals(response.getResultTable().getDataSchema().getColumnNames(),
-        new String[]{"tableName", "segments", "totalDocs"});
-    assertEquals(response.getResultTable().getDataSchema().getColumnDataTypes(),
-        new DataSchema.ColumnDataType[]{DataSchema.ColumnDataType.STRING, DataSchema.ColumnDataType.INT,
-            DataSchema.ColumnDataType.LONG});
-    assertEquals(response.getResultTable().getRows().size(), 1);
-    Object[] row = response.getResultTable().getRows().get(0);
-    assertEquals(row[0], "tblC");
-    assertEquals(row[1], 1);
-    assertEquals(row[2], 5L);
-  }
-
-  @Test
-  public void testCaseInsensitiveProjectionReturnsValues() {
-    TableCache tableCache = mock(TableCache.class);
-    when(tableCache.getTableNameMap()).thenReturn(Map.of("mytable_offline", "mytable_OFFLINE"));
-    when(tableCache.getTableConfig("mytable_OFFLINE"))
-        .thenReturn(new TableConfigBuilder(TableType.OFFLINE).setTableName("mytable").build());
-
-    TablesSystemTableProvider.TableSize tableSize = tableSizeWithOfflineSegments(Map.of("seg1", 10L));
-    TablesSystemTableProvider provider = new TablesSystemTableProvider(tableCache, null, null, tableName -> tableSize,
-        null);
-
-    PinotQuery pinotQuery = new PinotQuery();
-    pinotQuery.setSelectList(List.of(identifier("TABLENAME")));
-    pinotQuery.setOffset(0);
-    pinotQuery.setLimit(10);
-    BrokerResponseNative response = provider.getBrokerResponse(pinotQuery);
-    assertEquals(response.getResultTable().getDataSchema().getColumnNames(), new String[]{"tableName"});
-    assertEquals(response.getResultTable().getRows().get(0)[0], "mytable");
-  }
-
-  @Test(expectedExceptions = BadQueryRequestException.class)
-  public void testUnknownColumnProjectionThrows() {
-    TableCache tableCache = mock(TableCache.class);
-    when(tableCache.getTableNameMap()).thenReturn(Map.of("mytable_offline", "mytable_OFFLINE"));
-    when(tableCache.getTableConfig("mytable_OFFLINE"))
-        .thenReturn(new TableConfigBuilder(TableType.OFFLINE).setTableName("mytable").build());
-
-    TablesSystemTableProvider provider =
-        new TablesSystemTableProvider(tableCache, null, null, tableName -> new TablesSystemTableProvider.TableSize(),
-            null);
-    PinotQuery pinotQuery = new PinotQuery();
-    pinotQuery.setSelectList(List.of(identifier("no_such_column")));
-    provider.getBrokerResponse(pinotQuery);
-  }
-
-  private static org.apache.pinot.common.request.Expression identifier(String name) {
-    org.apache.pinot.common.request.Expression expression = new org.apache.pinot.common.request.Expression();
-    org.apache.pinot.common.request.Identifier identifier = new org.apache.pinot.common.request.Identifier();
-    identifier.setName(name);
-    expression.setIdentifier(identifier);
-    return expression;
   }
 
   private static TablesSystemTableProvider.TableSize tableSizeWithOfflineSegments(Map<String, Long> segmentDocs) {

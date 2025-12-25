@@ -20,7 +20,10 @@ package org.apache.pinot.integration.tests;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import java.io.File;
+import java.net.URI;
+import java.util.Iterator;
 import java.util.List;
+import org.apache.pinot.client.admin.PinotAdminClient;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.env.PinotConfiguration;
@@ -89,8 +92,22 @@ public class SystemTableIntegrationTest extends BaseClusterIntegrationTestSet {
     assertTrue(controllerReportedSize > 0, "controller size endpoint should report size");
     assertTrue(controllerEstimatedSize > 0, "controller size endpoint should report estimated size");
 
+    long controllerTotalDocs = 0;
+    String controllerAddress = URI.create(getControllerBaseApiUrl()).getAuthority();
+    try (PinotAdminClient adminClient = new PinotAdminClient(controllerAddress)) {
+      JsonNode offlineSegments = controllerSize.path("offlineSegments").path("segments");
+      Iterator<String> segmentNames = offlineSegments.fieldNames();
+      while (segmentNames.hasNext()) {
+        String segmentName = segmentNames.next();
+        JsonNode segmentMetadata =
+            adminClient.getSegmentApiClient().getSegmentMetadata("mytable_OFFLINE", segmentName);
+        controllerTotalDocs += segmentMetadata.path(CommonConstants.Segment.TOTAL_DOCS).asLong();
+      }
+    }
+    assertTrue(controllerTotalDocs > 0, "controller segment metadata should report totalDocs");
+
     JsonNode response = postQuery(
-        "SELECT tableName,type,segments,reportedSize,estimatedSize FROM system.tables "
+        "SELECT tableName,type,segments,totalDocs,reportedSize,estimatedSize FROM system.tables "
             + "WHERE tableName='mytable' AND type='OFFLINE'");
     assertNotNull(response);
     assertEquals(response.withArray("exceptions").size(), 0);
@@ -100,11 +117,14 @@ public class SystemTableIntegrationTest extends BaseClusterIntegrationTestSet {
     assertEquals(row.get(0).asText(), "mytable");
     assertEquals(row.get(1).asText(), "OFFLINE");
     int segments = row.get(2).asInt();
-    long reportedSize = row.get(3).asLong();
-    long estimatedSize = row.get(4).asLong();
+    long totalDocs = row.get(3).asLong();
+    long reportedSize = row.get(4).asLong();
+    long estimatedSize = row.get(5).asLong();
     assertTrue(segments > 0, "segments should be > 0 but was " + segments);
+    assertTrue(totalDocs > 0, "totalDocs should be > 0 but was " + totalDocs);
     assertTrue(reportedSize > 0, "reportedSize should be > 0 but was " + reportedSize);
     assertTrue(estimatedSize > 0, "estimatedSize should be > 0 but was " + estimatedSize);
     assertEquals(segments, controllerSegments, "segment count should match controller");
+    assertEquals(totalDocs, controllerTotalDocs, "totalDocs should match controller segment metadata");
   }
 }

@@ -19,12 +19,9 @@
 package org.apache.pinot.common.systemtable.provider;
 
 import java.util.Collections;
-import java.util.List;
-import java.util.stream.Collectors;
-import org.apache.pinot.common.request.PinotQuery;
-import org.apache.pinot.common.response.broker.BrokerResponseNative;
 import org.apache.pinot.common.systemtable.SystemTableDataProvider;
-import org.apache.pinot.common.systemtable.SystemTableResponseUtils;
+import org.apache.pinot.common.systemtable.datasource.InMemorySystemTableSegment;
+import org.apache.pinot.segment.spi.IndexSegment;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.TableType;
 import org.apache.pinot.spi.data.FieldSpec;
@@ -65,12 +62,7 @@ public final class InstancesSystemTableProvider implements SystemTableDataProvid
   }
 
   @Override
-  public BrokerResponseNative getBrokerResponse(PinotQuery pinotQuery) {
-    // Controller/Helix fetch can be added later; for now return an empty result.
-    List<String> projectionColumns = pinotQuery.getSelectList() != null
-        ? pinotQuery.getSelectList().stream().map(expr -> expr.getIdentifier().getName()).collect(Collectors.toList())
-        : List.of();
-    return SystemTableResponseUtils.buildBrokerResponse(
-        TABLE_NAME, SCHEMA, projectionColumns, Collections.emptyList(), 0);
+  public IndexSegment getDataSource() {
+    return new InMemorySystemTableSegment(TABLE_NAME, SCHEMA, 0, Collections.emptyMap());
   }
 }

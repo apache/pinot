@@ -20,34 +20,54 @@ package org.apache.pinot.broker.requesthandler;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import java.util.Collections;
+import java.util.HashMap;
+import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.OptionalLong;
 import java.util.Set;
 import java.util.concurrent.Executor;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
 import javax.annotation.Nullable;
 import javax.ws.rs.core.HttpHeaders;
-import org.apache.commons.collections.CollectionUtils;
 import org.apache.hc.client5.http.io.HttpClientConnectionManager;
 import org.apache.pinot.broker.api.AccessControl;
 import org.apache.pinot.broker.broker.AccessControlFactory;
 import org.apache.pinot.broker.querylog.QueryLogger;
 import org.apache.pinot.broker.queryquota.QueryQuotaManager;
 import org.apache.pinot.common.config.provider.TableCache;
+import org.apache.pinot.common.datatable.DataTable;
 import org.apache.pinot.common.metrics.BrokerMeter;
+import org.apache.pinot.common.request.BrokerRequest;
 import org.apache.pinot.common.request.PinotQuery;
+import org.apache.pinot.common.request.QuerySource;
 import org.apache.pinot.common.response.BrokerResponse;
 import org.apache.pinot.common.response.broker.BrokerResponseNative;
 import org.apache.pinot.common.systemtable.SystemTableDataProvider;
 import org.apache.pinot.common.systemtable.SystemTableRegistry;
+import org.apache.pinot.common.utils.config.QueryOptionsUtils;
 import org.apache.pinot.common.utils.request.RequestUtils;
+import org.apache.pinot.core.operator.blocks.InstanceResponseBlock;
+import org.apache.pinot.core.plan.Plan;
+import org.apache.pinot.core.plan.maker.InstancePlanMakerImplV2;
+import org.apache.pinot.core.plan.maker.PlanMaker;
+import org.apache.pinot.core.query.reduce.BrokerReduceService;
+import org.apache.pinot.core.query.request.context.QueryContext;
+import org.apache.pinot.core.query.request.context.utils.QueryContextConverterUtils;
 import org.apache.pinot.core.routing.RoutingManager;
+import org.apache.pinot.core.transport.ServerRoutingInstance;
+import org.apache.pinot.segment.spi.IndexSegment;
+import org.apache.pinot.segment.spi.SegmentContext;
 import org.apache.pinot.spi.accounting.ThreadAccountant;
 import org.apache.pinot.spi.auth.AuthorizationResult;
 import org.apache.pinot.spi.auth.broker.RequesterIdentity;
+import org.apache.pinot.spi.config.table.TableType;
 import org.apache.pinot.spi.env.PinotConfiguration;
 import org.apache.pinot.spi.exception.BadQueryRequestException;
 import org.apache.pinot.spi.exception.QueryErrorCode;
+import org.apache.pinot.spi.query.QueryExecutionContext;
+import org.apache.pinot.spi.query.QueryThreadContext;
 import org.apache.pinot.spi.trace.RequestContext;
 import org.apache.pinot.spi.utils.builder.TableNameBuilder;
 import org.apache.pinot.sql.parsers.CalciteSqlParser;
@@ -61,12 +81,20 @@ import org.slf4j.LoggerFactory;
 public class SystemTableBrokerRequestHandler extends BaseBrokerRequestHandler {
   private static final Logger LOGGER = LoggerFactory.getLogger(SystemTableBrokerRequestHandler.class);
 
+  private final BrokerReduceService _brokerReduceService;
+  private final PlanMaker _planMaker;
+  private final ExecutorService _executorService;
+
   public SystemTableBrokerRequestHandler(PinotConfiguration config, String brokerId,
       BrokerRequestIdGenerator requestIdGenerator, RoutingManager routingManager,
       AccessControlFactory accessControlFactory, QueryQuotaManager queryQuotaManager, TableCache tableCache,
       ThreadAccountant threadAccountant) {
     super(config, brokerId, requestIdGenerator, routingManager, accessControlFactory, queryQuotaManager, tableCache,
         threadAccountant);
+    _brokerReduceService = new BrokerReduceService(_config);
+    _planMaker = new InstancePlanMakerImplV2();
+    _planMaker.init(_config);
+    _executorService = QueryThreadContext.contextAwareExecutorService(Executors.newFixedThreadPool(2));
   }
 
   @Override
@@ -75,6 +103,8 @@ public class SystemTableBrokerRequestHandler extends BaseBrokerRequestHandler {
 
   @Override
   public void shutDown() {
+    _executorService.shutdownNow();
+    _brokerReduceService.shutDown();
   }
 
   public boolean canHandle(String tableName) {
@@ -86,36 +116,44 @@ public class SystemTableBrokerRequestHandler extends BaseBrokerRequestHandler {
       JsonNode request, @Nullable RequesterIdentity requesterIdentity, RequestContext requestContext,
       @Nullable HttpHeaders httpHeaders, AccessControl accessControl)
       throws Exception {
-    PinotQuery pinotQuery;
-    try {
-      pinotQuery = CalciteSqlParser.compileToPinotQuery(sqlNodeAndOptions);
-    } catch (Exception e) {
-      requestContext.setErrorCode(QueryErrorCode.SQL_PARSING);
-      return new BrokerResponseNative(QueryErrorCode.SQL_PARSING, e.getMessage());
-    }
+    long startTimeMs = requestContext.getRequestArrivalTimeMillis();
+    long deadlineMs = startTimeMs + _brokerTimeoutMs;
+    QueryExecutionContext executionContext =
+        new QueryExecutionContext(QueryExecutionContext.QueryType.SSE, requestId, Long.toString(requestId),
+            QueryOptionsUtils.getWorkloadName(sqlNodeAndOptions.getOptions()), startTimeMs, deadlineMs, deadlineMs,
+            _brokerId, _brokerId, org.apache.pinot.spi.utils.CommonConstants.Broker.DEFAULT_QUERY_HASH);
+    try (QueryThreadContext ignore = QueryThreadContext.open(executionContext, _threadAccountant)) {
+      PinotQuery pinotQuery;
+      try {
+        pinotQuery = CalciteSqlParser.compileToPinotQuery(sqlNodeAndOptions);
+      } catch (Exception e) {
+        requestContext.setErrorCode(QueryErrorCode.SQL_PARSING);
+        return new BrokerResponseNative(QueryErrorCode.SQL_PARSING, e.getMessage());
+      }
 
-    Set<String> tableNames = RequestUtils.getTableNames(pinotQuery);
-    if (tableNames == null || tableNames.isEmpty()) {
-      requestContext.setErrorCode(QueryErrorCode.QUERY_VALIDATION);
-      return new BrokerResponseNative(QueryErrorCode.QUERY_VALIDATION, "Failed to extract table name");
-    }
-    if (tableNames.size() != 1) {
-      requestContext.setErrorCode(QueryErrorCode.QUERY_VALIDATION);
-      return new BrokerResponseNative(QueryErrorCode.QUERY_VALIDATION, "System tables do not support joins");
-    }
-    String tableName = tableNames.iterator().next();
-    if (!isSystemTable(tableName)) {
-      requestContext.setErrorCode(QueryErrorCode.QUERY_VALIDATION);
-      return new BrokerResponseNative(QueryErrorCode.QUERY_VALIDATION, "Not a system table query");
-    }
-    AuthorizationResult authorizationResult =
-        hasTableAccess(requesterIdentity, Set.of(tableName), requestContext, httpHeaders);
-    if (!authorizationResult.hasAccess()) {
-      requestContext.setErrorCode(QueryErrorCode.ACCESS_DENIED);
-      return new BrokerResponseNative(QueryErrorCode.ACCESS_DENIED, authorizationResult.getFailureMessage());
-    }
+      Set<String> tableNames = RequestUtils.getTableNames(pinotQuery);
+      if (tableNames == null || tableNames.isEmpty()) {
+        requestContext.setErrorCode(QueryErrorCode.QUERY_VALIDATION);
+        return new BrokerResponseNative(QueryErrorCode.QUERY_VALIDATION, "Failed to extract table name");
+      }
+      if (tableNames.size() != 1) {
+        requestContext.setErrorCode(QueryErrorCode.QUERY_VALIDATION);
+        return new BrokerResponseNative(QueryErrorCode.QUERY_VALIDATION, "System tables do not support joins");
+      }
+      String tableName = tableNames.iterator().next();
+      if (!isSystemTable(tableName)) {
+        requestContext.setErrorCode(QueryErrorCode.QUERY_VALIDATION);
+        return new BrokerResponseNative(QueryErrorCode.QUERY_VALIDATION, "Not a system table query");
+      }
+      AuthorizationResult authorizationResult =
+          hasTableAccess(requesterIdentity, Set.of(tableName), requestContext, httpHeaders);
+      if (!authorizationResult.hasAccess()) {
+        requestContext.setErrorCode(QueryErrorCode.ACCESS_DENIED);
+        return new BrokerResponseNative(QueryErrorCode.ACCESS_DENIED, authorizationResult.getFailureMessage());
+      }
 
-    return handleSystemTableQuery(pinotQuery, tableName, requestContext, requesterIdentity, query);
+      return handleSystemTableQuery(pinotQuery, tableName, requestContext, requesterIdentity, query);
+    }
   }
 
   @Override
@@ -156,16 +194,31 @@ public class SystemTableBrokerRequestHandler extends BaseBrokerRequestHandler {
       return BrokerResponseNative.TABLE_DOES_NOT_EXIST;
     }
     try {
-      String unsupportedFeatures = getUnsupportedFeatures(pinotQuery);
-      if (unsupportedFeatures != null) {
-        requestContext.setErrorCode(QueryErrorCode.QUERY_VALIDATION);
-        return new BrokerResponseNative(QueryErrorCode.QUERY_VALIDATION,
-            "System tables do not support: " + unsupportedFeatures);
+      IndexSegment dataSource = provider.getDataSource();
+      BrokerResponseNative brokerResponse;
+      try {
+        QueryContext queryContext = QueryContextConverterUtils.getQueryContext(pinotQuery);
+        queryContext.setSchema(provider.getSchema());
+        queryContext.setEndTimeMs(System.currentTimeMillis() + _brokerTimeoutMs);
+
+        Plan plan = _planMaker.makeInstancePlan(List.of(new SegmentContext(dataSource)), queryContext, _executorService,
+            null);
+        InstanceResponseBlock instanceResponse = plan.execute();
+
+        Map<ServerRoutingInstance, DataTable> dataTableMap = new HashMap<>(1);
+        dataTableMap.put(new ServerRoutingInstance("localhost", 0, TableType.OFFLINE), instanceResponse.toDataTable());
+
+        BrokerRequest brokerRequest = new BrokerRequest();
+        QuerySource querySource = new QuerySource();
+        querySource.setTableName(tableName);
+        brokerRequest.setQuerySource(querySource);
+        brokerRequest.setPinotQuery(pinotQuery);
+        brokerResponse = _brokerReduceService.reduceOnDataTable(brokerRequest, brokerRequest, dataTableMap,
+            _brokerTimeoutMs, _brokerMetrics);
+      } finally {
+        dataSource.destroy();
       }
-      BrokerResponseNative brokerResponse = provider.getBrokerResponse(pinotQuery);
-      if (CollectionUtils.isEmpty(brokerResponse.getTablesQueried())) {
-        brokerResponse.setTablesQueried(Set.of(TableNameBuilder.extractRawTableName(tableName)));
-      }
+      brokerResponse.setTablesQueried(Set.of(TableNameBuilder.extractRawTableName(tableName)));
       brokerResponse.setTimeUsedMs(System.currentTimeMillis() - requestContext.getRequestArrivalTimeMillis());
       _queryLogger.log(new QueryLogger.QueryLogParams(requestContext, tableName, brokerResponse,
           QueryLogger.QueryLogParams.QueryEngine.SINGLE_STAGE, requesterIdentity, null));
@@ -179,26 +232,5 @@ public class SystemTableBrokerRequestHandler extends BaseBrokerRequestHandler {
       requestContext.setErrorCode(QueryErrorCode.QUERY_EXECUTION);
       return new BrokerResponseNative(QueryErrorCode.QUERY_EXECUTION, e.getMessage());
     }
-  }
-
-  @Nullable
-  private String getUnsupportedFeatures(PinotQuery pinotQuery) {
-    StringBuilder unsupported = new StringBuilder();
-    if (pinotQuery.getGroupByList() != null && !pinotQuery.getGroupByList().isEmpty()) {
-      unsupported.append("GROUP BY");
-    }
-    if (pinotQuery.getHavingExpression() != null) {
-      if (unsupported.length() != 0) {
-        unsupported.append(", ");
-      }
-      unsupported.append("HAVING");
-    }
-    if (pinotQuery.getOrderByList() != null && !pinotQuery.getOrderByList().isEmpty()) {
-      if (unsupported.length() != 0) {
-        unsupported.append(", ");
-      }
-      unsupported.append("ORDER BY");
-    }
-    return unsupported.length() == 0 ? null : unsupported.toString();
   }
 }

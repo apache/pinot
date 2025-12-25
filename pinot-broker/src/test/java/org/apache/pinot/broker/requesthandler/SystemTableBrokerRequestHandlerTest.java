@@ -18,30 +18,30 @@
  */
 package org.apache.pinot.broker.requesthandler;
 
-import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
+import java.util.function.IntFunction;
 import org.apache.pinot.broker.broker.AccessControlFactory;
 import org.apache.pinot.broker.broker.AllowAllAccessControlFactory;
 import org.apache.pinot.common.config.provider.TableCache;
 import org.apache.pinot.common.metrics.BrokerMetrics;
-import org.apache.pinot.common.request.PinotQuery;
 import org.apache.pinot.common.response.BrokerResponse;
 import org.apache.pinot.common.response.broker.BrokerResponseNative;
 import org.apache.pinot.common.response.broker.ResultTable;
 import org.apache.pinot.common.systemtable.SystemTableDataProvider;
 import org.apache.pinot.common.systemtable.SystemTableRegistry;
-import org.apache.pinot.common.systemtable.SystemTableResponseUtils;
+import org.apache.pinot.common.systemtable.datasource.InMemorySystemTableSegment;
 import org.apache.pinot.common.utils.DataSchema;
+import org.apache.pinot.segment.spi.IndexSegment;
 import org.apache.pinot.spi.accounting.ThreadAccountantUtils;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.TableType;
 import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.Schema;
-import org.apache.pinot.spi.data.readers.GenericRow;
 import org.apache.pinot.spi.env.PinotConfiguration;
 import org.apache.pinot.spi.eventlistener.query.BrokerQueryEventListenerFactory;
-import org.apache.pinot.spi.exception.BadQueryRequestException;
 import org.apache.pinot.spi.utils.builder.TableConfigBuilder;
 import org.mockito.Mockito;
 import org.testng.Assert;
@@ -83,7 +83,7 @@ public class SystemTableBrokerRequestHandlerTest {
             new BrokerRequestIdGenerator(), null, ACCESS_CONTROL_FACTORY, null, tableCache,
             ThreadAccountantUtils.getNoOpAccountant());
 
-    BrokerResponse response = handler.handleRequest("SELECT tableName,status FROM system.tables");
+    BrokerResponse response = handler.handleRequest("SELECT tableName,status FROM system.tables ORDER BY tableName");
     if (response.getExceptionsSize() > 0) {
       Assert.fail("Unexpected exceptions: " + response.getExceptions());
     }
@@ -102,7 +102,7 @@ public class SystemTableBrokerRequestHandlerTest {
   }
 
   @Test
-  public void testSystemTablesNativeResponsePassThrough()
+  public void testSystemTablesQueryOnAnotherSystemTable()
       throws Exception {
     SystemTableRegistry.register(new NativeResponseProvider());
 
@@ -143,7 +143,8 @@ public class SystemTableBrokerRequestHandlerTest {
             new BrokerRequestIdGenerator(), null, ACCESS_CONTROL_FACTORY, null, tableCache,
             ThreadAccountantUtils.getNoOpAccountant());
 
-    BrokerResponse response = handler.handleRequest("SELECT tableName,status FROM system.tables LIMIT 1 OFFSET 1");
+    BrokerResponse response = handler.handleRequest(
+        "SELECT tableName,status FROM system.tables ORDER BY tableName LIMIT 1 OFFSET 1");
     if (response.getExceptionsSize() > 0) {
       Assert.fail("Unexpected exceptions: " + response.getExceptions());
     }
@@ -156,7 +157,7 @@ public class SystemTableBrokerRequestHandlerTest {
   }
 
   @Test
-  public void testUnsupportedFeaturesIncludeDetails()
+  public void testSystemTablesSupportGroupBy()
       throws Exception {
     SystemTableRegistry.register(new FakeTablesProvider());
 
@@ -169,10 +170,22 @@ public class SystemTableBrokerRequestHandlerTest {
             new BrokerRequestIdGenerator(), null, ACCESS_CONTROL_FACTORY, null, tableCache,
             ThreadAccountantUtils.getNoOpAccountant());
 
-    BrokerResponse response = handler.handleRequest("SELECT tableName FROM system.tables ORDER BY tableName");
-    assertEquals(response.getExceptionsSize(), 1);
-    String message = ((BrokerResponseNative) response).getExceptions().get(0).getMessage();
-    Assert.assertTrue(message.contains("ORDER BY"), message);
+    BrokerResponse response = handler.handleRequest(
+        "SELECT status, COUNT(*) AS cnt FROM system.tables GROUP BY status ORDER BY status");
+    if (response.getExceptionsSize() > 0) {
+      Assert.fail("Unexpected exceptions: " + response.getExceptions());
+    }
+    ResultTable resultTable = response.getResultTable();
+    assertNotNull(resultTable, response.toString());
+    assertEquals(resultTable.getDataSchema().getColumnNames(), new String[]{"status", "cnt"});
+    assertEquals(resultTable.getDataSchema().getColumnDataTypes(), new DataSchema.ColumnDataType[]{
+        DataSchema.ColumnDataType.STRING, DataSchema.ColumnDataType.LONG});
+    List<Object[]> rows = resultTable.getRows();
+    assertEquals(rows.size(), 2);
+    assertEquals(rows.get(0)[0], "OFFLINE");
+    assertEquals(rows.get(0)[1], 1L);
+    assertEquals(rows.get(1)[0], "ONLINE");
+    assertEquals(rows.get(1)[1], 1L);
   }
 
   private static class FakeTablesProvider implements SystemTableDataProvider {
@@ -196,37 +209,11 @@ public class SystemTableBrokerRequestHandlerTest {
     }
 
     @Override
-    public BrokerResponseNative getBrokerResponse(PinotQuery pinotQuery)
-        throws BadQueryRequestException {
-      List<GenericRow> rows = new ArrayList<>();
-      GenericRow row1 = new GenericRow();
-      row1.putValue("tableName", "tblA");
-      row1.putValue("status", "ONLINE");
-      rows.add(row1);
-
-      GenericRow row2 = new GenericRow();
-      row2.putValue("tableName", "tblB");
-      row2.putValue("status", "OFFLINE");
-      rows.add(row2);
-
-      int totalRows = rows.size();
-      List<String> projectionColumns = pinotQuery.getSelectList().stream()
-          .map(expr -> expr.getIdentifier().getName()).collect(java.util.stream.Collectors.toList());
-      int offset = Math.max(0, pinotQuery.getOffset());
-      int limit = pinotQuery.getLimit();
-      if (offset > 0) {
-        if (offset >= rows.size()) {
-          return SystemTableResponseUtils.buildBrokerResponse(getTableName(), _schema, projectionColumns, List.of(),
-              totalRows);
-        }
-        rows = new ArrayList<>(rows.subList(offset, rows.size()));
-      }
-      if (limit == 0) {
-        rows = List.of();
-      } else if (limit > 0 && rows.size() > limit) {
-        rows = new ArrayList<>(rows.subList(0, limit));
-      }
-      return SystemTableResponseUtils.buildBrokerResponse(getTableName(), _schema, projectionColumns, rows, totalRows);
+    public IndexSegment getDataSource() {
+      Map<String, IntFunction<Object>> valueProviders = new HashMap<>();
+      valueProviders.put("tableName", docId -> docId == 0 ? "tblA" : "tblB");
+      valueProviders.put("status", docId -> docId == 0 ? "ONLINE" : "OFFLINE");
+      return new InMemorySystemTableSegment(getTableName(), _schema, 2, valueProviders);
     }
   }
 
@@ -251,19 +238,11 @@ public class SystemTableBrokerRequestHandlerTest {
     }
 
     @Override
-    public BrokerResponseNative getBrokerResponse(PinotQuery pinotQuery) {
-      List<String> projectionColumns = pinotQuery.getSelectList().stream()
-          .map(expr -> expr.getIdentifier().getName()).collect(java.util.stream.Collectors.toList());
-      DataSchema dataSchema = new DataSchema(new String[]{"tableName", "latencyMs"},
-          new DataSchema.ColumnDataType[]{DataSchema.ColumnDataType.STRING, DataSchema.ColumnDataType.LONG});
-      List<Object[]> rows = List.<Object[]>of(new Object[]{"tblC", 123L});
-      BrokerResponseNative brokerResponseNative = new BrokerResponseNative();
-      brokerResponseNative.setResultTable(new ResultTable(dataSchema, rows));
-      brokerResponseNative.setNumDocsScanned(rows.size());
-      brokerResponseNative.setNumEntriesScannedPostFilter(rows.size());
-      brokerResponseNative.setTotalDocs(rows.size());
-      brokerResponseNative.setTablesQueried(Set.of(getTableName()));
-      return brokerResponseNative;
+    public IndexSegment getDataSource() {
+      Map<String, IntFunction<Object>> valueProviders = new HashMap<>();
+      valueProviders.put("tableName", docId -> "tblC");
+      valueProviders.put("latencyMs", docId -> 123L);
+      return new InMemorySystemTableSegment(getTableName(), _schema, 1, valueProviders);
     }
   }
 }
