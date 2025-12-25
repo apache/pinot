@@ -30,11 +30,12 @@ import org.apache.commons.lang3.StringUtils;
 import org.apache.helix.store.zk.ZkHelixPropertyStore;
 import org.apache.helix.zookeeper.datamodel.ZNRecord;
 import org.apache.pinot.broker.api.AccessControl;
+import org.apache.pinot.common.auth.BasicAuthTokenUtils;
 import org.apache.pinot.common.config.provider.AccessControlUserCache;
 import org.apache.pinot.common.request.BrokerRequest;
 import org.apache.pinot.common.utils.BcryptUtils;
 import org.apache.pinot.core.auth.BasicAuthPrincipal;
-import org.apache.pinot.core.auth.BasicAuthUtils;
+import org.apache.pinot.core.auth.BasicAuthPrincipalUtils;
 import org.apache.pinot.core.auth.ZkBasicAuthPrincipal;
 import org.apache.pinot.spi.auth.AuthorizationResult;
 import org.apache.pinot.spi.auth.TableAuthorizationResult;
@@ -127,12 +128,12 @@ public class ZkBasicAuthAccessControlFactory extends AccessControlFactory {
       }
 
       Map<String, ZkBasicAuthPrincipal> name2principal =
-          BasicAuthUtils.extractBasicAuthPrincipals(_userCache.getAllBrokerUserConfig()).stream()
+          BasicAuthPrincipalUtils.extractBasicAuthPrincipals(_userCache.getAllBrokerUserConfig()).stream()
               .collect(Collectors.toMap(BasicAuthPrincipal::getName, p -> p));
 
       for (String token : tokens) {
-        String username = org.apache.pinot.common.auth.BasicAuthUtils.extractUsername(token);
-        String password = org.apache.pinot.common.auth.BasicAuthUtils.extractPassword(token);
+        String username = BasicAuthTokenUtils.extractUsername(token);
+        String password = BasicAuthTokenUtils.extractPassword(token);
 
         if (StringUtils.isEmpty(username) || StringUtils.isEmpty(password)) {
           continue;

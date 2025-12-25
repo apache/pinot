@@ -26,11 +26,12 @@ import java.util.Optional;
 import java.util.stream.Collectors;
 import javax.ws.rs.core.HttpHeaders;
 import org.apache.commons.lang3.StringUtils;
+import org.apache.pinot.common.auth.BasicAuthTokenUtils;
 import org.apache.pinot.common.config.provider.AccessControlUserCache;
 import org.apache.pinot.common.utils.BcryptUtils;
 import org.apache.pinot.controller.ControllerConf;
 import org.apache.pinot.controller.helix.core.PinotHelixResourceManager;
-import org.apache.pinot.core.auth.BasicAuthUtils;
+import org.apache.pinot.core.auth.BasicAuthPrincipalUtils;
 import org.apache.pinot.core.auth.TargetType;
 import org.apache.pinot.core.auth.ZkBasicAuthPrincipal;
 import org.apache.pinot.spi.env.PinotConfiguration;
@@ -102,8 +103,8 @@ public class ZkBasicAuthAccessControlFactory implements AccessControlFactory {
         return Optional.empty();
       }
 
-      _name2principal = BasicAuthUtils.extractBasicAuthPrincipals(_userCache.getAllControllerUserConfig()).stream()
-          .collect(Collectors.toMap(ZkBasicAuthPrincipal::getName, p -> p));
+      _name2principal = BasicAuthPrincipalUtils.extractBasicAuthPrincipals(_userCache.getAllControllerUserConfig())
+          .stream().collect(Collectors.toMap(ZkBasicAuthPrincipal::getName, p -> p));
 
       List<String> authHeaders = headers.getRequestHeader(HEADER_AUTHORIZATION);
       if (authHeaders == null) {
@@ -111,8 +112,8 @@ public class ZkBasicAuthAccessControlFactory implements AccessControlFactory {
       }
 
       for (String authHeader : authHeaders) {
-        String username = org.apache.pinot.common.auth.BasicAuthUtils.extractUsername(authHeader);
-        String password = org.apache.pinot.common.auth.BasicAuthUtils.extractPassword(authHeader);
+        String username = BasicAuthTokenUtils.extractUsername(authHeader);
+        String password = BasicAuthTokenUtils.extractPassword(authHeader);
         if (StringUtils.isEmpty(username) || StringUtils.isEmpty(password)) {
           continue;
         }
