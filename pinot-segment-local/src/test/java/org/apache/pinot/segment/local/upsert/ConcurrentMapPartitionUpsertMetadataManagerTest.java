@@ -1996,10 +1996,10 @@ public class ConcurrentMapPartitionUpsertMetadataManagerTest {
       validDocIds1.add(i);
     }
     List<PrimaryKey> primaryKeysList1 = getPrimaryKeyList(numRecords1, primaryKeys1);
-    ImmutableSegmentImpl segment1 = mockImmutableSegmentWithTimestamps(1, validDocIds1, null,
-        primaryKeysList1, timestamps1);
-    List<RecordInfo> recordInfoList1 = getRecordInfoListWithIntegerComparison(numRecords1, primaryKeys1,
-        timestamps1, null);
+    ImmutableSegmentImpl segment1 =
+        mockImmutableSegmentWithTimestamps(1, validDocIds1, null, primaryKeysList1, timestamps1);
+    List<RecordInfo> recordInfoList1 =
+        getRecordInfoListWithIntegerComparison(numRecords1, primaryKeys1, timestamps1, null);
 
     upsertMetadataManager.addSegment(segment1, validDocIds1, null, recordInfoList1.iterator());
 
@@ -2098,7 +2098,7 @@ public class ConcurrentMapPartitionUpsertMetadataManagerTest {
     int[] timestamps1 = new int[]{1500, 3500, 4000};
     ThreadSafeMutableRoaringBitmap validDocIds1 = new ThreadSafeMutableRoaringBitmap();
     ImmutableSegmentImpl segment1 = createRealSegment(primaryKeys1, timestamps1, validDocIds1);
-    
+
     upsertMetadataManager.addSegment(segment1);
 
     Map<Object, RecordLocation> recordLocationMap = upsertMetadataManager._primaryKeyToRecordLocationMap;
