@@ -54,8 +54,8 @@ public class PinotSegmentApiClient implements Closeable {
   private static final String SELECT_PATH = "/select";
   private static final String METADATA_PATH = "/metadata";
 
-  private static String encodePathSegment(String segment) {
-    return URLEncoder.encode(segment, StandardCharsets.UTF_8);
+  private static String encodePathSegment(String pathSegment) {
+    return URLEncoder.encode(pathSegment, StandardCharsets.UTF_8);
   }
 
   public JsonNode selectSegments(String rawTableName, String tableType, long startTimestamp, long endTimestamp,

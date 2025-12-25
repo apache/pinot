@@ -31,7 +31,7 @@ import java.util.Map;
 import java.util.Properties;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.atomic.AtomicLong;
 import java.util.function.Function;
 import java.util.function.IntFunction;
 import javax.annotation.Nullable;
@@ -72,6 +72,8 @@ public final class TablesSystemTableProvider implements SystemTableDataProvider 
   private static final long CONTROLLER_TIMEOUT_MS = getPositiveLongProperty(CONTROLLER_TIMEOUT_MS_PROPERTY,
       DEFAULT_CONTROLLER_TIMEOUT_MS);
 
+  private static final long SIZE_FETCH_FAILURE_WARN_INTERVAL_MS = Duration.ofHours(1).toMillis();
+
   private static final String ADMIN_TRANSPORT_REQUEST_TIMEOUT_MS = "pinot.admin.request.timeout.ms";
   private static final String ADMIN_TRANSPORT_SCHEME = "pinot.admin.scheme";
 
@@ -98,7 +100,7 @@ public final class TablesSystemTableProvider implements SystemTableDataProvider 
   private final List<String> _staticControllerUrls;
   private final Map<String, CachedSize> _sizeCache = new ConcurrentHashMap<>();
   private final Map<String, AutoCloseable> _adminClientCache = new ConcurrentHashMap<>();
-  private final AtomicBoolean _loggedSizeFetchFailure = new AtomicBoolean();
+  private final AtomicLong _lastSizeFetchFailureWarnLogMs = new AtomicLong();
 
   public TablesSystemTableProvider() {
     this(null, null, null, null, null);
@@ -446,33 +448,51 @@ public final class TablesSystemTableProvider implements SystemTableDataProvider 
       List<String> controllerBaseUrls) {
     if (tableType == TableType.OFFLINE && sizeFromController._offlineSegments != null
         && sizeFromController._offlineSegments._segments != null) {
-      if (sizeFromController._offlineTotalDocs >= 0) {
-        return sizeFromController._offlineTotalDocs;
+      long cached = sizeFromController._offlineTotalDocs;
+      if (cached >= 0) {
+        return cached;
       }
       long totalDocsFromSize = getTotalDocsFromSize(sizeFromController, tableType);
       if (totalDocsFromSize > 0) {
-        sizeFromController._offlineTotalDocs = totalDocsFromSize;
-        return totalDocsFromSize;
+        synchronized (sizeFromController) {
+          if (sizeFromController._offlineTotalDocs < 0) {
+            sizeFromController._offlineTotalDocs = totalDocsFromSize;
+          }
+          return sizeFromController._offlineTotalDocs;
+        }
       }
       long fetched = fetchTotalDocsFromSegmentMetadata(tableNameWithType, sizeFromController._offlineSegments._segments,
           controllerBaseUrls);
-      sizeFromController._offlineTotalDocs = fetched;
-      return fetched;
+      synchronized (sizeFromController) {
+        if (sizeFromController._offlineTotalDocs < 0) {
+          sizeFromController._offlineTotalDocs = fetched;
+        }
+        return sizeFromController._offlineTotalDocs;
+      }
     }
     if (tableType == TableType.REALTIME && sizeFromController._realtimeSegments != null
         && sizeFromController._realtimeSegments._segments != null) {
-      if (sizeFromController._realtimeTotalDocs >= 0) {
-        return sizeFromController._realtimeTotalDocs;
+      long cached = sizeFromController._realtimeTotalDocs;
+      if (cached >= 0) {
+        return cached;
       }
       long totalDocsFromSize = getTotalDocsFromSize(sizeFromController, tableType);
       if (totalDocsFromSize > 0) {
-        sizeFromController._realtimeTotalDocs = totalDocsFromSize;
-        return totalDocsFromSize;
+        synchronized (sizeFromController) {
+          if (sizeFromController._realtimeTotalDocs < 0) {
+            sizeFromController._realtimeTotalDocs = totalDocsFromSize;
+          }
+          return sizeFromController._realtimeTotalDocs;
+        }
       }
       long fetched = fetchTotalDocsFromSegmentMetadata(tableNameWithType,
           sizeFromController._realtimeSegments._segments, controllerBaseUrls);
-      sizeFromController._realtimeTotalDocs = fetched;
-      return fetched;
+      synchronized (sizeFromController) {
+        if (sizeFromController._realtimeTotalDocs < 0) {
+          sizeFromController._realtimeTotalDocs = fetched;
+        }
+        return sizeFromController._realtimeTotalDocs;
+      }
     }
     return 0;
   }
@@ -614,9 +634,6 @@ public final class TablesSystemTableProvider implements SystemTableDataProvider 
   }
 
   private static String stripScheme(String controllerUrl) {
-    if (controllerUrl == null) {
-      return null;
-    }
     if (controllerUrl.startsWith("http://")) {
       return controllerUrl.substring("http://".length());
     }
@@ -643,8 +660,8 @@ public final class TablesSystemTableProvider implements SystemTableDataProvider 
     @JsonProperty("realtimeSegments")
     public TableSubType _realtimeSegments;
 
-    public long _offlineTotalDocs = -1;
-    public long _realtimeTotalDocs = -1;
+    public volatile long _offlineTotalDocs = -1;
+    public volatile long _realtimeTotalDocs = -1;
   }
 
   @JsonIgnoreProperties(ignoreUnknown = true)
@@ -678,7 +695,10 @@ public final class TablesSystemTableProvider implements SystemTableDataProvider 
   }
 
   private void logSizeFetchFailure(String message, Object... args) {
-    if (_loggedSizeFetchFailure.compareAndSet(false, true)) {
+    long nowMs = System.currentTimeMillis();
+    long lastWarnLogMs = _lastSizeFetchFailureWarnLogMs.get();
+    if (nowMs - lastWarnLogMs >= SIZE_FETCH_FAILURE_WARN_INTERVAL_MS
+        && _lastSizeFetchFailureWarnLogMs.compareAndSet(lastWarnLogMs, nowMs)) {
       LOGGER.warn(message, args);
     } else {
       LOGGER.debug(message, args);

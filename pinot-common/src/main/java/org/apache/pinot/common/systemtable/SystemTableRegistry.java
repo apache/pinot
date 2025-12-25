@@ -144,6 +144,11 @@ public final class SystemTableRegistry {
       TableCache tableCache, HelixAdmin helixAdmin, String clusterName) {
     try {
       // Prefer the most specific constructor available.
+      // Supported provider constructors (in preference order):
+      //   (TableCache, HelixAdmin, String clusterName)
+      //   (TableCache, HelixAdmin)
+      //   (TableCache)
+      //   ()
       try {
         return clazz.getDeclaredConstructor(TableCache.class, HelixAdmin.class, String.class)
             .newInstance(tableCache, helixAdmin, clusterName);

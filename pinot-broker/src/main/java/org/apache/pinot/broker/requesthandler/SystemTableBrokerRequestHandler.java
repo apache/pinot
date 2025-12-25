@@ -46,6 +46,7 @@ import org.apache.pinot.common.response.BrokerResponse;
 import org.apache.pinot.common.response.broker.BrokerResponseNative;
 import org.apache.pinot.common.systemtable.SystemTableDataProvider;
 import org.apache.pinot.common.systemtable.SystemTableRegistry;
+import org.apache.pinot.common.utils.NamedThreadFactory;
 import org.apache.pinot.common.utils.config.QueryOptionsUtils;
 import org.apache.pinot.common.utils.request.RequestUtils;
 import org.apache.pinot.core.operator.blocks.InstanceResponseBlock;
@@ -69,6 +70,7 @@ import org.apache.pinot.spi.exception.QueryErrorCode;
 import org.apache.pinot.spi.query.QueryExecutionContext;
 import org.apache.pinot.spi.query.QueryThreadContext;
 import org.apache.pinot.spi.trace.RequestContext;
+import org.apache.pinot.spi.utils.CommonConstants;
 import org.apache.pinot.spi.utils.builder.TableNameBuilder;
 import org.apache.pinot.sql.parsers.CalciteSqlParser;
 import org.apache.pinot.sql.parsers.SqlNodeAndOptions;
@@ -94,7 +96,11 @@ public class SystemTableBrokerRequestHandler extends BaseBrokerRequestHandler {
     _brokerReduceService = new BrokerReduceService(_config);
     _planMaker = new InstancePlanMakerImplV2();
     _planMaker.init(_config);
-    _executorService = QueryThreadContext.contextAwareExecutorService(Executors.newFixedThreadPool(2));
+    int executorPoolSize = config.getProperty(CommonConstants.Broker.CONFIG_OF_SYSTEM_TABLE_EXECUTOR_POOL_SIZE,
+        CommonConstants.Broker.DEFAULT_SYSTEM_TABLE_EXECUTOR_POOL_SIZE);
+    executorPoolSize = Math.max(1, executorPoolSize);
+    _executorService = QueryThreadContext.contextAwareExecutorService(Executors.newFixedThreadPool(executorPoolSize,
+        new NamedThreadFactory("system-table-query-executor")));
   }
 
   @Override
