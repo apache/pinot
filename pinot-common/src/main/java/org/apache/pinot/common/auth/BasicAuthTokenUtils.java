@@ -27,10 +27,10 @@ import org.apache.pinot.common.utils.BcryptUtils;
 /**
  * Utility for configuring basic auth and parsing related http tokens
  */
-public final class BasicAuthUtils {
+public final class BasicAuthTokenUtils {
   private static final String ALL = "*";
 
-  private BasicAuthUtils() {
+  private BasicAuthTokenUtils() {
     // left blank
   }
 

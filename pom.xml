@@ -147,11 +147,11 @@
     <zkclient.version>0.11</zkclient.version>
     <jackson.version>2.20.1</jackson.version>
     <zookeeper.version>3.9.4</zookeeper.version>
-    <async-http-client.version>3.0.4</async-http-client.version>
+    <async-http-client.version>3.0.5</async-http-client.version>
     <jersey.version>2.47</jersey.version>
     <hk2.version>2.6.1</hk2.version>
     <swagger.version>1.6.16</swagger.version>
-    <swagger-ui.version>5.30.3</swagger-ui.version>
+    <swagger-ui.version>5.31.0</swagger-ui.version>
     <hadoop.version>3.4.2</hadoop.version>
     <jsonpath.version>2.10.0</jsonpath.version>
     <jsonsmart.version>2.6.0</jsonsmart.version>
@@ -168,17 +168,17 @@
     <zstd-jni.version>1.5.7-6</zstd-jni.version>
     <lz4-java.version>1.8.0</lz4-java.version>
     <libthrift.verion>0.22.0</libthrift.verion>
-    <log4j.version>2.25.2</log4j.version>
+    <log4j.version>2.25.3</log4j.version>
     <slf4j.version>2.0.17</slf4j.version>
     <netty.version>4.1.122.Final</netty.version>
     <reactivestreams.version>1.0.4</reactivestreams.version>
     <jts.version>1.20.0</jts.version>
-    <h3.version>4.3.2</h3.version>
+    <h3.version>4.4.0</h3.version>
     <jmh.version>1.37</jmh.version>
     <audienceannotations.version>0.15.1</audienceannotations.version>
     <clp-ffi.version>0.4.7</clp-ffi.version>
     <stax2-api.version>4.2.2</stax2-api.version>
-    <aws.sdk.version>2.40.7</aws.sdk.version>
+    <aws.sdk.version>2.40.15</aws.sdk.version>
     <azure.sdk.version>1.3.3</azure.sdk.version>
     <azure.msal4j.version>1.23.1</azure.msal4j.version>
     <joda-time.version>2.14.0</joda-time.version>
@@ -239,8 +239,8 @@
 
     <!-- Google Libraries -->
     <protobuf.version>3.25.8</protobuf.version>
-    <grpc.version>1.77.0</grpc.version>
-    <google.cloud.libraries.version>26.72.0</google.cloud.libraries.version>
+    <grpc.version>1.78.0</grpc.version>
+    <google.cloud.libraries.version>26.73.0</google.cloud.libraries.version>
     <google.auto-service.version>1.1.1</google.auto-service.version>
     <google.re2j.version>1.8</google.re2j.version>
     <google.errorprone.version>2.45.0</google.errorprone.version>
@@ -268,9 +268,9 @@
     <jna.version>5.18.1</jna.version>
     <jnr-ffi.version>2.2.18</jnr-ffi.version>
     <jnr-constants.version>0.10.4</jnr-constants.version>
-    <asm.version>9.9</asm.version>
+    <asm.version>9.9.1</asm.version>
     <paranamer.version>2.8.3</paranamer.version>
-    <kotlin.stdlib.version>2.2.21</kotlin.stdlib.version>
+    <kotlin.stdlib.version>2.3.0</kotlin.stdlib.version>
     <jetbrains.annotations.version>26.0.2-1</jetbrains.annotations.version>
     <okio.version>3.16.4</okio.version>
     <kryo.version>2.24.0</kryo.version>
@@ -296,9 +296,9 @@
     <tyrus-standalone-client.version>2.2.1</tyrus-standalone-client.version>
     <jopt-simple.version>5.0.4</jopt-simple.version>
     <ipaddress.version>5.5.1</ipaddress.version>
-    <openhft.chronicle-bom.version>2.27ea94</openhft.chronicle-bom.version>
+    <openhft.chronicle-bom.version>2.27ea96</openhft.chronicle-bom.version>
     <jdom2.version>2.0.6.1</jdom2.version>
-    <maven.version>3.9.11</maven.version>
+    <maven.version>3.9.12</maven.version>
     <plexus-component-annotations.version>2.2.0</plexus-component-annotations.version>
     <plexus-utils.version>3.6.0</plexus-utils.version>
 
@@ -2525,7 +2525,7 @@
         <plugin>
           <groupId>org.codehaus.mojo</groupId>
           <artifactId>exec-maven-plugin</artifactId>
-          <version>3.6.2</version>
+          <version>3.6.3</version>
         </plugin>
         <plugin>
           <groupId>org.eclipse.sisu</groupId>
@@ -2942,6 +2942,29 @@
           <properties>
             <projectName>Apache Pinot</projectName>
           </properties>
+        </configuration>
+      </plugin>
+      <plugin>
+        <groupId>de.shadowhunt.maven.plugins</groupId>
+        <artifactId>package-info-maven-plugin</artifactId>
+        <version>2.0.0</version>
+        <executions>
+          <execution>
+            <phase>generate-sources</phase>
+            <goals>
+              <goal>package-info</goal>
+            </goals>
+          </execution>
+        </executions>
+        <configuration>
+          <packages>
+            <package regex="org.apache.pinot.**">
+              <annotations>
+                <annotation>@javax.annotation.ParametersAreNonnullByDefault</annotation>
+                <annotation>@org.jspecify.annotations.NullMarked</annotation>
+              </annotations>
+            </package>
+          </packages>
         </configuration>
       </plugin>
     </plugins>

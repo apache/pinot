@@ -18,23 +18,26 @@
  */
 package org.apache.pinot.broker.routing.instanceselector;
 
-import java.time.Clock;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.Comparator;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import javax.annotation.Nullable;
 import org.apache.commons.collections.MapUtils;
 import org.apache.commons.lang3.tuple.Pair;
-import org.apache.helix.store.zk.ZkHelixPropertyStore;
-import org.apache.helix.zookeeper.datamodel.ZNRecord;
-import org.apache.pinot.broker.routing.adaptiveserverselector.AdaptiveServerSelector;
+import org.apache.helix.model.ExternalView;
+import org.apache.helix.model.IdealState;
 import org.apache.pinot.broker.routing.adaptiveserverselector.ServerSelectionContext;
 import org.apache.pinot.common.metrics.BrokerMeter;
 import org.apache.pinot.common.metrics.BrokerMetrics;
 import org.apache.pinot.common.utils.HashUtil;
 import org.apache.pinot.common.utils.config.QueryOptionsUtils;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 
 /**
@@ -65,14 +68,10 @@ import org.apache.pinot.common.utils.config.QueryOptionsUtils;
  */
 public class ReplicaGroupInstanceSelector extends BaseInstanceSelector {
 
-  public ReplicaGroupInstanceSelector(String tableNameWithType, ZkHelixPropertyStore<ZNRecord> propertyStore,
-      BrokerMetrics brokerMetrics, @Nullable AdaptiveServerSelector adaptiveServerSelector, Clock clock,
-      InstanceSelectorConfig config) {
-    super(tableNameWithType, propertyStore, brokerMetrics, adaptiveServerSelector, clock, config);
-  }
+  private static final Logger LOGGER = LoggerFactory.getLogger(ReplicaGroupInstanceSelector.class);
 
   @Override
-  Pair<Map<String, String>, Map<String, String>> select(List<String> segments, int requestId,
+  public Pair<Map<String, String>, Map<String, String>> select(List<String> segments, int requestId,
       SegmentStates segmentStates, Map<String, String> queryOptions) {
     ServerSelectionContext ctx = new ServerSelectionContext(queryOptions, _config);
     if (_adaptiveServerSelector != null) {
@@ -165,5 +164,116 @@ public class ReplicaGroupInstanceSelector extends BaseInstanceSelector {
       }
     }
     return new ArrayList<>(candidateServers.values());
+  }
+
+  @Override
+  void updateSegmentMaps(IdealState idealState, ExternalView externalView, Set<String> onlineSegments,
+      Map<String, Long> newSegmentCreationTimeMap) {
+    if (_tableConfig.isUpsertEnabled() || _tableConfig.isDedupEnabled()) {
+      updateSegmentMapsForUpsertTable(idealState, externalView, onlineSegments, newSegmentCreationTimeMap);
+    } else {
+      super.updateSegmentMaps(idealState, externalView, onlineSegments, newSegmentCreationTimeMap);
+    }
+  }
+
+  /**
+   *
+   * <pre>
+   * Instances unavailable for any old segment should not exist in _oldSegmentCandidatesMap or _newSegmentStateMap for
+   * segments with the same instances in ideal state.
+   *
+   * The maps are calculated in the following steps to meet the strict replica-group guarantee:
+   *   1. Compute the online instances for both old and new segments
+   *   2. Compare online instances for old segments with instances in ideal state and gather the unavailable instances
+   *   for each set of instances
+   *   3. Exclude the unavailable instances from the online instances map for both old and new segment map
+   * </pre>
+   */
+  void updateSegmentMapsForUpsertTable(IdealState idealState, ExternalView externalView, Set<String> onlineSegments,
+      Map<String, Long> newSegmentCreationTimeMap) {
+    _oldSegmentCandidatesMap.clear();
+    int newSegmentMapCapacity = HashUtil.getHashMapCapacity(newSegmentCreationTimeMap.size());
+    _newSegmentStateMap = new HashMap<>(newSegmentMapCapacity);
+
+    Map<String, Map<String, String>> idealStateAssignment = idealState.getRecord().getMapFields();
+    Map<String, Map<String, String>> externalViewAssignment = externalView.getRecord().getMapFields();
+
+    // Get the online instances for the segments
+    Map<String, Set<String>> oldSegmentToOnlineInstancesMap =
+        new HashMap<>(HashUtil.getHashMapCapacity(onlineSegments.size()));
+    Map<String, Set<String>> newSegmentToOnlineInstancesMap = new HashMap<>(newSegmentMapCapacity);
+    for (String segment : onlineSegments) {
+      Map<String, String> idealStateInstanceStateMap = idealStateAssignment.get(segment);
+      assert idealStateInstanceStateMap != null;
+      Map<String, String> externalViewInstanceStateMap = externalViewAssignment.get(segment);
+      Set<String> onlineInstances;
+      if (externalViewInstanceStateMap == null) {
+        onlineInstances = Collections.emptySet();
+      } else {
+        onlineInstances = getOnlineInstances(idealStateInstanceStateMap, externalViewInstanceStateMap);
+      }
+      if (newSegmentCreationTimeMap.containsKey(segment)) {
+        newSegmentToOnlineInstancesMap.put(segment, onlineInstances);
+      } else {
+        oldSegmentToOnlineInstancesMap.put(segment, onlineInstances);
+      }
+    }
+
+    // Calculate the unavailable instances based on the old segments' online instances for each combination of instances
+    // in the ideal state
+    Map<Set<String>, Set<String>> unavailableInstancesMap = new HashMap<>();
+    for (Map.Entry<String, Set<String>> entry : oldSegmentToOnlineInstancesMap.entrySet()) {
+      String segment = entry.getKey();
+      Set<String> onlineInstances = entry.getValue();
+      Map<String, String> idealStateInstanceStateMap = idealStateAssignment.get(segment);
+      Set<String> instancesInIdealState = idealStateInstanceStateMap.keySet();
+      Set<String> unavailableInstances =
+          unavailableInstancesMap.computeIfAbsent(instancesInIdealState, k -> new HashSet<>());
+      for (String instance : instancesInIdealState) {
+        if (!onlineInstances.contains(instance)) {
+          if (unavailableInstances.add(instance)) {
+            LOGGER.warn(
+                "Found unavailable instance: {} in instance group: {} for segment: {}, table: {} (IS: {}, EV: {})",
+                instance, instancesInIdealState, segment, _tableNameWithType, idealStateInstanceStateMap,
+                externalViewAssignment.get(segment));
+          }
+        }
+      }
+    }
+
+    // Iterate over the maps and exclude the unavailable instances
+    for (Map.Entry<String, Set<String>> entry : oldSegmentToOnlineInstancesMap.entrySet()) {
+      String segment = entry.getKey();
+      // NOTE: onlineInstances is either a TreeSet or an EmptySet (sorted)
+      Set<String> onlineInstances = entry.getValue();
+      Map<String, String> idealStateInstanceStateMap = idealStateAssignment.get(segment);
+      Set<String> unavailableInstances = unavailableInstancesMap.get(idealStateInstanceStateMap.keySet());
+      List<SegmentInstanceCandidate> candidates = new ArrayList<>(onlineInstances.size());
+      for (String instance : onlineInstances) {
+        if (!unavailableInstances.contains(instance)) {
+          candidates.add(new SegmentInstanceCandidate(instance, true, getPool(instance)));
+        }
+      }
+      _oldSegmentCandidatesMap.put(segment, candidates);
+    }
+
+    for (Map.Entry<String, Set<String>> entry : newSegmentToOnlineInstancesMap.entrySet()) {
+      String segment = entry.getKey();
+      Set<String> onlineInstances = entry.getValue();
+      Map<String, String> idealStateInstanceStateMap = idealStateAssignment.get(segment);
+      Set<String> unavailableInstances =
+          unavailableInstancesMap.getOrDefault(idealStateInstanceStateMap.keySet(), Collections.emptySet());
+      List<SegmentInstanceCandidate> candidates = new ArrayList<>(idealStateInstanceStateMap.size());
+      for (String instance : convertToSortedMap(idealStateInstanceStateMap).keySet()) {
+        if (!unavailableInstances.contains(instance)) {
+          candidates.add(new SegmentInstanceCandidate(instance, onlineInstances.contains(instance), getPool(instance)));
+        }
+      }
+      _newSegmentStateMap.put(segment, new NewSegmentState(newSegmentCreationTimeMap.get(segment), candidates));
+    }
+    if (LOGGER.isDebugEnabled()) {
+      LOGGER.debug("Got _newSegmentStateMap: {}, _oldSegmentCandidatesMap: {}", _newSegmentStateMap.keySet(),
+          _oldSegmentCandidatesMap.keySet());
+    }
   }
 }

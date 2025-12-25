@@ -45,20 +45,21 @@ import { Resizable } from 're-resizable';
 import SimpleAccordion from '../SimpleAccordion';
 import TimeseriesChart from './TimeseriesChart';
 import MetricStatsTable from './MetricStatsTable';
-import { parseTimeseriesResponse, isPrometheusFormat } from '../../utils/TimeseriesUtils';
+import { parseTimeseriesResponse, isBrokerFormat } from '../../utils/TimeseriesUtils';
 import { ChartSeries } from 'Models';
 import { DEFAULT_SERIES_LIMIT } from '../../utils/ChartConstants';
 
 // Define proper types
 interface TimeseriesQueryResponse {
-  error: string;
-  data: {
-    resultType: string;
-    result: Array<{
-      metric: Record<string, string>;
-      values: [number, number][];
-    }>;
+  resultTable?: {
+    dataSchema: {
+      columnNames: string[];
+      columnDataTypes: string[];
+    };
+    rows: any[][];
   };
+  exceptions?: any[];
+  error?: string;
 }
 
 interface CodeMirrorEditor {
@@ -367,16 +368,19 @@ const TimeseriesQueryPage = () => {
   const processQueryResponse = useCallback((parsedData: TimeseriesQueryResponse) => {
     setRawOutput(JSON.stringify(parsedData, null, 2));
 
-    // Check if this is an error response
-    if (parsedData.error != null && parsedData.error !== '') {
-      setError(parsedData.error);
+    // Check for errors
+    const errorMsg = parsedData.error ||
+      (parsedData.exceptions?.length > 0 ?
+        parsedData.exceptions.map((e: any) => e.message || e.toString()).join('; ') : '');
+    if (errorMsg) {
+      setError(errorMsg);
       setChartSeries([]);
       setTotalSeriesCount(0);
       return;
     }
 
-    // Parse timeseries data for chart and stats
-    if (isPrometheusFormat(parsedData)) {
+    // Parse broker response directly
+    if (isBrokerFormat(parsedData)) {
       const series = parseTimeseriesResponse(parsedData);
       setTotalSeriesCount(series.length);
 
@@ -617,7 +621,7 @@ const TimeseriesQueryPage = () => {
                       No Chart Data Available
                     </Typography>
                     <Typography variant="body2" color="textSecondary">
-                      The query response is not in Prometheus-compatible format or contains no timeseries data.
+                      The query response does not contain valid timeseries data.
                       <br />
                       Switch to JSON view to see the raw response.
                     </Typography>

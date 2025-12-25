@@ -27,7 +27,7 @@ import java.util.concurrent.CountDownLatch;
 import org.apache.helix.model.InstanceConfig;
 import org.apache.pinot.broker.broker.AllowAllAccessControlFactory;
 import org.apache.pinot.broker.queryquota.QueryQuotaManager;
-import org.apache.pinot.broker.routing.BrokerRoutingManager;
+import org.apache.pinot.broker.routing.manager.BrokerRoutingManager;
 import org.apache.pinot.common.config.provider.TableCache;
 import org.apache.pinot.common.metrics.BrokerMetrics;
 import org.apache.pinot.common.request.BrokerRequest;
@@ -44,11 +44,15 @@ import org.apache.pinot.spi.config.table.TenantConfig;
 import org.apache.pinot.spi.env.PinotConfiguration;
 import org.apache.pinot.spi.eventlistener.query.BrokerQueryEventListenerFactory;
 import org.apache.pinot.spi.exception.BadQueryRequestException;
+import org.apache.pinot.spi.trace.LoggerConstants;
 import org.apache.pinot.spi.trace.RequestContext;
+import org.apache.pinot.spi.utils.CommonConstants;
 import org.apache.pinot.sql.parsers.CalciteSqlParser;
 import org.apache.pinot.util.TestUtils;
 import org.mockito.Mockito;
+import org.slf4j.MDC;
 import org.testng.Assert;
+import org.testng.annotations.AfterMethod;
 import org.testng.annotations.Test;
 
 import static org.mockito.ArgumentMatchers.any;
@@ -58,6 +62,11 @@ import static org.mockito.Mockito.when;
 
 
 public class BaseSingleStageBrokerRequestHandlerTest {
+
+  @AfterMethod
+  public void cleanupMdc() {
+    MDC.clear();
+  }
 
   @Test
   public void testUpdateColumnNames() {
@@ -231,5 +240,37 @@ public class BaseSingleStageBrokerRequestHandlerTest {
         "error1, with routing policy: off_rp [offline]");
     Assert.assertEquals(BaseSingleStageBrokerRequestHandler.addRoutingPolicyInErrMsg("error1", "rt_rp", "off_rp"),
         "error1, with routing policy: rt_rp [realtime], off_rp [offline]");
+  }
+
+  @Test
+  public void testQueryHashRegisteredInMdc() {
+    String queryHash = "test_hash_abc123";
+    LoggerConstants.QUERY_HASH_KEY.registerInMdc(queryHash);
+    String mdcValue = MDC.get(LoggerConstants.QUERY_HASH_KEY.getKey());
+    Assert.assertNotNull(mdcValue, "QueryHash should be registered in MDC");
+    Assert.assertEquals(mdcValue, queryHash, "MDC should contain the correct queryHash");
+  }
+
+  @Test
+  public void testQueryHashNotRegisteredWhenNull() {
+    String mdcValue = MDC.get(LoggerConstants.QUERY_HASH_KEY.getKey());
+    Assert.assertNull(mdcValue, "Null queryHash should not be registered in MDC");
+  }
+
+  @Test
+  public void testQueryHashAddedToQueryOptions() {
+    String query = "SELECT * FROM myTable WHERE col = 100";
+    PinotQuery pinotQuery = CalciteSqlParser.compileToPinotQuery(query);
+    String queryHash = "generated_hash_xyz";
+    pinotQuery.putToQueryOptions(
+        CommonConstants.Broker.Request.QueryOptionKey.QUERY_HASH,
+        queryHash);
+    Assert.assertTrue(pinotQuery.getQueryOptions().containsKey(
+        CommonConstants.Broker.Request.QueryOptionKey.QUERY_HASH),
+        "QueryHash should be added to queryOptions");
+    Assert.assertEquals(
+        pinotQuery.getQueryOptions().get(CommonConstants.Broker.Request.QueryOptionKey.QUERY_HASH),
+        queryHash,
+        "QueryOptions should contain the correct queryHash value");
   }
 }
