@@ -242,6 +242,7 @@ public class BrokerGrpcServer extends PinotQueryBrokerGrpc.PinotQueryBrokerImplB
       }
       brokerResponse.emitBrokerResponseMetrics(_brokerMetrics);
       responseObserver.onNext(errorBlock);
+      _brokerMetrics.addMeteredGlobalValue(BrokerMeter.GRPC_BYTES_SENT, errorBlock.getSerializedSize());
       responseObserver.onCompleted();
       return;
     }
@@ -278,10 +279,14 @@ public class BrokerGrpcServer extends PinotQueryBrokerGrpc.PinotQueryBrokerImplB
         throw new RuntimeException(e);
       }
       responseObserver.onNext(emptyOrErrorBlock);
+      _brokerMetrics.addMeteredGlobalValue(BrokerMeter.GRPC_BYTES_SENT, emptyOrErrorBlock.getSerializedSize());
       responseObserver.onCompleted();
       return;
     }
     // Handle query response:
+    // Track total bytes sent for metrics
+    long totalBytesSent = 0;
+
     // First block is metadata
     try {
       Broker.BrokerResponse metadataBlock =
@@ -289,6 +294,7 @@ public class BrokerGrpcServer extends PinotQueryBrokerGrpc.PinotQueryBrokerImplB
               .setPayload(ByteString.copyFrom(brokerResponse.toMetadataJsonString().getBytes()))
               .build();
       responseObserver.onNext(metadataBlock);
+      totalBytesSent += metadataBlock.getSerializedSize();
     } catch (IOException e) {
       responseObserver.onError(e);
       throw new RuntimeException(e);
@@ -299,6 +305,7 @@ public class BrokerGrpcServer extends PinotQueryBrokerGrpc.PinotQueryBrokerImplB
           Broker.BrokerResponse.newBuilder().setPayload(ByteString.copyFrom(resultTable.getDataSchema().toBytes()))
               .build();
       responseObserver.onNext(schemaBlock);
+      totalBytesSent += schemaBlock.getSerializedSize();
     } catch (IOException e) {
       responseObserver.onError(e);
       throw new RuntimeException(e);
@@ -334,11 +341,13 @@ public class BrokerGrpcServer extends PinotQueryBrokerGrpc.PinotQueryBrokerImplB
                 .putMetadata("encoding", encodingAlgorithm)
                 .build();
         responseObserver.onNext(dataBlock);
+        totalBytesSent += dataBlock.getSerializedSize();
       } catch (Exception e) {
         responseObserver.onError(e);
         throw new RuntimeException(e);
       }
     }
+    _brokerMetrics.addMeteredGlobalValue(BrokerMeter.GRPC_BYTES_SENT, totalBytesSent);
     responseObserver.onCompleted();
   }
 
