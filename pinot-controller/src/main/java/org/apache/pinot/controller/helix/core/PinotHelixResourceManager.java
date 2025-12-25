@@ -3603,6 +3603,43 @@ public class PinotHelixResourceManager {
   }
 
   /**
+   * Drains a minion instance by preventing new task assignments while allowing existing tasks to complete.
+   * This is achieved by replacing all instance tags with minion_drained. Since Helix uses containsTag()
+   * for task assignment matching, keeping any existing tags would still allow task assignments.
+   *
+   * @param instanceName Name of the minion instance to drain
+   * @return Response indicating success or failure
+   * @throws UnsupportedOperationException if the minion is already drained
+   */
+  public synchronized PinotResourceManagerResponse drainMinionInstance(String instanceName) {
+    InstanceConfig instanceConfig = getHelixInstanceConfig(instanceName);
+    if (instanceConfig == null) {
+      return PinotResourceManagerResponse.failure("Instance " + instanceName + " not found");
+    }
+
+    // Validate that minion is not already drained
+    List<String> currentTags = instanceConfig.getTags();
+    if (currentTags != null && currentTags.contains(Helix.DRAINED_MINION_INSTANCE)) {
+      throw new UnsupportedOperationException(
+          "Minion instance " + instanceName + " is already drained");
+    }
+
+    // Replace all tags with minion_drained to prevent any task assignments
+    List<String> updatedTags = Collections.singletonList(Helix.DRAINED_MINION_INSTANCE);
+    instanceConfig.getRecord().setListField(
+        InstanceConfig.InstanceConfigProperty.TAG_LIST.name(), updatedTags);
+
+    // Save to Helix
+    if (!_helixDataAccessor.setProperty(_keyBuilder.instanceConfig(instanceName), instanceConfig)) {
+      return PinotResourceManagerResponse.failure("Failed to set instance config for instance: " + instanceName);
+    }
+
+    LOGGER.info("Successfully drained minion instance: {}", instanceName);
+    return PinotResourceManagerResponse.success(
+        "Successfully drained minion instance: " + instanceName);
+  }
+
+  /**
    * Utility to perform a safety check of the operation to drop an instance.
    * If the resource is not safe to drop the utility lists all the possible reasons.
    * @param instanceName Pinot instance name
