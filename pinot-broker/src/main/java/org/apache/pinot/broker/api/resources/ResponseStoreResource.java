@@ -150,7 +150,7 @@ public class ResponseStoreResource {
       }
       asyncResponse.resume(
           PinotClientRequest.getPinotQueryResponse(_responseStore.handleCursorRequest(requestId, offset, numRows),
-              headers));
+              headers, _brokerMetrics));
     } catch (WebApplicationException wae) {
       asyncResponse.resume(wae);
     } catch (Exception e) {

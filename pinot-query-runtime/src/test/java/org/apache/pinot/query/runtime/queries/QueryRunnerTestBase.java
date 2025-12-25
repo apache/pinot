@@ -173,7 +173,7 @@ public abstract class QueryRunnerTestBase extends QueryTestSet {
     }
     QueryExecutionContext executionContext =
         new QueryExecutionContext(QueryExecutionContext.QueryType.MSE, requestId, cid, workloadName, startTimeMs,
-            activeDeadlineMs, passiveDeadlineMs, "brokerId", "brokerId");
+            activeDeadlineMs, passiveDeadlineMs, "brokerId", "brokerId", "");
     QueryThreadContext.MseWorkerInfo mseWorkerInfo = new QueryThreadContext.MseWorkerInfo(0, 0);
     try (QueryThreadContext ignore = QueryThreadContext.open(executionContext, mseWorkerInfo,
         ThreadAccountantUtils.getNoOpAccountant())) {

@@ -164,6 +164,31 @@ public class PinotQueryResource {
   }
 
   @POST
+  @Path("/query/timeseries")
+  @ManualAuthorization
+  @ApiOperation(value = "Query Pinot using the Time Series Engine (Broker Compatible API)")
+  @Consumes(MediaType.APPLICATION_JSON)
+  public StreamingOutput handleTimeSeriesQueryPost(String requestBody, @Context HttpHeaders httpHeaders) {
+    try {
+      JsonNode requestJson = JsonUtils.stringToJsonNode(requestBody);
+      if (!requestJson.has("query")) {
+        return constructQueryExceptionResponse(QueryErrorCode.JSON_PARSING,
+            "Payload is missing the query string field 'query'");
+      }
+      String language = requestJson.has("language") ? requestJson.get("language").asText() : null;
+      String query = requestJson.get("query").asText();
+      String start = requestJson.has("start") ? requestJson.get("start").asText() : null;
+      String end = requestJson.has("end") ? requestJson.get("end").asText() : null;
+      String step = requestJson.has("step") ? requestJson.get("step").asText() : null;
+
+      return executeTimeSeriesQueryCatching(httpHeaders, language, query, start, end, step, true);
+    } catch (Exception e) {
+      LOGGER.error("Caught exception while processing POST timeseries request", e);
+      return constructQueryExceptionResponse(QueryErrorCode.INTERNAL, e.getMessage());
+    }
+  }
+
+  @POST
   @Path("validateMultiStageQuery")
   public List<MultiStageQueryValidationResponse> validateMultiStageQuery(MultiStageQueryValidationRequest request,
       @Context HttpHeaders httpHeaders) {
@@ -662,11 +687,17 @@ public class PinotQueryResource {
 
   private StreamingOutput executeTimeSeriesQueryCatching(HttpHeaders httpHeaders, String language, String query,
     String start, String end, String step) {
+    return executeTimeSeriesQueryCatching(httpHeaders, language, query, start, end, step, false);
+  }
+
+  private StreamingOutput executeTimeSeriesQueryCatching(HttpHeaders httpHeaders, String language, String query,
+    String start, String end, String step, boolean useBrokerCompatibleApi) {
     try {
-      return executeTimeSeriesQuery(httpHeaders, language, query, start, end, step);
-    } catch (ProcessingException pe) {
-      LOGGER.error("Caught exception while processing timeseries request {}", pe.getMessage());
-      return constructQueryExceptionResponse(QueryErrorCode.fromErrorCode(pe.getErrorCode()), pe.getMessage());
+      LOGGER.debug("Language: {}, Query: {}, Start: {}, End: {}, Step: {}, UseBrokerAPI: {}",
+          language, query, start, end, step, useBrokerCompatibleApi);
+      String instanceId = retrieveBrokerForTimeSeriesQuery(query, language, start, end);
+      return sendTimeSeriesRequestToBroker(language, query, start, end, step, instanceId, httpHeaders,
+          useBrokerCompatibleApi);
     } catch (QueryException ex) {
       LOGGER.warn("Caught exception while processing timeseries request {}", ex.getMessage());
       return constructQueryExceptionResponse(ex.getErrorCode(), ex.getMessage());
@@ -691,25 +722,40 @@ public class PinotQueryResource {
     return selectRandomInstanceId(instanceIds);
   }
 
-  private StreamingOutput executeTimeSeriesQuery(HttpHeaders httpHeaders, String language, String query,
-      String start, String end, String step) throws Exception {
-    LOGGER.debug("Language: {}, Query: {}, Start: {}, End: {}, Step: {}", language, query, start, end, step);
-    String instanceId = retrieveBrokerForTimeSeriesQuery(query, language, start, end);
-    return sendTimeSeriesRequestToBroker(language, query, start, end, step, instanceId, httpHeaders);
-  }
 
   private StreamingOutput sendTimeSeriesRequestToBroker(String language, String query, String start, String end,
-    String step, String instanceId, HttpHeaders httpHeaders) {
+    String step, String instanceId, HttpHeaders httpHeaders, boolean useBrokerCompatibleApi) {
     InstanceConfig instanceConfig = getInstanceConfig(instanceId);
     String hostName = getHost(instanceConfig);
     String protocol = _controllerConf.getControllerBrokerProtocol();
     int port = getPort(instanceConfig);
-    String url = getTimeSeriesQueryURL(protocol, hostName, port, language, query, start, end, step);
 
     // Forward client-supplied headers
     Map<String, String> headers = extractHeaders(httpHeaders);
 
-    return sendRequestRaw(url, "GET", query, JsonUtils.newObjectNode(), headers);
+    if (useBrokerCompatibleApi) {
+      // Use POST /query/timeseries endpoint (broker compatible API)
+      String url = String.format("%s://%s:%d/query/timeseries", protocol, hostName, port);
+      ObjectNode requestJson = JsonUtils.newObjectNode();
+      requestJson.put("query", query);
+      if (language != null && !language.isEmpty()) {
+        requestJson.put("language", language);
+      }
+      if (start != null && !start.isEmpty()) {
+        requestJson.put("start", start);
+      }
+      if (end != null && !end.isEmpty()) {
+        requestJson.put("end", end);
+      }
+      if (step != null && !step.isEmpty()) {
+        requestJson.put("step", step);
+      }
+      return sendRequestRaw(url, "POST", query, requestJson, headers);
+    } else {
+      // Use GET /timeseries/api/v1/query_range endpoint (Prometheus compatible API)
+      String url = getTimeSeriesQueryURL(protocol, hostName, port, language, query, start, end, step);
+      return sendRequestRaw(url, "GET", query, JsonUtils.newObjectNode(), headers);
+    }
   }
 
   private String getTimeSeriesQueryURL(String protocol, String hostName, int port, String language, String query,

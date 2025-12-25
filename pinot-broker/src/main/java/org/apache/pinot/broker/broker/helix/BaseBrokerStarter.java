@@ -54,7 +54,7 @@ import org.apache.pinot.broker.requesthandler.MultiStageBrokerRequestHandler;
 import org.apache.pinot.broker.requesthandler.MultiStageQueryThrottler;
 import org.apache.pinot.broker.requesthandler.SingleConnectionBrokerRequestHandler;
 import org.apache.pinot.broker.requesthandler.TimeSeriesRequestHandler;
-import org.apache.pinot.broker.routing.BrokerRoutingManager;
+import org.apache.pinot.broker.routing.manager.BrokerRoutingManager;
 import org.apache.pinot.common.Utils;
 import org.apache.pinot.common.audit.AuditServiceBinder;
 import org.apache.pinot.common.config.DefaultClusterConfigChangeHandler;

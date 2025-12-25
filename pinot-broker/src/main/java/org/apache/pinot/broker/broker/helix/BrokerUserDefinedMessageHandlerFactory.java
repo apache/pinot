@@ -24,7 +24,7 @@ import org.apache.helix.messaging.handling.MessageHandler;
 import org.apache.helix.messaging.handling.MessageHandlerFactory;
 import org.apache.helix.model.Message;
 import org.apache.pinot.broker.queryquota.HelixExternalViewBasedQueryQuotaManager;
-import org.apache.pinot.broker.routing.BrokerRoutingManager;
+import org.apache.pinot.broker.routing.manager.BrokerRoutingManager;
 import org.apache.pinot.common.messages.ApplicationQpsQuotaRefreshMessage;
 import org.apache.pinot.common.messages.DatabaseConfigRefreshMessage;
 import org.apache.pinot.common.messages.LogicalTableConfigRefreshMessage;

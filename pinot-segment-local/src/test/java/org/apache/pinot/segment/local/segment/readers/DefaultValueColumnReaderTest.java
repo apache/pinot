@@ -23,6 +23,7 @@ import java.util.Arrays;
 import org.apache.pinot.spi.data.DimensionFieldSpec;
 import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.MetricFieldSpec;
+import org.apache.pinot.spi.data.readers.MultiValueResult;
 import org.testng.Assert;
 import org.testng.annotations.Test;
 
@@ -222,21 +223,23 @@ public class DefaultValueColumnReaderTest {
     int[] expectedArray = new int[]{expectedValue};
     for (int i = 0; i < NUM_DOCS; i++) {
       Assert.assertTrue(reader.hasNext());
-      int[] result = reader.nextIntMV();
-      Assert.assertTrue(Arrays.equals(result, expectedArray));
+      MultiValueResult<int[]> mvResult = reader.nextIntMV();
+      Assert.assertFalse(mvResult.hasNulls());
+      Assert.assertTrue(Arrays.equals(mvResult.getValues(), expectedArray));
     }
 
     // Test random access
     reader.rewind();
     for (int i = 0; i < NUM_DOCS; i++) {
-      int[] result = reader.getIntMV(i);
-      Assert.assertTrue(Arrays.equals(result, expectedArray));
+      MultiValueResult<int[]> mvResult = reader.getIntMV(i);
+      Assert.assertFalse(mvResult.hasNulls());
+      Assert.assertTrue(Arrays.equals(mvResult.getValues(), expectedArray));
     }
 
     // Test that the same array instance is returned (optimization)
     reader.rewind();
-    int[] firstCall = reader.getIntMV(0);
-    int[] secondCall = reader.getIntMV(1);
+    int[] firstCall = reader.getIntMV(0).getValues();
+    int[] secondCall = reader.getIntMV(1).getValues();
     Assert.assertSame(firstCall, secondCall, "Multi-value arrays should be reused");
 
     reader.close();
@@ -254,14 +257,15 @@ public class DefaultValueColumnReaderTest {
     long expectedValue = ((Number) fieldSpec.getDefaultNullValue()).longValue();
     long[] expectedArray = new long[]{expectedValue};
     for (int i = 0; i < NUM_DOCS; i++) {
-      long[] result = reader.nextLongMV();
-      Assert.assertTrue(Arrays.equals(result, expectedArray));
+      MultiValueResult<long[]> mvResult = reader.nextLongMV();
+      Assert.assertFalse(mvResult.hasNulls());
+      Assert.assertTrue(Arrays.equals(mvResult.getValues(), expectedArray));
     }
 
     // Test random access and array reuse
     reader.rewind();
-    long[] firstCall = reader.getLongMV(0);
-    long[] secondCall = reader.getLongMV(1);
+    long[] firstCall = reader.getLongMV(0).getValues();
+    long[] secondCall = reader.getLongMV(1).getValues();
     Assert.assertTrue(Arrays.equals(firstCall, expectedArray));
     Assert.assertSame(firstCall, secondCall, "Multi-value arrays should be reused");
 
@@ -277,14 +281,15 @@ public class DefaultValueColumnReaderTest {
     float expectedValue = ((Number) fieldSpec.getDefaultNullValue()).floatValue();
     float[] expectedArray = new float[]{expectedValue};
     for (int i = 0; i < NUM_DOCS; i++) {
-      float[] result = reader.nextFloatMV();
-      Assert.assertTrue(Arrays.equals(result, expectedArray));
+      MultiValueResult<float[]> mvResult = reader.nextFloatMV();
+      Assert.assertFalse(mvResult.hasNulls());
+      Assert.assertTrue(Arrays.equals(mvResult.getValues(), expectedArray));
     }
 
     // Test random access and array reuse
     reader.rewind();
-    float[] firstCall = reader.getFloatMV(0);
-    float[] secondCall = reader.getFloatMV(1);
+    float[] firstCall = reader.getFloatMV(0).getValues();
+    float[] secondCall = reader.getFloatMV(1).getValues();
     Assert.assertSame(firstCall, secondCall, "Multi-value arrays should be reused");
 
     reader.close();
@@ -299,14 +304,15 @@ public class DefaultValueColumnReaderTest {
     double expectedValue = ((Number) fieldSpec.getDefaultNullValue()).doubleValue();
     double[] expectedArray = new double[]{expectedValue};
     for (int i = 0; i < NUM_DOCS; i++) {
-      double[] result = reader.nextDoubleMV();
-      Assert.assertTrue(Arrays.equals(result, expectedArray));
+      MultiValueResult<double[]> mvResult = reader.nextDoubleMV();
+      Assert.assertFalse(mvResult.hasNulls());
+      Assert.assertTrue(Arrays.equals(mvResult.getValues(), expectedArray));
     }
 
     // Test random access and array reuse
     reader.rewind();
-    double[] firstCall = reader.getDoubleMV(0);
-    double[] secondCall = reader.getDoubleMV(1);
+    double[] firstCall = reader.getDoubleMV(0).getValues();
+    double[] secondCall = reader.getDoubleMV(1).getValues();
     Assert.assertSame(firstCall, secondCall, "Multi-value arrays should be reused");
 
     reader.close();

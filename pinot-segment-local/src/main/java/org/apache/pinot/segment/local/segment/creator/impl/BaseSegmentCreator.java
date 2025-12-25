@@ -752,6 +752,13 @@ public abstract class BaseSegmentCreator implements SegmentCreator {
     }
     LOGGER.info("Finished segment seal for: {}", _segmentName);
 
+    // Compute data crc before segment format conversion applies since v3 puts all index files into a single one
+    // Compute data crc only if no column has fwd index disabled
+    boolean hasForwardIndexDisabledCols = hasAnyColumnWithForwardIndexDisabled();
+    long dataCrc = Long.MIN_VALUE;
+    if (!hasForwardIndexDisabledCols) {
+      dataCrc = CrcUtils.computeDataCrc(_indexDir);
+    }
     // Format conversion
     convertFormatIfNecessary(_indexDir);
 
@@ -765,7 +772,7 @@ public abstract class BaseSegmentCreator implements SegmentCreator {
     updatePostSegmentCreationIndexes(_indexDir);
 
     // Persist creation metadata
-    persistCreationMeta(_indexDir);
+    persistCreationMeta(_indexDir, dataCrc);
 
     LOGGER.info("Successfully created segment: {} in {}", _segmentName, _indexDir);
   }
@@ -949,15 +956,37 @@ public abstract class BaseSegmentCreator implements SegmentCreator {
     }
   }
 
+  private boolean hasAnyColumnWithForwardIndexDisabled() {
+    Map<String, FieldIndexConfigs> indexConfigsMap = _config.getIndexConfigsByColName();
+    for (Map.Entry<String, FieldIndexConfigs> entry : indexConfigsMap.entrySet()) {
+      String columnName = entry.getKey();
+      FieldIndexConfigs fieldIndexConfigs = entry.getValue();
+      // Ignore virtual columns
+      if (_schema.getFieldSpecFor(columnName).isVirtualColumn()) {
+        continue;
+      }
+
+      boolean isFwdIndexEnabled = indexConfigsMap
+          .get(columnName)
+          .getConfig(StandardIndexes.forward())
+          .isEnabled();
+
+      if (!isFwdIndexEnabled) {
+        return true;
+      }
+    }
+    return false;
+  }
+
   /**
    * Compute CRC and creation time, and persist to segment metadata file.
    *
    * @param indexDir Segment index directory
    * @throws IOException If writing metadata fails
    */
-  private void persistCreationMeta(File indexDir)
+  private void persistCreationMeta(File indexDir, long dataCrc)
       throws IOException {
-    long crc = CrcUtils.forAllFilesInFolder(indexDir).computeCrc();
+    long crc = CrcUtils.computeCrc(indexDir);
     long creationTime;
     String creationTimeInConfig = _config.getCreationTime();
     if (creationTimeInConfig != null) {
@@ -975,6 +1004,11 @@ public abstract class BaseSegmentCreator implements SegmentCreator {
     try (DataOutputStream output = new DataOutputStream(new FileOutputStream(creationMetaFile))) {
       output.writeLong(crc);
       output.writeLong(creationTime);
+      // might be negative if the data CRC could not be computed for the segment. eg. in case a column has fwd index
+      // disabled
+      if (dataCrc >= 0) {
+        output.writeLong(dataCrc);
+      }
     }
   }
 

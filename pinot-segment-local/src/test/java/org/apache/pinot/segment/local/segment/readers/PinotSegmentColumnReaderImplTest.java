@@ -28,6 +28,7 @@ import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.data.readers.GenericRow;
+import org.apache.pinot.spi.data.readers.MultiValueResult;
 import org.apache.pinot.spi.utils.ReadMode;
 import org.testng.Assert;
 import org.testng.annotations.AfterClass;
@@ -359,13 +360,39 @@ public class PinotSegmentColumnReaderImplTest extends ColumnarSegmentBuildingTes
   @DataProvider(name = "multiValueAccessorProvider")
   public Object[][] multiValueAccessorProvider() {
     // Base column configurations
+    // For primitive MV types, we need to extract .getValues() from MultiValueResult
+    // and verify that hasNulls() is false (nulls are removed by NullValueTransformer for MV primitive types)
     Object[][] baseConfigs = new Object[][] {
-        {MV_INT_COL, (MultiValueGetter) PinotSegmentColumnReaderImpl::getIntMV,
-            (MultiValueSequentialGetter) PinotSegmentColumnReaderImpl::nextIntMV, null},
-        {MV_LONG_COL, (MultiValueGetter) PinotSegmentColumnReaderImpl::getLongMV,
-            (MultiValueSequentialGetter) PinotSegmentColumnReaderImpl::nextLongMV, null},
-        {MV_FLOAT_COL, (MultiValueGetter) PinotSegmentColumnReaderImpl::getFloatMV,
-            (MultiValueSequentialGetter) PinotSegmentColumnReaderImpl::nextFloatMV,
+        {MV_INT_COL, (MultiValueGetter) (reader, docId) -> {
+              MultiValueResult<int[]> result = reader.getIntMV(docId);
+              Assert.assertFalse(result.hasNulls(), "Multi-value primitive types should not have nulls");
+              return result.getValues();
+            },
+            (MultiValueSequentialGetter) reader -> {
+              MultiValueResult<int[]> result = reader.nextIntMV();
+              Assert.assertFalse(result.hasNulls(), "Multi-value primitive types should not have nulls");
+              return result.getValues();
+            }, null},
+        {MV_LONG_COL, (MultiValueGetter) (reader, docId) -> {
+              MultiValueResult<long[]> result = reader.getLongMV(docId);
+              Assert.assertFalse(result.hasNulls(), "Multi-value primitive types should not have nulls");
+              return result.getValues();
+            },
+            (MultiValueSequentialGetter) reader -> {
+              MultiValueResult<long[]> result = reader.nextLongMV();
+              Assert.assertFalse(result.hasNulls(), "Multi-value primitive types should not have nulls");
+              return result.getValues();
+            }, null},
+        {MV_FLOAT_COL, (MultiValueGetter) (reader, docId) -> {
+              MultiValueResult<float[]> result = reader.getFloatMV(docId);
+              Assert.assertFalse(result.hasNulls(), "Multi-value primitive types should not have nulls");
+              return result.getValues();
+            },
+            (MultiValueSequentialGetter) reader -> {
+              MultiValueResult<float[]> result = reader.nextFloatMV();
+              Assert.assertFalse(result.hasNulls(), "Multi-value primitive types should not have nulls");
+              return result.getValues();
+            },
             (Function<Object[], Object>) expectedArray -> {
               float[] expectedFloatArray = new float[expectedArray.length];
               for (int i = 0; i < expectedArray.length; i++) {
@@ -373,8 +400,16 @@ public class PinotSegmentColumnReaderImplTest extends ColumnarSegmentBuildingTes
               }
               return expectedFloatArray;
             } },
-        {MV_DOUBLE_COL, (MultiValueGetter) PinotSegmentColumnReaderImpl::getDoubleMV,
-            (MultiValueSequentialGetter) PinotSegmentColumnReaderImpl::nextDoubleMV, null},
+        {MV_DOUBLE_COL, (MultiValueGetter) (reader, docId) -> {
+              MultiValueResult<double[]> result = reader.getDoubleMV(docId);
+              Assert.assertFalse(result.hasNulls(), "Multi-value primitive types should not have nulls");
+              return result.getValues();
+            },
+            (MultiValueSequentialGetter) reader -> {
+              MultiValueResult<double[]> result = reader.nextDoubleMV();
+              Assert.assertFalse(result.hasNulls(), "Multi-value primitive types should not have nulls");
+              return result.getValues();
+            }, null},
         {MV_STRING_COL, (MultiValueGetter) PinotSegmentColumnReaderImpl::getStringMV,
             (MultiValueSequentialGetter) PinotSegmentColumnReaderImpl::nextStringMV, null},
         {MV_BYTES_COL, (MultiValueGetter) PinotSegmentColumnReaderImpl::getBytesMV,
@@ -647,7 +682,8 @@ public class PinotSegmentColumnReaderImplTest extends ColumnarSegmentBuildingTes
       // First, read all values using random access
       int[][] randomAccessValues = new int[totalDocs][];
       for (int docId = 0; docId < totalDocs; docId++) {
-        randomAccessValues[docId] = reader.getIntMV(docId);
+        MultiValueResult<int[]> result = reader.getIntMV(docId);
+        randomAccessValues[docId] = result.getValues();
       }
 
       // Now read using iterator pattern

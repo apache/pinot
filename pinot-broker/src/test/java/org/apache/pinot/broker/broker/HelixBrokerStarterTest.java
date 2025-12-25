@@ -26,7 +26,7 @@ import org.apache.helix.model.HelixConfigScope;
 import org.apache.helix.model.IdealState;
 import org.apache.helix.model.builder.HelixConfigScopeBuilder;
 import org.apache.pinot.broker.broker.helix.HelixBrokerStarter;
-import org.apache.pinot.broker.routing.BrokerRoutingManager;
+import org.apache.pinot.broker.routing.manager.BrokerRoutingManager;
 import org.apache.pinot.common.metadata.segment.SegmentZKMetadata;
 import org.apache.pinot.common.request.BrokerRequest;
 import org.apache.pinot.common.utils.config.TagNameUtils;

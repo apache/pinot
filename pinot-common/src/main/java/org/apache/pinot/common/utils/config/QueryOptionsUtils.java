@@ -167,6 +167,10 @@ public class QueryOptionsUtils {
     return Boolean.parseBoolean(queryOptions.get(QueryOptionKey.COLLECT_GC_STATS));
   }
 
+  public static String getQueryHash(Map<String, String> queryOptions) {
+    return queryOptions.getOrDefault(QueryOptionKey.QUERY_HASH, CommonConstants.Broker.DEFAULT_QUERY_HASH);
+  }
+
   @Nullable
   public static Map<String, Set<FieldConfig.IndexType>> getSkipIndexes(Map<String, String> queryOptions) {
     // Example config:  skipIndexes='col1=inverted,range&col2=inverted'
@@ -590,5 +594,18 @@ public class QueryOptionsUtils {
   public static Integer getRegexDictSizeThreshold(Map<String, String> queryOptions) {
     String regexDictSizeThreshold = queryOptions.get(QueryOptionKey.REGEX_DICT_SIZE_THRESHOLD);
     return uncheckedParseInt(QueryOptionKey.REGEX_DICT_SIZE_THRESHOLD, regexDictSizeThreshold);
+  }
+
+  public static int getSortExchangeCopyThreshold(Map<String, String> options, int i) {
+    String sortExchangeCopyThreshold = options.get(QueryOptionKey.SORT_EXCHANGE_COPY_THRESHOLD);
+    if (sortExchangeCopyThreshold != null) {
+      try {
+        return Integer.parseInt(sortExchangeCopyThreshold);
+      } catch (NumberFormatException e) {
+        throw new IllegalArgumentException(String.format("%s must be an integer, got: %s",
+            QueryOptionKey.SORT_EXCHANGE_COPY_THRESHOLD, sortExchangeCopyThreshold));
+      }
+    }
+    return i;
   }
 }

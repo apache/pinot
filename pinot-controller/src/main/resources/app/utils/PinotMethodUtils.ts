@@ -356,7 +356,7 @@ const getQueryResults = (params) => {
       'numEntriesScannedPostFilter',
       'numGroupsLimitReached',
       'numGroupsWarningLimitReached',
-      'partialResponse',
+      'partialResult',
       'minConsumingFreshnessTimeMs',
       'offlineThreadCpuTimeNs',
       'realtimeThreadCpuTimeNs',
@@ -367,6 +367,8 @@ const getQueryResults = (params) => {
       'offlineTotalCpuTimeNs',
       'realtimeTotalCpuTimeNs'
     ];
+
+    const partialResult = queryResponse.partialResult ?? queryResponse.partialResponse;
 
     return {
       exceptions: exceptions,
@@ -379,7 +381,7 @@ const getQueryResults = (params) => {
         records: [[queryResponse.timeUsedMs, queryResponse.numDocsScanned, queryResponse.totalDocs, queryResponse.numServersQueried, queryResponse.numServersResponded,
           queryResponse.numSegmentsQueried, queryResponse.numSegmentsProcessed, queryResponse.numSegmentsMatched, queryResponse.numConsumingSegmentsQueried,
           queryResponse.numEntriesScannedInFilter, queryResponse.numEntriesScannedPostFilter, queryResponse.numGroupsLimitReached, queryResponse.numGroupsWarningLimitReached,
-          queryResponse.partialResponse ? queryResponse.partialResponse : '-', queryResponse.minConsumingFreshnessTimeMs,
+          partialResult ?? '-', queryResponse.minConsumingFreshnessTimeMs,
           queryResponse.offlineThreadCpuTimeNs, queryResponse.realtimeThreadCpuTimeNs,
           queryResponse.offlineSystemActivitiesCpuTimeNs, queryResponse.realtimeSystemActivitiesCpuTimeNs,
           queryResponse.offlineResponseSerializationCpuTimeNs, queryResponse.realtimeResponseSerializationCpuTimeNs,
