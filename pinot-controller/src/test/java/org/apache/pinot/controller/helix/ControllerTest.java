@@ -798,15 +798,33 @@ public class ControllerTest {
   }
 
   public TableConfig getOfflineTableConfig(String tableName) {
-    TableConfig offlineTableConfig = _helixResourceManager.getOfflineTableConfig(tableName);
-    assertNotNull(offlineTableConfig);
-    return offlineTableConfig;
+    if (_helixResourceManager != null) {
+      TableConfig offlineTableConfig = _helixResourceManager.getOfflineTableConfig(tableName);
+      assertNotNull(offlineTableConfig);
+      return offlineTableConfig;
+    }
+    try {
+      TableConfig offlineTableConfig = getControllerRequestClient().getTableConfig(tableName, TableType.OFFLINE);
+      assertNotNull(offlineTableConfig);
+      return offlineTableConfig;
+    } catch (IOException e) {
+      throw new RuntimeException(e);
+    }
   }
 
   public TableConfig getRealtimeTableConfig(String tableName) {
-    TableConfig realtimeTableConfig = _helixResourceManager.getRealtimeTableConfig(tableName);
-    assertNotNull(realtimeTableConfig);
-    return realtimeTableConfig;
+    if (_helixResourceManager != null) {
+      TableConfig realtimeTableConfig = _helixResourceManager.getRealtimeTableConfig(tableName);
+      assertNotNull(realtimeTableConfig);
+      return realtimeTableConfig;
+    }
+    try {
+      TableConfig realtimeTableConfig = getControllerRequestClient().getTableConfig(tableName, TableType.REALTIME);
+      assertNotNull(realtimeTableConfig);
+      return realtimeTableConfig;
+    } catch (IOException e) {
+      throw new RuntimeException(e);
+    }
   }
 
   public void dropOfflineTable(String tableName)

@@ -1186,15 +1186,10 @@ public class TableConfigUtilsTest {
     tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName(TABLE_NAME)
         .setNoDictionaryColumns(Arrays.asList("myCol1"))
         .build();
-    try {
-      FieldConfig fieldConfig =
-          new FieldConfig("myCol1", FieldConfig.EncodingType.RAW, FieldConfig.IndexType.FST, null, null);
-      tableConfig.setFieldConfigList(Arrays.asList(fieldConfig));
-      TableConfigUtils.validate(tableConfig, schema);
-      fail("Should fail since FST index is enabled on RAW encoding type");
-    } catch (Exception e) {
-      assertEquals(e.getMessage(), "Cannot create FST index on column: myCol1 without dictionary");
-    }
+    FieldConfig rawFstFieldConfig =
+        new FieldConfig("myCol1", FieldConfig.EncodingType.RAW, FieldConfig.IndexType.FST, null, null);
+    tableConfig.setFieldConfigList(Arrays.asList(rawFstFieldConfig));
+    TableConfigUtils.validate(tableConfig, schema);
 
     tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName(TABLE_NAME).build();
     try {
@@ -1403,7 +1398,7 @@ public class TableConfigUtilsTest {
       TableConfigUtils.validate(tableConfig, schema);
       fail("Should not be able to disable dictionary but keep inverted index");
     } catch (Exception e) {
-      assertEquals(e.getMessage(), "Cannot create FST index on column: myCol2 without dictionary");
+      assertEquals(e.getMessage(), "Cannot create FST index on multi-value column: myCol2");
     }
 
     tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName(TABLE_NAME)

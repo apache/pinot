@@ -202,7 +202,7 @@ public class ForwardIndexTypeTest {
                   + " }"
       );
 
-      assertEquals(ForwardIndexConfig.getDefault());
+      assertEquals(new ForwardIndexConfig.Builder().withRawEncoding(true).build());
     }
 
     @Test(dataProvider = "allCompressionCodec", dataProviderClass = ForwardIndexTypeTest.class)
@@ -226,6 +226,7 @@ public class ForwardIndexTypeTest {
                 .withDictIdCompressionType(expectedDictCompression)
                 .withDeriveNumDocsPerChunk(false)
                 .withRawIndexWriterVersion(ForwardIndexConfig.getDefaultRawWriterVersion())
+                .withRawEncoding(true)
                 .build()
       );
     }
@@ -247,6 +248,7 @@ public class ForwardIndexTypeTest {
           .withCompressionType(null)
           .withDeriveNumDocsPerChunk(true)
           .withRawIndexWriterVersion(ForwardIndexConfig.getDefaultRawWriterVersion())
+          .withRawEncoding(true)
           .build());
     }
 
@@ -267,6 +269,7 @@ public class ForwardIndexTypeTest {
           .withCompressionType(null)
           .withDeriveNumDocsPerChunk(false)
           .withRawIndexWriterVersion(3)
+          .withRawEncoding(true)
           .build());
     }
 
