@@ -66,6 +66,7 @@ public enum AggregationFunctionType {
   // TODO: Support MV types after next release (see https://github.com/apache/pinot/pull/17109)
   AVG("avg", SqlTypeName.OTHER, SqlTypeName.DOUBLE),
   MODE("mode", SqlTypeName.OTHER, SqlTypeName.DOUBLE),
+  ANYVALUE("anyValue", ReturnTypes.ARG0, OperandTypes.ANY, SqlTypeName.OTHER),
   FIRSTWITHTIME("firstWithTime", ReturnTypes.ARG0,
       OperandTypes.family(SqlTypeFamily.ANY, SqlTypeFamily.ANY, SqlTypeFamily.CHARACTER), SqlTypeName.OTHER),
   LASTWITHTIME("lastWithTime", ReturnTypes.ARG0,
