@@ -306,7 +306,8 @@
     <testng.version>7.11.0</testng.version>
     <mockito-core.version>5.17.0</mockito-core.version>
     <equalsverifier.version>3.19.4</equalsverifier.version>
-    <testcontainers.version>1.21.3</testcontainers.version>
+    <testcontainers.version>2.0.3</testcontainers.version>
+    <testcontainers-kafka.version>1.21.4</testcontainers-kafka.version>
     <h2.version>2.4.240</h2.version>
     <jnr-posix.version>3.1.21</jnr-posix.version>
     <scalatest.version>3.2.19</scalatest.version>
@@ -2075,14 +2076,6 @@
         <scope>test</scope>
       </dependency>
 
-      <!-- testcontainers bom -->
-      <dependency>
-        <groupId>org.testcontainers</groupId>
-        <artifactId>testcontainers-bom</artifactId>
-        <version>${testcontainers.version}</version>
-        <type>pom</type>
-        <scope>import</scope>
-      </dependency>
 
       <dependency>
         <groupId>com.h2database</groupId>
