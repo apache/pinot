@@ -53,6 +53,7 @@ import org.apache.pinot.broker.requesthandler.GrpcBrokerRequestHandler;
 import org.apache.pinot.broker.requesthandler.MultiStageBrokerRequestHandler;
 import org.apache.pinot.broker.requesthandler.MultiStageQueryThrottler;
 import org.apache.pinot.broker.requesthandler.SingleConnectionBrokerRequestHandler;
+import org.apache.pinot.broker.requesthandler.SystemTableBrokerRequestHandler;
 import org.apache.pinot.broker.requesthandler.TimeSeriesRequestHandler;
 import org.apache.pinot.broker.routing.manager.BrokerRoutingManager;
 import org.apache.pinot.common.Utils;
@@ -71,6 +72,7 @@ import org.apache.pinot.common.metrics.BrokerGauge;
 import org.apache.pinot.common.metrics.BrokerMeter;
 import org.apache.pinot.common.metrics.BrokerMetrics;
 import org.apache.pinot.common.metrics.BrokerTimer;
+import org.apache.pinot.common.systemtable.SystemTableRegistry;
 import org.apache.pinot.common.utils.PinotAppConfigs;
 import org.apache.pinot.common.utils.ServiceStartableUtils;
 import org.apache.pinot.common.utils.ServiceStatus;
@@ -354,6 +356,7 @@ public abstract class BaseBrokerStarter implements ServiceStartable {
     boolean caseInsensitive =
         _brokerConf.getProperty(Helix.ENABLE_CASE_INSENSITIVE_KEY, Helix.DEFAULT_ENABLE_CASE_INSENSITIVE);
     TableCache tableCache = new ZkTableCache(_propertyStore, caseInsensitive);
+    SystemTableRegistry.init(tableCache, _helixAdmin, _clusterName);
 
     LOGGER.info("Initializing Broker Event Listener Factory");
     BrokerQueryEventListenerFactory.init(_brokerConf.subset(Broker.EVENT_LISTENER_CONFIG_PREFIX));
@@ -443,9 +446,12 @@ public abstract class BaseBrokerStarter implements ServiceStartable {
     _responseStore.init(responseStoreConfiguration.subset(_responseStore.getType()), _hostname, _port, brokerId,
         _brokerMetrics, expirationTime);
 
+    SystemTableBrokerRequestHandler systemTableBrokerRequestHandler =
+        new SystemTableBrokerRequestHandler(_brokerConf, brokerId, requestIdGenerator, _routingManager,
+            _accessControlFactory, _queryQuotaManager, tableCache, _threadAccountant);
     _brokerRequestHandler =
-        new BrokerRequestHandlerDelegate(singleStageBrokerRequestHandler, multiStageBrokerRequestHandler,
-            timeSeriesRequestHandler, _responseStore);
+        new BrokerRequestHandlerDelegate(singleStageBrokerRequestHandler, systemTableBrokerRequestHandler,
+            multiStageBrokerRequestHandler, timeSeriesRequestHandler, _responseStore);
     _brokerRequestHandler.start();
 
     String controllerUrl = _brokerConf.getProperty(Broker.CONTROLLER_URL);
@@ -741,6 +747,11 @@ public abstract class BaseBrokerStarter implements ServiceStartable {
       PinotFSFactory.shutdown();
     } catch (IOException e) {
       LOGGER.error("Caught exception when shutting down PinotFsFactory", e);
+    }
+    try {
+      SystemTableRegistry.close();
+    } catch (Exception e) {
+      LOGGER.warn("Failed to close system table registry cleanly", e);
     }
 
     LOGGER.info("Disconnecting spectator Helix manager");
