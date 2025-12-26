@@ -20,24 +20,12 @@ package org.apache.pinot.broker.requesthandler;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import java.util.HashMap;
-import java.util.HashSet;
 import java.util.Map;
 import java.util.OptionalLong;
-import java.util.Set;
 import java.util.concurrent.Executor;
+import java.util.regex.Pattern;
 import javax.annotation.Nullable;
 import javax.ws.rs.core.HttpHeaders;
-import org.apache.calcite.sql.SqlBasicCall;
-import org.apache.calcite.sql.SqlExplain;
-import org.apache.calcite.sql.SqlIdentifier;
-import org.apache.calcite.sql.SqlJoin;
-import org.apache.calcite.sql.SqlKind;
-import org.apache.calcite.sql.SqlNode;
-import org.apache.calcite.sql.SqlNodeList;
-import org.apache.calcite.sql.SqlOrderBy;
-import org.apache.calcite.sql.SqlSelect;
-import org.apache.calcite.sql.SqlWith;
-import org.apache.calcite.sql.SqlWithItem;
 import org.apache.hc.client5.http.io.HttpClientConnectionManager;
 import org.apache.pinot.common.cursors.AbstractResponseStore;
 import org.apache.pinot.common.response.BrokerResponse;
@@ -52,8 +40,6 @@ import org.apache.pinot.spi.trace.RequestContext;
 import org.apache.pinot.spi.utils.CommonConstants.Broker.Request;
 import org.apache.pinot.sql.parsers.SqlNodeAndOptions;
 import org.apache.pinot.tsdb.spi.series.TimeSeriesBlock;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 
 /**
@@ -61,7 +47,8 @@ import org.slf4j.LoggerFactory;
  * {@link BrokerRequestHandler} implementations based on the request type.
  */
 public class BrokerRequestHandlerDelegate implements BrokerRequestHandler {
-  private static final Logger LOGGER = LoggerFactory.getLogger(BrokerRequestHandlerDelegate.class);
+  private static final Pattern SYSTEM_TABLE_QUERY_PATTERN =
+      Pattern.compile("\\b(from|join)\\s+system\\.", Pattern.CASE_INSENSITIVE);
 
   private final BaseSingleStageBrokerRequestHandler _singleStageBrokerRequestHandler;
   private final SystemTableBrokerRequestHandler _systemTableBrokerRequestHandler;
@@ -128,22 +115,18 @@ public class BrokerRequestHandlerDelegate implements BrokerRequestHandler {
 
     BaseBrokerRequestHandler requestHandler = _singleStageBrokerRequestHandler;
     if (QueryOptionsUtils.isUseMultistageEngine(sqlNodeAndOptions.getOptions())) {
+      if (isSystemTableQuery(request, sqlNodeAndOptions)) {
+        requestContext.setErrorCode(QueryErrorCode.QUERY_VALIDATION);
+        return new BrokerResponseNative(QueryErrorCode.QUERY_VALIDATION,
+            "System tables are not supported by the multi-stage query engine; please disable useMultistageEngine.");
+      }
       if (_multiStageBrokerRequestHandler != null) {
         requestHandler = _multiStageBrokerRequestHandler;
       } else {
         return new BrokerResponseNative(QueryErrorCode.INTERNAL, "V2 Multi-Stage query engine not enabled.");
       }
-    } else if (_systemTableBrokerRequestHandler != null) {
-      try {
-        Set<String> tableNames = extractTableNames(sqlNodeAndOptions.getSqlNode());
-        if (tableNames != null && tableNames.size() == 1
-            && _systemTableBrokerRequestHandler.canHandle(tableNames.iterator().next())) {
-          requestHandler = _systemTableBrokerRequestHandler;
-        }
-      } catch (Exception e) {
-        // Ignore exceptions here; the selected request handler will surface them appropriately.
-        LOGGER.debug("Failed to extract table names while determining request handler", e);
-      }
+    } else if (isSystemTableQuery(request, sqlNodeAndOptions)) {
+      requestHandler = _systemTableBrokerRequestHandler;
     }
 
     BrokerResponse response = requestHandler.handleRequest(request, sqlNodeAndOptions, requesterIdentity,
@@ -210,167 +193,10 @@ public class BrokerRequestHandlerDelegate implements BrokerRequestHandler {
     return _singleStageBrokerRequestHandler.getRequestIdByClientId(clientQueryId);
   }
 
-  @Nullable
-  private static Set<String> extractTableNames(SqlNode sqlNode) {
-    if (sqlNode == null) {
-      return null;
-    }
-    SqlNodeTableNameExtractor extractor = new SqlNodeTableNameExtractor();
-    extractor.extractTableNames(sqlNode);
-    Set<String> tableNames = extractor.getTableNames();
-    return tableNames.isEmpty() ? null : tableNames;
-  }
-
-  private static final class SqlNodeTableNameExtractor {
-    private final Set<String> _tableNames = new HashSet<>();
-    private final Set<String> _cteNames = new HashSet<>();
-    private boolean _inFromClause;
-
-    Set<String> getTableNames() {
-      return _tableNames;
-    }
-
-    void extractTableNames(SqlNode node) {
-      if (node == null) {
-        return;
-      }
-      if (node instanceof SqlExplain) {
-        extractTableNames(((SqlExplain) node).getExplicandum());
-      } else if (node instanceof SqlWith) {
-        visitWith((SqlWith) node);
-      } else if (node instanceof SqlOrderBy) {
-        visitOrderBy((SqlOrderBy) node);
-      } else if (node instanceof SqlWithItem) {
-        visitWithItem((SqlWithItem) node);
-      } else if (node instanceof SqlSelect) {
-        visitSelect((SqlSelect) node);
-      } else if (node instanceof SqlJoin) {
-        visitJoin((SqlJoin) node);
-      } else if (node instanceof SqlBasicCall) {
-        visitBasicCall((SqlBasicCall) node);
-      } else if (node instanceof SqlIdentifier) {
-        visitIdentifier((SqlIdentifier) node);
-      } else if (node instanceof SqlNodeList) {
-        visitNodeList((SqlNodeList) node);
-      }
-    }
-
-    private void visitWith(SqlWith with) {
-      if (with.withList != null) {
-        visitNodeList(with.withList);
-      }
-      if (with.body != null) {
-        extractTableNames(with.body);
-      }
-    }
-
-    private void visitOrderBy(SqlOrderBy orderBy) {
-      if (orderBy.query != null) {
-        extractTableNames(orderBy.query);
-      }
-      if (orderBy.orderList != null) {
-        visitNodeList(orderBy.orderList);
-      }
-      if (orderBy.offset != null) {
-        extractTableNames(orderBy.offset);
-      }
-      if (orderBy.fetch != null) {
-        extractTableNames(orderBy.fetch);
-      }
-    }
-
-    private void visitWithItem(SqlWithItem withItem) {
-      if (withItem.name != null) {
-        _cteNames.add(withItem.name.getSimple());
-      }
-      if (withItem.query != null) {
-        extractTableNames(withItem.query);
-      }
-    }
-
-    private void visitSelect(SqlSelect select) {
-      boolean wasInFromClause = _inFromClause;
-      try {
-        if (select.getFrom() != null) {
-          _inFromClause = true;
-          extractTableNames(select.getFrom());
-        }
-        _inFromClause = false;
-        if (select.getWhere() != null) {
-          extractTableNames(select.getWhere());
-        }
-        if (select.getGroup() != null) {
-          visitNodeList(select.getGroup());
-        }
-        if (select.getHaving() != null) {
-          extractTableNames(select.getHaving());
-        }
-        if (select.getOrderList() != null) {
-          visitNodeList(select.getOrderList());
-        }
-        if (select.getSelectList() != null) {
-          visitNodeList(select.getSelectList());
-        }
-      } finally {
-        _inFromClause = wasInFromClause;
-      }
-    }
-
-    private void visitJoin(SqlJoin join) {
-      boolean wasInFromClause = _inFromClause;
-      try {
-        if (join.getLeft() != null) {
-          _inFromClause = true;
-          extractTableNames(join.getLeft());
-        }
-        if (join.getRight() != null) {
-          _inFromClause = true;
-          extractTableNames(join.getRight());
-        }
-        if (join.getCondition() != null) {
-          _inFromClause = false;
-          extractTableNames(join.getCondition());
-        }
-      } finally {
-        _inFromClause = wasInFromClause;
-      }
-    }
-
-    private void visitBasicCall(SqlBasicCall call) {
-      if (call.getKind() == SqlKind.AS) {
-        if (!call.getOperandList().isEmpty() && call.getOperandList().get(0) != null) {
-          extractTableNames(call.getOperandList().get(0));
-        }
-        return;
-      }
-      if (call.getKind() == SqlKind.VALUES) {
-        return;
-      }
-      for (SqlNode operand : call.getOperandList()) {
-        if (operand != null) {
-          extractTableNames(operand);
-        }
-      }
-    }
-
-    private void visitIdentifier(SqlIdentifier identifier) {
-      if (!_inFromClause) {
-        return;
-      }
-      if (identifier.isSimple() && _cteNames.contains(identifier.getSimple())) {
-        return;
-      }
-      String tableName = identifier.toString();
-      if (!tableName.isEmpty() && !tableName.startsWith("$")) {
-        _tableNames.add(tableName);
-      }
-    }
-
-    private void visitNodeList(SqlNodeList nodeList) {
-      for (SqlNode node : nodeList) {
-        extractTableNames(node);
-      }
-    }
+  private static boolean isSystemTableQuery(JsonNode request, SqlNodeAndOptions sqlNodeAndOptions) {
+    JsonNode sql = request.get(Request.SQL);
+    String sqlQuery = (sql != null && sql.isTextual()) ? sql.asText() : sqlNodeAndOptions.getSqlNode().toString();
+    return SYSTEM_TABLE_QUERY_PATTERN.matcher(sqlQuery).find();
   }
 
   private CursorResponse getCursorResponse(Integer numRows, BrokerResponse response)
