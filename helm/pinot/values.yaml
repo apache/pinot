@@ -144,7 +144,7 @@ controller:
     host: pinot-controller
     port: 9000
 
-  jvmOpts: "-XX:ActiveProcessorCount=2 -Xms256M -Xmx1G -XX:+UseG1GC -XX:MaxGCPauseMillis=200 -Xlog:gc*:file=/opt/pinot/gc-pinot-controller.log -Djute.maxbuffer=4000000"
+  jvmOpts: "-XX:ActiveProcessorCount=2 -Xms256M -XX:+UseG1GC -XX:-G1UseAdaptiveIHOP -XX:InitiatingHeapOccupancyPercent=60 -XX:G1PeriodicGCInterval=2000 -XX:MaxGCPauseMillis=200 -Xlog:gc*:file=/opt/pinot/gc-pinot-controller.log -Djute.maxbuffer=4000000"
 
   log4j2ConfFile: /opt/pinot/etc/conf/pinot-controller-log4j2.xml
   pluginsDir: /opt/pinot/plugins
@@ -253,7 +253,7 @@ broker:
   securityContext: {}
   startCommand: "StartBroker"
 
-  jvmOpts: "-XX:ActiveProcessorCount=2 -Xms256M -Xmx1G -XX:+UseG1GC -XX:MaxGCPauseMillis=200 -Xlog:gc*:file=/opt/pinot/gc-pinot-broker.log -Djute.maxbuffer=4000000"
+  jvmOpts: "-XX:ActiveProcessorCount=2 -Xms256M -XX:+UseG1GC -XX:-G1UseAdaptiveIHOP -XX:InitiatingHeapOccupancyPercent=60 -XX:G1PeriodicGCInterval=2000 -XX:MaxGCPauseMillis=200 -Xlog:gc*:file=/opt/pinot/gc-pinot-broker.log -Djute.maxbuffer=4000000"
 
   log4j2ConfFile: /opt/pinot/etc/conf/pinot-broker-log4j2.xml
   pluginsDir: /opt/pinot/plugins
@@ -439,7 +439,7 @@ server:
     extraVolumes: []
     extraVolumeMounts: []
 
-  jvmOpts: "-Xms512M -Xmx1G -XX:+UseG1GC -XX:MaxGCPauseMillis=200 -Xlog:gc*:file=/opt/pinot/gc-pinot-server.log -Djute.maxbuffer=4000000"
+  jvmOpts: "-Xms512M -XX:+UseG1GC -XX:-G1UseAdaptiveIHOP -XX:InitiatingHeapOccupancyPercent=60 -XX:G1PeriodicGCInterval=2000 -XX:MaxGCPauseMillis=200 -Xlog:gc*:file=/opt/pinot/gc-pinot-server.log -Djute.maxbuffer=4000000"
 
   log4j2ConfFile: /opt/pinot/etc/conf/pinot-server-log4j2.xml
   pluginsDir: /opt/pinot/plugins
@@ -558,7 +558,7 @@ minion:
       periodSeconds: 10
 
   dataDir: /var/pinot/minion/data
-  jvmOpts: "-XX:ActiveProcessorCount=2 -Xms256M -Xmx1G -XX:+UseG1GC -XX:MaxGCPauseMillis=200 -Xlog:gc*:file=/opt/pinot/gc-pinot-minion.log -Djute.maxbuffer=4000000"
+  jvmOpts: "-XX:ActiveProcessorCount=2 -Xms256M -XX:+UseG1GC -XX:-G1UseAdaptiveIHOP -XX:InitiatingHeapOccupancyPercent=60 -XX:G1PeriodicGCInterval=2000 -XX:MaxGCPauseMillis=200 -Xlog:gc*:file=/opt/pinot/gc-pinot-minion.log -Djute.maxbuffer=4000000"
 
   log4j2ConfFile: /opt/pinot/etc/conf/pinot-minion-log4j2.xml
   pluginsDir: /opt/pinot/plugins
@@ -675,7 +675,7 @@ minionStateless:
       periodSeconds: 10
 
   dataDir: /var/pinot/minion/data
-  jvmOpts: "-XX:ActiveProcessorCount=2 -Xms256M -Xmx1G -XX:+UseG1GC -XX:MaxGCPauseMillis=200 -Xlog:gc*:file=/opt/pinot/gc-pinot-minion.log -Djute.maxbuffer=4000000"
+  jvmOpts: "-XX:ActiveProcessorCount=2 -Xms256M -XX:+UseG1GC -XX:-G1UseAdaptiveIHOP -XX:InitiatingHeapOccupancyPercent=60 -XX:G1PeriodicGCInterval=2000 -XX:MaxGCPauseMillis=200 -Xlog:gc*:file=/opt/pinot/gc-pinot-minion.log -Djute.maxbuffer=4000000"
 
   log4j2ConfFile: /opt/pinot/etc/conf/pinot-minion-log4j2.xml
   pluginsDir: /opt/pinot/plugins
