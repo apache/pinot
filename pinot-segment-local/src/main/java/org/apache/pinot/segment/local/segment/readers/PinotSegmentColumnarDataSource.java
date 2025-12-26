@@ -32,10 +32,12 @@ public class PinotSegmentColumnarDataSource implements ColumnarDataSource {
 
   private final IndexSegment _indexSegment;
   private final int _totalDocs;
+  private final boolean _initializeDefaultValueReaders;
 
-  public PinotSegmentColumnarDataSource(IndexSegment indexSegment) {
+  public PinotSegmentColumnarDataSource(IndexSegment indexSegment, boolean initializeDefaultValueReaders) {
     _indexSegment = indexSegment;
     _totalDocs = indexSegment.getSegmentMetadata().getTotalDocs();
+    _initializeDefaultValueReaders = initializeDefaultValueReaders;
   }
 
   @Override
@@ -45,7 +47,7 @@ public class PinotSegmentColumnarDataSource implements ColumnarDataSource {
 
   @Override
   public ColumnReaderFactory createColumnReaderFactory() {
-    return new PinotSegmentColumnReaderFactory(_indexSegment);
+    return new PinotSegmentColumnReaderFactory(_indexSegment, _initializeDefaultValueReaders);
   }
 
   @Override
