@@ -19,6 +19,7 @@
 package org.apache.pinot.server.starter.helix;
 
 import java.util.concurrent.ExecutorService;
+import javax.annotation.Nullable;
 import org.apache.helix.NotificationContext;
 import org.apache.helix.model.Message;
 import org.apache.helix.participant.statemachine.StateModel;
@@ -252,6 +253,7 @@ public class SegmentOnlineOfflineStateModelFactory extends StateModelFactory<Sta
   }
 
   @Override
+  @Nullable
   public ExecutorService getExecutorService(String resourceName, String fromState, String toState) {
     if (fromState.equals("CONSUMING") || toState.equals("CONSUMING")) {
       return _serverThreadPoolManager.getHelixConsumingTransitionExecutor();

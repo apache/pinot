@@ -1115,10 +1115,8 @@ public class CommonConstants {
     // Configs for helix thread pools
     public static final String CONFIG_OF_HELIX_TRANSITION_THREAD_POOL_SIZE =
         "pinot.server.helix.transition.thread.pool.size";
-    public static final int DEFAULT_HELIX_TRANSITION_THREAD_POOL_SIZE = 40;
     public static final String CONFIG_OF_HELIX_CONSUMING_TRANSITION_THREAD_POOL_SIZE =
         "pinot.server.helix.transition.consuming.thread.pool.size";
-    public static final int DEFAULT_HELIX_CONSUMING_TRANSITION_THREAD_POOL_SIZE = 10;
 
     // Query logger related configs
     public static final String CONFIG_OF_QUERY_LOG_MAX_RATE = "pinot.server.query.log.maxRatePerSecond";
