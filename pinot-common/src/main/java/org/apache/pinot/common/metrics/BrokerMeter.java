@@ -178,6 +178,9 @@ public class BrokerMeter implements AbstractMetrics.Meter {
 
   public static final BrokerMeter HELIX_ZOOKEEPER_RECONNECTS = create("HELIX_ZOOKEEPER_RECONNECTS", "reconnects", true);
 
+  public static final BrokerMeter MULTI_CLUSTER_BROKER_STARTUP_FAILURE = create(
+      "MULTI_CLUSTER_BROKER_STARTUP_FAILURE", "failureCount", true);
+
   public static final BrokerMeter REQUEST_DROPPED_DUE_TO_ACCESS_ERROR = create(
       "REQUEST_DROPPED_DUE_TO_ACCESS_ERROR", "requestsDropped", false);
 

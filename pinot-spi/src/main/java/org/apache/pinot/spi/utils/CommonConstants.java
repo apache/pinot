@@ -251,6 +251,9 @@ public class CommonConstants {
     @Deprecated(since = "1.5.0", forRemoval = true)
     public static final String CONFIG_OF_ZOOKEEPR_SERVER = "pinot.zk.server";
 
+    public static final String CONFIG_OF_REMOTE_CLUSTER_NAMES = "pinot.remote.cluster.names";
+    public static final String CONFIG_OF_REMOTE_ZOOKEEPER_SERVERS = "pinot.remote.zk.server.%s";
+
     public static final String CONFIG_OF_PINOT_CONTROLLER_STARTABLE_CLASS = "pinot.controller.startable.class";
     public static final String CONFIG_OF_PINOT_BROKER_STARTABLE_CLASS = "pinot.broker.startable.class";
     public static final String CONFIG_OF_PINOT_SERVER_STARTABLE_CLASS = "pinot.server.startable.class";
