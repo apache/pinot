@@ -24,8 +24,10 @@ import java.net.InetAddress;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.concurrent.TimeUnit;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.helix.HelixAdmin;
@@ -578,6 +580,59 @@ public abstract class BaseBrokerStarter implements ServiceStartable {
         _failureDetector);
   }
 
+  /**
+   * Reconciles broker instance tags in Helix InstanceConfig with the tags specified in broker configuration.
+   * This ensures that on every broker restart, the tags are updated to match the intended configuration,
+   * preventing stale tag issues when brokers restart on different pods/hosts.
+   *
+   * @return true if broker resource needs to be updated due to tag changes
+   */
+  private boolean reconcileInstanceTagsWithConfig(InstanceConfig instanceConfig) {
+    String instanceTagsConfig = _brokerConf.getProperty(Broker.CONFIG_OF_BROKER_INSTANCE_TAGS);
+    List<String> currentTags = instanceConfig.getTags();
+    // Determine expected tags based on configuration
+    Set<String> expectedTags = new HashSet<>();
+    if (StringUtils.isNotEmpty(instanceTagsConfig)) {
+      // Explicit tags configured - validate and use them
+      for (String tag : StringUtils.split(instanceTagsConfig, ',')) {
+        String trimmedTag = tag.trim();
+        Preconditions.checkArgument(TagNameUtils.isBrokerTag(trimmedTag),
+            "Illegal broker instance tag: %s. Tags must be broker tags.", trimmedTag);
+        expectedTags.add(trimmedTag);
+      }
+      LOGGER.info("Broker configured with explicit instance tags: {}", expectedTags);
+    } else if (currentTags.isEmpty()) {
+      // No explicit config and no existing tags - apply defaults
+      if (ZKMetadataProvider.getClusterTenantIsolationEnabled(_propertyStore)) {
+        expectedTags.add(TagNameUtils.getBrokerTagForTenant(null));
+        LOGGER.info("No explicit tags configured. Applying default tenant-specific tag: {}", expectedTags);
+      } else {
+        expectedTags.add(Helix.UNTAGGED_BROKER_INSTANCE);
+        LOGGER.info("No explicit tags configured. Applying untagged broker instance tag: {}", expectedTags);
+      }
+    } else {
+      // No explicit config but has existing tags - preserve them
+      LOGGER.info("No explicit tags configured. Preserving existing tags in Helix: {}", currentTags);
+      return false;
+    }
+    // Check if reconciliation is needed
+    if (expectedTags.equals(new HashSet<>(currentTags))) {
+      LOGGER.info("Broker instance tags already match expected configuration: {}", currentTags);
+      return false;
+    }
+
+    // Tags differ - update InstanceConfig
+    LOGGER.warn("Broker instance tag mismatch detected! Current tags in Helix: {}, Expected tags from config: {}. "
+        + "Updating InstanceConfig and BrokerResource to reconcile.", currentTags, expectedTags);
+
+    instanceConfig.getTags().clear();
+    for (String tag : expectedTags) {
+      instanceConfig.addTag(tag);
+    }
+    LOGGER.info("Updated InstanceConfig tags from {} to {}", currentTags, expectedTags);
+    return true;
+  }
+
   private void updateInstanceConfigAndBrokerResourceIfNeeded() {
     InstanceConfig instanceConfig = HelixHelper.getInstanceConfig(_participantHelixManager, _instanceId);
     boolean updated = HelixHelper.updateHostnamePort(instanceConfig, _hostname, _port);
@@ -603,38 +658,23 @@ public abstract class BaseBrokerStarter implements ServiceStartable {
       updated |= updatePortIfNeeded(simpleFields, Helix.Instance.MULTI_STAGE_QUERY_ENGINE_MAILBOX_PORT_KEY, -1);
     }
     updated |= HelixHelper.removeDisabledPartitions(instanceConfig);
-    boolean shouldUpdateBrokerResource = false;
-    List<String> instanceTags = instanceConfig.getTags();
-    if (instanceTags.isEmpty()) {
-      // This is a new broker (first time joining the cluster). We allow configuring initial broker tags regardless of
-      // tenant isolation mode since it defaults to true and is relatively obscure.
-      String instanceTagsConfig = _brokerConf.getProperty(Broker.CONFIG_OF_BROKER_INSTANCE_TAGS);
-      if (StringUtils.isNotEmpty(instanceTagsConfig)) {
-        for (String instanceTag : StringUtils.split(instanceTagsConfig, ',')) {
-          Preconditions.checkArgument(TagNameUtils.isBrokerTag(instanceTag), "Illegal broker instance tag: %s",
-              instanceTag);
-          instanceConfig.addTag(instanceTag);
-        }
-        shouldUpdateBrokerResource = true;
-      } else if (ZKMetadataProvider.getClusterTenantIsolationEnabled(_propertyStore)) {
-        instanceConfig.addTag(TagNameUtils.getBrokerTagForTenant(null));
-        shouldUpdateBrokerResource = true;
-      } else {
-        instanceConfig.addTag(Helix.UNTAGGED_BROKER_INSTANCE);
-      }
-      instanceTags = instanceConfig.getTags();
+    // Reconcile instance tags with configuration on every startup
+    boolean shouldUpdateBrokerResource = reconcileInstanceTagsWithConfig(instanceConfig);
+    if (shouldUpdateBrokerResource) {
       updated = true;
     }
+
     updated |= HelixHelper.updatePinotVersion(instanceConfig);
     if (updated) {
       HelixHelper.updateInstanceConfig(_participantHelixManager, instanceConfig);
     }
     if (shouldUpdateBrokerResource) {
-      // Update broker resource to include the new broker
+      // Update broker resource to reflect tag changes
       long startTimeMs = System.currentTimeMillis();
+      List<String> instanceTags = instanceConfig.getTags();
       List<String> tablesAdded = new ArrayList<>();
       HelixHelper.updateBrokerResource(_participantHelixManager, _instanceId, instanceTags, tablesAdded, null);
-      LOGGER.info("Updated broker resource for new joining broker: {} with instance tags: {} in {}ms, tables added: {}",
+      LOGGER.info("Updated broker resource for instance: {} with reconciled tags: {} in {}ms, tables added: {}",
           _instanceId, instanceTags, System.currentTimeMillis() - startTimeMs, tablesAdded);
     }
   }
