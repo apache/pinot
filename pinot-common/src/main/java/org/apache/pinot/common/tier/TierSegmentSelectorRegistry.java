@@ -49,7 +49,7 @@ public final class TierSegmentSelectorRegistry {
     TierSegmentSelector create(TierConfig tierConfig);
   }
 
-  private static final Map<String, TierSegmentSelectorFactory> FACTORIES = new ConcurrentHashMap<>();
+  private static final ConcurrentHashMap<String, TierSegmentSelectorFactory> FACTORIES = new ConcurrentHashMap<>();
 
   static {
     // Register default selectors
