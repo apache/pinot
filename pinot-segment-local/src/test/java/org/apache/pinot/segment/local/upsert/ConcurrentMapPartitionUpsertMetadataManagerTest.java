@@ -56,6 +56,7 @@ import org.apache.pinot.segment.spi.index.mutable.ThreadSafeMutableRoaringBitmap
 import org.apache.pinot.segment.spi.index.reader.ForwardIndexReader;
 import org.apache.pinot.spi.config.table.HashFunction;
 import org.apache.pinot.spi.config.table.TableConfig;
+import org.apache.pinot.spi.config.table.TableType;
 import org.apache.pinot.spi.config.table.UpsertConfig;
 import org.apache.pinot.spi.data.DimensionFieldSpec;
 import org.apache.pinot.spi.data.FieldSpec;
@@ -66,6 +67,7 @@ import org.apache.pinot.spi.data.readers.PrimaryKey;
 import org.apache.pinot.spi.utils.ByteArray;
 import org.apache.pinot.spi.utils.BytesUtils;
 import org.apache.pinot.spi.utils.ReadMode;
+import org.apache.pinot.spi.utils.builder.TableConfigBuilder;
 import org.apache.pinot.spi.utils.builder.TableNameBuilder;
 import org.apache.pinot.util.TestUtils;
 import org.mockito.MockedConstruction;
@@ -100,6 +102,9 @@ public class ConcurrentMapPartitionUpsertMetadataManagerTest {
       .addSingleValueDimension(PRIMARY_KEY_COLUMNS.get(0), FieldSpec.DataType.INT)
       .addMetric(COMPARISON_COLUMNS.get(0), FieldSpec.DataType.INT)
       .setPrimaryKeyColumns(PRIMARY_KEY_COLUMNS)
+      .build();
+  private static final TableConfig SEGMENT_TABLE_CONFIG = new TableConfigBuilder(TableType.REALTIME)
+      .setTableName(RAW_TABLE_NAME)
       .build();
 
   private UpsertContext.Builder _contextBuilder;
@@ -928,7 +933,12 @@ public class ConcurrentMapPartitionUpsertMetadataManagerTest {
   private ImmutableSegmentImpl createRealSegment(int[] primaryKeys, int[] timestamps,
       ThreadSafeMutableRoaringBitmap validDocIds)
       throws Exception {
-    String segmentName = "segment_" + (_segmentCounter++);
+    return createRealSegment("segment_" + (_segmentCounter++), primaryKeys, timestamps, validDocIds);
+  }
+
+  private ImmutableSegmentImpl createRealSegment(String segmentName, int[] primaryKeys, int[] timestamps,
+      ThreadSafeMutableRoaringBitmap validDocIds)
+      throws Exception {
     File segmentOutputDir = new File(SEGMENT_DIR, segmentName);
 
     // Create rows with primary key and timestamp data
@@ -942,7 +952,7 @@ public class ConcurrentMapPartitionUpsertMetadataManagerTest {
     }
 
     // Configure segment generation
-    SegmentGeneratorConfig config = new SegmentGeneratorConfig(SEGMENT_SCHEMA);
+    SegmentGeneratorConfig config = new SegmentGeneratorConfig(SEGMENT_TABLE_CONFIG, SEGMENT_SCHEMA);
     config.setOutDir(segmentOutputDir.getAbsolutePath());
     config.setSegmentName(segmentName);
     config.setTableName(RAW_TABLE_NAME);
@@ -2093,11 +2103,13 @@ public class ConcurrentMapPartitionUpsertMetadataManagerTest {
     ConcurrentMapPartitionUpsertMetadataManager upsertMetadataManager =
         new ConcurrentMapPartitionUpsertMetadataManager(REALTIME_TABLE_NAME, 0, upsertContext);
 
+    String segmentName = "test_segment";
+
     // Create first real segment with 3 records
     int[] primaryKeys1 = new int[]{10, 30, 40};
     int[] timestamps1 = new int[]{1500, 3500, 4000};
     ThreadSafeMutableRoaringBitmap validDocIds1 = new ThreadSafeMutableRoaringBitmap();
-    ImmutableSegmentImpl segment1 = createRealSegment(primaryKeys1, timestamps1, validDocIds1);
+    ImmutableSegmentImpl segment1 = createRealSegment(segmentName, primaryKeys1, timestamps1, validDocIds1);
 
     upsertMetadataManager.addSegment(segment1);
 
@@ -2108,7 +2120,7 @@ public class ConcurrentMapPartitionUpsertMetadataManagerTest {
     int[] primaryKeys2 = new int[]{10, 30};
     int[] timestamps2 = new int[]{1500, 3500};
     ThreadSafeMutableRoaringBitmap validDocIds2 = new ThreadSafeMutableRoaringBitmap();
-    ImmutableSegmentImpl segment2 = createRealSegment(primaryKeys2, timestamps2, validDocIds2);
+    ImmutableSegmentImpl segment2 = createRealSegment(segmentName, primaryKeys2, timestamps2, validDocIds2);
 
     // Replace segment - RecordInfoReader will read real data from segment2
     upsertMetadataManager.replaceSegment(segment2, segment1);
