@@ -47,7 +47,6 @@ public final class TierFactory {
   public static Tier getTier(TierConfig tierConfig, @Nullable Set<String> providedSegmentsForTier) {
     TierSegmentSelector segmentSelector;
     TierStorage storageSelector;
-    String segmentSelectorType = tierConfig.getSegmentSelectorType();
     if (providedSegmentsForTier != null) {
       LOGGER.debug("Provided segments: {} for tier: {}", providedSegmentsForTier, tierConfig.getName());
       segmentSelector = new FixedTierSegmentSelector(providedSegmentsForTier);
