@@ -23,8 +23,28 @@ import javax.annotation.Nullable;
 import org.apache.pinot.common.metadata.segment.SegmentZKMetadata;
 import org.apache.pinot.segment.local.segment.index.loader.IndexLoadingConfig;
 
-
+/**
+ * {@code SegmentMetadataPreProcessor} provides a hook to preprocess a segment's metadata
+ * before the segment is fully loaded by the server.
+ */
 public interface SegmentMetadataPreProcessor {
+  /**
+   * Preprocesses the metadata for a segment located at the given index directory.
+   *
+   * @param indexDir
+   *        The root directory of the segment index containing the segment metadata files.
+   * @param indexLoadingConfig
+   *        The {@link IndexLoadingConfig} used for loading the segment, which may influence
+   *        preprocessing behavior (e.g. table name, segment type, or server-level settings).
+   * @param zkMetadata
+   *        Optional {@link SegmentZKMetadata} associated with the segment, if available.
+   *        This may be {@code null} when the segment is loaded outside of Helix or Zookeeper
+   *        context.
+   *
+   * @throws Exception
+   *         If preprocessing fails and the segment should not be loaded. Throwing an
+   *         exception will abort the segment loading process.
+   */
   void process(File indexDir, IndexLoadingConfig indexLoadingConfig,
       @Nullable SegmentZKMetadata zkMetadata)
       throws Exception;

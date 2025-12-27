@@ -123,9 +123,9 @@ public class ImmutableSegmentLoader {
     Preconditions.checkArgument(indexDir.isDirectory(), "Index directory: %s does not exist or is not a directory",
         indexDir);
 
-    SegmentMetadataPreProcessor preprocessor = SegmentMetadataPreProcessorRegistry.getInstance();
-    if (preprocessor != null) {
-      preprocessor.process(indexDir, indexLoadingConfig, zkMetadata);
+    SegmentMetadataPreProcessor segmentMetadataPreProcessor = SegmentMetadataPreProcessorRegistry.getInstance();
+    if (segmentMetadataPreProcessor != null) {
+      segmentMetadataPreProcessor.process(indexDir, indexLoadingConfig, zkMetadata);
     }
 
     SegmentMetadataImpl segmentMetadata = new SegmentMetadataImpl(indexDir);
