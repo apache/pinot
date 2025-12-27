@@ -18,11 +18,8 @@
  */
 package org.apache.pinot.common.tier;
 
-import java.util.HashSet;
-import java.util.List;
 import java.util.Set;
 import javax.annotation.Nullable;
-import org.apache.commons.collections4.CollectionUtils;
 import org.apache.pinot.spi.config.table.TierConfig;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -54,14 +51,9 @@ public final class TierFactory {
     if (providedSegmentsForTier != null) {
       LOGGER.debug("Provided segments: {} for tier: {}", providedSegmentsForTier, tierConfig.getName());
       segmentSelector = new FixedTierSegmentSelector(providedSegmentsForTier);
-    } else if (segmentSelectorType.equalsIgnoreCase(TierFactory.TIME_SEGMENT_SELECTOR_TYPE)) {
-      segmentSelector = new TimeBasedTierSegmentSelector(tierConfig.getSegmentAge());
-    } else if (segmentSelectorType.equalsIgnoreCase(TierFactory.FIXED_SEGMENT_SELECTOR_TYPE)) {
-      List<String> segments = tierConfig.getSegmentList();
-      segmentSelector =
-          new FixedTierSegmentSelector(CollectionUtils.isEmpty(segments) ? Set.of() : new HashSet<>(segments));
     } else {
-      throw new IllegalStateException("Unsupported segmentSelectorType: " + segmentSelectorType);
+      // Use the registry's create method which handles null checking
+      segmentSelector = TierSegmentSelectorRegistry.create(tierConfig);
     }
 
     String storageSelectorType = tierConfig.getStorageType();
