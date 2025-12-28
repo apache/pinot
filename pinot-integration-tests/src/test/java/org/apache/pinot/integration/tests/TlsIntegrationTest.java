@@ -514,6 +514,9 @@ public class TlsIntegrationTest extends BaseClusterIntegrationTest {
     ResultSet resultSet = statement.executeQuery(query);
     resultSet.first();
     Assert.assertTrue(resultSet.getLong(1) > 0);
+    resultSet.close();
+    statement.close();
+    connection.close();
 
     try (java.sql.Connection invalidConnection = getInValidJDBCConnection(_internalControllerPort)) {
       invalidConnection.createStatement().executeQuery(query);
