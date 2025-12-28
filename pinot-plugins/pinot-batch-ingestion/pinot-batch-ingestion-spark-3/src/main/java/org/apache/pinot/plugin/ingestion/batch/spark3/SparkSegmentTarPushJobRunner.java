@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.plugin.ingestion.batch.spark3;
 
+import java.io.FileNotFoundException;
 import java.net.URI;
 import java.util.Arrays;
 import java.util.List;
@@ -65,7 +66,7 @@ public class SparkSegmentTarPushJobRunner extends BaseSparkSegmentTarPushJobRunn
         try {
           SegmentPushUtils.pushSegments(_spec, PinotFSFactory.create(finalOutputDirURI.getScheme()),
               Arrays.asList(segmentTarPath));
-        } catch (RetriableOperationException | AttemptsExceededException e) {
+        } catch (RetriableOperationException | AttemptsExceededException | FileNotFoundException e) {
           throw new RuntimeException(e);
         }
       }
