@@ -47,10 +47,58 @@ public class AvgValueAggregator implements ValueAggregator<Object, AvgPair> {
   }
 
   @Override
+  public AvgPair getInitialAggregatedValue(@Nullable Object rawValue, @Nullable DataType sourceDataType) {
+    if (sourceDataType == null) {
+      return getInitialAggregatedValue(rawValue);
+    }
+    if (rawValue == null) {
+      return new AvgPair();
+    }
+    switch (sourceDataType) {
+      case BYTES:
+        return deserializeAggregatedValue((byte[]) rawValue);
+      case INT:
+      case LONG:
+      case DOUBLE:
+      case FLOAT:
+        return new AvgPair(((Number) rawValue).doubleValue(), 1L);
+      case STRING:
+        return new AvgPair(Double.parseDouble((String) rawValue), 1L);
+      default:
+        throw new UnsupportedOperationException(
+            "Cannot convert rawValue: " + rawValue + " of type: " + sourceDataType + " to double.");
+    }
+  }
+
+  @Override
   public AvgPair applyRawValue(AvgPair value, Object rawValue) {
     AvgPair processedValue = processRawValue(rawValue);
     value.apply(processedValue);
     return value;
+  }
+
+  @Override
+  public AvgPair applyRawValue(AvgPair value, Object rawValue, @Nullable DataType sourceDataType) {
+    if (sourceDataType == null) {
+      return applyRawValue(value, rawValue);
+    }
+    switch (sourceDataType) {
+      case BYTES:
+        value.apply(deserializeAggregatedValue((byte[]) rawValue));
+        return value;
+      case INT:
+      case LONG:
+      case DOUBLE:
+      case FLOAT:
+        value.apply(((Number) rawValue).doubleValue(), 1L);
+        return value;
+      case STRING:
+        value.apply(Double.parseDouble((String) rawValue), 1L);
+        return value;
+      default:
+        throw new UnsupportedOperationException(
+            "Cannot convert rawValue: " + rawValue + " of type: " + sourceDataType + " to double.");
+    }
   }
 
   @Override
