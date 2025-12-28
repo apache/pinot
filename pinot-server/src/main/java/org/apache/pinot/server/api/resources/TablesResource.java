@@ -35,7 +35,6 @@ import java.net.URI;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.util.ArrayList;
-import java.util.ConcurrentModificationException;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
@@ -88,6 +87,7 @@ import org.apache.pinot.common.utils.helix.HelixHelper;
 import org.apache.pinot.core.data.manager.InstanceDataManager;
 import org.apache.pinot.core.data.manager.offline.ImmutableSegmentDataManager;
 import org.apache.pinot.core.data.manager.realtime.RealtimeSegmentDataManager;
+import org.apache.pinot.core.data.manager.realtime.RealtimeSegmentMetadataUtils;
 import org.apache.pinot.core.data.manager.realtime.RealtimeTableDataManager;
 import org.apache.pinot.core.data.manager.realtime.SegmentUploader;
 import org.apache.pinot.segment.local.data.manager.SegmentDataManager;
@@ -108,6 +108,9 @@ import org.apache.pinot.spi.config.table.TableType;
 import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
 import org.apache.pinot.spi.stream.ConsumerPartitionState;
+import org.apache.pinot.spi.stream.PartitionLagState;
+import org.apache.pinot.spi.stream.StreamMetadataProvider;
+import org.apache.pinot.spi.stream.StreamPartitionMsgOffset;
 import org.apache.pinot.spi.utils.CommonConstants;
 import org.apache.pinot.spi.utils.CommonConstants.Helix.StateModel.SegmentStateModel;
 import org.apache.pinot.spi.utils.JsonUtils;
@@ -899,7 +902,7 @@ public class TablesResource {
   @Produces(MediaType.APPLICATION_JSON)
   @ApiOperation(value = "Upload a low level consumer segment to segment store and return the segment download url,"
       + "crc and other segment metadata",
-      notes = "Upload a low level consumer segment to segment store and return the segment download url, crc "
+      notes = "Upload a low level consumer segment to segment store and return the segment download url, crc, data crc "
           + "and other segment metadata")
   @ApiResponses(value = {
       @ApiResponse(code = 200, message = "Success"),
@@ -946,8 +949,11 @@ public class TablesResource {
     try {
       segmentTarFile = createSegmentTarFile(tableDataManager, segmentName);
       String downloadUrl = uploadSegment(segmentTarFile, realtimeTableNameWithType, segmentName, timeoutMs);
-      return new TableLLCSegmentUploadResponse(segmentName,
-          Long.parseLong(segmentDataManager.getSegment().getSegmentMetadata().getCrc()), downloadUrl);
+      return new TableLLCSegmentUploadResponse(
+          segmentName,
+          Long.parseLong(segmentDataManager.getSegment().getSegmentMetadata().getCrc()),
+          Long.parseLong(segmentDataManager.getSegment().getSegmentMetadata().getDataCrc()),
+          downloadUrl);
     } finally {
       FileUtils.deleteQuietly(segmentTarFile);
       tableDataManager.releaseSegment(segmentDataManager);
@@ -1101,11 +1107,17 @@ public class TablesResource {
       for (SegmentDataManager segmentDataManager : segmentDataManagers) {
         if (segmentDataManager instanceof RealtimeSegmentDataManager) {
           RealtimeSegmentDataManager realtimeSegmentDataManager = (RealtimeSegmentDataManager) segmentDataManager;
-          Map<String, ConsumerPartitionState> partitionStateMap =
-              realtimeSegmentDataManager.getConsumerPartitionState();
+          StreamMetadataProvider streamMetadataProvider =
+              ((RealtimeTableDataManager) (tableDataManager)).getStreamMetadataProvider(realtimeSegmentDataManager);
+          StreamPartitionMsgOffset latestMsgOffset =
+              RealtimeSegmentMetadataUtils.fetchLatestStreamOffset(realtimeSegmentDataManager, streamMetadataProvider);
+          Map<String, ConsumerPartitionState> partitionIdToStateMap =
+              realtimeSegmentDataManager.getConsumerPartitionState(latestMsgOffset);
           Map<String, String> recordsLagMap = new HashMap<>();
           Map<String, String> availabilityLagMsMap = new HashMap<>();
-          realtimeSegmentDataManager.getPartitionToLagState(partitionStateMap).forEach((k, v) -> {
+          Map<String, PartitionLagState> partitionToLagState =
+              streamMetadataProvider.getCurrentPartitionLagState(partitionIdToStateMap);
+          partitionToLagState.forEach((k, v) -> {
             recordsLagMap.put(k, v.getRecordsLag());
             availabilityLagMsMap.put(k, v.getAvailabilityLagMs());
           });
@@ -1114,15 +1126,12 @@ public class TablesResource {
           segmentConsumerInfoList.add(new SegmentConsumerInfo(segmentDataManager.getSegmentName(),
               realtimeSegmentDataManager.getConsumerState().toString(),
               realtimeSegmentDataManager.getLastConsumedTimestamp(), partitiionToOffsetMap,
-              new SegmentConsumerInfo.PartitionOffsetInfo(partitiionToOffsetMap, partitionStateMap.entrySet().stream()
+              new SegmentConsumerInfo.PartitionOffsetInfo(partitiionToOffsetMap, partitionIdToStateMap.entrySet()
+                  .stream()
                   .collect(Collectors.toMap(Map.Entry::getKey, e -> e.getValue().getUpstreamLatestOffset().toString())),
                   recordsLagMap, availabilityLagMsMap)));
         }
       }
-    } catch (ConcurrentModificationException e) {
-      LOGGER.warn("Multi-threaded access is unsafe for KafkaConsumer, caught exception when fetching stream offset",
-          e);
-      return segmentConsumerInfoList;
     } catch (Exception e) {
       throw new WebApplicationException("Caught exception when getting consumer info for table: " + realtimeTableName);
     } finally {

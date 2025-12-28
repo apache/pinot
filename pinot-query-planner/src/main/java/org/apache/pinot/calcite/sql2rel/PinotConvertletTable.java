@@ -23,6 +23,8 @@ import javax.annotation.Nullable;
 import org.apache.calcite.rex.RexBuilder;
 import org.apache.calcite.rex.RexNode;
 import org.apache.calcite.sql.SqlCall;
+import org.apache.calcite.sql.SqlKind;
+import org.apache.calcite.sql.SqlNode;
 import org.apache.calcite.sql.fun.SqlBetweenOperator;
 import org.apache.calcite.sql.fun.SqlStdOperatorTable;
 import org.apache.calcite.sql2rel.SqlRexContext;
@@ -60,6 +62,17 @@ public class PinotConvertletTable implements SqlRexConvertletTable {
         return TimestampDiffConvertlet.INSTANCE;
       case BETWEEN:
         return BetweenConvertlet.INSTANCE;
+      case EQUALS:
+      case NOT_EQUALS:
+      case GREATER_THAN:
+      case GREATER_THAN_OR_EQUAL:
+      case LESS_THAN:
+      case LESS_THAN_OR_EQUAL:
+        // special convertlet to handle ROW comparisons
+        if (isRowComparison(call)) {
+          return RowComparisonConvertlet.INSTANCE;
+        }
+        return StandardConvertletTable.INSTANCE.get(call);
       default:
         return StandardConvertletTable.INSTANCE.get(call);
     }
@@ -136,5 +149,20 @@ public class PinotConvertletTable implements SqlRexConvertletTable {
         return StandardConvertletTable.INSTANCE.convertBetween(cx, (SqlBetweenOperator) call.getOperator(), call);
       }
     }
+  }
+
+  /**
+   * Check if a comparison call involves ROW expressions.
+   */
+  private static boolean isRowComparison(SqlCall call) {
+    if (call.getOperandList().size() != 2) {
+      return false;
+    }
+    SqlNode left = call.operand(0);
+    SqlNode right = call.operand(1);
+    boolean leftIsRow = left instanceof SqlCall && ((SqlCall) left).getKind() == SqlKind.ROW;
+    boolean rightIsRow = right instanceof SqlCall && ((SqlCall) right).getKind() == SqlKind.ROW;
+
+    return leftIsRow || rightIsRow;
   }
 }

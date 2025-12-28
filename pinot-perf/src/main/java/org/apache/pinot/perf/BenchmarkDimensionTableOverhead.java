@@ -198,7 +198,7 @@ public class BenchmarkDimensionTableOverhead extends BaseQueriesTest {
         null,
         SEGMENT_OPERATIONS_THROTTLER,
         false,
-        new ServerReloadJobStatusCache());
+        new ServerReloadJobStatusCache("benchmarkInstance"));
     _tableDataManager.start();
 
     for (int i = 0; i < _indexSegments.size(); i++) {

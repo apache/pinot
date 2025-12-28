@@ -43,11 +43,7 @@ public class AvgValueAggregator implements ValueAggregator<Object, AvgPair> {
     if (rawValue == null) {
       return new AvgPair();
     }
-    if (rawValue instanceof byte[]) {
-      return deserializeAggregatedValue((byte[]) rawValue);
-    } else {
-      return new AvgPair(ValueAggregatorUtils.toDouble(rawValue), 1L);
-    }
+    return processRawValue(rawValue);
   }
 
   @Override
@@ -76,11 +72,8 @@ public class AvgValueAggregator implements ValueAggregator<Object, AvgPair> {
 
   @Override
   public AvgPair applyRawValue(AvgPair value, Object rawValue) {
-    if (rawValue instanceof byte[]) {
-      value.apply(deserializeAggregatedValue((byte[]) rawValue));
-    } else {
-      value.apply(ValueAggregatorUtils.toDouble(rawValue), 1L);
-    }
+    AvgPair processedValue = processRawValue(rawValue);
+    value.apply(processedValue);
     return value;
   }
 
@@ -137,5 +130,27 @@ public class AvgValueAggregator implements ValueAggregator<Object, AvgPair> {
   @Override
   public AvgPair deserializeAggregatedValue(byte[] bytes) {
     return CustomSerDeUtils.AVG_PAIR_SER_DE.deserialize(bytes);
+  }
+
+  /**
+   * Processes a raw value (either multi-value array or single number) and returns an AvgPair with the sum and count.
+   */
+  protected AvgPair processRawValue(Object rawValue) {
+    if (rawValue instanceof byte[]) {
+      return deserializeAggregatedValue((byte[]) rawValue);
+    }
+
+    if (rawValue instanceof Object[]) {
+      Object[] values = (Object[]) rawValue;
+      AvgPair avgPair = new AvgPair();
+      for (Object value : values) {
+        if (value != null) {
+          avgPair.apply(ValueAggregatorUtils.toDouble(value));
+        }
+      }
+      return avgPair;
+    }
+
+    return new AvgPair(ValueAggregatorUtils.toDouble(rawValue), 1L);
   }
 }

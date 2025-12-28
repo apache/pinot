@@ -39,6 +39,7 @@ import org.apache.pinot.query.planner.plannode.ProjectNode;
 import org.apache.pinot.query.planner.plannode.SetOpNode;
 import org.apache.pinot.query.planner.plannode.SortNode;
 import org.apache.pinot.query.planner.plannode.TableScanNode;
+import org.apache.pinot.query.planner.plannode.UnnestNode;
 import org.apache.pinot.query.planner.plannode.ValueNode;
 import org.apache.pinot.query.planner.plannode.WindowNode;
 
@@ -149,6 +150,11 @@ public class SubPlanFragmenter implements PlanNodeVisitor<PlanNode, SubPlanFragm
         new SubPlanMetadata(node.getTableNames(), ImmutablePairList.of()));
     PlanNode literalValueNode = new LiteralValueNode(nextStageRoot.getDataSchema());
     return literalValueNode;
+  }
+
+  @Override
+  public PlanNode visitUnnest(UnnestNode node, Context context) {
+    return process(node, context);
   }
 
   private boolean isSubPlanSplitter(PlanNode node) {

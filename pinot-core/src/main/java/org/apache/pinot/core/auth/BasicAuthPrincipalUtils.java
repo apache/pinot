@@ -28,14 +28,17 @@ import java.util.Optional;
 import java.util.Set;
 import java.util.stream.Collectors;
 import org.apache.commons.lang3.StringUtils;
+import org.apache.pinot.common.auth.BasicAuthTokenUtils;
 import org.apache.pinot.spi.config.user.UserConfig;
 import org.apache.pinot.spi.env.PinotConfiguration;
 
 
 /**
- * Utility for configuring basic auth and parsing related http tokens
+ * Utility for extracting and constructing BasicAuth principals
+ * from configuration and user metadata, including permissions,
+ * table access rules, and row-level security (RLS) filters.
  */
-public final class BasicAuthUtils {
+public final class BasicAuthPrincipalUtils {
   private static final String PASSWORD = "password";
   private static final String PERMISSIONS = "permissions";
   private static final String TABLES = "tables";
@@ -43,7 +46,7 @@ public final class BasicAuthUtils {
   private static final String ALL = "*";
   private static final String RLS_FILTER = "rls";
 
-  private BasicAuthUtils() {
+  private BasicAuthPrincipalUtils() {
     // left blank
   }
 
@@ -97,7 +100,7 @@ public final class BasicAuthUtils {
         }
       }
 
-      return new BasicAuthPrincipal(name, org.apache.pinot.common.auth.BasicAuthUtils.toBasicAuthToken(name, password),
+      return new BasicAuthPrincipal(name, BasicAuthTokenUtils.toBasicAuthToken(name, password),
           tables, excludeTables, permissions, tableRlsFilters);
     }).collect(Collectors.toList());
   }
@@ -124,7 +127,7 @@ public final class BasicAuthUtils {
               .collect(Collectors.toSet());
           //todo: Handle RLS filters properly
           return new ZkBasicAuthPrincipal(name,
-              org.apache.pinot.common.auth.BasicAuthUtils.toBasicAuthToken(name, password), password, component, role,
+              BasicAuthTokenUtils.toBasicAuthToken(name, password), password, component, role,
               tables, excludeTables, permissions, Map.of());
         }).collect(Collectors.toList());
   }

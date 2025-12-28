@@ -209,12 +209,12 @@ public abstract class QueryScheduler {
         if (e instanceof QueryException) {
           queryException = (QueryException) e;
           // TODO: Revisit if we should log exception here
-          LOGGER.warn("Caught QueryException while serializing response from response for requestId: {}, brokerId: {}",
-              requestId, brokerId, queryException);
+          LOGGER.warn("Caught QueryException while serializing response for requestId: {}, brokerId: {}", requestId,
+              brokerId, queryException);
         } else {
           _serverMetrics.addMeteredGlobalValue(ServerMeter.RESPONSE_SERIALIZATION_EXCEPTIONS, 1);
-          LOGGER.error("Caught exception while serializing response from response for requestId: {}, brokerId: {}",
-              requestId, brokerId, e);
+          LOGGER.error("Caught exception while serializing response for requestId: {}, brokerId: {}", requestId,
+              brokerId, e);
           queryException = QueryErrorCode.INTERNAL.asException("Error serializing response", e);
         }
       }

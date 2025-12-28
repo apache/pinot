@@ -46,12 +46,12 @@ public class MinValueAggregator implements ValueAggregator<Object, Double> {
     if (rawValue == null) {
       return Double.POSITIVE_INFINITY;
     }
-    return ValueAggregatorUtils.toDouble(rawValue, sourceDataType);
+    return processRawValue(rawValue, sourceDataType);
   }
 
   @Override
   public Double applyRawValue(Double value, Object rawValue, @Nullable DataType sourceDataType) {
-    return Math.min(value, ValueAggregatorUtils.toDouble(rawValue, sourceDataType));
+    return Math.min(value, processRawValue(rawValue, sourceDataType));
   }
 
   @Override
@@ -87,5 +87,24 @@ public class MinValueAggregator implements ValueAggregator<Object, Double> {
   @Override
   public Double deserializeAggregatedValue(byte[] bytes) {
     throw new UnsupportedOperationException();
+  }
+
+  protected Double processRawValue(Object rawValue) {
+    return processRawValue(rawValue, null);
+  }
+
+  protected Double processRawValue(Object rawValue, @Nullable DataType sourceDataType) {
+    if (rawValue instanceof Object[]) {
+      Object[] values = (Object[]) rawValue;
+      double min = Double.POSITIVE_INFINITY;
+      for (Object value : values) {
+        if (value != null) {
+          min = Math.min(min, ValueAggregatorUtils.toDouble(value, sourceDataType));
+        }
+      }
+      return min;
+    } else {
+      return ValueAggregatorUtils.toDouble(rawValue, sourceDataType);
+    }
   }
 }

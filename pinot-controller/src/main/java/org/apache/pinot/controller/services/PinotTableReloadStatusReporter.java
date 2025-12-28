@@ -35,6 +35,8 @@ import javax.ws.rs.core.Response;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.hc.client5.http.io.HttpClientConnectionManager;
 import org.apache.pinot.common.exception.InvalidConfigException;
+import org.apache.pinot.common.response.server.SegmentReloadFailureResponse;
+import org.apache.pinot.common.response.server.ServerReloadStatusResponse;
 import org.apache.pinot.common.utils.URIUtils;
 import org.apache.pinot.controller.api.dto.PinotControllerJobMetadataDto;
 import org.apache.pinot.controller.api.dto.PinotTableReloadStatusResponse;
@@ -155,18 +157,28 @@ public class PinotTableReloadStatusReporter {
 
     long totalFailureCount = 0;
     boolean hasFailureCountData = false;
+    List<SegmentReloadFailureResponse> allFailedSegments = new ArrayList<>();
 
+    // Single iteration to aggregate counts and collect failed segments
     for (Map.Entry<String, String> streamResponse : serviceResponse._httpResponses.entrySet()) {
       String responseString = streamResponse.getValue();
       try {
-        PinotTableReloadStatusResponse r =
-            JsonUtils.stringToObject(responseString, PinotTableReloadStatusResponse.class);
-        response.setSuccessCount(response.getSuccessCount() + r.getSuccessCount());
+        ServerReloadStatusResponse serverResponse =
+            JsonUtils.stringToObject(responseString, ServerReloadStatusResponse.class);
+
+        // Aggregate success count
+        response.setSuccessCount(response.getSuccessCount() + serverResponse.getSuccessCount());
 
         // Aggregate failure counts if available
-        if (r.getFailureCount() != null) {
-          totalFailureCount += r.getFailureCount();
+        if (serverResponse.getFailureCount() != null) {
+          totalFailureCount += serverResponse.getFailureCount();
           hasFailureCountData = true;
+        }
+
+        // Collect failed segments
+        if (serverResponse.getSampleSegmentReloadFailures() != null
+            && !serverResponse.getSampleSegmentReloadFailures().isEmpty()) {
+          allFailedSegments.addAll(serverResponse.getSampleSegmentReloadFailures());
         }
       } catch (Exception e) {
         response.setTotalServerCallsFailed(response.getTotalServerCallsFailed() + 1);
@@ -176,6 +188,19 @@ public class PinotTableReloadStatusReporter {
     // Only set failure count if at least one server provided data
     if (hasFailureCountData) {
       response.setFailureCount(totalFailureCount);
+    }
+
+    // Set failed segments in response if any were collected
+    if (!allFailedSegments.isEmpty()) {
+      // Limit to prevent huge responses (e.g., max 500 failures across all servers)
+      // This limit is higher than per-server limit since we're aggregating
+      int maxFailuresInResponse = 500;
+      if (allFailedSegments.size() > maxFailuresInResponse) {
+        LOG.warn("Truncating failed segments list from {} to {} for job {}",
+            allFailedSegments.size(), maxFailuresInResponse, reloadJobId);
+        allFailedSegments = allFailedSegments.subList(0, maxFailuresInResponse);
+      }
+      response.setSegmentReloadFailures(allFailedSegments);
     }
 
     // Add derived fields

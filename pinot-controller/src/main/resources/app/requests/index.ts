@@ -240,7 +240,7 @@ export const getQueryResult = (params: Object): Promise<AxiosResponse<SQLResult>
   transformApi.post(`/sql`, params, {headers});
 
 export const getTimeSeriesQueryResult = (params: Object): Promise<AxiosResponse<any>> =>
-  transformApi.get(`/timeseries/api/v1/query_range`, { params });
+  transformApi.post(`/query/timeseries`, params);
 
 export const getTimeSeriesLanguages = (): Promise<AxiosResponse<string[]>> =>
   baseApi.get('/timeseries/languages');
@@ -334,7 +334,7 @@ export const getInfo = (): Promise<AxiosResponse<OperationResponse>> =>
   baseApi.get(`/auth/info`);
 
 export const authenticateUser = (authToken): Promise<AxiosResponse<OperationResponse>> =>
-  baseApi.get(`/auth/verify`, {headers:{"Authorization": authToken}});
+  baseApi.get(`/auth/verify/v2`, {headers:{"Authorization": authToken}});
 
 export const getSegmentDebugInfo = (tableName: string, tableType: string): Promise<AxiosResponse<OperationResponse>> =>
   baseApi.get(`debug/tables/${tableName}?type=${tableType}&verbosity=10`);

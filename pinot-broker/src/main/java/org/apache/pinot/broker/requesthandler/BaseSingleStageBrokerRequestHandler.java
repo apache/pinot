@@ -80,6 +80,7 @@ import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.common.utils.DataSchema.ColumnDataType;
 import org.apache.pinot.common.utils.DatabaseUtils;
 import org.apache.pinot.common.utils.config.QueryOptionsUtils;
+import org.apache.pinot.common.utils.request.QueryFingerprintUtils;
 import org.apache.pinot.common.utils.request.RequestUtils;
 import org.apache.pinot.core.auth.Actions;
 import org.apache.pinot.core.auth.TargetType;
@@ -115,6 +116,7 @@ import org.apache.pinot.spi.exception.DatabaseConflictException;
 import org.apache.pinot.spi.exception.QueryErrorCode;
 import org.apache.pinot.spi.query.QueryExecutionContext;
 import org.apache.pinot.spi.query.QueryThreadContext;
+import org.apache.pinot.spi.trace.QueryFingerprint;
 import org.apache.pinot.spi.trace.RequestContext;
 import org.apache.pinot.spi.utils.CommonConstants;
 import org.apache.pinot.spi.utils.CommonConstants.Broker;
@@ -140,7 +142,9 @@ public abstract class BaseSingleStageBrokerRequestHandler extends BaseBrokerRequ
   private static final Expression TRUE = RequestUtils.getLiteralExpression(true);
   private static final Expression STAR = RequestUtils.getIdentifierExpression("*");
   private static final int MAX_UNAVAILABLE_SEGMENTS_TO_PRINT_IN_QUERY_EXCEPTION = 10;
-  private static final Map<String, String> DISTINCT_MV_COL_FUNCTION_OVERRIDE_MAP = Map.ofEntries(
+  // TODO: After the next release, remove overrides here for consolidated aggregation functions
+  //  (see https://github.com/apache/pinot/issues/17061)
+  private static final Map<String, String> MV_COL_AGG_FUNCTION_OVERRIDE_MAP = Map.ofEntries(
       Map.entry("distinctcount", "distinctcountmv"),
       Map.entry("distinctcountbitmap", "distinctcountbitmapmv"),
       Map.entry("distinctcounthll", "distinctcounthllmv"),
@@ -170,6 +174,7 @@ public abstract class BaseSingleStageBrokerRequestHandler extends BaseBrokerRequ
   protected final int _defaultQueryLimit;
   protected final boolean _enableMultistageMigrationMetric;
   protected final boolean _useMSEToFillEmptyResponseSchema;
+  protected final boolean _enableQueryFingerprinting;
   protected ExecutorService _multistageCompileExecutor;
   protected BlockingQueue<Pair<String, String>> _multistageCompileQueryQueue;
   protected ImplicitHybridTableRouteProvider _implicitHybridTableRouteProvider;
@@ -200,6 +205,8 @@ public abstract class BaseSingleStageBrokerRequestHandler extends BaseBrokerRequ
 
     _enableMultistageMigrationMetric = _config.getProperty(Broker.CONFIG_OF_BROKER_ENABLE_MULTISTAGE_MIGRATION_METRIC,
         Broker.DEFAULT_ENABLE_MULTISTAGE_MIGRATION_METRIC);
+    _enableQueryFingerprinting = _config.getProperty(Broker.CONFIG_OF_BROKER_ENABLE_QUERY_FINGERPRINTING,
+        Broker.DEFAULT_BROKER_ENABLE_QUERY_FINGERPRINTING);
     if (_enableMultistageMigrationMetric) {
       _multistageCompileExecutor = Executors.newSingleThreadExecutor();
       _multistageCompileQueryQueue = new LinkedBlockingQueue<>(1000);
@@ -329,6 +336,19 @@ public abstract class BaseSingleStageBrokerRequestHandler extends BaseBrokerRequ
       throws Exception {
     _queryLogger.log(requestId, query);
 
+    String queryHash = CommonConstants.Broker.DEFAULT_QUERY_HASH;
+    if (_enableQueryFingerprinting) {
+      try {
+        QueryFingerprint queryFingerprint = QueryFingerprintUtils.generateFingerprint(sqlNodeAndOptions);
+        if (queryFingerprint != null) {
+          queryHash = queryFingerprint.getQueryHash();
+          requestContext.setQueryFingerprint(queryFingerprint);
+        }
+      } catch (Exception e) {
+        LOGGER.warn("Failed to generate query fingerprint for request {}: {}. {}", requestId, query, e.getMessage());
+      }
+    }
+
     String cid = extractClientRequestId(sqlNodeAndOptions);
     if (cid == null) {
       cid = Long.toString(requestId);
@@ -340,7 +360,8 @@ public abstract class BaseSingleStageBrokerRequestHandler extends BaseBrokerRequ
     // TODO: Revisit whether we should set deadline here
     QueryExecutionContext executionContext =
         new QueryExecutionContext(QueryExecutionContext.QueryType.SSE, requestId, cid, workloadName,
-            requestContext.getRequestArrivalTimeMillis(), Long.MAX_VALUE, Long.MAX_VALUE, _brokerId, _brokerId);
+            requestContext.getRequestArrivalTimeMillis(), Long.MAX_VALUE, Long.MAX_VALUE, _brokerId, _brokerId,
+            queryHash);
     try (QueryThreadContext ignore = QueryThreadContext.open(executionContext, _threadAccountant)) {
       return doHandleRequest(requestId, query, sqlNodeAndOptions, request, requesterIdentity, requestContext,
           httpHeaders, accessControl);
@@ -904,6 +925,16 @@ public abstract class BaseSingleStageBrokerRequestHandler extends BaseBrokerRequ
       }
     }
 
+    // Add queryHash to pinotQuery so it gets passed to servers for observability
+    if (_enableQueryFingerprinting) {
+      QueryFingerprint queryFingerprint = requestContext.getQueryFingerprint();
+      if (queryFingerprint != null) {
+        pinotQuery.putToQueryOptions(
+              CommonConstants.Broker.Request.QueryOptionKey.QUERY_HASH,
+              queryFingerprint.getQueryHash());
+      }
+    }
+
     if (isDefaultQueryResponseLimitEnabled() && !pinotQuery.isSetLimit()) {
       pinotQuery.setLimit(_defaultQueryLimit);
     }
@@ -1010,7 +1041,7 @@ public abstract class BaseSingleStageBrokerRequestHandler extends BaseBrokerRequ
 
     Schema schema = _tableCache.getSchema(rawTableName);
     if (schema != null) {
-      handleDistinctMultiValuedOverride(serverPinotQuery, schema);
+      handleAggFunctionMVOverride(serverPinotQuery, schema);
     }
     _queryOptimizer.optimize(serverPinotQuery, schema);
 
@@ -1312,7 +1343,6 @@ public abstract class BaseSingleStageBrokerRequestHandler extends BaseBrokerRequ
    * @return multivalued columns of the table .
    */
   private static boolean isMultiValueColumn(Schema tableSchema, String columnName) {
-
     DimensionFieldSpec dimensionFieldSpec = tableSchema.getDimensionSpec(columnName);
     return dimensionFieldSpec != null && !dimensionFieldSpec.isSingleValueField();
   }
@@ -1451,39 +1481,39 @@ public abstract class BaseSingleStageBrokerRequestHandler extends BaseBrokerRequ
   }
 
   /**
-   * Rewrites selected 'Distinct' prefixed function to 'Distinct----MV' function for the field of multivalued type.
+   * Rewrites aggregation functions to MV equivalents if the function operand is an MV column
    */
   @VisibleForTesting
-  static void handleDistinctMultiValuedOverride(PinotQuery pinotQuery, Schema tableSchema) {
+  static void handleAggFunctionMVOverride(PinotQuery pinotQuery, Schema tableSchema) {
     for (Expression expression : pinotQuery.getSelectList()) {
-      handleDistinctMultiValuedOverride(expression, tableSchema);
+      handleAggFunctionMVOverride(expression, tableSchema);
     }
     List<Expression> orderByExpressions = pinotQuery.getOrderByList();
     if (orderByExpressions != null) {
       for (Expression expression : orderByExpressions) {
         // NOTE: Order-by is always a Function with the ordering of the Expression
-        handleDistinctMultiValuedOverride(expression.getFunctionCall().getOperands().get(0), tableSchema);
+        handleAggFunctionMVOverride(expression.getFunctionCall().getOperands().get(0), tableSchema);
       }
     }
     Expression havingExpression = pinotQuery.getHavingExpression();
     if (havingExpression != null) {
-      handleDistinctMultiValuedOverride(havingExpression, tableSchema);
+      handleAggFunctionMVOverride(havingExpression, tableSchema);
     }
   }
 
   /**
-   * Rewrites selected 'Distinct' prefixed function to 'Distinct----MV' function for the field of multivalued type.
+   * Rewrites aggregation functions to MV equivalents if the function operand is an MV column
    */
-  private static void handleDistinctMultiValuedOverride(Expression expression, Schema tableSchema) {
+  private static void handleAggFunctionMVOverride(Expression expression, Schema tableSchema) {
     Function function = expression.getFunctionCall();
     if (function == null) {
       return;
     }
 
-    String overrideOperator = DISTINCT_MV_COL_FUNCTION_OVERRIDE_MAP.get(function.getOperator());
+    String overrideOperator = MV_COL_AGG_FUNCTION_OVERRIDE_MAP.get(function.getOperator());
     if (overrideOperator != null) {
       List<Expression> operands = function.getOperands();
-      if (operands.size() >= 1 && operands.get(0).isSetIdentifier() && isMultiValueColumn(tableSchema,
+      if (!operands.isEmpty() && operands.get(0).isSetIdentifier() && isMultiValueColumn(tableSchema,
           operands.get(0).getIdentifier().getName())) {
         // we are only checking the first operand that if its a MV column as all the overriding agg. fn.'s have
         // first operator is column name
@@ -1491,7 +1521,7 @@ public abstract class BaseSingleStageBrokerRequestHandler extends BaseBrokerRequ
       }
     } else {
       for (Expression operand : function.getOperands()) {
-        handleDistinctMultiValuedOverride(operand, tableSchema);
+        handleAggFunctionMVOverride(operand, tableSchema);
       }
     }
   }

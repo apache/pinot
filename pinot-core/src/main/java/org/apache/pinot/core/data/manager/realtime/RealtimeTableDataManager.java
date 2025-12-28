@@ -20,9 +20,13 @@ package org.apache.pinot.core.data.manager.realtime;
 
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
+import com.google.common.cache.Cache;
+import com.google.common.cache.CacheBuilder;
+import com.google.common.cache.RemovalNotification;
 import java.io.File;
 import java.io.IOException;
 import java.net.URI;
+import java.time.Duration;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashSet;
@@ -31,6 +35,7 @@ import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Semaphore;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
@@ -82,7 +87,9 @@ import org.apache.pinot.spi.data.DateTimeFormatSpec;
 import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.stream.StreamConfigProperties;
+import org.apache.pinot.spi.stream.StreamConsumerFactory;
 import org.apache.pinot.spi.stream.StreamMessageMetadata;
+import org.apache.pinot.spi.stream.StreamMetadataProvider;
 import org.apache.pinot.spi.stream.StreamPartitionMsgOffset;
 import org.apache.pinot.spi.utils.CommonConstants;
 import org.apache.pinot.spi.utils.CommonConstants.Segment.Realtime.Status;
@@ -133,6 +140,9 @@ public class RealtimeTableDataManager extends BaseTableDataManager {
   public static final long SLEEP_INTERVAL_MS = 30000; // 30 seconds sleep interval
   @Deprecated
   private static final String SEGMENT_DOWNLOAD_TIMEOUT_MINUTES = "segmentDownloadTimeoutMinutes";
+  private static final Duration STREAM_METADATA_PROVIDER_CACHE_TTL = Duration.ofMinutes(10);
+
+  protected Cache<String, StreamMetadataProvider> _streamMetadataProviderCache;
 
   private final BooleanSupplier _isServerReadyToServeQueries;
 
@@ -216,6 +226,7 @@ public class RealtimeTableDataManager extends BaseTableDataManager {
     }
 
     _enforceConsumptionInOrder = isEnforceConsumptionInOrder();
+    _streamMetadataProviderCache = getStreamMetadataProviderCache();
 
     // For dedup and partial-upsert, need to wait for all segments loaded before starting consuming data
     if (isDedupEnabled() || isPartialUpsertEnabled()) {
@@ -246,6 +257,23 @@ public class RealtimeTableDataManager extends BaseTableDataManager {
     } else {
       _isTableReadyToConsumeData = () -> true;
     }
+  }
+
+  @VisibleForTesting
+  protected Cache<String, StreamMetadataProvider> getStreamMetadataProviderCache() {
+    return CacheBuilder.newBuilder()
+        .expireAfterAccess(STREAM_METADATA_PROVIDER_CACHE_TTL)
+        .removalListener((RemovalNotification<String, StreamMetadataProvider> notification) -> {
+          StreamMetadataProvider provider = notification.getValue();
+          if (provider != null) {
+            try {
+              provider.close();
+            } catch (Exception e) {
+              LOGGER.warn("Failed to close StreamMetadataProvider for key {}", notification.getKey(), e);
+            }
+          }
+        })
+        .build();
   }
 
   @Override
@@ -353,6 +381,21 @@ public class RealtimeTableDataManager extends BaseTableDataManager {
       _tableUpsertMetadataManager.setSegmentContexts(segmentContexts, queryOptions);
     }
     return segmentContexts;
+  }
+
+  /**
+   *  Returns thread safe StreamMetadataProvider which is shared across different callers.
+   */
+  public StreamMetadataProvider getStreamMetadataProvider(RealtimeSegmentDataManager realtimeSegmentDataManager) {
+    String tableStreamName = realtimeSegmentDataManager.getTableStreamName();
+    StreamConsumerFactory streamConsumerFactory = realtimeSegmentDataManager.getStreamConsumerFactory();
+    try {
+      return _streamMetadataProviderCache.get(tableStreamName,
+          () -> streamConsumerFactory.createStreamMetadataProvider(tableStreamName, true));
+    } catch (ExecutionException e) {
+      LOGGER.error("Failed to get stream metadata provider for tableStream: {}", tableStreamName);
+      throw new RuntimeException(e);
+    }
   }
 
   /**
