@@ -431,6 +431,8 @@ public class LuceneTextIndexCreator extends AbstractTextIndexCreator {
         }
         LOGGER.info("lucene doc IdMapping file doesn't exists for column: {},  building mapping file", _textColumn);
         // Build the docId mapping file so it's available during segment load
+        // The last argument is an optional reusable IndexReader/IndexSearcher; null indicates that
+        // buildMappingFile should create and manage its own short-lived reader for this offline build.
         buildMappingFile(_segmentDirectory, _textColumn, _indexDirectory, null);
       }
       _indexDirectory.close();
