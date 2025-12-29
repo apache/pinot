@@ -522,6 +522,10 @@ public class MultiStageBrokerRequestHandler extends BaseBrokerRequestHandler {
       RequesterIdentity requesterIdentity, RequestContext requestContext, HttpHeaders httpHeaders, Timer timer,
       boolean rlsFiltersApplied)
       throws QueryException, WebApplicationException {
+    // Strip any user-supplied internal-only options to prevent spoofing. These will be set programmatically later.
+    // NOTE: 'leafLimitProvenance' is internal and must not be accepted from client input.
+    query.getOptions().remove("leafLimitProvenance");
+
     QueryEnvironment.QueryPlannerResult queryPlanResult = callAsync(requestId, query.getTextQuery(),
         () -> query.planQuery(requestId), timer);
 

@@ -152,6 +152,20 @@ public class BrokerResponseNativeV2 implements BrokerResponse {
     _brokerStats.merge(StatKey.NUM_GROUPS_WARNING_LIMIT_REACHED, numGroupsWarningLimitReached);
   }
 
+  /**
+   * Returns whether the leaf stage truncated due to lite per-node cap.
+   */
+  public boolean isLiteLeafCapTruncation() {
+    return _brokerStats.getBoolean(StatKey.LITE_LEAF_CAP_TRUNCATION);
+  }
+
+  /**
+   * Merges the lite leaf cap truncation flag from server stats.
+   */
+  public void mergeLiteLeafCapTruncation(boolean liteLeafCapTruncation) {
+    _brokerStats.merge(StatKey.LITE_LEAF_CAP_TRUNCATION, liteLeafCapTruncation);
+  }
+
   @Override
   public boolean isMaxRowsInJoinReached() {
     return _maxRowsInJoinReached;
@@ -453,7 +467,8 @@ public class BrokerResponseNativeV2 implements BrokerResponse {
     NUM_SEGMENTS_PRUNED_BY_VALUE(StatMap.Type.INT),
     GROUPS_TRIMMED(StatMap.Type.BOOLEAN),
     NUM_GROUPS_LIMIT_REACHED(StatMap.Type.BOOLEAN),
-    NUM_GROUPS_WARNING_LIMIT_REACHED(StatMap.Type.BOOLEAN);
+    NUM_GROUPS_WARNING_LIMIT_REACHED(StatMap.Type.BOOLEAN),
+    LITE_LEAF_CAP_TRUNCATION(StatMap.Type.BOOLEAN);
 
     private final StatMap.Type _type;
 
