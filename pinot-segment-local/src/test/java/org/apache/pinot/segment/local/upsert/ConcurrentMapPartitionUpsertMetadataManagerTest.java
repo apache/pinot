@@ -815,7 +815,7 @@ public class ConcurrentMapPartitionUpsertMetadataManagerTest {
   }
 
   // Helper method for new reversion tests that need Integer comparison values
-  private List<RecordInfo> getRecordInfoListWithIntegerComparison(int numRecords, int[] primaryKeys, int[] timestamps,
+  private List<RecordInfo> getRecordInfoListWithIntComparison(int numRecords, int[] primaryKeys, int[] timestamps,
       @Nullable boolean[] deleteRecordFlags) {
     List<RecordInfo> recordInfoList = new ArrayList<>();
     for (int i = 0; i < numRecords; i++) {
@@ -1983,10 +1983,10 @@ public class ConcurrentMapPartitionUpsertMetadataManagerTest {
     MutableSegment mutableSegment = mockMutableSegmentWithDataSource(1, validDocIds1, null, mutablePrimaryKeys);
 
     // Add records to the mutable segment
-    upsertMetadataManager.addRecord(mutableSegment, new RecordInfo(makePrimaryKey(1), 0, new Integer(100), false));
-    upsertMetadataManager.addRecord(mutableSegment, new RecordInfo(makePrimaryKey(2), 1, new Integer(200), false));
-    upsertMetadataManager.addRecord(mutableSegment, new RecordInfo(makePrimaryKey(3), 2, new Integer(300), false));
-    upsertMetadataManager.addRecord(mutableSegment, new RecordInfo(makePrimaryKey(4), 3, new Integer(400), false));
+    upsertMetadataManager.addRecord(mutableSegment, new RecordInfo(makePrimaryKey(1), 0, 100, false));
+    upsertMetadataManager.addRecord(mutableSegment, new RecordInfo(makePrimaryKey(2), 1, 200, false));
+    upsertMetadataManager.addRecord(mutableSegment, new RecordInfo(makePrimaryKey(3), 2, 300, false));
+    upsertMetadataManager.addRecord(mutableSegment, new RecordInfo(makePrimaryKey(4), 3, 400, false));
 
     Map<Object, RecordLocation> recordLocationMap = upsertMetadataManager._primaryKeyToRecordLocationMap;
     assertEquals(recordLocationMap.size(), 4);
@@ -2228,9 +2228,9 @@ public class ConcurrentMapPartitionUpsertMetadataManagerTest {
     ThreadSafeMutableRoaringBitmap validDocIdsMutable = new ThreadSafeMutableRoaringBitmap();
     MutableSegment mutableSegment = mockMutableSegmentWithDataSource(1, validDocIdsMutable, null, mutablePrimaryKeys);
 
-    upsertMetadataManager.addRecord(mutableSegment, new RecordInfo(makePrimaryKey(10), 0, new Integer(1000), false));
-    upsertMetadataManager.addRecord(mutableSegment, new RecordInfo(makePrimaryKey(20), 1, new Integer(2000), false));
-    upsertMetadataManager.addRecord(mutableSegment, new RecordInfo(makePrimaryKey(30), 2, new Integer(3000), false));
+    upsertMetadataManager.addRecord(mutableSegment, new RecordInfo(makePrimaryKey(10), 0, Integer.valueOf(1000), false));
+    upsertMetadataManager.addRecord(mutableSegment, new RecordInfo(makePrimaryKey(20), 1, Integer.valueOf(2000), false));
+    upsertMetadataManager.addRecord(mutableSegment, new RecordInfo(makePrimaryKey(30), 2, Integer.valueOf(3000), false));
 
     Map<Object, RecordLocation> recordLocationMap = upsertMetadataManager._primaryKeyToRecordLocationMap;
     assertEquals(recordLocationMap.size(), 3);
