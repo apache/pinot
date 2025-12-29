@@ -4277,6 +4277,47 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
     }
   }
 
+  /**
+   * Test SQL string literal escaping behavior.
+   *
+   * In SQL, single quotes within string literals are escaped by doubling them:
+   * - 'It''s' represents the string "It's" (2 quotes = 1 quote in result)
+   *
+   * The Calcite parser handles this escaping correctly.
+   */
+  @Test(dataProvider = "useBothQueryEngines")
+  public void testStringLiteralEscaping(boolean useMultiStageQueryEngine)
+      throws Exception {
+    setUseMultiStageQueryEngine(useMultiStageQueryEngine);
+
+    // Test 1: Simple escaped quote (2 quotes in SQL = 1 quote in result)
+    // SQL: 'It''s a test' should result in "It's a test"
+    String query = "SELECT 'It''s a test' FROM mytable LIMIT 1";
+    JsonNode response = postQuery(query);
+    assertTrue(response.get("exceptions").isEmpty());
+    JsonNode rows = response.get("resultTable").get("rows");
+    assertEquals(rows.size(), 1);
+    assertEquals(rows.get(0).get(0).asText(), "It's a test");
+
+    // Test 2: String literal in WHERE clause with comparison
+    // Query for carriers where we compare against a literal with escaped quotes
+    // Note: No carrier has quotes in its name, so we just verify the query doesn't error
+    query = "SELECT COUNT(*) FROM mytable WHERE Carrier = 'doesn''t exist'";
+    response = postQuery(query);
+    assertTrue(response.get("exceptions").isEmpty());
+    rows = response.get("resultTable").get("rows");
+    assertEquals(rows.size(), 1);
+    assertEquals(rows.get(0).get(0).asLong(), 0); // No matches expected
+
+    // Test 3: Multiple escaped quotes in same query
+    query = "SELECT 'He said ''''hello'''' and ''goodbye''' FROM mytable LIMIT 1";
+    response = postQuery(query);
+    assertTrue(response.get("exceptions").isEmpty());
+    rows = response.get("resultTable").get("rows");
+    assertEquals(rows.size(), 1);
+    assertEquals(rows.get(0).get(0).asText(), "He said ''hello'' and 'goodbye'");
+  }
+
   private void reloadAndWait(String tableNameWithType, @Nullable String segmentName) throws Exception {
     String response = (segmentName != null)
         ? reloadOfflineSegment(tableNameWithType, segmentName, true)

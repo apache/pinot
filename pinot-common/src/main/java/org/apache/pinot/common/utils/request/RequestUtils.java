@@ -51,8 +51,10 @@ import org.apache.pinot.common.request.Identifier;
 import org.apache.pinot.common.request.Literal;
 import org.apache.pinot.common.request.PinotQuery;
 import org.apache.pinot.common.utils.DataSchema.ColumnDataType;
+import org.apache.pinot.spi.config.instance.InstanceConfigProvider;
 import org.apache.pinot.spi.utils.BigDecimalUtils;
 import org.apache.pinot.spi.utils.BytesUtils;
+import org.apache.pinot.spi.utils.CommonConstants;
 import org.apache.pinot.spi.utils.CommonConstants.Broker.Request;
 import org.apache.pinot.spi.utils.TimestampIndexUtils;
 import org.apache.pinot.sql.FilterKind;
@@ -246,7 +248,10 @@ public class RequestUtils {
           literal.setNullValue(true);
           break;
         default:
-          literal.setStringValue(StringUtils.replace(node.toValue(), "''", "'"));
+          boolean useLegacyUnescaping =
+              InstanceConfigProvider.getProperty(CommonConstants.Helix.CONFIG_OF_SSE_LEGACY_LITERAL_UNESCAPING,
+                  CommonConstants.Helix.DEFAULT_SSE_LEGACY_LITERAL_UNESCAPING);
+          literal.setStringValue(useLegacyUnescaping ? StringUtils.replace(node.toValue(), "''", "'") : node.toValue());
           break;
       }
     }
