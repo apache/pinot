@@ -21,6 +21,7 @@ package org.apache.pinot.core.routing;
 import com.google.common.base.Preconditions;
 import java.util.ArrayList;
 import java.util.List;
+import javax.annotation.Nullable;
 import org.apache.pinot.common.config.provider.TableCache;
 import org.apache.pinot.common.request.BrokerRequest;
 import org.apache.pinot.core.routing.timeboundary.TimeBoundaryInfo;
@@ -37,6 +38,7 @@ import org.slf4j.LoggerFactory;
 
 public class LogicalTableRouteProvider implements TableRouteProvider {
   private static final Logger LOGGER = LoggerFactory.getLogger(LogicalTableRouteProvider.class);
+  @Nullable
   private final MultiClusterRoutingContext _multiClusterRoutingContext;
 
   public LogicalTableRouteProvider() {
