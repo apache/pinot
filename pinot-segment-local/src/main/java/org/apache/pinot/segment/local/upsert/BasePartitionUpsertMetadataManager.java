@@ -624,6 +624,8 @@ public abstract class BasePartitionUpsertMetadataManager implements PartitionUps
         System.currentTimeMillis() - startTimeMs, numPrimaryKeys);
   }
 
+  private static final int MAX_UPSERT_REVERT_RETRIES = 3;
+
   /**
    * NOTE: We allow passing in validDocIds and queryableDocIds here so that the value can be easily accessed from the
    *       tests. The passed in bitmaps should always be empty.
@@ -663,56 +665,97 @@ public abstract class BasePartitionUpsertMetadataManager implements PartitionUps
       validDocIdsForOldSegment = getValidDocIdsForOldSegment(oldSegment);
     }
     if (validDocIdsForOldSegment != null && !validDocIdsForOldSegment.isEmpty()) {
-      int numKeysNotReplaced = validDocIdsForOldSegment.getCardinality();
-      // Add the new metric tracking here
-      if (_context.isDropOutOfOrderRecord() && _context.getConsistencyMode() == UpsertConfig.ConsistencyMode.NONE) {
-        // For Upsert tables when some of the records get dropped when dropOutOfOrderRecord is enabled, we donot
-        // store the original record location when keys are not replaced, this can potentially cause inconsistencies
-        // leading to some rows not getting dropped when reconsumed. This can be caused when a consuming segment
-        // that is consumed from a different server is replaced with the existing segment which consumed rows ahead
-        // of the other server
-        _logger.warn(
-            "Found {} primary keys not replaced when replacing segment: {} for upsert table with dropOutOfOrderRecord"
-                + " enabled with no consistency mode. This can potentially cause inconsistency between replicas. "
-                + "Reverting metadata changes and triggering segment replacement.", numKeysNotReplaced, segmentName);
-        _serverMetrics.addMeteredTableValue(_tableNameWithType, ServerMeter.REALTIME_UPSERT_INCONSISTENT_ROWS,
-            numKeysNotReplaced);
-        // Revert consuming segment pks to previous segment locations and perform metadata replacement again
-        revertSegmentUpsertMetadata(segment, validDocIds, queryableDocIds, oldSegment, segmentName);
-      } else if (_partialUpsertHandler != null) {
-        // For partial-upsert table, because we do not restore the original record location when removing the primary
-        // keys not replaced, it can potentially cause inconsistency between replicas. This can happen when a
-        // consuming segment is replaced by a committed segment that is consumed from a different server with
-        // different records (some stream consumer cannot guarantee consuming the messages in the same order/
-        // when a segment is replaced with lesser consumed rows from the other server).
-        _logger.warn("Found {} primary keys not replaced when replacing segment: {} for partial-upsert table. This "
-            + "can potentially cause inconsistency between replicas. "
-            + "Reverting metadata changes and triggering segment replacement.", numKeysNotReplaced, segmentName);
-        _serverMetrics.addMeteredTableValue(_tableNameWithType, ServerMeter.PARTIAL_UPSERT_KEYS_NOT_REPLACED,
-            numKeysNotReplaced);
-        // Revert consuming segment pks to previous segment locations and perform metadata replacement again
-        revertSegmentUpsertMetadata(segment, validDocIds, queryableDocIds, oldSegment, segmentName);
-      } else {
-        _logger.info("Found {} primary keys not replaced when replacing segment: {}", numKeysNotReplaced, segmentName);
-      }
+      checkForInconsistencies(segment, validDocIds, queryableDocIds, oldSegment, validDocIdsForOldSegment, segmentName);
       removeSegment(oldSegment, validDocIdsForOldSegment);
     }
   }
 
-  private void revertSegmentUpsertMetadata(ImmutableSegment segment, ThreadSafeMutableRoaringBitmap validDocIds,
+  void checkForInconsistencies(ImmutableSegment segment, ThreadSafeMutableRoaringBitmap validDocIds,
+      ThreadSafeMutableRoaringBitmap queryableDocIds, IndexSegment oldSegment,
+      MutableRoaringBitmap validDocIdsForOldSegment, String segmentName) {
+    int numKeysNotReplaced = validDocIdsForOldSegment.getCardinality();
+    // Only apply revert logic when sealing a consuming (mutable) segment, not for immutable segment replacement.
+    // Consuming segments are mutable, so we check if the old segment is NOT an ImmutableSegment.
+    boolean isConsumingSegmentSeal = !(oldSegment instanceof ImmutableSegment);
+    if (isConsumingSegmentSeal && _context.isDropOutOfOrderRecord()
+        && _context.getConsistencyMode() == UpsertConfig.ConsistencyMode.NONE) {
+      // For Upsert tables when some of the records get dropped when dropOutOfOrderRecord is enabled, we donot
+      // store the original record location when keys are not replaced, this can potentially cause inconsistencies
+      // leading to some rows not getting dropped when reconsumed. This can be caused when a consuming segment
+      // that is consumed from a different server is replaced with the existing segment which consumed rows ahead
+      // of the other server
+      _logger.warn("Found {} primary keys not replaced when sealing consuming segment: {} for upsert table with "
+              + "dropOutOfOrderRecord enabled with no consistency mode. This can potentially cause inconsistency "
+              + "between replicas. Reverting back metadata changes and triggering segment replacement.",
+          numKeysNotReplaced, segmentName);
+      // Revert consuming segment pks to previous segment locations and perform metadata replacement again with retry
+      revertSegmentUpsertMetadataWithRetry(segment, validDocIds, queryableDocIds, oldSegment, segmentName);
+    } else if (isConsumingSegmentSeal && _partialUpsertHandler != null) {
+      // For partial-upsert table, because we do not restore the original record location when removing the primary
+      // keys not replaced, it can potentially cause inconsistency between replicas. This can happen when a
+      // consuming segment is replaced by a committed segment that is consumed from a different server with
+      // different records (some stream consumer cannot guarantee consuming the messages in the same order/
+      // when a segment is replaced with lesser consumed rows from the other server).
+      _logger.warn("Found {} primary keys not replaced when sealing consuming segment: {} for partial-upsert table. "
+          + "This can potentially cause inconsistency between replicas. "
+          + "Reverting metadata changes and triggering segment replacement.", numKeysNotReplaced, segmentName);
+      // Revert consuming segment pks to previous segment locations and perform metadata replacement again with retry
+      revertSegmentUpsertMetadataWithRetry(segment, validDocIds, queryableDocIds, oldSegment, segmentName);
+    } else if (isConsumingSegmentSeal) {
+      _logger.info("Found {} primary keys not replaced when sealing consuming segment: {}", numKeysNotReplaced,
+          segmentName);
+    } else {
+      // For immutable segment replacement (e.g., segment reload), just log the info without revert
+      _logger.warn("Found {} primary keys not replaced when replacing immutable segment: {}. "
+          + "Skipping revert as this is not a consuming segment.", numKeysNotReplaced, segmentName);
+    }
+  }
+
+  /**
+   * Reverts segment upsert metadata and retries addOrReplaceSegment with a maximum retry limit to prevent infinite
+   * recursion in case of persistent inconsistencies.
+   */
+  void revertSegmentUpsertMetadataWithRetry(ImmutableSegment segment, ThreadSafeMutableRoaringBitmap validDocIds,
       ThreadSafeMutableRoaringBitmap queryableDocIds, IndexSegment oldSegment, String segmentName) {
-    revertCurrentSegmentUpsertMetadata(oldSegment, validDocIds, queryableDocIds);
-    MutableRoaringBitmap validDocIdsForOldSegment = getValidDocIdsForOldSegment(oldSegment);
-    try (UpsertUtils.RecordInfoReader recordInfoReader = new UpsertUtils.RecordInfoReader(segment, _primaryKeyColumns,
-        _comparisonColumns, _deleteRecordColumn)) {
-      Iterator<RecordInfo> latestRecordInfoIterator =
-          UpsertUtils.getRecordInfoIterator(recordInfoReader, segment.getSegmentMetadata().getTotalDocs());
-      addOrReplaceSegment((ImmutableSegmentImpl) segment, validDocIds, queryableDocIds, latestRecordInfoIterator,
-          oldSegment, validDocIdsForOldSegment);
-    } catch (Exception e) {
-      throw new RuntimeException(
-          String.format("Caught exception while replacing segment metadata during inconsistencies: %s, table: %s",
-              segmentName, _tableNameWithType), e);
+    for (int retryCount = 0; retryCount < MAX_UPSERT_REVERT_RETRIES; retryCount++) {
+      revertCurrentSegmentUpsertMetadata(oldSegment, validDocIds, queryableDocIds);
+      MutableRoaringBitmap validDocIdsForOldSegment = getValidDocIdsForOldSegment(oldSegment);
+      try (UpsertUtils.RecordInfoReader recordInfoReader = new UpsertUtils.RecordInfoReader(segment, _primaryKeyColumns,
+          _comparisonColumns, _deleteRecordColumn)) {
+        Iterator<RecordInfo> latestRecordInfoIterator =
+            UpsertUtils.getRecordInfoIterator(recordInfoReader, segment.getSegmentMetadata().getTotalDocs());
+        addOrReplaceSegment((ImmutableSegmentImpl) segment, validDocIds, queryableDocIds, latestRecordInfoIterator,
+            oldSegment, validDocIdsForOldSegment);
+      } catch (Exception e) {
+        throw new RuntimeException(
+            String.format("Caught exception while replacing segment metadata during inconsistencies: %s, table: %s",
+                segmentName, _tableNameWithType), e);
+      }
+
+      validDocIdsForOldSegment = getValidDocIdsForOldSegment(oldSegment);
+      if (validDocIdsForOldSegment == null || validDocIdsForOldSegment.isEmpty()) {
+        _logger.info("Successfully resolved inconsistency for segment: {} after {} retry attempt(s)", segmentName,
+            retryCount + 1);
+        return;
+      }
+
+      int numKeysStillNotReplaced = validDocIdsForOldSegment.getCardinality();
+      if (retryCount < MAX_UPSERT_REVERT_RETRIES - 1) {
+        _logger.warn("Retry {}/{}: Still found {} primary keys not replaced for segment: {}. Retrying...",
+            retryCount + 1, MAX_UPSERT_REVERT_RETRIES, numKeysStillNotReplaced, segmentName);
+      } else {
+        _logger.error("Exhausted all {} retries for segment: {}. Found {} primary keys still not replaced. "
+                + "Proceeding with current state which may cause inconsistency.", MAX_UPSERT_REVERT_RETRIES,
+            segmentName,
+            numKeysStillNotReplaced);
+        if (_context.isDropOutOfOrderRecord() && _context.getConsistencyMode() == UpsertConfig.ConsistencyMode.NONE) {
+          _serverMetrics.addMeteredTableValue(_tableNameWithType, ServerMeter.REALTIME_UPSERT_INCONSISTENT_ROWS,
+              numKeysStillNotReplaced);
+        } else if (_partialUpsertHandler != null) {
+          _serverMetrics.addMeteredTableValue(_tableNameWithType, ServerMeter.PARTIAL_UPSERT_KEYS_NOT_REPLACED,
+              numKeysStillNotReplaced);
+        }
+      }
     }
   }
 

@@ -1039,6 +1039,33 @@ public class ConcurrentMapPartitionUpsertMetadataManagerTest {
     return segment;
   }
 
+  private static MutableSegment mockMutableSegmentWithDataSource(int sequenceNumber,
+      ThreadSafeMutableRoaringBitmap validDocIds, ThreadSafeMutableRoaringBitmap queryableDocIds,
+      int[] primaryKeys) {
+    MutableSegment segment = mock(MutableSegment.class);
+    when(segment.getSegmentName()).thenReturn(getSegmentName(sequenceNumber));
+    when(segment.getQueryableDocIds()).thenReturn(queryableDocIds);
+    when(segment.getValidDocIds()).thenReturn(validDocIds);
+
+    DataSource dataSource = mock(DataSource.class);
+    ForwardIndexReader forwardIndex = mock(ForwardIndexReader.class);
+    when(forwardIndex.isSingleValue()).thenReturn(true);
+    when(forwardIndex.getStoredType()).thenReturn(DataType.INT);
+    when(forwardIndex.getInt(anyInt(), any())).thenAnswer(invocation -> {
+      int docId = invocation.getArgument(0);
+      if (primaryKeys != null && docId < primaryKeys.length) {
+        return primaryKeys[docId];
+      }
+      return docId;
+    });
+    when(dataSource.getForwardIndex()).thenReturn(forwardIndex);
+
+    when(segment.getDataSource(anyString())).thenReturn(dataSource);
+    when(segment.getDataSource(PRIMARY_KEY_COLUMNS.get(0))).thenReturn(dataSource);
+
+    return segment;
+  }
+
   private static String getSegmentName(int sequenceNumber) {
     return new LLCSegmentName(RAW_TABLE_NAME, 0, sequenceNumber, System.currentTimeMillis()).toString();
   }
@@ -1940,7 +1967,8 @@ public class ConcurrentMapPartitionUpsertMetadataManagerTest {
 
   @Test
   public void testPartialUpsertOldSegmentTriggerReversion() throws IOException {
-    // Test partial upserts with old segment having more docs than new segment
+    // Test partial upserts with consuming (mutable) segment being sealed - revert should be triggered
+    // Note: Revert logic only applies when sealing a consuming segment, not for immutable segment replacement
     PartialUpsertHandler mockPartialUpsertHandler = mock(PartialUpsertHandler.class);
     UpsertContext upsertContext = _contextBuilder.setPartialUpsertHandler(mockPartialUpsertHandler)
         .setConsistencyMode(UpsertConfig.ConsistencyMode.NONE).build();
@@ -1948,42 +1976,42 @@ public class ConcurrentMapPartitionUpsertMetadataManagerTest {
     ConcurrentMapPartitionUpsertMetadataManager upsertMetadataManager =
         new ConcurrentMapPartitionUpsertMetadataManager(REALTIME_TABLE_NAME, 0, upsertContext);
 
-    int numRecords1 = 4;
-    int[] primaryKeys1 = new int[]{1, 2, 3, 4};
-    int[] timestamps1 = new int[]{100, 200, 300, 400};
+    // Create a mutable (consuming) segment with 4 records - use mockMutableSegmentWithDataSource
+    // to support removeSegment which needs to read primary keys
+    int[] mutablePrimaryKeys = new int[]{1, 2, 3, 4};
     ThreadSafeMutableRoaringBitmap validDocIds1 = new ThreadSafeMutableRoaringBitmap();
-    for (int i = 0; i < numRecords1; i++) {
-      validDocIds1.add(i);
-    }
-    List<PrimaryKey> primaryKeysList1 = getPrimaryKeyList(numRecords1, primaryKeys1);
-    ImmutableSegmentImpl segment1 = mockImmutableSegmentWithTimestamps(1, validDocIds1, null,
-        primaryKeysList1, timestamps1);
-    List<RecordInfo> recordInfoList1 = getRecordInfoListWithIntegerComparison(numRecords1, primaryKeys1,
-        timestamps1, null);
+    MutableSegment mutableSegment = mockMutableSegmentWithDataSource(1, validDocIds1, null, mutablePrimaryKeys);
 
-    upsertMetadataManager.addSegment(segment1, validDocIds1, null, recordInfoList1.iterator());
+    // Add records to the mutable segment
+    upsertMetadataManager.addRecord(mutableSegment, new RecordInfo(makePrimaryKey(1), 0, new Integer(100), false));
+    upsertMetadataManager.addRecord(mutableSegment, new RecordInfo(makePrimaryKey(2), 1, new Integer(200), false));
+    upsertMetadataManager.addRecord(mutableSegment, new RecordInfo(makePrimaryKey(3), 2, new Integer(300), false));
+    upsertMetadataManager.addRecord(mutableSegment, new RecordInfo(makePrimaryKey(4), 3, new Integer(400), false));
 
     Map<Object, RecordLocation> recordLocationMap = upsertMetadataManager._primaryKeyToRecordLocationMap;
     assertEquals(recordLocationMap.size(), 4);
+    assertEquals(validDocIds1.getMutableRoaringBitmap().getCardinality(), 4);
 
     int numRecords2 = 2;
     int[] primaryKeys2 = new int[]{1, 3};
     int[] timestamps2 = new int[]{150, 350};
     ThreadSafeMutableRoaringBitmap validDocIds2 = new ThreadSafeMutableRoaringBitmap();
-    for (int i = 0; i < numRecords2; i++) {
-      validDocIds2.add(i);
-    }
     List<PrimaryKey> primaryKeysList2 = getPrimaryKeyList(numRecords2, primaryKeys2);
     ImmutableSegmentImpl segment2 = mockImmutableSegmentWithTimestamps(1, validDocIds2, null,
         primaryKeysList2, timestamps2);
-    upsertMetadataManager.replaceSegment(segment2, segment1);
+
+    // Replace mutable with immutable (consuming segment seal) - revert SHOULD be triggered
+    upsertMetadataManager.replaceSegment(segment2, validDocIds2, null,
+        getRecordInfoListWithIntegerComparison(numRecords2, primaryKeys2, timestamps2, null).iterator(),
+        mutableSegment);
 
     assertEquals(recordLocationMap.size(), 2);
     assertEquals(segment2.getValidDocIds().getMutableRoaringBitmap().getCardinality(), 2);
     checkRecordLocation(recordLocationMap, 1, segment2, 0, 150, HashFunction.NONE);
     checkRecordLocation(recordLocationMap, 3, segment2, 1, 350, HashFunction.NONE);
 
-    assertEquals(segment1.getValidDocIds().getMutableRoaringBitmap().getCardinality(), 0);
+    // Mutable segment's validDocIds should be 0 after removal
+    assertEquals(validDocIds1.getMutableRoaringBitmap().getCardinality(), 0);
     upsertMetadataManager.stop();
     upsertMetadataManager.close();
   }
@@ -2182,6 +2210,100 @@ public class ConcurrentMapPartitionUpsertMetadataManagerTest {
 
     assertEquals(segment1.getValidDocIds().getMutableRoaringBitmap().getCardinality(), 2);
     assertEquals(segment2.getValidDocIds().getMutableRoaringBitmap().getCardinality(), 1);
+
+    upsertMetadataManager.stop();
+    upsertMetadataManager.close();
+  }
+
+  @Test
+  public void testRevertOnlyAppliesForConsumingSegmentSeal()
+      throws IOException {
+    UpsertContext upsertContext =
+        _contextBuilder.setConsistencyMode(UpsertConfig.ConsistencyMode.NONE).setDropOutOfOrderRecord(true).build();
+
+    ConcurrentMapPartitionUpsertMetadataManager upsertMetadataManager =
+        new ConcurrentMapPartitionUpsertMetadataManager(REALTIME_TABLE_NAME, 0, upsertContext);
+
+    int[] mutablePrimaryKeys = new int[]{10, 20, 30};
+    ThreadSafeMutableRoaringBitmap validDocIdsMutable = new ThreadSafeMutableRoaringBitmap();
+    MutableSegment mutableSegment = mockMutableSegmentWithDataSource(1, validDocIdsMutable, null, mutablePrimaryKeys);
+
+    upsertMetadataManager.addRecord(mutableSegment, new RecordInfo(makePrimaryKey(10), 0, new Integer(1000), false));
+    upsertMetadataManager.addRecord(mutableSegment, new RecordInfo(makePrimaryKey(20), 1, new Integer(2000), false));
+    upsertMetadataManager.addRecord(mutableSegment, new RecordInfo(makePrimaryKey(30), 2, new Integer(3000), false));
+
+    Map<Object, RecordLocation> recordLocationMap = upsertMetadataManager._primaryKeyToRecordLocationMap;
+    assertEquals(recordLocationMap.size(), 3);
+    assertEquals(validDocIdsMutable.getMutableRoaringBitmap().getCardinality(), 3);
+
+    int numRecords = 2;
+    int[] primaryKeys = new int[]{10, 20};
+    int[] timestamps = new int[]{1500, 2500};
+    ThreadSafeMutableRoaringBitmap validDocIdsImmutable = new ThreadSafeMutableRoaringBitmap();
+    List<PrimaryKey> primaryKeysList = getPrimaryKeyList(numRecords, primaryKeys);
+    ImmutableSegmentImpl immutableSegment = mockImmutableSegmentWithTimestamps(1, validDocIdsImmutable, null,
+        primaryKeysList, timestamps);
+
+    // This should trigger the revert logic since old segment is mutable
+    upsertMetadataManager.replaceSegment(immutableSegment, validDocIdsImmutable, null,
+        getRecordInfoListWithIntegerComparison(numRecords, primaryKeys, timestamps, null).iterator(), mutableSegment);
+
+    // After replacement, the records from immutable segment should be present
+    assertEquals(recordLocationMap.size(), 2);
+    checkRecordLocation(recordLocationMap, 10, immutableSegment, 0, 1500, HashFunction.NONE);
+    checkRecordLocation(recordLocationMap, 20, immutableSegment, 1, 2500, HashFunction.NONE);
+
+    upsertMetadataManager.stop();
+    upsertMetadataManager.close();
+  }
+
+  @Test
+  public void testNoRevertForImmutableSegmentReplacement()
+      throws IOException {
+    // Test that revert logic is NOT applied when replacing immutable segment with another immutable segment
+    UpsertContext upsertContext =
+        _contextBuilder.setConsistencyMode(UpsertConfig.ConsistencyMode.NONE).setDropOutOfOrderRecord(true).build();
+
+    ConcurrentMapPartitionUpsertMetadataManager upsertMetadataManager =
+        new ConcurrentMapPartitionUpsertMetadataManager(REALTIME_TABLE_NAME, 0, upsertContext);
+
+    // Create first immutable segment with 3 records
+    int numRecords1 = 3;
+    int[] primaryKeys1 = new int[]{10, 20, 30};
+    int[] timestamps1 = new int[]{1000, 2000, 3000};
+    ThreadSafeMutableRoaringBitmap validDocIds1 = new ThreadSafeMutableRoaringBitmap();
+    for (int i = 0; i < numRecords1; i++) {
+      validDocIds1.add(i);
+    }
+    List<PrimaryKey> primaryKeysList1 = getPrimaryKeyList(numRecords1, primaryKeys1);
+    ImmutableSegmentImpl segment1 = mockImmutableSegmentWithTimestamps(1, validDocIds1, null,
+        primaryKeysList1, timestamps1);
+
+    upsertMetadataManager.addSegment(segment1, validDocIds1, null,
+        getRecordInfoListWithIntegerComparison(numRecords1, primaryKeys1, timestamps1, null).iterator());
+    Map<Object, RecordLocation> recordLocationMap = upsertMetadataManager._primaryKeyToRecordLocationMap;
+    assertEquals(recordLocationMap.size(), 3);
+
+    int numRecords2 = 1;
+    int[] primaryKeys2 = new int[]{10};
+    int[] timestamps2 = new int[]{1500};
+    ThreadSafeMutableRoaringBitmap validDocIds2 = new ThreadSafeMutableRoaringBitmap();
+    for (int i = 0; i < numRecords2; i++) {
+      validDocIds2.add(i);
+    }
+    List<PrimaryKey> primaryKeysList2 = getPrimaryKeyList(numRecords2, primaryKeys2);
+    ImmutableSegmentImpl segment2 = mockImmutableSegmentWithTimestamps(1, validDocIds2, null,
+        primaryKeysList2, timestamps2);
+
+    long startTime = System.currentTimeMillis();
+    upsertMetadataManager.replaceSegment(segment2, validDocIds2, null,
+        getRecordInfoListWithIntegerComparison(numRecords2, primaryKeys2, timestamps2, null).iterator(), segment1);
+    long duration = System.currentTimeMillis() - startTime;
+
+    assertTrue(duration < 1000, "Immutable-to-immutable replacement should complete quickly, took: " + duration + "ms");
+
+    assertEquals(recordLocationMap.size(), 1);
+    checkRecordLocation(recordLocationMap, 10, segment2, 0, 1500, HashFunction.NONE);
 
     upsertMetadataManager.stop();
     upsertMetadataManager.close();

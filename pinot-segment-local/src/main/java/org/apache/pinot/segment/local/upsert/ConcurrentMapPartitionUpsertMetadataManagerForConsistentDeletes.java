@@ -257,16 +257,9 @@ public class ConcurrentMapPartitionUpsertMetadataManagerForConsistentDeletes
         addOrReplaceSegment((ImmutableSegmentImpl) segment, validDocIds, queryableDocIds, recordInfoIterator,
             oldSegment, validDocIdsForOldSegment);
       }
-      if (validDocIdsForOldSegment != null && !validDocIdsForOldSegment.isEmpty() && _partialUpsertHandler != null) {
-        int numKeysNotReplaced = validDocIdsForOldSegment.getCardinality();
-        // For partial-upsert table, because we do not restore the original record location when removing the primary
-        // keys not replaced, it can potentially cause inconsistency between replicas. This can happen when a
-        // consuming segment is replaced by a committed segment that is consumed from a different server with
-        // different records (some stream consumer cannot guarantee consuming the messages in the same order).
-        _logger.warn("Found {} primary keys not replaced when replacing segment: {} for partial-upsert table. This "
-            + "can potentially cause inconsistency between replicas", numKeysNotReplaced, segmentName);
-        _serverMetrics.addMeteredTableValue(_tableNameWithType, ServerMeter.PARTIAL_UPSERT_KEYS_NOT_REPLACED,
-            numKeysNotReplaced);
+      if (validDocIdsForOldSegment != null && !validDocIdsForOldSegment.isEmpty()) {
+        checkForInconsistencies(segment, validDocIds, queryableDocIds, oldSegment, validDocIdsForOldSegment,
+            segmentName);
       }
       // we want to always remove a segment in case of enableDeletedKeysCompactionConsistency = true
       // this is to account for the removal of primary-key in the to-be-removed segment and reduce
