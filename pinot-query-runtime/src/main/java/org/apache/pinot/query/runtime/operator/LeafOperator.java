@@ -371,6 +371,9 @@ public class LeafOperator extends MultiStageOperator {
         case LITE_MODE_LEAF_STAGE_LIMIT_REACHED:
           _statMap.merge(StatKey.LITE_MODE_LEAF_STAGE_LIMIT_REACHED, Boolean.parseBoolean(entry.getValue()));
           break;
+        case LITE_LEAF_CAP_TRUNCATION:
+          _statMap.merge(StatKey.LITE_LEAF_CAP_TRUNCATION, Boolean.parseBoolean(entry.getValue()));
+          break;
         case TIME_USED_MS:
           _statMap.merge(StatKey.SSE_EXECUTION_TIME_MS, Long.parseLong(entry.getValue()));
           break;
@@ -429,6 +432,8 @@ public class LeafOperator extends MultiStageOperator {
           mergeEarlyTerminationReason(entry.getValue());
           break;
         case SORTED:
+          break;
+        case LEAF_TRUNCATION_REASON:
           break;
         default:
           throw new IllegalArgumentException("Unhandled leaf execution stat: " + key);
@@ -754,6 +759,7 @@ public class LeafOperator extends MultiStageOperator {
     NUM_GROUPS_LIMIT_REACHED(StatMap.Type.BOOLEAN),
     NUM_GROUPS_WARNING_LIMIT_REACHED(StatMap.Type.BOOLEAN),
     LITE_MODE_LEAF_STAGE_LIMIT_REACHED(StatMap.Type.BOOLEAN),
+    LITE_LEAF_CAP_TRUNCATION(StatMap.Type.BOOLEAN),
     NUM_RESIZES(StatMap.Type.INT, null),
     RESIZE_TIME_MS(StatMap.Type.LONG, null),
     THREAD_CPU_TIME_NS(StatMap.Type.LONG, null),

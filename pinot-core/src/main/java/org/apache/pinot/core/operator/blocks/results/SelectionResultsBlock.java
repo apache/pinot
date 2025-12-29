@@ -37,6 +37,8 @@ public class SelectionResultsBlock extends BaseResultsBlock {
   private final Comparator<? super Object[]> _comparator;
   private final QueryContext _queryContext;
   private List<Object[]> _rows;
+  private boolean _liteLeafLimitReached;
+  private String _leafTruncationReason;
 
   public SelectionResultsBlock(DataSchema dataSchema, List<Object[]> rows,
       @Nullable Comparator<? super Object[]> comparator, QueryContext queryContext) {
@@ -79,6 +81,16 @@ public class SelectionResultsBlock extends BaseResultsBlock {
     return _rows;
   }
 
+  /** Marks that the leaf-stage selection stopped because a local cap (e.g., MSE lite per-node cap) was hit. */
+  public void setLiteLeafLimitReached(boolean liteLeafLimitReached) {
+    _liteLeafLimitReached = liteLeafLimitReached;
+  }
+
+  /** Sets the reason for truncation at leaf. */
+  public void setLeafTruncationReason(String reason) {
+    _leafTruncationReason = reason;
+  }
+
   @Override
   public DataTable getDataTable()
       throws IOException {
@@ -93,6 +105,14 @@ public class SelectionResultsBlock extends BaseResultsBlock {
     // come with non-null comparator
     if (_comparator != null) {
       metadata.put(DataTable.MetadataKey.SORTED.getName(), "true");
+    }
+    // Emit lite-cap truncation flag when truncation actually occurred and reason is lite-cap
+    if (_liteLeafLimitReached && "LITE_CAP".equals(_leafTruncationReason)) {
+      metadata.put(DataTable.MetadataKey.LITE_LEAF_CAP_TRUNCATION.getName(), "true");
+    }
+    // do we need this?
+    if (_leafTruncationReason != null) {
+      metadata.put(DataTable.MetadataKey.LEAF_TRUNCATION_REASON.getName(), _leafTruncationReason);
     }
     return metadata;
   }

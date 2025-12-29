@@ -162,11 +162,13 @@ public interface DataTable {
     // inputs. How a downstream consumer reacts (skip, retry, accept with annotation) is the
     // consumer's policy.
     INCOMPLETE_MERGE(43, "incompleteMerge", MetadataValueType.STRING),
-    LITE_MODE_LEAF_STAGE_LIMIT_REACHED(44, "liteModeLeafStageLimitReached", MetadataValueType.STRING);
+    LITE_MODE_LEAF_STAGE_LIMIT_REACHED(44, "liteModeLeafStageLimitReached", MetadataValueType.STRING),
+    LEAF_TRUNCATION_REASON(45, "leafTruncationReason", MetadataValueType.STRING),
+    LITE_LEAF_CAP_TRUNCATION(46, "liteLeafCapTruncation", MetadataValueType.BOOLEAN);
 
     // We keep this constant to track the max id added so far for backward compatibility.
     // Increase it when adding new keys, but NEVER DECREASE IT!!!
-    private static final int MAX_ID = LITE_MODE_LEAF_STAGE_LIMIT_REACHED.getId();
+    private static final int MAX_ID = LITE_LEAF_CAP_TRUNCATION.getId();
 
     private static final MetadataKey[] ID_TO_ENUM_KEY_MAP = new MetadataKey[MAX_ID + 1];
     private static final Map<String, MetadataKey> NAME_TO_ENUM_KEY_MAP = new HashMap<>();
