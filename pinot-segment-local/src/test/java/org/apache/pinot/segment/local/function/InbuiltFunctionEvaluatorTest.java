@@ -130,6 +130,28 @@ public class InbuiltFunctionEvaluatorTest {
   }
 
   @Test
+  public void testColumnExpressionWithNullValue() {
+    String expression = "testColumn";
+    InbuiltFunctionEvaluator evaluator = new InbuiltFunctionEvaluator(expression);
+    assertEquals(evaluator.getArguments(), Collections.singletonList("testColumn"));
+
+    // Test with putDefaultNullValue - column has a default value but is marked as null
+    GenericRow row = new GenericRow();
+    row.putDefaultNullValue("testColumn", "defaultValue");
+    assertNull(evaluator.evaluate(row));
+
+    // Test with addNullValueField - column has a value but is explicitly marked as null
+    row.clear();
+    row.putValue("testColumn", "actualValue");
+    row.addNullValueField("testColumn");
+    assertNull(evaluator.evaluate(row));
+
+    // Test that after removing null marker, value is returned
+    row.removeNullValueField("testColumn");
+    assertEquals(evaluator.evaluate(row), "actualValue");
+  }
+
+  @Test
   public void testLiteralExpression() {
     String expression = "'testValue'";
     InbuiltFunctionEvaluator evaluator = new InbuiltFunctionEvaluator(expression);

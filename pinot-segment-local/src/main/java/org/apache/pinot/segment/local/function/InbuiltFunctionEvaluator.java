@@ -376,7 +376,9 @@ public class InbuiltFunctionEvaluator implements FunctionEvaluator {
 
     @Override
     public Object execute(GenericRow row) {
-      return row.getValue(_column);
+      // Pinot segment stores the default value for nulls, so we need to check isNullValue first
+      // to return nulls correctly
+      return row.isNullValue(_column) ? null : row.getValue(_column);
     }
 
     @Override
