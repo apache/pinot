@@ -819,7 +819,7 @@ public class ConcurrentMapPartitionUpsertMetadataManagerTest {
       @Nullable boolean[] deleteRecordFlags) {
     List<RecordInfo> recordInfoList = new ArrayList<>();
     for (int i = 0; i < numRecords; i++) {
-      recordInfoList.add(new RecordInfo(makePrimaryKey(primaryKeys[i]), i, Integer.valueOf(timestamps[i]),
+      recordInfoList.add(new RecordInfo(makePrimaryKey(primaryKeys[i]), i, timestamps[i],
           deleteRecordFlags != null && deleteRecordFlags[i]));
     }
     return recordInfoList;
