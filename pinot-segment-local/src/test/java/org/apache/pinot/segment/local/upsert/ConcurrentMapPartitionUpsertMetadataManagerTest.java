@@ -2228,9 +2228,12 @@ public class ConcurrentMapPartitionUpsertMetadataManagerTest {
     ThreadSafeMutableRoaringBitmap validDocIdsMutable = new ThreadSafeMutableRoaringBitmap();
     MutableSegment mutableSegment = mockMutableSegmentWithDataSource(1, validDocIdsMutable, null, mutablePrimaryKeys);
 
-    upsertMetadataManager.addRecord(mutableSegment, new RecordInfo(makePrimaryKey(10), 0, Integer.valueOf(1000), false));
-    upsertMetadataManager.addRecord(mutableSegment, new RecordInfo(makePrimaryKey(20), 1, Integer.valueOf(2000), false));
-    upsertMetadataManager.addRecord(mutableSegment, new RecordInfo(makePrimaryKey(30), 2, Integer.valueOf(3000), false));
+    upsertMetadataManager.addRecord(mutableSegment,
+        new RecordInfo(makePrimaryKey(10), 0, Integer.valueOf(1000), false));
+    upsertMetadataManager.addRecord(mutableSegment,
+        new RecordInfo(makePrimaryKey(20), 1, Integer.valueOf(2000), false));
+    upsertMetadataManager.addRecord(mutableSegment,
+        new RecordInfo(makePrimaryKey(30), 2, Integer.valueOf(3000), false));
 
     Map<Object, RecordLocation> recordLocationMap = upsertMetadataManager._primaryKeyToRecordLocationMap;
     assertEquals(recordLocationMap.size(), 3);
