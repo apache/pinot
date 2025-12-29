@@ -424,7 +424,7 @@ public class LuceneTextIndexCreator extends AbstractTextIndexCreator {
       // Build docIdMapping file if storeInSegmentFile is true
       // This allows the mapping file to be available during read without building it on-the-fly
       if (_config.isStoreInSegmentFile()) {
-        //Check if mapping file already exists
+        // Check if mapping file already exists
         if (new File(SegmentDirectoryPaths.findSegmentDirectory(_segmentDirectory),
             _textColumn + V1Constants.Indexes.LUCENE_TEXT_INDEX_DOCID_MAPPING_FILE_EXTENSION).exists()) {
           return;
