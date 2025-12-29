@@ -674,38 +674,29 @@ public abstract class BasePartitionUpsertMetadataManager implements PartitionUps
       ThreadSafeMutableRoaringBitmap queryableDocIds, IndexSegment oldSegment,
       MutableRoaringBitmap validDocIdsForOldSegment, String segmentName) {
     int numKeysNotReplaced = validDocIdsForOldSegment.getCardinality();
-    // Only apply revert logic when sealing a consuming (mutable) segment, not for immutable segment replacement.
-    // Consuming segments are mutable, so we check if the old segment is NOT an ImmutableSegment.
     boolean isConsumingSegmentSeal = !(oldSegment instanceof ImmutableSegment);
+    // For partial-upsert table and upsert table with dropOutOfOrder=true & consistencyMode = NONE, we do not store
+    // the previous record location when removing the primary keys not replaced, it can potentially cause inconsistency
+    // between replicas. This can happen when a consuming segment is replaced by a committed segment that is consumed
+    // from a different server with different records (some stream consumer cannot guarantee consuming the messages in
+    // the same order/ when a segment is replaced with lesser consumed rows from the other server).
     if (isConsumingSegmentSeal && _context.isDropOutOfOrderRecord()
         && _context.getConsistencyMode() == UpsertConfig.ConsistencyMode.NONE) {
-      // For Upsert tables when some of the records get dropped when dropOutOfOrderRecord is enabled, we donot
-      // store the original record location when keys are not replaced, this can potentially cause inconsistencies
-      // leading to some rows not getting dropped when reconsumed. This can be caused when a consuming segment
-      // that is consumed from a different server is replaced with the existing segment which consumed rows ahead
-      // of the other server
       _logger.warn("Found {} primary keys not replaced when sealing consuming segment: {} for upsert table with "
               + "dropOutOfOrderRecord enabled with no consistency mode. This can potentially cause inconsistency "
               + "between replicas. Reverting back metadata changes and triggering segment replacement.",
-          numKeysNotReplaced, segmentName);
-      // Revert consuming segment pks to previous segment locations and perform metadata replacement again with retry
+          numKeysNotReplaced,
+          segmentName);
       revertSegmentUpsertMetadataWithRetry(segment, validDocIds, queryableDocIds, oldSegment, segmentName);
     } else if (isConsumingSegmentSeal && _partialUpsertHandler != null) {
-      // For partial-upsert table, because we do not restore the original record location when removing the primary
-      // keys not replaced, it can potentially cause inconsistency between replicas. This can happen when a
-      // consuming segment is replaced by a committed segment that is consumed from a different server with
-      // different records (some stream consumer cannot guarantee consuming the messages in the same order/
-      // when a segment is replaced with lesser consumed rows from the other server).
       _logger.warn("Found {} primary keys not replaced when sealing consuming segment: {} for partial-upsert table. "
           + "This can potentially cause inconsistency between replicas. "
           + "Reverting metadata changes and triggering segment replacement.", numKeysNotReplaced, segmentName);
-      // Revert consuming segment pks to previous segment locations and perform metadata replacement again with retry
       revertSegmentUpsertMetadataWithRetry(segment, validDocIds, queryableDocIds, oldSegment, segmentName);
     } else if (isConsumingSegmentSeal) {
       _logger.info("Found {} primary keys not replaced when sealing consuming segment: {}", numKeysNotReplaced,
           segmentName);
     } else {
-      // For immutable segment replacement (e.g., segment reload), just log the info without revert
       _logger.warn("Found {} primary keys not replaced when replacing immutable segment: {}. "
           + "Skipping revert as this is not a consuming segment.", numKeysNotReplaced, segmentName);
     }

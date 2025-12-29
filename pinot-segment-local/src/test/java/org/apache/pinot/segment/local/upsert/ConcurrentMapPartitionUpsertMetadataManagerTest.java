@@ -97,6 +97,8 @@ public class ConcurrentMapPartitionUpsertMetadataManagerTest {
       new File(FileUtils.getTempDirectory(), "ConcurrentMapPartitionUpsertMetadataManagerTest");
   private static final File SEGMENT_DIR = new File(INDEX_DIR, "segments");
 
+  private static final int MOCK_FALLBACK_BASE_OFFSET = 1000;
+
   // Schema and TableConfig for creating real segments
   private static final Schema SEGMENT_SCHEMA = new Schema.SchemaBuilder()
       .addSingleValueDimension(PRIMARY_KEY_COLUMNS.get(0), FieldSpec.DataType.INT)
@@ -872,7 +874,7 @@ public class ConcurrentMapPartitionUpsertMetadataManagerTest {
       if (primaryKeys != null && docId < primaryKeys.size()) {
         return (Integer) primaryKeys.get(docId).getValues()[0];
       }
-      return 1000 + docId; // Default fallback
+      return MOCK_FALLBACK_BASE_OFFSET + docId;
     });
     when(primaryKeyDataSource.getForwardIndex()).thenReturn(primaryKeyForwardIndex);
 
@@ -888,7 +890,7 @@ public class ConcurrentMapPartitionUpsertMetadataManagerTest {
       if (timestamps != null && docId < timestamps.length) {
         return timestamps[docId];
       }
-      return 1000 + (docId * 100); // Default fallback
+      return MOCK_FALLBACK_BASE_OFFSET + (docId * 100);
     });
     when(comparisonDataSource.getForwardIndex()).thenReturn(comparisonForwardIndex);
 
