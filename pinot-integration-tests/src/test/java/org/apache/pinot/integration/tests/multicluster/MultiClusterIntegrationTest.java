@@ -39,6 +39,7 @@ import org.apache.pinot.common.utils.FileUploadDownloadClient;
 import org.apache.pinot.common.utils.ZkStarter;
 import org.apache.pinot.controller.BaseControllerStarter;
 import org.apache.pinot.controller.ControllerConf;
+import org.apache.pinot.controller.helix.ControllerRequestClient;
 import org.apache.pinot.controller.helix.ControllerTest;
 import org.apache.pinot.integration.tests.ClusterIntegrationTestUtils;
 import org.apache.pinot.integration.tests.ClusterTest;
@@ -46,6 +47,8 @@ import org.apache.pinot.server.starter.helix.BaseServerStarter;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.TableType;
 import org.apache.pinot.spi.data.FieldSpec;
+import org.apache.pinot.spi.data.LogicalTableConfig;
+import org.apache.pinot.spi.data.PhysicalTableConfig;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.env.PinotConfiguration;
 import org.apache.pinot.spi.utils.CommonConstants;
@@ -54,6 +57,8 @@ import org.apache.pinot.spi.utils.CommonConstants.Helix;
 import org.apache.pinot.spi.utils.CommonConstants.Server;
 import org.apache.pinot.spi.utils.JsonUtils;
 import org.apache.pinot.spi.utils.NetUtils;
+import org.apache.pinot.spi.utils.builder.ControllerRequestURLBuilder;
+import org.apache.pinot.spi.utils.builder.LogicalTableConfigBuilder;
 import org.apache.pinot.spi.utils.builder.TableConfigBuilder;
 import org.apache.pinot.util.TestUtils;
 import org.slf4j.Logger;
@@ -76,6 +81,13 @@ public class MultiClusterIntegrationTest extends ClusterTest {
   protected static final String CLUSTER_2_NAME = "DualIsolatedCluster2";
   protected static final ClusterConfig CLUSTER_1_CONFIG = new ClusterConfig(CLUSTER_1_NAME, 30000);
   protected static final ClusterConfig CLUSTER_2_CONFIG = new ClusterConfig(CLUSTER_2_NAME, 40000);
+  protected static final String DEFAULT_TENANT = "DefaultTenant";
+  protected static final String LOGICAL_TABLE_NAME = "logical_table";
+  protected static final String LOGICAL_TABLE_NAME_2 = "logical_table_2";
+  protected static final String LOGICAL_FEDERATION_CLUSTER_1_TABLE = "logical_federation_table_cluster1";
+  protected static final String LOGICAL_FEDERATION_CLUSTER_2_TABLE = "logical_federation_table_cluster2";
+  protected static final int CLUSTER_1_SIZE = 1500;
+  protected static final int CLUSTER_2_SIZE = 1000;
 
   protected ClusterComponents _cluster1;
   protected ClusterComponents _cluster2;
@@ -127,8 +139,8 @@ public class MultiClusterIntegrationTest extends ClusterTest {
     createSchemaAndTableOnBothClusters(testTableName);
 
     // Create and load test data into both clusters
-    _cluster1AvroFiles = createAvroData(100, 1);
-    _cluster2AvroFiles = createAvroData(100, 2);
+    _cluster1AvroFiles = createAvroData(CLUSTER_1_SIZE, 1);
+    _cluster2AvroFiles = createAvroData(CLUSTER_2_SIZE, 2);
 
     loadDataIntoCluster(_cluster1AvroFiles, testTableName, _cluster1);
     loadDataIntoCluster(_cluster2AvroFiles, testTableName, _cluster2);
@@ -138,15 +150,34 @@ public class MultiClusterIntegrationTest extends ClusterTest {
     String result1 = executeQuery(query, _cluster1);
     assertNotNull(result1, "Query result from cluster 1 should not be null");
     long count1 = parseCountResult(result1);
-    assertEquals(count1, 100, "Cluster 1 should have 100 records");
+    assertEquals(count1, CLUSTER_1_SIZE);
 
     // Verify cluster 2 is queryable
     String result2 = executeQuery(query, _cluster2);
     assertNotNull(result2, "Query result from cluster 2 should not be null");
     long count2 = parseCountResult(result2);
-    assertEquals(count2, 100, "Cluster 2 should have 100 records");
+    assertEquals(count2, CLUSTER_2_SIZE);
 
     LOGGER.info("Multi-cluster broker test passed: both clusters started and queryable");
+  }
+
+  @Test
+  public void testLogicalFederationTwoOfflineTablesSSE() throws Exception {
+    dropLogicalTableIfExists(LOGICAL_TABLE_NAME, _cluster1._controllerBaseApiUrl);
+    dropLogicalTableIfExists(LOGICAL_TABLE_NAME, _cluster2._controllerBaseApiUrl);
+    dropLogicalTableIfExists(LOGICAL_TABLE_NAME_2, _cluster1._controllerBaseApiUrl);
+    dropLogicalTableIfExists(LOGICAL_TABLE_NAME_2, _cluster2._controllerBaseApiUrl);
+    setupFirstLogicalFederatedTable();
+    createLogicalTableOnBothClusters(LOGICAL_TABLE_NAME,
+        LOGICAL_FEDERATION_CLUSTER_1_TABLE, LOGICAL_FEDERATION_CLUSTER_2_TABLE);
+    cleanSegmentDirs();
+    _cluster1AvroFiles = createAvroData(CLUSTER_1_SIZE, 1);
+    _cluster2AvroFiles = createAvroData(CLUSTER_2_SIZE, 2);
+    loadDataIntoCluster(_cluster1AvroFiles, LOGICAL_FEDERATION_CLUSTER_1_TABLE, _cluster1);
+    loadDataIntoCluster(_cluster2AvroFiles, LOGICAL_FEDERATION_CLUSTER_2_TABLE, _cluster2);
+    long expectedTotal = CLUSTER_1_SIZE + CLUSTER_2_SIZE;
+    assertEquals(getCount(LOGICAL_TABLE_NAME, _cluster1, true), expectedTotal);
+    assertEquals(getCount(LOGICAL_TABLE_NAME, _cluster2, true), expectedTotal);
   }
 
   @Override
@@ -486,5 +517,69 @@ public class MultiClusterIntegrationTest extends ClusterTest {
     } catch (Exception e) {
       LOGGER.warn("Error stopping cluster", e);
     }
+  }
+
+  protected void cleanSegmentDirs() {
+    cleanDirectories(_cluster1._segmentDir, _cluster1._tarDir, _cluster2._segmentDir, _cluster2._tarDir);
+  }
+
+  protected long getCount(String tableName, ClusterComponents cluster, boolean enableMultiClusterRouting)
+      throws Exception {
+    String query = "SET enableMultiClusterRouting=" + enableMultiClusterRouting + "; SELECT COUNT(*) as count FROM "
+      + tableName;
+    return parseCountResult(executeQuery(query, cluster));
+  }
+
+  /*
+  Logical table helper methods
+  */
+  protected void createLogicalTable(String schemaFile,
+      Map<String, PhysicalTableConfig> physicalTableConfigMap, String brokerTenant, String controllerBaseApiUrl,
+      String logicalTable, String refOfflineTable, String refRealtimeTable) throws IOException {
+    ControllerRequestURLBuilder urlBuilder = ControllerRequestURLBuilder.baseUrl(controllerBaseApiUrl);
+    ControllerRequestClient client = new ControllerRequestClient(urlBuilder, getHttpClient(),
+        getControllerRequestClientHeaders());
+    Schema schema = createSchema(schemaFile);
+    schema.setSchemaName(logicalTable);
+    client.addSchema(schema);
+    LogicalTableConfig config = new LogicalTableConfigBuilder()
+        .setTableName(logicalTable)
+        .setBrokerTenant(brokerTenant)
+        .setRefOfflineTableName(refOfflineTable)
+        .setRefRealtimeTableName(refRealtimeTable)
+        .setPhysicalTableConfigMap(physicalTableConfigMap)
+        .build();
+    String response = ControllerTest.sendPostRequest(urlBuilder.forLogicalTableCreate(),
+        config.toSingleLineJsonString(), Map.of());
+    assertEquals(response, "{\"unrecognizedProperties\":{},\"status\":\"" + logicalTable
+        + " logical table successfully added.\"}");
+  }
+
+  protected void createLogicalTableOnBothClusters(String logicalTableName,
+      String cluster1PhysicalTable, String cluster2PhysicalTable) throws IOException {
+    Map<String, PhysicalTableConfig> physicalTableConfigMap = Map.of(
+        cluster1PhysicalTable + "_OFFLINE", new PhysicalTableConfig(true),
+        cluster2PhysicalTable + "_OFFLINE", new PhysicalTableConfig(true)
+    );
+
+    createLogicalTable(SCHEMA_FILE, physicalTableConfigMap, DEFAULT_TENANT,
+        _cluster1._controllerBaseApiUrl, logicalTableName, cluster1PhysicalTable + "_OFFLINE", null);
+    createLogicalTable(SCHEMA_FILE, physicalTableConfigMap, DEFAULT_TENANT,
+        _cluster2._controllerBaseApiUrl, logicalTableName, cluster2PhysicalTable + "_OFFLINE", null);
+  }
+
+  protected void dropLogicalTableIfExists(String logicalTableName, String controllerBaseApiUrl) {
+    dropResource(controllerBaseApiUrl + "/logicalTables/" + logicalTableName);
+  }
+
+  protected void setupFirstLogicalFederatedTable() throws Exception {
+    setupLogicalFederatedTable(LOGICAL_FEDERATION_CLUSTER_1_TABLE, LOGICAL_FEDERATION_CLUSTER_2_TABLE);
+  }
+
+  protected void setupLogicalFederatedTable(String cluster1TableName, String cluster2TableName) throws Exception {
+    dropTableAndSchemaIfExists(cluster1TableName, _cluster1._controllerBaseApiUrl);
+    dropTableAndSchemaIfExists(cluster2TableName, _cluster2._controllerBaseApiUrl);
+    createSchemaAndTableForCluster(cluster1TableName, _cluster1._controllerBaseApiUrl);
+    createSchemaAndTableForCluster(cluster2TableName, _cluster2._controllerBaseApiUrl);
   }
 }
