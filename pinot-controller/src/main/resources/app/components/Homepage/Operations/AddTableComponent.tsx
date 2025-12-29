@@ -46,14 +46,12 @@ type Props = {
   tableObj: any,
   setTableObj: Function,
   dateTimeFieldSpecs: Array<any>
-  disable:boolean
 };
 
 export default function AddTableComponent({
   tableObj,
   setTableObj,
   dateTimeFieldSpecs,
-  disable
 }: Props) {
   const classes = useStyles();
 
@@ -132,7 +130,6 @@ export default function AddTableComponent({
             id="tableType"
             value={tableDataObj.tableType}
             onChange={(e)=> changeHandler('tableType', e.target.value)}
-            disabled={disable}
           >
             <MenuItem value="OFFLINE">OFFLINE</MenuItem>
             <MenuItem value="REALTIME">REALTIME</MenuItem>

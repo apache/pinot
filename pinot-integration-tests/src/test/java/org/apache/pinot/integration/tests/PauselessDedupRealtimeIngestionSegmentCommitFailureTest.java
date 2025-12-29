@@ -20,6 +20,8 @@ package org.apache.pinot.integration.tests;
 
 import java.io.File;
 import java.util.List;
+import java.util.Map;
+import java.util.Random;
 import org.apache.pinot.common.utils.PauselessConsumptionUtils;
 import org.apache.pinot.spi.config.table.DisasterRecoveryMode;
 import org.apache.pinot.spi.config.table.TableConfig;
@@ -33,6 +35,7 @@ import org.apache.pinot.spi.utils.builder.TableNameBuilder;
 import org.apache.pinot.util.TestUtils;
 import org.testng.annotations.BeforeClass;
 
+import static org.apache.pinot.controller.ControllerConf.ControllerPeriodicTasksConf.DISASTER_RECOVERY_MODE_CONFIG_KEY;
 import static org.testng.Assert.assertNotNull;
 
 
@@ -40,6 +43,7 @@ public class PauselessDedupRealtimeIngestionSegmentCommitFailureTest
     extends PauselessRealtimeIngestionSegmentCommitFailureTest {
 
   private static final int NUM_PARTITIONS = 2;
+  private final double _randomDouble = new Random().nextDouble();
 
   @Override
   protected String getAvroTarFileName() {
@@ -81,6 +85,14 @@ public class PauselessDedupRealtimeIngestionSegmentCommitFailureTest
         .setParallelSegmentConsumptionPolicy(ParallelSegmentConsumptionPolicy.ALLOW_DURING_BUILD_ONLY);
     ingestionConfig.getStreamIngestionConfig().setEnforceConsumptionInOrder(true);
     return ingestionConfig;
+  }
+
+  @Override
+  protected void overrideControllerConf(Map<String, Object> properties) {
+    super.overrideControllerConf(properties);
+    if (_randomDouble > 0.5) {
+      properties.put(DISASTER_RECOVERY_MODE_CONFIG_KEY, "ALWAYS");
+    }
   }
 
   @BeforeClass
@@ -130,7 +142,9 @@ public class PauselessDedupRealtimeIngestionSegmentCommitFailureTest
         .get(0)
         .put(StreamConfigProperties.PAUSELESS_SEGMENT_DOWNLOAD_TIMEOUT_SECONDS, "10");
     streamIngestionConfig.setPauselessConsumptionEnabled(true);
-    streamIngestionConfig.setDisasterRecoveryMode(DisasterRecoveryMode.ALWAYS);
+    if (_randomDouble <= 0.5) {
+      streamIngestionConfig.setDisasterRecoveryMode(DisasterRecoveryMode.ALWAYS);
+    }
     tableConfig.getValidationConfig().setPeerSegmentDownloadScheme(CommonConstants.HTTP_PROTOCOL);
 
     addTableConfig(tableConfig);

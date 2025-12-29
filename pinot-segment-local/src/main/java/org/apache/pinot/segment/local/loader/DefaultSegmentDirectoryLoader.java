@@ -55,7 +55,7 @@ public class DefaultSegmentDirectoryLoader implements SegmentDirectoryLoader {
     if (!directory.exists()) {
       return new SegmentLocalFSDirectory(directory);
     }
-    return new SegmentLocalFSDirectory(directory,
+    return new SegmentLocalFSDirectory(directory, segmentLoaderContext,
         ReadMode.valueOf(segmentDirectoryConfigs.getProperty(IndexLoadingConfig.READ_MODE_KEY)));
   }
 

@@ -18,8 +18,6 @@
  */
 package org.apache.pinot.plugin.filesystem;
 
-import com.google.common.collect.ImmutableList;
-import com.google.common.collect.ImmutableMap;
 import com.google.common.io.Closer;
 import java.io.BufferedWriter;
 import java.io.IOException;
@@ -31,6 +29,7 @@ import java.nio.file.Paths;
 import java.util.Arrays;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 import java.util.stream.Collectors;
 import java.util.stream.IntStream;
@@ -92,8 +91,7 @@ public class GcsPinotFSTest {
     _bucket = System.getenv("GCS_BUCKET");
     if (_keyFile != null && _projectId != null && _bucket != null) {
       _pinotFS = new GcsPinotFS();
-      _pinotFS.init(new PinotConfiguration(
-          ImmutableMap.<String, Object>builder().put(PROJECT_ID, _projectId).put(GCP_KEY, _keyFile).build()));
+      _pinotFS.init(new PinotConfiguration(Map.of(PROJECT_ID, _projectId, GCP_KEY, _keyFile)));
     }
   }
 
@@ -244,7 +242,7 @@ public class GcsPinotFSTest {
     Set<GcsUri> expectedElementsCopy = new HashSet<>();
     String directoryName = Paths.get(gcsDirectoryUri.getPath()).getFileName().toString();
     String directoryCopyName = Paths.get(gcsDirectoryUriCopy.getPath()).getFileName().toString();
-    for (GcsUri element : ImmutableList.copyOf(expectedElements)) {
+    for (GcsUri element : List.copyOf(expectedElements)) {
       expectedElementsCopy.add(
           createGcsUri(element.getBucketName(), element.getPath().replace(directoryName, directoryCopyName)));
     }

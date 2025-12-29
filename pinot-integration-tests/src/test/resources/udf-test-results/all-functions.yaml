@@ -158,6 +158,46 @@ arraymin:
   scalar: null
   transform: "org.apache.pinot.core.operator.transform.function.ArrayMinTransformFunction"
   udf: null
+arraypushbackdouble:
+  scalar: "ArgumentCountBasedScalarFunction{org.apache.pinot.common.function.scalar.ArrayFunctions.arrayPushBackDouble}"
+  transform: null
+  udf: null
+arraypushbackfloat:
+  scalar: "ArgumentCountBasedScalarFunction{org.apache.pinot.common.function.scalar.ArrayFunctions.arrayPushBackFloat}"
+  transform: null
+  udf: null
+arraypushbackint:
+  scalar: "ArgumentCountBasedScalarFunction{org.apache.pinot.common.function.scalar.ArrayFunctions.arrayPushBackInt}"
+  transform: null
+  udf: null
+arraypushbacklong:
+  scalar: "ArgumentCountBasedScalarFunction{org.apache.pinot.common.function.scalar.ArrayFunctions.arrayPushBackLong}"
+  transform: null
+  udf: null
+arraypushbackstring:
+  scalar: "ArgumentCountBasedScalarFunction{org.apache.pinot.common.function.scalar.ArrayFunctions.arrayPushBackString}"
+  transform: null
+  udf: null
+arraypushfrontdouble:
+  scalar: "ArgumentCountBasedScalarFunction{org.apache.pinot.common.function.scalar.ArrayFunctions.arrayPushFrontDouble}"
+  transform: null
+  udf: null
+arraypushfrontfloat:
+  scalar: "ArgumentCountBasedScalarFunction{org.apache.pinot.common.function.scalar.ArrayFunctions.arrayPushFrontFloat}"
+  transform: null
+  udf: null
+arraypushfrontint:
+  scalar: "ArgumentCountBasedScalarFunction{org.apache.pinot.common.function.scalar.ArrayFunctions.arrayPushFrontInt}"
+  transform: null
+  udf: null
+arraypushfrontlong:
+  scalar: "ArgumentCountBasedScalarFunction{org.apache.pinot.common.function.scalar.ArrayFunctions.arrayPushFrontLong}"
+  transform: null
+  udf: null
+arraypushfrontstring:
+  scalar: "ArgumentCountBasedScalarFunction{org.apache.pinot.common.function.scalar.ArrayFunctions.arrayPushFrontString}"
+  transform: null
+  udf: null
 arrayremoveint:
   scalar: "ArgumentCountBasedScalarFunction{org.apache.pinot.common.function.scalar.ArrayFunctions.arrayRemoveInt}"
   transform: null

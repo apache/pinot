@@ -96,31 +96,31 @@ public class PinotTaskManager extends ControllerPeriodicTask<Void> {
   public final static String SCHEDULE_KEY = "schedule";
   public final static String MINION_INSTANCE_TAG_CONFIG = "minionInstanceTag";
 
-  private static final String TABLE_CONFIG_PARENT_PATH = "/CONFIGS/TABLE";
-  private static final String TABLE_CONFIG_PATH_PREFIX = "/CONFIGS/TABLE/";
-  private static final String TASK_QUEUE_PATH_PATTERN = "/TaskRebalancer/TaskQueue_%s/Context";
+  protected static final String TABLE_CONFIG_PARENT_PATH = "/CONFIGS/TABLE";
+  protected static final String TABLE_CONFIG_PATH_PREFIX = "/CONFIGS/TABLE/";
+  protected static final String TASK_QUEUE_PATH_PATTERN = "/TaskRebalancer/TaskQueue_%s/Context";
 
-  private final PinotHelixTaskResourceManager _helixTaskResourceManager;
-  private final ClusterInfoAccessor _clusterInfoAccessor;
-  private final TaskGeneratorRegistry _taskGeneratorRegistry;
-  private final ResourceUtilizationManager _resourceUtilizationManager;
+  protected final PinotHelixTaskResourceManager _helixTaskResourceManager;
+  protected final ClusterInfoAccessor _clusterInfoAccessor;
+  protected final TaskGeneratorRegistry _taskGeneratorRegistry;
+  protected final ResourceUtilizationManager _resourceUtilizationManager;
 
   // For cron-based scheduling
-  private final Scheduler _scheduler;
-  private final boolean _skipLateCronSchedule;
-  private final int _maxCronScheduleDelayInSeconds;
-  private final Map<String, Map<String, String>> _tableTaskTypeToCronExpressionMap = new ConcurrentHashMap<>();
-  private final Map<String, TableTaskSchedulerUpdater> _tableTaskSchedulerUpdaterMap = new ConcurrentHashMap<>();
+  protected final Scheduler _scheduler;
+  protected final boolean _skipLateCronSchedule;
+  protected final int _maxCronScheduleDelayInSeconds;
+  protected final Map<String, Map<String, String>> _tableTaskTypeToCronExpressionMap = new ConcurrentHashMap<>();
+  protected final Map<String, TableTaskSchedulerUpdater> _tableTaskSchedulerUpdaterMap = new ConcurrentHashMap<>();
 
-  private final boolean _isPinotTaskManagerSchedulerEnabled;
+  protected final boolean _isPinotTaskManagerSchedulerEnabled;
 
   // For metrics
-  private final Map<String, TaskTypeMetricsUpdater> _taskTypeMetricsUpdaterMap = new ConcurrentHashMap<>();
-  private final Map<TaskState, Integer> _taskStateToCountMap = new ConcurrentHashMap<>();
+  protected final Map<String, TaskTypeMetricsUpdater> _taskTypeMetricsUpdaterMap = new ConcurrentHashMap<>();
+  protected final Map<TaskState, Integer> _taskStateToCountMap = new ConcurrentHashMap<>();
 
-  private final ZkTableConfigChangeListener _zkTableConfigChangeListener = new ZkTableConfigChangeListener();
+  protected final ZkTableConfigChangeListener _zkTableConfigChangeListener = new ZkTableConfigChangeListener();
 
-  private final TaskManagerStatusCache<TaskGeneratorMostRecentRunInfo> _taskManagerStatusCache;
+  protected final TaskManagerStatusCache<TaskGeneratorMostRecentRunInfo> _taskManagerStatusCache;
 
   protected final @Nullable DistributedTaskLockManager _distributedTaskLockManager;
 
@@ -325,7 +325,7 @@ public class PinotTaskManager extends ControllerPeriodicTask<Void> {
     _distributedTaskLockManager.forceReleaseLock(tableNameWithType);
   }
 
-  private class ZkTableConfigChangeListener implements IZkChildListener {
+  protected class ZkTableConfigChangeListener implements IZkChildListener {
 
     @Override
     public synchronized void handleChildChange(String path, List<String> tableNamesWithType) {
@@ -333,7 +333,7 @@ public class PinotTaskManager extends ControllerPeriodicTask<Void> {
     }
   }
 
-  private void checkTableConfigChanges(List<String> tableNamesWithType) {
+  protected void checkTableConfigChanges(List<String> tableNamesWithType) {
     LOGGER.info("Checking task config changes in table configs");
     // NOTE: we avoided calling _leadControllerManager::isLeaderForTable here to skip tables the current
     // controller is not leader for. Because _leadControllerManager updates its leadership states based
@@ -364,11 +364,11 @@ public class PinotTaskManager extends ControllerPeriodicTask<Void> {
     }
   }
 
-  private String getPropertyStorePathForTable(String tableWithType) {
+  protected String getPropertyStorePathForTable(String tableWithType) {
     return TABLE_CONFIG_PATH_PREFIX + tableWithType;
   }
 
-  private String getPropertyStorePathForTaskQueue(String taskType) {
+  protected String getPropertyStorePathForTaskQueue(String taskType) {
     return String.format(TASK_QUEUE_PATH_PATTERN, taskType);
   }
 

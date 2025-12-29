@@ -196,7 +196,8 @@ public class KafkaStreamMetadataProvider extends KafkaPartitionLevelConnectionHa
 
   @Override
   public List<TopicMetadata> getTopics() {
-    try (AdminClient adminClient = createAdminClient()) {
+    try {
+      AdminClient adminClient = getOrCreateSharedAdminClient();
       ListTopicsResult result = adminClient.listTopics();
       if (result == null) {
         return Collections.emptyList();
@@ -229,10 +230,21 @@ public class KafkaStreamMetadataProvider extends KafkaPartitionLevelConnectionHa
     }
   }
 
+
+
   @Override
   public StreamPartitionMsgOffset getOffsetAtTimestamp(int partitionId, long timestampMillis, long timeoutMillis) {
-      return new LongMsgOffset(_consumer.offsetsForTimes(Map.of(_topicPartition, timestampMillis),
-              Duration.ofMillis(timeoutMillis)).get(_topicPartition).offset());
+    try {
+      OffsetAndTimestamp offsetAndTimestamp = _consumer.offsetsForTimes(Map.of(_topicPartition, timestampMillis),
+          Duration.ofMillis(timeoutMillis)).get(_topicPartition);
+      if (offsetAndTimestamp == null) {
+        return null;
+      }
+      return new LongMsgOffset(offsetAndTimestamp.offset());
+    } catch (Exception e) {
+      LOGGER.warn("Failed to get offset at timestamp {} for partition {}", timestampMillis, partitionId, e);
+      return null;
+    }
   }
 
   @Override

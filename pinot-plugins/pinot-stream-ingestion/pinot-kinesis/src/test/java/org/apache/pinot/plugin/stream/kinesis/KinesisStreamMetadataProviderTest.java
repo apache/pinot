@@ -18,7 +18,6 @@
  */
 package org.apache.pinot.plugin.stream.kinesis;
 
-import com.google.common.collect.ImmutableList;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
@@ -89,7 +88,7 @@ public class KinesisStreamMetadataProviderTest {
     Shard shard1 = Shard.builder().shardId(SHARD_ID_1)
         .sequenceNumberRange(SequenceNumberRange.builder().startingSequenceNumber("1").build()).build();
 
-    when(_kinesisConnectionHandler.getShards()).thenReturn(ImmutableList.of(shard0, shard1));
+    when(_kinesisConnectionHandler.getShards()).thenReturn(List.of(shard0, shard1));
 
     List<PartitionGroupMetadata> result =
         _kinesisStreamMetadataProvider.computePartitionGroupMetadata(CLIENT_ID, getStreamConfig(), new ArrayList<>(),
@@ -108,7 +107,7 @@ public class KinesisStreamMetadataProviderTest {
     Shard shard1 = Shard.builder().shardId(SHARD_ID_PREFIX + SHARD_ID_1)
         .sequenceNumberRange(
             SequenceNumberRange.builder().startingSequenceNumber("2").endingSequenceNumber("200").build()).build();
-    when(_kinesisConnectionHandler.getShards()).thenReturn(ImmutableList.of(shard0, shard1));
+    when(_kinesisConnectionHandler.getShards()).thenReturn(List.of(shard0, shard1));
 
     KinesisStreamMetadataProvider kinesisStreamMetadataProviderShard0 =
         new KinesisStreamMetadataProvider(CLIENT_ID, getStreamConfig(), SHARD_ID_0, _kinesisConnectionHandler,
@@ -166,7 +165,7 @@ public class KinesisStreamMetadataProviderTest {
         SequenceNumberRange.builder().startingSequenceNumber("1").endingSequenceNumber("1").build()).build();
     Shard shard1 = Shard.builder().shardId(SHARD_ID_1)
         .sequenceNumberRange(SequenceNumberRange.builder().startingSequenceNumber("1").build()).build();
-    when(_kinesisConnectionHandler.getShards()).thenReturn(ImmutableList.of(shard0, shard1));
+    when(_kinesisConnectionHandler.getShards()).thenReturn(List.of(shard0, shard1));
     when(_streamConsumerFactory.createPartitionGroupConsumer(stringCapture.capture(),
         partitionGroupMetadataCapture.capture())).thenReturn(_partitionGroupConsumer);
     when(_partitionGroupConsumer.fetchMessages(checkpointArgs.capture(), intArguments.capture())).thenReturn(
@@ -237,7 +236,7 @@ public class KinesisStreamMetadataProviderTest {
     Shard shard1 = Shard.builder().shardId(SHARD_ID_1).sequenceNumberRange(
         SequenceNumberRange.builder().startingSequenceNumber("1").endingSequenceNumber("1").build()).build();
 
-    when(_kinesisConnectionHandler.getShards()).thenReturn(ImmutableList.of(shard0, shard1));
+    when(_kinesisConnectionHandler.getShards()).thenReturn(List.of(shard0, shard1));
     when(_streamConsumerFactory.createPartitionGroupConsumer(stringCapture.capture(),
         partitionGroupMetadataCapture.capture())).thenReturn(_partitionGroupConsumer);
     when(_partitionGroupConsumer.fetchMessages(checkpointArgs.capture(), intArguments.capture())).thenReturn(

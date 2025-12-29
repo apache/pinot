@@ -29,11 +29,13 @@ import java.util.Random;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
+import javax.annotation.Nullable;
 import org.apache.commons.configuration2.Configuration;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.helix.controller.rebalancer.strategy.AutoRebalanceStrategy;
 import org.apache.pinot.common.protocols.SegmentCompletionProtocol;
 import org.apache.pinot.controller.helix.core.rebalance.RebalanceConfig;
+import org.apache.pinot.spi.config.table.DisasterRecoveryMode;
 import org.apache.pinot.spi.env.PinotConfiguration;
 import org.apache.pinot.spi.filesystem.LocalPinotFS;
 import org.apache.pinot.spi.utils.CommonConstants;
@@ -222,6 +224,7 @@ public class ControllerConf extends PinotConfiguration {
         "controller.segment.level.validation.intervalPeriod";
     public static final String AUTO_RESET_ERROR_SEGMENTS_VALIDATION =
         "controller.segment.error.autoReset";
+    public static final String DISASTER_RECOVERY_MODE_CONFIG_KEY = "controller.segment.disaster.recovery.mode";
 
     // Initial delays
     public static final String STATUS_CHECKER_INITIAL_DELAY_IN_SECONDS =
@@ -273,6 +276,7 @@ public class ControllerConf extends PinotConfiguration {
     public static final int MIN_INITIAL_DELAY_IN_SECONDS = 120;
     public static final int MAX_INITIAL_DELAY_IN_SECONDS = 300;
     public static final int DEFAULT_SPLIT_COMMIT_TMP_SEGMENT_LIFETIME_SECOND = 60 * 60; // 1 Hour.
+    public static final int DEFAULT_DEEP_STORE_RETRY_UPLOAD_PARALLELISM = 1;
 
     public static final Random RANDOM = new Random();
 
@@ -576,6 +580,10 @@ public class ControllerConf extends PinotConfiguration {
 
   public String generateVipUrl() {
     return getControllerVipProtocol() + "://" + getControllerVipHost() + ":" + getControllerVipPort();
+  }
+
+  public String generateVipUrl(String host, String port) {
+    return getControllerVipProtocol() + "://" + host + ":" + port;
   }
 
   public String getZkStr() {
@@ -1125,6 +1133,17 @@ public class ControllerConf extends PinotConfiguration {
     return getProperty(ControllerPeriodicTasksConf.AUTO_RESET_ERROR_SEGMENTS_VALIDATION, true);
   }
 
+  public DisasterRecoveryMode getDisasterRecoveryMode() {
+    return getDisasterRecoveryMode(getProperty(ControllerPeriodicTasksConf.DISASTER_RECOVERY_MODE_CONFIG_KEY));
+  }
+
+  public static DisasterRecoveryMode getDisasterRecoveryMode(@Nullable String disasterRecoveryModeString) {
+    if (disasterRecoveryModeString == null) {
+      return DisasterRecoveryMode.DEFAULT;
+    }
+    return DisasterRecoveryMode.valueOf(disasterRecoveryModeString);
+  }
+
   public long getStatusCheckerInitialDelayInSeconds() {
     return getProperty(ControllerPeriodicTasksConf.STATUS_CHECKER_INITIAL_DELAY_IN_SECONDS,
         ControllerPeriodicTasksConf.getRandomInitialDelayInSeconds());
@@ -1176,7 +1195,8 @@ public class ControllerConf extends PinotConfiguration {
   }
 
   public int getDeepStoreRetryUploadParallelism() {
-    return getProperty(ControllerPeriodicTasksConf.DEEP_STORE_RETRY_UPLOAD_PARALLELISM, 1);
+    return getProperty(ControllerPeriodicTasksConf.DEEP_STORE_RETRY_UPLOAD_PARALLELISM,
+        ControllerPeriodicTasksConf.DEFAULT_DEEP_STORE_RETRY_UPLOAD_PARALLELISM);
   }
 
   public int getTmpSegmentRetentionInSeconds() {

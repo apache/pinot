@@ -54,6 +54,8 @@ public enum ServerMeter implements AbstractMetrics.Meter {
   REALTIME_OFFSET_COMMITS("commits", true),
   REALTIME_OFFSET_COMMIT_EXCEPTIONS("exceptions", false),
   STREAM_CONSUMER_CREATE_EXCEPTIONS("exceptions", false),
+  REALTIME_ROWS_AHEAD_OF_ZK("rows", false),
+  REALTIME_UPSERT_INCONSISTENT_ROWS("rows", false),
   // number of times partition of a record did not match the partition of the stream
   REALTIME_PARTITION_MISMATCH("mismatch", false),
   REALTIME_DEDUP_DROPPED("rows", false),
@@ -105,6 +107,7 @@ public enum ServerMeter implements AbstractMetrics.Meter {
   SEGMENT_UPLOAD_TIMEOUT("segments", false),
   NUM_RESIZES("numResizes", false),
   RESIZE_TIME_MS("resizeTimeMs", false),
+  STAR_TREE_INDEX_BUILD_FAILURES("segments", false),
   NO_TABLE_ACCESS("tables", true),
   INDEXING_FAILURES("attributeValues", true),
 
@@ -210,6 +213,16 @@ public enum ServerMeter implements AbstractMetrics.Meter {
   // reingestion metrics
   SEGMENT_REINGESTION_FAILURE("segments", false),
 
+  // ThrottleOnCriticalHeapUsageExecutor meters
+  THROTTLE_EXECUTOR_QUEUED_TASKS("count", true,
+      "Number of tasks that have been queued in the throttle executor"),
+  THROTTLE_EXECUTOR_PROCESSED_TASKS("count", true,
+      "Number of tasks processed from the throttle executor queue"),
+  THROTTLE_EXECUTOR_TIMED_OUT_TASKS("count", true,
+      "Number of tasks that timed out in the throttle executor queue"),
+  THROTTLE_EXECUTOR_SHUTDOWN_CANCELED_TASKS("count", true,
+      "Number of tasks canceled during throttle executor shutdown"),
+
   // commit-time compaction metrics
   COMMIT_TIME_COMPACTION_ENABLED_SEGMENTS("segments", false,
       "Number of segments processed with commit-time compaction enabled"),
@@ -226,7 +239,14 @@ public enum ServerMeter implements AbstractMetrics.Meter {
   // Workload Budget exceeded counter
   WORKLOAD_BUDGET_EXCEEDED("workloadBudgetExceeded", false, "Number of times workload budget exceeded"),
   INGESTION_DELAY_TRACKING_ERRORS("errors", false,
-      "Indicates the count of errors encountered while tracking ingestion delay.");
+      "Indicates the count of errors encountered while tracking ingestion delay."),
+  INGESTION_DELAY_LATEST_OFFSET_FETCH_ERRORS("errors", false,
+      "Indicates the count of errors encountered while fetching latest stream offset for tracking ingestion offset "
+          + "lag."),
+
+  TRANSFORMATION_ERROR_COUNT("rows", false),
+  DROPPED_RECORD_COUNT("rows", false),
+  CORRUPTED_RECORD_COUNT("rows", false);
 
   private final String _meterName;
   private final String _unit;

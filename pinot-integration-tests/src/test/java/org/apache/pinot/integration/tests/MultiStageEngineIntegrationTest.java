@@ -94,6 +94,7 @@ public class MultiStageEngineIntegrationTest extends BaseClusterIntegrationTestS
   private static final String DIM_TABLE_SCHEMA_PATH = "dimDayOfWeek_schema.json";
   private static final String DIM_TABLE_TABLE_CONFIG_PATH = "dimDayOfWeek_config.json";
   private static final Integer DIM_NUMBER_OF_RECORDS = 7;
+  private static final String DIM_TABLE = "daysOfWeek";
 
   @Override
   protected String getSchemaFileName() {
@@ -144,6 +145,7 @@ public class MultiStageEngineIntegrationTest extends BaseClusterIntegrationTestS
     waitForAllDocsLoaded(600_000L);
 
     setupTableWithNonDefaultDatabase(avroFiles);
+    setupDimensionTable();
   }
 
   @Override
@@ -1541,6 +1543,26 @@ public class MultiStageEngineIntegrationTest extends BaseClusterIntegrationTestS
     assertEquals(tablesQueried.get(0).asText(), "mytable");
   }
 
+  @Test(dataProvider = "useBothQueryEngines")
+  public void testTablesQueriedFieldWithPrunedSegments(boolean useMultiStageQueryEngine)
+      throws Exception {
+    setUseMultiStageQueryEngine(useMultiStageQueryEngine);
+    // Query with a filter that is always false, causing all segments to be pruned at the broker
+    String query = "select sum(ActualElapsedTime) from mytable WHERE 1=0;";
+    JsonNode jsonNode = postQuery(query);
+    JsonNode tablesQueried = jsonNode.get("tablesQueried");
+    assertNotNull(tablesQueried, "tablesQueried should not be null even when all segments are pruned");
+    assertTrue(tablesQueried.isArray());
+    if (useMultiStageQueryEngine) {
+      // TODO: Multi-stage engine will optimize the query before getting. Once this is fixed,
+      // we can update the test to expect "mytable" here.
+      assertEquals(tablesQueried.size(), 0);
+    } else {
+      assertEquals(tablesQueried.size(), 1);
+      assertEquals(tablesQueried.get(0).asText(), "mytable");
+    }
+  }
+
   @Test
   public void testTablesQueriedWithJoin()
       throws Exception {
@@ -1640,15 +1662,6 @@ public class MultiStageEngineIntegrationTest extends BaseClusterIntegrationTestS
   public void testLookupJoin()
       throws Exception {
 
-    Schema lookupTableSchema = createSchema(DIM_TABLE_SCHEMA_PATH);
-    addSchema(lookupTableSchema);
-    TableConfig tableConfig = createTableConfig(DIM_TABLE_TABLE_CONFIG_PATH);
-    TenantConfig tenantConfig = new TenantConfig(getBrokerTenant(), getServerTenant(), null);
-    tableConfig.setTenantConfig(tenantConfig);
-    addTableConfig(tableConfig);
-    createAndUploadSegmentFromClasspath(tableConfig, lookupTableSchema, DIM_TABLE_DATA_PATH, FileFormat.CSV,
-        DIM_NUMBER_OF_RECORDS, 60_000);
-
     // Compare total rows in the primary table with number of rows in the result of the join with lookup table
     String query = "select count(*) from " + getTableName();
     JsonNode jsonNode = postQuery(query);
@@ -1671,8 +1684,6 @@ public class MultiStageEngineIntegrationTest extends BaseClusterIntegrationTestS
     }
     assertTrue(stages.contains("LOOKUP_JOIN"), "Could not find LOOKUP_JOIN stage in the query plan");
     assertFalse(stages.contains("HASH_JOIN"), "HASH_JOIN stage should not be present in the query plan");
-
-    dropOfflineTable(tableConfig.getTableName());
   }
 
   public void testSearchLiteralFilter()
@@ -2109,11 +2120,41 @@ public class MultiStageEngineIntegrationTest extends BaseClusterIntegrationTestS
     return postQuery(query, headers);
   }
 
+  private void setupDimensionTable() throws Exception {
+    // Set up the dimension table for JOIN tests
+    Schema lookupTableSchema = createSchema(DIM_TABLE_SCHEMA_PATH);
+    addSchema(lookupTableSchema);
+    TableConfig tableConfig = createTableConfig(DIM_TABLE_TABLE_CONFIG_PATH);
+    TenantConfig tenantConfig = new TenantConfig(getBrokerTenant(), getServerTenant(), null);
+    tableConfig.setTenantConfig(tenantConfig);
+    addTableConfig(tableConfig);
+    createAndUploadSegmentFromClasspath(tableConfig, lookupTableSchema, DIM_TABLE_DATA_PATH, FileFormat.CSV,
+        DIM_NUMBER_OF_RECORDS, 60_000);
+  }
+
+  @Test
+  public void testNaturalJoinWithVirtualColumns()
+      throws Exception {
+    String query = "SET excludeVirtualColumns=false; SELECT * FROM mytable a NATURAL JOIN daysOfWeek b LIMIT 5";
+    JsonNode response = postQuery(query);
+    assertNotNull(response.get("exceptions").get(0).get("message"), "Should have an error message");
+  }
+
+  @Test
+  public void testNaturalJoinWithNoVirtualColumns()
+      throws Exception {
+    String query = "SET excludeVirtualColumns=true; SELECT * FROM mytable NATURAL JOIN daysOfWeek LIMIT 5";
+    JsonNode response = postQuery(query);
+    assertEquals(response.get("exceptions").get(0), null);
+    assertNotNull(response.get("resultTable"), "Should have result table");
+  }
+
   @AfterClass
   public void tearDown()
       throws Exception {
     dropOfflineTable(DEFAULT_TABLE_NAME);
     dropOfflineTable(TABLE_NAME_WITH_DATABASE);
+    dropOfflineTable(DIM_TABLE);
 
     stopServer();
     stopBroker();

@@ -35,22 +35,26 @@ import org.apache.calcite.sql.type.SqlTypeName;
 import org.apache.pinot.calcite.rel.logical.PinotLogicalSortExchange;
 import org.apache.pinot.query.planner.logical.RexExpressionUtils;
 import org.apache.pinot.query.type.TypeFactory;
+import org.apache.pinot.spi.utils.CommonConstants;
+import org.immutables.value.Value;
 
 
-public class PinotSortExchangeCopyRule extends RelRule<RelRule.Config> {
+@Value.Enclosing
+public class PinotSortExchangeCopyRule extends RelRule<PinotSortExchangeCopyRule.Config> {
   public static final PinotSortExchangeCopyRule SORT_EXCHANGE_COPY =
       PinotSortExchangeCopyRule.Config.DEFAULT.toRule();
-  private static final int DEFAULT_SORT_EXCHANGE_COPY_THRESHOLD = 10_000;
   private static final TypeFactory TYPE_FACTORY = new TypeFactory();
   private static final RexBuilder REX_BUILDER = new RexBuilder(TYPE_FACTORY);
   private static final RexLiteral REX_ZERO = REX_BUILDER.makeLiteral(0,
       TYPE_FACTORY.createSqlType(SqlTypeName.INTEGER));
+  private final int _fetchLimitThreshold;
 
   /**
    * Creates a PinotSortExchangeCopyRule.
    */
   protected PinotSortExchangeCopyRule(Config config) {
     super(config);
+    _fetchLimitThreshold = config.getFetchLimitThreshold();
   }
 
   @Override
@@ -88,7 +92,7 @@ public class PinotSortExchangeCopyRule extends RelRule<RelRule.Config> {
     }
     // do not transform sort-exchange copy when there's no fetch limit, or fetch amount is larger than threshold
     if (!collation.getFieldCollations().isEmpty()
-        && (fetch == null || RexExpressionUtils.getValueAsInt(fetch) > DEFAULT_SORT_EXCHANGE_COPY_THRESHOLD)) {
+        && (fetch == null || RexExpressionUtils.getValueAsInt(fetch) > _fetchLimitThreshold)) {
       return;
     }
 
@@ -100,23 +104,22 @@ public class PinotSortExchangeCopyRule extends RelRule<RelRule.Config> {
     call.transformTo(sortCopy);
   }
 
+  @Value.Immutable
   public interface Config extends RelRule.Config {
 
-    Config DEFAULT = ImmutableSortExchangeCopyRule.Config.of()
-        .withOperandFor(LogicalSort.class, PinotLogicalSortExchange.class);
+    Config DEFAULT = ImmutablePinotSortExchangeCopyRule.Config.builder()
+        .operandSupplier(b0 ->
+            b0.operand(LogicalSort.class)
+                .oneInput(b1 -> b1.operand(PinotLogicalSortExchange.class).anyInputs()))
+        .build();
 
     @Override default PinotSortExchangeCopyRule toRule() {
       return new PinotSortExchangeCopyRule(this);
     }
 
-    /** Defines an operand tree for the given classes. */
-
-    default Config withOperandFor(Class<? extends Sort> sortClass,
-        Class<? extends SortExchange> exchangeClass) {
-      return withOperandSupplier(b0 ->
-          b0.operand(sortClass).oneInput(b1 ->
-              b1.operand(exchangeClass).anyInputs()))
-          .as(Config.class);
+    @Value.Default
+    default int getFetchLimitThreshold() {
+      return CommonConstants.Broker.DEFAULT_SORT_EXCHANGE_COPY_THRESHOLD;
     }
   }
 }

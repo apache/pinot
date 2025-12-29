@@ -85,17 +85,7 @@ public class CountAggregationFunction extends NullableSingleInputAggregationFunc
       Map<ExpressionContext, BlockValSet> blockValSetMap) {
     if (blockValSetMap.isEmpty()) {
       aggregationResultHolder.setValue(aggregationResultHolder.getDoubleResult() + length);
-    } else if (_nullHandlingEnabled) {
-      assert blockValSetMap.size() == 1;
-      BlockValSet blockValSet = blockValSetMap.values().iterator().next();
-      RoaringBitmap nullBitmap = blockValSet.getNullBitmap();
-      int numNulls = 0;
-      if (nullBitmap != null) {
-        numNulls = nullBitmap.getCardinality();
-      }
-      assert numNulls <= length;
-      aggregationResultHolder.setValue(aggregationResultHolder.getDoubleResult() + (length - numNulls));
-    } else {
+    } else if (blockValSetMap.containsKey(STAR_TREE_COUNT_STAR_EXPRESSION)) {
       // Star-tree pre-aggregated values
       long[] valueArray = blockValSetMap.get(STAR_TREE_COUNT_STAR_EXPRESSION).getLongValuesSV();
       long count = 0;
@@ -103,6 +93,20 @@ public class CountAggregationFunction extends NullableSingleInputAggregationFunc
         count += valueArray[i];
       }
       aggregationResultHolder.setValue(aggregationResultHolder.getDoubleResult() + count);
+    } else {
+      assert blockValSetMap.size() == 1;
+      BlockValSet blockValSet = blockValSetMap.values().iterator().next();
+      int numNulls = 0;
+
+      if (_nullHandlingEnabled) {
+        RoaringBitmap nullBitmap = blockValSet.getNullBitmap();
+        if (nullBitmap != null) {
+          numNulls = nullBitmap.getCardinality();
+        }
+        assert numNulls <= length;
+      }
+
+      aggregationResultHolder.setValue(aggregationResultHolder.getDoubleResult() + (length - numNulls));
     }
   }
 
@@ -114,7 +118,14 @@ public class CountAggregationFunction extends NullableSingleInputAggregationFunc
         int groupKey = groupKeyArray[i];
         groupByResultHolder.setValueForKey(groupKey, groupByResultHolder.getDoubleResult(groupKey) + 1);
       }
-    } else if (_nullHandlingEnabled) {
+    } else if (blockValSetMap.containsKey(STAR_TREE_COUNT_STAR_EXPRESSION)) {
+      // Star-tree pre-aggregated values
+      long[] valueArray = blockValSetMap.get(STAR_TREE_COUNT_STAR_EXPRESSION).getLongValuesSV();
+      for (int i = 0; i < length; i++) {
+        int groupKey = groupKeyArray[i];
+        groupByResultHolder.setValueForKey(groupKey, groupByResultHolder.getDoubleResult(groupKey) + valueArray[i]);
+      }
+    } else {
       // In Presto, null values are not counted:
       // SELECT count(id) as count, key FROM (VALUES (null, 1), (null, 1), (null, 2), (1, 3), (null, 3)) AS t(id, key)
       // GROUP BY key ORDER BY key DESC;
@@ -132,13 +143,6 @@ public class CountAggregationFunction extends NullableSingleInputAggregationFunc
           groupByResultHolder.setValueForKey(groupKey, groupByResultHolder.getDoubleResult(groupKey) + 1);
         }
       });
-    } else {
-      // Star-tree pre-aggregated values
-      long[] valueArray = blockValSetMap.get(STAR_TREE_COUNT_STAR_EXPRESSION).getLongValuesSV();
-      for (int i = 0; i < length; i++) {
-        int groupKey = groupKeyArray[i];
-        groupByResultHolder.setValueForKey(groupKey, groupByResultHolder.getDoubleResult(groupKey) + valueArray[i]);
-      }
     }
   }
 
@@ -151,7 +155,16 @@ public class CountAggregationFunction extends NullableSingleInputAggregationFunc
           groupByResultHolder.setValueForKey(groupKey, groupByResultHolder.getDoubleResult(groupKey) + 1);
         }
       }
-    } else if (_nullHandlingEnabled) {
+    } else if (blockValSetMap.containsKey(STAR_TREE_COUNT_STAR_EXPRESSION)) {
+      // Star-tree pre-aggregated values
+      long[] valueArray = blockValSetMap.get(STAR_TREE_COUNT_STAR_EXPRESSION).getLongValuesSV();
+      for (int i = 0; i < length; i++) {
+        long value = valueArray[i];
+        for (int groupKey : groupKeysArray[i]) {
+          groupByResultHolder.setValueForKey(groupKey, groupByResultHolder.getDoubleResult(groupKey) + value);
+        }
+      }
+    } else {
       assert blockValSetMap.size() == 1;
       BlockValSet blockValSet = blockValSetMap.values().iterator().next();
 
@@ -162,15 +175,6 @@ public class CountAggregationFunction extends NullableSingleInputAggregationFunc
           }
         }
       });
-    } else {
-      // Star-tree pre-aggregated values
-      long[] valueArray = blockValSetMap.get(STAR_TREE_COUNT_STAR_EXPRESSION).getLongValuesSV();
-      for (int i = 0; i < length; i++) {
-        long value = valueArray[i];
-        for (int groupKey : groupKeysArray[i]) {
-          groupByResultHolder.setValueForKey(groupKey, groupByResultHolder.getDoubleResult(groupKey) + value);
-        }
-      }
     }
   }
 

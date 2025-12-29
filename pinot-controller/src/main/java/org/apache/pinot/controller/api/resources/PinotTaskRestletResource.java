@@ -185,6 +185,18 @@ public class PinotTaskRestletResource {
   }
 
   @GET
+  @Path("/tasks/summary")
+  @Authorize(targetType = TargetType.CLUSTER, action = Actions.Cluster.GET_TASK)
+  @Produces(MediaType.APPLICATION_JSON)
+  @ApiOperation("Get summary of all tasks across all task types, grouped by tenant. "
+      + "Optionally filter by server tenant name to get tasks for a specific tenant only.")
+  public PinotHelixTaskResourceManager.TaskSummaryResponse getTasksSummary(
+      @ApiParam(value = "Server tenant name to filter tasks. If not specified, returns all tenants grouped.")
+      @QueryParam("tenant") @Nullable String tenantName) {
+    return _pinotHelixTaskResourceManager.getTasksSummary(tenantName);
+  }
+
+  @GET
   @Path("/tasks/{taskType}/state")
   @Authorize(targetType = TargetType.CLUSTER, action = Actions.Cluster.GET_TASK)
   @Produces(MediaType.APPLICATION_JSON)

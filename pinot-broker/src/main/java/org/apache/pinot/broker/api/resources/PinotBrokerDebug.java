@@ -47,7 +47,7 @@ import javax.ws.rs.core.MediaType;
 import javax.ws.rs.core.Response;
 import org.apache.pinot.broker.broker.AccessControlFactory;
 import org.apache.pinot.broker.queryquota.QueryQuotaManager;
-import org.apache.pinot.broker.routing.BrokerRoutingManager;
+import org.apache.pinot.broker.routing.manager.BrokerRoutingManager;
 import org.apache.pinot.common.request.BrokerRequest;
 import org.apache.pinot.common.utils.DatabaseUtils;
 import org.apache.pinot.core.auth.Actions;
@@ -175,11 +175,14 @@ public class PinotBrokerDebug {
   }
 
   private void getRoutingTable(String tableName, BiConsumer<String, RoutingTable> consumer) {
+    // Use a single requestId for both OFFLINE and REALTIME routing so that replica-group selection rotates properly
+    // for raw table names (no suffix) and stays consistent for hybrid tables.
+    long requestId = getRequestId();
     TableType tableType = TableNameBuilder.getTableTypeFromTableName(tableName);
     if (tableType != TableType.REALTIME) {
       String offlineTableName = TableNameBuilder.OFFLINE.tableNameWithType(tableName);
       RoutingTable routingTable = _routingManager.getRoutingTable(
-          CalciteSqlCompiler.compileToBrokerRequest("SELECT * FROM " + offlineTableName), getRequestId());
+          CalciteSqlCompiler.compileToBrokerRequest("SELECT * FROM " + offlineTableName), requestId);
       if (routingTable != null) {
         consumer.accept(offlineTableName, routingTable);
       }
@@ -187,7 +190,7 @@ public class PinotBrokerDebug {
     if (tableType != TableType.OFFLINE) {
       String realtimeTableName = TableNameBuilder.REALTIME.tableNameWithType(tableName);
       RoutingTable routingTable = _routingManager.getRoutingTable(
-          CalciteSqlCompiler.compileToBrokerRequest("SELECT * FROM " + realtimeTableName), getRequestId());
+          CalciteSqlCompiler.compileToBrokerRequest("SELECT * FROM " + realtimeTableName), requestId);
       if (routingTable != null) {
         consumer.accept(realtimeTableName, routingTable);
       }

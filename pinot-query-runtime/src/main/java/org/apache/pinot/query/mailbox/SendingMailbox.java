@@ -39,7 +39,7 @@ import org.apache.pinot.segment.spi.memory.DataBuffer;
  *   </li>
  * </ol>
  */
-public interface SendingMailbox {
+public interface SendingMailbox extends AutoCloseable {
 
   /**
    * Returns whether the mailbox is sending data to a local receiver, where blocks can be directly passed to the

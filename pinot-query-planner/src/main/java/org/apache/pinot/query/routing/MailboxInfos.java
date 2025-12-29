@@ -18,7 +18,6 @@
  */
 package org.apache.pinot.query.routing;
 
-import com.google.common.collect.ImmutableList;
 import com.google.protobuf.ByteString;
 import java.util.List;
 
@@ -31,7 +30,7 @@ public class MailboxInfos {
   }
 
   public MailboxInfos(MailboxInfo mailboxInfo) {
-    _mailboxInfos = ImmutableList.of(mailboxInfo);
+    _mailboxInfos = List.of(mailboxInfo);
   }
 
   public List<MailboxInfo> getMailboxInfos() {

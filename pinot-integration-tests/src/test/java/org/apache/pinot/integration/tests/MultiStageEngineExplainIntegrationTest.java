@@ -20,6 +20,7 @@ package org.apache.pinot.integration.tests;
 
 import java.io.File;
 import java.util.List;
+import java.util.Map;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.env.PinotConfiguration;
@@ -64,8 +65,12 @@ public class MultiStageEngineExplainIntegrationTest extends BaseClusterIntegrati
   }
 
   protected void overrideBrokerConf(PinotConfiguration brokerConf) {
-    String property = CommonConstants.MultiStageQueryRunner.KEY_OF_MULTISTAGE_EXPLAIN_INCLUDE_SEGMENT_PLAN;
-    brokerConf.setProperty(property, "true");
+    brokerConf.setProperty(
+        CommonConstants.MultiStageQueryRunner.KEY_OF_MULTISTAGE_EXPLAIN_INCLUDE_SEGMENT_PLAN, "true"
+    );
+    brokerConf.setProperty(CommonConstants.Broker.CONFIG_OF_BROKER_MSE_PLANNER_DISABLED_RULES,
+        List.of(CommonConstants.Broker.PlannerRuleNames.AGGREGATE_FUNCTION_REWRITE,
+            CommonConstants.Broker.PlannerRuleNames.AGGREGATE_REDUCE_FUNCTIONS));
   }
 
   @BeforeMethod
@@ -164,6 +169,38 @@ public class MultiStageEngineExplainIntegrationTest extends BaseClusterIntegrati
         "Execution Plan\n"
             + "LogicalProject(EXPR$0=[1])\n"
             + "  PinotLogicalTableScan(table=[[default, mytable]])\n");
+  }
+
+  @Test
+  public void testDefaultDisabledRuleOverride() {
+    // PinotAggregateFunctionRewriteRule and PinotAggregateReduceFunctionsRule are disabled using broker configs
+    explainLogical("SELECT SUM(AirlineID) FROM mytable",
+        "Execution Plan\n"
+            + "PinotLogicalAggregate(group=[{}], agg#0=[SUM($0)], aggType=[FINAL])\n"
+            + "  PinotLogicalExchange(distribution=[hash])\n"
+            + "    PinotLogicalAggregate(group=[{}], agg#0=[SUM($6)], aggType=[LEAF])\n"
+            + "      PinotLogicalTableScan(table=[[default, mytable]])\n");
+
+    // Enable PinotAggregateFunctionRewriteRule through query option, ensure it overrides the broker config
+    explainLogical("SELECT SUM(AirlineID) FROM mytable",
+        "Execution Plan\n"
+            + "PinotLogicalAggregate(group=[{}], agg#0=[SUMLONG($0)], aggType=[FINAL])\n"
+            + "  PinotLogicalExchange(distribution=[hash])\n"
+            + "    PinotLogicalAggregate(group=[{}], agg#0=[SUMLONG($6)], aggType=[LEAF])\n"
+            + "      PinotLogicalTableScan(table=[[default, mytable]])\n",
+        Map.of("usePlannerRules", CommonConstants.Broker.PlannerRuleNames.AGGREGATE_FUNCTION_REWRITE));
+
+    // Enable PinotAggregateFunctionRewriteRule and PinotAggregateReduceFunctionsRule through query option, ensure they
+    // override the broker config
+    explainLogical("SELECT SUM(AirlineID) FROM mytable",
+        "Execution Plan\n"
+            + "LogicalProject(EXPR$0=[CASE(=($1, 0), null:BIGINT, $0)])\n"
+            + "  PinotLogicalAggregate(group=[{}], agg#0=[SUMLONG($0)], agg#1=[COUNT($1)], aggType=[FINAL])\n"
+            + "    PinotLogicalExchange(distribution=[hash])\n"
+            + "      PinotLogicalAggregate(group=[{}], agg#0=[SUMLONG($6)], agg#1=[COUNT()], aggType=[LEAF])\n"
+            + "        PinotLogicalTableScan(table=[[default, mytable]])\n",
+        Map.of("usePlannerRules", CommonConstants.Broker.PlannerRuleNames.AGGREGATE_FUNCTION_REWRITE + ","
+            + CommonConstants.Broker.PlannerRuleNames.AGGREGATE_REDUCE_FUNCTIONS));
   }
 
   @AfterClass

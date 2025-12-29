@@ -426,6 +426,7 @@ public class LeafOperator extends MultiStageOperator {
       try {
         execute();
       } catch (Exception e) {
+        LOGGER.error("Caught exception while executing leaf stage", e);
         setErrorBlock(
             ErrorMseBlock.fromError(QueryErrorCode.INTERNAL, "Caught exception while executing leaf stage: " + e));
       } finally {
@@ -460,6 +461,9 @@ public class LeafOperator extends MultiStageOperator {
           try {
             // Drain the latch when receiving exception block and not wait for the other thread to finish
             executeOneRequest(request, latch::countDown);
+          } catch (Throwable t) {
+            // TODO: We need to propagate this error back
+            LOGGER.error("Caught exception while executing leaf stage on hybrid table", t);
           } finally {
             latch.countDown();
           }

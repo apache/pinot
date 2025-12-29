@@ -763,7 +763,13 @@ public abstract class BaseClusterIntegrationTest extends ClusterTest {
   protected long getCurrentCountStarResult(String tableName) {
     ResultSetGroup resultSetGroup = getPinotConnection().execute("SELECT COUNT(*) FROM " + tableName);
     if (resultSetGroup.getResultSetCount() > 0) {
-      return resultSetGroup.getResultSet(0).getLong(0);
+      // count(*) can return null sometimes for initializing tables.
+      String countStarStr = resultSetGroup.getResultSet(0).getString(0);
+      try {
+        return Long.parseLong(countStarStr);
+      } catch (NumberFormatException e) {
+        return 0;
+      }
     }
     return 0;
   }
@@ -807,6 +813,11 @@ public abstract class BaseClusterIntegrationTest extends ClusterTest {
     long countStarResult = getCountStarResult();
     TestUtils.waitForCondition(() -> getCurrentCountStarResult(tableName) == countStarResult, 100L, timeoutMs,
         "Failed to load " + countStarResult + " documents", raiseError, Duration.ofMillis(timeoutMs / 10));
+  }
+
+  protected void waitForNonZeroDocsLoaded(long timeoutMs, boolean raiseError, String tableName) {
+    TestUtils.waitForCondition(() -> getCurrentCountStarResult(tableName) > 0, 100L, timeoutMs,
+        "Failed to load non zero documents", raiseError, Duration.ofMillis(timeoutMs / 10));
   }
 
   /**

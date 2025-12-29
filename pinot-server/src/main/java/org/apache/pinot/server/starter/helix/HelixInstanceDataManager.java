@@ -36,7 +36,7 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.concurrent.locks.Lock;
-import java.util.function.Supplier;
+import java.util.function.BooleanSupplier;
 import javax.annotation.Nullable;
 import javax.annotation.concurrent.ThreadSafe;
 import org.apache.commons.io.FileUtils;
@@ -61,12 +61,15 @@ import org.apache.pinot.segment.local.data.manager.TableDataManager;
 import org.apache.pinot.segment.local.utils.SegmentLocks;
 import org.apache.pinot.segment.local.utils.SegmentOperationsThrottler;
 import org.apache.pinot.segment.local.utils.SegmentReloadSemaphore;
+import org.apache.pinot.segment.local.utils.ServerReloadJobStatusCache;
+import org.apache.pinot.segment.local.utils.TableConfigUtils;
 import org.apache.pinot.segment.spi.SegmentMetadata;
 import org.apache.pinot.segment.spi.loader.SegmentDirectoryLoader;
 import org.apache.pinot.segment.spi.loader.SegmentDirectoryLoaderContext;
 import org.apache.pinot.segment.spi.loader.SegmentDirectoryLoaderRegistry;
 import org.apache.pinot.server.realtime.ServerSegmentCompletionProtocolHandler;
 import org.apache.pinot.spi.config.table.TableConfig;
+import org.apache.pinot.spi.config.table.UpsertConfig;
 import org.apache.pinot.spi.data.LogicalTableConfig;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.env.PinotConfiguration;
@@ -76,6 +79,8 @@ import org.apache.pinot.spi.utils.builder.TableNameBuilder;
 import org.apache.zookeeper.data.Stat;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+
+import static java.util.Objects.requireNonNull;
 
 
 /**
@@ -96,10 +101,11 @@ public class HelixInstanceDataManager implements InstanceDataManager {
   private HelixInstanceDataManagerConfig _instanceDataManagerConfig;
   private String _instanceId;
   private TableDataManagerProvider _tableDataManagerProvider;
+  private ServerReloadJobStatusCache _reloadJobStatusCache;
   private HelixManager _helixManager;
   private ZkHelixPropertyStore<ZNRecord> _propertyStore;
   private SegmentUploader _segmentUploader;
-  private Supplier<Boolean> _isServerReadyToServeQueries = () -> false;
+  private BooleanSupplier _isServerReadyToServeQueries = () -> false;
 
   // Fixed size LRU cache for storing last N errors on the instance.
   // Key is TableNameWithType-SegmentName pair.
@@ -117,13 +123,13 @@ public class HelixInstanceDataManager implements InstanceDataManager {
   private ExecutorService _segmentPreloadExecutor;
 
   @Override
-  public void setSupplierOfIsServerReadyToServeQueries(Supplier<Boolean> isServingQueries) {
+  public void setSupplierOfIsServerReadyToServeQueries(BooleanSupplier isServingQueries) {
     _isServerReadyToServeQueries = isServingQueries;
   }
 
   @Override
   public synchronized void init(PinotConfiguration config, HelixManager helixManager, ServerMetrics serverMetrics,
-      @Nullable SegmentOperationsThrottler segmentOperationsThrottler)
+      @Nullable SegmentOperationsThrottler segmentOperationsThrottler, ServerReloadJobStatusCache reloadJobStatusCache)
       throws Exception {
     LOGGER.info("Initializing Helix instance data manager");
 
@@ -131,10 +137,12 @@ public class HelixInstanceDataManager implements InstanceDataManager {
     LOGGER.info("HelixInstanceDataManagerConfig: {}", _instanceDataManagerConfig.getConfig());
     _instanceId = _instanceDataManagerConfig.getInstanceId();
     _helixManager = helixManager;
+    _reloadJobStatusCache = requireNonNull(reloadJobStatusCache, "reloadJobStatusCache cannot be null");
     String tableDataManagerProviderClass = _instanceDataManagerConfig.getTableDataManagerProviderClass();
     LOGGER.info("Initializing table data manager provider of class: {}", tableDataManagerProviderClass);
     _tableDataManagerProvider = PluginManager.get().createInstance(tableDataManagerProviderClass);
-    _tableDataManagerProvider.init(_instanceDataManagerConfig, helixManager, _segmentLocks, segmentOperationsThrottler);
+    _tableDataManagerProvider.init(_instanceDataManagerConfig, helixManager, _segmentLocks, segmentOperationsThrottler,
+        _reloadJobStatusCache);
     _segmentUploader = new PinotFSSegmentUploader(_instanceDataManagerConfig.getSegmentStoreUri(),
         ServerSegmentCompletionProtocolHandler.getSegmentUploadRequestTimeoutMs(), serverMetrics);
 
@@ -333,7 +341,7 @@ public class HelixInstanceDataManager implements InstanceDataManager {
     TableDataManager tableDataManager =
         _tableDataManagerProvider.getTableDataManager(tableConfig, schema, _segmentReloadSemaphore,
             _segmentReloadRefreshExecutor, _segmentPreloadExecutor, _errorCache, _isServerReadyToServeQueries,
-            _enableAsyncSegmentRefresh);
+            _enableAsyncSegmentRefresh, _reloadJobStatusCache);
     tableDataManager.start();
     LOGGER.info("Created table data manager for table: {}", tableNameWithType);
     return tableDataManager;
@@ -411,12 +419,12 @@ public class HelixInstanceDataManager implements InstanceDataManager {
   }
 
   @Override
-  public void reloadSegment(String tableNameWithType, String segmentName, boolean forceDownload)
+  public void reloadSegment(String tableNameWithType, String segmentName, boolean forceDownload, String reloadJobId)
       throws Exception {
     LOGGER.info("Reloading segment: {} in table: {}", segmentName, tableNameWithType);
     TableDataManager tableDataManager = _tableDataManagerMap.get(tableNameWithType);
     if (tableDataManager != null) {
-      tableDataManager.reloadSegment(segmentName, forceDownload);
+      tableDataManager.reloadSegment(segmentName, forceDownload, reloadJobId);
     } else {
       LOGGER.warn("Failed to find data manager for table: {}, skipping reloading segment: {}", tableNameWithType,
           segmentName);
@@ -424,24 +432,25 @@ public class HelixInstanceDataManager implements InstanceDataManager {
   }
 
   @Override
-  public void reloadAllSegments(String tableNameWithType, boolean forceDownload)
+  public void reloadAllSegments(String tableNameWithType, boolean forceDownload, String reloadJobId)
       throws Exception {
     LOGGER.info("Reloading all segments in table: {}", tableNameWithType);
     TableDataManager tableDataManager = _tableDataManagerMap.get(tableNameWithType);
     if (tableDataManager != null) {
-      tableDataManager.reloadAllSegments(forceDownload);
+      tableDataManager.reloadAllSegments(forceDownload, reloadJobId);
     } else {
       LOGGER.warn("Failed to find data manager for table: {}, skipping reloading all segments", tableNameWithType);
     }
   }
 
   @Override
-  public void reloadSegments(String tableNameWithType, List<String> segmentNames, boolean forceDownload)
+  public void reloadSegments(String tableNameWithType, List<String> segmentNames, boolean forceDownload,
+      String reloadJobId)
       throws Exception {
     LOGGER.info("Reloading segments: {} in table: {}", segmentNames, tableNameWithType);
     TableDataManager tableDataManager = _tableDataManagerMap.get(tableNameWithType);
     if (tableDataManager != null) {
-      tableDataManager.reloadSegments(segmentNames, forceDownload);
+      tableDataManager.reloadSegments(segmentNames, forceDownload, reloadJobId);
     } else {
       LOGGER.warn("Failed to find data manager for table: {}, skipping reloading segments: {}", tableNameWithType,
           segmentNames);
@@ -544,7 +553,22 @@ public class HelixInstanceDataManager implements InstanceDataManager {
         if (segmentDataManager != null) {
           try {
             if (segmentDataManager instanceof RealtimeSegmentDataManager) {
-              ((RealtimeSegmentDataManager) segmentDataManager).forceCommit();
+              // For partial-upsert tables or upserts with out-of-order events enabled, force-committing
+              // consuming segments is disabled. In some cases (especially when replication > 1), the
+              // server that consumed fewer rows was incorrectly selected as the winner, causing other
+              // servers to reconsume rows and resulting in inconsistent data when previous state must
+              // be referenced for add/update operations.
+
+              // TODO: Temporarily disabled until a proper fix is implemented.
+              TableConfig tableConfig = tableDataManager.getCachedTableConfigAndSchema().getLeft();
+              if (TableConfigUtils.checkForInconsistentStateConfigs(tableConfig)) {
+                LOGGER.warn(
+                    "Force commit is not allowed when replication > 1 for partial-upsert tables, or for upsert tables"
+                        + " when dropOutOfOrder is enabled with consistency mode: {}" + "for the table: {} ",
+                    UpsertConfig.ConsistencyMode.NONE, tableNameWithType);
+              } else {
+                ((RealtimeSegmentDataManager) segmentDataManager).forceCommit();
+              }
             }
           } finally {
             tableDataManager.releaseSegment(segmentDataManager);

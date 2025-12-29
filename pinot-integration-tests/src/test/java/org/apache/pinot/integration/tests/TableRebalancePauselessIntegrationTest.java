@@ -129,6 +129,7 @@ public class TableRebalancePauselessIntegrationTest extends BasePauselessRealtim
       updateTableConfig(tableConfig);
       rebalanceConfig.setDryRun(false);
       rebalanceConfig.setIncludeConsuming(true);
+      rebalanceConfig.setMinAvailableReplicas(0);
 
       String response = sendPostRequest(getTableRebalanceUrl(rebalanceConfig, TableType.REALTIME));
       RebalanceResult rebalanceResult = JsonUtils.stringToObject(response, RebalanceResult.class);

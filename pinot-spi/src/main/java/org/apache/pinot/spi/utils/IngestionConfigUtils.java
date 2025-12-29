@@ -102,6 +102,11 @@ public final class IngestionConfigUtils {
     return new StreamConfig(tableConfig.getTableName(), getFirstStreamConfigMap(tableConfig));
   }
 
+  /// Returns `true` if the table contains multiple streams.
+  public static boolean hasMultipleStreams(TableConfig tableConfig) {
+    return getStreamConfigMaps(tableConfig).size() > 1;
+  }
+
   /**
    * Getting the Pinot segment level partition id from the stream partition id.
    * @param partitionId the partition id from the stream
@@ -111,18 +116,27 @@ public final class IngestionConfigUtils {
     return index * PARTITION_PADDING_OFFSET + partitionId;
   }
 
-  /**
-   * Getting the Stream partition id from the Pinot segment partition id.
-   * @param partitionId the segment partition id on Pinot
-   */
+  /// Returns the stream partition id from the Pinot segment partition id.
+  public static int getStreamPartitionIdFromPinotPartitionId(TableConfig tableConfig, int partitionId) {
+    return hasMultipleStreams(tableConfig) ? getStreamPartitionIdFromPinotPartitionId(partitionId) : partitionId;
+  }
+
+  /// Returns the stream partition id from the Pinot segment partition id.
+  /// NOTE: First verify if there are multiple stream configs before invoking this method. User might plug in a stream
+  ///       that generates large partition id.
   public static int getStreamPartitionIdFromPinotPartitionId(int partitionId) {
     return partitionId % PARTITION_PADDING_OFFSET;
   }
 
-  /**
-   * Getting the StreamConfig index of StreamConfigs list from the Pinot segment partition id.
-   * @param partitionId the segment partition id on Pinot
-   */
+  /// Returns the StreamConfig for the given Pinot segment partition id.
+  public static StreamConfig getStreamConfigFromPinotPartitionId(List<StreamConfig> streamConfigs, int partitionId) {
+    return streamConfigs.size() > 1 ? streamConfigs.get(getStreamConfigIndexFromPinotPartitionId(partitionId))
+        : streamConfigs.get(0);
+  }
+
+  /// Returns the index of the StreamConfigs from the Pinot segment partition id.
+  /// NOTE: First verify if there are multiple stream configs before invoking this method. User might plug in a stream
+  ///       that generates large partition id.
   public static int getStreamConfigIndexFromPinotPartitionId(int partitionId) {
     return partitionId / PARTITION_PADDING_OFFSET;
   }
