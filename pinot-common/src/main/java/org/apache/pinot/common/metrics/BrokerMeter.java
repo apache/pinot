@@ -235,10 +235,10 @@ public class BrokerMeter implements AbstractMetrics.Meter {
    */
   public static final BrokerMeter WINDOW_COUNT = create("WINDOW_COUNT", "queries", true);
 
-  public static final BrokerMeter MSE_STAGES_STARTED = create("MSE_STAGES_STARTED", "stages", false);
-  public static final BrokerMeter MSE_STAGES_COMPLETED = create("MSE_STAGES_COMPLETED", "stages", false);
-  public static final BrokerMeter MSE_OPCHAINS_STARTED = create("MSE_OPCHAINS_STARTED", "opchains", false);
-  public static final BrokerMeter MSE_OPCHAINS_COMPLETED = create("MSE_OPCHAINS_COMPLETED", "opchains", false);
+  public static final BrokerMeter MSE_STAGES_STARTED = create("MSE_STAGES_STARTED", "stages", true);
+  public static final BrokerMeter MSE_STAGES_COMPLETED = create("MSE_STAGES_COMPLETED", "stages", true);
+  public static final BrokerMeter MSE_OPCHAINS_STARTED = create("MSE_OPCHAINS_STARTED", "opchains", true);
+  public static final BrokerMeter MSE_OPCHAINS_COMPLETED = create("MSE_OPCHAINS_COMPLETED", "opchains", true);
 
   /**
    * How many MSE queries have encountered segments with invalid partitions.

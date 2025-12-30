@@ -251,20 +251,20 @@ public enum ServerMeter implements AbstractMetrics.Meter {
 
   /// Number of multi-stage execution opchains started.
   /// This is equal to the number of stages times the average parallelism
-  MSE_OPCHAINS_STARTED("opchains", false),
+  MSE_OPCHAINS_STARTED("opchains", true),
   /// Number of multi-stage execution opchains completed.
   /// This is equal to the number of stages times the average parallelism
-  MSE_OPCHAINS_COMPLETED("opchains", false),
+  MSE_OPCHAINS_COMPLETED("opchains", true),
 
   /// Total execution time spent in multi-stage execution on CPU in milliseconds.
   /// This is equal to the sum of the executionTimeMs reported by the root of all the opchains executed in the server.
-  MSE_CPU_EXECUTION_TIME_MS("milliseconds", false),
+  MSE_CPU_EXECUTION_TIME_MS("milliseconds", true),
   /// Total memory allocated in bytes for multi-stage execution.
   /// This is equal to the sum of the allocatedMemoryBytes reported by all the opchains executed in the server.
-  MSE_MEMORY_ALLOCATED_BYTES("bytes", false),
+  MSE_MEMORY_ALLOCATED_BYTES("bytes", true),
   /// Total number of rows emitted by multi-stage execution.
   /// This is equal to the sum of the emittedRows reported by the root of all the opchains executed in the server.
-  MSE_EMITTED_ROWS("rows", false);
+  MSE_EMITTED_ROWS("rows", true);
 
   private final String _meterName;
   private final String _unit;
