@@ -60,45 +60,51 @@ public class InstanceConfigProvider {
   }
 
   public static String getProperty(String name, String defaultValue) {
-    if (getInstanceConfig() == null) {
+    PinotConfiguration instanceConfig = getInstanceConfig();
+    if (instanceConfig == null) {
       return defaultValue;
     }
-    return getInstanceConfig().getProperty(name, defaultValue);
+    return instanceConfig.getProperty(name, defaultValue);
   }
 
   public static boolean getProperty(String name, boolean defaultValue) {
-    if (getInstanceConfig() == null) {
+    PinotConfiguration instanceConfig = getInstanceConfig();
+    if (instanceConfig == null) {
       return defaultValue;
     }
-    return getInstanceConfig().getProperty(name, defaultValue);
+    return instanceConfig.getProperty(name, defaultValue);
   }
 
   public static int getProperty(String name, int defaultValue) {
-    if (getInstanceConfig() == null) {
+    PinotConfiguration instanceConfig = getInstanceConfig();
+    if (instanceConfig == null) {
       return defaultValue;
     }
-    return getInstanceConfig().getProperty(name, defaultValue);
+    return instanceConfig.getProperty(name, defaultValue);
   }
 
   public static long getProperty(String name, long defaultValue) {
-    if (getInstanceConfig() == null) {
+    PinotConfiguration instanceConfig = getInstanceConfig();
+    if (instanceConfig == null) {
       return defaultValue;
     }
-    return getInstanceConfig().getProperty(name, defaultValue);
+    return instanceConfig.getProperty(name, defaultValue);
   }
 
   public static double getProperty(String name, double defaultValue) {
-    if (getInstanceConfig() == null) {
+    PinotConfiguration instanceConfig = getInstanceConfig();
+    if (instanceConfig == null) {
       return defaultValue;
     }
-    return getInstanceConfig().getProperty(name, defaultValue);
+    return instanceConfig.getProperty(name, defaultValue);
   }
 
   public static List<String> getProperty(String name, List<String> defaultValue) {
-    if (getInstanceConfig() == null) {
+    PinotConfiguration instanceConfig = getInstanceConfig();
+    if (instanceConfig == null) {
       return defaultValue;
     }
-    return getInstanceConfig().getProperty(name, defaultValue);
+    return instanceConfig.getProperty(name, defaultValue);
   }
 
   /**
