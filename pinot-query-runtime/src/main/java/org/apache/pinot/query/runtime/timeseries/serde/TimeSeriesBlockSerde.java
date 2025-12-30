@@ -42,6 +42,9 @@ import org.apache.pinot.core.common.datablock.DataBlockBuilder;
 import org.apache.pinot.query.runtime.blocks.MseBlock;
 import org.apache.pinot.query.runtime.blocks.RowHeapDataBlock;
 import org.apache.pinot.query.runtime.blocks.SerializedDataBlock;
+import org.apache.pinot.spi.exception.QueryErrorCode;
+import org.apache.pinot.spi.exception.QueryException;
+import org.apache.pinot.spi.utils.JsonUtils;
 import org.apache.pinot.tsdb.spi.TimeBuckets;
 import org.apache.pinot.tsdb.spi.series.TimeSeries;
 import org.apache.pinot.tsdb.spi.series.TimeSeriesBlock;
@@ -83,6 +86,9 @@ public class TimeSeriesBlockSerde {
    */
   private static final String VALUES_COLUMN_NAME = "__ts_serde_values";
   private static final double NULL_PLACEHOLDER = Double.MIN_VALUE;
+  private static final String EXCEPTIONS_METADATA_KEY = "__ts_exceptions";
+  private static final String ERROR_CODE = "errorCode";
+  private static final String MESSAGE = "message";
 
   private TimeSeriesBlockSerde() {
   }
@@ -104,7 +110,21 @@ public class TimeSeriesBlockSerde {
       long seriesId = Long.parseLong(timeSeries.getId());
       seriesMap.computeIfAbsent(seriesId, x -> new ArrayList<>()).add(timeSeries);
     }
-    return new TimeSeriesBlock(timeBuckets, seriesMap, metadataMap);
+    TimeSeriesBlock block = new TimeSeriesBlock(timeBuckets, seriesMap, metadataMap);
+    if (metadataMap.containsKey(EXCEPTIONS_METADATA_KEY)) {
+      String exceptionsJson = metadataMap.get(EXCEPTIONS_METADATA_KEY);
+      try {
+        List<Map<String, Object>> exceptionsList = JsonUtils.stringToObject(exceptionsJson, List.class);
+        for (Map<String, Object> exceptionData : exceptionsList) {
+          int errorCode = ((Number) exceptionData.get(ERROR_CODE)).intValue();
+          String message = (String) exceptionData.get(MESSAGE);
+          block.addToExceptions(new QueryException(QueryErrorCode.fromErrorCode(errorCode), message));
+        }
+      } catch (Exception e) {
+        throw new IOException("Failed to deserialize exceptions from metadata", e);
+      }
+    }
+    return block;
   }
 
   public static ByteString serializeTimeSeriesBlock(TimeSeriesBlock timeSeriesBlock)
@@ -118,8 +138,26 @@ public class TimeSeriesBlockSerde {
         container.add(timeSeriesToRow(timeSeries, dataSchema));
       }
     }
-    RowHeapDataBlock transferableBlock = new RowHeapDataBlock(container, dataSchema);
-    return DataBlockUtils.toByteString(transferableBlock.asSerialized().getDataBlock());
+    RowHeapDataBlock rowHeapBlock = new RowHeapDataBlock(container, dataSchema);
+    return DataBlockUtils.toByteString(rowHeapBlock.asSerialized().getDataBlock());
+  }
+
+  public static void encodeExceptionsToMetadata(TimeSeriesBlock timeSeriesBlock, Map<String, String> metadataMap) {
+    List<QueryException> exceptions = timeSeriesBlock.getExceptions();
+    if (exceptions != null && !exceptions.isEmpty()) {
+      try {
+        List<Map<String, Object>> exceptionsList = new ArrayList<>();
+        for (QueryException exception : exceptions) {
+          Map<String, Object> exceptionData = new HashMap<>();
+          exceptionData.put(ERROR_CODE, exception.getErrorCode().getId());
+          exceptionData.put(MESSAGE, exception.getMessage());
+          exceptionsList.add(exceptionData);
+        }
+        metadataMap.put(EXCEPTIONS_METADATA_KEY, JsonUtils.objectToString(exceptionsList));
+      } catch (Exception e) {
+        throw new RuntimeException("Failed to encode exceptions to metadata", e);
+      }
+    }
   }
 
   /**

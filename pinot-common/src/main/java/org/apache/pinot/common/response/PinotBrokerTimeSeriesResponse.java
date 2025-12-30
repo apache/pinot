@@ -55,6 +55,7 @@ public class PinotBrokerTimeSeriesResponse {
   private Data _data;
   private String _errorType;
   private String _error;
+  private List<String> _warnings;
 
   static {
     OBJECT_MAPPER.setDefaultPropertyInclusion(JsonInclude.Include.NON_NULL);
@@ -62,11 +63,13 @@ public class PinotBrokerTimeSeriesResponse {
 
   @JsonCreator
   public PinotBrokerTimeSeriesResponse(@JsonProperty("status") String status, @JsonProperty("data") Data data,
-      @JsonProperty("errorType") String errorType, @JsonProperty("error") String error) {
+      @JsonProperty("errorType") String errorType, @JsonProperty("error") String error,
+      @JsonProperty("warnings") List<String> warnings) {
     _status = status;
     _data = data;
     _errorType = errorType;
     _error = error;
+    _warnings = warnings;
   }
 
   public String getStatus() {
@@ -85,21 +88,29 @@ public class PinotBrokerTimeSeriesResponse {
     return _error;
   }
 
+  public List<String> getWarnings() {
+    return _warnings;
+  }
+
   public String serialize()
       throws JsonProcessingException {
     return OBJECT_MAPPER.writeValueAsString(this);
   }
 
   public static PinotBrokerTimeSeriesResponse newEmptyResponse() {
-    return new PinotBrokerTimeSeriesResponse(SUCCESS_STATUS, Data.EMPTY, null, null);
+    return new PinotBrokerTimeSeriesResponse(SUCCESS_STATUS, Data.EMPTY, null, null, null);
   }
 
   public static PinotBrokerTimeSeriesResponse newSuccessResponse(Data data) {
-    return new PinotBrokerTimeSeriesResponse(SUCCESS_STATUS, data, null, null);
+    return new PinotBrokerTimeSeriesResponse(SUCCESS_STATUS, data, null, null, null);
+  }
+
+  public static PinotBrokerTimeSeriesResponse newSuccessResponse(Data data, List<String> warnings) {
+    return new PinotBrokerTimeSeriesResponse(SUCCESS_STATUS, data, null, null, warnings);
   }
 
   public static PinotBrokerTimeSeriesResponse newErrorResponse(String errorType, String errorMessage) {
-    return new PinotBrokerTimeSeriesResponse(ERROR_STATUS, Data.EMPTY, errorType, errorMessage);
+    return new PinotBrokerTimeSeriesResponse(ERROR_STATUS, Data.EMPTY, errorType, errorMessage, null);
   }
 
   public static PinotBrokerTimeSeriesResponse fromTimeSeriesBlock(TimeSeriesBlock seriesBlock) {
@@ -120,6 +131,7 @@ public class PinotBrokerTimeSeriesResponse {
   private static PinotBrokerTimeSeriesResponse convertBucketedSeriesBlock(TimeSeriesBlock seriesBlock) {
     Long[] timeValues = Objects.requireNonNull(seriesBlock.getTimeBuckets()).getTimeBuckets();
     List<PinotBrokerTimeSeriesResponse.Value> result = new ArrayList<>();
+    List<String> warnings = null;
     for (var listOfTimeSeries : seriesBlock.getSeriesMap().values()) {
       Preconditions.checkState(!listOfTimeSeries.isEmpty(), "Received empty time-series");
       TimeSeries anySeries = listOfTimeSeries.get(0);
@@ -137,8 +149,14 @@ public class PinotBrokerTimeSeriesResponse {
         result.add(new PinotBrokerTimeSeriesResponse.Value(metricMap, values));
       }
     }
+    if (seriesBlock.getExceptions() != null && !seriesBlock.getExceptions().isEmpty()) {
+      warnings = new ArrayList<>();
+      for (QueryException queryException : seriesBlock.getExceptions()) {
+        warnings.add(queryException.getErrorCode().getDefaultMessage() + ": " + queryException.getMessage());
+      }
+    }
     PinotBrokerTimeSeriesResponse.Data data = PinotBrokerTimeSeriesResponse.Data.newMatrix(result);
-    return PinotBrokerTimeSeriesResponse.newSuccessResponse(data);
+    return PinotBrokerTimeSeriesResponse.newSuccessResponse(data, warnings);
   }
 
   public static class Data {
