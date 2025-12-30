@@ -153,9 +153,6 @@ public class ConcurrentMapPartitionUpsertMetadataManager extends BasePartitionUp
                 }
                 return new RecordLocation(segment, newDocId, newComparisonValue);
               } else {
-                if (currentSegment != segment) {
-                  _previousKeyToRecordLocationMap.put(primaryKey, currentRecordLocation);
-                }
                 return currentRecordLocation;
               }
             } else {
@@ -269,18 +266,23 @@ public class ConcurrentMapPartitionUpsertMetadataManager extends BasePartitionUp
     // Revert to previous locations present in other segment
     for (Map.Entry<Object, RecordLocation> obj : _previousKeyToRecordLocationMap.entrySet()) {
       IndexSegment prevSegment = obj.getValue().getSegment();
-      try (UpsertUtils.RecordInfoReader recordInfoReader = new UpsertUtils.RecordInfoReader(prevSegment,
-          _primaryKeyColumns, _comparisonColumns, _deleteRecordColumn)) {
-        int newDocId = obj.getValue().getDocId();
-        int currentDocId = _primaryKeyToRecordLocationMap.get(obj.getKey()).getDocId();
-        RecordInfo recordInfo = recordInfoReader.getRecordInfo(newDocId);
-        // update valid docId to the other segment location
-        replaceDocId(prevSegment, prevSegment.getValidDocIds(), prevSegment.getQueryableDocIds(), oldSegment,
-            currentDocId, newDocId, recordInfo);
-      } catch (IOException e) {
-        throw new RuntimeException(e);
+      if (prevSegment != null) {
+        try (UpsertUtils.RecordInfoReader recordInfoReader = new UpsertUtils.RecordInfoReader(prevSegment,
+            _primaryKeyColumns, _comparisonColumns, _deleteRecordColumn)) {
+          int newDocId = obj.getValue().getDocId();
+          int currentDocId = _primaryKeyToRecordLocationMap.get(obj.getKey()).getDocId();
+          RecordInfo recordInfo = recordInfoReader.getRecordInfo(newDocId);
+          // update valid docId to the other segment location
+          replaceDocId(prevSegment, prevSegment.getValidDocIds(), prevSegment.getQueryableDocIds(), oldSegment,
+              currentDocId, newDocId, recordInfo);
+        } catch (IOException e) {
+          throw new RuntimeException(e);
+        }
+        _primaryKeyToRecordLocationMap.put(obj.getKey(), obj.getValue());
+      } else {
+        _primaryKeyToRecordLocationMap.remove(obj.getKey());
+        removeDocId(oldSegment, obj.getValue().getDocId());
       }
-      _primaryKeyToRecordLocationMap.put(obj.getKey(), obj.getValue());
     }
     // For the newly added keys into the segment, remove the pk and valid doc id
     removeNewlyAddedKeys(oldSegment);
