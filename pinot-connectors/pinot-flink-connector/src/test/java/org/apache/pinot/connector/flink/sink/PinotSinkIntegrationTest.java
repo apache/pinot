@@ -18,9 +18,7 @@
  */
 package org.apache.pinot.connector.flink.sink;
 
-import com.fasterxml.jackson.databind.JsonNode;
 import com.google.common.collect.Lists;
-import java.io.IOException;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashMap;
@@ -42,7 +40,6 @@ import org.apache.pinot.spi.config.table.ingestion.IngestionConfig;
 import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.ingestion.batch.BatchConfigProperties;
-import org.apache.pinot.spi.utils.JsonUtils;
 import org.apache.pinot.spi.utils.builder.TableConfigBuilder;
 import org.apache.pinot.spi.utils.builder.TableNameBuilder;
 import org.apache.pinot.util.TestUtils;
@@ -133,17 +130,20 @@ public class PinotSinkIntegrationTest extends BaseClusterIntegrationTest {
   }
 
   private void verifySegments(int numSegments, int numTotalDocs)
-      throws IOException {
-    JsonNode segments = JsonUtils.stringToJsonNode(sendGetRequest(
-            _controllerRequestURLBuilder.forSegmentListAPI(OFFLINE_TABLE_NAME, TableType.OFFLINE.toString()))).get(0)
-        .get("OFFLINE");
+      throws Exception {
+    List<String> segments = getOrCreateAdminClient().getSegmentClient()
+        .listSegments(OFFLINE_TABLE_NAME, TableType.OFFLINE.toString(), false);
     assertEquals(segments.size(), numSegments);
     int actualNumTotalDocs = 0;
-    for (int i = 0; i < numSegments; i++) {
-      String segmentName = segments.get(i).asText();
-      actualNumTotalDocs += JsonUtils.stringToJsonNode(
-              sendGetRequest(_controllerRequestURLBuilder.forSegmentMetadata(OFFLINE_TABLE_NAME, segmentName)))
-          .get("segment.total.docs").asInt();
+    for (String segmentName : segments) {
+      Object value = getOrCreateAdminClient().getSegmentClient()
+          .getSegmentMetadata(OFFLINE_TABLE_NAME, segmentName, null)
+          .get("segment.total.docs");
+      if (value instanceof Number) {
+        actualNumTotalDocs += ((Number) value).intValue();
+      } else if (value != null) {
+        actualNumTotalDocs += Integer.parseInt(value.toString());
+      }
     }
     assertEquals(actualNumTotalDocs, numTotalDocs);
   }

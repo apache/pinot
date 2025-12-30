@@ -22,7 +22,7 @@ import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-import org.apache.pinot.controller.helix.ControllerRequestClient;
+import org.apache.pinot.client.admin.PinotAdminClient;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.TableType;
 import org.apache.pinot.spi.config.table.ingestion.BatchIngestionConfig;
@@ -38,18 +38,23 @@ public final class PinotConnectionUtils {
   private PinotConnectionUtils() {
   }
 
-  public static Schema getSchema(ControllerRequestClient client, String tableName) {
+  public static Schema getSchema(PinotAdminClient client, String tableName) {
     try {
-      return client.getSchema(tableName);
+      return client.getSchemaClient().getSchema(tableName);
     } catch (Exception e) {
       throw new RuntimeException(String.format("Failed to get table schema %s from Pinot controller", tableName), e);
     }
   }
 
-  public static TableConfig getTableConfig(ControllerRequestClient client, String tableName, String tableType) {
+  public static TableConfig getTableConfig(PinotAdminClient client, String tableName, String tableType) {
     TableConfig tableConfig;
     try {
-      tableConfig = client.getTableConfig(tableName, TableType.valueOf(tableType));
+      String configJson = client.getTableClient().getTableConfig(tableName, tableType);
+      com.fasterxml.jackson.databind.JsonNode node =
+          org.apache.pinot.client.admin.PinotAdminTransport.getObjectMapper().readTree(configJson);
+      // Deserialize specific type config
+      tableConfig = org.apache.pinot.spi.utils.JsonUtils.jsonNodeToObject(
+          node.get(TableType.valueOf(tableType).name()), TableConfig.class);
     } catch (Exception e) {
       throw new RuntimeException(String.format("Failed to get table config %s from Pinot controller", tableName), e);
     }
@@ -58,7 +63,7 @@ public final class PinotConnectionUtils {
 
     Map<String, String> newBatchConfigMap = new HashMap<>();
     // append the batch config of controller URI
-    String controllerBaseUrl = client.getControllerRequestURLBuilder().getBaseUrl();
+    String controllerBaseUrl = client.getControllerBaseUrl();
     newBatchConfigMap.put("push.controllerUri", controllerBaseUrl);
     newBatchConfigMap.put("outputDirURI", "/tmp/pinotoutput");
 

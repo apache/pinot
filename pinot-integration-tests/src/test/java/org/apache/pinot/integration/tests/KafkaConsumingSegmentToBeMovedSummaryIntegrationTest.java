@@ -101,8 +101,8 @@ public class KafkaConsumingSegmentToBeMovedSummaryIntegrationTest extends BaseRe
   @Test
   public void testConsumingSegmentSummary()
       throws Exception {
-    String response = sendPostRequest(
-        getControllerRequestURLBuilder().forTableRebalance(getTableName(), "REALTIME", true, false, true, false, -1));
+    String response = getOrCreateAdminClient().getTableClient()
+        .rebalanceTable(getTableName(), "REALTIME", true, false, true, false, -1);
     RebalanceResult result = JsonUtils.stringToObject(response, RebalanceResult.class);
     Assert.assertNotNull(result);
     Assert.assertNotNull(result.getRebalanceSummaryResult());
@@ -117,8 +117,8 @@ public class KafkaConsumingSegmentToBeMovedSummaryIntegrationTest extends BaseRe
         0);
 
     startServer();
-    response = sendPostRequest(
-        getControllerRequestURLBuilder().forTableRebalance(getTableName(), "REALTIME", true, false, true, false, -1));
+    response = getOrCreateAdminClient().getTableClient()
+        .rebalanceTable(getTableName(), "REALTIME", true, false, true, false, -1);
     result = JsonUtils.stringToObject(response, RebalanceResult.class);
     Assert.assertNotNull(result);
     Assert.assertNotNull(result.getRebalanceSummaryResult());
@@ -143,8 +143,8 @@ public class KafkaConsumingSegmentToBeMovedSummaryIntegrationTest extends BaseRe
         .reduce(0L, (a, b) -> a + b.getTotalOffsetsToCatchUpAcrossAllConsumingSegments(), Long::sum), 57801);
 
     // set includeConsuming to false
-    response = sendPostRequest(
-        getControllerRequestURLBuilder().forTableRebalance(getTableName(), "REALTIME", true, false, false, false, -1));
+    response = getOrCreateAdminClient().getTableClient()
+        .rebalanceTable(getTableName(), "REALTIME", true, false, false, false, -1);
     result = JsonUtils.stringToObject(response, RebalanceResult.class);
     Assert.assertNotNull(result);
     Assert.assertNotNull(result.getRebalanceSummaryResult());
@@ -158,8 +158,8 @@ public class KafkaConsumingSegmentToBeMovedSummaryIntegrationTest extends BaseRe
         0);
 
     stopKafka();
-    response = sendPostRequest(
-        getControllerRequestURLBuilder().forTableRebalance(getTableName(), "REALTIME", true, false, true, false, -1));
+    response = getOrCreateAdminClient().getTableClient()
+        .rebalanceTable(getTableName(), "REALTIME", true, false, true, false, -1);
     RebalanceResult resultNoInfo = JsonUtils.stringToObject(response, RebalanceResult.class);
     Assert.assertNotNull(resultNoInfo);
     Assert.assertNotNull(resultNoInfo.getRebalanceSummaryResult());

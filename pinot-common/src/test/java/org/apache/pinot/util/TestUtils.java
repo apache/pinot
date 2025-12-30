@@ -131,7 +131,6 @@ public class TestUtils {
         if (Boolean.TRUE.equals(condition.get())) {
           return;
         }
-        Thread.sleep(checkIntervalMs);
       } catch (InterruptedException e) {
         lastError = e;
         break;
@@ -145,6 +144,12 @@ public class TestUtils {
             errorLogInstant = now;
           }
         }
+      }
+      try {
+        Thread.sleep(checkIntervalMs);
+      } catch (InterruptedException e) {
+        lastError = e;
+        break;
       }
     }
     if (raiseError) {
