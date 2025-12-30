@@ -817,7 +817,7 @@ public class ConcurrentMapPartitionUpsertMetadataManagerTest {
   }
 
   // Helper method for new reversion tests that need Integer comparison values
-  private List<RecordInfo> getRecordInfoListWithIntComparison(int numRecords, int[] primaryKeys, int[] timestamps,
+  private List<RecordInfo> getRecordInfoListWithIntegerComparison(int numRecords, int[] primaryKeys, int[] timestamps,
       @Nullable boolean[] deleteRecordFlags) {
     List<RecordInfo> recordInfoList = new ArrayList<>();
     for (int i = 0; i < numRecords; i++) {
