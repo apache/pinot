@@ -720,7 +720,7 @@ public abstract class BasePartitionUpsertMetadataManager implements PartitionUps
       }
 
       validDocIdsForOldSegment = getValidDocIdsForOldSegment(oldSegment);
-      if (validDocIdsForOldSegment == null || validDocIdsForOldSegment.isEmpty()) {
+      if (validDocIdsForOldSegment.isEmpty()) {
         _logger.info("Successfully resolved inconsistency for segment: {} after {} retry attempt(s)", segmentName,
             retryCount + 1);
         return;

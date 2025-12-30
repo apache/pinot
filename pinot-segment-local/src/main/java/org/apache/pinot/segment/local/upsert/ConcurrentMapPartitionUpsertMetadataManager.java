@@ -262,8 +262,9 @@ public class ConcurrentMapPartitionUpsertMetadataManager extends BasePartitionUp
   @Override
   protected void revertCurrentSegmentUpsertMetadata(IndexSegment oldSegment, ThreadSafeMutableRoaringBitmap validDocIds,
       ThreadSafeMutableRoaringBitmap queryableDocIds) {
-    _logger.info("Reverting Upsert metadata for {} keys", _previousKeyToRecordLocationMap.size());
     // Revert to previous locations present in other segment
+    // Replace the valid doc id to that segment location
+    _logger.info("Reverting Upsert metadata for {} keys", _previousKeyToRecordLocationMap.size());
     for (Map.Entry<Object, RecordLocation> obj : _previousKeyToRecordLocationMap.entrySet()) {
       IndexSegment prevSegment = obj.getValue().getSegment();
       if (prevSegment != null) {
@@ -272,7 +273,6 @@ public class ConcurrentMapPartitionUpsertMetadataManager extends BasePartitionUp
           int newDocId = obj.getValue().getDocId();
           int currentDocId = _primaryKeyToRecordLocationMap.get(obj.getKey()).getDocId();
           RecordInfo recordInfo = recordInfoReader.getRecordInfo(newDocId);
-          // update valid docId to the other segment location
           replaceDocId(prevSegment, prevSegment.getValidDocIds(), prevSegment.getQueryableDocIds(), oldSegment,
               currentDocId, newDocId, recordInfo);
         } catch (IOException e) {
@@ -283,12 +283,12 @@ public class ConcurrentMapPartitionUpsertMetadataManager extends BasePartitionUp
         _primaryKeyToRecordLocationMap.remove(obj.getKey());
       }
     }
-    // For the newly added keys into the segment, remove the pk and valid doc id
     removeNewlyAddedKeys(oldSegment);
   }
 
   @Override
   protected void removeNewlyAddedKeys(IndexSegment oldSegment) {
+    // Remove the newly added keys in the metadata map and in the valid docids
     for (Map.Entry<Object, RecordLocation> entry : _newlyAddedKeys.entrySet()) {
       _primaryKeyToRecordLocationMap.remove(entry.getKey());
       removeDocId(oldSegment, entry.getValue().getDocId());
