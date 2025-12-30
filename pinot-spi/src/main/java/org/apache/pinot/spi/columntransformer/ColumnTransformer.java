@@ -16,29 +16,18 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.pinot.spi.data;
+package org.apache.pinot.spi.columntransformer;
 
-import com.fasterxml.jackson.annotation.JsonProperty;
-import org.apache.pinot.spi.config.BaseJsonConfig;
+import javax.annotation.Nullable;
 
 
-/**
- * This class represents the configuration for a physical table in {@link LogicalTableConfig}.
- * This is empty by design and more docs would be added as features are added.
- */
-public class PhysicalTableConfig extends BaseJsonConfig {
-  @JsonProperty("multiCluster")
-  private final boolean _isMultiCluster;
+public interface ColumnTransformer {
 
-  public PhysicalTableConfig() {
-    this(false);
-  }
+  /// Returns `true` if the transformer is no-op (can be skipped), `false` otherwise.
+  boolean isNoOp();
 
-  public PhysicalTableConfig(boolean isMultiCluster) {
-    _isMultiCluster = isMultiCluster;
-  }
-
-  public boolean isMultiCluster() {
-    return _isMultiCluster;
-  }
+  /// Transforms a value based on some custom rules.
+  /// @param value The original value.
+  /// @return The transformed value.
+  Object transform(@Nullable Object value);
 }

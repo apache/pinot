@@ -21,6 +21,7 @@ package org.apache.pinot.core.routing;
 import java.util.Map;
 import javax.annotation.Nullable;
 import org.apache.pinot.common.config.provider.TableCache;
+import org.apache.pinot.common.utils.config.QueryOptionsUtils;
 
 
 /**
@@ -51,5 +52,29 @@ public class MultiClusterRoutingContext {
     _tableCacheMap = tableCacheMap;
     _localRoutingManager = localRoutingManager;
     _multiClusterRoutingManager = multiClusterRoutingManager;
+  }
+
+  public Map<String, TableCache> getTableCacheMap() {
+    return _tableCacheMap;
+  }
+
+  public TableCache getTableCache(String clusterName) {
+    return _tableCacheMap.get(clusterName);
+  }
+
+  /**
+   * Returns the appropriate routing manager based on query options.
+   * If federation is enabled in query options and a multi cluster routing manager is available,
+   * returns the federated routing manager. Otherwise, returns the primary routing manager.
+   *
+   * @param queryOptions Query options containing federation flag
+   * @return The appropriate routing manager for the query
+   */
+  public RoutingManager getRoutingManager(Map<String, String> queryOptions) {
+    boolean isMultiClusterRoutingEnabled = QueryOptionsUtils.isMultiClusterRoutingEnabled(queryOptions, false);
+    if (isMultiClusterRoutingEnabled && _multiClusterRoutingManager != null) {
+      return _multiClusterRoutingManager;
+    }
+    return _localRoutingManager;
   }
 }

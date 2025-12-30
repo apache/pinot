@@ -22,6 +22,7 @@ import java.io.IOException;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.Set;
+import javax.annotation.Nullable;
 import org.apache.pinot.segment.spi.IndexSegment;
 import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.Schema;
@@ -124,29 +125,31 @@ public class PinotSegmentColumnReaderFactory implements ColumnReaderFactory {
    * Internal method to create a column reader for the specified column.
    * This method is called during initialization to create all readers.
    */
+  @Nullable
   private ColumnReader createColumnReader(String columnName, FieldSpec targetFieldSpec) {
     if (targetFieldSpec.isVirtualColumn()) {
       throw new IllegalStateException("Target field spec is a virtual column.");
     }
 
-    ColumnReader columnReader;
+    ColumnReader columnReader = null;
 
     if (hasColumn(columnName)) {
       // Column exists in source segment - create a segment column reader
       LOGGER.debug("Creating segment column reader for existing column: {}", columnName);
       columnReader = new PinotSegmentColumnReaderImpl(_indexSegment, columnName, _skipDefaultNullValues);
     } else {
-      // New column - create a default value reader
-      LOGGER.debug("Creating default value reader for new column: {}", columnName);
-      columnReader = new DefaultValueColumnReader(columnName, getNumDocs(), targetFieldSpec);
+      if (_initializeDefaultValueReaders) {
+        // New column - create a default value reader
+        LOGGER.debug("Creating default value reader for new column: {}", columnName);
+        columnReader = new DefaultValueColumnReader(columnName, getNumDocs(), targetFieldSpec);
+      }
     }
 
     return columnReader;
   }
 
   @Override
-  public Map<String, ColumnReader> getAllColumnReaders()
-      throws IOException {
+  public Map<String, ColumnReader> getAllColumnReaders() {
     return _columnReaders;
   }
 
@@ -167,7 +170,9 @@ public class PinotSegmentColumnReaderFactory implements ColumnReaderFactory {
         continue;
       }
       ColumnReader reader = createColumnReader(columnName, fieldSpec);
-      allReaders.put(columnName, reader);
+      if (reader != null) {
+        allReaders.put(columnName, reader);
+      }
     }
 
     return allReaders;

@@ -32,9 +32,8 @@ public class PinotSegmentColumnarDataSource implements ColumnarDataSource {
 
   private final IndexSegment _indexSegment;
   private final int _totalDocs;
-
-  private final boolean _skipDefaultNullValues;
   private final boolean _initializeDefaultValueReaders;
+  private final boolean _skipDefaultNullValues;
 
   /**
    * @param indexSegment Source segment to read from
