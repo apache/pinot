@@ -68,6 +68,7 @@ public class PinotControllerAuthResource {
    *
    * @return {@code true} if authenticated and authorized, {@code false} otherwise
    */
+  @Deprecated
   @GET
   @Path("auth/verify")
   @Authorize(targetType = TargetType.CLUSTER, action = Actions.Cluster.GET_AUTH)
@@ -82,6 +83,31 @@ public class PinotControllerAuthResource {
       @ApiParam(value = "Endpoint URL") @QueryParam("endpointUrl") String endpointUrl) {
     AccessControl accessControl = _accessControlFactory.create();
     return accessControl.hasAccess(tableName, accessType, _httpHeaders, endpointUrl);
+  }
+
+  /**
+   * Verify a token is both authenticated and authorized to perform an operation.
+   *
+   * @param tableName table name (optional)
+   * @param accessType access type (optional)
+   * @param endpointUrl endpoint url (optional)
+   *
+   * @return {@code true} if authenticated and authorized, {@code false} otherwise
+   */
+  @GET
+  @Path("auth/verify/v2")
+  @Authorize(targetType = TargetType.CLUSTER, action = Actions.Cluster.GET_AUTH)
+  @Produces(MediaType.APPLICATION_JSON)
+  @ApiOperation(value = "Check whether authentication is enabled")
+  @ApiResponses(value = {
+      @ApiResponse(code = 200, message = "Verification result provided"),
+      @ApiResponse(code = 500, message = "Verification error")
+  })
+  public boolean verifyV2(@ApiParam(value = "Table name without type") @QueryParam("tableName") String tableName,
+      @ApiParam(value = "API access type") @DefaultValue("READ") @QueryParam("accessType") AccessType accessType,
+      @ApiParam(value = "Endpoint URL") @QueryParam("endpointUrl") String endpointUrl) {
+    AccessControl accessControl = _accessControlFactory.create();
+    return accessControl.hasAccess(_httpHeaders, TargetType.CLUSTER);
   }
 
   /**

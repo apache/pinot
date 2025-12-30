@@ -221,7 +221,7 @@ public final class AuthProviderUtils {
     }
 
     if (StringUtils.isNotBlank(user)) {
-      return new StaticTokenAuthProvider(BasicAuthUtils.toBasicAuthToken(user, password));
+      return new StaticTokenAuthProvider(BasicAuthTokenUtils.toBasicAuthToken(user, password));
     }
 
     return new NullAuthProvider();

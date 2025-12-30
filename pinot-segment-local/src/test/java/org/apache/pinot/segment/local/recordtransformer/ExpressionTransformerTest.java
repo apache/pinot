@@ -24,6 +24,7 @@ import java.util.Collections;
 import java.util.HashMap;
 import java.util.Iterator;
 import java.util.List;
+import java.util.Map;
 import java.util.concurrent.TimeUnit;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.TableType;
@@ -241,6 +242,34 @@ public class ExpressionTransformerTest {
   }
 
   @Test
+  public void testExistingCollectionIsTransformedWhenIncompatibleType() {
+    Schema schema = new Schema.SchemaBuilder()
+        .addMultiValueDimension("rawBids", FieldSpec.DataType.INT)
+        .addMultiValueDimension("bids", FieldSpec.DataType.INT)
+        .build();
+
+    IngestionConfig ingestionConfig = new IngestionConfig();
+    ingestionConfig.setTransformConfigs(Collections.singletonList(
+        new TransformConfig("bids", "Groovy({rawBids.toArray()}, rawBids)")));
+    TableConfig tableConfig = new TableConfigBuilder(TableType.OFFLINE)
+        .setTableName("testExistingCollectionIsTransformed")
+        .setIngestionConfig(ingestionConfig)
+        .build();
+
+    ExpressionTransformer expressionTransformer = new ExpressionTransformer(tableConfig, schema);
+    GenericRow genericRow = new GenericRow();
+    genericRow.putValue("rawBids", Arrays.asList(1, 2, 3));
+    // Simulate pre-existing collection value that should be overwritten by transform
+    genericRow.putValue("bids", Arrays.asList(10, 20));
+
+    expressionTransformer.transform(genericRow);
+
+    Object transformedValue = genericRow.getValue("bids");
+    Assert.assertTrue(transformedValue.getClass().isArray());
+    Assert.assertEquals(Arrays.asList((Object[]) transformedValue), Arrays.asList(1, 2, 3));
+  }
+
+  @Test
   public void testTransformFunctionSortOrder() {
     Schema schema = new Schema.SchemaBuilder().addSingleValueDimension("a", FieldSpec.DataType.STRING)
         .addSingleValueDimension("b", FieldSpec.DataType.STRING).addSingleValueDimension("c", FieldSpec.DataType.STRING)
@@ -393,11 +422,68 @@ public class ExpressionTransformerTest {
     genericRow = new GenericRow();
     genericRow.putValue("x", "abcd");
     expressionTransformer.transform(genericRow);
-    Assert.assertEquals(genericRow.getValue("y"), null);
+    Assert.assertNull(genericRow.getValue("y"));
     // Invalid case: x is null, y is int
     genericRow = new GenericRow();
     genericRow.putValue("x", null);
     expressionTransformer.transform(genericRow);
-    Assert.assertEquals(genericRow.getValue("y"), null);
+    Assert.assertNull(genericRow.getValue("y"));
+  }
+
+  @Test
+  public void testJsonToMapIngestionTransform() {
+    Schema schema = new Schema.SchemaBuilder()
+        .addSingleValueDimension("columnJson", FieldSpec.DataType.STRING)
+        .addComplex("columnMap", FieldSpec.DataType.MAP, Map.of(
+            "a", new DimensionFieldSpec("a", FieldSpec.DataType.INT, true),
+            "b", new DimensionFieldSpec("b", FieldSpec.DataType.STRING, true)
+        ))
+        .build();
+
+    IngestionConfig ingestionConfig = new IngestionConfig();
+    ingestionConfig.setTransformConfigs(Collections.singletonList(
+        new TransformConfig("columnMap", "jsonStringToMap(columnJson)")));
+    TableConfig tableConfig = new TableConfigBuilder(TableType.OFFLINE)
+        .setTableName("testJsonToMapIngestionTransform")
+        .setIngestionConfig(ingestionConfig)
+        .build();
+
+    ExpressionTransformer expressionTransformer = new ExpressionTransformer(tableConfig, schema);
+
+    GenericRow row = new GenericRow();
+    row.putValue("columnJson", "{\"a\":1,\"b\":\"x\"}");
+
+    expressionTransformer.transform(row);
+    Map<String, Object> map = (Map<String, Object>) row.getValue("columnMap");
+    Assert.assertEquals(map.get("a"), 1);
+    Assert.assertEquals(map.get("b"), "x");
+  }
+
+  @Test
+  public void testJsonToArrayIngestionTransform() {
+    Schema schema = new Schema.SchemaBuilder()
+        .addSingleValueDimension("columnJson", FieldSpec.DataType.STRING)
+        .addMultiValueDimension("columnArray", FieldSpec.DataType.STRING)
+        .build();
+
+    IngestionConfig ingestionConfig = new IngestionConfig();
+    ingestionConfig.setTransformConfigs(Collections.singletonList(
+        new TransformConfig("columnArray", "jsonPathArray(columnJson, '$')")));
+    TableConfig tableConfig = new TableConfigBuilder(TableType.OFFLINE)
+        .setTableName("testJsonToArrayIngestionTransform")
+        .setIngestionConfig(ingestionConfig)
+        .build();
+
+    ExpressionTransformer expressionTransformer = new ExpressionTransformer(tableConfig, schema);
+
+    GenericRow row = new GenericRow();
+    row.putValue("columnJson", "[\"a\",\"b\",\"c\"]");
+    // Pre-existing collection should be overwritten because transform returns an array (incompatible type)
+    row.putValue("columnArray", Arrays.asList("preExisting"));
+
+    expressionTransformer.transform(row);
+    Object transformedValue = row.getValue("columnArray");
+    Assert.assertTrue(transformedValue.getClass().isArray());
+    Assert.assertEquals(Arrays.asList((Object[]) transformedValue), Arrays.asList("a", "b", "c"));
   }
 }

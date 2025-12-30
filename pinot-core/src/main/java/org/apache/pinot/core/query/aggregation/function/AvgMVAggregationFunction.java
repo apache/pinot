@@ -22,10 +22,8 @@ import java.util.List;
 import java.util.Map;
 import org.apache.pinot.common.request.context.ExpressionContext;
 import org.apache.pinot.core.common.BlockValSet;
-import org.apache.pinot.core.common.ObjectSerDeUtils;
 import org.apache.pinot.core.query.aggregation.AggregationResultHolder;
 import org.apache.pinot.core.query.aggregation.groupby.GroupByResultHolder;
-import org.apache.pinot.segment.local.customobject.AvgPair;
 import org.apache.pinot.segment.spi.AggregationFunctionType;
 
 
@@ -48,30 +46,11 @@ public class AvgMVAggregationFunction extends AvgAggregationFunction {
     if (blockValSet.isSingleValue()) {
       // star-tree pre-aggregated values: During star-tree creation, the multi-value column is pre-aggregated
       // per star-tree node, resulting in a single value per node.
-      byte[][] bytesValues = blockValSet.getBytesValuesSV();
-      AvgPair avgPair = new AvgPair();
-      for (int i = 0; i < length; i++) {
-        AvgPair value = ObjectSerDeUtils.AVG_PAIR_SER_DE.deserialize(bytesValues[i]);
-        avgPair.apply(value);
-      }
-      if (avgPair.getCount() != 0) {
-        updateAggregationResult(aggregationResultHolder, avgPair.getSum(), avgPair.getCount());
-      }
+      aggregateSerialized(blockValSet, length, aggregationResultHolder);
       return;
     }
 
-    double[][] valuesArray = blockValSet.getDoubleValuesMV();
-    AvgPair avgPair = new AvgPair();
-    forEachNotNull(length, blockValSet, (from, to) -> {
-      for (int i = from; i < to; i++) {
-        for (double value : valuesArray[i]) {
-          avgPair.apply(value);
-        }
-      }
-    });
-    if (avgPair.getCount() != 0) {
-      updateAggregationResult(aggregationResultHolder, avgPair.getSum(), avgPair.getCount());
-    }
+    aggregateMV(blockValSet, length, aggregationResultHolder);
   }
 
   @Override
@@ -82,46 +61,16 @@ public class AvgMVAggregationFunction extends AvgAggregationFunction {
     if (blockValSet.isSingleValue()) {
       // star-tree pre-aggregated values: During star-tree creation, the multi-value column is pre-aggregated
       // per star-tree node, resulting in a single value per node.
-      byte[][] bytesValues = blockValSet.getBytesValuesSV();
-      for (int i = 0; i < length; i++) {
-        AvgPair avgPair = ObjectSerDeUtils.AVG_PAIR_SER_DE.deserialize(bytesValues[i]);
-        updateGroupByResult(groupKeyArray[i], groupByResultHolder, avgPair.getSum(), avgPair.getCount());
-      }
+      aggregateGroupBySVSerialized(blockValSet, length, groupKeyArray, groupByResultHolder);
       return;
     }
 
-    double[][] valuesArray = blockValSet.getDoubleValuesMV();
-    forEachNotNull(length, blockValSet, (from, to) -> {
-      for (int i = from; i < to; i++) {
-        aggregateOnGroupKey(groupKeyArray[i], groupByResultHolder, valuesArray[i]);
-      }
-    });
+    aggregateMVGroupBySV(blockValSet, length, groupKeyArray, groupByResultHolder);
   }
 
   @Override
   public void aggregateGroupByMV(int length, int[][] groupKeysArray, GroupByResultHolder groupByResultHolder,
       Map<ExpressionContext, BlockValSet> blockValSetMap) {
-    BlockValSet blockValSet = blockValSetMap.get(_expression);
-    double[][] valuesArray = blockValSet.getDoubleValuesMV();
-
-    forEachNotNull(length, blockValSet, (from, to) -> {
-      for (int i = from; i < to; i++) {
-        double[] values = valuesArray[i];
-        for (int groupKey : groupKeysArray[i]) {
-          aggregateOnGroupKey(groupKey, groupByResultHolder, values);
-        }
-      }
-    });
-  }
-
-  private void aggregateOnGroupKey(int groupKey, GroupByResultHolder groupByResultHolder, double[] values) {
-    double sum = 0.0;
-    for (double value : values) {
-      sum += value;
-    }
-    long count = values.length;
-    if (count != 0) {
-      updateGroupByResult(groupKey, groupByResultHolder, sum, count);
-    }
+    aggregateMVGroupByMV(blockValSetMap.get(_expression), length, groupKeysArray, groupByResultHolder);
   }
 }

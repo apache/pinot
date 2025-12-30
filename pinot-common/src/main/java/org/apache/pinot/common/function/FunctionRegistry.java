@@ -129,7 +129,8 @@ public class FunctionRegistry {
       ScalarFunction scalarFunction = method.getAnnotation(ScalarFunction.class);
       if (scalarFunction.enabled()) {
         FunctionInfo functionInfo =
-            new FunctionInfo(method, method.getDeclaringClass(), scalarFunction.nullableParameters());
+            new FunctionInfo(method, method.getDeclaringClass(), scalarFunction.nullableParameters(),
+                scalarFunction.isDeterministic());
         int numArguments = scalarFunction.isVarArg() ? VAR_ARG_KEY : method.getParameterCount();
         String[] names = scalarFunction.names();
         if (names.length == 0) {
@@ -279,7 +280,7 @@ public class FunctionRegistry {
 
     @Override
     public PinotSqlFunction toPinotSqlFunction() {
-      return new PinotSqlFunction(_mainName, getReturnTypeInference(), getOperandTypeChecker());
+      return new PinotSqlFunction(_mainName, getReturnTypeInference(), getOperandTypeChecker(), isDeterministic());
     }
 
     private SqlReturnTypeInference getReturnTypeInference() {
@@ -347,6 +348,15 @@ public class FunctionRegistry {
     public FunctionInfo getFunctionInfo(int numArguments) {
       FunctionInfo functionInfo = _functionInfoMap.get(numArguments);
       return functionInfo != null ? functionInfo : _functionInfoMap.get(VAR_ARG_KEY);
+    }
+
+    private boolean isDeterministic() {
+      for (FunctionInfo functionInfo : _functionInfoMap.values()) {
+        if (!functionInfo.isDeterministic()) {
+          return false;
+        }
+      }
+      return true;
     }
 
     @Override

@@ -18,7 +18,6 @@
  */
 package org.apache.pinot.segment.local.aggregator;
 
-import javax.annotation.Nullable;
 import org.apache.pinot.segment.spi.AggregationFunctionType;
 
 /**
@@ -30,40 +29,5 @@ public class SumMVValueAggregator extends SumValueAggregator {
   @Override
   public AggregationFunctionType getAggregationType() {
     return AggregationFunctionType.SUMMV;
-  }
-
-  @Override
-  public Double getInitialAggregatedValue(@Nullable Object rawValue) {
-    if (rawValue == null) {
-      return 0.0;
-    }
-    return processMultiValueArray(rawValue);
-  }
-
-  @Override
-  public Double applyRawValue(Double value, Object rawValue) {
-    if (rawValue == null) {
-      return value;
-    }
-    return value + processMultiValueArray(rawValue);
-  }
-
-  /**
-   * Processes a multi-value array and returns the sum of all values.
-   * The rawValue can be an Object[] array containing numeric values.
-   */
-  private Double processMultiValueArray(Object rawValue) {
-    if (rawValue instanceof Object[]) {
-      Object[] values = (Object[]) rawValue;
-      double sum = 0.0;
-      for (Object value : values) {
-        if (value != null) {
-          sum += ValueAggregatorUtils.toDouble(value);
-        }
-      }
-      return sum;
-    } else {
-      return ValueAggregatorUtils.toDouble(rawValue);
-    }
   }
 }

@@ -43,21 +43,12 @@ public class MinMaxRangeValueAggregator implements ValueAggregator<Object, MinMa
     if (rawValue == null) {
       return new MinMaxRangePair();
     }
-    if (rawValue instanceof byte[]) {
-      return deserializeAggregatedValue((byte[]) rawValue);
-    } else {
-      double doubleValue = ValueAggregatorUtils.toDouble(rawValue);
-      return new MinMaxRangePair(doubleValue, doubleValue);
-    }
+    return processRawValue(rawValue);
   }
 
   @Override
   public MinMaxRangePair applyRawValue(MinMaxRangePair value, Object rawValue) {
-    if (rawValue instanceof byte[]) {
-      value.apply(deserializeAggregatedValue((byte[]) rawValue));
-    } else {
-      value.apply(ValueAggregatorUtils.toDouble(rawValue));
-    }
+    value.apply(processRawValue(rawValue));
     return value;
   }
 
@@ -90,5 +81,23 @@ public class MinMaxRangeValueAggregator implements ValueAggregator<Object, MinMa
   @Override
   public MinMaxRangePair deserializeAggregatedValue(byte[] bytes) {
     return CustomSerDeUtils.MIN_MAX_RANGE_PAIR_SER_DE.deserialize(bytes);
+  }
+
+  protected MinMaxRangePair processRawValue(Object rawValue) {
+    if (rawValue instanceof byte[]) {
+      return deserializeAggregatedValue((byte[]) rawValue);
+    } else if (rawValue instanceof Object[]) {
+      Object[] values = (Object[]) rawValue;
+      MinMaxRangePair minMaxRangePair = new MinMaxRangePair();
+      for (Object value : values) {
+        if (value != null) {
+          minMaxRangePair.apply(ValueAggregatorUtils.toDouble(value));
+        }
+      }
+      return minMaxRangePair;
+    } else {
+      double doubleValue = ValueAggregatorUtils.toDouble(rawValue);
+      return new MinMaxRangePair(doubleValue, doubleValue);
+    }
   }
 }

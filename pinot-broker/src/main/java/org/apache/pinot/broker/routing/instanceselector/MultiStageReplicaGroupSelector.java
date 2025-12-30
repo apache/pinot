@@ -41,6 +41,7 @@ import org.apache.pinot.common.assignment.InstancePartitionsUtils;
 import org.apache.pinot.common.metrics.BrokerMetrics;
 import org.apache.pinot.common.utils.LLCSegmentName;
 import org.apache.pinot.core.transport.ServerInstance;
+import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.TableType;
 import org.apache.pinot.spi.config.table.assignment.InstancePartitionsType;
 import org.apache.pinot.spi.utils.builder.TableNameBuilder;
@@ -62,16 +63,13 @@ public class MultiStageReplicaGroupSelector extends BaseInstanceSelector {
 
   private volatile InstancePartitions _instancePartitions;
 
-  public MultiStageReplicaGroupSelector(String tableNameWithType, ZkHelixPropertyStore<ZNRecord> propertyStore,
-      BrokerMetrics brokerMetrics, @Nullable AdaptiveServerSelector adaptiveServerSelector, Clock clock,
-      InstanceSelectorConfig config) {
-    super(tableNameWithType, propertyStore, brokerMetrics, adaptiveServerSelector, clock, config);
-  }
-
   @Override
-  public void init(Set<String> enabledInstances, Map<String, ServerInstance> enabledServerMap, IdealState idealState,
-      ExternalView externalView, Set<String> onlineSegments) {
-    super.init(enabledInstances, enabledServerMap, idealState, externalView, onlineSegments);
+  public void init(TableConfig tableConfig, ZkHelixPropertyStore<ZNRecord> propertyStore,
+      BrokerMetrics brokerMetrics, @Nullable AdaptiveServerSelector adaptiveServerSelector, Clock clock,
+      InstanceSelectorConfig config, Set<String> enabledInstances, Map<String, ServerInstance> enabledServerMap,
+      IdealState idealState, ExternalView externalView, Set<String> onlineSegments) {
+    super.init(tableConfig, propertyStore, brokerMetrics, adaptiveServerSelector, clock, config, enabledInstances,
+        enabledServerMap, idealState, externalView, onlineSegments);
     _instancePartitions = getInstancePartitions();
   }
 
@@ -88,7 +86,7 @@ public class MultiStageReplicaGroupSelector extends BaseInstanceSelector {
   }
 
   @Override
-  Pair<Map<String, String>, Map<String, String>> select(List<String> segments, int requestId,
+  public Pair<Map<String, String>, Map<String, String>> select(List<String> segments, int requestId,
       SegmentStates segmentStates, Map<String, String> queryOptions) {
     // Create a copy of InstancePartitions to avoid race-condition with event-listeners above.
     InstancePartitions instancePartitions = _instancePartitions;

@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.query.planner.partitioning;
 
+import java.util.List;
 import java.util.Locale;
 import org.testng.Assert;
 import org.testng.annotations.Test;
@@ -81,30 +82,30 @@ public class KeySelectorHashFunctionTest {
   @Test
   public void testKeySelectorFactoryWithCustomHashFunction() {
     // Test single column
-    KeySelector<?> singleSelector = KeySelectorFactory.getKeySelector(java.util.List.of(0), "murmur");
+    KeySelector<?> singleSelector = KeySelectorFactory.getKeySelector(List.of(0), "murmur");
     Assert.assertEquals(singleSelector.hashAlgorithm(), "murmur");
 
     // Test multi column
-    KeySelector<?> multiSelector = KeySelectorFactory.getKeySelector(java.util.List.of(0, 1), "murmur3");
+    KeySelector<?> multiSelector = KeySelectorFactory.getKeySelector(List.of(0, 1), "murmur3");
     Assert.assertEquals(multiSelector.hashAlgorithm(), "murmur3");
 
     // Test empty
-    KeySelector<?> emptySelector = KeySelectorFactory.getKeySelector(java.util.List.of(), "hashcode");
+    KeySelector<?> emptySelector = KeySelectorFactory.getKeySelector(List.of(), "hashcode");
     Assert.assertEquals(emptySelector.hashAlgorithm(), "hashcode");
   }
 
   @Test
   public void testKeySelectorFactoryWithDefaultHashFunction() {
     // Test single column
-    KeySelector<?> singleSelector = KeySelectorFactory.getKeySelector(java.util.List.of(0));
+    KeySelector<?> singleSelector = KeySelectorFactory.getKeySelector(List.of(0));
     Assert.assertEquals(singleSelector.hashAlgorithm(), KeySelector.DEFAULT_HASH_ALGORITHM.toLowerCase(Locale.US));
 
     // Test multi column
-    KeySelector<?> multiSelector = KeySelectorFactory.getKeySelector(java.util.List.of(0, 1));
+    KeySelector<?> multiSelector = KeySelectorFactory.getKeySelector(List.of(0, 1));
     Assert.assertEquals(multiSelector.hashAlgorithm(), KeySelector.DEFAULT_HASH_ALGORITHM.toLowerCase(Locale.US));
 
     // Test empty
-    KeySelector<?> emptySelector = KeySelectorFactory.getKeySelector(java.util.List.of());
+    KeySelector<?> emptySelector = KeySelectorFactory.getKeySelector(List.of());
     Assert.assertEquals(emptySelector.hashAlgorithm(), KeySelector.DEFAULT_HASH_ALGORITHM.toLowerCase(Locale.US));
   }
 }

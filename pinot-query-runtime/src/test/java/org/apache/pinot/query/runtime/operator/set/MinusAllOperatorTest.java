@@ -18,7 +18,6 @@
  */
 package org.apache.pinot.query.runtime.operator.set;
 
-import com.google.common.collect.ImmutableList;
 import java.util.Arrays;
 import java.util.List;
 import org.apache.pinot.common.utils.DataSchema;
@@ -50,7 +49,7 @@ public class MinusAllOperatorTest {
         .buildWithEos();
 
     MinusAllOperator minusOperator =
-        new MinusAllOperator(OperatorTestUtil.getTracingContext(), ImmutableList.of(leftOperator, rightOperator),
+        new MinusAllOperator(OperatorTestUtil.getTracingContext(), List.of(leftOperator, rightOperator),
             schema);
 
     MseBlock result = minusOperator.nextBlock();
@@ -87,7 +86,7 @@ public class MinusAllOperatorTest {
         .buildWithEos();
 
     MinusAllOperator minusOperator =
-        new MinusAllOperator(OperatorTestUtil.getTracingContext(), ImmutableList.of(leftOperator, rightOperator),
+        new MinusAllOperator(OperatorTestUtil.getTracingContext(), List.of(leftOperator, rightOperator),
             schema);
 
     MseBlock result = minusOperator.nextBlock();

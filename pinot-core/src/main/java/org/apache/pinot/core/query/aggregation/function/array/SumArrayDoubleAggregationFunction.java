@@ -21,9 +21,11 @@ package org.apache.pinot.core.query.aggregation.function.array;
 import it.unimi.dsi.fastutil.doubles.DoubleArrayList;
 import java.util.List;
 import java.util.Map;
+import org.apache.pinot.common.CustomObject;
 import org.apache.pinot.common.request.context.ExpressionContext;
 import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.core.common.BlockValSet;
+import org.apache.pinot.core.common.ObjectSerDeUtils;
 import org.apache.pinot.core.query.aggregation.AggregationResultHolder;
 import org.apache.pinot.core.query.aggregation.ObjectAggregationResultHolder;
 import org.apache.pinot.core.query.aggregation.function.BaseSingleInputAggregationFunction;
@@ -136,7 +138,21 @@ public class SumArrayDoubleAggregationFunction
 
   @Override
   public DataSchema.ColumnDataType getIntermediateResultColumnType() {
-    return DataSchema.ColumnDataType.DOUBLE_ARRAY;
+    // AggregationResultsBlock#setIntermediateResult and AggregationFunctionUtils#getIntermediateResult only serialize
+    // intermediate results whose stored type is INT/LONG/DOUBLE/STRING/OBJECT, so we need the OBJECT/custom ser-de path
+    // for DoubleArrayList payloads.
+    return DataSchema.ColumnDataType.OBJECT;
+  }
+
+  @Override
+  public SerializedIntermediateResult serializeIntermediateResult(DoubleArrayList doubleArrayList) {
+    return new SerializedIntermediateResult(ObjectSerDeUtils.ObjectType.DoubleArrayList.getValue(),
+        ObjectSerDeUtils.DOUBLE_ARRAY_LIST_SER_DE.serialize(doubleArrayList));
+  }
+
+  @Override
+  public DoubleArrayList deserializeIntermediateResult(CustomObject customObject) {
+    return ObjectSerDeUtils.DOUBLE_ARRAY_LIST_SER_DE.deserialize(customObject.getBuffer());
   }
 
   @Override

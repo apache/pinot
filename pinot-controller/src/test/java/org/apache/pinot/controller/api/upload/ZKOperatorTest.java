@@ -18,7 +18,6 @@
  */
 package org.apache.pinot.controller.api.upload;
 
-import com.google.common.collect.ImmutableList;
 import java.io.File;
 import java.net.URI;
 import java.util.HashMap;
@@ -124,7 +123,7 @@ public class ZKOperatorTest {
     config.setSegmentName(SEGMENT_NAME);
     GenericRow row = new GenericRow();
     row.putValue("colA", "100");
-    List<GenericRow> rows = ImmutableList.of(row);
+    List<GenericRow> rows = List.of(row);
 
     SegmentIndexCreationDriverImpl driver = new SegmentIndexCreationDriverImpl();
     driver.init(config, new GenericRowRecordReader(rows));
@@ -160,6 +159,7 @@ public class ZKOperatorTest {
     SegmentMetadata segmentMetadata = mock(SegmentMetadata.class);
     when(segmentMetadata.getName()).thenReturn(segmentName);
     when(segmentMetadata.getCrc()).thenReturn("12345");
+    when(segmentMetadata.getDataCrc()).thenReturn("432");
     when(segmentMetadata.getIndexCreationTime()).thenReturn(123L);
     HttpHeaders httpHeaders = mock(HttpHeaders.class);
 
@@ -201,6 +201,7 @@ public class ZKOperatorTest {
     SegmentMetadata segmentMetadata = mock(SegmentMetadata.class);
     when(segmentMetadata.getName()).thenReturn(SEGMENT_NAME);
     when(segmentMetadata.getCrc()).thenReturn("12345");
+    when(segmentMetadata.getDataCrc()).thenReturn("432");
     when(segmentMetadata.getIndexCreationTime()).thenReturn(123L);
     HttpHeaders httpHeaders = mock(HttpHeaders.class);
 
@@ -332,6 +333,7 @@ public class ZKOperatorTest {
     SegmentMetadata segmentMetadata = mock(SegmentMetadata.class);
     when(segmentMetadata.getName()).thenReturn(SEGMENT_NAME);
     when(segmentMetadata.getCrc()).thenReturn("12345");
+    when(segmentMetadata.getDataCrc()).thenReturn("432");
     zkOperator.completeSegmentOperations(REALTIME_TABLE_CONFIG, segmentMetadata, FileUploadType.SEGMENT, null, null,
         "downloadUrl", "downloadUrl", null, 10, true, true, mock(HttpHeaders.class));
 

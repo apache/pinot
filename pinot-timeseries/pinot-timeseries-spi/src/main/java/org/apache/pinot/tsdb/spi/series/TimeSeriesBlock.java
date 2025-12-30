@@ -18,9 +18,12 @@
  */
 package org.apache.pinot.tsdb.spi.series;
 
+import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import javax.annotation.Nullable;
+import org.apache.pinot.spi.exception.QueryException;
 import org.apache.pinot.tsdb.spi.TimeBuckets;
 
 
@@ -37,10 +40,27 @@ public class TimeSeriesBlock {
    * {@link TimeSeries#getId()}.
    */
   private final Map<Long, List<TimeSeries>> _seriesMap;
+  /**
+   * Holds optional metadata about the block (e.g., statistics).
+   */
+  private final Map<String, String> _metadata;
+  /**
+   * Holds exceptions encountered during processing of the block.
+   */
+  // TODO(timeseries): Exceptions are not serialized and propagated from servers to brokers currently, need to pass
+  // all exceptions from servers to broker through this only.
+  private final List<QueryException> _exceptions;
 
   public TimeSeriesBlock(@Nullable TimeBuckets timeBuckets, Map<Long, List<TimeSeries>> seriesMap) {
+    this(timeBuckets, seriesMap, Map.of());
+  }
+
+  public TimeSeriesBlock(@Nullable TimeBuckets timeBuckets, Map<Long, List<TimeSeries>> seriesMap,
+      Map<String, String> metadata) {
     _timeBuckets = timeBuckets;
     _seriesMap = seriesMap;
+    _metadata = Collections.unmodifiableMap(metadata);
+    _exceptions = new ArrayList<>();
   }
 
   @Nullable
@@ -50,5 +70,17 @@ public class TimeSeriesBlock {
 
   public Map<Long, List<TimeSeries>> getSeriesMap() {
     return _seriesMap;
+  }
+
+  public Map<String, String> getMetadata() {
+    return _metadata;
+  }
+
+  public List<QueryException> getExceptions() {
+    return _exceptions;
+  }
+
+  public void addToExceptions(QueryException exception) {
+    _exceptions.add(exception);
   }
 }

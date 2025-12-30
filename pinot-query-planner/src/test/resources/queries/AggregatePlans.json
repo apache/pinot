@@ -160,7 +160,7 @@
       },
       {
         "description": "MIN on STRING column rewritten to MINSTRING",
-        "sql": "EXPLAIN PLAN FOR SELECT MIN(a.col1) FROM a",
+        "sql": "SET autoRewriteAggregationType=true; EXPLAIN PLAN FOR SELECT MIN(a.col1) FROM a",
         "output": [
           "Execution Plan",
           "\nPinotLogicalAggregate(group=[{}], agg#0=[MINSTRING($0)], aggType=[FINAL])",
@@ -172,7 +172,7 @@
       },
       {
         "description": "MIN on INT column not rewritten",
-        "sql": "EXPLAIN PLAN FOR SELECT MIN(a.col3) FROM a",
+        "sql": "SET autoRewriteAggregationType=true; EXPLAIN PLAN FOR SELECT MIN(a.col3) FROM a",
         "output": [
           "Execution Plan",
           "\nPinotLogicalAggregate(group=[{}], agg#0=[MIN($0)], aggType=[FINAL])",
@@ -184,7 +184,7 @@
       },
       {
         "description": "MAX on STRING column rewritten to MAXSTRING",
-        "sql": "EXPLAIN PLAN FOR SELECT MAX(a.col2) FROM a",
+        "sql": "SET autoRewriteAggregationType=true; EXPLAIN PLAN FOR SELECT MAX(a.col2) FROM a",
         "output": [
           "Execution Plan",
           "\nPinotLogicalAggregate(group=[{}], agg#0=[MAXSTRING($0)], aggType=[FINAL])",
@@ -196,7 +196,7 @@
       },
       {
         "description": "MAX on INT column not rewritten",
-        "sql": "EXPLAIN PLAN FOR SELECT MAX(a.col3) FROM a",
+        "sql": "SET autoRewriteAggregationType=true; EXPLAIN PLAN FOR SELECT MAX(a.col3) FROM a",
         "output": [
           "Execution Plan",
           "\nPinotLogicalAggregate(group=[{}], agg#0=[MAX($0)], aggType=[FINAL])",

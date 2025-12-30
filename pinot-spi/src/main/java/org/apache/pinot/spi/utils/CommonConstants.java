@@ -36,6 +36,7 @@ public class CommonConstants {
   public static final String DEFAULT_FAILURE_DOMAIN = "No such domain";
 
   public static final String PREFIX_OF_SSL_SUBSET = "ssl";
+  public static final String CONFIG_OF_SSL_USE_RENEWABLE_CONTEXT = "ssl.use.renewable.context";
   public static final String HTTP_PROTOCOL = "http";
   public static final String HTTPS_PROTOCOL = "https";
 
@@ -250,6 +251,9 @@ public class CommonConstants {
     @Deprecated(since = "1.5.0", forRemoval = true)
     public static final String CONFIG_OF_ZOOKEEPR_SERVER = "pinot.zk.server";
 
+    public static final String CONFIG_OF_REMOTE_CLUSTER_NAMES = "pinot.remote.cluster.names";
+    public static final String CONFIG_OF_REMOTE_ZOOKEEPER_SERVERS = "pinot.remote.zk.server.%s";
+
     public static final String CONFIG_OF_PINOT_CONTROLLER_STARTABLE_CLASS = "pinot.controller.startable.class";
     public static final String CONFIG_OF_PINOT_BROKER_STARTABLE_CLASS = "pinot.broker.startable.class";
     public static final String CONFIG_OF_PINOT_SERVER_STARTABLE_CLASS = "pinot.server.startable.class";
@@ -355,6 +359,10 @@ public class CommonConstants {
         "pinot.broker.query.regex.dict.size.threshold";
     public static final String CONFIG_OF_BROKER_ENABLE_QUERY_CANCELLATION = "pinot.broker.enable.query.cancellation";
     public static final boolean DEFAULT_BROKER_ENABLE_QUERY_CANCELLATION = true;
+    public static final String CONFIG_OF_BROKER_ENABLE_QUERY_FINGERPRINTING =
+        "pinot.broker.enable.query.fingerprinting";
+    public static final boolean DEFAULT_BROKER_ENABLE_QUERY_FINGERPRINTING = false;
+    public static final String DEFAULT_QUERY_HASH = "";
     public static final double DEFAULT_BROKER_QUERY_LOG_MAX_RATE_PER_SECOND = 10_000d;
     public static final String CONFIG_OF_BROKER_TIMEOUT_MS = "pinot.broker.timeoutMs";
     public static final long DEFAULT_BROKER_TIMEOUT_MS = 10_000L;
@@ -596,6 +604,22 @@ public class CommonConstants {
     @Deprecated
     public static final int FALLBACK_REPLICA_GROUP_ID = -1;
 
+    public static final String CONFIG_OF_BROKER_QUERY_ENABLE_AUTO_REWRITE_AGGREGATION_TYPE =
+        "pinot.broker.query.enable.auto.rewrite.aggregation.type";
+
+    /// Config for sort exchange copy threshold in multi-stage engine.
+    ///
+    /// When there is an `order by X limit Y` clause in the query, during the distributed execution
+    /// we have to perform a sort exchange to gather the top Y rows from all the workers.
+    /// This can be optimized by having each upstream send only the top Y rows to the downstream.
+    ///
+    /// We only apply this optimization when Y is small smaller than the value of this property.
+    /// The default value is a heuristic value which may change from Pinot version to version.
+    public static final String CONFIG_OF_SORT_EXCHANGE_COPY_THRESHOLD =
+        "pinot.broker.multistage.sort.exchange.copy.threshold";
+    // TODO: Change this default to something very high, as this _optimnization_ is usually not beneficial.
+    public static final int DEFAULT_SORT_EXCHANGE_COPY_THRESHOLD = 10_000;
+
     public static class Request {
       public static final String SQL = "sql";
       public static final String SQL_V1 = "sqlV1";
@@ -617,6 +641,7 @@ public class CommonConstants {
         public static final String USE_SCAN_REORDER_OPTIMIZATION = "useScanReorderOpt";
         public static final String MAX_EXECUTION_THREADS = "maxExecutionThreads";
         public static final String COLLECT_GC_STATS = "collectGCStats";
+        public static final String QUERY_HASH = "queryHash";
 
         // For group-by queries with order-by clause, the tail groups are trimmed off to reduce the memory footprint. To
         // ensure the accuracy of the result, {@code max(limit * 5, minTrimSize)} groups are retained. When
@@ -832,6 +857,17 @@ public class CommonConstants {
         // Option denoting the workloadName to which the query belongs. This is used to enforce resource budgets for
         // each workload if "Query Workload Isolation" feature enabled.
         public static final String WORKLOAD_NAME = "workloadName";
+
+        // Option to enable auto rewrite of certain aggregations based on input operand type. This can be enabled to
+        // improve performance and also avoid precision loss from default double based aggregations. This will be turned
+        // on by default in a future release. Examples of rewrites:
+        // MIN(longCol) -> MINLONG(longCol)
+        // MAX(stringCol) -> MAXSTRING(stringCol)
+        // SUM(intCol) -> SUMINT(intCol)
+        public static final String AUTO_REWRITE_AGGREGATION_TYPE = "autoRewriteAggregationType";
+
+        /// Option to customize the value of [Broker#CONFIG_OF_SORT_EXCHANGE_COPY_THRESHOLD]
+        public static final String SORT_EXCHANGE_COPY_THRESHOLD = "sortExchangeCopyThreshold";
       }
 
       public static class QueryOptionValue {
@@ -902,8 +938,12 @@ public class CommonConstants {
         PlannerRuleNames.SORT_JOIN_TRANSPOSE,
         PlannerRuleNames.SORT_JOIN_COPY,
         PlannerRuleNames.AGGREGATE_UNION_AGGREGATE,
-        PlannerRuleNames.JOIN_TO_ENRICHED_JOIN
+        PlannerRuleNames.JOIN_TO_ENRICHED_JOIN,
+        PlannerRuleNames.AGGREGATE_FUNCTION_REWRITE,
+        PlannerRuleNames.JOIN_PUSH_TRANSITIVE_PREDICATES
     );
+
+    public static final String CONFIG_OF_BROKER_MSE_PLANNER_DISABLED_RULES = "pinot.broker.mse.planner.disabled.rules";
 
     public static class FailureDetector {
       public enum Type {
@@ -1036,6 +1076,9 @@ public class CommonConstants {
     public static final String USE_MSE_TO_FILL_EMPTY_RESPONSE_SCHEMA =
         "pinot.broker.use.mse.to.fill.empty.response.schema";
     public static final boolean DEFAULT_USE_MSE_TO_FILL_EMPTY_RESPONSE_SCHEMA = false;
+
+    public static final String USE_HTTP_STATUS_FOR_ERRORS_HEADER =
+        "Pinot-Use-Http-Status-For-Errors";
   }
 
   public static class Server {
@@ -1443,6 +1486,10 @@ public class CommonConstants {
     public static final boolean DEFAULT_ENABLE_THREAD_CPU_TIME_MEASUREMENT = false;
     public static final boolean DEFAULT_THREAD_ALLOCATED_BYTES_MEASUREMENT = false;
 
+    // Predownload related configs
+    public static final String CONFIG_OF_PREDOWNLOAD_PARALLELISM = "pinot.server.predownload.parallelism";
+    public static final int DEFAULT_PREDOWNLOAD_PARALLELISM = -1; // Use numProcessors * 3 as default
+
     public static final String CONFIG_OF_CURRENT_DATA_TABLE_VERSION = "pinot.server.instance.currentDataTableVersion";
 
     // Environment Provider Configs
@@ -1758,6 +1805,7 @@ public class CommonConstants {
     public static final String INDEX_VERSION = "segment.index.version";
     public static final String TOTAL_DOCS = "segment.total.docs";
     public static final String CRC = "segment.crc";
+    public static final String DATA_CRC = "segment.data.crc";
     public static final String TIER = "segment.tier";
     public static final String CREATION_TIME = "segment.creation.time";
     public static final String PUSH_TIME = "segment.push.time";
@@ -2076,6 +2124,10 @@ public class CommonConstants {
         "pinot.field.spec.default.json.max.length.exceed.strategy";
     public static final String CONFIG_OF_DEFAULT_JSON_MAX_LENGTH =
         "pinot.field.spec.default.json.max.length";
+  }
+
+  public static class IngestionConfigs {
+    public static final int DEFAULT_INGESTION_EXCEPTION_LOG_RATE_LIMIT_PER_MIN = 5;
   }
 
   /**

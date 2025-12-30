@@ -167,6 +167,10 @@ public class QueryOptionsUtils {
     return Boolean.parseBoolean(queryOptions.get(QueryOptionKey.COLLECT_GC_STATS));
   }
 
+  public static String getQueryHash(Map<String, String> queryOptions) {
+    return queryOptions.getOrDefault(QueryOptionKey.QUERY_HASH, CommonConstants.Broker.DEFAULT_QUERY_HASH);
+  }
+
   @Nullable
   public static Map<String, Set<FieldConfig.IndexType>> getSkipIndexes(Map<String, String> queryOptions) {
     // Example config:  skipIndexes='col1=inverted,range&col2=inverted'
@@ -197,26 +201,26 @@ public class QueryOptionsUtils {
 
   public static Set<String> getSkipPlannerRules(Map<String, String> queryOptions) {
     // Example config:  skipPlannerRules='FilterIntoJoin,FilterAggregateTranspose'
-    String skipIndexesStr = queryOptions.get(QueryOptionKey.SKIP_PLANNER_RULES);
-    if (skipIndexesStr == null) {
+    String skipPlannerRulesStr = queryOptions.get(QueryOptionKey.SKIP_PLANNER_RULES);
+    if (skipPlannerRulesStr == null) {
       return Set.of();
     }
 
-    String[] skippedRules = StringUtils.split(skipIndexesStr, ',');
+    String[] skippedRules = StringUtils.split(skipPlannerRulesStr, ',');
 
     return new HashSet<>(List.of(skippedRules));
   }
 
   public static Set<String> getUsePlannerRules(Map<String, String> queryOptions) {
     // Example config:  usePlannerRules='SortJoinTranspose, AggregateJoinTransposeExtended'
-    String usedIndexesStr = queryOptions.get(QueryOptionKey.USE_PLANNER_RULES);
-    if (usedIndexesStr == null) {
+    String usePlannerRulesStr = queryOptions.get(QueryOptionKey.USE_PLANNER_RULES);
+    if (usePlannerRulesStr == null) {
       return Set.of();
     }
 
-    String[] usedRules = StringUtils.split(usedIndexesStr, ',');
+    String[] useRules = StringUtils.split(usePlannerRulesStr, ',');
 
-    return new HashSet<>(List.of(usedRules));
+    return new HashSet<>(List.of(useRules));
   }
 
   @Nullable
@@ -590,5 +594,18 @@ public class QueryOptionsUtils {
   public static Integer getRegexDictSizeThreshold(Map<String, String> queryOptions) {
     String regexDictSizeThreshold = queryOptions.get(QueryOptionKey.REGEX_DICT_SIZE_THRESHOLD);
     return uncheckedParseInt(QueryOptionKey.REGEX_DICT_SIZE_THRESHOLD, regexDictSizeThreshold);
+  }
+
+  public static int getSortExchangeCopyThreshold(Map<String, String> options, int i) {
+    String sortExchangeCopyThreshold = options.get(QueryOptionKey.SORT_EXCHANGE_COPY_THRESHOLD);
+    if (sortExchangeCopyThreshold != null) {
+      try {
+        return Integer.parseInt(sortExchangeCopyThreshold);
+      } catch (NumberFormatException e) {
+        throw new IllegalArgumentException(String.format("%s must be an integer, got: %s",
+            QueryOptionKey.SORT_EXCHANGE_COPY_THRESHOLD, sortExchangeCopyThreshold));
+      }
+    }
+    return i;
   }
 }

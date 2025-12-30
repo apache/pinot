@@ -587,7 +587,7 @@ public class JsonUtilsTest {
         .addSingleValueDimension("tuple.address.city", FieldSpec.DataType.STRING)
         .addSingleValueDimension("entries", FieldSpec.DataType.STRING)
         .addMultiValueDimension("d2", FieldSpec.DataType.INT)
-        .addDateTime("hoursSinceEpoch", FieldSpec.DataType.INT, "1:HOURS:EPOCH", "1:HOURS").build();
+        .addDateTime("hoursSinceEpoch", FieldSpec.DataType.INT, "EPOCH|HOURS", "1:HOURS").build();
     Assert.assertEquals(inferredPinotSchema, expectedSchema);
 
     // unnest collection entries
@@ -601,7 +601,7 @@ public class JsonUtilsTest {
         .addSingleValueDimension("entries.id", FieldSpec.DataType.INT)
         .addSingleValueDimension("entries.description", FieldSpec.DataType.STRING)
         .addMultiValueDimension("d2", FieldSpec.DataType.INT)
-        .addDateTime("hoursSinceEpoch", FieldSpec.DataType.INT, "1:HOURS:EPOCH", "1:HOURS").build();
+        .addDateTime("hoursSinceEpoch", FieldSpec.DataType.INT, "EPOCH|HOURS", "1:HOURS").build();
     Assert.assertEquals(inferredPinotSchema, expectedSchema);
 
     // change delimiter
@@ -614,7 +614,7 @@ public class JsonUtilsTest {
         .addSingleValueDimension("tuple_address_city", FieldSpec.DataType.STRING)
         .addSingleValueDimension("entries", FieldSpec.DataType.STRING)
         .addMultiValueDimension("d2", FieldSpec.DataType.INT)
-        .addDateTime("hoursSinceEpoch", FieldSpec.DataType.INT, "1:HOURS:EPOCH", "1:HOURS").build();
+        .addDateTime("hoursSinceEpoch", FieldSpec.DataType.INT, "EPOCH|HOURS", "1:HOURS").build();
     Assert.assertEquals(inferredPinotSchema, expectedSchema);
 
     // change the handling of collection-to-json option, d2 will become string
@@ -628,7 +628,7 @@ public class JsonUtilsTest {
         .addSingleValueDimension("entries.id", FieldSpec.DataType.INT)
         .addSingleValueDimension("entries.description", FieldSpec.DataType.STRING)
         .addSingleValueDimension("d2", FieldSpec.DataType.STRING)
-        .addDateTime("hoursSinceEpoch", FieldSpec.DataType.INT, "1:HOURS:EPOCH", "1:HOURS").build();
+        .addDateTime("hoursSinceEpoch", FieldSpec.DataType.INT, "EPOCH|HOURS", "1:HOURS").build();
     Assert.assertEquals(inferredPinotSchema, expectedSchema);
   }
 

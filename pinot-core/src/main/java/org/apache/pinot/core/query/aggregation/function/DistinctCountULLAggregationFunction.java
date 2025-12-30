@@ -22,6 +22,7 @@ import com.dynatrace.hash4j.distinctcount.UltraLogLog;
 import com.google.common.base.Preconditions;
 import java.util.List;
 import java.util.Map;
+import javax.annotation.Nullable;
 import org.apache.pinot.common.CustomObject;
 import org.apache.pinot.common.request.context.ExpressionContext;
 import org.apache.pinot.common.utils.DataSchema.ColumnDataType;
@@ -305,11 +306,12 @@ public class DistinctCountULLAggregationFunction extends BaseSingleInputAggregat
     }
   }
 
+  @Nullable
   @Override
   public UltraLogLog extractAggregationResult(AggregationResultHolder aggregationResultHolder) {
     Object result = aggregationResultHolder.getResult();
     if (result == null) {
-      return UltraLogLog.create(_p);
+      return null;
     }
 
     if (result instanceof DictIdsWrapper) {
@@ -321,11 +323,12 @@ public class DistinctCountULLAggregationFunction extends BaseSingleInputAggregat
     }
   }
 
+  @Nullable
   @Override
   public UltraLogLog extractGroupByResult(GroupByResultHolder groupByResultHolder, int groupKey) {
     Object result = groupByResultHolder.getResult(groupKey);
     if (result == null) {
-      return UltraLogLog.create(_p);
+      return null;
     }
 
     if (result instanceof DictIdsWrapper) {
@@ -337,13 +340,20 @@ public class DistinctCountULLAggregationFunction extends BaseSingleInputAggregat
     }
   }
 
+  @Nullable
   @Override
-  public UltraLogLog merge(UltraLogLog intermediateResult1, UltraLogLog intermediateResult2) {
-    int largerP = Math.max(intermediateResult1.getP(), intermediateResult2.getP());
-    UltraLogLog merged = UltraLogLog.create(largerP);
-    merged.add(intermediateResult1);
-    merged.add(intermediateResult2);
-    return merged;
+  public UltraLogLog merge(@Nullable UltraLogLog intermediateResult1, @Nullable UltraLogLog intermediateResult2) {
+    if (intermediateResult1 == null) {
+      return intermediateResult2;
+    }
+    if (intermediateResult2 == null) {
+      return intermediateResult1;
+    }
+    // UltraLogLog object doesn't support merging a smaller p object into a larger p object.
+    if (intermediateResult1.getP() > intermediateResult2.getP()) {
+      return intermediateResult2.add(intermediateResult1);
+    }
+    return intermediateResult1.add(intermediateResult2);
   }
 
   @Override

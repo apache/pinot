@@ -187,7 +187,7 @@ public class PinotEvaluateLiteralRule {
     }
     String canonicalName = FunctionRegistry.canonicalize(PinotRuleUtils.extractFunctionName(rexCall));
     FunctionInfo functionInfo = FunctionRegistry.lookupFunctionInfo(canonicalName, argumentTypes);
-    if (functionInfo == null) {
+    if (functionInfo == null || !functionInfo.isDeterministic()) {
       // Function cannot be evaluated
       return rexCall;
     }
