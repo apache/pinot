@@ -426,7 +426,6 @@ public abstract class BaseTableDataManager implements TableDataManager {
 
   /**
    * Replaces an already loaded segment in a table if the segment has been overridden in the deep store (CRC mismatch).
-   * Accepts a flag to indicate whether to use data CRC (if available) for comparison instead of the default index CRC.
    */
   protected void replaceSegmentIfCrcMismatch(SegmentDataManager segmentDataManager, SegmentZKMetadata zkMetadata,
       IndexLoadingConfig indexLoadingConfig)
@@ -1283,9 +1282,7 @@ public abstract class BaseTableDataManager implements TableDataManager {
       return false;
     }
     if (isSegmentStatusCompleted(zkMetadata) && !hasSameCRC(zkMetadata, segmentMetadata)) {
-      _logger.warn("Segment: {} has CRC changed from: {} to: {}",
-          segmentName,
-          segmentMetadata.getCrc(),
+      _logger.warn("Segment: {} has CRC changed from: {} to: {}", segmentName, segmentMetadata.getCrc(),
           zkMetadata.getCrc());
       if (_instanceDataManagerConfig.shouldCheckCRCOnSegmentLoad()) {
         closeSegmentDirectoryQuietly(segmentDirectory);
