@@ -113,15 +113,11 @@ public class TimeSeriesBlockSerde {
     TimeSeriesBlock block = new TimeSeriesBlock(timeBuckets, seriesMap, metadataMap);
     if (metadataMap.containsKey(EXCEPTIONS_METADATA_KEY)) {
       String exceptionsJson = metadataMap.get(EXCEPTIONS_METADATA_KEY);
-      try {
-        List<Map<String, Object>> exceptionsList = JsonUtils.stringToObject(exceptionsJson, List.class);
-        for (Map<String, Object> exceptionData : exceptionsList) {
-          int errorCode = ((Number) exceptionData.get(ERROR_CODE)).intValue();
-          String message = (String) exceptionData.get(MESSAGE);
-          block.addToExceptions(new QueryException(QueryErrorCode.fromErrorCode(errorCode), message));
-        }
-      } catch (Exception e) {
-        throw new IOException("Failed to deserialize exceptions from metadata", e);
+      List<Map<String, Object>> exceptionsList = JsonUtils.stringToObject(exceptionsJson, List.class);
+      for (Map<String, Object> exceptionData : exceptionsList) {
+        int errorCode = ((Number) exceptionData.get(ERROR_CODE)).intValue();
+        String message = (String) exceptionData.get(MESSAGE);
+        block.addToExceptions(new QueryException(QueryErrorCode.fromErrorCode(errorCode), message));
       }
     }
     return block;
@@ -142,21 +138,18 @@ public class TimeSeriesBlockSerde {
     return DataBlockUtils.toByteString(rowHeapBlock.asSerialized().getDataBlock());
   }
 
-  public static void encodeExceptionsToMetadata(TimeSeriesBlock timeSeriesBlock, Map<String, String> metadataMap) {
+  public static void encodeExceptionsToMetadata(TimeSeriesBlock timeSeriesBlock, Map<String, String> metadataMap)
+    throws Exception {
     List<QueryException> exceptions = timeSeriesBlock.getExceptions();
     if (exceptions != null && !exceptions.isEmpty()) {
-      try {
-        List<Map<String, Object>> exceptionsList = new ArrayList<>();
-        for (QueryException exception : exceptions) {
-          Map<String, Object> exceptionData = new HashMap<>();
-          exceptionData.put(ERROR_CODE, exception.getErrorCode().getId());
-          exceptionData.put(MESSAGE, exception.getMessage());
-          exceptionsList.add(exceptionData);
-        }
-        metadataMap.put(EXCEPTIONS_METADATA_KEY, JsonUtils.objectToString(exceptionsList));
-      } catch (Exception e) {
-        throw new RuntimeException("Failed to encode exceptions to metadata", e);
+      List<Map<String, Object>> exceptionsList = new ArrayList<>();
+      for (QueryException exception : exceptions) {
+        Map<String, Object> exceptionData = new HashMap<>();
+        exceptionData.put(ERROR_CODE, exception.getErrorCode().getId());
+        exceptionData.put(MESSAGE, exception.getMessage());
+        exceptionsList.add(exceptionData);
       }
+      metadataMap.put(EXCEPTIONS_METADATA_KEY, JsonUtils.objectToString(exceptionsList));
     }
   }
 

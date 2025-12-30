@@ -208,7 +208,7 @@ public class TimeSeriesIntegrationTest extends BaseClusterIntegrationTest {
   }
 
   @Test(dataProvider = "isBrokerResponseCompatible")
-  public void testQueryWithJsonMatchWithoutIndex(boolean isBrokerResponseCompatible) {
+  public void testQueryWithServerExceptions(boolean isBrokerResponseCompatible) {
     // JSON_MATCH on a column without JSON index triggers a QUERY_EXECUTION error.
     String query = String.format(
         "fetch{table=\"mytable_OFFLINE\",filter=\"JSON_MATCH(%s, '\\\"$.key=value\\\"')\",ts_column=\"%s\","
