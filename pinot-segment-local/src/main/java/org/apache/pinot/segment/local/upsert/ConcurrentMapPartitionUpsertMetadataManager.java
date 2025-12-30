@@ -281,7 +281,6 @@ public class ConcurrentMapPartitionUpsertMetadataManager extends BasePartitionUp
         _primaryKeyToRecordLocationMap.put(obj.getKey(), obj.getValue());
       } else {
         _primaryKeyToRecordLocationMap.remove(obj.getKey());
-        removeDocId(oldSegment, obj.getValue().getDocId());
       }
     }
     // For the newly added keys into the segment, remove the pk and valid doc id

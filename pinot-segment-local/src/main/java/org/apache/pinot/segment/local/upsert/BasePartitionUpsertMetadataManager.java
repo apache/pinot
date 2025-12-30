@@ -693,12 +693,8 @@ public abstract class BasePartitionUpsertMetadataManager implements PartitionUps
           + "This can potentially cause inconsistency between replicas. "
           + "Reverting metadata changes and triggering segment replacement.", numKeysNotReplaced, segmentName);
       revertSegmentUpsertMetadataWithRetry(segment, validDocIds, queryableDocIds, oldSegment, segmentName);
-    } else if (isConsumingSegmentSeal) {
-      _logger.info("Found {} primary keys not replaced when sealing consuming segment: {}", numKeysNotReplaced,
-          segmentName);
     } else {
-      _logger.warn("Found {} primary keys not replaced when replacing immutable segment: {}. "
-          + "Skipping revert as this is not a consuming segment.", numKeysNotReplaced, segmentName);
+      _logger.warn("Found {} primary keys not replaced for the segment: {}.", numKeysNotReplaced, segmentName);
     }
   }
 
