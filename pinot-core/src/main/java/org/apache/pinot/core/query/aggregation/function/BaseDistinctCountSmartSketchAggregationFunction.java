@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.core.query.aggregation.function;
 
+import com.clearspring.analytics.stream.cardinality.HyperLogLog;
 import it.unimi.dsi.fastutil.doubles.DoubleOpenHashSet;
 import it.unimi.dsi.fastutil.floats.FloatOpenHashSet;
 import it.unimi.dsi.fastutil.ints.IntOpenHashSet;
@@ -64,6 +65,15 @@ abstract class BaseDistinctCountSmartSketchAggregationFunction
   protected abstract Object convertToSketch(DictIdsWrapper dictIdsWrapper);
 
   protected abstract IllegalStateException getIllegalDataTypeException(DataType dataType, boolean singleValue);
+
+  /**
+   * Returns the dictionary cardinality threshold for adaptive conversion.
+   * If the cardinality exceeds this threshold, the bitmap is converted to a sketch.
+   * Return Integer.MAX_VALUE to disable adaptive conversion during aggregation.
+   */
+  protected int getDictIdCardinalityThreshold() {
+    return Integer.MAX_VALUE;
+  }
 
   @Override
   public final AggregationResultHolder createAggregationResultHolder() {
@@ -202,17 +212,21 @@ abstract class BaseDistinctCountSmartSketchAggregationFunction
 
     Dictionary dictionary = blockValSet.getDictionary();
     if (dictionary != null) {
+      // Track which groups were modified to check cardinality only once per group per batch
+      IntSet modifiedGroups = new IntOpenHashSet();
       if (blockValSet.isSingleValue()) {
         int[] dictIds = blockValSet.getDictionaryIdsSV();
         for (int i = 0; i < length; i++) {
-          getDictIdBitmap(groupByResultHolder, groupKeyArray[i], dictionary).add(dictIds[i]);
+          aggregateDictIdForGroup(groupByResultHolder, groupKeyArray[i], dictionary, dictIds[i], modifiedGroups);
         }
       } else {
         int[][] dictIds = blockValSet.getDictionaryIdsMV();
         for (int i = 0; i < length; i++) {
-          getDictIdBitmap(groupByResultHolder, groupKeyArray[i], dictionary).add(dictIds[i]);
+          aggregateDictIdsForGroup(groupByResultHolder, groupKeyArray[i], dictionary, dictIds[i], modifiedGroups);
         }
       }
+      // Check cardinality only once per modified group after all additions
+      checkAndConvertToSketchForGroups(groupByResultHolder, modifiedGroups);
       return;
     }
 
@@ -335,19 +349,25 @@ abstract class BaseDistinctCountSmartSketchAggregationFunction
 
     Dictionary dictionary = blockValSet.getDictionary();
     if (dictionary != null) {
+      // Track which groups were modified to check cardinality only once per group per batch
+      IntSet modifiedGroups = new IntOpenHashSet();
       if (blockValSet.isSingleValue()) {
         int[] dictIds = blockValSet.getDictionaryIdsSV();
         for (int i = 0; i < length; i++) {
-          setDictIdForGroupKeys(groupByResultHolder, groupKeysArray[i], dictionary, dictIds[i]);
+          for (int groupKey : groupKeysArray[i]) {
+            aggregateDictIdForGroup(groupByResultHolder, groupKey, dictionary, dictIds[i], modifiedGroups);
+          }
         }
       } else {
         int[][] dictIds = blockValSet.getDictionaryIdsMV();
         for (int i = 0; i < length; i++) {
           for (int groupKey : groupKeysArray[i]) {
-            getDictIdBitmap(groupByResultHolder, groupKey, dictionary).add(dictIds[i]);
+            aggregateDictIdsForGroup(groupByResultHolder, groupKey, dictionary, dictIds[i], modifiedGroups);
           }
         }
       }
+      // Check cardinality only once per modified group after all additions
+      checkAndConvertToSketchForGroups(groupByResultHolder, modifiedGroups);
       return;
     }
 
@@ -667,6 +687,62 @@ abstract class BaseDistinctCountSmartSketchAggregationFunction
       default:
         throw new IllegalStateException(
             "Illegal data type for DISTINCT_COUNT_SMART aggregation function: " + storedType);
+    }
+  }
+
+  /**
+   * Aggregate a single dictionary ID for a group. If already a sketch, offer directly.
+   * Otherwise add to bitmap and track as modified.
+   */
+  private void aggregateDictIdForGroup(GroupByResultHolder groupByResultHolder, int groupKey, Dictionary dictionary,
+      int dictId, IntSet modifiedGroups) {
+    Object result = groupByResultHolder.getResult(groupKey);
+    if (!(result instanceof DictIdsWrapper)) {
+      // Already converted to sketch, offer directly
+      ((HyperLogLog) result).offer(dictionary.get(dictId));
+    } else {
+      // Still using bitmap, add dict ID
+      getDictIdBitmap(groupByResultHolder, groupKey, dictionary).add(dictId);
+      modifiedGroups.add(groupKey);
+    }
+  }
+
+  /**
+   * Aggregate multiple dictionary IDs for a group. If already a sketch, offer directly.
+   * Otherwise add to bitmap and track as modified.
+   */
+  private void aggregateDictIdsForGroup(GroupByResultHolder groupByResultHolder, int groupKey, Dictionary dictionary,
+      int[] dictIds, IntSet modifiedGroups) {
+    Object result = groupByResultHolder.getResult(groupKey);
+    if (!(result instanceof DictIdsWrapper)) {
+      // Already converted to sketch, offer directly
+      for (int dictId : dictIds) {
+        ((HyperLogLog) result).offer(dictionary.get(dictId));
+      }
+    } else {
+      // Still using bitmap, add dict IDs
+      getDictIdBitmap(groupByResultHolder, groupKey, dictionary).add(dictIds);
+      modifiedGroups.add(groupKey);
+    }
+  }
+
+  /**
+   * Check and convert to sketch if cardinality threshold exceeded for group-by aggregation.
+   */
+  private void checkAndConvertToSketchForGroups(GroupByResultHolder groupByResultHolder, IntSet modifiedGroups) {
+    int threshold = getDictIdCardinalityThreshold();
+    // Skip conversion check if adaptive conversion is disabled (threshold is Integer.MAX_VALUE)
+    if (threshold == Integer.MAX_VALUE) {
+      return;
+    }
+    for (int groupKey : modifiedGroups) {
+      Object result = groupByResultHolder.getResult(groupKey);
+      if (result instanceof DictIdsWrapper) {
+        DictIdsWrapper dictIdsWrapper = (DictIdsWrapper) result;
+        if (dictIdsWrapper._dictIdBitmap.getCardinality() > threshold) {
+          groupByResultHolder.setValueForKey(groupKey, convertToSketch(dictIdsWrapper));
+        }
+      }
     }
   }
 
