@@ -42,7 +42,7 @@ import CustomizedTables from '../components/Table';
 import QuerySideBar from '../components/Query/QuerySideBar';
 import TableToolbar from '../components/TableToolbar';
 import SimpleAccordion from '../components/SimpleAccordion';
-import PinotMethodUtils from '../utils/PinotMethodUtils';
+import PinotMethodUtils, { QUERY_STATS_COLUMNS } from '../utils/PinotMethodUtils';
 import '../styles/styles.css';
 import {Resizable} from "re-resizable";
 import {useHistory, useLocation} from 'react-router';
@@ -145,32 +145,6 @@ const sqlFuntionsList = [
   'DISTINCTCOUNTTHETASKETCH', 'DISTINCTCOUNTRAWTHETASKETCH', 'COUNTMV', 'MINMV', 'MAXMV',
   'SUMMV', 'AVGMV', 'MINMAXRANGEMV', 'DISTINCTCOUNTMV', 'DISTINCTCOUNTBITMAPMV', 'DISTINCTCOUNTHLLMV',
   'DISTINCTCOUNTRAWHLLMV', 'DISTINCT', 'ST_UNION'];
-
-const responseStatCols = [
-  'timeUsedMs',
-  'numDocsScanned',
-  'totalDocs',
-  'numServersQueried',
-  'numServersResponded',
-  'numSegmentsQueried',
-  'numSegmentsProcessed',
-  'numSegmentsMatched',
-  'numConsumingSegmentsQueried',
-  'numEntriesScannedInFilter',
-  'numEntriesScannedPostFilter',
-  'numGroupsLimitReached',
-  'numGroupsWarningLimitReached',
-  'partialResult',
-  'minConsumingFreshnessTimeMs',
-  'offlineThreadCpuTimeNs',
-  'realtimeThreadCpuTimeNs',
-  'offlineSystemActivitiesCpuTimeNs',
-  'realtimeSystemActivitiesCpuTimeNs',
-  'offlineResponseSerializationCpuTimeNs',
-  'realtimeResponseSerializationCpuTimeNs',
-  'offlineTotalCpuTimeNs',
-  'realtimeTotalCpuTimeNs'
-];
 
 // A custom hook that builds on useLocation to parse the query string
 function useQuery() {
@@ -389,7 +363,7 @@ const QueryPage = () => {
     const results = await PinotMethodUtils.getQueryResults(params);
     setResultError(results.exceptions || []);
     setResultData(results.result || { columns: [], records: [] });
-    setQueryStats(results.queryStats || { columns: responseStatCols, records: [] });
+    setQueryStats(results.queryStats || { columns: QUERY_STATS_COLUMNS, records: [] });
     setOutputResult(JSON.stringify(results.data, null, 2) || '');
     setStageStats(results?.data?.stageStats || {});
     setWarnings(extractWarnings(results));
