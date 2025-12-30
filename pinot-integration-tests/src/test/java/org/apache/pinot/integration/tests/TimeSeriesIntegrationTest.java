@@ -207,34 +207,36 @@ public class TimeSeriesIntegrationTest extends BaseClusterIntegrationTest {
     assertEquals(statusCodeAndResponse.getRight(), "[\"m3ql\"]");
   }
 
-  @Test(dataProvider = "isBrokerResponseCompatible")
-  public void testQueryWithServerExceptions(boolean isBrokerResponseCompatible) {
+  @Test(expectedExceptions = RuntimeException.class)
+  public void testQueryWithServerExceptionsForPrometheus() {
     // JSON_MATCH on a column without JSON index triggers a QUERY_EXECUTION error.
     String query = String.format(
         "fetch{table=\"mytable_OFFLINE\",filter=\"JSON_MATCH(%s, '\\\"$.key=value\\\"')\",ts_column=\"%s\","
             + "ts_unit=\"MILLISECONDS\",value=\"%s\"} | max{%s}",
         DEVICE_OS_COLUMN, TS_COLUMN, TOTAL_TRIPS_COLUMN, DEVICE_OS_COLUMN
     );
-    JsonNode result = isBrokerResponseCompatible
-        ? postTimeseriesQuery(getBrokerBaseApiUrl(), query, QUERY_START_TIME_SEC, QUERY_END_TIME_SEC, getHeaders())
-        : getTimeseriesQuery(query, QUERY_START_TIME_SEC, QUERY_END_TIME_SEC, getHeaders());
+    // Prometheus endpoint should throw an exception.
+    getTimeseriesQuery(query, QUERY_START_TIME_SEC, QUERY_END_TIME_SEC, getHeaders());
+  }
+
+  @Test
+  public void testQueryWithServerExceptionsForBroker() {
+    // JSON_MATCH on a column without JSON index triggers a QUERY_EXECUTION error.
+    String query = String.format(
+      "fetch{table=\"mytable_OFFLINE\",filter=\"JSON_MATCH(%s, '\\\"$.key=value\\\"')\",ts_column=\"%s\","
+        + "ts_unit=\"MILLISECONDS\",value=\"%s\"} | max{%s}",
+      DEVICE_OS_COLUMN, TS_COLUMN, TOTAL_TRIPS_COLUMN, DEVICE_OS_COLUMN
+    );
+    JsonNode result = postTimeseriesQuery(getBrokerBaseApiUrl(), query, QUERY_START_TIME_SEC, QUERY_END_TIME_SEC,
+      getHeaders());
     assertNotNull(result);
 
-    if (isBrokerResponseCompatible) {
-      JsonNode exceptions = result.get("exceptions");
-      assertNotNull(exceptions);
-      assertFalse(exceptions.isEmpty());
-      JsonNode firstException = exceptions.get(0);
-      assertEquals(firstException.get("errorCode").asInt(), 200);
-      assertTrue(firstException.get("message").asText().contains("Cannot apply JSON_MATCH on column"));
-    } else {
-      // Prometheus response returns success status with warnings.
-      assertEquals(result.get("status").asText(), "success");
-      JsonNode warnings = result.get("warnings");
-      assertNotNull(warnings);
-      assertFalse(warnings.isEmpty());
-      assertTrue(warnings.get(0).asText().contains("Cannot apply JSON_MATCH on column"));
-    }
+    JsonNode exceptions = result.get("exceptions");
+    assertNotNull(exceptions);
+    assertFalse(exceptions.isEmpty());
+    JsonNode firstException = exceptions.get(0);
+    assertEquals(firstException.get("errorCode").asInt(), 200);
+    assertTrue(firstException.get("message").asText().contains("Cannot apply JSON_MATCH on column"));
   }
 
   @DataProvider(name = "isBrokerResponseCompatible")

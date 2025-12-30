@@ -29,6 +29,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import java.util.stream.Collectors;
 import org.apache.pinot.spi.annotations.InterfaceStability;
 import org.apache.pinot.spi.exception.QueryException;
 import org.apache.pinot.tsdb.spi.series.TimeSeries;
@@ -55,7 +56,6 @@ public class PinotBrokerTimeSeriesResponse {
   private Data _data;
   private String _errorType;
   private String _error;
-  private List<String> _warnings;
 
   static {
     OBJECT_MAPPER.setDefaultPropertyInclusion(JsonInclude.Include.NON_NULL);
@@ -69,7 +69,6 @@ public class PinotBrokerTimeSeriesResponse {
     _data = data;
     _errorType = errorType;
     _error = error;
-    _warnings = warnings;
   }
 
   public String getStatus() {
@@ -88,10 +87,6 @@ public class PinotBrokerTimeSeriesResponse {
     return _error;
   }
 
-  public List<String> getWarnings() {
-    return _warnings;
-  }
-
   public String serialize()
       throws JsonProcessingException {
     return OBJECT_MAPPER.writeValueAsString(this);
@@ -105,10 +100,6 @@ public class PinotBrokerTimeSeriesResponse {
     return new PinotBrokerTimeSeriesResponse(SUCCESS_STATUS, data, null, null, null);
   }
 
-  public static PinotBrokerTimeSeriesResponse newSuccessResponse(Data data, List<String> warnings) {
-    return new PinotBrokerTimeSeriesResponse(SUCCESS_STATUS, data, null, null, warnings);
-  }
-
   public static PinotBrokerTimeSeriesResponse newErrorResponse(String errorType, String errorMessage) {
     return new PinotBrokerTimeSeriesResponse(ERROR_STATUS, Data.EMPTY, errorType, errorMessage, null);
   }
@@ -116,6 +107,11 @@ public class PinotBrokerTimeSeriesResponse {
   public static PinotBrokerTimeSeriesResponse fromTimeSeriesBlock(TimeSeriesBlock seriesBlock) {
     if (seriesBlock.getTimeBuckets() == null) {
       throw new UnsupportedOperationException("Non-bucketed series block not supported yet");
+    }
+    if (seriesBlock.getExceptions() != null && !seriesBlock.getExceptions().isEmpty()) {
+      QueryException firstException = seriesBlock.getExceptions().get(0);
+      return newErrorResponse(firstException.getErrorCode().getDefaultMessage(), seriesBlock.getExceptions().stream()
+          .map(QueryException::toString).collect(Collectors.joining("; ")));
     }
     return convertBucketedSeriesBlock(seriesBlock);
   }
@@ -149,14 +145,8 @@ public class PinotBrokerTimeSeriesResponse {
         result.add(new PinotBrokerTimeSeriesResponse.Value(metricMap, values));
       }
     }
-    if (seriesBlock.getExceptions() != null && !seriesBlock.getExceptions().isEmpty()) {
-      warnings = new ArrayList<>();
-      for (QueryException queryException : seriesBlock.getExceptions()) {
-        warnings.add(queryException.getErrorCode().getDefaultMessage() + ": " + queryException.getMessage());
-      }
-    }
     PinotBrokerTimeSeriesResponse.Data data = PinotBrokerTimeSeriesResponse.Data.newMatrix(result);
-    return PinotBrokerTimeSeriesResponse.newSuccessResponse(data, warnings);
+    return PinotBrokerTimeSeriesResponse.newSuccessResponse(data);
   }
 
   public static class Data {
