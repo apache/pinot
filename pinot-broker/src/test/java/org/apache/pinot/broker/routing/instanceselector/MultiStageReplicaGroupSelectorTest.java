@@ -33,6 +33,7 @@ import org.apache.helix.model.IdealState;
 import org.apache.helix.store.zk.ZkHelixPropertyStore;
 import org.apache.helix.zookeeper.datamodel.ZNRecord;
 import org.apache.pinot.common.assignment.InstancePartitions;
+import org.apache.pinot.common.assignment.InstancePartitionsUtils;
 import org.apache.pinot.common.metrics.BrokerMetrics;
 import org.apache.pinot.common.request.BrokerRequest;
 import org.apache.pinot.common.request.PinotQuery;
@@ -50,9 +51,7 @@ import static org.apache.pinot.spi.utils.CommonConstants.Helix.StateModel.Segmen
 import static org.mockito.Mockito.doReturn;
 import static org.mockito.Mockito.spy;
 import static org.mockito.Mockito.when;
-import static org.testng.Assert.assertEquals;
-import static org.testng.Assert.assertTrue;
-import static org.testng.Assert.fail;
+import static org.testng.Assert.*;
 
 
 public class MultiStageReplicaGroupSelectorTest {
@@ -60,10 +59,9 @@ public class MultiStageReplicaGroupSelectorTest {
   private final static List<String> SEGMENTS =
       Arrays.asList("segment0", "segment1", "segment2", "segment3", "segment4", "segment5", "segment6", "segment7",
           "segment8", "segment9", "segment10", "segment11");
-
   private static final Map<String, ServerInstance> EMPTY_SERVER_MAP = Collections.emptyMap();
-
   private static final InstanceSelectorConfig INSTANCE_SELECTOR_CONFIG = new InstanceSelectorConfig(false, 300, false);
+
   private AutoCloseable _mocks;
   @Mock
   private ZkHelixPropertyStore<ZNRecord> _propertyStore;
@@ -142,23 +140,74 @@ public class MultiStageReplicaGroupSelectorTest {
     long delta = multiStageSelector._newSegmentExpirationTimeInSeconds * 1000 + 10_000;
     long expiredSegmentEpochMs = System.currentTimeMillis() - delta;
     segments.set(segments.size() - 1, getLLCSegmentName(expiredSegmentEpochMs).getSegmentName());
-    try {
-      multiStageSelector.select(_brokerRequest, segments, 1);
-      fail("call should have failed");
-    } catch (Exception e) {
-      assertTrue(e.getMessage().contains(segments.get(segments.size() - 1)));
-    }
+    Exception e =
+        expectThrows(IllegalStateException.class, () -> multiStageSelector.select(_brokerRequest, segments, 1));
+    assertTrue(e.getMessage().contains(segments.get(segments.size() - 1)));
 
     // Test with a non LLC segment, like UploadedRealtimeSegment, that has just been created. Since it is not present
     // in segmentState, it should throw.
     segments.set(segments.size() - 1, new UploadedRealtimeSegmentName(TABLE_NAME, 1 /* partition */,
         System.currentTimeMillis(), "someprefix", "somesuffix").getSegmentName());
-    try {
-      multiStageSelector.select(_brokerRequest, segments, 1);
-      fail("call should have failed");
-    } catch (Exception e) {
-      assertTrue(e.getMessage().contains(segments.get(segments.size() - 1)));
-    }
+    e = expectThrows(IllegalStateException.class, () -> multiStageSelector.select(_brokerRequest, segments, 1));
+    assertTrue(e.getMessage().contains(segments.get(segments.size() - 1)));
+  }
+
+  @Test
+  public void testBasicReplicaGroupSelectionUsingIdealStateInstancePartitions() {
+    // Create instance-partitions with two replica-groups and 1 partition. Each replica-group has 2 instances.
+    List<String> replicaGroup0 = List.of("instance-0", "instance-1");
+    List<String> replicaGroup1 = List.of("instance-2", "instance-3");
+    InstancePartitions instancePartitions = createInstancePartitions(replicaGroup0, replicaGroup1);
+    MultiStageReplicaGroupSelector multiStageSelector = createMultiStageSelector(instancePartitions);
+
+    List<String> enabledInstances = createEnabledInstances(4);
+    IdealState idealState = new IdealState(TABLE_NAME);
+    ExternalView externalView = new ExternalView(TABLE_NAME);
+    Set<String> onlineSegments = new HashSet<>();
+
+    setupBasicTestEnvironment(enabledInstances, idealState, externalView, onlineSegments);
+    InstancePartitionsUtils.combineInstancePartitionsInIdealState(idealState, List.of(instancePartitions));
+    multiStageSelector.init(_tableConfig, _propertyStore, _brokerMetrics, null, Clock.systemUTC(),
+        INSTANCE_SELECTOR_CONFIG, new HashSet<>(enabledInstances), EMPTY_SERVER_MAP, idealState, externalView,
+        onlineSegments);
+
+    // Using requestId=0 should select replica-group 0. Even segments get assigned to instance-0 and odd segments get
+    // assigned to instance-1.
+    Map<String, String> expectedSelectorResult = createExpectedAssignment(replicaGroup0, getSegments());
+    InstanceSelector.SelectionResult selectionResult = multiStageSelector.select(_brokerRequest, getSegments(), 0);
+    assertEquals(selectionResult.getSegmentToInstanceMap(), expectedSelectorResult);
+
+    // Using same requestId again should return the same selection
+    selectionResult = multiStageSelector.select(_brokerRequest, getSegments(), 0);
+    assertEquals(selectionResult.getSegmentToInstanceMap(), expectedSelectorResult);
+
+    // Using requestId=1 should select replica-group 1
+    expectedSelectorResult = createExpectedAssignment(replicaGroup1, getSegments());
+    selectionResult = multiStageSelector.select(_brokerRequest, getSegments(), 1);
+    assertEquals(selectionResult.getSegmentToInstanceMap(), expectedSelectorResult);
+
+    // Add a new LLC segment to the list of segments but don't update segment states. The selection result should
+    // remain the same.
+    List<String> segments = new ArrayList<>(getSegments());
+    LLCSegmentName newSegmentName = getLLCSegmentName(System.currentTimeMillis());
+    segments.add(newSegmentName.getSegmentName());
+    selectionResult = multiStageSelector.select(_brokerRequest, segments, 1);
+    assertEquals(selectionResult.getSegmentToInstanceMap(), expectedSelectorResult);
+
+    // Test with an LLC segment that is older than the new segment expiration time.
+    long delta = multiStageSelector._newSegmentExpirationTimeInSeconds * 1000 + 10_000;
+    long expiredSegmentEpochMs = System.currentTimeMillis() - delta;
+    segments.set(segments.size() - 1, getLLCSegmentName(expiredSegmentEpochMs).getSegmentName());
+    Exception e =
+        expectThrows(IllegalStateException.class, () -> multiStageSelector.select(_brokerRequest, segments, 1));
+    assertTrue(e.getMessage().contains(segments.get(segments.size() - 1)));
+
+    // Test with a non LLC segment, like UploadedRealtimeSegment, that has just been created. Since it is not present
+    // in segmentState, it should throw.
+    segments.set(segments.size() - 1, new UploadedRealtimeSegmentName(TABLE_NAME, 1 /* partition */,
+        System.currentTimeMillis(), "someprefix", "somesuffix").getSegmentName());
+    e = expectThrows(IllegalStateException.class, () -> multiStageSelector.select(_brokerRequest, segments, 1));
+    assertTrue(e.getMessage().contains(segments.get(segments.size() - 1)));
   }
 
   @Test
@@ -193,11 +242,44 @@ public class MultiStageReplicaGroupSelectorTest {
     multiStageSelector.init(_tableConfig, _propertyStore, _brokerMetrics, null, Clock.systemUTC(),
         INSTANCE_SELECTOR_CONFIG, new HashSet<>(enabledInstances), EMPTY_SERVER_MAP, idealState, externalView,
         onlineSegments);
-    try {
-      multiStageSelector.select(_brokerRequest, getSegments(), 0);
-      fail("Method call above should have failed");
-    } catch (Exception ignored) {
-    }
+    assertThrows(IllegalStateException.class, () -> multiStageSelector.select(_brokerRequest, getSegments(), 0));
+  }
+
+  @Test
+  public void testInstanceFailureHandlingUsingIdealStateInstancePartitions() {
+    // Create instance-partitions with two replica-groups and 1 partition. Each replica-group has 2 instances.
+    List<String> replicaGroup0 = List.of("instance-0", "instance-1");
+    List<String> replicaGroup1 = List.of("instance-2", "instance-3");
+    InstancePartitions instancePartitions = createInstancePartitions(replicaGroup0, replicaGroup1);
+    MultiStageReplicaGroupSelector multiStageSelector = createMultiStageSelector(instancePartitions);
+
+    List<String> enabledInstances = createEnabledInstances(4);
+    IdealState idealState = new IdealState(TABLE_NAME);
+    ExternalView externalView = new ExternalView(TABLE_NAME);
+    Set<String> onlineSegments = new HashSet<>();
+
+    setupBasicTestEnvironment(enabledInstances, idealState, externalView, onlineSegments);
+    InstancePartitionsUtils.combineInstancePartitionsInIdealState(idealState, List.of(instancePartitions));
+    multiStageSelector.init(_tableConfig, _propertyStore, _brokerMetrics, null, Clock.systemUTC(),
+        INSTANCE_SELECTOR_CONFIG, new HashSet<>(enabledInstances), EMPTY_SERVER_MAP, idealState, externalView,
+        onlineSegments);
+
+    // If instance-0 is down, requestId=0 will select instances across the replica groups
+    enabledInstances.remove("instance-0");
+    multiStageSelector.init(_tableConfig, _propertyStore, _brokerMetrics, null, Clock.systemUTC(),
+        INSTANCE_SELECTOR_CONFIG, new HashSet<>(enabledInstances), EMPTY_SERVER_MAP, idealState, externalView,
+        onlineSegments);
+    Map<String, String> expectedSelectorResult =
+        createExpectedAssignment(List.of("instance-2", "instance-1"), getSegments());
+    InstanceSelector.SelectionResult selectionResult = multiStageSelector.select(_brokerRequest, getSegments(), 0);
+    assertEquals(selectionResult.getSegmentToInstanceMap(), expectedSelectorResult);
+
+    // If instance-2 also goes down, no replica-group is eligible
+    enabledInstances.remove("instance-2");
+    multiStageSelector.init(_tableConfig, _propertyStore, _brokerMetrics, null, Clock.systemUTC(),
+        INSTANCE_SELECTOR_CONFIG, new HashSet<>(enabledInstances), EMPTY_SERVER_MAP, idealState, externalView,
+        onlineSegments);
+    assertThrows(IllegalStateException.class, () -> multiStageSelector.select(_brokerRequest, getSegments(), 0));
   }
 
   @Test
@@ -258,8 +340,306 @@ public class MultiStageReplicaGroupSelectorTest {
   }
 
   @Test
+  public void testRebalanceInstancePartitionsIdealStateMismatch1() {
+    // InstancePartitions updated to a new set of instances, while IdealState/ExternalView still reference old ones.
+    // This scenario can occur during a rebalance when the InstancePartitions in ZK are updated first, and then the
+    // IdealState is updated in batches.
+
+    // IP contains instances [instance-100..103], but IS/EV map segments to [instance-0..3].
+    List<String> newReplicaGroup0 = List.of("instance-100", "instance-101");
+    List<String> newReplicaGroup1 = List.of("instance-102", "instance-103");
+    InstancePartitions instancePartitions = createInstancePartitions(newReplicaGroup0, newReplicaGroup1);
+    MultiStageReplicaGroupSelector multiStageSelector = createMultiStageSelector(instancePartitions);
+
+    // Segment assignments still reference the old instances [instance-0..3]
+    List<String> initialInstances = createEnabledInstances(4);
+    IdealState idealState = new IdealState(TABLE_NAME);
+    ExternalView externalView = new ExternalView(TABLE_NAME);
+    Set<String> onlineSegments = new HashSet<>();
+
+    setupBasicTestEnvironment(initialInstances, idealState, externalView, onlineSegments);
+    List<String> oldAndNewInstances = new ArrayList<>(initialInstances);
+    oldAndNewInstances.addAll(List.of("instance-100", "instance-101", "instance-102", "instance-103"));
+
+    // When the instance partitions are updated during a rebalance with instance reassignment, the table rebalancer
+    // makes sure to combine the old and new set of instances in the ideal state instance partitions so that query
+    // routing is unaffected.
+    InstancePartitionsUtils.combineInstancePartitionsInIdealState(idealState, List.of(
+        createInstancePartitions(List.of("instance-0", "instance-1", "instance-100", "instance-101"),
+            List.of("instance-2", "instance-3", "instance-102", "instance-103"))));
+    multiStageSelector.init(_tableConfig, _propertyStore, _brokerMetrics, null, Clock.systemUTC(),
+        INSTANCE_SELECTOR_CONFIG, new HashSet<>(oldAndNewInstances), EMPTY_SERVER_MAP, idealState, externalView,
+        onlineSegments);
+
+    List<String> replicaGroup0 = List.of("instance-0", "instance-1");
+    List<String> replicaGroup1 = List.of("instance-2", "instance-3");
+    // Using requestId=0 should select replica-group 0. Even segments get assigned to instance-0 and odd segments get
+    // assigned to instance-1.
+    Map<String, String> expectedSelectorResult = createExpectedAssignment(replicaGroup0, getSegments());
+    InstanceSelector.SelectionResult selectionResult = multiStageSelector.select(_brokerRequest, getSegments(), 0);
+    assertEquals(selectionResult.getSegmentToInstanceMap(), expectedSelectorResult);
+
+    // Using requestId=1 should select replica-group 1. Even segments get assigned to instance-2 and odd segments get
+    // assigned to instance-3.
+    expectedSelectorResult = createExpectedAssignment(replicaGroup1, getSegments());
+    selectionResult = multiStageSelector.select(_brokerRequest, getSegments(), 1);
+    assertEquals(selectionResult.getSegmentToInstanceMap(), expectedSelectorResult);
+
+    // Update ideal state to replace instance-0 with instance-100 and instance-1 with instance-101
+    Map<String, String> oldInstanceMap1 = Map.of("instance-0", ONLINE, "instance-2", ONLINE);
+    Map<String, String> newInstanceMap1 = Map.of("instance-100", ONLINE, "instance-2", ONLINE);
+    Map<String, String> oldInstanceMap2 = Map.of("instance-1", ONLINE, "instance-3", ONLINE);
+    Map<String, String> newInstanceMap2 = Map.of("instance-101", ONLINE, "instance-3", ONLINE);
+
+    idealState.getRecord().getMapFields().replaceAll((k, v) -> {
+      if (v.equals(oldInstanceMap1)) {
+        return newInstanceMap1;
+      } else if (v.equals(oldInstanceMap2)) {
+        return newInstanceMap2;
+      } else {
+        return v;
+      }
+    });
+
+    multiStageSelector.onAssignmentChange(idealState, externalView, onlineSegments);
+
+    // Now, since instance-100 and instance-101 aren't available as per the external view, all requests should use
+    // replica-group 1 (i.e., instance-2 and instance-3)
+    expectedSelectorResult = createExpectedAssignment(replicaGroup1, getSegments());
+    selectionResult = multiStageSelector.select(_brokerRequest, getSegments(), 0);
+    assertEquals(selectionResult.getSegmentToInstanceMap(), expectedSelectorResult);
+
+    expectedSelectorResult = createExpectedAssignment(replicaGroup1, getSegments());
+    selectionResult = multiStageSelector.select(_brokerRequest, getSegments(), 1);
+    assertEquals(selectionResult.getSegmentToInstanceMap(), expectedSelectorResult);
+
+    // External view updated
+    externalView.getRecord().getMapFields().replaceAll((k, v) -> {
+      if (v.equals(oldInstanceMap1)) {
+        return newInstanceMap1;
+      } else if (v.equals(oldInstanceMap2)) {
+        return newInstanceMap2;
+      } else {
+        return v;
+      }
+    });
+
+    multiStageSelector.onAssignmentChange(idealState, externalView, onlineSegments);
+
+    // Now, even request IDs should use the new replica-group 0 (instance-100, instance-101)
+    expectedSelectorResult = createExpectedAssignment(newReplicaGroup0, getSegments());
+    selectionResult = multiStageSelector.select(_brokerRequest, getSegments(), 0);
+    assertEquals(selectionResult.getSegmentToInstanceMap(), expectedSelectorResult);
+
+    // Odd request IDs should still be able to use the old replica-group 1
+    expectedSelectorResult = createExpectedAssignment(replicaGroup1, getSegments());
+    selectionResult = multiStageSelector.select(_brokerRequest, getSegments(), 1);
+    assertEquals(selectionResult.getSegmentToInstanceMap(), expectedSelectorResult);
+
+    // Update ideal state to replace old replica-group 1 with new replica-group 1
+    Map<String, String> finalInstanceMap1 = Map.of("instance-100", ONLINE, "instance-102", ONLINE);
+    Map<String, String> finalInstanceMap2 = Map.of("instance-101", ONLINE, "instance-103", ONLINE);
+
+    idealState.getRecord().getMapFields().replaceAll((k, v) -> {
+      if (v.equals(newInstanceMap1)) {
+        return finalInstanceMap1;
+      } else if (v.equals(newInstanceMap2)) {
+        return finalInstanceMap2;
+      } else {
+        return v;
+      }
+    });
+
+    multiStageSelector.onAssignmentChange(idealState, externalView, onlineSegments);
+
+    // Now, since instance-102 and instance-103 aren't available as per the external view, all requests should use
+    // new replica-group 0 (i.e., instance-100 and instance-101)
+    expectedSelectorResult = createExpectedAssignment(newReplicaGroup0, getSegments());
+    selectionResult = multiStageSelector.select(_brokerRequest, getSegments(), 0);
+    assertEquals(selectionResult.getSegmentToInstanceMap(), expectedSelectorResult);
+
+    expectedSelectorResult = createExpectedAssignment(newReplicaGroup0, getSegments());
+    selectionResult = multiStageSelector.select(_brokerRequest, getSegments(), 1);
+    assertEquals(selectionResult.getSegmentToInstanceMap(), expectedSelectorResult);
+
+    // External view updated
+    externalView.getRecord().getMapFields().replaceAll((k, v) -> {
+      if (v.equals(newInstanceMap1)) {
+        return finalInstanceMap1;
+      } else if (v.equals(newInstanceMap2)) {
+        return finalInstanceMap2;
+      } else {
+        return v;
+      }
+    });
+
+    multiStageSelector.onAssignmentChange(idealState, externalView, onlineSegments);
+
+    // Even request IDs should still use the new replica-group 0 (instance-100, instance-101)
+    expectedSelectorResult = createExpectedAssignment(newReplicaGroup0, getSegments());
+    selectionResult = multiStageSelector.select(_brokerRequest, getSegments(), 0);
+    assertEquals(selectionResult.getSegmentToInstanceMap(), expectedSelectorResult);
+
+    // Odd request IDs should now be able to use the new replica-group 1
+    expectedSelectorResult = createExpectedAssignment(newReplicaGroup1, getSegments());
+    selectionResult = multiStageSelector.select(_brokerRequest, getSegments(), 1);
+    assertEquals(selectionResult.getSegmentToInstanceMap(), expectedSelectorResult);
+  }
+
+  @Test
+  public void testRebalanceInstancePartitionsIdealStateMismatch2() {
+    // InstancePartitions updated to a new set of instances, while IdealState/ExternalView still reference old ones.
+    // This scenario can occur during a rebalance when the InstancePartitions in ZK are updated first, and then the
+    // IdealState is updated in batches.
+
+    // IP contains instances [instance-100..103], but IS/EV map segments to [instance-0..3].
+    List<String> newReplicaGroup0 = List.of("instance-100", "instance-101");
+    List<String> newReplicaGroup1 = List.of("instance-102", "instance-103");
+    InstancePartitions instancePartitions = createInstancePartitions(newReplicaGroup0, newReplicaGroup1);
+    MultiStageReplicaGroupSelector multiStageSelector = createMultiStageSelector(instancePartitions);
+
+    // Segment assignments still reference the old instances [instance-0..3]
+    List<String> initialInstances = createEnabledInstances(4);
+    IdealState idealState = new IdealState(TABLE_NAME);
+    ExternalView externalView = new ExternalView(TABLE_NAME);
+    Set<String> onlineSegments = new HashSet<>();
+
+    setupBasicTestEnvironment(initialInstances, idealState, externalView, onlineSegments);
+    List<String> oldAndNewInstances = new ArrayList<>(initialInstances);
+    oldAndNewInstances.addAll(List.of("instance-100", "instance-101", "instance-102", "instance-103"));
+
+    // When the instance partitions are updated during a rebalance with instance reassignment, the table rebalancer
+    // makes sure to combine the old and new set of instances in the ideal state instance partitions so that query
+    // routing is unaffected.
+    InstancePartitionsUtils.combineInstancePartitionsInIdealState(idealState, List.of(
+        createInstancePartitions(List.of("instance-0", "instance-1", "instance-100", "instance-101"),
+            List.of("instance-2", "instance-3", "instance-102", "instance-103"))));
+    multiStageSelector.init(_tableConfig, _propertyStore, _brokerMetrics, null, Clock.systemUTC(),
+        INSTANCE_SELECTOR_CONFIG, new HashSet<>(oldAndNewInstances), EMPTY_SERVER_MAP, idealState, externalView,
+        onlineSegments);
+
+    List<String> replicaGroup0 = List.of("instance-0", "instance-1");
+    List<String> replicaGroup1 = List.of("instance-2", "instance-3");
+    // Using requestId=0 should select replica-group 0. Even segments get assigned to instance-0 and odd segments get
+    // assigned to instance-1.
+    Map<String, String> expectedSelectorResult = createExpectedAssignment(replicaGroup0, getSegments());
+    InstanceSelector.SelectionResult selectionResult = multiStageSelector.select(_brokerRequest, getSegments(), 0);
+    assertEquals(selectionResult.getSegmentToInstanceMap(), expectedSelectorResult);
+
+    // Using requestId=1 should select replica-group 1. Even segments get assigned to instance-2 and odd segments get
+    // assigned to instance-3.
+    expectedSelectorResult = createExpectedAssignment(replicaGroup1, getSegments());
+    selectionResult = multiStageSelector.select(_brokerRequest, getSegments(), 1);
+    assertEquals(selectionResult.getSegmentToInstanceMap(), expectedSelectorResult);
+
+    // Update ideal state to replace instance-0 with instance-100 and instance-3 with instance-103
+    Map<String, String> oldInstanceMap1 = Map.of("instance-0", ONLINE, "instance-2", ONLINE);
+    Map<String, String> newInstanceMap1 = Map.of("instance-100", ONLINE, "instance-2", ONLINE);
+    Map<String, String> oldInstanceMap2 = Map.of("instance-1", ONLINE, "instance-3", ONLINE);
+    Map<String, String> newInstanceMap2 = Map.of("instance-1", ONLINE, "instance-103", ONLINE);
+
+    idealState.getRecord().getMapFields().replaceAll((k, v) -> {
+      if (v.equals(oldInstanceMap1)) {
+        return newInstanceMap1;
+      } else if (v.equals(oldInstanceMap2)) {
+        return newInstanceMap2;
+      } else {
+        return v;
+      }
+    });
+
+    multiStageSelector.onAssignmentChange(idealState, externalView, onlineSegments);
+
+    // Now, since instance-100 and instance-103 aren't available as per the external view, all requests should use
+    // a combination of replica-group 0 and 1 (i.e., the available instances - instance-2 and instance-1)
+    expectedSelectorResult = createExpectedAssignment(List.of("instance-2", "instance-1"), getSegments());
+    selectionResult = multiStageSelector.select(_brokerRequest, getSegments(), 0);
+    assertEquals(selectionResult.getSegmentToInstanceMap(), expectedSelectorResult);
+
+    expectedSelectorResult = createExpectedAssignment(List.of("instance-2", "instance-1"), getSegments());
+    selectionResult = multiStageSelector.select(_brokerRequest, getSegments(), 1);
+    assertEquals(selectionResult.getSegmentToInstanceMap(), expectedSelectorResult);
+
+    // External view updated
+    externalView.getRecord().getMapFields().replaceAll((k, v) -> {
+      if (v.equals(oldInstanceMap1)) {
+        return newInstanceMap1;
+      } else if (v.equals(oldInstanceMap2)) {
+        return newInstanceMap2;
+      } else {
+        return v;
+      }
+    });
+
+    multiStageSelector.onAssignmentChange(idealState, externalView, onlineSegments);
+
+    // Now, even request IDs should use replica-group 0 (instance-100, instance-1)
+    expectedSelectorResult = createExpectedAssignment(List.of("instance-100", "instance-1"), getSegments());
+    selectionResult = multiStageSelector.select(_brokerRequest, getSegments(), 0);
+    assertEquals(selectionResult.getSegmentToInstanceMap(), expectedSelectorResult);
+
+    // Now, odd request IDs should use replica-group 1 (instance-2, instance-103)
+    expectedSelectorResult = createExpectedAssignment(List.of("instance-2", "instance-103"), getSegments());
+    selectionResult = multiStageSelector.select(_brokerRequest, getSegments(), 1);
+    assertEquals(selectionResult.getSegmentToInstanceMap(), expectedSelectorResult);
+
+    // Update ideal state to replace instance-2 with instance-102 and instance-1 with instance-101
+    Map<String, String> finalInstanceMap1 = Map.of("instance-100", ONLINE, "instance-102", ONLINE);
+    Map<String, String> finalInstanceMap2 = Map.of("instance-101", ONLINE, "instance-103", ONLINE);
+
+    idealState.getRecord().getMapFields().replaceAll((k, v) -> {
+      if (v.equals(newInstanceMap1)) {
+        return finalInstanceMap1;
+      } else if (v.equals(newInstanceMap2)) {
+        return finalInstanceMap2;
+      } else {
+        return v;
+      }
+    });
+
+    multiStageSelector.onAssignmentChange(idealState, externalView, onlineSegments);
+
+    // Now, since instance-102 and instance-101 aren't available as per the external view, all requests should use
+    // a combination of replica-group 0 and 1 (i.e., the available instances - instance-100 and instance-103)
+    expectedSelectorResult = createExpectedAssignment(List.of("instance-100", "instance-103"), getSegments());
+    selectionResult = multiStageSelector.select(_brokerRequest, getSegments(), 0);
+    assertEquals(selectionResult.getSegmentToInstanceMap(), expectedSelectorResult);
+
+    expectedSelectorResult = createExpectedAssignment(List.of("instance-100", "instance-103"), getSegments());
+    selectionResult = multiStageSelector.select(_brokerRequest, getSegments(), 1);
+    assertEquals(selectionResult.getSegmentToInstanceMap(), expectedSelectorResult);
+
+    // External view updated
+    externalView.getRecord().getMapFields().replaceAll((k, v) -> {
+      if (v.equals(newInstanceMap1)) {
+        return finalInstanceMap1;
+      } else if (v.equals(newInstanceMap2)) {
+        return finalInstanceMap2;
+      } else {
+        return v;
+      }
+    });
+
+    multiStageSelector.onAssignmentChange(idealState, externalView, onlineSegments);
+
+    // Even request IDs should now use the new replica-group 0 (instance-100, instance-101)
+    expectedSelectorResult = createExpectedAssignment(newReplicaGroup0, getSegments());
+    selectionResult = multiStageSelector.select(_brokerRequest, getSegments(), 0);
+    assertEquals(selectionResult.getSegmentToInstanceMap(), expectedSelectorResult);
+
+    // Odd request IDs should now use the new replica-group 1 (instance-102, instance-103)
+    expectedSelectorResult = createExpectedAssignment(newReplicaGroup1, getSegments());
+    selectionResult = multiStageSelector.select(_brokerRequest, getSegments(), 1);
+    assertEquals(selectionResult.getSegmentToInstanceMap(), expectedSelectorResult);
+  }
+
+  @Test
   public void testInstancePartitionsIdealStateMismatchSegmentsDropped() {
-    // TODO: Fix this issue (described in https://github.com/apache/pinot/issues/17179) and update or remove this test.
+    // This issue (described in https://github.com/apache/pinot/issues/17179) is fixed by using the instance partitions
+    // stored alongside the ideal state which will also reflect intermediate states during a rebalance accurately.
+    // However, the older algorithm, based on the INSTANCE_PARTITIONS ZNode is still retained as a fallback because
+    // the new ideal state based instance partitions mechanism for query routing can only be used for new tables or
+    // tables that are rebalanced with an instance assignment change.
 
     // InstancePartitions updated to a new set of instances, while IdealState/ExternalView still reference old ones.
     // This scenario can occur during a rebalance with instance reassignment, where the InstancePartitions in ZK are
