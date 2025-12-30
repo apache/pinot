@@ -94,6 +94,8 @@ public class SegmentZKMetadataUtils {
 
       segmentZKMetadata.setEndOffset(endOffset);
       segmentZKMetadata.setStatus(CommonConstants.Segment.Realtime.Status.DONE);
+      // for committing segments, we use data CRC for replace
+      segmentZKMetadata.setUseDataCrcForReplace(true);
 
       // For committing segment, use current time as start/end time if total docs is 0
       if (segmentMetadata.getTotalDocs() > 0) {

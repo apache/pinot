@@ -80,7 +80,6 @@ import org.testng.annotations.BeforeMethod;
 import org.testng.annotations.Test;
 
 import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.doAnswer;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.spy;
@@ -349,7 +348,7 @@ public class BaseTableDataManagerTest {
     BaseTableDataManager tableDataManager = createTableManager();
     File dataDir = tableDataManager.getSegmentDataDir(SEGMENT_NAME);
     assertFalse(dataDir.exists());
-    tableDataManager.replaceSegmentIfCrcMismatch(segmentDataManager, zkMetadata, new IndexLoadingConfig(), false);
+    tableDataManager.replaceSegmentIfCrcMismatch(segmentDataManager, zkMetadata, new IndexLoadingConfig());
     assertTrue(dataDir.exists());
     assertEquals(new SegmentMetadataImpl(dataDir).getTotalDocs(), 5);
   }
@@ -369,14 +368,14 @@ public class BaseTableDataManagerTest {
     File defaultDataDir = tableDataManager.getSegmentDataDir(SEGMENT_NAME);
     assertFalse(defaultDataDir.exists());
     tableDataManager.replaceSegmentIfCrcMismatch(segmentDataManager, zkMetadata,
-        createTierIndexLoadingConfig(DEFAULT_TABLE_CONFIG), false);
+        createTierIndexLoadingConfig(DEFAULT_TABLE_CONFIG));
     assertTrue(defaultDataDir.exists());
     assertEquals(new SegmentMetadataImpl(defaultDataDir).getTotalDocs(), 5);
 
     // Configured dataDir for coolTier, thus move to new dir.
     tableDataManager = createTableManager();
     tableDataManager.replaceSegmentIfCrcMismatch(segmentDataManager, zkMetadata,
-        createTierIndexLoadingConfig(TIER_TABLE_CONFIG), false);
+        createTierIndexLoadingConfig(TIER_TABLE_CONFIG));
     File tierDataDir = tableDataManager.getSegmentDataDir(SEGMENT_NAME, TIER_NAME, TIER_TABLE_CONFIG);
     assertTrue(tierDataDir.exists());
     assertFalse(defaultDataDir.exists());
@@ -397,7 +396,7 @@ public class BaseTableDataManagerTest {
 
     BaseTableDataManager tableDataManager = createTableManager();
     assertFalse(tableDataManager.getSegmentDataDir(segmentName).exists());
-    tableDataManager.replaceSegmentIfCrcMismatch(segmentDataManager, zkMetadata, new IndexLoadingConfig(), false);
+    tableDataManager.replaceSegmentIfCrcMismatch(segmentDataManager, zkMetadata, new IndexLoadingConfig());
     // As CRC is same, the index dir is left as is, so not get created by the test.
     assertFalse(tableDataManager.getSegmentDataDir(segmentName).exists());
   }
@@ -432,7 +431,7 @@ public class BaseTableDataManagerTest {
       latch.countDown();
       return null;
     }).when(tableDataManager).replaceSegmentIfCrcMismatch(
-        any(SegmentDataManager.class), any(SegmentZKMetadata.class), any(IndexLoadingConfig.class), eq(false));
+        any(SegmentDataManager.class), any(SegmentZKMetadata.class), any(IndexLoadingConfig.class));
 
     // Call replaceSegment which will execute asynchronously
     tableDataManager.replaceSegment(SEGMENT_NAME);
@@ -474,7 +473,7 @@ public class BaseTableDataManagerTest {
       latch.countDown();
       return null;
     }).when(tableDataManager).replaceSegmentIfCrcMismatch(
-        any(SegmentDataManager.class), any(SegmentZKMetadata.class), any(IndexLoadingConfig.class), eq(false));
+        any(SegmentDataManager.class), any(SegmentZKMetadata.class), any(IndexLoadingConfig.class));
 
     // Call replaceSegment which will execute asynchronously
     tableDataManager.replaceSegment(SEGMENT_NAME);
@@ -502,7 +501,7 @@ public class BaseTableDataManagerTest {
       latch2.countDown();
       return null;
     }).when(tableDataManager).replaceSegmentIfCrcMismatch(
-        any(SegmentDataManager.class), any(SegmentZKMetadata.class), any(IndexLoadingConfig.class), eq(false));
+        any(SegmentDataManager.class), any(SegmentZKMetadata.class), any(IndexLoadingConfig.class));
 
     // Call replaceSegment which will execute asynchronously
     tableDataManager.replaceSegment(SEGMENT_NAME);
@@ -546,7 +545,7 @@ public class BaseTableDataManagerTest {
       latch.countDown();
       return null;
     }).when(tableDataManager).replaceSegmentIfCrcMismatch(
-        any(SegmentDataManager.class), any(SegmentZKMetadata.class), any(IndexLoadingConfig.class), eq(false));
+        any(SegmentDataManager.class), any(SegmentZKMetadata.class), any(IndexLoadingConfig.class));
 
     // Call replaceSegment which will execute asynchronously
     tableDataManager.replaceSegment(segmentName);
@@ -804,169 +803,71 @@ public class BaseTableDataManagerTest {
   }
 
   @Test
-  public void testReplaceSegmentBothCrcsMatch()
+  public void testReplaceSegmentIfCrcMismatchWhenFlagDisabledSegmentCrcMismatchShouldDownload()
       throws Exception {
-    String segmentName = "seg01";
-    SegmentZKMetadata zkMetadata = mock(SegmentZKMetadata.class);
-    when(zkMetadata.getSegmentName()).thenReturn(segmentName);
-    when(zkMetadata.getCrc()).thenReturn(1024L);
-    when(zkMetadata.getDataCrc()).thenReturn(512L);
+    // When flag is disabled and segment CRCs don't match, should download
+    SegmentZKMetadata zkMetadata = createRawSegment(SegmentVersion.v3, 5);
+    zkMetadata.setCrc(2048L); // Different from local
+    zkMetadata.setDataCrc(99999L);
+    zkMetadata.setUseDataCrcForReplace(false);
 
-    ImmutableSegmentDataManager segmentDataManager = mock(ImmutableSegmentDataManager.class);
-    when(segmentDataManager.getSegmentName()).thenReturn(segmentName);
-    ImmutableSegment immutableSegment = mock(ImmutableSegment.class);
-    when(segmentDataManager.getSegment()).thenReturn(immutableSegment);
-    SegmentMetadata segmentMetadata = mock(SegmentMetadata.class);
-    when(immutableSegment.getSegmentMetadata()).thenReturn(segmentMetadata);
-    when(segmentMetadata.getCrc()).thenReturn("1024");
-    when(segmentMetadata.getDataCrc()).thenReturn("512");
+    ImmutableSegmentDataManager segmentDataManager = createImmutableSegmentDataManager(SEGMENT_NAME, 1024L);
+    SegmentMetadata segmentMetadata = segmentDataManager.getSegment().getSegmentMetadata();
+    when(segmentMetadata.getDataCrc()).thenReturn("99999");
 
     BaseTableDataManager tableDataManager = createTableManager();
-    assertFalse(tableDataManager.getSegmentDataDir(segmentName).exists());
+    File dataDir = tableDataManager.getSegmentDataDir(SEGMENT_NAME);
+    assertFalse(dataDir.exists());
 
-    // Test with useDataCrcIfAvailable = false
-    tableDataManager.replaceSegmentIfCrcMismatch(segmentDataManager, zkMetadata, new IndexLoadingConfig(), false);
-    assertFalse(tableDataManager.getSegmentDataDir(segmentName).exists());
+    // Should download because segment CRCs don't match (ignores data CRC)
+    tableDataManager.replaceSegmentIfCrcMismatch(segmentDataManager, zkMetadata, new IndexLoadingConfig());
 
-    // Test with useDataCrcIfAvailable = true
-    tableDataManager.replaceSegmentIfCrcMismatch(segmentDataManager, zkMetadata, new IndexLoadingConfig(), true);
-    assertFalse(tableDataManager.getSegmentDataDir(segmentName).exists());
+    assertTrue(dataDir.exists());
+    assertEquals(new SegmentMetadataImpl(dataDir).getTotalDocs(), 5);
   }
 
   @Test
-  public void testReplaceSegmentDataCrcMatchIndexChange()
+  public void testReplaceSegmentIfCrcMismatchWhenFlagEnabledAndSegmentCrcMatchShouldNoDownload()
       throws Exception {
-    String segmentName = "seg02";
+    // When flag is enabled and segment CRCs match, should not download
+    SegmentZKMetadata zkMetadata = createRawSegment(SegmentVersion.v3, 5);
+    long segmentCrc = zkMetadata.getCrc();
+    zkMetadata.setDataCrc(99999L);
+    zkMetadata.setUseDataCrcForReplace(true);
 
-    // ZK metadata has different regular CRC (indexes changed) but same data CRC
-    SegmentZKMetadata zkMetadata = mock(SegmentZKMetadata.class);
-    when(zkMetadata.getSegmentName()).thenReturn(segmentName);
-    when(zkMetadata.getCrc()).thenReturn(2048L);
-    when(zkMetadata.getDataCrc()).thenReturn(512L);
-
-    ImmutableSegmentDataManager segmentDataManager = mock(ImmutableSegmentDataManager.class);
-    when(segmentDataManager.getSegmentName()).thenReturn(segmentName);
-    ImmutableSegment immutableSegment = mock(ImmutableSegment.class);
-    when(segmentDataManager.getSegment()).thenReturn(immutableSegment);
-    SegmentMetadata segmentMetadata = mock(SegmentMetadata.class);
-    when(immutableSegment.getSegmentMetadata()).thenReturn(segmentMetadata);
-    when(segmentMetadata.getCrc()).thenReturn("1024");
-    when(segmentMetadata.getDataCrc()).thenReturn("512");
+    ImmutableSegmentDataManager segmentDataManager = createImmutableSegmentDataManager(SEGMENT_NAME, segmentCrc);
+    SegmentMetadata segmentMetadata = segmentDataManager.getSegment().getSegmentMetadata();
+    when(segmentMetadata.getDataCrc()).thenReturn("11111");
 
     BaseTableDataManager tableDataManager = createTableManager();
-    assertFalse(tableDataManager.getSegmentDataDir(segmentName).exists());
+    File dataDir = tableDataManager.getSegmentDataDir(SEGMENT_NAME);
 
-    // With useDataCrcIfAvailable = true, should NOT download (data CRC matches)
-    tableDataManager.replaceSegmentIfCrcMismatch(segmentDataManager, zkMetadata, new IndexLoadingConfig(), true);
-    assertFalse(tableDataManager.getSegmentDataDir(segmentName).exists());
+    assertTrue(dataDir.mkdirs());
+
+    // Should NOT download because segment CRCs match
+    tableDataManager.replaceSegmentIfCrcMismatch(segmentDataManager, zkMetadata, new IndexLoadingConfig());
   }
 
   @Test
-  public void testReplaceSegmentDataCrcMatchButNotUsed()
+  public void testReplaceSegmentIfCrcMismatchWhenFlagEnabledAndSegmentCrcMismatchWithInvalidZkDataCrc()
       throws Exception {
+    // When ZK data CRC is invalid (-1), should download if segment CRCs don't match
     SegmentZKMetadata zkMetadata = createRawSegment(SegmentVersion.v3, 5);
     zkMetadata.setCrc(2048L);
-    zkMetadata.setDataCrc(512L);
+    zkMetadata.setDataCrc(-1L);
+    zkMetadata.setUseDataCrcForReplace(true);
 
-    ImmutableSegmentDataManager segmentDataManager = mock(ImmutableSegmentDataManager.class);
-    when(segmentDataManager.getSegmentName()).thenReturn(SEGMENT_NAME);
-    ImmutableSegment immutableSegment = mock(ImmutableSegment.class);
-    when(segmentDataManager.getSegment()).thenReturn(immutableSegment);
-    SegmentMetadata segmentMetadata = mock(SegmentMetadata.class);
-    when(immutableSegment.getSegmentMetadata()).thenReturn(segmentMetadata);
-    when(segmentMetadata.getCrc()).thenReturn("1024");  // Different from ZK
-    when(segmentMetadata.getDataCrc()).thenReturn("512");  // Same as ZK
+    ImmutableSegmentDataManager segmentDataManager = createImmutableSegmentDataManager(SEGMENT_NAME, 1024L);
+    SegmentMetadata segmentMetadata = segmentDataManager.getSegment().getSegmentMetadata();
+    when(segmentMetadata.getDataCrc()).thenReturn("99999");
 
     BaseTableDataManager tableDataManager = createTableManager();
     File dataDir = tableDataManager.getSegmentDataDir(SEGMENT_NAME);
     assertFalse(dataDir.exists());
 
-    // With useDataCrcIfAvailable = false, download despite data CRC match
-    tableDataManager.replaceSegmentIfCrcMismatch(segmentDataManager, zkMetadata, new IndexLoadingConfig(), false);
-    assertTrue(dataDir.exists());
-    assertEquals(new SegmentMetadataImpl(dataDir).getTotalDocs(), 5);
-  }
+    // Should download because ZK data CRC is invalid
+    tableDataManager.replaceSegmentIfCrcMismatch(segmentDataManager, zkMetadata, new IndexLoadingConfig());
 
-  @Test
-  public void testReplaceSegmentBothCrcsDiffer()
-      throws Exception {
-    SegmentZKMetadata zkMetadata = createRawSegment(SegmentVersion.v3, 5);
-    zkMetadata.setCrc(2048L);  // Different CRC
-    zkMetadata.setDataCrc(1024L);  // Different data CRC
-
-    ImmutableSegmentDataManager segmentDataManager = mock(ImmutableSegmentDataManager.class);
-    when(segmentDataManager.getSegmentName()).thenReturn(SEGMENT_NAME);
-    ImmutableSegment immutableSegment = mock(ImmutableSegment.class);
-    when(segmentDataManager.getSegment()).thenReturn(immutableSegment);
-    SegmentMetadata segmentMetadata = mock(SegmentMetadata.class);
-    when(immutableSegment.getSegmentMetadata()).thenReturn(segmentMetadata);
-    when(segmentMetadata.getCrc()).thenReturn("1024");
-    when(segmentMetadata.getDataCrc()).thenReturn("512");
-
-    BaseTableDataManager tableDataManager = createTableManager();
-    File dataDir = tableDataManager.getSegmentDataDir(SEGMENT_NAME);
-    assertFalse(dataDir.exists());
-
-    // With useDataCrcIfAvailable = true, should download
-    tableDataManager.replaceSegmentIfCrcMismatch(segmentDataManager, zkMetadata, new IndexLoadingConfig(), true);
-    assertTrue(dataDir.exists());
-    assertEquals(new SegmentMetadataImpl(dataDir).getTotalDocs(), 5);
-    FileUtils.deleteDirectory(dataDir);
-
-    // With useDataCrcIfAvailable = false, should download
-    tableDataManager.replaceSegmentIfCrcMismatch(segmentDataManager, zkMetadata, new IndexLoadingConfig(), false);
-    assertTrue(dataDir.exists());
-    assertEquals(new SegmentMetadataImpl(dataDir).getTotalDocs(), 5);
-  }
-
-  @Test
-  public void testReplaceSegmentDataCrcNotAvailable()
-      throws Exception {
-    SegmentZKMetadata zkMetadata = createRawSegment(SegmentVersion.v3, 5);
-    zkMetadata.setCrc(2048L);
-    zkMetadata.setDataCrc(-1L);  // Data CRC not available
-
-    ImmutableSegmentDataManager segmentDataManager = mock(ImmutableSegmentDataManager.class);
-    when(segmentDataManager.getSegmentName()).thenReturn(SEGMENT_NAME);
-    ImmutableSegment immutableSegment = mock(ImmutableSegment.class);
-    when(segmentDataManager.getSegment()).thenReturn(immutableSegment);
-    SegmentMetadata segmentMetadata = mock(SegmentMetadata.class);
-    when(immutableSegment.getSegmentMetadata()).thenReturn(segmentMetadata);
-    when(segmentMetadata.getCrc()).thenReturn("1024"); // normal crc different
-    when(segmentMetadata.getDataCrc()).thenReturn("-1");  // Not available
-
-    BaseTableDataManager tableDataManager = createTableManager();
-    File dataDir = tableDataManager.getSegmentDataDir(SEGMENT_NAME);
-    assertFalse(dataDir.exists());
-
-    // With useDataCrcIfAvailable = true but data CRC not available, should download
-    tableDataManager.replaceSegmentIfCrcMismatch(segmentDataManager, zkMetadata, new IndexLoadingConfig(), true);
-    assertTrue(dataDir.exists());
-    assertEquals(new SegmentMetadataImpl(dataDir).getTotalDocs(), 5);
-  }
-
-  @Test
-  public void testReplaceSegmentOnlyLocalDataCrcNotAvailable()
-      throws Exception {
-    SegmentZKMetadata zkMetadata = createRawSegment(SegmentVersion.v3, 5);
-    zkMetadata.setCrc(2048L);
-    zkMetadata.setDataCrc(512L);  // ZK has data CRC
-
-    ImmutableSegmentDataManager segmentDataManager = mock(ImmutableSegmentDataManager.class);
-    when(segmentDataManager.getSegmentName()).thenReturn(SEGMENT_NAME);
-    ImmutableSegment immutableSegment = mock(ImmutableSegment.class);
-    when(segmentDataManager.getSegment()).thenReturn(immutableSegment);
-    SegmentMetadata segmentMetadata = mock(SegmentMetadata.class);
-    when(immutableSegment.getSegmentMetadata()).thenReturn(segmentMetadata);
-    when(segmentMetadata.getCrc()).thenReturn("1024");
-    when(segmentMetadata.getDataCrc()).thenReturn("-1");  // Local doesn't have it
-
-    BaseTableDataManager tableDataManager = createTableManager();
-    File dataDir = tableDataManager.getSegmentDataDir(SEGMENT_NAME);
-    assertFalse(dataDir.exists());
-
-    // Should download because data CRC comparison is not possible
-    tableDataManager.replaceSegmentIfCrcMismatch(segmentDataManager, zkMetadata, new IndexLoadingConfig(), true);
     assertTrue(dataDir.exists());
     assertEquals(new SegmentMetadataImpl(dataDir).getTotalDocs(), 5);
   }
