@@ -18,17 +18,12 @@
  */
 package org.apache.pinot.sql.parsers;
 
-import java.util.HashMap;
 import java.util.List;
-import java.util.Map;
 import org.apache.pinot.common.request.Expression;
 import org.apache.pinot.common.request.Function;
 import org.apache.pinot.common.request.PinotQuery;
-import org.apache.pinot.spi.config.instance.InstanceConfigProvider;
-import org.apache.pinot.spi.env.PinotConfiguration;
-import org.apache.pinot.spi.utils.CommonConstants;
+import org.apache.pinot.common.utils.request.RequestUtils;
 import org.testng.annotations.AfterMethod;
-import org.testng.annotations.BeforeMethod;
 import org.testng.annotations.DataProvider;
 import org.testng.annotations.Test;
 
@@ -56,21 +51,10 @@ public class CalciteSqlParserTest {
   private static final String SINGLE_CHAR = "a";
   private static final String QUERY_TEMPLATE = "SELECT %s FROM %s";
 
-  @BeforeMethod
-  public void initDefaultConfig() {
-    // Initialize with empty config so tests have a valid InstanceConfigProvider with default values
-    InstanceConfigProvider.setInstanceConfig(new PinotConfiguration(new HashMap<>()));
-  }
-
   @AfterMethod
-  public void resetInstanceConfigProvider() {
-    InstanceConfigProvider.getInstance().reset();
-  }
-
-  private void initInstanceConfig(boolean legacyUnescaping) {
-    Map<String, Object> properties = new HashMap<>();
-    properties.put(CommonConstants.Helix.CONFIG_OF_SSE_LEGACY_LITERAL_UNESCAPING, legacyUnescaping);
-    InstanceConfigProvider.setInstanceConfig(new PinotConfiguration(properties));
+  public void resetLegacyUnescaping() {
+    // Reset to default (false) after each test
+    RequestUtils.setUseLegacyLiteralUnescaping(false);
   }
 
   @Test
@@ -125,12 +109,9 @@ public class CalciteSqlParserTest {
     };
   }
 
-  // ==================== Tests for SSE legacy literal unescaping behavior ====================
+  // ==================== Tests for SQL string literal escaping ====================
   //
-  // The legacy behavior performs an additional '' -> ' replacement on strings that Calcite
-  // has ALREADY unescaped. This test suite verifies:
-  // 1. Simple cases (2 quotes = 1 quote in SQL) work the same with both settings
-  // 2. Complex cases (4+ quotes) show the double-unescaping problem with legacy enabled
+  // These tests verify correct escaping behavior with both legacy and default modes.
 
   @Test
   public void testSimpleEscapedQuoteBothBehaviorsMatch() {
@@ -139,13 +120,12 @@ public class CalciteSqlParserTest {
     // Both legacy and non-legacy should return "It's" for this simple case
     String query = "SELECT 'It''s working' FROM testTable";
 
-    // Test with legacy disabled (default)
-    initInstanceConfig(false);
+    // Without legacy (default)
     PinotQuery pinotQuery = CalciteSqlParser.compileToPinotQuery(query);
     assertEquals(pinotQuery.getSelectList().get(0).getLiteral().getStringValue(), "It's working");
 
-    // Test with legacy enabled - same result for simple case
-    initInstanceConfig(true);
+    // With legacy - same result for simple case
+    RequestUtils.setUseLegacyLiteralUnescaping(true);
     pinotQuery = CalciteSqlParser.compileToPinotQuery(query);
     assertEquals(pinotQuery.getSelectList().get(0).getLiteral().getStringValue(), "It's working");
   }
@@ -162,12 +142,8 @@ public class CalciteSqlParserTest {
     PinotQuery pinotQuery = CalciteSqlParser.compileToPinotQuery(query);
     assertEquals(pinotQuery.getSelectList().get(0).getLiteral().getStringValue(), "test''value");
 
-    initInstanceConfig(false);
-    pinotQuery = CalciteSqlParser.compileToPinotQuery(query);
-    assertEquals(pinotQuery.getSelectList().get(0).getLiteral().getStringValue(), "test''value");
-
     // With legacy: incorrectly reduces to one quote (double unescaping)
-    initInstanceConfig(true);
+    RequestUtils.setUseLegacyLiteralUnescaping(true);
     pinotQuery = CalciteSqlParser.compileToPinotQuery(query);
     assertEquals(pinotQuery.getSelectList().get(0).getLiteral().getStringValue(), "test'value");
   }
@@ -181,12 +157,11 @@ public class CalciteSqlParserTest {
     String query = "SELECT 'test''''''value' FROM testTable";
 
     // Without legacy: preserves all three single quotes
-    initInstanceConfig(false);
     PinotQuery pinotQuery = CalciteSqlParser.compileToPinotQuery(query);
     assertEquals(pinotQuery.getSelectList().get(0).getLiteral().getStringValue(), "test'''value");
 
     // With legacy: reduces from 3 to 2 quotes
-    initInstanceConfig(true);
+    RequestUtils.setUseLegacyLiteralUnescaping(true);
     pinotQuery = CalciteSqlParser.compileToPinotQuery(query);
     assertEquals(pinotQuery.getSelectList().get(0).getLiteral().getStringValue(), "test''value");
   }
@@ -197,7 +172,6 @@ public class CalciteSqlParserTest {
     String query = "SELECT col FROM testTable WHERE name = 'O''''Brien'";
 
     // Without legacy: "O''Brien" (two quotes)
-    initInstanceConfig(false);
     PinotQuery pinotQuery = CalciteSqlParser.compileToPinotQuery(query);
     Expression filterExpr = pinotQuery.getFilterExpression();
     Function function = filterExpr.getFunctionCall();
@@ -205,7 +179,7 @@ public class CalciteSqlParserTest {
     assertEquals(function.getOperands().get(1).getLiteral().getStringValue(), "O''Brien");
 
     // With legacy: "O'Brien" (double unescaping)
-    initInstanceConfig(true);
+    RequestUtils.setUseLegacyLiteralUnescaping(true);
     pinotQuery = CalciteSqlParser.compileToPinotQuery(query);
     filterExpr = pinotQuery.getFilterExpression();
     function = filterExpr.getFunctionCall();
@@ -220,7 +194,6 @@ public class CalciteSqlParserTest {
     String query = "SELECT col FROM testTable WHERE JSON_MATCH(jsonCol, '\"$.name\" = ''''John''''')";
 
     // Without legacy: preserves the two single quotes around John
-    initInstanceConfig(false);
     PinotQuery pinotQuery = CalciteSqlParser.compileToPinotQuery(query);
     Expression filterExpr = pinotQuery.getFilterExpression();
     Function function = filterExpr.getFunctionCall();
@@ -228,7 +201,7 @@ public class CalciteSqlParserTest {
     assertEquals(function.getOperands().get(1).getLiteral().getStringValue(), "\"$.name\" = ''John''");
 
     // With legacy: reduces quotes (double unescaping)
-    initInstanceConfig(true);
+    RequestUtils.setUseLegacyLiteralUnescaping(true);
     pinotQuery = CalciteSqlParser.compileToPinotQuery(query);
     filterExpr = pinotQuery.getFilterExpression();
     function = filterExpr.getFunctionCall();
@@ -240,11 +213,10 @@ public class CalciteSqlParserTest {
     // Strings without quotes should be unaffected by either setting
     String query = "SELECT 'simple string' FROM testTable";
 
-    initInstanceConfig(false);
     PinotQuery pinotQuery = CalciteSqlParser.compileToPinotQuery(query);
     assertEquals(pinotQuery.getSelectList().get(0).getLiteral().getStringValue(), "simple string");
 
-    initInstanceConfig(true);
+    RequestUtils.setUseLegacyLiteralUnescaping(true);
     pinotQuery = CalciteSqlParser.compileToPinotQuery(query);
     assertEquals(pinotQuery.getSelectList().get(0).getLiteral().getStringValue(), "simple string");
   }
@@ -257,11 +229,10 @@ public class CalciteSqlParserTest {
     // Without legacy: "test''''value" (correct)
     String query = "SELECT 'test''''''''value' FROM testTable";
 
-    initInstanceConfig(false);
     PinotQuery pinotQuery = CalciteSqlParser.compileToPinotQuery(query);
     assertEquals(pinotQuery.getSelectList().get(0).getLiteral().getStringValue(), "test''''value");
 
-    initInstanceConfig(true);
+    RequestUtils.setUseLegacyLiteralUnescaping(true);
     pinotQuery = CalciteSqlParser.compileToPinotQuery(query);
     assertEquals(pinotQuery.getSelectList().get(0).getLiteral().getStringValue(), "test''value");
   }
@@ -269,8 +240,6 @@ public class CalciteSqlParserTest {
   @Test
   public void testComplexQueryWithMultipleQuotePatterns() {
     // A complex query with different quote patterns in projection and filter
-    initInstanceConfig(false);
-
     String query = "SELECT 'He said ''''hello'''' and ''''goodbye''''' AS greeting FROM testTable "
         + "WHERE message = 'It''''s fine'";
     PinotQuery pinotQuery = CalciteSqlParser.compileToPinotQuery(query);
