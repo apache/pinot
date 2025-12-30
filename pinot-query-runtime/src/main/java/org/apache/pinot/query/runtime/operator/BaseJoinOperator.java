@@ -330,7 +330,7 @@ public abstract class BaseJoinOperator extends MultiStageOperator {
   }
 
   @Override
-  protected StatMap<?> copyStatMaps() {
+  public StatMap<StatKey> copyStatMaps() {
     return new StatMap<>(_statMap);
   }
 

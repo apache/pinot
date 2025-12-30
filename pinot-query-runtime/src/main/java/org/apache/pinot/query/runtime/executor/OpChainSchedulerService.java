@@ -34,6 +34,8 @@ import java.util.concurrent.locks.Lock;
 import java.util.concurrent.locks.ReadWriteLock;
 import java.util.concurrent.locks.ReentrantReadWriteLock;
 import org.apache.commons.lang3.tuple.Pair;
+import org.apache.pinot.common.datatable.StatMap;
+import org.apache.pinot.common.metrics.ServerMeter;
 import org.apache.pinot.core.util.trace.TraceRunnable;
 import org.apache.pinot.query.runtime.blocks.ErrorMseBlock;
 import org.apache.pinot.query.runtime.blocks.MseBlock;
@@ -46,6 +48,7 @@ import org.apache.pinot.spi.exception.QueryCancelledException;
 import org.apache.pinot.spi.exception.QueryErrorCode;
 import org.apache.pinot.spi.exception.QueryException;
 import org.apache.pinot.spi.exception.TerminationException;
+import org.apache.pinot.spi.metrics.PinotMeter;
 import org.apache.pinot.spi.query.QueryExecutionContext;
 import org.apache.pinot.spi.query.QueryThreadContext;
 import org.apache.pinot.spi.utils.CommonConstants.MultiStageQueryRunner;
@@ -65,6 +68,7 @@ public class OpChainSchedulerService {
   private final Cache<OpChainId, Pair<MultiStageOperator, QueryExecutionContext>> _opChainCache;
   private final ReadWriteLock[] _queryLocks;
   private final Cache<Long, Boolean> _cancelledQueryCache;
+  private final Metrics _metrics = new Metrics();
 
   public OpChainSchedulerService(String instanceId, ExecutorService executorService, PinotConfiguration config) {
     this(instanceId, executorService, config.getProperty(MultiStageQueryRunner.KEY_OF_OP_STATS_CACHE_SIZE,
@@ -153,6 +157,7 @@ public class OpChainSchedulerService {
     ListenableFutureTask<Void> listenableFutureTask = ListenableFutureTask.create(new TraceRunnable() {
       @Override
       public void runJob() {
+        _metrics.onOpChainStarted();
         LOGGER.trace("({}): Executing", operatorChain);
         MseBlock result = rootOperator.nextBlock();
         while (result.isData()) {
@@ -174,12 +179,14 @@ public class OpChainSchedulerService {
     Futures.addCallback(listenableFutureTask, new FutureCallback<>() {
       @Override
       public void onSuccess(Void result) {
+        _metrics.onOpChainFinished(rootOperator);
         operatorChain.close();
       }
 
       @Override
       public void onFailure(Throwable t) {
         String logMsg = "Failed to execute operator chain: " + t.getMessage();
+        _metrics.onOpChainFinished(rootOperator);
         if (t instanceof QueryException) {
           switch (((QueryException) t).getErrorCode()) {
             case UNKNOWN:
@@ -265,5 +272,29 @@ public class OpChainSchedulerService {
 
   private ReadWriteLock getQueryLock(long requestId) {
     return _queryLocks[(int) (requestId & QUERY_LOCK_MASK)];
+  }
+
+  private static class Metrics {
+    private final PinotMeter _startedOpchains = ServerMeter.MSE_OPCHAINS_STARTED.getGlobalMeter();
+    private final PinotMeter _competedOpchains = ServerMeter.MSE_OPCHAINS_COMPLETED.getGlobalMeter();
+    private final PinotMeter _emittedRows = ServerMeter.MSE_EMITTED_ROWS.getGlobalMeter();
+    private final PinotMeter _cpuExecutionTimeMs = ServerMeter.MSE_CPU_EXECUTION_TIME_MS.getGlobalMeter();
+    private final PinotMeter _memoryAllocatedBytes = ServerMeter.MSE_MEMORY_ALLOCATED_BYTES.getGlobalMeter();
+
+    private static final String EMITTED_ROWS = "EMITTED_ROWS";
+    private static final String EXECUTION_TIME_MS = "EXECUTION_TIME_MS";
+    private static final String ALLOCATED_MEMORY_BYTES = "ALLOCATED_MEMORY_BYTES";
+
+    public void onOpChainStarted() {
+      _startedOpchains.mark();
+    }
+
+    public void onOpChainFinished(MultiStageOperator rootOperator) {
+      _competedOpchains.mark();
+      StatMap<?> operatorStats = rootOperator.copyStatMaps();
+      _emittedRows.mark(operatorStats.getUnsafe(EMITTED_ROWS, 0L));
+      _cpuExecutionTimeMs.mark(operatorStats.getUnsafe(EXECUTION_TIME_MS, 0L));
+      _memoryAllocatedBytes.mark(operatorStats.getUnsafe(ALLOCATED_MEMORY_BYTES, 0L));
+    }
   }
 }

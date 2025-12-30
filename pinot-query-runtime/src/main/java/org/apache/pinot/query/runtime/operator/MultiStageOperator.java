@@ -177,7 +177,7 @@ public abstract class MultiStageOperator implements Operator<MseBlock>, AutoClos
         .orElse(MultiStageQueryStats.emptyStats(_context.getStageId()));
   }
 
-  protected abstract StatMap<?> copyStatMaps();
+  public abstract StatMap<?> copyStatMaps();
 
   // TODO: Ideally close() call should finish within request deadline.
   // TODO: Consider passing deadline as part of the API.
