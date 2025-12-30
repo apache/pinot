@@ -20,6 +20,7 @@ package org.apache.pinot.common.tier;
 
 import com.google.common.base.Preconditions;
 import org.apache.pinot.common.metadata.segment.SegmentZKMetadata;
+import org.apache.pinot.spi.config.table.TierConfig;
 import org.apache.pinot.spi.utils.TimeUtils;
 
 
@@ -28,6 +29,13 @@ import org.apache.pinot.spi.utils.TimeUtils;
  */
 public class TimeBasedTierSegmentSelector implements TierSegmentSelector {
   private final long _segmentAgeMillis;
+  /**
+   * Static factory method to create a TimeBasedTierSegmentSelector from TierConfig
+   */
+  public static TimeBasedTierSegmentSelector create(TierConfig tierConfig) {
+    return new TimeBasedTierSegmentSelector(tierConfig.getSegmentAge());
+  }
+
 
   public TimeBasedTierSegmentSelector(String segmentAge) {
     _segmentAgeMillis = TimeUtils.convertPeriodToMillis(segmentAge);
