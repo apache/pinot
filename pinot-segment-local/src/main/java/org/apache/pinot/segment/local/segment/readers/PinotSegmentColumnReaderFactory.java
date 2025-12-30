@@ -49,6 +49,8 @@ public class PinotSegmentColumnReaderFactory implements ColumnReaderFactory {
   private Schema _targetSchema;
   private Set<String> _colsToRead;
   private Map<String, ColumnReader> _columnReaders;
+  private final boolean _skipDefaultNullValues;
+  private final boolean _initializeDefaultValueReaders;
 
   /**
    * Create a PinotSegmentColumnReaderFactory.
@@ -56,8 +58,27 @@ public class PinotSegmentColumnReaderFactory implements ColumnReaderFactory {
    * @param indexSegment Source segment to read from
    */
   public PinotSegmentColumnReaderFactory(IndexSegment indexSegment) {
+    this(indexSegment, false, true);
+  }
+
+  /**
+   * Create a PinotSegmentColumnReaderFactory.
+   *
+   * @param indexSegment Source segment to read from
+   * @param skipDefaultNullValues Whether to read null values as default values or as nulls
+   *                              If true, nulls will be read as nulls.
+   *                              If false, nulls will be read as default values.
+   * @param initializeDefaultValueReaders Whether to initialize default value readers for missing columns
+   *           TODO - Ideally this factory shouldn't initialize default value readers.
+   *                  The clients of this factory should decide whether to create default value readers or not.
+   *                  This parameter is kept for backward compatibility and will be removed in future.
+   */
+  public PinotSegmentColumnReaderFactory(IndexSegment indexSegment, boolean skipDefaultNullValues,
+      boolean initializeDefaultValueReaders) {
     _indexSegment = indexSegment;
     _columnReaders = new HashMap<>();
+    _skipDefaultNullValues = skipDefaultNullValues;
+    _initializeDefaultValueReaders = initializeDefaultValueReaders;
   }
 
   @Override
@@ -113,7 +134,7 @@ public class PinotSegmentColumnReaderFactory implements ColumnReaderFactory {
     if (hasColumn(columnName)) {
       // Column exists in source segment - create a segment column reader
       LOGGER.debug("Creating segment column reader for existing column: {}", columnName);
-      columnReader = new PinotSegmentColumnReaderImpl(_indexSegment, columnName);
+      columnReader = new PinotSegmentColumnReaderImpl(_indexSegment, columnName, _skipDefaultNullValues);
     } else {
       // New column - create a default value reader
       LOGGER.debug("Creating default value reader for new column: {}", columnName);
