@@ -68,8 +68,18 @@ import org.slf4j.LoggerFactory;
 public class RequestUtils {
   private static final Logger LOGGER = LoggerFactory.getLogger(RequestUtils.class);
   private static final JsonNode EMPTY_OBJECT_NODE = new ObjectMapper().createObjectNode();
+  // This class will only be loaded when a query request comes in, which should only be after the server startup has
+  // completed and the global instance config context is initialized.
+  private static boolean _useLegacyLiteralUnescaping =
+      InstanceConfigProvider.getProperty(CommonConstants.Helix.CONFIG_OF_SSE_LEGACY_LITERAL_UNESCAPING,
+          CommonConstants.Helix.DEFAULT_SSE_LEGACY_LITERAL_UNESCAPING);
 
   private RequestUtils() {
+  }
+
+  @VisibleForTesting
+  public static void setUseLegacyLiteralUnescaping(boolean useLegacyLiteralUnescaping) {
+    _useLegacyLiteralUnescaping = useLegacyLiteralUnescaping;
   }
 
   public static SqlNodeAndOptions parseQuery(String query)
@@ -248,10 +258,8 @@ public class RequestUtils {
           literal.setNullValue(true);
           break;
         default:
-          boolean useLegacyUnescaping =
-              InstanceConfigProvider.getProperty(CommonConstants.Helix.CONFIG_OF_SSE_LEGACY_LITERAL_UNESCAPING,
-                  CommonConstants.Helix.DEFAULT_SSE_LEGACY_LITERAL_UNESCAPING);
-          literal.setStringValue(useLegacyUnescaping ? StringUtils.replace(node.toValue(), "''", "'") : node.toValue());
+          literal.setStringValue(
+              _useLegacyLiteralUnescaping ? StringUtils.replace(node.toValue(), "''", "'") : node.toValue());
           break;
       }
     }
