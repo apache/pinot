@@ -129,7 +129,6 @@ public class MultiStageBrokerRequestHandler extends BaseBrokerRequestHandler {
   private static final int NUM_UNAVAILABLE_SEGMENTS_TO_LOG = 10;
 
   private final WorkerManager _workerManager;
-  // Initialized only when multi cluster routing is enabled
   private final WorkerManager _multiClusterWorkerManager;
   private final QueryDispatcher _queryDispatcher;
   private final boolean _explainAskingServerDefault;

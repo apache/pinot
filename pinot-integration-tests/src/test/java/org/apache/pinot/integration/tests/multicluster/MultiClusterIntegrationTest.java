@@ -88,8 +88,8 @@ public class MultiClusterIntegrationTest extends ClusterTest {
   protected static final String LOGICAL_FEDERATION_CLUSTER_2_TABLE = "logical_federation_table_cluster2";
   protected static final String LOGICAL_FEDERATION_CLUSTER_1_TABLE_2 = "logical_federation_table2_cluster1";
   protected static final String LOGICAL_FEDERATION_CLUSTER_2_TABLE_2 = "logical_federation_table2_cluster2";
-  protected static final int CLUSTER_1_SIZE = 1500;
-  protected static final int CLUSTER_2_SIZE = 1000;
+  protected static final int TABLE_SIZE_CLUSTER_1 = 1500;
+  protected static final int TABLE_SIZE_CLUSTER_2 = 1000;
   protected static final int SEGMENTS_PER_CLUSTER = 3;
   protected static final String JOIN_COLUMN = "OriginCityName";
 
@@ -143,8 +143,8 @@ public class MultiClusterIntegrationTest extends ClusterTest {
     createSchemaAndTableOnBothClusters(testTableName);
 
     // Create and load test data into both clusters
-    _cluster1AvroFiles = createAvroData(CLUSTER_1_SIZE, 1);
-    _cluster2AvroFiles = createAvroData(CLUSTER_2_SIZE, 2);
+    _cluster1AvroFiles = createAvroData(TABLE_SIZE_CLUSTER_1, 1);
+    _cluster2AvroFiles = createAvroData(TABLE_SIZE_CLUSTER_2, 2);
 
     loadDataIntoCluster(_cluster1AvroFiles, testTableName, _cluster1);
     loadDataIntoCluster(_cluster2AvroFiles, testTableName, _cluster2);
@@ -154,13 +154,13 @@ public class MultiClusterIntegrationTest extends ClusterTest {
     String result1 = executeQuery(query, _cluster1);
     assertNotNull(result1, "Query result from cluster 1 should not be null");
     long count1 = parseCountResult(result1);
-    assertEquals(count1, CLUSTER_1_SIZE);
+    assertEquals(count1, TABLE_SIZE_CLUSTER_1);
 
     // Verify cluster 2 is queryable
     String result2 = executeQuery(query, _cluster2);
     assertNotNull(result2, "Query result from cluster 2 should not be null");
     long count2 = parseCountResult(result2);
-    assertEquals(count2, CLUSTER_2_SIZE);
+    assertEquals(count2, TABLE_SIZE_CLUSTER_2);
 
     LOGGER.info("Multi-cluster broker test passed: both clusters started and queryable");
   }
@@ -175,11 +175,11 @@ public class MultiClusterIntegrationTest extends ClusterTest {
     createLogicalTableOnBothClusters(LOGICAL_TABLE_NAME,
         LOGICAL_FEDERATION_CLUSTER_1_TABLE, LOGICAL_FEDERATION_CLUSTER_2_TABLE);
     cleanSegmentDirs();
-    _cluster1AvroFiles = createAvroData(CLUSTER_1_SIZE, 1);
-    _cluster2AvroFiles = createAvroData(CLUSTER_2_SIZE, 2);
+    _cluster1AvroFiles = createAvroData(TABLE_SIZE_CLUSTER_1, 1);
+    _cluster2AvroFiles = createAvroData(TABLE_SIZE_CLUSTER_2, 2);
     loadDataIntoCluster(_cluster1AvroFiles, LOGICAL_FEDERATION_CLUSTER_1_TABLE, _cluster1);
     loadDataIntoCluster(_cluster2AvroFiles, LOGICAL_FEDERATION_CLUSTER_2_TABLE, _cluster2);
-    long expectedTotal = CLUSTER_1_SIZE + CLUSTER_2_SIZE;
+    long expectedTotal = TABLE_SIZE_CLUSTER_1 + TABLE_SIZE_CLUSTER_2;
     assertEquals(getCount(LOGICAL_TABLE_NAME, _cluster1, true), expectedTotal);
     assertEquals(getCount(LOGICAL_TABLE_NAME, _cluster2, true), expectedTotal);
   }
@@ -197,11 +197,11 @@ public class MultiClusterIntegrationTest extends ClusterTest {
     createLogicalTableOnBothClusters(LOGICAL_TABLE_NAME_2,
         LOGICAL_FEDERATION_CLUSTER_1_TABLE_2, LOGICAL_FEDERATION_CLUSTER_2_TABLE_2);
     cleanSegmentDirs();
-    loadDataIntoCluster(createAvroData(CLUSTER_1_SIZE, 1), LOGICAL_FEDERATION_CLUSTER_1_TABLE, _cluster1);
-    loadDataIntoCluster(createAvroData(CLUSTER_2_SIZE, 2), LOGICAL_FEDERATION_CLUSTER_2_TABLE, _cluster2);
-    loadDataIntoCluster(createAvroDataMultipleSegments(CLUSTER_1_SIZE, 1, SEGMENTS_PER_CLUSTER),
+    loadDataIntoCluster(createAvroData(TABLE_SIZE_CLUSTER_1, 1), LOGICAL_FEDERATION_CLUSTER_1_TABLE, _cluster1);
+    loadDataIntoCluster(createAvroData(TABLE_SIZE_CLUSTER_2, 2), LOGICAL_FEDERATION_CLUSTER_2_TABLE, _cluster2);
+    loadDataIntoCluster(createAvroDataMultipleSegments(TABLE_SIZE_CLUSTER_1, 1, SEGMENTS_PER_CLUSTER),
         LOGICAL_FEDERATION_CLUSTER_1_TABLE_2, _cluster1);
-    loadDataIntoCluster(createAvroDataMultipleSegments(CLUSTER_2_SIZE, 2, SEGMENTS_PER_CLUSTER),
+    loadDataIntoCluster(createAvroDataMultipleSegments(TABLE_SIZE_CLUSTER_2, 2, SEGMENTS_PER_CLUSTER),
         LOGICAL_FEDERATION_CLUSTER_2_TABLE_2, _cluster2);
     String joinQuery = "SET useMultistageEngine=true; SET enableMultiClusterRouting=true; "
         + "SELECT t1." + JOIN_COLUMN + ", COUNT(*) as count FROM " + LOGICAL_TABLE_NAME + " t1 "
@@ -632,7 +632,11 @@ public class MultiClusterIntegrationTest extends ClusterTest {
     assertNotNull(rows);
     for (JsonNode row : rows) {
       int number = Integer.parseInt(row.get(0).asText().split("_")[2]);
-      int expectedCount = number < 1000 ? 4 : 1;
+      // Depending on the number of records with the same join key in each cluster, the expected count varies.
+      // If the number is less than the size of the smaller cluster, it should appear in both clusters,
+      // resulting in 4 records (2 from each cluster).
+      // Otherwise, it should appear only in one cluster, resulting in 1 record.
+      int expectedCount = number < Math.min(TABLE_SIZE_CLUSTER_1, TABLE_SIZE_CLUSTER_2) ? 4 : 1;
       assertEquals(row.get(1).asInt(), expectedCount);
     }
   }
