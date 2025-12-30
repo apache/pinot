@@ -86,8 +86,12 @@ public class MultiClusterIntegrationTest extends ClusterTest {
   protected static final String LOGICAL_TABLE_NAME_2 = "logical_table_2";
   protected static final String LOGICAL_FEDERATION_CLUSTER_1_TABLE = "logical_federation_table_cluster1";
   protected static final String LOGICAL_FEDERATION_CLUSTER_2_TABLE = "logical_federation_table_cluster2";
+  protected static final String LOGICAL_FEDERATION_CLUSTER_1_TABLE_2 = "logical_federation_table2_cluster1";
+  protected static final String LOGICAL_FEDERATION_CLUSTER_2_TABLE_2 = "logical_federation_table2_cluster2";
   protected static final int CLUSTER_1_SIZE = 1500;
   protected static final int CLUSTER_2_SIZE = 1000;
+  protected static final int SEGMENTS_PER_CLUSTER = 3;
+  protected static final String JOIN_COLUMN = "OriginCityName";
 
   protected ClusterComponents _cluster1;
   protected ClusterComponents _cluster2;
@@ -178,6 +182,35 @@ public class MultiClusterIntegrationTest extends ClusterTest {
     long expectedTotal = CLUSTER_1_SIZE + CLUSTER_2_SIZE;
     assertEquals(getCount(LOGICAL_TABLE_NAME, _cluster1, true), expectedTotal);
     assertEquals(getCount(LOGICAL_TABLE_NAME, _cluster2, true), expectedTotal);
+  }
+
+  @Test
+  public void testLogicalFederationTwoLogicalTablesMSE() throws Exception {
+    dropLogicalTableIfExists(LOGICAL_TABLE_NAME, _cluster1._controllerBaseApiUrl);
+    dropLogicalTableIfExists(LOGICAL_TABLE_NAME, _cluster2._controllerBaseApiUrl);
+    dropLogicalTableIfExists(LOGICAL_TABLE_NAME_2, _cluster1._controllerBaseApiUrl);
+    dropLogicalTableIfExists(LOGICAL_TABLE_NAME_2, _cluster2._controllerBaseApiUrl);
+    setupFirstLogicalFederatedTable();
+    setupSecondLogicalFederatedTable();
+    createLogicalTableOnBothClusters(LOGICAL_TABLE_NAME,
+        LOGICAL_FEDERATION_CLUSTER_1_TABLE, LOGICAL_FEDERATION_CLUSTER_2_TABLE);
+    createLogicalTableOnBothClusters(LOGICAL_TABLE_NAME_2,
+        LOGICAL_FEDERATION_CLUSTER_1_TABLE_2, LOGICAL_FEDERATION_CLUSTER_2_TABLE_2);
+    cleanSegmentDirs();
+    loadDataIntoCluster(createAvroData(CLUSTER_1_SIZE, 1), LOGICAL_FEDERATION_CLUSTER_1_TABLE, _cluster1);
+    loadDataIntoCluster(createAvroData(CLUSTER_2_SIZE, 2), LOGICAL_FEDERATION_CLUSTER_2_TABLE, _cluster2);
+    loadDataIntoCluster(createAvroDataMultipleSegments(CLUSTER_1_SIZE, 1, SEGMENTS_PER_CLUSTER),
+        LOGICAL_FEDERATION_CLUSTER_1_TABLE_2, _cluster1);
+    loadDataIntoCluster(createAvroDataMultipleSegments(CLUSTER_2_SIZE, 2, SEGMENTS_PER_CLUSTER),
+        LOGICAL_FEDERATION_CLUSTER_2_TABLE_2, _cluster2);
+    String joinQuery = "SET useMultistageEngine=true; SET enableMultiClusterRouting=true; "
+        + "SELECT t1." + JOIN_COLUMN + ", COUNT(*) as count FROM " + LOGICAL_TABLE_NAME + " t1 "
+        + "JOIN " + LOGICAL_TABLE_NAME_2 + " t2 ON t1." + JOIN_COLUMN + " = t2." + JOIN_COLUMN + " "
+        + "GROUP BY t1." + JOIN_COLUMN + " LIMIT 20";
+    String result = executeQuery(joinQuery, _cluster1);
+    assertNotNull(result);
+    assertTrue(result.contains("resultTable"));
+    assertResultRows(result);
   }
 
   @Override
@@ -557,14 +590,21 @@ public class MultiClusterIntegrationTest extends ClusterTest {
 
   protected void createLogicalTableOnBothClusters(String logicalTableName,
       String cluster1PhysicalTable, String cluster2PhysicalTable) throws IOException {
-    Map<String, PhysicalTableConfig> physicalTableConfigMap = Map.of(
-        cluster1PhysicalTable + "_OFFLINE", new PhysicalTableConfig(true),
+    // For cluster 1: cluster1's table is local (isMultiCluster=false), cluster2's table is remote (isMultiCluster=true)
+    Map<String, PhysicalTableConfig> cluster1PhysicalTableConfigMap = Map.of(
+        cluster1PhysicalTable + "_OFFLINE", new PhysicalTableConfig(false),
         cluster2PhysicalTable + "_OFFLINE", new PhysicalTableConfig(true)
     );
 
-    createLogicalTable(SCHEMA_FILE, physicalTableConfigMap, DEFAULT_TENANT,
+    // For cluster 2: cluster2's table is local (isMultiCluster=false), cluster1's table is remote (isMultiCluster=true)
+    Map<String, PhysicalTableConfig> cluster2PhysicalTableConfigMap = Map.of(
+        cluster1PhysicalTable + "_OFFLINE", new PhysicalTableConfig(true),
+        cluster2PhysicalTable + "_OFFLINE", new PhysicalTableConfig(false)
+    );
+
+    createLogicalTable(SCHEMA_FILE, cluster1PhysicalTableConfigMap, DEFAULT_TENANT,
         _cluster1._controllerBaseApiUrl, logicalTableName, cluster1PhysicalTable + "_OFFLINE", null);
-    createLogicalTable(SCHEMA_FILE, physicalTableConfigMap, DEFAULT_TENANT,
+    createLogicalTable(SCHEMA_FILE, cluster2PhysicalTableConfigMap, DEFAULT_TENANT,
         _cluster2._controllerBaseApiUrl, logicalTableName, cluster2PhysicalTable + "_OFFLINE", null);
   }
 
@@ -576,10 +616,24 @@ public class MultiClusterIntegrationTest extends ClusterTest {
     setupLogicalFederatedTable(LOGICAL_FEDERATION_CLUSTER_1_TABLE, LOGICAL_FEDERATION_CLUSTER_2_TABLE);
   }
 
+  protected void setupSecondLogicalFederatedTable() throws Exception {
+    setupLogicalFederatedTable(LOGICAL_FEDERATION_CLUSTER_1_TABLE_2, LOGICAL_FEDERATION_CLUSTER_2_TABLE_2);
+  }
+
   protected void setupLogicalFederatedTable(String cluster1TableName, String cluster2TableName) throws Exception {
     dropTableAndSchemaIfExists(cluster1TableName, _cluster1._controllerBaseApiUrl);
     dropTableAndSchemaIfExists(cluster2TableName, _cluster2._controllerBaseApiUrl);
     createSchemaAndTableForCluster(cluster1TableName, _cluster1._controllerBaseApiUrl);
     createSchemaAndTableForCluster(cluster2TableName, _cluster2._controllerBaseApiUrl);
+  }
+
+  protected void assertResultRows(String resultJson) throws Exception {
+    JsonNode rows = JsonMapper.builder().build().readTree(resultJson).get("resultTable").get("rows");
+    assertNotNull(rows);
+    for (JsonNode row : rows) {
+      int number = Integer.parseInt(row.get(0).asText().split("_")[2]);
+      int expectedCount = number < 1000 ? 4 : 1;
+      assertEquals(row.get(1).asInt(), expectedCount);
+    }
   }
 }

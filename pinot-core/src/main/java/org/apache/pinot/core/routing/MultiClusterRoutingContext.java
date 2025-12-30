@@ -77,4 +77,8 @@ public class MultiClusterRoutingContext {
     }
     return _localRoutingManager;
   }
+
+  public RoutingManager getMultiClusterRoutingManager() {
+    return _multiClusterRoutingManager;
+  }
 }
