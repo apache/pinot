@@ -740,6 +740,10 @@ public abstract class BaseSegmentCreator implements SegmentCreator {
     return _segmentName;
   }
 
+  public int getTotalDocs() {
+    return _totalDocs;
+  }
+
   @Override
   public void seal()
       throws Exception {

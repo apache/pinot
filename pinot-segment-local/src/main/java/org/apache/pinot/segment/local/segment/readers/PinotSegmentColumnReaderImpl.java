@@ -41,6 +41,7 @@ public class PinotSegmentColumnReaderImpl implements ColumnReader {
   private final String _columnName;
   private final int _numDocs;
   private final FieldSpec.DataType _dataType;
+  private final boolean _skipDefaultNullValues;
 
   private int _currentIndex;
 
@@ -54,15 +55,45 @@ public class PinotSegmentColumnReaderImpl implements ColumnReader {
    * @param columnName Name of the column
    */
   public PinotSegmentColumnReaderImpl(IndexSegment indexSegment, String columnName) {
-    _segmentColumnReader = new PinotSegmentColumnReader(indexSegment, columnName);
-    _columnName = columnName;
-    _numDocs = indexSegment.getSegmentMetadata().getTotalDocs();
-    _currentIndex = 0;
+    this(indexSegment, columnName, false);
+  }
 
-    // Get the data type from the schema
-    FieldSpec fieldSpec = indexSegment.getSegmentMetadata().getSchema().getFieldSpecFor(columnName);
-    assert fieldSpec != null : "FieldSpec should not be null for column: " + columnName;
-    _dataType = fieldSpec.getDataType();
+  /**
+   * Create a PinotSegmentColumnReaderImpl for an existing column in the segment.
+   *
+   * @param indexSegment Source segment to read from
+   * @param columnName Name of the column
+   * @param skipDefaultNullValues Whether to skip reading default null values from the record.
+   *                              If true, null values return null. If false, null values return
+   *                              the segment's stored value (which contains the default).
+   */
+  public PinotSegmentColumnReaderImpl(IndexSegment indexSegment, String columnName,
+      boolean skipDefaultNullValues) {
+    this(new PinotSegmentColumnReader(indexSegment, columnName), columnName,
+        indexSegment.getSegmentMetadata().getTotalDocs(),
+        indexSegment.getSegmentMetadata().getSchema().getFieldSpecFor(columnName).getDataType(),
+        skipDefaultNullValues);
+  }
+
+  /**
+   * Constructor for subclasses that need to provide their own PinotSegmentColumnReader.
+   *
+   * @param segmentColumnReader The segment column reader
+   * @param columnName Name of the column
+   * @param numDocs Total number of documents
+   * @param dataType The data type of the column
+   * @param skipDefaultNullValues Whether to skip reading default null values from the record.
+   *                              If true, null values return null. If false, null values return
+   *                              the segment's stored value (which contains the default).
+   */
+  public PinotSegmentColumnReaderImpl(PinotSegmentColumnReader segmentColumnReader, String columnName,
+      int numDocs, FieldSpec.DataType dataType, boolean skipDefaultNullValues) {
+    _segmentColumnReader = segmentColumnReader;
+    _columnName = columnName;
+    _numDocs = numDocs;
+    _dataType = dataType;
+    _currentIndex = 0;
+    _skipDefaultNullValues = skipDefaultNullValues;
   }
 
   @Override
@@ -78,8 +109,8 @@ public class PinotSegmentColumnReaderImpl implements ColumnReader {
       throw new IllegalStateException("No more values available");
     }
 
-    // Return null if the value is null
-    if (_segmentColumnReader.isNull(_currentIndex)) {
+    // Return null if the value is null and skipDefaultNullValues is true
+    if (_skipDefaultNullValues && _segmentColumnReader.isNull(_currentIndex)) {
       _currentIndex++;
       return null;
     }
@@ -326,6 +357,11 @@ public class PinotSegmentColumnReaderImpl implements ColumnReader {
   @Override
   public Object getValue(int docId)
       throws IOException {
+    // Return null if the value is null and skipDefaultNullValues is true
+    if (_skipDefaultNullValues && _segmentColumnReader.isNull(docId)) {
+      return null;
+    }
+    // Return the segment value (which contains the default for null entries)
     return _segmentColumnReader.getValue(docId);
   }
 

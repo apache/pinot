@@ -33,10 +33,23 @@ public class PinotSegmentColumnarDataSource implements ColumnarDataSource {
   private final IndexSegment _indexSegment;
   private final int _totalDocs;
   private final boolean _initializeDefaultValueReaders;
+  private final boolean _skipDefaultNullValues;
 
-  public PinotSegmentColumnarDataSource(IndexSegment indexSegment, boolean initializeDefaultValueReaders) {
+  /**
+   * @param indexSegment Source segment to read from
+   * @param skipDefaultNullValues Whether to read null values as default values or as nulls
+   *                              If true, nulls will be read as nulls.
+   *                              If false, nulls will be read as default values.
+   * @param initializeDefaultValueReaders Whether to initialize default value readers for missing columns
+   *           TODO - Ideally this factory shouldn't initialize default value readers.
+   *                  The clients of this factory should decide whether to create default value readers or not.
+   *                  This parameter is kept for backward compatibility and will be removed in future.
+   */
+  public PinotSegmentColumnarDataSource(IndexSegment indexSegment, boolean skipDefaultNullValues,
+      boolean initializeDefaultValueReaders) {
     _indexSegment = indexSegment;
     _totalDocs = indexSegment.getSegmentMetadata().getTotalDocs();
+    _skipDefaultNullValues = skipDefaultNullValues;
     _initializeDefaultValueReaders = initializeDefaultValueReaders;
   }
 
@@ -47,7 +60,7 @@ public class PinotSegmentColumnarDataSource implements ColumnarDataSource {
 
   @Override
   public ColumnReaderFactory createColumnReaderFactory() {
-    return new PinotSegmentColumnReaderFactory(_indexSegment, _initializeDefaultValueReaders);
+    return new PinotSegmentColumnReaderFactory(_indexSegment, _skipDefaultNullValues, _initializeDefaultValueReaders);
   }
 
   @Override
