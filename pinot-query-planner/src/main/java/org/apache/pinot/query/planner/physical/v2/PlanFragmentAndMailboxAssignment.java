@@ -156,7 +156,16 @@ public class PlanFragmentAndMailboxAssignment {
           tableScanMetadata.getUnavailableSegmentsMap().get(tableName));
     }
     fragmentMetadata.addScannedTable(tableName);
-    fragmentMetadata.setWorkerIdToSegmentsMap(tableScanMetadata.getWorkedIdToSegmentsMap());
+
+    // Handle logical tables vs physical tables differently
+    if (tableScanMetadata.isLogicalTable()) {
+      // For logical tables, use workerIdToTableSegmentsMap (physicalTableName -> segments)
+      fragmentMetadata.setWorkerIdToTableSegmentsMap(tableScanMetadata.getWorkerIdToLogicalTableSegmentsMap());
+    } else {
+      // For physical tables, use workerIdToSegmentsMap (tableType -> segments)
+      fragmentMetadata.setWorkerIdToSegmentsMap(tableScanMetadata.getWorkedIdToSegmentsMap());
+    }
+
     NodeHint nodeHint = NodeHint.fromRelHints(tableScan.getHints());
     fragmentMetadata.setTableOptions(nodeHint.getHintOptions().get(PinotHintOptions.TABLE_HINT_OPTIONS));
     if (tableScanMetadata.getTimeBoundaryInfo() != null) {
