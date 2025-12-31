@@ -264,7 +264,8 @@ public class ConcurrentMapPartitionUpsertMetadataManager extends BasePartitionUp
       ThreadSafeMutableRoaringBitmap queryableDocIds) {
     // Revert to previous locations present in other segment
     // Replace the valid doc id to that segment location
-    _logger.info("Reverting Upsert metadata for {} keys", _previousKeyToRecordLocationMap.size());
+    _logger.info("Reverting Upsert metadata for {} keys for the segment: {}", _previousKeyToRecordLocationMap.size(),
+        oldSegment.getSegmentName());
     for (Map.Entry<Object, RecordLocation> obj : _previousKeyToRecordLocationMap.entrySet()) {
       IndexSegment prevSegment = obj.getValue().getSegment();
       if (prevSegment != null) {
@@ -283,17 +284,24 @@ public class ConcurrentMapPartitionUpsertMetadataManager extends BasePartitionUp
         _primaryKeyToRecordLocationMap.remove(obj.getKey());
       }
     }
+    _logger.info("Reverted Upsert metadata of {} keys to previous segment locations for the segment: {}",
+        _previousKeyToRecordLocationMap.size(), oldSegment.getSegmentName());
     removeNewlyAddedKeys(oldSegment);
   }
 
   @Override
   protected void removeNewlyAddedKeys(IndexSegment oldSegment) {
-    // Remove the newly added keys in the metadata map and in the valid docids
+    // Remove the newly added keys in the metadata map and in the valid doc ids
+    int removedKeys = 0;
     for (Map.Entry<Object, RecordLocation> entry : _newlyAddedKeys.entrySet()) {
-      _primaryKeyToRecordLocationMap.remove(entry.getKey());
-      removeDocId(oldSegment, entry.getValue().getDocId());
+      if (entry.getValue().getSegment() == oldSegment) {
+        _primaryKeyToRecordLocationMap.remove(entry.getKey());
+        removeDocId(oldSegment, entry.getValue().getDocId());
+        removedKeys++;
+      }
     }
-    _newlyAddedKeys.clear();
+    _logger.info("Removed newly added {} keys for the segment: {} out of : {}", removedKeys,
+        oldSegment.getSegmentName(), _previousKeyToRecordLocationMap.size());
   }
 
   @Override
