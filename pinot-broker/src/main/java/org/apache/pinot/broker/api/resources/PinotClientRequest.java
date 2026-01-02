@@ -557,6 +557,10 @@ public class PinotClientRequest {
     SqlNodeAndOptions sqlNodeAndOptions;
     try {
       sqlNodeAndOptions = RequestUtils.parseQuery(sqlRequestJson.get(Request.SQL).asText(), sqlRequestJson);
+      if (sqlRequestJson.has(Request.QUERY_OPTIONS)) {
+        sqlNodeAndOptions.setExtraOptions(
+            RequestUtils.getOptionsFromString(sqlRequestJson.get(Request.QUERY_OPTIONS).asText()));
+      }
     } catch (Exception e) {
       return new BrokerResponseNative(QueryErrorCode.SQL_PARSING, e.getMessage());
     }
