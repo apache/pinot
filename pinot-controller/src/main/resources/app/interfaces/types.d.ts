@@ -72,6 +72,7 @@ declare module 'Models' {
     queryServicePort: number;
     queryMailboxPort: number;
     queriesDisabled: boolean;
+    shutdownInProgress?: boolean;
     tags: Array<string>;
     pools?: string;
   };
