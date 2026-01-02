@@ -611,11 +611,26 @@ public class LeafStageWorkerAssignmentRule extends PRelOptRule {
     return buildLogicalTableScanResult(tableScan, logicalTableName, logicalTableRouteInfo, tableOptions);
   }
 
-  /**
-   * Builds the PhysicalTableScan result for a logical table.
-   */
   private PhysicalTableScan buildLogicalTableScanResult(PhysicalTableScan tableScan, String logicalTableName,
       LogicalTableRouteInfo logicalTableRouteInfo, Map<String, String> tableOptions) {
+    LogicalTableScanWorkerAssignmentResult result = buildLogicalTableWorkerAssignment(
+        logicalTableName, logicalTableRouteInfo, tableOptions);
+
+    // Cache the server instance mappings
+    for (ServerInstance serverInstance : result._serverInstances) {
+      _physicalPlannerContext.getInstanceIdToQueryServerInstance().computeIfAbsent(
+          serverInstance.getInstanceId(), (ignore) -> new QueryServerInstance(serverInstance));
+    }
+
+    return tableScan.with(result._pinotDataDistribution, result._tableScanMetadata);
+  }
+
+  /**
+   * Builds worker assignment for a logical table scan.
+   */
+  @VisibleForTesting
+  static LogicalTableScanWorkerAssignmentResult buildLogicalTableWorkerAssignment(
+      String logicalTableName, LogicalTableRouteInfo logicalTableRouteInfo, Map<String, String> tableOptions) {
     // Collect server to segments mapping across all physical tables
     Map<ServerInstance, Map<String, List<String>>> serverInstanceToLogicalSegmentsMap = new HashMap<>();
 
@@ -648,6 +663,7 @@ public class LeafStageWorkerAssignmentRule extends PRelOptRule {
     int numWorkers = sortedServerInstanceToSegmentsMap.size();
     Map<Integer, Map<String, List<String>>> workerIdToLogicalTableSegmentsMap = new HashMap<>();
     List<String> workers = new ArrayList<>();
+    List<ServerInstance> serverInstances = new ArrayList<>();
 
     for (int workerId = 0; workerId < numWorkers; workerId++) {
       Map.Entry<ServerInstance, Map<String, List<String>>> entry = sortedServerInstanceToSegmentsMap.get(workerId);
@@ -656,10 +672,7 @@ public class LeafStageWorkerAssignmentRule extends PRelOptRule {
 
       workerIdToLogicalTableSegmentsMap.put(workerId, physicalTableSegments);
       workers.add(String.format("%s@%s", workerId, serverInstance.getInstanceId()));
-
-      // Cache the server instance mapping
-      _physicalPlannerContext.getInstanceIdToQueryServerInstance().computeIfAbsent(
-          serverInstance.getInstanceId(), (ignore) -> new QueryServerInstance(serverInstance));
+      serverInstances.add(serverInstance);
     }
 
     // Build unavailable segments map
@@ -689,13 +702,14 @@ public class LeafStageWorkerAssignmentRule extends PRelOptRule {
         true  // isLogicalTable
     );
 
-    return tableScan.with(pinotDataDistribution, metadata);
+    return new LogicalTableScanWorkerAssignmentResult(pinotDataDistribution, metadata, serverInstances);
   }
 
   /**
    * Helper method to transfer routing table entries to the server instance logical segments map.
    */
-  private static void transferToServerInstanceLogicalSegmentsMap(String physicalTableName,
+  @VisibleForTesting
+  static void transferToServerInstanceLogicalSegmentsMap(String physicalTableName,
       Map<ServerInstance, SegmentsToQuery> routingTable,
       Map<ServerInstance, Map<String, List<String>>> serverInstanceToLogicalSegmentsMap) {
     for (Map.Entry<ServerInstance, SegmentsToQuery> entry : routingTable.entrySet()) {
@@ -715,6 +729,23 @@ public class LeafStageWorkerAssignmentRule extends PRelOptRule {
         Map<Integer, Map<String, List<String>>> workerIdToSegmentsMap) {
       _pinotDataDistribution = pinotDataDistribution;
       _workerIdToSegmentsMap = workerIdToSegmentsMap;
+    }
+  }
+
+  /**
+   * Result of building worker assignment for a logical table scan.
+   */
+  @VisibleForTesting
+  static class LogicalTableScanWorkerAssignmentResult {
+    final PinotDataDistribution _pinotDataDistribution;
+    final TableScanMetadata _tableScanMetadata;
+    final List<ServerInstance> _serverInstances;
+
+    LogicalTableScanWorkerAssignmentResult(PinotDataDistribution pinotDataDistribution,
+        TableScanMetadata tableScanMetadata, List<ServerInstance> serverInstances) {
+      _pinotDataDistribution = pinotDataDistribution;
+      _tableScanMetadata = tableScanMetadata;
+      _serverInstances = serverInstances;
     }
   }
 
