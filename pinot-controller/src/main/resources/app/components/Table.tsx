@@ -389,7 +389,7 @@ export default function CustomizedTables({
             />
           );
         }
-    if (str.toLowerCase() === 'bad' || str.toLowerCase() === 'unhealthy' || str.toLowerCase() === 'offline' || str.toLowerCase() === 'dead' || str.toLowerCase() === 'false') {
+    if (str.toLowerCase() === 'bad' || str.toLowerCase() === 'offline' || str.toLowerCase() === 'dead' || str.toLowerCase() === 'false') {
       return (
         <StyledChip
           label={str}
@@ -398,7 +398,7 @@ export default function CustomizedTables({
         />
       );
     }
-    if (str.toLowerCase() === 'consuming' || str.toLowerCase() === "partial" || str.toLowerCase() === "updating") {
+    if (str.toLowerCase() === 'disabled' || str.toLowerCase() === "queries disabled" || str.toLowerCase() === 'unhealthy') {
       return (
         <StyledChip
           label={str}
@@ -407,7 +407,7 @@ export default function CustomizedTables({
         />
       );
     }
-    if (str.toLowerCase() === 'disabled' || str.toLowerCase() === "queries disabled") {
+    if (str.toLowerCase() === 'consuming' || str.toLowerCase() === "partial" || str.toLowerCase() === "updating") {
       return (
         <StyledChip
           label={str}
