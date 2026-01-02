@@ -222,16 +222,14 @@ const getInstanceData = (instances, liveInstanceArr) => {
         return { ...record, healthStatus: status };
       }
 
-      if (record.isAlive) {
-        if (record.shutdownInProgress) {
-          status = {value: InstanceStatus.UNHEALTHY, tooltip: 'Instance is running but is starting up or shutting down'};
-        } else if (!record.isEnabled) {
-          status = {value: InstanceStatus.INSTANCE_DISABLED, tooltip: 'Instance has been disabled in helix'};
-        } else if (record.queriesDisabled) {
-          status = {value: InstanceStatus.QUERIES_DISABLED, tooltip: 'Instance running but has queries disabled'};
-        } else {
-          status = {value: InstanceStatus.HEALTHY, tooltip: 'Instance is healthy and ready to serve requests'};
-        }
+      if (record.shutdownInProgress) {
+        status = {value: InstanceStatus.UNHEALTHY, tooltip: 'Instance is running but is starting up or shutting down'};
+      } else if (!record.isEnabled) {
+        status = {value: InstanceStatus.INSTANCE_DISABLED, tooltip: 'Instance has been disabled in helix'};
+      } else if (record.queriesDisabled) {
+        status = {value: InstanceStatus.QUERIES_DISABLED, tooltip: 'Instance running but has queries disabled'};
+      } else {
+        status = {value: InstanceStatus.HEALTHY, tooltip: 'Instance is healthy and ready to serve requests'};
       }
 
       return { ...record, healthStatus: status };
