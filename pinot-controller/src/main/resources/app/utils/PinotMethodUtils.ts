@@ -186,20 +186,6 @@ const getAllInstances = () => {
   });
 };
 
-// This method is used to check the health endpoint of an instance
-// API: http://{hostname}:{port}/health
-// Expected Output: 'OK' or error
-const checkInstanceHealth = async (hostname, port) => {
-  try {
-    const response = await baseApi.get(`http://${hostname}:${port}/health`, {
-      timeout: 5000 // 5 second timeout
-    });
-    return response.data === 'OK' || response.status === 200;
-  } catch (error) {
-    return false;
-  }
-};
-
 // This method is used to display instance data on cluster manager home page
 // API: /instances/:instanceName
 // Expected Output: {columns: [], records: []}
