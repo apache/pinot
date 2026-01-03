@@ -24,6 +24,11 @@ declare module 'Models' {
     component?: JSX.Element
   }
 
+  export type InstanceStatusCell = {
+    value: InstanceStatus,
+    tooltip: string,
+  }
+
   export type LoadingRecord = {
     customRenderer: JSX.Element
   }
@@ -405,6 +410,14 @@ declare module 'Models' {
   export const enum InstanceState {
     ENABLE = "enable",
     DISABLE = "disable"
+  }
+
+  export const enum InstanceStatus {
+    DEAD = "Dead",
+    UNHEALTHY = "Unhealthy",
+    INSTANCE_DISABLED = "Disabled",
+    QUERIES_DISABLED = "Queries Disabled",
+    HEALTHY = "Healthy",
   }
 
   export const enum InstanceType {

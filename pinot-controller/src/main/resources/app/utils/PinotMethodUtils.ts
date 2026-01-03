@@ -21,6 +21,8 @@ import jwtDecode from "jwt-decode";
 import { get, each, isEqual, isArray, keys, union } from 'lodash';
 import {
   DataTable,
+  InstanceStatus,
+  InstanceStatusCell,
   InstanceType,
   RebalanceTableSegmentJob,
   RebalanceTableSegmentJobs,
@@ -28,7 +30,7 @@ import {
   SegmentMetadata,
   SqlException,
   SQLResult,
-  TaskType
+  TaskType,
 } from 'Models';
 import moment from 'moment';
 import {
@@ -184,20 +186,6 @@ const getAllInstances = () => {
   });
 };
 
-// This method is used to check the health endpoint of an instance
-// API: http://{hostname}:{port}/health
-// Expected Output: 'OK' or error
-const checkInstanceHealth = async (hostname, port) => {
-  try {
-    const response = await baseApi.get(`http://${hostname}:${port}/health`, {
-      timeout: 5000 // 5 second timeout
-    });
-    return response.data === 'OK' || response.status === 200;
-  } catch (error) {
-    return false;
-  }
-};
-
 // This method is used to display instance data on cluster manager home page
 // API: /instances/:instanceName
 // Expected Output: {columns: [], records: []}
@@ -227,28 +215,21 @@ const getInstanceData = (instances, liveInstanceArr) => {
 
     // Then check health endpoints for alive instances
     const healthCheckPromises = instanceRecords.map(async (record) => {
+
+      let status: InstanceStatusCell = {value: InstanceStatus.DEAD, tooltip: 'Instance is not running'};
+
       if (!record.isAlive) {
-        return { ...record, healthStatus: 'Dead' };
+        return { ...record, healthStatus: status };
       }
 
-      // Determine which port to use for health check
-      // For brokers and servers, use adminPort if available, otherwise use main port
-      const healthPort = record.adminPort && record.adminPort > 0 ? record.adminPort : record.port;
-      const isHealthy = await checkInstanceHealth(record.hostName, healthPort);
-
-      let status = 'Dead';
-      if (record.isAlive) {
-        if (record.shutdownInProgress) {
-          status = 'Shutting Down';
-        } else if (!record.isEnabled) {
-          status = 'Disabled';
-        } else if (record.queriesDisabled) {
-          status = 'Queries Disabled';
-        } else if (isHealthy) {
-          status = 'Healthy';
-        } else {
-          status = 'Unhealthy';
-        }
+      if (record.shutdownInProgress) {
+        status = {value: InstanceStatus.UNHEALTHY, tooltip: 'Instance is running but is starting up or shutting down'};
+      } else if (!record.isEnabled) {
+        status = {value: InstanceStatus.INSTANCE_DISABLED, tooltip: 'Instance has been disabled in helix'};
+      } else if (record.queriesDisabled) {
+        status = {value: InstanceStatus.QUERIES_DISABLED, tooltip: 'Instance running but has queries disabled'};
+      } else {
+        status = {value: InstanceStatus.HEALTHY, tooltip: 'Instance is healthy and ready to serve requests'};
       }
 
       return { ...record, healthStatus: status };
