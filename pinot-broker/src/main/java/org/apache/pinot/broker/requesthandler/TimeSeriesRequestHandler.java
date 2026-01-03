@@ -50,6 +50,7 @@ import org.apache.pinot.common.request.context.FilterContext;
 import org.apache.pinot.common.request.context.RequestContextUtils;
 import org.apache.pinot.common.response.BrokerResponse;
 import org.apache.pinot.common.utils.HumanReadableDuration;
+import org.apache.pinot.common.utils.request.RequestUtils;
 import org.apache.pinot.core.auth.Actions;
 import org.apache.pinot.core.auth.TargetType;
 import org.apache.pinot.core.routing.MultiClusterRoutingContext;
@@ -62,6 +63,7 @@ import org.apache.pinot.spi.env.PinotConfiguration;
 import org.apache.pinot.spi.exception.QueryErrorCode;
 import org.apache.pinot.spi.exception.QueryException;
 import org.apache.pinot.spi.trace.RequestContext;
+import org.apache.pinot.spi.utils.JsonUtils;
 import org.apache.pinot.spi.utils.builder.TableNameBuilder;
 import org.apache.pinot.sql.parsers.CalciteSqlParser;
 import org.apache.pinot.sql.parsers.SqlNodeAndOptions;
@@ -201,7 +203,8 @@ public class TimeSeriesRequestHandler extends BaseBrokerRequestHandler {
     Long stepSeconds = getStepSeconds(mergedParams.get("step"));
     Duration timeout = StringUtils.isNotBlank(mergedParams.get("timeout"))
         ? HumanReadableDuration.from(mergedParams.get("timeout")) : Duration.ofMillis(_brokerTimeoutMs);
-
+    Map<String, String> queryOptions = RequestUtils.getOptionsFromString(mergedParams.getOrDefault("queryOptions",
+      ""));
     Preconditions.checkNotNull(query, "Query cannot be null");
     Preconditions.checkNotNull(startTs, "Start time cannot be null");
     Preconditions.checkNotNull(endTs, "End time cannot be null");
@@ -210,7 +213,7 @@ public class TimeSeriesRequestHandler extends BaseBrokerRequestHandler {
     return new RangeTimeSeriesRequest(language, query, startTs, endTs, stepSeconds, timeout,
         parseIntOrDefault(mergedParams.get("limit"), RangeTimeSeriesRequest.DEFAULT_SERIES_LIMIT),
         parseIntOrDefault(mergedParams.get("numGroupsLimit"), RangeTimeSeriesRequest.DEFAULT_NUM_GROUPS_LIMIT),
-        queryParamString
+        queryParamString, queryOptions
     );
   }
 

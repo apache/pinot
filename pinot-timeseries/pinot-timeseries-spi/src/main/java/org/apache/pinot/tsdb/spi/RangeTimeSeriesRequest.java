@@ -20,6 +20,7 @@ package org.apache.pinot.tsdb.spi;
 
 import com.google.common.base.Preconditions;
 import java.time.Duration;
+import java.util.Map;
 
 
 /**
@@ -72,9 +73,11 @@ public class RangeTimeSeriesRequest {
   private final int _numGroupsLimit;
   /** Full query string to allow language implementations to pass custom parameters. */
   private final String _fullQueryString;
+  /** Query options */
+  private final Map<String, String> _queryOptions;
 
   public RangeTimeSeriesRequest(String language, String query, long startSeconds, long endSeconds, long stepSeconds,
-      Duration timeout, int limit, int numGroupsLimit, String fullQueryString) {
+      Duration timeout, int limit, int numGroupsLimit, String fullQueryString, Map<String, String> queryOptions) {
     Preconditions.checkState(endSeconds >= startSeconds, "Invalid range. startSeconds "
         + "should be greater than or equal to endSeconds. Found startSeconds=%s and endSeconds=%s",
         startSeconds, endSeconds);
@@ -87,6 +90,7 @@ public class RangeTimeSeriesRequest {
     _limit = limit;
     _numGroupsLimit = numGroupsLimit;
     _fullQueryString = fullQueryString;
+    _queryOptions = queryOptions;
   }
 
   public String getLanguage() {
@@ -123,5 +127,9 @@ public class RangeTimeSeriesRequest {
 
   public String getFullQueryString() {
     return _fullQueryString;
+  }
+
+  public Map<String, String> getQueryOptions() {
+    return _queryOptions;
   }
 }
