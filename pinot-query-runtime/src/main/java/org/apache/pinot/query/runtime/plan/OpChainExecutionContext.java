@@ -26,8 +26,7 @@ import org.apache.pinot.query.mailbox.MailboxService;
 import org.apache.pinot.query.routing.StageMetadata;
 import org.apache.pinot.query.routing.VirtualServerAddress;
 import org.apache.pinot.query.routing.WorkerMetadata;
-import org.apache.pinot.query.runtime.context.BrokerContext;
-import org.apache.pinot.query.runtime.context.ServerContext;
+import org.apache.pinot.query.runtime.context.QueryRuntimeContext;
 import org.apache.pinot.query.runtime.operator.OpChainId;
 import org.apache.pinot.query.runtime.operator.factory.DefaultQueryOperatorFactoryProvider;
 import org.apache.pinot.query.runtime.operator.factory.QueryOperatorFactoryProvider;
@@ -201,16 +200,11 @@ public class OpChainExecutionContext {
   }
 
   private static QueryOperatorFactoryProvider getDefaultQueryOperatorFactoryProvider() {
-    // Prefer server context when explicitly configured, otherwise fall back to broker, then default.
-    QueryOperatorFactoryProvider serverProvider =
-        ServerContext.getInstance().getQueryOperatorFactoryProvider();
-    if (serverProvider != null) {
-      return serverProvider;
-    }
-    QueryOperatorFactoryProvider brokerProvider =
-        BrokerContext.getInstance().getQueryOperatorFactoryProvider();
-    if (brokerProvider != null) {
-      return brokerProvider;
+    // Prefer query runtime context when explicitly configured, otherwise fall back to default.
+    QueryOperatorFactoryProvider queryRuntimeProvider =
+        QueryRuntimeContext.getInstance().getQueryOperatorFactoryProvider();
+    if (queryRuntimeProvider != null) {
+      return queryRuntimeProvider;
     }
     return DefaultQueryOperatorFactoryProvider.INSTANCE;
   }

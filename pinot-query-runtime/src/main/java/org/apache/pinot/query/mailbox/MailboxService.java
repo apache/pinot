@@ -21,15 +21,19 @@ package org.apache.pinot.query.mailbox;
 import com.google.common.cache.Cache;
 import com.google.common.cache.CacheBuilder;
 import com.google.common.cache.RemovalListener;
+import io.grpc.netty.shaded.io.netty.handler.ssl.SslContext;
 import java.time.Duration;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.TimeUnit;
 import javax.annotation.Nullable;
 import org.apache.pinot.common.config.TlsConfig;
 import org.apache.pinot.common.datatable.StatMap;
+import org.apache.pinot.common.utils.grpc.ServerGrpcQueryClient;
+import org.apache.pinot.core.transport.grpc.GrpcQueryServer;
 import org.apache.pinot.query.access.QueryAccessControlFactory;
 import org.apache.pinot.query.mailbox.channel.ChannelManager;
 import org.apache.pinot.query.mailbox.channel.GrpcMailboxServer;
+import org.apache.pinot.query.runtime.context.QueryRuntimeContext;
 import org.apache.pinot.query.runtime.operator.MailboxSendOperator;
 import org.apache.pinot.spi.config.instance.InstanceType;
 import org.apache.pinot.spi.env.PinotConfiguration;
@@ -72,6 +76,10 @@ public class MailboxService {
   private final PinotConfiguration _config;
   private final ChannelManager _channelManager;
   @Nullable private final TlsConfig _tlsConfig;
+  @Nullable
+  private final SslContext _clientSslContext;
+  @Nullable
+  private final SslContext _serverSslContext;
   @Nullable private final QueryAccessControlFactory _accessControlFactory;
   /**
    * The max inbound message size for the gRPC server.
@@ -103,11 +111,14 @@ public class MailboxService {
     _instanceType = instanceType;
     _config = config;
     _tlsConfig = tlsConfig;
+    _clientSslContext = resolveClientSslContext(instanceType, tlsConfig);
+    _serverSslContext = resolveServerSslContext(instanceType, tlsConfig);
     _maxInboundMessageSize = config.getProperty(
         CommonConstants.MultiStageQueryRunner.KEY_OF_MAX_INBOUND_QUERY_DATA_BLOCK_SIZE_BYTES,
         CommonConstants.MultiStageQueryRunner.DEFAULT_MAX_INBOUND_QUERY_DATA_BLOCK_SIZE_BYTES
     );
-    _channelManager = new ChannelManager(tlsConfig, _maxInboundMessageSize, getIdleTimeout(config));
+    _channelManager = new ChannelManager(tlsConfig, _clientSslContext, _maxInboundMessageSize,
+        getIdleTimeout(config));
     _accessControlFactory = accessControlFactory;
     LOGGER.info("Initialized MailboxService with hostname: {}, port: {}", hostname, port);
   }
@@ -117,7 +128,7 @@ public class MailboxService {
    */
   public void start() {
     LOGGER.info("Starting GrpcMailboxServer");
-    _grpcMailboxServer = new GrpcMailboxServer(this, _config, _tlsConfig, _accessControlFactory);
+    _grpcMailboxServer = new GrpcMailboxServer(this, _config, _tlsConfig, _serverSslContext, _accessControlFactory);
     _grpcMailboxServer.start();
   }
 
@@ -191,5 +202,53 @@ public class MailboxService {
     }
     // Use a reasonable maximum idle timeout (1 year) to avoid overflow.
     return Duration.ofDays(365);
+  }
+
+  @Nullable
+  private static SslContext resolveClientSslContext(InstanceType instanceType, @Nullable TlsConfig tlsConfig) {
+    if (tlsConfig == null) {
+      return null;
+    }
+    switch (instanceType) {
+      case BROKER:
+      case SERVER:
+      case CONTROLLER:
+        return getOrBuildClientSslContext(instanceType, tlsConfig);
+      default:
+        return ServerGrpcQueryClient.buildSslContext(tlsConfig);
+    }
+  }
+
+  @Nullable
+  private static SslContext resolveServerSslContext(InstanceType instanceType, @Nullable TlsConfig tlsConfig) {
+    if (tlsConfig == null) {
+      return null;
+    }
+    switch (instanceType) {
+      case BROKER:
+      case SERVER:
+      case CONTROLLER:
+        return getOrBuildServerSslContext(instanceType, tlsConfig);
+      default:
+        return GrpcQueryServer.buildGrpcSslContext(tlsConfig);
+    }
+  }
+
+  private static SslContext getOrBuildClientSslContext(InstanceType instanceType, TlsConfig tlsConfig) {
+    SslContext sslContext = QueryRuntimeContext.getInstance().getClientGrpcSslContext(instanceType);
+    if (sslContext == null) {
+      sslContext = ServerGrpcQueryClient.buildSslContext(tlsConfig);
+      QueryRuntimeContext.getInstance().setClientGrpcSslContext(instanceType, sslContext);
+    }
+    return sslContext;
+  }
+
+  private static SslContext getOrBuildServerSslContext(InstanceType instanceType, TlsConfig tlsConfig) {
+    SslContext sslContext = QueryRuntimeContext.getInstance().getServerGrpcSslContext(instanceType);
+    if (sslContext == null) {
+      sslContext = GrpcQueryServer.buildGrpcSslContext(tlsConfig);
+      QueryRuntimeContext.getInstance().setServerGrpcSslContext(instanceType, sslContext);
+    }
+    return sslContext;
   }
 }

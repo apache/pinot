@@ -19,10 +19,17 @@
 package org.apache.pinot.server.worker;
 
 import javax.annotation.Nullable;
+import javax.net.ssl.SSLContext;
+import nl.altindag.ssl.SSLFactory;
 import org.apache.pinot.common.config.TlsConfig;
+import org.apache.pinot.common.utils.grpc.ServerGrpcQueryClient;
+import org.apache.pinot.common.utils.tls.PinotInsecureMode;
+import org.apache.pinot.common.utils.tls.RenewableTlsUtils;
 import org.apache.pinot.core.data.manager.InstanceDataManager;
+import org.apache.pinot.core.transport.grpc.GrpcQueryServer;
 import org.apache.pinot.query.runtime.QueryRunner;
 import org.apache.pinot.query.service.server.QueryServer;
+import org.apache.pinot.server.ServerContext;
 import org.apache.pinot.server.starter.helix.SendStatsPredicate;
 import org.apache.pinot.spi.accounting.ThreadAccountant;
 import org.apache.pinot.spi.env.PinotConfiguration;
@@ -41,6 +48,25 @@ public class WorkerQueryServer {
     serverConf = toWorkerQueryConfig(serverConf);
     _queryServicePort = serverConf.getProperty(MultiStageQueryRunner.KEY_OF_QUERY_SERVER_PORT,
         MultiStageQueryRunner.DEFAULT_QUERY_SERVER_PORT);
+    if (tlsConfig != null) {
+      ServerContext serverContext = ServerContext.getInstance();
+      if (serverContext.getClientGrpcSslContext() == null) {
+        serverContext.setClientGrpcSslContext(ServerGrpcQueryClient.buildSslContext(tlsConfig));
+      }
+      if (serverContext.getServerGrpcSslContext() == null) {
+        serverContext.setServerGrpcSslContext(GrpcQueryServer.buildGrpcSslContext(tlsConfig));
+      }
+      SSLFactory sslFactory =
+          RenewableTlsUtils.createSSLFactoryAndEnableAutoRenewalWhenUsingFileStores(tlsConfig,
+              PinotInsecureMode::isPinotInInsecureMode);
+      SSLContext sslContext = sslFactory.getSslContext();
+      if (serverContext.getClientHttpsContext() == null) {
+        serverContext.setClientHttpsContext(sslContext);
+      }
+      if (serverContext.getServerHttpsContext() == null) {
+        serverContext.setServerHttpsContext(sslContext);
+      }
+    }
     QueryRunner queryRunner = new QueryRunner();
     queryRunner.init(serverConf, instanceDataManager, tlsConfig, sendStats::isSendStats);
     _queryWorkerService =
