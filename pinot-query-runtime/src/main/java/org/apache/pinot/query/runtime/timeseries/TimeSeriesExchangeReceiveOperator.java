@@ -121,6 +121,7 @@ public class TimeSeriesExchangeReceiveOperator extends BaseTimeSeriesOperator {
     TimeBuckets timeBuckets = null;
     Map<Long, BaseTimeSeriesBuilder> seriesBuilderMap = new HashMap<>();
     Map<String, String> aggregatedStats = new HashMap<>();
+    List<QueryException> allExceptions = new ArrayList<>();
     QueryException timeoutException = null;
 
     for (int index = 0; index < _numServersQueried; index++) {
@@ -145,6 +146,8 @@ public class TimeSeriesExchangeReceiveOperator extends BaseTimeSeriesOperator {
           "Found unexpected object. This is a bug: %s", result.getClass());
       // Step-2: Init timeBuckets and ensure they are the same across all servers.
       TimeSeriesBlock blockToMerge = (TimeSeriesBlock) result;
+      // Merge exceptions from the received block
+      allExceptions.addAll(blockToMerge.getExceptions());
       if (timeBuckets == null) {
         timeBuckets = blockToMerge.getTimeBuckets();
       } else {
@@ -180,6 +183,8 @@ public class TimeSeriesExchangeReceiveOperator extends BaseTimeSeriesOperator {
       seriesMap.put(seriesHash, timeSeriesList);
     }
     TimeSeriesBlock resultBlock = new TimeSeriesBlock(timeBuckets, seriesMap, aggregatedStats);
+    // Add all collected exceptions to the result block
+    allExceptions.forEach(resultBlock::addToExceptions);
     if (timeoutException != null) {
       resultBlock.addToExceptions(timeoutException);
     }
@@ -212,6 +217,7 @@ public class TimeSeriesExchangeReceiveOperator extends BaseTimeSeriesOperator {
     Map<Long, List<TimeSeries>> timeSeriesMap = new HashMap<>();
     TimeBuckets timeBuckets = null;
     Map<String, String> aggregatedStats = new HashMap<>();
+    List<QueryException> allExceptions = new ArrayList<>();
     QueryException timeoutException = null;
     for (int index = 0; index < _numServersQueried; index++) {
       long remainingTimeMs = _deadlineMs - System.currentTimeMillis();
@@ -233,6 +239,8 @@ public class TimeSeriesExchangeReceiveOperator extends BaseTimeSeriesOperator {
       Preconditions.checkState(result instanceof TimeSeriesBlock,
           "Found unexpected object. This is a bug: %s", result.getClass());
       TimeSeriesBlock blockToMerge = (TimeSeriesBlock) result;
+      // Merge exceptions from the received block
+      allExceptions.addAll(blockToMerge.getExceptions());
       if (timeBuckets == null) {
         timeBuckets = blockToMerge.getTimeBuckets();
       } else {
@@ -248,6 +256,8 @@ public class TimeSeriesExchangeReceiveOperator extends BaseTimeSeriesOperator {
     }
     Preconditions.checkNotNull(timeBuckets, "Time buckets is null in exchange receive operator");
     TimeSeriesBlock resultBlock = new TimeSeriesBlock(timeBuckets, timeSeriesMap, aggregatedStats);
+    // Add all collected exceptions to the result block
+    allExceptions.forEach(resultBlock::addToExceptions);
     if (timeoutException != null) {
       resultBlock.addToExceptions(timeoutException);
     }

@@ -406,6 +406,7 @@ public class QueryRunner {
             TimeSeriesBlock seriesBlock = fragmentOpChain.nextBlock();
             Map<String, String> metadataMap = new HashMap<>(seriesBlock.getMetadata());
             metadataMap.put(Response.MetadataKeys.TimeSeries.PLAN_ID, currentPlanId);
+            TimeSeriesBlockSerde.encodeExceptionsToMetadata(seriesBlock, metadataMap);
             Worker.TimeSeriesResponse response = Worker.TimeSeriesResponse.newBuilder()
                 .setPayload(TimeSeriesBlockSerde.serializeTimeSeriesBlock(seriesBlock))
                 .putAllMetadata(metadataMap)
