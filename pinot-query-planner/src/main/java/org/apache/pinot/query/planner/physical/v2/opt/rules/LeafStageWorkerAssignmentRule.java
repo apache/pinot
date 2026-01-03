@@ -22,6 +22,7 @@ import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
 import com.google.common.collect.ImmutableSet;
 import java.util.ArrayList;
+import java.util.Comparator;
 import java.util.Deque;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -41,16 +42,20 @@ import org.apache.pinot.calcite.rel.hint.PinotHintOptions;
 import org.apache.pinot.common.config.provider.TableCache;
 import org.apache.pinot.common.metrics.BrokerMeter;
 import org.apache.pinot.common.metrics.BrokerMetrics;
+import org.apache.pinot.common.request.BrokerRequest;
 import org.apache.pinot.common.request.DataSource;
 import org.apache.pinot.common.request.PinotQuery;
 import org.apache.pinot.common.utils.DatabaseUtils;
 import org.apache.pinot.common.utils.LLCSegmentName;
 import org.apache.pinot.common.utils.UploadedRealtimeSegmentName;
 import org.apache.pinot.common.utils.config.QueryOptionsUtils;
+import org.apache.pinot.core.routing.LogicalTableRouteInfo;
+import org.apache.pinot.core.routing.LogicalTableRouteProvider;
 import org.apache.pinot.core.routing.RoutingManager;
 import org.apache.pinot.core.routing.RoutingTable;
 import org.apache.pinot.core.routing.SegmentsToQuery;
 import org.apache.pinot.core.routing.TablePartitionInfo;
+import org.apache.pinot.core.routing.TableRouteInfo;
 import org.apache.pinot.core.routing.timeboundary.TimeBoundaryInfo;
 import org.apache.pinot.core.transport.ServerInstance;
 import org.apache.pinot.query.context.PhysicalPlannerContext;
@@ -116,7 +121,21 @@ public class LeafStageWorkerAssignmentRule extends PRelOptRule {
     if (call._currentNode.unwrap() instanceof TableScan) {
       PRelNode leafStageRoot = extractCurrentLeafStageParent(call._parents);
       leafStageRoot = leafStageRoot == null ? call._currentNode : leafStageRoot;
-      String tableName = getActualTableName((TableScan) call._currentNode.unwrap());
+      TableScan tableScan = (TableScan) call._currentNode.unwrap();
+      String tableName = getActualTableName(tableScan);
+
+      // Check if this is a logical table
+      if (tableName == null) {
+        String logicalTableName = getActualLogicalTableName(tableScan);
+        if (logicalTableName == null) {
+          throw new IllegalStateException(String.format(
+              "Table '%s' not found in physical or logical table cache",
+              getTableNameForLookup(tableScan)));
+        }
+        return assignLogicalTableScan((PhysicalTableScan) call._currentNode,
+            _physicalPlannerContext.getRequestId(), logicalTableName);
+      }
+
       PinotQuery pinotQuery = LeafStageToPinotQuery.createPinotQueryForRouting(tableName, leafStageRoot.unwrap(),
           !_physicalPlannerContext.isUseBrokerPruning());
       return assignTableScan((PhysicalTableScan) call._currentNode, _physicalPlannerContext.getRequestId(),
@@ -532,12 +551,174 @@ public class LeafStageWorkerAssignmentRule extends PRelOptRule {
     return tmp == null ? Map.of() : tmp;
   }
 
-  private String getActualTableName(TableScan tableScan) {
+  /**
+   * Gets the table name from the TableScan in a format that can be looked up in the table cache.
+   * This follows the same logic as {@link org.apache.pinot.query.catalog.PinotCatalog#getTable(String)}.
+   */
+  private String getTableNameForLookup(TableScan tableScan) {
     RelOptTable table = tableScan.getTable();
     List<String> qualifiedName = table.getQualifiedName();
-    String tmp = qualifiedName.size() == 1 ? qualifiedName.get(0)
+    String tableName = qualifiedName.size() == 1 ? qualifiedName.get(0)
         : DatabaseUtils.constructFullyQualifiedTableName(qualifiedName.get(0), qualifiedName.get(1));
-    return _tableCache.getActualTableName(tmp);
+    // Extract raw table name (removes _OFFLINE/_REALTIME suffix if present)
+    return TableNameBuilder.extractRawTableName(tableName);
+  }
+
+  @Nullable
+  private String getActualTableName(TableScan tableScan) {
+    String tableName = getTableNameForLookup(tableScan);
+    return _tableCache.getActualTableName(tableName);
+  }
+
+  @Nullable
+  private String getActualLogicalTableName(TableScan tableScan) {
+    String tableName = getTableNameForLookup(tableScan);
+    return _tableCache.getActualLogicalTableName(tableName);
+  }
+
+  /**
+   * Assigns workers for a logical table scan. A logical table maps to multiple physical tables.
+   */
+  private PhysicalTableScan assignLogicalTableScan(PhysicalTableScan tableScan, long requestId,
+      String logicalTableName) {
+    Map<String, String> tableOptions = getTableOptions(tableScan.getHints());
+
+    // Step 1: Get LogicalTableRouteInfo using LogicalTableRouteProvider
+    LogicalTableRouteProvider tableRouteProvider = new LogicalTableRouteProvider();
+    LogicalTableRouteInfo logicalTableRouteInfo = new LogicalTableRouteInfo();
+    tableRouteProvider.fillTableConfigMetadata(logicalTableRouteInfo, logicalTableName, _tableCache);
+    tableRouteProvider.fillRouteMetadata(logicalTableRouteInfo, _routingManager);
+
+    // Step 2: Build broker requests for route calculation
+    BrokerRequest offlineBrokerRequest = null;
+    BrokerRequest realtimeBrokerRequest = null;
+
+    if (logicalTableRouteInfo.hasOffline()) {
+      offlineBrokerRequest = CalciteSqlCompiler.compileToBrokerRequest(
+          "SELECT * FROM \"" + logicalTableRouteInfo.getOfflineTableName() + "\"");
+    }
+
+    if (logicalTableRouteInfo.hasRealtime()) {
+      realtimeBrokerRequest = CalciteSqlCompiler.compileToBrokerRequest(
+          "SELECT * FROM \"" + logicalTableRouteInfo.getRealtimeTableName() + "\"");
+    }
+
+    // Step 3: Calculate routes
+    tableRouteProvider.calculateRoutes(logicalTableRouteInfo, _routingManager,
+        offlineBrokerRequest, realtimeBrokerRequest, requestId);
+
+    // Step 4: Build worker assignment from LogicalTableRouteInfo
+    return buildLogicalTableScanResult(tableScan, logicalTableName, logicalTableRouteInfo, tableOptions);
+  }
+
+  private PhysicalTableScan buildLogicalTableScanResult(PhysicalTableScan tableScan, String logicalTableName,
+      LogicalTableRouteInfo logicalTableRouteInfo, Map<String, String> tableOptions) {
+    LogicalTableScanWorkerAssignmentResult result = buildLogicalTableWorkerAssignment(
+        logicalTableName, logicalTableRouteInfo, tableOptions);
+
+    // Cache the server instance mappings
+    for (ServerInstance serverInstance : result._serverInstances) {
+      _physicalPlannerContext.getInstanceIdToQueryServerInstance().computeIfAbsent(
+          serverInstance.getInstanceId(), (ignore) -> new QueryServerInstance(serverInstance));
+    }
+
+    return tableScan.with(result._pinotDataDistribution, result._tableScanMetadata);
+  }
+
+  /**
+   * Builds worker assignment for a logical table scan.
+   */
+  @VisibleForTesting
+  static LogicalTableScanWorkerAssignmentResult buildLogicalTableWorkerAssignment(
+      String logicalTableName, LogicalTableRouteInfo logicalTableRouteInfo, Map<String, String> tableOptions) {
+    // Collect server to segments mapping across all physical tables
+    Map<ServerInstance, Map<String, List<String>>> serverInstanceToLogicalSegmentsMap = new HashMap<>();
+
+    // Process offline tables
+    if (logicalTableRouteInfo.getOfflineTables() != null) {
+      for (TableRouteInfo physicalTableRoute : logicalTableRouteInfo.getOfflineTables()) {
+        if (physicalTableRoute.getOfflineRoutingTable() != null) {
+          transferToServerInstanceLogicalSegmentsMap(physicalTableRoute.getOfflineTableName(),
+              physicalTableRoute.getOfflineRoutingTable(), serverInstanceToLogicalSegmentsMap);
+        }
+      }
+    }
+
+    // Process realtime tables
+    if (logicalTableRouteInfo.getRealtimeTables() != null) {
+      for (TableRouteInfo physicalTableRoute : logicalTableRouteInfo.getRealtimeTables()) {
+        if (physicalTableRoute.getRealtimeRoutingTable() != null) {
+          transferToServerInstanceLogicalSegmentsMap(physicalTableRoute.getRealtimeTableName(),
+              physicalTableRoute.getRealtimeRoutingTable(), serverInstanceToLogicalSegmentsMap);
+        }
+      }
+    }
+
+    // Sort server instances to ensure deterministic worker ID assignment
+    List<Map.Entry<ServerInstance, Map<String, List<String>>>> sortedServerInstanceToSegmentsMap =
+        new ArrayList<>(serverInstanceToLogicalSegmentsMap.entrySet());
+    sortedServerInstanceToSegmentsMap.sort(Comparator.comparing(entry -> entry.getKey().getInstanceId()));
+
+    // Assign 1 worker per server
+    int numWorkers = sortedServerInstanceToSegmentsMap.size();
+    Map<Integer, Map<String, List<String>>> workerIdToLogicalTableSegmentsMap = new HashMap<>();
+    List<String> workers = new ArrayList<>();
+    List<ServerInstance> serverInstances = new ArrayList<>();
+
+    for (int workerId = 0; workerId < numWorkers; workerId++) {
+      Map.Entry<ServerInstance, Map<String, List<String>>> entry = sortedServerInstanceToSegmentsMap.get(workerId);
+      ServerInstance serverInstance = entry.getKey();
+      Map<String, List<String>> physicalTableSegments = entry.getValue();
+
+      workerIdToLogicalTableSegmentsMap.put(workerId, physicalTableSegments);
+      workers.add(String.format("%s@%s", workerId, serverInstance.getInstanceId()));
+      serverInstances.add(serverInstance);
+    }
+
+    // Build unavailable segments map
+    Map<String, Set<String>> unavailableSegmentsMap = new HashMap<>();
+    List<String> unavailableSegments = logicalTableRouteInfo.getUnavailableSegments();
+    if (CollectionUtils.isNotEmpty(unavailableSegments)) {
+      unavailableSegmentsMap.put(logicalTableName, new HashSet<>(unavailableSegments));
+    }
+
+    // Get time boundary info
+    TimeBoundaryInfo timeBoundaryInfo = logicalTableRouteInfo.getTimeBoundaryInfo();
+
+    // Build distribution - use RANDOM_DISTRIBUTED for logical tables for now
+    // TODO: Add support for partitioned distribution when all physical tables share the same partitioning
+    RelDistribution.Type distType = workers.size() == 1 ? RelDistribution.Type.SINGLETON
+        : RelDistribution.Type.RANDOM_DISTRIBUTED;
+    PinotDataDistribution pinotDataDistribution = new PinotDataDistribution(distType, workers, workers.hashCode(),
+        null, null);
+
+    // Create TableScanMetadata for logical table
+    TableScanMetadata metadata = new TableScanMetadata(
+        Set.of(logicalTableName),
+        workerIdToLogicalTableSegmentsMap,
+        tableOptions,
+        unavailableSegmentsMap,
+        timeBoundaryInfo,
+        true  // isLogicalTable
+    );
+
+    return new LogicalTableScanWorkerAssignmentResult(pinotDataDistribution, metadata, serverInstances);
+  }
+
+  /**
+   * Helper method to transfer routing table entries to the server instance logical segments map.
+   */
+  @VisibleForTesting
+  static void transferToServerInstanceLogicalSegmentsMap(String physicalTableName,
+      Map<ServerInstance, SegmentsToQuery> routingTable,
+      Map<ServerInstance, Map<String, List<String>>> serverInstanceToLogicalSegmentsMap) {
+    for (Map.Entry<ServerInstance, SegmentsToQuery> entry : routingTable.entrySet()) {
+      ServerInstance serverInstance = entry.getKey();
+      List<String> segments = entry.getValue().getSegments();
+      serverInstanceToLogicalSegmentsMap
+          .computeIfAbsent(serverInstance, k -> new HashMap<>())
+          .put(physicalTableName, segments);
+    }
   }
 
   static class TableScanWorkerAssignmentResult {
@@ -548,6 +729,23 @@ public class LeafStageWorkerAssignmentRule extends PRelOptRule {
         Map<Integer, Map<String, List<String>>> workerIdToSegmentsMap) {
       _pinotDataDistribution = pinotDataDistribution;
       _workerIdToSegmentsMap = workerIdToSegmentsMap;
+    }
+  }
+
+  /**
+   * Result of building worker assignment for a logical table scan.
+   */
+  @VisibleForTesting
+  static class LogicalTableScanWorkerAssignmentResult {
+    final PinotDataDistribution _pinotDataDistribution;
+    final TableScanMetadata _tableScanMetadata;
+    final List<ServerInstance> _serverInstances;
+
+    LogicalTableScanWorkerAssignmentResult(PinotDataDistribution pinotDataDistribution,
+        TableScanMetadata tableScanMetadata, List<ServerInstance> serverInstances) {
+      _pinotDataDistribution = pinotDataDistribution;
+      _tableScanMetadata = tableScanMetadata;
+      _serverInstances = serverInstances;
     }
   }
 
