@@ -71,6 +71,15 @@ public class QueryLoggerTest {
       return null;
     }).when(_logger).info(Mockito.anyString());
 
+    // Also mock the varargs version used by logQueryReceived
+    Mockito.doAnswer(invocationOnMock -> {
+      String format = invocationOnMock.getArgument(0);
+      Object arg1 = invocationOnMock.getArgument(1);
+      Object arg2 = invocationOnMock.getArgument(2);
+      _infoLog.add(String.format(format.replace("{}", "%s"), arg1, arg2));
+      return null;
+    }).when(_logger).info(Mockito.anyString(), Mockito.anyLong(), Mockito.anyString());
+
     Mockito.doAnswer(inv -> {
       _numDropped.add(inv.getArgument(1));
       return null;
@@ -86,12 +95,11 @@ public class QueryLoggerTest {
   @Test
   public void shouldFormatLogLineProperly() {
     // Given:
-    Mockito.when(_logRateLimiter.tryAcquire()).thenReturn(true);
     QueryLogger.QueryLogParams params = generateParams(false, false, 0, 456, null);
     QueryLogger queryLogger = new QueryLogger(_logRateLimiter, 100, true, true, _logger, _droppedRateLimiter);
 
     // When:
-    queryLogger.log(params);
+    queryLogger.logQueryCompleted(params, true);
 
     // Then:
     Assert.assertEquals(_infoLog.size(), 1);
@@ -127,12 +135,11 @@ public class QueryLoggerTest {
   @Test
   public void shouldOmitClientId() {
     // Given:
-    Mockito.when(_logRateLimiter.tryAcquire()).thenReturn(true);
     QueryLogger.QueryLogParams params = generateParams(false, false, 0, 456, null);
     QueryLogger queryLogger = new QueryLogger(_logRateLimiter, 100, false, true, _logger, _droppedRateLimiter);
 
     // When:
-    queryLogger.log(params);
+    queryLogger.logQueryCompleted(params, true);
 
     // Then:
     Assert.assertEquals(_infoLog.size(), 1);
@@ -141,14 +148,13 @@ public class QueryLoggerTest {
   }
 
   @Test
-  public void shouldNotForceLog() {
-    // Given:
-    Mockito.when(_logRateLimiter.tryAcquire()).thenReturn(false);
+  public void shouldNotLogCompletionWhenWasLoggedFalseAndNoForceLog() {
+    // Given: wasLogged=false and no force-log conditions (no exceptions, not slow)
     QueryLogger.QueryLogParams params = generateParams(false, false, 0, 456, null);
     QueryLogger queryLogger = new QueryLogger(_logRateLimiter, 100, true, true, _logger, _droppedRateLimiter);
 
     // When:
-    queryLogger.log(params);
+    queryLogger.logQueryCompleted(params, false);
 
     // Then:
     Assert.assertEquals(_infoLog.size(), 0);
@@ -156,41 +162,94 @@ public class QueryLoggerTest {
 
   @Test
   public void shouldForceLogWhenNumGroupsLimitIsReached() {
-    // Given:
-    Mockito.when(_logRateLimiter.tryAcquire()).thenReturn(false);
+    // Given: wasLogged=false but numGroupsLimitReached (force-log condition)
     QueryLogger.QueryLogParams params = generateParams(true, true, 0, 456, null);
     QueryLogger queryLogger = new QueryLogger(_logRateLimiter, 100, true, true, _logger, _droppedRateLimiter);
 
     // When:
-    queryLogger.log(params);
+    queryLogger.logQueryCompleted(params, false);
 
-    // Then:
+    // Then: should still log due to force-log condition
     Assert.assertEquals(_infoLog.size(), 1);
   }
 
   @Test
   public void shouldForceLogWhenExceptionsExist() {
-    // Given:
-    Mockito.when(_logRateLimiter.tryAcquire()).thenReturn(false);
+    // Given: wasLogged=false but exceptions exist (force-log condition)
     QueryLogger.QueryLogParams params = generateParams(false, false, 1, 456, null);
     QueryLogger queryLogger = new QueryLogger(_logRateLimiter, 100, true, true, _logger, _droppedRateLimiter);
 
     // When:
-    queryLogger.log(params);
+    queryLogger.logQueryCompleted(params, false);
 
-    // Then:
+    // Then: should still log due to force-log condition
     Assert.assertEquals(_infoLog.size(), 1);
   }
 
   @Test
   public void shouldForceLogWhenTimeIsMoreThanOneSecond() {
-    // Given:
-    Mockito.when(_logRateLimiter.tryAcquire()).thenReturn(false);
+    // Given: wasLogged=false but query took >1s (force-log condition)
     QueryLogger.QueryLogParams params = generateParams(false, false, 0, 1456, null);
     QueryLogger queryLogger = new QueryLogger(_logRateLimiter, 100, true, true, _logger, _droppedRateLimiter);
 
     // When:
-    queryLogger.log(params);
+    queryLogger.logQueryCompleted(params, false);
+
+    // Then: should still log due to force-log condition
+    Assert.assertEquals(_infoLog.size(), 1);
+  }
+
+  @Test
+  public void shouldLogQueryReceivedWhenAllowed() {
+    // Given: rate limiter allows
+    Mockito.when(_logRateLimiter.tryAcquire()).thenReturn(true);
+    QueryLogger queryLogger = new QueryLogger(_logRateLimiter, 100, true, true, _logger, _droppedRateLimiter);
+
+    // When:
+    boolean wasLogged = queryLogger.logQueryReceived(123L, "SELECT * FROM foo");
+
+    // Then:
+    Assert.assertTrue(wasLogged);
+    Assert.assertEquals(_infoLog.size(), 1);
+    Assert.assertTrue(_infoLog.get(0).contains("SQL query for request 123"));
+  }
+
+  @Test
+  public void shouldNotLogQueryReceivedWhenRateLimited() {
+    // Given: rate limiter denies
+    Mockito.when(_logRateLimiter.tryAcquire()).thenReturn(false);
+    QueryLogger queryLogger = new QueryLogger(_logRateLimiter, 100, true, true, _logger, _droppedRateLimiter);
+
+    // When:
+    boolean wasLogged = queryLogger.logQueryReceived(123L, "SELECT * FROM foo");
+
+    // Then:
+    Assert.assertFalse(wasLogged);
+    Assert.assertEquals(_infoLog.size(), 0);
+  }
+
+  @Test
+  public void shouldReturnTrueButNotLogWhenLogBeforeProcessingIsDisabled() {
+    // Given: rate limiter allows, but logBeforeProcessing=false
+    Mockito.when(_logRateLimiter.tryAcquire()).thenReturn(true);
+    QueryLogger queryLogger = new QueryLogger(_logRateLimiter, 100, true, false, _logger, _droppedRateLimiter);
+
+    // When:
+    boolean wasLogged = queryLogger.logQueryReceived(123L, "SELECT * FROM foo");
+
+    // Then: returns true because rate limiter allowed, but no log because logBeforeProcessing=false
+    Assert.assertTrue(wasLogged);
+    Assert.assertEquals(_infoLog.size(), 0);
+  }
+
+  @Test
+  public void shouldLogCompletionWhenWasLoggedIsTrue() {
+    // Given:
+    QueryLogger.QueryLogParams params = generateParams(false, false, 0, 456);
+    QueryLogger queryLogger = new QueryLogger(_logRateLimiter, 100, true, true, _logger, _droppedRateLimiter);
+
+    // When:
+    queryLogger.logQueryCompleted(params, true);
 
     // Then:
     Assert.assertEquals(_infoLog.size(), 1);
@@ -220,7 +279,6 @@ public class QueryLoggerTest {
       return true;
     }).thenReturn(true);
 
-    QueryLogger.QueryLogParams params = generateParams(false, false, 0, 456, null);
     QueryLogger queryLogger = new QueryLogger(_logRateLimiter, 100, true, true, _logger, _droppedRateLimiter);
 
     ExecutorService executorService = Executors.newFixedThreadPool(4);
@@ -230,7 +288,7 @@ public class QueryLoggerTest {
       // use logAndDecrement on all invocations since any one of them could
       // be the one that blocks
       Runnable logAndDecrement = () -> {
-        queryLogger.log(params);
+        queryLogger.logQueryReceived(123, "SELECT * FROM foo");
         dropLogLatch.countDown();
       };
 
@@ -251,13 +309,12 @@ public class QueryLoggerTest {
   @Test
   public void shouldEmitQueryHashWhenSet() {
     // Given:
-    Mockito.when(_logRateLimiter.tryAcquire()).thenReturn(true);
     QueryLogger.QueryLogParams params = generateParams(false, false, 0, 456,
       new QueryFingerprint("abc", "SELECT * FROM foo"));
     QueryLogger queryLogger = new QueryLogger(_logRateLimiter, 100, true, true, _logger, _droppedRateLimiter);
 
     // When:
-    queryLogger.log(params);
+    queryLogger.logQueryCompleted(params, true);
 
     // Then:
     Assert.assertEquals(_infoLog.size(), 1);
@@ -269,18 +326,22 @@ public class QueryLoggerTest {
   @Test
   public void shouldEmitEmptyQueryHashWhenNotSet() {
     // Given:
-    Mockito.when(_logRateLimiter.tryAcquire()).thenReturn(true);
     QueryLogger.QueryLogParams params = generateParams(false, false, 0, 456, null);
     QueryLogger queryLogger = new QueryLogger(_logRateLimiter, 100, true, true, _logger, _droppedRateLimiter);
 
     // When:
-    queryLogger.log(params);
+    queryLogger.logQueryCompleted(params, true);
 
     // Then:
     Assert.assertEquals(_infoLog.size(), 1);
     String logLine = _infoLog.get(0);
     Assert.assertTrue(logLine.contains("queryHash=,"),
         "Expected empty queryHash field. Got: " + logLine);
+  }
+
+  private QueryLogger.QueryLogParams generateParams(boolean numGroupsLimitReached, boolean numGroupsWarningLimitReached,
+      int numExceptions, long timeUsedMs) {
+    return generateParams(numGroupsLimitReached, numGroupsWarningLimitReached, numExceptions, timeUsedMs, null);
   }
 
   private QueryLogger.QueryLogParams generateParams(boolean numGroupsLimitReached, boolean numGroupsWarningLimitReached,
