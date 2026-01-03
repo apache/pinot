@@ -21,6 +21,8 @@ package org.apache.pinot.client.admin;
 import com.fasterxml.jackson.databind.JsonNode;
 import java.io.Closeable;
 import java.io.IOException;
+import java.net.URLEncoder;
+import java.nio.charset.StandardCharsets;
 import java.util.HashMap;
 import java.util.Map;
 
@@ -52,6 +54,10 @@ public class PinotSegmentApiClient implements Closeable {
   private static final String SELECT_PATH = "/select";
   private static final String METADATA_PATH = "/metadata";
 
+  private static String encodePathSegment(String pathSegment) {
+    return URLEncoder.encode(pathSegment, StandardCharsets.UTF_8).replace("+", "%20");
+  }
+
   public JsonNode selectSegments(String rawTableName, String tableType, long startTimestamp, long endTimestamp,
       boolean excludeOverlapping) throws PinotAdminException {
     Map<String, String> queryParams = new HashMap<>();
@@ -59,13 +65,14 @@ public class PinotSegmentApiClient implements Closeable {
     queryParams.put(QueryParameters.END_TIMESTAMP, String.valueOf(endTimestamp));
     queryParams.put(QueryParameters.EXCLUDE_OVERLAPPING, String.valueOf(excludeOverlapping));
     queryParams.put(QueryParameters.TYPE, tableType);
-    return _transport.executeGet(_controllerAddress, SEGMENT_PATH + "/" + rawTableName + SELECT_PATH,
+    return _transport.executeGet(_controllerAddress, SEGMENT_PATH + "/" + encodePathSegment(rawTableName) + SELECT_PATH,
         queryParams, _headers);
   }
 
   public JsonNode getSegmentMetadata(String tableNameWithType, String segmentName) throws PinotAdminException {
     return _transport.executeGet(_controllerAddress,
-        SEGMENT_PATH + "/" + tableNameWithType + "/" + segmentName + METADATA_PATH, null, _headers);
+        SEGMENT_PATH + "/" + encodePathSegment(tableNameWithType) + "/" + encodePathSegment(segmentName)
+            + METADATA_PATH, null, _headers);
   }
 
   @Override
