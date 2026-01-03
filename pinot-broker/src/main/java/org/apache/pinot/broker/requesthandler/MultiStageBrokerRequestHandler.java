@@ -129,6 +129,7 @@ public class MultiStageBrokerRequestHandler extends BaseBrokerRequestHandler {
   private static final int NUM_UNAVAILABLE_SEGMENTS_TO_LOG = 10;
 
   private final WorkerManager _workerManager;
+  private final WorkerManager _multiClusterWorkerManager;
   private final QueryDispatcher _queryDispatcher;
   private final boolean _explainAskingServerDefault;
   private final MultiStageQueryThrottler _queryThrottler;
@@ -146,7 +147,16 @@ public class MultiStageBrokerRequestHandler extends BaseBrokerRequestHandler {
         threadAccountant, multiClusterRoutingContext);
     String hostname = config.getProperty(CommonConstants.MultiStageQueryRunner.KEY_OF_QUERY_RUNNER_HOSTNAME);
     int port = Integer.parseInt(config.getProperty(CommonConstants.MultiStageQueryRunner.KEY_OF_QUERY_RUNNER_PORT));
+
     _workerManager = new WorkerManager(_brokerId, hostname, port, _routingManager);
+    if (multiClusterRoutingContext != null) {
+      _multiClusterWorkerManager = new WorkerManager(_brokerId, hostname, port,
+          multiClusterRoutingContext.getMultiClusterRoutingManager());
+    } else {
+      // if multi-cluster routing is not enabled, use the same worker manager.
+      _multiClusterWorkerManager = _workerManager;
+    }
+
     TlsConfig tlsConfig = config.getProperty(CommonConstants.Helix.CONFIG_OF_MULTI_STAGE_ENGINE_TLS_ENABLED,
         CommonConstants.Helix.DEFAULT_MULTI_STAGE_ENGINE_TLS_ENABLED) ? TlsUtils.extractTlsConfig(config,
         CommonConstants.Broker.BROKER_TLS_PREFIX) : null;
@@ -373,7 +383,7 @@ public class MultiStageBrokerRequestHandler extends BaseBrokerRequestHandler {
 
     try {
       ImmutableQueryEnvironment.Config queryEnvConf = getQueryEnvConf(httpHeaders, queryOptions, requestId);
-      QueryEnvironment queryEnv = new QueryEnvironment(queryEnvConf);
+      QueryEnvironment queryEnv = new QueryEnvironment(queryEnvConf, _multiClusterRoutingContext);
       return callAsync(requestId, query, () -> queryEnv.compile(query, sqlNodeAndOptions), queryTimer);
     } catch (WebApplicationException e) {
       throw e;
@@ -461,11 +471,13 @@ public class MultiStageBrokerRequestHandler extends BaseBrokerRequestHandler {
     int sortExchangeCopyThreshold = _config.getProperty(
         CommonConstants.Broker.CONFIG_OF_SORT_EXCHANGE_COPY_THRESHOLD,
         CommonConstants.Broker.DEFAULT_SORT_EXCHANGE_COPY_THRESHOLD);
+    WorkerManager workerManager = QueryOptionsUtils.isMultiClusterRoutingEnabled(queryOptions, false)
+        ? _multiClusterWorkerManager : _workerManager;
     return QueryEnvironment.configBuilder()
         .requestId(requestId)
         .database(database)
         .tableCache(_tableCache)
-        .workerManager(_workerManager)
+        .workerManager(workerManager)
         .isCaseSensitive(caseSensitive)
         .isNullHandlingEnabled(QueryOptionsUtils.isNullHandlingEnabled(queryOptions))
         .defaultInferPartitionHint(inferPartitionHint)
