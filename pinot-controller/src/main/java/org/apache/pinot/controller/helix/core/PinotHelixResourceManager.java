@@ -149,10 +149,13 @@ import org.apache.pinot.controller.helix.core.controllerjob.ControllerJobTypes;
 import org.apache.pinot.controller.helix.core.lineage.LineageManager;
 import org.apache.pinot.controller.helix.core.lineage.LineageManagerFactory;
 import org.apache.pinot.controller.helix.core.minion.PinotTaskManager;
+import org.apache.pinot.controller.helix.core.realtime.PartitionGroupInfo;
 import org.apache.pinot.controller.helix.core.realtime.PinotLLCRealtimeSegmentManager;
 import org.apache.pinot.controller.helix.core.util.ControllerZkHelixUtils;
 import org.apache.pinot.controller.helix.core.util.MessagingServiceUtils;
 import org.apache.pinot.controller.workload.QueryWorkloadManager;
+import org.apache.pinot.core.util.NumberUtils;
+import org.apache.pinot.core.util.NumericException;
 import org.apache.pinot.segment.spi.SegmentMetadata;
 import org.apache.pinot.spi.config.DatabaseConfig;
 import org.apache.pinot.spi.config.instance.Instance;
@@ -172,6 +175,8 @@ import org.apache.pinot.spi.controller.ControllerJobType;
 import org.apache.pinot.spi.data.DateTimeFieldSpec;
 import org.apache.pinot.spi.data.LogicalTableConfig;
 import org.apache.pinot.spi.data.Schema;
+import org.apache.pinot.spi.stream.PartitionGroupConsumptionStatus;
+import org.apache.pinot.spi.stream.StreamConfig;
 import org.apache.pinot.spi.utils.CommonConstants;
 import org.apache.pinot.spi.utils.CommonConstants.Helix;
 import org.apache.pinot.spi.utils.CommonConstants.Helix.StateModel.BrokerResourceStateModel;
@@ -1729,8 +1734,21 @@ public class PinotHelixResourceManager {
    */
   public void addTable(TableConfig tableConfig)
       throws IOException {
+    addTable(tableConfig, Collections.emptyList());
+  }
+
+  /**
+   * Performs validations of table config and adds the table to zookeeper
+   * @throws InvalidTableConfigException if validations fail
+   * @throws TableAlreadyExistsException for offline tables only if the table already exists
+   */
+  public void addTable(TableConfig tableConfig, List<PartitionGroupInfo> consumeMeta)
+      throws IOException {
     String tableNameWithType = tableConfig.getTableName();
     LOGGER.info("Adding table {}: Start", tableNameWithType);
+    if (consumeMeta != null && !consumeMeta.isEmpty()) {
+      LOGGER.info("[copyTable] Adding table {} with {} partition group infos", tableNameWithType, consumeMeta.size());
+    }
 
     if (getTableConfig(tableNameWithType) != null) {
       throw new TableAlreadyExistsException("Table config for " + tableNameWithType
@@ -1789,10 +1807,16 @@ public class PinotHelixResourceManager {
         // Add ideal state
         _helixAdmin.addResource(_helixClusterName, tableNameWithType, idealState);
         LOGGER.info("Adding table {}: Added ideal state for offline table", tableNameWithType);
-      } else {
+      } else if (consumeMeta == null || consumeMeta.isEmpty()) {
         // Add ideal state with the first CONSUMING segment
         _pinotLLCRealtimeSegmentManager.setUpNewTable(tableConfig, idealState);
         LOGGER.info("Adding table {}: Added ideal state with first consuming segment", tableNameWithType);
+      } else {
+        // Add ideal state with the first CONSUMING segment with designated partition consuming metadata
+        // Add ideal state with the first CONSUMING segment
+        _pinotLLCRealtimeSegmentManager.setUpNewTable(tableConfig, idealState, consumeMeta);
+        LOGGER.info("Adding table {}: Added consuming segments ideal state given the designated consuming metadata",
+                tableNameWithType);
       }
     } catch (Exception e) {
       LOGGER.error("Caught exception while setting up table: {}, cleaning it up", tableNameWithType, e);
@@ -4713,6 +4737,40 @@ public class PinotHelixResourceManager {
 
   public QueryWorkloadManager getQueryWorkloadManager() {
     return _queryWorkloadManager;
+  }
+
+  public WatermarkInductionResult inductConsumingWatermarks(String tableName) throws TableNotFoundException {
+    String tableNameWithType = TableNameBuilder.REALTIME.tableNameWithType(tableName);
+    if (!hasRealtimeTable(tableName)) {
+      throw new TableNotFoundException("Table " + tableNameWithType + " does not exist");
+    }
+    TableConfig tableConfig = getTableConfig(tableNameWithType);
+    Preconditions.checkNotNull(tableConfig, "Table " + tableNameWithType + "exists but null tableConfig");
+    List<StreamConfig> streamConfigs = IngestionConfigUtils.getStreamConfigs(tableConfig);
+    IdealState idealState = _helixAdmin
+        .getResourceIdealState(getHelixClusterName(), tableNameWithType);
+    if (idealState == null) {
+      throw new IllegalStateException("Null IdealState of the table " + tableNameWithType);
+    }
+    List<PartitionGroupConsumptionStatus> lst = _pinotLLCRealtimeSegmentManager
+        .getPartitionGroupConsumptionStatusList(idealState, streamConfigs);
+    List<WatermarkInductionResult.Watermark> watermarks = lst.stream().map(status -> {
+      long seq = status.getSequenceNumber();
+      long startOffset;
+      try {
+        if ("DONE".equalsIgnoreCase(status.getStatus())) {
+          Preconditions.checkNotNull(status.getEndOffset());
+          startOffset = NumberUtils.parseLong(status.getEndOffset().toString());
+          seq++;
+        } else {
+          startOffset = NumberUtils.parseLong(status.getStartOffset().toString());
+        }
+      } catch (NumericException e) {
+        throw new RuntimeException(e);
+      }
+      return new WatermarkInductionResult.Watermark(status.getPartitionGroupId(), seq, startOffset);
+    }).collect(Collectors.toList());
+    return new WatermarkInductionResult(watermarks);
   }
 
   /*
