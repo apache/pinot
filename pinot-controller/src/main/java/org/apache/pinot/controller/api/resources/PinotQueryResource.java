@@ -689,7 +689,7 @@ public class PinotQueryResource {
 
   private StreamingOutput executeTimeSeriesQueryCatching(HttpHeaders httpHeaders, String language, String query,
     String start, String end, String step) {
-    return executeTimeSeriesQueryCatching(httpHeaders, language, query, start, end, step, "", false);
+    return executeTimeSeriesQueryCatching(httpHeaders, language, query, start, end, step, null, false);
   }
 
   private StreamingOutput executeTimeSeriesQueryCatching(HttpHeaders httpHeaders, String language, String query,
