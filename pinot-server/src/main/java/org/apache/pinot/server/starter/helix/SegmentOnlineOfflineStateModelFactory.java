@@ -18,6 +18,8 @@
  */
 package org.apache.pinot.server.starter.helix;
 
+import java.util.concurrent.ExecutorService;
+import javax.annotation.Nullable;
 import org.apache.helix.NotificationContext;
 import org.apache.helix.model.Message;
 import org.apache.helix.participant.statemachine.StateModel;
@@ -40,10 +42,16 @@ public class SegmentOnlineOfflineStateModelFactory extends StateModelFactory<Sta
 
   private final String _instanceId;
   private final InstanceDataManager _instanceDataManager;
+  /** Provides custom thread pools for executing Helix state transition messages. If this is null, all state
+   * transition message will be executed using the default shared thread pool by Helix */
+  @Nullable
+  private final StateTransitionThreadPoolManager _stateTransitionThreadPoolManager;
 
-  public SegmentOnlineOfflineStateModelFactory(String instanceId, InstanceDataManager instanceDataManager) {
+  public SegmentOnlineOfflineStateModelFactory(String instanceId, InstanceDataManager instanceDataManager,
+      @Nullable StateTransitionThreadPoolManager stateTransitionThreadPoolManager) {
     _instanceId = instanceId;
     _instanceDataManager = instanceDataManager;
+    _stateTransitionThreadPoolManager = stateTransitionThreadPoolManager;
   }
 
   public static String getStateModelName() {
@@ -162,7 +170,6 @@ public class SegmentOnlineOfflineStateModelFactory extends StateModelFactory<Sta
     public void onBecomeOnlineFromOffline(Message message, NotificationContext context)
         throws Exception {
       _logger.info("SegmentOnlineOfflineStateModel.onBecomeOnlineFromOffline() : {}", message);
-
       try {
         _instanceDataManager.addOnlineSegment(message.getResourceName(), message.getPartitionName());
       } catch (Exception e) {
@@ -246,5 +253,44 @@ public class SegmentOnlineOfflineStateModelFactory extends StateModelFactory<Sta
         throw e;
       }
     }
+  }
+
+  /**
+   *Get thread pool to handle the given state transition message.
+   * If this method returns null, the threadpool returned from
+   * {@link StateModelFactory#getExecutorService(String resourceName, String fromState, String toState)} will be used;
+   * it this method returns null the threadpool returned from
+   * {@link StateModelFactory#getExecutorService(String resourceName)} will be used.
+   * If that method return null too, then the default shared threadpool will be used.
+   * This method may be called only once for each category of messages,
+   * it will NOT be called during each state transition.
+   * @param messageInfo contains information used to categorize messages to use different threadpools
+   * @return An object contains the MessageIdentifierBase and the assigned threadpool for the input message
+   */
+  @Override
+  @Nullable
+  public CustomizedExecutorService getExecutorService(Message.MessageInfo messageInfo) {
+    if (_stateTransitionThreadPoolManager == null) {
+      return null;
+    }
+    return _stateTransitionThreadPoolManager.getExecutorService(messageInfo);
+  }
+
+  @Override
+  @Nullable
+  public ExecutorService getExecutorService(String resourceName, String fromState, String toState) {
+    if (_stateTransitionThreadPoolManager == null) {
+      return null;
+    }
+    return _stateTransitionThreadPoolManager.getExecutorService(resourceName, fromState, toState);
+  }
+
+  @Override
+  @Nullable
+  public ExecutorService getExecutorService(String resourceName) {
+    if (_stateTransitionThreadPoolManager == null) {
+      return null;
+    }
+    return _stateTransitionThreadPoolManager.getExecutorService(resourceName);
   }
 }
