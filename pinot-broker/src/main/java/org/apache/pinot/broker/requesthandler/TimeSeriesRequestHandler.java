@@ -203,7 +203,6 @@ public class TimeSeriesRequestHandler extends BaseBrokerRequestHandler {
     Long stepSeconds = getStepSeconds(mergedParams.get("step"));
     Duration timeout = StringUtils.isNotBlank(mergedParams.get("timeout"))
         ? HumanReadableDuration.from(mergedParams.get("timeout")) : Duration.ofMillis(_brokerTimeoutMs);
-    // Parse queryOptions from JSON string in mergedParams
     Map<String, String> queryOptions = parseQueryOptionsFromJson(mergedParams.get("queryOptions"));
     Preconditions.checkNotNull(query, "Query cannot be null");
     Preconditions.checkNotNull(startTs, "Start time cannot be null");

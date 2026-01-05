@@ -182,7 +182,6 @@ public class PinotQueryResource {
       String end = requestJson.has("end") ? requestJson.get("end").asText() : null;
       String step = requestJson.has("step") ? requestJson.get("step").asText() : null;
 
-      // Extract queryOptions as Map<String, String> when it's an object
       Map<String, String> queryOptions = new HashMap<>();
       if (requestJson.has("queryOptions") && requestJson.get("queryOptions").isObject()) {
         requestJson.get("queryOptions").fields().forEachRemaining(entry -> {

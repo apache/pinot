@@ -254,7 +254,6 @@ public class TimeSeriesIntegrationTest extends BaseClusterIntegrationTest {
     assertEquals(resultWithLimit.path("numRowsResultSet").asInt(), 1,
         "Expected only 1 group with numGroupsLimit=1 query option");
 
-    // Validate the result structure for the limited result
     JsonNode resultTable = resultWithLimit.path("resultTable");
     assertNotNull(resultTable);
     JsonNode rows = resultTable.path("rows");

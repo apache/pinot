@@ -73,7 +73,7 @@ public class RangeTimeSeriesRequest {
   private final int _numGroupsLimit;
   /** Full query string to allow language implementations to pass custom parameters. */
   private final String _fullQueryString;
-  /** Query options */
+  /** Query options to allow language implementations to parse custom options. */
   private final Map<String, String> _queryOptions;
 
   public RangeTimeSeriesRequest(String language, String query, long startSeconds, long endSeconds, long stepSeconds,
