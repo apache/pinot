@@ -23,6 +23,7 @@ import java.util.HashSet;
 import java.util.Map;
 import java.util.Set;
 import org.apache.pinot.common.config.provider.TableCache;
+import org.apache.pinot.core.routing.MultiClusterRoutingContext;
 import org.apache.pinot.query.context.PlannerContext;
 import org.apache.pinot.query.planner.PlanFragment;
 import org.apache.pinot.query.planner.SubPlan;
@@ -52,7 +53,7 @@ public class PinotDispatchPlanner {
    * Entry point for attaching dispatch metadata to a {@link SubPlan}.
    * @param subPlan the entrypoint of the sub plan.
    */
-  public DispatchableSubPlan createDispatchableSubPlan(SubPlan subPlan) {
+  public DispatchableSubPlan createDispatchableSubPlan(SubPlan subPlan, MultiClusterRoutingContext routingContext) {
     // perform physical plan conversion and assign workers to each stage.
     // metadata may come directly from Calcite's RelNode which has not resolved actual table names (taking
     // case-sensitivity into account) yet, so we need to ensure table names are resolved while creating the subplan.
@@ -62,7 +63,7 @@ public class PinotDispatchPlanner {
     PlanFragment rootFragment = subPlan.getSubPlanRoot();
     PlanNode rootNode = rootFragment.getFragmentRoot();
     // 1. start by visiting the sub plan fragment root.
-    rootNode.visit(new DispatchablePlanVisitor(_tableCache), context);
+    rootNode.visit(new DispatchablePlanVisitor(_tableCache, routingContext), context);
     // 2. add a special stage for the global mailbox receive, this runs on the dispatcher.
     context.getDispatchablePlanStageRootMap().put(0, rootNode);
     // 3. add worker assignment after the dispatchable plan context is fulfilled after the visit.
