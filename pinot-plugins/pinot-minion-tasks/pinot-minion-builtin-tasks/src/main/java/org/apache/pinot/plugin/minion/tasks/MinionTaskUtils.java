@@ -355,20 +355,18 @@ public class MinionTaskUtils {
       return false;
     }
 
-    // Check server readiness for ALL replicas - skip if ANY server is not ready
+    // Check server readiness and validDoc consensus
+    Long consensusValidDocs = null;
     for (ValidDocIdsMetadataInfo metadata : replicaMetadataList) {
+      // Check server readiness - skip if ANY server is not ready
       if (metadata.getServerStatus() != null && !metadata.getServerStatus().equals(ServiceStatus.Status.GOOD)) {
         LOGGER.warn("Server {} is in {} state for segment: {}, skipping consensus check",
             metadata.getInstanceId(), metadata.getServerStatus(), segmentName);
         return false;
       }
-    }
 
-    // Check if all replicas have the same totalValidDocs count
-    Long consensusValidDocs = null;
-    for (ValidDocIdsMetadataInfo metadata : replicaMetadataList) {
+      // Check if all replicas have the same totalValidDocs count
       long validDocs = metadata.getTotalValidDocs();
-
       if (consensusValidDocs == null) {
         // First iteration, we record the value to compare against
         consensusValidDocs = validDocs;
