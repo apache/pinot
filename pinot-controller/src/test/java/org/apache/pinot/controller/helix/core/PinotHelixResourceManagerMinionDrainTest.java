@@ -91,7 +91,8 @@ public class PinotHelixResourceManagerMinionDrainTest extends ControllerTest {
     String minionHost = "minion-test-2.example.com";
     int minionPort = 9515;
     List<String> tags = Arrays.asList(Helix.UNTAGGED_MINION_INSTANCE, "custom_tag_1", "custom_tag_2");
-    Instance minionInstance = new Instance(minionHost, minionPort, InstanceType.MINION, tags, null, 0, 0, 0, 0, false);
+    Instance minionInstance = new Instance(minionHost, minionPort, InstanceType.MINION,
+        tags, null, 0, 0, 0, 0, false);
 
     PinotResourceManagerResponse addResponse = _helixResourceManager.addInstance(minionInstance, false);
     assertTrue(addResponse.isSuccessful());
@@ -118,7 +119,8 @@ public class PinotHelixResourceManagerMinionDrainTest extends ControllerTest {
     String minionHost = "minion-test-3.example.com";
     int minionPort = 9516;
     List<String> tags = Arrays.asList("custom_tag");
-    Instance minionInstance = new Instance(minionHost, minionPort, InstanceType.MINION, tags, null, 0, 0, 0, 0, false);
+    Instance minionInstance = new Instance(minionHost, minionPort, InstanceType.MINION,
+        tags, null, 0, 0, 0, 0, false);
 
     PinotResourceManagerResponse addResponse = _helixResourceManager.addInstance(minionInstance, false);
     assertTrue(addResponse.isSuccessful());
@@ -145,7 +147,8 @@ public class PinotHelixResourceManagerMinionDrainTest extends ControllerTest {
     String minionHost = "minion-test-4.example.com";
     int minionPort = 9517;
     List<String> tags = Arrays.asList(Helix.DRAINED_MINION_INSTANCE);
-    Instance minionInstance = new Instance(minionHost, minionPort, InstanceType.MINION, tags, null, 0, 0, 0, 0, false);
+    Instance minionInstance = new Instance(minionHost, minionPort, InstanceType.MINION,
+        tags, null, 0, 0, 0, 0, false);
 
     PinotResourceManagerResponse addResponse = _helixResourceManager.addInstance(minionInstance, false);
     assertTrue(addResponse.isSuccessful());
@@ -337,6 +340,120 @@ public class PinotHelixResourceManagerMinionDrainTest extends ControllerTest {
     assertEquals(finalTags.size(), 1);
     assertTrue(finalTags.contains(Helix.DRAINED_MINION_INSTANCE));
     assertFalse(finalTags.contains(Helix.UNTAGGED_MINION_INSTANCE));
+
+    // Cleanup
+    _helixResourceManager.dropInstance(minionInstanceId);
+  }
+
+  @Test
+  public void testDrainThenEnableRestoresOriginalTags() {
+    // Create a minion with minion_untagged tag
+    String minionHost = "minion-test-9.example.com";
+    int minionPort = 9522;
+    List<String> originalTags = Collections.singletonList(Helix.UNTAGGED_MINION_INSTANCE);
+    Instance minionInstance = new Instance(minionHost, minionPort, InstanceType.MINION,
+        originalTags, null, 0, 0, 0, 0, false);
+
+    PinotResourceManagerResponse addResponse = _helixResourceManager.addInstance(minionInstance, false);
+    assertTrue(addResponse.isSuccessful());
+
+    String minionInstanceId = "Minion_" + minionHost + "_" + minionPort;
+
+    // Drain the minion
+    PinotResourceManagerResponse drainResponse = _helixResourceManager.drainMinionInstance(minionInstanceId);
+    assertTrue(drainResponse.isSuccessful());
+
+    // Verify it's drained
+    InstanceConfig instanceConfig = _helixResourceManager.getHelixInstanceConfig(minionInstanceId);
+    List<String> drainedTags = instanceConfig.getTags();
+    assertEquals(drainedTags.size(), 1);
+    assertEquals(drainedTags.get(0), Helix.DRAINED_MINION_INSTANCE);
+
+    // Verify pre-drain tags were stored
+    List<String> storedPreDrainTags = instanceConfig.getRecord().getListField(Helix.PREVIOUS_TAGS);
+    assertNotNull(storedPreDrainTags);
+    assertEquals(storedPreDrainTags, originalTags);
+
+    // Enable the minion - should restore original tags
+    PinotResourceManagerResponse enableResponse = _helixResourceManager.enableInstance(minionInstanceId);
+    assertTrue(enableResponse.isSuccessful());
+
+    // Verify tags were restored
+    instanceConfig = _helixResourceManager.getHelixInstanceConfig(minionInstanceId);
+    List<String> restoredTags = instanceConfig.getTags();
+    assertEquals(restoredTags.size(), 1);
+    assertEquals(restoredTags.get(0), Helix.UNTAGGED_MINION_INSTANCE);
+
+    // Verify pre-drain tags were cleared
+    List<String> clearedPreDrainTags = instanceConfig.getRecord().getListField(Helix.PREVIOUS_TAGS);
+    assertTrue(clearedPreDrainTags == null || clearedPreDrainTags.isEmpty());
+
+    // Cleanup
+    _helixResourceManager.dropInstance(minionInstanceId);
+  }
+
+  @Test
+  public void testDrainThenEnableRestoresCustomTags() {
+    // Create a minion with custom tags
+    String minionHost = "minion-test-10.example.com";
+    int minionPort = 9523;
+    List<String> originalTags = Arrays.asList("minion_partition_A", "custom_tag");
+    Instance minionInstance = new Instance(minionHost, minionPort, InstanceType.MINION,
+        originalTags, null, 0, 0, 0, 0, false);
+
+    PinotResourceManagerResponse addResponse = _helixResourceManager.addInstance(minionInstance, false);
+    assertTrue(addResponse.isSuccessful());
+
+    String minionInstanceId = "Minion_" + minionHost + "_" + minionPort;
+
+    // Drain the minion
+    PinotResourceManagerResponse drainResponse = _helixResourceManager.drainMinionInstance(minionInstanceId);
+    assertTrue(drainResponse.isSuccessful());
+
+    // Verify it's drained
+    InstanceConfig instanceConfig = _helixResourceManager.getHelixInstanceConfig(minionInstanceId);
+    assertEquals(instanceConfig.getTags().size(), 1);
+    assertEquals(instanceConfig.getTags().get(0), Helix.DRAINED_MINION_INSTANCE);
+
+    // Enable the minion - should restore custom tags
+    PinotResourceManagerResponse enableResponse = _helixResourceManager.enableInstance(minionInstanceId);
+    assertTrue(enableResponse.isSuccessful());
+
+    // Verify custom tags were restored
+    instanceConfig = _helixResourceManager.getHelixInstanceConfig(minionInstanceId);
+    List<String> restoredTags = instanceConfig.getTags();
+    assertEquals(restoredTags.size(), 2);
+    assertTrue(restoredTags.contains("minion_partition_A"));
+    assertTrue(restoredTags.contains("custom_tag"));
+    assertFalse(restoredTags.contains(Helix.DRAINED_MINION_INSTANCE));
+
+    // Cleanup
+    _helixResourceManager.dropInstance(minionInstanceId);
+  }
+
+  @Test
+  public void testEnableNonDrainedMinionDoesNotModifyTags() {
+    // Create a normal minion
+    String minionHost = "minion-test-11.example.com";
+    int minionPort = 9524;
+    List<String> originalTags = Collections.singletonList(Helix.UNTAGGED_MINION_INSTANCE);
+    Instance minionInstance = new Instance(minionHost, minionPort, InstanceType.MINION,
+        originalTags, null, 0, 0, 0, 0, false);
+
+    PinotResourceManagerResponse addResponse = _helixResourceManager.addInstance(minionInstance, false);
+    assertTrue(addResponse.isSuccessful());
+
+    String minionInstanceId = "Minion_" + minionHost + "_" + minionPort;
+
+    // Enable the minion (not drained) - tags should remain unchanged
+    PinotResourceManagerResponse enableResponse = _helixResourceManager.enableInstance(minionInstanceId);
+    assertTrue(enableResponse.isSuccessful());
+
+    // Verify tags were not modified
+    InstanceConfig instanceConfig = _helixResourceManager.getHelixInstanceConfig(minionInstanceId);
+    List<String> tags = instanceConfig.getTags();
+    assertEquals(tags.size(), 1);
+    assertEquals(tags.get(0), Helix.UNTAGGED_MINION_INSTANCE);
 
     // Cleanup
     _helixResourceManager.dropInstance(minionInstanceId);

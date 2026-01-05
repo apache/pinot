@@ -161,6 +161,8 @@ public class CommonConstants {
     public static final String UNTAGGED_MINION_INSTANCE = "minion_untagged";
     public static final String DRAINED_MINION_INSTANCE = "minion_drained";
 
+    public static final String PREVIOUS_TAGS = "previousTags";
+
     public static class StateModel {
       public static class SegmentStateModel {
         public static final String ONLINE = "ONLINE";
