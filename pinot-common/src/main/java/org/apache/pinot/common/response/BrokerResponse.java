@@ -92,8 +92,8 @@ public interface BrokerResponse {
    * This method ensures we emit metrics for all queries that have exceptions with a one-to-one mapping.
    */
   default void emitBrokerResponseMetrics(BrokerMetrics brokerMetrics) {
-    boolean hasExceptions = !this.getExceptions().isEmpty();
     boolean isSystemError = false;
+    boolean isUserError = false;
     for (QueryProcessingException exception : this.getExceptions()) {
       QueryErrorCode queryErrorCode;
       try {
@@ -105,12 +105,16 @@ public interface BrokerResponse {
       brokerMetrics.addMeteredGlobalValue(BrokerMeter.getQueryErrorMeter(queryErrorCode), 1);
       if (SYSTEM_ERROR_CODES.contains(queryErrorCode)) {
         isSystemError = true;
+      } else {
+        isUserError = true;
       }
     }
-    
-    if (hasExceptions) {
-      brokerMetrics.addMeteredGlobalValue(
-          isSystemError ? BrokerMeter.QUERY_SYSTEM_ERROR : BrokerMeter.QUERY_USER_ERROR, 1);
+
+    if (isSystemError) {
+      brokerMetrics.addMeteredGlobalValue(BrokerMeter.QUERY_SYSTEM_ERROR, 1);
+    }
+    if (isUserError) {
+      brokerMetrics.addMeteredGlobalValue(BrokerMeter.QUERY_USER_ERROR, 1);
     }
   }
 

@@ -287,7 +287,6 @@ public class BrokerMeter implements AbstractMetrics.Meter {
 
   /**
    * SLA-style per-query error classification metrics.
-   * Exactly one of these should be emitted for a query that returns with any errors.
    */
   public static final BrokerMeter QUERY_SYSTEM_ERROR = create("QUERY_SYSTEM_ERROR", "queries", true);
   public static final BrokerMeter QUERY_USER_ERROR = create("QUERY_USER_ERROR", "queries", true);
