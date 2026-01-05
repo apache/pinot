@@ -586,7 +586,7 @@ public abstract class ClusterTest extends ControllerTest {
   }
 
   public JsonNode postTimeseriesQuery(String baseUrl, String query, long startTime, long endTime,
-      Map<String, String> headers, Map<String, String> queryOptions) {
+      Map<String, String> headers, Map<String, Object> queryOptions) {
     try {
       ObjectNode payload = JsonUtils.newObjectNode();
       payload.put("language", "m3ql");
@@ -595,7 +595,7 @@ public abstract class ClusterTest extends ControllerTest {
       payload.put("end", String.valueOf(endTime));
       if (queryOptions != null && !queryOptions.isEmpty()) {
         ObjectNode queryOptionsNode = JsonUtils.newObjectNode();
-        queryOptions.forEach(queryOptionsNode::put);
+        queryOptions.forEach(queryOptionsNode::putPOJO);
         payload.set("queryOptions", queryOptionsNode);
       }
       return JsonUtils.stringToJsonNode(

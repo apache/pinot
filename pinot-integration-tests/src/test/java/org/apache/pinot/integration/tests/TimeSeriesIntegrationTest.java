@@ -249,7 +249,7 @@ public class TimeSeriesIntegrationTest extends BaseClusterIntegrationTest {
     // This query would normally return 3 groups (one for each device OS: windows, android, ios)
     // With numGroupsLimit=1 query option, we expect only 1 group
     JsonNode resultWithLimit = postTimeseriesQuery(getBrokerBaseApiUrl(), query, QUERY_START_TIME_SEC,
-        QUERY_END_TIME_SEC, getHeaders(), Map.of("numGroupsLimit", "1"));
+        QUERY_END_TIME_SEC, getHeaders(), Map.of("numGroupsLimit", 1, "enableNullHandling", true));
     assertNotNull(resultWithLimit);
     assertEquals(resultWithLimit.path("numRowsResultSet").asInt(), 1,
         "Expected only 1 group with numGroupsLimit=1 query option");
