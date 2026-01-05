@@ -148,9 +148,83 @@ public class ServerPlanRequestUtils {
     PinotQuery pinotQuery = serverContext.getPinotQuery();
     // attach leaf node limit it not set
     Integer leafNodeLimit = QueryOptionsUtils.getMultiStageLeafLimit(requestMetadata);
+    int prevLimit = pinotQuery.getLimit();
     pinotQuery.setLimit(leafNodeLimit != null ? leafNodeLimit : DEFAULT_LEAF_NODE_LIMIT);
+    // Tag provenance if a leaf cap (explicit or lite-mode fallback) tightened the previous limit.
+    tagLeafLimitProvenanceIfTightened(pinotQuery, requestMetadata, prevLimit);
     // visit the plan and create PinotQuery and determine the leaf stage boundary PlanNode.
     ServerPlanRequestVisitor.walkPlanNode(stagePlan.getRootNode(), serverContext);
+  }
+
+  /**
+   * Tags queryOptions["leafLimitProvenance"]="LITE_CAP" if either:
+   *   - an explicit multiStageLeafLimit (in request metadata or query options) would tighten the previous LIMIT; or
+   *   - useLiteMode=true and a lite-mode leaf cap (fanout-adjusted or leaf-stage limit) would tighten the previous LIMIT.
+   * This does not change the effective LIMIT; it only annotates provenance for downstream operators to emit warnings.
+   */
+  private static void tagLeafLimitProvenanceIfTightened(PinotQuery pinotQuery, @Nullable Map<String, String> requestMetadata,
+      int previousLimit) {
+    Map<String, String> qOpts = pinotQuery.getQueryOptions();
+    if (qOpts == null) {
+      qOpts = new HashMap<>();
+      pinotQuery.setQueryOptions(qOpts);
+    }
+    boolean useLiteMode = QueryOptionsUtils.isUseLiteMode(qOpts, false)
+        || (requestMetadata != null && QueryOptionsUtils.isUseLiteMode(requestMetadata, false));
+    boolean tightened = false;
+    // explicit per-query cap
+    Integer explicitCapMeta = requestMetadata != null ? QueryOptionsUtils.getMultiStageLeafLimit(requestMetadata) : null;
+    Integer explicitCapOpts = QueryOptionsUtils.getMultiStageLeafLimit(qOpts);
+    Integer explicitCap = explicitCapMeta != null ? explicitCapMeta : explicitCapOpts;
+    if (explicitCap != null && (previousLimit <= 0 || previousLimit > explicitCap)) {
+      tightened = true;
+    } else if (useLiteMode) {
+      // lite-mode fallbacks: fanout-adjusted first, then leaf-stage limit (options preferred over metadata)
+      Integer fallbackCap = resolveLiteModeFallbackCap(qOpts, requestMetadata);
+      if (fallbackCap != null && (previousLimit <= 0 || previousLimit > fallbackCap)) {
+        tightened = true;
+      }
+    }
+    if (tightened) {
+      qOpts.put("leafLimitProvenance", "LITE_CAP");
+    } else {
+      qOpts.remove("leafLimitProvenance");
+    }
+  }
+
+  /**
+   * Compute effective lite-mode fallback cap for provenance tagging.
+   * Precedence: fanout-adjusted (options) -> leaf-stage limit (options) -> fanout-adjusted (metadata) -> leaf-stage limit (metadata).
+   */
+  @Nullable
+  private static Integer resolveLiteModeFallbackCap(@Nullable Map<String, String> qOpts,
+      @Nullable Map<String, String> requestMeta) {
+    Integer faOpt = (qOpts != null)
+        ? QueryOptionsUtils.getLiteModeLeafStageFanOutAdjustedLimit(qOpts, 0)
+        : null;
+    Integer lsOpt = (qOpts != null)
+        ? QueryOptionsUtils.getLiteModeLeafStageLimit(qOpts, 0)
+        : null;
+    Integer faMeta = (requestMeta != null)
+        ? QueryOptionsUtils.getLiteModeLeafStageFanOutAdjustedLimit(requestMeta, 0)
+        : null;
+    Integer lsMeta = (requestMeta != null)
+        ? QueryOptionsUtils.getLiteModeLeafStageLimit(requestMeta, 0)
+        : null;
+    return firstPositive(faOpt, lsOpt, faMeta, lsMeta);
+  }
+
+  @Nullable
+  private static Integer firstPositive(@Nullable Integer... values) {
+    if (values == null) {
+      return null;
+    }
+    for (Integer v : values) {
+      if (v != null && v > 0) {
+        return v;
+      }
+    }
+    return null;
   }
 
   /**
