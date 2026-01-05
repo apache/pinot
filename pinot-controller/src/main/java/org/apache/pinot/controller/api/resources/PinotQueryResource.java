@@ -33,6 +33,7 @@ import java.nio.charset.StandardCharsets;
 import java.time.Duration;
 import java.util.ArrayList;
 import java.util.Collections;
+import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
@@ -180,10 +181,16 @@ public class PinotQueryResource {
       String start = requestJson.has("start") ? requestJson.get("start").asText() : null;
       String end = requestJson.has("end") ? requestJson.get("end").asText() : null;
       String step = requestJson.has("step") ? requestJson.get("step").asText() : null;
-      String queryOptionsStr = requestJson.has("queryOptions")
-          ? requestJson.get("queryOptions").asText() : null;
 
-      return executeTimeSeriesQueryCatching(httpHeaders, language, query, start, end, step, queryOptionsStr, true);
+      // Extract queryOptions as Map<String, String> when it's an object
+      Map<String, String> queryOptions = new HashMap<>();
+      if (requestJson.has("queryOptions") && requestJson.get("queryOptions").isObject()) {
+        requestJson.get("queryOptions").fields().forEachRemaining(entry -> {
+          queryOptions.put(entry.getKey(), entry.getValue().asText());
+        });
+      }
+
+      return executeTimeSeriesQueryCatching(httpHeaders, language, query, start, end, step, queryOptions, true);
     } catch (Exception e) {
       LOGGER.error("Caught exception while processing POST timeseries request", e);
       return constructQueryExceptionResponse(QueryErrorCode.INTERNAL, e.getMessage());
@@ -689,11 +696,11 @@ public class PinotQueryResource {
 
   private StreamingOutput executeTimeSeriesQueryCatching(HttpHeaders httpHeaders, String language, String query,
     String start, String end, String step) {
-    return executeTimeSeriesQueryCatching(httpHeaders, language, query, start, end, step, null, false);
+    return executeTimeSeriesQueryCatching(httpHeaders, language, query, start, end, step, Map.of(), false);
   }
 
   private StreamingOutput executeTimeSeriesQueryCatching(HttpHeaders httpHeaders, String language, String query,
-    String start, String end, String step, String queryOptions, boolean useBrokerCompatibleApi) {
+    String start, String end, String step, Map<String, String> queryOptions, boolean useBrokerCompatibleApi) {
     try {
       LOGGER.debug("Language: {}, Query: {}, Start: {}, End: {}, Step: {}, UseBrokerAPI: {}",
           language, query, start, end, step, useBrokerCompatibleApi);
@@ -726,7 +733,8 @@ public class PinotQueryResource {
 
 
   private StreamingOutput sendTimeSeriesRequestToBroker(String language, String query, String start, String end,
-    String step, String queryOptions, String instanceId, HttpHeaders httpHeaders, boolean useBrokerCompatibleApi) {
+    String step, Map<String, String> queryOptions, String instanceId, HttpHeaders httpHeaders,
+    boolean useBrokerCompatibleApi) {
     InstanceConfig instanceConfig = getInstanceConfig(instanceId);
     String hostName = getHost(instanceConfig);
     String protocol = _controllerConf.getControllerBrokerProtocol();
@@ -753,7 +761,9 @@ public class PinotQueryResource {
         requestJson.put("step", step);
       }
       if (queryOptions != null && !queryOptions.isEmpty()) {
-        requestJson.put("queryOptions", queryOptions);
+        ObjectNode queryOptionsNode = JsonUtils.newObjectNode();
+        queryOptions.forEach(queryOptionsNode::put);
+        requestJson.set("queryOptions", queryOptionsNode);
       }
       return sendRequestRaw(url, "POST", query, requestJson, headers);
     } else {

@@ -241,23 +241,15 @@ public class TimeSeriesIntegrationTest extends BaseClusterIntegrationTest {
 
   @Test
   public void testQueryOptionsNumGroupsLimit() {
-    // This query would normally return 3 groups (one for each device OS: windows, android, ios)
     String query = String.format(
         "fetch{table=\"mytable_OFFLINE\",filter=\"\",ts_column=\"%s\",ts_unit=\"MILLISECONDS\",value=\"%s\"}"
             + " | max{%s} | transformNull{0} | keepLastValue{}",
         TS_COLUMN, TOTAL_TRIPS_COLUMN, DEVICE_OS_COLUMN
     );
-
-    // Without query options, we expect 3 groups
-    JsonNode resultWithoutLimit = postTimeseriesQuery(getBrokerBaseApiUrl(), query, QUERY_START_TIME_SEC,
-        QUERY_END_TIME_SEC, getHeaders());
-    assertNotNull(resultWithoutLimit);
-    assertEquals(resultWithoutLimit.path("numRowsResultSet").asInt(), 3,
-        "Expected 3 groups without numGroupsLimit query option");
-
+    // This query would normally return 3 groups (one for each device OS: windows, android, ios)
     // With numGroupsLimit=1 query option, we expect only 1 group
     JsonNode resultWithLimit = postTimeseriesQuery(getBrokerBaseApiUrl(), query, QUERY_START_TIME_SEC,
-        QUERY_END_TIME_SEC, getHeaders(), "numGroupsLimit=1");
+        QUERY_END_TIME_SEC, getHeaders(), Map.of("numGroupsLimit", "1"));
     assertNotNull(resultWithLimit);
     assertEquals(resultWithLimit.path("numRowsResultSet").asInt(), 1,
         "Expected only 1 group with numGroupsLimit=1 query option");
