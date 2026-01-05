@@ -589,7 +589,7 @@ public class MultiStageBrokerRequestHandler extends BaseBrokerRequestHandler {
 
     int stageCount = dispatchableSubPlan.getQueryStageMap().size();
     int opChainCount = dispatchableSubPlan.getQueryStageMap().values().stream()
-        .mapToInt(stage -> stage.getServerInstances().size())
+        .mapToInt(stage -> stage.getWorkerMetadataList().size())
         .sum();
 
     try {
