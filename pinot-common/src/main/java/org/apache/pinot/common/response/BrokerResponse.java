@@ -92,7 +92,6 @@ public interface BrokerResponse {
    * This method ensures we emit metrics for all queries that have exceptions with a one-to-one mapping.
    */
   default void emitBrokerResponseMetrics(BrokerMetrics brokerMetrics) {
-    // Emit per-error meters (existing behavior)
     boolean hasExceptions = !this.getExceptions().isEmpty();
     boolean isSystemError = false;
     for (QueryProcessingException exception : this.getExceptions()) {
@@ -108,7 +107,7 @@ public interface BrokerResponse {
         isSystemError = true;
       }
     }
-    // Emit a single SLA-style per-query metric if there are any exceptions
+    
     if (hasExceptions) {
       brokerMetrics.addMeteredGlobalValue(
           isSystemError ? BrokerMeter.QUERY_SYSTEM_ERROR : BrokerMeter.QUERY_USER_ERROR, 1);
