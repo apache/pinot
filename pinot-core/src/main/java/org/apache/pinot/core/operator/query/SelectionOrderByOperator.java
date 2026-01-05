@@ -88,6 +88,7 @@ public class SelectionOrderByOperator extends BaseOperator<SelectionResultsBlock
   private final int _numRowsToKeep;
   private final Comparator<Object[]> _comparator;
   private final PriorityQueue<Object[]> _rows;
+  private boolean _liteLeafLimitReached;
 
   private int _numDocsScanned = 0;
   private long _numEntriesScannedPostFilter = 0;
@@ -162,6 +163,7 @@ public class SelectionOrderByOperator extends BaseOperator<SelectionResultsBlock
     BlockValSet[] blockValSets = new BlockValSet[numExpressions];
     int numColumnsProjected = _projectOperator.getNumColumnsProjected();
     ValueBlock valueBlock;
+    long totalDocsSeen = 0;
     while ((valueBlock = _projectOperator.nextBlock()) != null) {
       for (int i = 0; i < numExpressions; i++) {
         ExpressionContext expression = _expressions.get(i);
@@ -169,6 +171,7 @@ public class SelectionOrderByOperator extends BaseOperator<SelectionResultsBlock
       }
       RowBasedBlockValueFetcher blockValueFetcher = new RowBasedBlockValueFetcher(blockValSets);
       int numDocsFetched = valueBlock.getNumDocs();
+      totalDocsSeen += numDocsFetched;
       if (_nullHandlingEnabled) {
         RoaringBitmap[] nullBitmaps = new RoaringBitmap[numExpressions];
         for (int i = 0; i < numExpressions; i++) {
@@ -208,7 +211,15 @@ public class SelectionOrderByOperator extends BaseOperator<SelectionResultsBlock
     }
     DataSchema dataSchema = new DataSchema(columnNames, columnDataTypes);
 
-    return new SelectionResultsBlock(dataSchema, getSortedRows(), _comparator, _queryContext);
+    int emittedRows = Math.min(_rows.size(), _numRowsToKeep);
+    SelectionResultsBlock results = new SelectionResultsBlock(dataSchema, getSortedRows(), _comparator, _queryContext);
+    String prov = _queryContext.getQueryOptions().get("leafLimitProvenance");
+    if ("LITE_CAP".equals(prov) && totalDocsSeen > emittedRows) {
+      _liteLeafLimitReached = true;
+      results.setLiteLeafLimitReached(true);
+      results.setLeafTruncationReason(prov);
+    }
+    return results;
   }
 
   /**
@@ -222,6 +233,7 @@ public class SelectionOrderByOperator extends BaseOperator<SelectionResultsBlock
     BlockValSet[] blockValSets = new BlockValSet[numOrderByExpressions];
     int numColumnsProjected = _projectOperator.getNumColumnsProjected();
     ValueBlock valueBlock;
+    long totalDocsSeen = 0;
     while ((valueBlock = _projectOperator.nextBlock()) != null) {
       for (int i = 0; i < numOrderByExpressions; i++) {
         ExpressionContext expression = _orderByExpressions.get(i).getExpression();
@@ -229,6 +241,7 @@ public class SelectionOrderByOperator extends BaseOperator<SelectionResultsBlock
       }
       RowBasedBlockValueFetcher blockValueFetcher = new RowBasedBlockValueFetcher(blockValSets);
       int numDocsFetched = valueBlock.getNumDocs();
+      totalDocsSeen += numDocsFetched;
       int[] docIds = valueBlock.getDocIds();
       if (_nullHandlingEnabled) {
         RoaringBitmap[] nullBitmaps = new RoaringBitmap[numOrderByExpressions];
@@ -349,7 +362,16 @@ public class SelectionOrderByOperator extends BaseOperator<SelectionResultsBlock
       }
       DataSchema dataSchema = new DataSchema(columnNames, columnDataTypes);
 
-      return new SelectionResultsBlock(dataSchema, getSortedRows(), _comparator, _queryContext);
+      int emittedRows = Math.min(_rows.size(), _numRowsToKeep);
+      SelectionResultsBlock results =
+ new SelectionResultsBlock(dataSchema, getSortedRows(), _comparator, _queryContext);
+      String prov = _queryContext.getQueryOptions().get("leafLimitProvenance");
+      if ("LITE_CAP".equals(prov) && totalDocsSeen > emittedRows) {
+        _liteLeafLimitReached = true;
+        results.setLiteLeafLimitReached(true);
+        results.setLeafTruncationReason(prov);
+      }
+      return results;
     }
   }
 
