@@ -301,6 +301,14 @@ public class PinotTableRestletResource {
     try {
       LOGGER.info("[copyTable] received request for table: {}, payload: {}", tableName, payload);
       tableName = DatabaseUtils.translateTableName(tableName, headers);
+
+      if (_pinotHelixResourceManager.getTableConfig(TableNameBuilder.REALTIME.tableNameWithType(tableName)) != null
+          || _pinotHelixResourceManager.getTableConfig(TableNameBuilder.OFFLINE.tableNameWithType(tableName)) != null) {
+        throw new TableAlreadyExistsException("Table config for " + tableName
+            + " already exists. If this is unexpected, try deleting the table to remove all metadata associated"
+            + " with it before attempting to recreate.");
+      }
+
       CopyTablePayload copyTablePayload = JsonUtils.stringToObject(payload, CopyTablePayload.class);
       String sourceControllerUri = copyTablePayload.getSourceClusterUri();
       Map<String, String> requestHeaders = copyTablePayload.getHeaders();
@@ -325,7 +333,7 @@ public class PinotTableRestletResource {
       boolean hasOffline = tableConfigNode.has(TableType.OFFLINE.name());
       boolean hasRealtime = tableConfigNode.has(TableType.REALTIME.name());
       if (hasOffline && !hasRealtime) {
-        return new CopyTableResponse("fail", "pure offline table copy not supported yet");
+        throw new IllegalArgumentException("pure offline table copy not supported yet");
       }
 
       ObjectNode realtimeTableConfigNode = (ObjectNode) tableConfigNode.get(TableType.REALTIME.name());
