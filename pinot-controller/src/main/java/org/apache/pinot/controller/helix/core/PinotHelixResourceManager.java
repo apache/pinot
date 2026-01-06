@@ -3562,38 +3562,6 @@ public class PinotHelixResourceManager {
   }
 
   public PinotResourceManagerResponse enableInstance(String instanceName) {
-    // If enabling a drained minion, restore to its previous tags
-    if (InstanceTypeUtils.isMinion(instanceName)) {
-      InstanceConfig instanceConfig = getHelixInstanceConfig(instanceName);
-      if (instanceConfig == null) {
-        return PinotResourceManagerResponse.failure("Instance " + instanceName + " not found");
-      }
-      List<String> currentTags = instanceConfig.getTags();
-      if (currentTags != null && currentTags.contains(Helix.DRAINED_MINION_INSTANCE)) {
-        // Restore pre-drain tags
-        List<String> preDrainTags = instanceConfig.getRecord().getListField(Helix.PREVIOUS_TAGS);
-        if (preDrainTags != null && !preDrainTags.isEmpty()) {
-          instanceConfig.getRecord().setListField(
-              InstanceConfig.InstanceConfigProperty.TAG_LIST.name(), new ArrayList<>(preDrainTags));
-          // Clear the stored pre-drain tags
-          instanceConfig.getRecord().getListFields().remove(Helix.PREVIOUS_TAGS);
-          // Save the updated config
-          if (!_helixDataAccessor.setProperty(_keyBuilder.instanceConfig(instanceName), instanceConfig)) {
-            return PinotResourceManagerResponse.failure(
-                "Failed to restore pre-drain tags for minion instance: " + instanceName);
-          }
-          LOGGER.info("Restored pre-drain tags for minion instance: {}", instanceName);
-          // Return success immediately for drained minions - no need to wait for partition states
-          // since minions don't have partitions like servers do
-          return PinotResourceManagerResponse.success("Successfully restored tags for minion instance: "
-              + instanceName);
-        }
-      } else {
-        LOGGER.info("Minion instance: {} is not drained. No need to restore tags.", instanceName);
-        return PinotResourceManagerResponse.success(
-            "Minion instance: " + instanceName + " is not drained. No need to restore tags.");
-      }
-    }
     return enableInstance(instanceName, true, 10_000L);
   }
 
@@ -3652,8 +3620,7 @@ public class PinotHelixResourceManager {
     // Validate that minion is not already drained
     List<String> currentTags = instanceConfig.getTags();
     if (currentTags != null && currentTags.contains(Helix.DRAINED_MINION_INSTANCE)) {
-      throw new UnsupportedOperationException(
-          "Minion instance " + instanceName + " is already drained");
+      return PinotResourceManagerResponse.failure("Minion instance " + instanceName + " is already drained");
     }
 
     // Store original tags so they can be restored when enabling the minion
@@ -3702,6 +3669,52 @@ public class PinotHelixResourceManager {
   }
 
   /**
+   * Restores previous tags for a drained minion instance if applicable.
+   * When a minion is drained, its original tags are stored and replaced with minion_drained.
+   * This method restores those original tags when enabling the instance.
+   *
+   * @param instanceName: Name of the instance to check and restore tags for
+   * @return PinotResourceManagerResponse indicating failure if restoration fails, or null if no action is needed
+   */
+  private PinotResourceManagerResponse restoreMinionTagsIfDrained(String instanceName) {
+    if (!InstanceTypeUtils.isMinion(instanceName)) {
+      return null;
+    }
+
+    InstanceConfig instanceConfig = getHelixInstanceConfig(instanceName);
+    // we can skip the null check for instanceConfig because instance existence is already
+    // validated in enableInstance method before this method is called
+    List<String> currentTags = instanceConfig.getTags();
+    if (currentTags == null || !currentTags.contains(Helix.DRAINED_MINION_INSTANCE)) {
+      // Not a drained minion, no action needed
+      return null;
+    }
+
+    // Restore pre-drain tags
+    List<String> preDrainTags = instanceConfig.getRecord().getListField(Helix.PREVIOUS_TAGS);
+    if (preDrainTags == null || preDrainTags.isEmpty()) {
+      // No previous tags to restore, just return null to continue with normal flow
+      instanceConfig.getRecord().setListField(
+          InstanceConfig.InstanceConfigProperty.TAG_LIST.name(), new ArrayList<>());
+    } else {
+      instanceConfig.getRecord().setListField(
+          InstanceConfig.InstanceConfigProperty.TAG_LIST.name(), new ArrayList<>(preDrainTags));
+      // Clear the stored pre-drain tags
+      instanceConfig.getRecord().getListFields().remove(Helix.PREVIOUS_TAGS);
+    }
+
+    // Save the updated config
+    if (!_helixDataAccessor.setProperty(_keyBuilder.instanceConfig(instanceName), instanceConfig)) {
+      return PinotResourceManagerResponse.failure(
+          "Failed to restore tags for minion instance: " + instanceName);
+    }
+
+    LOGGER.info("Successfully restored tags for minion instance: {}", instanceName);
+    // Return null to continue with normal enable flow
+    return null;
+  }
+
+  /**
    * Toggle the status of an Instance between OFFLINE and ONLINE.
    * Keeps checking until ideal-state is successfully updated or times out.
    *
@@ -3713,6 +3726,15 @@ public class PinotHelixResourceManager {
   private PinotResourceManagerResponse enableInstance(String instanceName, boolean enableInstance, long timeOutMs) {
     if (!instanceExists(instanceName)) {
       return PinotResourceManagerResponse.failure("Instance " + instanceName + " not found");
+    }
+
+    // If enabling a drained minion, restore its previous tags
+    if (enableInstance) {
+      PinotResourceManagerResponse restoreResponse = restoreMinionTagsIfDrained(instanceName);
+      if (restoreResponse != null) {
+        // Failed to restore tags for a drained minion
+        return restoreResponse;
+      }
     }
 
     _helixAdmin.enableInstance(_helixClusterName, instanceName, enableInstance);

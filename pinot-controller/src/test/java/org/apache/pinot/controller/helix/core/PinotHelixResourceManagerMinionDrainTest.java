@@ -21,6 +21,8 @@ package org.apache.pinot.controller.helix.core;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
+import org.apache.helix.HelixManager;
+import org.apache.helix.HelixManagerFactory;
 import org.apache.helix.model.InstanceConfig;
 import org.apache.pinot.controller.helix.ControllerTest;
 import org.apache.pinot.spi.config.instance.Instance;
@@ -34,19 +36,32 @@ import static org.testng.Assert.assertEquals;
 import static org.testng.Assert.assertFalse;
 import static org.testng.Assert.assertNotNull;
 import static org.testng.Assert.assertTrue;
-import static org.testng.Assert.fail;
 
 
 /**
  * Unit tests for minion drain functionality in PinotHelixResourceManager
  */
 public class PinotHelixResourceManagerMinionDrainTest extends ControllerTest {
+  private List<HelixManager> _fakeMinionHelixManagers = new java.util.ArrayList<>();
 
   @BeforeClass
   public void setUp()
       throws Exception {
     startZk();
     startController();
+  }
+
+  /**
+   * Creates a fake minion HelixManager that connects to the cluster, creating a LiveInstance entry.
+   * This is needed for enableInstance to work in tests.
+   */
+  private void createFakeMinionLiveInstance(String instanceId)
+      throws Exception {
+    HelixManager helixManager =
+        HelixManagerFactory.getZKHelixManager(getHelixClusterName(),
+            instanceId, org.apache.helix.InstanceType.PARTICIPANT, getZkUrl());
+    helixManager.connect();
+    _fakeMinionHelixManagers.add(helixManager);
   }
 
   @Test
@@ -141,7 +156,7 @@ public class PinotHelixResourceManagerMinionDrainTest extends ControllerTest {
     _helixResourceManager.dropInstance(minionInstanceId);
   }
 
-  @Test(expectedExceptions = UnsupportedOperationException.class)
+  @Test
   public void testDrainMinionInstanceAlreadyDrainedFails() {
     // Create a minion that's already drained - should throw exception
     String minionHost = "minion-test-4.example.com";
@@ -157,7 +172,8 @@ public class PinotHelixResourceManagerMinionDrainTest extends ControllerTest {
 
     try {
       // Attempt to drain the already drained minion - should throw UnsupportedOperationException
-      _helixResourceManager.drainMinionInstance(minionInstanceId);
+      PinotResourceManagerResponse drainResponse = _helixResourceManager.drainMinionInstance(minionInstanceId);
+      assertFalse(drainResponse.isSuccessful(), "Draining an already drained minion should have failed");
     } finally {
       // Cleanup
       _helixResourceManager.dropInstance(minionInstanceId);
@@ -269,12 +285,8 @@ public class PinotHelixResourceManagerMinionDrainTest extends ControllerTest {
 
     // Subsequent drain attempts should throw UnsupportedOperationException (already drained)
     for (int i = 1; i < 3; i++) {
-      try {
-        _helixResourceManager.drainMinionInstance(minionInstanceId);
-        fail("Drain operation " + i + " should have thrown UnsupportedOperationException");
-      } catch (UnsupportedOperationException e) {
-        assertTrue(e.getMessage().contains("already drained"));
-      }
+        PinotResourceManagerResponse drainResponse = _helixResourceManager.drainMinionInstance(minionInstanceId);
+        assertFalse(drainResponse.isSuccessful(), "Subsequent drain operation " + (i + 1) + " should have failed");
     }
 
     // Verify final state remains unchanged
@@ -346,7 +358,7 @@ public class PinotHelixResourceManagerMinionDrainTest extends ControllerTest {
   }
 
   @Test
-  public void testDrainThenEnableRestoresOriginalTags() {
+  public void testDrainThenEnableRestoresOriginalTags() throws Exception {
     // Create a minion with minion_untagged tag
     String minionHost = "minion-test-9.example.com";
     int minionPort = 9522;
@@ -358,6 +370,9 @@ public class PinotHelixResourceManagerMinionDrainTest extends ControllerTest {
     assertTrue(addResponse.isSuccessful());
 
     String minionInstanceId = "Minion_" + minionHost + "_" + minionPort;
+
+    // Create a fake minion live instance (simulate minion joining) - needed for enableInstance to work
+    createFakeMinionLiveInstance(minionInstanceId);
 
     // Drain the minion
     PinotResourceManagerResponse drainResponse = _helixResourceManager.drainMinionInstance(minionInstanceId);
@@ -393,7 +408,7 @@ public class PinotHelixResourceManagerMinionDrainTest extends ControllerTest {
   }
 
   @Test
-  public void testDrainThenEnableRestoresCustomTags() {
+  public void testDrainThenEnableRestoresCustomTags() throws Exception {
     // Create a minion with custom tags
     String minionHost = "minion-test-10.example.com";
     int minionPort = 9523;
@@ -405,6 +420,9 @@ public class PinotHelixResourceManagerMinionDrainTest extends ControllerTest {
     assertTrue(addResponse.isSuccessful());
 
     String minionInstanceId = "Minion_" + minionHost + "_" + minionPort;
+
+    // Create a fake minion live instance (simulate minion joining) - needed for enableInstance to work
+    createFakeMinionLiveInstance(minionInstanceId);
 
     // Drain the minion
     PinotResourceManagerResponse drainResponse = _helixResourceManager.drainMinionInstance(minionInstanceId);
@@ -432,7 +450,7 @@ public class PinotHelixResourceManagerMinionDrainTest extends ControllerTest {
   }
 
   @Test
-  public void testEnableNonDrainedMinionDoesNotModifyTags() {
+  public void testEnableNonDrainedMinionDoesNotModifyTags() throws Exception {
     // Create a normal minion
     String minionHost = "minion-test-11.example.com";
     int minionPort = 9524;
@@ -444,6 +462,9 @@ public class PinotHelixResourceManagerMinionDrainTest extends ControllerTest {
     assertTrue(addResponse.isSuccessful());
 
     String minionInstanceId = "Minion_" + minionHost + "_" + minionPort;
+
+    // Create a fake minion live instance (simulate minion joining) - needed for enableInstance to work
+    createFakeMinionLiveInstance(minionInstanceId);
 
     // Enable the minion (not drained) - tags should remain unchanged
     PinotResourceManagerResponse enableResponse = _helixResourceManager.enableInstance(minionInstanceId);
@@ -461,6 +482,13 @@ public class PinotHelixResourceManagerMinionDrainTest extends ControllerTest {
 
   @AfterClass
   public void tearDown() {
+    // Disconnect fake minion managers
+    for (HelixManager manager : _fakeMinionHelixManagers) {
+      if (manager != null && manager.isConnected()) {
+        manager.disconnect();
+      }
+    }
+    _fakeMinionHelixManagers.clear();
     stopController();
     stopZk();
   }
