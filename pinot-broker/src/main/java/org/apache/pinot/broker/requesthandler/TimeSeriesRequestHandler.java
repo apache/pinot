@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.broker.requesthandler;
 
+import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.google.common.base.Preconditions;
 import java.net.URI;
@@ -62,6 +63,7 @@ import org.apache.pinot.spi.env.PinotConfiguration;
 import org.apache.pinot.spi.exception.QueryErrorCode;
 import org.apache.pinot.spi.exception.QueryException;
 import org.apache.pinot.spi.trace.RequestContext;
+import org.apache.pinot.spi.utils.JsonUtils;
 import org.apache.pinot.spi.utils.builder.TableNameBuilder;
 import org.apache.pinot.sql.parsers.CalciteSqlParser;
 import org.apache.pinot.sql.parsers.SqlNodeAndOptions;
@@ -201,7 +203,7 @@ public class TimeSeriesRequestHandler extends BaseBrokerRequestHandler {
     Long stepSeconds = getStepSeconds(mergedParams.get("step"));
     Duration timeout = StringUtils.isNotBlank(mergedParams.get("timeout"))
         ? HumanReadableDuration.from(mergedParams.get("timeout")) : Duration.ofMillis(_brokerTimeoutMs);
-
+    Map<String, String> queryOptions = parseQueryOptionsFromJson(mergedParams.get("queryOptions"));
     Preconditions.checkNotNull(query, "Query cannot be null");
     Preconditions.checkNotNull(startTs, "Start time cannot be null");
     Preconditions.checkNotNull(endTs, "End time cannot be null");
@@ -210,8 +212,20 @@ public class TimeSeriesRequestHandler extends BaseBrokerRequestHandler {
     return new RangeTimeSeriesRequest(language, query, startTs, endTs, stepSeconds, timeout,
         parseIntOrDefault(mergedParams.get("limit"), RangeTimeSeriesRequest.DEFAULT_SERIES_LIMIT),
         parseIntOrDefault(mergedParams.get("numGroupsLimit"), RangeTimeSeriesRequest.DEFAULT_NUM_GROUPS_LIMIT),
-        queryParamString
+        queryParamString, queryOptions
     );
+  }
+
+  private Map<String, String> parseQueryOptionsFromJson(String queryOptionsJson) {
+    if (queryOptionsJson == null || queryOptionsJson.isEmpty()) {
+      return Map.of();
+    }
+    try {
+      return JsonUtils.stringToObject(queryOptionsJson, new TypeReference<>() { });
+    } catch (Exception e) {
+      LOGGER.warn("Failed to parse queryOptions JSON: {}", queryOptionsJson, e);
+      return Map.of();
+    }
   }
 
   private Long parseLongSafe(String value) {
