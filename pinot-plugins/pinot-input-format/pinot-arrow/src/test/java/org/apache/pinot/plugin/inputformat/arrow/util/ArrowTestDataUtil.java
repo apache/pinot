@@ -592,6 +592,222 @@ public class ArrowTestDataUtil {
     }
   }
 
+  /**
+   * Creates Arrow IPC data with a List of dictionary-encoded strings.
+   */
+  public static byte[] createListWithDictEncodedElementsData(int numRows)
+      throws Exception {
+    List<String> dictionaryValues = Arrays.asList("new", "sale", "featured", "bestseller");
+    DictionaryEncoding dictionaryEncoding =
+        new DictionaryEncoding(1L, false, new ArrowType.Int(32, true));
+
+    try (RootAllocator allocator = new RootAllocator(Long.MAX_VALUE);
+        VarCharVector dictionaryVector = new VarCharVector("tags_dict", allocator);
+        IntVector idVector = new IntVector("id", allocator)) {
+
+      // Create dictionary
+      dictionaryVector.allocateNew();
+      for (int i = 0; i < dictionaryValues.size(); i++) {
+        dictionaryVector.set(i, dictionaryValues.get(i).getBytes());
+      }
+      dictionaryVector.setValueCount(dictionaryValues.size());
+
+      Dictionary dictionary = new Dictionary(dictionaryVector, dictionaryEncoding);
+      DictionaryProvider.MapDictionaryProvider dictionaryProvider =
+          new DictionaryProvider.MapDictionaryProvider();
+      dictionaryProvider.put(dictionary);
+
+      // Create List field with dictionary-encoded elements
+      Field tagsElementField =
+          new Field("$data$", new FieldType(true, new ArrowType.Utf8(), dictionaryEncoding), null);
+      Field tagsField =
+          new Field("tags", FieldType.nullable(new ArrowType.List()), Arrays.asList(tagsElementField));
+      Field idField = new Field("id", FieldType.nullable(new ArrowType.Int(32, true)), null);
+
+      Schema schema = new Schema(Arrays.asList(idField, tagsField));
+
+      try (VectorSchemaRoot root = VectorSchemaRoot.create(schema, allocator)) {
+        idVector = (IntVector) root.getVector("id");
+        ListVector tagsVector = (ListVector) root.getVector("tags");
+        VarCharVector tagsChild = (VarCharVector) tagsVector.getDataVector();
+
+        root.allocateNew();
+        idVector.allocateNew(numRows);
+        tagsVector.allocateNew();
+
+        int elemIndex = 0;
+        for (int i = 0; i < numRows; i++) {
+          idVector.set(i, i + 1);
+          tagsVector.startNewValue(i);
+          // Each row has 2-3 tags
+          int numTags = 2 + (i % 2);
+          for (int j = 0; j < numTags; j++) {
+            tagsChild.set(elemIndex++, dictionaryValues.get((i + j) % dictionaryValues.size()).getBytes());
+          }
+          tagsVector.endValue(i, numTags);
+        }
+
+        idVector.setValueCount(numRows);
+        tagsChild.setValueCount(elemIndex);
+        tagsVector.setValueCount(numRows);
+        root.setRowCount(numRows);
+
+        // Encode the list elements
+        try (VarCharVector encodedTagsChild = (VarCharVector) DictionaryEncoder.encode(tagsChild, dictionary)) {
+          tagsVector.replaceDataVector(encodedTagsChild);
+          return writeArrowDataToBytes(root, dictionaryProvider);
+        }
+      }
+    }
+  }
+
+  /**
+   * Creates Arrow IPC data with a Struct containing dictionary-encoded fields.
+   */
+  public static byte[] createStructWithDictEncodedFieldsData(int numRows)
+      throws Exception {
+    List<String> nameDictionary = Arrays.asList("Alice", "Bob", "Charlie", "Diana");
+    DictionaryEncoding nameDictEncoding =
+        new DictionaryEncoding(1L, false, new ArrowType.Int(32, true));
+
+    try (RootAllocator allocator = new RootAllocator(Long.MAX_VALUE);
+        VarCharVector nameDictionaryVector = new VarCharVector("name_dict", allocator);
+        IntVector idVector = new IntVector("id", allocator)) {
+
+      // Create dictionary
+      nameDictionaryVector.allocateNew();
+      for (int i = 0; i < nameDictionary.size(); i++) {
+        nameDictionaryVector.set(i, nameDictionary.get(i).getBytes());
+      }
+      nameDictionaryVector.setValueCount(nameDictionary.size());
+
+      Dictionary dictionary = new Dictionary(nameDictionaryVector, nameDictEncoding);
+      DictionaryProvider.MapDictionaryProvider dictionaryProvider =
+          new DictionaryProvider.MapDictionaryProvider();
+      dictionaryProvider.put(dictionary);
+
+      // Create Struct field with dictionary-encoded name field
+      Field nameField = new Field("name", new FieldType(true, new ArrowType.Utf8(), nameDictEncoding), null);
+      Field ageField = new Field("age", FieldType.nullable(new ArrowType.Int(32, true)), null);
+      Field personField =
+          new Field("person", FieldType.nullable(new ArrowType.Struct()), Arrays.asList(nameField, ageField));
+      Field idField = new Field("id", FieldType.nullable(new ArrowType.Int(32, true)), null);
+
+      Schema schema = new Schema(Arrays.asList(idField, personField));
+
+      try (VectorSchemaRoot root = VectorSchemaRoot.create(schema, allocator)) {
+        idVector = (IntVector) root.getVector("id");
+        StructVector personVector = (StructVector) root.getVector("person");
+        VarCharVector nameVector = (VarCharVector) personVector.getChild("name");
+        IntVector ageVector = (IntVector) personVector.getChild("age");
+
+        root.allocateNew();
+        idVector.allocateNew(numRows);
+        personVector.allocateNew();
+
+        for (int i = 0; i < numRows; i++) {
+          idVector.set(i, i + 1);
+          personVector.setIndexDefined(i);
+          nameVector.set(i, nameDictionary.get(i % nameDictionary.size()).getBytes());
+          ageVector.set(i, 25 + i);
+        }
+
+        idVector.setValueCount(numRows);
+        nameVector.setValueCount(numRows);
+        ageVector.setValueCount(numRows);
+        personVector.setValueCount(numRows);
+        root.setRowCount(numRows);
+
+        // Encode the name field
+        try (VarCharVector encodedNameVector = (VarCharVector) DictionaryEncoder.encode(nameVector, dictionary)) {
+          personVector.putChild("name", encodedNameVector);
+          return writeArrowDataToBytes(root, dictionaryProvider);
+        }
+      }
+    }
+  }
+
+  /**
+   * Creates Arrow IPC data with a Map containing dictionary-encoded keys.
+   */
+  public static byte[] createMapWithDictEncodedKeysData(int numRows)
+      throws Exception {
+    List<String> keyDictionary = Arrays.asList("status", "priority", "category", "region");
+    DictionaryEncoding keyDictEncoding =
+        new DictionaryEncoding(1L, false, new ArrowType.Int(32, true));
+
+    try (RootAllocator allocator = new RootAllocator(Long.MAX_VALUE);
+        VarCharVector keyDictionaryVector = new VarCharVector("key_dict", allocator);
+        IntVector idVector = new IntVector("id", allocator)) {
+
+      // Create dictionary
+      keyDictionaryVector.allocateNew();
+      for (int i = 0; i < keyDictionary.size(); i++) {
+        keyDictionaryVector.set(i, keyDictionary.get(i).getBytes());
+      }
+      keyDictionaryVector.setValueCount(keyDictionary.size());
+
+      Dictionary dictionary = new Dictionary(keyDictionaryVector, keyDictEncoding);
+      DictionaryProvider.MapDictionaryProvider dictionaryProvider =
+          new DictionaryProvider.MapDictionaryProvider();
+      dictionaryProvider.put(dictionary);
+
+      // Create Map field with dictionary-encoded keys
+      Field keyField = new Field(MapVector.KEY_NAME, new FieldType(false, new ArrowType.Utf8(), keyDictEncoding), null);
+      Field valueField = new Field(MapVector.VALUE_NAME, FieldType.nullable(new ArrowType.Int(32, true)), null);
+      Field structField =
+          new Field(
+              MapVector.DATA_VECTOR_NAME,
+              new FieldType(false, new ArrowType.Struct(), null),
+              Arrays.asList(keyField, valueField));
+      Field mapField =
+          new Field("metadata", FieldType.nullable(new ArrowType.Map(false)), Arrays.asList(structField));
+      Field idField = new Field("id", FieldType.nullable(new ArrowType.Int(32, true)), null);
+
+      Schema schema = new Schema(Arrays.asList(idField, mapField));
+
+      try (VectorSchemaRoot root = VectorSchemaRoot.create(schema, allocator)) {
+        idVector = (IntVector) root.getVector("id");
+        MapVector mapVector = (MapVector) root.getVector("metadata");
+        StructVector entriesVector = (StructVector) mapVector.getDataVector();
+        VarCharVector keyVector = (VarCharVector) entriesVector.getChild(MapVector.KEY_NAME);
+        IntVector valueVector = (IntVector) entriesVector.getChild(MapVector.VALUE_NAME);
+
+        root.allocateNew();
+        idVector.allocateNew(numRows);
+        mapVector.allocateNew();
+
+        int entryIndex = 0;
+        for (int i = 0; i < numRows; i++) {
+          idVector.set(i, i + 1);
+          mapVector.startNewValue(i);
+          // Each row has 2-3 map entries
+          int numEntries = 2 + (i % 2);
+          for (int j = 0; j < numEntries; j++) {
+            entriesVector.setIndexDefined(entryIndex);
+            keyVector.set(entryIndex, keyDictionary.get((i + j) % keyDictionary.size()).getBytes());
+            valueVector.set(entryIndex, i * 10 + j);
+            entryIndex++;
+          }
+          mapVector.endValue(i, numEntries);
+        }
+
+        idVector.setValueCount(numRows);
+        keyVector.setValueCount(entryIndex);
+        valueVector.setValueCount(entryIndex);
+        entriesVector.setValueCount(entryIndex);
+        mapVector.setValueCount(numRows);
+        root.setRowCount(numRows);
+
+        // Encode the key vector
+        try (VarCharVector encodedKeyVector = (VarCharVector) DictionaryEncoder.encode(keyVector, dictionary)) {
+          entriesVector.putChild(MapVector.KEY_NAME, encodedKeyVector);
+          return writeArrowDataToBytes(root, dictionaryProvider);
+        }
+      }
+    }
+  }
+
   private static byte[] writeArrowDataToBytes(
       VectorSchemaRoot root, DictionaryProvider dictionaryProvider)
       throws Exception {

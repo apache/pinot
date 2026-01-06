@@ -759,4 +759,143 @@ public class ArrowMessageDecoderTest {
         "All nested structure types are compatible with ArrowMessageDecoder and produce valid GenericRow objects");
     decoder.close();
   }
+
+  @Test
+  public void testListWithDictEncodedElements()
+      throws Exception {
+    ArrowMessageDecoder decoder = new ArrowMessageDecoder();
+
+    Map<String, String> props = new HashMap<>();
+    Set<String> fieldsToRead = Sets.newHashSet("id", "tags");
+    String topicName = "test-list-dict-encoded";
+
+    decoder.init(props, fieldsToRead, topicName);
+
+    byte[] arrowData = ArrowTestDataUtil.createListWithDictEncodedElementsData(3);
+    GenericRow result = decoder.decode(arrowData, null);
+
+    assertNotNull(result);
+    @SuppressWarnings("unchecked")
+    List<GenericRow> rows = (List<GenericRow>) result.getValue(GenericRow.MULTIPLE_RECORDS_KEY);
+    assertNotNull(rows);
+    assertEquals(3, rows.size());
+
+    // Verify list elements are decoded strings, not indices
+    GenericRow row0 = rows.get(0);
+    assertEquals(1, row0.getValue("id"));
+    Object tags0 = row0.getValue("tags");
+    assertNotNull(tags0);
+    assertTrue(tags0 instanceof List);
+    @SuppressWarnings("unchecked")
+    List<Object> tagsList0 = (List<Object>) tags0;
+    assertEquals(2, tagsList0.size());
+    assertEquals("new", tagsList0.get(0));
+    assertEquals("sale", tagsList0.get(1));
+
+    GenericRow row1 = rows.get(1);
+    assertEquals(2, row1.getValue("id"));
+    @SuppressWarnings("unchecked")
+    List<Object> tagsList1 = (List<Object>) row1.getValue("tags");
+    assertEquals(3, tagsList1.size());
+    assertEquals("sale", tagsList1.get(0));
+    assertEquals("featured", tagsList1.get(1));
+    assertEquals("bestseller", tagsList1.get(2));
+
+    LOGGER.info("Successfully decoded List with dictionary-encoded elements");
+    decoder.close();
+  }
+
+  @Test
+  public void testStructWithDictEncodedFields()
+      throws Exception {
+    ArrowMessageDecoder decoder = new ArrowMessageDecoder();
+
+    Map<String, String> props = new HashMap<>();
+    Set<String> fieldsToRead = Sets.newHashSet("id", "person");
+    String topicName = "test-struct-dict-encoded";
+
+    decoder.init(props, fieldsToRead, topicName);
+
+    byte[] arrowData = ArrowTestDataUtil.createStructWithDictEncodedFieldsData(4);
+    GenericRow result = decoder.decode(arrowData, null);
+
+    assertNotNull(result);
+    @SuppressWarnings("unchecked")
+    List<GenericRow> rows = (List<GenericRow>) result.getValue(GenericRow.MULTIPLE_RECORDS_KEY);
+    assertNotNull(rows);
+    assertEquals(4, rows.size());
+
+    // Verify struct fields are decoded, not indices
+    GenericRow row0 = rows.get(0);
+    assertEquals(1, row0.getValue("id"));
+    Object person0 = row0.getValue("person");
+    assertNotNull(person0);
+    assertTrue(person0 instanceof Map);
+    @SuppressWarnings("unchecked")
+    Map<String, Object> personMap0 = (Map<String, Object>) person0;
+    assertEquals("Alice", personMap0.get("name"));
+    assertEquals(25, personMap0.get("age"));
+
+    GenericRow row1 = rows.get(1);
+    @SuppressWarnings("unchecked")
+    Map<String, Object> personMap1 = (Map<String, Object>) row1.getValue("person");
+    assertEquals("Bob", personMap1.get("name"));
+    assertEquals(26, personMap1.get("age"));
+
+    GenericRow row2 = rows.get(2);
+    @SuppressWarnings("unchecked")
+    Map<String, Object> personMap2 = (Map<String, Object>) row2.getValue("person");
+    assertEquals("Charlie", personMap2.get("name"));
+    assertEquals(27, personMap2.get("age"));
+
+    LOGGER.info("Successfully decoded Struct with dictionary-encoded fields");
+    decoder.close();
+  }
+
+  @Test
+  public void testMapWithDictEncodedKeys()
+      throws Exception {
+    ArrowMessageDecoder decoder = new ArrowMessageDecoder();
+
+    Map<String, String> props = new HashMap<>();
+    Set<String> fieldsToRead = Sets.newHashSet("id", "metadata");
+    String topicName = "test-map-dict-encoded";
+
+    decoder.init(props, fieldsToRead, topicName);
+
+    byte[] arrowData = ArrowTestDataUtil.createMapWithDictEncodedKeysData(3);
+    GenericRow result = decoder.decode(arrowData, null);
+
+    assertNotNull(result);
+    @SuppressWarnings("unchecked")
+    List<GenericRow> rows = (List<GenericRow>) result.getValue(GenericRow.MULTIPLE_RECORDS_KEY);
+    assertNotNull(rows);
+    assertEquals(3, rows.size());
+
+    // Verify map keys are decoded strings, not indices
+    GenericRow row0 = rows.get(0);
+    assertEquals(1, row0.getValue("id"));
+    Object metadata0 = row0.getValue("metadata");
+    assertNotNull(metadata0);
+    assertTrue(metadata0 instanceof Map);
+    @SuppressWarnings("unchecked")
+    Map<String, Object> metadataMap0 = (Map<String, Object>) metadata0;
+    assertEquals(2, metadataMap0.size());
+    assertTrue(metadataMap0.containsKey("status"));
+    assertTrue(metadataMap0.containsKey("priority"));
+    assertEquals(0, metadataMap0.get("status"));
+    assertEquals(1, metadataMap0.get("priority"));
+
+    GenericRow row1 = rows.get(1);
+    @SuppressWarnings("unchecked")
+    Map<String, Object> metadataMap1 = (Map<String, Object>) row1.getValue("metadata");
+    assertEquals(3, metadataMap1.size());
+    assertTrue(metadataMap1.containsKey("priority"));
+    assertTrue(metadataMap1.containsKey("category"));
+    assertTrue(metadataMap1.containsKey("region"));
+
+    LOGGER.info("Successfully decoded Map with dictionary-encoded keys");
+    decoder.close();
+  }
 }
+
