@@ -26,6 +26,7 @@ import org.apache.pinot.calcite.rel.hint.PinotHintOptions;
 import org.apache.pinot.common.config.provider.TableCache;
 import org.apache.pinot.core.routing.LogicalTableRouteInfo;
 import org.apache.pinot.core.routing.LogicalTableRouteProvider;
+import org.apache.pinot.core.routing.MultiClusterRoutingContext;
 import org.apache.pinot.query.planner.plannode.AggregateNode;
 import org.apache.pinot.query.planner.plannode.EnrichedJoinNode;
 import org.apache.pinot.query.planner.plannode.ExchangeNode;
@@ -48,9 +49,11 @@ import org.apache.pinot.query.planner.plannode.WindowNode;
 public class DispatchablePlanVisitor implements PlanNodeVisitor<Void, DispatchablePlanContext> {
   private final Set<MailboxSendNode> _visited = Collections.newSetFromMap(new IdentityHashMap<>());
   private final TableCache _tableCache;
+  private final MultiClusterRoutingContext _multiClusterRoutingContext;
 
-  public DispatchablePlanVisitor(TableCache tableCache) {
+  public DispatchablePlanVisitor(TableCache tableCache, MultiClusterRoutingContext multiClusterRoutingContext) {
     _tableCache = tableCache;
+    _multiClusterRoutingContext = multiClusterRoutingContext;
   }
 
   private static DispatchablePlanMetadata getOrCreateDispatchablePlanMetadata(PlanNode node,
@@ -156,7 +159,7 @@ public class DispatchablePlanVisitor implements PlanNodeVisitor<Void, Dispatchab
     if (tableName == null) {
       tableName = _tableCache.getActualLogicalTableName(tableNameInNode);
       Preconditions.checkNotNull(tableName, "Logical table config not found in table cache: " + tableNameInNode);
-      LogicalTableRouteProvider tableRouteProvider = new LogicalTableRouteProvider();
+      LogicalTableRouteProvider tableRouteProvider = new LogicalTableRouteProvider(_multiClusterRoutingContext);
       LogicalTableRouteInfo logicalTableRouteInfo = new LogicalTableRouteInfo();
       tableRouteProvider.fillTableConfigMetadata(logicalTableRouteInfo, tableName, _tableCache);
       dispatchablePlanMetadata.setLogicalTableRouteInfo(logicalTableRouteInfo);

@@ -21,6 +21,8 @@ import jwtDecode from "jwt-decode";
 import { get, each, isEqual, isArray, keys, union } from 'lodash';
 import {
   DataTable,
+  InstanceStatus,
+  InstanceStatusCell,
   InstanceType,
   RebalanceTableSegmentJob,
   RebalanceTableSegmentJobs,
@@ -28,7 +30,7 @@ import {
   SegmentMetadata,
   SqlException,
   SQLResult,
-  TaskType
+  TaskType,
 } from 'Models';
 import moment from 'moment';
 import {
@@ -190,18 +192,60 @@ const getAllInstances = () => {
 const getInstanceData = (instances, liveInstanceArr) => {
   const promiseArr = [...instances.map((inst) => getInstance(inst))];
 
-  return Promise.all(promiseArr).then((result) => {
+  return Promise.all(promiseArr).then(async (result) => {
+    // First, get all instance configs
+    const instanceRecords = result.map(({ data }) => {
+      const isAlive = liveInstanceArr.indexOf(data.instanceName) > -1;
+      const isEnabled = data.enabled;
+      const queriesDisabled = data.queriesDisabled === 'true' || data.queriesDisabled === true;
+      const shutdownInProgress = data.shutdownInProgress === true;
+      
+      return {
+        instanceName: data.instanceName,
+        enabled: data.enabled,
+        hostName: data.hostName,
+        port: data.port,
+        adminPort: data.adminPort,
+        isAlive,
+        isEnabled,
+        queriesDisabled,
+        shutdownInProgress
+      };
+    });
+
+    // Then check health endpoints for alive instances
+    const healthCheckPromises = instanceRecords.map(async (record) => {
+
+      let status: InstanceStatusCell = {value: InstanceStatus.DEAD, tooltip: 'Instance is not running'};
+
+      if (!record.isAlive) {
+        return { ...record, healthStatus: status };
+      }
+
+      if (record.shutdownInProgress) {
+        status = {value: InstanceStatus.UNHEALTHY, tooltip: 'Instance is running but is starting up or shutting down'};
+      } else if (!record.isEnabled) {
+        status = {value: InstanceStatus.INSTANCE_DISABLED, tooltip: 'Instance has been disabled in helix'};
+      } else if (record.queriesDisabled) {
+        status = {value: InstanceStatus.QUERIES_DISABLED, tooltip: 'Instance running but has queries disabled'};
+      } else {
+        status = {value: InstanceStatus.HEALTHY, tooltip: 'Instance is healthy and ready to serve requests'};
+      }
+
+      return { ...record, healthStatus: status };
+    });
+
+    const recordsWithHealth = await Promise.all(healthCheckPromises);
+
     return {
       columns: ['Instance Name', 'Enabled', 'Hostname', 'Port', 'Status'],
-      records: [
-        ...result.map(({ data }) => [
-          data.instanceName,
-          data.enabled,
-          data.hostName,
-          data.port,
-          liveInstanceArr.indexOf(data.instanceName) > -1 ? 'Alive' : 'Dead'
-        ]),
-      ],
+      records: recordsWithHealth.map(record => [
+        record.instanceName,
+        record.enabled,
+        record.hostName,
+        record.port,
+        record.healthStatus
+      ])
     };
   });
 };
