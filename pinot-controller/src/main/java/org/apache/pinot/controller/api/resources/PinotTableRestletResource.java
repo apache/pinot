@@ -344,8 +344,7 @@ public class PinotTableRestletResource {
       }
       LOGGER.info("[copyTable] Successfully fetched and tweaked table config for table: {}", tableName);
 
-      String watermarkUrl = urlBuilder.getBaseUrl() + "/tables/" + tableName + "/consumerWatermarks";
-      URI watermarkUri = new URI(watermarkUrl);
+      URI watermarkUri = new URI(urlBuilder.forConsumerWatermarksGet(tableName));
       SimpleHttpResponse watermarkResponse = HttpClient.wrapAndThrowHttpException(
           HttpClient.getInstance().sendGetRequest(watermarkUri, requestHeaders));
       String watermarkJson = watermarkResponse.getResponse();
