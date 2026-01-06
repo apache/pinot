@@ -340,7 +340,7 @@ public class PinotTableRestletResource {
       tweakRealtimeTableConfig(realtimeTableConfigNode, copyTablePayload);
       TableConfig realtimeTableConfig = JsonUtils.jsonNodeToObject(realtimeTableConfigNode, TableConfig.class);
       if (realtimeTableConfig.getUpsertConfig() != null) {
-        return new CopyTableResponse("fail", "upsert table copy not supported");
+        throw new IllegalArgumentException("upsert table copy not supported");
       }
       LOGGER.info("[copyTable] Successfully fetched and tweaked table config for table: {}", tableName);
 
@@ -363,9 +363,15 @@ public class PinotTableRestletResource {
       LOGGER.info("[copyTable] Successfully added table config: {} with designated high watermark", tableName);
       // hybrid table
       if (hasOffline) {
-        return new CopyTableResponse("warn", "detect offline too; it will only copy real-time segments");
+        return copyTablePayload.isVerbose() ? new CopyTableResponse("warn",
+            "detect offline too; it will only copy real-time segments", schema,
+            realtimeTableConfig, watermarkInductionResult)
+            : new CopyTableResponse("warn", "detect offline too; it will only copy real-time segments", null, null,
+                null);
       }
-      return new CopyTableResponse("success", "");
+      return copyTablePayload.isVerbose() ? new CopyTableResponse("success", "", schema,
+          realtimeTableConfig, watermarkInductionResult)
+          : new CopyTableResponse("success", "", null, null, null);
     } catch (Exception e) {
       LOGGER.error("[copyTable] Error copying table: {}", tableName, e);
       throw new ControllerApplicationException(LOGGER, "Error copying table: " + e.getMessage(),

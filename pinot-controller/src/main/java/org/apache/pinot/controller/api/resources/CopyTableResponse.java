@@ -19,8 +19,15 @@
 
 package org.apache.pinot.controller.api.resources;
 
+import com.fasterxml.jackson.annotation.JsonInclude;
 import com.fasterxml.jackson.annotation.JsonProperty;
+import org.apache.pinot.controller.helix.core.WatermarkInductionResult;
+import org.apache.pinot.spi.config.table.TableConfig;
+import org.apache.pinot.spi.data.Schema;
 
+import javax.annotation.Nullable;
+
+@JsonInclude(JsonInclude.Include.NON_NULL)
 public class CopyTableResponse {
   @JsonProperty("msg")
   private String _msg;
@@ -28,9 +35,25 @@ public class CopyTableResponse {
   @JsonProperty("status")
   private String _status;
 
-  public CopyTableResponse(String status, String msg) {
+  @JsonProperty("schema")
+  private Schema _schema;
+
+  @JsonProperty("realtimeTableConfig")
+  private TableConfig _tableConfig;
+
+  @JsonProperty("watermarkInductionResult")
+  private WatermarkInductionResult _watermarkInductionResult;
+
+  @JsonCreator
+  public CopyTableResponse(@JsonProperty("status") String status, @JsonProperty("msg") String msg,
+      @JsonProperty("schema") @Nullable Schema schema,
+      @JsonProperty("realtimeTableConfig") @Nullable TableConfig tableConfig,
+      @JsonProperty("watermarkInductionResult") @Nullable WatermarkInductionResult watermarkInductionResult) {
     _status = status;
     _msg = msg;
+    _schema = schema;
+    _tableConfig = tableConfig;
+    _watermarkInductionResult = watermarkInductionResult;
   }
 
   public String getMsg() {
@@ -47,5 +70,30 @@ public class CopyTableResponse {
 
   public void setStatus(String status) {
     _status = status;
+  }
+
+  public Schema getSchema() {
+    return _schema;
+  }
+
+  public void setSchema(Schema schema) {
+    _schema = schema;
+  }
+
+  public TableConfig getTableConfig() {
+    return _tableConfig;
+  }
+
+  public void setTableConfig(TableConfig tableConfig) {
+    _tableConfig = tableConfig;
+  }
+
+  public WatermarkInductionResult getWatermarkInductionResult() {
+    return _watermarkInductionResult;
+  }
+
+  public void setWatermarkInductionResult(
+      WatermarkInductionResult watermarkInductionResult) {
+    _watermarkInductionResult = watermarkInductionResult;
   }
 }
