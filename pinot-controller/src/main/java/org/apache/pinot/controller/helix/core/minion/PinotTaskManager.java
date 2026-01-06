@@ -250,6 +250,20 @@ public class PinotTaskManager extends ControllerPeriodicTask<Void> {
     return responseMap;
   }
 
+  /**
+   * This method performs the following validations:
+   * <ul>
+   *   <li>Checks if the number of generated tasks exceeds the maximum allowed subtasks per task
+   *       (controlled by {@link MinionConstants#MAX_ALLOWED_SUB_TASKS_KEY} cluster config)</li>
+   *   <li>For user-triggered tasks: If the limit is exceeded, clears all task configs and throws
+   *       a {@link RuntimeException} to notify the user immediately</li>
+   *   <li>For scheduled tasks: If the limit is exceeded, logs a warning and limits the number of
+   *       tasks to the maximum allowed by taking only the first N tasks (where N is the maximum)</li>
+   *   <li>Adds metadata to each task config indicating the maximum number of subtasks that were
+   *       used (via {@link MinionConstants#TABLE_MAX_NUM_TASKS_KEY}) when tasks are limited</li>
+   * </ul>
+   *
+   */
   protected static List<PinotTaskConfig> validatePinotTaskConfigs(String taskType, String tableNameWithType,
       PinotTaskGenerator taskGenerator, List<PinotTaskConfig> pinotTaskConfigs, String triggeredBy) {
     int maxNumberOfSubTasks = taskGenerator.getMaxAllowedSubTasksPerTask();
@@ -275,13 +289,28 @@ public class PinotTaskManager extends ControllerPeriodicTask<Void> {
     return pinotTaskConfigs;
   }
 
+  /**
+   * Acquires a distributed lock for the given table to prevent concurrent task generation.
+   * <p>
+   * The lock protects against:
+   * <ul>
+   *   <li>Race conditions with periodic task generation</li>
+   *   <li>Multiple simultaneous ad-hoc requests</li>
+   *   <li>Leadership changes during task generation</li>
+   * </ul>
+   *
+   * @param taskType The type of task being generated
+   * @param tableNameWithType The table name with type for which to acquire the lock
+   * @param flowName The flow name (e.g., "ad-hoc", "scheduled") for logging purposes
+   * @return A {@link DistributedTaskLockManager.TaskLock} if the lock is successfully acquired,
+   *         or {@code null} if distributed locking is disabled (when
+   *         {@code _distributedTaskLockManager} is {@code null})
+   * @throws RuntimeException If distributed locking is enabled but the lock cannot be acquired
+   *                          (typically because another controller is already generating tasks
+   *                          for this table).
+   */
   protected @Nullable DistributedTaskLockManager.TaskLock acquireTaskLock(String taskType, String tableNameWithType,
       String flowName) {
-    // Acquire distributed lock before proceeding with task generation
-    // Need locking to protect against:
-    // 1. Race conditions with periodic task generation
-    // 2. Multiple simultaneous ad-hoc requests
-    // 3. Leadership changes during task generation
     DistributedTaskLockManager.TaskLock lock = null;
     if (_distributedTaskLockManager != null) {
       lock = _distributedTaskLockManager.acquireLock(tableNameWithType);
