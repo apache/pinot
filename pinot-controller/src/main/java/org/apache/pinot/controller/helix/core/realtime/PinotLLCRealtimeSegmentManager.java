@@ -61,7 +61,9 @@ import org.apache.helix.ClusterMessagingService;
 import org.apache.helix.HelixAdmin;
 import org.apache.helix.HelixManager;
 import org.apache.helix.model.ExternalView;
+import org.apache.helix.model.HelixConfigScope;
 import org.apache.helix.model.IdealState;
+import org.apache.helix.model.builder.HelixConfigScopeBuilder;
 import org.apache.helix.store.zk.ZkHelixPropertyStore;
 import org.apache.helix.zookeeper.datamodel.ZNRecord;
 import org.apache.helix.zookeeper.zkclient.exception.ZkBadVersionException;
@@ -104,6 +106,7 @@ import org.apache.pinot.controller.helix.core.retention.strategy.TimeRetentionSt
 import org.apache.pinot.controller.helix.core.util.MessagingServiceUtils;
 import org.apache.pinot.controller.validation.RealtimeSegmentValidationManager;
 import org.apache.pinot.core.data.manager.realtime.SegmentCompletionUtils;
+import org.apache.pinot.core.data.manager.realtime.UpsertInconsistentStateConfig;
 import org.apache.pinot.core.util.PeerServerSegmentFinder;
 import org.apache.pinot.segment.local.utils.TableConfigUtils;
 import org.apache.pinot.segment.spi.index.metadata.SegmentMetadataImpl;
@@ -2573,17 +2576,15 @@ public class PinotLLCRealtimeSegmentManager {
 
   private void sendForceCommitMessageToServers(String tableNameWithType, Set<String> consumingSegments) {
     // For partial-upsert tables or upserts with out-of-order events enabled, force-committing
-    // consuming segments is disabled. In some cases (especially when replication > 1), the
-    // server that consumed fewer rows was incorrectly selected as the winner, causing other
-    // servers to reconsume rows and resulting in inconsistent data when previous state must
-    // be referenced for add/update operations.
-    // TODO: Temporarily disabled until a proper fix is implemented.
+    // consuming segments is disabled by default. In some cases (especially when replication > 1),
+    // the server that consumed fewer rows was incorrectly selected as the winner, causing other
+    // servers to reconsume rows and resulting in inconsistent data.
+    // This behavior can be controlled via cluster config without requiring server restart.
     TableConfig tableConfig = _helixResourceManager.getTableConfig(tableNameWithType);
-    if (TableConfigUtils.checkForInconsistentStateConfigs(tableConfig)) {
+    if (!isForceCommitReloadAllowed(tableConfig)) {
       throw new IllegalStateException(
-          "Force commit is not allowed when replication > 1 for partial-upsert tables, or for upsert tables"
-              + " when dropOutOfOrder is enabled with consistency mode: " + UpsertConfig.ConsistencyMode.NONE
-              + " for the table: " + tableNameWithType);
+          "Force commit disabled for table: " + tableNameWithType + " due to inconsistent state config. "
+              + "Control via cluster config: " + UpsertInconsistentStateConfig.FORCE_COMMIT_RELOAD_CONFIG);
     }
 
     if (!consumingSegments.isEmpty()) {
@@ -2596,6 +2597,27 @@ public class PinotLLCRealtimeSegmentManager {
       } else {
         throw new IllegalStateException("No force commit message sent for table: " + tableNameWithType);
       }
+    }
+  }
+
+  /**
+   * Checks if force commit/reload is allowed for the given table based on cluster config.
+   */
+  private boolean isForceCommitReloadAllowed(TableConfig tableConfig) {
+    if (!TableConfigUtils.checkForInconsistentStateConfigs(tableConfig)) {
+      return true;
+    }
+    try {
+      HelixConfigScope scope =
+          new HelixConfigScopeBuilder(HelixConfigScope.ConfigScopeProperty.CLUSTER).forCluster(_clusterName).build();
+      Map<String, String> configs = _helixResourceManager.getHelixAdmin()
+          .getConfig(scope, List.of(UpsertInconsistentStateConfig.FORCE_COMMIT_RELOAD_CONFIG));
+      String value =
+          configs != null ? configs.get(UpsertInconsistentStateConfig.FORCE_COMMIT_RELOAD_CONFIG) : null;
+      return value != null ? Boolean.parseBoolean(value) : UpsertInconsistentStateConfig.DEFAULT_FORCE_COMMIT_RELOAD;
+    } catch (Exception e) {
+      LOGGER.warn("Failed to read cluster config {}", UpsertInconsistentStateConfig.FORCE_COMMIT_RELOAD_CONFIG, e);
+      return UpsertInconsistentStateConfig.DEFAULT_FORCE_COMMIT_RELOAD;
     }
   }
 

@@ -54,6 +54,7 @@ import org.apache.pinot.core.data.manager.provider.TableDataManagerProvider;
 import org.apache.pinot.core.data.manager.realtime.PinotFSSegmentUploader;
 import org.apache.pinot.core.data.manager.realtime.RealtimeSegmentDataManager;
 import org.apache.pinot.core.data.manager.realtime.RealtimeTableDataManager;
+import org.apache.pinot.core.data.manager.realtime.UpsertInconsistentStateConfig;
 import org.apache.pinot.core.data.manager.realtime.SegmentBuildTimeLeaseExtender;
 import org.apache.pinot.core.data.manager.realtime.SegmentUploader;
 import org.apache.pinot.segment.local.data.manager.SegmentDataManager;
@@ -62,14 +63,12 @@ import org.apache.pinot.segment.local.utils.SegmentLocks;
 import org.apache.pinot.segment.local.utils.SegmentOperationsThrottler;
 import org.apache.pinot.segment.local.utils.SegmentReloadSemaphore;
 import org.apache.pinot.segment.local.utils.ServerReloadJobStatusCache;
-import org.apache.pinot.segment.local.utils.TableConfigUtils;
 import org.apache.pinot.segment.spi.SegmentMetadata;
 import org.apache.pinot.segment.spi.loader.SegmentDirectoryLoader;
 import org.apache.pinot.segment.spi.loader.SegmentDirectoryLoaderContext;
 import org.apache.pinot.segment.spi.loader.SegmentDirectoryLoaderRegistry;
 import org.apache.pinot.server.realtime.ServerSegmentCompletionProtocolHandler;
 import org.apache.pinot.spi.config.table.TableConfig;
-import org.apache.pinot.spi.config.table.UpsertConfig;
 import org.apache.pinot.spi.data.LogicalTableConfig;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.env.PinotConfiguration;
@@ -554,20 +553,17 @@ public class HelixInstanceDataManager implements InstanceDataManager {
           try {
             if (segmentDataManager instanceof RealtimeSegmentDataManager) {
               // For partial-upsert tables or upserts with out-of-order events enabled, force-committing
-              // consuming segments is disabled. In some cases (especially when replication > 1), the
-              // server that consumed fewer rows was incorrectly selected as the winner, causing other
-              // servers to reconsume rows and resulting in inconsistent data when previous state must
-              // be referenced for add/update operations.
-
-              // TODO: Temporarily disabled until a proper fix is implemented.
+              // consuming segments is disabled by default. In some cases (especially when replication > 1),
+              // the server that consumed fewer rows was incorrectly selected as the winner, causing other
+              // servers to reconsume rows and resulting in inconsistent data.
+              // This behavior can be controlled via cluster config without requiring server restart.
               TableConfig tableConfig = tableDataManager.getCachedTableConfigAndSchema().getLeft();
-              if (TableConfigUtils.checkForInconsistentStateConfigs(tableConfig)) {
-                LOGGER.warn(
-                    "Force commit is not allowed when replication > 1 for partial-upsert tables, or for upsert tables"
-                        + " when dropOutOfOrder is enabled with consistency mode: {}" + "for the table: {} ",
-                    UpsertConfig.ConsistencyMode.NONE, tableNameWithType);
-              } else {
+              UpsertInconsistentStateConfig config = UpsertInconsistentStateConfig.getInstance();
+              if (config.isForceCommitReloadAllowed(tableConfig)) {
                 ((RealtimeSegmentDataManager) segmentDataManager).forceCommit();
+              } else {
+                LOGGER.warn("Force commit disabled for table: {} due to inconsistent state config. "
+                    + "Control via cluster config: {}", tableNameWithType, config.getConfigKey());
               }
             }
           } finally {

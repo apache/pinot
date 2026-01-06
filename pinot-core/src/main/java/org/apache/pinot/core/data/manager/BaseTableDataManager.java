@@ -64,6 +64,7 @@ import org.apache.pinot.common.utils.config.TierConfigUtils;
 import org.apache.pinot.common.utils.fetcher.SegmentFetcherFactory;
 import org.apache.pinot.core.data.manager.offline.ImmutableSegmentDataManager;
 import org.apache.pinot.core.data.manager.realtime.RealtimeSegmentDataManager;
+import org.apache.pinot.core.data.manager.realtime.UpsertInconsistentStateConfig;
 import org.apache.pinot.core.util.PeerServerSegmentFinder;
 import org.apache.pinot.segment.local.data.manager.SegmentDataManager;
 import org.apache.pinot.segment.local.data.manager.StaleSegment;
@@ -81,7 +82,6 @@ import org.apache.pinot.segment.local.utils.SegmentLocks;
 import org.apache.pinot.segment.local.utils.SegmentOperationsThrottler;
 import org.apache.pinot.segment.local.utils.SegmentReloadSemaphore;
 import org.apache.pinot.segment.local.utils.ServerReloadJobStatusCache;
-import org.apache.pinot.segment.local.utils.TableConfigUtils;
 import org.apache.pinot.segment.spi.ColumnMetadata;
 import org.apache.pinot.segment.spi.ImmutableSegment;
 import org.apache.pinot.segment.spi.IndexSegment;
@@ -820,20 +820,18 @@ public abstract class BaseTableDataManager implements TableDataManager {
       // Use force commit to reload consuming segment
       if (_instanceDataManagerConfig.shouldReloadConsumingSegment()) {
         // For partial-upsert tables or upserts with out-of-order events enabled, force-committing
-        // consuming segments is disabled. In some cases (especially when replication > 1), the
-        // server that consumed fewer rows was incorrectly selected as the winner, causing other
-        // servers to reconsume rows and resulting in inconsistent data when previous state must
-        // be referenced for add/update operations.
-        // TODO: Temporarily disabled until a proper fix is implemented.
+        // consuming segments is disabled by default. In some cases (especially when replication > 1),
+        // the server that consumed fewer rows was incorrectly selected as the winner, causing other
+        // servers to reconsume rows and resulting in inconsistent data.
+        // This behavior can be controlled via cluster config without requiring server restart.
         TableConfig tableConfig = indexLoadingConfig.getTableConfig();
-        if (TableConfigUtils.checkForInconsistentStateConfigs(tableConfig)) {
-          _logger.warn(
-              "Skipping reload (force committing) on consuming segment: {} for a Partial Upsert Table/ upsert tables "
-                  + "when dropOutOfOrder is enabled with no consistency mode",
-              segmentName);
-        } else {
+        UpsertInconsistentStateConfig config = UpsertInconsistentStateConfig.getInstance();
+        if (config.isForceCommitReloadAllowed(tableConfig)) {
           _logger.info("Reloading (force committing) consuming segment: {}", segmentName);
           ((RealtimeSegmentDataManager) segmentDataManager).forceCommit();
+        } else {
+          _logger.warn("Skipping reload (force commit) on consuming segment: {} due to inconsistent state config. "
+              + "Control via cluster config: {}", segmentName, config.getConfigKey());
         }
       } else {
         _logger.warn("Skip reloading consuming segment: {} as configured", segmentName);
