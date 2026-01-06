@@ -4739,7 +4739,18 @@ public class PinotHelixResourceManager {
     return _queryWorkloadManager;
   }
 
-  public WatermarkInductionResult inductConsumingWatermarks(String tableName) throws TableNotFoundException {
+  /**
+   * Retrieves the consumer watermark for a given real-time table.
+   * <p>The watermark represents the next offset to be consumed for each partition group.
+   * If the latest segment of a partition is in a DONE state, the watermark is the end offset of the completed segment.
+   * Otherwise, it is the start offset of the current consuming segment.
+   *
+   * @param tableName The name of the real-time table (without type suffix).
+   * @return A {@link WatermarkInductionResult} containing a list of watermarks for each partition group.
+   * @throws TableNotFoundException if the specified real-time table does not exist.
+   * @throws IllegalStateException if the IdealState for the table is not found.
+   */
+  public WatermarkInductionResult getConsumerWatermarks(String tableName) throws TableNotFoundException {
     String tableNameWithType = TableNameBuilder.REALTIME.tableNameWithType(tableName);
     if (!hasRealtimeTable(tableName)) {
       throw new TableNotFoundException("Table " + tableNameWithType + " does not exist");

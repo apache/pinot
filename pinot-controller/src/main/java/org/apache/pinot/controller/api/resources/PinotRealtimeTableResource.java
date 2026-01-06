@@ -457,12 +457,12 @@ public class PinotRealtimeTableResource {
   @Path("/tables/{tableName}/consumerWatermarks")
   @Authorize(targetType = TargetType.TABLE, paramName = "tableName", action = Actions.Table.GET_IDEAL_STATE)
   @ApiOperation(value = "Get table ideal state", notes = "Get table ideal state")
-  public WatermarkInductionResult inductConsumingWatermark(
+  public WatermarkInductionResult getConsumerWatermark(
       @ApiParam(value = "Name of the realtime table", required = true) @PathParam("tableName") String tableName,
       @Context HttpHeaders headers) {
     try {
       String table = DatabaseUtils.translateTableName(tableName, headers);
-      return _pinotHelixResourceManager.inductConsumingWatermarks(table);
+      return _pinotHelixResourceManager.getConsumerWatermarks(table);
     } catch (TableNotFoundException e) {
       throw new ControllerApplicationException(LOGGER, e.getMessage(), Response.Status.NOT_FOUND, e);
     } catch (Exception e) {

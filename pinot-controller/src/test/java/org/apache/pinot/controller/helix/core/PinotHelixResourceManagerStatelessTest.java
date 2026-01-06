@@ -1611,13 +1611,13 @@ public class PinotHelixResourceManagerStatelessTest extends ControllerTest {
   }
 
   @Test
-  public void testInductConsumingWatermarks()
+  public void testGetConsumerWatermarks()
       throws Exception {
     String rawTableName = "watermarksTable";
     String realtimeTableName = TableNameBuilder.REALTIME.tableNameWithType(rawTableName);
 
     // Test table not found
-    assertThrows(TableNotFoundException.class, () -> _helixResourceManager.inductConsumingWatermarks(rawTableName));
+    assertThrows(TableNotFoundException.class, () -> _helixResourceManager.getConsumerWatermarks(rawTableName));
 
     // Setup table
     addDummySchema(rawTableName);
@@ -1652,7 +1652,7 @@ public class PinotHelixResourceManagerStatelessTest extends ControllerTest {
     when(mockSegmentManager.getPartitionGroupConsumptionStatusList(any(), any()))
         .thenReturn(Arrays.asList(doneStatus, inProgressStatus));
 
-    WatermarkInductionResult waterMarkInductionResult = _helixResourceManager.inductConsumingWatermarks(rawTableName);
+    WatermarkInductionResult waterMarkInductionResult = _helixResourceManager.getConsumerWatermarks(rawTableName);
     assertEquals(waterMarkInductionResult.getWatermarks().size(), 2);
     WatermarkInductionResult.Watermark doneWatermark = waterMarkInductionResult.getWatermarks().get(0);
     assertEquals(doneWatermark.getPartitionGroupId(), 0);

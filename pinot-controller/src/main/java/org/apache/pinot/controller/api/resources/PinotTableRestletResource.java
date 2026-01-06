@@ -349,13 +349,14 @@ public class PinotTableRestletResource {
             .map(PartitionGroupInfo::from)
             .collect(Collectors.toList());
 
+        // Add the table with designated starting kafka offset and segment sequence number to create consuming segments
         _pinotHelixResourceManager.addTable(realtimeTableConfig, partitionGroupInfos);
         if (hasOffline) {
-          return new CopyTableResponse("warn", "detect offline; copy real-time only");
+          return new CopyTableResponse("warn", "detect offline; copy real-time segments only");
         }
         return new CopyTableResponse("success", "");
       }
-      return new CopyTableResponse("fail", "offline table copy not supported");
+      return new CopyTableResponse("fail", "copying offline table's segments is not supported yet");
     } catch (Exception e) {
       LOGGER.error("[copyTable] Error copying table: {}", tableName, e);
       throw new ControllerApplicationException(LOGGER, "Error copying table: " + e.getMessage(),
@@ -364,11 +365,13 @@ public class PinotTableRestletResource {
   }
 
   /**
-   * Tweaks the realtime table config with the given broker and server tenants.
+   * Helper method to tweak the realtime table config. This method is used to set the broker and server tenants, and
+   * optionally replace the pool tags in the instance assignment config.
    *
    * @param realtimeTableConfigNode The JSON object representing the realtime table config.
    * @param brokerTenant The broker tenant to set in the config.
    * @param serverTenant The server tenant to set in the config.
+   * @param tagPoolReplacementMap A map from source pool tag to destination pool tag.
    */
   @VisibleForTesting
   static void tweakRealtimeTableConfig(ObjectNode realtimeTableConfigNode, String brokerTenant, String serverTenant,

@@ -41,6 +41,10 @@ public class CopyTablePayload {
    */
   private String _serverTenant;
 
+  /**
+   * The instanceAssignmentConfig's tagPoolConfig contains full tenant name. We will use this field to let user specify
+   * the replacement relation from source cluster's full tenant to target cluster's full tenant.
+   */
   private Map<String, String> _tagPoolReplacementMap;
 
   @JsonCreator
