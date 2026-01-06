@@ -697,13 +697,13 @@ abstract class BaseDistinctCountSmartSketchAggregationFunction
   private void aggregateDictIdForGroup(GroupByResultHolder groupByResultHolder, int groupKey, Dictionary dictionary,
       int dictId, IntSet modifiedGroups) {
     Object result = groupByResultHolder.getResult(groupKey);
-    if (!(result instanceof DictIdsWrapper)) {
-      // Already converted to sketch, offer directly
-      ((HyperLogLog) result).offer(dictionary.get(dictId));
-    } else {
-      // Still using bitmap, add dict ID
+    if (result == null || result instanceof DictIdsWrapper) {
+      // Null or still using bitmap, add dict ID
       getDictIdBitmap(groupByResultHolder, groupKey, dictionary).add(dictId);
       modifiedGroups.add(groupKey);
+    } else {
+      // Already converted to sketch, offer directly
+      ((HyperLogLog) result).offer(dictionary.get(dictId));
     }
   }
 
@@ -714,15 +714,15 @@ abstract class BaseDistinctCountSmartSketchAggregationFunction
   private void aggregateDictIdsForGroup(GroupByResultHolder groupByResultHolder, int groupKey, Dictionary dictionary,
       int[] dictIds, IntSet modifiedGroups) {
     Object result = groupByResultHolder.getResult(groupKey);
-    if (!(result instanceof DictIdsWrapper)) {
+    if (result == null || result instanceof DictIdsWrapper) {
+      // Null or still using bitmap, add dict IDs
+      getDictIdBitmap(groupByResultHolder, groupKey, dictionary).add(dictIds);
+      modifiedGroups.add(groupKey);
+    } else {
       // Already converted to sketch, offer directly
       for (int dictId : dictIds) {
         ((HyperLogLog) result).offer(dictionary.get(dictId));
       }
-    } else {
-      // Still using bitmap, add dict IDs
-      getDictIdBitmap(groupByResultHolder, groupKey, dictionary).add(dictIds);
-      modifiedGroups.add(groupKey);
     }
   }
 

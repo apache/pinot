@@ -95,7 +95,7 @@ public class DistinctCountSmartHLLAggregationFunction extends BaseDistinctCountS
 
   @Override
   public void aggregate(int length, AggregationResultHolder aggregationResultHolder,
-                        Map<ExpressionContext, BlockValSet> blockValSetMap) {
+      Map<ExpressionContext, BlockValSet> blockValSetMap) {
     BlockValSet blockValSet = blockValSetMap.get(_expression);
 
     // For dictionary-encoded expression, use adaptive conversion strategy
