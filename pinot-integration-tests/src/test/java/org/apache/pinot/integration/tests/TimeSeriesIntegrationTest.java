@@ -49,6 +49,7 @@ import org.testng.annotations.DataProvider;
 import org.testng.annotations.Test;
 
 import static org.testng.Assert.assertEquals;
+import static org.testng.Assert.assertFalse;
 import static org.testng.Assert.assertNotNull;
 import static org.testng.Assert.assertTrue;
 
@@ -204,6 +205,59 @@ public class TimeSeriesIntegrationTest extends BaseClusterIntegrationTest {
         getControllerBaseApiUrl() + "/timeseries/languages", getHeaders());
     assertEquals(statusCodeAndResponse.getLeft(), 200);
     assertEquals(statusCodeAndResponse.getRight(), "[\"m3ql\"]");
+  }
+
+  @Test(expectedExceptions = RuntimeException.class)
+  public void testQueryWithServerExceptionsForPrometheus() {
+    // JSON_MATCH on a column without JSON index triggers a QUERY_EXECUTION error.
+    String query = String.format(
+        "fetch{table=\"mytable_OFFLINE\",filter=\"JSON_MATCH(%s, '\\\"$.key=value\\\"')\",ts_column=\"%s\","
+            + "ts_unit=\"MILLISECONDS\",value=\"%s\"} | max{%s}",
+        DEVICE_OS_COLUMN, TS_COLUMN, TOTAL_TRIPS_COLUMN, DEVICE_OS_COLUMN
+    );
+    // Prometheus endpoint should throw an exception.
+    getTimeseriesQuery(query, QUERY_START_TIME_SEC, QUERY_END_TIME_SEC, getHeaders());
+  }
+
+  @Test
+  public void testQueryWithServerExceptionsForBroker() {
+    // JSON_MATCH on a column without JSON index triggers a QUERY_EXECUTION error.
+    String query = String.format(
+      "fetch{table=\"mytable_OFFLINE\",filter=\"JSON_MATCH(%s, '\\\"$.key=value\\\"')\",ts_column=\"%s\","
+        + "ts_unit=\"MILLISECONDS\",value=\"%s\"} | max{%s}",
+      DEVICE_OS_COLUMN, TS_COLUMN, TOTAL_TRIPS_COLUMN, DEVICE_OS_COLUMN
+    );
+    JsonNode result = postTimeseriesQuery(getBrokerBaseApiUrl(), query, QUERY_START_TIME_SEC, QUERY_END_TIME_SEC,
+      getHeaders());
+    assertNotNull(result);
+
+    JsonNode exceptions = result.get("exceptions");
+    assertNotNull(exceptions);
+    assertFalse(exceptions.isEmpty());
+    JsonNode firstException = exceptions.get(0);
+    assertEquals(firstException.get("errorCode").asInt(), 200);
+    assertTrue(firstException.get("message").asText().contains("Cannot apply JSON_MATCH on column"));
+  }
+
+  @Test
+  public void testQueryOptionsNumGroupsLimit() {
+    String query = String.format(
+        "fetch{table=\"mytable_OFFLINE\",filter=\"\",ts_column=\"%s\",ts_unit=\"MILLISECONDS\",value=\"%s\"}"
+            + " | max{%s} | transformNull{0} | keepLastValue{}",
+        TS_COLUMN, TOTAL_TRIPS_COLUMN, DEVICE_OS_COLUMN
+    );
+    // This query would normally return 3 groups (one for each device OS: windows, android, ios)
+    // With numGroupsLimit=1 query option, we expect only 1 group
+    JsonNode resultWithLimit = postTimeseriesQuery(getBrokerBaseApiUrl(), query, QUERY_START_TIME_SEC,
+        QUERY_END_TIME_SEC, getHeaders(), Map.of("numGroupsLimit", 1, "enableNullHandling", true));
+    assertNotNull(resultWithLimit);
+    assertEquals(resultWithLimit.path("numRowsResultSet").asInt(), 1,
+        "Expected only 1 group with numGroupsLimit=1 query option");
+
+    JsonNode resultTable = resultWithLimit.path("resultTable");
+    assertNotNull(resultTable);
+    JsonNode rows = resultTable.path("rows");
+    assertEquals(rows.size(), 1, "Expected only 1 row in result table with numGroupsLimit=1");
   }
 
   @DataProvider(name = "isBrokerResponseCompatible")

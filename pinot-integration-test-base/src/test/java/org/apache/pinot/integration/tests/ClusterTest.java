@@ -582,9 +582,22 @@ public abstract class ClusterTest extends ControllerTest {
 
   public JsonNode postTimeseriesQuery(String baseUrl, String query, long startTime, long endTime,
       Map<String, String> headers) {
+    return postTimeseriesQuery(baseUrl, query, startTime, endTime, headers, null);
+  }
+
+  public JsonNode postTimeseriesQuery(String baseUrl, String query, long startTime, long endTime,
+      Map<String, String> headers, Map<String, Object> queryOptions) {
     try {
-      Map<String, String> payload = Map.of("language", "m3ql", "query", query, "start",
-          String.valueOf(startTime), "end", String.valueOf(endTime));
+      ObjectNode payload = JsonUtils.newObjectNode();
+      payload.put("language", "m3ql");
+      payload.put("query", query);
+      payload.put("start", String.valueOf(startTime));
+      payload.put("end", String.valueOf(endTime));
+      if (queryOptions != null && !queryOptions.isEmpty()) {
+        ObjectNode queryOptionsNode = JsonUtils.newObjectNode();
+        queryOptions.forEach(queryOptionsNode::putPOJO);
+        payload.set("queryOptions", queryOptionsNode);
+      }
       return JsonUtils.stringToJsonNode(
           sendPostRequest(baseUrl + "/query/timeseries", JsonUtils.objectToString(payload), headers));
     } catch (Exception e) {

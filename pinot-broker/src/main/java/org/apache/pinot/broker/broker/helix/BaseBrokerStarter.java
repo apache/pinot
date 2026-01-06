@@ -391,7 +391,8 @@ public abstract class BaseBrokerStarter implements ServiceStartable {
     if (brokerRequestHandlerType.equalsIgnoreCase(Broker.GRPC_BROKER_REQUEST_HANDLER_TYPE)) {
       singleStageBrokerRequestHandler =
           new GrpcBrokerRequestHandler(_brokerConf, brokerId, requestIdGenerator, _routingManager,
-              _accessControlFactory, _queryQuotaManager, _tableCache, _failureDetector, _threadAccountant);
+              _accessControlFactory, _queryQuotaManager, _tableCache, _failureDetector, _threadAccountant,
+              multiClusterRoutingContext);
     } else {
       // Default request handler type, i.e. netty
       NettyConfig nettyDefaults = NettyConfig.extractNettyConfig(_brokerConf, Broker.BROKER_NETTY_PREFIX);
@@ -403,7 +404,7 @@ public abstract class BaseBrokerStarter implements ServiceStartable {
       singleStageBrokerRequestHandler =
           new SingleConnectionBrokerRequestHandler(_brokerConf, brokerId, requestIdGenerator, _routingManager,
               _accessControlFactory, _queryQuotaManager, _tableCache, nettyDefaults, tlsDefaults,
-              _serverRoutingStatsManager, _failureDetector, _threadAccountant);
+              _serverRoutingStatsManager, _failureDetector, _threadAccountant, multiClusterRoutingContext);
     }
     MultiStageBrokerRequestHandler multiStageBrokerRequestHandler = null;
     QueryDispatcher queryDispatcher = null;
@@ -417,14 +418,15 @@ public abstract class BaseBrokerStarter implements ServiceStartable {
       multiStageBrokerRequestHandler =
           new MultiStageBrokerRequestHandler(_brokerConf, brokerId, requestIdGenerator, _routingManager,
               _accessControlFactory, _queryQuotaManager, _tableCache, _multiStageQueryThrottler, _failureDetector,
-              _threadAccountant);
+              _threadAccountant, multiClusterRoutingContext);
     }
     TimeSeriesRequestHandler timeSeriesRequestHandler = null;
     if (StringUtils.isNotBlank(_brokerConf.getProperty(PinotTimeSeriesConfiguration.getEnabledLanguagesConfigKey()))) {
       Preconditions.checkNotNull(queryDispatcher, "Multistage Engine should be enabled to use time-series engine");
       timeSeriesRequestHandler =
           new TimeSeriesRequestHandler(_brokerConf, brokerId, requestIdGenerator, _routingManager,
-              _accessControlFactory, _queryQuotaManager, _tableCache, queryDispatcher, _threadAccountant);
+              _accessControlFactory, _queryQuotaManager, _tableCache, queryDispatcher, _threadAccountant,
+              multiClusterRoutingContext);
     }
 
     LOGGER.info("Initializing PinotFSFactory");

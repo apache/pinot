@@ -147,25 +147,29 @@ public class LogicalTableConfigUtils {
       String physicalTableName = entry.getKey();
       PhysicalTableConfig physicalTableConfig = entry.getValue();
 
-      // validate database name matches
-      String physicalTableDatabaseName = DatabaseUtils.extractDatabaseFromFullyQualifiedTableName(physicalTableName);
-      if (!StringUtils.equalsIgnoreCase(databaseName, physicalTableDatabaseName)) {
-        throw new IllegalArgumentException(
-            "Invalid logical table. Reason: '" + physicalTableName
-                + "' should have the same database name as logical table: " + databaseName + " != "
-                + physicalTableDatabaseName);
-      }
-
-      // validate physical table exists
-      if (!physicalTableExistsPredicate.test(physicalTableName)) {
-        throw new IllegalArgumentException(
-            "Invalid logical table. Reason: '" + physicalTableName + "' should be one of the existing tables");
-      }
       // validate physical table config is not null
       if (physicalTableConfig == null) {
         throw new IllegalArgumentException(
             "Invalid logical table. Reason: 'physicalTableConfig' should not be null for physical table: "
                 + physicalTableName);
+      }
+
+      // Skip database and existence validation for multi-cluster physical tables
+      if (!physicalTableConfig.isMultiCluster()) {
+        // validate database name matches
+        String physicalTableDatabaseName = DatabaseUtils.extractDatabaseFromFullyQualifiedTableName(physicalTableName);
+        if (!StringUtils.equalsIgnoreCase(databaseName, physicalTableDatabaseName)) {
+          throw new IllegalArgumentException(
+              "Invalid logical table. Reason: '" + physicalTableName
+                  + "' should have the same database name as logical table: " + databaseName + " != "
+                  + physicalTableDatabaseName);
+        }
+
+        // validate physical table exists
+        if (!physicalTableExistsPredicate.test(physicalTableName)) {
+          throw new IllegalArgumentException(
+              "Invalid logical table. Reason: '" + physicalTableName + "' should be one of the existing tables");
+        }
       }
 
       if (TableNameBuilder.isOfflineTableResource(physicalTableName)) {
