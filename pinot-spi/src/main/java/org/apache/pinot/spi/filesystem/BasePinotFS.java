@@ -36,6 +36,11 @@ public abstract class BasePinotFS implements PinotFS {
       throws IOException {
     boolean result = true;
     for (URI segmentUri : segmentUris) {
+      // Check if file exists before attempting deletion to avoid FileNotFoundException
+      if (!exists(segmentUri)) {
+        LOGGER.debug("File {} does not exist, skipping deletion", segmentUri);
+        continue;
+      }
       result &= delete(segmentUri, forceDelete);
     }
     return result;
