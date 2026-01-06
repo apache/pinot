@@ -20,6 +20,9 @@ package org.apache.pinot.spi.data.readers;
 
 import java.io.Closeable;
 import java.io.IOException;
+import javax.annotation.Nullable;
+import org.roaringbitmap.RoaringBitmap;
+
 
 /**
  * <p>
@@ -63,4 +66,19 @@ public interface ColumnarDataSource extends Closeable {
    * @return a description of the underlying source (e.g., file name)
    */
   String toString();
+
+
+  /**
+   * Returns the valid document IDs bitmap for this data source.
+   * Documents not in this bitmap will be filtered out during processing.
+   * <p>
+   * This is used for scenarios like upsert compaction where only valid (non-obsolete)
+   * documents should be processed.
+   *
+   * @return RoaringBitmap of valid doc IDs, or null if all docs are valid
+   */
+  @Nullable
+  default RoaringBitmap getValidDocIds() {
+    return null;
+  }
 }
