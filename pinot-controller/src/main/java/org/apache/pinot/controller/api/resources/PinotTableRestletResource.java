@@ -241,7 +241,7 @@ public class PinotTableRestletResource {
       TableConfigTunerUtils.applyTunerConfigs(_pinotHelixResourceManager, tableConfig, schema, Collections.emptyMap());
 
       // TableConfigUtils.validate(...) is used across table create/update.
-      TableConfigUtils.validate(tableConfig, schema, typesToSkip);
+      TableConfigUtils.validate(tableConfig, schema, typesToSkip, null);
       TableConfigUtils.validateTableName(tableConfig);
     } catch (TableAlreadyExistsException e) {
       throw new ControllerApplicationException(LOGGER, e.getMessage(), Response.Status.CONFLICT, e);
@@ -253,7 +253,7 @@ public class PinotTableRestletResource {
         TableConfigUtils.ensureMinReplicas(tableConfig, _controllerConf.getDefaultTableMinReplicas());
         TableConfigUtils.ensureStorageQuotaConstraints(tableConfig, _controllerConf.getDimTableMaxSize());
         checkHybridTableConfig(TableNameBuilder.extractRawTableName(tableNameWithType), tableConfig);
-        TaskConfigUtils.validateTaskConfigs(tableConfig, schema, _pinotTaskManager, typesToSkip);
+        TaskConfigUtils.validateTaskConfigs(tableConfig, schema, _pinotTaskManager, typesToSkip, null);
         validateInstanceAssignment(tableConfig);
       } catch (Exception e) {
         throw new InvalidTableConfigException(e);
@@ -617,7 +617,7 @@ public class PinotTableRestletResource {
 
       schema = _pinotHelixResourceManager.getTableSchema(tableNameWithType);
       Preconditions.checkState(schema != null, "Failed to find schema for table: %s", tableNameWithType);
-      TableConfigUtils.validate(tableConfig, schema, typesToSkip);
+      TableConfigUtils.validate(tableConfig, schema, typesToSkip, null);
     } catch (Exception e) {
       String msg = String.format("Invalid table config: %s with error: %s", tableName, e.getMessage());
       throw new ControllerApplicationException(LOGGER, msg, Response.Status.BAD_REQUEST, e);
@@ -633,7 +633,7 @@ public class PinotTableRestletResource {
         TableConfigUtils.ensureMinReplicas(tableConfig, _controllerConf.getDefaultTableMinReplicas());
         TableConfigUtils.ensureStorageQuotaConstraints(tableConfig, _controllerConf.getDimTableMaxSize());
         checkHybridTableConfig(TableNameBuilder.extractRawTableName(tableNameWithType), tableConfig);
-        TaskConfigUtils.validateTaskConfigs(tableConfig, schema, _pinotTaskManager, typesToSkip);
+        TaskConfigUtils.validateTaskConfigs(tableConfig, schema, _pinotTaskManager, typesToSkip, null);
         validateInstanceAssignment(tableConfig);
       } catch (Exception e) {
         throw new InvalidTableConfigException(e);
@@ -692,8 +692,8 @@ public class PinotTableRestletResource {
       if (schema == null) {
         throw new SchemaNotFoundException("Failed to find schema for table: " + tableNameWithType);
       }
-      TableConfigUtils.validate(tableConfig, schema, typesToSkip);
-      TaskConfigUtils.validateTaskConfigs(tableConfig, schema, _pinotTaskManager, typesToSkip);
+      TableConfigUtils.validate(tableConfig, schema, typesToSkip, null);
+      TaskConfigUtils.validateTaskConfigs(tableConfig, schema, _pinotTaskManager, typesToSkip, null);
       ObjectNode tableConfigValidateStr = JsonUtils.newObjectNode();
       if (tableConfig.getTableType() == TableType.OFFLINE) {
         tableConfigValidateStr.set(TableType.OFFLINE.name(), tableConfig.toJsonNode());

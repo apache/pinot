@@ -79,7 +79,7 @@ public class TaskConfigUtilsTest {
         new TableTaskConfig(Map.of(TEST_TASK_TYPE, Map.of("schedule", "0 */10 * ? * * *")));
     TableConfig tableConfig =
         new TableConfigBuilder(TableType.OFFLINE).setTableName(TEST_TABLE_NAME).setTaskConfig(tableTaskConfig).build();
-    TaskConfigUtils.validateTaskConfigs(tableConfig, new Schema(), _mockTaskManager, null);
+    TaskConfigUtils.validateTaskConfigs(tableConfig, new Schema(), _mockTaskManager, null, null);
   }
 
   @Test(expectedExceptions = RuntimeException.class)
@@ -88,7 +88,7 @@ public class TaskConfigUtilsTest {
         new TableTaskConfig(Map.of("otherTask", Map.of("schedule", "0 */10 * ? * * *")));
     TableConfig tableConfig =
         new TableConfigBuilder(TableType.OFFLINE).setTableName(TEST_TABLE_NAME).setTaskConfig(tableTaskConfig).build();
-    TaskConfigUtils.validateTaskConfigs(tableConfig, new Schema(), _mockTaskManager, null);
+    TaskConfigUtils.validateTaskConfigs(tableConfig, new Schema(), _mockTaskManager, null, null);
   }
 
   @Test
