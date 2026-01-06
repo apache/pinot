@@ -36,8 +36,9 @@ public class PinotTableRestletResourceTest {
 
       String brokerTenant = "testBroker";
       String serverTenant = "testServer";
-      PinotTableRestletResource.tweakRealtimeTableConfig(tableConfig, brokerTenant, serverTenant,
-          Map.of("server1_REALTIME", "testServer_REALTIME"));
+      CopyTablePayload copyTablePayload = new CopyTablePayload("http://localhost:9000", null, brokerTenant,
+          serverTenant, Map.of("server1_REALTIME", "testServer_REALTIME"));
+      PinotTableRestletResource.tweakRealtimeTableConfig(tableConfig, copyTablePayload);
 
       assertEquals(tableConfig.get("tenants").get("broker").asText(), brokerTenant);
       assertEquals(tableConfig.get("tenants").get("server").asText(), serverTenant);

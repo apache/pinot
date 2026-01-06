@@ -45,8 +45,8 @@ public class PartitionGroupInfo {
    */
   public static PartitionGroupInfo from(WatermarkInductionResult.Watermark watermark) {
     return new PartitionGroupInfo(
-        new PartitionGroupMetadata((int) watermark.getPartitionGroupId(), new LongMsgOffset(watermark.getOffset())),
-        (int) watermark.getSequenceNumber());
+        new PartitionGroupMetadata(watermark.getPartitionGroupId(), new LongMsgOffset(watermark.getOffset())),
+        watermark.getSequenceNumber());
   }
 
   /**

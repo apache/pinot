@@ -56,8 +56,8 @@ public class WatermarkInductionResult {
    * Represents a single watermark with its partitionGroupId, sequence, and offset.
    */
   public static class Watermark {
-    private long _partitionGroupId;
-    private long _sequenceNumber;
+    private int _partitionGroupId;
+    private int _sequenceNumber;
     private long _offset;
 
     /**
@@ -70,8 +70,8 @@ public class WatermarkInductionResult {
       * @param offset The first Kafka offset whose corresponding record has not yet sealed in Pinot
      */
     @JsonCreator
-    public Watermark(@JsonProperty("partitionGroupId") long partitionGroupId,
-        @JsonProperty("sequenceNumber") long sequenceNumber, @JsonProperty("offset") long offset) {
+    public Watermark(@JsonProperty("partitionGroupId") int partitionGroupId,
+        @JsonProperty("sequenceNumber") int sequenceNumber, @JsonProperty("offset") long offset) {
       _partitionGroupId = partitionGroupId;
       _sequenceNumber = sequenceNumber;
       _offset = offset;
@@ -83,7 +83,7 @@ public class WatermarkInductionResult {
      * @return The partition group ID.
      */
     @JsonGetter("partitionGroupId")
-    public long getPartitionGroupId() {
+    public int getPartitionGroupId() {
       return _partitionGroupId;
     }
 
@@ -93,7 +93,7 @@ public class WatermarkInductionResult {
      * @return The segment sequence number.
      */
     @JsonGetter("sequenceNumber")
-    public long getSequenceNumber() {
+    public int getSequenceNumber() {
       return _sequenceNumber;
     }
 

@@ -30,17 +30,17 @@ public class PartitionGroupInfoTest {
 
   @Test
   public void testFromWatermark() {
-    long partitionGroupId = 123;
+    int partitionGroupId = 123;
     long offset = 456;
-    long sequenceNumber = 789;
+    int sequenceNumber = 789;
 
     WatermarkInductionResult.Watermark watermark =
         new WatermarkInductionResult.Watermark(partitionGroupId, sequenceNumber, offset);
     PartitionGroupInfo partitionGroupInfo = PartitionGroupInfo.from(watermark);
 
     assertNotNull(partitionGroupInfo);
-    assertEquals(partitionGroupInfo.getPartitionGroupId(), (int) partitionGroupId);
-    assertEquals(partitionGroupInfo.getSequence(), (int) sequenceNumber);
+    assertEquals(partitionGroupInfo.getPartitionGroupId(), partitionGroupId);
+    assertEquals(partitionGroupInfo.getSequence(), sequenceNumber);
     assertNotNull(partitionGroupInfo.getStartOffset());
     assertEquals(partitionGroupInfo.getStartOffset().toString(), new LongMsgOffset(offset).toString());
   }

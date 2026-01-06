@@ -130,6 +130,7 @@ import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.utils.CommonConstants;
 import org.apache.pinot.spi.utils.Enablement;
 import org.apache.pinot.spi.utils.JsonUtils;
+import org.apache.pinot.spi.utils.builder.ControllerRequestURLBuilder;
 import org.apache.pinot.spi.utils.builder.TableNameBuilder;
 import org.apache.pinot.spi.utils.retry.RetryPolicies;
 import org.apache.zookeeper.data.Stat;
@@ -303,60 +304,61 @@ public class PinotTableRestletResource {
       CopyTablePayload copyTablePayload = JsonUtils.stringToObject(payload, CopyTablePayload.class);
       String sourceControllerUri = copyTablePayload.getSourceClusterUri();
       Map<String, String> requestHeaders = copyTablePayload.getHeaders();
-      String brokerTenant = copyTablePayload.getBrokerTenant();
-      String serverTenant = copyTablePayload.getServerTenant();
-      Map<String, String> tagReplacementMap = copyTablePayload.getTagPoolReplacementMap();
 
       LOGGER.info("[copyTable] Start copying table: {} from source: {}", tableName, sourceControllerUri);
 
-      // Fetch and add schema
-      URI schemaUri = new URI(sourceControllerUri + "/tables/" + tableName + "/schema");
+      ControllerRequestURLBuilder urlBuilder = ControllerRequestURLBuilder.baseUrl(sourceControllerUri);
+
+      URI schemaUri = new URI(urlBuilder.forTableSchemaGet(tableName));
       SimpleHttpResponse schemaResponse = HttpClient.wrapAndThrowHttpException(
           HttpClient.getInstance().sendGetRequest(schemaUri, requestHeaders));
       String schemaJson = schemaResponse.getResponse();
       Schema schema = Schema.fromString(schemaJson);
-      _pinotHelixResourceManager.addSchema(schema, true, false);
-      LOGGER.info("[copyTable] Successfully added schema for table: {}, schema: {}", tableName, schema);
 
-      // Fetch and add table configs
-      URI tableConfigUri = new URI(sourceControllerUri + "/tables/" + tableName);
+      URI tableConfigUri = new URI(urlBuilder.forTableGet(tableName));
       SimpleHttpResponse tableConfigResponse = HttpClient.wrapAndThrowHttpException(
           HttpClient.getInstance().sendGetRequest(tableConfigUri, requestHeaders));
       String tableConfigJson = tableConfigResponse.getResponse();
-      LOGGER.info("[copyTable] Fetched table config for table: {}, tableConfig: {}", tableName, tableConfigJson);
+      LOGGER.info("[copyTable] Fetched table config for table: {}", tableName);
       JsonNode tableConfigNode = JsonUtils.stringToJsonNode(tableConfigJson);
 
       boolean hasOffline = tableConfigNode.has(TableType.OFFLINE.name());
-      if (tableConfigNode.has(TableType.REALTIME.name())) {
-        ObjectNode realtimeTableConfigNode = (ObjectNode) tableConfigNode.get(TableType.REALTIME.name());
-        tweakRealtimeTableConfig(realtimeTableConfigNode, brokerTenant, serverTenant, tagReplacementMap);
-        TableConfig realtimeTableConfig = JsonUtils.jsonNodeToObject(realtimeTableConfigNode, TableConfig.class);
-        if (realtimeTableConfig.getUpsertConfig() != null) {
-          return new CopyTableResponse("fail", "upsert table copy not supported");
-        }
-        LOGGER.info("[copyTable] Successfully fetched and tweaked table config for table: {}, tableConfig: {}",
-            tableName, realtimeTableConfig.toString());
-
-        URI watermarkUri = new URI(sourceControllerUri + "/tables/" + tableName + "/consumerWatermarks");
-        SimpleHttpResponse watermarkResponse = HttpClient.wrapAndThrowHttpException(
-            HttpClient.getInstance().sendGetRequest(watermarkUri, requestHeaders));
-        String watermarkJson = watermarkResponse.getResponse();
-        LOGGER.info("[copyTable] Fetched watermarks for table: {}. Result: {}", tableName, watermarkJson);
-        WatermarkInductionResult watermarkInductionResult =
-            JsonUtils.stringToObject(watermarkJson, WatermarkInductionResult.class);
-
-        List<PartitionGroupInfo> partitionGroupInfos = watermarkInductionResult.getWatermarks().stream()
-            .map(PartitionGroupInfo::from)
-            .collect(Collectors.toList());
-
-        // Add the table with designated starting kafka offset and segment sequence number to create consuming segments
-        _pinotHelixResourceManager.addTable(realtimeTableConfig, partitionGroupInfos);
-        if (hasOffline) {
-          return new CopyTableResponse("warn", "detect offline; copy real-time segments only");
-        }
-        return new CopyTableResponse("success", "");
+      boolean hasRealtime = tableConfigNode.has(TableType.REALTIME.name());
+      if (hasOffline && !hasRealtime) {
+        return new CopyTableResponse("fail", "pure offline table copy not supported yet");
       }
-      return new CopyTableResponse("fail", "copying offline table's segments is not supported yet");
+
+      ObjectNode realtimeTableConfigNode = (ObjectNode) tableConfigNode.get(TableType.REALTIME.name());
+      tweakRealtimeTableConfig(realtimeTableConfigNode, copyTablePayload);
+      TableConfig realtimeTableConfig = JsonUtils.jsonNodeToObject(realtimeTableConfigNode, TableConfig.class);
+      if (realtimeTableConfig.getUpsertConfig() != null) {
+        return new CopyTableResponse("fail", "upsert table copy not supported");
+      }
+      LOGGER.info("[copyTable] Successfully fetched and tweaked table config for table: {}", tableName);
+
+      String watermarkUrl = urlBuilder.getBaseUrl() + "/tables/" + tableName + "/consumerWatermarks";
+      URI watermarkUri = new URI(watermarkUrl);
+      SimpleHttpResponse watermarkResponse = HttpClient.wrapAndThrowHttpException(
+          HttpClient.getInstance().sendGetRequest(watermarkUri, requestHeaders));
+      String watermarkJson = watermarkResponse.getResponse();
+      LOGGER.info("[copyTable] Fetched watermarks for table: {}. Result: {}", tableName, watermarkJson);
+      WatermarkInductionResult watermarkInductionResult =
+          JsonUtils.stringToObject(watermarkJson, WatermarkInductionResult.class);
+
+      List<PartitionGroupInfo> partitionGroupInfos = watermarkInductionResult.getWatermarks().stream()
+          .map(PartitionGroupInfo::from)
+          .collect(Collectors.toList());
+
+      _pinotHelixResourceManager.addSchema(schema, true, false);
+      LOGGER.info("[copyTable] Successfully added schema for table: {}", tableName);
+      // Add the table with designated starting kafka offset and segment sequence number to create consuming segments
+      _pinotHelixResourceManager.addTable(realtimeTableConfig, partitionGroupInfos);
+      LOGGER.info("[copyTable] Successfully added table config: {} with designated high watermark", tableName);
+      // hybrid table
+      if (hasOffline) {
+        return new CopyTableResponse("warn", "detect offline too; it will only copy real-time segments");
+      }
+      return new CopyTableResponse("success", "");
     } catch (Exception e) {
       LOGGER.error("[copyTable] Error copying table: {}", tableName, e);
       throw new ControllerApplicationException(LOGGER, "Error copying table: " + e.getMessage(),
@@ -369,14 +371,14 @@ public class PinotTableRestletResource {
    * optionally replace the pool tags in the instance assignment config.
    *
    * @param realtimeTableConfigNode The JSON object representing the realtime table config.
-   * @param brokerTenant The broker tenant to set in the config.
-   * @param serverTenant The server tenant to set in the config.
-   * @param tagPoolReplacementMap A map from source pool tag to destination pool tag.
+   * @param copyTablePayload The payload containing tenant and tag pool replacement information.
    */
   @VisibleForTesting
-  static void tweakRealtimeTableConfig(ObjectNode realtimeTableConfigNode, String brokerTenant, String serverTenant,
-      @Nullable Map<String, String> tagPoolReplacementMap) {
-    // TenantConfig is a mandatory field. Thus skip the null check.
+  static void tweakRealtimeTableConfig(ObjectNode realtimeTableConfigNode, CopyTablePayload copyTablePayload) {
+    String brokerTenant = copyTablePayload.getBrokerTenant();
+    String serverTenant = copyTablePayload.getServerTenant();
+    Map<String, String> tagPoolReplacementMap = copyTablePayload.getTagPoolReplacementMap();
+
     ObjectNode tenantConfig = (ObjectNode) realtimeTableConfigNode.get("tenants");
     tenantConfig.put("broker", brokerTenant);
     tenantConfig.put("server", serverTenant);
@@ -391,9 +393,7 @@ public class PinotTableRestletResource {
     while (iterator.hasNext()) {
       Map.Entry<String, JsonNode> entry = iterator.next();
       JsonNode instanceAssignmentConfig = entry.getValue();
-      // TagPoolConfig is a mandatory field. Thus skip the null check.
       ObjectNode tagPoolConfig = (ObjectNode) instanceAssignmentConfig.get("tagPoolConfig");
-      // Tag is a mandatory field. Thus skip the null check.
       String srcTag = tagPoolConfig.get("tag").asText();
       if (tagPoolReplacementMap.containsKey(srcTag)) {
         tagPoolConfig.put("tag", tagPoolReplacementMap.get(srcTag));

@@ -1747,7 +1747,7 @@ public class PinotHelixResourceManager {
     String tableNameWithType = tableConfig.getTableName();
     LOGGER.info("Adding table {}: Start", tableNameWithType);
     if (consumeMeta != null && !consumeMeta.isEmpty()) {
-      LOGGER.info("[copyTable] Adding table {} with {} partition group infos", tableNameWithType, consumeMeta.size());
+      LOGGER.info("Adding table {} with {} partition group infos", tableNameWithType, consumeMeta.size());
     }
 
     if (getTableConfig(tableNameWithType) != null) {
@@ -4766,7 +4766,7 @@ public class PinotHelixResourceManager {
     List<PartitionGroupConsumptionStatus> lst = _pinotLLCRealtimeSegmentManager
         .getPartitionGroupConsumptionStatusList(idealState, streamConfigs);
     List<WatermarkInductionResult.Watermark> watermarks = lst.stream().map(status -> {
-      long seq = status.getSequenceNumber();
+      int seq = status.getSequenceNumber();
       long startOffset;
       try {
         if ("DONE".equalsIgnoreCase(status.getStatus())) {
