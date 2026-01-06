@@ -330,6 +330,14 @@ public class PinotTableRestletResource {
       LOGGER.info("[copyTable] Fetched table config for table: {}", tableName);
       JsonNode tableConfigNode = JsonUtils.stringToJsonNode(tableConfigJson);
 
+      URI watermarkUri = new URI(urlBuilder.forConsumerWatermarksGet(tableName));
+      SimpleHttpResponse watermarkResponse = HttpClient.wrapAndThrowHttpException(
+          HttpClient.getInstance().sendGetRequest(watermarkUri, requestHeaders));
+      String watermarkJson = watermarkResponse.getResponse();
+      LOGGER.info("[copyTable] Fetched watermarks for table: {}. Result: {}", tableName, watermarkJson);
+      WatermarkInductionResult watermarkInductionResult =
+          JsonUtils.stringToObject(watermarkJson, WatermarkInductionResult.class);
+
       boolean hasOffline = tableConfigNode.has(TableType.OFFLINE.name());
       boolean hasRealtime = tableConfigNode.has(TableType.REALTIME.name());
       if (hasOffline && !hasRealtime) {
@@ -344,13 +352,11 @@ public class PinotTableRestletResource {
       }
       LOGGER.info("[copyTable] Successfully fetched and tweaked table config for table: {}", tableName);
 
-      URI watermarkUri = new URI(urlBuilder.forConsumerWatermarksGet(tableName));
-      SimpleHttpResponse watermarkResponse = HttpClient.wrapAndThrowHttpException(
-          HttpClient.getInstance().sendGetRequest(watermarkUri, requestHeaders));
-      String watermarkJson = watermarkResponse.getResponse();
-      LOGGER.info("[copyTable] Fetched watermarks for table: {}. Result: {}", tableName, watermarkJson);
-      WatermarkInductionResult watermarkInductionResult =
-          JsonUtils.stringToObject(watermarkJson, WatermarkInductionResult.class);
+      if (copyTablePayload.isDryRun()) {
+        return new CopyTableResponse("dryrun",
+            "Dry run successful. Fetched schema, table config and watermarks from source cluster.", schema,
+            realtimeTableConfig, watermarkInductionResult);
+      }
 
       List<PartitionGroupInfo> partitionGroupInfos = watermarkInductionResult.getWatermarks().stream()
           .map(PartitionGroupInfo::from)

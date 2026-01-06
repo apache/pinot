@@ -48,6 +48,7 @@ public class CopyTablePayload {
   private Map<String, String> _tagPoolReplacementMap;
 
   private boolean _verbose = false;
+  private boolean _dryRun = true;
 
   @JsonCreator
   public CopyTablePayload(
@@ -56,7 +57,7 @@ public class CopyTablePayload {
       @JsonProperty(value = "brokerTenant", required = true) String brokerTenant,
       @JsonProperty(value = "serverTenant", required = true) String serverTenant,
       @JsonProperty("tagPoolReplacementMap") @Nullable Map<String, String> tagPoolReplacementMap,
-      @JsonProperty("verbose") @Nullable Boolean verbose) {
+      @JsonProperty("verbose") @Nullable Boolean verbose, @JsonProperty("dryRun") @Nullable Boolean dryRun) {
     _sourceClusterUri = sourceClusterUri;
     _headers = headers;
     _brokerTenant = brokerTenant;
@@ -64,6 +65,9 @@ public class CopyTablePayload {
     _tagPoolReplacementMap = tagPoolReplacementMap;
     if (verbose != null) {
       _verbose = verbose;
+    }
+    if (dryRun != null) {
+      _dryRun = dryRun;
     }
   }
 
@@ -95,5 +99,10 @@ public class CopyTablePayload {
   @JsonGetter("verbose")
   public boolean isVerbose() {
     return _verbose;
+  }
+
+  @JsonGetter("dryRun")
+  public boolean isDryRun() {
+    return _dryRun;
   }
 }
