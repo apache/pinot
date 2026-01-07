@@ -375,7 +375,7 @@ public class UpsertCompactMergeTaskGeneratorTest {
 
     SegmentSelectionResult result = UpsertCompactMergeTaskGenerator.processValidDocIdsMetadata(
         RAW_TABLE_NAME + "_REALTIME", taskConfigs, candidateSegmentsMap,
-        validDocIdsMetadata, alreadyMergedSegments);
+        validDocIdsMetadata, alreadyMergedSegments, null);
 
     Assert.assertNotNull(result);
     Assert.assertNotNull(result.getSegmentsForCompactMergeByPartition());
@@ -413,7 +413,7 @@ public class UpsertCompactMergeTaskGeneratorTest {
 
     SegmentSelectionResult result = UpsertCompactMergeTaskGenerator.processValidDocIdsMetadata(
         RAW_TABLE_NAME + "_REALTIME", taskConfigs, candidateSegmentsMap,
-        validDocIdsMetadata, alreadyMergedSegments);
+        validDocIdsMetadata, alreadyMergedSegments, null);
 
     Assert.assertNotNull(result);
     Assert.assertEquals(result.getSegmentsForDeletion().size(), 1, "Should have one segment for deletion");
