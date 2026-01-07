@@ -556,22 +556,19 @@ public class QueryDispatcher {
   }
 
   /**
-   * Resets the DispatchClient for a server, clearing stale gRPC channel state and creating a fresh connection.
-   * Call this when a server is re-enabled to bypass gRPC's exponential backoff on reconnection which will cause
-   * requests to fast fail.
+   * Reset the connection backoff for a server. When the GRPC channel enters a TRANSIENT_FAILURE state from
+   * connection failures, it will fast fail requests and reconnect with exponential backoff. This method
+   * resets the backoff so servers that have recovered can be reconnected to immediately.
    */
-  public void resetDispatchClient(ServerInstance serverInstance) {
+  public void resetClientConnectionBackoff(ServerInstance serverInstance) {
     String hostname = serverInstance.getHostname();
     int port = serverInstance.getQueryServicePort();
     String hostnamePort = String.format("%s_%d", hostname, port);
-    _dispatchClientMap.compute(hostnamePort, (key, oldClient) -> {
-      LOGGER.info("Resetting DispatchClient for server: {}", serverInstance.getInstanceId());
-      if (oldClient != null) {
-        LOGGER.info("Shutting down old channel for server: {}", serverInstance.getInstanceId());
-        oldClient.getChannel().shutdown();
-      }
-      return new DispatchClient(hostname, port, _tlsConfig);
-    });
+    DispatchClient dispatchClient = _dispatchClientMap.get(hostnamePort);
+    if (dispatchClient != null) {
+      LOGGER.info("Resetting connection backoff for server: {}", serverInstance.getInstanceId());
+      dispatchClient.getChannel().resetConnectBackoff();
+    }
   }
 
   private TimeSeriesDispatchClient getOrCreateTimeSeriesDispatchClient(

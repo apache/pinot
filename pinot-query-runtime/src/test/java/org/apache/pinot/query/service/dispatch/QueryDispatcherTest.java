@@ -30,7 +30,6 @@ import java.util.concurrent.TimeoutException;
 import java.util.concurrent.atomic.AtomicLong;
 import org.apache.pinot.common.failuredetector.FailureDetector;
 import org.apache.pinot.common.proto.Worker;
-import org.apache.pinot.core.transport.ServerInstance;
 import org.apache.pinot.query.QueryEnvironment;
 import org.apache.pinot.query.QueryEnvironmentTestBase;
 import org.apache.pinot.query.QueryTestSet;
@@ -219,35 +218,5 @@ public class QueryDispatcherTest extends QueryTestSet {
     try (QueryThreadContext ignore = QueryThreadContext.openForMseTest()) {
       _queryDispatcher.submit(REQUEST_ID_GEN.getAndIncrement(), dispatchableSubPlan, 0L, new HashSet<>(), Map.of());
     }
-  }
-
-  @Test
-  public void testResetDispatchClientCreatesClientForUnknownServer() {
-    ServerInstance serverInstance = Mockito.mock(ServerInstance.class);
-    Mockito.when(serverInstance.getHostname()).thenReturn("unknown-host");
-    Mockito.when(serverInstance.getQueryServicePort()).thenReturn(12345);
-    Mockito.when(serverInstance.getInstanceId()).thenReturn("Server_unknown-host_12345");
-    _queryDispatcher.resetDispatchClient(serverInstance);
-    FailureDetector.ServerState state = _queryDispatcher.checkConnectivityToInstance(serverInstance);
-    Assert.assertNotEquals(state, FailureDetector.ServerState.UNKNOWN,
-        "resetDispatchClient should create a client, so checkConnectivity should not return UNKNOWN");
-  }
-
-  @Test
-  public void testResetDispatchClientReplacesExistingClient() {
-    ServerInstance serverInstance = Mockito.mock(ServerInstance.class);
-    Mockito.when(serverInstance.getHostname()).thenReturn("existing-host");
-    Mockito.when(serverInstance.getQueryServicePort()).thenReturn(54321);
-    Mockito.when(serverInstance.getInstanceId()).thenReturn("Server_existing-host_54321");
-
-    // Create initial client
-    _queryDispatcher.resetDispatchClient(serverInstance);
-    FailureDetector.ServerState state1 = _queryDispatcher.checkConnectivityToInstance(serverInstance);
-    Assert.assertNotEquals(state1, FailureDetector.ServerState.UNKNOWN);
-
-    // Reset should replace the client
-    _queryDispatcher.resetDispatchClient(serverInstance);
-    FailureDetector.ServerState state2 = _queryDispatcher.checkConnectivityToInstance(serverInstance);
-    Assert.assertNotEquals(state2, FailureDetector.ServerState.UNKNOWN);
   }
 }

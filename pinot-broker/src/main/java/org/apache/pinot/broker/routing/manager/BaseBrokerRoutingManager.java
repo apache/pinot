@@ -398,9 +398,8 @@ public abstract class BaseBrokerRoutingManager implements RoutingManager, Cluste
             // NOTE: Remove new enabled server from excluded servers because the server is likely being restarted
             if (_excludedServers.remove(instanceId)) {
               LOGGER.info("Got excluded server: {} re-enabled, including it into the routing", instanceId);
-              // Reset gRPC channel when a previously-excluded server restarts. Helix detects the restart via ZK
-              // before the FailureDetector marks the server healthy, so resetting here allows multi-stage queries
-              // to reconnect immediately without waiting for gRPC backoff delays.
+              // We clear any GRPC channel reconnection backoff in this callback when a server is re-enabled. Otherwise,
+              // MSE queries to this server may fail fast until the next backoff retry succeeds.
               if (_serverReenableCallback != null) {
                 LOGGER.info("Calling server re-enable callback for server: {}", instanceId);
                 _serverReenableCallback.accept(serverInstance);

@@ -421,12 +421,9 @@ public abstract class BaseBrokerStarter implements ServiceStartable {
           new MultiStageBrokerRequestHandler(_brokerConf, brokerId, requestIdGenerator, _routingManager,
               _accessControlFactory, _queryQuotaManager, _tableCache, _multiStageQueryThrottler, _failureDetector,
               _threadAccountant, multiClusterRoutingContext);
-      // Register a callback to reset gRPC channels when a server is re-enabled. This forces an immediate reconnect by
-      // bypassing the gRPC channel’s exponential backoff, which can otherwise cause requests to fail fast. Without
-      // this, requests may continue failing until the next backoff retry succeeds.
       MultiStageBrokerRequestHandler finalHandler = multiStageBrokerRequestHandler;
       _routingManager.setServerReenableCallback(
-          serverInstance -> finalHandler.getQueryDispatcher().resetDispatchClient(serverInstance));
+          serverInstance -> finalHandler.getQueryDispatcher().resetClientConnectionBackoff(serverInstance));
     }
     TimeSeriesRequestHandler timeSeriesRequestHandler = null;
     if (StringUtils.isNotBlank(_brokerConf.getProperty(PinotTimeSeriesConfiguration.getEnabledLanguagesConfigKey()))) {
