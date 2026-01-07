@@ -288,8 +288,8 @@ public class BrokerMeter implements AbstractMetrics.Meter {
   /**
    * SLA-style per-query error classification metrics.
    */
-  public static final BrokerMeter QUERY_SYSTEM_ERROR = create("QUERY_SYSTEM_ERROR", "queries", true);
-  public static final BrokerMeter QUERY_USER_ERROR = create("QUERY_USER_ERROR", "queries", true);
+  public static final BrokerMeter QUERY_CRITICAL_ERROR = create("QUERY_CRITICAL_ERROR", "queries", true);
+  public static final BrokerMeter QUERY_NON_CRITICAL_ERROR = create("QUERY_NON_CRITICAL_ERROR", "queries", true);
 
   private static final Map<QueryErrorCode, BrokerMeter> QUERY_ERROR_CODE_METER_MAP;
 

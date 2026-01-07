@@ -22,7 +22,6 @@ import com.fasterxml.jackson.annotation.JsonIgnore;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 import java.io.IOException;
 import java.io.OutputStream;
-import java.util.EnumSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -42,21 +41,6 @@ import org.slf4j.LoggerFactory;
  */
 public interface BrokerResponse {
   static final Logger LOGGER = LoggerFactory.getLogger(BrokerResponse.class);
-  static final EnumSet<QueryErrorCode> SYSTEM_ERROR_CODES = EnumSet.of(
-      QueryErrorCode.SQL_RUNTIME,
-      QueryErrorCode.INTERNAL,
-      QueryErrorCode.QUERY_SCHEDULING_TIMEOUT,
-      QueryErrorCode.EXECUTION_TIMEOUT,
-      QueryErrorCode.BROKER_TIMEOUT,
-      QueryErrorCode.SERVER_SEGMENT_MISSING,
-      QueryErrorCode.BROKER_SEGMENT_UNAVAILABLE,
-      QueryErrorCode.SERVER_NOT_RESPONDING,
-      QueryErrorCode.BROKER_REQUEST_SEND,
-      QueryErrorCode.MERGE_RESPONSE,
-      QueryErrorCode.QUERY_CANCELLATION,
-      QueryErrorCode.SERVER_SHUTTING_DOWN,
-      QueryErrorCode.QUERY_PLANNING
-  );
   /**
    * Convert the broker response to JSON String.
    */
@@ -92,8 +76,8 @@ public interface BrokerResponse {
    * This method ensures we emit metrics for all queries that have exceptions with a one-to-one mapping.
    */
   default void emitBrokerResponseMetrics(BrokerMetrics brokerMetrics) {
-    boolean isSystemError = false;
-    boolean isUserError = false;
+    boolean hasCriticalError = false;
+    boolean hasNonCriticalError = false;
     for (QueryProcessingException exception : this.getExceptions()) {
       QueryErrorCode queryErrorCode;
       try {
@@ -103,18 +87,18 @@ public interface BrokerResponse {
         queryErrorCode = QueryErrorCode.UNKNOWN;
       }
       brokerMetrics.addMeteredGlobalValue(BrokerMeter.getQueryErrorMeter(queryErrorCode), 1);
-      if (SYSTEM_ERROR_CODES.contains(queryErrorCode)) {
-        isSystemError = true;
+      if (queryErrorCode.isCriticalError()) {
+        hasCriticalError = true;
       } else {
-        isUserError = true;
+        hasNonCriticalError = true;
       }
     }
-
-    if (isSystemError) {
-      brokerMetrics.addMeteredGlobalValue(BrokerMeter.QUERY_SYSTEM_ERROR, 1);
+    // Emit exactly one SLA-style metric per query if there are any exceptions
+    if (hasCriticalError) {
+      brokerMetrics.addMeteredGlobalValue(BrokerMeter.QUERY_CRITICAL_ERROR, 1);
     }
-    if (isUserError) {
-      brokerMetrics.addMeteredGlobalValue(BrokerMeter.QUERY_USER_ERROR, 1);
+    if (hasNonCriticalError) {
+      brokerMetrics.addMeteredGlobalValue(BrokerMeter.QUERY_NON_CRITICAL_ERROR, 1);
     }
   }
 
