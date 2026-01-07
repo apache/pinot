@@ -112,7 +112,6 @@ import org.apache.pinot.spi.accounting.ThreadAccountant;
 import org.apache.pinot.spi.accounting.ThreadAccountantUtils;
 import org.apache.pinot.spi.accounting.ThreadResourceUsageProvider;
 import org.apache.pinot.spi.accounting.WorkloadBudgetManager;
-import org.apache.pinot.spi.config.instance.InstanceConfigProvider;
 import org.apache.pinot.spi.config.provider.PinotClusterConfigChangeListener;
 import org.apache.pinot.spi.crypt.PinotCrypterFactory;
 import org.apache.pinot.spi.env.PinotConfiguration;
@@ -288,7 +287,6 @@ public abstract class BaseServerStarter implements ServiceStartable {
         HelixManagerFactory.getZKHelixManager(_helixClusterName, _instanceId, InstanceType.PARTICIPANT, _zkAddress);
 
     _clusterConfigChangeHandler.registerClusterConfigChangeListener(ContinuousJfrStarter.INSTANCE);
-    InstanceConfigProvider.setInstanceConfig(_serverConf);
   }
 
   /// Can be overridden to apply custom configs to the server conf.
