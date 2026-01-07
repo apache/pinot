@@ -19,6 +19,7 @@
 package org.apache.pinot.spi.exception;
 
 import java.util.EnumMap;
+import java.util.EnumSet;
 import java.util.Map;
 import javax.annotation.Nonnegative;
 import javax.ws.rs.core.Response;
@@ -67,6 +68,23 @@ public enum QueryErrorCode {
   private static final Logger LOGGER = LoggerFactory.getLogger(QueryErrorCode.class);
 
   private static final QueryErrorCode[] BY_ID;
+
+  // Static set of SLA-critical (system) error codes
+  private static final EnumSet<QueryErrorCode> CRITICAL_ERROR_CODES = EnumSet.of(
+      SQL_RUNTIME,
+      INTERNAL,
+      QUERY_SCHEDULING_TIMEOUT,
+      EXECUTION_TIMEOUT,
+      BROKER_TIMEOUT,
+      SERVER_SEGMENT_MISSING,
+      BROKER_SEGMENT_UNAVAILABLE,
+      SERVER_NOT_RESPONDING,
+      BROKER_REQUEST_SEND,
+      MERGE_RESPONSE,
+      QUERY_CANCELLATION,
+      SERVER_SHUTTING_DOWN,
+      QUERY_PLANNING
+  );
 
   static {
     int maxId = -1;
@@ -172,5 +190,13 @@ public enum QueryErrorCode {
       default:
         return false;
     }
+  }
+
+  /**
+   * Returns true if the error is considered critical for SLA accounting.
+   * Critical errors represent system-side failures (timeouts, internal errors, infra issues, etc.).
+   */
+  public boolean isCriticalError() {
+    return CRITICAL_ERROR_CODES.contains(this);
   }
 }

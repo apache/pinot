@@ -285,6 +285,12 @@ public class BrokerMeter implements AbstractMetrics.Meter {
    */
   public static final BrokerMeter QUERY_RESPONSE_SIZE_BYTES = create("QUERY_RESPONSE_SIZE_BYTES", "bytes", true);
 
+  /**
+   * SLA-style per-query error classification metrics.
+   */
+  public static final BrokerMeter QUERY_CRITICAL_ERROR = create("QUERY_CRITICAL_ERROR", "queries", true);
+  public static final BrokerMeter QUERY_NON_CRITICAL_ERROR = create("QUERY_NON_CRITICAL_ERROR", "queries", true);
+
   private static final Map<QueryErrorCode, BrokerMeter> QUERY_ERROR_CODE_METER_MAP;
 
   // Iterate through all query error codes from QueryErrorCode.getAllValues() and create a metric for each
