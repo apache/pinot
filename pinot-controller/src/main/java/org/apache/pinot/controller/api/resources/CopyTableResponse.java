@@ -19,13 +19,13 @@
 
 package org.apache.pinot.controller.api.resources;
 
+import com.fasterxml.jackson.annotation.JsonCreator;
 import com.fasterxml.jackson.annotation.JsonInclude;
 import com.fasterxml.jackson.annotation.JsonProperty;
+import javax.annotation.Nullable;
 import org.apache.pinot.controller.helix.core.WatermarkInductionResult;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.data.Schema;
-
-import javax.annotation.Nullable;
 
 @JsonInclude(JsonInclude.Include.NON_NULL)
 public class CopyTableResponse {

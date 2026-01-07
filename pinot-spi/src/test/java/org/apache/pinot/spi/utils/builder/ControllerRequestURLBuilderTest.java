@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.spi.utils.builder;
 
+import org.apache.pinot.spi.utils.StringUtil;
 import org.testng.annotations.Test;
 
 import static org.testng.Assert.assertEquals;
