@@ -393,7 +393,6 @@ public class PinotLLCRealtimeSegmentManager {
     Preconditions.checkState(!_isStopping, "Segment manager is stopping");
 
     String realtimeTableName = tableConfig.getTableName();
-    LOGGER.info("Setting up new LLC table: {}", realtimeTableName);
     LOGGER.info("[copyTable] Setting up new LLC table: {}", realtimeTableName);
 
     List<StreamConfig> streamConfigs = IngestionConfigUtils.getStreamConfigs(tableConfig);
