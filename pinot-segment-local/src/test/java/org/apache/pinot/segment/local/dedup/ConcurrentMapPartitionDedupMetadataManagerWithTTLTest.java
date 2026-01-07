@@ -457,4 +457,82 @@ public class ConcurrentMapPartitionDedupMetadataManagerWithTTLTest {
     // do not throw when stopped
     metadataManager.addSegment(segment);
   }
+
+  @Test
+  public void testRealtimeTTLCleanup()
+      throws IOException, InterruptedException {
+    verifyRealtimeTTLCleanup(HashFunction.NONE);
+    verifyRealtimeTTLCleanup(HashFunction.MD5);
+    verifyRealtimeTTLCleanup(HashFunction.MURMUR3);
+  }
+
+  private void verifyRealtimeTTLCleanup(HashFunction hashFunction)
+      throws IOException, InterruptedException {
+    // Set cleanup interval to 1 second for testing
+    _dedupContextBuilder.setHashFunction(hashFunction).setRealtimeTTLCleanupIntervalSeconds(1);
+    ConcurrentMapPartitionDedupMetadataManager metadataManager =
+        new ConcurrentMapPartitionDedupMetadataManager(DedupTestUtils.REALTIME_TABLE_NAME, 0,
+            _dedupContextBuilder.build());
+
+    // Start the realtime cleanup thread
+    metadataManager.start();
+
+    // Add 20 keys with different timestamps
+    IndexSegment segment = Mockito.mock(IndexSegment.class);
+    for (int i = 0; i < 20; i++) {
+      double time = i * 1000;
+      Object primaryKeyKey = HashUtils.hashPrimaryKey(DedupTestUtils.getPrimaryKey(i), hashFunction);
+      metadataManager._primaryKeyToSegmentAndTimeMap.computeIfAbsent(primaryKeyKey, k -> Pair.of(segment, time));
+    }
+    metadataManager._largestSeenTime.set(19000);
+    assertEquals(metadataManager._primaryKeyToSegmentAndTimeMap.size(), 20);
+
+    // Wait for background cleanup to run (should happen within 1-2 seconds)
+    Thread.sleep(2500);
+
+    // Verify that expired keys have been removed
+    // With largestSeenTime=19000 and TTL=10000, keys with time < 9000 should be removed
+    // That means keys 0-8 (9 keys) should be removed, leaving 11 keys
+    assertTrue(metadataManager.getNumPrimaryKeys() <= 11,
+        "Expected at most 11 keys after background cleanup, but got " + metadataManager.getNumPrimaryKeys());
+
+    // Verify remaining keys are within TTL
+    verifyInMemoryState(metadataManager, 9, 11, segment, hashFunction);
+
+    metadataManager.stop();
+    metadataManager.close();
+  }
+
+  @Test
+  public void testRealtimeTTLCleanupDisabled()
+      throws IOException, InterruptedException {
+    // Set cleanup interval to 0 to disable realtime cleanup
+    _dedupContextBuilder.setHashFunction(HashFunction.NONE).setRealtimeTTLCleanupIntervalSeconds(0);
+    ConcurrentMapPartitionDedupMetadataManager metadataManager =
+        new ConcurrentMapPartitionDedupMetadataManager(DedupTestUtils.REALTIME_TABLE_NAME, 0,
+            _dedupContextBuilder.build());
+
+    // Start the realtime cleanup thread (should be a no-op)
+    metadataManager.start();
+
+    // Add 20 keys with different timestamps
+    IndexSegment segment = Mockito.mock(IndexSegment.class);
+    for (int i = 0; i < 20; i++) {
+      double time = i * 1000;
+      Object primaryKeyKey = HashUtils.hashPrimaryKey(DedupTestUtils.getPrimaryKey(i), HashFunction.NONE);
+      metadataManager._primaryKeyToSegmentAndTimeMap.computeIfAbsent(primaryKeyKey, k -> Pair.of(segment, time));
+    }
+    metadataManager._largestSeenTime.set(19000);
+    assertEquals(metadataManager._primaryKeyToSegmentAndTimeMap.size(), 20);
+
+    // Wait to ensure no cleanup happens in the background
+    Thread.sleep(2000);
+
+    // Verify that NO keys have been removed (cleanup is disabled)
+    assertEquals(metadataManager.getNumPrimaryKeys(), 20,
+        "Expected all 20 keys to remain when realtime cleanup is disabled");
+
+    metadataManager.stop();
+    metadataManager.close();
+  }
 }
