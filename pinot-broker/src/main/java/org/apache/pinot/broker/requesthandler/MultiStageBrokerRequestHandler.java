@@ -837,4 +837,8 @@ public class MultiStageBrokerRequestHandler extends BaseBrokerRequestHandler {
         return false;
     }
   }
+
+  public QueryDispatcher getQueryDispatcher() {
+    return _queryDispatcher;
+  }
 }

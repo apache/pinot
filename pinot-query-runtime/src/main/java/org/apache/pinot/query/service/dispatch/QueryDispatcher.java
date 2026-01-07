@@ -555,6 +555,25 @@ public class QueryDispatcher {
     return _dispatchClientMap.computeIfAbsent(hostnamePort, k -> new DispatchClient(hostname, port, _tlsConfig));
   }
 
+  /**
+   * Resets the DispatchClient for a server, clearing stale gRPC channel state and creating a fresh connection.
+   * Call this when a server is re-enabled to bypass gRPC's exponential backoff on reconnection which will cause
+   * requests to fast fail.
+   */
+  public void resetDispatchClient(ServerInstance serverInstance) {
+    String hostname = serverInstance.getHostname();
+    int port = serverInstance.getQueryServicePort();
+    String hostnamePort = String.format("%s_%d", hostname, port);
+    _dispatchClientMap.compute(hostnamePort, (key, oldClient) -> {
+      LOGGER.info("Resetting DispatchClient for server: {}", serverInstance.getInstanceId());
+      if (oldClient != null) {
+        LOGGER.info("Shutting down old channel for server: {}", serverInstance.getInstanceId());
+        oldClient.getChannel().shutdown();
+      }
+      return new DispatchClient(hostname, port, _tlsConfig);
+    });
+  }
+
   private TimeSeriesDispatchClient getOrCreateTimeSeriesDispatchClient(
       TimeSeriesQueryServerInstance queryServerInstance) {
     String hostname = queryServerInstance.getHostname();
