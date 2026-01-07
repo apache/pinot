@@ -19,5 +19,5 @@
 package org.apache.pinot.spi.config.user;
 
 public enum ComponentType {
-    CONTROLLER, BROKER, SERVER, MINION, PROXY
+  CONTROLLER, BROKER, SERVER, MINION, PROXY
 }
