@@ -81,7 +81,9 @@ public enum ControllerMeter implements AbstractMetrics.Meter {
   // Audit logging metrics
   AUDIT_REQUEST_FAILURES("failures", true),
   AUDIT_RESPONSE_FAILURES("failures", true),
-  AUDIT_REQUEST_PAYLOAD_TRUNCATED("count", true);
+  AUDIT_REQUEST_PAYLOAD_TRUNCATED("count", true),
+  // Upsert compact merge task metrics
+  UPSERT_COMPACT_MERGE_SEGMENT_SKIPPED_CONSENSUS_FAILURE("UpsertCompactMergeSegmentsSkipped", false);
 
   private final String _brokerMeterName;
   private final String _unit;

@@ -34,16 +34,18 @@ import org.apache.commons.lang3.StringUtils;
 import org.apache.helix.task.TaskState;
 import org.apache.pinot.common.exception.InvalidConfigException;
 import org.apache.pinot.common.metadata.segment.SegmentZKMetadata;
+import org.apache.pinot.common.metrics.ControllerMeter;
+import org.apache.pinot.common.metrics.ControllerMetrics;
 import org.apache.pinot.common.restlet.resources.ValidDocIdsMetadataInfo;
 import org.apache.pinot.common.restlet.resources.ValidDocIdsType;
 import org.apache.pinot.common.utils.SegmentUtils;
-import org.apache.pinot.common.utils.ServiceStatus;
 import org.apache.pinot.controller.helix.core.PinotHelixResourceManager;
 import org.apache.pinot.controller.helix.core.minion.generator.BaseTaskGenerator;
 import org.apache.pinot.controller.helix.core.minion.generator.TaskGeneratorUtils;
 import org.apache.pinot.controller.util.ServerSegmentMetadataReader;
 import org.apache.pinot.core.common.MinionConstants;
 import org.apache.pinot.core.minion.PinotTaskConfig;
+import org.apache.pinot.plugin.minion.tasks.MinionTaskUtils;
 import org.apache.pinot.spi.annotations.minion.TaskGenerator;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.TableType;
@@ -187,7 +189,7 @@ public class UpsertCompactMergeTaskGenerator extends BaseTaskGenerator {
 
       SegmentSelectionResult segmentSelectionResult =
           processValidDocIdsMetadata(tableNameWithType, taskConfigs, candidateSegmentsMap, validDocIdsMetadataList,
-              alreadyMergedSegments);
+              alreadyMergedSegments, _clusterInfoAccessor.getControllerMetrics());
 
       if (!segmentSelectionResult.getSegmentsForDeletion().isEmpty()) {
         pinotHelixResourceManager.deleteSegments(tableNameWithType, segmentSelectionResult.getSegmentsForDeletion(),
@@ -240,10 +242,17 @@ public class UpsertCompactMergeTaskGenerator extends BaseTaskGenerator {
     return pinotTaskConfigs;
   }
 
+  /**
+   * Processes validDocIds metadata to determine segments eligible for deletion or compaction.
+   * Evaluates segments based on valid/invalid document counts, server readiness, and CRC consistency.
+   * Requires consensus across all replicas on validDoc counts before proceeding with any operations.
+   * Marks segments with zero valid documents for deletion and groups others by partition for compaction.
+   */
   @VisibleForTesting
   public static SegmentSelectionResult processValidDocIdsMetadata(String tableNameWithType,
       Map<String, String> taskConfigs, Map<String, SegmentZKMetadata> candidateSegmentsMap,
-      Map<String, List<ValidDocIdsMetadataInfo>> validDocIdsMetadataInfoMap, Set<String> alreadyMergedSegments) {
+      Map<String, List<ValidDocIdsMetadataInfo>> validDocIdsMetadataInfoMap, Set<String> alreadyMergedSegments,
+      ControllerMetrics controllerMetrics) {
     Map<Integer, List<SegmentMergerMetadata>> segmentsEligibleForCompactMerge = new HashMap<>();
     Set<String> segmentsForDeletion = new HashSet<>();
 
@@ -286,7 +295,23 @@ public class UpsertCompactMergeTaskGenerator extends BaseTaskGenerator {
         continue;
       }
       SegmentZKMetadata segment = candidateSegmentsMap.get(segmentName);
-      for (ValidDocIdsMetadataInfo validDocIdsMetadata : validDocIdsMetadataInfoMap.get(segmentName)) {
+      List<ValidDocIdsMetadataInfo> replicaMetadataList = validDocIdsMetadataInfoMap.get(segmentName);
+
+      // Check consensus across all replicas before proceeding with any operations
+      if (!MinionTaskUtils.hasValidDocConsensus(segmentName, replicaMetadataList)) {
+        LOGGER.info("Skipping segment {} for table {} - no consensus on validDoc counts across replicas",
+            segmentName, tableNameWithType);
+
+        // Emit metric to track segments skipped due to consensus failure
+        if (controllerMetrics != null) {
+          controllerMetrics.addMeteredTableValue(tableNameWithType,
+              ControllerMeter.UPSERT_COMPACT_MERGE_SEGMENT_SKIPPED_CONSENSUS_FAILURE, 1L);
+        }
+        continue;
+      }
+
+      // Process with existing logic using the first replica with matching CRC (since all have consensus)
+      for (ValidDocIdsMetadataInfo validDocIdsMetadata : replicaMetadataList) {
         long totalInvalidDocs = validDocIdsMetadata.getTotalInvalidDocs();
         long totalValidDocs = validDocIdsMetadata.getTotalValidDocs();
         long segmentSizeInBytes = validDocIdsMetadata.getSegmentSizeInBytes();
@@ -295,16 +320,6 @@ public class UpsertCompactMergeTaskGenerator extends BaseTaskGenerator {
         if (segment.getCrc() != Long.parseLong(validDocIdsMetadata.getSegmentCrc())) {
           LOGGER.warn("CRC mismatch for segment: {}, (segmentZKMetadata={}, validDocIdsMetadata={})", segmentName,
               segment.getCrc(), validDocIdsMetadata.getSegmentCrc());
-          continue;
-        }
-
-        // skipping segments for which their servers are not in READY state. The bitmaps would be inconsistent when
-        // server is NOT READY as UPDATING segments might be updating the ONLINE segments
-        if (validDocIdsMetadata.getServerStatus() != null && !validDocIdsMetadata.getServerStatus()
-            .equals(ServiceStatus.Status.GOOD)) {
-          LOGGER.warn("Server {} is in {} state, skipping {} generation for segment: {}",
-              validDocIdsMetadata.getInstanceId(), validDocIdsMetadata.getServerStatus(),
-              MinionConstants.UpsertCompactMergeTask.TASK_TYPE, segmentName);
           continue;
         }
 
