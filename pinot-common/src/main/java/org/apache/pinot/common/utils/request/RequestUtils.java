@@ -51,7 +51,6 @@ import org.apache.pinot.common.request.Identifier;
 import org.apache.pinot.common.request.Literal;
 import org.apache.pinot.common.request.PinotQuery;
 import org.apache.pinot.common.utils.DataSchema.ColumnDataType;
-import org.apache.pinot.spi.config.instance.InstanceConfigProvider;
 import org.apache.pinot.spi.utils.BigDecimalUtils;
 import org.apache.pinot.spi.utils.BytesUtils;
 import org.apache.pinot.spi.utils.CommonConstants;
@@ -70,14 +69,11 @@ public class RequestUtils {
   private static final JsonNode EMPTY_OBJECT_NODE = new ObjectMapper().createObjectNode();
   // This class will only be loaded when a query request comes in, which should only be after the server startup has
   // completed and the global instance config context is initialized.
-  private static boolean _useLegacyLiteralUnescaping =
-      InstanceConfigProvider.getProperty(CommonConstants.Helix.CONFIG_OF_SSE_LEGACY_LITERAL_UNESCAPING,
-          CommonConstants.Helix.DEFAULT_SSE_LEGACY_LITERAL_UNESCAPING);
+  private static boolean _useLegacyLiteralUnescaping = CommonConstants.Helix.DEFAULT_SSE_LEGACY_LITERAL_UNESCAPING;
 
   private RequestUtils() {
   }
 
-  @VisibleForTesting
   public static void setUseLegacyLiteralUnescaping(boolean useLegacyLiteralUnescaping) {
     _useLegacyLiteralUnescaping = useLegacyLiteralUnescaping;
   }
