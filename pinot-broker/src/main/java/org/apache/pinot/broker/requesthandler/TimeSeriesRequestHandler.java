@@ -54,7 +54,7 @@ import org.apache.pinot.common.utils.HumanReadableDuration;
 import org.apache.pinot.core.auth.Actions;
 import org.apache.pinot.core.auth.TargetType;
 import org.apache.pinot.core.routing.MultiClusterRoutingContext;
-import org.apache.pinot.query.service.dispatch.QueryDispatcher;
+import org.apache.pinot.query.service.dispatch.timeseries.TimeSeriesQueryDispatcher;
 import org.apache.pinot.spi.accounting.ThreadAccountant;
 import org.apache.pinot.spi.auth.AuthorizationResult;
 import org.apache.pinot.spi.auth.broker.RequesterIdentity;
@@ -82,20 +82,21 @@ import org.slf4j.LoggerFactory;
 public class TimeSeriesRequestHandler extends BaseBrokerRequestHandler {
   private static final Logger LOGGER = LoggerFactory.getLogger(TimeSeriesRequestHandler.class);
   private static final long DEFAULT_STEP_SECONDS = 60L;
+
   private final TimeSeriesQueryEnvironment _queryEnvironment;
-  private final QueryDispatcher _queryDispatcher;
+  private final TimeSeriesQueryDispatcher _queryDispatcher;
 
   public TimeSeriesRequestHandler(PinotConfiguration config, String brokerId,
       BrokerRequestIdGenerator requestIdGenerator, BrokerRoutingManager routingManager,
       AccessControlFactory accessControlFactory, QueryQuotaManager queryQuotaManager, TableCache tableCache,
-      QueryDispatcher queryDispatcher, ThreadAccountant threadAccountant,
+      ThreadAccountant threadAccountant,
       MultiClusterRoutingContext multiClusterRoutingContext) {
     super(config, brokerId, requestIdGenerator, routingManager, accessControlFactory, queryQuotaManager, tableCache,
         threadAccountant, multiClusterRoutingContext);
+    TimeSeriesBuilderFactoryProvider.init(config);
     _queryEnvironment = new TimeSeriesQueryEnvironment(config, routingManager, tableCache);
     _queryEnvironment.init(config);
-    _queryDispatcher = queryDispatcher;
-    TimeSeriesBuilderFactoryProvider.init(config);
+    _queryDispatcher = new TimeSeriesQueryDispatcher();
   }
 
   @Override
@@ -116,11 +117,13 @@ public class TimeSeriesRequestHandler extends BaseBrokerRequestHandler {
   @Override
   public void start() {
     LOGGER.info("Starting time-series request handler");
+    _queryDispatcher.start();
   }
 
   @Override
   public void shutDown() {
     LOGGER.info("Shutting down time-series request handler");
+    _queryDispatcher.shutdown();
   }
 
   @Override
