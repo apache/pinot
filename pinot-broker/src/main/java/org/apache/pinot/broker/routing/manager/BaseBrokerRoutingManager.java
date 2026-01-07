@@ -398,6 +398,13 @@ public abstract class BaseBrokerRoutingManager implements RoutingManager, Cluste
             // NOTE: Remove new enabled server from excluded servers because the server is likely being restarted
             if (_excludedServers.remove(instanceId)) {
               LOGGER.info("Got excluded server: {} re-enabled, including it into the routing", instanceId);
+              // Reset gRPC channel when a previously-excluded server restarts. Helix detects the restart via ZK
+              // before the FailureDetector marks the server healthy, so resetting here allows multi-stage queries
+              // to reconnect immediately without waiting for gRPC backoff delays.
+              if (_serverReenableCallback != null) {
+                LOGGER.info("Calling server re-enable callback for server: {}", instanceId);
+                _serverReenableCallback.accept(serverInstance);
+              }
             }
           }
         }
@@ -553,11 +560,6 @@ public abstract class BaseBrokerRoutingManager implements RoutingManager, Cluste
     if (!_enabledServerInstanceMap.containsKey(instanceId)) {
       LOGGER.info("Server: {} is not enabled, skipping updating the routing", instanceId);
       return;
-    }
-
-    ServerInstance serverInstance = _enabledServerInstanceMap.get(instanceId);
-    if (_serverReenableCallback != null && serverInstance != null) {
-      _serverReenableCallback.accept(serverInstance);
     }
 
     // Update routing entry for all tables
