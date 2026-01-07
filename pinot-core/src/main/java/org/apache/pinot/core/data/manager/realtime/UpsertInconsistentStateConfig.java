@@ -24,6 +24,7 @@ import java.util.concurrent.atomic.AtomicBoolean;
 import org.apache.pinot.segment.local.utils.TableConfigUtils;
 import org.apache.pinot.spi.config.provider.PinotClusterConfigChangeListener;
 import org.apache.pinot.spi.config.table.TableConfig;
+import org.apache.pinot.spi.utils.CommonConstants.ConfigChangeListenerConstants;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -39,13 +40,8 @@ public class UpsertInconsistentStateConfig implements PinotClusterConfigChangeLi
   private static final Logger LOGGER = LoggerFactory.getLogger(UpsertInconsistentStateConfig.class);
   private static final UpsertInconsistentStateConfig INSTANCE = new UpsertInconsistentStateConfig();
 
-  // Cluster config key to control whether force commit/reload is allowed for upsert tables with inconsistent state
-  public static final String FORCE_COMMIT_RELOAD_CONFIG = "pinot.server.upsert.force.commit.reload";
-
-  // Default: true (force commit/reload is disabled for safety)
-  public static final boolean DEFAULT_FORCE_COMMIT_RELOAD = true;
-
-  private final AtomicBoolean _forceCommitReloadEnabled = new AtomicBoolean(DEFAULT_FORCE_COMMIT_RELOAD);
+  private final AtomicBoolean _forceCommitReloadEnabled =
+      new AtomicBoolean(ConfigChangeListenerConstants.DEFAULT_FORCE_COMMIT_RELOAD);
 
   private UpsertInconsistentStateConfig() {
   }
@@ -56,36 +52,33 @@ public class UpsertInconsistentStateConfig implements PinotClusterConfigChangeLi
 
   /**
    * Checks if force commit/reload is allowed for the given table config.
-   * Returns true if force commit/reload is enabled OR the table does NOT have inconsistent state configs.
    */
   public boolean isForceCommitReloadAllowed(TableConfig tableConfig) {
-    return _forceCommitReloadEnabled.get() || !TableConfigUtils.checkForInconsistentStateConfigs(tableConfig);
+    return (_forceCommitReloadEnabled.get() || !TableConfigUtils.checkForInconsistentStateConfigs(tableConfig));
   }
 
   /**
    * Returns the current config key used for this setting.
    */
   public String getConfigKey() {
-    return FORCE_COMMIT_RELOAD_CONFIG;
+    return ConfigChangeListenerConstants.FORCE_COMMIT_RELOAD_CONFIG;
   }
 
   @Override
   public void onChange(Set<String> changedConfigs, Map<String, String> clusterConfigs) {
-    if (!changedConfigs.contains(FORCE_COMMIT_RELOAD_CONFIG)) {
+    if (!changedConfigs.contains(ConfigChangeListenerConstants.FORCE_COMMIT_RELOAD_CONFIG)) {
       return;
     }
 
-    String configValue = clusterConfigs.get(FORCE_COMMIT_RELOAD_CONFIG);
-    boolean enabled = (configValue == null) ? DEFAULT_FORCE_COMMIT_RELOAD : Boolean.parseBoolean(configValue);
+    String configValue = clusterConfigs.get(ConfigChangeListenerConstants.FORCE_COMMIT_RELOAD_CONFIG);
+    boolean enabled = (configValue == null)
+        ? ConfigChangeListenerConstants.DEFAULT_FORCE_COMMIT_RELOAD
+        : Boolean.parseBoolean(configValue);
 
     boolean previousValue = _forceCommitReloadEnabled.getAndSet(enabled);
     if (previousValue != enabled) {
-      LOGGER.info("Updated {} from {} to {}", FORCE_COMMIT_RELOAD_CONFIG, previousValue, enabled);
+      LOGGER.info("Updated cluster config: {} from {} to {}", ConfigChangeListenerConstants.FORCE_COMMIT_RELOAD_CONFIG,
+          previousValue, enabled);
     }
-  }
-
-  // For testing
-  void setForceCommitReloadEnabled(boolean enabled) {
-    _forceCommitReloadEnabled.set(enabled);
   }
 }

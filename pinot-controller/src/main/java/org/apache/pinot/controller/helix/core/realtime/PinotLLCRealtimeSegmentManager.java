@@ -61,9 +61,7 @@ import org.apache.helix.ClusterMessagingService;
 import org.apache.helix.HelixAdmin;
 import org.apache.helix.HelixManager;
 import org.apache.helix.model.ExternalView;
-import org.apache.helix.model.HelixConfigScope;
 import org.apache.helix.model.IdealState;
-import org.apache.helix.model.builder.HelixConfigScopeBuilder;
 import org.apache.helix.store.zk.ZkHelixPropertyStore;
 import org.apache.helix.zookeeper.datamodel.ZNRecord;
 import org.apache.helix.zookeeper.zkclient.exception.ZkBadVersionException;
@@ -108,7 +106,6 @@ import org.apache.pinot.controller.validation.RealtimeSegmentValidationManager;
 import org.apache.pinot.core.data.manager.realtime.SegmentCompletionUtils;
 import org.apache.pinot.core.data.manager.realtime.UpsertInconsistentStateConfig;
 import org.apache.pinot.core.util.PeerServerSegmentFinder;
-import org.apache.pinot.segment.local.utils.TableConfigUtils;
 import org.apache.pinot.segment.spi.index.metadata.SegmentMetadataImpl;
 import org.apache.pinot.segment.spi.partition.metadata.ColumnPartitionMetadata;
 import org.apache.pinot.spi.config.table.ColumnPartitionConfig;
@@ -2581,10 +2578,15 @@ public class PinotLLCRealtimeSegmentManager {
     // servers to reconsume rows and resulting in inconsistent data.
     // This behavior can be controlled via cluster config without requiring server restart.
     TableConfig tableConfig = _helixResourceManager.getTableConfig(tableNameWithType);
-    if (!isForceCommitReloadAllowed(tableConfig)) {
+    if (tableConfig == null) {
+      throw new IllegalStateException("Table config not found for table: " + tableNameWithType);
+    }
+    if (!UpsertInconsistentStateConfig.getInstance().isForceCommitReloadAllowed(tableConfig)) {
       throw new IllegalStateException(
-          "Force commit disabled for table: " + tableNameWithType + " due to inconsistent state config. "
-              + "Control via cluster config: " + UpsertInconsistentStateConfig.FORCE_COMMIT_RELOAD_CONFIG);
+          "Force commit disabled for table: " + tableNameWithType
+              + ". Table is configured as partial upsert or dropOutOfOrderRecord=true with replication > 1, "
+              + "which can cause data inconsistency during force commit. "
+              + "To override, set cluster config: " + UpsertInconsistentStateConfig.getInstance().getConfigKey());
     }
 
     if (!consumingSegments.isEmpty()) {
@@ -2597,27 +2599,6 @@ public class PinotLLCRealtimeSegmentManager {
       } else {
         throw new IllegalStateException("No force commit message sent for table: " + tableNameWithType);
       }
-    }
-  }
-
-  /**
-   * Checks if force commit/reload is allowed for the given table based on cluster config.
-   */
-  private boolean isForceCommitReloadAllowed(TableConfig tableConfig) {
-    if (!TableConfigUtils.checkForInconsistentStateConfigs(tableConfig)) {
-      return true;
-    }
-    try {
-      HelixConfigScope scope =
-          new HelixConfigScopeBuilder(HelixConfigScope.ConfigScopeProperty.CLUSTER).forCluster(_clusterName).build();
-      Map<String, String> configs = _helixResourceManager.getHelixAdmin()
-          .getConfig(scope, List.of(UpsertInconsistentStateConfig.FORCE_COMMIT_RELOAD_CONFIG));
-      String value =
-          configs != null ? configs.get(UpsertInconsistentStateConfig.FORCE_COMMIT_RELOAD_CONFIG) : null;
-      return value != null ? Boolean.parseBoolean(value) : UpsertInconsistentStateConfig.DEFAULT_FORCE_COMMIT_RELOAD;
-    } catch (Exception e) {
-      LOGGER.warn("Failed to read cluster config {}", UpsertInconsistentStateConfig.FORCE_COMMIT_RELOAD_CONFIG, e);
-      return UpsertInconsistentStateConfig.DEFAULT_FORCE_COMMIT_RELOAD;
     }
   }
 

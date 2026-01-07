@@ -826,7 +826,7 @@ public abstract class BaseTableDataManager implements TableDataManager {
         // This behavior can be controlled via cluster config without requiring server restart.
         TableConfig tableConfig = indexLoadingConfig.getTableConfig();
         UpsertInconsistentStateConfig config = UpsertInconsistentStateConfig.getInstance();
-        if (config.isForceCommitReloadAllowed(tableConfig)) {
+        if (tableConfig != null && config.isForceCommitReloadAllowed(tableConfig)) {
           _logger.info("Reloading (force committing) consuming segment: {}", segmentName);
           ((RealtimeSegmentDataManager) segmentDataManager).forceCommit();
         } else {
