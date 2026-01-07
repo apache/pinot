@@ -54,4 +54,9 @@ public class MaxValueAggregator implements ValueAggregator {
     }
     return result;
   }
+
+  @Override
+  public String getValueType() {
+    return "max";
+  }
 }

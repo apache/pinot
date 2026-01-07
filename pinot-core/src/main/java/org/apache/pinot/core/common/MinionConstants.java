@@ -192,6 +192,15 @@ public class MinionConstants {
     public static final String TASK_TYPE = "SegmentGenerationAndPushTask";
   }
 
+  public static class MaterializedViewTask extends MergeTask {
+    public static final String TASK_TYPE = "MaterializedViewTask";
+    public static final String MATERIALIZED_VIEW_SEGMENTS_TASK_TYPE = "taskType";
+    public static final String SELECTED_DIMENSION_LIST = "selectedDimensionList";
+    public static final String FILTER_FUNCTION = "filterFunction";
+    public static final String MATERIALIZED_VIEW_MARK = "mvMark";
+    public static final String MATERIALIZED_VIEW_NAME = "mvName";
+  }
+
   /**
    * Minion task to refresh segments when there are changes to tableConfigs and Schema. This task currently supports the
    * following functionality:
