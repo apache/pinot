@@ -349,6 +349,8 @@ public class PinotLLCRealtimeSegmentManagerTest {
     FakePinotLLCRealtimeSegmentManager segmentManager = new FakePinotLLCRealtimeSegmentManager();
     segmentManager._numReplicas = 1;
     segmentManager.makeTableConfig();
+    when(segmentManager._mockResourceManager.getTableConfig(REALTIME_TABLE_NAME)).thenReturn(
+        segmentManager._tableConfig);
     segmentManager._numInstances = 2;
     segmentManager.makeConsumingInstancePartitions();
     segmentManager._numPartitions = 1;
@@ -391,6 +393,8 @@ public class PinotLLCRealtimeSegmentManagerTest {
     FakePinotLLCRealtimeSegmentManager segmentManager = new FakePinotLLCRealtimeSegmentManager();
     segmentManager._numReplicas = 1;
     segmentManager.makeTableConfig();
+    when(segmentManager._mockResourceManager.getTableConfig(REALTIME_TABLE_NAME)).thenReturn(
+        segmentManager._tableConfig);
     segmentManager._numInstances = 2;
     segmentManager.makeConsumingInstancePartitions();
     segmentManager._numPartitions = 1;
