@@ -231,7 +231,7 @@ public class PinotConfiguration {
             PropertyIOFactoryKind.ConfigFileIOFactory);
       } else {
         propertiesConfiguration = CommonsConfigurationUtils.fromPath(configPath, true,
-            PropertyIOFactoryKind.ConfigFileIOFactory);
+            PropertyIOFactoryKind.ConfigFileIOFactory, true);
       }
       return propertiesConfiguration;
     } catch (ConfigurationException e) {
