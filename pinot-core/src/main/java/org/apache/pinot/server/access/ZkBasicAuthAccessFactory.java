@@ -94,7 +94,7 @@ public class ZkBasicAuthAccessFactory implements AccessControlFactory {
       Collection<String> tokens = getTokens(requesterIdentity);
       _name2principal =
           BasicAuthPrincipalUtils.extractBasicAuthPrincipals(_userCache.getAllServerUserConfig()).stream()
-          .collect(Collectors.toMap(ZkBasicAuthPrincipal::getName, p -> p));
+              .collect(Collectors.toMap(ZkBasicAuthPrincipal::getName, p -> p));
 
       Map<String, String> name2password = tokens.stream().collect(
           Collectors.toMap(BasicAuthTokenUtils::extractUsername, BasicAuthTokenUtils::extractPassword,
