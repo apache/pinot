@@ -414,16 +414,11 @@ public abstract class BaseBrokerStarter implements ServiceStartable {
       // multi-stage request handler uses both Netty and GRPC ports.
       // worker requires both the "Netty port" for protocol transport; and "GRPC port" for mailbox transport.
       // TODO: decouple protocol and engine selection.
-      // This query dispatcher is only used by the time-series request handler. The multi-stage request handler creates
-      // it's own query dispatcher.
       queryDispatcher = createQueryDispatcher(_brokerConf);
       multiStageBrokerRequestHandler =
           new MultiStageBrokerRequestHandler(_brokerConf, brokerId, requestIdGenerator, _routingManager,
               _accessControlFactory, _queryQuotaManager, _tableCache, _multiStageQueryThrottler, _failureDetector,
               _threadAccountant, multiClusterRoutingContext);
-      MultiStageBrokerRequestHandler finalHandler = multiStageBrokerRequestHandler;
-      _routingManager.setServerReenableCallback(
-          serverInstance -> finalHandler.getQueryDispatcher().resetClientConnectionBackoff(serverInstance));
     }
     TimeSeriesRequestHandler timeSeriesRequestHandler = null;
     if (StringUtils.isNotBlank(_brokerConf.getProperty(PinotTimeSeriesConfiguration.getEnabledLanguagesConfigKey()))) {
