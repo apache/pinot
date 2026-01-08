@@ -297,6 +297,9 @@ public class PinotTableRestletResource {
   @ApiOperation(value = "Copy a table's schema and config from another cluster", notes = "Non upsert table only")
   public CopyTableResponse copyTable(
       @ApiParam(value = "Name of the table", required = true) @PathParam("tableName") String tableName, String payload,
+      @ApiParam(value = "Include verbose information in response")
+      @QueryParam("verbose") @DefaultValue("false") boolean verbose,
+      @ApiParam(value = "Dry run mode") @QueryParam("dryRun") @DefaultValue("true") boolean dryRun,
       @Context HttpHeaders headers) {
     try {
       LOGGER.info("[copyTable] received request for table: {}, payload: {}", tableName, payload);
@@ -341,21 +344,19 @@ public class PinotTableRestletResource {
       boolean hasOffline = tableConfigNode.has(TableType.OFFLINE.name());
       boolean hasRealtime = tableConfigNode.has(TableType.REALTIME.name());
       if (hasOffline && !hasRealtime) {
-        throw new IllegalArgumentException("pure offline table copy not supported yet");
+        throw new IllegalStateException("pure offline table copy not supported yet");
       }
 
       ObjectNode realtimeTableConfigNode = (ObjectNode) tableConfigNode.get(TableType.REALTIME.name());
       tweakRealtimeTableConfig(realtimeTableConfigNode, copyTablePayload);
       TableConfig realtimeTableConfig = JsonUtils.jsonNodeToObject(realtimeTableConfigNode, TableConfig.class);
       if (realtimeTableConfig.getUpsertConfig() != null) {
-        throw new IllegalArgumentException("upsert table copy not supported");
+        throw new IllegalStateException("upsert table copy not supported");
       }
       LOGGER.info("[copyTable] Successfully fetched and tweaked table config for table: {}", tableName);
 
-      if (copyTablePayload.isDryRun()) {
-        return new CopyTableResponse("dryrun",
-            "Dry run successful. Fetched schema, table config and watermarks from source cluster.", schema,
-            realtimeTableConfig, watermarkInductionResult);
+      if (dryRun) {
+        return new CopyTableResponse("success", "Dry run", schema, realtimeTableConfig, watermarkInductionResult);
       }
 
       List<PartitionGroupInfo> partitionGroupInfos = watermarkInductionResult.getWatermarks().stream()
@@ -367,17 +368,17 @@ public class PinotTableRestletResource {
       // Add the table with designated starting kafka offset and segment sequence number to create consuming segments
       _pinotHelixResourceManager.addTable(realtimeTableConfig, partitionGroupInfos);
       LOGGER.info("[copyTable] Successfully added table config: {} with designated high watermark", tableName);
-      // hybrid table
+      CopyTableResponse response = new CopyTableResponse("success", "Table copied successfully", null, null, null);
       if (hasOffline) {
-        return copyTablePayload.isVerbose() ? new CopyTableResponse("warn",
-            "detect offline too; it will only copy real-time segments", schema,
-            realtimeTableConfig, watermarkInductionResult)
-            : new CopyTableResponse("warn", "detect offline too; it will only copy real-time segments", null, null,
-                null);
+        response = new CopyTableResponse("warn", "detect offline too; it will only copy real-time segments",
+            null, null, null);
       }
-      return copyTablePayload.isVerbose() ? new CopyTableResponse("success", "", schema,
-          realtimeTableConfig, watermarkInductionResult)
-          : new CopyTableResponse("success", "", null, null, null);
+      if (verbose) {
+        response.setSchema(schema);
+        response.setTableConfig(realtimeTableConfig);
+        response.setWatermarkInductionResult(watermarkInductionResult);
+      }
+      return response;
     } catch (Exception e) {
       LOGGER.error("[copyTable] Error copying table: {}", tableName, e);
       throw new ControllerApplicationException(LOGGER, "Error copying table: " + e.getMessage(),

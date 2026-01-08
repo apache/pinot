@@ -393,7 +393,7 @@ public class PinotLLCRealtimeSegmentManager {
     Preconditions.checkState(!_isStopping, "Segment manager is stopping");
 
     String realtimeTableName = tableConfig.getTableName();
-    LOGGER.info("[copyTable] Setting up new LLC table: {}", realtimeTableName);
+    LOGGER.info("Setting up new LLC table: {}", realtimeTableName);
 
     List<StreamConfig> streamConfigs = IngestionConfigUtils.getStreamConfigs(tableConfig);
     streamConfigs.forEach(_flushThresholdUpdateManager::clearFlushThresholdUpdater);
@@ -1929,8 +1929,7 @@ public class PinotLLCRealtimeSegmentManager {
     String realtimeTableName = tableConfig.getTableName();
     int partitionGroupId = wrapper.getPartitionGroupId();
     String startOffset = wrapper.getStartOffset().toString();
-    LOGGER.info("Setting up new partition group: {} for table: {}", partitionGroupId, realtimeTableName);
-    LOGGER.info("[copyTable] Setting up new partition group: {} for table: {} with sequence: {} and startOffset: {}",
+    LOGGER.info("Setting up new partition group: {} for table: {} with sequence: {} and startOffset: {}",
         partitionGroupId, realtimeTableName, wrapper.getSequence(), startOffset);
 
     String rawTableName = TableNameBuilder.extractRawTableName(realtimeTableName);
