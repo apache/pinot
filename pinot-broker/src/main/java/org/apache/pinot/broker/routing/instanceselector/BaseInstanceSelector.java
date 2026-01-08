@@ -39,6 +39,7 @@ import org.apache.helix.store.zk.ZkHelixPropertyStore;
 import org.apache.helix.zookeeper.datamodel.ZNRecord;
 import org.apache.pinot.broker.routing.adaptiveserverselector.AdaptiveServerSelector;
 import org.apache.pinot.broker.routing.adaptiveserverselector.PriorityPoolInstanceSelector;
+import org.apache.pinot.common.assignment.InstancePartitionsUtils;
 import org.apache.pinot.common.metadata.ZKMetadataProvider;
 import org.apache.pinot.common.metadata.segment.SegmentZKMetadata;
 import org.apache.pinot.common.metrics.BrokerMeter;
@@ -54,6 +55,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import static org.apache.pinot.spi.utils.CommonConstants.Broker.FALLBACK_POOL_ID;
+import static org.apache.pinot.spi.utils.CommonConstants.Broker.FALLBACK_REPLICA_GROUP_ID;
 
 
 /// Base implementation of instance selector. Selector maintains a map from segment to enabled ONLINE/CONSUMING server
@@ -245,6 +247,30 @@ public abstract class BaseInstanceSelector implements InstanceSelector {
     }
   }
 
+  static Map<String, Integer> serverToReplicaGroupMap(IdealState idealState) {
+    Map<String, Integer> serverToReplicaGroupMap = new HashMap<>();
+
+    for (Map.Entry<String, List<String>> listFields : idealState.getRecord().getListFields().entrySet()) {
+      String key = listFields.getKey();
+      // key looks like "INSTANCE_PARTITIONS__myTable_CONSUMING__0_0"
+      if (key.startsWith(InstancePartitionsUtils.IDEAL_STATE_IP_PREFIX)) {
+        String[] parts = key.split(InstancePartitionsUtils.IDEAL_STATE_IP_SEPARATOR);
+        Integer replicaGroup =
+            InstancePartitionsUtils.getPartitionIdAndReplicaGroupId(parts[parts.length - 1]).getRight();
+        listFields.getValue().forEach(value -> {
+          if (serverToReplicaGroupMap.containsKey(value)) {
+            LOGGER.warn("Server {} assigned to multiple replica groups ({}, {})", value, replicaGroup,
+                serverToReplicaGroupMap.get(value));
+          } else {
+            serverToReplicaGroupMap.put(value, replicaGroup);
+          }
+        });
+      }
+    }
+
+    return serverToReplicaGroupMap;
+  }
+
   /// Updates the segment maps based on the given ideal state, external view, online segments (segments with
   /// ONLINE/CONSUMING instances in the ideal state and pre-selected by the {@code SegmentPreSelector}) and new
   /// segments. After this update:
@@ -257,6 +283,7 @@ public abstract class BaseInstanceSelector implements InstanceSelector {
 
     Map<String, Map<String, String>> idealStateAssignment = idealState.getRecord().getMapFields();
     Map<String, Map<String, String>> externalViewAssignment = externalView.getRecord().getMapFields();
+    Map<String, Integer> serverToReplicaGroupMap = serverToReplicaGroupMap(idealState);
     int numSinglePoolSegments = 0;
     Set<Integer> pools = new HashSet<>();
     for (String segment : onlineSegments) {
@@ -270,7 +297,8 @@ public abstract class BaseInstanceSelector implements InstanceSelector {
           for (Map.Entry<String, String> entry : convertToSortedMap(idealStateInstanceStateMap).entrySet()) {
             if (isOnlineForRouting(entry.getValue())) {
               String instance = entry.getKey();
-              candidates.add(new SegmentInstanceCandidate(instance, false, getPool(instance)));
+              candidates.add(new SegmentInstanceCandidate(instance, false, getPool(instance),
+                  serverToReplicaGroupMap.getOrDefault(instance, FALLBACK_REPLICA_GROUP_ID)));
             }
           }
           _newSegmentStateMap.put(segment, new NewSegmentState(newSegmentCreationTimeMs, candidates));
@@ -287,7 +315,8 @@ public abstract class BaseInstanceSelector implements InstanceSelector {
             if (isOnlineForRouting(entry.getValue())) {
               String instance = entry.getKey();
               candidates.add(
-                  new SegmentInstanceCandidate(instance, onlineInstances.contains(instance), getPool(instance)));
+                  new SegmentInstanceCandidate(instance, onlineInstances.contains(instance), getPool(instance),
+                      serverToReplicaGroupMap.getOrDefault(instance, FALLBACK_REPLICA_GROUP_ID)));
             }
           }
           _newSegmentStateMap.put(segment, new NewSegmentState(newSegmentCreationTimeMs, candidates));
@@ -295,7 +324,8 @@ public abstract class BaseInstanceSelector implements InstanceSelector {
           // Old segment
           List<SegmentInstanceCandidate> candidates = new ArrayList<>(onlineInstances.size());
           for (String instance : onlineInstances) {
-            candidates.add(new SegmentInstanceCandidate(instance, true, getPool(instance)));
+            candidates.add(new SegmentInstanceCandidate(instance, true, getPool(instance),
+                serverToReplicaGroupMap.getOrDefault(instance, FALLBACK_REPLICA_GROUP_ID)));
           }
           _oldSegmentCandidatesMap.put(segment, candidates);
         }

@@ -137,5 +137,11 @@ public interface InstanceSelector {
     public void setNumPrunedSegments(int numPrunedSegments) {
       _numPrunedSegments = numPrunedSegments;
     }
+
+    @Override
+    public String toString() {
+      return "SelectionResult [_segmentToInstanceMap=" + _segmentToInstanceMap + ", _unavailableSegments="
+          + _unavailableSegments + ", _numPrunedSegments=" + _numPrunedSegments + "]";
+    }
   }
 }

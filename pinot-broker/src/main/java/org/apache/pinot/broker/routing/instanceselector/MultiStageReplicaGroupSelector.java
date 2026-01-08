@@ -24,6 +24,7 @@ import com.google.common.collect.Sets;
 import java.time.Clock;
 import java.util.HashMap;
 import java.util.HashSet;
+import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -47,6 +48,8 @@ import org.apache.pinot.spi.config.table.assignment.InstancePartitionsType;
 import org.apache.pinot.spi.utils.builder.TableNameBuilder;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+
+import static org.apache.pinot.spi.utils.CommonConstants.Broker.FALLBACK_REPLICA_GROUP_ID;
 
 
 /**
@@ -124,8 +127,69 @@ public class MultiStageReplicaGroupSelector extends BaseInstanceSelector {
    *   }
    * }
    */
-  private Pair<Map<String, String>, Map<String, String>> assign(Set<String> segments,
-    SegmentStates segmentStates, InstancePartitions instancePartitions, int preferredReplicaId) {
+  private Pair<Map<String, String>, Map<String, String>> assign(Set<String> segments, SegmentStates segmentStates,
+      InstancePartitions instancePartitions, int preferredReplicaId) {
+    Pair<Map<String, String>, Map<String, String>> assignment =
+        assignUsingIdealStateMetadata(segments, segmentStates, instancePartitions, preferredReplicaId);
+
+    if (assignment != null) {
+      return assignment;
+    } else {
+      return assignUsingInstancePartitions(segments, segmentStates, instancePartitions, preferredReplicaId);
+    }
+  }
+
+  @Nullable
+  private Pair<Map<String, String>, Map<String, String>> assignUsingIdealStateMetadata(Set<String> segments,
+      SegmentStates segmentStates, InstancePartitions instancePartitions, int preferredReplicaId) {
+    Set<String> segmentsToAssign = Sets.newHashSet(segments);
+    int numReplicaGroups = instancePartitions.getNumReplicaGroups();
+
+    Map<String, String> segmentToSelectedInstanceMap = new HashMap<>();
+
+    for (int replicaGroupOffset = 0; replicaGroupOffset < numReplicaGroups; replicaGroupOffset++) {
+      int selectedReplicaGroup = (replicaGroupOffset + preferredReplicaId) % numReplicaGroups;
+
+      // Check if the replica group can serve all the required segments
+      for (Iterator<String> iterator = segmentsToAssign.iterator(); iterator.hasNext();) {
+        String segment = iterator.next();
+        List<SegmentInstanceCandidate> candidates = segmentStates.getCandidates(segment);
+        if (CollectionUtils.isEmpty(candidates)) {
+          if (isNewLLCSegment(segment)) {
+            // New segments might not be tracked in segmentStates yet.
+            iterator.remove();
+            continue;
+          } else {
+            throw new IllegalStateException(String.format("Failed to find servers for segment: %s", segment));
+          }
+        }
+
+        for (SegmentInstanceCandidate candidate : candidates) {
+          if (candidate.getReplicaGroupId() == FALLBACK_REPLICA_GROUP_ID) {
+            // Ideal state instance partitions metadata unavailable fallback to older selection logic
+            return null;
+          }
+          if (candidate.getReplicaGroupId() == selectedReplicaGroup) {
+            segmentToSelectedInstanceMap.put(segment, candidate.getInstance());
+            iterator.remove();
+            break;
+          }
+        }
+      }
+
+      // All segments can be served. If not, continue attempting to assign the remaining segments using other replica
+      // groups.
+      if (segmentsToAssign.isEmpty()) {
+        return computeOptionalSegments(segmentToSelectedInstanceMap, segmentStates);
+      }
+    }
+
+    // Can't route based on ideal state metadata, fall back to older strategy.
+    return null;
+  }
+
+  private Pair<Map<String, String>, Map<String, String>> assignUsingInstancePartitions(Set<String> segments,
+      SegmentStates segmentStates, InstancePartitions instancePartitions, int preferredReplicaId) {
     Map<String, Integer> instanceToPartitionMap = instancePartitions.getInstanceToPartitionIdMap();
     Map<String, Set<String>> instanceToSegmentsMap = new HashMap<>();
 
@@ -142,8 +206,8 @@ public class MultiStageReplicaGroupSelector extends BaseInstanceSelector {
       }
       for (SegmentInstanceCandidate candidate : candidates) {
         instanceToSegmentsMap
-          .computeIfAbsent(candidate.getInstance(), k -> new HashSet<>())
-          .add(segment);
+            .computeIfAbsent(candidate.getInstance(), k -> new HashSet<>())
+            .add(segment);
       }
     }
 
@@ -153,8 +217,8 @@ public class MultiStageReplicaGroupSelector extends BaseInstanceSelector {
     for (Map.Entry<String, Set<String>> entry : instanceToSegmentsMap.entrySet()) {
       Integer partitionId = instanceToPartitionMap.get(entry.getKey());
       partitionToRequiredSegmentsMap
-        .computeIfAbsent(partitionId, k -> new HashSet<>())
-        .addAll(entry.getValue());
+          .computeIfAbsent(partitionId, k -> new HashSet<>())
+          .addAll(entry.getValue());
     }
 
     // Assign segments to instances based on the partitionToRequiredSegmentsMap. This ensures that we select the
@@ -165,7 +229,7 @@ public class MultiStageReplicaGroupSelector extends BaseInstanceSelector {
       Set<String> requiredSegments = partitionToRequiredSegmentsMap.get(partition);
       if (requiredSegments != null) {
         getSelectedInstancesForPartition(instanceToSegmentsMap, requiredSegments, partition, preferredReplicaId,
-          segmentToSelectedInstanceMap);
+            segmentToSelectedInstanceMap);
       }
     }
 
@@ -230,7 +294,7 @@ public class MultiStageReplicaGroupSelector extends BaseInstanceSelector {
    * this method computes the segments that are optional and the segments that are not.
    */
   private Pair<Map<String, String>, Map<String, String>> computeOptionalSegments(
-    Map<String, String> segmentToSelectedInstanceMap, SegmentStates segmentStates) {
+      Map<String, String> segmentToSelectedInstanceMap, SegmentStates segmentStates) {
 
     Map<String, String> segmentsToInstanceMap = new HashMap<>();
     Map<String, String> optionalSegmentToInstanceMap = new HashMap<>();
@@ -260,7 +324,6 @@ public class MultiStageReplicaGroupSelector extends BaseInstanceSelector {
 
     return Pair.of(segmentsToInstanceMap, optionalSegmentToInstanceMap);
   }
-
 
   @VisibleForTesting
   protected InstancePartitions getInstancePartitions() {

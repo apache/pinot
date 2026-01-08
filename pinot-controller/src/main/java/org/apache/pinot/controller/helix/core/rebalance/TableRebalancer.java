@@ -69,6 +69,7 @@ import org.apache.pinot.common.tier.TierFactory;
 import org.apache.pinot.common.utils.PauselessConsumptionUtils;
 import org.apache.pinot.common.utils.SegmentUtils;
 import org.apache.pinot.common.utils.config.TierConfigUtils;
+import org.apache.pinot.common.utils.helix.HelixHelper;
 import org.apache.pinot.controller.api.resources.BatchConfig;
 import org.apache.pinot.controller.helix.core.assignment.instance.InstanceAssignmentDriver;
 import org.apache.pinot.controller.helix.core.assignment.segment.BaseStrictRealtimeSegmentAssignment;
@@ -97,6 +98,7 @@ import org.apache.pinot.spi.utils.Enablement;
 import org.apache.pinot.spi.utils.IngestionConfigUtils;
 import org.apache.pinot.spi.utils.StringUtil;
 import org.apache.pinot.spi.utils.builder.TableNameBuilder;
+import org.apache.pinot.spi.utils.retry.RetryPolicies;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -157,11 +159,13 @@ public class TableRebalancer {
   private final RebalancePreChecker _rebalancePreChecker;
   private final TableSizeReader _tableSizeReader;
   private final PinotLLCRealtimeSegmentManager _pinotLLCRealtimeSegmentManager;
+  private final boolean _updateIdealStateInstancePartitions;
 
   public TableRebalancer(HelixManager helixManager, @Nullable TableRebalanceObserver tableRebalanceObserver,
       @Nullable ControllerMetrics controllerMetrics, @Nullable RebalancePreChecker rebalancePreChecker,
       @Nullable TableSizeReader tableSizeReader,
-      @Nullable PinotLLCRealtimeSegmentManager pinotLLCRealtimeSegmentManager) {
+      @Nullable PinotLLCRealtimeSegmentManager pinotLLCRealtimeSegmentManager,
+      boolean updateIdealStateInstancePartitions) {
     _helixManager = helixManager;
     _tableRebalanceObserver = Objects.requireNonNullElseGet(tableRebalanceObserver, NoOpTableRebalanceObserver::new);
     _helixDataAccessor = helixManager.getHelixDataAccessor();
@@ -169,10 +173,11 @@ public class TableRebalancer {
     _rebalancePreChecker = rebalancePreChecker;
     _tableSizeReader = tableSizeReader;
     _pinotLLCRealtimeSegmentManager = pinotLLCRealtimeSegmentManager;
+    _updateIdealStateInstancePartitions = updateIdealStateInstancePartitions;
   }
 
   public TableRebalancer(HelixManager helixManager) {
-    this(helixManager, null, null, null, null, null);
+    this(helixManager, null, null, null, null, null, true);
   }
 
   public static String createUniqueRebalanceJobIdentifier() {
@@ -334,6 +339,24 @@ public class TableRebalancer {
           null, null, null, null);
     }
 
+    // Update ideal state instance partitions metadata
+    if (_updateIdealStateInstancePartitions && !dryRun && (!instancePartitionsUnchanged
+        || !tierInstancePartitionsUnchanged)) {
+      try {
+        List<InstancePartitions> instancePartitionsList = new ArrayList<>(instancePartitionsMap.values());
+        if (tierToInstancePartitionsMap != null) {
+          instancePartitionsList.addAll(tierToInstancePartitionsMap.values());
+        }
+        currentIdealState =
+            combineInstancePartitionsInIdealState(tableNameWithType, currentIdealState, instancePartitionsList);
+      } catch (Exception e) {
+        onReturnFailure("Caught exception while updating ideal state, aborting the rebalance", e, tableRebalanceLogger);
+        return new RebalanceResult(rebalanceJobId, RebalanceResult.Status.FAILED,
+            "Caught exception while updating ideal state: " + e, null,
+            null, null, null, null);
+      }
+    }
+
     tableRebalanceLogger.info("Calculating the target assignment");
     SegmentAssignment segmentAssignment =
         SegmentAssignmentFactory.getSegmentAssignment(_helixManager, tableConfig, _controllerMetrics);
@@ -396,6 +419,21 @@ public class TableRebalancer {
             instancePartitionsMap, tierToInstancePartitionsMap, targetAssignment, preChecksResult, summaryResult);
       } else {
         tableRebalanceLogger.info("Instance reassigned but table is already balanced");
+        if (!dryRun && _updateIdealStateInstancePartitions) {
+          List<InstancePartitions> instancePartitionsList = new ArrayList<>(instancePartitionsMap.values());
+          if (tierToInstancePartitionsMap != null) {
+            instancePartitionsList.addAll(tierToInstancePartitionsMap.values());
+          }
+          try {
+            replaceInstancePartitionsInIdealState(tableNameWithType, currentIdealState, instancePartitionsList);
+          } catch (Exception e) {
+            onReturnFailure("Caught exception while updating ideal state, aborting the rebalance", e,
+                tableRebalanceLogger);
+            return new RebalanceResult(rebalanceJobId, RebalanceResult.Status.FAILED,
+                "Caught exception while updating ideal state: " + e, instancePartitionsMap,
+                tierToInstancePartitionsMap, targetAssignment, preChecksResult, summaryResult);
+          }
+        }
         return new RebalanceResult(rebalanceJobId, RebalanceResult.Status.DONE,
             "Instance reassigned, table is already balanced", instancePartitionsMap,
             tierToInstancePartitionsMap, targetAssignment, preChecksResult, summaryResult);
@@ -462,6 +500,18 @@ public class TableRebalancer {
       idealStateRecord.setMapFields(targetAssignment);
       currentIdealState.setNumPartitions(targetAssignment.size());
       currentIdealState.setReplicas(Integer.toString(targetAssignment.values().iterator().next().size()));
+
+      // Update instance partitions in ideal state
+      if (_updateIdealStateInstancePartitions) {
+        List<InstancePartitions> instancePartitionsList = new ArrayList<>(instancePartitionsMap.values());
+        if (tierToInstancePartitionsMap != null) {
+          instancePartitionsList.addAll(tierToInstancePartitionsMap.values());
+        }
+        Map<String, List<String>> idealStateListFields = currentIdealState.getRecord().getListFields();
+        // Replace old set of instance partitions with the new set of instance partitions.
+        idealStateListFields.keySet().removeIf(key -> key.startsWith(InstancePartitionsUtils.IDEAL_STATE_IP_PREFIX));
+        InstancePartitionsUtils.combineInstancePartitionsInIdealState(currentIdealState, instancePartitionsList);
+      }
 
       // Check version and update IdealState
       try {
@@ -722,6 +772,25 @@ public class TableRebalancer {
         tableRebalanceLogger.info(msg);
         // Record completion
         _tableRebalanceObserver.onSuccess(msg);
+
+        if (_updateIdealStateInstancePartitions && !instancePartitionsUnchanged || !tierInstancePartitionsUnchanged) {
+          // Rebalance completed successfully, so we can update the instance partitions in the ideal state to reflect
+          // the new set of instance partitions.
+          List<InstancePartitions> instancePartitionsList = new ArrayList<>(instancePartitionsMap.values());
+          if (tierToInstancePartitionsMap != null) {
+            instancePartitionsList.addAll(tierToInstancePartitionsMap.values());
+          }
+          try {
+            replaceInstancePartitionsInIdealState(tableNameWithType, currentIdealState, instancePartitionsList);
+          } catch (Exception e) {
+            onReturnFailure("Caught exception while updating ideal state, aborting the rebalance", e,
+                tableRebalanceLogger);
+            return new RebalanceResult(rebalanceJobId, RebalanceResult.Status.FAILED,
+                "Caught exception while updating ideal state: " + e, instancePartitionsMap,
+                tierToInstancePartitionsMap, targetAssignment, preChecksResult, summaryResult);
+          }
+        }
+
         return new RebalanceResult(rebalanceJobId, RebalanceResult.Status.DONE, "Success with minAvailableReplicas: "
             + minAvailableReplicas + " (both IdealState and ExternalView should reach the target segment assignment)",
             instancePartitionsMap, tierToInstancePartitionsMap, targetAssignment, preChecksResult, summaryResult);
@@ -2241,5 +2310,26 @@ public class TableRebalancer {
         forceCommitBatchConfig);
     tableRebalanceLogger.info("Successfully force committed {} consuming segments", segmentsToCommit.size());
     return _helixDataAccessor.getProperty(_helixDataAccessor.keyBuilder().idealStates(tableNameWithType));
+  }
+
+  private IdealState combineInstancePartitionsInIdealState(String tableNameWithType, IdealState currentIdealState,
+      List<InstancePartitions> instancePartitionsList) {
+    InstancePartitionsUtils.combineInstancePartitionsInIdealState(currentIdealState, instancePartitionsList);
+    return HelixHelper.updateIdealState(_helixManager, tableNameWithType, is -> {
+      is.getRecord().setListFields(currentIdealState.getRecord().getListFields());
+      return is;
+    }, RetryPolicies.exponentialBackoffRetryPolicy(5, 500L, 1.2f));
+  }
+
+  private void replaceInstancePartitionsInIdealState(String tableNameWithType, IdealState currentIdealState,
+      List<InstancePartitions> instancePartitionsList) {
+    Map<String, List<String>> idealStateListFields = currentIdealState.getRecord().getListFields();
+    idealStateListFields.keySet().removeIf(key -> key.startsWith(InstancePartitionsUtils.IDEAL_STATE_IP_PREFIX));
+    InstancePartitionsUtils.combineInstancePartitionsInIdealState(currentIdealState, instancePartitionsList);
+
+    HelixHelper.updateIdealState(_helixManager, tableNameWithType, is -> {
+      is.getRecord().setListFields(idealStateListFields);
+      return is;
+    }, RetryPolicies.exponentialBackoffRetryPolicy(5, 500L, 1.2f));
   }
 }
