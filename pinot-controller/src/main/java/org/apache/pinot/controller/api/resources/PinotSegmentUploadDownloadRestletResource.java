@@ -46,8 +46,10 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
+import java.util.concurrent.ExecutorService;
 import javax.annotation.Nullable;
 import javax.inject.Inject;
+import javax.inject.Named;
 import javax.ws.rs.Consumes;
 import javax.ws.rs.DefaultValue;
 import javax.ws.rs.Encoded;
@@ -85,6 +87,7 @@ import org.apache.pinot.common.utils.URIUtils;
 import org.apache.pinot.common.utils.UploadedRealtimeSegmentName;
 import org.apache.pinot.common.utils.fetcher.SegmentFetcherFactory;
 import org.apache.pinot.controller.ControllerConf;
+import org.apache.pinot.controller.BaseControllerStarter;
 import org.apache.pinot.controller.api.access.AccessControl;
 import org.apache.pinot.controller.api.access.AccessControlFactory;
 import org.apache.pinot.controller.api.access.AccessType;
@@ -155,6 +158,10 @@ public class PinotSegmentUploadDownloadRestletResource {
 
   @Inject
   AccessControlFactory _accessControlFactory;
+
+  @Inject
+  @Named(BaseControllerStarter.MINION_TASK_RESOURCE_EXECUTOR_SERVICE_NAME)
+  ExecutorService _resourceExecutorService;
 
   @GET
   @Produces(MediaType.APPLICATION_OCTET_STREAM)
@@ -984,29 +991,44 @@ public class PinotSegmentUploadDownloadRestletResource {
   @Authenticate(AccessType.UPDATE)
   @Produces(MediaType.APPLICATION_JSON)
   @ApiOperation(value = "Start to replace segments", notes = "Start to replace segments")
-  public Response startReplaceSegments(
+  public void startReplaceSegments(
       @ApiParam(value = "Name of the table", required = true) @PathParam("tableName") String tableName,
       @ApiParam(value = "OFFLINE|REALTIME", required = true) @QueryParam("type") String tableTypeStr,
       @ApiParam(value = "Force cleanup") @QueryParam("forceCleanup") @DefaultValue("false") boolean forceCleanup,
       @ApiParam(value = "Fields belonging to start replace segment request", required = true)
-      StartReplaceSegmentsRequest startReplaceSegmentsRequest, @Context HttpHeaders headers) {
-    tableName = DatabaseUtils.translateTableName(tableName, headers);
-    TableType tableType = Constants.validateTableType(tableTypeStr);
-    if (tableType == null) {
-      throw new ControllerApplicationException(LOGGER, "Table type should either be offline or realtime",
-          Response.Status.BAD_REQUEST);
-    }
-    String tableNameWithType =
-        ResourceUtils.getExistingTableNamesWithType(_pinotHelixResourceManager, tableName, tableType, LOGGER).get(0);
-    try {
-      String segmentLineageEntryId = _pinotHelixResourceManager.startReplaceSegments(tableNameWithType,
-          startReplaceSegmentsRequest.getSegmentsFrom(), startReplaceSegmentsRequest.getSegmentsTo(), forceCleanup,
-          startReplaceSegmentsRequest.getCustomMap());
-      return Response.ok(JsonUtils.newObjectNode().put("segmentLineageEntryId", segmentLineageEntryId)).build();
-    } catch (Exception e) {
-      _controllerMetrics.addMeteredTableValue(tableNameWithType, ControllerMeter.NUMBER_START_REPLACE_FAILURE, 1);
-      throw new ControllerApplicationException(LOGGER, e.getMessage(), Response.Status.INTERNAL_SERVER_ERROR, e);
-    }
+      StartReplaceSegmentsRequest startReplaceSegmentsRequest, @Context HttpHeaders headers,
+      @Suspended final AsyncResponse asyncResponse) {
+    _resourceExecutorService.execute(() -> {
+      try {
+        String translatedTableName = DatabaseUtils.translateTableName(tableName, headers);
+        TableType tableType = Constants.validateTableType(tableTypeStr);
+        if (tableType == null) {
+          asyncResponse.resume(new ControllerApplicationException(LOGGER, "Table type should either be offline or realtime",
+              Response.Status.BAD_REQUEST));
+          return;
+        }
+        String tableNameWithType =
+            ResourceUtils.getExistingTableNamesWithType(_pinotHelixResourceManager, translatedTableName, tableType, LOGGER).get(0);
+        String segmentLineageEntryId = _pinotHelixResourceManager.startReplaceSegments(tableNameWithType,
+            startReplaceSegmentsRequest.getSegmentsFrom(), startReplaceSegmentsRequest.getSegmentsTo(), forceCleanup,
+            startReplaceSegmentsRequest.getCustomMap());
+        asyncResponse.resume(Response.ok(JsonUtils.newObjectNode().put("segmentLineageEntryId", segmentLineageEntryId)).build());
+      } catch (Exception e) {
+        String tableNameWithType = null;
+        try {
+          String translatedTableName = DatabaseUtils.translateTableName(tableName, headers);
+          TableType tableType = Constants.validateTableType(tableTypeStr);
+          if (tableType != null) {
+            tableNameWithType =
+                ResourceUtils.getExistingTableNamesWithType(_pinotHelixResourceManager, translatedTableName, tableType, LOGGER).get(0);
+            _controllerMetrics.addMeteredTableValue(tableNameWithType, ControllerMeter.NUMBER_START_REPLACE_FAILURE, 1);
+          }
+        } catch (Exception ignored) {
+          // Ignore errors when trying to get table name for metrics
+        }
+        asyncResponse.resume(new ControllerApplicationException(LOGGER, e.getMessage(), Response.Status.INTERNAL_SERVER_ERROR, e));
+      }
+    });
   }
 
   @POST
@@ -1015,7 +1037,7 @@ public class PinotSegmentUploadDownloadRestletResource {
   @Authenticate(AccessType.UPDATE)
   @Produces(MediaType.APPLICATION_JSON)
   @ApiOperation(value = "End to replace segments", notes = "End to replace segments")
-  public Response endReplaceSegments(
+  public void endReplaceSegments(
       @ApiParam(value = "Name of the table", required = true) @PathParam("tableName") String tableName,
       @ApiParam(value = "OFFLINE|REALTIME", required = true) @QueryParam("type") String tableTypeStr,
       @ApiParam(value = "Segment lineage entry id returned by startReplaceSegments API", required = true)
@@ -1023,28 +1045,43 @@ public class PinotSegmentUploadDownloadRestletResource {
       @ApiParam(value = "Trigger an immediate segment cleanup") @QueryParam("cleanup") @DefaultValue("false")
       boolean cleanupSegments,
       @ApiParam(value = "Fields belonging to end replace segment request")
-      EndReplaceSegmentsRequest endReplaceSegmentsRequest, @Context HttpHeaders headers) {
-    tableName = DatabaseUtils.translateTableName(tableName, headers);
-    TableType tableType = Constants.validateTableType(tableTypeStr);
-    if (tableType == null) {
-      throw new ControllerApplicationException(LOGGER, "Table type should either be offline or realtime",
-          Response.Status.BAD_REQUEST);
-    }
-    String tableNameWithType =
-        ResourceUtils.getExistingTableNamesWithType(_pinotHelixResourceManager, tableName, tableType, LOGGER).get(0);
-    try {
-      // Check that the segment lineage entry id is valid
-      Preconditions.checkNotNull(segmentLineageEntryId, "'segmentLineageEntryId' should not be null");
-      _pinotHelixResourceManager.endReplaceSegments(tableNameWithType, segmentLineageEntryId,
-          endReplaceSegmentsRequest);
-      if (cleanupSegments) {
-        _pinotHelixResourceManager.invokeControllerPeriodicTask(tableNameWithType, RetentionManager.TASK_NAME, null);
+      EndReplaceSegmentsRequest endReplaceSegmentsRequest, @Context HttpHeaders headers,
+      @Suspended final AsyncResponse asyncResponse) {
+    _resourceExecutorService.execute(() -> {
+      try {
+        String translatedTableName = DatabaseUtils.translateTableName(tableName, headers);
+        TableType tableType = Constants.validateTableType(tableTypeStr);
+        if (tableType == null) {
+          asyncResponse.resume(new ControllerApplicationException(LOGGER, "Table type should either be offline or realtime",
+              Response.Status.BAD_REQUEST));
+          return;
+        }
+        String tableNameWithType =
+            ResourceUtils.getExistingTableNamesWithType(_pinotHelixResourceManager, translatedTableName, tableType, LOGGER).get(0);
+        // Check that the segment lineage entry id is valid
+        Preconditions.checkNotNull(segmentLineageEntryId, "'segmentLineageEntryId' should not be null");
+        _pinotHelixResourceManager.endReplaceSegments(tableNameWithType, segmentLineageEntryId,
+            endReplaceSegmentsRequest);
+        if (cleanupSegments) {
+          _pinotHelixResourceManager.invokeControllerPeriodicTask(tableNameWithType, RetentionManager.TASK_NAME, null);
+        }
+        asyncResponse.resume(Response.ok().build());
+      } catch (Exception e) {
+        String tableNameWithType = null;
+        try {
+          String translatedTableName = DatabaseUtils.translateTableName(tableName, headers);
+          TableType tableType = Constants.validateTableType(tableTypeStr);
+          if (tableType != null) {
+            tableNameWithType =
+                ResourceUtils.getExistingTableNamesWithType(_pinotHelixResourceManager, translatedTableName, tableType, LOGGER).get(0);
+            _controllerMetrics.addMeteredTableValue(tableNameWithType, ControllerMeter.NUMBER_END_REPLACE_FAILURE, 1);
+          }
+        } catch (Exception ignored) {
+          // Ignore errors when trying to get table name for metrics
+        }
+        asyncResponse.resume(new ControllerApplicationException(LOGGER, e.getMessage(), Response.Status.INTERNAL_SERVER_ERROR, e));
       }
-      return Response.ok().build();
-    } catch (Exception e) {
-      _controllerMetrics.addMeteredTableValue(tableNameWithType, ControllerMeter.NUMBER_END_REPLACE_FAILURE, 1);
-      throw new ControllerApplicationException(LOGGER, e.getMessage(), Response.Status.INTERNAL_SERVER_ERROR, e);
-    }
+    });
   }
 
   @POST
@@ -1053,7 +1090,7 @@ public class PinotSegmentUploadDownloadRestletResource {
   @Authenticate(AccessType.UPDATE)
   @Produces(MediaType.APPLICATION_JSON)
   @ApiOperation(value = "Revert segments replacement", notes = "Revert segments replacement")
-  public Response revertReplaceSegments(
+  public void revertReplaceSegments(
       @ApiParam(value = "Name of the table", required = true) @PathParam("tableName") String tableName,
       @ApiParam(value = "OFFLINE|REALTIME", required = true) @QueryParam("type") String tableTypeStr,
       @ApiParam(value = "Segment lineage entry id to revert", required = true) @QueryParam("segmentLineageEntryId")
@@ -1061,25 +1098,40 @@ public class PinotSegmentUploadDownloadRestletResource {
       @ApiParam(value = "Force revert in case the user knows that the lineage entry is interrupted")
       @QueryParam("forceRevert") @DefaultValue("false") boolean forceRevert,
       @ApiParam(value = "Fields belonging to revert replace segment request")
-      RevertReplaceSegmentsRequest revertReplaceSegmentsRequest, @Context HttpHeaders headers) {
-    tableName = DatabaseUtils.translateTableName(tableName, headers);
-    TableType tableType = Constants.validateTableType(tableTypeStr);
-    if (tableType == null) {
-      throw new ControllerApplicationException(LOGGER, "Table type should either be offline or realtime",
-          Response.Status.BAD_REQUEST);
-    }
-    String tableNameWithType =
-        ResourceUtils.getExistingTableNamesWithType(_pinotHelixResourceManager, tableName, tableType, LOGGER).get(0);
-    try {
-      // Check that the segment lineage entry id is valid
-      Preconditions.checkNotNull(segmentLineageEntryId, "'segmentLineageEntryId' should not be null");
-      _pinotHelixResourceManager.revertReplaceSegments(tableNameWithType, segmentLineageEntryId, forceRevert,
-          revertReplaceSegmentsRequest);
-      return Response.ok().build();
-    } catch (Exception e) {
-      _controllerMetrics.addMeteredTableValue(tableNameWithType, ControllerMeter.NUMBER_REVERT_REPLACE_FAILURE, 1);
-      throw new ControllerApplicationException(LOGGER, e.getMessage(), Response.Status.INTERNAL_SERVER_ERROR, e);
-    }
+      RevertReplaceSegmentsRequest revertReplaceSegmentsRequest, @Context HttpHeaders headers,
+      @Suspended final AsyncResponse asyncResponse) {
+    _resourceExecutorService.execute(() -> {
+      try {
+        String translatedTableName = DatabaseUtils.translateTableName(tableName, headers);
+        TableType tableType = Constants.validateTableType(tableTypeStr);
+        if (tableType == null) {
+          asyncResponse.resume(new ControllerApplicationException(LOGGER, "Table type should either be offline or realtime",
+              Response.Status.BAD_REQUEST));
+          return;
+        }
+        String tableNameWithType =
+            ResourceUtils.getExistingTableNamesWithType(_pinotHelixResourceManager, translatedTableName, tableType, LOGGER).get(0);
+        // Check that the segment lineage entry id is valid
+        Preconditions.checkNotNull(segmentLineageEntryId, "'segmentLineageEntryId' should not be null");
+        _pinotHelixResourceManager.revertReplaceSegments(tableNameWithType, segmentLineageEntryId, forceRevert,
+            revertReplaceSegmentsRequest);
+        asyncResponse.resume(Response.ok().build());
+      } catch (Exception e) {
+        String tableNameWithType = null;
+        try {
+          String translatedTableName = DatabaseUtils.translateTableName(tableName, headers);
+          TableType tableType = Constants.validateTableType(tableTypeStr);
+          if (tableType != null) {
+            tableNameWithType =
+                ResourceUtils.getExistingTableNamesWithType(_pinotHelixResourceManager, translatedTableName, tableType, LOGGER).get(0);
+            _controllerMetrics.addMeteredTableValue(tableNameWithType, ControllerMeter.NUMBER_REVERT_REPLACE_FAILURE, 1);
+          }
+        } catch (Exception ignored) {
+          // Ignore errors when trying to get table name for metrics
+        }
+        asyncResponse.resume(new ControllerApplicationException(LOGGER, e.getMessage(), Response.Status.INTERNAL_SERVER_ERROR, e));
+      }
+    });
   }
 
   @POST
