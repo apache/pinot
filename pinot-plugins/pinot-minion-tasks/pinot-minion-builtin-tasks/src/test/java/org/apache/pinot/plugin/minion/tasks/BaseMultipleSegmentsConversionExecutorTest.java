@@ -30,9 +30,12 @@ import org.apache.commons.io.FileUtils;
 import org.apache.hc.core5.http.Header;
 import org.apache.hc.core5.http.NameValuePair;
 import org.apache.hc.core5.http.message.BasicNameValuePair;
+import org.apache.pinot.common.auth.NullAuthProvider;
 import org.apache.pinot.common.metadata.segment.SegmentZKMetadataCustomMapModifier;
 import org.apache.pinot.common.utils.FileUploadDownloadClient;
+import org.apache.pinot.core.common.MinionConstants;
 import org.apache.pinot.core.minion.PinotTaskConfig;
+import org.apache.pinot.minion.MinionContext;
 import org.apache.pinot.spi.auth.AuthProvider;
 import org.apache.pinot.spi.ingestion.batch.BatchConfigProperties;
 import org.apache.pinot.spi.ingestion.batch.spec.PushJobSpec;
@@ -52,6 +55,7 @@ public class BaseMultipleSegmentsConversionExecutorTest {
 
   @AfterMethod
   public void tearDown() throws IOException {
+    MinionContext.getInstance().setTaskAuthProvider(null);
     // Clean up the temporary directory
     FileUtils.deleteDirectory(_tempDir);
   }
@@ -96,6 +100,55 @@ public class BaseMultipleSegmentsConversionExecutorTest {
     List<Header> headers =
         _executor.getSegmentPushCommonHeaders(pinotTaskConfig, _mockAuthProvider, segmentConversionResults);
     Assert.assertEquals(headers.size(), 1);
+  }
+
+  @Test
+  public void testRuntimeAuthProviderPreferredOverTaskToken() {
+    AuthProvider runtimeProvider = new AuthProvider() {
+      @Override
+      public Map<String, Object> getRequestHeaders() {
+        Map<String, Object> m = new HashMap<>();
+        m.put("X-Test", "v1");
+        return m;
+      }
+      @Override
+      public String getTaskToken() {
+        return "IGNORED";
+      }
+    };
+    MinionContext.getInstance().setTaskAuthProvider(runtimeProvider);
+
+    Map<String, String> taskConfigs = new HashMap<>();
+    taskConfigs.put("tableName", "myTable_OFFLINE");
+    taskConfigs.put("uploadURL", "http://controller:9000/upload");
+    PinotTaskConfig pinotTaskConfig = new PinotTaskConfig("customMinionTask", taskConfigs);
+    List<SegmentConversionResult> results = new ArrayList<>();
+    BaseMultipleSegmentsConversionExecutor.SegmentUploadContext ctx =
+        new BaseMultipleSegmentsConversionExecutor.SegmentUploadContext(pinotTaskConfig, results);
+
+    List<Header> headers = _executor.getSegmentPushCommonHeaders(pinotTaskConfig, ctx.getAuthProvider(), results);
+
+    boolean foundCustom = headers.stream().anyMatch(h -> h.getName().equals("X-Test") && h.getValue().equals("v1"));
+    Assert.assertTrue(foundCustom, "Expected custom header from runtime provider");
+  }
+
+  @Test
+  public void testFallbackToTaskTokenWhenNoRuntimeProvider() {
+    MinionContext.getInstance().setTaskAuthProvider(new NullAuthProvider());
+    Map<String, String> taskConfigs = new HashMap<>();
+    taskConfigs.put("tableName", "myTable_OFFLINE");
+    taskConfigs.put("uploadURL", "http://controller:9000/upload");
+    taskConfigs.put(MinionConstants.AUTH_TOKEN, "Bearer foo");
+    PinotTaskConfig pinotTaskConfig = new PinotTaskConfig("customMinionTask", taskConfigs);
+    List<SegmentConversionResult> results = new ArrayList<>();
+    BaseMultipleSegmentsConversionExecutor.SegmentUploadContext ctx =
+        new BaseMultipleSegmentsConversionExecutor.SegmentUploadContext(pinotTaskConfig, results);
+
+    List<Header> headers = _executor.getSegmentPushCommonHeaders(pinotTaskConfig, ctx.getAuthProvider(), results);
+
+    boolean foundAuth = headers.stream().anyMatch(h -> h.getName().equals("Authorization")
+        && h.getValue().equals("Bearer foo"));
+    Assert.assertTrue(foundAuth, "Expected Authorization header from AUTH_TOKEN fallback");
   }
 
   @Test

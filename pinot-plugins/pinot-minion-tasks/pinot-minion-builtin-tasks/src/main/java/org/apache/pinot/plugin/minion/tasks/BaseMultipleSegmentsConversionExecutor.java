@@ -124,7 +124,8 @@ public abstract class BaseMultipleSegmentsConversionExecutor extends BaseTaskExe
     String tableNameWithType = configs.get(MinionConstants.TABLE_NAME_KEY);
     String inputSegmentNames = configs.get(MinionConstants.SEGMENT_NAME_KEY);
     String uploadURL = configs.get(MinionConstants.UPLOAD_URL_KEY);
-    AuthProvider authProvider = AuthProviderUtils.makeAuthProvider(configs.get(MinionConstants.AUTH_TOKEN));
+    // Prefer the runtime minion AuthProvider; fallback to token if needed.
+    AuthProvider authProvider = resolveAuthProvider(configs);
     Set<String> segmentNamesForTable = SegmentConversionUtils.getSegmentNamesForTable(tableNameWithType,
         FileUploadDownloadClient.extractBaseURI(new URI(uploadURL)), authProvider);
     Set<String> nonExistingSegmentNames =
@@ -194,7 +195,8 @@ public abstract class BaseMultipleSegmentsConversionExecutor extends BaseTaskExe
     String uploadURL = taskConfigs.get(MinionConstants.UPLOAD_URL_KEY);
     String downloadURLString = taskConfigs.get(MinionConstants.DOWNLOAD_URL_KEY);
     String[] downloadURLs = downloadURLString.split(MinionConstants.URL_SEPARATOR);
-    AuthProvider authProvider = AuthProviderUtils.makeAuthProvider(taskConfigs.get(MinionConstants.AUTH_TOKEN));
+    // Prefer the runtime minion AuthProvider; fallback to token if needed.
+    AuthProvider authProvider = resolveAuthProvider(taskConfigs);
     File tempDataDir = new File(new File(MINION_CONTEXT.getDataDir(), taskType), "tmp-" + UUID.randomUUID());
     Preconditions.checkState(tempDataDir.mkdirs());
     int numRecords;
@@ -613,7 +615,8 @@ public abstract class BaseMultipleSegmentsConversionExecutor extends BaseTaskExe
       Map<String, String> configs = pinotTaskConfig.getConfigs();
       _tableNameWithType = configs.get(MinionConstants.TABLE_NAME_KEY);
       _uploadURL = configs.get(MinionConstants.UPLOAD_URL_KEY);
-      _authProvider = AuthProviderUtils.makeAuthProvider(configs.get(MinionConstants.AUTH_TOKEN));
+      // Prefer the runtime minion AuthProvider; fallback to token if needed.
+      _authProvider = BaseTaskExecutor.resolveAuthProvider(configs);
       _inputSegmentNames = configs.get(MinionConstants.SEGMENT_NAME_KEY);
       String replaceSegmentsString = configs.get(MinionConstants.ENABLE_REPLACE_SEGMENTS_KEY);
       _replaceSegmentsEnabled = Boolean.parseBoolean(replaceSegmentsString);
