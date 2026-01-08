@@ -19,6 +19,7 @@
 package org.apache.pinot.query.service.dispatch;
 
 import io.grpc.stub.StreamObserver;
+import java.time.Duration;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -74,7 +75,8 @@ public class QueryDispatcherTest extends QueryTestSet {
         QueryEnvironmentTestBase.TABLE_SCHEMAS, QueryEnvironmentTestBase.SERVER1_SEGMENTS,
         QueryEnvironmentTestBase.SERVER2_SEGMENTS, null);
     _queryDispatcher =
-        new QueryDispatcher(Mockito.mock(MailboxService.class), Mockito.mock(FailureDetector.class), null, true);
+        new QueryDispatcher(Mockito.mock(MailboxService.class), Mockito.mock(FailureDetector.class), null, true,
+            Duration.ofSeconds(1));
   }
 
   @AfterClass

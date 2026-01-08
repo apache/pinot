@@ -81,10 +81,6 @@ import org.apache.pinot.query.runtime.operator.OpChain;
 import org.apache.pinot.query.runtime.plan.MultiStageQueryStats;
 import org.apache.pinot.query.runtime.plan.OpChainExecutionContext;
 import org.apache.pinot.query.runtime.plan.PlanNodeToOpChain;
-import org.apache.pinot.query.runtime.timeseries.PhysicalTimeSeriesBrokerPlanVisitor;
-import org.apache.pinot.query.runtime.timeseries.TimeSeriesExecutionContext;
-import org.apache.pinot.query.service.dispatch.timeseries.TimeSeriesDispatchClient;
-import org.apache.pinot.query.service.dispatch.timeseries.TimeSeriesDispatchObserver;
 import org.apache.pinot.spi.exception.QueryErrorCode;
 import org.apache.pinot.spi.exception.QueryException;
 import org.apache.pinot.spi.query.QueryExecutionContext;
@@ -94,13 +90,6 @@ import org.apache.pinot.spi.utils.CommonConstants.Broker.Request.QueryOptionKey;
 import org.apache.pinot.spi.utils.CommonConstants.MultiStageQueryRunner.PlanVersions;
 import org.apache.pinot.spi.utils.CommonConstants.Query.Request.MetadataKeys;
 import org.apache.pinot.spi.utils.CommonConstants.Query.Response.ServerResponseStatus;
-import org.apache.pinot.tsdb.planner.TimeSeriesExchangeNode;
-import org.apache.pinot.tsdb.planner.physical.TimeSeriesDispatchablePlan;
-import org.apache.pinot.tsdb.planner.physical.TimeSeriesQueryServerInstance;
-import org.apache.pinot.tsdb.spi.TimeBuckets;
-import org.apache.pinot.tsdb.spi.operator.BaseTimeSeriesOperator;
-import org.apache.pinot.tsdb.spi.plan.BaseTimeSeriesPlanNode;
-import org.apache.pinot.tsdb.spi.series.TimeSeriesBlock;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -115,24 +104,12 @@ public class QueryDispatcher {
   private final MailboxService _mailboxService;
   private final ExecutorService _executorService;
   private final Map<String, DispatchClient> _dispatchClientMap = new ConcurrentHashMap<>();
-  private final Map<String, TimeSeriesDispatchClient> _timeSeriesDispatchClientMap = new ConcurrentHashMap<>();
   @Nullable
   private final TlsConfig _tlsConfig;
   // maps broker-generated query id to the set of servers that the query was dispatched to
   private final Map<Long, Set<QueryServerInstance>> _serversByQuery;
-  private final PhysicalTimeSeriesBrokerPlanVisitor _timeSeriesBrokerPlanVisitor =
-      new PhysicalTimeSeriesBrokerPlanVisitor();
   private final FailureDetector _failureDetector;
   private final Duration _cancelTimeout;
-
-  public QueryDispatcher(MailboxService mailboxService, FailureDetector failureDetector) {
-    this(mailboxService, failureDetector, null, false);
-  }
-
-  public QueryDispatcher(MailboxService mailboxService, FailureDetector failureDetector, @Nullable TlsConfig tlsConfig,
-      boolean enableCancellation) {
-    this(mailboxService, failureDetector, tlsConfig, enableCancellation, Duration.ofSeconds(1));
-  }
 
   public QueryDispatcher(MailboxService mailboxService, FailureDetector failureDetector, @Nullable TlsConfig tlsConfig,
       boolean enableCancellation, Duration cancelTimeout) {
@@ -383,24 +360,6 @@ public class QueryDispatcher {
     }
   }
 
-  Map<String, String> initializeTimeSeriesMetadataMap(TimeSeriesDispatchablePlan dispatchablePlan, long deadlineMs,
-      RequestContext requestContext, String instanceId) {
-    Map<String, String> result = new HashMap<>();
-    TimeBuckets timeBuckets = dispatchablePlan.getTimeBuckets();
-    result.put(MetadataKeys.TimeSeries.LANGUAGE, dispatchablePlan.getLanguage());
-    result.put(MetadataKeys.TimeSeries.START_TIME_SECONDS, Long.toString(timeBuckets.getTimeBuckets()[0]));
-    result.put(MetadataKeys.TimeSeries.WINDOW_SECONDS, Long.toString(timeBuckets.getBucketSize().getSeconds()));
-    result.put(MetadataKeys.TimeSeries.NUM_ELEMENTS, Long.toString(timeBuckets.getTimeBuckets().length));
-    result.put(MetadataKeys.TimeSeries.DEADLINE_MS, Long.toString(deadlineMs));
-    Map<String, List<String>> leafIdToSegments = dispatchablePlan.getLeafIdToSegmentsByInstanceId().get(instanceId);
-    for (Map.Entry<String, List<String>> entry : leafIdToSegments.entrySet()) {
-      result.put(MetadataKeys.TimeSeries.encodeSegmentListKey(entry.getKey()), String.join(",", entry.getValue()));
-    }
-    result.put(MetadataKeys.REQUEST_ID, Long.toString(requestContext.getRequestId()));
-    result.put(MetadataKeys.BROKER_ID, requestContext.getBrokerId());
-    return result;
-  }
-
   private static Worker.QueryRequest createRequest(QueryServerInstance serverInstance,
       Map<DispatchablePlanFragment, StageInfo> stageInfos, ByteString protoRequestMetadata) {
     Worker.QueryRequest.Builder requestBuilder = Worker.QueryRequest.newBuilder();
@@ -571,14 +530,6 @@ public class QueryDispatcher {
     }
   }
 
-  private TimeSeriesDispatchClient getOrCreateTimeSeriesDispatchClient(
-      TimeSeriesQueryServerInstance queryServerInstance) {
-    String hostname = queryServerInstance.getHostname();
-    int port = queryServerInstance.getQueryServicePort();
-    String key = String.format("%s_%d", hostname, port);
-    return _timeSeriesDispatchClientMap.computeIfAbsent(key, k -> new TimeSeriesDispatchClient(hostname, port));
-  }
-
   /// Concatenates the results of the sub-plan and returns a [QueryResult] with the concatenated result.
   /// [QueryThreadContext] must already be set up before calling this method.
   @VisibleForTesting
@@ -692,47 +643,6 @@ public class QueryDispatcher {
     _dispatchClientMap.clear();
     _mailboxService.shutdown();
     _executorService.shutdown();
-  }
-
-  public TimeSeriesBlock submitAndGet(long requestId, TimeSeriesDispatchablePlan plan, long timeoutMs,
-      RequestContext requestContext)
-      throws Exception {
-    long deadlineMs = System.currentTimeMillis() + timeoutMs;
-    BaseTimeSeriesPlanNode brokerFragment = plan.getBrokerFragment();
-    // Get consumers for leafs
-    Map<String, BlockingQueue<Object>> receiversByPlanId = new HashMap<>();
-    populateConsumers(brokerFragment, receiversByPlanId);
-    // Compile brokerFragment to get operators
-    TimeSeriesExecutionContext brokerExecutionContext =
-        new TimeSeriesExecutionContext(plan.getLanguage(), plan.getTimeBuckets(), deadlineMs, Map.of(), Map.of(),
-            receiversByPlanId);
-    BaseTimeSeriesOperator brokerOperator = _timeSeriesBrokerPlanVisitor.compile(brokerFragment, brokerExecutionContext,
-        plan.getNumInputServersForExchangePlanNode());
-    // Create dispatch observer for each query server
-    for (TimeSeriesQueryServerInstance serverInstance : plan.getQueryServerInstances()) {
-      String serverId = serverInstance.getInstanceId();
-      Deadline deadline = Deadline.after(deadlineMs - System.currentTimeMillis(), TimeUnit.MILLISECONDS);
-      Preconditions.checkState(!deadline.isExpired(), "Deadline expired before query could be sent to servers");
-      // Send server fragment to every server
-      Worker.TimeSeriesQueryRequest request = Worker.TimeSeriesQueryRequest.newBuilder()
-          .addAllDispatchPlan(plan.getSerializedServerFragments())
-          .putAllMetadata(initializeTimeSeriesMetadataMap(plan, deadlineMs, requestContext, serverId))
-          .putMetadata(MetadataKeys.REQUEST_ID, Long.toString(requestId))
-          .build();
-      TimeSeriesDispatchObserver dispatchObserver = new TimeSeriesDispatchObserver(receiversByPlanId);
-      getOrCreateTimeSeriesDispatchClient(serverInstance).submit(request, deadline, dispatchObserver);
-    }
-    // Execute broker fragment
-    return brokerOperator.nextBlock();
-  }
-
-  private void populateConsumers(BaseTimeSeriesPlanNode planNode, Map<String, BlockingQueue<Object>> receiverMap) {
-    if (planNode instanceof TimeSeriesExchangeNode) {
-      receiverMap.put(planNode.getId(), new ArrayBlockingQueue<>(TimeSeriesDispatchObserver.MAX_QUEUE_CAPACITY));
-    }
-    for (BaseTimeSeriesPlanNode childNode : planNode.getInputs()) {
-      populateConsumers(childNode, receiverMap);
-    }
   }
 
   public static class QueryResult {

@@ -318,7 +318,7 @@ public class MultiStageBrokerRequestHandler extends BaseBrokerRequestHandler {
   protected BrokerResponse handleRequestThrowing(long requestId, String query, SqlNodeAndOptions sqlNodeAndOptions,
       @Nullable RequesterIdentity requesterIdentity, RequestContext requestContext, HttpHeaders httpHeaders)
       throws QueryException, WebApplicationException {
-    _queryLogger.log(requestId, query);
+    boolean queryWasLogged = _queryLogger.logQueryReceived(requestId, query);
 
     String queryHash = CommonConstants.Broker.DEFAULT_QUERY_HASH;
     if (_enableQueryFingerprinting) {
@@ -359,7 +359,7 @@ public class MultiStageBrokerRequestHandler extends BaseBrokerRequestHandler {
         return explain(compiledQuery, requestId, requestContext, queryTimer);
       } else {
         return query(compiledQuery, requestId, requesterIdentity, requestContext, httpHeaders, queryTimer,
-            rlsFiltersApplied.get());
+            rlsFiltersApplied.get(), queryWasLogged);
       }
     }
   }
@@ -534,7 +534,7 @@ public class MultiStageBrokerRequestHandler extends BaseBrokerRequestHandler {
 
   private BrokerResponse query(QueryEnvironment.CompiledQuery query, long requestId,
       RequesterIdentity requesterIdentity, RequestContext requestContext, HttpHeaders httpHeaders, Timer timer,
-      boolean rlsFiltersApplied)
+      boolean rlsFiltersApplied, boolean queryWasLogged)
       throws QueryException, WebApplicationException {
     QueryEnvironment.QueryPlannerResult queryPlanResult = callAsync(requestId, query.getTextQuery(),
         () -> query.planQuery(requestId), timer);
@@ -686,9 +686,10 @@ public class MultiStageBrokerRequestHandler extends BaseBrokerRequestHandler {
       brokerResponse.setRLSFiltersApplied(rlsFiltersApplied);
 
       // Log query and stats
-      _queryLogger.log(
+      _queryLogger.logQueryCompleted(
           new QueryLogger.QueryLogParams(requestContext, tableNames.toString(), brokerResponse,
-              QueryLogger.QueryLogParams.QueryEngine.MULTI_STAGE, requesterIdentity, null));
+              QueryLogger.QueryLogParams.QueryEngine.MULTI_STAGE, requesterIdentity, null),
+          queryWasLogged);
 
       return brokerResponse;
     } finally {

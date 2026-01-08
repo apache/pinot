@@ -335,7 +335,7 @@ public abstract class BaseSingleStageBrokerRequestHandler extends BaseBrokerRequ
       JsonNode request, @Nullable RequesterIdentity requesterIdentity, RequestContext requestContext,
       @Nullable HttpHeaders httpHeaders, AccessControl accessControl)
       throws Exception {
-    _queryLogger.log(requestId, query);
+    boolean queryWasLogged = _queryLogger.logQueryReceived(requestId, query);
 
     String queryHash = CommonConstants.Broker.DEFAULT_QUERY_HASH;
     if (_enableQueryFingerprinting) {
@@ -365,7 +365,7 @@ public abstract class BaseSingleStageBrokerRequestHandler extends BaseBrokerRequ
             queryHash);
     try (QueryThreadContext ignore = QueryThreadContext.open(executionContext, _threadAccountant)) {
       return doHandleRequest(requestId, query, sqlNodeAndOptions, request, requesterIdentity, requestContext,
-          httpHeaders, accessControl);
+          httpHeaders, accessControl, queryWasLogged);
     }
   }
 
@@ -406,7 +406,7 @@ public abstract class BaseSingleStageBrokerRequestHandler extends BaseBrokerRequ
 
   protected BrokerResponse doHandleRequest(long requestId, String query, SqlNodeAndOptions sqlNodeAndOptions,
       JsonNode request, @Nullable RequesterIdentity requesterIdentity, RequestContext requestContext,
-      @Nullable HttpHeaders httpHeaders, AccessControl accessControl)
+      @Nullable HttpHeaders httpHeaders, AccessControl accessControl, boolean queryWasLogged)
       throws Exception {
     // Compile the request into PinotQuery
     long compilationStartTimeNs = System.nanoTime();
@@ -640,7 +640,7 @@ public abstract class BaseSingleStageBrokerRequestHandler extends BaseBrokerRequ
 
     if (offlineBrokerRequest == null && realtimeBrokerRequest == null) {
       return getEmptyBrokerOnlyResponse(pinotQuery, serverPinotQuery, requestContext, tableName, requesterIdentity,
-          schema, query, database);
+          schema, query, database, queryWasLogged);
     }
 
     if (offlineBrokerRequest != null && isFilterAlwaysTrue(offlineBrokerRequest.getPinotQuery())) {
@@ -718,7 +718,7 @@ public abstract class BaseSingleStageBrokerRequestHandler extends BaseBrokerRequ
       } else {
         // If no route is found, send an empty response
         return getEmptyBrokerOnlyResponse(pinotQuery, serverPinotQuery, requestContext, tableName, requesterIdentity,
-            schema, query, database);
+            schema, query, database, queryWasLogged);
       }
     }
     long routingEndTimeNs = System.nanoTime();
@@ -899,9 +899,10 @@ public abstract class BaseSingleStageBrokerRequestHandler extends BaseBrokerRequ
     brokerResponse.setRLSFiltersApplied(rlsFiltersApplied.get());
 
     // Log query and stats
-    _queryLogger.log(
+    _queryLogger.logQueryCompleted(
         new QueryLogger.QueryLogParams(requestContext, tableName, brokerResponse,
-            QueryLogger.QueryLogParams.QueryEngine.SINGLE_STAGE, requesterIdentity, serverStats));
+            QueryLogger.QueryLogParams.QueryEngine.SINGLE_STAGE, requesterIdentity, serverStats),
+        queryWasLogged);
 
     return brokerResponse;
   }
@@ -1106,7 +1107,7 @@ public abstract class BaseSingleStageBrokerRequestHandler extends BaseBrokerRequ
 
   private BrokerResponseNative getEmptyBrokerOnlyResponse(PinotQuery pinotQuery, PinotQuery serverPinotQuery,
       RequestContext requestContext, String tableName, @Nullable RequesterIdentity requesterIdentity, Schema schema,
-      String query, String database) {
+      String query, String database, boolean queryWasLogged) {
     if (pinotQuery.isExplain()) {
       // EXPLAIN PLAN results to show that query is evaluated exclusively by Broker.
       return BrokerResponseNative.BROKER_ONLY_EXPLAIN_PLAN_OUTPUT;
@@ -1134,8 +1135,8 @@ public abstract class BaseSingleStageBrokerRequestHandler extends BaseBrokerRequ
     }
     brokerResponse.setTablesQueried(Set.of(TableNameBuilder.extractRawTableName(tableName)));
     brokerResponse.setTimeUsedMs(System.currentTimeMillis() - requestContext.getRequestArrivalTimeMillis());
-    _queryLogger.log(new QueryLogger.QueryLogParams(requestContext, tableName, brokerResponse,
-        QueryLogger.QueryLogParams.QueryEngine.SINGLE_STAGE, requesterIdentity, null));
+    _queryLogger.logQueryCompleted(new QueryLogger.QueryLogParams(requestContext, tableName, brokerResponse,
+        QueryLogger.QueryLogParams.QueryEngine.SINGLE_STAGE, requesterIdentity, null), queryWasLogged);
     return brokerResponse;
   }
 
@@ -1264,9 +1265,10 @@ public abstract class BaseSingleStageBrokerRequestHandler extends BaseBrokerRequ
         sqlNodeAndOptions.getOptions().putIfAbsent(QueryOptionKey.REGEX_DICT_SIZE_THRESHOLD, _regexDictSizeThreshold);
       }
 
+      // Pass false for queryWasLogged to avoid logging subqueries separately
       BrokerResponse response =
           doHandleRequest(requestId, subquery, sqlNodeAndOptions, jsonRequest, requesterIdentity, requestContext,
-              httpHeaders, accessControl);
+              httpHeaders, accessControl, false);
       if (response.getExceptionsSize() != 0) {
         throw new RuntimeException("Caught exception while executing subquery: " + subquery);
       }
