@@ -173,8 +173,6 @@ public class MultiStageBrokerRequestHandler extends BaseBrokerRequestHandler {
     _queryDispatcher =
         new QueryDispatcher(new MailboxService(hostname, port, InstanceType.BROKER, config, tlsConfig), failureDetector,
             tlsConfig, isQueryCancellationEnabled(), cancelTimeout);
-    _routingManager.setServerReenableCallback(
-        serverInstance -> _queryDispatcher.resetClientConnectionBackoff(serverInstance));
     LOGGER.info("Initialized MultiStageBrokerRequestHandler on host: {}, port: {} with broker id: {}, timeout: {}ms, "
             + "query log max length: {}, query log max rate: {}, query cancellation enabled: {}", hostname, port,
         _brokerId, _brokerTimeoutMs, _queryLogger.getMaxQueryLengthToLog(), _queryLogger.getLogRateLimit(),
@@ -838,5 +836,9 @@ public class MultiStageBrokerRequestHandler extends BaseBrokerRequestHandler {
       default:
         return false;
     }
+  }
+
+  public QueryDispatcher getQueryDispatcher() {
+    return _queryDispatcher;
   }
 }
