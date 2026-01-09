@@ -206,14 +206,41 @@ public class ControllerLeaderLocator {
    * @param instanceId instance id without any prefix, e.g. localhost_9000
    */
   private Pair<String, Integer> convertToHostAndPortPair(String instanceId) {
-    // TODO: improve the exception handling.
-    if (instanceId == null) {
+    if (instanceId == null || instanceId.trim().isEmpty()) {
+      LOGGER.warn("Instance ID is null or empty");
       return null;
     }
-    int index = instanceId.lastIndexOf('_');
-    String leaderHost = instanceId.substring(0, index);
-    int leaderPort = Integer.parseInt(instanceId.substring(index + 1));
-    return Pair.of(leaderHost, leaderPort);
+
+    try {
+      int index = instanceId.lastIndexOf('_');
+      if (index <= 0 || index >= instanceId.length() - 1) {
+        LOGGER.error("Invalid instance ID format: {}. Expected format: hostname_port", instanceId);
+        return null;
+      }
+
+      String leaderHost = instanceId.substring(0, index);
+      String portStr = instanceId.substring(index + 1);
+
+      if (leaderHost.trim().isEmpty()) {
+        LOGGER.error("Empty hostname in instance ID: {}", instanceId);
+        return null;
+      }
+
+      int leaderPort = Integer.parseInt(portStr);
+      if (leaderPort <= 0 || leaderPort > 65535) {
+        LOGGER.error("Invalid port number {} in instance ID: {}. Port must be between 1 and 65535",
+            leaderPort, instanceId);
+        return null;
+      }
+
+      return Pair.of(leaderHost, leaderPort);
+    } catch (NumberFormatException e) {
+      LOGGER.error("Failed to parse port number from instance ID: {}. Error: {}", instanceId, e.getMessage());
+      return null;
+    } catch (Exception e) {
+      LOGGER.error("Unexpected error while parsing instance ID: {}. Error: {}", instanceId, e.getMessage());
+      return null;
+    }
   }
 
   /**
