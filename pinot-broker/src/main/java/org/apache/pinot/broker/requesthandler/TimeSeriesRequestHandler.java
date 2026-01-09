@@ -32,6 +32,7 @@ import java.util.Set;
 import java.util.Stack;
 import java.util.concurrent.Executor;
 import java.util.concurrent.TimeUnit;
+import java.util.stream.Collectors;
 import javax.annotation.Nullable;
 import javax.ws.rs.WebApplicationException;
 import javax.ws.rs.core.HttpHeaders;
@@ -50,6 +51,7 @@ import org.apache.pinot.common.request.context.ExpressionContext;
 import org.apache.pinot.common.request.context.FilterContext;
 import org.apache.pinot.common.request.context.RequestContextUtils;
 import org.apache.pinot.common.response.BrokerResponse;
+import org.apache.pinot.common.response.mapper.TimeSeriesResponseMapper;
 import org.apache.pinot.common.utils.HumanReadableDuration;
 import org.apache.pinot.core.auth.Actions;
 import org.apache.pinot.core.auth.TargetType;
@@ -126,6 +128,7 @@ public class TimeSeriesRequestHandler extends BaseBrokerRequestHandler {
     _queryDispatcher.shutdown();
   }
 
+  // TODO: Consider returning BrokerResponse instead of TimeSeriesBlock for consistency with other handlers.
   @Override
   public TimeSeriesBlock handleTimeSeriesRequest(String lang, String rawQueryParamString,
       Map<String, String> queryParams, RequestContext requestContext, RequesterIdentity requesterIdentity,
@@ -136,13 +139,17 @@ public class TimeSeriesRequestHandler extends BaseBrokerRequestHandler {
       _brokerMetrics.addMeteredGlobalValue(BrokerMeter.TIME_SERIES_GLOBAL_QUERIES, 1);
       requestContext.setBrokerId(_brokerId);
       requestContext.setRequestId(_requestIdGenerator.get());
-      RangeTimeSeriesRequest timeSeriesRequest = null;
+      setTrackedHeadersInRequestContext(requestContext, httpHeaders, _trackedHeaders);
+
       firstStageAccessControlCheck(requesterIdentity);
+      RangeTimeSeriesRequest timeSeriesRequest;
       try {
         timeSeriesRequest = buildRangeTimeSeriesRequest(lang, rawQueryParamString, queryParams);
       } catch (URISyntaxException e) {
         throw new QueryException(QueryErrorCode.TIMESERIES_PARSING, "Error building RangeTimeSeriesRequest", e);
       }
+      requestContext.setQuery(timeSeriesRequest.getQuery());
+
       TimeSeriesLogicalPlanResult logicalPlanResult = _queryEnvironment.buildLogicalPlan(timeSeriesRequest);
       // If there are no buckets in the logical plan, return an empty response.
       if (logicalPlanResult.getTimeBuckets().getNumBuckets() == 0) {
@@ -154,17 +161,33 @@ public class TimeSeriesRequestHandler extends BaseBrokerRequestHandler {
 
       timeSeriesBlock = _queryDispatcher.submitAndGet(requestContext.getRequestId(), dispatchablePlan,
           timeSeriesRequest.getTimeout().toMillis(), requestContext);
+      TimeSeriesResponseMapper.setStatsInRequestContext(requestContext, timeSeriesBlock.getMetadata());
+      setExceptionsFromBlockToRequestContext(timeSeriesBlock, requestContext);
       return timeSeriesBlock;
     } catch (Exception e) {
+      QueryException qe;
       _brokerMetrics.addMeteredGlobalValue(BrokerMeter.TIME_SERIES_GLOBAL_QUERIES_FAILED, 1);
       if (e instanceof QueryException) {
-        throw (QueryException) e;
+        qe = (QueryException) e;
       } else {
-        throw new QueryException(QueryErrorCode.UNKNOWN, "Error processing time-series query", e);
+        qe = new QueryException(QueryErrorCode.UNKNOWN, "Error processing time-series query", e);
       }
+      requestContext.setErrorCode(qe.getErrorCode());
+      throw qe;
     } finally {
       _brokerMetrics.addTimedValue(BrokerTimer.QUERY_TOTAL_TIME_MS, System.currentTimeMillis() - queryStartTime,
           TimeUnit.MILLISECONDS);
+      _brokerQueryEventListener.onQueryCompletion(requestContext);
+    }
+  }
+
+  private void setExceptionsFromBlockToRequestContext(TimeSeriesBlock timeSeriesBlock, RequestContext requestContext) {
+    List<QueryException> exceptions = timeSeriesBlock.getExceptions();
+    if (exceptions != null && !exceptions.isEmpty()) {
+      // Set the first exception's error code in the request context
+      requestContext.setErrorCode(exceptions.get(0).getErrorCode());
+      requestContext.setProcessingExceptions(exceptions.stream().map(QueryException::getMessage)
+        .collect(Collectors.toList()));
     }
   }
 
