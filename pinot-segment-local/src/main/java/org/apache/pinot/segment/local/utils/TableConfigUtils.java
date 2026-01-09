@@ -1604,11 +1604,22 @@ public final class TableConfigUtils {
     }
   }
 
-  public static boolean checkForInconsistentStateConfigs(TableConfig tableConfig) {
-    return tableConfig.getUpsertConfig() != null && tableConfig.getReplication() > 1 && (
-        tableConfig.getUpsertConfig().getMode() == UpsertConfig.Mode.PARTIAL
-            || tableConfig.getUpsertConfig().isDropOutOfOrderRecord()
-            && tableConfig.getUpsertConfig().getConsistencyMode() == UpsertConfig.ConsistencyMode.NONE);
+  /**
+   * Checks if the table config has inconsistent state configurations that could cause
+   * data inconsistency during force commit/reload operations.
+   *
+   * @param tableConfig the table config to check, may be null
+   * @return true if the table has inconsistent state configs, false if tableConfig is null or no issues found
+   */
+  public static boolean checkForInconsistentStateConfigs(@Nullable TableConfig tableConfig) {
+    UpsertConfig upsertConfig = tableConfig.getUpsertConfig();
+    if (upsertConfig == null) {
+      return false;
+    }
+    return tableConfig.getReplication() > 1 && (
+        upsertConfig.getMode() == UpsertConfig.Mode.PARTIAL
+            || (upsertConfig.isDropOutOfOrderRecord()
+            && upsertConfig.getConsistencyMode() == UpsertConfig.ConsistencyMode.NONE));
   }
 
   // enum of all the skip-able validation types.

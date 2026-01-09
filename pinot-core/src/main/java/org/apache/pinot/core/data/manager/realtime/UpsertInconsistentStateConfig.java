@@ -21,6 +21,7 @@ package org.apache.pinot.core.data.manager.realtime;
 import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.atomic.AtomicBoolean;
+import javax.annotation.Nullable;
 import org.apache.pinot.segment.local.utils.TableConfigUtils;
 import org.apache.pinot.spi.config.provider.PinotClusterConfigChangeListener;
 import org.apache.pinot.spi.config.table.TableConfig;
@@ -52,9 +53,26 @@ public class UpsertInconsistentStateConfig implements PinotClusterConfigChangeLi
 
   /**
    * Checks if force commit/reload is allowed for the given table config.
+   *
+   * @param tableConfig the table config to check, may be null
+   * @return true if force commit/reload is allowed (either globally enabled or table has no inconsistent configs)
    */
-  public boolean isForceCommitReloadAllowed(TableConfig tableConfig) {
-    return (_forceCommitReloadEnabled.get() || !TableConfigUtils.checkForInconsistentStateConfigs(tableConfig));
+  public boolean isForceCommitReloadAllowed(@Nullable TableConfig tableConfig) {
+    if (tableConfig == null) {
+      return false;
+    }
+    if (_forceCommitReloadEnabled.get()) {
+      return true;
+    }
+    // Allow if table doesn't have inconsistent state configs
+    return !TableConfigUtils.checkForInconsistentStateConfigs(tableConfig);
+  }
+
+  /**
+   * Returns whether force commit/reload is currently enabled globally.
+   */
+  public boolean isForceCommitReloadEnabled() {
+    return _forceCommitReloadEnabled.get();
   }
 
   /**
@@ -71,14 +89,14 @@ public class UpsertInconsistentStateConfig implements PinotClusterConfigChangeLi
     }
 
     String configValue = clusterConfigs.get(ConfigChangeListenerConstants.FORCE_COMMIT_RELOAD_CONFIG);
-    boolean enabled = (configValue == null)
+    boolean forceCommitReloadAllowed = (configValue == null)
         ? ConfigChangeListenerConstants.DEFAULT_FORCE_COMMIT_RELOAD
         : Boolean.parseBoolean(configValue);
 
-    boolean previousValue = _forceCommitReloadEnabled.getAndSet(enabled);
-    if (previousValue != enabled) {
-      LOGGER.info("Updated cluster config: {} from {} to {}", ConfigChangeListenerConstants.FORCE_COMMIT_RELOAD_CONFIG,
-          previousValue, enabled);
+    boolean previousValue = _forceCommitReloadEnabled.getAndSet(forceCommitReloadAllowed);
+    if (previousValue != forceCommitReloadAllowed) {
+      LOGGER.info("Updated cluster config: {} from {} to {}",
+          ConfigChangeListenerConstants.FORCE_COMMIT_RELOAD_CONFIG, previousValue, forceCommitReloadAllowed);
     }
   }
 }
