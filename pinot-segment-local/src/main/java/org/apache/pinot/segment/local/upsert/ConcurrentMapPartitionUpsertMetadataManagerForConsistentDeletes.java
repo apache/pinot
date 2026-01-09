@@ -375,7 +375,7 @@ public class ConcurrentMapPartitionUpsertMetadataManagerForConsistentDeletes
     // Revert to previous locations present in other segment
     for (Map.Entry<Object, RecordLocation> obj : _previousKeyToRecordLocationMap.entrySet()) {
       IndexSegment prevSegment = obj.getValue().getSegment();
-      IndexSegment currentLocation = obj.getValue().getSegment();
+      IndexSegment currentLocation = _primaryKeyToRecordLocationMap.get(obj.getKey()).getSegment();
       if (prevSegment != null) {
         if (currentLocation == oldSegment) {
           try (UpsertUtils.RecordInfoReader recordInfoReader = new UpsertUtils.RecordInfoReader(prevSegment,

@@ -2572,11 +2572,13 @@ public class PinotLLCRealtimeSegmentManager {
   }
 
   private void sendForceCommitMessageToServers(String tableNameWithType, Set<String> consumingSegments) {
-    // For partial-upsert tables or upserts with out-of-order events enabled, force-committing
-    // consuming segments is disabled by default. In some cases (especially when replication > 1),
-    // the server that consumed fewer rows was incorrectly selected as the winner, causing other
-    // servers to reconsume rows and resulting in inconsistent data.
-    // This behavior can be controlled via cluster config without requiring server restart.
+    // Force-committing consuming segments is enabled by default.
+    // For partial-upsert tables or upserts with out-of-order events enabled (notably when replication > 1),
+    // winner selection could incorrectly favor replicas with fewer consumed rows.
+    // This triggered unnecessary reconsumption and resulted in inconsistent upsert state.
+    // The new fix restores and correct segment metadata after inconsistencies are noticed.
+    // To toggle, existing default Force commit behavior dynamically use the cluster config
+    // `pinot.server.upsert.force.commit.reload` without restarting servers.
     TableConfig tableConfig = _helixResourceManager.getTableConfig(tableNameWithType);
     if (tableConfig == null) {
       throw new IllegalStateException("Table config not found for table: " + tableNameWithType);
