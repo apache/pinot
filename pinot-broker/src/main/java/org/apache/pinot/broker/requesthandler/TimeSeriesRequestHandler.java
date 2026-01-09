@@ -32,6 +32,7 @@ import java.util.Set;
 import java.util.Stack;
 import java.util.concurrent.Executor;
 import java.util.concurrent.TimeUnit;
+import java.util.stream.Collectors;
 import javax.annotation.Nullable;
 import javax.ws.rs.WebApplicationException;
 import javax.ws.rs.core.HttpHeaders;
@@ -142,7 +143,6 @@ public class TimeSeriesRequestHandler extends BaseBrokerRequestHandler {
       try {
         timeSeriesRequest = buildRangeTimeSeriesRequest(lang, rawQueryParamString, queryParams);
       } catch (URISyntaxException e) {
-        requestContext.setErrorCode(QueryErrorCode.TIMESERIES_PARSING);
         throw new QueryException(QueryErrorCode.TIMESERIES_PARSING, "Error building RangeTimeSeriesRequest", e);
       }
       requestContext.setQuery(timeSeriesRequest.getQuery());
@@ -159,6 +159,7 @@ public class TimeSeriesRequestHandler extends BaseBrokerRequestHandler {
       timeSeriesBlock = _queryDispatcher.submitAndGet(requestContext.getRequestId(), dispatchablePlan,
           timeSeriesRequest.getTimeout().toMillis(), requestContext);
       TimeSeriesResponseMapper.setStatsInRequestContext(requestContext, timeSeriesBlock.getMetadata());
+      setExceptionsFromBlockToRequestContext(timeSeriesBlock, requestContext);
       return timeSeriesBlock;
     } catch (Exception e) {
       QueryException qe;
@@ -174,6 +175,16 @@ public class TimeSeriesRequestHandler extends BaseBrokerRequestHandler {
       _brokerMetrics.addTimedValue(BrokerTimer.QUERY_TOTAL_TIME_MS, System.currentTimeMillis() - queryStartTime,
           TimeUnit.MILLISECONDS);
       _brokerQueryEventListener.onQueryCompletion(requestContext);
+    }
+  }
+
+  private void setExceptionsFromBlockToRequestContext(TimeSeriesBlock timeSeriesBlock, RequestContext requestContext) {
+    List<QueryException> exceptions = timeSeriesBlock.getExceptions();
+    if (exceptions != null && !exceptions.isEmpty()) {
+      // Set the first exception's error code in the request context
+      requestContext.setErrorCode(exceptions.get(0).getErrorCode());
+      requestContext.setProcessingExceptions(exceptions.stream().map(QueryException::getMessage)
+        .collect(Collectors.toList()));
     }
   }
 
