@@ -514,6 +514,22 @@ public class QueryDispatcher {
     return _dispatchClientMap.computeIfAbsent(hostnamePort, k -> new DispatchClient(hostname, port, _tlsConfig));
   }
 
+  /**
+   * Reset the connection backoff for a server. When the GRPC channel enters a TRANSIENT_FAILURE state from
+   * connection failures, it will fast fail requests and reconnect with exponential backoff. This method
+   * resets the backoff so servers that have recovered can be reconnected to immediately.
+   */
+  public void resetClientConnectionBackoff(ServerInstance serverInstance) {
+    String hostname = serverInstance.getHostname();
+    int port = serverInstance.getQueryServicePort();
+    String hostnamePort = String.format("%s_%d", hostname, port);
+    DispatchClient dispatchClient = _dispatchClientMap.get(hostnamePort);
+    if (dispatchClient != null) {
+      LOGGER.info("Resetting connection backoff for server: {}", serverInstance.getInstanceId());
+      dispatchClient.getChannel().resetConnectBackoff();
+    }
+  }
+
   /// Concatenates the results of the sub-plan and returns a [QueryResult] with the concatenated result.
   /// [QueryThreadContext] must already be set up before calling this method.
   @VisibleForTesting
