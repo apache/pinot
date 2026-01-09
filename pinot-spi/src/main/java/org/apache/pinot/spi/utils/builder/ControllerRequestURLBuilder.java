@@ -20,6 +20,7 @@ package org.apache.pinot.spi.utils.builder;
 
 import java.net.URLEncoder;
 import java.nio.charset.StandardCharsets;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
@@ -123,6 +124,21 @@ public class ControllerRequestURLBuilder {
 
   public String forDeleteMinionTask(String taskName) {
     return StringUtil.join("/", _baseUrl, "tasks", "task", taskName);
+  }
+
+  public String forMinionStatus(@Nullable String statusFilter, boolean includeTaskCounts) {
+    StringBuilder url = new StringBuilder(StringUtil.join("/", _baseUrl, "minions", "status"));
+    List<String> params = new ArrayList<>();
+    if (statusFilter != null && !statusFilter.isEmpty()) {
+      params.add("status=" + statusFilter);
+    }
+    if (includeTaskCounts) {
+      params.add("includeTaskCounts=true");
+    }
+    if (!params.isEmpty()) {
+      url.append("?").append(String.join("&", params));
+    }
+    return url.toString();
   }
 
   public String forStopMinionTaskQueue(String taskType) {
