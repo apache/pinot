@@ -40,4 +40,22 @@ public class UploadedRealtimeSegmentNameGeneratorTest {
 
     assertEquals(actualSegmentName, expectedSegmentName);
   }
+
+
+  @Test
+  public void testGenerateSegmentNameWithPrefixSuffixHavingSpaces() {
+    String tableName = "tableName";
+    int partitionId = 1;
+    long creationTimeMillis = 1234567890L;
+    int sequenceId = 2;
+
+    UploadedRealtimeSegmentNameGenerator generator =
+            new UploadedRealtimeSegmentNameGenerator(tableName, partitionId, creationTimeMillis, "prefix  " + 'a',
+                    "suffix  " + 'b');
+    String expectedSegmentName = "prefix_a__tableName__1__1234567890__suffix_b";
+
+    String actualSegmentName = generator.generateSegmentName(sequenceId, null, null);
+
+    assertEquals(actualSegmentName, expectedSegmentName);
+  }
 }
