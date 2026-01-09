@@ -389,8 +389,8 @@ public class ConcurrentMapPartitionUpsertMetadataManagerForConsistentDeletes
           } catch (IOException e) {
             throw new RuntimeException(e);
           }
+          _primaryKeyToRecordLocationMap.put(obj.getKey(), obj.getValue());
         }
-        _primaryKeyToRecordLocationMap.put(obj.getKey(), obj.getValue());
       } else {
         _primaryKeyToRecordLocationMap.remove(obj.getKey());
       }
