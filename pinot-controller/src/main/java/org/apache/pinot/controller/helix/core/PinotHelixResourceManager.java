@@ -4744,6 +4744,7 @@ public class PinotHelixResourceManager {
    * <p>The watermark represents the next offset to be consumed for each partition group.
    * If the latest segment of a partition is in a DONE state, the watermark is the end offset of the completed segment.
    * Otherwise, it is the start offset of the current consuming segment.
+   * <p>This API is restricted to realtime tables only. It works with both upsert and non-upsert tables.
    *
    * @param tableName The name of the real-time table (without type suffix).
    * @return A {@link WatermarkInductionResult} containing a list of watermarks for each partition group.
