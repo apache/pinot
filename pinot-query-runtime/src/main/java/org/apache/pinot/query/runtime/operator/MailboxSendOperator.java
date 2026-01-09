@@ -275,7 +275,7 @@ public class MailboxSendOperator extends MultiStageOperator {
   }
 
   @Override
-  protected StatMap<?> copyStatMaps() {
+  public StatMap<StatKey> copyStatMaps() {
     return new StatMap<>(_statMap);
   }
 
