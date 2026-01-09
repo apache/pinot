@@ -477,6 +477,9 @@ public class MultiStageBrokerRequestHandler extends BaseBrokerRequestHandler {
     int sortExchangeCopyThreshold = _config.getProperty(
         CommonConstants.Broker.CONFIG_OF_SORT_EXCHANGE_COPY_THRESHOLD,
         CommonConstants.Broker.DEFAULT_SORT_EXCHANGE_COPY_THRESHOLD);
+    int mseMaxInClauseElements = _config.getProperty(
+        CommonConstants.Broker.CONFIG_OF_MSE_MAX_IN_CLAUSE_ELEMENTS,
+        CommonConstants.Broker.DEFAULT_MSE_MAX_IN_CLAUSE_ELEMENTS);
     WorkerManager workerManager = QueryOptionsUtils.isMultiClusterRoutingEnabled(queryOptions, false)
         ? _multiClusterWorkerManager : _workerManager;
     return QueryEnvironment.configBuilder()
@@ -501,6 +504,7 @@ public class MultiStageBrokerRequestHandler extends BaseBrokerRequestHandler {
         .defaultHashFunction(defaultHashFunction)
         .defaultDisabledPlannerRules(_defaultDisabledPlannerRules)
         .defaultSortExchangeCopyLimit(sortExchangeCopyThreshold)
+        .defaultMseMaxInClauseElements(mseMaxInClauseElements)
         .build();
   }
 
