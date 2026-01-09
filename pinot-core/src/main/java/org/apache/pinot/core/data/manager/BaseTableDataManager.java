@@ -1659,7 +1659,18 @@ public abstract class BaseTableDataManager implements TableDataManager {
     return segmentDirectoryLoader.load(indexDir.toURI(), loaderContext);
   }
 
+  // CRC check can be performed on both segment CRC and data CRC (if available) based on the ZK property value of
+  // useDataCRCForReplace.
   private static boolean hasSameCRC(SegmentZKMetadata zkMetadata, SegmentMetadata localMetadata) {
+    if (zkMetadata.isUseDataCrcForReplace()) {
+      if (zkMetadata.getCrc() == Long.parseLong(localMetadata.getCrc())) {
+        return true;
+      } else {
+        return zkMetadata.getDataCrc() >= 0
+            && Long.parseLong(localMetadata.getDataCrc()) >= 0
+            && zkMetadata.getDataCrc() == Long.parseLong(localMetadata.getDataCrc());
+      }
+    }
     return zkMetadata.getCrc() == Long.parseLong(localMetadata.getCrc());
   }
 
