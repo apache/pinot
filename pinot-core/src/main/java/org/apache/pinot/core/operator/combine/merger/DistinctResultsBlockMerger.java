@@ -18,18 +18,91 @@
  */
 package org.apache.pinot.core.operator.combine.merger;
 
+import java.util.Objects;
+import java.util.concurrent.TimeUnit;
+import org.apache.pinot.common.utils.config.QueryOptionsUtils;
+import org.apache.pinot.core.operator.blocks.results.BaseResultsBlock;
 import org.apache.pinot.core.operator.blocks.results.DistinctResultsBlock;
+import org.apache.pinot.core.query.request.context.QueryContext;
 
 
 public class DistinctResultsBlockMerger implements ResultsBlockMerger<DistinctResultsBlock> {
+  private final int _maxRowsAcrossSegments;
+  private boolean _rowBudgetReached;
+  private boolean _timeLimitReached;
+  private final long _maxExecutionTimeNs;
+  private final long _startTimeNs;
+
+  public DistinctResultsBlockMerger(QueryContext queryContext) {
+    Integer maxRows = null;
+    Long maxExecutionTimeMs = null;
+    if (queryContext.getQueryOptions() != null) {
+      maxRows = QueryOptionsUtils.getMaxRowsInDistinct(queryContext.getQueryOptions());
+      maxExecutionTimeMs = QueryOptionsUtils.getMaxExecutionTimeMsInDistinct(queryContext.getQueryOptions());
+    }
+    _maxRowsAcrossSegments = Objects.requireNonNullElse(maxRows, Integer.MAX_VALUE);
+    _maxExecutionTimeNs = maxExecutionTimeMs != null ? TimeUnit.MILLISECONDS.toNanos(maxExecutionTimeMs)
+        : Long.MAX_VALUE;
+    _startTimeNs = System.nanoTime();
+  }
 
   @Override
   public boolean isQuerySatisfied(DistinctResultsBlock resultsBlock) {
+    if (_timeLimitReached) {
+      if (resultsBlock.getEarlyTerminationReason() == BaseResultsBlock.EarlyTerminationReason.NONE) {
+        resultsBlock.setEarlyTerminationReason(BaseResultsBlock.EarlyTerminationReason.TIME_LIMIT);
+      }
+      return true;
+    }
+    if (hasExceededTimeLimit()) {
+      _timeLimitReached = true;
+      if (resultsBlock.getEarlyTerminationReason() == BaseResultsBlock.EarlyTerminationReason.NONE) {
+        resultsBlock.setEarlyTerminationReason(BaseResultsBlock.EarlyTerminationReason.TIME_LIMIT);
+      }
+      return true;
+    }
+    if (resultsBlock.getEarlyTerminationReason() == BaseResultsBlock.EarlyTerminationReason.TIME_LIMIT) {
+      _timeLimitReached = true;
+      return true;
+    }
+    if (_rowBudgetReached) {
+      return true;
+    }
+    if (_maxRowsAcrossSegments != Integer.MAX_VALUE
+        && resultsBlock.getNumDocsScanned() >= _maxRowsAcrossSegments) {
+      if (resultsBlock.getEarlyTerminationReason() == BaseResultsBlock.EarlyTerminationReason.NONE) {
+        resultsBlock.setEarlyTerminationReason(BaseResultsBlock.EarlyTerminationReason.DISTINCT_MAX_ROWS);
+      }
+      _rowBudgetReached = true;
+      return true;
+    }
     return resultsBlock.getDistinctTable().isSatisfied();
   }
 
   @Override
   public void mergeResultsBlocks(DistinctResultsBlock mergedBlock, DistinctResultsBlock blockToMerge) {
+    if (_rowBudgetReached || _timeLimitReached) {
+      return;
+    }
+    boolean timeLimitReached =
+        blockToMerge.getEarlyTerminationReason() == BaseResultsBlock.EarlyTerminationReason.TIME_LIMIT;
+    mergedBlock.setNumDocsScanned(mergedBlock.getNumDocsScanned() + blockToMerge.getNumDocsScanned());
     mergedBlock.getDistinctTable().mergeDistinctTable(blockToMerge.getDistinctTable());
+    if (_maxRowsAcrossSegments != Integer.MAX_VALUE
+        && mergedBlock.getNumDocsScanned() >= _maxRowsAcrossSegments) {
+      if (mergedBlock.getEarlyTerminationReason() == BaseResultsBlock.EarlyTerminationReason.NONE) {
+        mergedBlock.setEarlyTerminationReason(BaseResultsBlock.EarlyTerminationReason.DISTINCT_MAX_ROWS);
+      }
+      _rowBudgetReached = true;
+    } else if (timeLimitReached) {
+      if (mergedBlock.getEarlyTerminationReason() == BaseResultsBlock.EarlyTerminationReason.NONE) {
+        mergedBlock.setEarlyTerminationReason(BaseResultsBlock.EarlyTerminationReason.TIME_LIMIT);
+      }
+      _timeLimitReached = true;
+    }
+  }
+
+  private boolean hasExceededTimeLimit() {
+    return _maxExecutionTimeNs != Long.MAX_VALUE && System.nanoTime() - _startTimeNs >= _maxExecutionTimeNs;
   }
 }

@@ -24,6 +24,7 @@ import org.apache.calcite.sql.SqlLiteral;
 import org.apache.calcite.sql.parser.SqlParserPos;
 import org.apache.pinot.common.request.Expression;
 import org.apache.pinot.common.request.ExpressionType;
+import org.apache.pinot.spi.utils.JsonUtils;
 import org.apache.pinot.sql.parsers.CalciteSqlParser;
 import org.apache.pinot.sql.parsers.PinotSqlType;
 import org.apache.pinot.sql.parsers.SqlNodeAndOptions;
@@ -59,6 +60,16 @@ public class RequestUtilsTest {
     assertEquals(result.getSqlType(), PinotSqlType.DQL);
     assertEquals(result.getSqlNode().toSqlString((SqlDialect) null).toString(),
         "SELECT `foo`\n" + "FROM `countries`\n" + "WHERE `bar` > 1");
+  }
+
+  @Test
+  public void testParseQueryOptionsFromJson()
+      throws Exception {
+    SqlNodeAndOptions result = RequestUtils.parseQuery("select foo from countries", JsonUtils.stringToJsonNode(
+        "{\"sql\":\"select foo from countries\","
+            + "\"queryOptions\":\"maxRowsInDistinct=5;numRowsWithoutChangeInDistinct=10\"}"));
+    assertEquals(result.getOptions().get("maxRowsInDistinct"), "5");
+    assertEquals(result.getOptions().get("numRowsWithoutChangeInDistinct"), "10");
   }
 
   @DataProvider(name = "queryProvider")

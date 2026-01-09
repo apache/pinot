@@ -602,7 +602,7 @@ public class MultiStageBrokerRequestHandler extends BaseBrokerRequestHandler {
       QueryDispatcher.QueryResult queryResults;
       try {
         queryResults = _queryDispatcher.submitAndReduce(requestContext, dispatchableSubPlan, timer.getRemainingTimeMs(),
-            query.getOptions());
+            mergeQueryOptions(query));
       } catch (QueryException e) {
         throw e;
       } catch (Throwable t) {
@@ -697,6 +697,14 @@ public class MultiStageBrokerRequestHandler extends BaseBrokerRequestHandler {
       _brokerMetrics.setValueOfGlobalGauge(BrokerGauge.ESTIMATED_MSE_SERVER_THREADS,
           _queryThrottler.currentQueryServerThreads());
     }
+  }
+
+  /**
+    * Uses both the parsed SQL options and the (potentially mutated) compiled query options to ensure we
+    * propagate everything (including queryOptions from the client) to the servers.
+    */
+  private static Map<String, String> mergeQueryOptions(QueryEnvironment.CompiledQuery query) {
+    return QueryOptionsUtils.mergeQueryOptions(query.getSqlNodeAndOptions().getOptions(), query.getOptions());
   }
 
   private static void throwTableAccessError(TableAuthorizationResult tableAuthorizationResult) {
