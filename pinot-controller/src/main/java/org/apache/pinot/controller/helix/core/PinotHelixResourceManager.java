@@ -1730,7 +1730,7 @@ public class PinotHelixResourceManager {
   /**
    * Performs validations of table config and adds the table to zookeeper
    * @throws InvalidTableConfigException if validations fail
-   * @throws TableAlreadyExistsException for offline tables only if the table already exists
+   * @throws TableAlreadyExistsException if the table already exists
    */
   public void addTable(TableConfig tableConfig)
       throws IOException {
@@ -1739,8 +1739,14 @@ public class PinotHelixResourceManager {
 
   /**
    * Performs validations of table config and adds the table to zookeeper
+   * <p>Call this api when you wanted to create a realtime table with consuming segments starting to ingest from
+   * designated offset and being assigned with a segment sequence number per partition. Otherwise, you should
+   * directly call the {@link #addTable(TableConfig)} which will further call this api with an empty list.
+   * @param tableConfig The config for the table to be created.
+   * @param consumeMeta A list of pairs, where each pair contains the partition group metadata and the initial sequence
+   *                    number for a consuming segment. This is used to start ingestion from a specific offset.
    * @throws InvalidTableConfigException if validations fail
-   * @throws TableAlreadyExistsException for offline tables only if the table already exists
+   * @throws TableAlreadyExistsException if the table already exists
    */
   public void addTable(TableConfig tableConfig, List<Pair<PartitionGroupMetadata, Integer>> consumeMeta)
       throws IOException {
@@ -4744,7 +4750,6 @@ public class PinotHelixResourceManager {
    * <p>The watermark represents the next offset to be consumed for each partition group.
    * If the latest segment of a partition is in a DONE state, the watermark is the end offset of the completed segment.
    * Otherwise, it is the start offset of the current consuming segment.
-   * <p>This API is restricted to realtime tables only. It works with both upsert and non-upsert tables.
    *
    * @param tableName The name of the real-time table (without type suffix).
    * @return A {@link WatermarkInductionResult} containing a list of watermarks for each partition group.
