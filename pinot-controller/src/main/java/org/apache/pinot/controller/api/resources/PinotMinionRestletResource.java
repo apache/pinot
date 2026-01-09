@@ -79,12 +79,12 @@ public class PinotMinionRestletResource {
       @ApiResponse(code = 500, message = "Internal error")
   })
   public MinionStatusResponse getMinionStatus(
-      @ApiParam(value = "Filter by status (ONLINE or DRAINED)")
+      @ApiParam(value = "Filter by status (ONLINE, OFFLINE, or DRAINED)")
       @QueryParam("status") String status,
-      @ApiParam(value = "Maximum number of minions to return (0 = no limit)")
-      @QueryParam("limit") @DefaultValue("0") int limit) {
+      @ApiParam(value = "Include running task counts for each minion")
+      @QueryParam("includeTaskCounts") @DefaultValue("false") boolean includeTaskCounts) {
     try {
-      return _pinotHelixTaskResourceManager.getMinionStatus(status, limit);
+      return _pinotHelixTaskResourceManager.getMinionStatus(status, includeTaskCounts);
     } catch (IllegalArgumentException e) {
       throw new ControllerApplicationException(LOGGER, e.getMessage(), Response.Status.BAD_REQUEST);
     } catch (Exception e) {

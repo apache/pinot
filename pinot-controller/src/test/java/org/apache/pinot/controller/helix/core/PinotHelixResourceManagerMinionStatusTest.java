@@ -23,6 +23,7 @@ import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Map;
 import java.util.Set;
+import java.util.stream.Collectors;
 import org.apache.helix.task.JobContext;
 import org.apache.helix.task.TaskDriver;
 import org.apache.helix.task.TaskPartitionState;
@@ -130,7 +131,7 @@ public class PinotHelixResourceManagerMinionStatusTest extends ControllerTest {
     PinotHelixTaskResourceManager taskResourceManager = new PinotHelixTaskResourceManager(
         _helixResourceManager, mockTaskDriver);
 
-    MinionStatusResponse response = taskResourceManager.getMinionStatus(null, 0);
+    MinionStatusResponse response = taskResourceManager.getMinionStatus(null, true);
     assertNotNull(response);
     assertEquals(response.getCurrentMinionCount(), 0);
     assertNotNull(response.getMinionStatus());
@@ -159,7 +160,7 @@ public class PinotHelixResourceManagerMinionStatusTest extends ControllerTest {
         _helixResourceManager, mockTaskDriver);
 
     // Get all minions
-    MinionStatusResponse response = taskResourceManager.getMinionStatus(null, 0);
+    MinionStatusResponse response = taskResourceManager.getMinionStatus(null, true);
     assertNotNull(response);
     assertEquals(response.getCurrentMinionCount(), 3);
     assertEquals(response.getMinionStatus().size(), 3);
@@ -218,7 +219,7 @@ public class PinotHelixResourceManagerMinionStatusTest extends ControllerTest {
         _helixResourceManager, mockTaskDriver);
 
     // Get all minions
-    MinionStatusResponse allResponse = taskResourceManager.getMinionStatus(null, 0);
+    MinionStatusResponse allResponse = taskResourceManager.getMinionStatus(null, true);
     assertEquals(allResponse.getCurrentMinionCount(), 5);
     assertEquals(allResponse.getMinionStatus().size(), 5);
 
@@ -233,7 +234,7 @@ public class PinotHelixResourceManagerMinionStatusTest extends ControllerTest {
     assertEquals(drainedCount, 2);
 
     // Get only ONLINE minions
-    MinionStatusResponse onlineResponse = taskResourceManager.getMinionStatus("ONLINE", 0);
+    MinionStatusResponse onlineResponse = taskResourceManager.getMinionStatus("ONLINE", true);
     assertEquals(onlineResponse.getCurrentMinionCount(), 3);
     assertEquals(onlineResponse.getMinionStatus().size(), 3);
     for (MinionStatusResponse.MinionStatus status : onlineResponse.getMinionStatus()) {
@@ -241,7 +242,7 @@ public class PinotHelixResourceManagerMinionStatusTest extends ControllerTest {
     }
 
     // Get only DRAINED minions
-    MinionStatusResponse drainedResponse = taskResourceManager.getMinionStatus("DRAINED", 0);
+    MinionStatusResponse drainedResponse = taskResourceManager.getMinionStatus("DRAINED", true);
     assertEquals(drainedResponse.getCurrentMinionCount(), 2);
     assertEquals(drainedResponse.getMinionStatus().size(), 2);
     for (MinionStatusResponse.MinionStatus status : drainedResponse.getMinionStatus()) {
@@ -263,58 +264,10 @@ public class PinotHelixResourceManagerMinionStatusTest extends ControllerTest {
   }
 
   @Test
-  public void testGetMinionStatusWithLimit() {
-    // Create 10 minions
-    for (int i = 0; i < 10; i++) {
-      String minionHost = "minion-limit-test-" + i + ".example.com";
-      int minionPort = 9514;
-      Instance minionInstance = new Instance(minionHost, minionPort, InstanceType.MINION,
-          Collections.singletonList(Helix.UNTAGGED_MINION_INSTANCE), null, 0, 0, 0, 0, false);
-      PinotResourceManagerResponse addResponse = _helixResourceManager.addInstance(minionInstance, false);
-      assertTrue(addResponse.isSuccessful());
-    }
-
-    // Create a mock TaskDriver with running tasks for some minions
-    Map<String, Integer> taskAssignments = new HashMap<>();
-    for (int i = 0; i < 10; i++) {
-      // Give varying task counts: 0, 1, 2, 3, 0, 1, 2, 3, 0, 1
-      int taskCount = i % 4;
-      if (taskCount > 0) {
-        taskAssignments.put("Minion_minion-limit-test-" + i + ".example.com_" + (9514), taskCount);
-      }
-    }
-
-    TaskDriver mockTaskDriver = createMockTaskDriverWithRunningTasks(taskAssignments);
-    PinotHelixTaskResourceManager taskResourceManager = new PinotHelixTaskResourceManager(
-        _helixResourceManager, mockTaskDriver);
-
-    // Get all minions (limit = 0 means no limit)
-    MinionStatusResponse allResponse = taskResourceManager.getMinionStatus(null, 0);
-    assertEquals(allResponse.getCurrentMinionCount(), 10);
-    assertEquals(allResponse.getMinionStatus().size(), 10);
-
-    // Get with limit = 5
-    MinionStatusResponse limitedResponse = taskResourceManager.getMinionStatus(null, 5);
-    assertEquals(limitedResponse.getCurrentMinionCount(), 5);
-    assertEquals(limitedResponse.getMinionStatus().size(), 5);
-
-    // Get with limit = 1
-    MinionStatusResponse singleResponse = taskResourceManager.getMinionStatus(null, 1);
-    assertEquals(singleResponse.getCurrentMinionCount(), 1);
-    assertEquals(singleResponse.getMinionStatus().size(), 1);
-
-    // Cleanup
-    for (int i = 0; i < 10; i++) {
-      String minionInstanceId = "Minion_minion-limit-test-" + i + ".example.com_" + (9514);
-      _helixResourceManager.dropInstance(minionInstanceId);
-    }
-  }
-
-  @Test
-  public void testGetMinionStatusWithFilterAndLimit() {
+  public void testGetMinionStatusWithFilter() {
     // Create 6 minions, drain 3 of them
     for (int i = 0; i < 6; i++) {
-      String minionHost = "minion-filter-limit-" + i + ".example.com";
+      String minionHost = "minion-filter-" + i + ".example.com";
       int minionPort = 9514;
       Instance minionInstance = new Instance(minionHost, minionPort, InstanceType.MINION,
           Collections.singletonList(Helix.UNTAGGED_MINION_INSTANCE), null, 0, 0, 0, 0, false);
@@ -324,42 +277,42 @@ public class PinotHelixResourceManagerMinionStatusTest extends ControllerTest {
 
     // Drain minions 0, 2, 4
     for (int i = 0; i < 6; i += 2) {
-      String minionInstanceId = "Minion_minion-filter-limit-" + i + ".example.com_" + (9514);
+      String minionInstanceId = "Minion_minion-filter-" + i + ".example.com_" + (9514);
       _helixResourceManager.drainMinionInstance(minionInstanceId);
     }
 
     // Create a mock TaskDriver with running tasks: drained minions have tasks, online minions have tasks
     Map<String, Integer> taskAssignments = new HashMap<>();
-    taskAssignments.put("Minion_minion-filter-limit-0.example.com_9514", 2); // Drained
-    taskAssignments.put("Minion_minion-filter-limit-1.example.com_9514", 3); // Online
-    taskAssignments.put("Minion_minion-filter-limit-2.example.com_9514", 1); // Drained
-    taskAssignments.put("Minion_minion-filter-limit-3.example.com_9514", 2); // Online
-    taskAssignments.put("Minion_minion-filter-limit-4.example.com_9514", 1); // Drained
-    taskAssignments.put("Minion_minion-filter-limit-5.example.com_9514", 1); // Online
+    taskAssignments.put("Minion_minion-filter-0.example.com_9514", 2); // Drained
+    taskAssignments.put("Minion_minion-filter-1.example.com_9514", 3); // Online
+    taskAssignments.put("Minion_minion-filter-2.example.com_9514", 1); // Drained
+    taskAssignments.put("Minion_minion-filter-3.example.com_9514", 2); // Online
+    taskAssignments.put("Minion_minion-filter-4.example.com_9514", 1); // Drained
+    taskAssignments.put("Minion_minion-filter-5.example.com_9514", 1); // Online
 
     TaskDriver mockTaskDriver = createMockTaskDriverWithRunningTasks(taskAssignments);
     PinotHelixTaskResourceManager taskResourceManager = new PinotHelixTaskResourceManager(
         _helixResourceManager, mockTaskDriver);
 
-    // Get drained minions with limit = 2
-    MinionStatusResponse response = taskResourceManager.getMinionStatus("DRAINED", 2);
-    assertEquals(response.getCurrentMinionCount(), 2);
-    assertEquals(response.getMinionStatus().size(), 2);
+    // Get drained minions
+    MinionStatusResponse response = taskResourceManager.getMinionStatus("DRAINED", true);
+    assertEquals(response.getCurrentMinionCount(), 3);
+    assertEquals(response.getMinionStatus().size(), 3);
     for (MinionStatusResponse.MinionStatus status : response.getMinionStatus()) {
       assertEquals(status.getStatus(), "DRAINED");
     }
 
-    // Get online minions with limit = 2
-    MinionStatusResponse onlineResponse = taskResourceManager.getMinionStatus("ONLINE", 2);
-    assertEquals(onlineResponse.getCurrentMinionCount(), 2);
-    assertEquals(onlineResponse.getMinionStatus().size(), 2);
+    // Get online minions
+    MinionStatusResponse onlineResponse = taskResourceManager.getMinionStatus("ONLINE", true);
+    assertEquals(onlineResponse.getCurrentMinionCount(), 3);
+    assertEquals(onlineResponse.getMinionStatus().size(), 3);
     for (MinionStatusResponse.MinionStatus status : onlineResponse.getMinionStatus()) {
       assertEquals(status.getStatus(), "ONLINE");
     }
 
     // Cleanup
     for (int i = 0; i < 6; i++) {
-      String minionInstanceId = "Minion_minion-filter-limit-" + i + ".example.com_" + (9514);
+      String minionInstanceId = "Minion_minion-filter-" + i + ".example.com_" + (9514);
       _helixResourceManager.dropInstance(minionInstanceId);
     }
   }
@@ -383,7 +336,7 @@ public class PinotHelixResourceManagerMinionStatusTest extends ControllerTest {
 
     try {
       // Try with invalid status filter - should throw IllegalArgumentException
-      taskResourceManager.getMinionStatus("INVALID_STATUS", 0);
+      taskResourceManager.getMinionStatus("INVALID_STATUS", true);
     } finally {
       // Cleanup
       String minionInstanceId = "Minion_" + minionHost + "_" + minionPort;
@@ -420,9 +373,9 @@ public class PinotHelixResourceManagerMinionStatusTest extends ControllerTest {
         _helixResourceManager, mockTaskDriver);
 
     // Test case-insensitive filters
-    MinionStatusResponse responseUpperCase = taskResourceManager.getMinionStatus("DRAINED", 0);
-    MinionStatusResponse responseLowerCase = taskResourceManager.getMinionStatus("drained", 0);
-    MinionStatusResponse responseMixedCase = taskResourceManager.getMinionStatus("Drained", 0);
+    MinionStatusResponse responseUpperCase = taskResourceManager.getMinionStatus("DRAINED", true);
+    MinionStatusResponse responseLowerCase = taskResourceManager.getMinionStatus("drained", true);
+    MinionStatusResponse responseMixedCase = taskResourceManager.getMinionStatus("Drained", true);
 
     assertEquals(responseUpperCase.getCurrentMinionCount(), 1);
     assertEquals(responseLowerCase.getCurrentMinionCount(), 1);
@@ -465,7 +418,7 @@ public class PinotHelixResourceManagerMinionStatusTest extends ControllerTest {
         _helixResourceManager, mockTaskDriver);
 
     // Get minion status - should only return the minion instance
-    MinionStatusResponse response = taskResourceManager.getMinionStatus(null, 0);
+    MinionStatusResponse response = taskResourceManager.getMinionStatus(null, true);
     assertEquals(response.getCurrentMinionCount(), 1);
     assertEquals(response.getMinionStatus().size(), 1);
     assertEquals(response.getMinionStatus().get(0).getHost(), minionHost);
@@ -496,7 +449,7 @@ public class PinotHelixResourceManagerMinionStatusTest extends ControllerTest {
         _helixResourceManager, mockTaskDriver);
 
     // Get status and verify host/port
-    MinionStatusResponse response = taskResourceManager.getMinionStatus(null, 0);
+    MinionStatusResponse response = taskResourceManager.getMinionStatus(null, true);
     assertEquals(response.getCurrentMinionCount(), 1);
 
     MinionStatusResponse.MinionStatus status = response.getMinionStatus().get(0);
@@ -538,7 +491,7 @@ public class PinotHelixResourceManagerMinionStatusTest extends ControllerTest {
         _helixResourceManager, mockTaskDriver);
 
     // Call getMinionStatus on the task resource manager
-    MinionStatusResponse response = taskResourceManager.getMinionStatus(null, 0);
+    MinionStatusResponse response = taskResourceManager.getMinionStatus(null, true);
 
     assertNotNull(response);
     assertEquals(response.getCurrentMinionCount(), 3);
@@ -589,7 +542,7 @@ public class PinotHelixResourceManagerMinionStatusTest extends ControllerTest {
         _helixResourceManager, mockTaskDriver);
 
     // Call getMinionStatus
-    MinionStatusResponse response = taskResourceManager.getMinionStatus(null, 0);
+    MinionStatusResponse response = taskResourceManager.getMinionStatus(null, true);
 
     assertNotNull(response);
     assertEquals(response.getCurrentMinionCount(), 2);
@@ -631,7 +584,7 @@ public class PinotHelixResourceManagerMinionStatusTest extends ControllerTest {
         _helixResourceManager, mockTaskDriver);
 
     // Get all minions
-    MinionStatusResponse response = taskResourceManager.getMinionStatus(null, 0);
+    MinionStatusResponse response = taskResourceManager.getMinionStatus(null, true);
     assertEquals(response.getCurrentMinionCount(), 1);
 
     MinionStatusResponse.MinionStatus status = response.getMinionStatus().get(0);
@@ -640,12 +593,12 @@ public class PinotHelixResourceManagerMinionStatusTest extends ControllerTest {
     assertEquals(status.getRunningTaskCount(), 2); // Should still show running tasks
 
     // Get only DRAINED minions
-    MinionStatusResponse drainedResponse = taskResourceManager.getMinionStatus("DRAINED", 0);
+    MinionStatusResponse drainedResponse = taskResourceManager.getMinionStatus("DRAINED", true);
     assertEquals(drainedResponse.getCurrentMinionCount(), 1);
     assertEquals(drainedResponse.getMinionStatus().get(0).getRunningTaskCount(), 2);
 
     // Get only ONLINE minions
-    MinionStatusResponse onlineResponse = taskResourceManager.getMinionStatus("ONLINE", 0);
+    MinionStatusResponse onlineResponse = taskResourceManager.getMinionStatus("ONLINE", true);
     assertEquals(onlineResponse.getCurrentMinionCount(), 0);
 
     // Cleanup
@@ -670,7 +623,7 @@ public class PinotHelixResourceManagerMinionStatusTest extends ControllerTest {
         _helixResourceManager, mockTaskDriver);
 
     // getMinionStatus should still work, just with 0 running task counts
-    MinionStatusResponse response = taskResourceManager.getMinionStatus(null, 0);
+    MinionStatusResponse response = taskResourceManager.getMinionStatus(null, true);
 
     assertNotNull(response);
     assertEquals(response.getCurrentMinionCount(), 1);
@@ -678,6 +631,177 @@ public class PinotHelixResourceManagerMinionStatusTest extends ControllerTest {
 
     // Cleanup
     _helixResourceManager.dropInstance(minionId);
+  }
+
+  @Test
+  public void testGetMinionStatusWithOfflineMinions() {
+    // Test OFFLINE status (Helix disabled minions)
+    // Create 4 minions: 2 ONLINE, 1 OFFLINE, 1 DRAINED
+    String onlineMinion1 = "Minion_minion-offline-test-0.example.com_9514";
+    String offlineMinion = "Minion_minion-offline-test-1.example.com_9514";
+    String onlineMinion2 = "Minion_minion-offline-test-2.example.com_9514";
+    String drainedMinion = "Minion_minion-offline-test-3.example.com_9514";
+
+    for (int i = 0; i < 4; i++) {
+      Instance minion = new Instance("minion-offline-test-" + i + ".example.com", 9514, InstanceType.MINION,
+          Collections.singletonList(Helix.UNTAGGED_MINION_INSTANCE), null, 0, 0, 0, 0, false);
+      _helixResourceManager.addInstance(minion, false);
+    }
+
+    // Disable one minion in Helix (OFFLINE)
+    _helixResourceManager.disableInstance(offlineMinion);
+
+    // Drain one minion (DRAINED)
+    _helixResourceManager.drainMinionInstance(drainedMinion);
+
+    // Create a mock TaskDriver with running tasks
+    // Note: OFFLINE minions cannot have running tasks since they are disabled in Helix
+    Map<String, Integer> taskAssignments = new HashMap<>();
+    taskAssignments.put(onlineMinion1, 2);
+    taskAssignments.put(onlineMinion2, 3);
+
+    TaskDriver mockTaskDriver = createMockTaskDriverWithRunningTasks(taskAssignments);
+    PinotHelixTaskResourceManager taskResourceManager = new PinotHelixTaskResourceManager(
+        _helixResourceManager, mockTaskDriver);
+
+    // Get all minions
+    MinionStatusResponse allResponse = taskResourceManager.getMinionStatus(null, true);
+    assertEquals(allResponse.getCurrentMinionCount(), 4);
+    assertEquals(allResponse.getMinionStatus().size(), 4);
+
+    // Count statuses
+    Map<String, Long> statusCounts = allResponse.getMinionStatus().stream()
+        .collect(Collectors.groupingBy(MinionStatusResponse.MinionStatus::getStatus, Collectors.counting()));
+    assertEquals(statusCounts.get("ONLINE").longValue(), 2);
+    assertEquals(statusCounts.get("OFFLINE").longValue(), 1);
+    assertEquals(statusCounts.get("DRAINED").longValue(), 1);
+
+    // Get only OFFLINE minions
+    MinionStatusResponse offlineResponse = taskResourceManager.getMinionStatus("OFFLINE", true);
+    assertEquals(offlineResponse.getCurrentMinionCount(), 1);
+    assertEquals(offlineResponse.getMinionStatus().size(), 1);
+    assertEquals(offlineResponse.getMinionStatus().get(0).getInstanceId(), offlineMinion);
+    assertEquals(offlineResponse.getMinionStatus().get(0).getStatus(), "OFFLINE");
+    assertEquals(offlineResponse.getMinionStatus().get(0).getRunningTaskCount(), 0);
+
+    // Cleanup
+    for (int i = 0; i < 4; i++) {
+      _helixResourceManager.dropInstance("Minion_minion-offline-test-" + i + ".example.com_9514");
+    }
+  }
+
+  @Test
+  public void testGetMinionStatusWithoutTaskCounts() {
+    // Test that includeTaskCounts=false doesn't query task counts (all should be 0)
+    String minion1Id = "Minion_minion-no-tasks-1.example.com_9514";
+    String minion2Id = "Minion_minion-no-tasks-2.example.com_9514";
+
+    Instance minion1 = new Instance("minion-no-tasks-1.example.com", 9514, InstanceType.MINION,
+        Collections.singletonList(Helix.UNTAGGED_MINION_INSTANCE), null, 0, 0, 0, 0, false);
+    Instance minion2 = new Instance("minion-no-tasks-2.example.com", 9514, InstanceType.MINION,
+        Collections.singletonList(Helix.UNTAGGED_MINION_INSTANCE), null, 0, 0, 0, 0, false);
+
+    _helixResourceManager.addInstance(minion1, false);
+    _helixResourceManager.addInstance(minion2, false);
+
+    // Create a mock TaskDriver with running tasks
+    Map<String, Integer> taskAssignments = new HashMap<>();
+    taskAssignments.put(minion1Id, 5);
+    taskAssignments.put(minion2Id, 3);
+
+    TaskDriver mockTaskDriver = createMockTaskDriverWithRunningTasks(taskAssignments);
+    PinotHelixTaskResourceManager taskResourceManager = new PinotHelixTaskResourceManager(
+        _helixResourceManager, mockTaskDriver);
+
+    // Call with includeTaskCounts=false - all task counts should be 0
+    MinionStatusResponse response = taskResourceManager.getMinionStatus(null, false);
+
+    assertEquals(response.getCurrentMinionCount(), 2);
+    assertEquals(response.getMinionStatus().size(), 2);
+
+    // Verify all task counts are 0 (not queried)
+    for (MinionStatusResponse.MinionStatus status : response.getMinionStatus()) {
+      assertEquals(status.getRunningTaskCount(), 0);
+    }
+
+    // Cleanup
+    _helixResourceManager.dropInstance(minion1Id);
+    _helixResourceManager.dropInstance(minion2Id);
+  }
+
+  @Test
+  public void testGetMinionStatusMixedStates() {
+    // Test with a mix of ONLINE, OFFLINE, and DRAINED minions
+    String onlineMinion = "Minion_minion-mixed-0.example.com_9514";
+    String offlineMinion = "Minion_minion-mixed-1.example.com_9514";
+    String drainedMinion = "Minion_minion-mixed-2.example.com_9514";
+    String onlineMinion2 = "Minion_minion-mixed-3.example.com_9514";
+
+    for (int i = 0; i < 4; i++) {
+      Instance minion = new Instance("minion-mixed-" + i + ".example.com", 9514, InstanceType.MINION,
+          Collections.singletonList(Helix.UNTAGGED_MINION_INSTANCE), null, 0, 0, 0, 0, false);
+      _helixResourceManager.addInstance(minion, false);
+    }
+
+    // Set different states
+    _helixResourceManager.disableInstance(offlineMinion); // OFFLINE
+    _helixResourceManager.drainMinionInstance(drainedMinion); // DRAINED
+
+    // OFFLINE minions cannot have running tasks since they are disabled in Helix
+    Map<String, Integer> taskAssignments = new HashMap<>();
+    taskAssignments.put(onlineMinion, 1);
+    taskAssignments.put(drainedMinion, 3);
+    taskAssignments.put(onlineMinion2, 4);
+
+    TaskDriver mockTaskDriver = createMockTaskDriverWithRunningTasks(taskAssignments);
+    PinotHelixTaskResourceManager taskResourceManager = new PinotHelixTaskResourceManager(
+        _helixResourceManager, mockTaskDriver);
+
+    // Test filtering by each status
+    MinionStatusResponse onlineResponse = taskResourceManager.getMinionStatus("ONLINE", true);
+    assertEquals(onlineResponse.getCurrentMinionCount(), 2);
+    for (MinionStatusResponse.MinionStatus status : onlineResponse.getMinionStatus()) {
+      assertEquals(status.getStatus(), "ONLINE");
+      assertTrue(status.getRunningTaskCount() > 0);
+    }
+
+    MinionStatusResponse offlineResponse = taskResourceManager.getMinionStatus("OFFLINE", true);
+    assertEquals(offlineResponse.getCurrentMinionCount(), 1);
+    assertEquals(offlineResponse.getMinionStatus().get(0).getStatus(), "OFFLINE");
+    assertEquals(offlineResponse.getMinionStatus().get(0).getInstanceId(), offlineMinion);
+    assertEquals(offlineResponse.getMinionStatus().get(0).getRunningTaskCount(), 0);
+
+    MinionStatusResponse drainedResponse = taskResourceManager.getMinionStatus("DRAINED", true);
+    assertEquals(drainedResponse.getCurrentMinionCount(), 1);
+    assertEquals(drainedResponse.getMinionStatus().get(0).getStatus(), "DRAINED");
+    assertEquals(drainedResponse.getMinionStatus().get(0).getInstanceId(), drainedMinion);
+
+    // Cleanup
+    for (int i = 0; i < 4; i++) {
+      _helixResourceManager.dropInstance("Minion_minion-mixed-" + i + ".example.com_9514");
+    }
+  }
+
+  @Test(expectedExceptions = IllegalArgumentException.class)
+  public void testGetMinionStatusWithInvalidOfflineFilter() {
+    // Test that invalid status filter throws exception (test with various invalid values)
+    String minionHost = "minion-invalid-offline.example.com";
+    int minionPort = 9514;
+    Instance minionInstance = new Instance(minionHost, minionPort, InstanceType.MINION,
+        Collections.singletonList(Helix.UNTAGGED_MINION_INSTANCE), null, 0, 0, 0, 0, false);
+    _helixResourceManager.addInstance(minionInstance, false);
+
+    TaskDriver mockTaskDriver = createMockTaskDriverWithRunningTasks(new HashMap<>());
+    PinotHelixTaskResourceManager taskResourceManager = new PinotHelixTaskResourceManager(
+        _helixResourceManager, mockTaskDriver);
+
+    try {
+      // Try with invalid status filter - should throw IllegalArgumentException
+      taskResourceManager.getMinionStatus("DISABLED", false);
+    } finally {
+      // Cleanup
+      _helixResourceManager.dropInstance("Minion_" + minionHost + "_" + minionPort);
+    }
   }
 
   @AfterClass

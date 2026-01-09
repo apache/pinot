@@ -126,14 +126,14 @@ public class ControllerRequestURLBuilder {
     return StringUtil.join("/", _baseUrl, "tasks", "task", taskName);
   }
 
-  public String forMinionStatus(@Nullable String statusFilter, int limit) {
+  public String forMinionStatus(@Nullable String statusFilter, boolean includeTaskCounts) {
     StringBuilder url = new StringBuilder(StringUtil.join("/", _baseUrl, "minions", "status"));
     List<String> params = new ArrayList<>();
     if (statusFilter != null && !statusFilter.isEmpty()) {
       params.add("status=" + statusFilter);
     }
-    if (limit > 0) {
-      params.add("limit=" + limit);
+    if (includeTaskCounts) {
+      params.add("includeTaskCounts=true");
     }
     if (!params.isEmpty()) {
       url.append("?").append(String.join("&", params));

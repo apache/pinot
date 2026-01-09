@@ -1302,7 +1302,7 @@ public class PinotHelixTaskResourceManager {
    * <p>E.g. TaskQueue_DummyTask -> DummyTask (from Helix JobQueue name)
    * <p>E.g. TaskQueue_DummyTask_Task_DummyTask_12345 -> DummyTask (from Helix Job name)
    *
-   * @param name Pinot task name, Helix JobQueue name or Helix Job name
+   * @param name Pinot task name, Helix JobQueue name, or Helix Job name
    * @return Task type
    */
   public static String getTaskType(String name) {
@@ -1346,15 +1346,17 @@ public class PinotHelixTaskResourceManager {
   /**
    * Gets the status of all minion instances, including their task counts and drain state.
    *
-   * @param statusFilter Optional filter by status ("ONLINE" or "DRAINED"). If null, returns all minions.
-   * @param limit Maximum number of minions to return. If 0 or negative, returns all minions.
+   * @param statusFilter Optional filter by status ("ONLINE", "OFFLINE", or "DRAINED"). If null, returns all minions.
+   * @param includeTaskCounts Whether to include running task counts For each minion. Default false.
    * @return MinionStatusResponse containing status information for minion instances
    */
-  public MinionStatusResponse getMinionStatus(String statusFilter, int limit) {
+  public MinionStatusResponse getMinionStatus(String statusFilter, boolean includeTaskCounts) {
     // Validate status filter
     if (statusFilter != null && !statusFilter.isEmpty()) {
-      if (!"ONLINE".equalsIgnoreCase(statusFilter) && !"DRAINED".equalsIgnoreCase(statusFilter)) {
-        throw new IllegalArgumentException("Invalid status filter. Must be 'ONLINE' or 'DRAINED'");
+      if (!"ONLINE".equalsIgnoreCase(statusFilter)
+          && !"OFFLINE".equalsIgnoreCase(statusFilter)
+          && !"DRAINED".equalsIgnoreCase(statusFilter)) {
+        throw new IllegalArgumentException("Invalid status filter. Must be 'ONLINE', 'OFFLINE', or 'DRAINED'");
       }
     }
 
@@ -1365,13 +1367,15 @@ public class PinotHelixTaskResourceManager {
         .sorted()
         .collect(Collectors.toList());
 
-    // Get running task counts per minion (if a task resource manager is provided)
+    // Get running task counts per minion only if requested (can be expensive)
     Map<String, Integer> runningTaskCounts = new HashMap<>();
+    if (includeTaskCounts) {
       try {
         runningTaskCounts = getRunningTaskCountsPerMinion();
       } catch (Exception e) {
         LOGGER.warn("Failed to get running task counts from task resource manager", e);
-        // Continue with an empty map-task counts will be 0
+        // Continue with an empty map - task counts will be 0
+      }
     }
 
     // Build status list for each minion
@@ -1382,10 +1386,19 @@ public class PinotHelixTaskResourceManager {
         continue;
       }
 
-      // Determine if minion is drained
+      // Determine minion status: OFFLINE (disabled in Helix), DRAINED, or ONLINE
+      boolean isEnabled = instanceConfig.getInstanceEnabled();
       List<String> tags = instanceConfig.getTags();
       boolean isDrained = tags != null && tags.contains(Helix.DRAINED_MINION_INSTANCE);
-      String status = isDrained ? "DRAINED" : "ONLINE";
+
+      String status;
+      if (!isEnabled) {
+        status = "OFFLINE";
+      } else if (isDrained) {
+        status = "DRAINED";
+      } else {
+        status = "ONLINE";
+      }
 
       // Apply status filter if specified
       if (statusFilter != null && !statusFilter.isEmpty() && !status.equalsIgnoreCase(statusFilter)) {
@@ -1396,17 +1409,12 @@ public class PinotHelixTaskResourceManager {
       String host = instanceConfig.getHostName();
       int port = Integer.parseInt(instanceConfig.getPort());
 
-      // Get a running task count for this minion
+      // Get the running task count for this minion
       int runningTaskCount = runningTaskCounts.getOrDefault(minionInstanceId, 0);
 
       MinionStatusResponse.MinionStatus minionStatus =
           new MinionStatusResponse.MinionStatus(minionInstanceId, host, port, runningTaskCount, status);
       minionStatusList.add(minionStatus);
-
-      // Apply limit if specified
-      if (limit > 0 && minionStatusList.size() >= limit) {
-        break;
-      }
     }
 
     return new MinionStatusResponse(minionStatusList.size(), minionStatusList);
