@@ -331,7 +331,6 @@ public class MultiClusterHelixBrokerStarter extends BaseBrokerStarter {
         handlers.put(ChangeType.IDEAL_STATE, Collections.singletonList(routingManager));
         handlers.put(ChangeType.EXTERNAL_VIEW, Collections.singletonList(routingManager));
         handlers.put(ChangeType.INSTANCE_CONFIG, Collections.singletonList(routingManager));
-        handlers.put(ChangeType.RESOURCE_CONFIG, Collections.singletonList(routingManager));
 
         ClusterChangeMediator mediator = new ClusterChangeMediator(handlers, _brokerMetrics);
         mediator.start();
