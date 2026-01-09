@@ -1,0 +1,15 @@
+{
+  "tenants": {
+    "broker": "broker1",
+    "server": "server1"
+  },
+  "instanceAssignmentConfigMap": {
+    "CONSUMING": {
+      "tagPoolConfig": {
+        "tag": "server1_REALTIME",
+        "poolBased": true,
+        "numPools": 2
+      }
+    }
+  }
+}
