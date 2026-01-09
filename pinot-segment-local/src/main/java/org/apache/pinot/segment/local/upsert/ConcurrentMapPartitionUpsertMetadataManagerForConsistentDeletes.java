@@ -375,17 +375,20 @@ public class ConcurrentMapPartitionUpsertMetadataManagerForConsistentDeletes
     // Revert to previous locations present in other segment
     for (Map.Entry<Object, RecordLocation> obj : _previousKeyToRecordLocationMap.entrySet()) {
       IndexSegment prevSegment = obj.getValue().getSegment();
+      IndexSegment currentLocation = obj.getValue().getSegment();
       if (prevSegment != null) {
-        try (UpsertUtils.RecordInfoReader recordInfoReader = new UpsertUtils.RecordInfoReader(prevSegment,
-            _primaryKeyColumns, _comparisonColumns, _deleteRecordColumn)) {
-          int newDocId = obj.getValue().getDocId();
-          int currentDocId = _primaryKeyToRecordLocationMap.get(obj.getKey()).getDocId();
-          RecordInfo recordInfo = recordInfoReader.getRecordInfo(newDocId);
-          // Update valid docId to the other segment location
-          replaceDocId(prevSegment, prevSegment.getValidDocIds(), prevSegment.getQueryableDocIds(), oldSegment,
-              currentDocId, newDocId, recordInfo);
-        } catch (IOException e) {
-          throw new RuntimeException(e);
+        if (currentLocation == oldSegment) {
+          try (UpsertUtils.RecordInfoReader recordInfoReader = new UpsertUtils.RecordInfoReader(prevSegment,
+              _primaryKeyColumns, _comparisonColumns, _deleteRecordColumn)) {
+            int newDocId = obj.getValue().getDocId();
+            int currentDocId = _primaryKeyToRecordLocationMap.get(obj.getKey()).getDocId();
+            RecordInfo recordInfo = recordInfoReader.getRecordInfo(newDocId);
+            // Update valid docId to the other segment location
+            replaceDocId(prevSegment, prevSegment.getValidDocIds(), prevSegment.getQueryableDocIds(), oldSegment,
+                currentDocId, newDocId, recordInfo);
+          } catch (IOException e) {
+            throw new RuntimeException(e);
+          }
         }
         _primaryKeyToRecordLocationMap.put(obj.getKey(), obj.getValue());
       } else {

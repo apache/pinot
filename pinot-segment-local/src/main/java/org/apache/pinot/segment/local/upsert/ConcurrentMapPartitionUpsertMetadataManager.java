@@ -268,18 +268,21 @@ public class ConcurrentMapPartitionUpsertMetadataManager extends BasePartitionUp
         oldSegment.getSegmentName());
     for (Map.Entry<Object, RecordLocation> obj : _previousKeyToRecordLocationMap.entrySet()) {
       IndexSegment prevSegment = obj.getValue().getSegment();
+      IndexSegment currentLocation = obj.getValue().getSegment();
       if (prevSegment != null) {
-        try (UpsertUtils.RecordInfoReader recordInfoReader = new UpsertUtils.RecordInfoReader(prevSegment,
-            _primaryKeyColumns, _comparisonColumns, _deleteRecordColumn)) {
-          int newDocId = obj.getValue().getDocId();
-          int currentDocId = _primaryKeyToRecordLocationMap.get(obj.getKey()).getDocId();
-          RecordInfo recordInfo = recordInfoReader.getRecordInfo(newDocId);
-          replaceDocId(prevSegment, prevSegment.getValidDocIds(), prevSegment.getQueryableDocIds(), oldSegment,
-              currentDocId, newDocId, recordInfo);
-        } catch (IOException e) {
-          throw new RuntimeException(e);
+        if (currentLocation == oldSegment) {
+          try (UpsertUtils.RecordInfoReader recordInfoReader = new UpsertUtils.RecordInfoReader(prevSegment,
+              _primaryKeyColumns, _comparisonColumns, _deleteRecordColumn)) {
+            int newDocId = obj.getValue().getDocId();
+            int currentDocId = _primaryKeyToRecordLocationMap.get(obj.getKey()).getDocId();
+            RecordInfo recordInfo = recordInfoReader.getRecordInfo(newDocId);
+            replaceDocId(prevSegment, prevSegment.getValidDocIds(), prevSegment.getQueryableDocIds(), oldSegment,
+                currentDocId, newDocId, recordInfo);
+          } catch (IOException e) {
+            throw new RuntimeException(e);
+          }
+          _primaryKeyToRecordLocationMap.put(obj.getKey(), obj.getValue());
         }
-        _primaryKeyToRecordLocationMap.put(obj.getKey(), obj.getValue());
       } else {
         _primaryKeyToRecordLocationMap.remove(obj.getKey());
       }
