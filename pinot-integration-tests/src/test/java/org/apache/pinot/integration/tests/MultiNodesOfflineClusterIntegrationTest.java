@@ -24,6 +24,7 @@ import java.util.Map;
 import org.apache.helix.model.ExternalView;
 import org.apache.helix.model.IdealState;
 import org.apache.pinot.broker.broker.helix.BaseBrokerStarter;
+import org.apache.pinot.client.admin.PinotInstanceAdminClient;
 import org.apache.pinot.core.accounting.ResourceUsageAccountantFactory;
 import org.apache.pinot.server.starter.helix.BaseServerStarter;
 import org.apache.pinot.spi.env.PinotConfiguration;
@@ -102,6 +103,7 @@ public class MultiNodesOfflineClusterIntegrationTest extends OfflineClusterInteg
   @Test
   public void testUpdateBrokerResource()
       throws Exception {
+    PinotInstanceAdminClient instanceClient = getOrCreateAdminClient().getInstanceClient();
     // Add a new broker to the cluster
     BaseBrokerStarter brokerStarter = startOneBroker(NUM_BROKERS);
 
@@ -130,14 +132,14 @@ public class MultiNodesOfflineClusterIntegrationTest extends OfflineClusterInteg
 
     // Dropping the broker should fail because it is still in the broker resource
     try {
-      sendDeleteRequest(_controllerRequestURLBuilder.forInstance(brokerId));
+      instanceClient.dropInstance(brokerId);
       fail("Dropping instance should fail because it is still in the broker resource");
     } catch (Exception e) {
       // Expected
     }
 
     // Untag the broker and update the broker resource so that it is removed from the broker resource
-    sendPutRequest(_controllerRequestURLBuilder.forInstanceUpdateTags(brokerId, Collections.emptyList(), true));
+    instanceClient.updateInstanceTags(brokerId, Collections.emptyList(), true);
 
     // Check if broker is removed from all the tables in broker resource
     brokerResourceIdealState = _helixAdmin.getResourceIdealState(clusterName, Helix.BROKER_RESOURCE_INSTANCE);
@@ -156,7 +158,7 @@ public class MultiNodesOfflineClusterIntegrationTest extends OfflineClusterInteg
     }, 60_000L, "Failed to remove broker from broker resource ExternalView");
 
     // Dropping the broker should success now
-    sendDeleteRequest(_controllerRequestURLBuilder.forInstance(brokerId));
+    instanceClient.dropInstance(brokerId);
 
     // Check if broker is dropped from the cluster
     assertFalse(_helixAdmin.getInstancesInCluster(clusterName).contains(brokerId));

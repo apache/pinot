@@ -18,10 +18,11 @@
  */
 package org.apache.pinot.controller.api;
 
-import java.net.HttpURLConnection;
-import java.net.URL;
 import java.util.Map;
 import org.apache.helix.InstanceType;
+import org.apache.pinot.client.admin.PinotAdminClient;
+import org.apache.pinot.client.admin.PinotAdminNotFoundException;
+import org.apache.pinot.client.admin.PinotAdminValidationException;
 import org.apache.pinot.common.utils.URIUtils;
 import org.apache.pinot.controller.api.resources.TableViews;
 import org.apache.pinot.controller.helix.ControllerTest;
@@ -44,6 +45,7 @@ import static org.testng.Assert.assertEquals;
 import static org.testng.Assert.assertNotNull;
 import static org.testng.Assert.assertNull;
 import static org.testng.Assert.assertTrue;
+import static org.testng.Assert.expectThrows;
 
 
 public class TableViewsTest extends ControllerTest {
@@ -78,6 +80,29 @@ public class TableViewsTest extends ControllerTest {
         .setNumReplicas(DEFAULT_MIN_NUM_REPLICAS).setStreamConfigs(streamConfig.getStreamConfigsMap()).build();
     DEFAULT_INSTANCE.getHelixResourceManager().addTable(tableConfig);
 
+    // Ensure table configs are visible before querying views.
+    TestUtils.waitForCondition(aVoid -> DEFAULT_INSTANCE.getHelixResourceManager()
+            .getTableConfig(TableNameBuilder.OFFLINE.tableNameWithType(OFFLINE_TABLE_NAME)) != null,
+        30_000L, "Offline table config not created in time");
+    TestUtils.waitForCondition(aVoid -> DEFAULT_INSTANCE.getHelixResourceManager()
+            .getTableConfig(TableNameBuilder.OFFLINE.tableNameWithType(HYBRID_TABLE_NAME)) != null,
+        30_000L, "Hybrid offline table config not created in time");
+    TestUtils.waitForCondition(aVoid -> DEFAULT_INSTANCE.getHelixResourceManager()
+            .getTableConfig(TableNameBuilder.REALTIME.tableNameWithType(HYBRID_TABLE_NAME)) != null,
+        30_000L, "Hybrid realtime table config not created in time");
+    TestUtils.waitForCondition(aVoid -> DEFAULT_INSTANCE.getHelixAdmin()
+            .getResourceIdealState(DEFAULT_INSTANCE.getHelixClusterName(),
+                TableNameBuilder.OFFLINE.tableNameWithType(OFFLINE_TABLE_NAME)) != null,
+        30_000L, "Offline table ideal state not created in time");
+    TestUtils.waitForCondition(aVoid -> DEFAULT_INSTANCE.getHelixAdmin()
+            .getResourceIdealState(DEFAULT_INSTANCE.getHelixClusterName(),
+                TableNameBuilder.OFFLINE.tableNameWithType(HYBRID_TABLE_NAME)) != null,
+        30_000L, "Hybrid offline table ideal state not created in time");
+    TestUtils.waitForCondition(aVoid -> DEFAULT_INSTANCE.getHelixAdmin()
+            .getResourceIdealState(DEFAULT_INSTANCE.getHelixClusterName(),
+                TableNameBuilder.REALTIME.tableNameWithType(HYBRID_TABLE_NAME)) != null,
+        30_000L, "Hybrid realtime table ideal state not created in time");
+
     // Wait for external view get updated
     TestUtils.waitForCondition(aVoid -> {
       try {
@@ -92,7 +117,7 @@ public class TableViewsTest extends ControllerTest {
         // Expected before external view is created
         return false;
       }
-    }, 10_000L, "Failed to get external view updated");
+    }, 30_000L, "Failed to get external view updated");
   }
 
   @DataProvider(name = "viewProvider")
@@ -103,18 +128,16 @@ public class TableViewsTest extends ControllerTest {
   @Test(dataProvider = "viewProvider")
   public void testTableNotFound(String view)
       throws Exception {
-    String url = DEFAULT_INSTANCE.getControllerRequestURLBuilder().forTableView("unknownTable", view, null);
-    HttpURLConnection connection = (HttpURLConnection) new URL(url).openConnection();
-    assertEquals(connection.getResponseCode(), 404);
+    RuntimeException exception = expectThrows(RuntimeException.class, () -> getTableView("unknownTable", view, null));
+    assertTrue(getRootCause(exception) instanceof PinotAdminNotFoundException);
   }
 
   @Test(dataProvider = "viewProvider")
   public void testBadRequest(String view)
       throws Exception {
-    String url =
-        DEFAULT_INSTANCE.getControllerRequestURLBuilder().forTableView(OFFLINE_TABLE_NAME, view, "no_such_type");
-    HttpURLConnection connection = (HttpURLConnection) new URL(url).openConnection();
-    assertEquals(connection.getResponseCode(), 400);
+    RuntimeException exception =
+        expectThrows(RuntimeException.class, () -> getTableView(OFFLINE_TABLE_NAME, view, "no_such_type"));
+    assertTrue(getRootCause(exception) instanceof PinotAdminValidationException);
   }
 
   @Test(dataProvider = "viewProvider")
@@ -166,13 +189,21 @@ public class TableViewsTest extends ControllerTest {
 
   private TableViews.TableView getTableView(String tableName, String view, String tableType)
       throws Exception {
-    return JsonUtils.stringToObject(
-        sendGetRequest(DEFAULT_INSTANCE.getControllerRequestURLBuilder().forTableView(tableName, view, tableType)),
-        TableViews.TableView.class);
+    PinotAdminClient adminClient = getOrCreateAdminClient();
+    String response = adminClient.getTableClient().getTableView(tableName, view, tableType);
+    return JsonUtils.stringToObject(response, TableViews.TableView.class);
   }
 
   private String getDownloadURL(String controllerDataDir, String rawTableName, String segmentId) {
     return URIUtils.getUri(controllerDataDir, rawTableName, URIUtils.encode(segmentId)).toString();
+  }
+
+  private Throwable getRootCause(Throwable throwable) {
+    Throwable current = throwable;
+    while (current.getCause() != null && current.getCause() != current) {
+      current = current.getCause();
+    }
+    return current;
   }
 
   @AfterClass

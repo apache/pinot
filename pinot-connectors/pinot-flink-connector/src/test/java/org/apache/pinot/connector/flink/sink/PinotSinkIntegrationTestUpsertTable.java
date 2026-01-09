@@ -18,9 +18,7 @@
  */
 package org.apache.pinot.connector.flink.sink;
 
-import com.fasterxml.jackson.databind.JsonNode;
 import java.io.File;
-import java.io.IOException;
 import java.time.Duration;
 import java.util.Arrays;
 import java.util.Collections;
@@ -49,7 +47,6 @@ import org.apache.pinot.spi.config.table.ingestion.BatchIngestionConfig;
 import org.apache.pinot.spi.config.table.ingestion.IngestionConfig;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.ingestion.batch.BatchConfigProperties;
-import org.apache.pinot.spi.utils.JsonUtils;
 import org.apache.pinot.spi.utils.builder.TableNameBuilder;
 import org.apache.pinot.util.TestUtils;
 import org.testng.annotations.BeforeClass;
@@ -164,16 +161,11 @@ public class PinotSinkIntegrationTestUpsertTable extends BaseClusterIntegrationT
   }
 
   private void verifyContainsSegments(List<String> segmentsToCheck)
-      throws IOException {
+      throws Exception {
     String tableNameWithType = TableNameBuilder.REALTIME.tableNameWithType(_rawTableName);
-    JsonNode segments = JsonUtils.stringToJsonNode(sendGetRequest(
-            _controllerRequestURLBuilder.forSegmentListAPI(tableNameWithType, TableType.REALTIME.toString()))).get(0)
-        .get("REALTIME");
-    Set<String> segmentNames = new HashSet<>();
-    for (int i = 0; i < segments.size(); i++) {
-      String segmentName = segments.get(i).asText();
-      segmentNames.add(segmentName);
-    }
+    List<String> segments = getOrCreateAdminClient().getSegmentClient()
+        .listSegments(tableNameWithType, TableType.REALTIME.toString(), false);
+    Set<String> segmentNames = new HashSet<>(segments);
 
     for (String segmentName : segmentsToCheck) {
       assertTrue(segmentNames.contains(segmentName));
@@ -181,22 +173,26 @@ public class PinotSinkIntegrationTestUpsertTable extends BaseClusterIntegrationT
   }
 
   private void verifySegments(int numSegments, int numTotalDocs)
-      throws IOException {
+      throws Exception {
     String tableNameWithType = TableNameBuilder.REALTIME.tableNameWithType(_rawTableName);
-    JsonNode segments = JsonUtils.stringToJsonNode(sendGetRequest(
-            _controllerRequestURLBuilder.forSegmentListAPI(tableNameWithType, TableType.REALTIME.toString()))).get(0)
-        .get("REALTIME");
+    List<String> segments = getOrCreateAdminClient().getSegmentClient()
+        .listSegments(tableNameWithType, TableType.REALTIME.toString(), false);
     assertEquals(segments.size(), numSegments);
     int actualNumTotalDocs = 0;
     // count docs in completed segments only
-    for (int i = 0; i < numSegments; i++) {
-      String segmentName = segments.get(i).asText();
-      JsonNode segmentMetadata = JsonUtils.stringToJsonNode(
-          sendGetRequest(_controllerRequestURLBuilder.forSegmentMetadata(tableNameWithType, segmentName)));
-      if (segmentMetadata.get("segment.realtime.status").asText().equals("IN_PROGRESS")) {
+    for (String segmentName : segments) {
+      Map<String, Object> segmentMetadata =
+          getOrCreateAdminClient().getSegmentClient().getSegmentMetadata(tableNameWithType, segmentName, null);
+      Object status = segmentMetadata.get("segment.realtime.status");
+      if (status != null && "IN_PROGRESS".equals(status.toString())) {
         continue;
       }
-      actualNumTotalDocs += segmentMetadata.get("segment.total.docs").asInt();
+      Object totalDocs = segmentMetadata.get("segment.total.docs");
+      if (totalDocs instanceof Number) {
+        actualNumTotalDocs += ((Number) totalDocs).intValue();
+      } else if (totalDocs != null) {
+        actualNumTotalDocs += Integer.parseInt(totalDocs.toString());
+      }
     }
     assertEquals(actualNumTotalDocs, numTotalDocs);
   }
