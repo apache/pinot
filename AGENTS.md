@@ -88,7 +88,7 @@ repo. It is intentionally short and focused on day-to-day work.
 
 ## Coding conventions and hygiene
 - Add class-level Javadoc for new classes; describe behavior and thread-safety.
-- Use `/** ... */` Javadoc syntax; code targets Java 11.
+- Use Javadoc comments with either `/** ... */` or `///` syntax (per JEP-467); code targets Java 11.
 - Keep license headers on all new source files.
 - Use `./mvnw license:format` to add headers to new files.
 - Preserve backward compatibility across mixed-version broker/server/controller.
