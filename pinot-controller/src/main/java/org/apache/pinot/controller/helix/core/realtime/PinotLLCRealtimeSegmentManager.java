@@ -56,6 +56,7 @@ import java.util.stream.Stream;
 import javax.annotation.Nullable;
 import org.apache.commons.collections4.CollectionUtils;
 import org.apache.commons.lang3.StringUtils;
+import org.apache.commons.lang3.tuple.Pair;
 import org.apache.helix.AccessOption;
 import org.apache.helix.ClusterMessagingService;
 import org.apache.helix.HelixAdmin;
@@ -377,9 +378,9 @@ public class PinotLLCRealtimeSegmentManager {
    */
   public void setUpNewTable(TableConfig tableConfig, IdealState idealState) {
     List<StreamConfig> streamConfigs = IngestionConfigUtils.getStreamConfigs(tableConfig);
-    List<PartitionGroupInfo> newPartitionGroupMetadataList =
+    List<Pair<PartitionGroupMetadata, Integer>> newPartitionGroupMetadataList =
         getNewPartitionGroupMetadataList(streamConfigs, Collections.emptyList(), idealState).stream().map(
-            x -> new PartitionGroupInfo(x, STARTING_SEQUENCE_NUMBER)
+            x -> Pair.of(x, STARTING_SEQUENCE_NUMBER)
         ).collect(Collectors.toList());
     setUpNewTable(tableConfig, idealState, newPartitionGroupMetadataList);
   }
@@ -389,7 +390,7 @@ public class PinotLLCRealtimeSegmentManager {
    * <p>NOTE: the passed in IdealState may contain HLC segments if both HLC and LLC are configured.
    */
   public void setUpNewTable(TableConfig tableConfig, IdealState idealState,
-      List<PartitionGroupInfo> consumeMeta) {
+      List<Pair<PartitionGroupMetadata, Integer>> consumeMeta) {
     Preconditions.checkState(!_isStopping, "Segment manager is stopping");
 
     String realtimeTableName = tableConfig.getTableName();
@@ -408,11 +409,13 @@ public class PinotLLCRealtimeSegmentManager {
 
     long currentTimeMs = getCurrentTimeMs();
     Map<String, Map<String, String>> instanceStatesMap = idealState.getRecord().getMapFields();
-    for (PartitionGroupInfo partitionGroupInfo : consumeMeta) {
+    for (Pair<PartitionGroupMetadata, Integer> pair : consumeMeta) {
+      PartitionGroupMetadata metadata = pair.getLeft();
+      int sequence = pair.getRight();
       StreamConfig streamConfig = IngestionConfigUtils.getStreamConfigFromPinotPartitionId(streamConfigs,
-          partitionGroupInfo.getPartitionGroupId());
+          metadata.getPartitionGroupId());
       String segmentName =
-          setupNewPartitionGroup(tableConfig, streamConfig, partitionGroupInfo, currentTimeMs, instancePartitions,
+          setupNewPartitionGroup(tableConfig, streamConfig, metadata, sequence, currentTimeMs, instancePartitions,
               numPartitionGroups, numReplicas);
       updateInstanceStatesForNewConsumingSegment(instanceStatesMap, null, segmentName, segmentAssignment,
           instancePartitionsMap);
@@ -1915,26 +1918,22 @@ public class PinotLLCRealtimeSegmentManager {
   private String setupNewPartitionGroup(TableConfig tableConfig, StreamConfig streamConfig,
       PartitionGroupMetadata partitionGroupMetadata, long creationTimeMs, InstancePartitions instancePartitions,
       int numPartitions, int numReplicas) {
-    return setupNewPartitionGroup(tableConfig, streamConfig, new PartitionGroupInfo(partitionGroupMetadata,
-            STARTING_SEQUENCE_NUMBER), creationTimeMs, instancePartitions, numPartitions, numReplicas);
+    return setupNewPartitionGroup(tableConfig, streamConfig, partitionGroupMetadata, STARTING_SEQUENCE_NUMBER,
+        creationTimeMs, instancePartitions, numPartitions, numReplicas);
   }
 
-  /**
-   * Sets up a new partition group.
-   * <p>Persists the ZK metadata for the first CONSUMING segment, and returns the segment name.
-   */
   private String setupNewPartitionGroup(TableConfig tableConfig, StreamConfig streamConfig,
-      PartitionGroupInfo wrapper, long creationTimeMs, InstancePartitions instancePartitions,
-      int numPartitions, int numReplicas) {
+      PartitionGroupMetadata partitionGroupMetadata, int sequence, long creationTimeMs,
+      InstancePartitions instancePartitions, int numPartitions, int numReplicas) {
     String realtimeTableName = tableConfig.getTableName();
-    int partitionGroupId = wrapper.getPartitionGroupId();
-    String startOffset = wrapper.getStartOffset().toString();
+    int partitionGroupId = partitionGroupMetadata.getPartitionGroupId();
+    String startOffset = partitionGroupMetadata.getStartOffset().toString();
     LOGGER.info("Setting up new partition group: {} for table: {} with sequence: {} and startOffset: {}",
-        partitionGroupId, realtimeTableName, wrapper.getSequence(), startOffset);
+        partitionGroupId, realtimeTableName, sequence, startOffset);
 
     String rawTableName = TableNameBuilder.extractRawTableName(realtimeTableName);
     LLCSegmentName newLLCSegmentName =
-        new LLCSegmentName(rawTableName, partitionGroupId, wrapper.getSequence(), creationTimeMs);
+        new LLCSegmentName(rawTableName, partitionGroupId, sequence, creationTimeMs);
     String newSegmentName = newLLCSegmentName.getSegmentName();
 
     CommittingSegmentDescriptor committingSegmentDescriptor = new CommittingSegmentDescriptor(null,

@@ -104,7 +104,6 @@ import org.apache.pinot.controller.helix.core.WatermarkInductionResult;
 import org.apache.pinot.controller.helix.core.controllerjob.ControllerJobTypes;
 import org.apache.pinot.controller.helix.core.minion.PinotHelixTaskResourceManager;
 import org.apache.pinot.controller.helix.core.minion.PinotTaskManager;
-import org.apache.pinot.controller.helix.core.realtime.PartitionGroupInfo;
 import org.apache.pinot.controller.helix.core.rebalance.RebalanceConfig;
 import org.apache.pinot.controller.helix.core.rebalance.RebalanceResult;
 import org.apache.pinot.controller.helix.core.rebalance.TableRebalanceManager;
@@ -127,6 +126,8 @@ import org.apache.pinot.spi.config.table.TableType;
 import org.apache.pinot.spi.controller.ControllerJobType;
 import org.apache.pinot.spi.data.LogicalTableConfig;
 import org.apache.pinot.spi.data.Schema;
+import org.apache.pinot.spi.stream.LongMsgOffset;
+import org.apache.pinot.spi.stream.PartitionGroupMetadata;
 import org.apache.pinot.spi.utils.CommonConstants;
 import org.apache.pinot.spi.utils.Enablement;
 import org.apache.pinot.spi.utils.JsonUtils;
@@ -359,8 +360,11 @@ public class PinotTableRestletResource {
         return new CopyTableResponse("success", "Dry run", schema, realtimeTableConfig, watermarkInductionResult);
       }
 
-      List<PartitionGroupInfo> partitionGroupInfos = watermarkInductionResult.getWatermarks().stream()
-          .map(PartitionGroupInfo::from)
+      List<Pair<PartitionGroupMetadata, Integer>> partitionGroupInfos = watermarkInductionResult.getWatermarks()
+          .stream()
+          .map(watermark -> Pair.of(
+              new PartitionGroupMetadata(watermark.getPartitionGroupId(), new LongMsgOffset(watermark.getOffset())),
+              watermark.getSequenceNumber()))
           .collect(Collectors.toList());
 
       _pinotHelixResourceManager.addSchema(schema, true, false);

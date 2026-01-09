@@ -18,10 +18,14 @@
  */
 package org.apache.pinot.controller.helix.core.realtime;
 
+import org.apache.commons.lang3.tuple.Pair;
 import org.apache.pinot.controller.helix.core.WatermarkInductionResult;
 import org.apache.pinot.spi.stream.LongMsgOffset;
+import org.apache.pinot.spi.stream.PartitionGroupMetadata;
 import org.testng.annotations.Test;
 
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.when;
 import static org.testng.Assert.assertEquals;
 import static org.testng.Assert.assertNotNull;
 
@@ -29,19 +33,24 @@ import static org.testng.Assert.assertNotNull;
 public class PartitionGroupInfoTest {
 
   @Test
-  public void testFromWatermark() {
+  public void testConversionFromWatermark() {
     int partitionGroupId = 123;
     long offset = 456;
     int sequenceNumber = 789;
 
     WatermarkInductionResult.Watermark watermark =
         new WatermarkInductionResult.Watermark(partitionGroupId, sequenceNumber, offset);
-    PartitionGroupInfo partitionGroupInfo = PartitionGroupInfo.from(watermark);
 
-    assertNotNull(partitionGroupInfo);
-    assertEquals(partitionGroupInfo.getPartitionGroupId(), partitionGroupId);
-    assertEquals(partitionGroupInfo.getSequence(), sequenceNumber);
-    assertNotNull(partitionGroupInfo.getStartOffset());
-    assertEquals(partitionGroupInfo.getStartOffset().toString(), new LongMsgOffset(offset).toString());
+    PartitionGroupMetadata metadata = mock(PartitionGroupMetadata.class);
+    when(metadata.getPartitionGroupId()).thenReturn(partitionGroupId);
+    when(metadata.getStartOffset()).thenReturn(new LongMsgOffset(offset));
+
+    Pair<PartitionGroupMetadata, Integer> pair = Pair.of(metadata, sequenceNumber);
+
+    assertNotNull(pair);
+    assertEquals(pair.getLeft().getPartitionGroupId(), partitionGroupId);
+    assertEquals(pair.getRight().intValue(), sequenceNumber);
+    assertNotNull(pair.getLeft().getStartOffset());
+    assertEquals(pair.getLeft().getStartOffset().toString(), new LongMsgOffset(offset).toString());
   }
 }

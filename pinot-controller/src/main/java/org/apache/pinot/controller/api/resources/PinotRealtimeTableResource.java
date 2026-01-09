@@ -456,7 +456,8 @@ public class PinotRealtimeTableResource {
   @Produces(MediaType.APPLICATION_JSON)
   @Path("/tables/{tableName}/consumerWatermarks")
   @Authorize(targetType = TargetType.TABLE, paramName = "tableName", action = Actions.Table.GET_IDEAL_STATE)
-  @ApiOperation(value = "Get consumer watermarks for a realtime table", notes = "Returns the next offset to be consumed for each partition group. Only works for realtime tables.")
+  @ApiOperation(value = "Get consumer watermarks for a realtime table",
+      notes = "Returns the next offset to be consumed for each partition group. Only works for realtime tables.")
   public WatermarkInductionResult getConsumerWatermark(
       @ApiParam(value = "Name of the realtime table", required = true) @PathParam("tableName") String tableName,
       @Context HttpHeaders headers) {
