@@ -22,7 +22,9 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.google.common.collect.ImmutableSet;
 import java.io.File;
 import java.io.IOException;
+import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
 import java.util.Map;
@@ -34,9 +36,11 @@ import org.apache.pinot.spi.config.table.ingestion.ComplexTypeConfig;
 import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.Schema;
 import org.testng.Assert;
+import org.testng.annotations.DataProvider;
 import org.testng.annotations.Test;
 
 import static org.testng.Assert.assertEquals;
+import static org.testng.Assert.assertNull;
 import static org.testng.Assert.assertTrue;
 
 
@@ -762,5 +766,432 @@ public class JsonUtilsTest {
       assertEquals(flattenedRecord1.get(".addresses..country"), "ca");
       assertEquals(flattenedRecord1.get(".addresses..street"), "second st");
     }
+  }
+
+  // ==================== Tests for bytesToMap optimization ====================
+  // These tests verify that bytesToMap produces identical results to the old
+  // two-step approach (bytesToJsonNode + jsonNodeToMap)
+
+  /**
+   * Data provider for various JSON payloads to test bytesToMap equivalence
+   */
+  @DataProvider(name = "jsonPayloads")
+  public Object[][] jsonPayloads() {
+    return new Object[][]{
+        // Empty and null cases
+        {"{}"},
+        {"{\"key\":null}"},
+
+        // Simple primitives
+        {"{\"string\":\"value\"}"},
+        {"{\"integer\":42}"},
+        {"{\"negative\":-123}"},
+        {"{\"float\":3.14159}"},
+        {"{\"negative_float\":-2.718}"},
+        {"{\"boolean_true\":true}"},
+        {"{\"boolean_false\":false}"},
+        {"{\"zero\":0}"},
+        {"{\"zero_float\":0.0}"},
+
+        // Large numbers
+        {"{\"large_int\":9223372036854775807}"},
+        {"{\"large_negative\":-9223372036854775808}"},
+        {"{\"scientific\":1.23e10}"},
+        {"{\"scientific_negative\":1.23e-10}"},
+
+        // String edge cases
+        {"{\"empty_string\":\"\"}"},
+        {"{\"whitespace\":\"   \"}"},
+        {"{\"with_quotes\":\"she said \\\"hello\\\"\"}"},
+        {"{\"with_backslash\":\"path\\\\to\\\\file\"}"},
+        {"{\"with_newline\":\"line1\\nline2\"}"},
+        {"{\"with_tab\":\"col1\\tcol2\"}"},
+        {"{\"with_unicode\":\"日本語\"}"},
+        {"{\"emoji\":\"Hello 👋 World 🌍\"}"},
+        {"{\"special_chars\":\"<>&'\\\"\"}"},
+
+        // Arrays
+        {"{\"empty_array\":[]}"},
+        {"{\"int_array\":[1,2,3,4,5]}"},
+        {"{\"string_array\":[\"a\",\"b\",\"c\"]}"},
+        {"{\"mixed_array\":[1,\"two\",3.0,true,null]}"},
+        {"{\"nested_array\":[[1,2],[3,4],[5,6]]}"},
+        {"{\"array_of_objects\":[{\"a\":1},{\"b\":2}]}"},
+
+        // Nested objects
+        {"{\"nested\":{\"level1\":{\"level2\":{\"level3\":\"deep\"}}}}"},
+        {"{\"person\":{\"name\":\"John\",\"age\":30,\"address\":{\"city\":\"NYC\",\"zip\":\"10001\"}}}"},
+
+        // Complex realistic payloads
+        {
+            "{\"event\":{\"id\":123,\"type\":\"click\",\"timestamp\":1609459200000,"
+                + "\"user\":{\"id\":\"user123\",\"session\":\"sess456\"},"
+                + "\"data\":{\"page\":\"/products\",\"element\":\"button\",\"coordinates\":{\"x\":100,\"y\":200}}}}"
+        },
+
+        // Multiple fields with same type
+        {"{\"a\":1,\"b\":2,\"c\":3,\"d\":4,\"e\":5,\"f\":6,\"g\":7,\"h\":8,\"i\":9,\"j\":10}"},
+
+        // Field names with special characters
+        {"{\"field-with-dash\":1}"},
+        {"{\"field.with.dots\":2}"},
+        {"{\"field_with_underscore\":3}"},
+        {"{\"123numeric_start\":4}"},
+
+        // Boolean and null combinations
+        {"{\"flags\":{\"active\":true,\"deleted\":false,\"pending\":null}}"},
+
+        // Array with nulls
+        {"{\"array_with_nulls\":[1,null,3,null,5]}"},
+
+        // Unicode field names
+        {"{\"日本語キー\":\"value\"}"},
+
+        // Very long string value
+        {"{\"long_string\":\"" + "a".repeat(1000) + "\"}"},
+
+        // Deeply nested structure
+        {"{\"l1\":{\"l2\":{\"l3\":{\"l4\":{\"l5\":{\"value\":\"deep\"}}}}}}"},
+
+        // Real-world like Kafka message
+        {
+            "{\"topic\":\"events\",\"partition\":0,\"offset\":12345,\"timestamp\":1609459200000,"
+                + "\"key\":\"user123\",\"value\":{\"event_type\":\"purchase\","
+                + "\"items\":[{\"sku\":\"ABC123\",\"qty\":2,\"price\":29.99},"
+                + "{\"sku\":\"XYZ789\",\"qty\":1,\"price\":49.99}],"
+                + "\"total\":109.97,\"currency\":\"USD\"}}"
+        }
+    };
+  }
+
+  /**
+   * Test that bytesToMap produces identical results to bytesToJsonNode + jsonNodeToMap
+   * for all payload types
+   */
+  @Test(dataProvider = "jsonPayloads")
+  public void testBytesToMapEquivalence(String jsonString)
+      throws IOException {
+    byte[] jsonBytes = jsonString.getBytes(StandardCharsets.UTF_8);
+
+    // Old approach: bytesToJsonNode + jsonNodeToMap
+    JsonNode jsonNode = JsonUtils.bytesToJsonNode(jsonBytes, 0, jsonBytes.length);
+    Map<String, Object> oldResult = JsonUtils.jsonNodeToMap(jsonNode);
+
+    // New approach: bytesToMap directly
+    Map<String, Object> newResult = JsonUtils.bytesToMap(jsonBytes, 0, jsonBytes.length);
+
+    // Verify they are equal
+    assertEquals(newResult, oldResult,
+        "bytesToMap should produce identical result to bytesToJsonNode + jsonNodeToMap for: " + jsonString);
+  }
+
+  /**
+   * Test bytesToMap with offset and length parameters (partial array reading)
+   */
+  @Test
+  public void testBytesToMapWithOffset()
+      throws IOException {
+    String prefix = "GARBAGE";
+    String jsonString = "{\"key\":\"value\",\"num\":42}";
+    String suffix = "MORE_GARBAGE";
+    String combined = prefix + jsonString + suffix;
+
+    byte[] fullBytes = combined.getBytes(StandardCharsets.UTF_8);
+    int offset = prefix.length();
+    int length = jsonString.length();
+
+    // Old approach
+    JsonNode jsonNode = JsonUtils.bytesToJsonNode(fullBytes, offset, length);
+    Map<String, Object> oldResult = JsonUtils.jsonNodeToMap(jsonNode);
+
+    // New approach
+    Map<String, Object> newResult = JsonUtils.bytesToMap(fullBytes, offset, length);
+
+    assertEquals(newResult, oldResult);
+    assertEquals(newResult.get("key"), "value");
+    assertEquals(newResult.get("num"), 42);
+  }
+
+  /**
+   * Test bytesToMap without offset (full array)
+   */
+  @Test
+  public void testBytesToMapFullArray()
+      throws IOException {
+    String jsonString = "{\"name\":\"test\",\"values\":[1,2,3]}";
+    byte[] jsonBytes = jsonString.getBytes(StandardCharsets.UTF_8);
+
+    // Old approach using full array methods
+    JsonNode jsonNode = JsonUtils.bytesToJsonNode(jsonBytes);
+    Map<String, Object> oldResult = JsonUtils.jsonNodeToMap(jsonNode);
+
+    // New approach
+    Map<String, Object> newResult = JsonUtils.bytesToMap(jsonBytes);
+
+    assertEquals(newResult, oldResult);
+  }
+
+  /**
+   * Test that numeric types are preserved correctly
+   */
+  @Test
+  public void testBytesToMapNumericTypes()
+      throws IOException {
+    String jsonString = "{\"int\":42,\"long\":9223372036854775807,\"double\":3.14159,\"float\":1.5}";
+    byte[] jsonBytes = jsonString.getBytes(StandardCharsets.UTF_8);
+
+    Map<String, Object> result = JsonUtils.bytesToMap(jsonBytes);
+
+    // Verify the types and values
+    assertEquals(result.get("int"), 42);
+    assertEquals(result.get("long"), 9223372036854775807L);
+    assertEquals(result.get("double"), 3.14159);
+    assertEquals(result.get("float"), 1.5);
+
+    // Also verify equivalence with old approach
+    JsonNode jsonNode = JsonUtils.bytesToJsonNode(jsonBytes);
+    Map<String, Object> oldResult = JsonUtils.jsonNodeToMap(jsonNode);
+    assertEquals(result, oldResult);
+  }
+
+  /**
+   * Test nested object access after parsing
+   */
+  @Test
+  @SuppressWarnings("unchecked")
+  public void testBytesToMapNestedAccess()
+      throws IOException {
+    String jsonString = "{\"outer\":{\"inner\":{\"value\":\"deep\"},\"array\":[1,2,3]}}";
+    byte[] jsonBytes = jsonString.getBytes(StandardCharsets.UTF_8);
+
+    Map<String, Object> result = JsonUtils.bytesToMap(jsonBytes);
+    Map<String, Object> outer = (Map<String, Object>) result.get("outer");
+    Map<String, Object> inner = (Map<String, Object>) outer.get("inner");
+    List<Object> array = (List<Object>) outer.get("array");
+
+    assertEquals(inner.get("value"), "deep");
+    assertEquals(array, Arrays.asList(1, 2, 3));
+
+    // Verify equivalence
+    JsonNode jsonNode = JsonUtils.bytesToJsonNode(jsonBytes);
+    Map<String, Object> oldResult = JsonUtils.jsonNodeToMap(jsonNode);
+    assertEquals(result, oldResult);
+  }
+
+  /**
+   * Test null handling in bytesToMap
+   */
+  @Test
+  public void testBytesToMapNullHandling()
+      throws IOException {
+    String jsonString = "{\"nullField\":null,\"nested\":{\"alsoNull\":null}}";
+    byte[] jsonBytes = jsonString.getBytes(StandardCharsets.UTF_8);
+
+    Map<String, Object> result = JsonUtils.bytesToMap(jsonBytes);
+
+    assertTrue(result.containsKey("nullField"));
+    assertNull(result.get("nullField"));
+
+    @SuppressWarnings("unchecked")
+    Map<String, Object> nested = (Map<String, Object>) result.get("nested");
+    assertTrue(nested.containsKey("alsoNull"));
+    assertNull(nested.get("alsoNull"));
+
+    // Verify equivalence
+    JsonNode jsonNode = JsonUtils.bytesToJsonNode(jsonBytes);
+    Map<String, Object> oldResult = JsonUtils.jsonNodeToMap(jsonNode);
+    assertEquals(result, oldResult);
+  }
+
+  /**
+   * Test boolean handling
+   */
+  @Test
+  public void testBytesToMapBooleanHandling()
+      throws IOException {
+    String jsonString = "{\"trueVal\":true,\"falseVal\":false}";
+    byte[] jsonBytes = jsonString.getBytes(StandardCharsets.UTF_8);
+
+    Map<String, Object> result = JsonUtils.bytesToMap(jsonBytes);
+
+    assertEquals(result.get("trueVal"), true);
+    assertEquals(result.get("falseVal"), false);
+
+    // Verify equivalence
+    JsonNode jsonNode = JsonUtils.bytesToJsonNode(jsonBytes);
+    Map<String, Object> oldResult = JsonUtils.jsonNodeToMap(jsonNode);
+    assertEquals(result, oldResult);
+  }
+
+  /**
+   * Test empty object and array
+   */
+  @Test
+  public void testBytesToMapEmptyStructures()
+      throws IOException {
+    String jsonString = "{\"emptyObj\":{},\"emptyArr\":[]}";
+    byte[] jsonBytes = jsonString.getBytes(StandardCharsets.UTF_8);
+
+    Map<String, Object> result = JsonUtils.bytesToMap(jsonBytes);
+
+    @SuppressWarnings("unchecked")
+    Map<String, Object> emptyObj = (Map<String, Object>) result.get("emptyObj");
+    assertTrue(emptyObj.isEmpty());
+
+    @SuppressWarnings("unchecked")
+    List<Object> emptyArr = (List<Object>) result.get("emptyArr");
+    assertTrue(emptyArr.isEmpty());
+
+    // Verify equivalence
+    JsonNode jsonNode = JsonUtils.bytesToJsonNode(jsonBytes);
+    Map<String, Object> oldResult = JsonUtils.jsonNodeToMap(jsonNode);
+    assertEquals(result, oldResult);
+  }
+
+  /**
+   * Test that the method correctly handles UTF-8 encoded bytes
+   */
+  @Test
+  public void testBytesToMapUtf8Encoding()
+      throws IOException {
+    // Test various UTF-8 characters
+    String jsonString = "{\"chinese\":\"中文\",\"japanese\":\"日本語\",\"korean\":\"한국어\","
+        + "\"emoji\":\"🎉🎊🎁\",\"mixed\":\"Hello世界\"}";
+    byte[] jsonBytes = jsonString.getBytes(StandardCharsets.UTF_8);
+
+    Map<String, Object> result = JsonUtils.bytesToMap(jsonBytes);
+
+    assertEquals(result.get("chinese"), "中文");
+    assertEquals(result.get("japanese"), "日本語");
+    assertEquals(result.get("korean"), "한국어");
+    assertEquals(result.get("emoji"), "🎉🎊🎁");
+    assertEquals(result.get("mixed"), "Hello世界");
+
+    // Verify equivalence
+    JsonNode jsonNode = JsonUtils.bytesToJsonNode(jsonBytes);
+    Map<String, Object> oldResult = JsonUtils.jsonNodeToMap(jsonNode);
+    assertEquals(result, oldResult);
+  }
+
+  /**
+   * Test escape sequences in strings
+   */
+  @Test
+  public void testBytesToMapEscapeSequences()
+      throws IOException {
+    String jsonString = "{\"quotes\":\"\\\"quoted\\\"\",\"backslash\":\"a\\\\b\","
+        + "\"newline\":\"line1\\nline2\",\"tab\":\"col1\\tcol2\","
+        + "\"unicode\":\"\\u0048\\u0065\\u006C\\u006C\\u006F\"}";
+    byte[] jsonBytes = jsonString.getBytes(StandardCharsets.UTF_8);
+
+    Map<String, Object> result = JsonUtils.bytesToMap(jsonBytes);
+
+    assertEquals(result.get("quotes"), "\"quoted\"");
+    assertEquals(result.get("backslash"), "a\\b");
+    assertEquals(result.get("newline"), "line1\nline2");
+    assertEquals(result.get("tab"), "col1\tcol2");
+    assertEquals(result.get("unicode"), "Hello");
+
+    // Verify equivalence
+    JsonNode jsonNode = JsonUtils.bytesToJsonNode(jsonBytes);
+    Map<String, Object> oldResult = JsonUtils.jsonNodeToMap(jsonNode);
+    assertEquals(result, oldResult);
+  }
+
+  /**
+   * Test mixed type arrays
+   */
+  @Test
+  public void testBytesToMapMixedArrays()
+      throws IOException {
+    String jsonString = "{\"mixed\":[1,\"two\",3.0,true,null,{\"nested\":\"obj\"},[1,2]]}";
+    byte[] jsonBytes = jsonString.getBytes(StandardCharsets.UTF_8);
+
+    Map<String, Object> result = JsonUtils.bytesToMap(jsonBytes);
+
+    @SuppressWarnings("unchecked")
+    List<Object> mixed = (List<Object>) result.get("mixed");
+    assertEquals(mixed.size(), 7);
+    assertEquals(mixed.get(0), 1);
+    assertEquals(mixed.get(1), "two");
+    assertEquals(mixed.get(2), 3.0);
+    assertEquals(mixed.get(3), true);
+    assertNull(mixed.get(4));
+
+    // Verify equivalence
+    JsonNode jsonNode = JsonUtils.bytesToJsonNode(jsonBytes);
+    Map<String, Object> oldResult = JsonUtils.jsonNodeToMap(jsonNode);
+    assertEquals(result, oldResult);
+  }
+
+  /**
+   * Test error handling - malformed JSON should throw IOException
+   */
+  @Test(expectedExceptions = IOException.class)
+  public void testBytesToMapMalformedJson()
+      throws IOException {
+    String malformedJson = "{\"key\":value}"; // missing quotes around value
+    byte[] jsonBytes = malformedJson.getBytes(StandardCharsets.UTF_8);
+    JsonUtils.bytesToMap(jsonBytes);
+  }
+
+  /**
+   * Test error handling - incomplete JSON
+   */
+  @Test(expectedExceptions = IOException.class)
+  public void testBytesToMapIncompleteJson()
+      throws IOException {
+    String incompleteJson = "{\"key\":\"value\""; // missing closing brace
+    byte[] jsonBytes = incompleteJson.getBytes(StandardCharsets.UTF_8);
+    JsonUtils.bytesToMap(jsonBytes);
+  }
+
+  /**
+   * Stress test with a large number of fields
+   */
+  @Test
+  public void testBytesToMapManyFields()
+      throws IOException {
+    StringBuilder sb = new StringBuilder("{");
+    for (int i = 0; i < 100; i++) {
+      if (i > 0) {
+        sb.append(",");
+      }
+      sb.append("\"field").append(i).append("\":").append(i);
+    }
+    sb.append("}");
+    String jsonString = sb.toString();
+    byte[] jsonBytes = jsonString.getBytes(StandardCharsets.UTF_8);
+
+    // Old approach
+    JsonNode jsonNode = JsonUtils.bytesToJsonNode(jsonBytes);
+    Map<String, Object> oldResult = JsonUtils.jsonNodeToMap(jsonNode);
+
+    // New approach
+    Map<String, Object> newResult = JsonUtils.bytesToMap(jsonBytes);
+
+    assertEquals(newResult, oldResult);
+    assertEquals(newResult.size(), 100);
+
+    for (int i = 0; i < 100; i++) {
+      assertEquals(newResult.get("field" + i), i);
+    }
+  }
+
+  /**
+   * Test with a deeply nested array structure
+   */
+  @Test
+  public void testBytesToMapDeeplyNestedArrays()
+      throws IOException {
+    String jsonString = "{\"data\":[[[[[\"deep\"]]]]]}";
+    byte[] jsonBytes = jsonString.getBytes(StandardCharsets.UTF_8);
+
+    Map<String, Object> result = JsonUtils.bytesToMap(jsonBytes);
+
+    // Verify equivalence
+    JsonNode jsonNode = JsonUtils.bytesToJsonNode(jsonBytes);
+    Map<String, Object> oldResult = JsonUtils.jsonNodeToMap(jsonNode);
+    assertEquals(result, oldResult);
   }
 }
