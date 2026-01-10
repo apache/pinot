@@ -26,7 +26,7 @@
     <groupId>org.apache</groupId>
     <artifactId>apache</artifactId>
     <version>36</version>
-    <relativePath />
+    <relativePath/>
   </parent>
 
   <groupId>org.apache.pinot</groupId>
@@ -965,7 +965,7 @@
         </exclusions>
       </dependency>
 
-     <!-- JMX exporter-->
+      <!-- JMX exporter-->
       <dependency>
         <groupId>io.prometheus.jmx</groupId>
         <artifactId>jmx_prometheus_javaagent</artifactId>
@@ -2180,7 +2180,7 @@
               <importOrder>
                 <order>,\#</order>
               </importOrder>
-              <removeUnusedImports />
+              <removeUnusedImports/>
             </java>
           </configuration>
         </plugin>
@@ -2319,7 +2319,7 @@
               <phase>validate</phase>
               <configuration>
                 <rules>
-                  <dependencyConvergence />
+                  <dependencyConvergence/>
                   <bannedDependencies>
                     <excludes>
                       <!-- Use org.slf4j:jcl-over-slf4j -->
@@ -2871,6 +2871,11 @@
       </plugin>
       <plugin>
         <groupId>org.apache.maven.plugins</groupId>
+        <artifactId>maven-dependency-plugin</artifactId>
+        <version>3.8.1</version>
+      </plugin>
+      <plugin>
+        <groupId>org.apache.maven.plugins</groupId>
         <artifactId>maven-shade-plugin</artifactId>
         <dependencies>
           <dependency>
@@ -2893,8 +2898,8 @@
           <transformers>
             <!-- See https://logging.apache.org/log4j/transform for details -->
             <transformer implementation="org.apache.logging.log4j.maven.plugins.shade.transformer.Log4j2PluginCacheFileTransformer"/>
-            <transformer implementation="org.apache.maven.plugins.shade.resource.ApacheLicenseResourceTransformer" />
-            <transformer implementation="org.apache.maven.plugins.shade.resource.ServicesResourceTransformer" />
+            <transformer implementation="org.apache.maven.plugins.shade.resource.ApacheLicenseResourceTransformer"/>
+            <transformer implementation="org.apache.maven.plugins.shade.resource.ServicesResourceTransformer"/>
             <transformer implementation="org.apache.maven.plugins.shade.resource.ManifestResourceTransformer">
               <mainClass>${mainClass}</mainClass>
               <manifestEntries>
