@@ -74,6 +74,7 @@ import org.apache.pinot.core.auth.ManualAuthorization;
 import org.apache.pinot.core.auth.TargetType;
 import org.apache.pinot.segment.local.utils.SchemaUtils;
 import org.apache.pinot.segment.local.utils.TableConfigUtils;
+import org.apache.pinot.segment.local.utils.TableConfigUtils.ValidationType;
 import org.apache.pinot.spi.config.TableConfigs;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.data.LogicalTableConfig;
@@ -195,7 +196,7 @@ public class TableConfigsRestletResource {
   @ManualAuthorization // performed after parsing table configs
   public ConfigSuccessResponse addConfig(
       String tableConfigsStr,
-      @ApiParam(value = "comma separated list of validation type(s) to skip. supported types: (ALL|TASK|UPSERT)")
+      @ApiParam(value = "comma separated list of validation type(s) to skip. supported types: (ALL|TASK|UPSERT|INGESTION|INDEXING|TIER|RETENTION|INSTANCE_ASSIGNMENT|SCHEMA)")
       @QueryParam("validationTypesToSkip") @Nullable String typesToSkip,
       @DefaultValue("false") @QueryParam("ignoreActiveTasks") boolean ignoreActiveTasks,
       @Context HttpHeaders httpHeaders, @Context Request request)
@@ -218,7 +219,7 @@ public class TableConfigsRestletResource {
           Response.Status.BAD_REQUEST);
     }
 
-    validateConfig(tableConfigs, databaseName, typesToSkip);
+    validateConfig(tableConfigs, databaseName, typesToSkip, null);
     tableConfigs.setTableName(rawTableName);
 
     TableConfig offlineTableConfig = tableConfigs.getOffline();
@@ -362,7 +363,7 @@ public class TableConfigsRestletResource {
   public ConfigSuccessResponse updateConfig(
       @ApiParam(value = "TableConfigs name i.e. raw table name", required = true) @PathParam("tableName")
       String tableName,
-      @ApiParam(value = "comma separated list of validation type(s) to skip. supported types: (ALL|TASK|UPSERT)")
+      @ApiParam(value = "comma separated list of validation type(s) to skip. supported types: (ALL|TASK|UPSERT|INGESTION|INDEXING|TIER|RETENTION|INSTANCE_ASSIGNMENT|SCHEMA)")
       @QueryParam("validationTypesToSkip") @Nullable String typesToSkip,
       @ApiParam(value = "Reload the table if the new schema is backward compatible") @DefaultValue("false")
       @QueryParam("reload") boolean reload,
@@ -377,7 +378,7 @@ public class TableConfigsRestletResource {
       tableConfigsAndUnrecognizedProps =
           JsonUtils.stringToObjectAndUnrecognizedProperties(tableConfigsStr, TableConfigs.class);
       tableConfigs = tableConfigsAndUnrecognizedProps.getLeft();
-      validateConfig(tableConfigs, databaseName, typesToSkip);
+      validateConfig(tableConfigs, databaseName, typesToSkip, null);
       Preconditions.checkState(
           DatabaseUtils.translateTableName(tableConfigs.getTableName(), databaseName).equals(tableName),
           "'tableName' in TableConfigs: %s must match provided tableName: %s", tableConfigs.getTableName(), tableName);
@@ -447,8 +448,10 @@ public class TableConfigsRestletResource {
   @ApiOperation(value = "Validate the TableConfigs", notes = "Validate the TableConfigs")
   @ManualAuthorization // performed after parsing TableConfigs
   public String validateConfig(String tableConfigsStr,
-      @ApiParam(value = "comma separated list of validation type(s) to skip. supported types: (ALL|TASK|UPSERT)")
-      @QueryParam("validationTypesToSkip") @Nullable String typesToSkip, @Context HttpHeaders httpHeaders,
+      @ApiParam(value = "comma separated list of validation type(s) to skip. supported types: (ALL|TASK|UPSERT|INGESTION|INDEXING|TIER|RETENTION|INSTANCE_ASSIGNMENT|SCHEMA)")
+      @QueryParam("validationTypesToSkip") @Nullable String typesToSkip,
+      @ApiParam(value = "comma separated list of validation type(s) to only validate. supported types: (ALL|TASK|UPSERT|INGESTION|INDEXING|TIER|RETENTION|INSTANCE_ASSIGNMENT|SCHEMA)")
+      @QueryParam("validationTypesToValidateOnly") @Nullable String validateOnlyTypes, @Context HttpHeaders httpHeaders,
       @Context Request request) {
     Pair<TableConfigs, Map<String, Object>> tableConfigsAndUnrecognizedProps;
     try {
@@ -461,7 +464,7 @@ public class TableConfigsRestletResource {
     }
     String databaseName = DatabaseUtils.extractDatabaseFromHttpHeaders(httpHeaders);
     TableConfigs tableConfigs = tableConfigsAndUnrecognizedProps.getLeft();
-    validateConfig(tableConfigs, databaseName, typesToSkip);
+    validateConfig(tableConfigs, databaseName, typesToSkip, validateOnlyTypes);
     String rawTableName = DatabaseUtils.translateTableName(tableConfigs.getTableName(), databaseName);
     tableConfigs.setTableName(rawTableName);
 
@@ -484,7 +487,8 @@ public class TableConfigsRestletResource {
     TableConfigUtils.ensureStorageQuotaConstraints(tableConfig, _controllerConf.getDimTableMaxSize());
   }
 
-  private void validateConfig(TableConfigs tableConfigs, String database, @Nullable String typesToSkip) {
+  private void validateConfig(TableConfigs tableConfigs, String database, 
+    @Nullable String typesToSkip, @Nullable String validateOnlyTypes) {
     String rawTableName = DatabaseUtils.translateTableName(tableConfigs.getTableName(), database);
     TableConfig offlineTableConfig = tableConfigs.getOffline();
     TableConfig realtimeTableConfig = tableConfigs.getRealtime();
@@ -495,19 +499,23 @@ public class TableConfigsRestletResource {
           rawTableName);
       Preconditions.checkState(schema != null, "Must provide 'schema' for adding TableConfigs: %s", rawTableName);
       String schemaName = DatabaseUtils.translateTableName(schema.getSchemaName(), database);
-      Preconditions.checkState(!rawTableName.isEmpty(), "'tableName' cannot be empty in TableConfigs");
 
-      Preconditions.checkState(rawTableName.equals(schemaName),
-          "'tableName': %s must be equal to 'schemaName' from 'schema': %s", rawTableName, schema.getSchemaName());
-      SchemaUtils.validate(schema);
+      if (TableConfigUtils.shouldValidate(typesToSkip, validateOnlyTypes, ValidationType.SCHEMA)) {
+        Preconditions.checkState(!rawTableName.isEmpty(), "'tableName' cannot be empty in TableConfigs");
+
+        Preconditions.checkState(rawTableName.equals(schemaName),
+            "'tableName': %s must be equal to 'schemaName' from 'schema': %s", rawTableName, schema.getSchemaName());
+        SchemaUtils.validate(schema);
+      }
+
       if (offlineTableConfig != null) {
         String offlineRawTableName = DatabaseUtils.translateTableName(
             TableNameBuilder.extractRawTableName(offlineTableConfig.getTableName()), database);
         Preconditions.checkState(offlineRawTableName.equals(rawTableName),
             "Name in 'offline' table config: %s must be equal to 'tableName': %s", offlineRawTableName, rawTableName);
         TableConfigUtils.validateTableName(offlineTableConfig);
-        TableConfigUtils.validate(offlineTableConfig, schema, typesToSkip);
-        TaskConfigUtils.validateTaskConfigs(tableConfigs.getOffline(), schema, _pinotTaskManager, typesToSkip);
+        TableConfigUtils.validate(offlineTableConfig, schema, typesToSkip, validateOnlyTypes);
+        TaskConfigUtils.validateTaskConfigs(tableConfigs.getOffline(), schema, _pinotTaskManager, typesToSkip, validateOnlyTypes);
       }
       if (realtimeTableConfig != null) {
         String realtimeRawTableName = DatabaseUtils.translateTableName(
@@ -515,8 +523,8 @@ public class TableConfigsRestletResource {
         Preconditions.checkState(realtimeRawTableName.equals(rawTableName),
             "Name in 'realtime' table config: %s must be equal to 'tableName': %s", realtimeRawTableName, rawTableName);
         TableConfigUtils.validateTableName(realtimeTableConfig);
-        TableConfigUtils.validate(realtimeTableConfig, schema, typesToSkip);
-        TaskConfigUtils.validateTaskConfigs(tableConfigs.getRealtime(), schema, _pinotTaskManager, typesToSkip);
+        TableConfigUtils.validate(realtimeTableConfig, schema, typesToSkip, validateOnlyTypes);
+        TaskConfigUtils.validateTaskConfigs(tableConfigs.getRealtime(), schema, _pinotTaskManager, typesToSkip, validateOnlyTypes);
       }
       if (offlineTableConfig != null && realtimeTableConfig != null) {
         TableConfigUtils.verifyHybridTableConfigs(rawTableName, offlineTableConfig, realtimeTableConfig);
