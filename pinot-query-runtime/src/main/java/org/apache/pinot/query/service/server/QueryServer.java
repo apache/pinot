@@ -24,6 +24,7 @@ import com.google.protobuf.UnsafeByteOperations;
 import io.grpc.Server;
 import io.grpc.ServerBuilder;
 import io.grpc.netty.shaded.io.grpc.netty.NettyServerBuilder;
+import io.grpc.netty.shaded.io.netty.handler.ssl.SslContext;
 import io.grpc.stub.StreamObserver;
 import java.io.DataOutputStream;
 import java.util.ArrayList;
@@ -50,9 +51,11 @@ import org.apache.pinot.query.routing.StageMetadata;
 import org.apache.pinot.query.routing.StagePlan;
 import org.apache.pinot.query.routing.WorkerMetadata;
 import org.apache.pinot.query.runtime.QueryRunner;
+import org.apache.pinot.query.runtime.context.QueryRuntimeContext;
 import org.apache.pinot.query.runtime.plan.MultiStageQueryStats;
 import org.apache.pinot.spi.accounting.ThreadAccountant;
 import org.apache.pinot.spi.accounting.ThreadAccountantUtils;
+import org.apache.pinot.spi.config.instance.InstanceType;
 import org.apache.pinot.spi.env.PinotConfiguration;
 import org.apache.pinot.spi.executor.ExecutorServiceUtils;
 import org.apache.pinot.spi.executor.MetricsExecutor;
@@ -169,7 +172,7 @@ public class QueryServer extends PinotQueryWorkerGrpc.PinotQueryWorkerImplBase {
         if (_tlsConfig == null) {
           serverBuilder = ServerBuilder.forPort(_port);
         } else {
-          serverBuilder = NettyServerBuilder.forPort(_port).sslContext(GrpcQueryServer.buildGrpcSslContext(_tlsConfig));
+          serverBuilder = NettyServerBuilder.forPort(_port).sslContext(getOrCreateServerSslContext());
         }
         _server = buildGrpcServer(serverBuilder);
         LOGGER.info("Initialized QueryServer on port: {}", _port);
@@ -205,6 +208,15 @@ public class QueryServer extends PinotQueryWorkerGrpc.PinotQueryWorkerImplBase {
     _submissionExecutorService.shutdown();
     _explainExecutorService.shutdown();
     _timeSeriesExecutorService.shutdown();
+  }
+
+  private SslContext getOrCreateServerSslContext() {
+    SslContext sslContext = QueryRuntimeContext.getInstance().getServerGrpcSslContext(InstanceType.SERVER);
+    if (sslContext == null) {
+      sslContext = GrpcQueryServer.buildGrpcSslContext(_tlsConfig);
+      QueryRuntimeContext.getInstance().setServerGrpcSslContext(InstanceType.SERVER, sslContext);
+    }
+    return sslContext;
   }
 
   /// Submits a query for executions.

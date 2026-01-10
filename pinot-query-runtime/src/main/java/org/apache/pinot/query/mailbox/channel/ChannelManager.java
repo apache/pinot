@@ -21,6 +21,7 @@ package org.apache.pinot.query.mailbox.channel;
 import io.grpc.ManagedChannel;
 import io.grpc.ManagedChannelBuilder;
 import io.grpc.netty.shaded.io.grpc.netty.NettyChannelBuilder;
+import io.grpc.netty.shaded.io.netty.handler.ssl.SslContext;
 import java.time.Duration;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.TimeUnit;
@@ -41,6 +42,7 @@ public class ChannelManager {
    * Map from (hostname, port) to the ManagedChannel with all known channels
    */
   private final ConcurrentHashMap<Pair<String, Integer>, ManagedChannel> _channelMap = new ConcurrentHashMap<>();
+  @Nullable
   private final TlsConfig _tlsConfig;
   /**
    * The idle timeout for the channel, which cannot be disabled in gRPC.
@@ -51,11 +53,15 @@ public class ChannelManager {
    */
   private final Duration _idleTimeout;
   private final int _maxInboundMessageSize;
+  @Nullable
+  private final SslContext _clientSslContext;
 
-  public ChannelManager(@Nullable TlsConfig tlsConfig, int maxInboundMessageSize, Duration idleTimeout) {
+  public ChannelManager(@Nullable TlsConfig tlsConfig, @Nullable SslContext clientSslContext, int maxInboundMessageSize,
+      Duration idleTimeout) {
     _tlsConfig = tlsConfig;
     _maxInboundMessageSize = maxInboundMessageSize;
     _idleTimeout = idleTimeout;
+    _clientSslContext = clientSslContext;
   }
 
   public ManagedChannel getChannel(String hostname, int port) {
@@ -67,7 +73,7 @@ public class ChannelManager {
                 .forAddress(k.getLeft(), k.getRight())
                 .maxInboundMessageSize(
                     _maxInboundMessageSize)
-                .sslContext(ServerGrpcQueryClient.buildSslContext(_tlsConfig));
+                .sslContext(resolveClientSslContext());
             return decorate(channelBuilder).build();
           }
       );
@@ -86,5 +92,12 @@ public class ChannelManager {
 
   private ManagedChannelBuilder<?> decorate(ManagedChannelBuilder<?> builder) {
     return builder.idleTimeout(_idleTimeout.getSeconds(), TimeUnit.SECONDS);
+  }
+
+  private SslContext resolveClientSslContext() {
+    if (_clientSslContext != null) {
+      return _clientSslContext;
+    }
+    return ServerGrpcQueryClient.buildSslContext(_tlsConfig);
   }
 }

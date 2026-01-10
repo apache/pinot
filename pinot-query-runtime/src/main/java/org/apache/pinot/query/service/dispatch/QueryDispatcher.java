@@ -25,6 +25,7 @@ import com.google.protobuf.ByteString;
 import com.google.protobuf.InvalidProtocolBufferException;
 import io.grpc.ConnectivityState;
 import io.grpc.Deadline;
+import io.grpc.netty.shaded.io.netty.handler.ssl.SslContext;
 import java.io.DataInputStream;
 import java.io.InputStream;
 import java.time.Duration;
@@ -59,6 +60,7 @@ import org.apache.pinot.common.response.broker.QueryProcessingException;
 import org.apache.pinot.common.response.broker.ResultTable;
 import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.common.utils.DataSchema.ColumnDataType;
+import org.apache.pinot.common.utils.grpc.ServerGrpcQueryClient;
 import org.apache.pinot.core.transport.ServerInstance;
 import org.apache.pinot.core.util.DataBlockExtractUtils;
 import org.apache.pinot.core.util.trace.TracedThreadFactory;
@@ -75,12 +77,14 @@ import org.apache.pinot.query.routing.StageMetadata;
 import org.apache.pinot.query.routing.WorkerMetadata;
 import org.apache.pinot.query.runtime.blocks.ErrorMseBlock;
 import org.apache.pinot.query.runtime.blocks.MseBlock;
+import org.apache.pinot.query.runtime.context.QueryRuntimeContext;
 import org.apache.pinot.query.runtime.operator.BaseMailboxReceiveOperator;
 import org.apache.pinot.query.runtime.operator.MultiStageOperator;
 import org.apache.pinot.query.runtime.operator.OpChain;
 import org.apache.pinot.query.runtime.plan.MultiStageQueryStats;
 import org.apache.pinot.query.runtime.plan.OpChainExecutionContext;
 import org.apache.pinot.query.runtime.plan.PlanNodeToOpChain;
+import org.apache.pinot.spi.config.instance.InstanceType;
 import org.apache.pinot.spi.exception.QueryErrorCode;
 import org.apache.pinot.spi.exception.QueryException;
 import org.apache.pinot.spi.query.QueryExecutionContext;
@@ -106,6 +110,8 @@ public class QueryDispatcher {
   private final Map<String, DispatchClient> _dispatchClientMap = new ConcurrentHashMap<>();
   @Nullable
   private final TlsConfig _tlsConfig;
+  @Nullable
+  private final SslContext _clientGrpcSslContext;
   // maps broker-generated query id to the set of servers that the query was dispatched to
   private final Map<Long, Set<QueryServerInstance>> _serversByQuery;
   private final FailureDetector _failureDetector;
@@ -118,6 +124,7 @@ public class QueryDispatcher {
     _executorService = Executors.newFixedThreadPool(2 * Runtime.getRuntime().availableProcessors(),
         new TracedThreadFactory(Thread.NORM_PRIORITY, false, PINOT_BROKER_QUERY_DISPATCHER_FORMAT));
     _tlsConfig = tlsConfig;
+    _clientGrpcSslContext = initClientSslContext(tlsConfig);
     _failureDetector = failureDetector;
 
     if (enableCancellation) {
@@ -511,9 +518,24 @@ public class QueryDispatcher {
     String hostname = queryServerInstance.getHostname();
     int port = queryServerInstance.getQueryServicePort();
     String hostnamePort = String.format("%s_%d", hostname, port);
-    return _dispatchClientMap.computeIfAbsent(hostnamePort, k -> new DispatchClient(hostname, port, _tlsConfig));
+    return _dispatchClientMap.computeIfAbsent(hostnamePort,
+        k -> new DispatchClient(hostname, port, _tlsConfig, _clientGrpcSslContext));
   }
 
+  @Nullable
+  private static SslContext initClientSslContext(@Nullable TlsConfig tlsConfig) {
+    if (tlsConfig == null) {
+      return null;
+    }
+    QueryRuntimeContext queryRuntimeContext = QueryRuntimeContext.getInstance();
+    SslContext sslContext = queryRuntimeContext.getClientGrpcSslContext(InstanceType.BROKER);
+    if (sslContext != null) {
+      return sslContext;
+    }
+    SslContext built = ServerGrpcQueryClient.buildSslContext(tlsConfig);
+    queryRuntimeContext.setClientGrpcSslContext(InstanceType.BROKER, built);
+    return built;
+  }
   /// Concatenates the results of the sub-plan and returns a [QueryResult] with the concatenated result.
   /// [QueryThreadContext] must already be set up before calling this method.
   @VisibleForTesting
