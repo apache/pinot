@@ -24,6 +24,7 @@ import com.google.common.base.Preconditions;
 import java.net.URI;
 import java.net.URISyntaxException;
 import java.time.Duration;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
@@ -51,7 +52,10 @@ import org.apache.pinot.common.request.context.ExpressionContext;
 import org.apache.pinot.common.request.context.FilterContext;
 import org.apache.pinot.common.request.context.RequestContextUtils;
 import org.apache.pinot.common.response.BrokerResponse;
+import org.apache.pinot.common.response.broker.BrokerResponseNative;
+import org.apache.pinot.common.response.broker.ResultTable;
 import org.apache.pinot.common.response.mapper.TimeSeriesResponseMapper;
+import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.common.utils.HumanReadableDuration;
 import org.apache.pinot.core.auth.Actions;
 import org.apache.pinot.core.auth.TargetType;
@@ -393,5 +397,34 @@ public class TimeSeriesRequestHandler extends BaseBrokerRequestHandler {
           Response.Status.FORBIDDEN);
       }
     }
+  }
+
+  @Override
+  public BrokerResponse handleExplainTimeSeriesRequest(String lang, String rawQueryParamString,
+      Map<String, String> queryParams) {
+    try {
+      RangeTimeSeriesRequest request = buildRangeTimeSeriesRequest(lang, rawQueryParamString, queryParams);
+      TimeSeriesLogicalPlanResult planResult = _queryEnvironment.buildLogicalPlan(request);
+      String plan = explainPlanTree(planResult.getPlanNode(), new StringBuilder(), 0).toString();
+      DataSchema schema = new DataSchema(new String[]{"SQL", "PLAN"},
+          new DataSchema.ColumnDataType[]{DataSchema.ColumnDataType.STRING, DataSchema.ColumnDataType.STRING});
+      BrokerResponseNative response = BrokerResponseNative.empty();
+      response.setResultTable(new ResultTable(schema, Collections.singletonList(new Object[]{request.getQuery(),
+        plan})));
+      return response;
+    } catch (URISyntaxException e) {
+      throw new QueryException(QueryErrorCode.TIMESERIES_PARSING, "Error building RangeTimeSeriesRequest", e);
+    }
+  }
+
+  private static StringBuilder explainPlanTree(BaseTimeSeriesPlanNode node, StringBuilder sb, int depth) {
+    if (depth > 0) {
+      sb.append("\n").append("  ".repeat(depth));
+    }
+    sb.append(node.getExplainName());
+    for (BaseTimeSeriesPlanNode child : node.getInputs()) {
+      explainPlanTree(child, sb, depth + 1);
+    }
+    return sb;
   }
 }
