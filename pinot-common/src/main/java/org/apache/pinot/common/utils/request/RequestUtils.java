@@ -53,6 +53,7 @@ import org.apache.pinot.common.request.PinotQuery;
 import org.apache.pinot.common.utils.DataSchema.ColumnDataType;
 import org.apache.pinot.spi.utils.BigDecimalUtils;
 import org.apache.pinot.spi.utils.BytesUtils;
+import org.apache.pinot.spi.utils.CommonConstants;
 import org.apache.pinot.spi.utils.CommonConstants.Broker.Request;
 import org.apache.pinot.spi.utils.TimestampIndexUtils;
 import org.apache.pinot.sql.FilterKind;
@@ -66,8 +67,15 @@ import org.slf4j.LoggerFactory;
 public class RequestUtils {
   private static final Logger LOGGER = LoggerFactory.getLogger(RequestUtils.class);
   private static final JsonNode EMPTY_OBJECT_NODE = new ObjectMapper().createObjectNode();
+  // This class will only be loaded when a query request comes in, which should only be after the server startup has
+  // completed and the global instance config context is initialized.
+  private static boolean _useLegacyLiteralUnescaping = CommonConstants.Helix.DEFAULT_SSE_LEGACY_LITERAL_UNESCAPING;
 
   private RequestUtils() {
+  }
+
+  public static void setUseLegacyLiteralUnescaping(boolean useLegacyLiteralUnescaping) {
+    _useLegacyLiteralUnescaping = useLegacyLiteralUnescaping;
   }
 
   public static SqlNodeAndOptions parseQuery(String query)
@@ -246,7 +254,8 @@ public class RequestUtils {
           literal.setNullValue(true);
           break;
         default:
-          literal.setStringValue(StringUtils.replace(node.toValue(), "''", "'"));
+          literal.setStringValue(
+              _useLegacyLiteralUnescaping ? StringUtils.replace(node.toValue(), "''", "'") : node.toValue());
           break;
       }
     }

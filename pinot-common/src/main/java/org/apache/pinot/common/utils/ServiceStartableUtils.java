@@ -24,6 +24,7 @@ import java.util.concurrent.TimeUnit;
 import org.apache.helix.zookeeper.datamodel.ZNRecord;
 import org.apache.helix.zookeeper.datamodel.serializer.ZNRecordSerializer;
 import org.apache.helix.zookeeper.impl.client.ZkClient;
+import org.apache.pinot.common.utils.request.RequestUtils;
 import org.apache.pinot.segment.spi.index.ForwardIndexConfig;
 import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.env.PinotConfiguration;
@@ -100,6 +101,7 @@ public class ServiceStartableUtils {
     setTimezone(instanceConfig);
     initForwardIndexConfig(instanceConfig);
     initFieldSpecConfig(instanceConfig);
+    initRequestUtilsConfig(instanceConfig);
   }
 
   private static void addConfigIfNotExists(PinotConfiguration instanceConfig, String key, String value) {
@@ -163,5 +165,12 @@ public class ServiceStartableUtils {
             defaultJsonMaxLength, FieldSpec.getDefaultJsonMaxLength());
       }
     }
+  }
+
+  public static void initRequestUtilsConfig(PinotConfiguration instanceConfig) {
+    boolean useLegacyLiteralUnescaping =
+        instanceConfig.getProperty(CommonConstants.Helix.CONFIG_OF_SSE_LEGACY_LITERAL_UNESCAPING,
+            CommonConstants.Helix.DEFAULT_SSE_LEGACY_LITERAL_UNESCAPING);
+    RequestUtils.setUseLegacyLiteralUnescaping(useLegacyLiteralUnescaping);
   }
 }
