@@ -417,7 +417,10 @@ public class QueryEnvironment {
       // Validate IN clause size to prevent Calcite planner bottlenecks with large IN lists
       int maxInClauseElements = QueryOptionsUtils.getMseMaxInClauseElements(
           plannerContext.getOptions(), plannerContext.getEnvConfig().defaultMseMaxInClauseElements());
-      validated.accept(new InClauseSizeValidationVisitor(maxInClauseElements));
+
+      if (maxInClauseElements > 0) {
+        validated.accept(new InClauseSizeValidationVisitor(maxInClauseElements));
+      }
 
       return validated;
     } catch (QueryException e) {
