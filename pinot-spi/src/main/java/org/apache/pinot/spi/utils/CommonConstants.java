@@ -326,7 +326,7 @@ public class CommonConstants {
 
     // SQL parsing
     public static final String CONFIG_OF_SSE_LEGACY_LITERAL_UNESCAPING =
-        "pinot.sse.parsing.legacy.literal.unescaping";
+        "pinot.query.sse.parsing.legacy.literal.unescaping";
     public static final boolean DEFAULT_SSE_LEGACY_LITERAL_UNESCAPING = false;
   }
 
