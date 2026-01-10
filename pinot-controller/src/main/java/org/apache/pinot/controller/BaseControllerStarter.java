@@ -130,6 +130,7 @@ import org.apache.pinot.controller.validation.ResourceUtilizationChecker;
 import org.apache.pinot.controller.validation.ResourceUtilizationManager;
 import org.apache.pinot.controller.validation.StorageQuotaChecker;
 import org.apache.pinot.controller.validation.UtilizationChecker;
+import org.apache.pinot.core.data.manager.realtime.UpsertInconsistentStateConfig;
 import org.apache.pinot.core.periodictask.PeriodicTask;
 import org.apache.pinot.core.periodictask.PeriodicTaskScheduler;
 import org.apache.pinot.core.query.executor.sql.SqlQueryExecutor;
@@ -727,6 +728,8 @@ public abstract class BaseControllerStarter implements ServiceStartable {
     _serviceStatusCallbackList.add(generateServiceStatusCallback(_helixParticipantManager));
 
     _clusterConfigChangeHandler.registerClusterConfigChangeListener(ContinuousJfrStarter.INSTANCE);
+    _clusterConfigChangeHandler.registerClusterConfigChangeListener(UpsertInconsistentStateConfig.getInstance());
+    LOGGER.info("Registered UpsertInconsistentStateConfig as cluster config change listener");
   }
 
   protected PinotLLCRealtimeSegmentManager createPinotLLCRealtimeSegmentManager() {

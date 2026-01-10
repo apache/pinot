@@ -104,8 +104,8 @@ import org.apache.pinot.controller.helix.core.retention.strategy.TimeRetentionSt
 import org.apache.pinot.controller.helix.core.util.MessagingServiceUtils;
 import org.apache.pinot.controller.validation.RealtimeSegmentValidationManager;
 import org.apache.pinot.core.data.manager.realtime.SegmentCompletionUtils;
+import org.apache.pinot.core.data.manager.realtime.UpsertInconsistentStateConfig;
 import org.apache.pinot.core.util.PeerServerSegmentFinder;
-import org.apache.pinot.segment.local.utils.TableConfigUtils;
 import org.apache.pinot.segment.spi.index.metadata.SegmentMetadataImpl;
 import org.apache.pinot.segment.spi.partition.metadata.ColumnPartitionMetadata;
 import org.apache.pinot.spi.config.table.ColumnPartitionConfig;
@@ -2299,6 +2299,9 @@ public class PinotLLCRealtimeSegmentManager {
    */
   public Set<String> forceCommit(String tableNameWithType, @Nullable String partitionGroupIdsToCommit,
       @Nullable String segmentsToCommit, @Nullable BatchConfig batchConfig) {
+    // Validate force commit is allowed BEFORE setting pause state to avoid leaving table in paused state on failure
+    validateForceCommitAllowed(tableNameWithType);
+
     IdealState idealState = getIdealState(tableNameWithType);
     Set<String> allConsumingSegments = findConsumingSegments(idealState);
     Set<String> targetConsumingSegments =
@@ -2467,11 +2470,15 @@ public class PinotLLCRealtimeSegmentManager {
 
   /**
    * Pause consumption on a table by
-   *   1) Update PauseState in the table ideal state and
-   *   2) Sending force commit messages to servers
+   *   1) Validate force commit is allowed for this table (fail fast before modifying state)
+   *   2) Update PauseState in the table ideal state and
+   *   3) Sending force commit messages to servers
    */
   public PauseStatusDetails pauseConsumption(String tableNameWithType, PauseState.ReasonCode reasonCode,
       @Nullable String comment, @Nullable BatchConfig batchConfig) {
+    // Validate force commit is allowed BEFORE setting pause state to avoid leaving table in paused state on failure
+    validateForceCommitAllowed(tableNameWithType);
+
     IdealState updatedIdealState = updatePauseStateInIdealState(tableNameWithType, true, reasonCode, comment);
     Set<String> consumingSegments = findConsumingSegments(updatedIdealState);
     forceCommit(tableNameWithType, null, null, batchConfig);
@@ -2524,6 +2531,9 @@ public class PinotLLCRealtimeSegmentManager {
   }
 
   public PauseState pauseTopicsConsumption(String tableNameWithType, List<Integer> indexOfPausedTopics) {
+    // Validate force commit is allowed BEFORE modifying IdealState to avoid leaving table in paused state on failure
+    validateForceCommitAllowed(tableNameWithType);
+
     IdealState updatedIdealState = HelixHelper.updateIdealState(_helixManager, tableNameWithType, idealState -> {
       PauseState pauseState = extractTablePauseState(idealState);
       if (pauseState == null) {
@@ -2571,21 +2581,29 @@ public class PinotLLCRealtimeSegmentManager {
     return extractTablePauseState(updatedIdealState);
   }
 
-  private void sendForceCommitMessageToServers(String tableNameWithType, Set<String> consumingSegments) {
-    // For partial-upsert tables or upserts with out-of-order events enabled, force-committing
-    // consuming segments is disabled. In some cases (especially when replication > 1), the
-    // server that consumed fewer rows was incorrectly selected as the winner, causing other
-    // servers to reconsume rows and resulting in inconsistent data when previous state must
-    // be referenced for add/update operations.
-    // TODO: Temporarily disabled until a proper fix is implemented.
+  /**
+   * Validates that force commit is allowed for the given table.
+   * Throws IllegalStateException if force commit is disabled for partial-upsert tables
+   * or upsert tables with dropOutOfOrder enabled when replication > 1.
+   */
+  private void validateForceCommitAllowed(String tableNameWithType) {
     TableConfig tableConfig = _helixResourceManager.getTableConfig(tableNameWithType);
-    if (TableConfigUtils.checkForInconsistentStateConfigs(tableConfig)) {
-      throw new IllegalStateException(
-          "Force commit is not allowed when replication > 1 for partial-upsert tables, or for upsert tables"
-              + " when dropOutOfOrder is enabled with consistency mode: " + UpsertConfig.ConsistencyMode.NONE
-              + " for the table: " + tableNameWithType);
+    if (tableConfig == null) {
+      throw new IllegalStateException("Table config not found for table: " + tableNameWithType);
     }
+    UpsertInconsistentStateConfig configInstance = UpsertInconsistentStateConfig.getInstance();
+    if (!configInstance.isForceCommitReloadAllowed(tableConfig)) {
+      throw new IllegalStateException(
+          "Force commit disabled for table: " + tableNameWithType
+              + ". Table is configured as partial upsert or dropOutOfOrderRecord=true with replication > 1, "
+              + "which can cause data inconsistency during force commit. "
+              + "Current cluster config '" + configInstance.getConfigKey() + "' is set to: "
+              + configInstance.isForceCommitReloadEnabled()
+              + ". To enable force commit, set this config to 'true'.");
+    }
+  }
 
+  private void sendForceCommitMessageToServers(String tableNameWithType, Set<String> consumingSegments) {
     if (!consumingSegments.isEmpty()) {
       LOGGER.info("Sending force commit messages for segments: {} of table: {}", consumingSegments, tableNameWithType);
       ClusterMessagingService messagingService = _helixManager.getMessagingService();
