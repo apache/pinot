@@ -913,6 +913,71 @@ public class JsonUtilsTest {
   }
 
   /**
+   * Test bytesToMap with offset where offset + length would exceed array bounds.
+   * This test ensures we're passing length (not offset+length) to Jackson API.
+   */
+  @Test
+  public void testBytesToMapWithOffsetEdgeCase()
+      throws IOException {
+    // Create a case where offset + length > array.length would fail if we incorrectly
+    // passed offset+length as the third parameter to Jackson's readValue
+    String prefix = "XX";  // 2 bytes
+    String jsonString = "{\"a\":1}";  // 7 bytes
+    // Total: 9 bytes
+    // offset=2, length=7
+    // If buggy (passing offset+length=9), would try to read 9 bytes from position 2,
+    // but only 7 bytes available from that position
+
+    String combined = prefix + jsonString;  // No suffix - exactly at the boundary
+    byte[] fullBytes = combined.getBytes(StandardCharsets.UTF_8);
+    int offset = prefix.length();
+    int length = jsonString.length();
+
+    // Verify array bounds: offset + length should equal array length exactly
+    assertEquals(fullBytes.length, offset + length,
+        "Test setup: offset + length should equal array length");
+
+    // This would fail with the bug: "Invalid 'offset' and/or 'len' arguments"
+    Map<String, Object> result = JsonUtils.bytesToMap(fullBytes, offset, length);
+    assertEquals(result.get("a"), 1);
+
+    // Verify equivalence with old approach
+    JsonNode jsonNode = JsonUtils.bytesToJsonNode(fullBytes, offset, length);
+    Map<String, Object> oldResult = JsonUtils.jsonNodeToMap(jsonNode);
+    assertEquals(result, oldResult);
+  }
+
+  /**
+   * Test bytesToMap with various offset positions to ensure correct slicing.
+   */
+  @Test
+  public void testBytesToMapWithVariousOffsets()
+      throws IOException {
+    String json = "{\"x\":\"y\"}";
+    byte[] jsonBytes = json.getBytes(StandardCharsets.UTF_8);
+
+    // Test with offset=0 (should work like no offset)
+    Map<String, Object> result0 = JsonUtils.bytesToMap(jsonBytes, 0, jsonBytes.length);
+    assertEquals(result0.get("x"), "y");
+
+    // Test with padding on both sides at different positions
+    for (int prefixLen = 1; prefixLen <= 10; prefixLen++) {
+      String prefix = "P".repeat(prefixLen);
+      String suffix = "S".repeat(5);
+      String combined = prefix + json + suffix;
+      byte[] fullBytes = combined.getBytes(StandardCharsets.UTF_8);
+
+      Map<String, Object> result = JsonUtils.bytesToMap(fullBytes, prefixLen, json.length());
+      assertEquals(result.get("x"), "y",
+          "Failed with prefix length " + prefixLen);
+
+      // Verify equivalence
+      JsonNode node = JsonUtils.bytesToJsonNode(fullBytes, prefixLen, json.length());
+      assertEquals(result, JsonUtils.jsonNodeToMap(node));
+    }
+  }
+
+  /**
    * Test bytesToMap without offset (full array)
    */
   @Test
