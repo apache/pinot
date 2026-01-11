@@ -201,10 +201,15 @@ public class ConcurrentMapPartitionUpsertMetadataManager extends BasePartitionUp
 
   @Override
   public void doRemoveExpiredPrimaryKeys() {
+    // Check if all segments are loaded before allowing delete key removal to prevent stale records
+    // from reappearing after server restart due to out-of-order segment loading
+    boolean allSegmentsLoaded = areAllSegmentsLoaded();
+
     AtomicInteger numMetadataTTLKeysRemoved = new AtomicInteger();
     AtomicInteger numDeletedTTLKeysRemoved = new AtomicInteger();
     AtomicInteger numTotalKeysMarkForDeletion = new AtomicInteger();
     AtomicInteger numDeletedKeysWithinTTLWindow = new AtomicInteger();
+    AtomicInteger numDeletedKeysSkippedDueToSegmentLoading = new AtomicInteger();
     double largestSeenComparisonValue = _largestSeenComparisonValue.get();
     double metadataTTLKeysThreshold =
         _metadataTTL > 0 ? largestSeenComparisonValue - _metadataTTL : Double.NEGATIVE_INFINITY;
@@ -223,6 +228,9 @@ public class ConcurrentMapPartitionUpsertMetadataManager extends BasePartitionUp
           if (comparisonValue >= deletedKeysThreshold) {
             // If key is within the TTL window, do not remove it from the primary hashmap
             numDeletedKeysWithinTTLWindow.getAndIncrement();
+          } else if (!allSegmentsLoaded) {
+            // Skip removing deleted keys if not all segments are loaded to prevent stale records from reappearing
+            numDeletedKeysSkippedDueToSegmentLoading.getAndIncrement();
           } else {
             // delete key from primary hashmap
             _primaryKeyToRecordLocationMap.remove(primaryKey, recordLocation);
@@ -256,6 +264,11 @@ public class ConcurrentMapPartitionUpsertMetadataManager extends BasePartitionUp
     if (numDeletedKeysWithinTTLWindowValue > 0) {
       _serverMetrics.addMeteredTableValue(_tableNameWithType, ServerMeter.DELETED_KEYS_WITHIN_TTL_WINDOW,
           numDeletedKeysWithinTTLWindowValue);
+    }
+    int numSkippedKeysDueToSegmentLoading = numDeletedKeysSkippedDueToSegmentLoading.get();
+    if (numSkippedKeysDueToSegmentLoading > 0) {
+      _serverMetrics.addMeteredTableValue(_tableNameWithType, ServerMeter.DELETED_KEYS_SKIPPED_SEGMENT_LOADING,
+          numSkippedKeysDueToSegmentLoading);
     }
   }
 
