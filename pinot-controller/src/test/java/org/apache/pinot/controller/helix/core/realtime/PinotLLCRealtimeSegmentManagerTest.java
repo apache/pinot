@@ -414,6 +414,10 @@ public class PinotLLCRealtimeSegmentManagerTest {
     FakePinotLLCRealtimeSegmentManager segmentManager = spy(new FakePinotLLCRealtimeSegmentManager());
     String tableNameWithType = TableNameBuilder.REALTIME.tableNameWithType(RAW_TABLE_NAME);
 
+    segmentManager._numReplicas = 2;
+    segmentManager.makeTableConfig();
+    when(segmentManager._mockResourceManager.getTableConfig(tableNameWithType)).thenReturn(segmentManager._tableConfig);
+
     IdealState pausedIdealState = new IdealState(tableNameWithType);
     String consumingSegment = new LLCSegmentName(RAW_TABLE_NAME, 0, 0, CURRENT_TIME_MS).getSegmentName();
     pausedIdealState.setPartitionState(consumingSegment, "Server_0", SegmentStateModel.CONSUMING);
