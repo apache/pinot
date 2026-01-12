@@ -948,6 +948,8 @@ public class BaseTableDataManagerTest {
       throws Exception {
     // Prepare ZK metadata with tar ready; local immutable segment reports different CRC
     SegmentZKMetadata zkMetadata = createRawSegment(SegmentVersion.v3, 5);
+    // Force download failure to exercise best-effort replace fallback (serve local, no on-disk replacement)
+    zkMetadata.setDownloadUrl("file:///nonexistent/path/" + System.nanoTime());
     ImmutableSegmentDataManager segmentDataManager = createImmutableSegmentDataManager(SEGMENT_NAME, 0);
     TableConfig tableConfig =
         new TableConfigBuilder(TableType.OFFLINE).setTableName(RAW_TABLE_NAME).setSkipCrcCheckOnLoad(true).build();
@@ -962,22 +964,27 @@ public class BaseTableDataManagerTest {
   @Test
   public void testTryLoadExistingSegmentSkipTrueUsesLocal()
       throws Exception {
-    // Create a local segment directory
+    // Create a local segment directory with CRC X
     File localIndexDir = createSegment(SegmentVersion.v3, 5);
     long localCrc = getCRC(localIndexDir);
-    // Create ZK metadata with a different CRC but keep local dir
+    // Create ZK metadata with a different CRC (X+1) and a bad download URL to force failure
     SegmentZKMetadata zkMetadata =
         makeRawSegment(localIndexDir, new File(TEMP_DIR, "tmp-" + SEGMENT_NAME + ".tar.gz"), false);
-    zkMetadata.setCrc(localCrc + 1); // ensure mismatch
+    zkMetadata.setCrc(localCrc + 1);
+    zkMetadata.setDownloadUrl("file:///nonexistent/path/" + System.nanoTime());
 
     TableConfig tableConfig =
         new TableConfigBuilder(TableType.OFFLINE).setTableName(RAW_TABLE_NAME).setSkipCrcCheckOnLoad(true).build();
     BaseTableDataManager tableDataManager =
         createTableManager(createDefaultInstanceDataManagerConfig(), tableConfig);
     IndexLoadingConfig indexLoadingConfig = new IndexLoadingConfig(tableConfig, SCHEMA);
-    boolean reused = tableDataManager.tryLoadExistingSegment(zkMetadata, indexLoadingConfig);
-    assertTrue(reused, "Should reuse local segment when skipCrcCheckOnLoad is true");
+    // tryLoadExistingSegment will return false on mismatch; add path will attempt download then fallback to local
+    assertFalse(tableDataManager.tryLoadExistingSegment(zkMetadata, indexLoadingConfig),
+        "Should trigger download path on CRC mismatch");
+    // Now simulate add path behavior using the same ZK metadata and index config: it should fallback to local
+    tableDataManager.addNewOnlineSegment(zkMetadata, indexLoadingConfig);
     assertTrue(localIndexDir.exists(), "Local segment dir should remain");
+    assertEquals(new SegmentMetadataImpl(localIndexDir).getTotalDocs(), 5, "Should serve local segment on failure");
   }
 
   private static boolean hasInvertedIndex(File indexDir, String columnName)

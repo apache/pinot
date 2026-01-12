@@ -424,7 +424,20 @@ public abstract class BaseTableDataManager implements TableDataManager {
       throws Exception {
     _logger.info("Adding new ONLINE segment: {}", zkMetadata.getSegmentName());
     if (!tryLoadExistingSegment(zkMetadata, indexLoadingConfig)) {
-      downloadAndLoadSegment(zkMetadata, indexLoadingConfig);
+      // If tryLoadExistingSegment() returned false, either no local exists or skipCrcCheckOnLoad is not allowed.
+      // Proceed with download; on failure, optionally serve local if skipCrcCheckOnLoad is enabled.
+      try {
+        downloadAndLoadSegment(zkMetadata, indexLoadingConfig);
+      } catch (Exception e) {
+        if (_skipCrcCheckForThisTable) {
+          boolean servedLocal = serveLocalSegmentWithDivergence(zkMetadata, indexLoadingConfig, e);
+          if (!servedLocal) {
+            throw e;
+          }
+        } else {
+          throw e;
+        }
+      }
     }
   }
 
@@ -442,16 +455,36 @@ public abstract class BaseTableDataManager implements TableDataManager {
       _logger.info("Segment: {} has CRC: {} same as before, not replacing it", segmentName, localMetadata.getCrc());
       return;
     }
-    if (!_instanceDataManagerConfig.shouldCheckCRCOnSegmentLoad()) {
-      _logger.info("Skipping replacing segment: {} even though its CRC has changed from: {} to: {} because "
-          + "instance.check.crc.on.segment.load is set to false", segmentName,
-          localMetadata.getCrc(), zkMetadata.getCrc());
-      return;
-    }
+    // Even if CRC check is disabled (instance) or skipped (table), attempt a best-effort replacement:
+    // try to download and swap atomically, but continue serving local on failure.
+    boolean tolerateCrcMismatch =
+        !_instanceDataManagerConfig.shouldCheckCRCOnSegmentLoad() || _skipCrcCheckForThisTable;
     _logger.info("Replacing segment: {} because its CRC has changed from: {} to: {}", segmentName,
         localMetadata.getCrc(), zkMetadata.getCrc());
-    downloadAndLoadSegment(zkMetadata, indexLoadingConfig);
-    _logger.info("Replaced segment: {} with new CRC: {}", segmentName, zkMetadata.getCrc());
+    try {
+      downloadAndLoadSegment(zkMetadata, indexLoadingConfig);
+      _logger.info("Replaced segment: {} with new CRC: {}", segmentName, zkMetadata.getCrc());
+    } catch (Exception e) {
+      // Safe replacement policy: keep serving existing local segment, mark divergent, and alert loudly if configured
+      // to tolerate CRC mismatch (table-level skip or instance-level disabled).
+      if (tolerateCrcMismatch) {
+        _logger.warn(
+            "Failed to download/load replacement for segment: {} (oldCrc={}, newCrc={}). Continuing to serve local "
+                + "segment and marking as divergent due to CRC tolerance. Error: {}",
+            segmentName, localMetadata.getCrc(), zkMetadata.getCrc(), e.toString());
+        _serverMetrics.addMeteredTableValue(_tableNameWithType, ServerMeter.REFRESH_FAILURES, 1);
+        addSegmentError(segmentName,
+            new SegmentErrorInfo(System.currentTimeMillis(),
+                String.format("Serving local segment with CRC mismatch (oldCrc=%s, newCrc=%s). "
+                        + "Replacement failed; will retry.",
+                    localMetadata.getCrc(), zkMetadata.getCrc()),
+                e));
+        // Do not rethrow: we intentionally keep local serving to avoid data loss. Controller will retry later.
+      } else {
+        // Strict mode: surface the failure and do not change existing behavior.
+        throw e;
+      }
+    }
   }
 
   @Override
@@ -870,7 +903,7 @@ public abstract class BaseTableDataManager implements TableDataManager {
       - Copy the backup directory back to the original index directory.
       - Continue loading the segment from the index directory.
       */
-      boolean checkCrc = _instanceDataManagerConfig.shouldCheckCRCOnSegmentLoad() && !_skipCrcCheckForThisTable;
+      boolean checkCrc = _instanceDataManagerConfig.shouldCheckCRCOnSegmentLoad();
       boolean shouldDownload =
           forceDownload || (isSegmentStatusCompleted(zkMetadata) && !hasSameCRC(zkMetadata, localMetadata) && checkCrc);
       if (shouldDownload) {
@@ -1168,6 +1201,46 @@ public abstract class BaseTableDataManager implements TableDataManager {
     return moveSegment(segmentName, untarSegment(segmentName, segmentTarFile, tempRootDir));
   }
 
+  /**
+   * Attempt to serve the existing local segment when replacement/add download fails and a local copy exists.
+   * This ignores CRC mismatches, loads the local directory, and registers the segment, while recording
+   * a divergent state via logs and error cache, allowing the cluster to remain available until convergence.
+   *
+   * @return true if we successfully loaded and began serving the local segment; false otherwise.
+   */
+  private boolean serveLocalSegmentWithDivergence(SegmentZKMetadata zkMetadata, IndexLoadingConfig indexLoadingConfig,
+      Exception rootCause) {
+    String segmentName = zkMetadata.getSegmentName();
+    String segmentTier = zkMetadata.getTier();
+    File indexDir = getSegmentDataDir(segmentName, segmentTier, indexLoadingConfig.getTableConfig());
+    try {
+      SegmentDirectory segmentDirectory =
+          tryInitSegmentDirectory(segmentName, String.valueOf(zkMetadata.getCrc()), indexLoadingConfig, zkMetadata);
+      SegmentMetadataImpl localMetadata = (segmentDirectory == null) ? null : segmentDirectory.getSegmentMetadata();
+      if (localMetadata == null) {
+        _logger.warn("Cannot serve local segment for {}: no local index directory present at {}", segmentName,
+            indexDir);
+        closeSegmentDirectoryQuietly(segmentDirectory);
+        return false;
+      }
+      // Ensure directory is consistent with latest config; reprocess if needed, then load.
+      ImmutableSegment segment = prepareAndLoadLocalSegment(
+          segmentDirectory, indexDir, indexLoadingConfig, zkMetadata, "Local segment", segmentName);
+      addSegment(segment, zkMetadata);
+      _logger.warn("Serving local segment: {} with CRC mismatch (localCrc={}, zkCrc={}). Marked as divergent.",
+          segmentName, localMetadata.getCrc(), zkMetadata.getCrc());
+      addSegmentError(segmentName,
+          new SegmentErrorInfo(System.currentTimeMillis(),
+              String.format("Serving local segment with CRC mismatch (localCrc=%s, zkCrc=%s). Will retry replacement.",
+                  localMetadata.getCrc(), zkMetadata.getCrc()),
+              rootCause));
+      return true;
+    } catch (Exception loadEx) {
+      _logger.error("Failed to load local segment: {} while attempting divergence fallback", segmentName, loadEx);
+      return false;
+    }
+  }
+
   @VisibleForTesting
   File getSegmentDataDir(String segmentName) {
     return new File(_indexDir, segmentName);
@@ -1283,31 +1356,18 @@ public abstract class BaseTableDataManager implements TableDataManager {
       return false;
     }
     if (isSegmentStatusCompleted(zkMetadata) && !hasSameCRC(zkMetadata, segmentMetadata)) {
-      _logger.warn("Segment: {} has CRC changed from: {} to: {}", segmentName, segmentMetadata.getCrc(),
-          zkMetadata.getCrc());
-      if (_instanceDataManagerConfig.shouldCheckCRCOnSegmentLoad() && !_skipCrcCheckForThisTable) {
-        closeSegmentDirectoryQuietly(segmentDirectory);
-        return false;
-      }
-      _logger.info("Skipping CRC check for segment: {} as configured. Proceed to load segment.", segmentName);
+      // Always trigger download path first on CRC mismatch during ONLINE transition; fallback to local happens later
+      // in addNewOnlineSegment only if skipCrcCheckOnLoad is enabled and the download fails.
+      _logger.warn("Segment: {} has CRC changed from: {} to: {}. Will attempt download before serving local.",
+          segmentName, segmentMetadata.getCrc(), zkMetadata.getCrc());
+      closeSegmentDirectoryQuietly(segmentDirectory);
+      return false;
     }
 
     try {
-      // If the segment is still kept by the server, then we can
-      // either load it directly if it's still consistent with latest table config and schema;
-      // or reprocess it to reflect latest table config and schema before loading.
-      if (!ImmutableSegmentLoader.needPreprocess(segmentDirectory, indexLoadingConfig)) {
-        _logger.info("Segment: {} is consistent with latest table config and schema", segmentName);
-      } else {
-        _logger.info("Segment: {} needs reprocess to reflect latest table config and schema", segmentName);
-        segmentDirectory.copyTo(indexDir);
-        // Close the stale SegmentDirectory object and recreate it with reprocessed segment.
-        closeSegmentDirectoryQuietly(segmentDirectory);
-        ImmutableSegmentLoader.preprocess(indexDir, indexLoadingConfig, _segmentOperationsThrottler, zkMetadata);
-        segmentDirectory = initSegmentDirectory(segmentName, String.valueOf(zkMetadata.getCrc()),
-            indexLoadingConfig, zkMetadata);
-      }
-      ImmutableSegment segment = ImmutableSegmentLoader.load(segmentDirectory, indexLoadingConfig);
+      // If the segment is still kept by the server, we can either load it directly or reprocess it before loading.
+      ImmutableSegment segment = prepareAndLoadLocalSegment(segmentDirectory, indexDir, indexLoadingConfig, zkMetadata,
+          "Segment", segmentName);
       addSegment(segment, zkMetadata);
       _logger.info("Loaded existing segment: {} with CRC: {} on tier: {}", segmentName, zkMetadata.getCrc(),
           TierConfigUtils.normalizeTierName(segmentTier));
@@ -1680,6 +1740,30 @@ public abstract class BaseTableDataManager implements TableDataManager {
         LOGGER.warn("Failed to close SegmentDirectory due to error: {}", e.getMessage());
       }
     }
+  }
+
+  /**
+   * Loads a local segment, preprocessing on-disk files when required to reflect current table config and schema.
+   * This does not perform any CRC validation logic; callers are responsible for gating on CRC policies.
+   *
+   * The caller provides a human-readable subjectPrefix to preserve existing log wording at call sites
+   * (e.g., "Segment" or "Local segment").
+   */
+  private ImmutableSegment prepareAndLoadLocalSegment(SegmentDirectory segmentDirectory, File indexDir,
+      IndexLoadingConfig indexLoadingConfig, SegmentZKMetadata zkMetadata, String subjectPrefix, String segmentName)
+      throws Exception {
+    if (!ImmutableSegmentLoader.needPreprocess(segmentDirectory, indexLoadingConfig)) {
+      _logger.info("{}: {} is consistent with latest table config and schema", subjectPrefix, segmentName);
+    } else {
+      _logger.info("{}: {} needs reprocess to reflect latest table config and schema", subjectPrefix, segmentName);
+      segmentDirectory.copyTo(indexDir);
+      // Close the stale SegmentDirectory object and recreate it with reprocessed segment.
+      closeSegmentDirectoryQuietly(segmentDirectory);
+      ImmutableSegmentLoader.preprocess(indexDir, indexLoadingConfig, _segmentOperationsThrottler, zkMetadata);
+      segmentDirectory =
+          initSegmentDirectory(segmentName, String.valueOf(zkMetadata.getCrc()), indexLoadingConfig, zkMetadata);
+    }
+    return ImmutableSegmentLoader.load(segmentDirectory, indexLoadingConfig);
   }
 
   /**
