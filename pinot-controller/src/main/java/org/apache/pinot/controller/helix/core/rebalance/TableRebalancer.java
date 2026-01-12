@@ -773,7 +773,7 @@ public class TableRebalancer {
         // Record completion
         _tableRebalanceObserver.onSuccess(msg);
 
-        if (_updateIdealStateInstancePartitions && !instancePartitionsUnchanged || !tierInstancePartitionsUnchanged) {
+        if (_updateIdealStateInstancePartitions && (!instancePartitionsUnchanged || !tierInstancePartitionsUnchanged)) {
           // Rebalance completed successfully, so we can update the instance partitions in the ideal state to reflect
           // the new set of instance partitions.
           List<InstancePartitions> instancePartitionsList = new ArrayList<>(instancePartitionsMap.values());

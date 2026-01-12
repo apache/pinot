@@ -268,10 +268,14 @@ public class PinotInstanceAssignmentRestletResource {
         persistInstancePartitionsHelper(instancePartitions);
       }
       // Add the new set of assigned instances to the instance partitions metadata maintained in the ideal state.
-      _resourceManager.combineInstancePartitionsInIdealState(TableNameBuilder.OFFLINE.tableNameWithType(tableName),
-          new ArrayList<>(offlineInstancePartitionsMap.values()));
-      _resourceManager.combineInstancePartitionsInIdealState(TableNameBuilder.REALTIME.tableNameWithType(tableName),
-          new ArrayList<>(realtimeInstancePartitionsMap.values()));
+      if (offlineTableConfig != null) {
+        _resourceManager.combineInstancePartitionsInIdealState(TableNameBuilder.OFFLINE.tableNameWithType(tableName),
+            new ArrayList<>(offlineInstancePartitionsMap.values()));
+      }
+      if (realtimeTableConfig != null) {
+        _resourceManager.combineInstancePartitionsInIdealState(TableNameBuilder.REALTIME.tableNameWithType(tableName),
+            new ArrayList<>(realtimeInstancePartitionsMap.values()));
+      }
     }
 
     Map<String, InstancePartitions> instancePartitionsMap = new HashMap<>();

@@ -247,6 +247,8 @@ public abstract class BaseInstanceSelector implements InstanceSelector {
     }
   }
 
+  /// Returns a map from server instance to replica group ID, generated from the ideal state instance partitions
+  /// metadata.
   static Map<String, Integer> serverToReplicaGroupMap(IdealState idealState) {
     Map<String, Integer> serverToReplicaGroupMap = new HashMap<>();
 
