@@ -32,6 +32,7 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.atomic.AtomicBoolean;
 import javax.annotation.Nullable;
 import org.apache.commons.io.FileUtils;
+import org.apache.helix.HelixManager;
 import org.apache.pinot.common.metrics.ServerMetrics;
 import org.apache.pinot.common.utils.LLCSegmentName;
 import org.apache.pinot.common.utils.UploadedRealtimeSegmentName;
@@ -40,6 +41,7 @@ import org.apache.pinot.segment.local.indexsegment.immutable.EmptyIndexSegment;
 import org.apache.pinot.segment.local.indexsegment.immutable.ImmutableSegmentImpl;
 import org.apache.pinot.segment.local.segment.readers.PinotSegmentColumnReader;
 import org.apache.pinot.segment.local.utils.HashUtils;
+import org.apache.pinot.segment.local.utils.tablestate.TableStateUtils;
 import org.apache.pinot.segment.spi.ColumnMetadata;
 import org.apache.pinot.segment.spi.IndexSegment;
 import org.apache.pinot.segment.spi.MutableSegment;
@@ -59,6 +61,7 @@ import org.apache.pinot.spi.utils.BytesUtils;
 import org.apache.pinot.spi.utils.builder.TableNameBuilder;
 import org.apache.pinot.util.TestUtils;
 import org.mockito.MockedConstruction;
+import org.mockito.MockedStatic;
 import org.roaringbitmap.buffer.MutableRoaringBitmap;
 import org.testng.annotations.AfterClass;
 import org.testng.annotations.BeforeClass;
@@ -68,8 +71,10 @@ import org.testng.annotations.Test;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.mockConstruction;
+import static org.mockito.Mockito.mockStatic;
 import static org.mockito.Mockito.when;
 import static org.testng.Assert.*;
 
@@ -1129,9 +1134,15 @@ public class ConcurrentMapPartitionUpsertMetadataManagerForConsistentDeletesTest
 
   private void verifyRemoveExpiredDeletedKeys(HashFunction hashFunction)
       throws IOException {
+    // Mock HelixManager to simulate all segments loaded
+    TableDataManager tableDataManager = mock(TableDataManager.class);
+    when(tableDataManager.getTableDataDir()).thenReturn(INDEX_DIR);
+    HelixManager helixManager = mock(HelixManager.class);
+    when(tableDataManager.getHelixManager()).thenReturn(helixManager);
+
     ConcurrentMapPartitionUpsertMetadataManagerForConsistentDeletes upsertMetadataManager =
         new ConcurrentMapPartitionUpsertMetadataManagerForConsistentDeletes(REALTIME_TABLE_NAME, 0,
-            _contextBuilder.setHashFunction(hashFunction).build());
+            _contextBuilder.setHashFunction(hashFunction).setTableDataManager(tableDataManager).build());
     Map<Object, ConcurrentMapPartitionUpsertMetadataManagerForConsistentDeletes.RecordLocation> recordLocationMap =
         upsertMetadataManager._primaryKeyToRecordLocationMap;
 
@@ -1200,8 +1211,12 @@ public class ConcurrentMapPartitionUpsertMetadataManagerForConsistentDeletesTest
     // call delete-key workflow
     // value 2 will be there as it is within TTL window
     // value 1 will also be there as it is outside TTL window but data exists in one more segment
-    // value 3 will be removed
-    upsertMetadataManager.removeExpiredPrimaryKeys();
+    // value 3 will be removed (when all segments are loaded)
+    try (MockedStatic<TableStateUtils> mockedTableStateUtils = mockStatic(TableStateUtils.class)) {
+      mockedTableStateUtils.when(() -> TableStateUtils.isAllSegmentsLoaded(any(), eq(REALTIME_TABLE_NAME)))
+          .thenReturn(true);
+      upsertMetadataManager.removeExpiredPrimaryKeys();
+    }
     // segment1: 0 -> {0, 100}
     // segment2: 2 -> {1, 120}, 1 -> {1, 120}
     checkRecordLocation(recordLocationMap, 0, segment1, 0, 100, 1, hashFunction);
@@ -1338,6 +1353,77 @@ public class ConcurrentMapPartitionUpsertMetadataManagerForConsistentDeletesTest
 
     assertEquals(recordLocationMap.size(), 1);
 
+    upsertMetadataManager.stop();
+    upsertMetadataManager.close();
+  }
+
+  @Test
+  public void testRemoveExpiredDeletedKeysSkippedWhenSegmentsStillLoading()
+      throws IOException, ReflectiveOperationException {
+    // Mock TableDataManager and HelixManager to simulate segments still loading
+    TableDataManager tableDataManager = mock(TableDataManager.class);
+    when(tableDataManager.getTableDataDir()).thenReturn(INDEX_DIR);
+    HelixManager helixManager = mock(HelixManager.class);
+    when(tableDataManager.getHelixManager()).thenReturn(helixManager);
+
+    ConcurrentMapPartitionUpsertMetadataManagerForConsistentDeletes upsertMetadataManager =
+        new ConcurrentMapPartitionUpsertMetadataManagerForConsistentDeletes(REALTIME_TABLE_NAME, 0,
+            _contextBuilder.setHashFunction(HashFunction.NONE).setTableDataManager(tableDataManager).build());
+    Map<Object, ConcurrentMapPartitionUpsertMetadataManagerForConsistentDeletes.RecordLocation> recordLocationMap =
+        upsertMetadataManager._primaryKeyToRecordLocationMap;
+
+    // Add a mutable segment with delete record (outside TTL window, single segment)
+    // Key 0 is only added to this segment, so distinctSegmentCount = 1
+    ThreadSafeMutableRoaringBitmap validDocIds1 = new ThreadSafeMutableRoaringBitmap();
+    ThreadSafeMutableRoaringBitmap queryableDocIds1 = new ThreadSafeMutableRoaringBitmap();
+    MutableSegment segment1 = mockMutableSegment(1, validDocIds1, queryableDocIds1);
+    upsertMetadataManager.addRecord(segment1, new RecordInfo(makePrimaryKey(0), 0, 120, true));
+
+    // Add another record with a higher timestamp to update largestSeenComparisonValue
+    // This makes timestamp 120 fall outside the TTL window (150 - 20 = 130 > 120)
+    upsertMetadataManager.addRecord(segment1, new RecordInfo(makePrimaryKey(1), 1, 150, false));
+
+    // Now key 0 is marked as deleted and is outside TTL window (only in 1 segment)
+    checkRecordLocation(recordLocationMap, 0, segment1, 0, 120, 1, HashFunction.NONE);
+    checkRecordLocation(recordLocationMap, 1, segment1, 1, 150, 1, HashFunction.NONE);
+    assertEquals(validDocIds1.getMutableRoaringBitmap().toArray(), new int[]{0, 1});
+    assertEquals(queryableDocIds1.getMutableRoaringBitmap().toArray(), new int[]{1});
+
+    // Call delete-key workflow with segments still loading (isAllSegmentsLoaded returns false)
+    // Key 0 should NOT be removed because segments are still loading
+    try (MockedStatic<TableStateUtils> mockedTableStateUtils = mockStatic(TableStateUtils.class)) {
+      mockedTableStateUtils.when(() -> TableStateUtils.isAllSegmentsLoaded(any(), eq(REALTIME_TABLE_NAME)))
+          .thenReturn(false);
+      upsertMetadataManager.removeExpiredPrimaryKeys();
+    }
+
+    // Key 0 should still be in the map (NOT removed), key 1 should also be there
+    checkRecordLocation(recordLocationMap, 0, segment1, 0, 120, 1, HashFunction.NONE);
+    checkRecordLocation(recordLocationMap, 1, segment1, 1, 150, 1, HashFunction.NONE);
+    assertEquals(validDocIds1.getMutableRoaringBitmap().toArray(), new int[]{0, 1});
+    assertEquals(queryableDocIds1.getMutableRoaringBitmap().toArray(), new int[]{1});
+
+    // Reset the timestamp to force re-check on next call (bypassing the 5-second cache)
+    java.lang.reflect.Field lastCheckField =
+        BasePartitionUpsertMetadataManager.class.getDeclaredField("_lastSegmentsLoadedCheckTimeMs");
+    lastCheckField.setAccessible(true);
+    lastCheckField.setLong(upsertMetadataManager, 0);
+
+    // Now call delete-key workflow with all segments loaded (isAllSegmentsLoaded returns true)
+    // Key 0 should be removed
+    try (MockedStatic<TableStateUtils> mockedTableStateUtils = mockStatic(TableStateUtils.class)) {
+      mockedTableStateUtils.when(() -> TableStateUtils.isAllSegmentsLoaded(any(), eq(REALTIME_TABLE_NAME)))
+          .thenReturn(true);
+      upsertMetadataManager.removeExpiredPrimaryKeys();
+    }
+
+    // Key 0 should now be removed from the map, but key 1 should remain
+    assertNull(recordLocationMap.get(HashUtils.hashPrimaryKey(makePrimaryKey(0), HashFunction.NONE)));
+    checkRecordLocation(recordLocationMap, 1, segment1, 1, 150, 1, HashFunction.NONE);
+    assertEquals(validDocIds1.getMutableRoaringBitmap().toArray(), new int[]{1});
+    assertEquals(queryableDocIds1.getMutableRoaringBitmap().toArray(), new int[]{1});
+
+    // Stop and close the metadata manager
     upsertMetadataManager.stop();
     upsertMetadataManager.close();
   }
