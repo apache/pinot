@@ -24,12 +24,14 @@ import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
+import org.apache.pinot.common.datatable.StatMap;
 import org.apache.pinot.common.utils.NamedThreadFactory;
 import org.apache.pinot.query.mailbox.MailboxService;
 import org.apache.pinot.query.routing.StageMetadata;
 import org.apache.pinot.query.routing.WorkerMetadata;
 import org.apache.pinot.query.runtime.blocks.ErrorMseBlock;
 import org.apache.pinot.query.runtime.blocks.SuccessMseBlock;
+import org.apache.pinot.query.runtime.operator.MailboxSendOperator;
 import org.apache.pinot.query.runtime.operator.MultiStageOperator;
 import org.apache.pinot.query.runtime.operator.OpChain;
 import org.apache.pinot.query.runtime.plan.MultiStageQueryStats;
@@ -74,6 +76,7 @@ public class OpChainSchedulerServiceTest {
   public void beforeMethod() {
     _operatorA = Mockito.mock(MultiStageOperator.class);
     clearInvocations(_operatorA);
+    Mockito.when(_operatorA.copyStatMaps()).thenAnswer(inv -> new StatMap<>(MailboxSendOperator.StatKey.class));
   }
 
   private OpChain getChain(MultiStageOperator operator) {

@@ -86,11 +86,9 @@ import org.apache.pinot.core.transport.ListenerConfig;
 import org.apache.pinot.core.transport.server.routing.stats.ServerRoutingStatsManager;
 import org.apache.pinot.core.util.ListenerConfigUtil;
 import org.apache.pinot.core.util.trace.ContinuousJfrStarter;
-import org.apache.pinot.query.mailbox.MailboxService;
 import org.apache.pinot.query.runtime.context.BrokerContext;
 import org.apache.pinot.query.runtime.operator.factory.DefaultQueryOperatorFactoryProvider;
 import org.apache.pinot.query.runtime.operator.factory.QueryOperatorFactoryProvider;
-import org.apache.pinot.query.service.dispatch.QueryDispatcher;
 import org.apache.pinot.segment.local.function.GroovyFunctionEvaluator;
 import org.apache.pinot.spi.accounting.ThreadAccountant;
 import org.apache.pinot.spi.accounting.ThreadAccountantUtils;
@@ -407,14 +405,12 @@ public abstract class BaseBrokerStarter implements ServiceStartable {
               _serverRoutingStatsManager, _failureDetector, _threadAccountant, multiClusterRoutingContext);
     }
     MultiStageBrokerRequestHandler multiStageBrokerRequestHandler = null;
-    QueryDispatcher queryDispatcher = null;
     if (_brokerConf.getProperty(Helix.CONFIG_OF_MULTI_STAGE_ENGINE_ENABLED, Helix.DEFAULT_MULTI_STAGE_ENGINE_ENABLED)) {
       _multiStageQueryThrottler = new MultiStageQueryThrottler(_brokerConf);
       _multiStageQueryThrottler.init(_spectatorHelixManager);
       // multi-stage request handler uses both Netty and GRPC ports.
       // worker requires both the "Netty port" for protocol transport; and "GRPC port" for mailbox transport.
       // TODO: decouple protocol and engine selection.
-      queryDispatcher = createQueryDispatcher(_brokerConf);
       multiStageBrokerRequestHandler =
           new MultiStageBrokerRequestHandler(_brokerConf, brokerId, requestIdGenerator, _routingManager,
               _accessControlFactory, _queryQuotaManager, _tableCache, _multiStageQueryThrottler, _failureDetector,
@@ -422,10 +418,9 @@ public abstract class BaseBrokerStarter implements ServiceStartable {
     }
     TimeSeriesRequestHandler timeSeriesRequestHandler = null;
     if (StringUtils.isNotBlank(_brokerConf.getProperty(PinotTimeSeriesConfiguration.getEnabledLanguagesConfigKey()))) {
-      Preconditions.checkNotNull(queryDispatcher, "Multistage Engine should be enabled to use time-series engine");
       timeSeriesRequestHandler =
           new TimeSeriesRequestHandler(_brokerConf, brokerId, requestIdGenerator, _routingManager,
-              _accessControlFactory, _queryQuotaManager, _tableCache, queryDispatcher, _threadAccountant,
+              _accessControlFactory, _queryQuotaManager, _tableCache, _threadAccountant,
               multiClusterRoutingContext);
     }
 
@@ -594,15 +589,6 @@ public abstract class BaseBrokerStarter implements ServiceStartable {
    */
   protected WorkloadBudgetManager createWorkloadBudgetManager(PinotConfiguration brokerConf) {
     return new WorkloadBudgetManager(brokerConf);
-  }
-
-  private QueryDispatcher createQueryDispatcher(PinotConfiguration brokerConf) {
-    String hostname = _brokerConf.getProperty(CommonConstants.MultiStageQueryRunner.KEY_OF_QUERY_RUNNER_HOSTNAME);
-    int port =
-        Integer.parseInt(_brokerConf.getProperty(CommonConstants.MultiStageQueryRunner.KEY_OF_QUERY_RUNNER_PORT));
-    return new QueryDispatcher(
-        new MailboxService(hostname, port, org.apache.pinot.spi.config.instance.InstanceType.BROKER, _brokerConf),
-        _failureDetector);
   }
 
   private void updateInstanceConfigAndBrokerResourceIfNeeded() {

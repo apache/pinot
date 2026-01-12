@@ -24,9 +24,11 @@ import java.util.List;
 import java.util.Map;
 import org.apache.pinot.common.Utils;
 import org.apache.pinot.spi.exception.QueryErrorCode;
+import org.apache.pinot.spi.metrics.PinotMeter;
+
 
 /**
- * Class containing all the metrics exposed by the Pinot broker.
+ * Class containing all the meters exposed by the Pinot broker.
  * This is implemented as a class rather than an enum to allow for dynamic addition of metrics for all QueryErrorCodes.
  */
 public class BrokerMeter implements AbstractMetrics.Meter {
@@ -236,6 +238,11 @@ public class BrokerMeter implements AbstractMetrics.Meter {
    */
   public static final BrokerMeter WINDOW_COUNT = create("WINDOW_COUNT", "queries", true);
 
+  public static final BrokerMeter MSE_STAGES_STARTED = create("MSE_STAGES_STARTED", "stages", true);
+  public static final BrokerMeter MSE_STAGES_COMPLETED = create("MSE_STAGES_COMPLETED", "stages", true);
+  public static final BrokerMeter MSE_OPCHAINS_STARTED = create("MSE_OPCHAINS_STARTED", "opchains", true);
+  public static final BrokerMeter MSE_OPCHAINS_COMPLETED = create("MSE_OPCHAINS_COMPLETED", "opchains", true);
+
   /**
    * How many MSE queries have encountered segments with invalid partitions.
    * <p>
@@ -346,5 +353,9 @@ public class BrokerMeter implements AbstractMetrics.Meter {
 
   public static BrokerMeter getQueryErrorMeter(QueryErrorCode queryErrorCode) {
     return QUERY_ERROR_CODE_METER_MAP.get(queryErrorCode);
+  }
+
+  public PinotMeter getGlobalMeter() {
+    return BrokerMetrics.get().getMeteredValue(this);
   }
 }

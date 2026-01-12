@@ -247,6 +247,20 @@ public class JsonUtils {
     return DEFAULT_READER.forType(MAP_TYPE_REFERENCE).readValue(jsonNode);
   }
 
+  /**
+   * Parses JSON bytes directly to a Map, avoiding the intermediate JsonNode representation.
+   * This is more efficient than calling bytesToJsonNode followed by jsonNodeToMap.
+   */
+  public static Map<String, Object> bytesToMap(byte[] jsonBytes)
+      throws IOException {
+    return DEFAULT_READER.forType(MAP_TYPE_REFERENCE).readValue(jsonBytes);
+  }
+
+  public static Map<String, Object> bytesToMap(byte[] jsonBytes, int offset, int length)
+      throws IOException {
+    return DEFAULT_READER.forType(MAP_TYPE_REFERENCE).readValue(jsonBytes, offset, length);
+  }
+
   public static String objectToString(Object object)
       throws JsonProcessingException {
     return DEFAULT_WRITER.writeValueAsString(object);

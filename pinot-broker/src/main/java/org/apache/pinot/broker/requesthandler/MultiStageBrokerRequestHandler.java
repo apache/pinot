@@ -93,6 +93,7 @@ import org.apache.pinot.spi.config.instance.InstanceType;
 import org.apache.pinot.spi.env.PinotConfiguration;
 import org.apache.pinot.spi.exception.QueryErrorCode;
 import org.apache.pinot.spi.exception.QueryException;
+import org.apache.pinot.spi.metrics.PinotMeter;
 import org.apache.pinot.spi.query.QueryExecutionContext;
 import org.apache.pinot.spi.query.QueryThreadContext;
 import org.apache.pinot.spi.trace.QueryFingerprint;
@@ -137,6 +138,11 @@ public class MultiStageBrokerRequestHandler extends BaseBrokerRequestHandler {
   private final Set<String> _defaultDisabledPlannerRules;
   protected final long _extraPassiveTimeoutMs;
   protected final boolean _enableQueryFingerprinting;
+
+  protected final PinotMeter _stagesStartedMeter = BrokerMeter.MSE_STAGES_STARTED.getGlobalMeter();
+  protected final PinotMeter _stagesFinishedMeter = BrokerMeter.MSE_STAGES_COMPLETED.getGlobalMeter();
+  protected final PinotMeter _opchainsStartedMeter = BrokerMeter.MSE_OPCHAINS_STARTED.getGlobalMeter();
+  protected final PinotMeter _opchainsCompletedMeter = BrokerMeter.MSE_OPCHAINS_COMPLETED.getGlobalMeter();
 
   public MultiStageBrokerRequestHandler(PinotConfiguration config, String brokerId,
       BrokerRequestIdGenerator requestIdGenerator, RoutingManager routingManager,
@@ -318,7 +324,7 @@ public class MultiStageBrokerRequestHandler extends BaseBrokerRequestHandler {
   protected BrokerResponse handleRequestThrowing(long requestId, String query, SqlNodeAndOptions sqlNodeAndOptions,
       @Nullable RequesterIdentity requesterIdentity, RequestContext requestContext, HttpHeaders httpHeaders)
       throws QueryException, WebApplicationException {
-    _queryLogger.log(requestId, query);
+    boolean queryWasLogged = _queryLogger.logQueryReceived(requestId, query);
 
     String queryHash = CommonConstants.Broker.DEFAULT_QUERY_HASH;
     if (_enableQueryFingerprinting) {
@@ -359,7 +365,7 @@ public class MultiStageBrokerRequestHandler extends BaseBrokerRequestHandler {
         return explain(compiledQuery, requestId, requestContext, queryTimer);
       } else {
         return query(compiledQuery, requestId, requesterIdentity, requestContext, httpHeaders, queryTimer,
-            rlsFiltersApplied.get());
+            rlsFiltersApplied.get(), queryWasLogged);
       }
     }
   }
@@ -534,7 +540,7 @@ public class MultiStageBrokerRequestHandler extends BaseBrokerRequestHandler {
 
   private BrokerResponse query(QueryEnvironment.CompiledQuery query, long requestId,
       RequesterIdentity requesterIdentity, RequestContext requestContext, HttpHeaders httpHeaders, Timer timer,
-      boolean rlsFiltersApplied)
+      boolean rlsFiltersApplied, boolean queryWasLogged)
       throws QueryException, WebApplicationException {
     QueryEnvironment.QueryPlannerResult queryPlanResult = callAsync(requestId, query.getTextQuery(),
         () -> query.planQuery(requestId), timer);
@@ -595,10 +601,19 @@ public class MultiStageBrokerRequestHandler extends BaseBrokerRequestHandler {
       return new BrokerResponseNative(QueryErrorCode.EXECUTION_TIMEOUT);
     }
 
+    int stageCount = dispatchableSubPlan.getQueryStageMap().size();
+    int opChainCount = dispatchableSubPlan.getQueryStageMap().values().stream()
+        .mapToInt(stage -> stage.getWorkerMetadataList().size())
+        .sum();
+
     try {
       String clientRequestId = extractClientRequestId(query.getSqlNodeAndOptions());
       onQueryStart(requestId, clientRequestId, query.getTextQuery());
       long executionStartTimeNs = System.nanoTime();
+
+      _stagesStartedMeter.mark(stageCount);
+      _opchainsStartedMeter.mark(opChainCount);
+
       QueryDispatcher.QueryResult queryResults;
       try {
         queryResults = _queryDispatcher.submitAndReduce(requestContext, dispatchableSubPlan, timer.getRemainingTimeMs(),
@@ -612,6 +627,8 @@ public class MultiStageBrokerRequestHandler extends BaseBrokerRequestHandler {
         requestContext.setErrorCode(queryErrorCode);
         return new BrokerResponseNative(queryErrorCode, consolidatedMessage);
       } finally {
+        _stagesFinishedMeter.mark(stageCount);
+        _opchainsCompletedMeter.mark(opChainCount);
         onQueryFinish(requestId);
       }
 
@@ -686,9 +703,10 @@ public class MultiStageBrokerRequestHandler extends BaseBrokerRequestHandler {
       brokerResponse.setRLSFiltersApplied(rlsFiltersApplied);
 
       // Log query and stats
-      _queryLogger.log(
+      _queryLogger.logQueryCompleted(
           new QueryLogger.QueryLogParams(requestContext, tableNames.toString(), brokerResponse,
-              QueryLogger.QueryLogParams.QueryEngine.MULTI_STAGE, requesterIdentity, null));
+              QueryLogger.QueryLogParams.QueryEngine.MULTI_STAGE, requesterIdentity, null),
+          queryWasLogged);
 
       return brokerResponse;
     } finally {

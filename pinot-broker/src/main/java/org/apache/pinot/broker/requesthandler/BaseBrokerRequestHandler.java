@@ -150,18 +150,7 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
     requestContext.setBrokerId(_brokerId);
     long requestId = _requestIdGenerator.get();
     requestContext.setRequestId(requestId);
-
-    if (httpHeaders != null && !_trackedHeaders.isEmpty()) {
-      MultivaluedMap<String, String> requestHeaders = httpHeaders.getRequestHeaders();
-      Map<String, List<String>> trackedHeadersMap = Maps.newHashMapWithExpectedSize(_trackedHeaders.size());
-      for (Map.Entry<String, List<String>> entry : requestHeaders.entrySet()) {
-        String key = entry.getKey().toLowerCase();
-        if (_trackedHeaders.contains(key)) {
-          trackedHeadersMap.put(key, entry.getValue());
-        }
-      }
-      requestContext.setRequestHttpHeaders(trackedHeadersMap);
-    }
+    setTrackedHeadersInRequestContext(requestContext, httpHeaders, _trackedHeaders);
 
     // First-stage access control to prevent unauthenticated requests from using up resources. Secondary table-level
     // check comes later.
@@ -359,6 +348,21 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
     statistics.setExplainPlanNumEmptyFilterSegments(response.getExplainPlanNumEmptyFilterSegments());
     statistics.setExplainPlanNumMatchAllFilterSegments(response.getExplainPlanNumMatchAllFilterSegments());
     statistics.setTraceInfo(response.getTraceInfo());
+  }
+
+  protected static void setTrackedHeadersInRequestContext(RequestContext requestContext,
+      HttpHeaders httpHeaders, Set<String> trackedHeaders) {
+    if (httpHeaders != null && !trackedHeaders.isEmpty()) {
+      MultivaluedMap<String, String> requestHeaders = httpHeaders.getRequestHeaders();
+      Map<String, List<String>> trackedHeadersMap = Maps.newHashMapWithExpectedSize(trackedHeaders.size());
+      for (Map.Entry<String, List<String>> entry : requestHeaders.entrySet()) {
+        String key = entry.getKey().toLowerCase();
+        if (trackedHeaders.contains(key)) {
+          trackedHeadersMap.put(key, entry.getValue());
+        }
+      }
+      requestContext.setRequestHttpHeaders(trackedHeadersMap);
+    }
   }
 
   @Override
