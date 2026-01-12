@@ -36,7 +36,11 @@ let navigationItems = [
 
 const Layout = (props) => {
   const role = props.role;
-  if(role === 'ADMIN'){
+  if (props.authWorkflow === 'NONE') {
+    navigationItems.push(
+        {id: 3, name: 'Zookeeper Browser', link: '/zookeeper', icon: <ZookeeperIcon /> }
+    );
+  } else if(role === 'ADMIN'){
     if(navigationItems.length <5){
       navigationItems = [
         ...navigationItems,
