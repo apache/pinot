@@ -364,9 +364,10 @@ public class ConcurrentMapPartitionUpsertMetadataManagerForConsistentDeletes
     for (Map.Entry<Object, RecordLocation> obj : _previousKeyToRecordLocationMap.entrySet()) {
       IndexSegment prevSegment = obj.getValue().getSegment();
       RecordLocation currentLocation = _primaryKeyToRecordLocationMap.get(obj.getKey());
-      if (prevSegment != null) {
-        if (currentLocation != null && currentLocation.getSegment() == oldSegment) {
+      if (currentLocation != null && currentLocation.getSegment() == oldSegment) {
+        if (prevSegment != null) {
           if (prevSegment == oldSegment) {
+            removeDocId(oldSegment, _primaryKeyToRecordLocationMap.get(obj.getKey()).getDocId());
             _primaryKeyToRecordLocationMap.remove(obj.getKey());
             _previousKeyToRecordLocationMap.remove(obj.getKey());
           } else {
@@ -384,10 +385,11 @@ public class ConcurrentMapPartitionUpsertMetadataManagerForConsistentDeletes
             _primaryKeyToRecordLocationMap.put(obj.getKey(), obj.getValue());
             _previousKeyToRecordLocationMap.remove(obj.getKey());
           }
+        } else {
+          removeDocId(oldSegment, _primaryKeyToRecordLocationMap.get(obj.getKey()).getDocId());
+          _primaryKeyToRecordLocationMap.remove(obj.getKey());
+          _previousKeyToRecordLocationMap.remove(obj.getKey());
         }
-      } else {
-        _primaryKeyToRecordLocationMap.remove(obj.getKey());
-        _previousKeyToRecordLocationMap.remove(obj.getKey());
       }
     }
     _logger.info("Reverted Upsert metadata of {} keys to previous segment locations for the segment: {}",
