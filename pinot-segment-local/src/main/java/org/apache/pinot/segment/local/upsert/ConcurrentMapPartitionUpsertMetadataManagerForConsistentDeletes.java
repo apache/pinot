@@ -73,9 +73,6 @@ public class ConcurrentMapPartitionUpsertMetadataManagerForConsistentDeletes
       ConcurrentMapPartitionUpsertMetadataManagerForConsistentDeletes.RecordLocation>
       _previousKeyToRecordLocationMap = new ConcurrentHashMap<>();
 
-  private final Map<Object, ConcurrentMapPartitionUpsertMetadataManagerForConsistentDeletes.RecordLocation>
-      _newlyAddedKeys = new ConcurrentHashMap<>();
-
   // Used to initialize a reference to previous row for merging in partial upsert
   private final LazyRow _reusePreviousRow = new LazyRow();
   private final Map<String, Object> _reuseMergeResultHolder = new HashMap<>();
@@ -124,13 +121,8 @@ public class ConcurrentMapPartitionUpsertMetadataManagerForConsistentDeletes
               if (currentSegment == segment) {
                 if (comparisonResult >= 0) {
                   replaceDocId(segment, validDocIds, queryableDocIds, currentDocId, newDocId, recordInfo);
-                  RecordLocation newRecordLocation = new RecordLocation(segment,
-                      newDocId, newComparisonValue, currentDistinctSegmentCount);
-                  // Track the record location of the newly added keys
-                  if (_newlyAddedKeys.containsKey(primaryKey)) {
-                    _newlyAddedKeys.put(primaryKey, newRecordLocation);
-                  }
-                  return newRecordLocation;
+                  _previousKeyToRecordLocationMap.put(primaryKey, currentRecordLocation);
+                  return new RecordLocation(segment, newDocId, newComparisonValue, currentDistinctSegmentCount);
                 } else {
                   return currentRecordLocation;
                 }
@@ -183,8 +175,18 @@ public class ConcurrentMapPartitionUpsertMetadataManagerForConsistentDeletes
                   currentSegmentName, getAuthoritativeCreationTime(segment),
                   getAuthoritativeCreationTime(currentSegment)))) {
                 replaceDocId(segment, validDocIds, queryableDocIds, currentSegment, currentDocId, newDocId, recordInfo);
-                return new RecordLocation(segment, newDocId, newComparisonValue,
+                RecordLocation newRecordLocation = new RecordLocation(segment, newDocId, newComparisonValue,
                     RecordLocation.incrementSegmentCount(currentDistinctSegmentCount));
+                // If current key is in the consuming segment, update it with immutable segment's new location
+                // If the current key already exists in immutable segment, then store the current location
+                // This will help us to revert back to the states before the consuming segment until the immutable
+                // segment's data is consumed
+                if (currentSegment instanceof MutableSegment) {
+                  _previousKeyToRecordLocationMap.put(primaryKey, newRecordLocation);
+                } else {
+                  _previousKeyToRecordLocationMap.put(primaryKey, currentRecordLocation);
+                }
+                return newRecordLocation;
               } else {
                 return new RecordLocation(currentSegment, currentDocId, currentComparisonValue,
                     RecordLocation.incrementSegmentCount(currentDistinctSegmentCount));
@@ -193,7 +195,7 @@ public class ConcurrentMapPartitionUpsertMetadataManagerForConsistentDeletes
               // New primary key
               addDocId(segment, validDocIds, queryableDocIds, newDocId, recordInfo);
               RecordLocation newRecordLocation = new RecordLocation(segment, newDocId, newComparisonValue, 1);
-              _newlyAddedKeys.put(primaryKey, newRecordLocation);
+              _previousKeyToRecordLocationMap.put(primaryKey, newRecordLocation);
               return newRecordLocation;
             }
           });
@@ -268,20 +270,6 @@ public class ConcurrentMapPartitionUpsertMetadataManagerForConsistentDeletes
     } finally {
       segmentLock.unlock();
     }
-  }
-
-  @Override
-  protected void removeNewlyAddedKeys(IndexSegment oldSegment) {
-    int removedKeys = 0;
-    for (Map.Entry<Object, RecordLocation> entry : _newlyAddedKeys.entrySet()) {
-      if (entry.getValue().getSegment() == oldSegment) {
-        _primaryKeyToRecordLocationMap.remove(entry.getKey());
-        removeDocId(oldSegment, entry.getValue().getDocId());
-        removedKeys++;
-      }
-    }
-    _logger.info("Removed newly added {} keys for the segment: {} out of : {}", removedKeys,
-        oldSegment.getSegmentName(), _previousKeyToRecordLocationMap.size());
   }
 
   @Override
@@ -378,33 +366,37 @@ public class ConcurrentMapPartitionUpsertMetadataManagerForConsistentDeletes
       RecordLocation currentLocation = _primaryKeyToRecordLocationMap.get(obj.getKey());
       if (prevSegment != null) {
         if (currentLocation != null && currentLocation.getSegment() == oldSegment) {
-          try (UpsertUtils.RecordInfoReader recordInfoReader = new UpsertUtils.RecordInfoReader(prevSegment,
-              _primaryKeyColumns, _comparisonColumns, _deleteRecordColumn)) {
-            int newDocId = obj.getValue().getDocId();
-            int currentDocId = _primaryKeyToRecordLocationMap.get(obj.getKey()).getDocId();
-            RecordInfo recordInfo = recordInfoReader.getRecordInfo(newDocId);
-            // Update valid docId to the other segment location
-            replaceDocId(prevSegment, prevSegment.getValidDocIds(), prevSegment.getQueryableDocIds(), oldSegment,
-                currentDocId, newDocId, recordInfo);
-          } catch (IOException e) {
-            throw new RuntimeException(e);
+          if (prevSegment == oldSegment) {
+            _primaryKeyToRecordLocationMap.remove(obj.getKey());
+            _previousKeyToRecordLocationMap.remove(obj.getKey());
+          } else {
+            try (UpsertUtils.RecordInfoReader recordInfoReader = new UpsertUtils.RecordInfoReader(prevSegment,
+                _primaryKeyColumns, _comparisonColumns, _deleteRecordColumn)) {
+              int newDocId = obj.getValue().getDocId();
+              int currentDocId = _primaryKeyToRecordLocationMap.get(obj.getKey()).getDocId();
+              RecordInfo recordInfo = recordInfoReader.getRecordInfo(newDocId);
+              // Update valid docId to the other segment location
+              replaceDocId(prevSegment, prevSegment.getValidDocIds(), prevSegment.getQueryableDocIds(), oldSegment,
+                  currentDocId, newDocId, recordInfo);
+            } catch (IOException e) {
+              throw new RuntimeException(e);
+            }
+            _primaryKeyToRecordLocationMap.put(obj.getKey(), obj.getValue());
+            _previousKeyToRecordLocationMap.remove(obj.getKey());
           }
-          _primaryKeyToRecordLocationMap.put(obj.getKey(), obj.getValue());
         }
       } else {
         _primaryKeyToRecordLocationMap.remove(obj.getKey());
+        _previousKeyToRecordLocationMap.remove(obj.getKey());
       }
     }
     _logger.info("Reverted Upsert metadata of {} keys to previous segment locations for the segment: {}",
         _previousKeyToRecordLocationMap.size(), oldSegment.getSegmentName());
-    // For the newly added keys into the segment, remove the pk and valid doc id
-    removeNewlyAddedKeys(oldSegment);
   }
 
   @Override
   protected void eraseKeyToPreviousLocationMap() {
     _previousKeyToRecordLocationMap.clear();
-    _newlyAddedKeys.clear();
   }
 
   @Override
@@ -434,13 +426,11 @@ public class ConcurrentMapPartitionUpsertMetadataManagerForConsistentDeletes
                 replaceDocId(segment, validDocIds, queryableDocIds, currentDocId, newDocId, recordInfo);
                 RecordLocation newRecordLocation = new RecordLocation(segment, newDocId, newComparisonValue,
                     currentRecordLocation.getDistinctSegmentCount());
-                // Track the record location of the newly added keys
-                if (_newlyAddedKeys.containsKey(primaryKey)) {
-                  _newlyAddedKeys.put(primaryKey, newRecordLocation);
-                }
                 return newRecordLocation;
               } else {
-                _previousKeyToRecordLocationMap.put(primaryKey, currentRecordLocation);
+                if (!(currentSegment instanceof MutableSegment)) {
+                  _previousKeyToRecordLocationMap.put(primaryKey, currentRecordLocation);
+                }
                 replaceDocId(segment, validDocIds, queryableDocIds, currentSegment, currentDocId, newDocId, recordInfo);
                 return new RecordLocation(segment, newDocId, newComparisonValue,
                     RecordLocation.incrementSegmentCount(currentRecordLocation.getDistinctSegmentCount()));
@@ -462,7 +452,7 @@ public class ConcurrentMapPartitionUpsertMetadataManagerForConsistentDeletes
             // New primary key
             addDocId(segment, validDocIds, queryableDocIds, newDocId, recordInfo);
             RecordLocation newRecordLocation = new RecordLocation(segment, newDocId, newComparisonValue, 1);
-            _newlyAddedKeys.put(primaryKey, newRecordLocation);
+            _previousKeyToRecordLocationMap.put(primaryKey, newRecordLocation);
             return newRecordLocation;
           }
         });

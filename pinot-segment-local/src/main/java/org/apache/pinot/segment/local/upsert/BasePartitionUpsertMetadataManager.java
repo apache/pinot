@@ -289,7 +289,6 @@ public abstract class BasePartitionUpsertMetadataManager implements PartitionUps
     }
     try {
       doAddSegment((ImmutableSegmentImpl) segment);
-      eraseKeyToPreviousLocationMap();
       _trackedSegments.add(segment);
       if (_enableSnapshot) {
         _updatedSegmentsSinceLastSnapshot.add(segment);
@@ -405,7 +404,6 @@ public abstract class BasePartitionUpsertMetadataManager implements PartitionUps
     }
     try {
       doPreloadSegment((ImmutableSegmentImpl) segment);
-      eraseKeyToPreviousLocationMap();
       _trackedSegments.add(segment);
       _updatedSegmentsSinceLastSnapshot.add(segment);
     } finally {
@@ -573,7 +571,9 @@ public abstract class BasePartitionUpsertMetadataManager implements PartitionUps
     }
     try {
       doReplaceSegment(segment, oldSegment);
-      eraseKeyToPreviousLocationMap();
+      if (oldSegment instanceof MutableSegment) {
+        eraseKeyToPreviousLocationMap();
+      }
       if (!(segment instanceof EmptyIndexSegment)) {
         _trackedSegments.add(segment);
         if (_enableSnapshot) {
@@ -745,8 +745,6 @@ public abstract class BasePartitionUpsertMetadataManager implements PartitionUps
       }
     }
   }
-
-  protected abstract void removeNewlyAddedKeys(IndexSegment oldSegment);
 
   protected abstract void eraseKeyToPreviousLocationMap();
 

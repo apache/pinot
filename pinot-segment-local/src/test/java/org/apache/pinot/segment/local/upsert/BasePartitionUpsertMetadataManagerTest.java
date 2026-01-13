@@ -1051,10 +1051,6 @@ public class BasePartitionUpsertMetadataManagerTest {
     }
 
     @Override
-    protected void removeNewlyAddedKeys(IndexSegment oldSegment) {
-    }
-
-    @Override
     protected void removeSegment(IndexSegment segment, MutableRoaringBitmap validDocIds) {
     }
 
