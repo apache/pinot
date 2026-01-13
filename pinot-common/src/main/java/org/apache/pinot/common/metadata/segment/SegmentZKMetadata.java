@@ -184,7 +184,7 @@ public class SegmentZKMetadata implements ZKMetadata {
 
   public boolean isUseDataCrcForReplace() {
     String useDataCrcForReplaceString = _simpleFields.get(Segment.USE_DATA_CRC_FOR_REPLACE);
-    return useDataCrcForReplaceString != null && Boolean.parseBoolean(useDataCrcForReplaceString);
+    return Boolean.parseBoolean(useDataCrcForReplaceString);
   }
 
   // useDataCrcForReplace is set for consuming segments in realtime table
@@ -192,7 +192,7 @@ public class SegmentZKMetadata implements ZKMetadata {
   // of segments
   public void setUseDataCrcForReplace(boolean useDataCrcForReplace) {
     if (useDataCrcForReplace) {
-      _simpleFields.put(Segment.USE_DATA_CRC_FOR_REPLACE, String.valueOf(useDataCrcForReplace));
+      _simpleFields.put(Segment.USE_DATA_CRC_FOR_REPLACE, "true");
     } else {
       _simpleFields.remove(Segment.USE_DATA_CRC_FOR_REPLACE);
     }
