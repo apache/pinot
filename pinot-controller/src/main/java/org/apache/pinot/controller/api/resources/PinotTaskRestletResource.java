@@ -174,6 +174,9 @@ public class PinotTaskRestletResource {
   @Inject
   ControllerConf _controllerConf;
 
+  // TODO: To prevent blocking, we make most of the API resources here to run async because they are calling
+  //  synchronized methods in PinotHelixTaskResourceManager. We should revisit the synchronization strategy in
+  //  PinotHelixTaskResourceManager and see if we can remove the need of async APIs here.
   @Inject
   @Named(BaseControllerStarter.MINION_TASK_RESOURCE_EXECUTOR_SERVICE_NAME)
   ExecutorService _minionTaskResourceExecutorService;
