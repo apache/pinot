@@ -1001,7 +1001,7 @@ public abstract class BaseControllerStarter implements ServiceStartable {
   /**
    * Creates a TaskManager instance  as specified in the configuration.
    */
-  private PinotTaskManager createTaskManager() {
+  protected PinotTaskManager createTaskManager() {
     String taskManagerClass = _config.getProperty(CommonConstants.Controller.CONFIG_OF_TASK_MANAGER_CLASS,
         CommonConstants.Controller.DEFAULT_TASK_MANAGER_CLASS);
     LOGGER.info("Creating TaskManager with class: {}", taskManagerClass);
