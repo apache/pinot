@@ -618,7 +618,6 @@ public abstract class BaseControllerStarter implements ServiceStartable {
       throw new RuntimeException("Failed to register cluster config change handler", e);
     }
 
-
     SegmentCompletionConfig segmentCompletionConfig = new SegmentCompletionConfig(_config);
 
     _segmentCompletionManager =
@@ -652,8 +651,9 @@ public abstract class BaseControllerStarter implements ServiceStartable {
         new TenantRebalancer(_tableRebalanceManager, _helixResourceManager, _rebalancerExecutorService);
 
     // Set up executor service for specific resources for isolation
-    _minionTaskResourceExecutorService = createExecutorService(HttpServerThreadPoolConfig.defaultInstance().getCorePoolSize(),
-        "minion-task-resource-thread-%d");
+    _minionTaskResourceExecutorService =
+        createExecutorService(HttpServerThreadPoolConfig.defaultInstance().getCorePoolSize(),
+            "minion-task-resource-thread-%d");
 
     // Setting up periodic tasks
     List<PeriodicTask> controllerPeriodicTasks = setupControllerPeriodicTasks();
@@ -707,7 +707,8 @@ public abstract class BaseControllerStarter implements ServiceStartable {
         bind(_taskManagerStatusCache).to(TaskManagerStatusCache.class);
         bind(_connectionManager).to(HttpClientConnectionManager.class);
         bind(_executorService).to(Executor.class);
-        bind(_minionTaskResourceExecutorService).named(MINION_TASK_RESOURCE_EXECUTOR_SERVICE_NAME).to(ExecutorService.class);
+        bind(_minionTaskResourceExecutorService).named(MINION_TASK_RESOURCE_EXECUTOR_SERVICE_NAME)
+            .to(ExecutorService.class);
         bind(_controllerMetrics).to(ControllerMetrics.class);
         bind(accessControlFactory).to(AccessControlFactory.class);
         bind(metadataEventNotifierFactory).to(MetadataEventNotifierFactory.class);

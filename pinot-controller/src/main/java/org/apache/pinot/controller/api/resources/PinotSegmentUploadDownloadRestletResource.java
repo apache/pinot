@@ -86,8 +86,8 @@ import org.apache.pinot.common.utils.TarCompressionUtils;
 import org.apache.pinot.common.utils.URIUtils;
 import org.apache.pinot.common.utils.UploadedRealtimeSegmentName;
 import org.apache.pinot.common.utils.fetcher.SegmentFetcherFactory;
-import org.apache.pinot.controller.ControllerConf;
 import org.apache.pinot.controller.BaseControllerStarter;
+import org.apache.pinot.controller.ControllerConf;
 import org.apache.pinot.controller.api.access.AccessControl;
 import org.apache.pinot.controller.api.access.AccessControlFactory;
 import org.apache.pinot.controller.api.access.AccessType;
@@ -129,15 +129,18 @@ import static org.apache.pinot.spi.utils.CommonConstants.DATABASE;
 import static org.apache.pinot.spi.utils.CommonConstants.SWAGGER_AUTHORIZATION_KEY;
 
 
-@Api(tags = Constants.SEGMENT_TAG, authorizations = {@Authorization(value = SWAGGER_AUTHORIZATION_KEY),
-    @Authorization(value = DATABASE)})
+@Api(tags = Constants.SEGMENT_TAG, authorizations = {
+    @Authorization(value = SWAGGER_AUTHORIZATION_KEY),
+    @Authorization(value = DATABASE)
+})
 @SwaggerDefinition(securityDefinition = @SecurityDefinition(apiKeyAuthDefinitions = {
     @ApiKeyAuthDefinition(name = HttpHeaders.AUTHORIZATION, in = ApiKeyAuthDefinition.ApiKeyLocation.HEADER,
         key = SWAGGER_AUTHORIZATION_KEY,
         description = "The format of the key is  ```\"Basic <token>\" or \"Bearer <token>\"```"),
     @ApiKeyAuthDefinition(name = DATABASE, in = ApiKeyAuthDefinition.ApiKeyLocation.HEADER, key = DATABASE,
         description = "Database context passed through http header. If no context is provided 'default' database "
-            + "context will be considered.")}))
+            + "context will be considered.")
+}))
 @Path("/")
 public class PinotSegmentUploadDownloadRestletResource {
   private static final Logger LOGGER = LoggerFactory.getLogger(PinotSegmentUploadDownloadRestletResource.class);
@@ -587,7 +590,7 @@ public class PinotSegmentUploadDownloadRestletResource {
 
     try {
       int entryCount = 0;
-      for (Map.Entry<String, SegmentMetadataInfo> entry: segmentsMetadataInfoMap.entrySet()) {
+      for (Map.Entry<String, SegmentMetadataInfo> entry : segmentsMetadataInfoMap.entrySet()) {
         String segmentName = entry.getKey();
         SegmentMetadataInfo segmentMetadataInfo = entry.getValue();
         segmentNames.add(segmentName);
@@ -1003,16 +1006,19 @@ public class PinotSegmentUploadDownloadRestletResource {
         String translatedTableName = DatabaseUtils.translateTableName(tableName, headers);
         TableType tableType = Constants.validateTableType(tableTypeStr);
         if (tableType == null) {
-          asyncResponse.resume(new ControllerApplicationException(LOGGER, "Table type should either be offline or realtime",
-              Response.Status.BAD_REQUEST));
+          asyncResponse.resume(
+              new ControllerApplicationException(LOGGER, "Table type should either be offline or realtime",
+                  Response.Status.BAD_REQUEST));
           return;
         }
         String tableNameWithType =
-            ResourceUtils.getExistingTableNamesWithType(_pinotHelixResourceManager, translatedTableName, tableType, LOGGER).get(0);
+            ResourceUtils.getExistingTableNamesWithType(_pinotHelixResourceManager, translatedTableName, tableType,
+                LOGGER).get(0);
         String segmentLineageEntryId = _pinotHelixResourceManager.startReplaceSegments(tableNameWithType,
             startReplaceSegmentsRequest.getSegmentsFrom(), startReplaceSegmentsRequest.getSegmentsTo(), forceCleanup,
             startReplaceSegmentsRequest.getCustomMap());
-        asyncResponse.resume(Response.ok(JsonUtils.newObjectNode().put("segmentLineageEntryId", segmentLineageEntryId)).build());
+        asyncResponse.resume(
+            Response.ok(JsonUtils.newObjectNode().put("segmentLineageEntryId", segmentLineageEntryId)).build());
       } catch (Exception e) {
         String tableNameWithType = null;
         try {
@@ -1020,13 +1026,15 @@ public class PinotSegmentUploadDownloadRestletResource {
           TableType tableType = Constants.validateTableType(tableTypeStr);
           if (tableType != null) {
             tableNameWithType =
-                ResourceUtils.getExistingTableNamesWithType(_pinotHelixResourceManager, translatedTableName, tableType, LOGGER).get(0);
+                ResourceUtils.getExistingTableNamesWithType(_pinotHelixResourceManager, translatedTableName, tableType,
+                    LOGGER).get(0);
             _controllerMetrics.addMeteredTableValue(tableNameWithType, ControllerMeter.NUMBER_START_REPLACE_FAILURE, 1);
           }
         } catch (Exception ignored) {
           // Ignore errors when trying to get table name for metrics
         }
-        asyncResponse.resume(new ControllerApplicationException(LOGGER, e.getMessage(), Response.Status.INTERNAL_SERVER_ERROR, e));
+        asyncResponse.resume(
+            new ControllerApplicationException(LOGGER, e.getMessage(), Response.Status.INTERNAL_SERVER_ERROR, e));
       }
     });
   }
@@ -1052,12 +1060,14 @@ public class PinotSegmentUploadDownloadRestletResource {
         String translatedTableName = DatabaseUtils.translateTableName(tableName, headers);
         TableType tableType = Constants.validateTableType(tableTypeStr);
         if (tableType == null) {
-          asyncResponse.resume(new ControllerApplicationException(LOGGER, "Table type should either be offline or realtime",
-              Response.Status.BAD_REQUEST));
+          asyncResponse.resume(
+              new ControllerApplicationException(LOGGER, "Table type should either be offline or realtime",
+                  Response.Status.BAD_REQUEST));
           return;
         }
         String tableNameWithType =
-            ResourceUtils.getExistingTableNamesWithType(_pinotHelixResourceManager, translatedTableName, tableType, LOGGER).get(0);
+            ResourceUtils.getExistingTableNamesWithType(_pinotHelixResourceManager, translatedTableName, tableType,
+                LOGGER).get(0);
         // Check that the segment lineage entry id is valid
         Preconditions.checkNotNull(segmentLineageEntryId, "'segmentLineageEntryId' should not be null");
         _pinotHelixResourceManager.endReplaceSegments(tableNameWithType, segmentLineageEntryId,
@@ -1073,13 +1083,15 @@ public class PinotSegmentUploadDownloadRestletResource {
           TableType tableType = Constants.validateTableType(tableTypeStr);
           if (tableType != null) {
             tableNameWithType =
-                ResourceUtils.getExistingTableNamesWithType(_pinotHelixResourceManager, translatedTableName, tableType, LOGGER).get(0);
+                ResourceUtils.getExistingTableNamesWithType(_pinotHelixResourceManager, translatedTableName, tableType,
+                    LOGGER).get(0);
             _controllerMetrics.addMeteredTableValue(tableNameWithType, ControllerMeter.NUMBER_END_REPLACE_FAILURE, 1);
           }
         } catch (Exception ignored) {
           // Ignore errors when trying to get table name for metrics
         }
-        asyncResponse.resume(new ControllerApplicationException(LOGGER, e.getMessage(), Response.Status.INTERNAL_SERVER_ERROR, e));
+        asyncResponse.resume(
+            new ControllerApplicationException(LOGGER, e.getMessage(), Response.Status.INTERNAL_SERVER_ERROR, e));
       }
     });
   }
@@ -1105,12 +1117,14 @@ public class PinotSegmentUploadDownloadRestletResource {
         String translatedTableName = DatabaseUtils.translateTableName(tableName, headers);
         TableType tableType = Constants.validateTableType(tableTypeStr);
         if (tableType == null) {
-          asyncResponse.resume(new ControllerApplicationException(LOGGER, "Table type should either be offline or realtime",
-              Response.Status.BAD_REQUEST));
+          asyncResponse.resume(
+              new ControllerApplicationException(LOGGER, "Table type should either be offline or realtime",
+                  Response.Status.BAD_REQUEST));
           return;
         }
         String tableNameWithType =
-            ResourceUtils.getExistingTableNamesWithType(_pinotHelixResourceManager, translatedTableName, tableType, LOGGER).get(0);
+            ResourceUtils.getExistingTableNamesWithType(_pinotHelixResourceManager, translatedTableName, tableType,
+                LOGGER).get(0);
         // Check that the segment lineage entry id is valid
         Preconditions.checkNotNull(segmentLineageEntryId, "'segmentLineageEntryId' should not be null");
         _pinotHelixResourceManager.revertReplaceSegments(tableNameWithType, segmentLineageEntryId, forceRevert,
@@ -1123,13 +1137,16 @@ public class PinotSegmentUploadDownloadRestletResource {
           TableType tableType = Constants.validateTableType(tableTypeStr);
           if (tableType != null) {
             tableNameWithType =
-                ResourceUtils.getExistingTableNamesWithType(_pinotHelixResourceManager, translatedTableName, tableType, LOGGER).get(0);
-            _controllerMetrics.addMeteredTableValue(tableNameWithType, ControllerMeter.NUMBER_REVERT_REPLACE_FAILURE, 1);
+                ResourceUtils.getExistingTableNamesWithType(_pinotHelixResourceManager, translatedTableName, tableType,
+                    LOGGER).get(0);
+            _controllerMetrics.addMeteredTableValue(tableNameWithType, ControllerMeter.NUMBER_REVERT_REPLACE_FAILURE,
+                1);
           }
         } catch (Exception ignored) {
           // Ignore errors when trying to get table name for metrics
         }
-        asyncResponse.resume(new ControllerApplicationException(LOGGER, e.getMessage(), Response.Status.INTERNAL_SERVER_ERROR, e));
+        asyncResponse.resume(
+            new ControllerApplicationException(LOGGER, e.getMessage(), Response.Status.INTERNAL_SERVER_ERROR, e));
       }
     });
   }
@@ -1249,7 +1266,7 @@ public class PinotSegmentUploadDownloadRestletResource {
     }
 
     Map<String, SegmentMetadataInfo> segmentsMetadataInfoMap = new HashMap<>();
-    for (File file: segmentsMetadataFiles) {
+    for (File file : segmentsMetadataFiles) {
       String fileName = file.getName();
       if (fileName.equalsIgnoreCase(SegmentUploadConstants.ALL_SEGMENTS_METADATA_FILENAME)) {
         try (InputStream inputStream = FileUtils.openInputStream(file)) {

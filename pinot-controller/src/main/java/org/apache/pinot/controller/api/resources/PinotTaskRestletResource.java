@@ -174,7 +174,6 @@ public class PinotTaskRestletResource {
   @Inject
   ControllerConf _controllerConf;
 
-
   @Inject
   @Named(BaseControllerStarter.MINION_TASK_RESOURCE_EXECUTOR_SERVICE_NAME)
   ExecutorService _minionTaskResourceExecutorService;
@@ -190,8 +189,8 @@ public class PinotTaskRestletResource {
   public void listTaskTypes(@Suspended AsyncResponse asyncResponse) {
     _minionTaskResourceExecutorService.execute(() -> {
       try {
-      Set<String> taskTypes = listTaskTypesSync();
-      asyncResponse.resume(taskTypes);
+        Set<String> taskTypes = listTaskTypesSync();
+        asyncResponse.resume(taskTypes);
       } catch (Exception e) {
         asyncResponse.resume(e);
       }
@@ -350,7 +349,7 @@ public class PinotTaskRestletResource {
     _pinotHelixTaskResourceManager.deleteTaskMetadataByTable(taskType, tableNameWithType);
     return new SuccessResponse(
         String.format("Successfully deleted metadata for task type: %s from table: %s", taskType,
-        tableNameWithType));
+            tableNameWithType));
   }
 
   @GET
@@ -371,7 +370,8 @@ public class PinotTaskRestletResource {
     _minionTaskResourceExecutorService.execute(() -> {
       try {
         String tableNameWithType = table != null ? DatabaseUtils.translateTableName(table, headers) : null;
-        Map<String, PinotHelixTaskResourceManager.TaskCount> counts = getTaskCountsSync(taskType, state, tableNameWithType);
+        Map<String, PinotHelixTaskResourceManager.TaskCount> counts =
+            getTaskCountsSync(taskType, state, tableNameWithType);
         asyncResponse.resume(counts);
       } catch (Exception e) {
         asyncResponse.resume(e);
@@ -468,7 +468,8 @@ public class PinotTaskRestletResource {
   }
 
   private String getTaskGenerationDebugIntoSync(String taskType, String tableNameWithType, boolean localOnly,
-      HttpHeaders httpHeaders) throws JsonProcessingException {
+      HttpHeaders httpHeaders)
+      throws JsonProcessingException {
     String translatedTableName = DatabaseUtils.translateTableName(tableNameWithType, httpHeaders);
     if (localOnly) {
       BaseTaskGeneratorInfo taskGeneratorMostRecentRunInfo =
@@ -701,7 +702,8 @@ public class PinotTaskRestletResource {
   }
 
   private String getSubtaskProgressSync(HttpHeaders httpHeaders, String taskName,
-      @Nullable String subtaskNames) throws Exception {
+      @Nullable String subtaskNames)
+      throws Exception {
     // Relying on original schema that was used to query the controller
     String scheme = _uriInfo.getRequestUri().getScheme();
     List<InstanceConfig> workers = _pinotHelixResourceManager.getAllMinionInstanceConfigs();
@@ -754,7 +756,8 @@ public class PinotTaskRestletResource {
   }
 
   private String getSubtaskOnWorkerProgressSync(HttpHeaders httpHeaders, String subTaskState,
-      @Nullable String minionWorkerIds) throws Exception {
+      @Nullable String minionWorkerIds)
+      throws Exception {
     Set<String> selectedMinionWorkers = new HashSet<>();
     if (StringUtils.isNotEmpty(minionWorkerIds)) {
       selectedMinionWorkers.addAll(
@@ -917,7 +920,7 @@ public class PinotTaskRestletResource {
       @QueryParam("tableName") @Nullable String tableName,
       @ApiParam(value = "Minion Instance tag to schedule the task explicitly on") @QueryParam("minionInstanceTag")
       @Nullable String minionInstanceTag, @Context HttpHeaders headers, @Suspended AsyncResponse asyncResponse) {
-    
+
     _minionTaskResourceExecutorService.execute(() -> {
       try {
         String database = headers != null ? headers.getHeaderString(DATABASE) : DEFAULT_DATABASE;
@@ -948,7 +951,9 @@ public class PinotTaskRestletResource {
         response.put(SCHEDULING_ERRORS_KEY, String.join(",", schedulingErrors));
         asyncResponse.resume(response);
       } catch (Exception e) {
-        asyncResponse.resume(new ControllerApplicationException(LOGGER, String.format("Failed to schedule tasks due to error: %s", ExceptionUtils.getStackTrace(e)), Response.Status.INTERNAL_SERVER_ERROR, e));
+        asyncResponse.resume(new ControllerApplicationException(LOGGER,
+            String.format("Failed to schedule tasks due to error: %s", ExceptionUtils.getStackTrace(e)),
+            Response.Status.INTERNAL_SERVER_ERROR, e));
       }
     });
   }
@@ -962,10 +967,11 @@ public class PinotTaskRestletResource {
   public void executeAdhocTask(AdhocTaskConfig adhocTaskConfig, @Suspended AsyncResponse asyncResponse,
       @Context Request requestContext) {
     _minionTaskResourceExecutorService.execute(() -> {
-      try{
+      try {
         try {
-        asyncResponse.resume(_pinotTaskManager.createTask(adhocTaskConfig.getTaskType(), adhocTaskConfig.getTableName(),
-            adhocTaskConfig.getTaskName(), adhocTaskConfig.getTaskConfigs()));
+          asyncResponse.resume(
+              _pinotTaskManager.createTask(adhocTaskConfig.getTaskType(), adhocTaskConfig.getTableName(),
+                  adhocTaskConfig.getTaskName(), adhocTaskConfig.getTaskConfigs()));
         } catch (TableNotFoundException e) {
           throw new ControllerApplicationException(LOGGER, "Failed to find table: " + adhocTaskConfig.getTableName(),
               Response.Status.NOT_FOUND, e);
@@ -981,7 +987,8 @@ public class PinotTaskRestletResource {
                   + adhocTaskConfig.getTaskType(), Response.Status.BAD_REQUEST, e);
         } catch (Exception e) {
           throw new ControllerApplicationException(LOGGER,
-              "Failed to create adhoc task: " + ExceptionUtils.getStackTrace(e), Response.Status.INTERNAL_SERVER_ERROR, e);
+              "Failed to create adhoc task: " + ExceptionUtils.getStackTrace(e), Response.Status.INTERNAL_SERVER_ERROR,
+              e);
         }
       } catch (Exception e) {
         asyncResponse.resume(e);
