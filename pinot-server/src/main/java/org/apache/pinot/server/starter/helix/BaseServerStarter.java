@@ -183,6 +183,7 @@ public abstract class BaseServerStarter implements ServiceStartable {
   protected volatile boolean _isServerReadyToServeQueries = false;
   protected ScheduledExecutorService _helixMessageCountScheduler;
   protected ServerReloadJobStatusCache _reloadJobStatusCache;
+  // Override this to provide custom thread pool for Helix state transitions. Null means using Helix's default
   protected StateTransitionThreadPoolManager _transitionThreadPoolManager;
 
   @Override

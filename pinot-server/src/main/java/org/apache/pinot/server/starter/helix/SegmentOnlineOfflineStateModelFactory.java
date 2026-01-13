@@ -256,10 +256,10 @@ public class SegmentOnlineOfflineStateModelFactory extends StateModelFactory<Sta
   }
 
   /**
-   *Get thread pool to handle the given state transition message.
+   * Get thread pool to handle the given state transition message.
    * If this method returns null, the threadpool returned from
    * {@link StateModelFactory#getExecutorService(String resourceName, String fromState, String toState)} will be used;
-   * it this method returns null the threadpool returned from
+   * If this method returns null the threadpool returned from
    * {@link StateModelFactory#getExecutorService(String resourceName)} will be used.
    * If that method return null too, then the default shared threadpool will be used.
    * This method may be called only once for each category of messages,
@@ -271,7 +271,7 @@ public class SegmentOnlineOfflineStateModelFactory extends StateModelFactory<Sta
   @Nullable
   public CustomizedExecutorService getExecutorService(Message.MessageInfo messageInfo) {
     if (_stateTransitionThreadPoolManager == null) {
-      return null;
+      return super.getExecutorService(messageInfo);
     }
     return _stateTransitionThreadPoolManager.getExecutorService(messageInfo);
   }
@@ -280,7 +280,7 @@ public class SegmentOnlineOfflineStateModelFactory extends StateModelFactory<Sta
   @Nullable
   public ExecutorService getExecutorService(String resourceName, String fromState, String toState) {
     if (_stateTransitionThreadPoolManager == null) {
-      return null;
+      return super.getExecutorService(resourceName, fromState, toState);
     }
     return _stateTransitionThreadPoolManager.getExecutorService(resourceName, fromState, toState);
   }
@@ -289,7 +289,7 @@ public class SegmentOnlineOfflineStateModelFactory extends StateModelFactory<Sta
   @Nullable
   public ExecutorService getExecutorService(String resourceName) {
     if (_stateTransitionThreadPoolManager == null) {
-      return null;
+      return super.getExecutorService(resourceName);
     }
     return _stateTransitionThreadPoolManager.getExecutorService(resourceName);
   }
