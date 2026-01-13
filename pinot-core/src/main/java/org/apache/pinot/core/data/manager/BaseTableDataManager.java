@@ -1665,11 +1665,10 @@ public abstract class BaseTableDataManager implements TableDataManager {
     if (zkMetadata.getCrc() == Long.parseLong(localMetadata.getCrc())) {
       return true;
     }
-    return zkMetadata.isUseDataCrcForReplace() &&
-           zkMetadata.getDataCrc() >= 0
+    return zkMetadata.isUseDataCrcForReplace()
+           && zkMetadata.getDataCrc() >= 0
             && Long.parseLong(localMetadata.getDataCrc()) >= 0
             && zkMetadata.getDataCrc() == Long.parseLong(localMetadata.getDataCrc());
-
   }
 
   private static void recoverReloadFailureQuietly(String tableNameWithType, String segmentName, File indexDir) {
