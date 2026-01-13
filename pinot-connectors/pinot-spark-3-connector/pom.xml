@@ -32,6 +32,8 @@
   <properties>
     <pinot.root>${basedir}/../..</pinot.root>
     <shadeBase>org.apache.pinot.\$internal</shadeBase>
+    <jdk.version>11</jdk.version>
+    <jdk.test.version>11</jdk.test.version>
   </properties>
 
   <profiles>

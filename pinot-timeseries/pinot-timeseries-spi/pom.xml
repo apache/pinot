@@ -33,6 +33,7 @@
 
   <properties>
     <pinot.root>${basedir}/../..</pinot.root>
+    <jdk.version>11</jdk.version>
   </properties>
   <dependencies>
     <dependency>
