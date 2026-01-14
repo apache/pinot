@@ -651,6 +651,9 @@ public class CommonConstants {
         public static final String MAX_EXECUTION_THREADS = "maxExecutionThreads";
         public static final String COLLECT_GC_STATS = "collectGCStats";
         public static final String QUERY_HASH = "queryHash";
+        // Enable server-side gapfill processing and carry the original PinotQuery when applicable.
+        public static final String SERVER_SIDE_GAPFILL = "serverSideGapfill";
+        public static final String SERVER_SIDE_GAPFILL_QUERY = "serverSideGapfillQuery";
 
         // For group-by queries with order-by clause, the tail groups are trimmed off to reduce the memory footprint. To
         // ensure the accuracy of the result, {@code max(limit * 5, minTrimSize)} groups are retained. When

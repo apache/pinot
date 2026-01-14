@@ -22,6 +22,7 @@ import com.google.common.base.Preconditions;
 import java.math.BigDecimal;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Base64;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -37,6 +38,7 @@ import org.apache.pinot.common.request.InstanceRequest;
 import org.apache.pinot.common.request.PinotQuery;
 import org.apache.pinot.common.request.QuerySource;
 import org.apache.pinot.common.request.TableSegmentsInfo;
+import org.apache.pinot.common.request.context.ExpressionContext;
 import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.common.utils.config.QueryOptionsUtils;
 import org.apache.pinot.common.utils.request.RequestUtils;
@@ -45,7 +47,10 @@ import org.apache.pinot.core.data.manager.LogicalTableContext;
 import org.apache.pinot.core.query.executor.QueryExecutor;
 import org.apache.pinot.core.query.optimizer.QueryOptimizer;
 import org.apache.pinot.core.query.request.ServerQueryRequest;
+import org.apache.pinot.core.query.request.context.QueryContext;
+import org.apache.pinot.core.query.request.context.utils.QueryContextConverterUtils;
 import org.apache.pinot.core.routing.timeboundary.TimeBoundaryInfo;
+import org.apache.pinot.core.util.GapfillUtils;
 import org.apache.pinot.query.planner.plannode.PlanNode;
 import org.apache.pinot.query.routing.StageMetadata;
 import org.apache.pinot.query.routing.StagePlan;
@@ -67,6 +72,9 @@ import org.apache.pinot.sql.parsers.rewriter.PredicateComparisonRewriter;
 import org.apache.pinot.sql.parsers.rewriter.QueryRewriter;
 import org.apache.pinot.sql.parsers.rewriter.QueryRewriterFactory;
 import org.apache.pinot.sql.parsers.rewriter.RlsFiltersRewriter;
+import org.apache.thrift.TException;
+import org.apache.thrift.TSerializer;
+import org.apache.thrift.protocol.TCompactProtocol;
 
 
 public class ServerPlanRequestUtils {
@@ -127,7 +135,13 @@ public class ServerPlanRequestUtils {
     int numRequests = instanceRequests.size();
     List<ServerQueryRequest> serverQueryRequests = new ArrayList<>(numRequests);
     for (InstanceRequest instanceRequest : instanceRequests) {
-      serverQueryRequests.add(new ServerQueryRequest(instanceRequest, ServerMetrics.get(), queryArrivalTimeMs, true));
+      boolean enableStreaming = true;
+      Map<String, String> queryOptions = instanceRequest.getQuery().getPinotQuery().getQueryOptions();
+      if (queryOptions != null && QueryOptionsUtils.isServerSideGapfill(queryOptions)) {
+        enableStreaming = false;
+      }
+      serverQueryRequests.add(
+          new ServerQueryRequest(instanceRequest, ServerMetrics.get(), queryArrivalTimeMs, enableStreaming));
     }
     serverContext.setServerQueryRequests(serverQueryRequests);
     // 3. Compile the OpChain
@@ -237,6 +251,17 @@ public class ServerPlanRequestUtils {
 
     // 2. Update query options according to requestMetadataMap
     updateQueryOptions(pinotQuery, executionContext);
+    // In the multi-stage engine, we deliberately remove the server-side gapfill options from the leaf-stage PinotQuery
+    // (see updateQueryOptions()) to prevent the SSE executor from running GapfillInstanceResponseOperator. However, the
+    // leaf-stage PinotQuery must still have the GAPFILL wrapper stripped so SSE doesn't try to execute GAPFILL as a
+    // regular transform function. Use the stage request metadata to decide if we should strip GAPFILL.
+    boolean shouldStripGapfill = QueryOptionsUtils.isServerSideGapfill(pinotQuery.getQueryOptions());
+    if (!shouldStripGapfill && QueryOptionsUtils.isServerSideGapfill(executionContext.getOpChainMetadata())) {
+      shouldStripGapfill = true;
+    }
+    if (shouldStripGapfill) {
+      pinotQuery = GapfillUtils.stripGapfill(pinotQuery);
+    }
 
     // 3. Wrap PinotQuery into BrokerRequest
     BrokerRequest brokerRequest = new BrokerRequest();
@@ -286,6 +311,57 @@ public class ServerPlanRequestUtils {
         Long.toString(executionContext.getActiveDeadlineMs() - System.currentTimeMillis()));
     queryOptions.put(CommonConstants.Broker.Request.QueryOptionKey.EXTRA_PASSIVE_TIMEOUT_MS,
         Long.toString(executionContext.getPassiveDeadlineMs() - executionContext.getActiveDeadlineMs()));
+    maybeEnableServerSideGapfill(pinotQuery, queryOptions);
+    if (QueryOptionsUtils.isUseMultistageEngine(queryOptions)) {
+      // Leaf-stage SSE execution should not run server-side gapfill; MSQ applies it in TransformOperator.
+      queryOptions.remove(CommonConstants.Broker.Request.QueryOptionKey.SERVER_SIDE_GAPFILL);
+      queryOptions.remove(CommonConstants.Broker.Request.QueryOptionKey.SERVER_SIDE_GAPFILL_QUERY);
+    } else if (QueryOptionsUtils.isServerSideGapfill(queryOptions)) {
+      queryOptions.put(CommonConstants.Broker.Request.QueryOptionKey.SERVER_RETURN_FINAL_RESULT, "true");
+    }
+  }
+
+  private static void maybeEnableServerSideGapfill(PinotQuery pinotQuery, Map<String, String> queryOptions) {
+    if (QueryOptionsUtils.isServerSideGapfill(queryOptions)) {
+      return;
+    }
+    QueryContext queryContext = QueryContextConverterUtils.getQueryContext(pinotQuery);
+    GapfillUtils.GapfillType gapfillType;
+    try {
+      gapfillType = GapfillUtils.getGapfillType(queryContext);
+    } catch (RuntimeException e) {
+      return;
+    }
+    if (gapfillType == null) {
+      return;
+    }
+    if (queryContext.getAggregationFunctions() != null) {
+      return;
+    }
+    ExpressionContext gapfillExpression = GapfillUtils.getGapfillExpressionContext(queryContext, gapfillType);
+    if (gapfillExpression == null || gapfillExpression.getFunction() == null) {
+      return;
+    }
+    ExpressionContext timeSeriesOn = GapfillUtils.getTimeSeriesOnExpressionContext(gapfillExpression);
+    if (timeSeriesOn == null || timeSeriesOn.getFunction() == null) {
+      return;
+    }
+    List<ExpressionContext> timeSeriesOnArgs = timeSeriesOn.getFunction().getArguments();
+    if (timeSeriesOnArgs.size() != 1 || timeSeriesOnArgs.get(0).getType() != ExpressionContext.Type.IDENTIFIER) {
+      return;
+    }
+    queryOptions.put(CommonConstants.Broker.Request.QueryOptionKey.SERVER_SIDE_GAPFILL, "true");
+    queryOptions.put(CommonConstants.Broker.Request.QueryOptionKey.SERVER_SIDE_GAPFILL_QUERY,
+        serializePinotQuery(pinotQuery));
+  }
+
+  private static String serializePinotQuery(PinotQuery pinotQuery) {
+    try {
+      return Base64.getEncoder()
+          .encodeToString(new TSerializer(new TCompactProtocol.Factory()).serialize(pinotQuery));
+    } catch (TException e) {
+      throw new IllegalStateException("Failed to serialize PinotQuery for server-side gapfill", e);
+    }
   }
 
   /**

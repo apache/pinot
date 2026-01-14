@@ -23,6 +23,7 @@ import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
 import java.net.URI;
 import java.util.ArrayList;
+import java.util.Base64;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -72,6 +73,7 @@ import org.apache.pinot.common.request.Function;
 import org.apache.pinot.common.request.Identifier;
 import org.apache.pinot.common.request.Literal;
 import org.apache.pinot.common.request.PinotQuery;
+import org.apache.pinot.common.request.context.ExpressionContext;
 import org.apache.pinot.common.response.BrokerResponse;
 import org.apache.pinot.common.response.broker.BrokerResponseNative;
 import org.apache.pinot.common.response.broker.QueryProcessingException;
@@ -84,6 +86,7 @@ import org.apache.pinot.common.utils.request.QueryFingerprintUtils;
 import org.apache.pinot.common.utils.request.RequestUtils;
 import org.apache.pinot.core.auth.Actions;
 import org.apache.pinot.core.auth.TargetType;
+import org.apache.pinot.core.query.aggregation.function.AggregationFunction;
 import org.apache.pinot.core.query.optimizer.QueryOptimizer;
 import org.apache.pinot.core.query.reduce.BaseGapfillProcessor;
 import org.apache.pinot.core.query.reduce.GapfillProcessorFactory;
@@ -93,6 +96,7 @@ import org.apache.pinot.core.routing.ImplicitHybridTableRouteProvider;
 import org.apache.pinot.core.routing.LogicalTableRouteProvider;
 import org.apache.pinot.core.routing.MultiClusterRoutingContext;
 import org.apache.pinot.core.routing.RoutingManager;
+import org.apache.pinot.core.routing.TablePartitionReplicatedServersInfo;
 import org.apache.pinot.core.routing.TableRouteInfo;
 import org.apache.pinot.core.routing.TableRouteProvider;
 import org.apache.pinot.core.routing.timeboundary.TimeBoundaryInfo;
@@ -130,6 +134,9 @@ import org.apache.pinot.sql.parsers.CalciteSqlParser;
 import org.apache.pinot.sql.parsers.SqlNodeAndOptions;
 import org.apache.pinot.sql.parsers.rewriter.RlsFiltersRewriter;
 import org.apache.pinot.sql.parsers.rewriter.RlsUtils;
+import org.apache.thrift.TException;
+import org.apache.thrift.TSerializer;
+import org.apache.thrift.protocol.TCompactProtocol;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -584,6 +591,20 @@ public abstract class BaseSingleStageBrokerRequestHandler extends BaseBrokerRequ
       }
     }
 
+    if (!pinotQuery.isExplain() && shouldUseServerSideGapfill(pinotQuery, routeInfo, selectedRoutingManager)) {
+      String serializedGapfillQuery = serializePinotQuery(pinotQuery);
+      Map<String, String> queryOptions = pinotQuery.getQueryOptions();
+      if (queryOptions == null) {
+        queryOptions = new HashMap<>();
+        pinotQuery.setQueryOptions(queryOptions);
+      }
+      queryOptions.put(QueryOptionKey.SERVER_SIDE_GAPFILL, "true");
+      queryOptions.put(QueryOptionKey.SERVER_SIDE_GAPFILL_QUERY, serializedGapfillQuery);
+      if (serverPinotQuery != pinotQuery) {
+        serverPinotQuery.setQueryOptions(queryOptions);
+      }
+    }
+
     // Prepare OFFLINE and REALTIME requests
     BrokerRequest offlineBrokerRequest = null;
     BrokerRequest realtimeBrokerRequest = null;
@@ -872,6 +893,22 @@ public abstract class BaseSingleStageBrokerRequestHandler extends BaseBrokerRequ
       _brokerMetrics.addMeteredTableValue(rawTableName, BrokerMeter.BROKER_RESPONSES_WITH_GROUPS_TRIMMED, 1);
     }
 
+    // Apply broker-side gapfill for single-stage engine. The server request has the GAPFILL wrapper stripped, so the
+    // broker must apply the gapfill processor on the reduced result.
+    if (pinotQuery != serverPinotQuery) {
+      try {
+        QueryContext queryContext = QueryContextConverterUtils.getQueryContext(pinotQuery);
+        GapfillUtils.GapfillType gapfillType = GapfillUtils.getGapfillType(queryContext);
+        if (gapfillType == null) {
+          throw new BadQueryRequestException("Nested query is not supported without gapfill");
+        }
+        BaseGapfillProcessor gapfillProcessor = GapfillProcessorFactory.getGapfillProcessor(queryContext, gapfillType);
+        gapfillProcessor.process(brokerResponse);
+      } catch (Exception e) {
+        brokerResponse.addException(new QueryProcessingException(QueryErrorCode.QUERY_EXECUTION, e.getMessage()));
+      }
+    }
+
     // server returns STRING as default dataType for all columns in (some) scenarios where no rows are returned
     // this is an attempt to return more faithful information based on other sources
     fillEmptyResponseSchema(pinotQuery, brokerResponse, schema, database, query);
@@ -1112,6 +1149,221 @@ public abstract class BaseSingleStageBrokerRequestHandler extends BaseBrokerRequ
     }
     String selectorType = routingConfig.getInstanceSelectorType();
     return selectorType != null ? selectorType : RoutingConfig.DEFAULT_INSTANCE_SELECTOR_TYPE;
+  }
+
+  private static String serializePinotQuery(PinotQuery pinotQuery) {
+    try {
+      return Base64.getEncoder()
+          .encodeToString(new TSerializer(new TCompactProtocol.Factory()).serialize(pinotQuery));
+    } catch (TException e) {
+      throw new IllegalStateException("Failed to serialize PinotQuery for server-side gapfill", e);
+    }
+  }
+
+  private boolean shouldUseServerSideGapfill(PinotQuery pinotQuery, TableRouteInfo routeInfo,
+      RoutingManager routingManager) {
+    QueryContext queryContext = QueryContextConverterUtils.getQueryContext(pinotQuery);
+    GapfillUtils.GapfillType gapfillType;
+    try {
+      gapfillType = GapfillUtils.getGapfillType(queryContext);
+    } catch (RuntimeException e) {
+      return false;
+    }
+    if (gapfillType == null) {
+      return false;
+    }
+    if (!isServerSideGapfillQuerySupported(queryContext)) {
+      return false;
+    }
+    ExpressionContext gapfillExpression = GapfillUtils.getGapfillExpressionContext(queryContext, gapfillType);
+    if (gapfillExpression == null || gapfillExpression.getFunction() == null) {
+      return false;
+    }
+    ExpressionContext timeSeriesOn = GapfillUtils.getTimeSeriesOnExpressionContext(gapfillExpression);
+    if (timeSeriesOn == null || timeSeriesOn.getFunction() == null) {
+      return false;
+    }
+    List<ExpressionContext> timeSeriesOnArgs = timeSeriesOn.getFunction().getArguments();
+    if (timeSeriesOnArgs.size() != 1) {
+      return false;
+    }
+    ExpressionContext partitionExpression = timeSeriesOnArgs.get(0);
+    if (partitionExpression.getType() != ExpressionContext.Type.IDENTIFIER) {
+      return false;
+    }
+    String partitionColumn = partitionExpression.getIdentifier();
+    if (StringUtils.isBlank(partitionColumn)) {
+      return false;
+    }
+    if (!isServerSideGapfillAggregationSupported(queryContext)) {
+      return false;
+    }
+    if (routeInfo.isHybrid()) {
+      if (!isStrictReplicaGroupRouting(routeInfo.getOfflineTableConfig())
+          || !isStrictReplicaGroupRouting(routeInfo.getRealtimeTableConfig())) {
+        return false;
+      }
+    } else if (routeInfo.isOffline()) {
+      if (!isStrictReplicaGroupRouting(routeInfo.getOfflineTableConfig())) {
+        return false;
+      }
+    } else if (routeInfo.isRealtime()) {
+      if (!isStrictReplicaGroupRouting(routeInfo.getRealtimeTableConfig())) {
+        return false;
+      }
+    } else {
+      return false;
+    }
+    return hasGapfillPartitionInfo(routeInfo, routingManager, partitionColumn);
+  }
+
+  private static boolean isServerSideGapfillQuerySupported(QueryContext queryContext) {
+    if (queryContext.getAggregationFunctions() != null) {
+      return false;
+    }
+    QueryContext subquery = queryContext.getSubquery();
+    while (subquery != null) {
+      if (subquery.getAggregationFunctions() != null) {
+        return false;
+      }
+      subquery = subquery.getSubquery();
+    }
+    return true;
+  }
+
+  private static boolean isServerSideGapfillAggregationSupported(QueryContext queryContext) {
+    AggregationFunction[] aggregationFunctions = queryContext.getAggregationFunctions();
+    if (aggregationFunctions == null) {
+      return true;
+    }
+    for (AggregationFunction aggregationFunction : aggregationFunctions) {
+      ColumnDataType intermediateResultType = aggregationFunction.getIntermediateResultColumnType();
+      ColumnDataType finalResultType = aggregationFunction.getFinalResultColumnType();
+      if (intermediateResultType == ColumnDataType.OBJECT || intermediateResultType != finalResultType) {
+        return false;
+      }
+    }
+    return true;
+  }
+
+  private static boolean isStrictReplicaGroupRouting(@Nullable TableConfig tableConfig) {
+    if (tableConfig == null) {
+      return false;
+    }
+    RoutingConfig routingConfig = tableConfig.getRoutingConfig();
+    if (routingConfig == null) {
+      return false;
+    }
+    return RoutingConfig.STRICT_REPLICA_GROUP_INSTANCE_SELECTOR_TYPE
+        .equals(routingConfig.getInstanceSelectorType());
+  }
+
+  private boolean hasGapfillPartitionInfo(TableRouteInfo routeInfo, RoutingManager routingManager,
+      String partitionColumn) {
+    if (routeInfo.isHybrid()) {
+      String offlineTableName = routeInfo.getOfflineTableName();
+      String realtimeTableName = routeInfo.getRealtimeTableName();
+      if (offlineTableName == null || realtimeTableName == null) {
+        return false;
+      }
+      TablePartitionReplicatedServersInfo offlineTpi =
+          routingManager.getTablePartitionReplicatedServersInfo(offlineTableName);
+      TablePartitionReplicatedServersInfo realtimeTpi =
+          routingManager.getTablePartitionReplicatedServersInfo(realtimeTableName);
+      if (offlineTpi == null || realtimeTpi == null) {
+        return false;
+      }
+      TimeBoundaryInfo timeBoundaryInfo = routeInfo.getTimeBoundaryInfo();
+      if (timeBoundaryInfo == null) {
+        return validatePartitionInfo(realtimeTpi, partitionColumn);
+      }
+      if (!partitionColumnMatches(offlineTpi, partitionColumn)
+          || !partitionColumnMatches(realtimeTpi, partitionColumn)) {
+        return false;
+      }
+      String offlinePartitionFunction = offlineTpi.getPartitionFunctionName();
+      String realtimePartitionFunction = realtimeTpi.getPartitionFunctionName();
+      if (offlinePartitionFunction == null || realtimePartitionFunction == null) {
+        return false;
+      }
+      if (!offlinePartitionFunction.equalsIgnoreCase(realtimePartitionFunction)) {
+        return false;
+      }
+      if (offlineTpi.getNumPartitions() != realtimeTpi.getNumPartitions()) {
+        return false;
+      }
+      if (!offlineTpi.getSegmentsWithInvalidPartition().isEmpty()
+          || !realtimeTpi.getSegmentsWithInvalidPartition().isEmpty()) {
+        return false;
+      }
+      TablePartitionReplicatedServersInfo.PartitionInfo[] offlinePartitionInfoMap = offlineTpi.getPartitionInfoMap();
+      TablePartitionReplicatedServersInfo.PartitionInfo[] realtimePartitionInfoMap = realtimeTpi.getPartitionInfoMap();
+      int numPartitions = offlineTpi.getNumPartitions();
+      for (int i = 0; i < numPartitions; i++) {
+        TablePartitionReplicatedServersInfo.PartitionInfo offlinePartitionInfo = offlinePartitionInfoMap[i];
+        TablePartitionReplicatedServersInfo.PartitionInfo realtimePartitionInfo = realtimePartitionInfoMap[i];
+        if (offlinePartitionInfo == null && realtimePartitionInfo == null) {
+          continue;
+        }
+        Set<String> fullyReplicatedServers;
+        if (offlinePartitionInfo != null && realtimePartitionInfo != null) {
+          fullyReplicatedServers = new HashSet<>(offlinePartitionInfo._fullyReplicatedServers);
+          fullyReplicatedServers.retainAll(realtimePartitionInfo._fullyReplicatedServers);
+        } else {
+          fullyReplicatedServers = offlinePartitionInfo != null
+              ? offlinePartitionInfo._fullyReplicatedServers : realtimePartitionInfo._fullyReplicatedServers;
+        }
+        if (fullyReplicatedServers == null || fullyReplicatedServers.isEmpty()) {
+          return false;
+        }
+      }
+      return true;
+    }
+    if (routeInfo.isOffline()) {
+      String offlineTableName = routeInfo.getOfflineTableName();
+      if (offlineTableName == null) {
+        return false;
+      }
+      TablePartitionReplicatedServersInfo offlineTpi =
+          routingManager.getTablePartitionReplicatedServersInfo(offlineTableName);
+      return validatePartitionInfo(offlineTpi, partitionColumn);
+    }
+    if (routeInfo.isRealtime()) {
+      String realtimeTableName = routeInfo.getRealtimeTableName();
+      if (realtimeTableName == null) {
+        return false;
+      }
+      TablePartitionReplicatedServersInfo realtimeTpi =
+          routingManager.getTablePartitionReplicatedServersInfo(realtimeTableName);
+      return validatePartitionInfo(realtimeTpi, partitionColumn);
+    }
+    return false;
+  }
+
+  private static boolean validatePartitionInfo(@Nullable TablePartitionReplicatedServersInfo partitionInfo,
+      String partitionColumn) {
+    if (partitionInfo == null || !partitionColumnMatches(partitionInfo, partitionColumn)) {
+      return false;
+    }
+    if (!partitionInfo.getSegmentsWithInvalidPartition().isEmpty()) {
+      return false;
+    }
+    TablePartitionReplicatedServersInfo.PartitionInfo[] partitionInfoMap = partitionInfo.getPartitionInfoMap();
+    for (TablePartitionReplicatedServersInfo.PartitionInfo info : partitionInfoMap) {
+      if (info == null) {
+        continue;
+      }
+      if (info._fullyReplicatedServers == null || info._fullyReplicatedServers.isEmpty()) {
+        return false;
+      }
+    }
+    return true;
+  }
+
+  private static boolean partitionColumnMatches(TablePartitionReplicatedServersInfo partitionInfo,
+      String partitionColumn) {
+    String tablePartitionColumn = partitionInfo.getPartitionColumn();
+    return tablePartitionColumn != null && tablePartitionColumn.equalsIgnoreCase(partitionColumn);
   }
 
   private BrokerResponseNative getEmptyBrokerOnlyResponse(PinotQuery pinotQuery, PinotQuery serverPinotQuery,

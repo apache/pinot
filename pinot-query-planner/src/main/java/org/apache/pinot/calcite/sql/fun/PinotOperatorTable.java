@@ -45,6 +45,7 @@ import org.apache.calcite.sql.fun.SqlStdOperatorTable;
 import org.apache.calcite.sql.type.InferTypes;
 import org.apache.calcite.sql.type.OperandTypes;
 import org.apache.calcite.sql.type.ReturnTypes;
+import org.apache.calcite.sql.type.SqlOperandCountRanges;
 import org.apache.calcite.sql.type.SqlReturnTypeInference;
 import org.apache.calcite.sql.type.SqlTypeFamily;
 import org.apache.calcite.sql.type.SqlTypeTransforms;
@@ -310,6 +311,12 @@ public class PinotOperatorTable implements SqlOperatorTable {
       // to 'GTR'
       new PinotSqlFunction("ARRAY_TO_MV", opBinding -> opBinding.getOperandType(0).getComponentType(),
           OperandTypes.ARRAY, false),
+      new PinotSqlFunction("GAPFILL", ReturnTypes.ARG0,
+          OperandTypes.variadic(SqlOperandCountRanges.from(6))),
+      new PinotSqlFunction("FILL", ReturnTypes.ARG0,
+          OperandTypes.variadic(SqlOperandCountRanges.from(2))),
+      new PinotSqlFunction("TIMESERIESON", ReturnTypes.ARG0,
+          OperandTypes.variadic(SqlOperandCountRanges.from(1))),
 
       // SqlStdOperatorTable.COALESCE without rewrite
       new SqlFunction("COALESCE", SqlKind.COALESCE,

@@ -166,7 +166,11 @@ public abstract class BaseGapfillProcessor {
 
     // The first one argument of timeSeries is time column. The left ones are defining entity.
     for (ExpressionContext entityColum : _timeSeries) {
-      int index = indexes.get(entityColum.getIdentifier());
+      Integer index = findColumnIndex(indexes, dataSchema, entityColum.getIdentifier());
+      if (index == null) {
+        throw new IllegalStateException(
+            "Gapfill TIMESERIESON column not found in result schema: " + entityColum.getIdentifier());
+      }
       _isGroupBySelections[index] = true;
     }
 
@@ -243,6 +247,69 @@ public abstract class BaseGapfillProcessor {
   protected long truncate(long epoch) {
     int sz = _gapfillDateTimeGranularity.getSize();
     return epoch / sz * sz;
+  }
+
+  private Integer findColumnIndex(Map<String, Integer> indexes, DataSchema dataSchema, String columnName) {
+    Integer index = indexes.get(columnName);
+    if (index != null) {
+      return index;
+    }
+    // Case-insensitive match.
+    for (Map.Entry<String, Integer> entry : indexes.entrySet()) {
+      if (entry.getKey().equalsIgnoreCase(columnName)) {
+        return entry.getValue();
+      }
+    }
+    // Qualified column name match (e.g. "tbl.col" vs "col").
+    String suffix = "." + columnName;
+    for (Map.Entry<String, Integer> entry : indexes.entrySet()) {
+      if (entry.getKey().endsWith(suffix)) {
+        return entry.getValue();
+      }
+    }
+    // Fallback: in MSQ, schemas might have non-user-facing field names (e.g. "$f1"). When that happens, rely on the
+    // projection order from the query context that contains the GAPFILL expression.
+    Integer selectionIndex = findSelectionIndex(columnName);
+    if (selectionIndex != null && selectionIndex >= 0 && selectionIndex < dataSchema.size()) {
+      return selectionIndex;
+    }
+    return null;
+  }
+
+  private Integer findSelectionIndex(String columnName) {
+    QueryContext selectionQueryContext;
+    if (_gapfillType == GapfillUtils.GapfillType.GAP_FILL
+        || _gapfillType == GapfillUtils.GapfillType.AGGREGATE_GAP_FILL) {
+      selectionQueryContext = _queryContext;
+    } else {
+      selectionQueryContext = _queryContext.getSubquery();
+    }
+    if (selectionQueryContext == null) {
+      return null;
+    }
+    List<ExpressionContext> selectExpressions = selectionQueryContext.getSelectExpressions();
+    List<String> aliasList = selectionQueryContext.getAliasList();
+    if (selectExpressions == null) {
+      return null;
+    }
+    for (int i = 0; i < selectExpressions.size(); i++) {
+      if (aliasList != null && aliasList.size() > i && aliasList.get(i) != null
+          && aliasList.get(i).equalsIgnoreCase(columnName)) {
+        return i;
+      }
+      ExpressionContext expressionContext = selectExpressions.get(i);
+      if (GapfillUtils.isGapfill(expressionContext)) {
+        expressionContext = expressionContext.getFunction().getArguments().get(0);
+      }
+      if (expressionContext.getType() == ExpressionContext.Type.IDENTIFIER
+          && expressionContext.getIdentifier().equalsIgnoreCase(columnName)) {
+        return i;
+      }
+      if (expressionContext.toString().equalsIgnoreCase(columnName)) {
+        return i;
+      }
+    }
+    return null;
   }
 
   protected List<Object[]> gapFillAndAggregate(List<Object[]> rows, DataSchema dataSchema,

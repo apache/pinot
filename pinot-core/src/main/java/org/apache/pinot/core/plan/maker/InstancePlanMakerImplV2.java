@@ -204,8 +204,9 @@ public class InstancePlanMakerImplV2 implements PlanMaker {
     }
 
     CombinePlanNode combinePlanNode = new CombinePlanNode(planNodes, queryContext, executorService, null);
-    return new GlobalPlanImplV0(
-        new InstanceResponsePlanNode(combinePlanNode, segmentContexts, fetchContexts, queryContext));
+    InstanceResponsePlanNode responsePlanNode =
+        new InstanceResponsePlanNode(combinePlanNode, segmentContexts, fetchContexts, queryContext);
+    return new GlobalPlanImplV0(responsePlanNode);
   }
 
   private void applyQueryOptions(QueryContext queryContext) {
