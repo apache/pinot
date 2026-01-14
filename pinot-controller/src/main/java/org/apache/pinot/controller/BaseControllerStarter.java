@@ -652,7 +652,7 @@ public abstract class BaseControllerStarter implements ServiceStartable {
 
     // Set up executor service for specific resources for isolation
     _minionTaskResourceExecutorService =
-        createExecutorService(HttpServerThreadPoolConfig.defaultInstance().getCorePoolSize(),
+        createExecutorService(_config.getControllerExecutorMinionTaskResourceNumThreads(),
             "minion-task-resource-thread-%d");
 
     // Setting up periodic tasks
