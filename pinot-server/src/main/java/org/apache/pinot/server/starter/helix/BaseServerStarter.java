@@ -184,6 +184,7 @@ public abstract class BaseServerStarter implements ServiceStartable {
   protected ScheduledExecutorService _helixMessageCountScheduler;
   protected ServerReloadJobStatusCache _reloadJobStatusCache;
   // Override this to provide custom thread pool for Helix state transitions. Null means using Helix's default
+  @Nullable
   protected StateTransitionThreadPoolManager _transitionThreadPoolManager;
 
   @Override
@@ -284,6 +285,14 @@ public abstract class BaseServerStarter implements ServiceStartable {
         HelixManagerFactory.getZKHelixManager(_helixClusterName, _instanceId, InstanceType.PARTICIPANT, _zkAddress);
 
     _clusterConfigChangeHandler.registerClusterConfigChangeListener(ContinuousJfrStarter.INSTANCE);
+    initTransitionThreadPoolManager();
+  }
+
+  /**
+   * Override to provide custom transition thread pool manager
+   */
+  protected void initTransitionThreadPoolManager() {
+    _transitionThreadPoolManager = null;
   }
 
   /// Can be overridden to apply custom configs to the server conf.
