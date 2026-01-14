@@ -170,6 +170,7 @@ import org.apache.pinot.spi.config.user.UserConfig;
 import org.apache.pinot.spi.config.workload.QueryWorkloadConfig;
 import org.apache.pinot.spi.controller.ControllerJobType;
 import org.apache.pinot.spi.data.DateTimeFieldSpec;
+import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.LogicalTableConfig;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.utils.CommonConstants;
@@ -1569,9 +1570,56 @@ public class PinotHelixResourceManager {
       if (forceTableSchemaUpdate) {
         LOGGER.warn("Force updated schema: {} which is backward incompatible with the existing schema", oldSchema);
       } else {
-        // TODO: Add the reason of the incompatibility
-        throw new SchemaBackwardIncompatibleException("New schema: " + schemaName + " is not backward-compatible with "
-            + "the existing schema");
+        // Build detailed error message with incompatibility reasons
+        StringBuilder errorMsg = new StringBuilder();
+        errorMsg.append("New schema: ").append(schemaName)
+            .append(" is not backward-compatible with the existing schema.");
+        errorMsg.append("\n\nIncompatibility Details:");
+
+        // Check for missing columns
+        Set<String> newSchemaColumns = schema.getColumnNames();
+        List<String> missingColumns = new ArrayList<>();
+        for (String oldColumn : oldSchema.getColumnNames()) {
+          if (!newSchemaColumns.contains(oldColumn)) {
+            missingColumns.add(oldColumn);
+          }
+        }
+
+        if (!missingColumns.isEmpty()) {
+          errorMsg.append("\n- Missing columns (present in old schema but not in new): ").append(missingColumns);
+        }
+
+        // Check for incompatible field specs
+        List<String> incompatibleFields = new ArrayList<>();
+        for (Map.Entry<String, FieldSpec> entry : oldSchema.getFieldSpecMap().entrySet()) {
+          String columnName = entry.getKey();
+          if (newSchemaColumns.contains(columnName)) {
+            FieldSpec oldFieldSpec = entry.getValue();
+            FieldSpec newFieldSpec = schema.getFieldSpecFor(columnName);
+            if (!newFieldSpec.isBackwardCompatibleWith(oldFieldSpec)) {
+              incompatibleFields.add(String.format("%s (old: %s %s, new: %s %s)",
+                  columnName,
+                  oldFieldSpec.getFieldType(),
+                  oldFieldSpec.getDataType(),
+                  newFieldSpec.getFieldType(),
+                  newFieldSpec.getDataType()));
+            }
+          }
+        }
+
+        if (!incompatibleFields.isEmpty()) {
+          errorMsg.append("\n- Incompatible field specifications: ").append(incompatibleFields);
+        }
+
+        // Add suggestions
+        errorMsg.append("\n\nSuggestions to fix:");
+        errorMsg.append("\n1. Ensure all columns from the existing schema are retained in the new schema");
+        errorMsg.append("\n2. Do not change the data type or field type of existing columns");
+        errorMsg.append("\n3. New columns should be added as optional fields with default values");
+        errorMsg.append("\n4. If you must make breaking changes, consider creating a new schema version or use "
+            + "forceTableSchemaUpdate=true (use with caution)");
+
+        throw new SchemaBackwardIncompatibleException(errorMsg.toString());
       }
     }
     ZKMetadataProvider.setSchema(_propertyStore, schema);
