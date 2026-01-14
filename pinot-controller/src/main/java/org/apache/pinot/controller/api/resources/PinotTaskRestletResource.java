@@ -454,7 +454,7 @@ public class PinotTaskRestletResource {
   @Path("/tasks/generator/{tableNameWithType}/{taskType}/debug")
   @Authorize(targetType = TargetType.CLUSTER, action = Actions.Cluster.GET_TASK)
   @ApiOperation("Fetch task generation information for the recent runs of the given task for the given table")
-  public void getTaskGenerationDebugInto(
+  public void getTaskGenerationDebugInfo(
       @ApiParam(value = "Task type", required = true) @PathParam("taskType") String taskType,
       @ApiParam(value = "Table name with type", required = true) @PathParam("tableNameWithType")
       String tableNameWithType,
@@ -462,7 +462,7 @@ public class PinotTaskRestletResource {
       boolean localOnly, @Context HttpHeaders httpHeaders, @Suspended AsyncResponse asyncResponse) {
     _minionTaskResourceExecutorService.execute(() -> {
       try {
-        String result = getTaskGenerationDebugIntoSync(taskType, tableNameWithType, localOnly, httpHeaders);
+        String result = getTaskGenerationDebugInfoSync(taskType, tableNameWithType, localOnly, httpHeaders);
         asyncResponse.resume(result);
       } catch (Exception e) {
         asyncResponse.resume(e);
@@ -470,7 +470,7 @@ public class PinotTaskRestletResource {
     });
   }
 
-  private String getTaskGenerationDebugIntoSync(String taskType, String tableNameWithType, boolean localOnly,
+  private String getTaskGenerationDebugInfoSync(String taskType, String tableNameWithType, boolean localOnly,
       HttpHeaders httpHeaders)
       throws JsonProcessingException {
     String translatedTableName = DatabaseUtils.translateTableName(tableNameWithType, httpHeaders);
