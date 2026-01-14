@@ -54,7 +54,7 @@ public class CalciteSqlParserTest {
   @AfterMethod
   public void resetLegacyUnescaping() {
     // Reset to default (false) after each test
-    RequestUtils.setUseLegacyLiteralUnescaping(false);
+    RequestUtils.setUseLegacyLiteralUnescaping(true);
   }
 
   @Test
@@ -138,14 +138,14 @@ public class CalciteSqlParserTest {
     // Without legacy: "test''value" (CORRECT)
     String query = "SELECT 'test''''value' FROM testTable";
 
-    // Without legacy: preserves the two single quotes
-    PinotQuery pinotQuery = CalciteSqlParser.compileToPinotQuery(query);
-    assertEquals(pinotQuery.getSelectList().get(0).getLiteral().getStringValue(), "test''value");
-
     // With legacy: incorrectly reduces to one quote (double unescaping)
-    RequestUtils.setUseLegacyLiteralUnescaping(true);
-    pinotQuery = CalciteSqlParser.compileToPinotQuery(query);
+    PinotQuery pinotQuery = CalciteSqlParser.compileToPinotQuery(query);
     assertEquals(pinotQuery.getSelectList().get(0).getLiteral().getStringValue(), "test'value");
+
+    // Without legacy: preserves the two single quotes
+    RequestUtils.setUseLegacyLiteralUnescaping(false);
+    pinotQuery = CalciteSqlParser.compileToPinotQuery(query);
+    assertEquals(pinotQuery.getSelectList().get(0).getLiteral().getStringValue(), "test''value");
   }
 
   @Test
@@ -156,14 +156,14 @@ public class CalciteSqlParserTest {
     // Without legacy: "test'''value" (CORRECT)
     String query = "SELECT 'test''''''value' FROM testTable";
 
-    // Without legacy: preserves all three single quotes
-    PinotQuery pinotQuery = CalciteSqlParser.compileToPinotQuery(query);
-    assertEquals(pinotQuery.getSelectList().get(0).getLiteral().getStringValue(), "test'''value");
-
     // With legacy: reduces from 3 to 2 quotes
-    RequestUtils.setUseLegacyLiteralUnescaping(true);
-    pinotQuery = CalciteSqlParser.compileToPinotQuery(query);
+    PinotQuery pinotQuery = CalciteSqlParser.compileToPinotQuery(query);
     assertEquals(pinotQuery.getSelectList().get(0).getLiteral().getStringValue(), "test''value");
+
+    // Without legacy: preserves all three single quotes
+    RequestUtils.setUseLegacyLiteralUnescaping(false);
+    pinotQuery = CalciteSqlParser.compileToPinotQuery(query);
+    assertEquals(pinotQuery.getSelectList().get(0).getLiteral().getStringValue(), "test'''value");
   }
 
   @Test
@@ -171,19 +171,19 @@ public class CalciteSqlParserTest {
     // Same test but in WHERE clause
     String query = "SELECT col FROM testTable WHERE name = 'O''''Brien'";
 
-    // Without legacy: "O''Brien" (two quotes)
+    // With legacy: "O'Brien" (double unescaping)
     PinotQuery pinotQuery = CalciteSqlParser.compileToPinotQuery(query);
     Expression filterExpr = pinotQuery.getFilterExpression();
     Function function = filterExpr.getFunctionCall();
-    assertEquals(function.getOperator(), "EQUALS");
-    assertEquals(function.getOperands().get(1).getLiteral().getStringValue(), "O''Brien");
+    assertEquals(function.getOperands().get(1).getLiteral().getStringValue(), "O'Brien");
 
-    // With legacy: "O'Brien" (double unescaping)
-    RequestUtils.setUseLegacyLiteralUnescaping(true);
+    // Without legacy: "O''Brien" (two quotes)
+    RequestUtils.setUseLegacyLiteralUnescaping(false);
     pinotQuery = CalciteSqlParser.compileToPinotQuery(query);
     filterExpr = pinotQuery.getFilterExpression();
     function = filterExpr.getFunctionCall();
-    assertEquals(function.getOperands().get(1).getLiteral().getStringValue(), "O'Brien");
+    assertEquals(function.getOperator(), "EQUALS");
+    assertEquals(function.getOperands().get(1).getLiteral().getStringValue(), "O''Brien");
   }
 
   @Test
@@ -193,19 +193,19 @@ public class CalciteSqlParserTest {
     // This means: "$.name" = ''John'' (value with surrounding single quotes)
     String query = "SELECT col FROM testTable WHERE JSON_MATCH(jsonCol, '\"$.name\" = ''''John''''')";
 
-    // Without legacy: preserves the two single quotes around John
+    // With legacy: reduces quotes (double unescaping)
     PinotQuery pinotQuery = CalciteSqlParser.compileToPinotQuery(query);
     Expression filterExpr = pinotQuery.getFilterExpression();
     Function function = filterExpr.getFunctionCall();
-    assertEquals(function.getOperator(), "JSON_MATCH");
-    assertEquals(function.getOperands().get(1).getLiteral().getStringValue(), "\"$.name\" = ''John''");
+    assertEquals(function.getOperands().get(1).getLiteral().getStringValue(), "\"$.name\" = 'John'");
 
-    // With legacy: reduces quotes (double unescaping)
-    RequestUtils.setUseLegacyLiteralUnescaping(true);
+    // Without legacy: preserves the two single quotes around John
+    RequestUtils.setUseLegacyLiteralUnescaping(false);
     pinotQuery = CalciteSqlParser.compileToPinotQuery(query);
     filterExpr = pinotQuery.getFilterExpression();
     function = filterExpr.getFunctionCall();
-    assertEquals(function.getOperands().get(1).getLiteral().getStringValue(), "\"$.name\" = 'John'");
+    assertEquals(function.getOperator(), "JSON_MATCH");
+    assertEquals(function.getOperands().get(1).getLiteral().getStringValue(), "\"$.name\" = ''John''");
   }
 
   @Test
@@ -230,11 +230,11 @@ public class CalciteSqlParserTest {
     String query = "SELECT 'test''''''''value' FROM testTable";
 
     PinotQuery pinotQuery = CalciteSqlParser.compileToPinotQuery(query);
-    assertEquals(pinotQuery.getSelectList().get(0).getLiteral().getStringValue(), "test''''value");
-
-    RequestUtils.setUseLegacyLiteralUnescaping(true);
-    pinotQuery = CalciteSqlParser.compileToPinotQuery(query);
     assertEquals(pinotQuery.getSelectList().get(0).getLiteral().getStringValue(), "test''value");
+
+    RequestUtils.setUseLegacyLiteralUnescaping(false);
+    pinotQuery = CalciteSqlParser.compileToPinotQuery(query);
+    assertEquals(pinotQuery.getSelectList().get(0).getLiteral().getStringValue(), "test''''value");
   }
 
   @Test
@@ -248,11 +248,11 @@ public class CalciteSqlParserTest {
     // After Calcite: He said ''hello'' and ''goodbye''
     List<Expression> selectList = pinotQuery.getSelectList();
     Function asFunc = selectList.get(0).getFunctionCall();
-    assertEquals(asFunc.getOperands().get(0).getLiteral().getStringValue(), "He said ''hello'' and ''goodbye''");
+    assertEquals(asFunc.getOperands().get(0).getLiteral().getStringValue(), "He said 'hello' and 'goodbye'");
 
     // Check filter: 'It''''s fine' -> It''s fine
     Expression filterExpr = pinotQuery.getFilterExpression();
     Function function = filterExpr.getFunctionCall();
-    assertEquals(function.getOperands().get(1).getLiteral().getStringValue(), "It''s fine");
+    assertEquals(function.getOperands().get(1).getLiteral().getStringValue(), "It's fine");
   }
 }

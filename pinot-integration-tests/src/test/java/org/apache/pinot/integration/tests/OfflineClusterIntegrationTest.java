@@ -62,6 +62,7 @@ import org.apache.pinot.common.utils.FileUploadDownloadClient;
 import org.apache.pinot.common.utils.ServiceStatus;
 import org.apache.pinot.common.utils.SimpleHttpResponse;
 import org.apache.pinot.common.utils.http.HttpClient;
+import org.apache.pinot.common.utils.request.RequestUtils;
 import org.apache.pinot.core.operator.query.NonScanBasedAggregationOperator;
 import org.apache.pinot.segment.spi.index.ForwardIndexConfig;
 import org.apache.pinot.segment.spi.index.StandardIndexes;
@@ -4283,11 +4284,13 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
    * In SQL, single quotes within string literals are escaped by doubling them:
    * - 'It''s' represents the string "It's" (2 quotes = 1 quote in result)
    *
-   * The Calcite parser handles this escaping correctly.
+   * The Calcite parser handles this escaping correctly. This test disables the legacy SSE behavior of double escaping
+   * quotes. With the legacy behavior disabled, both SSE and MSE have the same standard behavior.
    */
   @Test(dataProvider = "useBothQueryEngines")
   public void testStringLiteralEscaping(boolean useMultiStageQueryEngine)
       throws Exception {
+    RequestUtils.setUseLegacyLiteralUnescaping(false);
     setUseMultiStageQueryEngine(useMultiStageQueryEngine);
 
     // Test 1: Simple escaped quote (2 quotes in SQL = 1 quote in result)
