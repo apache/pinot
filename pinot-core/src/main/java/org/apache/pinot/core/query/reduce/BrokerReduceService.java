@@ -20,6 +20,7 @@ package org.apache.pinot.core.query.reduce;
 
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Base64;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
@@ -28,6 +29,7 @@ import org.apache.pinot.common.datatable.DataTable;
 import org.apache.pinot.common.metrics.BrokerMeter;
 import org.apache.pinot.common.metrics.BrokerMetrics;
 import org.apache.pinot.common.request.BrokerRequest;
+import org.apache.pinot.common.request.PinotQuery;
 import org.apache.pinot.common.response.broker.BrokerResponseNative;
 import org.apache.pinot.common.response.broker.QueryProcessingException;
 import org.apache.pinot.common.utils.DataSchema;
@@ -43,6 +45,9 @@ import org.apache.pinot.spi.exception.QueryException;
 import org.apache.pinot.spi.query.QueryThreadContext;
 import org.apache.pinot.spi.utils.CommonConstants;
 import org.apache.pinot.spi.utils.builder.TableNameBuilder;
+import org.apache.thrift.TDeserializer;
+import org.apache.thrift.TException;
+import org.apache.thrift.protocol.TCompactProtocol;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -148,7 +153,17 @@ public class BrokerReduceService extends BaseReduceService {
     }
 
     QueryContext serverQueryContext = QueryContextConverterUtils.getQueryContext(serverBrokerRequest.getPinotQuery());
-    DataTableReducer dataTableReducer = ResultReducerFactory.getResultReducer(serverQueryContext);
+    QueryContext reduceQueryContext = serverQueryContext;
+    boolean serverSideGapfill = queryOptions != null && QueryOptionsUtils.isServerSideGapfill(queryOptions);
+    if (serverSideGapfill) {
+      String serializedGapfillQuery = QueryOptionsUtils.getServerSideGapfillQuery(queryOptions);
+      if (serializedGapfillQuery == null) {
+        throw new BadQueryRequestException("Missing server-side gapfill query option");
+      }
+      PinotQuery gapfillPinotQuery = deserializePinotQuery(serializedGapfillQuery);
+      reduceQueryContext = QueryContextConverterUtils.getQueryContext(gapfillPinotQuery);
+    }
+    DataTableReducer dataTableReducer = ResultReducerFactory.getResultReducer(reduceQueryContext);
 
     Integer minGroupTrimSizeQueryOption = null;
     Integer groupTrimThresholdQueryOption = null;
@@ -185,7 +200,9 @@ public class BrokerReduceService extends BaseReduceService {
       }
     }
     QueryContext queryContext;
-    if (brokerRequest == serverBrokerRequest) {
+    if (serverSideGapfill) {
+      queryContext = reduceQueryContext;
+    } else if (brokerRequest == serverBrokerRequest) {
       queryContext = serverQueryContext;
     } else {
       queryContext = QueryContextConverterUtils.getQueryContext(brokerRequest.getPinotQuery());
@@ -201,6 +218,17 @@ public class BrokerReduceService extends BaseReduceService {
       updateAlias(queryContext, brokerResponseNative);
     }
     return brokerResponseNative;
+  }
+
+  private static PinotQuery deserializePinotQuery(String serializedPinotQuery) {
+    try {
+      byte[] bytes = Base64.getDecoder().decode(serializedPinotQuery);
+      PinotQuery pinotQuery = new PinotQuery();
+      new TDeserializer(new TCompactProtocol.Factory()).deserialize(pinotQuery, bytes);
+      return pinotQuery;
+    } catch (IllegalArgumentException | TException e) {
+      throw new BadQueryRequestException("Failed to deserialize server-side gapfill query", e);
+    }
   }
 
   public void shutDown() {

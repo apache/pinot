@@ -62,4 +62,20 @@ public final class GapfillProcessorFactory {
 
     return new GapfillProcessor(queryContext, gapfillType);
   }
+
+  public static BaseGapfillProcessor getGapfillProcessorForServer(QueryContext queryContext,
+      GapfillUtils.GapfillType gapfillType) {
+    QueryContext effectiveContext = queryContext;
+    GapfillUtils.GapfillType effectiveGapfillType = gapfillType;
+    if (gapfillType == GapfillUtils.GapfillType.GAP_FILL_SELECT
+        || gapfillType == GapfillUtils.GapfillType.GAP_FILL_AGGREGATE
+        || gapfillType == GapfillUtils.GapfillType.AGGREGATE_GAP_FILL_AGGREGATE) {
+      QueryContext subqueryContext = queryContext.getSubquery();
+      if (subqueryContext != null) {
+        effectiveContext = subqueryContext;
+        effectiveGapfillType = GapfillUtils.getGapfillType(subqueryContext);
+      }
+    }
+    return new GapfillProcessor(effectiveContext, effectiveGapfillType, false, true);
+  }
 }

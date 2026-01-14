@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.core.query.reduce;
 
+import java.sql.Timestamp;
 import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
@@ -89,8 +90,12 @@ class CountGapfillProcessor extends BaseGapfillProcessor {
       if (aggregatedCount > 0 && (timeBucketIndex + 1) % _aggregationSize == 0) {
         Object[] aggregatedRow = new Object[_queryContext.getSelectExpressions().size()];
         long aggregationTimeBucketTimestamp = time - (_aggregationSize - 1) * _gapfillTimeBucketSize;
-        aggregatedRow[0] = (timeColumnDataType == DataSchema.ColumnDataType.LONG)
-            ? aggregationTimeBucketTimestamp : _dateTimeFormatter.fromMillisToFormat(aggregationTimeBucketTimestamp);
+        if (timeColumnDataType == DataSchema.ColumnDataType.LONG
+            || timeColumnDataType == DataSchema.ColumnDataType.TIMESTAMP) {
+          aggregatedRow[0] = aggregationTimeBucketTimestamp;
+        } else {
+          aggregatedRow[0] = _dateTimeFormatter.fromMillisToFormat(aggregationTimeBucketTimestamp);
+        }
         aggregatedRow[1] = aggregatedCount;
         aggregatedCount = 0;
         if (_postAggregateHavingFilterHandler == null || _postAggregateHavingFilterHandler.isMatch(aggregatedRow)) {
@@ -105,8 +110,13 @@ class CountGapfillProcessor extends BaseGapfillProcessor {
   }
 
   private long extractTimeColumn(Object[] row, DataSchema.ColumnDataType columnDataType) {
-    if (columnDataType == DataSchema.ColumnDataType.LONG) {
-      return (Long) row[_timeBucketColumnIndex];
+    if (columnDataType == DataSchema.ColumnDataType.LONG
+        || columnDataType == DataSchema.ColumnDataType.TIMESTAMP) {
+      Object value = row[_timeBucketColumnIndex];
+      if (value instanceof Timestamp) {
+        return ((Timestamp) value).getTime();
+      }
+      return ((Number) value).longValue();
     } else {
       return _dateTimeFormatter.fromFormatToMillis((String) row[_timeBucketColumnIndex]);
     }
