@@ -1002,37 +1002,33 @@ public class PinotSegmentUploadDownloadRestletResource {
       StartReplaceSegmentsRequest startReplaceSegmentsRequest, @Context HttpHeaders headers,
       @Suspended final AsyncResponse asyncResponse) {
     _resourceExecutorService.execute(() -> {
+      String translatedTableName;
+      TableType tableType;
+      String tableNameWithType;
       try {
-        String translatedTableName = DatabaseUtils.translateTableName(tableName, headers);
-        TableType tableType = Constants.validateTableType(tableTypeStr);
+        translatedTableName = DatabaseUtils.translateTableName(tableName, headers);
+        tableType = Constants.validateTableType(tableTypeStr);
         if (tableType == null) {
           asyncResponse.resume(
               new ControllerApplicationException(LOGGER, "Table type should either be offline or realtime",
                   Response.Status.BAD_REQUEST));
           return;
         }
-        String tableNameWithType =
+        tableNameWithType =
             ResourceUtils.getExistingTableNamesWithType(_pinotHelixResourceManager, translatedTableName, tableType,
                 LOGGER).get(0);
+      } catch (Exception e) {
+        asyncResponse.resume(e);
+        return;
+      }
+      try {
         String segmentLineageEntryId = _pinotHelixResourceManager.startReplaceSegments(tableNameWithType,
             startReplaceSegmentsRequest.getSegmentsFrom(), startReplaceSegmentsRequest.getSegmentsTo(), forceCleanup,
             startReplaceSegmentsRequest.getCustomMap());
         asyncResponse.resume(
             Response.ok(JsonUtils.newObjectNode().put("segmentLineageEntryId", segmentLineageEntryId)).build());
       } catch (Exception e) {
-        String tableNameWithType = null;
-        try {
-          String translatedTableName = DatabaseUtils.translateTableName(tableName, headers);
-          TableType tableType = Constants.validateTableType(tableTypeStr);
-          if (tableType != null) {
-            tableNameWithType =
-                ResourceUtils.getExistingTableNamesWithType(_pinotHelixResourceManager, translatedTableName, tableType,
-                    LOGGER).get(0);
-            _controllerMetrics.addMeteredTableValue(tableNameWithType, ControllerMeter.NUMBER_START_REPLACE_FAILURE, 1);
-          }
-        } catch (Exception ignored) {
-          // Ignore errors when trying to get table name for metrics
-        }
+        _controllerMetrics.addMeteredTableValue(tableNameWithType, ControllerMeter.NUMBER_START_REPLACE_FAILURE, 1);
         asyncResponse.resume(
             new ControllerApplicationException(LOGGER, e.getMessage(), Response.Status.INTERNAL_SERVER_ERROR, e));
       }
@@ -1056,18 +1052,26 @@ public class PinotSegmentUploadDownloadRestletResource {
       EndReplaceSegmentsRequest endReplaceSegmentsRequest, @Context HttpHeaders headers,
       @Suspended final AsyncResponse asyncResponse) {
     _resourceExecutorService.execute(() -> {
+      String translatedTableName;
+      TableType tableType;
+      String tableNameWithType;
       try {
-        String translatedTableName = DatabaseUtils.translateTableName(tableName, headers);
-        TableType tableType = Constants.validateTableType(tableTypeStr);
+        translatedTableName = DatabaseUtils.translateTableName(tableName, headers);
+        tableType = Constants.validateTableType(tableTypeStr);
         if (tableType == null) {
           asyncResponse.resume(
               new ControllerApplicationException(LOGGER, "Table type should either be offline or realtime",
                   Response.Status.BAD_REQUEST));
           return;
         }
-        String tableNameWithType =
+        tableNameWithType =
             ResourceUtils.getExistingTableNamesWithType(_pinotHelixResourceManager, translatedTableName, tableType,
                 LOGGER).get(0);
+      } catch (Exception e) {
+        asyncResponse.resume(e);
+        return;
+      }
+      try {
         // Check that the segment lineage entry id is valid
         Preconditions.checkNotNull(segmentLineageEntryId, "'segmentLineageEntryId' should not be null");
         _pinotHelixResourceManager.endReplaceSegments(tableNameWithType, segmentLineageEntryId,
@@ -1077,19 +1081,7 @@ public class PinotSegmentUploadDownloadRestletResource {
         }
         asyncResponse.resume(Response.ok().build());
       } catch (Exception e) {
-        String tableNameWithType = null;
-        try {
-          String translatedTableName = DatabaseUtils.translateTableName(tableName, headers);
-          TableType tableType = Constants.validateTableType(tableTypeStr);
-          if (tableType != null) {
-            tableNameWithType =
-                ResourceUtils.getExistingTableNamesWithType(_pinotHelixResourceManager, translatedTableName, tableType,
-                    LOGGER).get(0);
-            _controllerMetrics.addMeteredTableValue(tableNameWithType, ControllerMeter.NUMBER_END_REPLACE_FAILURE, 1);
-          }
-        } catch (Exception ignored) {
-          // Ignore errors when trying to get table name for metrics
-        }
+        _controllerMetrics.addMeteredTableValue(tableNameWithType, ControllerMeter.NUMBER_END_REPLACE_FAILURE, 1);
         asyncResponse.resume(
             new ControllerApplicationException(LOGGER, e.getMessage(), Response.Status.INTERNAL_SERVER_ERROR, e));
       }
@@ -1113,38 +1105,34 @@ public class PinotSegmentUploadDownloadRestletResource {
       RevertReplaceSegmentsRequest revertReplaceSegmentsRequest, @Context HttpHeaders headers,
       @Suspended final AsyncResponse asyncResponse) {
     _resourceExecutorService.execute(() -> {
+      String translatedTableName;
+      TableType tableType;
+      String tableNameWithType;
       try {
-        String translatedTableName = DatabaseUtils.translateTableName(tableName, headers);
-        TableType tableType = Constants.validateTableType(tableTypeStr);
+        translatedTableName = DatabaseUtils.translateTableName(tableName, headers);
+        tableType = Constants.validateTableType(tableTypeStr);
         if (tableType == null) {
           asyncResponse.resume(
               new ControllerApplicationException(LOGGER, "Table type should either be offline or realtime",
                   Response.Status.BAD_REQUEST));
           return;
         }
-        String tableNameWithType =
+        tableNameWithType =
             ResourceUtils.getExistingTableNamesWithType(_pinotHelixResourceManager, translatedTableName, tableType,
                 LOGGER).get(0);
+      } catch (Exception e) {
+        asyncResponse.resume(e);
+        return;
+      }
+      try {
         // Check that the segment lineage entry id is valid
         Preconditions.checkNotNull(segmentLineageEntryId, "'segmentLineageEntryId' should not be null");
         _pinotHelixResourceManager.revertReplaceSegments(tableNameWithType, segmentLineageEntryId, forceRevert,
             revertReplaceSegmentsRequest);
         asyncResponse.resume(Response.ok().build());
       } catch (Exception e) {
-        String tableNameWithType = null;
-        try {
-          String translatedTableName = DatabaseUtils.translateTableName(tableName, headers);
-          TableType tableType = Constants.validateTableType(tableTypeStr);
-          if (tableType != null) {
-            tableNameWithType =
-                ResourceUtils.getExistingTableNamesWithType(_pinotHelixResourceManager, translatedTableName, tableType,
-                    LOGGER).get(0);
-            _controllerMetrics.addMeteredTableValue(tableNameWithType, ControllerMeter.NUMBER_REVERT_REPLACE_FAILURE,
-                1);
-          }
-        } catch (Exception ignored) {
-          // Ignore errors when trying to get table name for metrics
-        }
+        _controllerMetrics.addMeteredTableValue(tableNameWithType, ControllerMeter.NUMBER_REVERT_REPLACE_FAILURE,
+            1);
         asyncResponse.resume(
             new ControllerApplicationException(LOGGER, e.getMessage(), Response.Status.INTERNAL_SERVER_ERROR, e));
       }
@@ -1233,8 +1221,8 @@ public class PinotSegmentUploadDownloadRestletResource {
   }
 
   // The multipart input would contain a single multipart and this part would contain the segment metadata
-  // files (creation.meta, metadata.properties), and an additional mapping file names 'all_segments_metadata' which
-  // would contain the mappings from segment names to segment download URI's.
+// files (creation.meta, metadata.properties), and an additional mapping file names 'all_segments_metadata' which
+// would contain the mappings from segment names to segment download URI's.
   private static Map<String, SegmentMetadataInfo> createSegmentsMetadataInfoMap(FormDataMultiPart multiPart) {
     List<BodyPart> bodyParts = multiPart.getBodyParts();
     validateMultiPartForBatchSegmentUpload(bodyParts);
