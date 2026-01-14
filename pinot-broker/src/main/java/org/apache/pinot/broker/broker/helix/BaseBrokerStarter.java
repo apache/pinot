@@ -415,6 +415,9 @@ public abstract class BaseBrokerStarter implements ServiceStartable {
           new MultiStageBrokerRequestHandler(_brokerConf, brokerId, requestIdGenerator, _routingManager,
               _accessControlFactory, _queryQuotaManager, _tableCache, _multiStageQueryThrottler, _failureDetector,
               _threadAccountant, multiClusterRoutingContext);
+      MultiStageBrokerRequestHandler finalHandler = multiStageBrokerRequestHandler;
+      _routingManager.setServerReenableCallback(
+          serverInstance -> finalHandler.getQueryDispatcher().resetClientConnectionBackoff(serverInstance));
     }
     TimeSeriesRequestHandler timeSeriesRequestHandler = null;
     if (StringUtils.isNotBlank(_brokerConf.getProperty(PinotTimeSeriesConfiguration.getEnabledLanguagesConfigKey()))) {
