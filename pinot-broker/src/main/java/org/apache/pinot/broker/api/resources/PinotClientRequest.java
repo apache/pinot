@@ -648,18 +648,8 @@ public class PinotClientRequest {
         requesterIdentity, httpHeaders);
   }
 
-  /**
-   * Checks if the timeseries request is an explain mode request.
-   * Looks for "mode": "explain" in the queryOptions field.
-   */
   private static boolean isExplainMode(JsonNode requestJson) {
-    if (requestJson.has("queryOptions")) {
-      JsonNode queryOptions = requestJson.get("queryOptions");
-      if (queryOptions.has("mode")) {
-        return "explain".equalsIgnoreCase(queryOptions.get("mode").asText());
-      }
-    }
-    return false;
+    return requestJson.has("mode") && "explain".equalsIgnoreCase(requestJson.get("mode").asText());
   }
 
   public static HttpRequesterIdentity makeHttpIdentity(org.glassfish.grizzly.http.server.Request context) {
