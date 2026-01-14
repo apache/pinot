@@ -1660,13 +1660,13 @@ public abstract class BaseTableDataManager implements TableDataManager {
   }
 
   // CRC check can be performed on both segment CRC and data CRC (if available) based on the ZK property value of
-  // useDataCRCForReplace.
+  // useDataCRC.
   private static boolean hasSameCRC(SegmentZKMetadata zkMetadata, SegmentMetadata localMetadata) {
     if (zkMetadata.getCrc() == Long.parseLong(localMetadata.getCrc())) {
       return true;
     }
-    return zkMetadata.isUseDataCrcForReplace()
-           && zkMetadata.getDataCrc() >= 0
+    return zkMetadata.isUseDataCrc()
+            && zkMetadata.getDataCrc() >= 0
             && Long.parseLong(localMetadata.getDataCrc()) >= 0
             && zkMetadata.getDataCrc() == Long.parseLong(localMetadata.getDataCrc());
   }

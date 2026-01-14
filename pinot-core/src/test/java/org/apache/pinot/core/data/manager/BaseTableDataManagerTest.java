@@ -809,7 +809,7 @@ public class BaseTableDataManagerTest {
     SegmentZKMetadata zkMetadata = createRawSegment(SegmentVersion.v3, 5);
     zkMetadata.setCrc(2048L); // Different from local
     zkMetadata.setDataCrc(99999L);
-    zkMetadata.setUseDataCrcForReplace(false);
+    zkMetadata.setUseDataCrc(false);
 
     ImmutableSegmentDataManager segmentDataManager = createImmutableSegmentDataManager(SEGMENT_NAME, 1024L);
     SegmentMetadata segmentMetadata = segmentDataManager.getSegment().getSegmentMetadata();
@@ -833,7 +833,7 @@ public class BaseTableDataManagerTest {
     SegmentZKMetadata zkMetadata = createRawSegment(SegmentVersion.v3, 5);
     long segmentCrc = zkMetadata.getCrc();
     zkMetadata.setDataCrc(99999L);
-    zkMetadata.setUseDataCrcForReplace(true);
+    zkMetadata.setUseDataCrc(true);
 
     ImmutableSegmentDataManager segmentDataManager = createImmutableSegmentDataManager(SEGMENT_NAME, segmentCrc);
     SegmentMetadata segmentMetadata = segmentDataManager.getSegment().getSegmentMetadata();
@@ -855,7 +855,7 @@ public class BaseTableDataManagerTest {
     SegmentZKMetadata zkMetadata = createRawSegment(SegmentVersion.v3, 5);
     zkMetadata.setCrc(2048L);
     zkMetadata.setDataCrc(-1L);
-    zkMetadata.setUseDataCrcForReplace(true);
+    zkMetadata.setUseDataCrc(true);
 
     ImmutableSegmentDataManager segmentDataManager = createImmutableSegmentDataManager(SEGMENT_NAME, 1024L);
     SegmentMetadata segmentMetadata = segmentDataManager.getSegment().getSegmentMetadata();

@@ -1782,7 +1782,7 @@ public class CommonConstants {
     public static final String TOTAL_DOCS = "segment.total.docs";
     public static final String CRC = "segment.crc";
     public static final String DATA_CRC = "segment.data.crc";
-    public static final String USE_DATA_CRC_FOR_REPLACE = "segment.use.data.crc";
+    public static final String USE_DATA_CRC = "segment.use.data.crc";
     public static final String TIER = "segment.tier";
     public static final String CREATION_TIME = "segment.creation.time";
     public static final String PUSH_TIME = "segment.push.time";

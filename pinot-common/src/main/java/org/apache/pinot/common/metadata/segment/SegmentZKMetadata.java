@@ -182,19 +182,19 @@ public class SegmentZKMetadata implements ZKMetadata {
     setNonNegativeValue(Segment.DATA_CRC, dataCrc);
   }
 
-  public boolean isUseDataCrcForReplace() {
-    String useDataCrcForReplaceString = _simpleFields.get(Segment.USE_DATA_CRC_FOR_REPLACE);
-    return Boolean.parseBoolean(useDataCrcForReplaceString);
+  public boolean isUseDataCrc() {
+    String useDataCrcString = _simpleFields.get(Segment.USE_DATA_CRC);
+    return Boolean.parseBoolean(useDataCrcString);
   }
 
-  // useDataCrcForReplace is set for consuming segments in realtime table
+  // useDataCrc is set for consuming segments in realtime table
   // that signal replica server to use Data CRC when available for doing any replacement
   // of segments
-  public void setUseDataCrcForReplace(boolean useDataCrcForReplace) {
-    if (useDataCrcForReplace) {
-      _simpleFields.put(Segment.USE_DATA_CRC_FOR_REPLACE, "true");
+  public void setUseDataCrc(boolean useDataCrc) {
+    if (useDataCrc) {
+      _simpleFields.put(Segment.USE_DATA_CRC, "true");
     } else {
-      _simpleFields.remove(Segment.USE_DATA_CRC_FOR_REPLACE);
+      _simpleFields.remove(Segment.USE_DATA_CRC);
     }
   }
 
