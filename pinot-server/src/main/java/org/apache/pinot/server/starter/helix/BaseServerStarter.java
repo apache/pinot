@@ -81,6 +81,7 @@ import org.apache.pinot.core.common.datatable.DataTableBuilderFactory;
 import org.apache.pinot.core.data.manager.InstanceDataManager;
 import org.apache.pinot.core.data.manager.realtime.RealtimeConsumptionRateManager;
 import org.apache.pinot.core.data.manager.realtime.ServerRateLimitConfigChangeListener;
+import org.apache.pinot.core.data.manager.realtime.UpsertInconsistentStateConfig;
 import org.apache.pinot.core.query.scheduler.resources.ResourceManager;
 import org.apache.pinot.core.transport.ListenerConfig;
 import org.apache.pinot.core.util.ListenerConfigUtil;
@@ -183,6 +184,9 @@ public abstract class BaseServerStarter implements ServiceStartable {
   protected volatile boolean _isServerReadyToServeQueries = false;
   protected ScheduledExecutorService _helixMessageCountScheduler;
   protected ServerReloadJobStatusCache _reloadJobStatusCache;
+  // Override this to provide custom thread pool for Helix state transitions. Null means using Helix's default
+  @Nullable
+  protected StateTransitionThreadPoolManager _transitionThreadPoolManager;
 
   @Override
   public void init(PinotConfiguration serverConf)
@@ -275,6 +279,10 @@ public abstract class BaseServerStarter implements ServiceStartable {
     _clusterConfigChangeHandler.registerClusterConfigChangeListener(
         new ClusterConfigForTable.ConfigChangeListener());
     LOGGER.info("Registered ClusterConfigForTable change listener");
+    // Register configuration change listener for upsert force commit/reload disable setting
+    _clusterConfigChangeHandler.registerClusterConfigChangeListener(
+        UpsertInconsistentStateConfig.getInstance());
+    LOGGER.info("Registered UpsertInconsistentStateConfig change listener for dynamic force commit/reload control");
 
     LOGGER.info("Initializing Helix manager with zkAddress: {}, clusterName: {}, instanceId: {}", _zkAddress,
         _helixClusterName, _instanceId);
@@ -282,6 +290,14 @@ public abstract class BaseServerStarter implements ServiceStartable {
         HelixManagerFactory.getZKHelixManager(_helixClusterName, _instanceId, InstanceType.PARTICIPANT, _zkAddress);
 
     _clusterConfigChangeHandler.registerClusterConfigChangeListener(ContinuousJfrStarter.INSTANCE);
+    initTransitionThreadPoolManager();
+  }
+
+  /**
+   * Override to provide custom transition thread pool manager
+   */
+  protected void initTransitionThreadPoolManager() {
+    _transitionThreadPoolManager = null;
   }
 
   /// Can be overridden to apply custom configs to the server conf.
@@ -732,7 +748,7 @@ public abstract class BaseServerStarter implements ServiceStartable {
 
     initSegmentFetcher(_serverConf);
     StateModelFactory<?> stateModelFactory =
-        new SegmentOnlineOfflineStateModelFactory(_instanceId, instanceDataManager);
+        new SegmentOnlineOfflineStateModelFactory(_instanceId, instanceDataManager, _transitionThreadPoolManager);
     _helixManager.getStateMachineEngine()
         .registerStateModelFactory(SegmentOnlineOfflineStateModelFactory.getStateModelName(), stateModelFactory);
     // Start the data manager as a pre-connect callback so that it starts after connecting to the ZK in order to access
@@ -945,7 +961,9 @@ public abstract class BaseServerStarter implements ServiceStartable {
     _adminApiApplication.startShuttingDown();
     _helixAdmin.setConfig(_instanceConfigScope,
         Collections.singletonMap(Helix.IS_SHUTDOWN_IN_PROGRESS, Boolean.toString(true)));
-
+    if (_transitionThreadPoolManager != null) {
+      _transitionThreadPoolManager.shutdown();
+    }
     long endTimeMs =
         startTimeMs + _serverConf.getProperty(Server.CONFIG_OF_SHUTDOWN_TIMEOUT_MS, Server.DEFAULT_SHUTDOWN_TIMEOUT_MS);
     if (_serverConf.getProperty(Server.CONFIG_OF_SHUTDOWN_ENABLE_QUERY_CHECK,

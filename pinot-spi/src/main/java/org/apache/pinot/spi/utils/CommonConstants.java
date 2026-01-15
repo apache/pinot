@@ -1811,6 +1811,7 @@ public class CommonConstants {
     public static final String TOTAL_DOCS = "segment.total.docs";
     public static final String CRC = "segment.crc";
     public static final String DATA_CRC = "segment.data.crc";
+    public static final String USE_DATA_CRC = "segment.use.data.crc";
     public static final String TIER = "segment.tier";
     public static final String CREATION_TIME = "segment.creation.time";
     public static final String PUSH_TIME = "segment.push.time";
@@ -2154,5 +2155,22 @@ public class CommonConstants {
     public static final String LOGICAL_TABLE_PATH_PREFIX = "/LOGICAL/TABLE/";
     public static final String TABLE_CONFIG_PATH_PREFIX = "/CONFIGS/TABLE/";
     public static final String SCHEMA_PATH_PREFIX = "/SCHEMAS/";
+  }
+
+  /**
+   * Constants for cluster config change listeners.
+   */
+  public static class ConfigChangeListenerConstants {
+    /**
+     * Cluster config key to control whether force commit/reload is allowed for upsert tables
+     * with inconsistent state configurations (partial upsert or dropOutOfOrderRecord=true
+     * with consistency mode NONE and replication > 1).
+     */
+    public static final String FORCE_COMMIT_RELOAD_CONFIG = "pinot.server.upsert.force.commit.reload";
+
+    /**
+     * Default value: true (force commit/reload is allowed by default).
+     */
+    public static final boolean DEFAULT_FORCE_COMMIT_RELOAD = true;
   }
 }

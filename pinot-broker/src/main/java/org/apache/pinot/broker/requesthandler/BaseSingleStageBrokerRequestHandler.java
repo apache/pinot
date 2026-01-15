@@ -849,6 +849,15 @@ public abstract class BaseSingleStageBrokerRequestHandler extends BaseBrokerRequ
     for (QueryProcessingException errorMsg : errorMsgs) {
       brokerResponse.addException(errorMsg);
     }
+
+    // Add warnings for unavailable remote clusters in multi-cluster routing.
+    if (_multiClusterRoutingContext != null && QueryOptionsUtils.isMultiClusterRoutingEnabled(
+        pinotQuery.getQueryOptions(), false)) {
+      for (QueryProcessingException clusterException : _multiClusterRoutingContext.getUnavailableClusterExceptions()) {
+        brokerResponse.addException(clusterException);
+      }
+    }
+
     brokerResponse.setNumSegmentsPrunedByBroker(numPrunedSegmentsTotal);
     long executionEndTimeNs = System.nanoTime();
     _brokerMetrics.addPhaseTiming(rawTableName, BrokerQueryPhase.QUERY_EXECUTION,
