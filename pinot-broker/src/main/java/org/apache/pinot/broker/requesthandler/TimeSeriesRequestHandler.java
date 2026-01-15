@@ -406,7 +406,7 @@ public class TimeSeriesRequestHandler extends BaseBrokerRequestHandler {
       RangeTimeSeriesRequest request = buildRangeTimeSeriesRequest(lang, rawQueryParamString, queryParams);
       TimeSeriesLogicalPlanResult planResult = _queryEnvironment.buildLogicalPlan(request);
       String plan = explainPlanTree(planResult.getPlanNode(), new StringBuilder(), 0).toString();
-      DataSchema schema = new DataSchema(new String[]{"SQL", "PLAN"},
+      DataSchema schema = new DataSchema(new String[]{"QUERY", "PLAN"},
           new DataSchema.ColumnDataType[]{DataSchema.ColumnDataType.STRING, DataSchema.ColumnDataType.STRING});
       BrokerResponseNative response = BrokerResponseNative.empty();
       response.setResultTable(new ResultTable(schema, Collections.singletonList(new Object[]{request.getQuery(),
