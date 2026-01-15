@@ -18,10 +18,16 @@
  */
 package org.apache.pinot.core.routing;
 
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import javax.annotation.Nullable;
 import org.apache.pinot.common.config.provider.TableCache;
+import org.apache.pinot.common.response.broker.QueryProcessingException;
 import org.apache.pinot.common.utils.config.QueryOptionsUtils;
+import org.apache.pinot.spi.exception.QueryErrorCode;
 
 
 /**
@@ -40,18 +46,22 @@ public class MultiClusterRoutingContext {
   @Nullable
   private final RoutingManager _multiClusterRoutingManager;
 
+  // Set of cluster names that failed to connect (for warning in query responses)
+  private final Set<String> _unavailableClusters;
+
   /**
-   * Constructor for FederationProvider with routing managers.
+   * Constructor for FederationProvider with routing managers and unavailable clusters.
    *
    * @param tableCacheMap Map of cluster name to TableCache
    * @param localRoutingManager Local routing manager for non-federated queries
    * @param multiClusterRoutingManager Multi cluster routing manager for cross-cluster queries (can be null)
    */
   public MultiClusterRoutingContext(Map<String, TableCache> tableCacheMap, RoutingManager localRoutingManager,
-      @Nullable RoutingManager multiClusterRoutingManager) {
+      @Nullable RoutingManager multiClusterRoutingManager, Set<String> unavailableClusters) {
     _tableCacheMap = tableCacheMap;
     _localRoutingManager = localRoutingManager;
     _multiClusterRoutingManager = multiClusterRoutingManager;
+    _unavailableClusters = unavailableClusters != null ? unavailableClusters : Collections.emptySet();
   }
 
   public Map<String, TableCache> getTableCacheMap() {
@@ -80,5 +90,22 @@ public class MultiClusterRoutingContext {
 
   public RoutingManager getMultiClusterRoutingManager() {
     return _multiClusterRoutingManager;
+  }
+
+  public boolean hasUnavailableClusters() {
+    return !_unavailableClusters.isEmpty();
+  }
+
+  public List<QueryProcessingException> getUnavailableClusterExceptions() {
+    if (_unavailableClusters.isEmpty()) {
+      return Collections.emptyList();
+    }
+    List<QueryProcessingException> exceptions = new ArrayList<>();
+    for (String clusterName : _unavailableClusters) {
+      String message = String.format("Remote cluster '%s' is not connected. "
+          + "Query results may be incomplete.", clusterName);
+      exceptions.add(new QueryProcessingException(QueryErrorCode.REMOTE_CLUSTER_UNAVAILABLE, message));
+    }
+    return exceptions;
   }
 }

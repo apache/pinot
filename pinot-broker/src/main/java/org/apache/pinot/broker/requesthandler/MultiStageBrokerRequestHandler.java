@@ -678,6 +678,15 @@ public class MultiStageBrokerRequestHandler extends BaseBrokerRequestHandler {
       }
       requestContext.setNumUnavailableSegments(numUnavailableSegments);
 
+      // Add warnings for unavailable remote clusters in multi-cluster routing
+      if (_multiClusterRoutingContext != null && QueryOptionsUtils.isMultiClusterRoutingEnabled(query.getOptions(),
+          false)) {
+        for (QueryProcessingException clusterException
+            : _multiClusterRoutingContext.getUnavailableClusterExceptions()) {
+          brokerResponse.addException(clusterException);
+        }
+      }
+
       fillOldBrokerResponseStats(brokerResponse, queryResults.getQueryStats(), dispatchableSubPlan);
       long totalTimeMs = System.currentTimeMillis() - requestContext.getRequestArrivalTimeMillis();
       _brokerMetrics.addTimedValue(BrokerTimer.MULTI_STAGE_QUERY_TOTAL_TIME_MS, totalTimeMs, TimeUnit.MILLISECONDS);

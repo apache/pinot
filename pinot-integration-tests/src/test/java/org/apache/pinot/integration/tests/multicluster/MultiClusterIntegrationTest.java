@@ -65,6 +65,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.testng.annotations.AfterClass;
 import org.testng.annotations.BeforeClass;
+import org.testng.annotations.DataProvider;
 import org.testng.annotations.Test;
 
 import static org.testng.Assert.assertEquals;
@@ -92,9 +93,12 @@ public class MultiClusterIntegrationTest extends ClusterTest {
   protected static final int TABLE_SIZE_CLUSTER_2 = 1000;
   protected static final int SEGMENTS_PER_CLUSTER = 3;
   protected static final String JOIN_COLUMN = "OriginCityName";
+  protected static final String UNAVAILABLE_CLUSTER_NAME = "UnavailableCluster";
+  protected static final String UNAVAILABLE_ZK_ADDRESS = "localhost:29999";
 
   protected ClusterComponents _cluster1;
   protected ClusterComponents _cluster2;
+  protected ClusterComponents _brokerWithUnavailableCluster;
   protected List<File> _cluster1AvroFiles;
   protected List<File> _cluster2AvroFiles;
 
@@ -122,7 +126,38 @@ public class MultiClusterIntegrationTest extends ClusterTest {
     startCluster(_cluster1, _cluster2, CLUSTER_1_CONFIG);
     startCluster(_cluster2, _cluster1, CLUSTER_2_CONFIG);
 
+    // Start an alternate broker with one valid and one unavailable remote cluster
+    startBrokerWithUnavailableCluster();
+
     LOGGER.info("MultiClusterIntegrationTest setup complete");
+  }
+
+  /**
+   * Starts a broker configured with cluster2 (valid) and an unavailable cluster (invalid ZK).
+   */
+  private void startBrokerWithUnavailableCluster() throws Exception {
+    _brokerWithUnavailableCluster = new ClusterComponents();
+    _brokerWithUnavailableCluster._brokerPort = findAvailablePort(55000);
+
+    PinotConfiguration brokerConfig = new PinotConfiguration();
+    brokerConfig.setProperty(Helix.CONFIG_OF_ZOOKEEPER_SERVER, _cluster1._zkUrl);
+    brokerConfig.setProperty(Helix.CONFIG_OF_CLUSTER_NAME, CLUSTER_1_NAME);
+    brokerConfig.setProperty(Broker.CONFIG_OF_BROKER_HOSTNAME, ControllerTest.LOCAL_HOST);
+    brokerConfig.setProperty(Helix.KEY_OF_BROKER_QUERY_PORT, _brokerWithUnavailableCluster._brokerPort);
+    brokerConfig.setProperty(Broker.CONFIG_OF_BROKER_TIMEOUT_MS, 60 * 1000L);
+    brokerConfig.setProperty(Broker.CONFIG_OF_DELAY_SHUTDOWN_TIME_MS, 0);
+    brokerConfig.setProperty(CommonConstants.CONFIG_OF_TIMEZONE, "UTC");
+    brokerConfig.setProperty(Helix.CONFIG_OF_REMOTE_CLUSTER_NAMES,
+        CLUSTER_2_NAME + "," + UNAVAILABLE_CLUSTER_NAME);
+    brokerConfig.setProperty(String.format(Helix.CONFIG_OF_REMOTE_ZOOKEEPER_SERVERS, CLUSTER_2_NAME),
+        _cluster2._zkUrl);
+    brokerConfig.setProperty(String.format(Helix.CONFIG_OF_REMOTE_ZOOKEEPER_SERVERS, UNAVAILABLE_CLUSTER_NAME),
+        UNAVAILABLE_ZK_ADDRESS);
+
+    _brokerWithUnavailableCluster._brokerStarter = createBrokerStarter();
+    _brokerWithUnavailableCluster._brokerStarter.init(brokerConfig);
+    _brokerWithUnavailableCluster._brokerStarter.start();
+    LOGGER.info("Started broker with unavailable cluster on port {}", _brokerWithUnavailableCluster._brokerPort);
   }
 
   // TODO: Add more tests for cross-cluster queries in subsequent iterations.
@@ -165,8 +200,11 @@ public class MultiClusterIntegrationTest extends ClusterTest {
     LOGGER.info("Multi-cluster broker test passed: both clusters started and queryable");
   }
 
-  @Test
-  public void testLogicalFederationTwoOfflineTablesSSE() throws Exception {
+  @Test(dataProvider = "brokerModes")
+  public void testLogicalFederationTwoOfflineTablesSSE(int brokerPort, boolean expectUnavailableException)
+      throws Exception {
+    LOGGER.info("Testing SSE on broker port {} (expectUnavailableException={})",
+        brokerPort, expectUnavailableException);
     dropLogicalTableIfExists(LOGICAL_TABLE_NAME, _cluster1._controllerBaseApiUrl);
     dropLogicalTableIfExists(LOGICAL_TABLE_NAME, _cluster2._controllerBaseApiUrl);
     dropLogicalTableIfExists(LOGICAL_TABLE_NAME_2, _cluster1._controllerBaseApiUrl);
@@ -180,12 +218,18 @@ public class MultiClusterIntegrationTest extends ClusterTest {
     loadDataIntoCluster(_cluster1AvroFiles, LOGICAL_FEDERATION_CLUSTER_1_TABLE, _cluster1);
     loadDataIntoCluster(_cluster2AvroFiles, LOGICAL_FEDERATION_CLUSTER_2_TABLE, _cluster2);
     long expectedTotal = TABLE_SIZE_CLUSTER_1 + TABLE_SIZE_CLUSTER_2;
-    assertEquals(getCount(LOGICAL_TABLE_NAME, _cluster1, true), expectedTotal);
-    assertEquals(getCount(LOGICAL_TABLE_NAME, _cluster2, true), expectedTotal);
+
+    String query = "SET enableMultiClusterRouting=true; SELECT COUNT(*) as count FROM " + LOGICAL_TABLE_NAME;
+    String result = executeQueryOnBrokerPort(query, brokerPort);
+    assertEquals(parseCountResult(result), expectedTotal);
+    verifyUnavailableClusterException(result, expectUnavailableException);
   }
 
-  @Test
-  public void testLogicalFederationTwoLogicalTablesMSE() throws Exception {
+  @Test(dataProvider = "brokerModes")
+  public void testLogicalFederationTwoLogicalTablesMSE(int brokerPort, boolean expectUnavailableException)
+      throws Exception {
+    LOGGER.info("Testing MSE on broker port {} (expectUnavailableException={})",
+        brokerPort, expectUnavailableException);
     dropLogicalTableIfExists(LOGICAL_TABLE_NAME, _cluster1._controllerBaseApiUrl);
     dropLogicalTableIfExists(LOGICAL_TABLE_NAME, _cluster2._controllerBaseApiUrl);
     dropLogicalTableIfExists(LOGICAL_TABLE_NAME_2, _cluster1._controllerBaseApiUrl);
@@ -207,10 +251,22 @@ public class MultiClusterIntegrationTest extends ClusterTest {
         + "SELECT t1." + JOIN_COLUMN + ", COUNT(*) as count FROM " + LOGICAL_TABLE_NAME + " t1 "
         + "JOIN " + LOGICAL_TABLE_NAME_2 + " t2 ON t1." + JOIN_COLUMN + " = t2." + JOIN_COLUMN + " "
         + "GROUP BY t1." + JOIN_COLUMN + " LIMIT 20";
-    String result = executeQuery(joinQuery, _cluster1);
+    String result = executeQueryOnBrokerPort(joinQuery, brokerPort);
     assertNotNull(result);
     assertTrue(result.contains("resultTable"));
     assertResultRows(result);
+    verifyUnavailableClusterException(result, expectUnavailableException);
+  }
+
+  /**
+   * Data provider for broker modes: normal broker vs broker with unavailable remote cluster.
+   */
+  @DataProvider(name = "brokerModes")
+  public Object[][] brokerModes() {
+    return new Object[][]{
+        {_cluster1._brokerPort, false},  // Normal broker - all clusters connected
+        {_brokerWithUnavailableCluster._brokerPort, true}  // Broker with unavailable cluster
+    };
   }
 
   @Override
@@ -497,9 +553,32 @@ public class MultiClusterIntegrationTest extends ClusterTest {
   }
 
   protected String executeQuery(String query, ClusterComponents cluster) throws Exception {
+    return executeQueryOnBrokerPort(query, cluster._brokerPort);
+  }
+
+  protected String executeQueryOnBrokerPort(String query, int brokerPort) throws Exception {
     Map<String, Object> payload = Map.of("sql", query);
-    String url = "http://localhost:" + cluster._brokerPort + "/query/sql";
+    String url = "http://localhost:" + brokerPort + "/query/sql";
     return ControllerTest.sendPostRequest(url, JsonUtils.objectToPrettyString(payload));
+  }
+
+  protected void verifyUnavailableClusterException(String result, boolean expectException) throws Exception {
+    if (expectException) {
+      assertTrue(result.contains(UNAVAILABLE_CLUSTER_NAME),
+          "Response should mention unavailable cluster: " + UNAVAILABLE_CLUSTER_NAME);
+      JsonNode resultJson = JsonMapper.builder().build().readTree(result);
+      JsonNode exceptions = resultJson.get("exceptions");
+      assertNotNull(exceptions, "Exceptions array should exist");
+      boolean found = false;
+      for (JsonNode ex : exceptions) {
+        if (ex.get("errorCode").asInt() == 510
+            && ex.get("message").asText().contains(UNAVAILABLE_CLUSTER_NAME)) {
+          found = true;
+          break;
+        }
+      }
+      assertTrue(found, "Should find REMOTE_CLUSTER_UNAVAILABLE (510) exception");
+    }
   }
 
   protected long parseCountResult(String result) {
@@ -525,6 +604,14 @@ public class MultiClusterIntegrationTest extends ClusterTest {
 
   @AfterClass
   public void tearDown() throws Exception {
+    // Stop the alternate broker with unavailable cluster
+    if (_brokerWithUnavailableCluster != null && _brokerWithUnavailableCluster._brokerStarter != null) {
+      try {
+        _brokerWithUnavailableCluster._brokerStarter.stop();
+      } catch (Exception e) {
+        LOGGER.warn("Error stopping broker with unavailable cluster", e);
+      }
+    }
     stopCluster(_cluster1);
     stopCluster(_cluster2);
   }

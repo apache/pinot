@@ -59,6 +59,7 @@ public enum QueryErrorCode {
   INTERNAL(450, "InternalError", Response.Status.INTERNAL_SERVER_ERROR),
   MERGE_RESPONSE(500, "MergeResponseError", Response.Status.INTERNAL_SERVER_ERROR),
   QUERY_CANCELLATION(503, "QueryCancellationError", Response.Status.SERVICE_UNAVAILABLE),
+  REMOTE_CLUSTER_UNAVAILABLE(510, "RemoteClusterUnavailable", Response.Status.SERVICE_UNAVAILABLE),
   /// Error detected at validation time. For example, type mismatch.
   QUERY_VALIDATION(700, "QueryValidationError", Response.Status.BAD_REQUEST),
   UNKNOWN_COLUMN(710, "UnknownColumnError", Response.Status.BAD_REQUEST),
