@@ -591,10 +591,10 @@ public abstract class ClusterTest extends ControllerTest {
 
   public JsonNode postTimeseriesQuery(String baseUrl, String query, long startTime, long endTime,
       Map<String, String> headers) {
-    return postTimeseriesQuery(baseUrl, query, startTime, endTime, headers, null);
+    return postTimeseriesQuery(baseUrl, query, startTime, endTime, null, headers, null);
   }
 
-  public JsonNode postTimeseriesQuery(String baseUrl, String query, long startTime, long endTime,
+  public JsonNode postTimeseriesQuery(String baseUrl, String query, long startTime, long endTime, String mode,
       Map<String, String> headers, Map<String, Object> queryOptions) {
     try {
       ObjectNode payload = JsonUtils.newObjectNode();
@@ -602,6 +602,9 @@ public abstract class ClusterTest extends ControllerTest {
       payload.put("query", query);
       payload.put("start", String.valueOf(startTime));
       payload.put("end", String.valueOf(endTime));
+      if (mode != null) {
+        payload.put("mode", mode);
+      }
       if (queryOptions != null && !queryOptions.isEmpty()) {
         ObjectNode queryOptionsNode = JsonUtils.newObjectNode();
         queryOptions.forEach(queryOptionsNode::putPOJO);

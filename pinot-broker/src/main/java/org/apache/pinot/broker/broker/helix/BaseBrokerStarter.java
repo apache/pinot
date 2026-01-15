@@ -309,9 +309,6 @@ public abstract class BaseBrokerStarter implements ServiceStartable {
     _isStarting = true;
     Utils.logVersions();
 
-    LOGGER.info("Connecting spectator Helix manager");
-    initSpectatorHelixManager();
-
     LOGGER.info("Setting up broker request handler");
     // Set up metric registry and broker metrics
     _metricsRegistry = PinotMetricUtils.getPinotMetricsRegistry(_brokerConf.subset(Broker.METRICS_CONFIG_PREFIX));
@@ -328,6 +325,10 @@ public abstract class BaseBrokerStarter implements ServiceStartable {
         _brokerConf.getProperty(Broker.AdaptiveServerSelector.CONFIG_OF_TYPE,
             Broker.AdaptiveServerSelector.DEFAULT_TYPE), 1);
     BrokerMetrics.register(_brokerMetrics);
+
+    LOGGER.info("Connecting spectator Helix manager");
+    initSpectatorHelixManager();
+
     // Set up request handling classes
     _serverRoutingStatsManager = new ServerRoutingStatsManager(_brokerConf, _brokerMetrics);
     _serverRoutingStatsManager.init();
@@ -415,6 +416,9 @@ public abstract class BaseBrokerStarter implements ServiceStartable {
           new MultiStageBrokerRequestHandler(_brokerConf, brokerId, requestIdGenerator, _routingManager,
               _accessControlFactory, _queryQuotaManager, _tableCache, _multiStageQueryThrottler, _failureDetector,
               _threadAccountant, multiClusterRoutingContext);
+      MultiStageBrokerRequestHandler finalHandler = multiStageBrokerRequestHandler;
+      _routingManager.setServerReenableCallback(
+          serverInstance -> finalHandler.getQueryDispatcher().resetClientConnectionBackoff(serverInstance));
     }
     TimeSeriesRequestHandler timeSeriesRequestHandler = null;
     if (StringUtils.isNotBlank(_brokerConf.getProperty(PinotTimeSeriesConfiguration.getEnabledLanguagesConfigKey()))) {

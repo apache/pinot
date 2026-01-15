@@ -255,9 +255,8 @@ public class QueryDispatcher {
   public FailureDetector.ServerState checkConnectivityToInstance(ServerInstance serverInstance) {
     String hostname = serverInstance.getHostname();
     int port = serverInstance.getQueryServicePort();
-    String hostnamePort = String.format("%s_%d", hostname, port);
 
-    DispatchClient client = _dispatchClientMap.get(hostnamePort);
+    DispatchClient client = _dispatchClientMap.get(toHostnamePortKey(hostname, port));
     // Could occur if the cluster is only serving single-stage queries
     if (client == null) {
       LOGGER.debug("No DispatchClient found for server with instanceId: {}", serverInstance.getInstanceId());
@@ -510,8 +509,27 @@ public class QueryDispatcher {
   private DispatchClient getOrCreateDispatchClient(QueryServerInstance queryServerInstance) {
     String hostname = queryServerInstance.getHostname();
     int port = queryServerInstance.getQueryServicePort();
-    String hostnamePort = String.format("%s_%d", hostname, port);
-    return _dispatchClientMap.computeIfAbsent(hostnamePort, k -> new DispatchClient(hostname, port, _tlsConfig));
+    return _dispatchClientMap.computeIfAbsent(toHostnamePortKey(hostname, port),
+        k -> new DispatchClient(hostname, port, _tlsConfig));
+  }
+
+  /**
+   * Reset the connection backoff for a server. When the GRPC channel enters a TRANSIENT_FAILURE state from
+   * connection failures, it will fast fail requests and reconnect with exponential backoff. This method
+   * resets the backoff so servers that have recovered can be reconnected to immediately.
+   */
+  public void resetClientConnectionBackoff(ServerInstance serverInstance) {
+    String hostname = serverInstance.getHostname();
+    int port = serverInstance.getQueryServicePort();
+    DispatchClient dispatchClient = _dispatchClientMap.get(toHostnamePortKey(hostname, port));
+    if (dispatchClient != null) {
+      LOGGER.info("Resetting connection backoff for server: {}", serverInstance.getInstanceId());
+      dispatchClient.getChannel().resetConnectBackoff();
+    }
+  }
+
+  private static String toHostnamePortKey(String hostname, int port) {
+    return String.format("%s_%d", hostname, port);
   }
 
   /// Concatenates the results of the sub-plan and returns a [QueryResult] with the concatenated result.
