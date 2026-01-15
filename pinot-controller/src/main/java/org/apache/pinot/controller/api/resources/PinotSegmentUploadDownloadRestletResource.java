@@ -627,8 +627,12 @@ public class PinotSegmentUploadDownloadRestletResource {
           SegmentValidationUtils.validateTimeInterval(segmentMetadata, tableConfig);
         }
         // TODO: Include the un-tarred segment size when using the METADATA push rest API. Currently we can only use the
-        //  tarred segment size as an approximation. Additionally, add the storage quota check for batch upload mode.
+        //  tarred segment size as an approximation.
         long segmentSizeInBytes = getSegmentSizeFromFile(sourceDownloadURIStr);
+        // Adding Storage Quota Check
+        long untarredSegmentSizeInBytes = segmentSizeInBytes;
+        SegmentValidationUtils.checkStorageQuota(segmentName, segmentSizeInBytes, untarredSegmentSizeInBytes,
+            tableConfig, _storageQuotaChecker);
 
         // Encrypt segment
         String crypterNameInTableConfig = tableConfig.getValidationConfig().getCrypterClassName();
