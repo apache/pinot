@@ -613,8 +613,8 @@ public abstract class BaseControllerStarter implements ServiceStartable {
     _rebalancerExecutorService = createExecutorService(_config.getControllerExecutorRebalanceNumThreads(),
         "rebalance-thread-%d");
     _tableRebalanceManager =
-        new TableRebalanceManager(_helixResourceManager, _controllerMetrics, _rebalancePreChecker, _tableSizeReader,
-            _rebalancerExecutorService);
+        new TableRebalanceManager(_config, _helixResourceManager, _controllerMetrics, _rebalancePreChecker,
+            _tableSizeReader, _rebalancerExecutorService);
     _tenantRebalancer =
         new TenantRebalancer(_tableRebalanceManager, _helixResourceManager, _rebalancerExecutorService);
 

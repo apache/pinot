@@ -406,6 +406,10 @@ public class ControllerConf extends PinotConfiguration {
   public static final String CONFIG_OF_MAX_RELOAD_SEGMENT_JOBS_IN_ZK = "controller.reload.segment.maxJobsInZK";
   public static final String CONFIG_OF_MAX_FORCE_COMMIT_JOBS_IN_ZK = "controller.force.commit.maxJobsInZK";
 
+  public static final String ENABLE_IDEAL_STATE_INSTANCE_PARTITIONS =
+      "controller.enable.ideal.state.instance.partitions";
+  public static final boolean DEFAULT_ENABLE_IDEAL_STATE_INSTANCE_PARTITIONS = false;
+
   private final Map<String, String> _invalidConfigs = new ConcurrentHashMap<>();
 
   public ControllerConf() {
@@ -1381,6 +1385,10 @@ public class ControllerConf extends PinotConfiguration {
 
   public int getMaxForceCommitZkJobs() {
     return getProperty(CONFIG_OF_MAX_FORCE_COMMIT_JOBS_IN_ZK, ControllerJob.DEFAULT_MAXIMUM_CONTROLLER_JOBS_IN_ZK);
+  }
+
+  public boolean isIdealStateInstancePartitionsEnabled() {
+    return getProperty(ENABLE_IDEAL_STATE_INSTANCE_PARTITIONS, DEFAULT_ENABLE_IDEAL_STATE_INSTANCE_PARTITIONS);
   }
 
   /**

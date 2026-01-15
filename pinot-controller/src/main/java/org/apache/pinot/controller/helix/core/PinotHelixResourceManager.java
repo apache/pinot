@@ -225,6 +225,7 @@ public class PinotHelixResourceManager {
   private final boolean _enableBatchMessageMode;
   private final int _deletedSegmentsRetentionInDays;
   private final boolean _enableTieredSegmentAssignment;
+  private final boolean _isIdealStateInstancePartitionsEnabled;
 
   private HelixManager _helixZkManager;
   private HelixAdmin _helixAdmin;
@@ -240,7 +241,8 @@ public class PinotHelixResourceManager {
 
   public PinotHelixResourceManager(String helixClusterName, @Nullable String dataDir,
       boolean isSingleTenantCluster, boolean enableBatchMessageMode, int deletedSegmentsRetentionInDays,
-      boolean enableTieredSegmentAssignment, LineageManager lineageManager) {
+      boolean enableTieredSegmentAssignment, LineageManager lineageManager,
+      boolean isIdealStateInstancePartitionsEnabled) {
     _helixClusterName = helixClusterName;
     _dataDir = dataDir;
     _isSingleTenantCluster = isSingleTenantCluster;
@@ -263,13 +265,14 @@ public class PinotHelixResourceManager {
     }
     _lineageManager = lineageManager;
     _queryWorkloadManager = new QueryWorkloadManager(this);
+    _isIdealStateInstancePartitionsEnabled = isIdealStateInstancePartitionsEnabled;
   }
 
   public PinotHelixResourceManager(ControllerConf controllerConf) {
     this(controllerConf.getHelixClusterName(), controllerConf.getDataDir(),
         controllerConf.tenantIsolationEnabled(), controllerConf.getEnableBatchMessageMode(),
         controllerConf.getDeletedSegmentsRetentionInDays(), controllerConf.tieredSegmentAssignmentEnabled(),
-        LineageManagerFactory.create(controllerConf));
+        LineageManagerFactory.create(controllerConf), controllerConf.isIdealStateInstancePartitionsEnabled());
   }
 
   /**
@@ -1806,7 +1809,7 @@ public class PinotHelixResourceManager {
       Preconditions.checkState(tableConfig != null, "Failed to read table config for table: %s", tableNameWithType);
 
       // Assign instances
-      assignInstances(tableConfig, true);
+      assignInstances(tableConfig, idealState, true);
       LOGGER.info("Adding table {}: Assigned instances", tableNameWithType);
 
       if (tableType == TableType.OFFLINE) {
@@ -2025,7 +2028,11 @@ public class PinotHelixResourceManager {
     _pinotLLCRealtimeSegmentManager = pinotLLCRealtimeSegmentManager;
   }
 
-  private void assignInstances(TableConfig tableConfig, boolean override) {
+  /**
+   * Returns true if instances were (re)assigned and the ideal state updated with the new instance replica group
+   * information, false otherwise.
+   */
+  private boolean assignInstances(TableConfig tableConfig, IdealState idealState, boolean override) {
     String tableNameWithType = tableConfig.getTableName();
     String rawTableName = TableNameBuilder.extractRawTableName(tableNameWithType);
 
@@ -2039,6 +2046,7 @@ public class PinotHelixResourceManager {
       }
     }
 
+    List<InstancePartitions> assignedInstancePartitions = new ArrayList<>();
     InstanceAssignmentDriver instanceAssignmentDriver = new InstanceAssignmentDriver(tableConfig);
     List<InstanceConfig> instanceConfigs = getAllHelixInstanceConfigs();
     if (!instancePartitionsTypesToAssign.isEmpty()) {
@@ -2069,6 +2077,7 @@ public class PinotHelixResourceManager {
                 referenceInstancePartitionsName);
           }
         }
+        assignedInstancePartitions.add(instancePartitions);
         InstancePartitionsUtils.persistInstancePartitions(_propertyStore, instancePartitions);
       }
     }
@@ -2087,11 +2096,24 @@ public class PinotHelixResourceManager {
                 instanceAssignmentDriver.assignInstances(tierConfig.getName(), instanceConfigs, null,
                     tableConfig.getInstanceAssignmentConfigMap().get(tierConfig.getName()));
             LOGGER.info("Persisting instance partitions: {}", instancePartitions);
+            assignedInstancePartitions.add(instancePartitions);
             InstancePartitionsUtils.persistInstancePartitions(_propertyStore, instancePartitions);
           }
         }
       }
     }
+
+    if (!assignedInstancePartitions.isEmpty() && _isIdealStateInstancePartitionsEnabled) {
+      if (override) {
+        InstancePartitionsUtils.updateInstancePartitionsInIdealState(idealState, assignedInstancePartitions);
+      } else {
+        // Wipe out instance partitions metadata maintained in the ideal state to avoid inconsistency. Rebalance should
+        // be performed after instance assignment, and that will also ensure ideal state instance partitions update.
+        InstancePartitionsUtils.updateInstancePartitionsInIdealState(idealState, List.of());
+      }
+      return true;
+    }
+    return false;
   }
 
   public void updateUserConfig(UserConfig userConfig)
@@ -2202,7 +2224,13 @@ public class PinotHelixResourceManager {
     }
 
     // Assign instances
-    assignInstances(tableConfig, false);
+    if (assignInstances(tableConfig, idealState, false)) {
+      HelixHelper.updateIdealState(_helixZkManager, tableNameWithType, is -> {
+        assert is != null;
+        is.getRecord().setListFields(idealState.getRecord().getListFields());
+        return is;
+      }, RetryPolicies.exponentialBackoffRetryPolicy(5, 1000L, 1.2f));
+    }
 
     // Send update query quota message if quota is specified
     sendTableConfigRefreshMessage(tableNameWithType);
@@ -4860,13 +4888,12 @@ public class PinotHelixResourceManager {
     TableConfig tableConfig = getTableConfig(tableNameWithType);
     Preconditions.checkNotNull(tableConfig, "Table " + tableNameWithType + "exists but null tableConfig");
     List<StreamConfig> streamConfigs = IngestionConfigUtils.getStreamConfigs(tableConfig);
-    IdealState idealState = _helixAdmin
-        .getResourceIdealState(getHelixClusterName(), tableNameWithType);
+    IdealState idealState = _helixAdmin.getResourceIdealState(getHelixClusterName(), tableNameWithType);
     if (idealState == null) {
       throw new IllegalStateException("Null IdealState of the table " + tableNameWithType);
     }
-    List<PartitionGroupConsumptionStatus> lst = _pinotLLCRealtimeSegmentManager
-        .getPartitionGroupConsumptionStatusList(idealState, streamConfigs);
+    List<PartitionGroupConsumptionStatus> lst =
+        _pinotLLCRealtimeSegmentManager.getPartitionGroupConsumptionStatusList(idealState, streamConfigs);
     List<WatermarkInductionResult.Watermark> watermarks = lst.stream().map(status -> {
       int seq = status.getSequenceNumber();
       long startOffset;
@@ -4884,6 +4911,32 @@ public class PinotHelixResourceManager {
       return new WatermarkInductionResult.Watermark(status.getPartitionGroupId(), seq, startOffset);
     }).collect(Collectors.toList());
     return new WatermarkInductionResult(watermarks);
+  }
+
+  /** Update a given set of instance partitions into an ideal state's instance partitions metadata maintained in its
+   *  list fields. Previous instance partitions will be wiped out.
+   *
+   * @param tableNameWithType name of the table whose ideal state needs to be updated.
+   * @param instancePartitions List of instance partitions to be written into the ideal state instance partitions
+   *                           metadata.
+   */
+  public void updateInstancePartitionsInIdealState(String tableNameWithType,
+      List<InstancePartitions> instancePartitions) {
+    if (!_isIdealStateInstancePartitionsEnabled) {
+      return;
+    }
+
+    IdealState currentIdealState = getTableIdealState(tableNameWithType);
+    if (currentIdealState == null) {
+      throw new RuntimeException("Failed to retrieve IdealState for table: " + tableNameWithType);
+    }
+
+    InstancePartitionsUtils.updateInstancePartitionsInIdealState(currentIdealState, instancePartitions);
+    HelixHelper.updateIdealState(_helixZkManager, tableNameWithType, idealState -> {
+      assert idealState != null;
+      idealState.getRecord().setListFields(currentIdealState.getRecord().getListFields());
+      return idealState;
+    }, DEFAULT_RETRY_POLICY);
   }
 
   /*

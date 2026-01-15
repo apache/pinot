@@ -603,9 +603,9 @@ public class CommonConstants {
     // When the server instance's pool field is null or the pool contains multi distinguished group value, the broker
     // would set the pool to -1 in the routing table for that server.
     public static final int FALLBACK_POOL_ID = -1;
-    // keep the variable to pass the compability test
-    @Deprecated
-    public static final int FALLBACK_REPLICA_GROUP_ID = -1;
+    // When there's no replica group information for a server in the table's ideal state, this value will be used when
+    // computing the routing table in the brokers.
+    public static final int FALLBACK_REPLICA_ID = -1;
 
     public static final String CONFIG_OF_BROKER_QUERY_ENABLE_AUTO_REWRITE_AGGREGATION_TYPE =
         "pinot.broker.query.enable.auto.rewrite.aggregation.type";

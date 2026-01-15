@@ -19,12 +19,16 @@
 package org.apache.pinot.common.assignment;
 
 import com.google.common.base.Preconditions;
+import java.util.ArrayList;
 import java.util.Collections;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import javax.annotation.Nullable;
+import org.apache.commons.lang3.tuple.Pair;
 import org.apache.helix.AccessOption;
 import org.apache.helix.HelixManager;
+import org.apache.helix.model.IdealState;
 import org.apache.helix.store.HelixPropertyStore;
 import org.apache.helix.store.zk.ZkHelixPropertyStore;
 import org.apache.helix.zookeeper.datamodel.ZNRecord;
@@ -36,6 +40,8 @@ import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.TenantConfig;
 import org.apache.pinot.spi.config.table.assignment.InstancePartitionsType;
 import org.apache.pinot.spi.utils.builder.TableNameBuilder;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 
 /**
@@ -47,6 +53,21 @@ public class InstancePartitionsUtils {
 
   public static final char TYPE_SUFFIX_SEPARATOR = '_';
   public static final String TIER_SUFFIX = "__TIER__";
+  public static final String IDEAL_STATE_IP_PREFIX = "INSTANCE_PARTITIONS__";
+  public static final String IDEAL_STATE_IP_SEPARATOR = "__";
+
+  private static final Logger LOGGER = LoggerFactory.getLogger(InstancePartitionsUtils.class);
+
+  /**
+   * Takes in an InstancePartitions key like "1_1" and returns a pair of integers {1, 1} with the left integer
+   * representing the partition ID and the right integer representing the replica group ID.
+   */
+  public static Pair<Integer, Integer> getPartitionIdAndReplicaGroupId(String key) {
+    int separatorIndex = key.indexOf(InstancePartitions.PARTITION_REPLICA_GROUP_SEPARATOR);
+    int partitionId = Integer.parseInt(key.substring(0, separatorIndex));
+    int replicaGroupId = Integer.parseInt(key.substring(separatorIndex + 1));
+    return Pair.of(partitionId, replicaGroupId);
+  }
 
   /**
    * Returns the name of the instance partitions for the given table name (with or without type suffix) and instance
@@ -211,5 +232,53 @@ public class InstancePartitionsUtils {
       InstancePartitionsType instancePartitionsType) {
     return hasPreConfiguredInstancePartitions(tableConfig, instancePartitionsType)
         && !InstanceAssignmentConfigUtils.isMirrorServerSetAssignment(tableConfig, instancePartitionsType);
+  }
+
+  /**
+   * Update a given set of instance partitions into an ideal state's instance partitions metadata maintained in its
+   * list fields. Previous instance partitions will be wiped out.
+   *
+   * @param idealState Current ideal state
+   * @param instancePartitionsList List of instance partitions to be written into the ideal state instance partitions
+   *                               metadata.
+   */
+  public static void updateInstancePartitionsInIdealState(IdealState idealState,
+      List<InstancePartitions> instancePartitionsList) {
+    Map<String, List<String>> idealStateListFields = idealState.getRecord().getListFields();
+    idealStateListFields.keySet().removeIf(key -> key.startsWith(InstancePartitionsUtils.IDEAL_STATE_IP_PREFIX));
+    for (InstancePartitions instancePartitions : instancePartitionsList) {
+      String instancePartitionsName = instancePartitions.getInstancePartitionsName();
+      for (String partitionReplica : instancePartitions.getPartitionToInstancesMap().keySet()) {
+        String idealStateListKey = InstancePartitionsUtils.IDEAL_STATE_IP_PREFIX + instancePartitionsName
+            + InstancePartitionsUtils.IDEAL_STATE_IP_SEPARATOR + partitionReplica;
+        idealStateListFields.put(idealStateListKey, new ArrayList<>(instancePartitions.getInstances(partitionReplica)));
+      }
+    }
+  }
+
+  /// Creates a map from server instance to replica group ID using the ideal state instance partitions metadata.
+  public static Map<String, Integer> serverToReplicaGroupMap(IdealState idealState) {
+    Map<String, Integer> serverToReplicaGroupMap = new HashMap<>();
+
+    for (Map.Entry<String, List<String>> listFields : idealState.getRecord().getListFields().entrySet()) {
+      String key = listFields.getKey();
+      // key looks like "INSTANCE_PARTITIONS__<INSTANCE_PARTITION_NAME>"
+      // <INSTANCE_PARTITION_NAME> typically looks like myTable_CONSUMING__0_1 (here, 0 would be the partition ID and
+      // 1 would be the replica group ID)
+      if (key.startsWith(InstancePartitionsUtils.IDEAL_STATE_IP_PREFIX)) {
+        int separatorIndex = key.lastIndexOf(InstancePartitions.PARTITION_REPLICA_GROUP_SEPARATOR);
+        Integer replicaGroup = Integer.parseInt(key.substring(separatorIndex + 1));
+        listFields.getValue().forEach(value -> {
+          if (serverToReplicaGroupMap.containsKey(value)) {
+            LOGGER.warn("Server {} assigned to multiple replica groups ({}, {})", value, replicaGroup,
+                serverToReplicaGroupMap.get(value));
+          } else {
+            serverToReplicaGroupMap.put(value, replicaGroup);
+          }
+        });
+      }
+    }
+
+    return serverToReplicaGroupMap;
   }
 }

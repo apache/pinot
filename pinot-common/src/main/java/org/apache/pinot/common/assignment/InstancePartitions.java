@@ -60,7 +60,7 @@ import org.apache.pinot.spi.utils.JsonUtils;
  */
 @JsonIgnoreProperties(ignoreUnknown = true)
 public class InstancePartitions {
-  private static final char PARTITION_REPLICA_GROUP_SEPARATOR = '_';
+  public static final char PARTITION_REPLICA_GROUP_SEPARATOR = '_';
 
   private final String _instancePartitionsName;
   private final Map<String, List<String>> _partitionToInstancesMap;
@@ -73,14 +73,15 @@ public class InstancePartitions {
   }
 
   @JsonCreator
-  private InstancePartitions(
+  public InstancePartitions(
       @JsonProperty(value = "instancePartitionsName", required = true) String instancePartitionsName,
       @JsonProperty(value = "partitionToInstancesMap", required = true)
           Map<String, List<String>> partitionToInstancesMap) {
     _instancePartitionsName = instancePartitionsName;
     _partitionToInstancesMap = partitionToInstancesMap;
     for (String key : partitionToInstancesMap.keySet()) {
-      Pair<Integer, Integer> partitionIdAndReplicaGroupId = getPartitionIdAndReplicaGroupId(key);
+      Pair<Integer, Integer> partitionIdAndReplicaGroupId =
+          InstancePartitionsUtils.getPartitionIdAndReplicaGroupId(key);
       int partitionId = partitionIdAndReplicaGroupId.getLeft();
       int replicaGroupId = partitionIdAndReplicaGroupId.getRight();
       _numPartitions = Integer.max(_numPartitions, partitionId + 1);
@@ -113,6 +114,12 @@ public class InstancePartitions {
         .get(Integer.toString(partitionId) + PARTITION_REPLICA_GROUP_SEPARATOR + replicaGroupId);
   }
 
+  /// Given a partition ID and replica group ID like "0_0", return the list of instances belonging to that instance
+  /// partition
+  public List<String> getInstances(String partitionReplica) {
+    return _partitionToInstancesMap.get(partitionReplica);
+  }
+
   /**
    * Generates a mapping from instance names to their corresponding partition IDs.
    * This method iterates over the `_partitionToInstancesMap`, which maps partition-replica group keys
@@ -124,7 +131,8 @@ public class InstancePartitions {
   public Map<String, Integer> getInstanceToPartitionIdMap() {
     Map<String, Integer> instanceToPartitionIdMap = new HashMap<>();
     for (Map.Entry<String, List<String>> entry : _partitionToInstancesMap.entrySet()) {
-      Pair<Integer, Integer> partitionIdAndReplicaGroupId = getPartitionIdAndReplicaGroupId(entry.getKey());
+      Pair<Integer, Integer> partitionIdAndReplicaGroupId =
+          InstancePartitionsUtils.getPartitionIdAndReplicaGroupId(entry.getKey());
       int partitionId = partitionIdAndReplicaGroupId.getLeft();
       List<String> instances = entry.getValue();
       for (String instance : instances) {
@@ -187,12 +195,5 @@ public class InstancePartitions {
   @Override
   public int hashCode() {
     return Objects.hash(_instancePartitionsName, _partitionToInstancesMap);
-  }
-
-  private Pair<Integer, Integer> getPartitionIdAndReplicaGroupId(String key) {
-    int separatorIndex = key.indexOf(PARTITION_REPLICA_GROUP_SEPARATOR);
-    int partitionId = Integer.parseInt(key.substring(0, separatorIndex));
-    int replicaGroupId = Integer.parseInt(key.substring(separatorIndex + 1));
-    return Pair.of(partitionId, replicaGroupId);
   }
 }

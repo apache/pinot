@@ -35,6 +35,7 @@ import org.apache.helix.zookeeper.datamodel.ZNRecord;
 import org.apache.pinot.common.exception.RebalanceInProgressException;
 import org.apache.pinot.common.exception.TableNotFoundException;
 import org.apache.pinot.common.metrics.ControllerMetrics;
+import org.apache.pinot.controller.ControllerConf;
 import org.apache.pinot.controller.api.resources.ServerRebalanceJobStatusResponse;
 import org.apache.pinot.controller.helix.core.PinotHelixResourceManager;
 import org.apache.pinot.controller.helix.core.controllerjob.ControllerJobTypes;
@@ -54,14 +55,17 @@ import org.slf4j.LoggerFactory;
 public class TableRebalanceManager {
   private static final Logger LOGGER = LoggerFactory.getLogger(TableRebalanceManager.class);
 
+  private final ControllerConf _controllerConf;
   private final PinotHelixResourceManager _resourceManager;
   private final ControllerMetrics _controllerMetrics;
   private final RebalancePreChecker _rebalancePreChecker;
   private final TableSizeReader _tableSizeReader;
   private final ExecutorService _executorService;
 
-  public TableRebalanceManager(PinotHelixResourceManager resourceManager, ControllerMetrics controllerMetrics,
-      RebalancePreChecker rebalancePreChecker, TableSizeReader tableSizeReader, ExecutorService executorService) {
+  public TableRebalanceManager(ControllerConf controllerConf, PinotHelixResourceManager resourceManager,
+      ControllerMetrics controllerMetrics, RebalancePreChecker rebalancePreChecker, TableSizeReader tableSizeReader,
+      ExecutorService executorService) {
+    _controllerConf = controllerConf;
     _resourceManager = resourceManager;
     _controllerMetrics = controllerMetrics;
     _rebalancePreChecker = rebalancePreChecker;
@@ -216,7 +220,8 @@ public class TableRebalanceManager {
     }
     TableRebalancer tableRebalancer =
         new TableRebalancer(_resourceManager.getHelixZkManager(), zkBasedTableRebalanceObserver, _controllerMetrics,
-            _rebalancePreChecker, _tableSizeReader, _resourceManager.getRealtimeSegmentManager());
+            _rebalancePreChecker, _tableSizeReader, _resourceManager.getRealtimeSegmentManager(),
+            _controllerConf.isIdealStateInstancePartitionsEnabled());
 
     return tableRebalancer.rebalance(tableConfig, rebalanceConfig, rebalanceJobId, tierToSegmentsMap);
   }

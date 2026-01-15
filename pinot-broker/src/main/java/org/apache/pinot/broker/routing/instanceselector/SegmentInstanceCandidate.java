@@ -22,6 +22,7 @@ import com.google.common.annotations.VisibleForTesting;
 import javax.annotation.concurrent.Immutable;
 
 import static org.apache.pinot.spi.utils.CommonConstants.Broker.FALLBACK_POOL_ID;
+import static org.apache.pinot.spi.utils.CommonConstants.Broker.FALLBACK_REPLICA_ID;
 
 
 /**
@@ -32,6 +33,7 @@ public class SegmentInstanceCandidate {
   private final String _instance;
   private final boolean _online;
   private final int _pool;
+  private final int _replicaGroupId;
 
   @VisibleForTesting
   public SegmentInstanceCandidate(String instance, boolean online) {
@@ -39,12 +41,15 @@ public class SegmentInstanceCandidate {
     _online = online;
     // no group
     _pool = FALLBACK_POOL_ID;
+    // no replica group
+    _replicaGroupId = FALLBACK_REPLICA_ID;
   }
 
-  public SegmentInstanceCandidate(String instance, boolean online, int pool) {
+  public SegmentInstanceCandidate(String instance, boolean online, int pool, int replicaGroupId) {
     _instance = instance;
     _online = online;
     _pool = pool;
+    _replicaGroupId = replicaGroupId;
   }
 
   public String getInstance() {
@@ -59,9 +64,13 @@ public class SegmentInstanceCandidate {
     return _pool;
   }
 
+  public int getReplicaGroupId() {
+    return _replicaGroupId;
+  }
+
   @Override
   public String toString() {
     return "SegmentInstanceCandidate{" + "_instance='" + _instance + '\'' + ", _online=" + _online + ", _pool=" + _pool
-        + '}';
+        + ", _replicaGroupId=" + _replicaGroupId + '}';
   }
 }
