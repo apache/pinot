@@ -385,7 +385,6 @@ public class ConcurrentMapPartitionUpsertMetadataManagerForConsistentDeletes
         totalDeletedKeys++;
       } else if (prevSegment == oldSegment && currentLocation.getSegment() == segment) {
         removeDocId(oldSegment, _previousKeyToRecordLocationMap.get(entry.getKey()).getDocId());
-        _previousKeyToRecordLocationMap.remove(entry.getKey());
         totalDeletedKeys++;
       } else if (_trackedSegments.contains(prevSegment)) {
         // Case 2: Previous segment is still tracked (not deleted) - revert to previous location

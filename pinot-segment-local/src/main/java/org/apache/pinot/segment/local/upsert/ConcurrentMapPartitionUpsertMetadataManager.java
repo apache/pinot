@@ -291,11 +291,9 @@ public class ConcurrentMapPartitionUpsertMetadataManager extends BasePartitionUp
       if (currentLocation.getSegment() == oldSegment && prevSegment == oldSegment) {
         removeDocId(oldSegment, currentLocation.getDocId());
         _primaryKeyToRecordLocationMap.remove(entry.getKey());
-        _previousKeyToRecordLocationMap.remove(entry.getKey());
         totalDeletedKeys++;
       } else if (prevSegment == oldSegment && currentLocation.getSegment() == segment) {
         removeDocId(oldSegment, _previousKeyToRecordLocationMap.get(entry.getKey()).getDocId());
-        _previousKeyToRecordLocationMap.remove(entry.getKey());
         totalDeletedKeys++;
       } else if (_trackedSegments.contains(prevSegment)) {
         // Previous segment is  tracked (not deleted) - revert to previous location
@@ -330,6 +328,7 @@ public class ConcurrentMapPartitionUpsertMetadataManager extends BasePartitionUp
         _primaryKeyToRecordLocationMap.remove(entry.getKey());
         totalDeletedKeys++;
       }
+      _previousKeyToRecordLocationMap.remove(entry.getKey());
     }
     _logger.info("Reverted {} keys to previous segment locations, deleted {} keys for segment: {}", totalRevertedKeys,
         totalDeletedKeys, oldSegment.getSegmentName());
