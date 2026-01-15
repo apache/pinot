@@ -373,12 +373,12 @@ public class ConcurrentMapPartitionUpsertMetadataManagerForConsistentDeletes
       RecordLocation currentLocation = _primaryKeyToRecordLocationMap.get(entry.getKey());
 
       // Only revert if the key's current location points to the consuming segment being reverted
-      if (currentLocation == null || currentLocation.getSegment() != oldSegment) {
+      if (currentLocation == null || (currentLocation.getSegment() != oldSegment
+          && currentLocation.getSegment() != segment)) {
         continue;
       }
       int currentDocId = currentLocation.getDocId();
-      // Key was newly added by the consuming segment (prevSegment == oldSegment)
-      // Action: Remove the key entirely
+      // When a key still exists in old segment, and if the key is a newly inserted key in consuming segment
       if (currentLocation.getSegment() == oldSegment && prevSegment == oldSegment) {
         removeDocId(oldSegment, currentDocId);
         _primaryKeyToRecordLocationMap.remove(entry.getKey());
