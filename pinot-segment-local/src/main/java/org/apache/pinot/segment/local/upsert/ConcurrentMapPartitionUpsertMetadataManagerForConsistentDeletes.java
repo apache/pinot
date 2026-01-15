@@ -387,7 +387,7 @@ public class ConcurrentMapPartitionUpsertMetadataManagerForConsistentDeletes
         removeDocId(oldSegment, _previousKeyToRecordLocationMap.get(entry.getKey()).getDocId());
         totalDeletedKeys++;
       } else if (_trackedSegments.contains(prevSegment)) {
-        // Case 2: Previous segment is still tracked (not deleted) - revert to previous location
+        // Previous segment is still tracked (not deleted) - revert to previous location
         ThreadSafeMutableRoaringBitmap prevValidDocIds = prevSegment.getValidDocIds();
         // Only revert if previous segment's validDocIds is available
         if (prevValidDocIds != null) {
@@ -413,7 +413,7 @@ public class ConcurrentMapPartitionUpsertMetadataManagerForConsistentDeletes
           totalDeletedKeys++;
         }
       } else {
-        // Case 3: Previous segment was deleted (not in _trackedSegments) - remove the key
+        // Previous segment was deleted (not in _trackedSegments) - remove the key
         _logger.debug("Previous segment {} is no longer tracked, removing key", prevSegment.getSegmentName());
         removeDocId(oldSegment, currentDocId);
         _primaryKeyToRecordLocationMap.remove(entry.getKey());
