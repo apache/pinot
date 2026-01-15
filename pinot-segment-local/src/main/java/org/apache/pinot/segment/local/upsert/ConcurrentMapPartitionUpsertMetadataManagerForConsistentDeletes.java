@@ -144,6 +144,10 @@ public class ConcurrentMapPartitionUpsertMetadataManagerForConsistentDeletes
                     if (validDocIdsForOldSegment != null) {
                       validDocIdsForOldSegment.remove(currentDocId);
                     }
+                    if (!_previousKeyToRecordLocationMap.containsKey(primaryKey)
+                        || _previousKeyToRecordLocationMap.get(primaryKey).getSegment() == oldSegment) {
+                      _previousKeyToRecordLocationMap.put(primaryKey, currentRecordLocation);
+                    }
                   }
                   return new RecordLocation(segment, newDocId, newComparisonValue,
                       RecordLocation.incrementSegmentCount(currentDistinctSegmentCount));
@@ -356,7 +360,8 @@ public class ConcurrentMapPartitionUpsertMetadataManagerForConsistentDeletes
 
   @Override
   protected void revertCurrentSegmentUpsertMetadata(IndexSegment oldSegment, ThreadSafeMutableRoaringBitmap validDocIds,
-      ThreadSafeMutableRoaringBitmap queryableDocIds) {
+      ThreadSafeMutableRoaringBitmap queryableDocIds, ImmutableSegment segment,
+      MutableRoaringBitmap validDocIdsForOldSegment) {
     // Revert to previous locations present in other segment
     // Replace the valid doc id to that segment location
     _logger.info("Reverting Upsert metadata for {} keys for the segment: {}", _previousKeyToRecordLocationMap.size(),
@@ -374,9 +379,13 @@ public class ConcurrentMapPartitionUpsertMetadataManagerForConsistentDeletes
       int currentDocId = currentLocation.getDocId();
       // Key was newly added by the consuming segment (prevSegment == oldSegment)
       // Action: Remove the key entirely
-      if (prevSegment == oldSegment) {
+      if (currentLocation.getSegment() == oldSegment && prevSegment == oldSegment) {
         removeDocId(oldSegment, currentDocId);
         _primaryKeyToRecordLocationMap.remove(entry.getKey());
+        totalDeletedKeys++;
+      } else if (prevSegment == oldSegment && currentLocation.getSegment() == segment) {
+        removeDocId(oldSegment, _previousKeyToRecordLocationMap.get(entry.getKey()).getDocId());
+        _previousKeyToRecordLocationMap.remove(entry.getKey());
         totalDeletedKeys++;
       } else if (_trackedSegments.contains(prevSegment)) {
         // Case 2: Previous segment is still tracked (not deleted) - revert to previous location
@@ -411,6 +420,7 @@ public class ConcurrentMapPartitionUpsertMetadataManagerForConsistentDeletes
         _primaryKeyToRecordLocationMap.remove(entry.getKey());
         totalDeletedKeys++;
       }
+      _previousKeyToRecordLocationMap.remove(entry.getKey());
     }
     _logger.info("Reverted {} keys to previous segment locations, deleted {} keys for segment: {}",
         totalRevertedKeys, totalDeletedKeys, oldSegment.getSegmentName());

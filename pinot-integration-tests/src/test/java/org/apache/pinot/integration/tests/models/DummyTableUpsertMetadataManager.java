@@ -29,6 +29,7 @@ import org.apache.pinot.segment.local.upsert.BaseTableUpsertMetadataManager;
 import org.apache.pinot.segment.local.upsert.PartitionUpsertMetadataManager;
 import org.apache.pinot.segment.local.upsert.RecordInfo;
 import org.apache.pinot.segment.local.upsert.UpsertContext;
+import org.apache.pinot.segment.spi.ImmutableSegment;
 import org.apache.pinot.segment.spi.IndexSegment;
 import org.apache.pinot.segment.spi.MutableSegment;
 import org.apache.pinot.segment.spi.index.mutable.ThreadSafeMutableRoaringBitmap;
@@ -93,7 +94,8 @@ public class DummyTableUpsertMetadataManager extends BaseTableUpsertMetadataMana
 
     @Override
     protected void revertCurrentSegmentUpsertMetadata(IndexSegment oldSegment,
-        ThreadSafeMutableRoaringBitmap validDocIds, ThreadSafeMutableRoaringBitmap queryableDocIds) {
+        ThreadSafeMutableRoaringBitmap validDocIds, ThreadSafeMutableRoaringBitmap queryableDocIds,
+        ImmutableSegment segment, MutableRoaringBitmap validDocIdsForOldSegment) {
     }
 
     @Override
