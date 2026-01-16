@@ -96,7 +96,7 @@ import org.apache.pinot.controller.api.upload.SegmentValidationUtils;
 import org.apache.pinot.controller.api.upload.ZKOperator;
 import org.apache.pinot.controller.helix.core.PinotHelixResourceManager;
 import org.apache.pinot.controller.helix.core.retention.RetentionManager;
-import org.apache.pinot.controller.validation.ResourceUtilizationManager;
+import org.apache.pinot.controller.validation.DiskUtilizationChecker;
 import org.apache.pinot.controller.validation.StorageQuotaChecker;
 import org.apache.pinot.controller.validation.UtilizationChecker;
 import org.apache.pinot.core.auth.Actions;
@@ -162,7 +162,7 @@ public class PinotSegmentUploadDownloadRestletResource {
   AccessControlFactory _accessControlFactory;
 
   @Inject
-  ResourceUtilizationManager _resourceUtilizationManager;
+  DiskUtilizationChecker _diskUtilizationChecker;
 
   @GET
   @Produces(MediaType.APPLICATION_OCTET_STREAM)
@@ -412,10 +412,10 @@ public class PinotSegmentUploadDownloadRestletResource {
           _storageQuotaChecker);
 
       // Perform resource utilization checks
-      UtilizationChecker.CheckResult isResourceUtilizationWithinLimits =
-          _resourceUtilizationManager.isResourceUtilizationWithinLimits(tableNameWithType,
+      UtilizationChecker.CheckResult isDiskUtilizationWithinLimits =
+          _diskUtilizationChecker.isResourceUtilizationWithinLimits(tableNameWithType,
               UtilizationChecker.CheckPurpose.OFFLINE_SEGMENT_UPLOAD);
-      if (isResourceUtilizationWithinLimits == UtilizationChecker.CheckResult.FAIL) {
+      if (isDiskUtilizationWithinLimits == UtilizationChecker.CheckResult.FAIL) {
         _controllerMetrics.setOrUpdateTableGauge(tableNameWithType, ControllerGauge.RESOURCE_UTILIZATION_LIMIT_EXCEEDED,
             1L);
         throw new ControllerApplicationException(LOGGER,
@@ -423,7 +423,7 @@ public class PinotSegmentUploadDownloadRestletResource {
                 tableNameWithType,
                 segmentName),
             Response.Status.FORBIDDEN);
-      } else if (isResourceUtilizationWithinLimits == UtilizationChecker.CheckResult.UNDETERMINED) {
+      } else if (isDiskUtilizationWithinLimits == UtilizationChecker.CheckResult.UNDETERMINED) {
         LOGGER.warn(
             "Disk utilization status could not be determined for for table: {}. Will allow segment upload to proceed.",
             tableNameWithType);
