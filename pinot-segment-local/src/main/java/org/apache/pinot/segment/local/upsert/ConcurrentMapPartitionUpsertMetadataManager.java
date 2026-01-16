@@ -32,9 +32,7 @@ import javax.annotation.concurrent.ThreadSafe;
 import org.apache.pinot.common.metrics.ServerMeter;
 import org.apache.pinot.segment.local.indexsegment.immutable.ImmutableSegmentImpl;
 import org.apache.pinot.segment.local.segment.readers.LazyRow;
-import org.apache.pinot.segment.local.segment.readers.PrimaryKeyReader;
 import org.apache.pinot.segment.local.utils.HashUtils;
-import org.apache.pinot.segment.spi.ImmutableSegment;
 import org.apache.pinot.segment.spi.IndexSegment;
 import org.apache.pinot.segment.spi.MutableSegment;
 import org.apache.pinot.segment.spi.index.mutable.ThreadSafeMutableRoaringBitmap;
@@ -162,9 +160,7 @@ public class ConcurrentMapPartitionUpsertMetadataManager extends BasePartitionUp
             } else {
               // New primary key
               addDocId(segment, validDocIds, queryableDocIds, newDocId, recordInfo);
-              RecordLocation newRecordLocation = new RecordLocation(segment, newDocId, newComparisonValue);
-              _previousKeyToRecordLocationMap.put(primaryKey, newRecordLocation);
-              return newRecordLocation;
+              return new RecordLocation(segment, newDocId, newComparisonValue);
             }
           });
     }
@@ -190,13 +186,54 @@ public class ConcurrentMapPartitionUpsertMetadataManager extends BasePartitionUp
   }
 
   @Override
-  protected void removeSegment(IndexSegment segment, Iterator<PrimaryKey> primaryKeyIterator) {
+  protected void revertAndRemoveSegment(IndexSegment segment,
+      Iterator<Map.Entry<Integer, PrimaryKey>> primaryKeyIterator) {
     while (primaryKeyIterator.hasNext()) {
-      PrimaryKey primaryKey = primaryKeyIterator.next();
+      Map.Entry<Integer, PrimaryKey> primaryKeyEntry = primaryKeyIterator.next();
+      PrimaryKey primaryKey = primaryKeyEntry.getValue();
+      int docId = primaryKeyEntry.getKey();
       _primaryKeyToRecordLocationMap.computeIfPresent(HashUtils.hashPrimaryKey(primaryKey, _hashFunction),
           (pk, recordLocation) -> {
-            if (recordLocation.getSegment() == segment) {
+            RecordLocation prevLocation = _previousKeyToRecordLocationMap.get(primaryKey);
+            if (segment instanceof MutableSegment && prevLocation != null && !(_previousKeyToRecordLocationMap.get(
+                primaryKey).getSegment() instanceof MutableSegment) && _trackedSegments.contains(
+                prevLocation.getSegment())) {
+              // Revert to previous immutable segment location
+              IndexSegment prevSegment = prevLocation.getSegment();
+              ThreadSafeMutableRoaringBitmap prevValidDocIds = prevSegment.getValidDocIds();
+              if (prevValidDocIds != null) {
+                try (UpsertUtils.RecordInfoReader recordInfoReader = new UpsertUtils.RecordInfoReader(prevSegment,
+                    _primaryKeyColumns, _comparisonColumns, _deleteRecordColumn)) {
+                  int prevDocId = prevLocation.getDocId();
+                  RecordInfo recordInfo = recordInfoReader.getRecordInfo(prevDocId);
+                  replaceDocId(prevSegment, prevValidDocIds, prevSegment.getQueryableDocIds(), segment, docId,
+                      prevDocId, recordInfo);
+                  _previousKeyToRecordLocationMap.remove(primaryKey);
+                  return prevLocation;
+                } catch (IOException e) {
+                  _logger.warn("Failed to revert to previous segment: {}, removing key", prevSegment.getSegmentName(),
+                      e);
+                  removeDocId(segment, docId);
+                  _previousKeyToRecordLocationMap.remove(primaryKey);
+                  return null;
+                }
+              } else {
+                _logger.debug("Previous segment {} has null validDocIds, removing key", prevSegment.getSegmentName());
+                removeDocId(segment, docId);
+                _previousKeyToRecordLocationMap.remove(primaryKey);
+                return null;
+              }
+            } else if (recordLocation.getSegment() == segment) {
+              // New key in the segment
+              if (segment instanceof MutableSegment) {
+                removeDocId(segment, recordLocation.getDocId());
+                _previousKeyToRecordLocationMap.remove(primaryKey);
+              }
               return null;
+            }
+            if (segment instanceof MutableSegment) {
+              removeDocId(segment, docId);
+              _previousKeyToRecordLocationMap.remove(primaryKey);
             }
             return recordLocation;
           });
@@ -264,74 +301,6 @@ public class ConcurrentMapPartitionUpsertMetadataManager extends BasePartitionUp
   }
 
   @Override
-  protected void revertCurrentSegmentUpsertMetadata(IndexSegment oldSegment, ThreadSafeMutableRoaringBitmap validDocIds,
-      ThreadSafeMutableRoaringBitmap queryableDocIds, ImmutableSegment segment,
-      MutableRoaringBitmap validDocIdsForOldSegment) {
-    // Iterate over validDocIdsForOldSegment to get all PKs that still need to be reverted.
-    // For each PK, look up the previous location in _previousKeyToRecordLocationMap:
-    //   - If previous location is in an ImmutableSegment: revert to that location
-    //   - Otherwise (no previous or previous is MutableSegment): remove the key
-    int numKeysToRevert = validDocIdsForOldSegment.getCardinality();
-    _logger.info("Reverting Upsert metadata for {} keys in segment: {}", numKeysToRevert, oldSegment.getSegmentName());
-    int totalRevertedKeys = 0;
-    int totalDeletedKeys = 0;
-
-    // Collect all docIds first to avoid concurrent modification during iteration
-    int[] docIdsToProcess = validDocIdsForOldSegment.toArray();
-
-    try (PrimaryKeyReader primaryKeyReader = new PrimaryKeyReader(oldSegment, _primaryKeyColumns)) {
-      for (int docId : docIdsToProcess) {
-        Object primaryKey = HashUtils.hashPrimaryKey(primaryKeyReader.getPrimaryKey(docId), _hashFunction);
-        RecordLocation prevLocation = _previousKeyToRecordLocationMap.get(primaryKey);
-
-        // Check if previous location is in an immutable segment (not mutable/consuming) and still tracked
-        if (prevLocation != null && !(prevLocation.getSegment() instanceof MutableSegment) && _trackedSegments.contains(
-            prevLocation.getSegment())) {
-          // Revert to previous immutable segment location
-          IndexSegment prevSegment = prevLocation.getSegment();
-          ThreadSafeMutableRoaringBitmap prevValidDocIds = prevSegment.getValidDocIds();
-          if (prevValidDocIds != null) {
-            try (UpsertUtils.RecordInfoReader recordInfoReader = new UpsertUtils.RecordInfoReader(prevSegment,
-                _primaryKeyColumns, _comparisonColumns, _deleteRecordColumn)) {
-              int prevDocId = prevLocation.getDocId();
-              RecordInfo recordInfo = recordInfoReader.getRecordInfo(prevDocId);
-              replaceDocId(prevSegment, prevValidDocIds, prevSegment.getQueryableDocIds(), oldSegment, docId, prevDocId,
-                  recordInfo);
-              validDocIdsForOldSegment.remove(docId);
-              _primaryKeyToRecordLocationMap.put(primaryKey, prevLocation);
-              totalRevertedKeys++;
-            } catch (IOException e) {
-              _logger.warn("Failed to revert to previous segment: {}, removing key", prevSegment.getSegmentName(), e);
-              removeDocId(oldSegment, docId);
-              validDocIdsForOldSegment.remove(docId);
-              _primaryKeyToRecordLocationMap.remove(primaryKey);
-              totalDeletedKeys++;
-            }
-          } else {
-            _logger.debug("Previous segment {} has null validDocIds, removing key", prevSegment.getSegmentName());
-            removeDocId(oldSegment, docId);
-            validDocIdsForOldSegment.remove(docId);
-            _primaryKeyToRecordLocationMap.remove(primaryKey);
-            totalDeletedKeys++;
-          }
-        } else {
-          // No valid previous location or key is newly added in the consuming segment - remove key
-          removeDocId(oldSegment, docId);
-          validDocIdsForOldSegment.remove(docId);
-          _primaryKeyToRecordLocationMap.remove(primaryKey);
-          totalDeletedKeys++;
-        }
-      }
-    } catch (Exception e) {
-      throw new RuntimeException(String.format("Failed to revert segment upsert metadata for segment: %s, table: %s",
-          oldSegment.getSegmentName(), _tableNameWithType), e);
-    }
-    _previousKeyToRecordLocationMap.clear();
-    _logger.info("Reverted {} keys, deleted {} keys for segment: {}", totalRevertedKeys, totalDeletedKeys,
-        oldSegment.getSegmentName());
-  }
-
-  @Override
   protected void eraseKeyToPreviousLocationMap() {
     _previousKeyToRecordLocationMap.clear();
   }
@@ -378,9 +347,7 @@ public class ConcurrentMapPartitionUpsertMetadataManager extends BasePartitionUp
           } else {
             // New primary key
             addDocId(segment, validDocIds, queryableDocIds, newDocId, recordInfo);
-            RecordLocation newRecordLocation = new RecordLocation(segment, newDocId, newComparisonValue);
-            _previousKeyToRecordLocationMap.put(primaryKey, newRecordLocation);
-            return newRecordLocation;
+            return new RecordLocation(segment, newDocId, newComparisonValue);
           }
         });
 

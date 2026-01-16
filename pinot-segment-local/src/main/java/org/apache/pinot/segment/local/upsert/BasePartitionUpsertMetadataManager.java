@@ -700,8 +700,7 @@ public abstract class BasePartitionUpsertMetadataManager implements PartitionUps
   }
 
   /**
-   * Reverts segment upsert metadata and retries addOrReplaceSegment with a maximum retry limit to prevent infinite
-   * recursion in case of persistent inconsistencies.
+   * Reverts segment upsert metadata and retries addOrReplaceSegment.
    */
   void revertSegmentUpsertMetadataWithRetry(ImmutableSegment segment,
       @Nullable ThreadSafeMutableRoaringBitmap validDocIds, @Nullable ThreadSafeMutableRoaringBitmap queryableDocIds,
@@ -713,7 +712,9 @@ public abstract class BasePartitionUpsertMetadataManager implements PartitionUps
     if (queryableDocIds == null && _deleteRecordColumn != null) {
       queryableDocIds = new ThreadSafeMutableRoaringBitmap();
     }
-    revertCurrentSegmentUpsertMetadata(oldSegment, validDocIds, queryableDocIds, segment, validDocIdsForOldSegment);
+    // Revert to previous location and remove the newly added keys
+    // Note: Replacing the valid docs happens in place during inconsistent states irrespective of consistency mode
+    removeSegment(oldSegment, validDocIdsForOldSegment);
     try (UpsertUtils.RecordInfoReader recordInfoReader = new UpsertUtils.RecordInfoReader(segment, _primaryKeyColumns,
         _comparisonColumns, _deleteRecordColumn)) {
       Iterator<RecordInfo> latestRecordInfoIterator =
@@ -725,6 +726,7 @@ public abstract class BasePartitionUpsertMetadataManager implements PartitionUps
           String.format("Caught exception while replacing segment metadata during inconsistencies: %s, table: %s",
               segmentName, _tableNameWithType), e);
     }
+    validDocIdsForOldSegment = getValidDocIdsForOldSegment(oldSegment);
     if (validDocIdsForOldSegment.isEmpty()) {
       _logger.info("Successfully resolved inconsistency for segment: {} across servers", segmentName);
       return;
@@ -747,27 +749,18 @@ public abstract class BasePartitionUpsertMetadataManager implements PartitionUps
 
   protected abstract void eraseKeyToPreviousLocationMap();
 
-  protected abstract void revertCurrentSegmentUpsertMetadata(IndexSegment oldSegment,
-      ThreadSafeMutableRoaringBitmap validDocIds, ThreadSafeMutableRoaringBitmap queryableDocIds,
-      ImmutableSegment segment, MutableRoaringBitmap validDocIdsForOldSegment);
-
   private MutableRoaringBitmap getValidDocIdsForOldSegment(IndexSegment oldSegment) {
     return oldSegment.getValidDocIds() != null ? oldSegment.getValidDocIds().getMutableRoaringBitmap() : null;
   }
 
   protected void removeSegment(IndexSegment segment, MutableRoaringBitmap validDocIds) {
     try (PrimaryKeyReader primaryKeyReader = new PrimaryKeyReader(segment, _primaryKeyColumns)) {
-      removeSegment(segment, UpsertUtils.getPrimaryKeyIterator(primaryKeyReader, validDocIds));
+      revertAndRemoveSegment(segment, UpsertUtils.getRecordIterator(primaryKeyReader, validDocIds));
     } catch (Exception e) {
       throw new RuntimeException(
           String.format("Caught exception while removing segment: %s, table: %s, message: %s", segment.getSegmentName(),
               _tableNameWithType, e.getMessage()), e);
     }
-  }
-
-  protected void removeSegment(IndexSegment segment, Iterator<PrimaryKey> primaryKeyIterator) {
-    throw new UnsupportedOperationException("Both removeSegment(segment, validDocID) and "
-        + "removeSegment(segment, pkIterator) are not implemented. Implement one of them to support removal.");
   }
 
   @Override
@@ -1125,6 +1118,9 @@ public abstract class BasePartitionUpsertMetadataManager implements PartitionUps
       finishOperation();
     }
   }
+
+  protected abstract void revertAndRemoveSegment(IndexSegment segment,
+      Iterator<Map.Entry<Integer, PrimaryKey>> primaryKeyIterator);
 
   /**
    * Removes all primary keys that have comparison value smaller than (largestSeenComparisonValue - TTL).
