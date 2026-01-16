@@ -607,7 +607,19 @@ const TimeseriesQueryPage = () => {
               name="Query Options (JSON)"
               showSearchBox={false}
               showTooltip={true}
-              tooltipText={`Enter query options as a JSON map of strings, e.g. {"enableNullHandling": "true"}`}
+              tooltipText={
+                <span>
+                  Enter query options as a JSON map of strings, e.g. {`{"enableNullHandling": "true"}`}. Please find the list of supported query options in the{' '}
+                  <a
+                    href="https://docs.pinot.apache.org/users/user-guide-query/query-options"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    style={{ color: '#90caf9', textDecoration: 'underline' }}
+                  >
+                    documentation
+                  </a>.
+                </span>
+              }
             />
             <CodeMirror
               value={config.queryOptions}
