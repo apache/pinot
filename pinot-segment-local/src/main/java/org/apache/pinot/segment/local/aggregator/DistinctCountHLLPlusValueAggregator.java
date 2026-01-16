@@ -76,7 +76,7 @@ public class DistinctCountHLLPlusValueAggregator implements ValueAggregator<Obje
       _maxByteSize = bytes.length;
     } else {
       initialValue = new HyperLogLogPlus(_p, _sp);
-      initialValue.offer(rawValue);
+      offerValue(initialValue, rawValue);
       _maxByteSize = HyperLogLogPlusUtils.byteSize(_p, _sp);
     }
     return initialValue;
@@ -91,9 +91,25 @@ public class DistinctCountHLLPlusValueAggregator implements ValueAggregator<Obje
         throw new RuntimeException(e);
       }
     } else {
-      value.offer(rawValue);
+      offerValue(value, rawValue);
     }
     return value;
+  }
+
+  /**
+   * Offers a raw value (single value or multi-value array) to the HyperLogLogPlus.
+   */
+  protected void offerValue(HyperLogLogPlus hll, Object rawValue) {
+    if (rawValue instanceof Object[]) {
+      Object[] values = (Object[]) rawValue;
+      for (Object value : values) {
+        if (value != null) {
+          hll.offer(value);
+        }
+      }
+    } else {
+      hll.offer(rawValue);
+    }
   }
 
   @Override
