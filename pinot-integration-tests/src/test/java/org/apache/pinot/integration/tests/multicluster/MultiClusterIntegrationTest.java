@@ -260,9 +260,9 @@ public class MultiClusterIntegrationTest extends ClusterTest {
     int unavailableBroker = _brokerWithUnavailableCluster._brokerPort;
 
     String sseOpts = "SET enableMultiClusterRouting=true; ";
-    String mseOpts = "SET useMultistageEngine=true; SET enableMultiClusterRouting=true; ";
+    String mseOpts = sseOpts + "SET useMultistageEngine=true; ";
     String physOptOpts = mseOpts + "SET usePhysicalOptimizer=true; ";
-    String runInBrokerOpts = physOptOpts + "SET runInBroker=true; ";
+    String mseLiteOpts = physOptOpts + "SET runInBroker=true; ";
 
     return new Object[][]{
         // SSE tests (count only)
@@ -274,9 +274,9 @@ public class MultiClusterIntegrationTest extends ClusterTest {
         // Physical optimizer tests (join + count)
         {"PhysicalOptimizer-NormalBroker", physOptOpts, true, normalBroker, false},
         {"PhysicalOptimizer-UnavailableBroker", physOptOpts, true, unavailableBroker, true},
-        // RunInBroker tests (join + count)
-        {"RunInBroker-NormalBroker", runInBrokerOpts, true, normalBroker, false},
-        {"RunInBroker-UnavailableBroker", runInBrokerOpts, true, unavailableBroker, true},
+        // MSELiteMode tests (join + count)
+        {"MSELiteMode-NormalBroker", mseLiteOpts, true, normalBroker, false},
+        {"MSELiteMode-UnavailableBroker", mseLiteOpts, true, unavailableBroker, true},
     };
   }
 
