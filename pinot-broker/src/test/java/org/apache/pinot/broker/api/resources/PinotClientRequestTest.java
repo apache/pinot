@@ -311,4 +311,35 @@ public class PinotClientRequestTest {
     assertEquals(sizeCaptor.getValue().longValue(), expectedSize,
         "Metric should record the actual response size in bytes");
   }
+
+  @Test
+  public void testPinotQueryValidationWithValidQuery() throws Exception {
+    String validQuery = "{\"sql\":\"SELECT * FROM myTable LIMIT 10\"}";
+    PinotClientRequest.QuerySyntaxValidationResponse response =
+            _pinotClientRequest.validateSqlQuerySyntaxPost(validQuery, _httpHeaders);
+
+    Assert.assertTrue(response.isValidQuerySyntax(), "Response value should be valid");
+    Assert.assertNull(response.getErrorMessage());
+    Assert.assertNull(response.getErrorCode());
+  }
+
+  @Test
+  public void testPinotQueryValidationWithInvalidQuery() throws Exception {
+    String invalidQuery = "{\"sql\":\"SELECT select FROM myTable LIMIT 10\"}";
+
+    PinotClientRequest.QuerySyntaxValidationResponse response =
+            _pinotClientRequest.validateSqlQuerySyntaxPost(invalidQuery, _httpHeaders);
+    Assert.assertFalse(response.isValidQuerySyntax(), "Response value should be invalid");
+    assertEquals(response.getErrorCode(), QueryErrorCode.SQL_PARSING);
+  }
+
+  @Test
+  public void testPinotQueryValidationWithInvalidRequestPayload() throws Exception {
+    String invalidQuery = "{\"query\":\"SELECT select FROM myTable LIMIT 10\"}";
+
+    PinotClientRequest.QuerySyntaxValidationResponse response =
+            _pinotClientRequest.validateSqlQuerySyntaxPost(invalidQuery, _httpHeaders);
+    Assert.assertFalse(response.isValidQuerySyntax(), "Response value should be invalid");
+    assertEquals(response.getErrorCode(), QueryErrorCode.JSON_PARSING);
+  }
 }

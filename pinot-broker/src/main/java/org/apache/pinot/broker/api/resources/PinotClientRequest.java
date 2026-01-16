@@ -40,6 +40,7 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.Executor;
+import javax.annotation.Nullable;
 import javax.inject.Inject;
 import javax.inject.Named;
 import javax.ws.rs.DELETE;
@@ -92,6 +93,7 @@ import org.apache.pinot.spi.utils.CommonConstants;
 import org.apache.pinot.spi.utils.CommonConstants.Broker.Request;
 import org.apache.pinot.spi.utils.JsonUtils;
 import org.apache.pinot.sql.parsers.PinotSqlType;
+import org.apache.pinot.sql.parsers.SqlCompilationException;
 import org.apache.pinot.sql.parsers.SqlNodeAndOptions;
 import org.apache.pinot.tsdb.spi.series.TimeSeriesBlock;
 import org.glassfish.jersey.server.ManagedAsync;
@@ -243,6 +245,94 @@ public class PinotClientRequest {
       return Response.status(Response.Status.INTERNAL_SERVER_ERROR)
           .entity("{\"error\": \"" + e.getMessage() + "\"}")
           .build();
+    }
+  }
+
+  @POST
+  @Produces(MediaType.APPLICATION_JSON)
+  @Path("query/sql/validateSyntax")
+  @ApiOperation(value = "Validate SQL query syntax",
+          notes = "Validates if the SQL query can be parsed by Calcite without executing it. "
+                  + "This is useful for validating if queries can be parsed successfully")
+  @ApiResponses(value = {
+          @ApiResponse(code = 200, message = "Validation response (check 'valid' field for result)")
+  })
+  @ManualAuthorization
+  public QuerySyntaxValidationResponse validateSqlQuerySyntaxPost(
+          @ApiParam(value = "JSON with 'sql' field", required = true) String query,
+          @Context HttpHeaders httpHeaders) {
+      try {
+          JsonNode requestJson = JsonUtils.stringToJsonNode(query);
+          if (!requestJson.has(Request.SQL)) {
+              return new QuerySyntaxValidationResponse(
+                      false,
+                      "Payload is missing query string field 'sql'",
+                      QueryErrorCode.JSON_PARSING
+              );
+          }
+          String sqlQuery = requestJson.get(Request.SQL).asText();
+          return performSqlSyntaxValidation(sqlQuery);
+      } catch (Exception e) {
+          LOGGER.error("Error parsing validation request", e);
+          return new QuerySyntaxValidationResponse(
+                  false,
+                  e.getMessage(),
+                  QueryErrorCode.JSON_PARSING
+          );
+      }
+  }
+
+  private QuerySyntaxValidationResponse performSqlSyntaxValidation(String sqlQuery) {
+    try {
+      // This catches reserved keyword issues and syntax errors
+      SqlNodeAndOptions sqlNodeAndOptions = RequestUtils.parseQuery(sqlQuery);
+
+      return new QuerySyntaxValidationResponse(
+              true,
+              null,
+              null
+      );
+    } catch (SqlCompilationException e) {
+      LOGGER.debug("SQL validation failed for query: {}", sqlQuery, e);
+      return new QuerySyntaxValidationResponse(
+              false,
+              e.getMessage(),
+              QueryErrorCode.SQL_PARSING
+      );
+    } catch (Exception e) {
+      String msg = "Unexpected error parsing query" + e.getMessage();
+      LOGGER.error(msg);
+      return new QuerySyntaxValidationResponse(
+              false,
+              msg,
+              QueryErrorCode.UNKNOWN
+      );
+    }
+  }
+
+  public static class QuerySyntaxValidationResponse {
+    private final boolean _validQuerySyntax;
+    private final String _errorMessage;
+    private final QueryErrorCode _errorCode;
+
+    public QuerySyntaxValidationResponse(boolean validQuery, String errorMessage, QueryErrorCode errorCode) {
+      _validQuerySyntax = validQuery;
+      _errorMessage = errorMessage;
+      _errorCode = errorCode;
+    }
+
+    public boolean isValidQuerySyntax() {
+      return _validQuerySyntax;
+    }
+
+    @Nullable
+    public String getErrorMessage() {
+      return _errorMessage;
+    }
+
+    @Nullable
+    public QueryErrorCode getErrorCode() {
+      return _errorCode;
     }
   }
 
