@@ -144,6 +144,7 @@ public class ConcurrentMapPartitionUpsertMetadataManagerForConsistentDeletes
                       validDocIdsForOldSegment.remove(currentDocId);
                     }
                   }
+                  _previousKeyToRecordLocationMap.remove(primaryKey);
                   return new RecordLocation(segment, newDocId, newComparisonValue,
                       RecordLocation.incrementSegmentCount(currentDistinctSegmentCount));
                 } else {
@@ -396,11 +397,6 @@ public class ConcurrentMapPartitionUpsertMetadataManagerForConsistentDeletes
       _serverMetrics.addMeteredTableValue(_tableNameWithType, ServerMeter.DELETED_KEYS_TTL_PRIMARY_KEYS_REMOVED,
           numDeletedTTLKeys);
     }
-  }
-
-  @Override
-  protected void eraseKeyToPreviousLocationMap() {
-    _previousKeyToRecordLocationMap.clear();
   }
 
   @Override

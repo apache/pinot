@@ -571,9 +571,6 @@ public abstract class BasePartitionUpsertMetadataManager implements PartitionUps
     }
     try {
       doReplaceSegment(segment, oldSegment);
-      if (oldSegment instanceof MutableSegment) {
-        eraseKeyToPreviousLocationMap();
-      }
       if (!(segment instanceof EmptyIndexSegment)) {
         _trackedSegments.add(segment);
         if (_enableSnapshot) {
@@ -746,8 +743,6 @@ public abstract class BasePartitionUpsertMetadataManager implements PartitionUps
       removeSegment(oldSegment, validDocIdsForOldSegment);
     }
   }
-
-  protected abstract void eraseKeyToPreviousLocationMap();
 
   private MutableRoaringBitmap getValidDocIdsForOldSegment(IndexSegment oldSegment) {
     return oldSegment.getValidDocIds() != null ? oldSegment.getValidDocIds().getMutableRoaringBitmap() : null;

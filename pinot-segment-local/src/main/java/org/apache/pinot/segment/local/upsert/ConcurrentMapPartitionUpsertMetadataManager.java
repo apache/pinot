@@ -116,6 +116,7 @@ public class ConcurrentMapPartitionUpsertMetadataManager extends BasePartitionUp
                       validDocIdsForOldSegment.remove(currentDocId);
                     }
                   }
+                  _previousKeyToRecordLocationMap.remove(primaryKey);
                   return new RecordLocation(segment, newDocId, newComparisonValue);
                 } else {
                   return currentRecordLocation;
@@ -298,11 +299,6 @@ public class ConcurrentMapPartitionUpsertMetadataManager extends BasePartitionUp
       _serverMetrics.addMeteredTableValue(_tableNameWithType, ServerMeter.DELETED_KEYS_WITHIN_TTL_WINDOW,
           numDeletedKeysWithinTTLWindowValue);
     }
-  }
-
-  @Override
-  protected void eraseKeyToPreviousLocationMap() {
-    _previousKeyToRecordLocationMap.clear();
   }
 
   @Override
