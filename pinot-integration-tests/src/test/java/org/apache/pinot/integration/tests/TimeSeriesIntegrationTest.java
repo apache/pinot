@@ -320,15 +320,15 @@ public class TimeSeriesIntegrationTest extends BaseClusterIntegrationTest {
 
     JsonNode dataSchema = resultTable.path("dataSchema");
     JsonNode columnNames = dataSchema.path("columnNames");
-    assertEquals(columnNames.size(), 2, "Should have SQL and PLAN columns");
-    assertEquals(columnNames.get(0).asText(), "SQL");
+    assertEquals(columnNames.size(), 2, "Should have QUERY and PLAN columns");
+    assertEquals(columnNames.get(0).asText(), "QUERY");
     assertEquals(columnNames.get(1).asText(), "PLAN");
 
     JsonNode rows = resultTable.path("rows");
     assertEquals(rows.size(), 1, "Should have exactly one row");
     JsonNode row = rows.get(0);
 
-    assertEquals(row.get(0).asText(), query, "SQL should match the original query");
+    assertEquals(row.get(0).asText(), query, "QUERY should match the original query");
 
     // Verify PLAN matches expected (normalize dynamic plan IDs like "plan_2, ")
     String actualPlan = row.get(1).asText().replaceAll("plan_\\d+, ", "");
