@@ -1968,7 +1968,8 @@ public class ConcurrentMapPartitionUpsertMetadataManagerTest {
   }
 
   @Test
-  public void testPartialUpsertOldSegmentTriggerReversion() throws IOException {
+  public void testPartialUpsertOldSegmentTriggerReversion()
+      throws IOException {
     // Test partial upserts with consuming (mutable) segment being sealed - revert should be triggered
     // Note: Revert logic only applies when sealing a consuming segment, not for immutable segment replacement
     PartialUpsertHandler mockPartialUpsertHandler = mock(PartialUpsertHandler.class);
@@ -1999,8 +2000,8 @@ public class ConcurrentMapPartitionUpsertMetadataManagerTest {
     int[] timestamps2 = new int[]{150, 350};
     ThreadSafeMutableRoaringBitmap validDocIds2 = new ThreadSafeMutableRoaringBitmap();
     List<PrimaryKey> primaryKeysList2 = getPrimaryKeyList(numRecords2, primaryKeys2);
-    ImmutableSegmentImpl segment2 = mockImmutableSegmentWithTimestamps(1, validDocIds2, null,
-        primaryKeysList2, timestamps2);
+    ImmutableSegmentImpl segment2 =
+        mockImmutableSegmentWithTimestamps(1, validDocIds2, null, primaryKeysList2, timestamps2);
 
     // Replace mutable with immutable (consuming segment seal) - revert SHOULD be triggered
     upsertMetadataManager.replaceSegment(segment2, validDocIds2, null,
@@ -2013,7 +2014,7 @@ public class ConcurrentMapPartitionUpsertMetadataManagerTest {
     checkRecordLocation(recordLocationMap, 3, segment2, 1, 350, HashFunction.NONE);
 
     // Mutable segment's validDocIds should be 0 after removal
-    assertEquals(validDocIds1.getMutableRoaringBitmap().getCardinality(), 0);
+    assertEquals(mutableSegment.getValidDocIds().getMutableRoaringBitmap().getCardinality(), 0);
     upsertMetadataManager.stop();
     upsertMetadataManager.close();
   }
@@ -2155,7 +2156,7 @@ public class ConcurrentMapPartitionUpsertMetadataManagerTest {
     // Replace segment - RecordInfoReader will read real data from segment2
     upsertMetadataManager.replaceSegment(segment2, segment1);
 
-    assertEquals(recordLocationMap.size(), 2);
+    assertEquals(recordLocationMap.size(), 3);
     checkRecordLocation(recordLocationMap, 10, segment2, 0, 1500, HashFunction.NONE);
     checkRecordLocation(recordLocationMap, 30, segment2, 1, 3500, HashFunction.NONE);
     assertEquals(segment2.getValidDocIds().getMutableRoaringBitmap().getCardinality(), 2);
@@ -2207,7 +2208,7 @@ public class ConcurrentMapPartitionUpsertMetadataManagerTest {
 
     upsertMetadataManager.replaceSegment(segment2, segment1);
 
-    assertEquals(recordLocationMap.size(), 1);
+    assertEquals(recordLocationMap.size(), 3);
     checkRecordLocation(recordLocationMap, 100, segment2, 0, 15000, HashFunction.NONE);
 
     assertEquals(segment1.getValidDocIds().getMutableRoaringBitmap().getCardinality(), 2);
@@ -2307,7 +2308,7 @@ public class ConcurrentMapPartitionUpsertMetadataManagerTest {
 
     assertTrue(duration < 1000, "Immutable-to-immutable replacement should complete quickly, took: " + duration + "ms");
 
-    assertEquals(recordLocationMap.size(), 1);
+    assertEquals(recordLocationMap.size(), 3);
     checkRecordLocation(recordLocationMap, 10, segment2, 0, 1500, HashFunction.NONE);
 
     upsertMetadataManager.stop();
