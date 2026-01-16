@@ -798,7 +798,7 @@ public class PinotSegmentUploadDownloadRestletResource {
       boolean enableParallelPushProtection,
       @ApiParam(value = "Whether to refresh if the segment already exists") @DefaultValue("true")
       @QueryParam(FileUploadDownloadClient.QueryParameters.ALLOW_REFRESH) boolean allowRefresh,
-      @Context HttpHeaders headers, @Context Request request, @Suspended final AsyncResponse asyncResponse) {
+      @Context HttpHeaders headers, @Context Request request, @Suspended AsyncResponse asyncResponse) {
     try {
       asyncResponse.resume(uploadSegment(tableName, TableType.valueOf(tableType.toUpperCase()), null, false,
           enableParallelPushProtection, allowRefresh, headers, request));
@@ -837,7 +837,7 @@ public class PinotSegmentUploadDownloadRestletResource {
       boolean enableParallelPushProtection,
       @ApiParam(value = "Whether to refresh if the segment already exists") @DefaultValue("true")
       @QueryParam(FileUploadDownloadClient.QueryParameters.ALLOW_REFRESH) boolean allowRefresh,
-      @Context HttpHeaders headers, @Context Request request, @Suspended final AsyncResponse asyncResponse) {
+      @Context HttpHeaders headers, @Context Request request, @Suspended AsyncResponse asyncResponse) {
     try {
       asyncResponse.resume(uploadSegment(tableName, TableType.valueOf(tableType.toUpperCase()), multiPart, true,
           enableParallelPushProtection, allowRefresh, headers, request));
@@ -885,7 +885,7 @@ public class PinotSegmentUploadDownloadRestletResource {
       boolean allowRefresh,
       @Context HttpHeaders headers,
       @Context Request request,
-      @Suspended final AsyncResponse asyncResponse) {
+      @Suspended AsyncResponse asyncResponse) {
     if (StringUtils.isEmpty(tableName)) {
       throw new ControllerApplicationException(LOGGER,
           "tableName is a required field while uploading segments in batch mode.", Response.Status.BAD_REQUEST);
@@ -939,7 +939,7 @@ public class PinotSegmentUploadDownloadRestletResource {
       boolean enableParallelPushProtection,
       @ApiParam(value = "Whether to refresh if the segment already exists") @DefaultValue("true")
       @QueryParam(FileUploadDownloadClient.QueryParameters.ALLOW_REFRESH) boolean allowRefresh,
-      @Context HttpHeaders headers, @Context Request request, @Suspended final AsyncResponse asyncResponse) {
+      @Context HttpHeaders headers, @Context Request request, @Suspended AsyncResponse asyncResponse) {
     try {
       asyncResponse.resume(
           uploadSegment(tableName, TableType.valueOf(tableType.toUpperCase()), null, true, enableParallelPushProtection,
@@ -979,7 +979,7 @@ public class PinotSegmentUploadDownloadRestletResource {
       boolean enableParallelPushProtection,
       @ApiParam(value = "Whether to refresh if the segment already exists") @DefaultValue("true")
       @QueryParam(FileUploadDownloadClient.QueryParameters.ALLOW_REFRESH) boolean allowRefresh,
-      @Context HttpHeaders headers, @Context Request request, @Suspended final AsyncResponse asyncResponse) {
+      @Context HttpHeaders headers, @Context Request request, @Suspended AsyncResponse asyncResponse) {
     try {
       asyncResponse.resume(uploadSegment(tableName, TableType.valueOf(tableType.toUpperCase()), multiPart, true,
           enableParallelPushProtection, allowRefresh, headers, request));
@@ -1000,27 +1000,16 @@ public class PinotSegmentUploadDownloadRestletResource {
       @ApiParam(value = "Force cleanup") @QueryParam("forceCleanup") @DefaultValue("false") boolean forceCleanup,
       @ApiParam(value = "Fields belonging to start replace segment request", required = true)
       StartReplaceSegmentsRequest startReplaceSegmentsRequest, @Context HttpHeaders headers,
-      @Suspended final AsyncResponse asyncResponse) {
+      @Suspended AsyncResponse asyncResponse) {
+    tableName = DatabaseUtils.translateTableName(tableName, headers);
+    TableType tableType = Constants.validateTableType(tableTypeStr);
+    if (tableType == null) {
+      throw new ControllerApplicationException(LOGGER, "Table type should either be offline or realtime",
+          Response.Status.BAD_REQUEST);
+    }
+    String tableNameWithType =
+        ResourceUtils.getExistingTableNamesWithType(_pinotHelixResourceManager, tableName, tableType, LOGGER).get(0);
     _resourceExecutorService.execute(() -> {
-      String translatedTableName;
-      TableType tableType;
-      String tableNameWithType;
-      try {
-        translatedTableName = DatabaseUtils.translateTableName(tableName, headers);
-        tableType = Constants.validateTableType(tableTypeStr);
-        if (tableType == null) {
-          asyncResponse.resume(
-              new ControllerApplicationException(LOGGER, "Table type should either be offline or realtime",
-                  Response.Status.BAD_REQUEST));
-          return;
-        }
-        tableNameWithType =
-            ResourceUtils.getExistingTableNamesWithType(_pinotHelixResourceManager, translatedTableName, tableType,
-                LOGGER).get(0);
-      } catch (Exception e) {
-        asyncResponse.resume(e);
-        return;
-      }
       try {
         String segmentLineageEntryId = _pinotHelixResourceManager.startReplaceSegments(tableNameWithType,
             startReplaceSegmentsRequest.getSegmentsFrom(), startReplaceSegmentsRequest.getSegmentsTo(), forceCleanup,
@@ -1050,27 +1039,16 @@ public class PinotSegmentUploadDownloadRestletResource {
       boolean cleanupSegments,
       @ApiParam(value = "Fields belonging to end replace segment request")
       EndReplaceSegmentsRequest endReplaceSegmentsRequest, @Context HttpHeaders headers,
-      @Suspended final AsyncResponse asyncResponse) {
+      @Suspended AsyncResponse asyncResponse) {
+    tableName = DatabaseUtils.translateTableName(tableName, headers);
+    TableType tableType = Constants.validateTableType(tableTypeStr);
+    if (tableType == null) {
+      throw new ControllerApplicationException(LOGGER, "Table type should either be offline or realtime",
+          Response.Status.BAD_REQUEST);
+    }
+    String tableNameWithType =
+        ResourceUtils.getExistingTableNamesWithType(_pinotHelixResourceManager, tableName, tableType, LOGGER).get(0);
     _resourceExecutorService.execute(() -> {
-      String translatedTableName;
-      TableType tableType;
-      String tableNameWithType;
-      try {
-        translatedTableName = DatabaseUtils.translateTableName(tableName, headers);
-        tableType = Constants.validateTableType(tableTypeStr);
-        if (tableType == null) {
-          asyncResponse.resume(
-              new ControllerApplicationException(LOGGER, "Table type should either be offline or realtime",
-                  Response.Status.BAD_REQUEST));
-          return;
-        }
-        tableNameWithType =
-            ResourceUtils.getExistingTableNamesWithType(_pinotHelixResourceManager, translatedTableName, tableType,
-                LOGGER).get(0);
-      } catch (Exception e) {
-        asyncResponse.resume(e);
-        return;
-      }
       try {
         // Check that the segment lineage entry id is valid
         Preconditions.checkNotNull(segmentLineageEntryId, "'segmentLineageEntryId' should not be null");
@@ -1103,27 +1081,16 @@ public class PinotSegmentUploadDownloadRestletResource {
       @QueryParam("forceRevert") @DefaultValue("false") boolean forceRevert,
       @ApiParam(value = "Fields belonging to revert replace segment request")
       RevertReplaceSegmentsRequest revertReplaceSegmentsRequest, @Context HttpHeaders headers,
-      @Suspended final AsyncResponse asyncResponse) {
+      @Suspended AsyncResponse asyncResponse) {
+    tableName = DatabaseUtils.translateTableName(tableName, headers);
+    TableType tableType = Constants.validateTableType(tableTypeStr);
+    if (tableType == null) {
+      throw new ControllerApplicationException(LOGGER, "Table type should either be offline or realtime",
+          Response.Status.BAD_REQUEST);
+    }
+    String tableNameWithType =
+        ResourceUtils.getExistingTableNamesWithType(_pinotHelixResourceManager, tableName, tableType, LOGGER).get(0);
     _resourceExecutorService.execute(() -> {
-      String translatedTableName;
-      TableType tableType;
-      String tableNameWithType;
-      try {
-        translatedTableName = DatabaseUtils.translateTableName(tableName, headers);
-        tableType = Constants.validateTableType(tableTypeStr);
-        if (tableType == null) {
-          asyncResponse.resume(
-              new ControllerApplicationException(LOGGER, "Table type should either be offline or realtime",
-                  Response.Status.BAD_REQUEST));
-          return;
-        }
-        tableNameWithType =
-            ResourceUtils.getExistingTableNamesWithType(_pinotHelixResourceManager, translatedTableName, tableType,
-                LOGGER).get(0);
-      } catch (Exception e) {
-        asyncResponse.resume(e);
-        return;
-      }
       try {
         // Check that the segment lineage entry id is valid
         Preconditions.checkNotNull(segmentLineageEntryId, "'segmentLineageEntryId' should not be null");
@@ -1131,8 +1098,7 @@ public class PinotSegmentUploadDownloadRestletResource {
             revertReplaceSegmentsRequest);
         asyncResponse.resume(Response.ok().build());
       } catch (Exception e) {
-        _controllerMetrics.addMeteredTableValue(tableNameWithType, ControllerMeter.NUMBER_REVERT_REPLACE_FAILURE,
-            1);
+        _controllerMetrics.addMeteredTableValue(tableNameWithType, ControllerMeter.NUMBER_REVERT_REPLACE_FAILURE, 1);
         asyncResponse.resume(
             new ControllerApplicationException(LOGGER, e.getMessage(), Response.Status.INTERNAL_SERVER_ERROR, e));
       }
