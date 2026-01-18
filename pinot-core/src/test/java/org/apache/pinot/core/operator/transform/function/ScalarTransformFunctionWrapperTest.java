@@ -28,6 +28,7 @@ import java.util.Random;
 import org.apache.commons.codec.digest.DigestUtils;
 import org.apache.commons.lang3.ArrayUtils;
 import org.apache.commons.lang3.StringUtils;
+import org.apache.pinot.common.function.scalar.ArithmeticFunctions;
 import org.apache.pinot.common.request.context.ExpressionContext;
 import org.apache.pinot.common.request.context.RequestContextUtils;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
@@ -337,21 +338,21 @@ public class ScalarTransformFunctionWrapperTest extends BaseTransformFunctionTes
     }
     testTransformFunction(transformFunction, expectedValues);
 
-    String seperator = "::";
+    String separator = "::";
     expression = RequestContextUtils.getExpression(
-        String.format("repeat(%s, '%s', %d)", STRING_ALPHANUM_SV_COLUMN, seperator, timesToRepeat));
+        String.format("repeat(%s, '%s', %d)", STRING_ALPHANUM_SV_COLUMN, separator, timesToRepeat));
     transformFunction = TransformFunctionFactory.get(expression, _dataSourceMap);
     assertTrue(transformFunction instanceof ScalarTransformFunctionWrapper);
     assertEquals(transformFunction.getName(), "repeat");
     expectedValues = new String[NUM_ROWS];
     for (int i = 0; i < NUM_ROWS; i++) {
-      expectedValues[i] = StringUtils.repeat(_stringAlphaNumericSVValues[i], seperator, timesToRepeat);
+      expectedValues[i] = StringUtils.repeat(_stringAlphaNumericSVValues[i], separator, timesToRepeat);
     }
     testTransformFunction(transformFunction, expectedValues);
 
     timesToRepeat = -1;
     expression = RequestContextUtils.getExpression(
-        String.format("repeat(%s, '%s', %d)", STRING_ALPHANUM_SV_COLUMN, seperator, timesToRepeat));
+        String.format("repeat(%s, '%s', %d)", STRING_ALPHANUM_SV_COLUMN, separator, timesToRepeat));
     transformFunction = TransformFunctionFactory.get(expression, _dataSourceMap);
     assertTrue(transformFunction instanceof ScalarTransformFunctionWrapper);
     assertEquals(transformFunction.getName(), "repeat");
@@ -1123,6 +1124,57 @@ public class ScalarTransformFunctionWrapperTest extends BaseTransformFunctionTes
     assertTrue(transformFunction instanceof ScalarTransformFunctionWrapper);
     assertEquals(transformFunction.getName(), "bytesToBigDecimal");
     testTransformFunction(transformFunction, _bigDecimalSVValues);
+  }
+
+  @Test
+  public void testRandTransformFunction() {
+    ExpressionContext expression = RequestContextUtils.getExpression("rand()");
+    TransformFunction transformFunction = TransformFunctionFactory.get(expression, _dataSourceMap);
+    assertTrue(transformFunction instanceof ScalarTransformFunctionWrapper);
+    assertEquals(transformFunction.getName(), "rand");
+    double[] firstValues = Arrays.copyOf(transformFunction.transformToDoubleValuesSV(_projectionBlock), NUM_ROWS);
+    for (double value : firstValues) {
+      assertTrue(value >= 0d && value < 1d, "rand() should return values in [0, 1)");
+    }
+    double[] secondValues = Arrays.copyOf(transformFunction.transformToDoubleValuesSV(_projectionBlock), NUM_ROWS);
+    assertFalse(Arrays.equals(firstValues, secondValues),
+        "rand() should yield non-deterministic results across evaluations");
+  }
+
+  @Test
+  public void testRandWithSeedTransformFunction() {
+    ExpressionContext expression = RequestContextUtils.getExpression("rand(42)");
+    TransformFunction transformFunction = TransformFunctionFactory.get(expression, _dataSourceMap);
+    assertTrue(transformFunction instanceof ScalarTransformFunctionWrapper);
+    assertEquals(transformFunction.getName(), "rand");
+    double[] firstValues = Arrays.copyOf(transformFunction.transformToDoubleValuesSV(_projectionBlock), NUM_ROWS);
+    double[] secondValues = Arrays.copyOf(transformFunction.transformToDoubleValuesSV(_projectionBlock), NUM_ROWS);
+    assertTrue(Arrays.equals(firstValues, secondValues), "rand(seed) should be deterministic");
+    double literalExpected = ArithmeticFunctions.rand(42L);
+    for (double value : firstValues) {
+      assertTrue(value >= 0d && value < 1d, "rand(seed) should return values in [0, 1)");
+      assertEquals(value, literalExpected);
+    }
+
+    expression = RequestContextUtils.getExpression(String.format("rand(%s)", INT_SV_COLUMN));
+    transformFunction = TransformFunctionFactory.get(expression, _dataSourceMap);
+    assertTrue(transformFunction instanceof ScalarTransformFunctionWrapper);
+    double[] columnSeedValues = Arrays.copyOf(transformFunction.transformToDoubleValuesSV(_projectionBlock), NUM_ROWS);
+    double[] columnSeedValuesSecond =
+        Arrays.copyOf(transformFunction.transformToDoubleValuesSV(_projectionBlock), NUM_ROWS);
+    assertTrue(Arrays.equals(columnSeedValues, columnSeedValuesSecond),
+        "rand(seedColumn) should be deterministic per seed");
+    boolean hasVariance = false;
+    for (int i = 1; i < NUM_ROWS; i++) {
+      if (Double.compare(columnSeedValues[i], columnSeedValues[0]) != 0) {
+        hasVariance = true;
+        break;
+      }
+    }
+    assertTrue(hasVariance, "rand(seedColumn) should produce varied outputs when seeds differ");
+    for (double value : columnSeedValues) {
+      assertTrue(value >= 0d && value < 1d, "rand(seedColumn) should return values in [0, 1)");
+    }
   }
 
   @Test

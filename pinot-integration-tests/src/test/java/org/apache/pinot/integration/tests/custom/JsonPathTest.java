@@ -20,7 +20,6 @@ package org.apache.pinot.integration.tests.custom;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.node.ArrayNode;
-import com.google.common.collect.ImmutableMap;
 import com.jayway.jsonpath.spi.cache.Cache;
 import com.jayway.jsonpath.spi.cache.CacheProvider;
 import java.io.File;
@@ -32,7 +31,6 @@ import java.util.List;
 import java.util.Map;
 import org.apache.avro.file.DataFileWriter;
 import org.apache.avro.generic.GenericData;
-import org.apache.avro.generic.GenericDatumWriter;
 import org.apache.pinot.common.function.JsonPathCache;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.TableType;
@@ -52,18 +50,18 @@ public class JsonPathTest extends CustomDataQueryClusterIntegrationTest {
 
   protected static final String DEFAULT_TABLE_NAME = "JsonPathTest";
 
-  protected static final int NUM_TOTAL_DOCS = 1000;
+  protected static final int NUM_DOCS_PER_SEGMENT = 1000;
   private static final String MY_MAP_STR_FIELD_NAME = "myMapStr";
   private static final String MY_MAP_STR_K1_FIELD_NAME = "myMapStr_k1";
   private static final String MY_MAP_STR_K2_FIELD_NAME = "myMapStr_k2";
   private static final String COMPLEX_MAP_STR_FIELD_NAME = "complexMapStr";
   private static final String COMPLEX_MAP_STR_K3_FIELD_NAME = "complexMapStr_k3";
 
-  protected final List<String> _sortedSequenceIds = new ArrayList<>(NUM_TOTAL_DOCS);
+  protected final List<String> _sortedSequenceIds = new ArrayList<>(NUM_DOCS_PER_SEGMENT);
 
   @Override
   protected long getCountStarResult() {
-    return NUM_TOTAL_DOCS;
+    return (long) NUM_DOCS_PER_SEGMENT * getNumAvroFiles();
   }
 
   @Override
@@ -106,10 +104,8 @@ public class JsonPathTest extends CustomDataQueryClusterIntegrationTest {
                 org.apache.avro.Schema.Type.STRING), null, null));
     avroSchema.setFields(fields);
 
-    File avroFile = new File(_tempDir, "data.avro");
-    try (DataFileWriter<GenericData.Record> fileWriter = new DataFileWriter<>(new GenericDatumWriter<>(avroSchema))) {
-      fileWriter.create(avroSchema, avroFile);
-      for (int i = 0; i < NUM_TOTAL_DOCS; i++) {
+    try (AvroFilesAndWriters avroFilesAndWriters = createAvroFilesAndWriters(avroSchema)) {
+      for (int i = 0; i < NUM_DOCS_PER_SEGMENT; i++) {
         Map<String, String> map = new HashMap<>();
         map.put("k1", "value-k1-" + i);
         map.put("k2", "value-k2-" + i);
@@ -121,16 +117,17 @@ public class JsonPathTest extends CustomDataQueryClusterIntegrationTest {
         complexMap.put("k2", "value-k2-" + i);
         complexMap.put("k3", Arrays.asList("value-k3-0-" + i, "value-k3-1-" + i, "value-k3-2-" + i));
         complexMap.put("k4",
-            ImmutableMap.of("k4-k1", "value-k4-k1-" + i, "k4-k2", "value-k4-k2-" + i, "k4-k3", "value-k4-k3-" + i,
+            Map.of("k4-k1", "value-k4-k1-" + i, "k4-k2", "value-k4-k2-" + i, "k4-k3", "value-k4-k3-" + i,
                 "met", i));
         record.put(COMPLEX_MAP_STR_FIELD_NAME, JsonUtils.objectToString(complexMap));
-        fileWriter.append(record);
+        for (DataFileWriter<GenericData.Record> writer : avroFilesAndWriters.getWriters()) {
+          writer.append(record);
+        }
         _sortedSequenceIds.add(String.valueOf(i));
       }
+      Collections.sort(_sortedSequenceIds);
+      return avroFilesAndWriters.getAvroFiles();
     }
-    Collections.sort(_sortedSequenceIds);
-
-    return List.of(avroFile);
   }
 
   @Test(dataProvider = "useBothQueryEngines")
@@ -198,21 +195,21 @@ public class JsonPathTest extends CustomDataQueryClusterIntegrationTest {
     Assert.assertFalse(rows.isEmpty());
     for (int i = 0; i < rows.size(); i++) {
       String value = rows.get(i).get(0).textValue();
-      Map results = JsonUtils.stringToObject(value, Map.class);
+      Map<?, ?> results = JsonUtils.stringToObject(value, Map.class);
       Assert.assertTrue(value.indexOf("-k1-") > 0);
-      Assert.assertEquals(results.get("k1"), "value-k1-" + i);
-      Assert.assertEquals(results.get("k2"), "value-k2-" + i);
-      final List k3 = (List) results.get("k3");
+      Assert.assertEquals(results.get("k1"), "value-k1-" + i % NUM_DOCS_PER_SEGMENT);
+      Assert.assertEquals(results.get("k2"), "value-k2-" + i % NUM_DOCS_PER_SEGMENT);
+      final List<?> k3 = (List<?>) results.get("k3");
       Assert.assertEquals(k3.size(), 3);
-      Assert.assertEquals(k3.get(0), "value-k3-0-" + i);
-      Assert.assertEquals(k3.get(1), "value-k3-1-" + i);
-      Assert.assertEquals(k3.get(2), "value-k3-2-" + i);
-      final Map k4 = (Map) results.get("k4");
+      Assert.assertEquals(k3.get(0), "value-k3-0-" + i % NUM_DOCS_PER_SEGMENT);
+      Assert.assertEquals(k3.get(1), "value-k3-1-" + i % NUM_DOCS_PER_SEGMENT);
+      Assert.assertEquals(k3.get(2), "value-k3-2-" + i % NUM_DOCS_PER_SEGMENT);
+      final Map<?, ?> k4 = (Map<?, ?>) results.get("k4");
       Assert.assertEquals(k4.size(), 4);
-      Assert.assertEquals(k4.get("k4-k1"), "value-k4-k1-" + i);
-      Assert.assertEquals(k4.get("k4-k2"), "value-k4-k2-" + i);
-      Assert.assertEquals(k4.get("k4-k3"), "value-k4-k3-" + i);
-      Assert.assertEquals(Double.parseDouble(k4.get("met").toString()), (double) i);
+      Assert.assertEquals(k4.get("k4-k1"), "value-k4-k1-" + i % NUM_DOCS_PER_SEGMENT);
+      Assert.assertEquals(k4.get("k4-k2"), "value-k4-k2-" + i % NUM_DOCS_PER_SEGMENT);
+      Assert.assertEquals(k4.get("k4-k3"), "value-k4-k3-" + i % NUM_DOCS_PER_SEGMENT);
+      Assert.assertEquals(Double.parseDouble(k4.get("met").toString()), i % NUM_DOCS_PER_SEGMENT);
     }
 
     //Filter Query
@@ -221,16 +218,20 @@ public class JsonPathTest extends CustomDataQueryClusterIntegrationTest {
     pinotResponse = postQuery(query);
     rows = (ArrayNode) pinotResponse.get("resultTable").get("rows");
     Assert.assertNotNull(rows);
-    Assert.assertEquals(rows.size(), 1);
+    Assert.assertEquals(rows.size(), getNumAvroFiles());
     for (int i = 0; i < rows.size(); i++) {
       String value = rows.get(i).get(0).textValue();
-      Assert.assertEquals(value,
-          "{\"k4-k1\":\"value-k4-k1-0\",\"k4-k2\":\"value-k4-k2-0\",\"k4-k3\":\"value-k4-k3-0\",\"met\":0}");
+      Map<?, ?> k4 = JsonUtils.stringToObject(value, Map.class);
+      Assert.assertEquals(k4.size(), 4);
+      Assert.assertEquals(k4.get("k4-k1"), "value-k4-k1-0");
+      Assert.assertEquals(k4.get("k4-k2"), "value-k4-k2-0");
+      Assert.assertEquals(k4.get("k4-k3"), "value-k4-k3-0");
+      Assert.assertEquals(Double.parseDouble(k4.get("met").toString()), 0.0);
     }
 
     //selection order by
     query = "Select complexMapStr from " + getTableName()
-        + " order by jsonExtractScalar(complexMapStr,'$.k4.k4-k1','STRING') DESC LIMIT " + NUM_TOTAL_DOCS;
+        + " order by jsonExtractScalar(complexMapStr,'$.k4.k4-k1','STRING') DESC LIMIT " + NUM_DOCS_PER_SEGMENT;
     pinotResponse = postQuery(query);
     rows = (ArrayNode) pinotResponse.get("resultTable").get("rows");
     Assert.assertNotNull(rows);
@@ -238,15 +239,15 @@ public class JsonPathTest extends CustomDataQueryClusterIntegrationTest {
     for (int i = 0; i < rows.size(); i++) {
       String value = rows.get(i).get(0).textValue();
       Assert.assertTrue(value.indexOf("-k1-") > 0);
-      Map results = JsonUtils.stringToObject(value, Map.class);
-      String seqId = _sortedSequenceIds.get(NUM_TOTAL_DOCS - 1 - i);
+      Map<?, ?> results = JsonUtils.stringToObject(value, Map.class);
+      String seqId = _sortedSequenceIds.get(NUM_DOCS_PER_SEGMENT - 1 - i / getNumAvroFiles());
       Assert.assertEquals(results.get("k1"), "value-k1-" + seqId);
       Assert.assertEquals(results.get("k2"), "value-k2-" + seqId);
-      final List k3 = (List) results.get("k3");
+      final List<?> k3 = (List<?>) results.get("k3");
       Assert.assertEquals(k3.get(0), "value-k3-0-" + seqId);
       Assert.assertEquals(k3.get(1), "value-k3-1-" + seqId);
       Assert.assertEquals(k3.get(2), "value-k3-2-" + seqId);
-      final Map k4 = (Map) results.get("k4");
+      final Map<?, ?> k4 = (Map<?, ?>) results.get("k4");
       Assert.assertEquals(k4.get("k4-k1"), "value-k4-k1-" + seqId);
       Assert.assertEquals(k4.get("k4-k2"), "value-k4-k2-" + seqId);
       Assert.assertEquals(k4.get("k4-k3"), "value-k4-k3-" + seqId);
@@ -268,10 +269,10 @@ public class JsonPathTest extends CustomDataQueryClusterIntegrationTest {
     Assert.assertNotNull(pinotResponse.get("resultTable").get("rows"));
     ArrayNode rows = (ArrayNode) pinotResponse.get("resultTable").get("rows");
     for (int i = 0; i < rows.size(); i++) {
-      String seqId = _sortedSequenceIds.get(NUM_TOTAL_DOCS - 1 - i);
+      String seqId = _sortedSequenceIds.get(NUM_DOCS_PER_SEGMENT - 1 - i);
       final JsonNode row = rows.get(i);
       Assert.assertEquals(row.get(0).asText(), "value-k1-" + seqId);
-      Assert.assertEquals(row.get(1).asDouble(), Double.parseDouble(seqId));
+      Assert.assertEquals(row.get(1).asDouble(), Double.parseDouble(seqId) * getNumAvroFiles());
     }
   }
 
@@ -288,10 +289,10 @@ public class JsonPathTest extends CustomDataQueryClusterIntegrationTest {
     Assert.assertNotNull(pinotResponse.get("resultTable").get("rows"));
     ArrayNode rows = (ArrayNode) pinotResponse.get("resultTable").get("rows");
     for (int i = 0; i < rows.size(); i++) {
-      String seqId = String.valueOf(NUM_TOTAL_DOCS - 1 - i);
+      String seqId = String.valueOf(NUM_DOCS_PER_SEGMENT - 1 - i);
       final JsonNode row = rows.get(i);
       Assert.assertEquals(row.get(0).asText(), "value-k1-" + seqId);
-      Assert.assertEquals(row.get(1).asDouble(), Double.parseDouble(seqId));
+      Assert.assertEquals(row.get(1).asDouble(), Double.parseDouble(seqId) * getNumAvroFiles());
     }
   }
 
@@ -310,7 +311,7 @@ public class JsonPathTest extends CustomDataQueryClusterIntegrationTest {
     Assert.assertEquals(rows.size(), 1);
     final JsonNode row = rows.get(0);
     Assert.assertEquals(row.get(0).asText(), "defaultKey");
-    Assert.assertEquals(row.get(1).asDouble(), 1000.0);
+    Assert.assertEquals(row.get(1).asDouble(), 1000.0 * getNumAvroFiles());
   }
 
   @Test(dataProvider = "useBothQueryEngines")
@@ -328,7 +329,7 @@ public class JsonPathTest extends CustomDataQueryClusterIntegrationTest {
     Assert.assertEquals(rows.size(), 1);
     final JsonNode row = rows.get(0);
     Assert.assertEquals(row.get(0).asText(), "defaultKey");
-    Assert.assertTrue(Math.abs(row.get(1).asDouble() - 100.0) < 1e-10);
+    Assert.assertTrue(Math.abs(row.get(1).asDouble() - 100.0 * getNumAvroFiles()) < 1e-10);
   }
 
   @Test(dataProvider = "useBothQueryEngines")
@@ -367,5 +368,229 @@ public class JsonPathTest extends CustomDataQueryClusterIntegrationTest {
     Cache cache = CacheProvider.getCache();
     Assert.assertTrue(cache instanceof JsonPathCache);
     Assert.assertTrue(((JsonPathCache) cache).size() > 0);
+  }
+
+  @Test(dataProvider = "useBothQueryEngines")
+  public void testJsonKeysQueries(boolean useMultiStageQueryEngine)
+      throws Exception {
+    setUseMultiStageQueryEngine(useMultiStageQueryEngine);
+    String query = "SELECT jsonExtractKey(myMapStr, '$.*', 'maxDepth=1') FROM " + getTableName() + " LIMIT 1";
+    JsonNode pinotResponse = postQuery(query);
+    Assert.assertEquals(pinotResponse.get("exceptions").size(), 0);
+    JsonNode rows = pinotResponse.get("resultTable").get("rows");
+    Assert.assertEquals(rows.size(), 1);
+    JsonNode row = rows.get(0);
+    Assert.assertEquals(row.size(), 1);
+    // JsonPath returns keys in JsonPath format like "$['key']"
+    JsonNode keys = row.get(0);
+    Assert.assertTrue(keys.isArray());
+    Assert.assertTrue(keys.size() > 0);
+
+    query = "SELECT jsonExtractKey(complexMapStr, '$.*', 'maxDepth=2') FROM " + getTableName() + " LIMIT 1";
+    pinotResponse = postQuery(query);
+    Assert.assertEquals(pinotResponse.get("exceptions").size(), 0);
+    rows = pinotResponse.get("resultTable").get("rows");
+    Assert.assertEquals(rows.size(), 1);
+    row = rows.get(0);
+    Assert.assertEquals(row.size(), 1);
+    keys = row.get(0);
+    Assert.assertTrue(keys.isArray());
+    Assert.assertTrue(keys.size() > 0);
+
+    query = "SELECT jsonExtractKey(complexMapStr, '$.*', 'maxDepth=3') FROM " + getTableName() + " LIMIT 1";
+    pinotResponse = postQuery(query);
+    Assert.assertEquals(pinotResponse.get("exceptions").size(), 0);
+    rows = pinotResponse.get("resultTable").get("rows");
+    Assert.assertEquals(rows.size(), 1);
+    row = rows.get(0);
+    Assert.assertEquals(row.size(), 1);
+    keys = row.get(0);
+    Assert.assertTrue(keys.isArray());
+    Assert.assertTrue(keys.size() > 0);
+  }
+
+  @Test(dataProvider = "useBothQueryEngines")
+  public void testJsonKeysQueriesWithDotNotation(boolean useMultiStageQueryEngine)
+      throws Exception {
+    setUseMultiStageQueryEngine(useMultiStageQueryEngine);
+
+    // Test optional parameter jsonExtractKey with dotNotation=true (simple JSON)
+    String query =
+        "SELECT jsonExtractKey(myMapStr, '$.*', 'maxDepth=1; dotNotation=true') FROM " + getTableName() + " LIMIT 1";
+    JsonNode pinotResponse = postQuery(query);
+    Assert.assertEquals(pinotResponse.get("exceptions").size(), 0);
+    JsonNode rows = pinotResponse.get("resultTable").get("rows");
+    Assert.assertEquals(rows.size(), 1);
+    JsonNode row = rows.get(0);
+    Assert.assertEquals(row.size(), 1);
+    JsonNode keys = row.get(0);
+    Assert.assertTrue(keys.isArray());
+    Assert.assertEquals(keys.size(), 2); // k1, k2
+    // Should contain simple key names, not JsonPath format
+    List<String> keyList = new ArrayList<>();
+    for (JsonNode key : keys) {
+      keyList.add(key.asText());
+    }
+    Assert.assertTrue(keyList.contains("k1"));
+    Assert.assertTrue(keyList.contains("k2"));
+    // Should NOT contain JsonPath format like "$['k1']"
+    Assert.assertFalse(keyList.contains("$['k1']"));
+    Assert.assertFalse(keyList.contains("$['k2']"));
+
+    // Test optional parameter jsonExtractKey with dotNotation=false (JsonPath format)
+    query =
+        "SELECT jsonExtractKey(myMapStr, '$.*', 'maxDepth=1; dotNotation=false') FROM " + getTableName() + " LIMIT 1";
+    pinotResponse = postQuery(query);
+    Assert.assertEquals(pinotResponse.get("exceptions").size(), 0);
+    rows = pinotResponse.get("resultTable").get("rows");
+    row = rows.get(0);
+    keys = row.get(0);
+    Assert.assertTrue(keys.isArray());
+    Assert.assertEquals(keys.size(), 2);
+    keyList.clear();
+    for (JsonNode key : keys) {
+      keyList.add(key.asText());
+    }
+    // Should contain JsonPath format
+    Assert.assertTrue(keyList.contains("$['k1']"));
+    Assert.assertTrue(keyList.contains("$['k2']"));
+
+    // Test recursive key extraction with dot notation on complex JSON
+    query = "SELECT jsonExtractKey(complexMapStr, '$..**', 'maxDepth=2; dotNotation=true') FROM " + getTableName()
+        + " LIMIT 1";
+    pinotResponse = postQuery(query);
+    Assert.assertEquals(pinotResponse.get("exceptions").size(), 0);
+    rows = pinotResponse.get("resultTable").get("rows");
+    row = rows.get(0);
+    keys = row.get(0);
+    Assert.assertTrue(keys.isArray());
+    Assert.assertTrue(keys.size() >= 4); // At least k1, k2, k3, k4
+    keyList.clear();
+    for (JsonNode key : keys) {
+      keyList.add(key.asText());
+    }
+    // Should contain top-level keys in dot notation
+    Assert.assertTrue(keyList.contains("k1"));
+    Assert.assertTrue(keyList.contains("k2"));
+    Assert.assertTrue(keyList.contains("k3"));
+    Assert.assertTrue(keyList.contains("k4"));
+
+    // Test recursive key extraction with JsonPath format
+    query = "SELECT jsonExtractKey(complexMapStr, '$..**', 'maxDepth=2; dotNotation=false') FROM " + getTableName()
+        + " LIMIT 1";
+    pinotResponse = postQuery(query);
+    Assert.assertEquals(pinotResponse.get("exceptions").size(), 0);
+    rows = pinotResponse.get("resultTable").get("rows");
+    row = rows.get(0);
+    keys = row.get(0);
+    Assert.assertTrue(keys.isArray());
+    keyList.clear();
+    for (JsonNode key : keys) {
+      keyList.add(key.asText());
+    }
+    // Should contain JsonPath format
+    Assert.assertTrue(keyList.contains("$['k1']"));
+    Assert.assertTrue(keyList.contains("$['k2']"));
+    Assert.assertTrue(keyList.contains("$['k3']"));
+    Assert.assertTrue(keyList.contains("$['k4']"));
+
+    // Test deeper recursive extraction with dot notation
+    query = "SELECT jsonExtractKey(complexMapStr, '$..**', 'maxDepth=3; dotNotation=true') FROM " + getTableName()
+        + " LIMIT 1";
+    pinotResponse = postQuery(query);
+    Assert.assertEquals(pinotResponse.get("exceptions").size(), 0);
+    rows = pinotResponse.get("resultTable").get("rows");
+    row = rows.get(0);
+    keys = row.get(0);
+    Assert.assertTrue(keys.isArray());
+    Assert.assertTrue(keys.size() > 4); // Should include nested keys
+    keyList.clear();
+    for (JsonNode key : keys) {
+      keyList.add(key.asText());
+    }
+    // Should contain nested keys in dot notation
+    Assert.assertTrue(keyList.contains("k4.k4-k1"));
+    Assert.assertTrue(keyList.contains("k4.k4-k2"));
+    Assert.assertTrue(keyList.contains("k4.k4-k3"));
+    Assert.assertTrue(keyList.contains("k4.met"));
+    // Should contain array indices in dot notation
+    Assert.assertTrue(keyList.contains("k3.0"));
+    Assert.assertTrue(keyList.contains("k3.1"));
+    Assert.assertTrue(keyList.contains("k3.2"));
+
+    // Test deeper recursive extraction with JsonPath format
+    query = "SELECT jsonExtractKey(complexMapStr, '$..**', 'maxDepth=3; dotNotation=false') FROM " + getTableName()
+        + " LIMIT 1";
+    pinotResponse = postQuery(query);
+    Assert.assertEquals(pinotResponse.get("exceptions").size(), 0);
+    rows = pinotResponse.get("resultTable").get("rows");
+    row = rows.get(0);
+    keys = row.get(0);
+    Assert.assertTrue(keys.isArray());
+    keyList.clear();
+    for (JsonNode key : keys) {
+      keyList.add(key.asText());
+    }
+    // Should contain nested keys in JsonPath format
+    Assert.assertTrue(keyList.contains("$['k4']['k4-k1']"));
+    Assert.assertTrue(keyList.contains("$['k4']['k4-k2']"));
+    Assert.assertTrue(keyList.contains("$['k4']['k4-k3']"));
+    Assert.assertTrue(keyList.contains("$['k4']['met']"));
+    // Should contain array indices in JsonPath format
+    Assert.assertTrue(keyList.contains("$['k3'][0]"));
+    Assert.assertTrue(keyList.contains("$['k3'][1]"));
+    Assert.assertTrue(keyList.contains("$['k3'][2]"));
+
+    // Test specific path extraction with dot notation
+    query = "SELECT jsonExtractKey(complexMapStr, '$.k4.*', 'maxDepth=2; dotNotation=true') FROM " + getTableName()
+        + " LIMIT 1";
+    pinotResponse = postQuery(query);
+    Assert.assertEquals(pinotResponse.get("exceptions").size(), 0);
+    rows = pinotResponse.get("resultTable").get("rows");
+    row = rows.get(0);
+    keys = row.get(0);
+    Assert.assertTrue(keys.isArray());
+    Assert.assertEquals(keys.size(), 4); // k4-k1, k4-k2, k4-k3, met
+    keyList.clear();
+    for (JsonNode key : keys) {
+      keyList.add(key.asText());
+    }
+    // Should contain nested keys in dot notation format
+    Assert.assertTrue(keyList.contains("k4.k4-k1"));
+    Assert.assertTrue(keyList.contains("k4.k4-k2"));
+    Assert.assertTrue(keyList.contains("k4.k4-k3"));
+    Assert.assertTrue(keyList.contains("k4.met"));
+
+    // Test backward compatibility - 2-parameter version should default to JsonPath format
+    query = "SELECT jsonExtractKey(myMapStr, '$.*') FROM " + getTableName() + " LIMIT 1";
+    pinotResponse = postQuery(query);
+    Assert.assertEquals(pinotResponse.get("exceptions").size(), 0);
+    rows = pinotResponse.get("resultTable").get("rows");
+    row = rows.get(0);
+    keys = row.get(0);
+    Assert.assertTrue(keys.isArray());
+    keyList.clear();
+    for (JsonNode key : keys) {
+      keyList.add(key.asText());
+    }
+    // Should default to JsonPath format
+    Assert.assertTrue(keyList.contains("$['k1']"));
+    Assert.assertTrue(keyList.contains("$['k2']"));
+
+    // Test backward compatibility - no dotNotation should default to JsonPath format
+    query = "SELECT jsonExtractKey(myMapStr, '$.*', 'maxDepth=1') FROM " + getTableName() + " LIMIT 1";
+    pinotResponse = postQuery(query);
+    Assert.assertEquals(pinotResponse.get("exceptions").size(), 0);
+    rows = pinotResponse.get("resultTable").get("rows");
+    row = rows.get(0);
+    keys = row.get(0);
+    Assert.assertTrue(keys.isArray());
+    keyList.clear();
+    for (JsonNode key : keys) {
+      keyList.add(key.asText());
+    }
+    // Should default to JsonPath format
+    Assert.assertTrue(keyList.contains("$['k1']"));
+    Assert.assertTrue(keyList.contains("$['k2']"));
   }
 }

@@ -757,7 +757,8 @@ public class MergeRollupTaskGenerator extends BaseTaskGenerator {
             _clusterInfoAccessor);
         configs.putAll(getBaseTaskConfigs(tableConfig, segmentNamesList.get(i)));
         configs.put(MinionConstants.DOWNLOAD_URL_KEY, downloadURL);
-        configs.put(MinionConstants.UPLOAD_URL_KEY, _clusterInfoAccessor.getVipUrl() + "/segments");
+        configs.put(MinionConstants.UPLOAD_URL_KEY,
+            _clusterInfoAccessor.getVipUrlForLeadController(tableNameWithType) + "/segments");
         configs.put(MinionConstants.ENABLE_REPLACE_SEGMENTS_KEY, "true");
 
         for (Map.Entry<String, String> taskConfig : taskConfigs.entrySet()) {
@@ -789,9 +790,9 @@ public class MergeRollupTaskGenerator extends BaseTaskGenerator {
     return pinotTaskConfigs;
   }
 
-  private long getMergeRollupTaskDelayInNumTimeBuckets(long watermarkMs, long maxEndTimeMsOfCurrentLevel,
+  private long getMergeRollupTaskDelayInNumTimeBuckets(long watermarkMs, @Nullable Long maxEndTimeMsOfCurrentLevel,
       long bufferTimeMs, long bucketTimeMs) {
-    if (watermarkMs == -1 || maxEndTimeMsOfCurrentLevel == Long.MIN_VALUE) {
+    if (watermarkMs == -1 || maxEndTimeMsOfCurrentLevel == null || maxEndTimeMsOfCurrentLevel == Long.MIN_VALUE) {
       return 0;
     }
     return (Math.min(System.currentTimeMillis() - bufferTimeMs, maxEndTimeMsOfCurrentLevel) - watermarkMs)

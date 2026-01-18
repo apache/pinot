@@ -20,6 +20,7 @@ package org.apache.pinot.query.planner.physical;
 
 import com.google.common.base.Preconditions;
 import java.util.ArrayList;
+import java.util.Comparator;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -165,8 +166,13 @@ public class MailboxAssignmentVisitor extends DefaultPostOrderTraversalVisitor<V
       DispatchablePlanMetadata receiver) {
     int numSenders = sender.getWorkerIdToServerInstanceMap().size();
     int numReceivers = receiver.getWorkerIdToServerInstanceMap().size();
-    return numSenders * sender.getPartitionParallelism() == numReceivers && sender.getPartitionFunction() != null
-        && sender.getPartitionFunction().equalsIgnoreCase(receiver.getPartitionFunction());
+    if (numSenders * sender.getPartitionParallelism() != numReceivers) {
+      return false;
+    }
+    if (sender.getPartitionFunction() == null) {
+      return receiver.getPartitionFunction() == null;
+    }
+    return sender.getPartitionFunction().equalsIgnoreCase(receiver.getPartitionFunction());
   }
 
   private void connectWorkers(int stageId, Map<Integer, QueryServerInstance> serverMap,
@@ -182,6 +188,12 @@ public class MailboxAssignmentVisitor extends DefaultPostOrderTraversalVisitor<V
       List<Integer> workerIds = entry.getValue();
       mailboxInfoList.add(new MailboxInfo(server.getHostname(), server.getQueryMailboxPort(), workerIds));
     }
+    // Sort by first workerId to ensure deterministic ordering.
+    // This is critical for hash-distributed exchanges where (hash % numMailboxes) is used as an index to choose the
+    // receiving worker.
+    // Without this sorting, different stages could route the same hash value to different workers, resulting in
+    // incorrect join/union/intersect results for pre-partitioned sends (where a full partition shuffle is skipped).
+    mailboxInfoList.sort(Comparator.comparingInt(info -> info.getWorkerIds().get(0)));
     MailboxInfos mailboxInfos =
         numWorkers > 1 ? new SharedMailboxInfos(mailboxInfoList) : new MailboxInfos(mailboxInfoList);
     for (int workerId = 0; workerId < numWorkers; workerId++) {

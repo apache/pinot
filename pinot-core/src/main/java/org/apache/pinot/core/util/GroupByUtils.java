@@ -19,6 +19,8 @@
 package org.apache.pinot.core.util;
 
 import com.google.common.annotations.VisibleForTesting;
+import java.util.Comparator;
+import java.util.List;
 import java.util.concurrent.ExecutorService;
 import org.apache.pinot.common.datatable.DataTable;
 import org.apache.pinot.common.utils.DataSchema;
@@ -26,11 +28,16 @@ import org.apache.pinot.common.utils.HashUtil;
 import org.apache.pinot.core.data.table.ConcurrentIndexedTable;
 import org.apache.pinot.core.data.table.DeterministicConcurrentIndexedTable;
 import org.apache.pinot.core.data.table.IndexedTable;
+import org.apache.pinot.core.data.table.IntermediateRecord;
+import org.apache.pinot.core.data.table.Record;
 import org.apache.pinot.core.data.table.SimpleIndexedTable;
+import org.apache.pinot.core.data.table.SortedRecords;
+import org.apache.pinot.core.data.table.SortedRecordsMerger;
 import org.apache.pinot.core.data.table.UnboundedConcurrentIndexedTable;
 import org.apache.pinot.core.operator.blocks.results.GroupByResultsBlock;
 import org.apache.pinot.core.query.reduce.DataTableReducerContext;
 import org.apache.pinot.core.query.request.context.QueryContext;
+import org.apache.pinot.spi.query.QueryThreadContext;
 
 
 public final class GroupByUtils {
@@ -41,17 +48,17 @@ public final class GroupByUtils {
   public static final int MAX_TRIM_THRESHOLD = 1_000_000_000;
 
   /**
-   * Returns the capacity of the table required by the given query.
-   * NOTE: It returns {@code max(limit * 5, 5000)} to ensure the result accuracy.
+   * Returns the capacity of the table required by the given query. NOTE: It returns {@code max(limit * 5, 5000)} to
+   * ensure the result accuracy.
    */
   public static int getTableCapacity(int limit) {
     return getTableCapacity(limit, DEFAULT_MIN_NUM_GROUPS);
   }
 
   /**
-   * Returns the capacity of the table required by the given query.
-   * NOTE: It returns {@code max(limit * 5, minNumGroups)} where minNumGroups is configurable to tune the table size and
-   * result accuracy.
+   * Returns the capacity of the table required by the given query. NOTE: It returns
+   * {@code max(limit * 5, minNumGroups)} where minNumGroups is configurable to tune the table size and result
+   * accuracy.
    */
   public static int getTableCapacity(int limit, int minNumGroups) {
     long capacityByLimit = limit * 5L;
@@ -211,5 +218,21 @@ public final class GroupByUtils {
       return new ConcurrentIndexedTable(dataSchema, hasFinalInput, queryContext, resultSize, trimSize, trimThreshold,
           initialCapacity, executorService);
     }
+  }
+
+  public static SortedRecords getAndPopulateSortedRecords(GroupByResultsBlock block) {
+    List<IntermediateRecord> intermediateRecords = block.getIntermediateRecords();
+    Record[] sortedRecords = new Record[intermediateRecords.size()];
+    int idx = 0;
+    for (IntermediateRecord intermediateRecord : intermediateRecords) {
+      QueryThreadContext.checkTerminationAndSampleUsagePeriodically(idx, "GroupByUtils#getAndPopulateSortedRecords");
+      sortedRecords[idx++] = intermediateRecord._record;
+    }
+    return new SortedRecords(sortedRecords, idx);
+  }
+
+  public static SortedRecordsMerger getSortedReduceMerger(QueryContext queryContext,
+      int resultSize, Comparator<Record> comparator) {
+    return new SortedRecordsMerger(queryContext, resultSize, comparator);
   }
 }

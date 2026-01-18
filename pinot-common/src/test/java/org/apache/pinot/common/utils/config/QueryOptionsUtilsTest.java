@@ -62,6 +62,19 @@ public class QueryOptionsUtilsTest {
   }
 
   @Test
+  public void shouldReadIgnoreMissingSegmentsOption() {
+    // Given:
+    Map<String, String> optsTrue = Map.of(IGNORE_MISSING_SEGMENTS, "true");
+    Map<String, String> optsFalse = Map.of(IGNORE_MISSING_SEGMENTS, "false");
+    Map<String, String> optsMissing = Map.of();
+
+    // Then:
+    org.testng.Assert.assertTrue(QueryOptionsUtils.isIgnoreMissingSegments(optsTrue));
+    org.testng.Assert.assertFalse(QueryOptionsUtils.isIgnoreMissingSegments(optsFalse));
+    org.testng.Assert.assertFalse(QueryOptionsUtils.isIgnoreMissingSegments(optsMissing));
+  }
+
+  @Test
   public void testSkipIndexesParsing() {
     String skipIndexesStr = "col1=inverted,range&col2=sorted";
     Map<String, String> queryOptions = Map.of(SKIP_INDEXES, skipIndexesStr);
@@ -143,6 +156,27 @@ public class QueryOptionsUtilsTest {
         }
       }
     }
+  }
+
+  @Test
+  public void testGetQueryHashWithValue() {
+    Map<String, String> queryOptions = Map.of(QUERY_HASH, "abc123def456");
+    String actualHash = QueryOptionsUtils.getQueryHash(queryOptions);
+    assertEquals(actualHash, "abc123def456");
+  }
+
+  @Test
+  public void testGetQueryHashWithEmptyString() {
+    Map<String, String> queryOptions = Map.of(QUERY_HASH, "");
+    String actualHash = QueryOptionsUtils.getQueryHash(queryOptions);
+    assertEquals(actualHash, "");
+  }
+
+  @Test
+  public void testGetQueryHashWithoutValue() {
+    Map<String, String> queryOptions = new HashMap<>();
+    String actualHash = QueryOptionsUtils.getQueryHash(queryOptions);
+    assertEquals(actualHash, "");
   }
 
   private static Object getValue(Map<String, String> map, String key) {

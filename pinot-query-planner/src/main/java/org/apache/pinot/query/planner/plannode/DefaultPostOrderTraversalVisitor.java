@@ -46,6 +46,11 @@ public abstract class DefaultPostOrderTraversalVisitor<T, C> implements PlanNode
   }
 
   @Override
+  public T visitEnrichedJoin(EnrichedJoinNode node, C context) {
+    return visitJoin(node, context);
+  }
+
+  @Override
   public T visitMailboxReceive(MailboxReceiveNode node, C context) {
     node.getSender().visit(this, context);
     return process(node, context);
@@ -100,6 +105,12 @@ public abstract class DefaultPostOrderTraversalVisitor<T, C> implements PlanNode
   @Override
   public T visitExplained(ExplainedNode node, C context) {
     node.getInputs().forEach(input -> input.visit(this, context));
+    return process(node, context);
+  }
+
+  @Override
+  public T visitUnnest(UnnestNode node, C context) {
+    node.getInputs().get(0).visit(this, context);
     return process(node, context);
   }
 }

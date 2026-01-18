@@ -33,6 +33,7 @@ import org.apache.pinot.core.common.Operator;
 import org.apache.pinot.core.operator.BaseOperator;
 import org.apache.pinot.core.operator.ExecutionStatistics;
 import org.apache.pinot.core.operator.blocks.results.BaseResultsBlock;
+import org.apache.pinot.core.operator.blocks.results.ExceptionResultsBlock;
 import org.apache.pinot.core.query.request.context.QueryContext;
 import org.apache.pinot.core.query.request.context.utils.QueryContextConverterUtils;
 import org.apache.pinot.segment.spi.IndexSegment;
@@ -172,19 +173,12 @@ public class CombineSlowOperatorsTest {
     testCancelCombineOperator(combineOperator, ready);
   }
 
-  private void testCancelCombineOperator(BaseCombineOperator combineOperator, CountDownLatch ready) {
-    AtomicReference<Exception> exp = new AtomicReference<>();
+  private void testCancelCombineOperator(BaseCombineOperator<?> combineOperator, CountDownLatch ready) {
+    AtomicReference<BaseResultsBlock> resultsBlock = new AtomicReference<>();
     // Avoid early finalization by not using Executors.newSingleThreadExecutor (java <= 20, JDK-8145304)
     ExecutorService combineExecutor = Executors.newFixedThreadPool(1);
     try {
-      Future<?> future = combineExecutor.submit(() -> {
-        try {
-          return combineOperator.nextBlock();
-        } catch (Exception e) {
-          exp.set(e);
-          throw e;
-        }
-      });
+      Future<?> future = combineExecutor.submit(() -> resultsBlock.set(combineOperator.nextBlock()));
       ready.await();
       // At this point, the combineOperator is or will be waiting on future.get() for all sub operators, and the
       // waiting can be cancelled as below.
@@ -194,7 +188,7 @@ public class CombineSlowOperatorsTest {
     } finally {
       combineExecutor.shutdownNow();
     }
-    TestUtils.waitForCondition((aVoid) -> exp.get() instanceof EarlyTerminationException, 10_000,
+    TestUtils.waitForCondition((aVoid) -> resultsBlock.get() instanceof ExceptionResultsBlock, 10_000,
         "Should have been cancelled");
   }
 

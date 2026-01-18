@@ -18,8 +18,6 @@
  */
 package org.apache.pinot.core.accounting;
 
-import java.lang.management.ManagementFactory;
-import java.lang.management.MemoryMXBean;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
@@ -28,6 +26,7 @@ import org.apache.log4j.Level;
 import org.apache.log4j.LogManager;
 import org.apache.pinot.spi.accounting.ThreadResourceSnapshot;
 import org.apache.pinot.spi.accounting.ThreadResourceUsageProvider;
+import org.apache.pinot.spi.utils.ResourceUsageUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.testng.Assert;
@@ -72,10 +71,9 @@ public class TestThreadMXBean {
       AtomicLong b = new AtomicLong();
       AtomicLong c = new AtomicLong();
       ExecutorService executor = Executors.newFixedThreadPool(3);
-      MemoryMXBean memoryMXBean = ManagementFactory.getMemoryMXBean();
       System.gc();
 
-      long heapPrev = memoryMXBean.getHeapMemoryUsage().getUsed();
+      long heapPrev = ResourceUsageUtils.getUsedHeapSize();
       ThreadResourceSnapshot threadResourceSnapshot0 = new ThreadResourceSnapshot();
       executor.submit(() -> {
         ThreadResourceSnapshot threadResourceSnapshot = new ThreadResourceSnapshot();
@@ -108,7 +106,7 @@ public class TestThreadMXBean {
 
       long d = threadResourceSnapshot0.getAllocatedBytes();
       long threadAllocatedBytes = a.get() + b.get() + c.get() + d;
-      float heapUsedBytes = (float) memoryMXBean.getHeapMemoryUsage().getUsed() - heapPrev;
+      float heapUsedBytes = (float) ResourceUsageUtils.getUsedHeapSize() - heapPrev;
       float ratio = threadAllocatedBytes / heapUsedBytes;
 
       LOGGER.info("Measured thread allocated bytes {}, heap used bytes {}, ratio {}",
@@ -129,10 +127,9 @@ public class TestThreadMXBean {
       AtomicLong b = new AtomicLong();
       AtomicLong c = new AtomicLong();
       ExecutorService executor = Executors.newFixedThreadPool(3);
-      MemoryMXBean memoryMXBean = ManagementFactory.getMemoryMXBean();
       System.gc();
 
-      long heapPrev = memoryMXBean.getHeapMemoryUsage().getUsed();
+      long heapPrev = ResourceUsageUtils.getUsedHeapSize();
       ThreadResourceSnapshot threadResourceSnapshot0 = new ThreadResourceSnapshot();
       executor.submit(() -> {
         ThreadResourceSnapshot threadResourceSnapshot = new ThreadResourceSnapshot();
@@ -165,7 +162,7 @@ public class TestThreadMXBean {
 
       long d = threadResourceSnapshot0.getAllocatedBytes();
       long threadAllocatedBytes = a.get() + b.get() + c.get() + d;
-      float heapUsedBytes = (float) memoryMXBean.getHeapMemoryUsage().getUsed() - heapPrev;
+      float heapUsedBytes = (float) ResourceUsageUtils.getUsedHeapSize() - heapPrev;
       float ratio = threadAllocatedBytes / heapUsedBytes;
 
       LOGGER.info("Measured thread allocated bytes {}, heap used bytes {}, ratio {}",
@@ -180,15 +177,14 @@ public class TestThreadMXBean {
   @SuppressWarnings("unused")
   public void testThreadMXBeanMemAllocGCTracking() {
     LogManager.getLogger(TestThreadMXBean.class).setLevel(Level.INFO);
-    MemoryMXBean memoryMXBean = ManagementFactory.getMemoryMXBean();
     System.gc();
     ThreadResourceSnapshot threadResourceSnapshot0 = new ThreadResourceSnapshot();
-    long heapPrev = memoryMXBean.getHeapMemoryUsage().getUsed();
+    long heapPrev = ResourceUsageUtils.getUsedHeapSize();
     for (int i = 0; i < 3; i++) {
       long[] ignored = new long[100000000];
     }
     System.gc();
-    long heapResult = memoryMXBean.getHeapMemoryUsage().getUsed() - heapPrev;
+    long heapResult = ResourceUsageUtils.getUsedHeapSize() - heapPrev;
     long result = threadResourceSnapshot0.getAllocatedBytes();
     LOGGER.info("Measured thread allocated bytes {}, heap used bytes {}",
         result, heapResult);

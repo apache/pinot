@@ -28,6 +28,7 @@ import org.apache.pinot.broker.requesthandler.BaseSingleStageBrokerRequestHandle
 import org.apache.pinot.common.response.BrokerResponse;
 import org.apache.pinot.spi.auth.broker.RequesterIdentity;
 import org.apache.pinot.spi.env.PinotConfiguration;
+import org.apache.pinot.spi.trace.QueryFingerprint;
 import org.apache.pinot.spi.trace.RequestContext;
 import org.apache.pinot.spi.utils.CommonConstants;
 import org.slf4j.Logger;
@@ -78,20 +79,40 @@ public class QueryLogger {
     _logBeforeProcessing = logBeforeProcessing;
   }
 
-  public void log(long requestId, String query) {
-    if (!_logBeforeProcessing || !checkRateLimiter(null)) {
-      return;
+  /**
+   * Logs the query received message before processing begins.
+   * This method checks the rate limiter and returns whether logging was allowed.
+   * The return value should be passed to logQueryCompleted.
+   *
+   * @param requestId the request ID
+   * @param query the SQL query
+   * @return true if the rate limiter allowed this query (not rate-limited), false if rate-limited
+   */
+  public boolean logQueryReceived(long requestId, String query) {
+    if (!checkRateLimiter()) {
+      return false;
     }
 
-    _logger.info("SQL query for request {}: {}", requestId, query);
+    if (_logBeforeProcessing) {
+      _logger.info("SQL query for request {}: {}", requestId, query);
+    }
 
     tryLogDropped();
+    return true;
   }
 
-  public void log(QueryLogParams params) {
+  /**
+   * Logs the query completion stats after processing completes.
+   *
+   * @param params the query log parameters
+   * @param wasLogged true if logQueryReceived returned true, false otherwise.
+   *                  When false, the completion log will only be emitted if force-log
+   *                  conditions are met (exceptions, slow queries).
+   */
+  public void logQueryCompleted(QueryLogParams params, boolean wasLogged) {
     _logger.debug("Broker Response: {}", params._response);
 
-    if (!checkRateLimiter(params)) {
+    if (!wasLogged && !shouldForceLog(params)) {
       return;
     }
 
@@ -109,8 +130,8 @@ public class QueryLogger {
     tryLogDropped();
   }
 
-  private boolean checkRateLimiter(@Nullable QueryLogParams params) {
-    boolean allowed = _logRateLimiter.tryAcquire() || shouldForceLog(params);
+  private boolean checkRateLimiter() {
+    boolean allowed = _logRateLimiter.tryAcquire();
     if (!allowed) {
       _numDroppedLogs.incrementAndGet();
     }
@@ -197,6 +218,14 @@ public class QueryLogger {
       @Override
       void doFormat(StringBuilder builder, QueryLogger logger, QueryLogParams params) {
         builder.append(params._table);
+      }
+    },
+    QUERY_HASH("queryHash") {
+      @Override
+      void doFormat(StringBuilder builder, QueryLogger logger, QueryLogParams params) {
+        QueryFingerprint queryFingerprint = params._requestContext.getQueryFingerprint();
+        String queryHash = queryFingerprint != null ? queryFingerprint.getQueryHash() : Broker.DEFAULT_QUERY_HASH;
+        builder.append(queryHash);
       }
     },
     TIME_MS("timeMs") {

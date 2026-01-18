@@ -19,7 +19,6 @@
 package org.apache.pinot.tsdb.planner;
 
 import com.google.common.base.Preconditions;
-import com.google.common.collect.ImmutableMap;
 import java.lang.reflect.Constructor;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -27,8 +26,8 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import org.apache.pinot.common.config.provider.TableCache;
+import org.apache.pinot.core.routing.ImplicitHybridTableRouteProvider;
 import org.apache.pinot.core.routing.RoutingManager;
-import org.apache.pinot.query.routing.table.ImplicitHybridTableRouteProvider;
 import org.apache.pinot.spi.env.PinotConfiguration;
 import org.apache.pinot.spi.trace.RequestContext;
 import org.apache.pinot.tsdb.planner.physical.TableScanVisitor;
@@ -61,16 +60,8 @@ public class TimeSeriesQueryEnvironment {
         .split(",");
     LOGGER.info("Found {} configured time series languages. List: {}", languages.length, languages);
     for (String language : languages) {
-      String configPrefix = PinotTimeSeriesConfiguration.getLogicalPlannerConfigKey(language);
-      String klassName =
-          config.getProperty(PinotTimeSeriesConfiguration.getLogicalPlannerConfigKey(language));
-      Preconditions.checkNotNull(klassName, "Logical planner class not found for language: " + language);
-      // Create the planner with empty constructor
       try {
-        Class<?> klass = TimeSeriesQueryEnvironment.class.getClassLoader().loadClass(klassName);
-        Constructor<?> constructor = klass.getConstructor();
-        TimeSeriesLogicalPlanner planner = (TimeSeriesLogicalPlanner) constructor.newInstance();
-        planner.init(config.subset(configPrefix));
+        TimeSeriesLogicalPlanner planner = buildLogicalPlanner(language, config);
         _plannerMap.put(language, planner);
       } catch (Exception e) {
         throw new RuntimeException("Failed to instantiate logical planner for language: " + language, e);
@@ -78,6 +69,23 @@ public class TimeSeriesQueryEnvironment {
     }
     // TODO(timeseries): Add support for logical tables in the future.
     TableScanVisitor.INSTANCE.init(_routingManager, new ImplicitHybridTableRouteProvider(), _tableCache);
+  }
+
+  public static TimeSeriesLogicalPlanner buildLogicalPlanner(String language, PinotConfiguration config)
+      throws RuntimeException {
+    String configPrefix = PinotTimeSeriesConfiguration.getLogicalPlannerConfigKey(language);
+    String klassName = config.getProperty(configPrefix);
+    Preconditions.checkNotNull(klassName, "Logical planner class not found for language: " + language);
+    // Create the planner with empty constructor
+    try {
+      Class<?> klass = TimeSeriesQueryEnvironment.class.getClassLoader().loadClass(klassName);
+      Constructor<?> constructor = klass.getConstructor();
+      TimeSeriesLogicalPlanner planner = (TimeSeriesLogicalPlanner) constructor.newInstance();
+      planner.init(config.subset(configPrefix));
+      return planner;
+    } catch (Exception e) {
+      throw new RuntimeException("Failed to instantiate logical planner for language: " + language, e);
+    }
   }
 
   public TimeSeriesLogicalPlanResult buildLogicalPlan(RangeTimeSeriesRequest request) {
@@ -91,7 +99,7 @@ public class TimeSeriesQueryEnvironment {
       RequestContext requestContext, TimeSeriesLogicalPlanResult logicalPlan) {
     // Step-0: Add table type info to the logical plan.
     logicalPlan = new TimeSeriesLogicalPlanResult(TableScanVisitor.INSTANCE.addTableTypeInfoToPlan(
-      logicalPlan.getPlanNode()), logicalPlan.getTimeBuckets());
+      logicalPlan.getPlanNode(), requestContext), logicalPlan.getTimeBuckets());
     // Step-1: Assign segments to servers for each leaf node.
     TableScanVisitor.Context scanVisitorContext = TableScanVisitor.createContext(requestContext.getRequestId());
     TableScanVisitor.INSTANCE.assignSegmentsToPlan(logicalPlan.getPlanNode(), logicalPlan.getTimeBuckets(),
@@ -115,7 +123,7 @@ public class TimeSeriesQueryEnvironment {
     Preconditions.checkState(!serverInstances.isEmpty(), "No servers selected for the query");
     if (serverInstances.size() == 1) {
       // For single-server case, the broker fragment consists only of the TimeSeriesExchangeNode.
-      return ImmutableMap.of(planNodes.get(0).getId(), 1);
+      return Map.of(planNodes.get(0).getId(), 1);
     }
     // For the multi-server case, the leafIdToSegmentsByInstanceId map already has the information we need, but we
     // just need to restructure it so that we can get number of servers by planId.

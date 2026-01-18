@@ -36,7 +36,7 @@ import org.apache.pinot.common.utils.HashUtil;
 import org.apache.pinot.common.utils.RoaringBitmapUtils;
 import org.apache.pinot.spi.accounting.ThreadResourceSnapshot;
 import org.apache.pinot.spi.accounting.ThreadResourceUsageProvider;
-import org.apache.pinot.spi.trace.Tracing;
+import org.apache.pinot.spi.query.QueryThreadContext;
 import org.apache.pinot.spi.utils.BigDecimalUtils;
 import org.apache.pinot.spi.utils.ByteArray;
 import org.apache.pinot.spi.utils.MapUtils;
@@ -380,11 +380,11 @@ public class DataTableImplV4 implements DataTable {
     dataOutputStream.writeInt(_stringDictionary.length);
     int numEntriesAdded = 0;
     for (String entry : _stringDictionary) {
-      Tracing.ThreadAccountantOps.sampleAndCheckInterruptionPeriodically(numEntriesAdded);
+      QueryThreadContext.checkTerminationAndSampleUsagePeriodically(numEntriesAdded++,
+          "DataTableImplV4#serializeStringDictionary");
       byte[] valueBytes = entry.getBytes(UTF_8);
       dataOutputStream.writeInt(valueBytes.length);
       dataOutputStream.write(valueBytes);
-      numEntriesAdded++;
     }
 
     return byteArrayOutputStream.toByteArray();

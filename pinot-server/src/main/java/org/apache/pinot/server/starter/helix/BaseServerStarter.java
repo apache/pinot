@@ -20,7 +20,6 @@ package org.apache.pinot.server.starter.helix;
 
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
-import com.google.common.collect.ImmutableList;
 import com.google.common.util.concurrent.ThreadFactoryBuilder;
 import java.io.File;
 import java.io.IOException;
@@ -58,6 +57,7 @@ import org.apache.helix.participant.statemachine.StateModelFactory;
 import org.apache.helix.zookeeper.constant.ZkSystemPropertyKeys;
 import org.apache.helix.zookeeper.datamodel.ZNRecord;
 import org.apache.pinot.common.Utils;
+import org.apache.pinot.common.config.DefaultClusterConfigChangeHandler;
 import org.apache.pinot.common.config.TlsConfig;
 import org.apache.pinot.common.metadata.ZKMetadataProvider;
 import org.apache.pinot.common.metrics.ServerGauge;
@@ -81,17 +81,24 @@ import org.apache.pinot.core.common.datatable.DataTableBuilderFactory;
 import org.apache.pinot.core.data.manager.InstanceDataManager;
 import org.apache.pinot.core.data.manager.realtime.RealtimeConsumptionRateManager;
 import org.apache.pinot.core.data.manager.realtime.ServerRateLimitConfigChangeListener;
+import org.apache.pinot.core.data.manager.realtime.UpsertInconsistentStateConfig;
 import org.apache.pinot.core.query.scheduler.resources.ResourceManager;
 import org.apache.pinot.core.transport.ListenerConfig;
 import org.apache.pinot.core.util.ListenerConfigUtil;
 import org.apache.pinot.core.util.trace.ContinuousJfrStarter;
+import org.apache.pinot.query.runtime.context.ServerContext;
+import org.apache.pinot.query.runtime.operator.factory.DefaultQueryOperatorFactoryProvider;
+import org.apache.pinot.query.runtime.operator.factory.QueryOperatorFactoryProvider;
 import org.apache.pinot.segment.local.realtime.impl.invertedindex.RealtimeLuceneIndexRefreshManager;
 import org.apache.pinot.segment.local.realtime.impl.invertedindex.RealtimeLuceneTextIndexSearcherPool;
+import org.apache.pinot.segment.local.segment.store.TextIndexUtils;
+import org.apache.pinot.segment.local.utils.ClusterConfigForTable;
 import org.apache.pinot.segment.local.utils.SegmentAllIndexPreprocessThrottler;
 import org.apache.pinot.segment.local.utils.SegmentDownloadThrottler;
 import org.apache.pinot.segment.local.utils.SegmentMultiColTextIndexPreprocessThrottler;
 import org.apache.pinot.segment.local.utils.SegmentOperationsThrottler;
 import org.apache.pinot.segment.local.utils.SegmentStarTreePreprocessThrottler;
+import org.apache.pinot.segment.local.utils.ServerReloadJobStatusCache;
 import org.apache.pinot.segment.spi.memory.PinotDataBuffer;
 import org.apache.pinot.segment.spi.memory.unsafe.MmapMemoryConfig;
 import org.apache.pinot.server.access.AccessControlFactory;
@@ -101,17 +108,21 @@ import org.apache.pinot.server.realtime.ControllerLeaderLocator;
 import org.apache.pinot.server.realtime.ServerSegmentCompletionProtocolHandler;
 import org.apache.pinot.server.starter.ServerInstance;
 import org.apache.pinot.server.starter.ServerQueriesDisabledTracker;
+import org.apache.pinot.spi.accounting.ThreadAccountant;
+import org.apache.pinot.spi.accounting.ThreadAccountantUtils;
 import org.apache.pinot.spi.accounting.ThreadResourceUsageProvider;
+import org.apache.pinot.spi.accounting.WorkloadBudgetManager;
 import org.apache.pinot.spi.config.provider.PinotClusterConfigChangeListener;
 import org.apache.pinot.spi.crypt.PinotCrypterFactory;
 import org.apache.pinot.spi.env.PinotConfiguration;
 import org.apache.pinot.spi.environmentprovider.PinotEnvironmentProvider;
 import org.apache.pinot.spi.environmentprovider.PinotEnvironmentProviderFactory;
 import org.apache.pinot.spi.filesystem.PinotFSFactory;
+import org.apache.pinot.spi.metrics.PinotMetricUtils;
+import org.apache.pinot.spi.metrics.PinotMetricsRegistry;
 import org.apache.pinot.spi.plugin.PluginManager;
 import org.apache.pinot.spi.services.ServiceRole;
 import org.apache.pinot.spi.services.ServiceStartable;
-import org.apache.pinot.spi.trace.Tracing;
 import org.apache.pinot.spi.utils.CommonConstants;
 import org.apache.pinot.spi.utils.CommonConstants.Helix;
 import org.apache.pinot.spi.utils.CommonConstants.Helix.Instance;
@@ -159,6 +170,7 @@ public abstract class BaseServerStarter implements ServiceStartable {
   protected HelixConfigScope _instanceConfigScope;
   protected HelixManager _helixManager;
   protected HelixAdmin _helixAdmin;
+  protected ServerMetrics _serverMetrics;
   protected ServerInstance _serverInstance;
   protected AccessControlFactory _accessControlFactory;
   protected AdminApiApplication _adminApiApplication;
@@ -167,19 +179,25 @@ public abstract class BaseServerStarter implements ServiceStartable {
   protected RealtimeLuceneIndexRefreshManager _realtimeLuceneTextIndexRefreshManager;
   protected PinotEnvironmentProvider _pinotEnvironmentProvider;
   protected SegmentOperationsThrottler _segmentOperationsThrottler;
+  protected ThreadAccountant _threadAccountant;
   protected DefaultClusterConfigChangeHandler _clusterConfigChangeHandler;
   protected volatile boolean _isServerReadyToServeQueries = false;
-  private ScheduledExecutorService _helixMessageCountScheduler;
+  protected ScheduledExecutorService _helixMessageCountScheduler;
+  protected ServerReloadJobStatusCache _reloadJobStatusCache;
+  // Override this to provide custom thread pool for Helix state transitions. Null means using Helix's default
+  @Nullable
+  protected StateTransitionThreadPoolManager _transitionThreadPoolManager;
 
   @Override
   public void init(PinotConfiguration serverConf)
       throws Exception {
     // Make a clone so that changes to the config won't propagate to the caller
     _serverConf = serverConf.clone();
-    _zkAddress = _serverConf.getProperty(CommonConstants.Helix.CONFIG_OF_ZOOKEEPR_SERVER);
+    _zkAddress = _serverConf.getProperty(CommonConstants.Helix.CONFIG_OF_ZOOKEEPER_SERVER);
     _helixClusterName = _serverConf.getProperty(CommonConstants.Helix.CONFIG_OF_CLUSTER_NAME);
     ServiceStartableUtils.applyClusterConfig(_serverConf, _zkAddress, _helixClusterName, ServiceRole.SERVER);
     applyCustomConfigs(_serverConf);
+    ServerContext.getInstance().setQueryOperatorFactoryProvider(createQueryOperatorFactoryProvider(_serverConf));
 
     PinotInsecureMode.setPinotInInsecureMode(
         _serverConf.getProperty(CommonConstants.CONFIG_OF_PINOT_INSECURE_MODE, false));
@@ -241,14 +259,6 @@ public abstract class BaseServerStarter implements ServiceStartable {
     // Initialize the data buffer factory
     PinotDataBuffer.loadDefaultFactory(serverConf);
 
-    // Enable/disable thread CPU time measurement through instance config.
-    ThreadResourceUsageProvider.setThreadCpuTimeMeasurementEnabled(
-        _serverConf.getProperty(Server.CONFIG_OF_ENABLE_THREAD_CPU_TIME_MEASUREMENT,
-            Server.DEFAULT_ENABLE_THREAD_CPU_TIME_MEASUREMENT));
-    // Enable/disable thread memory allocation tracking through instance config
-    ThreadResourceUsageProvider.setThreadMemoryMeasurementEnabled(
-        _serverConf.getProperty(Server.CONFIG_OF_ENABLE_THREAD_ALLOCATED_BYTES_MEASUREMENT,
-            Server.DEFAULT_THREAD_ALLOCATED_BYTES_MEASUREMENT));
     // Set data table version send to broker.
     int dataTableVersion =
         _serverConf.getProperty(Server.CONFIG_OF_CURRENT_DATA_TABLE_VERSION, DataTableBuilderFactory.DEFAULT_VERSION);
@@ -261,16 +271,44 @@ public abstract class BaseServerStarter implements ServiceStartable {
 
     _clusterConfigChangeHandler = new DefaultClusterConfigChangeHandler();
 
+    // Register configuration change listener for dynamic max clause count updates
+    _clusterConfigChangeHandler.registerClusterConfigChangeListener(
+        new TextIndexUtils.LuceneMaxClauseCountConfigChangeListener());
+    LOGGER.info("Registered Lucene max clause count configuration change listener");
+    // Register cluster-level override for table configs
+    _clusterConfigChangeHandler.registerClusterConfigChangeListener(
+        new ClusterConfigForTable.ConfigChangeListener());
+    LOGGER.info("Registered ClusterConfigForTable change listener");
+    // Register configuration change listener for upsert force commit/reload disable setting
+    _clusterConfigChangeHandler.registerClusterConfigChangeListener(
+        UpsertInconsistentStateConfig.getInstance());
+    LOGGER.info("Registered UpsertInconsistentStateConfig change listener for dynamic force commit/reload control");
+
     LOGGER.info("Initializing Helix manager with zkAddress: {}, clusterName: {}, instanceId: {}", _zkAddress,
         _helixClusterName, _instanceId);
     _helixManager =
         HelixManagerFactory.getZKHelixManager(_helixClusterName, _instanceId, InstanceType.PARTICIPANT, _zkAddress);
 
-    ContinuousJfrStarter.init(_serverConf);
+    _clusterConfigChangeHandler.registerClusterConfigChangeListener(ContinuousJfrStarter.INSTANCE);
+    initTransitionThreadPoolManager();
+  }
+
+  /**
+   * Override to provide custom transition thread pool manager
+   */
+  protected void initTransitionThreadPoolManager() {
+    _transitionThreadPoolManager = null;
   }
 
   /// Can be overridden to apply custom configs to the server conf.
   protected void applyCustomConfigs(PinotConfiguration serverConf) {
+  }
+
+  /**
+   * Override to customize the query operator factory provider used by the multi-stage engine.
+   */
+  protected QueryOperatorFactoryProvider createQueryOperatorFactoryProvider(PinotConfiguration serverConf) {
+    return DefaultQueryOperatorFactoryProvider.INSTANCE;
   }
 
   /**
@@ -356,8 +394,7 @@ public abstract class BaseServerStarter implements ServiceStartable {
       }
     }
 
-    ImmutableList.Builder<ServiceStatus.ServiceStatusCallback> serviceStatusCallbackListBuilder =
-        new ImmutableList.Builder<>();
+    List<ServiceStatus.ServiceStatusCallback> serviceStatusCallbackListBuilder = new ArrayList<>();
     serviceStatusCallbackListBuilder.add(
         new ServiceStatus.IdealStateAndCurrentStateMatchServiceStatusCallback(_helixManager, _helixClusterName,
             _instanceId, resourcesToMonitor, minResourcePercentForStartup));
@@ -402,7 +439,7 @@ public abstract class BaseServerStarter implements ServiceStartable {
     }
     LOGGER.info("Registering service status handler");
     ServiceStatus.setServiceStatusCallback(_instanceId,
-        new ServiceStatus.MultipleCallbackServiceStatusCallback(serviceStatusCallbackListBuilder.build()));
+        new ServiceStatus.MultipleCallbackServiceStatusCallback(List.copyOf(serviceStatusCallbackListBuilder)));
   }
 
   @Nullable
@@ -606,6 +643,23 @@ public abstract class BaseServerStarter implements ServiceStartable {
     LOGGER.info("Server configs: {}", new PinotAppConfigs(getConfig()).toJSONString());
     long startTimeMs = System.currentTimeMillis();
 
+    LOGGER.info("Initializing server metrics");
+    ServerConf serverConf = new ServerConf(_serverConf);
+    PinotMetricsRegistry metricsRegistry = PinotMetricUtils.getPinotMetricsRegistry(serverConf.getMetricsConfig());
+    _serverMetrics =
+        new ServerMetrics(serverConf.getMetricsPrefix(), metricsRegistry, serverConf.emitTableLevelMetrics(),
+            serverConf.getAllowedTablesForEmittingMetrics());
+    _serverMetrics.initializeGlobalMeters();
+    _serverMetrics.setValueOfGlobalGauge(ServerGauge.VERSION, PinotVersion.VERSION_METRIC_NAME, 1);
+    ServerMetrics.register(_serverMetrics);
+
+    LOGGER.info("Initializing reload job status cache");
+    _reloadJobStatusCache = new ServerReloadJobStatusCache(_instanceId);
+
+    // Register cache as cluster config listener for dynamic config updates
+    _clusterConfigChangeHandler.registerClusterConfigChangeListener(_reloadJobStatusCache);
+    LOGGER.info("Registered ServerReloadJobStatusCache as cluster config listener");
+
     // install default SSL context if necessary (even if not force-enabled everywhere)
     TlsConfig tlsDefaults = TlsUtils.extractTlsConfig(_serverConf, Server.SERVER_TLS_PREFIX);
     if (StringUtils.isNotBlank(tlsDefaults.getKeyStorePath()) || StringUtils.isNotBlank(
@@ -663,27 +717,38 @@ public abstract class BaseServerStarter implements ServiceStartable {
               segmentDownloadThrottler, segmentMultiColTextIndexPreprocessThrottler);
     }
 
-    // initialize the thread accountant for query killing
-    Tracing.ThreadAccountantOps.initializeThreadAccountant(
-        _serverConf.subset(CommonConstants.PINOT_QUERY_SCHEDULER_PREFIX), _instanceId,
+    // Enable/disable thread CPU time measurement through instance config.
+    ThreadResourceUsageProvider.setThreadCpuTimeMeasurementEnabled(
+        _serverConf.getProperty(Server.CONFIG_OF_ENABLE_THREAD_CPU_TIME_MEASUREMENT,
+            Server.DEFAULT_ENABLE_THREAD_CPU_TIME_MEASUREMENT));
+    // Enable/disable thread memory allocation tracking through instance config
+    ThreadResourceUsageProvider.setThreadMemoryMeasurementEnabled(
+        _serverConf.getProperty(Server.CONFIG_OF_ENABLE_THREAD_ALLOCATED_BYTES_MEASUREMENT,
+            Server.DEFAULT_THREAD_ALLOCATED_BYTES_MEASUREMENT));
+    // Initialize workload budget manager and thread accountant. Workload budget manager must be initialized first
+    // because it might be used by the accountant.
+    PinotConfiguration schedulerConfig = _serverConf.subset(CommonConstants.PINOT_QUERY_SCHEDULER_PREFIX);
+    WorkloadBudgetManager.set(createWorkloadBudgetManager(schedulerConfig));
+    _threadAccountant = ThreadAccountantUtils.createAccountant(schedulerConfig, _instanceId,
         org.apache.pinot.spi.config.instance.InstanceType.SERVER);
-    if (Tracing.getThreadAccountant().getClusterConfigChangeListener() != null) {
-      _clusterConfigChangeHandler.registerClusterConfigChangeListener(
-          Tracing.getThreadAccountant().getClusterConfigChangeListener());
-    }
 
     SendStatsPredicate sendStatsPredicate = SendStatsPredicate.create(_serverConf, _helixManager);
-    ServerConf serverConf = new ServerConf(_serverConf);
-    _serverInstance = new ServerInstance(serverConf, _helixManager, _accessControlFactory, _segmentOperationsThrottler,
-        sendStatsPredicate, Tracing.getThreadAccountant());
-    ServerMetrics serverMetrics = _serverInstance.getServerMetrics();
+    _serverInstance =
+        new ServerInstance(serverConf, _instanceId, _helixManager, _accessControlFactory, _segmentOperationsThrottler,
+            _threadAccountant, sendStatsPredicate, _reloadJobStatusCache);
 
     InstanceDataManager instanceDataManager = _serverInstance.getInstanceDataManager();
     instanceDataManager.setSupplierOfIsServerReadyToServeQueries(() -> _isServerReadyToServeQueries);
 
+    // Enable Server level realtime ingestion rate limier
+    RealtimeConsumptionRateManager.getInstance().createServerRateLimiter(_serverConf, _serverMetrics);
+    PinotClusterConfigChangeListener serverRateLimitConfigChangeListener =
+        new ServerRateLimitConfigChangeListener(_serverMetrics);
+    _clusterConfigChangeHandler.registerClusterConfigChangeListener(serverRateLimitConfigChangeListener);
+
     initSegmentFetcher(_serverConf);
     StateModelFactory<?> stateModelFactory =
-        new SegmentOnlineOfflineStateModelFactory(_instanceId, instanceDataManager);
+        new SegmentOnlineOfflineStateModelFactory(_instanceId, instanceDataManager, _transitionThreadPoolManager);
     _helixManager.getStateMachineEngine()
         .registerStateModelFactory(SegmentOnlineOfflineStateModelFactory.getStateModelName(), stateModelFactory);
     // Start the data manager as a pre-connect callback so that it starts after connecting to the ZK in order to access
@@ -731,19 +796,13 @@ public abstract class BaseServerStarter implements ServiceStartable {
 
     // Register message handler factory
     SegmentMessageHandlerFactory messageHandlerFactory =
-        new SegmentMessageHandlerFactory(instanceDataManager, serverMetrics);
+        new SegmentMessageHandlerFactory(instanceDataManager, _serverMetrics);
     _helixManager.getMessagingService()
         .registerMessageHandlerFactory(Message.MessageType.USER_DEFINE_MSG.toString(), messageHandlerFactory);
-    // Query workload message handler factory
-    QueryWorkloadMessageHandlerFactory queryWorkloadMessageHandlerFactory =
-        new QueryWorkloadMessageHandlerFactory(serverMetrics);
-    _helixManager.getMessagingService()
-        .registerMessageHandlerFactory(Message.MessageType.USER_DEFINE_MSG.toString(),
-            queryWorkloadMessageHandlerFactory);
 
-    serverMetrics.addCallbackGauge(Helix.INSTANCE_CONNECTED_METRIC_NAME, () -> _helixManager.isConnected() ? 1L : 0L);
+    _serverMetrics.addCallbackGauge(Helix.INSTANCE_CONNECTED_METRIC_NAME, () -> _helixManager.isConnected() ? 1L : 0L);
     _helixManager.addPreConnectCallback(
-        () -> serverMetrics.addMeteredGlobalValue(ServerMeter.HELIX_ZOOKEEPER_RECONNECTS, 1L));
+        () -> _serverMetrics.addMeteredGlobalValue(ServerMeter.HELIX_ZOOKEEPER_RECONNECTS, 1L));
 
     // Register the service status handler
     registerServiceStatusHandler();
@@ -753,7 +812,7 @@ public abstract class BaseServerStarter implements ServiceStartable {
       long endTimeMs =
           startTimeMs + _serverConf.getProperty(Server.CONFIG_OF_STARTUP_TIMEOUT_MS, Server.DEFAULT_STARTUP_TIMEOUT_MS);
       try {
-        serverMetrics.setValueOfGlobalGauge(ServerGauge.STARTUP_STATUS_CHECK_IN_PROGRESS, 1);
+        _serverMetrics.setValueOfGlobalGauge(ServerGauge.STARTUP_STATUS_CHECK_IN_PROGRESS, 1);
         startupServiceStatusCheck(endTimeMs);
       } catch (Exception e) {
         LOGGER.error("Caught exception while checking service status. Stopping server.", e);
@@ -762,7 +821,7 @@ public abstract class BaseServerStarter implements ServiceStartable {
         _helixManager.disconnect();
         throw e;
       } finally {
-        serverMetrics.setValueOfGlobalGauge(ServerGauge.STARTUP_STATUS_CHECK_IN_PROGRESS, 0);
+        _serverMetrics.setValueOfGlobalGauge(ServerGauge.STARTUP_STATUS_CHECK_IN_PROGRESS, 0);
       }
     }
 
@@ -772,11 +831,12 @@ public abstract class BaseServerStarter implements ServiceStartable {
 
     preServeQueries();
 
-    // Enable Server level realtime ingestion rate limier
-    RealtimeConsumptionRateManager.getInstance().createServerRateLimiter(_serverConf, serverMetrics);
-    PinotClusterConfigChangeListener serverRateLimitConfigChangeListener =
-        new ServerRateLimitConfigChangeListener(serverMetrics);
-    _clusterConfigChangeHandler.registerClusterConfigChangeListener(serverRateLimitConfigChangeListener);
+    // Start the thread accountant
+    _threadAccountant.startWatcherTask();
+    PinotClusterConfigChangeListener threadAccountantListener = _threadAccountant.getClusterConfigChangeListener();
+    if (threadAccountantListener != null) {
+      _clusterConfigChangeHandler.registerClusterConfigChangeListener(threadAccountantListener);
+    }
 
     // Start the query server after finishing the service status check. If the query server is started before all the
     // segments are loaded, broker might not have finished processing the callback of routing table update, and start
@@ -786,28 +846,28 @@ public abstract class BaseServerStarter implements ServiceStartable {
         Collections.singletonMap(Helix.IS_SHUTDOWN_IN_PROGRESS, Boolean.toString(false)));
     _isServerReadyToServeQueries = true;
     // Throttling for realtime consumption is disabled up to this point to allow maximum consumption during startup time
-    RealtimeConsumptionRateManager.getInstance().enableThrottling();
+    RealtimeConsumptionRateManager.getInstance().enablePartitionRateLimiter();
 
     LOGGER.info("Pinot server ready");
 
     // Create metrics for mmap stuff
-    serverMetrics.addCallbackGauge("memory.directBufferCount", PinotDataBuffer::getDirectBufferCount);
-    serverMetrics.addCallbackGauge("memory.directBufferUsage", PinotDataBuffer::getDirectBufferUsage);
-    serverMetrics.addCallbackGauge("memory.mmapBufferCount", PinotDataBuffer::getMmapBufferCount);
-    serverMetrics.addCallbackGauge("memory.mmapBufferUsage", PinotDataBuffer::getMmapBufferUsage);
-    serverMetrics.addCallbackGauge("memory.allocationFailureCount", PinotDataBuffer::getAllocationFailureCount);
+    _serverMetrics.addCallbackGauge("memory.directBufferCount", PinotDataBuffer::getDirectBufferCount);
+    _serverMetrics.addCallbackGauge("memory.directBufferUsage", PinotDataBuffer::getDirectBufferUsage);
+    _serverMetrics.addCallbackGauge("memory.mmapBufferCount", PinotDataBuffer::getMmapBufferCount);
+    _serverMetrics.addCallbackGauge("memory.mmapBufferUsage", PinotDataBuffer::getMmapBufferUsage);
+    _serverMetrics.addCallbackGauge("memory.allocationFailureCount", PinotDataBuffer::getAllocationFailureCount);
 
     // Add ZK buffer size metric
-    serverMetrics.setOrUpdateGlobalGauge(ServerGauge.ZK_JUTE_MAX_BUFFER,
+    _serverMetrics.setOrUpdateGlobalGauge(ServerGauge.ZK_JUTE_MAX_BUFFER,
         () -> Integer.getInteger(ZkSystemPropertyKeys.JUTE_MAXBUFFER, 0xfffff));
 
     // Track metric for queries disabled
     _serverQueriesDisabledTracker =
-        new ServerQueriesDisabledTracker(_helixClusterName, _instanceId, _helixManager, serverMetrics);
+        new ServerQueriesDisabledTracker(_helixClusterName, _instanceId, _helixManager, _serverMetrics);
     _serverQueriesDisabledTracker.start();
 
     // Add metrics for consumer directory usage
-    serverMetrics.setOrUpdateGlobalGauge(ServerGauge.REALTIME_CONSUMER_DIR_USAGE, () -> {
+    _serverMetrics.setOrUpdateGlobalGauge(ServerGauge.REALTIME_CONSUMER_DIR_USAGE, () -> {
       List<File> instanceConsumerDirs = instanceDataManager.getConsumerDirPaths();
       long totalSize = 0;
       try {
@@ -825,11 +885,9 @@ public abstract class BaseServerStarter implements ServiceStartable {
 
     long startupDurationMs = System.currentTimeMillis() - startTimeMs;
     if (ServiceStatus.getServiceStatus(_instanceId).equals(Status.GOOD)) {
-      serverMetrics.addTimedValue(
-          ServerTimer.STARTUP_SUCCESS_DURATION_MS, startupDurationMs, TimeUnit.MILLISECONDS);
+      _serverMetrics.addTimedValue(ServerTimer.STARTUP_SUCCESS_DURATION_MS, startupDurationMs, TimeUnit.MILLISECONDS);
     } else {
-      serverMetrics.addTimedValue(
-          ServerTimer.STARTUP_FAILURE_DURATION_MS, startupDurationMs, TimeUnit.MILLISECONDS);
+      _serverMetrics.addTimedValue(ServerTimer.STARTUP_FAILURE_DURATION_MS, startupDurationMs, TimeUnit.MILLISECONDS);
     }
   }
 
@@ -888,6 +946,13 @@ public abstract class BaseServerStarter implements ServiceStartable {
     _segmentOperationsThrottler.startServingQueries();
   }
 
+  /**
+   * Can be overridden to create a custom WorkloadBudgetManager.
+   */
+  protected WorkloadBudgetManager createWorkloadBudgetManager(PinotConfiguration config) {
+    return new WorkloadBudgetManager(config);
+  }
+
   @Override
   public void stop() {
     LOGGER.info("Shutting down Pinot server");
@@ -896,7 +961,9 @@ public abstract class BaseServerStarter implements ServiceStartable {
     _adminApiApplication.startShuttingDown();
     _helixAdmin.setConfig(_instanceConfigScope,
         Collections.singletonMap(Helix.IS_SHUTDOWN_IN_PROGRESS, Boolean.toString(true)));
-
+    if (_transitionThreadPoolManager != null) {
+      _transitionThreadPoolManager.shutdown();
+    }
     long endTimeMs =
         startTimeMs + _serverConf.getProperty(Server.CONFIG_OF_SHUTDOWN_TIMEOUT_MS, Server.DEFAULT_SHUTDOWN_TIMEOUT_MS);
     if (_serverConf.getProperty(Server.CONFIG_OF_SHUTDOWN_ENABLE_QUERY_CHECK,
@@ -912,6 +979,7 @@ public abstract class BaseServerStarter implements ServiceStartable {
     if (_serverQueriesDisabledTracker != null) {
       _serverQueriesDisabledTracker.stop();
     }
+    _threadAccountant.stopWatcherTask();
     try {
       // Close PinotFS after all data managers are shutdown. Otherwise, segments which are being committed will not
       // be uploaded to the deep-store.
@@ -1123,7 +1191,7 @@ public abstract class BaseServerStarter implements ServiceStartable {
   }
 
   protected AdminApiApplication createServerAdminApp() {
-    return new AdminApiApplication(_serverInstance, _accessControlFactory, _serverConf);
+    return new AdminApiApplication(_serverInstance, _accessControlFactory, _reloadJobStatusCache, _serverConf);
   }
 
   private void refreshMessageCount() {

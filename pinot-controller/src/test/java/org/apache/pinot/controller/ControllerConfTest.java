@@ -18,7 +18,6 @@
  */
 package org.apache.pinot.controller;
 
-import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -26,6 +25,7 @@ import java.util.Random;
 import java.util.concurrent.TimeUnit;
 import org.apache.commons.lang3.RandomStringUtils;
 import org.apache.pinot.controller.helix.core.rebalance.RebalanceConfig;
+import org.apache.pinot.spi.config.table.DisasterRecoveryMode;
 import org.apache.pinot.spi.utils.Enablement;
 import org.apache.pinot.spi.utils.TimeUtils;
 import org.testng.Assert;
@@ -36,27 +36,33 @@ import static org.apache.pinot.controller.ControllerConf.ControllerPeriodicTasks
 
 public class ControllerConfTest {
 
-  private static final List<String> DEPRECATED_CONFIGS = Arrays
-      .asList(DEPRECATED_RETENTION_MANAGER_FREQUENCY_IN_SECONDS,
-          DEPRECATED_OFFLINE_SEGMENT_INTERVAL_CHECKER_FREQUENCY_IN_SECONDS,
-          DEPRECATED_OFFLINE_SEGMENT_INTERVAL_CHECKER_FREQUENCY_IN_SECONDS,
-          DEPRECATED_REALTIME_SEGMENT_VALIDATION_FREQUENCY_IN_SECONDS,
-          DEPRECATED_BROKER_RESOURCE_VALIDATION_FREQUENCY_IN_SECONDS, DEPRECATED_STATUS_CHECKER_FREQUENCY_IN_SECONDS,
-          DEPRECATED_TASK_MANAGER_FREQUENCY_IN_SECONDS, DEPRECATED_MINION_INSTANCES_CLEANUP_TASK_FREQUENCY_IN_SECONDS,
-          DEPRECATED_MINION_INSTANCES_CLEANUP_TASK_MIN_OFFLINE_TIME_BEFORE_DELETION_SECONDS,
-          DEPRECATED_TASK_METRICS_EMITTER_FREQUENCY_IN_SECONDS, DEPRECATED_SEGMENT_RELOCATOR_FREQUENCY_IN_SECONDS,
-          DEPRECATED_SEGMENT_LEVEL_VALIDATION_INTERVAL_IN_SECONDS,
-          DEPRECATED_REALTIME_SEGMENT_RELOCATION_INITIAL_DELAY_IN_SECONDS,
-          DEPRECATED_STATUS_CHECKER_WAIT_FOR_PUSH_TIME_IN_SECONDS);
+  private static final List<String> DEPRECATED_CONFIGS = List.of(
+      DEPRECATED_RETENTION_MANAGER_FREQUENCY_IN_SECONDS,
+      DEPRECATED_OFFLINE_SEGMENT_INTERVAL_CHECKER_FREQUENCY_IN_SECONDS,
+      DEPRECATED_REALTIME_SEGMENT_VALIDATION_FREQUENCY_IN_SECONDS,
+      DEPRECATED_BROKER_RESOURCE_VALIDATION_FREQUENCY_IN_SECONDS,
+      DEPRECATED_STATUS_CHECKER_FREQUENCY_IN_SECONDS,
+      DEPRECATED_TASK_MANAGER_FREQUENCY_IN_SECONDS,
+      DEPRECATED_TASK_METRICS_EMITTER_FREQUENCY_IN_SECONDS,
+      DEPRECATED_SEGMENT_RELOCATOR_FREQUENCY_IN_SECONDS,
+      DEPRECATED_SEGMENT_LEVEL_VALIDATION_INTERVAL_IN_SECONDS,
+      DEPRECATED_REALTIME_SEGMENT_RELOCATION_INITIAL_DELAY_IN_SECONDS,
+      DEPRECATED_STATUS_CHECKER_WAIT_FOR_PUSH_TIME_IN_SECONDS
+  );
 
-  private static final List<String> NEW_CONFIGS = Arrays
-      .asList(RETENTION_MANAGER_FREQUENCY_PERIOD, OFFLINE_SEGMENT_INTERVAL_CHECKER_FREQUENCY_PERIOD,
-          REALTIME_SEGMENT_VALIDATION_FREQUENCY_PERIOD, BROKER_RESOURCE_VALIDATION_FREQUENCY_PERIOD,
-          STATUS_CHECKER_FREQUENCY_PERIOD, TASK_MANAGER_FREQUENCY_PERIOD,
-          MINION_INSTANCES_CLEANUP_TASK_FREQUENCY_PERIOD,
-          MINION_INSTANCES_CLEANUP_TASK_MIN_OFFLINE_TIME_BEFORE_DELETION_PERIOD, TASK_METRICS_EMITTER_FREQUENCY_PERIOD,
-          SEGMENT_RELOCATOR_FREQUENCY_PERIOD, SEGMENT_LEVEL_VALIDATION_INTERVAL_PERIOD,
-          STATUS_CHECKER_WAIT_FOR_PUSH_TIME_PERIOD);
+  private static final List<String> NEW_CONFIGS = List.of(
+      RETENTION_MANAGER_FREQUENCY_PERIOD,
+      OFFLINE_SEGMENT_INTERVAL_CHECKER_FREQUENCY_PERIOD,
+      REALTIME_SEGMENT_VALIDATION_FREQUENCY_PERIOD,
+      BROKER_RESOURCE_VALIDATION_FREQUENCY_PERIOD,
+      STATUS_CHECKER_FREQUENCY_PERIOD,
+      TASK_MANAGER_FREQUENCY_PERIOD,
+      TASK_METRICS_EMITTER_FREQUENCY_PERIOD,
+      SEGMENT_RELOCATOR_FREQUENCY_PERIOD,
+      SEGMENT_LEVEL_VALIDATION_INTERVAL_PERIOD,
+      SEGMENT_RELOCATOR_INITIAL_DELAY_IN_SECONDS,
+      STATUS_CHECKER_WAIT_FOR_PUSH_TIME_PERIOD
+  );
 
   private static final Random RAND = new Random();
 
@@ -196,6 +202,18 @@ public class ControllerConfTest {
   }
 
   @Test
+  public void testGetDisasterRecoveryMode() {
+    Map<String, Object> controllerConfig = new HashMap<>();
+    ControllerConf conf = new ControllerConf(controllerConfig);
+    Assert.assertEquals(conf.getDisasterRecoveryMode(), DisasterRecoveryMode.DEFAULT);
+
+    controllerConfig = new HashMap<>();
+    controllerConfig.put(DISASTER_RECOVERY_MODE_CONFIG_KEY, "ALWAYS");
+    conf = new ControllerConf(controllerConfig);
+    Assert.assertEquals(conf.getDisasterRecoveryMode(), DisasterRecoveryMode.ALWAYS);
+  }
+
+  @Test
   public void shouldBeAbleToDisableUsingNewConfig() {
     Map<String, Object> controllerConfig = new HashMap<>();
     ControllerConf conf = new ControllerConf(controllerConfig);
@@ -239,9 +257,6 @@ public class ControllerConfTest {
     int segmentLevelValidationIntervalInSeconds = conf.getSegmentLevelValidationIntervalInSeconds();
     int segmentRelocatorFrequencyInSeconds = conf.getSegmentRelocatorFrequencyInSeconds();
     int taskMetricsEmitterFrequencyInSeconds = conf.getTaskMetricsEmitterFrequencyInSeconds();
-    int minionInstancesCleanupTaskMinOfflineTimeBeforeDeletionInSeconds =
-        conf.getMinionInstancesCleanupTaskMinOfflineTimeBeforeDeletionInSeconds();
-    long minionInstancesCleanupTaskFrequencyInSeconds = conf.getMinionInstancesCleanupTaskFrequencyInSeconds();
     int taskManagerFrequencyInSeconds = conf.getTaskManagerFrequencyInSeconds();
     int statusCheckerFrequencyInSeconds = conf.getStatusCheckerFrequencyInSeconds();
     int brokerResourceValidationFrequencyInSeconds = conf.getBrokerResourceValidationFrequencyInSeconds();
@@ -253,9 +268,6 @@ public class ControllerConfTest {
     Assert.assertEquals(segmentLevelValidationIntervalInSeconds, expectedDuration, confAsString);
     Assert.assertEquals(segmentRelocatorFrequencyInSeconds, expectedDuration, confAsString);
     Assert.assertEquals(taskMetricsEmitterFrequencyInSeconds, expectedDuration, confAsString);
-    Assert
-        .assertEquals(minionInstancesCleanupTaskMinOfflineTimeBeforeDeletionInSeconds, expectedDuration, confAsString);
-    Assert.assertEquals(minionInstancesCleanupTaskFrequencyInSeconds, expectedDuration, confAsString);
     Assert.assertEquals(taskManagerFrequencyInSeconds, expectedDuration, confAsString);
     Assert.assertEquals(statusCheckerFrequencyInSeconds, expectedDuration, confAsString);
     Assert.assertEquals(brokerResourceValidationFrequencyInSeconds, expectedDuration, confAsString);

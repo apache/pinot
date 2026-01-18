@@ -53,4 +53,10 @@ public class TaskSchedulingInfo {
   public void addSchedulingError(String schedulingError) {
     _schedulingErrors.add(schedulingError);
   }
+
+  @Override
+  public String toString() {
+    return "TaskSchedulingInfo{scheduledTaskNames='" + _scheduledTaskNames + "', generationErrors='" + _generationErrors
+        + "', schedulingErrors='" + _schedulingErrors + "'}";
+  }
 }

@@ -29,6 +29,7 @@ import SubTaskDetail from './pages/SubTaskDetail';
 import TenantsPage from './pages/Tenants';
 import TenantPageDetails from './pages/TenantDetails';
 import QueryPage from './pages/Query';
+import TimeseriesQueryPageWrapper from './pages/TimeseriesQueryPage';
 import SegmentDetails from './pages/SegmentDetails';
 import InstanceDetails from './pages/InstanceDetails';
 import ZookeeperPage from './pages/ZookeeperPage';
@@ -39,6 +40,7 @@ import UserPage from "./pages/UserPage";
 export default [
   // TODO: make async
   { path: '/', Component: HomePage },
+  { path: '/query/timeseries', Component: TimeseriesQueryPageWrapper },
   { path: '/query', Component: QueryPage },
   { path: '/tenants', Component: TenantsListingPage },
   { path: '/controllers', Component: InstanceListingPage },

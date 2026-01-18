@@ -128,8 +128,10 @@ public class DefaultAggregationExecutorTest {
     }
     int totalDocs = _indexSegment.getSegmentMetadata().getTotalDocs();
     MatchAllFilterOperator matchAllFilterOperator = new MatchAllFilterOperator(totalDocs);
-    DocIdSetOperator docIdSetOperator = new DocIdSetOperator(matchAllFilterOperator, DocIdSetPlanNode.MAX_DOC_PER_CALL);
-    ProjectionOperator projectionOperator = new ProjectionOperator(dataSourceMap, docIdSetOperator);
+    DocIdSetOperator docIdSetOperator =
+        new DocIdSetOperator(matchAllFilterOperator, DocIdSetPlanNode.MAX_DOC_PER_CALL);
+    ProjectionOperator projectionOperator =
+        new ProjectionOperator(dataSourceMap, docIdSetOperator, new QueryContext.Builder().build());
     TransformOperator transformOperator = new TransformOperator(_queryContext, projectionOperator, expressions);
     TransformBlock transformBlock = transformOperator.nextBlock();
     AggregationFunction[] aggregationFunctions = _queryContext.getAggregationFunctions();

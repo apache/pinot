@@ -42,6 +42,7 @@ public class LagValueWindowFunction extends ValueWindowFunction {
     Object defaultValue = null;
     List<RexExpression> operands = aggCall.getFunctionOperands();
     int numOperands = operands.size();
+    Preconditions.checkArgument(numOperands > 0, "LAG function requires at least one operand");
     if (numOperands > 1) {
       RexExpression secondOperand = operands.get(1);
       Preconditions.checkArgument(secondOperand instanceof RexExpression.Literal,
@@ -59,7 +60,7 @@ public class LagValueWindowFunction extends ValueWindowFunction {
       defaultValue = defaultValueLiteral.getValue();
       if (defaultValue != null) {
         DataSchema.ColumnDataType srcDataType = defaultValueLiteral.getDataType();
-        DataSchema.ColumnDataType destDataType = inputSchema.getColumnDataType(0);
+        DataSchema.ColumnDataType destDataType = getDataType();
         if (srcDataType != destDataType) {
           // Convert the default value to the same data type as the input column
           // (e.g. convert INT to LONG, FLOAT to DOUBLE, etc.
@@ -77,7 +78,10 @@ public class LagValueWindowFunction extends ValueWindowFunction {
     int numRows = rows.size();
     Object[] result = new Object[numRows];
     if (_defaultValue != null) {
-      Arrays.fill(result, 0, _offset, _defaultValue);
+      // We only fill up to the minimum of _offset and numRows to handle the case
+      // where the offset is larger than the result size.
+      int fillTo = Math.min(_offset, numRows);
+      Arrays.fill(result, 0, fillTo, _defaultValue);
     }
     for (int i = _offset; i < numRows; i++) {
       result[i] = extractValueFromRow(rows.get(i - _offset));

@@ -51,6 +51,13 @@ public class AggregationGroupByResult {
     return _groupKeyGenerator.getGroupKeys();
   }
 
+  /**
+   * Clear and trim DictionaryBasedGroupKeyGenerator after use
+   */
+  public void closeGroupKeyGenerator() {
+    _groupKeyGenerator.close();
+  }
+
   public Object getResultForGroupId(int index, int groupId) {
     return _aggregationFunctions[index].extractGroupByResult(_resultHolders[index], groupId);
   }

@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.plugin.minion.tasks;
 
+import com.google.common.base.Preconditions;
 import java.net.URI;
 import java.text.SimpleDateFormat;
 import java.time.Instant;
@@ -28,10 +29,13 @@ import java.util.List;
 import java.util.Map;
 import java.util.TimeZone;
 import javax.annotation.Nullable;
+import org.apache.commons.lang3.StringUtils;
 import org.apache.helix.HelixAdmin;
 import org.apache.helix.model.ExternalView;
 import org.apache.helix.model.InstanceConfig;
 import org.apache.pinot.common.restlet.resources.ValidDocIdsBitmapResponse;
+import org.apache.pinot.common.restlet.resources.ValidDocIdsMetadataInfo;
+import org.apache.pinot.common.restlet.resources.ValidDocIdsType;
 import org.apache.pinot.common.utils.RoaringBitmapUtils;
 import org.apache.pinot.common.utils.ServiceStatus;
 import org.apache.pinot.common.utils.config.InstanceUtils;
@@ -40,6 +44,7 @@ import org.apache.pinot.controller.util.ServerSegmentMetadataReader;
 import org.apache.pinot.minion.MinionContext;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.TableTaskConfig;
+import org.apache.pinot.spi.config.table.UpsertConfig;
 import org.apache.pinot.spi.env.PinotConfiguration;
 import org.apache.pinot.spi.filesystem.LocalPinotFS;
 import org.apache.pinot.spi.filesystem.PinotFS;
@@ -47,6 +52,7 @@ import org.apache.pinot.spi.filesystem.PinotFSFactory;
 import org.apache.pinot.spi.ingestion.batch.BatchConfigProperties;
 import org.apache.pinot.spi.plugin.PluginManager;
 import org.apache.pinot.spi.utils.CommonConstants;
+import org.apache.pinot.spi.utils.Enablement;
 import org.apache.pinot.spi.utils.IngestionConfigUtils;
 import org.apache.pinot.spi.utils.builder.TableNameBuilder;
 import org.roaringbitmap.RoaringBitmap;
@@ -99,39 +105,60 @@ public class MinionTaskUtils {
     return PinotFSFactory.create(fileURIScheme);
   }
 
+  public static URI getOutputSegmentDirURI(Map<String, String> taskConfigs, ClusterInfoAccessor clusterInfoAccessor,
+      String tableName) {
+    // taskConfigs has priority over clusterInfo configs for output.segment.dir.uri
+    String outputDir = taskConfigs.getOrDefault(BatchConfigProperties.OUTPUT_SEGMENT_DIR_URI,
+        normalizeDirectoryURI(clusterInfoAccessor.getDataDir()) + TableNameBuilder.extractRawTableName(tableName));
+    return URI.create(outputDir);
+  }
+
   public static Map<String, String> getPushTaskConfig(String tableName, Map<String, String> taskConfigs,
       ClusterInfoAccessor clusterInfoAccessor) {
+    Map<String, String> singleFileGenerationTaskConfig = new HashMap<>(taskConfigs);
     try {
       String pushMode = IngestionConfigUtils.getPushMode(taskConfigs);
 
-      Map<String, String> singleFileGenerationTaskConfig = new HashMap<>(taskConfigs);
-      if (pushMode == null || pushMode.toUpperCase()
-          .contentEquals(BatchConfigProperties.SegmentPushType.TAR.toString())) {
+      // Default value for Segment Push Type is TAR.
+      BatchConfigProperties.SegmentPushType segmentPushType;
+      if (pushMode == null) {
+        segmentPushType = BatchConfigProperties.SegmentPushType.TAR;
+      } else {
+        segmentPushType = BatchConfigProperties.SegmentPushType.valueOf(pushMode.toUpperCase());
+      }
+
+      URI outputSegmentDirURI = getOutputSegmentDirURI(taskConfigs, clusterInfoAccessor, tableName);
+      if (!isLocalOutputDir(outputSegmentDirURI.getScheme())) {
+        switch (segmentPushType) {
+          case URI:
+            singleFileGenerationTaskConfig.put(BatchConfigProperties.OUTPUT_SEGMENT_DIR_URI,
+                outputSegmentDirURI.toString());
+            LOGGER.warn("URI push type is not supported in this task. Switching to METADATA push");
+            singleFileGenerationTaskConfig.put(BatchConfigProperties.PUSH_MODE,
+                BatchConfigProperties.SegmentPushType.METADATA.toString());
+            break;
+          case METADATA:
+            singleFileGenerationTaskConfig.put(BatchConfigProperties.OUTPUT_SEGMENT_DIR_URI,
+                outputSegmentDirURI.toString());
+            break;
+          default:
+            singleFileGenerationTaskConfig.put(BatchConfigProperties.PUSH_MODE,
+                BatchConfigProperties.SegmentPushType.TAR.toString());
+            break;
+        }
+      } else {
+        LOGGER.warn("Local output dir found, defaulting to TAR: {}.", outputSegmentDirURI);
         singleFileGenerationTaskConfig.put(BatchConfigProperties.PUSH_MODE,
             BatchConfigProperties.SegmentPushType.TAR.toString());
-      } else {
-        URI outputDirURI = URI.create(
-            normalizeDirectoryURI(clusterInfoAccessor.getDataDir()) + TableNameBuilder.extractRawTableName(tableName));
-        String outputDirURIScheme = outputDirURI.getScheme();
-
-        if (!isLocalOutputDir(outputDirURIScheme)) {
-          singleFileGenerationTaskConfig.put(BatchConfigProperties.OUTPUT_SEGMENT_DIR_URI, outputDirURI.toString());
-          if (pushMode.toUpperCase().contentEquals(BatchConfigProperties.SegmentPushType.URI.toString())) {
-            LOGGER.warn("URI push type is not supported in this task. Switching to METADATA push");
-            pushMode = BatchConfigProperties.SegmentPushType.METADATA.toString();
-          }
-          singleFileGenerationTaskConfig.put(BatchConfigProperties.PUSH_MODE, pushMode);
-        } else {
-          LOGGER.warn("segment upload with METADATA push is not supported with local output dir: {}."
-              + " Switching to TAR push.", outputDirURI);
-          singleFileGenerationTaskConfig.put(BatchConfigProperties.PUSH_MODE,
-              BatchConfigProperties.SegmentPushType.TAR.toString());
-        }
       }
-      singleFileGenerationTaskConfig.put(BatchConfigProperties.PUSH_CONTROLLER_URI, clusterInfoAccessor.getVipUrl());
+
+      singleFileGenerationTaskConfig.put(BatchConfigProperties.PUSH_CONTROLLER_URI,
+          clusterInfoAccessor.getVipUrlForLeadController(tableName));
       return singleFileGenerationTaskConfig;
     } catch (Exception e) {
-      return taskConfigs;
+      singleFileGenerationTaskConfig.put(BatchConfigProperties.PUSH_MODE,
+          BatchConfigProperties.SegmentPushType.TAR.toString());
+      return singleFileGenerationTaskConfig;
     }
   }
 
@@ -264,5 +291,91 @@ public class MinionTaskUtils {
 
   public static long fromUTCString(String utcString) {
     return Instant.parse(utcString).toEpochMilli();
+  }
+
+  /**
+   * Get the validDocIdsType based on the upsertConfig and taskConfigs.
+   * The default value is determined by whether delete is enabled in the upsertConfig. If delete is enabled,
+   * the default value is 'snapshot_with_delete', otherwise it is 'snapshot'.
+   * If delete is enabled, we override the user-specified value to 'snapshot_with_delete' for backward compatibility
+   * except when it is 'in_memory_with_delete'.
+   * It also validates the combination of validDocIdsType, snapshot and deleteRecordColumn.
+   * @param upsertConfig upsertConfig of the table
+   * @param taskConfigs taskConfigs of the task
+   * @param validDocIdsTypeKey the key to get validDocIdsType from taskConfigs
+   * @return the validDocIdsType
+   */
+  public static ValidDocIdsType getValidDocIdsType(UpsertConfig upsertConfig, Map<String, String> taskConfigs,
+      String validDocIdsTypeKey) {
+    boolean isDeleteEnabled = StringUtils.isNotEmpty(upsertConfig.getDeleteRecordColumn());
+    ValidDocIdsType defaultValidDocIdsType =
+        isDeleteEnabled ? ValidDocIdsType.SNAPSHOT_WITH_DELETE : ValidDocIdsType.SNAPSHOT;
+    String validDocIdsTypeStr = taskConfigs.getOrDefault(validDocIdsTypeKey,
+        defaultValidDocIdsType.name()).toUpperCase();
+    ValidDocIdsType validDocIdsType = ValidDocIdsType.valueOf(validDocIdsTypeStr);
+
+    if (isDeleteEnabled && validDocIdsType != ValidDocIdsType.SNAPSHOT_WITH_DELETE
+        && validDocIdsType != ValidDocIdsType.IN_MEMORY_WITH_DELETE) {
+      LOGGER.warn(
+          "Overriding user-specified validDocIdsType '{}' to '{}' for backward compatibility because delete is "
+              + "enabled (deleteRecordColumn='{}').",
+          validDocIdsType, ValidDocIdsType.SNAPSHOT_WITH_DELETE, upsertConfig.getDeleteRecordColumn());
+      validDocIdsType = ValidDocIdsType.SNAPSHOT_WITH_DELETE;
+    }
+
+    if (validDocIdsType == ValidDocIdsType.SNAPSHOT || validDocIdsType == ValidDocIdsType.SNAPSHOT_WITH_DELETE) {
+      Preconditions.checkState(upsertConfig.getSnapshot() != Enablement.DISABLE,
+          "'snapshot' must not be 'DISABLE' with validDocIdsType: %s", validDocIdsType);
+    }
+
+    if (validDocIdsType == ValidDocIdsType.IN_MEMORY_WITH_DELETE
+        || validDocIdsType == ValidDocIdsType.SNAPSHOT_WITH_DELETE) {
+      Preconditions.checkState(isDeleteEnabled,
+          "'deleteRecordColumn' must be provided with validDocIdsType: %s", validDocIdsType);
+    }
+    return validDocIdsType;
+  }
+
+  /**
+   * Checks if all replicas have consensus on validDoc counts for a segment.
+   * SAFETY LOGIC:
+   * 1. Only proceed with operations when ALL replicas agree on totalValidDocs count
+   * 2. Skip operations if ANY server hosting the segment is not in READY state
+   * 3. Include all replicas (even those with CRC mismatches) in consensus for safety
+   *
+   * @param segmentName the name of the segment being checked
+   * @param replicaMetadataList list of metadata from all replicas of the segment
+   * @return true if all replicas have consensus on validDoc counts, false otherwise
+   */
+  public static boolean hasValidDocConsensus(String segmentName,
+      List<ValidDocIdsMetadataInfo> replicaMetadataList) {
+
+    if (replicaMetadataList == null || replicaMetadataList.isEmpty()) {
+      LOGGER.warn("No replica metadata available for segment: {}", segmentName);
+      return false;
+    }
+
+    // Check server readiness and validDoc consensus
+    Long consensusValidDocs = null;
+    for (ValidDocIdsMetadataInfo metadata : replicaMetadataList) {
+      // Check server readiness - skip if ANY server is not ready
+      if (metadata.getServerStatus() != null && !metadata.getServerStatus().equals(ServiceStatus.Status.GOOD)) {
+        LOGGER.warn("Server {} is in {} state for segment: {}, skipping consensus check",
+            metadata.getInstanceId(), metadata.getServerStatus(), segmentName);
+        return false;
+      }
+
+      // Check if all replicas have the same totalValidDocs count
+      long validDocs = metadata.getTotalValidDocs();
+      if (consensusValidDocs == null) {
+        // First iteration, we record the value to compare against
+        consensusValidDocs = validDocs;
+      } else if (!consensusValidDocs.equals(validDocs)) {
+        LOGGER.warn("Inconsistent validDoc counts across replicas for segment: {}. Expected: {}, but found: {}",
+            segmentName, consensusValidDocs, validDocs);
+        return false;
+      }
+    }
+    return true;
   }
 }

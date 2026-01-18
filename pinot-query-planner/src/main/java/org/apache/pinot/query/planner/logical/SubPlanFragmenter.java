@@ -26,6 +26,7 @@ import org.apache.calcite.runtime.ImmutablePairList;
 import org.apache.pinot.calcite.rel.logical.PinotRelExchangeType;
 import org.apache.pinot.query.planner.SubPlanMetadata;
 import org.apache.pinot.query.planner.plannode.AggregateNode;
+import org.apache.pinot.query.planner.plannode.EnrichedJoinNode;
 import org.apache.pinot.query.planner.plannode.ExchangeNode;
 import org.apache.pinot.query.planner.plannode.ExplainedNode;
 import org.apache.pinot.query.planner.plannode.FilterNode;
@@ -38,6 +39,7 @@ import org.apache.pinot.query.planner.plannode.ProjectNode;
 import org.apache.pinot.query.planner.plannode.SetOpNode;
 import org.apache.pinot.query.planner.plannode.SortNode;
 import org.apache.pinot.query.planner.plannode.TableScanNode;
+import org.apache.pinot.query.planner.plannode.UnnestNode;
 import org.apache.pinot.query.planner.plannode.ValueNode;
 import org.apache.pinot.query.planner.plannode.WindowNode;
 
@@ -77,6 +79,11 @@ public class SubPlanFragmenter implements PlanNodeVisitor<PlanNode, SubPlanFragm
   @Override
   public PlanNode visitJoin(JoinNode node, Context context) {
     return process(node, context);
+  }
+
+  @Override
+  public PlanNode visitEnrichedJoin(EnrichedJoinNode node, Context context) {
+    return visitJoin(node, context);
   }
 
   @Override
@@ -143,6 +150,11 @@ public class SubPlanFragmenter implements PlanNodeVisitor<PlanNode, SubPlanFragm
         new SubPlanMetadata(node.getTableNames(), ImmutablePairList.of()));
     PlanNode literalValueNode = new LiteralValueNode(nextStageRoot.getDataSchema());
     return literalValueNode;
+  }
+
+  @Override
+  public PlanNode visitUnnest(UnnestNode node, Context context) {
+    return process(node, context);
   }
 
   private boolean isSubPlanSplitter(PlanNode node) {

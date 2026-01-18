@@ -23,9 +23,13 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.atomic.AtomicReference;
 import org.apache.pinot.common.metrics.ServerMetrics;
 import org.apache.pinot.spi.env.PinotConfiguration;
+import org.apache.pinot.spi.stream.MessageBatch;
 import org.apache.pinot.spi.utils.CommonConstants;
+import org.mockito.Mockito;
 import org.testng.annotations.Test;
 
 import static org.mockito.Mockito.mock;
@@ -39,37 +43,93 @@ public class ServerRateLimitConfigChangeListenerTest {
   private static final double DELTA = 0.0001;
   private static final ServerMetrics MOCK_SERVER_METRICS = mock(ServerMetrics.class);
 
-  static {
-    when(SERVER_CONFIG.getProperty(CommonConstants.Server.CONFIG_OF_SERVER_CONSUMPTION_RATE_LIMIT,
-        CommonConstants.Server.DEFAULT_SERVER_CONSUMPTION_RATE_LIMIT)).thenReturn(5.0);
-  }
-
   @Test
-  public void testRateLimitUpdate() {
+  public void testRateLimitUpdate()
+      throws InterruptedException {
+    String rateLimiterConfigKey = CommonConstants.Server.CONFIG_OF_SERVER_CONSUMPTION_RATE_LIMIT;
+    if (Math.random() < 0.5) {
+      rateLimiterConfigKey = CommonConstants.Server.CONFIG_OF_SERVER_CONSUMPTION_RATE_LIMIT_BYTES;
+    }
+
+    when(SERVER_CONFIG.getProperty(rateLimiterConfigKey,
+        CommonConstants.Server.DEFAULT_SERVER_CONSUMPTION_RATE_LIMIT)).thenReturn(5.0);
+
+    AtomicReference<Throwable> errorRef = new AtomicReference<>();
+    simulateThrottling(errorRef);
     // Initial state
     RealtimeConsumptionRateManager.getInstance().createServerRateLimiter(SERVER_CONFIG, null);
-    RealtimeConsumptionRateManager.RateLimiterImpl serverRateLimiter = getServerRateLimiter();
+    RealtimeConsumptionRateManager.ServerRateLimiter serverRateLimiter = getServerRateLimiter();
     double initialRate = serverRateLimiter.getRate();
     assertEquals(initialRate, 5.0, DELTA);
 
     // Simulate config change
     Map<String, String> newConfig = new HashMap<>();
-    newConfig.put(CommonConstants.Server.CONFIG_OF_SERVER_CONSUMPTION_RATE_LIMIT, "300.0");
+    newConfig.put(rateLimiterConfigKey, "300.0");
     ServerRateLimitConfigChangeListener listener = new ServerRateLimitConfigChangeListener(MOCK_SERVER_METRICS);
-    Set<String> changedConfigSet =
-        new HashSet<>(List.of(CommonConstants.Server.CONFIG_OF_SERVER_CONSUMPTION_RATE_LIMIT));
+    Set<String> changedConfigSet = new HashSet<>(List.of(rateLimiterConfigKey));
+    simulateThrottling(errorRef);
     listener.onChange(changedConfigSet, newConfig);
+    simulateThrottling(errorRef);
 
-    // Verify that old rate remains same and the new rate is applied
+    // Verify that rate changed
     double rate = serverRateLimiter.getRate();
-    assertEquals(rate, 5.0, DELTA);
-
+    assertEquals(rate, 300.0, DELTA);
     double updatedRate = getServerRateLimiter().getRate();
     assertEquals(updatedRate, 300.0, DELTA);
+
+    // Test removal of serverRateLimit
+    newConfig = new HashMap<>();
+    newConfig.put(rateLimiterConfigKey, "0");
+    changedConfigSet = new HashSet<>(List.of(rateLimiterConfigKey));
+    simulateThrottling(errorRef);
+    listener.onChange(changedConfigSet, newConfig);
+    simulateThrottling(errorRef);
+
+    // Verify that old rate remains same and the new rate is applied
+    rate = serverRateLimiter.getRate();
+    assertEquals(rate, 300.0, DELTA);
+
+    assertEquals(RealtimeConsumptionRateManager.NOOP_RATE_LIMITER,
+        RealtimeConsumptionRateManager.getInstance().getServerRateLimiter());
+
+    // Test update of serverRateLimit after it was removed
+    newConfig = new HashMap<>();
+    newConfig.put(rateLimiterConfigKey, "10000");
+    changedConfigSet = new HashSet<>(List.of(rateLimiterConfigKey));
+    simulateThrottling(errorRef);
+    listener.onChange(changedConfigSet, newConfig);
+    simulateThrottling(errorRef);
+
+    // Verify that old rate (one before the config change was deleted and again added) remains same.
+    rate = serverRateLimiter.getRate();
+    assertEquals(rate, 300.0, DELTA);
+
+    updatedRate = getServerRateLimiter().getRate();
+    assertEquals(updatedRate, 10000, DELTA);
+
+    Thread.sleep(1000);
+    if (errorRef.get() != null) {
+      throw new RuntimeException("Throttle call failed: " + errorRef.get().getMessage());
+    }
   }
 
-  private RealtimeConsumptionRateManager.RateLimiterImpl getServerRateLimiter() {
-    return (RealtimeConsumptionRateManager.RateLimiterImpl) (RealtimeConsumptionRateManager.getInstance()
+  private void simulateThrottling(AtomicReference<Throwable> errorRef) {
+    // A helper method to test side effects of throttling during serverRateLimit config change.
+    MessageBatch messageBatch = Mockito.mock(MessageBatch.class);
+    when(messageBatch.getMessageCount()).thenReturn(100);
+    for (int i = 0; i < 10; i++) {
+      CompletableFuture.runAsync(() -> {
+        try {
+          RealtimeConsumptionRateManager.getInstance().getServerRateLimiter().throttle(messageBatch);
+        } catch (Throwable throwable) {
+          errorRef.set(throwable);
+        }
+      });
+    }
+  }
+
+  private RealtimeConsumptionRateManager.ServerRateLimiter getServerRateLimiter() {
+    return (RealtimeConsumptionRateManager.ServerRateLimiter) (RealtimeConsumptionRateManager.getInstance()
         .getServerRateLimiter());
   }
 }

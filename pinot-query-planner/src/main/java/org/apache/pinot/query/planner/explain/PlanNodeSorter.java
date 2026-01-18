@@ -25,6 +25,7 @@ import java.util.List;
 import java.util.TreeSet;
 import org.apache.pinot.common.proto.Plan;
 import org.apache.pinot.query.planner.plannode.AggregateNode;
+import org.apache.pinot.query.planner.plannode.EnrichedJoinNode;
 import org.apache.pinot.query.planner.plannode.ExchangeNode;
 import org.apache.pinot.query.planner.plannode.ExplainedNode;
 import org.apache.pinot.query.planner.plannode.FilterNode;
@@ -37,6 +38,7 @@ import org.apache.pinot.query.planner.plannode.ProjectNode;
 import org.apache.pinot.query.planner.plannode.SetOpNode;
 import org.apache.pinot.query.planner.plannode.SortNode;
 import org.apache.pinot.query.planner.plannode.TableScanNode;
+import org.apache.pinot.query.planner.plannode.UnnestNode;
 import org.apache.pinot.query.planner.plannode.ValueNode;
 import org.apache.pinot.query.planner.plannode.WindowNode;
 
@@ -89,6 +91,11 @@ public class PlanNodeSorter {
     @Override
     public PlanNode visitJoin(JoinNode node, Comparator<PlanNode> comparator) {
       return defaultNode(node, comparator);
+    }
+
+    @Override
+    public PlanNode visitEnrichedJoin(EnrichedJoinNode node, Comparator<PlanNode> comparator) {
+      return visitJoin(node, comparator);
     }
 
     @Override
@@ -147,6 +154,11 @@ public class PlanNodeSorter {
         return node;
       }
       return node.withInputs(simplifiedChildren);
+    }
+
+    @Override
+    public PlanNode visitUnnest(UnnestNode node, Comparator<PlanNode> comparator) {
+      return defaultNode(node, comparator);
     }
 
     private List<PlanNode> applyToChildren(List<PlanNode> children, Comparator<PlanNode> comparator) {

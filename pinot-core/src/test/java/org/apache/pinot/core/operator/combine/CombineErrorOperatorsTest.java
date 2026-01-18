@@ -20,17 +20,18 @@ package org.apache.pinot.core.operator.combine;
 
 import java.util.ArrayList;
 import java.util.Arrays;
-import java.util.Collections;
 import java.util.List;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import org.apache.pinot.common.utils.DataSchema;
+import org.apache.pinot.common.utils.DataSchema.ColumnDataType;
 import org.apache.pinot.core.common.Block;
 import org.apache.pinot.core.common.Operator;
 import org.apache.pinot.core.operator.BaseOperator;
 import org.apache.pinot.core.operator.ExecutionStatistics;
 import org.apache.pinot.core.operator.blocks.results.BaseResultsBlock;
 import org.apache.pinot.core.operator.blocks.results.ExceptionResultsBlock;
+import org.apache.pinot.core.operator.blocks.results.GroupByResultsBlock;
 import org.apache.pinot.core.operator.blocks.results.SelectionResultsBlock;
 import org.apache.pinot.core.query.request.context.QueryContext;
 import org.apache.pinot.core.query.request.context.utils.QueryContextConverterUtils;
@@ -51,9 +52,12 @@ public class CombineErrorOperatorsTest {
   private static final int NUM_THREADS = 2;
   private static final QueryContext QUERY_CONTEXT =
       QueryContextConverterUtils.getQueryContext("SELECT * FROM testTable");
+  private static final QueryContext GROUP_BY_QUERY_CONTEXT =
+      QueryContextConverterUtils.getQueryContext("SELECT myColumn, COUNT(*) FROM testTable GROUP BY 1 ORDER BY 1");
 
   static {
     QUERY_CONTEXT.setEndTimeMs(Long.MAX_VALUE);
+    GROUP_BY_QUERY_CONTEXT.setEndTimeMs(Long.MAX_VALUE);
   }
 
   private ExecutorService _executorService;
@@ -66,8 +70,8 @@ public class CombineErrorOperatorsTest {
   @DataProvider(name = "getErrorCodes")
   public static Object[][] getErrorCodes() {
     return Arrays.stream(QueryErrorCode.values())
-      .map(queryErrorCode -> new Object[]{queryErrorCode})
-      .toArray(Object[][]::new);
+        .map(queryErrorCode -> new Object[]{queryErrorCode})
+        .toArray(Object[][]::new);
   }
 
   @Test(dataProvider = "getErrorCodes")
@@ -79,6 +83,24 @@ public class CombineErrorOperatorsTest {
     operators.add(new ExceptionOperator(queryErrorCode.asException("Test exception message")));
     SelectionOnlyCombineOperator combineOperator =
         new SelectionOnlyCombineOperator(operators, QUERY_CONTEXT, _executorService);
+    BaseResultsBlock resultsBlock = combineOperator.nextBlock();
+    assertTrue(resultsBlock instanceof ExceptionResultsBlock);
+    List<QueryErrorMessage> errorMsgs = resultsBlock.getErrorMessages();
+    assertNotNull(errorMsgs);
+    assertEquals(errorMsgs.size(), 1);
+    QueryErrorMessage errorMsg = errorMsgs.get(0);
+    assertEquals(errorMsg.getErrCode(), queryErrorCode);
+  }
+
+  @Test(dataProvider = "getErrorCodes")
+  public void testSequentialSortedGroupByCombineExceptionOperator(QueryErrorCode queryErrorCode) {
+    List<Operator> operators = new ArrayList<>(NUM_OPERATORS);
+    for (int i = 0; i < NUM_OPERATORS - 1; i++) {
+      operators.add(new RegularGroupByOperator());
+    }
+    operators.add(new ExceptionOperator(queryErrorCode.asException("Test exception message")));
+    SequentialSortedGroupByCombineOperator combineOperator =
+        new SequentialSortedGroupByCombineOperator(operators, GROUP_BY_QUERY_CONTEXT, _executorService);
     BaseResultsBlock resultsBlock = combineOperator.nextBlock();
     assertTrue(resultsBlock instanceof ExceptionResultsBlock);
     List<QueryErrorMessage> errorMsgs = resultsBlock.getErrorMessages();
@@ -141,7 +163,7 @@ public class CombineErrorOperatorsTest {
 
     @Override
     public List<Operator> getChildOperators() {
-      return Collections.emptyList();
+      return List.of();
     }
 
     @Override
@@ -165,7 +187,7 @@ public class CombineErrorOperatorsTest {
 
     @Override
     public List<Operator> getChildOperators() {
-      return Collections.emptyList();
+      return List.of();
     }
 
     @Override
@@ -185,13 +207,38 @@ public class CombineErrorOperatorsTest {
     @Override
     protected Block getNextBlock() {
       return new SelectionResultsBlock(
-          new DataSchema(new String[]{"myColumn"}, new DataSchema.ColumnDataType[]{DataSchema.ColumnDataType.INT}),
-          new ArrayList<>(), QUERY_CONTEXT);
+          new DataSchema(new String[]{"myColumn"}, new ColumnDataType[]{ColumnDataType.STRING}), new ArrayList<>(),
+          QUERY_CONTEXT);
     }
 
     @Override
     public List<Operator> getChildOperators() {
-      return Collections.emptyList();
+      return List.of();
+    }
+
+    @Override
+    public String toExplainString() {
+      return EXPLAIN_NAME;
+    }
+
+    @Override
+    public ExecutionStatistics getExecutionStatistics() {
+      return new ExecutionStatistics(0, 0, 0, 0);
+    }
+  }
+
+  private static class RegularGroupByOperator extends BaseOperator {
+    private static final String EXPLAIN_NAME = "REGULAR_GROUP_BY";
+
+    @Override
+    protected Block getNextBlock() {
+      return new GroupByResultsBlock(new DataSchema(new String[]{"myColumn", "count(*)"},
+          new ColumnDataType[]{ColumnDataType.STRING, ColumnDataType.LONG}), new ArrayList<>(), GROUP_BY_QUERY_CONTEXT);
+    }
+
+    @Override
+    public List<Operator> getChildOperators() {
+      return List.of();
     }
 
     @Override

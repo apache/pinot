@@ -18,7 +18,6 @@
  */
 package org.apache.pinot.common.function.scalar;
 
-import org.apache.pinot.common.function.scalar.string.NgramFunctions;
 import org.testng.annotations.DataProvider;
 import org.testng.annotations.Test;
 
@@ -95,23 +94,50 @@ public class StringFunctionsTest {
     };
   }
 
-  @DataProvider(name = "ngramTestCases")
-  public static Object[][] ngramTestCases() {
+  @DataProvider(name = "levenshteinDistanceTestCases")
+  public static Object[][] levenshteinDistanceTestCases() {
     return new Object[][]{
-        {"abcd", 0, 3, new String[]{"abc", "bcd"}, new String[]{"a", "b", "c", "d", "ab", "bc", "cd", "abc", "bcd"}},
-        {"abcd", 2, 2, new String[]{"ab", "bc", "cd"}, new String[]{"ab", "bc", "cd"}},
-        {"abcd", 3, 0, new String[]{}, new String[]{}},
-        {"abc", 0, 3, new String[]{"abc"}, new String[]{"a", "b", "c", "ab", "bc", "abc"}},
-        {"abc", 3, 0, new String[]{}, new String[]{}},
-        {"abc", 3, 3, new String[]{"abc"}, new String[]{"abc"}},
-        {"a", 0, 3, new String[]{}, new String[]{"a"}},
-        {"a", 2, 3, new String[]{}, new String[]{}},
-        {"a", 3, 3, new String[]{}, new String[]{}},
-        {"", 3, 0, new String[]{}, new String[]{}},
-        {"", 3, 3, new String[]{}, new String[]{}},
-        {"", 0, 3, new String[]{}, new String[]{}}
+        // Basic test cases
+        {"", "", 0},
+        {"a", "", 1},
+        {"", "a", 1},
+        {"a", "a", 0},
+
+        // Classic examples
+        {"kitten", "sitting", 3},
+        {"saturday", "sunday", 3},
+        {"intention", "execution", 5},
+
+        // Single character operations
+        {"cat", "bat", 1}, // substitution
+        {"cat", "cats", 1}, // insertion
+        {"cats", "cat", 1}, // deletion
+
+        // More complex cases
+        {"book", "back", 2},
+        {"hello", "world", 4},
+        {"algorithm", "altruistic", 6},
+
+        // Edge cases with repeated characters
+        {"aaa", "aa", 1},
+        {"aa", "aaa", 1},
+        {"abc", "def", 3},
+
+        // Longer strings
+        {"abcdefghijklmnop", "1234567890123456", 16},
+        {"programming", "grammar", 6},
+
+        // Case sensitivity
+        {"Hello", "hello", 1},
+        {"WORLD", "world", 5},
+
+        // Special characters and numbers
+        {"test123", "test456", 3},
+        {"hello!", "hello?", 1},
+        {"a@b.com", "a@c.com", 1}
     };
   }
+
 
   @Test(dataProvider = "isJson")
   public void testIsJson(String input, boolean expectedValue) {
@@ -134,10 +160,23 @@ public class StringFunctionsTest {
     assertEquals(StringFunctions.suffixesWithSuffix(input, length, "$"), expectedSuffixWithRegexChar);
   }
 
-  @Test(dataProvider = "ngramTestCases")
-  public void testNGram(String input, int minGram, int maxGram, String[] expectedExactNGram, String[] expectedNGram) {
-    assertEquals(new NgramFunctions().uniqueNgrams(input, maxGram), expectedExactNGram);
-    assertEquals(new NgramFunctions().uniqueNgrams(input, minGram, maxGram), expectedNGram);
+  @Test(dataProvider = "levenshteinDistanceTestCases")
+  public void testLevenshteinDistance(String input1, String input2, int expectedDistance) {
+    assertEquals(StringFunctions.levenshteinDistance(input1, input2), expectedDistance);
+  }
+
+
+  @Test
+  public void testHammingDistance() {
+    // Test existing hammingDistance function for comparison
+    assertEquals(StringFunctions.hammingDistance("abc", "abc"), 0);
+    assertEquals(StringFunctions.hammingDistance("abc", "def"), 3);
+    assertEquals(StringFunctions.hammingDistance("abc", "aef"), 2);
+    assertEquals(StringFunctions.hammingDistance("abc", "abcd"), -1); // Different lengths
+
+    // Demonstrate the difference between hammingDistance and levenshteinDistance
+    assertEquals(StringFunctions.hammingDistance("cat", "cats"), -1); // Hamming can't handle different lengths
+    assertEquals(StringFunctions.levenshteinDistance("cat", "cats"), 1); // Levenshtein can handle different lengths
   }
 
   @Test

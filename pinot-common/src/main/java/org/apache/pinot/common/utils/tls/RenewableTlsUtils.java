@@ -43,6 +43,7 @@ import nl.altindag.ssl.keymanager.HotSwappableX509ExtendedKeyManager;
 import nl.altindag.ssl.trustmanager.HotSwappableX509ExtendedTrustManager;
 import nl.altindag.ssl.util.SSLFactoryUtils;
 import org.apache.pinot.common.config.TlsConfig;
+import org.apache.pinot.common.utils.NamedThreadFactory;
 import org.apache.pinot.spi.utils.retry.RetryPolicies;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -55,6 +56,8 @@ public class RenewableTlsUtils {
   private static final String FILE_SCHEME = "file";
   private static final int CERT_RELOAD_JOB_INTERVAL_IN_MINUTES = 1440;
   private static final int CERT_RELOAD_JOB_INITAL_DELAY_IN_MINUTES = 20;
+  private static final String SSL_FILE_WATCHER_THREAD_PREFIX = "ssl-file-watcher";
+  private static final String SSL_DAILY_RELOAD_THREAD_PREFIX = "ssl-daily-reload";
 
   private RenewableTlsUtils() {
     // left blank
@@ -209,7 +212,8 @@ public class RenewableTlsUtils {
       // The reloadSslFactoryWhenFileStoreChanges is a blocking call, so we need to create a new thread to run it.
       // Creating a new thread to run the reloadSslFactoryWhenFileStoreChanges is costly; however, unless we
       // invoke the createAutoRenewedSSLFactoryFromFileStore method crazily, this should not be a problem.
-      Executors.newSingleThreadExecutor().execute(() -> {
+      // Use daemon thread to allow JVM to exit when on-demand processes complete.
+      Executors.newSingleThreadExecutor(new NamedThreadFactory(SSL_FILE_WATCHER_THREAD_PREFIX, true)).execute(() -> {
         try {
           reloadSslFactoryWhenFileStoreChanges(sslFactory,
               keyStoreType, keyStorePath, keyStorePassword,
@@ -227,8 +231,9 @@ public class RenewableTlsUtils {
       // it was never detected and run in others. This will result in few components with
       // stale certificates. In order to prevent this issue, we are adding a new scheduled
       // thread which will run once a day and reload the certs.
-
-      Executors.newSingleThreadScheduledExecutor().scheduleAtFixedRate(() -> {
+      // Use daemon thread to allow JVM to exit when on-demand processes complete.
+      Executors.newSingleThreadScheduledExecutor(new NamedThreadFactory(SSL_DAILY_RELOAD_THREAD_PREFIX, true))
+              .scheduleAtFixedRate(() -> {
         LOGGER.info("Creating a scheduled thread to reloadSsl once a day");
         try {
           reloadSslFactory(sslFactory,

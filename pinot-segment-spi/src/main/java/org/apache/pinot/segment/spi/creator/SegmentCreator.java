@@ -24,10 +24,12 @@ import java.io.IOException;
 import java.io.Serializable;
 import java.util.TreeMap;
 import javax.annotation.Nullable;
-import org.apache.commons.configuration2.ex.ConfigurationException;
 import org.apache.pinot.segment.spi.IndexSegment;
 import org.apache.pinot.segment.spi.index.creator.SegmentIndexCreationInfo;
+import org.apache.pinot.segment.spi.index.mutable.ThreadSafeMutableRoaringBitmap;
+import org.apache.pinot.spi.config.instance.InstanceType;
 import org.apache.pinot.spi.data.Schema;
+import org.apache.pinot.spi.data.readers.ColumnReader;
 import org.apache.pinot.spi.data.readers.GenericRow;
 
 
@@ -45,11 +47,14 @@ public interface SegmentCreator extends Closeable, Serializable {
    * @param indexCreationInfoMap
    * @param schema
    * @param outDir
+   * @param immutableToMutableIdMap
+   * @param instanceType - Instance type that's used to select the metrics for observability
+   * TODO - Move instanceType to SegmentGeneratorConfig and avoid passing it here
    * @throws Exception
    */
   void init(SegmentGeneratorConfig segmentCreationSpec, SegmentIndexCreationInfo segmentIndexCreationInfo,
       TreeMap<String, ColumnIndexCreationInfo> indexCreationInfoMap, Schema schema, File outDir,
-      @Nullable int[] immutableToMutableIdMap)
+      @Nullable int[] immutableToMutableIdMap, @Nullable InstanceType instanceType)
       throws Exception;
 
   /**
@@ -70,19 +75,38 @@ public interface SegmentCreator extends Closeable, Serializable {
   void indexColumn(String columnName, @Nullable int[] sortedDocIds, IndexSegment segment)
       throws IOException;
 
-  /**
-   * Sets the name of the segment.
-   *
-   * @param segmentName The name of the segment
-   */
-  void setSegmentName(String segmentName);
+  void indexColumn(String columnName, ColumnReader columnReader)
+      throws IOException;
 
   /**
-   * Seals the segment, flushing it to disk.
+   * Adds a column to the index.
    *
-   * @throws ConfigurationException
-   * @throws IOException
+   * @param columnName - The name of the column being added to.
+   * @param sortedDocIds - If not null, then this provides the sorted order of documents.
+   * @param segment - Used to get the values of the column.
+   * @param validDocIds - If not null, then will only iterate over valid doc ids and skip invalid doc ids.
+   *                      When null, all documents in the segment will be processed.
+   */
+  default void indexColumn(String columnName, @Nullable int[] sortedDocIds, IndexSegment segment,
+      @Nullable ThreadSafeMutableRoaringBitmap validDocIds)
+      throws IOException {
+    // Default implementation ignores validDocIds for backward compatibility
+    indexColumn(columnName, sortedDocIds, segment);
+  }
+
+  String getSegmentName();
+
+  /**
+   * Seals and creates the final segment in outDir provided in init().
+   * This method is supposed to
+   * 1. flush all column indexes to disk
+   * 2. generate the segment name
+   * 3. convert the segment to the final format
+   * 4. build other indexes (startree index, etc.) if needed.
+   * 5. persist the segment metadata and creation info files.
+   *
+   * @throws Exception If finalization fails
    */
   void seal()
-      throws ConfigurationException, IOException;
+      throws Exception;
 }

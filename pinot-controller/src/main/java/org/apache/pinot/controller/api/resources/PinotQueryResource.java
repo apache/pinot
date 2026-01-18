@@ -18,8 +18,11 @@
  */
 package org.apache.pinot.controller.api.resources;
 
+import com.fasterxml.jackson.annotation.JsonCreator;
+import com.fasterxml.jackson.annotation.JsonProperty;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.node.ObjectNode;
+import io.swagger.annotations.ApiOperation;
 import java.io.BufferedOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
@@ -27,7 +30,10 @@ import java.io.OutputStream;
 import java.net.HttpURLConnection;
 import java.net.URL;
 import java.nio.charset.StandardCharsets;
+import java.time.Duration;
 import java.util.ArrayList;
+import java.util.Collections;
+import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
@@ -39,20 +45,26 @@ import java.util.stream.Collectors;
 import java.util.stream.Stream;
 import javax.annotation.Nullable;
 import javax.inject.Inject;
+import javax.ws.rs.Consumes;
 import javax.ws.rs.GET;
 import javax.ws.rs.POST;
 import javax.ws.rs.Path;
+import javax.ws.rs.Produces;
 import javax.ws.rs.QueryParam;
 import javax.ws.rs.WebApplicationException;
 import javax.ws.rs.core.Context;
 import javax.ws.rs.core.HttpHeaders;
+import javax.ws.rs.core.MediaType;
 import javax.ws.rs.core.Response;
 import javax.ws.rs.core.StreamingOutput;
 import org.apache.calcite.sql.SqlNode;
+import org.apache.commons.collections.CollectionUtils;
 import org.apache.commons.io.IOUtils;
-import org.apache.commons.lang3.tuple.Pair;
+import org.apache.hc.core5.net.URIBuilder;
 import org.apache.helix.model.InstanceConfig;
 import org.apache.pinot.common.Utils;
+import org.apache.pinot.common.config.provider.StaticTableCache;
+import org.apache.pinot.common.config.provider.TableCache;
 import org.apache.pinot.common.response.ProcessingException;
 import org.apache.pinot.common.response.broker.BrokerResponseNative;
 import org.apache.pinot.common.utils.DatabaseUtils;
@@ -68,10 +80,11 @@ import org.apache.pinot.core.auth.ManualAuthorization;
 import org.apache.pinot.core.query.executor.sql.SqlQueryExecutor;
 import org.apache.pinot.query.QueryEnvironment;
 import org.apache.pinot.query.parser.utils.ParserUtils;
+import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.data.LogicalTableConfig;
+import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.exception.DatabaseConflictException;
 import org.apache.pinot.spi.exception.QueryErrorCode;
-import org.apache.pinot.spi.exception.QueryErrorMessage;
 import org.apache.pinot.spi.exception.QueryException;
 import org.apache.pinot.spi.utils.CommonConstants;
 import org.apache.pinot.spi.utils.CommonConstants.Broker.Request.QueryOptionKey;
@@ -81,6 +94,12 @@ import org.apache.pinot.sql.parsers.CalciteSqlCompiler;
 import org.apache.pinot.sql.parsers.CalciteSqlParser;
 import org.apache.pinot.sql.parsers.PinotSqlType;
 import org.apache.pinot.sql.parsers.SqlNodeAndOptions;
+import org.apache.pinot.sql.parsers.parser.TableNameExtractor;
+import org.apache.pinot.tsdb.planner.TimeSeriesQueryEnvironment;
+import org.apache.pinot.tsdb.planner.TimeSeriesTableMetadataProvider;
+import org.apache.pinot.tsdb.spi.RangeTimeSeriesRequest;
+import org.apache.pinot.tsdb.spi.TimeSeriesLogicalPlanResult;
+import org.apache.pinot.tsdb.spi.TimeSeriesLogicalPlanner;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -113,7 +132,7 @@ public class PinotQueryResource {
     }
     if (!requestJson.has("sql")) {
       return constructQueryExceptionResponse(QueryErrorCode.JSON_PARSING,
-          "JSON Payload is missing the query string field 'sql'");
+        "JSON Payload is missing the query string field 'sql'");
     }
     String sqlQuery = requestJson.get("sql").asText();
     String traceEnabled = "false";
@@ -131,8 +150,217 @@ public class PinotQueryResource {
   @Path("sql")
   @ManualAuthorization
   public StreamingOutput handleGetSql(@QueryParam("sql") String sqlQuery, @QueryParam("trace") String traceEnabled,
-      @QueryParam("queryOptions") String queryOptions, @Context HttpHeaders httpHeaders) {
+    @QueryParam("queryOptions") String queryOptions, @Context HttpHeaders httpHeaders) {
     return executeSqlQueryCatching(httpHeaders, sqlQuery, traceEnabled, queryOptions);
+  }
+
+  @GET
+  @Path("/timeseries/api/v1/query_range")
+  @ManualAuthorization
+  @ApiOperation(value = "Prometheus Compatible API for Pinot's Time Series Engine")
+  public StreamingOutput handleTimeSeriesQueryRange(@QueryParam("language") String language,
+    @QueryParam("query") String query, @QueryParam("start") String start, @QueryParam("end") String end,
+    @QueryParam("step") String step, @Context HttpHeaders httpHeaders) {
+    return executeTimeSeriesQueryCatching(httpHeaders, language, query, start, end, step);
+  }
+
+  @POST
+  @Path("/query/timeseries")
+  @ManualAuthorization
+  @ApiOperation(value = "Query Pinot using the Time Series Engine (Broker Compatible API)")
+  @Consumes(MediaType.APPLICATION_JSON)
+  public StreamingOutput handleTimeSeriesQueryPost(String requestBody, @Context HttpHeaders httpHeaders) {
+    try {
+      JsonNode requestJson = JsonUtils.stringToJsonNode(requestBody);
+      if (!requestJson.has("query")) {
+        return constructQueryExceptionResponse(QueryErrorCode.JSON_PARSING,
+            "Payload is missing the query string field 'query'");
+      }
+      String language = requestJson.has("language") ? requestJson.get("language").asText() : null;
+      String query = requestJson.get("query").asText();
+      String start = requestJson.has("start") ? requestJson.get("start").asText() : null;
+      String end = requestJson.has("end") ? requestJson.get("end").asText() : null;
+      String step = requestJson.has("step") ? requestJson.get("step").asText() : null;
+      String mode = requestJson.has("mode") ? requestJson.get("mode").asText() : null;
+
+      Map<String, String> queryOptions = new HashMap<>();
+      if (requestJson.has("queryOptions") && requestJson.get("queryOptions").isObject()) {
+        requestJson.get("queryOptions").fields().forEachRemaining(entry -> {
+          queryOptions.put(entry.getKey(), entry.getValue().asText());
+        });
+      }
+
+      return executeTimeSeriesQueryCatching(httpHeaders, language, query, start, end, step, queryOptions, mode, true);
+    } catch (Exception e) {
+      LOGGER.error("Caught exception while processing POST timeseries request", e);
+      return constructQueryExceptionResponse(QueryErrorCode.INTERNAL, e.getMessage());
+    }
+  }
+
+  @POST
+  @Path("validateMultiStageQuery")
+  public List<MultiStageQueryValidationResponse> validateMultiStageQuery(MultiStageQueryValidationRequest request,
+      @Context HttpHeaders httpHeaders) {
+
+    List<String> sqlQueries = request.getSqls();
+    String sql = request.getSql();
+    List<MultiStageQueryValidationResponse> multiStageQueryValidationResponses = new ArrayList<>();
+    if ((sql == null || sql.isEmpty()) && (sqlQueries == null || sqlQueries.isEmpty())) {
+      MultiStageQueryValidationResponse multiStageQueryValidationResponse =
+          new MultiStageQueryValidationResponse(false, "Request is missing the queries string field 'sql'", null, null);
+      multiStageQueryValidationResponses.add(multiStageQueryValidationResponse);
+    }
+    if (sqlQueries == null || sqlQueries.isEmpty()) {
+      sqlQueries = new ArrayList<>();
+      sqlQueries.add(sql);
+    }
+    for (String sqlQuery : sqlQueries) {
+      Map<String, String> queryOptionsMap = RequestUtils.parseQuery(sqlQuery).getOptions();
+      String database = DatabaseUtils.extractDatabaseFromQueryRequest(queryOptionsMap, httpHeaders);
+      try {
+        TableCache tableCache;
+        if (CollectionUtils.isNotEmpty(request.getTableConfigs()) && CollectionUtils.isNotEmpty(request.getSchemas())) {
+          tableCache =
+              new StaticTableCache(request.getTableConfigs(), request.getSchemas(), request.getLogicalTableConfigs(),
+                  request.isIgnoreCase());
+          LOGGER.info("Validating multi-stage query: {} compilation using static table cache ", sqlQuery);
+        } else {
+          // Use TableCache from environment if static fields are not specified
+          tableCache = _pinotHelixResourceManager.getTableCache();
+          LOGGER.info("Validating multi-stage query: {} compilation using Zk table cache", sqlQuery);
+        }
+        try (QueryEnvironment.CompiledQuery compiledQuery = new QueryEnvironment(database, tableCache, null).compile(
+            sqlQuery)) {
+          MultiStageQueryValidationResponse multiStageQueryValidationResponse =
+              new MultiStageQueryValidationResponse(true, null, null, sqlQuery);
+          multiStageQueryValidationResponses.add(multiStageQueryValidationResponse);
+        }
+      } catch (QueryException e) {
+        LOGGER.error("Caught exception while compiling multi-stage query: {}", e.getMessage());
+        MultiStageQueryValidationResponse multiStageQueryValidationResponse =
+            new MultiStageQueryValidationResponse(false, e.getMessage(), e.getErrorCode(), sqlQuery);
+        multiStageQueryValidationResponses.add(multiStageQueryValidationResponse);
+      } catch (Exception e) {
+        LOGGER.error("Caught exception while validating multi-stage query: {}", e.getMessage());
+        MultiStageQueryValidationResponse multiStageQueryValidationResponse =
+            new MultiStageQueryValidationResponse(false, "Unexpected error: " + e.getMessage(), QueryErrorCode.UNKNOWN,
+                sqlQuery);
+        multiStageQueryValidationResponses.add(multiStageQueryValidationResponse);
+      }
+    }
+    return multiStageQueryValidationResponses;
+  }
+
+  @POST
+  @Path("query/tableNames")
+  @Consumes(MediaType.APPLICATION_JSON)
+  @Produces(MediaType.APPLICATION_JSON)
+  @ApiOperation(value = "Extract table names from SQL queries")
+  public Set<String> extractTableNames(List<String> sqlQueries, @Context HttpHeaders httpHeaders) {
+
+    Set<String> allTableNames = new HashSet<>();
+
+    if ((sqlQueries == null || sqlQueries.isEmpty())) {
+      return allTableNames;
+    }
+
+    for (String sqlQuery : sqlQueries) {
+      try {
+        String[] tableNamesArray = TableNameExtractor.resolveTableName(sqlQuery);
+        if (tableNamesArray != null) {
+          Collections.addAll(allTableNames, tableNamesArray);
+        }
+      } catch (Exception e) {
+        LOGGER.error("Failed to extract table names from query: {}", sqlQuery, e);
+        throw e;
+      }
+    }
+    return allTableNames;
+  }
+
+  public static class MultiStageQueryValidationResponse {
+    private final boolean _compiledSuccessfully;
+    private final String _errorMessage;
+    private final QueryErrorCode _errorCode;
+    private final String _sql;
+
+    public MultiStageQueryValidationResponse(boolean compiledSuccessfully, @Nullable String errorMessage,
+        @Nullable QueryErrorCode errorCode, String sql) {
+      _compiledSuccessfully = compiledSuccessfully;
+      _errorMessage = errorMessage;
+      _errorCode = errorCode;
+      _sql = sql;
+    }
+
+    public boolean isCompiledSuccessfully() {
+      return _compiledSuccessfully;
+    }
+
+    @Nullable
+    public String getErrorMessage() {
+      return _errorMessage;
+    }
+
+    @Nullable
+    public QueryErrorCode getErrorCode() {
+      return _errorCode;
+    }
+
+    public String getSql() {
+      return _sql;
+    }
+  }
+
+  public static class MultiStageQueryValidationRequest {
+    private final String _sql;
+    private final List<TableConfig> _tableConfigs;
+    private final List<Schema> _schemas;
+    private final List<LogicalTableConfig> _logicalTableConfigs;
+    private final boolean _ignoreCase;
+    private final List<String> _sqls;
+
+    @JsonCreator
+    public MultiStageQueryValidationRequest(@JsonProperty("sql") String sql,
+        @JsonProperty("tableConfigs") @Nullable List<TableConfig> tableConfigs,
+        @JsonProperty("schemas") @Nullable List<Schema> schemas,
+        @JsonProperty("logicalTableConfigs") @Nullable List<LogicalTableConfig> logicalTableConfigs,
+        @JsonProperty("sqls") List<String> sqls, @JsonProperty("ignoreCase") boolean ignoreCase) {
+      _sql = sql;
+      _tableConfigs = tableConfigs;
+      _schemas = schemas;
+      _logicalTableConfigs = logicalTableConfigs;
+      _ignoreCase = ignoreCase;
+      _sqls = sqls;
+    }
+
+    @Nullable
+    public List<String> getSqls() {
+      return _sqls;
+    }
+
+    @Nullable
+    public String getSql() {
+      return _sql;
+    }
+
+    @Nullable
+    public List<TableConfig> getTableConfigs() {
+      return _tableConfigs;
+    }
+
+    @Nullable
+    public List<Schema> getSchemas() {
+      return _schemas;
+    }
+
+    @Nullable
+    public List<LogicalTableConfig> getLogicalTableConfigs() {
+      return _logicalTableConfigs;
+    }
+
+    public boolean isIgnoreCase() {
+      return _ignoreCase;
+    }
   }
 
   private StreamingOutput executeSqlQueryCatching(HttpHeaders httpHeaders, String sqlQuery, String traceEnabled,
@@ -182,10 +410,7 @@ public class PinotQueryResource {
             ? getMultiStageQueryResponse(sqlQuery, queryOptions, httpHeaders, traceEnabled)
             : getQueryResponse(sqlQuery, sqlNodeAndOptions.getSqlNode(), traceEnabled, queryOptions, httpHeaders);
       case DML:
-        Map<String, String> headers = httpHeaders.getRequestHeaders().entrySet().stream()
-            .filter(entry -> !entry.getValue().isEmpty())
-            .map(entry -> Pair.of(entry.getKey(), entry.getValue().get(0)))
-            .collect(Collectors.toMap(Pair::getKey, Pair::getValue));
+        Map<String, String> headers = extractHeaders(httpHeaders);
         return output -> {
           try (OutputStream os = output) {
             _sqlQueryExecutor.executeDMLStatement(sqlNodeAndOptions, headers).toOutputStream(os);
@@ -372,31 +597,17 @@ public class PinotQueryResource {
 
   private StreamingOutput sendRequestToBroker(String query, String instanceId, String traceEnabled, String queryOptions,
       HttpHeaders httpHeaders) {
-    InstanceConfig instanceConfig = _pinotHelixResourceManager.getHelixInstanceConfig(instanceId);
-    if (instanceConfig == null) {
-      LOGGER.error("Instance {} not found", instanceId);
-      throw QueryErrorCode.INTERNAL.asException();
-    }
-
-    String hostName = instanceConfig.getHostName();
-    // Backward-compatible with legacy hostname of format 'Broker_<hostname>'
-    if (hostName.startsWith(CommonConstants.Helix.PREFIX_OF_BROKER_INSTANCE)) {
-      hostName = hostName.substring(CommonConstants.Helix.BROKER_INSTANCE_PREFIX_LENGTH);
-    }
-
+    InstanceConfig instanceConfig = getInstanceConfig(instanceId);
+    String hostName = getHost(instanceConfig);
     String protocol = _controllerConf.getControllerBrokerProtocol();
-    int port = _controllerConf.getControllerBrokerPortOverride() > 0 ? _controllerConf.getControllerBrokerPortOverride()
-        : Integer.parseInt(instanceConfig.getPort());
+    int port = getPort(instanceConfig);
     String url = getQueryURL(protocol, hostName, port);
     ObjectNode requestJson = getRequestJson(query, traceEnabled, queryOptions);
 
-    // forward client-supplied headers
-    Map<String, String> headers =
-        httpHeaders.getRequestHeaders().entrySet().stream().filter(entry -> !entry.getValue().isEmpty())
-            .map(entry -> Pair.of(entry.getKey(), entry.getValue().get(0)))
-            .collect(Collectors.toMap(Pair::getKey, Pair::getValue));
+    // Forward client-supplied headers
+    Map<String, String> headers = extractHeaders(httpHeaders);
 
-    return sendRequestRaw(url, query, requestJson, headers);
+    return sendRequestRaw(url, "POST", query, requestJson, headers);
   }
 
   private ObjectNode getRequestJson(String query, String traceEnabled, String queryOptions) {
@@ -415,47 +626,47 @@ public class PinotQueryResource {
     return String.format("%s://%s:%d/query/sql", protocol, hostName, port);
   }
 
-  public void sendPostRaw(String urlStr, String requestStr, Map<String, String> headers, OutputStream outputStream) {
+  public void sendRequestRaw(String urlStr, String method, String requestStr, Map<String, String> headers,
+    OutputStream outputStream) {
     HttpURLConnection conn = null;
     try {
-      LOGGER.info("url string passed is : {}", urlStr);
+      LOGGER.info("Sending {} request to: {}", method, urlStr);
       final URL url = new URL(urlStr);
       conn = (HttpURLConnection) url.openConnection();
-      conn.setDoOutput(true);
-      conn.setRequestMethod("POST");
-      // conn.setRequestProperty("Content-Type", "application/json; charset=utf-8");
-
+      conn.setRequestMethod(method);
       conn.setRequestProperty("Accept-Encoding", "gzip");
+      conn.setRequestProperty("http.keepAlive", "true");
+      conn.setRequestProperty("default", "true");
 
-      final byte[] requestBytes = requestStr.getBytes(StandardCharsets.UTF_8);
-      conn.setRequestProperty("Content-Length", String.valueOf(requestBytes.length));
-      conn.setRequestProperty("http.keepAlive", String.valueOf(true));
-      conn.setRequestProperty("default", String.valueOf(true));
+      // Set headers
+      if (headers != null) {
+        headers.forEach(conn::setRequestProperty);
+      }
 
-      if (headers != null && !headers.isEmpty()) {
-        final Set<Entry<String, String>> entries = headers.entrySet();
-        for (final Entry<String, String> entry : entries) {
-          conn.setRequestProperty(entry.getKey(), entry.getValue());
+      // Handle POST request body
+      if ("POST".equalsIgnoreCase(method)) {
+        conn.setDoOutput(true);
+        final byte[] requestBytes = requestStr.getBytes(StandardCharsets.UTF_8);
+        conn.setRequestProperty("Content-Length", String.valueOf(requestBytes.length));
+
+        try (final OutputStream os = new BufferedOutputStream(conn.getOutputStream())) {
+          os.write(requestBytes);
+          os.flush();
         }
       }
 
-      try (final OutputStream os = new BufferedOutputStream(conn.getOutputStream())) {
-        os.write(requestBytes);
-        os.flush();
-      }
       final int responseCode = conn.getResponseCode();
 
       if (responseCode == HttpURLConnection.HTTP_FORBIDDEN) {
         throw new WebApplicationException("Permission denied", Response.Status.FORBIDDEN);
       } else if (responseCode != HttpURLConnection.HTTP_OK) {
         InputStream errorStream = conn.getErrorStream();
-        throw new IOException(
-            "Failed : HTTP error code : " + responseCode + ". Root Cause: " + (errorStream != null ? IOUtils.toString(
-                errorStream, StandardCharsets.UTF_8) : "Unknown"));
+        String errorMessage = errorStream != null ? IOUtils.toString(errorStream, StandardCharsets.UTF_8) : "Unknown";
+        throw new IOException("HTTP error code: " + responseCode + ". Root Cause: " + errorMessage);
       }
       IOUtils.copy(conn.getInputStream(), outputStream);
     } catch (final Exception ex) {
-      LOGGER.error("Caught exception while sending query request", ex);
+      LOGGER.error("Caught exception while sending {} request", method, ex);
       Utils.rethrowException(ex);
       throw new AssertionError("Should not reach this");
     } finally {
@@ -465,13 +676,13 @@ public class PinotQueryResource {
     }
   }
 
-  public StreamingOutput sendRequestRaw(String url, String query, ObjectNode requestJson, Map<String, String> headers) {
+  public StreamingOutput sendRequestRaw(String url, String method, String query, ObjectNode requestJson,
+    Map<String, String> headers) {
     return outputStream -> {
       final long startTime = System.currentTimeMillis();
-      sendPostRaw(url, requestJson.toString(), headers, outputStream);
-
+      sendRequestRaw(url, method, requestJson.toString(), headers, outputStream);
       final long queryTime = System.currentTimeMillis() - startTime;
-      LOGGER.info("Query: {} Time: {}", query, queryTime);
+      LOGGER.info("Query: {} Time: {}ms", query, queryTime);
     };
   }
 
@@ -483,8 +694,139 @@ public class PinotQueryResource {
     };
   }
 
+  private StreamingOutput executeTimeSeriesQueryCatching(HttpHeaders httpHeaders, String language, String query,
+    String start, String end, String step) {
+    return executeTimeSeriesQueryCatching(httpHeaders, language, query, start, end, step, Map.of(), null, false);
+  }
 
-  private static StreamingOutput constructQueryExceptionResponse(QueryErrorMessage message) {
-    return constructQueryExceptionResponse(message.getErrCode(), message.getUsrMsg());
+  private StreamingOutput executeTimeSeriesQueryCatching(HttpHeaders httpHeaders, String language, String query,
+    String start, String end, String step, Map<String, String> queryOptions, String mode,
+    boolean useBrokerCompatibleApi) {
+    try {
+      LOGGER.debug("Language: {}, Query: {}, Start: {}, End: {}, Step: {}, UseBrokerAPI: {}",
+          language, query, start, end, step, useBrokerCompatibleApi);
+      String instanceId = retrieveBrokerForTimeSeriesQuery(query, language, start, end);
+      return sendTimeSeriesRequestToBroker(language, query, start, end, step, queryOptions, mode, instanceId,
+          httpHeaders, useBrokerCompatibleApi);
+    } catch (QueryException ex) {
+      LOGGER.warn("Caught exception while processing timeseries request {}", ex.getMessage());
+      return constructQueryExceptionResponse(ex.getErrorCode(), ex.getMessage());
+    } catch (WebApplicationException wae) {
+      LOGGER.error("Caught exception while processing timeseries request", wae);
+      throw wae;
+    } catch (Exception e) {
+      LOGGER.error("Caught unknown exception while processing timeseries request", e);
+      return constructQueryExceptionResponse(QueryErrorCode.INTERNAL, e.getMessage());
+    }
+  }
+
+  private String retrieveBrokerForTimeSeriesQuery(String query, String language, String start, String end) {
+    TimeSeriesLogicalPlanner planner = TimeSeriesQueryEnvironment.buildLogicalPlanner(language, _controllerConf);
+    TimeSeriesLogicalPlanResult planResult = planner.plan(
+        new RangeTimeSeriesRequest(language, query, Integer.parseInt(start), Long.parseLong(end),
+            60L, Duration.ofMinutes(1), 100, 100, "", Map.of()),
+        new TimeSeriesTableMetadataProvider(_pinotHelixResourceManager.getTableCache()));
+    String tableName = planner.getTableName(planResult);
+    String rawTableName = TableNameBuilder.extractRawTableName(tableName);
+    List<String> instanceIds = _pinotHelixResourceManager.getBrokerInstancesFor(rawTableName);
+    return selectRandomInstanceId(instanceIds);
+  }
+
+
+  private StreamingOutput sendTimeSeriesRequestToBroker(String language, String query, String start, String end,
+    String step, Map<String, String> queryOptions, String mode, String instanceId, HttpHeaders httpHeaders,
+    boolean useBrokerCompatibleApi) {
+    InstanceConfig instanceConfig = getInstanceConfig(instanceId);
+    String hostName = getHost(instanceConfig);
+    String protocol = _controllerConf.getControllerBrokerProtocol();
+    int port = getPort(instanceConfig);
+
+    // Forward client-supplied headers
+    Map<String, String> headers = extractHeaders(httpHeaders);
+
+    if (useBrokerCompatibleApi) {
+      // Use POST /query/timeseries endpoint (broker compatible API)
+      String url = String.format("%s://%s:%d/query/timeseries", protocol, hostName, port);
+      ObjectNode requestJson = JsonUtils.newObjectNode();
+      requestJson.put("query", query);
+      if (language != null && !language.isEmpty()) {
+        requestJson.put("language", language);
+      }
+      if (start != null && !start.isEmpty()) {
+        requestJson.put("start", start);
+      }
+      if (end != null && !end.isEmpty()) {
+        requestJson.put("end", end);
+      }
+      if (step != null && !step.isEmpty()) {
+        requestJson.put("step", step);
+      }
+      if (mode != null && !mode.isEmpty()) {
+        requestJson.put("mode", mode);
+      }
+      if (queryOptions != null && !queryOptions.isEmpty()) {
+        ObjectNode queryOptionsNode = JsonUtils.newObjectNode();
+        queryOptions.forEach(queryOptionsNode::put);
+        requestJson.set("queryOptions", queryOptionsNode);
+      }
+      return sendRequestRaw(url, "POST", query, requestJson, headers);
+    } else {
+      // Use GET /timeseries/api/v1/query_range endpoint (Prometheus compatible API)
+      String url = getTimeSeriesQueryURL(protocol, hostName, port, language, query, start, end, step);
+      return sendRequestRaw(url, "GET", query, JsonUtils.newObjectNode(), headers);
+    }
+  }
+
+  private String getTimeSeriesQueryURL(String protocol, String hostName, int port, String language, String query,
+    String start, String end, String step) {
+    try {
+      URIBuilder uriBuilder = new URIBuilder().setScheme(protocol).setHost(hostName).setPort(port)
+        .setPath("/timeseries/api/v1/query_range").addParameter("language", language);
+      // Add optional parameters
+      if (query != null && !query.isEmpty()) {
+        uriBuilder.addParameter("query", query);
+      }
+      if (start != null && !start.isEmpty()) {
+        uriBuilder.addParameter("start", start);
+      }
+      if (end != null && !end.isEmpty()) {
+        uriBuilder.addParameter("end", end);
+      }
+      if (step != null && !step.isEmpty()) {
+        uriBuilder.addParameter("step", step);
+      }
+      return uriBuilder.build().toString();
+    } catch (Exception e) {
+      throw new RuntimeException("Failed to build timeseries query URL", e);
+    }
+  }
+
+  private Map<String, String> extractHeaders(HttpHeaders httpHeaders) {
+    return httpHeaders.getRequestHeaders().entrySet().stream()
+      .filter(entry -> !entry.getValue().isEmpty())
+      .collect(Collectors.toMap(Entry::getKey, entry -> entry.getValue().get(0)));
+  }
+
+  private InstanceConfig getInstanceConfig(String instanceId) {
+    InstanceConfig instanceConfig = _pinotHelixResourceManager.getHelixInstanceConfig(instanceId);
+    if (instanceConfig == null) {
+      LOGGER.error("Instance {} not found", instanceId);
+      throw QueryErrorCode.INTERNAL.asException();
+    }
+    return instanceConfig;
+  }
+
+  private String getHost(InstanceConfig instanceConfig) {
+    String hostName = instanceConfig.getHostName();
+    // Backward-compatible with legacy hostname of format 'Broker_<hostname>'
+    if (hostName.startsWith(CommonConstants.Helix.PREFIX_OF_BROKER_INSTANCE)) {
+      hostName = hostName.substring(CommonConstants.Helix.BROKER_INSTANCE_PREFIX_LENGTH);
+    }
+    return hostName;
+  }
+
+  private int getPort(InstanceConfig instanceConfig) {
+    return _controllerConf.getControllerBrokerPortOverride() > 0 ? _controllerConf.getControllerBrokerPortOverride()
+      : Integer.parseInt(instanceConfig.getPort());
   }
 }

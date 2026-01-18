@@ -24,6 +24,7 @@ import java.util.Collections;
 import java.util.List;
 import org.apache.pinot.core.query.reduce.ExplainPlanDataTableReducer;
 import org.apache.pinot.query.planner.plannode.AggregateNode;
+import org.apache.pinot.query.planner.plannode.EnrichedJoinNode;
 import org.apache.pinot.query.planner.plannode.ExchangeNode;
 import org.apache.pinot.query.planner.plannode.ExplainedNode;
 import org.apache.pinot.query.planner.plannode.FilterNode;
@@ -36,6 +37,7 @@ import org.apache.pinot.query.planner.plannode.ProjectNode;
 import org.apache.pinot.query.planner.plannode.SetOpNode;
 import org.apache.pinot.query.planner.plannode.SortNode;
 import org.apache.pinot.query.planner.plannode.TableScanNode;
+import org.apache.pinot.query.planner.plannode.UnnestNode;
 import org.apache.pinot.query.planner.plannode.ValueNode;
 import org.apache.pinot.query.planner.plannode.WindowNode;
 import org.slf4j.Logger;
@@ -86,6 +88,11 @@ public class ExplainNodeSimplifier {
 
     @Override
     public PlanNode visitJoin(JoinNode node, Void context) {
+      return defaultNode(node);
+    }
+
+    @Override
+    public PlanNode visitEnrichedJoin(EnrichedJoinNode node, Void context) {
       return defaultNode(node);
     }
 
@@ -154,6 +161,11 @@ public class ExplainNodeSimplifier {
       }
       return new ExplainedNode(node.getStageId(), node.getDataSchema(), node.getNodeHint(),
           Collections.singletonList(child1), node.getTitle(), node.getAttributes());
+    }
+
+    @Override
+    public PlanNode visitUnnest(UnnestNode node, Void context) {
+      return defaultNode(node);
     }
 
     private List<PlanNode> simplifyChildren(List<PlanNode> children) {

@@ -61,9 +61,10 @@ public class OffHeapH3IndexCreator extends BaseH3IndexCreator {
 
   private long _postingListChunkOffset;
 
-  public OffHeapH3IndexCreator(File indexDir, String columnName, String tableNameWithType, H3IndexResolution resolution)
+  public OffHeapH3IndexCreator(File indexDir, String columnName, String tableNameWithType, boolean continueOnError,
+      H3IndexResolution resolution)
       throws IOException {
-    super(indexDir, columnName, tableNameWithType, resolution);
+    super(indexDir, columnName, tableNameWithType, continueOnError, resolution);
     _postingListFile = new File(_tempDir, POSTING_LIST_FILE_NAME);
     _postingListOutputStream = new DataOutputStream(new BufferedOutputStream(new FileOutputStream(_postingListFile)));
   }

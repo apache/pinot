@@ -18,24 +18,25 @@
  */
 package org.apache.pinot.server.api;
 
-import com.google.common.collect.ImmutableMap;
 import io.netty.channel.ChannelHandlerContext;
 import java.io.File;
 import java.io.IOException;
 import java.net.ServerSocket;
 import java.util.Arrays;
 import java.util.Collections;
+import java.util.Map;
 import javax.ws.rs.client.ClientBuilder;
 import javax.ws.rs.client.WebTarget;
 import javax.ws.rs.core.HttpHeaders;
 import javax.ws.rs.core.Response;
 import org.apache.commons.io.FileUtils;
 import org.apache.helix.HelixManager;
-import org.apache.pinot.common.auth.BasicAuthUtils;
+import org.apache.pinot.common.auth.BasicAuthTokenUtils;
 import org.apache.pinot.common.config.TlsConfig;
 import org.apache.pinot.common.metrics.ServerMetrics;
 import org.apache.pinot.core.transport.HttpServerThreadPoolConfig;
 import org.apache.pinot.core.transport.ListenerConfig;
+import org.apache.pinot.segment.local.utils.ServerReloadJobStatusCache;
 import org.apache.pinot.server.access.AccessControl;
 import org.apache.pinot.server.access.AccessControlFactory;
 import org.apache.pinot.server.access.BasicAuthAccessFactory;
@@ -84,7 +85,9 @@ public class AccessControlTest {
         CommonConstants.Helix.DEFAULT_SERVER_NETTY_PORT);
     serverConf.setProperty(CommonConstants.Server.CONFIG_OF_INSTANCE_ID,
         CommonConstants.Helix.PREFIX_OF_SERVER_INSTANCE + hostname + "_" + port);
-    _adminApiApplication = new AdminApiApplication(serverInstance, new DenyAllAccessFactory(), serverConf);
+    _adminApiApplication = new AdminApiApplication(serverInstance, new DenyAllAccessFactory(),
+        mock(ServerReloadJobStatusCache.class),
+        serverConf);
 
     int adminApiApplicationPort = getAvailablePort();
     _adminApiApplication.start(Collections.singletonList(
@@ -131,14 +134,14 @@ public class AccessControlTest {
   @Test
   public void testGrpcBasicAuth() {
     testBasicAuth(new GrpcRequesterIdentity(
-        ImmutableMap.of("authorization", BasicAuthUtils.toBasicAuthToken("admin123", "verysecret"))), true);
+        Map.of("authorization", BasicAuthTokenUtils.toBasicAuthToken("admin123", "verysecret"))), true);
     testBasicAuth(new GrpcRequesterIdentity(
-        ImmutableMap.of("authorization", BasicAuthUtils.toBasicAuthToken("user456", "kindasecret"))), false);
+        Map.of("authorization", BasicAuthTokenUtils.toBasicAuthToken("user456", "kindasecret"))), false);
 
     testBasicAuth(new GrpcRequesterIdentity(
-        ImmutableMap.of("authorization", "Basic YWRtaW4xMjM6dmVyeXNlY3JldA")), true);
+        Map.of("authorization", "Basic YWRtaW4xMjM6dmVyeXNlY3JldA")), true);
     testBasicAuth(new GrpcRequesterIdentity(
-        ImmutableMap.of("authorization", "Basic dXNlcjQ1NjpraW5kYXNlY3JldA==")), false);
+        Map.of("authorization", "Basic dXNlcjQ1NjpraW5kYXNlY3JldA==")), false);
   }
 
   @Test
@@ -146,10 +149,10 @@ public class AccessControlTest {
     HttpHeaders headers = new ContainerRequest(null, null, null, null, new MapPropertiesDelegate());
     headers.getRequestHeaders()
         .put("authorization", Arrays.asList(
-            org.apache.pinot.common.auth.BasicAuthUtils.toBasicAuthToken("admin123", "verysecret")));
+            BasicAuthTokenUtils.toBasicAuthToken("admin123", "verysecret")));
     testBasicAuth(new HttpRequesterIdentity(headers), true);
     headers.getRequestHeaders()
-        .put("authorization", Arrays.asList(BasicAuthUtils.toBasicAuthToken("user456", "kindasecret")));
+        .put("authorization", Arrays.asList(BasicAuthTokenUtils.toBasicAuthToken("user456", "kindasecret")));
     testBasicAuth(new HttpRequesterIdentity(headers), false);
     headers.getRequestHeaders().put("authorization", Arrays.asList("Basic YWRtaW4xMjM6dmVyeXNlY3JldA"));
     testBasicAuth(new HttpRequesterIdentity(headers), true);
@@ -159,7 +162,7 @@ public class AccessControlTest {
 
   public void testBasicAuth(RequesterIdentity requesterIdentity, boolean isAdmin) {
     final BasicAuthAccessFactory basicAuthAccessFactory = new BasicAuthAccessFactory();
-    PinotConfiguration config = new PinotConfiguration(ImmutableMap.of("principals", "admin123,user456",
+    PinotConfiguration config = new PinotConfiguration(Map.of("principals", "admin123,user456",
         "principals.admin123.password", "verysecret", "principals.user456.password", "kindasecret",
         "principals.user456.tables", "stuff,lessImportantStuff"));
     basicAuthAccessFactory.init(config);

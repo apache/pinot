@@ -28,6 +28,9 @@ import java.util.Map;
 import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.TimeUnit;
 import javax.annotation.Nullable;
+import org.apache.pinot.common.datatable.DataTable;
+import org.apache.pinot.spi.exception.QueryErrorCode;
+import org.apache.pinot.spi.exception.QueryException;
 import org.apache.pinot.tsdb.spi.AggInfo;
 import org.apache.pinot.tsdb.spi.TimeBuckets;
 import org.apache.pinot.tsdb.spi.operator.BaseTimeSeriesOperator;
@@ -50,6 +53,20 @@ import org.apache.pinot.tsdb.spi.series.TimeSeriesBuilderFactory;
  * different servers, we will simply append them to the list, creating a union.
  */
 public class TimeSeriesExchangeReceiveOperator extends BaseTimeSeriesOperator {
+
+  private static final List<DataTable.MetadataKey> ADDITIVE_STATS_KEYS = List.of(
+    DataTable.MetadataKey.NUM_DOCS_SCANNED,
+    DataTable.MetadataKey.NUM_ENTRIES_SCANNED_IN_FILTER,
+    DataTable.MetadataKey.NUM_ENTRIES_SCANNED_POST_FILTER,
+    DataTable.MetadataKey.NUM_SEGMENTS_QUERIED,
+    DataTable.MetadataKey.NUM_SEGMENTS_PROCESSED,
+    DataTable.MetadataKey.NUM_SEGMENTS_MATCHED,
+    DataTable.MetadataKey.NUM_CONSUMING_SEGMENTS_QUERIED,
+    DataTable.MetadataKey.NUM_CONSUMING_SEGMENTS_PROCESSED,
+    DataTable.MetadataKey.NUM_CONSUMING_SEGMENTS_MATCHED,
+    DataTable.MetadataKey.TOTAL_DOCS
+  );
+
   /**
    * Receiver will receive either TimeSeriesBlock or Throwable. And will have at most _numServersQueried objects that
    * can be polled.
@@ -93,6 +110,9 @@ public class TimeSeriesExchangeReceiveOperator extends BaseTimeSeriesOperator {
   @VisibleForTesting
   protected Object poll(long remainingTimeMs)
       throws InterruptedException {
+    if (remainingTimeMs <= 0) {
+      return null;
+    }
     return _receiver.poll(remainingTimeMs, TimeUnit.MILLISECONDS);
   }
 
@@ -100,13 +120,25 @@ public class TimeSeriesExchangeReceiveOperator extends BaseTimeSeriesOperator {
       throws Throwable {
     TimeBuckets timeBuckets = null;
     Map<Long, BaseTimeSeriesBuilder> seriesBuilderMap = new HashMap<>();
+    Map<String, String> aggregatedStats = new HashMap<>();
+    List<QueryException> allExceptions = new ArrayList<>();
+    QueryException timeoutException = null;
+
     for (int index = 0; index < _numServersQueried; index++) {
       // Step-1: Poll, and ensure we received a TimeSeriesBlock.
       long remainingTimeMs = _deadlineMs - System.currentTimeMillis();
-      Preconditions.checkState(remainingTimeMs > 0,
-          "Timed out before polling all servers. Successfully Polled: %s of %s", index, _numServersQueried);
       Object result = poll(remainingTimeMs);
-      Preconditions.checkNotNull(result, "Timed out waiting for response. Waited: %s ms", remainingTimeMs);
+      if (result == null) {
+        // TODO: List host:port of unresponsive servers in the exception message.
+        timeoutException = new QueryException(QueryErrorCode.SERVER_NOT_RESPONDING,
+          "Timed out waiting for response. Waited: "
+            + remainingTimeMs
+            + " ms and successfully polled: "
+            + index
+            + " of "
+            + _numServersQueried);
+        break;
+      }
       if (result instanceof Throwable) {
         throw (Throwable) result;
       }
@@ -114,6 +146,8 @@ public class TimeSeriesExchangeReceiveOperator extends BaseTimeSeriesOperator {
           "Found unexpected object. This is a bug: %s", result.getClass());
       // Step-2: Init timeBuckets and ensure they are the same across all servers.
       TimeSeriesBlock blockToMerge = (TimeSeriesBlock) result;
+      // Merge exceptions from the received block
+      allExceptions.addAll(blockToMerge.getExceptions());
       if (timeBuckets == null) {
         timeBuckets = blockToMerge.getTimeBuckets();
       } else {
@@ -137,6 +171,8 @@ public class TimeSeriesExchangeReceiveOperator extends BaseTimeSeriesOperator {
           seriesBuilder.mergeAlignedSeries(timeSeries);
         }
       }
+      // Step-4: Merge stats
+      mergeStats(aggregatedStats, blockToMerge.getMetadata());
     }
     // Convert series builders to series and return.
     Map<Long, List<TimeSeries>> seriesMap = new HashMap<>(seriesBuilderMap.size());
@@ -146,24 +182,65 @@ public class TimeSeriesExchangeReceiveOperator extends BaseTimeSeriesOperator {
       timeSeriesList.add(entry.getValue().build());
       seriesMap.put(seriesHash, timeSeriesList);
     }
-    return new TimeSeriesBlock(timeBuckets, seriesMap);
+    TimeSeriesBlock resultBlock = new TimeSeriesBlock(timeBuckets, seriesMap, aggregatedStats);
+    // Add all collected exceptions to the result block
+    allExceptions.forEach(resultBlock::addToExceptions);
+    if (timeoutException != null) {
+      resultBlock.addToExceptions(timeoutException);
+    }
+    return resultBlock;
+  }
+
+  /**
+   * TODO: Consider consolidating stats merging logic with
+   * {@link org.apache.pinot.core.query.reduce.ExecutionStatsAggregator}
+   **/
+  private void mergeStats(Map<String, String> aggregatedStats, Map<String, String> metadata) {
+    for (DataTable.MetadataKey statKey : ADDITIVE_STATS_KEYS) {
+      String key = statKey.getName();
+      String existingValue = aggregatedStats.getOrDefault(key, "0");
+      String newValue = metadata.get(key);
+      if (newValue != null) {
+        try {
+          long newLong = Long.parseLong(newValue);
+          long existingLong = Long.parseLong(existingValue);
+          aggregatedStats.put(key, Long.toString(existingLong + newLong));
+        } catch (NumberFormatException e) {
+          // Ignore malformed stats
+        }
+      }
+    }
   }
 
   private TimeSeriesBlock getNextBlockNoAggregation()
       throws Throwable {
     Map<Long, List<TimeSeries>> timeSeriesMap = new HashMap<>();
     TimeBuckets timeBuckets = null;
+    Map<String, String> aggregatedStats = new HashMap<>();
+    List<QueryException> allExceptions = new ArrayList<>();
+    QueryException timeoutException = null;
     for (int index = 0; index < _numServersQueried; index++) {
       long remainingTimeMs = _deadlineMs - System.currentTimeMillis();
-      Preconditions.checkState(remainingTimeMs > 0, "Timed out before polling exchange receive");
-      Object result = _receiver.poll(remainingTimeMs, TimeUnit.MILLISECONDS);
-      Preconditions.checkNotNull(result, "Timed out waiting for response. Waited: %s ms", remainingTimeMs);
+      Object result = poll(remainingTimeMs);
+      // TODO: List host:port of unresponsive servers in the exception message.
+      if (result == null) {
+        timeoutException = new QueryException(QueryErrorCode.SERVER_NOT_RESPONDING,
+            "Timed out waiting for response. Waited: "
+                + remainingTimeMs
+                + " ms and successfully polled: "
+                + index
+                + " of "
+                + _numServersQueried);
+        break;
+      }
       if (result instanceof Throwable) {
         throw ((Throwable) result);
       }
       Preconditions.checkState(result instanceof TimeSeriesBlock,
           "Found unexpected object. This is a bug: %s", result.getClass());
       TimeSeriesBlock blockToMerge = (TimeSeriesBlock) result;
+      // Merge exceptions from the received block
+      allExceptions.addAll(blockToMerge.getExceptions());
       if (timeBuckets == null) {
         timeBuckets = blockToMerge.getTimeBuckets();
       } else {
@@ -175,8 +252,15 @@ public class TimeSeriesExchangeReceiveOperator extends BaseTimeSeriesOperator {
         List<TimeSeries> timeSeriesList = entry.getValue();
         timeSeriesMap.computeIfAbsent(seriesHash, x -> new ArrayList<>()).addAll(timeSeriesList);
       }
+      mergeStats(aggregatedStats, blockToMerge.getMetadata());
     }
     Preconditions.checkNotNull(timeBuckets, "Time buckets is null in exchange receive operator");
-    return new TimeSeriesBlock(timeBuckets, timeSeriesMap);
+    TimeSeriesBlock resultBlock = new TimeSeriesBlock(timeBuckets, timeSeriesMap, aggregatedStats);
+    // Add all collected exceptions to the result block
+    allExceptions.forEach(resultBlock::addToExceptions);
+    if (timeoutException != null) {
+      resultBlock.addToExceptions(timeoutException);
+    }
+    return resultBlock;
   }
 }

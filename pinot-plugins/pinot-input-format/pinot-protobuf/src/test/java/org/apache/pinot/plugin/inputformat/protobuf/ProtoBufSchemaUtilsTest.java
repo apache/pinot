@@ -197,7 +197,7 @@ public class ProtoBufSchemaUtilsTest {
         ".");
     FieldSpec fieldSpec = schema.getFieldSpecFor("test_message.long_field");
     FieldSpec expectedFieldSpec = new DateTimeFieldSpec("test_message.long_field", FieldSpec.DataType.LONG,
-        "1:SECONDS:EPOCH", "1:SECONDS");
+        "EPOCH|SECONDS", "1:SECONDS");
     assertEquals(fieldSpec, expectedFieldSpec);
 
     fieldSpec = schema.getFieldSpecFor("test_message.int_field");

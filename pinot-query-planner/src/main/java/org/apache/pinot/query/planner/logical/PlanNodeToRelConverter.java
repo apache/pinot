@@ -21,7 +21,9 @@ package org.apache.pinot.query.planner.logical;
 import com.google.common.base.Preconditions;
 import java.util.ArrayList;
 import java.util.Collections;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.stream.Collectors;
 import org.apache.calcite.plan.RelOptCluster;
 import org.apache.calcite.plan.RelTraitSet;
@@ -32,6 +34,7 @@ import org.apache.calcite.rel.RelDistributions;
 import org.apache.calcite.rel.RelNode;
 import org.apache.calcite.rel.core.JoinRelType;
 import org.apache.calcite.rel.core.SetOp;
+import org.apache.calcite.rel.core.Uncollect;
 import org.apache.calcite.rel.core.Window;
 import org.apache.calcite.rel.logical.LogicalIntersect;
 import org.apache.calcite.rel.logical.LogicalMinus;
@@ -47,10 +50,12 @@ import org.apache.calcite.rex.RexWindowExclusion;
 import org.apache.calcite.sql.SqlAggFunction;
 import org.apache.calcite.tools.RelBuilder;
 import org.apache.calcite.util.ImmutableBitSet;
+import org.apache.pinot.common.proto.Plan;
 import org.apache.pinot.common.utils.DatabaseUtils;
 import org.apache.pinot.core.operator.ExplainAttributeBuilder;
 import org.apache.pinot.core.plan.PinotExplainedRelNode;
 import org.apache.pinot.query.planner.plannode.AggregateNode;
+import org.apache.pinot.query.planner.plannode.EnrichedJoinNode;
 import org.apache.pinot.query.planner.plannode.ExchangeNode;
 import org.apache.pinot.query.planner.plannode.ExplainedNode;
 import org.apache.pinot.query.planner.plannode.FilterNode;
@@ -63,6 +68,7 @@ import org.apache.pinot.query.planner.plannode.ProjectNode;
 import org.apache.pinot.query.planner.plannode.SetOpNode;
 import org.apache.pinot.query.planner.plannode.SortNode;
 import org.apache.pinot.query.planner.plannode.TableScanNode;
+import org.apache.pinot.query.planner.plannode.UnnestNode;
 import org.apache.pinot.query.planner.plannode.ValueNode;
 import org.apache.pinot.query.planner.plannode.WindowNode;
 import org.slf4j.Logger;
@@ -160,6 +166,40 @@ public final class PlanNodeToRelConverter {
           _builder.asofJoin(node.getJoinType(), _builder.and(conditions), matchCondition);
         } else {
           _builder.join(node.getJoinType(), conditions);
+        }
+      } catch (RuntimeException e) {
+        LOGGER.warn("Failed to convert join node: {}", node, e);
+        _builder.push(new PinotExplainedRelNode(_builder.getCluster(), "UnknownJoin", Collections.emptyMap(),
+            node.getDataSchema(), readAlreadyPushedChildren(node)));
+      }
+
+      return null;
+    }
+
+    @Override
+    public Void visitEnrichedJoin(EnrichedJoinNode node, Void context) {
+      visitChildren(node);
+
+      try {
+        List<RexNode> conditions = new ArrayList<>(
+            node.getLeftKeys().size() + node.getRightKeys().size() + node.getNonEquiConditions().size());
+        for (Integer leftKey : node.getLeftKeys()) {
+          conditions.add(_builder.field(2, 0, leftKey));
+        }
+        for (Integer rightKey : node.getRightKeys()) {
+          conditions.add(_builder.field(2, 1, rightKey));
+        }
+        for (RexExpression nonEquiCondition : node.getNonEquiConditions()) {
+          conditions.add(RexExpressionUtils.toRexNode(_builder, nonEquiCondition));
+        }
+
+        if (node.getJoinType() == JoinRelType.ASOF || node.getJoinType() == JoinRelType.LEFT_ASOF) {
+          _builder.push(new PinotExplainedRelNode(_builder.getCluster(), "EnrichedASOFJoin", Collections.emptyMap(),
+              node.getDataSchema(), readAlreadyPushedChildren(node)));
+        } else {
+          Map<String, Plan.ExplainNode.AttributeValue> attributes = new HashMap<>();
+          _builder.push(new PinotExplainedRelNode(_builder.getCluster(), "EnrichedJoin", attributes,
+              node.getDataSchema(), readAlreadyPushedChildren(node)));
         }
       } catch (RuntimeException e) {
         LOGGER.warn("Failed to convert join node: {}", node, e);
@@ -343,7 +383,6 @@ public final class PlanNodeToRelConverter {
             node.getConstants().stream().map(constant -> RexExpressionUtils.toRexLiteral(_builder, constant))
                 .collect(Collectors.toList());
         RelDataType rowType = node.getDataSchema().toRelDataType(_builder.getTypeFactory());
-        ;
 
         LogicalWindow window = LogicalWindow.create(RelTraitSet.createEmpty(), input, constants, rowType,
             Collections.singletonList(group));
@@ -411,6 +450,37 @@ public final class PlanNodeToRelConverter {
       } catch (RuntimeException e) {
         LOGGER.warn("Failed to convert explained node: {}", node, e);
         _builder.push(new PinotExplainedRelNode(_builder.getCluster(), "UnknownExplained", Collections.emptyMap(),
+            node.getDataSchema(), inputs));
+      }
+      return null;
+    }
+
+    @Override
+    public Void visitUnnest(UnnestNode node, Void context) {
+      List<RelNode> inputs = inputsAsList(node);
+      try {
+        Preconditions.checkArgument(inputs.size() == 1, "Unnest node should have exactly one input");
+        RelNode input = inputs.get(0);
+
+        // Build a Project to compute the array expressions that will be unnested.
+        _builder.push(input);
+        List<RexNode> arrayProjects = new ArrayList<>(node.getArrayExprs().size());
+        for (RexExpression arrayExpr : node.getArrayExprs()) {
+          arrayProjects.add(RexExpressionUtils.toRexNode(_builder, arrayExpr));
+        }
+        if (arrayProjects.isEmpty()) {
+          arrayProjects.add(_builder.field(0));
+        }
+        _builder.project(arrayProjects);
+        RelNode project = _builder.build();
+
+        // Use Uncollect to model UNNEST with optional ordinality.
+        Uncollect uncollect =
+            Uncollect.create(project.getTraitSet(), project, node.isWithOrdinality(), Collections.emptyList());
+        _builder.push(uncollect);
+      } catch (RuntimeException e) {
+        LOGGER.warn("Failed to convert unnest node: {}", node, e);
+        _builder.push(new PinotExplainedRelNode(_builder.getCluster(), "UnknownUnnest", Collections.emptyMap(),
             node.getDataSchema(), inputs));
       }
       return null;

@@ -303,6 +303,8 @@ export default function CustomizedTables({
   const [finalData, setFinalData] = React.useState(Utils.tableFormat(data));
   React.useEffect( () => {
     setInitialData(data);
+    // Reset pagination when data changes
+    setPage(0);
   }, [data]);
   // We do not use data.isLoading directly in the renderer because there's a gap between data
   // changing and finalData being set. Without this, there's a flicker where we go from
@@ -368,6 +370,8 @@ export default function CustomizedTables({
       // Table.tsx currently doesn't support sorting after filtering. So for now, we just
       // remove the visual indicator of the sorted column until users sort again.
       setColumnClicked('')
+      // Reset pagination to first page when search changes
+      setPage(0);
     }, 200);
 
     return () => {
@@ -376,7 +380,7 @@ export default function CustomizedTables({
   }, [search, timeoutId, filterSearchResults]);
 
   const styleCell = (str: string) => {
-    if (str.toLowerCase() === 'good' || str.toLowerCase() === 'online' || str.toLowerCase() === 'alive' || str.toLowerCase() === 'true') {
+    if (str.toLowerCase() === 'good' || str.toLowerCase() === 'healthy' || str.toLowerCase() === 'online' || str.toLowerCase() === 'alive' || str.toLowerCase() === 'true') {
           return (
             <StyledChip
               label={str}
@@ -385,7 +389,7 @@ export default function CustomizedTables({
             />
           );
         }
-    if (str.toLocaleLowerCase() === 'bad' || str.toLowerCase() === 'offline' || str.toLowerCase() === 'dead' || str.toLowerCase() === 'false') {
+    if (str.toLowerCase() === 'bad' || str.toLowerCase() === 'offline' || str.toLowerCase() === 'dead' || str.toLowerCase() === 'false') {
       return (
         <StyledChip
           label={str}
@@ -394,7 +398,16 @@ export default function CustomizedTables({
         />
       );
     }
-    if (str.toLowerCase() === 'consuming' || str.toLocaleLowerCase() === "partial" || str.toLocaleLowerCase() === "updating" ) {
+    if (str.toLowerCase() === 'disabled' || str.toLowerCase() === "queries disabled" || str.toLowerCase() === 'unhealthy') {
+      return (
+        <StyledChip
+          label={str}
+          className={classes.cellStatusConsuming}
+          variant="outlined"
+        />
+      );
+    }
+    if (str.toLowerCase() === 'consuming' || str.toLowerCase() === "partial" || str.toLowerCase() === "updating") {
       return (
         <StyledChip
           label={str}
@@ -521,6 +534,8 @@ export default function CustomizedTables({
                       }
                       setOrder(!order);
                       setColumnClicked(column);
+                      // Reset pagination when sorting
+                      setPage(0);
                     }}
                   >
                     <>
@@ -591,7 +606,7 @@ export default function CustomizedTables({
         </TableContainer>
         {finalData.length > 10 ? (
           <TablePagination
-            rowsPerPageOptions={[5, 10, 25]}
+            rowsPerPageOptions={[5, 10, 25, 50, 100]}
             component="div"
             count={finalData.length}
             rowsPerPage={rowsPerPage}

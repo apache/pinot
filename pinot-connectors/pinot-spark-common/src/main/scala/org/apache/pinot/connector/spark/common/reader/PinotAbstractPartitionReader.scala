@@ -57,7 +57,7 @@ trait PinotAbstractPartitionReader[RowType] {
 
   private def getIteratorAndSource(): (Iterator[RowType], Closeable) = {
     if (_dataSourceOptions.useGrpcServer) {
-      val dataFetcher = PinotGrpcServerDataFetcher(_pinotSplit)
+      val dataFetcher = PinotGrpcServerDataFetcher(_pinotSplit, _dataSourceOptions)
       val iterable = dataFetcher.fetchData()
         .flatMap(_dataExtractor)
       (iterable, dataFetcher)

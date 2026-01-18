@@ -26,6 +26,8 @@ import java.util.Map;
 import java.util.TreeMap;
 import java.util.function.Consumer;
 import java.util.stream.Collectors;
+import javax.annotation.Nullable;
+import org.apache.commons.collections4.CollectionUtils;
 import org.apache.commons.io.FileUtils;
 import org.apache.commons.lang3.tuple.Pair;
 import org.apache.pinot.core.segment.processing.framework.SegmentProcessorConfig;
@@ -33,13 +35,11 @@ import org.apache.pinot.core.segment.processing.genericrow.AdaptiveSizeBasedWrit
 import org.apache.pinot.core.segment.processing.genericrow.FileWriter;
 import org.apache.pinot.core.segment.processing.genericrow.GenericRowFileManager;
 import org.apache.pinot.core.segment.processing.partitioner.Partitioner;
-import org.apache.pinot.core.segment.processing.partitioner.PartitionerConfig;
 import org.apache.pinot.core.segment.processing.partitioner.PartitionerFactory;
 import org.apache.pinot.core.segment.processing.timehandler.TimeHandler;
 import org.apache.pinot.core.segment.processing.timehandler.TimeHandlerFactory;
 import org.apache.pinot.core.segment.processing.utils.SegmentProcessorUtils;
-import org.apache.pinot.segment.local.recordtransformer.ComplexTypeTransformer;
-import org.apache.pinot.segment.local.recordtransformer.CompositeTransformer;
+import org.apache.pinot.segment.local.recordtransformer.RecordTransformerUtils;
 import org.apache.pinot.segment.local.segment.creator.TransformPipeline;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.data.FieldSpec;
@@ -84,16 +84,17 @@ public class SegmentMapper {
   public SegmentMapper(List<RecordReaderFileConfig> recordReaderFileConfigs,
       List<RecordTransformer> customRecordTransformers, SegmentProcessorConfig processorConfig, File mapperOutputDir) {
     this(recordReaderFileConfigs,
-        new TransformPipeline(
-            // pre-complex type transformers
-            CompositeTransformer.getPreComplexTypeTransformers(processorConfig.getTableConfig()),
-            // complex type transformer
-            ComplexTypeTransformer.getComplexTypeTransformer(processorConfig.getTableConfig()),
-            // plain record transformations
-            CompositeTransformer.composeAllTransformers(
-                customRecordTransformers, processorConfig.getTableConfig(), processorConfig.getSchema()
-            )),
+        getTransformPipeline(processorConfig.getTableConfig(), processorConfig.getSchema(), customRecordTransformers),
         processorConfig, mapperOutputDir);
+  }
+
+  private static TransformPipeline getTransformPipeline(TableConfig tableConfig, Schema schema,
+      @Nullable List<RecordTransformer> customRecordTransformers) {
+    List<RecordTransformer> recordTransformers = RecordTransformerUtils.getDefaultTransformers(tableConfig, schema);
+    if (CollectionUtils.isNotEmpty(customRecordTransformers)) {
+      recordTransformers.addAll(customRecordTransformers);
+    }
+    return new TransformPipeline(tableConfig.getTableName(), recordTransformers);
   }
 
   public SegmentMapper(List<RecordReaderFileConfig> recordReaderFileConfigs, TransformPipeline transformPipeline,
@@ -112,14 +113,9 @@ public class SegmentMapper {
         schema.isEnableColumnBasedNullHandling() || tableConfig.getIndexingConfig().isNullHandlingEnabled();
     _transformPipeline = transformPipeline;
     _timeHandler = TimeHandlerFactory.getTimeHandler(processorConfig);
-    List<PartitionerConfig> partitionerConfigs = processorConfig.getPartitionerConfigs();
-    int numPartitioners = partitionerConfigs.size();
-    _partitioners = new Partitioner[numPartitioners];
-    for (int i = 0; i < numPartitioners; i++) {
-      _partitioners[i] = PartitionerFactory.getPartitioner(partitionerConfigs.get(i));
-    }
+    _partitioners = PartitionerFactory.getPartitioners(processorConfig.getPartitionerConfigs());
     // Time partition + partition from partitioners
-    _partitionsBuffer = new String[numPartitioners + 1];
+    _partitionsBuffer = new String[_partitioners.length + 1];
 
     LOGGER.info("Initialized mapper with {} record readers, output dir: {}, timeHandler: {}, partitioners: {}",
         _recordReaderFileConfigs.size(), _mapperOutputDir, _timeHandler.getClass(),
@@ -127,7 +123,8 @@ public class SegmentMapper {
 
     // initialize adaptive writer.
     _adaptiveSizeBasedWriter =
-        new AdaptiveSizeBasedWriter(processorConfig.getSegmentConfig().getIntermediateFileSizeThreshold());
+        new AdaptiveSizeBasedWriter(processorConfig.getSegmentConfig().getIntermediateFileSizeThreshold(),
+            processorConfig.getSegmentConfig().getMaxDiskUsagePercentage(), mapperOutputDir);
   }
 
   /**
@@ -179,11 +176,10 @@ public class SegmentMapper {
 
 //   Returns true if the map phase can continue, false if it should terminate based on the configured threshold for
 //   intermediate file size during map phase.
-  protected boolean completeMapAndTransformRow(RecordReader recordReader, GenericRow reuse,
-      Consumer<Object> observer, int count, int totalCount) throws Exception {
+  protected boolean completeMapAndTransformRow(RecordReader recordReader, GenericRow reuse, Consumer<Object> observer,
+      int count, int totalCount) {
     observer.accept(String.format("Doing map phase on data from RecordReader (%d out of %d)", count, totalCount));
 
-    TransformPipeline.Result reusedResult = new TransformPipeline.Result();
     boolean continueOnError =
         _processorConfig.getTableConfig().getIngestionConfig() != null && _processorConfig.getTableConfig()
             .getIngestionConfig().isContinueOnError();
@@ -191,13 +187,13 @@ public class SegmentMapper {
     while (recordReader.hasNext() && (_adaptiveSizeBasedWriter.canWrite())) {
       try {
         reuse = recordReader.next(reuse);
-        _transformPipeline.processRow(reuse, reusedResult);
-        for (GenericRow transformedRow : reusedResult.getTransformedRows()) {
+        TransformPipeline.Result result = _transformPipeline.processRow(reuse);
+        for (GenericRow transformedRow : result.getTransformedRows()) {
           writeRecord(transformedRow);
         }
-        _incompleteRowsFound += reusedResult.getIncompleteRowCount();
-        _skippedRowsFound += reusedResult.getSkippedRowCount();
-        _sanitizedRowsFound += reusedResult.getSanitizedRowCount();
+        _incompleteRowsFound += result.getIncompleteRowCount();
+        _skippedRowsFound += result.getSkippedRowCount();
+        _sanitizedRowsFound += result.getSanitizedRowCount();
       } catch (Exception e) {
         String logMessage = "Caught exception while reading data.";
         observer.accept(new MinionTaskBaseObserverStats.StatusEntry.Builder()

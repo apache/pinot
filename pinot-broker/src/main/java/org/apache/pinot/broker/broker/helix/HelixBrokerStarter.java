@@ -53,7 +53,7 @@ public class HelixBrokerStarter extends BaseBrokerStarter {
   private static PinotConfiguration applyBrokerConfigs(PinotConfiguration brokerConf, String clusterName,
       String zkServers, @Nullable String brokerHost) {
     brokerConf.setProperty(Helix.CONFIG_OF_CLUSTER_NAME, clusterName);
-    brokerConf.setProperty(Helix.CONFIG_OF_ZOOKEEPR_SERVER, zkServers);
+    brokerConf.setProperty(Helix.CONFIG_OF_ZOOKEEPER_SERVER, zkServers);
     if (brokerHost == null) {
       brokerConf.clearProperty(Broker.CONFIG_OF_BROKER_HOSTNAME);
     } else {
@@ -75,7 +75,7 @@ public class HelixBrokerStarter extends BaseBrokerStarter {
     properties.put(Helix.KEY_OF_BROKER_QUERY_PORT, 5001);
     properties.put(Broker.CONFIG_OF_BROKER_TIMEOUT_MS, 60 * 1000L);
     properties.put(Helix.CONFIG_OF_CLUSTER_NAME, "quickstart");
-    properties.put(Helix.CONFIG_OF_ZOOKEEPR_SERVER, "localhost:2122");
+    properties.put(Helix.CONFIG_OF_ZOOKEEPER_SERVER, "localhost:2122");
     HelixBrokerStarter helixBrokerStarter = new HelixBrokerStarter();
     helixBrokerStarter.init(new PinotConfiguration(properties));
     return helixBrokerStarter;

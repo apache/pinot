@@ -24,9 +24,10 @@ import org.apache.pinot.common.metrics.BrokerMetrics
 import org.apache.pinot.common.request.BrokerRequest
 import org.apache.pinot.connector.spark.common.partition.PinotSplit
 import org.apache.pinot.connector.spark.common.{Logging, PinotDataSourceReadOptions, PinotException}
-import org.apache.pinot.core.routing.ServerRouteInfo
+import org.apache.pinot.core.routing.SegmentsToQuery
 import org.apache.pinot.core.transport.server.routing.stats.ServerRoutingStatsManager
 import org.apache.pinot.core.transport.{AsyncQueryResponse, QueryRouter, ServerInstance}
+import org.apache.pinot.spi.accounting.ThreadAccountantUtils
 import org.apache.pinot.spi.config.table.TableType
 import org.apache.pinot.spi.env.PinotConfiguration
 import org.apache.pinot.spi.metrics.PinotMetricUtils
@@ -48,9 +49,64 @@ private[reader] class PinotServerDataFetcher(
   private val metricsRegistry = PinotMetricUtils.getPinotMetricsRegistry
   private val brokerMetrics = new BrokerMetrics(metricsRegistry)
   private val pinotConfig = new PinotConfiguration()
+  
+  // Configure TLS settings if HTTPS is enabled
+  if (dataSourceOptions.useHttps) {
+    // Set Pinot configuration for TLS
+    pinotConfig.setProperty("pinot.broker.client.protocol", "https")
+    pinotConfig.setProperty("pinot.broker.tls.enabled", "true")
+    
+    // Configure keystore if provided
+    dataSourceOptions.keystorePath.foreach { path =>
+      pinotConfig.setProperty("pinot.broker.tls.keystore.path", path)
+    }
+    dataSourceOptions.keystorePassword.foreach { password =>
+      pinotConfig.setProperty("pinot.broker.tls.keystore.password", password)
+    }
+    
+    // Configure truststore if provided
+    dataSourceOptions.truststorePath.foreach { path =>
+      pinotConfig.setProperty("pinot.broker.tls.truststore.path", path)
+    }
+    dataSourceOptions.truststorePassword.foreach { password =>
+      pinotConfig.setProperty("pinot.broker.tls.truststore.password", password)
+    }
+  }
+  
+  // Configure gRPC settings
+  pinotConfig.setProperty("pinot.broker.grpc.port", dataSourceOptions.grpcPort.toString)
+  pinotConfig.setProperty("pinot.broker.grpc.max.inbound.message.size", dataSourceOptions.grpcMaxInboundMessageSize.toString)
+  pinotConfig.setProperty("pinot.broker.grpc.tls.enabled", (!dataSourceOptions.grpcUsePlainText).toString)
+  
+  // Configure gRPC TLS settings if not using plain text
+  if (!dataSourceOptions.grpcUsePlainText) {
+    pinotConfig.setProperty("pinot.broker.grpc.tls.keystore.type", dataSourceOptions.grpcTlsKeystoreType)
+    dataSourceOptions.grpcTlsKeystorePath.foreach { path =>
+      pinotConfig.setProperty("pinot.broker.grpc.tls.keystore.path", path)
+    }
+    dataSourceOptions.grpcTlsKeystorePassword.foreach { password =>
+      pinotConfig.setProperty("pinot.broker.grpc.tls.keystore.password", password)
+    }
+    pinotConfig.setProperty("pinot.broker.grpc.tls.truststore.type", dataSourceOptions.grpcTlsTruststoreType)
+    dataSourceOptions.grpcTlsTruststorePath.foreach { path =>
+      pinotConfig.setProperty("pinot.broker.grpc.tls.truststore.path", path)
+    }
+    dataSourceOptions.grpcTlsTruststorePassword.foreach { password =>
+      pinotConfig.setProperty("pinot.broker.grpc.tls.truststore.password", password)
+    }
+    pinotConfig.setProperty("pinot.broker.grpc.tls.ssl.provider", dataSourceOptions.grpcTlsSslProvider)
+  }
+  
+  // Configure proxy settings if enabled
+  if (dataSourceOptions.proxyEnabled) {
+    pinotConfig.setProperty("pinot.broker.proxy.enabled", "true")
+    dataSourceOptions.grpcProxyUri.foreach { proxyUri =>
+      pinotConfig.setProperty("pinot.broker.grpc.proxy.uri", proxyUri)
+    }
+  }
+  
   private val serverRoutingStatsManager = new ServerRoutingStatsManager(pinotConfig, brokerMetrics)
-  private val queryRouter = new QueryRouter(brokerId, brokerMetrics, serverRoutingStatsManager)
-  // TODO add support for TLS-secured server
+  private val queryRouter = new QueryRouter(brokerId, null, null, serverRoutingStatsManager, ThreadAccountantUtils.getNoOpAccountant())
 
   def fetchData(): List[DataTable] = {
     val routingTableForRequest = createRoutingTableForRequest()
@@ -93,23 +149,45 @@ private[reader] class PinotServerDataFetcher(
     dataTables.filter(_.getNumberOfRows > 0)
   }
 
-  private def createRoutingTableForRequest(): JMap[ServerInstance, ServerRouteInfo] = {
+  private def createRoutingTableForRequest(): JMap[ServerInstance, SegmentsToQuery] = {
     val nullZkId: String = null
     val instanceConfig = new InstanceConfig(nullZkId)
     instanceConfig.setHostName(pinotSplit.serverAndSegments.serverHost)
     instanceConfig.setPort(pinotSplit.serverAndSegments.serverPort)
-    // TODO: support netty-sec
+    
+    // Configure TLS for server instance if HTTPS is enabled
+    if (dataSourceOptions.useHttps) {
+      instanceConfig.getRecord.setSimpleField("TLS_PORT", pinotSplit.serverAndSegments.serverPort)
+    }
+    
+    // Configure gRPC port
+    instanceConfig.getRecord.setSimpleField("GRPC_PORT", dataSourceOptions.grpcPort.toString)
+    
+    // Configure proxy forwarding if enabled
+    if (dataSourceOptions.proxyEnabled && dataSourceOptions.grpcProxyUri.isDefined) {
+      // When using proxy, the server instance should point to the proxy
+      val proxyUri = dataSourceOptions.grpcProxyUri.get
+      val (proxyHost, proxyPort) = org.apache.pinot.connector.spark.common.NetUtils.parseHostPort(proxyUri, dataSourceOptions.grpcUsePlainText)
+      instanceConfig.setHostName(proxyHost)
+      instanceConfig.setPort(proxyPort)
+      instanceConfig.getRecord.setSimpleField("GRPC_PORT", proxyPort)
+      
+      // Store original target for proxy headers
+      instanceConfig.getRecord.setSimpleField("FORWARD_HOST", pinotSplit.serverAndSegments.serverHost)
+      instanceConfig.getRecord.setSimpleField("FORWARD_PORT", pinotSplit.serverAndSegments.serverPort)
+    }
+    
     val serverInstance = new ServerInstance(instanceConfig)
     Map(
-      serverInstance -> new ServerRouteInfo(pinotSplit.serverAndSegments.segments.asJava, List[String]().asJava)
+      serverInstance -> new SegmentsToQuery(pinotSplit.serverAndSegments.segments.asJava, List[String]().asJava)
     ).asJava
   }
 
   private def submitRequestToPinotServer(
       offlineBrokerRequest: BrokerRequest,
-      offlineRoutingTable: JMap[ServerInstance, ServerRouteInfo],
+      offlineRoutingTable: JMap[ServerInstance, SegmentsToQuery],
       realtimeBrokerRequest: BrokerRequest,
-      realtimeRoutingTable: JMap[ServerInstance, ServerRouteInfo]): AsyncQueryResponse = {
+      realtimeRoutingTable: JMap[ServerInstance, SegmentsToQuery]): AsyncQueryResponse = {
     logInfo(s"Sending request to ${pinotSplit.serverAndSegments.toString}")
     queryRouter.submitQuery(
       partitionId,

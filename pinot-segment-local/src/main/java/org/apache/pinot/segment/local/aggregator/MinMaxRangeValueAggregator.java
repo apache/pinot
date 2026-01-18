@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.segment.local.aggregator;
 
+import javax.annotation.Nullable;
 import org.apache.pinot.segment.local.customobject.MinMaxRangePair;
 import org.apache.pinot.segment.local.utils.CustomSerDeUtils;
 import org.apache.pinot.segment.spi.AggregationFunctionType;
@@ -38,23 +39,16 @@ public class MinMaxRangeValueAggregator implements ValueAggregator<Object, MinMa
   }
 
   @Override
-  public MinMaxRangePair getInitialAggregatedValue(Object rawValue) {
-    if (rawValue instanceof byte[]) {
-      return deserializeAggregatedValue((byte[]) rawValue);
-    } else {
-      double doubleValue = ((Number) rawValue).doubleValue();
-      return new MinMaxRangePair(doubleValue, doubleValue);
+  public MinMaxRangePair getInitialAggregatedValue(@Nullable Object rawValue) {
+    if (rawValue == null) {
+      return new MinMaxRangePair();
     }
+    return processRawValue(rawValue);
   }
 
   @Override
   public MinMaxRangePair applyRawValue(MinMaxRangePair value, Object rawValue) {
-    if (rawValue instanceof byte[]) {
-      value.apply(deserializeAggregatedValue((byte[]) rawValue));
-    } else {
-      double doubleValue = ((Number) rawValue).doubleValue();
-      value.apply(doubleValue);
-    }
+    value.apply(processRawValue(rawValue));
     return value;
   }
 
@@ -70,6 +64,11 @@ public class MinMaxRangeValueAggregator implements ValueAggregator<Object, MinMa
   }
 
   @Override
+  public boolean isAggregatedValueFixedSize() {
+    return true;
+  }
+
+  @Override
   public int getMaxAggregatedValueByteSize() {
     return Double.BYTES + Double.BYTES;
   }
@@ -82,5 +81,23 @@ public class MinMaxRangeValueAggregator implements ValueAggregator<Object, MinMa
   @Override
   public MinMaxRangePair deserializeAggregatedValue(byte[] bytes) {
     return CustomSerDeUtils.MIN_MAX_RANGE_PAIR_SER_DE.deserialize(bytes);
+  }
+
+  protected MinMaxRangePair processRawValue(Object rawValue) {
+    if (rawValue instanceof byte[]) {
+      return deserializeAggregatedValue((byte[]) rawValue);
+    } else if (rawValue instanceof Object[]) {
+      Object[] values = (Object[]) rawValue;
+      MinMaxRangePair minMaxRangePair = new MinMaxRangePair();
+      for (Object value : values) {
+        if (value != null) {
+          minMaxRangePair.apply(ValueAggregatorUtils.toDouble(value));
+        }
+      }
+      return minMaxRangePair;
+    } else {
+      double doubleValue = ValueAggregatorUtils.toDouble(rawValue);
+      return new MinMaxRangePair(doubleValue, doubleValue);
+    }
   }
 }

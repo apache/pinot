@@ -57,11 +57,19 @@ jobs:
           distribution: 'temurin'
           cache: 'maven'
       - name: Install pinot-dependency-verifier into repo
-        run: |
-          mvn clean install \
-          -pl pinot-dependency-verifier \
-          -am \
-          -DskipTests
+        uses: nick-fields/retry@v3
+        with:
+          max_attempts: 3
+          retry_wait_seconds: 20
+          timeout_minutes: 120
+          retry_on_exit_code: 75
+          command: |
+            cat <<'EOF' | .github/workflows/scripts/retry_on_fast_fail.sh
+            mvn clean install \
+            -pl pinot-dependency-verifier \
+            -am \
+            -DskipTests
+            EOF
       - name: Linter Test
         env:
           DEVELOCITY_ACCESS_KEY: ${{ secrets.DEVELOCITY_ACCESS_KEY }}
@@ -75,7 +83,16 @@ jobs:
             --add-exports=jdk.compiler/com.sun.tools.javac.parser=ALL-UNNAMED
             --add-exports=jdk.compiler/com.sun.tools.javac.tree=ALL-UNNAMED
             --add-exports=jdk.compiler/com.sun.tools.javac.util=ALL-UNNAMED
-        run: .github/workflows/scripts/.pinot_linter.sh
+        uses: nick-fields/retry@v3
+        with:
+          max_attempts: 3
+          retry_wait_seconds: 20
+          timeout_minutes: 120
+          retry_on_exit_code: 75
+          command: |
+            cat <<'EOF' | .github/workflows/scripts/retry_on_fast_fail.sh
+            .github/workflows/scripts/.pinot_linter.sh
+            EOF
 
   binary-compat-check:
     if: github.repository == 'apache/pinot'
@@ -100,10 +117,18 @@ jobs:
             ${{ runner.os }}-maven-
       # Build the PR branch's module to get a new JAR to compare
       - name: Build SPI on PR branch
-        run: |
-          for mod in pinot-spi pinot-segment-spi; do
-            mvn clean package -T1C -pl $mod -am -DskipTests -Dproject.build.finalName="$mod"
-          done
+        uses: nick-fields/retry@v3
+        with:
+          max_attempts: 3
+          retry_wait_seconds: 20
+          timeout_minutes: 120
+          retry_on_exit_code: 75
+          command: |
+            cat <<'EOF' | .github/workflows/scripts/retry_on_fast_fail.sh
+            for mod in pinot-spi pinot-segment-spi; do
+              mvn clean package -T1C -pl $mod -am -DskipTests -Dproject.build.finalName="$mod"
+            done
+            EOF
       - name: Checkout master into a subfolder
         uses: actions/checkout@v4
         with:
@@ -111,11 +136,19 @@ jobs:
           path: master-head
       # Build the same module on master to produce the baseline JAR
       - name: Build SPI on master
-        working-directory: master-head
-        run: |
-          for mod in pinot-spi pinot-segment-spi; do
-            mvn clean package -T1C -pl $mod -am -DskipTests -Dproject.build.finalName="$mod"
-          done
+        uses: nick-fields/retry@v3
+        with:
+          max_attempts: 3
+          retry_wait_seconds: 20
+          timeout_minutes: 120
+          retry_on_exit_code: 75
+          command: |
+            cat <<'EOF' | .github/workflows/scripts/retry_on_fast_fail.sh
+            cd master-head || exit 1
+            for mod in pinot-spi pinot-segment-spi; do
+              mvn clean package -T1C -pl $mod -am -DskipTests -Dproject.build.finalName="$mod"
+            done
+            EOF
       # Download the japicmp standalone JAR which will be used to compare APIs
       - name: Download japicmp CLI
         run: |
@@ -185,7 +218,19 @@ jobs:
             --add-opens=java.base/java.lang=ALL-UNNAMED
             --add-opens=java.base/java.util=ALL-UNNAMED
             --add-opens=java.base/java.lang.reflect=ALL-UNNAMED
-        run: .github/workflows/scripts/pr-tests/.pinot_tests_build.sh
+            --add-opens=java.base/jdk.internal.misc=ALL-UNNAMED
+            -Dio.netty.tryReflectionSetAccessible=true
+            -Dio.grpc.netty.shaded.io.netty.tryReflectionSetAccessible=true
+        uses: nick-fields/retry@v3
+        with:
+          max_attempts: 3
+          retry_wait_seconds: 20
+          timeout_minutes: 120
+          retry_on_exit_code: 75
+          command: |
+            cat <<'EOF' | .github/workflows/scripts/retry_on_fast_fail.sh
+            .github/workflows/scripts/pr-tests/.pinot_tests_build.sh
+            EOF
       - name: Unit Test
         env:
           RUN_INTEGRATION_TESTS: false
@@ -206,7 +251,19 @@ jobs:
             --add-opens=java.base/java.lang=ALL-UNNAMED
             --add-opens=java.base/java.util=ALL-UNNAMED
             --add-opens=java.base/java.lang.reflect=ALL-UNNAMED
-        run: .github/workflows/scripts/pr-tests/.pinot_tests_unit.sh
+            --add-opens=java.base/jdk.internal.misc=ALL-UNNAMED
+            -Dio.netty.tryReflectionSetAccessible=true
+            -Dio.grpc.netty.shaded.io.netty.tryReflectionSetAccessible=true
+        uses: nick-fields/retry@v3
+        with:
+          max_attempts: 3
+          retry_wait_seconds: 20
+          timeout_minutes: 120
+          retry_on_exit_code: 75
+          command: |
+            cat <<'EOF' | .github/workflows/scripts/retry_on_fast_fail.sh
+            .github/workflows/scripts/pr-tests/.pinot_tests_unit.sh
+            EOF
       - name: Upload coverage to Codecov
         uses: codecov/codecov-action@v5
         continue-on-error: true
@@ -227,6 +284,28 @@ jobs:
           token: ${{ secrets.CODECOV_TOKEN }}
           fail_ci_if_error: false
           verbose: true
+      - name: Generate Surefire Report
+        if: ${{ !cancelled() && github.ref == 'refs/heads/master' }}
+        continue-on-error: true
+        uses: nick-fields/retry@v3
+        with:
+          max_attempts: 3
+          retry_wait_seconds: 20
+          timeout_minutes: 120
+          retry_on_exit_code: 75
+          command: |
+            cat <<'EOF' | .github/workflows/scripts/retry_on_fast_fail.sh
+            mvn surefire-report:report-only -P github-actions,codecoverage,no-integration-tests
+            EOF
+      - name: Upload Surefire Reports
+        if: ${{ !cancelled() && github.ref == 'refs/heads/master' }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: surefire-reports-unit-test-${{ matrix.testset }}-${{matrix.distribution}}-${{matrix.java}}
+          path: |
+            **/target/surefire-reports/
+            **/target/site/surefire-report.html
+          retention-days: 30
 
   integration-test:
     if: github.repository == 'apache/pinot'
@@ -270,7 +349,16 @@ jobs:
             --add-exports=jdk.compiler/com.sun.tools.javac.parser=ALL-UNNAMED
             --add-exports=jdk.compiler/com.sun.tools.javac.tree=ALL-UNNAMED
             --add-exports=jdk.compiler/com.sun.tools.javac.util=ALL-UNNAMED
-        run: .github/workflows/scripts/pr-tests/.pinot_tests_build.sh
+        uses: nick-fields/retry@v3
+        with:
+          max_attempts: 3
+          retry_wait_seconds: 20
+          timeout_minutes: 120
+          retry_on_exit_code: 75
+          command: |
+            cat <<'EOF' | .github/workflows/scripts/retry_on_fast_fail.sh
+            .github/workflows/scripts/pr-tests/.pinot_tests_build.sh
+            EOF
       - name: Integration Test
         env:
           RUN_INTEGRATION_TESTS: true
@@ -286,7 +374,16 @@ jobs:
             --add-exports=jdk.compiler/com.sun.tools.javac.parser=ALL-UNNAMED
             --add-exports=jdk.compiler/com.sun.tools.javac.tree=ALL-UNNAMED
             --add-exports=jdk.compiler/com.sun.tools.javac.util=ALL-UNNAMED
-        run: .github/workflows/scripts/pr-tests/.pinot_tests_integration.sh
+        uses: nick-fields/retry@v3
+        with:
+          max_attempts: 3
+          retry_wait_seconds: 20
+          timeout_minutes: 120
+          retry_on_exit_code: 75
+          command: |
+            cat <<'EOF' | .github/workflows/scripts/retry_on_fast_fail.sh
+            .github/workflows/scripts/pr-tests/.pinot_tests_integration.sh
+            EOF
       - name: Upload coverage to Codecov
         uses: codecov/codecov-action@v5
         continue-on-error: true
@@ -324,7 +421,16 @@ jobs:
             --add-exports=jdk.compiler/com.sun.tools.javac.parser=ALL-UNNAMED
             --add-exports=jdk.compiler/com.sun.tools.javac.tree=ALL-UNNAMED
             --add-exports=jdk.compiler/com.sun.tools.javac.util=ALL-UNNAMED
-        run: .github/workflows/scripts/pr-tests/.pinot_tests_custom_integration.sh
+        uses: nick-fields/retry@v3
+        with:
+          max_attempts: 3
+          retry_wait_seconds: 20
+          timeout_minutes: 120
+          retry_on_exit_code: 75
+          command: |
+            cat <<'EOF' | .github/workflows/scripts/retry_on_fast_fail.sh
+            .github/workflows/scripts/pr-tests/.pinot_tests_custom_integration.sh
+            EOF
       - name: Upload coverage to Codecov
         if : ${{ matrix.testset == 1 }}
         uses: codecov/codecov-action@v5
@@ -346,6 +452,28 @@ jobs:
           token: ${{ secrets.CODECOV_TOKEN }}
           fail_ci_if_error: false
           verbose: true
+      - name: Generate Surefire Report
+        if: ${{ !cancelled() && github.ref == 'refs/heads/master' }}
+        continue-on-error: true
+        uses: nick-fields/retry@v3
+        with:
+          max_attempts: 3
+          retry_wait_seconds: 20
+          timeout_minutes: 120
+          retry_on_exit_code: 75
+          command: |
+            cat <<'EOF' | .github/workflows/scripts/retry_on_fast_fail.sh
+            mvn surefire-report:report-only -P github-actions,codecoverage
+            EOF
+      - name: Upload Surefire Reports
+        if: ${{ !cancelled() && github.ref == 'refs/heads/master' }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: surefire-reports-integration-test-${{ matrix.testset }}-${{matrix.distribution}}-${{matrix.java}}
+          path: |
+            **/target/surefire-reports/
+            **/target/site/surefire-report.html
+          retention-days: 30
 
   compatibility-verifier:
     if: github.repository == 'apache/pinot'
@@ -356,7 +484,7 @@ jobs:
       matrix:
         test_suite: [ "compatibility-verifier/sample-test-suite" ]
         old_commit: [
-          "release-1.2.0", "release-1.3.0", "master"
+          "release-1.3.0", "release-1.4.0", "master"
         ]
     name: Pinot Compatibility Regression Testing against ${{ matrix.old_commit }} on ${{ matrix.test_suite }}
     steps:
@@ -401,7 +529,16 @@ jobs:
             --add-exports=jdk.compiler/com.sun.tools.javac.parser=ALL-UNNAMED
             --add-exports=jdk.compiler/com.sun.tools.javac.tree=ALL-UNNAMED
             --add-exports=jdk.compiler/com.sun.tools.javac.util=ALL-UNNAMED
-        run: .github/workflows/scripts/.pinot_compatibility_verifier.sh
+        uses: nick-fields/retry@v3
+        with:
+          max_attempts: 3
+          retry_wait_seconds: 20
+          timeout_minutes: 120
+          retry_on_exit_code: 75
+          command: |
+            cat <<'EOF' | .github/workflows/scripts/retry_on_fast_fail.sh
+            .github/workflows/scripts/.pinot_compatibility_verifier.sh
+            EOF
 
   multi-stage-compatibility-verifier:
     if: github.repository == 'apache/pinot'
@@ -412,7 +549,7 @@ jobs:
       matrix:
         test_suite: [ "compatibility-verifier/multi-stage-query-engine-test-suite" ]
         old_commit: [
-          "release-1.2.0", "release-1.3.0", "master"
+          "release-1.3.0", "release-1.4.0", "master"
         ]
     name: Pinot Multi-Stage Query Engine Compatibility Regression Testing against ${{ matrix.old_commit }} on ${{ matrix.test_suite }}
     steps:
@@ -457,7 +594,16 @@ jobs:
             --add-exports=jdk.compiler/com.sun.tools.javac.parser=ALL-UNNAMED
             --add-exports=jdk.compiler/com.sun.tools.javac.tree=ALL-UNNAMED
             --add-exports=jdk.compiler/com.sun.tools.javac.util=ALL-UNNAMED
-        run: .github/workflows/scripts/.pinot_compatibility_verifier.sh
+        uses: nick-fields/retry@v3
+        with:
+          max_attempts: 3
+          retry_wait_seconds: 20
+          timeout_minutes: 120
+          retry_on_exit_code: 75
+          command: |
+            cat <<'EOF' | .github/workflows/scripts/retry_on_fast_fail.sh
+            .github/workflows/scripts/.pinot_compatibility_verifier.sh
+            EOF
 
   quickstarts:
     if: github.repository == 'apache/pinot'
@@ -488,4 +634,13 @@ jobs:
           restore-keys: |
             ${{ runner.os }}-maven-
       - name: Quickstart on JDK ${{ matrix.java }}
-        run: .github/workflows/scripts/.pinot_quickstart.sh
+        uses: nick-fields/retry@v3
+        with:
+          max_attempts: 3
+          retry_wait_seconds: 20
+          timeout_minutes: 120
+          retry_on_exit_code: 75
+          command: |
+            cat <<'EOF' | .github/workflows/scripts/retry_on_fast_fail.sh
+            .github/workflows/scripts/.pinot_quickstart.sh
+            EOF

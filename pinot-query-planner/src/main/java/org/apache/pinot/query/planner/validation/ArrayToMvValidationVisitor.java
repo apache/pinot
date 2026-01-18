@@ -19,8 +19,10 @@
 package org.apache.pinot.query.planner.validation;
 
 import java.util.List;
+import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.query.planner.logical.RexExpression;
 import org.apache.pinot.query.planner.plannode.AggregateNode;
+import org.apache.pinot.query.planner.plannode.EnrichedJoinNode;
 import org.apache.pinot.query.planner.plannode.ExchangeNode;
 import org.apache.pinot.query.planner.plannode.ExplainedNode;
 import org.apache.pinot.query.planner.plannode.FilterNode;
@@ -32,6 +34,7 @@ import org.apache.pinot.query.planner.plannode.ProjectNode;
 import org.apache.pinot.query.planner.plannode.SetOpNode;
 import org.apache.pinot.query.planner.plannode.SortNode;
 import org.apache.pinot.query.planner.plannode.TableScanNode;
+import org.apache.pinot.query.planner.plannode.UnnestNode;
 import org.apache.pinot.query.planner.plannode.ValueNode;
 import org.apache.pinot.query.planner.plannode.WindowNode;
 import org.apache.pinot.spi.exception.QueryErrorCode;
@@ -66,6 +69,12 @@ public class ArrayToMvValidationVisitor implements PlanNodeVisitor<Void, Boolean
   }
 
   @Override
+  public Void visitEnrichedJoin(EnrichedJoinNode node, Boolean isIntermediateStage) {
+    visitJoin(node, isIntermediateStage);
+    return null;
+  }
+
+  @Override
   public Void visitMailboxReceive(MailboxReceiveNode node, Boolean isIntermediateStage) {
     node.getInputs().forEach(e -> e.visit(this, isIntermediateStage));
     return null;
@@ -79,14 +88,25 @@ public class ArrayToMvValidationVisitor implements PlanNodeVisitor<Void, Boolean
 
   @Override
   public Void visitAggregate(AggregateNode node, Boolean isIntermediateStage) {
-    if (isIntermediateStage && containsArrayToMv(node.getAggCalls())) {
+    if (!isIntermediateStage) {
+      // No need to traverse underlying ProjectNode in leaf stage
+      return null;
+    }
+    if (containsArrayToMv(node.getAggCalls())) {
       throw new QueryException(QueryErrorCode.QUERY_PLANNING,
           "Function 'ArrayToMv' is not supported in AGGREGATE Intermediate Stage");
     }
-    if (isIntermediateStage) {
-      node.getInputs().forEach(e -> e.visit(this, true));
+    DataSchema.ColumnDataType[] columnDataTypes = node.getDataSchema().getColumnDataTypes();
+    for (Integer key : node.getGroupKeys()) {
+      if (key >= 0 && key < columnDataTypes.length
+          && columnDataTypes[key] != null
+          && columnDataTypes[key].isArray()) {
+        throw new QueryException(QueryErrorCode.QUERY_PLANNING,
+            "Multi-valued columns are not supported as a grouping key in the intermediate stage. "
+                + "Use ARRAY_TO_MV() to group by multi-value column");
+      }
     }
-    // No need to traverse underlying ProjectNode in leaf stage
+    node.getInputs().forEach(e -> e.visit(this, true));
     return null;
   }
 
@@ -143,6 +163,12 @@ public class ArrayToMvValidationVisitor implements PlanNodeVisitor<Void, Boolean
   @Override
   public Void visitExplained(ExplainedNode node, Boolean isIntermediateStage) {
     node.getInputs().forEach(input -> input.visit(this, isIntermediateStage));
+    return null;
+  }
+
+  @Override
+  public Void visitUnnest(UnnestNode node, Boolean isIntermediateStage) {
+    node.getInputs().forEach(e -> e.visit(this, isIntermediateStage));
     return null;
   }
 

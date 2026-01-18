@@ -27,7 +27,7 @@ import java.util.concurrent.CountDownLatch;
 import org.apache.helix.model.InstanceConfig;
 import org.apache.pinot.broker.broker.AllowAllAccessControlFactory;
 import org.apache.pinot.broker.queryquota.QueryQuotaManager;
-import org.apache.pinot.broker.routing.BrokerRoutingManager;
+import org.apache.pinot.broker.routing.manager.BrokerRoutingManager;
 import org.apache.pinot.common.config.provider.TableCache;
 import org.apache.pinot.common.metrics.BrokerMetrics;
 import org.apache.pinot.common.request.BrokerRequest;
@@ -35,20 +35,24 @@ import org.apache.pinot.common.request.Expression;
 import org.apache.pinot.common.request.PinotQuery;
 import org.apache.pinot.common.response.broker.BrokerResponseNative;
 import org.apache.pinot.core.routing.RoutingTable;
-import org.apache.pinot.core.routing.ServerRouteInfo;
+import org.apache.pinot.core.routing.SegmentsToQuery;
+import org.apache.pinot.core.routing.TableRouteInfo;
 import org.apache.pinot.core.transport.ServerInstance;
-import org.apache.pinot.core.transport.TableRouteInfo;
+import org.apache.pinot.spi.accounting.ThreadAccountantUtils;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.TenantConfig;
 import org.apache.pinot.spi.env.PinotConfiguration;
 import org.apache.pinot.spi.eventlistener.query.BrokerQueryEventListenerFactory;
 import org.apache.pinot.spi.exception.BadQueryRequestException;
+import org.apache.pinot.spi.trace.LoggerConstants;
 import org.apache.pinot.spi.trace.RequestContext;
-import org.apache.pinot.spi.utils.CommonConstants.Broker;
+import org.apache.pinot.spi.utils.CommonConstants;
 import org.apache.pinot.sql.parsers.CalciteSqlParser;
 import org.apache.pinot.util.TestUtils;
 import org.mockito.Mockito;
+import org.slf4j.MDC;
 import org.testng.Assert;
+import org.testng.annotations.AfterMethod;
 import org.testng.annotations.Test;
 
 import static org.mockito.ArgumentMatchers.any;
@@ -58,6 +62,11 @@ import static org.mockito.Mockito.when;
 
 
 public class BaseSingleStageBrokerRequestHandlerTest {
+
+  @AfterMethod
+  public void cleanupMdc() {
+    MDC.clear();
+  }
 
   @Test
   public void testUpdateColumnNames() {
@@ -168,7 +177,7 @@ public class BaseSingleStageBrokerRequestHandlerTest {
     when(routingManager.getQueryTimeoutMs(tableName)).thenReturn(10000L);
     RoutingTable rt = mock(RoutingTable.class);
     when(rt.getServerInstanceToSegmentsMap()).thenReturn(Map.of(new ServerInstance(new InstanceConfig("server01_9000")),
-        new ServerRouteInfo(List.of("segment01"), List.of())));
+        new SegmentsToQuery(List.of("segment01"), List.of())));
     when(routingManager.getRoutingTable(any(), Mockito.anyLong())).thenReturn(rt);
     QueryQuotaManager queryQuotaManager = mock(QueryQuotaManager.class);
     when(queryQuotaManager.acquire(anyString())).thenReturn(true);
@@ -177,12 +186,12 @@ public class BaseSingleStageBrokerRequestHandlerTest {
     CountDownLatch latch = new CountDownLatch(1);
     long[] testRequestId = {-1};
     BrokerMetrics.register(mock(BrokerMetrics.class));
-    PinotConfiguration config =
-        new PinotConfiguration(Map.of(Broker.CONFIG_OF_BROKER_ENABLE_QUERY_CANCELLATION, "true"));
+    PinotConfiguration config = new PinotConfiguration();
     BrokerQueryEventListenerFactory.init(config);
     BaseSingleStageBrokerRequestHandler requestHandler =
-        new BaseSingleStageBrokerRequestHandler(config, "testBrokerId", routingManager,
-            new AllowAllAccessControlFactory(), queryQuotaManager, tableCache) {
+        new BaseSingleStageBrokerRequestHandler(config, "testBrokerId", new BrokerRequestIdGenerator(), routingManager,
+            new AllowAllAccessControlFactory(), queryQuotaManager, tableCache,
+            ThreadAccountantUtils.getNoOpAccountant(), null) {
           @Override
           public void start() {
           }
@@ -193,8 +202,8 @@ public class BaseSingleStageBrokerRequestHandlerTest {
 
           @Override
           protected BrokerResponseNative processBrokerRequest(long requestId, BrokerRequest originalBrokerRequest,
-              BrokerRequest serverBrokerRequest, TableRouteInfo route, long timeoutMs,
-              ServerStats serverStats, RequestContext requestContext)
+              BrokerRequest serverBrokerRequest, TableRouteInfo route, long timeoutMs, ServerStats serverStats,
+              RequestContext requestContext)
               throws Exception {
             testRequestId[0] = requestId;
             latch.await();
@@ -231,5 +240,37 @@ public class BaseSingleStageBrokerRequestHandlerTest {
         "error1, with routing policy: off_rp [offline]");
     Assert.assertEquals(BaseSingleStageBrokerRequestHandler.addRoutingPolicyInErrMsg("error1", "rt_rp", "off_rp"),
         "error1, with routing policy: rt_rp [realtime], off_rp [offline]");
+  }
+
+  @Test
+  public void testQueryHashRegisteredInMdc() {
+    String queryHash = "test_hash_abc123";
+    LoggerConstants.QUERY_HASH_KEY.registerInMdc(queryHash);
+    String mdcValue = MDC.get(LoggerConstants.QUERY_HASH_KEY.getKey());
+    Assert.assertNotNull(mdcValue, "QueryHash should be registered in MDC");
+    Assert.assertEquals(mdcValue, queryHash, "MDC should contain the correct queryHash");
+  }
+
+  @Test
+  public void testQueryHashNotRegisteredWhenNull() {
+    String mdcValue = MDC.get(LoggerConstants.QUERY_HASH_KEY.getKey());
+    Assert.assertNull(mdcValue, "Null queryHash should not be registered in MDC");
+  }
+
+  @Test
+  public void testQueryHashAddedToQueryOptions() {
+    String query = "SELECT * FROM myTable WHERE col = 100";
+    PinotQuery pinotQuery = CalciteSqlParser.compileToPinotQuery(query);
+    String queryHash = "generated_hash_xyz";
+    pinotQuery.putToQueryOptions(
+        CommonConstants.Broker.Request.QueryOptionKey.QUERY_HASH,
+        queryHash);
+    Assert.assertTrue(pinotQuery.getQueryOptions().containsKey(
+        CommonConstants.Broker.Request.QueryOptionKey.QUERY_HASH),
+        "QueryHash should be added to queryOptions");
+    Assert.assertEquals(
+        pinotQuery.getQueryOptions().get(CommonConstants.Broker.Request.QueryOptionKey.QUERY_HASH),
+        queryHash,
+        "QueryOptions should contain the correct queryHash value");
   }
 }

@@ -21,11 +21,13 @@ package org.apache.pinot.integration.tests;
 import com.fasterxml.jackson.databind.JsonNode;
 import java.io.File;
 import java.util.List;
+import java.util.Map;
 import javax.annotation.Nullable;
 import org.apache.commons.io.FileUtils;
 import org.apache.pinot.spi.env.PinotConfiguration;
 import org.apache.pinot.spi.utils.CommonConstants;
 import org.apache.pinot.util.TestUtils;
+import org.intellij.lang.annotations.Language;
 import org.testng.annotations.AfterClass;
 import org.testng.annotations.BeforeClass;
 import org.testng.annotations.DataProvider;
@@ -39,7 +41,8 @@ import static org.testng.Assert.assertTrue;
  * Integration test that creates a Kafka broker, creates a Pinot cluster that consumes from Kafka and queries Pinot.
  * The data pushed to Kafka includes null values.
  */
-public class NullHandlingIntegrationTest extends BaseClusterIntegrationTestSet {
+public class NullHandlingIntegrationTest extends BaseClusterIntegrationTestSet
+    implements ExplainIntegrationTestTrait {
 
   @BeforeClass
   public void setUp()
@@ -89,6 +92,11 @@ public class NullHandlingIntegrationTest extends BaseClusterIntegrationTestSet {
     // Stop Zookeeper
     stopZk();
     FileUtils.deleteDirectory(_tempDir);
+  }
+
+  public JsonNode postQuery(@Language("sql") String query)
+      throws Exception {
+    return queryBrokerHttpEndpoint(query);
   }
 
   @Override
@@ -351,6 +359,76 @@ public class NullHandlingIntegrationTest extends BaseClusterIntegrationTestSet {
     }
   }
 
+  @Test
+  public void isNotNullAndComparisonWithoutNullHandling() {
+    setUseMultiStageQueryEngine(true);
+    String query = ""
+        + "SELECT 1 \n"
+        + "FROM " + getTableName() + " \n"
+        + "WHERE\n"
+        + "    salary IS NOT NULL \n"
+        + "AND salary <> 0";
+
+    explainLogical(query,
+        "Execution Plan\n"
+            + "LogicalProject(EXPR$0=[1])\n"
+            + "  LogicalFilter(condition=[AND(IS NOT NULL($8), <>($8, 0))])\n"
+            + "    PinotLogicalTableScan(table=[[default, mytable]])\n",
+        Map.of(CommonConstants.Broker.Request.QueryOptionKey.ENABLE_NULL_HANDLING, "false"));
+  }
+
+  @Test
+  public void isNotNullAndComparisonWithNullHandling() {
+    setUseMultiStageQueryEngine(true);
+    String query = ""
+        + "SELECT 1 \n"
+        + "FROM " + getTableName() + " \n"
+        + "WHERE \n"
+        + "    salary IS NOT NULL "
+        + "AND salary <> 0";
+
+    explainLogical(query,
+        "Execution Plan\n"
+            + "LogicalProject(EXPR$0=[1])\n"
+            + "  LogicalFilter(condition=[<>($8, 0)])\n"
+            + "    PinotLogicalTableScan(table=[[default, mytable]])\n",
+        Map.of(CommonConstants.Broker.Request.QueryOptionKey.ENABLE_NULL_HANDLING, "true"));
+  }
+
+  @Test
+  public void mseIsNullAndComparisonWithoutNullHandling() {
+    setUseMultiStageQueryEngine(true);
+    String query = ""
+        + "SELECT 1 \n"
+        + "FROM " + getTableName() + " \n"
+        + "WHERE\n"
+        + "    salary IS NULL \n"
+        + "AND salary <> 0";
+
+    explainLogical(query,
+        "Execution Plan\n"
+            + "LogicalProject(EXPR$0=[1])\n"
+            + "  LogicalFilter(condition=[AND(IS NULL($8), <>($8, 0))])\n"
+            + "    PinotLogicalTableScan(table=[[default, mytable]])\n",
+        Map.of(CommonConstants.Broker.Request.QueryOptionKey.ENABLE_NULL_HANDLING, "false"));
+  }
+
+  @Test
+  public void mseIsNullAndComparisonWithNullHandling() {
+    setUseMultiStageQueryEngine(true);
+    String query = ""
+        + "SELECT 1 \n"
+        + "FROM " + getTableName() + " \n"
+        + "WHERE \n"
+        + "    salary IS NULL "
+        + "AND salary <> 0";
+
+    explainLogical(query,
+        "Execution Plan\n"
+            + "LogicalValues(tuples=[[]])\n",
+        Map.of(CommonConstants.Broker.Request.QueryOptionKey.ENABLE_NULL_HANDLING, "true"));
+  }
+
   @Override
   protected void overrideBrokerConf(PinotConfiguration brokerConf) {
     brokerConf.setProperty(CommonConstants.Broker.CONFIG_OF_BROKER_QUERY_ENABLE_NULL_HANDLING, "true");
@@ -380,5 +458,46 @@ public class NullHandlingIntegrationTest extends BaseClusterIntegrationTestSet {
         {String.format("SELECT not(null) FROM %s", getTableName()), "null"},
         {String.format("SELECT tan(null) FROM %s", getTableName()), "null"}
     };
+  }
+
+  /// This test ensures IS_TRUE can be trimmed off on leaf stage
+  @Test(dataProvider = "useBothQueryEngines")
+  public void testFilteredAggregationNoScanInFilter(boolean useMultiStageQueryEngine)
+      throws Exception {
+    setUseMultiStageQueryEngine(useMultiStageQueryEngine);
+
+    String query = "SELECT city, COUNT(*), COUNT(*) FILTER(WHERE description = 'unknown') FROM mytable GROUP BY city";
+
+    if (useMultiStageQueryEngine) {
+      // MSE will insert IS_TRUE to the aggregate filter
+      explainLogical(query,
+          "Execution Plan\n"
+              + "PinotLogicalAggregate(group=[{0}], agg#0=[COUNT($1)], agg#1=[COUNT($2)], aggType=[FINAL])\n"
+              + "  PinotLogicalExchange(distribution=[hash[0]])\n"
+              + "    PinotLogicalAggregate(group=[{0}], agg#0=[COUNT()], agg#1=[COUNT() FILTER $1], aggType=[LEAF])\n"
+              + "      LogicalProject(city=[$5], $f1=[IS TRUE(=($7, _UTF-8'unknown'))])\n"
+              + "        PinotLogicalTableScan(table=[[default, mytable]])\n");
+      // IS_TRUE should be trimmed off, then the filter becomes always false in the server execution plan
+      explainAskingServers(query,
+          "Execution Plan\n"
+              + "PinotLogicalAggregate(group=[{0}], agg#0=[COUNT($1)], agg#1=[COUNT($2)], aggType=[FINAL])\n"
+              + "  PinotLogicalExchange(distribution=[hash[0]])\n"
+              + "    LeafStageCombineOperator(table=[mytable])\n"
+              + "      StreamingInstanceResponse\n"
+              + "        CombineGroupBy\n"
+              + "          GroupByFiltered(groupKeys=[[city]], aggregations=[[count(*), count(*)]])\n"
+              + "            Project(columns=[[city]])\n"
+              + "              DocIdSet(maxDocs=[20000])\n"
+              + "                FilterEmpty\n"
+              + "            Project(columns=[[city]])\n"
+              + "              DocIdSet(maxDocs=[20000])\n"
+              + "                FilterMatchEntireSegment(numDocs=[100])\n"
+      );
+    }
+
+    // There should be no scan in the filter since description = 'unknown' matches no value
+    JsonNode response = postQuery(query);
+    assertNoError(response);
+    assertEquals(response.get("numEntriesScannedInFilter").asLong(), 0L);
   }
 }

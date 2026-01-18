@@ -29,6 +29,7 @@ import org.apache.pinot.calcite.rel.logical.PinotRelExchangeType;
 import org.apache.pinot.query.planner.PlanFragment;
 import org.apache.pinot.query.planner.SubPlan;
 import org.apache.pinot.query.planner.plannode.AggregateNode;
+import org.apache.pinot.query.planner.plannode.EnrichedJoinNode;
 import org.apache.pinot.query.planner.plannode.ExchangeNode;
 import org.apache.pinot.query.planner.plannode.ExplainedNode;
 import org.apache.pinot.query.planner.plannode.FilterNode;
@@ -41,6 +42,7 @@ import org.apache.pinot.query.planner.plannode.ProjectNode;
 import org.apache.pinot.query.planner.plannode.SetOpNode;
 import org.apache.pinot.query.planner.plannode.SortNode;
 import org.apache.pinot.query.planner.plannode.TableScanNode;
+import org.apache.pinot.query.planner.plannode.UnnestNode;
 import org.apache.pinot.query.planner.plannode.ValueNode;
 import org.apache.pinot.query.planner.plannode.WindowNode;
 
@@ -127,6 +129,11 @@ public class PlanFragmenter implements PlanNodeVisitor<PlanNode, PlanFragmenter.
   }
 
   @Override
+  public PlanNode visitEnrichedJoin(EnrichedJoinNode node, Context context) {
+    return visitJoin(node, context);
+  }
+
+  @Override
   public PlanNode visitMailboxReceive(MailboxReceiveNode node, Context context) {
     throw new UnsupportedOperationException("MailboxReceiveNode should not be visited by PlanNodeFragmenter");
   }
@@ -203,6 +210,11 @@ public class PlanFragmenter implements PlanNodeVisitor<PlanNode, PlanFragmenter.
   @Override
   public PlanNode visitExplained(ExplainedNode node, Context context) {
     throw new UnsupportedOperationException("ExplainNode should not be visited by PlanNodeFragmenter");
+  }
+
+  @Override
+  public PlanNode visitUnnest(UnnestNode node, Context context) {
+    return process(node, context);
   }
 
   public IdentityHashMap<MailboxSendNode, ExchangeNode> getMailboxSendToExchangeNodeMap() {

@@ -27,10 +27,10 @@ import org.apache.pinot.query.routing.WorkerMetadata;
 import org.apache.pinot.query.runtime.QueryRunner;
 import org.apache.pinot.query.testutils.MockInstanceDataManagerFactory;
 import org.apache.pinot.query.testutils.QueryTestUtils;
-import org.apache.pinot.spi.accounting.ThreadExecutionContext;
+import org.apache.pinot.spi.accounting.ThreadAccountantUtils;
 import org.apache.pinot.spi.env.PinotConfiguration;
+import org.apache.pinot.spi.query.QueryExecutionContext;
 import org.apache.pinot.spi.query.QueryThreadContext;
-import org.apache.pinot.spi.trace.Tracing;
 import org.apache.pinot.spi.utils.CommonConstants;
 
 
@@ -62,8 +62,7 @@ public class QueryServerEnclosure {
     runnerConfig.put(CommonConstants.MultiStageQueryRunner.KEY_OF_QUERY_RUNNER_PORT, _queryRunnerPort);
     InstanceDataManager instanceDataManager = factory.buildInstanceDataManager();
     _queryRunner = new QueryRunner();
-    _queryRunner.init(new PinotConfiguration(runnerConfig), instanceDataManager, null, () -> true,
-        new Tracing.DefaultThreadResourceUsageAccountant());
+    _queryRunner.init(new PinotConfiguration(runnerConfig), instanceDataManager, null, () -> true);
   }
 
   public int getPort() {
@@ -79,11 +78,13 @@ public class QueryServerEnclosure {
   }
 
   public CompletableFuture<Void> processQuery(WorkerMetadata workerMetadata, StagePlan stagePlan,
-      Map<String, String> requestMetadataMap, ThreadExecutionContext parentContext) {
-    try (QueryThreadContext.CloseableContext closeMe1 =
-        QueryThreadContext.openFromRequestMetadata("test", requestMetadataMap);
-        QueryThreadContext.CloseableContext closeMe2 = MseWorkerThreadContext.open()) {
-      return _queryRunner.processQuery(workerMetadata, stagePlan, requestMetadataMap, parentContext);
+      Map<String, String> requestMetadataMap) {
+    QueryExecutionContext executionContext = QueryExecutionContext.forMseServerRequest(requestMetadataMap, "serverId");
+    QueryThreadContext.MseWorkerInfo mseWorkerInfo =
+        new QueryThreadContext.MseWorkerInfo(stagePlan.getStageMetadata().getStageId(), workerMetadata.getWorkerId());
+    try (QueryThreadContext ignore = QueryThreadContext.open(executionContext, mseWorkerInfo,
+        ThreadAccountantUtils.getNoOpAccountant())) {
+      return _queryRunner.processQuery(workerMetadata, stagePlan, requestMetadataMap);
     }
   }
 }

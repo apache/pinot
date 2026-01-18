@@ -29,7 +29,9 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import java.util.stream.Collectors;
 import org.apache.pinot.spi.annotations.InterfaceStability;
+import org.apache.pinot.spi.exception.QueryException;
 import org.apache.pinot.tsdb.spi.series.TimeSeries;
 import org.apache.pinot.tsdb.spi.series.TimeSeriesBlock;
 
@@ -56,12 +58,13 @@ public class PinotBrokerTimeSeriesResponse {
   private String _error;
 
   static {
-    OBJECT_MAPPER.setSerializationInclusion(JsonInclude.Include.NON_NULL);
+    OBJECT_MAPPER.setDefaultPropertyInclusion(JsonInclude.Include.NON_NULL);
   }
 
   @JsonCreator
   public PinotBrokerTimeSeriesResponse(@JsonProperty("status") String status, @JsonProperty("data") Data data,
-      @JsonProperty("errorType") String errorType, @JsonProperty("error") String error) {
+      @JsonProperty("errorType") String errorType, @JsonProperty("error") String error,
+      @JsonProperty("warnings") List<String> warnings) {
     _status = status;
     _data = data;
     _errorType = errorType;
@@ -90,27 +93,41 @@ public class PinotBrokerTimeSeriesResponse {
   }
 
   public static PinotBrokerTimeSeriesResponse newEmptyResponse() {
-    return new PinotBrokerTimeSeriesResponse(SUCCESS_STATUS, Data.EMPTY, null, null);
+    return new PinotBrokerTimeSeriesResponse(SUCCESS_STATUS, Data.EMPTY, null, null, null);
   }
 
   public static PinotBrokerTimeSeriesResponse newSuccessResponse(Data data) {
-    return new PinotBrokerTimeSeriesResponse(SUCCESS_STATUS, data, null, null);
+    return new PinotBrokerTimeSeriesResponse(SUCCESS_STATUS, data, null, null, null);
   }
 
   public static PinotBrokerTimeSeriesResponse newErrorResponse(String errorType, String errorMessage) {
-    return new PinotBrokerTimeSeriesResponse(ERROR_STATUS, Data.EMPTY, errorType, errorMessage);
+    return new PinotBrokerTimeSeriesResponse(ERROR_STATUS, Data.EMPTY, errorType, errorMessage, null);
   }
 
   public static PinotBrokerTimeSeriesResponse fromTimeSeriesBlock(TimeSeriesBlock seriesBlock) {
     if (seriesBlock.getTimeBuckets() == null) {
       throw new UnsupportedOperationException("Non-bucketed series block not supported yet");
     }
+    if (seriesBlock.getExceptions() != null && !seriesBlock.getExceptions().isEmpty()) {
+      QueryException firstException = seriesBlock.getExceptions().get(0);
+      return newErrorResponse(firstException.getErrorCode().getDefaultMessage(), seriesBlock.getExceptions().stream()
+          .map(QueryException::toString).collect(Collectors.joining("; ")));
+    }
     return convertBucketedSeriesBlock(seriesBlock);
+  }
+
+  public static PinotBrokerTimeSeriesResponse fromException(Exception e) {
+    if (e instanceof QueryException) {
+      QueryException qe = (QueryException) e;
+      return newErrorResponse(qe.getErrorCode().getDefaultMessage(), e.getMessage());
+    }
+    return newErrorResponse(e.getClass().getSimpleName(), e.getMessage());
   }
 
   private static PinotBrokerTimeSeriesResponse convertBucketedSeriesBlock(TimeSeriesBlock seriesBlock) {
     Long[] timeValues = Objects.requireNonNull(seriesBlock.getTimeBuckets()).getTimeBuckets();
     List<PinotBrokerTimeSeriesResponse.Value> result = new ArrayList<>();
+    List<String> warnings = null;
     for (var listOfTimeSeries : seriesBlock.getSeriesMap().values()) {
       Preconditions.checkState(!listOfTimeSeries.isEmpty(), "Received empty time-series");
       TimeSeries anySeries = listOfTimeSeries.get(0);

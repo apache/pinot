@@ -19,8 +19,6 @@
 package org.apache.pinot.integration.tests.custom;
 
 import com.fasterxml.jackson.databind.JsonNode;
-import com.google.common.collect.ImmutableList;
-import com.google.common.collect.ImmutableMap;
 import java.io.File;
 import java.io.IOException;
 import java.nio.ByteBuffer;
@@ -30,7 +28,6 @@ import java.util.List;
 import java.util.Map;
 import org.apache.avro.file.DataFileWriter;
 import org.apache.avro.generic.GenericData;
-import org.apache.avro.generic.GenericDatumWriter;
 import org.apache.commons.lang3.tuple.ImmutablePair;
 import org.apache.commons.lang3.tuple.Pair;
 import org.apache.datasketches.theta.UpdateSketch;
@@ -92,7 +89,7 @@ public class ThetaSketchTest extends CustomDataQueryClusterIntegrationTest {
 
     // create avro schema
     org.apache.avro.Schema avroSchema = org.apache.avro.Schema.createRecord("myRecord", null, null, false);
-    avroSchema.setFields(ImmutableList.of(new org.apache.avro.Schema.Field(DIM_NAME, org.apache.avro.Schema.create(
+    avroSchema.setFields(List.of(new org.apache.avro.Schema.Field(DIM_NAME, org.apache.avro.Schema.create(
             org.apache.avro.Schema.Type.STRING), null, null),
         new org.apache.avro.Schema.Field(DIM_VALUE, org.apache.avro.Schema.create(org.apache.avro.Schema.Type.STRING),
             null, null),
@@ -101,13 +98,11 @@ public class ThetaSketchTest extends CustomDataQueryClusterIntegrationTest {
         new org.apache.avro.Schema.Field(THETA_SKETCH, org.apache.avro.Schema.create(org.apache.avro.Schema.Type.BYTES),
             null, null)));
 
-    // create avro file
-    File avroFile = new File(_tempDir, "data.avro");
-    try (DataFileWriter<GenericData.Record> fileWriter = new DataFileWriter<>(new GenericDatumWriter<>(avroSchema))) {
-      fileWriter.create(avroSchema, avroFile);
-
-      int studentId = 0;
-      int cardinality = 50;
+    int studentId = 0;
+    int cardinality = 50;
+    int recordId = 0;
+    try (AvroFilesAndWriters avroFilesAndWriters = createAvroFilesAndWriters(avroSchema)) {
+      List<DataFileWriter<GenericData.Record>> writers = avroFilesAndWriters.getWriters();
       for (int shardId = 0; shardId < 2; shardId++) {
 
         // populate student-course data (studentId, gender, course) for this shard id
@@ -144,7 +139,8 @@ public class ThetaSketchTest extends CustomDataQueryClusterIntegrationTest {
           record.put(THETA_SKETCH, ByteBuffer.wrap(sketch.compact().toByteArray()));
 
           // add avro record to file
-          fileWriter.append(record);
+          writers.get(recordId % getNumAvroFiles()).append(record);
+          recordId++;
         }
 
         // [course dimension] calculate theta sketches & add them to avro file
@@ -166,12 +162,12 @@ public class ThetaSketchTest extends CustomDataQueryClusterIntegrationTest {
           record.put(THETA_SKETCH, ByteBuffer.wrap(sketch.compact().toByteArray()));
 
           // add avro record to file
-          fileWriter.append(record);
+          writers.get(recordId % getNumAvroFiles()).append(record);
+          recordId++;
         }
       }
+      return avroFilesAndWriters.getAvroFiles();
     }
-
-    return List.of(avroFile);
   }
 
   @Test(dataProvider = "useV1QueryEngine")
@@ -292,8 +288,8 @@ public class ThetaSketchTest extends CustomDataQueryClusterIntegrationTest {
     {
       String query = "select dimValue, distinctCountThetaSketch(thetaSketchCol) from " + getTableName()
           + " where dimName = 'gender' group by dimValue";
-      ImmutableMap<String, Integer> expected =
-          ImmutableMap.of("Female", 50 + 60 + 70 + 110 + 120 + 130, "Male", 80 + 90 + 100 + 140 + 150 + 160);
+      Map<String, Integer> expected =
+          Map.of("Female", 50 + 60 + 70 + 110 + 120 + 130, "Male", 80 + 90 + 100 + 140 + 150 + 160);
       runAndAssert(query, expected);
     }
   }
@@ -448,8 +444,8 @@ public class ThetaSketchTest extends CustomDataQueryClusterIntegrationTest {
           + "    DISTINCT_COUNT_RAW_THETA_SKETCH(thetaSketchCol, '') FILTER (WHERE dimName = 'gender'),"
           + "    DISTINCT_COUNT_RAW_THETA_SKETCH(thetaSketchCol, '') FILTER (WHERE dimName != 'gender'))) "
           + "  FROM " + getTableName() + " GROUP BY dimValue";
-      ImmutableMap<String, Integer> expected =
-          ImmutableMap.of("Female", 0, "Male", 0, "Math", 0, "History", 0, "Biology", 0);
+      Map<String, Integer> expected =
+          Map.of("Female", 0, "Male", 0, "Math", 0, "History", 0, "Biology", 0);
       runAndAssert(query, expected);
     }
 
@@ -457,8 +453,8 @@ public class ThetaSketchTest extends CustomDataQueryClusterIntegrationTest {
     {
       String query = "select dimValue, distinctCountThetaSketch(thetaSketchCol) from " + getTableName()
           + " where dimName = 'gender' group by dimValue";
-      ImmutableMap<String, Integer> expected =
-          ImmutableMap.of("Female", 50 + 60 + 70 + 110 + 120 + 130, "Male", 80 + 90 + 100 + 140 + 150 + 160);
+      Map<String, Integer> expected =
+          Map.of("Female", 50 + 60 + 70 + 110 + 120 + 130, "Male", 80 + 90 + 100 + 140 + 150 + 160);
       runAndAssert(query, expected);
     }
 
@@ -473,8 +469,8 @@ public class ThetaSketchTest extends CustomDataQueryClusterIntegrationTest {
           + " where dimName = 'gender' and dimValue = 'Male' "
           + ") "
           + "GROUP BY dimValue";
-      ImmutableMap<String, Integer> expected =
-          ImmutableMap.of("Female", 50 + 60 + 70 + 110 + 120 + 130, "Male", 80 + 90 + 100 + 140 + 150 + 160);
+      Map<String, Integer> expected =
+          Map.of("Female", 50 + 60 + 70 + 110 + 120 + 130, "Male", 80 + 90 + 100 + 140 + 150 + 160);
       runAndAssert(query, expected);
     }
 
@@ -489,8 +485,8 @@ public class ThetaSketchTest extends CustomDataQueryClusterIntegrationTest {
           + " where dimName = 'gender' and dimValue = 'Male') b "
           + "ON a.dimName = b.dimName "
           + "GROUP BY a.dimValue";
-      ImmutableMap<String, Integer> expected =
-          ImmutableMap.of("Female", 80 + 90 + 100 + 140 + 150 + 160);
+      Map<String, Integer> expected =
+          Map.of("Female", 80 + 90 + 100 + 140 + 150 + 160);
       runAndAssert(query, expected);
     }
     {
@@ -503,8 +499,8 @@ public class ThetaSketchTest extends CustomDataQueryClusterIntegrationTest {
           + " where dimName = 'gender' and dimValue = 'Male') b "
           + "ON a.dimName = b.dimName "
           + "GROUP BY b.dimValue";
-      ImmutableMap<String, Integer> expected =
-          ImmutableMap.of("Male", 50 + 60 + 70 + 110 + 120 + 130);
+      Map<String, Integer> expected =
+          Map.of("Male", 50 + 60 + 70 + 110 + 120 + 130);
       runAndAssert(query, expected);
     }
     {

@@ -21,39 +21,46 @@ package org.apache.pinot.segment.local.utils.fst;
 import java.io.File;
 import java.io.FileOutputStream;
 import java.io.IOException;
-import java.nio.ByteOrder;
-import java.util.List;
 import java.util.SortedMap;
 import java.util.TreeMap;
 import org.apache.commons.io.FileUtils;
 import org.apache.lucene.store.OutputStreamDataOutput;
 import org.apache.lucene.util.fst.FST;
-import org.apache.lucene.util.fst.Outputs;
-import org.apache.lucene.util.fst.PositiveIntOutputs;
 import org.apache.pinot.segment.local.PinotBuffersAfterMethodCheckRule;
+import org.apache.pinot.segment.local.segment.index.readers.LuceneFSTIndexReader;
 import org.apache.pinot.segment.spi.memory.PinotDataBuffer;
+import org.roaringbitmap.buffer.ImmutableRoaringBitmap;
 import org.testng.Assert;
 import org.testng.annotations.AfterClass;
 import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
 
+import static org.testng.Assert.assertEquals;
+import static org.testng.Assert.assertTrue;
+
 
 public class FSTBuilderTest implements PinotBuffersAfterMethodCheckRule {
-  private static final File TEMP_DIR = new File(FileUtils.getTempDirectory(), "FST");
+  private static final File TEMP_DIR = new File(FileUtils.getTempDirectory(), "FSTBuilderTest");
 
   @BeforeClass
   public void setUp()
       throws Exception {
     FileUtils.deleteDirectory(TEMP_DIR);
-    TEMP_DIR.mkdirs();
+    FileUtils.forceMkdir(TEMP_DIR);
+  }
+
+  @AfterClass
+  public void tearDown()
+      throws IOException {
+    FileUtils.deleteDirectory(TEMP_DIR);
   }
 
   @Test
   public void testRegexMatch() {
     RegexpMatcher regexpMatcher = new RegexpMatcher("hello.*ld", null);
-    Assert.assertTrue(regexpMatcher.match("helloworld"));
-    Assert.assertTrue(regexpMatcher.match("helloworld"));
-    Assert.assertTrue(regexpMatcher.match("helloasdfworld"));
+    assertTrue(regexpMatcher.match("helloworld"));
+    assertTrue(regexpMatcher.match("helloworld"));
+    assertTrue(regexpMatcher.match("helloasdfworld"));
     Assert.assertFalse(regexpMatcher.match("ahelloasdfworld"));
   }
 
@@ -67,31 +74,20 @@ public class FSTBuilderTest implements PinotBuffersAfterMethodCheckRule {
 
     FST<Long> fst = FSTBuilder.buildFST(x);
     File outputFile = new File(TEMP_DIR, "test.lucene");
-    FileOutputStream fileOutputStream = new FileOutputStream(outputFile);
-    OutputStreamDataOutput d = new OutputStreamDataOutput(fileOutputStream);
-    fst.save(d, d);
-    fileOutputStream.close();
-
-    Outputs<Long> outputs = PositiveIntOutputs.getSingleton();
-    File fstFile = new File(outputFile.getAbsolutePath());
-
-    try (PinotDataBuffer pinotDataBuffer =
-        PinotDataBuffer.mapFile(fstFile, true, 0, fstFile.length(), ByteOrder.BIG_ENDIAN, "")) {
-      PinotBufferIndexInput indexInput = new PinotBufferIndexInput(pinotDataBuffer, 0L, fstFile.length());
-
-      List<Long> results = RegexpMatcher.regexMatch("hello.*123", fst);
-      Assert.assertEquals(results.size(), 1);
-      Assert.assertEquals(results.get(0).longValue(), 21L);
-
-      results = RegexpMatcher.regexMatch(".*world", fst);
-      Assert.assertEquals(results.size(), 1);
-      Assert.assertEquals(results.get(0).longValue(), 12L);
+    try (FileOutputStream outputStream = new FileOutputStream(outputFile);
+        OutputStreamDataOutput dataOutput = new OutputStreamDataOutput(outputStream)) {
+      fst.save(dataOutput, dataOutput);
     }
-  }
 
-  @AfterClass
-  public void tearDown()
-      throws IOException {
-    FileUtils.deleteDirectory(TEMP_DIR);
+    try (PinotDataBuffer dataBuffer = PinotDataBuffer.loadBigEndianFile(outputFile);
+        LuceneFSTIndexReader reader = new LuceneFSTIndexReader(dataBuffer)) {
+      ImmutableRoaringBitmap result = reader.getDictIds("hello.*123");
+      assertEquals(result.getCardinality(), 1);
+      assertTrue(result.contains(21));
+
+      result = reader.getDictIds(".*world");
+      assertEquals(result.getCardinality(), 1);
+      assertTrue(result.contains(12));
+    }
   }
 }

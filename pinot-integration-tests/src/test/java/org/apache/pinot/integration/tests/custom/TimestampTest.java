@@ -19,7 +19,6 @@
 package org.apache.pinot.integration.tests.custom;
 
 import com.fasterxml.jackson.databind.JsonNode;
-import com.google.common.collect.ImmutableList;
 import java.io.File;
 import java.sql.Timestamp;
 import java.util.List;
@@ -28,7 +27,6 @@ import org.apache.avro.Schema.Field;
 import org.apache.avro.Schema.Type;
 import org.apache.avro.file.DataFileWriter;
 import org.apache.avro.generic.GenericData;
-import org.apache.avro.generic.GenericDatumWriter;
 import org.apache.pinot.common.function.DateTimeUtils;
 import org.apache.pinot.common.function.scalar.DateTimeFunctions;
 import org.apache.pinot.spi.data.FieldSpec;
@@ -90,8 +88,8 @@ public class TimestampTest extends CustomDataQueryClusterIntegrationTest {
       throws Exception {
     setUseMultiStageQueryEngine(useMultiStageQueryEngine);
     String query =
-        String.format("SELECT tsBase, tsHalfDayAfter, longBase,longHalfDayAfter FROM %s LIMIT %d", getTableName(),
-            getCountStarResult());
+        String.format("SELECT tsBase, tsHalfDayAfter, longBase,longHalfDayAfter FROM %s ORDER BY tsBase LIMIT %d",
+            getTableName(), getCountStarResult());
     JsonNode jsonNode = postQuery(query);
     long expectedTsBase = DateTimeFunctions.fromDateTime("2019-01-01 00:00:00", "yyyy-MM-dd HH:mm:ss");
     long expectedTsHalfDayAfter = DateTimeFunctions.fromDateTime("2019-01-01 12:00:00", "yyyy-MM-dd HH:mm:ss");
@@ -466,7 +464,7 @@ public class TimestampTest extends CustomDataQueryClusterIntegrationTest {
       throws Exception {
     // create avro schema
     org.apache.avro.Schema avroSchema = org.apache.avro.Schema.createRecord("myRecord", null, null, false);
-    avroSchema.setFields(ImmutableList.of(
+    avroSchema.setFields(List.of(
         new Field(TIMESTAMP_BASE, create(Type.LONG), null, null),
         new Field(TIMESTAMP_HALF_DAY_AFTER, create(Type.LONG), null, null),
         new Field(TIMESTAMP_ONE_DAY_AFTER, create(Type.LONG), null, null),
@@ -490,12 +488,10 @@ public class TimestampTest extends CustomDataQueryClusterIntegrationTest {
         new Field(YYYY_MM_DD_ONE_YEAR_AFTER, create(Type.STRING), null, null)
     ));
 
-    // create avro file
-    File avroFile = new File(_tempDir, "data.avro");
     ISOChronology chronology = ISOChronology.getInstanceUTC();
-    try (DataFileWriter<GenericData.Record> fileWriter = new DataFileWriter<>(new GenericDatumWriter<>(avroSchema))) {
-      fileWriter.create(avroSchema, avroFile);
-      long tsBaseLong = DateTimeFunctions.fromDateTime("2019-01-01 00:00:00", "yyyy-MM-dd HH:mm:ss");
+    long tsBaseLong = DateTimeFunctions.fromDateTime("2019-01-01 00:00:00", "yyyy-MM-dd HH:mm:ss");
+    try (AvroFilesAndWriters avroFilesAndWriters = createAvroFilesAndWriters(avroSchema)) {
+      List<DataFileWriter<GenericData.Record>> writers = avroFilesAndWriters.getWriters();
       for (int i = 0; i < getCountStarResult(); i++) {
         // Generate data
         long tsHalfDayAfter = DateTimeUtils.getTimestampField(chronology, "HOUR").add(tsBaseLong, 12);
@@ -530,10 +526,10 @@ public class TimestampTest extends CustomDataQueryClusterIntegrationTest {
         record.put(YYYY_MM_DD_ONE_YEAR_AFTER, DateTimeFunctions.toDateTime(tsOneYearAfter, "yyyy-MM-dd"));
 
         // add avro record to file
-        fileWriter.append(record);
+        writers.get(i % getNumAvroFiles()).append(record);
         tsBaseLong += 86400000;
       }
+      return avroFilesAndWriters.getAvroFiles();
     }
-    return List.of(avroFile);
   }
 }

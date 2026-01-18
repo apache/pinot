@@ -28,12 +28,15 @@ import org.apache.pinot.common.request.BrokerRequest;
 import org.apache.pinot.common.request.InstanceRequest;
 import org.apache.pinot.common.request.PinotQuery;
 import org.apache.pinot.common.request.TableSegmentsInfo;
+import org.apache.pinot.common.utils.config.QueryOptionsUtils;
 import org.apache.pinot.core.query.request.context.QueryContext;
 import org.apache.pinot.core.query.request.context.TableSegmentsContext;
 import org.apache.pinot.core.query.request.context.TimerContext;
 import org.apache.pinot.core.query.request.context.utils.QueryContextConverterUtils;
 import org.apache.pinot.core.query.utils.QueryIdUtils;
-import org.apache.pinot.spi.query.QueryThreadContext;
+import org.apache.pinot.spi.config.table.TableType;
+import org.apache.pinot.spi.query.QueryExecutionContext;
+import org.apache.pinot.spi.utils.CommonConstants;
 import org.apache.pinot.spi.utils.CommonConstants.Query.Request;
 import org.apache.pinot.spi.utils.builder.TableNameBuilder;
 import org.apache.pinot.sql.parsers.CalciteSqlCompiler;
@@ -60,10 +63,14 @@ public class ServerQueryRequest {
   private final List<String> _optionalSegments;
   private final List<TableSegmentsContext> _tableSegmentsContexts;
   private final QueryContext _queryContext;
+  private final TableType _tableType;
 
   // Request id might not be unique across brokers or for request hitting a hybrid table. To solve that we may construct
   // a unique query id from broker id, request id and table type.
   private final String _queryId;
+
+  // Hash of the query fingerprint.
+  private final String _queryHash;
 
   // Timing information for different phases of query execution
   private final TimerContext _timerContext;
@@ -88,8 +95,9 @@ public class ServerQueryRequest {
     _segmentsToQuery = instanceRequest.getSearchSegments();
     _optionalSegments = instanceRequest.getOptionalSegments();
     _queryContext = getQueryContext(instanceRequest.getQuery().getPinotQuery());
-    _queryId = QueryIdUtils.getQueryId(_brokerId, _requestId,
-        TableNameBuilder.getTableTypeFromTableName(_queryContext.getTableName()));
+    _tableType = TableNameBuilder.getTableTypeFromTableName(_queryContext.getTableName());
+    _queryId = QueryIdUtils.getQueryId(_brokerId, _requestId, _tableType);
+    _queryHash = QueryOptionsUtils.getQueryHash(_queryContext.getQueryOptions());
     _timerContext = new TimerContext(_queryContext.getTableName(), serverMetrics, queryArrivalTimeMs);
     if (instanceRequest.getTableSegmentsInfoListSize() > 0) {
       _tableSegmentsContexts = new ArrayList<>(instanceRequest.getTableSegmentsInfoListSize());
@@ -127,7 +135,6 @@ public class ServerQueryRequest {
     BrokerRequest brokerRequest;
     String payloadType = metadata.getOrDefault(Request.MetadataKeys.PAYLOAD_TYPE, Request.PayloadType.SQL);
     if (payloadType.equalsIgnoreCase(Request.PayloadType.SQL)) {
-      QueryThreadContext.setSql(serverRequest.getSql());
       brokerRequest = CalciteSqlCompiler.compileToBrokerRequest(serverRequest.getSql());
     } else if (payloadType.equalsIgnoreCase(Request.PayloadType.BROKER_REQUEST)) {
       brokerRequest = new BrokerRequest();
@@ -137,8 +144,9 @@ public class ServerQueryRequest {
       throw new UnsupportedOperationException("Unsupported payloadType: " + payloadType);
     }
     _queryContext = getQueryContext(brokerRequest.getPinotQuery());
-    _queryId = QueryIdUtils.getQueryId(_brokerId, _requestId,
-        TableNameBuilder.getTableTypeFromTableName(_queryContext.getTableName()));
+    _tableType = TableNameBuilder.getTableTypeFromTableName(_queryContext.getTableName());
+    _queryId = QueryIdUtils.getQueryId(_brokerId, _requestId, _tableType);
+    _queryHash = QueryOptionsUtils.getQueryHash(_queryContext.getQueryOptions());
     _timerContext = new TimerContext(_queryContext.getTableName(), serverMetrics, queryArrivalTimeMs);
     if (serverRequest.getTableSegmentsInfoCount() > 0) {
       _tableSegmentsContexts = new ArrayList<>(serverRequest.getTableSegmentsInfoCount());
@@ -160,6 +168,7 @@ public class ServerQueryRequest {
       ServerMetrics serverMetrics) {
     long queryArrivalTimeMs = System.currentTimeMillis();
     _queryContext = queryContext;
+    _tableType = TableNameBuilder.getTableTypeFromTableName(_queryContext.getTableName());
 
     // Initialize metadata
     _requestId = Long.parseLong(metadata.getOrDefault(Request.MetadataKeys.REQUEST_ID, "0"));
@@ -167,8 +176,8 @@ public class ServerQueryRequest {
     _brokerId = metadata.getOrDefault(Request.MetadataKeys.BROKER_ID, "unknown");
     _enableTrace = Boolean.parseBoolean(metadata.getOrDefault(Request.MetadataKeys.ENABLE_TRACE, "false"));
     _enableStreaming = Boolean.parseBoolean(metadata.getOrDefault(Request.MetadataKeys.ENABLE_STREAMING, "false"));
-    _queryId = QueryIdUtils.getQueryId(_brokerId, _requestId,
-        TableNameBuilder.getTableTypeFromTableName(_queryContext.getTableName()));
+    _queryId = QueryIdUtils.getQueryId(_brokerId, _requestId, _tableType);
+    _queryHash = QueryOptionsUtils.getQueryHash(_queryContext.getQueryOptions());
 
     _segmentsToQuery = segmentsToQuery;
     _optionalSegments = null;
@@ -183,6 +192,10 @@ public class ServerQueryRequest {
 
   public long getRequestId() {
     return _requestId;
+  }
+
+  public String getCid() {
+    return _cid;
   }
 
   public String getBrokerId() {
@@ -218,17 +231,39 @@ public class ServerQueryRequest {
     return _queryContext;
   }
 
+  public TableType getTableType() {
+    return _tableType;
+  }
+
   public String getQueryId() {
     return _queryId;
+  }
+
+  public String getQueryHash() {
+    return _queryHash;
   }
 
   public TimerContext getTimerContext() {
     return _timerContext;
   }
 
-  public void registerOnQueryThreadLocal() {
-    // Notice that we register the request id and not the query id.
-    QueryThreadContext.setIds(_requestId, _cid);
-    QueryThreadContext.setBrokerId(_brokerId);
+  public QueryExecutionContext toExecutionContext(String instanceId) {
+    Map<String, String> queryOptions = _queryContext.getQueryOptions();
+    long startTimeMs = _timerContext.getQueryArrivalTimeMs();
+    Long timeoutMs = QueryOptionsUtils.getTimeoutMs(queryOptions);
+    long deadlineMs;
+    if (timeoutMs != null) {
+      deadlineMs = startTimeMs + timeoutMs;
+    } else {
+      // NOTE: In production environment, the timeout should always be set by the broker. Use 15 seconds as the default
+      //       timeout for test environment.
+      deadlineMs = startTimeMs + CommonConstants.Server.DEFAULT_QUERY_EXECUTOR_TIMEOUT_MS;
+    }
+    // NOTE: Add table type suffix to the cid to make it unique when querying a hybrid table.
+    // TODO: Revisit the handling for logical table when multiple tables are queries with the same cid.
+    String cid = QueryIdUtils.withTypeSuffix(_cid, _tableType);
+    return new QueryExecutionContext(QueryExecutionContext.QueryType.SSE, _requestId, cid,
+        QueryOptionsUtils.getWorkloadName(queryOptions), startTimeMs, deadlineMs, deadlineMs, _brokerId, instanceId,
+        _queryHash);
   }
 }

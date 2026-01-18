@@ -24,6 +24,11 @@ declare module 'Models' {
     component?: JSX.Element
   }
 
+  export type InstanceStatusCell = {
+    value: InstanceStatus,
+    tooltip: string,
+  }
+
   export type LoadingRecord = {
     customRenderer: JSX.Element
   }
@@ -72,6 +77,7 @@ declare module 'Models' {
     queryServicePort: number;
     queryMailboxPort: number;
     queriesDisabled: boolean;
+    shutdownInProgress?: boolean;
     tags: Array<string>;
     pools?: string;
   };
@@ -152,7 +158,7 @@ declare module 'Models' {
     serversUnparsableRespond: number;
     _segmentToConsumingInfoMap: Record<string, ConsumingInfo[]>;
   }
-  
+
   /**
    * Pause status information for a realtime table
    */
@@ -213,7 +219,7 @@ declare module 'Models' {
     numEntriesScannedPostFilter: number
     numGroupsLimitReached: boolean
     numGroupsWarningLimitReached: boolean
-    partialResponse?: number
+    partialResult?: boolean
     minConsumingFreshnessTimeMs: number
     offlineThreadCpuTimeNs: number
     realtimeThreadCpuTimeNs: number
@@ -225,8 +231,58 @@ declare module 'Models' {
     realtimeTotalCpuTimeNs: number
   };
 
+  // Timeseries related types
+  export interface TimeseriesData {
+    metric: Record<string, string>;
+    values: [number, number][]; // [timestamp, value]
+  }
+
+  export interface TimeseriesResponse {
+    status: string;
+    data: {
+      resultType: string;
+      result: TimeseriesData[];
+    };
+  }
+
+  export interface MetricStats {
+    min: number;
+    max: number;
+    avg: number;
+    sum: number;
+    count: number;
+    firstValue: number;
+    lastValue: number;
+  }
+
+  export interface ChartDataPoint {
+    timestamp: number;
+    value: number;
+    formattedTime: string;
+  }
+
+  export interface ChartSeries {
+    name: string;
+    data: ChartDataPoint[];
+    stats: MetricStats;
+  }
+
+  export type TimeseriesViewType = 'json' | 'chart' | 'stats';
+
+  export interface TimeseriesQueryConfig {
+    queryLanguage: string;
+    query: string;
+    startTime: string;
+    endTime: string;
+    timeout: number;
+  }
+
   export type ClusterName = {
     clusterName: string
+  };
+
+  export type PackageVersions = {
+    [packageName: string]: string;
   };
 
   export type ZKGetList = Array<string>;
@@ -313,7 +369,7 @@ declare module 'Models' {
   export type RebalanceTableSegmentJobs = {
     [key: string]: RebalanceTableSegmentJob;
   }
-  
+
   export interface TaskRuntimeConfig {
     ConcurrentTasksPerWorker: string,
     TaskTimeoutMs: string,
@@ -343,7 +399,7 @@ declare module 'Models' {
     OFFLINE = "OFFLINE",
     CONSUMING = "CONSUMING",
     ERROR = "ERROR"
-  } 
+  }
 
   export const enum DISPLAY_SEGMENT_STATUS {
     BAD = "BAD",
@@ -354,6 +410,14 @@ declare module 'Models' {
   export const enum InstanceState {
     ENABLE = "enable",
     DISABLE = "disable"
+  }
+
+  export const enum InstanceStatus {
+    DEAD = "Dead",
+    UNHEALTHY = "Unhealthy",
+    INSTANCE_DISABLED = "Disabled",
+    QUERIES_DISABLED = "Queries Disabled",
+    HEALTHY = "Healthy",
   }
 
   export const enum InstanceType {

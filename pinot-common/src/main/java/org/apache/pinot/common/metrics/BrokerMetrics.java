@@ -92,9 +92,7 @@ public class BrokerMetrics extends AbstractMetrics<BrokerQueryPhase, BrokerMeter
     if (queryOption == null) {
       return PREFERRED_POOL_UNSET_TAG;
     }
-    // backward compatibility to check ORDERED_PREFERRED_REPLICAS here
-    return (queryOption.containsKey(CommonConstants.Broker.Request.QueryOptionKey.ORDERED_PREFERRED_POOLS)
-            || queryOption.containsKey(CommonConstants.Broker.Request.QueryOptionKey.ORDERED_PREFERRED_REPLICAS))
+    return queryOption.containsKey(CommonConstants.Broker.Request.QueryOptionKey.ORDERED_PREFERRED_POOLS)
         ? PREFERRED_POOL_SET_TAG : PREFERRED_POOL_UNSET_TAG;
   }
 }

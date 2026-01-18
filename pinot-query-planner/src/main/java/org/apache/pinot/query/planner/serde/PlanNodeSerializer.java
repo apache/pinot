@@ -31,6 +31,7 @@ import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.common.utils.DataSchema.ColumnDataType;
 import org.apache.pinot.query.planner.logical.RexExpression;
 import org.apache.pinot.query.planner.plannode.AggregateNode;
+import org.apache.pinot.query.planner.plannode.EnrichedJoinNode;
 import org.apache.pinot.query.planner.plannode.ExchangeNode;
 import org.apache.pinot.query.planner.plannode.ExplainedNode;
 import org.apache.pinot.query.planner.plannode.FilterNode;
@@ -44,6 +45,7 @@ import org.apache.pinot.query.planner.plannode.ProjectNode;
 import org.apache.pinot.query.planner.plannode.SetOpNode;
 import org.apache.pinot.query.planner.plannode.SortNode;
 import org.apache.pinot.query.planner.plannode.TableScanNode;
+import org.apache.pinot.query.planner.plannode.UnnestNode;
 import org.apache.pinot.query.planner.plannode.ValueNode;
 import org.apache.pinot.query.planner.plannode.WindowNode;
 
@@ -127,6 +129,44 @@ public class PlanNodeSerializer {
         joinNode.setMatchCondition(RexExpressionToProtoExpression.convertExpression(node.getMatchCondition()));
       }
       builder.setJoinNode(joinNode.build());
+      return null;
+    }
+
+    @Override
+    public Void visitEnrichedJoin(EnrichedJoinNode node, Plan.PlanNode.Builder builder) {
+      Plan.EnrichedJoinNode.Builder enrichedJoinNode = Plan.EnrichedJoinNode.newBuilder()
+          .setJoinType(convertJoinType(node.getJoinType()))
+          .addAllLeftKeys(node.getLeftKeys())
+          .addAllRightKeys(node.getRightKeys())
+          .addAllNonEquiConditions(convertExpressions(node.getNonEquiConditions()))
+          .setJoinStrategy(convertJoinStrategy(node.getJoinStrategy()))
+          .setJoinResultDataSchema(convertDataSchema(node.getJoinResultSchema()));
+
+      for (EnrichedJoinNode.FilterProjectRex rex : node.getFilterProjectRexes()) {
+        Plan.FilterProjectRex.Builder rexBuilder = Plan.FilterProjectRex.newBuilder();
+        if (rex.getType() == EnrichedJoinNode.FilterProjectRexType.FILTER) {
+          rexBuilder
+              .setFilter(RexExpressionToProtoExpression.convertExpression(rex.getFilter()))
+              .setType(Plan.FilterProjectRexType.FILTER);
+        } else {
+          rexBuilder
+              .setProjectAndResultSchema(
+                  Plan.ProjectAndResultSchema.newBuilder()
+                      .addAllProject(convertExpressions(rex.getProjectAndResultSchema().getProject()))
+                      .setSchema(convertDataSchema(rex.getProjectAndResultSchema().getSchema()))
+                      .build())
+              .setType(Plan.FilterProjectRexType.PROJECT);
+        }
+        enrichedJoinNode.addFilterProjectRex(rexBuilder.build());
+      }
+
+      enrichedJoinNode.setFetch(node.getFetch());
+      enrichedJoinNode.setOffset(node.getOffset());
+
+      if (node.getMatchCondition() != null) {
+        enrichedJoinNode.setMatchCondition(RexExpressionToProtoExpression.convertExpression(node.getMatchCondition()));
+      }
+      builder.setEnrichedJoinNode(enrichedJoinNode.build());
       return null;
     }
 
@@ -237,6 +277,18 @@ public class PlanNodeSerializer {
       Plan.ExplainNode explainNode =
           Plan.ExplainNode.newBuilder().setTitle(node.getTitle()).putAllAttributes(node.getAttributes()).build();
       builder.setExplainNode(explainNode);
+      return null;
+    }
+
+    @Override
+    public Void visitUnnest(UnnestNode node, Plan.PlanNode.Builder builder) {
+      UnnestNode.TableFunctionContext context = node.getTableFunctionContext();
+      Plan.UnnestNode.Builder unnestNodeBuilder = Plan.UnnestNode.newBuilder()
+          .addAllArrayExprs(convertExpressions(node.getArrayExprs()))
+          .setWithOrdinality(context.isWithOrdinality())
+          .addAllElementIndexes(context.getElementIndexes())
+          .setOrdinalityIndex(context.getOrdinalityIndex());
+      builder.setUnnestNode(unnestNodeBuilder.build());
       return null;
     }
 

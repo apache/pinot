@@ -23,6 +23,7 @@ import { AppBar, Box, makeStyles, Paper } from '@material-ui/core';
 import MenuIcon from '@material-ui/icons/Menu';
 import Logo from './SvgIcons/Logo';
 import BreadcrumbsComponent from './Breadcrumbs';
+import TimezoneSelector from './TimezoneSelector';
 
 type Props = {
   highlightSidebarLink: (id: number) => void;
@@ -32,6 +33,51 @@ type Props = {
 };
 
 const useStyles = makeStyles((theme) => ({
+  clusterContainer: {
+    display: 'flex',
+    alignItems: 'center',
+    marginRight: theme.spacing(2),
+  },
+  clusterBox: {
+    textAlign: 'center',
+    margin: '11.5px 0',
+    paddingLeft: theme.spacing(2),
+    borderLeft: '1px solid rgba(255,255,255,0.5)',
+  },
+  linkGroup: {
+    display: 'flex',
+    alignItems: 'center',
+    gap: theme.spacing(1),
+    fontSize: '0.85rem',
+    paddingLeft: theme.spacing(1.5),
+    whiteSpace: 'nowrap',
+    borderLeft: '1px solid rgba(255,255,255,0.5)',
+  },
+  linkColumn: {
+    display: 'flex',
+    flexDirection: 'column',
+    height: theme.spacing(5),
+    minWidth: theme.spacing(9),
+  },
+  linkItem: {
+    flex: 1,
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    padding: theme.spacing(0, 1),
+  },
+  linkItemTop: {
+    borderBottom: '1px solid rgba(255, 255, 255, 0.2)',
+  },
+  link: {
+    color: 'rgba(255, 255, 255, 0.9)',
+    textDecoration: 'none',
+    fontWeight: 700,
+    '&:hover': {
+      color: '#fff',
+      textDecoration: 'underline',
+    },
+  },
   breadcrumbRoot:{
     flexGrow: 1
   },
@@ -53,6 +99,32 @@ const useStyles = makeStyles((theme) => ({
       letterSpacing: 1,
       fontWeight: 500
     }
+  },
+  timezoneContainer: {
+    display: 'flex',
+    alignItems: 'center',
+    marginRight: theme.spacing(2),
+    '& .MuiFormControl-root': {
+      margin: 0,
+    },
+    '& .MuiInputLabel-root': {
+      color: 'rgba(255, 255, 255, 0.7)',
+    },
+    '& .MuiSelect-select': {
+      color: '#fff',
+    },
+    '& .MuiSelect-icon': {
+      color: 'rgba(255, 255, 255, 0.7)',
+    },
+    '& .MuiOutlinedInput-notchedOutline': {
+      borderColor: 'rgba(255, 255, 255, 0.3)',
+    },
+    '& .MuiOutlinedInput-root:hover .MuiOutlinedInput-notchedOutline': {
+      borderColor: 'rgba(255, 255, 255, 0.5)',
+    },
+    '& .MuiOutlinedInput-root.Mui-focused .MuiOutlinedInput-notchedOutline': {
+      borderColor: 'rgba(255, 255, 255, 0.7)',
+    },
   }
 }));
 
@@ -70,11 +142,39 @@ const Header = ({ highlightSidebarLink, showHideSideBarHandler, openSidebar, clu
           </Box>
           <BreadcrumbsComponent {...props} />
         </Box>
-        <Box textAlign="center" marginY="11.5px" borderLeft="1px solid rgba(255,255,255,0.5)">
-          <Paper className={classes.paper}>
-            <h4>Cluster Name</h4>
-            <h2>{clusterName}</h2>
-          </Paper>
+        <Box display="flex" alignItems="center" marginRight={2}>
+          <Box className={classes.timezoneContainer}>
+            <TimezoneSelector variant="outlined" size="small" showIcon={false} />
+          </Box>
+        </Box>
+        <Box className={classes.clusterContainer}>
+          <Box className={classes.clusterBox}>
+            <Paper className={classes.paper}>
+              <h4>Cluster Name</h4>
+              <h2>{clusterName}</h2>
+            </Paper>
+          </Box>
+          <Box className={classes.linkGroup}>
+            <Logo style={{ width: 18, height: 18, fill: '#fff' }} />
+            <Box className={classes.linkColumn}>
+              <a
+                className={`${classes.link} ${classes.linkItem} ${classes.linkItemTop}`}
+                href="https://pinot.apache.org/"
+                target="_blank"
+                rel="noopener noreferrer"
+              >
+                Website
+              </a>
+              <a
+                className={`${classes.link} ${classes.linkItem}`}
+                href="https://docs.pinot.apache.org/"
+                target="_blank"
+                rel="noopener noreferrer"
+              >
+                Docs
+              </a>
+            </Box>
+          </Box>
         </Box>
       </Box>
     </AppBar>

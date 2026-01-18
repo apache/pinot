@@ -1,0 +1,88 @@
+/**
+ * Licensed to the Apache Software Foundation (ASF) under one
+ * or more contributor license agreements.  See the NOTICE file
+ * distributed with this work for additional information
+ * regarding copyright ownership.  The ASF licenses this file
+ * to you under the Apache License, Version 2.0 (the
+ * "License"); you may not use this file except in compliance
+ * with the License.  You may obtain a copy of the License at
+ *
+ *   http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing,
+ * software distributed under the License is distributed on an
+ * "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+ * KIND, either express or implied.  See the License for the
+ * specific language governing permissions and limitations
+ * under the License.
+ */
+package org.apache.pinot.spi.data.readers;
+
+import java.io.Closeable;
+import java.io.IOException;
+import java.io.Serializable;
+import java.util.Map;
+import java.util.Set;
+import javax.annotation.Nullable;
+import org.apache.pinot.spi.data.Schema;
+
+
+/**
+ * Factory interface for creating ColumnReader instances for different data sources.
+ *
+ * <p>This factory provides a generic way to create column readers for various data sources
+ * such as Pinot segments, Parquet files, etc. The factory handles:
+ * <ul>
+ *   <li>Creating column readers for existing columns</li>
+ *   <li>Creating default value readers for new columns</li>
+ *   <li>Data type conversions between source and target schemas</li>
+ *   <li>Resource management</li>
+ * </ul>
+ */
+public interface ColumnReaderFactory extends Closeable, Serializable {
+
+  /**
+   * Initialize the factory with the data source and target schema.
+   *
+   * @param targetSchema Target schema for the output segment
+   * @throws IOException If initialization fails
+   */
+  void init(Schema targetSchema)
+      throws IOException;
+
+  /**
+   * Initialize the factory with the data source, target schema, and specific target columns.
+   * @param targetSchema Target schema for the output segment
+   * @param colsToRead Set of target columns to read
+   * @throws IOException If initialization fails
+   */
+  void init(Schema targetSchema, Set<String> colsToRead)
+      throws IOException;
+
+  /**
+   * Get the set of column names available in the source data.
+   *
+   * @return Set of available column names in the source
+   */
+  Set<String> getAvailableColumns();
+
+  /**
+   * Get a column reader for the specified column.
+   * Implementations may cache and reuse readers for efficiency.
+   *
+   * @param columnName Name of the column to read
+   *                   Can return null if column doesn't exist in the source
+   * @return ColumnReader instance for the specified column (may be cached)
+   */
+  @Nullable ColumnReader getColumnReader(String columnName);
+
+  /**
+   * Get all column readers for the target schema.
+   * Implementations may cache and reuse instances that were created during init().
+   *
+   * @return Map of column name to ColumnReader (cached instances)
+   * @throws IOException If any column reader cannot be obtained
+   */
+  Map<String, ColumnReader> getAllColumnReaders()
+      throws IOException;
+}

@@ -18,18 +18,14 @@
  */
 package org.apache.pinot.query.mailbox;
 
-import java.io.IOException;
 import java.util.Collections;
 import java.util.List;
-import java.util.concurrent.TimeoutException;
 import org.apache.pinot.common.datatable.StatMap;
 import org.apache.pinot.query.runtime.blocks.ErrorMseBlock;
 import org.apache.pinot.query.runtime.blocks.MseBlock;
 import org.apache.pinot.query.runtime.operator.MailboxSendOperator;
 import org.apache.pinot.segment.spi.memory.DataBuffer;
 import org.apache.pinot.spi.exception.QueryCancelledException;
-import org.apache.pinot.spi.exception.QueryErrorCode;
-import org.apache.pinot.spi.exception.QueryException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -42,7 +38,13 @@ public class InMemorySendingMailbox implements SendingMailbox {
   private final long _deadlineMs;
 
   private ReceivingMailbox _receivingMailbox;
+
+  /// Set to true when the send operation completes calling [#complete()]
   private volatile boolean _isTerminated;
+
+  /// Set to true when the receiver waits for EOS but discards any further data blocks.
+  /// This can happen when the receiver has already early terminated, for example,
+  /// when the [org.apache.pinot.query.runtime.operator.SortOperator] limit has been reached.
   private volatile boolean _isEarlyTerminated;
   private final StatMap<MailboxSendOperator.StatKey> _statMap;
 
@@ -60,20 +62,19 @@ public class InMemorySendingMailbox implements SendingMailbox {
   }
 
   @Override
-  public void send(MseBlock.Data data)
-      throws IOException, TimeoutException {
+  public void send(MseBlock.Data data) {
     sendPrivate(data, Collections.emptyList());
   }
 
   @Override
-  public void send(MseBlock.Eos block, List<DataBuffer> serializedStats)
-      throws IOException, TimeoutException {
+  public void send(MseBlock.Eos block, List<DataBuffer> serializedStats) {
     sendPrivate(block, serializedStats);
+    _isTerminated = true;
   }
 
-  private void sendPrivate(MseBlock block, List<DataBuffer> serializedStats)
-      throws TimeoutException {
+  private void sendPrivate(MseBlock block, List<DataBuffer> serializedStats) {
     if (isTerminated() || (isEarlyTerminated() && block.isData())) {
+      LOGGER.debug("Mailbox {} already terminated, ignoring block {}", _id, block);
       return;
     }
     if (_receivingMailbox == null) {
@@ -82,20 +83,18 @@ public class InMemorySendingMailbox implements SendingMailbox {
     _statMap.merge(MailboxSendOperator.StatKey.IN_MEMORY_MESSAGES, 1);
     long timeoutMs = _deadlineMs - System.currentTimeMillis();
     ReceivingMailbox.ReceivingMailboxStatus status = _receivingMailbox.offer(block, serializedStats, timeoutMs);
-
     switch (status) {
       case SUCCESS:
         break;
-      case CANCELLED:
-        throw new QueryCancelledException(String.format("Mailbox: %s already cancelled from upstream", _id));
-      case ERROR:
-        throw new QueryException(QueryErrorCode.INTERNAL, String.format(
-            "Mailbox: %s already errored out (received error block before)", _id));
-      case TIMEOUT:
-        throw new QueryException(QueryErrorCode.EXECUTION_TIMEOUT,
-            String.format("Timed out adding block into mailbox: %s with timeout: %dms", _id, timeoutMs));
-      case EARLY_TERMINATED:
+      case WAITING_EOS:
         _isEarlyTerminated = true;
+        break;
+      case LAST_BLOCK:
+        _isTerminated = true;
+        break;
+      case ALREADY_TERMINATED:
+        // this can happen when the mailbox is cancelled by the receiver. No more messages are going to be accepted.
+        _isTerminated = true;
         break;
       default:
         throw new IllegalStateException("Unsupported mailbox status: " + status);
@@ -103,15 +102,11 @@ public class InMemorySendingMailbox implements SendingMailbox {
   }
 
   @Override
-  public void complete() {
-    _isTerminated = true;
-  }
-
-  @Override
   public void cancel(Throwable t) {
     if (_isTerminated) {
       return;
     }
+    _isTerminated = true;
     LOGGER.debug("Cancelling mailbox: {}", _id);
     if (_receivingMailbox == null) {
       _receivingMailbox = _mailboxService.getReceivingMailbox(_id);
@@ -134,5 +129,20 @@ public class InMemorySendingMailbox implements SendingMailbox {
   @Override
   public String toString() {
     return "m" + _id;
+  }
+
+  @Override
+  public void close() {
+    if (!isTerminated()) {
+      String msg = "Closing in-memory mailbox without proper EOS message";
+      RuntimeException exception = new RuntimeException(msg);
+      exception.fillInStackTrace();
+
+      LOGGER.error(msg, exception);
+      if (_receivingMailbox == null) {
+        _receivingMailbox = _mailboxService.getReceivingMailbox(_id);
+      }
+      _receivingMailbox.setErrorBlock(ErrorMseBlock.fromException(exception), Collections.emptyList());
+    }
   }
 }

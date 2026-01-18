@@ -24,7 +24,7 @@
   <parent>
     <artifactId>pinot-connectors</artifactId>
     <groupId>org.apache.pinot</groupId>
-    <version>1.4.0-SNAPSHOT</version>
+    <version>1.5.0-SNAPSHOT</version>
   </parent>
   <artifactId>pinot-spark-3-connector</artifactId>
   <name>Pinot Spark 3 Connector</name>
@@ -56,6 +56,13 @@
                       <includes>
                         <include>com.google.protobuf.**</include>
                         <include>com.google.common.**</include>
+                      </includes>
+                    </relocation>
+                    <relocation>
+                      <pattern>io</pattern>
+                      <shadedPattern>${shadeBase}.io</shadedPattern>
+                      <includes>
+                        <include>io.grpc.**</include>
                       </includes>
                     </relocation>
                   </relocations>
@@ -155,6 +162,9 @@
             --add-opens=java.base/java.lang=ALL-UNNAMED
             --add-opens=java.base/java.util=ALL-UNNAMED
             --add-opens=java.base/java.lang.reflect=ALL-UNNAMED
+            --add-opens=java.base/jdk.internal.misc=ALL-UNNAMED
+            -Dio.netty.tryReflectionSetAccessible=true
+            -Dio.grpc.netty.shaded.io.netty.tryReflectionSetAccessible=true
           </argLine>
         </configuration>
       </plugin>

@@ -327,6 +327,30 @@ public class ArithmeticFunctionsTest {
       inputs.add(new Object[]{"roundDecimal(a, 2)", Lists.newArrayList("a"), row, 9.46});
       inputs.add(new Object[]{"roundDecimal(a, 3)", Lists.newArrayList("a"), row, 9.46});
     }
+    {
+      GenericRow row = new GenericRow();
+      row.putValue("a", Double.NEGATIVE_INFINITY);
+      inputs.add(new Object[]{"roundDecimal(a)", Lists.newArrayList("a"), row, Double.NEGATIVE_INFINITY});
+      inputs.add(new Object[]{"roundDecimal(a, 1)", Lists.newArrayList("a"), row, Double.NEGATIVE_INFINITY});
+      inputs.add(new Object[]{"roundDecimal(a, 2)", Lists.newArrayList("a"), row, Double.NEGATIVE_INFINITY});
+      inputs.add(new Object[]{"roundDecimal(a, 3)", Lists.newArrayList("a"), row, Double.NEGATIVE_INFINITY});
+    }
+    {
+      GenericRow row = new GenericRow();
+      row.putValue("a", Double.POSITIVE_INFINITY);
+      inputs.add(new Object[]{"roundDecimal(a)", Lists.newArrayList("a"), row, Double.POSITIVE_INFINITY});
+      inputs.add(new Object[]{"roundDecimal(a, 1)", Lists.newArrayList("a"), row, Double.POSITIVE_INFINITY});
+      inputs.add(new Object[]{"roundDecimal(a, 2)", Lists.newArrayList("a"), row, Double.POSITIVE_INFINITY});
+      inputs.add(new Object[]{"roundDecimal(a, 3)", Lists.newArrayList("a"), row, Double.POSITIVE_INFINITY});
+    }
+    {
+      GenericRow row = new GenericRow();
+      row.putValue("a", Double.NaN);
+      inputs.add(new Object[]{"roundDecimal(a)", Lists.newArrayList("a"), row, Double.NaN});
+      inputs.add(new Object[]{"roundDecimal(a, 1)", Lists.newArrayList("a"), row, Double.NaN});
+      inputs.add(new Object[]{"roundDecimal(a, 2)", Lists.newArrayList("a"), row, Double.NaN});
+      inputs.add(new Object[]{"roundDecimal(a, 3)", Lists.newArrayList("a"), row, Double.NaN});
+    }
     // test truncate
     {
       GenericRow row = new GenericRow();

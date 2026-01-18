@@ -42,6 +42,7 @@ import javax.annotation.Nullable;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.commons.lang3.tuple.Pair;
 import org.apache.hc.client5.http.io.HttpClientConnectionManager;
+import org.apache.helix.model.InstanceConfig;
 import org.apache.helix.store.zk.ZkHelixPropertyStore;
 import org.apache.helix.task.JobConfig;
 import org.apache.helix.task.JobContext;
@@ -56,13 +57,16 @@ import org.apache.helix.zookeeper.datamodel.ZNRecord;
 import org.apache.pinot.common.minion.MinionTaskMetadataUtils;
 import org.apache.pinot.common.utils.DateTimeUtils;
 import org.apache.pinot.common.utils.HashUtil;
+import org.apache.pinot.controller.api.resources.MinionStatusResponse;
 import org.apache.pinot.controller.helix.core.PinotHelixResourceManager;
 import org.apache.pinot.controller.util.CompletionServiceHelper;
 import org.apache.pinot.core.common.MinionConstants;
 import org.apache.pinot.core.minion.PinotTaskConfig;
+import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.ingestion.batch.BatchConfigProperties;
 import org.apache.pinot.spi.utils.CommonConstants;
 import org.apache.pinot.spi.utils.CommonConstants.Helix;
+import org.apache.pinot.spi.utils.InstanceTypeUtils;
 import org.apache.pinot.spi.utils.JsonUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -83,6 +87,7 @@ public class PinotHelixTaskResourceManager {
   private static final String TASK_QUEUE_PREFIX = "TaskQueue" + TASK_NAME_SEPARATOR;
   private static final String TASK_PREFIX = "Task" + TASK_NAME_SEPARATOR;
   private static final String UNKNOWN_TABLE_NAME = "unknown";
+  private static final String UNKNOWN_TENANT_NAME = "unknown";
 
   private final TaskDriver _taskDriver;
   private final PinotHelixResourceManager _helixResourceManager;
@@ -399,37 +404,60 @@ public class PinotHelixTaskResourceManager {
 
   /**
    * This method returns a map of table name to count of sub-tasks in various states, given the top-level task name.
+   * It also collects waiting times for subtasks with null state and running times for subtasks in RUNNING state.
    *
    * @param taskName in the form "Task_<taskType>_<uuid>_<timestamp>"
-   * @return a map of table name to {@link TaskCount}
+   * @return a map of table name to {@link TaskStatusSummary}
    */
-  public synchronized Map<String, TaskCount> getTableTaskCount(String taskName) {
+  public synchronized Map<String, TaskStatusSummary> getTableTaskStatusSummary(String taskName) {
     String helixJobName = getHelixJobName(taskName);
     JobConfig jobConfig = _taskDriver.getJobConfig(helixJobName);
     Preconditions.checkArgument(jobConfig != null, "Task: %s does not exist", taskName);
     Map<String, TaskConfig> taskConfigMap = jobConfig.getTaskConfigMap();
-    Map<String, TaskCount> taskCountMap = new HashMap<>();
+    Map<String, TaskStatusSummary> taskStatusSummaryMap = new HashMap<>();
     JobContext jobContext = _taskDriver.getJobContext(helixJobName);
     if (jobContext == null) {
+      // No job context available, only populate TaskCount without timing info
       for (TaskConfig taskConfig : taskConfigMap.values()) {
         String tableName = taskConfig.getConfigMap().getOrDefault(MinionConstants.TABLE_NAME_KEY, UNKNOWN_TABLE_NAME);
-        taskCountMap.computeIfAbsent(tableName, k -> new TaskCount()).addTaskState(null);
+        TaskStatusSummary taskStatusSummary = taskStatusSummaryMap.computeIfAbsent(tableName,
+            k -> new TaskStatusSummary());
+        taskStatusSummary.getTaskCount().addTaskState(null);
       }
-      return taskCountMap;
+      return taskStatusSummaryMap;
     }
+    long jobStartTime = jobContext.getStartTime();
+    long currentTime = System.currentTimeMillis();
     Map<String, Integer> taskIdPartitionMap = jobContext.getTaskIdPartitionMap();
     for (Map.Entry<String, TaskConfig> entry : taskConfigMap.entrySet()) {
       String taskId = entry.getKey();
       TaskPartitionState state = null;
+      long executionStartTime = 0;
       Integer partition = taskIdPartitionMap.get(taskId);
       if (partition != null) {
         state = jobContext.getPartitionState(partition);
+        executionStartTime = jobContext.getPartitionStartTime(partition);
       }
       TaskConfig taskConfig = entry.getValue();
       String tableName = taskConfig.getConfigMap().getOrDefault(MinionConstants.TABLE_NAME_KEY, UNKNOWN_TABLE_NAME);
-      taskCountMap.computeIfAbsent(tableName, k -> new TaskCount()).addTaskState(state);
+
+      TaskStatusSummary taskStatusSummary = taskStatusSummaryMap.computeIfAbsent(tableName,
+          k -> new TaskStatusSummary());
+      taskStatusSummary.getTaskCount().addTaskState(state);
+
+      // Calculate waiting time for subtasks with null state
+      if (state == null && jobStartTime > 0) {
+        long waitingTimeMillis = (currentTime - jobStartTime);
+        taskStatusSummary.getSubtaskWaitingTimes().put(taskId, waitingTimeMillis);
+      }
+
+      // Calculate running time for RUNNING subtasks
+      if (state == TaskPartitionState.RUNNING && executionStartTime > 0) {
+        long runningTimeMillis = (currentTime - executionStartTime);
+        taskStatusSummary.getSubtaskRunningTimes().put(taskId, runningTimeMillis);
+      }
     }
-    return taskCountMap;
+    return taskStatusSummaryMap;
   }
 
   /**
@@ -441,24 +469,68 @@ public class PinotHelixTaskResourceManager {
    * @return Set of task names
    */
   public synchronized Set<String> getTasksInProgress(String taskType) {
-    WorkflowConfig workflowConfig = _taskDriver.getWorkflowConfig(getHelixJobQueueName(taskType));
+    return getTasksByStatus(taskType, 0).getInProgressTasks();
+  }
+
+  /**
+   * Returns tasks organized by status (in-progress and recent).
+   * NOTE: For tasks just submitted without the context created, count them as NOT_STARTED.
+   * This method combines in-progress tasks and recent tasks in a single Helix call to avoid duplicate calls.
+   *
+   * @param taskType Task type
+   * @param afterTimestampMs If > 0, also include tasks that started after this timestamp (in milliseconds).
+   *                         This is used to detect short-lived tasks that started and completed between cycles.
+   * @return TasksByStatus containing in-progress tasks and recent tasks that started after the timestamp
+   */
+  public synchronized TasksByStatus getTasksByStatus(String taskType, long afterTimestampMs) {
+    String helixJobQueueName = getHelixJobQueueName(taskType);
+    WorkflowConfig workflowConfig = _taskDriver.getWorkflowConfig(helixJobQueueName);
     if (workflowConfig == null) {
-      return Collections.emptySet();
+      return new TasksByStatus();
     }
     Set<String> helixJobs = workflowConfig.getJobDag().getAllNodes();
     if (helixJobs.isEmpty()) {
-      return Collections.emptySet();
+      return new TasksByStatus();
     }
-    WorkflowContext workflowContext = _taskDriver.getWorkflowContext(getHelixJobQueueName(taskType));
+    WorkflowContext workflowContext = _taskDriver.getWorkflowContext(helixJobQueueName);
     if (workflowContext == null) {
-      return helixJobs.stream().map(PinotHelixTaskResourceManager::getPinotTaskName).collect(Collectors.toSet());
-    } else {
-      Map<String, TaskState> helixJobStates = workflowContext.getJobStates();
-      return helixJobs.stream().filter(helixJobName -> {
-        TaskState taskState = helixJobStates.get(helixJobName);
-        return taskState == null || taskState == TaskState.NOT_STARTED || taskState == TaskState.IN_PROGRESS;
-      }).map(PinotHelixTaskResourceManager::getPinotTaskName).collect(Collectors.toSet());
+      // If no context, return all jobs as in-progress (backward compatible behavior)
+      Set<String> allTasks = helixJobs.stream()
+          .map(PinotHelixTaskResourceManager::getPinotTaskName)
+          .collect(Collectors.toSet());
+      // If timestamp is specified, we can't filter by start time without context, so return all as in-progress
+      TasksByStatus result = new TasksByStatus();
+      result.setInProgressTasks(allTasks);
+      return result;
     }
+
+    Map<String, TaskState> helixJobStates = workflowContext.getJobStates();
+    Map<String, Long> jobStartTimes = afterTimestampMs > 0 ? workflowContext.getJobStartTimes() : null;
+    Set<String> inProgressTasks = new HashSet<>();
+    Set<String> recentTasks = new HashSet<>();
+    TasksByStatus result = new TasksByStatus();
+
+    for (String helixJobName : helixJobs) {
+      String pinotTaskName = getPinotTaskName(helixJobName);
+      TaskState taskState = helixJobStates.get(helixJobName);
+
+      // Include if in-progress
+      if (taskState == null || taskState == TaskState.NOT_STARTED || taskState == TaskState.IN_PROGRESS) {
+        inProgressTasks.add(pinotTaskName);
+        continue;
+      }
+
+      if (afterTimestampMs > 0) {
+        // If not in-progress but timestamp is specified, check if task started after timestamp
+        Long jobStartTime = jobStartTimes.get(helixJobName);
+        if (jobStartTime != null && jobStartTime > afterTimestampMs) {
+          recentTasks.add(pinotTaskName);
+        }
+      }
+    }
+    result.setInProgressTasks(inProgressTasks);
+    result.setRecentTasks(recentTasks);
+    return result;
   }
 
   /**
@@ -524,8 +596,11 @@ public class PinotHelixTaskResourceManager {
    * @return List of child task configs
    */
   public synchronized List<PinotTaskConfig> getSubtaskConfigs(String taskName) {
-    Collection<TaskConfig> helixTaskConfigs =
-        _taskDriver.getJobConfig(getHelixJobName(taskName)).getTaskConfigMap().values();
+    JobConfig jobConfig = _taskDriver.getJobConfig(getHelixJobName(taskName));
+    if (jobConfig == null) {
+      return List.of();
+    }
+    Collection<TaskConfig> helixTaskConfigs = jobConfig.getTaskConfigMap().values();
     List<PinotTaskConfig> taskConfigs = new ArrayList<>(helixTaskConfigs.size());
     for (TaskConfig helixTaskConfig : helixTaskConfigs) {
       taskConfigs.add(PinotTaskConfig.fromHelixTaskConfig(helixTaskConfig));
@@ -774,6 +849,257 @@ public class PinotHelixTaskResourceManager {
   }
 
   /**
+   * Fetch count of sub-tasks for each of the tasks for the given taskType, filtered by state.
+   *
+   * @param taskType      Pinot taskType / Helix JobQueue
+   * @param state         State(s) to filter by. Can be single state or comma-separated multiple states
+   *                      (waiting, running, error, completed, dropped, timedOut, aborted, unknown, total)
+   * @return Map of Pinot Task Name to TaskCount containing only tasks that have > 0 count for any of the
+   *         specified states
+   */
+  public synchronized Map<String, TaskCount> getTaskCounts(String taskType, String state) {
+    return getTaskCounts(taskType, state, null);
+  }
+
+  /**
+   * Fetch count of sub-tasks for each of the tasks for the given taskType, filtered by state and/or table.
+   *
+   * @param taskType           Pinot taskType / Helix JobQueue
+   * @param state              State(s) to filter by. Can be single state or comma-separated multiple states
+   *                           (NOT_STARTED, IN_PROGRESS, STOPPED, STOPPING, FAILED, COMPLETED, ABORTED, TIMED_OUT,
+   *                           TIMING_OUT, FAILING). Can be null to skip state filtering.
+   * @param tableNameWithType  Table name with type to filter by. Only tasks that have subtasks for this table
+   *                           will be returned. Can be null to skip table filtering.
+   * @return Map of Pinot Task Name to TaskCount containing only tasks that match the specified filters
+   */
+  public synchronized Map<String, TaskCount> getTaskCounts(String taskType, @Nullable String state,
+      @Nullable String tableNameWithType) {
+    Set<String> tasks = getTasks(taskType);
+    if (tasks == null) {
+      return Collections.emptyMap();
+    }
+
+    // Parse and validate comma-separated states if provided
+    Set<TaskState> requestedStates = null;
+    if (StringUtils.isNotEmpty(state)) {
+      String[] stateArray = state.trim().split(",");
+      requestedStates = new HashSet<>();
+      for (String s : stateArray) {
+        String normalizedState = s.trim().toUpperCase();
+        // Validate each state upfront
+        TaskState taskState = validateAndParseTaskState(normalizedState);
+        requestedStates.add(taskState);
+      }
+    }
+
+    // Get all task states if we need to filter by state
+    Map<String, TaskState> taskStates = null;
+    if (requestedStates != null) {
+      taskStates = getTaskStates(taskType);
+    }
+
+    Map<String, TaskCount> taskCounts = new TreeMap<>();
+    for (String taskName : tasks) {
+      // Apply state filtering first (less expensive)
+      if (requestedStates != null) {
+        TaskState currentTaskState = taskStates.get(taskName);
+        if (currentTaskState == null || !requestedStates.contains(currentTaskState)) {
+          continue;
+        }
+      }
+
+      // Apply table filtering next (also less expensive than getting task count)
+      if (StringUtils.isNotEmpty(tableNameWithType) && !hasTasksForTable(taskName, tableNameWithType)) {
+        continue;
+      }
+
+      // Only collect TaskCount after passing all filters (expensive operation)
+      TaskCount taskCount = getTaskCount(taskName);
+      taskCounts.put(taskName, taskCount);
+    }
+    return taskCounts;
+  }
+
+  /**
+   * Validates and parses a task state string into TaskState enum.
+   *
+   * @param state State string to validate (should be uppercase)
+   * @throws IllegalArgumentException if the state is invalid
+   * @return TaskState enum value
+   */
+  private TaskState validateAndParseTaskState(String state) {
+    try {
+      return TaskState.valueOf(state);
+    } catch (IllegalArgumentException e) {
+      throw new IllegalArgumentException("Invalid state: " + state + ". Valid states are: "
+          + Arrays.toString(TaskState.values()));
+    }
+  }
+
+  /**
+   * Helper method to check if a task has any subtasks for the specified table.
+   *
+   * @param taskName          Task name to check
+   * @param tableNameWithType Table name with type to check for
+   * @return true if the task has subtasks for the specified table
+   */
+  private boolean hasTasksForTable(String taskName, String tableNameWithType) {
+    try {
+      // Get all subtask configs for this task
+      List<PinotTaskConfig> subtaskConfigs = getSubtaskConfigs(taskName);
+
+      // Check if any subtask is for the specified table
+      for (PinotTaskConfig taskConfig : subtaskConfigs) {
+        String taskTableName = taskConfig.getTableName();
+        if (taskTableName != null && taskTableName.equals(tableNameWithType)) {
+          return true;
+        }
+      }
+      return false;
+    } catch (Exception e) {
+      // If we can't get the subtask configs, assume no match
+      LOGGER.warn("Failed to get subtask configs for task: {}", taskName, e);
+      return false;
+    }
+  }
+
+  /**
+   * Get the server tenant name for a given table by looking up its configuration.
+   * Returns "unknown" if the table or tenant cannot be determined.
+   *
+   * @param tableName Table name with type (e.g., "myTable_OFFLINE")
+   * @return Server tenant name or "unknown"
+   */
+  private String getTenantForTable(String tableName) {
+    if (tableName == null || UNKNOWN_TABLE_NAME.equals(tableName)) {
+      return UNKNOWN_TENANT_NAME;
+    }
+
+    try {
+      TableConfig tableConfig = _helixResourceManager.getTableConfig(tableName);
+      if (tableConfig != null && tableConfig.getTenantConfig() != null) {
+        String serverTenant = tableConfig.getTenantConfig().getServer();
+        return serverTenant != null ? serverTenant : UNKNOWN_TENANT_NAME;
+      }
+      return UNKNOWN_TENANT_NAME;
+    } catch (Exception e) {
+      LOGGER.warn("Failed to determine tenant for table: {}", tableName, e);
+      return UNKNOWN_TENANT_NAME;
+    }
+  }
+
+  /**
+   * Get a summary of all tasks across all task types, grouped by tenant.
+   *
+   * <p>Only includes tasks with RUNNING or WAITING subtasks. Completed, failed, or aborted tasks are excluded.
+   * Tasks are first resolved to their table, then grouped by the table's server tenant.
+   *
+   * @param tenantFilter Optional tenant name to filter results. If null, returns all tenants.
+   * @return TaskSummaryResponse containing aggregated task counts grouped by tenant
+   */
+  public synchronized TaskSummaryResponse getTasksSummary(@Nullable String tenantFilter) {
+    TaskSummaryResponse response = new TaskSummaryResponse();
+    Set<String> taskTypes = getTaskTypes();
+
+    if (taskTypes == null || taskTypes.isEmpty()) {
+      return response;
+    }
+
+    // Map: tenant -> taskType -> aggregated TaskCount
+    Map<String, Map<String, TaskCount>> tenantToTaskTypeCounts = new TreeMap<>();
+    int totalRunning = 0;
+    int totalWaiting = 0;
+
+    for (String taskType : taskTypes) {
+      Map<String, TaskCount> taskCounts = getTaskCounts(taskType);
+      if (taskCounts == null || taskCounts.isEmpty()) {
+        continue;
+      }
+
+      // For each parent task, only fetch table breakdown if it has active tasks
+      for (Map.Entry<String, TaskCount> entry : taskCounts.entrySet()) {
+        String taskName = entry.getKey();
+        TaskCount totalTaskCount = entry.getValue();
+
+        // Skip if this parent task has no running/waiting tasks
+        if (totalTaskCount.getRunning() == 0 && totalTaskCount.getWaiting() == 0) {
+          continue;
+        }
+
+        // Get the table name from the first subtask
+        // Note: All subtasks in a parent task belong to the same table
+        List<PinotTaskConfig> subtaskConfigs = getSubtaskConfigs(taskName);
+        if (subtaskConfigs.isEmpty()) {
+          continue;
+        }
+
+        PinotTaskConfig firstSubtaskConfig = subtaskConfigs.get(0);
+        Map<String, String> configs = firstSubtaskConfig.getConfigs();
+        String tableName = (configs != null)
+            ? configs.getOrDefault(MinionConstants.TABLE_NAME_KEY, UNKNOWN_TABLE_NAME)
+            : UNKNOWN_TABLE_NAME;
+
+        if (UNKNOWN_TABLE_NAME.equals(tableName)) {
+          continue;
+        }
+
+        // Get tenant for this table
+        String tenant = getTenantForTable(tableName);
+
+        // Apply tenant filter if specified
+        if (tenantFilter != null && !tenantFilter.equals(tenant)) {
+          continue;
+        }
+
+        // Accumulate counts for this tenant and task type
+        tenantToTaskTypeCounts
+            .computeIfAbsent(tenant, k -> new TreeMap<>())
+            .computeIfAbsent(taskType, k -> new TaskCount())
+            .accumulate(totalTaskCount);
+      }
+    }
+
+    // Build tenant breakdown from aggregated data
+    List<TenantTaskBreakdown> tenantBreakdowns = new ArrayList<>();
+    for (Map.Entry<String, Map<String, TaskCount>> tenantEntry : tenantToTaskTypeCounts.entrySet()) {
+      String tenant = tenantEntry.getKey();
+      Map<String, TaskCount> taskTypeCounts = tenantEntry.getValue();
+
+      int tenantRunning = 0;
+      int tenantWaiting = 0;
+      List<TaskTypeBreakdown> taskTypeBreakdowns = new ArrayList<>();
+
+      for (Map.Entry<String, TaskCount> taskTypeEntry : taskTypeCounts.entrySet()) {
+        String taskType = taskTypeEntry.getKey();
+        TaskCount aggregatedCount = taskTypeEntry.getValue();
+
+        int running = aggregatedCount.getRunning();
+        int waiting = aggregatedCount.getWaiting();
+
+        // Only include task types that have running or waiting tasks
+        if (running > 0 || waiting > 0) {
+          tenantRunning += running;
+          tenantWaiting += waiting;
+          taskTypeBreakdowns.add(new TaskTypeBreakdown(taskType, running, waiting));
+        }
+      }
+
+      // Only include tenants that have active tasks
+      if (tenantRunning > 0 || tenantWaiting > 0) {
+        totalRunning += tenantRunning;
+        totalWaiting += tenantWaiting;
+        tenantBreakdowns.add(new TenantTaskBreakdown(tenant, tenantRunning, tenantWaiting, taskTypeBreakdowns));
+      }
+    }
+
+    response.setTotalRunningTasks(totalRunning);
+    response.setTotalWaitingTasks(totalWaiting);
+    response.setTaskBreakdown(tenantBreakdowns);
+
+    return response;
+  }
+
+  /**
    * Given a taskType, helper method to debug all the HelixJobs for the taskType.
    * For each of the HelixJobs, collects status of the (sub)tasks in the taskbatch.
    *
@@ -847,13 +1173,27 @@ public class PinotHelixTaskResourceManager {
    * @return TaskDebugInfo contains details for subtasks in this task batch.
    */
   public synchronized TaskDebugInfo getTaskDebugInfo(String taskName, int verbosity) {
+    return getTaskDebugInfo(taskName, null, verbosity);
+  }
+
+  /**
+   * Given a taskName and table name collects status of the (sub)tasks in the taskName for the table.
+   *
+   * @param taskName          Pinot taskName
+   * @param tableNameWithType table name for which subtask status to fetch
+   * @param verbosity         By default, does not show details for completed tasks.
+   *                          If verbosity > 0, shows details for all tasks.
+   * @return TaskDebugInfo contains details for subtasks in this task batch.
+   */
+  public synchronized TaskDebugInfo getTaskDebugInfo(String taskName, @Nullable String tableNameWithType,
+      int verbosity) {
     String taskType = getTaskType(taskName);
     WorkflowContext workflowContext = _taskDriver.getWorkflowContext(getHelixJobQueueName(taskType));
     if (workflowContext == null) {
       return null;
     }
     String helixJobName = getHelixJobName(taskName);
-    return getTaskDebugInfo(workflowContext, helixJobName, null, verbosity);
+    return getTaskDebugInfo(workflowContext, helixJobName, tableNameWithType, verbosity);
   }
 
   private synchronized TaskDebugInfo getTaskDebugInfo(WorkflowContext workflowContext, String helixJobName,
@@ -878,21 +1218,30 @@ public class PinotHelixTaskResourceManager {
       }
       String triggeredBy = jobConfig.getTaskConfigMap().values().stream().findFirst()
           .map(TaskConfig::getConfigMap)
-          .map(taskConfigs -> taskConfigs.get(PinotTaskManager.TRIGGERED_BY))
+          .map(taskConfigs -> taskConfigs.get(MinionConstants.TRIGGERED_BY))
           .orElse("");
       taskDebugInfo.setTriggeredBy(triggeredBy);
       Set<Integer> partitionSet = jobContext.getPartitionSet();
       TaskCount subtaskCount = new TaskCount();
       for (int partition : partitionSet) {
         // First get the partition's state and update the subtaskCount
+        String taskIdForPartition = jobContext.getTaskIdForPartition(partition);
         TaskPartitionState partitionState = jobContext.getPartitionState(partition);
+        TaskConfig helixTaskConfig = jobConfig.getTaskConfig(taskIdForPartition);
+        PinotTaskConfig pinotTaskConfig = null;
+        if (helixTaskConfig != null) {
+          pinotTaskConfig = PinotTaskConfig.fromHelixTaskConfig(helixTaskConfig);
+          if ((tableNameWithType != null) && (!tableNameWithType.equals(pinotTaskConfig.getTableName()))) {
+            // Filter task configs that match this table name
+            continue;
+          }
+        }
         subtaskCount.addTaskState(partitionState);
         // Skip details for COMPLETED tasks
         if (!showCompleted && partitionState == TaskPartitionState.COMPLETED) {
           continue;
         }
         SubtaskDebugInfo subtaskDebugInfo = new SubtaskDebugInfo();
-        String taskIdForPartition = jobContext.getTaskIdForPartition(partition);
         subtaskDebugInfo.setTaskId(taskIdForPartition);
         subtaskDebugInfo.setState(partitionState);
         subtaskDebugInfo.setTriggeredBy(triggeredBy);
@@ -906,15 +1255,7 @@ public class PinotHelixTaskResourceManager {
         }
         subtaskDebugInfo.setParticipant(jobContext.getAssignedParticipant(partition));
         subtaskDebugInfo.setInfo(jobContext.getPartitionInfo(partition));
-        TaskConfig helixTaskConfig = jobConfig.getTaskConfig(taskIdForPartition);
-        if (helixTaskConfig != null) {
-          PinotTaskConfig pinotTaskConfig = PinotTaskConfig.fromHelixTaskConfig(helixTaskConfig);
-          if ((tableNameWithType != null) && (!tableNameWithType.equals(pinotTaskConfig.getTableName()))) {
-            // Filter task configs that match this table name
-            continue;
-          }
-          subtaskDebugInfo.setTaskConfig(pinotTaskConfig);
-        }
+        subtaskDebugInfo.setTaskConfig(pinotTaskConfig);
         taskDebugInfo.addSubtaskInfo(subtaskDebugInfo);
       }
       taskDebugInfo.setSubtaskCount(subtaskCount);
@@ -951,7 +1292,7 @@ public class PinotHelixTaskResourceManager {
    * @param helixJobName Helix Job name
    * @return Pinot task name
    */
-  private static String getPinotTaskName(String helixJobName) {
+  public static String getPinotTaskName(String helixJobName) {
     return helixJobName.substring(TASK_QUEUE_PREFIX.length() + getTaskType(helixJobName).length() + 1);
   }
 
@@ -961,10 +1302,10 @@ public class PinotHelixTaskResourceManager {
    * <p>E.g. TaskQueue_DummyTask -> DummyTask (from Helix JobQueue name)
    * <p>E.g. TaskQueue_DummyTask_Task_DummyTask_12345 -> DummyTask (from Helix Job name)
    *
-   * @param name Pinot task name, Helix JobQueue name or Helix Job name
+   * @param name Pinot task name, Helix JobQueue name, or Helix Job name
    * @return Task type
    */
-  private static String getTaskType(String name) {
+  public static String getTaskType(String name) {
     String[] parts = name.split(TASK_NAME_SEPARATOR);
     if (parts.length < 2) {
       throw new IllegalArgumentException(String.format("Invalid task name : %s. Missing separator %s",
@@ -1000,6 +1341,129 @@ public class PinotHelixTaskResourceManager {
   public Map<String, Map<String, Long>> getTaskMetadataLastUpdateTimeMs() {
     ZkHelixPropertyStore<ZNRecord> propertyStore = _helixResourceManager.getPropertyStore();
     return MinionTaskMetadataUtils.getAllTaskMetadataLastUpdateTimeMs(propertyStore);
+  }
+
+  /**
+   * Gets the status of all minion instances, including their task counts and drain state.
+   *
+   * @param statusFilter Optional filter by status ("ONLINE", "OFFLINE", or "DRAINED"). If null, returns all minions.
+   * @param includeTaskCounts Whether to include running task counts For each minion. Default false.
+   * @return MinionStatusResponse containing status information for minion instances
+   */
+  public MinionStatusResponse getMinionStatus(String statusFilter, boolean includeTaskCounts) {
+    // Validate status filter
+    if (statusFilter != null && !statusFilter.isEmpty()) {
+      if (!"ONLINE".equalsIgnoreCase(statusFilter)
+          && !"OFFLINE".equalsIgnoreCase(statusFilter)
+          && !"DRAINED".equalsIgnoreCase(statusFilter)) {
+        throw new IllegalArgumentException("Invalid status filter. Must be 'ONLINE', 'OFFLINE', or 'DRAINED'");
+      }
+    }
+
+    // Get all instances and filter for minions, then sort them
+    List<String> allInstances = _helixResourceManager.getAllInstances();
+    List<String> minionInstances = allInstances.stream()
+        .filter(InstanceTypeUtils::isMinion)
+        .sorted()
+        .collect(Collectors.toList());
+
+    // Get running task counts per minion only if requested (can be expensive)
+    Map<String, Integer> runningTaskCounts = new HashMap<>();
+    if (includeTaskCounts) {
+      try {
+        runningTaskCounts = getRunningTaskCountsPerMinion();
+      } catch (Exception e) {
+        LOGGER.warn("Failed to get running task counts from task resource manager", e);
+        // Continue with an empty map - task counts will be 0
+      }
+    }
+
+    // Build status list for each minion
+    List<MinionStatusResponse.MinionStatus> minionStatusList = new ArrayList<>();
+    for (String minionInstanceId : minionInstances) {
+      InstanceConfig instanceConfig = _helixResourceManager.getHelixInstanceConfig(minionInstanceId);
+      if (instanceConfig == null) {
+        continue;
+      }
+
+      // Determine minion status: OFFLINE (disabled in Helix), DRAINED, or ONLINE
+      boolean isEnabled = instanceConfig.getInstanceEnabled();
+      List<String> tags = instanceConfig.getTags();
+      boolean isDrained = tags != null && tags.contains(Helix.DRAINED_MINION_INSTANCE);
+
+      String status;
+      if (!isEnabled) {
+        status = "OFFLINE";
+      } else if (isDrained) {
+        status = "DRAINED";
+      } else {
+        status = "ONLINE";
+      }
+
+      // Apply status filter if specified
+      if (statusFilter != null && !statusFilter.isEmpty() && !status.equalsIgnoreCase(statusFilter)) {
+        continue;
+      }
+
+      // Get host and port
+      String host = instanceConfig.getHostName();
+      int port = Integer.parseInt(instanceConfig.getPort());
+
+      // Get the running task count for this minion
+      int runningTaskCount = runningTaskCounts.getOrDefault(minionInstanceId, 0);
+
+      MinionStatusResponse.MinionStatus minionStatus =
+          new MinionStatusResponse.MinionStatus(minionInstanceId, host, port, runningTaskCount, status);
+      minionStatusList.add(minionStatus);
+    }
+
+    return new MinionStatusResponse(minionStatusList.size(), minionStatusList);
+  }
+
+  /**
+   * Gets the count of running tasks for each minion instance.
+   * This method iterates through all task workflows and jobs to count tasks in RUNNING state
+   * assigned to each minion.
+   *
+   * @return Map of minion instance ID to running task count
+   */
+  public synchronized Map<String, Integer> getRunningTaskCountsPerMinion() {
+    Map<String, Integer> runningTaskCounts = new HashMap<>();
+
+    // Get all workflows (task queues)
+    Set<String> workflows = _taskDriver.getWorkflows().keySet();
+
+    for (String workflow : workflows) {
+      WorkflowContext workflowContext = _taskDriver.getWorkflowContext(workflow);
+      if (workflowContext == null) {
+        continue;
+      }
+
+      // Get all jobs in this workflow
+      Set<String> jobs = workflowContext.getJobStates().keySet();
+      for (String job : jobs) {
+        JobContext jobContext = _taskDriver.getJobContext(job);
+        if (jobContext == null) {
+          continue;
+        }
+
+        // Iterate through all partitions (subtasks) in this job
+        Set<Integer> partitions = jobContext.getPartitionSet();
+        for (Integer partition : partitions) {
+          TaskPartitionState state = jobContext.getPartitionState(partition);
+          // Count INIT and RUNNING tasks (INIT means assigned but not yet started)
+          if (state == TaskPartitionState.RUNNING || state == TaskPartitionState.INIT) {
+            String assignedParticipant = jobContext.getAssignedParticipant(partition);
+            if (assignedParticipant != null) {
+              runningTaskCounts.put(assignedParticipant,
+                  runningTaskCounts.getOrDefault(assignedParticipant, 0) + 1);
+            }
+          }
+        }
+      }
+    }
+
+    return runningTaskCounts;
   }
 
   @JsonPropertyOrder({
@@ -1164,6 +1628,31 @@ public class PinotHelixTaskResourceManager {
     }
   }
 
+  /**
+   * Result class that organizes tasks by status.
+   * Holds sets of tasks directly, making it extensible for future use cases.
+   */
+  public static class TasksByStatus {
+    private Set<String> _inProgressTasks = Collections.emptySet();
+    private Set<String> _recentTasks = Collections.emptySet(); // Tasks that started after timestamp (any state)
+
+    public Set<String> getInProgressTasks() {
+      return _inProgressTasks;
+    }
+
+    public void setInProgressTasks(Set<String> inProgressTasks) {
+      _inProgressTasks = inProgressTasks;
+    }
+
+    public Set<String> getRecentTasks() {
+      return _recentTasks;
+    }
+
+    public void setRecentTasks(Set<String> recentTasks) {
+      _recentTasks = recentTasks;
+    }
+  }
+
   @JsonPropertyOrder({"total", "completed", "running", "waiting", "error", "unknown", "dropped", "timedOut", "aborted"})
   public static class TaskCount {
     private int _waiting;   // Number of tasks waiting to be scheduled on minions
@@ -1261,6 +1750,209 @@ public class PinotHelixTaskResourceManager {
       _dropped += other.getDropped();
       _timedOut += other.getTimedOut();
       _aborted += other.getAborted();
+    }
+  }
+
+  public static class TaskStatusSummary {
+    private TaskCount _taskCount = new TaskCount();
+    private Map<String, Long> _subtaskWaitingTimes = new HashMap<>(); // subtask ID -> waiting time in milliseconds
+    private Map<String, Long> _subtaskRunningTimes = new HashMap<>(); // subtask ID -> running time in milliseconds
+
+    public TaskCount getTaskCount() {
+      return _taskCount;
+    }
+
+    public void setTaskCount(TaskCount taskCount) {
+      _taskCount = taskCount;
+    }
+
+    public Map<String, Long> getSubtaskWaitingTimes() {
+      return _subtaskWaitingTimes;
+    }
+
+    public void setSubtaskWaitingTimes(Map<String, Long> subtaskWaitingTimes) {
+      _subtaskWaitingTimes = subtaskWaitingTimes;
+    }
+
+    public Map<String, Long> getSubtaskRunningTimes() {
+      return _subtaskRunningTimes;
+    }
+
+    public void setSubtaskRunningTimes(Map<String, Long> subtaskRunningTimes) {
+      _subtaskRunningTimes = subtaskRunningTimes;
+    }
+  }
+
+  /**
+   * Response model for the {@code GET /tasks/summary} endpoint.
+   *
+   * <p>Provides summary information about tasks currently managed by the Pinot cluster, grouped by tenant.
+   * Only tasks with RUNNING or WAITING subtasks are included; completed, failed, or aborted tasks are excluded.
+   *
+   * <p>Fields:
+   * <ul>
+   *   <li>{@code totalRunningTasks}: Total tasks in RUNNING or INIT state across all tenants</li>
+   *   <li>{@code totalWaitingTasks}: Total tasks in WAITING state (not yet assigned to a worker)</li>
+   *   <li>{@code taskBreakdown}: Task counts grouped by tenant and task type. Tasks with unknown tenant
+   *       configuration appear under tenant name "unknown"</li>
+   * </ul>
+   *
+   * @see TenantTaskBreakdown
+   * @see TaskTypeBreakdown
+   */
+  @JsonPropertyOrder({"totalRunningTasks", "totalWaitingTasks", "taskBreakdown"})
+  public static class TaskSummaryResponse {
+    private int _totalRunningTasks;
+    private int _totalWaitingTasks;
+    private List<TenantTaskBreakdown> _taskBreakdown;
+
+    public TaskSummaryResponse() {
+      _totalRunningTasks = 0;
+      _totalWaitingTasks = 0;
+      _taskBreakdown = new ArrayList<>();
+    }
+
+    public int getTotalRunningTasks() {
+      return _totalRunningTasks;
+    }
+
+    public void setTotalRunningTasks(int totalRunningTasks) {
+      _totalRunningTasks = totalRunningTasks;
+    }
+
+    public int getTotalWaitingTasks() {
+      return _totalWaitingTasks;
+    }
+
+    public void setTotalWaitingTasks(int totalWaitingTasks) {
+      _totalWaitingTasks = totalWaitingTasks;
+    }
+
+    public List<TenantTaskBreakdown> getTaskBreakdown() {
+      return _taskBreakdown;
+    }
+
+    public void setTaskBreakdown(List<TenantTaskBreakdown> taskBreakdown) {
+      _taskBreakdown = taskBreakdown;
+    }
+  }
+
+  /**
+   * Tenant-level breakdown of task counts for the {@code /tasks/summary} API response.
+   *
+   * <p>Fields:
+   * <ul>
+   *   <li>{@code tenant}: Server tenant name from table configuration (or "unknown" if not configured)</li>
+   *   <li>{@code runningTasks}: Total tasks in RUNNING or INIT state for this tenant</li>
+   *   <li>{@code waitingTasks}: Total tasks waiting to be assigned for this tenant</li>
+   *   <li>{@code taskTypeBreakdown}: Running/waiting counts per task type for this tenant</li>
+   * </ul>
+   *
+   * @see TaskSummaryResponse
+   * @see TaskTypeBreakdown
+   */
+  @JsonPropertyOrder({"tenant", "runningTasks", "waitingTasks", "taskTypeBreakdown"})
+  public static class TenantTaskBreakdown {
+    private String _tenant;
+    private int _runningTasks;
+    private int _waitingTasks;
+    private List<TaskTypeBreakdown> _taskTypeBreakdown;
+
+    public TenantTaskBreakdown() {
+      _taskTypeBreakdown = new ArrayList<>();
+    }
+
+    public TenantTaskBreakdown(String tenant, int runningTasks, int waitingTasks,
+        List<TaskTypeBreakdown> taskTypeBreakdown) {
+      _tenant = tenant;
+      _runningTasks = runningTasks;
+      _waitingTasks = waitingTasks;
+      _taskTypeBreakdown = taskTypeBreakdown;
+    }
+
+    public String getTenant() {
+      return _tenant;
+    }
+
+    public void setTenant(String tenant) {
+      _tenant = tenant;
+    }
+
+    public int getRunningTasks() {
+      return _runningTasks;
+    }
+
+    public void setRunningTasks(int runningTasks) {
+      _runningTasks = runningTasks;
+    }
+
+    public int getWaitingTasks() {
+      return _waitingTasks;
+    }
+
+    public void setWaitingTasks(int waitingTasks) {
+      _waitingTasks = waitingTasks;
+    }
+
+    public List<TaskTypeBreakdown> getTaskTypeBreakdown() {
+      return _taskTypeBreakdown;
+    }
+
+    public void setTaskTypeBreakdown(List<TaskTypeBreakdown> taskTypeBreakdown) {
+      _taskTypeBreakdown = taskTypeBreakdown;
+    }
+  }
+
+  /**
+   * Task type breakdown of task counts for the {@code /tasks/summary} API response.
+   *
+   * <p>Fields:
+   * <ul>
+   *   <li>{@code taskType}: Task type name (e.g., "SegmentGenerationAndPushTask", "MergeRollupTask")</li>
+   *   <li>{@code runningCount}: Tasks in RUNNING state</li>
+   *   <li>{@code waitingCount}: Tasks waiting to be scheduled</li>
+   * </ul>
+   *
+   * @see TaskSummaryResponse
+   * @see TenantTaskBreakdown
+   */
+  @JsonPropertyOrder({"taskType", "runningCount", "waitingCount"})
+  public static class TaskTypeBreakdown {
+    private String _taskType;
+    private int _runningCount;
+    private int _waitingCount;
+
+    public TaskTypeBreakdown() {
+    }
+
+    public TaskTypeBreakdown(String taskType, int runningCount, int waitingCount) {
+      _taskType = taskType;
+      _runningCount = runningCount;
+      _waitingCount = waitingCount;
+    }
+
+    public String getTaskType() {
+      return _taskType;
+    }
+
+    public void setTaskType(String taskType) {
+      _taskType = taskType;
+    }
+
+    public int getRunningCount() {
+      return _runningCount;
+    }
+
+    public void setRunningCount(int runningCount) {
+      _runningCount = runningCount;
+    }
+
+    public int getWaitingCount() {
+      return _waitingCount;
+    }
+
+    public void setWaitingCount(int waitingCount) {
+      _waitingCount = waitingCount;
     }
   }
 }

@@ -21,9 +21,11 @@ package org.apache.pinot.core.query.aggregation.function.array;
 import it.unimi.dsi.fastutil.longs.LongArrayList;
 import java.util.List;
 import java.util.Map;
+import org.apache.pinot.common.CustomObject;
 import org.apache.pinot.common.request.context.ExpressionContext;
 import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.core.common.BlockValSet;
+import org.apache.pinot.core.common.ObjectSerDeUtils;
 import org.apache.pinot.core.query.aggregation.AggregationResultHolder;
 import org.apache.pinot.core.query.aggregation.ObjectAggregationResultHolder;
 import org.apache.pinot.core.query.aggregation.function.BaseSingleInputAggregationFunction;
@@ -134,8 +136,22 @@ public class SumArrayLongAggregationFunction extends BaseSingleInputAggregationF
   }
 
   @Override
+  public SerializedIntermediateResult serializeIntermediateResult(LongArrayList longArrayList) {
+    return new SerializedIntermediateResult(ObjectSerDeUtils.ObjectType.LongArrayList.getValue(),
+        ObjectSerDeUtils.LONG_ARRAY_LIST_SER_DE.serialize(longArrayList));
+  }
+
+  @Override
+  public LongArrayList deserializeIntermediateResult(CustomObject customObject) {
+    return ObjectSerDeUtils.LONG_ARRAY_LIST_SER_DE.deserialize(customObject.getBuffer());
+  }
+
+  @Override
   public DataSchema.ColumnDataType getIntermediateResultColumnType() {
-    return DataSchema.ColumnDataType.LONG_ARRAY;
+    // AggregationResultsBlock#setIntermediateResult and AggregationFunctionUtils#getIntermediateResult only support
+    // INT/LONG/DOUBLE/STRING/OBJECT stored types, so LongArrayList must use OBJECT to piggyback on the custom ser-de
+    // implemented in ObjectSerDeUtils.
+    return DataSchema.ColumnDataType.OBJECT;
   }
 
   @Override

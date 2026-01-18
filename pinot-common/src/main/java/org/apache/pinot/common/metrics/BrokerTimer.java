@@ -30,6 +30,7 @@ public enum BrokerTimer implements AbstractMetrics.Timer {
   CLUSTER_CHANGE_QUEUE_TIME(true), // metric tracking the freshness lag for consuming segments
   FRESHNESS_LAG_MS(false),
   QUERY_TOTAL_TIME_MS(true),
+  MULTI_STAGE_QUERY_TOTAL_TIME_MS(true),
 
   SECONDARY_WORKLOAD_QUERY_TOTAL_TIME_MS(true),
 
@@ -57,7 +58,12 @@ public enum BrokerTimer implements AbstractMetrics.Timer {
   // How long it took the server to start.
   STARTUP_SUCCESS_DURATION_MS(true),
   // GRPC query execution time
-  GRPC_QUERY_EXECUTION_MS(true);
+  GRPC_QUERY_EXECUTION_MS(true),
+  // Audit logging timers
+  AUDIT_REQUEST_PROCESSING_TIME(true),
+  AUDIT_RESPONSE_PROCESSING_TIME(true),
+  // Time taken for remote cluster broker to compute routing table
+  REMOTE_CLUSTER_BROKER_ROUTING_CALCULATION_TIME_MS(true);
 
   private final String _timerName;
   private final boolean _global;

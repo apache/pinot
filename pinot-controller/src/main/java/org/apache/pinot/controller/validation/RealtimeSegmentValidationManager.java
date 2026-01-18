@@ -22,8 +22,10 @@ import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import java.util.Properties;
+import java.util.Set;
 import java.util.concurrent.TimeUnit;
 import org.apache.pinot.common.metadata.segment.SegmentZKMetadata;
 import org.apache.pinot.common.metrics.ControllerGauge;
@@ -37,6 +39,7 @@ import org.apache.pinot.controller.api.resources.PauseStatusDetails;
 import org.apache.pinot.controller.helix.core.PinotHelixResourceManager;
 import org.apache.pinot.controller.helix.core.periodictask.ControllerPeriodicTask;
 import org.apache.pinot.controller.helix.core.realtime.PinotLLCRealtimeSegmentManager;
+import org.apache.pinot.spi.config.table.DisasterRecoveryMode;
 import org.apache.pinot.spi.config.table.PauseState;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.stream.OffsetCriteria;
@@ -54,21 +57,20 @@ import org.slf4j.LoggerFactory;
  */
 public class RealtimeSegmentValidationManager extends ControllerPeriodicTask<RealtimeSegmentValidationManager.Context> {
   private static final Logger LOGGER = LoggerFactory.getLogger(RealtimeSegmentValidationManager.class);
+  public static final String OFFSET_CRITERIA = "offsetCriteria";
+  public static final String REPAIR_ERROR_SEGMENTS_FOR_PARTIAL_UPSERT_OR_DEDUP =
+      "repairErrorSegmentsForPartialUpsertOrDedup";
 
   private final PinotLLCRealtimeSegmentManager _llcRealtimeSegmentManager;
   private final ValidationMetrics _validationMetrics;
   private final ControllerMetrics _controllerMetrics;
   private final StorageQuotaChecker _storageQuotaChecker;
   private final ResourceUtilizationManager _resourceUtilizationManager;
-
   private final int _segmentLevelValidationIntervalInSeconds;
-  private long _lastSegmentLevelValidationRunTimeMs = 0L;
   private final boolean _segmentAutoResetOnErrorAtValidation;
 
-  public static final String OFFSET_CRITERIA = "offsetCriteria";
-  public static final String RUN_SEGMENT_LEVEL_VALIDATION = "runSegmentLevelValidation";
-  public static final String REPAIR_ERROR_SEGMENTS_FOR_PARTIAL_UPSERT_OR_DEDUP =
-      "repairErrorSegmentsForPartialUpsertOrDedup";
+  private long _lastSegmentLevelValidationRunTimeMs = 0L;
+  private volatile DisasterRecoveryMode _disasterRecoveryMode;
 
   public RealtimeSegmentValidationManager(ControllerConf config, PinotHelixResourceManager pinotHelixResourceManager,
       LeadControllerManager leadControllerManager, PinotLLCRealtimeSegmentManager llcRealtimeSegmentManager,
@@ -85,6 +87,7 @@ public class RealtimeSegmentValidationManager extends ControllerPeriodicTask<Rea
 
     _segmentLevelValidationIntervalInSeconds = config.getSegmentLevelValidationIntervalInSeconds();
     _segmentAutoResetOnErrorAtValidation = config.isAutoResetErrorSegmentsOnValidationEnabled();
+    _disasterRecoveryMode = config.getDisasterRecoveryMode();
     Preconditions.checkState(_segmentLevelValidationIntervalInSeconds > 0);
   }
 
@@ -130,15 +133,18 @@ public class RealtimeSegmentValidationManager extends ControllerPeriodicTask<Rea
       LOGGER.info("Skipping segment-level validation for table: {}", tableConfig.getTableName());
     }
 
-    boolean isPauselessConsumptionEnabled = PauselessConsumptionUtils.isPauselessEnabled(tableConfig);
-    if (isPauselessConsumptionEnabled) {
-      // For pauseless tables without dedup or partial upsert, repair segments in error state
-      _llcRealtimeSegmentManager.repairSegmentsInErrorStateForPauselessConsumption(tableConfig,
+    boolean isPauselessTable = PauselessConsumptionUtils.isPauselessEnabled(tableConfig);
+    if (isPauselessTable || _segmentAutoResetOnErrorAtValidation) {
+      // For realtime tables without dedup or partial upsert, repair segments in error state.
+      // When pauseless consumption is disabled, this behavior remains gated by
+      // _segmentAutoResetOnErrorAtValidation to preserve legacy semantics.
+      _llcRealtimeSegmentManager.repairSegmentsInErrorState(tableConfig,
           context._repairErrorSegmentsForPartialUpsertOrDedup);
-    } else if (_segmentAutoResetOnErrorAtValidation) {
-      // Reset for pauseless tables is already handled in repairSegmentsInErrorStateForPauselessConsumption method with
-      // additional checks for pauseless consumption
-      _pinotHelixResourceManager.resetSegments(tableConfig.getTableName(), null, true);
+    } else {
+      LOGGER.debug(
+          "Skipping segment error repair for table {} because pauseless consumption is disabled and "
+              + "_segmentAutoResetOnErrorAtValidation=false",
+          tableConfig.getTableName());
     }
   }
 
@@ -184,7 +190,7 @@ public class RealtimeSegmentValidationManager extends ControllerPeriodicTask<Rea
       // The table was previously paused due to exceeding resource utilization, but the current status cannot be
       // determined. To be safe, leave it as paused and once the status is available take the correct action
       LOGGER.warn("Resource utilization limit could not be determined for for table: {}, and it is paused, leave it as "
-              + "paused", tableNameWithType);
+          + "paused", tableNameWithType);
       return false;
     }
     _controllerMetrics.setOrUpdateTableGauge(tableNameWithType, ControllerGauge.RESOURCE_UTILIZATION_LIMIT_EXCEEDED,
@@ -233,12 +239,15 @@ public class RealtimeSegmentValidationManager extends ControllerPeriodicTask<Rea
 
     // Ensures all segments in COMMITTING state are properly tracked in ZooKeeper.
     // Acts as a recovery mechanism for segments that may have failed to register during start of commit protocol.
-    if (PauselessConsumptionUtils.isPauselessEnabled(tableConfig)) {
+    boolean pauselessEnabled = PauselessConsumptionUtils.isPauselessEnabled(tableConfig);
+    if (pauselessEnabled) {
       syncCommittingSegmentsFromMetadata(realtimeTableName, segmentsZKMetadata);
     }
 
     // Check missing segments and upload them to the deep store
-    if (_llcRealtimeSegmentManager.isDeepStoreLLCSegmentUploadRetryEnabled()) {
+    // If pauseless consumption is enabled, always run uploadToDeepStoreIfMissing step because in pauseless
+    // consumption, the segment commit can be marked completed even if segment was not uploaded to the deep store.
+    if (pauselessEnabled || _llcRealtimeSegmentManager.isDeepStoreLLCSegmentUploadRetryEnabled()) {
       _llcRealtimeSegmentManager.uploadToDeepStoreIfMissing(tableConfig, segmentsZKMetadata);
     }
   }
@@ -276,15 +285,19 @@ public class RealtimeSegmentValidationManager extends ControllerPeriodicTask<Rea
   }
 
   private boolean shouldRepairErrorSegmentsForPartialUpsertOrDedup(Properties periodicTaskProperties) {
-    return Optional.ofNullable(periodicTaskProperties.getProperty(REPAIR_ERROR_SEGMENTS_FOR_PARTIAL_UPSERT_OR_DEDUP))
-        .map(value -> {
-          try {
-            return Boolean.parseBoolean(value);
-          } catch (Exception e) {
-            return false;
-          }
-        })
-        .orElse(false);
+    String property = periodicTaskProperties.getProperty(REPAIR_ERROR_SEGMENTS_FOR_PARTIAL_UPSERT_OR_DEDUP);
+
+    if (property == null) {
+      return _llcRealtimeSegmentManager.shouldRepairErrorSegmentsForPartialUpsertOrDedup(_disasterRecoveryMode);
+    }
+
+    try {
+      return Boolean.parseBoolean(property);
+    } catch (Exception e) {
+      LOGGER.warn("Failed to parse property '{}' for '{}'. Returning false.", property,
+          REPAIR_ERROR_SEGMENTS_FOR_PARTIAL_UPSERT_OR_DEDUP, e);
+      return false;
+    }
   }
 
   @Override
@@ -310,6 +323,20 @@ public class RealtimeSegmentValidationManager extends ControllerPeriodicTask<Rea
   public void cleanUpTask() {
     LOGGER.info("Unregister all the validation metrics.");
     _validationMetrics.unregisterAllMetrics();
+  }
+
+  @Override
+  public void onChange(Set<String> changedConfigs, Map<String, String> clusterConfigs) {
+    if (changedConfigs.contains(ControllerConf.ControllerPeriodicTasksConf.DISASTER_RECOVERY_MODE_CONFIG_KEY)) {
+      String disasterRecoveryModeString =
+          clusterConfigs.get(ControllerConf.ControllerPeriodicTasksConf.DISASTER_RECOVERY_MODE_CONFIG_KEY);
+      _disasterRecoveryMode = ControllerConf.getDisasterRecoveryMode(disasterRecoveryModeString);
+    }
+  }
+
+  @VisibleForTesting
+  DisasterRecoveryMode getDisasterRecoveryMode() {
+    return _disasterRecoveryMode;
   }
 
   public static final class Context {

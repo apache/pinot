@@ -116,6 +116,54 @@ public class ADLSGen2PinotFSTest {
   }
 
   @Test
+  public void testSasTokenAuthentication() {
+    PinotConfiguration pinotConfiguration = new PinotConfiguration();
+    pinotConfiguration.setProperty("authenticationType", "SAS_TOKEN");
+    pinotConfiguration.setProperty("sasToken", "sp=rwdl&se=2025-12-31T23:59:59Z&sv=2022-11-02&sr=c&sig=test");
+    pinotConfiguration.setProperty("accountName", "testaccount");
+    pinotConfiguration.setProperty("fileSystemName", "testcontainer");
+
+    when(_mockServiceClient.getFileSystemClient("testcontainer")).thenReturn(_mockFileSystemClient);
+    when(_mockFileSystemClient.getProperties()).thenReturn(null);
+
+    // Mock the creation of the service client
+    ADLSGen2PinotFS sasTokenFS = new ADLSGen2PinotFS() {
+      @Override
+      public DataLakeFileSystemClient getOrCreateClientWithFileSystem(DataLakeServiceClient serviceClient,
+          String fileSystemName) {
+        return _mockFileSystemClient;
+      }
+    };
+
+    sasTokenFS.init(pinotConfiguration);
+
+    // Verify that the filesystem client was set properly
+    assertTrue(sasTokenFS != null);
+  }
+
+  @Test(expectedExceptions = NullPointerException.class)
+  public void testSasTokenMissingToken() {
+    PinotConfiguration pinotConfiguration = new PinotConfiguration();
+    pinotConfiguration.setProperty("authenticationType", "SAS_TOKEN");
+    pinotConfiguration.setProperty("accountName", "testaccount");
+    pinotConfiguration.setProperty("fileSystemName", "testcontainer");
+    // Missing sasToken property
+
+    _adlsGen2PinotFsUnderTest.init(pinotConfiguration);
+  }
+
+  @Test(expectedExceptions = NullPointerException.class)
+  public void testSasTokenNullToken() {
+    PinotConfiguration pinotConfiguration = new PinotConfiguration();
+    pinotConfiguration.setProperty("authenticationType", "SAS_TOKEN");
+    pinotConfiguration.setProperty("sasToken", (String) null);
+    pinotConfiguration.setProperty("accountName", "testaccount");
+    pinotConfiguration.setProperty("fileSystemName", "testcontainer");
+
+    _adlsGen2PinotFsUnderTest.init(pinotConfiguration);
+  }
+
+  @Test
   public void testGetOrCreateClientWithFileSystemGet() {
     when(_mockServiceClient.getFileSystemClient(MOCK_FILE_SYSTEM_NAME)).thenReturn(_mockFileSystemClient);
     when(_mockFileSystemClient.getProperties()).thenReturn(null);

@@ -121,6 +121,7 @@ public class PluginManager {
           put("avro", "org.apache.pinot.plugin.inputformat.avro.AvroRecordReaderConfig");
           put("csv", "org.apache.pinot.plugin.inputformat.csv.CSVRecordReaderConfig");
           put("protobuf", "org.apache.pinot.plugin.inputformat.protobuf.ProtoBufRecordReaderConfig");
+          put("parquet", "org.apache.pinot.plugin.inputformat.parquet.ParquetRecordReaderConfig");
           put("thrift", "org.apache.pinot.plugin.inputformat.thrift.ThriftRecordReaderConfig");
         }
       };

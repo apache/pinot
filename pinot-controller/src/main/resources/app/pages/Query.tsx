@@ -18,13 +18,13 @@
  * under the License.
  */
 
-import React, { useEffect, useState } from 'react';
-import { makeStyles } from '@material-ui/core/styles';
-import { Grid, Checkbox, Button, FormControl, Input, InputLabel, Box, Typography, ButtonGroup } from '@material-ui/core';
+import React, {useEffect, useState} from 'react';
+import {makeStyles} from '@material-ui/core/styles';
+import {Box, Button, ButtonGroup, Checkbox, FormControl, Grid, Input, InputLabel, Typography} from '@material-ui/core';
 import Alert from '@material-ui/lab/Alert';
 import FileCopyIcon from '@material-ui/icons/FileCopy';
-import { SqlException, TableData } from 'Models';
-import { UnControlled as CodeMirror } from 'react-codemirror2';
+import {SqlException, TableData} from 'Models';
+import {UnControlled as CodeMirror} from 'react-codemirror2';
 import 'codemirror/lib/codemirror.css';
 import 'codemirror/theme/material.css';
 import 'codemirror/mode/javascript/javascript';
@@ -33,9 +33,8 @@ import 'codemirror/addon/hint/show-hint';
 import 'codemirror/addon/hint/sql-hint';
 import 'codemirror/addon/hint/show-hint.css';
 import NativeCodeMirror from 'codemirror';
-import { forEach, uniqBy, range as _range } from 'lodash';
+import {forEach, range as _range, uniqBy} from 'lodash';
 import FormControlLabel from '@material-ui/core/FormControlLabel';
-import Switch from '@material-ui/core/Switch';
 import exportFromJSON from 'export-from-json';
 import Utils from '../utils/Utils';
 import AppLoader from '../components/AppLoader';
@@ -43,12 +42,13 @@ import CustomizedTables from '../components/Table';
 import QuerySideBar from '../components/Query/QuerySideBar';
 import TableToolbar from '../components/TableToolbar';
 import SimpleAccordion from '../components/SimpleAccordion';
-import PinotMethodUtils from '../utils/PinotMethodUtils';
+import PinotMethodUtils, { QUERY_STATS_COLUMNS } from '../utils/PinotMethodUtils';
 import '../styles/styles.css';
 import {Resizable} from "re-resizable";
-import { useHistory, useLocation } from 'react-router';
+import {useHistory, useLocation} from 'react-router';
 import sqlFormatter from '@sqltools/formatter';
-import { VisualizeQueryStageStats } from '../components/Query/VisualizeQueryStageStats';
+import {FlamegraphMode, FlameGraphQueryStageStats} from '../components/Query/FlamegraphQueryStageStats';
+import {VisualizeQueryStageStats} from '../components/Query/VisualizeQueryStageStats';
 
 enum ResultViewType {
   TABULAR = 'tabular',
@@ -146,31 +146,6 @@ const sqlFuntionsList = [
   'SUMMV', 'AVGMV', 'MINMAXRANGEMV', 'DISTINCTCOUNTMV', 'DISTINCTCOUNTBITMAPMV', 'DISTINCTCOUNTHLLMV',
   'DISTINCTCOUNTRAWHLLMV', 'DISTINCT', 'ST_UNION'];
 
-const responseStatCols = [
-  'timeUsedMs',
-  'numDocsScanned',
-  'totalDocs',
-  'numServersQueried',
-  'numServersResponded',
-  'numSegmentsQueried',
-  'numSegmentsProcessed',
-  'numSegmentsMatched',
-  'numConsumingSegmentsQueried',
-  'numEntriesScannedInFilter',
-  'numEntriesScannedPostFilter',
-  'numGroupsLimitReached',
-  'partialResponse',
-  'minConsumingFreshnessTimeMs',
-  'offlineThreadCpuTimeNs',
-  'realtimeThreadCpuTimeNs',
-  'offlineSystemActivitiesCpuTimeNs',
-  'realtimeSystemActivitiesCpuTimeNs',
-  'offlineResponseSerializationCpuTimeNs',
-  'realtimeResponseSerializationCpuTimeNs',
-  'offlineTotalCpuTimeNs',
-  'realtimeTotalCpuTimeNs'
-];
-
 // A custom hook that builds on useLocation to parse the query string
 function useQuery() {
   const { search } = useLocation();
@@ -225,6 +200,10 @@ const QueryPage = () => {
   const [fetching, setFetching] = useState(true);
   const [queryLoader, setQueryLoader] = useState(false);
   const [tableList, setTableList] = useState<TableData>({
+    columns: [],
+    records: [],
+  });
+  const [logicalTableList, setLogicalTableList] = useState<TableData>({
     columns: [],
     records: [],
   });
@@ -298,7 +277,7 @@ const QueryPage = () => {
   useEffect(() => {
     handleQueryInterfaceKeyDownRef.current = handleQueryInterfaceKeyDown;
   }, [handleQueryInterfaceKeyDown]);
-  
+
 
   const handleComment = (cm: NativeCodeMirror.Editor) => {
     const selections = cm.listSelections();
@@ -384,7 +363,7 @@ const QueryPage = () => {
     const results = await PinotMethodUtils.getQueryResults(params);
     setResultError(results.exceptions || []);
     setResultData(results.result || { columns: [], records: [] });
-    setQueryStats(results.queryStats || { columns: responseStatCols, records: [] });
+    setQueryStats(results.queryStats || { columns: QUERY_STATS_COLUMNS, records: [] });
     setOutputResult(JSON.stringify(results.data, null, 2) || '');
     setStageStats(results?.data?.stageStats || {});
     setWarnings(extractWarnings(results));
@@ -451,6 +430,8 @@ const QueryPage = () => {
   const fetchData = async () => {
     const result = await PinotMethodUtils.getQueryTablesList({bothType: false});
     setTableList(result);
+    const logicalTablesResult = await PinotMethodUtils.getQueryLogicalTablesList();
+    setLogicalTableList(logicalTablesResult);
     setFetching(false);
   };
 
@@ -526,6 +507,7 @@ const QueryPage = () => {
       <Grid item>
         <QuerySideBar
           tableList={tableList}
+          logicalTableList={logicalTableList}
           fetchSQLData={fetchSQLData}
           tableSchema={tableSchema}
           selectedTable={selectedTable}
@@ -566,7 +548,7 @@ const QueryPage = () => {
                   onChange={handleOutputDataChange}
                   // Ensures the latest function is always called, preventing stale state issues due to closures.
                   // Directly passing handleQueryInterfaceKeyDown may result in outdated state references.
-                  onKeyDown={(editor, event) => handleQueryInterfaceKeyDownRef.current(editor, event)} 
+                  onKeyDown={(editor, event) => handleQueryInterfaceKeyDownRef.current(editor, event)}
                   className={classes.codeMirror}
                   autoCursor={false}
                 />
@@ -646,13 +628,13 @@ const QueryPage = () => {
                                    </Alert>
                   )
                 }
-        
+
                 {/* Sql result errors */}
                 {resultError && resultError.length > 0 && (
                     <>
-                      <Alert 
-                        className={classes.sqlError} 
-                        severity="error" 
+                      <Alert
+                        className={classes.sqlError}
+                        severity="error"
                         action={
 
                           <FormControlLabel
@@ -706,18 +688,11 @@ const QueryPage = () => {
                             />
                           </SimpleAccordion>
                       )}
-                      {showErrorType === ErrorViewType.VISUAL && (
-                          <SimpleAccordion
-                              headerTitle="Query Stats Visualized"
-                              showSearchBox={false}
-                          >
-                            <VisualizeQueryStageStats stageStats={stageStats} />
-                          </SimpleAccordion>
-                      )}
+                      {showErrorType === ErrorViewType.VISUAL && <MseVisualizer stageStats={stageStats}/>}
                     </>
                   )
                 }
-        
+
                 <Grid item xs style={{ backgroundColor: 'white' }}>
                   {resultData.columns.length ? (
                     <>
@@ -781,7 +756,7 @@ const QueryPage = () => {
                           showSearchBox={true}
                           inAccordionFormat={true}
                         />
-                      )} 
+                      )}
                       {resultViewType === ResultViewType.JSON && (
                         <SimpleAccordion
                           headerTitle="Query Result (JSON Format)"
@@ -795,14 +770,7 @@ const QueryPage = () => {
                           />
                         </SimpleAccordion>
                       )}
-                      {resultViewType === ResultViewType.VISUAL && (
-                        <SimpleAccordion
-                          headerTitle="Query Stats Visualized"
-                          showSearchBox={false}
-                        >
-                          <VisualizeQueryStageStats stageStats={stageStats} />
-                        </SimpleAccordion>
-                      )}
+                      {resultViewType === ResultViewType.VISUAL && <MseVisualizer stageStats={stageStats} />}
                     </>
                   ) : null}
                 </Grid>
@@ -814,5 +782,35 @@ const QueryPage = () => {
     </>
   );
 };
+
+const MseVisualizer = ({ stageStats }) => {
+  const [flameGraphMode, setFlameGraphMode] = useState(FlamegraphMode.CLOCK_TIME);
+  return <Grid container direction="row" alignItems="stretch" spacing={2}>
+    <Grid item xs>
+      <SimpleAccordion
+        headerTitle="Query Stats Visualized"
+        showSearchBox={false}
+        key={1}
+      >
+        <VisualizeQueryStageStats stageStats={stageStats} />
+      </SimpleAccordion>
+    </Grid>
+    <Grid item xs>
+      <SimpleAccordion
+        headerTitle="Querœy Stats Visualized"
+        showSearchBox={false}
+        key={2}
+        additionalControls={
+          <ButtonGroup color='primary' size='small'>
+            <Button onClick={() => setFlameGraphMode(FlamegraphMode.CLOCK_TIME)} variant={flameGraphMode === FlamegraphMode.CLOCK_TIME ? "contained" : "outlined"}>Clock</Button>
+            <Button onClick={() => setFlameGraphMode(FlamegraphMode.ALLOCATION)} variant={flameGraphMode === FlamegraphMode.ALLOCATION ? "contained" : "outlined"}>Alloc</Button>
+          </ButtonGroup>
+        }
+      >
+        <FlameGraphQueryStageStats stageStats={stageStats} mode={flameGraphMode}/>
+      </SimpleAccordion>
+    </Grid>
+  </Grid>
+}
 
 export default QueryPage;

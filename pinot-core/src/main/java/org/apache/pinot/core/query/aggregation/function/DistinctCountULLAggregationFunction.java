@@ -22,6 +22,7 @@ import com.dynatrace.hash4j.distinctcount.UltraLogLog;
 import com.google.common.base.Preconditions;
 import java.util.List;
 import java.util.Map;
+import javax.annotation.Nullable;
 import org.apache.pinot.common.CustomObject;
 import org.apache.pinot.common.request.context.ExpressionContext;
 import org.apache.pinot.common.utils.DataSchema.ColumnDataType;
@@ -47,8 +48,8 @@ public class DistinctCountULLAggregationFunction extends BaseSingleInputAggregat
   public DistinctCountULLAggregationFunction(List<ExpressionContext> arguments) {
     super(arguments.get(0));
     int numExpressions = arguments.size();
-    // This function expects 1 or 2 or 3 arguments.
-    Preconditions.checkArgument(numExpressions <= 2, "DistinctCountHLLPlus expects 1 or 2 arguments, got: %s",
+    // This function expects 1 or 2 arguments.
+    Preconditions.checkArgument(numExpressions <= 2, "DistinctCountULL expects 1 or 2 arguments, got: %s",
         numExpressions);
     if (arguments.size() == 2) {
       _p = arguments.get(1).getLiteral().getIntValue();
@@ -128,19 +129,19 @@ public class DistinctCountULLAggregationFunction extends BaseSingleInputAggregat
       case FLOAT:
         float[] floatValues = blockValSet.getFloatValuesSV();
         for (int i = 0; i < length; i++) {
-            UltraLogLogUtils.hashObject(floatValues[i]).ifPresent(ull::add);
+          UltraLogLogUtils.hashObject(floatValues[i]).ifPresent(ull::add);
         }
         break;
       case DOUBLE:
         double[] doubleValues = blockValSet.getDoubleValuesSV();
         for (int i = 0; i < length; i++) {
-            UltraLogLogUtils.hashObject(doubleValues[i]).ifPresent(ull::add);
+          UltraLogLogUtils.hashObject(doubleValues[i]).ifPresent(ull::add);
         }
         break;
       case STRING:
         String[] stringValues = blockValSet.getStringValuesSV();
         for (int i = 0; i < length; i++) {
-            UltraLogLogUtils.hashObject(stringValues[i]).ifPresent(ull::add);
+          UltraLogLogUtils.hashObject(stringValues[i]).ifPresent(ull::add);
         }
         break;
       default:
@@ -305,11 +306,12 @@ public class DistinctCountULLAggregationFunction extends BaseSingleInputAggregat
     }
   }
 
+  @Nullable
   @Override
   public UltraLogLog extractAggregationResult(AggregationResultHolder aggregationResultHolder) {
     Object result = aggregationResultHolder.getResult();
     if (result == null) {
-      return UltraLogLog.create(_p);
+      return null;
     }
 
     if (result instanceof DictIdsWrapper) {
@@ -321,11 +323,12 @@ public class DistinctCountULLAggregationFunction extends BaseSingleInputAggregat
     }
   }
 
+  @Nullable
   @Override
   public UltraLogLog extractGroupByResult(GroupByResultHolder groupByResultHolder, int groupKey) {
     Object result = groupByResultHolder.getResult(groupKey);
     if (result == null) {
-      return UltraLogLog.create(_p);
+      return null;
     }
 
     if (result instanceof DictIdsWrapper) {
@@ -337,13 +340,20 @@ public class DistinctCountULLAggregationFunction extends BaseSingleInputAggregat
     }
   }
 
+  @Nullable
   @Override
-  public UltraLogLog merge(UltraLogLog intermediateResult1, UltraLogLog intermediateResult2) {
-    int largerP = Math.max(intermediateResult1.getP(), intermediateResult2.getP());
-    UltraLogLog merged = UltraLogLog.create(largerP);
-    merged.add(intermediateResult1);
-    merged.add(intermediateResult2);
-    return merged;
+  public UltraLogLog merge(@Nullable UltraLogLog intermediateResult1, @Nullable UltraLogLog intermediateResult2) {
+    if (intermediateResult1 == null) {
+      return intermediateResult2;
+    }
+    if (intermediateResult2 == null) {
+      return intermediateResult1;
+    }
+    // UltraLogLog object doesn't support merging a smaller p object into a larger p object.
+    if (intermediateResult1.getP() > intermediateResult2.getP()) {
+      return intermediateResult2.add(intermediateResult1);
+    }
+    return intermediateResult1.add(intermediateResult2);
   }
 
   @Override

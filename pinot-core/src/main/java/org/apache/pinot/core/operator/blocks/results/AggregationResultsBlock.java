@@ -185,7 +185,7 @@ public class AggregationResultsBlock extends BaseResultsBlock {
   }
 
   private void setIntermediateResult(DataTableBuilder dataTableBuilder, ColumnDataType[] columnDataTypes, int index,
-      Object result) {
+      Object result) throws IOException {
     ColumnDataType columnDataType = columnDataTypes[index];
     switch (columnDataType) {
       case INT:
@@ -196,6 +196,18 @@ public class AggregationResultsBlock extends BaseResultsBlock {
         break;
       case DOUBLE:
         dataTableBuilder.setColumn(index, (double) result);
+        break;
+      case STRING:
+        dataTableBuilder.setColumn(index, result.toString());
+        break;
+      case FLOAT:
+        dataTableBuilder.setColumn(index, (float) result);
+        break;
+      case BIG_DECIMAL:
+        dataTableBuilder.setColumn(index, (BigDecimal) result);
+        break;
+      case BYTES:
+        dataTableBuilder.setColumn(index, (ByteArray) result);
         break;
       default:
         throw new IllegalStateException("Illegal column data type in intermediate result: " + columnDataType);

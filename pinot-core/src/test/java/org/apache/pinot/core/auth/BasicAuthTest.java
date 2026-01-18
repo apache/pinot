@@ -18,7 +18,6 @@
  */
 package org.apache.pinot.core.auth;
 
-import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableSet;
 import java.util.Collections;
 import java.util.HashMap;
@@ -71,8 +70,8 @@ public class BasicAuthTest {
         .hasPermission("write"));
 
     Assert.assertEquals(new BasicAuthPrincipal("name", "token", ImmutableSet.of("myTable"), Collections.emptySet(),
-        ImmutableSet.of("read"), Map.of("myTable", ImmutableList.of("cityID > 100")))
-        .getRLSFilters("myTable"), Optional.of(ImmutableList.of("cityID > 100")));
+        ImmutableSet.of("read"), Map.of("myTable", List.of("cityID > 100")))
+        .getRLSFilters("myTable"), Optional.of(List.of("cityID > 100")));
   }
 
   @Test
@@ -89,7 +88,8 @@ public class BasicAuthTest {
     config.put("principals.user.lesserImportantStuff.rls", "region = 'US'");
 
     PinotConfiguration configuration = new PinotConfiguration(config);
-    List<BasicAuthPrincipal> principals = BasicAuthUtils.extractBasicAuthPrincipals(configuration, "principals");
+    List<BasicAuthPrincipal> principals = BasicAuthPrincipalUtils
+        .extractBasicAuthPrincipals(configuration, "principals");
 
     Assert.assertEquals(principals.size(), 2);
 
@@ -146,7 +146,7 @@ public class BasicAuthTest {
   public void testExtractBasicAuthPrincipalsNoPrincipals() {
     Map<String, Object> config = new HashMap<>();
     PinotConfiguration configuration = new PinotConfiguration(config);
-    BasicAuthUtils.extractBasicAuthPrincipals(configuration, "principals");
+    BasicAuthPrincipalUtils.extractBasicAuthPrincipals(configuration, "principals");
   }
 
   @Test(expectedExceptions = IllegalArgumentException.class, expectedExceptionsMessageRegExp = "must provide a "
@@ -155,7 +155,7 @@ public class BasicAuthTest {
     Map<String, Object> config = new HashMap<>();
     config.put("principals", "admin");
     PinotConfiguration configuration = new PinotConfiguration(config);
-    BasicAuthUtils.extractBasicAuthPrincipals(configuration, "principals");
+    BasicAuthPrincipalUtils.extractBasicAuthPrincipals(configuration, "principals");
   }
 
   @Test(expectedExceptions = IllegalArgumentException.class, expectedExceptionsMessageRegExp = ".* is not a valid name")
@@ -165,6 +165,6 @@ public class BasicAuthTest {
     config.put("principals.admin.password", "secret");
     config.put("principals.user.password", "secret");
     PinotConfiguration configuration = new PinotConfiguration(config);
-    BasicAuthUtils.extractBasicAuthPrincipals(configuration, "principals");
+    BasicAuthPrincipalUtils.extractBasicAuthPrincipals(configuration, "principals");
   }
 }

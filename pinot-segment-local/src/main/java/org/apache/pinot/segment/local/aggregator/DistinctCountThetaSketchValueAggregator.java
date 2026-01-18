@@ -116,6 +116,8 @@ public class DistinctCountThetaSketchValueAggregator implements ValueAggregator<
 
   @Override
   public Object getInitialAggregatedValue(Object rawValue) {
+    // NOTE: rawValue cannot be null because this aggregator can only be used for star-tree index.
+    assert rawValue != null;
     Union thetaUnion = _setOperationBuilder.buildUnion();
     if (rawValue instanceof byte[]) { // Serialized Sketch
       byte[] bytes = (byte[]) rawValue;
@@ -173,6 +175,11 @@ public class DistinctCountThetaSketchValueAggregator implements ValueAggregator<
   @Override
   public Object cloneAggregatedValue(Object value) {
     return deserializeAggregatedValue(serializeAggregatedValue(value));
+  }
+
+  @Override
+  public boolean isAggregatedValueFixedSize() {
+    return false;
   }
 
   @Override

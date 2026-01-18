@@ -21,6 +21,7 @@ package org.apache.pinot.controller.api.resources;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.node.ObjectNode;
+import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
 import com.google.common.collect.BiMap;
 import io.swagger.annotations.Api;
@@ -36,6 +37,7 @@ import it.unimi.dsi.fastutil.Arrays;
 import it.unimi.dsi.fastutil.Swapper;
 import it.unimi.dsi.fastutil.ints.IntComparator;
 import java.io.IOException;
+import java.net.URI;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Comparator;
@@ -72,6 +74,7 @@ import org.apache.hc.client5.http.io.HttpClientConnectionManager;
 import org.apache.helix.AccessOption;
 import org.apache.helix.model.IdealState;
 import org.apache.helix.store.zk.ZkHelixPropertyStore;
+import org.apache.helix.task.TaskState;
 import org.apache.helix.zookeeper.datamodel.ZNRecord;
 import org.apache.pinot.common.exception.InvalidConfigException;
 import org.apache.pinot.common.exception.RebalanceInProgressException;
@@ -85,7 +88,9 @@ import org.apache.pinot.common.restlet.resources.TableSegmentValidationInfo;
 import org.apache.pinot.common.restlet.resources.ValidDocIdsType;
 import org.apache.pinot.common.utils.DatabaseUtils;
 import org.apache.pinot.common.utils.LogicalTableConfigUtils;
+import org.apache.pinot.common.utils.SimpleHttpResponse;
 import org.apache.pinot.common.utils.helix.HelixHelper;
+import org.apache.pinot.common.utils.http.HttpClient;
 import org.apache.pinot.controller.ControllerConf;
 import org.apache.pinot.controller.api.access.AccessControlFactory;
 import org.apache.pinot.controller.api.access.AccessType;
@@ -95,6 +100,7 @@ import org.apache.pinot.controller.api.exception.InvalidTableConfigException;
 import org.apache.pinot.controller.api.exception.TableAlreadyExistsException;
 import org.apache.pinot.controller.helix.core.PinotHelixResourceManager;
 import org.apache.pinot.controller.helix.core.PinotResourceManagerResponse;
+import org.apache.pinot.controller.helix.core.WatermarkInductionResult;
 import org.apache.pinot.controller.helix.core.controllerjob.ControllerJobTypes;
 import org.apache.pinot.controller.helix.core.minion.PinotHelixTaskResourceManager;
 import org.apache.pinot.controller.helix.core.minion.PinotTaskManager;
@@ -120,9 +126,12 @@ import org.apache.pinot.spi.config.table.TableType;
 import org.apache.pinot.spi.controller.ControllerJobType;
 import org.apache.pinot.spi.data.LogicalTableConfig;
 import org.apache.pinot.spi.data.Schema;
+import org.apache.pinot.spi.stream.LongMsgOffset;
+import org.apache.pinot.spi.stream.PartitionGroupMetadata;
 import org.apache.pinot.spi.utils.CommonConstants;
 import org.apache.pinot.spi.utils.Enablement;
 import org.apache.pinot.spi.utils.JsonUtils;
+import org.apache.pinot.spi.utils.builder.ControllerRequestURLBuilder;
 import org.apache.pinot.spi.utils.builder.TableNameBuilder;
 import org.apache.pinot.spi.utils.retry.RetryPolicies;
 import org.apache.zookeeper.data.Stat;
@@ -207,8 +216,10 @@ public class PinotTableRestletResource {
   @ManualAuthorization // performed after parsing table configs
   public ConfigSuccessResponse addTable(String tableConfigStr,
       @ApiParam(value = "comma separated list of validation type(s) to skip. supported types: (ALL|TASK|UPSERT)")
-      @QueryParam("validationTypesToSkip") @Nullable String typesToSkip, @Context HttpHeaders httpHeaders,
-      @Context Request request) {
+      @QueryParam("validationTypesToSkip") @Nullable String typesToSkip,
+      @DefaultValue("false") @QueryParam("ignoreActiveTasks") boolean ignoreActiveTasks,
+      @Context HttpHeaders httpHeaders, @Context Request request)
+      throws IOException {
     // TODO introduce a table config ctor with json string.
     Pair<TableConfig, Map<String, Object>> tableConfigAndUnrecognizedProperties;
     TableConfig tableConfig;
@@ -225,6 +236,13 @@ public class PinotTableRestletResource {
       ResourceUtils.checkPermissionAndAccess(tableNameWithType, request, httpHeaders,
           AccessType.CREATE, Actions.Table.CREATE_TABLE, _accessControlFactory, LOGGER);
 
+      // fail if table entry is present in IS. This saves all the validation checks if table already exists
+      if (_pinotHelixResourceManager.hasTable(tableNameWithType)) {
+        throw new TableAlreadyExistsException("Table config for " + tableNameWithType
+            + " already exists. If this is unexpected, try deleting the table to remove all metadata associated"
+            + " with it before attempting to recreate.");
+      }
+
       schema = _pinotHelixResourceManager.getTableSchema(tableNameWithType);
       Preconditions.checkState(schema != null, "Failed to find schema for table: %s", tableNameWithType);
 
@@ -233,6 +251,8 @@ public class PinotTableRestletResource {
       // TableConfigUtils.validate(...) is used across table create/update.
       TableConfigUtils.validate(tableConfig, schema, typesToSkip);
       TableConfigUtils.validateTableName(tableConfig);
+    } catch (TableAlreadyExistsException e) {
+      throw new ControllerApplicationException(LOGGER, e.getMessage(), Response.Status.CONFLICT, e);
     } catch (Exception e) {
       throw new ControllerApplicationException(LOGGER, e.getMessage(), Response.Status.BAD_REQUEST, e);
     }
@@ -245,6 +265,9 @@ public class PinotTableRestletResource {
         validateInstanceAssignment(tableConfig);
       } catch (Exception e) {
         throw new InvalidTableConfigException(e);
+      }
+      if (!ignoreActiveTasks) {
+        tableTasksValidation(tableConfig, _pinotHelixTaskResourceManager);
       }
       _pinotHelixResourceManager.addTable(tableConfig);
       // TODO: validate that table was created successfully
@@ -260,8 +283,144 @@ public class PinotTableRestletResource {
         throw new ControllerApplicationException(LOGGER, errStr, Response.Status.BAD_REQUEST, e);
       } else if (e instanceof TableAlreadyExistsException) {
         throw new ControllerApplicationException(LOGGER, e.getMessage(), Response.Status.CONFLICT, e);
+      } else if (e instanceof ControllerApplicationException) {
+        throw e;
       } else {
         throw new ControllerApplicationException(LOGGER, e.getMessage(), Response.Status.INTERNAL_SERVER_ERROR, e);
+      }
+    }
+  }
+
+  @POST
+  @Path("/tables/{tableName}/copy")
+  @Authorize(targetType = TargetType.TABLE, action = Actions.Table.CREATE_TABLE)
+  @Produces(MediaType.APPLICATION_JSON)
+  @ApiOperation(value = "Copy a table's schema and config from another cluster", notes = "Non upsert table only")
+  public CopyTableResponse copyTable(
+      @ApiParam(value = "Name of the table", required = true) @PathParam("tableName") String tableName, String payload,
+      @ApiParam(value = "Include verbose information in response")
+      @QueryParam("verbose") @DefaultValue("false") boolean verbose,
+      @ApiParam(value = "Dry run mode") @QueryParam("dryRun") @DefaultValue("true") boolean dryRun,
+      @Context HttpHeaders headers) {
+    try {
+      LOGGER.info("[copyTable] received request for table: {}, payload: {}", tableName, payload);
+      tableName = DatabaseUtils.translateTableName(tableName, headers);
+
+      if (_pinotHelixResourceManager.getTableConfig(TableNameBuilder.REALTIME.tableNameWithType(tableName)) != null
+          || _pinotHelixResourceManager.getTableConfig(TableNameBuilder.OFFLINE.tableNameWithType(tableName)) != null) {
+        throw new TableAlreadyExistsException("Table config for " + tableName
+            + " already exists. If this is unexpected, try deleting the table to remove all metadata associated"
+            + " with it before attempting to recreate.");
+      }
+
+      CopyTablePayload copyTablePayload = JsonUtils.stringToObject(payload, CopyTablePayload.class);
+      String sourceControllerUri = copyTablePayload.getSourceClusterUri();
+      Map<String, String> requestHeaders = copyTablePayload.getHeaders();
+
+      LOGGER.info("[copyTable] Start copying table: {} from source: {}", tableName, sourceControllerUri);
+
+      ControllerRequestURLBuilder urlBuilder = ControllerRequestURLBuilder.baseUrl(sourceControllerUri);
+
+      URI schemaUri = new URI(urlBuilder.forTableSchemaGet(tableName));
+      SimpleHttpResponse schemaResponse = HttpClient.wrapAndThrowHttpException(
+          HttpClient.getInstance().sendGetRequest(schemaUri, requestHeaders));
+      String schemaJson = schemaResponse.getResponse();
+      Schema schema = Schema.fromString(schemaJson);
+
+      URI tableConfigUri = new URI(urlBuilder.forTableGet(tableName));
+      SimpleHttpResponse tableConfigResponse = HttpClient.wrapAndThrowHttpException(
+          HttpClient.getInstance().sendGetRequest(tableConfigUri, requestHeaders));
+      String tableConfigJson = tableConfigResponse.getResponse();
+      LOGGER.info("[copyTable] Fetched table config for table: {}", tableName);
+      JsonNode tableConfigNode = JsonUtils.stringToJsonNode(tableConfigJson);
+
+      URI watermarkUri = new URI(urlBuilder.forConsumerWatermarksGet(tableName));
+      SimpleHttpResponse watermarkResponse = HttpClient.wrapAndThrowHttpException(
+          HttpClient.getInstance().sendGetRequest(watermarkUri, requestHeaders));
+      String watermarkJson = watermarkResponse.getResponse();
+      LOGGER.info("[copyTable] Fetched watermarks for table: {}. Result: {}", tableName, watermarkJson);
+      WatermarkInductionResult watermarkInductionResult =
+          JsonUtils.stringToObject(watermarkJson, WatermarkInductionResult.class);
+
+      boolean hasOffline = tableConfigNode.has(TableType.OFFLINE.name());
+      boolean hasRealtime = tableConfigNode.has(TableType.REALTIME.name());
+      if (hasOffline && !hasRealtime) {
+        throw new IllegalStateException("pure offline table copy not supported yet");
+      }
+
+      ObjectNode realtimeTableConfigNode = (ObjectNode) tableConfigNode.get(TableType.REALTIME.name());
+      tweakRealtimeTableConfig(realtimeTableConfigNode, copyTablePayload);
+      TableConfig realtimeTableConfig = JsonUtils.jsonNodeToObject(realtimeTableConfigNode, TableConfig.class);
+      if (realtimeTableConfig.getUpsertConfig() != null) {
+        throw new IllegalStateException("upsert table copy not supported");
+      }
+      LOGGER.info("[copyTable] Successfully fetched and tweaked table config for table: {}", tableName);
+
+      if (dryRun) {
+        return new CopyTableResponse("success", "Dry run", schema, realtimeTableConfig, watermarkInductionResult);
+      }
+
+      List<Pair<PartitionGroupMetadata, Integer>> partitionGroupInfos = watermarkInductionResult.getWatermarks()
+          .stream()
+          .map(watermark -> Pair.of(
+              new PartitionGroupMetadata(watermark.getPartitionGroupId(), new LongMsgOffset(watermark.getOffset())),
+              watermark.getSequenceNumber()))
+          .collect(Collectors.toList());
+
+      _pinotHelixResourceManager.addSchema(schema, true, false);
+      LOGGER.info("[copyTable] Successfully added schema for table: {}", tableName);
+      // Add the table with designated starting kafka offset and segment sequence number to create consuming segments
+      _pinotHelixResourceManager.addTable(realtimeTableConfig, partitionGroupInfos);
+      LOGGER.info("[copyTable] Successfully added table config: {} with designated high watermark", tableName);
+      CopyTableResponse response = new CopyTableResponse("success", "Table copied successfully", null, null, null);
+      if (hasOffline) {
+        response = new CopyTableResponse("warn", "detect offline too; it will only copy real-time segments",
+            null, null, null);
+      }
+      if (verbose) {
+        response.setSchema(schema);
+        response.setTableConfig(realtimeTableConfig);
+        response.setWatermarkInductionResult(watermarkInductionResult);
+      }
+      return response;
+    } catch (Exception e) {
+      LOGGER.error("[copyTable] Error copying table: {}", tableName, e);
+      throw new ControllerApplicationException(LOGGER, "Error copying table: " + e.getMessage(),
+          Response.Status.INTERNAL_SERVER_ERROR, e);
+    }
+  }
+
+  /**
+   * Helper method to tweak the realtime table config. This method is used to set the broker and server tenants, and
+   * optionally replace the pool tags in the instance assignment config.
+   *
+   * @param realtimeTableConfigNode The JSON object representing the realtime table config.
+   * @param copyTablePayload The payload containing tenant and tag pool replacement information.
+   */
+  @VisibleForTesting
+  static void tweakRealtimeTableConfig(ObjectNode realtimeTableConfigNode, CopyTablePayload copyTablePayload) {
+    String brokerTenant = copyTablePayload.getBrokerTenant();
+    String serverTenant = copyTablePayload.getServerTenant();
+    Map<String, String> tagPoolReplacementMap = copyTablePayload.getTagPoolReplacementMap();
+
+    ObjectNode tenantConfig = (ObjectNode) realtimeTableConfigNode.get("tenants");
+    tenantConfig.put("broker", brokerTenant);
+    tenantConfig.put("server", serverTenant);
+    if (tagPoolReplacementMap == null || tagPoolReplacementMap.isEmpty()) {
+      return;
+    }
+    JsonNode instanceAssignmentConfigMap = realtimeTableConfigNode.get("instanceAssignmentConfigMap");
+    if (instanceAssignmentConfigMap == null) {
+      return;
+    }
+    java.util.Iterator<Map.Entry<String, JsonNode>> iterator = instanceAssignmentConfigMap.fields();
+    while (iterator.hasNext()) {
+      Map.Entry<String, JsonNode> entry = iterator.next();
+      JsonNode instanceAssignmentConfig = entry.getValue();
+      ObjectNode tagPoolConfig = (ObjectNode) instanceAssignmentConfig.get("tagPoolConfig");
+      String srcTag = tagPoolConfig.get("tag").asText();
+      if (tagPoolReplacementMap.containsKey(srcTag)) {
+        tagPoolConfig.put("tag", tagPoolReplacementMap.get(srcTag));
       }
     }
   }
@@ -426,6 +585,7 @@ public class PinotTableRestletResource {
       @ApiParam(value = "Retention period for the table segments (e.g. 12h, 3d); If not set, the retention period "
           + "will default to the first config that's not null: the cluster setting, then '7d'. Using 0d or -1d will "
           + "instantly delete segments without retention") @QueryParam("retention") String retentionPeriod,
+      @DefaultValue("false") @QueryParam("ignoreActiveTasks") boolean ignoreActiveTasks,
       @Context HttpHeaders headers) {
     TableType tableType = Constants.validateTableType(tableTypeStr);
 
@@ -435,21 +595,25 @@ public class PinotTableRestletResource {
       validateLogicalTableReference(tableName, tableType);
       boolean tableExist = false;
       if (verifyTableType(tableName, tableType, TableType.OFFLINE)) {
+        String tableWithType = TableNameBuilder.OFFLINE.tableNameWithType(tableName);
+        tableTasksCleanup(tableWithType, ignoreActiveTasks, _pinotHelixResourceManager, _pinotHelixTaskResourceManager);
         tableExist = _pinotHelixResourceManager.hasOfflineTable(tableName);
         // Even the table name does not exist, still go on to delete remaining table metadata in case a previous delete
         // did not complete.
         _pinotHelixResourceManager.deleteOfflineTable(tableName, retentionPeriod);
         if (tableExist) {
-          tablesDeleted.add(TableNameBuilder.OFFLINE.tableNameWithType(tableName));
+          tablesDeleted.add(tableWithType);
         }
       }
       if (verifyTableType(tableName, tableType, TableType.REALTIME)) {
+        String tableWithType = TableNameBuilder.REALTIME.tableNameWithType(tableName);
+        tableTasksCleanup(tableWithType, ignoreActiveTasks, _pinotHelixResourceManager, _pinotHelixTaskResourceManager);
         tableExist = _pinotHelixResourceManager.hasRealtimeTable(tableName);
         // Even the table name does not exist, still go on to delete remaining table metadata in case a previous delete
         // did not complete.
         _pinotHelixResourceManager.deleteRealtimeTable(tableName, retentionPeriod);
         if (tableExist) {
-          tablesDeleted.add(TableNameBuilder.REALTIME.tableNameWithType(tableName));
+          tablesDeleted.add(tableWithType);
         }
       }
       if (!tablesDeleted.isEmpty()) {
@@ -461,6 +625,78 @@ public class PinotTableRestletResource {
     }
     throw new ControllerApplicationException(LOGGER,
         "Table '" + tableName + "' with type " + tableType + " does not exist", Response.Status.NOT_FOUND);
+  }
+
+  public static void tableTasksValidation(TableConfig tableConfig,
+      PinotHelixTaskResourceManager pinotHelixTaskResourceManager) {
+    if (tableConfig.getTaskConfig() == null) {
+      return;
+    }
+    String tableWithType = tableConfig.getTableName();
+    Map<String, Map<String, String>> taskTypeConfigsMap = tableConfig.getTaskConfig().getTaskTypeConfigsMap();
+    for (String taskType : taskTypeConfigsMap.keySet()) {
+      Map<String, TaskState> taskStates;
+      try {
+        taskStates = pinotHelixTaskResourceManager.getTaskStatesByTable(taskType, tableWithType);
+      } catch (IllegalArgumentException e) {
+        LOGGER.info(e.getMessage());
+        return;
+      }
+      if (!taskStates.isEmpty()) {
+        throw new ControllerApplicationException(LOGGER, "The table has dangling task data, try performing table "
+            + "delete operation in case the delete operation was not completed successfully, else delete the tasks "
+            + "manually through DELETE /tasks/task/{taskName} endpoint. Please try again once the dangling tasks are "
+            + "cleaned up", Response.Status.BAD_REQUEST);
+      }
+    }
+  }
+
+  public static void tableTasksCleanup(String tableWithType, boolean ignoreActiveTasks,
+      PinotHelixResourceManager pinotHelixResourceManager, PinotHelixTaskResourceManager pinotHelixTaskResourceManager)
+      throws IOException {
+    TableConfig tableConfig = pinotHelixResourceManager.getTableConfig(tableWithType);
+    if (tableConfig == null || tableConfig.getTaskConfig() == null) {
+      return;
+    }
+    Map<String, Map<String, String>> taskTypeConfigsMap = tableConfig.getTaskConfig().getTaskTypeConfigsMap();
+    Set<String> taskTypes = taskTypeConfigsMap.keySet();
+    boolean tableConfigChanged = false;
+    for (String taskType : taskTypes) {
+      // remove the task schedules to avoid task being scheduled during table deletion
+      tableConfigChanged =
+          tableConfigChanged || taskTypeConfigsMap.get(taskType).remove(PinotTaskManager.SCHEDULE_KEY) != null;
+    }
+    if (tableConfigChanged) {
+      try {
+        pinotHelixResourceManager.updateTableConfig(tableConfig);
+      } catch (Exception e) {
+        LOGGER.warn("Unable to remove the task schedules, going ahead with table deletion anyways. "
+            + "Reason for failure : {}", e.getMessage());
+      }
+    }
+    List<String> pendingTasks = new ArrayList<>();
+    for (String taskType : taskTypes) {
+      Map<String, TaskState> taskStates;
+      try {
+        taskStates = pinotHelixTaskResourceManager.getTaskStatesByTable(taskType, tableWithType);
+      } catch (IllegalArgumentException e) {
+        LOGGER.info(e.getMessage());
+        continue;
+      }
+      for (String taskName : taskStates.keySet()) {
+        if (TaskState.IN_PROGRESS.equals(taskStates.get(taskName))
+            && pinotHelixTaskResourceManager.getTaskCount(taskName).getRunning() > 0) {
+          pendingTasks.add(taskName);
+        } else {
+          pinotHelixTaskResourceManager.deleteTask(taskName, true);
+        }
+      }
+    }
+    if (!ignoreActiveTasks && !pendingTasks.isEmpty()) {
+      throw new ControllerApplicationException(LOGGER, "The table has " + pendingTasks.size() + " active running tasks "
+          + ": " + pendingTasks + ". The task schedules have been cleared, so new tasks should not be generated. "
+          + "Please try again once there are no more active tasks", Response.Status.BAD_REQUEST);
+    }
   }
 
   //   Return true iff the table is of the expectedType based on the given tableName and tableType. The truth table:
@@ -628,6 +864,8 @@ public class PinotTableRestletResource {
       boolean dryRun,
       @ApiParam(value = "Whether to enable pre-checks for table, must be in dry-run mode to enable")
       @DefaultValue("false") @QueryParam("preChecks") boolean preChecks,
+      @ApiParam(value = "Whether to disable summary calculation")
+      @DefaultValue("false") @QueryParam("disableSummary") boolean disableSummary,
       @ApiParam(value = "Whether to reassign instances before reassigning segments") @DefaultValue("true")
       @QueryParam("reassignInstances") boolean reassignInstances,
       @ApiParam(value = "Whether to reassign CONSUMING segments for real-time table") @DefaultValue("true")
@@ -640,6 +878,13 @@ public class PinotTableRestletResource {
       @DefaultValue("false") @QueryParam("bootstrap") boolean bootstrap,
       @ApiParam(value = "Whether to allow downtime for the rebalance") @DefaultValue("false") @QueryParam("downtime")
       boolean downtime,
+      @ApiParam(value = "This flag only applies to peer-download enabled tables undergoing downtime=true or "
+          + "minAvailableReplicas=0 rebalance (both of which can result in possible data loss scenarios). If enabled, "
+          + "this flag will allow the rebalance to continue even in cases where data loss scenarios have been "
+          + "detected, otherwise the rebalance will be failed and user action will be required to rebalance again. "
+          + "This flag should be used with caution and only used in scenarios where data loss is acceptable")
+      @DefaultValue("false") @QueryParam("allowPeerDownloadDataLoss")
+      boolean allowPeerDownloadDataLoss,
       @ApiParam(value = "For no-downtime rebalance, minimum number of replicas to keep alive during rebalance, or "
           + "maximum number of replicas allowed to be unavailable if value is negative") @DefaultValue("-1")
       @QueryParam("minAvailableReplicas") int minAvailableReplicas,
@@ -682,13 +927,13 @@ public class PinotTableRestletResource {
       @DefaultValue("false")
       @QueryParam("forceCommit") boolean forceCommit,
       @ApiParam(value = "Batch size for force commit operations")
-      @DefaultValue(ForceCommitBatchConfig.DEFAULT_BATCH_SIZE + "")
+      @DefaultValue(BatchConfig.DEFAULT_BATCH_SIZE + "")
       @QueryParam("forceCommitBatchSize") int forceCommitBatchSize,
       @ApiParam(value = "Interval in milliseconds for checking force commit batch status")
-      @DefaultValue(ForceCommitBatchConfig.DEFAULT_STATUS_CHECK_INTERVAL_SEC * 1000 + "")
+      @DefaultValue(BatchConfig.DEFAULT_STATUS_CHECK_INTERVAL_SEC * 1000 + "")
       @QueryParam("forceCommitBatchStatusCheckIntervalMs") int forceCommitBatchStatusCheckIntervalMs,
       @ApiParam(value = "Timeout in milliseconds for force commit batch status check")
-      @DefaultValue(ForceCommitBatchConfig.DEFAULT_STATUS_CHECK_TIMEOUT_SEC * 1000 + "")
+      @DefaultValue(BatchConfig.DEFAULT_STATUS_CHECK_TIMEOUT_SEC * 1000 + "")
       @QueryParam("forceCommitBatchStatusCheckTimeoutMs") int forceCommitBatchStatusCheckTimeoutMs,
       @Context HttpHeaders headers
       //@formatter:on
@@ -698,11 +943,13 @@ public class PinotTableRestletResource {
     RebalanceConfig rebalanceConfig = new RebalanceConfig();
     rebalanceConfig.setDryRun(dryRun);
     rebalanceConfig.setPreChecks(preChecks);
+    rebalanceConfig.setDisableSummary(disableSummary);
     rebalanceConfig.setReassignInstances(reassignInstances);
     rebalanceConfig.setIncludeConsuming(includeConsuming);
     rebalanceConfig.setMinimizeDataMovement(minimizeDataMovement);
     rebalanceConfig.setBootstrap(bootstrap);
     rebalanceConfig.setDowntime(downtime);
+    rebalanceConfig.setAllowPeerDownloadDataLoss(allowPeerDownloadDataLoss);
     rebalanceConfig.setMinAvailableReplicas(minAvailableReplicas);
     rebalanceConfig.setLowDiskMode(lowDiskMode);
     rebalanceConfig.setBestEfforts(bestEfforts);
@@ -814,7 +1061,8 @@ public class PinotTableRestletResource {
       @Context HttpHeaders headers) {
     tableName = DatabaseUtils.translateTableName(tableName, headers);
     String tableNameWithType = constructTableNameWithType(tableName, tableTypeStr);
-    return _tableRebalanceManager.cancelRebalance(tableNameWithType);
+    return TableRebalanceManager.cancelRebalance(tableNameWithType, _pinotHelixResourceManager,
+        RebalanceResult.Status.CANCELLED);
   }
 
   @GET
@@ -991,8 +1239,8 @@ public class PinotTableRestletResource {
   public String getTableAggregateMetadata(
       @ApiParam(value = "Name of the table", required = true) @PathParam("tableName") String tableName,
       @ApiParam(value = "OFFLINE|REALTIME") @QueryParam("type") String tableTypeStr,
-      @ApiParam(value = "Columns name", allowMultiple = true) @QueryParam("columns") @DefaultValue("")
-      List<String> columns, @Context HttpHeaders headers) {
+      @ApiParam(value = "Columns name", allowMultiple = true) @QueryParam("columns") List<String> columns,
+      @Context HttpHeaders headers) {
     tableName = DatabaseUtils.translateTableName(tableName, headers);
     LOGGER.info("Received a request to fetch aggregate metadata for a table {}", tableName);
     TableType tableType = Constants.validateTableType(tableTypeStr);

@@ -31,6 +31,7 @@ import org.apache.spark.unsafe.types.UTF8String
 import org.roaringbitmap.RoaringBitmap
 
 import scala.io.Source
+import java.math.{BigDecimal => JBigDecimal, RoundingMode}
 
 /**
  * Test pinot/spark conversions like schema, data table etc.
@@ -201,6 +202,18 @@ class DataExtractorTest extends BaseTest {
     resultSchema.fields should contain theSameElementsAs sparkSchema.fields
   }
 
+  test("Pinot schema to Spark schema should map BIG_DECIMAL and JSON correctly") {
+    val pinotSchema = new Schema.SchemaBuilder()
+      .addSingleValueDimension("decCol", org.apache.pinot.spi.data.FieldSpec.DataType.BIG_DECIMAL)
+      .addSingleValueDimension("jsonCol", org.apache.pinot.spi.data.FieldSpec.DataType.JSON)
+      .build()
+
+    val sparkSchema = DataExtractor.pinotSchemaToSparkSchema(pinotSchema)
+
+    sparkSchema.apply("decCol").dataType shouldEqual DecimalType(38, 18)
+    sparkSchema.apply("jsonCol").dataType shouldEqual StringType
+  }
+
   test("Should fail if configured when metadata indicates invalid segments") {
     val columnNames = Array(
       "strCol"
@@ -233,5 +246,39 @@ class DataExtractorTest extends BaseTest {
     val result =
       DataExtractor.pinotDataTableToInternalRows(dataTable, schema, failOnInvalidSegments = false).head
     result.getString(0) shouldEqual "strValue"
+  }
+
+  test("DataExtractor should handle BIG_DECIMAL and JSON column types") {
+    val columnNames = Array(
+      "decCol",
+      "jsonCol"
+    )
+    val columnTypes = Array(
+      ColumnDataType.BIG_DECIMAL,
+      ColumnDataType.JSON
+    )
+    val dataSchema = new DataSchema(columnNames, columnTypes)
+
+    val dataTableBuilder = DataTableBuilderFactory.getDataTableBuilder(dataSchema)
+    dataTableBuilder.startRow()
+    val inputDecimal = new JBigDecimal("123.456789")
+    dataTableBuilder.setColumn(0, inputDecimal)
+    val jsonString = "{" + "\"a\":1," + "\"b\":\"x\"}" // {"a":1,"b":"x"}
+    dataTableBuilder.setColumn(1, jsonString)
+    dataTableBuilder.finishRow()
+    val dataTable = dataTableBuilder.build()
+
+    val sparkSchema = StructType(
+      Seq(
+        StructField("decCol", DecimalType(38, 18)),
+        StructField("jsonCol", StringType)
+      )
+    )
+
+    val result = DataExtractor.pinotDataTableToInternalRows(dataTable, sparkSchema, failOnInvalidSegments = false).head
+
+    val expectedScaled = inputDecimal.setScale(18, RoundingMode.HALF_UP)
+    result.getDecimal(0, 38, 18).toJavaBigDecimal shouldEqual expectedScaled
+    result.getString(1) shouldEqual jsonString
   }
 }

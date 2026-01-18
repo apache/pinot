@@ -25,9 +25,10 @@ import java.util.Objects;
 import java.util.stream.Collectors;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.helix.HelixManager;
+import org.apache.pinot.common.auth.BasicAuthTokenUtils;
 import org.apache.pinot.common.config.provider.AccessControlUserCache;
 import org.apache.pinot.common.utils.BcryptUtils;
-import org.apache.pinot.core.auth.BasicAuthUtils;
+import org.apache.pinot.core.auth.BasicAuthPrincipalUtils;
 import org.apache.pinot.core.auth.ZkBasicAuthPrincipal;
 import org.apache.pinot.spi.auth.server.RequesterIdentity;
 import org.apache.pinot.spi.env.PinotConfiguration;
@@ -91,12 +92,13 @@ public class ZkBasicAuthAccessFactory implements AccessControlFactory {
         initUserCache();
       }
       Collection<String> tokens = getTokens(requesterIdentity);
-      _name2principal = BasicAuthUtils.extractBasicAuthPrincipals(_userCache.getAllServerUserConfig()).stream()
-          .collect(Collectors.toMap(ZkBasicAuthPrincipal::getName, p -> p));
+      _name2principal =
+          BasicAuthPrincipalUtils.extractBasicAuthPrincipals(_userCache.getAllServerUserConfig()).stream()
+              .collect(Collectors.toMap(ZkBasicAuthPrincipal::getName, p -> p));
 
       Map<String, String> name2password = tokens.stream().collect(
-          Collectors.toMap(org.apache.pinot.common.auth.BasicAuthUtils::extractUsername,
-              org.apache.pinot.common.auth.BasicAuthUtils::extractPassword));
+          Collectors.toMap(BasicAuthTokenUtils::extractUsername, BasicAuthTokenUtils::extractPassword,
+              (v1, v2) -> v2));
       Map<String, ZkBasicAuthPrincipal> password2principal =
           name2password.keySet().stream().collect(Collectors.toMap(name2password::get, _name2principal::get));
       return password2principal.entrySet().stream().filter(

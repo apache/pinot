@@ -28,7 +28,7 @@
       https://logging.apache.org/log4j/2.x/manual/pattern-layout.html#converter-not-empty
       and https://logging.apache.org/log4j/2.x/manual/pattern-layout.html#converter-thread-context-map
     -->
-    <Property name="LOG_PATTERN">%d{yyyy/MM/dd HH:mm:ss.SSS} %p [%c{1}] [%t]%notEmpty{ [cid=%X{pinot.query.cid}%notEmpty{,stg=%X{pinot.mse.stageId}}]} %m%n</Property>
+    <Property name="LOG_PATTERN">%d{yyyy/MM/dd HH:mm:ss.SSS} %p [%c{1}] [%t]%notEmpty{ [cid=%X{pinot.query.cid}%notEmpty{,hash=%X{pinot.query.hash}}%notEmpty{,stg=%X{pinot.mse.stageId}}]} %m%n</Property>
     <Property name="PINOT_COMPONENT">all</Property>
   </Properties>
   <Appenders>
@@ -41,6 +41,16 @@
       <PatternLayout pattern="${env:LOG_PATTERN}"/>
       <Policies>
         <SizeBasedTriggeringPolicy size="19500KB"/>
+      </Policies>
+      <DefaultRolloverStrategy max="10"/>
+    </RollingFile>
+    <RollingFile name="auditLog" fileName="${env:LOG_ROOT}/pinot-audit.log"
+                 filePattern="${env:LOG_ROOT}/audit-%d{yyyy-MM-dd}-%i.log"
+                 immediateFlush="false">
+      <PatternLayout pattern="%m%n"/>
+      <Policies>
+        <SizeBasedTriggeringPolicy size="19500KB"/>
+        <TimeBasedTriggeringPolicy/>
       </Policies>
       <DefaultRolloverStrategy max="10"/>
     </RollingFile>
@@ -69,6 +79,9 @@
       <AppenderRef ref="pinotLog"/>
       <AppenderRef ref="console" level="error"/>
     </Root>
+    <Logger name="org.apache.pinot.audit" level="${env:AUDIT_LOG_LEVEL:-info}" additivity="false">
+      <AppenderRef ref="auditLog"/>
+    </Logger>
     <Logger name="org.apache.pinot.tools.admin" level="info" additivity="false">
       <AppenderRef ref="console"/>
     </Logger>

@@ -25,6 +25,7 @@ import java.io.DataOutput;
 import java.io.IOException;
 import java.util.Collections;
 import java.util.EnumMap;
+import java.util.HashMap;
 import java.util.Map;
 import java.util.Objects;
 import java.util.concurrent.ConcurrentHashMap;
@@ -45,7 +46,7 @@ import org.apache.pinot.spi.utils.JsonUtils;
  *   <li>Change the name of the keys</li>
  * </ul>
  *
- * Any other change (like changing the type of key, changing their literal order are not supported or removing keys)
+ * Any other change (like changing the type of key, changing their literal order or removing keys)
  * are backward incompatible changes.
  * @param <K>
  */
@@ -54,10 +55,13 @@ public class StatMap<K extends Enum<K> & StatMap.Key> {
   private final Map<K, Object> _map;
 
   private static final ConcurrentHashMap<Class<?>, Object[]> KEYS_BY_CLASS = new ConcurrentHashMap<>();
+  private static final ConcurrentHashMap<Class<?>, Map<String, Object>> KEYS_BY_STRING_BY_CLASS
+      = new ConcurrentHashMap<>();
 
   public StatMap(Class<K> keyClass) {
     _keyClass = keyClass;
     // TODO: Study whether this is fine or we should impose a single thread policy in StatMaps
+    // TODO: We might need to synchronize the methods because some methods access the map multiple times
     _map = Collections.synchronizedMap(new EnumMap<>(keyClass));
   }
 
@@ -166,6 +170,25 @@ public class StatMap<K extends Enum<K> & StatMap.Key> {
   }
 
   /**
+   * Returns the value associated with the key name.
+   *
+   * In general, it is better to use the type-specific getters with the enum key directly, but sometimes it is
+   * impossible or requires complex to read code (like complex unsafe casts).
+   *
+   * @param keyName The name of the key.
+   * @param defaultValue The default value to return if the key is not found.
+   * @throws ClassCastException if the value cannot be cast to the same static type as the default value.
+   */
+  public <E> E getUnsafe(String keyName, E defaultValue)
+      throws ClassCastException {
+    K key = getKey(keyName);
+    if (key == null) {
+      return defaultValue;
+    }
+    return (E) getAny(key);
+  }
+
+  /**
    * Modifies this object to merge the values of the other object.
    *
    * @param other The object to merge with. This argument will not be modified.
@@ -200,11 +223,28 @@ public class StatMap<K extends Enum<K> & StatMap.Key> {
     return this;
   }
 
+  private K[] keys() {
+    return (K[]) KEYS_BY_CLASS.computeIfAbsent(_keyClass, k -> k.getEnumConstants());
+  }
+
+  @Nullable
+  private K getKey(String name) {
+    Map<String, Object> cachedMap = KEYS_BY_STRING_BY_CLASS.computeIfAbsent(_keyClass, k -> {
+      K[] keys = (K[]) k.getEnumConstants();
+      Map<String, Object> mapValue = new HashMap<>();
+      for (K key : keys) {
+        mapValue.put(key.name(), key);
+      }
+      return mapValue;
+    });
+    return (K) cachedMap.get(name);
+  }
+
   public StatMap<K> merge(DataInput input)
       throws IOException {
     byte serializedKeys = input.readByte();
 
-    K[] keys = (K[]) KEYS_BY_CLASS.computeIfAbsent(_keyClass, k -> k.getEnumConstants());
+    K[] keys = keys();
     for (byte i = 0; i < serializedKeys; i++) {
       int ordinal = input.readByte();
       K key = keys[ordinal];

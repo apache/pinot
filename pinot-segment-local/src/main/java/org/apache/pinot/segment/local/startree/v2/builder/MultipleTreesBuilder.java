@@ -24,10 +24,12 @@ import java.io.File;
 import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.util.ArrayList;
+import java.util.Iterator;
 import java.util.List;
 import javax.annotation.Nullable;
 import org.apache.commons.collections4.CollectionUtils;
 import org.apache.commons.configuration2.Configuration;
+import org.apache.commons.configuration2.ConfigurationUtils;
 import org.apache.commons.configuration2.PropertiesConfiguration;
 import org.apache.commons.io.FileUtils;
 import org.apache.commons.lang3.tuple.Pair;
@@ -68,6 +70,8 @@ public class MultipleTreesBuilder implements Closeable {
   private final ImmutableSegment _segment;
   private StarTreeIndexSeparator _separator;
   private File _separatorTempDir;
+  private Configuration _existingStarTreeMetadata;
+  private boolean _starTreeCreationFailed;
 
   public enum BuildMode {
     ON_HEAP, OFF_HEAP
@@ -100,6 +104,7 @@ public class MultipleTreesBuilder implements Closeable {
       LOGGER.debug(logUpdatedStarTrees.toString());
     }
     _segment = ImmutableSegmentLoader.load(indexDir, ReadMode.mmap);
+    _starTreeCreationFailed = false;
   }
 
   /**
@@ -129,6 +134,7 @@ public class MultipleTreesBuilder implements Closeable {
       _segment.destroy();
       throw e;
     }
+    _starTreeCreationFailed = false;
   }
 
   @Nullable
@@ -149,6 +155,10 @@ public class MultipleTreesBuilder implements Closeable {
       StarTreeIndexSeparator separator =
           new StarTreeIndexSeparator(new File(_separatorTempDir, StarTreeV2Constants.INDEX_MAP_FILE_NAME),
               new File(_separatorTempDir, StarTreeV2Constants.INDEX_FILE_NAME), starTreeMetadataList);
+      // Copy the star-tree metadata into a separate configuration in case star-tree index creation fails
+      _existingStarTreeMetadata = new PropertiesConfiguration();
+      ConfigurationUtils.copy(_metadataProperties.subset(StarTreeV2Constants.MetadataKey.STAR_TREE_SUBSET),
+          _existingStarTreeMetadata);
       _metadataProperties.subset(StarTreeV2Constants.MetadataKey.STAR_TREE_SUBSET).clear();
       CommonsConfigurationUtils.saveToFile(_metadataProperties,
           new File(_segmentDirectory, V1Constants.MetadataKeys.METADATA_FILE_NAME));
@@ -175,28 +185,44 @@ public class MultipleTreesBuilder implements Closeable {
     LOGGER.info("Starting building {} star-trees with configs: {} using {} builder", numStarTrees, _builderConfigs,
         _buildMode);
 
-    try (StarTreeIndexCombiner indexCombiner = new StarTreeIndexCombiner(
-        new File(_segmentDirectory, StarTreeV2Constants.INDEX_FILE_NAME))) {
+    File starTreeV2IndexFile = new File(_segmentDirectory, StarTreeV2Constants.INDEX_FILE_NAME);
+    try (StarTreeIndexCombiner indexCombiner = new StarTreeIndexCombiner(starTreeV2IndexFile)) {
       File starTreeIndexDir = new File(_segmentDirectory, StarTreeV2Constants.STAR_TREE_TEMP_DIR);
       FileUtils.forceMkdir(starTreeIndexDir);
       _metadataProperties.addProperty(MetadataKey.STAR_TREE_COUNT, numStarTrees);
       List<List<Pair<IndexKey, IndexValue>>> indexMaps = new ArrayList<>(numStarTrees);
 
       // Build all star-trees
-      for (int i = 0; i < numStarTrees; i++) {
-        StarTreeV2BuilderConfig builderConfig = _builderConfigs.get(i);
-        Configuration metadataProperties = _metadataProperties.subset(MetadataKey.getStarTreePrefix(i));
-        if (_separator != null && handleExistingStarTreeAddition(starTreeIndexDir, metadataProperties, builderConfig)) {
-          // Used existing tree
-          LOGGER.info("Reused existing star-tree: {}", builderConfig.toString());
-          reusedStarTrees++;
-        } else {
-          try (SingleTreeBuilder singleTreeBuilder = getSingleTreeBuilder(builderConfig, starTreeIndexDir, _segment,
-              metadataProperties, _buildMode)) {
-            singleTreeBuilder.build();
+      try {
+        for (int i = 0; i < numStarTrees; i++) {
+          StarTreeV2BuilderConfig builderConfig = _builderConfigs.get(i);
+          Configuration metadataProperties = _metadataProperties.subset(MetadataKey.getStarTreePrefix(i));
+          if (_separator != null && handleExistingStarTreeAddition(starTreeIndexDir, metadataProperties,
+              builderConfig)) {
+            // Used existing tree
+            LOGGER.info("Reused existing star-tree: {}", builderConfig.toString());
+            reusedStarTrees++;
+          } else {
+            try (SingleTreeBuilder singleTreeBuilder = getSingleTreeBuilder(builderConfig, starTreeIndexDir, _segment,
+                metadataProperties, _buildMode)) {
+              singleTreeBuilder.build();
+            }
           }
+          indexMaps.add(indexCombiner.combine(builderConfig, starTreeIndexDir));
         }
-        indexMaps.add(indexCombiner.combine(builderConfig, starTreeIndexDir));
+      } catch (Exception e) {
+        // Clean-up some of the files created before throwing exception back to caller
+        // No need to undo changes to _metadataProperties as changes weren't saved to the file
+        LOGGER.error("Failed to build star-trees, cleaning up the index file and temp directory if they exist");
+        _starTreeCreationFailed = true;
+        if (starTreeV2IndexFile.exists()) {
+          FileUtils.forceDelete(starTreeV2IndexFile);
+        }
+        if (starTreeIndexDir.exists()) {
+          FileUtils.forceDelete(starTreeIndexDir);
+        }
+        _metadataProperties.clearProperty(MetadataKey.STAR_TREE_COUNT);
+        throw e;
       }
 
       // Save the metadata and index maps to the disk
@@ -240,13 +266,46 @@ public class MultipleTreesBuilder implements Closeable {
   }
 
   @Override
-  public void close() {
+  public void close()
+      throws IOException {
     if (_separatorTempDir != null) {
+      if (_starTreeCreationFailed) {
+        try {
+          LOGGER.info("Star-tree index creation failed, trying to reset the older star-tree index and metadata");
+          FileUtils.moveFileToDirectory(new File(_separatorTempDir, StarTreeV2Constants.INDEX_FILE_NAME),
+              _segmentDirectory,
+              false);
+          FileUtils.moveFileToDirectory(new File(_separatorTempDir, StarTreeV2Constants.INDEX_MAP_FILE_NAME),
+              _segmentDirectory, false);
+
+          // Copy back the older star-tree related metadata
+          Iterator<String> keys = _existingStarTreeMetadata.getKeys();
+          while (keys.hasNext()) {
+            String key = keys.next();
+            Object value = _existingStarTreeMetadata.getProperty(key);
+            _metadataProperties.addProperty(MetadataKey.STAR_TREE_PREFIX + key, value);
+          }
+          CommonsConfigurationUtils.saveToFile(_metadataProperties,
+              new File(_segmentDirectory, V1Constants.MetadataKeys.METADATA_FILE_NAME));
+        } catch (Exception e) {
+          LOGGER.error("Could not reset the star-tree index state to the previous one", e);
+          // Perform remaining clean-up if possible
+          try {
+            FileUtils.forceDelete(_separatorTempDir);
+          } catch (Exception ex) {
+            LOGGER.warn("Caught exception while deleting the separator tmp directory: {}",
+                _separatorTempDir.getAbsolutePath(), ex);
+          }
+          _segment.destroy();
+          throw e;
+        }
+      }
+
       try {
         FileUtils.forceDelete(_separatorTempDir);
       } catch (Exception e) {
         LOGGER.warn("Caught exception while deleting the separator tmp directory: {}",
-            _separatorTempDir.getAbsolutePath());
+            _separatorTempDir.getAbsolutePath(), e);
       }
     }
     _segment.destroy();

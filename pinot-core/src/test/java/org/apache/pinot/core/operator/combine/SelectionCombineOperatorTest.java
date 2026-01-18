@@ -48,6 +48,7 @@ import org.apache.pinot.spi.data.readers.GenericRow;
 import org.apache.pinot.spi.utils.CommonConstants.Server;
 import org.apache.pinot.spi.utils.ReadMode;
 import org.apache.pinot.spi.utils.builder.TableConfigBuilder;
+import org.intellij.lang.annotations.Language;
 import org.testng.annotations.AfterClass;
 import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
@@ -114,7 +115,7 @@ public class SelectionCombineOperatorTest {
   }
 
   @Test
-  public void testSelectionLimit0() {
+  public void selectionLimit0() {
     SelectionResultsBlock combineResult = getCombineResult("SELECT * FROM testTable LIMIT 0");
     assertEquals(combineResult.getDataSchema(),
         new DataSchema(new String[]{INT_COLUMN}, new DataSchema.ColumnDataType[]{DataSchema.ColumnDataType.INT}));
@@ -130,7 +131,7 @@ public class SelectionCombineOperatorTest {
   }
 
   @Test
-  public void testSelectionOnly() {
+  public void selectionOnly() {
     SelectionResultsBlock combineResult = getCombineResult("SELECT * FROM testTable");
     assertEquals(combineResult.getDataSchema(),
         new DataSchema(new String[]{INT_COLUMN}, new DataSchema.ColumnDataType[]{DataSchema.ColumnDataType.INT}));
@@ -177,8 +178,10 @@ public class SelectionCombineOperatorTest {
   }
 
   @Test
-  public void testSelectionOrderBy() {
-    SelectionResultsBlock combineResult = getCombineResult("SELECT * FROM testTable ORDER BY intColumn");
+  public void selectionOrderByAscending() {
+    SelectionResultsBlock combineResult = getCombineResult(
+        "SET allowReverseOrder=false;"
+        + "SELECT * FROM testTable ORDER BY intColumn");
     assertEquals(combineResult.getDataSchema(),
         new DataSchema(new String[]{INT_COLUMN}, new DataSchema.ColumnDataType[]{DataSchema.ColumnDataType.INT}));
     List<Object[]> rows = combineResult.getRows();
@@ -198,11 +201,16 @@ public class SelectionCombineOperatorTest {
     int numSegmentsMatched = combineResult.getNumSegmentsMatched();
     assertTrue(numSegmentsMatched >= 1 && numSegmentsMatched <= QueryMultiThreadingUtils.MAX_NUM_THREADS_PER_QUERY);
     assertEquals(combineResult.getNumTotalDocs(), NUM_SEGMENTS * NUM_RECORDS_PER_SEGMENT);
+  }
 
-    combineResult = getCombineResult("SELECT * FROM testTable ORDER BY intColumn DESC");
+  @Test
+  public void selectionOrderByDescending() {
+    SelectionResultsBlock combineResult = getCombineResult(
+        "SET allowReverseOrder=false; "
+            + "SELECT * FROM testTable ORDER BY intColumn DESC");
     assertEquals(combineResult.getDataSchema(),
         new DataSchema(new String[]{INT_COLUMN}, new DataSchema.ColumnDataType[]{DataSchema.ColumnDataType.INT}));
-    rows = combineResult.getRows();
+    List<Object[]> rows = combineResult.getRows();
     assertNotNull(rows);
     assertEquals(rows.size(), 10);
     int expectedValue = NUM_SEGMENTS * NUM_RECORDS_PER_SEGMENT / 2 + 49;
@@ -211,24 +219,32 @@ public class SelectionCombineOperatorTest {
     }
     // Should early-terminate after processing the result of the first segment. Each thread should process at most 1
     // segment.
-    numDocsScanned = combineResult.getNumDocsScanned();
+    long numDocsScanned = combineResult.getNumDocsScanned();
     assertTrue(numDocsScanned >= NUM_RECORDS_PER_SEGMENT
-        && numDocsScanned <= QueryMultiThreadingUtils.MAX_NUM_THREADS_PER_QUERY * NUM_RECORDS_PER_SEGMENT);
+        && numDocsScanned <= QueryMultiThreadingUtils.MAX_NUM_THREADS_PER_QUERY * NUM_RECORDS_PER_SEGMENT,
+        "Expected number of docs scanned to be between " + NUM_RECORDS_PER_SEGMENT + " and "
+            + (QueryMultiThreadingUtils.MAX_NUM_THREADS_PER_QUERY * NUM_RECORDS_PER_SEGMENT) + ", but got: "
+            + numDocsScanned);
     assertEquals(combineResult.getNumEntriesScannedInFilter(), 0);
     assertEquals(combineResult.getNumEntriesScannedPostFilter(), numDocsScanned);
     assertEquals(combineResult.getNumSegmentsProcessed(), NUM_SEGMENTS);
-    numSegmentsMatched = combineResult.getNumSegmentsMatched();
+    int numSegmentsMatched = combineResult.getNumSegmentsMatched();
     assertTrue(numSegmentsMatched >= 1 && numSegmentsMatched <= QueryMultiThreadingUtils.MAX_NUM_THREADS_PER_QUERY);
     assertEquals(combineResult.getNumTotalDocs(), NUM_SEGMENTS * NUM_RECORDS_PER_SEGMENT);
+  }
 
-    combineResult = getCombineResult("SELECT * FROM testTable ORDER BY intColumn DESC LIMIT 10000");
+  @Test
+  public void selectionOrderByDescendingWithLargeLimit() {
+    SelectionResultsBlock combineResult = getCombineResult(
+        "SET allowReverseOrder=false; "
+            + "SELECT * FROM testTable ORDER BY intColumn DESC LIMIT 10000");
     assertEquals(combineResult.getDataSchema(),
         new DataSchema(new String[]{INT_COLUMN}, new DataSchema.ColumnDataType[]{DataSchema.ColumnDataType.INT}));
-    rows = combineResult.getRows();
+    List<Object[]> rows = combineResult.getRows();
     assertNotNull(rows);
     assertEquals(rows.size(), NUM_SEGMENTS * NUM_RECORDS_PER_SEGMENT);
     // Should not early-terminate
-    numDocsScanned = combineResult.getNumDocsScanned();
+    long numDocsScanned = combineResult.getNumDocsScanned();
     assertEquals(numDocsScanned, NUM_SEGMENTS * NUM_RECORDS_PER_SEGMENT);
     assertEquals(combineResult.getNumEntriesScannedInFilter(), 0);
     assertEquals(combineResult.getNumEntriesScannedPostFilter(), numDocsScanned);
@@ -237,7 +253,60 @@ public class SelectionCombineOperatorTest {
     assertEquals(combineResult.getNumTotalDocs(), NUM_SEGMENTS * NUM_RECORDS_PER_SEGMENT);
   }
 
-  private SelectionResultsBlock getCombineResult(String query) {
+  @Test
+  public void selectionOrderByDescendingWithReverseOrder() {
+    int limit = 10;
+    SelectionResultsBlock combineResult = getCombineResult(
+        "SET allowReverseOrder=true; "
+            + "SELECT * FROM testTable "
+            + "ORDER BY intColumn DESC "
+            + "LIMIT " + limit);
+    assertEquals(combineResult.getDataSchema(),
+        new DataSchema(new String[]{INT_COLUMN}, new DataSchema.ColumnDataType[]{DataSchema.ColumnDataType.INT}));
+    List<Object[]> rows = combineResult.getRows();
+    assertNotNull(rows);
+    assertEquals(rows.size(), 10);
+    int expectedValue = NUM_SEGMENTS * NUM_RECORDS_PER_SEGMENT / 2 + 49;
+    for (int i = 0; i < 10; i++) {
+      assertEquals((int) rows.get(i)[0], expectedValue - i);
+    }
+    // Should early-terminate after processing the result of the first segment. Each thread should process at most 1
+    // segment.
+    long numDocsScanned = combineResult.getNumDocsScanned();
+    assertTrue(numDocsScanned >= limit
+        && numDocsScanned <= QueryMultiThreadingUtils.MAX_NUM_THREADS_PER_QUERY * limit,
+        "Expected number of docs scanned to be between " + NUM_RECORDS_PER_SEGMENT + " and "
+            + (QueryMultiThreadingUtils.MAX_NUM_THREADS_PER_QUERY * NUM_RECORDS_PER_SEGMENT) + ", but got: "
+            + numDocsScanned);
+    assertEquals(combineResult.getNumEntriesScannedInFilter(), 0);
+    assertEquals(combineResult.getNumEntriesScannedPostFilter(), numDocsScanned);
+    assertEquals(combineResult.getNumSegmentsProcessed(), NUM_SEGMENTS);
+    int numSegmentsMatched = combineResult.getNumSegmentsMatched();
+    assertTrue(numSegmentsMatched >= 1 && numSegmentsMatched <= QueryMultiThreadingUtils.MAX_NUM_THREADS_PER_QUERY);
+    assertEquals(combineResult.getNumTotalDocs(), NUM_SEGMENTS * NUM_RECORDS_PER_SEGMENT);
+  }
+
+  @Test
+  public void selectionOrderByDescendingWithLargeLimitAndReverseOrder() {
+    SelectionResultsBlock combineResult = getCombineResult(
+        "SET allowReverseOrder=true; "
+            + "SELECT * FROM testTable ORDER BY intColumn DESC LIMIT 10000");
+    assertEquals(combineResult.getDataSchema(),
+        new DataSchema(new String[]{INT_COLUMN}, new DataSchema.ColumnDataType[]{DataSchema.ColumnDataType.INT}));
+    List<Object[]> rows = combineResult.getRows();
+    assertNotNull(rows);
+    assertEquals(rows.size(), NUM_SEGMENTS * NUM_RECORDS_PER_SEGMENT);
+    // Should not early-terminate
+    long numDocsScanned = combineResult.getNumDocsScanned();
+    assertEquals(numDocsScanned, NUM_SEGMENTS * NUM_RECORDS_PER_SEGMENT);
+    assertEquals(combineResult.getNumEntriesScannedInFilter(), 0);
+    assertEquals(combineResult.getNumEntriesScannedPostFilter(), numDocsScanned);
+    assertEquals(combineResult.getNumSegmentsProcessed(), NUM_SEGMENTS);
+    assertEquals(combineResult.getNumSegmentsMatched(), NUM_SEGMENTS);
+    assertEquals(combineResult.getNumTotalDocs(), NUM_SEGMENTS * NUM_RECORDS_PER_SEGMENT);
+  }
+
+  private SelectionResultsBlock getCombineResult(@Language("sql") String query) {
     QueryContext queryContext = QueryContextConverterUtils.getQueryContext(query);
     List<PlanNode> planNodes = new ArrayList<>(NUM_SEGMENTS);
     for (IndexSegment indexSegment : _indexSegments) {

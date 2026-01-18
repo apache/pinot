@@ -31,10 +31,14 @@ public class MinionConstants {
   public static final String TASK_TIME_SUFFIX = ".time";
 
   public static final String TABLE_NAME_KEY = "tableName";
+
+  // Input segment name(s) and download url(s) for those segments for the minion task.
+  // If there are multiple segments, they are separated by SEGMENT_NAME_SEPARATOR.
+  // The index of the segment name and download url is the same for the same segment.
   public static final String SEGMENT_NAME_KEY = "segmentName";
   public static final String DOWNLOAD_URL_KEY = "downloadURL";
+
   public static final String UPLOAD_URL_KEY = "uploadURL";
-  public static final String DOT_SEPARATOR = ".";
   public static final String URL_SEPARATOR = ",";
   public static final String SEGMENT_NAME_SEPARATOR = ",";
   public static final String AUTH_TOKEN = "authToken";
@@ -59,18 +63,34 @@ public class MinionConstants {
   public static final String TIMEOUT_MS_KEY_SUFFIX = ".timeoutMs";
   public static final String NUM_CONCURRENT_TASKS_PER_INSTANCE_KEY_SUFFIX = ".numConcurrentTasksPerInstance";
   public static final String MAX_ATTEMPTS_PER_TASK_KEY_SUFFIX = ".maxAttemptsPerTask";
+  // Cluster level config of maximum subtasks for a given task
+  // This is primarily used to prevent performance issues in helix leader controller when it creates
+  // more subtasks than it can support
+  public static final String MAX_ALLOWED_SUB_TASKS_KEY = "minion.maxAllowedSubTasksPerTask";
+  // Cluster level config of maximum disk usage percentage on minion hosts before the task tries to gracefully
+  // handle the situation rather than getting killed due to lack of disk space.
+  // Note - Not all tasks may support this config. Currently, MergeTask and its variants support this config
+  public static final String MAX_DISK_USAGE_PERCENTAGE_KEY = "minion.maxDiskUsagePercentage";
 
   /**
    * Table level configs
    */
   public static final String TABLE_MAX_NUM_TASKS_KEY = "tableMaxNumTasks";
   public static final String ENABLE_REPLACE_SEGMENTS_KEY = "enableReplaceSegments";
-  public static final long DEFAULT_TABLE_MAX_NUM_TASKS = 1;
+  public static final int DEFAULT_TABLE_MAX_NUM_TASKS = 1;
 
   /**
    * Job configs
    */
   public static final int DEFAULT_MAX_ATTEMPTS_PER_TASK = 1;
+  public static final int DEFAULT_MINION_MAX_NUM_OF_SUBTASKS_LIMIT = Integer.MAX_VALUE;
+  // Source of minion task trigger. Possible values are in enum CommonConstants.TaskTriggers
+  public static final String TRIGGERED_BY = "triggeredBy";
+
+  /**
+   * Segment download thread pool size to be set at task level.
+   */
+  public static final String SEGMENT_DOWNLOAD_PARALLELISM = "segmentDownloadParallelism";
 
   // Purges rows inside segment that match chosen criteria
   public static class PurgeTask {
@@ -112,7 +132,11 @@ public class MinionConstants {
     // Segment config
     public static final String MAX_NUM_RECORDS_PER_TASK_KEY = "maxNumRecordsPerTask";
     public static final String MAX_NUM_RECORDS_PER_SEGMENT_KEY = "maxNumRecordsPerSegment";
+
+    // See AdaptiveSizeBasedWriter for documentation of these configs
     public static final String SEGMENT_MAPPER_FILE_SIZE_IN_BYTES = "segmentMapperFileSizeThresholdInBytes";
+    public static final String MAX_DISK_USAGE_PERCENTAGE = "maxDiskUsagePercentage";
+
     public static final String MAX_NUM_PARALLEL_BUCKETS = "maxNumParallelBuckets";
     public static final String SEGMENT_NAME_PREFIX_KEY = "segmentNamePrefix";
     public static final String SEGMENT_NAME_POSTFIX_KEY = "segmentNamePostfix";
@@ -291,6 +315,18 @@ public class MinionConstants {
      * default maximum number of segments to process in a single task
      */
     public static final long DEFAULT_MAX_NUM_SEGMENTS_PER_TASK = 10;
+
+    /**
+     * minimum number of segments to process in a single task
+     */
+    public static final String MIN_NUM_SEGMENTS_PER_TASK_KEY = "minNumSegmentsPerTask";
+
+    /**
+     * default minimum number of segments to process in a single task.
+     * Keeping this default to 2 means that we won't run this task if there is only one segment which can be merged.
+     * If this is set to 1, this task can act as UpsertCompact task as well.
+     */
+    public static final long DEFAULT_MIN_NUM_SEGMENTS_PER_TASK = 2;
 
     public static final String MERGED_SEGMENTS_ZK_SUFFIX = ".mergedSegments";
 

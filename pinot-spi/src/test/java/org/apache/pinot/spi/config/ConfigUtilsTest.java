@@ -18,7 +18,6 @@
  */
 package org.apache.pinot.spi.config;
 
-import com.google.common.collect.ImmutableMap;
 import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;
@@ -40,7 +39,7 @@ public class ConfigUtilsTest {
   @Test
   public void testIndexing() {
     Map<String, String> environment =
-        ImmutableMap.of("LOAD_MODE", "MMAP", "AWS_ACCESS_KEY", "default_aws_access_key", "AWS_SECRET_KEY",
+        Map.of("LOAD_MODE", "MMAP", "AWS_ACCESS_KEY", "default_aws_access_key", "AWS_SECRET_KEY",
             "default_aws_secret_key");
     testIndexingWithConfig(environment);
   }
@@ -79,7 +78,7 @@ public class ConfigUtilsTest {
     String streamType = "fakeStream";
     String topic = "fakeTopic";
     String tableName = "fakeTable_REALTIME";
-    String defaultConsumerFactoryClass = "org.apache.pinot.plugin.stream.kafka20.StreamConsumerFactory";
+    String defaultConsumerFactoryClass = "org.apache.pinot.plugin.stream.kafka30.StreamConsumerFactory";
     String defaultDecoderClass = "org.apache.pinot.plugin.inputformat.avro.KafkaAvroMessageDecoder";
 
     String consumerFactoryClass = "${CONSUMER_FACTORY_CLASS:" + defaultConsumerFactoryClass + "}";

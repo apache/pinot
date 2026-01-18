@@ -26,7 +26,6 @@ import it.unimi.dsi.fastutil.objects.ObjectArrayList;
 import java.io.IOException;
 import java.math.BigDecimal;
 import java.util.ArrayList;
-import java.util.Collection;
 import java.util.Collections;
 import java.util.Iterator;
 import java.util.List;
@@ -45,7 +44,7 @@ import org.apache.pinot.core.data.table.Table;
 import org.apache.pinot.core.query.aggregation.function.AggregationFunction;
 import org.apache.pinot.core.query.aggregation.groupby.AggregationGroupByResult;
 import org.apache.pinot.core.query.request.context.QueryContext;
-import org.apache.pinot.spi.trace.Tracing;
+import org.apache.pinot.spi.query.QueryThreadContext;
 import org.apache.pinot.spi.utils.ByteArray;
 import org.roaringbitmap.RoaringBitmap;
 
@@ -57,7 +56,7 @@ import org.roaringbitmap.RoaringBitmap;
 public class GroupByResultsBlock extends BaseResultsBlock {
   private final DataSchema _dataSchema;
   private final AggregationGroupByResult _aggregationGroupByResult;
-  private final Collection<IntermediateRecord> _intermediateRecords;
+  private final List<IntermediateRecord> _intermediateRecords;
   private final Table _table;
   private final QueryContext _queryContext;
 
@@ -82,7 +81,7 @@ public class GroupByResultsBlock extends BaseResultsBlock {
   /**
    * For segment level group-by results.
    */
-  public GroupByResultsBlock(DataSchema dataSchema, Collection<IntermediateRecord> intermediateRecords,
+  public GroupByResultsBlock(DataSchema dataSchema, List<IntermediateRecord> intermediateRecords,
       QueryContext queryContext) {
     _dataSchema = dataSchema;
     _aggregationGroupByResult = null;
@@ -117,7 +116,7 @@ public class GroupByResultsBlock extends BaseResultsBlock {
     return _aggregationGroupByResult;
   }
 
-  public Collection<IntermediateRecord> getIntermediateRecords() {
+  public List<IntermediateRecord> getIntermediateRecords() {
     return _intermediateRecords;
   }
 
@@ -227,7 +226,7 @@ public class GroupByResultsBlock extends BaseResultsBlock {
       }
       int rowId = 0;
       while (iterator.hasNext()) {
-        Tracing.ThreadAccountantOps.sampleAndCheckInterruptionPeriodically(numRowsAdded);
+        QueryThreadContext.checkTerminationAndSampleUsagePeriodically(numRowsAdded, "GroupByResultsBlock#getDataTable");
         dataTableBuilder.startRow();
         Object[] values = iterator.next().getValues();
         for (int i = 0; i < numColumns; i++) {
@@ -256,7 +255,7 @@ public class GroupByResultsBlock extends BaseResultsBlock {
       }
     } else {
       while (iterator.hasNext()) {
-        Tracing.ThreadAccountantOps.sampleAndCheckInterruptionPeriodically(numRowsAdded);
+        QueryThreadContext.checkTerminationAndSampleUsagePeriodically(numRowsAdded, "GroupByResultsBlock#getDataTable");
         dataTableBuilder.startRow();
         Object[] values = iterator.next().getValues();
         for (int i = 0; i < numColumns; i++) {

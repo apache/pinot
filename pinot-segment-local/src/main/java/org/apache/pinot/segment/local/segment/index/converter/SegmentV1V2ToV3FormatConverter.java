@@ -32,6 +32,7 @@ import org.apache.commons.configuration2.PropertiesConfiguration;
 import org.apache.commons.configuration2.ex.ConfigurationException;
 import org.apache.commons.io.FileUtils;
 import org.apache.pinot.segment.local.segment.index.loader.IndexLoadingConfig;
+import org.apache.pinot.segment.local.segment.store.TextIndexUtils;
 import org.apache.pinot.segment.spi.V1Constants;
 import org.apache.pinot.segment.spi.converter.SegmentFormatConverter;
 import org.apache.pinot.segment.spi.creator.SegmentVersion;
@@ -154,9 +155,15 @@ public class SegmentV1V2ToV3FormatConverter implements SegmentFormatConverter {
           SegmentDirectory.Writer v3DataWriter = v3Segment.createWriter()) {
         for (String column : v2Metadata.getAllColumns()) {
           for (IndexType<?, ?, ?> indexType : IndexService.getInstance().getAllIndexes()) {
-            // NOTE: Text index is copied separately
-            if (indexType != StandardIndexes.text() && indexType != StandardIndexes.vector()) {
-              copyIndexIfExists(v2DataReader, v3DataWriter, column, indexType);
+            //If Text index files are combined merge into columns.psf else no-op
+            if (indexType == StandardIndexes.text()) {
+              if (!TextIndexUtils.hasTextIndex(v2Directory, column)) {
+                copyIndexIfExists(v2DataReader, v3DataWriter, column, indexType);
+              }
+            } else {
+              if (indexType != StandardIndexes.vector()) {
+                copyIndexIfExists(v2DataReader, v3DataWriter, column, indexType);
+              }
             }
           }
         }

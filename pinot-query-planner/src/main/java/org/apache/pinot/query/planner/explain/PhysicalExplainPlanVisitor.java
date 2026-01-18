@@ -29,6 +29,7 @@ import java.util.stream.Stream;
 import org.apache.pinot.query.planner.physical.DispatchablePlanFragment;
 import org.apache.pinot.query.planner.physical.DispatchableSubPlan;
 import org.apache.pinot.query.planner.plannode.AggregateNode;
+import org.apache.pinot.query.planner.plannode.EnrichedJoinNode;
 import org.apache.pinot.query.planner.plannode.ExchangeNode;
 import org.apache.pinot.query.planner.plannode.ExplainedNode;
 import org.apache.pinot.query.planner.plannode.FilterNode;
@@ -41,6 +42,7 @@ import org.apache.pinot.query.planner.plannode.ProjectNode;
 import org.apache.pinot.query.planner.plannode.SetOpNode;
 import org.apache.pinot.query.planner.plannode.SortNode;
 import org.apache.pinot.query.planner.plannode.TableScanNode;
+import org.apache.pinot.query.planner.plannode.UnnestNode;
 import org.apache.pinot.query.planner.plannode.ValueNode;
 import org.apache.pinot.query.planner.plannode.WindowNode;
 import org.apache.pinot.query.routing.MailboxInfo;
@@ -168,6 +170,14 @@ public class PhysicalExplainPlanVisitor implements PlanNodeVisitor<StringBuilder
   }
 
   @Override
+  public StringBuilder visitEnrichedJoin(EnrichedJoinNode node, Context context) {
+    appendInfo(node, context).append('\n');
+    node.getInputs().get(0).visit(this, context.next(true, context._host, context._workerId));
+    node.getInputs().get(1).visit(this, context.next(false, context._host, context._workerId));
+    return context._builder;
+  }
+
+  @Override
   public StringBuilder visitMailboxReceive(MailboxReceiveNode node, Context context) {
     appendInfo(node, context).append('\n');
 
@@ -263,6 +273,11 @@ public class PhysicalExplainPlanVisitor implements PlanNodeVisitor<StringBuilder
   @Override
   public StringBuilder visitExplained(ExplainedNode node, Context context) {
     return appendInfo(node, context);
+  }
+
+  @Override
+  public StringBuilder visitUnnest(UnnestNode node, Context context) {
+    return visitSimpleNode(node, context);
   }
 
   static class Context {

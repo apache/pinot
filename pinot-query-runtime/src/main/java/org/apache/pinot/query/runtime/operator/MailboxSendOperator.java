@@ -24,7 +24,6 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.EnumSet;
 import java.util.List;
-import java.util.concurrent.TimeoutException;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 import org.apache.calcite.rel.RelDistribution;
@@ -45,6 +44,8 @@ import org.apache.pinot.query.runtime.plan.MultiStageQueryStats;
 import org.apache.pinot.query.runtime.plan.OpChainExecutionContext;
 import org.apache.pinot.segment.spi.memory.DataBuffer;
 import org.apache.pinot.spi.exception.QueryCancelledException;
+import org.apache.pinot.spi.exception.QueryException;
+import org.apache.pinot.spi.query.QueryThreadContext;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -167,8 +168,8 @@ public class MailboxSendOperator extends MultiStageOperator {
     List<MailboxInfo> mailboxInfos =
         context.getWorkerMetadata().getMailboxInfosMap().get(receiverStageId).getMailboxInfos();
     List<RoutingInfo> routingInfos =
-          MailboxIdUtils.toRoutingInfos(requestId, context.getStageId(), context.getWorkerId(), receiverStageId,
-              mailboxInfos);
+        MailboxIdUtils.toRoutingInfos(requestId, context.getStageId(), context.getWorkerId(), receiverStageId,
+            mailboxInfos);
     List<SendingMailbox> sendingMailboxes = routingInfos.stream()
         .map(v -> mailboxService.getSendingMailbox(v.getHostname(), v.getPort(), v.getMailboxId(), deadlineMs, statMap))
         .collect(Collectors.toList());
@@ -178,9 +179,11 @@ public class MailboxSendOperator extends MultiStageOperator {
   }
 
   @Override
-  public void registerExecution(long time, int numRows) {
+  public void registerExecution(long time, int numRows, long memoryUsedBytes, long gcTimeMs) {
     _statMap.merge(StatKey.EXECUTION_TIME_MS, time);
     _statMap.merge(StatKey.EMITTED_ROWS, numRows);
+    _statMap.merge(StatKey.ALLOCATED_MEMORY_BYTES, memoryUsedBytes);
+    _statMap.merge(StatKey.GC_TIME_MS, gcTimeMs);
   }
 
   @Override
@@ -210,24 +213,32 @@ public class MailboxSendOperator extends MultiStageOperator {
       if (block.isEos()) {
         sendEos((MseBlock.Eos) block);
       } else {
-        if (sendMseBlock(((MseBlock.Data) block))) {
-          earlyTerminate();
-        }
+        sendMseBlock(((MseBlock.Data) block));
+        checkTerminationAndSampleUsage();
       }
-      sampleAndCheckInterruption();
       return block;
-    } catch (QueryCancelledException e) {
-      LOGGER.debug("Query was cancelled! for opChain: {}", _context.getId());
-      return SuccessMseBlock.INSTANCE;
-    } catch (TimeoutException e) {
-      LOGGER.warn("Timed out transferring data on opChain: {}", _context.getId(), e);
-      return ErrorMseBlock.fromException(e);
-    } catch (Exception e) {
-      ErrorMseBlock errorBlock = ErrorMseBlock.fromException(e);
+    } catch (RuntimeException e) {
+      if (e instanceof QueryCancelledException) {
+        LOGGER.debug("Query was cancelled for opChain: {}", _context.getId());
+        // TODO: Revisit if we should return success block here.
+        return SuccessMseBlock.INSTANCE;
+      }
+      ErrorMseBlock errorBlock;
+      // First check terminate exception and use it as the results block if exists. We want to return the termination
+      // reason when query is explicitly terminated.
+      QueryException queryException = QueryThreadContext.getTerminateException();
+      if (queryException == null && e instanceof QueryException) {
+        queryException = (QueryException) e;
+      }
+      if (queryException != null) {
+        errorBlock = ErrorMseBlock.fromException(queryException);
+      } else {
+        LOGGER.error("Exception while transferring data on opChain: {}", _context.getId(), e);
+        errorBlock = ErrorMseBlock.fromException(e);
+      }
       try {
-        LOGGER.error("Exception while transferring data on opChain: {}", _context.getId());
         sendEos(errorBlock);
-      } catch (Exception e2) {
+      } catch (RuntimeException e2) {
         LOGGER.error("Exception while sending error block.", e2);
       }
       return errorBlock;
@@ -235,14 +246,12 @@ public class MailboxSendOperator extends MultiStageOperator {
   }
 
   @Override
-  protected void sampleAndCheckInterruption() {
+  protected long getDeadlineMs() {
     // mailbox send operator uses passive deadline instead of the active one
-    sampleAndCheckInterruption(_context.getPassiveDeadlineMs());
+    return _context.getPassiveDeadlineMs();
   }
 
-  private void sendEos(MseBlock.Eos eosBlockWithoutStats)
-      throws Exception {
-
+  private void sendEos(MseBlock.Eos eosBlockWithoutStats) {
     MultiStageQueryStats stats = null;
     List<DataBuffer> serializedStats;
     if (_context.isSendStats()) {
@@ -266,26 +275,24 @@ public class MailboxSendOperator extends MultiStageOperator {
   }
 
   @Override
-  protected StatMap<?> copyStatMaps() {
+  public StatMap<StatKey> copyStatMaps() {
     return new StatMap<>(_statMap);
   }
 
-  private boolean sendMseBlock(MseBlock.Data block)
-      throws Exception {
-    boolean isEarlyTerminated = _exchange.send(block);
+  private void sendMseBlock(MseBlock.Data block) {
+    if (_exchange.send(block)) {
+      earlyTerminate();
+    }
     if (LOGGER.isDebugEnabled()) {
       LOGGER.debug("==[SEND]== Block " + block + " sent from: " + _context.getId());
     }
-    return isEarlyTerminated;
   }
 
-  private boolean sendMseBlock(MseBlock.Eos block, List<DataBuffer> serializedStats)
-      throws Exception {
-    boolean isEarlyTerminated = _exchange.send(block, serializedStats);
+  private void sendMseBlock(MseBlock.Eos block, List<DataBuffer> serializedStats) {
+    _exchange.send(block, serializedStats);
     if (LOGGER.isDebugEnabled()) {
       LOGGER.debug("==[SEND]== Block " + block + " sent from: " + _context.getId());
     }
-    return isEarlyTerminated;
   }
 
   @Override
@@ -317,7 +324,6 @@ public class MailboxSendOperator extends MultiStageOperator {
   }
 
   public enum StatKey implements StatMap.Key {
-    //@formatter:off
     EXECUTION_TIME_MS(StatMap.Type.LONG) {
       @Override
       public boolean includeDefaultInJson() {
@@ -387,8 +393,15 @@ public class MailboxSendOperator extends MultiStageOperator {
       public boolean includeDefaultInJson() {
         return true;
       }
-    };
-    //@formatter:on
+    },
+    /**
+     * Allocated memory in bytes for this operator or its children in the same stage.
+     */
+    ALLOCATED_MEMORY_BYTES(StatMap.Type.LONG),
+    /**
+     * Time spent on GC while this operator or its children in the same stage were running.
+     */
+    GC_TIME_MS(StatMap.Type.LONG);
 
     private final StatMap.Type _type;
 

@@ -35,16 +35,7 @@ import org.apache.pinot.spi.utils.DataSizeUtils;
 
 
 public class ForwardIndexConfig extends IndexConfig {
-  @Deprecated
-  public static final int DEFAULT_RAW_WRITER_VERSION = 2;
-  @Deprecated
-  public static final String DEFAULT_TARGET_MAX_CHUNK_SIZE = "1MB";
-  @Deprecated
-  public static final int DEFAULT_TARGET_MAX_CHUNK_SIZE_BYTES = 1024 * 1024;
-  @Deprecated
-  public static final int DEFAULT_TARGET_DOCS_PER_CHUNK = 1000;
-
-  private static int _defaultRawIndexWriterVersion = 2;
+  private static int _defaultRawIndexWriterVersion = 4;
   private static String _defaultTargetMaxChunkSize = "1MB";
   private static int _defaultTargetMaxChunkSizeBytes = 1024 * 1024;
   private static int _defaultTargetDocsPerChunk = 1000;
@@ -141,6 +132,14 @@ public class ForwardIndexConfig extends IndexConfig {
           _chunkCompressionType = ChunkCompressionType.GZIP;
           _dictIdCompressionType = null;
           break;
+        case DELTA:
+          _chunkCompressionType = ChunkCompressionType.DELTA;
+          _dictIdCompressionType = null;
+          break;
+        case DELTADELTA:
+          _chunkCompressionType = ChunkCompressionType.DELTADELTA;
+          _dictIdCompressionType = null;
+          break;
         case MV_ENTRY_DICT:
           _dictIdCompressionType = DictIdCompressionType.MV_ENTRY_DICT;
           _chunkCompressionType = null;
@@ -186,6 +185,10 @@ public class ForwardIndexConfig extends IndexConfig {
           return CompressionCodec.ZSTANDARD;
         case LZ4:
           return CompressionCodec.LZ4;
+        case DELTA:
+          return CompressionCodec.DELTA;
+        case DELTADELTA:
+          return CompressionCodec.DELTADELTA;
         default:
           throw new IllegalStateException("Unsupported chunk compression type: " + chunkCompressionType);
       }

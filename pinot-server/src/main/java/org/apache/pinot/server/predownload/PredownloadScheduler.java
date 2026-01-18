@@ -84,17 +84,29 @@ public class PredownloadScheduler {
       throws Exception {
     _properties = properties;
     _clusterName = properties.getString(CommonConstants.Helix.CONFIG_OF_CLUSTER_NAME);
-    _zkAddress = properties.getString(CommonConstants.Helix.CONFIG_OF_ZOOKEEPR_SERVER);
+    _zkAddress = properties.getString(CommonConstants.Helix.CONFIG_OF_ZOOKEEPER_SERVER);
     _instanceId = properties.getString(CommonConstants.Server.CONFIG_OF_INSTANCE_ID);
     _pinotConfig = new PinotConfiguration(properties);
     _instanceDataManagerConfig =
         new HelixInstanceDataManagerConfig(new ServerConf(_pinotConfig).getInstanceDataManagerConfig());
-    // Get the number of available processors (vCPUs)
-    int numProcessors = Runtime.getRuntime().availableProcessors();
+
+    // Configure predownload parallelism
+    int predownloadParallelism = _pinotConfig.getProperty(CommonConstants.Server.CONFIG_OF_PREDOWNLOAD_PARALLELISM,
+        CommonConstants.Server.DEFAULT_PREDOWNLOAD_PARALLELISM);
+
+    if (predownloadParallelism <= 0) {
+      // Use default logic: numProcessors * 3
+      int numProcessors = Runtime.getRuntime().availableProcessors();
+      predownloadParallelism = numProcessors * 3;
+      LOGGER.info("Using default predownload parallelism: {} (numProcessors: {} * 3)", predownloadParallelism,
+          numProcessors);
+    } else {
+      LOGGER.info("Using configured predownload parallelism: {}", predownloadParallelism);
+    }
+
     _failedSegments = ConcurrentHashMap.newKeySet();
-    // TODO: tune the value
-    _executor = Executors.newFixedThreadPool(numProcessors * 3);
-    LOGGER.info("Created thread pool with num of threads: {}", numProcessors * 3);
+    _executor = Executors.newFixedThreadPool(predownloadParallelism);
+    LOGGER.info("Created thread pool with num of threads: {}", predownloadParallelism);
     _numOfSkippedSegments = 0;
     _numOfDownloadSegments = 0;
   }

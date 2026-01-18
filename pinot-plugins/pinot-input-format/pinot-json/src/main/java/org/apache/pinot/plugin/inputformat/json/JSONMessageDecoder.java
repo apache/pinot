@@ -18,8 +18,6 @@
  */
 package org.apache.pinot.plugin.inputformat.json;
 
-import com.fasterxml.jackson.databind.JsonNode;
-import java.util.Arrays;
 import java.util.Map;
 import java.util.Set;
 import org.apache.pinot.spi.data.readers.GenericRow;
@@ -27,15 +25,12 @@ import org.apache.pinot.spi.data.readers.RecordExtractor;
 import org.apache.pinot.spi.plugin.PluginManager;
 import org.apache.pinot.spi.stream.StreamMessageDecoder;
 import org.apache.pinot.spi.utils.JsonUtils;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 
 /**
  * An implementation of StreamMessageDecoder to read JSON records from a stream.
  */
 public class JSONMessageDecoder implements StreamMessageDecoder<byte[]> {
-  private static final Logger LOGGER = LoggerFactory.getLogger(JSONMessageDecoder.class);
   private static final String JSON_RECORD_EXTRACTOR_CLASS =
       "org.apache.pinot.plugin.inputformat.json.JSONRecordExtractor";
 
@@ -57,19 +52,18 @@ public class JSONMessageDecoder implements StreamMessageDecoder<byte[]> {
 
   @Override
   public GenericRow decode(byte[] payload, GenericRow destination) {
-    try {
-      JsonNode message = JsonUtils.bytesToJsonNode(payload);
-      Map<String, Object> from = JsonUtils.jsonNodeToMap(message);
-      _jsonRecordExtractor.extract(from, destination);
-      return destination;
-    } catch (Exception e) {
-      LOGGER.error("Caught exception while decoding row, discarding row. Payload is {}", new String(payload), e);
-      return null;
-    }
+    return decode(payload, 0, payload.length, destination);
   }
 
   @Override
   public GenericRow decode(byte[] payload, int offset, int length, GenericRow destination) {
-    return decode(Arrays.copyOfRange(payload, offset, offset + length), destination);
+    try {
+      // Parse directly to Map, avoiding intermediate JsonNode representation for better performance
+      Map<String, Object> jsonMap = JsonUtils.bytesToMap(payload, offset, length);
+      return _jsonRecordExtractor.extract(jsonMap, destination);
+    } catch (Exception e) {
+      throw new RuntimeException(
+          "Caught exception while decoding JSON record with payload: " + new String(payload, offset, length), e);
+    }
   }
 }

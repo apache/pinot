@@ -19,7 +19,7 @@
 package org.apache.pinot.controller.helix.core;
 
 import com.google.common.collect.BiMap;
-import com.google.common.collect.ImmutableMap;
+import java.lang.reflect.Field;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
@@ -32,6 +32,8 @@ import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.ThreadLocalRandom;
 import java.util.concurrent.TimeUnit;
+import org.apache.commons.lang3.tuple.Pair;
+import org.apache.helix.HelixAdmin;
 import org.apache.helix.controller.dataproviders.ResourceControllerDataProvider;
 import org.apache.helix.controller.rebalancer.strategy.CrushEdRebalanceStrategy;
 import org.apache.helix.model.ClusterConfig;
@@ -59,6 +61,7 @@ import org.apache.pinot.controller.ControllerConf;
 import org.apache.pinot.controller.api.exception.InvalidTableConfigException;
 import org.apache.pinot.controller.api.resources.InstanceInfo;
 import org.apache.pinot.controller.helix.ControllerTest;
+import org.apache.pinot.controller.helix.core.realtime.PinotLLCRealtimeSegmentManager;
 import org.apache.pinot.controller.utils.SegmentMetadataMockUtils;
 import org.apache.pinot.core.common.MinionConstants;
 import org.apache.pinot.core.realtime.impl.fakestream.FakeStreamConfigUtils;
@@ -76,6 +79,10 @@ import org.apache.pinot.spi.config.tenant.Tenant;
 import org.apache.pinot.spi.config.tenant.TenantRole;
 import org.apache.pinot.spi.data.DateTimeFieldSpec;
 import org.apache.pinot.spi.data.FieldSpec;
+import org.apache.pinot.spi.stream.LongMsgOffset;
+import org.apache.pinot.spi.stream.PartitionGroupConsumptionStatus;
+import org.apache.pinot.spi.stream.PartitionGroupMetadata;
+import org.apache.pinot.spi.stream.StreamPartitionMsgOffset;
 import org.apache.pinot.spi.utils.CommonConstants.Helix;
 import org.apache.pinot.spi.utils.CommonConstants.Segment;
 import org.apache.pinot.spi.utils.CommonConstants.Server;
@@ -89,6 +96,12 @@ import org.testng.annotations.AfterClass;
 import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
 
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.doReturn;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.spy;
+import static org.mockito.Mockito.when;
 import static org.testng.Assert.*;
 
 
@@ -687,7 +700,7 @@ public class PinotHelixResourceManagerStatelessTest extends ControllerTest {
 
     // Minion instance tag set but no minion present
     realtimeTableConfig.setTaskConfig(new TableTaskConfig(
-        ImmutableMap.of(MinionConstants.RealtimeToOfflineSegmentsTask.TASK_TYPE, upsertCompactionTask)));
+        Map.of(MinionConstants.RealtimeToOfflineSegmentsTask.TASK_TYPE, upsertCompactionTask)));
 
     assertThrows(InvalidTableConfigException.class, () -> {
       try {
@@ -706,11 +719,11 @@ public class PinotHelixResourceManagerStatelessTest extends ControllerTest {
     //Untag minion instance
     untagMinions();
     realtimeTableConfig.setTaskConfig(new TableTaskConfig(
-        ImmutableMap.of(MinionConstants.RealtimeToOfflineSegmentsTask.TASK_TYPE, segmentGenerationAndPushTaskConfig)));
+        Map.of(MinionConstants.RealtimeToOfflineSegmentsTask.TASK_TYPE, segmentGenerationAndPushTaskConfig)));
     _helixResourceManager.validateTableTaskMinionInstanceTagConfig(realtimeTableConfig);
 
     realtimeTableConfig.setTaskConfig(new TableTaskConfig(
-        ImmutableMap.of(MinionConstants.RealtimeToOfflineSegmentsTask.TASK_TYPE, segmentGenerationAndPushTaskConfig2)));
+        Map.of(MinionConstants.RealtimeToOfflineSegmentsTask.TASK_TYPE, segmentGenerationAndPushTaskConfig2)));
     assertThrows(InvalidTableConfigException.class, () -> {
       try {
         _helixResourceManager.validateTableTaskMinionInstanceTagConfig(realtimeTableConfig);
@@ -725,7 +738,7 @@ public class PinotHelixResourceManagerStatelessTest extends ControllerTest {
         Map.of("tableMaxNumTasks", "1", "validDocIdsType", "SNAPSHOT",
             "minionInstanceTag", "anotherMinionTenant");
     realtimeTableConfig.setTaskConfig(new TableTaskConfig(
-        ImmutableMap.of(MinionConstants.RealtimeToOfflineSegmentsTask.TASK_TYPE, taskWithWrongTenantButNotScheduled)));
+        Map.of(MinionConstants.RealtimeToOfflineSegmentsTask.TASK_TYPE, taskWithWrongTenantButNotScheduled)));
     _helixResourceManager.validateTableTaskMinionInstanceTagConfig(realtimeTableConfig);
   }
 
@@ -1597,10 +1610,115 @@ public class PinotHelixResourceManagerStatelessTest extends ControllerTest {
     assertEquals(actualSet, new HashSet<>(Arrays.asList(expected)));
   }
 
+  @Test
+  public void testGetConsumerWatermarks()
+      throws Exception {
+    String rawTableName = "watermarksTable";
+    String realtimeTableName = TableNameBuilder.REALTIME.tableNameWithType(rawTableName);
+
+    // Test table not found
+    assertThrows(TableNotFoundException.class, () -> _helixResourceManager.getConsumerWatermarks(rawTableName));
+
+    // Setup table
+    addDummySchema(rawTableName);
+    TableConfig tableConfig =
+        new TableConfigBuilder(TableType.REALTIME).setTableName(rawTableName).setBrokerTenant(BROKER_TENANT_NAME)
+            .setServerTenant(SERVER_TENANT_NAME)
+            .setStreamConfigs(FakeStreamConfigUtils.getDefaultLowLevelStreamConfigs().getStreamConfigsMap()).build();
+    _helixResourceManager.addTable(tableConfig);
+
+    // Setup mocks
+    PinotLLCRealtimeSegmentManager mockSegmentManager = mock(PinotLLCRealtimeSegmentManager.class);
+    Field llcManagerField = PinotHelixResourceManager.class.getDeclaredField("_pinotLLCRealtimeSegmentManager");
+    llcManagerField.setAccessible(true);
+    PinotLLCRealtimeSegmentManager originalLlcManager =
+        (PinotLLCRealtimeSegmentManager) llcManagerField.get(_helixResourceManager);
+    llcManagerField.set(_helixResourceManager, mockSegmentManager);
+
+    Field helixAdminField = PinotHelixResourceManager.class.getDeclaredField("_helixAdmin");
+    helixAdminField.setAccessible(true);
+    HelixAdmin originalHelixAdmin = (HelixAdmin) helixAdminField.get(_helixResourceManager);
+    HelixAdmin spyHelixAdmin = spy(originalHelixAdmin);
+    helixAdminField.set(_helixResourceManager, spyHelixAdmin);
+
+    IdealState idealState = new IdealState(realtimeTableName);
+    doReturn(idealState).when(spyHelixAdmin).getResourceIdealState(any(), eq(realtimeTableName));
+
+    // Test happy path
+    PartitionGroupConsumptionStatus doneStatus = new PartitionGroupConsumptionStatus(0, 100,
+        new LongMsgOffset(123), new LongMsgOffset(456), "done");
+    PartitionGroupConsumptionStatus inProgressStatus =
+        new PartitionGroupConsumptionStatus(1, 200, new LongMsgOffset(789), null, "IN_PROGRESS");
+    when(mockSegmentManager.getPartitionGroupConsumptionStatusList(any(), any()))
+        .thenReturn(Arrays.asList(doneStatus, inProgressStatus));
+
+    WatermarkInductionResult waterMarkInductionResult = _helixResourceManager.getConsumerWatermarks(rawTableName);
+    assertEquals(waterMarkInductionResult.getWatermarks().size(), 2);
+    WatermarkInductionResult.Watermark doneWatermark = waterMarkInductionResult.getWatermarks().get(0);
+    assertEquals(doneWatermark.getPartitionGroupId(), 0);
+    assertEquals(doneWatermark.getSequenceNumber(), 101L);
+    assertEquals(doneWatermark.getOffset(), 456L);
+    WatermarkInductionResult.Watermark inProgressWatermark = waterMarkInductionResult.getWatermarks().get(1);
+    assertEquals(inProgressWatermark.getPartitionGroupId(), 1);
+    assertEquals(inProgressWatermark.getSequenceNumber(), 200L);
+    assertEquals(inProgressWatermark.getOffset(), 789L);
+
+    // recover the original values
+    helixAdminField.set(_helixResourceManager, originalHelixAdmin);
+    llcManagerField.set(_helixResourceManager, originalLlcManager);
+    // Cleanup
+    _helixResourceManager.deleteRealtimeTable(rawTableName);
+    deleteSchema(rawTableName);
+  }
+
   @AfterClass
   public void tearDown() {
     stopFakeInstances();
     stopController();
     stopZk();
+  }
+
+  @Test
+  public void testAddRealtimeTableWithConsumingMetadata()
+      throws Exception {
+    final String rawTableName = "testTable2";
+    final String realtimeTableName = rawTableName + "_REALTIME";
+    TableConfig tableConfig =
+        new TableConfigBuilder(TableType.REALTIME).setTableName(rawTableName).setBrokerTenant(BROKER_TENANT_NAME)
+            .setServerTenant(SERVER_TENANT_NAME)
+            .setStreamConfigs(FakeStreamConfigUtils.getDefaultLowLevelStreamConfigs().getStreamConfigsMap()).build();
+    waitForEVToDisappear(tableConfig.getTableName());
+    addDummySchema(rawTableName);
+
+    List<Pair<PartitionGroupMetadata, Integer>> consumingMetadata = new ArrayList<>();
+    PartitionGroupMetadata metadata0 = mock(PartitionGroupMetadata.class);
+    when(metadata0.getPartitionGroupId()).thenReturn(0);
+    when(metadata0.getStartOffset()).thenReturn(mock(StreamPartitionMsgOffset.class));
+    consumingMetadata.add(Pair.of(metadata0, 5));
+    PartitionGroupMetadata metadata1 = mock(PartitionGroupMetadata.class);
+    when(metadata1.getPartitionGroupId()).thenReturn(1);
+    when(metadata1.getStartOffset()).thenReturn(mock(StreamPartitionMsgOffset.class));
+    consumingMetadata.add(Pair.of(metadata1, 10));
+
+    _helixResourceManager.addTable(tableConfig, consumingMetadata);
+
+    IdealState idealState = _helixResourceManager.getTableIdealState(realtimeTableName);
+    assertNotNull(idealState);
+    assertEquals(idealState.getPartitionSet().size(), 2);
+
+    for (String segmentName : idealState.getPartitionSet()) {
+      LLCSegmentName llcSegmentName = new LLCSegmentName(segmentName);
+      int partitionGroupId = llcSegmentName.getPartitionGroupId();
+      if (partitionGroupId == 0) {
+        assertEquals(llcSegmentName.getSequenceNumber(), 5);
+      } else if (partitionGroupId == 1) {
+        assertEquals(llcSegmentName.getSequenceNumber(), 10);
+      } else {
+        fail("Unexpected partition group id: " + partitionGroupId);
+      }
+    }
+
+    _helixResourceManager.deleteRealtimeTable(rawTableName);
+    deleteSchema(rawTableName);
   }
 }

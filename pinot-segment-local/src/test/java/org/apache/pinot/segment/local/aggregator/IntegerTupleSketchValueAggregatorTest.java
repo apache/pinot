@@ -44,6 +44,13 @@ public class IntegerTupleSketchValueAggregatorTest {
   }
 
   @Test
+  public void nullInitialShouldReturnEmptySketch() {
+    IntegerTupleSketchValueAggregator agg =
+        new IntegerTupleSketchValueAggregator(Collections.emptyList(), IntegerSummary.Mode.Sum);
+    assertEquals(toSketch(agg.getInitialAggregatedValue(null)).getEstimate(), 0.0);
+  }
+
+  @Test
   public void applyAggregatedValueShouldUnion() {
     IntegerSketch s1 = new IntegerSketch(16, IntegerSummary.Mode.Sum);
     IntegerSketch s2 = new IntegerSketch(16, IntegerSummary.Mode.Sum);

@@ -31,6 +31,7 @@ import org.apache.helix.model.Message;
 import org.apache.pinot.common.Utils;
 import org.apache.pinot.common.messages.ForceCommitMessage;
 import org.apache.pinot.common.messages.IngestionMetricsRemoveMessage;
+import org.apache.pinot.common.messages.QueryWorkloadRefreshMessage;
 import org.apache.pinot.common.messages.SegmentRefreshMessage;
 import org.apache.pinot.common.messages.SegmentReloadMessage;
 import org.apache.pinot.common.messages.TableConfigSchemaRefreshMessage;
@@ -43,6 +44,8 @@ import org.apache.pinot.common.metrics.ServerTimer;
 import org.apache.pinot.core.data.manager.InstanceDataManager;
 import org.apache.pinot.core.data.manager.realtime.RealtimeTableDataManager;
 import org.apache.pinot.segment.local.data.manager.TableDataManager;
+import org.apache.pinot.spi.accounting.WorkloadBudgetManager;
+import org.apache.pinot.spi.config.workload.InstanceCost;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -77,6 +80,9 @@ public class SegmentMessageHandlerFactory implements MessageHandlerFactory {
         return new IngestionMetricsRemoveMessageHandler(new IngestionMetricsRemoveMessage(message), _metrics, context);
       case TableConfigSchemaRefreshMessage.REFRESH_TABLE_CONFIG_AND_SCHEMA:
         return new TableSchemaRefreshMessageHandler(new TableConfigSchemaRefreshMessage(message), _metrics, context);
+      case QueryWorkloadRefreshMessage.REFRESH_QUERY_WORKLOAD_MSG_SUB_TYPE:
+      case QueryWorkloadRefreshMessage.DELETE_QUERY_WORKLOAD_MSG_SUB_TYPE:
+        return new QueryWorkloadRefreshMessageHandler(new QueryWorkloadRefreshMessage(message), _metrics, context);
       default:
         LOGGER.warn("Unsupported user defined message sub type: {} for segment: {}", msgSubType,
             message.getPartitionName());
@@ -120,12 +126,14 @@ public class SegmentMessageHandlerFactory implements MessageHandlerFactory {
   private class SegmentReloadMessageHandler extends DefaultMessageHandler {
     private final boolean _forceDownload;
     private final List<String> _segmentList;
+    private final String _reloadJobId;
 
     SegmentReloadMessageHandler(SegmentReloadMessage segmentReloadMessage, ServerMetrics metrics,
         NotificationContext context) {
       super(segmentReloadMessage, metrics, context);
       _forceDownload = segmentReloadMessage.shouldForceDownload();
       _segmentList = segmentReloadMessage.getSegmentList();
+      _reloadJobId = segmentReloadMessage.getReloadJobId();
     }
 
     @Override
@@ -134,16 +142,16 @@ public class SegmentMessageHandlerFactory implements MessageHandlerFactory {
       _logger.info("Handling message: {}", _message);
       try {
         if (CollectionUtils.isNotEmpty(_segmentList)) {
-          _instanceDataManager.reloadSegments(_tableNameWithType, _segmentList, _forceDownload);
+          _instanceDataManager.reloadSegments(_tableNameWithType, _segmentList, _forceDownload, _reloadJobId);
         } else if (StringUtils.isNotEmpty(_segmentName)) {
           // TODO: check _segmentName to be backward compatible. Moving forward, we just need to check the list to
           //       reload one or more segments. If the list or the segment name is empty, all segments are reloaded.
-          _instanceDataManager.reloadSegment(_tableNameWithType, _segmentName, _forceDownload);
+          _instanceDataManager.reloadSegment(_tableNameWithType, _segmentName, _forceDownload, _reloadJobId);
         } else {
           // NOTE: the method continues if any segment reload encounters an unhandled exception,
           // and failed segments are logged out in the end. We don't acquire any permit here as they'll be acquired
           // by worked threads later.
-          _instanceDataManager.reloadAllSegments(_tableNameWithType, _forceDownload);
+          _instanceDataManager.reloadAllSegments(_tableNameWithType, _forceDownload, _reloadJobId);
         }
         helixTaskResult.setSuccess(true);
       } catch (Throwable e) {
@@ -270,6 +278,52 @@ public class SegmentMessageHandlerFactory implements MessageHandlerFactory {
       HelixTaskResult helixTaskResult = new HelixTaskResult();
       helixTaskResult.setSuccess(true);
       return helixTaskResult;
+    }
+  }
+
+  private static class QueryWorkloadRefreshMessageHandler extends DefaultMessageHandler {
+    final String _queryWorkloadName;
+    final InstanceCost _instanceCost;
+    final String _messageType;
+
+    QueryWorkloadRefreshMessageHandler(QueryWorkloadRefreshMessage queryWorkloadRefreshMessage,
+                                       ServerMetrics metrics, NotificationContext context) {
+      super(queryWorkloadRefreshMessage, metrics, context);
+      _queryWorkloadName = queryWorkloadRefreshMessage.getQueryWorkloadName();
+      _instanceCost = queryWorkloadRefreshMessage.getInstanceCost();
+      _messageType = queryWorkloadRefreshMessage.getMsgSubType();
+    }
+
+    @Override
+    public HelixTaskResult handleMessage() {
+      LOGGER.info("Handling query workload message: {}", _message);
+      try {
+        if (_messageType.equals(QueryWorkloadRefreshMessage.DELETE_QUERY_WORKLOAD_MSG_SUB_TYPE)) {
+          WorkloadBudgetManager.get().deleteWorkload(_queryWorkloadName);
+        } else if (_messageType.equals(QueryWorkloadRefreshMessage.REFRESH_QUERY_WORKLOAD_MSG_SUB_TYPE)) {
+          if (_instanceCost == null) {
+            throw new IllegalStateException(
+                "Instance cost is not provided for refreshing query workload: " + _queryWorkloadName);
+          }
+          WorkloadBudgetManager.get()
+              .addOrUpdateWorkload(_queryWorkloadName, _instanceCost.getCpuCostNs(),
+                  _instanceCost.getMemoryCostBytes());
+        } else {
+          throw new IllegalStateException("Unknown message type: " + _messageType);
+        }
+        HelixTaskResult result = new HelixTaskResult();
+        result.setSuccess(true);
+        return result;
+      } catch (Exception e) {
+        LOGGER.warn("Failed to handle query workload message: {}", _queryWorkloadName, e);
+        throw e;
+      }
+    }
+
+    @Override
+    public void onError(Exception e, ErrorCode errorCode, ErrorType errorType) {
+      LOGGER.error("Got error while refreshing query workload config for query workload: {} (error code: {},"
+          + " error type: {})", _queryWorkloadName, errorCode, errorType, e);
     }
   }
 

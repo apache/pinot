@@ -31,6 +31,7 @@ import org.apache.pinot.common.proto.Plan;
 import org.apache.pinot.core.operator.ExplainAttributeBuilder;
 import org.apache.pinot.core.query.reduce.ExplainPlanDataTableReducer;
 import org.apache.pinot.query.planner.plannode.AggregateNode;
+import org.apache.pinot.query.planner.plannode.EnrichedJoinNode;
 import org.apache.pinot.query.planner.plannode.ExchangeNode;
 import org.apache.pinot.query.planner.plannode.ExplainedNode;
 import org.apache.pinot.query.planner.plannode.FilterNode;
@@ -43,6 +44,7 @@ import org.apache.pinot.query.planner.plannode.ProjectNode;
 import org.apache.pinot.query.planner.plannode.SetOpNode;
 import org.apache.pinot.query.planner.plannode.SortNode;
 import org.apache.pinot.query.planner.plannode.TableScanNode;
+import org.apache.pinot.query.planner.plannode.UnnestNode;
 import org.apache.pinot.query.planner.plannode.ValueNode;
 import org.apache.pinot.query.planner.plannode.WindowNode;
 
@@ -162,6 +164,32 @@ class PlanNodeMerger {
 
     @Nullable
     @Override
+    public PlanNode visitUnnest(UnnestNode node, PlanNode context) {
+      if (context.getClass() != UnnestNode.class) {
+        return null;
+      }
+      UnnestNode otherNode = (UnnestNode) context;
+      if (!Objects.equals(node.getArrayExprs(), otherNode.getArrayExprs())) {
+        return null;
+      }
+      if (node.isWithOrdinality() != otherNode.isWithOrdinality()) {
+        return null;
+      }
+      if (!Objects.equals(node.getElementIndexes(), otherNode.getElementIndexes())) {
+        return null;
+      }
+      if (node.getOrdinalityIndex() != otherNode.getOrdinalityIndex()) {
+        return null;
+      }
+      List<PlanNode> children = mergeChildren(node, context);
+      if (children == null) {
+        return null;
+      }
+      return node.withInputs(children);
+    }
+
+    @Nullable
+    @Override
     public PlanNode visitFilter(FilterNode node, PlanNode context) {
       if (context.getClass() != FilterNode.class) {
         return null;
@@ -194,6 +222,38 @@ class PlanNodeMerger {
         return null;
       }
       if (!node.getNonEquiConditions().equals(otherNode.getNonEquiConditions())) {
+        return null;
+      }
+      List<PlanNode> children = mergeChildren(node, context);
+      if (children == null) {
+        return null;
+      }
+      return node.withInputs(children);
+    }
+
+    @Nullable
+    @Override
+    public PlanNode visitEnrichedJoin(EnrichedJoinNode node, PlanNode context) {
+      if (context.getClass() != EnrichedJoinNode.class) {
+        return null;
+      }
+      EnrichedJoinNode otherNode = (EnrichedJoinNode) context;
+      if (!node.getJoinType().equals(otherNode.getJoinType())) {
+        return null;
+      }
+      if (!node.getLeftKeys().equals(otherNode.getLeftKeys())) {
+        return null;
+      }
+      if (!node.getRightKeys().equals(otherNode.getRightKeys())) {
+        return null;
+      }
+      if (!node.getNonEquiConditions().equals(otherNode.getNonEquiConditions())) {
+        return null;
+      }
+      if (!Objects.equals(node.getFilterProjectRexes(), otherNode.getFilterProjectRexes())) {
+        return null;
+      }
+      if (node.getFetch() != otherNode.getFetch() || node.getOffset() != otherNode.getOffset()) {
         return null;
       }
       List<PlanNode> children = mergeChildren(node, context);

@@ -22,6 +22,7 @@ import com.clearspring.analytics.stream.cardinality.CardinalityMergeException;
 import com.clearspring.analytics.stream.cardinality.HyperLogLogPlus;
 import com.google.common.annotations.VisibleForTesting;
 import java.util.List;
+import javax.annotation.Nullable;
 import org.apache.pinot.common.request.context.ExpressionContext;
 import org.apache.pinot.segment.local.utils.CustomSerDeUtils;
 import org.apache.pinot.segment.local.utils.HyperLogLogPlusUtils;
@@ -64,7 +65,10 @@ public class DistinctCountHLLPlusValueAggregator implements ValueAggregator<Obje
   }
 
   @Override
-  public HyperLogLogPlus getInitialAggregatedValue(Object rawValue) {
+  public HyperLogLogPlus getInitialAggregatedValue(@Nullable Object rawValue) {
+    if (rawValue == null) {
+      return new HyperLogLogPlus(_p, _sp);
+    }
     HyperLogLogPlus initialValue;
     if (rawValue instanceof byte[]) {
       byte[] bytes = (byte[]) rawValue;
@@ -105,6 +109,11 @@ public class DistinctCountHLLPlusValueAggregator implements ValueAggregator<Obje
   @Override
   public HyperLogLogPlus cloneAggregatedValue(HyperLogLogPlus value) {
     return deserializeAggregatedValue(serializeAggregatedValue(value));
+  }
+
+  @Override
+  public boolean isAggregatedValueFixedSize() {
+    return true;
   }
 
   @Override

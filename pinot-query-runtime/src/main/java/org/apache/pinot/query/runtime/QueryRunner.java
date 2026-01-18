@@ -19,7 +19,6 @@
 package org.apache.pinot.query.runtime;
 
 import com.google.common.base.Preconditions;
-import com.google.common.collect.ImmutableMap;
 import io.grpc.stub.StreamObserver;
 import java.time.Duration;
 import java.util.ArrayList;
@@ -29,7 +28,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutorService;
-import java.util.concurrent.TimeoutException;
 import java.util.function.BiConsumer;
 import java.util.function.BooleanSupplier;
 import java.util.function.Consumer;
@@ -45,9 +43,9 @@ import org.apache.pinot.common.metrics.ServerMetrics;
 import org.apache.pinot.common.proto.Worker;
 import org.apache.pinot.common.utils.config.QueryOptionsUtils;
 import org.apache.pinot.core.data.manager.InstanceDataManager;
+import org.apache.pinot.core.executor.ThrottleOnCriticalHeapUsageExecutor;
 import org.apache.pinot.core.query.executor.QueryExecutor;
 import org.apache.pinot.core.query.executor.ServerQueryExecutorV1Impl;
-import org.apache.pinot.query.MseWorkerThreadContext;
 import org.apache.pinot.query.mailbox.MailboxService;
 import org.apache.pinot.query.mailbox.SendingMailbox;
 import org.apache.pinot.query.planner.physical.MailboxIdUtils;
@@ -74,24 +72,25 @@ import org.apache.pinot.query.runtime.plan.server.ServerPlanRequestUtils;
 import org.apache.pinot.query.runtime.timeseries.PhysicalTimeSeriesServerPlanVisitor;
 import org.apache.pinot.query.runtime.timeseries.TimeSeriesExecutionContext;
 import org.apache.pinot.query.runtime.timeseries.serde.TimeSeriesBlockSerde;
-import org.apache.pinot.spi.accounting.ThreadExecutionContext;
-import org.apache.pinot.spi.accounting.ThreadResourceUsageAccountant;
+import org.apache.pinot.spi.config.instance.InstanceType;
 import org.apache.pinot.spi.env.PinotConfiguration;
+import org.apache.pinot.spi.exception.QueryErrorCode;
+import org.apache.pinot.spi.exception.QueryException;
 import org.apache.pinot.spi.executor.ExecutorServiceUtils;
 import org.apache.pinot.spi.executor.HardLimitExecutor;
 import org.apache.pinot.spi.executor.MetricsExecutor;
-import org.apache.pinot.spi.executor.ThrottleOnCriticalHeapUsageExecutor;
+import org.apache.pinot.spi.query.QueryExecutionContext;
 import org.apache.pinot.spi.query.QueryThreadContext;
 import org.apache.pinot.spi.query.QueryThreadExceedStrategy;
-import org.apache.pinot.spi.utils.CommonConstants;
 import org.apache.pinot.spi.utils.CommonConstants.Broker.Request.QueryOptionKey;
+import org.apache.pinot.spi.utils.CommonConstants.Helix;
+import org.apache.pinot.spi.utils.CommonConstants.MultiStageQueryRunner;
 import org.apache.pinot.spi.utils.CommonConstants.MultiStageQueryRunner.JoinOverFlowMode;
 import org.apache.pinot.spi.utils.CommonConstants.MultiStageQueryRunner.WindowOverFlowMode;
-import org.apache.pinot.spi.utils.CommonConstants.Query.Request.MetadataKeys;
+import org.apache.pinot.spi.utils.CommonConstants.Query.Request;
+import org.apache.pinot.spi.utils.CommonConstants.Query.Response;
 import org.apache.pinot.spi.utils.CommonConstants.Server;
 import org.apache.pinot.sql.parsers.rewriter.RlsUtils;
-import org.apache.pinot.tsdb.planner.TimeSeriesPlanConstants.WorkerRequestMetadataKeys;
-import org.apache.pinot.tsdb.planner.TimeSeriesPlanConstants.WorkerResponseMetadataKeys;
 import org.apache.pinot.tsdb.spi.PinotTimeSeriesConfiguration;
 import org.apache.pinot.tsdb.spi.TimeBuckets;
 import org.apache.pinot.tsdb.spi.operator.BaseTimeSeriesOperator;
@@ -147,13 +146,13 @@ public class QueryRunner {
    * <p>Should be called only once and before calling any other method.
    */
   public void init(PinotConfiguration serverConf, InstanceDataManager instanceDataManager,
-      @Nullable TlsConfig tlsConfig, BooleanSupplier sendStats, ThreadResourceUsageAccountant resourceUsageAccountant) {
-    String hostname = serverConf.getProperty(CommonConstants.MultiStageQueryRunner.KEY_OF_QUERY_RUNNER_HOSTNAME);
-    if (hostname.startsWith(CommonConstants.Helix.PREFIX_OF_SERVER_INSTANCE)) {
-      hostname = hostname.substring(CommonConstants.Helix.SERVER_INSTANCE_PREFIX_LENGTH);
+      @Nullable TlsConfig tlsConfig, BooleanSupplier sendStats) {
+    String hostname = serverConf.getProperty(MultiStageQueryRunner.KEY_OF_QUERY_RUNNER_HOSTNAME);
+    if (hostname.startsWith(Helix.PREFIX_OF_SERVER_INSTANCE)) {
+      hostname = hostname.substring(Helix.SERVER_INSTANCE_PREFIX_LENGTH);
     }
-    int port = serverConf.getProperty(CommonConstants.MultiStageQueryRunner.KEY_OF_QUERY_RUNNER_PORT,
-        CommonConstants.MultiStageQueryRunner.DEFAULT_QUERY_RUNNER_PORT);
+    int port = serverConf.getProperty(MultiStageQueryRunner.KEY_OF_QUERY_RUNNER_PORT,
+        MultiStageQueryRunner.DEFAULT_QUERY_RUNNER_PORT);
 
     // TODO: Consider using separate config for intermediate stage and leaf stage
     String numGroupsLimitStr = serverConf.getProperty(Server.CONFIG_OF_QUERY_EXECUTOR_NUM_GROUPS_LIMIT);
@@ -180,18 +179,16 @@ public class QueryRunner {
     _mseMaxInitialResultHolderCapacity =
         mseMaxInitialGroupHolderCapacity != null ? Integer.parseInt(mseMaxInitialGroupHolderCapacity) : null;
 
-    String maxRowsInJoinStr = serverConf.getProperty(CommonConstants.MultiStageQueryRunner.KEY_OF_MAX_ROWS_IN_JOIN);
+    String maxRowsInJoinStr = serverConf.getProperty(MultiStageQueryRunner.KEY_OF_MAX_ROWS_IN_JOIN);
     _maxRowsInJoin = maxRowsInJoinStr != null ? Integer.parseInt(maxRowsInJoinStr) : null;
 
-    String joinOverflowModeStr =
-        serverConf.getProperty(CommonConstants.MultiStageQueryRunner.KEY_OF_JOIN_OVERFLOW_MODE);
+    String joinOverflowModeStr = serverConf.getProperty(MultiStageQueryRunner.KEY_OF_JOIN_OVERFLOW_MODE);
     _joinOverflowMode = joinOverflowModeStr != null ? JoinOverFlowMode.valueOf(joinOverflowModeStr) : null;
 
-    String maxRowsInWindowStr = serverConf.getProperty(CommonConstants.MultiStageQueryRunner.KEY_OF_MAX_ROWS_IN_WINDOW);
+    String maxRowsInWindowStr = serverConf.getProperty(MultiStageQueryRunner.KEY_OF_MAX_ROWS_IN_WINDOW);
     _maxRowsInWindow = maxRowsInWindowStr != null ? Integer.parseInt(maxRowsInWindowStr) : null;
 
-    String windowOverflowModeStr =
-        serverConf.getProperty(CommonConstants.MultiStageQueryRunner.KEY_OF_WINDOW_OVERFLOW_MODE);
+    String windowOverflowModeStr = serverConf.getProperty(MultiStageQueryRunner.KEY_OF_WINDOW_OVERFLOW_MODE);
     _windowOverflowMode = windowOverflowModeStr != null ? WindowOverFlowMode.valueOf(windowOverflowModeStr) : null;
 
     ExecutorService baseExecutorService =
@@ -202,36 +199,29 @@ public class QueryRunner {
     MetricsExecutor metricsExecutor = new MetricsExecutor(baseExecutorService,
         serverMetrics.getMeteredValue(ServerMeter.MULTI_STAGE_RUNNER_STARTED_TASKS),
         serverMetrics.getMeteredValue(ServerMeter.MULTI_STAGE_RUNNER_COMPLETED_TASKS));
-    _executorService = MseWorkerThreadContext.contextAwareExecutorService(
-        QueryThreadContext.contextAwareExecutorService(metricsExecutor));
+    _executorService = QueryThreadContext.contextAwareExecutorService(metricsExecutor);
 
     int hardLimit = HardLimitExecutor.getMultiStageExecutorHardLimit(serverConf);
     if (hardLimit > 0) {
-      String strategyStr = serverConf.getProperty(
-          CommonConstants.Server.CONFIG_OF_MSE_MAX_EXECUTION_THREADS_EXCEED_STRATEGY,
-          CommonConstants.Server.DEFAULT_MSE_MAX_EXECUTION_THREADS_EXCEED_STRATEGY);
+      String strategyStr = serverConf.getProperty(Server.CONFIG_OF_MSE_MAX_EXECUTION_THREADS_EXCEED_STRATEGY,
+          Server.DEFAULT_MSE_MAX_EXECUTION_THREADS_EXCEED_STRATEGY);
       QueryThreadExceedStrategy exceedStrategy;
       try {
         exceedStrategy = QueryThreadExceedStrategy.valueOf(strategyStr.toUpperCase());
       } catch (IllegalArgumentException e) {
         LOGGER.error("Invalid exceed strategy: {}, using default: {}", strategyStr,
-            CommonConstants.Server.DEFAULT_MSE_MAX_EXECUTION_THREADS_EXCEED_STRATEGY);
-        exceedStrategy = QueryThreadExceedStrategy.valueOf(
-            CommonConstants.Server.DEFAULT_MSE_MAX_EXECUTION_THREADS_EXCEED_STRATEGY);
+            Server.DEFAULT_MSE_MAX_EXECUTION_THREADS_EXCEED_STRATEGY);
+        exceedStrategy = QueryThreadExceedStrategy.valueOf(Server.DEFAULT_MSE_MAX_EXECUTION_THREADS_EXCEED_STRATEGY);
       }
-
       LOGGER.info("Setting multi-stage executor hardLimit: {} exceedStrategy: {}", hardLimit, exceedStrategy);
       _executorService = new HardLimitExecutor(hardLimit, _executorService, exceedStrategy);
     }
 
-    if (serverConf.getProperty(Server.CONFIG_OF_ENABLE_QUERY_SCHEDULER_THROTTLING_ON_HEAP_USAGE,
-        Server.DEFAULT_ENABLE_QUERY_SCHEDULER_THROTTLING_ON_HEAP_USAGE)) {
-      LOGGER.info("Enable OOM Throttling on critical heap usage for multi-stage executor");
-      _executorService = new ThrottleOnCriticalHeapUsageExecutor(_executorService, resourceUsageAccountant);
-    }
+    _executorService = ThrottleOnCriticalHeapUsageExecutor.maybeWrap(
+        _executorService, serverConf, "multi-stage executor");
 
-    _opChainScheduler = new OpChainSchedulerService(_executorService, serverConf);
-    _mailboxService = new MailboxService(hostname, port, serverConf, tlsConfig);
+    _opChainScheduler = new OpChainSchedulerService(instanceDataManager.getInstanceId(), _executorService, serverConf);
+    _mailboxService = new MailboxService(hostname, port, InstanceType.SERVER, serverConf, tlsConfig);
     try {
       _leafQueryExecutor = new ServerQueryExecutorV1Impl();
       _leafQueryExecutor.init(serverConf.subset(Server.QUERY_EXECUTOR_CONFIG_PREFIX), instanceDataManager,
@@ -266,9 +256,9 @@ public class QueryRunner {
   /// This method will not block the current thread but use [#_executorService] instead.
   /// If any error happened during the asynchronous execution, an error block will be sent to all receiver mailboxes.
   public CompletableFuture<Void> processQuery(WorkerMetadata workerMetadata, StagePlan stagePlan,
-      Map<String, String> requestMetadata, @Nullable ThreadExecutionContext parentContext) {
-    Runnable runnable = () -> processQueryBlocking(workerMetadata, stagePlan, requestMetadata, parentContext);
-    return CompletableFuture.runAsync(runnable, _executorService);
+      Map<String, String> requestMetadata) {
+    return CompletableFuture.runAsync(() -> processQueryBlocking(workerMetadata, stagePlan, requestMetadata),
+        _executorService);
   }
 
   /// Executes a {@link StagePlan} pseudo-synchronously.
@@ -278,17 +268,14 @@ public class QueryRunner {
   ///
   /// If the pipeline breaker success, the rest of the stage is asynchronously executed on the [#_opChainScheduler].
   private void processQueryBlocking(WorkerMetadata workerMetadata, StagePlan stagePlan,
-      Map<String, String> requestMetadata, @Nullable ThreadExecutionContext parentContext) {
-    MseWorkerThreadContext.setStageId(stagePlan.getStageMetadata().getStageId());
-    MseWorkerThreadContext.setWorkerId(workerMetadata.getWorkerId());
-
+      Map<String, String> requestMetadata) {
     StageMetadata stageMetadata = stagePlan.getStageMetadata();
     Map<String, String> opChainMetadata = consolidateMetadata(stageMetadata.getCustomProperties(), requestMetadata);
 
     // run pre-stage execution for all pipeline breakers
     PipelineBreakerResult pipelineBreakerResult =
-        PipelineBreakerExecutor.executePipelineBreakersFromQueryContext(_opChainScheduler, _mailboxService,
-            workerMetadata, stagePlan, opChainMetadata, parentContext, _sendStats.getAsBoolean());
+        PipelineBreakerExecutor.executePipelineBreakers(_opChainScheduler, _mailboxService,
+            workerMetadata, stagePlan, opChainMetadata, _sendStats.getAsBoolean());
 
     // Send error block to all the receivers if pipeline breaker fails
     if (pipelineBreakerResult != null && pipelineBreakerResult.getErrorBlock() != null) {
@@ -298,19 +285,19 @@ public class QueryRunner {
     }
 
     // run OpChain
-    OpChainExecutionContext executionContext = OpChainExecutionContext.fromQueryContext(_mailboxService,
-        opChainMetadata, stageMetadata, workerMetadata, pipelineBreakerResult, parentContext,
-        _sendStats.getAsBoolean());
-    OpChain opChain;
-    if (workerMetadata.isLeafStageWorker()) {
-      Map<String, String> rlsFilters = RlsUtils.extractRlsFilters(requestMetadata);
-      opChain =
-          ServerPlanRequestUtils.compileLeafStage(executionContext, stagePlan, _leafQueryExecutor, _executorService,
-              rlsFilters);
-    } else {
-      opChain = PlanNodeToOpChain.convert(stagePlan.getRootNode(), executionContext);
-    }
+    OpChainExecutionContext executionContext =
+        OpChainExecutionContext.fromQueryContext(_mailboxService, opChainMetadata, stageMetadata, workerMetadata,
+            pipelineBreakerResult, _sendStats.getAsBoolean());
     try {
+      OpChain opChain;
+      if (workerMetadata.isLeafStageWorker()) {
+        Map<String, String> rlsFilters = RlsUtils.extractRlsFilters(requestMetadata);
+        opChain =
+            ServerPlanRequestUtils.compileLeafStage(executionContext, stagePlan, _leafQueryExecutor, _executorService,
+                rlsFilters);
+      } else {
+        opChain = PlanNodeToOpChain.convert(stagePlan.getRootNode(), executionContext);
+      }
       // This can fail if the executor rejects the task.
       _opChainScheduler.register(opChain);
     } catch (RuntimeException e) {
@@ -319,9 +306,10 @@ public class QueryRunner {
     }
   }
 
-  private void notifyErrorAfterSubmission(int stageId, ErrorMseBlock errorBlock,
-      WorkerMetadata workerMetadata, StagePlan stagePlan) {
-    long requestId = QueryThreadContext.getRequestId();
+  private void notifyErrorAfterSubmission(int stageId, ErrorMseBlock errorBlock, WorkerMetadata workerMetadata,
+      StagePlan stagePlan) {
+    QueryExecutionContext executionContext = QueryThreadContext.get().getExecutionContext();
+    long requestId = executionContext.getRequestId();
     LOGGER.error("Error executing pipeline breaker for request: {}, stage: {}, sending error block: {}", requestId,
         stageId, errorBlock);
     MailboxSendNode rootNode = (MailboxSendNode) stagePlan.getRootNode();
@@ -334,23 +322,32 @@ public class QueryRunner {
               receiverMailboxInfos);
       routingInfos.addAll(stageRoutingInfos);
     }
-    long deadlineMs = QueryThreadContext.getPassiveDeadlineMs();
+    long deadlineMs = executionContext.getPassiveDeadlineMs();
     for (RoutingInfo routingInfo : routingInfos) {
-      try {
-        StatMap<MailboxSendOperator.StatKey> statMap = new StatMap<>(MailboxSendOperator.StatKey.class);
-        SendingMailbox sendingMailbox =
-            _mailboxService.getSendingMailbox(routingInfo.getHostname(), routingInfo.getPort(),
-                routingInfo.getMailboxId(), deadlineMs, statMap);
+      String mailboxId = routingInfo.getMailboxId();
+      StatMap<MailboxSendOperator.StatKey> statMap = new StatMap<>(MailboxSendOperator.StatKey.class);
+      try (SendingMailbox sendingMailbox = _mailboxService.getSendingMailbox(routingInfo.getHostname(),
+          routingInfo.getPort(), mailboxId, deadlineMs, statMap)) {
         // TODO: Here we are breaking the stats invariants, sending errors without including the stats of the
         //  current stage. We will need to fix this in future, but for now, we are sending the error block without
         //  the stats.
         sendingMailbox.send(errorBlock, Collections.emptyList());
-      } catch (TimeoutException e) {
-        LOGGER.warn("Timed out sending error block to mailbox: {} for request: {}, stage: {}",
-            routingInfo.getMailboxId(), requestId, stageId, e);
+      } catch (QueryException e) {
+        QueryErrorCode errorCode = e.getErrorCode();
+        switch (errorCode) {
+          case EXECUTION_TIMEOUT:
+            LOGGER.warn("Timed out sending error block to mailbox: {}", mailboxId, e);
+            break;
+          case QUERY_CANCELLATION:
+            LOGGER.info("Query cancelled while offering blocks to mailbox: {}", mailboxId);
+            break;
+          default:
+            LOGGER.error("{} exception while exception sending error block to mailbox: {}", errorCode, mailboxId, e);
+            break;
+        }
       } catch (Exception e) {
         LOGGER.error("Caught exception sending error block to mailbox: {} for request: {}, stage: {}",
-            routingInfo.getMailboxId(), requestId, stageId, e);
+            mailboxId, requestId, stageId, e);
       }
     }
   }
@@ -369,10 +366,10 @@ public class QueryRunner {
       try {
         String planId = pair.getRight();
         Map<String, String> errorMetadata = new HashMap<>();
-        errorMetadata.put(WorkerResponseMetadataKeys.ERROR_TYPE, t.getClass().getSimpleName());
-        errorMetadata.put(WorkerResponseMetadataKeys.ERROR_MESSAGE,
+        errorMetadata.put(Response.MetadataKeys.TimeSeries.ERROR_TYPE, t.getClass().getSimpleName());
+        errorMetadata.put(Response.MetadataKeys.TimeSeries.ERROR_MESSAGE,
             t.getMessage() == null ? "Unknown error: no message" : t.getMessage());
-        errorMetadata.put(WorkerResponseMetadataKeys.PLAN_ID, planId);
+        errorMetadata.put(Response.MetadataKeys.TimeSeries.PLAN_ID, planId);
         // TODO(timeseries): remove logging for failed queries.
         LOGGER.warn("time-series query failed:", t);
         responseObserver.onNext(Worker.TimeSeriesResponse.newBuilder().putAllMetadata(errorMetadata).build());
@@ -393,8 +390,9 @@ public class QueryRunner {
       List<BaseTimeSeriesPlanNode> fragmentRoots =
           serializedPlanFragments.stream().map(TimeSeriesPlanSerde::deserialize).collect(Collectors.toList());
       TimeSeriesExecutionContext context =
-          new TimeSeriesExecutionContext(metadata.get(WorkerRequestMetadataKeys.LANGUAGE), extractTimeBuckets(metadata),
-              deadlineMs, metadata, extractPlanToSegmentMap(metadata), Collections.emptyMap());
+          new TimeSeriesExecutionContext(metadata.get(Request.MetadataKeys.TimeSeries.LANGUAGE),
+              extractTimeBuckets(metadata), deadlineMs, metadata, extractPlanToSegmentMap(metadata),
+              Collections.emptyMap());
       final List<BaseTimeSeriesOperator> fragmentOpChains = fragmentRoots.stream().map(x -> {
         return _timeSeriesPhysicalPlanVisitor.compile(x, context);
       }).collect(Collectors.toList());
@@ -406,9 +404,12 @@ public class QueryRunner {
             currentPlanId = fragmentRoots.get(index).getId();
             BaseTimeSeriesOperator fragmentOpChain = fragmentOpChains.get(index);
             TimeSeriesBlock seriesBlock = fragmentOpChain.nextBlock();
+            Map<String, String> metadataMap = new HashMap<>(seriesBlock.getMetadata());
+            metadataMap.put(Response.MetadataKeys.TimeSeries.PLAN_ID, currentPlanId);
+            TimeSeriesBlockSerde.encodeExceptionsToMetadata(seriesBlock, metadataMap);
             Worker.TimeSeriesResponse response = Worker.TimeSeriesResponse.newBuilder()
                 .setPayload(TimeSeriesBlockSerde.serializeTimeSeriesBlock(seriesBlock))
-                .putAllMetadata(ImmutableMap.of(WorkerResponseMetadataKeys.PLAN_ID, currentPlanId))
+                .putAllMetadata(metadataMap)
                 .build();
             responseObserver.onNext(response);
           }
@@ -523,9 +524,6 @@ public class QueryRunner {
       LOGGER.debug("Explain query on intermediate stages is a NOOP");
       return stagePlan;
     }
-    long requestId = Long.parseLong(requestMetadata.get(MetadataKeys.REQUEST_ID));
-    long timeoutMs = Long.parseLong(requestMetadata.get(QueryOptionKey.TIMEOUT_MS));
-    long deadlineMs = System.currentTimeMillis() + timeoutMs;
 
     StageMetadata stageMetadata = stagePlan.getStageMetadata();
     Map<String, String> opChainMetadata = consolidateMetadata(stageMetadata.getCustomProperties(), requestMetadata);
@@ -543,8 +541,9 @@ public class QueryRunner {
       }
     };
     // compile OpChain
-    OpChainExecutionContext executionContext = OpChainExecutionContext.fromQueryContext(_mailboxService,
-        opChainMetadata, stageMetadata, workerMetadata, null, null, false);
+    OpChainExecutionContext executionContext =
+        OpChainExecutionContext.fromQueryContext(_mailboxService, opChainMetadata, stageMetadata, workerMetadata, null,
+            false);
 
     OpChain opChain =
         ServerPlanRequestUtils.compileLeafStage(executionContext, stagePlan, _leafQueryExecutor, _executorService,
@@ -580,21 +579,21 @@ public class QueryRunner {
   // Time series related utility methods below
 
   private long extractDeadlineMs(Map<String, String> metadataMap) {
-    return Long.parseLong(metadataMap.get(WorkerRequestMetadataKeys.DEADLINE_MS));
+    return Long.parseLong(metadataMap.get(Request.MetadataKeys.TimeSeries.DEADLINE_MS));
   }
 
   private TimeBuckets extractTimeBuckets(Map<String, String> metadataMap) {
-    long startTimeSeconds = Long.parseLong(metadataMap.get(WorkerRequestMetadataKeys.START_TIME_SECONDS));
-    long windowSeconds = Long.parseLong(metadataMap.get(WorkerRequestMetadataKeys.WINDOW_SECONDS));
-    int numElements = Integer.parseInt(metadataMap.get(WorkerRequestMetadataKeys.NUM_ELEMENTS));
+    long startTimeSeconds = Long.parseLong(metadataMap.get(Request.MetadataKeys.TimeSeries.START_TIME_SECONDS));
+    long windowSeconds = Long.parseLong(metadataMap.get(Request.MetadataKeys.TimeSeries.WINDOW_SECONDS));
+    int numElements = Integer.parseInt(metadataMap.get(Request.MetadataKeys.TimeSeries.NUM_ELEMENTS));
     return TimeBuckets.ofSeconds(startTimeSeconds, Duration.ofSeconds(windowSeconds), numElements);
   }
 
   private Map<String, List<String>> extractPlanToSegmentMap(Map<String, String> metadataMap) {
     Map<String, List<String>> result = new HashMap<>();
     for (var entry : metadataMap.entrySet()) {
-      if (WorkerRequestMetadataKeys.isKeySegmentList(entry.getKey())) {
-        String planId = WorkerRequestMetadataKeys.decodeSegmentListKey(entry.getKey());
+      if (Request.MetadataKeys.TimeSeries.isKeySegmentList(entry.getKey())) {
+        String planId = Request.MetadataKeys.TimeSeries.decodeSegmentListKey(entry.getKey());
         String[] segments = entry.getValue().split(",");
         result.put(planId, Stream.of(segments).map(String::strip).collect(Collectors.toList()));
       }

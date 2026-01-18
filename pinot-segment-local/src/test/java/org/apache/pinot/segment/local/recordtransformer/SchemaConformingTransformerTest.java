@@ -97,20 +97,6 @@ public class SchemaConformingTransformerTest {
     ServerMetrics.register(mock(ServerMetrics.class));
   }
 
-  private static final SchemaConformingTransformer _RECORD_TRANSFORMER =
-      new SchemaConformingTransformer(createDefaultBasicTableConfig(), createDefaultSchema());
-
-  private static TableConfig createDefaultBasicTableConfig() {
-    IngestionConfig ingestionConfig = new IngestionConfig();
-    SchemaConformingTransformerConfig schemaConformingTransformerConfig =
-        new SchemaConformingTransformerConfig(true, INDEXABLE_EXTRAS_FIELD_NAME, true, UNINDEXABLE_EXTRAS_FIELD_NAME,
-            UNINDEXABLE_FIELD_SUFFIX, null, null, null, null, null, null, false, null, null, null, null, null, null,
-            null, null, null, null, null);
-    ingestionConfig.setSchemaConformingTransformerConfig(schemaConformingTransformerConfig);
-    return new TableConfigBuilder(TableType.OFFLINE).setTableName("testTable").setIngestionConfig(ingestionConfig)
-        .build();
-  }
-
   private static TableConfig createDefaultTableConfig(String indexableExtrasField, String unindexableExtrasField,
       String unindexableFieldSuffix, Set<String> fieldPathsToDrop, Set<String> fieldPathsToPreserve,
       Set<String> fieldPathsToPreserveWithIndex, Map<String, String> columnNameToJsonKeyPathMap,
@@ -128,10 +114,6 @@ public class SchemaConformingTransformerTest {
     ingestionConfig.setSchemaConformingTransformerConfig(schemaConformingTransformerConfig);
     return new TableConfigBuilder(TableType.OFFLINE).setTableName("testTable").setIngestionConfig(ingestionConfig)
         .build();
-  }
-
-  private static Schema createDefaultSchema() {
-    return createDefaultSchemaBuilder().addSingleValueDimension("intField", DataType.INT).build();
   }
 
   private static Schema.SchemaBuilder createDefaultSchemaBuilder() {
@@ -956,10 +938,10 @@ public class SchemaConformingTransformerTest {
    */
   private GenericRow transformRow(TableConfig tableConfig, Schema schema, String inputRecordJSONString) {
     Map<String, Object> inputRecordMap = jsonStringToMap(inputRecordJSONString);
-    GenericRow inputRecord = createRowFromMap(inputRecordMap);
-    SchemaConformingTransformer schemaConformingTransformer =
-        new SchemaConformingTransformer(tableConfig, schema);
-    return schemaConformingTransformer.transform(inputRecord);
+    GenericRow record = createRowFromMap(inputRecordMap);
+    SchemaConformingTransformer transformer = SchemaConformingTransformer.create(tableConfig, schema);
+    assertNotNull(transformer);
+    return transformer.transform(List.of(record)).get(0);
   }
 
   /**
@@ -971,10 +953,8 @@ public class SchemaConformingTransformerTest {
       };
       return OBJECT_MAPPER.readValue(jsonString, typeRef);
     } catch (IOException e) {
-      fail(e.getMessage());
+      throw new RuntimeException(e);
     }
-    // Should never reach here
-    return null;
   }
 
   /**

@@ -19,9 +19,12 @@
 package org.apache.pinot.integration.tests;
 
 import com.fasterxml.jackson.databind.JsonNode;
-import com.google.common.collect.ImmutableList;
+import com.fasterxml.jackson.databind.node.ArrayNode;
 import java.io.File;
+import java.util.ArrayList;
 import java.util.Collections;
+import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 import org.apache.avro.file.DataFileWriter;
 import org.apache.avro.generic.GenericData;
@@ -32,6 +35,7 @@ import org.apache.pinot.spi.config.table.TableType;
 import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.env.PinotConfiguration;
+import org.apache.pinot.spi.utils.JsonUtils;
 import org.apache.pinot.spi.utils.builder.ControllerRequestURLBuilder;
 import org.apache.pinot.spi.utils.builder.TableConfigBuilder;
 import org.apache.pinot.tsdb.spi.PinotTimeSeriesConfiguration;
@@ -41,9 +45,14 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.testng.annotations.AfterClass;
 import org.testng.annotations.BeforeClass;
+import org.testng.annotations.DataProvider;
 import org.testng.annotations.Test;
 
 import static org.testng.Assert.assertEquals;
+import static org.testng.Assert.assertFalse;
+import static org.testng.Assert.assertNotNull;
+import static org.testng.Assert.assertTrue;
+
 
 public class TimeSeriesIntegrationTest extends BaseClusterIntegrationTest {
 
@@ -62,39 +71,39 @@ public class TimeSeriesIntegrationTest extends BaseClusterIntegrationTest {
   private static final long QUERY_START_TIME_SEC = DATA_START_TIME_SEC - 60; // 1 minute before start time
   private static final long QUERY_END_TIME_SEC = DATA_START_TIME_SEC + 300; // 5 minutes after start time
 
-  @Test
-  public void testGroupByMax() {
+  @Test(dataProvider = "isBrokerResponseCompatible")
+  public void testGroupByMax(boolean isBrokerResponseCompatible) {
     String query = String.format(
       "fetch{table=\"mytable_OFFLINE\",filter=\"\",ts_column=\"%s\",ts_unit=\"MILLISECONDS\",value=\"%s\"}"
         + " | max{%s} | transformNull{0} | keepLastValue{}",
       TS_COLUMN, TOTAL_TRIPS_COLUMN, DEVICE_OS_COLUMN
     );
-    runGroupedTimeSeriesQuery(query, 3, (ts, val, row) ->
+    runGroupedTimeSeriesQuery(query, 3, isBrokerResponseCompatible, (ts, val, row) ->
       assertEquals(val, ts <= DATA_START_TIME_SEC ? 0L : VIEWS_MAX_VALUE)
     );
   }
 
-  @Test
-  public void testGroupByMin() {
+  @Test(dataProvider = "isBrokerResponseCompatible")
+  public void testGroupByMin(boolean isBrokerResponseCompatible) {
     String query = String.format(
       "fetch{table=\"mytable_OFFLINE\",filter=\"\",ts_column=\"%s\",ts_unit=\"MILLISECONDS\",value=\"%s\"}"
         + " | min{%s} | transformNull{0} | keepLastValue{}",
       TS_COLUMN, TOTAL_TRIPS_COLUMN, DAYS_SINCE_FIRST_TRIP_COLUMN
     );
-    runGroupedTimeSeriesQuery(query, 5, (ts, val, row) ->
+    runGroupedTimeSeriesQuery(query, 5, isBrokerResponseCompatible, (ts, val, row) ->
       assertEquals(val, ts <= DATA_START_TIME_SEC ? 0L : VIEWS_MIN_VALUE)
     );
   }
 
-  @Test
-  public void testGroupBySum() {
+  @Test(dataProvider = "isBrokerResponseCompatible")
+  public void testGroupBySum(boolean isBrokerResponseCompatible) {
     String query = String.format(
       "fetch{table=\"mytable_OFFLINE\",filter=\"\",ts_column=\"%s\",ts_unit=\"MILLISECONDS\",value=\"%s\"}"
         + " | sum{%s} | transformNull{0} | keepLastValue{}",
       TS_COLUMN, TOTAL_TRIPS_COLUMN, REFERRAL_COLUMN
     );
-    runGroupedTimeSeriesQuery(query, 2, (ts, val, row) -> {
-      String referral = row.get("metric").get(REFERRAL_COLUMN).asText();
+    runGroupedTimeSeriesQuery(query, 2, isBrokerResponseCompatible, (ts, val, row) -> {
+      String referral = row.get(REFERRAL_COLUMN);
       long expected = ts <= DATA_START_TIME_SEC ? 0L
         // If referral is true, views are MAX_VALUE, otherwise 20
         : "1".equals(referral) ? 30 * VIEWS_MIN_VALUE : 30 * VIEWS_MAX_VALUE;
@@ -102,65 +111,65 @@ public class TimeSeriesIntegrationTest extends BaseClusterIntegrationTest {
     });
   }
 
-  @Test
-  public void testGroupByTwoColumnsAndExpressionValue() {
+  @Test(dataProvider = "isBrokerResponseCompatible")
+  public void testGroupByTwoColumnsAndExpressionValue(boolean isBrokerResponseCompatible) {
     String query = String.format(
       "fetch{table=\"mytable_OFFLINE\",filter=\"\",ts_column=\"%s\",ts_unit=\"MILLISECONDS\",value=\"%s*10\"}"
         + " | max{%s,%s} | transformNull{0} | keepLastValue{}",
       TS_COLUMN, TOTAL_TRIPS_COLUMN, DEVICE_OS_COLUMN, DAYS_SINCE_FIRST_TRIP_COLUMN
     );
-    runGroupedTimeSeriesQuery(query, 15, (ts, val, row) -> {
+    runGroupedTimeSeriesQuery(query, 15, isBrokerResponseCompatible, (ts, val, row) -> {
       long expected = ts <= DATA_START_TIME_SEC ? 0L : 10 * VIEWS_MAX_VALUE;
       assertEquals(val, expected);
     });
   }
 
-  @Test
-  public void testGroupByThreeColumnsAndConstantValue() {
+  @Test(dataProvider = "isBrokerResponseCompatible")
+  public void testGroupByThreeColumnsAndConstantValue(boolean isBrokerResponseCompatible) {
     String query = String.format(
       "fetch{table=\"mytable_OFFLINE\",filter=\"\",ts_column=\"%s\",ts_unit=\"MILLISECONDS\",value=\"1\"}"
         + " | sum{%s,%s,%s} | transformNull{0} | keepLastValue{}",
       TS_COLUMN, TOTAL_TRIPS_COLUMN, DEVICE_OS_COLUMN, DAYS_SINCE_FIRST_TRIP_COLUMN, REFERRAL_COLUMN
     );
-    runGroupedTimeSeriesQuery(query, 30, (ts, val, row) -> {
+    runGroupedTimeSeriesQuery(query, 30, isBrokerResponseCompatible, (ts, val, row) -> {
       // Since there are 30 groups, each minute will have 2 rows.
       long expected = ts <= DATA_START_TIME_SEC ? 0L : 2L;
       assertEquals(val, expected);
     });
   }
 
-  @Test
-  public void testGroupByWithFilter() {
+  @Test(dataProvider = "isBrokerResponseCompatible")
+  public void testGroupByWithFilter(boolean isBrokerResponseCompatible) {
     String query = String.format(
       "fetch{table=\"mytable_OFFLINE\",filter=\"%s='windows'\",ts_column=\"%s\",ts_unit=\"MILLISECONDS\",value=\"1\"}"
         + " | sum{%s,%s,%s} | transformNull{0} | keepLastValue{}",
       DEVICE_OS_COLUMN, TS_COLUMN, TOTAL_TRIPS_COLUMN, DEVICE_OS_COLUMN, DAYS_SINCE_FIRST_TRIP_COLUMN, REFERRAL_COLUMN
     );
-    runGroupedTimeSeriesQuery(query, 10, (ts, val, row) ->
+    runGroupedTimeSeriesQuery(query, 10, isBrokerResponseCompatible, (ts, val, row) ->
       assertEquals(val, ts <= DATA_START_TIME_SEC ? 0L : 2L)
     );
   }
 
-  @Test
-  public void testTransformNull() {
+  @Test(dataProvider = "isBrokerResponseCompatible")
+  public void testTransformNull(boolean isBrokerResponseCompatible) {
     String query = String.format(
       "fetch{table=\"mytable_OFFLINE\",filter=\"\",ts_column=\"%s\",ts_unit=\"MILLISECONDS\",value=\"%s\"}"
         + " | max{%s} | transformNull{42} | keepLastValue{}",
       TS_COLUMN, TOTAL_TRIPS_COLUMN, DEVICE_OS_COLUMN
     );
-    runGroupedTimeSeriesQuery(query, 3, (ts, val, row) ->
+    runGroupedTimeSeriesQuery(query, 3, isBrokerResponseCompatible, (ts, val, row) ->
       assertEquals(val, ts <= DATA_START_TIME_SEC ? 42L : VIEWS_MAX_VALUE)
     );
   }
 
-  @Test
-  public void testTableWithoutType() {
+  @Test(dataProvider = "isBrokerResponseCompatible")
+  public void testTableWithoutType(boolean isBrokerResponseCompatible) {
     String query = String.format(
       "fetch{table=\"mytable\",filter=\"\",ts_column=\"%s\",ts_unit=\"MILLISECONDS\",value=\"%s\"}"
         + " | max{%s} | transformNull{0} | keepLastValue{}",
       TS_COLUMN, TOTAL_TRIPS_COLUMN, DEVICE_OS_COLUMN
     );
-    runGroupedTimeSeriesQuery(query, 3, (ts, val, row) ->
+    runGroupedTimeSeriesQuery(query, 3, isBrokerResponseCompatible, (ts, val, row) ->
       assertEquals(val, ts <= DATA_START_TIME_SEC ? 0L : VIEWS_MAX_VALUE)
     );
   }
@@ -178,25 +187,246 @@ public class TimeSeriesIntegrationTest extends BaseClusterIntegrationTest {
     assertEquals(series.size(), 0);
   }
 
+  @Test
+  public void testControllerTimeseriesEndpoints()
+      throws Exception {
+    // Call /timeseries/api/v1/query_range.
+    String query = String.format(
+        "fetch{table=\"mytable_OFFLINE\",filter=\"\",ts_column=\"%s\",ts_unit=\"MILLISECONDS\",value=\"%s\"}"
+            + " | max{%s} | transformNull{0} | keepLastValue{}",
+        TS_COLUMN, TOTAL_TRIPS_COLUMN, DEVICE_OS_COLUMN
+    );
+    JsonNode result = getTimeseriesQuery(getControllerBaseApiUrl(), query, QUERY_START_TIME_SEC, QUERY_END_TIME_SEC,
+        getHeaders());
+    assertEquals(result.get("status").asText(), "success");
+
+    // Call /timeseries/languages.
+    var statusCodeAndResponse = sendGetRequestWithStatusCode(
+        getControllerBaseApiUrl() + "/timeseries/languages", getHeaders());
+    assertEquals(statusCodeAndResponse.getLeft(), 200);
+    assertEquals(statusCodeAndResponse.getRight(), "[\"m3ql\"]");
+  }
+
+  @Test(expectedExceptions = RuntimeException.class)
+  public void testQueryWithServerExceptionsForPrometheus() {
+    // JSON_MATCH on a column without JSON index triggers a QUERY_EXECUTION error.
+    String query = String.format(
+        "fetch{table=\"mytable_OFFLINE\",filter=\"JSON_MATCH(%s, '\\\"$.key=value\\\"')\",ts_column=\"%s\","
+            + "ts_unit=\"MILLISECONDS\",value=\"%s\"} | max{%s}",
+        DEVICE_OS_COLUMN, TS_COLUMN, TOTAL_TRIPS_COLUMN, DEVICE_OS_COLUMN
+    );
+    // Prometheus endpoint should throw an exception.
+    getTimeseriesQuery(query, QUERY_START_TIME_SEC, QUERY_END_TIME_SEC, getHeaders());
+  }
+
+  @Test
+  public void testQueryWithServerExceptionsForBroker() {
+    // JSON_MATCH on a column without JSON index triggers a QUERY_EXECUTION error.
+    String query = String.format(
+      "fetch{table=\"mytable_OFFLINE\",filter=\"JSON_MATCH(%s, '\\\"$.key=value\\\"')\",ts_column=\"%s\","
+        + "ts_unit=\"MILLISECONDS\",value=\"%s\"} | max{%s}",
+      DEVICE_OS_COLUMN, TS_COLUMN, TOTAL_TRIPS_COLUMN, DEVICE_OS_COLUMN
+    );
+    JsonNode result = postTimeseriesQuery(getBrokerBaseApiUrl(), query, QUERY_START_TIME_SEC, QUERY_END_TIME_SEC,
+      getHeaders());
+    assertNotNull(result);
+
+    JsonNode exceptions = result.get("exceptions");
+    assertNotNull(exceptions);
+    assertFalse(exceptions.isEmpty());
+    JsonNode firstException = exceptions.get(0);
+    assertEquals(firstException.get("errorCode").asInt(), 200);
+    assertTrue(firstException.get("message").asText().contains("Cannot apply JSON_MATCH on column"));
+  }
+
+  @Test
+  public void testQueryOptionsNumGroupsLimit() {
+    String query = String.format(
+        "fetch{table=\"mytable_OFFLINE\",filter=\"\",ts_column=\"%s\",ts_unit=\"MILLISECONDS\",value=\"%s\"}"
+            + " | max{%s} | transformNull{0} | keepLastValue{}",
+        TS_COLUMN, TOTAL_TRIPS_COLUMN, DEVICE_OS_COLUMN
+    );
+    // This query would normally return 3 groups (one for each device OS: windows, android, ios)
+    // With numGroupsLimit=1 query option, we expect only 1 group
+    JsonNode resultWithLimit = postTimeseriesQuery(getBrokerBaseApiUrl(), query, QUERY_START_TIME_SEC,
+        QUERY_END_TIME_SEC, null, getHeaders(), Map.of("numGroupsLimit", 1, "enableNullHandling", true));
+    assertNotNull(resultWithLimit);
+    assertEquals(resultWithLimit.path("numRowsResultSet").asInt(), 1,
+        "Expected only 1 group with numGroupsLimit=1 query option");
+
+    JsonNode resultTable = resultWithLimit.path("resultTable");
+    assertNotNull(resultTable);
+    JsonNode rows = resultTable.path("rows");
+    assertEquals(rows.size(), 1, "Expected only 1 row in result table with numGroupsLimit=1");
+  }
+
+  @Test
+  public void testExplainPlan() {
+    // Test 1: Simple query with transformNull
+    String query1 = String.format(
+        "fetch{table=\"mytable_OFFLINE\",filter=\"\",ts_column=\"%s\",ts_unit=\"MILLISECONDS\",value=\"%s\"}"
+            + " | max{%s} | transformNull{0} | keepLastValue{}",
+        TS_COLUMN, TOTAL_TRIPS_COLUMN, DEVICE_OS_COLUMN
+    );
+    String expectedPlan1 = "KEEP_LAST_VALUE\n"
+        + "  TRANSFORM_NULL(defaultValue=0.0)\n"
+        + "    LEAF_TIME_SERIES_PLAN_NODE(table=mytable_OFFLINE, timeExpr=ts, valueExpr=totalTrips, "
+        + "aggInfo=MAX, groupBy=[deviceOs], filter=, offsetSeconds=0, limit=100000)";
+    verifyExplainPlan(query1, expectedPlan1);
+
+    // Test 2: Query without transformNull
+    String query2 = String.format(
+        "fetch{table=\"mytable_OFFLINE\",filter=\"\",ts_column=\"%s\",ts_unit=\"MILLISECONDS\",value=\"%s\"}"
+            + " | max{%s} | keepLastValue{}",
+        TS_COLUMN, TOTAL_TRIPS_COLUMN, DEVICE_OS_COLUMN
+    );
+    String expectedPlan2 = "KEEP_LAST_VALUE\n"
+        + "  LEAF_TIME_SERIES_PLAN_NODE(table=mytable_OFFLINE, timeExpr=ts, valueExpr=totalTrips, "
+        + "aggInfo=MAX, groupBy=[deviceOs], filter=, offsetSeconds=0, limit=100000)";
+    verifyExplainPlan(query2, expectedPlan2);
+
+    // Test 3: Query with filter
+    String query3 = String.format(
+        "fetch{table=\"mytable_OFFLINE\",filter=\"%s='windows'\",ts_column=\"%s\",ts_unit=\"MILLISECONDS\","
+            + "value=\"%s\"} | sum{%s} | transformNull{0} | keepLastValue{}",
+        DEVICE_OS_COLUMN, TS_COLUMN, TOTAL_TRIPS_COLUMN, DEVICE_OS_COLUMN
+    );
+    String expectedPlan3 = "KEEP_LAST_VALUE\n"
+        + "  TRANSFORM_NULL(defaultValue=0.0)\n"
+        + "    LEAF_TIME_SERIES_PLAN_NODE(table=mytable_OFFLINE, timeExpr=ts, valueExpr=totalTrips, "
+        + "aggInfo=SUM, groupBy=[deviceOs], filter=deviceOs='windows', offsetSeconds=0, limit=100000)";
+    verifyExplainPlan(query3, expectedPlan3);
+
+    // Test 4: Query with multiple groupBy columns
+    String query4 = String.format(
+        "fetch{table=\"mytable_OFFLINE\",filter=\"\",ts_column=\"%s\",ts_unit=\"MILLISECONDS\",value=\"%s\"}"
+            + " | max{%s,%s} | transformNull{0} | keepLastValue{}",
+        TS_COLUMN, TOTAL_TRIPS_COLUMN, DEVICE_OS_COLUMN, DAYS_SINCE_FIRST_TRIP_COLUMN
+    );
+    String expectedPlan4 = "KEEP_LAST_VALUE\n"
+        + "  TRANSFORM_NULL(defaultValue=0.0)\n"
+        + "    LEAF_TIME_SERIES_PLAN_NODE(table=mytable_OFFLINE, timeExpr=ts, valueExpr=totalTrips, "
+        + "aggInfo=MAX, groupBy=[deviceOs, daysSinceFirstTrip], filter=, offsetSeconds=0, limit=100000)";
+    verifyExplainPlan(query4, expectedPlan4);
+  }
+
+  private void verifyExplainPlan(String query, String expectedPlan) {
+    JsonNode result = postTimeseriesQuery(getBrokerBaseApiUrl(), query, QUERY_START_TIME_SEC,
+        QUERY_END_TIME_SEC, "explain", getHeaders(), Map.of());
+
+    assertNotNull(result);
+    JsonNode resultTable = result.path("resultTable");
+    assertNotNull(resultTable, "Result table should be present");
+
+    JsonNode dataSchema = resultTable.path("dataSchema");
+    JsonNode columnNames = dataSchema.path("columnNames");
+    assertEquals(columnNames.size(), 2, "Should have QUERY and PLAN columns");
+    assertEquals(columnNames.get(0).asText(), "QUERY");
+    assertEquals(columnNames.get(1).asText(), "PLAN");
+
+    JsonNode rows = resultTable.path("rows");
+    assertEquals(rows.size(), 1, "Should have exactly one row");
+    JsonNode row = rows.get(0);
+
+    assertEquals(row.get(0).asText(), query, "QUERY should match the original query");
+
+    // Verify PLAN matches expected (normalize dynamic plan IDs like "plan_2, ")
+    String actualPlan = row.get(1).asText().replaceAll("plan_\\d+, ", "");
+    assertEquals(actualPlan, expectedPlan, "Plan should match expected structure");
+  }
+
+  @DataProvider(name = "isBrokerResponseCompatible")
+  public Object[][] isBrokerResponseCompatible() {
+    return new Object[][]{
+        {false}, {true}
+    };
+  }
+
   protected Map<String, String> getHeaders() {
     return Collections.emptyMap();
   }
 
-  private void runGroupedTimeSeriesQuery(String query, int expectedGroups, TimeSeriesValidator validator) {
-    JsonNode result = getTimeseriesQuery(query, QUERY_START_TIME_SEC, QUERY_END_TIME_SEC, getHeaders());
-    System.out.println(result);
-    assertEquals(result.get("status").asText(), "success");
+  private void runGroupedTimeSeriesQuery(String query, int expectedGroups, boolean isBrokerResponseCompatible,
+      TimeSeriesValidator validator) {
+    JsonNode result = isBrokerResponseCompatible
+        ? postTimeseriesQuery(getBrokerBaseApiUrl(), query, QUERY_START_TIME_SEC, QUERY_END_TIME_SEC, getHeaders())
+        : getTimeseriesQuery(query, QUERY_START_TIME_SEC, QUERY_END_TIME_SEC, getHeaders());
 
-    JsonNode series = result.get("data").get("result");
-    assertEquals(series.size(), expectedGroups);
+    if (isBrokerResponseCompatible) {
+      validateBrokerResponse(result, expectedGroups, validator);
+    } else {
+      validatePrometheusResponse(result, expectedGroups, validator);
+    }
+  }
+
+  private void validatePrometheusResponse(JsonNode result, int expectedGroups, TimeSeriesValidator validator) {
+    assertEquals("success", result.path("status").asText());
+
+    JsonNode series = result.path("data").path("result");
+    assertEquals(expectedGroups, series.size());
 
     for (JsonNode row : series) {
-      for (JsonNode point : row.get("values")) {
+      Map<String, String> metric;
+      try {
+        metric = JsonUtils.jsonNodeToStringMap(row.path("metric"));
+      } catch (Exception e) {
+        throw new RuntimeException("Failed to parse metric from row", e);
+      }
+      for (JsonNode point : row.path("values")) {
         long ts = point.get(0).asLong();
         long val = point.get(1).asLong();
-        validator.validate(ts, val, row);
+        validator.validate(ts, val, metric);
       }
     }
+  }
+
+  private void validateBrokerResponse(JsonNode result, int expectedGroups, TimeSeriesValidator validator) {
+    assertNotNull(result);
+    assertEquals(expectedGroups, result.path("numRowsResultSet").asInt());
+
+    JsonNode resultTable = result.path("resultTable");
+    assertNotNull(resultTable);
+
+    List<String> columnNames = extractStrings(resultTable.path("dataSchema").path("columnNames"));
+    JsonNode rows = resultTable.path("rows");
+
+    for (JsonNode jsonRow : rows) {
+      ArrayNode row = (ArrayNode) jsonRow;
+      assertEquals(columnNames.size(), row.size());
+
+      ArrayNode tsArray = (ArrayNode) row.get(0);
+      ArrayNode valArray = (ArrayNode) row.get(1);
+      assertEquals(tsArray.size(), valArray.size());
+
+      Map<String, String> metric = new HashMap<>();
+      for (int i = 2; i < row.size(); i++) {
+        metric.put(columnNames.get(i), row.get(i).asText());
+      }
+
+      for (int i = 0; i < tsArray.size(); i++) {
+        validator.validate(tsArray.get(i).asLong(), valArray.get(i).asLong(), metric);
+      }
+    }
+
+    // Validate query stats
+    assertTrue(Long.parseLong(result.path("totalDocs").asText()) > 0);
+    assertTrue(Long.parseLong(result.path("numDocsScanned").asText()) > 0);
+    assertTrue(Long.parseLong(result.path("numSegmentsQueried").asText()) > 0);
+  }
+
+  private List<String> extractStrings(JsonNode arrayNode) {
+    List<String> result = new ArrayList<>();
+    arrayNode.forEach(node -> result.add(node.asText()));
+    return result;
+  }
+
+  @Override
+  protected void overrideControllerConf(Map<String, Object> properties) {
+    properties.put(PinotTimeSeriesConfiguration.getEnabledLanguagesConfigKey(), "m3ql");
+    properties.put(PinotTimeSeriesConfiguration.getLogicalPlannerConfigKey("m3ql"),
+        "org.apache.pinot.tsdb.m3ql.M3TimeSeriesPlanner");
+    properties.put(PinotTimeSeriesConfiguration.getSeriesBuilderFactoryConfigKey("m3ql"),
+        SimpleTimeSeriesBuilderFactory.class.getName());
   }
 
   @Override
@@ -286,7 +516,7 @@ public class TimeSeriesIntegrationTest extends BaseClusterIntegrationTest {
   public File createAvroFile()
     throws Exception {
     org.apache.avro.Schema avroSchema = org.apache.avro.Schema.createRecord("myRecord", null, null, false);
-    avroSchema.setFields(ImmutableList.of(
+    avroSchema.setFields(List.of(
       createAvroField(TS_COLUMN, org.apache.avro.Schema.Type.LONG),
       createAvroField(DAYS_SINCE_FIRST_TRIP_COLUMN, org.apache.avro.Schema.Type.LONG),
       createAvroField(DEVICE_OS_COLUMN, org.apache.avro.Schema.Type.STRING),
@@ -330,6 +560,6 @@ public class TimeSeriesIntegrationTest extends BaseClusterIntegrationTest {
 
   @FunctionalInterface
   interface TimeSeriesValidator {
-    void validate(long timestamp, long value, JsonNode row);
+    void validate(long timestamp, long value, Map<String, String> metricMap);
   }
 }

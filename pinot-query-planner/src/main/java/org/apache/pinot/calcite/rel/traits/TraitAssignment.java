@@ -20,7 +20,6 @@ package org.apache.pinot.calcite.rel.traits;
 
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
-import com.google.common.collect.ImmutableList;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
@@ -33,7 +32,10 @@ import org.apache.calcite.rel.RelDistributions;
 import org.apache.calcite.rel.RelNode;
 import org.apache.calcite.rel.core.Join;
 import org.apache.calcite.rel.core.JoinInfo;
+import org.apache.calcite.rel.core.SetOp;
+import org.apache.calcite.rel.core.Union;
 import org.apache.calcite.rel.core.Window;
+import org.apache.calcite.util.ImmutableIntList;
 import org.apache.pinot.calcite.rel.hint.PinotHintOptions;
 import org.apache.pinot.query.context.PhysicalPlannerContext;
 import org.apache.pinot.query.planner.physical.v2.PRelNode;
@@ -83,8 +85,29 @@ public class TraitAssignment {
       return (PRelNode) assignAggregate((PhysicalAggregate) relNode);
     } else if (relNode instanceof PhysicalWindow) {
       return (PRelNode) assignWindow((PhysicalWindow) relNode);
+    } else if (relNode instanceof SetOp) {
+      return (PRelNode) assignSetOp((SetOp) relNode);
     }
     return (PRelNode) relNode;
+  }
+
+  RelNode assignSetOp(SetOp setOp) {
+    if (setOp instanceof Union) {
+      Union union = (Union) setOp;
+      if (union.all) {
+        // UNION ALL means we can return duplicates, so no trait required.
+        return setOp;
+      }
+    }
+    RelDistribution pushedDownDistTrait = RelDistributions.hash(ImmutableIntList.range(0,
+        setOp.getRowType().getFieldCount()));
+    List<RelNode> newInputs = new ArrayList<>();
+    for (RelNode input : setOp.getInputs()) {
+      RelTraitSet newTraitSet = input.getTraitSet().plus(pushedDownDistTrait);
+      RelNode newInput = input.copy(newTraitSet, input.getInputs());
+      newInputs.add(newInput);
+    }
+    return setOp.copy(setOp.getTraitSet(), newInputs);
   }
 
   /**
@@ -95,7 +118,7 @@ public class TraitAssignment {
     RelNode input = sort.getInput();
     RelTraitSet newTraitSet = input.getTraitSet().plus(RelDistributions.SINGLETON);
     input = input.copy(newTraitSet, input.getInputs());
-    return sort.copy(sort.getTraitSet(), ImmutableList.of(input));
+    return sort.copy(sort.getTraitSet(), List.of(input));
   }
 
   /**
@@ -141,7 +164,7 @@ public class TraitAssignment {
     RelNode rightInput = join.getInput(1);
     RelTraitSet rightTraitSet = rightInput.getTraitSet().plus(rightDistribution);
     rightInput = rightInput.copy(rightTraitSet, rightInput.getInputs());
-    return join.copy(join.getTraitSet(), ImmutableList.of(leftInput, rightInput));
+    return join.copy(join.getTraitSet(), List.of(leftInput, rightInput));
   }
 
   /**
@@ -158,7 +181,7 @@ public class TraitAssignment {
       RelTraitSet newTraitSet = input.getTraitSet().plus(RelDistributions.hash(aggregate.getGroupSet().asList()));
       input = input.copy(newTraitSet, input.getInputs());
     }
-    return aggregate.copy(aggregate.getTraitSet(), ImmutableList.of(input));
+    return aggregate.copy(aggregate.getTraitSet(), List.of(input));
   }
 
   /**
@@ -218,7 +241,7 @@ public class TraitAssignment {
         input = input.copy(input.getTraitSet().plus(newHashDistTrait), input.getInputs());
       }
     }
-    return window.copy(window.getTraitSet(), ImmutableList.of(input));
+    return window.copy(window.getTraitSet(), List.of(input));
   }
 
   private RelNode assignLookupJoin(Join join) {
@@ -240,8 +263,8 @@ public class TraitAssignment {
             RelDistributions.BROADCAST_DISTRIBUTED), Collections.emptyList());
     PhysicalProject newProject =
         (PhysicalProject) oldProject.copy(oldProject.getTraitSet().plus(RelDistributions.BROADCAST_DISTRIBUTED),
-            ImmutableList.of(newTableScan));
-    return join.copy(join.getTraitSet(), ImmutableList.of(leftInput, newProject));
+            List.of(newTableScan));
+    return join.copy(join.getTraitSet(), List.of(leftInput, newProject));
   }
 
   @SuppressWarnings("unused")
@@ -262,6 +285,6 @@ public class TraitAssignment {
     RelTraitSet rightTraitSet = rightInput.getTraitSet().plus(distribution)
         .plus(PinotExecStrategyTrait.PIPELINE_BREAKER);
     rightInput = rightInput.copy(rightTraitSet, rightInput.getInputs());
-    return join.copy(join.getTraitSet(), ImmutableList.of(leftInput, rightInput));
+    return join.copy(join.getTraitSet(), List.of(leftInput, rightInput));
   }
 }

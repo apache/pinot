@@ -19,13 +19,11 @@
 package org.apache.pinot.integration.tests.custom;
 
 import com.fasterxml.jackson.databind.JsonNode;
-import com.google.common.collect.ImmutableList;
 import java.io.File;
 import java.nio.ByteBuffer;
 import java.util.List;
 import org.apache.avro.file.DataFileWriter;
 import org.apache.avro.generic.GenericData;
-import org.apache.avro.generic.GenericDatumWriter;
 import org.apache.pinot.core.geospatial.transform.function.ScalarFunctions;
 import org.apache.pinot.segment.local.utils.GeometrySerializer;
 import org.apache.pinot.segment.local.utils.GeometryUtils;
@@ -135,7 +133,7 @@ public class GeoSpatialTest extends CustomDataQueryClusterIntegrationTest {
       throws Exception {
     // create avro schema
     org.apache.avro.Schema avroSchema = org.apache.avro.Schema.createRecord("myRecord", null, null, false);
-    avroSchema.setFields(ImmutableList.of(
+    avroSchema.setFields(List.of(
         new org.apache.avro.Schema.Field(DIM_NAME, org.apache.avro.Schema.create(org.apache.avro.Schema.Type.STRING),
             null, null),
         new org.apache.avro.Schema.Field(ST_X_NAME, org.apache.avro.Schema.create(org.apache.avro.Schema.Type.DOUBLE),
@@ -162,10 +160,10 @@ public class GeoSpatialTest extends CustomDataQueryClusterIntegrationTest {
             org.apache.avro.Schema.create(org.apache.avro.Schema.Type.DOUBLE), null, null)
     ));
 
-    File avroFile = new File(_tempDir, "data.avro");
-    try (DataFileWriter<GenericData.Record> fileWriter = new DataFileWriter<>(new GenericDatumWriter<>(avroSchema))) {
-      fileWriter.create(avroSchema, avroFile);
+    try (AvroFilesAndWriters avroFilesAndWriters = createAvroFilesAndWriters(avroSchema)) {
+      List<DataFileWriter<GenericData.Record>> writers = avroFilesAndWriters.getWriters();
       for (int i = 0; i < NUM_TOTAL_DOCS; i++) {
+        int fileIdx = Math.min(i / (NUM_TOTAL_DOCS / getNumAvroFiles()), getNumAvroFiles() - 1);
         GenericData.Record record = new GenericData.Record(avroSchema);
         record.put(DIM_NAME, "dim" + i);
         Point point =
@@ -182,11 +180,10 @@ public class GeoSpatialTest extends CustomDataQueryClusterIntegrationTest {
         record.put(AREA_GEOM_SIZE_NAME, AREA_GEOM_SIZE_DATA[i % AREA_GEOM_SIZE_DATA.length]);
         record.put(AREA_GEOG_NAME, AREA_GEOG_DATA[i % AREA_GEOG_DATA.length]);
         record.put(AREA_GEOG_SIZE_NAME, AREA_GEOG_SIZE_DATA[i % AREA_GEOG_SIZE_DATA.length]);
-        fileWriter.append(record);
+        writers.get(fileIdx).append(record);
       }
+      return avroFilesAndWriters.getAvroFiles();
     }
-
-    return List.of(avroFile);
   }
 
   @Test(dataProvider = "useBothQueryEngines")

@@ -38,8 +38,9 @@ import org.apache.pinot.core.transport.ServerRoutingInstance;
 import org.apache.pinot.core.util.GapfillUtils;
 import org.apache.pinot.spi.env.PinotConfiguration;
 import org.apache.pinot.spi.exception.BadQueryRequestException;
-import org.apache.pinot.spi.exception.EarlyTerminationException;
 import org.apache.pinot.spi.exception.QueryErrorCode;
+import org.apache.pinot.spi.exception.QueryException;
+import org.apache.pinot.spi.query.QueryThreadContext;
 import org.apache.pinot.spi.utils.CommonConstants;
 import org.apache.pinot.spi.utils.builder.TableNameBuilder;
 import org.slf4j.Logger;
@@ -58,6 +59,7 @@ public class BrokerReduceService extends BaseReduceService {
     super(config);
   }
 
+  /// [org.apache.pinot.spi.query.QueryThreadContext] must already be set up before calling this method.
   public BrokerResponseNative reduceOnDataTable(BrokerRequest brokerRequest, BrokerRequest serverBrokerRequest,
       Map<ServerRoutingInstance, DataTable> dataTableMap, long reduceTimeOutMs, BrokerMetrics brokerMetrics) {
     if (dataTableMap.isEmpty()) {
@@ -119,6 +121,14 @@ public class BrokerReduceService extends BaseReduceService {
     // Set execution statistics and Update broker metrics.
     aggregator.setStats(rawTableName, brokerResponseNative, brokerMetrics);
 
+    // If configured, filter out SERVER_SEGMENT_MISSING exceptions emitted by servers. This must happen after
+    // aggregator.setStats(), because the aggregator appends server exceptions during setStats.
+    Map<String, String> brokerQueryOptions = brokerRequest.getPinotQuery().getQueryOptions();
+    if (brokerQueryOptions != null && QueryOptionsUtils.isIgnoreMissingSegments(brokerQueryOptions)) {
+      brokerResponseNative.getExceptions().removeIf(
+          ex -> ex.getErrorCode() == QueryErrorCode.SERVER_SEGMENT_MISSING.getId());
+    }
+
     // Report the servers with conflicting data schema.
     if (!serversWithConflictingDataSchema.isEmpty()) {
       QueryErrorCode errorCode = QueryErrorCode.MERGE_RESPONSE;
@@ -126,8 +136,7 @@ public class BrokerReduceService extends BaseReduceService {
           + " from servers: " + serversWithConflictingDataSchema + " got dropped due to data schema inconsistency.";
       LOGGER.warn(errorMessage);
       brokerMetrics.addMeteredTableValue(rawTableName, BrokerMeter.RESPONSE_MERGE_EXCEPTIONS, 1);
-      brokerResponseNative.addException(
-          new QueryProcessingException(errorCode, errorMessage));
+      brokerResponseNative.addException(new QueryProcessingException(errorCode, errorMessage));
     }
 
     // NOTE: When there is no cached data schema, that means all servers encountered exception. In such case, return the
@@ -160,9 +169,20 @@ public class BrokerReduceService extends BaseReduceService {
       dataTableReducer.reduceAndSetResults(rawTableName, cachedDataSchema, dataTableMap, brokerResponseNative,
           new DataTableReducerContext(_reduceExecutorService, _maxReduceThreadsPerQuery, reduceTimeOutMs,
               groupTrimThreshold, minGroupTrimSize, minInitialIndexedTableCapacity), brokerMetrics);
-    } catch (EarlyTerminationException e) {
-      brokerResponseNative.addException(
-          new QueryProcessingException(QueryErrorCode.QUERY_CANCELLATION, e.toString()));
+    } catch (RuntimeException e) {
+      // First check terminate exception and use it as the results block if exists. We want to return the termination
+      // reason when query is explicitly terminated.
+      QueryException queryException = QueryThreadContext.getTerminateException();
+      if (queryException == null && e instanceof QueryException) {
+        queryException = (QueryException) e;
+      }
+      if (queryException != null) {
+        brokerResponseNative.addException(QueryProcessingException.fromQueryException(queryException));
+      } else {
+        LOGGER.error("Caught exception while reducing data tables (query: {})", serverQueryContext, e);
+        brokerResponseNative.addException(new QueryProcessingException(QueryErrorCode.MERGE_RESPONSE,
+            "Caught exception while reducing data tables: " + e.getMessage()));
+      }
     }
     QueryContext queryContext;
     if (brokerRequest == serverBrokerRequest) {

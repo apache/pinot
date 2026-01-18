@@ -44,6 +44,8 @@ public interface PlanNodeVisitor<T, C> {
 
   T visitJoin(JoinNode node, C context);
 
+  T visitEnrichedJoin(EnrichedJoinNode node, C context);
+
   T visitMailboxReceive(MailboxReceiveNode node, C context);
 
   T visitMailboxSend(MailboxSendNode node, C context);
@@ -63,6 +65,8 @@ public interface PlanNodeVisitor<T, C> {
   T visitExchange(ExchangeNode node, C context);
 
   T visitExplained(ExplainedNode node, C context);
+
+  T visitUnnest(UnnestNode node, C context);
 
   /**
    * A depth-first visitor that visits all children of a node before visiting the node itself.
@@ -161,6 +165,13 @@ public interface PlanNodeVisitor<T, C> {
     }
 
     @Override
+    public T visitEnrichedJoin(EnrichedJoinNode node, C context) {
+      preChildren(node, context);
+      visitChildren(node, context);
+      return postChildren(node, context);
+    }
+
+    @Override
     public T visitMailboxReceive(MailboxReceiveNode node, C context) {
       preChildren(node, context);
       visitChildren(node, context);
@@ -228,6 +239,13 @@ public interface PlanNodeVisitor<T, C> {
 
     @Override
     public T visitExplained(ExplainedNode node, C context) {
+      preChildren(node, context);
+      visitChildren(node, context);
+      return postChildren(node, context);
+    }
+
+    @Override
+    public T visitUnnest(UnnestNode node, C context) {
       preChildren(node, context);
       visitChildren(node, context);
       return postChildren(node, context);

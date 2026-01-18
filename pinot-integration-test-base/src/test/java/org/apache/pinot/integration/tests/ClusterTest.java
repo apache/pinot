@@ -80,8 +80,6 @@ import org.apache.pinot.spi.utils.CommonConstants.Server;
 import org.apache.pinot.spi.utils.JsonUtils;
 import org.apache.pinot.spi.utils.NetUtils;
 import org.intellij.lang.annotations.Language;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 import org.testng.Assert;
 import org.testng.SkipException;
 import org.testng.annotations.DataProvider;
@@ -119,6 +117,7 @@ public abstract class ClusterTest extends ControllerTest {
   protected String _minionBaseApiUrl;
 
   protected boolean _useMultiStageQueryEngine = false;
+  protected boolean _usePhysicalOptimizer = false;
 
   protected int getServerGrpcPort() {
     return _serverGrpcPort;
@@ -148,8 +147,16 @@ public abstract class ClusterTest extends ControllerTest {
     return _useMultiStageQueryEngine;
   }
 
+  protected boolean usePhysicalOptimizer() {
+    return _usePhysicalOptimizer;
+  }
+
   protected void setUseMultiStageQueryEngine(boolean useMultiStageQueryEngine) {
     _useMultiStageQueryEngine = useMultiStageQueryEngine;
+  }
+
+  protected void setUsePhysicalOptimizer(boolean usePhysicalOptimizer) {
+    _usePhysicalOptimizer = usePhysicalOptimizer;
   }
 
   protected void disableMultiStageQueryEngine() {
@@ -175,7 +182,7 @@ public abstract class ClusterTest extends ControllerTest {
 
   protected PinotConfiguration getBrokerConf(int brokerId) {
     PinotConfiguration brokerConf = new PinotConfiguration();
-    brokerConf.setProperty(Helix.CONFIG_OF_ZOOKEEPR_SERVER, getZkUrl());
+    brokerConf.setProperty(Helix.CONFIG_OF_ZOOKEEPER_SERVER, getZkUrl());
     brokerConf.setProperty(Helix.CONFIG_OF_CLUSTER_NAME, getHelixClusterName());
     brokerConf.setProperty(Broker.CONFIG_OF_BROKER_HOSTNAME, LOCAL_HOST);
     int brokerPort = NetUtils.findOpenPort(_nextBrokerPort);
@@ -242,7 +249,7 @@ public abstract class ClusterTest extends ControllerTest {
 
   protected PinotConfiguration getServerConf(int serverId) {
     PinotConfiguration serverConf = new PinotConfiguration();
-    serverConf.setProperty(Helix.CONFIG_OF_ZOOKEEPR_SERVER, getZkUrl());
+    serverConf.setProperty(Helix.CONFIG_OF_ZOOKEEPER_SERVER, getZkUrl());
     serverConf.setProperty(Helix.CONFIG_OF_CLUSTER_NAME, getHelixClusterName());
     serverConf.setProperty(Helix.KEY_OF_SERVER_NETTY_HOST, LOCAL_HOST);
     serverConf.setProperty(Server.CONFIG_OF_INSTANCE_DATA_DIR,
@@ -317,7 +324,7 @@ public abstract class ClusterTest extends ControllerTest {
 
   protected PinotConfiguration getMinionConf() {
     PinotConfiguration minionConf = new PinotConfiguration();
-    minionConf.setProperty(Helix.CONFIG_OF_ZOOKEEPR_SERVER, getZkUrl());
+    minionConf.setProperty(Helix.CONFIG_OF_ZOOKEEPER_SERVER, getZkUrl());
     minionConf.setProperty(Helix.CONFIG_OF_CLUSTER_NAME, getHelixClusterName());
     minionConf.setProperty(Helix.KEY_OF_MINION_HOST, LOCAL_HOST);
     int minionPort = NetUtils.findOpenPort(_nextMinionPort);
@@ -496,7 +503,6 @@ public abstract class ClusterTest extends ControllerTest {
   }
 
   public static class AvroFileSchemaKafkaAvroMessageDecoder implements StreamMessageDecoder<byte[]> {
-    private static final Logger LOGGER = LoggerFactory.getLogger(AvroFileSchemaKafkaAvroMessageDecoder.class);
     public static File _avroFile;
     private RecordExtractor<GenericRecord> _recordExtractor;
     private final DecoderFactory _decoderFactory = new DecoderFactory();
@@ -509,9 +515,6 @@ public abstract class ClusterTest extends ControllerTest {
       org.apache.avro.Schema avroSchema;
       try (DataFileStream<GenericRecord> reader = AvroUtils.getAvroReader(_avroFile)) {
         avroSchema = reader.getSchema();
-      } catch (Exception ex) {
-        LOGGER.error("Caught exception", ex);
-        throw new RuntimeException(ex);
       }
       AvroRecordExtractorConfig config = new AvroRecordExtractorConfig();
       config.init(props);
@@ -532,7 +535,6 @@ public abstract class ClusterTest extends ControllerTest {
             _reader.read(null, _decoderFactory.binaryDecoder(payload, offset, length, null));
         return _recordExtractor.extract(avroRecord, destination);
       } catch (Exception e) {
-        LOGGER.error("Caught exception", e);
         throw new RuntimeException(e);
       }
     }
@@ -567,14 +569,51 @@ public abstract class ClusterTest extends ControllerTest {
    * This is used for testing timeseries queries.
    */
   public JsonNode getTimeseriesQuery(String query, long startTime, long endTime, Map<String, String> headers) {
+    return getTimeseriesQuery(getBrokerBaseApiUrl(), query, startTime, endTime, headers);
+  }
+
+  /**
+   * Queries the timeseries query endpoint (/timeseries/api/v1/query_range) of the given base URL.
+   * This is used for testing timeseries queries.
+   */
+  public JsonNode getTimeseriesQuery(String baseUrl, String query, long startTime, long endTime,
+      Map<String, String> headers) {
     try {
       Map<String, String> queryParams = Map.of("language", "m3ql", "query", query, "start",
         String.valueOf(startTime), "end", String.valueOf(endTime));
-      String url = buildQueryUrl(getTimeSeriesQueryApiUrl(getBrokerBaseApiUrl()), queryParams);
+      String url = buildQueryUrl(getTimeSeriesQueryApiUrl(baseUrl), queryParams);
       JsonNode responseJsonNode = JsonUtils.stringToJsonNode(sendGetRequest(url, headers));
       return sanitizeResponse(responseJsonNode);
     } catch (Exception e) {
       throw new RuntimeException("Failed to get timeseries query: " + query, e);
+    }
+  }
+
+  public JsonNode postTimeseriesQuery(String baseUrl, String query, long startTime, long endTime,
+      Map<String, String> headers) {
+    return postTimeseriesQuery(baseUrl, query, startTime, endTime, null, headers, null);
+  }
+
+  public JsonNode postTimeseriesQuery(String baseUrl, String query, long startTime, long endTime, String mode,
+      Map<String, String> headers, Map<String, Object> queryOptions) {
+    try {
+      ObjectNode payload = JsonUtils.newObjectNode();
+      payload.put("language", "m3ql");
+      payload.put("query", query);
+      payload.put("start", String.valueOf(startTime));
+      payload.put("end", String.valueOf(endTime));
+      if (mode != null) {
+        payload.put("mode", mode);
+      }
+      if (queryOptions != null && !queryOptions.isEmpty()) {
+        ObjectNode queryOptionsNode = JsonUtils.newObjectNode();
+        queryOptions.forEach(queryOptionsNode::putPOJO);
+        payload.set("queryOptions", queryOptionsNode);
+      }
+      return JsonUtils.stringToJsonNode(
+          sendPostRequest(baseUrl + "/query/timeseries", JsonUtils.objectToString(payload), headers));
+    } catch (Exception e) {
+      throw new RuntimeException("Failed to post timeseries query: " + query, e);
     }
   }
 
@@ -799,7 +838,11 @@ public abstract class ClusterTest extends ControllerTest {
     if (!useMultiStageQueryEngine()) {
       return Map.of();
     }
-    return Map.of("queryOptions", "useMultistageEngine=true");
+    StringBuilder queryOptions = new StringBuilder("useMultistageEngine=true");
+    if (usePhysicalOptimizer()) {
+      queryOptions.append("; usePhysicalOptimizer=true");
+    }
+    return Map.of("queryOptions", queryOptions.toString());
   }
 
   /**

@@ -22,6 +22,7 @@ import com.google.common.base.Preconditions;
 import java.util.List;
 import java.util.Objects;
 import org.apache.pinot.query.planner.plannode.AggregateNode;
+import org.apache.pinot.query.planner.plannode.EnrichedJoinNode;
 import org.apache.pinot.query.planner.plannode.ExchangeNode;
 import org.apache.pinot.query.planner.plannode.ExplainedNode;
 import org.apache.pinot.query.planner.plannode.FilterNode;
@@ -34,6 +35,7 @@ import org.apache.pinot.query.planner.plannode.ProjectNode;
 import org.apache.pinot.query.planner.plannode.SetOpNode;
 import org.apache.pinot.query.planner.plannode.SortNode;
 import org.apache.pinot.query.planner.plannode.TableScanNode;
+import org.apache.pinot.query.planner.plannode.UnnestNode;
 import org.apache.pinot.query.planner.plannode.ValueNode;
 import org.apache.pinot.query.planner.plannode.WindowNode;
 import org.slf4j.Logger;
@@ -259,6 +261,21 @@ public class EquivalentStagesFinder {
       }
 
       @Override
+      public Boolean visitEnrichedJoin(EnrichedJoinNode node1, PlanNode node2) {
+        if (!(node2 instanceof EnrichedJoinNode)) {
+          return false;
+        }
+        if (!visitJoin(node1, node2)) {
+          return false;
+        }
+        EnrichedJoinNode that = (EnrichedJoinNode) node2;
+        return Objects.equals(node1.getFilterProjectRexes(), that.getFilterProjectRexes())
+            && node1.getJoinStrategy() == that.getJoinStrategy()
+            && node1.getFetch() == that.getFetch()
+            && node1.getOffset() == that.getOffset();
+      }
+
+      @Override
       public Boolean visitProject(ProjectNode node1, PlanNode node2) {
         if (!(node2 instanceof ProjectNode)) {
           return false;
@@ -334,6 +351,19 @@ public class EquivalentStagesFinder {
       @Override
       public Boolean visitExplained(ExplainedNode node, PlanNode context) {
         throw new UnsupportedOperationException("ExplainedNode should not be visited by NodeEquivalence");
+      }
+
+      @Override
+      public Boolean visitUnnest(UnnestNode node1, PlanNode node2) {
+        if (!(node2 instanceof UnnestNode)) {
+          return false;
+        }
+        UnnestNode that = (UnnestNode) node2;
+        return areBaseNodesEquivalent(node1, node2)
+            && Objects.equals(node1.getArrayExprs(), that.getArrayExprs())
+            && node1.isWithOrdinality() == that.isWithOrdinality()
+            && Objects.equals(node1.getElementIndexes(), that.getElementIndexes())
+            && node1.getOrdinalityIndex() == that.getOrdinalityIndex();
       }
     }
   }
