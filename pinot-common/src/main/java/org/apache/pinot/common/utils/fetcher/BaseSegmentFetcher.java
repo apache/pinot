@@ -77,6 +77,10 @@ public abstract class BaseSegmentFetcher implements SegmentFetcher {
         _logger.info("Fetched segment from: {} to: {} of size: {}", uri, dest, dest.length());
         return true;
       } catch (Exception e) {
+        if (isFileNotFoundException(e)) {
+          _logger.error("File not found while fetching segment from: {} to: {}", uri, dest, e);
+          throw e;
+        }
         _logger.warn("Caught exception while fetching segment from: {} to: {}", uri, dest, e);
         return false;
       }
@@ -97,6 +101,10 @@ public abstract class BaseSegmentFetcher implements SegmentFetcher {
         _logger.info("Fetched segment from: {} to: {} of size: {}", uri, dest, dest.length());
         return true;
       } catch (Exception e) {
+        if (isFileNotFoundException(e)) {
+          _logger.error("File not found while fetching segment from: {} to: {}", uri, dest, e);
+          throw e;
+        }
         _logger.warn("Caught exception while fetching segment from: {} to: {}", uri, dest, e);
         return false;
       }
@@ -130,6 +138,10 @@ public abstract class BaseSegmentFetcher implements SegmentFetcher {
                 fetchSegmentToLocalWithoutRetry(uri, dest);
                 return true;
               } catch (Exception e) {
+                if (isFileNotFoundException(e)) {
+                  _logger.error("File not found while downloading segment {} from peer {}", segmentName, uri, e);
+                  throw e;
+                }
                 _logger.warn("Download segment {} from peer {} failed.", segmentName, uri, e);
               }
             }
@@ -150,5 +162,20 @@ public abstract class BaseSegmentFetcher implements SegmentFetcher {
   protected void fetchSegmentToLocalWithoutRetry(URI uri, File dest)
       throws Exception {
     throw new UnsupportedOperationException();
+  }
+
+  /**
+   * Checks if the exception or its cause chain contains a FileNotFoundException.
+   * FileNotFoundException indicates the file doesn't exist and retrying won't help.
+   */
+  private boolean isFileNotFoundException(Exception e) {
+    Throwable cause = e;
+    while (cause != null) {
+      if (cause instanceof java.io.FileNotFoundException) {
+        return true;
+      }
+      cause = cause.getCause();
+    }
+    return false;
   }
 }
