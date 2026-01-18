@@ -740,7 +740,15 @@ public class PinotSegmentUploadDownloadRestletResource {
       throw new ControllerApplicationException(LOGGER, "Unsupported URI: " + currentSegmentLocationURI,
           Response.Status.BAD_REQUEST);
     }
-    SegmentFetcherFactory.fetchSegmentToLocal(currentSegmentLocationURI, destFile);
+    try {
+      SegmentFetcherFactory.fetchSegmentToLocal(currentSegmentLocationURI, destFile);
+    } catch (Exception e) {
+      if (isFileNotFoundException(e)) {
+        throw new ControllerApplicationException(LOGGER,
+            "Segment file not found at URI: " + currentSegmentLocationURI, Response.Status.NOT_FOUND, e);
+      }
+      throw e;
+    }
   }
 
   private SegmentMetadata getSegmentMetadata(File tempDecryptedFile, File tempSegmentDir, String metadataProviderClass)
