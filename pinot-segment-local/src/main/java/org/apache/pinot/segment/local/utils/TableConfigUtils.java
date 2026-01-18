@@ -1269,6 +1269,7 @@ public final class TableConfigUtils {
       }
     }
 
+    validateIndexTypeCompatibility(indexConfigsMap, schema);
     validateMultiColumnTextIndex(indexingConfig.getMultiColumnTextIndexConfig());
 
     // Star-tree index config is not managed by FieldIndexConfigs, and we need to validate it separately.
@@ -1366,6 +1367,45 @@ public final class TableConfigUtils {
         if (encodingType == EncodingType.DICTIONARY) {
           Preconditions.checkState(!noDictionaryColumnsFromIndexingConfig.contains(column),
               "FieldConfig encoding type is different from indexingConfig for column: %s", column);
+        }
+      }
+    }
+  }
+
+  /// Validates index type compatibility, ensures that:
+  /// - Columns with Inverted, Range, FST and iFST indexes have dictionary enabled
+  private static void validateIndexTypeCompatibility(Map<String, FieldIndexConfigs> indexConfigsMap, Schema schema) {
+    for (Map.Entry<String, FieldIndexConfigs> entry : indexConfigsMap.entrySet()) {
+      String column = entry.getKey();
+      FieldIndexConfigs indexConfigs = entry.getValue();
+
+      boolean hasDictionary = indexConfigs.getConfig(StandardIndexes.dictionary()) != null
+          && indexConfigs.getConfig(StandardIndexes.dictionary()).isEnabled();
+
+      if (!hasDictionary) {
+        if (indexConfigs.getConfig(StandardIndexes.inverted()) != null
+            && indexConfigs.getConfig(StandardIndexes.inverted()).isEnabled()) {
+          throw new IllegalStateException(String.format(
+              "Column '%s' has inverted_index enabled but dictionary is disabled. "
+                  + "Inverted index requires dictionary encoding to be enabled.", column));
+        }
+        if (indexConfigs.getConfig(StandardIndexes.range()) != null
+            && indexConfigs.getConfig(StandardIndexes.range()).isEnabled()) {
+          throw new IllegalStateException(String.format(
+              "Column '%s' has range_index enabled but dictionary is disabled. "
+                  + "Range index requires dictionary encoding to be enabled.", column));
+        }
+        if (indexConfigs.getConfig(StandardIndexes.fst()) != null
+            && indexConfigs.getConfig(StandardIndexes.fst()).isEnabled()) {
+          throw new IllegalStateException(String.format(
+              "Column '%s' has fst_index enabled but dictionary is disabled. "
+                  + "FST index requires dictionary encoding to be enabled.", column));
+        }
+        if (indexConfigs.getConfig(StandardIndexes.ifst()) != null
+            && indexConfigs.getConfig(StandardIndexes.ifst()).isEnabled()) {
+          throw new IllegalStateException(String.format(
+              "Column '%s' has ifst_index (inverted FST) enabled but dictionary is disabled. "
+                  + "Inverted FST index requires dictionary encoding to be enabled.", column));
         }
       }
     }
