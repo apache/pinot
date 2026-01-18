@@ -109,8 +109,16 @@ public class UserConfig extends BaseJsonConfig {
   }
 
   @JsonProperty(PERMISSIONS_KEY)
-  public List<AccessType> getPermissios() {
+  public List<AccessType> getPermissions() {
     return _permissions;
+  }
+
+  /**
+   * @deprecated Use {@link #getPermissions()} instead. This method has a typo in its name.
+   */
+  @Deprecated
+  public List<AccessType> getPermissios() {
+    return getPermissions();
   }
 
   @JsonProperty(COMPONET_KEY)
