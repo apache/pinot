@@ -301,7 +301,7 @@
     <maven.version>3.9.12</maven.version>
     <plexus-component-annotations.version>2.2.0</plexus-component-annotations.version>
     <plexus-utils.version>3.6.0</plexus-utils.version>
-    <animal-sniffer-annotations.version>1.26</animal-sniffer-annotations.version>
+    <animal-sniffer-annotations.version>1.27</animal-sniffer-annotations.version>
 
     <!-- Test Libraries -->
     <testng.version>7.11.0</testng.version>
