@@ -34,6 +34,7 @@ import java.util.Set;
 import javax.annotation.Nullable;
 import org.apache.calcite.rel.RelDistribution;
 import org.apache.commons.collections4.CollectionUtils;
+import org.apache.commons.collections4.MapUtils;
 import org.apache.pinot.calcite.rel.hint.PinotHintOptions;
 import org.apache.pinot.calcite.rel.logical.PinotRelExchangeType;
 import org.apache.pinot.calcite.rel.rules.ImmutableTableOptions;
@@ -445,7 +446,7 @@ public class WorkerManager {
     Map<String, String> tableOptions = metadata.getTableOptions();
     if (tableOptions != null) {
       if (Boolean.parseBoolean(tableOptions.get(PinotHintOptions.TableHintOptions.IS_REPLICATED))) {
-        setSegmentsForReplicatedLeafFragment(metadata);
+        setSegmentsForReplicatedLeafFragment(metadata, context);
         return;
       }
 
@@ -485,7 +486,8 @@ public class WorkerManager {
   private void assignWorkersToNonPartitionedLeafFragment(DispatchablePlanMetadata metadata,
       DispatchablePlanContext context) {
     String tableName = metadata.getScannedTables().get(0);
-    Map<String, RoutingTable> routingTableMap = getRoutingTable(tableName, context.getRequestId());
+    Map<String, RoutingTable> routingTableMap =
+        getRoutingTable(tableName, context.getRequestId(), context.getPlannerContext().getOptions());
     Preconditions.checkState(!routingTableMap.isEmpty(), "Unable to find routing entries for table: %s", tableName);
 
     // acquire time boundary info if it is a hybrid table.
@@ -553,40 +555,52 @@ public class WorkerManager {
    * @return keyed-map from table type(s) to routing table(s).
    */
   private Map<String, RoutingTable> getRoutingTable(String tableName, long requestId) {
+    return getRoutingTable(tableName, requestId, Map.of());
+  }
+
+  private Map<String, RoutingTable> getRoutingTable(String tableName, long requestId,
+      Map<String, String> queryOptions) {
     TableType tableType = TableNameBuilder.getTableTypeFromTableName(tableName);
     if (tableType == null) {
       // Raw table name
       Map<String, RoutingTable> routingTableMap = new HashMap<>(4);
       RoutingTable offlineRoutingTable =
-          getRoutingTableHelper(TableNameBuilder.OFFLINE.tableNameWithType(tableName), requestId);
+          getRoutingTableHelper(TableNameBuilder.OFFLINE.tableNameWithType(tableName), requestId, queryOptions);
       if (offlineRoutingTable != null) {
         routingTableMap.put(TableType.OFFLINE.name(), offlineRoutingTable);
       }
       RoutingTable realtimeRoutingTable =
-          getRoutingTableHelper(TableNameBuilder.REALTIME.tableNameWithType(tableName), requestId);
+          getRoutingTableHelper(TableNameBuilder.REALTIME.tableNameWithType(tableName), requestId, queryOptions);
       if (realtimeRoutingTable != null) {
         routingTableMap.put(TableType.REALTIME.name(), realtimeRoutingTable);
       }
       return routingTableMap;
     } else {
       // Table name with type
-      RoutingTable routingTable = getRoutingTableHelper(tableName, requestId);
+      RoutingTable routingTable = getRoutingTableHelper(tableName, requestId, queryOptions);
       return routingTable != null ? Map.of(tableType.name(), routingTable) : Map.of();
     }
   }
 
   @Nullable
-  private RoutingTable getRoutingTableHelper(String tableNameWithType, long requestId) {
-    return _routingManager.getRoutingTable(
-        CalciteSqlCompiler.compileToBrokerRequest("SELECT * FROM \"" + tableNameWithType + "\""), requestId);
+  private RoutingTable getRoutingTableHelper(String tableNameWithType, long requestId,
+      Map<String, String> queryOptions) {
+    BrokerRequest brokerRequest =
+        CalciteSqlCompiler.compileToBrokerRequest("SELECT * FROM \"" + tableNameWithType + "\"");
+    if (MapUtils.isNotEmpty(queryOptions) && brokerRequest.isSetPinotQuery()) {
+      // Ensure query options (e.g. tableSampler) are visible to routing selection.
+      brokerRequest.getPinotQuery().setQueryOptions(new HashMap<>(queryOptions));
+    }
+    return _routingManager.getRoutingTable(brokerRequest, requestId);
   }
 
   // --------------------------------------------------------------------------
   // Replicated non-partitioned leaf stage assignment
   // --------------------------------------------------------------------------
-  private void setSegmentsForReplicatedLeafFragment(DispatchablePlanMetadata metadata) {
+  private void setSegmentsForReplicatedLeafFragment(DispatchablePlanMetadata metadata,
+      DispatchablePlanContext context) {
     String tableName = metadata.getScannedTables().get(0);
-    Map<String, List<String>> segmentsMap = getSegments(tableName);
+    Map<String, List<String>> segmentsMap = getSegments(tableName, context.getPlannerContext().getOptions());
     Preconditions.checkState(!segmentsMap.isEmpty(), "Unable to find segments for table: %s", tableName);
 
     // Acquire time boundary info if it is a hybrid table.
@@ -609,31 +623,34 @@ public class WorkerManager {
    * Returns the segments for the given table, keyed by table type.
    * TODO: It doesn't handle unavailable segments.
    */
-  private Map<String, List<String>> getSegments(String tableName) {
+  private Map<String, List<String>> getSegments(String tableName, Map<String, String> queryOptions) {
+    String samplerName = MapUtils.isNotEmpty(queryOptions) ? queryOptions.get(QueryOptionKey.TABLE_SAMPLER) : null;
     TableType tableType = TableNameBuilder.getTableTypeFromTableName(tableName);
     if (tableType == null) {
       // Raw table name
       Map<String, List<String>> segmentsMap = new HashMap<>(4);
-      List<String> offlineSegments = setSegmentsHelper(TableNameBuilder.OFFLINE.tableNameWithType(tableName));
+      List<String> offlineSegments =
+          setSegmentsHelper(TableNameBuilder.OFFLINE.tableNameWithType(tableName), samplerName);
       if (CollectionUtils.isNotEmpty(offlineSegments)) {
         segmentsMap.put(TableType.OFFLINE.name(), offlineSegments);
       }
-      List<String> realtimeSegments = setSegmentsHelper(TableNameBuilder.REALTIME.tableNameWithType(tableName));
+      List<String> realtimeSegments =
+          setSegmentsHelper(TableNameBuilder.REALTIME.tableNameWithType(tableName), samplerName);
       if (CollectionUtils.isNotEmpty(realtimeSegments)) {
         segmentsMap.put(TableType.REALTIME.name(), realtimeSegments);
       }
       return segmentsMap;
     } else {
       // Table name with type
-      List<String> segments = setSegmentsHelper(tableName);
+      List<String> segments = setSegmentsHelper(tableName, samplerName);
       return CollectionUtils.isNotEmpty(segments) ? Map.of(tableType.name(), segments) : Map.of();
     }
   }
 
   @Nullable
-  private List<String> setSegmentsHelper(String tableNameWithType) {
+  private List<String> setSegmentsHelper(String tableNameWithType, @Nullable String samplerName) {
     return _routingManager.getSegments(
-        CalciteSqlCompiler.compileToBrokerRequest("SELECT * FROM \"" + tableNameWithType + "\""));
+        CalciteSqlCompiler.compileToBrokerRequest("SELECT * FROM \"" + tableNameWithType + "\""), samplerName);
   }
 
   private void assignWorkersToNonPartitionedLeafFragmentForLogicalTable(DispatchablePlanMetadata metadata,
@@ -647,15 +664,22 @@ public class WorkerManager {
     }
     BrokerRequest offlineBrokerRequest = null;
     BrokerRequest realtimeBrokerRequest = null;
+    Map<String, String> queryOptions = context.getPlannerContext().getOptions();
 
     if (logicalTableRouteInfo.hasOffline()) {
       offlineBrokerRequest = CalciteSqlCompiler.compileToBrokerRequest(
           "SELECT * FROM \"" + logicalTableRouteInfo.getOfflineTableName() + "\"");
+      if (MapUtils.isNotEmpty(queryOptions) && offlineBrokerRequest.isSetPinotQuery()) {
+        offlineBrokerRequest.getPinotQuery().setQueryOptions(new HashMap<>(queryOptions));
+      }
     }
 
     if (logicalTableRouteInfo.hasRealtime()) {
       realtimeBrokerRequest = CalciteSqlCompiler.compileToBrokerRequest(
           "SELECT * FROM \"" + logicalTableRouteInfo.getRealtimeTableName() + "\"");
+      if (MapUtils.isNotEmpty(queryOptions) && realtimeBrokerRequest.isSetPinotQuery()) {
+        realtimeBrokerRequest.getPinotQuery().setQueryOptions(new HashMap<>(queryOptions));
+      }
     }
 
     tableRouteProvider.calculateRoutes(logicalTableRouteInfo, _routingManager, offlineBrokerRequest,

@@ -68,6 +68,8 @@ public class QueryOptionsUtils {
           }
         }
       }
+      // Backward-compatible alias used by SQL SET syntax: SET sampler='x'
+      configResolver.put("sampler", QueryOptionKey.TABLE_SAMPLER);
     } catch (IllegalAccessException e) {
       // prefer rethrowing this during runtime instead of a ClassNotFoundException
       configResolver = null;

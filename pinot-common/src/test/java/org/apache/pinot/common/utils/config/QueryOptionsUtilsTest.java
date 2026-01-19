@@ -62,6 +62,13 @@ public class QueryOptionsUtilsTest {
   }
 
   @Test
+  public void shouldResolveSamplerAliasToTableSamplerOption() {
+    Map<String, String> resolved = QueryOptionsUtils.resolveCaseInsensitiveOptions(Map.of("sampler", "firstOnly"));
+
+    assertEquals(resolved.get(TABLE_SAMPLER), "firstOnly");
+  }
+
+  @Test
   public void shouldReadIgnoreMissingSegmentsOption() {
     // Given:
     Map<String, String> optsTrue = Map.of(IGNORE_MISSING_SEGMENTS, "true");
