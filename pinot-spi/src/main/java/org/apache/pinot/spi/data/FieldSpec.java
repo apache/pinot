@@ -350,7 +350,31 @@ public abstract class FieldSpec implements Comparable<FieldSpec>, Serializable {
     if (value instanceof byte[]) {
       return BytesUtils.toHexString((byte[]) value);
     }
+    // Handle Java collections (Map, List) and Scala collections
+    // Scala collections don't implement java.util.Map/List, so we check by class name
+    if (value instanceof Map || value instanceof List || isScalaCollection(value)) {
+      try {
+        return JsonUtils.objectToString(value);
+      } catch (JsonProcessingException e) {
+        final String valueType = (value != null) ? value.getClass().getName() : "null";
+        throw new RuntimeException(
+            String.format("Failed to serialize %s to JSON: %s", valueType, e.getMessage()), e);
+      }
+    }
     return value.toString();
+  }
+
+  /**
+   * Check if the value is a Scala collection.
+   * Scala collections don't implement java.util.Map/List, so instanceof checks fail.
+   * We detect them by checking if the class name starts with "scala.collection".
+   */
+  private static boolean isScalaCollection(@Nullable Object value) {
+    if (value == null) {
+      return false;
+    }
+    final String className = value.getClass().getName();
+    return className.startsWith("scala.collection");
   }
 
   // Required by JSON de-serializer. DO NOT REMOVE.
