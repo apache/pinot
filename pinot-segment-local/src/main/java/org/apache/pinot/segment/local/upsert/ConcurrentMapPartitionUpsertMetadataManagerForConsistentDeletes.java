@@ -277,7 +277,7 @@ public class ConcurrentMapPartitionUpsertMetadataManagerForConsistentDeletes
         if (forceCommitReloadMode == ForceCommitReloadModeProvider.Mode.PROTECTED_RELOAD && (
             _context.isDropOutOfOrderRecord() || _context.getConsistencyMode() == UpsertConfig.ConsistencyMode.NONE
                 || _context.getPartialUpsertHandler() != null) && oldSegment instanceof MutableSegment) {
-          revertSegmentUpsertMetadataWithRetry(segment, validDocIds, queryableDocIds, oldSegment, segmentName,
+          revertSegmentUpsertMetadata(segment, validDocIds, queryableDocIds, oldSegment, segmentName,
               validDocIdsForOldSegment);
           return;
         }

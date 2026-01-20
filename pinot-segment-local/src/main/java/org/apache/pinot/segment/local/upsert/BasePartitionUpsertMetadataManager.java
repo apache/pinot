@@ -665,7 +665,7 @@ public abstract class BasePartitionUpsertMetadataManager implements PartitionUps
       if (checkForInconsistentConfigs(oldSegment)) {
         // If there are still valid docs in the old segment, validate and revert the metadata of the
         // consuming segment in place
-        revertSegmentUpsertMetadataWithRetry(segment, validDocIds, queryableDocIds, oldSegment, segmentName,
+        revertSegmentUpsertMetadata(segment, validDocIds, queryableDocIds, oldSegment, segmentName,
             validDocIdsForOldSegment);
         return;
       }
@@ -683,7 +683,7 @@ public abstract class BasePartitionUpsertMetadataManager implements PartitionUps
   /**
    * Reverts segment upsert metadata and retries addOrReplaceSegment.
    */
-  protected void revertSegmentUpsertMetadataWithRetry(ImmutableSegment segment,
+  protected void revertSegmentUpsertMetadata(ImmutableSegment segment,
       @Nullable ThreadSafeMutableRoaringBitmap validDocIds, @Nullable ThreadSafeMutableRoaringBitmap queryableDocIds,
       IndexSegment oldSegment, String segmentName, MutableRoaringBitmap validDocIdsForOldSegment) {
     // Revert the keys in the segment to previous location and remove the newly added keys
