@@ -19,6 +19,7 @@
 package org.apache.pinot.spi.config.user;
 
 import com.fasterxml.jackson.annotation.JsonCreator;
+import com.fasterxml.jackson.annotation.JsonIgnore;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import com.fasterxml.jackson.annotation.JsonPropertyDescription;
 import com.google.common.base.Preconditions;
@@ -116,6 +117,7 @@ public class UserConfig extends BaseJsonConfig {
   /**
    * @deprecated Use {@link #getPermissions()} instead. This method has a typo in its name.
    */
+  @JsonIgnore
   @Deprecated
   public List<AccessType> getPermissios() {
     return getPermissions();
