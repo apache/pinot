@@ -63,11 +63,11 @@ import org.apache.pinot.segment.spi.index.mutable.ThreadSafeMutableRoaringBitmap
 import org.apache.pinot.spi.config.table.HashFunction;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.UpsertConfig;
-import org.apache.pinot.spi.utils.ForceCommitReloadModeProvider;
-import org.apache.pinot.spi.utils.ForceCommitReloadModeProvider.Mode;
 import org.apache.pinot.spi.data.readers.GenericRow;
 import org.apache.pinot.spi.data.readers.PrimaryKey;
 import org.apache.pinot.spi.utils.BooleanUtils;
+import org.apache.pinot.spi.utils.ForceCommitReloadModeProvider;
+import org.apache.pinot.spi.utils.ForceCommitReloadModeProvider.Mode;
 import org.roaringbitmap.PeekableIntIterator;
 import org.roaringbitmap.buffer.MutableRoaringBitmap;
 import org.slf4j.Logger;
