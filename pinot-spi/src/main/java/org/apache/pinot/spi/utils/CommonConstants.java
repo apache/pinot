@@ -2172,6 +2172,13 @@ public class CommonConstants {
     public static final String FORCE_COMMIT_RELOAD_CONFIG = "pinot.server.upsert.force.commit.reload";
 
     /**
+     * Default value: true (force commit/reload is allowed by default).
+     * @deprecated Use {@link #DEFAULT_FORCE_COMMIT_RELOAD_MODE} instead.
+     */
+    @Deprecated
+    public static final boolean DEFAULT_FORCE_COMMIT_RELOAD = true;
+
+    /**
      * Default mode: PROTECTED_RELOAD (force commit/reload is allowed while reverting the Upsert metadata during
      * inconsistencies).
      */
