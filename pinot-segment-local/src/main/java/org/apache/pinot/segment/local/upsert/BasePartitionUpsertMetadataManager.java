@@ -662,7 +662,9 @@ public abstract class BasePartitionUpsertMetadataManager implements PartitionUps
       validDocIdsForOldSegment = getValidDocIdsForOldSegment(oldSegment);
     }
     if (validDocIdsForOldSegment != null && !validDocIdsForOldSegment.isEmpty()) {
-      if (checkForInconsistentConfigs(oldSegment)) {
+      ForceCommitReloadModeProvider.Mode forceCommitReloadMode = ForceCommitReloadModeProvider.getMode();
+      if (forceCommitReloadMode == Mode.PROTECTED_RELOAD && oldSegment instanceof MutableSegment
+          && checkForInconsistentTableConfigs()) {
         // If there are still valid docs in the old segment, validate and revert the metadata of the
         // consuming segment in place
         revertSegmentUpsertMetadata(segment, validDocIds, queryableDocIds, oldSegment, segmentName,
@@ -673,11 +675,9 @@ public abstract class BasePartitionUpsertMetadataManager implements PartitionUps
     }
   }
 
-  public boolean checkForInconsistentConfigs(IndexSegment oldSegment) {
-    ForceCommitReloadModeProvider.Mode forceCommitReloadMode = ForceCommitReloadModeProvider.getMode();
-    return forceCommitReloadMode == Mode.PROTECTED_RELOAD && (_context.isDropOutOfOrderRecord()
-        || _context.getConsistencyMode() == UpsertConfig.ConsistencyMode.NONE
-        || _context.getPartialUpsertHandler() != null) && oldSegment instanceof MutableSegment;
+  public boolean checkForInconsistentTableConfigs() {
+    return ((_context.isDropOutOfOrderRecord() && _context.getConsistencyMode() == UpsertConfig.ConsistencyMode.NONE)
+        || _context.getPartialUpsertHandler() != null);
   }
 
   /**

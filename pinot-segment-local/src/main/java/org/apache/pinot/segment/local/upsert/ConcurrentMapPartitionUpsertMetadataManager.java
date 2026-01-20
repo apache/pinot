@@ -38,6 +38,7 @@ import org.apache.pinot.segment.spi.MutableSegment;
 import org.apache.pinot.segment.spi.index.mutable.ThreadSafeMutableRoaringBitmap;
 import org.apache.pinot.spi.data.readers.GenericRow;
 import org.apache.pinot.spi.data.readers.PrimaryKey;
+import org.apache.pinot.spi.utils.ForceCommitReloadModeProvider;
 import org.roaringbitmap.buffer.MutableRoaringBitmap;
 
 
@@ -116,11 +117,13 @@ public class ConcurrentMapPartitionUpsertMetadataManager extends BasePartitionUp
                       validDocIdsForOldSegment.remove(currentDocId);
                     }
                   }
-                  _previousKeyToRecordLocationMap.remove(primaryKey);
+                  if(checkForInconsistentTableConfigs()) {
+                    _previousKeyToRecordLocationMap.remove(primaryKey);
+                  }
                   return new RecordLocation(segment, newDocId, newComparisonValue);
                 } else {
                   RecordLocation prevRecordLocation = _previousKeyToRecordLocationMap.get(primaryKey);
-                  if (prevRecordLocation == null
+                  if (checkForInconsistentTableConfigs() && prevRecordLocation == null
                       || newComparisonValue.compareTo(prevRecordLocation.getComparisonValue()) >= 0) {
                     RecordLocation newRecordLocation = new RecordLocation(segment, newDocId, newComparisonValue);
                     _previousKeyToRecordLocationMap.put(primaryKey, newRecordLocation);
@@ -136,8 +139,18 @@ public class ConcurrentMapPartitionUpsertMetadataManager extends BasePartitionUp
                 numKeysInWrongSegment.getAndIncrement();
                 if (comparisonResult >= 0) {
                   addDocId(segment, validDocIds, queryableDocIds, newDocId, recordInfo);
+                  if (checkForInconsistentTableConfigs() && currentSegment instanceof MutableSegment) {
+                    _previousKeyToRecordLocationMap.remove(primaryKey);
+                  }
                   return new RecordLocation(segment, newDocId, newComparisonValue);
                 } else {
+                  RecordLocation prevRecordLocation = _previousKeyToRecordLocationMap.get(primaryKey);
+                  if (checkForInconsistentTableConfigs() && currentSegment instanceof MutableSegment
+                      && prevRecordLocation == null
+                      || newComparisonValue.compareTo(prevRecordLocation.getComparisonValue()) >= 0) {
+                    RecordLocation newRecordLocation = new RecordLocation(segment, newDocId, newComparisonValue);
+                    _previousKeyToRecordLocationMap.put(primaryKey, newRecordLocation);
+                  }
                   return currentRecordLocation;
                 }
               }
@@ -155,7 +168,7 @@ public class ConcurrentMapPartitionUpsertMetadataManager extends BasePartitionUp
                 // - If current key is in consuming segment: Don't track - key is moving to immutable segment,
                 //   consuming segment no longer owns it, so no revert needed for this key
                 // - If current key is in immutable segment: No-op
-                if (currentSegment instanceof MutableSegment) {
+                if (checkForInconsistentTableConfigs() && currentSegment instanceof MutableSegment) {
                   _previousKeyToRecordLocationMap.remove(primaryKey);
                 }
                 return newRecordLocation;
@@ -201,7 +214,7 @@ public class ConcurrentMapPartitionUpsertMetadataManager extends BasePartitionUp
           (pk, recordLocation) -> {
             RecordLocation prevLocation = _previousKeyToRecordLocationMap.get(primaryKey);
             if (segment instanceof MutableSegment && recordLocation.getSegment() == segment
-                && checkForInconsistentConfigs(segment) && prevLocation != null
+                && checkForInconsistentTableConfigs() && prevLocation != null
                 && !(_previousKeyToRecordLocationMap.get(primaryKey).getSegment() instanceof MutableSegment)
                 && _trackedSegments.contains(prevLocation.getSegment())) {
               // Revert to previous immutable segment location
@@ -331,7 +344,7 @@ public class ConcurrentMapPartitionUpsertMetadataManager extends BasePartitionUp
       double comparisonValue = ((Number) newComparisonValue).doubleValue();
       _largestSeenComparisonValue.getAndUpdate(v -> Math.max(v, comparisonValue));
     }
-
+    ForceCommitReloadModeProvider.Mode forceCommitReloadMode = ForceCommitReloadModeProvider.getMode();
     _primaryKeyToRecordLocationMap.compute(HashUtils.hashPrimaryKey(recordInfo.getPrimaryKey(), _hashFunction),
         (primaryKey, currentRecordLocation) -> {
           if (currentRecordLocation != null) {
@@ -339,17 +352,20 @@ public class ConcurrentMapPartitionUpsertMetadataManager extends BasePartitionUp
             IndexSegment currentSegment = currentRecordLocation.getSegment();
             // Update the record location when the new comparison value is greater than or equal to the current value.
             // Update the record location when there is a tie to keep the newer record.
-            if (newComparisonValue.compareTo(currentRecordLocation.getComparisonValue()) >= 0) {
+            if (forceCommitReloadMode == ForceCommitReloadModeProvider.Mode.PROTECTED_RELOAD
+                && newComparisonValue.compareTo(currentRecordLocation.getComparisonValue()) >= 0) {
               int currentDocId = currentRecordLocation.getDocId();
               RecordLocation newRecordLocation = new RecordLocation(segment, newDocId, newComparisonValue);
               if (segment == currentSegment) {
                 replaceDocId(segment, validDocIds, queryableDocIds, currentDocId, newDocId, recordInfo);
               } else {
-                if (!(currentSegment instanceof MutableSegment)) {
-                  _previousKeyToRecordLocationMap.put(primaryKey, currentRecordLocation);
-                } else {
-                  _logger.warn("Detected another mutable segment: {} while consuming records from segment: {}",
-                      currentSegment.getSegmentName(), segment.getSegmentName());
+                if (checkForInconsistentTableConfigs()) {
+                  if (!(currentSegment instanceof MutableSegment)) {
+                    _previousKeyToRecordLocationMap.put(primaryKey, currentRecordLocation);
+                  } else {
+                    _logger.warn("Detected another mutable segment: {} while consuming records from segment: {}",
+                        currentSegment.getSegmentName(), segment.getSegmentName());
+                  }
                 }
                 replaceDocId(segment, validDocIds, queryableDocIds, currentSegment, currentDocId, newDocId, recordInfo);
               }
