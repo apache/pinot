@@ -1080,8 +1080,6 @@ public abstract class BasePartitionUpsertMetadataManager implements PartitionUps
   protected abstract void revertAndRemoveSegment(IndexSegment segment,
       Iterator<Map.Entry<Integer, PrimaryKey>> primaryKeyIterator);
 
-  protected abstract void removeSegment(IndexSegment segment, Iterator<PrimaryKey> primaryKeyIterator);
-
   /**
    * Removes all primary keys that have comparison value smaller than (largestSeenComparisonValue - TTL).
    */

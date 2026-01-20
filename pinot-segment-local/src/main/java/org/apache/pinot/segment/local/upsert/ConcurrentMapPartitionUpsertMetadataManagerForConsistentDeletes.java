@@ -371,29 +371,6 @@ public class ConcurrentMapPartitionUpsertMetadataManagerForConsistentDeletes
   }
 
   @Override
-  protected void removeSegment(IndexSegment segment, Iterator<PrimaryKey> primaryKeyIterator) {
-    // We need to decrease the distinctSegmentCount for each unique primary key in this deleting segment by 1
-    // as the occurrence of the key in this segment is being removed. We are taking a set of unique primary keys
-    // to avoid double counting the same key in the same segment.
-    Set<Object> uniquePrimaryKeys = new HashSet<>();
-    while (primaryKeyIterator.hasNext()) {
-      PrimaryKey primaryKey = primaryKeyIterator.next();
-      _primaryKeyToRecordLocationMap.computeIfPresent(HashUtils.hashPrimaryKey(primaryKey, _hashFunction),
-          (pk, recordLocation) -> {
-            if (recordLocation.getSegment() == segment) {
-              return null;
-            }
-            if (!uniquePrimaryKeys.add(pk)) {
-              return recordLocation;
-            }
-            return new RecordLocation(recordLocation.getSegment(), recordLocation.getDocId(),
-                recordLocation.getComparisonValue(),
-                RecordLocation.decrementSegmentCount(recordLocation.getDistinctSegmentCount()));
-          });
-    }
-  }
-
-  @Override
   public void doRemoveExpiredPrimaryKeys() {
     AtomicInteger numTotalKeysMarkForDeletion = new AtomicInteger();
     AtomicInteger numDeletedTTLKeysRemoved = new AtomicInteger();
