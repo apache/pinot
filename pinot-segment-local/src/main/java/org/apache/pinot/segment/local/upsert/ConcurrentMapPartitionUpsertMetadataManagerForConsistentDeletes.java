@@ -43,8 +43,10 @@ import org.apache.pinot.segment.spi.ImmutableSegment;
 import org.apache.pinot.segment.spi.IndexSegment;
 import org.apache.pinot.segment.spi.MutableSegment;
 import org.apache.pinot.segment.spi.index.mutable.ThreadSafeMutableRoaringBitmap;
+import org.apache.pinot.spi.config.table.UpsertConfig;
 import org.apache.pinot.spi.data.readers.GenericRow;
 import org.apache.pinot.spi.data.readers.PrimaryKey;
+import org.apache.pinot.spi.utils.ForceCommitReloadModeProvider;
 import org.roaringbitmap.buffer.MutableRoaringBitmap;
 
 
@@ -148,6 +150,13 @@ public class ConcurrentMapPartitionUpsertMetadataManagerForConsistentDeletes
                   return new RecordLocation(segment, newDocId, newComparisonValue,
                       RecordLocation.incrementSegmentCount(currentDistinctSegmentCount));
                 } else {
+                  RecordLocation prevRecordLocation = _previousKeyToRecordLocationMap.get(primaryKey);
+                  if (prevRecordLocation == null
+                      || newComparisonValue.compareTo(prevRecordLocation.getComparisonValue()) >= 0) {
+                    RecordLocation newRecordLocation =
+                        new RecordLocation(segment, newDocId, newComparisonValue, currentDistinctSegmentCount);
+                    _previousKeyToRecordLocationMap.put(primaryKey, newRecordLocation);
+                  }
                   return new RecordLocation(currentSegment, currentDocId, currentComparisonValue,
                       RecordLocation.incrementSegmentCount(currentDistinctSegmentCount));
                 }
@@ -177,13 +186,9 @@ public class ConcurrentMapPartitionUpsertMetadataManagerForConsistentDeletes
                 replaceDocId(segment, validDocIds, queryableDocIds, currentSegment, currentDocId, newDocId, recordInfo);
                 RecordLocation newRecordLocation = new RecordLocation(segment, newDocId, newComparisonValue,
                     RecordLocation.incrementSegmentCount(currentDistinctSegmentCount));
-                // Track previous location for revert purposes:
-                // - If current key is in consuming segment: Don't track - key is moving to immutable segment,
-                //   consuming segment no longer owns it, so no revert needed for this key
-                // - If current key is in immutable segment: Track current location to enable revert if needed
-                if (!(currentSegment instanceof MutableSegment)) {
-                  _previousKeyToRecordLocationMap.put(primaryKey, currentRecordLocation);
-                } else {
+                // - If current key is in consuming segment: key is moving to immutable segment,
+                //   consuming segment no longer owns it, so remove the key location from the map
+                if (currentSegment instanceof MutableSegment) {
                   _previousKeyToRecordLocationMap.remove(primaryKey);
                 }
                 return newRecordLocation;
@@ -234,6 +239,16 @@ public class ConcurrentMapPartitionUpsertMetadataManagerForConsistentDeletes
         System.currentTimeMillis() - startTimeMs, numPrimaryKeys);
   }
 
+  protected void removeSegment(IndexSegment segment, MutableRoaringBitmap validDocIds) {
+    try (PrimaryKeyReader primaryKeyReader = new PrimaryKeyReader(segment, _primaryKeyColumns)) {
+      revertAndRemoveSegment(segment, UpsertUtils.getRecordIterator(primaryKeyReader, validDocIds));
+    } catch (Exception e) {
+      throw new RuntimeException(
+          String.format("Caught exception while removing segment: %s, table: %s, message: %s", segment.getSegmentName(),
+              _tableNameWithType, e.getMessage()), e);
+    }
+  }
+
   @Override
   public void replaceSegment(ImmutableSegment segment, @Nullable ThreadSafeMutableRoaringBitmap validDocIds,
       @Nullable ThreadSafeMutableRoaringBitmap queryableDocIds, @Nullable Iterator<RecordInfo> recordInfoIterator,
@@ -258,8 +273,14 @@ public class ConcurrentMapPartitionUpsertMetadataManagerForConsistentDeletes
             oldSegment, validDocIdsForOldSegment);
       }
       if (validDocIdsForOldSegment != null && !validDocIdsForOldSegment.isEmpty()) {
-        checkForInconsistencies(segment, validDocIds, queryableDocIds, oldSegment, validDocIdsForOldSegment,
-            segmentName);
+        ForceCommitReloadModeProvider.Mode forceCommitReloadMode = ForceCommitReloadModeProvider.getMode();
+        if (forceCommitReloadMode == ForceCommitReloadModeProvider.Mode.PROTECTED_RELOAD && (
+            _context.isDropOutOfOrderRecord() || _context.getConsistencyMode() == UpsertConfig.ConsistencyMode.NONE
+                || _context.getPartialUpsertHandler() != null) && oldSegment instanceof MutableSegment) {
+          revertSegmentUpsertMetadataWithRetry(segment, validDocIds, queryableDocIds, oldSegment, segmentName,
+              validDocIdsForOldSegment);
+          return;
+        }
       }
       // we want to always remove a segment in case of enableDeletedKeysCompactionConsistency = true
       // this is to account for the removal of primary-key in the to-be-removed segment and reduce
@@ -284,9 +305,9 @@ public class ConcurrentMapPartitionUpsertMetadataManagerForConsistentDeletes
       _primaryKeyToRecordLocationMap.computeIfPresent(HashUtils.hashPrimaryKey(primaryKey, _hashFunction),
           (pk, recordLocation) -> {
             RecordLocation prevLocation = _previousKeyToRecordLocationMap.get(primaryKey);
-            if (segment instanceof MutableSegment && prevLocation != null && !(_previousKeyToRecordLocationMap.get(
-                primaryKey).getSegment() instanceof MutableSegment) && _trackedSegments.contains(
-                prevLocation.getSegment())) {
+            if (segment instanceof MutableSegment && checkForInconsistentConfigs(segment) && prevLocation != null
+                && !(_previousKeyToRecordLocationMap.get(primaryKey).getSegment() instanceof MutableSegment)
+                && _trackedSegments.contains(prevLocation.getSegment())) {
               // Revert to previous immutable segment location
               IndexSegment prevSegment = prevLocation.getSegment();
               ThreadSafeMutableRoaringBitmap prevValidDocIds = prevSegment.getValidDocIds();
@@ -307,26 +328,42 @@ public class ConcurrentMapPartitionUpsertMetadataManagerForConsistentDeletes
                 } catch (IOException e) {
                   _logger.warn("Failed to revert to previous segment: {}, removing key", prevSegment.getSegmentName(),
                       e);
-                  removeDocId(segment, docId);
                   _previousKeyToRecordLocationMap.remove(primaryKey);
                   return null;
                 }
               } else {
                 _logger.debug("Previous segment {} has null validDocIds, removing key", prevSegment.getSegmentName());
-                removeDocId(segment, docId);
                 _previousKeyToRecordLocationMap.remove(primaryKey);
                 return null;
               }
             } else if (recordLocation.getSegment() == segment) {
               if (segment instanceof MutableSegment) {
-                removeDocId(segment, docId);
                 _previousKeyToRecordLocationMap.remove(primaryKey);
               }
               return null;
             }
-            if (segment instanceof MutableSegment) {
-              removeDocId(segment, docId);
-              _previousKeyToRecordLocationMap.remove(primaryKey);
+            if (!uniquePrimaryKeys.add(pk)) {
+              return recordLocation;
+            }
+            return new RecordLocation(recordLocation.getSegment(), recordLocation.getDocId(),
+                recordLocation.getComparisonValue(),
+                RecordLocation.decrementSegmentCount(recordLocation.getDistinctSegmentCount()));
+          });
+    }
+  }
+
+  @Override
+  protected void removeSegment(IndexSegment segment, Iterator<PrimaryKey> primaryKeyIterator) {
+    // We need to decrease the distinctSegmentCount for each unique primary key in this deleting segment by 1
+    // as the occurrence of the key in this segment is being removed. We are taking a set of unique primary keys
+    // to avoid double counting the same key in the same segment.
+    Set<Object> uniquePrimaryKeys = new HashSet<>();
+    while (primaryKeyIterator.hasNext()) {
+      PrimaryKey primaryKey = primaryKeyIterator.next();
+      _primaryKeyToRecordLocationMap.computeIfPresent(HashUtils.hashPrimaryKey(primaryKey, _hashFunction),
+          (pk, recordLocation) -> {
+            if (recordLocation.getSegment() == segment) {
+              return null;
             }
             if (!uniquePrimaryKeys.add(pk)) {
               return recordLocation;
@@ -400,6 +437,11 @@ public class ConcurrentMapPartitionUpsertMetadataManagerForConsistentDeletes
   }
 
   @Override
+  protected int getPrevKeyToRecordLocationSize() {
+    return _previousKeyToRecordLocationMap.size();
+  }
+
+  @Override
   protected boolean doAddRecord(MutableSegment segment, RecordInfo recordInfo) {
     AtomicBoolean isOutOfOrderRecord = new AtomicBoolean(false);
     ThreadSafeMutableRoaringBitmap validDocIds = Objects.requireNonNull(segment.getValidDocIds());
@@ -424,12 +466,14 @@ public class ConcurrentMapPartitionUpsertMetadataManagerForConsistentDeletes
               int currentDocId = currentRecordLocation.getDocId();
               if (segment == currentSegment) {
                 replaceDocId(segment, validDocIds, queryableDocIds, currentDocId, newDocId, recordInfo);
-                RecordLocation newRecordLocation = new RecordLocation(segment, newDocId, newComparisonValue,
+                return new RecordLocation(segment, newDocId, newComparisonValue,
                     currentRecordLocation.getDistinctSegmentCount());
-                return newRecordLocation;
               } else {
                 if (!(currentSegment instanceof MutableSegment)) {
                   _previousKeyToRecordLocationMap.put(primaryKey, currentRecordLocation);
+                } else {
+                  _logger.warn("Detected another mutable segment: {} while consuming records from segment: {}",
+                      currentSegment.getSegmentName(), segment.getSegmentName());
                 }
                 replaceDocId(segment, validDocIds, queryableDocIds, currentSegment, currentDocId, newDocId, recordInfo);
                 return new RecordLocation(segment, newDocId, newComparisonValue,

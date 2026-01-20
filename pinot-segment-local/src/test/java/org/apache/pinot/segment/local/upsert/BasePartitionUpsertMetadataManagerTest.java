@@ -1065,7 +1065,16 @@ public class BasePartitionUpsertMetadataManagerTest {
     }
 
     @Override
+    protected void removeSegment(IndexSegment segment, Iterator<PrimaryKey> primaryKeyIterator) {
+    }
+
+    @Override
     protected void doRemoveExpiredPrimaryKeys() {
+    }
+
+    @Override
+    protected int getPrevKeyToRecordLocationSize() {
+      return 0;
     }
   }
 }

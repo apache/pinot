@@ -2165,12 +2165,16 @@ public class CommonConstants {
      * Cluster config key to control whether force commit/reload is allowed for upsert tables
      * with inconsistent state configurations (partial upsert or dropOutOfOrderRecord=true
      * with consistency mode NONE and replication > 1).
+     *
+     * Supported values: NO_RELOAD, PROTECTED_RELOAD, UNSAFE_RELOAD
+     * Legacy boolean values (true/false) are also supported for backward compatibility.
      */
     public static final String FORCE_COMMIT_RELOAD_CONFIG = "pinot.server.upsert.force.commit.reload";
 
     /**
-     * Default value: true (force commit/reload is allowed by default).
+     * Default mode: PROTECTED_RELOAD (force commit/reload is allowed while reverting the Upsert metadata during
+     * inconsistencies).
      */
-    public static final boolean DEFAULT_FORCE_COMMIT_RELOAD = true;
+    public static final String DEFAULT_FORCE_COMMIT_RELOAD_MODE = "PROTECTED_RELOAD";
   }
 }

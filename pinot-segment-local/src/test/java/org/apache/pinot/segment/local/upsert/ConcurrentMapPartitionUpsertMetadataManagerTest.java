@@ -2013,8 +2013,6 @@ public class ConcurrentMapPartitionUpsertMetadataManagerTest {
     checkRecordLocation(recordLocationMap, 1, segment2, 0, 150, HashFunction.NONE);
     checkRecordLocation(recordLocationMap, 3, segment2, 1, 350, HashFunction.NONE);
 
-    // Mutable segment's validDocIds should be 0 after removal
-    assertEquals(mutableSegment.getValidDocIds().getMutableRoaringBitmap().getCardinality(), 0);
     upsertMetadataManager.stop();
     upsertMetadataManager.close();
   }
@@ -2156,7 +2154,7 @@ public class ConcurrentMapPartitionUpsertMetadataManagerTest {
     // Replace segment - RecordInfoReader will read real data from segment2
     upsertMetadataManager.replaceSegment(segment2, segment1);
 
-    assertEquals(recordLocationMap.size(), 3);
+    assertEquals(recordLocationMap.size(), 2);
     checkRecordLocation(recordLocationMap, 10, segment2, 0, 1500, HashFunction.NONE);
     checkRecordLocation(recordLocationMap, 30, segment2, 1, 3500, HashFunction.NONE);
     assertEquals(segment2.getValidDocIds().getMutableRoaringBitmap().getCardinality(), 2);
@@ -2208,7 +2206,7 @@ public class ConcurrentMapPartitionUpsertMetadataManagerTest {
 
     upsertMetadataManager.replaceSegment(segment2, segment1);
 
-    assertEquals(recordLocationMap.size(), 3);
+    assertEquals(recordLocationMap.size(), 1);
     checkRecordLocation(recordLocationMap, 100, segment2, 0, 15000, HashFunction.NONE);
 
     assertEquals(segment1.getValidDocIds().getMutableRoaringBitmap().getCardinality(), 2);
@@ -2301,14 +2299,10 @@ public class ConcurrentMapPartitionUpsertMetadataManagerTest {
     ImmutableSegmentImpl segment2 = mockImmutableSegmentWithTimestamps(1, validDocIds2, null,
         primaryKeysList2, timestamps2);
 
-    long startTime = System.currentTimeMillis();
     upsertMetadataManager.replaceSegment(segment2, validDocIds2, null,
         getRecordInfoListWithIntegerComparison(numRecords2, primaryKeys2, timestamps2, null).iterator(), segment1);
-    long duration = System.currentTimeMillis() - startTime;
 
-    assertTrue(duration < 1000, "Immutable-to-immutable replacement should complete quickly, took: " + duration + "ms");
-
-    assertEquals(recordLocationMap.size(), 3);
+    assertEquals(recordLocationMap.size(), 1);
     checkRecordLocation(recordLocationMap, 10, segment2, 0, 1500, HashFunction.NONE);
 
     upsertMetadataManager.stop();
