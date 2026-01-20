@@ -350,31 +350,56 @@ public abstract class FieldSpec implements Comparable<FieldSpec>, Serializable {
     if (value instanceof byte[]) {
       return BytesUtils.toHexString((byte[]) value);
     }
-    // Handle Java collections (Map, List) and Scala collections
-    // Scala collections don't implement java.util.Map/List, so we check by class name
-    if (value instanceof Map || value instanceof List || isScalaCollection(value)) {
+    // Handle Java collections (Map, List)
+    if (value instanceof Map || value instanceof List) {
       try {
         return JsonUtils.objectToString(value);
       } catch (JsonProcessingException e) {
-        final String valueType = (value != null) ? value.getClass().getName() : "null";
         throw new RuntimeException(
-            String.format("Failed to serialize %s to JSON: %s", valueType, e.getMessage()), e);
+            String.format("Failed to serialize %s to JSON: %s", value.getClass().getName(), e.getMessage()), e);
       }
+    }
+    // Handle Scala collections - they don't implement java.util.Map/List
+    // JsonUtils doesn't have Scala module, so we handle empty collections directly
+    final String className = value.getClass().getName();
+    if (className.startsWith("scala.collection")) {
+      return serializeScalaCollection(value, className);
     }
     return value.toString();
   }
 
   /**
-   * Check if the value is a Scala collection.
-   * Scala collections don't implement java.util.Map/List, so instanceof checks fail.
-   * We detect them by checking if the class name starts with "scala.collection".
+   * Serialize a Scala collection to JSON string.
+   * For empty collections, returns "{}" or "[]". For non-empty, throws an error.
    */
-  private static boolean isScalaCollection(@Nullable Object value) {
-    if (value == null) {
-      return false;
+  private static String serializeScalaCollection(final Object scalaCollection, final String className) {
+    // Check if empty using reflection (all Scala collections have isEmpty method)
+    try {
+      final boolean isEmpty = (boolean) scalaCollection.getClass().getMethod("isEmpty").invoke(scalaCollection);
+      if (isEmpty) {
+        return getEmptyJsonForScalaCollection(className);
+      }
+    } catch (Exception e) {
+      // If we can't call isEmpty, fall through to error
     }
-    final String className = value.getClass().getName();
-    return className.startsWith("scala.collection");
+    throw new IllegalArgumentException(
+        String.format("Cannot serialize non-empty Scala collection %s. Use JSON string instead.", className));
+  }
+
+  /**
+   * Returns the appropriate empty JSON representation for a Scala collection based on its class name.
+   */
+  private static String getEmptyJsonForScalaCollection(final String className) {
+    if (className.contains("Map")) {
+      return "{}";
+    }
+    // Nil$ is Scala's empty list singleton
+    if (className.contains("List") || className.contains("Seq") || className.contains("Set")
+        || className.contains("Vector") || className.contains("Array") || className.contains("Buffer")) {
+      return "[]";
+    }
+    throw new IllegalArgumentException(
+        String.format("Unknown Scala collection type: %s. Use JSON string instead.", className));
   }
 
   // Required by JSON de-serializer. DO NOT REMOVE.
