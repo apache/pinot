@@ -65,6 +65,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.testng.annotations.AfterClass;
 import org.testng.annotations.BeforeClass;
+import org.testng.annotations.BeforeGroups;
 import org.testng.annotations.DataProvider;
 import org.testng.annotations.Test;
 
@@ -200,36 +201,8 @@ public class MultiClusterIntegrationTest extends ClusterTest {
     LOGGER.info("Multi-cluster broker test passed: both clusters started and queryable");
   }
 
-  @Test(dataProvider = "brokerModes")
-  public void testLogicalFederationTwoOfflineTablesSSE(int brokerPort, boolean expectUnavailableException)
-      throws Exception {
-    LOGGER.info("Testing SSE on broker port {} (expectUnavailableException={})",
-        brokerPort, expectUnavailableException);
-    dropLogicalTableIfExists(LOGICAL_TABLE_NAME, _cluster1._controllerBaseApiUrl);
-    dropLogicalTableIfExists(LOGICAL_TABLE_NAME, _cluster2._controllerBaseApiUrl);
-    dropLogicalTableIfExists(LOGICAL_TABLE_NAME_2, _cluster1._controllerBaseApiUrl);
-    dropLogicalTableIfExists(LOGICAL_TABLE_NAME_2, _cluster2._controllerBaseApiUrl);
-    setupFirstLogicalFederatedTable();
-    createLogicalTableOnBothClusters(LOGICAL_TABLE_NAME,
-        LOGICAL_FEDERATION_CLUSTER_1_TABLE, LOGICAL_FEDERATION_CLUSTER_2_TABLE);
-    cleanSegmentDirs();
-    _cluster1AvroFiles = createAvroData(TABLE_SIZE_CLUSTER_1, 1);
-    _cluster2AvroFiles = createAvroData(TABLE_SIZE_CLUSTER_2, 2);
-    loadDataIntoCluster(_cluster1AvroFiles, LOGICAL_FEDERATION_CLUSTER_1_TABLE, _cluster1);
-    loadDataIntoCluster(_cluster2AvroFiles, LOGICAL_FEDERATION_CLUSTER_2_TABLE, _cluster2);
-    long expectedTotal = TABLE_SIZE_CLUSTER_1 + TABLE_SIZE_CLUSTER_2;
-
-    String query = "SET enableMultiClusterRouting=true; SELECT COUNT(*) as count FROM " + LOGICAL_TABLE_NAME;
-    String result = executeQueryOnBrokerPort(query, brokerPort);
-    assertEquals(parseCountResult(result), expectedTotal);
-    verifyUnavailableClusterException(result, expectUnavailableException);
-  }
-
-  @Test(dataProvider = "brokerModes")
-  public void testLogicalFederationTwoLogicalTablesMSE(int brokerPort, boolean expectUnavailableException)
-      throws Exception {
-    LOGGER.info("Testing MSE on broker port {} (expectUnavailableException={})",
-        brokerPort, expectUnavailableException);
+  @BeforeGroups("query")
+  public void setupTablesForQueryTests() throws Exception {
     dropLogicalTableIfExists(LOGICAL_TABLE_NAME, _cluster1._controllerBaseApiUrl);
     dropLogicalTableIfExists(LOGICAL_TABLE_NAME, _cluster2._controllerBaseApiUrl);
     dropLogicalTableIfExists(LOGICAL_TABLE_NAME_2, _cluster1._controllerBaseApiUrl);
@@ -237,35 +210,73 @@ public class MultiClusterIntegrationTest extends ClusterTest {
     setupFirstLogicalFederatedTable();
     setupSecondLogicalFederatedTable();
     createLogicalTableOnBothClusters(LOGICAL_TABLE_NAME,
-        LOGICAL_FEDERATION_CLUSTER_1_TABLE, LOGICAL_FEDERATION_CLUSTER_2_TABLE);
+      LOGICAL_FEDERATION_CLUSTER_1_TABLE, LOGICAL_FEDERATION_CLUSTER_2_TABLE);
     createLogicalTableOnBothClusters(LOGICAL_TABLE_NAME_2,
-        LOGICAL_FEDERATION_CLUSTER_1_TABLE_2, LOGICAL_FEDERATION_CLUSTER_2_TABLE_2);
+      LOGICAL_FEDERATION_CLUSTER_1_TABLE_2, LOGICAL_FEDERATION_CLUSTER_2_TABLE_2);
     cleanSegmentDirs();
     loadDataIntoCluster(createAvroData(TABLE_SIZE_CLUSTER_1, 1), LOGICAL_FEDERATION_CLUSTER_1_TABLE, _cluster1);
     loadDataIntoCluster(createAvroData(TABLE_SIZE_CLUSTER_2, 2), LOGICAL_FEDERATION_CLUSTER_2_TABLE, _cluster2);
     loadDataIntoCluster(createAvroDataMultipleSegments(TABLE_SIZE_CLUSTER_1, 1, SEGMENTS_PER_CLUSTER),
-        LOGICAL_FEDERATION_CLUSTER_1_TABLE_2, _cluster1);
+      LOGICAL_FEDERATION_CLUSTER_1_TABLE_2, _cluster1);
     loadDataIntoCluster(createAvroDataMultipleSegments(TABLE_SIZE_CLUSTER_2, 2, SEGMENTS_PER_CLUSTER),
-        LOGICAL_FEDERATION_CLUSTER_2_TABLE_2, _cluster2);
-    String joinQuery = "SET useMultistageEngine=true; SET enableMultiClusterRouting=true; "
-        + "SELECT t1." + JOIN_COLUMN + ", COUNT(*) as count FROM " + LOGICAL_TABLE_NAME + " t1 "
-        + "JOIN " + LOGICAL_TABLE_NAME_2 + " t2 ON t1." + JOIN_COLUMN + " = t2." + JOIN_COLUMN + " "
-        + "GROUP BY t1." + JOIN_COLUMN + " LIMIT 20";
-    String result = executeQueryOnBrokerPort(joinQuery, brokerPort);
-    assertNotNull(result);
-    assertTrue(result.contains("resultTable"));
-    assertResultRows(result);
-    verifyUnavailableClusterException(result, expectUnavailableException);
+      LOGICAL_FEDERATION_CLUSTER_2_TABLE_2, _cluster2);
+  }
+
+  @Test(dataProvider = "queryModes", groups = "query")
+  public void testLogicalFederationQueries(String testName, String queryOptions, boolean isJoinQuery,
+      int brokerPort, boolean expectUnavailableException)
+      throws Exception {
+    LOGGER.info("Running {} on broker port {} (expectUnavailableException={})",
+        testName, brokerPort, expectUnavailableException);
+    long expectedTotal = TABLE_SIZE_CLUSTER_1 + TABLE_SIZE_CLUSTER_2;
+
+    if (isJoinQuery) {
+      // Join query test
+      String joinQuery = queryOptions
+          + "SELECT t1." + JOIN_COLUMN + ", COUNT(*) as count FROM " + LOGICAL_TABLE_NAME + " t1 "
+          + "JOIN " + LOGICAL_TABLE_NAME_2 + " t2 ON t1." + JOIN_COLUMN + " = t2." + JOIN_COLUMN + " "
+          + "GROUP BY t1." + JOIN_COLUMN + " LIMIT 20";
+      String result = executeQueryOnBrokerPort(joinQuery, brokerPort);
+      assertNotNull(result);
+      assertTrue(result.contains("resultTable"), "Expected resultTable in response: " + result);
+      assertResultRows(result);
+      verifyUnavailableClusterException(result, expectUnavailableException);
+    }
+
+    // Count query test (all modes)
+    String countQuery = queryOptions + "SELECT COUNT(*) as count FROM " + LOGICAL_TABLE_NAME;
+    String countResult = executeQueryOnBrokerPort(countQuery, brokerPort);
+    assertEquals(parseCountResult(countResult), expectedTotal);
+    verifyUnavailableClusterException(countResult, expectUnavailableException);
   }
 
   /**
-   * Data provider for broker modes: normal broker vs broker with unavailable remote cluster.
+   * Data provider for all query mode combinations: broker mode x query engine/options.
+   * Each test case has: testName, queryOptions, isJoinQuery, brokerPort, expectUnavailableException
    */
-  @DataProvider(name = "brokerModes")
-  public Object[][] brokerModes() {
+  @DataProvider(name = "queryModes")
+  public Object[][] queryModes() {
+    int normalBroker = _cluster1._brokerPort;
+    int unavailableBroker = _brokerWithUnavailableCluster._brokerPort;
+
+    String sseOpts = "SET enableMultiClusterRouting=true; ";
+    String mseOpts = sseOpts + "SET useMultistageEngine=true; ";
+    String physOptOpts = mseOpts + "SET usePhysicalOptimizer=true; ";
+    String mseLiteOpts = physOptOpts + "SET runInBroker=true; ";
+
     return new Object[][]{
-        {_cluster1._brokerPort, false},  // Normal broker - all clusters connected
-        {_brokerWithUnavailableCluster._brokerPort, true}  // Broker with unavailable cluster
+        // SSE tests (count only)
+        {"SSE-NormalBroker", sseOpts, false, normalBroker, false},
+        {"SSE-UnavailableBroker", sseOpts, false, unavailableBroker, true},
+        // MSE tests (join + count)
+        {"MSE-NormalBroker", mseOpts, true, normalBroker, false},
+        {"MSE-UnavailableBroker", mseOpts, true, unavailableBroker, true},
+        // Physical optimizer tests (join + count)
+        {"PhysicalOptimizer-NormalBroker", physOptOpts, true, normalBroker, false},
+        {"PhysicalOptimizer-UnavailableBroker", physOptOpts, true, unavailableBroker, true},
+        // MSELiteMode tests (join + count)
+        {"MSELiteMode-NormalBroker", mseLiteOpts, true, normalBroker, false},
+        {"MSELiteMode-UnavailableBroker", mseLiteOpts, true, unavailableBroker, true},
     };
   }
 

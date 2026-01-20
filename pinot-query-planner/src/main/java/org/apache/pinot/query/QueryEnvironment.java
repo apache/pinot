@@ -230,7 +230,8 @@ public class QueryEnvironment {
           workerManager.getInstanceId(), sqlNodeAndOptions.getOptions(),
           _envConfig.defaultUseLiteMode(), _envConfig.defaultRunInBroker(), _envConfig.defaultUseBrokerPruning(),
           _envConfig.defaultLiteModeLeafStageLimit(), _envConfig.defaultHashFunction(),
-          _envConfig.defaultLiteModeLeafStageFanOutAdjustedLimit(), _envConfig.defaultLiteModeEnableJoins());
+          _envConfig.defaultLiteModeLeafStageFanOutAdjustedLimit(), _envConfig.defaultLiteModeEnableJoins(),
+          _multiClusterRoutingContext);
     }
     return new PlannerContext(_config, _catalogReader, _typeFactory, optProgram, traitProgram,
         sqlNodeAndOptions.getOptions(), _envConfig, format, physicalPlannerContext);
