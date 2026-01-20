@@ -242,7 +242,7 @@ public class ConcurrentMapPartitionUpsertMetadataManager extends BasePartitionUp
               }
             } else if (recordLocation.getSegment() == segment) {
               // New key in the segment
-              if (segment instanceof MutableSegment) {
+              if (checkForInconsistentTableConfigs() && segment instanceof MutableSegment) {
                 _previousKeyToRecordLocationMap.remove(primaryKey);
               }
               return null;
