@@ -25,6 +25,7 @@ import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import org.apache.commons.io.FileUtils;
+import org.apache.commons.lang3.StringUtils;
 import org.apache.pinot.common.auth.AuthProviderUtils;
 import org.apache.pinot.common.auth.NullAuthProvider;
 import org.apache.pinot.common.metadata.ZKMetadataProvider;
@@ -117,16 +118,28 @@ public abstract class BaseTaskExecutor implements PinotTaskExecutor {
   }
 
   /**
-   * Resolves the AuthProvider to use for Minion tasks by preferring the runtime provider from MinionContext
-   * and falling back to the legacy AUTH_TOKEN when the runtime provider is absent or a NullAuthProvider.
+   * Resolves the AuthProvider to use for Minion tasks.
+   * Priority order:
+   * 1. If AUTH_TOKEN is explicitly provided in task configs (by Controller), use it for this specific task
+   * 2. Otherwise, fall back to the runtime AuthProvider from MinionContext (enables per-request token rotation)
+   *
+   * This approach allows:
+   * - Controller to override credentials per-task (e.g., for multi-tenancy or privileged operations)
+   * - Dynamic token rotation when no explicit override is provided
+   * - Clean separation between task-specific and global authentication
    */
   protected static AuthProvider resolveAuthProvider(Map<String, String> taskConfigs) {
+    String explicitToken = taskConfigs.get(MinionConstants.AUTH_TOKEN);
+    if (StringUtils.isNotBlank(explicitToken)) {
+      return AuthProviderUtils.makeAuthProvider(explicitToken);
+    }
+
     AuthProvider runtimeProvider = MINION_CONTEXT.getTaskAuthProvider();
     if (runtimeProvider == null || runtimeProvider instanceof NullAuthProvider) {
-      return AuthProviderUtils.makeAuthProvider(taskConfigs.get(MinionConstants.AUTH_TOKEN));
-    } else {
-      return runtimeProvider;
+      return new NullAuthProvider();
     }
+
+    return runtimeProvider;
   }
 
   protected File downloadSegmentToLocalAndUntar(String tableNameWithType, String segmentName, String deepstoreURL,
