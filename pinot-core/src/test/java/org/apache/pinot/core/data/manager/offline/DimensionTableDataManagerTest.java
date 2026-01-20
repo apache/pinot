@@ -24,6 +24,7 @@ import java.io.FileInputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.net.URL;
+import java.nio.charset.StandardCharsets;
 import java.util.Collections;
 import java.util.List;
 import java.util.concurrent.Executors;
@@ -133,8 +134,9 @@ public class DimensionTableDataManagerTest {
     FileUtils.deleteQuietly(TEMP_DIR);
   }
 
-  private TableConfig getTableConfig(boolean disablePreload, boolean errorOnDuplicatePrimaryKey) {
-    DimensionTableConfig dimensionTableConfig = new DimensionTableConfig(disablePreload, errorOnDuplicatePrimaryKey);
+  private TableConfig getTableConfig(boolean disablePreload, boolean errorOnDuplicatePrimaryKey, boolean enableUpsert) {
+    DimensionTableConfig dimensionTableConfig =
+        new DimensionTableConfig(disablePreload, errorOnDuplicatePrimaryKey, enableUpsert);
     return new TableConfigBuilder(TableType.OFFLINE)
         .setTableName("dimBaseballTeams")
         .setDimensionTableConfig(dimensionTableConfig)
@@ -157,6 +159,19 @@ public class DimensionTableDataManagerTest {
         .addSingleValueDimension("teamCity", DataType.STRING)
         .setPrimaryKeyColumns(Collections.singletonList("teamID"))
         .build();
+  }
+
+  private File createSegmentFromCsv(File csvFile, TableConfig tableConfig, Schema schema, String segmentName)
+      throws Exception {
+    File tableDataDir = new File(TEMP_DIR, OFFLINE_TABLE_NAME + "_upsert");
+    SegmentGeneratorConfig segmentGeneratorConfig =
+        SegmentTestUtils.getSegmentGeneratorConfig(csvFile, FileFormat.CSV, tableDataDir, RAW_TABLE_NAME, tableConfig,
+            schema);
+    segmentGeneratorConfig.setSegmentName(segmentName);
+    SegmentIndexCreationDriver driver = SegmentCreationDriverFactory.get(null);
+    driver.init(segmentGeneratorConfig);
+    driver.build();
+    return new File(tableDataDir, driver.getSegmentName());
   }
 
   private DimensionTableDataManager makeTableDataManager(TableConfig tableConfig, Schema schema)
@@ -187,7 +202,7 @@ public class DimensionTableDataManagerTest {
   @Test
   public void testInstantiation()
       throws Exception {
-    TableConfig tableConfig = getTableConfig(false, false);
+    TableConfig tableConfig = getTableConfig(false, false, false);
     Schema schema = getSchema();
     DimensionTableDataManager tableDataManager = makeTableDataManager(tableConfig, schema);
     assertEquals(tableDataManager.getTableName(), OFFLINE_TABLE_NAME);
@@ -216,7 +231,7 @@ public class DimensionTableDataManagerTest {
   @Test
   public void testLookup()
       throws Exception {
-    TableConfig tableConfig = getTableConfig(false, false);
+    TableConfig tableConfig = getTableConfig(false, false, false);
     Schema schema = getSchema();
     DimensionTableDataManager tableDataManager = makeTableDataManager(tableConfig, schema);
 
@@ -272,7 +287,7 @@ public class DimensionTableDataManagerTest {
   @Test
   public void testReloadTable()
       throws Exception {
-    TableConfig tableConfig = getTableConfig(false, false);
+    TableConfig tableConfig = getTableConfig(false, false, false);
     Schema schema = getSchema();
     ZkHelixPropertyStore<ZNRecord> propertyStore = mock(ZkHelixPropertyStore.class);
     DimensionTableDataManager tableDataManager = makeTableDataManager(tableConfig, schema, propertyStore);
@@ -319,9 +334,61 @@ public class DimensionTableDataManagerTest {
   }
 
   @Test
+  public void testUpsertOverwritesDuplicatePrimaryKey()
+      throws Exception {
+    TableConfig tableConfig = getTableConfig(false, false, true);
+    Schema schema = getSchema();
+    DimensionTableDataManager tableDataManager = makeTableDataManager(tableConfig, schema);
+
+    File csvFile1 = new File(TEMP_DIR, "dimBaseballTeams_upsert_1.csv");
+    FileUtils.writeStringToFile(csvFile1, "teamID,teamName\n\"SF\",\"Old Name\"\n", StandardCharsets.UTF_8);
+    File csvFile2 = new File(TEMP_DIR, "dimBaseballTeams_upsert_2.csv");
+    FileUtils.writeStringToFile(csvFile2, "teamID,teamName\n\"SF\",\"New Name\"\n", StandardCharsets.UTF_8);
+
+    File segment1 = createSegmentFromCsv(csvFile1, tableConfig, schema, "segment_1");
+    File segment2 = createSegmentFromCsv(csvFile2, tableConfig, schema, "segment_2");
+
+    tableDataManager.addSegment(ImmutableSegmentLoader.load(segment1, new IndexLoadingConfig(tableConfig, schema),
+        SEGMENT_OPERATIONS_THROTTLER));
+    tableDataManager.addSegment(ImmutableSegmentLoader.load(segment2, new IndexLoadingConfig(tableConfig, schema),
+        SEGMENT_OPERATIONS_THROTTLER));
+
+    PrimaryKey key = new PrimaryKey(new String[]{"SF"});
+    assertEquals(tableDataManager.lookupValue(key, "teamName"), "New Name");
+  }
+
+  @Test
+  public void testUpsertDedupesAcrossSegments()
+      throws Exception {
+    TableConfig tableConfig = getTableConfig(false, false, true);
+    Schema schema = getSchema();
+    DimensionTableDataManager tableDataManager = makeTableDataManager(tableConfig, schema);
+
+    File csvFile1 = new File(TEMP_DIR, "dimBaseballTeams_upsert_dupe_1.csv");
+    FileUtils.writeStringToFile(csvFile1,
+        "teamID,teamName\n\"SF\",\"Old SF\"\n\"LA\",\"Old LA\"\n", StandardCharsets.UTF_8);
+    File csvFile2 = new File(TEMP_DIR, "dimBaseballTeams_upsert_dupe_2.csv");
+    FileUtils.writeStringToFile(csvFile2,
+        "teamID,teamName\n\"SF\",\"New SF\"\n\"LA\",\"New LA\"\n", StandardCharsets.UTF_8);
+
+    File segment1 = createSegmentFromCsv(csvFile1, tableConfig, schema, "segment_dupe_1");
+    File segment2 = createSegmentFromCsv(csvFile2, tableConfig, schema, "segment_dupe_2");
+
+    tableDataManager.addSegment(ImmutableSegmentLoader.load(segment1, new IndexLoadingConfig(tableConfig, schema),
+        SEGMENT_OPERATIONS_THROTTLER));
+    tableDataManager.addSegment(ImmutableSegmentLoader.load(segment2, new IndexLoadingConfig(tableConfig, schema),
+        SEGMENT_OPERATIONS_THROTTLER));
+
+    PrimaryKey sfKey = new PrimaryKey(new String[]{"SF"});
+    PrimaryKey laKey = new PrimaryKey(new String[]{"LA"});
+    assertEquals(tableDataManager.lookupValue(sfKey, "teamName"), "New SF");
+    assertEquals(tableDataManager.lookupValue(laKey, "teamName"), "New LA");
+  }
+
+  @Test
   public void testLookupWithoutPreLoad()
       throws Exception {
-    TableConfig tableConfig = getTableConfig(true, false);
+    TableConfig tableConfig = getTableConfig(true, false, false);
     Schema schema = getSchema();
     DimensionTableDataManager tableDataManager = makeTableDataManager(tableConfig, schema);
 
@@ -371,7 +438,7 @@ public class DimensionTableDataManagerTest {
   @Test(dataProvider = "options")
   public void testDeleteTableRemovesManagerFromMemory(boolean disablePreload)
       throws Exception {
-    TableConfig tableConfig = getTableConfig(disablePreload, false);
+    TableConfig tableConfig = getTableConfig(disablePreload, false, false);
     Schema schema = getSchema();
     DimensionTableDataManager tableDataManager = makeTableDataManager(tableConfig, schema);
 
@@ -386,7 +453,7 @@ public class DimensionTableDataManagerTest {
   @Test
   public void testLookupErrorOnDuplicatePrimaryKey()
       throws Exception {
-    TableConfig tableConfig = getTableConfig(false, true);
+    TableConfig tableConfig = getTableConfig(false, true, false);
     Schema schema = getSchema();
     DimensionTableDataManager tableDataManager = makeTableDataManager(tableConfig, schema);
 
