@@ -2168,6 +2168,16 @@ public class CommonConstants {
      *
      * Supported values: NONE, PROTECTED, UNSAFE
      * Legacy boolean values (true/false) are also supported for backward compatibility.
+     * @deprecated Use {@link #CONSUMING_SEGMENT_COMMIT_CONFIG} instead.
+     */
+    @Deprecated
+    public static final String FORCE_COMMIT_RELOAD_CONFIG = "pinot.server.upsert.force.commit.reload";
+
+    /**
+     * Cluster config key to control the commit mode for consuming segments in upsert tables.
+     *
+     * Supported values: NONE, PROTECTED, UNSAFE
+     * Legacy boolean values (true/false) are also supported for backward compatibility.
      */
     public static final String CONSUMING_SEGMENT_COMMIT_CONFIG = "pinot.server.consuming.segment.commit.mode";
 
