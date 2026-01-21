@@ -2344,6 +2344,21 @@
                 </rules>
               </configuration>
             </execution>
+            <execution>
+              <id>default-cli-java-version</id>
+              <phase>validate</phase>
+              <goals>
+                <goal>enforce</goal>
+              </goals>
+              <configuration>
+                <rules>
+                  <requireJavaVersion>
+                    <version>11</version>
+                    <message>Pinot requires Java11 JDK for compilation</message>
+                  </requireJavaVersion>
+                </rules>
+              </configuration>
+            </execution>
           </executions>
         </plugin>
         <plugin>
