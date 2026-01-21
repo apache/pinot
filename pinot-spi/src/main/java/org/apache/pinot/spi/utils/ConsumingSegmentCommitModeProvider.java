@@ -47,9 +47,8 @@ public final class ConsumingSegmentCommitModeProvider {
     NONE(false),
 
     /**
-     * Reload is enabled but only for tables that do not have inconsistent state configurations.
-     * Tables with partial upsert or dropOutOfOrderRecord=true (with replication > 1) will be skipped.
-     * When inconsistencies are detected during reload/force commit, upsert metadata is reverted.
+     * Reload is enabled but tables with partial upsert or dropOutOfOrderRecord=true (with replication > 1) will be
+     * skipped. When inconsistencies are detected during reload/force commit, upsert metadata is reverted.
      */
     PROTECTED(true),
 
