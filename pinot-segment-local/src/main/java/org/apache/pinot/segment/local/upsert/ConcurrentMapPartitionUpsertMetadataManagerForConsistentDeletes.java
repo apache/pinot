@@ -146,7 +146,7 @@ public class ConcurrentMapPartitionUpsertMetadataManagerForConsistentDeletes
                       validDocIdsForOldSegment.remove(currentDocId);
                     }
                   }
-                  if(hasInconsistentTableConfigs()) {
+                  if (hasInconsistentTableConfigs()) {
                     _previousKeyToRecordLocationMap.remove(primaryKey);
                   }
                   return new RecordLocation(segment, newDocId, newComparisonValue,
@@ -493,10 +493,11 @@ public class ConcurrentMapPartitionUpsertMetadataManagerForConsistentDeletes
                 if (hasInconsistentTableConfigs()) {
                   if (!(currentSegment instanceof MutableSegment)) {
                     _previousKeyToRecordLocationMap.put(primaryKey, currentRecordLocation);
-                  } else {
-                    _logger.warn("Detected another mutable segment: {} while consuming records from segment: {}",
-                        currentSegment.getSegmentName(), segment.getSegmentName());
                   }
+                  // Detected another mutable segment when consuming, this could lead to inconsistencies during
+                  // segment replacement if different number of rows are consumed on servers and if previous location
+                  // is not identified or reverted to a wrong location.
+                  // TODO: Find a way to detect this case, look into allow
                 }
                 replaceDocId(segment, validDocIds, queryableDocIds, currentSegment, currentDocId, newDocId, recordInfo);
                 return new RecordLocation(segment, newDocId, newComparisonValue,

@@ -117,7 +117,7 @@ public class ConcurrentMapPartitionUpsertMetadataManager extends BasePartitionUp
                       validDocIdsForOldSegment.remove(currentDocId);
                     }
                   }
-                  if(hasInconsistentTableConfigs()) {
+                  if (hasInconsistentTableConfigs()) {
                     _previousKeyToRecordLocationMap.remove(primaryKey);
                   }
                   return new RecordLocation(segment, newDocId, newComparisonValue);
@@ -346,7 +346,6 @@ public class ConcurrentMapPartitionUpsertMetadataManager extends BasePartitionUp
       double comparisonValue = ((Number) newComparisonValue).doubleValue();
       _largestSeenComparisonValue.getAndUpdate(v -> Math.max(v, comparisonValue));
     }
-    ConsumingSegmentCommitModeProvider.Mode forceCommitReloadMode = ConsumingSegmentCommitModeProvider.getMode();
     _primaryKeyToRecordLocationMap.compute(HashUtils.hashPrimaryKey(recordInfo.getPrimaryKey(), _hashFunction),
         (primaryKey, currentRecordLocation) -> {
           if (currentRecordLocation != null) {
@@ -363,10 +362,11 @@ public class ConcurrentMapPartitionUpsertMetadataManager extends BasePartitionUp
                 if (hasInconsistentTableConfigs()) {
                   if (!(currentSegment instanceof MutableSegment)) {
                     _previousKeyToRecordLocationMap.put(primaryKey, currentRecordLocation);
-                  } else {
-                    _logger.warn("Detected another mutable segment: {} while consuming records from segment: {}",
-                        currentSegment.getSegmentName(), segment.getSegmentName());
                   }
+                  // Detected another mutable segment when consuming, this could lead to inconsistencies during
+                  // segment replacement if different number of rows are consumed on servers and if previous location
+                  // is not identified or reverted to a wrong location.
+                  // TODO: Find a way to detect this case, look into
                 }
                 replaceDocId(segment, validDocIds, queryableDocIds, currentSegment, currentDocId, newDocId, recordInfo);
               }
