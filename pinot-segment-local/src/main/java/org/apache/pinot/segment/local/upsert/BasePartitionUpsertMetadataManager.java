@@ -673,15 +673,6 @@ public abstract class BasePartitionUpsertMetadataManager implements PartitionUps
   }
 
   /**
-   * Checks whether the table has configurations that may lead to inconsistent state
-   * (partial upsert or dropOutOfOrderRecord=true with consistency mode NONE).
-   */
-  public boolean hasInconsistentTableConfigs() {
-    return ((_context.isDropOutOfOrderRecord() && _context.getConsistencyMode() == UpsertConfig.ConsistencyMode.NONE)
-        || _context.getPartialUpsertHandler() != null);
-  }
-
-  /**
    * Determines whether metadata should be reverted when inconsistencies are detected during segment replacement.
    * This is only applicable when in PROTECTED mode, the old segment is a mutable segment,
    * and the table has inconsistent state configurations.
@@ -691,7 +682,7 @@ public abstract class BasePartitionUpsertMetadataManager implements PartitionUps
    */
   public boolean shouldRevertMetadataOnInconsistency(IndexSegment oldSegment) {
     return ConsumingSegmentCommitModeProvider.getMode().isProtected() && oldSegment instanceof MutableSegment
-        && hasInconsistentTableConfigs();
+        && _context.hasInconsistentTableConfigs();
   }
 
   /**

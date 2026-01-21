@@ -1878,7 +1878,7 @@ public class RealtimeSegmentDataManager extends SegmentDataManager {
     if (_partitionUpsertMetadataManager != null) {
       UpsertContext upsertContext = _partitionUpsertMetadataManager.getContext();
       if (upsertContext.isAllowPartialUpsertConsumptionDuringCommit()
-          || upsertContext.getUpsertMode() != UpsertConfig.Mode.PARTIAL) {
+          || (!upsertContext.hasInconsistentTableConfigs())) {
         return ParallelSegmentConsumptionPolicy.ALLOW_ALWAYS;
       }
       return pauseless ? ParallelSegmentConsumptionPolicy.ALLOW_DURING_BUILD_ONLY

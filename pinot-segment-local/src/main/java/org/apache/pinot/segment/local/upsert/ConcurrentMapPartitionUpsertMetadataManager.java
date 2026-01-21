@@ -116,13 +116,13 @@ public class ConcurrentMapPartitionUpsertMetadataManager extends BasePartitionUp
                       validDocIdsForOldSegment.remove(currentDocId);
                     }
                   }
-                  if (hasInconsistentTableConfigs()) {
+                  if (_context.hasInconsistentTableConfigs()) {
                     _previousKeyToRecordLocationMap.remove(primaryKey);
                   }
                   return new RecordLocation(segment, newDocId, newComparisonValue);
                 } else {
                   RecordLocation prevRecordLocation = _previousKeyToRecordLocationMap.get(primaryKey);
-                  if (hasInconsistentTableConfigs() && (prevRecordLocation == null
+                  if (_context.hasInconsistentTableConfigs() && (prevRecordLocation == null
                       || newComparisonValue.compareTo(prevRecordLocation.getComparisonValue()) >= 0)) {
                     RecordLocation newRecordLocation = new RecordLocation(segment, newDocId, newComparisonValue);
                     _previousKeyToRecordLocationMap.put(primaryKey, newRecordLocation);
@@ -138,13 +138,13 @@ public class ConcurrentMapPartitionUpsertMetadataManager extends BasePartitionUp
                 numKeysInWrongSegment.getAndIncrement();
                 if (comparisonResult >= 0) {
                   addDocId(segment, validDocIds, queryableDocIds, newDocId, recordInfo);
-                  if (hasInconsistentTableConfigs() && currentSegment instanceof MutableSegment) {
+                  if (_context.hasInconsistentTableConfigs() && currentSegment instanceof MutableSegment) {
                     _previousKeyToRecordLocationMap.remove(primaryKey);
                   }
                   return new RecordLocation(segment, newDocId, newComparisonValue);
                 } else {
                   RecordLocation prevRecordLocation = _previousKeyToRecordLocationMap.get(primaryKey);
-                  if (hasInconsistentTableConfigs() && currentSegment instanceof MutableSegment
+                  if (_context.hasInconsistentTableConfigs() && currentSegment instanceof MutableSegment
                       && prevRecordLocation == null
                       || newComparisonValue.compareTo(prevRecordLocation.getComparisonValue()) >= 0) {
                     RecordLocation newRecordLocation = new RecordLocation(segment, newDocId, newComparisonValue);
@@ -167,7 +167,7 @@ public class ConcurrentMapPartitionUpsertMetadataManager extends BasePartitionUp
                 // - If current key is in consuming segment:  key is moving to immutable segment,
                 //   consuming segment no longer owns it, remove this key from the map
                 // - If current key is in immutable segment: No-op
-                if (hasInconsistentTableConfigs() && currentSegment instanceof MutableSegment) {
+                if (_context.hasInconsistentTableConfigs() && currentSegment instanceof MutableSegment) {
                   _previousKeyToRecordLocationMap.remove(primaryKey);
                 }
                 return newRecordLocation;
@@ -209,7 +209,7 @@ public class ConcurrentMapPartitionUpsertMetadataManager extends BasePartitionUp
       _primaryKeyToRecordLocationMap.computeIfPresent(HashUtils.hashPrimaryKey(primaryKey, _hashFunction),
           (pk, recordLocation) -> {
             if (recordLocation.getSegment() == segment) {
-              if (hasInconsistentTableConfigs()) {
+              if (_context.hasInconsistentTableConfigs()) {
                 _previousKeyToRecordLocationMap.remove(pk);
               }
               return null;
@@ -358,7 +358,7 @@ public class ConcurrentMapPartitionUpsertMetadataManager extends BasePartitionUp
               if (segment == currentSegment) {
                 replaceDocId(segment, validDocIds, queryableDocIds, currentDocId, newDocId, recordInfo);
               } else {
-                if (hasInconsistentTableConfigs()) {
+                if (_context.hasInconsistentTableConfigs()) {
                   _previousKeyToRecordLocationMap.put(primaryKey, currentRecordLocation);
                 }
                 replaceDocId(segment, validDocIds, queryableDocIds, currentSegment, currentDocId, newDocId, recordInfo);
