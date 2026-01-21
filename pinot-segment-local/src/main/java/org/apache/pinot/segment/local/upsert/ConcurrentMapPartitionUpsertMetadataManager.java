@@ -38,7 +38,6 @@ import org.apache.pinot.segment.spi.MutableSegment;
 import org.apache.pinot.segment.spi.index.mutable.ThreadSafeMutableRoaringBitmap;
 import org.apache.pinot.spi.data.readers.GenericRow;
 import org.apache.pinot.spi.data.readers.PrimaryKey;
-import org.apache.pinot.spi.utils.ConsumingSegmentCommitModeProvider;
 import org.roaringbitmap.buffer.MutableRoaringBitmap;
 
 
