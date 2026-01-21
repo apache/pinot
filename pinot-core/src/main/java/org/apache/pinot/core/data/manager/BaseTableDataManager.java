@@ -819,13 +819,13 @@ public abstract class BaseTableDataManager implements TableDataManager {
     if (segmentDataManager instanceof RealtimeSegmentDataManager) {
       // Use force commit to reload consuming segment
       if (_instanceDataManagerConfig.shouldReloadConsumingSegment()) {
-        // Force-committing consuming segments is enabled by default.
+        // Force-committing consuming segments is disabled by default.
         // For partial-upsert tables or upserts with out-of-order events enabled (notably when replication > 1),
         // winner selection could incorrectly favor replicas with fewer consumed rows.
         // This triggered unnecessary reconsumption and resulted in inconsistent upsert state.
         // The new fix restores and correct segment metadata after inconsistencies are noticed.
         // To toggle, existing Force commit behavior dynamically use the cluster config
-        // `pinot.server.upsert.force.commit.reload` without restarting servers.
+        // `pinot.server.consuming.segment.commit.mode` to change it to PROTECTED for safer reload.
         TableConfig tableConfig = indexLoadingConfig.getTableConfig();
         UpsertInconsistentStateConfig config = UpsertInconsistentStateConfig.getInstance();
         if (tableConfig != null && config.isForceCommitReloadAllowed()) {

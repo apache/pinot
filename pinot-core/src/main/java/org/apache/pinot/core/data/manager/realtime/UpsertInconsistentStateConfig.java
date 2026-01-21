@@ -72,22 +72,22 @@ public class UpsertInconsistentStateConfig implements PinotClusterConfigChangeLi
    * Returns the current config key used for this setting.
    */
   public String getConfigKey() {
-    return ConfigChangeListenerConstants.FORCE_COMMIT_RELOAD_CONFIG;
+    return ConfigChangeListenerConstants.CONSUMING_SEGMENT_COMMIT_CONFIG;
   }
 
   @Override
   public void onChange(Set<String> changedConfigs, Map<String, String> clusterConfigs) {
-    if (!changedConfigs.contains(ConfigChangeListenerConstants.FORCE_COMMIT_RELOAD_CONFIG)) {
+    if (!changedConfigs.contains(ConfigChangeListenerConstants.CONSUMING_SEGMENT_COMMIT_CONFIG)) {
       return;
     }
 
-    String configValue = clusterConfigs.get(ConfigChangeListenerConstants.FORCE_COMMIT_RELOAD_CONFIG);
+    String configValue = clusterConfigs.get(ConfigChangeListenerConstants.CONSUMING_SEGMENT_COMMIT_CONFIG);
     Mode newMode = Mode.fromString(configValue, Mode.NONE);
 
     Mode previousMode = _forceCommitReloadMode.getAndSet(newMode);
     if (previousMode != newMode) {
       LOGGER.info("Updated cluster config: {} from {} to {}",
-          ConfigChangeListenerConstants.FORCE_COMMIT_RELOAD_CONFIG, previousMode, newMode);
+          ConfigChangeListenerConstants.CONSUMING_SEGMENT_COMMIT_CONFIG, previousMode, newMode);
     }
   }
 }

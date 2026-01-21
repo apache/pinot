@@ -2169,7 +2169,7 @@ public class CommonConstants {
      * Supported values: NONE, PROTECTED, UNSAFE
      * Legacy boolean values (true/false) are also supported for backward compatibility.
      */
-    public static final String FORCE_COMMIT_RELOAD_CONFIG = "pinot.server.upsert.consuming.segment.force.commit";
+    public static final String CONSUMING_SEGMENT_COMMIT_CONFIG = "pinot.server.consuming.segment.commit.mode";
 
     /**
      * Default value: true (force commit/reload is allowed by default).

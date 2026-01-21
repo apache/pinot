@@ -552,13 +552,13 @@ public class HelixInstanceDataManager implements InstanceDataManager {
         if (segmentDataManager != null) {
           try {
             if (segmentDataManager instanceof RealtimeSegmentDataManager) {
-              // Force-committing consuming segments is enabled by default.
+              // Force-committing consuming segments is disabled by default.
               // For partial-upsert tables or upserts with out-of-order events enabled (notably when replication > 1),
               // winner selection could incorrectly favor replicas with fewer consumed rows.
               // This triggered unnecessary reconsumption and resulted in inconsistent upsert state.
               // The fix restores correct segment metadata before winner selection.
               // Force commit behavior can be toggled dynamically using the cluster config
-              // `pinot.server.upsert.force.commit.reload` without restarting servers.
+              // `pinot.server.consuming.segment.commit.mode` without restarting servers.
               UpsertInconsistentStateConfig config = UpsertInconsistentStateConfig.getInstance();
               if (config.isForceCommitReloadAllowed()) {
                 ((RealtimeSegmentDataManager) segmentDataManager).forceCommit();
