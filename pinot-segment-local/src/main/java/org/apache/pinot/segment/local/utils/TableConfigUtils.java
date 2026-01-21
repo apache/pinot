@@ -394,7 +394,7 @@ public final class TableConfigUtils {
     }
     Preconditions.checkState(!(dimensionTableConfig.isEnableUpsert()
             && dimensionTableConfig.isErrorOnDuplicatePrimaryKey()),
-        "Dimension table config cannot enable upsert and errorOnDuplicatePrimaryKey at the same time");
+        "Dimension table config cannot have both enableUpsert and errorOnDuplicatePrimaryKey enabled");
   }
 
   private static boolean isValidPeerDownloadScheme(String peerSegmentDownloadScheme) {

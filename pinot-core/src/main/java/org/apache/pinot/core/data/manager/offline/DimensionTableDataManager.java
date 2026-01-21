@@ -253,7 +253,7 @@ public class DimensionTableDataManager extends OfflineTableDataManager {
               if (!_enableUpsert && _errorOnDuplicatePrimaryKey && previousValue != null) {
                 throw new IllegalStateException(
                     "Caught exception while reading records from segment: " + indexSegment.getSegmentName()
-                        + "primary key already exist for: " + Arrays.toString(primaryKey));
+                        + " primary key already exists for: " + Arrays.toString(primaryKey));
               }
             }
           } catch (Exception e) {
@@ -325,11 +325,12 @@ public class DimensionTableDataManager extends OfflineTableDataManager {
             Object[] primaryKey = recordReader.getRecordValues(i, pkIndexes);
 
             long readerIdxAndDocId = (((long) readerIdx) << 32) | (i & 0xffffffffL);
-            long previousValue = lookupTable.put(primaryKey, readerIdxAndDocId);
-            if (!_enableUpsert && _errorOnDuplicatePrimaryKey && previousValue != Long.MIN_VALUE) {
+            boolean hasExistingKey = lookupTable.containsKey(primaryKey);
+            lookupTable.put(primaryKey, readerIdxAndDocId);
+            if (!_enableUpsert && _errorOnDuplicatePrimaryKey && hasExistingKey) {
               throw new IllegalStateException(
                   "Caught exception while reading records from segment: " + indexSegment.getSegmentName()
-                      + "primary key already exist for: " + Arrays.toString(primaryKey));
+                      + " primary key already exists for: " + Arrays.toString(primaryKey));
             }
           }
         } catch (Exception e) {
