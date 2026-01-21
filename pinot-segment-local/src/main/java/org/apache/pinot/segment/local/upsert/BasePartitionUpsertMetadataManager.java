@@ -725,8 +725,6 @@ public abstract class BasePartitionUpsertMetadataManager implements PartitionUps
     return oldSegment.getValidDocIds() != null ? oldSegment.getValidDocIds().getMutableRoaringBitmap() : null;
   }
 
-  protected abstract void removeSegment(IndexSegment segment, Iterator<PrimaryKey> primaryKeyIterator);
-
   protected void removeSegment(IndexSegment segment, MutableRoaringBitmap validDocIds) {
     try (PrimaryKeyReader primaryKeyReader = new PrimaryKeyReader(segment, _primaryKeyColumns)) {
       if (shouldRevertMetadataOnInconsistency(segment)) {
@@ -740,6 +738,8 @@ public abstract class BasePartitionUpsertMetadataManager implements PartitionUps
               _tableNameWithType, e.getMessage()), e);
     }
   }
+
+  protected abstract void removeSegment(IndexSegment segment, Iterator<PrimaryKey> primaryKeyIterator);
 
   @Override
   public void removeSegment(IndexSegment segment) {
