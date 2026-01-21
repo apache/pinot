@@ -2700,6 +2700,11 @@
                 <!-- Pinot-Druid Benchmark (not part of the distribution) -->
                 <exclude>contrib/**</exclude>
 
+                <!-- mkdocs -->
+                <exclude>mkdocs.yml</exclude>
+                <exclude>mkdocs/**</exclude>
+                <exclude>docs/**</exclude>
+
                 <!-- Top level files -->
                 <exclude>HEADER</exclude>
                 <exclude>LICENSE*</exclude>
@@ -2838,6 +2843,11 @@
 
             <!-- Pinot-Druid Benchmark (not part of the distribution) -->
             <exclude>contrib/**</exclude>
+
+            <!-- mkdocs -->
+            <exclude>mkdocs.yml</exclude>
+            <exclude>mkdocs/**</exclude>
+            <exclude>docs/**</exclude>
 
             <!-- Github template files -->
             <exclude>.github/*.md</exclude>

@@ -65,6 +65,8 @@ Please ensure your code is adequately documented. Some things to consider for do
 
 * Always include class level java docs. At the top class level, we are looking for information about what functionality is provided by the class, what state is maintained by the class, whether there are concurrency/thread-safety concerns and any exceptional behavior that the class might exhibit.
 * Document public methods and their parameters.
+* Update the [dev documentation](/docs/dev) if you are adding new features or changing existing ones. 
+  This is important to keep the documentation in sync with the codebase.
 
 #### Logging
 
