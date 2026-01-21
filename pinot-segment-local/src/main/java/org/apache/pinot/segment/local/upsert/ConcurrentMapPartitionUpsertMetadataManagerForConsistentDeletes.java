@@ -346,8 +346,8 @@ public class ConcurrentMapPartitionUpsertMetadataManagerForConsistentDeletes
             RecordLocation prevLocation = _previousKeyToRecordLocationMap.get(primaryKey);
             if (forceCommitReloadMode == ConsumingSegmentCommitModeProvider.Mode.PROTECTED
                 && segment instanceof MutableSegment && hasInconsistentTableConfigs() && prevLocation != null
-                && !(_previousKeyToRecordLocationMap.get(primaryKey).getSegment() instanceof MutableSegment)
-                && _trackedSegments.contains(prevLocation.getSegment())) {
+                && (prevLocation.getSegment() instanceof MutableSegment) || _trackedSegments.contains(
+                prevLocation.getSegment())) {
               // Revert to previous immutable segment location
               IndexSegment prevSegment = prevLocation.getSegment();
               ThreadSafeMutableRoaringBitmap prevValidDocIds = prevSegment.getValidDocIds();
@@ -487,15 +487,7 @@ public class ConcurrentMapPartitionUpsertMetadataManagerForConsistentDeletes
                     currentRecordLocation.getDistinctSegmentCount());
               } else {
                 if (hasInconsistentTableConfigs()) {
-                  if (!(currentSegment instanceof MutableSegment)) {
-                    _previousKeyToRecordLocationMap.put(primaryKey, currentRecordLocation);
-                  }
-                  // Detected another mutable segment that might not have been replaced when consuming another segment,
-                  // this could lead to inconsistencies during segment replacement if different number of rows are
-                  // consumed on servers and if previous location is not identified or reverted to a wrong location.
-                  // Make sure ParallelSegmentConsumptionPolicy is DISALLOW_ALWAYS for partial upsert tables and
-                  // upsert tables with dropOutOfOrder=true & consistencyMode=NONE
-                  // TODO: Find a way to detect this case, look into allow
+                  _previousKeyToRecordLocationMap.put(primaryKey, currentRecordLocation);
                 }
                 replaceDocId(segment, validDocIds, queryableDocIds, currentSegment, currentDocId, newDocId, recordInfo);
                 return new RecordLocation(segment, newDocId, newComparisonValue,
