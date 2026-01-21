@@ -164,8 +164,8 @@ public class ConcurrentMapPartitionUpsertMetadataManager extends BasePartitionUp
                 replaceDocId(segment, validDocIds, queryableDocIds, currentSegment, currentDocId, newDocId, recordInfo);
                 RecordLocation newRecordLocation = new RecordLocation(segment, newDocId, newComparisonValue);
                 // Track previous location for revert purposes:
-                // - If current key is in consuming segment: Don't track - key is moving to immutable segment,
-                //   consuming segment no longer owns it, so no revert needed for this key
+                // - If current key is in consuming segment:  key is moving to immutable segment,
+                //   consuming segment no longer owns it, remove this key from the map
                 // - If current key is in immutable segment: No-op
                 if (hasInconsistentTableConfigs() && currentSegment instanceof MutableSegment) {
                   _previousKeyToRecordLocationMap.remove(primaryKey);

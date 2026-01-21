@@ -202,7 +202,7 @@ public class ConcurrentMapPartitionUpsertMetadataManagerForConsistentDeletes
                 RecordLocation newRecordLocation = new RecordLocation(segment, newDocId, newComparisonValue,
                     RecordLocation.incrementSegmentCount(currentDistinctSegmentCount));
                 // - If current key is in consuming segment: key is moving to immutable segment,
-                //   consuming segment no longer owns it, so remove the key location from the map
+                //   consuming segment no longer owns it, remove the key location from the map
                 if (hasInconsistentTableConfigs() && currentSegment instanceof MutableSegment) {
                   _previousKeyToRecordLocationMap.remove(primaryKey);
                 }
