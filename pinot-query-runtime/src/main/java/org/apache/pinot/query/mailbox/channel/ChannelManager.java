@@ -19,8 +19,9 @@
 package org.apache.pinot.query.mailbox.channel;
 
 import io.grpc.ManagedChannel;
-import io.grpc.ManagedChannelBuilder;
 import io.grpc.netty.shaded.io.grpc.netty.NettyChannelBuilder;
+import io.grpc.netty.shaded.io.netty.buffer.PooledByteBufAllocator;
+import io.grpc.netty.shaded.io.netty.channel.ChannelOption;
 import java.time.Duration;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.TimeUnit;
@@ -51,22 +52,30 @@ public class ChannelManager {
    */
   private final Duration _idleTimeout;
   private final int _maxInboundMessageSize;
+  /**
+   * Buffer allocator configured to prefer direct (off-heap) buffers for better performance.
+   * Using a single allocator instance across all channels allows for better memory pooling and reduces fragmentation.
+   */
+  private final PooledByteBufAllocator _bufAllocator;
 
   public ChannelManager(@Nullable TlsConfig tlsConfig, int maxInboundMessageSize, Duration idleTimeout) {
     _tlsConfig = tlsConfig;
     _maxInboundMessageSize = maxInboundMessageSize;
     _idleTimeout = idleTimeout;
+    // Use direct buffers (off-heap) for better performance - matches server-side configuration
+    _bufAllocator = new PooledByteBufAllocator(true);
   }
 
   public ManagedChannel getChannel(String hostname, int port) {
-    // TODO: Revisit parameters
+    // Always use NettyChannelBuilder to allow setting Netty-specific channel options like the buffer allocator.
+    // This ensures we can explicitly configure direct (off-heap) buffers for better performance.
     if (_tlsConfig != null) {
       return _channelMap.computeIfAbsent(Pair.of(hostname, port),
           (k) -> {
             NettyChannelBuilder channelBuilder = NettyChannelBuilder
                 .forAddress(k.getLeft(), k.getRight())
-                .maxInboundMessageSize(
-                    _maxInboundMessageSize)
+                .maxInboundMessageSize(_maxInboundMessageSize)
+                .withOption(ChannelOption.ALLOCATOR, _bufAllocator)
                 .sslContext(ServerGrpcQueryClient.buildSslContext(_tlsConfig));
             return decorate(channelBuilder).build();
           }
@@ -74,17 +83,17 @@ public class ChannelManager {
     } else {
       return _channelMap.computeIfAbsent(Pair.of(hostname, port),
           (k) -> {
-            ManagedChannelBuilder<?> channelBuilder = ManagedChannelBuilder
+            NettyChannelBuilder channelBuilder = NettyChannelBuilder
                 .forAddress(k.getLeft(), k.getRight())
-                .maxInboundMessageSize(
-                    _maxInboundMessageSize)
+                .maxInboundMessageSize(_maxInboundMessageSize)
+                .withOption(ChannelOption.ALLOCATOR, _bufAllocator)
                 .usePlaintext();
             return decorate(channelBuilder).build();
           });
     }
   }
 
-  private ManagedChannelBuilder<?> decorate(ManagedChannelBuilder<?> builder) {
+  private NettyChannelBuilder decorate(NettyChannelBuilder builder) {
     return builder.idleTimeout(_idleTimeout.getSeconds(), TimeUnit.SECONDS);
   }
 }
