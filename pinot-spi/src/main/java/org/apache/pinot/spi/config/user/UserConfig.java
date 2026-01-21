@@ -86,6 +86,7 @@ public class UserConfig extends BaseJsonConfig {
     return _username;
   }
 
+  @JsonIgnore
   public String getUsernameWithComponent() {
     return getUserName() + "_" + getComponentType().toString();
   }
