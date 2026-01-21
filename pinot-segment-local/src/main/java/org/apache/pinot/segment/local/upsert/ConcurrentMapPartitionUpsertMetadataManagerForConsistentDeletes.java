@@ -490,9 +490,11 @@ public class ConcurrentMapPartitionUpsertMetadataManagerForConsistentDeletes
                   if (!(currentSegment instanceof MutableSegment)) {
                     _previousKeyToRecordLocationMap.put(primaryKey, currentRecordLocation);
                   }
-                  // Detected another mutable segment when consuming, this could lead to inconsistencies during
-                  // segment replacement if different number of rows are consumed on servers and if previous location
-                  // is not identified or reverted to a wrong location.
+                  // Detected another mutable segment that might not have been replaced when consuming another segment,
+                  // this could lead to inconsistencies during segment replacement if different number of rows are
+                  // consumed on servers and if previous location is not identified or reverted to a wrong location.
+                  // Make sure ParallelSegmentConsumptionPolicy is DISALLOW_ALWAYS for partial upsert tables and
+                  // upsert tables with dropOutOfOrder=true & consistencyMode=NONE
                   // TODO: Find a way to detect this case, look into allow
                 }
                 replaceDocId(segment, validDocIds, queryableDocIds, currentSegment, currentDocId, newDocId, recordInfo);
