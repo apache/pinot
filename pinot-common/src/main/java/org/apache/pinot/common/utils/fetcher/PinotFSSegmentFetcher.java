@@ -19,8 +19,17 @@
 package org.apache.pinot.common.utils.fetcher;
 
 import java.io.File;
+import java.io.InputStream;
 import java.net.URI;
+import java.util.List;
+import java.util.concurrent.atomic.AtomicInteger;
+import java.util.concurrent.atomic.AtomicReference;
+import org.apache.pinot.common.utils.TarCompressionUtils;
+import org.apache.pinot.spi.filesystem.PinotFS;
 import org.apache.pinot.spi.filesystem.PinotFSFactory;
+import org.apache.pinot.spi.utils.retry.AttemptsExceededException;
+import org.apache.pinot.spi.utils.retry.RetriableOperationException;
+import org.apache.pinot.spi.utils.retry.RetryPolicies;
 
 
 public class PinotFSSegmentFetcher extends BaseSegmentFetcher {
@@ -33,5 +42,37 @@ public class PinotFSSegmentFetcher extends BaseSegmentFetcher {
     } else {
       PinotFSFactory.create(uri.getScheme()).copyToLocalFile(uri, dest);
     }
+  }
+
+  @Override
+  public File fetchUntarSegmentToLocalStreamed(URI uri, File dest, long rateLimit, AtomicInteger attempts)
+      throws Exception {
+    PinotFS pinotFS;
+    if (uri.getScheme() == null) {
+      pinotFS = PinotFSFactory.create(PinotFSFactory.LOCAL_PINOT_FS_SCHEME);
+    } else {
+      pinotFS = PinotFSFactory.create(uri.getScheme());
+    }
+    AtomicReference<File> untarredFileRef = new AtomicReference<>();
+
+    int tries;
+    try {
+      tries =
+          RetryPolicies.exponentialBackoffRetryPolicy(_retryCount, _retryWaitMs, _retryDelayScaleFactor).attempt(() -> {
+            try (InputStream inputStream = pinotFS.open(uri)) {
+              List<File> untarredFiles = TarCompressionUtils.untarWithRateLimiter(inputStream, dest, rateLimit);
+              untarredFileRef.set(untarredFiles.get(0));
+              return true;
+            } catch (Exception e) {
+              _logger.warn("Caught exception while downloading segment from: {} to: {}", uri, dest, e);
+              return false;
+            }
+          });
+    } catch (AttemptsExceededException | RetriableOperationException e) {
+      attempts.set(e.getAttempts());
+      throw e;
+    }
+    attempts.set(tries);
+    return untarredFileRef.get();
   }
 }
