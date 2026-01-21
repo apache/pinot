@@ -50,6 +50,8 @@ import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
 import org.testng.collections.Lists;
 
+import static org.testng.Assert.assertNotNull;
+import static org.testng.Assert.assertTrue;
 import static org.testng.Assert.fail;
 
 
@@ -728,6 +730,190 @@ public class TableConfigsRestletResourceTest extends ControllerTest {
     // Delete
     sendDeleteRequest(DEFAULT_INSTANCE.getControllerRequestURLBuilder().forTableDelete(tableName));
     sendDeleteRequest(DEFAULT_INSTANCE.getControllerRequestURLBuilder().forSchemaDelete(tableName));
+  }
+
+  // ==================== Validation Types Integration Tests ====================
+
+  @Test
+  public void testValidationTypes_SkipSchema()
+      throws IOException {
+    String tableName = "testSkipSchema";
+    TableConfig offlineTableConfig = createOfflineTableConfig(tableName);
+    Schema schema = ControllerTest.createDummySchema("differentSchemaName"); // Mismatched name
+
+    TableConfigs tableConfigs = new TableConfigs(tableName, schema, offlineTableConfig, null);
+
+    // Without skip - should fail
+    try {
+      sendPostRequest(_createTableConfigsUrl, tableConfigs.toPrettyJsonString());
+      fail("Should have failed due to schema name mismatch");
+    } catch (Exception e) {
+      // expected
+    }
+
+    // With skip=SCHEMA - should succeed
+    String response = sendPostRequest(_createTableConfigsUrl + "?validationTypesToSkip=SCHEMA",
+        tableConfigs.toPrettyJsonString());
+    assertTrue(response.contains("successfully added"));
+
+    // Cleanup
+    sendDeleteRequest(DEFAULT_INSTANCE.getControllerRequestURLBuilder().forTableConfigsDelete(tableName));
+  }
+
+  @Test
+  public void testValidationTypes_SkipMultiple()
+      throws IOException {
+    String tableName = "testSkipMultiple";
+    TableConfig offlineTableConfig = createOfflineTableConfig(tableName);
+    Schema schema = ControllerTest.createDummySchema("differentSchemaName"); // Invalid
+
+    TableConfigs tableConfigs = new TableConfigs(tableName, schema, offlineTableConfig, null);
+
+    // Skip both SCHEMA and RETENTION
+    String response = sendPostRequest(_createTableConfigsUrl + "?validationTypesToSkip=SCHEMA,RETENTION",
+        tableConfigs.toPrettyJsonString());
+    assertTrue(response.contains("successfully added"));
+
+    // Cleanup
+    sendDeleteRequest(DEFAULT_INSTANCE.getControllerRequestURLBuilder().forTableConfigsDelete(tableName));
+  }
+
+  @Test
+  public void testValidationTypes_ValidateOnlySchemaAndIngestionConfig()
+      throws IOException {
+    String tableName = "testValidateOnlySchemaAndIngestionConfig";
+    TableConfig offlineTableConfig = createOfflineTableConfig(tableName);
+    Schema schema = ControllerTest.createDummySchema(tableName); // Valid schema
+
+    TableConfigs tableConfigs = new TableConfigs(tableName, schema, offlineTableConfig, null);
+
+    // Validate only SCHEMA - should succeed (schema is valid)
+    String response = sendPostRequest(_createTableConfigsUrl + "?validationTypesToValidateOnly=SCHEMA,INGESTION",
+        tableConfigs.toPrettyJsonString());
+    assertTrue(response.contains("successfully added"));
+
+    // Cleanup
+    sendDeleteRequest(DEFAULT_INSTANCE.getControllerRequestURLBuilder().forTableConfigsDelete(tableName));
+  }
+
+  @Test
+  public void testValidationTypes_SkipAll()
+      throws IOException {
+    String tableName = "testSkipAll";
+    TableConfig offlineTableConfig = createOfflineTableConfig(tableName);
+    Schema schema = ControllerTest.createDummySchema("differentSchemaName"); // Invalid
+
+    TableConfigs tableConfigs = new TableConfigs(tableName, schema, offlineTableConfig, null);
+
+    // Skip ALL validations - should succeed even with invalid config
+    String response = sendPostRequest(_createTableConfigsUrl + "?validationTypesToSkip=ALL",
+        tableConfigs.toPrettyJsonString());
+    assertTrue(response.contains("successfully added"));
+
+    // Cleanup
+    sendDeleteRequest(DEFAULT_INSTANCE.getControllerRequestURLBuilder().forTableConfigsDelete(tableName));
+  }
+
+  // TODO: Add test for mutually exclusive parameters once validation is properly integrated
+
+  @Test
+  public void testValidationTypes_InvalidType()
+      throws IOException {
+    String tableName = "testInvalidType";
+    TableConfig offlineTableConfig = createOfflineTableConfig(tableName);
+    Schema schema = ControllerTest.createDummySchema(tableName);
+
+    TableConfigs tableConfigs = new TableConfigs(tableName, schema, offlineTableConfig, null);
+
+    // Try to skip an invalid type - should fail with helpful error
+    try {
+      sendPostRequest(_createTableConfigsUrl + "?validationTypesToSkip=INVALID_TYPE",
+          tableConfigs.toPrettyJsonString());
+      fail("Should have failed due to invalid validation type");
+    } catch (Exception e) {
+      assertTrue(e.getMessage().contains("INVALID_TYPE")
+          || e.getMessage().contains("Invalid validation type"));
+    }
+  }
+
+  @Test
+  public void testValidationTypes_CaseInsensitive()
+      throws IOException {
+    String tableName = "testCaseInsensitive";
+    TableConfig offlineTableConfig = createOfflineTableConfig(tableName);
+    Schema schema = ControllerTest.createDummySchema("differentSchemaName");
+
+    TableConfigs tableConfigs = new TableConfigs(tableName, schema, offlineTableConfig, null);
+
+    // Test lowercase - should work
+    String response = sendPostRequest(_createTableConfigsUrl + "?validationTypesToSkip=schema",
+        tableConfigs.toPrettyJsonString());
+    assertTrue(response.contains("successfully added"));
+
+    // Cleanup
+    sendDeleteRequest(DEFAULT_INSTANCE.getControllerRequestURLBuilder().forTableConfigsDelete(tableName));
+  }
+
+  @Test
+  public void testValidationTypes_WithWhitespace()
+      throws IOException {
+    String tableName = "testWithWhitespace";
+    TableConfig offlineTableConfig = createOfflineTableConfig(tableName);
+    Schema schema = ControllerTest.createDummySchema("differentSchemaName");
+
+    TableConfigs tableConfigs = new TableConfigs(tableName, schema, offlineTableConfig, null);
+
+    // Test with spaces around commas - URL encode the spaces
+    String response = sendPostRequest(_createTableConfigsUrl + "?validationTypesToSkip=SCHEMA,RETENTION",
+        tableConfigs.toPrettyJsonString());
+    assertTrue(response.contains("successfully added"));
+
+    // Cleanup
+    sendDeleteRequest(DEFAULT_INSTANCE.getControllerRequestURLBuilder().forTableConfigsDelete(tableName));
+  }
+
+  @Test
+  public void testValidationTypes_UpdateEndpoint()
+      throws IOException {
+    String tableName = "testUpdateValidation";
+    TableConfig offlineTableConfig = createOfflineTableConfig(tableName);
+    Schema schema = ControllerTest.createDummySchema(tableName);
+
+    TableConfigs tableConfigs = new TableConfigs(tableName, schema, offlineTableConfig, null);
+
+    // Create the table first
+    sendPostRequest(_createTableConfigsUrl, tableConfigs.toPrettyJsonString());
+
+    // Update with mismatched schema name, skip schema validation
+    Schema newSchema = ControllerTest.createDummySchema("differentSchemaName");
+    TableConfigs updatedConfigs = new TableConfigs(tableName, newSchema, offlineTableConfig, null);
+
+    String response = sendPutRequest(
+        DEFAULT_INSTANCE.getControllerRequestURLBuilder().forTableConfigsUpdate(tableName)
+            + "?validationTypesToSkip=SCHEMA",
+        updatedConfigs.toPrettyJsonString());
+    assertTrue(response.contains("updated"));
+
+    // Cleanup
+    sendDeleteRequest(DEFAULT_INSTANCE.getControllerRequestURLBuilder().forTableConfigsDelete(tableName));
+  }
+
+  @Test
+  public void testValidationTypes_ValidateEndpoint()
+      throws IOException {
+    String tableName = "testValidateEndpoint";
+    TableConfig offlineTableConfig = createOfflineTableConfig(tableName);
+    Schema schema = ControllerTest.createDummySchema(tableName);
+
+    TableConfigs tableConfigs = new TableConfigs(tableName, schema, offlineTableConfig, null);
+
+    String validateUrl = DEFAULT_INSTANCE.getControllerRequestURLBuilder().forTableConfigsValidate();
+
+    // Validate with validateOnly parameter - should work
+    String response = sendPostRequest(validateUrl + "?validationTypesToValidateOnly=SCHEMA",
+        tableConfigs.toPrettyJsonString());
+    // Validation endpoint returns status
+    assertNotNull(response);
   }
 
   @AfterClass

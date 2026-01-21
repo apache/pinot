@@ -42,7 +42,7 @@ public class TaskConfigUtils {
   }
 
   public static void validateTaskConfigs(TableConfig tableConfig, Schema schema, PinotTaskManager pinotTaskManager,
-      String validationTypesToSkip) {
+      String validationTypesToSkip, String validateOnlyTypes) {
     if (tableConfig == null || tableConfig.getTaskConfig() == null) {
       return;
     }
