@@ -41,7 +41,7 @@ public class UpsertInconsistentStateConfig implements PinotClusterConfigChangeLi
   private static final UpsertInconsistentStateConfig INSTANCE = new UpsertInconsistentStateConfig();
 
   private final AtomicReference<Mode> _forceCommitReloadMode = new AtomicReference<>(
-      Mode.fromString(ConfigChangeListenerConstants.DEFAULT_FORCE_COMMIT_RELOAD_MODE, Mode.NONE));
+      Mode.fromString(ConfigChangeListenerConstants.DEFAULT_CONSUMING_COMMIT_MODE, Mode.NONE));
 
   private UpsertInconsistentStateConfig() {
     // Register this instance as the provider so pinot-segment-local can access the mode directly

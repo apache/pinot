@@ -2173,7 +2173,7 @@ public class CommonConstants {
 
     /**
      * Default value: true (force commit/reload is allowed by default).
-     * @deprecated Use {@link #DEFAULT_FORCE_COMMIT_RELOAD_MODE} instead.
+     * @deprecated Use {@link #DEFAULT_CONSUMING_COMMIT_MODE} instead.
      */
     @Deprecated
     public static final boolean DEFAULT_FORCE_COMMIT_RELOAD = true;
@@ -2182,6 +2182,6 @@ public class CommonConstants {
      * Default mode: PROTECTED (force commit/reload is allowed while reverting the Upsert metadata during
      * inconsistencies).
      */
-    public static final String DEFAULT_FORCE_COMMIT_RELOAD_MODE = "PROTECTED";
+    public static final String DEFAULT_CONSUMING_COMMIT_MODE = "PROTECTED";
   }
 }
