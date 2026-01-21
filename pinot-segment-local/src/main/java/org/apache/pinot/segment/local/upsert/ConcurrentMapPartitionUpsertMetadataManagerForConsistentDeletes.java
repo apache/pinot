@@ -289,10 +289,7 @@ public class ConcurrentMapPartitionUpsertMetadataManagerForConsistentDeletes
             oldSegment, validDocIdsForOldSegment);
       }
       if (validDocIdsForOldSegment != null && !validDocIdsForOldSegment.isEmpty()) {
-        ConsumingSegmentCommitModeProvider.Mode forceCommitReloadMode = ConsumingSegmentCommitModeProvider.getMode();
-        if (forceCommitReloadMode == ConsumingSegmentCommitModeProvider.Mode.PROTECTED && (
-            _context.isDropOutOfOrderRecord() || _context.getConsistencyMode() == UpsertConfig.ConsistencyMode.NONE
-                || _context.getPartialUpsertHandler() != null) && oldSegment instanceof MutableSegment) {
+        if (shouldRevertMetadataOnInconsistency(segment)) {
           revertSegmentUpsertMetadata(segment, validDocIds, queryableDocIds, oldSegment, segmentName,
               validDocIdsForOldSegment);
           return;
