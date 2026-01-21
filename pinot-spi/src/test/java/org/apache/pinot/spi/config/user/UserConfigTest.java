@@ -77,6 +77,10 @@ public class UserConfigTest {
     // Verify correct permissions field is present (not the typo'd one)
     assertTrue(jsonNode.has("permissions"),
         "Correct 'getPermissions()' method should be serialized to JSON");
+
+    // Verify utility method is NOT in JSON (should be excluded by @JsonIgnore)
+    assertFalse(jsonNode.has("usernameWithComponent"),
+        "Utility method 'getUsernameWithComponent()' should not be serialized to JSON");
   }
 
   @Test
@@ -164,6 +168,9 @@ public class UserConfigTest {
 
     // Verify the serialized JSON doesn't contain deprecated/utility methods
     JsonNode jsonNode = JsonUtils.stringToJsonNode(jsonString);
-    assertFalse(jsonNode.has("permissios"));
+    assertFalse(jsonNode.has("permissios"),
+        "Deprecated method 'getPermissios()' should not be serialized");
+    assertFalse(jsonNode.has("usernameWithComponent"),
+        "Utility method 'getUsernameWithComponent()' should not be serialized");
   }
 }
