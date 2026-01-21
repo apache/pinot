@@ -79,10 +79,10 @@ public class AccessControlUserConfigUtils {
       listFields.put(UserConfig.EXCLUDE_TABLES_KEY, userConfig.getExcludeTables());
     }
 
-    List<AccessType> permissionList = userConfig.getPermissios();
+    List<AccessType> permissionList = userConfig.getPermissions();
     if (permissionList != null) {
       listFields.put(UserConfig.PERMISSIONS_KEY,
-          userConfig.getPermissios().stream().map(e -> e.toString()).collect(Collectors.toList()));
+          userConfig.getPermissions().stream().map(e -> e.toString()).collect(Collectors.toList()));
     }
 
     ZNRecord znRecord = new ZNRecord(userConfig.getUserName());
