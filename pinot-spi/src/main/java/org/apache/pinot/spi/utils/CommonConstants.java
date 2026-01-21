@@ -2166,10 +2166,10 @@ public class CommonConstants {
      * with inconsistent state configurations (partial upsert or dropOutOfOrderRecord=true
      * with consistency mode NONE and replication > 1).
      *
-     * Supported values: NO_RELOAD, PROTECTED_RELOAD, UNSAFE_RELOAD
+     * Supported values: NONE, PROTECTED, UNSAFE
      * Legacy boolean values (true/false) are also supported for backward compatibility.
      */
-    public static final String FORCE_COMMIT_RELOAD_CONFIG = "pinot.server.upsert.force.commit.reload";
+    public static final String FORCE_COMMIT_RELOAD_CONFIG = "pinot.server.upsert.consuming.segment.force.commit";
 
     /**
      * Default value: true (force commit/reload is allowed by default).
@@ -2179,9 +2179,9 @@ public class CommonConstants {
     public static final boolean DEFAULT_FORCE_COMMIT_RELOAD = true;
 
     /**
-     * Default mode: PROTECTED_RELOAD (force commit/reload is allowed while reverting the Upsert metadata during
+     * Default mode: PROTECTED (force commit/reload is allowed while reverting the Upsert metadata during
      * inconsistencies).
      */
-    public static final String DEFAULT_FORCE_COMMIT_RELOAD_MODE = "PROTECTED_RELOAD";
+    public static final String DEFAULT_FORCE_COMMIT_RELOAD_MODE = "PROTECTED";
   }
 }

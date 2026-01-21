@@ -66,8 +66,7 @@ import org.apache.pinot.spi.config.table.UpsertConfig;
 import org.apache.pinot.spi.data.readers.GenericRow;
 import org.apache.pinot.spi.data.readers.PrimaryKey;
 import org.apache.pinot.spi.utils.BooleanUtils;
-import org.apache.pinot.spi.utils.ForceCommitReloadModeProvider;
-import org.apache.pinot.spi.utils.ForceCommitReloadModeProvider.Mode;
+import org.apache.pinot.spi.utils.ConsumingSegmentCommitModeProvider;
 import org.roaringbitmap.PeekableIntIterator;
 import org.roaringbitmap.buffer.MutableRoaringBitmap;
 import org.slf4j.Logger;
@@ -662,9 +661,7 @@ public abstract class BasePartitionUpsertMetadataManager implements PartitionUps
       validDocIdsForOldSegment = getValidDocIdsForOldSegment(oldSegment);
     }
     if (validDocIdsForOldSegment != null && !validDocIdsForOldSegment.isEmpty()) {
-      ForceCommitReloadModeProvider.Mode forceCommitReloadMode = ForceCommitReloadModeProvider.getMode();
-      if (forceCommitReloadMode == Mode.PROTECTED_RELOAD && oldSegment instanceof MutableSegment
-          && checkForInconsistentTableConfigs()) {
+      if (shouldRevertMetadataOnInconsistency(oldSegment)) {
         // If there are still valid docs in the old segment, validate and revert the metadata of the
         // consuming segment in place
         revertSegmentUpsertMetadata(segment, validDocIds, queryableDocIds, oldSegment, segmentName,
@@ -675,9 +672,26 @@ public abstract class BasePartitionUpsertMetadataManager implements PartitionUps
     }
   }
 
-  public boolean checkForInconsistentTableConfigs() {
+  /**
+   * Checks whether the table has configurations that may lead to inconsistent state
+   * (partial upsert or dropOutOfOrderRecord=true with consistency mode NONE).
+   */
+  public boolean hasInconsistentTableConfigs() {
     return ((_context.isDropOutOfOrderRecord() && _context.getConsistencyMode() == UpsertConfig.ConsistencyMode.NONE)
         || _context.getPartialUpsertHandler() != null);
+  }
+
+  /**
+   * Determines whether metadata should be reverted when inconsistencies are detected during segment replacement.
+   * This is only applicable when in PROTECTED mode, the old segment is a mutable segment,
+   * and the table has inconsistent state configurations.
+   *
+   * @param oldSegment the old segment being replaced
+   * @return true if metadata revert should be performed on inconsistency
+   */
+  private boolean shouldRevertMetadataOnInconsistency(IndexSegment oldSegment) {
+    return ConsumingSegmentCommitModeProvider.getMode().isProtected() && oldSegment instanceof MutableSegment
+        && hasInconsistentTableConfigs();
   }
 
   /**
@@ -711,9 +725,15 @@ public abstract class BasePartitionUpsertMetadataManager implements PartitionUps
     return oldSegment.getValidDocIds() != null ? oldSegment.getValidDocIds().getMutableRoaringBitmap() : null;
   }
 
+  protected abstract void removeSegment(IndexSegment segment, Iterator<PrimaryKey> primaryKeyIterator);
+
   protected void removeSegment(IndexSegment segment, MutableRoaringBitmap validDocIds) {
     try (PrimaryKeyReader primaryKeyReader = new PrimaryKeyReader(segment, _primaryKeyColumns)) {
-      revertAndRemoveSegment(segment, UpsertUtils.getRecordIterator(primaryKeyReader, validDocIds));
+      if (shouldRevertMetadataOnInconsistency(segment)) {
+        revertAndRemoveSegment(segment, UpsertUtils.getRecordIterator(primaryKeyReader, validDocIds));
+      } else {
+        removeSegment(segment, UpsertUtils.getPrimaryKeyIterator(primaryKeyReader, validDocIds));
+      }
     } catch (Exception e) {
       throw new RuntimeException(
           String.format("Caught exception while removing segment: %s, table: %s, message: %s", segment.getSegmentName(),

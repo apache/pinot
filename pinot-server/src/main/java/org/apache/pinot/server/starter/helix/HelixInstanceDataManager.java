@@ -559,9 +559,8 @@ public class HelixInstanceDataManager implements InstanceDataManager {
               // The fix restores correct segment metadata before winner selection.
               // Force commit behavior can be toggled dynamically using the cluster config
               // `pinot.server.upsert.force.commit.reload` without restarting servers.
-              TableConfig tableConfig = tableDataManager.getCachedTableConfigAndSchema().getLeft();
               UpsertInconsistentStateConfig config = UpsertInconsistentStateConfig.getInstance();
-              if (config.isForceCommitReloadAllowed(tableConfig)) {
+              if (config.isForceCommitReloadAllowed()) {
                 ((RealtimeSegmentDataManager) segmentDataManager).forceCommit();
               } else {
                 LOGGER.warn("Force commit disabled for table: {} due to inconsistent state config. "

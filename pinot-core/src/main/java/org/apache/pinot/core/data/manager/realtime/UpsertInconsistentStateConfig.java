@@ -21,12 +21,10 @@ package org.apache.pinot.core.data.manager.realtime;
 import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.atomic.AtomicReference;
-import javax.annotation.Nullable;
 import org.apache.pinot.spi.config.provider.PinotClusterConfigChangeListener;
-import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.utils.CommonConstants.ConfigChangeListenerConstants;
-import org.apache.pinot.spi.utils.ForceCommitReloadModeProvider;
-import org.apache.pinot.spi.utils.ForceCommitReloadModeProvider.Mode;
+import org.apache.pinot.spi.utils.ConsumingSegmentCommitModeProvider;
+import org.apache.pinot.spi.utils.ConsumingSegmentCommitModeProvider.Mode;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -43,11 +41,11 @@ public class UpsertInconsistentStateConfig implements PinotClusterConfigChangeLi
   private static final UpsertInconsistentStateConfig INSTANCE = new UpsertInconsistentStateConfig();
 
   private final AtomicReference<Mode> _forceCommitReloadMode = new AtomicReference<>(
-      Mode.fromString(ConfigChangeListenerConstants.DEFAULT_FORCE_COMMIT_RELOAD_MODE, Mode.PROTECTED_RELOAD));
+      Mode.fromString(ConfigChangeListenerConstants.DEFAULT_FORCE_COMMIT_RELOAD_MODE, Mode.NONE));
 
   private UpsertInconsistentStateConfig() {
     // Register this instance as the provider so pinot-segment-local can access the mode directly
-    ForceCommitReloadModeProvider.register(this::getForceCommitReloadMode);
+    ConsumingSegmentCommitModeProvider.register(this::getForceCommitReloadMode);
   }
 
   public static UpsertInconsistentStateConfig getInstance() {
@@ -55,23 +53,12 @@ public class UpsertInconsistentStateConfig implements PinotClusterConfigChangeLi
   }
 
   /**
-   * Checks if force commit/reload is allowed for the given table config.
+   * Checks if force commit/reload is allowed based on the current mode.
    *
-   * @param tableConfig the table config to check, may be null
-   * @return true if force commit/reload is allowed based on the current mode and table configuration
+   * @return true if force commit/reload is allowed (mode is PROTECTED or UNSAFE)
    */
-  public boolean isForceCommitReloadAllowed(@Nullable TableConfig tableConfig) {
-    if (tableConfig == null) {
-      return false;
-    }
-    Mode mode = _forceCommitReloadMode.get();
-    // NO_RELOAD: never allow reload
-    if (!mode.isReloadEnabled()) {
-      return false;
-    }
-    // UNSAFE_RELOAD or PROTECTED_RELOAD: always allow reload regardless of table config
-    // For PROTECTED_RELOAD, upsert metadata is reverted when inconsistencies are seen during reload/force commit
-    return true;
+  public boolean isForceCommitReloadAllowed() {
+    return _forceCommitReloadMode.get().isReloadEnabled();
   }
 
   /**
@@ -95,7 +82,7 @@ public class UpsertInconsistentStateConfig implements PinotClusterConfigChangeLi
     }
 
     String configValue = clusterConfigs.get(ConfigChangeListenerConstants.FORCE_COMMIT_RELOAD_CONFIG);
-    Mode newMode = Mode.fromString(configValue, Mode.PROTECTED_RELOAD);
+    Mode newMode = Mode.fromString(configValue, Mode.NONE);
 
     Mode previousMode = _forceCommitReloadMode.getAndSet(newMode);
     if (previousMode != newMode) {

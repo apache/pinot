@@ -18,7 +18,10 @@
  */
 package org.apache.pinot.spi.utils;
 
+import com.google.common.annotations.VisibleForTesting;
 import java.util.function.Supplier;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 
 /**
@@ -28,7 +31,9 @@ import java.util.function.Supplier;
  *
  * The supplier is registered by UpsertInconsistentStateConfig during server/controller startup.
  */
-public final class ForceCommitReloadModeProvider {
+public final class ConsumingSegmentCommitModeProvider {
+  private static final Logger LOGGER = LoggerFactory.getLogger(ConsumingSegmentCommitModeProvider.class);
+  private static final Supplier<Mode> DEFAULT_SUPPLIER = () -> Mode.NONE;
 
   /**
    * Enum defining the reload behavior for upsert tables with inconsistent state configurations
@@ -39,14 +44,14 @@ public final class ForceCommitReloadModeProvider {
      * Reload is disabled for tables with inconsistent state configurations.
      * Safe option that prevents potential data inconsistency issues.
      */
-    NO_RELOAD(false),
+    NONE(false),
 
     /**
      * Reload is enabled but only for tables that do not have inconsistent state configurations.
      * Tables with partial upsert or dropOutOfOrderRecord=true (with replication > 1) will be skipped.
      * When inconsistencies are detected during reload/force commit, upsert metadata is reverted.
      */
-    PROTECTED_RELOAD(true),
+    PROTECTED(true),
 
     /**
      * Reload is enabled for all tables regardless of their configuration.
@@ -54,7 +59,7 @@ public final class ForceCommitReloadModeProvider {
      * or upsert tables with dropOutOfOrderRecord enabled when replication > 1.
      * Inconsistency checks and metadata revert are skipped.
      */
-    UNSAFE_RELOAD(true);
+    UNSAFE(true);
 
     private final boolean _reloadEnabled;
 
@@ -64,17 +69,24 @@ public final class ForceCommitReloadModeProvider {
 
     /**
      * Returns whether reload operations are enabled for this mode.
-     * For NO_RELOAD, returns false; for PROTECTED_RELOAD and UNSAFE_RELOAD, returns true.
+     * For NONE, returns false; for PROTECTED and UNSAFE, returns true.
      */
     public boolean isReloadEnabled() {
       return _reloadEnabled;
     }
 
     /**
-     * Returns whether this mode is UNSAFE_RELOAD, which bypasses inconsistent state checks.
+     * Returns whether this mode is UNSAFE, which bypasses inconsistent state checks.
      */
     public boolean isUnsafe() {
-      return this == UNSAFE_RELOAD;
+      return this == UNSAFE;
+    }
+
+    /**
+     * Returns whether this mode is PROTECTED, which reverts metadata on inconsistencies.
+     */
+    public boolean isProtected() {
+      return this == PROTECTED;
     }
 
     /**
@@ -101,29 +113,35 @@ public final class ForceCommitReloadModeProvider {
 
       // Support legacy boolean values for backward compatibility
       if ("TRUE".equals(trimmedValue)) {
-        return PROTECTED_RELOAD;
+        return PROTECTED;
       }
       if ("FALSE".equals(trimmedValue)) {
-        return NO_RELOAD;
+        return NONE;
       }
 
       return defaultMode;
     }
   }
 
-  private static volatile Supplier<Mode> _modeSupplier = () -> Mode.PROTECTED_RELOAD;
+  private static volatile Supplier<Mode> _modeSupplier = DEFAULT_SUPPLIER;
+  private static volatile boolean _registered = false;
 
-  private ForceCommitReloadModeProvider() {
+  private ConsumingSegmentCommitModeProvider() {
   }
 
   /**
    * Registers the supplier that provides the current Mode.
    * Should be called during server/controller startup.
+   * Logs a warning if called multiple times (e.g., in tests).
    *
    * @param modeSupplier the supplier to register
    */
   public static void register(Supplier<Mode> modeSupplier) {
+    if (_registered) {
+      LOGGER.warn("ConsumingSegmentCommitModeProvider already registered, overwriting previous supplier");
+    }
     _modeSupplier = modeSupplier;
+    _registered = true;
   }
 
   /**
@@ -131,5 +149,15 @@ public final class ForceCommitReloadModeProvider {
    */
   public static Mode getMode() {
     return _modeSupplier.get();
+  }
+
+  /**
+   * Resets the provider to its default state.
+   * This is intended for testing purposes only.
+   */
+  @VisibleForTesting
+  public static void reset() {
+    _modeSupplier = DEFAULT_SUPPLIER;
+    _registered = false;
   }
 }

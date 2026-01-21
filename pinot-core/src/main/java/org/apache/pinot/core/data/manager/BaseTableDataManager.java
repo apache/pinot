@@ -828,7 +828,7 @@ public abstract class BaseTableDataManager implements TableDataManager {
         // `pinot.server.upsert.force.commit.reload` without restarting servers.
         TableConfig tableConfig = indexLoadingConfig.getTableConfig();
         UpsertInconsistentStateConfig config = UpsertInconsistentStateConfig.getInstance();
-        if (tableConfig != null && config.isForceCommitReloadAllowed(tableConfig)) {
+        if (tableConfig != null && config.isForceCommitReloadAllowed()) {
           _logger.info("Reloading (force committing) consuming segment: {}", segmentName);
           ((RealtimeSegmentDataManager) segmentDataManager).forceCommit();
         } else {

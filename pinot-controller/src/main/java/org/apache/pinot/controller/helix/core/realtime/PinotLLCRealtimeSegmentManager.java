@@ -2616,12 +2616,12 @@ public class PinotLLCRealtimeSegmentManager {
       throw new IllegalStateException("Table config not found for table: " + tableNameWithType);
     }
     UpsertInconsistentStateConfig configInstance = UpsertInconsistentStateConfig.getInstance();
-    if (!configInstance.isForceCommitReloadAllowed(tableConfig)) {
+    if (!configInstance.isForceCommitReloadAllowed()) {
       throw new IllegalStateException("Force commit disabled for table: " + tableNameWithType
           + ". Table is configured as partial upsert or dropOutOfOrderRecord=true with replication > 1, "
           + "which can cause data inconsistency during force commit. " + "Current cluster config '"
           + configInstance.getConfigKey() + "' is set to: " + configInstance.getForceCommitReloadMode()
-          + ". To enable force commit, set this config to 'UNSAFE_RELOAD' or 'PROTECTED_RELOAD'.");
+          + ". To enable force commit, set this config to 'UNSAFE' or 'PROTECTED'.");
     }
   }
 
