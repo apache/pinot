@@ -42,9 +42,9 @@ public class UpsertContext {
   private final PartialUpsertHandler _partialUpsertHandler;
   @Nullable
   private final String _deleteRecordColumn;
-  private final boolean _dropOutOfOrderRecord;
+  private boolean _dropOutOfOrderRecord;
   @Nullable
-  private final String _outOfOrderRecordColumn;
+  private String _outOfOrderRecordColumn;
   private final boolean _enableSnapshot;
   private final boolean _enablePreload;
   private final double _metadataTTL;
@@ -132,6 +132,14 @@ public class UpsertContext {
 
   public boolean isDropOutOfOrderRecord() {
     return _dropOutOfOrderRecord;
+  }
+
+  public void setDropOutOfOrderRecord(boolean dropOutOfOrderRecord) {
+    _dropOutOfOrderRecord = dropOutOfOrderRecord;
+  }
+
+  public void setOutOfOrderRecordColumn(@Nullable String outOfOrderRecordColumn) {
+    _outOfOrderRecordColumn = outOfOrderRecordColumn;
   }
 
   @Nullable
