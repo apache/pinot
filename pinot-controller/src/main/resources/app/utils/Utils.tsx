@@ -34,6 +34,8 @@ import Loading from '../components/Loading';
 import moment from "moment";
 import {RebalanceServerOption} from "../components/Homepage/Operations/RebalanceServer/RebalanceServerOptions";
 import { formatTimeInTimezone } from './TimezoneUtils';
+import VpnKeyIcon from '@material-ui/icons/VpnKey';
+import { Tooltip, Box } from '@material-ui/core';
 
 const getRebalanceConfigValue = (
     rebalanceConfig: { [optionName: string]: string | boolean | number },
@@ -316,11 +318,12 @@ const navigateToPreviousPage = (location, popTwice) => {
   return hasharr.join('/');
 };
 
-const syncTableSchemaData = (data, showFieldType) => {
+const syncTableSchemaData = (data, showFieldType, primaryKeyColumns?: string[]) => {
   const dimensionFields = data.dimensionFieldSpecs || [];
   const metricFields = data.metricFieldSpecs || [];
   const dateTimeField = data.dateTimeFieldSpecs || [];
   const complexFields = data.complexFieldSpecs || [];
+  const pkColumns = primaryKeyColumns || data.primaryKeyColumns || [];
 
   dimensionFields.map((field) => {
     field.fieldType = 'Dimension';
@@ -339,18 +342,37 @@ const syncTableSchemaData = (data, showFieldType) => {
   })
 
   const columnList = [...dimensionFields, ...metricFields, ...dateTimeField, ...complexFields];
+
+  const renderColumnName = (name: string) => {
+    const isPrimaryKey = pkColumns.includes(name);
+    if (isPrimaryKey) {
+      return {
+        customRenderer: (
+          <Box display="flex" alignItems="center">
+            <span>{name}</span>
+            <Tooltip title="Primary Key" arrow placement="top">
+              <VpnKeyIcon style={{ fontSize: 16, marginLeft: 4, color: '#f9a825' }} />
+            </Tooltip>
+          </Box>
+        ),
+        value: name
+      };
+    }
+    return name;
+  };
+
   if (showFieldType) {
     return {
       columns: ['Column', 'Type', 'Field Type', 'Multi Value'],
       records: columnList.map((field) => {
-        return [field.name, field.dataType, field.fieldType, getMultiValueField(field)];
+        return [renderColumnName(field.name), field.dataType, field.fieldType, getMultiValueField(field)];
       }),
     };
   }
   return {
     columns: ['Column', 'Type'],
     records: columnList.map((field) => {
-      return [field.name, field.dataType];
+      return [renderColumnName(field.name), field.dataType];
     }),
   };
 };
