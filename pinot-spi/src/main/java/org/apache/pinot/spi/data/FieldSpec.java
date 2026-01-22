@@ -418,9 +418,9 @@ public abstract class FieldSpec implements Comparable<FieldSpec>, Serializable {
         case COMPLEX:
           switch (dataType) {
             case MAP:
-              return DEFAULT_COMPLEX_NULL_VALUE_OF_MAP;
+              return DEFAULT_COMPLEX_NULL_VALUE_OF_MAP.toString();
             case LIST:
-              return DEFAULT_COMPLEX_NULL_VALUE_OF_LIST;
+              return DEFAULT_COMPLEX_NULL_VALUE_OF_LIST.toString();
             case STRUCT:
             default:
               throw new IllegalStateException("Unsupported complex data type: " + dataType);

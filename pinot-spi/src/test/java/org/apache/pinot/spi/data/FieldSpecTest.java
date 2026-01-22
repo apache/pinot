@@ -25,8 +25,11 @@ import java.sql.Timestamp;
 import java.util.ArrayList;
 import java.util.LinkedList;
 import java.util.List;
+import java.util.Map;
 import java.util.Random;
 import java.util.concurrent.TimeUnit;
+import org.apache.pinot.spi.data.FieldSpec.DataType;
+import org.apache.pinot.spi.data.FieldSpec.FieldType;
 import org.apache.pinot.spi.utils.JsonUtils;
 import org.testng.Assert;
 import org.testng.annotations.DataProvider;
@@ -500,5 +503,138 @@ public class FieldSpecTest {
         "JSON should contain dataType field: " + metricJson);
     Assert.assertTrue(metricJson.contains("\"singleValueField\":true"),
         "JSON should contain singleValueField field: " + metricJson);
+  }
+
+  /**
+   * DataProvider for testing getDefaultNullValue with all valid FieldType and DataType combinations.
+   * Each entry contains: FieldType, DataType, expected default null value
+   */
+  @DataProvider(name = "defaultNullValueCases")
+  public Object[][] defaultNullValueCases() {
+    return new Object[][]{
+        // DIMENSION field type (ordinal 0)
+        {FieldType.DIMENSION, DataType.INT, FieldSpec.DEFAULT_DIMENSION_NULL_VALUE_OF_INT},
+        {FieldType.DIMENSION, DataType.LONG, FieldSpec.DEFAULT_DIMENSION_NULL_VALUE_OF_LONG},
+        {FieldType.DIMENSION, DataType.FLOAT, FieldSpec.DEFAULT_DIMENSION_NULL_VALUE_OF_FLOAT},
+        {FieldType.DIMENSION, DataType.DOUBLE, FieldSpec.DEFAULT_DIMENSION_NULL_VALUE_OF_DOUBLE},
+        {FieldType.DIMENSION, DataType.BIG_DECIMAL, FieldSpec.DEFAULT_DIMENSION_NULL_VALUE_OF_BIG_DECIMAL},
+        {FieldType.DIMENSION, DataType.BOOLEAN, FieldSpec.DEFAULT_DIMENSION_NULL_VALUE_OF_BOOLEAN},
+        {FieldType.DIMENSION, DataType.TIMESTAMP, FieldSpec.DEFAULT_DIMENSION_NULL_VALUE_OF_TIMESTAMP},
+        {FieldType.DIMENSION, DataType.STRING, FieldSpec.DEFAULT_DIMENSION_NULL_VALUE_OF_STRING},
+        {FieldType.DIMENSION, DataType.JSON, FieldSpec.DEFAULT_DIMENSION_NULL_VALUE_OF_JSON},
+        {FieldType.DIMENSION, DataType.BYTES, FieldSpec.DEFAULT_DIMENSION_NULL_VALUE_OF_BYTES},
+
+        // TIME field type (ordinal 2) - same as DIMENSION
+        {FieldType.TIME, DataType.INT, FieldSpec.DEFAULT_DIMENSION_NULL_VALUE_OF_INT},
+        {FieldType.TIME, DataType.LONG, FieldSpec.DEFAULT_DIMENSION_NULL_VALUE_OF_LONG},
+        {FieldType.TIME, DataType.FLOAT, FieldSpec.DEFAULT_DIMENSION_NULL_VALUE_OF_FLOAT},
+        {FieldType.TIME, DataType.DOUBLE, FieldSpec.DEFAULT_DIMENSION_NULL_VALUE_OF_DOUBLE},
+        {FieldType.TIME, DataType.BIG_DECIMAL, FieldSpec.DEFAULT_DIMENSION_NULL_VALUE_OF_BIG_DECIMAL},
+        {FieldType.TIME, DataType.BOOLEAN, FieldSpec.DEFAULT_DIMENSION_NULL_VALUE_OF_BOOLEAN},
+        {FieldType.TIME, DataType.TIMESTAMP, FieldSpec.DEFAULT_DIMENSION_NULL_VALUE_OF_TIMESTAMP},
+        {FieldType.TIME, DataType.STRING, FieldSpec.DEFAULT_DIMENSION_NULL_VALUE_OF_STRING},
+        {FieldType.TIME, DataType.JSON, FieldSpec.DEFAULT_DIMENSION_NULL_VALUE_OF_JSON},
+        {FieldType.TIME, DataType.BYTES, FieldSpec.DEFAULT_DIMENSION_NULL_VALUE_OF_BYTES},
+
+        // DATE_TIME field type (ordinal 3) - same as DIMENSION
+        {FieldType.DATE_TIME, DataType.INT, FieldSpec.DEFAULT_DIMENSION_NULL_VALUE_OF_INT},
+        {FieldType.DATE_TIME, DataType.LONG, FieldSpec.DEFAULT_DIMENSION_NULL_VALUE_OF_LONG},
+        {FieldType.DATE_TIME, DataType.FLOAT, FieldSpec.DEFAULT_DIMENSION_NULL_VALUE_OF_FLOAT},
+        {FieldType.DATE_TIME, DataType.DOUBLE, FieldSpec.DEFAULT_DIMENSION_NULL_VALUE_OF_DOUBLE},
+        {FieldType.DATE_TIME, DataType.BIG_DECIMAL, FieldSpec.DEFAULT_DIMENSION_NULL_VALUE_OF_BIG_DECIMAL},
+        {FieldType.DATE_TIME, DataType.BOOLEAN, FieldSpec.DEFAULT_DIMENSION_NULL_VALUE_OF_BOOLEAN},
+        {FieldType.DATE_TIME, DataType.TIMESTAMP, FieldSpec.DEFAULT_DIMENSION_NULL_VALUE_OF_TIMESTAMP},
+        {FieldType.DATE_TIME, DataType.STRING, FieldSpec.DEFAULT_DIMENSION_NULL_VALUE_OF_STRING},
+        {FieldType.DATE_TIME, DataType.JSON, FieldSpec.DEFAULT_DIMENSION_NULL_VALUE_OF_JSON},
+        {FieldType.DATE_TIME, DataType.BYTES, FieldSpec.DEFAULT_DIMENSION_NULL_VALUE_OF_BYTES},
+
+        // METRIC field type (ordinal 1)
+        {FieldType.METRIC, DataType.INT, FieldSpec.DEFAULT_METRIC_NULL_VALUE_OF_INT},
+        {FieldType.METRIC, DataType.LONG, FieldSpec.DEFAULT_METRIC_NULL_VALUE_OF_LONG},
+        {FieldType.METRIC, DataType.FLOAT, FieldSpec.DEFAULT_METRIC_NULL_VALUE_OF_FLOAT},
+        {FieldType.METRIC, DataType.DOUBLE, FieldSpec.DEFAULT_METRIC_NULL_VALUE_OF_DOUBLE},
+        {FieldType.METRIC, DataType.BIG_DECIMAL, FieldSpec.DEFAULT_METRIC_NULL_VALUE_OF_BIG_DECIMAL},
+        {FieldType.METRIC, DataType.STRING, FieldSpec.DEFAULT_METRIC_NULL_VALUE_OF_STRING},
+        {FieldType.METRIC, DataType.BYTES, FieldSpec.DEFAULT_METRIC_NULL_VALUE_OF_BYTES},
+
+        // COMPLEX field type (ordinal 4)
+        {FieldType.COMPLEX, DataType.MAP, FieldSpec.DEFAULT_COMPLEX_NULL_VALUE_OF_MAP.toString()},
+        {FieldType.COMPLEX, DataType.LIST, FieldSpec.DEFAULT_COMPLEX_NULL_VALUE_OF_LIST.toString()},
+    };
+  }
+
+  /**
+   * Test that getDefaultNullValue returns correct default values for all valid FieldType + DataType combinations.
+   */
+  @Test(dataProvider = "defaultNullValueCases")
+  public void testGetDefaultNullValue(final FieldType fieldType, final DataType dataType, final Object expectedValue) {
+    final Object actualValue = FieldSpec.getDefaultNullValue(fieldType, dataType, null);
+    Assert.assertEquals(actualValue, expectedValue,
+        String.format("Default null value mismatch for fieldType=%s, dataType=%s", fieldType, dataType));
+  }
+
+  /**
+   * Test that default null values can be converted to string and back for all types.
+   * This validates the round-trip: defaultValue -> getStringValue -> dataType.convert -> original value
+   */
+  @DataProvider(name = "stringConversionCases")
+  public Object[][] stringConversionCases() {
+    return new Object[][]{
+        // Primitive types
+        {DataType.INT, FieldSpec.DEFAULT_DIMENSION_NULL_VALUE_OF_INT},
+        {DataType.LONG, FieldSpec.DEFAULT_DIMENSION_NULL_VALUE_OF_LONG},
+        {DataType.FLOAT, FieldSpec.DEFAULT_DIMENSION_NULL_VALUE_OF_FLOAT},
+        {DataType.DOUBLE, FieldSpec.DEFAULT_DIMENSION_NULL_VALUE_OF_DOUBLE},
+        {DataType.BIG_DECIMAL, FieldSpec.DEFAULT_DIMENSION_NULL_VALUE_OF_BIG_DECIMAL},
+        {DataType.BOOLEAN, FieldSpec.DEFAULT_DIMENSION_NULL_VALUE_OF_BOOLEAN},
+        {DataType.TIMESTAMP, FieldSpec.DEFAULT_DIMENSION_NULL_VALUE_OF_TIMESTAMP},
+        {DataType.STRING, FieldSpec.DEFAULT_DIMENSION_NULL_VALUE_OF_STRING},
+        {DataType.JSON, FieldSpec.DEFAULT_DIMENSION_NULL_VALUE_OF_JSON},
+        {DataType.BYTES, FieldSpec.DEFAULT_DIMENSION_NULL_VALUE_OF_BYTES},
+        // Complex types
+        {DataType.MAP, FieldSpec.DEFAULT_COMPLEX_NULL_VALUE_OF_MAP},
+        {DataType.LIST, FieldSpec.DEFAULT_COMPLEX_NULL_VALUE_OF_LIST},
+    };
+  }
+
+  @Test(dataProvider = "stringConversionCases")
+  public void testDefaultNullValueStringConversion(final DataType dataType, final Object defaultValue) {
+    // Convert to string
+    final String stringValue = FieldSpec.getStringValue(defaultValue);
+    Assert.assertNotNull(stringValue,
+        String.format("String value should not be null for dataType=%s", dataType));
+
+    // Convert back using dataType.convert
+    final Object convertedValue = dataType.convert(stringValue);
+    Assert.assertEquals(convertedValue, defaultValue,
+        String.format("Round-trip conversion failed for dataType=%s: original=%s, string=%s, converted=%s",
+            dataType, defaultValue, stringValue, convertedValue));
+  }
+
+  /**
+   * Test custom string default null values are correctly converted by dataType.convert().
+   */
+  @DataProvider(name = "customStringDefaultNullValueCases")
+  public Object[][] customStringDefaultNullValueCases() {
+    return new Object[][]{
+        {FieldType.DIMENSION, DataType.INT, "42", 42},
+        {FieldType.DIMENSION, DataType.LONG, "123456789", 123456789L},
+        {FieldType.DIMENSION, DataType.FLOAT, "3.14", 3.14f},
+        {FieldType.DIMENSION, DataType.DOUBLE, "2.718281828", 2.718281828},
+        {FieldType.DIMENSION, DataType.BIG_DECIMAL, "99999.99999", new BigDecimal("99999.99999")},
+        {FieldType.DIMENSION, DataType.STRING, "custom_default", "custom_default"},
+        {FieldType.DIMENSION, DataType.JSON, "{\"key\":\"value\"}", "{\"key\":\"value\"}"},
+        {FieldType.COMPLEX, DataType.MAP, "{\"a\":1}", Map.of("a", 1)},
+        {FieldType.COMPLEX, DataType.LIST, "[1,2,3]", List.of(1, 2, 3)},
+    };
+  }
+
+  @Test(dataProvider = "customStringDefaultNullValueCases")
+  public void testCustomStringDefaultNullValue(final FieldType fieldType, final DataType dataType,
+      final String stringDefaultNullValue, final Object expectedValue) {
+    final Object actualValue = FieldSpec.getDefaultNullValue(fieldType, dataType, stringDefaultNullValue);
+    Assert.assertEquals(actualValue, expectedValue,
+        String.format("Custom default null value conversion failed for fieldType=%s, dataType=%s, input=%s",
+            fieldType, dataType, stringDefaultNullValue));
   }
 }
