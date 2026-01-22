@@ -30,6 +30,7 @@ import org.apache.pinot.spi.config.table.HashFunction;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.UpsertConfig;
 import org.apache.pinot.spi.data.Schema;
+import org.slf4j.Logger;
 
 
 public class UpsertContext {
@@ -42,9 +43,9 @@ public class UpsertContext {
   private final PartialUpsertHandler _partialUpsertHandler;
   @Nullable
   private final String _deleteRecordColumn;
-  private boolean _dropOutOfOrderRecord;
+  private final boolean _dropOutOfOrderRecord;
   @Nullable
-  private String _outOfOrderRecordColumn;
+  private final String _outOfOrderRecordColumn;
   private final boolean _enableSnapshot;
   private final boolean _enablePreload;
   private final double _metadataTTL;
@@ -64,7 +65,7 @@ public class UpsertContext {
   @Nullable
   private final TableDataManager _tableDataManager;
   private final File _tableIndexDir;
-
+  private static final Logger LOGGER = org.slf4j.LoggerFactory.getLogger(UpsertContext.class);
   private UpsertContext(TableConfig tableConfig, Schema schema, List<String> primaryKeyColumns,
       HashFunction hashFunction, List<String> comparisonColumns, @Nullable PartialUpsertHandler partialUpsertHandler,
       @Nullable String deleteRecordColumn, boolean dropOutOfOrderRecord, @Nullable String outOfOrderRecordColumn,
@@ -131,20 +132,16 @@ public class UpsertContext {
   }
 
   public boolean isDropOutOfOrderRecord() {
-    return _dropOutOfOrderRecord;
-  }
-
-  public void setDropOutOfOrderRecord(boolean dropOutOfOrderRecord) {
-    _dropOutOfOrderRecord = dropOutOfOrderRecord;
-  }
-
-  public void setOutOfOrderRecordColumn(@Nullable String outOfOrderRecordColumn) {
-    _outOfOrderRecordColumn = outOfOrderRecordColumn;
+    return _dropOutOfOrderRecord && _consistencyMode == UpsertConfig.ConsistencyMode.NONE;
   }
 
   @Nullable
   public String getOutOfOrderRecordColumn() {
     return _outOfOrderRecordColumn;
+  }
+
+  public boolean isOutOfOrderRecordColumn() {
+    return _outOfOrderRecordColumn != null && _consistencyMode == UpsertConfig.ConsistencyMode.NONE;
   }
 
   public boolean isSnapshotEnabled() {
@@ -231,6 +228,7 @@ public class UpsertContext {
     private PartialUpsertHandler _partialUpsertHandler;
     private String _deleteRecordColumn;
     private boolean _dropOutOfOrderRecord;
+    @Nullable
     private String _outOfOrderRecordColumn;
     private boolean _enableSnapshot;
     private boolean _enablePreload;
@@ -362,6 +360,23 @@ public class UpsertContext {
       if (_tableIndexDir == null) {
         Preconditions.checkState(_tableDataManager != null, "Either table data manager or table index dir must be set");
         _tableIndexDir = _tableDataManager.getTableDataDir();
+      }
+      // dropOutOfOrderRecord and outOfOrderRecordColumn are not supported when consistencyMode is SYNC or SNAPSHOT.
+      // In these modes, records are indexed before metadata is updated, so we can't drop or mark out-of-order records.
+      // Disable them silently for backward compatibility with existing tables.
+      if (_consistencyMode != UpsertConfig.ConsistencyMode.NONE) {
+        if (_dropOutOfOrderRecord) {
+          _dropOutOfOrderRecord = false;
+          LOGGER.warn(
+              "dropOutOfOrderRecord is not supported when consistencyMode is set, disabling dropOutOfOrderRecord to get"
+                  + "consistent mode: {} for the table: {}", _consistencyMode, _tableConfig.getTableName());
+        }
+        if (_outOfOrderRecordColumn != null) {
+          _outOfOrderRecordColumn = null;
+          LOGGER.warn(
+              "outOfOrderRecordColumn is not supported when consistencyMode is set, removing outOfOrderRecordColumn "
+                  + "to get consistent mode: {} for the table: {}", _consistencyMode, _tableConfig.getTableName());
+        }
       }
       return new UpsertContext(_tableConfig, _schema, _primaryKeyColumns, _hashFunction, _comparisonColumns,
           _partialUpsertHandler, _deleteRecordColumn, _dropOutOfOrderRecord, _outOfOrderRecordColumn, _enableSnapshot,

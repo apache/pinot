@@ -646,18 +646,6 @@ public class MutableSegmentImpl implements MutableSegment {
       // consistent upsert view, otherwise the latest doc can be missed by query due to 'docId < _numDocs' check
       // in query filter operators. Here the record becomes queryable before validDocIds bitmaps are updated.
       if (_upsertConsistencyMode != UpsertConfig.ConsistencyMode.NONE) {
-        if (_upsertDropOutOfOrderRecord) {
-          _partitionUpsertMetadataManager.getContext().setDropOutOfOrderRecord(false);
-          _logger.warn(
-              "dropOutOfOrderRecord is not supported when consistencyMode is set, disabling dropOutOfOrderRecord to get"
-                  + "consistent mode: {} for the table: {}", _upsertConsistencyMode, _realtimeTableName);
-        }
-        if (_upsertOutOfOrderRecordColumn != null) {
-          _partitionUpsertMetadataManager.getContext().setOutOfOrderRecordColumn(null);
-          _logger.warn(
-              "outOfOrderRecordColumn is not supported when consistencyMode is set, removing outOfOrderRecordColumn "
-                  + "to get consistent mode: {} for the table: {}", _upsertConsistencyMode, _realtimeTableName);
-        }
         updateDictionary(updatedRow);
         addNewRow(numDocsIndexed, updatedRow);
         numDocsIndexed++;

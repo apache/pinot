@@ -680,10 +680,9 @@ public abstract class BasePartitionUpsertMetadataManager implements PartitionUps
     // between replicas. This can happen when a consuming segment is replaced by a committed segment that is consumed
     // from a different server with different records (some stream consumer cannot guarantee consuming the messages in
     // the same order/ when a segment is replaced with lesser consumed rows from the other server).
-    if (isConsumingSegmentSeal && _context.isDropOutOfOrderRecord()
-        && _context.getConsistencyMode() == UpsertConfig.ConsistencyMode.NONE) {
+    if (isConsumingSegmentSeal && (_context.isDropOutOfOrderRecord() || _context.isOutOfOrderRecordColumn())) {
       _logger.warn("Found {} primary keys not replaced when sealing consuming segment: {} for upsert table with "
-              + "dropOutOfOrderRecord enabled with no consistency mode. This can potentially cause inconsistency "
+              + "dropOutOfOrder enabled with no consistency mode. This can potentially cause inconsistency "
               + "between replicas. Reverting back metadata changes and triggering segment replacement.",
           numKeysNotReplaced,
           segmentName);
@@ -735,7 +734,7 @@ public abstract class BasePartitionUpsertMetadataManager implements PartitionUps
                 + "Proceeding with current state which may cause inconsistency.", MAX_UPSERT_REVERT_RETRIES,
             segmentName,
             numKeysStillNotReplaced);
-        if (_context.isDropOutOfOrderRecord() && _context.getConsistencyMode() == UpsertConfig.ConsistencyMode.NONE) {
+        if (_context.isOutOfOrderRecordColumn() || _context.isDropOutOfOrderRecord()) {
           _serverMetrics.addMeteredTableValue(_tableNameWithType, ServerMeter.REALTIME_UPSERT_INCONSISTENT_ROWS,
               numKeysStillNotReplaced);
         } else if (_partialUpsertHandler != null) {
