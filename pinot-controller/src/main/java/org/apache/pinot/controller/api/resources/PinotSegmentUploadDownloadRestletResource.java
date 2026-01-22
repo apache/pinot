@@ -629,6 +629,8 @@ public class PinotSegmentUploadDownloadRestletResource {
         // TODO: Include the un-tarred segment size when using the METADATA push rest API. Currently we can only use the
         //  tarred segment size as an approximation.
         long segmentSizeInBytes = getSegmentSizeFromFile(sourceDownloadURIStr);
+        if (segmentSizeInBytes < 0) {
+          segmentSizeInBytes = FileUtils.sizeOfDirectory(tempSegmentDir);
         }
         // Adding Storage Quota Check
         SegmentValidationUtils.checkStorageQuota(segmentName, segmentSizeInBytes, segmentSizeInBytes,
