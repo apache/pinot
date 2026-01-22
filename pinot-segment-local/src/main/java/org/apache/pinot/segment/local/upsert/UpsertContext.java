@@ -197,8 +197,7 @@ public class UpsertContext {
    * - dropOutOfOrderRecord is enabled with NONE consistency mode (records may have been dropped)
    */
   public boolean hasInconsistentTableConfigs() {
-    return (_dropOutOfOrderRecord && _consistencyMode == UpsertConfig.ConsistencyMode.NONE)
-        || _partialUpsertHandler != null;
+    return (_dropOutOfOrderRecord || _outOfOrderRecordColumn != null) || _partialUpsertHandler != null;
   }
 
   @Override
