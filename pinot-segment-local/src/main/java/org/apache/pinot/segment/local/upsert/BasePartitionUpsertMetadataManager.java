@@ -680,7 +680,7 @@ public abstract class BasePartitionUpsertMetadataManager implements PartitionUps
     // cause inconsistency between replicas when a consuming segment is replaced by a committed segment that is
     // consumed from a different server with different records (some stream consumers cannot guarantee consuming
     // messages in the same order, or when a segment is replaced with fewer consumed rows from another server).
-    // To avoid such inconsistencies, we store the previous locations to revert back to
+    // To avoid such inconsistencies, we store the previous locations to revert back to and resolve those inconsistencies
     if (isConsumingSegmentSeal && (_context.isDropOutOfOrderRecord() || _context.getOutOfOrderRecordColumn() != null)) {
       _logger.warn("Found {} primary keys not replaced when sealing consuming segment: {} for upsert table with "
               + "dropOutOfOrderRecord or outOfOrderRecordColumn enabled. This can potentially cause inconsistency "
