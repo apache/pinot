@@ -52,7 +52,6 @@ import org.apache.pinot.broker.queryquota.QueryQuotaManager;
 import org.apache.pinot.broker.routing.manager.BrokerRoutingManager;
 import org.apache.pinot.common.request.BrokerRequest;
 import org.apache.pinot.common.utils.DatabaseUtils;
-import org.apache.pinot.common.utils.WorkloadBudgetUtils;
 import org.apache.pinot.core.auth.Actions;
 import org.apache.pinot.core.auth.Authorize;
 import org.apache.pinot.core.auth.ManualAuthorization;
@@ -348,32 +347,5 @@ public class PinotBrokerDebug {
   public String getApplicationQueryQuota(
       @ApiParam(value = "Name of the application") @PathParam("applicationName") String applicationName) {
     return String.valueOf(_queryQuotaManager.getApplicationQueryQuota(applicationName));
-  }
-
-  @GET
-  @Path("debug/queryWorkloadCost/{workloadName}")
-  @ApiOperation(value = "Get instance cost information for a specific workload")
-  @ApiResponses(value = {
-      @ApiResponse(code = 200, message = "Success"),
-      @ApiResponse(code = 404, message = "Workload not found"),
-      @ApiResponse(code = 500, message = "Internal server error")
-  })
-  @Produces(MediaType.APPLICATION_JSON)
-  public String getWorkloadBudgetStats(
-      @ApiParam(value = "Name of the workload", required = true) @PathParam("workloadName") String workloadName
-  ) {
-    return WorkloadBudgetUtils.getWorkloadBudgetStats(workloadName, _instanceId);
-  }
-
-  @GET
-  @Path("debug/queryWorkloadCost")
-  @ApiOperation(value = "Get instance cost information for all workloads")
-  @ApiResponses(value = {
-      @ApiResponse(code = 200, message = "Success"),
-      @ApiResponse(code = 500, message = "Internal server error")
-  })
-  @Produces(MediaType.APPLICATION_JSON)
-  public String getAllWorkloadBudgetStats() {
-    return WorkloadBudgetUtils.getAllWorkloadBudgetStats(_instanceId);
   }
 }

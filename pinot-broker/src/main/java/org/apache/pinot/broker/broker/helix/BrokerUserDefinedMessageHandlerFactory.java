@@ -28,13 +28,10 @@ import org.apache.pinot.broker.routing.manager.BrokerRoutingManager;
 import org.apache.pinot.common.messages.ApplicationQpsQuotaRefreshMessage;
 import org.apache.pinot.common.messages.DatabaseConfigRefreshMessage;
 import org.apache.pinot.common.messages.LogicalTableConfigRefreshMessage;
-import org.apache.pinot.common.messages.QueryWorkloadRefreshMessage;
 import org.apache.pinot.common.messages.RoutingTableRebuildMessage;
 import org.apache.pinot.common.messages.SegmentRefreshMessage;
 import org.apache.pinot.common.messages.TableConfigRefreshMessage;
 import org.apache.pinot.common.utils.DatabaseUtils;
-import org.apache.pinot.common.utils.config.QueryWorkloadConfigUtils;
-import org.apache.pinot.spi.config.workload.InstanceCost;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -74,9 +71,6 @@ public class BrokerUserDefinedMessageHandlerFactory implements MessageHandlerFac
         return new RefreshDatabaseConfigMessageHandler(new DatabaseConfigRefreshMessage(message), context);
       case ApplicationQpsQuotaRefreshMessage.REFRESH_APP_QUOTA_MSG_SUB_TYPE:
         return new RefreshApplicationQpsQuotaMessageHandler(new ApplicationQpsQuotaRefreshMessage(message), context);
-      case QueryWorkloadRefreshMessage.REFRESH_QUERY_WORKLOAD_MSG_SUB_TYPE:
-      case QueryWorkloadRefreshMessage.DELETE_QUERY_WORKLOAD_MSG_SUB_TYPE:
-        return new QueryWorkloadRefreshMessageHandler(new QueryWorkloadRefreshMessage(message), context);
       default:
         // NOTE: Log a warning and return no-op message handler for unsupported message sub-types. This can happen when
         //       a new message sub-type is added, and the sender gets deployed first while receiver is still running the
@@ -263,42 +257,6 @@ public class BrokerUserDefinedMessageHandlerFactory implements MessageHandlerFac
     @Override
     public void onError(Exception e, ErrorCode code, ErrorType type) {
       LOGGER.error("Got error for no-op message handling (error code: {}, error type: {})", code, type, e);
-    }
-  }
-
-  private static class QueryWorkloadRefreshMessageHandler extends MessageHandler {
-    final String _queryWorkloadName;
-    final InstanceCost _instanceCost;
-    final String _messageType;
-
-    QueryWorkloadRefreshMessageHandler(QueryWorkloadRefreshMessage queryWorkloadRefreshMessage,
-        NotificationContext context) {
-      super(queryWorkloadRefreshMessage, context);
-      _queryWorkloadName = queryWorkloadRefreshMessage.getQueryWorkloadName();
-      _instanceCost = queryWorkloadRefreshMessage.getInstanceCost();
-      _messageType = queryWorkloadRefreshMessage.getMsgSubType();
-    }
-
-    @Override
-    public HelixTaskResult handleMessage() {
-      LOGGER.info("Handling query workload message: {}", _message);
-      try {
-        String instanceId = _message.getTgtName();
-        QueryWorkloadConfigUtils.handleWorkloadRefreshMessage(instanceId, _queryWorkloadName, _messageType,
-            _instanceCost);
-        HelixTaskResult result = new HelixTaskResult();
-        result.setSuccess(true);
-        return result;
-      } catch (Exception e) {
-        LOGGER.warn("Failed to handle query workload message: {}", _queryWorkloadName, e);
-        throw e;
-      }
-    }
-
-    @Override
-    public void onError(Exception e, ErrorCode errorCode, ErrorType errorType) {
-      LOGGER.error("Got error while refreshing query workload config for query workload: {} (error code: {},"
-          + " error type: {})", _queryWorkloadName, errorCode, errorType, e);
     }
   }
 }

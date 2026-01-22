@@ -32,6 +32,7 @@ import org.apache.helix.zookeeper.zkclient.exception.ZkException;
 import org.apache.pinot.common.metadata.ZKMetadataProvider;
 import org.apache.pinot.common.utils.config.TagNameUtils;
 import org.apache.pinot.common.utils.helix.HelixHelper;
+import org.apache.pinot.common.workload.WorkloadChangeListener;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.TenantConfig;
 import org.apache.pinot.spi.config.table.assignment.InstancePartitionsType;
@@ -169,11 +170,15 @@ public class InstancePartitionsUtils {
    * Persists the instance partitions to Helix property store.
    */
   public static void persistInstancePartitions(HelixPropertyStore<ZNRecord> propertyStore,
-      InstancePartitions instancePartitions) {
-    String path = ZKMetadataProvider.constructPropertyStorePathForInstancePartitions(
-        instancePartitions.getInstancePartitionsName());
+      InstancePartitions instancePartitions, @Nullable WorkloadChangeListener listener) {
+    String path = ZKMetadataProvider
+        .constructPropertyStorePathForInstancePartitions(instancePartitions.getInstancePartitionsName());
     if (!propertyStore.set(path, instancePartitions.toZNRecord(), AccessOption.PERSISTENT)) {
       throw new ZkException("Failed to persist instance partitions: " + instancePartitions);
+    }
+
+    if (listener != null) {
+      listener.onInstancePartitionsChanged(instancePartitions);
     }
   }
 

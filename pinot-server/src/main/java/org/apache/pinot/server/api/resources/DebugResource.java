@@ -22,8 +22,6 @@ import io.swagger.annotations.Api;
 import io.swagger.annotations.ApiKeyAuthDefinition;
 import io.swagger.annotations.ApiOperation;
 import io.swagger.annotations.ApiParam;
-import io.swagger.annotations.ApiResponse;
-import io.swagger.annotations.ApiResponses;
 import io.swagger.annotations.Authorization;
 import io.swagger.annotations.SecurityDefinition;
 import io.swagger.annotations.SwaggerDefinition;
@@ -50,7 +48,6 @@ import org.apache.pinot.common.restlet.resources.SegmentConsumerInfo;
 import org.apache.pinot.common.restlet.resources.SegmentErrorInfo;
 import org.apache.pinot.common.restlet.resources.SegmentServerDebugInfo;
 import org.apache.pinot.common.utils.DatabaseUtils;
-import org.apache.pinot.common.utils.WorkloadBudgetUtils;
 import org.apache.pinot.core.data.manager.offline.ImmutableSegmentDataManager;
 import org.apache.pinot.core.data.manager.realtime.RealtimeSegmentDataManager;
 import org.apache.pinot.core.data.manager.realtime.RealtimeSegmentMetadataUtils;
@@ -243,32 +240,5 @@ public class DebugResource {
                   upstreamLatest, recordsLagMap, availabilityLagMsMap));
     }
     return segmentConsumerInfo;
-  }
-
-  @GET
-  @Path("queryWorkloadCost/{workloadName}")
-  @ApiOperation(value = "Get instance cost information for a specific workload")
-  @ApiResponses(value = {
-      @ApiResponse(code = 200, message = "Success"),
-      @ApiResponse(code = 404, message = "Workload not found"),
-      @ApiResponse(code = 500, message = "Internal server error")
-  })
-  @Produces(MediaType.APPLICATION_JSON)
-  public String getWorkloadBudgetStats(
-      @ApiParam(value = "Name of the workload", required = true) @PathParam("workloadName") String workloadName
-  ) {
-    return WorkloadBudgetUtils.getWorkloadBudgetStats(workloadName, _instanceId);
-  }
-
-  @GET
-  @Path("queryWorkloadCost")
-  @ApiOperation(value = "Get instance cost information for all workloads")
-  @ApiResponses(value = {
-      @ApiResponse(code = 200, message = "Success"),
-      @ApiResponse(code = 500, message = "Internal server error")
-  })
-  @Produces(MediaType.APPLICATION_JSON)
-  public String getAllWorkloadBudgetStats() {
-    return WorkloadBudgetUtils.getAllWorkloadBudgetStats(_instanceId);
   }
 }

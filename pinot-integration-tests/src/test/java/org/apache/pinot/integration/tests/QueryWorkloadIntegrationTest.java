@@ -21,6 +21,7 @@ package org.apache.pinot.integration.tests;
 import com.fasterxml.jackson.databind.JsonNode;
 import java.io.File;
 import java.util.Collections;
+import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
@@ -35,6 +36,7 @@ import org.apache.pinot.spi.config.table.assignment.InstanceAssignmentConfig;
 import org.apache.pinot.spi.config.table.assignment.InstanceReplicaGroupPartitionConfig;
 import org.apache.pinot.spi.config.table.assignment.InstanceTagPoolConfig;
 import org.apache.pinot.spi.config.workload.EnforcementProfile;
+import org.apache.pinot.spi.config.workload.InstanceCost;
 import org.apache.pinot.spi.config.workload.NodeConfig;
 import org.apache.pinot.spi.config.workload.PropagationEntity;
 import org.apache.pinot.spi.config.workload.PropagationScheme;
@@ -49,6 +51,7 @@ import org.apache.pinot.spi.utils.builder.TableNameBuilder;
 import org.apache.pinot.util.TestUtils;
 import org.testng.annotations.AfterClass;
 import org.testng.annotations.BeforeClass;
+import org.testng.annotations.DataProvider;
 import org.testng.annotations.Test;
 
 import static org.testng.Assert.assertEquals;
@@ -218,6 +221,59 @@ public class QueryWorkloadIntegrationTest extends BaseClusterIntegrationTest {
     }
   }
 
+  @DataProvider(name = "instanceTypeProvider")
+  public Object[][] instanceTypeProvider() {
+    return new Object[][]{
+        {InstanceType.BROKER, new InstanceCost(1000000L, 1000000L), new InstanceCost(500000L, 500000L)},
+        {InstanceType.SERVER, new InstanceCost(2000000L, 2000000L), new InstanceCost(1000000L, 1000000L)}
+    };
+  }
+
+  @Test(dataProvider = "instanceTypeProvider")
+  public void testWorkloadResourcesOnInstances(InstanceType instanceType, InstanceCost cost1, InstanceCost cost2)
+      throws Exception {
+    Map<String, InstanceCost> workloadToCostMap = new HashMap<>();
+    workloadToCostMap.put("testWorkload1", cost1);
+    workloadToCostMap.put("testWorkload2", cost2);
+
+    Set<String> instances = getInstancesForTable(DEFAULT_TABLE_NAME, instanceType);
+
+    // Post the workload request to all instances
+    for (String instance : instances) {
+      String url = getBaseUrl(instance) + "/queryWorkloadConfigs";
+      sendPostRequest(url, JsonUtils.objectToString(workloadToCostMap));
+    }
+
+    try {
+      // Validate that the workloads are present on all instances
+      for (String instance : instances) {
+        String url = getBaseUrl(instance) + "/queryWorkloadConfigs";
+        String response = sendGetRequest(url);
+        JsonNode responseJson = JsonUtils.stringToJsonNode(response);
+        assertNotNull(responseJson);
+
+        for (JsonNode workloadNode : responseJson) {
+          String workloadName = workloadNode.get("workloadName").asText();
+          long cpuBudgetNs = workloadNode.get("cpuBudgetNs").asLong();
+          long memoryBudgetBytes = workloadNode.get("memoryBudgetBytes").asLong();
+          InstanceCost expectedCost = workloadToCostMap.get(workloadName);
+          assertNotNull(expectedCost, "Unexpected workload found on " + instanceType + ": " + workloadName);
+          assertEquals(cpuBudgetNs, expectedCost.getCpuCostNs(),
+              "Unexpected CPU budget for workload: " + workloadName);
+          assertEquals(memoryBudgetBytes, expectedCost.getMemoryCostBytes(),
+              "Unexpected Memory budget for workload: " + workloadName);
+        }
+      }
+    } finally {
+      // Clean up the workloads
+      String workloadNames = String.join(",", workloadToCostMap.keySet());
+      for (String instance : instances) {
+        String url = getBaseUrl(instance) + "/queryWorkloadConfigs" + "?workloadNames=" + workloadNames;
+        sendDeleteRequest(url);
+      }
+    }
+  }
+
   private void testWorkloadEnforcementWithBudgets(QueryWorkloadConfig workloadConfig, boolean expectRejection)
       throws Exception {
     String workloadName = workloadConfig.getQueryWorkloadName();
@@ -309,28 +365,23 @@ public class QueryWorkloadIntegrationTest extends BaseClusterIntegrationTest {
                                                   long expectedCpuBudgetNs, long expectedMemoryBudgetBytes)
       throws Exception {
     // Extract host from server instance name (format: Server_hostname_port)
-    String[] parts = instance.split("_");
-    String host = parts[1];
-
-    String baseUrl;
-    if (InstanceTypeUtils.isServer(instance)) {
-      baseUrl = "http://" + host + ":" + getServerAdminApiPort();
-    } else if (InstanceTypeUtils.isBroker(instance)) {
-      baseUrl = "http://" + host + ":" + parts[2];
-    } else {
-      throw new IllegalArgumentException("Instance is neither server nor broker: " + instance);
-    }
-    // Test the get specific workload endpoint (GET /queryWorkloadCost/{workloadName})
-    String getWorkloadUrl = baseUrl + "/debug/queryWorkloadCost/" + workloadName;
+    String getWorkloadUrl = getBaseUrl(instance) + "/queryWorkloadConfigs?workloadNames=" + workloadName;
     String workloadResponse = sendGetRequest(getWorkloadUrl);
 
     // Verify response is valid JSON and contains InstanceCost structure
     JsonNode workloadResponseJson = JsonUtils.stringToJsonNode(workloadResponse);
     assertNotNull(workloadResponseJson);
-    long actualCpuCostNs = workloadResponseJson.get("cpuBudgetNs").asLong();
-    long actualMemoryCostBytes = workloadResponseJson.get("memoryBudgetBytes").asLong();
-    assertEquals(actualCpuCostNs, expectedCpuBudgetNs);
-    assertEquals(actualMemoryCostBytes, expectedMemoryBudgetBytes);
+    for (JsonNode workloadNode : workloadResponseJson) {
+      String retrievedWorkloadName = workloadNode.get("workloadName").asText();
+      assertEquals(retrievedWorkloadName, workloadName, "Unexpected workload name on instance: " + instance);
+      long actualCpuCostNs = workloadNode.get("cpuBudgetNs").asLong();
+      long actualMemoryCostBytes = workloadNode.get("memoryBudgetBytes").asLong();
+      assertEquals(actualCpuCostNs, expectedCpuBudgetNs,
+          "Unexpected CPU budget for workload: " + workloadName + " on instance: " + instance);
+      assertEquals(actualMemoryCostBytes, expectedMemoryBudgetBytes,
+          "Unexpected Memory budget for workload: " + workloadName + " on instance: " + instance);
+      return;
+    }
   }
 
   /**
@@ -394,5 +445,21 @@ public class QueryWorkloadIntegrationTest extends BaseClusterIntegrationTest {
             null);
     return new InstanceAssignmentConfig(instanceTagPoolConfig,
         null, instanceReplicaGroupPartitionConfig, null, false);
+  }
+
+  private String getBaseUrl(String instance) {
+    // Extract host from server instance name (format: Server_hostname_port)
+    String[] parts = instance.split("_");
+    String host = parts[1];
+    String baseUrl;
+
+    if (InstanceTypeUtils.isServer(instance)) {
+      baseUrl = "http://" + host + ":" + getServerAdminApiPort();
+    } else if (InstanceTypeUtils.isBroker(instance)) {
+      baseUrl = "http://" + host + ":" + parts[2];
+    } else {
+      throw new IllegalArgumentException("Instance is neither server nor broker: " + instance);
+    }
+    return baseUrl;
   }
 }

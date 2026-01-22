@@ -18,24 +18,30 @@
  */
 package org.apache.pinot.controller.workload;
 
+import com.google.common.util.concurrent.ThreadFactoryBuilder;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.LinkedBlockingQueue;
+import java.util.concurrent.RejectedExecutionException;
+import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
-import java.util.concurrent.TimeoutException;
 import java.util.stream.Collectors;
-import org.apache.helix.ClusterMessagingService;
-import org.apache.helix.Criteria;
-import org.apache.helix.InstanceType;
+import javax.annotation.Nullable;
 import org.apache.helix.model.InstanceConfig;
-import org.apache.pinot.common.messages.QueryWorkloadRefreshMessage;
+import org.apache.pinot.common.assignment.InstancePartitions;
+import org.apache.pinot.common.metrics.ControllerMeter;
+import org.apache.pinot.common.metrics.ControllerMetrics;
+import org.apache.pinot.common.metrics.ControllerTimer;
 import org.apache.pinot.common.utils.config.QueryWorkloadConfigUtils;
 import org.apache.pinot.common.utils.config.TagNameUtils;
+import org.apache.pinot.common.workload.WorkloadChangeListener;
+import org.apache.pinot.controller.ControllerConf;
 import org.apache.pinot.controller.helix.core.PinotHelixResourceManager;
-import org.apache.pinot.controller.helix.core.util.MessagingServiceUtils;
 import org.apache.pinot.controller.workload.scheme.PropagationScheme;
 import org.apache.pinot.controller.workload.scheme.PropagationSchemeProvider;
 import org.apache.pinot.controller.workload.scheme.PropagationUtils;
@@ -65,23 +71,55 @@ import org.slf4j.LoggerFactory;
  * <ul>
  *   <li>Resolving instances based on node type and propagation scheme.</li>
  *   <li>Computing instance costs using a cost split strategy.</li>
- *   <li>Sending {@link QueryWorkloadRefreshMessage} updates to instances with their assigned costs.</li>
- *   <li>Handling workload deletions by propagating delete messages.</li>
+ *   <li>Sending HTTP refresh requests to instances with their assigned costs.</li>
+ *   <li>Handling workload deletions by propagating delete requests.</li>
  *   <li>Providing lookup APIs for workload costs per instance.</li>
  * </ul>
  */
-public class QueryWorkloadManager {
+public class QueryWorkloadManager implements WorkloadChangeListener {
   public static final Logger LOGGER = LoggerFactory.getLogger(QueryWorkloadManager.class);
 
+  private static final String WORKLOAD_EXECUTOR_THREAD_NAME_FORMAT = "workload-propagation-%d";
+  // Core dependencies for workload management
   private final PinotHelixResourceManager _pinotHelixResourceManager;
   private final PropagationSchemeProvider _propagationSchemeProvider;
   private final CostSplitter _costSplitter;
+  private final WorkloadPropagationClient _propagationClient;
+  // Dedicated executor pool for processing workload propagation
+  private final ExecutorService _queryWorkloadExecutor;
+  private final ControllerMetrics _controllerMetrics;
+  // This controls whether to propagate workloads on any (table/instance) change.
+  // TODO: Remove this check once we have fully rolled out query workload configs
+  private final boolean _enableInstanceChangePropagation;
+  private final boolean _enableBrokerChangePropagation;
 
-  public QueryWorkloadManager(PinotHelixResourceManager pinotHelixResourceManager) {
+
+  public QueryWorkloadManager(PinotHelixResourceManager pinotHelixResourceManager,
+                              ControllerConf controllerConf, ControllerMetrics controllerMetrics) {
+    // Initialize core dependencies
     _pinotHelixResourceManager = pinotHelixResourceManager;
     _propagationSchemeProvider = new PropagationSchemeProvider(pinotHelixResourceManager);
-    // TODO: To make this configurable once we have multiple cost splitters implementations
+    // TODO: Make cost splitter configurable once we have multiple implementations
     _costSplitter = new DefaultCostSplitter();
+    // Initialize executor for workload propagation tasks (high-level operations)
+    _queryWorkloadExecutor = createQueryWorkloadExecutor(controllerConf);
+    // Initialize propagation client for HTTP communication (creates its own executor for HTTP I/O)
+    _propagationClient = new WorkloadPropagationClient(pinotHelixResourceManager, controllerConf, controllerMetrics);
+    _enableInstanceChangePropagation = controllerConf.enableInstanceChangePropagation();
+    _enableBrokerChangePropagation = controllerConf.enableBrokerChangePropagation();
+    _controllerMetrics = controllerMetrics;
+    LOGGER.info("Initialized QueryWorkloadManager with instance change propagation: {}, broker change propagation: {}",
+        _enableInstanceChangePropagation, _enableBrokerChangePropagation);
+  }
+
+  private ExecutorService createQueryWorkloadExecutor(ControllerConf controllerConf) {
+    int workloadExecutorThreads = controllerConf.getControllerWorkloadExecutorThreads();
+    int queueSize = controllerConf.getControllerWorkloadExecutorQueueSize();
+    return new ThreadPoolExecutor(workloadExecutorThreads, workloadExecutorThreads,
+        60, TimeUnit.SECONDS,
+        new LinkedBlockingQueue<>(queueSize),
+        new ThreadFactoryBuilder().setNameFormat(WORKLOAD_EXECUTOR_THREAD_NAME_FORMAT).setDaemon(true).build(),
+        new ThreadPoolExecutor.AbortPolicy());
   }
 
   /**
@@ -94,25 +132,14 @@ public class QueryWorkloadManager {
    *   <li>Resolves the {@link PropagationScheme} from the node's configured scheme type.</li>
    *   <li>Computes the per-instance {@link InstanceCost} map using the configured
    *       {@link CostSplitter}.</li>
-   *   <li>Sends a {@link QueryWorkloadRefreshMessage} with subtype
-   *       {@link QueryWorkloadRefreshMessage#REFRESH_QUERY_WORKLOAD_MSG_SUB_TYPE} to each
-   *       instance with its computed cost.</li>
+   *   <li>Sends HTTP refresh requests to each instance with its computed cost.</li>
    * </ol>
    *
    * <p>
-   * This call is idempotent from the manager's perspective: the same inputs will result in the
-   * same set of messages being sent. Instances are expected to apply the new costs immediately.
-   * </p>
-   *
-   * <p>
    *  This call is atomic to the extent possible: if any error occurs during estimating the target instances
-   *  and their cost. The entire propagation is aborted and no partial updates are sent to any instances.
-   * </p>
-   *
-   * <p>
-   *  We rely on Helix reliable messaging to ensure message delivery to instances.
-   *  However, if an instance is down during the propagation, it will miss the update however, we have logic
-   *  on the instance side to fetch the latest workload configs from controller during startup.
+   *  and their cost. The entire propagation is aborted and no partial updates are sent to any instances. However,
+   *  if any error occurs during sending the HTTP requests, we do retry the propagation up to a configurable number of
+   *  times and if it still fails, we don't send delete requests to instances that were successfully updated.
    * </p>
    *
    * @param queryWorkloadConfig The workload definition (name, node types, budgets, and propagation
@@ -121,27 +148,39 @@ public class QueryWorkloadManager {
   public void propagateWorkloadUpdateMessage(QueryWorkloadConfig queryWorkloadConfig) {
     String queryWorkloadName = queryWorkloadConfig.getQueryWorkloadName();
     LOGGER.info("Propagating workload update for: {}", queryWorkloadName);
-
-    Map<String, QueryWorkloadRefreshMessage> instanceToRefreshMessageMap = new HashMap<>();
+    long startTime = System.currentTimeMillis();
+    // Track propagation call
+    _controllerMetrics.addMeteredTableValue(queryWorkloadName, ControllerMeter.QUERY_WORKLOAD_PROPAGATION_COUNT,
+        1L);
+    _controllerMetrics.addMeteredGlobalValue(ControllerMeter.QUERY_WORKLOAD_PROPAGATION_COUNT, 1L);
     try {
       Map<String, InstanceCost> workloadInstanceCostMap = new HashMap<>();
       for (NodeConfig nodeConfig: queryWorkloadConfig.getNodeConfigs()) {
         resolveInstanceCostMap(nodeConfig, workloadInstanceCostMap);
       }
-      Map<String, QueryWorkloadRefreshMessage> nodeToRefreshMessageMap = workloadInstanceCostMap.entrySet().stream()
-          .collect(Collectors.toMap(Map.Entry::getKey, entry -> new QueryWorkloadRefreshMessage(queryWorkloadName,
-              QueryWorkloadRefreshMessage.REFRESH_QUERY_WORKLOAD_MSG_SUB_TYPE, entry.getValue())));
-      instanceToRefreshMessageMap.putAll(nodeToRefreshMessageMap);
+      Map<String, QueryWorkloadRequest> instanceToRefreshRequestMap = workloadInstanceCostMap.entrySet().stream()
+          .collect(Collectors.toMap(Map.Entry::getKey, entry -> new QueryWorkloadRequest(
+              queryWorkloadName, entry.getValue())));
       // Sends the message only after all nodeConfigs are processed successfully
       // TODO: See if we also need to send a delete message message to entities that were previously targeted but
       //  are no longer targeted by the updated workload config.
-      sendQueryWorkloadRefreshMessage(instanceToRefreshMessageMap);
+      _propagationClient.sendQueryWorkloadMessage(instanceToRefreshRequestMap);
       LOGGER.info("Successfully propagated workload update for: {} to {} instances", queryWorkloadName,
-          instanceToRefreshMessageMap.size());
+          instanceToRefreshRequestMap.size());
     } catch (Exception e) {
+      // Track failure
+      _controllerMetrics.addMeteredTableValue(queryWorkloadName, ControllerMeter.QUERY_WORKLOAD_PROPAGATION_FAILED, 1L);
+      _controllerMetrics.addMeteredGlobalValue(ControllerMeter.QUERY_WORKLOAD_PROPAGATION_FAILED, 1L);
       String errorMsg = String.format("Failed to propagate workload update for: %s", queryWorkloadName);
       LOGGER.error(errorMsg, e);
       throw new RuntimeException(errorMsg, e);
+    } finally {
+      // Track propagation time
+      long duration = System.currentTimeMillis() - startTime;
+      _controllerMetrics.addTimedTableValue(queryWorkloadName, ControllerTimer.QUERY_WORKLOAD_PROPAGATE_TIME_MS,
+          duration, TimeUnit.MILLISECONDS);
+      _controllerMetrics.addTimedValue(ControllerTimer.QUERY_WORKLOAD_PROPAGATE_TIME_MS, duration,
+          TimeUnit.MILLISECONDS);
     }
   }
 
@@ -177,10 +216,9 @@ public class QueryWorkloadManager {
    * Propagates a delete for the given workload to all relevant instances.
    *
    * <p>
-   * The method resolves the target instances for each {@link NodeConfig} and sends a
-   * {@link QueryWorkloadRefreshMessage} with subtype
-   * {@link QueryWorkloadRefreshMessage#DELETE_QUERY_WORKLOAD_MSG_SUB_TYPE},
-   * which instructs the instance to remove local state associated with the workload and stop enforcing costs for it.
+   * The method resolves the target instances for each {@link NodeConfig} and sends HTTP
+   * delete requests to instruct instances to remove local state associated with the workload
+   * and stop enforcing costs for it.
    * </p>
    *
    * @param queryWorkloadConfig The workload to delete (only the name and node scoping are used).
@@ -188,7 +226,11 @@ public class QueryWorkloadManager {
   public void propagateDeleteWorkloadMessage(QueryWorkloadConfig queryWorkloadConfig) {
     String queryWorkloadName = queryWorkloadConfig.getQueryWorkloadName();
     LOGGER.info("Propagating workload delete for: {}", queryWorkloadName);
-    Map<String, QueryWorkloadRefreshMessage> instanceToDeleteMessageMap = new HashMap<>();
+    long startTime = System.currentTimeMillis();
+    _controllerMetrics.addMeteredTableValue(queryWorkloadName, ControllerMeter.QUERY_WORKLOAD_PROPAGATION_COUNT,
+        1L);
+    _controllerMetrics.addMeteredGlobalValue(ControllerMeter.QUERY_WORKLOAD_PROPAGATION_COUNT, 1L);
+    Map<String, QueryWorkloadRequest> instanceToDeleteRequestMap = new HashMap<>();
     try {
       for (NodeConfig nodeConfig : queryWorkloadConfig.getNodeConfigs()) {
         if (nodeConfig == null) {
@@ -200,68 +242,211 @@ public class QueryWorkloadManager {
           LOGGER.warn("No instances found for workload delete: {} with nodeConfig: {}", queryWorkloadName, nodeConfig);
           continue;
         }
-        QueryWorkloadRefreshMessage deleteMessage = new QueryWorkloadRefreshMessage(queryWorkloadName,
-            QueryWorkloadRefreshMessage.DELETE_QUERY_WORKLOAD_MSG_SUB_TYPE, null);
-        instanceToDeleteMessageMap.putAll(instances.stream()
-            .collect(Collectors.toMap(instance -> instance, instance -> deleteMessage)));
+        QueryWorkloadRequest deleteRequest = new QueryWorkloadRequest(queryWorkloadName, null);
+        instanceToDeleteRequestMap.putAll(instances.stream()
+            .collect(Collectors.toMap(instance -> instance, instance -> deleteRequest)));
       }
-      sendQueryWorkloadRefreshMessage(instanceToDeleteMessageMap);
+      _propagationClient.sendQueryWorkloadMessage(instanceToDeleteRequestMap);
       LOGGER.info("Successfully propagated workload delete for: {} to {} instances", queryWorkloadName,
-          instanceToDeleteMessageMap.size());
+          instanceToDeleteRequestMap.size());
     } catch (Exception e) {
+      _controllerMetrics.addMeteredTableValue(queryWorkloadName, ControllerMeter.QUERY_WORKLOAD_PROPAGATION_FAILED,
+          1L);
+      _controllerMetrics.addMeteredGlobalValue(ControllerMeter.QUERY_WORKLOAD_PROPAGATION_FAILED, 1L);
       String errorMsg = String.format("Failed to propagate workload delete for: %s", queryWorkloadName);
       LOGGER.error(errorMsg, e);
       throw new RuntimeException(errorMsg, e);
-    }
-  }
-
-  public void propagateWorkloadForTables(List<String> tablesAdded, List<String> tablesRemoved) {
-    Set<String> affectedTables = new HashSet<>();
-    if (tablesAdded != null) {
-      affectedTables.addAll(tablesAdded);
-    }
-    if (tablesRemoved != null) {
-      affectedTables.addAll(tablesRemoved);
-    }
-    for (String tableName : affectedTables) {
-        propagateWorkloadForTable(tableName);
+    } finally {
+      long duration = System.currentTimeMillis() - startTime;
+      _controllerMetrics.addTimedTableValue(queryWorkloadName, ControllerTimer.QUERY_WORKLOAD_PROPAGATE_TIME_MS,
+          duration, TimeUnit.MILLISECONDS);
+      _controllerMetrics.addTimedValue(ControllerTimer.QUERY_WORKLOAD_PROPAGATE_TIME_MS, duration,
+          TimeUnit.MILLISECONDS);
     }
   }
 
   /**
-   * Propagates workload updates for all workloads that apply to the given table.
+   * Propagates workload configurations for multiple tables efficiently.
+   * Deduplicates workloads that apply to multiple tables to avoid redundant propagation.
    *
-   * <p>
-   * This helper performs the following:
-   * </p>
-   * <ol>
-   *   <li>Fetches all {@link QueryWorkloadConfig}s from Zookeeper.</li>
-   *   <li>Resolves the Helix tags associated with the table (supports raw table names and
-   *       type-qualified names).</li>
-   *   <li>Filters the workload configs to those whose scope matches the table's tags.</li>
-   *   <li>Invokes {@link #propagateWorkloadUpdateMessage(QueryWorkloadConfig)} for each match.</li>
-   * </ol>
-   *
-   * <p>
-   * If no workloads are configured, the method returns immediately. Any exception encountered is
-   * logged and rethrown as a {@link RuntimeException}.
-   * </p>
-   *
-   * @param tableName The raw or type-qualified table name (e.g., {@code myTable} or
-   *                  {@code myTable_OFFLINE}).
-   * @throws RuntimeException If propagation fails due to Helix/ZK access or message dispatch
-   *                          errors.
+   * @param tableNames List of table names
+   * @param nodeType The node type (BROKER_NODE, SERVER_NODE, or null for both)
    */
-  public void propagateWorkloadForTable(String tableName) {
+  public void propagateWorkloadForTables(Set<String> tableNames, @Nullable NodeConfig.Type nodeType) {
+    if (nodeType == null) {
+      // Propagate to both broker and server nodes
+      propagateWorkloadForTables(tableNames, NodeConfig.Type.BROKER_NODE);
+      propagateWorkloadForTables(tableNames, NodeConfig.Type.SERVER_NODE);
+      return;
+    }
+    // Collect all unique helix tags from all tables
+    Set<String> allHelixTags = new HashSet<>();
+    for (String tableName : tableNames) {
+      try {
+        Set<String> helixTags = PropagationUtils.getHelixTagsForTable(_pinotHelixResourceManager, tableName, nodeType);
+        allHelixTags.addAll(helixTags);
+      } catch (Exception e) {
+        LOGGER.error("Failed to get helix tags for table: {}", tableName, e);
+      }
+    }
+    if (allHelixTags.isEmpty()) {
+      LOGGER.info("No helix tags found for tables: {}", tableNames);
+      return;
+    }
+    propagateWorkloadForHelixTags(allHelixTags);
+  }
+
+  /**
+   * Common helper method to propagate workload configurations based on Helix tags.
+   * Batches multiple workloads going to the same instance into a single message.
+   *
+   * @param helixTags Set of Helix tags to filter workload configs
+   */
+  private void propagateWorkloadForHelixTags(Set<String> helixTags) {
+    List<QueryWorkloadConfig> queryWorkloadConfigs = _pinotHelixResourceManager.getAllQueryWorkloadConfigs();
+    if (queryWorkloadConfigs.isEmpty()) {
+      return;
+    }
+    // Find all workloads associated with the helix tags
+    Set<QueryWorkloadConfig> queryWorkloadConfigsForTags =
+        PropagationUtils.getQueryWorkloadConfigsForTags(_pinotHelixResourceManager, helixTags, queryWorkloadConfigs);
+
+    if (queryWorkloadConfigsForTags.isEmpty()) {
+      LOGGER.info("No workload configs match {}, no propagation needed", helixTags);
+      return;
+    }
+    // Build a map of instance -> (set of workloadNames -> instanceCost) to batch workloads per instance
+    Map<String, Map<String, InstanceCost>> instanceToWorkloadCostMap = new HashMap<>();
+    int successCount = 0;
+    for (QueryWorkloadConfig queryWorkloadConfig : queryWorkloadConfigsForTags) {
+      try {
+        String queryWorkloadName = queryWorkloadConfig.getQueryWorkloadName();
+        Map<String, InstanceCost> workloadInstanceCostMap = new HashMap<>();
+        for (NodeConfig nodeConfig: queryWorkloadConfig.getNodeConfigs()) {
+          resolveInstanceCostMap(nodeConfig, workloadInstanceCostMap);
+        }
+        // Group by instance
+        for (Map.Entry<String, InstanceCost> entry : workloadInstanceCostMap.entrySet()) {
+          String instanceName = entry.getKey();
+          instanceToWorkloadCostMap.computeIfAbsent(instanceName, k -> new HashMap<>())
+              .put(queryWorkloadName, entry.getValue());
+        }
+        successCount++;
+      } catch (Exception e) {
+        LOGGER.error("Error processing workload config: {} for {}", queryWorkloadConfig.getQueryWorkloadName(),
+            helixTags, e);
+      }
+    }
+    // Convert to refresh requests and send
+    Map<String, QueryWorkloadRequest> instanceToRefreshRequestMap = new HashMap<>();
+    for (Map.Entry<String, Map<String, InstanceCost>> entry : instanceToWorkloadCostMap.entrySet()) {
+      instanceToRefreshRequestMap.put(entry.getKey(), new QueryWorkloadRequest(entry.getValue(), true));
+    }
+    // Send all requests
+    if (!instanceToRefreshRequestMap.isEmpty()) {
+      _propagationClient.sendQueryWorkloadMessage(instanceToRefreshRequestMap);
+      LOGGER.info("Successfully propagated {} workloads for {} to {} instances", successCount, helixTags,
+          instanceToRefreshRequestMap.size());
+    } else {
+      LOGGER.info("No instances to propagate workloads for {}", helixTags);
+    }
+  }
+
+  /**
+   * Computes the workload-to-cost mapping for a specific instance. This is used called by the broker/server
+   * during startup to load its assigned workloads and budgets.
+   *
+   * <p>
+   * This method iterates through all {@link QueryWorkloadConfig}s stored in Zookeeper and
+   * determines which workloads apply to the given instance. For each applicable workload, it
+   * computes the {@link InstanceCost} (CPU and memory budgets) assigned to that instance. The
+   * computation is based on the workload's {@link PropagationScheme} and the manager's
+   * {@link CostSplitter}.
+   * </p>
+   *
+   * <p>
+   * If the instance is not a recognized Pinot broker or server, or if its Helix configuration
+   * cannot be found, an empty map is returned and a warning is logged.
+   * </p>
+   *
+   * @param instanceName The Helix instance name (e.g., {@code Server_foo_8001} or
+   *                     {@code Broker_bar_8099}).
+   * @return A map from workload name to {@link InstanceCost} representing the budgets that apply
+   *         to the given instance for its role.
+   */
+  public Map<String, InstanceCost> getWorkloadToInstanceCostFor(String instanceName) {
+    Map<String, InstanceCost> workloadToInstanceCostMap = new HashMap<>();
+    long startTime = System.currentTimeMillis();
     try {
-      // Get the helixTags associated with the table
-      List<String> helixTags = PropagationUtils.getHelixTagsForTable(_pinotHelixResourceManager, tableName);
-      propagateWorkloadForHelixTags(helixTags, tableName);
+      _controllerMetrics.addMeteredGlobalValue(ControllerMeter.QUERY_WORKLOAD_COMPUTE_INSTANCE_COST_COUNT, 1L);
+      InstanceConfig instanceConfig = _pinotHelixResourceManager.getHelixInstanceConfig(instanceName);
+      if (instanceConfig == null) {
+        LOGGER.warn("InstanceConfig not found for instance: {}", instanceName);
+        return workloadToInstanceCostMap;
+      }
+      List<String> helixTags = instanceConfig.getTags();
+      if (helixTags.isEmpty()) {
+        LOGGER.warn("No helix tags found for instance: {}", instanceName);
+        return workloadToInstanceCostMap;
+      }
+      List<QueryWorkloadConfig> queryWorkloadConfigs = _pinotHelixResourceManager.getAllQueryWorkloadConfigs();
+      if (queryWorkloadConfigs.isEmpty()) {
+        LOGGER.warn("No query workload configs found in zookeeper");
+        return workloadToInstanceCostMap;
+      }
+      // Filter to only workloads that match this instance's tags - this is the key optimization
+      Set<QueryWorkloadConfig> relevantWorkloadConfigs =
+          PropagationUtils.getQueryWorkloadConfigsForTags(_pinotHelixResourceManager, new HashSet<>(helixTags),
+              queryWorkloadConfigs);
+      // Determine node type from instance name
+      NodeConfig.Type nodeType;
+      if (InstanceTypeUtils.isServer(instanceName)) {
+        nodeType = NodeConfig.Type.SERVER_NODE;
+      } else if (InstanceTypeUtils.isBroker(instanceName)) {
+        nodeType = NodeConfig.Type.BROKER_NODE;
+      } else {
+        LOGGER.warn("Instance {} is neither a server nor a broker", instanceName);
+        return workloadToInstanceCostMap;
+      }
+      // Iterate through relevant workloads and compute cost for this instance
+      for (QueryWorkloadConfig queryWorkloadConfig : relevantWorkloadConfigs) {
+        try {
+          List<String> errors = QueryWorkloadConfigUtils.validateQueryWorkloadConfig(queryWorkloadConfig);
+          if (!errors.isEmpty()) {
+            LOGGER.error("Invalid QueryWorkloadConfig: {}, errors: {}", queryWorkloadConfig, errors);
+            continue;
+          }
+          String queryWorkloadName = queryWorkloadConfig.getQueryWorkloadName();
+          for (NodeConfig nodeConfig : queryWorkloadConfig.getNodeConfigs()) {
+            if (nodeConfig.getNodeType() != nodeType) {
+              // Skip node configs that don't match this instance's type
+              continue;
+            }
+            Map<String, InstanceCost> instanceCostMap = new HashMap<>();
+            resolveInstanceCostMap(nodeConfig, instanceCostMap);
+            InstanceCost instanceCost = instanceCostMap.get(instanceName);
+            if (instanceCost != null) {
+              workloadToInstanceCostMap.put(queryWorkloadName, instanceCost);
+              break; // Found cost for this workload, move to next workload
+            }
+          }
+        } catch (Exception e) {
+          _controllerMetrics.addMeteredGlobalValue(ControllerMeter.QUERY_WORKLOAD_COMPUTE_INSTANCE_COST_FAILED, 1L);
+          LOGGER.error("Error computing cost for workload: {}", queryWorkloadConfig.getQueryWorkloadName(), e);
+          // Continue with other workloads instead of failing completely
+        }
+      }
+      LOGGER.info("Computed {} workload costs for instance: {}", workloadToInstanceCostMap.size(), instanceName);
+      return workloadToInstanceCostMap;
     } catch (Exception e) {
-      // TODO: Find a way to report partial success/failure
-      String errorMsg = String.format("Failed to propagate workload for table: %s", tableName);
+      _controllerMetrics.addMeteredGlobalValue(ControllerMeter.QUERY_WORKLOAD_COMPUTE_INSTANCE_COST_FAILED, 1L);
+      String errorMsg = String.format("Failed to compute workload costs for instance: %s", instanceName);
       LOGGER.error(errorMsg, e);
-      // Just log and return, we don't want to fail table operations due to workload propagation issues
+      throw new RuntimeException(errorMsg, e);
+    } finally {
+      long duration = System.currentTimeMillis() - startTime;
+      _controllerMetrics.addTimedValue(ControllerTimer.QUERY_WORKLOAD_COMPUTE_INSTANCE_COST_TIME_MS, duration,
+          TimeUnit.MILLISECONDS);
     }
   }
 
@@ -298,154 +483,8 @@ public class QueryWorkloadManager {
     } else if (TagNameUtils.isServerTag(tenantName)) {
       nodeType = NodeConfig.Type.SERVER_NODE;
     }
-    List<String> helixTags = PropagationUtils.getHelixTagsForTenant(tenantName, nodeType);
-    propagateWorkloadForHelixTags(helixTags, tenantName);
-  }
-
-  /**
-   * Common helper method to propagate workload configurations based on Helix tags.
-   *
-   * @param helixTags List of Helix tags to filter workload configs
-   * @param entityName Name of the entity for logging
-   */
-  private void propagateWorkloadForHelixTags(List<String> helixTags, String entityName) {
-    List<QueryWorkloadConfig> queryWorkloadConfigs = _pinotHelixResourceManager.getAllQueryWorkloadConfigs();
-    if (queryWorkloadConfigs.isEmpty()) {
-      return;
-    }
-    // Find all workloads associated with the helix tags
-    Set<QueryWorkloadConfig> queryWorkloadConfigsForTags =
-        PropagationUtils.getQueryWorkloadConfigsForTags(_pinotHelixResourceManager, helixTags, queryWorkloadConfigs);
-
-    if (queryWorkloadConfigsForTags.isEmpty()) {
-      LOGGER.info("No workload configs match {}, no propagation needed", entityName);
-      return;
-    }
-
-    // Propagate the workload for each QueryWorkloadConfig
-    int successCount = 0;
-    for (QueryWorkloadConfig queryWorkloadConfig : queryWorkloadConfigsForTags) {
-      try {
-        List<String> errors = QueryWorkloadConfigUtils.validateQueryWorkloadConfig(queryWorkloadConfig);
-        if (!errors.isEmpty()) {
-          LOGGER.error("Invalid QueryWorkloadConfig: {}: {}, errors: {}", queryWorkloadConfig, entityName, errors);
-          continue;
-        }
-        propagateWorkloadUpdateMessage(queryWorkloadConfig);
-        successCount++;
-      } catch (Exception e) {
-        LOGGER.error("Failed to propagate workload: {}: {}", queryWorkloadConfig.getQueryWorkloadName(),
-            entityName, e);
-        // Continue with other workloads instead of failing completely
-      }
-    }
-    LOGGER.info("Successfully propagated {} out of {} workloads for {}", successCount,
-        queryWorkloadConfigsForTags.size(), entityName);
-  }
-
-  /**
-   * Computes the effective workload costs for a specific instance.
-   *
-   * <p>
-   * The method infers the node type (broker or server) from the instance name, resolves the
-   * instance's Helix tags, and evaluates all configured workloads whose scope includes those tags.
-   * For each matching workload, the corresponding {@link InstanceCost} is computed using the
-   * workload's {@link PropagationScheme} and the manager's {@link CostSplitter}.
-   * </p>
-   *
-   * <p>
-   * If the instance is not a recognized Pinot broker or server, or if its Helix configuration
-   * cannot be found, an empty map is returned and a warning is logged.
-   * </p>
-   *
-   * @param instanceName The Helix instance name (e.g., {@code Server_foo_8001} or
-   *                     {@code Broker_bar_8099}).
-   * @return A map from workload name to {@link InstanceCost} representing the budgets that apply
-   *         to the given instance for its role.
-   */
-  public Map<String, InstanceCost> getWorkloadToInstanceCostFor(String instanceName) {
-    LOGGER.debug("Computing workload costs for instance: {}", instanceName);
-
-    Map<String, InstanceCost> workloadToInstanceCostMap = new HashMap<>();
-
-    try {
-      List<QueryWorkloadConfig> queryWorkloadConfigs = _pinotHelixResourceManager.getAllQueryWorkloadConfigs();
-      if (queryWorkloadConfigs.isEmpty()) {
-        LOGGER.warn("No query workload configs found in zookeeper");
-        return workloadToInstanceCostMap;
-      }
-
-      // Determine node type from instance name
-      NodeConfig.Type nodeType;
-      if (InstanceTypeUtils.isServer(instanceName)) {
-        nodeType = NodeConfig.Type.SERVER_NODE;
-      } else if (InstanceTypeUtils.isBroker(instanceName)) {
-        nodeType = NodeConfig.Type.BROKER_NODE;
-      } else {
-        LOGGER.warn("Unsupported instance type: {}, cannot compute workload costs", instanceName);
-        return workloadToInstanceCostMap;
-      }
-
-      // Find all helix tags for this instance
-      InstanceConfig instanceConfig = _pinotHelixResourceManager.getHelixInstanceConfig(instanceName);
-      if (instanceConfig == null) {
-        LOGGER.warn("Instance config not found for instance: {}", instanceName);
-        return workloadToInstanceCostMap;
-      }
-
-      List<String> instanceTags = instanceConfig.getTags();
-      if (instanceTags.isEmpty()) {
-        LOGGER.warn("No tags found for instance: {}, cannot compute workload costs", instanceName);
-        return workloadToInstanceCostMap;
-      }
-
-      // Filter workloads by the instance's tags
-      Set<QueryWorkloadConfig> queryWorkloadConfigsForTags =
-          PropagationUtils.getQueryWorkloadConfigsForTags(_pinotHelixResourceManager, instanceTags,
-              queryWorkloadConfigs);
-
-      if (queryWorkloadConfigsForTags.isEmpty()) {
-        LOGGER.debug("No workload configs match instance: {}", instanceName);
-        return workloadToInstanceCostMap;
-      }
-
-      // For each workload, aggregate contributions across all applicable nodeConfigs and propagation entities
-      for (QueryWorkloadConfig queryWorkloadConfig : queryWorkloadConfigsForTags) {
-        String queryWorkloadName = queryWorkloadConfig.getQueryWorkloadName();
-        for (NodeConfig nodeConfig : queryWorkloadConfig.getNodeConfigs()) {
-          try {
-            if (nodeConfig.getNodeType() == nodeType) {
-              List<String> errors = QueryWorkloadConfigUtils.validateQueryWorkloadConfig(queryWorkloadConfig);
-              if (!errors.isEmpty()) {
-                LOGGER.error("Invalid QueryWorkloadConfig: {} for instance: {}, errors: {}", queryWorkloadConfig,
-                    instanceName, errors);
-                continue;
-              }
-              Map<String, InstanceCost> instanceCostMap = new HashMap<>();
-              resolveInstanceCostMap(nodeConfig, instanceCostMap);
-              InstanceCost instanceCost = instanceCostMap.get(instanceName);
-              if (instanceCost != null) {
-                workloadToInstanceCostMap.put(queryWorkloadName, instanceCost);
-                LOGGER.info("Found workload cost for instance: {} workload: {} cost: {}",
-                    instanceName, queryWorkloadName, instanceCost);
-              }
-              // There should be only one matching nodeConfig (BROKER_NODE or SERVER_NODE) within a workload
-              break;
-            }
-          } catch (Exception e) {
-            LOGGER.error("Failed to compute instance cost for instance: {} workload: {}",
-                instanceName, queryWorkloadName, e);
-            // Continue with other workloads instead of failing completely
-          }
-        }
-      }
-      LOGGER.info("Computed {} workload costs for instance: {}", workloadToInstanceCostMap.size(), instanceName);
-      return workloadToInstanceCostMap;
-    } catch (Exception e) {
-      String errorMsg = String.format("Failed to compute workload costs for instance: %s", instanceName);
-      LOGGER.error(errorMsg, e);
-      throw new RuntimeException(errorMsg, e);
-    }
+    Set<String> helixTags = PropagationUtils.getHelixTagsForTenant(tenantName, nodeType);
+    propagateWorkloadForHelixTags(helixTags);
   }
 
   private Set<String> resolveInstances(NodeConfig nodeConfig) {
@@ -466,81 +505,84 @@ public class QueryWorkloadManager {
     return instances;
   }
 
-  /**
-   * Sends the provided map of {@link QueryWorkloadRefreshMessage} to their corresponding
-   * instances asynchronously.
-   *
-   * <p>
-   * Enqueuing messages one instance at a time proved to be slow—on larger clusters it
-   * could take close to a minute. Since Helix messaging does not support a batch API
-   * for targeting an arbitrary set of N instances, we parallelize the enqueue step by
-   * dispatching async tasks per instance.
-   * </p>
-   *
-   * <p>
-   * Each message is enqueued in its own asynchronous task, and the method waits for all tasks to queued
-   * with a overall timeout of 60 seconds. Success and failure counts are logged.
-   * </p>
-   *
-   * @param instanceToRefreshMessageMap A map from instance name to the {@link QueryWorkloadRefreshMessage} to send.
-   */
-  public void sendQueryWorkloadRefreshMessage(Map<String, QueryWorkloadRefreshMessage> instanceToRefreshMessageMap) {
-    // TODO: Explore if messages can be sent directly using server API and bypass Helix messaging,
-    //  to improve performance when messages are targeted to specific instances.
-    ClusterMessagingService messagingService = _pinotHelixResourceManager.getHelixZkManager().getMessagingService();
-    List<CompletableFuture<Boolean>> futures = instanceToRefreshMessageMap.entrySet().stream()
-      .map(entry -> CompletableFuture.supplyAsync(() -> {
-        String instance = entry.getKey();
-        QueryWorkloadRefreshMessage message = entry.getValue();
-        try {
-          Criteria criteria = new Criteria();
-          criteria.setRecipientInstanceType(InstanceType.PARTICIPANT);
-          criteria.setInstanceName(instance);
-          criteria.setSessionSpecific(true);
-          int numMessagesSent = MessagingServiceUtils.send(messagingService, message, criteria);
-          if (numMessagesSent > 0) {
-            LOGGER.info("Sent {} query workload config refresh messages to instance: {}", numMessagesSent, instance);
-            return true;
-          } else {
-            LOGGER.warn("No query workload config refresh message sent to instance: {}", instance);
-            return false;
-          }
-        } catch (Exception e) {
-          LOGGER.error("Error sending message to instance: {}", instance, e);
-          return false;
-        }
-      }))
-      .collect(Collectors.toList());
-
-    // Collect results with overall timeout of 1 minute for all tasks
+  @Override
+  public void onInstancePartitionsChanged(InstancePartitions instancePartitions) {
+    _controllerMetrics.addMeteredGlobalValue(ControllerMeter.QUERY_WORKLOAD_LISTENER_CHANGES_COUNT, 1L);
+    if (!_enableInstanceChangePropagation) {
+      return;
+    }
+    String instancePartitionsName = instancePartitions.getInstancePartitionsName();
+    LOGGER.info("Instance partitions changed for: {}, triggering workload propagation", instancePartitionsName);
     try {
-      CompletableFuture<Void> allFutures = CompletableFuture.allOf(futures.toArray(new CompletableFuture[0]));
-      allFutures.get(60, TimeUnit.SECONDS); // Overall timeout for all tasks
-      // Collect individual results (all should be completed by now)
-      List<Boolean> results = futures.stream()
-        .map(future -> {
-          try {
-            return future.get(); // No timeout needed since allOf already completed
-          } catch (Exception e) {
-            LOGGER.warn("Error getting result for query workload refresh message", e);
-            return false;
-          }
-        })
-        .collect(Collectors.toList());
-
-      long successCount = results.stream().filter(Boolean::booleanValue).count();
-      LOGGER.info("Query workload refresh completed: {}/{} successful", successCount,
-          instanceToRefreshMessageMap.size());
-    } catch (TimeoutException e) {
-      // Count completed tasks
-      long completedCount = futures.stream()
-        .mapToLong(future -> future.isDone() && !future.isCancelled() ? 1 : 0)
-        .sum();
-      LOGGER.warn("Query workload refresh partial completion: {}/{} tasks finished", completedCount,
-          instanceToRefreshMessageMap.size());
+      Set<String> helixTags = getHelixTagsFromInstancePartitions(instancePartitions);
+      if (!helixTags.isEmpty()) {
+        CompletableFuture.runAsync(() -> propagateWorkloadForHelixTags(helixTags), _queryWorkloadExecutor)
+            .exceptionally(ex -> {
+              LOGGER.error("Error propagating workload for instance partitions: {}", instancePartitionsName, ex);
+              return null;
+            });
+      }
     } catch (Exception e) {
-      LOGGER.error("Error collecting results from query workload refresh", e);
-      throw new RuntimeException("Error collecting results from query workload refresh", e);
+      if (e instanceof RejectedExecutionException) {
+        LOGGER.warn("Workload propagation queue full - cannot propagate for instance partitions change: {}. ",
+            instancePartitionsName, e);
+      }
+      LOGGER.warn("Error handling instance partitions change for: {}", instancePartitionsName, e);
+    }
+  }
+
+  private Set<String> getHelixTagsFromInstancePartitions(InstancePartitions instancePartitions) {
+    Set<String> helixTags = new HashSet<>();
+    Set<String> instances = instancePartitions.getInstanceToPartitionIdMap().keySet();
+    for (String instanceName : instances) {
+      try {
+        InstanceConfig instanceConfig = _pinotHelixResourceManager.getHelixInstanceConfig(instanceName);
+        if (instanceConfig != null) {
+          List<String> tags = instanceConfig.getTags();
+          helixTags.addAll(tags);
+          // TODO: This assumes that all instances in the instance partitions have the same helix tag types. See if
+          // can remove this assumption. The easiest is querying all instances but maybe expensive.
+          break;
+        }
+      } catch (Exception e) {
+        LOGGER.warn("Failed to get instance config for: {}", instanceName, e);
+      }
+    }
+    return helixTags;
+  }
+
+  @Override
+  public void onBrokerResourceChanged(@Nullable List<String> tablesAdded, @Nullable List<String> tablesRemoved) {
+    try {
+      _controllerMetrics.addMeteredGlobalValue(ControllerMeter.QUERY_WORKLOAD_LISTENER_CHANGES_COUNT, 1L);
+      if ((tablesAdded == null && tablesRemoved == null) || !_enableBrokerChangePropagation) {
+        return;
+      }
+      LOGGER.info("Broker resource changed - tables added: {}, removed: {}, triggering workload propagation",
+          tablesAdded, tablesRemoved);
+      Set<String> allTables = new HashSet<>();
+      if (tablesAdded != null) {
+        allTables.addAll(tablesAdded);
+      }
+      if (tablesRemoved != null) {
+        allTables.addAll(tablesRemoved);
+      }
+      CompletableFuture.runAsync(() ->
+        propagateWorkloadForTables(allTables, NodeConfig.Type.BROKER_NODE), _queryWorkloadExecutor)
+      .exceptionally(ex -> {
+        LOGGER.error("Error propagating workload for broker resource change - tables added: {}, removed: {}",
+            tablesAdded, tablesRemoved, ex);
+        return null;
+      });
+    } catch (Exception e) {
+      if (e instanceof RejectedExecutionException) {
+        _controllerMetrics.addMeteredGlobalValue(ControllerMeter.QUERY_WORKLOAD_REQUEST_DROPPED, 1L);
+        LOGGER.warn("Workload propagation queue full - cannot propagate for broker resource change: "
+            + "tables added: {}, removed: {}.", tablesAdded, tablesRemoved, e);
+      } else {
+        LOGGER.warn("Error handling broker resource change for tables added: {}, removed: {}",
+            tablesAdded, tablesRemoved, e);
+      }
     }
   }
 }

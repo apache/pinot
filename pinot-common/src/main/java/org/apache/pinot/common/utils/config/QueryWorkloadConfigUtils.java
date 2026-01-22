@@ -40,7 +40,6 @@ import org.apache.helix.PropertyKey;
 import org.apache.helix.zookeeper.datamodel.ZNRecord;
 import org.apache.pinot.common.exception.HttpErrorStatusException;
 import org.apache.pinot.common.helix.ExtraInstanceConfig;
-import org.apache.pinot.common.messages.QueryWorkloadRefreshMessage;
 import org.apache.pinot.common.utils.SimpleHttpResponse;
 import org.apache.pinot.common.utils.http.HttpClient;
 import org.apache.pinot.common.utils.http.HttpClientConfig;
@@ -67,7 +66,7 @@ public class QueryWorkloadConfigUtils {
 
   private static final Logger LOGGER = org.slf4j.LoggerFactory.getLogger(QueryWorkloadConfigUtils.class);
   private static final HttpClient HTTP_CLIENT = new HttpClient(HttpClientConfig.DEFAULT_HTTP_CLIENT_CONFIG,
-          TlsUtils.getSslContext());
+      TlsUtils.getSslContext());
   private static final Random RANDOM = new Random();
 
   /**
@@ -109,31 +108,6 @@ public class QueryWorkloadConfigUtils {
     }
   }
 
-  public static void updateZNRecordWithInstanceCost(ZNRecord znRecord, String queryWorkloadName,
-      InstanceCost instanceCost) {
-    Preconditions.checkNotNull(znRecord, "ZNRecord cannot be null");
-    Preconditions.checkNotNull(instanceCost, "InstanceCost cannot be null");
-    try {
-      znRecord.setSimpleField(QueryWorkloadRefreshMessage.QUERY_WORKLOAD_NAME, queryWorkloadName);
-      znRecord.setSimpleField(QueryWorkloadRefreshMessage.INSTANCE_COST, JsonUtils.objectToString(instanceCost));
-    } catch (Exception e) {
-      String errorMessage = String.format("Failed to convert InstanceCost : %s to ZNRecord",
-          instanceCost);
-      throw new RuntimeException(errorMessage, e);
-    }
-  }
-
-  public static InstanceCost getInstanceCostFromZNRecord(ZNRecord znRecord) {
-    Preconditions.checkNotNull(znRecord, "ZNRecord cannot be null");
-    String instanceCostJson = znRecord.getSimpleField(QueryWorkloadRefreshMessage.INSTANCE_COST);
-    Preconditions.checkNotNull(instanceCostJson, "InstanceCost cannot be null");
-    try {
-      return JsonUtils.stringToObject(instanceCostJson, InstanceCost.class);
-    } catch (Exception e) {
-      String errorMessage = String.format("Failed to convert ZNRecord : %s to InstanceCost", znRecord);
-      throw new RuntimeException(errorMessage, e);
-    }
-  }
 
   /**
    * Gets a random controller URL by dynamically discovering all live controller instances from Helix.
@@ -448,36 +422,5 @@ public class QueryWorkloadConfigUtils {
       return 0L;
     }
     return value;
-  }
-
-  /**
-   * Handles a query workload refresh message by updating or deleting the workload budget.
-   * This method is used by both broker and server message handlers.
-   */
-  public static void handleWorkloadRefreshMessage(String instanceId, String workloadName, String messageType,
-      InstanceCost instanceCost) {
-    WorkloadBudgetManager workloadBudgetManager = WorkloadBudgetManagerFactory.get();
-    if (workloadBudgetManager == null) {
-      String errorMsg = "WorkloadBudgetManager not initialized for instance: " + instanceId
-          + ". Failed to handle query workload message: " + workloadName;
-      LOGGER.error(errorMsg);
-      throw new IllegalStateException(errorMsg);
-    }
-
-    if (messageType.equals(QueryWorkloadRefreshMessage.DELETE_QUERY_WORKLOAD_MSG_SUB_TYPE)) {
-      workloadBudgetManager.deleteWorkload(workloadName);
-      LOGGER.info("Deleted workload: {} on instance: {}", workloadName, instanceId);
-    } else if (messageType.equals(QueryWorkloadRefreshMessage.REFRESH_QUERY_WORKLOAD_MSG_SUB_TYPE)) {
-      if (instanceCost == null) {
-        throw new IllegalStateException(
-            "Instance cost is not provided for refreshing query workload: " + workloadName);
-      }
-      workloadBudgetManager.addOrUpdateWorkload(workloadName, instanceCost.getCpuCostNs(),
-          instanceCost.getMemoryCostBytes());
-      LOGGER.info("Refreshed workload: {} on instance: {} with cpuCostNs: {}, memoryCostBytes: {}",
-          workloadName, instanceId, instanceCost.getCpuCostNs(), instanceCost.getMemoryCostBytes());
-    } else {
-      throw new IllegalStateException("Unknown message type: " + messageType);
-    }
   }
 }
