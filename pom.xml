@@ -110,7 +110,22 @@
   <properties>
     <pinot.root>${basedir}</pinot.root>
     <build.profile.id>dev</build.profile.id>
-    <jdk.version>11</jdk.version>
+    <!--
+      By default, the release version is JDK 21.
+      Some projects designed to be used as libraries for external JVMs (like the jdbc driver or the spark connectors)
+      must set their jdk.version to 11 (or whatever they need to support).
+      They also must set jdk.test.version to that same version to be sure test are executed with that version.
+
+      In case these external libraries depend on other internal libraries (ie pinot-common), those libraries need to
+      define jdk.version to the same version as well to avoid compilation issues, but can keep their jdk.test.version
+      to 21 in case they use test dependencies that require so (like pinot-avro).
+
+      This means the internal libraries will be compiled but not verified to be compatible with the lower jdk version.
+      It is the **external library** responsibility to verify that all codepaths of the internal libraries are
+      compatible with the lower jdk version.
+    -->
+    <jdk.version>21</jdk.version>
+    <jdk.test.version>21</jdk.test.version>
     <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
 
     <!-- Setting maven.compiler flags to the jdk version. These are used by maven plugins like maven-javadoc-plugin -->
@@ -2297,6 +2312,9 @@
               -Xshare:off
               -XX:+EnableDynamicAgentLoading
             </argLine>
+            <jdkToolchain>
+              <version>${jdk.test.version}</version>
+            </jdkToolchain>
           </configuration>
           <!-- Explicitly select the test provider, instead of relying on the classpath -->
           <dependencies>
@@ -2402,7 +2420,7 @@
             <release>${jdk.version}</release>
             <source>${jdk.version}</source>
             <target>${jdk.version}</target>
-            <fork>true</fork>
+<!--            <fork>true</fork>-->
             <encoding>${project.build.sourceEncoding}</encoding>
             <annotationProcessorPaths>
               <path>
@@ -2424,6 +2442,25 @@
                 <version>${immutables.version}</version>
               </path>
             </annotationProcessorPaths>
+          </configuration>
+        </plugin>
+        <plugin>
+          <groupId>org.apache.maven.plugins</groupId>
+          <artifactId>maven-toolchains-plugin</artifactId>
+          <version>1.1</version>
+          <executions>
+            <execution>
+              <goals>
+                <goal>toolchain</goal>
+              </goals>
+            </execution>
+          </executions>
+          <configuration>
+            <toolchains>
+              <jdk>
+                <version>${jdk.version}</version>
+              </jdk>
+            </toolchains>
           </configuration>
         </plugin>
         <plugin>
@@ -2590,6 +2627,9 @@
           </excludes>
           <forkCount>1</forkCount>
           <reuseForks>false</reuseForks>
+          <jdkToolchain>
+            <version>${jdk.test.version}</version>
+          </jdkToolchain>
         </configuration>
         <executions>
           <execution>

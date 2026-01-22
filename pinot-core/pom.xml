@@ -31,6 +31,8 @@
   <url>https://pinot.apache.org/</url>
   <properties>
     <pinot.root>${basedir}/..</pinot.root>
+    <jdk.version>11</jdk.version>
+    <jdk.test.version>21</jdk.test.version>
   </properties>
 
   <dependencies>

@@ -49,6 +49,8 @@ import org.apache.pinot.spi.utils.builder.ControllerRequestURLBuilder;
  *
  * <p>It should be provided with a specified {@link ControllerRequestURLBuilder} for constructing the URL requests
  * as well as a reusable {@link HttpClient} during construction.
+ *
+ * TODO: This should be moved to an external project in order to allow clients to use JDKs older than 21
  */
 public class ControllerRequestClient {
   private final HttpClient _httpClient;
