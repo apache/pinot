@@ -75,8 +75,6 @@ public class DateTimeUtils {
   public static final class DateTimeZoneIndex {
     private static final DateTimeZone[] DATE_TIME_ZONES;
     private static final ISOChronology[] CHRONOLOGIES;
-    private static final int[] FIXED_ZONE_OFFSET;
-    private static final int VARIABLE_ZONE = Integer.MAX_VALUE;
 
     private DateTimeZoneIndex() {
     }
@@ -92,7 +90,6 @@ public class DateTimeUtils {
     static {
       DATE_TIME_ZONES = new DateTimeZone[TimeZoneKey.MAX_TIME_ZONE_KEY + 1];
       CHRONOLOGIES = new ISOChronology[TimeZoneKey.MAX_TIME_ZONE_KEY + 1];
-      FIXED_ZONE_OFFSET = new int[TimeZoneKey.MAX_TIME_ZONE_KEY + 1];
       for (TimeZoneKey timeZoneKey : TimeZoneKey.getTimeZoneKeys()) {
         short zoneKey = timeZoneKey.getKey();
         DateTimeZone dateTimeZone;
@@ -104,11 +101,6 @@ public class DateTimeUtils {
         }
         DATE_TIME_ZONES[zoneKey] = dateTimeZone;
         CHRONOLOGIES[zoneKey] = ISOChronology.getInstance(dateTimeZone);
-        if (dateTimeZone.isFixed() && dateTimeZone.getOffset(0) % 60_000 == 0) {
-          FIXED_ZONE_OFFSET[zoneKey] = dateTimeZone.getOffset(0) / 60_000;
-        } else {
-          FIXED_ZONE_OFFSET[zoneKey] = VARIABLE_ZONE;
-        }
       }
     }
   }

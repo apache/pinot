@@ -25,6 +25,7 @@ import com.google.protobuf.ByteString;
 import com.google.protobuf.InvalidProtocolBufferException;
 import io.grpc.ConnectivityState;
 import io.grpc.Deadline;
+import io.grpc.netty.shaded.io.netty.handler.ssl.SslContext;
 import java.io.DataInputStream;
 import java.io.InputStream;
 import java.time.Duration;
@@ -59,6 +60,8 @@ import org.apache.pinot.common.response.broker.QueryProcessingException;
 import org.apache.pinot.common.response.broker.ResultTable;
 import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.common.utils.DataSchema.ColumnDataType;
+import org.apache.pinot.common.utils.grpc.ServerGrpcQueryClient;
+import org.apache.pinot.core.instance.context.BrokerContext;
 import org.apache.pinot.core.transport.ServerInstance;
 import org.apache.pinot.core.util.DataBlockExtractUtils;
 import org.apache.pinot.core.util.trace.TracedThreadFactory;
@@ -106,6 +109,8 @@ public class QueryDispatcher {
   private final Map<String, DispatchClient> _dispatchClientMap = new ConcurrentHashMap<>();
   @Nullable
   private final TlsConfig _tlsConfig;
+  @Nullable
+  private final SslContext _clientGrpcSslContext;
   // maps broker-generated query id to the set of servers that the query was dispatched to
   private final Map<Long, Set<QueryServerInstance>> _serversByQuery;
   private final FailureDetector _failureDetector;
@@ -118,6 +123,7 @@ public class QueryDispatcher {
     _executorService = Executors.newFixedThreadPool(2 * Runtime.getRuntime().availableProcessors(),
         new TracedThreadFactory(Thread.NORM_PRIORITY, false, PINOT_BROKER_QUERY_DISPATCHER_FORMAT));
     _tlsConfig = tlsConfig;
+    _clientGrpcSslContext = initClientSslContext(tlsConfig);
     _failureDetector = failureDetector;
 
     if (enableCancellation) {
@@ -510,7 +516,7 @@ public class QueryDispatcher {
     String hostname = queryServerInstance.getHostname();
     int port = queryServerInstance.getQueryServicePort();
     return _dispatchClientMap.computeIfAbsent(toHostnamePortKey(hostname, port),
-        k -> new DispatchClient(hostname, port, _tlsConfig));
+        k -> new DispatchClient(hostname, port, _tlsConfig, _clientGrpcSslContext));
   }
 
   /**
@@ -532,6 +538,20 @@ public class QueryDispatcher {
     return String.format("%s_%d", hostname, port);
   }
 
+  @Nullable
+  private static SslContext initClientSslContext(@Nullable TlsConfig tlsConfig) {
+    if (tlsConfig == null) {
+      return null;
+    }
+    BrokerContext brokerContext = BrokerContext.getInstance();
+    SslContext sslContext = brokerContext.getClientGrpcSslContext();
+    if (sslContext != null) {
+      return sslContext;
+    }
+    SslContext built = ServerGrpcQueryClient.buildSslContext(tlsConfig);
+    brokerContext.setClientGrpcSslContext(built);
+    return built;
+  }
   /// Concatenates the results of the sub-plan and returns a [QueryResult] with the concatenated result.
   /// [QueryThreadContext] must already be set up before calling this method.
   @VisibleForTesting

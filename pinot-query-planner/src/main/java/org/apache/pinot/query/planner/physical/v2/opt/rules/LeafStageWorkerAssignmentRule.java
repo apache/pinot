@@ -584,7 +584,9 @@ public class LeafStageWorkerAssignmentRule extends PRelOptRule {
     Map<String, String> tableOptions = getTableOptions(tableScan.getHints());
 
     // Step 1: Get LogicalTableRouteInfo using LogicalTableRouteProvider
-    LogicalTableRouteProvider tableRouteProvider = new LogicalTableRouteProvider();
+    // Use MultiClusterRoutingContext if available to support logical tables with physical tables from remote clusters
+    LogicalTableRouteProvider tableRouteProvider =
+        new LogicalTableRouteProvider(_physicalPlannerContext.getMultiClusterRoutingContext());
     LogicalTableRouteInfo logicalTableRouteInfo = new LogicalTableRouteInfo();
     tableRouteProvider.fillTableConfigMetadata(logicalTableRouteInfo, logicalTableName, _tableCache);
     tableRouteProvider.fillRouteMetadata(logicalTableRouteInfo, _routingManager);
