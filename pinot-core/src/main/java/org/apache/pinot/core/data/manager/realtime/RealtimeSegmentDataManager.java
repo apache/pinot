@@ -1521,7 +1521,7 @@ public class RealtimeSegmentDataManager extends SegmentDataManager {
                 && _realtimeTableDataManager.getTableUpsertMetadataManager() != null) {
               UpsertContext context = _realtimeTableDataManager.getTableUpsertMetadataManager().getContext();
               if (_realtimeTableDataManager.isPartialUpsertEnabled() || context.isDropOutOfOrderRecord()
-                  || context.isOutOfOrderRecordColumn()) {
+                  || context.getOutOfOrderRecordColumn() != null) {
                 _serverMetrics.addMeteredTableValue(_clientId, ServerMeter.REALTIME_ROWS_AHEAD_OF_ZK, 1L);
               }
             }

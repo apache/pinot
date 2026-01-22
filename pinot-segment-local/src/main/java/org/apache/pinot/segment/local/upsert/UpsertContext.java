@@ -31,9 +31,11 @@ import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.UpsertConfig;
 import org.apache.pinot.spi.data.Schema;
 import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 
 public class UpsertContext {
+  private static final Logger LOGGER = LoggerFactory.getLogger(UpsertContext.class);
   private final TableConfig _tableConfig;
   private final Schema _schema;
   private final List<String> _primaryKeyColumns;
@@ -65,7 +67,6 @@ public class UpsertContext {
   @Nullable
   private final TableDataManager _tableDataManager;
   private final File _tableIndexDir;
-  private static final Logger LOGGER = org.slf4j.LoggerFactory.getLogger(UpsertContext.class);
   private UpsertContext(TableConfig tableConfig, Schema schema, List<String> primaryKeyColumns,
       HashFunction hashFunction, List<String> comparisonColumns, @Nullable PartialUpsertHandler partialUpsertHandler,
       @Nullable String deleteRecordColumn, boolean dropOutOfOrderRecord, @Nullable String outOfOrderRecordColumn,
@@ -132,16 +133,12 @@ public class UpsertContext {
   }
 
   public boolean isDropOutOfOrderRecord() {
-    return _dropOutOfOrderRecord && _consistencyMode == UpsertConfig.ConsistencyMode.NONE;
+    return _dropOutOfOrderRecord;
   }
 
   @Nullable
   public String getOutOfOrderRecordColumn() {
     return _outOfOrderRecordColumn;
-  }
-
-  public boolean isOutOfOrderRecordColumn() {
-    return _outOfOrderRecordColumn != null && _consistencyMode == UpsertConfig.ConsistencyMode.NONE;
   }
 
   public boolean isSnapshotEnabled() {

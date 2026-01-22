@@ -675,14 +675,15 @@ public abstract class BasePartitionUpsertMetadataManager implements PartitionUps
       MutableRoaringBitmap validDocIdsForOldSegment, String segmentName) {
     int numKeysNotReplaced = validDocIdsForOldSegment.getCardinality();
     boolean isConsumingSegmentSeal = !(oldSegment instanceof ImmutableSegment);
-    // For partial-upsert table and upsert table with dropOutOfOrder=true & consistencyMode = NONE, we do not store
-    // the previous record location when removing the primary keys not replaced, it can potentially cause inconsistency
-    // between replicas. This can happen when a consuming segment is replaced by a committed segment that is consumed
-    // from a different server with different records (some stream consumer cannot guarantee consuming the messages in
-    // the same order/ when a segment is replaced with lesser consumed rows from the other server).
-    if (isConsumingSegmentSeal && (_context.isDropOutOfOrderRecord() || _context.isOutOfOrderRecordColumn())) {
+    // For partial-upsert table and upsert table with dropOutOfOrderRecord=true or outOfOrderRecordColumn set,
+    // we do not store the previous record location and removing all the primary keys not replaced. This can potentially
+    // cause inconsistency between replicas when a consuming segment is replaced by a committed segment that is
+    // consumed from a different server with different records (some stream consumers cannot guarantee consuming
+    // messages in the same order, or when a segment is replaced with fewer consumed rows from another server).
+    // To avoid such inconsistencies, we store the previous locations to revert back to
+    if (isConsumingSegmentSeal && (_context.isDropOutOfOrderRecord() || _context.getOutOfOrderRecordColumn() != null)) {
       _logger.warn("Found {} primary keys not replaced when sealing consuming segment: {} for upsert table with "
-              + "dropOutOfOrder enabled with no consistency mode. This can potentially cause inconsistency "
+              + "dropOutOfOrderRecord or outOfOrderRecordColumn enabled. This can potentially cause inconsistency "
               + "between replicas. Reverting back metadata changes and triggering segment replacement.",
           numKeysNotReplaced,
           segmentName);
@@ -734,7 +735,7 @@ public abstract class BasePartitionUpsertMetadataManager implements PartitionUps
                 + "Proceeding with current state which may cause inconsistency.", MAX_UPSERT_REVERT_RETRIES,
             segmentName,
             numKeysStillNotReplaced);
-        if (_context.isOutOfOrderRecordColumn() || _context.isDropOutOfOrderRecord()) {
+        if (_context.isDropOutOfOrderRecord() || _context.getOutOfOrderRecordColumn() != null) {
           _serverMetrics.addMeteredTableValue(_tableNameWithType, ServerMeter.REALTIME_UPSERT_INCONSISTENT_ROWS,
               numKeysStillNotReplaced);
         } else if (_partialUpsertHandler != null) {
