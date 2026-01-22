@@ -21,6 +21,7 @@ package org.apache.pinot.spi.data;
 import com.fasterxml.jackson.annotation.JsonIgnore;
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.databind.annotation.JsonDeserialize;
 import com.fasterxml.jackson.databind.node.ArrayNode;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 import com.google.common.base.Preconditions;
@@ -62,6 +63,7 @@ import org.slf4j.LoggerFactory;
  */
 @SuppressWarnings("unused")
 @JsonIgnoreProperties(ignoreUnknown = true)
+@JsonDeserialize(using = SchemaDeserializer.class)
 public final class Schema implements Serializable {
   private static final Logger LOGGER = LoggerFactory.getLogger(Schema.class);
 
