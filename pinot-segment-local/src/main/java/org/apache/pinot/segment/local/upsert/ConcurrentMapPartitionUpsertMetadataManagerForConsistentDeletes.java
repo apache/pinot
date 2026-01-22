@@ -346,8 +346,8 @@ public class ConcurrentMapPartitionUpsertMetadataManagerForConsistentDeletes
             RecordLocation prevLocation = _previousKeyToRecordLocationMap.get(primaryKey);
             if (forceCommitReloadMode == ConsumingSegmentCommitModeProvider.Mode.PROTECTED
                 && segment instanceof MutableSegment && _context.hasInconsistentTableConfigs() && prevLocation != null
-                && (prevLocation.getSegment() instanceof MutableSegment) || _trackedSegments.contains(
-                prevLocation.getSegment())) {
+                && (prevLocation.getSegment() instanceof MutableSegment || _trackedSegments.contains(
+                prevLocation.getSegment()))) {
               // Revert to previous immutable segment location
               IndexSegment prevSegment = prevLocation.getSegment();
               ThreadSafeMutableRoaringBitmap prevValidDocIds = prevSegment.getValidDocIds();
