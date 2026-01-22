@@ -664,9 +664,10 @@ public abstract class BasePartitionUpsertMetadataManager implements PartitionUps
       if (shouldRevertMetadataOnInconsistency(oldSegment)) {
         // If there are still valid docs in the old segment, validate and revert the metadata of the
         // consuming segment in place
-        revertSegmentUpsertMetadata(segment, validDocIds, queryableDocIds, oldSegment, segmentName,
-            validDocIdsForOldSegment);
+        revertSegmentUpsertMetadata(oldSegment, segmentName, validDocIdsForOldSegment);
         return;
+      } else {
+        logInconsistentResults(segmentName, validDocIdsForOldSegment.getCardinality());
       }
       removeSegment(oldSegment, validDocIdsForOldSegment);
     }
@@ -688,9 +689,8 @@ public abstract class BasePartitionUpsertMetadataManager implements PartitionUps
   /**
    * Reverts segment upsert metadata and retries addOrReplaceSegment.
    */
-  protected void revertSegmentUpsertMetadata(ImmutableSegment segment,
-      @Nullable ThreadSafeMutableRoaringBitmap validDocIds, @Nullable ThreadSafeMutableRoaringBitmap queryableDocIds,
-      IndexSegment oldSegment, String segmentName, MutableRoaringBitmap validDocIdsForOldSegment) {
+  protected void revertSegmentUpsertMetadata(IndexSegment oldSegment, String segmentName,
+      MutableRoaringBitmap validDocIdsForOldSegment) {
     // Revert the keys in the segment to previous location and remove the newly added keys
     removeSegment(oldSegment, validDocIdsForOldSegment);
     if (getPrevKeyToRecordLocationSize() == 0) {
@@ -699,16 +699,20 @@ public abstract class BasePartitionUpsertMetadataManager implements PartitionUps
     }
     int numKeysStillNotReplaced = getPrevKeyToRecordLocationSize();
     if (numKeysStillNotReplaced > 0) {
-      _logger.error("Found {} primary keys still not replaced for segment: {}. "
-          + "Proceeding with current state which may cause inconsistency.", numKeysStillNotReplaced, segmentName);
-      if (_context.isDropOutOfOrderRecord() && _context.getConsistencyMode() == UpsertConfig.ConsistencyMode.NONE) {
-        _serverMetrics.addMeteredTableValue(_tableNameWithType, ServerMeter.REALTIME_UPSERT_INCONSISTENT_ROWS,
-            numKeysStillNotReplaced);
-      } else if (_partialUpsertHandler != null) {
-        _serverMetrics.addMeteredTableValue(_tableNameWithType, ServerMeter.PARTIAL_UPSERT_KEYS_NOT_REPLACED,
-            numKeysStillNotReplaced);
-      }
+      logInconsistentResults(segmentName, numKeysStillNotReplaced);
       removeSegment(oldSegment, validDocIdsForOldSegment);
+    }
+  }
+
+  protected void logInconsistentResults(String segmentName, int numKeysStillNotReplaced) {
+    _logger.error("Found {} primary keys still not replaced for segment: {}. "
+        + "Proceeding with current state which may cause inconsistency.", numKeysStillNotReplaced, segmentName);
+    if (_context.isDropOutOfOrderRecord() && _context.getConsistencyMode() == UpsertConfig.ConsistencyMode.NONE) {
+      _serverMetrics.addMeteredTableValue(_tableNameWithType, ServerMeter.REALTIME_UPSERT_INCONSISTENT_ROWS,
+          numKeysStillNotReplaced);
+    } else if (_partialUpsertHandler != null) {
+      _serverMetrics.addMeteredTableValue(_tableNameWithType, ServerMeter.PARTIAL_UPSERT_KEYS_NOT_REPLACED,
+          numKeysStillNotReplaced);
     }
   }
 

@@ -289,9 +289,10 @@ public class ConcurrentMapPartitionUpsertMetadataManagerForConsistentDeletes
       }
       if (validDocIdsForOldSegment != null && !validDocIdsForOldSegment.isEmpty()) {
         if (shouldRevertMetadataOnInconsistency(segment)) {
-          revertSegmentUpsertMetadata(segment, validDocIds, queryableDocIds, oldSegment, segmentName,
-              validDocIdsForOldSegment);
+          revertSegmentUpsertMetadata(oldSegment, segmentName, validDocIdsForOldSegment);
           return;
+        } else {
+          logInconsistentResults(segmentName, validDocIdsForOldSegment.getCardinality());
         }
       }
       // we want to always remove a segment in case of enableDeletedKeysCompactionConsistency = true
