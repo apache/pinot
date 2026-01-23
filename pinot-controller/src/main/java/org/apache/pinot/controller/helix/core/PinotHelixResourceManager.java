@@ -4955,14 +4955,14 @@ public class PinotHelixResourceManager {
       return new WatermarkInductionResult.Watermark(status.getPartitionGroupId(), seq, startOffset);
     }).collect(Collectors.toList());
 
-    Map<Long, Long> partGroupToLatestSeq = watermarks.stream().collect(
+    Map<Integer, Integer> partGroupToLatestSeq = watermarks.stream().collect(
         Collectors.toMap(WatermarkInductionResult.Watermark::getPartitionGroupId,
             WatermarkInductionResult.Watermark::getSequenceNumber));
     List<String> historicalSegments = new ArrayList<>();
     for (String segment : idealState.getRecord().getMapFields().keySet()) {
       LLCSegmentName llcSegmentName = LLCSegmentName.of(segment);
       if (llcSegmentName != null) {
-        long partitionGroupId = llcSegmentName.getPartitionGroupId();
+        int partitionGroupId = llcSegmentName.getPartitionGroupId();
         int seq = llcSegmentName.getSequenceNumber();
         if (partGroupToLatestSeq.containsKey(partitionGroupId) && partGroupToLatestSeq.get(partitionGroupId) == seq) {
           continue;
