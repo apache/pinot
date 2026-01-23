@@ -824,8 +824,9 @@ public abstract class BaseTableDataManager implements TableDataManager {
         // winner selection could incorrectly favor replicas with fewer consumed rows.
         // This triggered unnecessary reconsumption and resulted in inconsistent upsert state.
         // The new fix restores and correct segment metadata after inconsistencies are noticed.
-        // To toggle, existing Force commit behavior dynamically use the cluster config
-        // `pinot.server.consuming.segment.commit.mode` to change it to PROTECTED for safer reload.
+        // To toggle, existing Force commit behavior dynamically change the cluster config
+        // `pinot.server.consuming.segment.commit.mode` to PROTECTED for safer reload. This doesn't
+        // need a server restart
         TableConfig tableConfig = indexLoadingConfig.getTableConfig();
         UpsertInconsistentStateConfig config = UpsertInconsistentStateConfig.getInstance();
         if (tableConfig != null && config.isForceCommitReloadAllowed()) {

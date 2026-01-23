@@ -25,7 +25,7 @@ import org.slf4j.LoggerFactory;
 
 
 /**
- * Provider for accessing the current ForceCommitReloadMode from anywhere in the codebase.
+ * Provider for accessing the current Consuming segment Commit Mode from anywhere in the codebase.
  * This allows pinot-segment-local to access the dynamically configured mode without
  * depending on pinot-core.
  *
@@ -35,10 +35,6 @@ public final class ConsumingSegmentCommitModeProvider {
   private static final Logger LOGGER = LoggerFactory.getLogger(ConsumingSegmentCommitModeProvider.class);
   private static final Supplier<Mode> DEFAULT_SUPPLIER = () -> Mode.NONE;
 
-  /**
-   * Enum defining the reload behavior for upsert tables with inconsistent state configurations
-   * (partial upsert or dropOutOfOrderRecord=true with consistency mode NONE and replication > 1).
-   */
   public enum Mode {
     /**
      * Reload is disabled for tables with inconsistent state configurations.
@@ -55,7 +51,7 @@ public final class ConsumingSegmentCommitModeProvider {
     /**
      * Reload is enabled for all tables regardless of their configuration.
      * Use with caution as this may cause data inconsistency for partial-upsert tables
-     * or upsert tables with dropOutOfOrderRecord enabled when replication > 1.
+     * or upsert tables with dropOutOfOrderRecord/ outOfOrderRecordColumn enabled when replication > 1.
      * Inconsistency checks and metadata revert are skipped.
      */
     UNSAFE(true);
@@ -66,24 +62,14 @@ public final class ConsumingSegmentCommitModeProvider {
       _reloadEnabled = reloadEnabled;
     }
 
-    /**
-     * Returns whether reload operations are enabled for this mode.
-     * For NONE, returns false; for PROTECTED and UNSAFE, returns true.
-     */
     public boolean isReloadEnabled() {
       return _reloadEnabled;
     }
 
-    /**
-     * Returns whether this mode is UNSAFE, which bypasses inconsistent state checks.
-     */
     public boolean isUnsafe() {
       return this == UNSAFE;
     }
 
-    /**
-     * Returns whether this mode is PROTECTED, which reverts metadata on inconsistencies.
-     */
     public boolean isProtected() {
       return this == PROTECTED;
     }
@@ -128,13 +114,6 @@ public final class ConsumingSegmentCommitModeProvider {
   private ConsumingSegmentCommitModeProvider() {
   }
 
-  /**
-   * Registers the supplier that provides the current Mode.
-   * Should be called during server/controller startup.
-   * Logs a warning if called multiple times (e.g., in tests).
-   *
-   * @param modeSupplier the supplier to register
-   */
   public static void register(Supplier<Mode> modeSupplier) {
     if (_registered) {
       LOGGER.warn("ConsumingSegmentCommitModeProvider already registered, overwriting previous supplier");
@@ -143,17 +122,10 @@ public final class ConsumingSegmentCommitModeProvider {
     _registered = true;
   }
 
-  /**
-   * Returns the current Mode from the registered supplier.
-   */
   public static Mode getMode() {
     return _modeSupplier.get();
   }
 
-  /**
-   * Resets the provider to its default state.
-   * This is intended for testing purposes only.
-   */
   @VisibleForTesting
   public static void reset() {
     _modeSupplier = DEFAULT_SUPPLIER;

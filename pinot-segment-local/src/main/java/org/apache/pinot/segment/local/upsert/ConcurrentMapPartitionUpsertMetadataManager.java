@@ -116,14 +116,15 @@ public class ConcurrentMapPartitionUpsertMetadataManager extends BasePartitionUp
                       validDocIdsForOldSegment.remove(currentDocId);
                     }
                   }
-                  if (_context.hasInconsistentTableConfigs()) {
+                  if (_context.hasInconsistentTableConfigs() && currentSegment instanceof MutableSegment) {
                     _previousKeyToRecordLocationMap.remove(primaryKey);
                   }
                   return new RecordLocation(segment, newDocId, newComparisonValue);
                 } else {
                   RecordLocation prevRecordLocation = _previousKeyToRecordLocationMap.get(primaryKey);
-                  if (_context.hasInconsistentTableConfigs() && (prevRecordLocation == null
-                      || newComparisonValue.compareTo(prevRecordLocation.getComparisonValue()) >= 0)) {
+                  if (_context.hasInconsistentTableConfigs() && currentSegment instanceof MutableSegment && (
+                      prevRecordLocation == null
+                          || newComparisonValue.compareTo(prevRecordLocation.getComparisonValue()) >= 0)) {
                     RecordLocation newRecordLocation = new RecordLocation(segment, newDocId, newComparisonValue);
                     _previousKeyToRecordLocationMap.put(primaryKey, newRecordLocation);
                   }
@@ -172,6 +173,13 @@ public class ConcurrentMapPartitionUpsertMetadataManager extends BasePartitionUp
                 }
                 return newRecordLocation;
               } else {
+                RecordLocation prevRecordLocation = _previousKeyToRecordLocationMap.get(primaryKey);
+                if (_context.hasInconsistentTableConfigs() && currentSegment instanceof MutableSegment
+                    && prevRecordLocation == null
+                    || newComparisonValue.compareTo(prevRecordLocation.getComparisonValue()) >= 0) {
+                  RecordLocation newRecordLocation = new RecordLocation(segment, newDocId, newComparisonValue);
+                  _previousKeyToRecordLocationMap.put(primaryKey, newRecordLocation);
+                }
                 return currentRecordLocation;
               }
             } else {
