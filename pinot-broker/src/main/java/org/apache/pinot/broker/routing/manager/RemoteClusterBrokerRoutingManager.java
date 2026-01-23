@@ -96,19 +96,28 @@ public class RemoteClusterBrokerRoutingManager extends BaseBrokerRoutingManager 
 
   private void addRouting(String table) {
     LOGGER.info("Adding routing for table: {} in cluster: {}", table, _remoteClusterName);
-    if (ZKMetadataProvider.isLogicalTableExists(_propertyStore, table)) {
-      buildRoutingForLogicalTable(table);
-    } else {
-      buildRouting(table);
+    try {
+      if (ZKMetadataProvider.isLogicalTableExists(_propertyStore, table)) {
+        buildRoutingForLogicalTable(table);
+      } else {
+        buildRouting(table);
+      }
+    } catch (Exception e) {
+      LOGGER.error("Caught exception while adding routing for table: {} in cluster: {}", table, _remoteClusterName, e);
     }
   }
 
   private void dropRouting(String table) {
     LOGGER.info("Dropping routing for table: {} in cluster: {}", table, _remoteClusterName);
-    if (ZKMetadataProvider.isLogicalTableExists(_propertyStore, table)) {
-      removeRoutingForLogicalTable(table);
-    } else {
-      removeRouting(table);
+    try {
+      if (ZKMetadataProvider.isLogicalTableExists(_propertyStore, table)) {
+        removeRoutingForLogicalTable(table);
+      } else {
+        removeRouting(table);
+      }
+    } catch (Exception e) {
+      LOGGER.error("Caught exception while dropping routing for table: {} in cluster: {}", table, _remoteClusterName,
+        e);
     }
   }
 
