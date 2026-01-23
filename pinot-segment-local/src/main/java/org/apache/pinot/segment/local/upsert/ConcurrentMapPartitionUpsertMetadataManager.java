@@ -206,7 +206,7 @@ public class ConcurrentMapPartitionUpsertMetadataManager extends BasePartitionUp
       _primaryKeyToRecordLocationMap.computeIfPresent(HashUtils.hashPrimaryKey(primaryKey, _hashFunction),
           (pk, recordLocation) -> {
             if (recordLocation.getSegment() == segment) {
-              if (_context.hasInconsistentTableConfigs()) {
+              if (_context.hasInconsistentTableConfigs() && segment instanceof MutableSegment) {
                 _previousKeyToRecordLocationMap.remove(pk);
               }
               return null;
@@ -226,9 +226,9 @@ public class ConcurrentMapPartitionUpsertMetadataManager extends BasePartitionUp
       _primaryKeyToRecordLocationMap.computeIfPresent(HashUtils.hashPrimaryKey(primaryKey, _hashFunction),
           (pk, recordLocation) -> {
             RecordLocation prevLocation = _previousKeyToRecordLocationMap.get(primaryKey);
-            if (segment instanceof MutableSegment && recordLocation.getSegment() == segment && prevLocation != null && (
-                prevLocation.getSegment() instanceof MutableSegment || _trackedSegments.contains(
-                    prevLocation.getSegment()))) {
+            if (segment instanceof MutableSegment && recordLocation.getSegment() == segment && prevLocation != null
+                && !(prevLocation.getSegment() instanceof MutableSegment || _trackedSegments.contains(
+                prevLocation.getSegment()))) {
               // Revert to previous immutable segment location
               IndexSegment prevSegment = prevLocation.getSegment();
               ThreadSafeMutableRoaringBitmap prevValidDocIds = prevSegment.getValidDocIds();
@@ -253,10 +253,7 @@ public class ConcurrentMapPartitionUpsertMetadataManager extends BasePartitionUp
                 return null;
               }
             } else if (recordLocation.getSegment() == segment) {
-              // New key in the segment
-              if (segment instanceof MutableSegment) {
-                _previousKeyToRecordLocationMap.remove(primaryKey);
-              }
+              _previousKeyToRecordLocationMap.remove(primaryKey);
               return null;
             }
             return recordLocation;

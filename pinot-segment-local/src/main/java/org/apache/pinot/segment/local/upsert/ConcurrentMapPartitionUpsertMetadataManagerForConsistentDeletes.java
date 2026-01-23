@@ -256,7 +256,11 @@ public class ConcurrentMapPartitionUpsertMetadataManagerForConsistentDeletes
 
   protected void removeSegment(IndexSegment segment, MutableRoaringBitmap validDocIds) {
     try (PrimaryKeyReader primaryKeyReader = new PrimaryKeyReader(segment, _primaryKeyColumns)) {
-      revertAndRemoveSegment(segment, UpsertUtils.getRecordIterator(primaryKeyReader, validDocIds));
+      if (shouldRevertMetadataOnInconsistency(segment)) {
+        revertAndRemoveSegment(segment, UpsertUtils.getRecordIterator(primaryKeyReader, validDocIds));
+      } else {
+        removeSegment(segment, UpsertUtils.getPrimaryKeyIterator(primaryKeyReader, validDocIds));
+      }
     } catch (Exception e) {
       throw new RuntimeException(
           String.format("Caught exception while removing segment: %s, table: %s, message: %s", segment.getSegmentName(),
@@ -315,7 +319,7 @@ public class ConcurrentMapPartitionUpsertMetadataManagerForConsistentDeletes
       _primaryKeyToRecordLocationMap.computeIfPresent(HashUtils.hashPrimaryKey(primaryKey, _hashFunction),
           (pk, recordLocation) -> {
             if (recordLocation.getSegment() == segment) {
-              if (_context.hasInconsistentTableConfigs()) {
+              if (_context.hasInconsistentTableConfigs() && segment instanceof MutableSegment) {
                 _previousKeyToRecordLocationMap.remove(pk);
               }
               return null;
@@ -345,10 +349,9 @@ public class ConcurrentMapPartitionUpsertMetadataManagerForConsistentDeletes
       _primaryKeyToRecordLocationMap.computeIfPresent(HashUtils.hashPrimaryKey(primaryKey, _hashFunction),
           (pk, recordLocation) -> {
             RecordLocation prevLocation = _previousKeyToRecordLocationMap.get(primaryKey);
-            if (forceCommitReloadMode == ConsumingSegmentCommitModeProvider.Mode.PROTECTED
-                && segment instanceof MutableSegment && _context.hasInconsistentTableConfigs() && prevLocation != null
-                && (prevLocation.getSegment() instanceof MutableSegment || _trackedSegments.contains(
-                prevLocation.getSegment()))) {
+            if (recordLocation.getSegment() == segment && prevLocation != null && !(
+                prevLocation.getSegment() instanceof MutableSegment || _trackedSegments.contains(
+                    prevLocation.getSegment()))) {
               // Revert to previous immutable segment location
               IndexSegment prevSegment = prevLocation.getSegment();
               ThreadSafeMutableRoaringBitmap prevValidDocIds = prevSegment.getValidDocIds();
@@ -378,9 +381,7 @@ public class ConcurrentMapPartitionUpsertMetadataManagerForConsistentDeletes
                 return null;
               }
             } else if (recordLocation.getSegment() == segment) {
-              if (_context.hasInconsistentTableConfigs() && segment instanceof MutableSegment) {
-                _previousKeyToRecordLocationMap.remove(primaryKey);
-              }
+              _previousKeyToRecordLocationMap.remove(primaryKey);
               return null;
             }
             if (!uniquePrimaryKeys.add(pk)) {
