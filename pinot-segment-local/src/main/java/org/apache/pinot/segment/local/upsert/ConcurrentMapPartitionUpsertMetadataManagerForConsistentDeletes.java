@@ -45,7 +45,6 @@ import org.apache.pinot.segment.spi.MutableSegment;
 import org.apache.pinot.segment.spi.index.mutable.ThreadSafeMutableRoaringBitmap;
 import org.apache.pinot.spi.data.readers.GenericRow;
 import org.apache.pinot.spi.data.readers.PrimaryKey;
-import org.apache.pinot.spi.utils.ConsumingSegmentCommitModeProvider;
 import org.roaringbitmap.buffer.MutableRoaringBitmap;
 
 
@@ -341,7 +340,6 @@ public class ConcurrentMapPartitionUpsertMetadataManagerForConsistentDeletes
     // as the occurrence of the key in this segment is being removed. We are taking a set of unique primary keys
     // to avoid double counting the same key in the same segment.
     Set<Object> uniquePrimaryKeys = new HashSet<>();
-    ConsumingSegmentCommitModeProvider.Mode forceCommitReloadMode = ConsumingSegmentCommitModeProvider.getMode();
     while (primaryKeyIterator.hasNext()) {
       Map.Entry<Integer, PrimaryKey> primaryKeyEntry = primaryKeyIterator.next();
       PrimaryKey primaryKey = primaryKeyEntry.getValue();
