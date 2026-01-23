@@ -30,6 +30,7 @@ import org.apache.pinot.core.data.manager.realtime.RealtimeSegmentDataManager;
 import org.apache.pinot.core.data.manager.realtime.RealtimeTableDataManager;
 import org.apache.pinot.segment.local.data.manager.SegmentDataManager;
 import org.apache.pinot.segment.local.data.manager.TableDataManager;
+import org.apache.pinot.spi.stream.StreamMetadataProvider;
 import org.apache.pinot.spi.stream.StreamPartitionMsgOffset;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -72,6 +73,8 @@ public abstract class IngestionBasedConsumptionStatusChecker {
       }
       Set<String> consumingSegments = tableSegments.getValue();
       Set<String> caughtUpSegments = _caughtUpSegmentsByTable.computeIfAbsent(tableNameWithType, k -> new HashSet<>());
+      boolean skipSegments = false;
+
       for (String segName : consumingSegments) {
         if (caughtUpSegments.contains(segName)) {
           continue;
@@ -94,7 +97,21 @@ public abstract class IngestionBasedConsumptionStatusChecker {
             continue;
           }
           RealtimeSegmentDataManager rtSegmentDataManager = (RealtimeSegmentDataManager) segmentDataManager;
-          if (isSegmentCaughtUp(segName, rtSegmentDataManager, (RealtimeTableDataManager) tableDataManager)) {
+          RealtimeTableDataManager realtimeTableDataManager = (RealtimeTableDataManager) tableDataManager;
+
+          StreamMetadataProvider streamMetadataProvider =
+              realtimeTableDataManager.getStreamMetadataProvider(rtSegmentDataManager);
+
+          if (!skipSegments && !streamMetadataProvider.supportsOffsetLag()) {
+            // Cannot conclude if segment has caught up or not. Skip such segments.
+            _logger.warn(
+                "Stream provider for table: {} does not support offset subtraction. Cannot conclude if the segment "
+                    + "has caught up. Skipping the segments.",
+                realtimeTableDataManager.getTableName());
+            skipSegments = true;
+          }
+
+          if (skipSegments || isSegmentCaughtUp(segName, rtSegmentDataManager, realtimeTableDataManager)) {
             caughtUpSegments.add(segName);
           }
         } finally {

@@ -81,15 +81,6 @@ public class FreshnessBasedConsumptionStatusChecker extends IngestionBasedConsum
     StreamMetadataProvider streamMetadataProvider =
         realtimeTableDataManager.getStreamMetadataProvider(rtSegmentDataManager);
 
-    if (!streamMetadataProvider.supportsOffsetLag()) {
-      // Cannot conclude if segment has caught up or not. Skip such segments.
-      _logger.warn(
-          "Stream provider for segment: {} does not support offset subtraction. Current offset: {}. Cannot conclude "
-              + "if the segment has caught up. Skipping the segment.",
-          segmentName, currentOffset);
-      return true;
-    }
-
     StreamPartitionMsgOffset latestStreamOffset =
         RealtimeSegmentMetadataUtils.fetchLatestStreamOffset(rtSegmentDataManager, streamMetadataProvider);
 
