@@ -101,7 +101,10 @@ public class TableReplicator {
         _pinotHelixResourceManager);
     observer.onTrigger(TableReplicationObserver.Trigger.START_TRIGGER, null);
     ConcurrentLinkedQueue<String> q = new ConcurrentLinkedQueue<>(segments);
-    for (int i = 0; i < 4; i++) {
+    int parallelism = copyTablePayload.getBackfillParallism() != null
+        ? copyTablePayload.getBackfillParallism()
+        : res.getWatermarks().size();
+    for (int i = 0; i < parallelism; i++) {
       _executorService.submit(() -> {
         while (true) {
           String segment = q.poll();
