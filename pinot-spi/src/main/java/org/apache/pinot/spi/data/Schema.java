@@ -842,20 +842,165 @@ public final class Schema implements Serializable {
    * @param oldSchema old schema
    */
   public boolean isBackwardCompatibleWith(Schema oldSchema) {
-    Set<String> columnNames = getColumnNames();
+    return checkBackwardCompatibilityWithDetails(oldSchema).isCompatible();
+  }
+
+  /**
+   * Check backward compatibility with detailed error reporting.
+   *
+   * This method provides comprehensive information about schema incompatibilities
+   * to help developers understand and fix schema evolution issues.
+   *
+   * @param oldSchema old schema to compare against
+   * @return SchemaCompatibilityResult with detailed error information
+   */
+  public SchemaCompatibilityResult checkBackwardCompatibilityWithDetails(Schema oldSchema) {
+    List<SchemaCompatibilityResult.IncompatibilityIssue> issues = new ArrayList<>();
+    Set<String> newSchemaColumnNames = getColumnNames();
+
+    // Check each column in the old schema
     for (Map.Entry<String, FieldSpec> entry : oldSchema.getFieldSpecMap().entrySet()) {
       String oldSchemaColumnName = entry.getKey();
-      if (!columnNames.contains(oldSchemaColumnName)) {
-        return false;
-      }
       FieldSpec oldSchemaFieldSpec = entry.getValue();
-      FieldSpec fieldSpec = getFieldSpecFor(oldSchemaColumnName);
 
-      if (!fieldSpec.isBackwardCompatibleWith(oldSchemaFieldSpec)) {
-        return false;
+      // Check if column exists in new schema
+      if (!newSchemaColumnNames.contains(oldSchemaColumnName)) {
+        String message = String.format(
+            SchemaCompatibilityResult.ErrorCode.MISSING_COLUMN.getMessageTemplate(),
+            oldSchemaColumnName
+        );
+        String suggestion = "Add the missing column back to the schema or ensure data migration "
+            + "handles the missing column appropriately.";
+        issues.add(new SchemaCompatibilityResult.IncompatibilityIssue(
+            SchemaCompatibilityResult.ErrorCode.MISSING_COLUMN,
+            oldSchemaColumnName,
+            message,
+            suggestion
+        ));
+        continue;
       }
+
+      // Column exists, check field spec compatibility
+      FieldSpec newSchemaFieldSpec = getFieldSpecFor(oldSchemaColumnName);
+      checkFieldSpecCompatibility(oldSchemaColumnName, oldSchemaFieldSpec, newSchemaFieldSpec, issues);
     }
-    return true;
+
+    return issues.isEmpty()
+        ? SchemaCompatibilityResult.compatible()
+        : SchemaCompatibilityResult.incompatible(issues);
+  }
+
+  /**
+   * Helper method to check compatibility between old and new field specs for a specific column.
+   */
+  private void checkFieldSpecCompatibility(String columnName, FieldSpec oldFieldSpec,
+                                           FieldSpec newFieldSpec,
+                                           List<SchemaCompatibilityResult.IncompatibilityIssue> issues) {
+
+    // Check data type compatibility
+    if (!EqualityUtils.isEqual(oldFieldSpec.getDataType(), newFieldSpec.getDataType())) {
+      String message = String.format(
+          SchemaCompatibilityResult.ErrorCode.DATA_TYPE_MISMATCH.getMessageTemplate(),
+          columnName,
+          oldFieldSpec.getDataType(),
+          newFieldSpec.getDataType()
+      );
+      String suggestion = generateDataTypeMismatchSuggestion(oldFieldSpec.getDataType(),
+          newFieldSpec.getDataType());
+      issues.add(new SchemaCompatibilityResult.IncompatibilityIssue(
+          SchemaCompatibilityResult.ErrorCode.DATA_TYPE_MISMATCH,
+          columnName,
+          message,
+          suggestion
+      ));
+    }
+
+    // Check field type compatibility
+    if (!EqualityUtils.isEqual(oldFieldSpec.getFieldType(), newFieldSpec.getFieldType())) {
+      String message = String.format(
+          SchemaCompatibilityResult.ErrorCode.FIELD_TYPE_MISMATCH.getMessageTemplate(),
+          columnName,
+          oldFieldSpec.getFieldType(),
+          newFieldSpec.getFieldType()
+      );
+      String suggestion = generateFieldTypeMismatchSuggestion(oldFieldSpec.getFieldType(),
+          newFieldSpec.getFieldType());
+      issues.add(new SchemaCompatibilityResult.IncompatibilityIssue(
+          SchemaCompatibilityResult.ErrorCode.FIELD_TYPE_MISMATCH,
+          columnName,
+          message,
+          suggestion
+      ));
+    }
+
+    // Check single/multi-value field compatibility
+    if (!EqualityUtils.isEqual(oldFieldSpec.isSingleValueField(), newFieldSpec.isSingleValueField())) {
+      String oldValue = oldFieldSpec.isSingleValueField() ? "single-value" : "multi-value";
+      String newValue = newFieldSpec.isSingleValueField() ? "single-value" : "multi-value";
+      String message = String.format(
+          SchemaCompatibilityResult.ErrorCode.SINGLE_MULTI_VALUE_MISMATCH.getMessageTemplate(),
+          columnName,
+          oldValue,
+          newValue
+      );
+      String suggestion = generateSingleMultiValueMismatchSuggestion(oldFieldSpec.isSingleValueField(),
+          newFieldSpec.isSingleValueField());
+      issues.add(new SchemaCompatibilityResult.IncompatibilityIssue(
+          SchemaCompatibilityResult.ErrorCode.SINGLE_MULTI_VALUE_MISMATCH,
+          columnName,
+          message,
+          suggestion
+      ));
+    }
+  }
+  
+  /**
+   * Generate helpful suggestions for data type mismatches.
+   */
+  private String generateDataTypeMismatchSuggestion(FieldSpec.DataType oldType, FieldSpec.DataType newType) {
+    // Handle common upgrade paths
+    if (oldType == FieldSpec.DataType.INT && newType == FieldSpec.DataType.LONG) {
+      return "INT to LONG is generally safe for most use cases, but verify no existing data will be affected.";
+    }
+    if (oldType == FieldSpec.DataType.FLOAT && newType == FieldSpec.DataType.DOUBLE) {
+      return "FLOAT to DOUBLE is generally safe for most use cases, but verify precision requirements.";
+    }
+    if (oldType == FieldSpec.DataType.STRING && newType == FieldSpec.DataType.JSON) {
+      return "STRING to JSON conversion requires ensuring existing string values are valid JSON format.";
+    }
+
+    return String.format("Reverting data type from %s back to %s, or implement a data migration strategy "
+        + "to handle the type change.", newType, oldType);
+  }
+  
+  /**
+   * Generate helpful suggestions for field type mismatches.
+   */
+  private String generateFieldTypeMismatchSuggestion(FieldSpec.FieldType oldType, FieldSpec.FieldType newType) {
+    if (oldType == FieldSpec.FieldType.DIMENSION && newType == FieldSpec.FieldType.METRIC) {
+      return "Converting DIMENSION to METRIC may affect query performance and indexing. "
+          + "Ensure the column contains only numeric data.";
+    }
+    if (oldType == FieldSpec.FieldType.METRIC && newType == FieldSpec.FieldType.DIMENSION) {
+      return "Converting METRIC to DIMENSION is generally safe but may affect aggregation queries "
+          + "that depend on this column.";
+    }
+
+    return String.format("Reverting field type from %s back to %s, or ensure the change is intentional "
+        + "and update dependent queries accordingly.", newType, oldType);
+  }
+  
+  /**
+   * Generate helpful suggestions for single/multi-value field mismatches.
+   */
+  private String generateSingleMultiValueMismatchSuggestion(boolean oldIsSingleValue, boolean newIsSingleValue) {
+    if (oldIsSingleValue && !newIsSingleValue) {
+      return "Converting single-value to multi-value requires ensuring existing data is compatible "
+          + "with multi-value semantics and updating queries that expect single values.";
+    } else {
+      return "Converting multi-value to single-value may cause data loss. Implement aggregation logic "
+          + "(e.g., take first value, concatenate) before making this change.";
+    }
   }
 
   @Override
