@@ -31,6 +31,7 @@ import org.apache.pinot.common.utils.http.HttpClient;
 import org.apache.pinot.controller.api.resources.CopyTablePayload;
 import org.apache.pinot.controller.helix.core.PinotHelixResourceManager;
 import org.apache.pinot.controller.helix.core.WatermarkInductionResult;
+import org.apache.pinot.spi.utils.builder.ControllerRequestURLBuilder;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -39,8 +40,6 @@ import org.slf4j.LoggerFactory;
  */
 public class TableReplicator {
   private static final Logger LOGGER = LoggerFactory.getLogger(TableReplicator.class);
-  private static final String SEGMENT_ZK_METADATA_ENDPOINT_TEMPLATE = "/segments/%s/zkmetadata";
-
   private final PinotHelixResourceManager _pinotHelixResourceManager;
   private final ExecutorService _executorService;
   private final SegmentCopier _segmentCopier;
@@ -81,8 +80,9 @@ public class TableReplicator {
     // TODO: throw IllegalStateException if any previous jobs doesn't expire.
     // TODO: replication job canceling mechanism
     LOGGER.info("[copyTable] Start replicating table: {} with jobId: {}", tableNameWithType, jobId);
-    URI zkMetadataUri = new URI(copyTablePayload.getSourceClusterUri()
-        + String.format(SEGMENT_ZK_METADATA_ENDPOINT_TEMPLATE, tableNameWithType));
+    ControllerRequestURLBuilder urlBuilder =
+        ControllerRequestURLBuilder.baseUrl(copyTablePayload.getSourceClusterUri());
+    URI zkMetadataUri = new URI(urlBuilder.forSegmentZkMetadata(tableNameWithType));
     SimpleHttpResponse zkMetadataResponse = HttpClient.wrapAndThrowHttpException(
         _httpClient.sendGetRequest(zkMetadataUri, copyTablePayload.getHeaders()));
     String zkMetadataJson = zkMetadataResponse.getResponse();
