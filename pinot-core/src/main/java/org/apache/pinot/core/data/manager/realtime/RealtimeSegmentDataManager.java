@@ -1520,8 +1520,8 @@ public class RealtimeSegmentDataManager extends SegmentDataManager {
             if (_realtimeTableDataManager.isUpsertEnabled()
                 && _realtimeTableDataManager.getTableUpsertMetadataManager() != null) {
               UpsertContext context = _realtimeTableDataManager.getTableUpsertMetadataManager().getContext();
-              if (_realtimeTableDataManager.isPartialUpsertEnabled() || (context.isDropOutOfOrderRecord()
-                  && context.getConsistencyMode() == UpsertConfig.ConsistencyMode.NONE)) {
+              if (_realtimeTableDataManager.isPartialUpsertEnabled() || context.isDropOutOfOrderRecord()
+                  || context.getOutOfOrderRecordColumn() != null) {
                 _serverMetrics.addMeteredTableValue(_clientId, ServerMeter.REALTIME_ROWS_AHEAD_OF_ZK, 1L);
               }
             }

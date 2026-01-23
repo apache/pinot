@@ -881,6 +881,18 @@ public final class TableConfigUtils {
         Preconditions.checkState(upsertConfig.getNewSegmentTrackingTimeMs() > 0,
             "Positive newSegmentTrackingTimeMs is required to enable consistency mode: "
                 + upsertConfig.getConsistencyMode());
+        // dropOutOfOrderRecord and outOfOrderRecordColumn are not supported with SYNC/SNAPSHOT consistency mode
+        // because records must be indexed before metadata is updated. By the time we know if a record is
+        // out-of-order, it's already indexed - As of today, we can't skip indexing or update the
+        // out-of-order column value.
+        Preconditions.checkState(!upsertConfig.isDropOutOfOrderRecord(),
+            "dropOutOfOrderRecord cannot be enabled when consistencyMode is %s. "
+                + "Out-of-order records can only be dropped in NONE consistency mode.",
+            upsertConfig.getConsistencyMode());
+        Preconditions.checkState(upsertConfig.getOutOfOrderRecordColumn() == null,
+            "outOfOrderRecordColumn cannot be configured when consistencyMode is %s. "
+                + "Out-of-order record marking is only supported in NONE consistency mode.",
+            upsertConfig.getConsistencyMode());
       }
     }
 
