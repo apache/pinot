@@ -323,6 +323,12 @@ public class CommonConstants {
     // Setting the before serving queries to Integer.MAX_VALUE to effectively disable throttling by default
     public static final String DEFAULT_MAX_SEGMENT_DOWNLOAD_PARALLELISM_BEFORE_SERVING_QUERIES =
         String.valueOf(Integer.MAX_VALUE);
+
+    // SQL parsing
+    public static final String CONFIG_OF_SSE_LEGACY_LITERAL_UNESCAPING =
+        "pinot.query.sse.parsing.legacy.literal.unescaping";
+    // Usee legacy mode by default for backward compatibility. Will be changed in a future release.
+    public static final boolean DEFAULT_SSE_LEGACY_LITERAL_UNESCAPING = true;
   }
 
   public static class Broker {

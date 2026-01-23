@@ -121,7 +121,7 @@ public final class BasicAuthPrincipalUtils {
           Set<String> excludeTables = Optional.ofNullable(user.getExcludeTables())
               .orElseGet(() -> Collections.emptyList())
               .stream().collect(Collectors.toSet());
-          Set<String> permissions = Optional.ofNullable(user.getPermissios())
+          Set<String> permissions = Optional.ofNullable(user.getPermissions())
               .orElseGet(() -> Collections.emptyList())
               .stream().map(x -> x.toString())
               .collect(Collectors.toSet());

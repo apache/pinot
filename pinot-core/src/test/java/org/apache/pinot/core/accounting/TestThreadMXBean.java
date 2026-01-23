@@ -43,6 +43,40 @@ public class TestThreadMXBean {
     ThreadResourceUsageProvider.setThreadMemoryMeasurementEnabled(true);
   }
 
+  @Test
+  public void testDisableThenEnableCpuTimeMeasurement() {
+    if (!ThreadResourceUsageProvider.isThreadCpuTimeMeasurementEnabled()) {
+      return;
+    }
+
+    Assert.assertTrue(ThreadResourceUsageProvider.getCurrentThreadCpuTime() > 0);
+
+    ThreadResourceUsageProvider.setThreadCpuTimeMeasurementEnabled(false);
+    Assert.assertFalse(ThreadResourceUsageProvider.isThreadCpuTimeMeasurementEnabled());
+    Assert.assertEquals(ThreadResourceUsageProvider.getCurrentThreadCpuTime(), 0);
+
+    ThreadResourceUsageProvider.setThreadCpuTimeMeasurementEnabled(true);
+    Assert.assertTrue(ThreadResourceUsageProvider.isThreadCpuTimeMeasurementEnabled());
+    Assert.assertTrue(ThreadResourceUsageProvider.getCurrentThreadCpuTime() > 0);
+  }
+
+  @Test
+  public void testDisableThenEnableMemoryMeasurement() {
+    if (!ThreadResourceUsageProvider.isThreadMemoryMeasurementEnabled()) {
+      return;
+    }
+
+    Assert.assertTrue(ThreadResourceUsageProvider.getCurrentThreadAllocatedBytes() > 0);
+
+    ThreadResourceUsageProvider.setThreadMemoryMeasurementEnabled(false);
+    Assert.assertFalse(ThreadResourceUsageProvider.isThreadMemoryMeasurementEnabled());
+    Assert.assertEquals(ThreadResourceUsageProvider.getCurrentThreadAllocatedBytes(), 0);
+
+    ThreadResourceUsageProvider.setThreadMemoryMeasurementEnabled(true);
+    Assert.assertTrue(ThreadResourceUsageProvider.isThreadMemoryMeasurementEnabled());
+    Assert.assertTrue(ThreadResourceUsageProvider.getCurrentThreadAllocatedBytes() > 0);
+  }
+
   /**
    * simple memory allocation
    */

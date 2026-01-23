@@ -62,6 +62,7 @@ import org.apache.pinot.common.utils.FileUploadDownloadClient;
 import org.apache.pinot.common.utils.ServiceStatus;
 import org.apache.pinot.common.utils.SimpleHttpResponse;
 import org.apache.pinot.common.utils.http.HttpClient;
+import org.apache.pinot.common.utils.request.RequestUtils;
 import org.apache.pinot.core.operator.query.NonScanBasedAggregationOperator;
 import org.apache.pinot.segment.spi.index.ForwardIndexConfig;
 import org.apache.pinot.segment.spi.index.StandardIndexes;
@@ -4275,6 +4276,49 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
       forceUpdateSchema(oldSchema);
       reloadAndWait(DEFAULT_TABLE_NAME + "_OFFLINE", null);
     }
+  }
+
+  /**
+   * Test SQL string literal escaping behavior.
+   *
+   * In SQL, single quotes within string literals are escaped by doubling them:
+   * - 'It''s' represents the string "It's" (2 quotes = 1 quote in result)
+   *
+   * The Calcite parser handles this escaping correctly. This test disables the legacy SSE behavior of double escaping
+   * quotes. With the legacy behavior disabled, both SSE and MSE have the same standard behavior.
+   */
+  @Test(dataProvider = "useBothQueryEngines")
+  public void testStringLiteralEscaping(boolean useMultiStageQueryEngine)
+      throws Exception {
+    RequestUtils.setUseLegacyLiteralUnescaping(false);
+    setUseMultiStageQueryEngine(useMultiStageQueryEngine);
+
+    // Test 1: Simple escaped quote (2 quotes in SQL = 1 quote in result)
+    // SQL: 'It''s a test' should result in "It's a test"
+    String query = "SELECT 'It''s a test' FROM mytable LIMIT 1";
+    JsonNode response = postQuery(query);
+    assertTrue(response.get("exceptions").isEmpty());
+    JsonNode rows = response.get("resultTable").get("rows");
+    assertEquals(rows.size(), 1);
+    assertEquals(rows.get(0).get(0).asText(), "It's a test");
+
+    // Test 2: String literal in WHERE clause with comparison
+    // Query for carriers where we compare against a literal with escaped quotes
+    // Note: No carrier has quotes in its name, so we just verify the query doesn't error
+    query = "SELECT COUNT(*) FROM mytable WHERE Carrier = 'doesn''t exist'";
+    response = postQuery(query);
+    assertTrue(response.get("exceptions").isEmpty());
+    rows = response.get("resultTable").get("rows");
+    assertEquals(rows.size(), 1);
+    assertEquals(rows.get(0).get(0).asLong(), 0); // No matches expected
+
+    // Test 3: Multiple escaped quotes in same query
+    query = "SELECT 'He said ''''hello'''' and ''goodbye''' FROM mytable LIMIT 1";
+    response = postQuery(query);
+    assertTrue(response.get("exceptions").isEmpty());
+    rows = response.get("resultTable").get("rows");
+    assertEquals(rows.size(), 1);
+    assertEquals(rows.get(0).get(0).asText(), "He said ''hello'' and 'goodbye'");
   }
 
   private void reloadAndWait(String tableNameWithType, @Nullable String segmentName) throws Exception {

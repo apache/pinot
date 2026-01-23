@@ -30,9 +30,12 @@ import org.apache.pinot.spi.config.table.HashFunction;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.UpsertConfig;
 import org.apache.pinot.spi.data.Schema;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 
 public class UpsertContext {
+  private static final Logger LOGGER = LoggerFactory.getLogger(UpsertContext.class);
   private final TableConfig _tableConfig;
   private final Schema _schema;
   private final List<String> _primaryKeyColumns;
@@ -64,7 +67,6 @@ public class UpsertContext {
   @Nullable
   private final TableDataManager _tableDataManager;
   private final File _tableIndexDir;
-
   private UpsertContext(TableConfig tableConfig, Schema schema, List<String> primaryKeyColumns,
       HashFunction hashFunction, List<String> comparisonColumns, @Nullable PartialUpsertHandler partialUpsertHandler,
       @Nullable String deleteRecordColumn, boolean dropOutOfOrderRecord, @Nullable String outOfOrderRecordColumn,
@@ -233,6 +235,7 @@ public class UpsertContext {
     private PartialUpsertHandler _partialUpsertHandler;
     private String _deleteRecordColumn;
     private boolean _dropOutOfOrderRecord;
+    @Nullable
     private String _outOfOrderRecordColumn;
     private boolean _enableSnapshot;
     private boolean _enablePreload;
@@ -364,6 +367,23 @@ public class UpsertContext {
       if (_tableIndexDir == null) {
         Preconditions.checkState(_tableDataManager != null, "Either table data manager or table index dir must be set");
         _tableIndexDir = _tableDataManager.getTableDataDir();
+      }
+      // dropOutOfOrderRecord and outOfOrderRecordColumn are not supported when consistencyMode is SYNC or SNAPSHOT.
+      // In these modes, records are indexed before metadata is updated, so we can't drop or mark out-of-order records.
+      // Disable them silently for backward compatibility with existing tables.
+      if (_consistencyMode != UpsertConfig.ConsistencyMode.NONE) {
+        if (_dropOutOfOrderRecord) {
+          _dropOutOfOrderRecord = false;
+          LOGGER.warn(
+              "dropOutOfOrderRecord is not supported when consistencyMode is set, disabling dropOutOfOrderRecord to get"
+                  + "consistent mode: {} for the table: {}", _consistencyMode, _tableConfig.getTableName());
+        }
+        if (_outOfOrderRecordColumn != null) {
+          _outOfOrderRecordColumn = null;
+          LOGGER.warn(
+              "outOfOrderRecordColumn is not supported when consistencyMode is set, removing outOfOrderRecordColumn "
+                  + "to get consistent mode: {} for the table: {}", _consistencyMode, _tableConfig.getTableName());
+        }
       }
       return new UpsertContext(_tableConfig, _schema, _primaryKeyColumns, _hashFunction, _comparisonColumns,
           _partialUpsertHandler, _deleteRecordColumn, _dropOutOfOrderRecord, _outOfOrderRecordColumn, _enableSnapshot,

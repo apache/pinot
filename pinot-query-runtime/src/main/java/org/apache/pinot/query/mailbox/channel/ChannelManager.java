@@ -22,13 +22,12 @@ import io.grpc.ManagedChannel;
 import io.grpc.netty.shaded.io.grpc.netty.NettyChannelBuilder;
 import io.grpc.netty.shaded.io.netty.buffer.PooledByteBufAllocator;
 import io.grpc.netty.shaded.io.netty.channel.ChannelOption;
+import io.grpc.netty.shaded.io.netty.handler.ssl.SslContext;
 import java.time.Duration;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.TimeUnit;
 import javax.annotation.Nullable;
 import org.apache.commons.lang3.tuple.Pair;
-import org.apache.pinot.common.config.TlsConfig;
-import org.apache.pinot.common.utils.grpc.ServerGrpcQueryClient;
 
 
 /**
@@ -42,7 +41,6 @@ public class ChannelManager {
    * Map from (hostname, port) to the ManagedChannel with all known channels
    */
   private final ConcurrentHashMap<Pair<String, Integer>, ManagedChannel> _channelMap = new ConcurrentHashMap<>();
-  private final TlsConfig _tlsConfig;
   /**
    * The idle timeout for the channel, which cannot be disabled in gRPC.
    *
@@ -57,9 +55,18 @@ public class ChannelManager {
    * Using a single allocator instance across all channels allows for better memory pooling and reduces fragmentation.
    */
   private final PooledByteBufAllocator _bufAllocator;
+  @Nullable
+  private final SslContext _clientSslContext;
 
-  public ChannelManager(@Nullable TlsConfig tlsConfig, int maxInboundMessageSize, Duration idleTimeout) {
-    _tlsConfig = tlsConfig;
+  /**
+   * Constructs a {@code ChannelManager}.
+   *
+   * @param clientSslContext optional cached client {@link SslContext} to reuse across channels
+   * @param maxInboundMessageSize maximum inbound message size for gRPC channels
+   * @param idleTimeout idle timeout for gRPC channels; channels close after this period of inactivity
+   */
+  public ChannelManager(@Nullable SslContext clientSslContext, int maxInboundMessageSize, Duration idleTimeout) {
+    _clientSslContext = clientSslContext;
     _maxInboundMessageSize = maxInboundMessageSize;
     _idleTimeout = idleTimeout;
     // Use direct buffers (off-heap) for better performance - matches server-side configuration
@@ -67,16 +74,14 @@ public class ChannelManager {
   }
 
   public ManagedChannel getChannel(String hostname, int port) {
-    // Always use NettyChannelBuilder to allow setting Netty-specific channel options like the buffer allocator.
-    // This ensures we can explicitly configure direct (off-heap) buffers for better performance.
-    if (_tlsConfig != null) {
+    if (_clientSslContext != null) {
       return _channelMap.computeIfAbsent(Pair.of(hostname, port),
           (k) -> {
             NettyChannelBuilder channelBuilder = NettyChannelBuilder
                 .forAddress(k.getLeft(), k.getRight())
                 .maxInboundMessageSize(_maxInboundMessageSize)
                 .withOption(ChannelOption.ALLOCATOR, _bufAllocator)
-                .sslContext(ServerGrpcQueryClient.buildSslContext(_tlsConfig));
+                .sslContext(_clientSslContext);
             return decorate(channelBuilder).build();
           }
       );

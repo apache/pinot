@@ -24,6 +24,7 @@ import com.google.protobuf.UnsafeByteOperations;
 import io.grpc.Server;
 import io.grpc.ServerBuilder;
 import io.grpc.netty.shaded.io.grpc.netty.NettyServerBuilder;
+import io.grpc.netty.shaded.io.netty.handler.ssl.SslContext;
 import io.grpc.stub.StreamObserver;
 import java.io.DataOutputStream;
 import java.util.ArrayList;
@@ -41,6 +42,7 @@ import org.apache.pinot.common.metrics.ServerMetrics;
 import org.apache.pinot.common.proto.PinotQueryWorkerGrpc;
 import org.apache.pinot.common.proto.Worker;
 import org.apache.pinot.common.utils.NamedThreadFactory;
+import org.apache.pinot.core.instance.context.ServerContext;
 import org.apache.pinot.core.transport.grpc.GrpcQueryServer;
 import org.apache.pinot.query.access.AuthorizationInterceptor;
 import org.apache.pinot.query.access.QueryAccessControlFactory;
@@ -169,7 +171,7 @@ public class QueryServer extends PinotQueryWorkerGrpc.PinotQueryWorkerImplBase {
         if (_tlsConfig == null) {
           serverBuilder = ServerBuilder.forPort(_port);
         } else {
-          serverBuilder = NettyServerBuilder.forPort(_port).sslContext(GrpcQueryServer.buildGrpcSslContext(_tlsConfig));
+          serverBuilder = NettyServerBuilder.forPort(_port).sslContext(getOrCreateServerSslContext());
         }
         _server = buildGrpcServer(serverBuilder);
         LOGGER.info("Initialized QueryServer on port: {}", _port);
@@ -205,6 +207,15 @@ public class QueryServer extends PinotQueryWorkerGrpc.PinotQueryWorkerImplBase {
     _submissionExecutorService.shutdown();
     _explainExecutorService.shutdown();
     _timeSeriesExecutorService.shutdown();
+  }
+
+  private SslContext getOrCreateServerSslContext() {
+    SslContext sslContext = ServerContext.getInstance().getServerGrpcSslContext();
+    if (sslContext == null) {
+      sslContext = GrpcQueryServer.buildGrpcSslContext(_tlsConfig);
+      ServerContext.getInstance().setServerGrpcSslContext(sslContext);
+    }
+    return sslContext;
   }
 
   /// Submits a query for executions.
