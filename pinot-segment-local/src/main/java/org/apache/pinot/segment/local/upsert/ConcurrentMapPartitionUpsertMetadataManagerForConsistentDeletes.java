@@ -347,10 +347,9 @@ public class ConcurrentMapPartitionUpsertMetadataManagerForConsistentDeletes
       _primaryKeyToRecordLocationMap.computeIfPresent(HashUtils.hashPrimaryKey(primaryKey, _hashFunction),
           (pk, recordLocation) -> {
             RecordLocation prevLocation = _previousKeyToRecordLocationMap.get(primaryKey);
-            if (recordLocation.getSegment() == segment && prevLocation != null
-                && !(prevLocation.getSegment() instanceof MutableSegment) && _trackedSegments.contains(
+            if (recordLocation.getSegment() == segment && prevLocation != null && _trackedSegments.contains(
                 prevLocation.getSegment())) {
-              // Revert to previous immutable segment location
+              // Revert to previous segment location
               IndexSegment prevSegment = prevLocation.getSegment();
               ThreadSafeMutableRoaringBitmap prevValidDocIds = prevSegment.getValidDocIds();
               if (prevValidDocIds != null) {
