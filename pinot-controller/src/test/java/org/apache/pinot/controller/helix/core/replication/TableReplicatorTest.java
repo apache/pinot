@@ -80,9 +80,12 @@ public class TableReplicatorTest {
     String tableName = "table1_REALTIME";
     String sourceClusterUri = "http://localhost:9000";
     CopyTablePayload copyTablePayload = new CopyTablePayload(sourceClusterUri, Collections.emptyMap(),
-        "http://dest", Collections.emptyMap(), "broker", "server", Collections.emptyMap());
+        "http://dest", Collections.emptyMap(), "broker", "server", Collections.emptyMap(), null);
 
-    WatermarkInductionResult watermarkInductionResult = new WatermarkInductionResult(Collections.emptyList(),
+    List<WatermarkInductionResult.Watermark> watermarks = Arrays.asList(
+        new WatermarkInductionResult.Watermark(0, 10, 100L),
+        new WatermarkInductionResult.Watermark(1, 11, 110L));
+    WatermarkInductionResult watermarkInductionResult = new WatermarkInductionResult(watermarks,
         Arrays.asList("seg1", "seg2"));
 
     // Mock HttpClient response for ZK metadata
@@ -115,6 +118,6 @@ public class TableReplicatorTest {
     Assert.assertTrue(capturedSegments.contains("seg1"));
     Assert.assertTrue(capturedSegments.contains("seg2"));
 
-    verify(_executorService, times(4)).submit(any(Runnable.class));
+    verify(_executorService, times(watermarks.size())).submit(any(Runnable.class));
   }
 }

@@ -46,6 +46,7 @@ public class CopyTablePayload {
    * MUST NOT contain the tenant type suffix, i.e. _REALTIME or _OFFLINE.
    */
   private String _serverTenant;
+  private Integer _backfillParallism;
 
   /**
    * The instanceAssignmentConfig's tagPoolConfig contains full tenant name. We will use this field to let user specify
@@ -61,7 +62,8 @@ public class CopyTablePayload {
       @JsonProperty(value = "destinationClusterHeaders") Map<String, String> destinationClusterHeaders,
       @JsonProperty(value = "brokerTenant", required = true) String brokerTenant,
       @JsonProperty(value = "serverTenant", required = true) String serverTenant,
-      @JsonProperty("tagPoolReplacementMap") @Nullable Map<String, String> tagPoolReplacementMap) {
+      @JsonProperty("tagPoolReplacementMap") @Nullable Map<String, String> tagPoolReplacementMap,
+      @JsonProperty("backfillParallism") @Nullable Integer backfillParallism) {
     _sourceClusterUri = sourceClusterUri;
     _headers = headers;
     _destinationClusterUri = destinationClusterUri;
@@ -69,6 +71,7 @@ public class CopyTablePayload {
     _brokerTenant = brokerTenant;
     _serverTenant = serverTenant;
     _tagPoolReplacementMap = tagPoolReplacementMap;
+    _backfillParallism = backfillParallism;
   }
 
   @JsonGetter("sourceClusterUri")
@@ -99,6 +102,11 @@ public class CopyTablePayload {
   @JsonGetter("serverTenant")
   public String getServerTenant() {
     return _serverTenant;
+  }
+
+  @JsonGetter("backfillParallism")
+  public Integer getBackfillParallism() {
+    return _backfillParallism;
   }
 
   @JsonGetter("tagPoolReplacementMap")
