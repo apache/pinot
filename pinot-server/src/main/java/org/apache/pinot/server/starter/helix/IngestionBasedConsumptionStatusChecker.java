@@ -109,8 +109,8 @@ public abstract class IngestionBasedConsumptionStatusChecker {
                   "Stream provider for table: {} does not support offset subtraction. Cannot conclude if the segment "
                       + "has caught up. Skipping the segments.",
                   realtimeTableDataManager.getTableName());
+              skippedSegmentsLogged = true;
             }
-            skippedSegmentsLogged = true;
           } else if (isSegmentCaughtUp(segName, rtSegmentDataManager, realtimeTableDataManager)) {
             caughtUpSegments.add(segName);
           }
