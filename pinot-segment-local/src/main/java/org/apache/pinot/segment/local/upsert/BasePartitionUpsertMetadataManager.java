@@ -675,13 +675,13 @@ public abstract class BasePartitionUpsertMetadataManager implements PartitionUps
       MutableRoaringBitmap validDocIdsForOldSegment, String segmentName) {
     int numKeysNotReplaced = validDocIdsForOldSegment.getCardinality();
     boolean isConsumingSegmentSeal = !(oldSegment instanceof ImmutableSegment);
-    // For partial-upsert table and upsert table with dropOutOfOrderRecord=true or outOfOrderRecordColumn set,
-    // we do not store the previous record location and removing all the primary keys not replaced. This can potentially
-    // cause inconsistency between replicas when a consuming segment is replaced by a committed segment that is
-    // consumed from a different server with different records (some stream consumers cannot guarantee consuming
-    // messages in the same order, or when a segment is replaced with fewer consumed rows from another server).
-    // To avoid such inconsistencies, we store the previous locations to revert back to and resolve those
-    // inconsistencies
+    // For partial-upsert tables and upsert tables with dropOutOfOrderRecord=true or outOfOrderRecordColumn configured,
+    // we do not store previous record locations and instead remove all primary keys that are not replaced. This can
+    // lead to inconsistencies across replicas when a consuming segment is replaced by a committed segment generated
+    // on a different server with a different set of records. Such scenarios can occur when stream consumers do not
+    // guarantee the same consumption order, or when a segment with fewer consumed rows replaces another segment.
+    // To prevent these inconsistencies, we persist the previous record locations so that we can revert to them and
+    // restore consistency across replicas.
     if (isConsumingSegmentSeal && (_context.isDropOutOfOrderRecord() || _context.getOutOfOrderRecordColumn() != null)) {
       _logger.warn("Found {} primary keys not replaced when sealing consuming segment: {} for upsert table with "
               + "dropOutOfOrderRecord or outOfOrderRecordColumn enabled. This can potentially cause inconsistency "
