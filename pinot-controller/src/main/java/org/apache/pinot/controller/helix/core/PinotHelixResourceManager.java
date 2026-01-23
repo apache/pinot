@@ -2104,13 +2104,7 @@ public class PinotHelixResourceManager {
     }
 
     if (!assignedInstancePartitions.isEmpty() && _isIdealStateInstancePartitionsEnabled) {
-      if (override) {
-        InstancePartitionsUtils.updateInstancePartitionsInIdealState(idealState, assignedInstancePartitions);
-      } else {
-        // Wipe out instance partitions metadata maintained in the ideal state to avoid inconsistency. Rebalance should
-        // be performed after instance assignment, and that will also ensure ideal state instance partitions update.
-        InstancePartitionsUtils.updateInstancePartitionsInIdealState(idealState, List.of());
-      }
+      InstancePartitionsUtils.updateInstancePartitionsInIdealState(idealState, assignedInstancePartitions);
       return true;
     }
     return false;
@@ -2599,6 +2593,27 @@ public class PinotHelixResourceManager {
           SegmentAssignmentFactory.getSegmentAssignment(_helixZkManager, tableConfig, _controllerMetrics);
       HelixHelper.updateIdealState(_helixZkManager, tableNameWithType, idealState -> {
         assert idealState != null;
+
+        if (_isIdealStateInstancePartitionsEnabled) {
+          // Check if ideal state instance partitions match the newly fetched / computed instance partitions.
+          // If there's a mismatch, wipe out ideal state instance partitions and log that a rebalance is required.
+          Map<String, InstancePartitions> idealStateInstancePartitions =
+              InstancePartitionsUtils.extractInstancePartitionsFromIdealState(idealState);
+          for (InstancePartitions instancePartitions : instancePartitionsMap.values()) {
+            if (!instancePartitions.equals(
+                idealStateInstancePartitions.get(instancePartitions.getInstancePartitionsName()))) {
+              LOGGER.warn(
+                  "Mismatch found between old and new instance partitions for: {}; rebalance is required for the table",
+                  instancePartitions.getInstancePartitionsName());
+              idealState.getRecord()
+                  .getListFields()
+                  .keySet()
+                  .removeIf(key -> key.startsWith(InstancePartitionsUtils.IDEAL_STATE_IP_PREFIX));
+              break;
+            }
+          }
+        }
+
         Map<String, Map<String, String>> currentAssignment = idealState.getRecord().getMapFields();
         if (currentAssignment.containsKey(segmentName)) {
           LOGGER.warn("Segment: {} already exists in the IdealState for table: {}, do not update", segmentName,
@@ -2670,6 +2685,33 @@ public class PinotHelixResourceManager {
       long segmentAssignmentStartMs = System.currentTimeMillis();
       HelixHelper.updateIdealState(_helixZkManager, tableNameWithType, idealState -> {
         assert idealState != null;
+
+        if (_isIdealStateInstancePartitionsEnabled) {
+          // Check if ideal state instance partitions match the newly fetched / computed instance partitions.
+          // If there's a mismatch, wipe out ideal state instance partitions and log that a rebalance is required.
+          Map<String, InstancePartitions> idealStateInstancePartitions =
+              InstancePartitionsUtils.extractInstancePartitionsFromIdealState(idealState);
+          Iterable<InstancePartitions> newInstancePartitions =
+              nonTierInstancePartitionsMap != null ? nonTierInstancePartitionsMap.values()
+                  : tierToInstancePartitionsMap.values()
+                      .stream()
+                      .flatMap(m -> m.values().stream())
+                      .collect(Collectors.toList());
+          for (InstancePartitions instancePartitions : newInstancePartitions) {
+            if (!instancePartitions.equals(
+                idealStateInstancePartitions.get(instancePartitions.getInstancePartitionsName()))) {
+              LOGGER.warn(
+                  "Mismatch found between old and new instance partitions for: {}; rebalance is required for the table",
+                  instancePartitions.getInstancePartitionsName());
+              idealState.getRecord()
+                  .getListFields()
+                  .keySet()
+                  .removeIf(key -> key.startsWith(InstancePartitionsUtils.IDEAL_STATE_IP_PREFIX));
+              break;
+            }
+          }
+        }
+
         Map<String, Map<String, String>> currentAssignment = idealState.getRecord().getMapFields();
         for (Map.Entry<String, SegmentZKMetadata> entry : segmentZKMetadataMap.entrySet()) {
           String segmentName = entry.getKey();
@@ -4911,32 +4953,6 @@ public class PinotHelixResourceManager {
       return new WatermarkInductionResult.Watermark(status.getPartitionGroupId(), seq, startOffset);
     }).collect(Collectors.toList());
     return new WatermarkInductionResult(watermarks);
-  }
-
-  /** Update a given set of instance partitions into an ideal state's instance partitions metadata maintained in its
-   *  list fields. Previous instance partitions will be wiped out.
-   *
-   * @param tableNameWithType name of the table whose ideal state needs to be updated.
-   * @param instancePartitions List of instance partitions to be written into the ideal state instance partitions
-   *                           metadata.
-   */
-  public void updateInstancePartitionsInIdealState(String tableNameWithType,
-      List<InstancePartitions> instancePartitions) {
-    if (!_isIdealStateInstancePartitionsEnabled) {
-      return;
-    }
-
-    IdealState currentIdealState = getTableIdealState(tableNameWithType);
-    if (currentIdealState == null) {
-      throw new RuntimeException("Failed to retrieve IdealState for table: " + tableNameWithType);
-    }
-
-    InstancePartitionsUtils.updateInstancePartitionsInIdealState(currentIdealState, instancePartitions);
-    HelixHelper.updateIdealState(_helixZkManager, tableNameWithType, idealState -> {
-      assert idealState != null;
-      idealState.getRecord().setListFields(currentIdealState.getRecord().getListFields());
-      return idealState;
-    }, DEFAULT_RETRY_POLICY);
   }
 
   /*

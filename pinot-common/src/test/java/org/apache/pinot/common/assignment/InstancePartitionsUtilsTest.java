@@ -83,7 +83,7 @@ public class InstancePartitionsUtilsTest {
   }
 
   @Test
-  public void testUpdateInstancePartitionsInIdealState() {
+  public void testReplaceInstancePartitionsInIdealState() {
     IdealState idealState = new IdealState("testTable");
     List<InstancePartitions> instancePartitionsList = new ArrayList<>();
     instancePartitionsList.add(
@@ -94,7 +94,7 @@ public class InstancePartitionsUtilsTest {
         new InstancePartitions("testTable_COMPLETED", Map.of("0_0", List.of("instance-4")))
     );
 
-    InstancePartitionsUtils.updateInstancePartitionsInIdealState(idealState, instancePartitionsList);
+    InstancePartitionsUtils.replaceInstancePartitionsInIdealState(idealState, instancePartitionsList);
     Map<String, List<String>> listFields = idealState.getRecord().getListFields();
 
     List<String> consumingPartition0Rg0 = listFields.get(
@@ -118,9 +118,9 @@ public class InstancePartitionsUtilsTest {
     // Add one more instance to 0_0 in COMPLETED, replace existing instance
     List<InstancePartitions> updatedInstancePartitionsList = List.of(instancePartitionsList.get(0),
         new InstancePartitions("testTable_COMPLETED", Map.of("0_0", List.of("instance-5", "instance-6"))));
-    InstancePartitionsUtils.updateInstancePartitionsInIdealState(idealState, updatedInstancePartitionsList);
+    InstancePartitionsUtils.replaceInstancePartitionsInIdealState(idealState, updatedInstancePartitionsList);
     // Verify idempotent
-    InstancePartitionsUtils.updateInstancePartitionsInIdealState(idealState, updatedInstancePartitionsList);
+    InstancePartitionsUtils.replaceInstancePartitionsInIdealState(idealState, updatedInstancePartitionsList);
 
     // Ensure that CONSUMING instance partitions aren't affected
     consumingPartition0Rg0 = listFields.get(
@@ -172,6 +172,78 @@ public class InstancePartitionsUtilsTest {
     assertEquals(map.get("F").intValue(), 0);
     assertEquals(map.get("G").intValue(), 1);
     assertEquals(map.get("H").intValue(), 1);
+  }
+
+  @Test
+  public void testExtractInstancePartitionsFromIdealState() {
+    ZNRecord znRecord = new ZNRecord("testTable_REALTIME");
+    // Add CONSUMING instance partitions
+    znRecord.setListField(InstancePartitionsUtils.IDEAL_STATE_IP_PREFIX + "testTable_CONSUMING"
+        + InstancePartitionsUtils.IDEAL_STATE_IP_SEPARATOR + "0_0", List.of("instance-0", "instance-1"));
+    znRecord.setListField(InstancePartitionsUtils.IDEAL_STATE_IP_PREFIX + "testTable_CONSUMING"
+        + InstancePartitionsUtils.IDEAL_STATE_IP_SEPARATOR + "0_1", List.of("instance-2", "instance-3"));
+    // Add COMPLETED instance partitions
+    znRecord.setListField(InstancePartitionsUtils.IDEAL_STATE_IP_PREFIX + "testTable_COMPLETED"
+        + InstancePartitionsUtils.IDEAL_STATE_IP_SEPARATOR + "0_0", List.of("instance-4", "instance-5"));
+    // Add a non-instance-partitions list field (should be ignored)
+    znRecord.setListField("k", List.of("v1", "v2", "v3"));
+    IdealState idealState = new IdealState(znRecord);
+
+    Map<String, InstancePartitions> result =
+        InstancePartitionsUtils.extractInstancePartitionsFromIdealState(idealState);
+
+    assertEquals(result.size(), 2);
+
+    InstancePartitions consuming = result.get("testTable_CONSUMING");
+    Assert.assertNotNull(consuming);
+    assertEquals(consuming.getInstancePartitionsName(), "testTable_CONSUMING");
+    assertEquals(consuming.getNumPartitions(), 1);
+    assertEquals(consuming.getNumReplicaGroups(), 2);
+    assertEquals(consuming.getInstances(0, 0), List.of("instance-0", "instance-1"));
+    assertEquals(consuming.getInstances(0, 1), List.of("instance-2", "instance-3"));
+
+    InstancePartitions completed = result.get("testTable_COMPLETED");
+    Assert.assertNotNull(completed);
+    assertEquals(completed.getInstancePartitionsName(), "testTable_COMPLETED");
+    assertEquals(completed.getNumPartitions(), 1);
+    assertEquals(completed.getNumReplicaGroups(), 1);
+    assertEquals(completed.getInstances(0, 0), List.of("instance-4", "instance-5"));
+  }
+
+  @Test
+  public void testExtractInstancePartitionsFromIdealStateWithTier() {
+    ZNRecord znRecord = new ZNRecord("testTable_OFFLINE");
+    // Add standard OFFLINE instance partitions
+    znRecord.setListField(InstancePartitionsUtils.IDEAL_STATE_IP_PREFIX + "testTable_OFFLINE"
+        + InstancePartitionsUtils.IDEAL_STATE_IP_SEPARATOR + "0_0", List.of("instance-0", "instance-1"));
+    // Add tier instance partitions (name contains __TIER__)
+    String tierInstancePartitionsName =
+        InstancePartitionsUtils.getInstancePartitionsNameForTier("testTable", "hotTier");
+    znRecord.setListField(InstancePartitionsUtils.IDEAL_STATE_IP_PREFIX + tierInstancePartitionsName
+        + InstancePartitionsUtils.IDEAL_STATE_IP_SEPARATOR + "0_0", List.of("instance-2", "instance-3"));
+    znRecord.setListField(InstancePartitionsUtils.IDEAL_STATE_IP_PREFIX + tierInstancePartitionsName
+        + InstancePartitionsUtils.IDEAL_STATE_IP_SEPARATOR + "1_0", List.of("instance-4", "instance-5"));
+    IdealState idealState = new IdealState(znRecord);
+
+    Map<String, InstancePartitions> result =
+        InstancePartitionsUtils.extractInstancePartitionsFromIdealState(idealState);
+
+    assertEquals(result.size(), 2);
+
+    InstancePartitions offline = result.get("testTable_OFFLINE");
+    Assert.assertNotNull(offline);
+    assertEquals(offline.getInstancePartitionsName(), "testTable_OFFLINE");
+    assertEquals(offline.getNumPartitions(), 1);
+    assertEquals(offline.getNumReplicaGroups(), 1);
+    assertEquals(offline.getInstances(0, 0), List.of("instance-0", "instance-1"));
+
+    InstancePartitions tier = result.get(tierInstancePartitionsName);
+    Assert.assertNotNull(tier);
+    assertEquals(tier.getInstancePartitionsName(), tierInstancePartitionsName);
+    assertEquals(tier.getNumPartitions(), 2);
+    assertEquals(tier.getNumReplicaGroups(), 1);
+    assertEquals(tier.getInstances(0, 0), List.of("instance-2", "instance-3"));
+    assertEquals(tier.getInstances(1, 0), List.of("instance-4", "instance-5"));
   }
 
   private static InstanceAssignmentConfig getInstanceAssignmentConfig(InstanceAssignmentConfig.PartitionSelector

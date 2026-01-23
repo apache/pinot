@@ -142,6 +142,16 @@ public class InstancePartitions {
     return instanceToPartitionIdMap;
   }
 
+  /// Given a partition ID and replica group ID like "0_0", set the list of instances belonging to that instance
+  /// partition
+  public void setInstances(String partitionReplica, List<String> instances) {
+    _partitionToInstancesMap.put(partitionReplica, instances);
+    Pair<Integer, Integer> partitionAndReplica =
+        InstancePartitionsUtils.getPartitionIdAndReplicaGroupId(partitionReplica);
+    _numPartitions = Integer.max(_numPartitions, partitionAndReplica.getLeft() + 1);
+    _numReplicaGroups = Integer.max(_numReplicaGroups, partitionAndReplica.getRight() + 1);
+  }
+
   public void setInstances(int partitionId, int replicaGroupId, List<String> instances) {
     String key = Integer.toString(partitionId) + PARTITION_REPLICA_GROUP_SEPARATOR + replicaGroupId;
     _partitionToInstancesMap.put(key, instances);

@@ -28,7 +28,6 @@ import io.swagger.annotations.SwaggerDefinition;
 import java.io.IOException;
 import java.util.Arrays;
 import java.util.Collections;
-import java.util.HashMap;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
@@ -101,20 +100,7 @@ public class PinotInstanceAssignmentRestletResource {
       @ApiParam(value = "OFFLINE|CONSUMING|COMPLETED|tier name") @QueryParam("type") @Nullable String type,
       @Context HttpHeaders headers) {
     tableName = DatabaseUtils.translateTableName(tableName, headers);
-    Map<String, InstancePartitions> result = new TreeMap<>();
-
-    for (Map<String, InstancePartitions> instancePartitionsMap : getInstancePartitionsInternal(tableName,
-        type).values()) {
-      result.putAll(instancePartitionsMap);
-    }
-
-    return result;
-  }
-
-  private Map<TableType, Map<String, InstancePartitions>> getInstancePartitionsInternal(String tableName,
-      @Nullable String type) {
-    Map<String, InstancePartitions> offlineInstancePartitionsMap = new TreeMap<>();
-    Map<String, InstancePartitions> realtimeInstancePartitionsMap = new TreeMap<>();
+    Map<String, InstancePartitions> instancePartitionsMap = new TreeMap<>();
 
     String rawTableName = TableNameBuilder.extractRawTableName(tableName);
     TableType tableType = TableNameBuilder.getTableTypeFromTableName(tableName);
@@ -124,7 +110,7 @@ public class PinotInstanceAssignmentRestletResource {
             InstancePartitionsUtils.fetchInstancePartitions(_resourceManager.getPropertyStore(),
                 InstancePartitionsType.OFFLINE.getInstancePartitionsName(rawTableName));
         if (offlineInstancePartitions != null) {
-          offlineInstancePartitionsMap.put(InstancePartitionsType.OFFLINE.toString(), offlineInstancePartitions);
+          instancePartitionsMap.put(InstancePartitionsType.OFFLINE.toString(), offlineInstancePartitions);
         }
       }
     }
@@ -134,7 +120,7 @@ public class PinotInstanceAssignmentRestletResource {
             InstancePartitionsUtils.fetchInstancePartitions(_resourceManager.getPropertyStore(),
                 InstancePartitionsType.CONSUMING.getInstancePartitionsName(rawTableName));
         if (consumingInstancePartitions != null) {
-          realtimeInstancePartitionsMap.put(InstancePartitionsType.CONSUMING.toString(), consumingInstancePartitions);
+          instancePartitionsMap.put(InstancePartitionsType.CONSUMING.toString(), consumingInstancePartitions);
         }
       }
       if (InstancePartitionsType.COMPLETED.toString().equals(type) || type == null) {
@@ -142,7 +128,7 @@ public class PinotInstanceAssignmentRestletResource {
             InstancePartitionsUtils.fetchInstancePartitions(_resourceManager.getPropertyStore(),
                 InstancePartitionsType.COMPLETED.getInstancePartitionsName(rawTableName));
         if (completedInstancePartitions != null) {
-          realtimeInstancePartitionsMap.put(InstancePartitionsType.COMPLETED.toString(), completedInstancePartitions);
+          instancePartitionsMap.put(InstancePartitionsType.COMPLETED.toString(), completedInstancePartitions);
         }
       }
     }
@@ -159,24 +145,17 @@ public class PinotInstanceAssignmentRestletResource {
                     InstancePartitionsUtils.getInstancePartitionsNameForTier(tableConfig.getTableName(),
                         tierConfig.getName()));
             if (instancePartitions != null) {
-              if (tableConfig.getTableType() == TableType.REALTIME) {
-                realtimeInstancePartitionsMap.put(tierConfig.getName(), instancePartitions);
-              } else {
-                offlineInstancePartitionsMap.put(tierConfig.getName(), instancePartitions);
-              }
+              instancePartitionsMap.put(tierConfig.getName(), instancePartitions);
             }
           }
         }
       }
     }
 
-    if (offlineInstancePartitionsMap.isEmpty() && realtimeInstancePartitionsMap.isEmpty()) {
+    if (instancePartitionsMap.isEmpty()) {
       throw new ControllerApplicationException(LOGGER, "Failed to find the instance partitions",
           Response.Status.NOT_FOUND);
     } else {
-      Map<TableType, Map<String, InstancePartitions>> instancePartitionsMap = new TreeMap<>();
-      instancePartitionsMap.put(TableType.OFFLINE, offlineInstancePartitionsMap);
-      instancePartitionsMap.put(TableType.REALTIME, realtimeInstancePartitionsMap);
       return instancePartitionsMap;
     }
   }
@@ -193,8 +172,7 @@ public class PinotInstanceAssignmentRestletResource {
       @ApiParam(value = "Whether to do dry-run") @DefaultValue("false") @QueryParam("dryRun") boolean dryRun,
       @Context HttpHeaders headers) {
     tableName = DatabaseUtils.translateTableName(tableName, headers);
-    Map<String, InstancePartitions> offlineInstancePartitionsMap = new TreeMap<>();
-    Map<String, InstancePartitions> realtimeInstancePartitionsMap = new TreeMap<>();
+    Map<String, InstancePartitions> instancePartitionsMap = new TreeMap<>();
     List<InstanceConfig> instanceConfigs = _resourceManager.getAllHelixInstanceConfigs();
 
     TableType tableType = TableNameBuilder.getTableTypeFromTableName(tableName);
@@ -204,7 +182,7 @@ public class PinotInstanceAssignmentRestletResource {
         try {
           if (InstanceAssignmentConfigUtils.allowInstanceAssignment(offlineTableConfig,
               InstancePartitionsType.OFFLINE)) {
-            assignInstancesForInstancePartitionsType(offlineInstancePartitionsMap, offlineTableConfig, instanceConfigs,
+            assignInstancesForInstancePartitionsType(instancePartitionsMap, offlineTableConfig, instanceConfigs,
                 InstancePartitionsType.OFFLINE);
           }
         } catch (IllegalStateException e) {
@@ -223,15 +201,15 @@ public class PinotInstanceAssignmentRestletResource {
           if (InstancePartitionsType.CONSUMING.toString().equals(type) || type == null) {
             if (InstanceAssignmentConfigUtils.allowInstanceAssignment(realtimeTableConfig,
                 InstancePartitionsType.CONSUMING)) {
-              assignInstancesForInstancePartitionsType(realtimeInstancePartitionsMap, realtimeTableConfig,
-                  instanceConfigs, InstancePartitionsType.CONSUMING);
+              assignInstancesForInstancePartitionsType(instancePartitionsMap, realtimeTableConfig, instanceConfigs,
+                  InstancePartitionsType.CONSUMING);
             }
           }
           if (InstancePartitionsType.COMPLETED.toString().equals(type) || type == null) {
             if (InstanceAssignmentConfigUtils.allowInstanceAssignment(realtimeTableConfig,
                 InstancePartitionsType.COMPLETED)) {
-              assignInstancesForInstancePartitionsType(realtimeInstancePartitionsMap, realtimeTableConfig,
-                  instanceConfigs, InstancePartitionsType.COMPLETED);
+              assignInstancesForInstancePartitionsType(instancePartitionsMap, realtimeTableConfig, instanceConfigs,
+                  InstancePartitionsType.COMPLETED);
             }
           }
         } catch (IllegalStateException e) {
@@ -246,41 +224,24 @@ public class PinotInstanceAssignmentRestletResource {
 
     TableConfig realtimeTableConfig = _resourceManager.getRealtimeTableConfig(tableName);
     if (realtimeTableConfig != null) {
-      assignInstancesForTier(realtimeInstancePartitionsMap, realtimeTableConfig, instanceConfigs, type);
+      assignInstancesForTier(instancePartitionsMap, realtimeTableConfig, instanceConfigs, type);
     }
 
     TableConfig offlineTableConfig = _resourceManager.getOfflineTableConfig(tableName);
     if (offlineTableConfig != null) {
-      assignInstancesForTier(offlineInstancePartitionsMap, offlineTableConfig, instanceConfigs, type);
+      assignInstancesForTier(instancePartitionsMap, offlineTableConfig, instanceConfigs, type);
     }
 
-    if (offlineInstancePartitionsMap.isEmpty() && realtimeInstancePartitionsMap.isEmpty()) {
+    if (instancePartitionsMap.isEmpty()) {
       throw new ControllerApplicationException(LOGGER, "Failed to find the instance assignment config",
           Response.Status.NOT_FOUND);
     }
 
     if (!dryRun) {
-      // Wipe out instance partitions metadata maintained in the ideal state to avoid inconsistency. Rebalance should
-      // be performed after instance assignment, and that will also ensure ideal state instance partitions update.
-      if (offlineTableConfig != null) {
-        _resourceManager.updateInstancePartitionsInIdealState(TableNameBuilder.OFFLINE.tableNameWithType(tableName),
-            List.of());
-      }
-      if (realtimeTableConfig != null) {
-        _resourceManager.updateInstancePartitionsInIdealState(TableNameBuilder.REALTIME.tableNameWithType(tableName),
-            List.of());
-      }
-      for (InstancePartitions instancePartitions : offlineInstancePartitionsMap.values()) {
-        persistInstancePartitionsHelper(instancePartitions);
-      }
-      for (InstancePartitions instancePartitions : realtimeInstancePartitionsMap.values()) {
+      for (InstancePartitions instancePartitions : instancePartitionsMap.values()) {
         persistInstancePartitionsHelper(instancePartitions);
       }
     }
-
-    Map<String, InstancePartitions> instancePartitionsMap = new HashMap<>();
-    instancePartitionsMap.putAll(offlineInstancePartitionsMap);
-    instancePartitionsMap.putAll(realtimeInstancePartitionsMap);
 
     return instancePartitionsMap;
   }
@@ -380,33 +341,20 @@ public class PinotInstanceAssignmentRestletResource {
     String instancePartitionsName = instancePartitions.getInstancePartitionsName();
     String rawTableName = TableNameBuilder.extractRawTableName(tableName);
     TableType tableType = TableNameBuilder.getTableTypeFromTableName(tableName);
-    String instancePartitionsType = null;
     if (tableType != TableType.REALTIME) {
       if (InstancePartitionsType.OFFLINE.getInstancePartitionsName(rawTableName).equals(instancePartitionsName)) {
-        // Wipe out instance partitions metadata maintained in the ideal state to avoid inconsistency. Rebalance should
-        // be performed after instance assignment, and that will also ensure ideal state instance partitions update.
-        _resourceManager.updateInstancePartitionsInIdealState(
-            TableNameBuilder.forType(TableType.OFFLINE).tableNameWithType(tableName), List.of());
         persistInstancePartitionsHelper(instancePartitions);
-        instancePartitionsType = InstancePartitionsType.OFFLINE.toString();
+        return Collections.singletonMap(InstancePartitionsType.OFFLINE.toString(), instancePartitions);
       }
     }
     if (tableType != TableType.OFFLINE) {
       if (InstancePartitionsType.CONSUMING.getInstancePartitionsName(rawTableName).equals(instancePartitionsName)) {
-        // Wipe out instance partitions metadata maintained in the ideal state to avoid inconsistency. Rebalance should
-        // be performed after instance assignment, and that will also ensure ideal state instance partitions update.
-        _resourceManager.updateInstancePartitionsInIdealState(
-            TableNameBuilder.forType(TableType.REALTIME).tableNameWithType(tableName), List.of());
         persistInstancePartitionsHelper(instancePartitions);
-        instancePartitionsType = InstancePartitionsType.CONSUMING.toString();
+        return Collections.singletonMap(InstancePartitionsType.CONSUMING.toString(), instancePartitions);
       }
       if (InstancePartitionsType.COMPLETED.getInstancePartitionsName(rawTableName).equals(instancePartitionsName)) {
-        // Wipe out instance partitions metadata maintained in the ideal state to avoid inconsistency. Rebalance should
-        // be performed after instance assignment, and that will also ensure ideal state instance partitions update.
-        _resourceManager.updateInstancePartitionsInIdealState(
-            TableNameBuilder.forType(TableType.REALTIME).tableNameWithType(tableName), List.of());
         persistInstancePartitionsHelper(instancePartitions);
-        instancePartitionsType = InstancePartitionsType.COMPLETED.toString();
+        return Collections.singletonMap(InstancePartitionsType.COMPLETED.toString(), instancePartitions);
       }
     }
 
@@ -418,21 +366,11 @@ public class PinotInstanceAssignmentRestletResource {
         for (TierConfig tierConfig : tableConfig.getTierConfigsList()) {
           if (InstancePartitionsUtils.getInstancePartitionsNameForTier(tableConfig.getTableName(), tierConfig.getName())
               .equals(instancePartitionsName)) {
-            // Wipe out instance partitions metadata maintained in the ideal state to avoid inconsistency. Rebalance
-            // should be performed after instance assignment, and that will also ensure ideal state instance partitions
-            // update.
-            _resourceManager.updateInstancePartitionsInIdealState(
-                TableNameBuilder.forType(tableConfig.getTableType()).tableNameWithType(tableName), List.of());
             persistInstancePartitionsHelper(instancePartitions);
-            instancePartitionsType = tierConfig.getName();
-            break;
+            return Collections.singletonMap(tierConfig.getName(), instancePartitions);
           }
         }
       }
-    }
-
-    if (instancePartitionsType != null) {
-      return Collections.singletonMap(instancePartitionsType, instancePartitions);
     }
 
     throw new ControllerApplicationException(LOGGER, "Instance partitions cannot be applied to the table",
@@ -507,39 +445,25 @@ public class PinotInstanceAssignmentRestletResource {
           String oldInstanceId,
       @ApiParam(value = "New instance to replace with", required = true) @QueryParam("newInstanceId")
           String newInstanceId, @Context HttpHeaders headers) {
-    tableName = DatabaseUtils.translateTableName(tableName, headers);
-    Map<TableType, Map<String, InstancePartitions>> instancePartitionsMap =
-        getInstancePartitionsInternal(tableName, type);
-
-    for (Map.Entry<TableType, Map<String, InstancePartitions>> entry : instancePartitionsMap.entrySet()) {
-      TableType tableType = entry.getKey();
-      Iterator<InstancePartitions> iterator = entry.getValue().values().iterator();
-      while (iterator.hasNext()) {
-        InstancePartitions instancePartitions = iterator.next();
-        boolean oldInstanceFound = false;
-        Map<String, List<String>> partitionToInstancesMap = instancePartitions.getPartitionToInstancesMap();
-        for (List<String> instances : partitionToInstancesMap.values()) {
-          oldInstanceFound |= Collections.replaceAll(instances, oldInstanceId, newInstanceId);
-        }
-        if (oldInstanceFound) {
-          // Wipe out instance partitions metadata maintained in the ideal state to avoid inconsistency. Rebalance
-          // should be performed after instance assignment, and that will also ensure ideal state instance partitions
-          // update.
-          _resourceManager.updateInstancePartitionsInIdealState(
-              TableNameBuilder.forType(tableType).tableNameWithType(tableName), List.of());
-          persistInstancePartitionsHelper(instancePartitions);
-        } else {
-          iterator.remove();
-        }
+    Map<String, InstancePartitions> instancePartitionsMap = getInstancePartitions(tableName, type, headers);
+    Iterator<InstancePartitions> iterator = instancePartitionsMap.values().iterator();
+    while (iterator.hasNext()) {
+      InstancePartitions instancePartitions = iterator.next();
+      boolean oldInstanceFound = false;
+      Map<String, List<String>> partitionToInstancesMap = instancePartitions.getPartitionToInstancesMap();
+      for (List<String> instances : partitionToInstancesMap.values()) {
+        oldInstanceFound |= Collections.replaceAll(instances, oldInstanceId, newInstanceId);
+      }
+      if (oldInstanceFound) {
+        persistInstancePartitionsHelper(instancePartitions);
+      } else {
+        iterator.remove();
       }
     }
-
-    Map<String, InstancePartitions> result = new HashMap<>();
-    instancePartitionsMap.values().forEach(result::putAll);
-    if (result.isEmpty()) {
+    if (instancePartitionsMap.isEmpty()) {
       throw new ControllerApplicationException(LOGGER, "Failed to find the old instance", Response.Status.NOT_FOUND);
     } else {
-      return result;
+      return instancePartitionsMap;
     }
   }
 }

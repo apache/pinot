@@ -502,7 +502,7 @@ public class TableRebalancer {
           instancePartitionsList.addAll(tierToInstancePartitionsMap.values());
         }
         // Replace old set of instance partitions with the new set of instance partitions.
-        InstancePartitionsUtils.updateInstancePartitionsInIdealState(currentIdealState, instancePartitionsList);
+        InstancePartitionsUtils.replaceInstancePartitionsInIdealState(currentIdealState, instancePartitionsList);
       }
 
       // Check version and update IdealState
@@ -2307,7 +2307,7 @@ public class TableRebalancer {
   private IdealState replaceInstancePartitionsInIdealState(String tableNameWithType, IdealState currentIdealState,
       List<InstancePartitions> instancePartitionsList) {
     Map<String, List<String>> idealStateListFields = currentIdealState.getRecord().getListFields();
-    InstancePartitionsUtils.updateInstancePartitionsInIdealState(currentIdealState, instancePartitionsList);
+    InstancePartitionsUtils.replaceInstancePartitionsInIdealState(currentIdealState, instancePartitionsList);
 
     return HelixHelper.updateIdealState(_helixManager, tableNameWithType, is -> {
       is.getRecord().setListFields(idealStateListFields);

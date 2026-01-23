@@ -242,10 +242,24 @@ public class InstancePartitionsUtils {
    * @param instancePartitionsList List of instance partitions to be written into the ideal state instance partitions
    *                               metadata.
    */
-  public static void updateInstancePartitionsInIdealState(IdealState idealState,
+  public static void replaceInstancePartitionsInIdealState(IdealState idealState,
       List<InstancePartitions> instancePartitionsList) {
     Map<String, List<String>> idealStateListFields = idealState.getRecord().getListFields();
     idealStateListFields.keySet().removeIf(key -> key.startsWith(InstancePartitionsUtils.IDEAL_STATE_IP_PREFIX));
+    updateInstancePartitionsInIdealState(idealState, instancePartitionsList);
+  }
+
+  /**
+   * Add a given set of instance partitions into an ideal state's instance partitions metadata maintained in its
+   * list fields.
+   *
+   * @param idealState Current ideal state
+   * @param instancePartitionsList List of instance partitions to be added to the ideal state instance partitions
+   *                               metadata.
+   */
+  public static void updateInstancePartitionsInIdealState(IdealState idealState,
+      List<InstancePartitions> instancePartitionsList) {
+    Map<String, List<String>> idealStateListFields = idealState.getRecord().getListFields();
     for (InstancePartitions instancePartitions : instancePartitionsList) {
       String instancePartitionsName = instancePartitions.getInstancePartitionsName();
       for (String partitionReplica : instancePartitions.getPartitionToInstancesMap().keySet()) {
@@ -254,6 +268,41 @@ public class InstancePartitionsUtils {
         idealStateListFields.put(idealStateListKey, new ArrayList<>(instancePartitions.getInstances(partitionReplica)));
       }
     }
+  }
+
+  /**
+   * Extracts all instance partitions from the ideal state's list fields.
+   *
+   * <p>The ideal state stores instance partitions metadata in list fields with keys of the format:
+   * {@code INSTANCE_PARTITIONS__<instancePartitionsName>__<partitionId>_<replicaGroupId>}
+   *
+   * <p>The instance partitions name itself may contain {@code __} (e.g., for tier instance partitions like
+   * {@code myTable__TIER__hotTier}), so we parse from the right by finding the last {@code __} separator
+   * which should always be followed by a valid 'partitionId_replicaId' pattern ({@code <int>_<int>}).
+   *
+   * @param idealState The ideal state to extract instance partitions from
+   * @return A map from instance partitions name to the reconstructed InstancePartitions object
+   */
+  public static Map<String, InstancePartitions> extractInstancePartitionsFromIdealState(IdealState idealState) {
+    Map<String, InstancePartitions> instancePartitionsMap = new HashMap<>();
+    for (Map.Entry<String, List<String>> entry : idealState.getRecord().getListFields().entrySet()) {
+      String key = entry.getKey();
+      // Keys look like 'INSTANCE_PARTITIONS__myTable_CONSUMING__0_1' and
+      // 'INSTANCE_PARTITIONS__myTable__TIER__hotTier__0_1'
+      if (key.startsWith(IDEAL_STATE_IP_PREFIX)) {
+        String remainder = key.substring(IDEAL_STATE_IP_PREFIX.length());
+
+        // The last '__' separates the instance partitions name from the partition-replica suffix
+        int lastSeparatorIdx = remainder.lastIndexOf(IDEAL_STATE_IP_SEPARATOR);
+        String instancePartitionsName = remainder.substring(0, lastSeparatorIdx);
+        String partitionReplica = remainder.substring(lastSeparatorIdx + IDEAL_STATE_IP_SEPARATOR.length());
+        List<String> instances = entry.getValue();
+
+        instancePartitionsMap.computeIfAbsent(instancePartitionsName, InstancePartitions::new)
+            .setInstances(partitionReplica, instances);
+      }
+    }
+    return instancePartitionsMap;
   }
 
   /// Creates a map from server instance to replica group ID using the ideal state instance partitions metadata.
