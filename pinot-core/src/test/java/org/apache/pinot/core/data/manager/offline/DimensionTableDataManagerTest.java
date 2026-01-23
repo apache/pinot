@@ -318,6 +318,7 @@ public class DimensionTableDataManagerTest {
     assertEquals(tableDataManager.lookupValue(key, "teamCity"), "null");
   }
 
+  @Test
   public void testLookupWithoutPreLoad()
       throws Exception {
     TableConfig tableConfig = getTableConfig(true, false);
