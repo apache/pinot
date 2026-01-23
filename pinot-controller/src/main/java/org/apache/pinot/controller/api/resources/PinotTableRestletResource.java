@@ -48,6 +48,7 @@ import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.Executor;
 import java.util.concurrent.Future;
@@ -108,6 +109,7 @@ import org.apache.pinot.controller.helix.core.rebalance.RebalanceConfig;
 import org.apache.pinot.controller.helix.core.rebalance.RebalanceResult;
 import org.apache.pinot.controller.helix.core.rebalance.TableRebalanceManager;
 import org.apache.pinot.controller.helix.core.rebalance.TableRebalancer;
+import org.apache.pinot.controller.helix.core.replication.TableReplicator;
 import org.apache.pinot.controller.recommender.RecommenderDriver;
 import org.apache.pinot.controller.tuner.TableConfigTunerUtils;
 import org.apache.pinot.controller.util.CompletionServiceHelper;
@@ -204,6 +206,9 @@ public class PinotTableRestletResource {
 
   @Inject
   HttpClientConnectionManager _connectionManager;
+
+  @Inject
+  TableReplicator _tableReplicator;
 
   /**
    * API to create a table. Before adding, validations will be done (min number of replicas, checking offline and
@@ -372,6 +377,9 @@ public class PinotTableRestletResource {
         response.setTableConfig(realtimeTableConfig);
         response.setWatermarkInductionResult(watermarkInductionResult);
       }
+      String jobID = UUID.randomUUID().toString();
+      _tableReplicator.replicateTable(jobID, realtimeTableConfig.getTableName(), copyTablePayload,
+          watermarkInductionResult);
       return response;
     } catch (Exception e) {
       LOGGER.error("[copyTable] Error copying table: {}", tableName, e);
