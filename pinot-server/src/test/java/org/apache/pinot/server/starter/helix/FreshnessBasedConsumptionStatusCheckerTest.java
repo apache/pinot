@@ -620,9 +620,10 @@ public class FreshnessBasedConsumptionStatusCheckerTest {
     when(segMngrA0.getSegmentName()).thenReturn(segA0);
     when(segMngrA1.getSegmentName()).thenReturn(segA1);
 
-    // segA0 provider throws TimeoutException - this should be caught and handled gracefully
+    // segA0 provider throws RuntimeException - this should be caught and handled gracefully
+    // In practice, RealtimeSegmentMetadataUtils wraps TimeoutException in RuntimeException
     when(segA0Provider.fetchLatestStreamOffset(anySet(), anyLong()))
-        .thenThrow(new TimeoutException("Timeout fetching latest stream offset"));
+        .thenThrow(new RuntimeException("Failed to fetch latest stream offset for segment: " + segA0, new TimeoutException("Timeout fetching latest stream offset")));
     // segA1 provider works normally
     when(segA1Provider.fetchLatestStreamOffset(anySet(), anyLong())).thenReturn(Map.of(1, new LongMsgOffset(20)));
 
