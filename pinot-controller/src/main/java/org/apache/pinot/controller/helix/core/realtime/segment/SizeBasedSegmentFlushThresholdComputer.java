@@ -44,7 +44,7 @@ class SizeBasedSegmentFlushThresholdComputer {
   private final Clock _clock;
 
   private long _timeConsumedForLastSegment;
-  private int _rowsConsumedForLastSegment;
+  private int _rowsIndexedForLastSegment;
   private long _sizeForLastSegment;
   private int _rowsThresholdForLastSegment;
   private double _segmentRowsToSizeRatio;
@@ -115,7 +115,7 @@ class SizeBasedSegmentFlushThresholdComputer {
 
     // Store values using the actual rows consumed for threshold calculations
     _timeConsumedForLastSegment = timeConsumed;
-    _rowsConsumedForLastSegment = (int) rowsForCalculation;
+    _rowsIndexedForLastSegment = (int) rowsForCalculation;
     _sizeForLastSegment = sizeForCalculation;
     _rowsThresholdForLastSegment = rowsThreshold;
 
@@ -171,9 +171,9 @@ class SizeBasedSegmentFlushThresholdComputer {
     // .getSizeThresholdToFlushSegment(),
     // we might end up using a lot more memory than required for the segment Using a minor bump strategy, until
     // we add feature to adjust time We will only slightly bump the threshold based on numRowsConsumed
-    if (_rowsConsumedForLastSegment < _rowsThresholdForLastSegment && _sizeForLastSegment < desiredSegmentSizeBytes) {
+    if (_rowsIndexedForLastSegment < _rowsThresholdForLastSegment && _sizeForLastSegment < desiredSegmentSizeBytes) {
       long timeThresholdMs = streamConfig.getFlushThresholdTimeMillis();
-      long rowsConsumed = _rowsConsumedForLastSegment;
+      long rowsConsumed = _rowsIndexedForLastSegment;
       StringBuilder logStringBuilder = new StringBuilder().append("Time threshold reached. ");
       if (timeThresholdMs < _timeConsumedForLastSegment) {
         // The administrator has reduced the time threshold. Adjust the
@@ -195,9 +195,9 @@ class SizeBasedSegmentFlushThresholdComputer {
     double optimalSegmentSizeBytesMax = desiredSegmentSizeBytes * 1.5;
     long targetRows;
     if (_sizeForLastSegment < optimalSegmentSizeBytesMin) {
-      targetRows = (long) (_rowsConsumedForLastSegment * 1.5);
+      targetRows = (long) (_rowsIndexedForLastSegment * 1.5);
     } else if (_sizeForLastSegment > optimalSegmentSizeBytesMax) {
-      targetRows = _rowsConsumedForLastSegment / 2;
+      targetRows = _rowsIndexedForLastSegment / 2;
     } else {
       targetRows = (long) (desiredSegmentSizeBytes * _segmentRowsToSizeRatio);
     }

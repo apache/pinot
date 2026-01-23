@@ -16,18 +16,18 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.pinot.query.runtime.context;
+package org.apache.pinot.spi.columntransformer;
 
-/**
- * The <code>ControllerContext</code> class is a singleton class which contains all controller related context.
- */
-public class ControllerContext {
-  private static final ControllerContext INSTANCE = new ControllerContext();
+import javax.annotation.Nullable;
 
-  private ControllerContext() {
-  }
 
-  public static ControllerContext getInstance() {
-    return INSTANCE;
-  }
+public interface ColumnTransformer {
+
+  /// Returns `true` if the transformer is no-op (can be skipped), `false` otherwise.
+  boolean isNoOp();
+
+  /// Transforms a value based on some custom rules.
+  /// @param value The original value.
+  /// @return The transformed value.
+  Object transform(@Nullable Object value);
 }

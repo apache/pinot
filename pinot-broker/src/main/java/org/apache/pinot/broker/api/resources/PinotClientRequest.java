@@ -325,14 +325,30 @@ public class PinotClientRequest {
   @Path("query/timeseries")
   @ApiOperation(value = "Query Pinot using the Time Series Engine")
   @ManualAuthorization
-  public void processTimeSeriesQueryEngine(Map<String, String> queryParams, @Suspended AsyncResponse asyncResponse,
+  public void processTimeSeriesQueryEngine(JsonNode requestJson, @Suspended AsyncResponse asyncResponse,
       @Context org.glassfish.grizzly.http.server.Request requestCtx, @Context HttpHeaders httpHeaders) {
     try {
-      if (!queryParams.containsKey(Request.QUERY)) {
+      if (!requestJson.has(Request.QUERY)) {
         throw new IllegalStateException("Payload is missing the query string field 'query'");
       }
-      String language = queryParams.get(Request.LANGUAGE);
-      String queryString = queryParams.get(Request.QUERY);
+      String language = requestJson.has(Request.LANGUAGE) ? requestJson.get(Request.LANGUAGE).asText() : null;
+      String queryString = requestJson.get(Request.QUERY).asText();
+      Map<String, String> queryParams = new HashMap<>();
+      requestJson.fields().forEachRemaining(entry -> {
+          if (entry.getValue().isTextual()) {
+            queryParams.put(entry.getKey(), entry.getValue().asText());
+          } else {
+            queryParams.put(entry.getKey(), entry.getValue().toString());
+          }
+      });
+
+      if (isExplainMode(requestJson)) {
+        BrokerResponse explainResponse = _requestHandler.handleExplainTimeSeriesRequest(language, queryString,
+          queryParams);
+        asyncResponse.resume(explainResponse);
+        return;
+      }
+
       try (RequestScope requestContext = Tracing.getTracer().createRequestScope()) {
         TimeSeriesBlock timeSeriesBlock = executeTimeSeriesQuery(language, queryString, queryParams,
             requestContext, makeHttpIdentity(requestCtx), httpHeaders);
@@ -630,6 +646,10 @@ public class PinotClientRequest {
       HttpHeaders httpHeaders) throws QueryException {
     return _requestHandler.handleTimeSeriesRequest(language, queryString, queryParams, requestContext,
         requesterIdentity, httpHeaders);
+  }
+
+  private static boolean isExplainMode(JsonNode requestJson) {
+    return requestJson.has("mode") && "explain".equalsIgnoreCase(requestJson.get("mode").asText());
   }
 
   public static HttpRequesterIdentity makeHttpIdentity(org.glassfish.grizzly.http.server.Request context) {

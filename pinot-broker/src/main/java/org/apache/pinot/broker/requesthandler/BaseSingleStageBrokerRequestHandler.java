@@ -91,6 +91,7 @@ import org.apache.pinot.core.query.request.context.QueryContext;
 import org.apache.pinot.core.query.request.context.utils.QueryContextConverterUtils;
 import org.apache.pinot.core.routing.ImplicitHybridTableRouteProvider;
 import org.apache.pinot.core.routing.LogicalTableRouteProvider;
+import org.apache.pinot.core.routing.MultiClusterRoutingContext;
 import org.apache.pinot.core.routing.RoutingManager;
 import org.apache.pinot.core.routing.TableRouteInfo;
 import org.apache.pinot.core.routing.TableRouteProvider;
@@ -183,9 +184,9 @@ public abstract class BaseSingleStageBrokerRequestHandler extends BaseBrokerRequ
   public BaseSingleStageBrokerRequestHandler(PinotConfiguration config, String brokerId,
       BrokerRequestIdGenerator requestIdGenerator, RoutingManager routingManager,
       AccessControlFactory accessControlFactory, QueryQuotaManager queryQuotaManager, TableCache tableCache,
-      ThreadAccountant threadAccountant) {
+      ThreadAccountant threadAccountant, MultiClusterRoutingContext multiClusterRoutingContext) {
     super(config, brokerId, requestIdGenerator, routingManager, accessControlFactory, queryQuotaManager, tableCache,
-        threadAccountant);
+        threadAccountant, multiClusterRoutingContext);
     _disableGroovy = _config.getProperty(Broker.DISABLE_GROOVY, Broker.DEFAULT_DISABLE_GROOVY);
     _useApproximateFunction = _config.getProperty(Broker.USE_APPROXIMATE_FUNCTION, false);
     _defaultHllLog2m = _config.getProperty(CommonConstants.Helix.DEFAULT_HYPERLOGLOG_LOG2M_KEY,
@@ -216,7 +217,7 @@ public abstract class BaseSingleStageBrokerRequestHandler extends BaseBrokerRequ
         Broker.DEFAULT_USE_MSE_TO_FILL_EMPTY_RESPONSE_SCHEMA);
 
     _implicitHybridTableRouteProvider = new ImplicitHybridTableRouteProvider();
-    _logicalTableRouteProvider = new LogicalTableRouteProvider();
+    _logicalTableRouteProvider = new LogicalTableRouteProvider(multiClusterRoutingContext);
 
     LOGGER.info("Initialized {} with broker id: {}, timeout: {}ms, query response limit: {}, "
             + "default query limit {}, query log max length: {}, query log max rate: {}, query cancellation "
@@ -334,7 +335,7 @@ public abstract class BaseSingleStageBrokerRequestHandler extends BaseBrokerRequ
       JsonNode request, @Nullable RequesterIdentity requesterIdentity, RequestContext requestContext,
       @Nullable HttpHeaders httpHeaders, AccessControl accessControl)
       throws Exception {
-    _queryLogger.log(requestId, query);
+    boolean queryWasLogged = _queryLogger.logQueryReceived(requestId, query);
 
     String queryHash = CommonConstants.Broker.DEFAULT_QUERY_HASH;
     if (_enableQueryFingerprinting) {
@@ -364,7 +365,7 @@ public abstract class BaseSingleStageBrokerRequestHandler extends BaseBrokerRequ
             queryHash);
     try (QueryThreadContext ignore = QueryThreadContext.open(executionContext, _threadAccountant)) {
       return doHandleRequest(requestId, query, sqlNodeAndOptions, request, requesterIdentity, requestContext,
-          httpHeaders, accessControl);
+          httpHeaders, accessControl, queryWasLogged);
     }
   }
 
@@ -405,7 +406,7 @@ public abstract class BaseSingleStageBrokerRequestHandler extends BaseBrokerRequ
 
   protected BrokerResponse doHandleRequest(long requestId, String query, SqlNodeAndOptions sqlNodeAndOptions,
       JsonNode request, @Nullable RequesterIdentity requesterIdentity, RequestContext requestContext,
-      @Nullable HttpHeaders httpHeaders, AccessControl accessControl)
+      @Nullable HttpHeaders httpHeaders, AccessControl accessControl, boolean queryWasLogged)
       throws Exception {
     // Compile the request into PinotQuery
     long compilationStartTimeNs = System.nanoTime();
@@ -525,8 +526,12 @@ public abstract class BaseSingleStageBrokerRequestHandler extends BaseBrokerRequ
       routeProvider = _implicitHybridTableRouteProvider;
     }
 
+    // Get the appropriate routing manager based on query options
+    RoutingManager selectedRoutingManager = _multiClusterRoutingContext != null && logicalTableConfig != null
+        ? _multiClusterRoutingContext.getRoutingManager(pinotQuery.getQueryOptions())
+        : _routingManager;
     // Get the tables hit by the request
-    TableRouteInfo routeInfo = routeProvider.getTableRouteInfo(tableName, _tableCache, _routingManager);
+    TableRouteInfo routeInfo = routeProvider.getTableRouteInfo(tableName, _tableCache, selectedRoutingManager);
 
     if (!routeInfo.isExists()) {
       LOGGER.info("Table not found for request {}: {}", requestId, query);
@@ -635,7 +640,7 @@ public abstract class BaseSingleStageBrokerRequestHandler extends BaseBrokerRequ
 
     if (offlineBrokerRequest == null && realtimeBrokerRequest == null) {
       return getEmptyBrokerOnlyResponse(pinotQuery, serverPinotQuery, requestContext, tableName, requesterIdentity,
-          schema, query, database);
+          schema, query, database, queryWasLogged);
     }
 
     if (offlineBrokerRequest != null && isFilterAlwaysTrue(offlineBrokerRequest.getPinotQuery())) {
@@ -650,7 +655,7 @@ public abstract class BaseSingleStageBrokerRequestHandler extends BaseBrokerRequ
     // Calculate routing table for the query
     // TODO: Modify RoutingManager interface to directly take PinotQuery
     long routingStartTimeNs = System.nanoTime();
-    routeProvider.calculateRoutes(routeInfo, _routingManager, offlineBrokerRequest, realtimeBrokerRequest,
+    routeProvider.calculateRoutes(routeInfo, selectedRoutingManager, offlineBrokerRequest, realtimeBrokerRequest,
         requestId);
 
     Set<ServerInstance> offlineExecutionServers = routeInfo.getOfflineExecutionServers();
@@ -713,7 +718,7 @@ public abstract class BaseSingleStageBrokerRequestHandler extends BaseBrokerRequ
       } else {
         // If no route is found, send an empty response
         return getEmptyBrokerOnlyResponse(pinotQuery, serverPinotQuery, requestContext, tableName, requesterIdentity,
-            schema, query, database);
+            schema, query, database, queryWasLogged);
       }
     }
     long routingEndTimeNs = System.nanoTime();
@@ -844,6 +849,15 @@ public abstract class BaseSingleStageBrokerRequestHandler extends BaseBrokerRequ
     for (QueryProcessingException errorMsg : errorMsgs) {
       brokerResponse.addException(errorMsg);
     }
+
+    // Add warnings for unavailable remote clusters in multi-cluster routing.
+    if (_multiClusterRoutingContext != null && QueryOptionsUtils.isMultiClusterRoutingEnabled(
+        pinotQuery.getQueryOptions(), false)) {
+      for (QueryProcessingException clusterException : _multiClusterRoutingContext.getUnavailableClusterExceptions()) {
+        brokerResponse.addException(clusterException);
+      }
+    }
+
     brokerResponse.setNumSegmentsPrunedByBroker(numPrunedSegmentsTotal);
     long executionEndTimeNs = System.nanoTime();
     _brokerMetrics.addPhaseTiming(rawTableName, BrokerQueryPhase.QUERY_EXECUTION,
@@ -894,9 +908,10 @@ public abstract class BaseSingleStageBrokerRequestHandler extends BaseBrokerRequ
     brokerResponse.setRLSFiltersApplied(rlsFiltersApplied.get());
 
     // Log query and stats
-    _queryLogger.log(
+    _queryLogger.logQueryCompleted(
         new QueryLogger.QueryLogParams(requestContext, tableName, brokerResponse,
-            QueryLogger.QueryLogParams.QueryEngine.SINGLE_STAGE, requesterIdentity, serverStats));
+            QueryLogger.QueryLogParams.QueryEngine.SINGLE_STAGE, requesterIdentity, serverStats),
+        queryWasLogged);
 
     return brokerResponse;
   }
@@ -1101,7 +1116,7 @@ public abstract class BaseSingleStageBrokerRequestHandler extends BaseBrokerRequ
 
   private BrokerResponseNative getEmptyBrokerOnlyResponse(PinotQuery pinotQuery, PinotQuery serverPinotQuery,
       RequestContext requestContext, String tableName, @Nullable RequesterIdentity requesterIdentity, Schema schema,
-      String query, String database) {
+      String query, String database, boolean queryWasLogged) {
     if (pinotQuery.isExplain()) {
       // EXPLAIN PLAN results to show that query is evaluated exclusively by Broker.
       return BrokerResponseNative.BROKER_ONLY_EXPLAIN_PLAN_OUTPUT;
@@ -1129,8 +1144,8 @@ public abstract class BaseSingleStageBrokerRequestHandler extends BaseBrokerRequ
     }
     brokerResponse.setTablesQueried(Set.of(TableNameBuilder.extractRawTableName(tableName)));
     brokerResponse.setTimeUsedMs(System.currentTimeMillis() - requestContext.getRequestArrivalTimeMillis());
-    _queryLogger.log(new QueryLogger.QueryLogParams(requestContext, tableName, brokerResponse,
-        QueryLogger.QueryLogParams.QueryEngine.SINGLE_STAGE, requesterIdentity, null));
+    _queryLogger.logQueryCompleted(new QueryLogger.QueryLogParams(requestContext, tableName, brokerResponse,
+        QueryLogger.QueryLogParams.QueryEngine.SINGLE_STAGE, requesterIdentity, null), queryWasLogged);
     return brokerResponse;
   }
 
@@ -1259,9 +1274,10 @@ public abstract class BaseSingleStageBrokerRequestHandler extends BaseBrokerRequ
         sqlNodeAndOptions.getOptions().putIfAbsent(QueryOptionKey.REGEX_DICT_SIZE_THRESHOLD, _regexDictSizeThreshold);
       }
 
+      // Pass false for queryWasLogged to avoid logging subqueries separately
       BrokerResponse response =
           doHandleRequest(requestId, subquery, sqlNodeAndOptions, jsonRequest, requesterIdentity, requestContext,
-              httpHeaders, accessControl);
+              httpHeaders, accessControl, false);
       if (response.getExceptionsSize() != 0) {
         throw new RuntimeException("Caught exception while executing subquery: " + subquery);
       }

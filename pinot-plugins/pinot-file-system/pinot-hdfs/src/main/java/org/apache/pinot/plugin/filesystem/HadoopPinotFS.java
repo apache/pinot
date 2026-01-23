@@ -81,11 +81,17 @@ public class HadoopPinotFS extends BasePinotFS {
   @Override
   public boolean delete(URI segmentUri, boolean forceDelete)
       throws IOException {
-    // Returns false if we are moving a directory and that directory is not empty
+    Path path = new Path(segmentUri);
+
+    if (!_hadoopFS.exists(path)) {
+      return true;
+    }
+
     if (isDirectory(segmentUri) && listFiles(segmentUri, false).length > 0 && !forceDelete) {
       return false;
     }
-    return _hadoopFS.delete(new Path(segmentUri), true);
+
+    return _hadoopFS.delete(path, true);
   }
 
   @Override
@@ -198,7 +204,7 @@ public class HadoopPinotFS extends BasePinotFS {
         throw new RuntimeException("_hadoopFS client is not initialized when trying to copy files");
       }
       if (_hadoopFS.isDirectory(remoteFile)) {
-        throw new IllegalArgumentException(srcUri.toString() + " is a direactory");
+        throw new IllegalArgumentException(srcUri.toString() + " is a directory");
       }
       long startMs = System.currentTimeMillis();
       _hadoopFS.copyToLocalFile(remoteFile, localFile);

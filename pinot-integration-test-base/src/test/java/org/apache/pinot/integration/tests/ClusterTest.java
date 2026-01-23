@@ -117,6 +117,7 @@ public abstract class ClusterTest extends ControllerTest {
   protected String _minionBaseApiUrl;
 
   protected boolean _useMultiStageQueryEngine = false;
+  protected boolean _usePhysicalOptimizer = false;
 
   protected int getServerGrpcPort() {
     return _serverGrpcPort;
@@ -146,8 +147,16 @@ public abstract class ClusterTest extends ControllerTest {
     return _useMultiStageQueryEngine;
   }
 
+  protected boolean usePhysicalOptimizer() {
+    return _usePhysicalOptimizer;
+  }
+
   protected void setUseMultiStageQueryEngine(boolean useMultiStageQueryEngine) {
     _useMultiStageQueryEngine = useMultiStageQueryEngine;
+  }
+
+  protected void setUsePhysicalOptimizer(boolean usePhysicalOptimizer) {
+    _usePhysicalOptimizer = usePhysicalOptimizer;
   }
 
   protected void disableMultiStageQueryEngine() {
@@ -582,9 +591,25 @@ public abstract class ClusterTest extends ControllerTest {
 
   public JsonNode postTimeseriesQuery(String baseUrl, String query, long startTime, long endTime,
       Map<String, String> headers) {
+    return postTimeseriesQuery(baseUrl, query, startTime, endTime, null, headers, null);
+  }
+
+  public JsonNode postTimeseriesQuery(String baseUrl, String query, long startTime, long endTime, String mode,
+      Map<String, String> headers, Map<String, Object> queryOptions) {
     try {
-      Map<String, String> payload = Map.of("language", "m3ql", "query", query, "start",
-          String.valueOf(startTime), "end", String.valueOf(endTime));
+      ObjectNode payload = JsonUtils.newObjectNode();
+      payload.put("language", "m3ql");
+      payload.put("query", query);
+      payload.put("start", String.valueOf(startTime));
+      payload.put("end", String.valueOf(endTime));
+      if (mode != null) {
+        payload.put("mode", mode);
+      }
+      if (queryOptions != null && !queryOptions.isEmpty()) {
+        ObjectNode queryOptionsNode = JsonUtils.newObjectNode();
+        queryOptions.forEach(queryOptionsNode::putPOJO);
+        payload.set("queryOptions", queryOptionsNode);
+      }
       return JsonUtils.stringToJsonNode(
           sendPostRequest(baseUrl + "/query/timeseries", JsonUtils.objectToString(payload), headers));
     } catch (Exception e) {
@@ -813,7 +838,11 @@ public abstract class ClusterTest extends ControllerTest {
     if (!useMultiStageQueryEngine()) {
       return Map.of();
     }
-    return Map.of("queryOptions", "useMultistageEngine=true");
+    StringBuilder queryOptions = new StringBuilder("useMultistageEngine=true");
+    if (usePhysicalOptimizer()) {
+      queryOptions.append("; usePhysicalOptimizer=true");
+    }
+    return Map.of("queryOptions", queryOptions.toString());
   }
 
   /**

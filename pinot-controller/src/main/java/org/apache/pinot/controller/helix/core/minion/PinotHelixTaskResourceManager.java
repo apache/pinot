@@ -42,6 +42,7 @@ import javax.annotation.Nullable;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.commons.lang3.tuple.Pair;
 import org.apache.hc.client5.http.io.HttpClientConnectionManager;
+import org.apache.helix.model.InstanceConfig;
 import org.apache.helix.store.zk.ZkHelixPropertyStore;
 import org.apache.helix.task.JobConfig;
 import org.apache.helix.task.JobContext;
@@ -56,6 +57,7 @@ import org.apache.helix.zookeeper.datamodel.ZNRecord;
 import org.apache.pinot.common.minion.MinionTaskMetadataUtils;
 import org.apache.pinot.common.utils.DateTimeUtils;
 import org.apache.pinot.common.utils.HashUtil;
+import org.apache.pinot.controller.api.resources.MinionStatusResponse;
 import org.apache.pinot.controller.helix.core.PinotHelixResourceManager;
 import org.apache.pinot.controller.util.CompletionServiceHelper;
 import org.apache.pinot.core.common.MinionConstants;
@@ -64,6 +66,7 @@ import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.ingestion.batch.BatchConfigProperties;
 import org.apache.pinot.spi.utils.CommonConstants;
 import org.apache.pinot.spi.utils.CommonConstants.Helix;
+import org.apache.pinot.spi.utils.InstanceTypeUtils;
 import org.apache.pinot.spi.utils.JsonUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -1299,7 +1302,7 @@ public class PinotHelixTaskResourceManager {
    * <p>E.g. TaskQueue_DummyTask -> DummyTask (from Helix JobQueue name)
    * <p>E.g. TaskQueue_DummyTask_Task_DummyTask_12345 -> DummyTask (from Helix Job name)
    *
-   * @param name Pinot task name, Helix JobQueue name or Helix Job name
+   * @param name Pinot task name, Helix JobQueue name, or Helix Job name
    * @return Task type
    */
   public static String getTaskType(String name) {
@@ -1338,6 +1341,129 @@ public class PinotHelixTaskResourceManager {
   public Map<String, Map<String, Long>> getTaskMetadataLastUpdateTimeMs() {
     ZkHelixPropertyStore<ZNRecord> propertyStore = _helixResourceManager.getPropertyStore();
     return MinionTaskMetadataUtils.getAllTaskMetadataLastUpdateTimeMs(propertyStore);
+  }
+
+  /**
+   * Gets the status of all minion instances, including their task counts and drain state.
+   *
+   * @param statusFilter Optional filter by status ("ONLINE", "OFFLINE", or "DRAINED"). If null, returns all minions.
+   * @param includeTaskCounts Whether to include running task counts For each minion. Default false.
+   * @return MinionStatusResponse containing status information for minion instances
+   */
+  public MinionStatusResponse getMinionStatus(String statusFilter, boolean includeTaskCounts) {
+    // Validate status filter
+    if (statusFilter != null && !statusFilter.isEmpty()) {
+      if (!"ONLINE".equalsIgnoreCase(statusFilter)
+          && !"OFFLINE".equalsIgnoreCase(statusFilter)
+          && !"DRAINED".equalsIgnoreCase(statusFilter)) {
+        throw new IllegalArgumentException("Invalid status filter. Must be 'ONLINE', 'OFFLINE', or 'DRAINED'");
+      }
+    }
+
+    // Get all instances and filter for minions, then sort them
+    List<String> allInstances = _helixResourceManager.getAllInstances();
+    List<String> minionInstances = allInstances.stream()
+        .filter(InstanceTypeUtils::isMinion)
+        .sorted()
+        .collect(Collectors.toList());
+
+    // Get running task counts per minion only if requested (can be expensive)
+    Map<String, Integer> runningTaskCounts = new HashMap<>();
+    if (includeTaskCounts) {
+      try {
+        runningTaskCounts = getRunningTaskCountsPerMinion();
+      } catch (Exception e) {
+        LOGGER.warn("Failed to get running task counts from task resource manager", e);
+        // Continue with an empty map - task counts will be 0
+      }
+    }
+
+    // Build status list for each minion
+    List<MinionStatusResponse.MinionStatus> minionStatusList = new ArrayList<>();
+    for (String minionInstanceId : minionInstances) {
+      InstanceConfig instanceConfig = _helixResourceManager.getHelixInstanceConfig(minionInstanceId);
+      if (instanceConfig == null) {
+        continue;
+      }
+
+      // Determine minion status: OFFLINE (disabled in Helix), DRAINED, or ONLINE
+      boolean isEnabled = instanceConfig.getInstanceEnabled();
+      List<String> tags = instanceConfig.getTags();
+      boolean isDrained = tags != null && tags.contains(Helix.DRAINED_MINION_INSTANCE);
+
+      String status;
+      if (!isEnabled) {
+        status = "OFFLINE";
+      } else if (isDrained) {
+        status = "DRAINED";
+      } else {
+        status = "ONLINE";
+      }
+
+      // Apply status filter if specified
+      if (statusFilter != null && !statusFilter.isEmpty() && !status.equalsIgnoreCase(statusFilter)) {
+        continue;
+      }
+
+      // Get host and port
+      String host = instanceConfig.getHostName();
+      int port = Integer.parseInt(instanceConfig.getPort());
+
+      // Get the running task count for this minion
+      int runningTaskCount = runningTaskCounts.getOrDefault(minionInstanceId, 0);
+
+      MinionStatusResponse.MinionStatus minionStatus =
+          new MinionStatusResponse.MinionStatus(minionInstanceId, host, port, runningTaskCount, status);
+      minionStatusList.add(minionStatus);
+    }
+
+    return new MinionStatusResponse(minionStatusList.size(), minionStatusList);
+  }
+
+  /**
+   * Gets the count of running tasks for each minion instance.
+   * This method iterates through all task workflows and jobs to count tasks in RUNNING state
+   * assigned to each minion.
+   *
+   * @return Map of minion instance ID to running task count
+   */
+  public synchronized Map<String, Integer> getRunningTaskCountsPerMinion() {
+    Map<String, Integer> runningTaskCounts = new HashMap<>();
+
+    // Get all workflows (task queues)
+    Set<String> workflows = _taskDriver.getWorkflows().keySet();
+
+    for (String workflow : workflows) {
+      WorkflowContext workflowContext = _taskDriver.getWorkflowContext(workflow);
+      if (workflowContext == null) {
+        continue;
+      }
+
+      // Get all jobs in this workflow
+      Set<String> jobs = workflowContext.getJobStates().keySet();
+      for (String job : jobs) {
+        JobContext jobContext = _taskDriver.getJobContext(job);
+        if (jobContext == null) {
+          continue;
+        }
+
+        // Iterate through all partitions (subtasks) in this job
+        Set<Integer> partitions = jobContext.getPartitionSet();
+        for (Integer partition : partitions) {
+          TaskPartitionState state = jobContext.getPartitionState(partition);
+          // Count INIT and RUNNING tasks (INIT means assigned but not yet started)
+          if (state == TaskPartitionState.RUNNING || state == TaskPartitionState.INIT) {
+            String assignedParticipant = jobContext.getAssignedParticipant(partition);
+            if (assignedParticipant != null) {
+              runningTaskCounts.put(assignedParticipant,
+                  runningTaskCounts.getOrDefault(assignedParticipant, 0) + 1);
+            }
+          }
+        }
+      }
+    }
+
+    return runningTaskCounts;
   }
 
   @JsonPropertyOrder({

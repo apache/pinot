@@ -1175,6 +1175,26 @@ public class TableConfigUtilsTest {
 
     try {
       FieldConfig fieldConfig =
+          new FieldConfig("myCol1", FieldConfig.EncodingType.RAW, null, null, CompressionCodec.DELTADELTA, null, null);
+      tableConfig.setFieldConfigList(Arrays.asList(fieldConfig));
+      TableConfigUtils.validate(tableConfig, schema);
+    } catch (Exception e) {
+      assertEquals(e.getMessage(),
+          "Compression codec DELTADELTA can only be used on INT/LONG data types, found STRING for column: myCol1");
+    }
+
+    try {
+      FieldConfig fieldConfig =
+          new FieldConfig("myCol2", FieldConfig.EncodingType.RAW, null, null, CompressionCodec.DELTADELTA, null, null);
+      tableConfig.setFieldConfigList(Arrays.asList(fieldConfig));
+      TableConfigUtils.validate(tableConfig, schema);
+    } catch (Exception e) {
+      assertEquals(e.getMessage(),
+          "Compression codec DELTADELTA can only be used on single-value columns, found multi-value column: myCol2");
+    }
+
+    try {
+      FieldConfig fieldConfig =
           new FieldConfig("myCol1", FieldConfig.EncodingType.DICTIONARY, FieldConfig.IndexType.FST, null, null);
       tableConfig.setFieldConfigList(Arrays.asList(fieldConfig));
       TableConfigUtils.validate(tableConfig, schema);
@@ -2480,6 +2500,121 @@ public class TableConfigUtilsTest {
     } catch (IllegalStateException e) {
       assertEquals(e.getMessage(), "The outOfOrderRecordColumn must be a single-valued BOOLEAN column");
     }
+
+    // test dropOutOfOrderRecord cannot be enabled with SYNC consistency mode
+    schema = new Schema.SchemaBuilder().setSchemaName(TABLE_NAME)
+        .setPrimaryKeyColumns(Lists.newArrayList("myPkCol"))
+        .addSingleValueDimension("myCol", FieldSpec.DataType.STRING)
+        .addSingleValueDimension("myPkCol", FieldSpec.DataType.STRING)
+        .build();
+    streamConfigs = getStreamConfigs();
+    upsertConfig = new UpsertConfig(UpsertConfig.Mode.FULL);
+    upsertConfig.setDropOutOfOrderRecord(true);
+    upsertConfig.setConsistencyMode(UpsertConfig.ConsistencyMode.SYNC);
+    upsertConfig.setNewSegmentTrackingTimeMs(60000L);
+    tableConfig = new TableConfigBuilder(TableType.REALTIME).setTableName(TABLE_NAME)
+        .setStreamConfigs(streamConfigs)
+        .setUpsertConfig(upsertConfig)
+        .setRoutingConfig(
+            new RoutingConfig(null, null, RoutingConfig.STRICT_REPLICA_GROUP_INSTANCE_SELECTOR_TYPE, false))
+        .build();
+    try {
+      TableConfigUtils.validateUpsertAndDedupConfig(tableConfig, schema);
+      fail("Expected IllegalStateException for dropOutOfOrderRecord with SYNC consistency mode");
+    } catch (IllegalStateException e) {
+      assertTrue(e.getMessage().contains("dropOutOfOrderRecord cannot be enabled when consistencyMode is SYNC"));
+    }
+
+    // test dropOutOfOrderRecord cannot be enabled with SNAPSHOT consistency mode
+    upsertConfig = new UpsertConfig(UpsertConfig.Mode.FULL);
+    upsertConfig.setDropOutOfOrderRecord(true);
+    upsertConfig.setConsistencyMode(UpsertConfig.ConsistencyMode.SNAPSHOT);
+    upsertConfig.setNewSegmentTrackingTimeMs(60000L);
+    tableConfig = new TableConfigBuilder(TableType.REALTIME).setTableName(TABLE_NAME)
+        .setStreamConfigs(streamConfigs)
+        .setUpsertConfig(upsertConfig)
+        .setRoutingConfig(
+            new RoutingConfig(null, null, RoutingConfig.STRICT_REPLICA_GROUP_INSTANCE_SELECTOR_TYPE, false))
+        .build();
+    try {
+      TableConfigUtils.validateUpsertAndDedupConfig(tableConfig, schema);
+      fail("Expected IllegalStateException for dropOutOfOrderRecord with SNAPSHOT consistency mode");
+    } catch (IllegalStateException e) {
+      assertTrue(e.getMessage().contains("dropOutOfOrderRecord cannot be enabled when consistencyMode is SNAPSHOT"));
+    }
+
+    // test dropOutOfOrderRecord is allowed with NONE consistency mode (should not throw)
+    upsertConfig = new UpsertConfig(UpsertConfig.Mode.FULL);
+    upsertConfig.setDropOutOfOrderRecord(true);
+    upsertConfig.setConsistencyMode(UpsertConfig.ConsistencyMode.NONE);
+    tableConfig = new TableConfigBuilder(TableType.REALTIME).setTableName(TABLE_NAME)
+        .setStreamConfigs(streamConfigs)
+        .setUpsertConfig(upsertConfig)
+        .setRoutingConfig(
+            new RoutingConfig(null, null, RoutingConfig.STRICT_REPLICA_GROUP_INSTANCE_SELECTOR_TYPE, false))
+        .build();
+    TableConfigUtils.validateUpsertAndDedupConfig(tableConfig, schema);
+
+    // test outOfOrderRecordColumn cannot be enabled with SYNC consistency mode
+    schema = new Schema.SchemaBuilder().setSchemaName(TABLE_NAME)
+        .setPrimaryKeyColumns(Lists.newArrayList("myPkCol"))
+        .addSingleValueDimension("myCol", FieldSpec.DataType.STRING)
+        .addSingleValueDimension("myPkCol", FieldSpec.DataType.STRING)
+        .addSingleValueDimension("isOutOfOrder", FieldSpec.DataType.BOOLEAN)
+        .build();
+    upsertConfig = new UpsertConfig(UpsertConfig.Mode.FULL);
+    upsertConfig.setOutOfOrderRecordColumn("isOutOfOrder");
+    upsertConfig.setConsistencyMode(UpsertConfig.ConsistencyMode.SYNC);
+    upsertConfig.setNewSegmentTrackingTimeMs(60000L);
+    tableConfig = new TableConfigBuilder(TableType.REALTIME).setTableName(TABLE_NAME)
+        .setStreamConfigs(streamConfigs)
+        .setUpsertConfig(upsertConfig)
+        .setRoutingConfig(
+            new RoutingConfig(null, null, RoutingConfig.STRICT_REPLICA_GROUP_INSTANCE_SELECTOR_TYPE, false))
+        .build();
+    try {
+      TableConfigUtils.validateUpsertAndDedupConfig(tableConfig, schema);
+      fail("Expected IllegalStateException for outOfOrderRecordColumn with SYNC consistency mode");
+    } catch (IllegalStateException e) {
+      assertTrue(e.getMessage().contains("outOfOrderRecordColumn cannot be configured when consistencyMode is SYNC"));
+    }
+
+    // test outOfOrderRecordColumn cannot be enabled with SNAPSHOT consistency mode
+    upsertConfig = new UpsertConfig(UpsertConfig.Mode.FULL);
+    upsertConfig.setOutOfOrderRecordColumn("isOutOfOrder");
+    upsertConfig.setConsistencyMode(UpsertConfig.ConsistencyMode.SNAPSHOT);
+    upsertConfig.setNewSegmentTrackingTimeMs(60000L);
+    tableConfig = new TableConfigBuilder(TableType.REALTIME).setTableName(TABLE_NAME)
+        .setStreamConfigs(streamConfigs)
+        .setUpsertConfig(upsertConfig)
+        .setRoutingConfig(
+            new RoutingConfig(null, null, RoutingConfig.STRICT_REPLICA_GROUP_INSTANCE_SELECTOR_TYPE, false))
+        .build();
+    try {
+      TableConfigUtils.validateUpsertAndDedupConfig(tableConfig, schema);
+      fail("Expected IllegalStateException for outOfOrderRecordColumn with SNAPSHOT consistency mode");
+    } catch (IllegalStateException e) {
+      assertTrue(
+          e.getMessage().contains("outOfOrderRecordColumn cannot be configured when consistencyMode is SNAPSHOT"));
+    }
+
+    // test outOfOrderRecordColumn is allowed with NONE consistency mode (should not throw)
+    schema = new Schema.SchemaBuilder().setSchemaName(TABLE_NAME)
+        .setPrimaryKeyColumns(Lists.newArrayList("myPkCol"))
+        .addSingleValueDimension("myCol", FieldSpec.DataType.STRING)
+        .addSingleValueDimension("myPkCol", FieldSpec.DataType.STRING)
+        .addSingleValueDimension("isOutOfOrder", FieldSpec.DataType.BOOLEAN)
+        .build();
+    upsertConfig = new UpsertConfig(UpsertConfig.Mode.FULL);
+    upsertConfig.setOutOfOrderRecordColumn("isOutOfOrder");
+    upsertConfig.setConsistencyMode(UpsertConfig.ConsistencyMode.NONE);
+    tableConfig = new TableConfigBuilder(TableType.REALTIME).setTableName(TABLE_NAME)
+        .setStreamConfigs(streamConfigs)
+        .setUpsertConfig(upsertConfig)
+        .setRoutingConfig(
+            new RoutingConfig(null, null, RoutingConfig.STRICT_REPLICA_GROUP_INSTANCE_SELECTOR_TYPE, false))
+        .build();
+    TableConfigUtils.validateUpsertAndDedupConfig(tableConfig, schema);
 
     // test enableDeletedKeysCompactionConsistency shouldn't exist with metadataTTL
     upsertConfig = new UpsertConfig(UpsertConfig.Mode.FULL);

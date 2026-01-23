@@ -98,7 +98,7 @@ public class ErrorOperator extends MultiStageOperator {
     return _childOperators;
   }
 
-  protected StatMap<?> copyStatMaps() {
+  public StatMap<LiteralValueOperator.StatKey> copyStatMaps() {
     return new StatMap<>(_statMap);
   }
 }

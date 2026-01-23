@@ -73,9 +73,9 @@ public final class SegmentProcessorUtils {
       }
     }
 
-    metricFieldSpecs.sort(Comparator.comparing(FieldSpec::getName));
-    fieldSpecs.addAll(nonMetricFieldSpecs);
     nonMetricFieldSpecs.sort(Comparator.comparing(FieldSpec::getName));
+    fieldSpecs.addAll(nonMetricFieldSpecs);
+    metricFieldSpecs.sort(Comparator.comparing(FieldSpec::getName));
     fieldSpecs.addAll(metricFieldSpecs);
 
     int numSortFields;

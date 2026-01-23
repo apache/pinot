@@ -159,6 +159,9 @@ public class CommonConstants {
     public static final String UNTAGGED_BROKER_INSTANCE = "broker_untagged";
     public static final String UNTAGGED_SERVER_INSTANCE = "server_untagged";
     public static final String UNTAGGED_MINION_INSTANCE = "minion_untagged";
+    public static final String DRAINED_MINION_INSTANCE = "minion_drained";
+
+    public static final String PREVIOUS_TAGS = "previousTags";
 
     public static class StateModel {
       public static class SegmentStateModel {
@@ -251,6 +254,9 @@ public class CommonConstants {
     @Deprecated(since = "1.5.0", forRemoval = true)
     public static final String CONFIG_OF_ZOOKEEPR_SERVER = "pinot.zk.server";
 
+    public static final String CONFIG_OF_REMOTE_CLUSTER_NAMES = "pinot.remote.cluster.names";
+    public static final String CONFIG_OF_REMOTE_ZOOKEEPER_SERVERS = "pinot.remote.zk.server.%s";
+
     public static final String CONFIG_OF_PINOT_CONTROLLER_STARTABLE_CLASS = "pinot.controller.startable.class";
     public static final String CONFIG_OF_PINOT_BROKER_STARTABLE_CLASS = "pinot.broker.startable.class";
     public static final String CONFIG_OF_PINOT_SERVER_STARTABLE_CLASS = "pinot.server.startable.class";
@@ -317,6 +323,12 @@ public class CommonConstants {
     // Setting the before serving queries to Integer.MAX_VALUE to effectively disable throttling by default
     public static final String DEFAULT_MAX_SEGMENT_DOWNLOAD_PARALLELISM_BEFORE_SERVING_QUERIES =
         String.valueOf(Integer.MAX_VALUE);
+
+    // SQL parsing
+    public static final String CONFIG_OF_SSE_LEGACY_LITERAL_UNESCAPING =
+        "pinot.query.sse.parsing.legacy.literal.unescaping";
+    // Usee legacy mode by default for backward compatibility. Will be changed in a future release.
+    public static final boolean DEFAULT_SSE_LEGACY_LITERAL_UNESCAPING = true;
   }
 
   public static class Broker {
@@ -862,6 +874,8 @@ public class CommonConstants {
         // MAX(stringCol) -> MAXSTRING(stringCol)
         // SUM(intCol) -> SUMINT(intCol)
         public static final String AUTO_REWRITE_AGGREGATION_TYPE = "autoRewriteAggregationType";
+        // When enabled, allows multi cluster/federated queries to be executed.
+        public static final String ENABLE_MULTI_CLUSTER_ROUTING = "enableMultiClusterRouting";
 
         /// Option to customize the value of [Broker#CONFIG_OF_SORT_EXCHANGE_COPY_THRESHOLD]
         public static final String SORT_EXCHANGE_COPY_THRESHOLD = "sortExchangeCopyThreshold";
@@ -1803,6 +1817,7 @@ public class CommonConstants {
     public static final String TOTAL_DOCS = "segment.total.docs";
     public static final String CRC = "segment.crc";
     public static final String DATA_CRC = "segment.data.crc";
+    public static final String USE_DATA_CRC = "segment.use.data.crc";
     public static final String TIER = "segment.tier";
     public static final String CREATION_TIME = "segment.creation.time";
     public static final String PUSH_TIME = "segment.push.time";
@@ -2146,5 +2161,22 @@ public class CommonConstants {
     public static final String LOGICAL_TABLE_PATH_PREFIX = "/LOGICAL/TABLE/";
     public static final String TABLE_CONFIG_PATH_PREFIX = "/CONFIGS/TABLE/";
     public static final String SCHEMA_PATH_PREFIX = "/SCHEMAS/";
+  }
+
+  /**
+   * Constants for cluster config change listeners.
+   */
+  public static class ConfigChangeListenerConstants {
+    /**
+     * Cluster config key to control whether force commit/reload is allowed for upsert tables
+     * with inconsistent state configurations (partial upsert or dropOutOfOrderRecord=true
+     * with consistency mode NONE and replication > 1).
+     */
+    public static final String FORCE_COMMIT_RELOAD_CONFIG = "pinot.server.upsert.force.commit.reload";
+
+    /**
+     * Default value: true (force commit/reload is allowed by default).
+     */
+    public static final boolean DEFAULT_FORCE_COMMIT_RELOAD = true;
   }
 }

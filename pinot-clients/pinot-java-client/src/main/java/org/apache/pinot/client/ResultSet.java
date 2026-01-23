@@ -18,6 +18,8 @@
  */
 package org.apache.pinot.client;
 
+import javax.annotation.Nullable;
+
 /**
  * A Pinot result group, representing an aggregation function in the original query.
  */
@@ -50,6 +52,7 @@ public interface ResultSet {
    * @param columnIndex The index of the column for which to retrieve the name
    * @return The data type of the column at the given column index. null if data type is not supported
    */
+  @Nullable
   String getColumnDataType(int columnIndex);
 
   /**

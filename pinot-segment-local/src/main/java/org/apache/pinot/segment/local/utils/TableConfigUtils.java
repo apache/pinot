@@ -881,6 +881,18 @@ public final class TableConfigUtils {
         Preconditions.checkState(upsertConfig.getNewSegmentTrackingTimeMs() > 0,
             "Positive newSegmentTrackingTimeMs is required to enable consistency mode: "
                 + upsertConfig.getConsistencyMode());
+        // dropOutOfOrderRecord and outOfOrderRecordColumn are not supported with SYNC/SNAPSHOT consistency mode
+        // because records must be indexed before metadata is updated. By the time we know if a record is
+        // out-of-order, it's already indexed - As of today, we can't skip indexing or update the
+        // out-of-order column value.
+        Preconditions.checkState(!upsertConfig.isDropOutOfOrderRecord(),
+            "dropOutOfOrderRecord cannot be enabled when consistencyMode is %s. "
+                + "Out-of-order records can only be dropped in NONE consistency mode.",
+            upsertConfig.getConsistencyMode());
+        Preconditions.checkState(upsertConfig.getOutOfOrderRecordColumn() == null,
+            "outOfOrderRecordColumn cannot be configured when consistencyMode is %s. "
+                + "Out-of-order record marking is only supported in NONE consistency mode.",
+            upsertConfig.getConsistencyMode());
       }
     }
 
@@ -1245,6 +1257,9 @@ public final class TableConfigUtils {
       for (FieldConfig fieldConfig : fieldConfigs) {
         String column = fieldConfig.getName();
         Preconditions.checkState(schema.hasColumn(column), "Failed to find column: %s in schema", column);
+
+        // Validate DELTA / DELTADELTA compression codecs compatibility
+        validateGorillaCompressionCodecIfPresent(fieldConfig, schema.getFieldSpecFor(column));
       }
       validateIndexingConfigAndFieldConfigListCompatibility(indexingConfig, fieldConfigs);
     }
@@ -1604,11 +1619,22 @@ public final class TableConfigUtils {
     }
   }
 
-  public static boolean checkForInconsistentStateConfigs(TableConfig tableConfig) {
-    return tableConfig != null && tableConfig.getUpsertConfig() != null && tableConfig.getReplication() > 1 && (
-        tableConfig.getUpsertConfig().getMode() == UpsertConfig.Mode.PARTIAL || (
-            tableConfig.getUpsertConfig().isDropOutOfOrderRecord()
-                && tableConfig.getUpsertConfig().getConsistencyMode() == UpsertConfig.ConsistencyMode.NONE));
+  /**
+   * Checks if the table config has inconsistent state configurations that could cause
+   * data inconsistency during force commit/reload operations.
+   *
+   * @param tableConfig the table config to check, may be null
+   * @return true if the table has inconsistent state configs, false if tableConfig is null or no issues found
+   */
+  public static boolean checkForInconsistentStateConfigs(@Nullable TableConfig tableConfig) {
+    UpsertConfig upsertConfig = tableConfig.getUpsertConfig();
+    if (upsertConfig == null) {
+      return false;
+    }
+    return tableConfig.getReplication() > 1 && (
+        upsertConfig.getMode() == UpsertConfig.Mode.PARTIAL
+            || (upsertConfig.isDropOutOfOrderRecord()
+            && upsertConfig.getConsistencyMode() == UpsertConfig.ConsistencyMode.NONE));
   }
 
   // enum of all the skip-able validation types.
@@ -1918,5 +1944,25 @@ public final class TableConfigUtils {
     Set<String> relevantTenants =
         getRelevantTags(tableConfig).stream().map(TagNameUtils::getTenantFromTag).collect(Collectors.toSet());
     return relevantTenants.contains(tenantName);
+  }
+
+  private static void validateGorillaCompressionCodecIfPresent(FieldConfig fieldConfig, FieldSpec fieldSpec) {
+    if (fieldConfig.getCompressionCodec() == null) {
+      return;
+    }
+    switch (fieldConfig.getCompressionCodec()) {
+      case DELTA:
+      case DELTADELTA:
+        Preconditions.checkState(fieldSpec.isSingleValueField(),
+            "Compression codec %s can only be used on single-value columns, found multi-value column: %s",
+            fieldConfig.getCompressionCodec(), fieldConfig.getName());
+        DataType storedType = fieldSpec.getDataType().getStoredType();
+        Preconditions.checkState(storedType == DataType.INT || storedType == DataType.LONG,
+            "Compression codec %s can only be used on INT/LONG data types, found %s for column: %s",
+            fieldConfig.getCompressionCodec(), storedType, fieldConfig.getName());
+        break;
+      default:
+        // no-op for other codecs
+    }
   }
 }
