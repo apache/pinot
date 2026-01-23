@@ -29,20 +29,16 @@ public class DimensionTableConfig extends BaseJsonConfig {
   private final boolean _enableUpsert;
 
   @JsonCreator
-  public DimensionTableConfig(@JsonProperty(value = "disablePreload") Boolean disablePreload,
-      @JsonProperty(value = "errorOnDuplicatePrimaryKey") Boolean errorOnDuplicatePrimaryKey,
-      @JsonProperty(value = "enableUpsert") Boolean enableUpsert) {
-    _disablePreload = disablePreload != null && disablePreload;
-    _errorOnDuplicatePrimaryKey = errorOnDuplicatePrimaryKey != null && errorOnDuplicatePrimaryKey;
-    _enableUpsert = enableUpsert != null && enableUpsert;
+  public DimensionTableConfig(@JsonProperty(value = "disablePreload") boolean disablePreload,
+      @JsonProperty(value = "errorOnDuplicatePrimaryKey") boolean errorOnDuplicatePrimaryKey,
+      @JsonProperty(value = "enableUpsert") boolean enableUpsert) {
+    _disablePreload = disablePreload;
+    _errorOnDuplicatePrimaryKey = errorOnDuplicatePrimaryKey;
+    _enableUpsert = enableUpsert;
   }
 
   public DimensionTableConfig(boolean disablePreload, boolean errorOnDuplicatePrimaryKey) {
-    this(disablePreload, errorOnDuplicatePrimaryKey, null);
-  }
-
-  public DimensionTableConfig(Boolean disablePreload, Boolean errorOnDuplicatePrimaryKey) {
-    this(disablePreload, errorOnDuplicatePrimaryKey, null);
+    this(disablePreload, errorOnDuplicatePrimaryKey, false);
   }
 
   public boolean isDisablePreload() {
