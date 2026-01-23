@@ -111,6 +111,7 @@ public abstract class IngestionBasedConsumptionStatusChecker {
                   realtimeTableDataManager.getTableName());
               skippedSegmentsLogged = true;
             }
+            caughtUpSegments.add(segName);
           } else if (isSegmentCaughtUp(segName, rtSegmentDataManager, realtimeTableDataManager)) {
             caughtUpSegments.add(segName);
           }
