@@ -80,7 +80,6 @@ public class FreshnessBasedConsumptionStatusChecker extends IngestionBasedConsum
 
     StreamMetadataProvider streamMetadataProvider =
         realtimeTableDataManager.getStreamMetadataProvider(rtSegmentDataManager);
-
     StreamPartitionMsgOffset latestStreamOffset =
         RealtimeSegmentMetadataUtils.fetchLatestStreamOffset(rtSegmentDataManager, streamMetadataProvider);
 

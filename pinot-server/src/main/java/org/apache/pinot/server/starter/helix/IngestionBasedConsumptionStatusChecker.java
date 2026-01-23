@@ -73,7 +73,7 @@ public abstract class IngestionBasedConsumptionStatusChecker {
       }
       Set<String> consumingSegments = tableSegments.getValue();
       Set<String> caughtUpSegments = _caughtUpSegmentsByTable.computeIfAbsent(tableNameWithType, k -> new HashSet<>());
-      boolean skipSegments = false;
+      boolean skippedSegmentsLogged = false;
 
       for (String segName : consumingSegments) {
         if (caughtUpSegments.contains(segName)) {
@@ -102,16 +102,16 @@ public abstract class IngestionBasedConsumptionStatusChecker {
           StreamMetadataProvider streamMetadataProvider =
               realtimeTableDataManager.getStreamMetadataProvider(rtSegmentDataManager);
 
-          if (!skipSegments && !streamMetadataProvider.supportsOffsetLag()) {
+          if (!streamMetadataProvider.supportsOffsetLag()) {
             // Cannot conclude if segment has caught up or not. Skip such segments.
-            _logger.warn(
-                "Stream provider for table: {} does not support offset subtraction. Cannot conclude if the segment "
-                    + "has caught up. Skipping the segments.",
-                realtimeTableDataManager.getTableName());
-            skipSegments = true;
-          }
-
-          if (skipSegments || isSegmentCaughtUp(segName, rtSegmentDataManager, realtimeTableDataManager)) {
+            if (!skippedSegmentsLogged) {
+              _logger.warn(
+                  "Stream provider for table: {} does not support offset subtraction. Cannot conclude if the segment "
+                      + "has caught up. Skipping the segments.",
+                  realtimeTableDataManager.getTableName());
+            }
+            skippedSegmentsLogged = true;
+          } else if (isSegmentCaughtUp(segName, rtSegmentDataManager, realtimeTableDataManager)) {
             caughtUpSegments.add(segName);
           }
         } finally {
