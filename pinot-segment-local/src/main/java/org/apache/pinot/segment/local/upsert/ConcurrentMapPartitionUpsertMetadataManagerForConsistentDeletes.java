@@ -145,7 +145,7 @@ public class ConcurrentMapPartitionUpsertMetadataManagerForConsistentDeletes
                       validDocIdsForOldSegment.remove(currentDocId);
                     }
                   }
-                  if (_context.hasInconsistentTableConfigs()) {
+                  if (_context.hasInconsistentTableConfigs() && currentSegment instanceof MutableSegment) {
                     _previousKeyToRecordLocationMap.remove(primaryKey);
                   }
                   return new RecordLocation(segment, newDocId, newComparisonValue,
@@ -153,8 +153,8 @@ public class ConcurrentMapPartitionUpsertMetadataManagerForConsistentDeletes
                 } else {
                   if (_context.hasInconsistentTableConfigs()) {
                     RecordLocation prevRecordLocation = _previousKeyToRecordLocationMap.get(primaryKey);
-                    if (prevRecordLocation == null
-                        || newComparisonValue.compareTo(prevRecordLocation.getComparisonValue()) >= 0) {
+                    if (currentSegment instanceof MutableSegment && (prevRecordLocation == null
+                        || newComparisonValue.compareTo(prevRecordLocation.getComparisonValue()) >= 0)) {
                       RecordLocation newRecordLocation =
                           new RecordLocation(segment, newDocId, newComparisonValue, currentDistinctSegmentCount);
                       _previousKeyToRecordLocationMap.put(primaryKey, newRecordLocation);
@@ -172,16 +172,13 @@ public class ConcurrentMapPartitionUpsertMetadataManagerForConsistentDeletes
                 numKeysInWrongSegment.getAndIncrement();
                 if (comparisonResult >= 0) {
                   addDocId(segment, validDocIds, queryableDocIds, newDocId, recordInfo);
-                  if (_context.hasInconsistentTableConfigs() && currentSegment instanceof MutableSegment) {
-                    _previousKeyToRecordLocationMap.remove(primaryKey);
-                  }
                   return new RecordLocation(segment, newDocId, newComparisonValue,
                       RecordLocation.incrementSegmentCount(currentDistinctSegmentCount));
                 } else {
                   if (_context.hasInconsistentTableConfigs()) {
                     RecordLocation prevRecordLocation = _previousKeyToRecordLocationMap.get(primaryKey);
-                    if (prevRecordLocation == null
-                        || newComparisonValue.compareTo(prevRecordLocation.getComparisonValue()) >= 0) {
+                    if (currentSegment instanceof MutableSegment && (prevRecordLocation == null
+                        || newComparisonValue.compareTo(prevRecordLocation.getComparisonValue()) >= 0)) {
                       RecordLocation newRecordLocation =
                           new RecordLocation(segment, newDocId, newComparisonValue, currentDistinctSegmentCount);
                       _previousKeyToRecordLocationMap.put(primaryKey, newRecordLocation);
@@ -199,15 +196,18 @@ public class ConcurrentMapPartitionUpsertMetadataManagerForConsistentDeletes
                   currentSegmentName, getAuthoritativeCreationTime(segment),
                   getAuthoritativeCreationTime(currentSegment)))) {
                 replaceDocId(segment, validDocIds, queryableDocIds, currentSegment, currentDocId, newDocId, recordInfo);
-                RecordLocation newRecordLocation = new RecordLocation(segment, newDocId, newComparisonValue,
+                return new RecordLocation(segment, newDocId, newComparisonValue,
                     RecordLocation.incrementSegmentCount(currentDistinctSegmentCount));
-                // - If current key is in consuming segment: key is moving to immutable segment,
-                //   consuming segment no longer owns it, remove the key location from the map
-                if (_context.hasInconsistentTableConfigs() && currentSegment instanceof MutableSegment) {
-                  _previousKeyToRecordLocationMap.remove(primaryKey);
-                }
-                return newRecordLocation;
               } else {
+                if (_context.hasInconsistentTableConfigs()) {
+                  RecordLocation prevRecordLocation = _previousKeyToRecordLocationMap.get(primaryKey);
+                  if (currentSegment instanceof MutableSegment && (prevRecordLocation == null
+                      || newComparisonValue.compareTo(prevRecordLocation.getComparisonValue()) >= 0)) {
+                    RecordLocation newRecordLocation =
+                        new RecordLocation(segment, newDocId, newComparisonValue, currentDistinctSegmentCount);
+                    _previousKeyToRecordLocationMap.put(primaryKey, newRecordLocation);
+                  }
+                }
                 return new RecordLocation(currentSegment, currentDocId, currentComparisonValue,
                     RecordLocation.incrementSegmentCount(currentDistinctSegmentCount));
               }
@@ -487,7 +487,7 @@ public class ConcurrentMapPartitionUpsertMetadataManagerForConsistentDeletes
                 return new RecordLocation(segment, newDocId, newComparisonValue,
                     currentRecordLocation.getDistinctSegmentCount());
               } else {
-                if (_context.hasInconsistentTableConfigs()) {
+                if (_context.hasInconsistentTableConfigs() && !(currentSegment instanceof MutableSegment)) {
                   _previousKeyToRecordLocationMap.put(primaryKey, currentRecordLocation);
                 }
                 replaceDocId(segment, validDocIds, queryableDocIds, currentSegment, currentDocId, newDocId, recordInfo);

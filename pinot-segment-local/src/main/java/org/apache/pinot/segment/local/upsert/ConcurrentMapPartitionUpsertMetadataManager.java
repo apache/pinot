@@ -139,9 +139,6 @@ public class ConcurrentMapPartitionUpsertMetadataManager extends BasePartitionUp
                 numKeysInWrongSegment.getAndIncrement();
                 if (comparisonResult >= 0) {
                   addDocId(segment, validDocIds, queryableDocIds, newDocId, recordInfo);
-                  if (_context.hasInconsistentTableConfigs() && currentSegment instanceof MutableSegment) {
-                    _previousKeyToRecordLocationMap.remove(primaryKey);
-                  }
                   return new RecordLocation(segment, newDocId, newComparisonValue);
                 } else {
                   RecordLocation prevRecordLocation = _previousKeyToRecordLocationMap.get(primaryKey);
@@ -163,15 +160,7 @@ public class ConcurrentMapPartitionUpsertMetadataManager extends BasePartitionUp
                   currentSegmentName, getAuthoritativeCreationTime(segment),
                   getAuthoritativeCreationTime(currentSegment)))) {
                 replaceDocId(segment, validDocIds, queryableDocIds, currentSegment, currentDocId, newDocId, recordInfo);
-                RecordLocation newRecordLocation = new RecordLocation(segment, newDocId, newComparisonValue);
-                // Track previous location for revert purposes:
-                // - If current key is in consuming segment:  key is moving to immutable segment,
-                //   consuming segment no longer owns it, remove this key from the map
-                // - If current key is in immutable segment: No-op
-                if (_context.hasInconsistentTableConfigs() && currentSegment instanceof MutableSegment) {
-                  _previousKeyToRecordLocationMap.remove(primaryKey);
-                }
-                return newRecordLocation;
+                return new RecordLocation(segment, newDocId, newComparisonValue);
               } else {
                 RecordLocation prevRecordLocation = _previousKeyToRecordLocationMap.get(primaryKey);
                 if (_context.hasInconsistentTableConfigs() && currentSegment instanceof MutableSegment
@@ -366,7 +355,7 @@ public class ConcurrentMapPartitionUpsertMetadataManager extends BasePartitionUp
               if (segment == currentSegment) {
                 replaceDocId(segment, validDocIds, queryableDocIds, currentDocId, newDocId, recordInfo);
               } else {
-                if (_context.hasInconsistentTableConfigs()) {
+                if (_context.hasInconsistentTableConfigs() && !(currentSegment instanceof MutableSegment)) {
                   _previousKeyToRecordLocationMap.put(primaryKey, currentRecordLocation);
                 }
                 replaceDocId(segment, validDocIds, queryableDocIds, currentSegment, currentDocId, newDocId, recordInfo);
