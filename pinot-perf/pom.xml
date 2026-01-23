@@ -179,6 +179,10 @@
               <name>pinot-BenchmarkStringDictionary</name>
             </program>
             <program>
+              <mainClass>org.apache.pinot.perf.aggregation.BenchmarkDistinctCountHLLThreshold</mainClass>
+              <name>pinot-BenchmarkDistinctCountHLLThreshold</name>
+            </program>
+            <program>
               <mainClass>org.apache.pinot.perf.DictionaryDumper</mainClass>
               <name>pinot-DictionaryDumper</name>
             </program>
@@ -201,6 +205,10 @@
             <program>
               <mainClass>org.apache.pinot.perf.aggregation.SumIntAggregationFunctionBenchmark</mainClass>
               <name>pinot-SumIntAggregationFunctionBenchmark</name>
+            </program>
+            <program>
+              <mainClass>org.apache.pinot.perf.BenchmarkJsonParsing</mainClass>
+              <name>pinot-BenchmarkJsonParsing</name>
             </program>
           </programs>
           <repositoryLayout>flat</repositoryLayout>

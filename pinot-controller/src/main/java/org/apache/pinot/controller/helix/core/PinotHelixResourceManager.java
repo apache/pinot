@@ -153,6 +153,8 @@ import org.apache.pinot.controller.helix.core.realtime.PinotLLCRealtimeSegmentMa
 import org.apache.pinot.controller.helix.core.util.ControllerZkHelixUtils;
 import org.apache.pinot.controller.helix.core.util.MessagingServiceUtils;
 import org.apache.pinot.controller.workload.QueryWorkloadManager;
+import org.apache.pinot.core.util.NumberUtils;
+import org.apache.pinot.core.util.NumericException;
 import org.apache.pinot.segment.spi.SegmentMetadata;
 import org.apache.pinot.spi.config.DatabaseConfig;
 import org.apache.pinot.spi.config.instance.Instance;
@@ -170,8 +172,12 @@ import org.apache.pinot.spi.config.user.UserConfig;
 import org.apache.pinot.spi.config.workload.QueryWorkloadConfig;
 import org.apache.pinot.spi.controller.ControllerJobType;
 import org.apache.pinot.spi.data.DateTimeFieldSpec;
+import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.LogicalTableConfig;
 import org.apache.pinot.spi.data.Schema;
+import org.apache.pinot.spi.stream.PartitionGroupConsumptionStatus;
+import org.apache.pinot.spi.stream.PartitionGroupMetadata;
+import org.apache.pinot.spi.stream.StreamConfig;
 import org.apache.pinot.spi.utils.CommonConstants;
 import org.apache.pinot.spi.utils.CommonConstants.Helix;
 import org.apache.pinot.spi.utils.CommonConstants.Helix.StateModel.BrokerResourceStateModel;
@@ -1569,9 +1575,56 @@ public class PinotHelixResourceManager {
       if (forceTableSchemaUpdate) {
         LOGGER.warn("Force updated schema: {} which is backward incompatible with the existing schema", oldSchema);
       } else {
-        // TODO: Add the reason of the incompatibility
-        throw new SchemaBackwardIncompatibleException("New schema: " + schemaName + " is not backward-compatible with "
-            + "the existing schema");
+        // Build detailed error message with incompatibility reasons
+        StringBuilder errorMsg = new StringBuilder();
+        errorMsg.append("New schema: ").append(schemaName)
+            .append(" is not backward-compatible with the existing schema.");
+        errorMsg.append("\n\nIncompatibility Details:");
+
+        // Check for missing columns
+        Set<String> newSchemaColumns = schema.getColumnNames();
+        List<String> missingColumns = new ArrayList<>();
+        for (String oldColumn : oldSchema.getColumnNames()) {
+          if (!newSchemaColumns.contains(oldColumn)) {
+            missingColumns.add(oldColumn);
+          }
+        }
+
+        if (!missingColumns.isEmpty()) {
+          errorMsg.append("\n- Missing columns (present in old schema but not in new): ").append(missingColumns);
+        }
+
+        // Check for incompatible field specs
+        List<String> incompatibleFields = new ArrayList<>();
+        for (Map.Entry<String, FieldSpec> entry : oldSchema.getFieldSpecMap().entrySet()) {
+          String columnName = entry.getKey();
+          if (newSchemaColumns.contains(columnName)) {
+            FieldSpec oldFieldSpec = entry.getValue();
+            FieldSpec newFieldSpec = schema.getFieldSpecFor(columnName);
+            if (!newFieldSpec.isBackwardCompatibleWith(oldFieldSpec)) {
+              incompatibleFields.add(String.format("%s (old: %s %s, new: %s %s)",
+                  columnName,
+                  oldFieldSpec.getFieldType(),
+                  oldFieldSpec.getDataType(),
+                  newFieldSpec.getFieldType(),
+                  newFieldSpec.getDataType()));
+            }
+          }
+        }
+
+        if (!incompatibleFields.isEmpty()) {
+          errorMsg.append("\n- Incompatible field specifications: ").append(incompatibleFields);
+        }
+
+        // Add suggestions
+        errorMsg.append("\n\nSuggestions to fix:");
+        errorMsg.append("\n1. Ensure all columns from the existing schema are retained in the new schema");
+        errorMsg.append("\n2. Do not change the data type or field type of existing columns");
+        errorMsg.append("\n3. New columns should be added as optional fields with default values");
+        errorMsg.append("\n4. If you must make breaking changes, consider creating a new schema version or use "
+            + "forceTableSchemaUpdate=true (use with caution)");
+
+        throw new SchemaBackwardIncompatibleException(errorMsg.toString());
       }
     }
     ZKMetadataProvider.setSchema(_propertyStore, schema);
@@ -1725,12 +1778,31 @@ public class PinotHelixResourceManager {
   /**
    * Performs validations of table config and adds the table to zookeeper
    * @throws InvalidTableConfigException if validations fail
-   * @throws TableAlreadyExistsException for offline tables only if the table already exists
+   * @throws TableAlreadyExistsException if the table already exists
    */
   public void addTable(TableConfig tableConfig)
       throws IOException {
+    addTable(tableConfig, Collections.emptyList());
+  }
+
+  /**
+   * Performs validations of table config and adds the table to zookeeper
+   * <p>Call this api when you wanted to create a realtime table with consuming segments starting to ingest from
+   * designated offset and being assigned with a segment sequence number per partition. Otherwise, you should
+   * directly call the {@link #addTable(TableConfig)} which will further call this api with an empty list.
+   * @param tableConfig The config for the table to be created.
+   * @param consumeMeta A list of pairs, where each pair contains the partition group metadata and the initial sequence
+   *                    number for a consuming segment. This is used to start ingestion from a specific offset.
+   * @throws InvalidTableConfigException if validations fail
+   * @throws TableAlreadyExistsException if the table already exists
+   */
+  public void addTable(TableConfig tableConfig, List<Pair<PartitionGroupMetadata, Integer>> consumeMeta)
+      throws IOException {
     String tableNameWithType = tableConfig.getTableName();
     LOGGER.info("Adding table {}: Start", tableNameWithType);
+    if (consumeMeta != null && !consumeMeta.isEmpty()) {
+      LOGGER.info("Adding table {} with {} partition group infos", tableNameWithType, consumeMeta.size());
+    }
 
     if (getTableConfig(tableNameWithType) != null) {
       throw new TableAlreadyExistsException("Table config for " + tableNameWithType
@@ -1789,10 +1861,16 @@ public class PinotHelixResourceManager {
         // Add ideal state
         _helixAdmin.addResource(_helixClusterName, tableNameWithType, idealState);
         LOGGER.info("Adding table {}: Added ideal state for offline table", tableNameWithType);
-      } else {
+      } else if (consumeMeta == null || consumeMeta.isEmpty()) {
         // Add ideal state with the first CONSUMING segment
         _pinotLLCRealtimeSegmentManager.setUpNewTable(tableConfig, idealState);
         LOGGER.info("Adding table {}: Added ideal state with first consuming segment", tableNameWithType);
+      } else {
+        // Add ideal state with the first CONSUMING segment with designated partition consuming metadata
+        // Add ideal state with the first CONSUMING segment
+        _pinotLLCRealtimeSegmentManager.setUpNewTable(tableConfig, idealState, consumeMeta);
+        LOGGER.info("Adding table {}: Added consuming segments ideal state given the designated consuming metadata",
+                tableNameWithType);
       }
     } catch (Exception e) {
       LOGGER.error("Caught exception while setting up table: {}, cleaning it up", tableNameWithType, e);
@@ -3603,6 +3681,47 @@ public class PinotHelixResourceManager {
   }
 
   /**
+   * Drains a minion instance by preventing new task assignments while allowing existing tasks to complete.
+   * This is achieved by replacing all instance tags with minion_drained. Since Helix uses containsTag()
+   * for task assignment matching, keeping any existing tags would still allow task assignments.
+   *
+   * @param instanceName Name of the minion instance to drain
+   * @return Response indicating success or failure
+   * @throws UnsupportedOperationException if the minion is already drained
+   */
+  public synchronized PinotResourceManagerResponse drainMinionInstance(String instanceName) {
+    InstanceConfig instanceConfig = getHelixInstanceConfig(instanceName);
+    if (instanceConfig == null) {
+      return PinotResourceManagerResponse.failure("Instance " + instanceName + " not found");
+    }
+
+    // Validate that minion is not already drained
+    List<String> currentTags = instanceConfig.getTags();
+    if (currentTags != null && currentTags.contains(Helix.DRAINED_MINION_INSTANCE)) {
+      return PinotResourceManagerResponse.failure("Minion instance " + instanceName + " is already drained");
+    }
+
+    // Store original tags so they can be restored when enabling the minion
+    if (currentTags != null && !currentTags.isEmpty()) {
+      instanceConfig.getRecord().setListField(Helix.PREVIOUS_TAGS, new ArrayList<>(currentTags));
+    }
+
+    // Replace all tags with minion_drained to prevent any task assignments
+    List<String> updatedTags = Collections.singletonList(Helix.DRAINED_MINION_INSTANCE);
+    instanceConfig.getRecord().setListField(
+        InstanceConfig.InstanceConfigProperty.TAG_LIST.name(), updatedTags);
+
+    // Save to Helix
+    if (!_helixDataAccessor.setProperty(_keyBuilder.instanceConfig(instanceName), instanceConfig)) {
+      return PinotResourceManagerResponse.failure("Failed to set instance config for instance: " + instanceName);
+    }
+
+    LOGGER.info("Successfully drained minion instance: {}", instanceName);
+    return PinotResourceManagerResponse.success(
+        "Successfully drained minion instance: " + instanceName);
+  }
+
+  /**
    * Utility to perform a safety check of the operation to drop an instance.
    * If the resource is not safe to drop the utility lists all the possible reasons.
    * @param instanceName Pinot instance name
@@ -3628,6 +3747,52 @@ public class PinotHelixResourceManager {
   }
 
   /**
+   * Restores previous tags for a drained minion instance if applicable.
+   * When a minion is drained, its original tags are stored and replaced with minion_drained.
+   * This method restores those original tags when enabling the instance.
+   *
+   * @param instanceName: Name of the instance to check and restore tags for
+   * @return PinotResourceManagerResponse indicating failure if restoration fails, or null if no action is needed
+   */
+  private PinotResourceManagerResponse restoreMinionTagsIfDrained(String instanceName) {
+    if (!InstanceTypeUtils.isMinion(instanceName)) {
+      return null;
+    }
+
+    InstanceConfig instanceConfig = getHelixInstanceConfig(instanceName);
+    // we can skip the null check for instanceConfig because instance existence is already
+    // validated in enableInstance method before this method is called
+    List<String> currentTags = instanceConfig.getTags();
+    if (currentTags == null || !currentTags.contains(Helix.DRAINED_MINION_INSTANCE)) {
+      // Not a drained minion, no action needed
+      return null;
+    }
+
+    // Restore pre-drain tags
+    List<String> preDrainTags = instanceConfig.getRecord().getListField(Helix.PREVIOUS_TAGS);
+    if (preDrainTags == null || preDrainTags.isEmpty()) {
+      // No previous tags to restore, just return null to continue with normal flow
+      instanceConfig.getRecord().setListField(
+          InstanceConfig.InstanceConfigProperty.TAG_LIST.name(), new ArrayList<>());
+    } else {
+      instanceConfig.getRecord().setListField(
+          InstanceConfig.InstanceConfigProperty.TAG_LIST.name(), new ArrayList<>(preDrainTags));
+      // Clear the stored pre-drain tags
+      instanceConfig.getRecord().getListFields().remove(Helix.PREVIOUS_TAGS);
+    }
+
+    // Save the updated config
+    if (!_helixDataAccessor.setProperty(_keyBuilder.instanceConfig(instanceName), instanceConfig)) {
+      return PinotResourceManagerResponse.failure(
+          "Failed to restore tags for minion instance: " + instanceName);
+    }
+
+    LOGGER.info("Successfully restored tags for minion instance: {}", instanceName);
+    // Return null to continue with normal enable flow
+    return null;
+  }
+
+  /**
    * Toggle the status of an Instance between OFFLINE and ONLINE.
    * Keeps checking until ideal-state is successfully updated or times out.
    *
@@ -3639,6 +3804,15 @@ public class PinotHelixResourceManager {
   private PinotResourceManagerResponse enableInstance(String instanceName, boolean enableInstance, long timeOutMs) {
     if (!instanceExists(instanceName)) {
       return PinotResourceManagerResponse.failure("Instance " + instanceName + " not found");
+    }
+
+    // If enabling a drained minion, restore its previous tags
+    if (enableInstance) {
+      PinotResourceManagerResponse restoreResponse = restoreMinionTagsIfDrained(instanceName);
+      if (restoreResponse != null) {
+        // Failed to restore tags for a drained minion
+        return restoreResponse;
+      }
     }
 
     _helixAdmin.enableInstance(_helixClusterName, instanceName, enableInstance);
@@ -4713,6 +4887,51 @@ public class PinotHelixResourceManager {
 
   public QueryWorkloadManager getQueryWorkloadManager() {
     return _queryWorkloadManager;
+  }
+
+  /**
+   * Retrieves the consumer watermark for a given real-time table.
+   * <p>The watermark represents the next offset to be consumed for each partition group.
+   * If the latest segment of a partition is in a DONE state, the watermark is the end offset of the completed segment.
+   * Otherwise, it is the start offset of the current consuming segment.
+   *
+   * @param tableName The name of the real-time table (without type suffix).
+   * @return A {@link WatermarkInductionResult} containing a list of watermarks for each partition group.
+   * @throws TableNotFoundException if the specified real-time table does not exist.
+   * @throws IllegalStateException if the IdealState for the table is not found.
+   */
+  public WatermarkInductionResult getConsumerWatermarks(String tableName) throws TableNotFoundException {
+    String tableNameWithType = TableNameBuilder.REALTIME.tableNameWithType(tableName);
+    if (!hasRealtimeTable(tableName)) {
+      throw new TableNotFoundException("Table " + tableNameWithType + " does not exist");
+    }
+    TableConfig tableConfig = getTableConfig(tableNameWithType);
+    Preconditions.checkNotNull(tableConfig, "Table " + tableNameWithType + "exists but null tableConfig");
+    List<StreamConfig> streamConfigs = IngestionConfigUtils.getStreamConfigs(tableConfig);
+    IdealState idealState = _helixAdmin
+        .getResourceIdealState(getHelixClusterName(), tableNameWithType);
+    if (idealState == null) {
+      throw new IllegalStateException("Null IdealState of the table " + tableNameWithType);
+    }
+    List<PartitionGroupConsumptionStatus> lst = _pinotLLCRealtimeSegmentManager
+        .getPartitionGroupConsumptionStatusList(idealState, streamConfigs);
+    List<WatermarkInductionResult.Watermark> watermarks = lst.stream().map(status -> {
+      int seq = status.getSequenceNumber();
+      long startOffset;
+      try {
+        if ("DONE".equalsIgnoreCase(status.getStatus())) {
+          Preconditions.checkNotNull(status.getEndOffset());
+          startOffset = NumberUtils.parseLong(status.getEndOffset().toString());
+          seq++;
+        } else {
+          startOffset = NumberUtils.parseLong(status.getStartOffset().toString());
+        }
+      } catch (NumericException e) {
+        throw new RuntimeException(e);
+      }
+      return new WatermarkInductionResult.Watermark(status.getPartitionGroupId(), seq, startOffset);
+    }).collect(Collectors.toList());
+    return new WatermarkInductionResult(watermarks);
   }
 
   /*

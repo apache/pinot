@@ -177,7 +177,10 @@ public class LuceneTextIndexReader implements TextIndexReader {
       }
       PinotDataBuffer docIdMappingBuffer = LuceneTextIndexBufferReader.extractDocIdMappingBuffer(indexBuffer, column);
       // Initialize docId translator
+      long startTime = System.currentTimeMillis();
       _docIdTranslator = createDocIdTranslator(docIdMappingBuffer, config, numDocs);
+      LOGGER.info("Time taken to create docIdTranslator for column {}: {} ms", column,
+          System.currentTimeMillis() - startTime);
       // Initialize analyzer and query parser
       _analyzer = TextIndexUtils.getAnalyzer(config);
       _queryParserClass = config.getLuceneQueryParserClass();
@@ -446,9 +449,15 @@ public class LuceneTextIndexReader implements TextIndexReader {
     }
 
     if (docIdMappingBuffer != null) {
-      return new DefaultDocIdTranslator(docIdMappingBuffer);
+      // Ensure the buffer is in little endian format as expected by DefaultDocIdTranslator
+      // Create a view with little endian byte order if the buffer is not already in little endian
+      PinotDataBuffer littleEndianBuffer = docIdMappingBuffer.order() == ByteOrder.LITTLE_ENDIAN
+          ? docIdMappingBuffer
+          : docIdMappingBuffer.view(0, docIdMappingBuffer.size(), ByteOrder.LITTLE_ENDIAN);
+      return new DefaultDocIdTranslator(littleEndianBuffer);
     }
 
+    LOGGER.info("building doc id mapping for text index column: {}", _column);
     // Create a new buffer and populate it
     int length = Integer.BYTES * numDocs;
     String desc = "Text index docId mapping buffer: " + _column;

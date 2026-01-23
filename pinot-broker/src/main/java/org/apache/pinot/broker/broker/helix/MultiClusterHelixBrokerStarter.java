@@ -22,8 +22,10 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import org.apache.helix.HelixConstants.ChangeType;
 import org.apache.helix.HelixManager;
 import org.apache.helix.HelixManagerFactory;
@@ -65,6 +67,9 @@ public class MultiClusterHelixBrokerStarter extends BaseBrokerStarter {
   protected MultiClusterRoutingManager _multiClusterRoutingManager;
   protected MultiClusterRoutingContext _multiClusterRoutingContext;
   protected Map<String, ClusterChangeMediator> _remoteClusterChangeMediator;
+
+  // Tracks clusters that failed to connect (for adding warnings to query responses)
+  protected Set<String> _unavailableClusters;
 
   public MultiClusterHelixBrokerStarter() {
   }
@@ -121,6 +126,7 @@ public class MultiClusterHelixBrokerStarter extends BaseBrokerStarter {
   }
 
   private void initRemoteClusterSpectatorHelixManagers() throws Exception {
+    _unavailableClusters = new HashSet<>();
     if (_remoteZkServers == null || _remoteZkServers.isEmpty()) {
       LOGGER.info("[multi-cluster] No remote ZK servers configured - skipping spectator Helix manager init");
       return;
@@ -141,6 +147,7 @@ public class MultiClusterHelixBrokerStarter extends BaseBrokerStarter {
         LOGGER.info("[multi-cluster] Connected to remote cluster '{}' at ZK: {}", clusterName, zkServers);
       } catch (Exception e) {
         LOGGER.error("[multi-cluster] Failed to connect to cluster '{}' at ZK: {}", clusterName, zkServers, e);
+        _unavailableClusters.add(clusterName);
         _brokerMetrics.addMeteredGlobalValue(BrokerMeter.MULTI_CLUSTER_BROKER_STARTUP_FAILURE, 1);
       }
     }
@@ -151,6 +158,10 @@ public class MultiClusterHelixBrokerStarter extends BaseBrokerStarter {
     } else {
       LOGGER.info("[multi-cluster] Connected to {}/{} remote clusters: {}", _remoteSpectatorHelixManager.size(),
         _remoteZkServers.size(), _remoteSpectatorHelixManager.keySet());
+    }
+    if (!_unavailableClusters.isEmpty()) {
+      LOGGER.warn("[multi-cluster] The following clusters are unavailable and will generate warnings "
+          + "in query responses: {}", _unavailableClusters);
     }
   }
 
@@ -271,9 +282,11 @@ public class MultiClusterHelixBrokerStarter extends BaseBrokerStarter {
     }
 
     _multiClusterRoutingContext = new MultiClusterRoutingContext(tableCacheMap, _routingManager,
-        _multiClusterRoutingManager);
-    LOGGER.info("[multi-cluster] Created federation provider with {}/{} clusters (1 primary + {} remote)",
-        tableCacheMap.size(), _remoteSpectatorHelixManager.size() + 1, tableCacheMap.size() - 1);
+        _multiClusterRoutingManager, _unavailableClusters);
+    LOGGER.info("[multi-cluster] Created federation provider with {}/{} clusters (1 primary + {} remote), "
+            + "{} unavailable",
+        tableCacheMap.size(), _remoteSpectatorHelixManager.size() + 1, tableCacheMap.size() - 1,
+        _unavailableClusters.size());
   }
 
   private void initRemoteClusterRouting() {
@@ -331,7 +344,6 @@ public class MultiClusterHelixBrokerStarter extends BaseBrokerStarter {
         handlers.put(ChangeType.IDEAL_STATE, Collections.singletonList(routingManager));
         handlers.put(ChangeType.EXTERNAL_VIEW, Collections.singletonList(routingManager));
         handlers.put(ChangeType.INSTANCE_CONFIG, Collections.singletonList(routingManager));
-        handlers.put(ChangeType.RESOURCE_CONFIG, Collections.singletonList(routingManager));
 
         ClusterChangeMediator mediator = new ClusterChangeMediator(handlers, _brokerMetrics);
         mediator.start();

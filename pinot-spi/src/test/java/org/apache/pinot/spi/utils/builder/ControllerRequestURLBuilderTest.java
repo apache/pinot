@@ -16,18 +16,19 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.pinot.query.runtime.context;
+package org.apache.pinot.spi.utils.builder;
 
-/**
- * The <code>ControllerContext</code> class is a singleton class which contains all controller related context.
- */
-public class ControllerContext {
-  private static final ControllerContext INSTANCE = new ControllerContext();
+import org.apache.pinot.spi.utils.StringUtil;
+import org.testng.annotations.Test;
 
-  private ControllerContext() {
-  }
+import static org.testng.Assert.assertEquals;
 
-  public static ControllerContext getInstance() {
-    return INSTANCE;
+public class ControllerRequestURLBuilderTest {
+
+  @Test
+  public void testForConsumerWatermarksGet() {
+    ControllerRequestURLBuilder builder = ControllerRequestURLBuilder.baseUrl("http://localhost:9000");
+    assertEquals(builder.forConsumerWatermarksGet("myTable"),
+        StringUtil.join("/", "http://localhost:9000", "tables", "myTable", "consumerWatermarks"));
   }
 }

@@ -52,6 +52,7 @@ import org.apache.pinot.common.response.broker.QueryProcessingException;
 import org.apache.pinot.common.utils.request.RequestUtils;
 import org.apache.pinot.core.auth.Actions;
 import org.apache.pinot.core.auth.TargetType;
+import org.apache.pinot.core.routing.MultiClusterRoutingContext;
 import org.apache.pinot.core.routing.RoutingManager;
 import org.apache.pinot.spi.accounting.ThreadAccountant;
 import org.apache.pinot.spi.auth.AuthorizationResult;
@@ -95,6 +96,8 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
   protected final boolean _enableQueryCancellation;
   @Nullable
   protected final String _enableAutoRewriteAggregationType;
+  @Nullable
+  protected final MultiClusterRoutingContext _multiClusterRoutingContext;
 
   /**
    * Maps broker-generated query id to the query string.
@@ -108,7 +111,7 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
   public BaseBrokerRequestHandler(PinotConfiguration config, String brokerId,
       BrokerRequestIdGenerator requestIdGenerator, RoutingManager routingManager,
       AccessControlFactory accessControlFactory, QueryQuotaManager queryQuotaManager, TableCache tableCache,
-      ThreadAccountant threadAccountant) {
+      ThreadAccountant threadAccountant, MultiClusterRoutingContext multiClusterRoutingContext) {
     _config = config;
     _brokerId = brokerId;
     _requestIdGenerator = requestIdGenerator;
@@ -117,6 +120,7 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
     _queryQuotaManager = queryQuotaManager;
     _tableCache = tableCache;
     _threadAccountant = threadAccountant;
+    _multiClusterRoutingContext = multiClusterRoutingContext;
     _brokerMetrics = BrokerMetrics.get();
     _brokerQueryEventListener = BrokerQueryEventListenerFactory.getBrokerQueryEventListener();
     _trackedHeaders = BrokerQueryEventListenerFactory.getTrackedHeaders();
@@ -146,18 +150,7 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
     requestContext.setBrokerId(_brokerId);
     long requestId = _requestIdGenerator.get();
     requestContext.setRequestId(requestId);
-
-    if (httpHeaders != null && !_trackedHeaders.isEmpty()) {
-      MultivaluedMap<String, String> requestHeaders = httpHeaders.getRequestHeaders();
-      Map<String, List<String>> trackedHeadersMap = Maps.newHashMapWithExpectedSize(_trackedHeaders.size());
-      for (Map.Entry<String, List<String>> entry : requestHeaders.entrySet()) {
-        String key = entry.getKey().toLowerCase();
-        if (_trackedHeaders.contains(key)) {
-          trackedHeadersMap.put(key, entry.getValue());
-        }
-      }
-      requestContext.setRequestHttpHeaders(trackedHeadersMap);
-    }
+    setTrackedHeadersInRequestContext(requestContext, httpHeaders, _trackedHeaders);
 
     // First-stage access control to prevent unauthenticated requests from using up resources. Secondary table-level
     // check comes later.
@@ -355,6 +348,21 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
     statistics.setExplainPlanNumEmptyFilterSegments(response.getExplainPlanNumEmptyFilterSegments());
     statistics.setExplainPlanNumMatchAllFilterSegments(response.getExplainPlanNumMatchAllFilterSegments());
     statistics.setTraceInfo(response.getTraceInfo());
+  }
+
+  protected static void setTrackedHeadersInRequestContext(RequestContext requestContext,
+      HttpHeaders httpHeaders, Set<String> trackedHeaders) {
+    if (httpHeaders != null && !trackedHeaders.isEmpty()) {
+      MultivaluedMap<String, String> requestHeaders = httpHeaders.getRequestHeaders();
+      Map<String, List<String>> trackedHeadersMap = Maps.newHashMapWithExpectedSize(trackedHeaders.size());
+      for (Map.Entry<String, List<String>> entry : requestHeaders.entrySet()) {
+        String key = entry.getKey().toLowerCase();
+        if (trackedHeaders.contains(key)) {
+          trackedHeadersMap.put(key, entry.getValue());
+        }
+      }
+      requestContext.setRequestHttpHeaders(trackedHeadersMap);
+    }
   }
 
   @Override

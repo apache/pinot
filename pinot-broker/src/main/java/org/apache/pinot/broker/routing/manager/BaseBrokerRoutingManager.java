@@ -36,6 +36,7 @@ import java.util.concurrent.ThreadFactory;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.locks.ReadWriteLock;
 import java.util.concurrent.locks.ReentrantReadWriteLock;
+import java.util.function.Consumer;
 import javax.annotation.Nullable;
 import org.apache.commons.lang3.tuple.Pair;
 import org.apache.helix.AccessOption;
@@ -129,6 +130,8 @@ public abstract class BaseBrokerRoutingManager implements RoutingManager, Cluste
   private final PinotConfiguration _pinotConfig;
   private final boolean _enablePartitionMetadataManager;
   private final ExecutorService _executorService;
+  @Nullable
+  private Consumer<ServerInstance> _serverReenableCallback;
 
   // Global read-write lock for protecting the global data structures such as _enabledServerInstanceMap,
   // _excludedServers, and _routableServers. Write lock must be held if any of these are modified, read lock must be
@@ -178,6 +181,14 @@ public abstract class BaseBrokerRoutingManager implements RoutingManager, Cluste
     _idealStatePathPrefix = helixDataAccessor.keyBuilder().idealStates().getPath() + "/";
     _instanceConfigsPath = helixDataAccessor.keyBuilder().instanceConfigs().getPath();
     _propertyStore = helixManager.getHelixPropertyStore();
+  }
+
+  /**
+   * Sets a callback to be invoked when a server is re-enabled after being excluded.
+   * This is useful for resetting gRPC channel state to avoid exponential backoff delays.
+   */
+  public void setServerReenableCallback(Consumer<ServerInstance> callback) {
+    _serverReenableCallback = callback;
   }
 
   private Object getRoutingTableBuildLock(String tableNameWithType) {
@@ -387,6 +398,12 @@ public abstract class BaseBrokerRoutingManager implements RoutingManager, Cluste
             // NOTE: Remove new enabled server from excluded servers because the server is likely being restarted
             if (_excludedServers.remove(instanceId)) {
               LOGGER.info("Got excluded server: {} re-enabled, including it into the routing", instanceId);
+              // We clear any GRPC channel reconnection backoff in this callback when a server is re-enabled. Otherwise,
+              // MSE queries to this server may fail fast until the next backoff retry succeeds.
+              if (_serverReenableCallback != null) {
+                LOGGER.info("Calling server re-enable callback for server: {}", instanceId);
+                _serverReenableCallback.accept(serverInstance);
+              }
             }
           }
         }

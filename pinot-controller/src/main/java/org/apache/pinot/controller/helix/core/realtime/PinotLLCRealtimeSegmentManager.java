@@ -56,6 +56,7 @@ import java.util.stream.Stream;
 import javax.annotation.Nullable;
 import org.apache.commons.collections4.CollectionUtils;
 import org.apache.commons.lang3.StringUtils;
+import org.apache.commons.lang3.tuple.Pair;
 import org.apache.helix.AccessOption;
 import org.apache.helix.ClusterMessagingService;
 import org.apache.helix.HelixAdmin;
@@ -104,8 +105,8 @@ import org.apache.pinot.controller.helix.core.retention.strategy.TimeRetentionSt
 import org.apache.pinot.controller.helix.core.util.MessagingServiceUtils;
 import org.apache.pinot.controller.validation.RealtimeSegmentValidationManager;
 import org.apache.pinot.core.data.manager.realtime.SegmentCompletionUtils;
+import org.apache.pinot.core.data.manager.realtime.UpsertInconsistentStateConfig;
 import org.apache.pinot.core.util.PeerServerSegmentFinder;
-import org.apache.pinot.segment.local.utils.TableConfigUtils;
 import org.apache.pinot.segment.spi.index.metadata.SegmentMetadataImpl;
 import org.apache.pinot.segment.spi.partition.metadata.ColumnPartitionMetadata;
 import org.apache.pinot.spi.config.table.ColumnPartitionConfig;
@@ -376,6 +377,20 @@ public class PinotLLCRealtimeSegmentManager {
    * <p>NOTE: the passed in IdealState may contain HLC segments if both HLC and LLC are configured.
    */
   public void setUpNewTable(TableConfig tableConfig, IdealState idealState) {
+    List<StreamConfig> streamConfigs = IngestionConfigUtils.getStreamConfigs(tableConfig);
+    List<Pair<PartitionGroupMetadata, Integer>> newPartitionGroupMetadataList =
+        getNewPartitionGroupMetadataList(streamConfigs, Collections.emptyList(), idealState).stream().map(
+            x -> Pair.of(x, STARTING_SEQUENCE_NUMBER)
+        ).collect(Collectors.toList());
+    setUpNewTable(tableConfig, idealState, newPartitionGroupMetadataList);
+  }
+
+  /**
+   * Sets up the initial segments for a new LLC real-time table.
+   * <p>NOTE: the passed in IdealState may contain HLC segments if both HLC and LLC are configured.
+   */
+  public void setUpNewTable(TableConfig tableConfig, IdealState idealState,
+      List<Pair<PartitionGroupMetadata, Integer>> consumeMeta) {
     Preconditions.checkState(!_isStopping, "Segment manager is stopping");
 
     String realtimeTableName = tableConfig.getTableName();
@@ -384,9 +399,7 @@ public class PinotLLCRealtimeSegmentManager {
     List<StreamConfig> streamConfigs = IngestionConfigUtils.getStreamConfigs(tableConfig);
     streamConfigs.forEach(_flushThresholdUpdateManager::clearFlushThresholdUpdater);
     InstancePartitions instancePartitions = getConsumingInstancePartitions(tableConfig);
-    List<PartitionGroupMetadata> newPartitionGroupMetadataList =
-        getNewPartitionGroupMetadataList(streamConfigs, Collections.emptyList(), idealState);
-    int numPartitionGroups = newPartitionGroupMetadataList.size();
+    int numPartitionGroups = consumeMeta.size();
     int numReplicas = getNumReplicas(tableConfig, instancePartitions);
 
     SegmentAssignment segmentAssignment =
@@ -396,11 +409,13 @@ public class PinotLLCRealtimeSegmentManager {
 
     long currentTimeMs = getCurrentTimeMs();
     Map<String, Map<String, String>> instanceStatesMap = idealState.getRecord().getMapFields();
-    for (PartitionGroupMetadata partitionGroupMetadata : newPartitionGroupMetadataList) {
+    for (Pair<PartitionGroupMetadata, Integer> pair : consumeMeta) {
+      PartitionGroupMetadata metadata = pair.getLeft();
+      int sequence = pair.getRight();
       StreamConfig streamConfig = IngestionConfigUtils.getStreamConfigFromPinotPartitionId(streamConfigs,
-          partitionGroupMetadata.getPartitionGroupId());
+          metadata.getPartitionGroupId());
       String segmentName =
-          setupNewPartitionGroup(tableConfig, streamConfig, partitionGroupMetadata, currentTimeMs, instancePartitions,
+          setupNewPartitionGroup(tableConfig, streamConfig, metadata, sequence, currentTimeMs, instancePartitions,
               numPartitionGroups, numReplicas);
       updateInstanceStatesForNewConsumingSegment(instanceStatesMap, null, segmentName, segmentAssignment,
           instancePartitionsMap);
@@ -1903,17 +1918,26 @@ public class PinotLLCRealtimeSegmentManager {
   private String setupNewPartitionGroup(TableConfig tableConfig, StreamConfig streamConfig,
       PartitionGroupMetadata partitionGroupMetadata, long creationTimeMs, InstancePartitions instancePartitions,
       int numPartitions, int numReplicas) {
+    return setupNewPartitionGroup(tableConfig, streamConfig, partitionGroupMetadata, STARTING_SEQUENCE_NUMBER,
+        creationTimeMs, instancePartitions, numPartitions, numReplicas);
+  }
+
+  private String setupNewPartitionGroup(TableConfig tableConfig, StreamConfig streamConfig,
+      PartitionGroupMetadata partitionGroupMetadata, int sequence, long creationTimeMs,
+      InstancePartitions instancePartitions, int numPartitions, int numReplicas) {
     String realtimeTableName = tableConfig.getTableName();
     int partitionGroupId = partitionGroupMetadata.getPartitionGroupId();
     String startOffset = partitionGroupMetadata.getStartOffset().toString();
-    LOGGER.info("Setting up new partition group: {} for table: {}", partitionGroupId, realtimeTableName);
+    LOGGER.info("Setting up new partition group: {} for table: {} with sequence: {} and startOffset: {}",
+        partitionGroupId, realtimeTableName, sequence, startOffset);
 
     String rawTableName = TableNameBuilder.extractRawTableName(realtimeTableName);
     LLCSegmentName newLLCSegmentName =
-        new LLCSegmentName(rawTableName, partitionGroupId, STARTING_SEQUENCE_NUMBER, creationTimeMs);
+        new LLCSegmentName(rawTableName, partitionGroupId, sequence, creationTimeMs);
     String newSegmentName = newLLCSegmentName.getSegmentName();
 
-    CommittingSegmentDescriptor committingSegmentDescriptor = new CommittingSegmentDescriptor(null, startOffset, 0);
+    CommittingSegmentDescriptor committingSegmentDescriptor = new CommittingSegmentDescriptor(null,
+            startOffset, 0);
     createNewSegmentZKMetadata(tableConfig, streamConfig, newLLCSegmentName, creationTimeMs,
         committingSegmentDescriptor, null, instancePartitions, numPartitions, numReplicas);
 
@@ -2299,6 +2323,9 @@ public class PinotLLCRealtimeSegmentManager {
    */
   public Set<String> forceCommit(String tableNameWithType, @Nullable String partitionGroupIdsToCommit,
       @Nullable String segmentsToCommit, @Nullable BatchConfig batchConfig) {
+    // Validate force commit is allowed BEFORE setting pause state to avoid leaving table in paused state on failure
+    validateForceCommitAllowed(tableNameWithType);
+
     IdealState idealState = getIdealState(tableNameWithType);
     Set<String> allConsumingSegments = findConsumingSegments(idealState);
     Set<String> targetConsumingSegments =
@@ -2467,11 +2494,15 @@ public class PinotLLCRealtimeSegmentManager {
 
   /**
    * Pause consumption on a table by
-   *   1) Update PauseState in the table ideal state and
-   *   2) Sending force commit messages to servers
+   *   1) Validate force commit is allowed for this table (fail fast before modifying state)
+   *   2) Update PauseState in the table ideal state and
+   *   3) Sending force commit messages to servers
    */
   public PauseStatusDetails pauseConsumption(String tableNameWithType, PauseState.ReasonCode reasonCode,
       @Nullable String comment, @Nullable BatchConfig batchConfig) {
+    // Validate force commit is allowed BEFORE setting pause state to avoid leaving table in paused state on failure
+    validateForceCommitAllowed(tableNameWithType);
+
     IdealState updatedIdealState = updatePauseStateInIdealState(tableNameWithType, true, reasonCode, comment);
     Set<String> consumingSegments = findConsumingSegments(updatedIdealState);
     forceCommit(tableNameWithType, null, null, batchConfig);
@@ -2524,6 +2555,9 @@ public class PinotLLCRealtimeSegmentManager {
   }
 
   public PauseState pauseTopicsConsumption(String tableNameWithType, List<Integer> indexOfPausedTopics) {
+    // Validate force commit is allowed BEFORE modifying IdealState to avoid leaving table in paused state on failure
+    validateForceCommitAllowed(tableNameWithType);
+
     IdealState updatedIdealState = HelixHelper.updateIdealState(_helixManager, tableNameWithType, idealState -> {
       PauseState pauseState = extractTablePauseState(idealState);
       if (pauseState == null) {
@@ -2571,21 +2605,29 @@ public class PinotLLCRealtimeSegmentManager {
     return extractTablePauseState(updatedIdealState);
   }
 
-  private void sendForceCommitMessageToServers(String tableNameWithType, Set<String> consumingSegments) {
-    // For partial-upsert tables or upserts with out-of-order events enabled, force-committing
-    // consuming segments is disabled. In some cases (especially when replication > 1), the
-    // server that consumed fewer rows was incorrectly selected as the winner, causing other
-    // servers to reconsume rows and resulting in inconsistent data when previous state must
-    // be referenced for add/update operations.
-    // TODO: Temporarily disabled until a proper fix is implemented.
+  /**
+   * Validates that force commit is allowed for the given table.
+   * Throws IllegalStateException if force commit is disabled for partial-upsert tables
+   * or upsert tables with dropOutOfOrder enabled when replication > 1.
+   */
+  private void validateForceCommitAllowed(String tableNameWithType) {
     TableConfig tableConfig = _helixResourceManager.getTableConfig(tableNameWithType);
-    if (TableConfigUtils.checkForInconsistentStateConfigs(tableConfig)) {
-      throw new IllegalStateException(
-          "Force commit is not allowed when replication > 1 for partial-upsert tables, or for upsert tables"
-              + " when dropOutOfOrder is enabled with consistency mode: " + UpsertConfig.ConsistencyMode.NONE
-              + " for the table: " + tableNameWithType);
+    if (tableConfig == null) {
+      throw new IllegalStateException("Table config not found for table: " + tableNameWithType);
     }
+    UpsertInconsistentStateConfig configInstance = UpsertInconsistentStateConfig.getInstance();
+    if (!configInstance.isForceCommitReloadAllowed(tableConfig)) {
+      throw new IllegalStateException(
+          "Force commit disabled for table: " + tableNameWithType
+              + ". Table is configured as partial upsert or dropOutOfOrderRecord=true with replication > 1, "
+              + "which can cause data inconsistency during force commit. "
+              + "Current cluster config '" + configInstance.getConfigKey() + "' is set to: "
+              + configInstance.isForceCommitReloadEnabled()
+              + ". To enable force commit, set this config to 'true'.");
+    }
+  }
 
+  private void sendForceCommitMessageToServers(String tableNameWithType, Set<String> consumingSegments) {
     if (!consumingSegments.isEmpty()) {
       LOGGER.info("Sending force commit messages for segments: {} of table: {}", consumingSegments, tableNameWithType);
       ClusterMessagingService messagingService = _helixManager.getMessagingService();

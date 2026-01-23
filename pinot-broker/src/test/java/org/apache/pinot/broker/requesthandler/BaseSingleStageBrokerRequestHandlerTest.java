@@ -191,7 +191,7 @@ public class BaseSingleStageBrokerRequestHandlerTest {
     BaseSingleStageBrokerRequestHandler requestHandler =
         new BaseSingleStageBrokerRequestHandler(config, "testBrokerId", new BrokerRequestIdGenerator(), routingManager,
             new AllowAllAccessControlFactory(), queryQuotaManager, tableCache,
-            ThreadAccountantUtils.getNoOpAccountant()) {
+            ThreadAccountantUtils.getNoOpAccountant(), null) {
           @Override
           public void start() {
           }

@@ -34,6 +34,7 @@ import org.apache.helix.HelixAdmin;
 import org.apache.helix.model.ExternalView;
 import org.apache.helix.model.InstanceConfig;
 import org.apache.pinot.common.restlet.resources.ValidDocIdsBitmapResponse;
+import org.apache.pinot.common.restlet.resources.ValidDocIdsMetadataInfo;
 import org.apache.pinot.common.restlet.resources.ValidDocIdsType;
 import org.apache.pinot.common.utils.RoaringBitmapUtils;
 import org.apache.pinot.common.utils.ServiceStatus;
@@ -156,7 +157,7 @@ public class MinionTaskUtils {
       return singleFileGenerationTaskConfig;
     } catch (Exception e) {
       singleFileGenerationTaskConfig.put(BatchConfigProperties.PUSH_MODE,
-            BatchConfigProperties.SegmentPushType.TAR.toString());
+          BatchConfigProperties.SegmentPushType.TAR.toString());
       return singleFileGenerationTaskConfig;
     }
   }
@@ -333,5 +334,48 @@ public class MinionTaskUtils {
           "'deleteRecordColumn' must be provided with validDocIdsType: %s", validDocIdsType);
     }
     return validDocIdsType;
+  }
+
+  /**
+   * Checks if all replicas have consensus on validDoc counts for a segment.
+   * SAFETY LOGIC:
+   * 1. Only proceed with operations when ALL replicas agree on totalValidDocs count
+   * 2. Skip operations if ANY server hosting the segment is not in READY state
+   * 3. Include all replicas (even those with CRC mismatches) in consensus for safety
+   *
+   * @param segmentName the name of the segment being checked
+   * @param replicaMetadataList list of metadata from all replicas of the segment
+   * @return true if all replicas have consensus on validDoc counts, false otherwise
+   */
+  public static boolean hasValidDocConsensus(String segmentName,
+      List<ValidDocIdsMetadataInfo> replicaMetadataList) {
+
+    if (replicaMetadataList == null || replicaMetadataList.isEmpty()) {
+      LOGGER.warn("No replica metadata available for segment: {}", segmentName);
+      return false;
+    }
+
+    // Check server readiness and validDoc consensus
+    Long consensusValidDocs = null;
+    for (ValidDocIdsMetadataInfo metadata : replicaMetadataList) {
+      // Check server readiness - skip if ANY server is not ready
+      if (metadata.getServerStatus() != null && !metadata.getServerStatus().equals(ServiceStatus.Status.GOOD)) {
+        LOGGER.warn("Server {} is in {} state for segment: {}, skipping consensus check",
+            metadata.getInstanceId(), metadata.getServerStatus(), segmentName);
+        return false;
+      }
+
+      // Check if all replicas have the same totalValidDocs count
+      long validDocs = metadata.getTotalValidDocs();
+      if (consensusValidDocs == null) {
+        // First iteration, we record the value to compare against
+        consensusValidDocs = validDocs;
+      } else if (!consensusValidDocs.equals(validDocs)) {
+        LOGGER.warn("Inconsistent validDoc counts across replicas for segment: {}. Expected: {}, but found: {}",
+            segmentName, consensusValidDocs, validDocs);
+        return false;
+      }
+    }
+    return true;
   }
 }
