@@ -325,9 +325,8 @@ public class DimensionTableDataManager extends OfflineTableDataManager {
             Object[] primaryKey = recordReader.getRecordValues(i, pkIndexes);
 
             long readerIdxAndDocId = (((long) readerIdx) << 32) | (i & 0xffffffffL);
-            boolean hasExistingKey = lookupTable.containsKey(primaryKey);
-            lookupTable.put(primaryKey, readerIdxAndDocId);
-            if (!_enableUpsert && _errorOnDuplicatePrimaryKey && hasExistingKey) {
+            long previousValue = lookupTable.put(primaryKey, readerIdxAndDocId);
+            if (!_enableUpsert && _errorOnDuplicatePrimaryKey && previousValue != Long.MIN_VALUE) {
               throw new IllegalStateException(
                   "Caught exception while reading records from segment: " + indexSegment.getSegmentName()
                       + " primary key already exists for: " + Arrays.toString(primaryKey));
