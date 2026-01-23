@@ -113,7 +113,7 @@ public class SchemaCompatibilityTest {
         .setSchemaName("test_table")
         .addSingleValueDimension("user_id", FieldSpec.DataType.STRING)
         .addMetric("age", FieldSpec.DataType.LONG) // Changed INT to LONG
-        .addMetric("score", FieldSpec.DataType.STRING) // Changed FLOAT to STRING
+        .addMetric("score", FieldSpec.DataType.DOUBLE) // Changed FLOAT to DOUBLE
         .build();
 
     // Test backward compatibility
@@ -127,7 +127,7 @@ public class SchemaCompatibilityTest {
     String detailedMessage = result.getDetailedErrorMessage();
     Assert.assertTrue(detailedMessage.contains("data type mismatch"));
     Assert.assertTrue(detailedMessage.contains("age") && detailedMessage.contains("INT") && detailedMessage.contains("LONG"));
-    Assert.assertTrue(detailedMessage.contains("score") && detailedMessage.contains("FLOAT") && detailedMessage.contains("STRING"));
+    Assert.assertTrue(detailedMessage.contains("score") && detailedMessage.contains("FLOAT") && detailedMessage.contains("DOUBLE"));
     Assert.assertTrue(detailedMessage.contains("💡 Suggestion"));
     
     // Check summary error message
@@ -149,7 +149,7 @@ public class SchemaCompatibilityTest {
     Schema newSchema = new Schema.SchemaBuilder()
         .setSchemaName("test_table")
         .addSingleValueDimension("user_id", FieldSpec.DataType.STRING)
-        .addMetric("category", FieldSpec.DataType.STRING) // Changed DIMENSION to METRIC
+        .addMetric("category", FieldSpec.DataType.STRING) // Changed DIMENSION to METRIC (invalid but for testing)
         .addSingleValueDimension("count", FieldSpec.DataType.INT) // Changed METRIC to DIMENSION
         .build();
 
@@ -226,9 +226,9 @@ public class SchemaCompatibilityTest {
         .setSchemaName("test_table")
         .addSingleValueDimension("user_id", FieldSpec.DataType.STRING)
         // Missing: name (MISSING_COLUMN)
-        .addMetric("category", FieldSpec.DataType.STRING) // Changed DIMENSION to METRIC (FIELD_TYPE_MISMATCH)
+        .addMetric("category", FieldSpec.DataType.INT) // Changed DIMENSION to METRIC (FIELD_TYPE_MISMATCH)
         .addSingleValueDimension("tags", FieldSpec.DataType.STRING) // Changed multi-value to single-value (SINGLE_MULTI_VALUE_MISMATCH)
-        .addMetric("age", FieldSpec.DataType.STRING) // Changed INT to STRING (DATA_TYPE_MISMATCH)  
+        .addMetric("age", FieldSpec.DataType.LONG) // Changed INT to LONG (DATA_TYPE_MISMATCH)  
         .addMetric("score", FieldSpec.DataType.DOUBLE)
         .build();
 
