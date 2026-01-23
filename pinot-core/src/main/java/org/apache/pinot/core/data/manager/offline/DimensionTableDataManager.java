@@ -106,7 +106,6 @@ public class DimensionTableDataManager extends OfflineTableDataManager {
 
   private boolean _disablePreload;
   private boolean _errorOnDuplicatePrimaryKey = false;
-  private boolean _enableUpsert = false;
 
   @Override
   protected void doInit() {
@@ -125,7 +124,6 @@ public class DimensionTableDataManager extends OfflineTableDataManager {
     if (dimensionTableConfig != null) {
       _disablePreload = dimensionTableConfig.isDisablePreload();
       _errorOnDuplicatePrimaryKey = dimensionTableConfig.isErrorOnDuplicatePrimaryKey();
-      _enableUpsert = dimensionTableConfig.isEnableUpsert();
     }
 
     if (_disablePreload) {
@@ -216,9 +214,7 @@ public class DimensionTableDataManager extends OfflineTableDataManager {
         "Primary key columns must be configured for dimension table: %s", _tableNameWithType);
 
     List<SegmentDataManager> segmentDataManagers = acquireAllSegments();
-    if (_enableUpsert) {
-      sortSegmentsForUpsert(segmentDataManagers);
-    }
+    sortSegmentsForUpsert(segmentDataManagers);
     try {
       // count all documents to limit map re-sizings
       int totalDocs = 0;
@@ -252,7 +248,7 @@ public class DimensionTableDataManager extends OfflineTableDataManager {
               Object[] values = recordReader.getRecordValues(i, valIndexes);
 
               Object[] previousValue = lookupTable.put(primaryKey, values);
-              if (!_enableUpsert && _errorOnDuplicatePrimaryKey && previousValue != null) {
+              if (_errorOnDuplicatePrimaryKey && previousValue != null) {
                 throw new IllegalStateException(
                     "Caught exception while reading records from segment: " + indexSegment.getSegmentName()
                         + " primary key already exists for: " + Arrays.toString(primaryKey));
@@ -294,9 +290,7 @@ public class DimensionTableDataManager extends OfflineTableDataManager {
         "Primary key columns must be configured for dimension table: %s", _tableNameWithType);
 
     List<SegmentDataManager> segmentDataManagers = acquireAllSegments();
-    if (_enableUpsert) {
-      sortSegmentsForUpsert(segmentDataManagers);
-    }
+    sortSegmentsForUpsert(segmentDataManagers);
     List<PinotSegmentRecordReader> recordReaders = new ArrayList<>(segmentDataManagers.size());
 
     int totalDocs = 0;
@@ -330,7 +324,7 @@ public class DimensionTableDataManager extends OfflineTableDataManager {
 
             long readerIdxAndDocId = (((long) readerIdx) << 32) | (i & 0xffffffffL);
             long previousValue = lookupTable.put(primaryKey, readerIdxAndDocId);
-            if (!_enableUpsert && _errorOnDuplicatePrimaryKey && previousValue != Long.MIN_VALUE) {
+            if (_errorOnDuplicatePrimaryKey && previousValue != Long.MIN_VALUE) {
               throw new IllegalStateException(
                   "Caught exception while reading records from segment: " + indexSegment.getSegmentName()
                       + " primary key already exists for: " + Arrays.toString(primaryKey));

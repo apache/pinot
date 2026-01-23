@@ -60,7 +60,6 @@ import org.apache.pinot.segment.spi.index.multicolumntext.MultiColumnTextMetadat
 import org.apache.pinot.segment.spi.index.startree.AggregationFunctionColumnPair;
 import org.apache.pinot.spi.config.table.ColumnPartitionConfig;
 import org.apache.pinot.spi.config.table.DedupConfig;
-import org.apache.pinot.spi.config.table.DimensionTableConfig;
 import org.apache.pinot.spi.config.table.FieldConfig;
 import org.apache.pinot.spi.config.table.FieldConfig.EncodingType;
 import org.apache.pinot.spi.config.table.IndexingConfig;
@@ -176,7 +175,6 @@ public final class TableConfigUtils {
     }
 
     validateValidationConfig(tableConfig, schema);
-    validateDimensionTableConfig(tableConfig);
     validateIngestionConfig(tableConfig, schema);
     if (tableConfig.getTableType() == TableType.REALTIME) {
       validateStreamConfigMaps(tableConfig);
@@ -385,16 +383,6 @@ public final class TableConfigUtils {
     }
 
     validateRetentionConfig(tableConfig);
-  }
-
-  private static void validateDimensionTableConfig(TableConfig tableConfig) {
-    DimensionTableConfig dimensionTableConfig = tableConfig.getDimensionTableConfig();
-    if (dimensionTableConfig == null) {
-      return;
-    }
-    Preconditions.checkState(!(dimensionTableConfig.isEnableUpsert()
-            && dimensionTableConfig.isErrorOnDuplicatePrimaryKey()),
-        "Dimension table config cannot have both enableUpsert and errorOnDuplicatePrimaryKey enabled");
   }
 
   private static boolean isValidPeerDownloadScheme(String peerSegmentDownloadScheme) {
