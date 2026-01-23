@@ -691,6 +691,8 @@ public abstract class BasePartitionUpsertMetadataManager implements PartitionUps
    */
   protected void revertSegmentUpsertMetadata(IndexSegment oldSegment, String segmentName,
       MutableRoaringBitmap validDocIdsForOldSegment) {
+    _logger.info("Inconsistencies noticed for the segment: {} across servers, reverting the metadata to resolve...",
+        segmentName);
     // Revert the keys in the segment to previous location and remove the newly added keys
     removeSegment(oldSegment, validDocIdsForOldSegment);
     if (getPrevKeyToRecordLocationSize() == 0) {
@@ -705,9 +707,11 @@ public abstract class BasePartitionUpsertMetadataManager implements PartitionUps
   }
 
   protected void logInconsistentResults(String segmentName, int numKeysStillNotReplaced) {
-    _logger.error("Found {} primary keys still not replaced for segment: {}. "
-        + "Proceeding with current state which may cause inconsistency.", numKeysStillNotReplaced, segmentName);
-    if (_context.isDropOutOfOrderRecord() && _context.getConsistencyMode() == UpsertConfig.ConsistencyMode.NONE) {
+    _logger.error("Found {} primary keys not replaced for segment: {}. "
+            + "Proceeding with current state which may cause inconsistency. To correct this behaviour from now, set "
+            + "cluster config: `pinot.server.consuming.segment.commit.mode` to `PROTECTED`", numKeysStillNotReplaced,
+        segmentName);
+    if (_context.isDropOutOfOrderRecord() || _context.getOutOfOrderRecordColumn() != null) {
       _serverMetrics.addMeteredTableValue(_tableNameWithType, ServerMeter.REALTIME_UPSERT_INCONSISTENT_ROWS,
           numKeysStillNotReplaced);
     } else if (_partialUpsertHandler != null) {
