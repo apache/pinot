@@ -24,6 +24,7 @@ import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Map;
 import java.util.Set;
+import java.util.concurrent.TimeoutException;
 import java.util.function.Function;
 import org.apache.pinot.core.data.manager.InstanceDataManager;
 import org.apache.pinot.core.data.manager.offline.ImmutableSegmentDataManager;
@@ -580,6 +581,73 @@ public class FreshnessBasedConsumptionStatusCheckerTest {
     setupLatestIngestionTimestamp(segMngrA0, 89L);
     when(segMngrA0.getCurrentOffset()).thenReturn(new LongMsgOffset(20));
     when(segB0Provider.fetchLatestStreamOffset(anySet(), anyLong())).thenReturn(Map.of(0, new LongMsgOffset(0)));
+    assertEquals(statusChecker.getNumConsumingSegmentsNotReachedIngestionCriteria(), 0);
+  }
+
+  @Test
+  public void testTimeoutExceptionWhenFetchingLatestStreamOffset() {
+    String segA0 = "tableA__0__0__123Z";
+    String segA1 = "tableA__1__0__123Z";
+    Map<String, Set<String>> consumingSegments = new HashMap<>();
+    consumingSegments.put("tableA_REALTIME", ImmutableSet.of(segA0, segA1));
+    InstanceDataManager instanceDataManager = mock(InstanceDataManager.class);
+    long idleTimeoutMs = 10L;
+    FreshnessBasedConsumptionStatusChecker statusChecker =
+        new FakeFreshnessBasedConsumptionStatusChecker(instanceDataManager, consumingSegments,
+            ConsumptionStatusCheckerTestUtils.getConsumingSegments(consumingSegments), 10L, idleTimeoutMs, 100L);
+
+    // TableDataManager is not set up yet
+    assertEquals(statusChecker.getNumConsumingSegmentsNotReachedIngestionCriteria(), 2);
+
+    // setup TableDataManager
+    RealtimeTableDataManager tableDataManagerA = mock(RealtimeTableDataManager.class);
+    when(instanceDataManager.getTableDataManager("tableA_REALTIME")).thenReturn(tableDataManagerA);
+
+    // setup SegmentDataManagers
+    RealtimeSegmentDataManager segMngrA0 = mock(RealtimeSegmentDataManager.class);
+    RealtimeSegmentDataManager segMngrA1 = mock(RealtimeSegmentDataManager.class);
+    when(tableDataManagerA.acquireSegment(segA0)).thenReturn(segMngrA0);
+    when(tableDataManagerA.acquireSegment(segA1)).thenReturn(segMngrA1);
+
+    StreamMetadataProvider segA0Provider = mock(StreamMetadataProvider.class);
+    StreamMetadataProvider segA1Provider = mock(StreamMetadataProvider.class);
+
+    when(tableDataManagerA.getStreamMetadataProvider(segMngrA0)).thenReturn(segA0Provider);
+    when(tableDataManagerA.getStreamMetadataProvider(segMngrA1)).thenReturn(segA1Provider);
+
+    when(segMngrA0.getStreamPartitionId()).thenReturn(0);
+    when(segMngrA1.getStreamPartitionId()).thenReturn(1);
+    when(segMngrA0.getSegmentName()).thenReturn(segA0);
+    when(segMngrA1.getSegmentName()).thenReturn(segA1);
+
+    // segA0 provider throws RuntimeException - this should be caught and handled gracefully
+    // In practice, RealtimeSegmentMetadataUtils wraps TimeoutException in RuntimeException
+    when(segA0Provider.fetchLatestStreamOffset(anySet(), anyLong())).thenThrow(
+        new RuntimeException("Failed to fetch latest stream offset for segment: " + segA0,
+            new TimeoutException("Timeout fetching latest stream offset")));
+    // segA1 provider works normally
+    when(segA1Provider.fetchLatestStreamOffset(anySet(), anyLong())).thenReturn(Map.of(1, new LongMsgOffset(20)));
+
+    when(segMngrA0.getCurrentOffset()).thenReturn(new LongMsgOffset(10));
+    when(segMngrA1.getCurrentOffset()).thenReturn(new LongMsgOffset(10));
+    // ensure negative values are ignored
+    setupLatestIngestionTimestamp(segMngrA0, Long.MIN_VALUE);
+    setupLatestIngestionTimestamp(segMngrA1, Long.MIN_VALUE);
+
+    // segA0 has idle time below threshold, segA1 has idle time above threshold
+    when(segMngrA0.getTimeSinceEventLastConsumedMs()).thenReturn(idleTimeoutMs - 1);
+    when(segMngrA1.getTimeSinceEventLastConsumedMs()).thenReturn(idleTimeoutMs + 1);
+
+    // segA0: timeout exception when fetching latest offset, but idle time is below threshold
+    //         - should not be caught up (can't determine from offset, and idle time not exceeded)
+    // segA1: can fetch latest offset (10 < 20), but idle time exceeds threshold
+    //         - should be caught up due to idle timeout
+    // Expected: 1 segment not caught up (segA0)
+    assertEquals(statusChecker.getNumConsumingSegmentsNotReachedIngestionCriteria(), 1);
+
+    // Now make segA0 also exceed idle timeout - it should be caught up despite timeout exception
+    when(segMngrA0.getTimeSinceEventLastConsumedMs()).thenReturn(idleTimeoutMs + 1);
+    // Expected: 0 segments not caught up (both exceed idle timeout)
     assertEquals(statusChecker.getNumConsumingSegmentsNotReachedIngestionCriteria(), 0);
   }
 }
