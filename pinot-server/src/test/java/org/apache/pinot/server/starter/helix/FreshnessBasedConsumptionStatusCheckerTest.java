@@ -621,4 +621,65 @@ public class FreshnessBasedConsumptionStatusCheckerTest {
     when(segB0Provider.fetchLatestStreamOffset(anySet(), anyLong())).thenReturn(Map.of(0, new LongMsgOffset(0)));
     assertEquals(statusChecker.getNumConsumingSegmentsNotReachedIngestionCriteria(), 0);
   }
+
+  @Test(expectedExceptions = RuntimeException.class)
+  public void testTimeoutExceptionWhenFetchingLatestStreamOffset() {
+    String segA0 = "tableA__0__0__123Z";
+    String segA1 = "tableA__1__0__123Z";
+    Map<String, Set<String>> consumingSegments = new HashMap<>();
+    consumingSegments.put("tableA_REALTIME", ImmutableSet.of(segA0, segA1));
+    InstanceDataManager instanceDataManager = mock(InstanceDataManager.class);
+    long idleTimeoutMs = 10L;
+    FreshnessBasedConsumptionStatusChecker statusChecker =
+        new FakeFreshnessBasedConsumptionStatusChecker(instanceDataManager, consumingSegments,
+            ConsumptionStatusCheckerTestUtils.getConsumingSegments(consumingSegments), 10L, idleTimeoutMs, 100L);
+
+    // TableDataManager is not set up yet
+    assertEquals(statusChecker.getNumConsumingSegmentsNotReachedIngestionCriteria(), 2);
+
+    // setup TableDataManager
+    RealtimeTableDataManager tableDataManagerA = mock(RealtimeTableDataManager.class);
+    when(instanceDataManager.getTableDataManager("tableA_REALTIME")).thenReturn(tableDataManagerA);
+
+    // setup SegmentDataManagers
+    RealtimeSegmentDataManager segMngrA0 = mock(RealtimeSegmentDataManager.class);
+    RealtimeSegmentDataManager segMngrA1 = mock(RealtimeSegmentDataManager.class);
+    when(tableDataManagerA.acquireSegment(segA0)).thenReturn(segMngrA0);
+    when(tableDataManagerA.acquireSegment(segA1)).thenReturn(segMngrA1);
+
+    StreamMetadataProvider segA0Provider = mock(StreamMetadataProvider.class);
+    StreamMetadataProvider segA1Provider = mock(StreamMetadataProvider.class);
+
+    when(tableDataManagerA.getStreamMetadataProvider(segMngrA0)).thenReturn(segA0Provider);
+    when(tableDataManagerA.getStreamMetadataProvider(segMngrA1)).thenReturn(segA1Provider);
+
+    when(segMngrA0.getStreamPartitionId()).thenReturn(0);
+    when(segMngrA1.getStreamPartitionId()).thenReturn(1);
+    when(segMngrA0.getSegmentName()).thenReturn(segA0);
+    when(segMngrA1.getSegmentName()).thenReturn(segA1);
+
+    when(segA0Provider.supportsOffsetLag()).thenReturn(true);
+    when(segA1Provider.supportsOffsetLag()).thenReturn(true);
+    // segA0 provider throws RuntimeException - this will cause RealtimeSegmentMetadataUtils to throw
+    // In this branch without exception handling, the exception will propagate
+    when(segA0Provider.fetchLatestStreamOffset(anySet(), anyLong()))
+        .thenThrow(new RuntimeException("Failed to fetch latest stream offset for segment: " + segA0,
+            new java.util.concurrent.TimeoutException("Timeout fetching latest stream offset")));
+    // segA1 provider works normally
+    when(segA1Provider.fetchLatestStreamOffset(anySet(), anyLong())).thenReturn(Map.of(1, new LongMsgOffset(20)));
+
+    when(segMngrA0.getCurrentOffset()).thenReturn(new LongMsgOffset(10));
+    when(segMngrA1.getCurrentOffset()).thenReturn(new LongMsgOffset(10));
+    // ensure negative values are ignored
+    setupLatestIngestionTimestamp(segMngrA0, Long.MIN_VALUE);
+    setupLatestIngestionTimestamp(segMngrA1, Long.MIN_VALUE);
+
+    // segA0 has idle time below threshold, segA1 has idle time above threshold
+    when(segMngrA0.getTimeSinceEventLastConsumedMs()).thenReturn(idleTimeoutMs - 1);
+    when(segMngrA1.getTimeSinceEventLastConsumedMs()).thenReturn(idleTimeoutMs + 1);
+
+    // In this branch without exception handling, the exception will propagate
+    // This test verifies that the exception is thrown as expected
+    statusChecker.getNumConsumingSegmentsNotReachedIngestionCriteria();
+  }
 }
