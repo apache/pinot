@@ -129,4 +129,3 @@ public class UpsertInconsistentStateConfig implements PinotClusterConfigChangeLi
     _consistencyMode.set(Mode.DEFAULT);
   }
 }
-
