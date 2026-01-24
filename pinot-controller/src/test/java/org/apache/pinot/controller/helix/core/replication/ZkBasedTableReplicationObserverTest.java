@@ -20,6 +20,7 @@ package org.apache.pinot.controller.helix.core.replication;
 
 import java.util.Arrays;
 import java.util.Collections;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import org.apache.pinot.controller.helix.core.PinotHelixResourceManager;
@@ -35,11 +36,13 @@ import org.testng.annotations.BeforeMethod;
 import org.testng.annotations.Test;
 
 import static org.mockito.Mockito.any;
+import static org.mockito.Mockito.anyLong;
 import static org.mockito.Mockito.anyMap;
 import static org.mockito.Mockito.anyString;
 import static org.mockito.Mockito.eq;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.when;
 
 public class ZkBasedTableReplicationObserverTest {
 
@@ -59,11 +62,17 @@ public class ZkBasedTableReplicationObserverTest {
   }
 
   @Test
-  public void testObserver() {
+  public void testObserver() throws Exception {
     String jobId = "job1";
     String tableName = "table1";
     List<String> segments = Arrays.asList("seg1", "seg2", "seg3");
     WatermarkInductionResult res = new WatermarkInductionResult(Collections.emptyList(), segments);
+
+    Map<String, String> baseMetadata = new HashMap<>();
+    baseMetadata.put(CommonConstants.ControllerJob.JOB_ID, jobId);
+    baseMetadata.put(CommonConstants.ControllerJob.TABLE_NAME_WITH_TYPE, tableName);
+    when(_pinotHelixResourceManager.commonTableReplicationJobMetadata(eq(tableName), eq(jobId), anyLong(),
+        eq(res))).thenReturn(baseMetadata);
 
     ZkBasedTableReplicationObserver observer =
         new ZkBasedTableReplicationObserver(jobId, tableName, res, _pinotHelixResourceManager);
@@ -92,11 +101,17 @@ public class ZkBasedTableReplicationObserverTest {
   }
 
   @Test
-  public void testObserverError() {
+  public void testObserverError() throws Exception {
     String jobId = "job1";
     String tableName = "table1";
     List<String> segments = Arrays.asList("seg1");
     WatermarkInductionResult res = new WatermarkInductionResult(Collections.emptyList(), segments);
+
+    Map<String, String> baseMetadata = new HashMap<>();
+    baseMetadata.put(CommonConstants.ControllerJob.JOB_ID, jobId);
+    baseMetadata.put(CommonConstants.ControllerJob.TABLE_NAME_WITH_TYPE, tableName);
+    when(_pinotHelixResourceManager.commonTableReplicationJobMetadata(eq(tableName), eq(jobId), anyLong(),
+        eq(res))).thenReturn(baseMetadata);
 
     ZkBasedTableReplicationObserver observer =
         new ZkBasedTableReplicationObserver(jobId, tableName, res, _pinotHelixResourceManager);
