@@ -51,7 +51,7 @@ public class SchemaCompatibilityTest {
 
     // Test backward compatibility
     Assert.assertTrue(newSchema.isBackwardCompatibleWith(oldSchema));
-    
+
     SchemaCompatibilityResult result = newSchema.checkBackwardCompatibilityWithDetails(oldSchema);
     Assert.assertTrue(result.isCompatible());
     Assert.assertTrue(result.getIssues().isEmpty());
@@ -80,18 +80,18 @@ public class SchemaCompatibilityTest {
 
     // Test backward compatibility
     Assert.assertFalse(newSchema.isBackwardCompatibleWith(oldSchema));
-    
+
     SchemaCompatibilityResult result = newSchema.checkBackwardCompatibilityWithDetails(oldSchema);
     Assert.assertFalse(result.isCompatible());
     Assert.assertEquals(result.getIssues().size(), 2);
-    
+
     // Check detailed error message contains missing columns
     String detailedMessage = result.getDetailedErrorMessage();
     Assert.assertTrue(detailedMessage.contains("Found 2 issue(s)"));
     Assert.assertTrue(detailedMessage.contains("name") && detailedMessage.contains("missing"));
     Assert.assertTrue(detailedMessage.contains("created_at") && detailedMessage.contains("missing"));
     Assert.assertTrue(detailedMessage.contains("💡 Suggestion: Add the missing column back"));
-    
+
     // Check summary error message
     String summaryMessage = result.getSummaryErrorMessage();
     Assert.assertTrue(summaryMessage.contains("missing columns"));
@@ -118,18 +118,20 @@ public class SchemaCompatibilityTest {
 
     // Test backward compatibility
     Assert.assertFalse(newSchema.isBackwardCompatibleWith(oldSchema));
-    
+
     SchemaCompatibilityResult result = newSchema.checkBackwardCompatibilityWithDetails(oldSchema);
     Assert.assertFalse(result.isCompatible());
     Assert.assertEquals(result.getIssues().size(), 2);
-    
+
     // Check detailed error message
     String detailedMessage = result.getDetailedErrorMessage();
     Assert.assertTrue(detailedMessage.contains("data type mismatch"));
-    Assert.assertTrue(detailedMessage.contains("age") && detailedMessage.contains("INT") && detailedMessage.contains("LONG"));
-    Assert.assertTrue(detailedMessage.contains("score") && detailedMessage.contains("FLOAT") && detailedMessage.contains("DOUBLE"));
+    Assert.assertTrue(detailedMessage.contains("age") && detailedMessage.contains("INT")
+        && detailedMessage.contains("LONG"));
+    Assert.assertTrue(detailedMessage.contains("score") && detailedMessage.contains("FLOAT")
+        && detailedMessage.contains("DOUBLE"));
     Assert.assertTrue(detailedMessage.contains("💡 Suggestion"));
-    
+
     // Check summary error message
     String summaryMessage = result.getSummaryErrorMessage();
     Assert.assertTrue(summaryMessage.contains("data type mismatches [age, score]"));
@@ -155,17 +157,19 @@ public class SchemaCompatibilityTest {
 
     // Test backward compatibility
     Assert.assertFalse(newSchema.isBackwardCompatibleWith(oldSchema));
-    
+
     SchemaCompatibilityResult result = newSchema.checkBackwardCompatibilityWithDetails(oldSchema);
     Assert.assertFalse(result.isCompatible());
     Assert.assertEquals(result.getIssues().size(), 2);
-    
+
     // Check detailed error message
     String detailedMessage = result.getDetailedErrorMessage();
     Assert.assertTrue(detailedMessage.contains("field type mismatch"));
-    Assert.assertTrue(detailedMessage.contains("category") && detailedMessage.contains("DIMENSION") && detailedMessage.contains("METRIC"));
-    Assert.assertTrue(detailedMessage.contains("count") && detailedMessage.contains("METRIC") && detailedMessage.contains("DIMENSION"));
-    
+    Assert.assertTrue(detailedMessage.contains("category") && detailedMessage.contains("DIMENSION")
+        && detailedMessage.contains("METRIC"));
+    Assert.assertTrue(detailedMessage.contains("count") && detailedMessage.contains("METRIC")
+        && detailedMessage.contains("DIMENSION"));
+
     // Check summary error message
     String summaryMessage = result.getSummaryErrorMessage();
     Assert.assertTrue(summaryMessage.contains("field type mismatches [category, count]"));
@@ -191,19 +195,21 @@ public class SchemaCompatibilityTest {
 
     // Test backward compatibility
     Assert.assertFalse(newSchema.isBackwardCompatibleWith(oldSchema));
-    
+
     SchemaCompatibilityResult result = newSchema.checkBackwardCompatibilityWithDetails(oldSchema);
     Assert.assertFalse(result.isCompatible());
     Assert.assertEquals(result.getIssues().size(), 2);
-    
+
     // Check detailed error message
     String detailedMessage = result.getDetailedErrorMessage();
     Assert.assertTrue(detailedMessage.contains("single/multi-value mismatch"));
-    Assert.assertTrue(detailedMessage.contains("tags") && detailedMessage.contains("multi-value") && detailedMessage.contains("single-value"));
-    Assert.assertTrue(detailedMessage.contains("status") && detailedMessage.contains("single-value") && detailedMessage.contains("multi-value"));
+    Assert.assertTrue(detailedMessage.contains("tags") && detailedMessage.contains("multi-value")
+        && detailedMessage.contains("single-value"));
+    Assert.assertTrue(detailedMessage.contains("status") && detailedMessage.contains("single-value")
+        && detailedMessage.contains("multi-value"));
     Assert.assertTrue(detailedMessage.contains("💡 Suggestion"));
-    
-    // Check summary error message  
+
+    // Check summary error message
     String summaryMessage = result.getSummaryErrorMessage();
     Assert.assertTrue(summaryMessage.contains("single/multi-value mismatches [status, tags]"));
   }
@@ -226,27 +232,27 @@ public class SchemaCompatibilityTest {
         .setSchemaName("test_table")
         .addSingleValueDimension("user_id", FieldSpec.DataType.STRING)
         // Missing: name (MISSING_COLUMN)
-        .addMetric("category", FieldSpec.DataType.INT) // Changed DIMENSION to METRIC (FIELD_TYPE_MISMATCH)
-        .addSingleValueDimension("tags", FieldSpec.DataType.STRING) // Changed multi-value to single-value (SINGLE_MULTI_VALUE_MISMATCH)
-        .addMetric("age", FieldSpec.DataType.LONG) // Changed INT to LONG (DATA_TYPE_MISMATCH)  
+        .addMetric("category", FieldSpec.DataType.INT) // Changed DIMENSION to METRIC
+        .addSingleValueDimension("tags", FieldSpec.DataType.STRING) // Changed multi-value to single-value
+        .addMetric("age", FieldSpec.DataType.LONG) // Changed INT to LONG (DATA_TYPE_MISMATCH)
         .addMetric("score", FieldSpec.DataType.DOUBLE)
         .build();
 
     // Test backward compatibility
     Assert.assertFalse(newSchema.isBackwardCompatibleWith(oldSchema));
-    
+
     SchemaCompatibilityResult result = newSchema.checkBackwardCompatibilityWithDetails(oldSchema);
     Assert.assertFalse(result.isCompatible());
     Assert.assertEquals(result.getIssues().size(), 4);
-    
+
     // Check that all error types are present
     String detailedMessage = result.getDetailedErrorMessage();
     Assert.assertTrue(detailedMessage.contains("Found 4 issue(s)"));
-    
-    // Check summary groups issues correctly  
+
+    // Check summary groups issues correctly
     String summaryMessage = result.getSummaryErrorMessage();
     Assert.assertTrue(summaryMessage.contains("missing columns [name]"));
-    Assert.assertTrue(summaryMessage.contains("data type mismatches [age]"));  
+    Assert.assertTrue(summaryMessage.contains("data type mismatches [age]"));
     Assert.assertTrue(summaryMessage.contains("field type mismatches [category]"));
     Assert.assertTrue(summaryMessage.contains("single/multi-value mismatches [tags]"));
   }

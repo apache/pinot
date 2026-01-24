@@ -32,7 +32,7 @@ public class SchemaCompatibilityResultTest {
   @Test
   public void testCompatibleResult() {
     SchemaCompatibilityResult result = SchemaCompatibilityResult.compatible();
-    
+
     Assert.assertTrue(result.isCompatible());
     Assert.assertTrue(result.getIssues().isEmpty());
     Assert.assertEquals(result.getDetailedErrorMessage(), "Schema is backward compatible");
@@ -46,19 +46,22 @@ public class SchemaCompatibilityResultTest {
         SchemaCompatibilityResult.ErrorCode.MISSING_COLUMN,
         "user_id",
         "Column 'user_id' exists in old schema but is missing in new schema",
-        "Add the missing column back to the schema or ensure data migration handles the missing column appropriately."
+        "Add the missing column back to the schema or ensure data migration handles the "
+            + "missing column appropriately."
     ));
-    
+
     SchemaCompatibilityResult result = SchemaCompatibilityResult.incompatible(issues);
-    
+
     Assert.assertFalse(result.isCompatible());
     Assert.assertEquals(result.getIssues().size(), 1);
-    
+
     String detailedMessage = result.getDetailedErrorMessage();
     Assert.assertTrue(detailedMessage.contains("Found 1 issue(s)"));
-    Assert.assertTrue(detailedMessage.contains("❌ Column 'user_id' exists in old schema but is missing in new schema"));
-    Assert.assertTrue(detailedMessage.contains("💡 Suggestion: Add the missing column back to the schema"));
-    
+    Assert.assertTrue(detailedMessage.contains("❌ Column 'user_id' exists in old schema "
+        + "but is missing in new schema"));
+    Assert.assertTrue(detailedMessage.contains("💡 Suggestion: Add the missing column back "
+        + "to the schema"));
+
     String summaryMessage = result.getSummaryErrorMessage();
     Assert.assertTrue(summaryMessage.contains("missing columns [user_id]"));
   }
@@ -70,16 +73,19 @@ public class SchemaCompatibilityResultTest {
         SchemaCompatibilityResult.ErrorCode.DATA_TYPE_MISMATCH,
         "age",
         "Column 'age' has data type mismatch: old=INT, new=STRING",
-        "Reverting data type from STRING back to INT, or implement a data migration strategy to handle the type change."
+        "Reverting data type from STRING back to INT, or implement a data migration strategy "
+            + "to handle the type change."
     ));
-    
+
     SchemaCompatibilityResult result = SchemaCompatibilityResult.incompatible(issues);
-    
+
     Assert.assertFalse(result.isCompatible());
     String detailedMessage = result.getDetailedErrorMessage();
-    Assert.assertTrue(detailedMessage.contains("❌ Column 'age' has data type mismatch: old=INT, new=STRING"));
-    Assert.assertTrue(detailedMessage.contains("💡 Suggestion: Reverting data type from STRING back to INT"));
-    
+    Assert.assertTrue(detailedMessage.contains("❌ Column 'age' has data type mismatch: "
+        + "old=INT, new=STRING"));
+    Assert.assertTrue(detailedMessage.contains("💡 Suggestion: Reverting data type from "
+        + "STRING back to INT"));
+
     String summaryMessage = result.getSummaryErrorMessage();
     Assert.assertTrue(summaryMessage.contains("data type mismatches [age]"));
   }
@@ -91,16 +97,19 @@ public class SchemaCompatibilityResultTest {
         SchemaCompatibilityResult.ErrorCode.FIELD_TYPE_MISMATCH,
         "score",
         "Column 'score' has field type mismatch: old=METRIC, new=DIMENSION",
-        "Converting METRIC to DIMENSION is generally safe but may affect aggregation queries that depend on this column."
+        "Converting METRIC to DIMENSION is generally safe but may affect aggregation queries "
+            + "that depend on this column."
     ));
-    
+
     SchemaCompatibilityResult result = SchemaCompatibilityResult.incompatible(issues);
-    
+
     Assert.assertFalse(result.isCompatible());
     String detailedMessage = result.getDetailedErrorMessage();
-    Assert.assertTrue(detailedMessage.contains("❌ Column 'score' has field type mismatch: old=METRIC, new=DIMENSION"));
-    Assert.assertTrue(detailedMessage.contains("💡 Suggestion: Converting METRIC to DIMENSION is generally safe"));
-    
+    Assert.assertTrue(detailedMessage.contains("❌ Column 'score' has field type mismatch: "
+        + "old=METRIC, new=DIMENSION"));
+    Assert.assertTrue(detailedMessage.contains("💡 Suggestion: Converting METRIC to DIMENSION "
+        + "is generally safe"));
+
     String summaryMessage = result.getSummaryErrorMessage();
     Assert.assertTrue(summaryMessage.contains("field type mismatches [score]"));
   }
@@ -112,16 +121,19 @@ public class SchemaCompatibilityResultTest {
         SchemaCompatibilityResult.ErrorCode.SINGLE_MULTI_VALUE_MISMATCH,
         "tags",
         "Column 'tags' has single/multi-value mismatch: old=multi-value, new=single-value",
-        "Converting multi-value to single-value may cause data loss. Implement aggregation logic (e.g., take first value, concatenate) before making this change."
+        "Converting multi-value to single-value may cause data loss. Implement aggregation logic "
+            + "(e.g., take first value, concatenate) before making this change."
     ));
-    
+
     SchemaCompatibilityResult result = SchemaCompatibilityResult.incompatible(issues);
-    
+
     Assert.assertFalse(result.isCompatible());
     String detailedMessage = result.getDetailedErrorMessage();
-    Assert.assertTrue(detailedMessage.contains("❌ Column 'tags' has single/multi-value mismatch: old=multi-value, new=single-value"));
-    Assert.assertTrue(detailedMessage.contains("💡 Suggestion: Converting multi-value to single-value may cause data loss"));
-    
+    Assert.assertTrue(detailedMessage.contains("❌ Column 'tags' has single/multi-value mismatch: "
+        + "old=multi-value, new=single-value"));
+    Assert.assertTrue(detailedMessage.contains("💡 Suggestion: Converting multi-value to "
+        + "single-value may cause data loss"));
+
     String summaryMessage = result.getSummaryErrorMessage();
     Assert.assertTrue(summaryMessage.contains("single/multi-value mismatches [tags]"));
   }
@@ -133,32 +145,35 @@ public class SchemaCompatibilityResultTest {
         SchemaCompatibilityResult.ErrorCode.MISSING_COLUMN,
         "user_id",
         "Column 'user_id' exists in old schema but is missing in new schema",
-        "Add the missing column back to the schema or ensure data migration handles the missing column appropriately."
+        "Add the missing column back to the schema or ensure data migration handles the "
+            + "missing column appropriately."
     ));
     issues.add(new SchemaCompatibilityResult.IncompatibilityIssue(
         SchemaCompatibilityResult.ErrorCode.DATA_TYPE_MISMATCH,
         "age",
         "Column 'age' has data type mismatch: old=INT, new=STRING",
-        "Reverting data type from STRING back to INT, or implement a data migration strategy to handle the type change."
+        "Reverting data type from STRING back to INT, or implement a data migration strategy "
+            + "to handle the type change."
     ));
     issues.add(new SchemaCompatibilityResult.IncompatibilityIssue(
         SchemaCompatibilityResult.ErrorCode.MISSING_COLUMN,
         "created_at",
         "Column 'created_at' exists in old schema but is missing in new schema",
-        "Add the missing column back to the schema or ensure data migration handles the missing column appropriately."
+        "Add the missing column back to the schema or ensure data migration handles the "
+            + "missing column appropriately."
     ));
-    
+
     SchemaCompatibilityResult result = SchemaCompatibilityResult.incompatible(issues);
-    
+
     Assert.assertFalse(result.isCompatible());
     Assert.assertEquals(result.getIssues().size(), 3);
-    
+
     String detailedMessage = result.getDetailedErrorMessage();
     Assert.assertTrue(detailedMessage.contains("Found 3 issue(s)"));
     Assert.assertTrue(detailedMessage.contains("1. ❌ Column 'user_id' exists in old schema"));
     Assert.assertTrue(detailedMessage.contains("2. ❌ Column 'age' has data type mismatch"));
     Assert.assertTrue(detailedMessage.contains("3. ❌ Column 'created_at' exists in old schema"));
-    
+
     String summaryMessage = result.getSummaryErrorMessage();
     Assert.assertTrue(summaryMessage.contains("missing columns [user_id, created_at]"));
     Assert.assertTrue(summaryMessage.contains("data type mismatches [age]"));
@@ -191,15 +206,16 @@ public class SchemaCompatibilityResultTest {
         SchemaCompatibilityResult.ErrorCode.MISSING_COLUMN,
         "user_id",
         "Column 'user_id' exists in old schema but is missing in new schema",
-        "Add the missing column back to the schema or ensure data migration handles the missing column appropriately."
+        "Add the missing column back to the schema or ensure data migration handles the "
+            + "missing column appropriately."
     );
-    
+
     String issueString = issue.toString();
     Assert.assertTrue(issueString.contains("❌ Column 'user_id' exists in old schema"));
     Assert.assertTrue(issueString.contains("💡 Suggestion: Add the missing column back"));
   }
 
-  @Test 
+  @Test
   public void testIncompatibilityIssueWithoutSuggestion() {
     SchemaCompatibilityResult.IncompatibilityIssue issue = new SchemaCompatibilityResult.IncompatibilityIssue(
         SchemaCompatibilityResult.ErrorCode.MISSING_COLUMN,
@@ -207,7 +223,7 @@ public class SchemaCompatibilityResultTest {
         "Column 'user_id' exists in old schema but is missing in new schema",
         null
     );
-    
+
     String issueString = issue.toString();
     Assert.assertTrue(issueString.contains("❌ Column 'user_id' exists in old schema"));
     Assert.assertFalse(issueString.contains("💡 Suggestion:"));
