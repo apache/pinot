@@ -214,7 +214,9 @@ public class DimensionTableDataManager extends OfflineTableDataManager {
         "Primary key columns must be configured for dimension table: %s", _tableNameWithType);
 
     List<SegmentDataManager> segmentDataManagers = acquireAllSegments();
-    sortSegmentsForUpsert(segmentDataManagers);
+    if (!_errorOnDuplicatePrimaryKey) {
+      sortSegmentsForUpsert(segmentDataManagers);
+    }
     try {
       // count all documents to limit map re-sizings
       int totalDocs = 0;
@@ -290,7 +292,9 @@ public class DimensionTableDataManager extends OfflineTableDataManager {
         "Primary key columns must be configured for dimension table: %s", _tableNameWithType);
 
     List<SegmentDataManager> segmentDataManagers = acquireAllSegments();
-    sortSegmentsForUpsert(segmentDataManagers);
+    if (!_errorOnDuplicatePrimaryKey) {
+      sortSegmentsForUpsert(segmentDataManagers);
+    }
     List<PinotSegmentRecordReader> recordReaders = new ArrayList<>(segmentDataManagers.size());
 
     int totalDocs = 0;
