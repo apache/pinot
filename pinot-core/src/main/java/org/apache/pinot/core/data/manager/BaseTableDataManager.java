@@ -64,7 +64,7 @@ import org.apache.pinot.common.utils.config.TierConfigUtils;
 import org.apache.pinot.common.utils.fetcher.SegmentFetcherFactory;
 import org.apache.pinot.core.data.manager.offline.ImmutableSegmentDataManager;
 import org.apache.pinot.core.data.manager.realtime.RealtimeSegmentDataManager;
-import org.apache.pinot.core.data.manager.realtime.UpsertInconsistentStateConfig;
+import org.apache.pinot.spi.utils.UpsertInconsistentStateConfig;
 import org.apache.pinot.core.util.PeerServerSegmentFinder;
 import org.apache.pinot.segment.local.data.manager.SegmentDataManager;
 import org.apache.pinot.segment.local.data.manager.StaleSegment;
@@ -825,11 +825,11 @@ public abstract class BaseTableDataManager implements TableDataManager {
         // This triggered unnecessary reconsumption and resulted in inconsistent upsert state.
         // The new fix restores and correct segment metadata after inconsistencies are noticed.
         // To toggle, existing Force commit behavior dynamically change the cluster config
-        // `pinot.server.consuming.segment.commit.mode` to PROTECTED for safer reload. This doesn't
+        // `pinot.server.consuming.segment.consistency.mode` to PROTECTED for safer reload. This doesn't
         // need a server restart
         TableConfig tableConfig = indexLoadingConfig.getTableConfig();
         UpsertInconsistentStateConfig config = UpsertInconsistentStateConfig.getInstance();
-        if (tableConfig != null && config.isForceCommitReloadAllowed()) {
+        if (tableConfig != null && config.isForceCommitAllowed()) {
           _logger.info("Reloading (force committing) consuming segment: {}", segmentName);
           ((RealtimeSegmentDataManager) segmentDataManager).forceCommit();
         } else {

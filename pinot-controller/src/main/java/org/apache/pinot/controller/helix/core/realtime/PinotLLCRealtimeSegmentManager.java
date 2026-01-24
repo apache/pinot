@@ -105,7 +105,7 @@ import org.apache.pinot.controller.helix.core.retention.strategy.TimeRetentionSt
 import org.apache.pinot.controller.helix.core.util.MessagingServiceUtils;
 import org.apache.pinot.controller.validation.RealtimeSegmentValidationManager;
 import org.apache.pinot.core.data.manager.realtime.SegmentCompletionUtils;
-import org.apache.pinot.core.data.manager.realtime.UpsertInconsistentStateConfig;
+import org.apache.pinot.spi.utils.UpsertInconsistentStateConfig;
 import org.apache.pinot.core.util.PeerServerSegmentFinder;
 import org.apache.pinot.segment.spi.index.metadata.SegmentMetadataImpl;
 import org.apache.pinot.segment.spi.partition.metadata.ColumnPartitionMetadata;
@@ -2616,12 +2616,12 @@ public class PinotLLCRealtimeSegmentManager {
       throw new IllegalStateException("Table config not found for table: " + tableNameWithType);
     }
     UpsertInconsistentStateConfig configInstance = UpsertInconsistentStateConfig.getInstance();
-    if (!configInstance.isForceCommitReloadAllowed()) {
+    if (!configInstance.isForceCommitAllowed()) {
       throw new IllegalStateException("Force commit disabled for table: " + tableNameWithType
           + ". Table is configured as partial upsert or dropOutOfOrderRecord=true with replication > 1, "
           + "which can cause data inconsistency during force commit. " + "Current cluster config '"
-          + configInstance.getConfigKey() + "' is set to: " + configInstance.getForceCommitReloadMode()
-          + ". To enable force commit, set this config to 'UNSAFE' or 'PROTECTED'.");
+          + configInstance.getConfigKey() + "' is set to: " + configInstance.getConsistencyMode()
+          + ". To enable force commit, set this config to 'PROTECTED'.");
     }
   }
 

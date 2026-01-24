@@ -66,7 +66,8 @@ import org.apache.pinot.spi.config.table.UpsertConfig;
 import org.apache.pinot.spi.data.readers.GenericRow;
 import org.apache.pinot.spi.data.readers.PrimaryKey;
 import org.apache.pinot.spi.utils.BooleanUtils;
-import org.apache.pinot.spi.utils.ConsumingSegmentCommitModeProvider;
+import org.apache.pinot.spi.utils.UpsertInconsistentStateConfig;
+import org.apache.pinot.spi.utils.UpsertInconsistentStateConfig.Mode;
 import org.roaringbitmap.PeekableIntIterator;
 import org.roaringbitmap.buffer.MutableRoaringBitmap;
 import org.slf4j.Logger;
@@ -682,8 +683,8 @@ public abstract class BasePartitionUpsertMetadataManager implements PartitionUps
    * @return true if metadata revert should be performed on inconsistency
    */
   public boolean shouldRevertMetadataOnInconsistency(IndexSegment oldSegment) {
-    return ConsumingSegmentCommitModeProvider.getMode().isProtected() && oldSegment instanceof MutableSegment
-        && _context.hasInconsistentTableConfigs();
+    return UpsertInconsistentStateConfig.getInstance().getConsistencyMode() == Mode.PROTECTED
+        && oldSegment instanceof MutableSegment && _context.hasInconsistentTableConfigs();
   }
 
   /**
@@ -709,8 +710,8 @@ public abstract class BasePartitionUpsertMetadataManager implements PartitionUps
   protected void logInconsistentResults(String segmentName, int numKeysStillNotReplaced) {
     _logger.error("Found {} primary keys not replaced for segment: {}. "
             + "Proceeding with current state which may cause inconsistency. To correct this behaviour from now, set "
-            + "cluster config: `pinot.server.consuming.segment.commit.mode` to `PROTECTED`", numKeysStillNotReplaced,
-        segmentName);
+            + "cluster config: `pinot.server.consuming.segment.consistency.mode` to `PROTECTED`",
+        numKeysStillNotReplaced, segmentName);
     if (_context.isDropOutOfOrderRecord() || _context.getOutOfOrderRecordColumn() != null) {
       _serverMetrics.addMeteredTableValue(_tableNameWithType, ServerMeter.REALTIME_UPSERT_INCONSISTENT_ROWS,
           numKeysStillNotReplaced);
@@ -738,7 +739,8 @@ public abstract class BasePartitionUpsertMetadataManager implements PartitionUps
     }
   }
 
-  protected abstract void removeSegment(IndexSegment segment, Iterator<PrimaryKey> primaryKeyIterator);
+  protected void removeSegment(IndexSegment segment, Iterator<PrimaryKey> primaryKeyIterator) {
+  }
 
   @Override
   public void removeSegment(IndexSegment segment) {
@@ -779,7 +781,11 @@ public abstract class BasePartitionUpsertMetadataManager implements PartitionUps
     }
 
     _logger.info("Removing {} primary keys for segment: {}", validDocIds.getCardinality(), segmentName);
-    removeSegment(segment, validDocIds);
+    if (shouldRevertMetadataOnInconsistency(segment)) {
+      revertSegmentUpsertMetadata(segment, segmentName, validDocIds);
+    } else {
+      removeSegment(segment, validDocIds);
+    }
 
     // Update metrics
     long numPrimaryKeys = getNumPrimaryKeys();

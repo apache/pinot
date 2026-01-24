@@ -84,7 +84,7 @@ import org.apache.pinot.core.common.datatable.DataTableBuilderFactory;
 import org.apache.pinot.core.data.manager.InstanceDataManager;
 import org.apache.pinot.core.data.manager.realtime.RealtimeConsumptionRateManager;
 import org.apache.pinot.core.data.manager.realtime.ServerRateLimitConfigChangeListener;
-import org.apache.pinot.core.data.manager.realtime.UpsertInconsistentStateConfig;
+import org.apache.pinot.spi.utils.UpsertInconsistentStateConfig;
 import org.apache.pinot.core.instance.context.ServerContext;
 import org.apache.pinot.core.query.scheduler.resources.ResourceManager;
 import org.apache.pinot.core.transport.ListenerConfig;

@@ -56,7 +56,7 @@ import org.apache.pinot.core.data.manager.realtime.RealtimeSegmentDataManager;
 import org.apache.pinot.core.data.manager.realtime.RealtimeTableDataManager;
 import org.apache.pinot.core.data.manager.realtime.SegmentBuildTimeLeaseExtender;
 import org.apache.pinot.core.data.manager.realtime.SegmentUploader;
-import org.apache.pinot.core.data.manager.realtime.UpsertInconsistentStateConfig;
+import org.apache.pinot.spi.utils.UpsertInconsistentStateConfig;
 import org.apache.pinot.segment.local.data.manager.SegmentDataManager;
 import org.apache.pinot.segment.local.data.manager.TableDataManager;
 import org.apache.pinot.segment.local.utils.SegmentLocks;
@@ -558,9 +558,9 @@ public class HelixInstanceDataManager implements InstanceDataManager {
               // This triggered unnecessary reconsumption and resulted in inconsistent upsert state.
               // The fix restores correct segment metadata before winner selection.
               // Force commit behavior can be toggled dynamically using the cluster config
-              // `pinot.server.consuming.segment.commit.mode` without restarting servers.
+              // `pinot.server.consuming.segment.consistency.mode` to `PROTECTED` without restarting servers.
               UpsertInconsistentStateConfig config = UpsertInconsistentStateConfig.getInstance();
-              if (config.isForceCommitReloadAllowed()) {
+              if (config.isForceCommitAllowed()) {
                 ((RealtimeSegmentDataManager) segmentDataManager).forceCommit();
               } else {
                 LOGGER.warn("Force commit disabled for table: {} due to inconsistent state config. "

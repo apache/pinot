@@ -2168,36 +2168,14 @@ public class CommonConstants {
    */
   public static class ConfigChangeListenerConstants {
     /**
-     * Cluster config key to control whether force commit/reload is allowed for upsert tables
-     * with inconsistent state configurations (partial upsert or dropOutOfOrderRecord=true
-     * with consistency mode NONE and replication > 1).
+     * Cluster config key to control how to handle inconsistency during consuming segment commit
+     * for upsert/dedup tables (partial upsert or dropOutOfOrderRecord=true with consistency mode).
      *
-     * Supported values: NONE, PROTECTED, UNSAFE
-     * Legacy boolean values (true/false) are also supported for backward compatibility.
-     * @deprecated Use {@link #CONSUMING_SEGMENT_COMMIT_CONFIG} instead.
+     * Supported values:
+     * - NONE: Force commit is disabled for tables with inconsistent state configurations
+     * - PROTECTED: Force commit is enabled with metadata reversion on inconsistencies
+     * - UNSAFE: Force commit is enabled without metadata reversion (Can lead to inconsistencies)
      */
-    @Deprecated
-    public static final String FORCE_COMMIT_RELOAD_CONFIG = "pinot.server.upsert.force.commit.reload";
-
-    /**
-     * Cluster config key to control the commit mode for consuming segments in upsert tables.
-     *
-     * Supported values: NONE, PROTECTED, UNSAFE
-     * Legacy boolean values (true/false) are also supported for backward compatibility.
-     */
-    public static final String CONSUMING_SEGMENT_COMMIT_CONFIG = "pinot.server.consuming.segment.commit.mode";
-
-    /**
-     * Default value: true (force commit/reload is allowed by default).
-     * @deprecated Use {@link #DEFAULT_CONSUMING_COMMIT_MODE} instead.
-     */
-    @Deprecated
-    public static final boolean DEFAULT_FORCE_COMMIT_RELOAD = true;
-
-    /**
-     * Default mode: PROTECTED (force commit/reload is allowed while reverting the Upsert metadata during
-     * inconsistencies).
-     */
-    public static final String DEFAULT_CONSUMING_COMMIT_MODE = "PROTECTED";
+    public static final String CONSUMING_SEGMENT_CONSISTENCY_MODE = "pinot.server.consuming.segment.consistency.mode";
   }
 }
