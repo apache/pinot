@@ -25,6 +25,7 @@ import java.util.Iterator;
 import java.util.Map;
 import java.util.Set;
 import java.util.function.Function;
+import javax.annotation.Nullable;
 import org.apache.pinot.core.data.manager.InstanceDataManager;
 import org.apache.pinot.core.data.manager.realtime.RealtimeSegmentDataManager;
 import org.apache.pinot.core.data.manager.realtime.RealtimeTableDataManager;
@@ -157,8 +158,8 @@ public abstract class IngestionBasedConsumptionStatusChecker {
   protected abstract boolean isSegmentCaughtUp(String segmentName, RealtimeSegmentDataManager rtSegmentDataManager,
       RealtimeTableDataManager realtimeTableDataManager);
 
-  protected boolean isOffsetCaughtUp(String segmentName,
-      StreamPartitionMsgOffset currentOffset, StreamPartitionMsgOffset latestOffset) {
+  protected boolean isOffsetCaughtUp(String segmentName, @Nullable StreamPartitionMsgOffset currentOffset,
+      @Nullable StreamPartitionMsgOffset latestOffset) {
     if (currentOffset != null && latestOffset != null) {
       // Kafka's "latest" offset is actually the next available offset. Therefore it will be 1 ahead of the
       // current offset in the case we are caught up.

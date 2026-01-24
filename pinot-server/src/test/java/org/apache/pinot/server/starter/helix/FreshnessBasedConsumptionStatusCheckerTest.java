@@ -24,6 +24,7 @@ import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Map;
 import java.util.Set;
+import java.util.concurrent.TimeoutException;
 import java.util.function.Function;
 import org.apache.pinot.core.data.manager.InstanceDataManager;
 import org.apache.pinot.core.data.manager.offline.ImmutableSegmentDataManager;
@@ -622,7 +623,7 @@ public class FreshnessBasedConsumptionStatusCheckerTest {
     assertEquals(statusChecker.getNumConsumingSegmentsNotReachedIngestionCriteria(), 0);
   }
 
-  @Test(expectedExceptions = RuntimeException.class)
+  @Test
   public void testTimeoutExceptionWhenFetchingLatestStreamOffset() {
     String segA0 = "tableA__0__0__123Z";
     String segA1 = "tableA__1__0__123Z";
@@ -660,11 +661,11 @@ public class FreshnessBasedConsumptionStatusCheckerTest {
 
     when(segA0Provider.supportsOffsetLag()).thenReturn(true);
     when(segA1Provider.supportsOffsetLag()).thenReturn(true);
-    // segA0 provider throws RuntimeException - this will cause RealtimeSegmentMetadataUtils to throw
-    // In this branch without exception handling, the exception will propagate
-    when(segA0Provider.fetchLatestStreamOffset(anySet(), anyLong()))
-        .thenThrow(new RuntimeException("Failed to fetch latest stream offset for segment: " + segA0,
-            new java.util.concurrent.TimeoutException("Timeout fetching latest stream offset")));
+    // segA0 provider throws RuntimeException - this should be caught and handled gracefully
+    // In practice, RealtimeSegmentMetadataUtils wraps TimeoutException in RuntimeException
+    when(segA0Provider.fetchLatestStreamOffset(anySet(), anyLong())).thenThrow(
+        new RuntimeException("Failed to fetch latest stream offset for segment: " + segA0,
+            new TimeoutException("Timeout fetching latest stream offset")));
     // segA1 provider works normally
     when(segA1Provider.fetchLatestStreamOffset(anySet(), anyLong())).thenReturn(Map.of(1, new LongMsgOffset(20)));
 
@@ -678,8 +679,16 @@ public class FreshnessBasedConsumptionStatusCheckerTest {
     when(segMngrA0.getTimeSinceEventLastConsumedMs()).thenReturn(idleTimeoutMs - 1);
     when(segMngrA1.getTimeSinceEventLastConsumedMs()).thenReturn(idleTimeoutMs + 1);
 
-    // In this branch without exception handling, the exception will propagate
-    // This test verifies that the exception is thrown as expected
-    statusChecker.getNumConsumingSegmentsNotReachedIngestionCriteria();
+    // segA0: timeout exception when fetching latest offset, but idle time is below threshold
+    //         - should not be caught up (can't determine from offset, and idle time not exceeded)
+    // segA1: can fetch latest offset (10 < 20), but idle time exceeds threshold
+    //         - should be caught up due to idle timeout
+    // Expected: 1 segment not caught up (segA0)
+    assertEquals(statusChecker.getNumConsumingSegmentsNotReachedIngestionCriteria(), 1);
+
+    // Now make segA0 also exceed idle timeout - it should be caught up despite timeout exception
+    when(segMngrA0.getTimeSinceEventLastConsumedMs()).thenReturn(idleTimeoutMs + 1);
+    // Expected: 0 segments not caught up (both exceed idle timeout)
+    assertEquals(statusChecker.getNumConsumingSegmentsNotReachedIngestionCriteria(), 0);
   }
 }
