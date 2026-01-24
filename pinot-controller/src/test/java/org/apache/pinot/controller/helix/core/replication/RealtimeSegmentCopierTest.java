@@ -22,6 +22,7 @@ import java.net.URI;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.Map;
+import org.apache.hc.core5.http.ClassicHttpRequest;
 import org.apache.pinot.common.utils.SimpleHttpResponse;
 import org.apache.pinot.common.utils.http.HttpClient;
 import org.apache.pinot.controller.ControllerConf;
@@ -34,8 +35,7 @@ import org.testng.annotations.BeforeMethod;
 import org.testng.annotations.Test;
 
 import static org.mockito.Mockito.any;
-import static org.mockito.Mockito.anyMap;
-import static org.mockito.Mockito.anyString;
+import static org.mockito.Mockito.anyLong;
 import static org.mockito.Mockito.doReturn;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
@@ -72,22 +72,24 @@ public class RealtimeSegmentCopierTest {
     String tableNameWithType = "table1_REALTIME";
     String segmentName = "seg1";
     CopyTablePayload payload = new CopyTablePayload("http://src", Collections.emptyMap(),
-        "http://dest", Collections.emptyMap(), "broker", "server", Collections.emptyMap());
+        "http://dest", Collections.emptyMap(), "broker", "server", Collections.emptyMap(), null);
 
     Map<String, String> metadata = new HashMap<>();
     metadata.put("segment.download.url", "hdfs://src/data/seg1");
 
     doReturn(_pinotFS).when(_copier).getPinotFS(any(URI.class));
     when(_pinotFS.exists(any(URI.class))).thenReturn(false);
+    when(_pinotFS.copy(any(URI.class), any(URI.class))).thenReturn(true);
 
     SimpleHttpResponse response = mock(SimpleHttpResponse.class);
     when(response.getStatusCode()).thenReturn(200);
-    when(_httpClient.sendJsonPostRequest(any(URI.class), anyString(), anyMap())).thenReturn(response);
+    when(response.getResponse()).thenReturn("{}");
+    doReturn(response).when(_httpClient).sendRequest(any(ClassicHttpRequest.class), anyLong());
 
     _copier.copy(tableNameWithType, segmentName, payload, metadata);
 
     verify(_pinotFS).copy(any(URI.class), any(URI.class));
-    verify(_httpClient).sendJsonPostRequest(any(URI.class), anyString(), anyMap());
+    verify(_httpClient).sendRequest(any(ClassicHttpRequest.class), anyLong());
   }
 
   @Test
@@ -95,7 +97,7 @@ public class RealtimeSegmentCopierTest {
     String tableNameWithType = "table1_REALTIME";
     String segmentName = "seg1";
     CopyTablePayload payload = new CopyTablePayload("http://src", Collections.emptyMap(),
-        "http://dest", Collections.emptyMap(), "broker", "server", Collections.emptyMap());
+        "http://dest", Collections.emptyMap(), "broker", "server", Collections.emptyMap(), null);
 
     Map<String, String> metadata = new HashMap<>();
     metadata.put("segment.download.url", "hdfs://src/data/seg1");
@@ -105,11 +107,12 @@ public class RealtimeSegmentCopierTest {
 
     SimpleHttpResponse response = mock(SimpleHttpResponse.class);
     when(response.getStatusCode()).thenReturn(200);
-    when(_httpClient.sendJsonPostRequest(any(URI.class), anyString(), anyMap())).thenReturn(response);
+    when(response.getResponse()).thenReturn("{}");
+    doReturn(response).when(_httpClient).sendRequest(any(ClassicHttpRequest.class), anyLong());
 
     _copier.copy(tableNameWithType, segmentName, payload, metadata);
 
     verify(_pinotFS, never()).copy(any(URI.class), any(URI.class));
-    verify(_httpClient).sendJsonPostRequest(any(URI.class), anyString(), anyMap());
+    verify(_httpClient).sendRequest(any(ClassicHttpRequest.class), anyLong());
   }
 }
