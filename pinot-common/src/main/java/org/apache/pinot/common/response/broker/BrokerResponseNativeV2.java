@@ -76,6 +76,7 @@ public class BrokerResponseNativeV2 implements BrokerResponse {
   private String _requestId;
   private String _clientRequestId;
   private String _brokerId;
+  private boolean _timeoutOverflowReached;
   private int _numServersQueried;
   private int _numServersResponded;
   private long _brokerReduceTimeMs;
@@ -109,7 +110,8 @@ public class BrokerResponseNativeV2 implements BrokerResponse {
   @JsonProperty(access = JsonProperty.Access.READ_ONLY)
   @Override
   public boolean isPartialResult() {
-    return getExceptionsSize() > 0 || isNumGroupsLimitReached() || isMaxRowsInJoinReached();
+    return getExceptionsSize() > 0 || isNumGroupsLimitReached() || isMaxRowsInJoinReached()
+        || isTimeoutOverflowReached();
   }
 
   @Override
@@ -150,6 +152,18 @@ public class BrokerResponseNativeV2 implements BrokerResponse {
 
   public void mergeNumGroupsWarningLimitReached(boolean numGroupsWarningLimitReached) {
     _brokerStats.merge(StatKey.NUM_GROUPS_WARNING_LIMIT_REACHED, numGroupsWarningLimitReached);
+  }
+
+  @JsonProperty("timeoutOverflowReached")
+  public boolean isTimeoutOverflowReached() {
+    return _timeoutOverflowReached;
+  }
+
+  public void mergeTimeoutOverflowReached(boolean timeoutOverflowReached) {
+    if (timeoutOverflowReached) {
+      _timeoutOverflowReached = true;
+    }
+    _brokerStats.merge(StatKey.TIMEOUT_OVERFLOW_REACHED, timeoutOverflowReached);
   }
 
   @Override
@@ -427,6 +441,9 @@ public class BrokerResponseNativeV2 implements BrokerResponse {
 
   public void addBrokerStats(StatMap<StatKey> brokerStats) {
     _brokerStats.merge(brokerStats);
+    if (brokerStats.getBoolean(StatKey.TIMEOUT_OVERFLOW_REACHED)) {
+      _timeoutOverflowReached = true;
+    }
   }
 
   // NOTE: The following keys should match the keys in the leaf-stage operator.
@@ -453,7 +470,8 @@ public class BrokerResponseNativeV2 implements BrokerResponse {
     NUM_SEGMENTS_PRUNED_BY_VALUE(StatMap.Type.INT),
     GROUPS_TRIMMED(StatMap.Type.BOOLEAN),
     NUM_GROUPS_LIMIT_REACHED(StatMap.Type.BOOLEAN),
-    NUM_GROUPS_WARNING_LIMIT_REACHED(StatMap.Type.BOOLEAN);
+    NUM_GROUPS_WARNING_LIMIT_REACHED(StatMap.Type.BOOLEAN),
+    TIMEOUT_OVERFLOW_REACHED(StatMap.Type.BOOLEAN);
 
     private final StatMap.Type _type;
 
