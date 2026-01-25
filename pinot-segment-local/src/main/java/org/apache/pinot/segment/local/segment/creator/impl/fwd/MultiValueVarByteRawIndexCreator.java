@@ -98,6 +98,11 @@ public class MultiValueVarByteRawIndexCreator implements ForwardIndexCreator {
   }
 
   @Override
+  public void add(Object cellValue, int dictId) {
+    addRaw(cellValue);
+  }
+
+  @Override
   public boolean isSingleValue() {
     return false;
   }

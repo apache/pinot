@@ -212,4 +212,9 @@ public class InvertedIndexType
     }
     return new RealtimeInvertedIndex();
   }
+
+  @Override
+  public boolean requiresDictionary(FieldSpec fieldSpec, FieldIndexConfigs fieldIndexConfigs) {
+    return fieldIndexConfigs.getConfig(StandardIndexes.inverted()).isEnabled();
+  }
 }

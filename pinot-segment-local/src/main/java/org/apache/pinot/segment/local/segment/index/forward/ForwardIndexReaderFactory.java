@@ -65,13 +65,9 @@ public class ForwardIndexReaderFactory extends IndexReaderFactory.Default<Forwar
   }
 
   @Override
-  protected ForwardIndexReader createIndexReader(PinotDataBuffer dataBuffer, ColumnMetadata metadata,
+  public ForwardIndexReader createIndexReader(PinotDataBuffer dataBuffer, ColumnMetadata metadata,
       ForwardIndexConfig indexConfig)
       throws IndexReaderConstraintException {
-    return createIndexReader(dataBuffer, metadata);
-  }
-
-  public ForwardIndexReader createIndexReader(PinotDataBuffer dataBuffer, ColumnMetadata metadata) {
     if (metadata.hasDictionary()) {
       if (metadata.isSingleValue()) {
         if (metadata.isSorted()) {

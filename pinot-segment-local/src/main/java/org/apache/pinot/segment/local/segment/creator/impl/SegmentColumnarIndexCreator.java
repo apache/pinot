@@ -42,6 +42,8 @@ import org.apache.pinot.spi.data.FieldSpec.FieldType;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.data.readers.ColumnReader;
 import org.apache.pinot.spi.data.readers.GenericRow;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 
 /**
@@ -49,6 +51,7 @@ import org.apache.pinot.spi.data.readers.GenericRow;
  */
 // TODO: check resource leaks
 public class SegmentColumnarIndexCreator extends BaseSegmentCreator {
+  private static final Logger LOGGER = LoggerFactory.getLogger(SegmentColumnarIndexCreator.class);
   private int _docIdCounter;
 
   @Override
@@ -61,6 +64,28 @@ public class SegmentColumnarIndexCreator extends BaseSegmentCreator {
         segmentCreationSpec.getIndexConfigsByColName().size());
     initializeCommon(segmentCreationSpec, segmentIndexCreationInfo, indexCreationInfoMap,
         schema, outDir, colIndexes, immutableToMutableIdMap, instanceType);
+
+    // Although NullValueVector is implemented as an index, it needs to be treated in a different way than other indexes
+    // Process all field specs (not just indexed columns) for null value vectors
+    for (FieldSpec fieldSpec : schema.getAllFieldSpecs()) {
+      String columnName = fieldSpec.getName();
+      // Create null value vector for non-indexed nullable columns
+      if (!_colIndexes.containsKey(columnName)) {
+        if (isNullable(fieldSpec, schema, segmentCreationSpec)) {
+          // Initialize Null value vector map
+          LOGGER.info("Column: {} is nullable", columnName);
+          _colIndexes.put(columnName,
+              new ColumnIndexCreators(columnName, fieldSpec, null, List.of(),
+                  new NullValueVectorCreator(outDir, columnName)));
+        } else {
+          LOGGER.debug("Column: {} is not nullable", columnName);
+        }
+      }
+    }
+  }
+
+  private boolean isNullable(FieldSpec fieldSpec, Schema schema, SegmentGeneratorConfig config) {
+    return schema.isEnableColumnBasedNullHandling() ? fieldSpec.isNullable() : config.isDefaultNullHandlingEnabled();
   }
 
   /**

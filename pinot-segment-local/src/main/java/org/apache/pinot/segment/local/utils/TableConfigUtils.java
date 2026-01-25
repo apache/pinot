@@ -28,6 +28,7 @@ import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
+import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Iterator;
 import java.util.List;
@@ -1280,6 +1281,7 @@ public final class TableConfigUtils {
         indexType.validate(indexConfigs, fieldSpec, tableConfig);
       }
     }
+    validateExplicitDictionaryForRawForwardIndex(tableConfig, schema, indexConfigsMap);
 
     validateMultiColumnTextIndex(indexingConfig.getMultiColumnTextIndexConfig());
 
@@ -1357,6 +1359,74 @@ public final class TableConfigUtils {
               "Multi-column text index doesn't allow: %s as property for column: %s", key, column);
         }
       }
+    }
+  }
+
+  private static void validateExplicitDictionaryForRawForwardIndex(TableConfig tableConfig, Schema schema,
+      Map<String, FieldIndexConfigs> indexConfigsMap) {
+    IndexingConfig indexingConfig = tableConfig.getIndexingConfig();
+    Set<String> noDictionaryColumns = new HashSet<>();
+    if (indexingConfig.getNoDictionaryColumns() != null) {
+      noDictionaryColumns.addAll(indexingConfig.getNoDictionaryColumns());
+    }
+    if (indexingConfig.getNoDictionaryConfig() != null) {
+      noDictionaryColumns.addAll(indexingConfig.getNoDictionaryConfig().keySet());
+    }
+
+    Map<String, FieldConfig> fieldConfigMap = new HashMap<>();
+    List<FieldConfig> fieldConfigs = tableConfig.getFieldConfigList();
+    if (fieldConfigs != null) {
+      for (FieldConfig fieldConfig : fieldConfigs) {
+        fieldConfigMap.put(fieldConfig.getName(), fieldConfig);
+      }
+    }
+
+    for (Map.Entry<String, FieldIndexConfigs> entry : indexConfigsMap.entrySet()) {
+      String column = entry.getKey();
+      FieldIndexConfigs indexConfigs = entry.getValue();
+      FieldConfig fieldConfig = fieldConfigMap.get(column);
+      boolean rawForwardIndexConfigured = noDictionaryColumns.contains(column)
+          || (fieldConfig != null && fieldConfig.getEncodingType() == FieldConfig.EncodingType.RAW);
+      if (!rawForwardIndexConfigured) {
+        continue;
+      }
+      FieldSpec fieldSpec = schema.getFieldSpecFor(column);
+      if (fieldSpec == null) {
+        continue;
+      }
+      List<String> dictionaryRequiredIndexes =
+          DictionaryIndexConfig.getIndexTypesWithDictionaryRequired(fieldSpec, indexConfigs).stream()
+              .map(IndexType::getPrettyName)
+              .sorted()
+              .collect(Collectors.toList());
+      if (dictionaryRequiredIndexes.isEmpty()) {
+        continue;
+      }
+      Preconditions.checkState(isDictionaryExplicitlyEnabled(fieldConfig),
+          "Column: %s has raw forward index with dictionary-required indexes enabled: %s. Please explicitly enable "
+              + "dictionary in FieldConfig (indexes.dictionary) to ensure these indexes can work.",
+          column, dictionaryRequiredIndexes);
+    }
+  }
+
+  private static boolean isDictionaryExplicitlyEnabled(@Nullable FieldConfig fieldConfig) {
+    if (fieldConfig == null) {
+      return false;
+    }
+    JsonNode indexes = fieldConfig.getIndexes();
+    if (indexes == null || !indexes.isObject()) {
+      return false;
+    }
+    JsonNode dictionaryConfig = indexes.get(StandardIndexes.DICTIONARY_ID);
+    if (dictionaryConfig == null || dictionaryConfig.isNull()) {
+      return false;
+    }
+    try {
+      DictionaryIndexConfig config = JsonUtils.jsonNodeToObject(dictionaryConfig, DictionaryIndexConfig.class);
+      return config != null && config.isEnabled();
+    } catch (IOException e) {
+      throw new IllegalStateException(
+          "Failed to parse dictionary index config for column: " + fieldConfig.getName(), e);
     }
   }
 
