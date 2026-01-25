@@ -688,7 +688,7 @@ public abstract class BasePartitionUpsertMetadataManager implements PartitionUps
   }
 
   /**
-   * Reverts segment upsert metadata and retries addOrReplaceSegment.
+   * Reverts segment upsert metadata
    */
   protected void revertSegmentUpsertMetadata(IndexSegment oldSegment, String segmentName,
       MutableRoaringBitmap validDocIdsForOldSegment) {
