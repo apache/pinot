@@ -274,7 +274,7 @@
     <jetbrains.annotations.version>26.0.2-1</jetbrains.annotations.version>
     <okio.version>3.16.4</okio.version>
     <kryo.version>2.24.0</kryo.version>
-    <objenesis.version>3.4</objenesis.version>
+    <objenesis.version>3.5</objenesis.version>
     <chill.version>0.10.0</chill.version>
     <HikariCP-java7.version>2.4.13</HikariCP-java7.version>
     <ivy.version>2.5.3</ivy.version>
