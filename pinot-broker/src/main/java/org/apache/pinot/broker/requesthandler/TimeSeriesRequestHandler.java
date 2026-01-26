@@ -174,7 +174,7 @@ public class TimeSeriesRequestHandler extends BaseBrokerRequestHandler {
       if (e instanceof QueryException) {
         qe = (QueryException) e;
       } else {
-        qe = new QueryException(QueryErrorCode.UNKNOWN, "Error processing time-series query", e);
+        qe = new QueryException(QueryErrorCode.UNKNOWN, e.getMessage(), e);
       }
       requestContext.setErrorCode(qe.getErrorCode());
       throw qe;
