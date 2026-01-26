@@ -18,21 +18,19 @@
  */
 package org.apache.pinot.controller.api;
 
-import java.io.IOException;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.TimeUnit;
+import org.apache.pinot.client.admin.PinotAdminClient;
 import org.apache.pinot.controller.helix.ControllerTest;
 import org.apache.pinot.controller.helix.core.PinotHelixResourceManager;
 import org.apache.pinot.controller.utils.SegmentMetadataMockUtils;
 import org.apache.pinot.segment.spi.SegmentMetadata;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.TableType;
-import org.apache.pinot.spi.utils.JsonUtils;
-import org.apache.pinot.spi.utils.builder.ControllerRequestURLBuilder;
 import org.apache.pinot.spi.utils.builder.TableConfigBuilder;
 import org.apache.pinot.spi.utils.builder.TableNameBuilder;
 import org.testng.annotations.AfterClass;
@@ -58,6 +56,7 @@ public class PinotSegmentRestletResourceTest {
   @Test
   public void testListSegmentLineage()
       throws Exception {
+    PinotAdminClient adminClient = TEST_INSTANCE.getOrCreateAdminClient();
     // Adding table
     String rawTableName = "lineageTestTable";
     TEST_INSTANCE.addDummySchema(rawTableName);
@@ -76,10 +75,10 @@ public class PinotSegmentRestletResourceTest {
     }
 
     // There should be no segment lineage at this point.
-    ControllerRequestURLBuilder urlBuilder = TEST_INSTANCE.getControllerRequestURLBuilder();
-    String segmentLineageResponse =
-        ControllerTest.sendGetRequest(urlBuilder.forListAllSegmentLineages(rawTableName, TableType.OFFLINE.name()));
-    assertEquals(segmentLineageResponse, "");
+    String segmentLineageResponse = adminClient.getSegmentClient()
+        .listSegmentLineage(rawTableName, TableType.OFFLINE.name());
+    assertTrue(segmentLineageResponse.isEmpty() || "{}".equals(segmentLineageResponse)
+        || "[]".equals(segmentLineageResponse));
 
     // Now starts to replace segments.
     List<String> segmentsFrom = Arrays.asList("s0", "s1");
@@ -95,7 +94,7 @@ public class PinotSegmentRestletResourceTest {
 
     // There should now be two segment lineage entries resulting from the operations above.
     segmentLineageResponse =
-        ControllerTest.sendGetRequest(urlBuilder.forListAllSegmentLineages(rawTableName, TableType.OFFLINE.toString()));
+        adminClient.getSegmentClient().listSegmentLineage(rawTableName, TableType.OFFLINE.toString());
     assertTrue(segmentLineageResponse.contains("\"state\":\"IN_PROGRESS\""));
     assertTrue(segmentLineageResponse.contains("\"segmentsFrom\":[\"s0\",\"s1\"]"));
     assertTrue(segmentLineageResponse.contains("\"segmentsTo\":[\"some_segment\"]"));
@@ -105,17 +104,18 @@ public class PinotSegmentRestletResourceTest {
     assertTrue(segmentLineageResponse.indexOf(segmentLineageId) < segmentLineageResponse.indexOf(nextSegmentLineageId));
 
     // List segment lineage should fail for non-existing table
-    assertThrows(IOException.class, () -> ControllerTest.sendGetRequest(
-        urlBuilder.forListAllSegmentLineages("non-existing-table", TableType.OFFLINE.toString())));
+    assertThrows(RuntimeException.class,
+        () -> adminClient.getSegmentClient().listSegmentLineage("non-existing-table", TableType.OFFLINE.toString()));
 
     // List segment lineage should also fail for invalid table type.
-    assertThrows(IOException.class,
-        () -> ControllerTest.sendGetRequest(urlBuilder.forListAllSegmentLineages(rawTableName, "invalid-type")));
+    assertThrows(RuntimeException.class,
+        () -> adminClient.getSegmentClient().listSegmentLineage(rawTableName, "invalid-type"));
   }
 
   @Test
   public void testSegmentCrcApi()
       throws Exception {
+    PinotAdminClient adminClient = TEST_INSTANCE.getOrCreateAdminClient();
     // Adding table
     String rawTableName = "crcTestTable";
     TEST_INSTANCE.addDummySchema(rawTableName);
@@ -127,7 +127,7 @@ public class PinotSegmentRestletResourceTest {
 
     // Check when there is no segment.
     Map<String, SegmentMetadata> segmentMetadataTable = new HashMap<>();
-    checkCrcRequest(rawTableName, segmentMetadataTable, 0);
+    checkCrcRequest(adminClient, rawTableName, segmentMetadataTable, 0);
 
     // Upload Segments
     for (int i = 0; i < 5; i++) {
@@ -137,19 +137,16 @@ public class PinotSegmentRestletResourceTest {
     }
 
     // Get crc info from API and check that they are correct.
-    checkCrcRequest(rawTableName, segmentMetadataTable, 5);
+    checkCrcRequest(adminClient, rawTableName, segmentMetadataTable, 5);
 
     // validate the segment metadata
     String sampleSegment = segmentMetadataTable.keySet().iterator().next();
-    String resp = ControllerTest.sendGetRequest(
-        TEST_INSTANCE.getControllerRequestURLBuilder().forSegmentMetadata(rawTableName, sampleSegment));
-    Map<String, String> fetchedMetadata = JsonUtils.stringToObject(resp, Map.class);
+    Map<String, Object> fetchedMetadata =
+        adminClient.getSegmentClient().getSegmentMetadata(rawTableName, sampleSegment, null);
     assertEquals(fetchedMetadata.get("segment.download.url"), "downloadUrl");
 
     // use table name with table type
-    resp = ControllerTest.sendGetRequest(
-        TEST_INSTANCE.getControllerRequestURLBuilder().forSegmentMetadata(offlineTableName, sampleSegment));
-    fetchedMetadata = JsonUtils.stringToObject(resp, Map.class);
+    fetchedMetadata = adminClient.getSegmentClient().getSegmentMetadata(offlineTableName, sampleSegment, null);
     assertEquals(fetchedMetadata.get("segment.download.url"), "downloadUrl");
 
     // Add more segments
@@ -160,18 +157,19 @@ public class PinotSegmentRestletResourceTest {
     }
 
     // Get crc info from API and check that they are correct.
-    checkCrcRequest(rawTableName, segmentMetadataTable, 10);
+    checkCrcRequest(adminClient, rawTableName, segmentMetadataTable, 10);
 
     // Delete one segment
     resourceManager.deleteSegment(offlineTableName, sampleSegment);
 
     // Check crc api
-    checkCrcRequest(rawTableName, segmentMetadataTable, 9);
+    checkCrcRequest(adminClient, rawTableName, segmentMetadataTable, 9);
   }
 
   @Test
   public void testDeleteSegmentsWithTimeWindow()
       throws Exception {
+    PinotAdminClient adminClient = TEST_INSTANCE.getOrCreateAdminClient();
     // Adding table and segment
     String rawTableName = "deleteWithTimeWindowTestTable";
     TEST_INSTANCE.addDummySchema(rawTableName);
@@ -185,27 +183,23 @@ public class PinotSegmentRestletResourceTest {
         10L, 20L, TimeUnit.MILLISECONDS);
     resourceManager.addNewSegment(offlineTableName, segmentMetadata, "downloadUrl");
 
-    // Send query and verify
-    ControllerRequestURLBuilder urlBuilder = TEST_INSTANCE.getControllerRequestURLBuilder();
     // case 1: no overlapping
-    String reply = ControllerTest.sendDeleteRequest(urlBuilder.forSegmentDeleteWithTimeWindowAPI(
-        rawTableName, 0L, 10L));
+    String reply = adminClient.getSegmentClient().deleteSegmentsByTimeWindow(rawTableName, 0L, 10L);
     assertTrue(reply.contains("Deleted 0 segments"));
 
     // case 2: partial overlapping
-    reply = ControllerTest.sendDeleteRequest(urlBuilder.forSegmentDeleteWithTimeWindowAPI(
-        rawTableName, 10L, 20L));
+    reply = adminClient.getSegmentClient().deleteSegmentsByTimeWindow(rawTableName, 10L, 20L);
     assertTrue(reply.contains("Deleted 0 segments"));
 
     // case 3: fully within the time window
-    reply = ControllerTest.sendDeleteRequest(urlBuilder.forSegmentDeleteWithTimeWindowAPI(
-        rawTableName, 10L, 21L));
+    reply = adminClient.getSegmentClient().deleteSegmentsByTimeWindow(rawTableName, 10L, 21L);
     assertTrue(reply.contains("Deleted 1 segments"));
   }
 
   @Test
   public void testDeleteMultipleSegments()
       throws Exception {
+    PinotAdminClient adminClient = TEST_INSTANCE.getOrCreateAdminClient();
     // Adding table and segment
     TEST_INSTANCE.addDummySchema(TEST_RAW_OFFLINE_TABLE_NAME);
     String offlineTableName = TableNameBuilder.OFFLINE.tableNameWithType(TEST_RAW_OFFLINE_TABLE_NAME);
@@ -224,24 +218,25 @@ public class PinotSegmentRestletResourceTest {
         "segment3");
     resourceManager.addNewSegment(offlineTableName, segmentMetadata, "downloadUrl");
 
-    // Send query and verify
-    ControllerRequestURLBuilder urlBuilder = TEST_INSTANCE.getControllerRequestURLBuilder();
     // case 1: send list of segments
-    String reply = ControllerTest.sendDeleteRequest(urlBuilder.forDeleteMultipleSegments(
-        TEST_RAW_OFFLINE_TABLE_NAME, TableType.OFFLINE.toString(), List.of("segment1")));
+    String reply = adminClient.getSegmentClient()
+        .deleteMultipleSegments(TEST_RAW_OFFLINE_TABLE_NAME, TableType.OFFLINE.toString(), List.of("segment1"), null);
     assertTrue(reply.contains("Deleted segments: [segment1] from table: offlineTableName1_OFFLINE"));
 
     // case 2: delete all remaining segments
-    reply = ControllerTest.sendDeleteRequest(urlBuilder.forDeleteMultipleSegments(
-        TEST_RAW_OFFLINE_TABLE_NAME, TableType.OFFLINE.toString(), Collections.emptyList()));
+    reply = adminClient.getSegmentClient()
+        .deleteMultipleSegments(TEST_RAW_OFFLINE_TABLE_NAME, TableType.OFFLINE.toString(), Collections.emptyList(),
+            null);
     assertTrue(reply.contains("All segments of table offlineTableName1_OFFLINE deleted"));
   }
 
-  private void checkCrcRequest(String tableName, Map<String, SegmentMetadata> metadataTable, int expectedSize)
+  private void checkCrcRequest(PinotAdminClient adminClient, String tableName,
+      Map<String, SegmentMetadata> metadataTable, int expectedSize)
       throws Exception {
-    String crcMapStr = ControllerTest.sendGetRequest(
-        TEST_INSTANCE.getControllerRequestURLBuilder().forListAllCrcInformationForTable(tableName));
-    Map<String, String> crcMap = JsonUtils.stringToObject(crcMapStr, Map.class);
+    Map<String, String> crcMap = adminClient.getSegmentClient().getSegmentToCrcMap(tableName);
+    if (crcMap == null) {
+      crcMap = java.util.Collections.emptyMap();
+    }
     for (String segmentName : crcMap.keySet()) {
       SegmentMetadata metadata = metadataTable.get(segmentName);
       assertNotNull(metadata);

@@ -28,7 +28,6 @@ import java.util.Map;
 import javax.annotation.Nullable;
 import org.apache.commons.io.FileUtils;
 import org.apache.commons.lang3.RandomStringUtils;
-import org.apache.pinot.controller.helix.ControllerTest;
 import org.apache.pinot.plugin.ingestion.batch.common.BaseSegmentPushJobRunner;
 import org.apache.pinot.plugin.ingestion.batch.standalone.SegmentMetadataPushJobRunner;
 import org.apache.pinot.plugin.ingestion.batch.standalone.SegmentTarPushJobRunner;
@@ -43,7 +42,6 @@ import org.apache.pinot.spi.ingestion.batch.spec.PushJobSpec;
 import org.apache.pinot.spi.ingestion.batch.spec.SegmentGenerationJobSpec;
 import org.apache.pinot.spi.ingestion.batch.spec.TableSpec;
 import org.apache.pinot.spi.utils.JsonUtils;
-import org.apache.pinot.spi.utils.builder.ControllerRequestURLBuilder;
 import org.apache.pinot.spi.utils.builder.TableNameBuilder;
 import org.apache.pinot.util.TestUtils;
 import org.testng.Assert;
@@ -140,7 +138,7 @@ public class SegmentUploadIntegrationTest extends BaseClusterIntegrationTest {
     jobSpec.setOutputDirURI(_tarDir.getAbsolutePath());
     TableSpec tableSpec = new TableSpec();
     tableSpec.setTableName(getTableName());
-    tableSpec.setTableConfigURI(_controllerRequestURLBuilder.forUpdateTableConfig(getTableName()));
+    tableSpec.setTableConfigURI(getControllerBaseApiUrl() + "/tables/" + getTableName());
     jobSpec.setTableSpec(tableSpec);
     PinotClusterSpec clusterSpec = new PinotClusterSpec();
     clusterSpec.setControllerURI(getControllerBaseApiUrl());
@@ -239,7 +237,7 @@ public class SegmentUploadIntegrationTest extends BaseClusterIntegrationTest {
     jobSpec.setOutputDirURI(_tarDir.getAbsolutePath());
     TableSpec tableSpec = new TableSpec();
     tableSpec.setTableName(getTableName() + "_OFFLINE");
-    tableSpec.setTableConfigURI(_controllerRequestURLBuilder.forUpdateTableConfig(getTableName()));
+    tableSpec.setTableConfigURI(getControllerBaseApiUrl() + "/tables/" + getTableName());
     jobSpec.setTableSpec(tableSpec);
     PinotClusterSpec clusterSpec = new PinotClusterSpec();
     clusterSpec.setControllerURI(getControllerBaseApiUrl());
@@ -264,7 +262,7 @@ public class SegmentUploadIntegrationTest extends BaseClusterIntegrationTest {
     JsonNode segmentsList = getSegmentsList();
     Assert.assertEquals(segmentsList.size(), 12);
     long numDocs = 0;
-    for (JsonNode segmentName: segmentsList) {
+    for (JsonNode segmentName : segmentsList) {
       numDocs += getNumDocs(segmentName.asText());
     }
     testCountStar(numDocs);
@@ -312,7 +310,7 @@ public class SegmentUploadIntegrationTest extends BaseClusterIntegrationTest {
     jobSpec.setOutputDirURI(_tarDir.getAbsolutePath());
     TableSpec tableSpec = new TableSpec();
     tableSpec.setTableName(getTableName());
-    tableSpec.setTableConfigURI(_controllerRequestURLBuilder.forUpdateTableConfig(getTableName()));
+    tableSpec.setTableConfigURI(getControllerBaseApiUrl() + "/tables/" + getTableName());
     jobSpec.setTableSpec(tableSpec);
     PinotClusterSpec clusterSpec = new PinotClusterSpec();
     clusterSpec.setControllerURI(getControllerBaseApiUrl());
@@ -340,9 +338,8 @@ public class SegmentUploadIntegrationTest extends BaseClusterIntegrationTest {
     testCountStar(numDocs);
 
     // Fetch segment lineage entry after running segment metadata push with consistent push enabled.
-    String segmentLineageResponse = ControllerTest.sendGetRequest(
-        ControllerRequestURLBuilder.baseUrl(getControllerBaseApiUrl())
-            .forListAllSegmentLineages(getTableName(), TableType.OFFLINE.toString()));
+    String segmentLineageResponse =
+        getOrCreateAdminClient().getSegmentClient().listSegmentLineage(getTableName(), TableType.OFFLINE.toString());
     // Segment lineage should be in completed state.
     Assert.assertTrue(segmentLineageResponse.contains("\"state\":\"COMPLETED\""));
     // SegmentsFrom should be empty as we started with a blank table.
@@ -389,9 +386,8 @@ public class SegmentUploadIntegrationTest extends BaseClusterIntegrationTest {
     testCountStar(numDocs);
 
     // Fetch segment lineage entry after running segment tar push with consistent push enabled.
-    segmentLineageResponse = ControllerTest.sendGetRequest(
-        ControllerRequestURLBuilder.baseUrl(getControllerBaseApiUrl())
-            .forListAllSegmentLineages(getTableName(), TableType.OFFLINE.toString()));
+    segmentLineageResponse =
+        getOrCreateAdminClient().getSegmentClient().listSegmentLineage(getTableName(), TableType.OFFLINE.toString());
     // Segment lineage should be in completed state.
     Assert.assertTrue(segmentLineageResponse.contains("\"state\":\"COMPLETED\""));
     // SegmentsFrom should contain the previous segment
@@ -409,17 +405,18 @@ public class SegmentUploadIntegrationTest extends BaseClusterIntegrationTest {
   }
 
   private long getNumDocs(String segmentName)
-      throws IOException {
-    return JsonUtils.stringToJsonNode(
-            sendGetRequest(_controllerRequestURLBuilder.forSegmentMetadata(getTableName(), segmentName)))
-        .get("segment.total.docs").asLong();
+      throws Exception {
+    Map<String, Object> metadata =
+        getOrCreateAdminClient().getSegmentClient().getSegmentMetadata(getTableName(), segmentName, null);
+    Object totalDocs = metadata.get("segment.total.docs");
+    return totalDocs instanceof Number ? ((Number) totalDocs).longValue() : 0L;
   }
 
   private JsonNode getSegmentsList()
-      throws IOException {
-    return JsonUtils.stringToJsonNode(sendGetRequest(
-            _controllerRequestURLBuilder.forSegmentListAPI(getTableName(), TableType.OFFLINE.toString())))
-        .get(0).get("OFFLINE");
+      throws Exception {
+    List<String> segments =
+        getOrCreateAdminClient().getSegmentClient().listSegments(getTableName(), TableType.OFFLINE.toString(), false);
+    return JsonUtils.objectToJsonNode(List.of(Map.of("OFFLINE", segments)));
   }
 
   protected void testCountStar(final long countStarResult) {

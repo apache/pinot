@@ -18,8 +18,10 @@
  */
 package org.apache.pinot.controller.helix;
 
+import com.fasterxml.jackson.databind.JsonNode;
 import java.io.File;
 import java.io.IOException;
+import java.net.URI;
 import java.net.URISyntaxException;
 import java.net.URL;
 import java.util.ArrayList;
@@ -32,6 +34,7 @@ import java.util.Set;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.stream.Collectors;
 import javax.annotation.Nullable;
+import javax.net.ssl.SSLContext;
 import org.apache.commons.collections4.CollectionUtils;
 import org.apache.commons.io.FileUtils;
 import org.apache.commons.io.IOUtils;
@@ -59,6 +62,9 @@ import org.apache.helix.participant.statemachine.StateModelInfo;
 import org.apache.helix.participant.statemachine.Transition;
 import org.apache.helix.store.zk.ZkHelixPropertyStore;
 import org.apache.helix.zookeeper.datamodel.ZNRecord;
+import org.apache.pinot.client.PinotClientException;
+import org.apache.pinot.client.admin.PinotAdminClient;
+import org.apache.pinot.client.admin.PinotAdminException;
 import org.apache.pinot.common.exception.HttpErrorStatusException;
 import org.apache.pinot.common.utils.SimpleHttpResponse;
 import org.apache.pinot.common.utils.ZkStarter;
@@ -81,6 +87,7 @@ import org.apache.pinot.spi.config.table.QueryConfig;
 import org.apache.pinot.spi.config.table.QuotaConfig;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.TableType;
+import org.apache.pinot.spi.config.table.assignment.InstancePartitionsType;
 import org.apache.pinot.spi.data.DateTimeFieldSpec;
 import org.apache.pinot.spi.data.DimensionFieldSpec;
 import org.apache.pinot.spi.data.FieldSpec;
@@ -153,7 +160,7 @@ public class ControllerTest {
   // The following fields need to be reset when stopping the controller.
   protected BaseControllerStarter _controllerStarter;
   protected int _controllerPort;
-  protected ControllerRequestClient _controllerRequestClient;
+  private PinotAdminClient _pinotAdminClient;
 
   // The following fields are always set when controller is started. No need to reset them when stopping the controller.
   protected ControllerConf _controllerConfig;
@@ -223,18 +230,11 @@ public class ControllerTest {
   }
 
   /**
-   * ControllerRequestClient is lazy evaluated, static object, only instantiate when first use.
-   *
-   * <p>This is because {@code ControllerTest} has HTTP utils that depends on the TLSUtils to install the security
-   * context first before the ControllerRequestClient can be initialized. However, because we have static usages of the
-   * ControllerRequestClient, it is not possible to create normal member variable, thus the workaround.
+   * Optionally provide an SSL context for controller admin transport and HTTP utilities.
    */
-  public ControllerRequestClient getControllerRequestClient() {
-    if (_controllerRequestClient == null) {
-      _controllerRequestClient = new ControllerRequestClient(_controllerRequestURLBuilder, getHttpClient(),
-          getControllerRequestClientHeaders());
-    }
-    return _controllerRequestClient;
+  @Nullable
+  protected SSLContext getControllerTransportSslContext() {
+    return null;
   }
 
   public void startZk() {
@@ -359,7 +359,15 @@ public class ControllerTest {
     _controllerStarter.stop();
     _controllerStarter = null;
     _controllerPort = 0;
-    _controllerRequestClient = null;
+    _controllerRequestURLBuilder = null;
+    if (_pinotAdminClient != null) {
+      try {
+        _pinotAdminClient.close();
+      } catch (Exception e) {
+        // ignore
+      }
+      _pinotAdminClient = null;
+    }
     FileUtils.deleteQuietly(new File(_controllerDataDir));
   }
 
@@ -719,6 +727,50 @@ public class ControllerTest {
     return schema;
   }
 
+  public PinotAdminClient getOrCreateAdminClient()
+      throws IOException {
+    if (_pinotAdminClient != null) {
+      return _pinotAdminClient;
+    }
+    try {
+      String baseApiUrl = _controllerBaseApiUrl;
+      if (baseApiUrl == null && _controllerRequestURLBuilder != null) {
+        // Some tests customize the controller request builder without starting their own controller instance.
+        baseApiUrl = _controllerRequestURLBuilder.getBaseUrl();
+      }
+      if (baseApiUrl == null && this != DEFAULT_INSTANCE && DEFAULT_INSTANCE._controllerBaseApiUrl != null) {
+        baseApiUrl = DEFAULT_INSTANCE._controllerBaseApiUrl;
+      }
+      if (baseApiUrl == null) {
+        throw new IOException("Controller base API URL is not initialized");
+      }
+      URI uri = URI.create(baseApiUrl);
+      String controllerAddress = uri.getHost() + ":" + uri.getPort();
+      java.util.Properties properties = new java.util.Properties();
+      if (uri.getScheme() != null) {
+        properties.setProperty(org.apache.pinot.client.admin.PinotAdminTransport.ADMIN_TRANSPORT_SCHEME,
+            uri.getScheme());
+      }
+      SSLContext sslContext = getControllerTransportSslContext();
+      if (sslContext != null) {
+        org.apache.pinot.common.utils.tls.TlsUtils.setSslContext(sslContext);
+      }
+      _pinotAdminClient = new PinotAdminClient(controllerAddress, properties, getControllerRequestClientHeaders(),
+          sslContext);
+      return _pinotAdminClient;
+    } catch (PinotClientException e) {
+      throw new IOException(e);
+    }
+  }
+
+  /**
+   * Exposes the admin client for callers that cannot access protected helpers.
+   */
+  public PinotAdminClient getAdminClient()
+      throws IOException {
+    return getOrCreateAdminClient();
+  }
+
   public static TableConfig createDummyTableConfig(String tableName, TableType tableType) {
     TableConfigBuilder builder = new TableConfigBuilder(tableType);
     if (tableType == TableType.REALTIME) {
@@ -748,17 +800,31 @@ public class ControllerTest {
    */
   public void addSchema(Schema schema)
       throws IOException {
-    getControllerRequestClient().addSchema(schema);
+    try {
+      getOrCreateAdminClient().getSchemaClient().createSchema(schema.toSingleLineJsonString());
+    } catch (PinotAdminException e) {
+      throw new IOException(e);
+    }
   }
 
   public void updateSchema(Schema schema)
       throws IOException {
-    getControllerRequestClient().updateSchema(schema);
+    try {
+      getOrCreateAdminClient().getSchemaClient().updateSchema(schema.getSchemaName(),
+          schema.toSingleLineJsonString());
+    } catch (PinotAdminException e) {
+      throw new IOException(e);
+    }
   }
 
   public void forceUpdateSchema(Schema schema)
       throws IOException {
-    getControllerRequestClient().forceUpdateSchema(schema);
+    try {
+      getOrCreateAdminClient().getSchemaClient().updateSchema(schema.getSchemaName(),
+          schema.toSingleLineJsonString(), false, true);
+    } catch (PinotAdminException e) {
+      throw new IOException(e);
+    }
   }
 
   public Schema getSchema(String schemaName) {
@@ -769,32 +835,64 @@ public class ControllerTest {
 
   public void deleteSchema(String schemaName)
       throws IOException {
-    getControllerRequestClient().deleteSchema(schemaName);
+    try {
+      getOrCreateAdminClient().getSchemaClient().deleteSchema(schemaName);
+    } catch (PinotAdminException e) {
+      throw new IOException(e);
+    }
   }
 
   public void addTableConfig(TableConfig tableConfig)
       throws IOException {
-    getControllerRequestClient().addTableConfig(tableConfig);
+    try {
+      getOrCreateAdminClient().getTableClient().createTable(tableConfig.toJsonString(), null);
+    } catch (PinotAdminException e) {
+      throw new IOException(e);
+    }
   }
 
   public void addLogicalTableConfig(LogicalTableConfig logicalTableConfig)
       throws IOException {
-    getControllerRequestClient().addLogicalTableConfig(logicalTableConfig);
+    try {
+      getOrCreateAdminClient().getLogicalTableClient().createLogicalTable(logicalTableConfig.toJsonString());
+    } catch (PinotAdminException e) {
+      e.printStackTrace();
+      throw new IOException(e);
+    } catch (RuntimeException e) {
+      e.printStackTrace();
+      throw new IOException(e);
+    }
   }
 
   public void updateTableConfig(TableConfig tableConfig)
       throws IOException {
-    getControllerRequestClient().updateTableConfig(tableConfig);
+    try {
+      getOrCreateAdminClient().getTableClient().updateTableConfig(tableConfig.getTableName(),
+          tableConfig.toJsonString());
+    } catch (PinotAdminException e) {
+      throw new IOException(e);
+    }
   }
 
   public void updateLogicalTableConfig(LogicalTableConfig logicalTableConfig)
       throws IOException {
-    getControllerRequestClient().updateLogicalTableConfig(logicalTableConfig);
+    try {
+      getOrCreateAdminClient().getLogicalTableClient()
+          .updateLogicalTable(logicalTableConfig.getTableName(), logicalTableConfig.toJsonString());
+    } catch (PinotAdminException e) {
+      throw new IOException(e);
+    } catch (RuntimeException e) {
+      throw new IOException(e);
+    }
   }
 
   public void toggleTableState(String tableName, TableType type, boolean enable)
       throws IOException {
-    getControllerRequestClient().toggleTableState(tableName, type, enable);
+    try {
+      getOrCreateAdminClient().getTableClient().setTableState(tableName, type.toString().toLowerCase(), enable);
+    } catch (PinotAdminException e) {
+      throw new IOException(e);
+    }
   }
 
   public TableConfig getOfflineTableConfig(String tableName) {
@@ -811,22 +909,41 @@ public class ControllerTest {
 
   public void dropOfflineTable(String tableName)
       throws IOException {
-    getControllerRequestClient().deleteTable(TableNameBuilder.OFFLINE.tableNameWithType(tableName));
+    try {
+      getOrCreateAdminClient().getTableClient()
+          .deleteTable(TableNameBuilder.OFFLINE.tableNameWithType(tableName));
+    } catch (PinotAdminException e) {
+      throw new IOException(e);
+    }
   }
 
   public void dropOfflineTable(String tableName, String retentionPeriod)
       throws IOException {
-    getControllerRequestClient().deleteTable(TableNameBuilder.OFFLINE.tableNameWithType(tableName), retentionPeriod);
+    try {
+      getOrCreateAdminClient().getTableClient()
+          .deleteTable(TableNameBuilder.OFFLINE.tableNameWithType(tableName), null, retentionPeriod, null);
+    } catch (PinotAdminException e) {
+      throw new IOException(e);
+    }
   }
 
   public void dropRealtimeTable(String tableName)
       throws IOException {
-    getControllerRequestClient().deleteTable(TableNameBuilder.REALTIME.tableNameWithType(tableName));
+    try {
+      getOrCreateAdminClient().getTableClient()
+          .deleteTable(TableNameBuilder.REALTIME.tableNameWithType(tableName));
+    } catch (PinotAdminException e) {
+      throw new IOException(e);
+    }
   }
 
   public void dropLogicalTable(String logicalTableName)
       throws IOException {
-    getControllerRequestClient().deleteLogicalTable(logicalTableName);
+    try {
+      getOrCreateAdminClient().getLogicalTableClient().deleteLogicalTable(logicalTableName);
+    } catch (PinotAdminException e) {
+      throw new IOException(e);
+    }
   }
 
   public void waitForEVToAppear(String tableNameWithType) {
@@ -846,27 +963,130 @@ public class ControllerTest {
 
   public List<String> listSegments(String tableName, @Nullable String tableType, boolean excludeReplacedSegments)
       throws IOException {
-    return getControllerRequestClient().listSegments(tableName, tableType, excludeReplacedSegments);
+    try {
+      return getOrCreateAdminClient().getSegmentClient()
+          .listSegments(tableName, tableType, excludeReplacedSegments);
+    } catch (PinotAdminException e) {
+      throw new IOException(e);
+    }
   }
 
   public void dropSegment(String tableName, String segmentName)
       throws IOException {
-    getControllerRequestClient().deleteSegment(tableName, segmentName);
+    try {
+      getOrCreateAdminClient().getSegmentClient().deleteSegment(tableName, segmentName, null);
+    } catch (PinotAdminException e) {
+      throw new IOException(e);
+    }
   }
 
   public void dropAllSegments(String tableName, TableType tableType)
       throws IOException {
-    getControllerRequestClient().deleteSegments(tableName, tableType);
+    try {
+      getOrCreateAdminClient().getSegmentClient().deleteMultipleSegments(
+          TableNameBuilder.forType(tableType).tableNameWithType(tableName), null, null);
+    } catch (PinotAdminException e) {
+      throw new IOException(e);
+    }
   }
 
   public long getTableSize(String tableName)
       throws IOException {
-    return getControllerRequestClient().getTableSize(tableName);
+    try {
+      return getOrCreateAdminClient().getTableClient().getReportedTableSizeInBytes(tableName);
+    } catch (PinotAdminException e) {
+      throw new IOException(e);
+    }
   }
 
   public Map<String, List<String>> getTableServersToSegmentsMap(String tableName, TableType tableType)
       throws IOException {
-    return getControllerRequestClient().getServersToSegmentsMap(tableName, tableType);
+    try {
+      return getOrCreateAdminClient().getSegmentClient()
+          .getServerToSegmentsMapAsMap(tableName, tableType != null ? tableType.name() : null);
+    } catch (PinotAdminException e) {
+      throw new IOException(e);
+    }
+  }
+
+  protected String getInstancePartitionsResponse(String tableName, @Nullable String instancePartitionsType)
+      throws IOException {
+    Map<String, String> queryParams = null;
+    if (instancePartitionsType != null) {
+      queryParams = new HashMap<>();
+      queryParams.put("type", instancePartitionsType);
+    }
+    return executeControllerRest("GET", "/tables/" + tableName + "/instancePartitions", null, queryParams);
+  }
+
+  protected String assignInstances(String tableName, @Nullable InstancePartitionsType instancePartitionsType,
+      boolean dryRun)
+      throws IOException {
+    Map<String, String> queryParams = new HashMap<>();
+    if (instancePartitionsType != null) {
+      queryParams.put("type", instancePartitionsType.toString());
+    }
+    if (dryRun) {
+      queryParams.put("dryRun", "true");
+    }
+    return executeControllerRest("POST", "/tables/" + tableName + "/assignInstances", null,
+        queryParams.isEmpty() ? null : queryParams);
+  }
+
+  protected void deleteInstancePartitions(String tableName, @Nullable String instancePartitionsType)
+      throws IOException {
+    Map<String, String> queryParams = null;
+    if (instancePartitionsType != null) {
+      queryParams = new HashMap<>();
+      queryParams.put("type", instancePartitionsType);
+    }
+    executeControllerRest("DELETE", "/tables/" + tableName + "/instancePartitions", null, queryParams);
+  }
+
+  protected String replaceInstanceInPartitions(String tableName,
+      @Nullable InstancePartitionsType instancePartitionsType, String oldInstanceId, String newInstanceId)
+      throws IOException {
+    Map<String, String> queryParams = new HashMap<>();
+    if (instancePartitionsType != null) {
+      queryParams.put("type", instancePartitionsType.toString());
+    }
+    queryParams.put("oldInstanceId", oldInstanceId);
+    queryParams.put("newInstanceId", newInstanceId);
+    return executeControllerRest("POST", "/tables/" + tableName + "/replaceInstance", null, queryParams);
+  }
+
+  protected String updateInstancePartitions(String tableName, String instancePartitionsJson)
+      throws IOException {
+    return executeControllerRest("PUT", "/tables/" + tableName + "/instancePartitions", instancePartitionsJson, null);
+  }
+
+  protected String executeControllerRest(String method, String path, @Nullable Object body,
+      @Nullable Map<String, String> queryParams)
+      throws IOException {
+    return executeControllerRest(method, path, body, queryParams, null);
+  }
+
+  protected String executeControllerRest(String method, String path, @Nullable Object body,
+      @Nullable Map<String, String> queryParams, @Nullable Map<String, String> headers)
+      throws IOException {
+    try {
+      JsonNode response = getOrCreateAdminClient().executeRequest(method, path, body, queryParams, headers);
+      return response.toString();
+    } catch (PinotAdminException e) {
+      throw new IOException(e);
+    } catch (RuntimeException e) {
+      // Wrap transport/runtime failures (e.g. 404 not found) as IOException for tests that expect IO failure mode,
+      // and surface the deepest cause message so assertions can match the controller error text.
+      Throwable t = e;
+      while (t.getCause() != null) {
+        t = t.getCause();
+      }
+      String message = t.getMessage();
+      if (message == null || message.isEmpty()) {
+        message = e.toString();
+      }
+      throw new IOException(message, e);
+    }
   }
 
   public String reloadOfflineTable(String tableName)
@@ -876,47 +1096,95 @@ public class ControllerTest {
 
   public String reloadOfflineTable(String tableName, boolean forceDownload)
       throws IOException {
-    return getControllerRequestClient().reloadTable(tableName, TableType.OFFLINE, forceDownload);
+    try {
+      return getOrCreateAdminClient().getSegmentClient()
+          .reloadTable(tableName, TableType.OFFLINE.name(), forceDownload);
+    } catch (PinotAdminException e) {
+      throw new IOException(e);
+    }
   }
 
   public String checkIfReloadIsNeeded(String tableNameWithType, Boolean verbose)
       throws IOException {
-    return getControllerRequestClient().checkIfReloadIsNeeded(tableNameWithType, verbose);
+    try {
+      return getOrCreateAdminClient().getSegmentClient()
+          .checkIfReloadIsNeeded(tableNameWithType, verbose != null && verbose);
+    } catch (PinotAdminException e) {
+      throw new IOException(e);
+    }
   }
 
   public String reloadOfflineSegment(String tableName, String segmentName, boolean forceDownload)
       throws IOException {
-    return getControllerRequestClient().reloadSegment(tableName, segmentName, forceDownload);
+    try {
+      return getOrCreateAdminClient().getSegmentClient().reloadSegment(tableName, segmentName, forceDownload);
+    } catch (PinotAdminException e) {
+      throw new IOException(e);
+    }
   }
 
   public String reloadRealtimeTable(String tableName)
       throws IOException {
-    return getControllerRequestClient().reloadTable(tableName, TableType.REALTIME, false);
+    try {
+      return getOrCreateAdminClient().getSegmentClient().reloadTable(tableName, TableType.REALTIME.name(), false);
+    } catch (PinotAdminException e) {
+      throw new IOException(e);
+    }
   }
 
   public void createBrokerTenant(String tenantName, int numBrokers)
       throws IOException {
-    getControllerRequestClient().createBrokerTenant(tenantName, numBrokers);
+    try {
+      String tenantJson = new org.apache.pinot.spi.config.tenant.Tenant(
+          org.apache.pinot.spi.config.tenant.TenantRole.BROKER, tenantName, numBrokers, 0, 0).toJsonString();
+      getOrCreateAdminClient().getTenantClient().createTenant(tenantJson);
+    } catch (PinotAdminException e) {
+      throw new IOException(e);
+    }
   }
 
   public void updateBrokerTenant(String tenantName, int numBrokers)
       throws IOException {
-    getControllerRequestClient().updateBrokerTenant(tenantName, numBrokers);
+    try {
+      String tenantJson = new org.apache.pinot.spi.config.tenant.Tenant(
+          org.apache.pinot.spi.config.tenant.TenantRole.BROKER, tenantName, numBrokers, 0, 0).toJsonString();
+      getOrCreateAdminClient().getTenantClient().updateTenant(tenantJson);
+    } catch (PinotAdminException e) {
+      throw new IOException(e);
+    }
   }
 
   public void deleteBrokerTenant(String tenantName)
       throws IOException {
-    getControllerRequestClient().deleteBrokerTenant(tenantName);
+    try {
+      getOrCreateAdminClient().getTenantClient().deleteTenant(tenantName, "BROKER");
+    } catch (PinotAdminException e) {
+      throw new IOException(e);
+    }
   }
 
   public void createServerTenant(String tenantName, int numOfflineServers, int numRealtimeServers)
       throws IOException {
-    getControllerRequestClient().createServerTenant(tenantName, numOfflineServers, numRealtimeServers);
+    try {
+      String tenantJson = new org.apache.pinot.spi.config.tenant.Tenant(
+          org.apache.pinot.spi.config.tenant.TenantRole.SERVER, tenantName,
+          numOfflineServers + numRealtimeServers, numOfflineServers, numRealtimeServers).toJsonString();
+      getOrCreateAdminClient().getTenantClient().createTenant(tenantJson);
+    } catch (PinotAdminException e) {
+      throw new IOException(e);
+    }
   }
 
   public void updateServerTenant(String tenantName, int numOfflineServers, int numRealtimeServers)
       throws IOException {
-    getControllerRequestClient().updateServerTenant(tenantName, numOfflineServers, numRealtimeServers);
+    try {
+      String tenantJson = new org.apache.pinot.spi.config.tenant.Tenant(
+          org.apache.pinot.spi.config.tenant.TenantRole.SERVER, tenantName,
+          numOfflineServers + numRealtimeServers, numOfflineServers, numRealtimeServers).toJsonString();
+      getOrCreateAdminClient().getTenantClient().updateTenant(tenantJson);
+    } catch (PinotAdminException e) {
+      throw new IOException(e);
+    }
   }
 
   public void enableResourceConfigForLeadControllerResource(boolean enable) {
@@ -936,17 +1204,31 @@ public class ControllerTest {
 
   public void runPeriodicTask(String taskName, String tableName, TableType tableType)
       throws IOException {
-    sendGetRequest(getControllerRequestURLBuilder().forPeriodTaskRun(taskName, tableName, tableType));
+    try {
+      getOrCreateAdminClient().getClusterClient()
+          .runPeriodicTask(taskName, tableName, tableType != null ? tableType.name() : null);
+    } catch (PinotAdminException e) {
+      throw new IOException(e);
+    }
   }
 
   public void updateClusterConfig(Map<String, String> clusterConfig)
       throws IOException {
-    getControllerRequestClient().updateClusterConfig(clusterConfig);
+    try {
+      String payload = JsonUtils.objectToString(clusterConfig);
+      getOrCreateAdminClient().getClusterClient().updateClusterConfig(payload);
+    } catch (PinotAdminException e) {
+      throw new IOException(e);
+    }
   }
 
   public void deleteClusterConfig(String clusterConfig)
       throws IOException {
-    getControllerRequestClient().deleteClusterConfig(clusterConfig);
+    try {
+      getOrCreateAdminClient().getClusterClient().deleteClusterConfig(clusterConfig);
+    } catch (PinotAdminException e) {
+      throw new IOException(e);
+    }
   }
 
   /**
@@ -973,18 +1255,21 @@ public class ControllerTest {
 
   public void pauseTable(String tableName)
       throws IOException {
-    sendPostRequest(getControllerRequestURLBuilder().forPauseConsumption(tableName));
+    try {
+      getOrCreateAdminClient().getTableClient().pauseConsumption(tableName);
+    } catch (PinotAdminException e) {
+      throw new IOException(e);
+    }
     TestUtils.waitForCondition((aVoid) -> {
       try {
-        PauseStatusDetails pauseStatusDetails =
-            JsonUtils.stringToObject(sendGetRequest(getControllerRequestURLBuilder().forPauseStatus(tableName)),
-                PauseStatusDetails.class);
+        PauseStatusDetails pauseStatusDetails = JsonUtils.stringToObject(
+            getOrCreateAdminClient().getTableClient().getPauseStatus(tableName), PauseStatusDetails.class);
         if (pauseStatusDetails.getConsumingSegments().isEmpty()) {
           return true;
         }
         LOGGER.warn("Table not yet paused. Response " + pauseStatusDetails);
         return false;
-      } catch (IOException e) {
+      } catch (IOException | PinotAdminException e) {
         throw new RuntimeException(e);
       }
     }, 2000, 60_000L, "Failed to pause table: " + tableName);
@@ -997,20 +1282,22 @@ public class ControllerTest {
 
   public void resumeTable(String tableName, String offsetCriteria)
       throws IOException {
-    sendPostRequest(getControllerRequestURLBuilder().forResumeConsumption(tableName)
-        + "?consumeFrom=" + offsetCriteria);
+    try {
+      getOrCreateAdminClient().getTableClient().resumeConsumption(tableName, offsetCriteria);
+    } catch (PinotAdminException e) {
+      throw new IOException(e);
+    }
     TestUtils.waitForCondition((aVoid) -> {
       try {
-        PauseStatusDetails pauseStatusDetails =
-            JsonUtils.stringToObject(sendGetRequest(getControllerRequestURLBuilder().forPauseStatus(tableName)),
-                PauseStatusDetails.class);
+        PauseStatusDetails pauseStatusDetails = JsonUtils.stringToObject(
+            getOrCreateAdminClient().getTableClient().getPauseStatus(tableName), PauseStatusDetails.class);
         // Its possible no segment is in consuming state, so check pause flag
         if (!pauseStatusDetails.getPauseFlag()) {
           return true;
         }
         LOGGER.warn("Pause flag is not yet set to false. Response " + pauseStatusDetails);
         return false;
-      } catch (IOException e) {
+      } catch (IOException | PinotAdminException e) {
         throw new RuntimeException(e);
       }
     }, 2000, 60_000L, "Failed to resume table: " + tableName);
@@ -1038,8 +1325,12 @@ public class ControllerTest {
 
   public TableViews.TableView getExternalView(String tableName, TableType type)
       throws IOException {
-    String state = sendGetRequest(getControllerRequestURLBuilder().forExternalView(tableName + "_" + type));
-    return JsonUtils.stringToObject(state, TableViews.TableView.class);
+    try {
+      String state = getOrCreateAdminClient().getTableClient().getExternalView(tableName + "_" + type);
+      return JsonUtils.stringToObject(state, TableViews.TableView.class);
+    } catch (PinotAdminException e) {
+      throw new IOException(e);
+    }
   }
 
   public static String sendGetRequest(String urlString)
@@ -1219,10 +1510,6 @@ public class ControllerTest {
     return count;
   }
 
-  public ControllerRequestURLBuilder getControllerRequestURLBuilder() {
-    return _controllerRequestURLBuilder;
-  }
-
   public HelixAdmin getHelixAdmin() {
     return _helixAdmin;
   }
@@ -1237,6 +1524,11 @@ public class ControllerTest {
 
   public String getControllerBaseApiUrl() {
     return _controllerBaseApiUrl;
+  }
+
+  protected String controllerUrl(String path) {
+    String relativePath = path.startsWith("/") ? path : "/" + path;
+    return _controllerBaseApiUrl + relativePath;
   }
 
   public HelixManager getHelixManager() {
@@ -1326,6 +1618,28 @@ public class ControllerTest {
       // cases are run one at a time within IntelliJ or through maven command line. When running under a testNG
       // group, state will have already been setup by @BeforeGroups method in ControllerTestSetup.
       startSharedTestSetup();
+    } else {
+      // Ensure the shared cluster starts clean between test classes.
+      List<String> existingTables = getHelixResourceManager().getAllTables();
+      List<String> existingSchemas = getHelixResourceManager().getSchemaNames();
+      if (!existingTables.isEmpty() || !existingSchemas.isEmpty()) {
+        cleanup();
+      }
+    }
+
+    // Always clean tables/schemas from any previous test class to guarantee isolation.
+    cleanup();
+
+    // Ensure expected fake instances are present before validation.
+    int currentBrokers =
+        _helixResourceManager.getAllInstancesForBrokerTenant(TagNameUtils.DEFAULT_TENANT_NAME).size();
+    if (currentBrokers < DEFAULT_NUM_BROKER_INSTANCES) {
+      addMoreFakeBrokerInstancesToAutoJoinHelixCluster(DEFAULT_NUM_BROKER_INSTANCES - currentBrokers, true);
+    }
+    int currentServers =
+        _helixResourceManager.getAllInstancesForServerTenant(TagNameUtils.DEFAULT_TENANT_NAME).size();
+    if (currentServers < DEFAULT_NUM_SERVER_INSTANCES) {
+      addMoreFakeServerInstancesToAutoJoinHelixCluster(DEFAULT_NUM_SERVER_INSTANCES - currentServers, true);
     }
 
     // In a single tenant cluster, only the default tenant should exist

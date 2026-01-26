@@ -463,9 +463,9 @@ public class UpsertTableIntegrationTest extends BaseClusterIntegrationTest {
     // 3. Resume consumption to trigger the snapshot
     // 4. Wait until new consuming segments show up
     // 5. Schedule compaction task which compact the segments based on the snapshot
-    sendPostRequest(_controllerRequestURLBuilder.forPauseConsumption(tableName));
+    getOrCreateAdminClient().getTableClient().pauseConsumption(tableName);
     waitForNumQueriedSegmentsToConverge(tableName, 600_000L, 3, 0);
-    sendPostRequest(_controllerRequestURLBuilder.forResumeConsumption(tableName));
+    getOrCreateAdminClient().getTableClient().resumeConsumption(tableName, null);
     waitForNumQueriedSegmentsToConverge(tableName, 600_000L, 5, 2);
     String realtimeTableName = TableNameBuilder.forType(TableType.REALTIME).tableNameWithType(tableName);
     assertNotNull(_taskManager.scheduleTasks(new TaskSchedulingContext()
@@ -542,7 +542,7 @@ public class UpsertTableIntegrationTest extends BaseClusterIntegrationTest {
     assertEquals(queryCountStar(tableName), 1);
 
     // Force commit the segments to ensure the deleting rows are part of the committed segments
-    sendPostRequest(_controllerRequestURLBuilder.forTableForceCommit(tableName));
+    getOrCreateAdminClient().getTableClient().forceCommit(tableName);
     waitForNumQueriedSegmentsToConverge(tableName, 10_000L, 5, 2);
 
     String realtimeTableName = TableNameBuilder.forType(TableType.REALTIME).tableNameWithType(tableName);

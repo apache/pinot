@@ -21,15 +21,14 @@ package org.apache.pinot.tools.admin.command;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.google.common.base.Preconditions;
 import java.io.File;
-import java.io.IOException;
 import java.util.concurrent.Callable;
+import org.apache.pinot.client.admin.PinotAdminClient;
 import org.apache.pinot.spi.config.TableConfigs;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.TableType;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.utils.JsonUtils;
 import org.apache.pinot.spi.utils.NetUtils;
-import org.apache.pinot.spi.utils.builder.ControllerRequestURLBuilder;
 import org.apache.pinot.spi.utils.builder.TableNameBuilder;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -69,8 +68,6 @@ public class AddTableCommand extends AbstractDatabaseBaseAdminCommand {
   @CommandLine.Option(names = {"-validationTypesToSkip"}, required = false, description =
       "comma separated list of validation type(s) to skip. supported types: (ALL|TASK|UPSERT)")
   private String _validationTypesToSkip = null;
-
-  private String _controllerAddress;
 
   @Override
   public String getName() {
@@ -125,32 +122,6 @@ public class AddTableCommand extends AbstractDatabaseBaseAdminCommand {
     return this;
   }
 
-  public boolean sendTableCreationRequest(JsonNode node)
-      throws IOException {
-    String res = AbstractBaseAdminCommand.sendRequest("POST",
-        getTableCreationRequestURL(), node.toString(), getHeaders(),
-        makeTrustAllSSLContext());
-    LOGGER.info(res);
-    return res.contains("successfully added");
-  }
-
-  private String getTableCreationRequestURL() {
-    String baseURL = ControllerRequestURLBuilder.baseUrl(_controllerAddress).forTableConfigsCreate();
-    if (_validationTypesToSkip != null) {
-      return String.format(baseURL + "?validationTypesToSkip=%s", _validationTypesToSkip);
-    }
-    return baseURL;
-  }
-
-  public boolean sendTableUpdateRequest(JsonNode node, String tableName)
-      throws IOException {
-    String res = AbstractBaseAdminCommand.sendRequest("PUT",
-        ControllerRequestURLBuilder.baseUrl(_controllerAddress).forTableConfigsUpdate(tableName), node.toString(),
-        getHeaders(), makeTrustAllSSLContext());
-    LOGGER.info(res);
-    return res.contains("TableConfigs updated");
-  }
-
   @Override
   public boolean execute()
       throws Exception {
@@ -163,8 +134,6 @@ public class AddTableCommand extends AbstractDatabaseBaseAdminCommand {
     if (_controllerHost == null) {
       _controllerHost = NetUtils.getHostAddress();
     }
-    _controllerAddress = _controllerProtocol + "://" + _controllerHost + ":" + _controllerPort;
-
     LOGGER.info("Executing command: {}", toString());
 
     String rawTableName = null;
@@ -199,10 +168,38 @@ public class AddTableCommand extends AbstractDatabaseBaseAdminCommand {
         "Failed reading schema " + _schemaFile);
     TableConfigs tableConfigs = new TableConfigs(rawTableName, schema, offlineTableConfig, realtimeTableConfig);
 
-    if (_update) {
-      return sendTableUpdateRequest(tableConfigs.toJsonNode(), rawTableName);
-    } else {
-      return sendTableCreationRequest(tableConfigs.toJsonNode());
+    try {
+      JsonNode payload = tableConfigs.toJsonNode();
+      if (_update) {
+        LOGGER.info("Updating tableConfigs {}", rawTableName);
+        return sendTableUpdateRequest(payload, rawTableName);
+      } else {
+        LOGGER.info("Creating tableConfigs {}", rawTableName);
+        return sendTableCreationRequest(payload);
+      }
+    } catch (Exception e) {
+      LOGGER.error("Failed to apply table configs for table {}", rawTableName, e);
+      return false;
+    }
+  }
+
+  private boolean sendTableCreationRequest(JsonNode tableConfigsNode)
+      throws Exception {
+    try (PinotAdminClient adminClient = getPinotAdminClient()) {
+      String response =
+          adminClient.getTableClient().createTableConfigs(tableConfigsNode.toString(), _validationTypesToSkip, null);
+      LOGGER.info(response);
+      return true;
+    }
+  }
+
+  private boolean sendTableUpdateRequest(JsonNode tableConfigsNode, String rawTableName)
+      throws Exception {
+    try (PinotAdminClient adminClient = getPinotAdminClient()) {
+      String response = adminClient.getTableClient()
+          .updateTableConfigs(rawTableName, tableConfigsNode.toString(), _validationTypesToSkip, false, false);
+      LOGGER.info(response);
+      return true;
     }
   }
 

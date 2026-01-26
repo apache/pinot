@@ -19,10 +19,13 @@
 package org.apache.pinot.client.admin;
 
 import com.fasterxml.jackson.databind.JsonNode;
+import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.concurrent.CompletableFuture;
+import javax.annotation.Nullable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -53,8 +56,55 @@ public class PinotTenantAdminClient {
    */
   public List<String> listTenants()
       throws PinotAdminException {
-    JsonNode response = _transport.executeGet(_controllerAddress, "/tenants", null, _headers);
-    return PinotAdminTransport.getObjectMapper().convertValue(response.get("tenants"), List.class);
+    return listTenants(null);
+  }
+
+  /**
+   * Lists tenants, optionally filtered by type.
+   *
+   * @param type tenant type filter (BROKER or SERVER)
+   */
+  public List<String> listTenants(@Nullable String type)
+      throws PinotAdminException {
+    Map<String, String> queryParams = new HashMap<>();
+    if (type != null && !type.isEmpty()) {
+      queryParams.put("type", type);
+    }
+
+    JsonNode response =
+        _transport.executeGet(_controllerAddress, "/tenants", queryParams.isEmpty() ? null : queryParams, _headers);
+    Set<String> tenants = new java.util.HashSet<>();
+    JsonNode brokerTenants = response.get("BROKER_TENANTS");
+    if (brokerTenants != null && brokerTenants.isArray()) {
+      brokerTenants.forEach(node -> tenants.add(node.asText()));
+    }
+    JsonNode serverTenants = response.get("SERVER_TENANTS");
+    if (serverTenants != null && serverTenants.isArray()) {
+      serverTenants.forEach(node -> tenants.add(node.asText()));
+    }
+    return new ArrayList<>(tenants);
+  }
+
+  /**
+   * Returns the tenants overview payload (BROKER_TENANTS and SERVER_TENANTS).
+   */
+  public String getTenants()
+      throws PinotAdminException {
+    return getTenants(null);
+  }
+
+  /**
+   * Returns the tenants overview payload filtered by type (optional).
+   */
+  public String getTenants(@Nullable String type)
+      throws PinotAdminException {
+    Map<String, String> queryParams = new HashMap<>();
+    if (type != null && !type.isEmpty()) {
+      queryParams.put("type", type);
+    }
+    JsonNode response =
+        _transport.executeGet(_controllerAddress, "/tenants", queryParams.isEmpty() ? null : queryParams, _headers);
+    return response.toString();
   }
 
   /**
@@ -92,7 +142,7 @@ public class PinotTenantAdminClient {
    * @return Tenant instances as JSON string
    * @throws PinotAdminException If the request fails
    */
-  public String getTenantInstances(String tenantName, String tenantType, String tableType)
+  public String getTenantInstances(String tenantName, @Nullable String tenantType, @Nullable String tableType)
       throws PinotAdminException {
     Map<String, String> queryParams = new HashMap<>();
     if (tenantType != null) {
@@ -127,7 +177,7 @@ public class PinotTenantAdminClient {
    * @return Success response
    * @throws PinotAdminException If the request fails
    */
-  public String setTenantState(String tenantName, String tenantType, String state)
+  public String setTenantState(String tenantName, @Nullable String tenantType, String state)
       throws PinotAdminException {
     Map<String, String> queryParams = new HashMap<>();
     if (tenantType != null) {
@@ -136,7 +186,7 @@ public class PinotTenantAdminClient {
     queryParams.put("state", state);
 
     JsonNode response =
-        _transport.executePut(_controllerAddress, "/tenants/" + tenantName, null, queryParams, _headers);
+        _transport.executePost(_controllerAddress, "/tenants/" + tenantName, null, queryParams, _headers);
     return response.toString();
   }
 
@@ -149,7 +199,7 @@ public class PinotTenantAdminClient {
    * @return Tenant tables as JSON string
    * @throws PinotAdminException If the request fails
    */
-  public String getTenantTables(String tenantName, String tenantType, boolean withTableProperties)
+  public String getTenantTables(String tenantName, @Nullable String tenantType, boolean withTableProperties)
       throws PinotAdminException {
     Map<String, String> queryParams = new HashMap<>();
     if (tenantType != null) {
@@ -206,7 +256,7 @@ public class PinotTenantAdminClient {
    * @return Tenant metadata as JSON string
    * @throws PinotAdminException If the request fails
    */
-  public String getTenantMetadata(String tenantName, String tenantType)
+  public String getTenantMetadata(String tenantName, @Nullable String tenantType)
       throws PinotAdminException {
     Map<String, String> queryParams = new HashMap<>();
     if (tenantType != null) {
@@ -227,7 +277,7 @@ public class PinotTenantAdminClient {
    * @return Success response
    * @throws PinotAdminException If the request fails
    */
-  public String changeTenantState(String tenantName, String tenantType, String state)
+  public String changeTenantState(String tenantName, @Nullable String tenantType, String state)
       throws PinotAdminException {
     Map<String, String> queryParams = new HashMap<>();
     if (tenantType != null) {
@@ -280,8 +330,8 @@ public class PinotTenantAdminClient {
    * @return Rebalance result
    * @throws PinotAdminException If the request fails
    */
-  public String rebalanceTenant(String tenantName, int degreeOfParallelism, String includeTableTypes,
-      String excludeTableTypes, String rebalanceMode)
+  public String rebalanceTenant(String tenantName, int degreeOfParallelism, @Nullable String includeTableTypes,
+      @Nullable String excludeTableTypes, @Nullable String rebalanceMode)
       throws PinotAdminException {
     Map<String, String> queryParams = new HashMap<>();
     queryParams.put("degreeOfParallelism", String.valueOf(degreeOfParallelism));
@@ -327,6 +377,31 @@ public class PinotTenantAdminClient {
     return response.toString();
   }
 
+  /**
+   * Runs tenant rebalance with a request body (e.g., TenantRebalanceConfig) and optional query parameters.
+   *
+   * @param tenantName Name of the tenant to rebalance
+   * @param rebalanceConfigJson JSON payload describing the rebalance configuration
+   * @param queryParams Optional query parameters such as includeTables/excludeTables
+   * @return Rebalance result as JSON string
+   * @throws PinotAdminException If the request fails
+   */
+  public String rebalanceTenantWithConfig(String tenantName, String rebalanceConfigJson,
+      @Nullable Map<String, String> queryParams)
+      throws PinotAdminException {
+    JsonNode response = _transport.executePost(_controllerAddress, "/tenants/" + tenantName + "/rebalance",
+        rebalanceConfigJson, queryParams, _headers);
+    return response.toString();
+  }
+
+  /**
+   * Runs tenant rebalance with a request body (no additional query parameters).
+   */
+  public String rebalanceTenantWithConfig(String tenantName, String rebalanceConfigJson)
+      throws PinotAdminException {
+    return rebalanceTenantWithConfig(tenantName, rebalanceConfigJson, null);
+  }
+
   // Async versions of key methods
 
   /**
@@ -348,7 +423,7 @@ public class PinotTenantAdminClient {
   /**
    * Gets tenant metadata information (async).
    */
-  public CompletableFuture<String> getTenantMetadataAsync(String tenantName, String tenantType) {
+  public CompletableFuture<String> getTenantMetadataAsync(String tenantName, @Nullable String tenantType) {
     Map<String, String> queryParams = new HashMap<>();
     if (tenantType != null) {
       queryParams.put("type", tenantType);
