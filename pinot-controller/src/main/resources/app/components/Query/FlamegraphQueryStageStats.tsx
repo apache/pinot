@@ -21,6 +21,7 @@ import { Typography, useTheme } from "@material-ui/core";
 import "react-flow-renderer/dist/style.css";
 import isEmpty from "lodash/isEmpty";
 import { FlameGraph } from 'react-flame-graph';
+import {act} from "react-dom/test-utils";
 
 
 /**
@@ -99,48 +100,89 @@ const generateFlameGraphData = (stats, highlightedStage : Number = null, mode : 
 
   const stages = [];
 
-  const processNode = (node, currentStage) => {
-    const { children, ...data } = node;
+  const processNode = (node, currentStage, onPipelineBreaker: boolean = false) => {
+    let { children, ...data } = node;
 
     const baseNode = {
       tooltip: JSON.stringify(data),
       value: getNodeValue(data),
       backgroundColor: highlightedStage === currentStage ? 'lightblue' : null,
     }
-    // If it's a MAILBOX_RECEIVE node, prune the tree here
-    if (data.type === "MAILBOX_RECEIVE") {
-      const sendOperator = children[0];
-      visitStage(sendOperator, currentStage);
-      return {
-        name: `MAILBOX_RECEIVE from stage ${sendOperator.stage || 'unknown'}`,
-        relatedStage: sendOperator.stage || null,
-        ...baseNode,
-      };
+    let name: String;
+    switch (data.type) {
+      case "LEAF": {
+        name = `LEAF (${data.table || ''})`;
+        if (children && children.length !== 0) {
+          // We don't want to include the children in this stage because its time is independent of the leaf node.
+          children = [];
+        }
+        break;
+      }
+      case "MAILBOX_RECEIVE": {
+        // If it's a MAILBOX_RECEIVE node, prune the tree here
+        const sendOperator = children[0];
+        visitStage(sendOperator, currentStage);
+        const prefix = onPipelineBreaker ? "PIPELINE_BREAKER " : "MAILBOX_RECEIVE";
+        return {
+          name: `${prefix} from stage ${sendOperator.stage || 'unknown'}`,
+          relatedStage: sendOperator.stage || null, ...baseNode,
+        };
+      }
+      default: {
+        name = data.type || "Unknown Type";
+      }
     }
 
     // For other nodes, continue processing children
     return {
-      name: data.type || "Unknown Type",
+      name: name,
       ...baseNode,
       children: children
-        ? children.map(node => processNode(node, currentStage))
+        ? children.map(node => processNode(node, currentStage, onPipelineBreaker))
           .filter(child => child !== null) : [],
     };
+  }
+
+  const getPipelineBreakerNode = (children, currentStage: number) => {
+    const stack = [...children];
+    while (stack.length > 0) {
+      const node = stack.pop();
+      if (node.type === "LEAF" && node.children && node.children.length > 0) {
+        return processNode(node.children[0], currentStage, true);
+      }
+      if (node.type == "MAILBOX_RECEIVE") {
+        // We don't want to go past MAILBOX_RECEIVE nodes, as their children belong to other stages.
+        continue;
+      }
+      if (node.children && node.children.length > 0) {
+        stack.push(...node.children);
+      }
+    }
+    return null;
   }
 
   const visitStage = (node, parentStage = null) => {
     const { children, ...data } = node;
     const stage = data.stage || 0;
-    const value = getNodeValue(node);
+    const pipelineBreakerNode = getPipelineBreakerNode(children, stage);
+    let value: number;
+    const childrenNodes = children
+        ? children.map(node => processNode(node, stage)).filter(child => child !== null)
+        : [];
+    if (pipelineBreakerNode) {
+      value = getNodeValue(node) + pipelineBreakerNode.value || 0;
+      childrenNodes.push(pipelineBreakerNode);
+    } else {
+      value = getNodeValue(node)
+    }
+
     stages.push({
       name: "Stage " + stage,
       value: value,
       tooltip: JSON.stringify(data),
       backgroundColor: stage === highlightedStage ? 'lightblue' : null,
       relatedStage: parentStage,
-      children: children
-        ? children.map(node => processNode(node, stage)).filter(child => child !== null)
-        : [],
+      children: childrenNodes
     });
   }
   stats.children.forEach((node) => visitStage(node));
@@ -149,7 +191,7 @@ const generateFlameGraphData = (stats, highlightedStage : Number = null, mode : 
   return {
     data: {
       name: 'All stages',
-      value: stages.reduce((sum, child) => sum + child.value, 1),
+      value: Math.max(1, stages.reduce((sum, child) => sum + child.value, 0)),
       children: stages,
     }
   };

@@ -24,6 +24,7 @@ import java.util.Objects;
 import java.util.function.BiConsumer;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
+import javax.annotation.Nullable;
 import org.apache.pinot.query.planner.plannode.AggregateNode;
 import org.apache.pinot.query.planner.plannode.EnrichedJoinNode;
 import org.apache.pinot.query.planner.plannode.ExchangeNode;
@@ -61,6 +62,7 @@ import org.apache.pinot.query.runtime.operator.set.MinusAllOperator;
 import org.apache.pinot.query.runtime.operator.set.MinusOperator;
 import org.apache.pinot.query.runtime.operator.set.UnionAllOperator;
 import org.apache.pinot.query.runtime.operator.set.UnionOperator;
+import org.apache.pinot.query.runtime.plan.pipeline.PipelineBreakerResult;
 import org.apache.pinot.query.runtime.plan.server.ServerPlanRequestContext;
 import org.apache.pinot.spi.exception.QueryErrorCode;
 
@@ -111,9 +113,14 @@ public class PlanNodeToOpChain {
       MultiStageOperator result;
       if (context.getLeafStageContext() != null && context.getLeafStageContext().getLeafStageBoundaryNode() == node) {
         ServerPlanRequestContext leafStageContext = context.getLeafStageContext();
+        PipelineBreakerResult pipelineBreakerResult = context.getPipelineBreakerResult();
+        @Nullable
+        MultiStageQueryStats pipelineBreakerQueryStats = pipelineBreakerResult != null
+            ? pipelineBreakerResult.getStageQueryStats()
+            : null;
         result = new LeafOperator(context, leafStageContext.getServerQueryRequests(),
             leafStageContext.getLeafStageBoundaryNode().getDataSchema(), leafStageContext.getLeafQueryExecutor(),
-            leafStageContext.getExecutorService());
+            leafStageContext.getExecutorService(), pipelineBreakerQueryStats);
       } else {
         result = node.visit(this, context);
       }

@@ -2120,7 +2120,8 @@ public class MultiStageEngineIntegrationTest extends BaseClusterIntegrationTestS
     return postQuery(query, headers);
   }
 
-  private void setupDimensionTable() throws Exception {
+  private void setupDimensionTable()
+      throws Exception {
     // Set up the dimension table for JOIN tests
     Schema lookupTableSchema = createSchema(DIM_TABLE_SCHEMA_PATH);
     addSchema(lookupTableSchema);
@@ -2147,6 +2148,70 @@ public class MultiStageEngineIntegrationTest extends BaseClusterIntegrationTestS
     JsonNode response = postQuery(query);
     assertEquals(response.get("exceptions").get(0), null);
     assertNotNull(response.get("resultTable"), "Should have result table");
+  }
+
+  @Test
+  public void testStageStatsPipelineBreaker()
+      throws Exception {
+    String query = "select * from mytable "
+        + "WHERE DayOfWeek in (select dayid from daysOfWeek)";
+    JsonNode response = postQuery(query);
+    assertNotNull(response.get("stageStats"), "Should have stage stats");
+
+    JsonNode receiveNode = response.get("stageStats");
+    Assertions.assertThat(receiveNode.get("type").asText()).isEqualTo("MAILBOX_RECEIVE");
+
+    JsonNode sendNode = receiveNode.get("children").get(0);
+    Assertions.assertThat(sendNode.get("type").asText()).isEqualTo("MAILBOX_SEND");
+
+    JsonNode mytableLeaf = sendNode.get("children").get(0);
+    Assertions.assertThat(mytableLeaf.get("type").asText()).isEqualTo("LEAF");
+    Assertions.assertThat(mytableLeaf.get("table").asText()).isEqualTo("mytable");
+
+    JsonNode pipelineReceive = mytableLeaf.get("children").get(0);
+    Assertions.assertThat(pipelineReceive.get("type").asText()).isEqualTo("MAILBOX_RECEIVE");
+
+    JsonNode pipelineSend = pipelineReceive.get("children").get(0);
+    Assertions.assertThat(pipelineSend.get("type").asText()).isEqualTo("MAILBOX_SEND");
+
+    JsonNode dayOfWeekLeaf = pipelineSend.get("children").get(0);
+    Assertions.assertThat(dayOfWeekLeaf.get("type").asText()).isEqualTo("LEAF");
+    Assertions.assertThat(dayOfWeekLeaf.get("table").asText()).isEqualTo("daysOfWeek");
+  }
+
+  @Test
+  public void testPipelineBreakerKeepsNumGroupsLimitReached()
+      throws Exception {
+    String query = ""
+        + "SET numGroupsLimit = 1;"
+        + "SELECT * FROM daysOfWeek "
+        + "WHERE dayid in ("
+        + " SELECT DayOfWeek FROM mytable"
+        + " GROUP BY DayOfWeek"
+        + ")";
+
+    JsonNode response = postQuery(query);
+    assertNotNull(response.get("stageStats"), "Should have stage stats");
+
+    JsonNode receiveNode = response.get("stageStats");
+    Assertions.assertThat(receiveNode.get("type").asText()).isEqualTo("MAILBOX_RECEIVE");
+
+    JsonNode sendNode = receiveNode.get("children").get(0);
+    Assertions.assertThat(sendNode.get("type").asText()).isEqualTo("MAILBOX_SEND");
+
+    JsonNode mytableLeaf = sendNode.get("children").get(0);
+    Assertions.assertThat(mytableLeaf.get("type").asText()).isEqualTo("LEAF");
+    Assertions.assertThat(mytableLeaf.get("table").asText()).isEqualToIgnoringCase("daysOfWeek");
+
+    JsonNode pipelineReceive = mytableLeaf.get("children").get(0);
+    Assertions.assertThat(pipelineReceive.get("type").asText()).isEqualTo("MAILBOX_RECEIVE");
+
+    JsonNode pipelineSend = pipelineReceive.get("children").get(0);
+    Assertions.assertThat(pipelineSend.get("type").asText()).isEqualTo("MAILBOX_SEND");
+
+    Assertions.assertThat(response.get("numGroupsLimitReached").asBoolean(false))
+        .describedAs("numGroupsLimitReached should be true even when the limit is reached on a pipeline breaker")
+        .isEqualTo(true);
   }
 
   @AfterClass
