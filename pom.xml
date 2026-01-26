@@ -311,7 +311,7 @@
     <h2.version>2.4.240</h2.version>
     <jnr-posix.version>3.1.21</jnr-posix.version>
     <scalatest.version>3.2.19</scalatest.version>
-    <assertj.version>3.27.6</assertj.version>
+    <assertj.version>3.27.7</assertj.version>
     <archiver.compress>true</archiver.compress>
     <archiver.recompressZippedFiles>true</archiver.recompressZippedFiles>
 
