@@ -25,6 +25,8 @@ import java.io.File;
 import java.io.FileInputStream;
 import java.io.FileOutputStream;
 import java.io.IOException;
+import java.io.InputStream;
+import java.net.URI;
 import java.net.URL;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Paths;
@@ -35,12 +37,23 @@ import java.util.Properties;
 import java.util.zip.GZIPInputStream;
 import org.apache.commons.configuration2.ex.ConfigurationException;
 import org.apache.commons.io.FileUtils;
+import org.apache.commons.io.IOUtils;
 import org.apache.commons.io.LineIterator;
 import org.apache.commons.lang3.StringUtils;
+import org.apache.hc.client5.http.entity.mime.FileBody;
+import org.apache.hc.client5.http.entity.mime.MultipartEntityBuilder;
+import org.apache.hc.core5.http.ContentType;
+import org.apache.hc.core5.http.HttpEntity;
 import org.apache.kafka.clients.admin.AdminClient;
+import org.apache.pinot.common.utils.SimpleHttpResponse;
+import org.apache.pinot.common.utils.http.HttpClient;
+import org.apache.pinot.spi.data.LogicalTableConfig;
+import org.apache.pinot.spi.data.PhysicalTableConfig;
+import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.stream.StreamDataProducer;
 import org.apache.pinot.spi.stream.StreamDataProvider;
 import org.apache.pinot.spi.stream.StreamDataServerStartable;
+import org.apache.pinot.tools.admin.command.AbstractBaseAdminCommand;
 import org.apache.pinot.tools.admin.command.QuickstartRunner;
 import org.apache.pinot.tools.streams.AirlineDataStream;
 import org.apache.pinot.tools.streams.MeetupRsvpStream;
@@ -81,17 +94,19 @@ public abstract class QuickStartBase {
       "examples/batch/testUnnest",
   };
 
-  protected static final Map<String, String> DEFAULT_STREAM_TABLE_DIRECTORIES = Map.of(
-      "airlineStats", "examples/stream/airlineStats",
-      "dailySales", "examples/stream/dailySales",
-      "githubEvents", "examples/stream/githubEvents",
-      "meetupRsvp", "examples/stream/meetupRsvp",
-      "meetupRsvpJson", "examples/stream/meetupRsvpJson",
-      "meetupRsvpComplexType", "examples/stream/meetupRsvpComplexType",
-      "upsertMeetupRsvp", "examples/stream/upsertMeetupRsvp",
-      "upsertJsonMeetupRsvp", "examples/stream/upsertJsonMeetupRsvp",
-      "upsertPartialMeetupRsvp", "examples/stream/upsertPartialMeetupRsvp",
-      "fineFoodReviews", "examples/stream/fineFoodReviews");
+  protected static final Map<String, String> DEFAULT_STREAM_TABLE_DIRECTORIES = Map.ofEntries(
+      Map.entry("airlineStats", "examples/stream/airlineStats"),
+      Map.entry("dailySales", "examples/stream/dailySales"),
+      Map.entry("githubEvents", "examples/stream/githubEvents"),
+      Map.entry("meetupRsvp", "examples/stream/meetupRsvp"),
+      Map.entry("meetupRsvpJson", "examples/stream/meetupRsvpJson"),
+      Map.entry("meetupRsvpComplexType", "examples/stream/meetupRsvpComplexType"),
+      Map.entry("upsertMeetupRsvp", "examples/stream/upsertMeetupRsvp"),
+      Map.entry("upsertJsonMeetupRsvp", "examples/stream/upsertJsonMeetupRsvp"),
+      Map.entry("upsertPartialMeetupRsvp", "examples/stream/upsertPartialMeetupRsvp"),
+      Map.entry("fineFoodReviews", "examples/stream/fineFoodReviews"),
+      Map.entry("fineFoodReviews-part-0", "examples/stream/fineFoodReviews-part-0"),
+      Map.entry("fineFoodReviews-part-1", "examples/stream/fineFoodReviews-part-1"));
 
   protected File _dataDir = FileUtils.getTempDirectory();
   protected boolean _setCustomDataDir;
@@ -566,6 +581,10 @@ public abstract class QuickStartBase {
               "***** Starting fineFoodReviews data stream and publishing to Kafka *****");
           publishStreamDataToKafka("fineFoodReviews", new File(quickstartTmpDir, "fineFoodReviews"));
           break;
+        case "fineFoodReviews-part-0":
+        case "fineFoodReviews-part-1":
+          // Consume from existing fineFoodReviews topic (partition subset); no separate stream to start
+          break;
         default:
           throw new UnsupportedOperationException("Unknown stream name: " + streamName);
       }
@@ -1022,5 +1041,68 @@ public abstract class QuickStartBase {
       }
     }
     return null;
+  }
+
+  protected void createFineFoodReviewsFederatedTable() {
+    if (!useDefaultBootstrapTableDir()) {
+      return;
+    }
+    Map<String, String> streamTableDirectories = getDefaultStreamTableDirectories();
+    if (!streamTableDirectories.containsKey("fineFoodReviews-part-0")
+        || !streamTableDirectories.containsKey("fineFoodReviews-part-1")) {
+      return;
+    }
+    String logicalTableName = "fineFoodReviews-federated";
+    try {
+      Schema schema = loadSchemaFromResource("/examples/stream/fineFoodReviews/fineFoodReviews_schema.json");
+      schema.setSchemaName(logicalTableName);
+      createSchemaOnController(schema, logicalTableName);
+
+      LogicalTableConfig logicalTableConfig = new LogicalTableConfig();
+      logicalTableConfig.setTableName(logicalTableName);
+      logicalTableConfig.setBrokerTenant("DefaultTenant");
+      logicalTableConfig.setRefRealtimeTableName("fineFoodReviews-part-0_REALTIME");
+      logicalTableConfig.setPhysicalTableConfigMap(Map.of(
+          "fineFoodReviews-part-0_REALTIME", new PhysicalTableConfig(),
+          "fineFoodReviews-part-1_REALTIME", new PhysicalTableConfig()
+      ));
+
+      String logicalTableUrl = "http://localhost:" + QuickstartRunner.DEFAULT_CONTROLLER_PORT + "/logicalTables";
+      AbstractBaseAdminCommand.sendPostRequest(logicalTableUrl, logicalTableConfig.toSingleLineJsonString());
+      printStatus(Quickstart.Color.GREEN,
+          "***** Logical table fineFoodReviews-federated created successfully *****");
+    } catch (Exception e) {
+      printStatus(Quickstart.Color.YELLOW,
+          "***** Logical table fineFoodReviews-federated creation failed: " + e.getMessage() + " *****");
+    }
+  }
+
+  private Schema loadSchemaFromResource(String resourcePath)
+      throws IOException {
+    try (InputStream inputStream = getClass().getResourceAsStream(resourcePath)) {
+      if (inputStream == null) {
+        throw new IOException("Schema file not found: " + resourcePath);
+      }
+      String schemaJsonString = IOUtils.toString(inputStream, StandardCharsets.UTF_8);
+      return Schema.fromString(schemaJsonString);
+    }
+  }
+
+  private void createSchemaOnController(Schema schema, String logicalTableName)
+      throws Exception {
+    File tempSchemaFile = File.createTempFile(logicalTableName + "_schema", ".json");
+    tempSchemaFile.deleteOnExit();
+    FileUtils.writeStringToFile(tempSchemaFile, schema.toSingleLineJsonString(), StandardCharsets.UTF_8);
+    HttpEntity multipartEntity = MultipartEntityBuilder.create()
+        .addPart("schema", new FileBody(tempSchemaFile, ContentType.APPLICATION_JSON, logicalTableName + ".json"))
+        .build();
+    try (HttpClient httpClient = new HttpClient()) {
+      String schemaUrl = "http://localhost:" + QuickstartRunner.DEFAULT_CONTROLLER_PORT + "/schemas?override=true"
+          + "&force=true";
+      SimpleHttpResponse response = httpClient.sendPostRequest(URI.create(schemaUrl), multipartEntity, null, null);
+      if (response.getStatusCode() != 200) {
+        throw new RuntimeException("Schema creation response: " + response.getResponse());
+      }
+    }
   }
 }

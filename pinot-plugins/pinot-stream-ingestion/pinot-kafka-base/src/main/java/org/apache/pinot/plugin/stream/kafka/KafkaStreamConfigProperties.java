@@ -68,4 +68,10 @@ public class KafkaStreamConfigProperties {
   }
 
   public static final String KAFKA_CONSUMER_PROP_PREFIX = "kafka.consumer.prop";
+
+  /**
+   * Optional comma-separated list of Kafka partition IDs to consume (e.g. "0,2,5").
+   * When set, only these partitions are used for the table; when absent, all topic partitions are consumed.
+   */
+  public static final String PARTITION_IDS = "kafka.partition.ids";
 }

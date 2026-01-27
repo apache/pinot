@@ -88,6 +88,30 @@ public class RealtimeQuickStart extends QuickStartBase {
     printStatus(Color.YELLOW, prettyPrintResponse(runner.runQuery(q5)));
     printStatus(Color.GREEN, "***************************************************");
 
+    String q6 = "select count(*) from fineFoodReviews";
+    printStatus(Color.YELLOW, "Total number of documents in fineFoodReviews");
+    printStatus(Color.CYAN, "Query : " + q6);
+    printStatus(Color.YELLOW, prettyPrintResponse(runner.runQuery(q6)));
+    printStatus(Color.GREEN, "***************************************************");
+
+    String q7 = "select count(*) from \"fineFoodReviews-federated\"";
+    printStatus(Color.YELLOW, "Total number of documents in fineFoodReviews-federated");
+    printStatus(Color.CYAN, "Query : " + q7);
+    printStatus(Color.YELLOW, prettyPrintResponse(runner.runQuery(q7)));
+    printStatus(Color.GREEN, "***************************************************");
+
+    String q8 = "select count(*) from \"fineFoodReviews-part-0\"";
+    printStatus(Color.YELLOW, "Total number of documents in fineFoodReviews-part-0");
+    printStatus(Color.CYAN, "Query : " + q8);
+    printStatus(Color.YELLOW, prettyPrintResponse(runner.runQuery(q8)));
+    printStatus(Color.GREEN, "***************************************************");
+
+    String q9 = "select count(*) from \"fineFoodReviews-part-1\"";
+    printStatus(Color.YELLOW, "Total number of documents in fineFoodReviews-part-1");
+    printStatus(Color.CYAN, "Query : " + q9);
+    printStatus(Color.YELLOW, prettyPrintResponse(runner.runQuery(q9)));
+    printStatus(Color.GREEN, "***************************************************");
+
     runVectorQueryExamples(runner);
   }
 
@@ -118,6 +142,7 @@ public class RealtimeQuickStart extends QuickStartBase {
 
     printStatus(Color.CYAN, "***** Bootstrap all tables *****");
     runner.bootstrapTable();
+    createFineFoodReviewsFederatedTable();
 
     printStatus(Color.CYAN, "***** Waiting for 5 seconds for a few events to get populated *****");
     Thread.sleep(5000);
