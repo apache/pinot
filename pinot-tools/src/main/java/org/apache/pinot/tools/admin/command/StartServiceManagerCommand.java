@@ -161,7 +161,7 @@ public class StartServiceManagerCommand extends AbstractBaseAdminCommand impleme
   public boolean execute()
       throws Exception {
     try {
-      LOGGER.info("Executing command: {}", toString());
+      LOGGER.info("Executing command: {}", this);
       if (!startPinotService("SERVICE_MANAGER", this::startServiceManager)) {
         return false;
       }
@@ -207,6 +207,7 @@ public class StartServiceManagerCommand extends AbstractBaseAdminCommand impleme
       case BROKER:
         return PinotConfigUtils
             .generateBrokerConf(_clusterName, _zkAddress, null, CommonConstants.Helix.DEFAULT_BROKER_QUERY_PORT,
+                -1,
                 CommonConstants.MultiStageQueryRunner.DEFAULT_QUERY_RUNNER_PORT);
       case SERVER:
         return PinotConfigUtils
