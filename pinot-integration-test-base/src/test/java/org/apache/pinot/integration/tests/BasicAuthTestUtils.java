@@ -34,7 +34,7 @@ public final class BasicAuthTestUtils {
   public static final Map<String, String> AUTH_HEADER_USER = Map.of("Authorization", AUTH_TOKEN_USER);
 
   public static void addControllerConfiguration(Map<String, Object> properties) {
-    properties.put("controller.segment.fetcher.auth.token", AUTH_TOKEN);
+    properties.put("pinot.controller.segment.fetcher.auth.token", AUTH_TOKEN);
     properties.put("controller.admin.access.control.factory.class",
         "org.apache.pinot.controller.api.access.BasicAuthAccessControlFactory");
     properties.put("controller.admin.access.control.principals", "admin, user");
@@ -61,7 +61,7 @@ public final class BasicAuthTestUtils {
   }
 
   public static void addMinionConfiguration(PinotConfiguration minionConf) {
-    minionConf.setProperty("segment.fetcher.auth.token", AUTH_TOKEN);
-    minionConf.setProperty("task.auth.token", AUTH_TOKEN);
+    minionConf.setProperty("pinot.minion.segment.fetcher.auth.token", AUTH_TOKEN);
+    minionConf.setProperty("pinot.minion.task.auth.token", AUTH_TOKEN);
   }
 }

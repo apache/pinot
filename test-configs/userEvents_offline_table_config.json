@@ -1,0 +1,17 @@
+{
+  "tableName": "userEvents",
+  "tableType": "OFFLINE",
+  "segmentsConfig": {
+    "timeColumnName": "timestamp",
+    "timeType": "MILLISECONDS",
+    "replication": "1",
+    "schemaName": "userEvents"
+  },
+  "tenants": {},
+  "tableIndexConfig": {
+    "loadMode": "MMAP"
+  },
+  "metadata": {
+    "customConfigs": {}
+  }
+}

@@ -1,0 +1,31 @@
+{
+  "schemaName": "airlineStats",
+  "dimensionFieldSpecs": [
+    {
+      "name": "flightNumber",
+      "dataType": "LONG"
+    },
+    {
+      "name": "origin",
+      "dataType": "STRING"
+    },
+    {
+      "name": "destination",
+      "dataType": "STRING"
+    }
+  ],
+  "metricFieldSpecs": [
+    {
+      "name": "price",
+      "dataType": "DOUBLE"
+    }
+  ],
+  "dateTimeFieldSpecs": [
+    {
+      "name": "daysSinceEpoch",
+      "dataType": "INT",
+      "format": "1:DAYS:EPOCH",
+      "granularity": "1:DAYS"
+    }
+  ]
+}

@@ -1,0 +1,6 @@
+userId,eventType,country,eventCount,timestamp
+1001,login,USA,1,1640000000000
+1002,purchase,UK,1,1640000060000
+1003,logout,USA,1,1640000120000
+1004,login,India,1,1640000180000
+1005,purchase,USA,1,1640000240000

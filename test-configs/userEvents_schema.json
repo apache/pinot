@@ -1,0 +1,31 @@
+{
+  "schemaName": "userEvents",
+  "dimensionFieldSpecs": [
+    {
+      "name": "userId",
+      "dataType": "LONG"
+    },
+    {
+      "name": "eventType",
+      "dataType": "STRING"
+    },
+    {
+      "name": "country",
+      "dataType": "STRING"
+    }
+  ],
+  "metricFieldSpecs": [
+    {
+      "name": "eventCount",
+      "dataType": "LONG"
+    }
+  ],
+  "dateTimeFieldSpecs": [
+    {
+      "name": "timestamp",
+      "dataType": "LONG",
+      "format": "1:MILLISECONDS:EPOCH",
+      "granularity": "1:MILLISECONDS"
+    }
+  ]
+}

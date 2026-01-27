@@ -1,0 +1,17 @@
+{
+  "tableName": "airlineStats",
+  "tableType": "OFFLINE",
+  "segmentsConfig": {
+    "timeColumnName": "daysSinceEpoch",
+    "timeType": "DAYS",
+    "replication": "2",
+    "schemaName": "airlineStats"
+  },
+  "tenants": {},
+  "tableIndexConfig": {
+    "loadMode": "MMAP"
+  },
+  "metadata": {
+    "customConfigs": {}
+  }
+}

@@ -1,0 +1,34 @@
+# Ingestion job spec for airlineStats table
+executionFrameworkSpec:
+  name: 'standalone'
+  segmentGenerationJobRunnerClassName: 'org.apache.pinot.plugin.ingestion.batch.standalone.SegmentGenerationJobRunner'
+  segmentTarPushJobRunnerClassName: 'org.apache.pinot.plugin.ingestion.batch.standalone.SegmentTarPushJobRunner'
+
+jobType: SegmentCreationAndTarPush
+
+inputDirURI: '/Users/akedia/pinot/os/pinot/test-configs'
+includeFileNamePattern: 'glob:**/airlineStats_data.csv'
+outputDirURI: '/tmp/pinotSegments/airlineStats'
+
+overwriteOutput: true
+
+pinotFSSpecs:
+  - scheme: file
+    className: org.apache.pinot.spi.filesystem.LocalPinotFS
+
+recordReaderSpec:
+  dataFormat: 'csv'
+  className: 'org.apache.pinot.plugin.inputformat.csv.CSVRecordReader'
+  configClassName: 'org.apache.pinot.plugin.inputformat.csv.CSVRecordReaderConfig'
+
+tableSpec:
+  tableName: 'airlineStats'
+  schemaURI: 'file:///Users/akedia/pinot/os/pinot/test-configs/airlineStats_schema.json'
+  tableConfigURI: 'file:///Users/akedia/pinot/os/pinot/test-configs/airlineStats_offline_table_config.json'
+
+pinotClusterSpecs:
+  - controllerURI: 'http://localhost:9001'
+
+pushJobSpec:
+  pushAttempts: 2
+  pushRetryIntervalMillis: 1000
