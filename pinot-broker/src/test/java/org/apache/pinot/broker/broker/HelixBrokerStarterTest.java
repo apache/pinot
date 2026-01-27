@@ -29,6 +29,7 @@ import org.apache.pinot.broker.broker.helix.HelixBrokerStarter;
 import org.apache.pinot.broker.routing.manager.BrokerRoutingManager;
 import org.apache.pinot.common.metadata.segment.SegmentZKMetadata;
 import org.apache.pinot.common.request.BrokerRequest;
+import org.apache.pinot.common.utils.ServiceStatus;
 import org.apache.pinot.common.utils.config.TagNameUtils;
 import org.apache.pinot.controller.api.exception.InvalidTableConfigException;
 import org.apache.pinot.controller.helix.ControllerTest;
@@ -135,6 +136,16 @@ public class HelixBrokerStarterTest extends ControllerTest {
     streamConfigs.put("stream.kafka.consumer.factory.class.name",
         "org.apache.pinot.core.realtime.impl.fakestream.FakeStreamConsumerFactory");
     return streamConfigs;
+  }
+
+  @Test
+  public void testServiceStatusReturnsGood() {
+    // Verify that ServiceStatus returns GOOD after broker is fully started
+    // This implicitly tests TenantTagReadinessCallback and RoutingReadinessCallback
+    String instanceId = _brokerStarter.getInstanceId();
+    ServiceStatus.Status status = ServiceStatus.getServiceStatus(instanceId);
+    assertEquals(status, ServiceStatus.Status.GOOD,
+        "Expected GOOD status but got " + status + ": " + ServiceStatus.getStatusDescription(instanceId));
   }
 
   @Test
