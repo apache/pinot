@@ -275,9 +275,9 @@ public class QueryRunner {
     Map<String, String> opChainMetadata = consolidateMetadata(stageMetadata.getCustomProperties(), requestMetadata);
 
     // run pre-stage execution for all pipeline breakers
-    PipelineBreakerResult pipelineBreakerResult =
-        PipelineBreakerExecutor.executePipelineBreakers(_opChainScheduler, _mailboxService,
-            workerMetadata, stagePlan, opChainMetadata, _sendStats.getAsBoolean(), _keepPipelineBreakerStats.getAsBoolean());
+    PipelineBreakerResult pipelineBreakerResult = PipelineBreakerExecutor.executePipelineBreakers(
+        _opChainScheduler, _mailboxService, workerMetadata, stagePlan, opChainMetadata,
+        _sendStats.getAsBoolean(), _keepPipelineBreakerStats.getAsBoolean());
 
     // Send error block to all the receivers if pipeline breaker fails
     if (pipelineBreakerResult != null && pipelineBreakerResult.getErrorBlock() != null) {
