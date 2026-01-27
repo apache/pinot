@@ -25,13 +25,13 @@ This is an implementation of the kafka stream for kafka versions 2.x.
 A stream plugin for another version of kafka, or another stream, can be added in a similar fashion. Refer to documentation on [Stream Ingestion Plugin](https://docs.pinot.apache.org/developers/plugin-architecture/write-custom-plugins/write-your-stream) for the specific interfaces to implement.
 
 * How to build and release Pinot package with Kafka 2.x connector
-```$xslt
+```bash
 ./mvnw clean package -DskipTests -Pbin-dist
 ```
 
 * How to use Kafka 2.x connector
 Below is a sample `streamConfigs` used to create a real-time table with Kafka consumer:
-```$xslt
+```json
 "streamConfigs": {
   "streamType": "kafka",
   "stream.kafka.broker.list": "localhost:19092",
@@ -39,4 +39,10 @@ Below is a sample `streamConfigs` used to create a real-time table with Kafka co
   "stream.kafka.consumer.factory.class.name": "org.apache.pinot.plugin.stream.kafka20.KafkaConsumerFactory",
   "stream.kafka.decoder.class.name": "org.apache.pinot.plugin.inputformat.json.JSONMessageDecoder",
 }
+```
+
+* Subset of partitions (optional)
+To consume only a subset of the topic's partitions, set `stream.kafka.partition.ids` to a comma-separated list of partition IDs (e.g. `"0,2,5"`). When not set, the table consumes all partitions. This is useful when sharing one topic across multiple tables or limiting scale per table. Non-contiguous IDs are supported; duplicate IDs in the config are deduplicated.
+```json
+"stream.kafka.partition.ids": "0,2,5"
 ```

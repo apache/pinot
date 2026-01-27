@@ -26,6 +26,7 @@ import java.time.Duration;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -39,11 +40,16 @@ import org.apache.kafka.common.PartitionInfo;
 import org.apache.kafka.common.TopicPartition;
 import org.apache.kafka.common.errors.TimeoutException;
 import org.apache.pinot.plugin.stream.kafka.KafkaConsumerPartitionLag;
+import org.apache.pinot.plugin.stream.kafka.KafkaPartitionSubsetUtils;
 import org.apache.pinot.spi.stream.ConsumerPartitionState;
 import org.apache.pinot.spi.stream.LongMsgOffset;
 import org.apache.pinot.spi.stream.OffsetCriteria;
+import org.apache.pinot.spi.stream.PartitionGroupConsumptionStatus;
+import org.apache.pinot.spi.stream.PartitionGroupMetadata;
 import org.apache.pinot.spi.stream.PartitionLagState;
 import org.apache.pinot.spi.stream.StreamConfig;
+import org.apache.pinot.spi.stream.StreamConsumerFactory;
+import org.apache.pinot.spi.stream.StreamConsumerFactoryProvider;
 import org.apache.pinot.spi.stream.StreamMessageMetadata;
 import org.apache.pinot.spi.stream.StreamMetadataProvider;
 import org.apache.pinot.spi.stream.StreamPartitionMsgOffset;
@@ -57,6 +63,8 @@ public class KafkaStreamMetadataProvider extends KafkaPartitionLevelConnectionHa
     implements StreamMetadataProvider {
 
   private static final Logger LOGGER = LoggerFactory.getLogger(KafkaStreamMetadataProvider.class);
+  private final boolean _partialPartitions;
+  private final List<Integer> _partitionIdSubset;
 
   public KafkaStreamMetadataProvider(String clientId, StreamConfig streamConfig) {
     this(clientId, streamConfig, Integer.MIN_VALUE);
@@ -64,16 +72,38 @@ public class KafkaStreamMetadataProvider extends KafkaPartitionLevelConnectionHa
 
   public KafkaStreamMetadataProvider(String clientId, StreamConfig streamConfig, int partition) {
     super(clientId, streamConfig, partition);
+    List<Integer> subset =
+        KafkaPartitionSubsetUtils.getPartitionIdsFromConfig(_config.getStreamConfigMap());
+    if (subset != null) {
+      _partialPartitions = true;
+      _partitionIdSubset = Collections.unmodifiableList(subset);
+    } else {
+      _partialPartitions = false;
+      _partitionIdSubset = Collections.emptyList();
+    }
   }
 
   @Override
   public int fetchPartitionCount(long timeoutMillis) {
     try {
       List<PartitionInfo> partitionInfos = _consumer.partitionsFor(_topic, Duration.ofMillis(timeoutMillis));
-      if (CollectionUtils.isNotEmpty(partitionInfos)) {
-        return partitionInfos.size();
+      if (CollectionUtils.isEmpty(partitionInfos)) {
+        throw new RuntimeException(String.format("Failed to fetch partition information for topic: %s", _topic));
       }
-      throw new RuntimeException(String.format("Failed to fetch partition information for topic: %s", _topic));
+      if (_partialPartitions) {
+        Set<Integer> topicIds = new HashSet<>();
+        for (PartitionInfo p : partitionInfos) {
+          topicIds.add(p.partition());
+        }
+        for (Integer id : _partitionIdSubset) {
+          if (!topicIds.contains(id)) {
+            throw new IllegalArgumentException(String.format(
+                "Configured partition id %d does not exist in topic %s. Topic partitions: %s", id, _topic, topicIds));
+          }
+        }
+        return _partitionIdSubset.size();
+      }
+      return partitionInfos.size();
     } catch (TimeoutException e) {
       throw new TransientConsumerException(e);
     }
@@ -86,6 +116,19 @@ public class KafkaStreamMetadataProvider extends KafkaPartitionLevelConnectionHa
       if (CollectionUtils.isEmpty(partitionInfos)) {
         throw new RuntimeException(String.format("Failed to fetch partition information for topic: %s", _topic));
       }
+      if (_partialPartitions) {
+        Set<Integer> topicIds = Sets.newHashSetWithExpectedSize(partitionInfos.size());
+        for (PartitionInfo p : partitionInfos) {
+          topicIds.add(p.partition());
+        }
+        for (Integer id : _partitionIdSubset) {
+          if (!topicIds.contains(id)) {
+            throw new IllegalArgumentException(String.format(
+                "Configured partition id %d does not exist in topic %s. Topic partitions: %s", id, _topic, topicIds));
+          }
+        }
+        return new HashSet<>(_partitionIdSubset);
+      }
       Set<Integer> partitionIds = Sets.newHashSetWithExpectedSize(partitionInfos.size());
       for (PartitionInfo partitionInfo : partitionInfos) {
         partitionIds.add(partitionInfo.partition());
@@ -94,6 +137,55 @@ public class KafkaStreamMetadataProvider extends KafkaPartitionLevelConnectionHa
     } catch (TimeoutException e) {
       throw new TransientConsumerException(e);
     }
+  }
+
+  @Override
+  public List<PartitionGroupMetadata> computePartitionGroupMetadata(String clientId, StreamConfig streamConfig,
+      List<PartitionGroupConsumptionStatus> partitionGroupConsumptionStatuses, int timeoutMillis)
+      throws IOException, java.util.concurrent.TimeoutException {
+    if (!_partialPartitions) {
+      return StreamMetadataProvider.super.computePartitionGroupMetadata(clientId, streamConfig,
+          partitionGroupConsumptionStatuses, timeoutMillis);
+    }
+    List<Integer> subset = _partitionIdSubset;
+    Set<Integer> topicIds = fetchPartitionIds(timeoutMillis);
+    Map<Integer, StreamPartitionMsgOffset> consumptionByPartition = new HashMap<>();
+    for (PartitionGroupConsumptionStatus s : partitionGroupConsumptionStatuses) {
+      consumptionByPartition.put(s.getStreamPartitionGroupId(), s.getEndOffset());
+    }
+    StreamConsumerFactory streamConsumerFactory = StreamConsumerFactoryProvider.create(streamConfig);
+    List<PartitionGroupMetadata> result = new ArrayList<>(subset.size());
+    for (Integer partitionId : subset) {
+      if (!topicIds.contains(partitionId)) {
+        LOGGER.warn(
+            "Configured partition id {} does not exist in topic {} when computing partition group metadata. "
+                + "This indicates that topic partitions may have changed between validation and metadata "
+                + "computation. Skipping this partition. Current topic partitions: {}",
+            partitionId, _topic, topicIds);
+        continue;
+      }
+      StreamPartitionMsgOffset startOffset = consumptionByPartition.get(partitionId);
+      if (startOffset == null) {
+        try (StreamMetadataProvider partitionMetadataProvider =
+            streamConsumerFactory.createPartitionMetadataProvider(
+                StreamConsumerFactory.getUniqueClientId(clientId), partitionId)) {
+          startOffset = partitionMetadataProvider.fetchStreamPartitionOffset(
+              streamConfig.getOffsetCriteria(), timeoutMillis);
+        }
+      }
+      result.add(new PartitionGroupMetadata(partitionId, startOffset));
+    }
+    return result;
+  }
+
+  @Override
+  public List<PartitionGroupMetadata> computePartitionGroupMetadata(String clientId, StreamConfig streamConfig,
+      List<PartitionGroupConsumptionStatus> partitionGroupConsumptionStatuses, int timeoutMillis,
+      boolean forceGetOffsetFromStream) throws IOException, java.util.concurrent.TimeoutException {
+    if (forceGetOffsetFromStream) {
+      return computePartitionGroupMetadata(clientId, streamConfig, Collections.emptyList(), timeoutMillis);
+    }
+    return computePartitionGroupMetadata(clientId, streamConfig, partitionGroupConsumptionStatuses, timeoutMillis);
   }
 
   @Override
