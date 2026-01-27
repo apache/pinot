@@ -693,10 +693,18 @@ public abstract class BaseBrokerStarter implements ServiceStartable {
         _brokerConf.getProperty(Broker.CONFIG_OF_BROKER_MIN_RESOURCE_PERCENT_FOR_START,
             Broker.DEFAULT_BROKER_MIN_RESOURCE_PERCENT_FOR_START);
 
+    /*
+     * Register service status callbacks. The order of callbacks matters:
+     * TenantTagReadinessCallback must precede RoutingReadinessCallback because an untagged broker
+     * has no tables assigned, so RoutingReadinessCallback would return GOOD prematurely.
+     * TenantTagReadinessCallback catches this case by checking for valid tenant tags first.
+     */
     LOGGER.info("Registering service status handler");
     ServiceStatus.setServiceStatusCallback(_instanceId, new ServiceStatus.MultipleCallbackServiceStatusCallback(
         List.of(
             new ServiceStatus.LifecycleServiceStatusCallback(this::isStarting, this::isShuttingDown),
+            new TenantTagReadinessCallback(_participantHelixManager, _clusterName, _instanceId),
+            new RoutingReadinessCallback(_helixAdmin, _routingManager, _clusterName, _instanceId),
             new ServiceStatus.IdealStateAndCurrentStateMatchServiceStatusCallback(_participantHelixManager,
                 _clusterName, _instanceId, resourcesToMonitor, minResourcePercentForStartup),
             new ServiceStatus.IdealStateAndExternalViewMatchServiceStatusCallback(_participantHelixManager,
