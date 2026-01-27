@@ -93,6 +93,17 @@ public class RoutingReadinessCallbackTest {
   }
 
   @Test
+  public void testIdealStatePartitionSetReturnsTableNames() {
+    // Verify that IdealState.getPartitionSet() returns table names
+    // and getInstanceSet(tableName) returns broker instances
+    IdealState idealState = createIdealStateWithTables(TABLE_1, TABLE_2);
+
+    assertThat(idealState.getPartitionSet()).containsExactlyInAnyOrder(TABLE_1, TABLE_2);
+    assertThat(idealState.getInstanceSet(TABLE_1)).containsExactly(INSTANCE_ID);
+    assertThat(idealState.getInstanceSet(TABLE_2)).containsExactly(INSTANCE_ID);
+  }
+
+  @Test
   public void testStatusIsCachedOnceGood() {
     IdealState idealState = createIdealStateWithTables(TABLE_1);
     when(_helixAdmin.getResourceIdealState(CLUSTER_NAME, Helix.BROKER_RESOURCE_INSTANCE)).thenReturn(idealState);
