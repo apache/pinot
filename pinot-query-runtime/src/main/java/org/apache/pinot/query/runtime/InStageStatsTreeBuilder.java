@@ -47,6 +47,7 @@ import org.apache.pinot.query.planner.plannode.TableScanNode;
 import org.apache.pinot.query.planner.plannode.UnnestNode;
 import org.apache.pinot.query.planner.plannode.ValueNode;
 import org.apache.pinot.query.planner.plannode.WindowNode;
+import org.apache.pinot.query.runtime.operator.BaseMailboxReceiveOperator;
 import org.apache.pinot.query.runtime.operator.MailboxSendOperator;
 import org.apache.pinot.query.runtime.operator.MultiStageOperator;
 import org.apache.pinot.query.runtime.plan.MultiStageQueryStats;
@@ -176,6 +177,14 @@ public class InStageStatsTreeBuilder implements PlanNodeVisitor<ObjectNode, InSt
 
   @Nullable
   private MailboxReceiveNode getPipelineBreakerNode(BasePlanNode node) {
+    if (_index == 0) {
+      return null;
+    }
+    MultiStageOperator.Type nextOperatorType = _stageStats.getOperatorType(_index - 1);
+    if (nextOperatorType != MultiStageOperator.Type.PIPELINE_BREAKER) {
+      // even if the plan may say there is a pipeline breaker, the stats do not have it
+      return null;
+    }
     // This code assumes there is a single pipeline breaker in the stage, which is true for now.
     ArrayList<PlanNode> nodeStack = new ArrayList<>(1);
     nodeStack.add(node);

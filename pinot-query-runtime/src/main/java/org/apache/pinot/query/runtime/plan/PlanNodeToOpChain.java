@@ -115,9 +115,12 @@ public class PlanNodeToOpChain {
         ServerPlanRequestContext leafStageContext = context.getLeafStageContext();
         PipelineBreakerResult pipelineBreakerResult = context.getPipelineBreakerResult();
         @Nullable
-        MultiStageQueryStats pipelineBreakerQueryStats = pipelineBreakerResult != null
-            ? pipelineBreakerResult.getStageQueryStats()
-            : null;
+        MultiStageQueryStats pipelineBreakerQueryStats;
+        if (context.isKeepPipelineBreakerStats() && pipelineBreakerResult != null) {
+          pipelineBreakerQueryStats = pipelineBreakerResult.getStageQueryStats();
+        } else {
+          pipelineBreakerQueryStats = null;
+        }
         result = new LeafOperator(context, leafStageContext.getServerQueryRequests(),
             leafStageContext.getLeafStageBoundaryNode().getDataSchema(), leafStageContext.getLeafQueryExecutor(),
             leafStageContext.getExecutorService(), pipelineBreakerQueryStats);

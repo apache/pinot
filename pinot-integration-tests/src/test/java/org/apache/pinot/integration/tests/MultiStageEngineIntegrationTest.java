@@ -78,10 +78,8 @@ import org.testng.annotations.DataProvider;
 import org.testng.annotations.Test;
 
 import static org.apache.pinot.common.function.scalar.StringFunctions.*;
-import static org.testng.Assert.assertEquals;
-import static org.testng.Assert.assertFalse;
-import static org.testng.Assert.assertNotNull;
-import static org.testng.Assert.assertTrue;
+import static org.testng.Assert.*;
+
 
 public class MultiStageEngineIntegrationTest extends BaseClusterIntegrationTestSet {
   private static final String SCHEMA_FILE_NAME = "On_Time_On_Time_Performance_2014_100k_subset_nonulls.schema";
@@ -2212,6 +2210,48 @@ public class MultiStageEngineIntegrationTest extends BaseClusterIntegrationTestS
     Assertions.assertThat(response.get("numGroupsLimitReached").asBoolean(false))
         .describedAs("numGroupsLimitReached should be true even when the limit is reached on a pipeline breaker")
         .isEqualTo(true);
+  }
+
+  @Test
+  public void testPipelineBreakerWithoutKeepingStats()
+      throws Exception {
+    HelixConfigScope scope =
+        new HelixConfigScopeBuilder(HelixConfigScope.ConfigScopeProperty.CLUSTER).forCluster(getHelixClusterName())
+            .build();
+    _helixManager.getConfigAccessor()
+        .set(scope, CommonConstants.MultiStageQueryRunner.KEY_OF_KEEP_PIPELINE_BREAKER_STATS, "false");
+    try {
+      // lets try several times to give helix time to propagate the config change
+      for (int i = 0; i < 10; i++) {
+        try {
+          String query = "select * from mytable "
+              + "WHERE DayOfWeek in (select dayid from daysOfWeek)";
+          JsonNode response = postQuery(query);
+          assertNotNull(response.get("stageStats"), "Should have stage stats");
+
+          JsonNode receiveNode = response.get("stageStats");
+          Assertions.assertThat(receiveNode.get("type").asText()).isEqualTo("MAILBOX_RECEIVE");
+
+          JsonNode sendNode = receiveNode.get("children").get(0);
+          Assertions.assertThat(sendNode.get("type").asText()).isEqualTo("MAILBOX_SEND");
+
+          JsonNode mytableLeaf = sendNode.get("children").get(0);
+          Assertions.assertThat(mytableLeaf.get("type").asText()).isEqualTo("LEAF");
+          Assertions.assertThat(mytableLeaf.get("table").asText()).isEqualTo("mytable");
+
+          Assert.assertNull(mytableLeaf.get("children"), "When pipeline breaker stats are not kept, "
+              + "there should be no children under the leaf node");
+          System.out.println("Successfully verified absence of pipeline breaker stats on attempt " + (i + 1));
+          return;
+        } catch (AssertionError e) {
+          Thread.sleep(100);
+        }
+      }
+      fail("Failed to verify absence of pipeline breaker stats after multiple attempts after 10 attempts");
+    } finally {
+      _helixManager.getConfigAccessor()
+          .set(scope, CommonConstants.MultiStageQueryRunner.KEY_OF_KEEP_PIPELINE_BREAKER_STATS, "true");
+    }
   }
 
   @AfterClass
