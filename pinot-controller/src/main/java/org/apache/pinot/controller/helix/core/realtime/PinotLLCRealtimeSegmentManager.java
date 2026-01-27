@@ -397,12 +397,14 @@ public class PinotLLCRealtimeSegmentManager {
     String realtimeTableName = tableConfig.getTableName();
     LOGGER.info("Setting up new LLC table: {}", realtimeTableName);
 
-    int numPartitionGroups = 0;
+    List<StreamConfig> streamConfigs = IngestionConfigUtils.getStreamConfigs(tableConfig);
+    int numActivePartitionGroups = 0;
     for (StreamMetadata streamMetadata : streamMetadataList) {
       _flushThresholdUpdateManager.clearFlushThresholdUpdater(streamMetadata.getStreamConfig());
-      numPartitionGroups += streamMetadata.getNumPartitions();
+      numActivePartitionGroups += streamMetadata.getPartitionGroupMetadataList().size();
     }
     InstancePartitions instancePartitions = getConsumingInstancePartitions(tableConfig);
+    int numPartitionGroups = getPartitionCountForRouting(streamConfigs, numActivePartitionGroups);
     int numReplicas = getNumReplicas(tableConfig, instancePartitions);
 
     SegmentAssignment segmentAssignment =
@@ -1727,10 +1729,11 @@ public class PinotLLCRealtimeSegmentManager {
 
     InstancePartitions instancePartitions = getConsumingInstancePartitions(tableConfig);
     int numReplicas = getNumReplicas(tableConfig, instancePartitions);
-    int numPartitions = 0;
+    int numActivePartitions = 0;
     for (StreamMetadata streamMetadata : streamMetadataList) {
-      numPartitions += streamMetadata.getNumPartitions();
+      numActivePartitions += streamMetadata.getPartitionGroupMetadataList().size();
     }
+    int numPartitions = getPartitionCountForRouting(streamConfigs, numActivePartitions);
 
     SegmentAssignment segmentAssignment =
         SegmentAssignmentFactory.getSegmentAssignment(_helixManager, tableConfig, _controllerMetrics);
@@ -2120,6 +2123,49 @@ public class PinotLLCRealtimeSegmentManager {
     } else {
       // Replica-group based
       return instancePartitions.getNumReplicaGroups();
+    }
+  }
+
+  /**
+   * Gets the total partition count for routing segment assignment.
+   *
+   * <p>For subset-partition tables, this MUST return the total Kafka topic partition count (not the
+   * subset size) so that RealtimeSegmentAssignment correctly routes non-contiguous partition IDs via
+   * {@code partitionId % totalPartitions}.
+   *
+   * <p>For standard tables, this returns the number of actively consumed partitions.
+   *
+   * <p>For tables with multiple streams, this sums the partition counts across all streams.
+   *
+   * @param streamConfigs the list of stream configurations for the table
+   * @param activePartitionCount the number of partitions being actively consumed (from partition group metadata)
+   * @return the partition count to use for segment assignment routing
+   */
+  private int getPartitionCountForRouting(List<StreamConfig> streamConfigs, int activePartitionCount) {
+    try {
+      int totalPartitionCount = 0;
+      for (StreamConfig streamConfig : streamConfigs) {
+        StreamConsumerFactory consumerFactory = StreamConsumerFactoryProvider.create(streamConfig);
+        try (StreamMetadataProvider metadataProvider =
+            consumerFactory.createStreamMetadataProvider(getClass().getSimpleName())) {
+          totalPartitionCount += metadataProvider.fetchPartitionCount(10_000L);
+        }
+      }
+
+      // If total partition count > active count, this is a subset-partition table
+      // Use total count for proper modulo routing
+      if (totalPartitionCount > activePartitionCount) {
+        LOGGER.info("Detected subset-partition table: total partitions = {}, active partitions = {}. "
+            + "Using total partition count for routing.", totalPartitionCount, activePartitionCount);
+        return totalPartitionCount;
+      }
+      // Standard table: total equals active
+      return activePartitionCount;
+    } catch (Exception e) {
+      LOGGER.warn("Failed to fetch partition count from stream for routing, falling back to active partition count: {}",
+          activePartitionCount, e);
+      // Fallback: use active partition count (safe for standard tables, may cause issues for subset tables)
+      return activePartitionCount;
     }
   }
 
