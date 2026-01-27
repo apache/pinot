@@ -20,8 +20,6 @@ package org.apache.pinot.broker.broker.helix;
 
 import java.util.ArrayList;
 import java.util.List;
-import java.util.Map;
-import java.util.Set;
 import org.apache.helix.HelixAdmin;
 import org.apache.helix.model.IdealState;
 import org.apache.pinot.common.utils.ServiceStatus;
@@ -125,14 +123,9 @@ public class RoutingReadinessCallback implements ServiceStatus.ServiceStatusCall
 
   private List<String> getAssignedTables(IdealState brokerResourceIdealState) {
     List<String> assignedTables = new ArrayList<>();
-    Map<String, Map<String, String>> mapFields = brokerResourceIdealState.getRecord().getMapFields();
-    if (mapFields != null) {
-      for (Map.Entry<String, Map<String, String>> entry : mapFields.entrySet()) {
-        String tableName = entry.getKey();
-        Set<String> instances = entry.getValue().keySet();
-        if (instances.contains(_instanceId)) {
-          assignedTables.add(tableName);
-        }
+    for (String tableName : brokerResourceIdealState.getPartitionSet()) {
+      if (brokerResourceIdealState.getInstanceSet(tableName).contains(_instanceId)) {
+        assignedTables.add(tableName);
       }
     }
     return assignedTables;
