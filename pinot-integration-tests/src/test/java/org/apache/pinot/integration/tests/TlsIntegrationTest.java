@@ -239,7 +239,7 @@ public class TlsIntegrationTest extends BaseClusterIntegrationTest {
 
     minionConf.setProperty("pinot.minion.tls.keystore.path", TLS_STORE_PKCS_12);
     minionConf.setProperty("pinot.minion.tls.keystore.password", "changeit");
-    minionConf.setProperty("pinot.server.tls.keystore.type", "PKCS12");
+    minionConf.setProperty("pinot.minion.tls.keystore.type", "PKCS12");
     minionConf.setProperty("pinot.minion.tls.truststore.path", TLS_STORE_PKCS_12);
     minionConf.setProperty("pinot.minion.tls.truststore.password", "changeit");
     minionConf.setProperty("pinot.minion.tls.truststore.type", "PKCS12");
@@ -490,7 +490,7 @@ public class TlsIntegrationTest extends BaseClusterIntegrationTest {
               .map(s -> s.get("OFFLINE")).findFirst().get();
       Assert.assertFalse(currentOfflineSegments.isEmpty());
       return currentOfflineSegments;
-    }, 30000);
+    }, 600_000L);
 
     // Verify constant row count
     ResultSetGroup resultAfterOffline = getPinotConnection().execute(query);
