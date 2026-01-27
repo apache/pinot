@@ -31,7 +31,9 @@ import org.apache.pinot.common.assignment.InstancePartitions;
 import org.apache.pinot.common.utils.LLCSegmentName;
 import org.apache.pinot.controller.helix.core.rebalance.RebalanceConfig;
 import org.apache.pinot.core.realtime.impl.fakestream.FakeStreamConfigUtils;
+import org.apache.pinot.spi.config.table.ColumnPartitionConfig;
 import org.apache.pinot.spi.config.table.ReplicaGroupStrategyConfig;
+import org.apache.pinot.spi.config.table.SegmentPartitionConfig;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.TableType;
 import org.apache.pinot.spi.config.table.assignment.InstancePartitionsType;
@@ -335,19 +337,20 @@ public class RealtimeReplicaGroupSegmentAssignmentTest {
   public void testExplicitPartition() {
     // CONSUMING instances:
     // {
-    //   0_0=[instance_0], 1_0=[instance_1], 2_0=[instance_2],
-    //   0_1=[instance_3], 1_1=[instance_4], 2_1=[instance_5],
-    //   0_2=[instance_6], 1_2=[instance_7], 2_2=[instance_8]
+    //   0_0=[instance_0], 1_0=[instance_1], 2_0=[instance_2], 3_0=[instance_0],
+    //   0_1=[instance_3], 1_1=[instance_4], 2_1=[instance_5], 3_1=[instance_3],
+    //   0_2=[instance_6], 1_2=[instance_7], 2_2=[instance_8], 3_2=[instance_6]
     // }
     //        p0                p1                p2
     //        p3
     InstancePartitions consumingInstancePartitions = new InstancePartitions(CONSUMING_INSTANCE_PARTITIONS_NAME);
     int numConsumingInstancesPerReplicaGroup = NUM_CONSUMING_INSTANCES / NUM_REPLICAS;
-    int consumingInstanceIdToAdd = 0;
     for (int replicaGroupId = 0; replicaGroupId < NUM_REPLICAS; replicaGroupId++) {
-      for (int partitionId = 0; partitionId < numConsumingInstancesPerReplicaGroup; partitionId++) {
+      for (int partitionId = 0; partitionId < NUM_PARTITIONS; partitionId++) {
+        int instanceIndex = (partitionId % numConsumingInstancesPerReplicaGroup)
+            + replicaGroupId * numConsumingInstancesPerReplicaGroup;
         consumingInstancePartitions.setInstances(partitionId, replicaGroupId,
-            Collections.singletonList(CONSUMING_INSTANCES.get(consumingInstanceIdToAdd++)));
+            Collections.singletonList(CONSUMING_INSTANCES.get(instanceIndex)));
       }
     }
 
@@ -439,6 +442,69 @@ public class RealtimeReplicaGroupSegmentAssignmentTest {
       } else {
         assertEquals(newAssignment.get(segmentName), consumingCurrentAssignment.get(segmentName));
       }
+    }
+  }
+
+  /**
+   * Tests that a kafka subset partition ID that has no direct instance-partition entry is mapped via
+   * {@code segmentPartitionId % numTotalPartitions}, where {@code numTotalPartitions} comes from the
+   * table's {@link SegmentPartitionConfig}.
+   *
+   * <p>Setup:
+   * <ul>
+   *   <li>Kafka topic has 120 total partitions.</li>
+   *   <li>The table consumes only partition 70 (subset).</li>
+   *   <li>{@link SegmentPartitionConfig} declares {@code numPartitions = 60}.</li>
+   *   <li>Instance partitions are keyed by contiguous IDs 0..59 (one server per partition per replica-group).</li>
+   * </ul>
+   *
+   * <p>Expected: segment with kafka partition 70 has no direct instance-partition entry, so it falls
+   * back to {@code 70 % 60 = 10} and is assigned to the servers for instance partition group 10.
+   */
+  @Test
+  public void testKafkaSubsetPartitionMappingViaTableConfigNumPartitions() {
+    // Kafka total: 120 partitions; table config segment partition config declares numPartitions = 60.
+    // Subset partition: 70. Expected modulo: 70 % 60 = 10.
+    int numTableConfigPartitions = 60;
+    int kafkaSubsetPartitionId = 70;
+    int expectedInstancePartitionGroup = kafkaSubsetPartitionId % numTableConfigPartitions; // 10
+
+    Map<String, String> streamConfigs = FakeStreamConfigUtils.getDefaultLowLevelStreamConfigs().getStreamConfigsMap();
+    SegmentPartitionConfig segmentPartitionConfig = new SegmentPartitionConfig(
+        Map.of(PARTITION_COLUMN, new ColumnPartitionConfig("Murmur", numTableConfigPartitions)));
+    TableConfig tableConfig =
+        new TableConfigBuilder(TableType.REALTIME).setTableName(RAW_TABLE_NAME).setNumReplicas(NUM_REPLICAS)
+            .setStreamConfigs(streamConfigs)
+            .setSegmentAssignmentStrategy(AssignmentStrategy.REPLICA_GROUP_SEGMENT_ASSIGNMENT_STRATEGY)
+            .setReplicaGroupStrategyConfig(new ReplicaGroupStrategyConfig(PARTITION_COLUMN, 1))
+            .setSegmentPartitionConfig(segmentPartitionConfig).build();
+    SegmentAssignment segmentAssignment =
+        SegmentAssignmentFactory.getSegmentAssignment(createHelixManager(), tableConfig, null);
+
+    // Build CONSUMING instance partitions with contiguous groups 0..59 (one server per group per replica-group).
+    // There is no entry for partition 70, so direct lookup will miss and the modulo fallback must be used.
+    InstancePartitions consumingInstancePartitions = new InstancePartitions(CONSUMING_INSTANCE_PARTITIONS_NAME);
+    for (int partitionId = 0; partitionId < numTableConfigPartitions; partitionId++) {
+      for (int replicaGroupId = 0; replicaGroupId < NUM_REPLICAS; replicaGroupId++) {
+        consumingInstancePartitions.setInstances(partitionId, replicaGroupId,
+            Collections.singletonList("server_p" + partitionId + "_r" + replicaGroupId));
+      }
+    }
+
+    // Create a segment whose LLC name encodes kafka partition 70
+    String segmentName =
+        new LLCSegmentName(RAW_TABLE_NAME, kafkaSubsetPartitionId, 0, System.currentTimeMillis()).getSegmentName();
+
+    Map<InstancePartitionsType, InstancePartitions> instancePartitionsMap =
+        Map.of(InstancePartitionsType.CONSUMING, consumingInstancePartitions);
+    List<String> instancesAssigned =
+        segmentAssignment.assignSegment(segmentName, new TreeMap<>(), instancePartitionsMap);
+
+    // Partition 70 has no direct entry; 70 % 60 = 10, so it must land on the servers for group 10.
+    assertEquals(instancesAssigned.size(), NUM_REPLICAS);
+    for (int replicaGroupId = 0; replicaGroupId < NUM_REPLICAS; replicaGroupId++) {
+      assertEquals(instancesAssigned.get(replicaGroupId),
+          "server_p" + expectedInstancePartitionGroup + "_r" + replicaGroupId);
     }
   }
 

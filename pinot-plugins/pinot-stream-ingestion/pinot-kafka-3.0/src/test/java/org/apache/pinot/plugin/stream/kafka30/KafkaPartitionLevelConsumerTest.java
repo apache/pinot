@@ -80,7 +80,9 @@ public class KafkaPartitionLevelConsumerTest {
   private static final String TEST_TOPIC_1 = "foo";
   private static final String TEST_TOPIC_2 = "bar";
   private static final String TEST_TOPIC_3 = "expired";
+  private static final String TEST_TOPIC_SUBSET_PARTITION = "subsetPartition";
   private static final int NUM_MSG_PRODUCED_PER_PARTITION = 1000;
+  private static final int NUM_MSG_PRODUCED_PER_SUBSET_PARTITION = 100;
   private static final long TIMESTAMP = Instant.now().toEpochMilli();
   private static final Random RANDOM = new Random();
 
@@ -105,6 +107,7 @@ public class KafkaPartitionLevelConsumerTest {
     _kafkaCluster.createTopic(TEST_TOPIC_1, 1);
     _kafkaCluster.createTopic(TEST_TOPIC_2, 2);
     _kafkaCluster.createTopic(TEST_TOPIC_3, 1);
+    _kafkaCluster.createTopic(TEST_TOPIC_SUBSET_PARTITION, 8);
     Thread.sleep(STABILIZE_SLEEP_DELAYS);
     produceMsgToKafka();
     Thread.sleep(STABILIZE_SLEEP_DELAYS);
@@ -125,6 +128,13 @@ public class KafkaPartitionLevelConsumerTest {
         producer.send(new ProducerRecord<>(TEST_TOPIC_2, 1, TIMESTAMP + i, null, "sample_msg_" + i));
         producer.send(new ProducerRecord<>(TEST_TOPIC_3, "sample_msg_" + i));
       }
+      for (int partitionId = 0; partitionId < 8; partitionId++) {
+        for (int msgIdx = 0; msgIdx < NUM_MSG_PRODUCED_PER_SUBSET_PARTITION; msgIdx++) {
+          String payload = "mod_" + partitionId + "_msg_" + msgIdx;
+          producer.send(new ProducerRecord<>(TEST_TOPIC_SUBSET_PARTITION, partitionId,
+              TIMESTAMP + (partitionId * 1000L) + msgIdx, Integer.toString(partitionId), payload));
+        }
+      }
       producer.flush();
     }
   }
@@ -136,6 +146,7 @@ public class KafkaPartitionLevelConsumerTest {
       _kafkaCluster.deleteTopic(TEST_TOPIC_1);
       _kafkaCluster.deleteTopic(TEST_TOPIC_2);
       _kafkaCluster.deleteTopic(TEST_TOPIC_3);
+      _kafkaCluster.deleteTopic(TEST_TOPIC_SUBSET_PARTITION);
     } finally {
       _kafkaCluster.stop();
     }
@@ -210,6 +221,68 @@ public class KafkaPartitionLevelConsumerTest {
 
     streamMetadataProvider = new KafkaStreamMetadataProvider(clientId, streamConfig);
     assertEquals(streamMetadataProvider.fetchPartitionCount(10000L), 2);
+  }
+
+  @Test(expectedExceptions = IllegalArgumentException.class)
+  public void testSubsetPartitionInvalidPartition() {
+    String streamType = "kafka";
+    String streamKafkaBrokerList = _kafkaBrokerAddress;
+    String clientId = "invalid-subset-client";
+    String tableNameWithType = "tableName_REALTIME";
+
+    Map<String, String> streamConfigMap = new HashMap<>();
+    streamConfigMap.put("streamType", streamType);
+    streamConfigMap.put("stream.kafka.topic.name", TEST_TOPIC_1);
+    streamConfigMap.put("stream.kafka.broker.list", streamKafkaBrokerList);
+    streamConfigMap.put("stream.kafka.consumer.factory.class.name", getKafkaConsumerFactoryName());
+    streamConfigMap.put("stream.kafka.decoder.class.name", "decoderClass");
+    streamConfigMap.put(KafkaStreamConfigProperties.constructStreamProperty(
+        KafkaStreamConfigProperties.PARTITION_IDS), "99");
+    StreamConfig streamConfig = new StreamConfig(tableNameWithType, streamConfigMap);
+
+    new KafkaStreamMetadataProvider(clientId, streamConfig);
+  }
+
+  @Test
+  public void testSubsetPartitionConsumption()
+      throws TimeoutException {
+    String streamType = "kafka";
+    String streamKafkaBrokerList = _kafkaBrokerAddress;
+    String tableNameWithType = "tableName_REALTIME";
+
+    for (int partitionId = 0; partitionId < 8; partitionId++) {
+      String clientId = "subset-client-" + partitionId;
+      Map<String, String> streamConfigMap = new HashMap<>();
+      streamConfigMap.put("streamType", streamType);
+      streamConfigMap.put("stream.kafka.topic.name", TEST_TOPIC_SUBSET_PARTITION);
+      streamConfigMap.put("stream.kafka.broker.list", streamKafkaBrokerList);
+      streamConfigMap.put("stream.kafka.consumer.factory.class.name", getKafkaConsumerFactoryName());
+      streamConfigMap.put("stream.kafka.decoder.class.name", "decoderClass");
+      streamConfigMap.put(KafkaStreamConfigProperties.constructStreamProperty(
+          KafkaStreamConfigProperties.PARTITION_IDS), Integer.toString(partitionId));
+      StreamConfig streamConfig = new StreamConfig(tableNameWithType, streamConfigMap);
+
+      KafkaStreamMetadataProvider streamMetadataProvider = new KafkaStreamMetadataProvider(clientId, streamConfig);
+      assertEquals(streamMetadataProvider.fetchPartitionCount(10000L), 1);
+      assertEquals(streamMetadataProvider.fetchPartitionIds(10000L), Set.of(partitionId));
+
+      StreamConsumerFactory streamConsumerFactory = StreamConsumerFactoryProvider.create(streamConfig);
+      PartitionGroupConsumer consumer = streamConsumerFactory.createPartitionGroupConsumer(
+          clientId,
+          new PartitionGroupConsumptionStatus(partitionId, 0, new LongMsgOffset(0),
+              new LongMsgOffset(NUM_MSG_PRODUCED_PER_SUBSET_PARTITION), "CONSUMING"));
+
+      MessageBatch messageBatch = consumer.fetchMessages(new LongMsgOffset(0), 10000);
+      assertEquals(messageBatch.getMessageCount(), NUM_MSG_PRODUCED_PER_SUBSET_PARTITION);
+      assertEquals(messageBatch.getUnfilteredMessageCount(), NUM_MSG_PRODUCED_PER_SUBSET_PARTITION);
+      for (int i = 0; i < NUM_MSG_PRODUCED_PER_SUBSET_PARTITION; i++) {
+        StreamMessage streamMessage = messageBatch.getStreamMessage(i);
+        assertEquals(new String((byte[]) streamMessage.getValue()), "mod_" + partitionId + "_msg_" + i);
+        StreamMessageMetadata metadata = streamMessage.getMetadata();
+        assertEquals(((LongMsgOffset) metadata.getOffset()).getOffset(), i);
+        assertEquals(metadata.getRecordIngestionTimeMs(), TIMESTAMP + (partitionId * 1000L) + i);
+      }
+    }
   }
 
   @Test

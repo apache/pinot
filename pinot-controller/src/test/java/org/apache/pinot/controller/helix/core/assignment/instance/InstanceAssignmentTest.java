@@ -652,6 +652,53 @@ public class InstanceAssignmentTest {
     assertEquals(instancePartitions.getInstances(8, 1), List.of(SERVER_INSTANCE_ID_PREFIX + 17));
   }
 
+  @Test
+  public void testSinglePartitionSubsetWithNonZeroIdAndMinimizeDataMovement() {
+    // Single-partition subset with non-zero stream partition ID (e.g. stream.kafka.partition.ids=5) must create
+    // instance partitions for partition 5, not 0, so consumption and assignment work.
+    int numReplicas = 2;
+    InstanceReplicaGroupPartitionConfig replicaGroupPartitionConfig =
+        new InstanceReplicaGroupPartitionConfig(true, 0, numReplicas, 0, 0, 1, true, null);
+    InstanceAssignmentConfig instanceAssignmentConfig =
+        new InstanceAssignmentConfig(new InstanceTagPoolConfig(REALTIME_TAG, false, 0, null), null,
+            replicaGroupPartitionConfig,
+            InstanceAssignmentConfig.PartitionSelector.IMPLICIT_REALTIME_TABLE_PARTITION_SELECTOR.name(), true);
+    TableConfig tableConfig =
+        new TableConfigBuilder(TableType.REALTIME).setTableName(RAW_TABLE_NAME).setServerTenant(TENANT_NAME)
+            .setNumReplicas(numReplicas)
+            .setInstanceAssignmentConfigMap(Map.of(InstancePartitionsType.CONSUMING.name(), instanceAssignmentConfig))
+            .build();
+
+    int numInstances = 4;
+    List<InstanceConfig> instanceConfigs = new ArrayList<>(numInstances);
+    for (int i = 0; i < numInstances; i++) {
+      InstanceConfig instanceConfig = new InstanceConfig(SERVER_INSTANCE_ID_PREFIX + i);
+      instanceConfig.addTag(REALTIME_TAG);
+      instanceConfigs.add(instanceConfig);
+    }
+
+    int singlePartitionId = 5;
+    StreamMetadataProvider streamMetadataProvider = mock(StreamMetadataProvider.class);
+    when(streamMetadataProvider.fetchPartitionCount(anyLong())).thenReturn(1);
+    when(streamMetadataProvider.fetchPartitionIds(anyLong())).thenReturn(Set.of(singlePartitionId));
+
+    InstancePartitionSelector instancePartitionSelector =
+        new ImplicitRealtimeTablePartitionSelector(replicaGroupPartitionConfig, tableConfig.getTableName(), null, true,
+            streamMetadataProvider);
+    InstanceAssignmentDriver driver = new InstanceAssignmentDriver(tableConfig);
+    InstancePartitions instancePartitions =
+        driver.getInstancePartitions(InstancePartitionsType.CONSUMING.getInstancePartitionsName(RAW_TABLE_NAME),
+            instanceAssignmentConfig, instanceConfigs, null, true, instancePartitionSelector);
+
+    assertEquals(instancePartitions.getNumReplicaGroups(), numReplicas);
+    assertEquals(instancePartitions.getNumPartitions(), singlePartitionId + 1);
+
+    // Instance partitions must be keyed by stream partition id 5, not 0
+    assertEquals(instancePartitions.getInstances(singlePartitionId, 0), List.of(SERVER_INSTANCE_ID_PREFIX + 0));
+    assertEquals(instancePartitions.getInstances(singlePartitionId, 1), List.of(SERVER_INSTANCE_ID_PREFIX + 1));
+    assertNull(instancePartitions.getInstances(0, 0));
+  }
+
   public void testMirrorServerSetBasedRandom()
       throws FileNotFoundException {
     testMirrorServerSetBasedRandomInner(10000000);
