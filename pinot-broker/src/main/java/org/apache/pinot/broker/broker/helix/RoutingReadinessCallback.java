@@ -38,7 +38,6 @@ import static java.util.Objects.requireNonNull;
  */
 public class RoutingReadinessCallback implements ServiceStatus.ServiceStatusCallback {
 
-  private static final int MAX_TABLES_TO_LOG = 5;
   private static final String STATUS_IDEAL_STATE_NOT_FOUND = "Broker resource ideal state not found";
 
   private final HelixAdmin _helixAdmin;
@@ -121,7 +120,7 @@ public class RoutingReadinessCallback implements ServiceStatus.ServiceStatusCall
     }
 
     return String.format("Waiting for routing to be ready for %d/%d tables: %s",
-        missingRoutingTables.size(), assignedTables.size(), formatTableList(missingRoutingTables));
+        missingRoutingTables.size(), assignedTables.size(), missingRoutingTables);
   }
 
   private List<String> getAssignedTables(IdealState brokerResourceIdealState) {
@@ -137,20 +136,5 @@ public class RoutingReadinessCallback implements ServiceStatus.ServiceStatusCall
       }
     }
     return assignedTables;
-  }
-
-  private String formatTableList(List<String> tables) {
-    if (tables.size() <= MAX_TABLES_TO_LOG) {
-      return tables.toString();
-    }
-    StringBuilder sb = new StringBuilder("[");
-    for (int i = 0; i < MAX_TABLES_TO_LOG; i++) {
-      if (i > 0) {
-        sb.append(", ");
-      }
-      sb.append(tables.get(i));
-    }
-    sb.append(", ... and ").append(tables.size() - MAX_TABLES_TO_LOG).append(" more]");
-    return sb.toString();
   }
 }
