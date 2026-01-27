@@ -150,7 +150,8 @@ public class TimeSeriesRequestHandler extends BaseBrokerRequestHandler {
       try {
         timeSeriesRequest = buildRangeTimeSeriesRequest(lang, rawQueryParamString, queryParams);
       } catch (URISyntaxException e) {
-        throw new QueryException(QueryErrorCode.TIMESERIES_PARSING, "Error building RangeTimeSeriesRequest: " + e.getMessage(), e);
+        throw new QueryException(QueryErrorCode.TIMESERIES_PARSING, "Error building RangeTimeSeriesRequest: "
+            + e.getMessage(), e);
       }
       requestContext.setQuery(timeSeriesRequest.getQuery());
 
