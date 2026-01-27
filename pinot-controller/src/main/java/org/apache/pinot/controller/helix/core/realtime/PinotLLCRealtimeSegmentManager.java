@@ -397,12 +397,11 @@ public class PinotLLCRealtimeSegmentManager {
     String realtimeTableName = tableConfig.getTableName();
     LOGGER.info("Setting up new LLC table: {}", realtimeTableName);
 
-    int numPartitionGroups = 0;
     for (StreamMetadata streamMetadata : streamMetadataList) {
       _flushThresholdUpdateManager.clearFlushThresholdUpdater(streamMetadata.getStreamConfig());
-      numPartitionGroups += streamMetadata.getNumPartitions();
     }
     InstancePartitions instancePartitions = getConsumingInstancePartitions(tableConfig);
+    int numPartitionGroups = getPartitionCountForRouting(streamMetadataList);
     int numReplicas = getNumReplicas(tableConfig, instancePartitions);
 
     SegmentAssignment segmentAssignment =
@@ -1727,10 +1726,7 @@ public class PinotLLCRealtimeSegmentManager {
 
     InstancePartitions instancePartitions = getConsumingInstancePartitions(tableConfig);
     int numReplicas = getNumReplicas(tableConfig, instancePartitions);
-    int numPartitions = 0;
-    for (StreamMetadata streamMetadata : streamMetadataList) {
-      numPartitions += streamMetadata.getNumPartitions();
-    }
+    int numPartitions = getPartitionCountForRouting(streamMetadataList);
 
     SegmentAssignment segmentAssignment =
         SegmentAssignmentFactory.getSegmentAssignment(_helixManager, tableConfig, _controllerMetrics);
@@ -2121,6 +2117,25 @@ public class PinotLLCRealtimeSegmentManager {
       // Replica-group based
       return instancePartitions.getNumReplicaGroups();
     }
+  }
+
+  /**
+   * Gets the total partition count for routing segment assignment.
+   *
+   * <p>For subset-partition tables, this returns the total Kafka topic partition count (not the
+   * subset size) so that RealtimeSegmentAssignment correctly routes non-contiguous partition IDs via
+   * {@code partitionId % totalPartitions}.
+   *
+   * <p>For standard tables, this equals the number of actively consumed partitions.
+   *
+   * <p>For tables with multiple streams, this sums the partition counts across all streams.
+   */
+  private int getPartitionCountForRouting(List<StreamMetadata> streamMetadataList) {
+    int totalPartitionCount = 0;
+    for (StreamMetadata streamMetadata : streamMetadataList) {
+      totalPartitionCount += streamMetadata.getNumPartitions();
+    }
+    return totalPartitionCount;
   }
 
   private int getMaxNumPartitionsPerInstance(InstancePartitions instancePartitions, int numPartitions,
