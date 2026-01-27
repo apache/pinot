@@ -19,13 +19,11 @@
 package org.apache.pinot.tools;
 
 import com.fasterxml.jackson.databind.JsonNode;
-import com.google.common.base.Preconditions;
 import java.io.File;
 import java.io.InputStream;
 import java.net.URI;
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -33,10 +31,8 @@ import org.apache.commons.io.FileUtils;
 import org.apache.hc.client5.http.entity.mime.FileBody;
 import org.apache.hc.client5.http.entity.mime.MultipartEntityBuilder;
 import org.apache.hc.core5.http.ContentType;
-import org.apache.hc.core5.http.HttpEntity;
 import org.apache.pinot.broker.broker.helix.BaseBrokerStarter;
 import org.apache.pinot.broker.broker.helix.MultiClusterHelixBrokerStarter;
-import org.apache.pinot.common.utils.SimpleHttpResponse;
 import org.apache.pinot.common.utils.ZkStarter;
 import org.apache.pinot.common.utils.http.HttpClient;
 import org.apache.pinot.controller.BaseControllerStarter;
@@ -44,7 +40,6 @@ import org.apache.pinot.controller.ControllerConf;
 import org.apache.pinot.controller.ControllerStarter;
 import org.apache.pinot.server.starter.helix.BaseServerStarter;
 import org.apache.pinot.server.starter.helix.HelixServerStarter;
-import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.TableType;
 import org.apache.pinot.spi.data.LogicalTableConfig;
 import org.apache.pinot.spi.data.PhysicalTableConfig;
@@ -61,402 +56,331 @@ import org.apache.pinot.tools.admin.command.AbstractBaseAdminCommand;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+
 /**
- * Multi-Cluster Quickstart for demonstrating multi-cluster querying (federation).
- * Usage: ./pinot-admin.sh QuickStart -type MULTI_CLUSTER
+ * Multi-Cluster Quickstart demonstrating cross-cluster querying via logical tables.
+ * Usage: QuickStart -type MULTI_CLUSTER
  */
 public class MultiClusterQuickstart extends QuickStartBase {
   private static final Logger LOGGER = LoggerFactory.getLogger(MultiClusterQuickstart.class);
-  private static final String DEFAULT_TENANT = "DefaultTenant";
-  private static final String LOGICAL_TABLE_NAME = "unified_orders";
-  private static final String PHYSICAL_TABLE_PREFIX = "orders_cluster";
-  private static final String SCHEMA_RESOURCE_PATH = "/examples/logicalTables/orders_schema.json";
-  private static final String DATA_RESOURCE_PATH = "/examples/batch/orders/ordersUS/rawdata/ordersUS_sample.csv";
-  private static final int DEFAULT_NUM_CLUSTERS = 2;
+  private static final int NUM_CLUSTERS = 3;
+  private static final String LOGICAL_TABLE = "unified_orders";
+  private static final String SCHEMA_PATH = "/examples/logicalTables/orders_schema.json";
+  private static final String DATA_PATH = "/examples/batch/orders/ordersUS/rawdata/ordersUS_sample.csv";
 
-  private final int _numClusters = DEFAULT_NUM_CLUSTERS;
-  private final List<ClusterComponents> _clusters;
-  private File _quickstartTmpDir;
-
-  public MultiClusterQuickstart() {
-    _clusters = new ArrayList<>();
-  }
+  private final List<Cluster> _clusters = new ArrayList<>();
+  private File _tmpDir;
 
   @Override
   public List<String> types() {
-    return Arrays.asList("MULTI_CLUSTER", "MULTICLUSTER");
+    return List.of("MULTI_CLUSTER", "MULTICLUSTER");
   }
 
   @Override
   public void execute() throws Exception {
-    _quickstartTmpDir = _setCustomDataDir ? _dataDir
-        : new File(_dataDir, "multicluster_" + System.currentTimeMillis());
-    Preconditions.checkState(_quickstartTmpDir.mkdirs() || _quickstartTmpDir.exists());
+    _tmpDir = _setCustomDataDir ? _dataDir : new File(_dataDir, "multicluster_" + System.currentTimeMillis());
+    _tmpDir.mkdirs();
 
-    printStatus(Quickstart.Color.CYAN,
-        "***** Starting Multi-Cluster Quickstart with " + _numClusters + " clusters *****");
-
+    printStatus(Quickstart.Color.CYAN, "***** Starting Multi-Cluster Quickstart *****");
     try {
-      startAllClusters();
-      createPhysicalTablesOnAllClusters();
-      loadDataIntoAllClusters();
-      createLogicalTablesOnAllClusters();
-      printStatus(Quickstart.Color.CYAN, "***** Waiting for tables to be fully loaded *****");
-      Thread.sleep(5000);
-      runSampleQueries();
-
-      printStatus(Quickstart.Color.GREEN, "***** Multi-Cluster Quickstart Complete! *****");
-      for (int i = 0; i < _clusters.size(); i++) {
-        printStatus(Quickstart.Color.GREEN,
-            "  Cluster " + (i + 1) + ": http://localhost:" + _clusters.get(i)._controllerPort);
+      startClusters();
+      setupTables();
+      runQueries();
+      printStatus(Quickstart.Color.GREEN, "***** Multi-Cluster Quickstart Complete *****");
+      for (Cluster c : _clusters) {
+        printStatus(Quickstart.Color.GREEN, "  " + c._name + ": http://localhost:" + c._controllerPort);
       }
-
-      Runtime.getRuntime().addShutdownHook(new Thread(() -> {
-        try {
-          stopAllClusters();
-          FileUtils.deleteDirectory(_quickstartTmpDir);
-        } catch (Exception e) {
-          LOGGER.error("Shutdown error", e);
-        }
-      }));
+      Runtime.getRuntime().addShutdownHook(new Thread(this::cleanup));
     } catch (Exception e) {
-      LOGGER.error("Error in quickstart", e);
-      stopAllClusters();
+      LOGGER.error("Quickstart failed", e);
+      cleanup();
       throw e;
     }
   }
 
-  private void startAllClusters() throws Exception {
-    printStatus(Quickstart.Color.CYAN, "***** Starting " + _numClusters + " Pinot clusters *****");
-
-    for (int i = 0; i < _numClusters; i++) {
-      ClusterComponents cluster = new ClusterComponents();
-      cluster._clusterName = "MultiCluster" + (i + 1);
-      cluster._clusterIndex = i;
-      cluster._tempDir = new File(_quickstartTmpDir, "cluster" + (i + 1));
-      Preconditions.checkState(cluster._tempDir.mkdirs() || cluster._tempDir.exists());
-      _clusters.add(cluster);
+  private void startClusters() throws Exception {
+    // Initialize clusters
+    for (int i = 0; i < NUM_CLUSTERS; i++) {
+      Cluster c = new Cluster();
+      c._index = i;
+      c._name = "MultiCluster" + (i + 1);
+      c._dir = new File(_tmpDir, "cluster" + (i + 1));
+      c._dir.mkdirs();
+      c._tableName = "orders_cluster" + (i + 1);
+      _clusters.add(c);
     }
 
-    for (ClusterComponents cluster : _clusters) {
-      startZookeeper(cluster);
-    }
-    for (ClusterComponents cluster : _clusters) {
-      startController(cluster);
-    }
-    for (ClusterComponents cluster : _clusters) {
-      startBrokerWithMultiClusterConfig(cluster);
-    }
-    for (ClusterComponents cluster : _clusters) {
-      startServer(cluster);
+    // Start ZooKeepers
+    printStatus(Quickstart.Color.CYAN, "Starting ZooKeepers...");
+    for (Cluster c : _clusters) {
+      c._zk = ZkStarter.startLocalZkServer();
+      c._zkUrl = c._zk.getZkUrl();
+      printStatus(Quickstart.Color.GREEN, "  Started ZK for " + c._name + " at " + c._zkUrl);
     }
 
-    printStatus(Quickstart.Color.GREEN, "***** All clusters started successfully *****");
-  }
-
-  private void startZookeeper(ClusterComponents cluster) throws Exception {
-    cluster._zkInstance = ZkStarter.startLocalZkServer();
-    cluster._zkUrl = cluster._zkInstance.getZkUrl();
-    printStatus(Quickstart.Color.GREEN, "  ZK for " + cluster._clusterName + " at " + cluster._zkUrl);
-  }
-
-  private void startController(ClusterComponents cluster) throws Exception {
-    int basePort = 9000 + (cluster._clusterIndex * 100);
-    cluster._controllerPort = NetUtils.findOpenPort(basePort);
-
-    Map<String, Object> config = new HashMap<>();
-    config.put(ControllerConf.ZK_STR, cluster._zkUrl);
-    config.put(ControllerConf.HELIX_CLUSTER_NAME, cluster._clusterName);
-    config.put(ControllerConf.CONTROLLER_HOST, "localhost");
-    config.put(ControllerConf.CONTROLLER_PORT, cluster._controllerPort);
-    config.put(ControllerConf.DATA_DIR, new File(cluster._tempDir, "controllerData").getAbsolutePath());
-    config.put(ControllerConf.LOCAL_TEMP_DIR, new File(cluster._tempDir, "controllerTmp").getAbsolutePath());
-    config.put(ControllerConf.DISABLE_GROOVY, false);
-    config.put(CommonConstants.CONFIG_OF_TIMEZONE, "UTC");
-
-    cluster._controllerStarter = new ControllerStarter();
-    cluster._controllerStarter.init(new PinotConfiguration(config));
-    cluster._controllerStarter.start();
-    printStatus(Quickstart.Color.GREEN,
-        "  Controller for " + cluster._clusterName + " on port " + cluster._controllerPort);
-  }
-
-  private void startBrokerWithMultiClusterConfig(ClusterComponents cluster) throws Exception {
-    int basePort = 8000 + (cluster._clusterIndex * 100);
-    cluster._brokerPort = NetUtils.findOpenPort(basePort);
-
-    PinotConfiguration brokerConfig = new PinotConfiguration();
-    brokerConfig.setProperty(Helix.CONFIG_OF_ZOOKEEPER_SERVER, cluster._zkUrl);
-    brokerConfig.setProperty(Helix.CONFIG_OF_CLUSTER_NAME, cluster._clusterName);
-    brokerConfig.setProperty(Broker.CONFIG_OF_BROKER_HOSTNAME, "localhost");
-    brokerConfig.setProperty(Helix.KEY_OF_BROKER_QUERY_PORT, cluster._brokerPort);
-    brokerConfig.setProperty(Broker.CONFIG_OF_BROKER_TIMEOUT_MS, 60000L);
-    brokerConfig.setProperty(Broker.CONFIG_OF_DELAY_SHUTDOWN_TIME_MS, 0);
-    brokerConfig.setProperty(CommonConstants.CONFIG_OF_TIMEZONE, "UTC");
-
-    List<String> remoteClusterNames = new ArrayList<>();
-    for (ClusterComponents remote : _clusters) {
-      if (remote != cluster) {
-        remoteClusterNames.add(remote._clusterName);
-        brokerConfig.setProperty(
-            String.format(Helix.CONFIG_OF_REMOTE_ZOOKEEPER_SERVERS, remote._clusterName), remote._zkUrl);
-      }
-    }
-    if (!remoteClusterNames.isEmpty()) {
-      brokerConfig.setProperty(Helix.CONFIG_OF_REMOTE_CLUSTER_NAMES, String.join(",", remoteClusterNames));
+    // Start Controllers
+    printStatus(Quickstart.Color.CYAN, "Starting Controllers...");
+    for (Cluster c : _clusters) {
+      c._controllerPort = NetUtils.findOpenPort(9000 + c._index * 100);
+      Map<String, Object> cfg = Map.of(
+          ControllerConf.ZK_STR, c._zkUrl,
+          ControllerConf.HELIX_CLUSTER_NAME, c._name,
+          ControllerConf.CONTROLLER_HOST, "localhost",
+          ControllerConf.CONTROLLER_PORT, c._controllerPort,
+          ControllerConf.DATA_DIR, new File(c._dir, "ctrl").getAbsolutePath(),
+          ControllerConf.DISABLE_GROOVY, false,
+          CommonConstants.CONFIG_OF_TIMEZONE, "UTC");
+      c._controller = new ControllerStarter();
+      c._controller.init(new PinotConfiguration(cfg));
+      c._controller.start();
+      printStatus(Quickstart.Color.GREEN, "  Started Controller for " + c._name + " on port " + c._controllerPort);
     }
 
-    cluster._brokerStarter = new MultiClusterHelixBrokerStarter();
-    cluster._brokerStarter.init(brokerConfig);
-    cluster._brokerStarter.start();
-    printStatus(Quickstart.Color.GREEN, "  Broker for " + cluster._clusterName + " on port " + cluster._brokerPort);
-  }
+    // Start Brokers with multi-cluster config
+    printStatus(Quickstart.Color.CYAN, "Starting Brokers...");
+    for (Cluster c : _clusters) {
+      c._brokerPort = NetUtils.findOpenPort(8000 + c._index * 100);
+      PinotConfiguration cfg = new PinotConfiguration();
+      cfg.setProperty(Helix.CONFIG_OF_ZOOKEEPER_SERVER, c._zkUrl);
+      cfg.setProperty(Helix.CONFIG_OF_CLUSTER_NAME, c._name);
+      cfg.setProperty(Broker.CONFIG_OF_BROKER_HOSTNAME, "localhost");
+      cfg.setProperty(Helix.KEY_OF_BROKER_QUERY_PORT, c._brokerPort);
+      cfg.setProperty(Broker.CONFIG_OF_DELAY_SHUTDOWN_TIME_MS, 0);
 
-  private void startServer(ClusterComponents cluster) throws Exception {
-    int basePort = 7000 + (cluster._clusterIndex * 100);
-    cluster._serverAdminPort = NetUtils.findOpenPort(basePort);
-    cluster._serverNettyPort = NetUtils.findOpenPort(basePort + 10);
-    cluster._serverGrpcPort = NetUtils.findOpenPort(basePort + 20);
-
-    PinotConfiguration serverConfig = new PinotConfiguration();
-    serverConfig.setProperty(Helix.CONFIG_OF_ZOOKEEPER_SERVER, cluster._zkUrl);
-    serverConfig.setProperty(Helix.CONFIG_OF_CLUSTER_NAME, cluster._clusterName);
-    serverConfig.setProperty(Helix.KEY_OF_SERVER_NETTY_HOST, "localhost");
-    serverConfig.setProperty(Server.CONFIG_OF_INSTANCE_DATA_DIR,
-        new File(cluster._tempDir, "serverData").getAbsolutePath());
-    serverConfig.setProperty(Server.CONFIG_OF_INSTANCE_SEGMENT_TAR_DIR,
-        new File(cluster._tempDir, "serverSegmentTar").getAbsolutePath());
-    serverConfig.setProperty(Server.CONFIG_OF_SEGMENT_FORMAT_VERSION, "v3");
-    serverConfig.setProperty(Server.CONFIG_OF_SHUTDOWN_ENABLE_QUERY_CHECK, false);
-    serverConfig.setProperty(Server.CONFIG_OF_ADMIN_API_PORT, cluster._serverAdminPort);
-    serverConfig.setProperty(Helix.KEY_OF_SERVER_NETTY_PORT, cluster._serverNettyPort);
-    serverConfig.setProperty(Server.CONFIG_OF_GRPC_PORT, cluster._serverGrpcPort);
-    serverConfig.setProperty(CommonConstants.CONFIG_OF_TIMEZONE, "UTC");
-    serverConfig.setProperty(Helix.CONFIG_OF_MULTI_STAGE_ENGINE_ENABLED, true);
-
-    cluster._serverStarter = new HelixServerStarter();
-    cluster._serverStarter.init(serverConfig);
-    cluster._serverStarter.start();
-    printStatus(Quickstart.Color.GREEN,
-        "  Server for " + cluster._clusterName + " on ports " + cluster._serverNettyPort);
-  }
-
-  private void createPhysicalTablesOnAllClusters() throws Exception {
-    printStatus(Quickstart.Color.CYAN, "***** Creating physical tables *****");
-    for (ClusterComponents cluster : _clusters) {
-      String tableName = PHYSICAL_TABLE_PREFIX + (cluster._clusterIndex + 1);
-      createPhysicalTable(cluster, tableName);
-      cluster._physicalTableName = tableName;
-    }
-  }
-
-  private void createPhysicalTable(ClusterComponents cluster, String tableName) throws Exception {
-    Schema schema = loadSchema(tableName);
-    uploadSchema(schema, "http://localhost:" + cluster._controllerPort + "/schemas?override=true&force=true");
-
-    TableConfig tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName(tableName).build();
-    AbstractBaseAdminCommand.sendPostRequest(
-        "http://localhost:" + cluster._controllerPort + "/tables", JsonUtils.objectToString(tableConfig));
-    printStatus(Quickstart.Color.GREEN, "  Table " + tableName + " created on " + cluster._clusterName);
-  }
-
-  private Schema loadSchema(String schemaName) throws Exception {
-    try (InputStream is = getClass().getResourceAsStream(SCHEMA_RESOURCE_PATH)) {
-      Schema schema = Schema.fromInputStream(is);
-      schema.setSchemaName(schemaName);
-      return schema;
-    }
-  }
-
-  private void uploadSchema(Schema schema, String url) throws Exception {
-    File tempFile = File.createTempFile("schema_", ".json");
-    tempFile.deleteOnExit();
-    FileUtils.writeStringToFile(tempFile, schema.toPrettyJsonString(), StandardCharsets.UTF_8);
-
-    HttpEntity entity = MultipartEntityBuilder.create()
-        .addPart("schema", new FileBody(tempFile, ContentType.APPLICATION_JSON, schema.getSchemaName() + ".json"))
-        .build();
-
-    new HttpClient().sendPostRequest(URI.create(url), entity, null, null);
-  }
-
-  private void loadDataIntoAllClusters() throws Exception {
-    printStatus(Quickstart.Color.CYAN, "***** Loading data *****");
-    for (ClusterComponents cluster : _clusters) {
-      loadDataIntoCluster(cluster);
-    }
-  }
-
-  private void loadDataIntoCluster(ClusterComponents cluster) throws Exception {
-    File inputDir = new File(cluster._tempDir, "inputData");
-    inputDir.mkdirs();
-    File inputFile = new File(inputDir, "data.csv");
-    copySampleDataForCluster(cluster, inputFile);
-
-    String url = "http://localhost:" + cluster._controllerPort
-        + "/ingestFromFile?tableNameWithType=" + cluster._physicalTableName + "_OFFLINE"
-        + "&batchConfigMapStr=" + java.net.URLEncoder.encode(
-            "{\"inputFormat\":\"csv\",\"recordReader.prop.delimiter\":\",\"}", StandardCharsets.UTF_8);
-
-    HttpEntity entity = MultipartEntityBuilder.create()
-        .addPart("file", new FileBody(inputFile, ContentType.TEXT_PLAIN, inputFile.getName()))
-        .build();
-
-    SimpleHttpResponse resp = new HttpClient().sendPostRequest(URI.create(url), entity, null, null);
-    printStatus(Quickstart.Color.GREEN,
-        "  Data loaded into " + cluster._clusterName + " (status: " + resp.getStatusCode() + ")");
-  }
-
-  private void copySampleDataForCluster(ClusterComponents cluster, File outputFile) throws Exception {
-    try (InputStream is = getClass().getResourceAsStream(DATA_RESOURCE_PATH)) {
-      String content = new String(is.readAllBytes(), StandardCharsets.UTF_8);
-      String[] lines = content.split("\n");
-
-      List<String> result = new ArrayList<>();
-      result.add(lines[0]);
-
-      String region = "cluster" + (cluster._clusterIndex + 1);
-      for (int i = 1; i < lines.length; i++) {
-        String[] parts = lines[i].split(",");
-        if (parts.length >= 3) {
-          parts[0] = region + "_" + parts[0];
-          parts[2] = region;
-          result.add(String.join(",", parts));
+      // Configure remote clusters
+      List<String> remotes = new ArrayList<>();
+      for (Cluster r : _clusters) {
+        if (r != c) {
+          remotes.add(r._name);
+          cfg.setProperty(String.format(Helix.CONFIG_OF_REMOTE_ZOOKEEPER_SERVERS, r._name), r._zkUrl);
         }
       }
-      FileUtils.writeLines(outputFile, result);
+      if (!remotes.isEmpty()) {
+        cfg.setProperty(Helix.CONFIG_OF_REMOTE_CLUSTER_NAMES, String.join(",", remotes));
+      }
+
+      c._broker = new MultiClusterHelixBrokerStarter();
+      c._broker.init(cfg);
+      c._broker.start();
+      printStatus(Quickstart.Color.GREEN, "  Started Broker for " + c._name + " on port " + c._brokerPort);
+    }
+
+    // Start Servers
+    printStatus(Quickstart.Color.CYAN, "Starting Servers...");
+    for (Cluster c : _clusters) {
+      int base = 7000 + c._index * 100;
+      c._serverPort = NetUtils.findOpenPort(base);
+      PinotConfiguration cfg = new PinotConfiguration();
+      cfg.setProperty(Helix.CONFIG_OF_ZOOKEEPER_SERVER, c._zkUrl);
+      cfg.setProperty(Helix.CONFIG_OF_CLUSTER_NAME, c._name);
+      cfg.setProperty(Helix.KEY_OF_SERVER_NETTY_HOST, "localhost");
+      cfg.setProperty(Helix.KEY_OF_SERVER_NETTY_PORT, NetUtils.findOpenPort(base + 10));
+      cfg.setProperty(Server.CONFIG_OF_ADMIN_API_PORT, c._serverPort);
+      cfg.setProperty(Server.CONFIG_OF_GRPC_PORT, NetUtils.findOpenPort(base + 20));
+      cfg.setProperty(Server.CONFIG_OF_INSTANCE_DATA_DIR, new File(c._dir, "data").getAbsolutePath());
+      cfg.setProperty(Server.CONFIG_OF_INSTANCE_SEGMENT_TAR_DIR, new File(c._dir, "seg").getAbsolutePath());
+      cfg.setProperty(Server.CONFIG_OF_SHUTDOWN_ENABLE_QUERY_CHECK, false);
+      cfg.setProperty(Helix.CONFIG_OF_MULTI_STAGE_ENGINE_ENABLED, true);
+      c._server = new HelixServerStarter();
+      c._server.init(cfg);
+      c._server.start();
+      printStatus(Quickstart.Color.GREEN, "  Started Server for " + c._name + " on port " + c._serverPort);
+    }
+
+    // Print cluster summary
+    printStatus(Quickstart.Color.GREEN, "\n***** All clusters started *****");
+    printStatus(Quickstart.Color.YELLOW, "Cluster Summary:");
+    for (Cluster c : _clusters) {
+      printStatus(Quickstart.Color.YELLOW, "  " + c._name + ":");
+      printStatus(Quickstart.Color.YELLOW, "    ZooKeeper:  http://" + c._zkUrl);
+      printStatus(Quickstart.Color.YELLOW, "    Controller: http://localhost:" + c._controllerPort);
+      printStatus(Quickstart.Color.YELLOW, "    Broker:     http://localhost:" + c._brokerPort);
+      printStatus(Quickstart.Color.YELLOW, "    Server:     http://localhost:" + c._serverPort);
     }
   }
 
-  private void createLogicalTablesOnAllClusters() throws Exception {
-    printStatus(Quickstart.Color.CYAN, "***** Creating logical tables *****");
-    for (ClusterComponents cluster : _clusters) {
-      createLogicalTableOnCluster(cluster);
+  private void setupTables() throws Exception {
+    printStatus(Quickstart.Color.CYAN, "***** Setting up tables *****");
+
+    // Create physical tables
+    for (Cluster c : _clusters) {
+      Schema schema = loadSchema(c._tableName);
+      uploadSchema(c, schema);
+      String tableJson = new TableConfigBuilder(TableType.OFFLINE).setTableName(c._tableName).build().toJsonString();
+      post(c.ctrlUrl("/tables"), tableJson);
+      printStatus(Quickstart.Color.GREEN, "  Physical table: " + c._tableName + " on " + c._name);
     }
+
+    // Load data
+    for (Cluster c : _clusters) {
+      File dataFile = new File(c._dir, "data.csv");
+      generateClusterData(c, dataFile);
+      String url = c.ctrlUrl("/ingestFromFile?tableNameWithType=" + c._tableName + "_OFFLINE"
+          + "&batchConfigMapStr=" + java.net.URLEncoder.encode("{\"inputFormat\":\"csv\"}", StandardCharsets.UTF_8));
+      var entity = MultipartEntityBuilder.create()
+          .addPart("file", new FileBody(dataFile, ContentType.TEXT_PLAIN)).build();
+      new HttpClient().sendPostRequest(URI.create(url), entity, null, null);
+      printStatus(Quickstart.Color.GREEN, "  Data loaded: " + c._name);
+    }
+
+    // Create logical tables
+    for (Cluster c : _clusters) {
+      Schema schema = loadSchema(LOGICAL_TABLE);
+      uploadSchema(c, schema);
+
+      Map<String, PhysicalTableConfig> physTables = new HashMap<>();
+      for (Cluster other : _clusters) {
+        physTables.put(other._tableName + "_OFFLINE", new PhysicalTableConfig(other != c));
+      }
+      LogicalTableConfig ltc = new LogicalTableConfig();
+      ltc.setTableName(LOGICAL_TABLE);
+      ltc.setBrokerTenant("DefaultTenant");
+      ltc.setRefOfflineTableName(c._tableName + "_OFFLINE");
+      ltc.setPhysicalTableConfigMap(physTables);
+      post(c.ctrlUrl("/logicalTables"), ltc.toSingleLineJsonString());
+      printStatus(Quickstart.Color.GREEN, "  Logical table on " + c._name);
+    }
+
+    Thread.sleep(5000); // Wait for tables to be ready
   }
 
-  private void createLogicalTableOnCluster(ClusterComponents cluster) throws Exception {
-    Schema schema = loadSchema(LOGICAL_TABLE_NAME);
-    uploadSchema(schema, "http://localhost:" + cluster._controllerPort + "/schemas?override=true&force=true");
-
-    Map<String, PhysicalTableConfig> physicalTableConfigMap = new HashMap<>();
-    for (ClusterComponents c : _clusters) {
-      boolean isRemote = (c != cluster);
-      physicalTableConfigMap.put(c._physicalTableName + "_OFFLINE", new PhysicalTableConfig(isRemote));
-    }
-
-    LogicalTableConfig config = new LogicalTableConfig();
-    config.setTableName(LOGICAL_TABLE_NAME);
-    config.setBrokerTenant(DEFAULT_TENANT);
-    config.setRefOfflineTableName(cluster._physicalTableName + "_OFFLINE");
-    config.setPhysicalTableConfigMap(physicalTableConfigMap);
-
-    try {
-      AbstractBaseAdminCommand.sendPostRequest(
-          "http://localhost:" + cluster._controllerPort + "/logicalTables", config.toSingleLineJsonString());
-      printStatus(Quickstart.Color.GREEN, "  Logical table created on " + cluster._clusterName);
-    } catch (Exception e) {
-      printStatus(Quickstart.Color.YELLOW, "  Logical table creation failed: " + e.getMessage());
-    }
-  }
-
-  private void runSampleQueries() throws Exception {
+  private void runQueries() throws Exception {
     printStatus(Quickstart.Color.YELLOW, "\n======== SAMPLE QUERIES ========\n");
-    ClusterComponents primary = _clusters.get(0);
+    Cluster primary = _clusters.get(0);
 
-    for (ClusterComponents cluster : _clusters) {
-      String query = "SELECT COUNT(*) FROM " + cluster._physicalTableName;
-      JsonNode result = runQuery(cluster, query);
-      printStatus(Quickstart.Color.GREEN, cluster._clusterName + ": " + extractCount(result) + " rows");
+    // Per-cluster counts
+    printStatus(Quickstart.Color.CYAN, "1. Query each cluster's physical table:");
+    for (Cluster c : _clusters) {
+      String sql = "SELECT COUNT(*) FROM " + c._tableName;
+      printStatus(Quickstart.Color.YELLOW, "   SQL: " + sql);
+      JsonNode r = query(c, sql);
+      printStatus(Quickstart.Color.GREEN, "   Result: " + getCount(r) + " rows\n");
     }
 
-    printStatus(Quickstart.Color.CYAN, "\n***** Multi-Cluster Query *****");
-    String fedQuery = "SET enableMultiClusterRouting=true; SELECT COUNT(*) FROM " + LOGICAL_TABLE_NAME;
-    JsonNode result = runQuery(primary, fedQuery);
-    printStatus(Quickstart.Color.GREEN, "Federated count: " + extractCount(result) + " rows from ALL clusters");
+    // Federated query (single-stage)
+    printStatus(Quickstart.Color.CYAN, "2. Multi-cluster query (single-stage engine):");
+    String fedSql = "SET enableMultiClusterRouting=true; SELECT COUNT(*) FROM " + LOGICAL_TABLE;
+    printStatus(Quickstart.Color.YELLOW, "   SQL: " + fedSql);
+    JsonNode r = query(primary, fedSql);
+    printStatus(Quickstart.Color.GREEN, "   Result: " + getCount(r) + " rows (combined from all clusters)\n");
 
-    printStatus(Quickstart.Color.CYAN, "\n***** MSE Multi-Cluster Query *****");
-    String mseQuery = "SET enableMultiClusterRouting=true; SET useMultistageEngine=true; "
-        + "SELECT region, COUNT(*) as cnt FROM " + LOGICAL_TABLE_NAME + " GROUP BY region ORDER BY region";
-    result = runQuery(primary, mseQuery);
-    printQueryResult(result);
+    // MSE query with GROUP BY
+    printStatus(Quickstart.Color.CYAN, "3. Multi-cluster query with GROUP BY (multi-stage engine):");
+    String mseSql = "SET enableMultiClusterRouting=true; SET useMultistageEngine=true; "
+        + "SELECT region, COUNT(*) FROM " + LOGICAL_TABLE + " GROUP BY region ORDER BY region";
+    printStatus(Quickstart.Color.YELLOW, "   SQL: " + mseSql);
+    printStatus(Quickstart.Color.GREEN, "   Result:");
+    r = query(primary, mseSql);
+    for (JsonNode row : r.path("resultTable").path("rows")) {
+      printStatus(Quickstart.Color.GREEN, "     " + row.get(0).asText() + ": " + row.get(1).asText() + " rows");
+    }
 
-    printStatus(Quickstart.Color.GREEN, "\n======== DEMO COMPLETE ========\n");
-    printStatus(Quickstart.Color.YELLOW, "Key: Use 'SET enableMultiClusterRouting=true' for cross-cluster queries");
+    printStatus(Quickstart.Color.YELLOW, "\nTip: Use 'SET enableMultiClusterRouting=true' for cross-cluster queries");
   }
 
-  private JsonNode runQuery(ClusterComponents cluster, String query) throws Exception {
-    String url = "http://localhost:" + cluster._brokerPort + "/query/sql";
-    String response = AbstractBaseAdminCommand.sendPostRequest(url, JsonUtils.objectToString(Map.of("sql", query)));
-    return JsonUtils.stringToJsonNode(response);
+  private Schema loadSchema(String name) throws Exception {
+    try (InputStream is = getClass().getResourceAsStream(SCHEMA_PATH)) {
+      Schema s = Schema.fromInputStream(is);
+      s.setSchemaName(name);
+      return s;
+    }
   }
 
-  private String extractCount(JsonNode result) {
+  private void uploadSchema(Cluster c, Schema schema) throws Exception {
+    File f = File.createTempFile("schema", ".json");
+    f.deleteOnExit();
+    FileUtils.writeStringToFile(f, schema.toPrettyJsonString(), StandardCharsets.UTF_8);
+    var entity = MultipartEntityBuilder.create()
+        .addPart("schema", new FileBody(f, ContentType.APPLICATION_JSON)).build();
+    new HttpClient().sendPostRequest(URI.create(c.ctrlUrl("/schemas?override=true&force=true")), entity, null, null);
+  }
+
+  private void generateClusterData(Cluster c, File out) throws Exception {
+    try (InputStream is = getClass().getResourceAsStream(DATA_PATH)) {
+      String[] lines = new String(is.readAllBytes(), StandardCharsets.UTF_8).split("\n");
+      List<String> result = new ArrayList<>();
+      result.add(lines[0]); // header
+      String region = "cluster" + (c._index + 1);
+      for (int i = 1; i < lines.length; i++) {
+        String[] p = lines[i].split(",");
+        if (p.length >= 3) {
+          p[0] = region + "_" + p[0];
+          p[2] = region;
+          result.add(String.join(",", p));
+        }
+      }
+      FileUtils.writeLines(out, result);
+    }
+  }
+
+  private JsonNode query(Cluster c, String sql) throws Exception {
+    String url = "http://localhost:" + c._brokerPort + "/query/sql";
+    String resp = post(url, JsonUtils.objectToString(Map.of("sql", sql)));
+    return JsonUtils.stringToJsonNode(resp);
+  }
+
+  private String getCount(JsonNode r) {
     try {
-      return result.path("resultTable").path("rows").get(0).get(0).asText();
+      return r.path("resultTable").path("rows").get(0).get(0).asText();
     } catch (Exception e) {
       return "N/A";
     }
   }
 
-  private void printQueryResult(JsonNode result) {
-    try {
-      JsonNode rows = result.path("resultTable").path("rows");
-      for (JsonNode row : rows) {
-        printStatus(Quickstart.Color.GREEN, "  " + row.get(0).asText() + ": " + row.get(1).asText() + " orders");
+  private String post(String url, String body) throws Exception {
+    return AbstractBaseAdminCommand.sendPostRequest(url, body);
+  }
+
+  private void cleanup() {
+    for (Cluster c : _clusters) {
+      try {
+        if (c._server != null) {
+          c._server.stop();
+        }
+      } catch (Exception ignored) {
       }
-    } catch (Exception e) {
-      printStatus(Quickstart.Color.YELLOW, result.toPrettyString());
+      try {
+        if (c._broker != null) {
+          c._broker.stop();
+        }
+      } catch (Exception ignored) {
+      }
+      try {
+        if (c._controller != null) {
+          c._controller.stop();
+        }
+      } catch (Exception ignored) {
+      }
+      try {
+        if (c._zk != null) {
+          ZkStarter.stopLocalZkServer(c._zk);
+        }
+      } catch (Exception ignored) {
+      }
+    }
+    try {
+      FileUtils.deleteDirectory(_tmpDir);
+    } catch (Exception ignored) {
     }
   }
 
-  private void stopAllClusters() {
-    for (ClusterComponents cluster : _clusters) {
-      stopCluster(cluster);
-    }
-  }
-
-  private void stopCluster(ClusterComponents cluster) {
-    if (cluster == null) {
-      return;
-    }
-    try {
-      if (cluster._serverStarter != null) {
-        cluster._serverStarter.stop();
-      }
-    } catch (Exception e) { /* ignore */ }
-    try {
-      if (cluster._brokerStarter != null) {
-        cluster._brokerStarter.stop();
-      }
-    } catch (Exception e) { /* ignore */ }
-    try {
-      if (cluster._controllerStarter != null) {
-        cluster._controllerStarter.stop();
-      }
-    } catch (Exception e) { /* ignore */ }
-    try {
-      if (cluster._zkInstance != null) {
-        ZkStarter.stopLocalZkServer(cluster._zkInstance);
-      }
-    } catch (Exception e) { /* ignore */ }
-  }
-
-  private static class ClusterComponents {
-    String _clusterName;
-    int _clusterIndex;
-    File _tempDir;
-    ZkStarter.ZookeeperInstance _zkInstance;
+  private static class Cluster {
+    int _index;
+    String _name;
+    File _dir;
+    String _tableName;
+    ZkStarter.ZookeeperInstance _zk;
     String _zkUrl;
-    BaseControllerStarter _controllerStarter;
+    BaseControllerStarter _controller;
     int _controllerPort;
-    BaseBrokerStarter _brokerStarter;
+    BaseBrokerStarter _broker;
     int _brokerPort;
-    BaseServerStarter _serverStarter;
-    int _serverAdminPort;
-    int _serverNettyPort;
-    int _serverGrpcPort;
-    String _physicalTableName;
+    BaseServerStarter _server;
+    int _serverPort;
+
+    String ctrlUrl(String path) {
+      return "http://localhost:" + _controllerPort + path;
+    }
   }
 
   public static void main(String[] args) throws Exception {
