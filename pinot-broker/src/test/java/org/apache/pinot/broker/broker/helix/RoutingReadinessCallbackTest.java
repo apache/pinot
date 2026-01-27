@@ -18,11 +18,8 @@
  */
 package org.apache.pinot.broker.broker.helix;
 
-import java.util.HashMap;
-import java.util.Map;
 import org.apache.helix.HelixAdmin;
-import org.apache.helix.model.IdealState;
-import org.apache.helix.zookeeper.datamodel.ZNRecord;
+import org.apache.helix.model.ExternalView;
 import org.apache.pinot.common.utils.ServiceStatus;
 import org.apache.pinot.core.routing.RoutingManager;
 import org.apache.pinot.spi.utils.CommonConstants.Helix;
@@ -53,17 +50,17 @@ public class RoutingReadinessCallbackTest {
   }
 
   @Test
-  public void testReturnsStartingWhenIdealStateNotFound() {
-    when(_helixAdmin.getResourceIdealState(CLUSTER_NAME, Helix.BROKER_RESOURCE_INSTANCE)).thenReturn(null);
+  public void testReturnsStartingWhenExternalViewNotFound() {
+    when(_helixAdmin.getResourceExternalView(CLUSTER_NAME, Helix.BROKER_RESOURCE_INSTANCE)).thenReturn(null);
 
     assertThat(_callback.getServiceStatus()).isEqualTo(ServiceStatus.Status.STARTING);
-    assertThat(_callback.getStatusDescription()).contains("Broker resource ideal state not found");
+    assertThat(_callback.getStatusDescription()).contains("Broker resource external view not found");
   }
 
   @Test
-  public void testReturnsGoodWhenNoTablesAssigned() {
-    IdealState idealState = createIdealStateWithTables();
-    when(_helixAdmin.getResourceIdealState(CLUSTER_NAME, Helix.BROKER_RESOURCE_INSTANCE)).thenReturn(idealState);
+  public void testReturnsGoodWhenNoTablesOnline() {
+    ExternalView externalView = createExternalViewWithTables();
+    when(_helixAdmin.getResourceExternalView(CLUSTER_NAME, Helix.BROKER_RESOURCE_INSTANCE)).thenReturn(externalView);
 
     assertThat(_callback.getServiceStatus()).isEqualTo(ServiceStatus.Status.GOOD);
     assertThat(_callback.getStatusDescription()).isEqualTo(ServiceStatus.STATUS_DESCRIPTION_NONE);
@@ -71,8 +68,8 @@ public class RoutingReadinessCallbackTest {
 
   @Test
   public void testReturnsStartingWhenRoutingMissing() {
-    IdealState idealState = createIdealStateWithTables(TABLE_1, TABLE_2);
-    when(_helixAdmin.getResourceIdealState(CLUSTER_NAME, Helix.BROKER_RESOURCE_INSTANCE)).thenReturn(idealState);
+    ExternalView externalView = createExternalViewWithTables(TABLE_1, TABLE_2);
+    when(_helixAdmin.getResourceExternalView(CLUSTER_NAME, Helix.BROKER_RESOURCE_INSTANCE)).thenReturn(externalView);
     when(_routingManager.routingExists(TABLE_1)).thenReturn(true);
     when(_routingManager.routingExists(TABLE_2)).thenReturn(false);
 
@@ -83,8 +80,8 @@ public class RoutingReadinessCallbackTest {
 
   @Test
   public void testReturnsGoodWhenAllRoutingExists() {
-    IdealState idealState = createIdealStateWithTables(TABLE_1, TABLE_2);
-    when(_helixAdmin.getResourceIdealState(CLUSTER_NAME, Helix.BROKER_RESOURCE_INSTANCE)).thenReturn(idealState);
+    ExternalView externalView = createExternalViewWithTables(TABLE_1, TABLE_2);
+    when(_helixAdmin.getResourceExternalView(CLUSTER_NAME, Helix.BROKER_RESOURCE_INSTANCE)).thenReturn(externalView);
     when(_routingManager.routingExists(TABLE_1)).thenReturn(true);
     when(_routingManager.routingExists(TABLE_2)).thenReturn(true);
 
@@ -93,20 +90,20 @@ public class RoutingReadinessCallbackTest {
   }
 
   @Test
-  public void testIdealStatePartitionSetReturnsTableNames() {
-    // Verify that IdealState.getPartitionSet() returns table names
-    // and getInstanceSet(tableName) returns broker instances
-    IdealState idealState = createIdealStateWithTables(TABLE_1, TABLE_2);
+  public void testExternalViewPartitionSetReturnsTableNames() {
+    // Verify that ExternalView.getPartitionSet() returns table names
+    // and getStateMap(tableName) returns broker instance to state mapping
+    ExternalView externalView = createExternalViewWithTables(TABLE_1, TABLE_2);
 
-    assertThat(idealState.getPartitionSet()).containsExactlyInAnyOrder(TABLE_1, TABLE_2);
-    assertThat(idealState.getInstanceSet(TABLE_1)).containsExactly(INSTANCE_ID);
-    assertThat(idealState.getInstanceSet(TABLE_2)).containsExactly(INSTANCE_ID);
+    assertThat(externalView.getPartitionSet()).containsExactlyInAnyOrder(TABLE_1, TABLE_2);
+    assertThat(externalView.getStateMap(TABLE_1)).containsKey(INSTANCE_ID);
+    assertThat(externalView.getStateMap(TABLE_2)).containsKey(INSTANCE_ID);
   }
 
   @Test
   public void testStatusIsCachedOnceGood() {
-    IdealState idealState = createIdealStateWithTables(TABLE_1);
-    when(_helixAdmin.getResourceIdealState(CLUSTER_NAME, Helix.BROKER_RESOURCE_INSTANCE)).thenReturn(idealState);
+    ExternalView externalView = createExternalViewWithTables(TABLE_1);
+    when(_helixAdmin.getResourceExternalView(CLUSTER_NAME, Helix.BROKER_RESOURCE_INSTANCE)).thenReturn(externalView);
     when(_routingManager.routingExists(TABLE_1)).thenReturn(true);
     assertThat(_callback.getServiceStatus()).isEqualTo(ServiceStatus.Status.GOOD);
 
@@ -118,13 +115,11 @@ public class RoutingReadinessCallbackTest {
     assertThat(_callback.getStatusDescription()).isEqualTo(ServiceStatus.STATUS_DESCRIPTION_NONE);
   }
 
-  private IdealState createIdealStateWithTables(String... tableNames) {
-    ZNRecord record = new ZNRecord(Helix.BROKER_RESOURCE_INSTANCE);
+  private ExternalView createExternalViewWithTables(String... tableNames) {
+    ExternalView externalView = new ExternalView(Helix.BROKER_RESOURCE_INSTANCE);
     for (String tableName : tableNames) {
-      Map<String, String> tableMap = new HashMap<>();
-      tableMap.put(INSTANCE_ID, "ONLINE");
-      record.setMapField(tableName, tableMap);
+      externalView.setState(tableName, INSTANCE_ID, "ONLINE");
     }
-    return new IdealState(record);
+    return externalView;
   }
 }

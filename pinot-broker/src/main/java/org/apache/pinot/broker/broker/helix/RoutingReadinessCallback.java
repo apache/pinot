@@ -20,8 +20,9 @@ package org.apache.pinot.broker.broker.helix;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 import org.apache.helix.HelixAdmin;
-import org.apache.helix.model.IdealState;
+import org.apache.helix.model.ExternalView;
 import org.apache.pinot.common.utils.ServiceStatus;
 import org.apache.pinot.core.routing.RoutingManager;
 import org.apache.pinot.spi.utils.CommonConstants.Helix;
@@ -36,7 +37,7 @@ import static java.util.Objects.requireNonNull;
  */
 public class RoutingReadinessCallback implements ServiceStatus.ServiceStatusCallback {
 
-  private static final String STATUS_IDEAL_STATE_NOT_FOUND = "Broker resource ideal state not found";
+  private static final String STATUS_EXTERNAL_VIEW_NOT_FOUND = "Broker resource external view not found";
 
   private final HelixAdmin _helixAdmin;
   private final RoutingManager _routingManager;
@@ -59,24 +60,24 @@ public class RoutingReadinessCallback implements ServiceStatus.ServiceStatusCall
       return ServiceStatus.Status.GOOD;
     }
 
-    IdealState brokerResourceIdealState =
-        _helixAdmin.getResourceIdealState(_clusterName, Helix.BROKER_RESOURCE_INSTANCE);
+    ExternalView brokerResourceExternalView =
+        _helixAdmin.getResourceExternalView(_clusterName, Helix.BROKER_RESOURCE_INSTANCE);
 
-    if (brokerResourceIdealState == null) {
+    if (brokerResourceExternalView == null) {
       return ServiceStatus.Status.STARTING;
     }
 
-    // Find all tables assigned to this broker instance
-    List<String> assignedTables = getAssignedTables(brokerResourceIdealState);
+    // Find all tables this broker instance is online for
+    List<String> onlineTables = getOnlineTables(brokerResourceExternalView);
 
-    // If no tables are assigned, consider it GOOD
-    if (assignedTables.isEmpty()) {
+    // If no tables are online, consider it GOOD
+    if (onlineTables.isEmpty()) {
       _serviceStatus = ServiceStatus.Status.GOOD;
       return _serviceStatus;
     }
 
-    // Check routing exists for all assigned tables
-    for (String tableName : assignedTables) {
+    // Check routing exists for all online tables
+    for (String tableName : onlineTables) {
       if (!_routingManager.routingExists(tableName)) {
         return ServiceStatus.Status.STARTING;
       }
@@ -92,22 +93,22 @@ public class RoutingReadinessCallback implements ServiceStatus.ServiceStatusCall
       return ServiceStatus.STATUS_DESCRIPTION_NONE;
     }
 
-    IdealState brokerResourceIdealState =
-        _helixAdmin.getResourceIdealState(_clusterName, Helix.BROKER_RESOURCE_INSTANCE);
+    ExternalView brokerResourceExternalView =
+        _helixAdmin.getResourceExternalView(_clusterName, Helix.BROKER_RESOURCE_INSTANCE);
 
-    if (brokerResourceIdealState == null) {
-      return STATUS_IDEAL_STATE_NOT_FOUND;
+    if (brokerResourceExternalView == null) {
+      return STATUS_EXTERNAL_VIEW_NOT_FOUND;
     }
 
-    List<String> assignedTables = getAssignedTables(brokerResourceIdealState);
+    List<String> onlineTables = getOnlineTables(brokerResourceExternalView);
 
-    if (assignedTables.isEmpty()) {
+    if (onlineTables.isEmpty()) {
       return ServiceStatus.STATUS_DESCRIPTION_NONE;
     }
 
     // Find tables missing routing
     List<String> missingRoutingTables = new ArrayList<>();
-    for (String tableName : assignedTables) {
+    for (String tableName : onlineTables) {
       if (!_routingManager.routingExists(tableName)) {
         missingRoutingTables.add(tableName);
       }
@@ -118,16 +119,17 @@ public class RoutingReadinessCallback implements ServiceStatus.ServiceStatusCall
     }
 
     return String.format("Waiting for routing to be ready for %d/%d tables: %s",
-        missingRoutingTables.size(), assignedTables.size(), missingRoutingTables);
+        missingRoutingTables.size(), onlineTables.size(), missingRoutingTables);
   }
 
-  private List<String> getAssignedTables(IdealState brokerResourceIdealState) {
-    List<String> assignedTables = new ArrayList<>();
-    for (String tableName : brokerResourceIdealState.getPartitionSet()) {
-      if (brokerResourceIdealState.getInstanceSet(tableName).contains(_instanceId)) {
-        assignedTables.add(tableName);
+  private List<String> getOnlineTables(ExternalView brokerResourceExternalView) {
+    List<String> onlineTables = new ArrayList<>();
+    for (String tableName : brokerResourceExternalView.getPartitionSet()) {
+      Map<String, String> stateMap = brokerResourceExternalView.getStateMap(tableName);
+      if (stateMap != null && stateMap.containsKey(_instanceId)) {
+        onlineTables.add(tableName);
       }
     }
-    return assignedTables;
+    return onlineTables;
   }
 }
