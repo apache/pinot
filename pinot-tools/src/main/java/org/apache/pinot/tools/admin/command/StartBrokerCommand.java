@@ -48,6 +48,11 @@ public class StartBrokerCommand extends AbstractBaseAdminCommand implements Comm
   @CommandLine.Option(names = {"-brokerPort"}, required = false, description = "Broker port number to use for query.")
   private int _brokerPort = CommonConstants.Helix.DEFAULT_BROKER_QUERY_PORT;
 
+  @CommandLine.Option(names = {"-brokerGrpcPort"}, required = false, description = "Broker gRPC port number to use "
+      + "for query. Positive values enable gRPC on that port, 0 enables gRPC on an available port, and negative "
+      + "values (default -1) disable gRPC.")
+  private int _brokerGrpcPort = -1;
+
   @CommandLine.Option(names = {"-brokerMultiStageRunnerPort"}, required = false,
       description = "Broker port number to use for query.")
   private int _brokerMultiStageRunnerPort = CommonConstants.MultiStageQueryRunner.DEFAULT_QUERY_RUNNER_PORT;
@@ -60,7 +65,7 @@ public class StartBrokerCommand extends AbstractBaseAdminCommand implements Comm
 
   @CommandLine.Option(names = {"-configFileName", "-config", "-configFile", "-brokerConfig", "-brokerConf"},
       required = false, description = "Broker Starter Config file.")
-      // TODO: support forbids = {"-brokerHost", "-brokerPort"})
+  // TODO: support forbids = {"-brokerHost", "-brokerPort"})
   private String _configFileName;
 
   @CommandLine.Option(names = {"-configOverrides"}, required = false, split = ",",
@@ -73,6 +78,10 @@ public class StartBrokerCommand extends AbstractBaseAdminCommand implements Comm
 
   public int getBrokerPort() {
     return _brokerPort;
+  }
+
+  public int getBrokerGrpcPort() {
+    return _brokerGrpcPort;
   }
 
   public int getBrokerMultiStageRunnerPort() {
@@ -105,7 +114,8 @@ public class StartBrokerCommand extends AbstractBaseAdminCommand implements Comm
     if (_configFileName != null) {
       return ("StartBroker -zkAddress " + _zkAddress + " -configFileName " + _configFileName);
     } else {
-      return ("StartBroker -brokerHost " + _brokerHost + " -brokerPort " + _brokerPort + " -zkAddress " + _zkAddress);
+      return ("StartBroker -brokerHost " + _brokerHost + " -brokerPort " + _brokerPort + " -brokerGrpcPort "
+          + _brokerGrpcPort + " -zkAddress " + _zkAddress);
     }
   }
 
@@ -125,6 +135,11 @@ public class StartBrokerCommand extends AbstractBaseAdminCommand implements Comm
 
   public StartBrokerCommand setPort(int port) {
     _brokerPort = port;
+    return this;
+  }
+
+  public StartBrokerCommand setGrpcPort(int grpcPort) {
+    _brokerGrpcPort = grpcPort;
     return this;
   }
 
@@ -152,7 +167,7 @@ public class StartBrokerCommand extends AbstractBaseAdminCommand implements Comm
   public boolean execute()
       throws Exception {
     try {
-      LOGGER.info("Executing command: {}", toString());
+      LOGGER.info("Executing command: {}", this);
       Map<String, Object> brokerConf = getBrokerConf();
       StartServiceManagerCommand startServiceManagerCommand =
           new StartServiceManagerCommand().setZkAddress(_zkAddress).setClusterName(_clusterName).setPort(-1)
@@ -180,7 +195,7 @@ public class StartBrokerCommand extends AbstractBaseAdminCommand implements Comm
       _clusterName = MapUtils.getString(properties, CommonConstants.Helix.CONFIG_OF_CLUSTER_NAME, _clusterName);
     } else {
       properties.putAll(PinotConfigUtils.generateBrokerConf(_clusterName, _zkAddress, _brokerHost, _brokerPort,
-          _brokerMultiStageRunnerPort));
+          _brokerGrpcPort, _brokerMultiStageRunnerPort));
     }
     if (_configOverrides != null) {
       properties.putAll(_configOverrides);
