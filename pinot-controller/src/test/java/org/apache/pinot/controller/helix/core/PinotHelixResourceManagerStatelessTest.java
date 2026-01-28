@@ -1642,6 +1642,15 @@ public class PinotHelixResourceManagerStatelessTest extends ControllerTest {
     helixAdminField.set(_helixResourceManager, spyHelixAdmin);
 
     IdealState idealState = new IdealState(realtimeTableName);
+    idealState.setPartitionState(new LLCSegmentName(rawTableName, 0, 100,
+        System.currentTimeMillis()).getSegmentName(), SERVER_NAME_TAGGED, "ONLINE");
+    idealState.setPartitionState(new LLCSegmentName(rawTableName, 0, 101,
+        System.currentTimeMillis()).getSegmentName(), SERVER_NAME_TAGGED, "CONSUMING");
+    idealState.setPartitionState(new LLCSegmentName(rawTableName, 1, 199,
+        System.currentTimeMillis()).getSegmentName(), SERVER_NAME_TAGGED, "ONLINE");
+    idealState.setPartitionState(new LLCSegmentName(rawTableName, 1, 200,
+        System.currentTimeMillis()).getSegmentName(), SERVER_NAME_TAGGED, "CONSUMING");
+
     doReturn(idealState).when(spyHelixAdmin).getResourceIdealState(any(), eq(realtimeTableName));
 
     // Test happy path
@@ -1662,6 +1671,17 @@ public class PinotHelixResourceManagerStatelessTest extends ControllerTest {
     assertEquals(inProgressWatermark.getPartitionGroupId(), 1);
     assertEquals(inProgressWatermark.getSequenceNumber(), 200L);
     assertEquals(inProgressWatermark.getOffset(), 789L);
+
+    List<String> historicalSegments = waterMarkInductionResult.getHistoricalSegments();
+    assertEquals(historicalSegments.size(), 2);
+    for (String segment : historicalSegments) {
+      LLCSegmentName llcSegmentName = LLCSegmentName.of(segment);
+      if (llcSegmentName.getPartitionGroupId() == 0) {
+        assertEquals(llcSegmentName.getSequenceNumber(), 100);
+      } else {
+        assertEquals(llcSegmentName.getSequenceNumber(), 199);
+      }
+    }
 
     // recover the original values
     helixAdminField.set(_helixResourceManager, originalHelixAdmin);
