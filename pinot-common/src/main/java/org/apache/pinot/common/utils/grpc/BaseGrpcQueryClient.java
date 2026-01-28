@@ -38,6 +38,7 @@ import org.apache.pinot.common.config.GrpcConfig;
 import org.apache.pinot.common.config.TlsConfig;
 import org.apache.pinot.common.utils.tls.PinotInsecureMode;
 import org.apache.pinot.common.utils.tls.RenewableTlsUtils;
+import org.apache.pinot.common.utils.tls.TlsUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -98,6 +99,9 @@ public abstract class BaseGrpcQueryClient<REQUEST, RESPONSE> implements Closeabl
       try {
         SSLFactory sslFactory = RenewableTlsUtils.createSSLFactoryAndEnableAutoRenewalWhenUsingFileStores(tlsConfig,
             PinotInsecureMode::isPinotInInsecureMode);
+        // Runtime visibility for Platform-FIPS-JDK deployments: warn & log the actual JSSE provider/protocol once.
+        TlsUtils.warnIfNonJdkProviderConfigured("grpc.query.client", tlsConfig);
+        TlsUtils.logJsseDiagnosticsOnce("grpc.query.client", sslFactory, tlsConfig);
         SslContextBuilder sslContextBuilder = SslContextBuilder.forClient();
         sslFactory.getKeyManagerFactory().ifPresent(sslContextBuilder::keyManager);
         sslFactory.getTrustManagerFactory().ifPresent(sslContextBuilder::trustManager);
