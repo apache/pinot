@@ -1004,9 +1004,6 @@ public class PinotHelixResourceManager {
     for (SegmentZKMetadata zkMetadata : getSegmentsZKMetadata(tableNameWithType)) {
       if (zkMetadata.getStatus() == CommonConstants.Segment.Realtime.Status.DONE) {
         LLCSegmentName llcName = LLCSegmentName.of(zkMetadata.getSegmentName());
-        if (llcName == null) {
-          continue;
-        }
         int partitionGroupId = llcName.getPartitionGroupId();
         int sequenceNumber = llcName.getSequenceNumber();
         String lastCompletedSegName = partitionIdToLastLLCCompletedSegmentMap.get(partitionGroupId);
